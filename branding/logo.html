@@ -11,19 +11,16 @@
     font-weight: 100 900;
   }
   :root {
-    --night: #120a0d;
-    --panel: #1c1115;
-    --line: #34212a;
+    --night: #0e0709;
+    --panel: #170c10;
+    --line: #2e1a21;
     --paper: #f7f3f4;
     --ink: #1b0f13;
-    --muted: #9b8d92;
-    --gem-1: #ffc2cb;
-    --gem-2: #ff8fa0;
-    --gem-3: #f43f5e;
-    --gem-4: #e11d48;
-    --gem-5: #b3123a;
-    --gem-6: #7d0b2a;
-    --outline: #3b0613;
+    --muted: #a8979d;
+    --rose: #ff8fa0;
+    --ruby: #f0375c;
+    --blood: #b40f39;
+    --wine: #5e061f;
   }
   * { box-sizing: border-box; }
   body {
@@ -35,188 +32,306 @@
   main { max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
   h2 {
     margin: 56px 0 16px;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
-    letter-spacing: 0.22em;
+    letter-spacing: 0.24em;
     text-transform: uppercase;
     color: var(--muted);
   }
 
-  /* ---- The mark: a cut ruby drawn with clip-path facets ---- */
+  /* ---- The mark ---- */
   .gem {
-    --size: 120px;
-    position: relative;
+    --size: 128px;
+    display: block;
     width: var(--size);
     height: var(--size);
     flex: none;
-    filter: drop-shadow(0 calc(var(--size) * 0.06) calc(var(--size) * 0.16) rgba(244, 63, 94, 0.45));
+    overflow: visible;
+    filter: drop-shadow(0 calc(var(--size) * 0.07) calc(var(--size) * 0.14) rgba(240, 55, 92, 0.5));
   }
-  .gem i { position: absolute; inset: 0; }
-  .gem i:nth-child(1) { background: #ff5d73; clip-path: polygon(8.3% 38.3%, 31.7% 16.7%, 29.2% 38.3%); }
-  .gem i:nth-child(2) { background: var(--gem-2); clip-path: polygon(31.7% 16.7%, 50% 38.3%, 29.2% 38.3%); }
-  .gem i:nth-child(3) { background: var(--gem-1); clip-path: polygon(31.7% 16.7%, 68.3% 16.7%, 50% 38.3%); }
-  .gem i:nth-child(4) { background: var(--gem-3); clip-path: polygon(68.3% 16.7%, 70.8% 38.3%, 50% 38.3%); }
-  .gem i:nth-child(5) { background: #c81e3f; clip-path: polygon(68.3% 16.7%, 91.7% 38.3%, 70.8% 38.3%); }
-  .gem i:nth-child(6) { background: var(--gem-4); clip-path: polygon(8.3% 38.3%, 29.2% 38.3%, 50% 91.7%); }
-  .gem i:nth-child(7) { background: #f6506b; clip-path: polygon(29.2% 38.3%, 50% 38.3%, 50% 91.7%); }
-  .gem i:nth-child(8) { background: var(--gem-5); clip-path: polygon(50% 38.3%, 70.8% 38.3%, 50% 91.7%); }
-  .gem i:nth-child(9) { background: var(--gem-6); clip-path: polygon(70.8% 38.3%, 91.7% 38.3%, 50% 91.7%); }
-  /* A glint that crosses the stone now and then. */
-  .gem b {
-    position: absolute;
-    inset: 0;
-    clip-path: polygon(8.3% 38.3%, 31.7% 16.7%, 68.3% 16.7%, 91.7% 38.3%, 50% 91.7%);
-    background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.75) 50%, transparent 58%);
-    background-size: 300% 100%;
-    background-position: 130% 0;
+  /* The play button breathes; a glint crosses the stone now and then. */
+  .hero .rg-play { animation: breathe 3.2s ease-in-out infinite; transform-origin: 61px 64px; }
+  .rg-glint {
+    fill: url(#glint);
     mix-blend-mode: screen;
-    animation: glint 5s ease-in-out infinite;
+    opacity: 0;
+    animation: glint 5.5s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.6)); transform: scale(1); }
+    50% { filter: drop-shadow(0 0 9px rgba(255, 255, 255, 0.95)); transform: scale(1.035); }
   }
   @keyframes glint {
-    0%, 55% { background-position: 130% 0; }
-    80%, 100% { background-position: -30% 0; }
+    0%, 62% { opacity: 0; transform: translateX(-70px); }
+    72% { opacity: 0.85; }
+    86%, 100% { opacity: 0; transform: translateX(70px); }
   }
-  @media (prefers-reduced-motion: reduce) { .gem b { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .hero .rg-play, .rg-glint { animation: none; } }
 
   /* ---- The wordmark ---- */
-  .logo { display: inline-flex; align-items: center; gap: calc(var(--scale, 1) * 22px); }
-  .logo .gem { --size: calc(var(--scale, 1) * 120px); }
+  .logo { display: inline-flex; align-items: center; gap: calc(var(--scale, 1) * 26px); }
+  .logo .gem { --size: calc(var(--scale, 1) * 128px); }
   .word { line-height: 1; }
   .word strong {
     display: block;
-    font-size: calc(var(--scale, 1) * 72px);
+    font-size: calc(var(--scale, 1) * 78px);
     font-weight: 800;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.045em;
     color: var(--word, var(--paper));
   }
   .word strong span {
-    background: linear-gradient(135deg, var(--gem-2), var(--gem-3) 50%, var(--gem-5));
+    background: linear-gradient(135deg, var(--rose), var(--ruby) 55%, var(--blood));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
   .word small {
     display: block;
-    margin-top: calc(var(--scale, 1) * 8px);
-    padding-left: calc(var(--scale, 1) * 4px);
-    font-size: calc(var(--scale, 1) * 19px);
+    margin-top: calc(var(--scale, 1) * 12px);
+    padding-left: calc(var(--scale, 1) * 5px);
+    font-size: calc(var(--scale, 1) * 17px);
     font-weight: 600;
-    letter-spacing: 0.5em;
+    letter-spacing: 0.58em;
     color: var(--muted);
   }
 
   .hero {
+    position: relative;
     display: grid;
     place-items: center;
-    min-height: 420px;
+    min-height: 460px;
+    overflow: hidden;
     border: 1px solid var(--line);
-    border-radius: 20px;
+    border-radius: 24px;
     background:
-      radial-gradient(60% 80% at 50% 110%, rgba(225, 29, 72, 0.28), transparent 70%),
-      radial-gradient(40% 50% at 18% 0%, rgba(255, 143, 160, 0.12), transparent 70%),
+      radial-gradient(55% 75% at 50% 115%, rgba(240, 55, 92, 0.34), transparent 70%),
+      radial-gradient(35% 45% at 12% -5%, rgba(255, 143, 160, 0.14), transparent 70%),
       var(--panel);
   }
-  .hero .logo { --scale: 1.35; }
-  .tagline { margin: 28px 0 0; font-size: 18px; color: var(--muted); text-align: center; }
-  .tagline code {
-    padding: 2px 8px;
-    border-radius: 6px;
-    background: rgba(244, 63, 94, 0.14);
-    color: var(--gem-2);
+  /* Faint facets behind the logo. */
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(120deg, transparent 49.8%, rgba(255, 143, 160, 0.07) 50%, transparent 50.2%),
+      linear-gradient(60deg, transparent 49.8%, rgba(255, 143, 160, 0.07) 50%, transparent 50.2%),
+      linear-gradient(0deg, transparent 49.8%, rgba(255, 143, 160, 0.05) 50%, transparent 50.2%);
+    background-size: 340px 590px, 340px 590px, 100% 295px;
+    mask-image: radial-gradient(70% 70% at 50% 50%, #000, transparent);
+  }
+  .hero > div { position: relative; text-align: center; }
+  .hero .logo { --scale: 1.3; text-align: left; }
+  .tagline { margin: 34px 0 0; font-size: 19px; color: var(--muted); }
+  .tagline b { color: var(--paper); font-weight: 600; }
+  code {
+    padding: 3px 9px;
+    border-radius: 7px;
+    background: rgba(240, 55, 92, 0.14);
+    color: var(--rose);
     font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
-    font-size: 16px;
+    font-size: 0.86em;
   }
 
   .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
   .card {
     display: grid;
     place-items: center;
-    min-height: 200px;
+    min-height: 210px;
     padding: 24px;
     border: 1px solid var(--line);
-    border-radius: 16px;
+    border-radius: 18px;
     background: var(--panel);
   }
   .card.light { background: var(--paper); --word: var(--ink); --muted: #7b6a70; border-color: #e6dcdf; }
-  .card.red { background: linear-gradient(135deg, #e11d48, #7d0b2a); --word: #fff; --muted: #ffd3da; border: 0; }
-  .card.red .word strong span { background: none; color: #ffd3da; }
-  .card.red .gem { filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35)); }
-  .card .logo { --scale: 0.62; }
+  .card.red { background: linear-gradient(135deg, #e3204b, #6d0824); --word: #fff; --muted: #ffd0d7; border: 0; }
+  .card.red .word strong span { background: none; color: #ffd0d7; }
+  .card.red .gem { filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4)); }
+  .card .logo { --scale: 0.56; }
 
   .sizes { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; }
   .sizes figure { margin: 0; text-align: center; color: var(--muted); font-size: 12px; }
-  .sizes .tile {
+  .tile {
     display: grid;
     place-items: center;
     margin-bottom: 8px;
-    border-radius: 22%;
-    background: linear-gradient(160deg, #2a1319, #120a0d);
-    border: 1px solid var(--line);
+    border-radius: 23%;
+    background: radial-gradient(120% 120% at 20% 0%, #3a1520, #12080b 70%);
+    border: 1px solid #40222b;
   }
+  .tile .gem { filter: drop-shadow(0 3px 8px rgba(240, 55, 92, 0.45)); }
 
-  .palette { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+  .palette { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
   .swatch { border-radius: 12px; overflow: hidden; border: 1px solid var(--line); font-size: 12px; }
   .swatch div { height: 64px; }
   .swatch p { margin: 0; padding: 8px 10px; color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+  .note { color: var(--muted); font-size: 15px; line-height: 1.6; max-width: 62ch; }
 </style>
 </head>
 <body>
+<!-- Gradients shared by every copy of the mark on this page. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="rg-f1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9aa9"/><stop offset="1" stop-color="#fb5a74"/></linearGradient>
+    <linearGradient id="rg-f2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb5a74"/><stop offset="1" stop-color="#e3204b"/></linearGradient>
+    <linearGradient id="rg-f3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0375c"/><stop offset="1" stop-color="#c2143f"/></linearGradient>
+    <linearGradient id="rg-f4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b40f39"/><stop offset="1" stop-color="#8a0a2d"/></linearGradient>
+    <linearGradient id="rg-f5" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cc1643"/><stop offset="1" stop-color="#8f0b2f"/></linearGradient>
+    <linearGradient id="rg-f6" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f0b2f"/><stop offset="1" stop-color="#5e061f"/></linearGradient>
+    <linearGradient id="rg-f7" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8103b"/><stop offset="1" stop-color="#7a0928"/></linearGradient>
+    <linearGradient id="rg-f8" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff7d90"/><stop offset="1" stop-color="#e3204b"/></linearGradient>
+    <linearGradient id="rg-f9" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#ff8fa0"/><stop offset="1" stop-color="#ffd0d7"/></linearGradient>
+    <linearGradient id="rg-play" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ffd0d7"/></linearGradient>
+    <linearGradient id="glint" x1="0" y1="0" x2="1" y2="0.35"><stop offset="0.4" stop-color="#fff" stop-opacity="0"/><stop offset="0.5" stop-color="#fff" stop-opacity="0.9"/><stop offset="0.6" stop-color="#fff" stop-opacity="0"/></linearGradient>\n  </defs>
+</svg>
 <main>
   <section class="hero">
     <div>
-      <div class="logo">
-        <div class="gem"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><b></b></div>
-        <div class="word"><strong>Red<span>Gem</span></strong><small>ENGINE</small></div>
-      </div>
-      <p class="tagline">A 3D game engine you script in Ruby: <code>class Player &lt; Behaviour</code></p>
+      <div class="logo"><svg class="gem" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
+  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
+  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
+    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
+    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
+    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
+    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
+    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
+    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
+    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
+    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
+    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
+  </g>
+  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/><polygon class="rg-glint" points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5"/></svg><div class="word"><strong>Red<span>Gem</span></strong><small>GAME ENGINE</small></div></div>
+      <p class="tagline">Build the world. <b>Script it in Ruby.</b> Press play. &nbsp;<code>class Player &lt; Behaviour</code></p>
     </div>
   </section>
 
+  <h2>The idea</h2>
+  <p class="note">A ruby seen from above: nine facets around the table, the flat one on top. The table is a play
+  button, because the gem is where the game runs. It reads as a stone at any size and as "play" up close.</p>
+
   <h2>On dark, light and red</h2>
   <div class="row">
-    <div class="card">
-      <div class="logo">
-        <div class="gem"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="word"><strong>Red<span>Gem</span></strong><small>ENGINE</small></div>
-      </div>
-    </div>
-    <div class="card light">
-      <div class="logo">
-        <div class="gem"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="word"><strong>Red<span>Gem</span></strong><small>ENGINE</small></div>
-      </div>
-    </div>
-    <div class="card red">
-      <div class="logo">
-        <div class="gem"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="word"><strong>Red<span>Gem</span></strong><small>ENGINE</small></div>
-      </div>
-    </div>
+    <div class="card"><div class="logo"><svg class="gem" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
+  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
+  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
+    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
+    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
+    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
+    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
+    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
+    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
+    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
+    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
+    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
+  </g>
+  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg><div class="word"><strong>Red<span>Gem</span></strong><small>GAME ENGINE</small></div></div></div>
+    <div class="card light"><div class="logo"><svg class="gem" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
+  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
+  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
+    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
+    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
+    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
+    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
+    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
+    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
+    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
+    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
+    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
+  </g>
+  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg><div class="word"><strong>Red<span>Gem</span></strong><small>GAME ENGINE</small></div></div></div>
+    <div class="card red"><div class="logo"><svg class="gem" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
+  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
+  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
+    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
+    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
+    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
+    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
+    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
+    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
+    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
+    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
+    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
+  </g>
+  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg><div class="word"><strong>Red<span>Gem</span></strong><small>GAME ENGINE</small></div></div></div>
   </div>
 
   <h2>The mark alone, as an app icon</h2>
   <div class="sizes">
-    <figure><div class="tile" style="width:144px;height:144px"><div class="gem" style="--size:112px"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>144</figure>
-    <figure><div class="tile" style="width:96px;height:96px"><div class="gem" style="--size:74px"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>96</figure>
-    <figure><div class="tile" style="width:64px;height:64px"><div class="gem" style="--size:50px"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>64</figure>
-    <figure><div class="tile" style="width:32px;height:32px"><div class="gem" style="--size:26px"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>32</figure>
-    <figure><div class="tile" style="width:16px;height:16px;border:0;background:none"><div class="gem" style="--size:16px"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>16</figure>
+    <figure><div class="tile" style="width:160px;height:160px"><svg class="gem" style="--size:118px" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
+  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
+  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
+    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
+    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
+    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
+    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
+    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
+    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
+    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
+    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
+    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
+  </g>
+  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg></div>160</figure><figure><div class="tile" style="width:96px;height:96px"><svg class="gem" style="--size:70px" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
+  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
+  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
+    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
+    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
+    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
+    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
+    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
+    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
+    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
+    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
+    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
+  </g>
+  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg></div>96</figure><figure><div class="tile" style="width:64px;height:64px"><svg class="gem" style="--size:47px" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
+  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
+  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
+    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
+    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
+    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
+    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
+    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
+    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
+    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
+    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
+    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
+  </g>
+  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg></div>64</figure><figure><div class="tile" style="width:40px;height:40px"><svg class="gem" style="--size:30px" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
+  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
+  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
+    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
+    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
+    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
+    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
+    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
+    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
+    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
+    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
+    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
+  </g>
+  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg></div>40</figure><figure><div class="tile" style="width:24px;height:24px"><svg class="gem" style="--size:18px" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
+  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
+  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
+    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
+    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
+    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
+    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
+    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
+    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
+    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
+    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
+    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
+  </g>
+  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg></div>24</figure>
   </div>
 
   <h2>Colors</h2>
   <div class="palette">
-    <div class="swatch"><div style="background:#ffc2cb"></div><p>#ffc2cb</p></div>
-    <div class="swatch"><div style="background:#ff8fa0"></div><p>#ff8fa0</p></div>
-    <div class="swatch"><div style="background:#f43f5e"></div><p>#f43f5e</p></div>
-    <div class="swatch"><div style="background:#e11d48"></div><p>#e11d48</p></div>
-    <div class="swatch"><div style="background:#b3123a"></div><p>#b3123a</p></div>
-    <div class="swatch"><div style="background:#7d0b2a"></div><p>#7d0b2a</p></div>
-    <div class="swatch"><div style="background:#120a0d"></div><p>#120a0d</p></div>
-    <div class="swatch"><div style="background:#f7f3f4"></div><p>#f7f3f4</p></div>
+    <div class="swatch"><div style="background:#ffd0d7"></div><p>#ffd0d7</p></div><div class="swatch"><div style="background:#ff8fa0"></div><p>#ff8fa0</p></div><div class="swatch"><div style="background:#f0375c"></div><p>#f0375c</p></div><div class="swatch"><div style="background:#e3204b"></div><p>#e3204b</p></div><div class="swatch"><div style="background:#b40f39"></div><p>#b40f39</p></div><div class="swatch"><div style="background:#5e061f"></div><p>#5e061f</p></div><div class="swatch"><div style="background:#0e0709"></div><p>#0e0709</p></div><div class="swatch"><div style="background:#f7f3f4"></div><p>#f7f3f4</p></div>
   </div>
 
   <h2>Files</h2>
-  <p class="tagline" style="text-align:left;font-size:15px"><code>redgem-mark.svg</code> the gem alone &nbsp; <code>redgem-logo.svg</code> gem and name, for dark backgrounds</p>
+  <p class="note"><code>redgem-mark.svg</code> the gem alone &nbsp; <code>redgem-logo.svg</code> gem and name, for dark backgrounds</p>
 </main>
 </body>
 </html>
