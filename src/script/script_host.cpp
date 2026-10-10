@@ -1,0 +1,260 @@
+#include "script/script_host.hpp"
+
+#include <mruby.h>
+#include <mruby/array.h>
+#include <mruby/class.h>
+#include <mruby/variable.h>
+
+#include <fstream>
+#include <sstream>
+
+#include "core/config.hpp"
+#include "core/log.hpp"
+#include "generated/ruby_prelude.hpp"
+#include "script/bindings/bindings.hpp"
+#include "script/script_naming.hpp"
+
+namespace redgem {
+namespace {
+
+constexpr const char* kObjectsCacheGlobal = "$__redgem_objects";
+
+}  // namespace
+
+ScriptHost& script_host(mrb_state* mrb) { return *static_cast<ScriptHost*>(mrb->ud); }
+
+ScriptHost::ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir)
+    : context_(context), scripts_dir_(std::move(scripts_dir)) {
+  mrb_state* mrb = vm_.state();
+  mrb->ud = this;
+  objects_cache_ = mrb_ary_new(mrb);
+  mrb_gv_set(mrb, mrb_intern_cstr(mrb, kObjectsCacheGlobal), objects_cache_);
+  install_bindings(mrb);
+  load_prelude();
+}
+
+void ScriptHost::load_prelude() {
+  for (const auto& source : generated::kPreludeSources) {
+    const RubyResult result = vm_.eval(source.code, source.file_name);
+    if (!result.ok) report_error(std::string("prelude ") + source.file_name, result.error);
+  }
+}
+
+void ScriptHost::report_error(const std::string& where, const std::string& error) {
+  ++error_count_;
+  log::error(where + ": " + error);
+}
+
+RubyResult ScriptHost::eval(const std::string& code, const std::string& file_name) {
+  return vm_.eval(code, file_name);
+}
+
+RubyResult ScriptHost::load_file(const std::filesystem::path& path) {
+  std::ifstream in(path);
+  if (!in) {
+    RubyResult result;
+    result.ok = false;
+    result.error = "cannot read " + path.string();
+    return result;
+  }
+  std::stringstream buffer;
+  buffer << in.rdbuf();
+  return vm_.eval(buffer.str(), path.string());
+}
+
+mrb_value ScriptHost::object_value(ObjectId object) {
+  mrb_state* mrb = vm_.state();
+  if (object < 0) return mrb_nil_value();
+  mrb_value cached = mrb_ary_entry(objects_cache_, object);
+  if (!mrb_nil_p(cached)) return cached;
+  RClass* klass = mrb_class_get(mrb, "GameObject");
+  mrb_value wrapper = mrb_obj_value(mrb_obj_alloc(mrb, MRB_TT_OBJECT, klass));
+  mrb_iv_set(mrb, wrapper, mrb_intern_lit(mrb, "@id"), mrb_int_value(mrb, object));
+  mrb_iv_set(mrb, wrapper, mrb_intern_lit(mrb, "@behaviours"), mrb_ary_new(mrb));
+  mrb_ary_set(mrb, objects_cache_, object, wrapper);
+  return wrapper;
+}
+
+void ScriptHost::attach_scripts() {
+  for (const ObjectId id : context_.scene->alive_ids()) attach_object(id);
+}
+
+void ScriptHost::reset_scene() {
+  mrb_state* mrb = vm_.state();
+  behaviours_.clear();
+  vm_.release_kept();
+  objects_cache_ = mrb_ary_new(mrb);
+  mrb_gv_set(mrb, mrb_intern_cstr(mrb, kObjectsCacheGlobal), objects_cache_);
+}
+
+void ScriptHost::attach_object(ObjectId id) {
+  if (context_.scene->is_prefab(id)) return;  // templates stay inert until spawned
+  const auto scripts = get_string(context_.scene->at(id).props, config::kPropScript);
+  if (!scripts) return;
+  for (const std::string& script : split_script_list(*scripts)) attach(id, script);
+}
+
+bool ScriptHost::require_script(const std::string& script) {
+  if (loaded_scripts_.count(script) != 0) return true;
+  // A script that uses its own class before defining it would otherwise load itself forever.
+  if (!loading_scripts_.insert(script).second) return false;
+  const std::filesystem::path path = scripts_dir_ / script;
+  const RubyResult result = load_file(path);
+  loading_scripts_.erase(script);
+  if (!result.ok) {
+    report_error("loading " + path.string(), result.error);
+    return false;
+  }
+  loaded_scripts_.insert(script);
+  return true;
+}
+
+void ScriptHost::attach(ObjectId object, const std::string& script) {
+  mrb_state* mrb = vm_.state();
+  const std::string& object_name = context_.scene->at(object).name;
+  if (!require_script(script)) return;
+  const std::string class_name = class_name_for_script(script);
+  if (!mrb_class_defined(mrb, class_name.c_str())) {
+    report_error("object '" + object_name + "'", script + " does not define class " + class_name);
+    return;
+  }
+  instantiate(object, mrb_class_get(mrb, class_name.c_str()), class_name);
+}
+
+mrb_value ScriptHost::instantiate(ObjectId object, RClass* klass, const std::string& class_name) {
+  mrb_state* mrb = vm_.state();
+  const std::string& object_name = context_.scene->at(object).name;
+  if (!mrb_obj_is_kind_of(mrb, mrb_obj_value(klass), mrb->class_class) ||
+      !mrb_class_defined(mrb, "Behaviour") ||
+      !mrb_test(vm_.call(mrb_obj_value(klass), "<=", {mrb_obj_value(mrb_class_get(mrb, "Behaviour"))}).value)) {
+    report_error("object '" + object_name + "'", class_name + " must inherit from Behaviour");
+    return mrb_nil_value();
+  }
+  const RubyResult instance = vm_.call(mrb_obj_value(klass), "new");
+  if (!instance.ok) {
+    report_error(class_name + ".new on '" + object_name + "'", instance.error);
+    return mrb_nil_value();
+  }
+  const RubyResult attached = vm_.call(instance.value, "__attach", {object_value(object)});
+  if (!attached.ok) {
+    report_error(class_name + "#__attach", attached.error);
+    return mrb_nil_value();
+  }
+  vm_.keep_alive(instance.value);
+  behaviours_.push_back({object, instance.value, class_name, false, true});
+  return instance.value;
+}
+
+mrb_value ScriptHost::add_behaviour(ObjectId object, mrb_value klass) {
+  mrb_state* mrb = vm_.state();
+  if (!mrb_class_p(klass)) {
+    report_error("object '" + context_.scene->at(object).name + "'", "add_component needs a Behaviour class");
+    return mrb_nil_value();
+  }
+  return instantiate(object, mrb_class_ptr(klass), mrb_class_name(mrb, mrb_class_ptr(klass)));
+}
+
+bool ScriptHost::require_class(const std::string& class_name) {
+  const std::string script = script_for_class_name(class_name);
+  std::error_code fs_error;
+  if (!std::filesystem::exists(scripts_dir_ / script, fs_error)) return false;
+  return require_script(script) && mrb_class_defined(vm_.state(), class_name.c_str());
+}
+
+void ScriptHost::run_scene_script(const std::string& scene_name) {
+  mrb_state* mrb = vm_.state();
+  const std::string script = scene_script_for(scene_name);
+  std::error_code fs_error;
+  if (!std::filesystem::exists(scripts_dir_ / script, fs_error) || !require_script(script)) return;
+  const std::string class_name = class_name_for_script(script);
+  if (!mrb_class_defined(mrb, class_name.c_str())) {
+    report_error("scene '" + scene_name + "'", script + " does not define class " + class_name);
+    return;
+  }
+  const int arena = mrb_gc_arena_save(mrb);
+  const RubyResult ran = vm_.call(mrb_obj_value(mrb_class_get(mrb, "SceneScript")), "__run",
+                                  {mrb_obj_value(mrb_class_get(mrb, class_name.c_str()))});
+  mrb_gc_arena_restore(mrb, arena);
+  if (!ran.ok) report_error(class_name + "#setup", ran.error);
+}
+
+bool ScriptHost::runnable(const BehaviourSlot& slot) const {
+  return slot.enabled && context_.scene->is_alive(slot.object);
+}
+
+void ScriptHost::invoke(std::size_t index, const char* method, std::initializer_list<mrb_value> args) {
+  // Callbacks may spawn objects, which appends behaviours: never hold a reference across the call.
+  const mrb_value instance = behaviours_[index].instance;
+  const int arena = mrb_gc_arena_save(vm_.state());
+  const RubyResult result = vm_.call(instance, method, args);
+  mrb_gc_arena_restore(vm_.state(), arena);
+  if (!result.ok) {
+    // A failing script keeps the game running; the behaviour is disabled.
+    BehaviourSlot& slot = behaviours_[index];
+    slot.enabled = false;
+    report_error(slot.class_name + "#" + method + " on '" + context_.scene->at(slot.object).name +
+                     "' (behaviour disabled)",
+                 result.error);
+  }
+}
+
+void ScriptHost::invoke_on_object(ObjectId object, const char* method, std::initializer_list<mrb_value> args) {
+  for (std::size_t i = 0; i < behaviours_.size(); ++i) {
+    if (behaviours_[i].object == object && runnable(behaviours_[i]) && behaviours_[i].started) {
+      invoke(i, method, args);
+    }
+  }
+}
+
+void ScriptHost::start_pending() {
+  for (std::size_t i = 0; i < behaviours_.size(); ++i) {
+    if (behaviours_[i].started || !runnable(behaviours_[i])) continue;
+    behaviours_[i].started = true;
+    invoke(i, "start", {});
+  }
+}
+
+void ScriptHost::fixed_update(float dt) {
+  const mrb_value delta = mrb_float_value(vm_.state(), dt);
+  for (std::size_t i = 0; i < behaviours_.size(); ++i) {
+    if (runnable(behaviours_[i]) && behaviours_[i].started) invoke(i, "fixed_update", {delta});
+  }
+}
+
+void ScriptHost::update(float dt) {
+  const mrb_value delta = mrb_float_value(vm_.state(), dt);
+  for (std::size_t i = 0; i < behaviours_.size(); ++i) {
+    if (runnable(behaviours_[i]) && behaviours_[i].started) invoke(i, "update", {delta});
+  }
+}
+
+void ScriptHost::dispatch(const ContactEvent& event) {
+  const mrb_value self = object_value(event.self);
+  const mrb_value other = object_value(event.other);
+  if (event.trigger) {
+    const char* method = event.phase == ContactPhase::Enter ? "on_trigger_enter" : "on_trigger_exit";
+    // Both the trigger and the object that entered it are notified.
+    invoke_on_object(event.self, method, {other});
+    invoke_on_object(event.other, method, {self});
+  } else {
+    const char* method = event.phase == ContactPhase::Enter ? "on_collision_enter" : "on_collision_exit";
+    invoke_on_object(event.self, method, {other});
+  }
+}
+
+void ScriptHost::on_destroyed(ObjectId object) {
+  for (std::size_t i = 0; i < behaviours_.size(); ++i) {
+    if (behaviours_[i].object == object && behaviours_[i].enabled && behaviours_[i].started) {
+      invoke(i, "on_destroy", {});
+    }
+  }
+}
+
+void ScriptHost::detach(ObjectId object) {
+  for (BehaviourSlot& slot : behaviours_) {
+    if (slot.object == object) slot.enabled = false;
+  }
+  vm_.call(object_value(object), "__remove_behaviours");
+}
+
+}  // namespace redgem
