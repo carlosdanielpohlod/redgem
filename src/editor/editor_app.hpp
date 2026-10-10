@@ -84,6 +84,9 @@ class EditorApp {
   ObjectId pick_at(float x, float y);
   float viewport_width() const;
   float viewport_height() const;
+  // Makes every frame count as this long, whatever it really took (tests and recordings step the
+  // editor at an even pace). nullopt goes back to real time.
+  void set_frame_seconds(std::optional<float> seconds) { fixed_frame_seconds_ = seconds; }
   // Writes the whole editor window to a PNG at the end of the next frame.
   void request_screenshot(const std::filesystem::path& path) { screenshot_ = path; }
 
@@ -106,6 +109,7 @@ class EditorApp {
   void update_title();
   void draw_dialogs();
   bool editing_blocked() const;
+  float frame_seconds() const;
 
   std::unique_ptr<ConsoleLog> console_;
   std::unique_ptr<Renderer> renderer_;
@@ -126,6 +130,7 @@ class EditorApp {
   EditorExit exit_action_ = EditorExit::Quit;
   bool shortcuts_open_ = false;
   std::optional<std::filesystem::path> screenshot_;
+  std::optional<float> fixed_frame_seconds_;
   struct Viewport;
   std::unique_ptr<Viewport> viewport_;
   long long frame_count_ = 0;

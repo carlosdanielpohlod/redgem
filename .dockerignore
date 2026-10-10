@@ -1,0 +1,13 @@
+.git
+.private
+.deps
+.cache
+.claude
+build
+dist
+screenshots
+games/*-build
+games/showcase/scene.glb
+showcase/*.blend
+**/*.blend1
+**/__pycache__

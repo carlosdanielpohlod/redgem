@@ -58,6 +58,7 @@ TEST_CASE("the editor opens, edits, plays, stops and saves a game") {
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
   EditorSession& session = app.session();
+  app.set_frame_seconds(config::kFixedDeltaSeconds);  // the game advances the same on any machine
   run(app, kWarmupFrames);
   app.request_screenshot(screenshot("editor_open"));
   run(app, 1);

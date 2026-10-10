@@ -3,335 +3,135 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RedGem Engine: logo</title>
+<title>RedGem 3D Engine: logo</title>
 <style>
-  @font-face {
-    font-family: "Inter";
-    src: url("../assets/editor/fonts/InterVariable.ttf") format("truetype");
-    font-weight: 100 900;
-  }
-  :root {
-    --night: #0e0709;
-    --panel: #170c10;
-    --line: #2e1a21;
-    --paper: #f7f3f4;
-    --ink: #1b0f13;
-    --muted: #a8979d;
-    --rose: #ff8fa0;
-    --ruby: #f0375c;
-    --blood: #b40f39;
-    --wine: #5e061f;
-  }
+  @font-face { font-family: "Inter"; src: url("../assets/editor/fonts/InterVariable.ttf") format("truetype"); font-weight: 100 900; }
+  :root { --night: #0b0608; --panel: #130a0d; --line: #2c181e; --paper: #f7f3f4; --ink: #1b0f13; --muted: #a8979d; --ruby: #f0375c; }
   * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--night);
-    color: var(--paper);
-    font-family: "Inter", "Segoe UI", Helvetica, Arial, sans-serif;
-  }
+  body { margin: 0; background: var(--night); color: var(--paper); font-family: "Inter", "Segoe UI", Helvetica, Arial, sans-serif; }
   main { max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
-  h2 {
-    margin: 56px 0 16px;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.24em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  /* ---- The mark ---- */
-  .gem {
-    --size: 128px;
-    display: block;
-    width: var(--size);
-    height: var(--size);
-    flex: none;
-    overflow: visible;
-    filter: drop-shadow(0 calc(var(--size) * 0.07) calc(var(--size) * 0.14) rgba(240, 55, 92, 0.5));
-  }
-  /* The play button breathes; a glint crosses the stone now and then. */
-  .hero .rg-play { animation: breathe 3.2s ease-in-out infinite; transform-origin: 61px 64px; }
-  .rg-glint {
-    fill: url(#glint);
-    mix-blend-mode: screen;
-    opacity: 0;
-    animation: glint 5.5s ease-in-out infinite;
-  }
-  @keyframes breathe {
-    0%, 100% { filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.6)); transform: scale(1); }
-    50% { filter: drop-shadow(0 0 9px rgba(255, 255, 255, 0.95)); transform: scale(1.035); }
-  }
-  @keyframes glint {
-    0%, 62% { opacity: 0; transform: translateX(-70px); }
-    72% { opacity: 0.85; }
-    86%, 100% { opacity: 0; transform: translateX(70px); }
-  }
-  @media (prefers-reduced-motion: reduce) { .hero .rg-play, .rg-glint { animation: none; } }
-
-  /* ---- The wordmark ---- */
-  .logo { display: inline-flex; align-items: center; gap: calc(var(--scale, 1) * 26px); }
-  .logo .gem { --size: calc(var(--scale, 1) * 128px); }
+  h2 { margin: 56px 0 16px; font-size: 12px; font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase; color: var(--muted); }
+  .gem { --size: 120px; display: block; flex: none; width: var(--size); height: var(--size); overflow: visible; }
+  .logo { display: inline-flex; align-items: center; gap: calc(var(--scale, 1) * 20px); }
+  .logo .gem { --size: calc(var(--scale, 1) * 120px); }
   .word { line-height: 1; }
   .word strong {
-    display: block;
-    font-size: calc(var(--scale, 1) * 78px);
-    font-weight: 800;
-    letter-spacing: -0.045em;
-    color: var(--word, var(--paper));
+    display: block; font-size: calc(var(--scale, 1) * 80px); font-weight: 900; letter-spacing: -0.04em;
+    transform: skewX(-9deg); transform-origin: left bottom; color: var(--word, var(--paper));
   }
-  .word strong span {
-    background: linear-gradient(135deg, var(--rose), var(--ruby) 55%, var(--blood));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
+  .word strong span { color: var(--gem, var(--ruby)); }
   .word small {
-    display: block;
-    margin-top: calc(var(--scale, 1) * 12px);
-    padding-left: calc(var(--scale, 1) * 5px);
-    font-size: calc(var(--scale, 1) * 17px);
-    font-weight: 600;
-    letter-spacing: 0.58em;
-    color: var(--muted);
+    display: block; margin-top: calc(var(--scale, 1) * 12px); font-size: calc(var(--scale, 1) * 16px);
+    font-weight: 600; letter-spacing: 0.84em; color: var(--muted);
   }
-
   .hero {
-    position: relative;
-    display: grid;
-    place-items: center;
-    min-height: 460px;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 24px;
-    background:
-      radial-gradient(55% 75% at 50% 115%, rgba(240, 55, 92, 0.34), transparent 70%),
-      radial-gradient(35% 45% at 12% -5%, rgba(255, 143, 160, 0.14), transparent 70%),
-      var(--panel);
+    display: grid; place-items: center; min-height: 420px; border: 1px solid var(--line); border-radius: 24px;
+    background: radial-gradient(55% 75% at 50% 118%, rgba(240, 55, 92, 0.3), transparent 70%), var(--panel);
   }
-  /* Faint facets behind the logo. */
-  .hero::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(120deg, transparent 49.8%, rgba(255, 143, 160, 0.07) 50%, transparent 50.2%),
-      linear-gradient(60deg, transparent 49.8%, rgba(255, 143, 160, 0.07) 50%, transparent 50.2%),
-      linear-gradient(0deg, transparent 49.8%, rgba(255, 143, 160, 0.05) 50%, transparent 50.2%);
-    background-size: 340px 590px, 340px 590px, 100% 295px;
-    mask-image: radial-gradient(70% 70% at 50% 50%, #000, transparent);
-  }
-  .hero > div { position: relative; text-align: center; }
-  .hero .logo { --scale: 1.3; text-align: left; }
-  .tagline { margin: 34px 0 0; font-size: 19px; color: var(--muted); }
-  .tagline b { color: var(--paper); font-weight: 600; }
-  code {
-    padding: 3px 9px;
-    border-radius: 7px;
-    background: rgba(240, 55, 92, 0.14);
-    color: var(--rose);
-    font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
-    font-size: 0.86em;
-  }
-
+  .hero .logo { --scale: 1.3; }
+  /* The wire half glows on the hero; the plain files do without it. */
+  .hero .gem { filter: drop-shadow(0 0 10px rgba(255, 77, 109, 0.55)); }
   .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-  .card {
-    display: grid;
-    place-items: center;
-    min-height: 210px;
-    padding: 24px;
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    background: var(--panel);
-  }
+  .card { display: grid; place-items: center; min-height: 200px; padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); }
   .card.light { background: var(--paper); --word: var(--ink); --muted: #7b6a70; border-color: #e6dcdf; }
-  .card.red { background: linear-gradient(135deg, #e3204b, #6d0824); --word: #fff; --muted: #ffd0d7; border: 0; }
-  .card.red .word strong span { background: none; color: #ffd0d7; }
-  .card.red .gem { filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4)); }
-  .card .logo { --scale: 0.56; }
-
+  .card.red { background: linear-gradient(135deg, #e3204b, #6d0824); --word: #fff; --gem: #ffd0d7; --muted: #ffd0d7; border: 0; }
+  .card.red .gem polygon[fill="#e3204b"], .card.red .gem polygon[fill="#f0375c"] { fill: #ff8fa0; }
+  .card.red .gem g[fill="none"] { stroke: #fff; }
+  .card .logo { --scale: 0.54; }
   .sizes { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; }
   .sizes figure { margin: 0; text-align: center; color: var(--muted); font-size: 12px; }
-  .tile {
-    display: grid;
-    place-items: center;
-    margin-bottom: 8px;
-    border-radius: 23%;
-    background: radial-gradient(120% 120% at 20% 0%, #3a1520, #12080b 70%);
-    border: 1px solid #40222b;
-  }
-  .tile .gem { filter: drop-shadow(0 3px 8px rgba(240, 55, 92, 0.45)); }
-
+  .tile { display: grid; place-items: center; margin-bottom: 8px; border-radius: 23%; border: 1px solid #40222b;
+           background: radial-gradient(120% 120% at 20% 0%, #33131c, #100709 70%); }
   .palette { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
   .swatch { border-radius: 12px; overflow: hidden; border: 1px solid var(--line); font-size: 12px; }
-  .swatch div { height: 64px; }
+  .swatch div { height: 60px; }
   .swatch p { margin: 0; padding: 8px 10px; color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
-  .note { color: var(--muted); font-size: 15px; line-height: 1.6; max-width: 62ch; }
+  .note { color: var(--muted); font-size: 15px; line-height: 1.6; max-width: 64ch; }
+  code { padding: 2px 8px; border-radius: 6px; background: rgba(240, 55, 92, 0.14); color: #ff8fa0; font-family: ui-monospace, Menlo, monospace; font-size: 0.9em; }
 </style>
 </head>
 <body>
-<!-- Gradients shared by every copy of the mark on this page. -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <linearGradient id="rg-f1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9aa9"/><stop offset="1" stop-color="#fb5a74"/></linearGradient>
-    <linearGradient id="rg-f2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb5a74"/><stop offset="1" stop-color="#e3204b"/></linearGradient>
-    <linearGradient id="rg-f3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f0375c"/><stop offset="1" stop-color="#c2143f"/></linearGradient>
-    <linearGradient id="rg-f4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b40f39"/><stop offset="1" stop-color="#8a0a2d"/></linearGradient>
-    <linearGradient id="rg-f5" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cc1643"/><stop offset="1" stop-color="#8f0b2f"/></linearGradient>
-    <linearGradient id="rg-f6" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f0b2f"/><stop offset="1" stop-color="#5e061f"/></linearGradient>
-    <linearGradient id="rg-f7" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8103b"/><stop offset="1" stop-color="#7a0928"/></linearGradient>
-    <linearGradient id="rg-f8" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff7d90"/><stop offset="1" stop-color="#e3204b"/></linearGradient>
-    <linearGradient id="rg-f9" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#ff8fa0"/><stop offset="1" stop-color="#ffd0d7"/></linearGradient>
-    <linearGradient id="rg-play" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#ffd0d7"/></linearGradient>
-    <linearGradient id="glint" x1="0" y1="0" x2="1" y2="0.35"><stop offset="0.4" stop-color="#fff" stop-opacity="0"/><stop offset="0.5" stop-color="#fff" stop-opacity="0.9"/><stop offset="0.6" stop-color="#fff" stop-opacity="0"/></linearGradient>\n  </defs>
-</svg>
 <main>
-  <section class="hero">
-    <div>
-      <div class="logo"><svg class="gem" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
-  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
-  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
-    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
-    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
-    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
-    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
-    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
-    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
-    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
-    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
-    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
-  </g>
-  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/><polygon class="rg-glint" points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5"/></svg><div class="word"><strong>Red<span>Gem</span></strong><small>GAME ENGINE</small></div></div>
-      <p class="tagline">Build the world. <b>Script it in Ruby.</b> Press play. &nbsp;<code>class Player &lt; Behaviour</code></p>
-    </div>
-  </section>
+  <section class="hero"><div class="logo"><svg class="gem" viewBox="0 0 120 120" aria-hidden="true"><defs>
+    <clipPath id="g-wire"><polygon points="0,0 68,0 50,120 0,120"/></clipPath>
+    <clipPath id="g-solid"><polygon points="68,0 120,0 120,120 50,120"/></clipPath>
+  </defs>
+  <!-- A ruby, half wireframe and half rendered: what a 3D engine does. -->
+  <g clip-path="url(#g-wire)" fill="none" stroke="#ff5a74" stroke-width="2.6" stroke-linejoin="round"><polygon points="10,46 36,18 44,46"/><polygon points="36,18 84,18 76,46 44,46"/><polygon points="84,18 110,46 76,46"/><polygon points="10,46 44,46 60,108"/><polygon points="44,46 76,46 60,108"/><polygon points="76,46 110,46 60,108"/></g>
+  <g clip-path="url(#g-solid)"><polygon points="10,46 36,18 44,46" fill="#ff8fa0"/><polygon points="36,18 84,18 76,46 44,46" fill="#ffd0d7"/><polygon points="84,18 110,46 76,46" fill="#b40f39"/><polygon points="10,46 44,46 60,108" fill="#f0375c"/><polygon points="44,46 76,46 60,108" fill="#e3204b"/><polygon points="76,46 110,46 60,108" fill="#7a0928"/></g></svg><div class="word"><strong>RED<span>GEM</span></strong><small>3D ENGINE</small></div></div></section>
 
   <h2>The idea</h2>
-  <p class="note">A ruby seen from above: nine facets around the table, the flat one on top. The table is a play
-  button, because the gem is where the game runs. It reads as a stone at any size and as "play" up close.</p>
+  <p class="note">A ruby, half wireframe and half rendered: the left side is the model, the right side is what the
+  engine makes of it. The name is set heavy and slanted, RED in white and GEM in ruby.</p>
 
   <h2>On dark, light and red</h2>
   <div class="row">
-    <div class="card"><div class="logo"><svg class="gem" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
-  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
-  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
-    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
-    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
-    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
-    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
-    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
-    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
-    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
-    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
-    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
-  </g>
-  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg><div class="word"><strong>Red<span>Gem</span></strong><small>GAME ENGINE</small></div></div></div>
-    <div class="card light"><div class="logo"><svg class="gem" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
-  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
-  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
-    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
-    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
-    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
-    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
-    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
-    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
-    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
-    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
-    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
-  </g>
-  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg><div class="word"><strong>Red<span>Gem</span></strong><small>GAME ENGINE</small></div></div></div>
-    <div class="card red"><div class="logo"><svg class="gem" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
-  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
-  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
-    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
-    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
-    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
-    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
-    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
-    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
-    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
-    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
-    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
-  </g>
-  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg><div class="word"><strong>Red<span>Gem</span></strong><small>GAME ENGINE</small></div></div></div>
+    <div class="card"><div class="logo"><svg class="gem" viewBox="0 0 120 120" aria-hidden="true"><defs>
+    <clipPath id="g-wire"><polygon points="0,0 68,0 50,120 0,120"/></clipPath>
+    <clipPath id="g-solid"><polygon points="68,0 120,0 120,120 50,120"/></clipPath>
+  </defs>
+  <!-- A ruby, half wireframe and half rendered: what a 3D engine does. -->
+  <g clip-path="url(#g-wire)" fill="none" stroke="#ff5a74" stroke-width="2.6" stroke-linejoin="round"><polygon points="10,46 36,18 44,46"/><polygon points="36,18 84,18 76,46 44,46"/><polygon points="84,18 110,46 76,46"/><polygon points="10,46 44,46 60,108"/><polygon points="44,46 76,46 60,108"/><polygon points="76,46 110,46 60,108"/></g>
+  <g clip-path="url(#g-solid)"><polygon points="10,46 36,18 44,46" fill="#ff8fa0"/><polygon points="36,18 84,18 76,46 44,46" fill="#ffd0d7"/><polygon points="84,18 110,46 76,46" fill="#b40f39"/><polygon points="10,46 44,46 60,108" fill="#f0375c"/><polygon points="44,46 76,46 60,108" fill="#e3204b"/><polygon points="76,46 110,46 60,108" fill="#7a0928"/></g></svg><div class="word"><strong>RED<span>GEM</span></strong><small>3D ENGINE</small></div></div></div>
+    <div class="card light"><div class="logo"><svg class="gem" viewBox="0 0 120 120" aria-hidden="true"><defs>
+    <clipPath id="g-wire"><polygon points="0,0 68,0 50,120 0,120"/></clipPath>
+    <clipPath id="g-solid"><polygon points="68,0 120,0 120,120 50,120"/></clipPath>
+  </defs>
+  <!-- A ruby, half wireframe and half rendered: what a 3D engine does. -->
+  <g clip-path="url(#g-wire)" fill="none" stroke="#ff5a74" stroke-width="2.6" stroke-linejoin="round"><polygon points="10,46 36,18 44,46"/><polygon points="36,18 84,18 76,46 44,46"/><polygon points="84,18 110,46 76,46"/><polygon points="10,46 44,46 60,108"/><polygon points="44,46 76,46 60,108"/><polygon points="76,46 110,46 60,108"/></g>
+  <g clip-path="url(#g-solid)"><polygon points="10,46 36,18 44,46" fill="#ff8fa0"/><polygon points="36,18 84,18 76,46 44,46" fill="#ffd0d7"/><polygon points="84,18 110,46 76,46" fill="#b40f39"/><polygon points="10,46 44,46 60,108" fill="#f0375c"/><polygon points="44,46 76,46 60,108" fill="#e3204b"/><polygon points="76,46 110,46 60,108" fill="#7a0928"/></g></svg><div class="word"><strong>RED<span>GEM</span></strong><small>3D ENGINE</small></div></div></div>
+    <div class="card red"><div class="logo"><svg class="gem" viewBox="0 0 120 120" aria-hidden="true"><defs>
+    <clipPath id="g-wire"><polygon points="0,0 68,0 50,120 0,120"/></clipPath>
+    <clipPath id="g-solid"><polygon points="68,0 120,0 120,120 50,120"/></clipPath>
+  </defs>
+  <!-- A ruby, half wireframe and half rendered: what a 3D engine does. -->
+  <g clip-path="url(#g-wire)" fill="none" stroke="#ff5a74" stroke-width="2.6" stroke-linejoin="round"><polygon points="10,46 36,18 44,46"/><polygon points="36,18 84,18 76,46 44,46"/><polygon points="84,18 110,46 76,46"/><polygon points="10,46 44,46 60,108"/><polygon points="44,46 76,46 60,108"/><polygon points="76,46 110,46 60,108"/></g>
+  <g clip-path="url(#g-solid)"><polygon points="10,46 36,18 44,46" fill="#ff8fa0"/><polygon points="36,18 84,18 76,46 44,46" fill="#ffd0d7"/><polygon points="84,18 110,46 76,46" fill="#b40f39"/><polygon points="10,46 44,46 60,108" fill="#f0375c"/><polygon points="44,46 76,46 60,108" fill="#e3204b"/><polygon points="76,46 110,46 60,108" fill="#7a0928"/></g></svg><div class="word"><strong>RED<span>GEM</span></strong><small>3D ENGINE</small></div></div></div>
   </div>
 
   <h2>The mark alone, as an app icon</h2>
   <div class="sizes">
-    <figure><div class="tile" style="width:160px;height:160px"><svg class="gem" style="--size:118px" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
-  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
-  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
-    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
-    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
-    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
-    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
-    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
-    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
-    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
-    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
-    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
-  </g>
-  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg></div>160</figure><figure><div class="tile" style="width:96px;height:96px"><svg class="gem" style="--size:70px" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
-  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
-  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
-    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
-    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
-    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
-    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
-    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
-    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
-    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
-    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
-    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
-  </g>
-  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg></div>96</figure><figure><div class="tile" style="width:64px;height:64px"><svg class="gem" style="--size:47px" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
-  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
-  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
-    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
-    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
-    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
-    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
-    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
-    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
-    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
-    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
-    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
-  </g>
-  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg></div>64</figure><figure><div class="tile" style="width:40px;height:40px"><svg class="gem" style="--size:30px" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
-  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
-  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
-    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
-    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
-    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
-    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
-    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
-    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
-    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
-    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
-    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
-  </g>
-  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg></div>40</figure><figure><div class="tile" style="width:24px;height:24px"><svg class="gem" style="--size:18px" viewBox="0 0 128 128" aria-hidden="true"><!-- A ruby seen from above. Its table, the flat facet on top, is a play button. -->
-  <polygon points="120,64 92,112.5 36,112.5 8,64 36,15.5 92,15.5" fill="#5e061f" stroke="#5e061f" stroke-width="9" stroke-linejoin="round"/>
-  <g stroke="#ffe3e8" stroke-opacity="0.28" stroke-width="0.9" stroke-linejoin="round">
-    <polygon points="36,15.5 92,15.5 46,38" fill="url(#rg-f1)"/>
-    <polygon points="92,15.5 92,64 46,38" fill="url(#rg-f2)"/>
-    <polygon points="92,15.5 120,64 92,64" fill="url(#rg-f3)"/>
-    <polygon points="120,64 92,112.5 92,64" fill="url(#rg-f4)"/>
-    <polygon points="92,112.5 46,90 92,64" fill="url(#rg-f5)"/>
-    <polygon points="92,112.5 36,112.5 46,90" fill="url(#rg-f6)"/>
-    <polygon points="36,112.5 8,64 46,90" fill="url(#rg-f7)"/>
-    <polygon points="8,64 46,38 46,90" fill="url(#rg-f8)"/>
-    <polygon points="8,64 36,15.5 46,38" fill="url(#rg-f9)"/>
-  </g>
-  <polygon class="rg-play" points="46,38 92,64 46,90" fill="url(#rg-play)" stroke="#ffffff" stroke-width="2.4" stroke-linejoin="round"/></svg></div>24</figure>
+    <figure><div class="tile" style="width:160px;height:160px"><svg style="--size:120px" class="gem" viewBox="0 0 120 120" aria-hidden="true"><defs>
+    <clipPath id="g-wire"><polygon points="0,0 68,0 50,120 0,120"/></clipPath>
+    <clipPath id="g-solid"><polygon points="68,0 120,0 120,120 50,120"/></clipPath>
+  </defs>
+  <!-- A ruby, half wireframe and half rendered: what a 3D engine does. -->
+  <g clip-path="url(#g-wire)" fill="none" stroke="#ff5a74" stroke-width="2.6" stroke-linejoin="round"><polygon points="10,46 36,18 44,46"/><polygon points="36,18 84,18 76,46 44,46"/><polygon points="84,18 110,46 76,46"/><polygon points="10,46 44,46 60,108"/><polygon points="44,46 76,46 60,108"/><polygon points="76,46 110,46 60,108"/></g>
+  <g clip-path="url(#g-solid)"><polygon points="10,46 36,18 44,46" fill="#ff8fa0"/><polygon points="36,18 84,18 76,46 44,46" fill="#ffd0d7"/><polygon points="84,18 110,46 76,46" fill="#b40f39"/><polygon points="10,46 44,46 60,108" fill="#f0375c"/><polygon points="44,46 76,46 60,108" fill="#e3204b"/><polygon points="76,46 110,46 60,108" fill="#7a0928"/></g></svg></div>160</figure><figure><div class="tile" style="width:96px;height:96px"><svg style="--size:72px" class="gem" viewBox="0 0 120 120" aria-hidden="true"><defs>
+    <clipPath id="g-wire"><polygon points="0,0 68,0 50,120 0,120"/></clipPath>
+    <clipPath id="g-solid"><polygon points="68,0 120,0 120,120 50,120"/></clipPath>
+  </defs>
+  <!-- A ruby, half wireframe and half rendered: what a 3D engine does. -->
+  <g clip-path="url(#g-wire)" fill="none" stroke="#ff5a74" stroke-width="2.6" stroke-linejoin="round"><polygon points="10,46 36,18 44,46"/><polygon points="36,18 84,18 76,46 44,46"/><polygon points="84,18 110,46 76,46"/><polygon points="10,46 44,46 60,108"/><polygon points="44,46 76,46 60,108"/><polygon points="76,46 110,46 60,108"/></g>
+  <g clip-path="url(#g-solid)"><polygon points="10,46 36,18 44,46" fill="#ff8fa0"/><polygon points="36,18 84,18 76,46 44,46" fill="#ffd0d7"/><polygon points="84,18 110,46 76,46" fill="#b40f39"/><polygon points="10,46 44,46 60,108" fill="#f0375c"/><polygon points="44,46 76,46 60,108" fill="#e3204b"/><polygon points="76,46 110,46 60,108" fill="#7a0928"/></g></svg></div>96</figure><figure><div class="tile" style="width:64px;height:64px"><svg style="--size:48px" class="gem" viewBox="0 0 120 120" aria-hidden="true"><defs>
+    <clipPath id="g-wire"><polygon points="0,0 68,0 50,120 0,120"/></clipPath>
+    <clipPath id="g-solid"><polygon points="68,0 120,0 120,120 50,120"/></clipPath>
+  </defs>
+  <!-- A ruby, half wireframe and half rendered: what a 3D engine does. -->
+  <g clip-path="url(#g-wire)" fill="none" stroke="#ff5a74" stroke-width="2.6" stroke-linejoin="round"><polygon points="10,46 36,18 44,46"/><polygon points="36,18 84,18 76,46 44,46"/><polygon points="84,18 110,46 76,46"/><polygon points="10,46 44,46 60,108"/><polygon points="44,46 76,46 60,108"/><polygon points="76,46 110,46 60,108"/></g>
+  <g clip-path="url(#g-solid)"><polygon points="10,46 36,18 44,46" fill="#ff8fa0"/><polygon points="36,18 84,18 76,46 44,46" fill="#ffd0d7"/><polygon points="84,18 110,46 76,46" fill="#b40f39"/><polygon points="10,46 44,46 60,108" fill="#f0375c"/><polygon points="44,46 76,46 60,108" fill="#e3204b"/><polygon points="76,46 110,46 60,108" fill="#7a0928"/></g></svg></div>64</figure><figure><div class="tile" style="width:40px;height:40px"><svg style="--size:30px" class="gem" viewBox="0 0 120 120" aria-hidden="true"><defs>
+    <clipPath id="g-wire"><polygon points="0,0 68,0 50,120 0,120"/></clipPath>
+    <clipPath id="g-solid"><polygon points="68,0 120,0 120,120 50,120"/></clipPath>
+  </defs>
+  <!-- A ruby, half wireframe and half rendered: what a 3D engine does. -->
+  <g clip-path="url(#g-wire)" fill="none" stroke="#ff5a74" stroke-width="2.6" stroke-linejoin="round"><polygon points="10,46 36,18 44,46"/><polygon points="36,18 84,18 76,46 44,46"/><polygon points="84,18 110,46 76,46"/><polygon points="10,46 44,46 60,108"/><polygon points="44,46 76,46 60,108"/><polygon points="76,46 110,46 60,108"/></g>
+  <g clip-path="url(#g-solid)"><polygon points="10,46 36,18 44,46" fill="#ff8fa0"/><polygon points="36,18 84,18 76,46 44,46" fill="#ffd0d7"/><polygon points="84,18 110,46 76,46" fill="#b40f39"/><polygon points="10,46 44,46 60,108" fill="#f0375c"/><polygon points="44,46 76,46 60,108" fill="#e3204b"/><polygon points="76,46 110,46 60,108" fill="#7a0928"/></g></svg></div>40</figure><figure><div class="tile" style="width:24px;height:24px"><svg style="--size:18px" class="gem" viewBox="0 0 120 120" aria-hidden="true"><defs>
+    <clipPath id="g-wire"><polygon points="0,0 68,0 50,120 0,120"/></clipPath>
+    <clipPath id="g-solid"><polygon points="68,0 120,0 120,120 50,120"/></clipPath>
+  </defs>
+  <!-- A ruby, half wireframe and half rendered: what a 3D engine does. -->
+  <g clip-path="url(#g-wire)" fill="none" stroke="#ff5a74" stroke-width="2.6" stroke-linejoin="round"><polygon points="10,46 36,18 44,46"/><polygon points="36,18 84,18 76,46 44,46"/><polygon points="84,18 110,46 76,46"/><polygon points="10,46 44,46 60,108"/><polygon points="44,46 76,46 60,108"/><polygon points="76,46 110,46 60,108"/></g>
+  <g clip-path="url(#g-solid)"><polygon points="10,46 36,18 44,46" fill="#ff8fa0"/><polygon points="36,18 84,18 76,46 44,46" fill="#ffd0d7"/><polygon points="84,18 110,46 76,46" fill="#b40f39"/><polygon points="10,46 44,46 60,108" fill="#f0375c"/><polygon points="44,46 76,46 60,108" fill="#e3204b"/><polygon points="76,46 110,46 60,108" fill="#7a0928"/></g></svg></div>24</figure>
   </div>
 
   <h2>Colors</h2>
   <div class="palette">
-    <div class="swatch"><div style="background:#ffd0d7"></div><p>#ffd0d7</p></div><div class="swatch"><div style="background:#ff8fa0"></div><p>#ff8fa0</p></div><div class="swatch"><div style="background:#f0375c"></div><p>#f0375c</p></div><div class="swatch"><div style="background:#e3204b"></div><p>#e3204b</p></div><div class="swatch"><div style="background:#b40f39"></div><p>#b40f39</p></div><div class="swatch"><div style="background:#5e061f"></div><p>#5e061f</p></div><div class="swatch"><div style="background:#0e0709"></div><p>#0e0709</p></div><div class="swatch"><div style="background:#f7f3f4"></div><p>#f7f3f4</p></div>
+    <div class="swatch"><div style="background:#ffd0d7"></div><p>#ffd0d7</p></div><div class="swatch"><div style="background:#ff8fa0"></div><p>#ff8fa0</p></div><div class="swatch"><div style="background:#f0375c"></div><p>#f0375c</p></div><div class="swatch"><div style="background:#e3204b"></div><p>#e3204b</p></div><div class="swatch"><div style="background:#b40f39"></div><p>#b40f39</p></div><div class="swatch"><div style="background:#7a0928"></div><p>#7a0928</p></div><div class="swatch"><div style="background:#0b0608"></div><p>#0b0608</p></div><div class="swatch"><div style="background:#f7f3f4"></div><p>#f7f3f4</p></div>
   </div>
 
   <h2>Files</h2>
-  <p class="note"><code>redgem-mark.svg</code> the gem alone &nbsp; <code>redgem-logo.svg</code> gem and name, for dark backgrounds</p>
+  <p class="note"><code>redgem-mark.svg</code> the gem alone &nbsp; <code>redgem-logo.svg</code> for dark backgrounds &nbsp;
+  <code>redgem-logo-light.svg</code> for light ones</p>
 </main>
 </body>
 </html>

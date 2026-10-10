@@ -258,6 +258,8 @@ float EditorApp::viewport_height() const { return static_cast<float>(viewport_->
 
 // --- Frame -----------------------------------------------------------------------------------
 
+float EditorApp::frame_seconds() const { return fixed_frame_seconds_.value_or(GetFrameTime()); }
+
 void EditorApp::frame() {
   ++frame_count_;
   if (frame_count_ % kReloadCheckFrames == 0 && session_->reload_if_changed_on_disk()) {
@@ -270,7 +272,7 @@ void EditorApp::frame() {
   handle_shortcuts();
   update_camera();
   game_input_.enabled = viewport_->focused && session_->play_state() == PlayState::Playing;
-  session_->tick(GetFrameTime());
+  session_->tick(frame_seconds());
   render_viewport_texture();
   update_title();
 
@@ -424,7 +426,7 @@ void EditorApp::handle_shortcuts() {
 void EditorApp::update_camera() {
   if (session_->play_state() != PlayState::Editing || !viewport_->hovered) return;
   FlyInput input;
-  input.dt = GetFrameTime();
+  input.dt = frame_seconds();
   input.zoom = GetMouseWheelMove();
   if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
     const Vector2 delta = GetMouseDelta();
