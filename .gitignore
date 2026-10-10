@@ -1,0 +1,34 @@
+# Private notes, specs and plans
+.private/
+
+# Build outputs and fetched dependencies
+build/
+.deps/
+.cache/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Blender autosaves
+*.blend1
+
+# Python bytecode (Blender tools)
+__pycache__/
+
+# Showcase scene files (renders in showcase/renders are kept)
+showcase/*.blend
+showcase/*.blend1
+
+# Real-time showcase export (large; rebuilt by tools/blender/build_showcase.py)
+games/showcase/scene.glb
+
+# Local tool state
+.claude/
+
+# Outputs of the examples in the README and of the editor's Build
+dist/
+games/*-build/
+screenshots/
