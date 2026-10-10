@@ -1,7 +1,8 @@
 <p align="center"><img src="branding/redgem-logo.svg" alt="RedGem 3D Engine" width="460"></p>
 
-A 3D game engine where games are written in **Ruby**. Model in **Blender**, script in Ruby,
-press Play in the editor.
+A 3D game engine and editor where games are written in **Ruby**, the most human-friendly
+language. Build levels in the editor or in **Blender**, write the gameplay in Ruby, press Play,
+ship a standalone game.
 
 ```ruby
 class Coin < Behaviour
@@ -92,6 +93,16 @@ If the X11 extension headers are missing and you cannot install them,
 
 A game is a folder: `scene.glb` (the scene, from Blender or the editor), `scripts/*.rb`,
 `models/`, `sounds/` and `game.json`.
+
+## Demos
+
+Small games and scenes that ship with the engine, each with its scripts and tests:
+
+- `games/platformer`: run, jump, push crates, ride platforms, collect the coins, reach the flag.
+- `games/driving`: a time trial with wheel physics, checkpoints and lap times.
+- `games/city`: a crossroad where cars obey traffic lights and brake for each other.
+- `games/showcase`: a detailed street at dusk to drive through (built from downloaded assets,
+  see [docs/development.md](docs/development.md)).
 
 ## Documentation
 
