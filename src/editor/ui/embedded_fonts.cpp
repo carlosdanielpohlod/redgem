@@ -37,10 +37,12 @@ extern const unsigned char redgem_font_mono_end[];
 namespace redgem::fonts {
 
 EmbeddedFont interface_font() {
+  // cppcheck-suppress subtractPointers ; the two labels mark the start and the end of one embedded file
   return {redgem_font_inter, static_cast<int>(redgem_font_inter_end - redgem_font_inter)};
 }
 
 EmbeddedFont code_font() {
+  // cppcheck-suppress subtractPointers ; the two labels mark the start and the end of one embedded file
   return {redgem_font_mono, static_cast<int>(redgem_font_mono_end - redgem_font_mono)};
 }
 

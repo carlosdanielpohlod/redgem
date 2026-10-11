@@ -35,7 +35,7 @@ constexpr int kOnlyBuffer = 0;                    // a .glb keeps everything in 
 constexpr int kOnlyPrimitive = 0;                 // a terrain's mesh is a single piece
 constexpr float kCameraNear = 0.1f;               // meters: clip planes of a new camera
 constexpr float kCameraFar = 1000.0f;
-constexpr float kInfiniteRange = 0.0f;  // glTF: a light without a range reaches as far as its strength allows
+constexpr float kInfiniteRange = 0.0f;            // glTF: a light without a range reaches as far as its strength allows
 constexpr const char* kTerrainCollider = "mesh";  // things stand on the ground as it is shaped
 
 // json[key] as a list (empty when the file has none).
@@ -93,8 +93,8 @@ bool same_materials(const std::vector<MaterialDesc>& a, const std::vector<Materi
 
 bool same_light(const std::optional<LightDesc>& a, const std::optional<LightDesc>& b) {
   if (a.has_value() != b.has_value()) return false;
-  return !a || (a->type == b->type && a->color.r == b->color.r && a->color.g == b->color.g && a->color.b == b->color.b &&
-                a->intensity == b->intensity && a->range == b->range);
+  return !a || (a->type == b->type && a->color.r == b->color.r && a->color.g == b->color.g &&
+                a->color.b == b->color.b && a->intensity == b->intensity && a->range == b->range);
 }
 
 bool same_camera(const std::optional<CameraDesc>& a, const std::optional<CameraDesc>& b) {
@@ -128,11 +128,68 @@ std::vector<int> positions_in(const std::vector<int>& order, std::size_t count) 
   return position;
 }
 
+// Where each of `children` is after a reordering, without the ones it left out.
+std::vector<int> kept_children(const std::vector<int>& children, const std::vector<int>& position) {
+  std::vector<int> kept;
+  for (const int child : children) {
+    if (position[child] != kNoIndex) kept.push_back(position[child]);
+  }
+  return kept;
+}
+
 void detach_from_parent(std::vector<NodeDesc>& nodes, int child) {
   const int parent = nodes[child].parent;
   if (parent == kNoIndex) return;
   std::vector<int>& siblings = nodes[parent].children;
   siblings.erase(std::remove(siblings.begin(), siblings.end(), child), siblings.end());
+}
+
+// Puts `child` under `parent` (kNoIndex = top level), placed at `local`.
+void move_under(std::vector<NodeDesc>& nodes, int child, int parent, const Transform& local) {
+  detach_from_parent(nodes, child);
+  nodes[child].parent = parent;
+  if (parent != kNoIndex) nodes[parent].children.push_back(child);
+  nodes[child].local = local;
+}
+
+// Where a node has to be placed under `parent` (kNoIndex = top level) to stay where it is in the world.
+Transform local_under(const std::vector<NodeDesc>& nodes, int index, int parent) {
+  const Transform world = scene_document_detail::world_of(nodes, index);
+  return parent == kNoIndex ? world : relative_to(scene_document_detail::world_of(nodes, parent), world);
+}
+
+bool all_copied(const std::vector<int>& joints, const std::vector<int>& copy_of) {
+  return std::all_of(joints.begin(), joints.end(),
+                     [&copy_of](int joint) { return joint != kNoIndex && copy_of[joint] != kNoIndex; });
+}
+
+// The current index of each source node of a list (see current_index).
+std::vector<int> current_indices(const std::vector<int>& current, const std::vector<int>& sources) {
+  std::vector<int> indices;
+  indices.reserve(sources.size());
+  for (const int source : sources) indices.push_back(current_index(current, source));
+  return indices;
+}
+
+// A model's .glb, when it is one the editor can take in.
+std::optional<GlbFile> read_importable_glb(const std::filesystem::path& path, std::string& error) {
+  std::optional<GlbFile> source = read_glb(path, error);
+  if (!source) return std::nullopt;
+  if (!model_import::has_several_buffers(source->json)) return source;
+  error = "models with several buffers are not supported (export a single .glb from Blender)";
+  return std::nullopt;
+}
+
+// Where a model's entries start in the scene description: the same places as in the glTF JSON
+// (the loader keeps glTF order for these), and after the skins the description has.
+model_import::DescOffsets description_offsets(const model_import::JsonOffsets& json_offsets, std::size_t skins) {
+  model_import::DescOffsets offsets;
+  offsets.images = json_offsets.images;
+  offsets.materials = json_offsets.materials;
+  offsets.meshes = json_offsets.meshes;
+  offsets.source_nodes = json_offsets.nodes;
+  offsets.skins = static_cast<int>(skins);
+  return offsets;
 }
 
 }  // namespace
@@ -177,14 +234,11 @@ std::vector<int> order_with_last(int count, const std::vector<int>& last) {
 std::vector<NodeDesc> nodes_in_order(const std::vector<NodeDesc>& nodes, const std::vector<int>& order) {
   const std::vector<int> position = positions_in(order, nodes.size());
   std::vector<NodeDesc> out;
+  out.reserve(order.size());
   for (const int old : order) out.push_back(nodes[old]);
   for (NodeDesc& node : out) {
     if (node.parent != kNoIndex) node.parent = position[node.parent];
-    std::vector<int> children;
-    for (const int child : node.children) {
-      if (position[child] != kNoIndex) children.push_back(position[child]);
-    }
-    node.children = std::move(children);
+    node.children = kept_children(node.children, position);
   }
   return out;
 }
@@ -202,13 +256,18 @@ std::variant<SceneDocument, std::string> SceneDocument::open(const std::filesyst
   if (!glb) return error;
   SceneDocument document;
   document.path_ = path;
-  document.glb_ = std::move(*glb);
-  document.source_nodes_ = list_of(document.glb_.json, kNodes);
-  document.source_skins_ = list_of(document.glb_.json, kSkins);
-  document.source_animations_ = list_of(document.glb_.json, kAnimations);
+  document.keep_file(std::move(*glb));
   document.desc_ = std::move(loaded.scene);
   document.remember_node_references(0, 0);
   return document;
+}
+
+// The file as loaded: saving writes the edits into it.
+void SceneDocument::keep_file(GlbFile glb) {
+  glb_ = std::move(glb);
+  source_nodes_ = list_of(glb_.json, kNodes);
+  source_skins_ = list_of(glb_.json, kSkins);
+  source_animations_ = list_of(glb_.json, kAnimations);
 }
 
 void SceneDocument::checkpoint() {
@@ -279,24 +338,27 @@ bool SceneDocument::store_mesh_vertices(int mesh, std::string& error) {
   const PrimitiveDesc& ground = source.primitives.front();
   const nlohmann::json& attributes =
       glb_.json[kMeshes][static_cast<std::size_t>(mesh)][kPrimitives][kOnlyPrimitive][kAttributes];
-  nlohmann::json& accessors = glb_.json[kAccessors];
-  const std::pair<const char*, const std::vector<float>*> streams[] = {{kPositionAttribute, &ground.positions},
-                                                                      {kNormalAttribute, &ground.normals}};
-  for (const auto& [name, values] : streams) {
-    const nlohmann::json& accessor = accessors[attributes.at(name).get<std::size_t>()];
-    const nlohmann::json& view = glb_.json[kBufferViews][accessor.at(kBufferView).get<std::size_t>()];
-    const std::size_t offset = view.value(kByteOffset, std::size_t{0}) + accessor.value(kByteOffset, std::size_t{0});
-    const std::size_t bytes = values->size() * sizeof(float);
-    const bool packed = !view.contains(kByteStride) ||
-                        view[kByteStride].get<std::size_t>() == config::kFloatsPerPosition * sizeof(float);
-    if (!packed || accessor.at(kCount).get<std::size_t>() * config::kFloatsPerPosition != values->size() ||
-        offset + bytes > glb_.bin.size()) {
-      error = "cannot save the shape of '" + source.name + "': its vertices are not stored the way the editor writes them";
-      return false;
-    }
-    std::memcpy(glb_.bin.data() + offset, values->data(), bytes);
+  const auto accessor_of = [&attributes](const char* name) { return attributes.at(name).get<std::size_t>(); };
+  if (!store_stream(accessor_of(kPositionAttribute), ground.positions) ||
+      !store_stream(accessor_of(kNormalAttribute), ground.normals)) {
+    error =
+        "cannot save the shape of '" + source.name + "': its vertices are not stored the way the editor writes them";
+    return false;
   }
-  write_bounds(accessors[attributes.at(kPositionAttribute).get<std::size_t>()], source.bounds);
+  write_bounds(glb_.json[kAccessors][accessor_of(kPositionAttribute)], source.bounds);
+  return true;
+}
+
+bool SceneDocument::store_stream(std::size_t accessor_index, const std::vector<float>& values) {
+  const nlohmann::json& accessor = glb_.json[kAccessors][accessor_index];
+  const nlohmann::json& view = glb_.json[kBufferViews][accessor.at(kBufferView).get<std::size_t>()];
+  const std::size_t offset = view.value(kByteOffset, std::size_t{0}) + accessor.value(kByteOffset, std::size_t{0});
+  const std::size_t bytes = values.size() * sizeof(float);
+  const bool packed =
+      !view.contains(kByteStride) || view[kByteStride].get<std::size_t>() == config::kFloatsPerPosition * sizeof(float);
+  const bool same_count = accessor.at(kCount).get<std::size_t>() * config::kFloatsPerPosition == values.size();
+  if (!packed || !same_count || offset + bytes > glb_.bin.size()) return false;
+  std::memcpy(glb_.bin.data() + offset, values.data(), bytes);
   return true;
 }
 
@@ -355,25 +417,31 @@ std::string SceneDocument::unique_name(const std::string& base) const {
 
 int SceneDocument::duplicate(int index) {
   checkpoint();
-  std::vector<NodeDesc>& nodes = desc_.nodes;
-  const std::vector<int> source = subtree(nodes, index);
-  const int first_copy = static_cast<int>(nodes.size());
-  std::vector<int> copy_of(nodes.size(), kNoIndex);
+  const std::vector<int> source = subtree(desc_.nodes, index);
+  const int first_copy = node_count();
+  std::vector<int> copy_of(desc_.nodes.size(), kNoIndex);
   for (std::size_t i = 0; i < source.size(); ++i) copy_of[source[i]] = first_copy + static_cast<int>(i);
-  for (const int original : source) {
-    NodeDesc copy = nodes[original];
-    copy.name = unique_name(copy.name);
-    copy.parent = original == index ? copy.parent : copy_of[copy.parent];
-    for (int& child : copy.children) child = copy_of[child];
-    nodes.push_back(std::move(copy));  // names stay unique because each copy is added before the next
-  }
-  if (nodes[first_copy].parent != kNoIndex) nodes[nodes[first_copy].parent].children.push_back(first_copy);
+  append_copies(source, copy_of);
   // Each copy is a node of its own in the file too, and a character copied with its bones gets
   // its own skeleton (its animation is not copied: the copy keeps the pose it was copied in).
   give_copies_own_source_nodes(first_copy, source.size());
   give_copies_own_skins(first_copy, source.size(), copy_of);
   touch();
   return first_copy;
+}
+
+void SceneDocument::append_copies(const std::vector<int>& source, const std::vector<int>& copy_of) {
+  std::vector<NodeDesc>& nodes = desc_.nodes;
+  const int root = source.front();
+  for (const int original : source) {
+    NodeDesc copy = nodes[original];
+    copy.name = unique_name(copy.name);
+    copy.parent = original == root ? copy.parent : copy_of[copy.parent];
+    for (int& child : copy.children) child = copy_of[child];
+    nodes.push_back(std::move(copy));  // names stay unique because each copy is added before the next
+  }
+  const int first_copy = copy_of[root];
+  if (nodes[first_copy].parent != kNoIndex) nodes[nodes[first_copy].parent].children.push_back(first_copy);
 }
 
 void SceneDocument::give_copies_own_source_nodes(int first_copy, std::size_t count) {
@@ -401,21 +469,25 @@ void SceneDocument::give_copies_own_skins(int first_copy, std::size_t count, con
 
 std::optional<int> SceneDocument::copy_skin(int original, const std::vector<int>& copy_of) {
   SkinDesc skin = desc_.skins[original];
-  const bool whole = std::all_of(skin.joints.begin(), skin.joints.end(),
-                                 [&copy_of](int joint) { return joint != kNoIndex && copy_of[joint] != kNoIndex; });
-  if (!whole) return std::nullopt;
+  if (!all_copied(skin.joints, copy_of)) return std::nullopt;
   nlohmann::json json = source_skins_[original];
+  std::vector<int> joint_sources = point_at_copies(skin, json, copy_of);
+  json.erase(kSkeleton);
+  desc_.skins.push_back(std::move(skin));
+  source_skins_.push_back(std::move(json));
+  skin_joint_sources_.push_back(std::move(joint_sources));
+  return static_cast<int>(desc_.skins.size()) - 1;
+}
+
+std::vector<int> SceneDocument::point_at_copies(SkinDesc& skin, nlohmann::json& json,
+                                                const std::vector<int>& copy_of) const {
   std::vector<int> joint_sources;
   for (std::size_t j = 0; j < skin.joints.size(); ++j) {
     skin.joints[j] = copy_of[skin.joints[j]];
     joint_sources.push_back(desc_.nodes[skin.joints[j]].source_node);
     json[kJoints][j] = joint_sources.back();
   }
-  json.erase(kSkeleton);
-  desc_.skins.push_back(std::move(skin));
-  source_skins_.push_back(std::move(json));
-  skin_joint_sources_.push_back(std::move(joint_sources));
-  return static_cast<int>(desc_.skins.size()) - 1;
+  return joint_sources;
 }
 
 void SceneDocument::remove(int index) {
@@ -468,24 +540,27 @@ void SceneDocument::set_camera(int index, const CameraDesc& camera, bool record)
 }
 
 void SceneDocument::sync_lights_and_cameras() {
-  nlohmann::json& json = glb_.json;
   // Entries are updated in place (undo snapshots keep pointing at them); a second node using the
   // same entry (a duplicate) gets a copy of its own.
   std::set<int> claimed_lights;
   std::set<int> claimed_cameras;
   for (NodeDesc& node : desc_.nodes) {
-    if (node.light) {
-      nlohmann::json& lights = json[kExtensions][kLightsExtension][kLights];
-      node.source_light = claim_entry(lights, node.source_light, claimed_lights);
-      write_light(lights[node.source_light], *node.light);
-      add_extension_used(json, kLightsExtension);
-    }
-    if (node.camera) {
-      nlohmann::json& cameras = json[kCameras];
-      node.source_camera = claim_entry(cameras, node.source_camera, claimed_cameras);
-      write_camera(cameras[node.source_camera], *node.camera);
-    }
+    if (node.light) sync_light(node, *node.light, claimed_lights);
+    if (node.camera) sync_camera(node, *node.camera, claimed_cameras);
   }
+}
+
+void SceneDocument::sync_light(NodeDesc& node, const LightDesc& light, std::set<int>& claimed) {
+  nlohmann::json& lights = glb_.json[kExtensions][kLightsExtension][kLights];
+  node.source_light = claim_entry(lights, node.source_light, claimed);
+  write_light(lights[node.source_light], light);
+  add_extension_used(glb_.json, kLightsExtension);
+}
+
+void SceneDocument::sync_camera(NodeDesc& node, const CameraDesc& camera, std::set<int>& claimed) {
+  nlohmann::json& cameras = glb_.json[kCameras];
+  node.source_camera = claim_entry(cameras, node.source_camera, claimed);
+  write_camera(cameras[node.source_camera], camera);
 }
 
 nlohmann::json SceneDocument::sync_nodes() {
@@ -494,7 +569,8 @@ nlohmann::json SceneDocument::sync_nodes() {
   for (int i = 0; i < node_count(); ++i) {
     const NodeDesc& node = desc_.nodes[i];
     const bool known = in_range(node.source_node, source_nodes_.size());
-    nodes.push_back(node_json(node, known ? nlohmann::json(source_nodes_[node.source_node]) : nlohmann::json::object()));
+    nodes.push_back(
+        node_json(node, known ? nlohmann::json(source_nodes_[node.source_node]) : nlohmann::json::object()));
     if (node.parent == kNoIndex) roots.push_back(i);
   }
   glb_.json[kNodes] = nodes;
@@ -510,6 +586,15 @@ void SceneDocument::sync_materials() {
   }
 }
 
+// A .glb keeps everything in one buffer, its binary chunk; without one it has no buffers at all.
+void SceneDocument::sync_buffer() {
+  if (glb_.bin.empty()) {
+    glb_.json.erase(kBuffers);
+  } else {
+    glb_.json[kBuffers] = nlohmann::json::array({{{kByteLength, glb_.bin.size()}}});
+  }
+}
+
 bool SceneDocument::sync_glb(std::string& error) {
   if (desc_.nodes.empty()) {
     error = "a glTF scene needs at least one object";
@@ -519,11 +604,7 @@ bool SceneDocument::sync_glb(std::string& error) {
   nlohmann::json& json = glb_.json;
   const nlohmann::json roots = sync_nodes();
   sync_materials();
-  if (glb_.bin.empty()) {
-    json.erase(kBuffers);
-  } else {
-    json[kBuffers] = nlohmann::json::array({{{kByteLength, glb_.bin.size()}}});
-  }
+  sync_buffer();
   // Only the scene the engine loads is edited; it becomes the file's single scene.
   if (has_several_scenes(json)) log::warning("saving keeps only the active glTF scene");
   keep_active_scene(json, roots);
@@ -541,39 +622,49 @@ std::vector<int> SceneDocument::current_node_indices() const {
   return current;
 }
 
+int SceneDocument::source_of(int node) const { return node == kNoIndex ? kNoIndex : desc_.nodes.at(node).source_node; }
+
 void SceneDocument::remember_node_references(std::size_t first_skin, std::size_t first_animation) {
-  const auto source_of = [this](int node) { return node == kNoIndex ? kNoIndex : desc_.nodes.at(node).source_node; };
-  for (std::size_t s = first_skin; s < desc_.skins.size(); ++s) {
-    std::vector<int> sources;
-    for (const int joint : desc_.skins[s].joints) sources.push_back(source_of(joint));
-    skin_joint_sources_.push_back(std::move(sources));
-  }
-  for (std::size_t a = first_animation; a < desc_.animations.size(); ++a) {
-    std::vector<int> sources;
-    for (const AnimationChannel& channel : desc_.animations[a].channels) sources.push_back(source_of(channel.node));
-    channel_node_sources_.push_back(std::move(sources));
-  }
+  for (std::size_t s = first_skin; s < desc_.skins.size(); ++s) remember_joints(desc_.skins[s]);
+  for (std::size_t a = first_animation; a < desc_.animations.size(); ++a) remember_channels(desc_.animations[a]);
+}
+
+void SceneDocument::remember_joints(const SkinDesc& skin) {
+  std::vector<int> sources;
+  sources.reserve(skin.joints.size());
+  for (const int joint : skin.joints) sources.push_back(source_of(joint));
+  skin_joint_sources_.push_back(std::move(sources));
+}
+
+void SceneDocument::remember_channels(const AnimationDesc& animation) {
+  std::vector<int> sources;
+  sources.reserve(animation.channels.size());
+  for (const AnimationChannel& channel : animation.channels) sources.push_back(source_of(channel.node));
+  channel_node_sources_.push_back(std::move(sources));
 }
 
 void SceneDocument::refresh_node_references() {
   if (desc_.skins.empty() && desc_.animations.empty()) return;
   const std::vector<int> current = current_node_indices();
   for (std::size_t s = 0; s < desc_.skins.size(); ++s) {
-    for (std::size_t j = 0; j < desc_.skins[s].joints.size(); ++j) {
-      desc_.skins[s].joints[j] = current_index(current, skin_joint_sources_[s][j]);
-    }
+    desc_.skins[s].joints = current_indices(current, skin_joint_sources_[s]);
   }
   for (std::size_t a = 0; a < desc_.animations.size(); ++a) {
-    for (std::size_t c = 0; c < desc_.animations[a].channels.size(); ++c) {
-      desc_.animations[a].channels[c].node = current_index(current, channel_node_sources_[a][c]);
-    }
+    const std::vector<int> nodes = current_indices(current, channel_node_sources_[a]);
+    std::vector<AnimationChannel>& channels = desc_.animations[a].channels;
+    for (std::size_t c = 0; c < channels.size(); ++c) channels[c].node = nodes[c];
   }
 }
 
 void SceneDocument::sync_skins_and_animations(nlohmann::json& json) const {
   const std::vector<int> current = current_node_indices();
-  // Skins: one that lost a joint (a deleted bone, or a whole deleted or undone character) is left
-  // out, and the meshes that used it are saved rigid; the others keep working.
+  sync_skins(json, current);
+  sync_animations(json, current);
+}
+
+// A skin that lost a joint (a deleted bone, or a whole deleted or undone character) is left out,
+// and the meshes that used it are saved rigid; the others keep working.
+void SceneDocument::sync_skins(nlohmann::json& json, const std::vector<int>& current) const {
   nlohmann::json skins = nlohmann::json::array();
   std::vector<int> written(source_skins_.size(), kNoIndex);  // skin index -> its index in the file
   for (std::size_t s = 0; s < source_skins_.size(); ++s) {
@@ -584,7 +675,10 @@ void SceneDocument::sync_skins_and_animations(nlohmann::json& json) const {
   }
   sync_node_skins(json, written);
   set_unless_empty(json, kSkins, skins);
-  // Animations: channels of deleted nodes are dropped.
+}
+
+// Channels of deleted nodes are dropped.
+void SceneDocument::sync_animations(nlohmann::json& json, const std::vector<int>& current) const {
   nlohmann::json animations = nlohmann::json::array();
   for (const nlohmann::json& animation : source_animations_) {
     std::optional<nlohmann::json> kept = animation_with_current_nodes(animation, current);
@@ -655,26 +749,35 @@ int SceneDocument::append_vertex_stream(const std::vector<float>& values, std::s
 }
 
 int SceneDocument::append_mesh(const std::string& name, const PrimitiveDesc& primitive) {
-  const std::size_t vertices = primitive.positions.size() / config::kFloatsPerPosition;
   MeshDesc mesh;
   mesh.name = name;
   mesh.primitives.push_back(primitive);
   mesh.bounds = mesh_bounds_of(primitive);
-  const int position = append_vertex_stream(primitive.positions, vertices, kVec3Type);
-  write_bounds(glb_.json[kAccessors][position], mesh.bounds);
-  const int normal = append_vertex_stream(primitive.normals, vertices, kVec3Type);
-  nlohmann::json attributes = {{kPositionAttribute, position}, {kNormalAttribute, normal}};
-  if (!primitive.texcoords.empty()) {
-    attributes[kTexcoordAttribute] = append_vertex_stream(primitive.texcoords, vertices, kVec2Type);
-  }
-  const int index_view = append_buffer_view(primitive.indices.data(), primitive.indices.size() * sizeof(std::uint32_t),
-                                            kElementArrayBufferTarget);
-  const int indices = append_accessor(index_view, kUnsignedIntComponent, primitive.indices.size(), kScalarType);
+  const nlohmann::json attributes = append_attributes(primitive, mesh.bounds);
+  const int indices = append_indices(primitive.indices);
   nlohmann::json json_primitive = {{kAttributes, attributes}, {kIndices, indices}};
   if (primitive.material != kNoIndex) json_primitive[kMaterial] = primitive.material;
   array_at(glb_.json, kMeshes).push_back({{kName, name}, {kPrimitives, nlohmann::json::array({json_primitive})}});
   desc_.meshes.push_back(std::move(mesh));
   return static_cast<int>(desc_.meshes.size()) - 1;
+}
+
+nlohmann::json SceneDocument::append_attributes(const PrimitiveDesc& primitive, const Bounds& bounds) {
+  const std::size_t vertices = primitive.positions.size() / config::kFloatsPerPosition;
+  const int position = append_vertex_stream(primitive.positions, vertices, kVec3Type);
+  write_bounds(glb_.json[kAccessors][position], bounds);
+  const int normal = append_vertex_stream(primitive.normals, vertices, kVec3Type);
+  nlohmann::json attributes = {{kPositionAttribute, position}, {kNormalAttribute, normal}};
+  if (!primitive.texcoords.empty()) {
+    attributes[kTexcoordAttribute] = append_vertex_stream(primitive.texcoords, vertices, kVec2Type);
+  }
+  return attributes;
+}
+
+int SceneDocument::append_indices(const std::vector<std::uint32_t>& indices) {
+  const int view =
+      append_buffer_view(indices.data(), indices.size() * sizeof(std::uint32_t), kElementArrayBufferTarget);
+  return append_accessor(view, kUnsignedIntComponent, indices.size(), kScalarType);
 }
 
 int SceneDocument::append_material(const MaterialDesc& material) {
@@ -723,10 +826,8 @@ int SceneDocument::add_terrain(const std::string& name, const TerrainGrid& grid,
 int SceneDocument::add_light(LightType type, const std::string& name, Color color, float intensity, int parent) {
   checkpoint();
   nlohmann::json& lights = array_at(glb_.json[kExtensions][kLightsExtension], kLights);
-  lights.push_back({{kName, name},
-                    {kType, light_type_name(type)},
-                    {kColor, {color.r, color.g, color.b}},
-                    {kIntensity, intensity}});
+  lights.push_back(
+      {{kName, name}, {kType, light_type_name(type)}, {kColor, {color.r, color.g, color.b}}, {kIntensity, intensity}});
   add_extension_used(glb_.json, kLightsExtension);
   NodeDesc node = named_node(name, parent);
   node.light = LightDesc{type, color, intensity, kInfiniteRange};
@@ -746,26 +847,25 @@ int SceneDocument::add_camera(const std::string& name, float fov_y_radians, int 
   return append_node(std::move(node));
 }
 
-int SceneDocument::reparent(int index, int new_parent) {
-  std::vector<NodeDesc>& nodes = desc_.nodes;
+bool SceneDocument::can_reparent(int index, int new_parent) const {
   const int count = node_count();
-  if (index < 0 || index >= count || new_parent < kNoIndex || new_parent >= count) return index;
-  const std::vector<int> moving = subtree(nodes, index);
-  if (new_parent != kNoIndex && std::find(moving.begin(), moving.end(), new_parent) != moving.end()) return index;
-  if (nodes.at(index).parent == new_parent) return index;
+  if (index < 0 || index >= count || new_parent < kNoIndex || new_parent >= count) return false;
+  const std::vector<int> moving = subtree(desc_.nodes, index);
+  const bool into_itself = std::find(moving.begin(), moving.end(), new_parent) != moving.end();
+  return !into_itself && desc_.nodes.at(index).parent != new_parent;
+}
+
+int SceneDocument::reparent(int index, int new_parent) {
+  if (!can_reparent(index, new_parent)) return index;
   checkpoint();
-  const Transform world = world_of(nodes, index);
-  const Transform parent_world = new_parent == kNoIndex ? Transform{} : world_of(nodes, new_parent);
+  std::vector<NodeDesc>& nodes = desc_.nodes;
+  const Transform local = local_under(nodes, index, new_parent);
   // Rebuild the list: everything else in order, then the moved subtree last (after its new parent).
-  const std::vector<int> order = order_with_last(count, moving);
+  const std::vector<int> order = order_with_last(node_count(), subtree(nodes, index));
   const std::vector<int> position = positions_in(order, nodes.size());
   std::vector<NodeDesc> reordered = nodes_in_order(nodes, order);
   const int moved = position[index];
-  const int parent = new_parent == kNoIndex ? kNoIndex : position[new_parent];
-  detach_from_parent(reordered, moved);
-  reordered[moved].parent = parent;
-  if (parent != kNoIndex) reordered[parent].children.push_back(moved);
-  reordered[moved].local = parent == kNoIndex ? world : relative_to(parent_world, world);
+  move_under(reordered, moved, new_parent == kNoIndex ? kNoIndex : position[new_parent], local);
   nodes = std::move(reordered);
   refresh_node_references();
   touch();
@@ -789,48 +889,65 @@ model_import::JsonOffsets SceneDocument::import_offsets() const {
 
 void SceneDocument::append_model_json(const nlohmann::json& model, const model_import::JsonOffsets& offsets,
                                       const std::filesystem::path& model_dir) {
+  append_model_geometry(model, offsets);
+  append_model_materials(model, offsets, model_dir);
+  append_entries(glb_.json, model, kMeshes,
+                 [&](const nlohmann::json& mesh) { return model_import::imported_mesh(mesh, offsets); });
+  append_model_sources(model, offsets);
+  model_import::merge_string_list(glb_.json, model, kExtensionsUsed);
+  model_import::merge_string_list(glb_.json, model, kExtensionsRequired);
+}
+
+void SceneDocument::append_model_geometry(const nlohmann::json& model, const model_import::JsonOffsets& offsets) {
+  using nlohmann::json;
+  append_entries(glb_.json, model, kBufferViews,
+                 [&](const json& view) { return model_import::imported_buffer_view(view, offsets); });
+  append_entries(glb_.json, model, kAccessors,
+                 [&](const json& accessor) { return model_import::imported_accessor(accessor, offsets); });
+}
+
+void SceneDocument::append_model_materials(const nlohmann::json& model, const model_import::JsonOffsets& offsets,
+                                           const std::filesystem::path& model_dir) {
   using nlohmann::json;
   const std::filesystem::path scene_dir = path_.parent_path();
   json& out = glb_.json;
-  append_entries(out, model, kBufferViews, [&](const json& view) { return model_import::imported_buffer_view(view, offsets); });
-  append_entries(out, model, kAccessors, [&](const json& accessor) { return model_import::imported_accessor(accessor, offsets); });
-  append_entries(out, model, kImages, [&](const json& image) {
-    return model_import::imported_image(image, offsets, model_dir, scene_dir);
-  });
+  append_entries(out, model, kImages,
+                 [&](const json& image) { return model_import::imported_image(image, offsets, model_dir, scene_dir); });
   append_entries(out, model, kSamplers, [](const json& sampler) { return sampler; });
-  append_entries(out, model, kTextures, [&](const json& texture) { return model_import::imported_texture(texture, offsets); });
-  append_entries(out, model, kMaterials, [&](const json& material) { return model_import::imported_material(material, offsets); });
-  append_entries(out, model, kMeshes, [&](const json& mesh) { return model_import::imported_mesh(mesh, offsets); });
-  // Nodes, skeletons and animations come along too, kept apart like the scene's own (saving
-  // numbers them again).
+  append_entries(out, model, kTextures,
+                 [&](const json& texture) { return model_import::imported_texture(texture, offsets); });
+  append_entries(out, model, kMaterials,
+                 [&](const json& material) { return model_import::imported_material(material, offsets); });
+}
+
+// Nodes, skeletons and animations come along too, kept apart like the scene's own (saving
+// numbers them again).
+void SceneDocument::append_model_sources(const nlohmann::json& model, const model_import::JsonOffsets& offsets) {
+  using nlohmann::json;
   for (const json& node : list_of(model, kNodes)) source_nodes_.push_back(model_import::imported_node(node, offsets));
   for (const json& skin : list_of(model, kSkins)) source_skins_.push_back(model_import::imported_skin(skin, offsets));
   for (const json& animation : list_of(model, kAnimations)) {
     source_animations_.push_back(model_import::imported_animation(animation, offsets));
   }
-  model_import::merge_string_list(out, model, kExtensionsUsed);
-  model_import::merge_string_list(out, model, kExtensionsRequired);
 }
 
 int SceneDocument::append_model_description(const SceneDesc& model, const model_import::JsonOffsets& json_offsets,
                                             const std::string& name, int parent) {
-  // The scene description mirrors the same arrays (the loader keeps glTF order for these).
-  model_import::DescOffsets offsets;
-  offsets.images = json_offsets.images;
-  offsets.materials = json_offsets.materials;
-  offsets.meshes = json_offsets.meshes;
-  offsets.source_nodes = json_offsets.nodes;
-  offsets.skins = static_cast<int>(desc_.skins.size());
-  for (const ImageData& image : model.images) desc_.images.push_back(image);
-  for (const MaterialDesc& material : model.materials) {
-    desc_.materials.push_back(model_import::imported_material(material, offsets));
-  }
-  for (const MeshDesc& mesh : model.meshes) desc_.meshes.push_back(model_import::imported_mesh(mesh, offsets));
+  model_import::DescOffsets offsets = description_offsets(json_offsets, desc_.skins.size());
+  append_model_assets(model, offsets);
   offsets.root = append_node(named_node(name, parent));
   offsets.nodes = node_count();
   append_model_nodes(model, offsets);
   touch();
   return offsets.root;
+}
+
+void SceneDocument::append_model_assets(const SceneDesc& model, const model_import::DescOffsets& offsets) {
+  for (const ImageData& image : model.images) desc_.images.push_back(image);
+  for (const MaterialDesc& material : model.materials) {
+    desc_.materials.push_back(model_import::imported_material(material, offsets));
+  }
+  for (const MeshDesc& mesh : model.meshes) desc_.meshes.push_back(model_import::imported_mesh(mesh, offsets));
 }
 
 void SceneDocument::append_model_nodes(const SceneDesc& model, const model_import::DescOffsets& offsets) {
@@ -859,17 +976,18 @@ int SceneDocument::import_model(const std::filesystem::path& path, std::string& 
     error = loaded.error;
     return kNoIndex;
   }
-  std::optional<GlbFile> source = read_glb(path, error);
+  const std::optional<GlbFile> source = read_importable_glb(path, error);
   if (!source) return kNoIndex;
-  if (model_import::has_several_buffers(source->json)) {
-    error = "models with several buffers are not supported (export a single .glb from Blender)";
-    return kNoIndex;
-  }
+  return append_model(loaded.scene, *source, path, parent);
+}
+
+int SceneDocument::append_model(const SceneDesc& scene, const GlbFile& source, const std::filesystem::path& path,
+                                int parent) {
   model_import::JsonOffsets offsets = import_offsets();
-  offsets.bin = append_binary(source->bin.data(), source->bin.size());
-  append_model_json(source->json, offsets, path.parent_path());
+  offsets.bin = append_binary(source.bin.data(), source.bin.size());
+  append_model_json(source.json, offsets, path.parent_path());
   checkpoint();
-  return append_model_description(loaded.scene, offsets, path.stem().string(), parent);
+  return append_model_description(scene, offsets, path.stem().string(), parent);
 }
 
 int SceneDocument::material_of(int node) const {

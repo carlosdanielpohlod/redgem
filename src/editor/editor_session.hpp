@@ -23,12 +23,12 @@ class EditorSession {
  public:
   static std::variant<std::unique_ptr<EditorSession>, std::string> open(const std::filesystem::path& game_dir);
 
-  SceneDocument& document() { return *document_; }
+  SceneDocument& document() { return document_; }
   const std::filesystem::path& game_dir() const { return game_dir_; }
 
   // The scene to draw: the live runtime while playing, otherwise the edited scene.
   const Scene& scene() const;
-  const SceneDesc& scene_desc() const { return document_->desc(); }
+  const SceneDesc& scene_desc() const { return document_.desc(); }
   // Call after every document edit so the preview reflects it.
   void refresh_preview();
 
@@ -91,14 +91,18 @@ class EditorSession {
   void keep_my_edits() { external_change_pending_ = false; }
 
  private:
-  EditorSession() = default;
+  EditorSession(std::filesystem::path game_dir, SceneDocument document);
+  // The first object carrying the environment's properties, or kNoObject.
+  ObjectId find_environment() const;
+  // The selection after an edit that renumbers the objects: the one called `name`.
+  void refresh_and_reselect(const std::string& name);
   ObjectId place_new(int node, Vec3 position);
   // Name of the selected object ("" without one): how the selection is found again after an edit
   // that renumbers the objects.
   std::string selected_name() const;
 
   std::filesystem::path game_dir_;
-  std::optional<SceneDocument> document_;
+  SceneDocument document_;
   Scene preview_;
   ObjectId selection_ = kNoObject;
   PlayState play_state_ = PlayState::Editing;

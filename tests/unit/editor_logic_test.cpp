@@ -58,6 +58,13 @@ constexpr float kLocalX = 2.0f;            // that point in the terrain's own sp
 constexpr float kLocalZ = 3.0f;
 constexpr float kLocalRadius = 3.0f;       // the radius, halved by the terrain's scale
 constexpr float kLocalMeters = 0.5f;       // two meters, quartered by its height scale
+constexpr Vec3 kMirroredScale{-2.0f, 0.0f, 3.0f};  // one part below the smallest scale, one at nothing
+constexpr float kSmallestScale = 0.001f;
+constexpr Vec3 kUsableScale{0.001f, 0.001f, 3.0f};
+constexpr const char* kFirstScript = "player.rb";
+constexpr const char* kMiddleScript = "enemy_ai.rb";
+constexpr const char* kLastScript = "coin.rb";
+constexpr std::size_t kMiddle = 1;
 constexpr const char* kBodies[] = {"static", "dynamic", "vehicle"};
 constexpr int kBodyCount = 3;
 
@@ -143,6 +150,18 @@ TEST_CASE("a mesh lists each of its materials once, in the order its parts use t
   mesh.primitives = {part_with(kWood), part_with(kNoIndex), part_with(kMetal), part_with(kWood)};
   CHECK(materials_of(mesh) == std::vector<int>{kWood, kMetal});
   CHECK(materials_of(MeshDesc{}).empty());
+}
+
+TEST_CASE("a list without one of its items keeps the others in order") {
+  const std::vector<std::string> scripts = {kFirstScript, kMiddleScript, kLastScript};
+  CHECK(without_item(scripts, kMiddle) == std::vector<std::string>{kFirstScript, kLastScript});
+  CHECK(without_item(scripts, 0) == std::vector<std::string>{kMiddleScript, kLastScript});
+  CHECK(without_item({kFirstScript}, 0).empty());
+}
+
+TEST_CASE("a vector kept at least so big raises only the parts that are below") {
+  CHECK(approx_equal(at_least(kMirroredScale, kSmallestScale), kUsableScale, kTolerance));
+  CHECK(approx_equal(at_least(kUsableScale, kSmallestScale), kUsableScale, kTolerance));
 }
 
 TEST_CASE("the corners of a box follow the object's placement") {

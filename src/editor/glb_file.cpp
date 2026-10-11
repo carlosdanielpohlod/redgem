@@ -8,10 +8,10 @@ namespace redgem {
 namespace {
 
 // Binary glTF 2.0 layout: 12-byte header, then chunks of (length, type, data).
-constexpr std::uint32_t kGlbMagic = 0x46546C67;      // "glTF"
+constexpr std::uint32_t kGlbMagic = 0x46546C67;  // "glTF"
 constexpr std::uint32_t kGlbVersion = 2;
-constexpr std::uint32_t kChunkJson = 0x4E4F534A;     // "JSON"
-constexpr std::uint32_t kChunkBin = 0x004E4942;      // "BIN\0"
+constexpr std::uint32_t kChunkJson = 0x4E4F534A;  // "JSON"
+constexpr std::uint32_t kChunkBin = 0x004E4942;   // "BIN\0"
 constexpr std::size_t kHeaderBytes = 12;
 constexpr std::size_t kChunkHeaderBytes = 8;
 constexpr std::size_t kChunkAlignment = 4;
@@ -50,27 +50,37 @@ std::vector<std::uint8_t> glb_bytes(const std::string& json, const std::vector<s
   return out;
 }
 
+// False when the bytes could not all be written to a new file at `path`.
+bool write_bytes(const std::filesystem::path& path, const std::vector<std::uint8_t>& bytes) {
+  std::ofstream file(path, std::ios::binary | std::ios::trunc);
+  return file && file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+}
+
+void remove_if_there(const std::filesystem::path& path) {
+  std::error_code ignored;
+  std::filesystem::remove(path, ignored);
+}
+
 // Writes to a temporary file first, so a failed save never leaves half a scene behind.
 bool write_atomically(const std::filesystem::path& path, const std::vector<std::uint8_t>& bytes, std::string& error) {
   const std::filesystem::path temp = path.string() + kTempSuffix;
-  std::error_code fs_error;
-  {
-    std::ofstream file(temp, std::ios::binary | std::ios::trunc);
-    if (!file || !file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()))) {
-      error = "cannot write " + temp.string();
-      file.close();
-      std::filesystem::remove(temp, fs_error);
-      return false;
-    }
-  }
-  std::filesystem::rename(temp, path, fs_error);
-  if (fs_error) {
-    error = "cannot replace " + path.string() + ": " + fs_error.message();
-    std::error_code cleanup;
-    std::filesystem::remove(temp, cleanup);
+  if (!write_bytes(temp, bytes)) {
+    error = "cannot write " + temp.string();
+    remove_if_there(temp);
     return false;
   }
-  return true;
+  std::error_code fs_error;
+  std::filesystem::rename(temp, path, fs_error);
+  if (!fs_error) return true;
+  error = "cannot replace " + path.string() + ": " + fs_error.message();
+  remove_if_there(temp);
+  return false;
+}
+
+std::optional<std::vector<std::uint8_t>> file_bytes(const std::filesystem::path& path) {
+  std::ifstream in(path, std::ios::binary);
+  if (!in) return std::nullopt;
+  return std::vector<std::uint8_t>((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 }
 
 bool is_glb(const std::vector<std::uint8_t>& data) {
@@ -108,21 +118,18 @@ std::string read_chunks(const std::vector<std::uint8_t>& data, GlbFile& glb) {
 
 }  // namespace
 
-std::size_t glb_padded_size(std::size_t size) { return (size + kChunkAlignment - 1) / kChunkAlignment * kChunkAlignment; }
+std::size_t glb_padded_size(std::size_t size) {
+  return (size + kChunkAlignment - 1) / kChunkAlignment * kChunkAlignment;
+}
 
 std::optional<GlbFile> read_glb(const std::filesystem::path& path, std::string& error) {
-  std::ifstream in(path, std::ios::binary);
-  if (!in) {
+  const auto data = file_bytes(path);
+  if (!data) {
     error = "cannot open " + path.string();
     return std::nullopt;
   }
-  const std::vector<std::uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-  if (!is_glb(data)) {
-    error = path.string() + " is not a glTF 2.0 binary file";
-    return std::nullopt;
-  }
   GlbFile glb;
-  const std::string problem = read_chunks(data, glb);
+  const std::string problem = is_glb(*data) ? read_chunks(*data, glb) : " is not a glTF 2.0 binary file";
   if (!problem.empty()) {
     error = path.string() + problem;
     return std::nullopt;

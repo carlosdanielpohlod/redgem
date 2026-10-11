@@ -26,7 +26,8 @@ void save(ScriptEditor& editor) {
 // Where the script stands: changed outside, broken, saved and fine, or being edited.
 void draw_status(const ScriptEditor& editor) {
   if (editor.changed_on_disk()) {
-    ImGui::TextColored(warning_color(), ICON_FA_TRIANGLE_EXCLAMATION "  Changed outside the editor: Save keeps this, Revert loads the file");
+    ImGui::TextColored(warning_color(), ICON_FA_TRIANGLE_EXCLAMATION
+                       "  Changed outside the editor: Save keeps this, Revert loads the file");
   } else if (!editor.syntax_error().empty()) {
     ImGui::TextColored(error_color(), ICON_FA_CIRCLE_XMARK "  %s", editor.syntax_error().c_str());
   } else if (!editor.modified()) {
@@ -36,26 +37,72 @@ void draw_status(const ScriptEditor& editor) {
   }
 }
 
-void draw_body(ScriptEditor& editor, const std::string& window_name, ScriptTabsResult& result) {
+// Save, Revert, Split right, Open externally, and where the script stands.
+void draw_file_buttons(ScriptEditor& editor) {
   if (ImGui::SmallButton(kSaveLabel)) save(editor);
   tooltip("Ctrl+S. Play saves and reloads scripts too.");
   ImGui::SameLine();
   ImGui::BeginDisabled(!editor.modified());
   if (ImGui::SmallButton(ICON_FA_ROTATE_LEFT "  Revert")) editor.revert();
   ImGui::EndDisabled();
-  ImGui::SameLine();
+}
+
+void draw_view_buttons(const ScriptEditor& editor, const std::string& window_name, ScriptTabsResult& result) {
   if (ImGui::SmallButton(ICON_FA_TABLE_COLUMNS "  Split right")) result.split_right = window_name;
   tooltip("Show this script next to the others (or drag its tab anywhere)");
   ImGui::SameLine();
   if (ImGui::SmallButton(ICON_FA_ARROW_UP_RIGHT_FROM_SQUARE "  Open externally")) editor.open_externally();
+}
+
+// Save and Revert, Split right and Open externally, and where the script stands.
+void draw_tab_bar(ScriptEditor& editor, const std::string& window_name, ScriptTabsResult& result) {
+  draw_file_buttons(editor);
+  ImGui::SameLine();
+  draw_view_buttons(editor, window_name, result);
   ImGui::SameLine();
   draw_status(editor);
+}
+
+// The code itself, filling the rest of the tab. Ctrl+S in it saves.
+void draw_code(ScriptEditor& editor) {
   ImGui::PushFont(code_font(), 0.0f);
   ImGui::InputTextMultiline(kCodeId, &editor.text(), ImVec2(editor_config::kFillWidth, editor_config::kFillWidth),
                             ImGuiInputTextFlags_AllowTabInput);
   ImGui::PopFont();
   const ImGuiIO& io = ImGui::GetIO();
   if (ImGui::IsItemActive() && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false)) save(editor);
+}
+
+void draw_body(ScriptEditor& editor, const std::string& window_name, ScriptTabsResult& result) {
+  draw_tab_bar(editor, window_name, result);
+  draw_code(editor);
+}
+
+// Save / Discard / Cancel for a tab closed with unsaved changes.
+void save_and_close(ScriptWorkspace& scripts, ScriptEditor& editor, const std::string& file) {
+  std::string error;
+  if (editor.save(error)) {
+    scripts.close(file);
+  } else {
+    log::error(error);
+  }
+}
+
+// The dialog's three buttons. True once the question is answered (or the script is gone).
+bool draw_close_choices(ScriptWorkspace& scripts, const std::string& file) {
+  ScriptEditor* editor = scripts.find(file);
+  bool done = editor == nullptr;
+  if (ImGui::Button(kSaveLabel) && editor != nullptr) {
+    save_and_close(scripts, *editor, file);
+    done = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button(kDiscardLabel)) {
+    scripts.close(file);
+    done = true;
+  }
+  ImGui::SameLine();
+  return ImGui::Button(kCancelLabel) || done;
 }
 
 // Save / Discard / Cancel for a tab closed with unsaved changes.
@@ -67,29 +114,26 @@ void draw_close_dialog(ScriptWorkspace& scripts, std::string& pending_close) {
   ImGui::SameLine();
   ImGui::Text("Save changes to %s?", pending_close.c_str());
   ImGui::Spacing();
-  ScriptEditor* editor = scripts.find(pending_close);
-  bool done = editor == nullptr;
-  if (ImGui::Button(kSaveLabel) && editor != nullptr) {
-    std::string error;
-    if (editor->save(error)) {
-      scripts.close(pending_close);
-    } else {
-      log::error(error);
-    }
-    done = true;
-  }
-  ImGui::SameLine();
-  if (ImGui::Button(kDiscardLabel)) {
-    scripts.close(pending_close);
-    done = true;
-  }
-  ImGui::SameLine();
-  if (ImGui::Button(kCancelLabel)) done = true;
-  if (done) {
+  if (draw_close_choices(scripts, pending_close)) {
     pending_close.clear();
     ImGui::CloseCurrentPopup();
   }
   ImGui::EndPopup();
+}
+
+// One script's window. False when its close button was pressed.
+bool draw_tab(ScriptEditor& editor, unsigned int new_tab_dock, bool focus, ScriptTabsResult& result) {
+  const std::string name = script_window_name(editor.file_name());
+  ImGui::SetNextWindowDockID(new_tab_dock, ImGuiCond_FirstUseEver);
+  if (focus) ImGui::SetNextWindowFocus();
+  bool open = true;
+  const ImGuiWindowFlags flags = editor.modified() ? ImGuiWindowFlags_UnsavedDocument : ImGuiWindowFlags_None;
+  if (ImGui::Begin(name.c_str(), &open, flags)) {
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) result.focused_dock = ImGui::GetWindowDockID();
+    draw_body(editor, name, result);
+  }
+  ImGui::End();
+  return open;
 }
 
 }  // namespace
@@ -100,31 +144,19 @@ std::string script_window_name(const std::string& file_name) {
 }
 
 ScriptTabsResult draw_script_tabs(ScriptWorkspace& scripts, unsigned int new_tab_dock) {
-  std::string& pending_close = g_pending_close;
   ScriptTabsResult result;
   const std::optional<std::string> focus = scripts.take_focus_request();
   std::vector<std::string> closed;
   for (const auto& tab : scripts.tabs()) {
-    ScriptEditor& editor = *tab;
-    const std::string name = script_window_name(editor.file_name());
-    ImGui::SetNextWindowDockID(new_tab_dock, ImGuiCond_FirstUseEver);
-    if (focus == editor.file_name()) ImGui::SetNextWindowFocus();
-    bool open = true;
-    const ImGuiWindowFlags flags = editor.modified() ? ImGuiWindowFlags_UnsavedDocument : ImGuiWindowFlags_None;
-    if (ImGui::Begin(name.c_str(), &open, flags)) {
-      if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) result.focused_dock = ImGui::GetWindowDockID();
-      draw_body(editor, name, result);
-    }
-    ImGui::End();
-    if (open) continue;
-    if (editor.modified()) {
-      pending_close = editor.file_name();
+    if (draw_tab(*tab, new_tab_dock, focus == tab->file_name(), result)) continue;
+    if (tab->modified()) {
+      g_pending_close = tab->file_name();  // asked about first (see draw_close_dialog)
     } else {
-      closed.push_back(editor.file_name());
+      closed.push_back(tab->file_name());
     }
   }
   for (const std::string& file : closed) scripts.close(file);
-  draw_close_dialog(scripts, pending_close);
+  draw_close_dialog(scripts, g_pending_close);
   return result;
 }
 

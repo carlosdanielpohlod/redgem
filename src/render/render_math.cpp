@@ -3,6 +3,7 @@
 #include <raymath.h>
 
 #include <cmath>
+#include <cstring>
 
 #include "core/config.hpp"
 
@@ -10,12 +11,22 @@ namespace redgem::render_math {
 namespace {
 
 constexpr const char* kRendererLine = "Renderer:";
-constexpr int kSmallestTarget = 1;  // pixels: a render target cannot be empty
+constexpr int kSmallestTarget = 1;      // pixels: a render target cannot be empty
+constexpr std::size_t kMatrixSide = 4;  // rows, and columns, of a matrix
 
 float longest_scale(Vec3 scale) { return std::max({std::fabs(scale.x), std::fabs(scale.y), std::fabs(scale.z)}); }
 
 // Half of a box's diagonal: the radius of the sphere around it.
 float half_diagonal(const Bounds& bounds) { return length(bounds.max - bounds.min) * kHalf; }
+
+// Where an object is in the world, from the places already worked out for the objects before
+// it. (When the parent is not there yet, e.g. after a reparent, ask the scene.)
+Transform placed(const Scene& scene, const GameObject& object, const std::vector<Transform>& worlds,
+                 std::size_t index) {
+  if (object.parent == kNoObject) return object.local;
+  const auto parent = static_cast<std::size_t>(object.parent);
+  return parent < index ? combine(worlds[parent], object.local) : scene.world_transform(object.id);
+}
 
 }  // namespace
 
@@ -37,7 +48,17 @@ std::array<float, kColorChannels> color_floats(::Color color) {
 }
 
 Matrix from_column_major(const std::array<float, kMatrixFloats>& m) {
-  return {m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14], m[3], m[7], m[11], m[15]};
+  // A Matrix keeps its numbers row after row (m0, m4, m8, m12, then m1, ...): the array, turned.
+  std::array<float, kMatrixFloats> rows{};
+  for (std::size_t row = 0; row < kMatrixSide; ++row) {
+    for (std::size_t column = 0; column < kMatrixSide; ++column) {
+      rows[row * kMatrixSide + column] = m[column * kMatrixSide + row];
+    }
+  }
+  static_assert(sizeof(Matrix) == sizeof(rows), "a Matrix is sixteen floats and nothing else");
+  Matrix matrix;
+  std::memcpy(&matrix, rows.data(), sizeof(matrix));
+  return matrix;
 }
 
 Matrix model_matrix(const Transform& t) {
@@ -91,12 +112,7 @@ void world_transforms(const Scene& scene, std::vector<Transform>& worlds) {
   worlds.resize(count);
   for (std::size_t i = 0; i < count; ++i) {
     const GameObject& object = scene.at(static_cast<ObjectId>(i));
-    if (object.destroyed) continue;
-    // (When the parent is not there yet, e.g. after a reparent, ask the scene.)
-    const bool parent_placed = object.parent != kNoObject && static_cast<std::size_t>(object.parent) < i;
-    worlds[i] = object.parent == kNoObject ? object.local
-                : parent_placed            ? combine(worlds[static_cast<std::size_t>(object.parent)], object.local)
-                                           : scene.world_transform(object.id);
+    if (!object.destroyed) worlds[i] = placed(scene, object, worlds, i);
   }
 }
 

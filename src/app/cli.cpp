@@ -50,6 +50,7 @@ constexpr const char* kUsageText =
 
 // A command line being read: what was understood so far, and how far the reading got.
 struct Reading {
+  // cppcheck-suppress uninitMemberVarNoCtor ; a reference: whoever makes one has to give it
   const std::vector<std::string>& args;
   std::size_t next = 0;  // the argument to read next
   CliResult result;

@@ -14,7 +14,7 @@ constexpr const char* kLogId = "log";
 constexpr const char* kIdSeparator = "##";  // ImGui: what follows names the widget without being shown
 
 struct LevelStyle {
-  const char* icon;
+  const char* icon = nullptr;
   ImVec4 color;
 };
 

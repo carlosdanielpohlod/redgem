@@ -42,6 +42,26 @@ constexpr const char* kFontFileType = ".ttf";
 // How a picture's file may be named: as asked for, or with one of the kinds of picture read.
 constexpr const char* kPictureExtensions[] = {"", ".png", ".jpg", ".jpeg"};
 
+// The uniforms raylib has a place for, under the lit shader's own names for them.
+constexpr std::pair<int, const char*> kKnownUniforms[] = {
+    {SHADER_LOC_MATRIX_MODEL, shaders::kModelMatrix},   {SHADER_LOC_MATRIX_NORMAL, shaders::kNormalMatrix},
+    {SHADER_LOC_VECTOR_VIEW, shaders::kViewPosition},   {SHADER_LOC_MAP_EMISSION, shaders::kEmissiveMap},
+    {SHADER_LOC_MAP_NORMAL, shaders::kNormalMap},       {SHADER_LOC_MAP_ROUGHNESS, shaders::kSurfaceMap},
+    {SHADER_LOC_MAP_OCCLUSION, shaders::kOcclusionMap}, {SHADER_LOC_BONE_MATRICES, shaders::kBoneMatrices},
+};
+
+// One part of a mesh, on the graphics card. A part that cannot be drawn is reported and left out.
+std::optional<GpuPrimitive> upload_primitive(const PrimitiveDesc& primitive, const std::string& mesh_name) {
+  std::string error;
+  std::optional<Mesh> mesh = build_mesh(primitive, error);
+  if (!mesh) {
+    log::warning("mesh '" + mesh_name + "': " + error);
+    return std::nullopt;
+  }
+  UploadMesh(&*mesh, false);
+  return GpuPrimitive{*mesh, primitive.material};
+}
+
 // The codes of the letters the game's font holds.
 std::vector<int> ui_letters() {
   std::vector<int> letters;
@@ -63,6 +83,45 @@ void free_maps(Material& material) {
 }  // namespace
 
 // --- Shaders ----------------------------------------------------------------------------------
+
+// What the lit shader takes per object and per material.
+const Renderer::Impl::Uniform Renderer::Impl::kMaterialUniforms[] = {
+    {&Impl::has_normal_map_loc, shaders::kHasNormalMap},
+    {&Impl::normal_scale_loc, shaders::kNormalScale},
+    {&Impl::has_surface_map_loc, shaders::kHasSurfaceMap},
+    {&Impl::occlusion_strength_loc, shaders::kOcclusionStrength},
+    {&Impl::metallic_loc, shaders::kMetallic},
+    {&Impl::roughness_loc, shaders::kRoughness},
+    {&Impl::emissive_loc, shaders::kEmissive},
+    {&Impl::has_emissive_map_loc, shaders::kHasEmissiveMap},
+    {&Impl::alpha_cutoff_loc, shaders::kAlphaCutoff},
+    {&Impl::tint_loc, shaders::kTint},
+    {&Impl::skinned_loc, shaders::kSkinned},
+    {&Impl::wind_loc, shaders::kWindAmount},
+};
+
+// What the lit shader takes once per frame: lights, shadows, reflections and the sky.
+const Renderer::Impl::Uniform Renderer::Impl::kFrameUniforms[] = {
+    {&Impl::shadow_map_loc, shaders::kShadowMap},
+    {&Impl::light_matrix_loc, shaders::kLightViewProjection},
+    {&Impl::shadow_strength_loc, shaders::kShadowStrength},
+    {&Impl::shadow_texel_loc, shaders::kShadowTexel},
+    {&Impl::reflection_map_loc, shaders::kReflectionMap},
+    {&Impl::reflection_strength_loc, shaders::kReflectionStrength},
+    {&Impl::sun_direction_loc, shaders::kSunDirection},
+    {&Impl::sun_color_loc, shaders::kSunColor},
+    {&Impl::ambient_loc, shaders::kAmbientStrength},
+    {&Impl::point_count_loc, shaders::kPointLightCount},
+    {&Impl::point_positions_loc, shaders::kPointLightPositions},
+    {&Impl::point_colors_loc, shaders::kPointLightColors},
+    {&Impl::point_ranges_loc, shaders::kPointLightRanges},
+    {&Impl::fog_color_loc, shaders::kFogColor},
+    {&Impl::fog_density_loc, shaders::kFogDensity},
+    {&Impl::time_loc, shaders::kTime},
+    {&Impl::sky_top_loc, shaders::kSkyTop},
+    {&Impl::sky_horizon_loc, shaders::kSkyHorizon},
+    {&Impl::ground_loc, shaders::kGroundColor},
+};
 
 Shader Renderer::Impl::compile(const char* vertex, const char* fragment, const char* name) {
   const std::string vertex_text = vertex != nullptr ? shaders::for_this_gpu(vertex) : std::string();
@@ -99,49 +158,13 @@ void Renderer::Impl::compile_shaders() {
 
 // What the lit shader takes per object and per material.
 void Renderer::Impl::find_material_uniforms() {
-  shader.locs[SHADER_LOC_MATRIX_MODEL] = GetShaderLocation(shader, shaders::kModelMatrix);
-  shader.locs[SHADER_LOC_MATRIX_NORMAL] = GetShaderLocation(shader, shaders::kNormalMatrix);
-  shader.locs[SHADER_LOC_VECTOR_VIEW] = GetShaderLocation(shader, shaders::kViewPosition);
-  shader.locs[SHADER_LOC_MAP_EMISSION] = GetShaderLocation(shader, shaders::kEmissiveMap);
-  shader.locs[SHADER_LOC_MAP_NORMAL] = GetShaderLocation(shader, shaders::kNormalMap);
-  shader.locs[SHADER_LOC_MAP_ROUGHNESS] = GetShaderLocation(shader, shaders::kSurfaceMap);
-  shader.locs[SHADER_LOC_MAP_OCCLUSION] = GetShaderLocation(shader, shaders::kOcclusionMap);
-  shader.locs[SHADER_LOC_BONE_MATRICES] = GetShaderLocation(shader, shaders::kBoneMatrices);
-  has_normal_map_loc = GetShaderLocation(shader, shaders::kHasNormalMap);
-  normal_scale_loc = GetShaderLocation(shader, shaders::kNormalScale);
-  has_surface_map_loc = GetShaderLocation(shader, shaders::kHasSurfaceMap);
-  occlusion_strength_loc = GetShaderLocation(shader, shaders::kOcclusionStrength);
-  metallic_loc = GetShaderLocation(shader, shaders::kMetallic);
-  roughness_loc = GetShaderLocation(shader, shaders::kRoughness);
-  emissive_loc = GetShaderLocation(shader, shaders::kEmissive);
-  has_emissive_map_loc = GetShaderLocation(shader, shaders::kHasEmissiveMap);
-  alpha_cutoff_loc = GetShaderLocation(shader, shaders::kAlphaCutoff);
-  tint_loc = GetShaderLocation(shader, shaders::kTint);
-  skinned_loc = GetShaderLocation(shader, shaders::kSkinned);
-  wind_loc = GetShaderLocation(shader, shaders::kWindAmount);
+  for (const auto& [place, name] : kKnownUniforms) shader.locs[place] = GetShaderLocation(shader, name);
+  for (const Uniform& uniform : kMaterialUniforms) this->*uniform.location = GetShaderLocation(shader, uniform.name);
 }
 
 // What the lit shader takes once per frame: lights, shadows, reflections and the sky.
 void Renderer::Impl::find_light_uniforms() {
-  shadow_map_loc = GetShaderLocation(shader, shaders::kShadowMap);
-  light_matrix_loc = GetShaderLocation(shader, shaders::kLightViewProjection);
-  shadow_strength_loc = GetShaderLocation(shader, shaders::kShadowStrength);
-  shadow_texel_loc = GetShaderLocation(shader, shaders::kShadowTexel);
-  reflection_map_loc = GetShaderLocation(shader, shaders::kReflectionMap);
-  reflection_strength_loc = GetShaderLocation(shader, shaders::kReflectionStrength);
-  sun_direction_loc = GetShaderLocation(shader, shaders::kSunDirection);
-  sun_color_loc = GetShaderLocation(shader, shaders::kSunColor);
-  ambient_loc = GetShaderLocation(shader, shaders::kAmbientStrength);
-  point_count_loc = GetShaderLocation(shader, shaders::kPointLightCount);
-  point_positions_loc = GetShaderLocation(shader, shaders::kPointLightPositions);
-  point_colors_loc = GetShaderLocation(shader, shaders::kPointLightColors);
-  point_ranges_loc = GetShaderLocation(shader, shaders::kPointLightRanges);
-  fog_color_loc = GetShaderLocation(shader, shaders::kFogColor);
-  fog_density_loc = GetShaderLocation(shader, shaders::kFogDensity);
-  time_loc = GetShaderLocation(shader, shaders::kTime);
-  sky_top_loc = GetShaderLocation(shader, shaders::kSkyTop);
-  sky_horizon_loc = GetShaderLocation(shader, shaders::kSkyHorizon);
-  ground_loc = GetShaderLocation(shader, shaders::kGroundColor);
+  for (const Uniform& uniform : kFrameUniforms) this->*uniform.location = GetShaderLocation(shader, uniform.name);
 }
 
 void Renderer::Impl::find_depth_and_particle_uniforms() {
@@ -192,11 +215,7 @@ void Renderer::Impl::release() {
 }
 
 void Renderer::Impl::release_assets() {
-  for (auto& primitives : meshes) {
-    for (GpuPrimitive& primitive : primitives) UnloadMesh(primitive.mesh);
-  }
-  meshes.clear();
-  mesh_bounds.clear();
+  release_meshes();
   skins.clear();
   for (Texture2D& texture : textures) UnloadTexture(texture);
   textures.clear();
@@ -204,6 +223,14 @@ void Renderer::Impl::release_assets() {
   for (Material& material : materials) MemFree(material.maps);
   materials.clear();
   material_factors.clear();
+}
+
+void Renderer::Impl::release_meshes() {
+  for (auto& primitives : meshes) {
+    for (GpuPrimitive& primitive : primitives) UnloadMesh(primitive.mesh);
+  }
+  meshes.clear();
+  mesh_bounds.clear();
 }
 
 void Renderer::Impl::release_sky() {
@@ -256,16 +283,23 @@ Texture2D Renderer::Impl::load_depth_texture(unsigned int framebuffer, int width
   return depth;
 }
 
+// An empty color texture, attached to the framebuffer being set up.
+Texture2D Renderer::Impl::load_color_texture(unsigned int framebuffer, int width, int height, int format) {
+  Texture2D color{};
+  color.id = rlLoadTexture(nullptr, width, height, format, kOneMipLevel);
+  color.width = width;
+  color.height = height;
+  color.format = format;
+  color.mipmaps = kOneMipLevel;
+  rlFramebufferAttach(framebuffer, color.id, RL_ATTACHMENT_COLOR_CHANNEL0, RL_ATTACHMENT_TEXTURE2D, 0);
+  return color;
+}
+
 RenderTexture2D Renderer::Impl::load_target(int width, int height, int format, bool with_depth) {
   RenderTexture2D target{};
   target.id = rlLoadFramebuffer();
   rlEnableFramebuffer(target.id);
-  target.texture.id = rlLoadTexture(nullptr, width, height, format, kOneMipLevel);
-  target.texture.width = width;
-  target.texture.height = height;
-  target.texture.format = format;
-  target.texture.mipmaps = kOneMipLevel;
-  rlFramebufferAttach(target.id, target.texture.id, RL_ATTACHMENT_COLOR_CHANNEL0, RL_ATTACHMENT_TEXTURE2D, 0);
+  target.texture = load_color_texture(target.id, width, height, format);
   if (with_depth) target.depth = load_depth_texture(target.id, width, height);
   const bool complete = rlFramebufferComplete(target.id);
   rlDisableFramebuffer();
@@ -355,19 +389,12 @@ void Renderer::Impl::refresh_material_values(const SceneDesc& desc) {
   skins = desc.skins;
 }
 
-// The parts of a mesh, on the graphics card. Parts that cannot be drawn are reported and left out.
+// The parts of a mesh, on the graphics card.
 std::vector<GpuPrimitive> Renderer::Impl::upload_mesh(const MeshDesc& mesh_desc) {
   std::vector<GpuPrimitive> primitives;
   for (const PrimitiveDesc& source : mesh_desc.primitives) {
     for (const PrimitiveDesc& primitive : split_primitive(source, config::kMaxVerticesPerMesh)) {
-      std::string error;
-      std::optional<Mesh> mesh = build_mesh(primitive, error);
-      if (!mesh) {
-        log::warning("mesh '" + mesh_desc.name + "': " + error);
-        continue;
-      }
-      UploadMesh(&*mesh, false);
-      primitives.push_back({*mesh, primitive.material});
+      if (const auto uploaded = upload_primitive(primitive, mesh_desc.name)) primitives.push_back(*uploaded);
     }
   }
   return primitives;

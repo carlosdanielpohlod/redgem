@@ -113,50 +113,86 @@ class EditorApp {
 
  private:
   EditorApp() = default;
+  void open_window();
   bool editing() const;  // not playing
   ui::PanelContext panel_context();
   // Before drawing: files changed outside, input, the running game.
+  void update_before_drawing();
   void check_files_on_disk();
   void handle_shortcuts();
+  void handle_window_shortcuts(bool was_editing);
+  void handle_editing_shortcuts();
+  void handle_document_shortcuts();
+  void handle_gizmo_keys();
   void update_camera();
   void feed_game();
   // The Scene view's picture.
   void render_viewport_texture();
   void aim_viewport_camera(const Scene& scene);
   void sync_renderer_assets();
+  void draw_over_world(Engine* playing);
   void draw_overlays();
   void draw_object_marks();
+  void draw_selection_box();
+  void draw_brush();
   // The interface, top to bottom.
+  void draw_interface();
   void draw_menu_bar();
   void draw_file_menu();
+  void draw_game_file_items();
   void draw_edit_menu();
+  void draw_undo_items();
+  void draw_selection_items();
   void draw_view_menu();
+  void draw_game_object_menu();
+  void draw_help_menu();
   void draw_graphics_card_menu();
   void draw_build_targets();
   void draw_toolbar();
   void draw_gizmo_tools();
   void draw_play_controls();
   void draw_game_tools();
+  void draw_game_name();
+  void draw_build_button();
   void draw_status_bar();
+  void draw_last_message();
+  void draw_scene_summary();
   void draw_dockspace();
   void build_default_layout(unsigned int dock);
   void apply_pending_split();
   unsigned int new_script_dock() const;
   void draw_panels();
+  void draw_side_panels(ui::PanelContext& context);
+  void draw_script_tabs();
   void draw_viewport_window();
   void draw_viewport_image();
   void draw_viewport_drop_target();
+  // What was dropped on a point of the Scene view (viewport pixels).
+  void drop_model(const char* model_file, float x, float y);
+  void drop_script(const char* script_file, float x, float y);
+  void track_viewport_focus();
+  void draw_play_border();
   void draw_viewport_hint(bool playing);
   void use_viewport_tools();
   void use_brush();
   void draw_gizmo(float x, float y, float width, float height);
+  void manipulate(float* model, float aspect);
+  void track_gizmo_drag(bool using_gizmo);
+  void end_abandoned_gizmo_drag();
   void apply_gizmo_drag(const Transform& world);
   void update_title();
   void draw_dialogs();
   void draw_unsaved_dialog();
+  void draw_unsaved_choices();
+  void save_and_leave();
+  void leave_without_saving();
+  void cancel_leaving();
   void draw_external_change_dialog();
+  void draw_external_change_choices();
   void draw_shortcuts_dialog();
   bool editing_blocked() const;
+  void save_scripts();
+  void take_requested_screenshot();
   float frame_seconds() const;
 
   std::unique_ptr<ConsoleLog> console_;
@@ -167,8 +203,8 @@ class EditorApp {
   std::unique_ptr<ScriptWorkspace> scripts_;
   PanelVisibility panels_;
   ui::TerrainTool terrain_tool_;
-  bool stroke_started_ = false;       // a brush stroke is in progress (one undo step)
-  std::optional<Vec3> brush_point_;   // where the brush is on the ground this frame, if it is over it
+  bool stroke_started_ = false;               // a brush stroke is in progress (one undo step)
+  std::optional<Vec3> brush_point_;           // where the brush is on the ground this frame, if it is over it
   std::optional<std::string> pending_split_;  // window name of a script tab to split off
   unsigned int center_dock_ = 0;              // where the Scene and new script tabs start
   unsigned int script_dock_ = 0;              // dock of the last focused script tab

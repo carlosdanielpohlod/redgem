@@ -83,14 +83,10 @@ float emissive_strength(const MaterialDesc& material) {
 
 bool needs_emissive_strength(const MaterialDesc& material) { return emissive_strength(material) > kUnitFactor; }
 
-nlohmann::json material_json(const MaterialDesc& material, const nlohmann::json& original) {
-  nlohmann::json out = original.is_object() ? original : nlohmann::json::object();
-  out[kName] = material.name;
-  const Color& c = material.base_color;
-  out[kPbr][kBaseColorFactor] = {c.r, c.g, c.b, c.a};
-  out[kPbr][kMetallicFactor] = material.metallic;
-  out[kPbr][kRoughnessFactor] = material.roughness;
-  // glTF factors stop at 1; brighter emission goes through KHR_materials_emissive_strength.
+namespace {
+
+// glTF factors stop at 1; brighter emission goes through KHR_materials_emissive_strength.
+void write_emission(nlohmann::json& out, const MaterialDesc& material) {
   const float strength = emissive_strength(material);
   const Vec3 factor = material.emissive / strength;
   out[kEmissiveFactor] = {factor.x, factor.y, factor.z};
@@ -99,6 +95,18 @@ nlohmann::json material_json(const MaterialDesc& material, const nlohmann::json&
   } else if (out.contains(kExtensions)) {
     out[kExtensions].erase(kEmissiveStrengthExtension);
   }
+}
+
+}  // namespace
+
+nlohmann::json material_json(const MaterialDesc& material, const nlohmann::json& original) {
+  nlohmann::json out = original.is_object() ? original : nlohmann::json::object();
+  out[kName] = material.name;
+  const Color& c = material.base_color;
+  out[kPbr][kBaseColorFactor] = {c.r, c.g, c.b, c.a};
+  out[kPbr][kMetallicFactor] = material.metallic;
+  out[kPbr][kRoughnessFactor] = material.roughness;
+  write_emission(out, material);
   return out;
 }
 

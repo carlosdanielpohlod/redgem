@@ -78,6 +78,10 @@ void reset_script_tabs_state();
 ObjectId import_model(EditorSession& session, const std::string& model_file, Vec3 position,
                       ObjectId parent = kNoObject);
 
+// A field for a new script's name with a button next to it, and under them the rule a name that
+// cannot be used breaks. True when the button (or Enter) asked for a script with a usable name.
+bool draw_new_script_form(const char* id, const char* hint, const char* button_label, std::string& name);
+
 // Opens a script in its own tab (or brings the tab to the front).
 void open_script(ScriptWorkspace& scripts, const std::string& file_name);
 

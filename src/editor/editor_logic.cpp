@@ -120,6 +120,15 @@ float fly_axis(bool negative_down, bool positive_down) {
   return (positive_down ? kFlyAxisFull : 0.0f) - (negative_down ? kFlyAxisFull : 0.0f);
 }
 
+std::vector<std::string> without_item(std::vector<std::string> items, std::size_t index) {
+  items.erase(items.begin() + static_cast<std::ptrdiff_t>(index));
+  return items;
+}
+
+Vec3 at_least(Vec3 value, float lowest) {
+  return {std::max(value.x, lowest), std::max(value.y, lowest), std::max(value.z, lowest)};
+}
+
 SculptMode reversed(SculptMode mode) {
   if (mode == SculptMode::Raise) return SculptMode::Lower;
   return mode == SculptMode::Lower ? SculptMode::Raise : mode;
@@ -140,7 +149,8 @@ Vec3 to_world(const Transform& world, Vec3 point) {
   return world.position + rotate(world.rotation, hadamard(point, world.scale));
 }
 
-TerrainBrush local_brush(const Transform& terrain_world, Vec3 world_point, float radius, float amount, SculptMode mode) {
+TerrainBrush local_brush(const Transform& terrain_world, Vec3 world_point, float radius, float amount,
+                         SculptMode mode) {
   const Vec3 local = to_local(terrain_world, world_point);
   return {local.x, local.z, radius / std::fabs(terrain_world.scale.x),
           moves_ground(mode) ? amount / std::fabs(terrain_world.scale.y) : amount, mode};

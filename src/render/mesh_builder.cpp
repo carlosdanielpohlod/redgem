@@ -59,6 +59,21 @@ unsigned short* short_indices(const std::vector<std::uint32_t>& indices) {
   return out;
 }
 
+// What a vertex has besides its place and normal: texture coordinates (zero when the primitive
+// has none), a color (white likewise) and, for skinned meshes, its joints and weights (raylib's
+// bone attributes).
+void copy_vertex_data(Mesh& mesh, const PrimitiveDesc& primitive) {
+  const std::size_t texcoord_count = vertex_count_of(primitive) * config::kFloatsPerTexcoord;
+  const std::size_t color_count = vertex_count_of(primitive) * config::kChannelsPerColor;
+  const VertexData has = vertex_data_of(primitive);
+  mesh.texcoords =
+      has.texcoords ? copy_array(primitive.texcoords.data(), texcoord_count) : zeroed_array<float>(texcoord_count);
+  mesh.colors = has.colors ? copy_array(primitive.colors.data(), color_count) : white_colors(color_count);
+  if (!has.skin) return;
+  mesh.boneIds = copy_array(primitive.joints.data(), primitive.joints.size());
+  mesh.boneWeights = copy_array(primitive.weights.data(), primitive.weights.size());
+}
+
 // Appends the `width` values vertex `source` has in `in` to `out`.
 template <typename T>
 void append_vertex_values(std::vector<T>& out, const std::vector<T>& in, std::uint32_t source, std::size_t width) {
@@ -151,24 +166,12 @@ std::optional<Mesh> build_mesh(const PrimitiveDesc& primitive, std::string& erro
     error = problem;
     return std::nullopt;
   }
-  const std::size_t vertex_count = vertex_count_of(primitive);
-  const std::size_t texcoord_count = vertex_count * config::kFloatsPerTexcoord;
-  const std::size_t color_count = vertex_count * config::kChannelsPerColor;
-  const VertexData has = vertex_data_of(primitive);
-
   Mesh mesh{};
-  mesh.vertexCount = static_cast<int>(vertex_count);
+  mesh.vertexCount = static_cast<int>(vertex_count_of(primitive));
   mesh.triangleCount = static_cast<int>(primitive.indices.size() / config::kVerticesPerTriangle);
   mesh.vertices = copy_array(primitive.positions.data(), primitive.positions.size());
   mesh.normals = copy_array(primitive.normals.data(), primitive.normals.size());
-  mesh.texcoords =
-      has.texcoords ? copy_array(primitive.texcoords.data(), texcoord_count) : zeroed_array<float>(texcoord_count);
-  mesh.colors = has.colors ? copy_array(primitive.colors.data(), color_count) : white_colors(color_count);
-  // Skinned meshes carry their joints and weights to the GPU (raylib's bone attributes).
-  if (has.skin) {
-    mesh.boneIds = copy_array(primitive.joints.data(), primitive.joints.size());
-    mesh.boneWeights = copy_array(primitive.weights.data(), primitive.weights.size());
-  }
+  copy_vertex_data(mesh, primitive);
   mesh.indices = short_indices(primitive.indices);
   return mesh;
 }

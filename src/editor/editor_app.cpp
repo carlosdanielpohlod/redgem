@@ -29,21 +29,21 @@ namespace {
 
 using namespace editor_config;
 
-constexpr float kBrushLift = 0.05f;            // meters the brush ring floats above the ground
-constexpr float kBrushPoleShare = 0.25f;       // height of the brush's center mark, as a share of its radius
+constexpr float kBrushLift = 0.05f;       // meters the brush ring floats above the ground
+constexpr float kBrushPoleShare = 0.25f;  // height of the brush's center mark, as a share of its radius
 constexpr Vector3 kWorldRight{1.0f, 0.0f, 0.0f};
 constexpr Vector3 kWorldUp{0.0f, 1.0f, 0.0f};
-constexpr float kQuarterTurn = 90.0f;          // degrees: lays a circle flat
-constexpr int kExitSuccess = 0;                // process exit code of a normal run
-constexpr int kBoxEdges = 12;                  // of a wireframe box
+constexpr float kQuarterTurn = 90.0f;  // degrees: lays a circle flat
+constexpr int kExitSuccess = 0;        // process exit code of a normal run
+constexpr int kBoxEdges = 12;          // of a wireframe box
 constexpr int kEdgeEnds = 2;
-constexpr float kRightButtons = 2.0f;          // Build and the Inspector toggle
-constexpr float kSplitRatio = 0.5f;            // a split tab gets half of its group
-constexpr int kMinTabsToSplit = 2;             // a tab needs a neighbour to split away from
-constexpr long long kStartupFrames = 2;        // the dock layout exists from the second frame on
-constexpr float kPlayControls = 2.0f;          // Play/Stop and Pause, centered together
-constexpr float kNoMotionBlur = 0.0f;          // strength of the blur while no game runs
-constexpr int kShortcutColumns = 2;            // keys, and what they do
+constexpr float kRightButtons = 2.0f;    // Build and the Inspector toggle
+constexpr float kSplitRatio = 0.5f;      // a split tab gets half of its group
+constexpr int kMinTabsToSplit = 2;       // a tab needs a neighbour to split away from
+constexpr long long kStartupFrames = 2;  // the dock layout exists from the second frame on
+constexpr float kPlayControls = 2.0f;    // Play/Stop and Pause, centered together
+constexpr float kNoMotionBlur = 0.0f;    // strength of the blur while no game runs
+constexpr int kShortcutColumns = 2;      // keys, and what they do
 constexpr const char* kDockspaceId = "EditorDock";
 constexpr const char* kToolbarId = "##toolbar";
 constexpr const char* kStatusBarId = "##status";
@@ -54,18 +54,26 @@ constexpr const char* kUnsavedPopup = "Unsaved changes";
 constexpr const char* kExternalChangePopup = "Scene changed on disk";
 constexpr const char* kShortcutsPopup = "Keyboard shortcuts";
 // Render textures are stored upside down: flip V when showing them.
-const ImVec2 kFlippedUvTopLeft(0.0f, 1.0f);
-const ImVec2 kFlippedUvBottomRight(1.0f, 0.0f);
+constexpr ImVec2 kFlippedUvTopLeft{0.0f, 1.0f};
+constexpr ImVec2 kFlippedUvBottomRight{1.0f, 0.0f};
 // Which corners (see editor_logic::box_corners) each edge of a box joins.
 constexpr int kBoxEdgeCorners[kBoxEdges][kEdgeEnds] = {{0, 1}, {2, 3}, {4, 5}, {6, 7}, {0, 2}, {1, 3},
                                                        {4, 6}, {5, 7}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
 
 constexpr const char* kShortcuts[][kShortcutColumns] = {
-    {"Ctrl+P", "Play / Stop"},          {"Esc", "Stop playing"},       {kKeysSave, "Save scene"},
-    {"Ctrl+Z / Ctrl+Y", "Undo / Redo"}, {kKeysDuplicate, "Duplicate"}, {kKeysDelete, "Delete"},
-    {"W / E / R", "Move / Rotate / Scale"}, {"Hold Ctrl", "Snap while dragging"}, {kKeysFrame, "Frame selection"},
-    {"Right mouse + WASD/QE", "Fly the camera"}, {"Mouse wheel", "Zoom"},
-    {"Ctrl+B / Ctrl+Alt+B", "Hide / show the left / right panel"}, {kKeysBottomPanel, "Hide / show the bottom panel"},
+    {"Ctrl+P", "Play / Stop"},
+    {"Esc", "Stop playing"},
+    {kKeysSave, "Save scene"},
+    {"Ctrl+Z / Ctrl+Y", "Undo / Redo"},
+    {kKeysDuplicate, "Duplicate"},
+    {kKeysDelete, "Delete"},
+    {"W / E / R", "Move / Rotate / Scale"},
+    {"Hold Ctrl", "Snap while dragging"},
+    {kKeysFrame, "Frame selection"},
+    {"Right mouse + WASD/QE", "Fly the camera"},
+    {"Mouse wheel", "Zoom"},
+    {"Ctrl+B / Ctrl+Alt+B", "Hide / show the left / right panel"},
+    {kKeysBottomPanel, "Hide / show the bottom panel"},
 };
 
 // Saved for this user (not in the game): which card draws the editor and the games it starts.
@@ -79,7 +87,34 @@ constexpr GpuOption kGpuOptions[] = {
     {GpuChoice::Integrated, "Integrated (cooler and quieter, much slower)"},
 };
 
-::Color rgba(const unsigned char (&c)[config::kChannelsPerColor]) { return {c[0], c[1], c[2], c[3]}; }
+// Where each channel is in a color given as four numbers.
+enum ColorChannel { kRed, kGreen, kBlue, kAlpha };
+
+// The systems a game can be built for, as the Build menus offer them.
+struct BuildOption {
+  BuildTarget target;
+  const char* label;
+};
+constexpr BuildOption kBuildOptions[] = {
+    {BuildTarget::Linux, ICON_FA_DESKTOP "  For Linux"},
+    {BuildTarget::Windows, ICON_FA_DESKTOP "  For Windows (.exe)"},
+    {BuildTarget::Android, ICON_FA_MOBILE_SCREEN "  For Android (.apk)"},
+};
+
+// What the gizmo can do: the key that picks each mode and its toolbar button.
+struct GizmoTool {
+  GizmoMode mode;
+  int key;
+  const char* icon;
+  const char* tooltip;
+};
+constexpr GizmoTool kGizmoTools[] = {
+    {GizmoMode::Translate, KEY_W, ICON_FA_UP_DOWN_LEFT_RIGHT, "Move (W)"},
+    {GizmoMode::Rotate, KEY_E, ICON_FA_ROTATE, "Rotate (E)"},
+    {GizmoMode::Scale, KEY_R, ICON_FA_UP_RIGHT_AND_DOWN_LEFT_FROM_CENTER, "Scale (R)"},
+};
+
+::Color rgba(const unsigned char (&c)[config::kChannelsPerColor]) { return {c[kRed], c[kGreen], c[kBlue], c[kAlpha]}; }
 Vector3 rl(Vec3 v) { return {v.x, v.y, v.z}; }
 Vec3 vec(Vector3 v) { return {v.x, v.y, v.z}; }
 
@@ -150,6 +185,73 @@ bool begin_bar(const char* id, ImGuiDir side, float height) {
   return open;
 }
 
+// The strip under the menu bar. Like begin_bar, ImGui::End() closes it whatever this returns.
+bool begin_toolbar() {
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+  const bool open = begin_bar(kToolbarId, ImGuiDir_Up, kToolbarHeight);
+  ImGui::PopStyleVar();
+  return open;
+}
+
+bool begin_status_bar() {
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ImGui::GetStyle().WindowPadding.x, 0.0f));
+  const bool open = begin_bar(kStatusBarId, ImGuiDir_Down, kStatusBarHeight);
+  ImGui::PopStyleVar();
+  return open;
+}
+
+// An empty dock space as big as the window, ready to be split.
+void start_layout(ImGuiID dock) {
+  ImGui::DockBuilderRemoveNode(dock);
+  ImGui::DockBuilderAddNode(dock, ImGuiDockNodeFlags_DockSpace);
+  ImGui::DockBuilderSetNodeSize(dock, ImGui::GetMainViewport()->WorkSize);
+}
+
+// Moves a tab into a new group on the right half of its own. Returns that group's dock.
+ImGuiID split_to_the_right(const ImGuiDockNode& group, const std::string& window_name) {
+  ImGuiID right = 0;
+  ImGuiID left = 0;
+  ImGui::DockBuilderSplitNode(group.ID, ImGuiDir_Right, kSplitRatio, &right, &left);
+  ImGui::DockBuilderDockWindow(window_name.c_str(), right);
+  ImGui::DockBuilderFinish(ImGui::GetID(kDockspaceId));
+  return right;
+}
+
+void draw_shortcuts_table() {
+  if (!ImGui::BeginTable(kShortcutsTableId, kShortcutColumns, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV))
+    return;
+  for (const auto& [keys, action] : kShortcuts) {
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    ImGui::TextColored(ui::accent_color(), "%s", keys);
+    ImGui::TableNextColumn();
+    ImGui::TextUnformatted(action);
+  }
+  ImGui::EndTable();
+}
+
+// What a picture of the scene would not show of a camera, a light or an empty object: a small
+// wire shape where it is, and for the first two a line along where it points.
+void draw_camera_mark(const Transform& world) {
+  DrawCubeWires(rl(world.position), kIconSize, kIconSize, kIconSize, rgba(kIconColor));
+  DrawLine3D(rl(world.position), rl(world.position + world.forward() * kCameraFrustumLength), rgba(kIconColor));
+}
+
+void draw_light_mark(const Transform& world) {
+  DrawSphereWires(rl(world.position), kIconSize, kIconRings, kIconSlices, rgba(kSunColor));
+  DrawLine3D(rl(world.position), rl(world.position + world.forward() * kSunArrowLength), rgba(kSunColor));
+}
+
+void draw_mark(const GameObject& object, const Transform& world) {
+  if (object.camera) {
+    draw_camera_mark(world);
+  } else if (object.light) {
+    draw_light_mark(world);
+  } else if (object.mesh == kNoIndex) {
+    DrawCubeWires(rl(world.position), kIconSize, kIconSize, kIconSize, rgba(kIconColor));
+  }
+}
+
 float icon_button_width() { return ImGui::GetFrameHeight() * kIconButtonWidth; }
 
 ImVec4 level_color(log::Level level) {
@@ -212,19 +314,22 @@ std::variant<std::unique_ptr<EditorApp>, std::string> EditorApp::create(const st
   if (auto* error = std::get_if<std::string>(&opened)) return *error;
   app->session_ = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
   app->scripts_ = std::make_unique<ScriptWorkspace>(game_dir / config::kScriptsDirName);
-
-  app->renderer_ = std::make_unique<Renderer>(window_settings());
-  app->renderer_->upload(app->session_->scene_desc());
-  app->renderer_->set_images_dir(app->session_->game_dir() / config::kImagesDirName);
-  app->viewport_ = std::make_unique<Viewport>();
-  app->audio_ = create_raylib_audio();
-
-  setup_interface();
-  look_through_main_camera(app->camera_, app->session_->scene());
-  app->rescan_files();
-  ui::reset_panel_state();  // the hub may open several games in one run
+  app->open_window();
   log::info("editing " + app->session_->document().path().string());
   return app;
+}
+
+// The window, and what draws and sounds in it, for the game just opened.
+void EditorApp::open_window() {
+  renderer_ = std::make_unique<Renderer>(window_settings());
+  renderer_->upload(session_->scene_desc());
+  renderer_->set_images_dir(session_->game_dir() / config::kImagesDirName);
+  viewport_ = std::make_unique<Viewport>();
+  audio_ = create_raylib_audio();
+  setup_interface();
+  look_through_main_camera(camera_, session_->scene());
+  rescan_files();
+  ui::reset_panel_state();  // the hub may open several games in one run
 }
 
 EditorApp::~EditorApp() {
@@ -255,11 +360,15 @@ bool EditorApp::editing_blocked() const {
 
 // --- Commands ------------------------------------------------------------------------------
 
-void EditorApp::play() {
+void EditorApp::save_scripts() {
   std::string error;
-  // Like an IDE "save all": the game must run the code on screen.
   if (!scripts_->save_all(error)) log::error(error);
+}
+
+void EditorApp::play() {
+  save_scripts();  // like an IDE "save all": the game must run the code on screen
   rescan_files();
+  std::string error;
   if (!session_->play(game_input_, error, audio_.get())) {
     log::error("cannot play: " + error);
     return;
@@ -303,7 +412,7 @@ void EditorApp::request_exit(EditorExit action) {
 std::optional<std::filesystem::path> EditorApp::build(BuildTarget target) {
   if (session_->document().dirty()) save();
   const std::filesystem::path game = session_->game_dir();
-  const std::filesystem::path out =
+  std::filesystem::path out =
       game.parent_path() / editor_logic::build_folder_name(game.filename().string(), build_target_name(target),
                                                            target == host_build_target());
   std::string error;
@@ -317,9 +426,9 @@ std::optional<std::filesystem::path> EditorApp::build(BuildTarget target) {
 }
 
 void EditorApp::draw_build_targets() {
-  if (ImGui::MenuItem(ICON_FA_DESKTOP "  For Linux")) build(BuildTarget::Linux);
-  if (ImGui::MenuItem(ICON_FA_DESKTOP "  For Windows (.exe)")) build(BuildTarget::Windows);
-  if (ImGui::MenuItem(ICON_FA_MOBILE_SCREEN "  For Android (.apk)")) build(BuildTarget::Android);
+  for (const BuildOption& option : kBuildOptions) {
+    if (ImGui::MenuItem(option.label)) build(option.target);
+  }
 }
 
 Vec3 EditorApp::spawn_point() const { return camera_.position() + camera_.forward() * kSpawnDistance; }
@@ -365,6 +474,15 @@ float EditorApp::frame_seconds() const { return fixed_frame_seconds_.value_or(Ge
 
 void EditorApp::frame() {
   ++frame_count_;
+  update_before_drawing();
+  BeginDrawing();
+  ClearBackground(rgba(kViewportBackground));
+  draw_interface();
+  take_requested_screenshot();
+  EndDrawing();
+}
+
+void EditorApp::update_before_drawing() {
   check_files_on_disk();
   handle_shortcuts();
   update_camera();
@@ -372,9 +490,9 @@ void EditorApp::frame() {
   session_->tick(frame_seconds());
   render_viewport_texture();
   update_title();
+}
 
-  BeginDrawing();
-  ClearBackground(rgba(kViewportBackground));
+void EditorApp::draw_interface() {
   rlImGuiBegin();
   ImGuizmo::BeginFrame();
   gizmo_drawn_ = false;
@@ -383,18 +501,22 @@ void EditorApp::frame() {
   draw_status_bar();
   draw_dockspace();
   draw_panels();
-  if (!gizmo_drawn_ && gizmo_dragging_) {
-    gizmo_dragging_ = false;  // the drag ended without the gizmo (selection cleared, play started)
-    session_->document().drop_checkpoint_if_unchanged();
-  }
+  end_abandoned_gizmo_drag();
   draw_dialogs();
   rlImGuiEnd();
+}
 
-  if (screenshot_) {
-    if (!save_window_picture(*screenshot_)) log::error("cannot write " + screenshot_->string());
-    screenshot_.reset();
-  }
-  EndDrawing();
+// A drag that ended without the gizmo being drawn (the selection was cleared, play started).
+void EditorApp::end_abandoned_gizmo_drag() {
+  if (gizmo_drawn_ || !gizmo_dragging_) return;
+  gizmo_dragging_ = false;
+  session_->document().drop_checkpoint_if_unchanged();
+}
+
+void EditorApp::take_requested_screenshot() {
+  if (!screenshot_) return;
+  if (!save_window_picture(*screenshot_)) log::error("cannot write " + screenshot_->string());
+  screenshot_.reset();
 }
 
 void EditorApp::check_files_on_disk() {
@@ -427,17 +549,24 @@ void EditorApp::feed_game() {
 
 void EditorApp::draw_panels() {
   ui::PanelContext context = panel_context();
+  draw_side_panels(context);
+  draw_viewport_window();  // before the script tabs: the Scene tab comes first
+  draw_script_tabs();
+  if (context.files_changed) rescan_files();
+}
+
+void EditorApp::draw_side_panels(ui::PanelContext& context) {
   if (panels_.hierarchy && ui::draw_hierarchy(context).frame_requested) frame_selection();
   if (panels_.inspector) ui::draw_inspector(context);
-  if (panels_.bottom) {
-    ui::draw_project(context);
-    ui::draw_console(*console_);
-  }
-  draw_viewport_window();  // before the script tabs: the Scene tab comes first
+  if (!panels_.bottom) return;
+  ui::draw_project(context);
+  ui::draw_console(*console_);
+}
+
+void EditorApp::draw_script_tabs() {
   const ui::ScriptTabsResult tabs = ui::draw_script_tabs(*scripts_, new_script_dock());
   if (tabs.focused_dock != 0) script_dock_ = tabs.focused_dock;
   if (tabs.split_right) pending_split_ = tabs.split_right;
-  if (context.files_changed) rescan_files();
 }
 
 void EditorApp::draw_dialogs() {
@@ -453,28 +582,37 @@ void EditorApp::draw_unsaved_dialog() {
   ImGui::SameLine();
   ImGui::Text("Save changes to %s before closing?", session_->game_dir().filename().string().c_str());
   ImGui::Spacing();
-  if (ImGui::Button(ui::kSaveLabel)) {
-    save();
-    std::string error;
-    if (!scripts_->save_all(error)) log::error(error);
-    // Stay open if saving the scene or a script failed.
-    quit_confirmed_ = !session_->document().dirty() && !scripts_->any_modified();
-    close_pending_ = false;
-    ImGui::CloseCurrentPopup();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button(ui::kDiscardLabel)) {
-    log::warning("closing without saving");
-    quit_confirmed_ = true;
-    ImGui::CloseCurrentPopup();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button(ui::kCancelLabel)) {
-    close_pending_ = false;
-    exit_action_ = EditorExit::Quit;
-    ImGui::CloseCurrentPopup();
-  }
+  draw_unsaved_choices();
   ImGui::EndPopup();
+}
+
+void EditorApp::draw_unsaved_choices() {
+  if (ImGui::Button(ui::kSaveLabel)) save_and_leave();
+  ImGui::SameLine();
+  if (ImGui::Button(ui::kDiscardLabel)) leave_without_saving();
+  ImGui::SameLine();
+  if (ImGui::Button(ui::kCancelLabel)) cancel_leaving();
+}
+
+void EditorApp::save_and_leave() {
+  save();
+  save_scripts();
+  // Stay open if saving the scene or a script failed.
+  quit_confirmed_ = !session_->document().dirty() && !scripts_->any_modified();
+  close_pending_ = false;
+  ImGui::CloseCurrentPopup();
+}
+
+void EditorApp::leave_without_saving() {
+  log::warning("closing without saving");
+  quit_confirmed_ = true;
+  ImGui::CloseCurrentPopup();
+}
+
+void EditorApp::cancel_leaving() {
+  close_pending_ = false;
+  exit_action_ = EditorExit::Quit;
+  ImGui::CloseCurrentPopup();
 }
 
 void EditorApp::draw_external_change_dialog() {
@@ -484,6 +622,11 @@ void EditorApp::draw_external_change_dialog() {
   if (!ImGui::BeginPopupModal(kExternalChangePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
   ImGui::Text("%s changed on disk (Blender export?) while you have unsaved edits.",
               session_->document().path().filename().string().c_str());
+  draw_external_change_choices();
+  ImGui::EndPopup();
+}
+
+void EditorApp::draw_external_change_choices() {
   if (ImGui::Button("Reload from disk")) {
     if (session_->reload_from_disk()) renderer_->upload(session_->scene_desc());
     ImGui::CloseCurrentPopup();
@@ -493,7 +636,6 @@ void EditorApp::draw_external_change_dialog() {
     session_->keep_my_edits();
     ImGui::CloseCurrentPopup();
   }
-  ImGui::EndPopup();
 }
 
 void EditorApp::draw_shortcuts_dialog() {
@@ -502,16 +644,7 @@ void EditorApp::draw_shortcuts_dialog() {
     shortcuts_open_ = false;
   }
   if (!ImGui::BeginPopupModal(kShortcutsPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
-  if (ImGui::BeginTable(kShortcutsTableId, kShortcutColumns, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV)) {
-    for (const auto& [keys, action] : kShortcuts) {
-      ImGui::TableNextRow();
-      ImGui::TableNextColumn();
-      ImGui::TextColored(ui::accent_color(), "%s", keys);
-      ImGui::TableNextColumn();
-      ImGui::TextUnformatted(action);
-    }
-    ImGui::EndTable();
-  }
+  draw_shortcuts_table();
   if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
   ImGui::EndPopup();
 }
@@ -525,30 +658,43 @@ void EditorApp::update_title() {
 }
 
 void EditorApp::handle_shortcuts() {
-  const ImGuiIO& io = ImGui::GetIO();
-  if (io.WantTextInput || editing_blocked()) return;
-  const bool ctrl = ctrl_down();
-  const bool shift = shift_down();
-  const bool alt = alt_down();
+  if (ImGui::GetIO().WantTextInput || editing_blocked()) return;
   const bool was_editing = editing();  // Play and Stop below take effect on the next frame's shortcuts
-  if (ctrl && IsKeyPressed(KEY_P)) was_editing ? play() : stop();
-  // Panel toggles, as in VS Code.
-  if (ctrl && IsKeyPressed(KEY_B)) (alt ? panels_.inspector : panels_.hierarchy) ^= true;
-  if (ctrl && IsKeyPressed(KEY_J)) panels_.bottom ^= true;
-  if (!was_editing) {
-    if (IsKeyPressed(KEY_ESCAPE)) stop();
-    return;  // the game owns the keyboard while playing
+  if (ctrl_down()) handle_window_shortcuts(was_editing);
+  if (was_editing) {
+    handle_editing_shortcuts();
+  } else if (IsKeyPressed(KEY_ESCAPE)) {
+    stop();  // the only key the game does not own while playing
   }
-  if (ctrl && IsKeyPressed(KEY_S)) save();
-  if (ctrl && IsKeyPressed(KEY_Z)) shift ? session_->redo() : session_->undo();
-  if (ctrl && IsKeyPressed(KEY_Y)) session_->redo();
-  if (ctrl && IsKeyPressed(KEY_D)) session_->duplicate_selection();
+}
+
+// Ctrl + a key, whether a game runs or not: Play / Stop and the panel toggles (as in VS Code).
+void EditorApp::handle_window_shortcuts(bool was_editing) {
+  if (IsKeyPressed(KEY_P)) was_editing ? play() : stop();
+  if (IsKeyPressed(KEY_B)) (alt_down() ? panels_.inspector : panels_.hierarchy) ^= true;
+  if (IsKeyPressed(KEY_J)) panels_.bottom ^= true;
+}
+
+void EditorApp::handle_editing_shortcuts() {
+  if (ctrl_down()) handle_document_shortcuts();
   if (IsKeyPressed(KEY_DELETE)) session_->delete_selection();
-  if (ctrl || IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) return;  // WASD flies the camera
+  if (ctrl_down() || IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) return;  // WASD flies the camera
   if (IsKeyPressed(KEY_F)) frame_selection();
-  if (IsKeyPressed(KEY_W)) gizmo_ = GizmoMode::Translate;
-  if (IsKeyPressed(KEY_E)) gizmo_ = GizmoMode::Rotate;
-  if (IsKeyPressed(KEY_R)) gizmo_ = GizmoMode::Scale;
+  handle_gizmo_keys();
+}
+
+void EditorApp::handle_gizmo_keys() {
+  for (const GizmoTool& tool : kGizmoTools) {
+    if (IsKeyPressed(tool.key)) gizmo_ = tool.mode;
+  }
+}
+
+// Ctrl + a key, while editing.
+void EditorApp::handle_document_shortcuts() {
+  if (IsKeyPressed(KEY_S)) save();
+  if (IsKeyPressed(KEY_Z)) shift_down() ? session_->redo() : session_->undo();
+  if (IsKeyPressed(KEY_Y)) session_->redo();
+  if (IsKeyPressed(KEY_D)) session_->duplicate_selection();
 }
 
 void EditorApp::update_camera() {
@@ -578,13 +724,18 @@ void EditorApp::render_viewport_texture() {
   sync_renderer_assets();
   Engine* playing = edit ? nullptr : session_->runtime();
   renderer_->draw_world(scene, view.camera, &view.target, playing != nullptr ? &playing->particles() : nullptr);
-  BeginTextureMode(view.target);  // overlays and HUD go on top of the finished image
-  if (edit) {
-    BeginMode3D(view.camera);
+  draw_over_world(playing);
+}
+
+// Overlays (while editing) or the game's HUD go on top of the finished image.
+void EditorApp::draw_over_world(Engine* playing) {
+  BeginTextureMode(viewport_->target);
+  if (editing()) {
+    BeginMode3D(viewport_->camera);
     draw_overlays();
     EndMode3D();
-  } else if (Engine* runtime = session_->runtime()) {
-    renderer_->draw_hud(runtime->hud());
+  } else if (playing != nullptr) {
+    renderer_->draw_hud(playing->hud());
   }
   EndTextureMode();
 }
@@ -621,18 +772,25 @@ void EditorApp::sync_renderer_assets() {
 void EditorApp::draw_overlays() {
   DrawGrid(kGridSlices, kGridSpacing);
   draw_object_marks();
+  draw_selection_box();
+  draw_brush();
+}
+
+void EditorApp::draw_selection_box() {
   const Scene& scene = session_->scene();
   const ObjectId selected = session_->selection();
-  if (scene.is_alive(selected)) {
-    const Bounds bounds = bounds_of(scene.at(selected), session_->scene_desc());
-    draw_box(scene.world_transform(selected), bounds, rgba(kSelectionColor));
-  }
+  if (!scene.is_alive(selected)) return;
+  const Bounds bounds = bounds_of(scene.at(selected), session_->scene_desc());
+  draw_box(scene.world_transform(selected), bounds, rgba(kSelectionColor));
+}
+
+// The terrain brush: a ring lying on the ground, and its center.
+void EditorApp::draw_brush() {
   if (!brush_point_) return;
-  // The brush: a ring lying on the ground, and its center.
-  DrawCircle3D(rl(*brush_point_ + Vec3::up() * kBrushLift), terrain_tool_.radius, kWorldRight, kQuarterTurn,
+  const Vec3 center = *brush_point_;
+  DrawCircle3D(rl(center + Vec3::up() * kBrushLift), terrain_tool_.radius, kWorldRight, kQuarterTurn,
                rgba(kSelectionColor));
-  DrawLine3D(rl(*brush_point_), rl(*brush_point_ + Vec3::up() * terrain_tool_.radius * kBrushPoleShare),
-             rgba(kSelectionColor));
+  DrawLine3D(rl(center), rl(center + Vec3::up() * terrain_tool_.radius * kBrushPoleShare), rgba(kSelectionColor));
 }
 
 // What a picture of the scene would not show: triggers, cameras, lights and empty objects.
@@ -644,15 +802,7 @@ void EditorApp::draw_object_marks() {
     if (body_config_from_props(object.props).trigger) {
       draw_box(world, bounds_of(object, session_->scene_desc()), rgba(kTriggerColor));
     }
-    if (object.camera) {
-      DrawCubeWires(rl(world.position), kIconSize, kIconSize, kIconSize, rgba(kIconColor));
-      DrawLine3D(rl(world.position), rl(world.position + world.forward() * kCameraFrustumLength), rgba(kIconColor));
-    } else if (object.light) {
-      DrawSphereWires(rl(world.position), kIconSize, kIconRings, kIconSlices, rgba(kSunColor));
-      DrawLine3D(rl(world.position), rl(world.position + world.forward() * kSunArrowLength), rgba(kSunColor));
-    } else if (object.mesh == kNoIndex) {
-      DrawCubeWires(rl(world.position), kIconSize, kIconSize, kIconSize, rgba(kIconColor));
-    }
+    draw_mark(object, world);
   }
 }
 
@@ -661,62 +811,61 @@ void EditorApp::draw_object_marks() {
 void EditorApp::draw_menu_bar() {
   if (!ImGui::BeginMainMenuBar()) return;
   ImGui::TextColored(ui::accent_color(), ICON_FA_GEM);
-  if (ImGui::BeginMenu("File")) {
-    draw_file_menu();
-    ImGui::EndMenu();
-  }
-  if (ImGui::BeginMenu("Edit")) {
-    draw_edit_menu();
-    ImGui::EndMenu();
-  }
-  if (ImGui::BeginMenu("View")) {
-    draw_view_menu();
-    ImGui::EndMenu();
-  }
-  if (ImGui::BeginMenu("GameObject", editing())) {
-    ui::PanelContext context = panel_context();
-    ui::draw_create_menu(context);
-    ImGui::EndMenu();
-  }
-  if (ImGui::BeginMenu("Help")) {
-    if (ImGui::MenuItem(ICON_FA_KEYBOARD "  Keyboard Shortcuts")) shortcuts_open_ = true;
-    ImGui::EndMenu();
-  }
+  ui::menu("File", [this] { draw_file_menu(); });
+  ui::menu("Edit", [this] { draw_edit_menu(); });
+  ui::menu("View", [this] { draw_view_menu(); });
+  ui::menu("GameObject", [this] { draw_game_object_menu(); }, editing());
+  ui::menu("Help", [this] { draw_help_menu(); });
   ImGui::EndMainMenuBar();
+}
+
+void EditorApp::draw_game_object_menu() {
+  ui::PanelContext context = panel_context();
+  ui::draw_create_menu(context);
+}
+
+void EditorApp::draw_help_menu() {
+  if (ImGui::MenuItem(ICON_FA_KEYBOARD "  Keyboard Shortcuts")) shortcuts_open_ = true;
 }
 
 void EditorApp::draw_file_menu() {
   if (ImGui::MenuItem(ICON_FA_FILE_CIRCLE_PLUS "  New Game...")) request_exit(EditorExit::OpenHub);
   if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Open Game...")) request_exit(EditorExit::OpenHub);
   ImGui::Separator();
-  if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK "  Save Scene", kKeysSave, false, editing())) save();
-  if (ImGui::BeginMenu(ICON_FA_BOX_ARCHIVE "  Build Game", editing())) {
-    draw_build_targets();
-    ImGui::EndMenu();
-  }
-  if (ImGui::MenuItem(ICON_FA_FOLDER "  Show Game Folder")) open_in_system(session_->game_dir());
+  draw_game_file_items();
   ImGui::Separator();
   if (ImGui::MenuItem(ICON_FA_RIGHT_FROM_BRACKET "  Quit")) request_exit(EditorExit::Quit);
 }
 
+// What the File menu offers for the game being edited.
+void EditorApp::draw_game_file_items() {
+  if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK "  Save Scene", kKeysSave, false, editing())) save();
+  ui::menu(ICON_FA_BOX_ARCHIVE "  Build Game", [this] { draw_build_targets(); }, editing());
+  if (ImGui::MenuItem(ICON_FA_FOLDER "  Show Game Folder")) open_in_system(session_->game_dir());
+}
+
 void EditorApp::draw_edit_menu() {
+  draw_undo_items();
+  ImGui::Separator();
+  draw_selection_items();
+  ImGui::Separator();
+  ui::menu(ICON_FA_MICROCHIP "  Graphics Card", [this] { draw_graphics_card_menu(); });
+}
+
+void EditorApp::draw_undo_items() {
   const bool edit = editing();
   const SceneDocument& doc = session_->document();
   if (ImGui::MenuItem(ICON_FA_ROTATE_LEFT "  Undo", kKeysUndo, false, edit && doc.can_undo())) session_->undo();
   if (ImGui::MenuItem(ICON_FA_ROTATE_RIGHT "  Redo", kKeysRedo, false, edit && doc.can_redo())) session_->redo();
-  ImGui::Separator();
+}
+
+void EditorApp::draw_selection_items() {
   const bool has_selection = session_->selection() != kNoObject;
-  if (ImGui::MenuItem(ui::kDuplicateLabel, kKeysDuplicate, false, edit && has_selection)) {
-    session_->duplicate_selection();
-  }
-  if (ImGui::MenuItem(ui::kDeleteLabel, kKeysDelete, false, edit && has_selection)) session_->delete_selection();
+  const bool can_change = editing() && has_selection;
+  if (ImGui::MenuItem(ui::kDuplicateLabel, kKeysDuplicate, false, can_change)) session_->duplicate_selection();
+  if (ImGui::MenuItem(ui::kDeleteLabel, kKeysDelete, false, can_change)) session_->delete_selection();
   ImGui::Separator();
   if (ImGui::MenuItem(ICON_FA_EXPAND "  Frame Selection", kKeysFrame, false, has_selection)) frame_selection();
-  ImGui::Separator();
-  if (ImGui::BeginMenu(ICON_FA_MICROCHIP "  Graphics Card")) {
-    draw_graphics_card_menu();
-    ImGui::EndMenu();
-  }
 }
 
 void EditorApp::draw_view_menu() {
@@ -746,32 +895,22 @@ void EditorApp::draw_graphics_card_menu() {
 }
 
 void EditorApp::draw_toolbar() {
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-  const bool open = begin_bar(kToolbarId, ImGuiDir_Up, kToolbarHeight);
-  ImGui::PopStyleVar();
-  if (!open) {
-    ImGui::End();
-    return;
+  if (begin_toolbar()) {
+    ui::toggle_button(ICON_FA_TABLE_LIST, "Show / hide the Hierarchy (Ctrl+B)", panels_.hierarchy);
+    ImGui::SameLine(0.0f, kToolbarGroupGap);
+    draw_gizmo_tools();
+    draw_play_controls();
+    draw_game_tools();
   }
-  if (ui::icon_button(ICON_FA_TABLE_LIST, "Show / hide the Hierarchy (Ctrl+B)", panels_.hierarchy)) {
-    panels_.hierarchy = !panels_.hierarchy;
-  }
-  ImGui::SameLine(0.0f, kToolbarGroupGap);
-  draw_gizmo_tools();
-  draw_play_controls();
-  draw_game_tools();
   ImGui::End();
 }
 
 // Left of the toolbar: what the gizmo does and how.
 void EditorApp::draw_gizmo_tools() {
   ImGui::BeginDisabled(!editing());
-  if (ui::icon_button(ICON_FA_UP_DOWN_LEFT_RIGHT, "Move (W)", gizmo_ == GizmoMode::Translate)) gizmo_ = GizmoMode::Translate;
-  ImGui::SameLine();
-  if (ui::icon_button(ICON_FA_ROTATE, "Rotate (E)", gizmo_ == GizmoMode::Rotate)) gizmo_ = GizmoMode::Rotate;
-  ImGui::SameLine();
-  if (ui::icon_button(ICON_FA_UP_RIGHT_AND_DOWN_LEFT_FROM_CENTER, "Scale (R)", gizmo_ == GizmoMode::Scale)) {
-    gizmo_ = GizmoMode::Scale;
+  for (const GizmoTool& tool : kGizmoTools) {
+    if (&tool != std::begin(kGizmoTools)) ImGui::SameLine();
+    if (ui::icon_button(tool.icon, tool.tooltip, gizmo_ == tool.mode)) gizmo_ = tool.mode;
   }
   ImGui::SameLine(0.0f, kToolbarGroupGap);
   if (ui::icon_button(gizmo_local_ ? ICON_FA_CUBE : ICON_FA_GLOBE,
@@ -779,7 +918,7 @@ void EditorApp::draw_gizmo_tools() {
     gizmo_local_ = !gizmo_local_;
   }
   ImGui::SameLine();
-  if (ui::icon_button(ICON_FA_MAGNET, "Snap to grid (or hold Ctrl while dragging)", snapping_)) snapping_ = !snapping_;
+  ui::toggle_button(ICON_FA_MAGNET, "Snap to grid (or hold Ctrl while dragging)", snapping_);
   ImGui::EndDisabled();
 }
 
@@ -803,51 +942,61 @@ void EditorApp::draw_play_controls() {
 
 // Right of the toolbar: the game's name, Build and the Inspector toggle.
 void EditorApp::draw_game_tools() {
-  const bool edit = editing();
+  draw_game_name();
+  ImGui::SameLine();
+  draw_build_button();
+  ImGui::SameLine(0.0f, kToolbarGroupGap);
+  ui::toggle_button(ICON_FA_TABLE_LIST, "Show / hide the Inspector (Ctrl+Alt+B)", panels_.inspector);
+}
+
+// The game's name (with a dot while the scene has unsaved changes), placed so that the buttons
+// after it end at the right edge.
+void EditorApp::draw_game_name() {
   const std::string game = session_->game_dir().filename().string();
-  const std::string label = std::string(ICON_FA_GAMEPAD "  ") + game + (session_->document().dirty() ? "  " ICON_FA_CIRCLE : "");
+  const std::string label =
+      std::string(ICON_FA_GAMEPAD "  ") + game + (session_->document().dirty() ? "  " ICON_FA_CIRCLE : "");
   const float width = ImGui::CalcTextSize(label.c_str()).x;
   const float buttons = (icon_button_width() + ImGui::GetStyle().ItemSpacing.x) * kRightButtons;
   ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - width - buttons - kToolbarGroupGap);
   ImGui::AlignTextToFramePadding();
   ImGui::TextColored(ui::muted_color(), "%s", label.c_str());
-  ImGui::SameLine();
-  ImGui::BeginDisabled(!edit);
-  if (ui::icon_button(ICON_FA_BOX_ARCHIVE, "Build the game: an executable for Linux or Windows, or an app for Android")) {
+}
+
+void EditorApp::draw_build_button() {
+  ImGui::BeginDisabled(!editing());
+  if (ui::icon_button(ICON_FA_BOX_ARCHIVE,
+                      "Build the game: an executable for Linux or Windows, or an app for Android")) {
     ImGui::OpenPopup(kBuildPopup);
   }
-  if (ImGui::BeginPopup(kBuildPopup)) {
-    draw_build_targets();
-    ImGui::EndPopup();
-  }
+  ui::popup(kBuildPopup, [this] { draw_build_targets(); });
   ImGui::EndDisabled();
-  ImGui::SameLine(0.0f, kToolbarGroupGap);
-  if (ui::icon_button(ICON_FA_TABLE_LIST, "Show / hide the Inspector (Ctrl+Alt+B)", panels_.inspector)) {
-    panels_.inspector = !panels_.inspector;
-  }
 }
 
 void EditorApp::draw_status_bar() {
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ImGui::GetStyle().WindowPadding.x, 0.0f));
-  const bool open = begin_bar(kStatusBarId, ImGuiDir_Down, kStatusBarHeight);
-  ImGui::PopStyleVar();
-  if (!open) {
-    ImGui::End();
-    return;
+  if (begin_status_bar()) {
+    ImGui::SetCursorPosY(editor_logic::centered_start(kStatusBarHeight, ImGui::GetTextLineHeight()));
+    draw_last_message();
+    draw_scene_summary();
   }
-  ImGui::SetCursorPosY(editor_logic::centered_start(kStatusBarHeight, ImGui::GetTextLineHeight()));
-  if (!console_->entries().empty()) {
-    const ConsoleEntry& last = console_->entries().back();
-    ImGui::TextColored(level_color(last.level), "%s", last.message.c_str());
-  }
+  ImGui::End();
+}
+
+// Left of the status bar: the console's newest line.
+void EditorApp::draw_last_message() {
+  if (console_->entries().empty()) return;
+  const ConsoleEntry& last = console_->entries().back();
+  ImGui::TextColored(level_color(last.level), "%s", last.message.c_str());
+}
+
+// Right of the status bar: the selection, how big the scene is, the play state and the frame rate.
+void EditorApp::draw_scene_summary() {
   const ObjectId selected = session_->selection();
   char info[kTextBufferSize];
   ImFormatString(info, sizeof(info), "%s    %s %d objects    %s    %d FPS",
-                 selected != kNoObject ? session_->document().node(selected).name.c_str() : "",
-                 ICON_FA_CUBES, session_->document().node_count(), play_state_label(session_->play_state()), GetFPS());
+                 selected != kNoObject ? session_->document().node(selected).name.c_str() : "", ICON_FA_CUBES,
+                 session_->document().node_count(), play_state_label(session_->play_state()), GetFPS());
   ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(info).x);
   ImGui::TextColored(ui::muted_color(), "%s", info);
-  ImGui::End();
 }
 
 void EditorApp::draw_dockspace() {
@@ -863,9 +1012,7 @@ void EditorApp::draw_dockspace() {
 
 // Hierarchy on the left, Inspector on the right, Project and Console below the Scene.
 void EditorApp::build_default_layout(unsigned int dock) {
-  ImGui::DockBuilderRemoveNode(dock);
-  ImGui::DockBuilderAddNode(dock, ImGuiDockNodeFlags_DockSpace);
-  ImGui::DockBuilderSetNodeSize(dock, ImGui::GetMainViewport()->WorkSize);
+  start_layout(dock);
   ImGuiID center = dock;
   const ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, kHierarchyWidth, nullptr, &center);
   const ImGuiID right =
@@ -892,12 +1039,7 @@ void EditorApp::apply_pending_split() {
     log::info("drag another tab here first: a single tab has nothing to split from");
     return;
   }
-  ImGuiID right = 0;
-  ImGuiID left = 0;
-  ImGui::DockBuilderSplitNode(window->DockNode->ID, ImGuiDir_Right, kSplitRatio, &right, &left);
-  ImGui::DockBuilderDockWindow(name.c_str(), right);
-  ImGui::DockBuilderFinish(ImGui::GetID(kDockspaceId));
-  script_dock_ = right;
+  script_dock_ = split_to_the_right(*window->DockNode, name);
 }
 
 unsigned int EditorApp::new_script_dock() const {
@@ -915,21 +1057,26 @@ unsigned int EditorApp::new_script_dock() const {
 void EditorApp::draw_viewport_drop_target() {
   if (!ImGui::BeginDragDropTarget()) return;
   const Vector2 mouse = viewport_->mouse();
-  if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kPayloadModel)) {
-    // Drop on the ground under the mouse (y = 0), or in front of the camera when aiming at the sky.
-    const Ray ray = viewport_->ray_at(mouse.x, mouse.y);
-    const Vec3 at = editor_logic::drop_point(vec(ray.position), vec(ray.direction), spawn_point());
-    ui::import_model(*session_, static_cast<const char*>(payload->Data), at);
-  }
-  if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kPayloadScript)) {
-    const ObjectId target = pick_at(mouse.x, mouse.y);
-    if (target != kNoObject) {
-      session_->attach_script(target, static_cast<const char*>(payload->Data));
-    } else {
-      log::warning("drop scripts on an object");
-    }
-  }
+  if (const char* model = ui::dropped_text(kPayloadModel)) drop_model(model, mouse.x, mouse.y);
+  if (const char* script = ui::dropped_text(kPayloadScript)) drop_script(script, mouse.x, mouse.y);
   ImGui::EndDragDropTarget();
+}
+
+// A model lands on the ground under the mouse (y = 0), or in front of the camera when aiming at the sky.
+void EditorApp::drop_model(const char* model_file, float x, float y) {
+  const Ray ray = viewport_->ray_at(x, y);
+  const Vec3 at = editor_logic::drop_point(vec(ray.position), vec(ray.direction), spawn_point());
+  ui::import_model(*session_, model_file, at);
+}
+
+// A script goes to the object under the mouse.
+void EditorApp::drop_script(const char* script_file, float x, float y) {
+  const ObjectId target = pick_at(x, y);
+  if (target == kNoObject) {
+    log::warning("drop scripts on an object");
+    return;
+  }
+  session_->attach_script(target, script_file);
 }
 
 void EditorApp::draw_viewport_window() {
@@ -938,22 +1085,29 @@ void EditorApp::draw_viewport_window() {
   if (frame_count_ <= kStartupFrames) ImGui::SetNextWindowFocus();  // the Scene tab starts in front
   ImGui::Begin(kViewportWindow, nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
   draw_viewport_image();
-  Viewport& view = *viewport_;
   if (!playing) draw_viewport_drop_target();
+  track_viewport_focus();
+  draw_viewport_hint(playing);
+  brush_point_.reset();
+  playing ? draw_play_border() : use_viewport_tools();
+  ImGui::End();
+  ImGui::PopStyleVar();
+}
+
+// Whether the mouse and the keyboard are in the Scene view. Flying (right mouse) takes the keyboard.
+void EditorApp::track_viewport_focus() {
+  Viewport& view = *viewport_;
   view.hovered = ImGui::IsWindowHovered();
   view.focused = ImGui::IsWindowFocused();
   if (view.hovered && IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) ImGui::SetWindowFocus();
-  draw_viewport_hint(playing);
-  brush_point_.reset();
-  if (playing) {
-    const ImVec2 origin(view.screen_x, view.screen_y);
-    const ImVec2 end(origin.x + viewport_width(), origin.y + viewport_height());
-    ImGui::GetWindowDrawList()->AddRect(origin, end, ImGui::GetColorU32(ui::accent_color()), 0.0f, 0, kPlayBorderThickness);
-  } else {
-    use_viewport_tools();
-  }
-  ImGui::End();
-  ImGui::PopStyleVar();
+}
+
+// A frame in the accent color around the running game.
+void EditorApp::draw_play_border() {
+  const ImVec2 origin(viewport_->screen_x, viewport_->screen_y);
+  const ImVec2 end(origin.x + viewport_width(), origin.y + viewport_height());
+  ImGui::GetWindowDrawList()->AddRect(origin, end, ImGui::GetColorU32(ui::accent_color()), 0.0f, 0,
+                                      kPlayBorderThickness);
 }
 
 // The rendered scene, filling the window. Remembers where it is on screen.
@@ -964,15 +1118,15 @@ void EditorApp::draw_viewport_image() {
   const ImVec2 origin = ImGui::GetCursorScreenPos();
   view.screen_x = origin.x;
   view.screen_y = origin.y;
-  ImGui::Image(ImTextureRef(static_cast<ImTextureID>(view.target.texture.id)), ImVec2(viewport_width(), viewport_height()),
-               kFlippedUvTopLeft, kFlippedUvBottomRight);
+  ImGui::Image(ImTextureRef(static_cast<ImTextureID>(view.target.texture.id)),
+               ImVec2(viewport_width(), viewport_height()), kFlippedUvTopLeft, kFlippedUvBottomRight);
 }
 
 // A hint in the bottom-left corner, on a dark pill so it reads over any scene (and stays clear
 // of the game's own HUD at the top).
 void EditorApp::draw_viewport_hint(bool playing) {
   const Viewport& view = *viewport_;
-  const char* hint = !playing      ? ICON_FA_COMPUTER_MOUSE "  Right mouse + WASD to fly    F frames the selection"
+  const char* hint = !playing       ? ICON_FA_COMPUTER_MOUSE "  Right mouse + WASD to fly    F frames the selection"
                      : view.focused ? ICON_FA_GAMEPAD "  The game has the keyboard    Esc stops"
                                     : ICON_FA_GAMEPAD "  Click the game to give it the keyboard";
   const ImVec2 hint_size = ImGui::CalcTextSize(hint);
@@ -1020,24 +1174,33 @@ void EditorApp::draw_gizmo(float x, float y, float width, float height) {
   ImGuizmo::SetOrthographic(false);
   ImGuizmo::SetDrawlist();
   ImGuizmo::SetRect(x, y, width, height);
+  float16 model = MatrixToFloatV(model_matrix(scene.world_transform(selected)));
+  manipulate(model.v, width / height);
+  gizmo_drawn_ = true;
+  track_gizmo_drag(ImGuizmo::IsUsing());
+  if (gizmo_dragging_) apply_gizmo_drag(transform_from_matrix(model.v));
+}
+
+// Draws the gizmo at `model` (the 16 numbers of a world matrix) and lets the mouse move it.
+void EditorApp::manipulate(float* model, float aspect) {
   const float16 view = MatrixToFloatV(GetCameraMatrix(viewport_->camera));
   // Same projection as raylib's BeginMode3D.
-  const float16 projection = MatrixToFloatV(MatrixPerspective(viewport_->camera.fovy * DEG2RAD, width / height,
-                                                              rlGetCullDistanceNear(), rlGetCullDistanceFar()));
-  float16 model = MatrixToFloatV(model_matrix(scene.world_transform(selected)));
+  const float16 projection = MatrixToFloatV(
+      MatrixPerspective(viewport_->camera.fovy * DEG2RAD, aspect, rlGetCullDistanceNear(), rlGetCullDistanceFar()));
   // Scaling always works on the object's own axes.
   const ImGuizmo::MODE mode = gizmo_local_ || gizmo_ == GizmoMode::Scale ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
   const bool snap = snapping_ || ImGui::GetIO().KeyCtrl;
   const float step = snap_step(gizmo_);
   const float snap_values[] = {step, step, step};
-  ImGuizmo::Manipulate(view.v, projection.v, gizmo_operation(gizmo_), mode, model.v, nullptr, snap ? snap_values : nullptr);
+  ImGuizmo::Manipulate(view.v, projection.v, gizmo_operation(gizmo_), mode, model, nullptr,
+                       snap ? snap_values : nullptr);
+}
 
-  gizmo_drawn_ = true;
-  const bool using_gizmo = ImGuizmo::IsUsing();
-  if (using_gizmo && !gizmo_dragging_) session_->document().checkpoint();  // one undo step per drag
+// One undo step per drag, dropped when the drag ends where it started.
+void EditorApp::track_gizmo_drag(bool using_gizmo) {
+  if (using_gizmo && !gizmo_dragging_) session_->document().checkpoint();
   if (!using_gizmo && gizmo_dragging_) session_->document().drop_checkpoint_if_unchanged();
   gizmo_dragging_ = using_gizmo;
-  if (using_gizmo) apply_gizmo_drag(transform_from_matrix(model.v));
 }
 
 // Moves the selection to where the gizmo was dragged (a world placement).

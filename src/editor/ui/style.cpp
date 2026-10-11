@@ -60,15 +60,11 @@ constexpr float kTabBarOverline = 2.0f;
 constexpr float kTreeLinesSize = 1.0f;
 constexpr float kSeparatorTextPadding = 0.0f;
 constexpr float kDisabledAlpha = 0.45f;
-constexpr int kActiveButtonColors = 2;  // style colors icon_button pushes for a pressed button
+constexpr int kActiveButtonColors = 2;                     // style colors icon_button pushes for a pressed button
 constexpr const char* kHeaderLabelFormat = "%s  %s###%s";  // icon, title, and the title again as the id
 
-ImFont* add_font(const fonts::EmbeddedFont& font, float size) {
-  ImGuiIO& io = ImGui::GetIO();
-  ImFontConfig config;
-  config.FontDataOwnedByAtlas = false;  // the data lives in the binary
-  ImFont* added = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(font.data), font.size, size, &config);
-
+// The icons, merged into the font added last.
+void merge_icons(float size) {
   static const ImWchar kIconRanges[] = {ICON_MIN_FA, ICON_MAX_FA, kRangesEnd};
   ImFontConfig icons;
   icons.MergeMode = true;
@@ -76,8 +72,16 @@ ImFont* add_font(const fonts::EmbeddedFont& font, float size) {
   icons.FontDataOwnedByAtlas = false;
   icons.GlyphMinAdvanceX = size * kIconMinAdvance;
   icons.GlyphOffset = ImVec2(0.0f, kIconOffsetY);
-  io.Fonts->AddFontFromMemoryCompressedTTF(fa_solid_900_compressed_data, fa_solid_900_compressed_size,
-                                           size * kIconScale, &icons, kIconRanges);
+  ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(fa_solid_900_compressed_data, fa_solid_900_compressed_size,
+                                                       size * kIconScale, &icons, kIconRanges);
+}
+
+ImFont* add_font(const fonts::EmbeddedFont& font, float size) {
+  ImFontConfig config;
+  config.FontDataOwnedByAtlas = false;  // the data lives in the binary
+  ImFont* added =
+      ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(font.data), font.size, size, &config);
+  merge_icons(size);
   return added;
 }
 
@@ -155,7 +159,7 @@ void apply_spacing(ImGuiStyle& style) {
   style.SeparatorTextPadding.x = kSeparatorTextPadding;
 }
 
-void apply_shapes(ImGuiStyle& style) {
+void apply_rounding(ImGuiStyle& style) {
   style.WindowRounding = kLargeRounding;
   style.ChildRounding = kSmallRounding;
   style.FrameRounding = kSmallRounding;
@@ -163,6 +167,9 @@ void apply_shapes(ImGuiStyle& style) {
   style.GrabRounding = kSmallRounding;
   style.TabRounding = kSmallRounding;
   style.ScrollbarRounding = kScrollbarRounding;
+}
+
+void apply_borders(ImGuiStyle& style) {
   style.WindowBorderSize = kBorderSize;
   style.PopupBorderSize = kBorderSize;
   style.FrameBorderSize = 0.0f;
@@ -187,7 +194,8 @@ ImFont* code_font() { return g_code_font; }
 void apply_theme() {
   ImGuiStyle& style = ImGui::GetStyle();
   apply_spacing(style);
-  apply_shapes(style);
+  apply_rounding(style);
+  apply_borders(style);
   for (const ThemeColor& entry : kThemeColors) style.Colors[entry.slot] = entry.color;
 }
 
@@ -231,6 +239,15 @@ void tooltip(const char* text) {
   if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled)) {
     ImGui::SetTooltip("%s", text);
   }
+}
+
+void toggle_button(const char* icon, const char* tip, bool& on) {
+  if (icon_button(icon, tip, on)) on = !on;
+}
+
+const char* dropped_text(const char* payload_type) {
+  const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(payload_type);
+  return payload != nullptr ? static_cast<const char*>(payload->Data) : nullptr;
 }
 
 }  // namespace redgem::ui

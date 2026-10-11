@@ -35,5 +35,26 @@ bool component_header(const char* icon, const char* title, bool* removed = nullp
 // A square icon button with a tooltip; `active` shows it pressed (toggle buttons).
 bool icon_button(const char* icon, const char* tooltip, bool active = false);
 void tooltip(const char* text);
+// A toggle button: clicking it flips `on`, and it shows pressed while `on`.
+void toggle_button(const char* icon, const char* tooltip, bool& on);
+// The text dropped on the last item, of a kind of payload (see editor_config's kPayload...);
+// nullptr when nothing of that kind was dropped. Call between BeginDragDropTarget and its End.
+const char* dropped_text(const char* payload_type);
+
+// A menu (of a menu bar, or a submenu): `draw_items` fills it while it is open.
+template <typename DrawItems>
+void menu(const char* label, DrawItems draw_items, bool enabled = true) {
+  if (!ImGui::BeginMenu(label, enabled)) return;
+  draw_items();
+  ImGui::EndMenu();
+}
+
+// A popup opened with ImGui::OpenPopup(id): `draw_contents` fills it while it is open.
+template <typename DrawContents>
+void popup(const char* id, DrawContents draw_contents) {
+  if (!ImGui::BeginPopup(id)) return;
+  draw_contents();
+  ImGui::EndPopup();
+}
 
 }  // namespace redgem::ui

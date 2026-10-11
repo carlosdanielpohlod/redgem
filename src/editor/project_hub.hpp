@@ -42,7 +42,11 @@ class ProjectHub {
   void draw();
   void draw_title();
   void draw_new_game(float width);
+  void draw_templates();
+  void draw_error();
   void draw_games();
+  void draw_game_list();
+  void draw_open_folder();
 
   Options options_;
   std::vector<std::filesystem::path> games_;

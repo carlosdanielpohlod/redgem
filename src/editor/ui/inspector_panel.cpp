@@ -23,12 +23,12 @@ namespace {
 using namespace editor_config;
 
 constexpr const char* kBodyTypes[] = {"static", "dynamic", "kinematic", "character", "vehicle"};
-constexpr const char* kBodyDescriptions[] = {
-    "Never moves (floors, walls)", "Falls and gets pushed (crates, balls)", "Moved by scripts, pushes others",
-    "Walks and jumps (CharacterController)", "Drives on its wheel children"};
+constexpr const char* kBodyDescriptions[] = {"Never moves (floors, walls)", "Falls and gets pushed (crates, balls)",
+                                             "Moved by scripts, pushes others", "Walks and jumps (CharacterController)",
+                                             "Drives on its wheel children"};
 constexpr const char* kColliders[] = {"box", "sphere", "capsule", "mesh"};
-constexpr int kDefaultBody = 0;      // "static": what an object with a collider and no body is
-constexpr int kDefaultCollider = 0;  // "box"
+constexpr int kDefaultBody = 0;                  // "static": what an object with a collider and no body is
+constexpr int kDefaultCollider = 0;              // "box"
 constexpr const char* kVehicleBody = "vehicle";  // wheels are children of an object with this body
 constexpr const char* kLightTypes[] = {"Directional", "Point", "Spot"};  // in LightType's order
 constexpr const char* kPropertyTypes[] = {"Number", "Text", "Toggle"};
@@ -39,12 +39,12 @@ constexpr float kUnitMin = 0.0f;        // metallic and roughness go from 0 to 1
 constexpr float kUnitMax = 1.0f;
 constexpr float kRadiansToDegrees = 57.29577951f;
 constexpr float kAddComponentWidth = 0.7f;  // of the panel width
-constexpr float kNoLowerLimit = 0.0f;  // intensities, ranges, clip distances and glow are never negative
+constexpr float kNoLowerLimit = 0.0f;       // intensities, ranges, clip distances and glow are never negative
 constexpr float kPopupFieldWidth = 160.0f;  // pixels: text fields inside the Add Component menus
 constexpr const char* kSculptModes[] = {"Raise", "Lower", "Smooth", "Flatten"};  // in SculptMode's order
-constexpr float kMinBrushRadius = 1.0f;     // meters
+constexpr float kMinBrushRadius = 1.0f;                                          // meters
 constexpr float kMaxBrushRadius = 30.0f;
-constexpr float kMinBrushStrength = 0.5f;   // meters per second (see TerrainTool::strength)
+constexpr float kMinBrushStrength = 0.5f;  // meters per second (see TerrainTool::strength)
 constexpr float kMaxBrushStrength = 20.0f;
 constexpr const char* kMetersFormat = "%.1f m";  // how distances are shown in sliders and drags
 constexpr const char* kAddComponentPopup = "add_component";
@@ -79,12 +79,16 @@ constexpr const char* kValueId = "##value";
 constexpr const char* kNewScriptId = "##new_script";
 constexpr const char* kNewPropertyId = "##key";
 
+// Where the parts of a vector and the channels of a color are in the arrays ImGui edits.
+enum Axis { kX, kY, kZ };
+enum Channel { kRed, kGreen, kBlue, kAlpha };
+
 // Properties edited by dedicated widgets instead of the generic list.
 const std::set<std::string>& reserved_props() {
-  static const std::set<std::string> keys = {
-      config::kPropScript, config::kPropBody, config::kPropCollider, config::kPropTrigger, config::kPropMass,
-      config::kPropTag,    config::kPropWheel, config::kPropVisible, config::kPropPrefab,
-      config::kPropTerrain, config::kPropTerrainSize, config::kPropTerrainCells};
+  static const std::set<std::string> keys = {config::kPropScript,  config::kPropBody,        config::kPropCollider,
+                                             config::kPropTrigger, config::kPropMass,        config::kPropTag,
+                                             config::kPropWheel,   config::kPropVisible,     config::kPropPrefab,
+                                             config::kPropTerrain, config::kPropTerrainSize, config::kPropTerrainCells};
   return keys;
 }
 
@@ -160,6 +164,58 @@ std::optional<PropertyValue> flag_or_nothing(bool stored, bool value) {
   return stored ? std::optional<PropertyValue>(value) : std::nullopt;
 }
 
+// A text property that is not stored while it is empty.
+std::optional<PropertyValue> text_or_nothing(const std::string& text) {
+  return text.empty() ? std::nullopt : std::optional<PropertyValue>(text);
+}
+
+bool has_physics(const PropertyMap& props) {
+  return body_config_from_props(props).wants_physics() || props.count(config::kPropCollider) != 0;
+}
+
+// --- Widgets -----------------------------------------------------------------------------------
+// Each returns true when it changed the value it shows.
+
+// A labelled row of three numbers.
+bool drag_vec3(const char* label, const char* id, Vec3& value, float speed, float lowest = 0.0f, float highest = 0.0f) {
+  float numbers[] = {value.x, value.y, value.z};
+  property_label(label);
+  if (!ImGui::DragFloat3(id, numbers, speed, lowest, highest)) return false;
+  value = {numbers[kX], numbers[kY], numbers[kZ]};
+  return true;
+}
+
+bool edit_color(const char* id, Color& color, ImGuiColorEditFlags flags) {
+  float channels[] = {color.r, color.g, color.b, color.a};
+  if (!ImGui::ColorEdit4(id, channels, flags)) return false;
+  color = {channels[kRed], channels[kGreen], channels[kBlue], channels[kAlpha]};
+  return true;
+}
+
+// A color without transparency, as a vector or as a Color whose alpha stays as it is.
+bool edit_rgb(const char* id, Vec3& color, ImGuiColorEditFlags flags) {
+  float channels[] = {color.x, color.y, color.z};
+  if (!ImGui::ColorEdit3(id, channels, flags)) return false;
+  color = {channels[kRed], channels[kGreen], channels[kBlue]};
+  return true;
+}
+
+bool edit_rgb(const char* id, Color& color, ImGuiColorEditFlags flags) {
+  Vec3 rgb{color.r, color.g, color.b};
+  if (!edit_rgb(id, rgb, flags)) return false;
+  color = {rgb.x, rgb.y, rgb.z, color.a};
+  return true;
+}
+
+// A drop-down over the values of an enum, listed by `names` in the enum's order.
+template <typename Enum, std::size_t Count>
+bool choose(const char* id, Enum& value, const char* const (&names)[Count]) {
+  int chosen = static_cast<int>(value);
+  if (!ImGui::Combo(id, &chosen, names, static_cast<int>(Count))) return false;
+  value = static_cast<Enum>(chosen);
+  return true;
+}
+
 // The scripts attached to an object, in order.
 std::vector<std::string> scripts_of(EditorSession& session, int index) {
   return split_script_list(get_string(session.document().node(index).props, config::kPropScript).value_or(""));
@@ -174,23 +230,30 @@ const char* object_icon(const NodeDesc& node) {
 
 // --- Header ------------------------------------------------------------------------------------
 
-void draw_header(EditorSession& session, int index) {
+// The object's icon and its name. A name already taken gets a number; an empty one is refused.
+void draw_name_field(EditorSession& session, int index) {
   const NodeDesc& node = session.document().node(index);
   ImGui::AlignTextToFramePadding();
   ImGui::TextColored(accent_color(), "%s", object_icon(node));
   ImGui::SameLine();
   ImGui::SetNextItemWidth(kFillWidth);
-  if (auto name = text_field(kNameId, index, node.name); name && is_object(session, name->object)) {
-    if (!name->text.empty()) session.document().set_name(name->object, session.document().unique_name(name->text));
-    session.refresh_preview();
-  }
-  const PropertyMap& props = session.document().node(index).props;
+  const auto name = text_field(kNameId, index, node.name);
+  if (!name || !is_object(session, name->object)) return;
+  if (!name->text.empty()) session.document().set_name(name->object, session.document().unique_name(name->text));
+  session.refresh_preview();
+}
+
+void draw_tag_field(EditorSession& session, int index) {
+  const std::string current = get_string(session.document().node(index).props, config::kPropTag).value_or("");
   property_label("Tag");
-  if (auto tag = text_field(kTagId, index, get_string(props, config::kPropTag).value_or(""), "untagged");
-      tag && is_object(session, tag->object)) {
-    set_or_remove(session, tag->object, config::kPropTag,
-                  tag->text.empty() ? std::nullopt : std::optional<PropertyValue>(tag->text));
-  }
+  const auto tag = text_field(kTagId, index, current, "untagged");
+  if (!tag || !is_object(session, tag->object)) return;
+  set_or_remove(session, tag->object, config::kPropTag, text_or_nothing(tag->text));
+}
+
+// Visible and Template, side by side.
+void draw_flags(EditorSession& session, int index) {
+  const PropertyMap& props = session.document().node(index).props;
   bool visible = get_bool(props, config::kPropVisible).value_or(true);
   if (ImGui::Checkbox("Visible", &visible)) {
     set_or_remove(session, index, config::kPropVisible, flag_or_nothing(!visible, false));
@@ -203,64 +266,83 @@ void draw_header(EditorSession& session, int index) {
   tooltip("Templates are hidden in the game and copied with Scene.spawn(\"Name\", position: ...).");
 }
 
+void draw_header(EditorSession& session, int index) {
+  draw_name_field(session, index);
+  draw_tag_field(session, index);
+  draw_flags(session, index);
+}
+
 // --- Transform ---------------------------------------------------------------------------------
+
+bool drag_rotation(Quat& rotation) {
+  Vec3 euler = quat_to_euler_degrees(rotation);
+  if (!drag_vec3("Rotation", kRotationId, euler, kDragSpeedRotation)) return false;
+  rotation = quat_from_euler_degrees(euler);
+  return true;
+}
+
+// Only touches the scale when it was itself edited: a mirrored object (negative scale) must survive a move.
+bool drag_scale(Vec3& scale) {
+  Vec3 edited = scale;
+  if (!drag_vec3("Scale", kScaleId, edited, kDragSpeedScale, kMinScale, FLT_MAX)) return false;
+  scale = editor_logic::at_least(edited, kMinScale);
+  return true;
+}
 
 void draw_transform(EditorSession& session, int index) {
   if (!component_header(ICON_FA_UP_DOWN_LEFT_RIGHT, "Transform")) return;
   SceneDocument& doc = session.document();
   Transform local = doc.node(index).local;
-  float position[] = {local.position.x, local.position.y, local.position.z};
-  const Vec3 euler = quat_to_euler_degrees(local.rotation);
-  float rotation[] = {euler.x, euler.y, euler.z};
-  float scale[] = {local.scale.x, local.scale.y, local.scale.z};
-
-  property_label("Position");
-  const bool moved = ImGui::DragFloat3(kPositionId, position, kDragSpeedPosition);
-  property_label("Rotation");
-  const bool rotated = ImGui::DragFloat3(kRotationId, rotation, kDragSpeedRotation);
-  property_label("Scale");
-  const bool scaled = ImGui::DragFloat3(kScaleId, scale, kDragSpeedScale, kMinScale, FLT_MAX);
+  const bool moved = drag_vec3("Position", kPositionId, local.position, kDragSpeedPosition);
+  const bool rotated = drag_rotation(local.rotation);
+  const bool scaled = drag_scale(local.scale);
   if (!moved && !rotated && !scaled) return;
   g_stream.before_change(doc);
-  local.position = {position[0], position[1], position[2]};
-  if (rotated) local.rotation = quat_from_euler_degrees({rotation[0], rotation[1], rotation[2]});
-  // Only when the scale itself was edited: a mirrored object (negative scale) must survive a move.
-  if (scaled) local.scale = {std::max(scale[0], kMinScale), std::max(scale[1], kMinScale), std::max(scale[2], kMinScale)};
   doc.set_local(index, local, false);
   session.refresh_preview();
 }
 
 // --- Mesh and materials ------------------------------------------------------------------------
 
-void draw_material(EditorSession& session, int material) {
-  SceneDocument& doc = session.document();
-  MaterialDesc edited = doc.material(material);
-  ImGui::PushID(material);
-  const std::string title = edited.name.empty() ? "Material " + std::to_string(material) : edited.name;
+// The material's name (or its number) and how many objects show it.
+void draw_material_title(const SceneDocument& doc, int material) {
+  const std::string& name = doc.material(material).name;
+  const std::string title = name.empty() ? "Material " + std::to_string(material) : name;
   ImGui::SeparatorText(title.c_str());
   const int users = doc.material_users(material);
   if (users > 1) ImGui::TextColored(muted_color(), ICON_FA_LINK "  Shared by %d objects", users);
+}
 
-  float base[] = {edited.base_color.r, edited.base_color.g, edited.base_color.b, edited.base_color.a};
-  float emission[] = {edited.emissive.x, edited.emissive.y, edited.emissive.z};
+bool draw_material_fields(MaterialDesc& edited) {
   bool changed = false;
   property_label(edited.base_color_image != kNoIndex ? "Tint" : "Color");
-  changed |= ImGui::ColorEdit4(kBaseColorId, base, ImGuiColorEditFlags_Float);
+  changed |= edit_color(kBaseColorId, edited.base_color, ImGuiColorEditFlags_Float);
   property_label("Metallic");
   changed |= ImGui::SliderFloat(kMetallicId, &edited.metallic, kUnitMin, kUnitMax);
   property_label("Roughness");
   changed |= ImGui::SliderFloat(kRoughnessId, &edited.roughness, kUnitMin, kUnitMax);
   property_label("Emission");
-  changed |= ImGui::ColorEdit3(kEmissionId, emission, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+  changed |= edit_rgb(kEmissionId, edited.emissive, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
   tooltip("Glow color; values above 1 glow brighter.");
-  if (edited.base_color_image != kNoIndex || edited.normal_image != kNoIndex) {
-    ImGui::TextColored(muted_color(), ICON_FA_IMAGE "  Textured%s", edited.normal_image != kNoIndex ? " + normal map" : "");
-  }
+  return changed;
+}
+
+void draw_texture_note(const MaterialDesc& material) {
+  if (material.base_color_image == kNoIndex && material.normal_image == kNoIndex) return;
+  const char* normal_map = material.normal_image != kNoIndex ? " + normal map" : "";
+  ImGui::TextColored(muted_color(), ICON_FA_IMAGE "  Textured%s", normal_map);
+}
+
+void draw_material(EditorSession& session, int material) {
+  SceneDocument& doc = session.document();
+  MaterialDesc edited = doc.material(material);
+  ImGui::PushID(material);
+  draw_material_title(doc, material);
+  const bool changed = draw_material_fields(edited);
+  draw_texture_note(edited);
   if (changed) {
     g_stream.before_change(doc);
-    edited.base_color = {base[0], base[1], base[2], base[3]};
-    edited.emissive = {std::max(emission[0], kNoLowerLimit), std::max(emission[1], kNoLowerLimit),
-                      std::max(emission[2], kNoLowerLimit)};
+    edited.emissive = editor_logic::at_least(edited.emissive, kNoLowerLimit);
     doc.set_material(material, edited, false);
   }
   ImGui::PopID();
@@ -278,51 +360,66 @@ void draw_mesh(EditorSession& session, int index) {
 
 // --- Light and camera --------------------------------------------------------------------------
 
+bool draw_light_range(LightDesc& light) {
+  property_label("Range");
+  const bool changed =
+      ImGui::DragFloat(kRangeId, &light.range, kDragSpeedNumber, kNoLowerLimit, FLT_MAX, kMetersFormat);
+  tooltip("0 = not set (the engine then uses its default reach)");
+  return changed;
+}
+
+bool draw_light_fields(LightDesc& light) {
+  const bool is_sun = light.type == LightType::Directional;  // as it was before this frame's edits
+  bool changed = false;
+  property_label("Type");
+  changed |= choose(kTypeId, light.type, kLightTypes);
+  property_label("Color");
+  changed |= edit_rgb(kColorId, light.color, ImGuiColorEditFlags_Float);
+  property_label("Intensity");
+  changed |= ImGui::DragFloat(kIntensityId, &light.intensity, kDragSpeedIntensity, kNoLowerLimit, FLT_MAX);
+  tooltip(is_sun ? "Sun strength" : "Watts (like Blender)");
+  if (!is_sun) changed |= draw_light_range(light);
+  return changed;
+}
+
 void draw_light(EditorSession& session, int index) {
   const NodeDesc& node = session.document().node(index);
   if (!node.light) return;
-  if (!component_header(ICON_FA_LIGHTBULB, "Light")) return;
   LightDesc light = *node.light;
-  int type = static_cast<int>(light.type);
-  float color[] = {light.color.r, light.color.g, light.color.b};
-  bool changed = false;
-  property_label("Type");
-  changed |= ImGui::Combo(kTypeId, &type, kLightTypes, static_cast<int>(std::size(kLightTypes)));
-  property_label("Color");
-  changed |= ImGui::ColorEdit3(kColorId, color, ImGuiColorEditFlags_Float);
-  property_label("Intensity");
-  changed |= ImGui::DragFloat(kIntensityId, &light.intensity, kDragSpeedIntensity, kNoLowerLimit, FLT_MAX);
-  tooltip(light.type == LightType::Directional ? "Sun strength" : "Watts (like Blender)");
-  if (light.type != LightType::Directional) {
-    property_label("Range");
-    changed |= ImGui::DragFloat(kRangeId, &light.range, kDragSpeedNumber, kNoLowerLimit, FLT_MAX, kMetersFormat);
-    tooltip("0 = not set (the engine then uses its default reach)");
-  }
-  if (!changed) return;
+  if (!component_header(ICON_FA_LIGHTBULB, "Light")) return;
+  if (!draw_light_fields(light)) return;
   g_stream.before_change(session.document());
-  light.type = static_cast<LightType>(type);
-  light.color = {color[0], color[1], color[2], light.color.a};
   light.intensity = std::max(light.intensity, kNoLowerLimit);
   light.range = std::max(light.range, kNoLowerLimit);
   session.document().set_light(index, light, false);
   session.refresh_preview();
 }
 
-void draw_camera(EditorSession& session, int index) {
-  const NodeDesc& node = session.document().node(index);
-  if (!node.camera) return;
-  if (!component_header(ICON_FA_VIDEO, "Camera")) return;
-  CameraDesc camera = *node.camera;
-  float fov = camera.fov_y_radians * kRadiansToDegrees;
+bool draw_camera_fields(CameraDesc& camera, float& fov_degrees) {
   bool changed = false;
   property_label("Field of view");
-  changed |= ImGui::SliderFloat(kFovId, &fov, kMinFovDegrees, kMaxFovDegrees, "%.0f deg");
+  changed |= ImGui::SliderFloat(kFovId, &fov_degrees, kMinFovDegrees, kMaxFovDegrees, "%.0f deg");
   property_label("Near");
   changed |= ImGui::DragFloat(kNearId, &camera.near_plane, kDragSpeedScale, kMinClipDistance, FLT_MAX);
   property_label("Far");
   changed |= ImGui::DragFloat(kFarId, &camera.far_plane, kDragSpeedNumber, kNoLowerLimit, FLT_MAX);
   tooltip("0 = infinite");
-  if (session.scene().main_camera() == index) ImGui::TextColored(muted_color(), ICON_FA_STAR "  The game starts with this camera");
+  return changed;
+}
+
+void draw_main_camera_note(const EditorSession& session, int index) {
+  if (session.scene().main_camera() != index) return;
+  ImGui::TextColored(muted_color(), ICON_FA_STAR "  The game starts with this camera");
+}
+
+void draw_camera(EditorSession& session, int index) {
+  const NodeDesc& node = session.document().node(index);
+  if (!node.camera) return;
+  CameraDesc camera = *node.camera;
+  if (!component_header(ICON_FA_VIDEO, "Camera")) return;
+  float fov = camera.fov_y_radians * kRadiansToDegrees;
+  const bool changed = draw_camera_fields(camera, fov);
+  draw_main_camera_note(session, index);
   if (!changed) return;
   g_stream.before_change(session.document());
   camera.fov_y_radians = std::clamp(fov, kMinFovDegrees, kMaxFovDegrees) / kRadiansToDegrees;
@@ -334,8 +431,7 @@ void draw_camera(EditorSession& session, int index) {
 // --- Scripts -----------------------------------------------------------------------------------
 
 void write_scripts(EditorSession& session, int index, const std::vector<std::string>& scripts) {
-  const std::string joined = join_script_list(scripts);
-  set_or_remove(session, index, config::kPropScript, joined.empty() ? std::nullopt : std::optional<PropertyValue>(joined));
+  set_or_remove(session, index, config::kPropScript, text_or_nothing(join_script_list(scripts)));
 }
 
 // The card of one attached script: a button that opens it, or a warning when its file is gone.
@@ -350,23 +446,24 @@ void draw_script_card(PanelContext& context, const std::string& script) {
   tooltip("Edit in a script tab");
 }
 
+// One attached script as a card of its own. True when its close button was pressed.
+bool draw_script(PanelContext& context, const std::string& script) {
+  bool removed = false;
+  const std::string title = class_name_for_script(script);
+  const bool open = component_header(ICON_FA_GEM, title.c_str(), &removed);
+  if (open && !removed) draw_script_card(context, script);
+  return removed;
+}
+
 void draw_scripts(PanelContext& context, int index) {
-  EditorSession& session = context.session;
-  const std::vector<std::string> scripts = scripts_of(session, index);
+  const std::vector<std::string> scripts = scripts_of(context.session, index);
   for (std::size_t i = 0; i < scripts.size(); ++i) {
     ImGui::PushID(static_cast<int>(i));
-    bool removed = false;
-    const std::string title = class_name_for_script(scripts[i]);
-    const bool open = component_header(ICON_FA_GEM, title.c_str(), &removed);
-    if (removed) {
-      std::vector<std::string> remaining = scripts;
-      remaining.erase(remaining.begin() + static_cast<std::ptrdiff_t>(i));
-      write_scripts(session, index, remaining);
-      ImGui::PopID();
-      return;
-    }
-    if (open) draw_script_card(context, scripts[i]);
+    const bool removed = draw_script(context, scripts[i]);
     ImGui::PopID();
+    if (!removed) continue;
+    write_scripts(context.session, index, editor_logic::without_item(scripts, i));
+    return;  // the cards after it are drawn from the new list on the next frame
   }
 }
 
@@ -384,6 +481,22 @@ void remove_physics(EditorSession& session, int index) {
 }
 
 // The brush that sculpts a terrain in the Scene view.
+void draw_brush_mode(TerrainTool& tool) {
+  property_label("Brush");
+  ImGui::SetNextItemWidth(kFillWidth);
+  choose(kBrushModeId, tool.mode, kSculptModes);
+}
+
+void draw_brush_size(TerrainTool& tool) {
+  property_label("Radius");
+  ImGui::SetNextItemWidth(kFillWidth);
+  ImGui::SliderFloat(kBrushRadiusId, &tool.radius, kMinBrushRadius, kMaxBrushRadius, kMetersFormat);
+  property_label("Strength");
+  ImGui::SetNextItemWidth(kFillWidth);
+  ImGui::SliderFloat(kBrushStrengthId, &tool.strength, kMinBrushStrength, kMaxBrushStrength, "%.1f");
+}
+
+// The brush that sculpts a terrain in the Scene view.
 void draw_terrain(PanelContext& context, int index) {
   if (context.terrain == nullptr || !context.session.is_terrain(index)) return;
   if (!component_header(ICON_FA_MOUNTAIN, "Terrain")) return;
@@ -391,18 +504,8 @@ void draw_terrain(PanelContext& context, int index) {
   property_label("Sculpt");
   ImGui::Checkbox(kSculptId, &tool.sculpting);
   tooltip("While on, drag the left mouse button over the terrain in the Scene view. Shift reverses Raise and Lower.");
-  property_label("Brush");
-  int mode = static_cast<int>(tool.mode);
-  ImGui::SetNextItemWidth(kFillWidth);
-  if (ImGui::Combo(kBrushModeId, &mode, kSculptModes, static_cast<int>(std::size(kSculptModes)))) {
-    tool.mode = static_cast<SculptMode>(mode);
-  }
-  property_label("Radius");
-  ImGui::SetNextItemWidth(kFillWidth);
-  ImGui::SliderFloat(kBrushRadiusId, &tool.radius, kMinBrushRadius, kMaxBrushRadius, kMetersFormat);
-  property_label("Strength");
-  ImGui::SetNextItemWidth(kFillWidth);
-  ImGui::SliderFloat(kBrushStrengthId, &tool.strength, kMinBrushStrength, kMaxBrushStrength, "%.1f");
+  draw_brush_mode(tool);
+  draw_brush_size(tool);
 }
 
 // Each of the rows below returns true when it changed the object: the card is then drawn again
@@ -447,19 +550,9 @@ void draw_mass_row(EditorSession& session, int index, float mass) {
   session.document().set_prop(index, config::kPropMass, static_cast<double>(std::max(mass, kMinMass)), false);
 }
 
-void draw_physics(EditorSession& session, int index) {
+// The rows of the Physics card, until one of them changes the object.
+void draw_physics_rows(EditorSession& session, int index, const BodyConfig& body) {
   const PropertyMap& props = session.document().node(index).props;
-  const BodyConfig body = body_config_from_props(props);
-  const bool has_collider = props.count(config::kPropCollider) != 0;
-  if (!body.wants_physics() && !has_collider) return;
-  bool removed = false;
-  const bool open = component_header(ICON_FA_WEIGHT_HANGING, "Physics", &removed);
-  if (removed) {
-    remove_physics(session, index);
-    return;
-  }
-  if (!open) return;
-
   bool trigger = get_bool(props, config::kPropTrigger).value_or(false);
   if (draw_trigger_row(session, index, trigger)) return;
   if (!trigger && draw_body_row(session, index, props)) return;
@@ -467,6 +560,19 @@ void draw_physics(EditorSession& session, int index) {
   if (body.type == BodyType::Dynamic || body.type == BodyType::Vehicle) draw_mass_row(session, index, body.mass);
   for (const std::string& warning : body.warnings) {
     ImGui::TextColored(warning_color(), ICON_FA_TRIANGLE_EXCLAMATION "  %s", warning.c_str());
+  }
+}
+
+void draw_physics(EditorSession& session, int index) {
+  const PropertyMap& props = session.document().node(index).props;
+  if (!has_physics(props)) return;
+  const BodyConfig body = body_config_from_props(props);
+  bool removed = false;
+  const bool open = component_header(ICON_FA_WEIGHT_HANGING, "Physics", &removed);
+  if (removed) {
+    remove_physics(session, index);
+  } else if (open) {
+    draw_physics_rows(session, index, body);
   }
 }
 
@@ -480,7 +586,8 @@ void draw_wheel(EditorSession& session, int index) {
   if (!component_header(ICON_FA_CAR, "Vehicle wheel")) return;
   bool wheel = is_wheel;
   property_label("Is a wheel");
-  if (ImGui::Checkbox(kWheelId, &wheel)) set_or_remove(session, index, config::kPropWheel, flag_or_nothing(wheel, true));
+  if (ImGui::Checkbox(kWheelId, &wheel))
+    set_or_remove(session, index, config::kPropWheel, flag_or_nothing(wheel, true));
 }
 
 // --- Custom properties -------------------------------------------------------------------------
@@ -488,22 +595,46 @@ void draw_wheel(EditorSession& session, int index) {
 bool is_custom(const std::string& key) { return reserved_props().count(key) == 0; }
 
 // The widget of one custom property, by what it holds: a checkbox, a number or a text field.
+void draw_flag_value(EditorSession& session, int index, const std::string& key, bool flag) {
+  if (ImGui::Checkbox(kValueId, &flag)) set_or_remove(session, index, key.c_str(), PropertyValue(flag));
+}
+
+void draw_number_value(EditorSession& session, int index, const std::string& key, double number) {
+  if (!ImGui::DragScalar(kValueId, ImGuiDataType_Double, &number, kDragSpeedNumber)) return;
+  g_stream.before_change(session.document());
+  session.document().set_prop(index, key, number, false);
+}
+
+void draw_text_value(EditorSession& session, int index, const std::string& key, const std::string& current) {
+  const auto text = text_field(kValueId, index, current);
+  if (!text || !is_object(session, text->object)) return;
+  set_or_remove(session, text->object, key.c_str(), PropertyValue(text->text));
+}
+
+// The widget of one custom property, by what it holds: a checkbox, a number or a text field.
 void draw_custom_value(EditorSession& session, int index, const std::string& key, const PropertyValue& value) {
   if (const auto* flag = std::get_if<bool>(&value)) {
-    bool checked = *flag;
-    if (ImGui::Checkbox(kValueId, &checked)) set_or_remove(session, index, key.c_str(), PropertyValue(checked));
+    draw_flag_value(session, index, key, *flag);
+  } else if (const auto* number = std::get_if<double>(&value)) {
+    draw_number_value(session, index, key, *number);
+  } else {
+    draw_text_value(session, index, key, std::get<std::string>(value));
+  }
+}
+
+// One custom property: a button that removes it, its name and its value.
+void draw_custom_row(EditorSession& session, int index, const std::string& key, const PropertyValue& value) {
+  if (ImGui::SmallButton(ICON_FA_XMARK)) {
+    set_or_remove(session, index, key.c_str(), std::nullopt);
     return;
   }
-  if (const auto* number = std::get_if<double>(&value)) {
-    double edited = *number;
-    if (!ImGui::DragScalar(kValueId, ImGuiDataType_Double, &edited, kDragSpeedNumber)) return;
-    g_stream.before_change(session.document());
-    session.document().set_prop(index, key, edited, false);
-    return;
-  }
-  if (auto text = text_field(kValueId, index, std::get<std::string>(value)); text && is_object(session, text->object)) {
-    set_or_remove(session, text->object, key.c_str(), PropertyValue(text->text));
-  }
+  tooltip("Remove");
+  ImGui::SameLine();
+  ImGui::AlignTextToFramePadding();
+  ImGui::TextColored(muted_color(), "%s", key.c_str());
+  ImGui::SameLine(kLabelColumnWidth);
+  ImGui::SetNextItemWidth(kFillWidth);
+  draw_custom_value(session, index, key, value);
 }
 
 void draw_custom_props(EditorSession& session, int index) {
@@ -514,18 +645,7 @@ void draw_custom_props(EditorSession& session, int index) {
   for (const auto& [key, value] : props) {
     if (!is_custom(key)) continue;
     ImGui::PushID(key.c_str());
-    if (ImGui::SmallButton(ICON_FA_XMARK)) {
-      set_or_remove(session, index, key.c_str(), std::nullopt);
-      ImGui::PopID();
-      continue;
-    }
-    tooltip("Remove");
-    ImGui::SameLine();
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextColored(muted_color(), "%s", key.c_str());
-    ImGui::SameLine(kLabelColumnWidth);
-    ImGui::SetNextItemWidth(kFillWidth);
-    draw_custom_value(session, index, key, value);
+    draw_custom_row(session, index, key, value);
     ImGui::PopID();
   }
   ImGui::TextColored(muted_color(), "Read them in Ruby with prop(:name).");
@@ -549,24 +669,23 @@ void create_and_attach_script(PanelContext& context, int index, std::string& nam
   ImGui::CloseCurrentPopup();
 }
 
-void add_script_menu(PanelContext& context, int index) {
-  EditorSession& session = context.session;
-  const std::vector<std::string> attached = scripts_of(session, index);
-  std::string& new_name = g_new_script_name;
-  ImGui::SetNextItemWidth(kPopupFieldWidth);
-  const bool entered =
-      ImGui::InputTextWithHint(kNewScriptId, "new_script_name", &new_name, ImGuiInputTextFlags_EnterReturnsTrue);
-  ImGui::SameLine();
-  const bool valid = valid_script_name(new_name);
-  ImGui::BeginDisabled(!valid);
-  if (ImGui::Button(ICON_FA_PLUS " New") || (entered && valid)) create_and_attach_script(context, index, new_name);
-  ImGui::EndDisabled();
-  if (!new_name.empty() && !valid) ImGui::TextColored(muted_color(), "%s", kScriptNameRule);
-  if (!context.files.scripts.empty()) ImGui::Separator();
+// The game's scripts the object does not have yet.
+void draw_attachable_scripts(PanelContext& context, int index, const std::vector<std::string>& attached) {
   for (const std::string& script : context.files.scripts) {
     if (std::find(attached.begin(), attached.end(), script) != attached.end()) continue;
-    if (ImGui::MenuItem((std::string(ICON_FA_GEM "  ") + script).c_str())) session.attach_script(index, script);
+    if (ImGui::MenuItem((std::string(ICON_FA_GEM "  ") + script).c_str())) context.session.attach_script(index, script);
   }
+}
+
+void add_script_menu(PanelContext& context, int index) {
+  const std::vector<std::string> attached = scripts_of(context.session, index);
+  std::string& new_name = g_new_script_name;
+  ImGui::SetNextItemWidth(kPopupFieldWidth);
+  if (draw_new_script_form(kNewScriptId, "new_script_name", ICON_FA_PLUS " New", new_name)) {
+    create_and_attach_script(context, index, new_name);
+  }
+  if (!context.files.scripts.empty()) ImGui::Separator();
+  draw_attachable_scripts(context, index, attached);
 }
 
 // What a new property of each kind starts as.
@@ -575,18 +694,20 @@ PropertyValue initial_value(int type) {
   return type == kTextType ? PropertyValue(std::string()) : PropertyValue(false);
 }
 
+// A name the object can take as a new property: not empty, not taken, not one with a widget of its own.
+bool can_add_property(const PropertyMap& props, const std::string& key) {
+  return !key.empty() && reserved_props().count(key) == 0 && props.count(key) == 0;
+}
+
 void add_property_menu(EditorSession& session, int index) {
   std::string& key = g_new_property_key;
-  int& type = g_new_property_type;
   ImGui::SetNextItemWidth(kPopupFieldWidth);
   ImGui::InputTextWithHint(kNewPropertyId, "name", &key);
   ImGui::SetNextItemWidth(kPopupFieldWidth);
-  ImGui::Combo(kTypeId, &type, kPropertyTypes, static_cast<int>(std::size(kPropertyTypes)));
-  const PropertyMap& props = session.document().node(index).props;
-  const bool valid = !key.empty() && reserved_props().count(key) == 0 && props.count(key) == 0;
-  ImGui::BeginDisabled(!valid);
+  ImGui::Combo(kTypeId, &g_new_property_type, kPropertyTypes, static_cast<int>(std::size(kPropertyTypes)));
+  ImGui::BeginDisabled(!can_add_property(session.document().node(index).props, key));
   if (ImGui::Button(ICON_FA_PLUS " Add property")) {
-    set_or_remove(session, index, key.c_str(), initial_value(type));
+    set_or_remove(session, index, key.c_str(), initial_value(g_new_property_type));
     key.clear();
     ImGui::CloseCurrentPopup();
   }
@@ -602,8 +723,19 @@ void add_body_menu(EditorSession& session, int index) {
   }
 }
 
-void draw_add_component(PanelContext& context, int index) {
+// What the Add Component button offers.
+void draw_component_choices(PanelContext& context, int index) {
   EditorSession& session = context.session;
+  menu(ICON_FA_GEM "  Script", [&context, index] { add_script_menu(context, index); });
+  const bool no_physics = !has_physics(session.document().node(index).props);
+  menu(ICON_FA_WEIGHT_HANGING "  Physics body", [&session, index] { add_body_menu(session, index); }, no_physics);
+  if (ImGui::MenuItem(ICON_FA_BULLSEYE "  Trigger", nullptr, false, no_physics)) {
+    set_or_remove(session, index, config::kPropTrigger, PropertyValue(true));
+  }
+  menu(ICON_FA_SLIDERS "  Property", [&session, index] { add_property_menu(session, index); });
+}
+
+void draw_add_component(PanelContext& context, int index) {
   ImGui::Spacing();
   ImGui::Separator();
   ImGui::Spacing();
@@ -611,25 +743,17 @@ void draw_add_component(PanelContext& context, int index) {
   const float width = available * kAddComponentWidth;
   ImGui::SetCursorPosX(ImGui::GetCursorPosX() + editor_logic::centered_start(available, width));
   if (ImGui::Button(ICON_FA_PLUS "  Add Component", ImVec2(width, 0.0f))) ImGui::OpenPopup(kAddComponentPopup);
-  if (!ImGui::BeginPopup(kAddComponentPopup)) return;
-  if (ImGui::BeginMenu(ICON_FA_GEM "  Script")) {
-    add_script_menu(context, index);
-    ImGui::EndMenu();
-  }
-  const PropertyMap& props = session.document().node(index).props;
-  const bool has_physics = body_config_from_props(props).wants_physics() || props.count(config::kPropCollider) != 0;
-  if (ImGui::BeginMenu(ICON_FA_WEIGHT_HANGING "  Physics body", !has_physics)) {
-    add_body_menu(session, index);
-    ImGui::EndMenu();
-  }
-  if (ImGui::MenuItem(ICON_FA_BULLSEYE "  Trigger", nullptr, false, !has_physics)) {
-    set_or_remove(session, index, config::kPropTrigger, PropertyValue(true));
-  }
-  if (ImGui::BeginMenu(ICON_FA_SLIDERS "  Property")) {
-    add_property_menu(session, index);
-    ImGui::EndMenu();
-  }
-  ImGui::EndPopup();
+  popup(kAddComponentPopup, [&context, index] { draw_component_choices(context, index); });
+}
+
+// Where the running game has the object now.
+void draw_live_transform(const Transform& world) {
+  if (!component_header(ICON_FA_UP_DOWN_LEFT_RIGHT, "Transform (live)")) return;
+  const Vec3 euler = quat_to_euler_degrees(world.rotation);
+  property_label("Position");
+  ImGui::Text("%.2f  %.2f  %.2f", world.position.x, world.position.y, world.position.z);
+  property_label("Rotation");
+  ImGui::Text("%.1f  %.1f  %.1f", euler.x, euler.y, euler.z);
 }
 
 void draw_runtime_view(EditorSession& session, int index) {
@@ -638,16 +762,38 @@ void draw_runtime_view(EditorSession& session, int index) {
     ImGui::TextColored(muted_color(), "Destroyed during play.");
     return;
   }
-  const Transform world = scene.world_transform(index);
-  const Vec3 euler = quat_to_euler_degrees(world.rotation);
-  if (component_header(ICON_FA_UP_DOWN_LEFT_RIGHT, "Transform (live)")) {
-    property_label("Position");
-    ImGui::Text("%.2f  %.2f  %.2f", world.position.x, world.position.y, world.position.z);
-    property_label("Rotation");
-    ImGui::Text("%.1f  %.1f  %.1f", euler.x, euler.y, euler.z);
-  }
+  draw_live_transform(scene.world_transform(index));
   ImGui::Spacing();
   ImGui::TextColored(muted_color(), ICON_FA_CIRCLE_INFO "  Stop the game to edit.");
+}
+
+// The selection as cards, one per component it has.
+void draw_components(PanelContext& context, int index) {
+  EditorSession& session = context.session;
+  draw_header(session, index);
+  draw_transform(session, index);
+  draw_mesh(session, index);
+  draw_light(session, index);
+  draw_camera(session, index);
+  draw_terrain(context, index);
+  draw_scripts(context, index);
+  draw_physics(session, index);
+  draw_wheel(session, index);
+  draw_custom_props(session, index);
+  draw_add_component(context, index);
+}
+
+// Widget IDs do not include the object: a text field being edited when another object gets
+// selected still commits to the object it was showing (see text_field).
+void draw_selection(PanelContext& context, int index) {
+  EditorSession& session = context.session;
+  if (session.play_state() == PlayState::Editing) {
+    draw_components(context, index);
+  } else {
+    ImGui::TextUnformatted(session.document().node(index).name.c_str());
+    draw_runtime_view(session, index);
+  }
+  g_stream.end_frame();
 }
 
 }  // namespace
@@ -658,33 +804,13 @@ void open_script(ScriptWorkspace& scripts, const std::string& file_name) {
 }
 
 void draw_inspector(PanelContext& context) {
-  EditorSession& session = context.session;
   ImGui::Begin(kInspectorWindow);
-  const ObjectId index = session.selection();
+  const ObjectId index = context.session.selection();
   if (index == kNoObject) {
     ImGui::TextColored(muted_color(), ICON_FA_ARROW_POINTER "  Select an object in the Hierarchy or the Scene.");
-    ImGui::End();
-    return;
-  }
-  // Widget IDs do not include the object: a text field being edited when another object gets
-  // selected still commits to the object it was showing (see text_field).
-  if (session.play_state() != PlayState::Editing) {
-    ImGui::TextUnformatted(session.document().node(index).name.c_str());
-    draw_runtime_view(session, index);
   } else {
-    draw_header(session, index);
-    draw_transform(session, index);
-    draw_mesh(session, index);
-    draw_light(session, index);
-    draw_camera(session, index);
-    draw_terrain(context, index);
-    draw_scripts(context, index);
-    draw_physics(session, index);
-    draw_wheel(session, index);
-    draw_custom_props(session, index);
-    draw_add_component(context, index);
+    draw_selection(context, index);
   }
-  g_stream.end_frame();
   ImGui::End();
 }
 

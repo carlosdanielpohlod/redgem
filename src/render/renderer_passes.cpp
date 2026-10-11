@@ -34,6 +34,17 @@ constexpr int kPanoramaMipsWanted = 1;                         // rlGenTextureMi
 // One texel of a texture `pixels` wide, in texture coordinates.
 float texel_of(int pixels) { return 1.0f / static_cast<float>(pixels); }
 
+// The sun's point of view: straight (no perspective) and wide enough for everything shadowed.
+Camera3D sun_camera(const render_math::SunView& fitted) {
+  Camera3D sun_view{};
+  sun_view.projection = CAMERA_ORTHOGRAPHIC;
+  sun_view.fovy = kShadowExtent;
+  sun_view.target = fitted.target;
+  sun_view.position = fitted.position;
+  sun_view.up = fitted.up;
+  return sun_view;
+}
+
 }  // namespace
 
 void Renderer::Impl::bind_for_the_frame(int sampler_location, int slot, unsigned int texture) {
@@ -57,27 +68,26 @@ void Renderer::Impl::draw_shadow_map(const Scene& scene, const Camera3D& camera,
 
 // The scene's depth as the sun sees it, and the matrix that leads the lit shader into that view.
 void Renderer::Impl::draw_sun_depth(const Scene& scene, const Camera3D& camera, Vec3 to_sun) {
-  const render_math::SunView fitted = render_math::fit_sun_view(camera.position, camera.target, to_sun);
-  Camera3D sun_view{};
-  sun_view.projection = CAMERA_ORTHOGRAPHIC;
-  sun_view.fovy = kShadowExtent;
-  sun_view.target = fitted.target;
-  sun_view.position = fitted.position;
-  sun_view.up = fitted.up;
+  const Camera3D sun_view = sun_camera(render_math::fit_sun_view(camera.position, camera.target, to_sun));
   send(depth_shader, depth_time_loc, static_cast<float>(GetTime()));
   const double game_near = rlGetCullDistanceNear();
   const double game_far = rlGetCullDistanceFar();
   rlSetClipPlanes(kShadowNearPlane, kShadowFarPlane);
+  const Matrix light_matrix = draw_depth_from(sun_view, scene, to_vec3(camera.position));
+  rlSetClipPlanes(game_near, game_far);
+  SetShaderValueMatrix(shader, light_matrix_loc, light_matrix);
+  send(shader, shaders::kShadowDepthRange, static_cast<float>(kShadowFarPlane - kShadowNearPlane));
+}
+
+Matrix Renderer::Impl::draw_depth_from(const Camera3D& sun_view, const Scene& scene, Vec3 viewer) {
   BeginTextureMode(shadow);
   ClearBackground(kWhite);
   BeginMode3D(sun_view);
   const Matrix light_matrix = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
-  draw_objects(scene, true, to_vec3(camera.position));
+  draw_objects(scene, true, viewer);
   EndMode3D();
   EndTextureMode();
-  rlSetClipPlanes(game_near, game_far);
-  SetShaderValueMatrix(shader, light_matrix_loc, light_matrix);
-  send(shader, shaders::kShadowDepthRange, static_cast<float>(kShadowFarPlane - kShadowNearPlane));
+  return light_matrix;
 }
 
 // --- Reflections ------------------------------------------------------------------------------

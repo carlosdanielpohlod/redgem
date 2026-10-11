@@ -115,6 +115,7 @@ class SceneDocument {
   };
 
   SceneDocument() = default;
+  void keep_file(GlbFile glb);
   void touch();
   Snapshot snapshot() const;
   // Goes back to a snapshot (its nodes are moved out of it).
@@ -126,9 +127,16 @@ class SceneDocument {
   // Writes a reshaped mesh's vertices over its old ones in the binary chunk (same count, so the
   // file does not grow).
   bool store_mesh_vertices(int mesh, std::string& error);
+  // Writes floats over the ones an accessor points at. False when they are not stored the way
+  // the editor writes them (packed, and as many).
+  bool store_stream(std::size_t accessor_index, const std::vector<float>& values);
   bool sync_glb(std::string& error);
+  void sync_buffer();
   // Writes every node's light and camera into the glTF arrays (copies get their own entry).
+  // `claimed`: the entries other nodes already use.
   void sync_lights_and_cameras();
+  void sync_light(NodeDesc& node, const LightDesc& light, std::set<int>& claimed);
+  void sync_camera(NodeDesc& node, const CameraDesc& camera, std::set<int>& claimed);
   // Writes the nodes in editor order; returns the numbers of the top-level ones.
   nlohmann::json sync_nodes();
   void sync_materials();
@@ -137,26 +145,45 @@ class SceneDocument {
   // Remembers which source nodes the description's skins and animations (from `first_skin` /
   // `first_animation` on) point at, given they currently hold description indices.
   void remember_node_references(std::size_t first_skin, std::size_t first_animation);
+  void remember_joints(const SkinDesc& skin);
+  void remember_channels(const AnimationDesc& animation);
+  // The source node of a node (kNoIndex for kNoIndex).
+  int source_of(int node) const;
   // Points the description's skins and animations at the nodes' current indices. Call after
   // anything that reorders, removes or restores nodes.
   void refresh_node_references();
   // Writes skins and animations into the glTF JSON with current node numbers.
   void sync_skins_and_animations(nlohmann::json& json) const;
+  void sync_skins(nlohmann::json& json, const std::vector<int>& current) const;
+  void sync_animations(nlohmann::json& json, const std::vector<int>& current) const;
   // Points every node at its skin's number in the file (`written`: skin index -> that number, or
   // kNoIndex for a skin left out).
   void sync_node_skins(nlohmann::json& json, const std::vector<int>& written) const;
   // The copies made by duplicate() (`count` nodes from `first_copy` on) become nodes of their own
   // in the file, with skeletons of their own. `copy_of`: node index -> its copy, or kNoIndex.
+  // Adds a copy of each node of `source` (a subtree, its root first), wired to each other like
+  // the originals and with the root's copy next to the root.
+  void append_copies(const std::vector<int>& source, const std::vector<int>& copy_of);
   void give_copies_own_source_nodes(int first_copy, std::size_t count);
   void give_copies_own_skins(int first_copy, std::size_t count, const std::vector<int>& copy_of);
   // Index of a copy of a skin that moves the copied bones; nullopt when some of its bones were
   // not copied.
   std::optional<int> copy_skin(int original, const std::vector<int>& copy_of);
+  // Points a copied skin and its glTF JSON at the copies of its bones. Returns their source nodes.
+  std::vector<int> point_at_copies(SkinDesc& skin, nlohmann::json& json, const std::vector<int>& copy_of) const;
+  // False for invalid indices, a move into the node's own subtree and a move to where it already is.
+  bool can_reparent(int index, int new_parent) const;
   // The three steps of import_model: where the model's entries will start, its glTF JSON, and its
   // scene description under a new object called `name`.
   model_import::JsonOffsets import_offsets() const;
+  int append_model(const SceneDesc& scene, const GlbFile& source, const std::filesystem::path& path, int parent);
   void append_model_json(const nlohmann::json& model, const model_import::JsonOffsets& offsets,
                          const std::filesystem::path& model_dir);
+  void append_model_geometry(const nlohmann::json& model, const model_import::JsonOffsets& offsets);
+  void append_model_materials(const nlohmann::json& model, const model_import::JsonOffsets& offsets,
+                              const std::filesystem::path& model_dir);
+  void append_model_sources(const nlohmann::json& model, const model_import::JsonOffsets& offsets);
+  void append_model_assets(const SceneDesc& model, const model_import::DescOffsets& offsets);
   int append_model_description(const SceneDesc& model, const model_import::JsonOffsets& json_offsets,
                                const std::string& name, int parent);
   void append_model_nodes(const SceneDesc& model, const model_import::DescOffsets& offsets);
@@ -166,6 +193,9 @@ class SceneDocument {
   // A material with just a color and a roughness (what new shapes and terrains get).
   int append_plain_material(const std::string& name, Color color, float roughness);
   int append_mesh(const std::string& name, const PrimitiveDesc& primitive);
+  // The vertex streams of a mesh as new accessors; returns the glTF "attributes" naming them.
+  nlohmann::json append_attributes(const PrimitiveDesc& primitive, const Bounds& bounds);
+  int append_indices(const std::vector<std::uint32_t>& indices);
   // Appends raw bytes to the binary chunk, aligned; returns where they start.
   std::size_t append_binary(const std::uint8_t* data, std::size_t bytes);
   // Appends raw bytes to the binary chunk as a new buffer view; returns its index.

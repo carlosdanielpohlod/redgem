@@ -59,8 +59,15 @@ float inspector_split_ratio();
 
 // Position of `value` in `names`, or `fallback` when it is not one of them.
 int index_of(const char* const* names, int count, const std::string& value, int fallback);
+// The list without the item at `index`.
+std::vector<std::string> without_item(std::vector<std::string> items, std::size_t index);
 // The materials a mesh uses, each once, in the order its parts use them.
 std::vector<int> materials_of(const MeshDesc& mesh);
+
+// --- Numbers ---------------------------------------------------------------------------------
+
+// The vector with no part below `lowest` (a scale that never reaches zero, a glow that is never negative).
+Vec3 at_least(Vec3 value, float lowest);
 
 // --- Scene view ------------------------------------------------------------------------------
 

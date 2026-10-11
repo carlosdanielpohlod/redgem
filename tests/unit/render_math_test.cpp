@@ -184,6 +184,16 @@ TEST_CASE("a matrix written column by column keeps its translation where raylib 
   CHECK(matrix.m3 == 0.0f);
 }
 
+TEST_CASE("a matrix written column by column keeps every number under raylib's name for it") {
+  std::array<float, kMatrixFloats> columns{};
+  for (int i = 0; i < kMatrixFloats; ++i) columns[static_cast<std::size_t>(i)] = static_cast<float>(i);
+  const Matrix matrix = from_column_major(columns);
+  // raylib names a matrix's numbers m0..m15 in the same column by column order.
+  const float named[] = {matrix.m0, matrix.m1, matrix.m2,  matrix.m3,  matrix.m4,  matrix.m5,  matrix.m6,  matrix.m7,
+                         matrix.m8, matrix.m9, matrix.m10, matrix.m11, matrix.m12, matrix.m13, matrix.m14, matrix.m15};
+  for (int i = 0; i < kMatrixFloats; ++i) CHECK(named[i] == static_cast<float>(i));
+}
+
 TEST_CASE("an object's matrix scales it, then moves it to its place") {
   redgem::Transform transform;
   transform.position = kPlace;

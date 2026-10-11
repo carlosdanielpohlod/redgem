@@ -23,7 +23,6 @@ namespace {
 
 using namespace render_detail;
 using render_math::to_raylib;
-using render_math::to_vec3;
 
 // On-screen touch controls: white, see-through, more solid under a finger.
 constexpr unsigned char kTouchShade = config::kMaxColorByte;
@@ -97,6 +96,14 @@ void save_screenshots(const std::vector<std::filesystem::path>& paths) {
   UnloadImage(frame);
 }
 
+// Same vertices in the same order, only moved: write over the buffers already on the card.
+void move_vertices(const Mesh& mesh, const PrimitiveDesc& primitive) {
+  if (static_cast<int>(primitive.positions.size() / config::kFloatsPerPosition) != mesh.vertexCount) return;
+  const int bytes = static_cast<int>(primitive.positions.size() * sizeof(float));
+  UpdateMeshBuffer(mesh, kPositionBuffer, primitive.positions.data(), bytes, 0);
+  UpdateMeshBuffer(mesh, kNormalBuffer, primitive.normals.data(), bytes, 0);
+}
+
 }  // namespace
 
 Renderer::Renderer(const RenderSettings& settings) : impl_(std::make_unique<Impl>()) {
@@ -128,22 +135,14 @@ void Renderer::sync(const SceneDesc& desc) {
 }
 
 void Renderer::refresh_mesh(const SceneDesc& desc, int mesh) {
-  if (mesh < 0 || static_cast<std::size_t>(mesh) >= impl_->meshes.size() ||
-      static_cast<std::size_t>(mesh) >= desc.meshes.size()) {
-    return;
-  }
-  const MeshDesc& source = desc.meshes[static_cast<std::size_t>(mesh)];
-  std::vector<GpuPrimitive>& parts = impl_->meshes[static_cast<std::size_t>(mesh)];
+  const auto index = static_cast<std::size_t>(mesh);
+  if (mesh < 0 || index >= impl_->meshes.size() || index >= desc.meshes.size()) return;
+  const MeshDesc& source = desc.meshes[index];
+  const std::vector<GpuPrimitive>& parts = impl_->meshes[index];
   for (std::size_t i = 0; i < std::min(parts.size(), source.primitives.size()); ++i) {
-    const PrimitiveDesc& primitive = source.primitives[i];
-    // Same vertices in the same order, only moved: write over the buffers already on the card.
-    if (static_cast<int>(primitive.positions.size() / config::kFloatsPerPosition) != parts[i].mesh.vertexCount)
-      continue;
-    const int bytes = static_cast<int>(primitive.positions.size() * sizeof(float));
-    UpdateMeshBuffer(parts[i].mesh, kPositionBuffer, primitive.positions.data(), bytes, 0);
-    UpdateMeshBuffer(parts[i].mesh, kNormalBuffer, primitive.normals.data(), bytes, 0);
+    move_vertices(parts[i].mesh, source.primitives[i]);
   }
-  impl_->mesh_bounds[static_cast<std::size_t>(mesh)] = source.bounds;
+  impl_->mesh_bounds[index] = source.bounds;
 }
 
 Camera3D Renderer::scene_camera(const Scene& scene) const { return impl_->camera_for(scene); }
@@ -155,22 +154,8 @@ void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const Rend
   if (width <= 0 || height <= 0) return;  // a minimized window: nothing to draw into
   impl_->ensure_targets(width, height);
   const Environment env = scene_environment(scene);
-  const Vec3 viewer = to_vec3(camera.position);
-  impl_->place_objects(scene);
-  impl_->apply_lights(scene, env, viewer);
-  impl_->view_tan_half_fov = std::tan(camera.fovy * DEG2RAD * kHalf);
-  impl_->view_aspect = static_cast<float>(width) / static_cast<float>(height);
-  impl_->draw_shadow_map(scene, camera, env);
-  impl_->capture_reflection_face(scene, camera);
-  send(impl_->shader, impl_->shader.locs[SHADER_LOC_VECTOR_VIEW], camera.position);
-  BeginTextureMode(impl_->hdr);
-  ClearBackground(kBlack);
-  BeginMode3D(camera);
-  impl_->draw_sky(camera);
-  impl_->draw_objects(scene, false, viewer);
-  if (particles != nullptr) impl_->draw_particles(*particles, camera);
-  EndMode3D();
-  EndTextureMode();
+  impl_->prepare_frame(scene, camera, env, static_cast<float>(width) / static_cast<float>(height));
+  impl_->draw_lit_scene(scene, camera, particles);
   impl_->post_process(env, output);
 }
 

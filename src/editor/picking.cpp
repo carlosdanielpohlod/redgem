@@ -12,6 +12,23 @@ constexpr int kAxes = 3;
 
 float component(Vec3 v, int axis) { return axis == 0 ? v.x : (axis == 1 ? v.y : v.z); }
 
+// The stretch of a ray that is inside a box, as distances along the ray.
+struct Stretch {
+  float near_t = -std::numeric_limits<float>::max();
+  float far_t = std::numeric_limits<float>::max();
+};
+
+// Narrows `inside` to where the ray is between `lo` and `hi` on one axis. False when no part of it is.
+bool clip_to_slab(float origin, float direction, float lo, float hi, Stretch& inside) {
+  if (std::fabs(direction) < kEpsilon) return !(origin < lo) && !(origin > hi);  // along the slab: in or out for good
+  float t0 = (lo - origin) / direction;
+  float t1 = (hi - origin) / direction;
+  if (t0 > t1) std::swap(t0, t1);
+  inside.near_t = std::max(inside.near_t, t0);
+  inside.far_t = std::min(inside.far_t, t1);
+  return !(inside.near_t > inside.far_t);
+}
+
 }  // namespace
 
 std::optional<float> intersect_ray_box(const PickRay& ray, const Transform& world, const Bounds& local) {
@@ -20,27 +37,15 @@ std::optional<float> intersect_ray_box(const PickRay& ray, const Transform& worl
   const Quat inverse = conjugate(world.rotation);
   const Vec3 origin = safe_divide(rotate(inverse, ray.origin - world.position), world.scale);
   const Vec3 direction = safe_divide(rotate(inverse, ray.direction), world.scale);
-  float near_t = -std::numeric_limits<float>::max();
-  float far_t = std::numeric_limits<float>::max();
+  Stretch inside;
   for (int axis = 0; axis < kAxes; ++axis) {
-    const float o = component(origin, axis);
-    const float d = component(direction, axis);
-    const float lo = component(local.min, axis);
-    const float hi = component(local.max, axis);
-    if (std::fabs(d) < kEpsilon) {
-      if (o < lo || o > hi) return std::nullopt;
-      continue;
-    }
-    float t0 = (lo - o) / d;
-    float t1 = (hi - o) / d;
-    if (t0 > t1) std::swap(t0, t1);
-    near_t = std::max(near_t, t0);
-    far_t = std::min(far_t, t1);
-    if (near_t > far_t) return std::nullopt;
+    const bool reaches = clip_to_slab(component(origin, axis), component(direction, axis), component(local.min, axis),
+                                      component(local.max, axis), inside);
+    if (!reaches) return std::nullopt;
   }
-  if (far_t < 0.0f) return std::nullopt;
+  if (inside.far_t < 0.0f) return std::nullopt;
   // `t` is in local units of the scaled direction, which maps 1:1 to world distance along ray.direction.
-  return std::max(near_t, 0.0f);
+  return std::max(inside.near_t, 0.0f);
 }
 
 ObjectId pick_object(const Scene& scene, const SceneDesc& desc, const PickRay& ray) {

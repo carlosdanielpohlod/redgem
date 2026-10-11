@@ -16,11 +16,29 @@ namespace {
 
 std::string strip_extension(const std::string& name) {
   const std::string extension = config::kRubyFileExtension;
-  if (name.size() > extension.size() && name.compare(name.size() - extension.size(), extension.size(), extension) == 0) {
+  if (name.size() > extension.size() &&
+      name.compare(name.size() - extension.size(), extension.size(), extension) == 0) {
     return name.substr(0, name.size() - extension.size());
   }
   return name;
 }
+
+// What a new script holds after its first two lines (a comment with its file name and the class).
+constexpr const char* kTemplateBody =
+    "  # Blender/editor custom properties are available with prop(:name, default).\n"
+    "  SPEED = 1.0\n"
+    "\n"
+    "  # Runs once, before the first update.\n"
+    "  def start\n"
+    "  end\n"
+    "\n"
+    "  # Runs every frame. dt is the frame time in seconds.\n"
+    "  def update(dt)\n"
+    "  end\n"
+    "\n"
+    "  # Other callbacks: fixed_update(dt), on_trigger_enter(other), on_trigger_exit(other),\n"
+    "  # on_collision_enter(other), on_collision_exit(other), on_destroy.\n"
+    "end\n";
 
 }  // namespace
 
@@ -37,23 +55,8 @@ bool valid_script_name(const std::string& name) {
 std::string script_file_name(const std::string& name) { return strip_extension(name) + config::kRubyFileExtension; }
 
 std::string script_template(const std::string& file_name) {
-  const std::string class_name = class_name_for_script(file_name);
-  return "# " + file_name + " - attach it to an object in the editor (Inspector > Scripts).\n"
-         "class " + class_name + " < Behaviour\n"
-         "  # Blender/editor custom properties are available with prop(:name, default).\n"
-         "  SPEED = 1.0\n"
-         "\n"
-         "  # Runs once, before the first update.\n"
-         "  def start\n"
-         "  end\n"
-         "\n"
-         "  # Runs every frame. dt is the frame time in seconds.\n"
-         "  def update(dt)\n"
-         "  end\n"
-         "\n"
-         "  # Other callbacks: fixed_update(dt), on_trigger_enter(other), on_trigger_exit(other),\n"
-         "  # on_collision_enter(other), on_collision_exit(other), on_destroy.\n"
-         "end\n";
+  return "# " + file_name + " - attach it to an object in the editor (Inspector > Scripts).\n" + "class " +
+         class_name_for_script(file_name) + " < Behaviour\n" + kTemplateBody;
 }
 
 std::optional<std::string> create_script(const std::filesystem::path& scripts_dir, const std::string& name,
@@ -62,7 +65,7 @@ std::optional<std::string> create_script(const std::filesystem::path& scripts_di
     error = "use lowercase letters, digits and underscores, starting with a letter (e.g. enemy_ai)";
     return std::nullopt;
   }
-  const std::string file_name = script_file_name(name);
+  std::string file_name = script_file_name(name);
   const std::filesystem::path path = scripts_dir / file_name;
   if (std::filesystem::exists(path)) {
     error = file_name + " already exists";
@@ -95,7 +98,9 @@ bool write_text_file(const std::filesystem::path& path, const std::string& text,
 }
 
 void open_in_system(const std::filesystem::path& path) {
-  if (std::system(platform::open_command(path).c_str()) != 0) log::warning("could not open " + path.string());
+  // (The desktop opens it: the command is the platform's own, with the path quoted.)
+  const int status = std::system(platform::open_command(path).c_str());  // NOLINT(bugprone-command-processor)
+  if (status != 0) log::warning("could not open " + path.string());
 }
 
 }  // namespace redgem

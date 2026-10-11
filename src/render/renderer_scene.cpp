@@ -5,6 +5,7 @@
 #include <raymath.h>
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 #include "render/culling.hpp"
@@ -23,6 +24,19 @@ using render_math::to_vec3;
 
 constexpr float kParticleGlowBoost = 4.0f;   // how much brighter than its color a glowing particle is
 constexpr float kLightFadeDistance = 12.0f;  // meters over which the farthest used lights fade out
+
+constexpr float kUnsetFov = 0.0f;  // radians: a camera that leaves its field of view to the engine
+
+// Where scenes without a camera are seen from: above and behind the origin, looking at it.
+Camera3D default_camera() {
+  Camera3D camera{};
+  camera.projection = CAMERA_PERSPECTIVE;
+  camera.position = {0.0f, config::kDefaultCameraDistance * kHalf, config::kDefaultCameraDistance};
+  camera.target = {0.0f, 0.0f, 0.0f};
+  camera.up = render_math::kUpAxis;
+  camera.fovy = config::kDefaultFovYDegrees;
+  return camera;
+}
 
 // One particle as a quad of the batch being filled.
 void add_particle_quad(const Particle& particle, const render_math::Facing& view) {
@@ -47,21 +61,16 @@ void blend_particles(bool glowing) {
 // --- Camera, lights, places ---------------------------------------------------------------------
 
 Camera3D Renderer::Impl::camera_for(const Scene& scene) const {
+  const ObjectId id = scene.main_camera();
+  if (id == kNoObject) return default_camera();
+  const Transform world = scene.world_transform(id);
   Camera3D camera{};
   camera.projection = CAMERA_PERSPECTIVE;
-  const ObjectId id = scene.main_camera();
-  if (id == kNoObject) {
-    camera.position = {0.0f, config::kDefaultCameraDistance * kHalf, config::kDefaultCameraDistance};
-    camera.target = {0.0f, 0.0f, 0.0f};
-    camera.up = render_math::kUpAxis;
-    camera.fovy = config::kDefaultFovYDegrees;
-    return camera;
-  }
-  const Transform world = scene.world_transform(id);
   camera.position = to_raylib(world.position);
   camera.target = to_raylib(world.position + world.forward());
   camera.up = to_raylib(world.up());
-  const float fov = scene.at(id).camera->fov_y_radians;
+  const std::optional<CameraDesc>& lens = scene.at(id).camera;
+  const float fov = lens ? lens->fov_y_radians : kUnsetFov;
   camera.fovy = fov > 0.0f ? radians_to_degrees(fov) : config::kDefaultFovYDegrees;
   return camera;
 }
@@ -197,8 +206,8 @@ void Renderer::Impl::bind_material(const Material& material, const Shader& pass_
   rlSetUniform(color_location, color.data(), SHADER_UNIFORM_VEC4, 1);
 }
 
-void Renderer::Impl::draw_mesh(const Mesh& mesh, const Matrix& model, const Shader& pass_shader,
-                               const std::vector<Matrix>* bones) {
+// Where the mesh is, for the shader: its own matrix, the one for its normals, and the whole way to the screen.
+void Renderer::Impl::send_matrices(const Matrix& model, const Shader& pass_shader) {
   if (pass_shader.locs[SHADER_LOC_MATRIX_MODEL] != kNoLocation) {
     rlSetUniformMatrix(pass_shader.locs[SHADER_LOC_MATRIX_MODEL], model);
   }
@@ -206,6 +215,11 @@ void Renderer::Impl::draw_mesh(const Mesh& mesh, const Matrix& model, const Shad
     rlSetUniformMatrix(pass_shader.locs[SHADER_LOC_MATRIX_NORMAL], MatrixTranspose(MatrixInvert(model)));
   }
   rlSetUniformMatrix(pass_shader.locs[SHADER_LOC_MATRIX_MVP], MatrixMultiply(model, pass_view_projection));
+}
+
+void Renderer::Impl::draw_mesh(const Mesh& mesh, const Matrix& model, const Shader& pass_shader,
+                               const std::vector<Matrix>* bones) {
+  send_matrices(model, pass_shader);
   if (bones != nullptr && pass_shader.locs[SHADER_LOC_BONE_MATRICES] != kNoLocation) {
     rlSetUniformMatrices(pass_shader.locs[SHADER_LOC_BONE_MATRICES], bones->data(), static_cast<int>(bones->size()));
   }
@@ -336,16 +350,43 @@ void Renderer::Impl::draw_particles(const ParticleSystem& system, const Camera3D
   rlDisableDepthMask();
   rlDisableBackfaceCulling();
   BeginShaderMode(particle_shader);
-  for (const bool glowing : {false, true}) {
-    send(particle_shader, particle_boost_loc, glowing ? kParticleGlowBoost : kOn);
-    blend_particles(glowing);
-    BeginBlendMode(BLEND_CUSTOM_SEPARATE);
-    for (const Texture2D* picture : batches) draw_particle_batch(system, pictures, picture, glowing, view);
-    EndBlendMode();
-  }
+  for (const bool glowing : {false, true}) draw_particle_layer({system, pictures, batches, view}, glowing);
   EndShaderMode();
   rlEnableBackfaceCulling();
   rlEnableDepthMask();
+}
+
+void Renderer::Impl::draw_particle_layer(const ParticleDraw& draw, bool glowing) {
+  send(particle_shader, particle_boost_loc, glowing ? kParticleGlowBoost : kOn);
+  blend_particles(glowing);
+  BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+  for (const Texture2D* picture : draw.batches) {
+    draw_particle_batch(draw.system, draw.pictures, picture, glowing, draw.view);
+  }
+  EndBlendMode();
+}
+
+// --- A frame ----------------------------------------------------------------------------------
+
+void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect) {
+  place_objects(scene);
+  apply_lights(scene, env, to_vec3(camera.position));
+  view_tan_half_fov = std::tan(camera.fovy * DEG2RAD * kHalf);
+  view_aspect = aspect;
+  draw_shadow_map(scene, camera, env);
+  capture_reflection_face(scene, camera);
+  send(shader, shader.locs[SHADER_LOC_VECTOR_VIEW], camera.position);
+}
+
+void Renderer::Impl::draw_lit_scene(const Scene& scene, const Camera3D& camera, const ParticleSystem* particles) {
+  BeginTextureMode(hdr);
+  ClearBackground(kBlack);
+  BeginMode3D(camera);
+  draw_sky(camera);
+  draw_objects(scene, false, to_vec3(camera.position));
+  if (particles != nullptr) draw_particles(*particles, camera);
+  EndMode3D();
+  EndTextureMode();
 }
 
 }  // namespace redgem

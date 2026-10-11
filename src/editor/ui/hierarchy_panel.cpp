@@ -50,32 +50,27 @@ void accept_drops(int target, Pending& pending) {
   if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kPayloadNode)) {
     pending = {Pending::Kind::Reparent, *static_cast<const int*>(payload->Data), target, {}};
   }
-  if (target != kNoIndex) {
-    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kPayloadScript)) {
-      pending = {Pending::Kind::AttachScript, target, kNoIndex, static_cast<const char*>(payload->Data)};
-    }
-  }
-  if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kPayloadModel)) {
-    pending = {Pending::Kind::ImportModel, kNoIndex, target, static_cast<const char*>(payload->Data)};
-  }
+  const char* script = target != kNoIndex ? dropped_text(kPayloadScript) : nullptr;
+  if (script != nullptr) pending = {Pending::Kind::AttachScript, target, kNoIndex, script};
+  if (const char* model = dropped_text(kPayloadModel)) pending = {Pending::Kind::ImportModel, kNoIndex, target, model};
   ImGui::EndDragDropTarget();
+}
+
+// What can be done to the object itself.
+void draw_node_actions(bool has_parent, int index, Pending& pending) {
+  if (ImGui::MenuItem(kDuplicateLabel, kKeysDuplicate)) pending = {Pending::Kind::Duplicate, index, kNoIndex, {}};
+  if (ImGui::MenuItem(kDeleteLabel, kKeysDelete)) pending = {Pending::Kind::Delete, index, kNoIndex, {}};
+  if (has_parent && ImGui::MenuItem(ICON_FA_ARROW_TURN_UP "  Move to top level")) {
+    pending = {Pending::Kind::Reparent, index, kNoIndex, {}};
+  }
 }
 
 void node_context_menu(PanelContext& context, int index, Pending& pending) {
   if (!ImGui::BeginPopupContextItem(kNodeMenu)) return;
-  const bool editing = context.session.play_state() == PlayState::Editing;
-  ImGui::BeginDisabled(!editing);
-  if (ImGui::MenuItem(kDuplicateLabel, kKeysDuplicate)) pending = {Pending::Kind::Duplicate, index, kNoIndex, {}};
-  if (ImGui::MenuItem(kDeleteLabel, kKeysDelete)) pending = {Pending::Kind::Delete, index, kNoIndex, {}};
-  if (context.session.document().node(index).parent != kNoIndex &&
-      ImGui::MenuItem(ICON_FA_ARROW_TURN_UP "  Move to top level")) {
-    pending = {Pending::Kind::Reparent, index, kNoIndex, {}};
-  }
+  ImGui::BeginDisabled(context.session.play_state() != PlayState::Editing);
+  draw_node_actions(context.session.document().node(index).parent != kNoIndex, index, pending);
   ImGui::Separator();
-  if (ImGui::BeginMenu(ICON_FA_PLUS "  Create")) {
-    draw_create_menu(context);
-    ImGui::EndMenu();
-  }
+  menu(ICON_FA_PLUS "  Create", [&context] { draw_create_menu(context); });
   ImGui::EndDisabled();
   ImGui::EndPopup();
 }
@@ -115,24 +110,31 @@ void draw_label(const RowLabel& label) {
   ImGui::TextColored(accent_color(), ICON_FA_GEM);
 }
 
-// One row: a tree node that selects, frames, drags, takes drops and opens the object's menu.
-bool draw_row(PanelContext& context, int index, ImGuiTreeNodeFlags flags, HierarchyResult& result,
-              Pending& pending) {
-  EditorSession& session = context.session;
-  const RowLabel label = label_of(session.document().node(index));
-  if (session.selection() == index) flags |= ImGuiTreeNodeFlags_Selected;
-  flags |= ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanFullWidth;
-
-  const bool open = ImGui::TreeNodeEx(kNodeId, flags);
+// A click on the row just drawn selects its object; a double click asks to frame it.
+void use_row_clicks(EditorSession& session, int index, HierarchyResult& result) {
   if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
     session.select(index);
   }
   if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) result.frame_requested = true;
-  if (session.play_state() == PlayState::Editing && ImGui::BeginDragDropSource()) {
-    ImGui::SetDragDropPayload(kPayloadNode, &index, sizeof(index));
-    ImGui::Text("%s  %s", label.icon, label.name.c_str());
-    ImGui::EndDragDropSource();
-  }
+}
+
+// The row just drawn can be dragged onto another object (or onto the empty space) while editing.
+void offer_row_drag(const EditorSession& session, int index, const RowLabel& label) {
+  if (session.play_state() != PlayState::Editing || !ImGui::BeginDragDropSource()) return;
+  ImGui::SetDragDropPayload(kPayloadNode, &index, sizeof(index));
+  ImGui::Text("%s  %s", label.icon, label.name.c_str());
+  ImGui::EndDragDropSource();
+}
+
+// One row: a tree node that selects, frames, drags, takes drops and opens the object's menu.
+bool draw_row(PanelContext& context, int index, ImGuiTreeNodeFlags flags, HierarchyResult& result, Pending& pending) {
+  EditorSession& session = context.session;
+  const RowLabel label = label_of(session.document().node(index));
+  if (session.selection() == index) flags |= ImGuiTreeNodeFlags_Selected;
+  flags |= ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanFullWidth;
+  const bool open = ImGui::TreeNodeEx(kNodeId, flags);
+  use_row_clicks(session, index, result);
+  offer_row_drag(session, index, label);
   accept_drops(index, pending);
   node_context_menu(context, index, pending);
   draw_label(label);
@@ -154,25 +156,38 @@ void draw_tree(PanelContext& context, int index, HierarchyResult& result, Pendin
   ImGui::PopID();
 }
 
+// What each kind of pending edit does, in Pending::Kind's order.
+void apply_nothing(PanelContext& /*context*/, const Pending& /*pending*/) {}
+
+void apply_duplicate(PanelContext& context, const Pending& pending) {
+  context.session.select(pending.target);
+  context.session.duplicate_selection();
+}
+
+void apply_delete(PanelContext& context, const Pending& pending) {
+  context.session.select(pending.target);
+  context.session.delete_selection();
+}
+
+void apply_reparent(PanelContext& context, const Pending& pending) {
+  context.session.reparent(pending.target, pending.parent);
+}
+
+void apply_attach_script(PanelContext& context, const Pending& pending) {
+  context.session.attach_script(pending.target, pending.file);
+  context.session.select(pending.target);
+}
+
+void apply_import_model(PanelContext& context, const Pending& pending) {
+  import_model(context.session, pending.file, context.spawn_point, pending.parent);
+}
+
+using ApplyPending = void (*)(PanelContext&, const Pending&);
+constexpr ApplyPending kApplyPending[] = {apply_nothing,  apply_duplicate,     apply_delete,
+                                          apply_reparent, apply_attach_script, apply_import_model};
+
 void apply(PanelContext& context, const Pending& pending) {
-  EditorSession& session = context.session;
-  switch (pending.kind) {
-    case Pending::Kind::None: break;
-    case Pending::Kind::Duplicate:
-      session.select(pending.target);
-      session.duplicate_selection();
-      break;
-    case Pending::Kind::Delete:
-      session.select(pending.target);
-      session.delete_selection();
-      break;
-    case Pending::Kind::Reparent: session.reparent(pending.target, pending.parent); break;
-    case Pending::Kind::AttachScript:
-      session.attach_script(pending.target, pending.file);
-      session.select(pending.target);
-      break;
-    case Pending::Kind::ImportModel: import_model(session, pending.file, context.spawn_point, pending.parent); break;
-  }
+  kApplyPending[static_cast<std::size_t>(pending.kind)](context, pending);
 }
 
 // The "+" button and the search field.
@@ -180,30 +195,37 @@ void draw_search_bar(PanelContext& context) {
   ImGui::BeginDisabled(context.session.play_state() != PlayState::Editing);
   if (icon_button(ICON_FA_PLUS, "Create an object")) ImGui::OpenPopup(kCreatePopup);
   ImGui::EndDisabled();
-  if (ImGui::BeginPopup(kCreatePopup)) {
-    draw_create_menu(context);
-    ImGui::EndPopup();
-  }
+  popup(kCreatePopup, [&context] { draw_create_menu(context); });
   ImGui::SameLine();
   ImGui::SetNextItemWidth(kFillWidth);
   ImGui::InputTextWithHint(kSearchId, ICON_FA_MAGNIFYING_GLASS "  Search", &g_filter);
 }
 
 // The whole tree, or a flat list of the objects whose name matches the search.
-void draw_objects(PanelContext& context, HierarchyResult& result, Pending& pending) {
+void draw_whole_tree(PanelContext& context, HierarchyResult& result, Pending& pending) {
   const SceneDocument& doc = context.session.document();
-  if (g_filter.empty()) {
-    for (int i = 0; i < doc.node_count(); ++i) {
-      if (doc.node(i).parent == kNoIndex) draw_tree(context, i, result, pending);
-    }
-    return;
+  for (int i = 0; i < doc.node_count(); ++i) {
+    if (doc.node(i).parent == kNoIndex) draw_tree(context, i, result, pending);
   }
-  const std::string wanted = editor_logic::lowercase(g_filter);
+}
+
+// A flat list of the objects whose name contains `wanted` (lowercase).
+void draw_matches(PanelContext& context, const std::string& wanted, HierarchyResult& result, Pending& pending) {
+  const SceneDocument& doc = context.session.document();
   for (int i = 0; i < doc.node_count(); ++i) {
     if (!editor_logic::name_contains(doc.node(i).name, wanted)) continue;
     ImGui::PushID(i);
     draw_row(context, i, ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen, result, pending);
     ImGui::PopID();
+  }
+}
+
+// The whole tree, or a flat list of the objects whose name matches the search.
+void draw_objects(PanelContext& context, HierarchyResult& result, Pending& pending) {
+  if (g_filter.empty()) {
+    draw_whole_tree(context, result, pending);
+  } else {
+    draw_matches(context, editor_logic::lowercase(g_filter), result, pending);
   }
 }
 
@@ -237,8 +259,6 @@ HierarchyResult draw_hierarchy(PanelContext& context) {
   return result;
 }
 
-void reset_hierarchy_state() {
-  g_filter.clear();
-}
+void reset_hierarchy_state() { g_filter.clear(); }
 
 }  // namespace redgem::ui

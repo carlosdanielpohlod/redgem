@@ -45,6 +45,30 @@ constexpr float kDayAmbientOcclusion = 0.8f;
 constexpr float kNeutralGrade = 1.0f;  // contrast and saturation that change nothing
 constexpr float kFullShadows = 1.0f;   // the most a 0..1 strength (shadows, occlusion, vignette) can be
 
+// The properties that are numbers, and the part of the environment each one sets.
+struct NumberProp {
+  const char* key;
+  float Environment::* value;
+};
+constexpr NumberProp kNumberProps[] = {
+    {kFogDensityProp, &Environment::fog_density},
+    {kAmbientProp, &Environment::ambient},
+    {kExposureProp, &Environment::exposure},
+    {kBloomProp, &Environment::bloom},
+    {kSunGlowProp, &Environment::sun_glow},
+    {kWindProp, &Environment::wind},
+    {kContrastProp, &Environment::contrast},
+    {kSaturationProp, &Environment::saturation},
+    {kGrainProp, &Environment::grain},
+    {kAberrationProp, &Environment::aberration},
+};
+// The ones that are a 0..1 strength.
+constexpr NumberProp kStrengthProps[] = {
+    {kVignetteProp, &Environment::vignette},
+    {kShadowsProp, &Environment::shadows},
+    {kAmbientOcclusionProp, &Environment::ambient_occlusion},
+};
+
 void read_color(const PropertyMap& props, const char* key, Vec3& out) {
   if (const auto text = get_string(props, key)) {
     if (const auto color = parse_hex_color(*text)) out = *color;
@@ -70,21 +94,52 @@ SceneLights default_lights() {
   return lights;
 }
 
+Vec3 rgb(const Color& color) { return {color.r, color.g, color.b}; }
+
 PointLight point_light(const LightDesc& light, Vec3 position) {
-  const Vec3 color{light.color.r, light.color.g, light.color.b};
-  return {position, color * (light.intensity * config::kPointWattScale),
+  return {position, rgb(light.color) * (light.intensity * config::kPointWattScale),
           light.range > 0.0f ? light.range : config::kDefaultPointLightRange};
 }
 
-}  // namespace
+// How far a light's reach ends from the viewer: a far but wide light can matter more than a near
+// but tiny one.
+float reach(const PointLight& light, Vec3 viewer) { return length(light.position - viewer) - light.range; }
 
-Environment default_environment() {
+// Lights fade to nothing as their reach approaches `cut`, over `fade_distance` meters.
+void fade_towards(std::vector<PointLight>& lights, Vec3 viewer, float cut, float fade_distance) {
+  for (PointLight& light : lights) {
+    light.color = light.color * std::clamp((cut - reach(light, viewer)) / fade_distance, 0.0f, 1.0f);
+  }
+}
+
+// The sky, the ground and the fog of a clear day.
+Environment day_sky() {
   Environment env;
   env.sky_top = kDaySkyTop;
   env.sky_horizon = kDaySkyHorizon;
   env.ground = kDayGround;
   env.fog_color = kDaySkyHorizon;
   env.fog_density = kDayFogDensity;
+  return env;
+}
+
+// A light of the scene: one more point light, or the sun (the first directional light; the
+// others are ignored).
+void add_light(SceneLights& lights, const LightDesc& light, const Transform& world, bool& sun_found) {
+  if (light.type != LightType::Directional) {
+    lights.points.push_back(point_light(light, world.position));
+    return;
+  }
+  if (sun_found) return;
+  sun_found = true;
+  lights.sun_direction = world.forward();
+  lights.sun_color = rgb(light.color) * (light.intensity * config::kSunStrengthScale);
+}
+
+}  // namespace
+
+Environment default_environment() {
+  Environment env = day_sky();
   env.ambient = kDayAmbient;
   env.exposure = kDayExposure;
   env.bloom = kDayBloom;
@@ -105,19 +160,8 @@ Environment environment_from_props(const PropertyMap& props) {
   read_color(props, kGroundColorProp, env.ground);
   env.fog_color = env.sky_horizon;  // fog fades into the horizon unless given its own color
   read_color(props, kFogColorProp, env.fog_color);
-  read_number(props, kFogDensityProp, env.fog_density);
-  read_number(props, kAmbientProp, env.ambient);
-  read_number(props, kExposureProp, env.exposure);
-  read_number(props, kBloomProp, env.bloom);
-  read_strength(props, kVignetteProp, env.vignette);
-  read_number(props, kSunGlowProp, env.sun_glow);
-  read_number(props, kWindProp, env.wind);
-  read_strength(props, kShadowsProp, env.shadows);
-  read_strength(props, kAmbientOcclusionProp, env.ambient_occlusion);
-  read_number(props, kContrastProp, env.contrast);
-  read_number(props, kSaturationProp, env.saturation);
-  read_number(props, kGrainProp, env.grain);
-  read_number(props, kAberrationProp, env.aberration);
+  for (const NumberProp& prop : kNumberProps) read_number(props, prop.key, env.*prop.value);
+  for (const NumberProp& prop : kStrengthProps) read_strength(props, prop.key, env.*prop.value);
   return env;
 }
 
@@ -131,20 +175,13 @@ Environment scene_environment(const Scene& scene) {
 
 std::vector<PointLight> nearest_lights(std::vector<PointLight> lights, Vec3 viewer, std::size_t max_count,
                                        float fade_distance) {
-  // Distance to the edge of what the light reaches: a far but wide light can matter more than a
-  // near but tiny one.
-  const auto reach = [viewer](const PointLight& light) { return length(light.position - viewer) - light.range; };
   std::stable_sort(lights.begin(), lights.end(),
-                   [&reach](const PointLight& a, const PointLight& b) { return reach(a) < reach(b); });
+                   [viewer](const PointLight& a, const PointLight& b) { return reach(a, viewer) < reach(b, viewer); });
   if (lights.size() <= max_count) return lights;
   // The first light left out marks the cut: kept lights fade to nothing as they approach it.
-  const float cut = reach(lights[max_count]);
+  const float cut = reach(lights[max_count], viewer);
   lights.resize(max_count);
-  if (fade_distance > 0.0f) {
-    for (PointLight& light : lights) {
-      light.color = light.color * std::clamp((cut - reach(light)) / fade_distance, 0.0f, 1.0f);
-    }
-  }
+  if (fade_distance > 0.0f) fade_towards(lights, viewer, cut, fade_distance);
   return lights;
 }
 
@@ -154,17 +191,7 @@ SceneLights scene_lights(const Scene& scene) {
   for (const ObjectId id : scene.alive_ids()) {
     const GameObject& object = scene.at(id);
     if (!object.light || object.prefab) continue;
-    const LightDesc& light = *object.light;
-    const Transform world = scene.world_transform(id);
-    if (light.type != LightType::Directional) {
-      lights.points.push_back(point_light(light, world.position));
-      continue;
-    }
-    if (sun_found) continue;
-    sun_found = true;
-    lights.sun_direction = world.forward();
-    lights.sun_color =
-        Vec3{light.color.r, light.color.g, light.color.b} * (light.intensity * config::kSunStrengthScale);
+    add_light(lights, *object.light, scene.world_transform(id), sun_found);
   }
   return lights;
 }

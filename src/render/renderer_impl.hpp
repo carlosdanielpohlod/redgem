@@ -45,6 +45,7 @@ struct GpuPrimitive {
 // One pass over the scene's objects: what it is drawn with, what it can see, and the material
 // the previous part left set (consecutive parts often share one).
 struct ObjectPass {
+  // cppcheck-suppress uninitMemberVarNoCtor ; a reference: whoever makes one has to give it
   const Shader& shader;
   int skinned_location = kNoLocation;
   bool depth = false;  // the shadow map's pass: only depth is written
@@ -170,6 +171,13 @@ struct Renderer::Impl {
   // reflection targets and the sky.
   void load_pipeline();
   void compile_shaders();
+  // A uniform of the lit shader, and the member that keeps its location.
+  struct Uniform {
+    int Impl::* location;
+    const char* name;
+  };
+  static const Uniform kMaterialUniforms[];
+  static const Uniform kFrameUniforms[];
   void find_material_uniforms();
   void find_light_uniforms();
   void find_depth_and_particle_uniforms();
@@ -178,6 +186,7 @@ struct Renderer::Impl {
   Material make_material(redgem::Color base_color);
   void release();
   void release_assets();
+  void release_meshes();
   void release_sky();
   void release_fixed_targets();
   void release_shaders();
@@ -185,6 +194,7 @@ struct Renderer::Impl {
   void release_ui_images();
 
   static RenderTexture2D load_target(int width, int height, int format, bool with_depth);
+  static Texture2D load_color_texture(unsigned int framebuffer, int width, int height, int format);
   static Texture2D load_depth_texture(unsigned int framebuffer, int width, int height);
   // A framebuffer with only a depth texture, which the lit shader samples.
   static RenderTexture2D load_shadow_target(int size);
@@ -231,6 +241,7 @@ struct Renderer::Impl {
 
   void begin_pass(const Shader& pass_shader);
   void bind_material(const Material& material, const Shader& pass_shader);
+  void send_matrices(const Matrix& model, const Shader& pass_shader);
   // `bones` is null for meshes that are not deformed by a skeleton.
   void draw_mesh(const Mesh& mesh, const Matrix& model, const Shader& pass_shader, const std::vector<Matrix>* bones);
   // Leaves the state raylib expects: nothing bound.
@@ -249,12 +260,30 @@ struct Renderer::Impl {
   // Particles are hidden behind objects but do not hide each other (no depth written). Ordinary
   // ones cover what is behind them; glowing ones add their light to it.
   void draw_particles(const ParticleSystem& system, const Camera3D& camera);
+  // What every layer of particles is drawn with: their pictures by Particle::image, the distinct
+  // ones among those (one batch each), and how the camera faces them.
+  struct ParticleDraw {
+    const ParticleSystem& system;
+    // cppcheck-suppress uninitMemberVarNoCtor ; a reference: whoever makes one has to give it
+    const std::vector<const Texture2D*>& pictures;
+    // cppcheck-suppress uninitMemberVarNoCtor ; a reference: whoever makes one has to give it
+    const std::vector<const Texture2D*>& batches;
+    const render_math::Facing& view;
+  };
+  // The particles that glow, or the ones that do not: each kind mixes with the picture in its own way.
+  void draw_particle_layer(const ParticleDraw& draw, bool glowing);
   // The pictures a particle system uses, by Particle::image. Null for one the game's images
   // folder does not have: those particles are drawn as dots.
   std::vector<const Texture2D*> particle_pictures(const ParticleSystem& system);
   // Draws the particles that glow (or the ones that do not) and wear `picture` (null: plain dots).
   void draw_particle_batch(const ParticleSystem& system, const std::vector<const Texture2D*>& pictures,
                            const Texture2D* picture, bool glowing, const render_math::Facing& view);
+
+  // What every pass of a frame needs before the picture is drawn: where things are, the lights,
+  // the sun's shadow map and one more face of the reflections. `aspect`: width over height.
+  void prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect);
+  // The scene as the camera sees it, into the HDR target.
+  void draw_lit_scene(const Scene& scene, const Camera3D& camera, const ParticleSystem* particles);
 
   // --- The passes around it (renderer_passes.cpp) -----------------------------------------------
 
@@ -264,6 +293,8 @@ struct Renderer::Impl {
   // Renders the scene's depth from the sun and hands the result to the lit shader.
   void draw_shadow_map(const Scene& scene, const Camera3D& camera, const Environment& env);
   void draw_sun_depth(const Scene& scene, const Camera3D& camera, Vec3 to_sun);
+  // Fills the shadow map from the sun's point of view. Returns the matrix that leads into that view.
+  Matrix draw_depth_from(const Camera3D& sun_view, const Scene& scene, Vec3 viewer);
 
   // Captures one more face of the camera's surroundings into the panorama the lit shader reflects.
   // Six frames make a full turn, so reflections follow the camera with a short delay.
