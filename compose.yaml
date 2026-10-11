@@ -1,5 +1,6 @@
 # tools/docker/editor.sh             opens the editor on your X11 display, as your own user
 # docker compose run --rm test       runs the whole test suite (no display needed)
+# docker compose up relay            runs a meeting point for multiplayer games (port 7778)
 services:
   # Started by tools/docker/editor.sh, which adds your user, your games folder and your settings.
   editor:
@@ -21,3 +22,13 @@ services:
     environment:
       LIBGL_ALWAYS_SOFTWARE: "1"
     command: xvfb-run -a -s "-screen 0 1600x900x24" ctest --test-dir build --output-on-failure
+
+  # Where games played over the internet meet (see the manual's Multiplayer page).
+  relay:
+    build: .
+    image: redgem
+    init: true
+    restart: unless-stopped
+    ports:
+      - "7778:7778"
+    command: build/src/redgem relay

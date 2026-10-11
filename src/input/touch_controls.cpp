@@ -22,6 +22,7 @@ constexpr float kBFromRight = 0.37f;        // B: left of it and a little lower
 constexpr float kBFromBottom = 0.13f;
 constexpr float kStartFromRight = 0.09f;    // Start: small, in the top corner
 constexpr float kStartFromTop = 0.09f;
+constexpr float kTeleport = 0.6f;           // of the height: no thumb moves this far between two frames
 
 bool touching(const TouchCircle& button, const TouchPoint& touch) {
   return std::hypot(touch.x - button.x, touch.y - button.y) <= button.radius * kButtonReach;
@@ -38,6 +39,9 @@ GamepadSample TouchControls::update(const std::vector<TouchPoint>& touches, floa
   const auto held = std::find_if(touches.begin(), touches.end(),
                                  [this](const TouchPoint& touch) { return touch.id == stick_touch_; });
   const TouchPoint* thumb = held != touches.end() ? &*held : nullptr;
+  // A finger that crossed the screen in one frame is another finger with a reused number: the
+  // thumb lifted, and someone pressed a button.
+  if (thumb != nullptr && std::hypot(thumb->x - last_x_, thumb->y - last_y_) > kTeleport * height) thumb = nullptr;
   if (thumb == nullptr) {
     stick_touch_ = kNoTouch;
     for (const TouchPoint& touch : touches) {
@@ -48,6 +52,10 @@ GamepadSample TouchControls::update(const std::vector<TouchPoint>& touches, floa
       thumb = &touch;
       break;
     }
+  }
+  if (thumb != nullptr) {
+    last_x_ = thumb->x;
+    last_y_ = thumb->y;
   }
 
   GamepadSample pad;

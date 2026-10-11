@@ -109,6 +109,8 @@ std::optional<std::string> Engine::initialize() {
   context_.animations = &animations_;
   context_.particles = &particles_;
   context_.network = &network_;
+  context_.discovery = &discovery_;
+  context_.game_title = window.title;
   context_.scene = &scene_;
   context_.audio = &audio();
   context_.physics = physics_.get();
@@ -251,6 +253,7 @@ void Engine::frame(float frame_seconds) {
   tick_system_test();
   if (test_status_ == TestStatus::Passed || test_status_ == TestStatus::Failed) return;
 
+  if (device_input_) device_input_->show_touch_controls(context_.touch_controls);
   const InputSource& source = options_.input != nullptr ? *options_.input
                               : device_input_       ? *device_input_
                                                     : static_cast<const InputSource&>(scripted_input_);
@@ -259,6 +262,10 @@ void Engine::frame(float frame_seconds) {
   scripts_->start_pending();
   // On the real clock: the network does not pause with the game.
   for (const net::NetworkEvent& event : network_.poll(frame_seconds)) scripts_->dispatch(event);
+  // A game hosted on this machine's own port answers the neighbours looking for one.
+  if (!network_.hosting() || !network_.room().empty()) discovery_.stop_announcing();
+  discovery_.set_players(static_cast<int>(network_.peers().size()) + 1);
+  discovery_.update(frame_seconds);
 
   if (renderer_) {
     context_.screen_width = renderer_->screen_width();

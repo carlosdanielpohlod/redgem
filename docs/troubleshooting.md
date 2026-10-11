@@ -10,8 +10,8 @@ Knowing this up front saves time:
 - **Particles** are let out in bursts, as dots or pictures. They do not collide and are not lit.
 - **Animation:** a character plays one clip with a second mixed over it. There are no blend trees,
   no animation events and no inverse kinematics.
-- **Multiplayer** needs the host's address: there is no matchmaking or relay server, and no lag
-  compensation (see [Multiplayer](scripting/multiplayer.md)).
+- **Multiplayer** has no matchmaking and no lag compensation; playing over the internet needs a
+  relay you run, or a forwarded port (see [Multiplayer](scripting/multiplayer.md)).
 - **Platforms:** the editor runs on Linux. Games are built for Linux, Windows and Android (no
   iOS, no web).
 - Scripts are loaded when you press Play; they are not reloaded while the game runs.

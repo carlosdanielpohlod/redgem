@@ -14,8 +14,7 @@ class RaylibInputSource final : public InputSource {
   GamepadSample gamepad() const override;
   std::string typed_text() const override;
   const TouchLayout* touch_layout() const override;
-  // Whether a touch screen shows its controls (a game with its own touch interface turns them off).
-  void show_touch_controls(bool show) { touch_wanted_ = show; }
+  void show_touch_controls(bool show) override { touch_wanted_ = show; }
 
  private:
   // (Reading the gamepad is where the fingers are read: the layout is its by-product.)

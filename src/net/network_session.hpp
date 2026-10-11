@@ -9,23 +9,9 @@
 
 #include "net/frame_buffer.hpp"
 #include "net/socket.hpp"
+#include "net/wire.hpp"
 
 namespace redgem::net {
-
-// Who a message is for, besides one peer's id.
-inline constexpr int kEveryone = 0;
-// The id of the machine hosting the game. Whoever joins gets 2, 3, ... in the order they arrive.
-inline constexpr int kHostId = 1;
-// Machines in one game, the host included.
-inline constexpr int kMaxPeers = 16;
-// What a message may be: how long its name and the keys of its hashes, and how deep its data may
-// nest (arrays in hashes in arrays...). Checked where a message is sent and again where it arrives,
-// since what arrives may come from a program that is not this one.
-inline constexpr std::size_t kMaxNameBytes = 64;
-inline constexpr int kMaxDataDepth = 16;
-
-// Whether `data` is something a message may carry.
-bool acceptable_data(const nlohmann::json& data);
 
 struct NetworkEvent {
   enum class Kind {
@@ -45,6 +31,9 @@ struct NetworkEvent {
 // One multiplayer game over TCP (Network in Ruby). One machine hosts and the others join it;
 // every message goes through the host, which passes it on. Messages arrive whole and in the order
 // they were sent. Nothing here waits: call poll() every frame.
+// When the machines cannot reach each other directly they meet in a room on a relay (see
+// RelayServer): whoever opens the room is the game's host in every way but one, the relay does
+// the passing on.
 class NetworkSession {
  public:
   enum class State { Offline, Connecting, Online };
@@ -53,6 +42,12 @@ class NetworkSession {
   bool host(std::uint16_t port, std::string& error);
   // Starts joining the game hosted at `address`. A Connected or Failed event tells how it went.
   bool join(const std::string& address, std::uint16_t port, std::string& error);
+  // Opens a room on the relay at `address`; the Connected event comes with its code in room().
+  bool host_room(const std::string& address, std::uint16_t port, std::string& error);
+  // Joins the room with that code on the relay at `address`.
+  bool join_room(const std::string& address, std::uint16_t port, const std::string& code, std::string& error);
+  // The code of the room this game is in, on a relay; empty for a game hosted directly.
+  const std::string& room() const { return room_; }
   // Leaves the game (ending it for everyone when hosting).
   void leave();
 
@@ -79,12 +74,19 @@ class NetworkSession {
     std::vector<std::uint8_t> outgoing;
     int peer = 0;            // 0 on the host until the newcomer said hello and was let in
     float waiting_for = 0.0f;  // seconds a newcomer has kept the host waiting for that hello
+    float quiet_for = 0.0f;    // seconds since anything arrived from it
+    float since_said = 0.0f;   // seconds since anything was sent to it
     bool closed = false;
   };
 
+  bool connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello, std::string& error);
+  // Whether this machine passes the others' messages on itself (a host reached directly).
+  bool relaying() const { return id_ == kHostId && !through_relay_; }
   void accept_newcomers();
   void admit(Link& link, std::vector<NetworkEvent>& events);
   void drop_silent_newcomers(float seconds);
+  // Says "I am here" over links that had nothing to carry lately, and gives up on silent ones.
+  void keep_in_touch(Link& link, float seconds);
   void await_connection(float seconds, std::vector<NetworkEvent>& events);
   // Reads and writes what the link can right now; marks it closed when the other side is gone.
   void pump(Link& link);
@@ -99,10 +101,12 @@ class NetworkSession {
 
   State state_ = State::Offline;
   int id_ = 0;
-  int next_id_ = kHostId + 1;
   std::uint16_t port_ = 0;
   float connecting_for_ = 0.0f;
   bool announce_hosting_ = false;
+  bool through_relay_ = false;   // the game is a room on a relay
+  bool opening_room_ = false;    // ... which this machine asked to open
+  std::string room_;
   Socket listener_;
   std::vector<Link> links_;
   std::vector<int> peers_;

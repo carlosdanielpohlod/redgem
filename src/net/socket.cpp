@@ -25,6 +25,7 @@ namespace {
 constexpr int kWaitingConnections = 16;   // connections the system holds until accept() takes them
 constexpr std::size_t kReadChunkBytes = 16 * 1024;
 constexpr int kEnabled = 1;
+constexpr std::size_t kDatagramBytes = 2048;  // more than any message games on a network exchange to find each other
 constexpr std::intptr_t kInvalidSocket = -1;
 
 #ifdef _WIN32
@@ -189,7 +190,18 @@ Socket Socket::accept() {
     return Socket();
   }
   set_option(guest, IPPROTO_TCP, TCP_NODELAY);
+  set_option(guest, SOL_SOCKET, SO_KEEPALIVE);
   return Socket(static_cast<std::intptr_t>(guest));
+}
+
+std::string Socket::peer_address() const {
+  if (!valid()) return {};
+  sockaddr_in address{};
+  Length size = sizeof(address);
+  if (getpeername(native(handle_), reinterpret_cast<sockaddr*>(&address), &size) != 0) return {};
+  char text[INET_ADDRSTRLEN] = {};
+  inet_ntop(AF_INET, &address.sin_addr, text, sizeof(text));
+  return text;
 }
 
 IoStatus Socket::connect_status() {
@@ -239,6 +251,84 @@ IoStatus Socket::write(std::vector<std::uint8_t>& bytes) {
 }
 
 std::uint16_t Socket::local_port() const {
+  if (!valid()) return 0;
+  sockaddr_in address{};
+  Length size = sizeof(address);
+  if (getsockname(native(handle_), reinterpret_cast<sockaddr*>(&address), &size) != 0) return 0;
+  return ntohs(address.sin_port);
+}
+
+// --- Datagrams -----------------------------------------------------------------------------
+
+Datagrams::Datagrams(Datagrams&& other) noexcept : handle_(std::exchange(other.handle_, kNoHandle)) {}
+
+Datagrams& Datagrams::operator=(Datagrams&& other) noexcept {
+  if (this != &other) {
+    close();
+    handle_ = std::exchange(other.handle_, kNoHandle);
+  }
+  return *this;
+}
+
+void Datagrams::close() {
+  if (handle_ == kNoHandle) return;
+  close_native(native(handle_));
+  handle_ = kNoHandle;
+}
+
+Datagrams Datagrams::open_on(std::uint16_t port, std::string& error) {
+  start_sockets();
+  const NativeSocket socket = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (static_cast<std::intptr_t>(socket) < 0 || !make_non_blocking(socket)) {
+    error = last_error();
+    if (static_cast<std::intptr_t>(socket) >= 0) close_native(socket);
+    return Datagrams();
+  }
+  set_option(socket, SOL_SOCKET, SO_BROADCAST);
+  // Two games on one machine both answer searches: they share the port.
+  set_option(socket, SOL_SOCKET, SO_REUSEADDR);
+#ifdef SO_REUSEPORT
+  set_option(socket, SOL_SOCKET, SO_REUSEPORT);
+#endif
+  sockaddr_in address{};
+  address.sin_family = AF_INET;
+  address.sin_addr.s_addr = htonl(INADDR_ANY);
+  address.sin_port = htons(port);
+  Datagrams datagrams(static_cast<std::intptr_t>(socket));
+  if (bind(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0) {
+    error = last_error();
+    datagrams.close();
+  }
+  return datagrams;
+}
+
+bool Datagrams::send_to(const std::string& address, std::uint16_t port, const std::string& message) {
+  if (!valid()) return false;
+  sockaddr_in to{};
+  to.sin_family = AF_INET;
+  to.sin_port = htons(port);
+  if (inet_pton(AF_INET, address.c_str(), &to.sin_addr) != 1) return false;
+  const auto sent = sendto(native(handle_), message.data(), static_cast<int>(message.size()), kSendFlags,
+                           reinterpret_cast<const sockaddr*>(&to), sizeof(to));
+  return sent == static_cast<decltype(sent)>(message.size());
+}
+
+bool Datagrams::receive(std::string& message, std::string& from_address, std::uint16_t& from_port) {
+  if (!valid()) return false;
+  char chunk[kDatagramBytes];
+  sockaddr_in from{};
+  Length size = sizeof(from);
+  const auto count = recvfrom(native(handle_), chunk, sizeof(chunk), 0, reinterpret_cast<sockaddr*>(&from), &size);
+  if (count <= 0) return false;
+  char text[INET_ADDRSTRLEN] = {};
+  inet_ntop(AF_INET, &from.sin_addr, text, sizeof(text));
+  message.assign(chunk, static_cast<std::size_t>(count));
+  from_address = text;
+  from_port = ntohs(from.sin_port);
+  return true;
+}
+
+std::uint16_t Datagrams::local_port() const {
   if (!valid()) return 0;
   sockaddr_in address{};
   Length size = sizeof(address);

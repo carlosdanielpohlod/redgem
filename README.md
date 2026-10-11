@@ -27,7 +27,8 @@ end
   scenes set up in Ruby; classes load on first use, no `require`.
 - **Gameplay kit**: keyboard, mouse and gamepad input, menus and HUD, sounds and music, particles,
   per-character animation with blending, saved progress.
-- **Multiplayer**: host and join over the network, named messages, objects kept in sync.
+- **Multiplayer**: games found by themselves on the local network, rooms by code over the
+  internet through a relay that ships with the engine, named messages, objects kept in sync.
 - **Editor**: scene view with gizmos, hierarchy, inspector, Ruby code tabs, play mode, undo,
   sculptable terrain, and one-click builds of the game for Linux, Windows and Android.
 - **Blender as the modeling tool**: scenes are glTF files; custom properties carry gameplay data.

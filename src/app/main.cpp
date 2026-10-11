@@ -1,9 +1,12 @@
+#include <chrono>
+#include <thread>
 #include <exception>
 #include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
 
+#include "net/relay_server.hpp"
 #include "core/exit_codes.hpp"
 #include "app/cli.hpp"
 #include "app/engine.hpp"
@@ -18,6 +21,7 @@
 namespace {
 
 constexpr int kExitUsage = 2;
+constexpr float kRelayPollSeconds = 0.005f;  // between looks at the relay's connections
 
 // The editor, with the project hub when no game is given (and for File > New / Open Game).
 int run_editor(std::filesystem::path game) {
@@ -48,6 +52,31 @@ int run_editor(std::filesystem::path game) {
     const int code = app.run();
     if (app.exit_action() != EditorExit::OpenHub) return code;
     game.clear();
+  }
+}
+
+// A meeting point for games over the internet (see RelayServer): runs until it is stopped.
+int run_relay(int port) {
+  using namespace redgem;
+  net::RelayServer relay;
+  std::string error;
+  const auto wanted = static_cast<std::uint16_t>(port != 0 ? port : net::kDefaultRelayPort);
+  if (!relay.start(wanted, error)) {
+    log::error("cannot listen on port " + std::to_string(wanted) + ": " + error);
+    return kExitFailure;
+  }
+  log::info("relay listening on port " + std::to_string(relay.port()) + " (Ctrl+C stops it)");
+  std::size_t rooms = 0;
+  auto before = std::chrono::steady_clock::now();
+  for (;;) {
+    const auto now = std::chrono::steady_clock::now();
+    relay.poll(std::chrono::duration<float>(now - before).count());
+    before = now;
+    if (relay.room_count() != rooms) {
+      rooms = relay.room_count();
+      log::info(std::to_string(rooms) + " room(s) open, " + std::to_string(relay.connection_count()) + " machine(s)");
+    }
+    std::this_thread::sleep_for(std::chrono::duration<float>(kRelayPollSeconds));
   }
 }
 
@@ -119,6 +148,8 @@ int main(int argc, char** argv) {
                   << executable->string() << "\n";
         return kExitSuccess;
       }
+      case RunMode::Relay:
+        return run_relay(options.relay_port);
       case RunMode::Editor:
         return run_editor(options.game_dir);
       case RunMode::Game:

@@ -1,34 +1,14 @@
 #include "net/network_session.hpp"
 
+#include "net/wire.hpp"
+
 #include <algorithm>
 
 namespace redgem::net {
 
 namespace {
 
-constexpr float kJoinTimeoutSeconds = 5.0f;
-// A machine that stopped listening is let go once this much is waiting to be sent to it.
-constexpr std::size_t kMaxPendingBytes = 8 * 1024 * 1024;
-// What one poll takes from one machine (at least a whole message, so there is always progress).
-constexpr std::size_t kMaxReadBytesPerPoll = 2 * kMaxFrameBytes;
-constexpr int kFirstGuestId = kHostId + 1;
-constexpr int kCompact = -1;  // nlohmann's "no indentation"
-// What a message on the wire says (JSON keys and the kinds of message).
-constexpr const char* kKind = "k";
-constexpr const char* kName = "n";
-constexpr const char* kFrom = "f";
-constexpr const char* kTo = "t";
-constexpr const char* kData = "d";
-constexpr const char* kPeers = "p";
-constexpr const char* kGameMessage = "m";
-constexpr const char* kHello = "h";     // a newcomer to the host: let me in
-constexpr const char* kWelcome = "w";   // host to a newcomer: your id, and who else is here
-constexpr const char* kArrived = "j";   // host to the others: someone joined
-constexpr const char* kGone = "l";      // host to the others: someone left
-
-nlohmann::json game_message(const std::string& name, const nlohmann::json& data, int from, int to) {
-  return {{kKind, kGameMessage}, {kName, name}, {kFrom, from}, {kTo, to}, {kData, data}};
-}
+using namespace wire;
 
 NetworkEvent event_of(NetworkEvent::Kind kind, int peer = 0) {
   NetworkEvent event;
@@ -37,45 +17,7 @@ NetworkEvent event_of(NetworkEvent::Kind kind, int peer = 0) {
   return event;
 }
 
-bool acceptable_at(const nlohmann::json& data, int depth) {
-  if (!data.is_structured()) return true;
-  if (depth >= kMaxDataDepth) return false;
-  if (data.is_object()) {
-    for (const auto& [key, value] : data.items()) {
-      if (key.size() > kMaxNameBytes || !acceptable_at(value, depth + 1)) return false;
-    }
-    return true;
-  }
-  for (const nlohmann::json& value : data) {
-    if (!acceptable_at(value, depth + 1)) return false;
-  }
-  return true;
-}
-
-bool is_id(const nlohmann::json& message, const char* key) {
-  return !message.contains(key) || (message[key].is_number_integer() && message[key] >= 0 && message[key] <= kMaxPeers * kMaxPeers);
-}
-
-// Whether what arrived is a message of ours, every field of the kind it should be. Anything else
-// comes from a broken or hostile program, and nothing of it is used.
-bool well_formed(const nlohmann::json& message) {
-  if (!message.is_object() || !message.contains(kKind) || !message[kKind].is_string()) return false;
-  if (!is_id(message, kFrom) || !is_id(message, kTo)) return false;
-  if (message.contains(kName) && (!message[kName].is_string() || message[kName].get_ref<const std::string&>().size() > kMaxNameBytes)) {
-    return false;
-  }
-  if (message.contains(kPeers)) {
-    if (!message[kPeers].is_array()) return false;
-    for (const nlohmann::json& peer : message[kPeers]) {
-      if (!peer.is_number_integer()) return false;
-    }
-  }
-  return !message.contains(kData) || acceptable_data(message[kData]);
-}
-
 }  // namespace
-
-bool acceptable_data(const nlohmann::json& data) { return acceptable_at(data, 0); }
 
 bool NetworkSession::host(std::uint16_t port, std::string& error) {
   leave();
@@ -83,23 +25,45 @@ bool NetworkSession::host(std::uint16_t port, std::string& error) {
   if (!listener_.valid()) return false;
   port_ = listener_.local_port();
   id_ = kHostId;
-  next_id_ = kFirstGuestId;
   state_ = State::Online;
   announce_hosting_ = true;
   return true;
 }
 
-bool NetworkSession::join(const std::string& address, std::uint16_t port, std::string& error) {
+bool NetworkSession::connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello,
+                                 std::string& error) {
   leave();
   Link link;
   link.socket = Socket::connect_to(address, port, error);
   if (!link.socket.valid()) return false;
   link.peer = kHostId;
   links_.push_back(std::move(link));
-  queue(links_.front(), {{kKind, kHello}});  // goes out once the connection is made
+  queue(links_.front(), hello);  // goes out once the connection is made
   port_ = port;
   connecting_for_ = 0.0f;
   state_ = State::Connecting;
+  return true;
+}
+
+bool NetworkSession::join(const std::string& address, std::uint16_t port, std::string& error) {
+  return connect_out(address, port, {{kKind, kHello}}, error);
+}
+
+bool NetworkSession::host_room(const std::string& address, std::uint16_t port, std::string& error) {
+  if (!connect_out(address, port, {{kKind, kHello}, {kRoom, kNewRoom}}, error)) return false;
+  through_relay_ = true;
+  opening_room_ = true;
+  return true;
+}
+
+bool NetworkSession::join_room(const std::string& address, std::uint16_t port, const std::string& code,
+                               std::string& error) {
+  if (code.empty() || code == kNewRoom) {
+    error = "a room's code is needed to join it";
+    return false;
+  }
+  if (!connect_out(address, port, {{kKind, kHello}, {kRoom, code}}, error)) return false;
+  through_relay_ = true;
   return true;
 }
 
@@ -117,6 +81,9 @@ void NetworkSession::go_offline() {
   id_ = 0;
   port_ = 0;
   announce_hosting_ = false;
+  through_relay_ = false;
+  opening_room_ = false;
+  room_.clear();
 }
 
 std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
@@ -135,6 +102,7 @@ std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
   for (std::size_t i = 0; i < links_.size() && state_ != State::Offline; ++i) {
     Link& link = links_[i];
     pump(link);
+    if (state_ == State::Online && link.peer != 0) keep_in_touch(link, seconds);
     while (const auto text = link.incoming.next()) {
       handle(link, *text, events);
       if (state_ == State::Offline) break;
@@ -155,7 +123,11 @@ void NetworkSession::accept_newcomers() {
 }
 
 void NetworkSession::admit(Link& link, std::vector<NetworkEvent>& events) {
-  link.peer = next_id_++;
+  link.peer = free_peer_id(peers_);
+  if (link.peer == 0) {
+    link.closed = true;  // full
+    return;
+  }
   std::vector<int> already_here{kHostId};
   already_here.insert(already_here.end(), peers_.begin(), peers_.end());
   queue(link, {{kKind, kWelcome}, {kTo, link.peer}, {kPeers, already_here}});
@@ -186,8 +158,19 @@ void NetworkSession::pump(Link& link) {
   if (state_ == State::Connecting && link.socket.connect_status() != IoStatus::Ok) return;
   std::vector<std::uint8_t> arrived;
   if (link.socket.read(arrived, kMaxReadBytesPerPoll) == IoStatus::Closed) link.closed = true;
+  if (!arrived.empty()) link.quiet_for = 0.0f;
   link.incoming.append(arrived.data(), arrived.size());
   if (!link.closed && link.socket.write(link.outgoing) == IoStatus::Closed) link.closed = true;
+}
+
+void NetworkSession::keep_in_touch(Link& link, float seconds) {
+  link.quiet_for += seconds;
+  link.since_said += seconds;
+  if (link.quiet_for > kSilenceTimeoutSeconds) {
+    link.closed = true;  // gone without a goodbye
+  } else if (link.since_said >= kPingEverySeconds) {
+    queue(link, {{kKind, kPing}});
+  }
 }
 
 void NetworkSession::handle(Link& link, const std::string& text, std::vector<NetworkEvent>& events) {
@@ -197,7 +180,7 @@ void NetworkSession::handle(Link& link, const std::string& text, std::vector<Net
     return;
   }
   try {
-    if (id_ == kHostId) {
+    if (relaying()) {
       handle_as_host(link, message, events);
     } else {
       handle_as_guest(message, events);
@@ -237,11 +220,15 @@ void NetworkSession::handle_as_host(Link& link, const nlohmann::json& message, s
 void NetworkSession::handle_as_guest(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
   const std::string kind = message[kKind];
   if (kind == kWelcome && state_ == State::Connecting) {
-    if (message.value(kTo, 0) < kFirstGuestId) {
-      links_.front().closed = true;  // only the host is 1, and nobody is 0
+    // Only the host is 1 (as is whoever opened a room on a relay), and nobody is 0.
+    const int lowest = through_relay_ && opening_room_ ? kHostId : kFirstGuestId;
+    const int given = message.value(kTo, 0);
+    if (given < lowest || (opening_room_ && given != kHostId)) {
+      links_.front().closed = true;
       return;
     }
-    id_ = message.value(kTo, 0);
+    id_ = given;
+    room_ = message.value(kRoom, std::string());
     peers_ = message.value(kPeers, std::vector<int>{});
     state_ = State::Online;
     events.push_back(event_of(NetworkEvent::Kind::Connected, id_));
@@ -264,7 +251,7 @@ void NetworkSession::handle_as_guest(const nlohmann::json& message, std::vector<
 }
 
 void NetworkSession::drop_closed_links(std::vector<NetworkEvent>& events) {
-  if (id_ != kHostId) {
+  if (!relaying()) {
     if (links_.empty() || !links_.front().closed) return;
     // The host is gone, and the game with it.
     const bool was_in = state_ == State::Online;
@@ -288,8 +275,8 @@ void NetworkSession::drop_closed_links(std::vector<NetworkEvent>& events) {
 bool NetworkSession::send(const std::string& name, const nlohmann::json& data, int to) {
   if (state_ != State::Online || to == id_ || name.size() > kMaxNameBytes || !acceptable_data(data)) return false;
   const nlohmann::json message = game_message(name, data, id_, to);
-  if (id_ != kHostId) {
-    // Everything goes to the host, which passes it on.
+  if (!relaying()) {
+    // Everything goes to the host (or the relay), which passes it on.
     if (to != kEveryone && to != kHostId && std::find(peers_.begin(), peers_.end(), to) == peers_.end()) return false;
     queue(links_.front(), message);
     return true;
@@ -306,9 +293,9 @@ bool NetworkSession::send(const std::string& name, const nlohmann::json& data, i
 
 void NetworkSession::queue(Link& link, const nlohmann::json& message) {
   // (Text that is not valid UTF-8 travels with the broken parts replaced, instead of not at all.)
-  const std::vector<std::uint8_t> bytes =
-      frame(message.dump(kCompact, ' ', false, nlohmann::json::error_handler_t::replace));
+  const std::vector<std::uint8_t> bytes = packed(message);
   link.outgoing.insert(link.outgoing.end(), bytes.begin(), bytes.end());
+  link.since_said = 0.0f;
   if (link.outgoing.size() > kMaxPendingBytes) {
     link.closed = true;  // it stopped listening: the game does not pile messages up for it forever
     link.outgoing.clear();

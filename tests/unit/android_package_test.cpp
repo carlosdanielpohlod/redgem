@@ -39,9 +39,17 @@ std::string read(const std::filesystem::path& file) {
 
 TEST_CASE("an app's id is made of the game's letters and digits") {
   CHECK(android_package_name("games/platformer") == "com.redgem.platformer");
-  CHECK(android_package_name("/home/someone/My Game 2/") == "com.redgem.mygame2");
-  CHECK(android_package_name("games/3d-maze") == "com.redgem.game3dmaze");  // a letter first
-  CHECK(android_package_name("games/---") == "com.redgem.game");
+  CHECK(android_package_name("games/maze2/") == "com.redgem.maze2");
+  CHECK(android_package_name("games/3dmaze") == "com.redgem.game3dmaze");  // a letter first
+  // Names that would come out the same get a few digits of their own, so they stay different apps.
+  const std::string spaced = android_package_name("/home/someone/My Game/");
+  const std::string dashed = android_package_name("games/my-game");
+  CHECK(spaced.rfind("com.redgem.mygame_", 0) == 0);
+  CHECK(dashed.rfind("com.redgem.mygame_", 0) == 0);
+  CHECK(spaced != dashed);
+  CHECK(spaced != android_package_name("games/mygame"));
+  CHECK(spaced == android_package_name("elsewhere/My Game"));  // the same game, wherever it is
+  CHECK(android_package_name("games/---").rfind("com.redgem.game_", 0) == 0);
 }
 
 TEST_CASE("the manifest describes a full-screen native activity running the engine") {
@@ -66,7 +74,7 @@ TEST_CASE("the SDK's tools are found in its newest build-tools and platform, or 
   }
   CHECK_FALSE(find_android_tools(scratch.dir, error).has_value());  // no platform yet
   CHECK(error.find("android.jar") != std::string::npos);
-  scratch.file("platforms/android-34/android.jar");
+  scratch.file("platforms/android-9/android.jar");  // older, though "9" sorts after "35" as text
   scratch.file("platforms/android-35/android.jar");
   const auto tools = find_android_tools(scratch.dir, error);
   REQUIRE(tools.has_value());
@@ -107,6 +115,24 @@ TEST_CASE("a game is laid out as an APK's contents: its files, their list, a sta
     copied += entry.is_regular_file() ? 1 : 0;
   }
   CHECK(listed == copied);
+
+  // Hidden files and editors' backups are not part of a game.
+  const std::filesystem::path game = scratch.dir / "My Game";
+  std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
+  std::ofstream(game / ".gitignore") << "x";
+  std::filesystem::create_directories(game / ".git");
+  std::ofstream(game / ".git" / "config") << "x";
+  std::ofstream(game / "scripts" / "probe.rb~") << "x";
+  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp-2", stage, error), error);
+  const std::string tidy = read(stage / "assets/game.files");
+  CHECK(tidy == listing);
+  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/.gitignore"));
+  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/.git"));
+  // A folder the SDK would silently leave out is refused, by name.
+  std::filesystem::create_directories(game / "_shared");
+  std::ofstream(game / "_shared" / "data.txt") << "x";
+  CHECK_FALSE(stage_android_game(game, runtimes, "s", stage, error));
+  CHECK(error.find("_shared/data.txt") != std::string::npos);
 
   // What cannot be packed is refused with a reason.
   CHECK_FALSE(stage_android_game(scratch.dir, runtimes, "s", stage, error));

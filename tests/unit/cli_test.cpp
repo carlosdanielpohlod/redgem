@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include "app/cli.hpp"
+#include "app/game_project.hpp"
 #include "core/config.hpp"
 
 using namespace redgem;
@@ -92,4 +93,26 @@ TEST_CASE("game folders are normalized: a trailing slash does not lose the game'
   const CliResult build = parse_cli({"build", "games/demo/", "dist/demo/"});
   REQUIRE(build.ok);
   CHECK(build.options.build_dir.filename() == "demo");
+}
+
+TEST_CASE("relay runs a meeting point, on a port of choice") {
+  const CliResult plain = parse_cli({"relay"});
+  REQUIRE(plain.ok);
+  CHECK(plain.options.mode == RunMode::Relay);
+  CHECK(plain.options.relay_port == 0);
+  const CliResult chosen = parse_cli({"relay", "--port", "9000"});
+  REQUIRE(chosen.ok);
+  CHECK(chosen.options.relay_port == 9000);
+  CHECK_FALSE(parse_cli({"relay", "--port", "70000"}).ok);
+  CHECK_FALSE(parse_cli({"relay", "--port", "many"}).ok);
+  CHECK_FALSE(parse_cli({"relay", "--port"}).ok);
+  CHECK_FALSE(parse_cli({"relay", "somewhere"}).ok);
+}
+
+TEST_CASE("android is a build target") {
+  const CliResult android = parse_cli({"build", "games/mine", "dist/apk", "--target", "android"});
+  REQUIRE(android.ok);
+  CHECK(android.options.build_target == "android");
+  CHECK(build_target_from_name("android") == BuildTarget::Android);
+  CHECK(std::string(build_target_name(BuildTarget::Android)) == "android");
 }

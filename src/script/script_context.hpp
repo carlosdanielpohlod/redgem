@@ -16,6 +16,7 @@ namespace redgem {
 class SaveStore;
 namespace net {
 class NetworkSession;
+class LanDiscovery;
 }
 class AnimationPlayer;
 class ParticleSystem;
@@ -63,6 +64,8 @@ struct ScriptContext {
   std::function<int(const std::string&, int)> measure_text;
   // Input.mouse_locked: the pointer is hidden and kept in the window (first-person cameras).
   bool mouse_locked = false;
+  // Input.touch_controls: whether a touch screen shows its stick and buttons.
+  bool touch_controls = true;
   // Camera.motion_blur: how much the picture streaks away from its center, 0 to 1.
   float motion_blur = 0.0f;
   // What the game keeps between runs (Save); null when there is nowhere to keep it.
@@ -72,6 +75,10 @@ struct ScriptContext {
   ParticleSystem* particles = nullptr;
   // The multiplayer game this machine hosts or joined (Network).
   net::NetworkSession* network = nullptr;
+  // Finding games on the local network, and being found (Network.search, Network.host).
+  net::LanDiscovery* discovery = nullptr;
+  // What the game is called (game.json): how a hosted game shows up to others unless named.
+  std::string game_title;
   std::vector<std::string> screenshot_requests;
   bool quit_requested = false;
   // Called when a script writes a transform, so physics can follow.

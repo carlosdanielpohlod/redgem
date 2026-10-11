@@ -46,6 +46,8 @@ class TouchControls {
   int stick_touch_ = kNoTouch;  // the finger on the stick, while one is
   float base_x_ = 0.0f;         // where it landed
   float base_y_ = 0.0f;
+  float last_x_ = 0.0f;         // where it was a frame ago
+  float last_y_ = 0.0f;
 };
 
 }  // namespace redgem

@@ -9,6 +9,7 @@
 #include <mruby/string.h>
 
 #include "core/log.hpp"
+#include "net/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
@@ -77,14 +78,86 @@ std::uint16_t port_arg(mrb_state* mrb, mrb_int port) {
   return static_cast<std::uint16_t>(port);
 }
 
+net::LanDiscovery& discovery(mrb_state* mrb) {
+  net::LanDiscovery* found = context(mrb).discovery;
+  if (found == nullptr) mrb_raise(mrb, E_RUNTIME_ERROR, "Network is only available while a game runs");
+  return *found;
+}
+
 // True when the game is being hosted; false (with the reason logged) when the port cannot be used.
+// `visible` lets machines on the same network find it, under `name` (the game's title when empty).
 mrb_value network_host(mrb_state* mrb, mrb_value) {
-  mrb_int port = 0;
-  mrb_get_args(mrb, "i", &port);
+  mrb_int port = 0, discovery_port = 0;
+  const char* name = nullptr;
+  mrb_bool visible = true;
+  mrb_get_args(mrb, "izbi", &port, &name, &visible, &discovery_port);
   std::string error;
-  if (network(mrb).host(port_arg(mrb, port), error)) return mrb_true_value();
-  log::warning("cannot host a game on port " + std::to_string(port) + ": " + error);
+  discovery(mrb).stop_announcing();  // whatever game was hosted before is no longer there to find
+  if (!network(mrb).host(port_arg(mrb, port), error)) {
+    log::warning("cannot host a game on port " + std::to_string(port) + ": " + error);
+    return mrb_false_value();
+  }
+  const std::string shown = *name != '\0' ? std::string(name) : context(mrb).game_title;
+  if (visible && !discovery(mrb).announce(shown, network(mrb).port(), port_arg(mrb, discovery_port))) {
+    log::warning("the game is hosted, but machines nearby will not find it by themselves: they join by its address");
+  }
+  return mrb_true_value();
+}
+
+// Opens a room on a relay, or joins one by its code. True when it started (the outcome comes as an event).
+mrb_value network_host_room(mrb_state* mrb, mrb_value) {
+  const char* address = nullptr;
+  mrb_int port = 0;
+  mrb_get_args(mrb, "zi", &address, &port);
+  std::string error;
+  if (network(mrb).host_room(address, port_arg(mrb, port), error)) return mrb_true_value();
+  log::warning(std::string("cannot reach the relay at ") + address + ": " + error);
   return mrb_false_value();
+}
+
+mrb_value network_join_room(mrb_state* mrb, mrb_value) {
+  const char* address = nullptr;
+  const char* code = nullptr;
+  mrb_int port = 0;
+  mrb_get_args(mrb, "ziz", &address, &port, &code);
+  std::string error;
+  if (network(mrb).join_room(address, port_arg(mrb, port), code, error)) return mrb_true_value();
+  log::warning(std::string("cannot join room ") + code + " at " + address + ": " + error);
+  return mrb_false_value();
+}
+
+// The code of the room this game is in, or nil for a game hosted directly.
+mrb_value network_room(mrb_state* mrb, mrb_value) {
+  const std::string& room = network(mrb).room();
+  return room.empty() ? mrb_nil_value() : mrb_str_new(mrb, room.data(), static_cast<mrb_int>(room.size()));
+}
+
+mrb_value network_search(mrb_state* mrb, mrb_value) {
+  mrb_int discovery_port = 0;
+  mrb_get_args(mrb, "i", &discovery_port);
+  return mrb_bool_value(discovery(mrb).search(port_arg(mrb, discovery_port)));
+}
+
+mrb_value network_searching(mrb_state* mrb, mrb_value) { return mrb_bool_value(discovery(mrb).searching()); }
+
+mrb_value network_stop_search(mrb_state* mrb, mrb_value) {
+  discovery(mrb).stop_searching();
+  return mrb_nil_value();
+}
+
+// The games found on the local network: [{ name:, address:, port:, players: }, ...].
+mrb_value network_games(mrb_state* mrb, mrb_value) {
+  const mrb_value games = mrb_ary_new(mrb);
+  for (const net::NearbyGame& game : discovery(mrb).games()) {
+    const mrb_value entry = mrb_hash_new(mrb);
+    mrb_hash_set(mrb, entry, mrb_symbol_value(mrb_intern_lit(mrb, "name")),
+                 mrb_str_new(mrb, game.name.data(), static_cast<mrb_int>(game.name.size())));
+    mrb_hash_set(mrb, entry, mrb_symbol_value(mrb_intern_lit(mrb, "address")), mrb_str_new_cstr(mrb, game.address.c_str()));
+    mrb_hash_set(mrb, entry, mrb_symbol_value(mrb_intern_lit(mrb, "port")), mrb_int_value(mrb, game.port));
+    mrb_hash_set(mrb, entry, mrb_symbol_value(mrb_intern_lit(mrb, "players")), mrb_int_value(mrb, game.players));
+    mrb_ary_push(mrb, games, entry);
+  }
+  return games;
 }
 
 // True when the join started (its outcome comes as an event); false when the address means nothing.
@@ -99,6 +172,7 @@ mrb_value network_join(mrb_state* mrb, mrb_value) {
 }
 
 mrb_value network_leave(mrb_state* mrb, mrb_value) {
+  discovery(mrb).stop_announcing();
   network(mrb).leave();
   return mrb_nil_value();
 }
@@ -161,7 +235,14 @@ mrb_value value_from(mrb_state* mrb, const nlohmann::json& json) {
 
 void install_network_bindings(mrb_state* mrb) {
   RClass* network_module = mrb_define_module(mrb, "Network");
-  mrb_define_module_function(mrb, network_module, "__host", network_host, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, network_module, "__host", network_host, MRB_ARGS_REQ(4));
+  mrb_define_module_function(mrb, network_module, "__host_room", network_host_room, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, network_module, "__join_room", network_join_room, MRB_ARGS_REQ(3));
+  mrb_define_module_function(mrb, network_module, "room", network_room, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, network_module, "__search", network_search, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, network_module, "searching?", network_searching, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, network_module, "stop_search", network_stop_search, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, network_module, "games", network_games, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, network_module, "__join", network_join, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, network_module, "__emit", network_emit, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, network_module, "__leave", network_leave, MRB_ARGS_NONE());

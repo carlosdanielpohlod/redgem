@@ -11,8 +11,9 @@ constexpr float kHeight = 720.0f;
 constexpr int kThumb = 7;        // ids of the fingers
 constexpr int kOtherFinger = 9;
 constexpr float kLanding = 300.0f;   // where the left thumb lands, both ways
-constexpr float kFarPush = 500.0f;   // pixels: much further than the stick reaches
+constexpr float kFarPush = 400.0f;   // pixels: much further than the stick reaches, yet a move a thumb makes
 constexpr float kRightSide = 1200.0f;
+constexpr int kWanderSteps = 10;     // frames a thumb takes to slide across the screen
 
 float axis(const GamepadSample& pad, GamepadAxis which) { return pad.axes[static_cast<std::size_t>(which)]; }
 bool button(const GamepadSample& pad, GamepadButton which) { return pad.buttons[static_cast<std::size_t>(which)]; }
@@ -44,7 +45,12 @@ TEST_CASE("the stick starts where the left thumb lands and follows it, up to a f
   CHECK(axis(pad, GamepadAxis::LeftY) == doctest::Approx(-1.0f));  // up, and no more than all the way
   CHECK(controls.layout().stick_knob.y == doctest::Approx(kLanding - reach));
   // The thumb may wander anywhere once it is on the stick, even over the buttons.
-  pad = controls.update({{kThumb, controls.layout().a.x, controls.layout().a.y}}, kWidth, kHeight);
+  const TouchCircle a_button = controls.layout().a;
+  for (int step = 1; step <= kWanderSteps; ++step) {
+    const float along = static_cast<float>(step) / static_cast<float>(kWanderSteps);
+    pad = controls.update({{kThumb, kLanding + (a_button.x - kLanding) * along, kLanding + (a_button.y - kLanding) * along}},
+                          kWidth, kHeight);
+  }
   CHECK(axis(pad, GamepadAxis::LeftX) == doctest::Approx(1.0f).epsilon(0.05));
   CHECK_FALSE(button(pad, GamepadButton::A));
 
@@ -78,4 +84,15 @@ TEST_CASE("the controls keep their proportions on any screen") {
   large.update({}, kWidth * 2.0f, kHeight * 2.0f);
   CHECK(large.layout().a.radius == doctest::Approx(small.layout().a.radius * 2.0f));
   CHECK(large.layout().a.x == doctest::Approx(small.layout().a.x * 2.0f));
+}
+
+TEST_CASE("a finger that lands on a button with the lifted thumb's number is a button press, not the stick") {
+  TouchControls controls;
+  controls.update({{kThumb, kLanding, kLanding}}, kWidth, kHeight);
+  const TouchLayout at = controls.layout();
+  // The thumb is gone and, the same frame, a finger given its number is on A.
+  const GamepadSample pad = controls.update({{kThumb, at.a.x, at.a.y}}, kWidth, kHeight);
+  CHECK(button(pad, GamepadButton::A));
+  CHECK(axis(pad, GamepadAxis::LeftX) == doctest::Approx(0.0f));
+  CHECK_FALSE(controls.layout().stick_base.pressed);
 }

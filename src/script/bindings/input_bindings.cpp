@@ -77,6 +77,14 @@ GamepadButton gamepad_button_arg(mrb_state* mrb) {
   return *button;
 }
 
+mrb_value input_touch_controls(mrb_state* mrb, mrb_value) { return mrb_bool_value(context(mrb).touch_controls); }
+mrb_value input_set_touch_controls(mrb_state* mrb, mrb_value) {
+  mrb_bool show = true;
+  mrb_get_args(mrb, "b", &show);
+  context(mrb).touch_controls = show;
+  return mrb_bool_value(show);
+}
+
 mrb_value input_text(mrb_state* mrb, mrb_value) {
   const std::string& typed = input(mrb).typed_text();
   return mrb_str_new(mrb, typed.data(), static_cast<mrb_int>(typed.size()));
@@ -209,6 +217,8 @@ void install_input_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, input_module, "mouse_pressed?", input_mouse_pressed, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, input_module, "mouse_released?", input_mouse_released, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, input_module, "text", input_text, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, input_module, "touch_controls?", input_touch_controls, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, input_module, "touch_controls=", input_set_touch_controls, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, input_module, "gamepad?", input_gamepad, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, input_module, "gamepad_axis", input_gamepad_axis, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, input_module, "gamepad_down?", input_gamepad_down, MRB_ARGS_REQ(1));

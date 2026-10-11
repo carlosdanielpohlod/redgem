@@ -10,6 +10,7 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "net/relay_server.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -53,6 +54,8 @@ struct Lan {
   // With this, machines play the fixture game's own level from its files (which a restart loads
   // again) instead of the small scene above.
   bool level_from_files = false;
+  // A relay the machines may meet on, kept going with them.
+  std::unique_ptr<net::RelayServer> relay;
 
   Lan() { std::filesystem::remove_all(dir); }
   ~Lan() {
@@ -73,6 +76,7 @@ struct Lan {
     // Every machine keeps a log of what its network told it.
     ruby(machine, R"(
       Network.allow_spawn('Ball', 'Crate')
+      Network.discovery_port = 47832  # the tests' own: a game open on this machine does not answer on it
       $log = []
       Network.on_connect { $log << :connected }
       Network.on_fail { $log << :failed }
@@ -84,6 +88,7 @@ struct Lan {
   }
 
   void round() {
+    if (relay) relay->poll(config::kFixedDeltaSeconds);
     for (auto& machine : machines) machine->frame(config::kFixedDeltaSeconds);
     std::this_thread::sleep_for(kRoundPause);
   }
@@ -338,4 +343,65 @@ TEST_CASE("after a level is loaded, the objects of the others are back and one's
   ruby(*guest, "Game.load_scene('main')");
   REQUIRE(lan.until([&] { return crates(*host) == "2" && crates(*guest) == "2"; }));
   CHECK(ruby(*guest, "Network.online?") == "true");
+}
+
+TEST_CASE("machines that cannot reach each other meet in a room on a relay, by its code") {
+  Lan lan;
+  lan.relay = std::make_unique<net::RelayServer>();
+  std::string error;
+  REQUIRE_MESSAGE(lan.relay->start(0, error), error);
+  Engine& opener = lan.add_machine();
+  Engine& guest = lan.add_machine();
+  CHECK_FALSE(opener.scripts().eval("Network.host(room: true)", "no_relay.rb").ok);  // where is the relay?
+  for (Engine* machine : {&opener, &guest}) {
+    ruby(*machine, "Network.relay = '127.0.0.1:" + std::to_string(lan.relay->port()) + "'");
+  }
+  REQUIRE(ruby(opener, "Network.host(room: true)") == "true");
+  REQUIRE(lan.until([&] { return ruby(opener, "Network.online?") == "true"; }));
+  const std::string code = ruby(opener, "Network.room");
+  CHECK(code.size() == net::kRoomCodeLetters);
+  CHECK(ruby(opener, "[Network.host?, Network.id, $log].inspect") == "[true, 1, [:connected]]");
+
+  // The code is typed by a person: small letters and stray spaces are forgiven.
+  REQUIRE(ruby(guest, "Network.join(room: ' " + code + " '.downcase)") == "true");
+  REQUIRE(lan.until([&] { return ruby(guest, "Network.online?") == "true"; }));
+  lan.round();
+  CHECK(ruby(guest, "[Network.host?, Network.id, Network.peers, Network.room].inspect") ==
+        "[false, 2, [1], \"" + code + "\"]");
+  CHECK(ruby(opener, "$log.last.inspect") == "[:joined, 2]");
+
+  // Everything a game does over the network works the same in a room.
+  ruby(opener, "$got = nil; Network.on(:hi) { |data, from| $got = [data, from] }");
+  ruby(guest, "Network.emit(:hi, { n: 1 }); $ball = Network.spawn('Ball', position: Vector3.new(5, 0, 0))");
+  REQUIRE(lan.until([&] { return ruby(opener, "Scene.objects.count { |o| o.name == 'Ball' }") == "2"; }));
+  CHECK(ruby(opener, "$got.inspect") == "[{n: 1}, 2]");
+
+  ruby(guest, "Network.join(room: 'ZZZZ')");  // no such room
+  REQUIRE(lan.until([&] { return ruby(guest, "Network.connecting?") == "false"; }));
+  CHECK(ruby(guest, "[Network.online?, $log.last].inspect") == "[false, :failed]");
+}
+
+TEST_CASE("a hosted game is found by the machines around it, by name, unless it hides") {
+  Lan lan;
+  Engine& host = lan.add_machine();
+  Engine& seeker = lan.add_machine();
+  REQUIRE(ruby(host, "Network.host(port: 0, name: 'Find me if you can')") == "true");
+  const std::string port = ruby(host, "Network.port");
+  const std::string find = "Network.games.find { |game| game[:port] == " + port + " }";
+  CHECK(ruby(seeker, "Network.games.inspect") == "[]");
+  REQUIRE(ruby(seeker, "Network.search") == "true");
+  REQUIRE(lan.until([&] { return ruby(seeker, find + ".nil?") == "false"; }));
+  CHECK(ruby(seeker, "game = " + find + "; [game[:name], game[:players], game[:address].empty?].inspect") ==
+        "[\"Find me if you can\", 1, false]");
+  // Joining what was found needs nothing typed.
+  REQUIRE(ruby(seeker, "game = " + find + "; Network.join(game[:address], port: game[:port])") == "true");
+  REQUIRE(lan.until([&] { return ruby(seeker, "Network.online?") == "true"; }));
+
+  // A game that asked not to be seen is not.
+  ruby(seeker, "Network.leave; Network.stop_search");
+  REQUIRE(ruby(host, "Network.host(port: 0, visible: false)") == "true");
+  const std::string hidden_port = ruby(host, "Network.port");
+  ruby(seeker, "Network.search");
+  lan.rounds(kSettleRounds * 2);
+  CHECK(ruby(seeker, "Network.games.inspect") == "[]");  // neither the hidden game nor the one hosted before it
 }

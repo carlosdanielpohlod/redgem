@@ -58,6 +58,10 @@ std::optional<std::filesystem::path> build_game_for(const std::filesystem::path&
                                                     const std::filesystem::path& out_dir, BuildTarget target,
                                                     std::string& error);
 
+// Whether `folder` is `outer` itself or somewhere inside it, by their real locations (a build
+// must not go into the game it copies).
+bool folder_inside(const std::filesystem::path& folder, const std::filesystem::path& outer);
+
 // The name of a game's executable: its folder name in lowercase, with anything that is not a
 // letter or a digit turned into '_' ("My Game" -> "my_game"). On Windows the file adds ".exe".
 std::string executable_name(const std::filesystem::path& game_dir);

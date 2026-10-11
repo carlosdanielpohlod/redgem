@@ -64,7 +64,8 @@ src/scene     glTF loader (meshes, skeletons, animations), Blender extras parser
               animation playback, particles
 src/physics   PhysicsWorld interface + Jolt implementation
 src/input     keys, axes/actions, keyboard, mouse, gamepad and scripted input sources
-src/net       sockets (the only place with OS socket calls), message framing, the host/guest session
+src/net       sockets (the only place with OS socket calls), message framing and wire format, the
+              host/guest session, discovery on the local network, the relay
 src/audio     sound effects and music (raylib, or a recorder for tests)
 src/script    mruby VM, behaviour host, native bindings
 src/render    renderer (HDR, shadows, reflections, post-processing), shaders, environment,

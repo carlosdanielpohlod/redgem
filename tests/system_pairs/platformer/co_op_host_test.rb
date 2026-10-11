@@ -7,7 +7,10 @@ JOIN_FRAMES = 1800        # the other game may still be starting
 WALK_FRAMES = 60
 MIN_GHOST_MOVE = 1.0      # meters the guest's hero walks aside
 
+DISCOVERY_PORT = 47_833   # the test's own: a game open on this machine does not answer on it
+
 SystemTest.define do |t|
+  Network.discovery_port = DISCOVERY_PORT
   t.wait(SETTLE_FRAMES)
   manager = GameManager.instance
   co_op = CoOp.instance

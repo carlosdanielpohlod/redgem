@@ -2,7 +2,14 @@
 # internet. Machines talk in named messages; each has an id (the host is 1).
 #
 #   Network.host                        # on one machine ...
-#   Network.join("192.168.0.12")        # ... and on the others
+#   Network.join("192.168.0.12")        # ... and on the others, by its address,
+#   Network.search; Network.games       # or found by itself on the same network.
+#
+# Over the internet, where machines cannot reach each other directly, they meet on a relay:
+#
+#   Network.relay = "relay.example.com"
+#   Network.host(room: true)            # Network.room is then a code like "K7QM3P" ...
+#   Network.join(room: "K7QM3P")          # ... which is all the others need
 #   Network.on(:hit) { |data, from| @health -= data[:damage] }
 #   Network.emit(:hit, { damage: 3 })   # to everyone else; to: :host or to: a peer's id for one
 #
@@ -11,6 +18,8 @@
 # register lasts until the next level is loaded.
 module Network
   DEFAULT_PORT = 7777
+  DEFAULT_RELAY_PORT = 7778
+  DISCOVERY_PORT = 7776   # where games on a local network ask each other who is hosting
   EVERYONE = 0
   HOST = 1
   LOCAL = 0   # the owner of something made while this machine was in no game
@@ -32,17 +41,37 @@ module Network
   @spawn_count = 0
 
   class << self
-    # Starts a game others can join (leaving the one this machine is in). False when the port
-    # is taken.
-    def host(port: DEFAULT_PORT)
+    # Where machines meet over the internet: "relay.example.com", or "relay.example.com:9000".
+    # Anyone can run one with `redgem relay`.
+    attr_accessor :relay
+
+    # The port games look for each other on. Every copy of a game must use the same one; another
+    # game may pick its own to keep to itself.
+    attr_writer :discovery_port
+
+    def discovery_port = @discovery_port || DISCOVERY_PORT
+
+    # Starts looking for games hosted on this network; Network.games lists them as they answer.
+    def search = __search(discovery_port)
+
+    # Starts a game others can join (leaving the one this machine is in). False when it could not.
+    # Machines on the same network find it by themselves, under `name` (the game's title unless
+    # said), unless visible: false. With room: true the game is a room on the relay instead:
+    # on_connect follows, and Network.room is then the code the others join with.
+    def host(port: DEFAULT_PORT, name: nil, visible: true, room: false)
       leave
-      __host(port.to_i)
+      return __host_room(*relay_address) if room
+
+      __host(port.to_i, name.to_s, visible, discovery_port)
     end
 
-    # Starts joining a game (leaving the one this machine is in). on_connect or on_fail tells how
-    # it went, a moment later.
-    def join(address, port: DEFAULT_PORT)
+    # Starts joining a game (leaving the one this machine is in): at an address, or with
+    # room: "K7QM3P" on the relay. on_connect or on_fail tells how it went, a moment later.
+    def join(address = nil, port: DEFAULT_PORT, room: nil)
       leave
+      return __join_room(*relay_address, room.to_s.strip.upcase) if room
+      raise ArgumentError, "join needs an address or a room" if address.nil?
+
       __join(address.to_s, port.to_i)
     end
 
@@ -132,6 +161,14 @@ module Network
     private
 
     def listen(kind, block) = (@listeners[kind] ||= []) << block
+
+    # The relay as [address, port].
+    def relay_address
+      raise ArgumentError, "say where the relay is first: Network.relay = \"relay.example.com\"" if relay.to_s.empty?
+
+      address, port = relay.to_s.split(":")
+      [address, (port || DEFAULT_RELAY_PORT).to_i]
+    end
 
     def enter_game
       @my_id = id

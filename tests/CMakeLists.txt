@@ -39,6 +39,7 @@ add_executable(redgem_tests
   integration/gameplay_api_test.cpp
   integration/network_session_test.cpp
   integration/multiplayer_test.cpp
+  integration/relay_test.cpp
   integration/editor_session_test.cpp
   integration/game_project_test.cpp)
 target_link_libraries(redgem_tests PRIVATE redgem_engine doctest::doctest)
@@ -77,17 +78,23 @@ foreach(test_file IN LISTS REDGEM_SYSTEM_TESTS)
 endforeach()
 
 # Multiplayer: two copies of the game run at once and play together, each driven by its own test.
-# tests/system_pairs/<game>/<name>_host_test.rb pairs up with <name>_guest_test.rb.
+# tests/system_pairs/<game>/<name>_host_test.rb pairs up with <name>_guest_test.rb. A pair whose
+# name ends in _room also gets a relay to meet on.
+set(REDGEM_TEST_RELAY_PORT 47841)
 file(GLOB REDGEM_PAIRED_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_pairs/*/*_host_test.rb)
 foreach(host_test IN LISTS REDGEM_PAIRED_TESTS)
   get_filename_component(game_dir ${host_test} DIRECTORY)
   get_filename_component(game ${game_dir} NAME)
   get_filename_component(host_name ${host_test} NAME_WE)
   string(REGEX REPLACE "_host_test$" "" pair_name ${host_name})
+  set(relay_port "")
+  if(pair_name MATCHES "_room$")
+    set(relay_port ${REDGEM_TEST_RELAY_PORT})
+  endif()
   add_test(NAME system.${game}.${pair_name}_together
            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/system_pairs/run_pair.sh $<TARGET_FILE:redgem>
                    ${CMAKE_SOURCE_DIR}/games/${game} ${host_test} ${game_dir}/${pair_name}_guest_test.rb
-                   ${REDGEM_SCREENSHOT_DIR}/${game})
+                   ${REDGEM_SCREENSHOT_DIR}/${game} ${relay_port})
   set_tests_properties(system.${game}.${pair_name}_together PROPERTIES LABELS system RUN_SERIAL TRUE)
 endforeach()
 

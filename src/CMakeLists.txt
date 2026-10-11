@@ -51,7 +51,10 @@ add_library(redgem_engine STATIC
   scene/animation_player.cpp
   net/frame_buffer.cpp
   net/socket.cpp
+  net/wire.cpp
   net/network_session.cpp
+  net/lan_discovery.cpp
+  net/relay_server.cpp
   scene/particles.cpp
   scene/terrain.cpp
   scene/primitives.cpp

@@ -57,6 +57,8 @@ class InputSource {
   virtual std::string typed_text() const { return {}; }
   // The on-screen controls to draw, on a touch screen showing them; null otherwise.
   virtual const struct TouchLayout* touch_layout() const { return nullptr; }
+  // Shows or hides a touch screen's controls (a game with a touch interface of its own hides them).
+  virtual void show_touch_controls(bool) {}
 };
 
 // Keys held down by a test (system tests drive the game through this).

@@ -51,7 +51,9 @@ What changes on a phone:
 - The game fills the screen: it keeps the height from `game.json` and gets the width that fits.
 - **Touch controls** appear by themselves and act as a gamepad: a stick under the left thumb,
   A and B under the right, Start in the corner. A game that plays with a gamepad plays on a phone
-  as it is; taps also work as mouse clicks, so `UI.button` menus work.
+  as it is; taps also work as mouse clicks, so `UI.button` menus work. A game with a touch
+  interface of its own hides them with `Input.touch_controls = false`.
+- Characters may have up to 48 bones on a phone (64 on a computer).
 - There is no on-screen keyboard yet, so text fields cannot be typed in.
 - Phones are slower than computers: keep levels light (few lights, modest textures) and test on
   a real device. It needs Android 8 or later with OpenGL ES 3.

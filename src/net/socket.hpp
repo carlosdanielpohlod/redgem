@@ -43,6 +43,8 @@ class Socket {
   IoStatus write(std::vector<std::uint8_t>& bytes);
   // The port a listening socket got.
   std::uint16_t local_port() const;
+  // The address, in numbers, of the machine at the other end; empty when there is none.
+  std::string peer_address() const;
   void close();
 
  private:
@@ -51,5 +53,39 @@ class Socket {
 
   std::intptr_t handle_ = kNoHandle;
 };
+
+// Short messages to whoever listens on a port, with no connection: how games on the same
+// network find each other. Nothing here waits either.
+class Datagrams {
+ public:
+  Datagrams() = default;
+  ~Datagrams() { close(); }
+  Datagrams(Datagrams&& other) noexcept;
+  Datagrams& operator=(Datagrams&& other) noexcept;
+  Datagrams(const Datagrams&) = delete;
+  Datagrams& operator=(const Datagrams&) = delete;
+
+  // Opens on a port of this machine (0 for any free one). Several programs may share a port.
+  static Datagrams open_on(std::uint16_t port, std::string& error);
+
+  bool valid() const { return handle_ != kNoHandle; }
+  // Sends to one machine by its address in numbers, or to every machine on the local network
+  // (kEveryoneNearby). False when it could not be sent.
+  bool send_to(const std::string& address, std::uint16_t port, const std::string& message);
+  // The next message waiting, with who sent it; false when there is none.
+  bool receive(std::string& message, std::string& from_address, std::uint16_t& from_port);
+  std::uint16_t local_port() const;
+  void close();
+
+ private:
+  static constexpr std::intptr_t kNoHandle = -1;
+  explicit Datagrams(std::intptr_t handle) : handle_(handle) {}
+
+  std::intptr_t handle_ = kNoHandle;
+};
+
+// The address that reaches every machine on the local network.
+inline constexpr const char* kEveryoneNearby = "255.255.255.255";
+inline constexpr const char* kThisMachine = "127.0.0.1";
 
 }  // namespace redgem::net

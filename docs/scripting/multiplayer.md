@@ -4,6 +4,14 @@ Games can be played together over a local network or the internet. One machine *
 and the others **join** it; every machine has an id (the host is 1, then 2, 3... as players arrive).
 Up to 16 machines play together.
 
+There are three ways for the others to get to the host, from the easiest:
+
+| Where the players are | How they join | What it takes |
+|-----------------------|---------------|---------------|
+| On the same network (same Wi-Fi) | The game is found by itself | Nothing |
+| Anywhere | A room code like `K7QM3P` | A relay running somewhere on the internet |
+| Anywhere | The host's address | The host's router forwarding a port |
+
 ## Host and join
 
 ```ruby
@@ -20,8 +28,58 @@ Network.on_disconnect { ... }          # the game is gone: the host left or the 
 `Network.online?`, `Network.host?`, `Network.id` and `Network.peers` (everyone else's ids) tell
 where things stand. `Network.leave` leaves the game; when the host leaves, it ends for everyone.
 
-To play over the internet, the host's router has to forward the port (TCP) to the host's machine,
-and the others join the host's public address.
+## Games on the same network
+
+A hosted game answers the machines around it, so nobody types an address:
+
+```ruby
+Network.host(name: "Ana's game")       # name: the game's title unless said; visible: false hides it
+
+Network.search                         # on the others: start looking
+Network.games                          # => [{ name: "Ana's game", address: "192.168.0.12", port: 7777, players: 1 }]
+game = Network.games.first
+Network.join(game[:address], port: game[:port])
+Network.stop_search
+```
+
+`Network.games` changes as games come and go, so a menu draws a button for each one every frame.
+Every RedGem game looks on the same port, so games see each other's; a game that wants to see
+only its own picks another with `Network.discovery_port = 7790` (the same on every copy).
+
+## Over the internet: rooms
+
+Home routers let connections out, not in, so two players at home cannot reach each other
+directly. They can both reach a **relay**: a small program on a machine with a public address.
+One player opens a room and gets a short code; the others join with the code:
+
+```ruby
+Network.relay = "relay.example.com"    # where the relay runs ("host:port" for another port)
+
+Network.host(room: true)               # then, once on_connect fired:
+Network.room                           # => "K7QM3P": tell it to the others
+
+Network.join(room: "K7QM3P")             # on the others
+```
+
+Everything else is the same in a room: messages, `NetworkSync`, `Network.spawn`. Whoever opened
+the room is the host; when they leave, the room closes.
+
+The relay comes with the engine. On any machine the players can reach (a small rented server is
+enough, it only passes messages on):
+
+```bash
+./build/src/redgem relay               # listens on port 7778; --port picks another
+docker compose up relay                # or with Docker
+```
+
+The relay expects strangers: one address can only open a few rooms and hold a few connections,
+guessing room codes gets it kept out for a while, and a machine that goes silent is let go.
+
+## By the host's address
+
+Without a relay, players anywhere can still join the host's public address
+(`Network.join("203.0.113.7")`) if the host's router forwards the game's port (7777, TCP) to the
+host's machine.
 
 ## Messages
 
@@ -110,7 +168,8 @@ and join `127.0.0.1` in the other.
 
 ## What it does not do
 
-There is no matchmaking, lobby list or relay server: players need the host's address. The host
-passes every message on, so there is no prediction or lag compensation: fine for co-op and casual
+There is no matchmaking or public list of games: players are on the same network, share a room
+code, or know the host's address. No relay is run for you. Every message passes through the host
+(or the relay), so there is no prediction or lag compensation: fine for co-op and casual
 games, not for competitive shooters. Messages are not encrypted, and players are not
 authenticated: play with people you trust.

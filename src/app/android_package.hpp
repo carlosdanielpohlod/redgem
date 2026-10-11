@@ -30,8 +30,10 @@ std::optional<AndroidTools> find_android_tools(const std::filesystem::path& sdk,
 // The SDK folder the environment points at; empty when it points nowhere.
 std::filesystem::path android_sdk_from_environment();
 
-// The app's id: "com.redgem." and the game's name with anything but letters and digits dropped
-// ("My Game 2" -> "com.redgem.mygame2"). A name with no letter to start with gets "game" before it.
+// The app's id: "com.redgem." and the game's folder name. A name of small letters and digits is
+// used as it is ("platformer" -> "com.redgem.platformer"); anything else is dropped and comes
+// back as a few digits, so "My Game" and "my-game" stay two apps ("com.redgem.mygame_3fa2c1").
+// A name with no letter to start with gets "game" before it.
 std::string android_package_name(const std::filesystem::path& game_dir);
 // The app's AndroidManifest.xml: a full-screen, landscape native activity running the engine.
 std::string android_manifest(const std::string& package, const std::string& label);
@@ -40,7 +42,8 @@ std::string android_manifest(const std::string& package, const std::string& labe
 // in `runtimes_dir`/<abi>/. Empty when none is built.
 std::map<std::string, std::filesystem::path> android_runtimes(const std::filesystem::path& runtimes_dir);
 
-// Lays out in `stage_dir` what goes into the APK: assets/game/... (a copy of the game),
+// Lays out in `stage_dir` what goes into the APK: assets/game/... (a copy of the game, without
+// hidden files and editors' backups),
 // assets/game.files, assets/game.stamp, lib/<abi>/libredgem.so and AndroidManifest.xml.
 bool stage_android_game(const std::filesystem::path& game_dir,
                         const std::map<std::string, std::filesystem::path>& runtimes, const std::string& stamp,

@@ -13,26 +13,30 @@ SystemTest.define do |t|
     t.click(x + width / 2, y + height / 2)
   end
   t.wait(SETTLE_FRAMES)
-  menu.port = PORT
+  menu.multiplayer.port = PORT
   t.press(:escape)
   t.wait
   press.call(MULTIPLAYER_BUTTON)
-  t.assert("the multiplayer screen is open, and nobody is online yet") { menu.screen == :multiplayer && !Network.online? }
+  t.assert("the multiplayer screen is open, nobody is online yet, and it looks for games around") do
+    menu.screen == :multiplayer && !Network.online? && Network.searching?
+  end
 
-  address = menu.server
+  address = menu.multiplayer.address
   t.type("9pç")
   t.wait
   t.assert("typing goes into the address (P included) and the screen stays") do
-    menu.server == "#{address}9pç" && menu.screen == :multiplayer
+    menu.multiplayer.address == "#{address}9pç" && menu.screen == :multiplayer
   end
   3.times do
     t.press(:backspace)
     t.wait  # the key comes up before it goes down again
   end
-  t.assert("backspace takes it out again, a whole letter at a time") { menu.server == address }
+  t.assert("backspace takes it out again, a whole letter at a time") { menu.multiplayer.address == address }
 
   press.call(HOST_BUTTON)
-  t.assert("Host a game starts one") { Network.host? && Network.id == 1 && Network.port == PORT }
+  t.assert("Host a game starts one, and the looking stops") do
+    Network.host? && Network.id == 1 && Network.port == PORT && !Network.searching?
+  end
   press.call(HOST_BUTTON)
   t.assert("hosting again starts over cleanly") { Network.host? && Network.peers.empty? }
   t.screenshot("multiplayer_menu")
@@ -41,5 +45,7 @@ SystemTest.define do |t|
 
   t.press(:escape)
   t.wait
-  t.assert("Esc goes back to the pause menu") { menu.screen == :pause }
+  t.assert("Esc goes back to the pause menu, and nothing is looked for any more") do
+    menu.screen == :pause && !Network.searching?
+  end
 end

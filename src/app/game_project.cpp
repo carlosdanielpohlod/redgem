@@ -345,11 +345,7 @@ bool build_game(const std::filesystem::path& game_folder, const std::filesystem:
     return false;
   }
   std::error_code fs_error;
-  // Compare real locations: the output must not be the game or anywhere inside it.
-  const std::filesystem::path game_real = std::filesystem::weakly_canonical(game_dir, fs_error);
-  const std::filesystem::path out_real = std::filesystem::weakly_canonical(out_dir, fs_error);
-  const std::filesystem::path relative = out_real.lexically_relative(game_real);
-  if (!relative.empty() && *relative.begin() != "..") {
+  if (folder_inside(out_dir, game_dir)) {
     error = "cannot build into " + out_dir.string() + ": it is inside the game folder";
     return false;
   }
@@ -371,6 +367,14 @@ bool build_game(const std::filesystem::path& game_folder, const std::filesystem:
     return false;
   }
   return true;
+}
+
+bool folder_inside(const std::filesystem::path& folder, const std::filesystem::path& outer) {
+  std::error_code fs_error;
+  const std::filesystem::path outer_real = std::filesystem::weakly_canonical(outer, fs_error);
+  const std::filesystem::path folder_real = std::filesystem::weakly_canonical(folder, fs_error);
+  const std::filesystem::path relative = folder_real.lexically_relative(outer_real);
+  return !relative.empty() && *relative.begin() != "..";
 }
 
 std::string executable_name(const std::filesystem::path& game_dir) {

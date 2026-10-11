@@ -76,9 +76,14 @@ bool unpack_game(AAssetManager* assets, const std::filesystem::path& home) {
     }
     ++copied;
   }
+  if (copied == 0) {
+    log::error("the app carries no game files");
+    return false;
+  }
+  // (If the stamp cannot be written the game still runs: it is only unpacked again next time.)
   std::ofstream(stamp_file) << stamp;
   log::info("unpacked " + std::to_string(copied) + " game files");
-  return copied > 0;
+  return true;
 }
 
 // How much wider than tall the screen is, held sideways.
@@ -96,7 +101,10 @@ int main(int, char**) {
   const std::filesystem::path home = app->activity->internalDataPath;
   // Saves and settings live in the app's storage, and the game's files are found from there.
   platform::set_environment(kHomeVariable, home.string(), true);
-  if (chdir(home.c_str()) != 0 || !unpack_game(app->activity->assetManager, home)) return kExitFailure;
+  if (chdir(home.c_str()) != 0 || !unpack_game(app->activity->assetManager, home)) {
+    log::error("the game could not be unpacked into " + home.string());
+    return kExitFailure;
+  }
   try {
     EngineOptions options;
     options.game_dir = kBundledGameFolder;

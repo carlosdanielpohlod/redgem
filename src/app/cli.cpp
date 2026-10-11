@@ -6,6 +6,11 @@
 
 namespace redgem {
 
+namespace {
+constexpr std::size_t kPortDigits = 5;
+constexpr int kLargestPort = 65535;
+}  // namespace
+
 std::string usage() {
   return "usage:\n"
          "  redgem                            open the project hub (new / recent games)\n"
@@ -15,6 +20,7 @@ std::string usage() {
          "  redgem --ruby-test <test_file.rb>\n"
          "  redgem new <game_dir> [--template empty|platformer]   create a game\n"
          "  redgem build <game_dir> <out_dir> [--target linux|windows|android]   make a standalone game (an executable, or an .apk)\n"
+         "  redgem relay [--port <number>]    run a meeting point for multiplayer games over the internet\n"
          "\n"
          "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting,\n"
          "                                       else the dedicated card when there is one)\n"
@@ -43,8 +49,8 @@ CliResult parse_cli(const std::vector<std::string>& args) {
     mode_chosen = true;
   };
   std::size_t first = 0;
-  if (!args.empty() && (args[0] == "new" || args[0] == "build")) {
-    choose(args[0] == "new" ? RunMode::NewGame : RunMode::BuildGame);
+  if (!args.empty() && (args[0] == "new" || args[0] == "build" || args[0] == "relay")) {
+    choose(args[0] == "new" ? RunMode::NewGame : args[0] == "build" ? RunMode::BuildGame : RunMode::Relay);
     first = 1;
   }
   for (std::size_t i = first; i < args.size(); ++i) {
@@ -83,11 +89,19 @@ CliResult parse_cli(const std::vector<std::string>& args) {
     } else if (arg == "--gpu") {
       if (!value(text) || !gpu_choice_from_name(text)) return fail("--gpu needs auto, dedicated or integrated");
       options.gpu = text;
+    } else if (arg == "--port") {
+      if (!value(text) || text.find_first_not_of("0123456789") != std::string::npos || text.size() > kPortDigits ||
+          std::stoi(text) > kLargestPort) {
+        return fail("--port needs a number up to 65535");
+      }
+      options.relay_port = std::stoi(text);
     } else if (arg == "--headless") {
       options.headless = true;
       choose(RunMode::Game);
     } else if (!arg.empty() && arg[0] == '-') {
       return fail("unknown option " + arg);
+    } else if (options.mode == RunMode::Relay) {
+      return fail("unexpected argument " + arg);
     } else if (options.game_dir.empty()) {
       options.game_dir = normalized_folder(arg);
     } else if (options.mode == RunMode::BuildGame && options.build_dir.empty()) {
@@ -96,7 +110,7 @@ CliResult parse_cli(const std::vector<std::string>& args) {
       return fail("unexpected argument " + arg);
     }
   }
-  if (conflict) return fail("choose one of: new, build, --play, --test, --ruby-test");
+  if (conflict) return fail("choose one of: new, build, relay, --play, --test, --ruby-test");
   // Without a window nobody can close the game: only a test ends such a run.
   if (options.headless && !options.test_script) return fail("--headless needs --test <system_test.rb>");
   const bool needs_game = options.mode == RunMode::Game || options.mode == RunMode::NewGame ||

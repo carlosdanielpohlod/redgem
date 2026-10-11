@@ -20,6 +20,9 @@ constexpr int kSecondGuest = kHostId + 2;
 constexpr std::size_t kBigMessageBytes = 300 * 1024;   // more than one read or write takes
 constexpr int kTooDeep = kMaxDataDepth + 4;            // arrays inside arrays
 constexpr std::size_t kTooLongName = kMaxNameBytes + 1;
+constexpr int kManyVisits = 300;                       // more than the largest id there is
+constexpr float kQuietStep = 4.0f;                     // seconds
+constexpr float kPastSilenceTimeout = kSilenceTimeoutSeconds + 3.0f * kQuietStep;
 constexpr std::size_t kShownBytes = 60;                // of a bad message, when a check fails
 
 // Sessions on this machine, and everything that happened to each.
@@ -319,4 +322,48 @@ TEST_CASE("what cannot be received is not sent") {
   REQUIRE(party.table.until(
       [&party] { return party.table.count(Party::kFirstSeat, NetworkEvent::Kind::Message) == 1; }));
   CHECK(party.table.last(Party::kFirstSeat, NetworkEvent::Kind::Message)->name == "text");
+}
+
+TEST_CASE("ids are handed out again once free, however many machines come and go") {
+  LoneHost lone;
+  NetworkSession regular;
+  lone.table.seat(regular);
+  std::string error;
+  REQUIRE(regular.join(kLocalhost, lone.host.port(), error));
+  REQUIRE(lone.table.until([&regular] { return regular.state() == NetworkSession::State::Online; }));
+  // More comings and goings than there are numbers a message may carry as an id.
+  for (int visit = 0; visit < kManyVisits; ++visit) {
+    Stranger visitor(lone.host, lone.table);
+    visitor.say(R"({"k":"h"})");
+    REQUIRE(lone.table.until([&lone] { return lone.host.peers().size() == 2; }));
+    CHECK(lone.host.peers().back() == kSecondGuest);  // always the lowest id that is free
+    visitor.socket.close();
+    REQUIRE(lone.table.until([&lone] { return lone.host.peers().size() == 1; }));
+  }
+  // The machine that stayed heard every arrival and is still in the game.
+  REQUIRE(lone.table.until([&] { return lone.table.count(1, NetworkEvent::Kind::PeerLeft) == kManyVisits; }));
+  CHECK(regular.state() == NetworkSession::State::Online);
+  CHECK(lone.table.count(1, NetworkEvent::Kind::Disconnected) == 0);
+}
+
+TEST_CASE("a machine that goes silent without hanging up is given up on; one that only has nothing to say is not") {
+  LoneHost lone;
+  NetworkSession quiet_guest;
+  lone.table.seat(quiet_guest);
+  std::string error;
+  REQUIRE(quiet_guest.join(kLocalhost, lone.host.port(), error));
+  REQUIRE(lone.table.until([&lone] { return lone.host.peers().size() == 1; }));
+  Stranger frozen(lone.host, lone.table);
+  frozen.say(R"({"k":"h"})");
+  REQUIRE(lone.table.until([&lone] { return lone.host.peers().size() == 2; }));
+
+  // A long while passes, in steps shorter than the time between "I am here"s.
+  for (float waited = 0.0f; waited < kPastSilenceTimeout; waited += kQuietStep) {
+    lone.host.poll(kQuietStep);
+    for (NetworkEvent& event : quiet_guest.poll(kQuietStep)) lone.table.events[1].push_back(std::move(event));
+    std::this_thread::sleep_for(kRoundPause);
+  }
+  REQUIRE(lone.table.until([&lone] { return lone.host.peers().size() == 1; }));
+  CHECK(lone.host.peers() == std::vector<int>{kFirstGuest});  // the real guest, which said nothing either
+  CHECK(quiet_guest.state() == NetworkSession::State::Online);
 }

@@ -9,6 +9,7 @@
 #include "audio/audio.hpp"
 #include "core/fixed_clock.hpp"
 #include "input/input.hpp"
+#include "net/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
 #include "scene/animation_player.hpp"
@@ -123,6 +124,7 @@ class Engine {
   AnimationPlayer animations_;
   ParticleSystem particles_;
   net::NetworkSession network_;
+  net::LanDiscovery discovery_;
   FixedClock clock_;
   TestStatus test_status_ = TestStatus::NotRunning;
   mrb_value system_test_ = mrb_nil_value();
