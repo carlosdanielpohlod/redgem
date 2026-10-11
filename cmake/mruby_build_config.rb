@@ -35,3 +35,20 @@ if ENV['REDGEM_MINGW_BIN']
     redgem_gems(conf)
   end
 end
+
+# For Android, cross-compiled with the NDK's clang for one kind of processor at a time.
+if ENV['REDGEM_NDK_BIN']
+  MRuby::CrossBuild.new("android-#{ENV['REDGEM_ANDROID_ABI']}") do |conf|
+    tools = ENV['REDGEM_NDK_BIN']
+    target = "--target=#{ENV['REDGEM_ANDROID_TARGET']}"
+    conf.toolchain :clang
+    conf.host_target = ENV['REDGEM_ANDROID_TARGET']
+    conf.cc.command = "#{tools}/clang"
+    conf.cxx.command = "#{tools}/clang++"
+    conf.linker.command = "#{tools}/clang++"
+    conf.archiver.command = "#{tools}/llvm-ar"
+    [conf.cc, conf.cxx].each { |compiler| compiler.flags << target << '-fPIC' }
+    conf.linker.flags << target
+    redgem_gems(conf)
+  end
+end

@@ -12,6 +12,7 @@ namespace redgem::binding {
 namespace {
 
 constexpr mrb_int kVectorComponents = 3;
+constexpr float kMaxColorChannel = 255.0f;
 
 }  // namespace
 
@@ -70,6 +71,17 @@ std::string to_name(mrb_state* mrb, mrb_value value) {
 mrb_value object_or_nil(mrb_state* mrb, ObjectId object) {
   if (!scene(mrb).is_alive(object)) return mrb_nil_value();
   return script_host(mrb).object_value(object);
+}
+
+std::string name_arg(mrb_state* mrb) {
+  mrb_value name;
+  mrb_get_args(mrb, "o", &name);
+  return to_name(mrb, name);
+}
+
+Color color_from(mrb_int r, mrb_int g, mrb_int b, mrb_int a) {
+  return {static_cast<float>(r) / kMaxColorChannel, static_cast<float>(g) / kMaxColorChannel,
+          static_cast<float>(b) / kMaxColorChannel, static_cast<float>(a) / kMaxColorChannel};
 }
 
 }  // namespace redgem::binding

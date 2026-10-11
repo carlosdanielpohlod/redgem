@@ -9,6 +9,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/test_case.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/system_test.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
@@ -48,6 +49,9 @@ add_library(redgem_engine STATIC
   scene/scene.cpp
   scene/animation.cpp
   scene/animation_player.cpp
+  net/frame_buffer.cpp
+  net/socket.cpp
+  net/network_session.cpp
   scene/particles.cpp
   scene/terrain.cpp
   scene/primitives.cpp
@@ -67,6 +71,11 @@ add_library(redgem_engine STATIC
   script/bindings/scene_bindings.cpp
   script/bindings/physics_bindings.cpp
   script/bindings/runtime_bindings.cpp
+  script/bindings/input_bindings.cpp
+  script/bindings/animation_bindings.cpp
+  script/bindings/particles_bindings.cpp
+  script/bindings/save_bindings.cpp
+  script/bindings/network_bindings.cpp
   render/mesh_builder.cpp
   render/renderer.cpp
   render/environment.cpp
@@ -108,10 +117,19 @@ if(WIN32)
 endif()
 target_compile_options(redgem_engine PRIVATE -Wall -Wextra -Wpedantic -Wno-unused-parameter)
 
-add_executable(redgem app/main.cpp)
-target_link_libraries(redgem PRIVATE redgem_engine)
-# On Windows it is what games ship as: a windowed program, with no console window behind it.
-set_target_properties(redgem PROPERTIES WIN32_EXECUTABLE ON)
+if(ANDROID)
+  # On Android the engine is a library the system loads into a native activity; it plays the game
+  # packed in the same APK (see app/android_main.cpp).
+  add_library(redgem SHARED app/android_main.cpp)
+  target_link_libraries(redgem PRIVATE redgem_engine android log)
+  target_include_directories(redgem SYSTEM PRIVATE ${ANDROID_NDK}/sources/android/native_app_glue)
+  target_link_options(redgem PRIVATE -u ANativeActivity_onCreate)
+else()
+  add_executable(redgem app/main.cpp)
+  target_link_libraries(redgem PRIVATE redgem_engine)
+  # On Windows it is what games ship as: a windowed program, with no console window behind it.
+  set_target_properties(redgem PROPERTIES WIN32_EXECUTABLE ON)
+endif()
 target_compile_options(redgem PRIVATE -Wall -Wextra -Wpedantic)
 
 # The editor's fonts are assembled into the binary (.incbin): rebuild when they change.

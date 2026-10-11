@@ -53,6 +53,13 @@ class SystemTest
 
   def press(key) = hold(key, frames: 1)
 
+  # Types a text, as on the keyboard (what Input.text and UI.text_field read).
+  def type(text)
+    TestInput.type(text.to_s)
+    wait
+    TestInput.type("")
+  end
+
   # A gamepad: pushes a stick (:left_x, :left_y, :right_x, :right_y; left and up are negative) or
   # pulls a trigger for some frames, then lets go.
   def tilt(axis, amount, frames:)

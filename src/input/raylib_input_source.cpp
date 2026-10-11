@@ -23,6 +23,17 @@ MouseSample RaylibInputSource::mouse() const {
   return sample;
 }
 
+std::string RaylibInputSource::typed_text() const {
+  std::string text;
+  // raylib queues the characters typed; 0 means the queue is empty.
+  for (int codepoint = GetCharPressed(); codepoint != 0; codepoint = GetCharPressed()) {
+    int bytes = 0;
+    const char* encoded = CodepointToUTF8(codepoint, &bytes);
+    text.append(encoded, static_cast<std::size_t>(bytes));
+  }
+  return text;
+}
+
 GamepadSample RaylibInputSource::gamepad() const {
   GamepadSample sample;
   if (!IsGamepadAvailable(kFirstGamepad)) return sample;

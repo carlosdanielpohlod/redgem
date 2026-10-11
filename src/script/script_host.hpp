@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
 #include "script/ruby_vm.hpp"
 #include "script/script_context.hpp"
@@ -39,6 +40,10 @@ class ScriptHost {
   void fixed_update(float dt);
   void update(float dt);
   void dispatch(const ContactEvent& event);
+  // Hands something that happened on the network to the scripts listening for it (Network.on...).
+  void dispatch(const net::NetworkEvent& event);
+  // Tells Ruby's own bookkeeping (Network handlers...) that the scene's objects are gone.
+  void scene_was_reset();
   // Runs on_destroy on the object's behaviours (they stay attached until detach()).
   void on_destroyed(ObjectId object);
   // Disables the object's behaviours and removes them from its GameObject.

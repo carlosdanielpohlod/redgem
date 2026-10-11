@@ -16,6 +16,7 @@ constexpr float kNarrowSpread = 10.0f;      // degrees
 constexpr float kWorldGravity = -20.0f;
 constexpr int kTooMany = 10000;
 constexpr int kLimit = 4096;
+constexpr float kSpin = 90.0f;  // degrees per second
 
 ParticleBurst sparks() {
   ParticleBurst burst;
@@ -106,4 +107,36 @@ TEST_CASE("the same bursts always give the same particles, and there is a limit 
   CHECK(first.burst(flood) == 0);
   first.clear();
   CHECK(first.particles().empty());
+}
+
+TEST_CASE("particles with a picture share it, start turned any which way and keep turning") {
+  ParticleSystem system;
+  ParticleBurst puffs = sparks();
+  puffs.image = "smoke";
+  puffs.spin_degrees = kSpin;
+  system.burst(puffs);
+  ParticleBurst stars = sparks();
+  stars.image = "spark";
+  system.burst(stars);
+  system.burst(puffs);
+  system.burst(sparks());  // plain dots
+  CHECK(system.images() == std::vector<std::string>{"smoke", "spark"});
+  const std::vector<Particle>& particles = system.particles();
+  CHECK(particles.front().image == 0);
+  CHECK(particles[kBurstCount].image == 1);
+  CHECK(particles[kBurstCount * 2].image == 0);
+  CHECK(particles.back().image == kNoParticleImage);
+  CHECK(particles.back().angle == doctest::Approx(0.0f));
+  CHECK(particles[0].angle != doctest::Approx(particles[1].angle));
+  bool clockwise = false, counterclockwise = false;
+  for (int i = 0; i < kBurstCount; ++i) {
+    clockwise = clockwise || particles[static_cast<std::size_t>(i)].spin < 0.0f;
+    counterclockwise = counterclockwise || particles[static_cast<std::size_t>(i)].spin > 0.0f;
+  }
+  CHECK(clockwise);
+  CHECK(counterclockwise);
+  const float before = particles.front().angle;
+  system.update(kStep);
+  CHECK(system.particles().front().angle != doctest::Approx(before));
+  CHECK(system.particles()[kBurstCount].angle == doctest::Approx(particles[kBurstCount].angle));  // no spin asked
 }

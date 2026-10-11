@@ -53,6 +53,8 @@ class InputSource {
   virtual bool is_key_down(Key key) const = 0;
   virtual MouseSample mouse() const { return {}; }
   virtual GamepadSample gamepad() const { return {}; }
+  // What was typed since the last frame, as text (UTF-8): letters as the keyboard layout gives them.
+  virtual std::string typed_text() const { return {}; }
 };
 
 // Keys held down by a test (system tests drive the game through this).
@@ -61,6 +63,9 @@ class ScriptedInputSource final : public InputSource {
   bool is_key_down(Key key) const override { return held_.count(key) != 0; }
   MouseSample mouse() const override { return mouse_; }
   GamepadSample gamepad() const override { return gamepad_; }
+  std::string typed_text() const override { return typed_; }
+  // What the test "types" every frame until told otherwise.
+  void type_text(std::string text) { typed_ = std::move(text); }
   // Either of these plugs the test's gamepad in.
   void set_gamepad_axis(GamepadAxis axis, float value) {
     gamepad_.connected = true;
@@ -79,12 +84,14 @@ class ScriptedInputSource final : public InputSource {
     mouse_.buttons = {};
     mouse_.wheel = 0.0f;
     gamepad_ = {};
+    typed_.clear();
   }
 
  private:
   std::set<Key> held_;
   MouseSample mouse_;
   GamepadSample gamepad_;
+  std::string typed_;
 };
 
 struct AxisBinding {
@@ -132,6 +139,8 @@ class InputState {
   std::optional<bool> action_down(const std::string& name) const;
   std::optional<bool> action_pressed(const std::string& name) const;
 
+  const std::string& typed_text() const { return typed_; }
+
   bool gamepad_connected() const { return gamepad_.connected; }
   // A stick or trigger; small stick movements around the center read as 0 (worn sticks drift).
   float gamepad_axis(GamepadAxis axis) const;
@@ -165,6 +174,7 @@ class InputState {
   MouseSample previous_mouse_;
   GamepadSample gamepad_;
   GamepadSample previous_gamepad_;
+  std::string typed_;
 };
 
 }  // namespace redgem

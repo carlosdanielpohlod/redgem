@@ -5,11 +5,13 @@
 Knowing this up front saves time:
 
 - **Input** is keyboard, mouse and one gamepad. Keys and buttons cannot be rebound by the player.
-- **In-game interface** is texts, rectangles, images and buttons you draw each frame. There are no
-  text fields, sliders or layout containers.
-- **Particles** are plain dots let out in bursts. They have no textures and do not collide.
-- **Animation:** clips are played, paused and stopped by name, for the whole level. Two clips on the
-  same character are not blended, and each copy of a character cannot play a different clip.
+- **In-game interface** is texts, rectangles, images, buttons and text fields you draw each frame.
+  There are no sliders or layout containers.
+- **Particles** are let out in bursts, as dots or pictures. They do not collide and are not lit.
+- **Animation:** a character plays one clip with a second mixed over it. There are no blend trees,
+  no animation events and no inverse kinematics.
+- **Multiplayer** needs the host's address: there is no matchmaking or relay server, and no lag
+  compensation (see [Multiplayer](scripting/multiplayer.md)).
 - **Platforms:** the editor runs on Linux. Games are built for Linux and for Windows.
 - Scripts are loaded when you press Play; they are not reloaded while the game runs.
 

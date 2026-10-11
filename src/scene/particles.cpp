@@ -11,6 +11,7 @@ constexpr std::size_t kMaxParticles = 4096;
 constexpr float kSpeedVariation = 0.4f;  // each particle's speed differs from the burst's by up to this share
 constexpr float kLifeVariation = 0.25f;
 constexpr float kSizeVariation = 0.3f;
+constexpr float kSpinVariation = 0.5f;
 constexpr float kFadeStart = 0.5f;       // share of its life after which a particle fades and shrinks
 constexpr float kEndSize = 0.3f;         // share of its size left at the end
 constexpr float kAirDrag = 0.6f;         // share of its speed a particle loses per second
@@ -37,7 +38,17 @@ float ParticleSystem::random_unit() {
   return static_cast<float>(seed_ >> kRandomShift) / kRandomRange;
 }
 
+int ParticleSystem::image_index(const std::string& name) {
+  if (name.empty()) return kNoParticleImage;
+  const auto found = std::find(images_.begin(), images_.end(), name);
+  if (found != images_.end()) return static_cast<int>(found - images_.begin());
+  images_.push_back(name);
+  return static_cast<int>(images_.size()) - 1;
+}
+
 int ParticleSystem::burst(const ParticleBurst& burst) {
+  const int image = image_index(burst.image);
+  const float spin = degrees_to_radians(burst.spin_degrees);
   const Vec3 axis = length(burst.direction) > kEpsilon ? normalize(burst.direction) : Vec3::up();
   // Two directions across the axis, to lean away from it.
   const Vec3 helper = std::fabs(axis.y) < kHalf ? Vec3::up() : Vec3{1.0f, 0.0f, 0.0f};
@@ -61,6 +72,12 @@ int ParticleSystem::burst(const ParticleBurst& burst) {
     particle.gravity = burst.gravity;
     particle.color = burst.color;
     particle.glow = burst.glow;
+    particle.image = image;
+    if (image != kNoParticleImage) {
+      // Pictures start turned any which way, or they would all look like the same stamp.
+      particle.angle = random_unit() * kTwo * kPi;
+      particle.spin = varied(spin, kSpinVariation, random_unit()) * (random_unit() < kHalf ? -1.0f : 1.0f);
+    }
     particles_.push_back(particle);
     ++added;
   }
@@ -72,6 +89,7 @@ void ParticleSystem::update(float dt) {
   const float kept_speed = std::max(0.0f, 1.0f - kAirDrag * dt);
   for (Particle& particle : particles_) {
     particle.age += dt;
+    particle.angle += particle.spin * dt;
     particle.velocity = (particle.velocity + gravity_ * (particle.gravity * dt)) * kept_speed;
     particle.position = particle.position + particle.velocity * dt;
   }

@@ -39,6 +39,7 @@ class GatedInputSource final : public InputSource {
     return sample;
   }
   GamepadSample gamepad() const override { return enabled ? device.gamepad() : GamepadSample{}; }
+  std::string typed_text() const override { return enabled ? device.typed_text() : std::string(); }
   bool enabled = false;
   float origin_x = 0.0f;  // where the Scene view's image starts in the window
   float origin_y = 0.0f;

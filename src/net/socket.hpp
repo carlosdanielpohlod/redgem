@@ -1,0 +1,55 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <vector>
+
+namespace redgem::net {
+
+enum class IoStatus {
+  Ok,
+  WouldBlock,  // nothing to do right now: try again next frame
+  Closed       // the other side is gone (or never answered)
+};
+
+// A TCP connection, or a port being listened on. A game calls these every frame, so nothing here
+// waits, with one exception: connect_to looks a machine's name up first, which can take a moment
+// (an address in numbers, like 192.168.0.12, never does). The one place the operating systems'
+// socket calls are used.
+class Socket {
+ public:
+  Socket() = default;
+  ~Socket() { close(); }
+  Socket(Socket&& other) noexcept;
+  Socket& operator=(Socket&& other) noexcept;
+  Socket(const Socket&) = delete;
+  Socket& operator=(const Socket&) = delete;
+
+  // Listens on a port of this machine (0 lets the system pick a free one). Invalid, with `error`
+  // set, when the port cannot be used.
+  static Socket listen_on(std::uint16_t port, std::string& error);
+  // Starts connecting to a machine by name or address; connect_status says how it is going.
+  static Socket connect_to(const std::string& address, std::uint16_t port, std::string& error);
+
+  bool valid() const { return handle_ != kNoHandle; }
+  // Someone who connected to a listening socket; invalid when nobody is waiting.
+  Socket accept();
+  // Ok once connected, WouldBlock while still trying, Closed when it was refused.
+  IoStatus connect_status();
+  // Appends what has arrived to `into`, up to `limit` bytes a call (the rest waits for the next).
+  IoStatus read(std::vector<std::uint8_t>& into, std::size_t limit);
+  // Sends as much of `bytes` as goes out now and removes that from its front.
+  IoStatus write(std::vector<std::uint8_t>& bytes);
+  // The port a listening socket got.
+  std::uint16_t local_port() const;
+  void close();
+
+ private:
+  static constexpr std::intptr_t kNoHandle = -1;
+  explicit Socket(std::intptr_t handle) : handle_(handle) {}
+
+  std::intptr_t handle_ = kNoHandle;
+};
+
+}  // namespace redgem::net

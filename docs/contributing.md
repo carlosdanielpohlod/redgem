@@ -64,6 +64,7 @@ src/scene     glTF loader (meshes, skeletons, animations), Blender extras parser
               animation playback, particles
 src/physics   PhysicsWorld interface + Jolt implementation
 src/input     keys, axes/actions, keyboard, mouse, gamepad and scripted input sources
+src/net       sockets (the only place with OS socket calls), message framing, the host/guest session
 src/audio     sound effects and music (raylib, or a recorder for tests)
 src/script    mruby VM, behaviour host, native bindings
 src/render    renderer (HDR, shadows, reflections, post-processing), shaders, environment,
@@ -85,8 +86,7 @@ cmake         dependencies (pinned versions) and file embedding
 
 ## Not there yet
 
-* Blending animations, and a different clip per copy of a character: clips are played, paused and
-  stopped by name for the whole scene. Characters copied with Duplicate in the editor keep the pose
+* Blend trees and animation events. Characters copied with Duplicate in the editor keep the pose
   they were copied in.
 * Spot light cones, and camera clip planes from the scene (the engine uses fixed ones).
 * Reusing data when the same model is imported twice, and dropping the data of deleted imports

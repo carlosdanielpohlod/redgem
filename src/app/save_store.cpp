@@ -67,7 +67,8 @@ bool SaveStore::write() const {
   {
     std::ofstream out(partial);
     if (!out) return false;
-    out << json.dump(kIndent) << "\n";
+    // (Text that is not valid UTF-8 is saved with the broken parts replaced, instead of not at all.)
+    out << json.dump(kIndent, ' ', false, nlohmann::json::error_handler_t::replace) << "\n";
     out.close();  // a full disk shows here: the file being replaced must not be lost to half a one
     if (!out) return false;
   }

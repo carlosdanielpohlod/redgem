@@ -18,6 +18,7 @@ constexpr int kFramesPerSecond = 60;
 constexpr int kHalfSecond = kFramesPerSecond / 2;
 constexpr float kClipSeconds = 2.0f;
 constexpr float kClipDistance = 10.0f;
+constexpr float kAjar = 6.0f;  // where the "Ajar" clip holds the door
 constexpr float kStickHalfway = 0.5f;
 constexpr int kFewestTweenCalls = 30;  // half a second of frames, give or take one, plus the start
 constexpr int kMostTweenCalls = 32;
@@ -285,6 +286,51 @@ TEST_CASE("scripts pause, stop and replay the scene's animations by name") {
   CHECK(fails(*engine, "Animation.duration(:Dance)"));
 }
 
+TEST_CASE("an object plays a clip of its own, fading into it, with another mixed over it") {
+  const TempSave temp;
+  SceneDesc scene = small_scene();
+  // A second clip for the door: "Ajar" holds it at a fixed place.
+  AnimationChannel hold;
+  hold.node = 2;
+  hold.times = {0.0f, kClipSeconds};
+  hold.values = {kAjar, 0, 0, kAjar, 0, 0};
+  AnimationDesc ajar;
+  ajar.name = "Ajar";
+  ajar.duration = kClipSeconds;
+  ajar.channels = {hold};
+  scene.animations.push_back(ajar);
+  auto engine = engine_for(scene, temp.file);
+  ruby(*engine, "Animation.stop(:Ajar); Animation.pause(:Open); $door = Scene.find('Door')");  // the scene holds it shut
+  frames(*engine, 1);
+  CHECK(door_x(*engine) == doctest::Approx(0.0f));
+  CHECK(ruby(*engine, "$door.animation.clip.inspect") == "nil");
+
+  ruby(*engine, "$door.animation.play(:Ajar, fade: 1.0)");
+  frames(*engine, kHalfSecond);
+  CHECK(door_x(*engine) == doctest::Approx(kAjar / 2.0f).epsilon(0.05));  // halfway there
+  frames(*engine, kFramesPerSecond);
+  CHECK(door_x(*engine) == doctest::Approx(kAjar));
+  CHECK(ruby(*engine, "[$door.animation.clip, $door.animation.playing?]") == "[\"Ajar\", true]");
+
+  ruby(*engine, "$door.animation.mix(:Open, weight: 0.5, speed: 0.0)");  // Open's first pose: x = 0
+  frames(*engine, 1);
+  CHECK(door_x(*engine) == doctest::Approx(kAjar / 2.0f));
+  ruby(*engine, "$door.animation.unmix; $door.animation.pause");
+  frames(*engine, 1);
+  CHECK(door_x(*engine) == doctest::Approx(kAjar));
+  CHECK(ruby(*engine, "$door.animation.playing?") == "false");
+
+  ruby(*engine, "$door.animation.follow_scene");
+  frames(*engine, 1);
+  CHECK(door_x(*engine) == doctest::Approx(0.0f));
+  CHECK(fails(*engine, "$door.animation.play(:Dance)"));
+  CHECK(fails(*engine, "$door.animation.mix(:Dance)"));
+  // A behaviour reaches its object's animation directly.
+  ruby(*engine, "class Opener < Behaviour; def start = animation.play(:Ajar); end; $door.add_component(Opener)");
+  frames(*engine, 2);
+  CHECK(door_x(*engine) == doctest::Approx(kAjar));
+}
+
 TEST_CASE("scripts let out bursts of particles, which fly for a while and are gone") {
   const TempSave temp;
   const SceneDesc scene = small_scene();
@@ -311,6 +357,12 @@ TEST_CASE("scripts let out bursts of particles, which fly for a while and are go
   frames(*engine, kFramesPerSecond);
   CHECK(ruby(*engine, "Particles.count") == "0");
 
+  // With a picture from the game's images/ folder, each one turning.
+  ruby(*engine, "Particles.burst(Vector3.zero, count: 3, image: :smoke, spin: 90)");
+  CHECK(engine->particles().images() == std::vector<std::string>{"smoke"});
+  CHECK(engine->particles().particles().back().image == 0);
+  CHECK(engine->particles().particles().back().spin != 0.0f);
+
   ruby(*engine, "Particles.burst(Vector3.zero); Particles.clear");
   CHECK(ruby(*engine, "Particles.count") == "0");
   CHECK(fails(*engine, "Particles.burst(Vector3.zero, color: :plaid)"));
@@ -326,4 +378,29 @@ TEST_CASE("particles stay put while the game is paused") {
   frames(*engine, kFramesPerSecond);
   CHECK(ruby(*engine, "Particles.count") == "12");
   CHECK(engine->particles().particles().front().age == doctest::Approx(0.0f));
+}
+
+TEST_CASE("scripts read what is typed, and a text field keeps it") {
+  const TempSave temp;
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene, temp.file);
+  ScriptedInputSource& input = engine->scripted_input();
+  const std::string field = "$name = UI.text_field($name, x: 10, y: 10, width: 300, height: 40, max_length: 6)";
+  ruby(*engine, "$name = ''");
+  input.type_text("Ana");
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "Input.text") == "Ana");
+  CHECK(ruby(*engine, field) == "Ana");
+  input.type_text("");
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "Input.text") == "");
+  CHECK(ruby(*engine, field) == "Ana");
+  CHECK(engine->hud().size() == 2);  // the box and its text
+  input.set_key(Key::Backspace, true);
+  frames(*engine, 1);
+  CHECK(ruby(*engine, field) == "An");
+  input.set_key(Key::Backspace, false);
+  input.type_text("tonia");  // more than fits
+  frames(*engine, 1);
+  CHECK(ruby(*engine, field) == "Antoni");
 }

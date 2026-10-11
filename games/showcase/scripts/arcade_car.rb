@@ -29,7 +29,19 @@ class ArcadeCar < Behaviour
   SCRAPE_SPARKS = 2         # ... and every frame it scrapes along one
   SPARK_SPEED = 6.0
   SPARK_LIFE = 0.5
-  SPARK_SIZE = 0.09
+  SPARK_SIZE = 0.22
+  SPARK_SPIN = 360.0        # degrees per second
+  SMOKE_MIN_SPEED = 8.0     # m/s above which hard braking smokes the tires
+  SMOKE_SECONDS = 0.04      # between puffs
+  SMOKE_SIZE = 1.3
+  SMOKE_LIFE = 1.4
+  SMOKE_ALPHA = 70
+  SMOKE_COLOR = [120, 120, 124].freeze   # in the dusk's light, white smoke would shine
+  SMOKE_HEIGHT = 0.45       # meters above the road
+  SMOKE_SPEED = 0.8
+  SMOKE_RISE = -0.04        # share of gravity, upside down: it drifts up
+  SMOKE_SPIN = 50.0
+  REAR_AXLE = 1.3           # meters behind the car's middle
   SPARK_HEIGHT = 0.5        # meters above the road: bumper height
   SCRAPE_MIN_SPEED = 2.0    # m/s below which a scrape throws no sparks
   POTHOLE_DROP = 0.7        # share of a pothole's depth the car body follows (the suspension takes the rest)
@@ -127,6 +139,7 @@ class ArcadeCar < Behaviour
 
   def accelerate(throttle, dt)
     if Input.action?(:jump)  # Space, or a gamepad's A
+      tire_smoke(dt)
       @speed = approach(@speed, 0.0, HARD_BRAKING * dt)
     elsif throttle.zero?
       @speed = approach(@speed, 0.0, ROLLING_DRAG * dt)
@@ -221,7 +234,18 @@ class ArcadeCar < Behaviour
   # Metal on metal: sparks thrown back from where the cars touch.
   def sparks(at, away, count)
     Particles.burst(at, count: count, color: :orange, glow: true, direction: away + Vector3.up, spread: 60,
-                    speed: SPARK_SPEED, life: SPARK_LIFE, size: SPARK_SIZE)
+                    speed: SPARK_SPEED, life: SPARK_LIFE, size: SPARK_SIZE, image: :spark, spin: SPARK_SPIN)
+  end
+
+  # Locked wheels at speed: puffs of smoke left behind the rear axle.
+  def tire_smoke(dt)
+    @smoke_wait = (@smoke_wait || 0.0) - dt
+    return unless @smoke_wait <= 0.0 && @speed.abs > SMOKE_MIN_SPEED
+
+    @smoke_wait = SMOKE_SECONDS
+    Particles.burst(transform.position - flat_nose * REAR_AXLE + Vector3.up * SMOKE_HEIGHT, count: 1, image: :smoke,
+                    color: SMOKE_COLOR, alpha: SMOKE_ALPHA,
+                    speed: SMOKE_SPEED, life: SMOKE_LIFE, size: SMOKE_SIZE, gravity: SMOKE_RISE, spin: SMOKE_SPIN)
   end
 
   # How far the car sinks at a position: the deepest pothole under it, eased toward its edge.

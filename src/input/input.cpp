@@ -51,6 +51,7 @@ void InputState::update(const InputSource& source) {
   mouse_ = source.mouse();
   previous_gamepad_ = gamepad_;
   gamepad_ = source.gamepad();
+  typed_ = source.typed_text();
 }
 
 float InputState::gamepad_axis(GamepadAxis axis) const {

@@ -34,6 +34,7 @@ nav:
   - Scripting in Ruby:
       - Behaviours: scripting/behaviours.md
       - Gameplay recipes: scripting/gameplay.md
+      - Multiplayer: scripting/multiplayer.md
       - API reference: scripting/api.md
   - Finishing a game:
       - Testing your game: testing.md

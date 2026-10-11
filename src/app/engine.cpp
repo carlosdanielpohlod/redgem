@@ -1,3 +1,4 @@
+#include "core/exit_codes.hpp"
 #include "scene/animation.hpp"
 #include "app/engine.hpp"
 
@@ -19,8 +20,6 @@
 namespace redgem {
 namespace {
 
-constexpr int kExitSuccess = 0;
-constexpr int kExitFailure = 1;
 constexpr const char* kSystemTestGlobal = "$__redgem_system_test";
 constexpr float kWheelRotationTolerance = 1e-3f;
 
@@ -65,7 +64,7 @@ std::optional<std::string> Engine::initialize() {
     scene_desc_ = std::move(loaded.scene);
   }
   scene_ = Scene::from_desc(scene_desc_);
-  animations_.reset(scene_desc_.animations);
+  animations_.reset(scene_desc_.animations, scene_);
   particles_.set_gravity(gravity());
 
   physics_ = create_jolt_physics_world(gravity());
@@ -103,6 +102,7 @@ std::optional<std::string> Engine::initialize() {
   context_.save = save_.get();
   context_.animations = &animations_;
   context_.particles = &particles_;
+  context_.network = &network_;
   context_.scene = &scene_;
   context_.audio = &audio();
   context_.physics = physics_.get();
@@ -110,7 +110,9 @@ std::optional<std::string> Engine::initialize() {
   context_.test_input = options_.test_script ? &scripted_input_ : nullptr;
   context_.time.fixed_delta = config::kFixedDeltaSeconds;
   context_.on_transform_written = [this](ObjectId id, TransformWrite write) { on_transform_written(id, write); };
-  context_.spawn = [this](ObjectId source, const std::optional<Transform>& world) { return spawn(source, world); };
+  context_.spawn = [this](ObjectId source, const std::optional<Transform>& world, bool physics) {
+    return spawn(source, world, physics);
+  };
   context_.scene_exists = [this](const std::string& name) { return std::filesystem::exists(scene_path(name)); };
   context_.scene_name = config::kMainSceneName;
 
@@ -149,6 +151,7 @@ void Engine::load_scene(const std::string& name) {
   for (const std::string& warning : loaded.warnings) log::warning(warning);
   // The Ruby VM survives (globals, loaded classes); the objects, bodies and behaviours do not.
   scripts_->reset_scene();
+  scripts_->scene_was_reset();
   scene_desc_ = std::move(loaded.scene);
   scene_ = Scene::from_desc(scene_desc_);
   physics_ = create_jolt_physics_world(gravity());
@@ -157,7 +160,7 @@ void Engine::load_scene(const std::string& name) {
   if (renderer_) renderer_->upload(scene_desc_);
   context_.scene_name = name;
   ++scene_generation_;
-  animations_.reset(scene_desc_.animations);
+  animations_.reset(scene_desc_.animations, scene_);
   particles_.clear();
   scripts_->attach_scripts();
   scripts_->run_scene_script(name);
@@ -193,7 +196,7 @@ void Engine::create_body(ObjectId id) {
   }
 }
 
-ObjectId Engine::spawn(ObjectId source, const std::optional<Transform>& world) {
+ObjectId Engine::spawn(ObjectId source, const std::optional<Transform>& world, bool physics) {
   if (!scene_.is_alive(source)) return kNoObject;
   const std::vector<ObjectId> created = scene_.clone(source);
   if (world) {
@@ -201,7 +204,9 @@ ObjectId Engine::spawn(ObjectId source, const std::optional<Transform>& world) {
     placed.scale = scene_.world_transform(created.front()).scale;
     scene_.set_world_transform(created.front(), placed);
   }
-  for (const ObjectId id : created) create_body(id);
+  if (physics) {
+    for (const ObjectId id : created) create_body(id);
+  }
   for (const ObjectId id : created) scripts_->attach_object(id);
   return created.front();
 }
@@ -246,6 +251,8 @@ void Engine::frame(float frame_seconds) {
   input_.update(source);
   context_.hud.clear();
   scripts_->start_pending();
+  // On the real clock: the network does not pause with the game.
+  for (const net::NetworkEvent& event : network_.poll(frame_seconds)) scripts_->dispatch(event);
 
   if (renderer_) {
     context_.screen_width = renderer_->screen_width();

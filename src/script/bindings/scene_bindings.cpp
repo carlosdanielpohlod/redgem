@@ -78,6 +78,15 @@ mrb_value game_object_set_visible(mrb_state* mrb, mrb_value self) {
   return mrb_bool_value(visible);
 }
 
+mrb_value game_object_tint(mrb_state* mrb, mrb_value self) { return vec3_value(mrb, alive_object(mrb, self).tint); }
+
+mrb_value game_object_set_tint(mrb_state* mrb, mrb_value self) {
+  mrb_value color;
+  mrb_get_args(mrb, "o", &color);
+  alive_object(mrb, self).tint = to_vec3(mrb, color);
+  return color;
+}
+
 mrb_value game_object_animation_offset(mrb_state* mrb, mrb_value self) {
   return mrb_float_value(mrb, alive_object(mrb, self).animation_offset);
 }
@@ -244,7 +253,8 @@ mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
   mrb_value source;
   mrb_value position = mrb_nil_value();
   mrb_value rotation = mrb_nil_value();
-  mrb_get_args(mrb, "o|oo", &source, &position, &rotation);
+  mrb_bool physics = true;
+  mrb_get_args(mrb, "o|oob", &source, &position, &rotation, &physics);
   ScriptContext& ctx = context(mrb);
   if (!ctx.spawn) mrb_raise(mrb, E_RUNTIME_ERROR, "Scene.spawn only works while the game runs");
   ObjectId id = kNoObject;
@@ -261,7 +271,7 @@ mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
     if (!mrb_nil_p(position)) world->position = to_vec3(mrb, position);
     if (!mrb_nil_p(rotation)) world->rotation = quat_from_euler_degrees(to_vec3(mrb, rotation));
   }
-  return object_or_nil(mrb, ctx.spawn(id, world));
+  return object_or_nil(mrb, ctx.spawn(id, world, physics));
 }
 
 mrb_value camera_main(mrb_state* mrb, mrb_value) { return object_or_nil(mrb, scene(mrb).main_camera()); }
@@ -327,6 +337,8 @@ void install_scene_bindings(mrb_state* mrb) {
   mrb_define_method(mrb, game_object, "props", game_object_props, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "visible", game_object_visible, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "visible=", game_object_set_visible, MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, game_object, "tint", game_object_tint, MRB_ARGS_NONE());
+  mrb_define_method(mrb, game_object, "tint=", game_object_set_tint, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, game_object, "animation_offset", game_object_animation_offset, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "animation_offset=", game_object_set_animation_offset, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, game_object, "parent", game_object_parent, MRB_ARGS_NONE());
@@ -356,7 +368,7 @@ void install_scene_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, scene_module, "find", scene_find, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, scene_module, "find_all", scene_find_all, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, scene_module, "objects", scene_objects, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, scene_module, "__spawn", scene_spawn, MRB_ARGS_ARG(1, 2));
+  mrb_define_module_function(mrb, scene_module, "__spawn", scene_spawn, MRB_ARGS_ARG(1, 3));
 
   RClass* camera_module = mrb_define_module(mrb, "Camera");
   mrb_define_module_function(mrb, camera_module, "main", camera_main, MRB_ARGS_NONE());

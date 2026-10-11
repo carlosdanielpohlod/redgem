@@ -9,6 +9,7 @@
 #include "audio/audio.hpp"
 #include "core/fixed_clock.hpp"
 #include "input/input.hpp"
+#include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
 #include "scene/animation_player.hpp"
 #include "scene/particles.hpp"
@@ -54,7 +55,7 @@ class Engine {
   int run();
   // Copies a prefab (or any object) into the running game with physics and scripts. `world`
   // overrides the copy's position/rotation. Returns the new root object.
-  ObjectId spawn(ObjectId source, const std::optional<Transform>& world);
+  ObjectId spawn(ObjectId source, const std::optional<Transform>& world, bool physics = true);
   // Simulates and renders one frame. Deterministic engines always advance exactly one fixed step.
   void frame(float frame_seconds);
 
@@ -72,6 +73,7 @@ class Engine {
   const SceneDesc& scene_desc() const { return scene_desc_; }
   AudioSystem& audio();
   AnimationPlayer& animations() { return animations_; }
+  net::NetworkSession& network() { return network_; }
   const ParticleSystem& particles() const { return particles_; }
   // HUD drawn by scripts during the last frame.
   const std::vector<HudItem>& hud() const { return context_.hud; }
@@ -117,6 +119,7 @@ class Engine {
   int scene_generation_ = 0;
   AnimationPlayer animations_;
   ParticleSystem particles_;
+  net::NetworkSession network_;
   FixedClock clock_;
   TestStatus test_status_ = TestStatus::NotRunning;
   mrb_value system_test_ = mrb_nil_value();

@@ -47,28 +47,66 @@ std::array<float, 4> sample_channel(const AnimationChannel& channel, float time)
 
 namespace {
 
-void pose(const AnimationChannel& channel, const AnimationDesc& clip, float time, bool loop, Transform& local) {
+Vec3 mix(Vec3 from, Vec3 to, float weight) { return from + (to - from) * weight; }
+
+// The rotation `weight` of the way from one to the other, the short way round.
+Quat mix(Quat from, Quat to, float weight) {
+  const float alignment = from.x * to.x + from.y * to.y + from.z * to.z + from.w * to.w;
+  const float sign = alignment < 0.0f ? -1.0f : 1.0f;
+  return normalize(Quat{from.x + (to.x * sign - from.x) * weight, from.y + (to.y * sign - from.y) * weight,
+                        from.z + (to.z * sign - from.z) * weight, from.w + (to.w * sign - from.w) * weight});
+}
+
+void pose(const AnimationChannel& channel, const AnimationDesc& clip, float time, const PoseOptions& options,
+          Transform& local) {
   const float local_time = clip.duration <= 0.0f ? 0.0f
-                           : loop                ? std::fmod(std::max(time, 0.0f), clip.duration)
+                           : options.loop        ? std::fmod(std::max(time, 0.0f), clip.duration)
                                                  : std::clamp(time, 0.0f, clip.duration);
   const std::array<float, 4> value = sample_channel(channel, local_time);
+  const bool whole = options.weight >= 1.0f;
   switch (channel.path) {
-    case AnimationPath::Translation: local.position = {value[0], value[1], value[2]}; break;
-    case AnimationPath::Rotation: local.rotation = Quat{value[0], value[1], value[2], value[3]}; break;
-    case AnimationPath::Scale: local.scale = {value[0], value[1], value[2]}; break;
+    case AnimationPath::Translation: {
+      const Vec3 to{value[0], value[1], value[2]};
+      local.position = whole ? to : mix(local.position, to, options.weight);
+      break;
+    }
+    case AnimationPath::Rotation: {
+      const Quat to{value[0], value[1], value[2], value[3]};
+      local.rotation = whole ? to : mix(local.rotation, to, options.weight);
+      break;
+    }
+    case AnimationPath::Scale: {
+      const Vec3 to{value[0], value[1], value[2]};
+      local.scale = whole ? to : mix(local.scale, to, options.weight);
+      break;
+    }
   }
 }
 
 }  // namespace
 
 void apply_animation(const AnimationDesc& clip, float time, Scene& scene, bool loop) {
+  PoseOptions options;
+  options.loop = loop;
+  apply_animation(clip, time, scene, options);
+}
+
+void apply_animation(const AnimationDesc& clip, float time, Scene& scene, const PoseOptions& options) {
+  if (options.weight <= 0.0f) return;
+  const auto wanted = [&options](ObjectId object) { return !options.wanted || options.wanted(object); };
   for (const AnimationChannel& channel : clip.channels) {
-    if (scene.is_alive(channel.node)) pose(channel, clip, time, loop, scene.at(channel.node).local);
+    if (scene.is_alive(channel.node) && wanted(channel.node)) {
+      Transform& local = scene.at(channel.node).local;
+      if (options.before) options.before(channel.node, channel.path, local);
+      pose(channel, clip, time, options, local);
+    }
     for (const ObjectId copy : scene.copies_of(channel.node)) {
       GameObject& object = scene.at(copy);
       // The root of a copy stays where it was put; what is inside it moves like the original.
-      if (object.copy_root == copy) continue;
-      pose(channel, clip, time + scene.at(object.copy_root).animation_offset, loop, object.local);
+      if (object.copy_root == copy || !wanted(copy)) continue;
+      const float ahead = options.offsets ? scene.at(object.copy_root).animation_offset : 0.0f;
+      if (options.before) options.before(copy, channel.path, object.local);
+      pose(channel, clip, time + ahead, options, object.local);
     }
   }
 }

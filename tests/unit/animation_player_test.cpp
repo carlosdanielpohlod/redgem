@@ -30,7 +30,7 @@ struct Stage {
     clip.channels = {channel};
     desc.animations = {clip};
     scene = Scene::from_desc(desc);
-    player.reset(desc.animations);
+    player.reset(desc.animations, scene);
   }
 
   float x() { return scene.at(0).local.position.x; }
@@ -122,4 +122,159 @@ TEST_CASE("unknown clips are refused") {
   AnimationPlayer empty;  // never given a scene
   CHECK(empty.names().empty());
   empty.advance(kQuarter, stage.scene);
+}
+
+namespace {
+
+constexpr float kRunX = 100.0f;      // where the "Run" clip holds the arm
+constexpr float kWaveHeight = 4.0f;  // how tall the "Wave" clip makes it
+constexpr float kFade = 1.0f;        // seconds
+constexpr float kHalfWeight = 0.5f;
+constexpr int kManyFrames = 30;
+
+// A person with an arm, and two copies of them. "Walk" slides the arm from x = 0 to 10 in two
+// seconds, "Run" holds it at x = 100, "Wave" only stretches it. The scene plays Walk.
+struct Crowd {
+  SceneDesc desc;
+  Scene scene;
+  AnimationPlayer player;
+  ObjectId first = kNoObject;   // roots of the copies
+  ObjectId second = kNoObject;
+  ObjectId first_arm = kNoObject;
+  ObjectId second_arm = kNoObject;
+  static constexpr ObjectId kPerson = 0;
+  static constexpr ObjectId kArm = 1;
+
+  Crowd() {
+    NodeDesc person;
+    person.name = "Person";
+    person.children = {kArm};
+    NodeDesc arm;
+    arm.name = "Arm";
+    arm.parent = kPerson;
+    desc.nodes = {person, arm};
+    desc.animations = {clip("Walk", AnimationPath::Translation, {0, 0, 0, kDistance, 0, 0}),
+                       clip("Run", AnimationPath::Translation, {kRunX, 0, 0, kRunX, 0, 0}),
+                       clip("Wave", AnimationPath::Scale, {1, kWaveHeight, 1, 1, kWaveHeight, 1})};
+    scene = Scene::from_desc(desc);
+    const std::vector<ObjectId> a = scene.clone(kPerson);
+    const std::vector<ObjectId> b = scene.clone(kPerson);
+    first = a.front();
+    first_arm = a.back();
+    second = b.front();
+    second_arm = b.back();
+    player.reset(desc.animations, scene);
+    player.stop("Run");
+    player.stop("Wave");
+  }
+
+  static AnimationDesc clip(const std::string& name, AnimationPath path, std::vector<float> values) {
+    AnimationChannel channel;
+    channel.node = kArm;
+    channel.path = path;
+    channel.times = {0.0f, kDuration};
+    channel.values = std::move(values);
+    AnimationDesc out;
+    out.name = name;
+    out.duration = kDuration;
+    out.channels = {channel};
+    return out;
+  }
+
+  float x(ObjectId arm) { return scene.at(arm).local.position.x; }
+  void advance(float seconds) { player.advance(seconds, scene); }
+};
+
+}  // namespace
+
+TEST_CASE("one copy of a character plays a clip of its own while the others follow the scene") {
+  Crowd crowd;
+  CHECK(crowd.player.play_on(crowd.scene, crowd.first, "Run", true, 1.0f, 0.0f, false));
+  crowd.advance(kQuarter);
+  CHECK(crowd.x(crowd.first_arm) == doctest::Approx(kRunX));
+  CHECK(crowd.x(crowd.second_arm) == doctest::Approx(kDistance / 4.0f));
+  CHECK(crowd.x(Crowd::kArm) == doctest::Approx(kDistance / 4.0f));
+  CHECK(crowd.player.clip_on(crowd.scene, crowd.first) == std::string("Run"));
+  CHECK(crowd.player.clip_on(crowd.scene, crowd.first_arm) == std::string("Run"));  // any part of the character
+  CHECK(crowd.player.playing_on(crowd.scene, crowd.first));
+  CHECK(crowd.player.time_on(crowd.scene, crowd.first) == doctest::Approx(kQuarter));
+  CHECK_FALSE(crowd.player.clip_on(crowd.scene, crowd.second).has_value());
+  CHECK_FALSE(crowd.player.play_on(crowd.scene, crowd.second, "Dance", true, 1.0f, 0.0f, false));
+}
+
+TEST_CASE("a character fades from what it was doing to its new clip") {
+  Crowd crowd;
+  crowd.advance(kQuarter);
+  crowd.player.play_on(crowd.scene, crowd.first, "Run", true, 1.0f, kFade, false);
+  crowd.advance(kFade * kHalfWeight);
+  // Halfway between where the walk has it by now and where the run holds it.
+  const float walking = crowd.x(crowd.second_arm);
+  CHECK(crowd.x(crowd.first_arm) == doctest::Approx((walking + kRunX) * kHalfWeight));
+  crowd.advance(kFade);
+  CHECK(crowd.x(crowd.first_arm) == doctest::Approx(kRunX));
+
+  // And back to the scene's clips the same way.
+  crowd.player.follow_scene(crowd.scene, crowd.first, kFade);
+  CHECK_FALSE(crowd.player.clip_on(crowd.scene, crowd.first).has_value());
+  crowd.advance(kFade * kHalfWeight);
+  CHECK(crowd.x(crowd.first_arm) == doctest::Approx((crowd.x(crowd.second_arm) + kRunX) * kHalfWeight));
+  crowd.advance(kFade);
+  CHECK(crowd.x(crowd.first_arm) == doctest::Approx(crowd.x(crowd.second_arm)));
+}
+
+TEST_CASE("a second clip is mixed over what a character does, by its weight") {
+  Crowd crowd;
+  CHECK(crowd.player.mix_on(crowd.scene, crowd.first, "Run", kHalfWeight, true, 1.0f));
+  crowd.advance(kQuarter);
+  CHECK(crowd.x(crowd.first_arm) == doctest::Approx((crowd.x(crowd.second_arm) + kRunX) * kHalfWeight));
+  CHECK_FALSE(crowd.player.clip_on(crowd.scene, crowd.first).has_value());  // still following the scene underneath
+
+  // A clip that is about something else (the arm's size) leaves the walk alone.
+  crowd.player.mix_on(crowd.scene, crowd.first, "Wave", 1.0f, true, 1.0f);
+  crowd.advance(kQuarter);
+  CHECK(crowd.x(crowd.first_arm) == doctest::Approx(crowd.x(crowd.second_arm)));
+  CHECK(crowd.scene.at(crowd.first_arm).local.scale.y == doctest::Approx(kWaveHeight));
+  CHECK(crowd.scene.at(crowd.second_arm).local.scale.y == doctest::Approx(1.0f));
+
+  // Half of it stays half, frame after frame (it does not creep up to the whole).
+  crowd.player.mix_on(crowd.scene, crowd.first, "Wave", kHalfWeight, true, 1.0f);
+  for (int frame = 0; frame < kManyFrames; ++frame) crowd.advance(kQuarter / kManyFrames);
+  CHECK(crowd.scene.at(crowd.first_arm).local.scale.y == doctest::Approx((1.0f + kWaveHeight) * kHalfWeight));
+
+  crowd.player.unmix_on(crowd.scene, crowd.first);
+  crowd.scene.at(crowd.first_arm).local.scale.y = 1.0f;
+  crowd.advance(kQuarter);
+  CHECK(crowd.scene.at(crowd.first_arm).local.scale.y == doctest::Approx(1.0f));
+  CHECK_FALSE(crowd.player.mix_on(crowd.scene, crowd.first, "Dance", 1.0f, true, 1.0f));
+}
+
+TEST_CASE("an object of the level is a character too: itself and what is under it") {
+  Crowd crowd;
+  crowd.player.play_on(crowd.scene, Crowd::kPerson, "Run", true, 1.0f, 0.0f, false);
+  crowd.advance(kQuarter);
+  CHECK(crowd.x(Crowd::kArm) == doctest::Approx(kRunX));
+  CHECK(crowd.x(crowd.first_arm) == doctest::Approx(kDistance / 4.0f));  // its copies still walk
+}
+
+TEST_CASE("a character's own clip can play once, pause and start over") {
+  Crowd crowd;
+  crowd.player.play_on(crowd.scene, crowd.first, "Walk", false, 1.0f, 0.0f, false);
+  crowd.advance(kDuration + kQuarter);
+  CHECK(crowd.x(crowd.first_arm) == doctest::Approx(kDistance));  // held at its end
+  CHECK_FALSE(crowd.player.playing_on(crowd.scene, crowd.first));
+  crowd.player.play_on(crowd.scene, crowd.first, "Walk", false, 1.0f, 0.0f, false);  // ended: starts over
+  crowd.advance(kQuarter);
+  CHECK(crowd.x(crowd.first_arm) == doctest::Approx(kDistance / 4.0f));
+  crowd.player.pause_on(crowd.scene, crowd.first);
+  crowd.advance(kQuarter);
+  CHECK(crowd.x(crowd.first_arm) == doctest::Approx(kDistance / 4.0f));
+}
+
+TEST_CASE("a destroyed character is forgotten") {
+  Crowd crowd;
+  crowd.player.play_on(crowd.scene, crowd.first, "Run", true, 1.0f, 0.0f, false);
+  crowd.scene.request_destroy(crowd.first);
+  for (const ObjectId gone : crowd.scene.pending_destroy_ids()) crowd.scene.finalize_destroy(gone);
+  crowd.advance(kQuarter);
+  CHECK(crowd.x(crowd.second_arm) == doctest::Approx(kDistance / 4.0f));
 }

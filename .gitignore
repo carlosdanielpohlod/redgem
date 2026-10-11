@@ -4,6 +4,7 @@
 # Build outputs and fetched dependencies
 build/
 build-windows/
+build-android/
 .deps/
 .cache/
 

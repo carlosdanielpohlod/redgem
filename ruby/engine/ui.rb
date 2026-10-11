@@ -28,6 +28,11 @@ module UI
   BUTTON_ALPHA = 225
   BUTTON_RADIUS = 10
   BUTTON_TEXT_SHARE = 0.42   # text height as a share of the button's height
+  FIELD_MAX_LENGTH = 64
+  FIELD_PADDING = 14         # pixels between a text field's edge and its text
+  FIELD_CARET = "_"
+  CONTINUATION_MASK = 0xC0
+  CONTINUATION_BITS = 0x80
   PRESSED_SHADE = 0.8        # a held button is this much darker
 
   def self.rgb(color)
@@ -56,6 +61,32 @@ module UI
   def self.image(name, x:, y:, width: 0, height: 0, alpha: OPAQUE)
     __image(name.to_s, x.to_i, y.to_i, width.to_i, height.to_i, alpha.to_i)
   end
+
+  # A box to type in. Returns the text after this frame's typing: keep it and pass it back.
+  #   @name = UI.text_field(@name, x: 40, y: 200, width: 320, height: 48)
+  def self.text_field(value, x:, y:, width:, height:, max_length: FIELD_MAX_LENGTH, color: BUTTON_COLOR,
+                      text_color: :white)
+    value = value.to_s + Input.text
+    value = chop(value) if Input.pressed?(:backspace)
+    value = chop(value) while letters(value) > max_length
+    rect(x: x, y: y, width: width, height: height, color: color, alpha: BUTTON_ALPHA, radius: BUTTON_RADIUS)
+    size = (height * BUTTON_TEXT_SHARE).to_i
+    text(value + FIELD_CARET, x: x + FIELD_PADDING, y: y + (height - size) / 2, size: size, color: text_color)
+    value
+  end
+
+  # A text without its last letter: all of that letter's bytes (accented letters take several).
+  def self.chop(text)
+    size = text.bytesize - 1
+    size -= 1 while size.positive? && continuation?(text.getbyte(size))
+    size.positive? ? text.byteslice(0, size) : ""
+  end
+
+  # How many letters a text has, however many bytes each takes.
+  def self.letters(text) = text.bytes.count { |byte| !continuation?(byte) }
+
+  # In UTF-8, the bytes of a letter after its first all look like 10xxxxxx.
+  def self.continuation?(byte) = (byte & CONTINUATION_MASK) == CONTINUATION_BITS
 
   def self.mouse_over?(x:, y:, width:, height:)
     Input.mouse_x >= x && Input.mouse_x < x + width && Input.mouse_y >= y && Input.mouse_y < y + height

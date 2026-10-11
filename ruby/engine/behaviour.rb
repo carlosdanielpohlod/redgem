@@ -43,6 +43,8 @@ class Behaviour
   def find_all(tag) = Scene.find_all(tag)
   def destroy(target = game_object) = target.destroy
   def get_component(klass) = game_object.get_component(klass)
+  # This object's own animation (see Animator): animation.play(:Run, fade: 0.2).
+  def animation = game_object.animation
 
   # --- Time: things that happen later, or over a while ------------------------------------------
   # All of it runs on game time: nothing fires while the game is paused (Time.scale = 0), and a

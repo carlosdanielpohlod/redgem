@@ -33,6 +33,7 @@ automated check. Add `--headless` to run without opening a window (no screenshot
 | `t.hold(:w, :a, frames: 60)` | Holds keys for that long |
 | `t.press(:space)` | Taps a key |
 | `t.move_mouse(x, y)`, `t.click(x, y)` | Moves the mouse; clicks there with the left button |
+| `t.type("Ana")` | Types a text (what `Input.text` and `UI.text_field` read) |
 | `t.tilt(:left_y, -1.0, frames: 60)` | Pushes a gamepad stick (or pulls a trigger) for that long |
 | `t.press_button(:a)`, `t.hold_button(:a, frames: 30)` | Taps or holds gamepad buttons |
 | `t.hold_until(:w, frames: 300) { ... }` | Holds keys until the block is true |

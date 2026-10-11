@@ -12,14 +12,30 @@
 #include "core/log.hpp"
 #include "generated/ruby_prelude.hpp"
 #include "script/bindings/bindings.hpp"
+#include "script/bindings/network_bindings.hpp"
 #include "script/script_naming.hpp"
 
 namespace redgem {
 
 namespace {
+
 constexpr const char* kUpdateEntry = "__update";  // Behaviour#__update: its timers, then its update
-}  // namespace
-namespace {
+constexpr const char* kNetworkModule = "Network";
+constexpr const char* kNetworkEventEntry = "__event";
+constexpr const char* kSceneResetEntry = "__scene_reset";
+
+// What Ruby calls each kind of network event.
+const char* network_event_name(net::NetworkEvent::Kind kind) {
+  switch (kind) {
+    case net::NetworkEvent::Kind::Connected: return "connected";
+    case net::NetworkEvent::Kind::Failed: return "failed";
+    case net::NetworkEvent::Kind::Disconnected: return "disconnected";
+    case net::NetworkEvent::Kind::PeerJoined: return "joined";
+    case net::NetworkEvent::Kind::PeerLeft: return "left";
+    case net::NetworkEvent::Kind::Message: return "message";
+  }
+  return "message";
+}
 
 constexpr const char* kObjectsCacheGlobal = "$__redgem_objects";
 
@@ -89,6 +105,26 @@ void ScriptHost::reset_scene() {
   vm_.release_kept();
   objects_cache_ = mrb_ary_new(mrb);
   mrb_gv_set(mrb, mrb_intern_cstr(mrb, kObjectsCacheGlobal), objects_cache_);
+}
+
+void ScriptHost::scene_was_reset() {
+  mrb_state* mrb = vm_.state();
+  const RubyResult result = vm_.call(mrb_obj_value(mrb_module_get(mrb, kNetworkModule)), kSceneResetEntry);
+  if (!result.ok) report_error("resetting the network's handlers", result.error);
+}
+
+void ScriptHost::dispatch(const net::NetworkEvent& event) {
+  mrb_state* mrb = vm_.state();
+  const int arena = mrb_gc_arena_save(mrb);
+  const char* kind = network_event_name(event.kind);
+  const RubyResult result =
+      vm_.call(mrb_obj_value(mrb_module_get(mrb, kNetworkModule)), kNetworkEventEntry,
+               {mrb_symbol_value(mrb_intern_cstr(mrb, kind)), mrb_int_value(mrb, event.peer),
+                mrb_str_new(mrb, event.name.data(), static_cast<mrb_int>(event.name.size())),
+                value_from(mrb, event.data)});
+  mrb_gc_arena_restore(mrb, arena);
+  // A failing handler does not take the game down, nor the connection.
+  if (!result.ok) report_error(std::string("a Network handler (") + kind + " " + event.name + ")", result.error);
 }
 
 void ScriptHost::attach_object(ObjectId id) {

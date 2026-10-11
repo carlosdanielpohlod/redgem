@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "core/math.hpp"
@@ -21,7 +22,13 @@ struct ParticleBurst {
   float gravity = 1.0f;  // share of the world's gravity: 0 floats, negative rises (smoke)
   Color color;
   bool glow = false;     // lit from within: adds light instead of covering what is behind
+  // A picture from the game's images/ folder drawn on each particle (a puff of smoke, a star);
+  // empty for a soft round dot.
+  std::string image;
+  float spin_degrees = 0.0f;  // how fast each one turns, per second (half of them the other way)
 };
+
+inline constexpr int kNoParticleImage = -1;
 
 struct Particle {
   Vec3 position;
@@ -32,6 +39,9 @@ struct Particle {
   float gravity = 0.0f;
   Color color;
   bool glow = false;
+  int image = kNoParticleImage;  // index into ParticleSystem::images()
+  float angle = 0.0f;            // radians it is turned by, around the line of sight
+  float spin = 0.0f;             // radians per second
 
   // What is drawn: particles shrink and fade out over the last part of their life.
   float size_now() const;
@@ -48,11 +58,15 @@ class ParticleSystem {
   void clear();
   void set_gravity(Vec3 gravity) { gravity_ = gravity; }
   const std::vector<Particle>& particles() const { return particles_; }
+  // The names of the pictures particles were given so far (Particle::image points here).
+  const std::vector<std::string>& images() const { return images_; }
 
  private:
   float random_unit();  // 0 to 1
+  int image_index(const std::string& name);
 
   std::vector<Particle> particles_;
+  std::vector<std::string> images_;
   Vec3 gravity_;
   std::uint32_t seed_ = 1;
 };

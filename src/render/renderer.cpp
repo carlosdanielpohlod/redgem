@@ -155,6 +155,7 @@ struct Renderer::Impl {
   Shader sky_shader{};
   Shader particle_shader{};
   int particle_boost_loc = -1;
+  int particle_textured_loc = -1;
   Shader panorama_shader{};
   Shader occlusion_shader{};
   RenderTexture2D occlusion_a{};  // ambient occlusion (ping-pong with occlusion_b for the blur)
@@ -248,6 +249,7 @@ struct Renderer::Impl {
     sky_shader = compile(shaders::kSkyVertex, shaders::kSkyFragment, "sky");
     particle_shader = compile(nullptr, shaders::kParticleFragment, "particles");
     particle_boost_loc = GetShaderLocation(particle_shader, shaders::kParticleBoost);
+    particle_textured_loc = GetShaderLocation(particle_shader, shaders::kParticleTextured);
     bright_shader = compile(nullptr, shaders::kBrightFragment, "bloom threshold");
     blur_shader = compile(nullptr, shaders::kBlurFragment, "blur");
     composite_shader = compile(nullptr, shaders::kCompositeFragment, "tone mapping");
@@ -683,7 +685,7 @@ struct Renderer::Impl {
     owns_ui_font = true;
   }
 
-  // The picture UI.image asks for by name, loaded on first use. Null (reported once) when the
+  // The picture UI.image or a particle asks for by name, loaded on first use. Null (reported once) when the
   // game's images folder has no such file.
   const Texture2D* ui_image(const std::string& name) {
     const auto found = ui_images.find(name);
@@ -697,7 +699,7 @@ struct Renderer::Impl {
       break;
     }
     if (picture.id == 0) {
-      log::error("UI.image: no picture named '" + name + "' in " + images_dir.string());
+      log::error("no picture named '" + name + "' in " + images_dir.string());
     } else {
       SetTextureFilter(picture, TEXTURE_FILTER_BILINEAR);
     }
@@ -969,14 +971,74 @@ struct Renderer::Impl {
     rlActiveTextureSlot(0);
   }
 
-  // Squares facing the camera, hidden behind objects but not hiding each other (no depth written).
-  // Ordinary ones cover what is behind them; glowing ones add their light to it.
-  void draw_particles(const std::vector<Particle>& particles, const Camera3D& camera) {
-    if (particles.empty()) return;
+  // The camera's right and up: what a square has to lie along to face it.
+  struct Facing {
+    Vec3 right;
+    Vec3 up;
+  };
+
+  static Facing facing(const Camera3D& camera) {
     const Vec3 eye{camera.position.x, camera.position.y, camera.position.z};
     const Vec3 forward = normalize(Vec3{camera.target.x, camera.target.y, camera.target.z} - eye);
     const Vec3 right = normalize(cross(forward, Vec3{camera.up.x, camera.up.y, camera.up.z}));
-    const Vec3 up = cross(right, forward);
+    return {right, cross(right, forward)};
+  }
+
+  // One particle: a square facing the camera, turned around the line of sight.
+  static void add_particle_quad(const Particle& particle, const Facing& view) {
+    rlCheckRenderBatchLimit(kQuadCorners);
+    const float half = particle.size_now() * kHalfFactor;
+    const float turned_cos = std::cos(particle.angle);
+    const float turned_sin = std::sin(particle.angle);
+    const Vec3 across = (view.right * turned_cos + view.up * turned_sin) * half;
+    const Vec3 along = (view.up * turned_cos - view.right * turned_sin) * half;
+    const Vec3 corners[kQuadCorners] = {particle.position - across - along, particle.position + across - along,
+                                        particle.position + across + along, particle.position - across + along};
+    constexpr float u[kQuadCorners] = {0.0f, 1.0f, 1.0f, 0.0f};
+    constexpr float v[kQuadCorners] = {1.0f, 1.0f, 0.0f, 0.0f};
+    rlColor4f(particle.color.r, particle.color.g, particle.color.b, particle.alpha_now());
+    for (int corner = 0; corner < kQuadCorners; ++corner) {
+      rlTexCoord2f(u[corner], v[corner]);
+      rlVertex3f(corners[corner].x, corners[corner].y, corners[corner].z);
+    }
+  }
+
+  // The pictures a particle system uses, by Particle::image. Null for one the game's images
+  // folder does not have: those particles are drawn as dots.
+  std::vector<const Texture2D*> particle_pictures(const ParticleSystem& system) {
+    std::vector<const Texture2D*> pictures;
+    for (const std::string& name : system.images()) pictures.push_back(ui_image(name));
+    return pictures;
+  }
+
+  // Draws the particles that glow (or the ones that do not) and wear `picture` (null: plain dots).
+  void draw_particle_batch(const ParticleSystem& system, const std::vector<const Texture2D*>& pictures,
+                           const Texture2D* picture, bool glowing, const Facing& view) {
+    const float textured = picture != nullptr ? kOn : kOff;
+    SetShaderValue(particle_shader, particle_textured_loc, &textured, SHADER_UNIFORM_FLOAT);
+    if (picture != nullptr) rlSetTexture(picture->id);
+    rlBegin(RL_QUADS);
+    for (const Particle& particle : system.particles()) {
+      const Texture2D* worn =
+          particle.image == kNoParticleImage ? nullptr : pictures[static_cast<std::size_t>(particle.image)];
+      if (particle.glow == glowing && worn == picture) add_particle_quad(particle, view);
+    }
+    rlEnd();
+    rlDrawRenderBatchActive();
+    rlSetTexture(0);
+  }
+
+  // Particles are hidden behind objects but do not hide each other (no depth written). Ordinary
+  // ones cover what is behind them; glowing ones add their light to it.
+  void draw_particles(const ParticleSystem& system, const Camera3D& camera) {
+    if (system.particles().empty()) return;
+    const Facing view = facing(camera);
+    const std::vector<const Texture2D*> pictures = particle_pictures(system);
+    // The plain dots (a null picture), then each picture once.
+    std::vector<const Texture2D*> batches{nullptr};
+    for (const Texture2D* picture : pictures) {
+      if (std::find(batches.begin(), batches.end(), picture) == batches.end()) batches.push_back(picture);
+    }
     rlDrawRenderBatchActive();
     rlDisableDepthMask();
     rlDisableBackfaceCulling();
@@ -988,25 +1050,7 @@ struct Renderer::Impl {
       rlSetBlendFactorsSeparate(RL_SRC_ALPHA, glowing ? RL_ONE : RL_ONE_MINUS_SRC_ALPHA, RL_ZERO, RL_ONE, RL_FUNC_ADD,
                                 RL_FUNC_ADD);
       BeginBlendMode(BLEND_CUSTOM_SEPARATE);
-      rlBegin(RL_QUADS);
-      for (const Particle& particle : particles) {
-        if (particle.glow != glowing) continue;
-        rlCheckRenderBatchLimit(kQuadCorners);
-        const float half = particle.size_now() * kHalfFactor;
-        const Vec3 across = right * half;
-        const Vec3 along = up * half;
-        const Vec3 corners[kQuadCorners] = {particle.position - across - along, particle.position + across - along,
-                                            particle.position + across + along, particle.position - across + along};
-        constexpr float u[kQuadCorners] = {0.0f, 1.0f, 1.0f, 0.0f};
-        constexpr float v[kQuadCorners] = {1.0f, 1.0f, 0.0f, 0.0f};
-        rlColor4f(particle.color.r, particle.color.g, particle.color.b, particle.alpha_now());
-        for (int corner = 0; corner < kQuadCorners; ++corner) {
-          rlTexCoord2f(u[corner], v[corner]);
-          rlVertex3f(corners[corner].x, corners[corner].y, corners[corner].z);
-        }
-      }
-      rlEnd();
-      rlDrawRenderBatchActive();
+      for (const Texture2D* picture : batches) draw_particle_batch(system, pictures, picture, glowing, view);
       EndBlendMode();
     }
     EndShaderMode();
@@ -1158,7 +1202,7 @@ void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const Rend
   BeginMode3D(camera);
   impl_->draw_sky(camera);
   impl_->draw_objects(scene, false, viewer);
-  if (particles != nullptr) impl_->draw_particles(particles->particles(), camera);
+  if (particles != nullptr) impl_->draw_particles(*particles, camera);
   EndMode3D();
   EndTextureMode();
   impl_->post_process(env, output);

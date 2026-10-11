@@ -175,6 +175,13 @@ end
 `UI.width` and `UI.height` are the size of the screen, so layouts can be centered. Pictures go in
 the game's `images/` folder (`.png` or `.jpg`).
 
+A text field hands back what is in it after this frame's typing, so keep the value and pass it in
+again (`Input.text` is what was typed this frame, for anything else):
+
+```ruby
+@name = UI.text_field(@name, x: 40, y: 200, width: 320, height: 48, max_length: 12)
+```
+
 ## Pause, and the flow between screens
 
 `Time.scale = 0` freezes the game: physics stops and behaviours get an `update` with a delta of
@@ -258,6 +265,11 @@ end
 | `direction`, `spread` | Where they fly, and how many degrees they may stray: 180 is everywhere | up, 180 |
 | `speed`, `life`, `size` | Meters per second, seconds, meters across (each particle varies a little) | 3.0, 0.8, 0.12 |
 | `gravity` | 1 falls like everything else, 0 floats, negative rises | 1.0 |
+| `image` | A picture from the game's `images/` folder drawn on each particle, tinted by `color` | a soft dot |
+| `spin` | Degrees per second each picture turns | 0 |
+
+A white picture with see-through edges works best, since the color tints it:
+`Particles.burst(at, image: :smoke, color: :gray, alpha: 90, size: 1.2, life: 1.5, gravity: -0.05, spin: 40)`.
 
 ## Control animations
 
@@ -274,6 +286,32 @@ Animation.playing?(:DoorOpen)                          # false once it reached i
 
 `Animation.names` lists the level's clips; `time`, `duration` and `seek(name, seconds)` are there
 for syncing things to a clip. A stopped clip lets go of its objects, so scripts can move them.
+
+## Animate one character
+
+`Animation` is for the whole level. A character with several clips (idle, walk, run) picks its own
+through `animation`, and so does each spawned copy of it:
+
+```ruby
+def start = animation.play(:Idle)
+
+def update(_dt)
+  animation.play(moving? ? :Run : :Idle, fade: 0.2)   # blends from one to the other over 0.2 s
+end
+```
+
+Playing the clip a character is already on just carries on, so it is fine to call every frame.
+`loop: false` plays once and holds the last pose; `speed:` and `restart: true` work as above.
+A second clip can be laid over the first:
+
+```ruby
+animation.mix(:Wave)                 # a clip that only moves the arm: the legs keep walking
+animation.mix(:Limp, weight: 0.5)    # half of it blended into everything
+animation.unmix
+```
+
+`animation.follow_scene(fade: 0.3)` hands the character back to what the level plays, and
+`animation.clip` is the name of its own clip (nil while it follows the level).
 
 ## Save progress
 

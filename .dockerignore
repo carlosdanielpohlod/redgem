@@ -12,3 +12,4 @@ games/showcase/scene.glb
 showcase/*.blend
 **/*.blend1
 **/__pycache__
+build-android

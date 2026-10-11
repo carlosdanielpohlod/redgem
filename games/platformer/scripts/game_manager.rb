@@ -14,7 +14,7 @@ class GameManager < Behaviour
   BEST_TIME_KEY = :best_time
   BEST_RIGHT_MARGIN = 20   # pixels between the best time and the screen's right edge
 
-  attr_reader :coins, :total_coins, :best_time
+  attr_reader :coins, :total_coins, :best_time, :collected
 
   def self.instance
     Scene.find("GameManager")&.get_component(GameManager)
@@ -22,6 +22,7 @@ class GameManager < Behaviour
 
   def start
     @coins = 0
+    @collected = []   # names of the coins picked up
     @total_coins = Scene.find_all(:coin).size
     @won = false
     @need_coins_until = nil
@@ -32,8 +33,9 @@ class GameManager < Behaviour
   # Seconds played in this run (the clock stops while a menu is open, and when the game is won).
   def run_time = (@finished_at || Time.elapsed) - @started_at
 
-  def collect_coin
+  def collect_coin(name)
     @coins += 1
+    @collected << name
   end
 
   def all_coins? = @coins >= @total_coins
@@ -41,14 +43,22 @@ class GameManager < Behaviour
 
   def reached_goal
     if all_coins?
-      @won = true
-      @finished_at = Time.elapsed
-      record = @best_time.nil? || run_time < @best_time
-      Save[BEST_TIME_KEY] = @best_time = run_time if record
-      GameMenu.instance&.finish(record ? format("New record: %.1f s!", run_time) : "You win!")
+      win(mine: true)
     else
       @need_coins_until = Time.elapsed + NEED_COINS_SECONDS
     end
+  end
+
+  # The game is won: by this machine's hero (`mine`), or by another player's.
+  def win(mine:)
+    return if @won
+
+    @won = true
+    @finished_at = Time.elapsed
+    CoOp.instance&.won if mine
+    record = @best_time.nil? || run_time < @best_time
+    Save[BEST_TIME_KEY] = @best_time = run_time if record
+    GameMenu.instance&.finish(record ? format("New record: %.1f s!", run_time) : "You win!")
   end
 
   def update(_dt)

@@ -14,8 +14,15 @@ class Player < Behaviour
     @respawns = 0
   end
 
+  # Another player's hero: it goes where their machine says (see CoOp).
+  def ghost?
+    sync = get_component(NetworkSync)
+    !sync.nil? && !sync.mine?
+  end
+
   def update(dt)
     return if dt.zero?  # a menu is open: its buttons are not the hero's
+    return if ghost?
 
     direction = Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).clamped
     character.move(direction * prop(:speed, SPEED))

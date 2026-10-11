@@ -14,6 +14,9 @@
 namespace redgem {
 
 class SaveStore;
+namespace net {
+class NetworkSession;
+}
 class AnimationPlayer;
 class ParticleSystem;
 
@@ -67,12 +70,16 @@ struct ScriptContext {
   // The scene's animation clips (Animation) and the particles flying around (Particles).
   AnimationPlayer* animations = nullptr;
   ParticleSystem* particles = nullptr;
+  // The multiplayer game this machine hosts or joined (Network).
+  net::NetworkSession* network = nullptr;
   std::vector<std::string> screenshot_requests;
   bool quit_requested = false;
   // Called when a script writes a transform, so physics can follow.
   std::function<void(ObjectId, TransformWrite)> on_transform_written;
   // Creates a live copy of an object (Scene.spawn); null outside a running engine.
-  std::function<ObjectId(ObjectId, const std::optional<Transform>&)> spawn;
+  // The flag says whether the copy gets physics bodies (a copy that only shows where something is
+  // on another machine must not push things around here).
+  std::function<ObjectId(ObjectId, const std::optional<Transform>&, bool)> spawn;
   AudioSystem* audio = nullptr;
   // Scene switching: Game.load_scene sets the request; the engine switches at the end of the frame.
   std::string scene_name;

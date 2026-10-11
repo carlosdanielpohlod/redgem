@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "core/exit_codes.hpp"
 #include "app/cli.hpp"
 #include "app/engine.hpp"
 #include "app/game_project.hpp"
@@ -16,8 +17,6 @@
 
 namespace {
 
-constexpr int kExitSuccess = 0;
-constexpr int kExitFailure = 1;
 constexpr int kExitUsage = 2;
 
 // The editor, with the project hub when no game is given (and for File > New / Open Game).
