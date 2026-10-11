@@ -1,6 +1,7 @@
 # Hidden folders (git data, local notes, downloaded dependencies, tool state)
 .*
 build
+build-windows
 dist
 site
 docs

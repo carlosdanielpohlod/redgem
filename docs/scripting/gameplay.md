@@ -181,6 +181,15 @@ Audio.music(:theme, loop: true)
 Audio.stop_music
 ```
 
+## A sense of speed
+
+```ruby
+rush = (speed / TOP_SPEED).clamp(0.0, 1.0)
+Camera.fov = 52 + 10 * rush          # the view widens
+Camera.motion_blur = 0.7 * rush      # the edges of the picture streak
+Audio.music_pitch = 0.8 + 0.7 * rush # the engine's note climbs (Audio.music(:engine) is looping)
+```
+
 ## Change level
 
 ```ruby

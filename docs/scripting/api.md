@@ -14,10 +14,10 @@ and [Gameplay recipes](gameplay.md).
 | `Physics` | `raycast(origin, direction, max_distance = 1000, ignore = nil)` → `{object:, point:, normal:, distance:}` or `nil` |
 | `Input` | `axis(:horizontal / :vertical)`, `down?(:space)`, `pressed?`, `released?`, `action?(:jump)`, `action_pressed?`; mouse: `mouse_x`, `mouse_y`, `mouse_dx`, `mouse_dy`, `mouse_wheel`, `mouse_down?(:left)`, `mouse_pressed?`, `mouse_released?`, `mouse_locked=` |
 | `Time` | `delta`, `fixed_delta`, `elapsed`, `frame`, `scale(=)` (0 pauses the game) |
-| `Scene` / `Camera` | `Scene.find(name)`, `Scene.find_all(tag)`, `Scene.objects`, `Camera.main`, `Camera.screen_ray(x, y)` → `[origin, direction]` |
+| `Scene` / `Camera` | `Scene.find(name)`, `Scene.find_all(tag)`, `Scene.objects`, `Camera.main`, `Camera.screen_ray(x, y)` → `[origin, direction]`, `Camera.fov(=)` (degrees), `Camera.motion_blur(=)` (0..1: the picture streaks away from its center, as when moving fast) |
 | `SceneScript` | `setup`, `find`, `find_all`, `find!` (see [Setting a level up in Ruby](behaviours.md#setting-a-level-up-in-ruby)) |
 | `Scene.spawn` | `Scene.spawn("Bullet", position: v, rotation: euler)` copies a `prefab = true` template (hidden and inert in the game) with its physics and scripts; copies of animated characters move like the original |
-| `Audio` | `Audio.play(:jump, volume:, pitch:)`, `Audio.music(:theme, loop: true, volume: 0.7)`, `Audio.stop_music`, `Audio.volume = 0.8` (files in `sounds/`) |
+| `Audio` | `Audio.play(:jump, volume:, pitch:)`, `Audio.music(:theme, loop: true, volume: 0.7)`, `Audio.stop_music`, `Audio.music_pitch = 1.2`, `Audio.music_volume = 0.5` (change them every frame for an engine's drone), `Audio.volume = 0.8` (files in `sounds/`) |
 | `UI` / `Debug` / `Game` | `UI.text(str, x:, y:, size:, color:, alpha:, align:)`, `UI.rect(x:, y:, width:, height:, color:, alpha:, radius:)`, `UI.image(name, x:, y:, width:, height:)`, `UI.button(label, x:, y:, width:, height:)` → clicked?, `UI.width`, `UI.height`, `UI.text_width(str, size:)`, `Debug.log/warn/error`, `Game.quit`, `Game.screenshot(name)`, `Game.load_scene("level2")` (`scenes/level2.glb`; `"main"` is `scene.glb`; Ruby globals survive), `Game.scene_name` |
 | `Vector3` | `Vector3.new(x, y, z)`, `Vector3.zero`, `one`, `up`, `down`, `left`, `right`, `forward`, `back`; arithmetic, `dot`, `cross`, `length`, `normalized`, `lerp`, `flat`, `with(y: 0)`, `distance_to`, `approx?`, `to_a` |
 

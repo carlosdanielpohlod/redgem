@@ -32,6 +32,8 @@ Environment in the editor, or a Blender empty) sets the mood through its propert
 | `wind` | how much foliage sways |
 | `shadows` | darkness of the sun's shadows (0 = none, 1 = full) |
 | `ambient_occlusion` | darkening of creases and contact areas (0 = none, 1 = full) |
+| `contrast`, `saturation` | the finished picture's grade: 1 leaves it as it is |
+| `grain`, `aberration` | film grain, and color fringes toward the corners as through a lens (0 turns each off) |
 
 Without one, scenes get a clear day. Other things worth knowing: the 16 point lights nearest to the
 camera are used each frame (so a street can have dozens of lamps); the sun casts soft shadows
