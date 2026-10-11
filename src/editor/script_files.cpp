@@ -1,5 +1,7 @@
 #include "editor/script_files.hpp"
 
+#include "core/platform.hpp"
+
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
@@ -11,13 +13,6 @@
 
 namespace redgem {
 namespace {
-
-// Wraps a path in single quotes for the shell.
-std::string shell_quote(const std::string& text) {
-  std::string quoted = "'";
-  for (const char c : text) quoted += c == '\'' ? std::string("'\\''") : std::string(1, c);
-  return quoted + "'";
-}
 
 std::string strip_extension(const std::string& name) {
   const std::string extension = config::kRubyFileExtension;
@@ -100,9 +95,7 @@ bool write_text_file(const std::filesystem::path& path, const std::string& text,
 }
 
 void open_in_system(const std::filesystem::path& path) {
-  // Detached so the editor keeps running; output is not interesting.
-  const std::string command = "xdg-open " + shell_quote(path.string()) + " >/dev/null 2>&1 &";
-  if (std::system(command.c_str()) != 0) log::warning("could not open " + path.string());
+  if (std::system(platform::open_command(path).c_str()) != 0) log::warning("could not open " + path.string());
 }
 
 }  // namespace redgem

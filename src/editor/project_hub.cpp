@@ -11,6 +11,7 @@
 #include <cstdlib>
 
 #include "app/game_project.hpp"
+#include "core/platform.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "editor/editor_config.hpp"
@@ -37,9 +38,9 @@ const char* template_icon(const std::string& name) { return name == "empty" ? IC
 
 // "~/RedGemGames/x" reads better than the full home path.
 std::string pretty_path(const std::filesystem::path& path) {
-  const char* home = std::getenv("HOME");
+  const std::string home = platform::home_dir().string();
   const std::string text = path.string();
-  if (home != nullptr && *home != '\0' && text.rfind(home, 0) == 0) return "~" + text.substr(std::string(home).size());
+  if (!home.empty() && text.rfind(home, 0) == 0) return "~" + text.substr(home.size());
   return text;
 }
 
@@ -124,11 +125,10 @@ bool ProjectHub::create_game(const std::string& name, const std::string& templat
 
 bool ProjectHub::open_game(const std::filesystem::path& typed) {
   // "~/games/x" as typed in the path field.
-  const char* home = std::getenv("HOME");
   const std::string text = typed.string();
   const std::string prefix = kHomePrefix;
-  const std::filesystem::path game_dir = normalized_folder(
-      home != nullptr && text.rfind(prefix, 0) == 0 ? std::filesystem::path(home) / text.substr(prefix.size()) : typed);
+  const std::filesystem::path game_dir =
+      normalized_folder(text.rfind(prefix, 0) == 0 ? platform::home_dir() / text.substr(prefix.size()) : typed);
   std::error_code fs_error;
   if (!std::filesystem::exists(game_dir / config::kSceneFileName, fs_error)) {
     error_ = pretty_path(game_dir) + " is not a game (it has no " + config::kSceneFileName + ")";

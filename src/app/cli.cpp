@@ -14,7 +14,7 @@ std::string usage() {
          "  redgem <game_dir> --test <system_test.rb> [--screenshots <dir>] [--headless]\n"
          "  redgem --ruby-test <test_file.rb>\n"
          "  redgem new <game_dir> [--template empty|platformer]   create a game\n"
-         "  redgem build <game_dir> <out_dir>                     make a standalone game (an executable)\n"
+         "  redgem build <game_dir> <out_dir> [--target linux|windows]   make a standalone game (an executable)\n"
          "\n"
          "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting,\n"
          "                                       else the dedicated card when there is one)\n"
@@ -77,6 +77,9 @@ CliResult parse_cli(const std::vector<std::string>& args) {
     } else if (arg == "--template") {
       if (!value(text)) return fail("--template needs a name");
       options.template_name = text;
+    } else if (arg == "--target") {
+      if (!value(text) || !build_target_from_name(text)) return fail("--target needs linux or windows");
+      options.build_target = text;
     } else if (arg == "--gpu") {
       if (!value(text) || !gpu_choice_from_name(text)) return fail("--gpu needs auto, dedicated or integrated");
       options.gpu = text;

@@ -14,7 +14,7 @@ set(REDGEM_JSON_VERSION "v3.12.0")
 
 # --- X11 headers extracted locally by tools/setup/fetch_x11_headers.sh -------
 set(REDGEM_LOCAL_X11_INCLUDE "${CMAKE_SOURCE_DIR}/.deps/x11/usr/include")
-if(EXISTS "${REDGEM_LOCAL_X11_INCLUDE}/X11/extensions/Xrandr.h")
+if(NOT WIN32 AND EXISTS "${REDGEM_LOCAL_X11_INCLUDE}/X11/extensions/Xrandr.h")
   message(STATUS "Using locally extracted X11 headers: ${REDGEM_LOCAL_X11_INCLUDE}")
   list(APPEND CMAKE_INCLUDE_PATH "${REDGEM_LOCAL_X11_INCLUDE}")
   include_directories(BEFORE SYSTEM "${REDGEM_LOCAL_X11_INCLUDE}")
@@ -56,6 +56,10 @@ set(DEBUG_RENDERER_IN_DEBUG_AND_RELEASE OFF CACHE BOOL "" FORCE)
 set(PROFILER_IN_DEBUG_AND_RELEASE OFF CACHE BOOL "" FORCE)
 set(CPP_RTTI_ENABLED ON CACHE BOOL "" FORCE)
 set(CPP_EXCEPTIONS_ENABLED ON CACHE BOOL "" FORCE)
+if(WIN32)
+  # Its warnings-as-errors trips on a newer compiler's notes; a dependency's warnings are not ours to fix.
+  set(ENABLE_ALL_WARNINGS OFF CACHE BOOL "" FORCE)
+endif()
 FetchContent_Declare(JoltPhysics
   GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
   GIT_TAG ${REDGEM_JOLT_TAG}
@@ -95,6 +99,11 @@ FetchContent_MakeAvailable(raylib cgltf JoltPhysics doctest mruby nlohmann_json)
 # Skinned meshes are deformed on the GPU: raylib then uploads bone ids / weights and bone matrices
 # (off in customized builds unless asked for).
 target_compile_definitions(raylib PRIVATE RL_SUPPORT_MESH_GPU_SKINNING)
+if(WIN32)
+  # This Jolt release leans on <type_traits> arriving through other headers, which the Windows
+  # toolchain's standard library no longer does.
+  target_compile_options(Jolt PUBLIC "SHELL:-include type_traits")
+endif()
 # These ship no (usable) CMake project: only fetch their sources.
 foreach(dep imgui rlimgui imguizmo)
   FetchContent_GetProperties(${dep})
@@ -122,7 +131,15 @@ target_include_directories(cgltf_headers SYSTEM INTERFACE "${cgltf_SOURCE_DIR}")
 find_program(REDGEM_RAKE rake REQUIRED)
 set(REDGEM_MRUBY_CONFIG "${CMAKE_SOURCE_DIR}/cmake/mruby_build_config.rb")
 set(REDGEM_MRUBY_BUILD_DIR "${CMAKE_BINARY_DIR}/mruby")
-set(REDGEM_MRUBY_LIB "${REDGEM_MRUBY_BUILD_DIR}/host/lib/libmruby.a")
+# Built for this machine ("host"); a Windows build also cross-compiles it (see the build config).
+set(REDGEM_MRUBY_TARGET host)
+set(REDGEM_MRUBY_ENV "")
+if(WIN32)
+  set(REDGEM_MRUBY_TARGET windows)
+  get_filename_component(REDGEM_MINGW_BIN "${CMAKE_CXX_COMPILER}" DIRECTORY)
+  set(REDGEM_MRUBY_ENV "REDGEM_MINGW_BIN=${REDGEM_MINGW_BIN}")
+endif()
+set(REDGEM_MRUBY_LIB "${REDGEM_MRUBY_BUILD_DIR}/${REDGEM_MRUBY_TARGET}/lib/libmruby.a")
 cmake_host_system_information(RESULT REDGEM_CPU_COUNT QUERY NUMBER_OF_LOGICAL_CORES)
 
 add_custom_command(
@@ -130,6 +147,7 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E env
           "MRUBY_CONFIG=${REDGEM_MRUBY_CONFIG}"
           "MRUBY_BUILD_DIR=${REDGEM_MRUBY_BUILD_DIR}"
+          ${REDGEM_MRUBY_ENV}
           ${REDGEM_RAKE} -j${REDGEM_CPU_COUNT} all
   WORKING_DIRECTORY "${mruby_SOURCE_DIR}"
   DEPENDS "${REDGEM_MRUBY_CONFIG}"

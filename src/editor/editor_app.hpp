@@ -7,6 +7,7 @@
 #include <variant>
 #include <vector>
 
+#include "app/game_project.hpp"
 #include "audio/audio.hpp"
 #include "editor/console_log.hpp"
 #include "editor/editor_camera.hpp"
@@ -92,7 +93,9 @@ class EditorApp {
   // Asks to leave (after the unsaved-changes dialog when needed).
   void request_exit(EditorExit action);
   // Makes a standalone game in "<game>-build": an executable and the game's files. Returns that folder.
-  std::optional<std::filesystem::path> build();
+  // Makes a standalone game for a system in a folder next to the game ("<game>-build", or
+  // "<game>-build-windows"). Returns that folder.
+  std::optional<std::filesystem::path> build(BuildTarget target = host_build_target());
   // Where objects created from the menus appear: in front of the editor camera.
   Vec3 spawn_point() const;
   // Re-reads the game folder (scripts, models, sounds, scenes).
@@ -117,6 +120,7 @@ class EditorApp {
   void draw_menu_bar();
   void draw_toolbar();
   void draw_graphics_card_menu();
+  void draw_build_targets();
   void draw_status_bar();
   void draw_viewport_drop_target(float x, float y);
   void apply_pending_split();

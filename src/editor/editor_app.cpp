@@ -27,6 +27,7 @@ namespace {
 
 using namespace editor_config;
 
+constexpr const char* kBuildPopup = "build_target";
 constexpr float kSmoothingPerStrength = 0.5f;  // Smooth and Flatten: share of the way per second, per unit of strength
 constexpr float kBrushLift = 0.05f;            // meters the brush ring floats above the ground
 constexpr float kBrushPoleShare = 0.25f;       // height of the brush's center mark, as a share of its radius
@@ -227,17 +228,28 @@ void EditorApp::request_exit(EditorExit action) {
   }
 }
 
-std::optional<std::filesystem::path> EditorApp::build() {
+std::optional<std::filesystem::path> EditorApp::build(BuildTarget target) {
   if (session_->document().dirty()) save();
   const std::filesystem::path game = session_->game_dir();
-  const std::filesystem::path out = game.parent_path() / (game.filename().string() + kBuildSuffix);
+  // "<game>-build" for this system, "<game>-build-windows" for another.
+  const std::string suffix = target == host_build_target() ? std::string(kBuildSuffix)
+                                                           : std::string(kBuildSuffix) + "-" + build_target_name(target);
+  const std::filesystem::path out = game.parent_path() / (game.filename().string() + suffix);
   std::string error;
-  if (!build_game(game, out, std::filesystem::canonical(config::kSelfExecutable), error)) {
+  const auto executable = build_game_for(game, out, target, error);
+  if (!executable) {
     log::error("build failed: " + error);
     return std::nullopt;
   }
-  log::info("built " + out.string() + ": run " + (out / executable_name(game)).string());
+  log::info(std::string("built for ") + build_target_name(target) + ": " + executable->string());
   return out;
+}
+
+void EditorApp::draw_build_targets() {
+  for (const BuildTarget target : {BuildTarget::Linux, BuildTarget::Windows}) {
+    const char* label = target == BuildTarget::Windows ? ICON_FA_DESKTOP "  For Windows (.exe)" : ICON_FA_DESKTOP "  For Linux";
+    if (ImGui::MenuItem(label)) build(target);
+  }
 }
 
 Vec3 EditorApp::spawn_point() const { return camera_.position() + camera_.forward() * kSpawnDistance; }
@@ -565,7 +577,10 @@ void EditorApp::draw_menu_bar() {
     if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Open Game...")) request_exit(EditorExit::OpenHub);
     ImGui::Separator();
     if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK "  Save Scene", "Ctrl+S", false, editing)) save();
-    if (ImGui::MenuItem(ICON_FA_BOX_ARCHIVE "  Build Game", nullptr, false, editing)) build();
+    if (ImGui::BeginMenu(ICON_FA_BOX_ARCHIVE "  Build Game", editing)) {
+      draw_build_targets();
+      ImGui::EndMenu();
+    }
     if (ImGui::MenuItem(ICON_FA_FOLDER "  Show Game Folder")) open_in_system(session_->game_dir());
     ImGui::Separator();
     if (ImGui::MenuItem(ICON_FA_RIGHT_FROM_BRACKET "  Quit")) request_exit(EditorExit::Quit);
@@ -698,7 +713,13 @@ void EditorApp::draw_toolbar() {
   ImGui::TextColored(ui::muted_color(), "%s", label.c_str());
   ImGui::SameLine();
   ImGui::BeginDisabled(!editing);
-  if (ui::icon_button(ICON_FA_BOX_ARCHIVE, "Build a standalone copy of the game")) build();
+  if (ui::icon_button(ICON_FA_BOX_ARCHIVE, "Build the game: an executable for Linux or Windows")) {
+    ImGui::OpenPopup(kBuildPopup);
+  }
+  if (ImGui::BeginPopup(kBuildPopup)) {
+    draw_build_targets();
+    ImGui::EndPopup();
+  }
   ImGui::EndDisabled();
   ImGui::SameLine(0.0f, kToolbarGroupGap);
   if (ui::icon_button(ICON_FA_TABLE_LIST, "Show / hide the Inspector (Ctrl+Alt+B)", panels_.inspector)) {

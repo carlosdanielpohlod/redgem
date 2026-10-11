@@ -25,7 +25,6 @@ inline constexpr int kMaxFixedStepsPerFrame = 8;
 // --- Game folder layout ---------------------------------------------------------
 inline constexpr const char* kSceneFileName = "scene.glb";
 // The running program's own file (Linux): what Build copies next to a game.
-inline constexpr const char* kSelfExecutable = "/proc/self/exe";
 inline constexpr const char* kImagesDirName = "images";  // pictures drawn with UI.image
 inline constexpr const char* kScriptsDirName = "scripts";
 inline constexpr const char* kSoundsDirName = "sounds";

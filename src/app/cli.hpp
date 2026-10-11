@@ -18,6 +18,7 @@ struct CliOptions {
   bool headless = false;
   std::string template_name = "empty";      // RunMode::NewGame
   std::filesystem::path build_dir;          // RunMode::BuildGame
+  std::string build_target;                 // --target linux|windows (empty: the system this runs on)
   std::optional<std::string> gpu;           // --gpu auto|dedicated|integrated (overrides the saved setting)
 };
 

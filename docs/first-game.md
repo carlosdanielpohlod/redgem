@@ -73,7 +73,7 @@ the error, with its line, appears in the Console.
 ## 5. Share it
 
 **Build** in the toolbar (or `redgem build <game> <folder>`) makes a folder with your game's
-executable and its files. Zip it and send it. See [Building and sharing](shipping.md).
+executable and its files, for Linux or for Windows. Zip it and send it. See [Building and sharing](shipping.md).
 
 ## Next
 

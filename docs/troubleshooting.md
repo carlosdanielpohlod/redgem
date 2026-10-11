@@ -10,7 +10,7 @@ Knowing this up front saves time:
 - **Saving progress** has no API.
 - **Particles** do not exist; small effects are objects moved by a script.
 - **Animation:** every animation in a level loops all the time. You cannot pick which one plays.
-- **Platforms:** Linux.
+- **Platforms:** the editor runs on Linux. Games are built for Linux and for Windows.
 - Scripts are loaded when you press Play; they are not reloaded while the game runs.
 
 ## Common problems

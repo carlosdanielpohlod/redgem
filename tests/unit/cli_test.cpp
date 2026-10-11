@@ -56,6 +56,11 @@ TEST_CASE("new and build subcommands") {
   CHECK(built.options.mode == RunMode::BuildGame);
   CHECK(built.options.build_dir == "dist/mine");
   CHECK_FALSE(parse_cli({"build", "games/mine"}).ok);
+  CHECK(built.options.build_target.empty());  // the system it runs on
+  const CliResult for_windows = parse_cli({"build", "games/mine", "dist/mine", "--target", "windows"});
+  REQUIRE(for_windows.ok);
+  CHECK(for_windows.options.build_target == "windows");
+  CHECK_FALSE(parse_cli({"build", "games/mine", "dist/mine", "--target", "amiga"}).ok);
   CHECK_FALSE(parse_cli({"new"}).ok);
 }
 

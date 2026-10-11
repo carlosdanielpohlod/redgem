@@ -26,7 +26,7 @@ end
 - **Ruby scripting**: behaviours with `start`, `update`, triggers and collisions; scenes set up in
   Ruby; classes load on first use, no `require`.
 - **Editor**: scene view with gizmos, hierarchy, inspector, Ruby code tabs, play mode, undo,
-  one-click standalone build.
+  sculptable terrain, and one-click builds of the game for Linux and Windows.
 - **Blender as the modeling tool**: scenes are glTF files; custom properties carry gameplay data.
 - **Rendering**: PBR materials, sun shadows, reflections, ambient occlusion, bloom, fog,
   skeletal animation.
@@ -80,6 +80,7 @@ ctest --test-dir build                  # run the tests
 ./build/src/redgem new games/my_game --template platformer   # or --template empty
 ./build/src/redgem games/my_game                             # edit and play it
 ./build/src/redgem build games/my_game dist/my_game          # standalone game: dist/my_game/my_game
+./build/src/redgem build games/my_game dist/win --target windows   # a Windows .exe (see docs/shipping.md)
 ```
 
 A game is a folder: `scene.glb` (the scene, from Blender or the editor), `scripts/*.rb`,

@@ -34,6 +34,7 @@ add_library(redgem_engine STATIC
   ${REDGEM_PRELUDE_HEADER}
   ${REDGEM_TEMPLATES_HEADER}
   core/log.cpp
+  core/platform.cpp
   core/math.cpp
   core/fixed_clock.cpp
   scene/property.cpp
@@ -96,10 +97,16 @@ target_include_directories(redgem_engine PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${REDGEM_GENERATED_DIR})
 target_link_libraries(redgem_engine PUBLIC raylib Jolt mruby_lib cgltf_headers nlohmann_json::nlohmann_json imgui_stack m)
+if(WIN32)
+  # mruby's socket and time gems use Windows' own libraries.
+  target_link_libraries(redgem_engine PUBLIC ws2_32)
+endif()
 target_compile_options(redgem_engine PRIVATE -Wall -Wextra -Wpedantic -Wno-unused-parameter)
 
 add_executable(redgem app/main.cpp)
 target_link_libraries(redgem PRIVATE redgem_engine)
+# On Windows it is what games ship as: a windowed program, with no console window behind it.
+set_target_properties(redgem PROPERTIES WIN32_EXECUTABLE ON)
 target_compile_options(redgem PRIVATE -Wall -Wextra -Wpedantic)
 
 # The editor's fonts are assembled into the binary (.incbin): rebuild when they change.

@@ -1,5 +1,7 @@
 #include "app/user_settings.hpp"
 
+#include "core/platform.hpp"
+
 #include <cstdlib>
 #include <fstream>
 
@@ -15,7 +17,6 @@ constexpr const char* kSettingsFileName = "settings.json";
 constexpr const char* kGpuKey = "gpu";
 constexpr const char* kGpuVariable = "REDGEM_GPU";
 constexpr int kJsonIndent = 2;
-constexpr int kOverwrite = 1;  // setenv: replace an existing value
 
 struct NamedChoice {
   GpuChoice choice;
@@ -74,7 +75,7 @@ GpuChoice apply_gpu_choice(const std::optional<std::string>& command_line) {
   const char* variable = std::getenv(kGpuVariable);
   const std::optional<std::string> environment = variable != nullptr ? std::optional<std::string>(variable) : std::nullopt;
   const GpuChoice choice = resolve_gpu_choice(command_line, environment, read_user_settings(user_settings_file()));
-  setenv(kGpuVariable, gpu_choice_name(choice), kOverwrite);
+  platform::set_environment(kGpuVariable, gpu_choice_name(choice), true);
   return choice;
 }
 

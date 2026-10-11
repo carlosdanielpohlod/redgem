@@ -12,6 +12,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/platform.hpp"
 #include "core/config.hpp"
 #include "editor/scene_document.hpp"
 #include "editor/script_files.hpp"
@@ -21,6 +22,10 @@ namespace redgem {
 namespace {
 
 constexpr const char* kSettingsFile = "game.json";
+constexpr const char* kLinuxTarget = "linux";
+constexpr const char* kWindowsTarget = "windows";
+constexpr const char* kRuntimesFolder = "runtimes";  // engines for other systems, next to this one
+constexpr const char* kRuntimeName = "redgem";
 constexpr const char* kGameFolder = "game";      // the game's files, next to a built executable
 constexpr const char* kFallbackExecutable = "play";  // for a game whose name gives no usable file name
 constexpr const char* kTemplateScriptsFolder = "/scripts/";
@@ -276,8 +281,48 @@ std::filesystem::path normalized_folder(const std::filesystem::path& folder) {
   return normal;
 }
 
+std::optional<BuildTarget> build_target_from_name(const std::string& name) {
+  if (name == kLinuxTarget) return BuildTarget::Linux;
+  if (name == kWindowsTarget) return BuildTarget::Windows;
+  return std::nullopt;
+}
+
+const char* build_target_name(BuildTarget target) { return target == BuildTarget::Windows ? kWindowsTarget : kLinuxTarget; }
+
+BuildTarget host_build_target() {
+#ifdef _WIN32
+  return BuildTarget::Windows;
+#else
+  return BuildTarget::Linux;
+#endif
+}
+
+std::optional<std::filesystem::path> runtime_for(BuildTarget target, const std::filesystem::path& self) {
+  if (target == host_build_target()) return self;
+  const std::filesystem::path runtime =
+      self.parent_path() / kRuntimesFolder / build_target_name(target) /
+      platform::executable_file_name(kRuntimeName, target == BuildTarget::Windows);
+  std::error_code fs_error;
+  if (!std::filesystem::is_regular_file(runtime, fs_error)) return std::nullopt;
+  return runtime;
+}
+
+std::optional<std::filesystem::path> build_game_for(const std::filesystem::path& game_dir,
+                                                    const std::filesystem::path& out_dir, BuildTarget target,
+                                                    std::string& error) {
+  const auto runtime = runtime_for(target, platform::executable_path());
+  if (!runtime) {
+    error = std::string("the ") + build_target_name(target) + " runtime is not built yet: run tools/" +
+            build_target_name(target) + "/build_runtime.sh";
+    return std::nullopt;
+  }
+  if (!build_game(game_dir, out_dir, *runtime, target, error)) return std::nullopt;
+  return normalized_folder(out_dir) /
+         platform::executable_file_name(executable_name(game_dir), target == BuildTarget::Windows);
+}
+
 bool build_game(const std::filesystem::path& game_folder, const std::filesystem::path& out_folder,
-                const std::filesystem::path& engine_binary, std::string& error) {
+                const std::filesystem::path& engine_binary, BuildTarget target, std::string& error) {
   const std::filesystem::path game_dir = normalized_folder(game_folder);
   const std::filesystem::path out_dir = normalized_folder(out_folder);
   if (!std::filesystem::exists(game_dir / config::kSceneFileName)) {
@@ -294,7 +339,8 @@ bool build_game(const std::filesystem::path& game_folder, const std::filesystem:
     return false;
   }
   std::filesystem::create_directories(out_dir, fs_error);
-  const std::filesystem::path binary = out_dir / executable_name(game_dir);
+  const std::filesystem::path binary =
+      out_dir / platform::executable_file_name(executable_name(game_dir), target == BuildTarget::Windows);
   std::filesystem::copy_file(engine_binary, binary, std::filesystem::copy_options::overwrite_existing, fs_error);
   if (fs_error) {
     error = "cannot copy the engine: " + fs_error.message();
@@ -345,10 +391,7 @@ std::vector<std::filesystem::path> find_games(const std::filesystem::path& folde
 
 namespace {
 
-std::filesystem::path home_dir() {
-  const char* home = std::getenv("HOME");
-  return home != nullptr ? std::filesystem::path(home) : std::filesystem::temp_directory_path();
-}
+std::filesystem::path home_dir() { return platform::home_dir(); }
 
 }  // namespace
 

@@ -1,5 +1,7 @@
 #include "render/gpu_select.hpp"
 
+#include "core/platform.hpp"
+
 #include <cstdlib>
 #include <filesystem>
 
@@ -9,7 +11,6 @@ namespace {
 constexpr const char* kPreferenceVariable = "REDGEM_GPU";
 constexpr const char* kIntegrated = "integrated";
 constexpr const char* kNvidiaDriverInfo = "/proc/driver/nvidia/version";
-constexpr int kKeepExisting = 0;  // setenv: do not overwrite
 
 }  // namespace
 
@@ -26,7 +27,7 @@ void prefer_discrete_gpu() {
   std::error_code error;
   const bool nvidia = std::filesystem::exists(kNvidiaDriverInfo, error);
   for (const auto& [name, value] : discrete_gpu_environment(nvidia, preference != nullptr ? preference : "")) {
-    setenv(name.c_str(), value.c_str(), kKeepExisting);
+    platform::set_environment(name, value, false);  // what the user already set stays
   }
 }
 

@@ -3,6 +3,7 @@
 
 # Build outputs and fetched dependencies
 build/
+build-windows/
 .deps/
 .cache/
 

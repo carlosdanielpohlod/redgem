@@ -143,7 +143,7 @@ TEST_CASE("building a game makes a standalone folder") {
   // Any file stands in for the engine binary here.
   const std::filesystem::path fake_engine = fresh("engine_binary");
   REQUIRE(write_text_file(fake_engine, "binary", error));
-  REQUIRE_MESSAGE(build_game(game, out, fake_engine, error), error);
+  REQUIRE_MESSAGE(build_game(game, out, fake_engine, BuildTarget::Linux, error), error);
   // The executable is named after the game and plays the game that sits next to it.
   const auto executable = out / executable_name(game);
   REQUIRE(std::filesystem::exists(executable));
@@ -152,7 +152,23 @@ TEST_CASE("building a game makes a standalone folder") {
   CHECK(std::filesystem::exists(out / "game" / config::kSceneFileName));
   CHECK(bundled_game(executable) == out / "game");
   CHECK_FALSE(bundled_game(fake_engine).has_value());  // an executable with no game beside it
-  CHECK_FALSE(build_game(fresh("not_a_game"), out, fake_engine, error));
+  CHECK_FALSE(build_game(fresh("not_a_game"), out, fake_engine, BuildTarget::Linux, error));
+
+  // For Windows the executable is an .exe, made from the Windows runtime kept next to the engine.
+  const auto windows_out = fresh("built_windows");
+  REQUIRE_MESSAGE(build_game(game, windows_out, fake_engine, BuildTarget::Windows, error), error);
+  CHECK(std::filesystem::exists(windows_out / (executable_name(game) + ".exe")));
+  CHECK(std::filesystem::exists(windows_out / "game" / config::kSceneFileName));
+  const std::filesystem::path install = fresh("install");
+  std::filesystem::create_directories(install / "runtimes" / "windows");
+  CHECK(runtime_for(BuildTarget::Linux, install / "redgem") == install / "redgem");  // this system: itself
+  CHECK_FALSE(runtime_for(BuildTarget::Windows, install / "redgem").has_value());   // not built yet
+  REQUIRE(write_text_file(install / "runtimes" / "windows" / "redgem.exe", "binary", error));
+  CHECK(runtime_for(BuildTarget::Windows, install / "redgem") == install / "runtimes" / "windows" / "redgem.exe");
+  CHECK(build_target_from_name("windows") == BuildTarget::Windows);
+  CHECK_FALSE(build_target_from_name("amiga").has_value());
+  std::filesystem::remove_all(windows_out);
+  std::filesystem::remove_all(install);
   CHECK(find_games(game.parent_path()).size() >= 1);
   std::filesystem::remove_all(game);
   std::filesystem::remove_all(out);
@@ -207,11 +223,11 @@ TEST_CASE("a game is never built into itself") {
   REQUIRE(write_text_file(engine, "not really an engine", error));
   // With a trailing slash the name used to be lost and the output landed inside the game.
   CHECK(normalized_folder(game.string() + "/").filename() == "game");
-  CHECK_FALSE(build_game(game, game / "out", engine, error));
+  CHECK_FALSE(build_game(game, game / "out", engine, BuildTarget::Linux, error));
   CHECK_FALSE(error.empty());
-  CHECK_FALSE(build_game(game.string() + "/", game, engine, error));
+  CHECK_FALSE(build_game(game.string() + "/", game, engine, BuildTarget::Linux, error));
   CHECK_FALSE(std::filesystem::exists(game / "out"));
-  REQUIRE_MESSAGE(build_game(game.string() + "/", root / "built", engine, error), error);
+  REQUIRE_MESSAGE(build_game(game.string() + "/", root / "built", engine, BuildTarget::Linux, error), error);
   CHECK(std::filesystem::exists(root / "built" / "game" / "scene.glb"));
   std::filesystem::remove_all(root);
 }

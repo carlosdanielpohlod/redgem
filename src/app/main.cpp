@@ -12,6 +12,7 @@
 #include "editor/project_hub.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "core/platform.hpp"
 
 namespace {
 
@@ -68,9 +69,7 @@ int main(int argc, char** argv) {
   const std::vector<std::string> args(argv + 1, argv + argc);
   // A built game: started by itself, the executable plays the game that ships next to it.
   if (args.empty()) {
-    std::error_code fs_error;
-    const std::filesystem::path self = std::filesystem::canonical(config::kSelfExecutable, fs_error);
-    if (const auto game = bundled_game(self)) {
+    if (const auto game = bundled_game(platform::executable_path())) {
       apply_gpu_choice(std::nullopt);
       try {
         EngineOptions options;
@@ -108,12 +107,15 @@ int main(int argc, char** argv) {
       }
       case RunMode::BuildGame: {
         std::string error;
-        if (!build_game(options.game_dir, options.build_dir, std::filesystem::canonical(config::kSelfExecutable), error)) {
+        const BuildTarget target =
+            options.build_target.empty() ? host_build_target() : *build_target_from_name(options.build_target);
+        const auto executable = build_game_for(options.game_dir, options.build_dir, target, error);
+        if (!executable) {
           log::error(error);
           return kExitFailure;
         }
-        std::cout << "built " << options.build_dir.string() << ": run "
-                  << (options.build_dir / executable_name(options.game_dir)).string() << "\n";
+        std::cout << "built " << options.build_dir.string() << " for " << build_target_name(target) << ": run "
+                  << executable->string() << "\n";
         return kExitSuccess;
       }
       case RunMode::Editor:
