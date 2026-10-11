@@ -105,8 +105,13 @@ SystemTest.define do |t|
   slower.transform.position = slower.transform.position.with(z: RAM_Z)  # far from the end of the street
   car.transform.position = slower.transform.position.with(y: height) + Vector3.new(0, 0, RAM_DISTANCE)
   bounced = false
-  watch.call(RAM_FRAMES, [:w]) { bounced ||= driver.speed.negative? }
+  sparks = 0
+  watch.call(RAM_FRAMES, [:w]) do
+    bounced ||= driver.speed.negative?
+    sparks = [sparks, Particles.count].max
+  end
   t.assert("the player's car bounces off the car it hits") { bounced }
+  t.assert("... in a shower of sparks") { sparks.positive? }
   t.assert("... and does not get through it") { car.transform.position.z > slower.transform.position.z }
 
   # The player stops in the middle of the road beside a parked car: no room on either side. Whoever

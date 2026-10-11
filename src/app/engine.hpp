@@ -10,8 +10,11 @@
 #include "core/fixed_clock.hpp"
 #include "input/input.hpp"
 #include "physics/physics_world.hpp"
+#include "scene/animation_player.hpp"
+#include "scene/particles.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
+#include "app/save_store.hpp"
 #include "script/script_context.hpp"
 #include "script/script_host.hpp"
 
@@ -29,6 +32,8 @@ struct EngineOptions {
   // Editor play mode: input comes from the editor viewport. Headless engines without it step
   // deterministically (one fixed step per frame).
   const InputSource* input = nullptr;
+  // Where Save keeps the game's data. Empty: the game's file in the user's RedGem folder.
+  std::filesystem::path save_file;
   // Editor play mode: the editor's audio device. Otherwise the engine opens its own (or, headless,
   // records what would play).
   AudioSystem* audio = nullptr;
@@ -66,6 +71,8 @@ class Engine {
   int scene_generation() const { return scene_generation_; }
   const SceneDesc& scene_desc() const { return scene_desc_; }
   AudioSystem& audio();
+  AnimationPlayer& animations() { return animations_; }
+  const ParticleSystem& particles() const { return particles_; }
   // HUD drawn by scripts during the last frame.
   const std::vector<HudItem>& hud() const { return context_.hud; }
   // For whoever draws a headless engine's frames (the editor's Scene view): the size of that
@@ -105,9 +112,11 @@ class Engine {
   std::unique_ptr<ScriptHost> scripts_;
   std::unique_ptr<Renderer> renderer_;
   std::unique_ptr<AudioSystem> owned_audio_;
+  std::unique_ptr<SaveStore> save_;
   float pending_steps_ = 0.0f;  // fixed steps owed while Time.scale slows a deterministic run
   int scene_generation_ = 0;
-  float animation_time_ = 0.0f;  // seconds the scene's animations have been playing
+  AnimationPlayer animations_;
+  ParticleSystem particles_;
   FixedClock clock_;
   TestStatus test_status_ = TestStatus::NotRunning;
   mrb_value system_test_ = mrb_nil_value();

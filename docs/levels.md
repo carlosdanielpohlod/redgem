@@ -46,7 +46,7 @@ Glossy surfaces reflect their surroundings: the engine keeps capturing the scene
 
 **Animated characters.** glTF skeletons and animations are supported: skinned meshes are deformed on
 the GPU (up to 64 bones per skeleton, 4 per vertex) and every animation in the scene plays in a
-loop. The editor keeps skeletons and animations when saving, reordering or importing models.
+loop until a script says otherwise (see [Control animations](scripting/gameplay.md#control-animations)). The editor keeps skeletons and animations when saving, reordering or importing models.
 `tools/blender/walk_rig.py` gives a scanned standing person leg bones and a walk cycle.
 
 **Per-object color.** The property `tint = "#rrggbb"` multiplies the colors of an object's mesh, so

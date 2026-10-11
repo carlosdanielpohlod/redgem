@@ -47,8 +47,10 @@ std::array<float, 4> sample_channel(const AnimationChannel& channel, float time)
 
 namespace {
 
-void pose(const AnimationChannel& channel, const AnimationDesc& clip, float time, Transform& local) {
-  const float local_time = clip.duration > 0.0f ? std::fmod(std::max(time, 0.0f), clip.duration) : 0.0f;
+void pose(const AnimationChannel& channel, const AnimationDesc& clip, float time, bool loop, Transform& local) {
+  const float local_time = clip.duration <= 0.0f ? 0.0f
+                           : loop                ? std::fmod(std::max(time, 0.0f), clip.duration)
+                                                 : std::clamp(time, 0.0f, clip.duration);
   const std::array<float, 4> value = sample_channel(channel, local_time);
   switch (channel.path) {
     case AnimationPath::Translation: local.position = {value[0], value[1], value[2]}; break;
@@ -59,14 +61,14 @@ void pose(const AnimationChannel& channel, const AnimationDesc& clip, float time
 
 }  // namespace
 
-void apply_animation(const AnimationDesc& clip, float time, Scene& scene) {
+void apply_animation(const AnimationDesc& clip, float time, Scene& scene, bool loop) {
   for (const AnimationChannel& channel : clip.channels) {
-    if (scene.is_alive(channel.node)) pose(channel, clip, time, scene.at(channel.node).local);
+    if (scene.is_alive(channel.node)) pose(channel, clip, time, loop, scene.at(channel.node).local);
     for (const ObjectId copy : scene.copies_of(channel.node)) {
       GameObject& object = scene.at(copy);
       // The root of a copy stays where it was put; what is inside it moves like the original.
       if (object.copy_root == copy) continue;
-      pose(channel, clip, time + scene.at(object.copy_root).animation_offset, object.local);
+      pose(channel, clip, time + scene.at(object.copy_root).animation_offset, loop, object.local);
     }
   }
 }

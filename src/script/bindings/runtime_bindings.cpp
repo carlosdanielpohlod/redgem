@@ -1,11 +1,17 @@
 // Input, Time, UI, Debug, Game and TestInput natives.
 
+#include <cmath>
+
 #include <mruby.h>
+#include <mruby/array.h>
 #include <mruby/string.h>
 
+#include "app/save_store.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "input/keys.hpp"
+#include "scene/animation_player.hpp"
+#include "scene/particles.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 
@@ -15,6 +21,7 @@ namespace {
 using namespace binding;
 
 constexpr float kMaxColorChannel = 255.0f;
+constexpr double kLargestSavedInteger = 9007199254740992.0;  // 2^53: whole numbers a double holds exactly
 
 InputState& input(mrb_state* mrb) { return *context(mrb).input; }
 
@@ -79,6 +86,30 @@ mrb_value input_mouse_pressed(mrb_state* mrb, mrb_value) {
 mrb_value input_mouse_released(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(input(mrb).mouse_released(button_arg(mrb)));
 }
+GamepadButton gamepad_button_arg(mrb_state* mrb) {
+  const std::string name = name_arg(mrb);
+  const auto button = gamepad_button_from_name(name);
+  if (!button) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown gamepad button :%s", name.c_str());
+  return *button;
+}
+
+mrb_value input_gamepad(mrb_state* mrb, mrb_value) { return mrb_bool_value(input(mrb).gamepad_connected()); }
+mrb_value input_gamepad_axis(mrb_state* mrb, mrb_value) {
+  const std::string name = name_arg(mrb);
+  const auto axis = gamepad_axis_from_name(name);
+  if (!axis) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown gamepad axis :%s", name.c_str());
+  return mrb_float_value(mrb, input(mrb).gamepad_axis(*axis));
+}
+mrb_value input_gamepad_down(mrb_state* mrb, mrb_value) {
+  return mrb_bool_value(input(mrb).gamepad_down(gamepad_button_arg(mrb)));
+}
+mrb_value input_gamepad_pressed(mrb_state* mrb, mrb_value) {
+  return mrb_bool_value(input(mrb).gamepad_pressed(gamepad_button_arg(mrb)));
+}
+mrb_value input_gamepad_released(mrb_state* mrb, mrb_value) {
+  return mrb_bool_value(input(mrb).gamepad_released(gamepad_button_arg(mrb)));
+}
+
 mrb_value input_mouse_locked(mrb_state* mrb, mrb_value) { return mrb_bool_value(context(mrb).mouse_locked); }
 mrb_value input_set_mouse_locked(mrb_state* mrb, mrb_value) {
   mrb_bool locked = false;
@@ -265,6 +296,171 @@ mrb_value game_load_scene(mrb_state* mrb, mrb_value) {
 
 mrb_value game_scene_name(mrb_state* mrb, mrb_value) { return mrb_str_new_cstr(mrb, context(mrb).scene_name.c_str()); }
 
+// --- Save --------------------------------------------------------------------------------------
+
+SaveStore& save(mrb_state* mrb) {
+  SaveStore* store = context(mrb).save;
+  if (store == nullptr) mrb_raise(mrb, E_RUNTIME_ERROR, "Save is only available while a game runs");
+  return *store;
+}
+
+mrb_value save_get(mrb_state* mrb, mrb_value) {
+  mrb_value key;
+  mrb_value fallback = mrb_nil_value();
+  mrb_get_args(mrb, "o|o", &key, &fallback);
+  const auto value = save(mrb).get(to_name(mrb, key));
+  if (!value) return fallback;
+  if (const auto* flag = std::get_if<bool>(&*value)) return mrb_bool_value(*flag);
+  if (const auto* number = std::get_if<double>(&*value)) {
+    // Whole numbers come back as Integers: a saved count of 3 is 3, not 3.0.
+    if (std::fabs(*number) > kLargestSavedInteger || std::floor(*number) != *number) return mrb_float_value(mrb, *number);
+    return mrb_int_value(mrb, static_cast<mrb_int>(*number));
+  }
+  const auto& text = std::get<std::string>(*value);
+  return mrb_str_new(mrb, text.data(), static_cast<mrb_int>(text.size()));
+}
+
+mrb_value save_set(mrb_state* mrb, mrb_value) {
+  mrb_value key;
+  mrb_value value;
+  mrb_get_args(mrb, "oo", &key, &value);
+  PropertyValue stored;
+  if (mrb_true_p(value) || mrb_false_p(value)) {
+    stored = mrb_true_p(value);
+  } else if (mrb_integer_p(value)) {
+    stored = static_cast<double>(mrb_integer(value));
+  } else if (mrb_float_p(value)) {
+    if (!std::isfinite(mrb_float(value))) mrb_raise(mrb, E_ARGUMENT_ERROR, "Save cannot keep infinity or NaN");
+    stored = static_cast<double>(mrb_float(value));
+  } else if (mrb_string_p(value) || mrb_symbol_p(value)) {
+    stored = to_name(mrb, value);
+  } else {
+    mrb_raise(mrb, E_ARGUMENT_ERROR, "Save keeps numbers, texts and true / false");
+  }
+  if (!save(mrb).set(to_name(mrb, key), stored)) log::warning("could not write " + save(mrb).file().string());
+  return value;
+}
+
+mrb_value save_delete(mrb_state* mrb, mrb_value) {
+  save(mrb).remove(name_arg(mrb));
+  return mrb_nil_value();
+}
+
+mrb_value save_clear(mrb_state* mrb, mrb_value) {
+  save(mrb).clear();
+  return mrb_nil_value();
+}
+
+mrb_value save_keys(mrb_state* mrb, mrb_value) {
+  mrb_value names = mrb_ary_new(mrb);
+  for (const std::string& key : save(mrb).keys()) {
+    mrb_ary_push(mrb, names, mrb_symbol_value(mrb_intern_cstr(mrb, key.c_str())));
+  }
+  return names;
+}
+
+// --- Animation ---------------------------------------------------------------------------------
+
+AnimationPlayer& animations(mrb_state* mrb) {
+  AnimationPlayer* player = context(mrb).animations;
+  if (player == nullptr) mrb_raise(mrb, E_RUNTIME_ERROR, "Animation is only available while a game runs");
+  return *player;
+}
+
+// The clip's name, which must be one of the scene's.
+std::string clip_arg(mrb_state* mrb, mrb_value name) {
+  const std::string clip = to_name(mrb, name);
+  if (!animations(mrb).has(clip)) mrb_raisef(mrb, E_ARGUMENT_ERROR, "the scene has no animation called '%s'", clip.c_str());
+  return clip;
+}
+
+std::string clip_arg(mrb_state* mrb) {
+  mrb_value name;
+  mrb_get_args(mrb, "o", &name);
+  return clip_arg(mrb, name);
+}
+
+mrb_value animation_names(mrb_state* mrb, mrb_value) {
+  const mrb_value names = mrb_ary_new(mrb);
+  for (const std::string& name : animations(mrb).names()) mrb_ary_push(mrb, names, mrb_str_new_cstr(mrb, name.c_str()));
+  return names;
+}
+
+mrb_value animation_play(mrb_state* mrb, mrb_value) {
+  mrb_value name;
+  mrb_bool loop = true, restart = false;
+  mrb_float speed = 1.0;
+  mrb_get_args(mrb, "obfb", &name, &loop, &speed, &restart);
+  animations(mrb).play(clip_arg(mrb, name), loop, static_cast<float>(speed), restart);
+  return mrb_nil_value();
+}
+
+mrb_value animation_pause(mrb_state* mrb, mrb_value) {
+  animations(mrb).pause(clip_arg(mrb));
+  return mrb_nil_value();
+}
+
+mrb_value animation_stop(mrb_state* mrb, mrb_value) {
+  animations(mrb).stop(clip_arg(mrb));
+  return mrb_nil_value();
+}
+
+mrb_value animation_seek(mrb_state* mrb, mrb_value) {
+  mrb_value name;
+  mrb_float seconds = 0.0;
+  mrb_get_args(mrb, "of", &name, &seconds);
+  animations(mrb).seek(clip_arg(mrb, name), static_cast<float>(seconds));
+  return mrb_nil_value();
+}
+
+mrb_value animation_playing(mrb_state* mrb, mrb_value) {
+  return mrb_bool_value(animations(mrb).playing(clip_arg(mrb)).value_or(false));
+}
+mrb_value animation_time(mrb_state* mrb, mrb_value) {
+  return mrb_float_value(mrb, animations(mrb).time(clip_arg(mrb)).value_or(0.0f));
+}
+mrb_value animation_duration(mrb_state* mrb, mrb_value) {
+  return mrb_float_value(mrb, animations(mrb).duration(clip_arg(mrb)).value_or(0.0f));
+}
+
+// --- Particles ---------------------------------------------------------------------------------
+
+ParticleSystem& particles(mrb_state* mrb) {
+  ParticleSystem* system = context(mrb).particles;
+  if (system == nullptr) mrb_raise(mrb, E_RUNTIME_ERROR, "Particles are only available while a game runs");
+  return *system;
+}
+
+mrb_value particles_burst(mrb_state* mrb, mrb_value) {
+  mrb_value position, direction;
+  mrb_int count = 0, r = 0, g = 0, b = 0, a = 0;
+  mrb_float speed = 0.0, spread = 0.0, life = 0.0, size = 0.0, gravity = 0.0;
+  mrb_bool glow = false;
+  mrb_get_args(mrb, "ooifffffiiiib", &position, &direction, &count, &speed, &spread, &life, &size, &gravity, &r, &g,
+               &b, &a, &glow);
+  ParticleBurst burst;
+  burst.position = to_vec3(mrb, position);
+  burst.direction = to_vec3(mrb, direction);
+  burst.count = static_cast<int>(count);
+  burst.speed = static_cast<float>(speed);
+  burst.spread_degrees = static_cast<float>(spread);
+  burst.life = static_cast<float>(life);
+  burst.size = static_cast<float>(size);
+  burst.gravity = static_cast<float>(gravity);
+  burst.color = color_from(r, g, b, a);
+  burst.glow = glow;
+  return mrb_int_value(mrb, particles(mrb).burst(burst));
+}
+
+mrb_value particles_count(mrb_state* mrb, mrb_value) {
+  return mrb_int_value(mrb, static_cast<mrb_int>(particles(mrb).particles().size()));
+}
+
+mrb_value particles_clear(mrb_state* mrb, mrb_value) {
+  particles(mrb).clear();
+  return mrb_nil_value();
+}
+
 // --- TestInput (system tests only) ---------------------------------------------------------------
 
 ScriptedInputSource& test_input(mrb_state* mrb) {
@@ -309,6 +505,28 @@ mrb_value test_input_set_mouse_wheel(mrb_state* mrb, mrb_value) {
   return mrb_nil_value();
 }
 
+mrb_value test_input_set_gamepad_axis(mrb_state* mrb, mrb_value) {
+  mrb_value name;
+  mrb_float value = 0.0;
+  mrb_get_args(mrb, "of", &name, &value);
+  const std::string axis_name = to_name(mrb, name);
+  const auto axis = gamepad_axis_from_name(axis_name);
+  if (!axis) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown gamepad axis :%s", axis_name.c_str());
+  test_input(mrb).set_gamepad_axis(*axis, static_cast<float>(value));
+  return mrb_nil_value();
+}
+
+mrb_value test_input_set_gamepad_button(mrb_state* mrb, mrb_value) {
+  mrb_value name;
+  mrb_bool down = false;
+  mrb_get_args(mrb, "ob", &name, &down);
+  const std::string button_name = to_name(mrb, name);
+  const auto button = gamepad_button_from_name(button_name);
+  if (!button) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown gamepad button :%s", button_name.c_str());
+  test_input(mrb).set_gamepad_button(*button, down);
+  return mrb_nil_value();
+}
+
 mrb_value test_input_down(mrb_state* mrb, mrb_value) {
   const Key key = key_arg(mrb);
   return mrb_bool_value(test_input(mrb).is_key_down(key));
@@ -337,6 +555,11 @@ void install_runtime_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, input_module, "mouse_down?", input_mouse_down, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, input_module, "mouse_pressed?", input_mouse_pressed, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, input_module, "mouse_released?", input_mouse_released, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, input_module, "gamepad?", input_gamepad, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, input_module, "gamepad_axis", input_gamepad_axis, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, input_module, "gamepad_down?", input_gamepad_down, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, input_module, "gamepad_pressed?", input_gamepad_pressed, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, input_module, "gamepad_released?", input_gamepad_released, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, input_module, "mouse_locked?", input_mouse_locked, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, input_module, "mouse_locked=", input_set_mouse_locked, MRB_ARGS_REQ(1));
 
@@ -377,10 +600,36 @@ void install_runtime_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, audio_module, "music_volume=", audio_set_music_volume, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, audio_module, "volume=", audio_set_volume, MRB_ARGS_REQ(1));
 
+  RClass* animation_module = mrb_define_module(mrb, "Animation");
+  mrb_define_module_function(mrb, animation_module, "names", animation_names, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, animation_module, "__play", animation_play, MRB_ARGS_REQ(4));
+  mrb_define_module_function(mrb, animation_module, "pause", animation_pause, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, animation_module, "stop", animation_stop, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, animation_module, "seek", animation_seek, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, animation_module, "playing?", animation_playing, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, animation_module, "time", animation_time, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, animation_module, "duration", animation_duration, MRB_ARGS_REQ(1));
+
+  RClass* particles_module = mrb_define_module(mrb, "Particles");
+  mrb_define_module_function(mrb, particles_module, "__burst", particles_burst, MRB_ARGS_REQ(13));
+  mrb_define_module_function(mrb, particles_module, "count", particles_count, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, particles_module, "clear", particles_clear, MRB_ARGS_NONE());
+
+  RClass* save_module = mrb_define_module(mrb, "Save");
+  mrb_define_module_function(mrb, save_module, "get", save_get, MRB_ARGS_ARG(1, 1));
+  mrb_define_module_function(mrb, save_module, "[]", save_get, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, save_module, "set", save_set, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, save_module, "[]=", save_set, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, save_module, "delete", save_delete, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, save_module, "clear", save_clear, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, save_module, "keys", save_keys, MRB_ARGS_NONE());
+
   RClass* test_input_module = mrb_define_module(mrb, "TestInput");
   mrb_define_module_function(mrb, test_input_module, "set", test_input_set, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, test_input_module, "release_all", test_input_release_all, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, test_input_module, "down?", test_input_down, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, test_input_module, "set_gamepad_axis", test_input_set_gamepad_axis, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, test_input_module, "set_gamepad_button", test_input_set_gamepad_button, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, test_input_module, "move_mouse", test_input_move_mouse, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, test_input_module, "set_mouse_button", test_input_set_mouse_button, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, test_input_module, "set_mouse_wheel", test_input_set_mouse_wheel, MRB_ARGS_REQ(1));

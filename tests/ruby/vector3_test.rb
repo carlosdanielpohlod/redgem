@@ -21,6 +21,13 @@ class Vector3Test < RedGemTest::Case
     assert_equal Vector3.zero, Vector3.zero.normalized
   end
 
+  def test_clamped_shortens_only_what_is_too_long
+    assert_in_delta 1.0, Vector3.new(1, 0, 1).clamped.length
+    assert_equal Vector3.new(0.5, 0, 0), Vector3.new(0.5, 0, 0).clamped
+    assert_in_delta 2.0, Vector3.new(0, 8, 0).clamped(2.0).length
+    assert_equal Vector3.zero, Vector3.zero.clamped
+  end
+
   def test_helpers
     v = Vector3.new(1, 2, 3)
     assert_equal Vector3.new(1, 0, 3), v.flat

@@ -521,7 +521,8 @@ void EditorApp::render_viewport_texture() {
       renderer_->refresh_mesh(session_->scene_desc(), mesh);  // sculpted terrain
     }
   }
-  renderer_->draw_world(scene, view.camera, &view.target);
+  Engine* playing = editing ? nullptr : session_->runtime();
+  renderer_->draw_world(scene, view.camera, &view.target, playing != nullptr ? &playing->particles() : nullptr);
   BeginTextureMode(view.target);  // overlays and HUD go on top of the finished image
   if (editing) {
     BeginMode3D(view.camera);

@@ -1,4 +1,4 @@
-# The hero: WASD / arrows to walk, Space to jump. Needs body = "character" on the object.
+# The hero: WASD / arrows or a gamepad's left stick to walk, Space or the gamepad's A to jump. Needs body = "character" on the object.
 class Player < Behaviour
   SPEED = 6.0
   JUMP_SPEED = 8.0
@@ -22,8 +22,10 @@ class Player < Behaviour
     GameMenu.instance&.finish("You got every coin!") if @coins == @total
   end
 
-  def update(_dt)
-    direction = Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).normalized
+  def update(dt)
+    return draw_hud if dt.zero?  # a menu is open: its buttons are not the hero's
+
+    direction = Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).clamped
     character.move(direction * prop(:speed, SPEED))
     if Input.action_pressed?(:jump) && character.grounded?
       character.jump(prop(:jump_speed, JUMP_SPEED))
@@ -33,6 +35,8 @@ class Player < Behaviour
       transform.rotation = Vector3.new(0, Math.atan2(-direction.x, -direction.z) * DEGREES_PER_RADIAN, 0)
     end
     transform.position = @spawn if transform.position.y < FALL_LIMIT
-    UI.text("Coins: #{@coins}/#{@total}", x: HUD_X, y: HUD_Y, size: HUD_SIZE, color: :gold)
+    draw_hud
   end
+
+  def draw_hud = UI.text("Coins: #{@coins}/#{@total}", x: HUD_X, y: HUD_Y, size: HUD_SIZE, color: :gold)
 end

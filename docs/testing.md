@@ -33,10 +33,13 @@ automated check. Add `--headless` to run without opening a window (no screenshot
 | `t.hold(:w, :a, frames: 60)` | Holds keys for that long |
 | `t.press(:space)` | Taps a key |
 | `t.move_mouse(x, y)`, `t.click(x, y)` | Moves the mouse; clicks there with the left button |
+| `t.tilt(:left_y, -1.0, frames: 60)` | Pushes a gamepad stick (or pulls a trigger) for that long |
+| `t.press_button(:a)`, `t.hold_button(:a, frames: 30)` | Taps or holds gamepad buttons |
 | `t.hold_until(:w, frames: 300) { ... }` | Holds keys until the block is true |
 | `t.wait_until(frames: 120) { ... }` | Waits until the block is true, or fails |
 | `t.assert("message") { ... }` | Fails the test when the block is false |
 | `t.screenshot("name")` | Saves `name.png` in the screenshots folder |
 
 Inside the blocks you have the whole scripting API, so a test can also move objects or read any
-behaviour's state.
+behaviour's state. What the game saves with `Save` goes to a file of the test's own, which starts
+empty: a test never sees or changes your real progress.

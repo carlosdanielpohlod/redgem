@@ -60,6 +60,8 @@ std::optional<std::filesystem::path> build_game_for(const std::filesystem::path&
 // The name of a game's executable: its folder name in lowercase, with anything that is not a
 // letter or a digit turned into '_' ("My Game" -> "my_game"). On Windows the file adds ".exe".
 std::string executable_name(const std::filesystem::path& game_dir);
+// The folder a built game's files are in, next to its executable.
+inline constexpr const char* kBundledGameFolder = "game";
 // The game a built executable ships with: the game folder next to it, when there is one.
 std::optional<std::filesystem::path> bundled_game(const std::filesystem::path& executable);
 

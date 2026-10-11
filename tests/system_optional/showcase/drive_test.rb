@@ -30,6 +30,11 @@ MIN_ZOOM = 1.5             # meters further away after those notches
 RETURN_FRAMES = 180
 MIN_LEAF_TRAVEL = 0.3      # meters a falling leaf covers while the hero drives
 MIN_LEAVES_MOVING = 50
+STOP_FRAMES = 120          # of hard braking
+STOPPED = 0.2              # m/s
+FULL_PULL = 1.0            # a trigger pulled, or a stick pushed, all the way
+STICK_FRAMES = 30
+STEERING_SLIP = 0.4        # the steering stick pulled back a little while the trigger is down
 
 SystemTest.define do |t|
   car = Scene.find(CAR_NAME)
@@ -44,6 +49,7 @@ SystemTest.define do |t|
   walkers = MORE_WALKERS.map { |name| Scene.find(name) }
   t.assert("more people are on the sidewalks") { walkers.all? && !Scene.find(BYSTANDER_NAME).nil? }
   t.wait(WARMUP_FRAMES)
+  parked_at = car.transform.position
   leaves = Scene.objects.select { |object| object.name.start_with?(LEAF_PREFIX) }
   t.assert("leaves are in the air") { leaves.size >= MIN_LEAVES }
   leaf_starts = leaves.map { |leaf| leaf.transform.position }
@@ -99,4 +105,25 @@ SystemTest.define do |t|
   # Steering hard for a long time cannot leave the road.
   t.hold(:w, :d, frames: STEER_FRAMES)
   t.assert("the curbs keep the car on the road") { car.transform.position.x.abs <= ROAD_HALF_WIDTH }
+
+  # The same car with a gamepad: A stops it, the right trigger drives it, the right stick looks around.
+  driver = car.get_component(ArcadeCar)
+  t.hold_button(:a, frames: STOP_FRAMES)
+  t.assert("A brakes the car to a stop") { driver.speed.abs < STOPPED }
+  car.transform.position = parked_at  # away from the curb
+  fastest = 0.0
+  TestInput.set_gamepad_axis(:right_trigger, FULL_PULL)
+  TestInput.set_gamepad_axis(:left_y, STEERING_SLIP)  # the thumb is never exactly centered
+  DRIVE_FRAMES.times do
+    t.wait
+    fastest = [fastest, driver.speed].max
+  end
+  TestInput.set_gamepad_axis(:right_trigger, 0.0)
+  TestInput.set_gamepad_axis(:left_y, 0.0)
+  t.assert("the right trigger accelerates (#{fastest} m/s)") { fastest > MIN_SPEED }
+  t.wait(RETURN_FRAMES)
+  behind = camera.transform.position - car.transform.position
+  t.tilt(:right_x, FULL_PULL, frames: STICK_FRAMES)
+  beside = camera.transform.position - car.transform.position
+  t.assert("the right stick swings the camera around the car") { beside.distance_to(behind) > MIN_SWING }
 end

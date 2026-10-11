@@ -13,6 +13,10 @@
 
 namespace redgem {
 
+class SaveStore;
+class AnimationPlayer;
+class ParticleSystem;
+
 // What a script changed on a transform; physics reacts differently to each.
 enum class TransformWrite { Position, Rotation };
 
@@ -58,6 +62,11 @@ struct ScriptContext {
   bool mouse_locked = false;
   // Camera.motion_blur: how much the picture streaks away from its center, 0 to 1.
   float motion_blur = 0.0f;
+  // What the game keeps between runs (Save); null when there is nowhere to keep it.
+  SaveStore* save = nullptr;
+  // The scene's animation clips (Animation) and the particles flying around (Particles).
+  AnimationPlayer* animations = nullptr;
+  ParticleSystem* particles = nullptr;
   std::vector<std::string> screenshot_requests;
   bool quit_requested = false;
   // Called when a script writes a transform, so physics can follow.

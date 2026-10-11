@@ -4,12 +4,12 @@
 
 Knowing this up front saves time:
 
-- **Input** is keyboard and mouse. There is no gamepad input.
+- **Input** is keyboard, mouse and one gamepad. Keys and buttons cannot be rebound by the player.
 - **In-game interface** is texts, rectangles, images and buttons you draw each frame. There are no
   text fields, sliders or layout containers.
-- **Saving progress** has no API.
-- **Particles** do not exist; small effects are objects moved by a script.
-- **Animation:** every animation in a level loops all the time. You cannot pick which one plays.
+- **Particles** are plain dots let out in bursts. They have no textures and do not collide.
+- **Animation:** clips are played, paused and stopped by name, for the whole level. Two clips on the
+  same character are not blended, and each copy of a character cannot play a different clip.
 - **Platforms:** the editor runs on Linux. Games are built for Linux and for Windows.
 - Scripts are loaded when you press Play; they are not reloaded while the game runs.
 

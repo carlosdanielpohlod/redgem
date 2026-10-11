@@ -38,6 +38,7 @@ class GatedInputSource final : public InputSource {
     if (!enabled) sample.buttons = {}, sample.wheel = 0.0f;
     return sample;
   }
+  GamepadSample gamepad() const override { return enabled ? device.gamepad() : GamepadSample{}; }
   bool enabled = false;
   float origin_x = 0.0f;  // where the Scene view's image starts in the window
   float origin_y = 0.0f;

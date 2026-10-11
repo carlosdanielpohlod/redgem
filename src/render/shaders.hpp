@@ -406,6 +406,26 @@ void main() {
 }
 )GLSL";
 
+// A particle: a soft round dot, drawn on a square that faces the camera. `boost` makes glowing ones
+// brighter than white, so they bloom.
+inline constexpr const char* kParticleBoost = "boost";
+inline constexpr const char* kParticleFragment = R"GLSL(
+#version 330
+in vec2 fragTexCoord;
+in vec4 fragColor;
+uniform float boost;
+out vec4 finalColor;
+const float GAMMA = 2.2;
+const float SOFT_FROM = 0.55;  // share of the radius where the dot starts fading out
+const vec2 CENTER = vec2(0.5);
+const float RADIUS = 0.5;      // of the square, in texture coordinates
+void main() {
+  float fromCenter = length(fragTexCoord - CENTER) / RADIUS;
+  float dot = 1.0 - smoothstep(SOFT_FROM, 1.0, fromCenter);
+  finalColor = vec4(pow(fragColor.rgb, vec3(GAMMA)) * boost, fragColor.a * dot);
+}
+)GLSL";
+
 // Copies one face of a cube capture (a 90-degree view along faceForward) into the part of the
 // panorama it covers; the other pixels are left as they were.
 inline constexpr const char* kPanoramaFragment = R"GLSL(

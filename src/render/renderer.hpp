@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "scene/particles.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
 #include "script/script_context.hpp"
@@ -42,7 +43,9 @@ class Renderer {
   // vignette, anti-aliasing), without HUD, into `output` or onto the screen when null. Must not
   // be called between BeginTextureMode/EndTextureMode. The scene's depth is copied to `output`,
   // so overlays drawn into it afterwards are hidden behind objects.
-  void draw_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output = nullptr);
+  // `particles`, when given, are drawn over the objects (and behind the ones in front of them).
+  void draw_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output = nullptr,
+                  const ParticleSystem* particles = nullptr);
   // Draws what scripts put on screen this frame: texts, rectangles and images.
   void draw_hud(const std::vector<HudItem>& hud);
   // How much the picture streaks with speed, 0 (none) to 1 (see Camera.motion_blur in Ruby).
@@ -60,7 +63,7 @@ class Renderer {
   void set_show_prefabs(bool show);
   // Draws one full game frame. Screenshots requested for this frame are written to `screenshot_paths`.
   void draw(const Scene& scene, const std::vector<HudItem>& hud,
-            const std::vector<std::filesystem::path>& screenshot_paths);
+            const std::vector<std::filesystem::path>& screenshot_paths, const ParticleSystem* particles = nullptr);
 
   bool close_requested() const;
   float frame_seconds() const;

@@ -1,4 +1,5 @@
-# Third-person platformer hero: walks with WASD/arrows, jumps with Space.
+# Third-person platformer hero: walks with WASD/arrows or a gamepad's left stick, jumps with Space
+# or the gamepad's A.
 # Blender props: speed, jump_speed.
 class Player < Behaviour
   SPEED = 6.0
@@ -13,8 +14,10 @@ class Player < Behaviour
     @respawns = 0
   end
 
-  def update(_dt)
-    direction = Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).normalized
+  def update(dt)
+    return if dt.zero?  # a menu is open: its buttons are not the hero's
+
+    direction = Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).clamped
     character.move(direction * prop(:speed, SPEED))
     character.jump(prop(:jump_speed, JUMP_SPEED)) if Input.action_pressed?(:jump) && character.grounded?
     face(direction) unless direction == Vector3.zero

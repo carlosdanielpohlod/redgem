@@ -4,6 +4,12 @@
 
 namespace redgem {
 
+namespace {
+constexpr int kFirstGamepad = 0;
+constexpr float kHalf = 0.5f;
+constexpr float kTriggerReleased = -1.0f;  // what raylib reports for a trigger nobody touches
+}  // namespace
+
 bool RaylibInputSource::is_key_down(Key key) const { return IsKeyDown(static_cast<int>(key)); }
 
 MouseSample RaylibInputSource::mouse() const {
@@ -14,6 +20,28 @@ MouseSample RaylibInputSource::mouse() const {
   sample.wheel = GetMouseWheelMove();
   sample.buttons = {IsMouseButtonDown(MOUSE_BUTTON_LEFT), IsMouseButtonDown(MOUSE_BUTTON_RIGHT),
                     IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)};
+  return sample;
+}
+
+GamepadSample RaylibInputSource::gamepad() const {
+  GamepadSample sample;
+  if (!IsGamepadAvailable(kFirstGamepad)) return sample;
+  sample.connected = true;
+  // In GamepadAxis' and GamepadButton's order.
+  constexpr int axes[] = {GAMEPAD_AXIS_LEFT_X,  GAMEPAD_AXIS_LEFT_Y,       GAMEPAD_AXIS_RIGHT_X,
+                          GAMEPAD_AXIS_RIGHT_Y, GAMEPAD_AXIS_LEFT_TRIGGER, GAMEPAD_AXIS_RIGHT_TRIGGER};
+  constexpr int buttons[] = {GAMEPAD_BUTTON_RIGHT_FACE_DOWN, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
+                             GAMEPAD_BUTTON_RIGHT_FACE_UP,   GAMEPAD_BUTTON_LEFT_TRIGGER_1,   GAMEPAD_BUTTON_RIGHT_TRIGGER_1,
+                             GAMEPAD_BUTTON_MIDDLE_LEFT,     GAMEPAD_BUTTON_MIDDLE_RIGHT,     GAMEPAD_BUTTON_LEFT_FACE_UP,
+                             GAMEPAD_BUTTON_LEFT_FACE_DOWN,  GAMEPAD_BUTTON_LEFT_FACE_LEFT,   GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
+                             GAMEPAD_BUTTON_LEFT_THUMB,      GAMEPAD_BUTTON_RIGHT_THUMB};
+  for (std::size_t i = 0; i < kGamepadAxisCount; ++i) sample.axes[i] = GetGamepadAxisMovement(kFirstGamepad, axes[i]);
+  // raylib reports a trigger from -1 (released) to 1 (pulled): here 0 to 1.
+  for (const GamepadAxis trigger : {GamepadAxis::LeftTrigger, GamepadAxis::RightTrigger}) {
+    float& value = sample.axes[static_cast<std::size_t>(trigger)];
+    value = (value - kTriggerReleased) * kHalf;
+  }
+  for (std::size_t i = 0; i < kGamepadButtonCount; ++i) sample.buttons[i] = IsGamepadButtonDown(kFirstGamepad, buttons[i]);
   return sample;
 }
 

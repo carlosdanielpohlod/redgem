@@ -65,6 +65,8 @@ std::optional<std::string> Engine::initialize() {
     scene_desc_ = std::move(loaded.scene);
   }
   scene_ = Scene::from_desc(scene_desc_);
+  animations_.reset(scene_desc_.animations);
+  particles_.set_gravity(gravity());
 
   physics_ = create_jolt_physics_world(gravity());
   create_physics_bodies();
@@ -90,6 +92,17 @@ std::optional<std::string> Engine::initialize() {
   }
   audio().set_sounds_dir(options_.game_dir / config::kSoundsDirName);
 
+  std::filesystem::path save_file = options_.save_file;
+  if (save_file.empty() && options_.test_script) {
+    // A test starts from no saves at all, and leaves the player's alone.
+    save_file = test_save_file_for(options_.game_dir);
+    std::error_code ignored;
+    std::filesystem::remove(save_file, ignored);
+  }
+  save_ = std::make_unique<SaveStore>(save_file.empty() ? save_file_for(options_.game_dir) : save_file);
+  context_.save = save_.get();
+  context_.animations = &animations_;
+  context_.particles = &particles_;
   context_.scene = &scene_;
   context_.audio = &audio();
   context_.physics = physics_.get();
@@ -144,7 +157,8 @@ void Engine::load_scene(const std::string& name) {
   if (renderer_) renderer_->upload(scene_desc_);
   context_.scene_name = name;
   ++scene_generation_;
-  animation_time_ = 0.0f;
+  animations_.reset(scene_desc_.animations);
+  particles_.clear();
   scripts_->attach_scripts();
   scripts_->run_scene_script(name);
   log::info("scene '" + name + "' loaded");
@@ -252,11 +266,13 @@ void Engine::frame(float frame_seconds) {
   }
   for (int i = 0; i < steps; ++i) fixed_step(config::kFixedDeltaSeconds);
 
-  const float delta = (deterministic_ ? config::kFixedDeltaSeconds : frame_seconds) * scale;
+  // A long stall (a dragged window, a loading hitch) counts as one long frame, not as seconds of game.
+  const float delta = (deterministic_ ? config::kFixedDeltaSeconds : std::min(frame_seconds, config::kMaxFrameSeconds)) * scale;
   context_.time.delta = delta;
-  // Every animation of the scene plays in a loop; scripts run after and may override poses.
-  animation_time_ += delta;  // (restarted by load_scene, so it stays precise)
-  for (const AnimationDesc& clip : scene_desc_.animations) apply_animation(clip, animation_time_, scene_);
+  // Every animation of the scene plays in a loop unless a script said otherwise (Animation);
+  // scripts run after and may override poses.
+  animations_.advance(delta, scene_);
+  particles_.update(delta);
   scripts_->update(delta);
   process_destroyed();
 
@@ -385,7 +401,7 @@ void Engine::render() {
   context_.screenshot_requests.clear();
   if (renderer_) {
     renderer_->set_motion_blur(context_.motion_blur);
-    renderer_->draw(scene_, context_.hud, screenshots);
+    renderer_->draw(scene_, context_.hud, screenshots, &particles_);
   }
 }
 

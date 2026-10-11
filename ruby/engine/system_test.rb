@@ -53,6 +53,22 @@ class SystemTest
 
   def press(key) = hold(key, frames: 1)
 
+  # A gamepad: pushes a stick (:left_x, :left_y, :right_x, :right_y; left and up are negative) or
+  # pulls a trigger for some frames, then lets go.
+  def tilt(axis, amount, frames:)
+    TestInput.set_gamepad_axis(axis, amount.to_f)
+    wait(frames)
+    TestInput.set_gamepad_axis(axis, 0.0)
+  end
+
+  def hold_button(*buttons, frames:)
+    buttons.each { |button| TestInput.set_gamepad_button(button, true) }
+    wait(frames)
+    buttons.each { |button| TestInput.set_gamepad_button(button, false) }
+  end
+
+  def press_button(button) = hold_button(button, frames: 1)
+
   def move_mouse(x, y) = TestInput.move_mouse(x.to_f, y.to_f)
 
   # Moves the mouse there and clicks: down for a frame, up for the next (what UI.button waits for).

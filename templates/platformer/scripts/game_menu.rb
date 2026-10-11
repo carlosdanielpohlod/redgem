@@ -1,5 +1,6 @@
-# The game's menus: a title screen, a pause menu (Esc or P) and an end screen. While a menu is
-# open the game is frozen (Time.scale = 0); menus are drawn and clicked with UI.button.
+# The game's menus: a title screen, a pause menu (Esc, P or a gamepad's Start) and an end screen. While a menu is
+# open the game is frozen (Time.scale = 0); menus are drawn and clicked with UI.button, and a
+# gamepad's A picks the first option.
 # Other scripts end the game with: GameMenu.instance.finish("You win!")
 # Settings: title (shown on the title screen), start_open (false starts the game right away).
 class GameMenu < Behaviour
@@ -11,6 +12,8 @@ class GameMenu < Behaviour
   FIRST_BUTTON_SHARE = 0.46   # where the first button sits, as a share of the screen's height
   SHADE_ALPHA = 170           # how dark the game gets behind a menu
   PAUSE_KEYS = [:escape, :p].freeze
+  PAUSE_BUTTON = :start
+  CONFIRM_BUTTON = :a
   RUNNING = 1.0
   FROZEN = 0.0
 
@@ -45,7 +48,7 @@ class GameMenu < Behaviour
   end
 
   def update(_dt)
-    toggle_pause if PAUSE_KEYS.any? { |key| Input.pressed?(key) }
+    toggle_pause if PAUSE_KEYS.any? { |key| Input.pressed?(key) } || Input.gamepad_pressed?(PAUSE_BUTTON)
     return unless @screen
 
     draw
@@ -77,7 +80,7 @@ class GameMenu < Behaviour
     UI.rect(x: 0, y: 0, width: UI.width, height: UI.height, color: :black, alpha: SHADE_ALPHA)
     heading = HEADINGS[@screen] || @heading
     UI.text(heading, x: UI.width / 2, y: button_box(0)[1] - TITLE_ABOVE_BUTTONS, size: TITLE_SIZE, align: :center)
-    chosen = nil
+    chosen = SCREENS[@screen].first.last if Input.gamepad_pressed?(CONFIRM_BUTTON)
     SCREENS[@screen].each_with_index do |(label, action), index|
       x, y, width, height = button_box(index)
       chosen = action if UI.button(label, x: x, y: y, width: width, height: height)

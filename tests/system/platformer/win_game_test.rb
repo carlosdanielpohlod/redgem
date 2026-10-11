@@ -1,4 +1,5 @@
-# End to end: the goal refuses to finish early, then every coin is collected and the game is won.
+# End to end: the goal refuses to finish early, then every coin is collected and the game is won,
+# and the time it took is kept as the best one.
 SETTLE_FRAMES = 20
 PICKUP_FRAMES = 30
 GOAL_FRAMES = 60
@@ -9,6 +10,7 @@ SystemTest.define do |t|
   manager = Scene.find("GameManager").get_component(GameManager)
   goal = Scene.find("Goal")
   t.wait(SETTLE_FRAMES)
+  t.assert("a first run has no best time yet") { manager.best_time.nil? && Save[:best_time].nil? }
 
   player.transform.position = goal.transform.position
   t.wait(GOAL_FRAMES)
@@ -25,5 +27,8 @@ SystemTest.define do |t|
   t.wait(SETTLE_FRAMES)
   player.transform.position = goal.transform.position
   t.wait_until(frames: GOAL_FRAMES, message: "goal did not register") { manager.won? }
+  t.assert("the first win is the record, and it is saved") do
+    manager.best_time && manager.best_time.positive? && Save[:best_time] == manager.best_time
+  end
   t.screenshot("win_game")
 end

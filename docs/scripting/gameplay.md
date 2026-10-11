@@ -15,6 +15,27 @@ Input.pressed?(:e)             # any key: went down this frame
 
 Built-in actions: `:jump` (Space), `:fire` (Left Ctrl or Enter), `:run` (Left Shift).
 
+## Read a gamepad
+
+A game written with axes and actions already works with a gamepad: the left stick moves
+`:horizontal` and `:vertical` (by as much as it is pushed), and A, X and B are `:jump`, `:fire`
+and `:run`. For the rest, ask the gamepad itself:
+
+```ruby
+Input.gamepad?                        # is one plugged in?
+Input.gamepad_axis(:right_x)          # -1..1: left_x, left_y, right_x, right_y (left and up are negative)
+Input.gamepad_axis(:right_trigger)    # 0..1: left_trigger, right_trigger
+Input.gamepad_down?(:start)           # held; also gamepad_pressed? and gamepad_released?
+```
+
+Buttons are named as on an Xbox pad: `:a`, `:b`, `:x`, `:y`, `:left_bumper`, `:right_bumper`,
+`:back`, `:start`, `:dpad_up`, `:dpad_down`, `:dpad_left`, `:dpad_right`, `:left_stick`,
+`:right_stick`. To walk slowly with a half-pushed stick, use `clamped` instead of `normalized`:
+
+```ruby
+direction = Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).clamped
+```
+
 ## Read the mouse
 
 ```ruby
@@ -198,6 +219,79 @@ Game.load_scene("level2")   # scenes/level2.glb; "main" is scene.glb
 
 The switch happens at the end of the frame. Ruby global variables survive it, which is the simple
 way to carry a score or lives from one level to the next.
+
+## Do something later, or over a while
+
+Every behaviour has timers. They run on game time, so they wait while the game is paused, and they
+end with their object.
+
+```ruby
+after(2.0) { destroy }                                   # once, two seconds from now
+every(0.5) { Scene.spawn("Bullet", position: muzzle) }   # again and again
+tween(0.4) { |t| transform.scale = Vector3.one * (1.0 + t) }   # every frame, t going from 0 to 1
+```
+
+`after` and `every` return a timer you can `cancel`; `cancel_timers` calls off all of a behaviour's.
+`tween` starts and ends gently; `ease: :linear` keeps a steady pace.
+
+## Sparks, dust and smoke
+
+`Particles.burst` lets out small dots that fly and fade. They are looks only: nothing collides
+with them.
+
+```ruby
+# A coin picked up: gold sparks in every direction.
+Particles.burst(transform.position, count: 24, color: :gold, glow: true)
+
+# Smoke from an exhaust: a few gray puffs a second, drifting up in a narrow cone.
+every(0.05) do
+  Particles.burst(exhaust, count: 1, color: :gray, direction: Vector3.up, spread: 20,
+                  speed: 1.0, life: 1.5, size: 0.4, gravity: -0.05)
+end
+```
+
+| Setting | Meaning | Default |
+|---------|---------|---------|
+| `count` | How many | 12 |
+| `color`, `alpha` | A color name or `[r, g, b]`; 0 to 255 | `:white`, 255 |
+| `glow` | Shines (sparks, magic) instead of covering what is behind (dust, smoke) | `false` |
+| `direction`, `spread` | Where they fly, and how many degrees they may stray: 180 is everywhere | up, 180 |
+| `speed`, `life`, `size` | Meters per second, seconds, meters across (each particle varies a little) | 3.0, 0.8, 0.12 |
+| `gravity` | 1 falls like everything else, 0 floats, negative rises | 1.0 |
+
+## Control animations
+
+Every animation in a level plays in a loop from the start. `Animation` is for the ones that should
+not, by the name the action has in Blender:
+
+```ruby
+Animation.stop(:DoorOpen)                              # in a scene script's setup: starts closed
+Animation.play(:DoorOpen, loop: false)                 # opens once and stays open
+Animation.play(:DoorOpen, loop: false, speed: -1.0)    # closes
+Animation.pause(:Fan)                                  # freezes where it is; play carries on
+Animation.playing?(:DoorOpen)                          # false once it reached its end
+```
+
+`Animation.names` lists the level's clips; `time`, `duration` and `seek(name, seconds)` are there
+for syncing things to a clip. A stopped clip lets go of its objects, so scripts can move them.
+
+## Save progress
+
+`Save` keeps numbers, texts and true/false values between runs, in one file per game:
+
+```ruby
+best = Save.get(:best_time, 999.0)    # the second value is what you get when nothing was saved
+Save[:best_time] = time if time < best
+Save[:name] = "Ana"
+Save.delete(:name)
+Save.clear                            # start from nothing
+```
+
+Whole numbers come back as integers (a saved `12.0` is read as `12`): call `.to_f` on a value you
+divide.
+
+The file is written on every change, to `.config/redgem/saves/<game>.json` in the player's home
+folder. Tests get a save file of their own, empty at the start of each test.
 
 ## Keep score across objects
 

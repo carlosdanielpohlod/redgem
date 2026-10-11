@@ -3,6 +3,9 @@ class Coin < Behaviour
   SPIN_DEGREES_PER_SECOND = 180.0
   BOB_HEIGHT = 0.15
   BOB_SPEED = 3.0
+  SPARKS = 24
+  SPARK_SPEED = 3.5
+  SPARK_SIZE = 0.14
 
   def start
     @base = transform.position
@@ -19,6 +22,7 @@ class Coin < Behaviour
     return unless other.get_component(Player)
 
     GameManager.instance&.collect_coin
+    Particles.burst(transform.position, count: SPARKS, color: :gold, speed: SPARK_SPEED, size: SPARK_SIZE, glow: true)
     destroy
   end
 end

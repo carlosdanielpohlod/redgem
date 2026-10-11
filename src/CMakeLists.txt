@@ -7,6 +7,8 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/animation.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/test_case.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/system_test.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
@@ -45,6 +47,8 @@ add_library(redgem_engine STATIC
   scene/cgltf_impl.cpp
   scene/scene.cpp
   scene/animation.cpp
+  scene/animation_player.cpp
+  scene/particles.cpp
   scene/terrain.cpp
   scene/primitives.cpp
   physics/body_config.cpp
@@ -89,6 +93,7 @@ add_library(redgem_engine STATIC
   editor/ui/style.cpp
   editor/ui/embedded_fonts.cpp
   app/game_project.cpp
+  app/save_store.cpp
   app/user_settings.cpp
   app/cli.cpp
   app/engine.cpp)

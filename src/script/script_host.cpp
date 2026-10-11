@@ -15,6 +15,10 @@
 #include "script/script_naming.hpp"
 
 namespace redgem {
+
+namespace {
+constexpr const char* kUpdateEntry = "__update";  // Behaviour#__update: its timers, then its update
+}  // namespace
 namespace {
 
 constexpr const char* kObjectsCacheGlobal = "$__redgem_objects";
@@ -192,7 +196,9 @@ void ScriptHost::invoke(std::size_t index, const char* method, std::initializer_
     // A failing script keeps the game running; the behaviour is disabled.
     BehaviourSlot& slot = behaviours_[index];
     slot.enabled = false;
-    report_error(slot.class_name + "#" + method + " on '" + context_.scene->at(slot.object).name +
+    // (Timers and the behaviour's update run through one entry point: to the user it is "update".)
+    const std::string shown = std::string(method) == kUpdateEntry ? "update" : method;
+    report_error(slot.class_name + "#" + shown + " on '" + context_.scene->at(slot.object).name +
                      "' (behaviour disabled)",
                  result.error);
   }
@@ -224,7 +230,7 @@ void ScriptHost::fixed_update(float dt) {
 void ScriptHost::update(float dt) {
   const mrb_value delta = mrb_float_value(vm_.state(), dt);
   for (std::size_t i = 0; i < behaviours_.size(); ++i) {
-    if (runnable(behaviours_[i]) && behaviours_[i].started) invoke(i, "update", {delta});
+    if (runnable(behaviours_[i]) && behaviours_[i].started) invoke(i, kUpdateEntry, {delta});
   }
 }
 

@@ -1,7 +1,7 @@
 # Camera behind the car, following where its nose points (asks the ArcadeCar on the target). Speed
 # shows: the view widens, the picture streaks at its edges and the camera trembles a little.
 # The mouse looks around: drag with a button held to orbit the car, turn the wheel to come closer
-# or move away. Let go and the camera swings back behind the car.
+# or move away; a gamepad's right stick orbits too. Let go and the camera swings back behind the car.
 # Settings: target (the car: the object or its name), distance, height (m), smoothing.
 class ChaseCamera < Behaviour
   DEFAULT_DISTANCE = 7.5
@@ -10,6 +10,7 @@ class ChaseCamera < Behaviour
   LOOK_HEIGHT = 1.0
   MAX_BLEND = 1.0
   ORBIT_DEGREES_PER_PIXEL = 0.25
+  STICK_DEGREES_PER_SECOND = 120.0   # how fast a gamepad's right stick swings the camera
   MIN_PITCH = -8.0            # degrees: how low the camera may go (never under the road)
   MAX_PITCH = 55.0
   RETURN_SPEED = 2.5          # how fast the camera swings back behind the car once the mouse lets go
@@ -60,11 +61,18 @@ class ChaseCamera < Behaviour
 
   def orbiting? = ORBIT_BUTTONS.any? { |button| Input.mouse_down?(button) }
 
+  # A gamepad's right stick, pushed away from its center.
+  def stick = [Input.gamepad_axis(:right_x), Input.gamepad_axis(:right_y)]
+
   def look_around(dt)
     @distance = (@distance - Input.mouse_wheel * ZOOM_PER_NOTCH).clamp(MIN_DISTANCE, MAX_DISTANCE)
+    stick_x, stick_y = stick
     if orbiting?
       @orbit_yaw -= Input.mouse_dx * ORBIT_DEGREES_PER_PIXEL
       @orbit_pitch = (@orbit_pitch + Input.mouse_dy * ORBIT_DEGREES_PER_PIXEL).clamp(MIN_PITCH, MAX_PITCH)
+    elsif !stick_x.zero? || !stick_y.zero?
+      @orbit_yaw -= stick_x * STICK_DEGREES_PER_SECOND * dt
+      @orbit_pitch = (@orbit_pitch + stick_y * STICK_DEGREES_PER_SECOND * dt).clamp(MIN_PITCH, MAX_PITCH)
     else
       ease = [RETURN_SPEED * dt, MAX_BLEND].min
       @orbit_yaw -= @orbit_yaw * ease

@@ -29,6 +29,8 @@ namespace redgem {
 namespace {
 
 constexpr float kHalfFactor = 0.5f;
+constexpr int kQuadCorners = 4;
+constexpr float kParticleGlowBoost = 4.0f;  // how much brighter than its color a glowing particle is
 // Sky dome (around the camera; its size only has to fit between the near and far planes).
 constexpr float kSkyRadius = 50.0f;
 constexpr int kSkyRings = 16;
@@ -151,6 +153,8 @@ struct Renderer::Impl {
   Shader shader{};
   Shader depth_shader{};
   Shader sky_shader{};
+  Shader particle_shader{};
+  int particle_boost_loc = -1;
   Shader panorama_shader{};
   Shader occlusion_shader{};
   RenderTexture2D occlusion_a{};  // ambient occlusion (ping-pong with occlusion_b for the blur)
@@ -242,6 +246,8 @@ struct Renderer::Impl {
     depth_wind_loc = GetShaderLocation(depth_shader, shaders::kWindAmount);
     depth_time_loc = GetShaderLocation(depth_shader, shaders::kTime);
     sky_shader = compile(shaders::kSkyVertex, shaders::kSkyFragment, "sky");
+    particle_shader = compile(nullptr, shaders::kParticleFragment, "particles");
+    particle_boost_loc = GetShaderLocation(particle_shader, shaders::kParticleBoost);
     bright_shader = compile(nullptr, shaders::kBrightFragment, "bloom threshold");
     blur_shader = compile(nullptr, shaders::kBlurFragment, "blur");
     composite_shader = compile(nullptr, shaders::kCompositeFragment, "tone mapping");
@@ -329,7 +335,7 @@ struct Renderer::Impl {
       if (target->id != 0) UnloadRenderTexture(*target);
       *target = RenderTexture2D{};
     }
-    for (Shader* loaded : {&shader, &depth_shader, &panorama_shader, &occlusion_shader, &sky_shader, &bright_shader, &blur_shader, &composite_shader, &antialias_shader}) {
+    for (Shader* loaded : {&shader, &depth_shader, &panorama_shader, &occlusion_shader, &sky_shader, &particle_shader, &bright_shader, &blur_shader, &composite_shader, &antialias_shader}) {
       if (loaded->id != 0) UnloadShader(*loaded);
       *loaded = Shader{};
     }
@@ -963,6 +969,51 @@ struct Renderer::Impl {
     rlActiveTextureSlot(0);
   }
 
+  // Squares facing the camera, hidden behind objects but not hiding each other (no depth written).
+  // Ordinary ones cover what is behind them; glowing ones add their light to it.
+  void draw_particles(const std::vector<Particle>& particles, const Camera3D& camera) {
+    if (particles.empty()) return;
+    const Vec3 eye{camera.position.x, camera.position.y, camera.position.z};
+    const Vec3 forward = normalize(Vec3{camera.target.x, camera.target.y, camera.target.z} - eye);
+    const Vec3 right = normalize(cross(forward, Vec3{camera.up.x, camera.up.y, camera.up.z}));
+    const Vec3 up = cross(right, forward);
+    rlDrawRenderBatchActive();
+    rlDisableDepthMask();
+    rlDisableBackfaceCulling();
+    BeginShaderMode(particle_shader);
+    for (const bool glowing : {false, true}) {
+      const float boost = glowing ? kParticleGlowBoost : kOn;
+      SetShaderValue(particle_shader, particle_boost_loc, &boost, SHADER_UNIFORM_FLOAT);
+      // The picture's own alpha is left alone: it is not see-through where a particle is.
+      rlSetBlendFactorsSeparate(RL_SRC_ALPHA, glowing ? RL_ONE : RL_ONE_MINUS_SRC_ALPHA, RL_ZERO, RL_ONE, RL_FUNC_ADD,
+                                RL_FUNC_ADD);
+      BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+      rlBegin(RL_QUADS);
+      for (const Particle& particle : particles) {
+        if (particle.glow != glowing) continue;
+        rlCheckRenderBatchLimit(kQuadCorners);
+        const float half = particle.size_now() * kHalfFactor;
+        const Vec3 across = right * half;
+        const Vec3 along = up * half;
+        const Vec3 corners[kQuadCorners] = {particle.position - across - along, particle.position + across - along,
+                                            particle.position + across + along, particle.position - across + along};
+        constexpr float u[kQuadCorners] = {0.0f, 1.0f, 1.0f, 0.0f};
+        constexpr float v[kQuadCorners] = {1.0f, 1.0f, 0.0f, 0.0f};
+        rlColor4f(particle.color.r, particle.color.g, particle.color.b, particle.alpha_now());
+        for (int corner = 0; corner < kQuadCorners; ++corner) {
+          rlTexCoord2f(u[corner], v[corner]);
+          rlVertex3f(corners[corner].x, corners[corner].y, corners[corner].z);
+        }
+      }
+      rlEnd();
+      rlDrawRenderBatchActive();
+      EndBlendMode();
+    }
+    EndShaderMode();
+    rlEnableBackfaceCulling();
+    rlEnableDepthMask();
+  }
+
   // A dome around the camera, behind everything (no depth written).
   void draw_sky(const Camera3D& camera) {
     rlDisableBackfaceCulling();
@@ -1085,7 +1136,8 @@ void Renderer::refresh_mesh(const SceneDesc& desc, int mesh) {
 
 Camera3D Renderer::scene_camera(const Scene& scene) const { return impl_->camera_for(scene); }
 
-void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output) {
+void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output,
+                          const ParticleSystem* particles) {
   const int width = output != nullptr ? output->texture.width : GetRenderWidth();
   const int height = output != nullptr ? output->texture.height : GetRenderHeight();
   if (width <= 0 || height <= 0) return;  // a minimized window: nothing to draw into
@@ -1106,6 +1158,7 @@ void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const Rend
   BeginMode3D(camera);
   impl_->draw_sky(camera);
   impl_->draw_objects(scene, false, viewer);
+  if (particles != nullptr) impl_->draw_particles(particles->particles(), camera);
   EndMode3D();
   EndTextureMode();
   impl_->post_process(env, output);
@@ -1173,9 +1226,9 @@ void Renderer::set_cursor_locked(bool locked) {
 }
 
 void Renderer::draw(const Scene& scene, const std::vector<HudItem>& hud,
-                    const std::vector<std::filesystem::path>& screenshot_paths) {
+                    const std::vector<std::filesystem::path>& screenshot_paths, const ParticleSystem* particles) {
   BeginDrawing();
-  draw_world(scene, impl_->camera_for(scene));
+  draw_world(scene, impl_->camera_for(scene), nullptr, particles);
   draw_hud(hud);
   if (impl_->settings.show_fps) DrawFPS(config::kFpsCounterX, config::kFpsCounterY);
 

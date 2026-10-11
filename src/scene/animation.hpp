@@ -15,6 +15,7 @@ std::array<float, 4> sample_channel(const AnimationChannel& channel, float time)
 // Poses the nodes a clip animates as they are `time` seconds into it, looping. Nodes that no
 // longer exist are skipped. Copies of those nodes (Scene::clone) are posed too, each as far
 // ahead in the clip as the animation_offset of its copy's root says.
-void apply_animation(const AnimationDesc& clip, float time, Scene& scene);
+// Without `loop`, times past the end hold the clip's last pose.
+void apply_animation(const AnimationDesc& clip, float time, Scene& scene, bool loop = true);
 
 }  // namespace redgem

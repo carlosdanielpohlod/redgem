@@ -9,6 +9,7 @@ class RaylibInputSource final : public InputSource {
  public:
   bool is_key_down(Key key) const override;
   MouseSample mouse() const override;
+  GamepadSample gamepad() const override;
 };
 
 }  // namespace redgem

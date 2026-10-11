@@ -47,6 +47,13 @@ class Vector3
     len > EPSILON ? self / len : Vector3.zero
   end
 
+  # The same direction, no longer than max_length: a half-pushed stick walks, a full one runs,
+  # and two keys at once are no faster than one.
+  def clamped(max_length = 1.0)
+    size = length
+    size > max_length ? self * (max_length / size) : self
+  end
+
   def distance_to(other) = (other - self).length
 
   # Same vector with y = 0, handy for ground movement.

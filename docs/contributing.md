@@ -61,9 +61,9 @@ Test fixtures are regenerated with
 ```
 src/core      constants (config.hpp), math, logging, fixed timestep clock
 src/scene     glTF loader (meshes, skeletons, animations), Blender extras parser, scene graph,
-              animation playback
+              animation playback, particles
 src/physics   PhysicsWorld interface + Jolt implementation
-src/input     keys, axes/actions, keyboard and scripted input sources
+src/input     keys, axes/actions, keyboard, mouse, gamepad and scripted input sources
 src/audio     sound effects and music (raylib, or a recorder for tests)
 src/script    mruby VM, behaviour host, native bindings
 src/render    renderer (HDR, shadows, reflections, post-processing), shaders, environment,
@@ -85,8 +85,9 @@ cmake         dependencies (pinned versions) and file embedding
 
 ## Not there yet
 
-* Choosing which animation plays: every animation in a scene loops at once (fine for one clip per
-  character). Characters copied with Duplicate in the editor keep the pose they were copied in.
+* Blending animations, and a different clip per copy of a character: clips are played, paused and
+  stopped by name for the whole scene. Characters copied with Duplicate in the editor keep the pose
+  they were copied in.
 * Spot light cones, and camera clip planes from the scene (the engine uses fixed ones).
 * Reusing data when the same model is imported twice, and dropping the data of deleted imports
   from `scene.glb` (each import appends its meshes and textures).

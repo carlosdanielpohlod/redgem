@@ -26,7 +26,6 @@ constexpr const char* kLinuxTarget = "linux";
 constexpr const char* kWindowsTarget = "windows";
 constexpr const char* kRuntimesFolder = "runtimes";  // engines for other systems, next to this one
 constexpr const char* kRuntimeName = "redgem";
-constexpr const char* kGameFolder = "game";      // the game's files, next to a built executable
 constexpr const char* kFallbackExecutable = "play";  // for a game whose name gives no usable file name
 constexpr const char* kTemplateScriptsFolder = "/scripts/";
 constexpr int kJsonIndent = 2;
@@ -349,8 +348,8 @@ bool build_game(const std::filesystem::path& game_folder, const std::filesystem:
   std::filesystem::permissions(binary, std::filesystem::perms::owner_exec | std::filesystem::perms::group_exec |
                                            std::filesystem::perms::others_exec,
                                std::filesystem::perm_options::add, fs_error);
-  std::filesystem::remove_all(out_dir / kGameFolder, fs_error);
-  std::filesystem::copy(game_dir, out_dir / kGameFolder, std::filesystem::copy_options::recursive, fs_error);
+  std::filesystem::remove_all(out_dir / kBundledGameFolder, fs_error);
+  std::filesystem::copy(game_dir, out_dir / kBundledGameFolder, std::filesystem::copy_options::recursive, fs_error);
   if (fs_error) {
     error = "cannot copy the game: " + fs_error.message();
     return false;
@@ -365,12 +364,12 @@ std::string executable_name(const std::filesystem::path& game_dir) {
     name.push_back(std::isalnum(letter) != 0 ? static_cast<char>(std::tolower(letter)) : '_');
   }
   // It sits next to the game's files: it cannot have their folder's name.
-  if (name.empty() || name == kGameFolder) return kFallbackExecutable;
+  if (name.empty() || name == kBundledGameFolder) return kFallbackExecutable;
   return name;
 }
 
 std::optional<std::filesystem::path> bundled_game(const std::filesystem::path& executable) {
-  const std::filesystem::path game = executable.parent_path() / kGameFolder;
+  const std::filesystem::path game = executable.parent_path() / kBundledGameFolder;
   std::error_code fs_error;
   if (!std::filesystem::exists(game / config::kSceneFileName, fs_error)) return std::nullopt;
   return game;

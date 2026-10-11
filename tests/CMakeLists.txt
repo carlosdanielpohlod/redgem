@@ -24,12 +24,16 @@ add_executable(redgem_tests
   unit/terrain_test.cpp
   unit/animation_test.cpp
   unit/user_settings_test.cpp
+  unit/save_store_test.cpp
+  unit/particles_test.cpp
+  unit/animation_player_test.cpp
   integration/physics_world_test.cpp
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp
   integration/engine_headless_test.cpp
   integration/scene_script_test.cpp
   integration/ui_input_test.cpp
+  integration/gameplay_api_test.cpp
   integration/editor_session_test.cpp
   integration/game_project_test.cpp)
 target_link_libraries(redgem_tests PRIVATE redgem_engine doctest::doctest)

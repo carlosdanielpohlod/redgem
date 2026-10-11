@@ -1,5 +1,6 @@
 # Arcade driving for a car without wheel physics: W/S accelerate and brake (then reverse),
-# A/D steer, Space is a hard brake. The body leans into what the car is doing (it squats when it
+# A/D steer, Space is a hard brake. With a gamepad: the triggers accelerate and brake, the left
+# stick steers, A is the hard brake. The body leans into what the car is doing (it squats when it
 # accelerates, dives when it brakes, rolls in turns), the engine is heard climbing through its
 # gears, and a speedometer is drawn. The car stays inside the street, cannot drive through other
 # cars (it needs a CarBody on the same object for that) and drops into potholes: the scene's
@@ -24,6 +25,13 @@ class ArcadeCar < Behaviour
   POTHOLE_TAG = "pothole"
   HEAD_ON = 0.5             # hitting a car more squarely than this (cosine) bounces off it ...
   SCRAPE_DRAG = 12.0        # ... a glancing touch only slows the car down, by this many m/s^2
+  CRASH_SPARKS = 28         # let out where the car hits another squarely ...
+  SCRAPE_SPARKS = 2         # ... and every frame it scrapes along one
+  SPARK_SPEED = 6.0
+  SPARK_LIFE = 0.5
+  SPARK_SIZE = 0.09
+  SPARK_HEIGHT = 0.5        # meters above the road: bumper height
+  SCRAPE_MIN_SPEED = 2.0    # m/s below which a scrape throws no sparks
   POTHOLE_DROP = 0.7        # share of a pothole's depth the car body follows (the suspension takes the rest)
   POTHOLE_PITCH = 14.0      # degrees of nose dip per meter of drop
   DEGREES_PER_RADIAN = 180.0 / Math::PI
@@ -99,7 +107,7 @@ class ArcadeCar < Behaviour
     return draw_hud if dt.zero?  # paused
 
     before = @speed
-    throttle = Input.axis(:vertical)
+    throttle = pedals
     accelerate(throttle, dt)
     turning = steer(Input.axis(:horizontal), dt)
     move(dt)
@@ -110,8 +118,15 @@ class ArcadeCar < Behaviour
 
   private
 
+  # From -1 (brake, then reverse) to 1 (full throttle): a gamepad's triggers, or the keys. The
+  # triggers come first: the stick that steers also moves the :vertical axis a little.
+  def pedals
+    triggers = Input.gamepad_axis(:right_trigger) - Input.gamepad_axis(:left_trigger)
+    triggers.zero? ? Input.axis(:vertical) : triggers
+  end
+
   def accelerate(throttle, dt)
-    if Input.down?(:space)
+    if Input.action?(:jump)  # Space, or a gamepad's A
       @speed = approach(@speed, 0.0, HARD_BRAKING * dt)
     elsif throttle.zero?
       @speed = approach(@speed, 0.0, ROLLING_DRAG * dt)
@@ -191,13 +206,22 @@ class ArcadeCar < Behaviour
       position += shove
       travel = flat_nose * (@speed.negative? ? -1.0 : 1.0)
       squareness = -shove.normalized.dot(travel)
+      touched = position - shove.normalized * @body.half_width + Vector3.up * SPARK_HEIGHT
       if squareness > HEAD_ON
+        sparks(touched, shove, CRASH_SPARKS)
         @speed *= BOUNCE
       elsif squareness.positive?
+        sparks(touched, shove, SCRAPE_SPARKS) if @speed.abs > SCRAPE_MIN_SPEED
         @speed = approach(@speed, 0.0, SCRAPE_DRAG * dt)
       end
     end
     position
+  end
+
+  # Metal on metal: sparks thrown back from where the cars touch.
+  def sparks(at, away, count)
+    Particles.burst(at, count: count, color: :orange, glow: true, direction: away + Vector3.up, spread: 60,
+                    speed: SPARK_SPEED, life: SPARK_LIFE, size: SPARK_SIZE)
   end
 
   # How far the car sinks at a position: the deepest pothole under it, eased toward its edge.
@@ -223,7 +247,12 @@ class ArcadeCar < Behaviour
     UI.rect(x: x + BAR_INSET, y: y + PANEL_HEIGHT - BAR_INSET, width: filled, height: BAR_HEIGHT, color: :ruby, radius: 3) if filled.positive?
     return unless Time.elapsed < HINT_SECONDS
 
-    UI.text("W/S accelerate and brake   A/D steer   Space hard brake   Mouse looks around", x: HINT_X, y: HINT_Y, size: HINT_SIZE)
+    hint = if Input.gamepad?
+             "Triggers accelerate and brake   Left stick steers   A hard brake   Right stick looks around"
+           else
+             "W/S accelerate and brake   A/D steer   Space hard brake   Mouse looks around"
+           end
+    UI.text(hint, x: HINT_X, y: HINT_Y, size: HINT_SIZE)
   end
 
   def approach(value, goal, step)
