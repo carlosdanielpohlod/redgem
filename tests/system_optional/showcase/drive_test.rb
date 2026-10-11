@@ -20,6 +20,14 @@ MORE_WALKERS = ["Standing Survivor Girl Green Top Cowboy (placed)", "Axel Standi
 BYSTANDER_NAME = "Standing Cute Girl White Jacket Jeans (placed)"
 LEAF_PREFIX = "Leaf"
 MIN_LEAVES = 100
+ORBIT_FROM_X = 400.0       # pixels: where the mouse drag starts
+ORBIT_Y = 300.0
+ORBIT_DRAG = 240.0         # pixels dragged sideways: a sixth of a turn around the car
+ORBIT_FRAMES = 5
+MIN_SWING = 2.0            # meters the camera moves sideways when dragged
+ZOOM_NOTCHES = 3.0
+MIN_ZOOM = 1.5             # meters further away after those notches
+RETURN_FRAMES = 180
 MIN_LEAF_TRAVEL = 0.3      # meters a falling leaf covers while the hero drives
 MIN_LEAVES_MOVING = 50
 
@@ -65,6 +73,28 @@ SystemTest.define do |t|
     (bone.transform.position - walker.transform.position).distance_to(bone_offset) > MIN_BONE_SWING
   end
   t.assert("the wheels turn") { wheel.transform.rotation.distance_to(wheel_start) > MIN_WHEEL_TURN }
+
+  # The mouse looks around: dragging swings the camera to the car's side, the wheel moves it away,
+  # and letting go brings it back behind the car.
+  behind = camera.transform.position - car.transform.position
+  TestInput.move_mouse(ORBIT_FROM_X, ORBIT_Y)
+  t.wait
+  TestInput.set_mouse_button(:left, true)
+  t.wait
+  TestInput.move_mouse(ORBIT_FROM_X + ORBIT_DRAG, ORBIT_Y)
+  t.wait(ORBIT_FRAMES)
+  beside = camera.transform.position - car.transform.position
+  t.assert("dragging the mouse swings the camera around the car") { (beside.x - behind.x).abs > MIN_SWING }
+  t.screenshot("showcase_look_around")
+  TestInput.set_mouse_wheel(-ZOOM_NOTCHES)
+  t.wait
+  TestInput.set_mouse_wheel(0.0)
+  t.wait
+  t.assert("the wheel moves the camera away") { camera.transform.position.distance_to(car.transform.position) > beside.length + MIN_ZOOM }
+  TestInput.set_mouse_button(:left, false)
+  t.wait(RETURN_FRAMES)
+  back = camera.transform.position - car.transform.position
+  t.assert("letting go brings the camera back behind the car") { (back.x - behind.x).abs < MIN_SWING }
 
   # Steering hard for a long time cannot leave the road.
   t.hold(:w, :d, frames: STEER_FRAMES)
