@@ -14,6 +14,12 @@
 
 namespace redgem::binding {
 
+// Ruby classes of the prelude that natives look up by name.
+inline constexpr const char* kGameObjectClass = "GameObject";
+inline constexpr const char* kVector3Class = "Vector3";
+// Where a wrapper (GameObject, Transform, Rigidbody...) keeps the id of its object.
+inline constexpr const char* kIdVariable = "@id";
+
 ScriptContext& context(mrb_state* mrb);
 Scene& scene(mrb_state* mrb);
 
@@ -27,7 +33,16 @@ GameObject& alive_object(mrb_state* mrb, mrb_value self);
 // Accepts a Vector3 or a 3-element Array.
 Vec3 to_vec3(mrb_state* mrb, mrb_value value);
 mrb_value vec3_value(mrb_state* mrb, Vec3 v);
+bool is_vector3(mrb_state* mrb, mrb_value value);
+bool is_game_object(mrb_state* mrb, mrb_value value);
 
+// A Ruby String holding `text` (which may contain any byte).
+mrb_value text_value(mrb_state* mrb, const std::string& text);
+// hash[:key] = value.
+void set_entry(mrb_state* mrb, mrb_value hash, const char* key, mrb_value value);
+
+// A Symbol or a String.
+bool is_name(mrb_value value);
 // Accepts a Symbol or a String.
 std::string to_name(mrb_state* mrb, mrb_value value);
 // The single argument of a native method, as a name (a Symbol or a String).

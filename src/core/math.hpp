@@ -3,6 +3,7 @@
 // Tiny engine-owned math types so modules do not depend on raylib or Jolt types.
 
 #include <cmath>
+#include <cstddef>
 
 namespace redgem {
 
@@ -41,9 +42,7 @@ inline Vec3 safe_divide(Vec3 a, Vec3 b) {
   return {div(a.x, b.x), div(a.y, b.y), div(a.z, b.z)};
 }
 inline float dot(Vec3 a, Vec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-inline Vec3 cross(Vec3 a, Vec3 b) {
-  return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
-}
+inline Vec3 cross(Vec3 a, Vec3 b) { return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
 inline float length(Vec3 v) { return std::sqrt(dot(v, v)); }
 inline Vec3 normalize(Vec3 v) {
   const float len = length(v);
@@ -51,8 +50,7 @@ inline Vec3 normalize(Vec3 v) {
 }
 inline bool approx_equal(float a, float b, float tolerance) { return std::fabs(a - b) <= tolerance; }
 inline bool approx_equal(Vec3 a, Vec3 b, float tolerance) {
-  return approx_equal(a.x, b.x, tolerance) && approx_equal(a.y, b.y, tolerance) &&
-         approx_equal(a.z, b.z, tolerance);
+  return approx_equal(a.x, b.x, tolerance) && approx_equal(a.y, b.y, tolerance) && approx_equal(a.z, b.z, tolerance);
 }
 
 struct Quat {
@@ -64,11 +62,21 @@ struct Quat {
   static Quat identity() { return {0.0f, 0.0f, 0.0f, 1.0f}; }
 };
 
+// Where each component sits when a vector (x y z) or a quaternion (x y z w) is stored as a run
+// of floats, as meshes, matrices and animation keys store them.
+inline constexpr std::size_t kXOffset = 0;
+inline constexpr std::size_t kYOffset = 1;
+inline constexpr std::size_t kZOffset = 2;
+inline constexpr std::size_t kWOffset = 3;
+
+inline Vec3 vec3_from(const float* floats) { return {floats[kXOffset], floats[kYOffset], floats[kZOffset]}; }
+inline Quat quat_from(const float* floats) {
+  return {floats[kXOffset], floats[kYOffset], floats[kZOffset], floats[kWOffset]};
+}
+
 inline Quat operator*(Quat a, Quat b) {
-  return {a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
-          a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
-          a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
-          a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z};
+  return {a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y, a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+          a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w, a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z};
 }
 inline Quat conjugate(Quat q) { return {-q.x, -q.y, -q.z, q.w}; }
 inline Quat normalize(Quat q) {

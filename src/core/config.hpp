@@ -49,6 +49,11 @@ inline constexpr float kDefaultColliderHalfExtent = 0.5f;
 inline constexpr const char* kPropScript = "script";
 inline constexpr const char* kPropBody = "body";
 inline constexpr const char* kPropCollider = "collider";
+// What `collider` may be set to.
+inline constexpr const char* kColliderBox = "box";
+inline constexpr const char* kColliderSphere = "sphere";
+inline constexpr const char* kColliderCapsule = "capsule";
+inline constexpr const char* kColliderMesh = "mesh";
 inline constexpr const char* kPropTrigger = "trigger";
 inline constexpr const char* kPropTag = "tag";
 inline constexpr const char* kPropMass = "mass";

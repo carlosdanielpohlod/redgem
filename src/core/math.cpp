@@ -10,6 +10,62 @@ constexpr float kQuarter = 0.25f;
 // |sin(pitch)| above which pitch is treated as exactly +/-90 degrees.
 constexpr float kGimbalLockSinPitch = 0.9999f;
 
+// The elements r(row)(column) of a rotation matrix that its Euler angles are read from.
+struct EulerElements {
+  float r00, r10, r11, r12, r20, r21, r22;
+};
+
+EulerElements euler_elements(Quat q) {
+  return {kOne - kTwo * (q.y * q.y + q.z * q.z), kTwo * (q.x * q.y + q.w * q.z), kOne - kTwo * (q.x * q.x + q.z * q.z),
+          kTwo * (q.y * q.z - q.w * q.x),        kTwo * (q.x * q.z - q.w * q.y), kTwo * (q.y * q.z + q.w * q.x),
+          kOne - kTwo * (q.x * q.x + q.y * q.y)};
+}
+
+Vec3 free_euler_radians(const EulerElements& r, float sin_pitch) {
+  return {std::atan2(r.r21, r.r22), std::asin(sin_pitch), std::atan2(r.r10, r.r00)};
+}
+
+// Gimbal lock: pitch is +/-90 degrees and X and Z turn around the same axis, so fold them into X.
+Vec3 locked_euler_radians(const EulerElements& r, float sin_pitch) {
+  return {std::atan2(-r.r12, r.r11), std::copysign(kPi * kHalf, sin_pitch), 0.0f};
+}
+
+// A rotation matrix, elements named m(row)(column).
+struct Matrix3 {
+  float m00, m10, m20;
+  float m01, m11, m21;
+  float m02, m12, m22;
+};
+
+// Shepperd's method has one formula per largest term (the trace, or one of the diagonal's
+// elements), so that the division is never by a small number.
+Quat quat_from_large_trace(const Matrix3& m) {
+  const float s = std::sqrt(m.m00 + m.m11 + m.m22 + kOne) * kTwo;
+  return {(m.m21 - m.m12) / s, (m.m02 - m.m20) / s, (m.m10 - m.m01) / s, kQuarter * s};
+}
+
+Quat quat_from_large_m00(const Matrix3& m) {
+  const float s = std::sqrt(kOne + m.m00 - m.m11 - m.m22) * kTwo;
+  return {kQuarter * s, (m.m01 + m.m10) / s, (m.m02 + m.m20) / s, (m.m21 - m.m12) / s};
+}
+
+Quat quat_from_large_m11(const Matrix3& m) {
+  const float s = std::sqrt(kOne + m.m11 - m.m00 - m.m22) * kTwo;
+  return {(m.m01 + m.m10) / s, kQuarter * s, (m.m12 + m.m21) / s, (m.m02 - m.m20) / s};
+}
+
+Quat quat_from_large_m22(const Matrix3& m) {
+  const float s = std::sqrt(kOne + m.m22 - m.m00 - m.m11) * kTwo;
+  return {(m.m02 + m.m20) / s, (m.m12 + m.m21) / s, kQuarter * s, (m.m10 - m.m01) / s};
+}
+
+Quat quat_from_matrix(const Matrix3& m) {
+  if (m.m00 + m.m11 + m.m22 > 0.0f) return quat_from_large_trace(m);
+  if (m.m00 > m.m11 && m.m00 > m.m22) return quat_from_large_m00(m);
+  if (m.m11 > m.m22) return quat_from_large_m11(m);
+  return quat_from_large_m22(m);
+}
+
 }  // namespace
 
 Quat quat_from_euler_degrees(Vec3 degrees) {
@@ -20,54 +76,16 @@ Quat quat_from_euler_degrees(Vec3 degrees) {
 }
 
 Vec3 quat_to_euler_degrees(Quat q) {
-  q = normalize(q);
-  // Inverse of R = Rz * Ry * Rx, read from the rotation matrix elements r(row)(column).
-  const float r00 = kOne - kTwo * (q.y * q.y + q.z * q.z);
-  const float r10 = kTwo * (q.x * q.y + q.w * q.z);
-  const float r11 = kOne - kTwo * (q.x * q.x + q.z * q.z);
-  const float r12 = kTwo * (q.y * q.z - q.w * q.x);
-  const float r20 = kTwo * (q.x * q.z - q.w * q.y);
-  const float r21 = kTwo * (q.y * q.z + q.w * q.x);
-  const float r22 = kOne - kTwo * (q.x * q.x + q.y * q.y);
-
-  const float sin_pitch = std::clamp(-r20, -kOne, kOne);
-  float x;
-  float y;
-  float z;
-  if (std::fabs(sin_pitch) < kGimbalLockSinPitch) {
-    x = std::atan2(r21, r22);
-    y = std::asin(sin_pitch);
-    z = std::atan2(r10, r00);
-  } else {
-    // Gimbal lock: pitch is +/-90 degrees and X and Z turn around the same axis, so fold them into X.
-    x = std::atan2(-r12, r11);
-    y = std::copysign(kPi * kHalf, sin_pitch);
-    z = 0.0f;
-  }
-  return {radians_to_degrees(x), radians_to_degrees(y), radians_to_degrees(z)};
+  // Inverse of R = Rz * Ry * Rx.
+  const EulerElements r = euler_elements(normalize(q));
+  const float sin_pitch = std::clamp(-r.r20, -kOne, kOne);
+  const bool locked = std::fabs(sin_pitch) >= kGimbalLockSinPitch;
+  const Vec3 radians = locked ? locked_euler_radians(r, sin_pitch) : free_euler_radians(r, sin_pitch);
+  return {radians_to_degrees(radians.x), radians_to_degrees(radians.y), radians_to_degrees(radians.z)};
 }
 
 Quat quat_from_basis(Vec3 c0, Vec3 c1, Vec3 c2) {
-  // Shepperd's method on the matrix with columns c0, c1, c2.
-  const float m00 = c0.x, m10 = c0.y, m20 = c0.z;
-  const float m01 = c1.x, m11 = c1.y, m21 = c1.z;
-  const float m02 = c2.x, m12 = c2.y, m22 = c2.z;
-  const float trace = m00 + m11 + m22;
-  Quat q;
-  if (trace > 0.0f) {
-    const float s = std::sqrt(trace + kOne) * kTwo;
-    q = {(m21 - m12) / s, (m02 - m20) / s, (m10 - m01) / s, kQuarter * s};
-  } else if (m00 > m11 && m00 > m22) {
-    const float s = std::sqrt(kOne + m00 - m11 - m22) * kTwo;
-    q = {kQuarter * s, (m01 + m10) / s, (m02 + m20) / s, (m21 - m12) / s};
-  } else if (m11 > m22) {
-    const float s = std::sqrt(kOne + m11 - m00 - m22) * kTwo;
-    q = {(m01 + m10) / s, kQuarter * s, (m12 + m21) / s, (m02 - m20) / s};
-  } else {
-    const float s = std::sqrt(kOne + m22 - m00 - m11) * kTwo;
-    q = {(m02 + m20) / s, (m12 + m21) / s, kQuarter * s, (m10 - m01) / s};
-  }
-  return normalize(q);
+  return normalize(quat_from_matrix({c0.x, c0.y, c0.z, c1.x, c1.y, c1.z, c2.x, c2.y, c2.z}));
 }
 
 Quat quat_look_rotation(Vec3 direction, Vec3 up) {

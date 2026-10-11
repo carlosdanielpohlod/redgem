@@ -15,27 +15,38 @@ std::string trim(const std::string& text) {
   return text.substr(begin, end - begin);
 }
 
+std::string without_directory(const std::string& path) {
+  const std::size_t slash = path.find_last_of('/');
+  return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+
+std::string without_ruby_extension(const std::string& file_name) {
+  const std::string extension = config::kRubyFileExtension;
+  const bool longer = file_name.size() > extension.size();
+  const bool ends_with_it =
+      longer && file_name.compare(file_name.size() - extension.size(), extension.size(), extension) == 0;
+  return ends_with_it ? file_name.substr(0, file_name.size() - extension.size()) : file_name;
+}
+
+bool separates_words(char c) { return c == '_' || c == '-' || c == ' '; }
+
+// "camera_follow" -> "CameraFollow".
+std::string camel_case(const std::string& words) {
+  std::string name;
+  bool upper_next = true;
+  for (const char c : words) {
+    if (!separates_words(c)) {
+      name.push_back(upper_next ? static_cast<char>(std::toupper(static_cast<unsigned char>(c))) : c);
+    }
+    upper_next = separates_words(c);
+  }
+  return name;
+}
+
 }  // namespace
 
 std::string class_name_for_script(const std::string& file_name) {
-  std::string base = file_name;
-  const std::size_t slash = base.find_last_of('/');
-  if (slash != std::string::npos) base = base.substr(slash + 1);
-  const std::string extension = config::kRubyFileExtension;
-  if (base.size() > extension.size() && base.compare(base.size() - extension.size(), extension.size(), extension) == 0) {
-    base.resize(base.size() - extension.size());
-  }
-  std::string name;
-  bool upper_next = true;
-  for (const char c : base) {
-    if (c == '_' || c == '-' || c == ' ') {
-      upper_next = true;
-      continue;
-    }
-    name.push_back(upper_next ? static_cast<char>(std::toupper(static_cast<unsigned char>(c))) : c);
-    upper_next = false;
-  }
-  return name;
+  return camel_case(without_ruby_extension(without_directory(file_name)));
 }
 
 std::string script_for_class_name(const std::string& class_name) {

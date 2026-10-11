@@ -85,6 +85,16 @@ mrb_value vehicle_speed(mrb_state* mrb, mrb_value self) {
 
 // --- Physics -------------------------------------------------------------------------------
 
+// What Physics.raycast answers: { object:, point:, normal:, distance: }.
+mrb_value hit_value(mrb_state* mrb, const RaycastHit& hit) {
+  mrb_value result = mrb_hash_new(mrb);
+  set_entry(mrb, result, "object", object_or_nil(mrb, hit.object));
+  set_entry(mrb, result, "point", vec3_value(mrb, hit.point));
+  set_entry(mrb, result, "normal", vec3_value(mrb, hit.normal));
+  set_entry(mrb, result, "distance", mrb_float_value(mrb, hit.distance));
+  return result;
+}
+
 mrb_value physics_raycast(mrb_state* mrb, mrb_value) {
   mrb_value origin;
   mrb_value direction;
@@ -92,21 +102,16 @@ mrb_value physics_raycast(mrb_state* mrb, mrb_value) {
   mrb_value ignore = mrb_nil_value();
   mrb_get_args(mrb, "oo|fo", &origin, &direction, &max_distance, &ignore);
   const ObjectId ignored = mrb_nil_p(ignore) ? kNoObject : self_id(mrb, ignore);
-  const auto hit = physics(mrb).raycast(to_vec3(mrb, origin), to_vec3(mrb, direction),
-                                        static_cast<float>(max_distance), ignored);
-  if (!hit) return mrb_nil_value();
-  mrb_value result = mrb_hash_new(mrb);
-  mrb_hash_set(mrb, result, mrb_symbol_value(mrb_intern_lit(mrb, "object")), object_or_nil(mrb, hit->object));
-  mrb_hash_set(mrb, result, mrb_symbol_value(mrb_intern_lit(mrb, "point")), vec3_value(mrb, hit->point));
-  mrb_hash_set(mrb, result, mrb_symbol_value(mrb_intern_lit(mrb, "normal")), vec3_value(mrb, hit->normal));
-  mrb_hash_set(mrb, result, mrb_symbol_value(mrb_intern_lit(mrb, "distance")),
-               mrb_float_value(mrb, hit->distance));
-  return result;
+  const auto hit =
+      physics(mrb).raycast(to_vec3(mrb, origin), to_vec3(mrb, direction), static_cast<float>(max_distance), ignored);
+  return hit ? hit_value(mrb, *hit) : mrb_nil_value();
 }
 
 }  // namespace
 
-void install_physics_bindings(mrb_state* mrb) {
+namespace {
+
+void install_body_bindings(mrb_state* mrb) {
   RClass* character = mrb_define_class(mrb, "CharacterController", mrb->object_class);
   mrb_define_method(mrb, character, "move", character_move, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, character, "jump", character_jump, MRB_ARGS_REQ(1));
@@ -117,12 +122,20 @@ void install_physics_bindings(mrb_state* mrb) {
   mrb_define_method(mrb, rigidbody, "velocity", body_velocity, MRB_ARGS_NONE());
   mrb_define_method(mrb, rigidbody, "velocity=", rigidbody_set_velocity, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, rigidbody, "add_impulse", rigidbody_add_impulse, MRB_ARGS_REQ(1));
+}
 
+void install_vehicle_bindings(mrb_state* mrb) {
   RClass* vehicle = mrb_define_class(mrb, "Vehicle", mrb->object_class);
   mrb_define_method(mrb, vehicle, "__drive", vehicle_drive, MRB_ARGS_REQ(4));
   mrb_define_method(mrb, vehicle, "speed", vehicle_speed, MRB_ARGS_NONE());
   mrb_define_method(mrb, vehicle, "velocity", body_velocity, MRB_ARGS_NONE());
+}
 
+}  // namespace
+
+void install_physics_bindings(mrb_state* mrb) {
+  install_body_bindings(mrb);
+  install_vehicle_bindings(mrb);
   RClass* physics_module = mrb_define_module(mrb, "Physics");
   mrb_define_module_function(mrb, physics_module, "raycast", physics_raycast, MRB_ARGS_ARG(2, 2));
 }

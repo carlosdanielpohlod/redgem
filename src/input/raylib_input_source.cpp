@@ -8,6 +8,44 @@ namespace {
 constexpr int kFirstGamepad = 0;
 constexpr float kHalf = 0.5f;
 constexpr float kTriggerReleased = -1.0f;  // what raylib reports for a trigger nobody touches
+// raylib's names for the axes and buttons, in GamepadAxis' and GamepadButton's order.
+constexpr int kRaylibAxes[] = {GAMEPAD_AXIS_LEFT_X,  GAMEPAD_AXIS_LEFT_Y,       GAMEPAD_AXIS_RIGHT_X,
+                               GAMEPAD_AXIS_RIGHT_Y, GAMEPAD_AXIS_LEFT_TRIGGER, GAMEPAD_AXIS_RIGHT_TRIGGER};
+constexpr int kRaylibButtons[] = {
+    GAMEPAD_BUTTON_RIGHT_FACE_DOWN, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
+    GAMEPAD_BUTTON_RIGHT_FACE_UP,   GAMEPAD_BUTTON_LEFT_TRIGGER_1,   GAMEPAD_BUTTON_RIGHT_TRIGGER_1,
+    GAMEPAD_BUTTON_MIDDLE_LEFT,     GAMEPAD_BUTTON_MIDDLE_RIGHT,     GAMEPAD_BUTTON_LEFT_FACE_UP,
+    GAMEPAD_BUTTON_LEFT_FACE_DOWN,  GAMEPAD_BUTTON_LEFT_FACE_LEFT,   GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
+    GAMEPAD_BUTTON_LEFT_THUMB,      GAMEPAD_BUTTON_RIGHT_THUMB};
+
+// The first gamepad, which must be plugged in.
+GamepadSample read_gamepad() {
+  GamepadSample sample;
+  sample.connected = true;
+  for (std::size_t i = 0; i < kGamepadAxisCount; ++i) {
+    sample.axes[i] = GetGamepadAxisMovement(kFirstGamepad, kRaylibAxes[i]);
+  }
+  // raylib reports a trigger from -1 (released) to 1 (pulled): here 0 to 1.
+  for (const GamepadAxis trigger : {GamepadAxis::LeftTrigger, GamepadAxis::RightTrigger}) {
+    float& value = sample.axes[static_cast<std::size_t>(trigger)];
+    value = (value - kTriggerReleased) * kHalf;
+  }
+  for (std::size_t i = 0; i < kGamepadButtonCount; ++i) {
+    sample.buttons[i] = IsGamepadButtonDown(kFirstGamepad, kRaylibButtons[i]);
+  }
+  return sample;
+}
+
+#if defined(PLATFORM_ANDROID)
+std::vector<TouchPoint> read_touches() {
+  std::vector<TouchPoint> touches;
+  for (int i = 0; i < GetTouchPointCount(); ++i) {
+    const Vector2 at = GetTouchPosition(i);
+    touches.push_back({GetTouchPointId(i), at.x, at.y});
+  }
+  return touches;
+}
+#endif
 }  // namespace
 
 bool RaylibInputSource::is_key_down(Key key) const { return IsKeyDown(static_cast<int>(key)); }
@@ -37,37 +75,14 @@ std::string RaylibInputSource::typed_text() const {
 const TouchLayout* RaylibInputSource::touch_layout() const { return touch_shown_ ? &touch_.layout() : nullptr; }
 
 GamepadSample RaylibInputSource::gamepad() const {
-  GamepadSample sample;
   touch_shown_ = false;
 #if defined(PLATFORM_ANDROID)
   if (!IsGamepadAvailable(kFirstGamepad) && touch_wanted_) {
-    std::vector<TouchPoint> touches;
-    for (int i = 0; i < GetTouchPointCount(); ++i) {
-      const Vector2 at = GetTouchPosition(i);
-      touches.push_back({GetTouchPointId(i), at.x, at.y});
-    }
     touch_shown_ = true;
-    return touch_.update(touches, static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight()));
+    return touch_.update(read_touches(), static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight()));
   }
 #endif
-  if (!IsGamepadAvailable(kFirstGamepad)) return sample;
-  sample.connected = true;
-  // In GamepadAxis' and GamepadButton's order.
-  constexpr int axes[] = {GAMEPAD_AXIS_LEFT_X,  GAMEPAD_AXIS_LEFT_Y,       GAMEPAD_AXIS_RIGHT_X,
-                          GAMEPAD_AXIS_RIGHT_Y, GAMEPAD_AXIS_LEFT_TRIGGER, GAMEPAD_AXIS_RIGHT_TRIGGER};
-  constexpr int buttons[] = {GAMEPAD_BUTTON_RIGHT_FACE_DOWN, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT, GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
-                             GAMEPAD_BUTTON_RIGHT_FACE_UP,   GAMEPAD_BUTTON_LEFT_TRIGGER_1,   GAMEPAD_BUTTON_RIGHT_TRIGGER_1,
-                             GAMEPAD_BUTTON_MIDDLE_LEFT,     GAMEPAD_BUTTON_MIDDLE_RIGHT,     GAMEPAD_BUTTON_LEFT_FACE_UP,
-                             GAMEPAD_BUTTON_LEFT_FACE_DOWN,  GAMEPAD_BUTTON_LEFT_FACE_LEFT,   GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
-                             GAMEPAD_BUTTON_LEFT_THUMB,      GAMEPAD_BUTTON_RIGHT_THUMB};
-  for (std::size_t i = 0; i < kGamepadAxisCount; ++i) sample.axes[i] = GetGamepadAxisMovement(kFirstGamepad, axes[i]);
-  // raylib reports a trigger from -1 (released) to 1 (pulled): here 0 to 1.
-  for (const GamepadAxis trigger : {GamepadAxis::LeftTrigger, GamepadAxis::RightTrigger}) {
-    float& value = sample.axes[static_cast<std::size_t>(trigger)];
-    value = (value - kTriggerReleased) * kHalf;
-  }
-  for (std::size_t i = 0; i < kGamepadButtonCount; ++i) sample.buttons[i] = IsGamepadButtonDown(kFirstGamepad, buttons[i]);
-  return sample;
+  return IsGamepadAvailable(kFirstGamepad) ? read_gamepad() : GamepadSample{};
 }
 
 }  // namespace redgem

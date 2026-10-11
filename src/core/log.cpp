@@ -24,7 +24,7 @@ void default_sink(Level level, const std::string& message) {
 #else
 void default_sink(Level level, const std::string& message) {
   std::ostream& out = (level == Level::Error || level == Level::Warning) ? std::cerr : std::cout;
-  out << "[redgem] " << level_name(level) << ": " << message << std::endl;
+  out << "[redgem] " << level_name(level) << ": " << message << '\n' << std::flush;
 }
 #endif
 
@@ -37,10 +37,14 @@ Sink& current_sink() {
 
 const char* level_name(Level level) {
   switch (level) {
-    case Level::Debug: return "debug";
-    case Level::Info: return "info";
-    case Level::Warning: return "warning";
-    case Level::Error: return "error";
+    case Level::Debug:
+      return "debug";
+    case Level::Info:
+      return "info";
+    case Level::Warning:
+      return "warning";
+    case Level::Error:
+      return "error";
   }
   return "unknown";
 }

@@ -11,7 +11,7 @@ OUT="${REPO_ROOT}/build/android-out"
 apk="$("${REPO_ROOT}/build/src/redgem" build "${GAME}" "${OUT}" --target android | sed -n 's/.*adb install //p')"
 [[ -n "${apk}" ]] || { echo "the build failed" >&2; exit 1; }
 # The app's id is in the APK; ask the SDK's own tool for it.
-aapt2="$(ls -d "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"/build-tools/*/aapt2 | sort | tail -1)"
+aapt2="$(find "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}/build-tools" -name aapt2 | sort -V | tail -1)"
 package="$("${aapt2}" dump packagename "${apk}")"
 adb install -r "${apk}"
 adb shell am force-stop "${package}"

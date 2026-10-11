@@ -57,7 +57,8 @@ TEST_CASE("lowering digs, flattening levels to the center's height, smoothing so
 
   PrimitiveDesc level = hill();
   sculpt_terrain(level, kGrid, {0.0f, 0.0f, kBrushRadius, 1.0f, SculptMode::Flatten});
-  CHECK(terrain_height(level, kGrid, 2.0f, 0.0f) > terrain_height(hill(), kGrid, 2.0f, 0.0f));  // pulled up toward the top
+  CHECK(terrain_height(level, kGrid, 2.0f, 0.0f) >
+        terrain_height(hill(), kGrid, 2.0f, 0.0f));  // pulled up toward the top
 
   PrimitiveDesc soft = hill();
   sculpt_terrain(soft, kGrid, {0.0f, 0.0f, kBrushRadius, 1.0f, SculptMode::Smooth});
@@ -87,4 +88,20 @@ TEST_CASE("a ray finds where it meets the ground") {
   // Up into the sky, and from under the ground: nothing.
   CHECK_FALSE(terrain_raycast(mesh, kGrid, {0.0f, 20.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, 100.0f).has_value());
   CHECK_FALSE(terrain_raycast(mesh, kGrid, {0.0f, -5.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, 100.0f).has_value());
+}
+
+TEST_CASE("a ray that comes in from beside the terrain still finds the ground, unless it comes in under it") {
+  constexpr float kOutside = 25.0f;  // meters from the center: 5 m off the terrain's edge
+  constexpr float kAbove = 5.0f;
+  constexpr float kReach = 100.0f;
+  const PrimitiveDesc mesh = make_terrain(kGrid);
+  const Vec3 inward_and_down = normalize(Vec3{-1.0f, -kHalf, 0.0f});
+  const auto hit = terrain_raycast(mesh, kGrid, {kOutside, kAbove, 0.0f}, inward_and_down, kReach);
+  REQUIRE(hit.has_value());
+  CHECK(std::fabs(hit->y) < kTolerance);
+  CHECK(hit->x == doctest::Approx(kOutside - kAbove / kHalf).epsilon(kHitTolerance));
+  // The same ray started below the ground's level meets no ground from above.
+  CHECK_FALSE(terrain_raycast(mesh, kGrid, {kOutside, -kAbove, 0.0f}, {-1.0f, 0.0f, 0.0f}, kReach).has_value());
+  // And one that stops short of the ground finds nothing.
+  CHECK_FALSE(terrain_raycast(mesh, kGrid, {0.0f, kAbove, 0.0f}, {0.0f, -1.0f, 0.0f}, kAbove * kHalf).has_value());
 }

@@ -50,6 +50,7 @@ add_library(redgem_engine STATIC
   scene/scene.cpp
   scene/animation.cpp
   scene/animation_player.cpp
+  scene/camera_ray.cpp
   net/frame_buffer.cpp
   net/socket.cpp
   net/wire.cpp

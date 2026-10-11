@@ -1,5 +1,8 @@
 #include <doctest/doctest.h>
 
+#include <string>
+#include <utility>
+
 #include "core/config.hpp"
 #include "physics/body_config.hpp"
 
@@ -25,7 +28,8 @@ TEST_CASE("dynamic body reads its mass") {
 
 TEST_CASE("characters always use capsules") {
   CHECK(body_config_from_props({{"body", std::string("character")}}).collider == ColliderShape::Capsule);
-  const BodyConfig forced = body_config_from_props({{"body", std::string("character")}, {"collider", std::string("box")}});
+  const BodyConfig forced =
+      body_config_from_props({{"body", std::string("character")}, {"collider", std::string("box")}});
   CHECK(forced.collider == ColliderShape::Capsule);
   CHECK(forced.warnings.size() == 1);
 }
@@ -39,14 +43,16 @@ TEST_CASE("triggers are volumes, not bodies") {
 }
 
 TEST_CASE("mesh colliders only on static bodies") {
-  const BodyConfig config = body_config_from_props({{"body", std::string("dynamic")}, {"collider", std::string("mesh")}});
+  const BodyConfig config =
+      body_config_from_props({{"body", std::string("dynamic")}, {"collider", std::string("mesh")}});
   CHECK(config.collider == ColliderShape::Box);
   CHECK(config.warnings.size() == 1);
   CHECK(body_config_from_props({{"collider", std::string("mesh")}}).collider == ColliderShape::Mesh);
 }
 
 TEST_CASE("unknown values produce warnings") {
-  const BodyConfig config = body_config_from_props({{"body", std::string("floaty")}, {"collider", std::string("blob")}});
+  const BodyConfig config =
+      body_config_from_props({{"body", std::string("floaty")}, {"collider", std::string("blob")}});
   CHECK(config.type == BodyType::None);
   CHECK(config.warnings.size() == 2);
 }
@@ -58,4 +64,38 @@ TEST_CASE("non-positive mass falls back to the default with a warning") {
     CHECK(config.mass == doctest::Approx(config::kDefaultBodyMass));
     CHECK(config.warnings.size() == 1);
   }
+}
+
+TEST_CASE("body types have the names scenes use, but none cannot be asked for") {
+  CHECK(std::string(body_type_name(BodyType::Kinematic)) == "kinematic");
+  CHECK(std::string(body_type_name(BodyType::None)) == "none");
+  for (const BodyType type : {BodyType::Static, BodyType::Dynamic, BodyType::Kinematic, BodyType::Vehicle}) {
+    CAPTURE(body_type_name(type));
+    CHECK(body_config_from_props({{"body", std::string(body_type_name(type))}}).type == type);
+  }
+  const BodyConfig none = body_config_from_props({{"body", std::string("none")}});
+  CHECK(none.type == BodyType::None);
+  CHECK(none.warnings.size() == 1);
+}
+
+TEST_CASE("each collider name gives its shape") {
+  const std::pair<const char*, ColliderShape> colliders[] = {{config::kColliderBox, ColliderShape::Box},
+                                                             {config::kColliderSphere, ColliderShape::Sphere},
+                                                             {config::kColliderCapsule, ColliderShape::Capsule},
+                                                             {config::kColliderMesh, ColliderShape::Mesh}};
+  for (const auto& [name, shape] : colliders) {
+    CAPTURE(name);
+    const BodyConfig config = body_config_from_props({{"collider", std::string(name)}});
+    CHECK(config.collider == shape);
+    CHECK(config.type == BodyType::Static);
+    CHECK(config.warnings.empty());
+  }
+}
+
+TEST_CASE("vehicles always use a box, and weigh more than other bodies by default") {
+  const BodyConfig config =
+      body_config_from_props({{"body", std::string("vehicle")}, {"collider", std::string("sphere")}});
+  CHECK(config.collider == ColliderShape::Box);
+  CHECK(config.warnings.size() == 1);
+  CHECK(config.mass == doctest::Approx(config::kVehicleDefaultMass));
 }

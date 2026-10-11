@@ -138,7 +138,8 @@ mrb_value audio_play(mrb_state* mrb, mrb_value) {
   mrb_value name;
   mrb_float volume = 0.0, pitch = 0.0;
   mrb_get_args(mrb, "off", &name, &volume, &pitch);
-  return mrb_bool_value(audio(mrb).play_sound(to_name(mrb, name), static_cast<float>(volume), static_cast<float>(pitch)));
+  return mrb_bool_value(
+      audio(mrb).play_sound(to_name(mrb, name), static_cast<float>(volume), static_cast<float>(pitch)));
 }
 
 mrb_value audio_music(mrb_state* mrb, mrb_value) {
@@ -181,7 +182,8 @@ mrb_value audio_set_volume(mrb_state* mrb, mrb_value) {
 mrb_value game_load_scene(mrb_state* mrb, mrb_value) {
   const std::string name = name_arg(mrb);
   ScriptContext& ctx = context(mrb);
-  if (!ctx.scene_exists || !ctx.scene_exists(name)) mrb_raisef(mrb, E_ARGUMENT_ERROR, "no scene named %s", name.c_str());
+  if (!ctx.scene_exists || !ctx.scene_exists(name))
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "no scene named %s", name.c_str());
   ctx.requested_scene = name;
   return mrb_nil_value();
 }
@@ -190,8 +192,10 @@ mrb_value game_scene_name(mrb_state* mrb, mrb_value) { return mrb_str_new_cstr(m
 
 }  // namespace
 
-void install_runtime_bindings(mrb_state* mrb) {
-  // mruby-time already defines the Time class; the game clock lives on it as class methods.
+namespace {
+
+// mruby-time already defines the Time class; the game clock lives on it as class methods.
+void install_time_bindings(mrb_state* mrb) {
   RClass* time_class = mrb_define_class(mrb, "Time", mrb->object_class);
   mrb_define_class_method(mrb, time_class, "delta", time_delta, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, time_class, "fixed_delta", time_fixed_delta, MRB_ARGS_NONE());
@@ -199,7 +203,9 @@ void install_runtime_bindings(mrb_state* mrb) {
   mrb_define_class_method(mrb, time_class, "frame", time_frame, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, time_class, "scale", time_scale, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, time_class, "scale=", time_set_scale, MRB_ARGS_REQ(1));
+}
 
+void install_ui_bindings(mrb_state* mrb) {
   RClass* ui_module = mrb_define_module(mrb, "UI");
   mrb_define_module_function(mrb, ui_module, "__text", ui_text, MRB_ARGS_REQ(8));
   mrb_define_module_function(mrb, ui_module, "__rect", ui_rect, MRB_ARGS_REQ(9));
@@ -207,18 +213,24 @@ void install_runtime_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, ui_module, "__text_width", ui_text_width, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, ui_module, "width", ui_width, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, ui_module, "height", ui_height, MRB_ARGS_NONE());
+}
 
+void install_debug_bindings(mrb_state* mrb) {
   RClass* debug_module = mrb_define_module(mrb, "Debug");
   mrb_define_module_function(mrb, debug_module, "log", debug_log, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, debug_module, "warn", debug_warn, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, debug_module, "error", debug_error, MRB_ARGS_REQ(1));
+}
 
+void install_game_bindings(mrb_state* mrb) {
   RClass* game_module = mrb_define_module(mrb, "Game");
   mrb_define_module_function(mrb, game_module, "quit", game_quit, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, game_module, "screenshot", game_screenshot, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, game_module, "load_scene", game_load_scene, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, game_module, "scene_name", game_scene_name, MRB_ARGS_NONE());
+}
 
+void install_audio_bindings(mrb_state* mrb) {
   RClass* audio_module = mrb_define_module(mrb, "Audio");
   mrb_define_module_function(mrb, audio_module, "__play", audio_play, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, audio_module, "__music", audio_music, MRB_ARGS_REQ(3));
@@ -226,6 +238,16 @@ void install_runtime_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, audio_module, "music_pitch=", audio_set_music_pitch, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, audio_module, "music_volume=", audio_set_music_volume, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, audio_module, "volume=", audio_set_volume, MRB_ARGS_REQ(1));
+}
+
+}  // namespace
+
+void install_runtime_bindings(mrb_state* mrb) {
+  install_time_bindings(mrb);
+  install_ui_bindings(mrb);
+  install_debug_bindings(mrb);
+  install_game_bindings(mrb);
+  install_audio_bindings(mrb);
 }
 
 }  // namespace redgem

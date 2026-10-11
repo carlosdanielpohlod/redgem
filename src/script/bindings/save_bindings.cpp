@@ -26,6 +26,12 @@ SaveStore& save(mrb_state* mrb) {
   return *store;
 }
 
+// Whole numbers come back as Integers: a saved count of 3 is 3, not 3.0.
+mrb_value number_value(mrb_state* mrb, double number) {
+  const bool whole = std::fabs(number) <= kLargestSavedInteger && std::floor(number) == number;
+  return whole ? mrb_int_value(mrb, static_cast<mrb_int>(number)) : mrb_float_value(mrb, number);
+}
+
 mrb_value save_get(mrb_state* mrb, mrb_value) {
   mrb_value key;
   mrb_value fallback = mrb_nil_value();
@@ -33,32 +39,30 @@ mrb_value save_get(mrb_state* mrb, mrb_value) {
   const auto value = save(mrb).get(to_name(mrb, key));
   if (!value) return fallback;
   if (const auto* flag = std::get_if<bool>(&*value)) return mrb_bool_value(*flag);
-  if (const auto* number = std::get_if<double>(&*value)) {
-    // Whole numbers come back as Integers: a saved count of 3 is 3, not 3.0.
-    if (std::fabs(*number) > kLargestSavedInteger || std::floor(*number) != *number) return mrb_float_value(mrb, *number);
-    return mrb_int_value(mrb, static_cast<mrb_int>(*number));
-  }
-  const auto& text = std::get<std::string>(*value);
-  return mrb_str_new(mrb, text.data(), static_cast<mrb_int>(text.size()));
+  if (const auto* number = std::get_if<double>(&*value)) return number_value(mrb, *number);
+  return text_value(mrb, std::get<std::string>(*value));
+}
+
+double finite_number(mrb_state* mrb, mrb_value value) {
+  if (!std::isfinite(mrb_float(value))) mrb_raise(mrb, E_ARGUMENT_ERROR, "Save cannot keep infinity or NaN");
+  return static_cast<double>(mrb_float(value));
+}
+
+// What is kept for a Ruby value; raises for one that cannot be kept.
+PropertyValue stored_value(mrb_state* mrb, mrb_value value) {
+  const bool flag = mrb_true_p(value);
+  if (flag || mrb_false_p(value)) return flag;
+  if (mrb_integer_p(value)) return static_cast<double>(mrb_integer(value));
+  if (mrb_float_p(value)) return finite_number(mrb, value);
+  if (is_name(value)) return to_name(mrb, value);
+  mrb_raise(mrb, E_ARGUMENT_ERROR, "Save keeps numbers, texts and true / false");
 }
 
 mrb_value save_set(mrb_state* mrb, mrb_value) {
   mrb_value key;
   mrb_value value;
   mrb_get_args(mrb, "oo", &key, &value);
-  PropertyValue stored;
-  if (mrb_true_p(value) || mrb_false_p(value)) {
-    stored = mrb_true_p(value);
-  } else if (mrb_integer_p(value)) {
-    stored = static_cast<double>(mrb_integer(value));
-  } else if (mrb_float_p(value)) {
-    if (!std::isfinite(mrb_float(value))) mrb_raise(mrb, E_ARGUMENT_ERROR, "Save cannot keep infinity or NaN");
-    stored = static_cast<double>(mrb_float(value));
-  } else if (mrb_string_p(value) || mrb_symbol_p(value)) {
-    stored = to_name(mrb, value);
-  } else {
-    mrb_raise(mrb, E_ARGUMENT_ERROR, "Save keeps numbers, texts and true / false");
-  }
+  const PropertyValue stored = stored_value(mrb, value);
   if (!save(mrb).set(to_name(mrb, key), stored)) log::warning("could not write " + save(mrb).file().string());
   return value;
 }

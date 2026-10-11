@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 
 #include "core/config.hpp"
@@ -17,31 +18,48 @@ namespace redgem {
 namespace {
 
 constexpr int kRgbaComponents = 4;
+// Where each channel sits in a color stored as floats.
+constexpr int kRedChannel = 0;
+constexpr int kGreenChannel = 1;
+constexpr int kBlueChannel = 2;
 constexpr int kAlphaChannel = 3;
+constexpr const char* kJpegMimeType = "image/jpeg";
+constexpr const char* kJpegExtension = ".jpg";
+constexpr const char* kPngExtension = ".png";
+constexpr const char* kDataUriPrefix = "data:";  // an image written into the .gltf's own text
 constexpr float kOpaqueAlpha = 1.0f;
 constexpr int kJointsPerVertex = config::kJointsPerVertex;
 constexpr cgltf_uint kMaxJointIndex = config::kMaxSkinJoints - 1;
-constexpr std::array<float, 16> kIdentityMatrix = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+constexpr std::array<float, kFloatsPerMatrix> kIdentityMatrix = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
 struct CgltfDeleter {
   void operator()(cgltf_data* data) const { cgltf_free(data); }
 };
 using CgltfPtr = std::unique_ptr<cgltf_data, CgltfDeleter>;
 
+// Why cgltf could not read a file, in words.
+struct ResultName {
+  cgltf_result result = cgltf_result_success;
+  const char* name = nullptr;
+};
+constexpr ResultName kResultNames[] = {
+    {cgltf_result_success, "success"},
+    {cgltf_result_data_too_short, "data too short"},
+    {cgltf_result_unknown_format, "unknown format"},
+    {cgltf_result_invalid_json, "invalid json"},
+    {cgltf_result_invalid_gltf, "invalid glTF"},
+    {cgltf_result_invalid_options, "invalid options"},
+    {cgltf_result_file_not_found, "file not found"},
+    {cgltf_result_io_error, "io error"},
+    {cgltf_result_out_of_memory, "out of memory"},
+    {cgltf_result_legacy_gltf, "legacy glTF"},
+};
+
 std::string describe(cgltf_result result) {
-  switch (result) {
-    case cgltf_result_success: return "success";
-    case cgltf_result_data_too_short: return "data too short";
-    case cgltf_result_unknown_format: return "unknown format";
-    case cgltf_result_invalid_json: return "invalid json";
-    case cgltf_result_invalid_gltf: return "invalid glTF";
-    case cgltf_result_invalid_options: return "invalid options";
-    case cgltf_result_file_not_found: return "file not found";
-    case cgltf_result_io_error: return "io error";
-    case cgltf_result_out_of_memory: return "out of memory";
-    case cgltf_result_legacy_gltf: return "legacy glTF";
-    default: return "unknown error";
+  for (const ResultName& known : kResultNames) {
+    if (known.result == result) return known.name;
   }
+  return "unknown error";
 }
 
 std::vector<float> unpack_floats(const cgltf_accessor* accessor) {
@@ -51,15 +69,139 @@ std::vector<float> unpack_floats(const cgltf_accessor* accessor) {
   return out;
 }
 
+std::string text_or(const char* text, const std::string& fallback) { return text != nullptr ? text : fallback; }
+
 Transform read_local_transform(const cgltf_node& node) {
   if (node.has_matrix) return transform_from_matrix(node.matrix);
   Transform t;
-  if (node.has_translation) t.position = {node.translation[0], node.translation[1], node.translation[2]};
-  if (node.has_rotation) {
-    t.rotation = normalize(Quat{node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]});
-  }
-  if (node.has_scale) t.scale = {node.scale[0], node.scale[1], node.scale[2]};
+  if (node.has_translation) t.position = vec3_from(node.translation);
+  if (node.has_rotation) t.rotation = normalize(quat_from(node.rotation));
+  if (node.has_scale) t.scale = vec3_from(node.scale);
   return t;
+}
+
+std::optional<CameraDesc> read_camera(const cgltf_camera* camera) {
+  if (camera == nullptr || camera->type != cgltf_camera_type_perspective) return std::nullopt;
+  const auto& perspective = camera->data.perspective;
+  return CameraDesc{perspective.yfov, perspective.znear, perspective.has_zfar ? perspective.zfar : 0.0f};
+}
+
+LightType light_type_of(cgltf_light_type type) {
+  if (type == cgltf_light_type_point) return LightType::Point;
+  return type == cgltf_light_type_spot ? LightType::Spot : LightType::Directional;
+}
+
+LightDesc read_light(const cgltf_light& light) {
+  LightDesc out;
+  out.type = light_type_of(light.type);
+  out.color = {light.color[kRedChannel], light.color[kGreenChannel], light.color[kBlueChannel], kOpaqueAlpha};
+  out.intensity = light.intensity;
+  out.range = light.range;
+  return out;
+}
+
+AlphaMode alpha_mode_of(cgltf_alpha_mode mode) {
+  switch (mode) {
+    case cgltf_alpha_mode_mask:
+      return AlphaMode::Mask;
+    case cgltf_alpha_mode_blend:
+      return AlphaMode::Blend;
+    default:
+      return AlphaMode::Opaque;
+  }
+}
+
+// Linear RGB, already multiplied by the emissive strength.
+Vec3 emissive_of(const cgltf_material& material) {
+  const float strength = material.has_emissive_strength ? material.emissive_strength.emissive_strength : 1.0f;
+  return vec3_from(material.emissive_factor) * strength;
+}
+
+// What a channel animates; nullopt for morph target weights, which are not supported.
+std::optional<AnimationPath> path_of(cgltf_animation_path_type type) {
+  switch (type) {
+    case cgltf_animation_path_type_translation:
+      return AnimationPath::Translation;
+    case cgltf_animation_path_type_rotation:
+      return AnimationPath::Rotation;
+    case cgltf_animation_path_type_scale:
+      return AnimationPath::Scale;
+    default:
+      return std::nullopt;
+  }
+}
+
+std::vector<std::uint8_t> embedded_bytes(const cgltf_buffer_view& view) {
+  const auto* bytes = static_cast<const std::uint8_t*>(cgltf_buffer_view_data(&view));
+  if (bytes == nullptr) return {};
+  return {bytes, bytes + view.size};
+}
+
+std::vector<std::uint8_t> file_bytes(const std::filesystem::path& file) {
+  std::ifstream in(file, std::ios::binary);
+  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+bool names_a_file(const char* uri) { return uri != nullptr && std::string(uri).rfind(kDataUriPrefix, 0) != 0; }
+
+std::vector<std::uint8_t> to_joint_bytes(const cgltf_accessor* accessor) {
+  std::vector<std::uint8_t> out(accessor->count * kJointsPerVertex);
+  for (cgltf_size v = 0; v < accessor->count; ++v) {
+    cgltf_uint joints[kJointsPerVertex] = {};
+    cgltf_accessor_read_uint(accessor, v, joints, kJointsPerVertex);
+    for (int j = 0; j < kJointsPerVertex; ++j) {
+      out[v * kJointsPerVertex + j] = static_cast<std::uint8_t>(std::min<cgltf_uint>(joints[j], kMaxJointIndex));
+    }
+  }
+  return out;
+}
+
+std::vector<std::uint8_t> to_rgba_bytes(const cgltf_accessor* accessor) {
+  const std::vector<float> floats = unpack_floats(accessor);
+  const cgltf_size components = cgltf_num_components(accessor->type);
+  std::vector<std::uint8_t> out(accessor->count * kRgbaComponents);
+  for (cgltf_size v = 0; v < accessor->count; ++v) {
+    for (int c = 0; c < kRgbaComponents; ++c) {
+      const bool has_channel = c < static_cast<int>(components);
+      const float value = has_channel ? floats[v * components + c] : kOpaqueAlpha;
+      out[v * kRgbaComponents + c] = static_cast<std::uint8_t>(std::clamp(value, 0.0f, 1.0f) * config::kMaxColorByte);
+    }
+  }
+  return out;
+}
+
+// Where the floats of an attribute are kept; null for the attributes that are not kept as floats.
+std::vector<float>* floats_of(cgltf_attribute_type type, PrimitiveDesc& primitive) {
+  if (type == cgltf_attribute_type_position) return &primitive.positions;
+  if (type == cgltf_attribute_type_normal) return &primitive.normals;
+  if (type == cgltf_attribute_type_texcoord) return &primitive.texcoords;
+  return type == cgltf_attribute_type_weights ? &primitive.weights : nullptr;
+}
+
+// Only the first set of each attribute is kept (TEXCOORD_0, COLOR_0...).
+void read_attribute(const cgltf_attribute& attribute, PrimitiveDesc& out) {
+  if (attribute.index != 0) return;
+  if (std::vector<float>* floats = floats_of(attribute.type, out)) *floats = unpack_floats(attribute.data);
+  if (attribute.type == cgltf_attribute_type_color) out.colors = to_rgba_bytes(attribute.data);
+  if (attribute.type == cgltf_attribute_type_joints) out.joints = to_joint_bytes(attribute.data);
+}
+
+// The triangles' corners: as the file lists them, or every vertex in turn when it lists none.
+std::vector<std::uint32_t> read_indices(const cgltf_primitive& primitive, std::size_t vertex_count) {
+  const bool listed = primitive.indices != nullptr;
+  std::vector<std::uint32_t> indices(listed ? primitive.indices->count : vertex_count);
+  for (std::size_t k = 0; k < indices.size(); ++k) {
+    indices[k] = static_cast<std::uint32_t>(listed ? cgltf_accessor_read_index(primitive.indices, k) : k);
+  }
+  return indices;
+}
+
+std::array<float, kFloatsPerMatrix> inverse_bind_of(const cgltf_skin& skin, cgltf_size joint) {
+  std::array<float, kFloatsPerMatrix> matrix = kIdentityMatrix;
+  if (skin.inverse_bind_matrices != nullptr) {
+    cgltf_accessor_read_float(skin.inverse_bind_matrices, joint, matrix.data(), matrix.size());
+  }
+  return matrix;
 }
 
 class Loader {
@@ -82,23 +224,26 @@ class Loader {
     return item == nullptr ? kNoIndex : static_cast<int>(item - first);
   }
 
+  void warn(std::string warning) { result_.warnings.push_back(std::move(warning)); }
+
+  ImageData load_image(const cgltf_image& image) const {
+    ImageData out;
+    out.file_extension = text_or(image.mime_type, "") == kJpegMimeType ? kJpegExtension : kPngExtension;
+    if (image.buffer_view != nullptr) {
+      out.encoded = embedded_bytes(*image.buffer_view);
+    } else if (names_a_file(image.uri)) {
+      const std::filesystem::path file = base_dir_ / image.uri;
+      out.encoded = file_bytes(file);
+      if (file.has_extension()) out.file_extension = file.extension().string();
+    }
+    return out;
+  }
+
   void load_images() {
     for (cgltf_size i = 0; i < data_.images_count; ++i) {
-      const cgltf_image& image = data_.images[i];
-      ImageData out;
-      const std::string mime = image.mime_type ? image.mime_type : "";
-      out.file_extension = mime == "image/jpeg" ? ".jpg" : ".png";
-      if (image.buffer_view != nullptr) {
-        const auto* bytes = static_cast<const std::uint8_t*>(cgltf_buffer_view_data(image.buffer_view));
-        if (bytes != nullptr) out.encoded.assign(bytes, bytes + image.buffer_view->size);
-      } else if (image.uri != nullptr && std::string(image.uri).rfind("data:", 0) != 0) {
-        const std::filesystem::path file = base_dir_ / image.uri;
-        std::ifstream in(file, std::ios::binary);
-        out.encoded.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-        if (file.has_extension()) out.file_extension = file.extension().string();
-      }
-      if (out.encoded.empty()) result_.warnings.push_back("image " + std::to_string(i) + " has no readable data");
-      result_.scene.images.push_back(std::move(out));
+      ImageData image = load_image(data_.images[i]);
+      if (image.encoded.empty()) warn("image " + std::to_string(i) + " has no readable data");
+      result_.scene.images.push_back(std::move(image));
     }
   }
 
@@ -108,99 +253,80 @@ class Loader {
     return index_of(view.texture->image, data_.images);
   }
 
+  void read_pbr(const cgltf_material& material, MaterialDesc& out) const {
+    if (!material.has_pbr_metallic_roughness) return;
+    const auto& pbr = material.pbr_metallic_roughness;
+    const float* color = pbr.base_color_factor;
+    out.base_color = {color[kRedChannel], color[kGreenChannel], color[kBlueChannel], color[kAlphaChannel]};
+    out.metallic = pbr.metallic_factor;
+    out.roughness = pbr.roughness_factor;
+    out.base_color_image = image_of(pbr.base_color_texture);
+    out.metallic_roughness_image = image_of(pbr.metallic_roughness_texture);
+  }
+
+  // The pictures laid over the base color, and how strongly the first two count.
+  void read_detail_textures(const cgltf_material& material, MaterialDesc& out) const {
+    out.normal_image = image_of(material.normal_texture);
+    if (out.normal_image != kNoIndex) out.normal_scale = material.normal_texture.scale;
+    out.occlusion_image = image_of(material.occlusion_texture);
+    if (out.occlusion_image != kNoIndex) out.occlusion_strength = material.occlusion_texture.scale;
+    out.emissive_image = image_of(material.emissive_texture);
+  }
+
+  MaterialDesc load_material(const cgltf_material& material) const {
+    MaterialDesc out;
+    out.name = text_or(material.name, "");
+    read_pbr(material, out);
+    read_detail_textures(material, out);
+    out.emissive = emissive_of(material);
+    out.alpha_mode = alpha_mode_of(material.alpha_mode);
+    out.alpha_cutoff = material.alpha_cutoff;
+    out.double_sided = material.double_sided;
+    return out;
+  }
+
   void load_materials() {
     for (cgltf_size i = 0; i < data_.materials_count; ++i) {
-      const cgltf_material& material = data_.materials[i];
-      MaterialDesc out;
-      out.name = material.name ? material.name : "";
-      if (material.has_pbr_metallic_roughness) {
-        const auto& pbr = material.pbr_metallic_roughness;
-        out.base_color = {pbr.base_color_factor[0], pbr.base_color_factor[1], pbr.base_color_factor[2],
-                          pbr.base_color_factor[kAlphaChannel]};
-        out.metallic = pbr.metallic_factor;
-        out.roughness = pbr.roughness_factor;
-        out.base_color_image = image_of(pbr.base_color_texture);
-        out.metallic_roughness_image = image_of(pbr.metallic_roughness_texture);
-      }
-      out.normal_image = image_of(material.normal_texture);
-      if (out.normal_image != kNoIndex) out.normal_scale = material.normal_texture.scale;
-      out.occlusion_image = image_of(material.occlusion_texture);
-      if (out.occlusion_image != kNoIndex) out.occlusion_strength = material.occlusion_texture.scale;
-      out.emissive_image = image_of(material.emissive_texture);
-      const float strength = material.has_emissive_strength ? material.emissive_strength.emissive_strength : 1.0f;
-      out.emissive = Vec3{material.emissive_factor[0], material.emissive_factor[1], material.emissive_factor[2]} * strength;
-      out.alpha_mode = material.alpha_mode == cgltf_alpha_mode_mask    ? AlphaMode::Mask
-                       : material.alpha_mode == cgltf_alpha_mode_blend ? AlphaMode::Blend
-                                                                       : AlphaMode::Opaque;
-      out.alpha_cutoff = material.alpha_cutoff;
-      out.double_sided = material.double_sided;
-      result_.scene.materials.push_back(std::move(out));
+      result_.scene.materials.push_back(load_material(data_.materials[i]));
     }
   }
 
-  void load_meshes() {
-    for (cgltf_size i = 0; i < data_.meshes_count; ++i) {
-      const cgltf_mesh& mesh = data_.meshes[i];
-      MeshDesc out;
-      out.name = mesh.name ? mesh.name : "";
-      for (cgltf_size p = 0; p < mesh.primitives_count; ++p) {
-        const cgltf_primitive& primitive = mesh.primitives[p];
-        if (primitive.type != cgltf_primitive_type_triangles) {
-          result_.warnings.push_back("mesh '" + out.name + "': skipping non-triangle primitive");
-          continue;
-        }
-        out.primitives.push_back(load_primitive(primitive, out));
+  MeshDesc load_mesh(const cgltf_mesh& mesh) {
+    MeshDesc out;
+    out.name = text_or(mesh.name, "");
+    for (cgltf_size p = 0; p < mesh.primitives_count; ++p) {
+      const cgltf_primitive& primitive = mesh.primitives[p];
+      if (primitive.type != cgltf_primitive_type_triangles) {
+        warn("mesh '" + out.name + "': skipping non-triangle primitive");
+        continue;
       }
-      result_.scene.meshes.push_back(std::move(out));
+      out.primitives.push_back(load_primitive(primitive, out));
     }
+    return out;
+  }
+
+  void load_meshes() {
+    for (cgltf_size i = 0; i < data_.meshes_count; ++i) result_.scene.meshes.push_back(load_mesh(data_.meshes[i]));
+  }
+
+  // A mesh exported without normals is lit as if it faced up everywhere.
+  void ensure_normals(PrimitiveDesc& primitive, const std::string& mesh_name) {
+    if (primitive.normals.size() == primitive.positions.size()) return;
+    warn("mesh '" + mesh_name + "': missing normals, using +Y");
+    primitive.normals.assign(primitive.positions.size(), 0.0f);
+    const std::size_t vertex_count = primitive.positions.size() / config::kFloatsPerPosition;
+    for (std::size_t v = 0; v < vertex_count; ++v) primitive.normals[v * config::kFloatsPerNormal + kYOffset] = 1.0f;
   }
 
   PrimitiveDesc load_primitive(const cgltf_primitive& primitive, MeshDesc& mesh) {
     PrimitiveDesc out;
     out.material = index_of(primitive.material, data_.materials);
-    for (cgltf_size a = 0; a < primitive.attributes_count; ++a) {
-      const cgltf_attribute& attribute = primitive.attributes[a];
-      if (attribute.index != 0) continue;
-      switch (attribute.type) {
-        case cgltf_attribute_type_position: out.positions = unpack_floats(attribute.data); break;
-        case cgltf_attribute_type_normal: out.normals = unpack_floats(attribute.data); break;
-        case cgltf_attribute_type_texcoord: out.texcoords = unpack_floats(attribute.data); break;
-        case cgltf_attribute_type_color: out.colors = to_rgba_bytes(attribute.data); break;
-        case cgltf_attribute_type_joints: out.joints = to_joint_bytes(attribute.data); break;
-        case cgltf_attribute_type_weights: out.weights = unpack_floats(attribute.data); break;
-        default: break;
-      }
-    }
+    for (cgltf_size a = 0; a < primitive.attributes_count; ++a) read_attribute(primitive.attributes[a], out);
     const std::size_t vertex_count = out.positions.size() / config::kFloatsPerPosition;
-    if (out.normals.size() != out.positions.size()) {
-      result_.warnings.push_back("mesh '" + mesh.name + "': missing normals, using +Y");
-      out.normals.assign(out.positions.size(), 0.0f);
-      for (std::size_t v = 0; v < vertex_count; ++v) out.normals[v * config::kFloatsPerNormal + 1] = 1.0f;
-    }
-    if (primitive.indices != nullptr) {
-      out.indices.resize(primitive.indices->count);
-      for (cgltf_size k = 0; k < primitive.indices->count; ++k) {
-        out.indices[k] = static_cast<std::uint32_t>(cgltf_accessor_read_index(primitive.indices, k));
-      }
-    } else {
-      out.indices.resize(vertex_count);
-      for (std::size_t k = 0; k < vertex_count; ++k) out.indices[k] = static_cast<std::uint32_t>(k);
-    }
+    ensure_normals(out, mesh.name);
+    out.indices = read_indices(primitive, vertex_count);
     for (std::size_t v = 0; v < vertex_count; ++v) {
-      const float* p = &out.positions[v * config::kFloatsPerPosition];
-      mesh.bounds.include({p[0], p[1], p[2]});
-    }
-    return out;
-  }
-
-  static std::vector<std::uint8_t> to_joint_bytes(const cgltf_accessor* accessor) {
-    std::vector<std::uint8_t> out(accessor->count * kJointsPerVertex);
-    for (cgltf_size v = 0; v < accessor->count; ++v) {
-      cgltf_uint joints[kJointsPerVertex] = {};
-      cgltf_accessor_read_uint(accessor, v, joints, kJointsPerVertex);
-      for (int j = 0; j < kJointsPerVertex; ++j) {
-        out[v * kJointsPerVertex + j] = static_cast<std::uint8_t>(std::min<cgltf_uint>(joints[j], kMaxJointIndex));
-      }
+      mesh.bounds.include(vec3_from(&out.positions[v * config::kFloatsPerPosition]));
     }
     return out;
   }
@@ -215,24 +341,26 @@ class Loader {
     return indices;
   }
 
+  SkinDesc load_skin(const cgltf_skin& skin, const std::vector<int>& nodes) const {
+    SkinDesc out;
+    for (cgltf_size j = 0; j < skin.joints_count; ++j) {
+      out.joints.push_back(nodes[static_cast<std::size_t>(index_of(skin.joints[j], data_.nodes))]);
+      out.inverse_bind.push_back(inverse_bind_of(skin, j));
+    }
+    return out;
+  }
+
+  void warn_of_extra_joints(const cgltf_skin& skin, cgltf_size index) {
+    if (skin.joints_count <= kMaxJointIndex + 1) return;
+    warn("skin " + std::to_string(index) + " has more than " + std::to_string(kMaxJointIndex + 1) +
+         " joints: vertices of the extra ones follow the last supported joint");
+  }
+
   void load_skins() {
     const std::vector<int> nodes = node_indices();
     for (cgltf_size i = 0; i < data_.skins_count; ++i) {
-      const cgltf_skin& skin = data_.skins[i];
-      SkinDesc out;
-      if (skin.joints_count > kMaxJointIndex + 1) {
-        result_.warnings.push_back("skin " + std::to_string(i) + " has more than " +
-                                   std::to_string(kMaxJointIndex + 1) + " joints: vertices of the extra ones follow the last supported joint");
-      }
-      for (cgltf_size j = 0; j < skin.joints_count; ++j) {
-        out.joints.push_back(nodes[static_cast<std::size_t>(index_of(skin.joints[j], data_.nodes))]);
-        std::array<float, 16> matrix = kIdentityMatrix;
-        if (skin.inverse_bind_matrices != nullptr) {
-          cgltf_accessor_read_float(skin.inverse_bind_matrices, j, matrix.data(), matrix.size());
-        }
-        out.inverse_bind.push_back(matrix);
-      }
-      result_.scene.skins.push_back(std::move(out));
+      warn_of_extra_joints(data_.skins[i], i);
+      result_.scene.skins.push_back(load_skin(data_.skins[i], nodes));
     }
     for (NodeDesc& node : result_.scene.nodes) {
       if (node.source_node == kNoIndex) continue;
@@ -240,106 +368,100 @@ class Loader {
     }
   }
 
-  void load_animations() {
-    const std::vector<int> nodes = node_indices();
-    for (cgltf_size i = 0; i < data_.animations_count; ++i) {
-      const cgltf_animation& animation = data_.animations[i];
-      AnimationDesc out;
-      out.name = animation.name ? animation.name : "animation_" + std::to_string(i);
-      for (cgltf_size c = 0; c < animation.channels_count; ++c) {
-        const cgltf_animation_channel& channel = animation.channels[c];
-        if (channel.target_node == nullptr || channel.sampler == nullptr) continue;
-        AnimationChannel track;
-        switch (channel.target_path) {
-          case cgltf_animation_path_type_translation: track.path = AnimationPath::Translation; break;
-          case cgltf_animation_path_type_rotation: track.path = AnimationPath::Rotation; break;
-          case cgltf_animation_path_type_scale: track.path = AnimationPath::Scale; break;
-          default: continue;  // morph target weights are not supported
-        }
-        if (channel.sampler->interpolation == cgltf_interpolation_type_cubic_spline) {
-          result_.warnings.push_back("animation '" + out.name + "': cubic spline keys are not supported, skipped");
-          continue;
-        }
-        track.node = nodes[static_cast<std::size_t>(index_of(channel.target_node, data_.nodes))];
-        if (track.node == kNoIndex) continue;
-        track.times = unpack_floats(channel.sampler->input);
-        track.values = unpack_floats(channel.sampler->output);
-        if (track.times.empty()) continue;
-        out.duration = std::max(out.duration, track.times.back());
-        out.channels.push_back(std::move(track));
-      }
-      if (!out.channels.empty()) result_.scene.animations.push_back(std::move(out));
-    }
+  // What a channel animates; nullopt (warned about when it is worth it) for one that cannot be played.
+  std::optional<AnimationPath> playable_path(const cgltf_animation_channel& channel, const std::string& clip_name) {
+    if (channel.target_node == nullptr || channel.sampler == nullptr) return std::nullopt;
+    const std::optional<AnimationPath> path = path_of(channel.target_path);
+    if (!path || channel.sampler->interpolation != cgltf_interpolation_type_cubic_spline) return path;
+    warn("animation '" + clip_name + "': cubic spline keys are not supported, skipped");
+    return std::nullopt;
   }
 
-  static std::vector<std::uint8_t> to_rgba_bytes(const cgltf_accessor* accessor) {
-    const std::vector<float> floats = unpack_floats(accessor);
-    const cgltf_size components = cgltf_num_components(accessor->type);
-    std::vector<std::uint8_t> out(accessor->count * kRgbaComponents);
-    for (cgltf_size v = 0; v < accessor->count; ++v) {
-      for (int c = 0; c < kRgbaComponents; ++c) {
-        const bool has_channel = c < static_cast<int>(components);
-        const float value = has_channel ? floats[v * components + c] : kOpaqueAlpha;
-        out[v * kRgbaComponents + c] = static_cast<std::uint8_t>(std::clamp(value, 0.0f, 1.0f) * config::kMaxColorByte);
-      }
+  std::optional<AnimationChannel> load_channel(const cgltf_animation_channel& channel, const std::string& clip_name,
+                                               const std::vector<int>& nodes) {
+    const std::optional<AnimationPath> path = playable_path(channel, clip_name);
+    if (!path) return std::nullopt;
+    AnimationChannel track;
+    track.path = *path;
+    track.node = nodes[static_cast<std::size_t>(index_of(channel.target_node, data_.nodes))];
+    if (track.node == kNoIndex) return std::nullopt;
+    track.times = unpack_floats(channel.sampler->input);
+    track.values = unpack_floats(channel.sampler->output);
+    if (track.times.empty()) return std::nullopt;
+    return track;
+  }
+
+  AnimationDesc load_animation(const cgltf_animation& animation, cgltf_size index, const std::vector<int>& nodes) {
+    AnimationDesc out;
+    out.name = text_or(animation.name, "animation_" + std::to_string(index));
+    for (cgltf_size c = 0; c < animation.channels_count; ++c) {
+      std::optional<AnimationChannel> track = load_channel(animation.channels[c], out.name, nodes);
+      if (!track) continue;
+      out.duration = std::max(out.duration, track->times.back());
+      out.channels.push_back(std::move(*track));
     }
     return out;
   }
 
-  void load_nodes() {
-    const cgltf_scene* scene = data_.scene != nullptr ? data_.scene
-                               : (data_.scenes_count > 0 ? &data_.scenes[0] : nullptr);
-    if (scene != nullptr) {
-      for (cgltf_size i = 0; i < scene->nodes_count; ++i) add_node(*scene->nodes[i], kNoIndex);
-    } else {
-      for (cgltf_size i = 0; i < data_.nodes_count; ++i) {
-        if (data_.nodes[i].parent == nullptr) add_node(data_.nodes[i], kNoIndex);
-      }
+  void load_animations() {
+    const std::vector<int> nodes = node_indices();
+    for (cgltf_size i = 0; i < data_.animations_count; ++i) {
+      AnimationDesc clip = load_animation(data_.animations[i], i, nodes);
+      if (!clip.channels.empty()) result_.scene.animations.push_back(std::move(clip));
     }
   }
 
-  void add_node(const cgltf_node& node, int parent) {
-    const int index = static_cast<int>(result_.scene.nodes.size());
+  // The scene the file opens with, or its first one; null for a file that has none.
+  const cgltf_scene* default_scene() const {
+    if (data_.scene != nullptr) return data_.scene;
+    return data_.scenes_count > 0 ? &data_.scenes[0] : nullptr;
+  }
+
+  void load_nodes() {
+    const cgltf_scene* scene = default_scene();
+    if (scene == nullptr) return add_parentless_nodes();
+    for (cgltf_size i = 0; i < scene->nodes_count; ++i) add_node(*scene->nodes[i], kNoIndex);
+  }
+
+  void add_parentless_nodes() {
+    for (cgltf_size i = 0; i < data_.nodes_count; ++i) {
+      if (data_.nodes[i].parent == nullptr) add_node(data_.nodes[i], kNoIndex);
+    }
+  }
+
+  void warn_of_skipped_property(const std::string& node_name, const std::string& key) {
+    warn("node '" + node_name + "': property '" + key + "' is not a scalar, ignored");
+  }
+
+  // A node's extras (Blender custom properties), with a warning for each thing left out.
+  PropertyMap read_props(const cgltf_node& node, const std::string& node_name) {
+    if (node.extras.data == nullptr) return {};
+    ExtrasParseResult parsed = parse_extras(node.extras.data);
+    if (!parsed.ok) warn("node '" + node_name + "': bad extras (" + parsed.error + ")");
+    for (const std::string& key : parsed.skipped_keys) warn_of_skipped_property(node_name, key);
+    return std::move(parsed.properties);
+  }
+
+  NodeDesc read_node(const cgltf_node& node, int parent, int index) {
     NodeDesc out;
-    out.name = node.name ? node.name : "node_" + std::to_string(index);
+    out.name = text_or(node.name, "node_" + std::to_string(index));
     out.parent = parent;
     out.local = read_local_transform(node);
     out.mesh = index_of(node.mesh, data_.meshes);
-    if (node.camera != nullptr && node.camera->type == cgltf_camera_type_perspective) {
-      const auto& perspective = node.camera->data.perspective;
-      out.camera = CameraDesc{perspective.yfov, perspective.znear,
-                              perspective.has_zfar ? perspective.zfar : 0.0f};
-    }
+    out.camera = read_camera(node.camera);
     if (node.light != nullptr) out.light = read_light(*node.light);
     out.source_node = index_of(&node, data_.nodes);
     out.source_camera = index_of(node.camera, data_.cameras);
     out.source_light = index_of(node.light, data_.lights);
-    if (node.extras.data != nullptr) {
-      ExtrasParseResult parsed = parse_extras(node.extras.data);
-      if (!parsed.ok) {
-        result_.warnings.push_back("node '" + out.name + "': bad extras (" + parsed.error + ")");
-      }
-      for (const std::string& key : parsed.skipped_keys) {
-        result_.warnings.push_back("node '" + out.name + "': property '" + key + "' is not a scalar, ignored");
-      }
-      out.props = std::move(parsed.properties);
-    }
-    result_.scene.nodes.push_back(std::move(out));
-    if (parent != kNoIndex) result_.scene.nodes[parent].children.push_back(index);
-    for (cgltf_size c = 0; c < node.children_count; ++c) add_node(*node.children[c], index);
+    out.props = read_props(node, out.name);
+    return out;
   }
 
-  static LightDesc read_light(const cgltf_light& light) {
-    LightDesc out;
-    switch (light.type) {
-      case cgltf_light_type_point: out.type = LightType::Point; break;
-      case cgltf_light_type_spot: out.type = LightType::Spot; break;
-      default: out.type = LightType::Directional; break;
-    }
-    out.color = {light.color[0], light.color[1], light.color[2], kOpaqueAlpha};
-    out.intensity = light.intensity;
-    out.range = light.range;
-    return out;
+  void add_node(const cgltf_node& node, int parent) {
+    const int index = static_cast<int>(result_.scene.nodes.size());
+    result_.scene.nodes.push_back(read_node(node, parent, index));
+    if (parent != kNoIndex) result_.scene.nodes[parent].children.push_back(index);
+    for (cgltf_size c = 0; c < node.children_count; ++c) add_node(*node.children[c], index);
   }
 
   const cgltf_data& data_;
@@ -347,28 +469,32 @@ class Loader {
   LoadResult& result_;
 };
 
+// One step of opening a file: false (and why, in `error`) when it failed.
+bool succeeded(cgltf_result status, const char* failure, const std::string& path, std::string& error) {
+  if (status == cgltf_result_success) return true;
+  error = std::string(failure) + " '" + path + "': " + describe(status);
+  return false;
+}
+
+// The file parsed, with its buffers, and checked; null (and why, in `error`) when any of that fails.
+CgltfPtr open_gltf(const std::string& path, std::string& error) {
+  cgltf_options options{};
+  cgltf_data* raw = nullptr;
+  const cgltf_result parsed = cgltf_parse_file(&options, path.c_str(), &raw);
+  CgltfPtr data(raw);
+  const bool opened =
+      succeeded(parsed, "cannot parse", path, error) &&
+      succeeded(cgltf_load_buffers(&options, data.get(), path.c_str()), "cannot load buffers of", path, error) &&
+      succeeded(cgltf_validate(data.get()), "invalid glTF", path, error);
+  return opened ? std::move(data) : nullptr;
+}
+
 }  // namespace
 
 LoadResult load_gltf_scene(const std::string& path) {
   LoadResult result;
-  cgltf_options options{};
-  cgltf_data* raw = nullptr;
-  cgltf_result status = cgltf_parse_file(&options, path.c_str(), &raw);
-  CgltfPtr data(raw);
-  if (status != cgltf_result_success) {
-    result.error = "cannot parse '" + path + "': " + describe(status);
-    return result;
-  }
-  status = cgltf_load_buffers(&options, data.get(), path.c_str());
-  if (status != cgltf_result_success) {
-    result.error = "cannot load buffers of '" + path + "': " + describe(status);
-    return result;
-  }
-  status = cgltf_validate(data.get());
-  if (status != cgltf_result_success) {
-    result.error = "invalid glTF '" + path + "': " + describe(status);
-    return result;
-  }
+  const CgltfPtr data = open_gltf(path, result.error);
+  if (data == nullptr) return result;
   Loader(*data, std::filesystem::path(path).parent_path(), result).run();
   result.ok = true;
   return result;

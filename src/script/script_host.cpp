@@ -11,6 +11,7 @@
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "generated/ruby_prelude.hpp"
+#include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 #include "script/bindings/network_bindings.hpp"
 #include "script/script_naming.hpp"
@@ -25,19 +26,30 @@ constexpr const char* kNetworkEventEntry = "__event";
 constexpr const char* kSceneResetEntry = "__scene_reset";
 
 // What Ruby calls each kind of network event.
+struct EventName {
+  net::NetworkEvent::Kind kind;
+  const char* name;
+};
+constexpr const char* kMessageEvent = "message";
+constexpr EventName kEventNames[] = {
+    {net::NetworkEvent::Kind::Connected, "connected"},
+    {net::NetworkEvent::Kind::Failed, "failed"},
+    {net::NetworkEvent::Kind::Disconnected, "disconnected"},
+    {net::NetworkEvent::Kind::PeerJoined, "joined"},
+    {net::NetworkEvent::Kind::PeerLeft, "left"},
+    {net::NetworkEvent::Kind::Message, kMessageEvent},
+};
+
 const char* network_event_name(net::NetworkEvent::Kind kind) {
-  switch (kind) {
-    case net::NetworkEvent::Kind::Connected: return "connected";
-    case net::NetworkEvent::Kind::Failed: return "failed";
-    case net::NetworkEvent::Kind::Disconnected: return "disconnected";
-    case net::NetworkEvent::Kind::PeerJoined: return "joined";
-    case net::NetworkEvent::Kind::PeerLeft: return "left";
-    case net::NetworkEvent::Kind::Message: return "message";
+  for (const EventName& known : kEventNames) {
+    if (known.kind == kind) return known.name;
   }
-  return "message";
+  return kMessageEvent;
 }
 
 constexpr const char* kObjectsCacheGlobal = "$__redgem_objects";
+constexpr const char* kBehaviourClass = "Behaviour";
+constexpr const char* kBehavioursVariable = "@behaviours";  // a GameObject's behaviours, kept by the prelude
 
 }  // namespace
 
@@ -47,8 +59,7 @@ ScriptHost::ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir
     : context_(context), scripts_dir_(std::move(scripts_dir)) {
   mrb_state* mrb = vm_.state();
   mrb->ud = this;
-  objects_cache_ = mrb_ary_new(mrb);
-  mrb_gv_set(mrb, mrb_intern_cstr(mrb, kObjectsCacheGlobal), objects_cache_);
+  start_objects_cache();
   install_bindings(mrb);
   load_prelude();
 }
@@ -65,9 +76,7 @@ void ScriptHost::report_error(const std::string& where, const std::string& error
   log::error(where + ": " + error);
 }
 
-RubyResult ScriptHost::eval(const std::string& code, const std::string& file_name) {
-  return vm_.eval(code, file_name);
-}
+RubyResult ScriptHost::eval(const std::string& code, const std::string& file_name) { return vm_.eval(code, file_name); }
 
 RubyResult ScriptHost::load_file(const std::filesystem::path& path) {
   std::ifstream in(path);
@@ -87,10 +96,10 @@ mrb_value ScriptHost::object_value(ObjectId object) {
   if (object < 0) return mrb_nil_value();
   mrb_value cached = mrb_ary_entry(objects_cache_, object);
   if (!mrb_nil_p(cached)) return cached;
-  RClass* klass = mrb_class_get(mrb, "GameObject");
+  RClass* klass = mrb_class_get(mrb, binding::kGameObjectClass);
   mrb_value wrapper = mrb_obj_value(mrb_obj_alloc(mrb, MRB_TT_OBJECT, klass));
-  mrb_iv_set(mrb, wrapper, mrb_intern_lit(mrb, "@id"), mrb_int_value(mrb, object));
-  mrb_iv_set(mrb, wrapper, mrb_intern_lit(mrb, "@behaviours"), mrb_ary_new(mrb));
+  mrb_iv_set(mrb, wrapper, mrb_intern_cstr(mrb, binding::kIdVariable), mrb_int_value(mrb, object));
+  mrb_iv_set(mrb, wrapper, mrb_intern_cstr(mrb, kBehavioursVariable), mrb_ary_new(mrb));
   mrb_ary_set(mrb, objects_cache_, object, wrapper);
   return wrapper;
 }
@@ -100,9 +109,13 @@ void ScriptHost::attach_scripts() {
 }
 
 void ScriptHost::reset_scene() {
-  mrb_state* mrb = vm_.state();
   behaviours_.clear();
   vm_.release_kept();
+  start_objects_cache();
+}
+
+void ScriptHost::start_objects_cache() {
+  mrb_state* mrb = vm_.state();
   objects_cache_ = mrb_ary_new(mrb);
   mrb_gv_set(mrb, mrb_intern_cstr(mrb, kObjectsCacheGlobal), objects_cache_);
 }
@@ -117,11 +130,10 @@ void ScriptHost::dispatch(const net::NetworkEvent& event) {
   mrb_state* mrb = vm_.state();
   const int arena = mrb_gc_arena_save(mrb);
   const char* kind = network_event_name(event.kind);
-  const RubyResult result =
-      vm_.call(mrb_obj_value(mrb_module_get(mrb, kNetworkModule)), kNetworkEventEntry,
-               {mrb_symbol_value(mrb_intern_cstr(mrb, kind)), mrb_int_value(mrb, event.peer),
-                mrb_str_new(mrb, event.name.data(), static_cast<mrb_int>(event.name.size())),
-                value_from(mrb, event.data)});
+  const RubyResult result = vm_.call(
+      mrb_obj_value(mrb_module_get(mrb, kNetworkModule)), kNetworkEventEntry,
+      {mrb_symbol_value(mrb_intern_cstr(mrb, kind)), mrb_int_value(mrb, event.peer),
+       mrb_str_new(mrb, event.name.data(), static_cast<mrb_int>(event.name.size())), value_from(mrb, event.data)});
   mrb_gc_arena_restore(mrb, arena);
   // A failing handler does not take the game down, nor the connection.
   if (!result.ok) report_error(std::string("a Network handler (") + kind + " " + event.name + ")", result.error);
@@ -161,37 +173,39 @@ void ScriptHost::attach(ObjectId object, const std::string& script) {
   instantiate(object, mrb_class_get(mrb, class_name.c_str()), class_name);
 }
 
-mrb_value ScriptHost::instantiate(ObjectId object, RClass* klass, const std::string& class_name) {
+bool ScriptHost::is_behaviour_class(RClass* klass) {
   mrb_state* mrb = vm_.state();
+  if (!mrb_obj_is_kind_of(mrb, mrb_obj_value(klass), mrb->class_class)) return false;
+  if (!mrb_class_defined(mrb, kBehaviourClass)) return false;
+  const mrb_value behaviour = mrb_obj_value(mrb_class_get(mrb, kBehaviourClass));
+  return mrb_test(vm_.call(mrb_obj_value(klass), "<=", {behaviour}).value);
+}
+
+mrb_value ScriptHost::not_created(const std::string& where, const std::string& error) {
+  report_error(where, error);
+  return mrb_nil_value();
+}
+
+mrb_value ScriptHost::instantiate(ObjectId object, RClass* klass, const std::string& class_name) {
   const std::string& object_name = context_.scene->at(object).name;
-  if (!mrb_obj_is_kind_of(mrb, mrb_obj_value(klass), mrb->class_class) ||
-      !mrb_class_defined(mrb, "Behaviour") ||
-      !mrb_test(vm_.call(mrb_obj_value(klass), "<=", {mrb_obj_value(mrb_class_get(mrb, "Behaviour"))}).value)) {
-    report_error("object '" + object_name + "'", class_name + " must inherit from Behaviour");
-    return mrb_nil_value();
+  if (!is_behaviour_class(klass)) {
+    return not_created("object '" + object_name + "'", class_name + " must inherit from Behaviour");
   }
   const RubyResult instance = vm_.call(mrb_obj_value(klass), "new");
-  if (!instance.ok) {
-    report_error(class_name + ".new on '" + object_name + "'", instance.error);
-    return mrb_nil_value();
-  }
+  if (!instance.ok) return not_created(class_name + ".new on '" + object_name + "'", instance.error);
   const RubyResult attached = vm_.call(instance.value, "__attach", {object_value(object)});
-  if (!attached.ok) {
-    report_error(class_name + "#__attach", attached.error);
-    return mrb_nil_value();
-  }
+  if (!attached.ok) return not_created(class_name + "#__attach", attached.error);
   vm_.keep_alive(instance.value);
   behaviours_.push_back({object, instance.value, class_name, false, true});
   return instance.value;
 }
 
 mrb_value ScriptHost::add_behaviour(ObjectId object, mrb_value klass) {
-  mrb_state* mrb = vm_.state();
-  if (!mrb_class_p(klass)) {
-    report_error("object '" + context_.scene->at(object).name + "'", "add_component needs a Behaviour class");
-    return mrb_nil_value();
+  const bool is_class = mrb_class_p(klass);
+  if (!is_class) {
+    return not_created("object '" + context_.scene->at(object).name + "'", "add_component needs a Behaviour class");
   }
-  return instantiate(object, mrb_class_ptr(klass), mrb_class_name(mrb, mrb_class_ptr(klass)));
+  return instantiate(object, mrb_class_ptr(klass), mrb_class_name(vm_.state(), mrb_class_ptr(klass)));
 }
 
 bool ScriptHost::require_class(const std::string& class_name) {
@@ -228,16 +242,17 @@ void ScriptHost::invoke(std::size_t index, const char* method, std::initializer_
   const int arena = mrb_gc_arena_save(vm_.state());
   const RubyResult result = vm_.call(instance, method, args);
   mrb_gc_arena_restore(vm_.state(), arena);
-  if (!result.ok) {
-    // A failing script keeps the game running; the behaviour is disabled.
-    BehaviourSlot& slot = behaviours_[index];
-    slot.enabled = false;
-    // (Timers and the behaviour's update run through one entry point: to the user it is "update".)
-    const std::string shown = std::string(method) == kUpdateEntry ? "update" : method;
-    report_error(slot.class_name + "#" + shown + " on '" + context_.scene->at(slot.object).name +
-                     "' (behaviour disabled)",
-                 result.error);
-  }
+  if (!result.ok) disable_failed(index, method, result.error);
+}
+
+// A failing script keeps the game running; the behaviour is disabled.
+void ScriptHost::disable_failed(std::size_t index, const char* method, const std::string& error) {
+  BehaviourSlot& slot = behaviours_[index];
+  slot.enabled = false;
+  // (Timers and the behaviour's update run through one entry point: to the user it is "update".)
+  const std::string shown = std::string(method) == kUpdateEntry ? "update" : method;
+  const std::string& object_name = context_.scene->at(slot.object).name;
+  report_error(slot.class_name + "#" + shown + " on '" + object_name + "' (behaviour disabled)", error);
 }
 
 void ScriptHost::invoke_on_object(ObjectId object, const char* method, std::initializer_list<mrb_value> args) {

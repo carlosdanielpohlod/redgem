@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <cmath>
+
 #include "input/touch_controls.hpp"
 
 using namespace redgem;
@@ -8,12 +10,12 @@ namespace {
 
 constexpr float kWidth = 1600.0f;
 constexpr float kHeight = 720.0f;
-constexpr int kThumb = 7;        // ids of the fingers
+constexpr int kThumb = 7;  // ids of the fingers
 constexpr int kOtherFinger = 9;
-constexpr float kLanding = 300.0f;   // where the left thumb lands, both ways
-constexpr float kFarPush = 400.0f;   // pixels: much further than the stick reaches, yet a move a thumb makes
+constexpr float kLanding = 300.0f;  // where the left thumb lands, both ways
+constexpr float kFarPush = 400.0f;  // pixels: much further than the stick reaches, yet a move a thumb makes
 constexpr float kRightSide = 1200.0f;
-constexpr int kWanderSteps = 10;     // frames a thumb takes to slide across the screen
+constexpr int kWanderSteps = 10;  // frames a thumb takes to slide across the screen
 
 float axis(const GamepadSample& pad, GamepadAxis which) { return pad.axes[static_cast<std::size_t>(which)]; }
 bool button(const GamepadSample& pad, GamepadButton which) { return pad.buttons[static_cast<std::size_t>(which)]; }
@@ -27,8 +29,8 @@ TEST_CASE("with no finger down the touch gamepad is there, at rest") {
   CHECK(axis(pad, GamepadAxis::LeftX) == doctest::Approx(0.0f));
   CHECK_FALSE(button(pad, GamepadButton::A));
   CHECK_FALSE(controls.layout().stick_base.pressed);
-  CHECK(controls.layout().a.x > kWidth / 2.0f);          // the buttons are on the right
-  CHECK(controls.layout().stick_base.x < kWidth / 2.0f); // the stick rests on the left
+  CHECK(controls.layout().a.x > kWidth / 2.0f);           // the buttons are on the right
+  CHECK(controls.layout().stick_base.x < kWidth / 2.0f);  // the stick rests on the left
 }
 
 TEST_CASE("the stick starts where the left thumb lands and follows it, up to a full push") {
@@ -48,8 +50,9 @@ TEST_CASE("the stick starts where the left thumb lands and follows it, up to a f
   const TouchCircle a_button = controls.layout().a;
   for (int step = 1; step <= kWanderSteps; ++step) {
     const float along = static_cast<float>(step) / static_cast<float>(kWanderSteps);
-    pad = controls.update({{kThumb, kLanding + (a_button.x - kLanding) * along, kLanding + (a_button.y - kLanding) * along}},
-                          kWidth, kHeight);
+    pad = controls.update(
+        {{kThumb, kLanding + (a_button.x - kLanding) * along, kLanding + (a_button.y - kLanding) * along}}, kWidth,
+        kHeight);
   }
   CHECK(axis(pad, GamepadAxis::LeftX) == doctest::Approx(1.0f).epsilon(0.05));
   CHECK_FALSE(button(pad, GamepadButton::A));
@@ -95,4 +98,22 @@ TEST_CASE("a finger that lands on a button with the lifted thumb's number is a b
   CHECK(button(pad, GamepadButton::A));
   CHECK(axis(pad, GamepadAxis::LeftX) == doctest::Approx(0.0f));
   CHECK_FALSE(controls.layout().stick_base.pressed);
+}
+
+TEST_CASE("a stick is pushed by how far the thumb is from where it landed, never past its reach") {
+  constexpr float kReach = 100.0f;
+  constexpr float kHalfWay = 50.0f;
+  constexpr float kFar = 300.0f;
+  const StickPush half = stick_push(kHalfWay, 0.0f, kReach);
+  CHECK(half.x == doctest::Approx(kHalfWay / kReach));
+  CHECK(half.y == doctest::Approx(0.0f));
+  // Far off in a diagonal: a full push, still in that direction.
+  const StickPush far = stick_push(-kFar, kFar, kReach);
+  CHECK(std::hypot(far.x, far.y) == doctest::Approx(1.0f));
+  CHECK(far.x == doctest::Approx(-far.y));
+  CHECK(far.x < 0.0f);
+  // A stick with no reach cannot be pushed.
+  const StickPush none = stick_push(kHalfWay, kHalfWay, 0.0f);
+  CHECK(none.x == 0.0f);
+  CHECK(none.y == 0.0f);
 }

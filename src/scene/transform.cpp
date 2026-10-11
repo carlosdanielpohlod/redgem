@@ -3,17 +3,20 @@
 namespace redgem {
 namespace {
 
-constexpr int kColumnStride = 4;
+// Where each column of a column-major 4x4 matrix starts.
+constexpr int kXAxisColumn = 0;
+constexpr int kYAxisColumn = 4;
+constexpr int kZAxisColumn = 8;
 constexpr int kTranslationColumn = 12;
 
 }  // namespace
 
 Transform transform_from_matrix(const float* m) {
-  const Vec3 c0{m[0], m[1], m[2]};
-  const Vec3 c1{m[kColumnStride], m[kColumnStride + 1], m[kColumnStride + 2]};
-  const Vec3 c2{m[2 * kColumnStride], m[2 * kColumnStride + 1], m[2 * kColumnStride + 2]};
+  const Vec3 c0 = vec3_from(m + kXAxisColumn);
+  const Vec3 c1 = vec3_from(m + kYAxisColumn);
+  const Vec3 c2 = vec3_from(m + kZAxisColumn);
   Transform t;
-  t.position = {m[kTranslationColumn], m[kTranslationColumn + 1], m[kTranslationColumn + 2]};
+  t.position = vec3_from(m + kTranslationColumn);
   t.scale = {length(c0), length(c1), length(c2)};
   t.rotation = quat_from_basis(normalize(c0), normalize(c1), normalize(c2));
   return t;

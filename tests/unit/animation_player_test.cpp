@@ -138,7 +138,7 @@ struct Crowd {
   SceneDesc desc;
   Scene scene;
   AnimationPlayer player;
-  ObjectId first = kNoObject;   // roots of the copies
+  ObjectId first = kNoObject;  // roots of the copies
   ObjectId second = kNoObject;
   ObjectId first_arm = kNoObject;
   ObjectId second_arm = kNoObject;
@@ -189,7 +189,7 @@ struct Crowd {
 
 TEST_CASE("one copy of a character plays a clip of its own while the others follow the scene") {
   Crowd crowd;
-  CHECK(crowd.player.play_on(crowd.scene, crowd.first, "Run", true, 1.0f, 0.0f, false));
+  CHECK(crowd.player.play_on(crowd.scene, crowd.first, "Run", ClipStart{true, 1.0f, 0.0f, false}));
   crowd.advance(kQuarter);
   CHECK(crowd.x(crowd.first_arm) == doctest::Approx(kRunX));
   CHECK(crowd.x(crowd.second_arm) == doctest::Approx(kDistance / 4.0f));
@@ -199,13 +199,13 @@ TEST_CASE("one copy of a character plays a clip of its own while the others foll
   CHECK(crowd.player.playing_on(crowd.scene, crowd.first));
   CHECK(crowd.player.time_on(crowd.scene, crowd.first) == doctest::Approx(kQuarter));
   CHECK_FALSE(crowd.player.clip_on(crowd.scene, crowd.second).has_value());
-  CHECK_FALSE(crowd.player.play_on(crowd.scene, crowd.second, "Dance", true, 1.0f, 0.0f, false));
+  CHECK_FALSE(crowd.player.play_on(crowd.scene, crowd.second, "Dance", ClipStart{true, 1.0f, 0.0f, false}));
 }
 
 TEST_CASE("a character fades from what it was doing to its new clip") {
   Crowd crowd;
   crowd.advance(kQuarter);
-  crowd.player.play_on(crowd.scene, crowd.first, "Run", true, 1.0f, kFade, false);
+  crowd.player.play_on(crowd.scene, crowd.first, "Run", ClipStart{true, 1.0f, kFade, false});
   crowd.advance(kFade * kHalfWeight);
   // Halfway between where the walk has it by now and where the run holds it.
   const float walking = crowd.x(crowd.second_arm);
@@ -250,7 +250,7 @@ TEST_CASE("a second clip is mixed over what a character does, by its weight") {
 
 TEST_CASE("an object of the level is a character too: itself and what is under it") {
   Crowd crowd;
-  crowd.player.play_on(crowd.scene, Crowd::kPerson, "Run", true, 1.0f, 0.0f, false);
+  crowd.player.play_on(crowd.scene, Crowd::kPerson, "Run", ClipStart{true, 1.0f, 0.0f, false});
   crowd.advance(kQuarter);
   CHECK(crowd.x(Crowd::kArm) == doctest::Approx(kRunX));
   CHECK(crowd.x(crowd.first_arm) == doctest::Approx(kDistance / 4.0f));  // its copies still walk
@@ -258,11 +258,11 @@ TEST_CASE("an object of the level is a character too: itself and what is under i
 
 TEST_CASE("a character's own clip can play once, pause and start over") {
   Crowd crowd;
-  crowd.player.play_on(crowd.scene, crowd.first, "Walk", false, 1.0f, 0.0f, false);
+  crowd.player.play_on(crowd.scene, crowd.first, "Walk", ClipStart{false, 1.0f, 0.0f, false});
   crowd.advance(kDuration + kQuarter);
   CHECK(crowd.x(crowd.first_arm) == doctest::Approx(kDistance));  // held at its end
   CHECK_FALSE(crowd.player.playing_on(crowd.scene, crowd.first));
-  crowd.player.play_on(crowd.scene, crowd.first, "Walk", false, 1.0f, 0.0f, false);  // ended: starts over
+  crowd.player.play_on(crowd.scene, crowd.first, "Walk", ClipStart{false, 1.0f, 0.0f, false});  // ended: starts over
   crowd.advance(kQuarter);
   CHECK(crowd.x(crowd.first_arm) == doctest::Approx(kDistance / 4.0f));
   crowd.player.pause_on(crowd.scene, crowd.first);
@@ -272,7 +272,7 @@ TEST_CASE("a character's own clip can play once, pause and start over") {
 
 TEST_CASE("a destroyed character is forgotten") {
   Crowd crowd;
-  crowd.player.play_on(crowd.scene, crowd.first, "Run", true, 1.0f, 0.0f, false);
+  crowd.player.play_on(crowd.scene, crowd.first, "Run", ClipStart{true, 1.0f, 0.0f, false});
   crowd.scene.request_destroy(crowd.first);
   for (const ObjectId gone : crowd.scene.pending_destroy_ids()) crowd.scene.finalize_destroy(gone);
   crowd.advance(kQuarter);

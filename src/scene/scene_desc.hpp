@@ -3,6 +3,7 @@
 // Plain data produced by the glTF loader. No third-party types leak out of the loader.
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -15,6 +16,9 @@
 namespace redgem {
 
 inline constexpr int kNoIndex = -1;
+// glTF's alpha cutoff when a masked material gives none: texels less opaque than this are not drawn.
+inline constexpr float kDefaultAlphaCutoff = 0.5f;
+inline constexpr std::size_t kFloatsPerMatrix = 16;  // a 4x4 matrix
 
 struct Color {
   float r = 1.0f;
@@ -40,25 +44,25 @@ struct MaterialDesc {
   int metallic_roughness_image = kNoIndex;  // G = roughness, B = metallic (glTF convention)
   int normal_image = kNoIndex;
   float normal_scale = 1.0f;
-  int occlusion_image = kNoIndex;           // R = ambient occlusion
+  int occlusion_image = kNoIndex;  // R = ambient occlusion
   float occlusion_strength = 1.0f;
-  Vec3 emissive = Vec3::zero();             // linear RGB, already multiplied by emissive strength
+  Vec3 emissive = Vec3::zero();  // linear RGB, already multiplied by emissive strength
   int emissive_image = kNoIndex;
   AlphaMode alpha_mode = AlphaMode::Opaque;
-  float alpha_cutoff = 0.5f;
+  float alpha_cutoff = kDefaultAlphaCutoff;
   bool double_sided = false;
 };
 
 struct PrimitiveDesc {
-  std::vector<float> positions;          // xyz
-  std::vector<float> normals;            // xyz, same count as positions
-  std::vector<float> texcoords;          // uv, empty when absent
-  std::vector<std::uint8_t> colors;      // rgba, empty when absent
-  std::vector<std::uint32_t> indices;    // triangle list
+  std::vector<float> positions;        // xyz
+  std::vector<float> normals;          // xyz, same count as positions
+  std::vector<float> texcoords;        // uv, empty when absent
+  std::vector<std::uint8_t> colors;    // rgba, empty when absent
+  std::vector<std::uint32_t> indices;  // triangle list
   // Skinning (both empty on rigid meshes): for each vertex, up to 4 joints of the node's skin and
   // how much each one moves it.
-  std::vector<std::uint8_t> joints;      // 4 per vertex, indices into SkinDesc::joints
-  std::vector<float> weights;            // 4 per vertex
+  std::vector<std::uint8_t> joints;  // 4 per vertex, indices into SkinDesc::joints
+  std::vector<float> weights;        // 4 per vertex
   int material = kNoIndex;
 };
 
@@ -98,7 +102,7 @@ struct SkinDesc {
   std::vector<int> joints;  // node indices (kNoIndex for a joint whose node was deleted)
   // Per joint, the matrix that brings a vertex from the mesh's bind pose into the joint's space
   // (column-major, as in glTF).
-  std::vector<std::array<float, 16>> inverse_bind;
+  std::vector<std::array<float, kFloatsPerMatrix>> inverse_bind;
 };
 
 enum class AnimationPath { Translation, Rotation, Scale };

@@ -8,10 +8,15 @@
 
 namespace redgem {
 
+// A channel's value: 3 floats for translation and scale, 4 for a rotation (the last one unused
+// otherwise).
+inline constexpr std::size_t kMaxChannelFloats = 4;
+using ChannelValue = std::array<float, kMaxChannelFloats>;
+
 // The value of a channel at `time` seconds (clamped to its first and last keys): 3 floats for
 // translation and scale, a normalized quaternion (x y z w) for rotation. Keys are interpolated
 // linearly (rotations along the shortest arc).
-std::array<float, 4> sample_channel(const AnimationChannel& channel, float time);
+ChannelValue sample_channel(const AnimationChannel& channel, float time);
 
 // Poses the nodes a clip animates as they are `time` seconds into it, looping. Nodes that no
 // longer exist are skipped. Copies of those nodes (Scene::clone) are posed too, each as far

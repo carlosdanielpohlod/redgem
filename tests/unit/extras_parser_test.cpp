@@ -42,3 +42,19 @@ TEST_CASE("malformed json reports an error") {
     CHECK(result.properties.empty());
   }
 }
+
+TEST_CASE("every one-letter escape is decoded, and an unknown one is an error") {
+  const auto result = parse_extras(R"({"text": "\/ \b \f \r \t"})");
+  REQUIRE(result.ok);
+  CHECK(get_string(result.properties, "text") == "/ \b \f \r \t");
+  CHECK_FALSE(parse_extras(R"({"text": "\q"})").ok);
+  CHECK_FALSE(parse_extras(R"({"text": "\u12"})").ok);
+}
+
+TEST_CASE("skipped values may hold anything, empty or nested") {
+  const auto result =
+      parse_extras(R"({"a": [], "b": {}, "c": [true, false, null, "x", -1.5, {"k": [1, {"deep": "]}"}]}], "ok": 2})");
+  REQUIRE(result.ok);
+  CHECK(result.skipped_keys == std::vector<std::string>{"a", "b", "c"});
+  CHECK(get_number(result.properties, "ok") == doctest::Approx(2.0));
+}

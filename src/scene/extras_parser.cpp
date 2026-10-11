@@ -17,6 +17,17 @@ constexpr unsigned kContinuation = 0x80;
 constexpr unsigned kSixBitMask = 0x3F;
 constexpr int kSixBits = 6;
 constexpr int kTwelveBits = 12;
+constexpr std::string_view kTrueLiteral = "true";
+constexpr std::string_view kFalseLiteral = "false";
+constexpr std::string_view kNullLiteral = "null";
+
+// The one-letter escapes of a JSON string: what follows the backslash, and what it stands for.
+struct Escape {
+  char written;
+  char meaning;
+};
+constexpr Escape kEscapes[] = {{'"', '"'},  {'\\', '\\'}, {'/', '/'},  {'b', '\b'},
+                               {'f', '\f'}, {'n', '\n'},  {'r', '\r'}, {'t', '\t'}};
 
 class ParseError : public std::runtime_error {
  public:
@@ -32,22 +43,30 @@ class JsonReader {
     skip_whitespace();
     expect('{');
     skip_whitespace();
-    if (try_consume('}')) return finish();
-    while (true) {
-      skip_whitespace();
-      std::string key = parse_string();
-      skip_whitespace();
-      expect(':');
-      skip_whitespace();
-      read_member(key, result);
-      skip_whitespace();
-      if (try_consume(',')) continue;
-      expect('}');
-      return finish();
-    }
+    if (!try_consume('}')) read_members(result);
+    finish();
   }
 
  private:
+  // The members of an object whose '{' was read, up to and including its '}'.
+  void read_members(ExtrasParseResult& result) {
+    do {
+      const std::string key = parse_key();
+      read_member(key, result);
+      skip_whitespace();
+    } while (try_consume(','));
+    expect('}');
+  }
+
+  // A member's name and the ':' after it.
+  std::string parse_key() {
+    skip_whitespace();
+    std::string key = parse_string();
+    skip_whitespace();
+    expect(':');
+    skip_whitespace();
+    return key;
+  }
   void read_member(const std::string& key, ExtrasParseResult& result) {
     const char c = peek();
     if (c == '"') {
@@ -70,27 +89,31 @@ class JsonReader {
   std::string parse_string() {
     expect('"');
     std::string out;
-    while (true) {
-      const char c = next();
-      if (c == '"') return out;
-      if (c != '\\') {
+    for (char c = next(); c != '"'; c = next()) {
+      if (c == '\\') {
+        append_escape(out);
+      } else {
         out.push_back(c);
-        continue;
-      }
-      const char escaped = next();
-      switch (escaped) {
-        case '"': out.push_back('"'); break;
-        case '\\': out.push_back('\\'); break;
-        case '/': out.push_back('/'); break;
-        case 'b': out.push_back('\b'); break;
-        case 'f': out.push_back('\f'); break;
-        case 'n': out.push_back('\n'); break;
-        case 'r': out.push_back('\r'); break;
-        case 't': out.push_back('\t'); break;
-        case 'u': append_utf8(out, parse_hex4()); break;
-        default: fail("invalid escape sequence");
       }
     }
+    return out;
+  }
+
+  // What follows a backslash in a string.
+  void append_escape(std::string& out) {
+    const char escaped = next();
+    if (escaped == 'u') {
+      append_utf8(out, parse_hex4());
+    } else {
+      out.push_back(unescaped(escaped));
+    }
+  }
+
+  char unescaped(char escaped) const {
+    for (const Escape& known : kEscapes) {
+      if (known.written == escaped) return known.meaning;
+    }
+    fail("invalid escape sequence");
   }
 
   unsigned parse_hex4() {
@@ -117,8 +140,8 @@ class JsonReader {
   }
 
   bool parse_bool() {
-    if (consume_literal("true")) return true;
-    if (consume_literal("false")) return false;
+    if (consume_literal(kTrueLiteral)) return true;
+    if (consume_literal(kFalseLiteral)) return false;
     fail("invalid literal");
   }
 
@@ -137,29 +160,29 @@ class JsonReader {
     if (c == '"') {
       parse_string();
     } else if (c == '[' || c == '{') {
-      const char close = c == '[' ? ']' : '}';
-      ++pos_;
-      skip_whitespace();
-      if (try_consume(close)) return;
-      while (true) {
-        skip_whitespace();
-        if (c == '{') {
-          parse_string();
-          skip_whitespace();
-          expect(':');
-          skip_whitespace();
-        }
-        skip_value();
-        skip_whitespace();
-        if (try_consume(',')) continue;
-        expect(close);
-        return;
-      }
-    } else if (consume_literal("null") || consume_literal("true") || consume_literal("false")) {
-      return;
-    } else {
+      skip_container(c);
+    } else if (!consume_any_literal()) {
       parse_number();
     }
+  }
+
+  // An array or an object, from its opening bracket to its closing one.
+  void skip_container(char open) {
+    const char close = open == '[' ? ']' : '}';
+    ++pos_;
+    skip_whitespace();
+    if (try_consume(close)) return;
+    do {
+      skip_whitespace();
+      if (open == '{') parse_key();
+      skip_value();
+      skip_whitespace();
+    } while (try_consume(','));
+    expect(close);
+  }
+
+  bool consume_any_literal() {
+    return consume_literal(kNullLiteral) || consume_literal(kTrueLiteral) || consume_literal(kFalseLiteral);
   }
 
   bool consume_literal(std::string_view literal) {

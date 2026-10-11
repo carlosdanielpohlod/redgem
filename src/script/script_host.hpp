@@ -79,6 +79,13 @@ class ScriptHost {
   void invoke(std::size_t index, const char* method, std::initializer_list<mrb_value> args);
   void invoke_on_object(ObjectId object, const char* method, std::initializer_list<mrb_value> args);
   bool runnable(const BehaviourSlot& slot) const;
+  // Starts an empty cache of GameObject wrappers, which Ruby's garbage collector leaves alone.
+  void start_objects_cache();
+  // Whether a Ruby class is Behaviour or inherits from it.
+  bool is_behaviour_class(RClass* klass);
+  // Reports why a behaviour could not be created; returns nil, which stands for it.
+  mrb_value not_created(const std::string& where, const std::string& error);
+  void disable_failed(std::size_t index, const char* method, const std::string& error);
 
   ScriptContext& context_;
   std::filesystem::path scripts_dir_;

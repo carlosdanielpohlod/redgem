@@ -18,6 +18,16 @@ namespace redgem {
 // A character can also be given a clip of its own (game_object.animation in Ruby): it then stops
 // following the scene's clips and plays that one, fading over from what it was doing. A character
 // is an object and what is under it, or a spawned copy as a whole.
+struct PoseOptions;
+
+// How a character is to start a clip (see AnimationPlayer::play_on).
+struct ClipStart {
+  bool loop = true;
+  float speed = 1.0f;    // a negative speed plays backwards
+  float fade = 0.0f;     // seconds taken to reach the clip from what the character was doing
+  bool restart = false;  // from the beginning, even when already on this clip
+};
+
 class AnimationPlayer {
  public:
   // Starts over with a scene's clips, which must outlive the player (or the next reset). The
@@ -41,10 +51,9 @@ class AnimationPlayer {
   std::optional<float> duration(const std::string& name) const;
 
   // --- One character -----------------------------------------------------------------------
-  // Plays a clip on the character `object` belongs to, reaching it over `fade` seconds from what
-  // the character was doing. False for an unknown clip.
-  bool play_on(const Scene& scene, ObjectId object, const std::string& name, bool loop, float speed, float fade,
-               bool restart);
+  // Plays a clip on the character `object` belongs to, reaching it over `how.fade` seconds from
+  // what the character was doing. False for an unknown clip.
+  bool play_on(const Scene& scene, ObjectId object, const std::string& name, const ClipStart& how);
   // Freezes the character's own clip where it is.
   void pause_on(const Scene& scene, ObjectId object);
   // Lays a second clip over what the character is doing, by `weight` (0 to 1): half a limp over a
@@ -95,6 +104,20 @@ class AnimationPlayer {
   const Track* track_on(const Scene& scene, ObjectId object) const;
   // Lays what a character is coming from or going to over its objects.
   void pose_character(ObjectId character, const std::optional<Track>& track, float weight, Scene& scene);
+  // Poses everything that follows the scene's clips.
+  void pose_followers(Scene& scene);
+  // Lays every scene clip that is posing over the objects `options` wants.
+  void apply_scene_clips(Scene& scene, PoseOptions options) const;
+  void advance_track(std::optional<Track>& track, float dt) const;
+  // Moves one character's own clips on and poses it. True once nothing of its own is left.
+  bool advance_own(ObjectId character, Own& own, float dt, Scene& scene);
+  // Sets a character on its way to `next` (the scene's clips when nullopt) over `fade` seconds.
+  static void fade_to(Own& own, const std::optional<Track>& next, float fade);
+  // What it takes to lay a clip over one character only, by `weight`.
+  PoseOptions character_options(ObjectId character, float weight, const Scene& scene);
+  // Called before a part of an object is posed by `weight`: a blend gets its steady base, and
+  // either way the part counts as posed this frame.
+  void before_posing(const Scene& scene, ObjectId object, AnimationPath path, Transform& local, float weight);
 
   const std::vector<AnimationDesc>* clips_ = nullptr;
   // Makes sure a blend starts from something steady: what was laid on that part of the object
@@ -103,8 +126,8 @@ class AnimationPlayer {
 
   std::vector<State> states_;
   std::map<ObjectId, Own> owned_;
-  std::vector<Transform> rest_;               // by object id, as the scene was loaded
-  std::unordered_set<std::uint64_t> posed_;   // (object, path) pairs posed so far this frame
+  std::vector<Transform> rest_;              // by object id, as the scene was loaded
+  std::unordered_set<std::uint64_t> posed_;  // (object, path) pairs posed so far this frame
 };
 
 }  // namespace redgem

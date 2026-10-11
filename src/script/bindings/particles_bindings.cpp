@@ -21,28 +21,49 @@ ParticleSystem& particles(mrb_state* mrb) {
   return *system;
 }
 
-mrb_value particles_burst(mrb_state* mrb, mrb_value) {
-  mrb_value position, direction;
+// What Particles.__burst is called with, as mruby hands it over.
+struct BurstArgs {
+  mrb_value position = mrb_nil_value();
+  mrb_value direction = mrb_nil_value();
   mrb_int count = 0, r = 0, g = 0, b = 0, a = 0;
-  mrb_float speed = 0.0, spread = 0.0, life = 0.0, size = 0.0, gravity = 0.0;
+  mrb_float speed = 0.0, spread = 0.0, life = 0.0, size = 0.0, gravity = 0.0, spin = 0.0;
   mrb_bool glow = false;
   const char* image = nullptr;
-  mrb_float spin = 0.0;
-  mrb_get_args(mrb, "ooifffffiiiibzf", &position, &direction, &count, &speed, &spread, &life, &size, &gravity, &r, &g,
-               &b, &a, &glow, &image, &spin);
+};
+
+BurstArgs burst_args(mrb_state* mrb) {
+  BurstArgs args;
+  mrb_get_args(mrb, "ooifffffiiiibzf", &args.position, &args.direction, &args.count, &args.speed, &args.spread,
+               &args.life, &args.size, &args.gravity, &args.r, &args.g, &args.b, &args.a, &args.glow, &args.image,
+               &args.spin);
+  return args;
+}
+
+// Where the particles go and how they move.
+void set_motion(mrb_state* mrb, const BurstArgs& args, ParticleBurst& burst) {
+  burst.position = to_vec3(mrb, args.position);
+  burst.direction = to_vec3(mrb, args.direction);
+  burst.count = static_cast<int>(args.count);
+  burst.speed = static_cast<float>(args.speed);
+  burst.spread_degrees = static_cast<float>(args.spread);
+  burst.life = static_cast<float>(args.life);
+  burst.gravity = static_cast<float>(args.gravity);
+}
+
+// What each particle looks like.
+void set_look(const BurstArgs& args, ParticleBurst& burst) {
+  burst.size = static_cast<float>(args.size);
+  burst.color = color_from(args.r, args.g, args.b, args.a);
+  burst.glow = args.glow;
+  burst.image = args.image;
+  burst.spin_degrees = static_cast<float>(args.spin);
+}
+
+mrb_value particles_burst(mrb_state* mrb, mrb_value) {
+  const BurstArgs args = burst_args(mrb);
   ParticleBurst burst;
-  burst.position = to_vec3(mrb, position);
-  burst.direction = to_vec3(mrb, direction);
-  burst.count = static_cast<int>(count);
-  burst.speed = static_cast<float>(speed);
-  burst.spread_degrees = static_cast<float>(spread);
-  burst.life = static_cast<float>(life);
-  burst.size = static_cast<float>(size);
-  burst.gravity = static_cast<float>(gravity);
-  burst.color = color_from(r, g, b, a);
-  burst.glow = glow;
-  burst.image = image;
-  burst.spin_degrees = static_cast<float>(spin);
+  set_motion(mrb, args, burst);
+  set_look(args, burst);
   return mrb_int_value(mrb, particles(mrb).burst(burst));
 }
 

@@ -131,17 +131,16 @@ ContactPair ordered(ObjectId a, ObjectId b) { return a < b ? ContactPair{a, b} :
 class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterContactListener {
  public:
   explicit JoltPhysicsWorld(Vec3 gravity)
-      : gravity_(gravity),
-        temp_allocator_(config::kPhysicsTempAllocatorBytes),
-        job_system_(config::kMaxPhysicsJobs) {
-    system_.Init(config::kMaxBodies, config::kNumBodyMutexes, config::kMaxBodyPairs,
-                 config::kMaxContactConstraints, broad_phase_layers_, object_vs_broad_phase_, object_pairs_);
+      : gravity_(gravity), temp_allocator_(config::kPhysicsTempAllocatorBytes), job_system_(config::kMaxPhysicsJobs) {
+    system_.Init(config::kMaxBodies, config::kNumBodyMutexes, config::kMaxBodyPairs, config::kMaxContactConstraints,
+                 broad_phase_layers_, object_vs_broad_phase_, object_pairs_);
     system_.SetGravity(to_jolt(gravity));
     system_.SetContactListener(this);
   }
 
   ~JoltPhysicsWorld() override {
     std::vector<ObjectId> ids;
+    ids.reserve(records_.size());
     for (const auto& [id, record] : records_) ids.push_back(id);
     for (const ObjectId id : ids) remove_object(id);
   }
@@ -154,15 +153,10 @@ class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::C
 
     Record record;
     record.type = desc.config.type;
+    record.trigger = desc.config.trigger;
     record.shape = info.shape;
     record.pose = desc.world;
-    if (desc.config.trigger) {
-      record.trigger = true;
-    } else if (desc.config.type == BodyType::Character) {
-      create_character(desc, info, record);
-    } else {
-      create_body(desc, info, record);
-    }
+    if (!record.trigger) create_simulated(desc, info, record);
     records_.emplace(desc.object, std::move(record));
     return std::nullopt;
   }
@@ -170,21 +164,9 @@ class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::C
   void remove_object(ObjectId object) override {
     const auto it = records_.find(object);
     if (it == records_.end()) return;
-    Record& record = it->second;
-    if (record.vehicle != nullptr) {
-      system_.RemoveStepListener(record.vehicle.GetPtr());
-      system_.RemoveConstraint(record.vehicle.GetPtr());
-      record.vehicle = nullptr;
-    }
-    if (!record.body.IsInvalid()) {
-      body_owners_.erase(record.body.GetIndexAndSequenceNumber());
-      system_.GetBodyInterface().RemoveBody(record.body);
-      system_.GetBodyInterface().DestroyBody(record.body);
-    }
-    if (record.character != nullptr) {
-      body_owners_.erase(record.character->GetInnerBodyID().GetIndexAndSequenceNumber());
-      record.character = nullptr;  // destroys the inner body too
-    }
+    release_vehicle(it->second);
+    release_body(it->second);
+    release_character(it->second);
     records_.erase(it);
     forget(object);
   }
@@ -216,13 +198,7 @@ class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::C
       record->character->SetPosition(JPH::RVec3(to_jolt(world.position)));
       record->character->SetLinearVelocity(JPH::Vec3::sZero());
     } else if (!record->body.IsInvalid()) {
-      JPH::BodyInterface& bodies = system_.GetBodyInterface();
-      bodies.SetPositionAndRotation(record->body, JPH::RVec3(to_jolt(world.position)), to_jolt(world.rotation),
-                                    JPH::EActivation::Activate);
-      if (record->type == BodyType::Dynamic || record->type == BodyType::Vehicle) {
-        bodies.SetLinearAndAngularVelocity(record->body, JPH::Vec3::sZero(), JPH::Vec3::sZero());
-      }
-      if (record->vehicle != nullptr) stop_vehicle(*record->vehicle);
+      teleport_body(*record, world);
     }
   }
 
@@ -237,8 +213,7 @@ class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::C
     JPH::BodyInterface& bodies = system_.GetBodyInterface();
     for (auto& [id, record] : records_) {
       if (record.has_target && !record.body.IsInvalid()) {
-        bodies.MoveKinematic(record.body, JPH::RVec3(to_jolt(record.pose.position)), to_jolt(record.pose.rotation),
-                             dt);
+        bodies.MoveKinematic(record.body, JPH::RVec3(to_jolt(record.pose.position)), to_jolt(record.pose.rotation), dt);
         record.has_target = false;
       }
     }
@@ -327,23 +302,12 @@ class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::C
     std::vector<WheelPose> poses;
     const Record* record = find(object);
     if (record == nullptr || record->vehicle == nullptr) return poses;
-    // Wheel meshes are modeled with their axle along X and Y up.
-    const JPH::Vec3 wheel_right = to_jolt(Vec3::right());
-    const JPH::Vec3 wheel_up = to_jolt(Vec3::up());
-    for (std::size_t i = 0; i < record->wheel_objects.size(); ++i) {
-      const JPH::RMat44 matrix =
-          record->vehicle->GetWheelWorldTransform(static_cast<JPH::uint>(i), wheel_right, wheel_up);
-      WheelPose pose;
-      pose.object = record->wheel_objects[i];
-      pose.world.position = from_jolt(JPH::Vec3(matrix.GetTranslation()));
-      pose.world.rotation = from_jolt(matrix.GetQuaternion());
-      poses.push_back(pose);
-    }
+    poses.reserve(record->wheel_objects.size());
+    for (std::size_t i = 0; i < record->wheel_objects.size(); ++i) poses.push_back(wheel_pose(*record, i));
     return poses;
   }
 
-  std::optional<RaycastHit> raycast(Vec3 origin, Vec3 direction, float max_distance,
-                                    ObjectId ignore) const override {
+  std::optional<RaycastHit> raycast(Vec3 origin, Vec3 direction, float max_distance, ObjectId ignore) const override {
     const Vec3 dir = normalize(direction);
     if (length(dir) <= kEpsilon || max_distance <= 0.0f) return std::nullopt;
     const JPH::RRayCast ray(JPH::RVec3(to_jolt(origin)), to_jolt(dir * max_distance));
@@ -355,10 +319,7 @@ class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::C
     hit.distance = result.mFraction * max_distance;
     const JPH::RVec3 point = ray.GetPointOnRay(result.mFraction);
     hit.point = from_jolt(JPH::Vec3(point));
-    JPH::BodyLockRead lock(system_.GetBodyLockInterface(), result.mBodyID);
-    if (lock.Succeeded()) {
-      hit.normal = from_jolt(lock.GetBody().GetWorldSpaceSurfaceNormal(result.mSubShapeID2, point));
-    }
+    hit.normal = surface_normal(result, point);
     return hit;
   }
 
@@ -399,24 +360,79 @@ class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::C
     return it == body_owners_.end() ? kNoObject : it->second;
   }
 
-  void create_body(const BodyDesc& desc, const jolt::ShapeInfo& info, Record& record) {
-    JPH::EMotionType motion = JPH::EMotionType::Static;
-    JPH::ObjectLayer layer = layers::kNonMoving;
-    if (desc.config.type == BodyType::Dynamic || desc.config.type == BodyType::Vehicle) {
-      motion = JPH::EMotionType::Dynamic;
-      layer = layers::kMoving;
-    } else if (desc.config.type == BodyType::Kinematic) {
-      motion = JPH::EMotionType::Kinematic;
-      layer = layers::kMoving;
+  // The normal of the surface a ray hit, or zero when the body is gone by now.
+  Vec3 surface_normal(const JPH::RayCastResult& result, JPH::RVec3Arg point) const {
+    JPH::BodyLockRead lock(system_.GetBodyLockInterface(), result.mBodyID);
+    if (!lock.Succeeded()) return {};
+    return from_jolt(lock.GetBody().GetWorldSpaceSurfaceNormal(result.mSubShapeID2, point));
+  }
+
+  WheelPose wheel_pose(const Record& record, std::size_t wheel) const {
+    // Wheel meshes are modeled with their axle along X and Y up.
+    const JPH::RMat44 matrix = record.vehicle->GetWheelWorldTransform(static_cast<JPH::uint>(wheel),
+                                                                      to_jolt(Vec3::right()), to_jolt(Vec3::up()));
+    WheelPose pose;
+    pose.object = record.wheel_objects[wheel];
+    pose.world.position = from_jolt(JPH::Vec3(matrix.GetTranslation()));
+    pose.world.rotation = from_jolt(matrix.GetQuaternion());
+    return pose;
+  }
+
+  void teleport_body(Record& record, const Transform& world) {
+    JPH::BodyInterface& bodies = system_.GetBodyInterface();
+    bodies.SetPositionAndRotation(record.body, JPH::RVec3(to_jolt(world.position)), to_jolt(world.rotation),
+                                  JPH::EActivation::Activate);
+    if (record.type == BodyType::Dynamic || record.type == BodyType::Vehicle) {
+      bodies.SetLinearAndAngularVelocity(record.body, JPH::Vec3::sZero(), JPH::Vec3::sZero());
     }
-    JPH::RefConst<JPH::Shape> shape = info.shape;
-    if (desc.config.type == BodyType::Vehicle) {
-      // A low center of mass keeps the car on its wheels.
-      const JPH::Vec3 drop(0.0f, -info.half_extents.y * config::kVehicleCenterOfMassDrop, 0.0f);
-      shape = JPH::OffsetCenterOfMassShapeSettings(drop, info.shape).Create().Get();
+    if (record.vehicle != nullptr) stop_vehicle(*record.vehicle);
+  }
+
+  void release_vehicle(Record& record) {
+    if (record.vehicle == nullptr) return;
+    system_.RemoveStepListener(record.vehicle.GetPtr());
+    system_.RemoveConstraint(record.vehicle.GetPtr());
+    record.vehicle = nullptr;
+  }
+
+  void release_body(Record& record) {
+    if (record.body.IsInvalid()) return;
+    body_owners_.erase(record.body.GetIndexAndSequenceNumber());
+    system_.GetBodyInterface().RemoveBody(record.body);
+    system_.GetBodyInterface().DestroyBody(record.body);
+  }
+
+  void release_character(Record& record) {
+    if (record.character == nullptr) return;
+    body_owners_.erase(record.character->GetInnerBodyID().GetIndexAndSequenceNumber());
+    record.character = nullptr;  // destroys the inner body too
+  }
+
+  // What the simulation moves, or keeps things from moving through: a character or a body.
+  void create_simulated(const BodyDesc& desc, const jolt::ShapeInfo& info, Record& record) {
+    if (desc.config.type == BodyType::Character) {
+      create_character(desc, info, record);
+    } else {
+      create_body(desc, info, record);
     }
-    JPH::BodyCreationSettings settings(shape, JPH::RVec3(to_jolt(desc.world.position)),
-                                       to_jolt(desc.world.rotation), motion, layer);
+  }
+
+  static JPH::EMotionType motion_of(BodyType type) {
+    if (type == BodyType::Dynamic || type == BodyType::Vehicle) return JPH::EMotionType::Dynamic;
+    return type == BodyType::Kinematic ? JPH::EMotionType::Kinematic : JPH::EMotionType::Static;
+  }
+
+  // A low center of mass keeps the car on its wheels.
+  static JPH::RefConst<JPH::Shape> chassis_shape(const jolt::ShapeInfo& info) {
+    const JPH::Vec3 drop(0.0f, -info.half_extents.y * config::kVehicleCenterOfMassDrop, 0.0f);
+    return JPH::OffsetCenterOfMassShapeSettings(drop, info.shape).Create().Get();
+  }
+
+  static JPH::BodyCreationSettings body_settings(const BodyDesc& desc, const JPH::RefConst<JPH::Shape>& shape,
+                                                 JPH::EMotionType motion) {
+    const JPH::ObjectLayer layer = motion == JPH::EMotionType::Static ? layers::kNonMoving : layers::kMoving;
+    JPH::BodyCreationSettings settings(shape, JPH::RVec3(to_jolt(desc.world.position)), to_jolt(desc.world.rotation),
+                                       motion, layer);
     settings.mUserData = static_cast<JPH::uint64>(desc.object);
     // Contacts are tracked every step, so bodies must never fall asleep.
     settings.mAllowSleeping = false;
@@ -424,11 +440,18 @@ class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::C
       settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
       settings.mMassPropertiesOverride.mMass = desc.config.mass;
     }
+    return settings;
+  }
+
+  void create_body(const BodyDesc& desc, const jolt::ShapeInfo& info, Record& record) {
+    const bool vehicle = desc.config.type == BodyType::Vehicle;
+    const JPH::EMotionType motion = motion_of(desc.config.type);
+    const JPH::RefConst<JPH::Shape> shape = vehicle ? chassis_shape(info) : info.shape;
     const JPH::EActivation activation =
         motion == JPH::EMotionType::Static ? JPH::EActivation::DontActivate : JPH::EActivation::Activate;
-    record.body = system_.GetBodyInterface().CreateAndAddBody(settings, activation);
+    record.body = system_.GetBodyInterface().CreateAndAddBody(body_settings(desc, shape, motion), activation);
     body_owners_[record.body.GetIndexAndSequenceNumber()] = desc.object;
-    if (desc.config.type == BodyType::Vehicle) attach_vehicle(desc, record);
+    if (vehicle) attach_vehicle(desc, record);
   }
 
   // Wheels and engine keep their own spin; a teleported car must not drive off by itself.
@@ -451,7 +474,7 @@ class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::C
     system_.AddStepListener(record.vehicle.GetPtr());
   }
 
-  void create_character(const BodyDesc& desc, const jolt::ShapeInfo& info, Record& record) {
+  static JPH::Ref<JPH::CharacterVirtualSettings> character_settings(const jolt::ShapeInfo& info) {
     JPH::Ref<JPH::CharacterVirtualSettings> settings = new JPH::CharacterVirtualSettings();
     settings->mShape = info.shape;
     settings->mInnerBodyShape = info.shape;
@@ -465,36 +488,45 @@ class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::C
     // Only contacts on the lower hemisphere of the capsule can support the character.
     const float bottom_sphere_center = info.center_offset.y - info.capsule_half_height;
     settings->mSupportingVolume = JPH::Plane(JPH::Vec3::sAxisY(), -bottom_sphere_center);
+    return settings;
+  }
+
+  void create_character(const BodyDesc& desc, const jolt::ShapeInfo& info, Record& record) {
     // Characters stay upright: physics only drives their position.
-    record.character = new JPH::CharacterVirtual(settings, JPH::RVec3(to_jolt(desc.world.position)),
-                                                 JPH::Quat::sIdentity(), static_cast<JPH::uint64>(desc.object),
-                                                 &system_);
+    record.character =
+        new JPH::CharacterVirtual(character_settings(info), JPH::RVec3(to_jolt(desc.world.position)),
+                                  JPH::Quat::sIdentity(), static_cast<JPH::uint64>(desc.object), &system_);
     record.character->SetListener(this);
     body_owners_[record.character->GetInnerBodyID().GetIndexAndSequenceNumber()] = desc.object;
     character_owners_[record.character.GetPtr()] = desc.object;
   }
 
-  void update_character(Record& record, float dt) {
-    JPH::CharacterVirtual& character = *record.character;
-    character.UpdateGroundVelocity();
-    const JPH::Vec3 gravity = to_jolt(gravity_);
+  // The speed a character carries into a step, before gravity and its own move: the ground's
+  // (plus a jump) while it stands on it, else its own fall.
+  static JPH::Vec3 carried_velocity(const Record& record) {
+    const JPH::CharacterVirtual& character = *record.character;
     const JPH::Vec3 ground_velocity = character.GetGroundVelocity();
     const float vertical = character.GetLinearVelocity().GetY();
     const bool on_ground = character.GetGroundState() == JPH::CharacterBase::EGroundState::OnGround;
     const bool settling = vertical - ground_velocity.GetY() < kGroundedVerticalTolerance;
+    if (!on_ground || !settling) return JPH::Vec3(0.0f, vertical, 0.0f);
+    if (!record.pending_jump) return ground_velocity;
+    return ground_velocity + JPH::Vec3(0.0f, *record.pending_jump, 0.0f);
+  }
 
-    JPH::Vec3 velocity;
-    if (on_ground && settling) {
-      velocity = ground_velocity;
-      if (record.pending_jump) velocity += JPH::Vec3(0.0f, *record.pending_jump, 0.0f);
-    } else {
-      velocity = JPH::Vec3(0.0f, vertical, 0.0f);
-    }
+  void update_character(Record& record, float dt) {
+    JPH::CharacterVirtual& character = *record.character;
+    character.UpdateGroundVelocity();
+    JPH::Vec3 velocity = carried_velocity(record);
     record.pending_jump.reset();
-    velocity += gravity * dt;
+    velocity += to_jolt(gravity_) * dt;
     velocity += to_jolt(record.desired_move);
     character.SetLinearVelocity(velocity);
+    move_character(character, dt);
+  }
 
+  // Moves a character by its velocity, sliding along what it meets, climbing steps and keeping to the floor.
+  void move_character(JPH::CharacterVirtual& character, float dt) {
     JPH::CharacterVirtual::ExtendedUpdateSettings update_settings;
     update_settings.mStickToFloorStepDown = JPH::Vec3(0.0f, -config::kCharacterStickToFloorDistance, 0.0f);
     update_settings.mWalkStairsStepUp = JPH::Vec3(0.0f, config::kCharacterStairStepHeight, 0.0f);
@@ -502,34 +534,46 @@ class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::C
     const JPH::DefaultObjectLayerFilter layer_filter(object_pairs_, layers::kMoving);
     const JPH::IgnoreSingleBodyFilter body_filter(character.GetInnerBodyID());
     const JPH::ShapeFilter shape_filter;
-    character.ExtendedUpdate(dt, gravity, update_settings, broad_filter, layer_filter, body_filter, shape_filter,
-                             temp_allocator_);
+    character.ExtendedUpdate(dt, to_jolt(gravity_), update_settings, broad_filter, layer_filter, body_filter,
+                             shape_filter, temp_allocator_);
+  }
+
+  static JPH::RMat44 matrix_of(const Transform& pose) {
+    return JPH::RMat44::sRotationTranslation(to_jolt(pose.rotation), JPH::RVec3(to_jolt(pose.position)));
+  }
+
+  // The objects inside a trigger right now.
+  std::set<ObjectId> objects_inside(ObjectId id, const Record& trigger) const {
+    JPH::AllHitCollisionCollector<JPH::CollideShapeCollector> collector;
+    const JPH::RMat44 transform = matrix_of(trigger.pose);
+    // Only moving things (characters, dynamic and kinematic bodies) fire triggers.
+    const JPH::SpecifiedBroadPhaseLayerFilter broad_filter(broad_phase_layers::kMoving);
+    const JPH::SpecifiedObjectLayerFilter layer_filter(layers::kMoving);
+    system_.GetNarrowPhaseQuery().CollideShape(trigger.shape, JPH::Vec3::sReplicate(kUnitScale), transform,
+                                               JPH::CollideShapeSettings(), JPH::RVec3::sZero(), collector,
+                                               broad_filter, layer_filter);
+    std::set<ObjectId> inside;
+    for (const JPH::CollideShapeResult& hit : collector.mHits) {
+      const ObjectId other = owner_of(hit.mBodyID2);
+      if (other != kNoObject && other != id) inside.insert(other);
+    }
+    return inside;
+  }
+
+  void update_trigger(ObjectId id, Record& record) {
+    std::set<ObjectId> now = objects_inside(id, record);
+    for (const ObjectId other : now) {
+      if (record.overlaps.count(other) == 0) events_.push_back({id, other, ContactPhase::Enter, true});
+    }
+    for (const ObjectId other : record.overlaps) {
+      if (now.count(other) == 0) events_.push_back({id, other, ContactPhase::Exit, true});
+    }
+    record.overlaps = std::move(now);
   }
 
   void update_triggers() {
     for (auto& [id, record] : records_) {
-      if (!record.trigger) continue;
-      JPH::AllHitCollisionCollector<JPH::CollideShapeCollector> collector;
-      const JPH::RMat44 transform =
-          JPH::RMat44::sRotationTranslation(to_jolt(record.pose.rotation), JPH::RVec3(to_jolt(record.pose.position)));
-      // Only moving things (characters, dynamic and kinematic bodies) fire triggers.
-      const JPH::SpecifiedBroadPhaseLayerFilter broad_filter(broad_phase_layers::kMoving);
-      const JPH::SpecifiedObjectLayerFilter layer_filter(layers::kMoving);
-      system_.GetNarrowPhaseQuery().CollideShape(record.shape, JPH::Vec3::sReplicate(kUnitScale), transform,
-                                                 JPH::CollideShapeSettings(), JPH::RVec3::sZero(), collector,
-                                                 broad_filter, layer_filter);
-      std::set<ObjectId> now;
-      for (const JPH::CollideShapeResult& hit : collector.mHits) {
-        const ObjectId other = owner_of(hit.mBodyID2);
-        if (other != kNoObject && other != id) now.insert(other);
-      }
-      for (const ObjectId other : now) {
-        if (record.overlaps.count(other) == 0) events_.push_back({id, other, ContactPhase::Enter, true});
-      }
-      for (const ObjectId other : record.overlaps) {
-        if (now.count(other) == 0) events_.push_back({id, other, ContactPhase::Exit, true});
-      }
-      record.overlaps = std::move(now);
+      if (record.trigger) update_trigger(id, record);
     }
   }
 
@@ -561,19 +605,20 @@ class JoltPhysicsWorld final : public PhysicsWorld, JPH::ContactListener, JPH::C
 
   // Removes every trace of an object from contact bookkeeping (no exit events for a destroyed object).
   void forget(ObjectId object) {
-    auto erase_pairs = [object](std::set<ContactPair>& pairs) {
-      for (auto it = pairs.begin(); it != pairs.end();) {
-        it = (it->first == object || it->second == object) ? pairs.erase(it) : std::next(it);
-      }
-    };
-    erase_pairs(previous_contacts_);
+    erase_pairs_with(object, previous_contacts_);
     {
       std::lock_guard<std::mutex> lock(contacts_mutex_);
-      erase_pairs(current_contacts_);
+      erase_pairs_with(object, current_contacts_);
     }
     for (auto& [id, record] : records_) record.overlaps.erase(object);
     for (auto it = character_owners_.begin(); it != character_owners_.end();) {
       it = it->second == object ? character_owners_.erase(it) : std::next(it);
+    }
+  }
+
+  static void erase_pairs_with(ObjectId object, std::set<ContactPair>& pairs) {
+    for (auto it = pairs.begin(); it != pairs.end();) {
+      it = (it->first == object || it->second == object) ? pairs.erase(it) : std::next(it);
     }
   }
 

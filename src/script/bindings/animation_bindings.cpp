@@ -21,10 +21,14 @@ AnimationPlayer& animations(mrb_state* mrb) {
   return *player;
 }
 
+[[noreturn]] void raise_unknown_clip(mrb_state* mrb, const std::string& clip) {
+  mrb_raisef(mrb, E_ARGUMENT_ERROR, "the scene has no animation called '%s'", clip.c_str());
+}
+
 // The clip's name, which must be one of the scene's.
 std::string clip_arg(mrb_state* mrb, mrb_value name) {
   const std::string clip = to_name(mrb, name);
-  if (!animations(mrb).has(clip)) mrb_raisef(mrb, E_ARGUMENT_ERROR, "the scene has no animation called '%s'", clip.c_str());
+  if (!animations(mrb).has(clip)) raise_unknown_clip(mrb, clip);
   return clip;
 }
 
@@ -88,10 +92,8 @@ mrb_value game_object_animation_play(mrb_state* mrb, mrb_value self) {
   mrb_float speed = 1.0, fade = 0.0;
   mrb_get_args(mrb, "obffb", &name, &loop, &speed, &fade, &restart);
   const std::string clip = to_name(mrb, name);
-  if (!animations(mrb).play_on(scene(mrb), character(mrb, self), clip, loop, static_cast<float>(speed),
-                               static_cast<float>(fade), restart)) {
-    mrb_raisef(mrb, E_ARGUMENT_ERROR, "the scene has no animation called '%s'", clip.c_str());
-  }
+  const ClipStart how{loop, static_cast<float>(speed), static_cast<float>(fade), restart};
+  if (!animations(mrb).play_on(scene(mrb), character(mrb, self), clip, how)) raise_unknown_clip(mrb, clip);
   return mrb_nil_value();
 }
 
@@ -101,10 +103,9 @@ mrb_value game_object_animation_mix(mrb_state* mrb, mrb_value self) {
   mrb_float weight = 0.0, speed = 1.0;
   mrb_get_args(mrb, "ofbf", &name, &weight, &loop, &speed);
   const std::string clip = to_name(mrb, name);
-  if (!animations(mrb).mix_on(scene(mrb), character(mrb, self), clip, static_cast<float>(weight), loop,
-                              static_cast<float>(speed))) {
-    mrb_raisef(mrb, E_ARGUMENT_ERROR, "the scene has no animation called '%s'", clip.c_str());
-  }
+  const bool mixed = animations(mrb).mix_on(scene(mrb), character(mrb, self), clip, static_cast<float>(weight), loop,
+                                            static_cast<float>(speed));
+  if (!mixed) raise_unknown_clip(mrb, clip);
   return mrb_nil_value();
 }
 
@@ -140,7 +141,9 @@ mrb_value game_object_animation_time(mrb_state* mrb, mrb_value self) {
 
 }  // namespace
 
-void install_animation_bindings(mrb_state* mrb) {
+namespace {
+
+void install_scene_clip_bindings(mrb_state* mrb) {
   RClass* animation_module = mrb_define_module(mrb, "Animation");
   mrb_define_module_function(mrb, animation_module, "names", animation_names, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, animation_module, "__play", animation_play, MRB_ARGS_REQ(4));
@@ -150,9 +153,11 @@ void install_animation_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, animation_module, "playing?", animation_playing, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, animation_module, "time", animation_time, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, animation_module, "duration", animation_duration, MRB_ARGS_REQ(1));
+}
 
-  // One object's own animation (see Animator in the prelude).
-  RClass* game_object = mrb_class_get(mrb, "GameObject");
+// One object's own animation (see Animator in the prelude).
+void install_object_animation_bindings(mrb_state* mrb) {
+  RClass* game_object = mrb_class_get(mrb, kGameObjectClass);
   mrb_define_method(mrb, game_object, "__animation_play", game_object_animation_play, MRB_ARGS_REQ(5));
   mrb_define_method(mrb, game_object, "__animation_mix", game_object_animation_mix, MRB_ARGS_REQ(4));
   mrb_define_method(mrb, game_object, "__animation_unmix", game_object_animation_unmix, MRB_ARGS_NONE());
@@ -161,6 +166,13 @@ void install_animation_bindings(mrb_state* mrb) {
   mrb_define_method(mrb, game_object, "__animation_clip", game_object_animation_clip, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "__animation_playing", game_object_animation_playing, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "__animation_time", game_object_animation_time, MRB_ARGS_NONE());
+}
+
+}  // namespace
+
+void install_animation_bindings(mrb_state* mrb) {
+  install_scene_clip_bindings(mrb);
+  install_object_animation_bindings(mrb);
 }
 
 }  // namespace redgem

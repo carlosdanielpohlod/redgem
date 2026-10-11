@@ -105,10 +105,9 @@ class RaylibAudio final : public AudioSystem {
 
 }  // namespace
 
-std::optional<std::filesystem::path> find_sound_file(const std::filesystem::path& sounds_dir,
-                                                     const std::string& name) {
+std::optional<std::filesystem::path> find_sound_file(const std::filesystem::path& sounds_dir, const std::string& name) {
   for (const char* extension : kSoundExtensions) {
-    const std::filesystem::path candidate = sounds_dir / (name + extension);
+    std::filesystem::path candidate = sounds_dir / (name + extension);
     if (std::filesystem::exists(candidate)) return candidate;
   }
   return std::nullopt;

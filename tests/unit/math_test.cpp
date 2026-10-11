@@ -71,3 +71,14 @@ TEST_CASE("euler conversion survives gimbal lock as a rotation") {
     }
   }
 }
+
+TEST_CASE("vectors and quaternions are read from runs of floats") {
+  const float floats[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+  CHECK(approx_equal(vec3_from(floats), Vec3{1.0f, 2.0f, 3.0f}, kTolerance));
+  CHECK(approx_equal(vec3_from(floats + 1), Vec3{2.0f, 3.0f, 4.0f}, kTolerance));
+  const Quat quat = quat_from(floats + 1);
+  CHECK(quat.x == doctest::Approx(2.0f));
+  CHECK(quat.y == doctest::Approx(3.0f));
+  CHECK(quat.z == doctest::Approx(4.0f));
+  CHECK(quat.w == doctest::Approx(5.0f));
+}

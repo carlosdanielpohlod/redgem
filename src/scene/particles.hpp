@@ -9,19 +9,25 @@
 
 namespace redgem {
 
+// What a burst is like when nothing else is asked for.
+inline constexpr int kDefaultBurstCount = 12;
+inline constexpr float kDefaultBurstSpeed = 3.0f;  // meters per second
+inline constexpr float kDefaultBurstLife = 0.8f;   // seconds
+inline constexpr float kDefaultBurstSize = 0.12f;  // meters across
+
 // A puff of particles let out at once (Particles.burst in Ruby): sparks, dust, smoke, confetti.
 struct ParticleBurst {
   Vec3 position;
-  int count = 12;
+  int count = kDefaultBurstCount;
   // Where they fly, and how far from that they may stray: 0 is a jet, 180 every direction.
   Vec3 direction = Vec3::up();
-  float spread_degrees = 180.0f;
-  float speed = 3.0f;    // meters per second (each particle gets a little more or less)
-  float life = 0.8f;     // seconds (also varied a little)
-  float size = 0.12f;    // meters across
-  float gravity = 1.0f;  // share of the world's gravity: 0 floats, negative rises (smoke)
+  float spread_degrees = kDegreesPerHalfTurn;
+  float speed = kDefaultBurstSpeed;  // meters per second (each particle gets a little more or less)
+  float life = kDefaultBurstLife;    // seconds (also varied a little)
+  float size = kDefaultBurstSize;    // meters across
+  float gravity = 1.0f;              // share of the world's gravity: 0 floats, negative rises (smoke)
   Color color;
-  bool glow = false;     // lit from within: adds light instead of covering what is behind
+  bool glow = false;  // lit from within: adds light instead of covering what is behind
   // A picture from the game's images/ folder drawn on each particle (a puff of smoke, a star);
   // empty for a soft round dot.
   std::string image;
@@ -48,6 +54,19 @@ struct Particle {
   float alpha_now() const;
 };
 
+// The directions a burst's particles fly in: a cone around `axis`, which they lean away from
+// along `side` and `other` (both across it).
+struct BurstCone {
+  Vec3 axis;
+  Vec3 side;
+  Vec3 other;
+  float widest = 0.0f;  // cosine of the angle between the axis and the cone's edge
+};
+BurstCone burst_cone(Vec3 direction, float spread_degrees);
+// One direction of a cone, picked by two numbers from 0 to 1 (how far from the axis, and where
+// around it), so that evenly spread numbers give directions evenly spread over the cone.
+Vec3 heading_in(const BurstCone& cone, float along_unit, float around_unit);
+
 // Every particle of a running game. They are looks only (nothing collides with them), and the same
 // calls always give the same particles, so tests and recordings repeat exactly.
 class ParticleSystem {
@@ -64,6 +83,9 @@ class ParticleSystem {
  private:
   float random_unit();  // 0 to 1
   int image_index(const std::string& name);
+  Particle new_particle(const ParticleBurst& burst, const BurstCone& cone, int image);
+  // Pictures start turned any which way, or they would all look like the same stamp.
+  void turn_at_random(Particle& particle, float spin);
 
   std::vector<Particle> particles_;
   std::vector<std::string> images_;

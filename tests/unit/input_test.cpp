@@ -122,3 +122,27 @@ TEST_CASE("gamepad axes and buttons have names") {
   CHECK(gamepad_button_from_name("right_stick") == GamepadButton::RightStick);
   CHECK_FALSE(gamepad_button_from_name("turbo").has_value());
 }
+
+TEST_CASE("mouse buttons have names") {
+  CHECK(mouse_button_from_name("left") == MouseButton::Left);
+  CHECK(mouse_button_from_name("right") == MouseButton::Right);
+  CHECK(mouse_button_from_name("middle") == MouseButton::Middle);
+  CHECK_FALSE(mouse_button_from_name("thumb").has_value());
+}
+
+TEST_CASE("every letter, digit and named key is known, and nothing else") {
+  CHECK(key_from_name("a") == Key::A);
+  CHECK(key_from_name("z") == Key::Z);
+  CHECK(key_from_name("0") == Key::Zero);
+  CHECK(key_from_name("9") == Key::Nine);
+  CHECK(key_from_name("slash") == Key::Slash);
+  CHECK(key_from_name("backspace") == Key::Backspace);
+  CHECK(key_from_name("up") == Key::Up);
+  CHECK(key_from_name("right_control") == Key::RightControl);
+  CHECK_FALSE(key_from_name("A").has_value());
+  CHECK_FALSE(key_from_name("f1").has_value());
+  constexpr std::size_t kLetters = 26;
+  constexpr std::size_t kDigits = 10;
+  constexpr std::size_t kNamedKeys = 19;  // space and punctuation, editing keys, arrows, modifiers
+  CHECK(all_keys().size() == kLetters + kDigits + kNamedKeys);
+}

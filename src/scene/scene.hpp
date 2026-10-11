@@ -4,6 +4,7 @@
 #include <string>
 #include <limits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "scene/property.hpp"
@@ -84,6 +85,12 @@ class Scene {
   void finalize_destroy(ObjectId id);
 
  private:
+  // Adds the copy of one object under `parent` (kNoObject for the root of a copy, whose root is
+  // then itself). Returns its id.
+  ObjectId add_copy(ObjectId original, ObjectId parent, ObjectId root);
+  // A copied character is deformed by its own copied bones (bones outside the copy stay shared).
+  // Takes (original, its copy) pairs and returns the copies' ids, in that order.
+  std::vector<ObjectId> with_copied_joints(const std::vector<std::pair<ObjectId, ObjectId>>& copies);
   bool valid(ObjectId id) const { return id >= 0 && static_cast<std::size_t>(id) < objects_.size(); }
 
   std::vector<GameObject> objects_;

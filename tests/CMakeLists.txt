@@ -37,6 +37,7 @@ add_executable(redgem_tests
   unit/frame_buffer_test.cpp
   unit/particles_test.cpp
   unit/animation_player_test.cpp
+  unit/camera_ray_test.cpp
   integration/physics_world_test.cpp
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp

@@ -140,3 +140,33 @@ TEST_CASE("particles with a picture share it, start turned any which way and kee
   CHECK(system.particles().front().angle != doctest::Approx(before));
   CHECK(system.particles()[kBurstCount].angle == doctest::Approx(particles[kBurstCount].angle));  // no spin asked
 }
+
+TEST_CASE("a burst's cone is built around its direction, or straight up when it has none") {
+  constexpr float kLong = 5.0f;
+  constexpr float kRightAngleSpread = 90.0f;
+  const BurstCone cone = burst_cone({kLong, 0.0f, 0.0f}, kRightAngleSpread);
+  CHECK(cone.axis.x == doctest::Approx(1.0f));
+  CHECK(length(cone.side) == doctest::Approx(1.0f));
+  CHECK(length(cone.other) == doctest::Approx(1.0f));
+  CHECK(dot(cone.axis, cone.side) == doctest::Approx(0.0f));
+  CHECK(dot(cone.axis, cone.other) == doctest::Approx(0.0f));
+  CHECK(dot(cone.side, cone.other) == doctest::Approx(0.0f));
+  CHECK(cone.widest == doctest::Approx(0.0f));  // the cosine of a right angle
+
+  CHECK(burst_cone(Vec3::zero(), kRightAngleSpread).axis.y == doctest::Approx(1.0f));
+  // A spread is at most every direction.
+  constexpr float kTooWide = 720.0f;
+  CHECK(burst_cone(Vec3::up(), kTooWide).widest == doctest::Approx(-1.0f));
+}
+
+TEST_CASE("a heading goes from the cone's axis to its edge, all the way around") {
+  constexpr float kRightAngleSpread = 90.0f;
+  constexpr float kHalfWayAround = 0.5f;
+  const BurstCone cone = burst_cone(Vec3::up(), kRightAngleSpread);
+  CHECK(heading_in(cone, 0.0f, 0.0f).y == doctest::Approx(1.0f));  // along the axis
+  const Vec3 edge = heading_in(cone, 1.0f, 0.0f);
+  CHECK(edge.y == doctest::Approx(0.0f));
+  CHECK(length(edge) == doctest::Approx(1.0f));
+  const Vec3 opposite = heading_in(cone, 1.0f, kHalfWayAround);
+  CHECK(dot(edge, opposite) == doctest::Approx(-1.0f));
+}

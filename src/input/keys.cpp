@@ -5,42 +5,54 @@
 namespace redgem {
 namespace {
 
-constexpr int kFirstLetter = static_cast<int>(Key::A);
-constexpr int kLastLetter = static_cast<int>(Key::Z);
-constexpr int kFirstDigit = static_cast<int>(Key::Zero);
-constexpr int kLastDigit = static_cast<int>(Key::Nine);
+using KeyTable = std::map<std::string, Key>;
 
-const std::map<std::string, Key>& key_names() {
-  static const std::map<std::string, Key> names = [] {
-    std::map<std::string, Key> table = {
-        {"space", Key::Space},
-        {"apostrophe", Key::Apostrophe},
-        {"comma", Key::Comma},
-        {"minus", Key::Minus},
-        {"period", Key::Period},
-        {"slash", Key::Slash},
-        {"escape", Key::Escape},
-        {"enter", Key::Enter},
-        {"tab", Key::Tab},
-        {"backspace", Key::Backspace},
-        {"right", Key::Right},
-        {"left", Key::Left},
-        {"down", Key::Down},
-        {"up", Key::Up},
-        {"left_shift", Key::LeftShift},
-        {"left_control", Key::LeftControl},
-        {"left_alt", Key::LeftAlt},
-        {"right_shift", Key::RightShift},
-        {"right_control", Key::RightControl},
-    };
-    for (int code = kFirstLetter; code <= kLastLetter; ++code) {
-      table.emplace(std::string(1, static_cast<char>('a' + (code - kFirstLetter))), static_cast<Key>(code));
-    }
-    for (int code = kFirstDigit; code <= kLastDigit; ++code) {
-      table.emplace(std::string(1, static_cast<char>('0' + (code - kFirstDigit))), static_cast<Key>(code));
-    }
-    return table;
-  }();
+void add_symbol_keys(KeyTable& table) {
+  table.insert({{"space", Key::Space},
+                {"apostrophe", Key::Apostrophe},
+                {"comma", Key::Comma},
+                {"minus", Key::Minus},
+                {"period", Key::Period},
+                {"slash", Key::Slash}});
+}
+
+void add_editing_keys(KeyTable& table) {
+  table.insert({{"escape", Key::Escape}, {"enter", Key::Enter}, {"tab", Key::Tab}, {"backspace", Key::Backspace}});
+}
+
+void add_arrow_keys(KeyTable& table) {
+  table.insert({{"right", Key::Right}, {"left", Key::Left}, {"down", Key::Down}, {"up", Key::Up}});
+}
+
+void add_modifier_keys(KeyTable& table) {
+  table.insert({{"left_shift", Key::LeftShift},
+                {"left_control", Key::LeftControl},
+                {"left_alt", Key::LeftAlt},
+                {"right_shift", Key::RightShift},
+                {"right_control", Key::RightControl}});
+}
+
+// Keys whose codes follow one another, named by characters that do too: "a" to "z", "0" to "9".
+void add_key_run(KeyTable& table, Key first, Key last, char first_name) {
+  const int first_code = static_cast<int>(first);
+  for (int code = first_code; code <= static_cast<int>(last); ++code) {
+    table.emplace(std::string(1, static_cast<char>(first_name + (code - first_code))), static_cast<Key>(code));
+  }
+}
+
+KeyTable named_keys() {
+  KeyTable table;
+  add_symbol_keys(table);
+  add_editing_keys(table);
+  add_arrow_keys(table);
+  add_modifier_keys(table);
+  add_key_run(table, Key::A, Key::Z, 'a');
+  add_key_run(table, Key::Zero, Key::Nine, '0');
+  return table;
+}
+
+const KeyTable& key_names() {
+  static const KeyTable names = named_keys();
   return names;
 }
 

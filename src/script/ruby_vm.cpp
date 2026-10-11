@@ -15,15 +15,15 @@ namespace {
 constexpr const char* kKeepAliveGlobal = "$__redgem_keep_alive";
 
 struct EvalRequest {
-  const std::string* code;
-  const std::string* file_name;
+  const std::string* code = nullptr;
+  const std::string* file_name = nullptr;
   bool compile_only = false;
 };
 
 struct CallRequest {
   mrb_value receiver;
-  const char* method;
-  const std::vector<mrb_value>* args;
+  const char* method = nullptr;
+  const std::vector<mrb_value>* args = nullptr;
 };
 
 mrb_value run_eval(mrb_state* mrb, void* userdata) {
@@ -32,8 +32,8 @@ mrb_value run_eval(mrb_state* mrb, void* userdata) {
   mrbc_filename(mrb, context, request->file_name->c_str());
   context->no_exec = request->compile_only;
   context->capture_errors = request->compile_only;  // report instead of printing to stderr
-  const mrb_value result = mrb_load_nstring_cxt(mrb, request->code->data(),
-                                                static_cast<mrb_int>(request->code->size()), context);
+  const mrb_value result =
+      mrb_load_nstring_cxt(mrb, request->code->data(), static_cast<mrb_int>(request->code->size()), context);
   mrbc_context_free(mrb, context);
   if (mrb->exc != nullptr) mrb_exc_raise(mrb, mrb_obj_value(mrb->exc));
   return result;
@@ -43,6 +43,29 @@ mrb_value run_call(mrb_state* mrb, void* userdata) {
   const auto* request = static_cast<const CallRequest*>(userdata);
   return mrb_funcall_argv(mrb, request->receiver, mrb_intern_cstr(mrb, request->method),
                           static_cast<mrb_int>(request->args->size()), request->args->data());
+}
+
+struct DescribeRequest {
+  mrb_value exception;
+  std::string* out = nullptr;
+};
+
+void append_backtrace(mrb_state* mrb, mrb_value exception, std::string& out) {
+  const mrb_value backtrace = mrb_funcall(mrb, exception, "backtrace", 0);
+  const bool listed = mrb_array_p(backtrace);
+  if (!listed) return;
+  for (mrb_int i = 0; i < RARRAY_LEN(backtrace); ++i) {
+    out += "\n    from ";
+    out += mrb_str_to_cstr(mrb, mrb_obj_as_string(mrb, mrb_ary_entry(backtrace, i)));
+  }
+}
+
+mrb_value run_describe(mrb_state* mrb, void* userdata) {
+  const auto* request = static_cast<const DescribeRequest*>(userdata);
+  const mrb_value message = mrb_funcall(mrb, request->exception, "inspect", 0);
+  *request->out = mrb_str_to_cstr(mrb, mrb_obj_as_string(mrb, message));
+  append_backtrace(mrb, request->exception, *request->out);
+  return mrb_nil_value();
 }
 
 }  // namespace
@@ -100,9 +123,7 @@ RubyResult RubyVm::call(mrb_value receiver, const char* method, const std::vecto
   return result;
 }
 
-void RubyVm::release_kept() {
-  mrb_gv_set(mrb_, mrb_intern_cstr(mrb_, kKeepAliveGlobal), mrb_ary_new(mrb_));
-}
+void RubyVm::release_kept() { mrb_gv_set(mrb_, mrb_intern_cstr(mrb_, kKeepAliveGlobal), mrb_ary_new(mrb_)); }
 
 void RubyVm::keep_alive(mrb_value value) {
   mrb_ary_push(mrb_, mrb_gv_get(mrb_, mrb_intern_cstr(mrb_, kKeepAliveGlobal)), value);
@@ -111,26 +132,9 @@ void RubyVm::keep_alive(mrb_value value) {
 std::string RubyVm::describe_exception(mrb_value exception) {
   mrb_bool failed = false;
   std::string text;
-  struct Describe {
-    mrb_value exception;
-    std::string* out;
-  } describe{exception, &text};
-  mrb_protect_error(
-      mrb_,
-      [](mrb_state* mrb, void* userdata) -> mrb_value {
-        auto* d = static_cast<Describe*>(userdata);
-        const mrb_value message = mrb_funcall(mrb, d->exception, "inspect", 0);
-        *d->out = mrb_str_to_cstr(mrb, mrb_obj_as_string(mrb, message));
-        const mrb_value backtrace = mrb_funcall(mrb, d->exception, "backtrace", 0);
-        if (mrb_array_p(backtrace)) {
-          for (mrb_int i = 0; i < RARRAY_LEN(backtrace); ++i) {
-            *d->out += "\n    from ";
-            *d->out += mrb_str_to_cstr(mrb, mrb_obj_as_string(mrb, mrb_ary_entry(backtrace, i)));
-          }
-        }
-        return mrb_nil_value();
-      },
-      &describe, &failed);
+  DescribeRequest request{exception, &text};
+  // (Protected: an exception's own inspect may raise.)
+  mrb_protect_error(mrb_, run_describe, &request, &failed);
   if (failed || text.empty()) text = "unknown Ruby error";
   return text;
 }

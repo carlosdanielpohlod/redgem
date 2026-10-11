@@ -5,10 +5,9 @@
 #include <mruby/hash.h>
 #include <mruby/string.h>
 
-#include <cmath>
-
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "scene/camera_ray.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 #include "script/script_host.hpp"
@@ -18,9 +17,7 @@ namespace {
 
 using namespace binding;
 
-constexpr float kHalf = 0.5f;
-constexpr float kFullSpan = 2.0f;  // a screen spans -1..1
-constexpr float kHalfSpan = 1.0f;
+constexpr mrb_int kRayParts = 2;  // a ray is [origin, direction]
 constexpr double kMinFovDegrees = 10.0;
 constexpr double kMaxFovDegrees = 150.0;
 constexpr double kFullBlur = 1.0;
@@ -33,8 +30,7 @@ void notify_transform_written(mrb_state* mrb, ObjectId id, TransformWrite write)
 mrb_value property_value(mrb_state* mrb, const PropertyValue& value) {
   if (const auto* flag = std::get_if<bool>(&value)) return mrb_bool_value(*flag);
   if (const auto* number = std::get_if<double>(&value)) return mrb_float_value(mrb, *number);
-  const auto& text = std::get<std::string>(value);
-  return mrb_str_new(mrb, text.data(), static_cast<mrb_int>(text.size()));
+  return text_value(mrb, std::get<std::string>(value));
 }
 
 // --- GameObject ------------------------------------------------------------------
@@ -192,23 +188,25 @@ mrb_value transform_rotate(mrb_state* mrb, mrb_value self) {
   return self;
 }
 
+// A place in the world given as a GameObject (where it is) or as a Vector3.
+Vec3 point_of(mrb_state* mrb, mrb_value target) {
+  if (!is_game_object(mrb, target)) return to_vec3(mrb, target);
+  return scene(mrb).world_transform(alive_object(mrb, target).id).position;
+}
+
 mrb_value transform_look_at(mrb_state* mrb, mrb_value self) {
   mrb_value target;
   mrb_get_args(mrb, "o", &target);
   const ObjectId id = alive_object(mrb, self).id;
-  Vec3 point;
-  if (mrb_obj_is_kind_of(mrb, target, mrb_class_get(mrb, "GameObject"))) {
-    point = scene(mrb).world_transform(alive_object(mrb, target).id).position;
-  } else {
-    point = to_vec3(mrb, target);
-  }
-  const Vec3 direction = point - scene(mrb).world_transform(id).position;
+  const Vec3 direction = point_of(mrb, target) - scene(mrb).world_transform(id).position;
   scene(mrb).set_world_rotation(id, quat_look_rotation(direction, Vec3::up()));
   notify_transform_written(mrb, id, TransformWrite::Rotation);
   return self;
 }
 
-mrb_value transform_scale(mrb_state* mrb, mrb_value self) { return vec3_value(mrb, alive_object(mrb, self).local.scale); }
+mrb_value transform_scale(mrb_state* mrb, mrb_value self) {
+  return vec3_value(mrb, alive_object(mrb, self).local.scale);
+}
 
 mrb_value transform_set_scale(mrb_state* mrb, mrb_value self) {
   mrb_value value;
@@ -249,6 +247,24 @@ mrb_value scene_find_all(mrb_state* mrb, mrb_value) {
 
 mrb_value scene_objects(mrb_state* mrb, mrb_value) { return ids_to_array(mrb, scene(mrb).alive_ids()); }
 
+// What Scene.spawn copies: a GameObject, or the object of that name.
+ObjectId spawn_source(mrb_state* mrb, mrb_value source) {
+  if (is_game_object(mrb, source)) return alive_object(mrb, source).id;
+  const std::string name = to_name(mrb, source);
+  const ObjectId id = scene(mrb).find(name);
+  if (id == kNoObject) mrb_raisef(mrb, E_ARGUMENT_ERROR, "no object named %s to spawn", name.c_str());
+  return id;
+}
+
+// Where a copy of `id` is put: where `id` is, moved and turned as asked. nullopt when nothing is asked.
+std::optional<Transform> spawn_placement(mrb_state* mrb, ObjectId id, mrb_value position, mrb_value rotation) {
+  if (mrb_nil_p(position) && mrb_nil_p(rotation)) return std::nullopt;
+  Transform world = scene(mrb).world_transform(id);
+  if (!mrb_nil_p(position)) world.position = to_vec3(mrb, position);
+  if (!mrb_nil_p(rotation)) world.rotation = quat_from_euler_degrees(to_vec3(mrb, rotation));
+  return world;
+}
+
 mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
   mrb_value source;
   mrb_value position = mrb_nil_value();
@@ -257,21 +273,16 @@ mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
   mrb_get_args(mrb, "o|oob", &source, &position, &rotation, &physics);
   ScriptContext& ctx = context(mrb);
   if (!ctx.spawn) mrb_raise(mrb, E_RUNTIME_ERROR, "Scene.spawn only works while the game runs");
-  ObjectId id = kNoObject;
-  if (mrb_obj_is_kind_of(mrb, source, mrb_class_get(mrb, "GameObject"))) {
-    id = alive_object(mrb, source).id;
-  } else {
-    const std::string name = to_name(mrb, source);
-    id = scene(mrb).find(name);
-    if (id == kNoObject) mrb_raisef(mrb, E_ARGUMENT_ERROR, "no object named %s to spawn", name.c_str());
-  }
-  std::optional<Transform> world;
-  if (!mrb_nil_p(position) || !mrb_nil_p(rotation)) {
-    world = scene(mrb).world_transform(id);
-    if (!mrb_nil_p(position)) world->position = to_vec3(mrb, position);
-    if (!mrb_nil_p(rotation)) world->rotation = quat_from_euler_degrees(to_vec3(mrb, rotation));
-  }
-  return object_or_nil(mrb, ctx.spawn(id, world, physics));
+  const ObjectId id = spawn_source(mrb, source);
+  return object_or_nil(mrb, ctx.spawn(id, spawn_placement(mrb, id, position, rotation), physics));
+}
+
+// The main camera's own description, or nullptr when the scene has no camera.
+CameraDesc* main_camera(mrb_state* mrb) {
+  const ObjectId id = scene(mrb).main_camera();
+  if (id == kNoObject) return nullptr;
+  std::optional<CameraDesc>& camera = scene(mrb).at(id).camera;
+  return camera ? &*camera : nullptr;
 }
 
 mrb_value camera_main(mrb_state* mrb, mrb_value) { return object_or_nil(mrb, scene(mrb).main_camera()); }
@@ -281,28 +292,21 @@ mrb_value camera_screen_ray(mrb_state* mrb, mrb_value) {
   mrb_float x = 0.0, y = 0.0;
   mrb_get_args(mrb, "ff", &x, &y);
   const ScriptContext& ctx = context(mrb);
-  const ObjectId id = scene(mrb).main_camera();
-  if (id == kNoObject || ctx.screen_width <= 0 || ctx.screen_height <= 0) return mrb_nil_value();
-  const Transform world = scene(mrb).world_transform(id);
-  const float fov = scene(mrb).at(id).camera->fov_y_radians;
-  const float tan_half = std::tan((fov > 0.0f ? fov : degrees_to_radians(config::kDefaultFovYDegrees)) * kHalf);
-  const float aspect = static_cast<float>(ctx.screen_width) / static_cast<float>(ctx.screen_height);
-  // From pixels to -1..1 across the screen, up positive.
-  const float across = (static_cast<float>(x) / static_cast<float>(ctx.screen_width)) * kFullSpan - kHalfSpan;
-  const float upward = kHalfSpan - (static_cast<float>(y) / static_cast<float>(ctx.screen_height)) * kFullSpan;
-  const Vec3 direction =
-      normalize(world.forward() + world.right() * (across * tan_half * aspect) + world.up() * (upward * tan_half));
-  mrb_value ray = mrb_ary_new_capa(mrb, 2);
+  const CameraDesc* camera = main_camera(mrb);
+  if (camera == nullptr || ctx.screen_width <= 0 || ctx.screen_height <= 0) return mrb_nil_value();
+  const Transform world = scene(mrb).world_transform(scene(mrb).main_camera());
+  const ScreenPoint point{static_cast<float>(x), static_cast<float>(y), ctx.screen_width, ctx.screen_height};
+  mrb_value ray = mrb_ary_new_capa(mrb, kRayParts);
   mrb_ary_push(mrb, ray, vec3_value(mrb, world.position));
-  mrb_ary_push(mrb, ray, vec3_value(mrb, direction));
+  mrb_ary_push(mrb, ray, vec3_value(mrb, screen_ray_direction(world, camera->fov_y_radians, point)));
   return ray;
 }
 
 // The main camera's field of view, top to bottom, in degrees.
 mrb_value camera_fov(mrb_state* mrb, mrb_value) {
-  const ObjectId id = scene(mrb).main_camera();
-  if (id == kNoObject) return mrb_nil_value();
-  const float fov = scene(mrb).at(id).camera->fov_y_radians;
+  const CameraDesc* camera = main_camera(mrb);
+  if (camera == nullptr) return mrb_nil_value();
+  const float fov = camera->fov_y_radians;
   return mrb_float_value(mrb, fov > 0.0f ? radians_to_degrees(fov) : config::kDefaultFovYDegrees);
 }
 
@@ -312,8 +316,8 @@ mrb_value camera_set_fov(mrb_state* mrb, mrb_value) {
   if (degrees < kMinFovDegrees || degrees > kMaxFovDegrees) {
     mrb_raise(mrb, E_ARGUMENT_ERROR, "Camera.fov must be between 10 and 150 degrees");
   }
-  const ObjectId id = scene(mrb).main_camera();
-  if (id != kNoObject) scene(mrb).at(id).camera->fov_y_radians = degrees_to_radians(static_cast<float>(degrees));
+  CameraDesc* camera = main_camera(mrb);
+  if (camera != nullptr) camera->fov_y_radians = degrees_to_radians(static_cast<float>(degrees));
   return mrb_float_value(mrb, degrees);
 }
 
@@ -328,28 +332,36 @@ mrb_value camera_set_motion_blur(mrb_state* mrb, mrb_value) {
 
 }  // namespace
 
-void install_scene_bindings(mrb_state* mrb) {
-  RClass* game_object = mrb_define_class(mrb, "GameObject", mrb->object_class);
+namespace {
+
+void install_game_object_bindings(RClass* game_object, mrb_state* mrb) {
   mrb_define_method(mrb, game_object, "name", game_object_name, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "tag", game_object_tag, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "alive?", game_object_alive, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "destroy", game_object_destroy, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "props", game_object_props, MRB_ARGS_NONE());
+  mrb_define_method(mrb, game_object, "parent", game_object_parent, MRB_ARGS_NONE());
+  mrb_define_method(mrb, game_object, "children", game_object_children, MRB_ARGS_NONE());
+}
+
+void install_game_object_look_bindings(RClass* game_object, mrb_state* mrb) {
   mrb_define_method(mrb, game_object, "visible", game_object_visible, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "visible=", game_object_set_visible, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, game_object, "tint", game_object_tint, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "tint=", game_object_set_tint, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, game_object, "animation_offset", game_object_animation_offset, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "animation_offset=", game_object_set_animation_offset, MRB_ARGS_REQ(1));
-  mrb_define_method(mrb, game_object, "parent", game_object_parent, MRB_ARGS_NONE());
-  mrb_define_method(mrb, game_object, "children", game_object_children, MRB_ARGS_NONE());
+}
+
+void install_component_bindings(RClass* game_object, mrb_state* mrb) {
   mrb_define_method(mrb, game_object, "__add_component", game_object_add_component, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, mrb->kernel_module, "__require_class", kernel_require_class, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, game_object, "__has_character?", game_object_has_character, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "__has_rigidbody?", game_object_has_rigidbody, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "__has_vehicle?", game_object_has_vehicle, MRB_ARGS_NONE());
+}
 
-  RClass* transform = mrb_define_class(mrb, "Transform", mrb->object_class);
+void install_placement_bindings(RClass* transform, mrb_state* mrb) {
   mrb_define_method(mrb, transform, "position", transform_position, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "position=", transform_set_position, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, transform, "local_position", transform_local_position, MRB_ARGS_NONE());
@@ -360,16 +372,23 @@ void install_scene_bindings(mrb_state* mrb) {
   mrb_define_method(mrb, transform, "look_at", transform_look_at, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, transform, "scale", transform_scale, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "scale=", transform_set_scale, MRB_ARGS_REQ(1));
+}
+
+void install_direction_bindings(RClass* transform, mrb_state* mrb) {
   mrb_define_method(mrb, transform, "forward", transform_forward, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "right", transform_right, MRB_ARGS_NONE());
   mrb_define_method(mrb, transform, "up", transform_up, MRB_ARGS_NONE());
+}
 
+void install_scene_module_bindings(mrb_state* mrb) {
   RClass* scene_module = mrb_define_module(mrb, "Scene");
   mrb_define_module_function(mrb, scene_module, "find", scene_find, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, scene_module, "find_all", scene_find_all, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, scene_module, "objects", scene_objects, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, scene_module, "__spawn", scene_spawn, MRB_ARGS_ARG(1, 3));
+}
 
+void install_camera_bindings(mrb_state* mrb) {
   RClass* camera_module = mrb_define_module(mrb, "Camera");
   mrb_define_module_function(mrb, camera_module, "main", camera_main, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, camera_module, "screen_ray", camera_screen_ray, MRB_ARGS_REQ(2));
@@ -377,6 +396,20 @@ void install_scene_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, camera_module, "fov=", camera_set_fov, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, camera_module, "motion_blur", camera_motion_blur, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, camera_module, "motion_blur=", camera_set_motion_blur, MRB_ARGS_REQ(1));
+}
+
+}  // namespace
+
+void install_scene_bindings(mrb_state* mrb) {
+  RClass* game_object = mrb_define_class(mrb, kGameObjectClass, mrb->object_class);
+  install_game_object_bindings(game_object, mrb);
+  install_game_object_look_bindings(game_object, mrb);
+  install_component_bindings(game_object, mrb);
+  RClass* transform = mrb_define_class(mrb, "Transform", mrb->object_class);
+  install_placement_bindings(transform, mrb);
+  install_direction_bindings(transform, mrb);
+  install_scene_module_bindings(mrb);
+  install_camera_bindings(mrb);
 }
 
 }  // namespace redgem
