@@ -45,6 +45,32 @@ mrb_value run_call(mrb_state* mrb, void* userdata) {
                           static_cast<mrb_int>(request->args->size()), request->args->data());
 }
 
+struct MadeCallRequest {
+  mrb_value receiver;
+  const char* method = nullptr;
+  const RubyVm::ArgumentsMaker* make = nullptr;
+};
+
+// The arguments, or nothing with `trouble` saying why. (Ruby's own errors are not caught here:
+// they pass on to whoever protects the call. What C++ throws must not cross the interpreter.)
+std::vector<mrb_value> made_arguments(mrb_state* mrb, const RubyVm::ArgumentsMaker& make, std::string& trouble) {
+  try {
+    return make(mrb);
+  } catch (const std::exception& error) {
+    trouble = std::string("cannot make the arguments: ") + error.what();
+    return {};
+  }
+}
+
+mrb_value run_made_call(mrb_state* mrb, void* userdata) {
+  const auto* request = static_cast<const MadeCallRequest*>(userdata);
+  std::string trouble;
+  const std::vector<mrb_value> args = made_arguments(mrb, *request->make, trouble);
+  if (!trouble.empty()) mrb_raise(mrb, E_RUNTIME_ERROR, trouble.c_str());
+  return mrb_funcall_argv(mrb, request->receiver, mrb_intern_cstr(mrb, request->method),
+                          static_cast<mrb_int>(args.size()), args.data());
+}
+
 struct DescribeRequest {
   mrb_value exception;
   std::string* out = nullptr;
@@ -115,6 +141,19 @@ RubyResult RubyVm::call(mrb_value receiver, const char* method, const std::vecto
   mrb_bool failed = false;
   RubyResult result;
   result.value = mrb_protect_error(mrb_, run_call, &request, &failed);
+  if (failed) {
+    result.ok = false;
+    result.error = describe_exception(result.value);
+    result.value = mrb_nil_value();
+  }
+  return result;
+}
+
+RubyResult RubyVm::call_with(mrb_value receiver, const char* method, const ArgumentsMaker& make) {
+  MadeCallRequest request{receiver, method, &make};
+  mrb_bool failed = false;
+  RubyResult result;
+  result.value = mrb_protect_error(mrb_, run_made_call, &request, &failed);
   if (failed) {
     result.ok = false;
     result.error = describe_exception(result.value);

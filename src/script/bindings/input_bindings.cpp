@@ -190,8 +190,9 @@ mrb_value test_input_type(mrb_state* mrb, mrb_value) {
 // the tests' own.
 std::filesystem::path note_file(mrb_state* mrb, const char* name) {
   const std::string note = name;
-  const bool plain = !note.empty() && note.size() <= kMaxNoteName &&
-                     std::all_of(note.begin(), note.end(), [](unsigned char c) { return std::isalnum(c) != 0 || c == '_'; });
+  const bool plain =
+      !note.empty() && note.size() <= kMaxNoteName &&
+      std::all_of(note.begin(), note.end(), [](unsigned char c) { return std::isalnum(c) != 0 || c == '_'; });
   if (!plain) mrb_raise(mrb, E_ARGUMENT_ERROR, "a note's name is made of letters, digits and _");
   return std::filesystem::temp_directory_path() / kNotesFolder / note;
 }

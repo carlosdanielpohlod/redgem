@@ -24,11 +24,17 @@ services:
     command: xvfb-run -a -s "-screen 0 1600x900x24" ctest --test-dir build --output-on-failure
 
   # Where games played over the internet meet (see the manual's Multiplayer page).
+  # It faces the internet, so it runs as nobody in particular, with none of root's powers, no way
+  # to gain any, and nothing it can write to: all a relay does is pass messages on.
   relay:
     build: .
     image: redgem
     init: true
     restart: unless-stopped
+    user: "65534:65534"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     ports:
       - "7778:7778"
     command: build/src/redgem relay

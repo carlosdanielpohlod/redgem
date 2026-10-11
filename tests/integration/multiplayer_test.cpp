@@ -10,6 +10,7 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "core/log.hpp"
 #include "net/relay_server.hpp"
 #include "test_support.hpp"
 
@@ -23,6 +24,7 @@ constexpr std::chrono::milliseconds kRoundPause{1};
 constexpr int kSettleRounds = 90;   // frames for a watched object to close in
 constexpr float kBallStart = 3.0f;  // where the ball's template sits, along x
 constexpr float kNear = 0.05f;      // meters: "the same place" across machines
+constexpr std::size_t kManyTexts = 64;
 
 // A camera, a platform the host moves, and a ball to spawn copies of.
 SceneDesc small_scene() {
@@ -142,6 +144,8 @@ TEST_CASE("scripts send each other named messages carrying Ruby values") {
   auto [host, guest] = lan.host_and_guest();
   ruby(*host, "$got = []; Network.on(:hit) { |data, from| $got << [data, from] }");
   ruby(*guest, "$got = []; Network.on(:hit) { |data, from| $got << [data, from] }");
+  // (The host's scripts use these keys, which is what makes them symbols when they arrive.)
+  ruby(*host, "$keys_in_use = %i[damage at tags crit note power]");
   CHECK(ruby(*guest,
              "Network.emit(:hit, { damage: 3, at: Vector3.new(1, 2, 3), tags: [:fire, 'big'], crit: true, "
              "note: nil, power: 0.5 })") == "true");
@@ -162,6 +166,60 @@ TEST_CASE("scripts send each other named messages carrying Ruby values") {
   CHECK_FALSE(host->scripts().eval("Network.emit(:hit, Scene.find('Ball'))", "bad.rb").ok);
   CHECK_FALSE(host->scripts().eval("Network.emit(:hit, Float::NAN)", "bad.rb").ok);
   CHECK(ruby(*host, "Network.emit(:hit, 1, to: 9)") == "false");
+}
+
+TEST_CASE("a hash key no script here ever used arrives as a text, and makes no new symbol") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  ruby(*host, "$got = nil; Network.on(:hit) { |data, _from| $got = data; $damage = data[:damage] }");
+  CHECK(ruby(*guest, "Network.emit(:hit, { damage: 3, 'key_only_the_sender_made_up' => 4 })") == "true");
+  REQUIRE(lan.until([&] { return ruby(*host, "$got.nil?") == "false"; }));
+  CHECK(ruby(*host, "$damage") == "3");
+  CHECK(ruby(*host, "$got.keys.map { |key| key.class.to_s }.sort.inspect") == "[\"String\", \"Symbol\"]");
+  CHECK(ruby(*host, "$got.keys.find { |key| key.is_a?(String) }") == "key_only_the_sender_made_up");
+}
+
+TEST_CASE("a message's name is shown in the log with nothing in it that fakes a line") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  ruby(*host, "Network.on(\"odd\\n[error] fake\") { raise 'broken handler' }");
+  std::vector<std::string> lines;
+  const log::Sink before = log::set_sink([&lines](log::Level, const std::string& line) { lines.push_back(line); });
+  net::NetworkEvent event;
+  event.peer = 2;
+  event.name = "odd\n[error] fake";
+  host->scripts().dispatch(event);
+  log::set_sink(before);
+  REQUIRE(lines.size() == 1);
+  CHECK(lines.front().find("odd?[error] fake") != std::string::npos);
+  CHECK(lines.front().find("odd\n") == std::string::npos);
+}
+
+namespace {
+
+// An allocator that has nothing left to give (and still takes back what it is handed).
+void* no_memory_left(mrb_state* mrb, void* block, std::size_t size, void* userdata) {
+  if (size == 0) return mrb_default_allocf(mrb, block, size, userdata);
+  return nullptr;
+}
+
+}  // namespace
+
+TEST_CASE("no memory for what a message carries loses the message, not the game") {
+  Lan lan;
+  Engine& machine = lan.add_machine();
+  mrb_state* mrb = machine.scripts().vm().state();
+  net::NetworkEvent event;
+  event.peer = 2;
+  event.name = std::string(net::kMaxNameBytes, 'n');  // (too long to fit inside a Ruby string's own header)
+  event.data = std::vector<std::string>(kManyTexts, std::string(net::kMaxNameBytes, 't'));
+  const int errors_before = machine.scripts().error_count();
+  const mrb_allocf real = mrb->allocf;
+  mrb->allocf = no_memory_left;
+  machine.scripts().dispatch(event);  // (outside the protected call, this ended the program)
+  mrb->allocf = real;
+  CHECK(machine.scripts().error_count() == errors_before + 1);
+  CHECK(ruby(machine, "1 + 1") == "2");
 }
 
 TEST_CASE("a handler that fails is reported and the game goes on") {
@@ -282,11 +340,11 @@ TEST_CASE("a machine only spawns for others what this game spawns, and only for 
   CHECK_FALSE(guest->scripts().eval("Network.emit('$spawn', [])", "bad.rb").ok);
   // ... and a guest that sends them anyway gets nowhere: an object for someone else, a template
   // the game never spawns, a list only the host may send, something that is not a record at all.
-  ruby(*guest, "Network.__deliver(Network::SPAWN, ['k1', 'Ball', 1, nil, nil], :all)");
-  ruby(*guest, "Network.__deliver(Network::SPAWN, ['k2', 'Platform', 2, nil, nil], :all)");
-  ruby(*guest, "Network.__deliver(Network::SPAWNED, [['k3', 'Ball', 2, nil, nil]], :all)");
+  ruby(*guest, "Network.__deliver(Network::SPAWN, ['Ball#2.1', 'Ball', 1, nil, nil], :all)");
+  ruby(*guest, "Network.__deliver(Network::SPAWN, ['Platform#2.2', 'Platform', 2, nil, nil], :all)");
+  ruby(*guest, "Network.__deliver(Network::SPAWNED, [['Ball#2.3', 'Ball', 2, nil, nil]], :all)");
   ruby(*guest, "Network.__deliver(Network::SPAWN, 'nonsense', :all)");
-  ruby(*guest, "Network.__deliver(Network::SPAWN, ['k4', 'Ball', 2, 'here', nil], :all)");
+  ruby(*guest, "Network.__deliver(Network::SPAWN, ['Ball#2.4', 'Ball', 2, 'here', nil], :all)");
   ruby(*guest, "Network.__deliver(Network::SYNC, 'nonsense', :all)");
   ruby(*guest, "Network.emit(:done)");
   ruby(*host, "$done = false; Network.on(:done) { $done = true }");
@@ -295,8 +353,72 @@ TEST_CASE("a machine only spawns for others what this game spawns, and only for 
   CHECK(ruby(*host, "Scene.objects.count { |o| o.name == 'Platform' }") == "1");
   CHECK(host->scripts().error_count() == 0);
   // What it may ask for: its own ball.
-  ruby(*guest, "Network.__deliver(Network::SPAWN, ['k5', 'Ball', 2, [1, 0, 0], nil], :all)");
+  ruby(*guest, "Network.__deliver(Network::SPAWN, ['Ball#2.5', 'Ball', 2, [1, 0, 0], nil], :all)");
   REQUIRE(lan.until([&] { return balls_on_host() == "2"; }));
+}
+
+namespace {
+
+// Has `sender` say something to everyone and waits until `receiver` has heard all it said before.
+void heard_out(Lan& lan, Engine& sender, Engine& receiver) {
+  ruby(receiver, "$done = false; Network.on(:done) { $done = true }");
+  ruby(sender, "Network.emit(:done)");
+  REQUIRE(lan.until([&receiver] { return ruby(receiver, "$done") == "true"; }));
+}
+
+}  // namespace
+
+TEST_CASE("a spawned object's key is its maker's to give: nobody takes the key something else goes by") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  const auto balls_on_host = [&] { return ruby(*host, "Scene.objects.count { |o| o.name == 'Ball' }"); };
+  // The host's own hero, kept in the same place everywhere under a key of the game's choosing.
+  ruby(*host, "$hero = Scene.find('Platform').add_component(NetworkSync, key: 'hero-1')");
+  lan.round();
+  // A guest asks for objects of its own under that key, under keys the host will give later,
+  // under keys written as no machine writes them, and somewhere no object can be.
+  for (const char* key :
+       {"hero-1", "Ball#1.1", "Ball#1.2", "Ball#3.1", "Crate#2.1", "Ball#2.01", "Ball#2.-1", "Ball"}) {
+    ruby(*guest, std::string("Network.__deliver(Network::SPAWN, ['") + key + "', 'Ball', 2, nil, nil], :all)");
+  }
+  ruby(*guest, "Network.__deliver(Network::SPAWN, ['Ball#2.1', 'Ball', 2, [1.0e12, 0, 0], nil], :all)");
+  heard_out(lan, *guest, *host);
+  lan.round();
+  CHECK(balls_on_host() == "1");
+  CHECK(ruby(*host, "Network.instance_variable_get(:@synced)['hero-1'].equal?($hero)") == "true");
+  // Its own key works, once: saying it again makes no second object.
+  ruby(*guest, "2.times { Network.__deliver(Network::SPAWN, ['Ball#2.1', 'Ball', 2, nil, nil], :all) }");
+  heard_out(lan, *guest, *host);
+  CHECK(balls_on_host() == "2");
+  // And the host's next ball gets the key the guest was after.
+  ruby(*host, "$ball = Network.spawn('Ball')");
+  CHECK(ruby(*host, "$ball.get_component(NetworkSync).key") == "Ball#1.1");
+  CHECK(balls_on_host() == "3");
+  CHECK(host->scripts().error_count() == 0);
+}
+
+TEST_CASE("a host spawns only for machines in the game, and what it says in the wrong shape is ignored") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  const auto balls_on_guest = [&] { return ruby(*guest, "Scene.objects.count { |o| o.name == 'Ball' }"); };
+  ruby(*guest, "$platform = Scene.find('Platform'); $platform.add_component(NetworkSync)");
+  lan.round();
+  // An object for a machine that is not there, and lists and places that are not what they should be.
+  ruby(*host, "Network.__deliver(Network::SPAWN, ['Ball#1.1', 'Ball', 9, nil, nil], :all)");
+  ruby(*host, "Network.__deliver(Network::SPAWNED, 'nonsense', :all)");
+  ruby(*host, "Network.__deliver(Network::SPAWNED, [7, nil, ['Ball#1.2', 'Ball', 9, nil, nil]], :all)");
+  ruby(*host, "Network.__deliver(Network::DESPAWN, [7, nil, ['Ball']], :all)");
+  for (const char* placement : {"['Platform', 'here', nil]", "['Platform', [1, 2], [0, 0, 0]]", "['Platform']", "[]",
+                                "[nil, nil, nil]", "['Platform', [1.0e12, 0, 0], [0, 0, 0]]"}) {
+    ruby(*host, std::string("Network.__deliver(Network::SYNC, ") + placement + ", :all)");
+  }
+  heard_out(lan, *host, *guest);
+  CHECK(balls_on_guest() == "1");
+  CHECK(guest->scripts().error_count() == 0);  // (each of these once raised inside the handler)
+  CHECK(x_of(*guest, "$platform") == doctest::Approx(0.0f));
+  // For a machine that is in the game it works, under the host's own key for it.
+  ruby(*host, "Network.__deliver(Network::SPAWN, ['Ball#1.3', 'Ball', 2, nil, nil], :all)");
+  REQUIRE(lan.until([&] { return balls_on_guest() == "2"; }));
 }
 
 TEST_CASE("offline, everything is this machine's; what it spawned then joins the game with it") {

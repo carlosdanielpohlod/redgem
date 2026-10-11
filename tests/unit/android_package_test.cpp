@@ -64,7 +64,20 @@ TEST_CASE("the manifest describes a full-screen native activity running the engi
   CHECK(manifest.find("android:name=\"android.app.lib_name\" android:value=\"redgem\"") != std::string::npos);
   CHECK(manifest.find("android.permission.INTERNET") != std::string::npos);  // multiplayer
   CHECK(manifest.find("glEsVersion=\"0x00030000\"") != std::string::npos);
+  CHECK(manifest.find("android:allowBackup=\"false\"") != std::string::npos);  // saves stay on the device
 }
+
+#ifndef _WIN32  // (Windows keeps who may read a file elsewhere than in these bits.)
+TEST_CASE("a file kept to its owner is one nobody else on the machine can read") {
+  const Scratch scratch;
+  const std::filesystem::path keystore = scratch.dir / "debug.keystore";
+  std::ofstream(keystore) << "a key";
+  std::filesystem::permissions(keystore, std::filesystem::perms::all);
+  keep_to_owner(keystore);
+  const auto owner_only = std::filesystem::perms::owner_read | std::filesystem::perms::owner_write;
+  CHECK(std::filesystem::status(keystore).permissions() == owner_only);
+}
+#endif
 
 TEST_CASE("the SDK's tools are found in its newest build-tools and platform, or what is missing is said") {
   const Scratch scratch;

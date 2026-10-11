@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <map>
 #include <memory>
-#include <random>
 #include <string>
 #include <vector>
 
@@ -15,6 +14,19 @@ namespace redgem::net {
 
 // The port a relay listens on unless told otherwise.
 inline constexpr std::uint16_t kDefaultRelayPort = 7778;
+// What a relay holds for all its machines together, of what arrived and of what waits to be sent.
+// Each machine's own limits, times the machines there may be, would be far more memory than a
+// small server has.
+inline constexpr std::size_t kMaxRelayBufferedBytes = 256 * 1024 * 1024;
+// What one machine may send through a relay: this much a second over time, and at once as much as
+// a few of the longest messages. Far more than a game says; a machine past it is let go.
+inline constexpr float kRelayBytesPerSecond = 1024.0f * 1024.0f;
+inline constexpr float kRelayBurstBytes = 4.0f * kRelayBytesPerSecond;
+
+// A code for a new room, every letter of it drawn from the operating system's own source of
+// randomness: the code is all that keeps strangers out of a room, so nobody must be able to work
+// out the next ones from the ones they were given.
+std::string random_room_code();
 
 // A meeting point on the internet for games whose players cannot reach each other directly
 // (home routers let connections out, not in). Every machine connects out to the relay; the
@@ -25,6 +37,10 @@ inline constexpr std::uint16_t kDefaultRelayPort = 7778;
 // limited, silent machines are let go, and a room ends with whoever opened it.
 class RelayServer {
  public:
+  RelayServer() = default;
+  // A relay that holds at most `buffered_bytes` for all its machines (a small server's may be less).
+  explicit RelayServer(std::size_t buffered_bytes) : max_buffered_bytes_(buffered_bytes) {}
+
   bool start(std::uint16_t port, std::string& error);
   std::uint16_t port() const { return port_; }
   // Moves messages in and out; `seconds` since the last call.
@@ -42,9 +58,10 @@ class RelayServer {
     std::string address;  // where it connected from
     std::string room;
     int peer = 0;
-    float waiting_for = 0.0f;  // seconds without saying which room
-    float quiet_for = 0.0f;    // seconds since anything arrived from it
-    float since_said = 0.0f;   // seconds since anything was sent to it
+    float waiting_for = 0.0f;            // seconds without saying which room
+    float quiet_for = 0.0f;              // seconds since anything arrived from it
+    float since_said = 0.0f;             // seconds since anything was sent to it
+    float allowance = kRelayBurstBytes;  // bytes it may still send now (see kRelayBytesPerSecond)
     bool closed = false;
     bool farewelled = false;  // the others in its room were told it is gone
   };
@@ -64,6 +81,11 @@ class RelayServer {
   void serve(Member& member, float seconds);
   void await_room_choice(Member& member, float seconds);
   void pump(Member& member);
+  void take_in(Member& member);
+  // Takes what arrived out of what the member may send; over it, the member is let go.
+  void charge(Member& member, std::size_t bytes);
+  // Lets go of the newest machines with much waiting, while the relay holds more than it may.
+  void shed_load();
   void handle(Member& member, const std::string& text);
   void act_on(Member& member, const nlohmann::json& message);
   void hear_newcomer(Member& member, const nlohmann::json& message);
@@ -80,14 +102,15 @@ class RelayServer {
   void queue(Member& member, const nlohmann::json& message);
   void tell_room(const std::string& room, int except, const nlohmann::json& message);
   std::vector<Member*> members_of(const std::string& room);
-  std::string new_room_code();
+  // A code no open room has; empty when none was found.
+  std::string new_room_code() const;
 
   Socket listener_;
   std::uint16_t port_ = 0;
   std::vector<std::unique_ptr<Member>> members_;
   std::map<std::string, bool> rooms_;  // the codes of the open rooms
   std::map<std::string, Visitor> visitors_;
-  std::mt19937 random_{std::random_device{}()};
+  std::size_t max_buffered_bytes_ = kMaxRelayBufferedBytes;
 };
 
 }  // namespace redgem::net

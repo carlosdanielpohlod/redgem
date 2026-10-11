@@ -24,6 +24,7 @@ module Network
   HOST = 1
   LOCAL = 0   # the owner of something made while this machine was in no game
   MAX_SPAWNS_PER_PEER = 64   # objects one machine may have spawned at a time
+  MAX_SPAWNS = 512           # ... and all of them together
 
   # What the engine's own messages are called. Games' names never start with "$".
   RESERVED = "$".freeze
@@ -41,8 +42,6 @@ module Network
   REACTIONS = {
     connected: :enter_game, joined: :send_spawned_to, left: :remove_objects_of, disconnected: :keep_only_my_objects
   }.freeze
-  RECORD_SIZE = 5         # parts of a spawn record: key, template, owner, position, rotation
-  VECTOR_SIZE = 3         # numbers a position or a rotation travels as: x, y, z
 
   @handlers = {}
   @listeners = {}
@@ -198,7 +197,7 @@ module Network
     end
 
     def receive_sync(data, from)
-      @synced[data[0]]&.__receive(data[1], data[2], from) if data.is_a?(Array)
+      @synced[data[0]]&.__receive(data[1], data[2], from) if Said.placement?(data)
     end
 
     def receive_spawn(record, from)
@@ -207,7 +206,7 @@ module Network
 
     # Only the host knows every object spawned so far.
     def receive_spawned(records, from)
-      records.each { |record| receive_spawn(record, from) } if from == HOST
+      records.each { |record| receive_spawn(record, from) } if from == HOST && records.is_a?(Array)
     end
 
     def receive_despawn(keys, from)
@@ -222,24 +221,27 @@ module Network
     end
 
     # Whether an object another machine asks for may be created here: only for itself (the host
-    # speaks for everyone), from a template this level has and this game spawns, and not too many
-    # of them.
+    # speaks for everyone in the game), under a key that is its maker's to give and that nothing
+    # here goes by yet, from a template this level has and this game spawns, and not too many.
     def spawn_allowed?(record, from)
-      return false unless well_formed?(record)
+      return false unless Said.record?(record)
 
-      _key, template, owner = record
-      speaks_for?(from, owner) && spawnable?(template) && spawned_by(owner).size < MAX_SPAWNS_PER_PEER
+      key, template, owner = record
+      speaks_for?(from, owner) && free_key?(key, template, owner, from) && spawnable?(template) && room_for?(owner)
     end
 
-    def well_formed?(record) = record.is_a?(Array) && record.size == RECORD_SIZE && right_parts?(*record)
+    def speaks_for?(peer, owner) = peer == owner || (peer == HOST && in_game?(owner))
 
-    def right_parts?(key, template, owner, position, rotation)
-      [key, template].all?(String) && peer_id?(owner) && [position, rotation].all? { |part| part.nil? || vector?(part) }
+    def in_game?(peer) = peer == HOST || peer == id || peers.include?(peer)
+
+    # The key's maker is the object's owner, or the host when it spawned the object for the owner.
+    def free_key?(key, template, owner, from)
+      return false if @spawned.key?(key) || @synced.key?(key)
+
+      [owner, from].any? { |maker| Said.key_of?(key, template, maker) }
     end
 
-    def peer_id?(owner) = owner.is_a?(Integer) && owner >= HOST
-
-    def speaks_for?(peer, owner) = peer == owner || peer == HOST
+    def room_for?(owner) = @spawned.size < MAX_SPAWNS && spawned_by(owner).size < MAX_SPAWNS_PER_PEER
 
     def spawnable?(template)
       source = Scene.find(template)
@@ -247,8 +249,6 @@ module Network
 
       @spawnable.include?(template) || source.props[:prefab]
     end
-
-    def vector?(part) = part.is_a?(Array) && part.size == VECTOR_SIZE && part.all?(Numeric)
 
     # What `owner` has spawned: [key, entry] pairs.
     def spawned_by(owner) = @spawned.to_a.select { |_key, entry| entry[:owner] == owner }
@@ -314,6 +314,55 @@ module Network
         entry[:owner] = LOCAL
         sync.owner = LOCAL
       end
+    end
+  end
+end
+
+module Network
+  # What other machines say about objects, checked before any of it is used: whoever sent it may
+  # not be running this game's code. What does not fit is ignored.
+  module Said
+    MAX_PEERS = 16            # machines in one game, the host included
+    RECORD_SIZE = 5           # parts of a spawn record: key, template, owner, position, rotation
+    SYNC_SIZE = 3             # parts of what says where an object is: key, position, rotation
+    VECTOR_SIZE = 3           # numbers a position or a rotation travels as: x, y, z
+    MAX_KEY_SIZE = 128        # letters in the key of a spawned object
+    MAX_COUNT_DIGITS = 9      # in the number such a key ends with
+    MAX_DISTANCE = 1_000_000.0   # meters from the middle of a level (or degrees of a turn) an object can be at
+
+    class << self
+      # A spawn record with every part of its kind.
+      def record?(record) = record.is_a?(Array) && record.size == RECORD_SIZE && right_parts?(*record)
+
+      def right_parts?(key, template, owner, position, rotation)
+        [key, template].all?(String) && peer_id?(owner) && [position, rotation].compact.all? { |part| vector?(part) }
+      end
+
+      def peer_id?(owner) = owner.is_a?(Integer) && owner.between?(HOST, MAX_PEERS)
+
+      # Three numbers an object can be at, or be turned by.
+      def vector?(part) = part.is_a?(Array) && part.size == VECTOR_SIZE && part.all? { |number| reachable?(number) }
+
+      # (Infinity and what is not a number compare as false, so they are out too.)
+      def reachable?(number) = number.is_a?(Numeric) && number.abs <= MAX_DISTANCE
+
+      # Where an object is, as its owner sends it: [key, position, rotation].
+      def placement?(data)
+        return false unless data.is_a?(Array) && data.size == SYNC_SIZE
+
+        data.first.is_a?(String) && data.drop(1).all? { |part| vector?(part) }
+      end
+
+      # Whether `key` is one `maker` gives what it spawns from `template`: "Ball#2.7" is the
+      # seventh thing machine 2 spawned. Nothing else is a spawned object's key, so no machine
+      # can take a key another one's objects go by, now or later.
+      def key_of?(key, template, maker)
+        start = "#{template}##{maker}."
+        key.size <= MAX_KEY_SIZE && key.start_with?(start) && count?(key[start.size, key.size])
+      end
+
+      # A count as it is written into a key: digits, with no sign and no zero in front.
+      def count?(text) = text.size.between?(1, MAX_COUNT_DIGITS) && text.to_i.positive? && text.to_i.to_s == text
     end
   end
 end

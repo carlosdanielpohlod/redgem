@@ -113,6 +113,7 @@ TEST_CASE("relay runs a meeting point, on a port of choice") {
   CHECK_FALSE(parse_cli({"relay", "--port", "70000"}).ok);
   CHECK_FALSE(parse_cli({"relay", "--port", "many"}).ok);
   CHECK_FALSE(parse_cli({"relay", "--port"}).ok);
+  CHECK_FALSE(parse_cli({"relay", "--port", ""}).ok);  // (an empty word once ended the program)
   CHECK_FALSE(parse_cli({"relay", "somewhere"}).ok);
 }
 

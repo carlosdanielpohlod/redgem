@@ -15,6 +15,21 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option(REDGEM_BUILD_TESTS "Build the test suites" ON)
 
+# The program is position independent (see cmake/Hardening.cmake), which every library linked
+# into it has to be as well. Most Linux toolchains build that way by themselves; where one does
+# not, everything is asked to.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT DEFINED CMAKE_POSITION_INDEPENDENT_CODE)
+  include(CheckCXXSourceCompiles)
+  check_cxx_source_compiles("
+#if !defined(__PIC__) && !defined(__PIE__)
+#error not position independent by default
+#endif
+int main() { return 0; }" REDGEM_POSITION_INDEPENDENT_BY_DEFAULT)
+  if(NOT REDGEM_POSITION_INDEPENDENT_BY_DEFAULT)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+  endif()
+endif()
+
 include(Dependencies)
 
 add_subdirectory(src)

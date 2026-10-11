@@ -23,9 +23,17 @@ class FrameBuffer {
   std::optional<std::string> next();
   // True once a message longer than kMaxFrameBytes was announced: nothing more can be trusted.
   bool broken() const { return broken_; }
+  // The bytes that arrived and are not part of a message taken yet.
+  std::size_t buffered() const { return bytes_.size() - taken_; }
 
  private:
+  // Forgets the bytes of the messages already taken.
+  void compact();
+
   std::vector<std::uint8_t> bytes_;
+  // Where the next message starts. Messages taken are skipped, not erased one by one: erasing
+  // moves everything after them, which a peer sending many tiny messages would make costly.
+  std::size_t taken_ = 0;
   bool broken_ = false;
 };
 

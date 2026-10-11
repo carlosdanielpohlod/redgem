@@ -13,6 +13,8 @@ constexpr int kGuest = 3;
 constexpr int kOtherGuest = 4;
 constexpr int kPoints = 12;
 constexpr std::size_t kTooLongName = kMaxNameBytes + 1;
+constexpr std::int64_t kFarTooLargeId = 5'000'000'000;  // more than 32 bits hold
+constexpr double kNotWhole = 2.5;
 
 // Arrays in arrays, `depth` of them.
 json nested(int depth) {
@@ -68,6 +70,34 @@ TEST_CASE("the peers of a welcome are a list of whole numbers") {
   CHECK(wire::well_formed(json{{wire::kKind, wire::kWelcome}, {wire::kPeers, {kHostId, kGuest}}}));
   CHECK_FALSE(wire::well_formed(json{{wire::kKind, wire::kWelcome}, {wire::kPeers, kGuest}}));
   CHECK_FALSE(wire::well_formed(json{{wire::kKind, wire::kWelcome}, {wire::kPeers, {kHostId, "3"}}}));
+}
+
+TEST_CASE("the peers of a welcome are ids there can be, each once, and fewer than a full game") {
+  const auto welcome = [](const json& peers) { return json{{wire::kKind, wire::kWelcome}, {wire::kPeers, peers}}; };
+  json others = json::array();
+  for (int id = kHostId; id < kMaxPeers; ++id) others.push_back(id);
+  CHECK(wire::well_formed(welcome(others)));  // everyone but the newcomer, in a full game
+  others.push_back(kMaxPeers);
+  CHECK_FALSE(wire::well_formed(welcome(others)));
+  CHECK_FALSE(wire::well_formed(welcome({kHostId, kGuest, kGuest})));
+  CHECK_FALSE(wire::well_formed(welcome({kHostId, 0})));
+  CHECK_FALSE(wire::well_formed(welcome({kHostId, -kGuest})));
+  CHECK_FALSE(wire::well_formed(welcome({kHostId, kMaxPeers + 1})));
+  CHECK_FALSE(wire::well_formed(welcome({kHostId, kFarTooLargeId})));
+  CHECK_FALSE(wire::well_formed(welcome(json::array({kHostId, kNotWhole}))));
+}
+
+TEST_CASE("an array or a hash holds only so many things") {
+  CHECK(acceptable_data(json(std::vector<int>(kMaxDataMembers, 0))));
+  CHECK_FALSE(acceptable_data(json(std::vector<int>(kMaxDataMembers + 1, 0))));
+  json crowded = json::object();
+  for (std::size_t i = 0; i <= kMaxDataMembers; ++i) crowded[std::to_string(i)] = true;
+  CHECK_FALSE(acceptable_data(crowded));
+  CHECK_FALSE(acceptable_data(json{{"inside", crowded}}));
+  crowded.erase("0");
+  CHECK(acceptable_data(crowded));
+  CHECK_FALSE(wire::well_formed(
+      json{{wire::kKind, wire::kGameMessage}, {wire::kData, std::vector<int>(kMaxDataMembers + 1, 0)}}));
 }
 
 TEST_CASE("data nests only so deep, under keys only so long") {

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <random>
 #include <string_view>
 
 namespace redgem::net {
@@ -25,7 +26,21 @@ constexpr std::size_t kMaxPendingPerMember = 2 * kMaxFrameBytes;
 constexpr std::string_view kCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 constexpr int kCodeTries = 64;  // at finding a code no open room has
 
+// What a member holds: what arrived from it and was not handled yet, and what waits to be sent to it.
+template <typename Member>
+std::size_t held_by(const Member& member) {
+  return member.closed ? 0 : member.incoming.buffered() + member.outgoing.size();
+}
+
 }  // namespace
+
+std::string random_room_code() {
+  std::random_device system_source;
+  std::uniform_int_distribution<std::size_t> letter(0, kCodeAlphabet.size() - 1);
+  std::string code;
+  for (std::size_t i = 0; i < kRoomCodeLetters; ++i) code.push_back(kCodeAlphabet[letter(system_source)]);
+  return code;
+}
 
 bool RelayServer::has_opener(const std::vector<Member*>& inside) {
   return std::any_of(inside.begin(), inside.end(),
@@ -45,15 +60,19 @@ void RelayServer::poll(float seconds) {
   accept_newcomers();
   // By index: nothing below adds members, but entering a room touches other members.
   for (std::size_t i = 0; i < members_.size(); ++i) serve(*members_[i], seconds);
+  shed_load();
   drop_closed_members();
 }
 
 void RelayServer::serve(Member& member, float seconds) {
   if (member.peer == 0) await_room_choice(member, seconds);
+  member.allowance = std::min(kRelayBurstBytes, member.allowance + seconds * kRelayBytesPerSecond);
   pump(member);
   if (member.peer != 0) keep_in_touch(member, seconds);
-  while (const auto text = member.incoming.next()) {
-    if (member.closed) break;
+  // (Only so many a poll: the rest wait for the next one, see kMaxMessagesPerPoll.)
+  for (int handled = 0; handled < kMaxMessagesPerPoll && !member.closed; ++handled) {
+    const auto text = member.incoming.next();
+    if (!text) break;
     handle(member, *text);
   }
   if (member.incoming.broken()) member.closed = true;
@@ -111,11 +130,41 @@ int RelayServer::rooms_opened_by(const std::string& address) const {
 }
 
 void RelayServer::pump(Member& member) {
+  take_in(member);
+  if (!member.closed && member.socket.write(member.outgoing) == IoStatus::Closed) member.closed = true;
+}
+
+void RelayServer::take_in(Member& member) {
+  // With that much of its talk still to handle, a machine's next words wait in the connection
+  // (and it is not silent).
+  if (member.incoming.buffered() >= kMaxReadBytesPerPoll) {
+    member.quiet_for = 0.0f;
+    return;
+  }
   std::vector<std::uint8_t> arrived;
   if (member.socket.read(arrived, kMaxReadBytesPerPoll) == IoStatus::Closed) member.closed = true;
   if (!arrived.empty()) member.quiet_for = 0.0f;
   member.incoming.append(arrived.data(), arrived.size());
-  if (!member.closed && member.socket.write(member.outgoing) == IoStatus::Closed) member.closed = true;
+  charge(member, arrived.size());
+}
+
+void RelayServer::charge(Member& member, std::size_t bytes) {
+  member.allowance -= static_cast<float>(bytes);
+  if (member.allowance < 0.0f) member.closed = true;  // no game talks this much: a flood
+}
+
+void RelayServer::shed_load() {
+  std::size_t held = 0;
+  for (const auto& member : members_) held += held_by(*member);
+  // Whoever holds less than an even share is never the reason: with every machine under it the
+  // total fits. The newest above it go first; those who were here before keep playing.
+  const std::size_t share = max_buffered_bytes_ / kMaxConnections;
+  for (auto member = members_.rbegin(); member != members_.rend() && held > max_buffered_bytes_; ++member) {
+    const std::size_t holding = held_by(**member);
+    if (holding <= share) continue;
+    (*member)->closed = true;
+    held -= holding;
+  }
 }
 
 void RelayServer::handle(Member& member, const std::string& text) {
@@ -266,11 +315,9 @@ std::vector<RelayServer::Member*> RelayServer::members_of(const std::string& roo
   return found;
 }
 
-std::string RelayServer::new_room_code() {
-  std::uniform_int_distribution<std::size_t> letter(0, kCodeAlphabet.size() - 1);
+std::string RelayServer::new_room_code() const {
   for (int attempt = 0; attempt < kCodeTries; ++attempt) {
-    std::string code;
-    for (std::size_t i = 0; i < kRoomCodeLetters; ++i) code.push_back(kCodeAlphabet[letter(random_)]);
+    const std::string code = random_room_code();
     if (rooms_.count(code) == 0) return code;
   }
   return {};

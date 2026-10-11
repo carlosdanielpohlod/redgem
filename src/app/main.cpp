@@ -201,17 +201,23 @@ std::optional<int> play_bundled_game(const std::vector<std::string>& args) {
   return reporting_errors([&options] { return play(options); });
 }
 
-}  // namespace
-
-int main(int argc, char** argv) {
+// What the command line asks for, done. (Reading the line is inside the same net as the running:
+// nothing a user types ends the program without a word.)
+int run_command_line(const std::vector<std::string>& args) {
   using namespace redgem;
-  const std::vector<std::string> args(argv + 1, argv + argc);
-  if (const auto code = play_bundled_game(args)) return *code;
   const CliResult cli = parse_cli(args);
   if (!cli.ok) {
     std::cerr << cli.error << "\n\n" << usage();
     return kExitUsage;
   }
   apply_gpu_choice(cli.options.gpu);
-  return reporting_errors([&cli] { return run_mode(cli.options); });
+  return run_mode(cli.options);
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  const std::vector<std::string> args(argv + 1, argv + argc);
+  if (const auto code = play_bundled_game(args)) return *code;
+  return reporting_errors([&args] { return run_command_line(args); });
 }

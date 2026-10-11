@@ -24,12 +24,19 @@ inline constexpr int kMaxPeers = 16;
 // since what arrives may come from a program that is not this one.
 inline constexpr std::size_t kMaxNameBytes = 64;
 inline constexpr int kMaxDataDepth = 16;
+// ... and how many things one of its arrays or hashes may hold (every one of them becomes a value
+// in the game's memory on arrival).
+inline constexpr std::size_t kMaxDataMembers = 4096;
 // How long a machine that connected may keep quiet before saying what it wants.
 inline constexpr float kJoinTimeoutSeconds = 5.0f;
 // A machine that stopped listening is let go once this much is waiting to be sent to it.
 inline constexpr std::size_t kMaxPendingBytes = 8 * 1024 * 1024;
 // What one poll takes from one machine (at least a whole message, so there is always progress).
 inline constexpr std::size_t kMaxReadBytesPerPoll = 2 * kMaxFrameBytes;
+// The messages of one machine handled in one poll; the rest wait for the next, and nothing more is
+// read from it while that much is waiting. However small its messages, one machine cannot keep a
+// poll busy: far more than a game sends in a frame, far less than a flood.
+inline constexpr int kMaxMessagesPerPoll = 1024;
 // A machine with nothing to say still says "I am here" this often; one not heard from for this
 // long is gone (its cable pulled, its battery flat), whatever the connection claims.
 inline constexpr float kPingEverySeconds = 10.0f;
@@ -61,8 +68,9 @@ inline constexpr const char* kPing = "i";     // nothing to say: I am here
 int free_peer_id(const std::vector<int>& taken);
 
 nlohmann::json game_message(const std::string& name, const nlohmann::json& data, int from, int to);
-// Whether what arrived is a message of ours, every field of the kind it should be. Anything else
-// comes from a broken or hostile program, and nothing of it is used.
+// Whether what arrived is a message of ours, every field of the kind it should be (a list of
+// peers: ids there can be, each once, and fewer than a full game). Anything else comes from a
+// broken or hostile program, and nothing of it is used.
 bool well_formed(const nlohmann::json& message);
 // Whether the id a welcome hands this machine can be its own: only the host is 1 (as is whoever
 // opened a room on a relay, who can be nothing else), and nobody is 0.

@@ -95,7 +95,6 @@ TEST_CASE("test saves are kept in the user's own folder, not where every user of
   CHECK(tested.parent_path().parent_path().string().rfind(shared, 0) != 0);
 }
 
-
 TEST_CASE("what a save file holds that a game cannot save is left out") {
   const TempSave temp;
   std::filesystem::create_directories(temp.file.parent_path());

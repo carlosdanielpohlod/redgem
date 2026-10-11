@@ -23,7 +23,10 @@ constexpr std::size_t kTooLongName = kMaxNameBytes + 1;
 constexpr int kManyVisits = 300;    // more than the largest id there is
 constexpr float kQuietStep = 4.0f;  // seconds
 constexpr float kPastSilenceTimeout = kSilenceTimeoutSeconds + 3.0f * kQuietStep;
-constexpr std::size_t kShownBytes = 60;  // of a bad message, when a check fails
+constexpr std::size_t kShownBytes = 60;          // of a bad message, when a check fails
+constexpr int kSilentStrangers = kMaxPeers - 1;  // as many as a game has places for guests
+constexpr int kFloodMessages = 3 * kMaxMessagesPerPoll / 2;
+constexpr std::chrono::milliseconds kArrivalPause{50};  // for what was written to be there to read
 
 // Sessions on this machine, and everything that happened to each.
 struct Table {
@@ -366,4 +369,105 @@ TEST_CASE("a machine that goes silent without hanging up is given up on; one tha
   REQUIRE(lone.table.until([&lone] { return lone.host.peers().size() == 1; }));
   CHECK(lone.host.peers() == std::vector<int>{kFirstGuest});  // the real guest, which said nothing either
   CHECK(quiet_guest.state() == NetworkSession::State::Online);
+}
+
+TEST_CASE("only a few machines from one address may keep a host waiting for their hello") {
+  LoneHost lone;
+  std::vector<std::unique_ptr<Stranger>> silent;
+  for (int i = 0; i < kSilentStrangers; ++i) silent.push_back(std::make_unique<Stranger>(lone.host, lone.table));
+  // Only a few from one address are kept waiting for their hello; the rest are hung up on at once.
+  CHECK(silent.back()->hung_up_on());
+  std::vector<std::uint8_t> ignored;
+  CHECK(silent.front()->socket.read(ignored, kBigMessageBytes) == IoStatus::WouldBlock);
+  // Once the quiet ones are given up on, a guest from the same address gets in: no place was taken.
+  lone.host.poll(kPastJoinTimeout);
+  NetworkSession guest;
+  lone.table.seat(guest);
+  std::string error;
+  REQUIRE(guest.join(kLocalhost, lone.host.port(), error));
+  REQUIRE(lone.table.until([&guest] { return guest.state() != NetworkSession::State::Connecting; }));
+  CHECK(guest.state() == NetworkSession::State::Online);
+  CHECK(lone.host.peers() == std::vector<int>{kFirstGuest});
+}
+
+TEST_CASE("a flood of tiny messages from one machine is handled a poll's worth at a time") {
+  LoneHost lone;
+  Stranger flooder(lone.host, lone.table);
+  flooder.get_in(lone.host);
+  std::vector<std::uint8_t> flood;
+  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x"})");
+  for (int i = 0; i < kFloodMessages; ++i) flood.insert(flood.end(), tiny.begin(), tiny.end());
+  REQUIRE(lone.table.until([&] { return flooder.socket.write(flood) == IoStatus::Ok && flood.empty(); }));
+  std::this_thread::sleep_for(kArrivalPause);
+  int most_in_a_poll = 0;
+  int heard = 0;
+  for (int round = 0; round < kMaxRounds && heard < kFloodMessages; ++round) {
+    const int in_this_poll = static_cast<int>(lone.host.poll(kRoundSeconds).size());
+    most_in_a_poll = std::max(most_in_a_poll, in_this_poll);
+    heard += in_this_poll;
+  }
+  CHECK(heard == kFloodMessages);  // none is lost: the rest waited for the next poll
+  CHECK(most_in_a_poll <= kMaxMessagesPerPoll);
+}
+
+namespace {
+
+// Something that takes a guest's connection and answers as it pleases, as a hostile host would.
+struct FakeHost {
+  Socket listener, link;
+  NetworkSession guest;
+  Table table;
+
+  FakeHost() {
+    std::string error;
+    listener = Socket::listen_on(0, error);
+    REQUIRE(listener.valid());
+    table.seat(guest);
+    REQUIRE(guest.join(kLocalhost, listener.local_port(), error));
+    REQUIRE(table.until([this] {
+      if (!link.valid()) link = listener.accept();
+      return link.valid();
+    }));
+  }
+
+  void say(const std::string& text) {
+    std::vector<std::uint8_t> bytes = frame(text);
+    REQUIRE(table.until([&] { return link.write(bytes) == IoStatus::Ok; }));
+  }
+};
+
+}  // namespace
+
+TEST_CASE("a guest does not believe a welcome whose list of the others cannot be true") {
+  std::string crowd = "[1";
+  for (int id = kFirstGuest + 1; id <= kMaxPeers + 1; ++id) crowd += "," + std::to_string(id);
+  crowd += "]";
+  for (const std::string& others : {std::string("[1,2]"), std::string("[1,3,3]"), std::string("[1,0]"),
+                                    std::string("[1,99]"), std::string("[1,-3]"), crowd}) {
+    CAPTURE(others);
+    FakeHost fake;
+    fake.say(R"({"k":"w","t":2,"p":)" + others + "}");
+    REQUIRE(fake.table.until([&fake] { return fake.table.count(0, NetworkEvent::Kind::Failed) == 1; }));
+    CHECK(fake.guest.state() == NetworkSession::State::Offline);
+    CHECK(fake.guest.peers().empty());
+  }
+}
+
+TEST_CASE("a guest hears of each arrival once, and of no departure of someone it never heard of") {
+  FakeHost fake;
+  fake.say(R"({"k":"w","t":2,"p":[1]})");
+  REQUIRE(fake.table.until([&fake] { return fake.guest.state() == NetworkSession::State::Online; }));
+  for (const char* claim : {R"({"k":"j","f":3})", R"({"k":"j","f":3})", R"({"k":"j","f":2})", R"({"k":"j","f":1})",
+                            R"({"k":"j","f":0})", R"({"k":"j"})", R"({"k":"l","f":9})", R"({"k":"l","f":2})"}) {
+    fake.say(claim);
+  }
+  fake.say(R"({"k":"m","n":"done","f":1})");
+  REQUIRE(fake.table.until([&fake] { return fake.table.count(0, NetworkEvent::Kind::Message) == 1; }));
+  CHECK(fake.guest.peers() == std::vector<int>{kHostId, kSecondGuest});
+  CHECK(fake.table.count(0, NetworkEvent::Kind::PeerJoined) == 1);
+  CHECK(fake.table.count(0, NetworkEvent::Kind::PeerLeft) == 0);
+  // Someone it does know of still leaves.
+  fake.say(R"({"k":"l","f":3})");
+  REQUIRE(fake.table.until([&fake] { return fake.table.count(0, NetworkEvent::Kind::PeerLeft) == 1; }));
+  CHECK(fake.guest.peers() == std::vector<int>{kHostId});
 }

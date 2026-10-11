@@ -12,6 +12,7 @@
 
 #include "app/game_project.hpp"
 #include "core/config.hpp"
+#include "core/log.hpp"
 #include "core/platform.hpp"
 #include "core/xml_writer.hpp"
 
@@ -92,6 +93,7 @@ constexpr const char* kName = "android:name";
 constexpr const char* kValue = "android:value";
 constexpr const char* kLabel = "android:label";
 constexpr const char* kHasCode = "android:hasCode";
+constexpr const char* kAllowBackup = "android:allowBackup";
 constexpr const char* kExtractNativeLibs = "android:extractNativeLibs";
 constexpr const char* kTheme = "android:theme";
 constexpr const char* kExported = "android:exported";
@@ -449,6 +451,18 @@ void add_activity(XmlElement& application) {
   launcher.child(tag::kCategory).attribute(attr::kName, kLauncherCategory);
 }
 
+// The app itself. No Java of its own: hasCode is off. Saves stay on the device: they do not leave
+// it through the system's backups unless a developer decides so.
+XmlElement& add_application(XmlElement& manifest, const std::string& label) {
+  XmlElement& application = manifest.child(tag::kApplication);
+  application.attribute(attr::kLabel, label)
+      .attribute(attr::kHasCode, kNo)
+      .attribute(attr::kAllowBackup, kNo)
+      .attribute(attr::kExtractNativeLibs, kYes)
+      .attribute(attr::kTheme, kFullScreenTheme);
+  return application;
+}
+
 }  // namespace
 
 std::string android_manifest(const std::string& package, const std::string& label, const AndroidSettings& settings) {
@@ -458,13 +472,7 @@ std::string android_manifest(const std::string& package, const std::string& labe
       .attribute(attr::kVersionCode, std::to_string(settings.version_code))
       .attribute(attr::kVersionName, settings.version_name);
   add_requirements(manifest);
-  // (No Java of its own: hasCode is off.)
-  XmlElement& application = manifest.child(tag::kApplication);
-  application.attribute(attr::kLabel, label)
-      .attribute(attr::kHasCode, kNo)
-      .attribute(attr::kExtractNativeLibs, kYes)
-      .attribute(attr::kTheme, kFullScreenTheme);
-  add_activity(application);
+  add_activity(add_application(manifest, label));
   return manifest.document();
 }
 
@@ -637,10 +645,19 @@ bool ensure_key(const SigningKey& key, const std::filesystem::path& log, std::st
   std::error_code fs_error;
   if (std::filesystem::exists(key.keystore, fs_error)) return true;
   std::filesystem::create_directories(key.keystore.parent_path(), fs_error);
-  return run(make_key_command(key), log, "making the signing key (is Java installed?)", error);
+  if (!run(make_key_command(key), log, "making the signing key (is Java installed?)", error)) return false;
+  keep_to_owner(key.keystore);
+  return true;
 }
 
 }  // namespace
+
+void keep_to_owner(const std::filesystem::path& file) {
+  std::error_code fs_error;
+  std::filesystem::permissions(file, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+                               std::filesystem::perm_options::replace, fs_error);
+  if (fs_error) log::warning("cannot keep " + file.string() + " to its owner: " + fs_error.message());
+}
 
 bool pack_android_apk(const AndroidTools& tools, const std::filesystem::path& stage_dir, const SigningKey& key,
                       const std::filesystem::path& apk, std::string& error) {

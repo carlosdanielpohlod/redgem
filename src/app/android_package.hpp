@@ -85,6 +85,9 @@ bool stage_android_game(const std::filesystem::path& game_dir,
                         const std::map<std::string, std::filesystem::path>& runtimes, const std::string& stamp,
                         const std::filesystem::path& stage_dir, std::string& error);
 
+// Lets only its owner read and write a file: a signing key is nobody else's on a shared machine.
+void keep_to_owner(const std::filesystem::path& file);
+
 // Makes `apk` out of a staged folder with the SDK's tools, signed with `key`.
 bool pack_android_apk(const AndroidTools& tools, const std::filesystem::path& stage_dir, const SigningKey& key,
                       const std::filesystem::path& apk, std::string& error);

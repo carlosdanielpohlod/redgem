@@ -25,7 +25,7 @@ bool acceptable_elements(const nlohmann::json& array, int depth) {
 
 bool acceptable_at(const nlohmann::json& data, int depth) {
   if (!data.is_structured()) return true;
-  if (depth >= kMaxDataDepth) return false;
+  if (depth >= kMaxDataDepth || data.size() > kMaxDataMembers) return false;
   return data.is_object() ? acceptable_members(data, depth + 1) : acceptable_elements(data, depth + 1);
 }
 
@@ -44,11 +44,20 @@ bool is_short_text(const nlohmann::json& message, const char* key) {
          (message[key].is_string() && message[key].get_ref<const std::string&>().size() <= kMaxNameBytes);
 }
 
-bool is_list_of_whole_numbers(const nlohmann::json& message, const char* key) {
+bool is_peer_id(const nlohmann::json& entry) {
+  return entry.is_number_integer() && entry >= kHostId && entry <= kLargestId;
+}
+
+// Who else is in a game: ids there can be, each once, and never a full game's worth (whoever is
+// told is in it too).
+bool is_list_of_peers(const nlohmann::json& message, const char* key) {
   if (!message.contains(key)) return true;
   const nlohmann::json& list = message[key];
-  return list.is_array() &&
-         std::all_of(list.begin(), list.end(), [](const nlohmann::json& entry) { return entry.is_number_integer(); });
+  if (!list.is_array() || list.size() >= static_cast<std::size_t>(kMaxPeers)) return false;
+  if (!std::all_of(list.begin(), list.end(), is_peer_id)) return false;
+  std::vector<int> ids = list.get<std::vector<int>>();
+  std::sort(ids.begin(), ids.end());
+  return std::adjacent_find(ids.begin(), ids.end()) == ids.end();
 }
 
 }  // namespace
@@ -63,7 +72,7 @@ nlohmann::json game_message(const std::string& name, const nlohmann::json& data,
 
 bool well_formed(const nlohmann::json& message) {
   return has_kind(message) && is_id(message, kFrom) && is_id(message, kTo) && is_short_text(message, kName) &&
-         is_list_of_whole_numbers(message, kPeers) && is_short_text(message, kRoom) &&
+         is_list_of_peers(message, kPeers) && is_short_text(message, kRoom) &&
          (!message.contains(kData) || acceptable_data(message[kData]));
 }
 

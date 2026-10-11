@@ -24,6 +24,10 @@ constexpr std::size_t kLongestName = 48;
 constexpr int kGamesOneAddressMayList = 4;
 constexpr int kGamesListed = 32;
 constexpr int kAddressesTried = 40;
+constexpr std::int64_t kPastThirtyTwoBits = std::int64_t{1} << 32;
+constexpr std::int64_t kWrapsToGamePort = kPastThirtyTwoBits + kGamePort;
+constexpr std::int64_t kWrapsToPlayers = kPastThirtyTwoBits + kPlayers;
+constexpr std::uint64_t kBeyondSigned = ~std::uint64_t{0};  // the largest number an answer can carry
 
 std::string answer(const json& name, const json& port, const json& players) {
   return json{{"is", "redgem"}, {"name", name}, {"port", port}, {"players", players}}.dump();
@@ -135,4 +139,29 @@ TEST_CASE("one address lists only a few games, and the list only so many") {
   games.clear();
   for (int i = 0; i < kAddressesTried; ++i) list_game(games, game_at("10.0.0." + std::to_string(i), kGamePort));
   CHECK(games.size() == kGamesListed);
+}
+
+TEST_CASE("an answer from an address that is not nearby describes no game") {
+  CHECK(game_from_answer(answer("Maze", kGamePort, kPlayers), kNeighbour).has_value());
+  for (const char* far : {"8.8.8.8", "203.0.113.9", "172.32.0.1", "", "somewhere"}) {
+    CAPTURE(far);
+    CHECK_FALSE(game_from_answer(answer("Maze", kGamePort, kPlayers), far).has_value());
+  }
+}
+
+TEST_CASE("numbers too large for a port or a count of players do not come out as small ones") {
+  // (Narrowed to 32 bits these would read as port 7777 and as 3 players.)
+  CHECK_FALSE(game_from_answer(answer("Maze", kWrapsToGamePort, kPlayers), kNeighbour).has_value());
+  CHECK_FALSE(game_from_answer(answer("Maze", kBeyondSigned, kPlayers), kNeighbour).has_value());
+  const auto crowded = game_from_answer(answer("Maze", kGamePort, kWrapsToPlayers), kNeighbour);
+  REQUIRE(crowded.has_value());
+  CHECK(crowded->players == kMostPlayersShown);
+  CHECK(game_from_answer(answer("Maze", kGamePort, kBeyondSigned), kNeighbour)->players == kMostPlayersShown);
+  CHECK(game_from_answer(answer("Maze", kGamePort, -kWrapsToPlayers), kNeighbour)->players == 1);
+}
+
+TEST_CASE("a game's name cannot carry what drives a terminal") {
+  const auto game = game_from_answer(answer("Maze\x1b[2J\nfake line", kGamePort, kPlayers), kNeighbour);
+  REQUIRE(game.has_value());
+  CHECK(game->name == "Maze?[2J?fake line");
 }

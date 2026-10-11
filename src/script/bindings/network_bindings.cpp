@@ -44,8 +44,16 @@ std::optional<nlohmann::json> scalar_json(mrb_state* mrb, mrb_value value) {
   return std::nullopt;
 }
 
+// An array or a hash holds only so much: the other machines would refuse the message.
+void check_members(mrb_state* mrb, mrb_int count) {
+  if (count > static_cast<mrb_int>(net::kMaxDataMembers)) {
+    mrb_raise(mrb, E_ARGUMENT_ERROR, "an array or a hash of a message holds too many things");
+  }
+}
+
 nlohmann::json array_json(mrb_state* mrb, mrb_value value, int depth) {
   nlohmann::json list = nlohmann::json::array();
+  check_members(mrb, RARRAY_LEN(value));
   for (mrb_int i = 0; i < RARRAY_LEN(value); ++i) list.push_back(nested_json(mrb, mrb_ary_entry(value, i), depth + 1));
   return list;
 }
@@ -61,6 +69,7 @@ std::string key_name(mrb_state* mrb, mrb_value key) {
 nlohmann::json hash_json(mrb_state* mrb, mrb_value value, int depth) {
   nlohmann::json object = nlohmann::json::object();
   const mrb_value keys = mrb_hash_keys(mrb, value);
+  check_members(mrb, RARRAY_LEN(keys));
   for (mrb_int i = 0; i < RARRAY_LEN(keys); ++i) {
     const mrb_value key = mrb_ary_entry(keys, i);
     const std::string name = key_name(mrb, key);
@@ -112,11 +121,17 @@ mrb_value vector_value(mrb_state* mrb, const nlohmann::json& json) {
   return vec3_value(mrb, vec3_from(parts.data()));
 }
 
+// A key of a hash that arrived: the Symbol the game's scripts know it by, or a String for a name
+// no script here ever used. Symbols are never forgotten, so making one for every key another
+// machine comes up with would let it fill this one's memory.
+mrb_value key_value(mrb_state* mrb, const std::string& key) {
+  const mrb_sym known = mrb_intern_check(mrb, key.data(), key.size());
+  return known != 0 ? mrb_symbol_value(known) : text_value(mrb, key);
+}
+
 mrb_value hash_value(mrb_state* mrb, const nlohmann::json& json) {
   const mrb_value hash = mrb_hash_new(mrb);
-  for (const auto& [key, item] : json.items()) {
-    mrb_hash_set(mrb, hash, mrb_symbol_value(mrb_intern(mrb, key.data(), key.size())), value_from(mrb, item));
-  }
+  for (const auto& [key, item] : json.items()) mrb_hash_set(mrb, hash, key_value(mrb, key), value_from(mrb, item));
   return hash;
 }
 

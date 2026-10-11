@@ -48,6 +48,13 @@ const char* network_event_name(net::NetworkEvent::Kind kind) {
   return kMessageEvent;
 }
 
+// A network event as what Network.__event takes. This makes Ruby values, which can fail: only
+// for where Ruby errors are caught.
+std::vector<mrb_value> event_arguments(mrb_state* mrb, const net::NetworkEvent& event) {
+  return {mrb_symbol_value(mrb_intern_cstr(mrb, network_event_name(event.kind))), mrb_int_value(mrb, event.peer),
+          binding::text_value(mrb, event.name), value_from(mrb, event.data)};
+}
+
 constexpr const char* kObjectsCacheGlobal = "$__redgem_objects";
 constexpr const char* kBehaviourClass = "Behaviour";
 constexpr const char* kBehavioursVariable = "@behaviours";  // a GameObject's behaviours, kept by the prelude
@@ -130,14 +137,16 @@ void ScriptHost::scene_was_reset() {
 void ScriptHost::dispatch(const net::NetworkEvent& event) {
   mrb_state* mrb = vm_.state();
   const int arena = mrb_gc_arena_save(mrb);
-  const char* kind = network_event_name(event.kind);
-  const RubyResult result = vm_.call(
-      mrb_obj_value(mrb_module_get(mrb, kNetworkModule)), kNetworkEventEntry,
-      {mrb_symbol_value(mrb_intern_cstr(mrb, kind)), mrb_int_value(mrb, event.peer),
-       mrb_str_new(mrb, event.name.data(), static_cast<mrb_int>(event.name.size())), value_from(mrb, event.data)});
+  // What another machine sent becomes Ruby values inside the protected call: should there be no
+  // memory for them, that is one message lost, not the game.
+  const RubyResult result = vm_.call_with(mrb_obj_value(mrb_module_get(mrb, kNetworkModule)), kNetworkEventEntry,
+                                          [&event](mrb_state* vm) { return event_arguments(vm, event); });
   mrb_gc_arena_restore(mrb, arena);
-  // A failing handler does not take the game down, nor the connection.
-  if (!result.ok) report_error(std::string("a Network handler (") + kind + " " + event.name + ")", result.error);
+  if (result.ok) return;
+  // A failing handler does not take the game down, nor the connection. (The message's name is the
+  // other machine's choice: it is shown with nothing in it that fakes log lines.)
+  const std::string handler = std::string(network_event_name(event.kind)) + " " + printable(event.name);
+  report_error("a Network handler (" + handler + ")", result.error);
 }
 
 void ScriptHost::attach_object(ObjectId id) {

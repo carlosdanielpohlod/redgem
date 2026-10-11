@@ -2,8 +2,11 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <limits>
 
 #include <nlohmann/json.hpp>
+
+#include "core/safe_path.hpp"
 
 namespace redgem::net {
 
@@ -61,6 +64,15 @@ bool is_answer(const nlohmann::json& answer) {
          has_whole_number(answer, kPortKey) && has_whole_number(answer, kPlayersKey);
 }
 
+// A whole number of an answer in 64 bits, however large it was written (one past what those hold
+// counts as the largest there is). Ports and players are checked as this before they are made to
+// fit anything smaller: a huge number must not come out as a small one.
+std::int64_t wide_number(const nlohmann::json& number) {
+  constexpr std::int64_t largest = std::numeric_limits<std::int64_t>::max();
+  if (number.is_number_unsigned() && number.get<std::uint64_t>() > static_cast<std::uint64_t>(largest)) return largest;
+  return number.get<std::int64_t>();
+}
+
 std::vector<NearbyGame>::iterator find_listed(std::vector<NearbyGame>& games, const NearbyGame& game) {
   return std::find_if(games.begin(), games.end(), [&game](const NearbyGame& other) {
     return other.address == game.address && other.port == game.port;
@@ -94,15 +106,17 @@ bool nearby_address(const std::string& address) {
 }
 
 std::optional<NearbyGame> game_from_answer(const std::string& message, const std::string& from) {
+  if (!nearby_address(from)) return std::nullopt;  // a game on this network is not heard of from far away
   const nlohmann::json answer = nlohmann::json::parse(message, nullptr, false);
   if (!is_answer(answer)) return std::nullopt;
-  const int port = answer[kPortKey].get<int>();
-  if (port <= 0 || port > kLargestPort) return std::nullopt;
+  const std::int64_t port = wide_number(answer[kPortKey]);
+  if (port < 1 || port > kLargestPort) return std::nullopt;
   NearbyGame game;
   game.address = from;
   game.port = static_cast<std::uint16_t>(port);
-  game.name = answer[kNameKey].get<std::string>().substr(0, kMaxNameBytes);
-  game.players = std::clamp(answer[kPlayersKey].get<int>(), 1, kMaxPlayersShown);
+  // (The name is shown on screens and in logs: nothing in it drives a terminal.)
+  game.name = printable(answer[kNameKey].get<std::string>().substr(0, kMaxNameBytes));
+  game.players = static_cast<int>(std::clamp<std::int64_t>(wide_number(answer[kPlayersKey]), 1, kMaxPlayersShown));
   return game;
 }
 

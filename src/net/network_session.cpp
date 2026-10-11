@@ -10,6 +10,12 @@ namespace {
 
 using namespace wire;
 
+// Machines that connected to a host and have not said hello yet: how many from one address, and
+// how many in all. They hold no place in the game (those are for who was let in), so whoever
+// connects and keeps quiet keeps nobody out but the next few from its own address.
+constexpr int kMaxWaitingPerAddress = 4;
+constexpr int kMaxWaitingLinks = 32;
+
 NetworkEvent event_of(NetworkEvent::Kind kind, int peer = 0) {
   NetworkEvent event;
   event.kind = kind;
@@ -120,20 +126,34 @@ void NetworkSession::announce_hosting(std::vector<NetworkEvent>& events) {
 void NetworkSession::serve(Link& link, float seconds, std::vector<NetworkEvent>& events) {
   pump(link);
   if (state_ == State::Online && link.peer != 0) keep_in_touch(link, seconds);
-  while (const auto text = link.incoming.next()) {
+  // (Only so many a poll: the rest wait for the next one, see kMaxMessagesPerPoll.)
+  for (int handled = 0; handled < kMaxMessagesPerPoll && state_ != State::Offline; ++handled) {
+    const auto text = link.incoming.next();
+    if (!text) break;
     handle(link, *text, events);
-    if (state_ == State::Offline) break;
   }
   if (link.incoming.broken()) link.closed = true;
 }
 
 void NetworkSession::accept_newcomers() {
   for (Socket guest = listener_.accept(); guest.valid(); guest = listener_.accept()) {
-    if (static_cast<int>(links_.size()) + 1 >= kMaxPeers) continue;  // full: the newcomer is hung up on
     Link link;
+    link.address = guest.peer_address();
+    if (!room_to_wait(link.address)) continue;  // too many waiting already: the newcomer is hung up on
     link.socket = std::move(guest);
-    links_.push_back(std::move(link));  // let in when it says hello (see admit)
+    links_.push_back(std::move(link));  // let in when it says hello (see admit), if the game has room
   }
+}
+
+bool NetworkSession::room_to_wait(const std::string& address) const {
+  int waiting = 0;
+  int from_there = 0;
+  for (const Link& link : links_) {
+    if (link.peer != 0 || link.closed) continue;
+    ++waiting;
+    if (link.address == address) ++from_there;
+  }
+  return waiting < kMaxWaitingLinks && from_there < kMaxWaitingPerAddress;
 }
 
 void NetworkSession::admit(Link& link, std::vector<NetworkEvent>& events) {
@@ -170,11 +190,21 @@ void NetworkSession::await_connection(float seconds, std::vector<NetworkEvent>& 
 
 void NetworkSession::pump(Link& link) {
   if (state_ == State::Connecting && link.socket.connect_status() != IoStatus::Ok) return;
+  take_in(link);
+  if (!link.closed && link.socket.write(link.outgoing) == IoStatus::Closed) link.closed = true;
+}
+
+void NetworkSession::take_in(Link& link) {
+  // With that much of its talk still to handle, a machine's next words wait in the connection
+  // (and it is not silent).
+  if (link.incoming.buffered() >= kMaxReadBytesPerPoll) {
+    link.quiet_for = 0.0f;
+    return;
+  }
   std::vector<std::uint8_t> arrived;
   if (link.socket.read(arrived, kMaxReadBytesPerPoll) == IoStatus::Closed) link.closed = true;
   if (!arrived.empty()) link.quiet_for = 0.0f;
   link.incoming.append(arrived.data(), arrived.size());
-  if (!link.closed && link.socket.write(link.outgoing) == IoStatus::Closed) link.closed = true;
 }
 
 void NetworkSession::keep_in_touch(Link& link, float seconds) {
@@ -250,24 +280,32 @@ void NetworkSession::hear_game_message(const nlohmann::json& message, std::vecto
 
 void NetworkSession::accept_welcome(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
   const int given = message.value(kTo, 0);
-  if (!own_id_believable(given, through_relay_, opening_room_)) {
+  // (well_formed saw to the list: ids there can be, each once. This machine is not one of the others.)
+  const std::vector<int> others = message.value(kPeers, std::vector<int>{});
+  const bool listed_itself = std::find(others.begin(), others.end(), given) != others.end();
+  if (listed_itself || !own_id_believable(given, through_relay_, opening_room_)) {
     links_.front().closed = true;
     return;
   }
   id_ = given;
   room_ = message.value(kRoom, std::string());
-  peers_ = message.value(kPeers, std::vector<int>{});
+  peers_ = others;
   state_ = State::Online;
   events.push_back(event_of(NetworkEvent::Kind::Connected, id_));
 }
 
 void NetworkSession::peer_arrived(int peer, std::vector<NetworkEvent>& events) {
+  // What a host says is checked like anything else: nobody arrives twice, as this machine, or as nobody.
+  const bool known = std::find(peers_.begin(), peers_.end(), peer) != peers_.end();
+  if (known || peer == id_ || peer < kHostId) return;
   peers_.push_back(peer);
   events.push_back(event_of(NetworkEvent::Kind::PeerJoined, peer));
 }
 
 void NetworkSession::peer_left(int peer, std::vector<NetworkEvent>& events) {
-  peers_.erase(std::remove(peers_.begin(), peers_.end(), peer), peers_.end());
+  const auto gone = std::remove(peers_.begin(), peers_.end(), peer);
+  if (gone == peers_.end()) return;  // nobody the game heard of
+  peers_.erase(gone, peers_.end());
   events.push_back(event_of(NetworkEvent::Kind::PeerLeft, peer));
 }
 

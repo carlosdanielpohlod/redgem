@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <functional>
+#include <set>
 #include <thread>
 
 #include "net/lan_discovery.hpp"
@@ -27,6 +28,17 @@ constexpr const char* kLocalhost = "127.0.0.1";
 constexpr std::uint16_t kTestDiscoveryPort = 47831;  // not the real one: a game may be open on this machine
 constexpr std::uint16_t kGamePort = 7777;
 constexpr std::size_t kWelcomeBytes = 4096;  // plenty for a relay's first answer
+constexpr int kManyCodes = 500;
+constexpr std::string_view kCodeLetters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+constexpr int kFloodMessages = 3 * kMaxMessagesPerPoll / 2;
+constexpr std::chrono::milliseconds kArrivalPause{50};  // for what was written to be there to read
+constexpr std::size_t kLongTextBytes = 512 * 1024;
+constexpr int kLongTexts = 10;                     // together, more than a machine may send through a relay at once
+constexpr std::size_t kSmallBudget = 1024 * 1024;  // what a small relay holds for all its machines
+constexpr std::size_t kLengthBytes = 4;
+// The start of a message most of a small relay's budget long, the rest of which never comes.
+constexpr std::uint8_t kLongAnnounced[kLengthBytes] = {0x00, 0x0E, 0x00, 0x00};
+constexpr std::size_t kHalfSentBytes = 600 * 1024;
 
 // A relay and the sessions talking through it, with everything that happened to each.
 struct Meeting {
@@ -34,7 +46,7 @@ struct Meeting {
   std::vector<NetworkSession*> sessions;
   std::vector<std::vector<NetworkEvent>> events;
 
-  Meeting() {
+  explicit Meeting(std::size_t buffered_bytes = kMaxRelayBufferedBytes) : relay(buffered_bytes) {
     std::string error;
     REQUIRE_MESSAGE(relay.start(0, error), error);
   }
@@ -91,7 +103,122 @@ struct RoomOfThree {
   }
 };
 
+// Something that is not this engine, talking to a relay over a plain connection.
+struct RawMachine {
+  Meeting& meeting;
+  Socket socket;
+  FrameBuffer heard;
+
+  explicit RawMachine(Meeting& where) : meeting(where) {
+    std::string error;
+    socket = Socket::connect_to(kLocalhost, meeting.relay.port(), error);
+    REQUIRE(socket.valid());
+  }
+
+  // Writes all of `bytes`; false when the relay hung up first.
+  bool send(std::vector<std::uint8_t> bytes) {
+    IoStatus status = IoStatus::Ok;
+    meeting.until([&] {
+      status = socket.write(bytes);
+      return bytes.empty() || status == IoStatus::Closed;
+    });
+    return bytes.empty();
+  }
+
+  bool say(const std::string& text) { return send(frame(text)); }
+
+  IoStatus listen() {
+    std::vector<std::uint8_t> arrived;
+    const IoStatus status = socket.read(arrived, kMaxReadBytesPerPoll);
+    heard.append(arrived.data(), arrived.size());
+    return status;
+  }
+
+  // The next message the relay sent, waited for.
+  nlohmann::json next_message() {
+    std::optional<std::string> text;
+    REQUIRE(meeting.until([&] {
+      listen();
+      text = heard.next();
+      return text.has_value();
+    }));
+    return nlohmann::json::parse(*text);
+  }
+
+  // Opens a room and returns its code.
+  std::string open_room() {
+    REQUIRE(say(R"({"k":"h","r":"new"})"));
+    return next_message()["r"];
+  }
+};
+
 }  // namespace
+
+TEST_CASE("a room's code is letters easy to read aloud, and no two rooms get the same") {
+  std::set<std::string> codes;
+  for (int i = 0; i < kManyCodes; ++i) {
+    const std::string code = random_room_code();
+    CHECK(code.size() == kRoomCodeLetters);
+    CHECK(code.find_first_not_of(kCodeLetters) == std::string::npos);
+    codes.insert(code);
+  }
+  CHECK(codes.size() == kManyCodes);
+}
+
+TEST_CASE("a flood of tiny messages through a relay is passed on a poll's worth at a time") {
+  Meeting meeting;
+  RawMachine opener(meeting), flooder(meeting);
+  const std::string code = opener.open_room();
+  REQUIRE(flooder.say(R"({"k":"h","r":")" + code + R"("})"));
+  CHECK(opener.next_message()["k"] == "j");
+  std::vector<std::uint8_t> flood;
+  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x"})");
+  for (int i = 0; i < kFloodMessages; ++i) flood.insert(flood.end(), tiny.begin(), tiny.end());
+  std::vector<std::uint8_t> unsent = flood;
+  while (!unsent.empty()) REQUIRE(flooder.socket.write(unsent) != IoStatus::Closed);
+  std::this_thread::sleep_for(kArrivalPause);
+  meeting.relay.poll(kRoundSeconds);
+  std::this_thread::sleep_for(kArrivalPause);
+  opener.listen();
+  int passed_on = 0;
+  while (opener.heard.next()) ++passed_on;
+  CHECK(passed_on == kMaxMessagesPerPoll);
+  // The rest comes with the next polls: nothing is lost.
+  REQUIRE(meeting.until([&] {
+    opener.listen();
+    while (opener.heard.next()) ++passed_on;
+    return passed_on == kFloodMessages;
+  }));
+}
+
+TEST_CASE("a machine that sends more than any game would is let go by the relay") {
+  Meeting meeting;
+  RawMachine flooder(meeting);
+  flooder.open_room();
+  REQUIRE(meeting.relay.room_count() == 1);
+  const std::string long_text = R"({"k":"i","d":")" + std::string(kLongTextBytes, 'a') + R"("})";
+  for (int i = 0; i < kLongTexts; ++i) flooder.say(long_text);
+  REQUIRE(meeting.until([&meeting] { return meeting.relay.connection_count() == 0; }));
+  CHECK(meeting.relay.room_count() == 0);
+}
+
+TEST_CASE("a relay holding more than it may lets go of the newest machine with much waiting") {
+  Meeting meeting(kSmallBudget);
+  std::vector<std::uint8_t> half_sent(std::begin(kLongAnnounced), std::end(kLongAnnounced));
+  half_sent.resize(kLengthBytes + kHalfSentBytes, 'a');
+  RawMachine modest(meeting), first(meeting);
+  modest.open_room();
+  REQUIRE(first.send(half_sent));
+  for (int round = 0; round < kSettleRounds; ++round) meeting.relay.poll(kRoundSeconds);
+  CHECK(meeting.relay.connection_count() == 2);  // within what the relay may hold
+  RawMachine second(meeting);
+  second.send(half_sent);
+  REQUIRE(meeting.until([&second] { return second.listen() == IoStatus::Closed; }));
+  CHECK(meeting.relay.connection_count() == 2);
+  CHECK(first.listen() == IoStatus::WouldBlock);   // whoever was there before stays ...
+  CHECK(modest.listen() == IoStatus::WouldBlock);  // ... and so does whoever holds little
+  CHECK(meeting.relay.room_count() == 1);
+}
 
 TEST_CASE("a room on a relay has a code, and whoever opened it is the game's host") {
   RoomOfThree room;

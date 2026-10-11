@@ -82,7 +82,7 @@ std::optional<std::string> value(Reading& reading) {
 }
 
 bool is_port(const std::string& text) {
-  return text.find_first_not_of(kDigits) == std::string::npos && text.size() <= kPortDigits &&
+  return !text.empty() && text.find_first_not_of(kDigits) == std::string::npos && text.size() <= kPortDigits &&
          std::stoi(text) <= kLargestPort;
 }
 

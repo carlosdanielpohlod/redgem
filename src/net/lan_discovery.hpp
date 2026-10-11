@@ -25,7 +25,8 @@ struct NearbyGame {
 // are not answered: a game must not be made to send messages to strangers.
 bool nearby_address(const std::string& address);
 // The game an answer to a search describes, heard from the address `from`; nullopt for anything
-// that is not a whole answer (anything can arrive on a port).
+// that is not a whole answer (anything can arrive on a port) and for one from an address that is
+// not nearby (whoever knows the port could otherwise list games from anywhere).
 std::optional<NearbyGame> game_from_answer(const std::string& message, const std::string& from);
 // Puts a game that answered in the list: over what was known of it, or as a new one while there
 // is room and its address has not filled its share. A game on this very machine answers twice

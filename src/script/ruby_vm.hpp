@@ -2,6 +2,7 @@
 
 #include <mruby.h>
 
+#include <functional>
 #include <initializer_list>
 #include <string>
 #include <vector>
@@ -30,6 +31,12 @@ class RubyVm {
   RubyResult check_syntax(const std::string& code, const std::string& file_name);
   RubyResult call(mrb_value receiver, const char* method, std::initializer_list<mrb_value> args = {});
   RubyResult call(mrb_value receiver, const char* method, const std::vector<mrb_value>& args);
+  // Calls a method with the arguments `make` returns, made inside the same protection as the
+  // call: making Ruby values can fail too (no memory left for them, say), and that is then an
+  // error like any other instead of the end of the program. For arguments made out of what came
+  // from outside.
+  using ArgumentsMaker = std::function<std::vector<mrb_value>(mrb_state*)>;
+  RubyResult call_with(mrb_value receiver, const char* method, const ArgumentsMaker& make);
 
   // Keeps a value alive across garbage collections until the VM dies.
   void keep_alive(mrb_value value);

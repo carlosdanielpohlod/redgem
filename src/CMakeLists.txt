@@ -135,6 +135,8 @@ if(WIN32)
   target_link_libraries(redgem_engine PUBLIC ws2_32)
 endif()
 target_compile_options(redgem_engine PRIVATE -Wall -Wextra -Wpedantic -Wno-unused-parameter)
+include(Hardening)
+redgem_harden(redgem_engine)
 
 if(ANDROID)
   # On Android the engine is a library the system loads into a native activity; it plays the game
@@ -150,6 +152,8 @@ else()
   set_target_properties(redgem PROPERTIES WIN32_EXECUTABLE ON)
 endif()
 target_compile_options(redgem PRIVATE -Wall -Wextra -Wpedantic)
+redgem_harden(redgem)
+redgem_harden_program(redgem)
 
 # The editor's fonts are assembled into the binary (.incbin): rebuild when they change.
 set(REDGEM_EDITOR_FONT_DIR ${CMAKE_SOURCE_DIR}/assets/editor/fonts)
