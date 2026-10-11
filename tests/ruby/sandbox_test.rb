@@ -3,7 +3,8 @@
 class SandboxTest < RedGemTest::Case
   FORBIDDEN_CONSTANTS = %i[File IO Dir Socket TCPSocket UDPSocket BasicSocket FileTest Binding].freeze
   FORBIDDEN_METHODS = %i[eval system exec spawn fork open binding exit!].freeze
-  CODE_AS_TEXT = "1 + 1"
+  CODE_AS_TEXT = "1 + 1".freeze
+  HALF_MORE = 1.5
 
   def test_no_files_processes_or_sockets_exist
     FORBIDDEN_CONSTANTS.each do |name|
@@ -29,7 +30,7 @@ class SandboxTest < RedGemTest::Case
 
   def test_what_scripts_do_need_is_there
     assert_equal 3, [1, 2].sum
-    assert_equal "1.50", format("%.2f", 1.5)
+    assert_equal "1.50", format("%<number>.2f", number: HALF_MORE)
     assert_in_delta 1.0, Math.sin(Math::PI / 2)
     assert_equal :done, Fiber.new { :done }.resume
     assert_equal 2, Struct.new(:a).new(2).a
