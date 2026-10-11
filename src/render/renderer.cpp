@@ -135,6 +135,12 @@ constexpr int kUiLastLetter = 255;    // through Latin-1: accented letters
 constexpr float kUiLetterSpacing = 0.0f;  // extra space between letters, as a share of the text size
 constexpr int kUiCornerSegments = 8;
 constexpr float kDiameterPerRadius = 2.0f;
+constexpr int kNoLocation = -1;       // a uniform the shader does not have
+constexpr int kTriangleCorners = 3;
+constexpr float kMaxColorByte = 255.0f;
+// The texture maps materials use (base color, emission, normal, metallic-roughness, occlusion).
+constexpr int kMaterialMaps[] = {MATERIAL_MAP_ALBEDO, MATERIAL_MAP_EMISSION, MATERIAL_MAP_NORMAL, MATERIAL_MAP_ROUGHNESS,
+                                 MATERIAL_MAP_OCCLUSION};
 constexpr int kNoMaterialYet = -2;  // no material index (kNoIndex is the fallback material)
 
 struct Renderer::Impl {
@@ -205,6 +211,7 @@ struct Renderer::Impl {
   Material sky_material{};
   // Post-processing targets, sized like the output.
   RenderTexture2D hdr{};      // the lit scene, linear HDR, with depth
+  Matrix pass_view_projection{};  // of the pass being drawn (see begin_pass)
   std::vector<Transform> worlds;  // every object's world transform this frame (see place_objects)
   Font ui_font{};
   bool owns_ui_font = false;
@@ -703,12 +710,89 @@ struct Renderer::Impl {
     return count > 0;
   }
 
+  // --- Drawing meshes -----------------------------------------------------------------------
+  // The engine's own draw call. raylib's DrawMesh sets the whole pipeline up again for every
+  // mesh (every matrix, every texture slot, bound and unbound); a scene is thousands of meshes
+  // per pass, so here what belongs to the pass is set once, what belongs to a material only
+  // when the material changes, and a mesh costs its matrices and one draw.
+
+  void begin_pass(const Shader& pass_shader) {
+    rlDrawRenderBatchActive();  // whatever raylib still had queued goes first
+    pass_view_projection = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
+    rlEnableShader(pass_shader.id);
+    if (pass_shader.locs[SHADER_LOC_MATRIX_VIEW] != kNoLocation) {
+      rlSetUniformMatrix(pass_shader.locs[SHADER_LOC_MATRIX_VIEW], rlGetMatrixModelview());
+    }
+    if (pass_shader.locs[SHADER_LOC_MATRIX_PROJECTION] != kNoLocation) {
+      rlSetUniformMatrix(pass_shader.locs[SHADER_LOC_MATRIX_PROJECTION], rlGetMatrixProjection());
+    }
+    // Each kind of texture has its own slot, the same for every material.
+    for (const int map : kMaterialMaps) {
+      const int location = pass_shader.locs[SHADER_LOC_MAP_DIFFUSE + map];
+      if (location != kNoLocation) rlSetUniform(location, &map, SHADER_UNIFORM_INT, 1);
+    }
+  }
+
+  void bind_material(const Material& material, const Shader& pass_shader) {
+    for (const int map : kMaterialMaps) {
+      if (pass_shader.locs[SHADER_LOC_MAP_DIFFUSE + map] == kNoLocation) continue;
+      rlActiveTextureSlot(map);
+      const unsigned int texture = material.maps[map].texture.id;
+      if (texture != 0) {
+        rlEnableTexture(texture);
+      } else {
+        rlDisableTexture();
+      }
+    }
+    const int color_location = pass_shader.locs[SHADER_LOC_COLOR_DIFFUSE];
+    if (color_location != kNoLocation) {
+      const ::Color base = material.maps[MATERIAL_MAP_DIFFUSE].color;
+      const float color[] = {static_cast<float>(base.r) / kMaxColorByte, static_cast<float>(base.g) / kMaxColorByte,
+                             static_cast<float>(base.b) / kMaxColorByte, static_cast<float>(base.a) / kMaxColorByte};
+      rlSetUniform(color_location, color, SHADER_UNIFORM_VEC4, 1);
+    }
+  }
+
+  // `bones` is null for meshes that are not deformed by a skeleton.
+  void draw_mesh(const Mesh& mesh, const Matrix& model, const Shader& pass_shader, const std::vector<Matrix>* bones) {
+    if (pass_shader.locs[SHADER_LOC_MATRIX_MODEL] != kNoLocation) {
+      rlSetUniformMatrix(pass_shader.locs[SHADER_LOC_MATRIX_MODEL], model);
+    }
+    if (pass_shader.locs[SHADER_LOC_MATRIX_NORMAL] != kNoLocation) {
+      rlSetUniformMatrix(pass_shader.locs[SHADER_LOC_MATRIX_NORMAL], MatrixTranspose(MatrixInvert(model)));
+    }
+    rlSetUniformMatrix(pass_shader.locs[SHADER_LOC_MATRIX_MVP], MatrixMultiply(model, pass_view_projection));
+    if (bones != nullptr && pass_shader.locs[SHADER_LOC_BONE_MATRICES] != kNoLocation) {
+      rlSetUniformMatrices(pass_shader.locs[SHADER_LOC_BONE_MATRICES], bones->data(), static_cast<int>(bones->size()));
+    }
+    rlEnableVertexArray(mesh.vaoId);
+    if (mesh.indices != nullptr) {
+      rlDrawVertexArrayElements(0, mesh.triangleCount * kTriangleCorners, nullptr);
+    } else {
+      rlDrawVertexArray(0, mesh.vertexCount);
+    }
+  }
+
+  // Leaves the state raylib expects: nothing bound.
+  void end_pass() {
+    rlDisableVertexArray();
+    for (const int map : kMaterialMaps) {
+      rlActiveTextureSlot(map);
+      rlDisableTexture();
+    }
+    rlActiveTextureSlot(0);
+    rlDisableShader();
+  }
+
   // Draws what the current 3D view can see. `viewer` is the game camera in both passes: detail
   // is judged by how big things look to the player, not to the sun.
   void draw_objects(const Scene& scene, bool depth_pass, Vec3 viewer, float detail_angle = 0.0f) {
     const Frustum frustum = frustum_from_matrix(MatrixToFloatV(MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection())).v);
     const float min_angle = detail_angle > 0.0f ? detail_angle : depth_pass ? kMinShadowAngle : kMinVisibleAngle;
     const std::size_t count = std::min(scene.size(), worlds.size());
+    const Shader& pass_shader = depth_pass ? depth_shader : shader;
+    const int skinned_location = depth_pass ? depth_skinned_loc : skinned_loc;
+    begin_pass(pass_shader);
     int last_material = kNoMaterialYet;
     bool last_two_sided = false;
     for (std::size_t slot = 0; slot < count; ++slot) {
@@ -740,32 +824,26 @@ struct Renderer::Impl {
 
       if (!depth_pass) {
         const Vector3 tint = to_raylib(object.tint);
-        SetShaderValue(shader, tint_loc, &tint, SHADER_UNIFORM_VEC3);
+        rlSetUniform(tint_loc, &tint, SHADER_UNIFORM_VEC3, 1);
       }
       for (const GpuPrimitive& primitive : meshes[object.mesh]) {
-        Material material = primitive.material == kNoIndex ? fallback_material : materials[primitive.material];
-        if (depth_pass) material.shader = depth_shader;
-        // Consecutive parts often share a material: its uniforms are already set.
+        // Consecutive parts often share a material: its textures and uniforms are already set.
         if (primitive.material != last_material) {
           last_two_sided = apply_material(primitive.material, depth_pass);
+          bind_material(primitive.material == kNoIndex ? fallback_material : materials[primitive.material], pass_shader);
           last_material = primitive.material;
         }
         const bool two_sided = last_two_sided;
         if (two_sided) rlDisableBackfaceCulling();
         // Per part: a skinned object may still have parts without bone weights, which stay rigid.
-        Mesh mesh = primitive.mesh;
-        const bool deformed = skinned && mesh.boneIds != nullptr;
-        if (deformed) {
-          mesh.boneMatrices = bone_matrices.data();
-          mesh.boneCount = static_cast<int>(bone_matrices.size());
-        }
+        const bool deformed = skinned && primitive.mesh.boneIds != nullptr;
         const float skinning = deformed ? kOn : kOff;
-        SetShaderValue(depth_pass ? depth_shader : shader, depth_pass ? depth_skinned_loc : skinned_loc, &skinning,
-                       SHADER_UNIFORM_FLOAT);
-        DrawMesh(mesh, material, transform);
+        rlSetUniform(skinned_location, &skinning, SHADER_UNIFORM_FLOAT, 1);
+        draw_mesh(primitive.mesh, transform, pass_shader, deformed ? &bone_matrices : nullptr);
         if (two_sided) rlEnableBackfaceCulling();
       }
     }
+    end_pass();
   }
 
   // Renders the scene's depth from the sun and hands the result to the lit shader.
