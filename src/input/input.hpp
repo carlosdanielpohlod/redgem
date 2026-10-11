@@ -55,6 +55,8 @@ class InputSource {
   virtual GamepadSample gamepad() const { return {}; }
   // What was typed since the last frame, as text (UTF-8): letters as the keyboard layout gives them.
   virtual std::string typed_text() const { return {}; }
+  // The on-screen controls to draw, on a touch screen showing them; null otherwise.
+  virtual const struct TouchLayout* touch_layout() const { return nullptr; }
 };
 
 // Keys held down by a test (system tests drive the game through this).

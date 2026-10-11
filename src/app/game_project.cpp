@@ -1,5 +1,7 @@
 #include "app/game_project.hpp"
 
+#include "app/android_package.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -24,6 +26,7 @@ namespace {
 constexpr const char* kSettingsFile = "game.json";
 constexpr const char* kLinuxTarget = "linux";
 constexpr const char* kWindowsTarget = "windows";
+constexpr const char* kAndroidTarget = "android";
 constexpr const char* kRuntimesFolder = "runtimes";  // engines for other systems, next to this one
 constexpr const char* kRuntimeName = "redgem";
 constexpr const char* kFallbackExecutable = "play";  // for a game whose name gives no usable file name
@@ -283,10 +286,18 @@ std::filesystem::path normalized_folder(const std::filesystem::path& folder) {
 std::optional<BuildTarget> build_target_from_name(const std::string& name) {
   if (name == kLinuxTarget) return BuildTarget::Linux;
   if (name == kWindowsTarget) return BuildTarget::Windows;
+  if (name == kAndroidTarget) return BuildTarget::Android;
   return std::nullopt;
 }
 
-const char* build_target_name(BuildTarget target) { return target == BuildTarget::Windows ? kWindowsTarget : kLinuxTarget; }
+const char* build_target_name(BuildTarget target) {
+  switch (target) {
+    case BuildTarget::Windows: return kWindowsTarget;
+    case BuildTarget::Android: return kAndroidTarget;
+    case BuildTarget::Linux: break;
+  }
+  return kLinuxTarget;
+}
 
 BuildTarget host_build_target() {
 #ifdef _WIN32
@@ -298,6 +309,7 @@ BuildTarget host_build_target() {
 
 std::optional<std::filesystem::path> runtime_for(BuildTarget target, const std::filesystem::path& self) {
   if (target == host_build_target()) return self;
+  if (target == BuildTarget::Android) return std::nullopt;
   const std::filesystem::path runtime =
       self.parent_path() / kRuntimesFolder / build_target_name(target) /
       platform::executable_file_name(kRuntimeName, target == BuildTarget::Windows);
@@ -309,6 +321,10 @@ std::optional<std::filesystem::path> runtime_for(BuildTarget target, const std::
 std::optional<std::filesystem::path> build_game_for(const std::filesystem::path& game_dir,
                                                     const std::filesystem::path& out_dir, BuildTarget target,
                                                     std::string& error) {
+  if (target == BuildTarget::Android) {
+    const std::filesystem::path runtimes = platform::executable_path().parent_path() / kRuntimesFolder / kAndroidTarget;
+    return build_android_game(game_dir, out_dir, runtimes, error);
+  }
   const auto runtime = runtime_for(target, platform::executable_path());
   if (!runtime) {
     error = std::string("the ") + build_target_name(target) + " runtime is not built yet: run tools/" +

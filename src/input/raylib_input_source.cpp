@@ -34,8 +34,22 @@ std::string RaylibInputSource::typed_text() const {
   return text;
 }
 
+const TouchLayout* RaylibInputSource::touch_layout() const { return touch_shown_ ? &touch_.layout() : nullptr; }
+
 GamepadSample RaylibInputSource::gamepad() const {
   GamepadSample sample;
+  touch_shown_ = false;
+#if defined(PLATFORM_ANDROID)
+  if (!IsGamepadAvailable(kFirstGamepad) && touch_wanted_) {
+    std::vector<TouchPoint> touches;
+    for (int i = 0; i < GetTouchPointCount(); ++i) {
+      const Vector2 at = GetTouchPosition(i);
+      touches.push_back({GetTouchPointId(i), at.x, at.y});
+    }
+    touch_shown_ = true;
+    return touch_.update(touches, static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight()));
+  }
+#endif
   if (!IsGamepadAvailable(kFirstGamepad)) return sample;
   sample.connected = true;
   // In GamepadAxis' and GamepadButton's order.

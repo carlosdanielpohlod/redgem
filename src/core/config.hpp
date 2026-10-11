@@ -126,7 +126,12 @@ inline constexpr int kFpsCounterY = 10;
 // Skinning: joints and weights per vertex (glTF), and how many joints one skeleton may have
 // (the size of the shader's bone array).
 inline constexpr int kJointsPerVertex = 4;
+#ifdef __ANDROID__
+// (Phones allow a shader fewer values than computers do: fewer bones fit.)
+inline constexpr int kMaxSkinJoints = 48;
+#else
 inline constexpr int kMaxSkinJoints = 64;
+#endif
 inline constexpr int kFloatsPerPosition = 3;
 inline constexpr int kFloatsPerNormal = 3;
 inline constexpr int kFloatsPerTexcoord = 2;

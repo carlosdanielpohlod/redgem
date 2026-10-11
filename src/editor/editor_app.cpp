@@ -246,10 +246,9 @@ std::optional<std::filesystem::path> EditorApp::build(BuildTarget target) {
 }
 
 void EditorApp::draw_build_targets() {
-  for (const BuildTarget target : {BuildTarget::Linux, BuildTarget::Windows}) {
-    const char* label = target == BuildTarget::Windows ? ICON_FA_DESKTOP "  For Windows (.exe)" : ICON_FA_DESKTOP "  For Linux";
-    if (ImGui::MenuItem(label)) build(target);
-  }
+  if (ImGui::MenuItem(ICON_FA_DESKTOP "  For Linux")) build(BuildTarget::Linux);
+  if (ImGui::MenuItem(ICON_FA_DESKTOP "  For Windows (.exe)")) build(BuildTarget::Windows);
+  if (ImGui::MenuItem(ICON_FA_MOBILE_SCREEN "  For Android (.apk)")) build(BuildTarget::Android);
 }
 
 Vec3 EditorApp::spawn_point() const { return camera_.position() + camera_.forward() * kSpawnDistance; }
@@ -716,7 +715,7 @@ void EditorApp::draw_toolbar() {
   ImGui::TextColored(ui::muted_color(), "%s", label.c_str());
   ImGui::SameLine();
   ImGui::BeginDisabled(!editing);
-  if (ui::icon_button(ICON_FA_BOX_ARCHIVE, "Build the game: an executable for Linux or Windows")) {
+  if (ui::icon_button(ICON_FA_BOX_ARCHIVE, "Build the game: an executable for Linux or Windows, or an app for Android")) {
     ImGui::OpenPopup(kBuildPopup);
   }
   if (ImGui::BeginPopup(kBuildPopup)) {

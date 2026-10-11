@@ -28,6 +28,18 @@
 namespace redgem {
 namespace {
 
+constexpr const char* kDesktopShaderVersion = "#version 330";
+#if defined(GRAPHICS_API_OPENGL_ES3)
+constexpr const char* kShaderHeader =
+    "#version 300 es\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;";
+#else
+constexpr const char* kShaderHeader = kDesktopShaderVersion;
+#endif
+// On-screen touch controls: white, see-through, more solid under a finger.
+constexpr unsigned char kTouchShade = 255;
+constexpr unsigned char kTouchBaseAlpha = 28;
+constexpr unsigned char kTouchRestingAlpha = 70;
+constexpr unsigned char kTouchPressedAlpha = 150;
 constexpr float kHalfFactor = 0.5f;
 constexpr int kQuadCorners = 4;
 constexpr float kParticleGlowBoost = 4.0f;  // how much brighter than its color a glowing particle is
@@ -233,8 +245,23 @@ struct Renderer::Impl {
   float wind = 0.0f;          // of the environment being drawn
   Vector3 sun_travel{};       // direction the sun's light travels this frame
 
+  // The shaders are written for desktop OpenGL 3.3. Phones speak OpenGL ES 3: the same language
+  // with another first line, and no say on how precise numbers are unless told. Either way the
+  // shader learns here how many bones a skeleton may have.
+  static std::string for_this_gpu(const char* source) {
+    const std::string text = source;
+    const std::size_t version = text.find(kDesktopShaderVersion);
+    if (version == std::string::npos) return text;
+    const std::string limits = "\n#define MAX_BONES " + std::to_string(config::kMaxSkinJoints);
+    // (ES wants the version on the very first line: what comes before it goes.)
+    return std::string(kShaderHeader) + limits + text.substr(version + std::string(kDesktopShaderVersion).size());
+  }
+
   static Shader compile(const char* vertex, const char* fragment, const char* name) {
-    const Shader compiled = LoadShaderFromMemory(vertex, fragment);
+    const std::string vertex_text = vertex != nullptr ? for_this_gpu(vertex) : std::string();
+    const std::string fragment_text = fragment != nullptr ? for_this_gpu(fragment) : std::string();
+    const Shader compiled = LoadShaderFromMemory(vertex != nullptr ? vertex_text.c_str() : nullptr,
+                                                 fragment != nullptr ? fragment_text.c_str() : nullptr);
     if (!IsShaderValid(compiled)) throw std::runtime_error(std::string("failed to compile the ") + name + " shader");
     return compiled;
   }
@@ -1269,11 +1296,25 @@ void Renderer::set_cursor_locked(bool locked) {
   }
 }
 
+void Renderer::draw_touch_controls(const TouchLayout& controls) {
+  const auto circle = [](const TouchCircle& at, unsigned char resting, unsigned char pressed) {
+    const ::Color fill{kTouchShade, kTouchShade, kTouchShade, at.pressed ? pressed : resting};
+    DrawCircleV({at.x, at.y}, at.radius, fill);
+  };
+  circle(controls.stick_base, kTouchBaseAlpha, kTouchBaseAlpha);
+  circle(controls.stick_knob, kTouchRestingAlpha, kTouchPressedAlpha);
+  for (const TouchCircle* button : {&controls.a, &controls.b, &controls.start}) {
+    circle(*button, kTouchRestingAlpha, kTouchPressedAlpha);
+  }
+}
+
 void Renderer::draw(const Scene& scene, const std::vector<HudItem>& hud,
-                    const std::vector<std::filesystem::path>& screenshot_paths, const ParticleSystem* particles) {
+                    const std::vector<std::filesystem::path>& screenshot_paths, const ParticleSystem* particles,
+                    const TouchLayout* touch) {
   BeginDrawing();
   draw_world(scene, impl_->camera_for(scene), nullptr, particles);
   draw_hud(hud);
+  if (touch != nullptr) draw_touch_controls(*touch);
   if (impl_->settings.show_fps) DrawFPS(config::kFpsCounterX, config::kFpsCounterY);
 
   if (!screenshot_paths.empty()) {

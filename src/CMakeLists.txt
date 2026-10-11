@@ -63,6 +63,7 @@ add_library(redgem_engine STATIC
   input/keys.cpp
   input/input.cpp
   input/raylib_input_source.cpp
+  input/touch_controls.cpp
   script/script_naming.cpp
   script/ruby_vm.cpp
   script/script_host.cpp
@@ -103,6 +104,7 @@ add_library(redgem_engine STATIC
   editor/ui/embedded_fonts.cpp
   app/game_project.cpp
   app/save_store.cpp
+  app/android_package.cpp
   app/user_settings.cpp
   app/cli.cpp
   app/engine.cpp)
@@ -121,7 +123,7 @@ if(ANDROID)
   # On Android the engine is a library the system loads into a native activity; it plays the game
   # packed in the same APK (see app/android_main.cpp).
   add_library(redgem SHARED app/android_main.cpp)
-  target_link_libraries(redgem PRIVATE redgem_engine android log)
+  target_link_libraries(redgem PRIVATE redgem_engine android log GLESv3)
   target_include_directories(redgem SYSTEM PRIVATE ${ANDROID_NDK}/sources/android/native_app_glue)
   target_link_options(redgem PRIVATE -u ANativeActivity_onCreate)
 else()

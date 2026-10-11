@@ -29,7 +29,7 @@ end
   per-character animation with blending, saved progress.
 - **Multiplayer**: host and join over the network, named messages, objects kept in sync.
 - **Editor**: scene view with gizmos, hierarchy, inspector, Ruby code tabs, play mode, undo,
-  sculptable terrain, and one-click builds of the game for Linux and Windows.
+  sculptable terrain, and one-click builds of the game for Linux, Windows and Android.
 - **Blender as the modeling tool**: scenes are glTF files; custom properties carry gameplay data.
 - **Rendering**: PBR materials, sun shadows, reflections, ambient occlusion, bloom, fog,
   skeletal animation.
@@ -46,6 +46,7 @@ RedGem stands on open source. Thank you to the people behind these projects.
 | [Jolt Physics](https://github.com/jrouwe/JoltPhysics) 5.3.0 | Rigid bodies, characters, vehicles, raycasts | MIT |
 | [mruby](https://mruby.org) 3.4.0 | The Ruby interpreter that runs game scripts | MIT |
 | [raylib](https://www.raylib.com) 5.5 | Window, input, OpenGL rendering, audio | zlib |
+| [Android NDK](https://developer.android.com/ndk) | Compiling the engine for Android games | Apache 2.0 |
 | [cgltf](https://github.com/jkuhlmann/cgltf) 1.15 | Loading glTF scenes | MIT |
 | [Dear ImGui](https://github.com/ocornut/imgui) 1.92.8 (docking) | The editor's interface | MIT |
 | [rlImGui](https://github.com/raylib-extras/rlImGui) | Dear ImGui on raylib | zlib |
@@ -84,6 +85,7 @@ ctest --test-dir build                  # run the tests
 ./build/src/redgem games/my_game                             # edit and play it
 ./build/src/redgem build games/my_game dist/my_game          # standalone game: dist/my_game/my_game
 ./build/src/redgem build games/my_game dist/win --target windows   # a Windows .exe (see docs/shipping.md)
+./build/src/redgem build games/my_game dist/apk --target android   # an Android .apk
 ```
 
 A game is a folder: `scene.glb` (the scene, from Blender or the editor), `scripts/*.rb`,

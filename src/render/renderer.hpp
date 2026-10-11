@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "input/touch_controls.hpp"
 #include "scene/particles.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -61,9 +62,12 @@ class Renderer {
   void set_cursor_locked(bool locked);
   // Prefabs (spawn templates) are hidden in games and shown in the editor.
   void set_show_prefabs(bool show);
+  // Draws a touch screen's controls over everything: see-through, brighter where a finger is.
+  void draw_touch_controls(const TouchLayout& controls);
   // Draws one full game frame. Screenshots requested for this frame are written to `screenshot_paths`.
   void draw(const Scene& scene, const std::vector<HudItem>& hud,
-            const std::vector<std::filesystem::path>& screenshot_paths, const ParticleSystem* particles = nullptr);
+            const std::vector<std::filesystem::path>& screenshot_paths, const ParticleSystem* particles = nullptr,
+            const TouchLayout* touch = nullptr);
 
   bool close_requested() const;
   float frame_seconds() const;

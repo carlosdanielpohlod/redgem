@@ -3,13 +3,30 @@
 #include <iostream>
 #include <utility>
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 namespace redgem::log {
 namespace {
 
+#ifdef __ANDROID__
+constexpr const char* kLogTag = "redgem";
+
+// An Android app has no terminal: its messages go to the system's log (adb logcat).
+void default_sink(Level level, const std::string& message) {
+  const int priority = level == Level::Error     ? ANDROID_LOG_ERROR
+                       : level == Level::Warning ? ANDROID_LOG_WARN
+                       : level == Level::Info    ? ANDROID_LOG_INFO
+                                                 : ANDROID_LOG_DEBUG;
+  __android_log_write(priority, kLogTag, message.c_str());
+}
+#else
 void default_sink(Level level, const std::string& message) {
   std::ostream& out = (level == Level::Error || level == Level::Warning) ? std::cerr : std::cout;
   out << "[redgem] " << level_name(level) << ": " << message << std::endl;
 }
+#endif
 
 Sink& current_sink() {
   static Sink sink = default_sink;

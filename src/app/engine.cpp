@@ -76,7 +76,13 @@ std::optional<std::string> Engine::initialize() {
   context_.screen_height = window.window_height;
 
   if (!options_.headless) {
-    const GameSettings settings = read_game_settings(options_.game_dir);
+    GameSettings settings = read_game_settings(options_.game_dir);
+    // A screen that is not a window has its own shape: the game keeps its height and gets the
+    // width that fills it.
+    if (options_.screen_aspect > 0.0f) {
+      settings.window_width = static_cast<int>(std::lround(static_cast<float>(settings.window_height) * options_.screen_aspect));
+      context_.screen_width = settings.window_width;
+    }
     renderer_ = std::make_unique<Renderer>(RenderSettings{settings.window_width, settings.window_height,
                                                           settings.title, !options_.test_script});
     renderer_->upload(scene_desc_);
@@ -408,7 +414,8 @@ void Engine::render() {
   context_.screenshot_requests.clear();
   if (renderer_) {
     renderer_->set_motion_blur(context_.motion_blur);
-    renderer_->draw(scene_, context_.hud, screenshots, &particles_);
+    renderer_->draw(scene_, context_.hud, screenshots, &particles_,
+                    device_input_ ? device_input_->touch_layout() : nullptr);
   }
 }
 

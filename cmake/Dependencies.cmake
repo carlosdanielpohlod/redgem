@@ -105,6 +105,11 @@ FetchContent_MakeAvailable(raylib cgltf JoltPhysics doctest mruby nlohmann_json)
 # Skinned meshes are deformed on the GPU: raylib then uploads bone ids / weights and bone matrices
 # (off in customized builds unless asked for).
 target_compile_definitions(raylib PRIVATE RL_SUPPORT_MESH_GPU_SKINNING)
+if(ANDROID)
+  # raylib asks for OpenGL ES 3 but calls one of its functions by the old extension's name (and
+  # links against ES 2: the engine's own target adds ES 3, see src/CMakeLists.txt).
+  target_compile_definitions(raylib PRIVATE glDrawBuffersEXT=glDrawBuffers)
+endif()
 if(WIN32)
   # This Jolt release leans on <type_traits> arriving through other headers, which the Windows
   # toolchain's standard library no longer does.

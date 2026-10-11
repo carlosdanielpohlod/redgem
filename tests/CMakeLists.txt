@@ -25,6 +25,8 @@ add_executable(redgem_tests
   unit/animation_test.cpp
   unit/user_settings_test.cpp
   unit/save_store_test.cpp
+  unit/touch_controls_test.cpp
+  unit/android_package_test.cpp
   unit/frame_buffer_test.cpp
   unit/particles_test.cpp
   unit/animation_player_test.cpp

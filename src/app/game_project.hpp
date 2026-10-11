@@ -34,8 +34,8 @@ bool create_game(const std::filesystem::path& game_dir, const std::string& templ
 std::filesystem::path normalized_folder(const std::filesystem::path& folder);
 
 // The systems a game can be built for.
-enum class BuildTarget { Linux, Windows };
-// "linux" / "windows" (and back); nullopt for anything else.
+enum class BuildTarget { Linux, Windows, Android };
+// "linux" / "windows" / "android" (and back); nullopt for anything else.
 std::optional<BuildTarget> build_target_from_name(const std::string& name);
 const char* build_target_name(BuildTarget target);
 // The system this program runs on.
@@ -43,6 +43,7 @@ BuildTarget host_build_target();
 // The engine a build for `target` ships: this program (`self`) for the system it runs on;
 // otherwise the runtime built for that system, in runtimes/<target>/ next to this program
 // (tools/windows/build_runtime.sh makes the Windows one). nullopt when that runtime is missing.
+// (Android is packed differently, see android_package.hpp: this has no single runtime for it.)
 std::optional<std::filesystem::path> runtime_for(BuildTarget target, const std::filesystem::path& self);
 
 // Makes a standalone game in `out_dir`: an executable named after the game (a copy of
@@ -52,7 +53,7 @@ std::optional<std::filesystem::path> runtime_for(BuildTarget target, const std::
 bool build_game(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                 const std::filesystem::path& engine_binary, BuildTarget target, std::string& error);
 // Everything a build needs, for the editor and the command line: finds the runtime for `target`
-// and builds. Returns the game's executable, or nullopt with `error` set.
+// and builds. Returns the game's executable (for Android, its .apk), or nullopt with `error` set.
 std::optional<std::filesystem::path> build_game_for(const std::filesystem::path& game_dir,
                                                     const std::filesystem::path& out_dir, BuildTarget target,
                                                     std::string& error);

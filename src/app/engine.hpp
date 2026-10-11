@@ -35,6 +35,9 @@ struct EngineOptions {
   const InputSource* input = nullptr;
   // Where Save keeps the game's data. Empty: the game's file in the user's RedGem folder.
   std::filesystem::path save_file;
+  // Width over height of the screen the game fills (a phone's); 0 for a window sized by the
+  // game's settings.
+  float screen_aspect = 0.0f;
   // Editor play mode: the editor's audio device. Otherwise the engine opens its own (or, headless,
   // records what would play).
   AudioSystem* audio = nullptr;

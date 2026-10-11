@@ -113,7 +113,9 @@ int main(int argc, char** argv) {
           log::error(error);
           return kExitFailure;
         }
-        std::cout << "built " << options.build_dir.string() << " for " << build_target_name(target) << ": run "
+        // (An Android app is not run from here: it is installed on a phone.)
+        const char* next = target == BuildTarget::Android ? ": install it with adb install " : ": run ";
+        std::cout << "built " << options.build_dir.string() << " for " << build_target_name(target) << next
                   << executable->string() << "\n";
         return kExitSuccess;
       }
