@@ -178,10 +178,15 @@ ENGINE_ENVIRONMENT = {
     "fog_density": 0.0018,
     "ambient": 0.9,
     "exposure": 1.0,
-    "bloom": 0.25,
-    "vignette": 0.3,
+    "bloom": 0.32,
+    "vignette": 0.42,
     "sun_glow": 0.7,
     "wind": 0.7,
+    # The grade of a racing game's dusk: punchier, a little more color, grain and lens fringes.
+    "contrast": 1.12,
+    "saturation": 1.14,
+    "grain": 0.45,
+    "aberration": 0.7,
 }
 # The people who walk in the game get legs that walk, and stand along the sidewalk: person
 # collection name -> (heading in degrees, 0 = toward the start of the street; x in meters).

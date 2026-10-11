@@ -24,6 +24,7 @@ constexpr float kDaySunGlow = 1.0f;
 constexpr float kDayWind = 0.4f;
 constexpr float kDayShadows = 1.0f;
 constexpr float kDayAmbientOcclusion = 0.8f;
+constexpr float kNeutralGrade = 1.0f;  // contrast and saturation that change nothing
 constexpr float kFullShadows = 1.0f;  // the most a 0..1 strength (shadows, occlusion, vignette) can be
 
 void read_color(const PropertyMap& props, const char* key, Vec3& out) {
@@ -53,6 +54,8 @@ Environment default_environment() {
   env.wind = kDayWind;
   env.shadows = kDayShadows;
   env.ambient_occlusion = kDayAmbientOcclusion;
+  env.contrast = kNeutralGrade;
+  env.saturation = kNeutralGrade;
   return env;
 }
 
@@ -75,6 +78,10 @@ Environment environment_from_props(const PropertyMap& props) {
   env.shadows = std::min(env.shadows, kFullShadows);
   read_number(props, "ambient_occlusion", env.ambient_occlusion);
   env.ambient_occlusion = std::min(env.ambient_occlusion, kFullShadows);
+  read_number(props, "contrast", env.contrast);
+  read_number(props, "saturation", env.saturation);
+  read_number(props, "grain", env.grain);
+  read_number(props, "aberration", env.aberration);
   return env;
 }
 

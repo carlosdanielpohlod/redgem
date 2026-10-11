@@ -383,7 +383,10 @@ void Engine::render() {
     screenshots.push_back(options_.screenshot_dir / (name + config::kScreenshotExtension));
   }
   context_.screenshot_requests.clear();
-  if (renderer_) renderer_->draw(scene_, context_.hud, screenshots);
+  if (renderer_) {
+    renderer_->set_motion_blur(context_.motion_blur);
+    renderer_->draw(scene_, context_.hud, screenshots);
+  }
 }
 
 int Engine::run() {

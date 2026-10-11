@@ -226,6 +226,21 @@ mrb_value audio_music(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(audio(mrb).play_music(to_name(mrb, name), loop, static_cast<float>(volume)));
 }
 
+mrb_value audio_set_music_pitch(mrb_state* mrb, mrb_value) {
+  mrb_float pitch = 0.0;
+  mrb_get_args(mrb, "f", &pitch);
+  if (pitch <= 0.0) mrb_raise(mrb, E_ARGUMENT_ERROR, "Audio.music_pitch must be positive");
+  audio(mrb).set_music_pitch(static_cast<float>(pitch));
+  return mrb_float_value(mrb, pitch);
+}
+
+mrb_value audio_set_music_volume(mrb_state* mrb, mrb_value) {
+  mrb_float volume = 0.0;
+  mrb_get_args(mrb, "f", &volume);
+  audio(mrb).set_music_volume(static_cast<float>(volume < 0.0 ? 0.0 : volume));
+  return mrb_float_value(mrb, volume);
+}
+
 mrb_value audio_stop_music(mrb_state* mrb, mrb_value) {
   audio(mrb).stop_music();
   return mrb_nil_value();
@@ -358,6 +373,8 @@ void install_runtime_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, audio_module, "__play", audio_play, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, audio_module, "__music", audio_music, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, audio_module, "stop_music", audio_stop_music, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, audio_module, "music_pitch=", audio_set_music_pitch, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, audio_module, "music_volume=", audio_set_music_volume, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, audio_module, "volume=", audio_set_volume, MRB_ARGS_REQ(1));
 
   RClass* test_input_module = mrb_define_module(mrb, "TestInput");

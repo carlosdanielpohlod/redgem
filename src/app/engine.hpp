@@ -73,6 +73,8 @@ class Engine {
   void set_screen(int width, int height, std::function<int(const std::string&, int)> measure_text);
   // Whether the game asked for the pointer to be hidden and kept (Input.mouse_locked = true).
   bool mouse_locked() const { return context_.mouse_locked; }
+  // The speed streaks the game asked for (Camera.motion_blur), for whoever draws its frames.
+  float motion_blur() const { return context_.motion_blur; }
 
  private:
   explicit Engine(const EngineOptions& options);

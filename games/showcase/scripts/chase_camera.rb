@@ -1,11 +1,12 @@
-# Camera behind the car, following where its nose points (asks the ArcadeCar on the target).
+# Camera behind the car, following where its nose points (asks the ArcadeCar on the target). Speed
+# shows: the view widens, the picture streaks at its edges and the camera trembles a little.
 # The mouse looks around: drag with a button held to orbit the car, turn the wheel to come closer
 # or move away. Let go and the camera swings back behind the car.
 # Settings: target (the car: the object or its name), distance, height (m), smoothing.
 class ChaseCamera < Behaviour
   DEFAULT_DISTANCE = 7.5
   DEFAULT_HEIGHT = 2.2
-  DEFAULT_SMOOTHING = 5.0
+  DEFAULT_SMOOTHING = 9.0
   LOOK_HEIGHT = 1.0
   MAX_BLEND = 1.0
   ORBIT_DEGREES_PER_PIXEL = 0.25
@@ -17,9 +18,16 @@ class ChaseCamera < Behaviour
   MAX_DISTANCE = 16.0
   ORBIT_BUTTONS = [:left, :right].freeze
   DEGREES_PER_RADIAN = 180.0 / Math::PI
-  HINT_X = 24
-  HINT_Y = 90
-  HINT_SIZE = 20
+  # What speed does to the picture, from SLOW (nothing) to FAST (all of it), in m/s.
+  SLOW = 9.0
+  FAST = 28.0
+  CALM_FOV = 52.0             # degrees, top to bottom
+  FAST_FOV = 62.0
+  FULL_STREAKS = 0.7          # of the engine's motion blur
+  SHAKE = 0.035               # meters the camera trembles at full speed
+  SHAKE_SPEED = 37.0          # how fast it trembles (radians per second)
+  SHAKE_VERTICAL = 1.7        # the up-and-down tremble runs this much faster than the sideways one
+  FOV_QUICKNESS = 3.0
 
   def start
     target = prop(:target, "")
@@ -30,12 +38,14 @@ class ChaseCamera < Behaviour
     @smoothing = prop(:smoothing, DEFAULT_SMOOTHING)
     @orbit_yaw = 0.0    # degrees around the car, away from straight behind it
     @orbit_pitch = 0.0  # degrees above the usual view
+    @fov = CALM_FOV
     follow(MAX_BLEND) if @car
   end
 
   # Stops following, leaving the camera to whoever moves it next (photo views, cutscenes).
   def release
     @car = nil
+    Camera.motion_blur = 0.0
   end
 
   def update(dt)
@@ -43,7 +53,7 @@ class ChaseCamera < Behaviour
 
     look_around(dt)
     follow([@smoothing * dt, MAX_BLEND].min)
-    UI.text("Mouse: drag to look around, wheel to zoom", x: HINT_X, y: HINT_Y, size: HINT_SIZE)
+    feel_the_speed(dt)
   end
 
   private
@@ -70,6 +80,22 @@ class ChaseCamera < Behaviour
     back = Vector3.new(-Math.sin(yaw), 0, -Math.cos(yaw))
     @target.transform.position + back * (@distance * Math.cos(pitch)) +
       Vector3.up * (@height + @distance * Math.sin(pitch))
+  end
+
+  # 0 when slow, 1 at full speed.
+  def rush = ((@car.speed.abs - SLOW) / (FAST - SLOW)).clamp(0.0, 1.0)
+
+  def feel_the_speed(dt)
+    @fov += (CALM_FOV + (FAST_FOV - CALM_FOV) * rush - @fov) * [FOV_QUICKNESS * dt, MAX_BLEND].min
+    Camera.fov = @fov
+    Camera.motion_blur = orbiting? ? 0.0 : FULL_STREAKS * rush
+    tremble = SHAKE * rush
+    return if tremble.zero? || orbiting?
+
+    time = Time.elapsed * SHAKE_SPEED
+    transform.position = transform.position +
+                         transform.right * (Math.sin(time) * tremble) +
+                         Vector3.up * (Math.sin(time * SHAKE_VERTICAL) * tremble)
   end
 
   def follow(blend)

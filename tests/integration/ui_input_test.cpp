@@ -168,3 +168,20 @@ TEST_CASE("Camera.screen_ray goes through a point of the screen") {
   CHECK(ruby(*engine, "Camera.screen_ray(400, 300)[0].approx?(Camera.main.transform.position, 0.001)") == "true");
   static_cast<void>(kRayTolerance);
 }
+
+TEST_CASE("scripts set the camera's field of view and the picture's speed streaks") {
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene);
+  frame(*engine);
+  ruby(*engine, "Camera.fov = 70");
+  CHECK(ruby(*engine, "Camera.fov.round") == "70");
+  const ObjectId camera = engine->scene().main_camera();
+  CHECK(radians_to_degrees(engine->scene().at(camera).camera->fov_y_radians) == doctest::Approx(70.0f));
+  CHECK_FALSE(engine->scripts().eval("Camera.fov = 400", "bad_fov.rb").ok);
+
+  CHECK(engine->motion_blur() == doctest::Approx(0.0f));
+  ruby(*engine, "Camera.motion_blur = 0.6");
+  CHECK(engine->motion_blur() == doctest::Approx(0.6f));
+  ruby(*engine, "Camera.motion_blur = 9");  // kept within 0..1
+  CHECK(engine->motion_blur() == doctest::Approx(1.0f));
+}

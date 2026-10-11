@@ -214,6 +214,7 @@ struct Renderer::Impl {
   Material sky_material{};
   // Post-processing targets, sized like the output.
   RenderTexture2D hdr{};      // the lit scene, linear HDR, with depth
+  float motion_blur = 0.0f;       // 0..1, asked for by the game (Camera.motion_blur)
   Matrix pass_view_projection{};  // of the pass being drawn (see begin_pass)
   std::vector<Transform> worlds;  // every object's world transform this frame (see place_objects)
   Font ui_font{};
@@ -484,6 +485,13 @@ struct Renderer::Impl {
     SetShaderValue(composite_shader, GetShaderLocation(composite_shader, shaders::kBloomStrength), &env.bloom, SHADER_UNIFORM_FLOAT);
     SetShaderValue(composite_shader, GetShaderLocation(composite_shader, shaders::kExposure), &env.exposure, SHADER_UNIFORM_FLOAT);
     SetShaderValue(composite_shader, GetShaderLocation(composite_shader, shaders::kVignette), &env.vignette, SHADER_UNIFORM_FLOAT);
+    const float grade_time = static_cast<float>(GetTime());
+    const std::pair<const char*, const float*> grade[] = {
+        {shaders::kContrast, &env.contrast}, {shaders::kSaturation, &env.saturation}, {shaders::kGrain, &env.grain},
+        {shaders::kAberration, &env.aberration}, {shaders::kMotionBlur, &motion_blur}, {shaders::kGradeTime, &grade_time}};
+    for (const auto& [name, value] : grade) {
+      SetShaderValue(composite_shader, GetShaderLocation(composite_shader, name), value, SHADER_UNIFORM_FLOAT);
+    }
     SetShaderValueTexture(composite_shader, GetShaderLocation(composite_shader, shaders::kBloomTexture), bloom_a.texture);
     SetShaderValue(composite_shader, GetShaderLocation(composite_shader, shaders::kOcclusionAmount), &env.ambient_occlusion, SHADER_UNIFORM_FLOAT);
     SetShaderValueTexture(composite_shader, GetShaderLocation(composite_shader, shaders::kOcclusionTexture), occlusion_a.texture);
@@ -1139,6 +1147,8 @@ void Renderer::draw_hud(const std::vector<HudItem>& hud) {
     }
   }
 }
+
+void Renderer::set_motion_blur(float amount) { impl_->motion_blur = std::clamp(amount, 0.0f, 1.0f); }
 
 void Renderer::set_images_dir(const std::filesystem::path& dir) {
   impl_->release_ui_images();

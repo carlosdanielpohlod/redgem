@@ -56,6 +56,8 @@ struct ScriptContext {
   std::function<int(const std::string&, int)> measure_text;
   // Input.mouse_locked: the pointer is hidden and kept in the window (first-person cameras).
   bool mouse_locked = false;
+  // Camera.motion_blur: how much the picture streaks away from its center, 0 to 1.
+  float motion_blur = 0.0f;
   std::vector<std::string> screenshot_requests;
   bool quit_requested = false;
   // Called when a script writes a transform, so physics can follow.

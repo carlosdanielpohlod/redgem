@@ -290,6 +290,11 @@ TEST_CASE("sounds are looked up in the game's sounds folder") {
   auto& recording = dynamic_cast<RecordingAudio&>(engine->audio());
   CHECK(recording.played() == std::vector<std::string>{"beep"});
   CHECK(recording.music() == "beep");
+  // Music can be bent while it plays (an engine's note following the car's speed).
+  ruby(*engine, "Audio.music_pitch = 1.5; Audio.music_volume = 0.25");
+  CHECK(recording.music_pitch() == doctest::Approx(1.5f));
+  CHECK(recording.music_volume() == doctest::Approx(0.25f));
+  CHECK_FALSE(engine->scripts().eval("Audio.music_pitch = 0", "bad_pitch.rb").ok);
   ruby(*engine, "Audio.stop_music; Audio.volume = " + std::to_string(kHalfVolume));
   CHECK_FALSE(recording.music().has_value());
   CHECK(recording.master_volume() == doctest::Approx(kHalfVolume));

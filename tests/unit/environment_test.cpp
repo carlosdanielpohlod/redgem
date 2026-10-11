@@ -89,3 +89,17 @@ TEST_CASE("lights about to be dropped are dimmed, so they do not pop when the vi
   // Nothing is left out: nothing fades.
   CHECK(nearest_lights(lights, Vec3::zero(), 3, kFade)[2].color.x == doctest::Approx(1.0f));
 }
+
+TEST_CASE("the picture's grade is neutral unless the environment sets one") {
+  const Environment plain = environment_from_props({});
+  CHECK(plain.contrast == doctest::Approx(1.0f));
+  CHECK(plain.saturation == doctest::Approx(1.0f));
+  CHECK(plain.grain == doctest::Approx(0.0f));
+  CHECK(plain.aberration == doctest::Approx(0.0f));
+  const Environment graded =
+      environment_from_props({{"contrast", 1.2}, {"saturation", 0.5}, {"grain", 0.4}, {"aberration", 0.7}});
+  CHECK(graded.contrast == doctest::Approx(1.2f));
+  CHECK(graded.saturation == doctest::Approx(0.5f));
+  CHECK(graded.grain == doctest::Approx(0.4f));
+  CHECK(graded.aberration == doctest::Approx(0.7f));
+}

@@ -317,8 +317,10 @@ void EditorApp::frame() {
                         [this](const std::string& text, int size) { return renderer_->text_width(text, size); });
     // A game that locks the pointer gets it while it has the focus; Esc (Stop) gives it back.
     renderer_->set_cursor_locked(game_input_.enabled && runtime->mouse_locked());
+    renderer_->set_motion_blur(runtime->motion_blur());
   } else {
     renderer_->set_cursor_locked(false);
+    renderer_->set_motion_blur(0.0f);
   }
   session_->tick(frame_seconds());
   render_viewport_texture();

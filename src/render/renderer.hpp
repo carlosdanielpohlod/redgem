@@ -45,6 +45,8 @@ class Renderer {
   void draw_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output = nullptr);
   // Draws what scripts put on screen this frame: texts, rectangles and images.
   void draw_hud(const std::vector<HudItem>& hud);
+  // How much the picture streaks with speed, 0 (none) to 1 (see Camera.motion_blur in Ruby).
+  void set_motion_blur(float amount);
   // Where UI.image looks for pictures (the game's images/ folder).
   void set_images_dir(const std::filesystem::path& dir);
   // Width in pixels of a text drawn by draw_hud at that size.

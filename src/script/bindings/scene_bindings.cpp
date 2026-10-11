@@ -21,6 +21,9 @@ using namespace binding;
 constexpr float kHalf = 0.5f;
 constexpr float kFullSpan = 2.0f;  // a screen spans -1..1
 constexpr float kHalfSpan = 1.0f;
+constexpr double kMinFovDegrees = 10.0;
+constexpr double kMaxFovDegrees = 150.0;
+constexpr double kFullBlur = 1.0;
 
 void notify_transform_written(mrb_state* mrb, ObjectId id, TransformWrite write) {
   ScriptContext& ctx = context(mrb);
@@ -285,6 +288,34 @@ mrb_value camera_screen_ray(mrb_state* mrb, mrb_value) {
   return ray;
 }
 
+// The main camera's field of view, top to bottom, in degrees.
+mrb_value camera_fov(mrb_state* mrb, mrb_value) {
+  const ObjectId id = scene(mrb).main_camera();
+  if (id == kNoObject) return mrb_nil_value();
+  const float fov = scene(mrb).at(id).camera->fov_y_radians;
+  return mrb_float_value(mrb, fov > 0.0f ? radians_to_degrees(fov) : config::kDefaultFovYDegrees);
+}
+
+mrb_value camera_set_fov(mrb_state* mrb, mrb_value) {
+  mrb_float degrees = 0.0;
+  mrb_get_args(mrb, "f", &degrees);
+  if (degrees < kMinFovDegrees || degrees > kMaxFovDegrees) {
+    mrb_raise(mrb, E_ARGUMENT_ERROR, "Camera.fov must be between 10 and 150 degrees");
+  }
+  const ObjectId id = scene(mrb).main_camera();
+  if (id != kNoObject) scene(mrb).at(id).camera->fov_y_radians = degrees_to_radians(static_cast<float>(degrees));
+  return mrb_float_value(mrb, degrees);
+}
+
+mrb_value camera_motion_blur(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, context(mrb).motion_blur); }
+
+mrb_value camera_set_motion_blur(mrb_state* mrb, mrb_value) {
+  mrb_float amount = 0.0;
+  mrb_get_args(mrb, "f", &amount);
+  context(mrb).motion_blur = static_cast<float>(amount < 0.0 ? 0.0 : amount > kFullBlur ? kFullBlur : amount);
+  return mrb_float_value(mrb, amount);
+}
+
 }  // namespace
 
 void install_scene_bindings(mrb_state* mrb) {
@@ -330,6 +361,10 @@ void install_scene_bindings(mrb_state* mrb) {
   RClass* camera_module = mrb_define_module(mrb, "Camera");
   mrb_define_module_function(mrb, camera_module, "main", camera_main, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, camera_module, "screen_ray", camera_screen_ray, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, camera_module, "fov", camera_fov, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, camera_module, "fov=", camera_set_fov, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, camera_module, "motion_blur", camera_motion_blur, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, camera_module, "motion_blur=", camera_set_motion_blur, MRB_ARGS_REQ(1));
 }
 
 }  // namespace redgem

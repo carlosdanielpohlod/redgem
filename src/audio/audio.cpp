@@ -62,6 +62,14 @@ class RaylibAudio final : public AudioSystem {
     has_music_ = false;
   }
 
+  void set_music_pitch(float pitch) override {
+    if (has_music_) SetMusicPitch(music_, pitch);
+  }
+
+  void set_music_volume(float volume) override {
+    if (has_music_) SetMusicVolume(music_, volume);
+  }
+
   void set_master_volume(float volume) override {
     if (ready_) SetMasterVolume(volume);
   }
