@@ -1,14 +1,7 @@
-# docker compose run --rm test      runs the whole test suite (no display needed)
-# docker compose run --rm editor    opens the editor on your X11 display (first: xhost +local:docker)
+# tools/docker/editor.sh             opens the editor on your X11 display, as your own user
+# docker compose run --rm test       runs the whole test suite (no display needed)
 services:
-  test:
-    build: .
-    image: redgem
-    init: true  # xvfb-run waits for a signal that never reaches process 1
-    environment:
-      LIBGL_ALWAYS_SOFTWARE: "1"
-    command: xvfb-run -a -s "-screen 0 1600x900x24" ctest --test-dir build --output-on-failure
-
+  # Started by tools/docker/editor.sh, which adds your user, your games folder and your settings.
   editor:
     build: .
     image: redgem
@@ -16,7 +9,15 @@ services:
       DISPLAY: ${DISPLAY:-:0}
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
-      - ./games:/redgem/games
+      - ./games:/redgem/games   # the demos of this checkout
     devices:
       - /dev/dri:/dev/dri
     command: build/src/redgem
+
+  test:
+    build: .
+    image: redgem
+    init: true  # xvfb-run waits for a signal that never reaches process 1
+    environment:
+      LIBGL_ALWAYS_SOFTWARE: "1"
+    command: xvfb-run -a -s "-screen 0 1600x900x24" ctest --test-dir build --output-on-failure

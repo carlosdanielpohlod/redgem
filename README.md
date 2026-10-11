@@ -57,31 +57,22 @@ The engine itself is **C++17**, built with CMake. Demo assets come from
 
 ## Quick start
 
-### With Docker
+With Docker, on Linux:
 
 ```bash
-docker compose run --rm test                           # builds the image and runs every test
-xhost +local:docker && docker compose run --rm editor  # opens the editor (Linux, X11)
+tools/docker/editor.sh                  # builds the image the first time, then opens the editor
+tools/docker/editor.sh games/platformer # open a demo
 ```
 
-The editor container uses your display and graphics device, and edits the `games/` folder of
-this checkout. It has no sound.
-
-### Natively (Linux)
-
-You need a C++17 compiler, CMake 3.24 or newer, Ninja, Ruby with rake (to build mruby) and the
-X11 and OpenGL development files. Every library above is downloaded by CMake at a pinned version.
+From source: a C++17 compiler, CMake 3.24 or newer, Ninja, Ruby with rake and the X11 and OpenGL
+development files.
 
 ```bash
 cmake -S . -B build -G Ninja
 cmake --build build
 ./build/src/redgem                      # project hub: open a demo or create a game
-./build/src/redgem games/platformer     # open a game in the editor
 ctest --test-dir build                  # run the tests
 ```
-
-If the X11 extension headers are missing and you cannot install them,
-`tools/setup/fetch_x11_headers.sh` extracts them locally.
 
 ## Making a game
 
@@ -102,11 +93,15 @@ Small games and scenes that ship with the engine, each with its scripts and test
 - `games/driving`: a time trial with wheel physics, checkpoints and lap times.
 - `games/city`: a crossroad where cars obey traffic lights and brake for each other.
 - `games/showcase`: a detailed street at dusk to drive through (built from downloaded assets,
-  see [docs/development.md](docs/development.md)).
+  see [docs/contributing.md](docs/contributing.md)).
 
 ## Documentation
 
-- [The editor](docs/editor.md)
-- [Scenes, lighting and Blender](docs/scenes.md)
-- [Ruby API](docs/ruby-api.md)
-- [Demos, tests and project layout](docs/development.md)
+The manual is in [docs/](docs/index.md): [install](docs/install.md), [your first game](docs/first-game.md),
+[the editor](docs/editor.md), [scripting](docs/scripting/behaviours.md) and the
+[API reference](docs/scripting/api.md). To read it as a site:
+
+```bash
+pip install -r docs/requirements.txt
+mkdocs serve
+```

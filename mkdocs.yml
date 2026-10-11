@@ -1,0 +1,42 @@
+site_name: RedGem 3D Engine
+site_description: The manual of RedGem, a 3D game engine where games are written in Ruby.
+docs_dir: docs
+theme:
+  name: material
+  logo: assets/redgem-mark.svg
+  favicon: assets/redgem-mark.svg
+  palette:
+    scheme: slate
+    primary: custom
+    accent: custom
+  font: false
+  features:
+    - navigation.sections
+    - navigation.footer
+    - content.code.copy
+extra_css:
+  - assets/manual.css
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+nav:
+  - Home: index.md
+  - Getting started:
+      - Install: install.md
+      - Your first game: first-game.md
+  - Using the editor:
+      - The editor: editor.md
+      - Levels, lighting and Blender: levels.md
+  - Scripting in Ruby:
+      - Behaviours: scripting/behaviours.md
+      - Gameplay recipes: scripting/gameplay.md
+      - API reference: scripting/api.md
+  - Finishing a game:
+      - Testing your game: testing.md
+      - Building and sharing: shipping.md
+  - Limits and troubleshooting: troubleshooting.md
+  - Working on the engine: contributing.md

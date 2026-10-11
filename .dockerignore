@@ -1,10 +1,10 @@
-.git
-.private
-.deps
-.cache
-.claude
+# Hidden folders (git data, local notes, downloaded dependencies, tool state)
+.*
 build
 dist
+site
+docs
+mkdocs.yml
 screenshots
 games/*-build
 games/showcase/scene.glb

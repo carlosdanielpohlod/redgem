@@ -1,0 +1,10 @@
+/* RedGem's colors on the Material theme. */
+:root, [data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #b40f39;
+  --md-primary-fg-color--light: #f0375c;
+  --md-primary-fg-color--dark: #7a0928;
+  --md-accent-fg-color: #ff8fa0;
+  --md-typeset-a-color: #ff8fa0;
+  --md-default-bg-color: #120a0d;
+  --md-code-bg-color: #1b0e13;
+}

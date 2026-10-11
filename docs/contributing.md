@@ -1,4 +1,6 @@
-# Development
+# Working on the engine
+
+For people changing RedGem itself. To make games with it, the rest of this manual is enough.
 
 ## Demos
 

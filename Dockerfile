@@ -1,4 +1,5 @@
-# Builds RedGem and its tests. See "Docker" in the README for how to run the editor and the tests.
+# Builds RedGem and its tests. tools/docker/editor.sh opens the editor; `docker compose run --rm test`
+# runs the tests.
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
