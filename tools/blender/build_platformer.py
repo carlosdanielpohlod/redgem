@@ -30,6 +30,7 @@ POLE = (0.85, 0.85, 0.85)
 WARM_LIGHT = (1.0, 0.8, 0.5)
 
 QUARTER_TURN = math.radians(90.0)
+HALF = 0.5                 # centers sit at half a height
 GOLD_METALLIC = 0.8
 GOLD_ROUGHNESS = 0.3
 
@@ -118,14 +119,14 @@ def build_props():
     wood = kit.material("Wood", WOOD)
     leaves = kit.material("Leaves", LEAVES)
     for index, (x, y) in enumerate(TREE_POSITIONS, start=1):
-        trunk = kit.cylinder(f"Tree{index}", (x, y, TRUNK_HEIGHT / 2), TRUNK_RADIUS, TRUNK_HEIGHT, mat=wood,
+        trunk = kit.cylinder(f"Tree{index}", (x, y, TRUNK_HEIGHT * HALF), TRUNK_RADIUS, TRUNK_HEIGHT, mat=wood,
                              props={"collider": "capsule"})
-        kit.sphere(f"Canopy{index}", (0.0, 0.0, TRUNK_HEIGHT / 2 + CANOPY_RADIUS * CANOPY_LIFT), CANOPY_RADIUS,
+        kit.sphere(f"Canopy{index}", (0.0, 0.0, TRUNK_HEIGHT * HALF + CANOPY_RADIUS * CANOPY_LIFT), CANOPY_RADIUS,
                    mat=leaves, parent=trunk)
     crate = kit.material("Crate", DIRT)
     x, y = CRATE_STACK_XY
     for level in range(CRATE_STACK_HEIGHT):
-        z = CRATE_SIZE / 2 + level * CRATE_SIZE
+        z = CRATE_SIZE * HALF + level * CRATE_SIZE
         kit.box(f"Crate{level + 1}", (x, y, z), (CRATE_SIZE, CRATE_SIZE, CRATE_SIZE), mat=crate,
                 props={"body": "dynamic", "mass": CRATE_MASS, "tag": "crate"})
 

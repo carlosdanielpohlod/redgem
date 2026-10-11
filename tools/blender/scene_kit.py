@@ -23,6 +23,11 @@ CAMERA_FOV_DEGREES = 50.0
 OPAQUE = 1.0
 DEFAULT_ROUGHNESS = 0.6
 DEFAULT_METALLIC = 0.0
+NO_ROTATION = (0.0, 0.0, 0.0)   # Euler angles, radians
+# Cameras and lights look along their own -Z with +Y up (Blender's convention).
+LOOK_AXIS = "-Z"
+UP_AXIS = "Y"
+PRINCIPLED_BSDF = "Principled BSDF"   # the shader node every new material starts with
 
 
 def output_path_from_argv(default_path):
@@ -44,7 +49,7 @@ def material(name, rgb, roughness=DEFAULT_ROUGHNESS, metallic=DEFAULT_METALLIC):
         return existing
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
-    bsdf = mat.node_tree.nodes["Principled BSDF"]
+    bsdf = mat.node_tree.nodes[PRINCIPLED_BSDF]
     bsdf.inputs["Base Color"].default_value = (*rgb, OPAQUE)
     bsdf.inputs["Roughness"].default_value = roughness
     bsdf.inputs["Metallic"].default_value = metallic
@@ -72,7 +77,7 @@ def apply_transform(obj, location=False, rotation=True, scale=True):
     bpy.ops.object.transform_apply(location=location, rotation=rotation, scale=scale)
 
 
-def box(name, location, dimensions, mat=None, props=None, parent=None, bake_scale=False):
+def box(name, location, dimensions, *, mat=None, props=None, parent=None, bake_scale=False):
     bpy.ops.mesh.primitive_cube_add(size=CUBE_SIZE, location=location)
     obj = bpy.context.active_object
     obj.scale = dimensions
@@ -81,7 +86,7 @@ def box(name, location, dimensions, mat=None, props=None, parent=None, bake_scal
     return _finish(obj, name, mat, props, parent)
 
 
-def cylinder(name, location, radius, depth, mat=None, props=None, parent=None, rotation=(0, 0, 0), bake=True):
+def cylinder(name, location, radius, depth, *, mat=None, props=None, parent=None, rotation=NO_ROTATION, bake=True):
     bpy.ops.mesh.primitive_cylinder_add(vertices=DEFAULT_SEGMENTS, radius=radius, depth=depth,
                                         location=location, rotation=rotation)
     obj = bpy.context.active_object
@@ -90,7 +95,7 @@ def cylinder(name, location, radius, depth, mat=None, props=None, parent=None, r
     return _finish(obj, name, mat, props, parent)
 
 
-def sphere(name, location, radius, mat=None, props=None, parent=None):
+def sphere(name, location, radius, *, mat=None, props=None, parent=None):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=DEFAULT_SEGMENTS, ring_count=DEFAULT_RING_COUNT,
                                          radius=radius, location=location)
     obj = bpy.context.active_object
@@ -98,7 +103,7 @@ def sphere(name, location, radius, mat=None, props=None, parent=None):
     return _finish(obj, name, mat, props, parent)
 
 
-def empty(name, location, props=None, parent=None):
+def empty(name, location, *, props=None, parent=None):
     obj = bpy.data.objects.new(name, None)
     obj.location = location
     bpy.context.collection.objects.link(obj)
@@ -107,7 +112,7 @@ def empty(name, location, props=None, parent=None):
 
 def look_rotation(source, target):
     direction = Vector(target) - Vector(source)
-    return direction.to_track_quat("-Z", "Y").to_euler()
+    return direction.to_track_quat(LOOK_AXIS, UP_AXIS).to_euler()
 
 
 def camera(name, location, look_at, props=None):

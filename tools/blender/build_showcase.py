@@ -16,11 +16,14 @@ Everything is in meters, Blender axes: the street runs along +Y, the camera look
 the sunset.
 """
 
+import functools
 import glob
+import itertools
 import math
 import os
 import random
 import sys
+from typing import NamedTuple
 
 import bpy
 from mathutils import Vector, noise
@@ -41,6 +44,30 @@ PREVIEW = os.environ.get("SHOWCASE_PREVIEW") == "1"
 RENDER = os.environ.get("SHOWCASE_RENDER", "1") == "1"
 EXPORT = os.environ.get("SHOWCASE_EXPORT", "1") == "1"
 GAME_DIR = os.path.join(REPO_ROOT, "games", "showcase")
+
+HALF = 0.5                         # centers and half-extents are half a size
+BOTH_SIDES = 2                     # a margin or a radius counts once on each side
+SIDES = (-1, 1)                    # the left-hand and the right-hand side of the street
+QUARTER_TURN = 90.0                # degrees
+ORIGIN = (0.0, 0.0, 0.0)
+X_AXIS = 0                         # indices into an (x, y, z)
+Z_AXIS = 2
+# Names Blender gives to things this script asks for again and again.
+PRINCIPLED = kit.PRINCIPLED_BSDF
+MESH = "MESH"                      # object type
+DECIMATE = "DECIMATE"              # the modifier that removes triangles
+SUBSURF = "SUBSURF"                # the modifier that subdivides them
+SRGB = "sRGB"                      # color space of maps that hold colors
+NON_COLOR = "Non-Color"            # ... and of maps that hold numbers (normals, roughness)
+FLAT = "FLAT"                      # texture projected along one axis
+BOX = "BOX"                        # ... or along all three, for blocks without a UV map
+# Maps that go straight into one input of the shader: (key in the maps, color space, input).
+PLAIN_MAPS = (("roughness", NON_COLOR, "Roughness"), ("metal", NON_COLOR, "Metallic"),
+              ("emission", SRGB, "Emission Color"))
+# Custom properties the engine reads.
+TINT = "tint"                      # color (sRGB hex) the object is multiplied by
+VISIBLE_FROM = "visible_from"      # drawn only between these distances from the camera (meters)
+VISIBLE_TO = "visible_to"
 
 # --- Real-time export (the engine has no path tracing, volumes or procedural textures) ---------
 # Share of their triangles the scanned models keep (they are made for close-ups; a street has
@@ -150,6 +177,7 @@ ENGINE_ROAD_DIP_DEPTH = 0.05
 ENGINE_ROAD_DIP_SIZE = 2.2
 ENGINE_ROAD_DIP_THRESHOLD = 0.62       # share of the noise range below which there is no dip
 ENGINE_ROAD_CROWN = 0.05               # the middle of the road is this much higher than its edges
+ENGINE_ROAD_CROWN_POWER = 2            # ... falling off as a parabola
 # Potholes: (x, y, radius, depth) in meters, with a ragged edge. Each also leaves a marker object
 # in the scene (tag "pothole", with its radius and depth), which is how the game knows of them.
 ENGINE_POTHOLES = [
@@ -198,6 +226,8 @@ ENGINE_WALKERS = {
 }
 POTHOLE_TAG = "pothole"
 AXES = 3
+MIN_TO_JOIN = 2                        # joining takes at least two objects
+ALBEDO_WORD = "albedo"                 # in the name of a scan's plain color texture
 
 # --- Street layout (meters) -------------------------------------------------------------------
 STREET_LENGTH = 220.0
@@ -225,6 +255,30 @@ LAMP_LIGHT_WATTS = 220.0
 LAMP_LIGHT_RADIUS = 0.12
 LAMP_COLOR_TEMPERATURE = (1.0, 0.62, 0.32)
 BULB_EMISSION = 18.0
+STREET_END = STREET_START + STREET_LENGTH
+CURB_LINE = ROAD_WIDTH * HALF + CURB_WIDTH   # distance from the middle of the road to the sidewalk
+FACADE_LINE = CURB_LINE + SIDEWALK_WIDTH     # ... and to the front of the buildings
+# Meters covered by one texture repeat along (x, y, z).
+ROAD_TILING = (ROAD_WIDTH, ROAD_TILE_LENGTH, 1.0)
+SIDEWALK_TILING = (SIDEWALK_TILE, SIDEWALK_TILE, 1.0)
+CURB_TILING = (CURB_TILE, CURB_TILE, CURB_TILE)
+ROAD_TEXTURE = "Road007"
+SIDEWALK_TEXTURE = "concrete_pavement"
+CONCRETE_TEXTURE = "concrete_floor_worn_001"  # curbs, plinths and cornices
+# Names of objects that are looked up again later.
+ROAD_NAME = "Road"
+HAZE_NAME = "Haze"
+BUILDING_PREFIX = "Building"
+LAMP_LIGHT_PREFIX = "LampLight"
+# Scanned models.
+LAMP_MODEL = "street_lamp_01"
+LAMP_GLASS_WORDS = ("glass", "bulb", "light")  # in the names of the lamp's materials that glow
+STREET_TREE = "island_tree_02"
+JACARANDA = "jacaranda_tree"
+MANHOLE = "water_manhole_cover"
+# The worn road's grid for the real-time export (see ENGINE_ROAD_CELL).
+ENGINE_ROAD_COLUMNS = round(ROAD_WIDTH / ENGINE_ROAD_CELL)
+ENGINE_ROAD_ROWS = round(STREET_LENGTH / ENGINE_ROAD_CELL)
 
 BUILDING_MIN_WIDTH = 9.0
 BUILDING_MAX_WIDTH = 17.0
@@ -243,6 +297,8 @@ CORNICE_HEIGHT = 0.5
 CORNICE_OVERHANG = 0.35
 WINDOW_GLOW_MIN = 0.0
 WINDOW_GLOW_MAX = 6.0
+BRICK_FACADES = ["Facade018A", "Facade020A"]
+GLASS_FACADE = "Facade006"
 
 # Wet asphalt: lower roughness everywhere, near-mirror puddles where noise is high.
 WET_ROUGHNESS_FACTOR = 0.45
@@ -301,16 +357,55 @@ PLANT_CHANCE = 0.25
 PLANT_FROM_WALL = 0.45
 BENCH_CHANCE = 0.3                 # in front of closed shops
 BENCH_FROM_WALL = 0.4
+SHOP_FRAME_ROUGHNESS = 0.4
+SHOP_FRAME_METALLIC = 0.6
+SHOP_BAND_ROUGHNESS = 0.6
+DISPLAY_ROUGHNESS = 0.9
+GLOW_STEPS = 2                     # the glow of shop windows comes in halves
+MIN_MULLIONS = 2                   # a window has at least the bars at its two ends
+SHOP_FLOOR = CURB_HEIGHT + PLINTH_HEIGHT   # where the shop fronts start, above the plinth
+SHOP_WINDOW_Z = SHOP_FLOOR + SHOP_WINDOW_SILL + SHOP_WINDOW_HEIGHT / 2   # middle of the windows
+SHOP_WINDOW_BOTTOM = SHOP_WINDOW_Z - SHOP_WINDOW_HEIGHT / 2
+# The bars along a window's top and sill: (name, height).
+SHOP_WINDOW_EDGES = (("top", SHOP_WINDOW_Z + SHOP_WINDOW_HEIGHT / 2), ("sill", SHOP_WINDOW_BOTTOM))
+# How far from the wall the middle of each layer of a shop front is.
+WINDOW_OUT = SHOP_BAND_DEPTH + SHOP_WINDOW_DEPTH / 2
+DISPLAY_OUT = SHOP_BAND_DEPTH + SHOP_WINDOW_DEPTH + DISPLAY_DEPTH / 2
+FRAME_OUT = SHOP_BAND_DEPTH + SHOP_WINDOW_DEPTH + SHOP_FRAME / 2
+CAFE_TABLE_OFFSETS = (-CAFE_TABLE_SPACING / 2, CAFE_TABLE_SPACING / 2)  # two tables per cafe
+CAFE_SET = "outdoor_table_chair_set_01"
+BENCH = "painted_wooden_bench"
+POTTED_PLANT = "potted_plant_02"
+
+
+class Front(NamedTuple):
+    """The street front of a building."""
+    name: str
+    side: int          # -1 on the left-hand side of the street, 1 on the right-hand
+    x_near: float      # x of the wall
+    start: float       # y where it starts
+    width: float       # meters along the street
+
+
+class Bay(NamedTuple):
+    """One shop window's share of a front."""
+    name: str
+    side: int
+    x_near: float
+    center: float      # y of its middle
+    width: float
+
 
 # Things along the curb, down the whole street: (model, weight, rotation on the right-hand sidewalk;
 # the left-hand one mirrors it). None is an empty spot.
 SCATTER_SEED_OFFSET = 2
 SCATTER_FROM = 50.0                # beyond the hand-placed props near the camera
 SCATTER_SLOTS = (4.5, 13.5)        # meters after each lamp (the tree is at 9)
+TRASH_PILE_SLOT = "trash_pile"     # the scatter entry that stands for the whole TRASH_PILE
 SCATTER = [
     (None, 3, 0.0), ("metal_trash_can", 3, 90.0), ("fire_hydrant", 2, 90.0), ("utility_box_01", 1, -90.0),
     ("utility_box_02", 1, -90.0), ("modular_street_seating", 2, -90.0), ("planter_box_01", 2, 90.0),
-    ("planter_box_02", 2, 90.0), ("planter_box_03", 2, 90.0), ("trash_pile", 2, 0.0),
+    ("planter_box_02", 2, 90.0), ("planter_box_03", 2, 90.0), (TRASH_PILE_SLOT, 2, 0.0),
 ]
 TRASH_PILE = [("trashbag", (0.0, 0.0), 0.0), ("trashbag", (0.35, 0.3), 70.0), ("cardboard_box_01", (-0.2, 0.55), 25.0),
               ("plastic_crate_02", (0.3, -0.5), -15.0)]
@@ -355,7 +450,8 @@ PEOPLE = [
     # (Scans by Calvin Serrano; outside the "ad" shot's frame, they populate the playable street.)
     ("melissa_green", "Standing Survivor Girl Green Top Cowboy", (-7.4, 34.0, SIDEWALK_TOP), 0.0),
     ("axel", "Axel Standing", (-8.3, 6.0, SIDEWALK_TOP), 180.0),
-    ("melissa_white", "Standing Cute Girl White Jacket Jeans", (7.9, 66.0, SIDEWALK_TOP), -70.0),  # wide trousers: she stands
+    # (Wide trousers: she stands.)
+    ("melissa_white", "Standing Cute Girl White Jacket Jeans", (7.9, 66.0, SIDEWALK_TOP), -70.0),
 ]
 HERO_CAR = "Generic Sport Sedan 2022 PL"
 # How that model names its tires, and the parts at a wheel that do not turn with it.
@@ -396,22 +492,29 @@ MAX_BOUNCES = 8
 EXPOSURE = 0.0
 LOOK = "AgX - Medium High Contrast"
 HDRI_ANALYSIS_WIDTH = 256
+EQUIRECTANGULAR_ASPECT = 2      # a sky image is twice as wide as it is tall
+RGB_CHANNELS = 3                # of the RGBA_CHANNELS each pixel has
+SHOTS_WITH_CAR = ("hero", "ad")  # these focus on the car
+GPU_BACKEND = "OPTIX"           # Cycles on NVIDIA RTX cards, also its denoiser
+FULL_RESOLUTION = 100           # percent of RESOLUTION
 
 
 # --- Materials ---------------------------------------------------------------------------------
 
-def image_node(nodes, path, colorspace="sRGB", projection="FLAT"):
+def image_node(nodes, path, colorspace=SRGB, projection=FLAT):
     node = nodes.new("ShaderNodeTexImage")
     node.image = bpy.data.images.load(path, check_existing=True)
     node.image.colorspace_settings.name = colorspace
     node.projection = projection
-    if projection == "BOX":
+    if projection == BOX:
         node.projection_blend = BOX_PROJECTION_BLEND
     return node
 
 
-def world_mapping(nodes, links, scale_x, scale_y, scale_z=1.0, offset=(0.0, 0.0, 0.0)):
-    """Texture coordinates from world position, so tiling is in meters on any object."""
+def world_mapping(nodes, links, scale, offset=ORIGIN):
+    """Texture coordinates from world position, so tiling is in meters on any object. `scale` is
+    the meters one repeat covers along (x, y, z)."""
+    scale_x, scale_y, scale_z = scale
     geometry = nodes.new("ShaderNodeNewGeometry")
     mapping = nodes.new("ShaderNodeMapping")
     mapping.inputs["Location"].default_value = offset
@@ -420,40 +523,52 @@ def world_mapping(nodes, links, scale_x, scale_y, scale_z=1.0, offset=(0.0, 0.0,
     return mapping.outputs["Vector"]
 
 
-def pbr_material(name, maps, uv, projection="FLAT"):
+def texture(setup, path, colorspace=SRGB):
+    """An image node for the material being set up, with its own texture coordinates. `setup` is
+    (node tree, function that makes the coordinates, projection)."""
+    tree, uv, projection = setup
+    node = image_node(tree.nodes, path, colorspace, projection)
+    tree.links.new(uv(tree.nodes, tree.links), node.inputs["Vector"])
+    return node
+
+
+def link_normal_map(setup, path, bsdf):
+    tree = setup[0]
+    normal_image = texture(setup, path, NON_COLOR)
+    normal = tree.nodes.new("ShaderNodeNormalMap")
+    tree.links.new(normal_image.outputs["Color"], normal.inputs["Color"])
+    tree.links.new(normal.outputs["Normal"], bsdf.inputs["Normal"])
+
+
+def link_arm_map(setup, path, bsdf):
+    """AO / roughness / metallic packed in R / G / B."""
+    tree = setup[0]
+    arm = texture(setup, path, NON_COLOR)
+    split = tree.nodes.new("ShaderNodeSeparateColor")
+    tree.links.new(arm.outputs["Color"], split.inputs["Color"])
+    tree.links.new(split.outputs["Green"], bsdf.inputs["Roughness"])
+    tree.links.new(split.outputs["Blue"], bsdf.inputs["Metallic"])
+
+
+def link_plain_maps(setup, maps, bsdf):
+    """The maps that go straight into one input of the shader."""
+    for key, colorspace, socket in PLAIN_MAPS:
+        if key in maps:
+            setup[0].links.new(texture(setup, maps[key], colorspace).outputs["Color"], bsdf.inputs[socket])
+
+
+def pbr_material(name, maps, uv, projection=FLAT):
     """maps: dict with color / normal / roughness / arm / ao / metal / emission paths."""
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
-    nodes, links = mat.node_tree.nodes, mat.node_tree.links
-    bsdf = nodes["Principled BSDF"]
-    color = image_node(nodes, maps["color"], projection=projection)
-    links.new(uv(nodes, links), color.inputs["Vector"])
-    links.new(color.outputs["Color"], bsdf.inputs["Base Color"])
+    setup = (mat.node_tree, uv, projection)
+    bsdf = mat.node_tree.nodes[PRINCIPLED]
+    mat.node_tree.links.new(texture(setup, maps["color"]).outputs["Color"], bsdf.inputs["Base Color"])
     if "normal" in maps:
-        normal_image = image_node(nodes, maps["normal"], "Non-Color", projection)
-        links.new(uv(nodes, links), normal_image.inputs["Vector"])
-        normal = nodes.new("ShaderNodeNormalMap")
-        links.new(normal_image.outputs["Color"], normal.inputs["Color"])
-        links.new(normal.outputs["Normal"], bsdf.inputs["Normal"])
-    if "arm" in maps:  # AO / roughness / metallic packed in R / G / B
-        arm = image_node(nodes, maps["arm"], "Non-Color", projection)
-        links.new(uv(nodes, links), arm.inputs["Vector"])
-        split = nodes.new("ShaderNodeSeparateColor")
-        links.new(arm.outputs["Color"], split.inputs["Color"])
-        links.new(split.outputs["Green"], bsdf.inputs["Roughness"])
-        links.new(split.outputs["Blue"], bsdf.inputs["Metallic"])
-    if "roughness" in maps:
-        rough = image_node(nodes, maps["roughness"], "Non-Color", projection)
-        links.new(uv(nodes, links), rough.inputs["Vector"])
-        links.new(rough.outputs["Color"], bsdf.inputs["Roughness"])
-    if "metal" in maps:
-        metal = image_node(nodes, maps["metal"], "Non-Color", projection)
-        links.new(uv(nodes, links), metal.inputs["Vector"])
-        links.new(metal.outputs["Color"], bsdf.inputs["Metallic"])
-    if "emission" in maps:
-        emission = image_node(nodes, maps["emission"], projection=projection)
-        links.new(uv(nodes, links), emission.inputs["Vector"])
-        links.new(emission.outputs["Color"], bsdf.inputs["Emission Color"])
+        link_normal_map(setup, maps["normal"], bsdf)
+    if "arm" in maps:
+        link_arm_map(setup, maps["arm"], bsdf)
+    link_plain_maps(setup, maps, bsdf)
     return mat
 
 
@@ -472,108 +587,143 @@ def polyhaven_maps(asset):
     return {"color": prefix + "diff_2k.jpg", "normal": prefix + "nor_gl_2k.jpg", "arm": prefix + "arm_2k.jpg"}
 
 
-def wet_road_material():
-    road_uv = lambda nodes, links: world_mapping(nodes, links, ROAD_WIDTH, ROAD_TILE_LENGTH,  # noqa: E731
-                                                 offset=(ROAD_WIDTH / 2, 0.0, 0.0))
-    mat = pbr_material("WetRoad", ambientcg_maps("Road007"), road_uv)
-    nodes, links = mat.node_tree.nodes, mat.node_tree.links
-    bsdf = nodes["Principled BSDF"]
+def wet_roughness(tree, bsdf):
+    """The road's own roughness, lowered everywhere."""
     rough_source = bsdf.inputs["Roughness"].links[0].from_socket
-    wet = nodes.new("ShaderNodeMath")
+    wet = tree.nodes.new("ShaderNodeMath")
     wet.operation = "MULTIPLY"
     wet.inputs[1].default_value = WET_ROUGHNESS_FACTOR
-    links.new(rough_source, wet.inputs[0])
-    # Puddles: a large noise pattern decides where the road is a near-mirror.
-    noise = nodes.new("ShaderNodeTexNoise")
-    noise.inputs["Scale"].default_value = PUDDLE_NOISE_SCALE
-    links.new(nodes.new("ShaderNodeNewGeometry").outputs["Position"], noise.inputs["Vector"])
-    ramp = nodes.new("ShaderNodeMapRange")
+    tree.links.new(rough_source, wet.inputs[0])
+    return wet.outputs["Value"]
+
+
+def puddle_mask(tree):
+    """Puddles: a large noise pattern decides where the road is a near-mirror (0 dry, 1 puddle)."""
+    pattern = tree.nodes.new("ShaderNodeTexNoise")
+    pattern.inputs["Scale"].default_value = PUDDLE_NOISE_SCALE
+    tree.links.new(tree.nodes.new("ShaderNodeNewGeometry").outputs["Position"], pattern.inputs["Vector"])
+    ramp = tree.nodes.new("ShaderNodeMapRange")
     ramp.inputs["From Min"].default_value = PUDDLE_THRESHOLD - PUDDLE_SOFTNESS
     ramp.inputs["From Max"].default_value = PUDDLE_THRESHOLD + PUDDLE_SOFTNESS
-    links.new(noise.outputs["Fac"], ramp.inputs["Value"])
-    mix_rough = nodes.new("ShaderNodeMix")
+    tree.links.new(pattern.outputs["Fac"], ramp.inputs["Value"])
+    return ramp.outputs["Result"]
+
+
+def mirror_puddles(tree, bsdf, wet, puddles):
+    mix_rough = tree.nodes.new("ShaderNodeMix")
     mix_rough.data_type = "FLOAT"
-    links.new(ramp.outputs["Result"], mix_rough.inputs["Factor"])
-    links.new(wet.outputs["Value"], mix_rough.inputs["A"])
+    tree.links.new(puddles, mix_rough.inputs["Factor"])
+    tree.links.new(wet, mix_rough.inputs["A"])
     mix_rough.inputs["B"].default_value = PUDDLE_ROUGHNESS
-    links.new(mix_rough.outputs["Result"], bsdf.inputs["Roughness"])
-    # Wet surfaces are darker.
+    tree.links.new(mix_rough.outputs["Result"], bsdf.inputs["Roughness"])
+
+
+def darken_puddles(tree, bsdf, puddles):
+    """Wet surfaces are darker."""
     color_source = bsdf.inputs["Base Color"].links[0].from_socket
-    darken = nodes.new("ShaderNodeMix")
+    darken = tree.nodes.new("ShaderNodeMix")
     darken.data_type = "RGBA"
     darken.blend_type = "MULTIPLY"
-    links.new(ramp.outputs["Result"], darken.inputs["Factor"])
-    links.new(color_source, darken.inputs["A"])
+    tree.links.new(puddles, darken.inputs["Factor"])
+    tree.links.new(color_source, darken.inputs["A"])
     darken.inputs["B"].default_value = (PUDDLE_DARKEN, PUDDLE_DARKEN, PUDDLE_DARKEN, 1.0)
-    links.new(darken.outputs["Result"], bsdf.inputs["Base Color"])
+    tree.links.new(darken.outputs["Result"], bsdf.inputs["Base Color"])
+
+
+def wet_road_material():
+    road_uv = functools.partial(world_mapping, scale=ROAD_TILING, offset=(ROAD_WIDTH * HALF, 0.0, 0.0))
+    mat = pbr_material("WetRoad", ambientcg_maps(ROAD_TEXTURE), road_uv)
+    tree = mat.node_tree
+    bsdf = tree.nodes[PRINCIPLED]
+    wet = wet_roughness(tree, bsdf)
+    puddles = puddle_mask(tree)
+    mirror_puddles(tree, bsdf, wet, puddles)
+    darken_puddles(tree, bsdf, puddles)
     return mat
 
 
 def facade_material(asset, tile, glow):
-    uv = lambda nodes, links: world_mapping(nodes, links, tile, tile, tile)  # noqa: E731
-    mat = pbr_material(f"{asset}_glow{glow:.1f}", ambientcg_maps(asset), uv, projection="BOX")
-    if "Emission Strength" in mat.node_tree.nodes["Principled BSDF"].inputs:
-        mat.node_tree.nodes["Principled BSDF"].inputs["Emission Strength"].default_value = glow
+    uv = functools.partial(world_mapping, scale=(tile, tile, tile))
+    mat = pbr_material(f"{asset}_glow{glow:.1f}", ambientcg_maps(asset), uv, projection=BOX)
+    if "Emission Strength" in mat.node_tree.nodes[PRINCIPLED].inputs:
+        mat.node_tree.nodes[PRINCIPLED].inputs["Emission Strength"].default_value = glow
     return mat
+
+
+def concrete_material(name):
+    return pbr_material(name, polyhaven_maps(CONCRETE_TEXTURE), functools.partial(world_mapping, scale=CURB_TILING),
+                        projection=BOX)
 
 
 # --- Geometry -----------------------------------------------------------------------------------
 
-def slab(name, x_min, x_max, y_min, y_max, z_min, z_max, mat):
-    size = (x_max - x_min, y_max - y_min, z_max - z_min)
-    center = ((x_min + x_max) / 2, (y_min + y_max) / 2, (z_min + z_max) / 2)
+def span(a, b):
+    """(lower, upper) of two coordinates given in either order."""
+    return min(a, b), max(a, b)
+
+
+def slab(name, x_range, y_range, z_range, mat):
+    """A box given by where it starts and ends along each axis."""
+    ranges = (x_range, y_range, z_range)
+    size = tuple(upper - lower for lower, upper in ranges)
+    center = tuple((lower + upper) * HALF for lower, upper in ranges)
     obj = kit.box(name, center, size, bake_scale=True)
     obj.data.materials.append(mat)
     return obj
 
 
 def build_street():
-    y0, y1 = STREET_START, STREET_START + STREET_LENGTH
-    half = ROAD_WIDTH / 2
-    slab("Road", -half, half, y0, y1, ROAD_UNDERSIDE, 0.0, wet_road_material())
-    sidewalk = pbr_material("Sidewalk", polyhaven_maps("concrete_pavement"),
-                            lambda n, l: world_mapping(n, l, SIDEWALK_TILE, SIDEWALK_TILE))
-    curb = pbr_material("Curb", polyhaven_maps("concrete_floor_worn_001"),
-                        lambda n, l: world_mapping(n, l, CURB_TILE, CURB_TILE, CURB_TILE), projection="BOX")
-    for side in (-1, 1):
-        inner = half * side
-        curb_outer = (half + CURB_WIDTH) * side
-        walk_outer = (half + CURB_WIDTH + SIDEWALK_WIDTH) * side
-        slab(f"Curb{side:+d}", min(inner, curb_outer), max(inner, curb_outer), y0, y1, ROAD_UNDERSIDE, CURB_HEIGHT, curb)
-        slab(f"Sidewalk{side:+d}", min(curb_outer, walk_outer), max(curb_outer, walk_outer), y0, y1, -0.1,
-             CURB_HEIGHT, sidewalk)
+    length = (STREET_START, STREET_END)
+    half = ROAD_WIDTH * HALF
+    slab(ROAD_NAME, (-half, half), length, (ROAD_UNDERSIDE, 0.0), wet_road_material())
+    sidewalk = pbr_material("Sidewalk", polyhaven_maps(SIDEWALK_TEXTURE),
+                            functools.partial(world_mapping, scale=SIDEWALK_TILING))
+    curb = concrete_material("Curb")
+    for side in SIDES:
+        inner, curb_outer, walk_outer = half * side, CURB_LINE * side, FACADE_LINE * side
+        slab(f"Curb{side:+d}", span(inner, curb_outer), length, (ROAD_UNDERSIDE, CURB_HEIGHT), curb)
+        slab(f"Sidewalk{side:+d}", span(curb_outer, walk_outer), length, (ROAD_UNDERSIDE, CURB_HEIGHT), sidewalk)
+
+
+def building_look(rng):
+    """(is it a glass tower?, height, facade material) of the next building."""
+    if rng.random() < TOWER_CHANCE:
+        height = rng.uniform(TOWER_MIN_HEIGHT, TOWER_MAX_HEIGHT)
+        return True, height, facade_material(GLASS_FACADE, GLASS_FACADE_TILE, 0.0)
+    height = rng.uniform(BUILDING_MIN_HEIGHT, BUILDING_MAX_HEIGHT)
+    glow_range = (WINDOW_GLOW_MIN, WINDOW_GLOW_MAX)
+    return False, height, facade_material(rng.choice(BRICK_FACADES), BRICK_FACADE_TILE, rng.uniform(*glow_range))
+
+
+def build_building(name, lot, height, materials):
+    """The block of a building with its plinth and cornice. `lot` is (side of the street, y where
+    it starts, width along the street); `materials` is (facade, plinth and cornice)."""
+    side, y, width = lot
+    facade, concrete = materials
+    x_near, x_far = FACADE_LINE * side, (FACADE_LINE + BUILDING_DEPTH) * side
+    y_end = y + width - BUILDING_GAP
+    slab(name, span(x_near, x_far), (y, y_end), (CURB_HEIGHT, height), facade)
+    plinth_near = x_near - PLINTH_PROTRUSION * side
+    slab(name + "_plinth", span(plinth_near, x_far), (y, y_end), (CURB_HEIGHT, CURB_HEIGHT + PLINTH_HEIGHT), concrete)
+    overhang_near = x_near - CORNICE_OVERHANG * side
+    slab(name + "_cornice", span(overhang_near, x_far), (y - CORNICE_OVERHANG, y_end + CORNICE_OVERHANG),
+         (height, height + CORNICE_HEIGHT), concrete)
 
 
 def build_buildings(rng):
-    brick = ["Facade018A", "Facade020A"]
-    concrete = pbr_material("Cornice", polyhaven_maps("concrete_floor_worn_001"),
-                            lambda n, l: world_mapping(n, l, CURB_TILE, CURB_TILE, CURB_TILE), projection="BOX")
-    front = ROAD_WIDTH / 2 + CURB_WIDTH + SIDEWALK_WIDTH
+    """Returns the fronts of the brick buildings, which get shops."""
+    concrete = concrete_material("Cornice")
     shop_fronts = []
-    for side in (-1, 1):
+    for side in SIDES:
         y = STREET_START
         index = 0
-        while y < STREET_START + STREET_LENGTH:
+        while y < STREET_END:
             width = rng.uniform(BUILDING_MIN_WIDTH, BUILDING_MAX_WIDTH)
-            tower = rng.random() < TOWER_CHANCE
-            if tower:
-                height = rng.uniform(TOWER_MIN_HEIGHT, TOWER_MAX_HEIGHT)
-                mat = facade_material("Facade006", GLASS_FACADE_TILE, 0.0)
-            else:
-                height = rng.uniform(BUILDING_MIN_HEIGHT, BUILDING_MAX_HEIGHT)
-                mat = facade_material(rng.choice(brick), BRICK_FACADE_TILE,
-                                      rng.uniform(WINDOW_GLOW_MIN, WINDOW_GLOW_MAX))
-            x_near, x_far = front * side, (front + BUILDING_DEPTH) * side
-            name = f"Building{side:+d}_{index}"
-            slab(name, min(x_near, x_far), max(x_near, x_far), y, y + width - BUILDING_GAP, CURB_HEIGHT, height, mat)
-            plinth_near = x_near - PLINTH_PROTRUSION * side
-            slab(name + "_plinth", min(plinth_near, x_far), max(plinth_near, x_far), y, y + width - BUILDING_GAP,
-                 CURB_HEIGHT, CURB_HEIGHT + PLINTH_HEIGHT, concrete)
-            overhang_near = x_near - CORNICE_OVERHANG * side
-            slab(name + "_cornice", min(overhang_near, x_far), max(overhang_near, x_far), y - CORNICE_OVERHANG,
-                 y + width - BUILDING_GAP + CORNICE_OVERHANG, height, height + CORNICE_HEIGHT, concrete)
+            tower, height, facade = building_look(rng)
+            name = f"{BUILDING_PREFIX}{side:+d}_{index}"
+            build_building(name, (side, y, width), height, (facade, concrete))
             if not tower:
-                shop_fronts.append((name, side, x_near, y, width - BUILDING_GAP))
+                shop_fronts.append(Front(name, side, FACADE_LINE * side, y, width - BUILDING_GAP))
             y += width
             index += 1
     return shop_fronts
@@ -581,98 +731,149 @@ def build_buildings(rng):
 
 def glow_material(name, color, strength):
     mat = kit.material(name, color)
-    bsdf = mat.node_tree.nodes["Principled BSDF"]
+    bsdf = mat.node_tree.nodes[PRINCIPLED]
     bsdf.inputs["Emission Color"].default_value = (*color, 1.0)
     bsdf.inputs["Emission Strength"].default_value = strength
     return mat
 
 
-def wall_box(name, side, x_near, out, y, z, size, mat):
-    """A box in front of a facade: `out` meters from the wall to its center, `size` is (depth out
-    of the wall, width along the street, height)."""
-    return kit.box(name, (x_near - side * out, y, z), size, mat=mat, bake_scale=True)
+def wall_box(front, part, offset, size, mat):
+    """A box in front of a facade, named after it and `part`. `offset` is (meters from the wall to
+    the box's center, y, z); `size` is (depth out of the wall, width along the street, height)."""
+    out, y, z = offset
+    return kit.box(f"{front.name}_{part}", (front.x_near - front.side * out, y, z), size, mat=mat, bake_scale=True)
+
+
+def build_shop_band(front, rng):
+    """The painted band across the whole ground floor."""
+    band_color = rng.randrange(len(SHOP_BAND_COLORS))
+    band = kit.material(f"ShopBand{band_color}", SHOP_BAND_COLORS[band_color], roughness=SHOP_BAND_ROUGHNESS)
+    center = front.start + front.width * HALF
+    wall_box(front, "band", (SHOP_BAND_DEPTH * HALF, center, (SHOP_FLOOR + SHOP_BAND_TOP) * HALF),
+             (SHOP_BAND_DEPTH, front.width, SHOP_BAND_TOP - SHOP_FLOOR), band)
+
+
+def shop_bays(front):
+    """The building's front cut into equal bays: as many as fit."""
+    bays = max(1, int(front.width // SHOP_BAY_WIDTH))
+    bay = front.width / bays
+    return [Bay(f"{front.name}_shop{index}", front.side, front.x_near, front.start + bay * (index + HALF), bay)
+            for index in range(bays)]
 
 
 def build_shop_fronts(shop_fronts, rng):
-    frame = kit.material("ShopFrame", SHOP_FRAME_COLOR, roughness=0.4, metallic=0.6)
+    frame = kit.material("ShopFrame", SHOP_FRAME_COLOR, roughness=SHOP_FRAME_ROUGHNESS, metallic=SHOP_FRAME_METALLIC)
     dark_glass = kit.material("ShopDarkGlass", SHOP_DARK_GLASS, roughness=SHOP_GLASS_ROUGHNESS)
-    floor = CURB_HEIGHT + PLINTH_HEIGHT
-    for name, side, x_near, y_start, width in shop_fronts:
-        band_color = rng.randrange(len(SHOP_BAND_COLORS))
-        band = kit.material(f"ShopBand{band_color}", SHOP_BAND_COLORS[band_color], roughness=0.6)
-        wall_box(f"{name}_band", side, x_near, SHOP_BAND_DEPTH / 2, y_start + width / 2, (floor + SHOP_BAND_TOP) / 2,
-                 (SHOP_BAND_DEPTH, width, SHOP_BAND_TOP - floor), band)
-        bays = max(1, int(width // SHOP_BAY_WIDTH))
-        bay = width / bays
-        for index in range(bays):
-            center = y_start + bay * (index + 0.5)
-            build_shop_bay(f"{name}_shop{index}", side, x_near, center, bay, floor, frame, dark_glass, rng)
+    for front in shop_fronts:
+        build_shop_band(front, rng)
+        for bay in shop_bays(front):
+            build_shop_bay(bay, frame, dark_glass, rng)
 
 
-def build_display(name, side, x_near, center, width, sill, rng):
-    dark = kit.material("ShopDisplay", DISPLAY_COLOR, roughness=0.9)
-    out = SHOP_BAND_DEPTH + SHOP_WINDOW_DEPTH + DISPLAY_DEPTH / 2
-    wall_box(f"{name}_counter", side, x_near, out, center, sill + DISPLAY_COUNTER_HEIGHT / 2,
+def window_width(bay):
+    return bay.width - SHOP_BAY_MARGIN
+
+
+def build_display(bay, rng):
+    dark = kit.material("ShopDisplay", DISPLAY_COLOR, roughness=DISPLAY_ROUGHNESS)
+    width = window_width(bay)
+    wall_box(bay, "counter", (DISPLAY_OUT, bay.center, SHOP_WINDOW_BOTTOM + DISPLAY_COUNTER_HEIGHT * HALF),
              (DISPLAY_DEPTH, width, DISPLAY_COUNTER_HEIGHT), dark)
     for item in range(rng.randint(*DISPLAY_ITEMS)):
         item_width = rng.uniform(*DISPLAY_ITEM_WIDTH)
         height = rng.uniform(*DISPLAY_ITEM_HEIGHT)
-        y = center + rng.uniform(-0.5, 0.5) * (width - item_width)
-        wall_box(f"{name}_item{item}", side, x_near, out, y, sill + DISPLAY_COUNTER_HEIGHT + height / 2,
+        y = bay.center + rng.uniform(-HALF, HALF) * (width - item_width)
+        wall_box(bay, f"item{item}", (DISPLAY_OUT, y, SHOP_WINDOW_BOTTOM + DISPLAY_COUNTER_HEIGHT + height * HALF),
                  (DISPLAY_DEPTH, item_width, height), dark)
 
 
-def build_shop_bay(name, side, x_near, center, bay, floor, frame, dark_glass, rng):
-    window_width = bay - SHOP_BAY_MARGIN
-    window_z = floor + SHOP_WINDOW_SILL + SHOP_WINDOW_HEIGHT / 2
-    lit = rng.random() < SHOP_LIT_CHANCE
-    if lit:
-        glow = rng.randrange(len(SHOP_GLOWS))
-        strength = round(rng.uniform(*SHOP_GLOW_STRENGTH) * 2) / 2  # half steps: few distinct materials
-        glass = glow_material(f"ShopGlow{glow}_{strength}", SHOP_GLOWS[glow], strength)
-    else:
-        glass = dark_glass
-    wall_box(f"{name}_window", side, x_near, SHOP_BAND_DEPTH + SHOP_WINDOW_DEPTH / 2, center, window_z,
-             (SHOP_WINDOW_DEPTH, window_width, SHOP_WINDOW_HEIGHT), glass)
-    if lit:
-        build_display(name, side, x_near, center, window_width, window_z - SHOP_WINDOW_HEIGHT / 2, rng)
-    frame_out = SHOP_BAND_DEPTH + SHOP_WINDOW_DEPTH + SHOP_FRAME / 2
-    mullions = max(2, round(window_width / SHOP_MULLION_SPACING) + 1)
+def shop_glass(rng):
+    """The glowing glass of an open shop."""
+    glow = rng.randrange(len(SHOP_GLOWS))
+    strength = round(rng.uniform(*SHOP_GLOW_STRENGTH) * GLOW_STEPS) / GLOW_STEPS  # few distinct materials
+    return glow_material(f"ShopGlow{glow}_{strength}", SHOP_GLOWS[glow], strength)
+
+
+def build_window_frame(bay, frame):
+    """Vertical bars across the window, and a bar along its top and its sill."""
+    width = window_width(bay)
+    mullions = max(MIN_MULLIONS, round(width / SHOP_MULLION_SPACING) + 1)
     for bar in range(mullions):
-        y = center - window_width / 2 + window_width * bar / (mullions - 1)
-        wall_box(f"{name}_bar{bar}", side, x_near, frame_out, y, window_z,
+        y = bay.center - width * HALF + width * bar / (mullions - 1)
+        wall_box(bay, f"bar{bar}", (FRAME_OUT, y, SHOP_WINDOW_Z),
                  (SHOP_FRAME, SHOP_FRAME, SHOP_WINDOW_HEIGHT + SHOP_FRAME), frame)
-    for edge, z in (("top", window_z + SHOP_WINDOW_HEIGHT / 2), ("sill", window_z - SHOP_WINDOW_HEIGHT / 2)):
-        wall_box(f"{name}_{edge}", side, x_near, frame_out, center, z, (SHOP_FRAME, window_width, SHOP_FRAME), frame)
-    if rng.random() < AWNING_CHANCE:
-        color = rng.randrange(len(AWNING_COLORS))
-        cloth = kit.material(f"Awning{color}", AWNING_COLORS[color], roughness=AWNING_ROUGHNESS)
-        drop = math.sin(math.radians(AWNING_SLOPE_DEGREES)) * AWNING_REACH / 2
-        awning = wall_box(f"{name}_awning", side, x_near, AWNING_REACH / 2, center, AWNING_HEIGHT - drop,
-                          (AWNING_REACH, bay - AWNING_SIDE_MARGIN * 2, AWNING_THICKNESS), cloth)
-        awning.rotation_euler = (0.0, -side * math.radians(AWNING_SLOPE_DEGREES), 0.0)  # lower toward the road
-    if lit and rng.random() < NEON_CHANCE:
-        color = rng.randrange(len(NEON_COLORS))
-        depth, share, height = NEON_SIZE
-        wall_box(f"{name}_neon", side, x_near, SHOP_BAND_DEPTH + depth / 2, center, NEON_HEIGHT,
-                 (depth, bay * share, height), glow_material(f"Neon{color}", NEON_COLORS[color], NEON_STRENGTH))
+    for edge, z in SHOP_WINDOW_EDGES:
+        wall_box(bay, edge, (FRAME_OUT, bay.center, z), (SHOP_FRAME, width, SHOP_FRAME), frame)
+
+
+def build_awning(bay, rng):
+    color = rng.randrange(len(AWNING_COLORS))
+    cloth = kit.material(f"Awning{color}", AWNING_COLORS[color], roughness=AWNING_ROUGHNESS)
+    slope = math.radians(AWNING_SLOPE_DEGREES)
+    drop = math.sin(slope) * AWNING_REACH * HALF
+    awning = wall_box(bay, "awning", (AWNING_REACH * HALF, bay.center, AWNING_HEIGHT - drop),
+                      (AWNING_REACH, bay.width - AWNING_SIDE_MARGIN * BOTH_SIDES, AWNING_THICKNESS), cloth)
+    awning.rotation_euler = (0.0, -bay.side * slope, 0.0)  # lower toward the road
+
+
+def build_neon(bay, rng):
+    color = rng.randrange(len(NEON_COLORS))
+    depth, share, height = NEON_SIZE
+    wall_box(bay, "neon", (SHOP_BAND_DEPTH + depth * HALF, bay.center, NEON_HEIGHT),
+             (depth, bay.width * share, height), glow_material(f"Neon{color}", NEON_COLORS[color], NEON_STRENGTH))
+
+
+def on_sidewalk(bay, from_wall, y):
+    """A spot on the sidewalk, `from_wall` meters in front of the bay's wall."""
+    return (bay.x_near - bay.side * from_wall, y, CURB_HEIGHT)
+
+
+def furnish_sidewalk(bay, lit, rng):
+    """Cafe tables in front of some open shops, a bench in front of some closed ones, a plant."""
     if lit and rng.random() < CAFE_CHANCE:
-        for offset in (-CAFE_TABLE_SPACING / 2, CAFE_TABLE_SPACING / 2):
-            instance("outdoor_table_chair_set_01", f"{name}_cafe{offset:+.0f}",
-                     (x_near - side * CAFE_FROM_WALL, center + offset, CURB_HEIGHT))
+        for offset in CAFE_TABLE_OFFSETS:
+            instance(CAFE_SET, f"{bay.name}_cafe{offset:+.0f}", on_sidewalk(bay, CAFE_FROM_WALL, bay.center + offset))
     elif not lit and rng.random() < BENCH_CHANCE:
-        instance("painted_wooden_bench", f"{name}_bench", (x_near - side * BENCH_FROM_WALL, center, CURB_HEIGHT),
-                 -90.0 * side)
+        instance(BENCH, f"{bay.name}_bench", on_sidewalk(bay, BENCH_FROM_WALL, bay.center), -QUARTER_TURN * bay.side)
     if rng.random() < PLANT_CHANCE:
-        instance("potted_plant_02", f"{name}_plant",
-                 (x_near - side * PLANT_FROM_WALL, center + window_width / 2 + SHOP_BAY_MARGIN / 2, CURB_HEIGHT),
+        beside_window = bay.center + window_width(bay) * HALF + SHOP_BAY_MARGIN * HALF
+        instance(POTTED_PLANT, f"{bay.name}_plant", on_sidewalk(bay, PLANT_FROM_WALL, beside_window),
                  rng.uniform(0.0, FULL_TURN_DEGREES))
+
+
+def build_shop_bay(bay, frame, dark_glass, rng):
+    lit = rng.random() < SHOP_LIT_CHANCE
+    glass = shop_glass(rng) if lit else dark_glass
+    wall_box(bay, "window", (WINDOW_OUT, bay.center, SHOP_WINDOW_Z),
+             (SHOP_WINDOW_DEPTH, window_width(bay), SHOP_WINDOW_HEIGHT), glass)
+    if lit:
+        build_display(bay, rng)
+    build_window_frame(bay, frame)
+    if rng.random() < AWNING_CHANCE:
+        build_awning(bay, rng)
+    if lit and rng.random() < NEON_CHANCE:
+        build_neon(bay, rng)
+    furnish_sidewalk(bay, lit, rng)
 
 
 # --- Scanned models ------------------------------------------------------------------------------
 
 _templates = {}
 _instances = {}  # model -> the roots of its copies in the scene
+
+
+def thin(objects, ratio):
+    """Replaces the meshes of `objects` by ones with that share of their triangles."""
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    for obj in objects:
+        if obj.type != MESH:
+            continue
+        obj.modifiers.new("Decimate", DECIMATE).ratio = ratio
+        depsgraph.update()
+        heavy = obj.data
+        obj.data = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph))
+        obj.modifiers.clear()
+        bpy.data.meshes.remove(heavy)
 
 
 def template(asset):
@@ -684,16 +885,7 @@ def template(asset):
     bpy.ops.import_scene.gltf(filepath=path)
     created = [obj for obj in bpy.data.objects if obj not in before]
     if asset in IMPORT_DECIMATE:
-        depsgraph = bpy.context.evaluated_depsgraph_get()
-        for obj in created:
-            if obj.type != "MESH":
-                continue
-            obj.modifiers.new("Decimate", "DECIMATE").ratio = IMPORT_DECIMATE[asset]
-            depsgraph.update()
-            heavy = obj.data
-            obj.data = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph))
-            obj.modifiers.clear()
-            bpy.data.meshes.remove(heavy)
+        thin(created, IMPORT_DECIMATE[asset])
     for obj in created:
         for collection in list(obj.users_collection):
             collection.objects.unlink(obj)
@@ -721,94 +913,115 @@ def instance(asset, name, location, rotation_degrees=0.0, scale=1.0):
     return root, list(copies.values())
 
 
+def is_lamp_glass(mat):
+    return mat is not None and any(word in mat.name.lower() for word in LAMP_GLASS_WORDS)
+
+
 def light_up_lamp(parts):
     for obj in parts:
         for slot in getattr(obj, "material_slots", []):
-            mat = slot.material
-            if mat is None or not any(word in mat.name.lower() for word in ("glass", "bulb", "light")):
+            if not is_lamp_glass(slot.material):
                 continue
-            bsdf = mat.node_tree.nodes.get("Principled BSDF")
+            bsdf = slot.material.node_tree.nodes.get(PRINCIPLED)
             if bsdf is not None:
                 bsdf.inputs["Emission Color"].default_value = (*LAMP_COLOR_TEMPERATURE, 1.0)
                 bsdf.inputs["Emission Strength"].default_value = BULB_EMISSION
 
 
-def build_street_furniture(rng):
-    curb_line = ROAD_WIDTH / 2 + CURB_WIDTH
+def lamp_rows():
+    """(index, y) of each pair of street lamps, down the street."""
     y = STREET_START
     index = 0
-    while y < STREET_START + STREET_LENGTH:
-        for side in (-1, 1):
-            x = (curb_line + LAMP_FROM_CURB) * side
-            _, parts = instance("street_lamp_01", f"Lamp{side:+d}_{index}", (x, y, CURB_HEIGHT),
-                                90.0 if side < 0 else -90.0)
-            light_up_lamp(parts)
-            bpy.ops.object.light_add(type="POINT", location=(x - LAMP_ARM_REACH * side, y, LAMP_HEAD_HEIGHT))
-            light = bpy.context.active_object
-            light.name = f"LampLight{side:+d}_{index}"
-            light.data.energy = LAMP_LIGHT_WATTS
-            light.data.color = LAMP_COLOR_TEMPERATURE
-            light.data.shadow_soft_size = LAMP_LIGHT_RADIUS
-            tree_x = (curb_line + TREE_FROM_CURB) * side
-            turn, spread = rng.uniform(0.0, FULL_TURN_DEGREES), rng.uniform(*TREE_SCALE_SPREAD)
-            if (index + (side > 0)) % JACARANDA_EVERY == 1:
-                instance("jacaranda_tree", f"Tree{side:+d}_{index}", (tree_x, y + TREE_OFFSET, CURB_HEIGHT), turn,
-                         JACARANDA_SCALE * spread)
-            else:
-                instance("island_tree_02", f"Tree{side:+d}_{index}", (tree_x, y + TREE_OFFSET, CURB_HEIGHT), turn,
-                         TREE_SCALE * spread)
+    while y < STREET_END:
+        yield index, y
         y += LAMP_SPACING
         index += 1
-    for index, (asset, side, y_prop, rotation) in enumerate(PROPS):
-        x = (curb_line + PROP_FROM_CURB) * side
-        instance(asset, f"Prop_{asset}_{index}", (x, y_prop, CURB_HEIGHT), rotation)
-    for index, (x, y_cover) in enumerate(MANHOLES + MORE_MANHOLES):
-        instance("water_manhole_cover", f"Manhole{index}", (x, y_cover, 0.0))
-    scatter_along_curbs(curb_line)
 
 
-def scatter_along_curbs(curb_line):
+def build_lamp(side, index, y):
+    """A lamp post and the light it casts."""
+    x = (CURB_LINE + LAMP_FROM_CURB) * side
+    _, parts = instance(LAMP_MODEL, f"Lamp{side:+d}_{index}", (x, y, CURB_HEIGHT),
+                        QUARTER_TURN if side < 0 else -QUARTER_TURN)
+    light_up_lamp(parts)
+    bpy.ops.object.light_add(type="POINT", location=(x - LAMP_ARM_REACH * side, y, LAMP_HEAD_HEIGHT))
+    light = bpy.context.active_object
+    light.name = f"{LAMP_LIGHT_PREFIX}{side:+d}_{index}"
+    light.data.energy = LAMP_LIGHT_WATTS
+    light.data.color = LAMP_COLOR_TEMPERATURE
+    light.data.shadow_soft_size = LAMP_LIGHT_RADIUS
+
+
+def build_tree(rng, side, index, y):
+    """The tree after a lamp: every few of them a jacaranda."""
+    turn, spread = rng.uniform(0.0, FULL_TURN_DEGREES), rng.uniform(*TREE_SCALE_SPREAD)
+    jacaranda = (index + (side > 0)) % JACARANDA_EVERY == 1
+    asset, scale = (JACARANDA, JACARANDA_SCALE) if jacaranda else (STREET_TREE, TREE_SCALE)
+    location = ((CURB_LINE + TREE_FROM_CURB) * side, y + TREE_OFFSET, CURB_HEIGHT)
+    instance(asset, f"Tree{side:+d}_{index}", location, turn, scale * spread)
+
+
+def build_props():
+    for index, (asset, side, y, rotation) in enumerate(PROPS):
+        instance(asset, f"Prop_{asset}_{index}", ((CURB_LINE + PROP_FROM_CURB) * side, y, CURB_HEIGHT), rotation)
+    for index, (x, y) in enumerate(MANHOLES + MORE_MANHOLES):
+        instance(MANHOLE, f"Manhole{index}", (x, y, 0.0))
+
+
+def build_street_furniture(rng):
+    for index, y in lamp_rows():
+        for side in SIDES:
+            build_lamp(side, index, y)
+            build_tree(rng, side, index, y)
+    build_props()
+    scatter_along_curbs()
+
+
+def place_scatter(name, asset, spot, rotation):
+    """One thing at the curb, or the few that make a pile of trash."""
+    if asset != TRASH_PILE_SLOT:
+        instance(asset, name, (*spot, CURB_HEIGHT), rotation)
+        return
+    for part, (model, (dx, dy), turn) in enumerate(TRASH_PILE):
+        instance(model, f"{name}_{part}", (spot[0] + dx, spot[1] + dy, CURB_HEIGHT), turn)
+
+
+def scatter_along_curbs():
     rng = random.Random(SEED + SCATTER_SEED_OFFSET)
     choices = [entry for entry in SCATTER for _ in range(entry[1])]
-    y = STREET_START
-    index = 0
-    while y < STREET_START + STREET_LENGTH:
-        for side in (-1, 1):
-            for slot, offset in enumerate(SCATTER_SLOTS):
-                asset, _, rotation = rng.choice(choices)
-                place = ((curb_line + PROP_FROM_CURB) * side, y + offset)
-                if asset is None or place[1] < SCATTER_FROM:
-                    continue
-                name = f"Scatter{side:+d}_{index}_{slot}"
-                if asset == "trash_pile":
-                    for part, (model, (dx, dy), turn) in enumerate(TRASH_PILE):
-                        instance(model, f"{name}_{part}", (place[0] + dx, place[1] + dy, CURB_HEIGHT), turn)
-                else:
-                    instance(asset, name, (*place, CURB_HEIGHT), rotation * side)
-        y += LAMP_SPACING
-        index += 1
+    slots = itertools.product(lamp_rows(), SIDES, enumerate(SCATTER_SLOTS))
+    for (index, y), side, (slot, offset) in slots:
+        asset, _, rotation = rng.choice(choices)
+        spot = ((CURB_LINE + PROP_FROM_CURB) * side, y + offset)
+        if asset is not None and spot[1] >= SCATTER_FROM:
+            place_scatter(f"Scatter{side:+d}_{index}_{slot}", asset, spot, rotation * side)
 
 
 # --- Sky, camera, render --------------------------------------------------------------------------
+
+def brightest_column(image):
+    """Horizontal position (0..1) of the brightest pixel of an image."""
+    width, height = image.size
+    pixels = image.pixels[:]
+    best, best_u = -1.0, 0.0
+    for row in range(height):
+        for column in range(width):
+            i = (row * width + column) * RGBA_CHANNELS
+            luminance = sum(pixels[i:i + RGB_CHANNELS])
+            if luminance > best:
+                best, best_u = luminance, (column + HALF) / width
+    return best_u
+
 
 def hdri_sun_azimuth(path):
     """Azimuth (radians, Blender world) of the brightest spot of an equirectangular HDRI."""
     image = bpy.data.images.load(path, check_existing=True)
     probe = image.copy()
-    probe.scale(HDRI_ANALYSIS_WIDTH, HDRI_ANALYSIS_WIDTH // 2)
-    width, height = probe.size
-    pixels = probe.pixels[:]
-    best, best_u = -1.0, 0.0
-    channels = RGBA_CHANNELS
-    for row in range(height):
-        for column in range(width):
-            i = (row * width + column) * channels
-            luminance = pixels[i] + pixels[i + 1] + pixels[i + 2]
-            if luminance > best:
-                best, best_u = luminance, (column + 0.5) / width
+    probe.scale(HDRI_ANALYSIS_WIDTH, HDRI_ANALYSIS_WIDTH // EQUIRECTANGULAR_ASPECT)
+    best_u = brightest_column(probe)
     bpy.data.images.remove(probe)
     # Blender equirect: u = 0.5 - azimuth / (2 pi)
-    return (0.5 - best_u) * 2.0 * math.pi
+    return (HALF - best_u) * math.tau
 
 
 def build_world():
@@ -830,21 +1043,29 @@ def build_world():
 
 def build_haze():
     """Thin atmospheric haze in a box around the street (a world volume would hide the sky)."""
-    half_width = ROAD_WIDTH / 2 + CURB_WIDTH + SIDEWALK_WIDTH + BUILDING_DEPTH
-    mat = bpy.data.materials.new("Haze")
+    half_width = FACADE_LINE + BUILDING_DEPTH
+    mat = bpy.data.materials.new(HAZE_NAME)
     mat.use_nodes = True
     nodes, links = mat.node_tree.nodes, mat.node_tree.links
-    nodes.remove(nodes["Principled BSDF"])
+    nodes.remove(nodes[PRINCIPLED])
     volume = nodes.new("ShaderNodeVolumePrincipled")
     volume.inputs["Density"].default_value = HAZE_DENSITY
     volume.inputs["Anisotropy"].default_value = HAZE_ANISOTROPY
     links.new(volume.outputs["Volume"], nodes["Material Output"].inputs["Volume"])
-    haze = slab("Haze", -half_width, half_width, STREET_START, STREET_START + STREET_LENGTH, 0.0, HAZE_HEIGHT, mat)
+    haze = slab(HAZE_NAME, (-half_width, half_width), (STREET_START, STREET_END), (0.0, HAZE_HEIGHT), mat)
     haze.visible_shadow = False
 
 
 def root_name(collection_name):
     return collection_name + " (placed)"
+
+
+def strip_custom_properties(objects):
+    """Asset libraries and add-ons leave their own custom properties on objects (thousands of
+    them on the car); the engine would load each as a game property."""
+    for obj in objects:
+        for key in list(obj.keys()):
+            del obj[key]
 
 
 def place_asset(folder, collection_name, location, heading_degrees):
@@ -856,11 +1077,7 @@ def place_asset(folder, collection_name, location, heading_degrees):
         return None
     bpy.ops.wm.append(directory=blend + "/Collection/", filename=collection_name)
     collection = bpy.data.collections[collection_name]
-    # Asset libraries and add-ons leave their own custom properties on objects (thousands of
-    # them on the car); the engine would load each as a game property.
-    for obj in collection.all_objects:
-        for key in list(obj.keys()):
-            del obj[key]
+    strip_custom_properties(collection.all_objects)
     root = bpy.data.objects.new(root_name(collection_name), None)
     bpy.context.collection.objects.link(root)
     for obj in collection.all_objects:
@@ -890,6 +1107,15 @@ def add_fill_light(target):
     light.visible_glossy = False  # no studio softbox reflected in the paint
 
 
+def focus_on_car(camera, hero):
+    """Focus on the hero car's nose."""
+    focus = bpy.data.objects.new("FocusTarget", None)
+    bpy.context.collection.objects.link(focus)
+    focus.location = hero.location + Vector((0.0, 0.0, CAR_FOCUS_HEIGHT))
+    camera.data.dof.focus_object = focus
+    add_fill_light(focus.location)
+
+
 def build_camera():
     camera = kit.camera("ShowcaseCamera", CAMERA_LOCATION, CAMERA_TARGET)
     camera.data.lens_unit = "MILLIMETERS"
@@ -898,36 +1124,36 @@ def build_camera():
     camera.data.dof.use_dof = True
     camera.data.dof.aperture_fstop = F_STOP
     hero = bpy.data.objects.get(root_name(HERO_CAR))
-    if SHOT in ("hero", "ad") and hero is not None:
-        # Focus on the hero car's nose.
-        focus = bpy.data.objects.new("FocusTarget", None)
-        bpy.context.collection.objects.link(focus)
-        focus.location = hero.location + Vector((0.0, 0.0, CAR_FOCUS_HEIGHT))
-        camera.data.dof.focus_object = focus
-        add_fill_light(focus.location)
+    if SHOT in SHOTS_WITH_CAR and hero is not None:
+        focus_on_car(camera, hero)
     else:
         camera.data.dof.focus_distance = FOCUS_DISTANCE
     return camera
 
 
-def configure_render(output_path):
-    scene = bpy.context.scene
+def use_gpu(scene):
     scene.render.engine = "CYCLES"
     prefs = bpy.context.preferences.addons["cycles"].preferences
-    prefs.compute_device_type = "OPTIX"
+    prefs.compute_device_type = GPU_BACKEND
     prefs.get_devices()
     for device in prefs.devices:
-        device.use = device.type == "OPTIX"
+        device.use = device.type == GPU_BACKEND
     scene.cycles.device = "GPU"
+
+
+def set_render_quality(scene):
     scene.cycles.samples = SAMPLES
     scene.cycles.adaptive_threshold = NOISE_THRESHOLD
     scene.cycles.use_denoising = True
-    scene.cycles.denoiser = "OPTIX"
+    scene.cycles.denoiser = GPU_BACKEND
     scene.cycles.max_bounces = MAX_BOUNCES
     scene.cycles.use_auto_tile = True
     scene.cycles.tile_size = TILE_SIZE
+
+
+def set_render_output(scene, output_path):
     scene.render.resolution_x, scene.render.resolution_y = RESOLUTION
-    scene.render.resolution_percentage = 100
+    scene.render.resolution_percentage = FULL_RESOLUTION
     scene.view_settings.view_transform = "AgX"
     scene.view_settings.look = LOOK
     scene.view_settings.exposure = EXPOSURE
@@ -939,54 +1165,70 @@ def configure_render(output_path):
             setattr(scene.render, name, False)
 
 
+def configure_render(output_path):
+    scene = bpy.context.scene
+    use_gpu(scene)
+    set_render_quality(scene)
+    set_render_output(scene, output_path)
+
+
 # --- Real-time export ---------------------------------------------------------------------------
+
+def is_world_mapping(node):
+    return node.type == "MAPPING" and any(link.from_node.type == "NEW_GEOMETRY" for link in node.inputs["Vector"].links)
+
 
 def world_mapping_node(material):
     """The Mapping node of a material built by world_mapping() (fed by world positions), or None.
     Imported models also use Mapping nodes, but on their own UVs: those must be left alone."""
     if material is None or not material.use_nodes:
         return None
-    for node in material.node_tree.nodes:
-        if node.type == "MAPPING" and any(link.from_node.type == "NEW_GEOMETRY" for link in node.inputs["Vector"].links):
-            return node
-    return None
+    return next((node for node in material.node_tree.nodes if is_world_mapping(node)), None)
+
+
+def main_axis(normal):
+    """Index of the axis a direction mostly points along."""
+    return max(range(AXES), key=lambda axis: abs(normal[axis]))
+
+
+def face_uv(mapped, axis, box):
+    """UV of a mapped point: seen from above, or (box projection) along the face's main axis."""
+    if not box or axis == Z_AXIS:
+        return (mapped.x, mapped.y)
+    if axis == X_AXIS:
+        return (mapped.y, mapped.z)
+    return (mapped.x, mapped.z)
 
 
 def bake_world_uvs(obj):
     """Turns a material's world-space mapping (meters) into a real UV map for glTF."""
     material = obj.active_material
     mapping = world_mapping_node(material)
-    if mapping is None or obj.type != "MESH":
+    if mapping is None or obj.type != MESH:
         return
     location = Vector(mapping.inputs["Location"].default_value)
     scale = Vector(mapping.inputs["Scale"].default_value)
-    box = any(n.type == "TEX_IMAGE" and n.projection == "BOX" for n in material.node_tree.nodes)
+    box = any(n.type == "TEX_IMAGE" and n.projection == BOX for n in material.node_tree.nodes)
     mesh = obj.data
     layer = mesh.uv_layers.active or mesh.uv_layers.new(name="UVMap")
     world = obj.matrix_world
     rotation = world.to_3x3()
     for polygon in mesh.polygons:
-        normal = rotation @ polygon.normal
-        axis = max(range(AXES), key=lambda a: abs(normal[a]))
+        axis = main_axis(rotation @ polygon.normal)
         for loop_index in polygon.loop_indices:
             p = world @ mesh.vertices[mesh.loops[loop_index].vertex_index].co
             m = Vector((p.x * scale.x + location.x, p.y * scale.y + location.y, p.z * scale.z + location.z))
-            if not box or axis == 2:
-                layer.data[loop_index].uv = (m.x, m.y)
-            elif axis == 0:
-                layer.data[loop_index].uv = (m.y, m.z)
-            else:
-                layer.data[loop_index].uv = (m.x, m.z)
+            layer.data[loop_index].uv = face_uv(m, axis, box)
 
 
 def simplify_material(material):
     """Image textures read the UV map directly (glTF cannot express world mapping or puddles)."""
     nodes, links = material.node_tree.nodes, material.node_tree.links
-    bsdf = nodes.get("Principled BSDF")
+    bsdf = nodes.get(PRINCIPLED)
     for node in nodes:
         if node.type != "TEX_IMAGE":
             continue
-        node.projection = "FLAT"
+        node.projection = FLAT
         for link in list(node.inputs["Vector"].links):
             links.remove(link)
         name = node.image.name.lower() if node.image else ""
@@ -996,24 +1238,29 @@ def simplify_material(material):
             links.new(node.outputs["Color"], bsdf.inputs["Roughness"])
 
 
+def replace_by_lighter(mesh, ratio, depsgraph):
+    """Every object using `mesh` gets, instead, one copy of it with that share of its triangles."""
+    probe = bpy.data.objects.new("DecimateProbe", mesh)
+    bpy.context.collection.objects.link(probe)
+    modifier = probe.modifiers.new("Decimate", DECIMATE)
+    modifier.ratio = ratio
+    depsgraph.update()
+    light = bpy.data.meshes.new_from_object(probe.evaluated_get(depsgraph))
+    for obj in bpy.data.objects:
+        if obj.data == mesh and obj is not probe:
+            obj.data = light
+    bpy.data.objects.remove(probe)
+
+
 def decimate_scans():
     """Replaces the shared meshes of the heavy scanned models by lighter copies, still shared by
     every copy of the model."""
     depsgraph = bpy.context.evaluated_depsgraph_get()
     for asset, ratio in ENGINE_DECIMATE.items():
         meshes = {child.data for root in _instances.get(asset, []) for child in root.children_recursive
-                  if child.type == "MESH"}
+                  if child.type == MESH}
         for mesh in meshes:
-            probe = bpy.data.objects.new("DecimateProbe", mesh)
-            bpy.context.collection.objects.link(probe)
-            modifier = probe.modifiers.new("Decimate", "DECIMATE")
-            modifier.ratio = ratio
-            depsgraph.update()
-            light = bpy.data.meshes.new_from_object(probe.evaluated_get(depsgraph))
-            for obj in bpy.data.objects:
-                if obj.data == mesh and obj is not probe:
-                    obj.data = light
-            bpy.data.objects.remove(probe)
+            replace_by_lighter(mesh, ratio, depsgraph)
 
 
 def cap_textures():
@@ -1034,13 +1281,17 @@ def triangle_count(obj, depsgraph):
     return count
 
 
+def set_subdivision(obj, levels):
+    for modifier in obj.modifiers:
+        if modifier.type == SUBSURF:
+            modifier.levels = modifier.render_levels = levels
+
+
 def fit_triangle_budget(root, budget):
     """Decimates the meshes under `root` so that together they stay within `budget` triangles."""
-    meshes = [obj for obj in root.children_recursive if obj.type == "MESH" and not obj.hide_render]
+    meshes = [obj for obj in root.children_recursive if obj.type == MESH and not obj.hide_render]
     for obj in meshes:
-        for modifier in obj.modifiers:
-            if modifier.type == "SUBSURF":
-                modifier.levels = modifier.render_levels = ENGINE_SUBSURF_LEVELS
+        set_subdivision(obj, ENGINE_SUBSURF_LEVELS)
     depsgraph = bpy.context.evaluated_depsgraph_get()
     depsgraph.update()
     counts = {obj: triangle_count(obj, depsgraph) for obj in meshes}
@@ -1050,48 +1301,78 @@ def fit_triangle_budget(root, budget):
     ratio = budget / total
     for obj, count in counts.items():
         if count >= ENGINE_DECIMATE_MIN_TRIANGLES:
-            obj.modifiers.new("EngineDecimate", "DECIMATE").ratio = ratio
+            obj.modifiers.new("EngineDecimate", DECIMATE).ratio = ratio
     print(f"[showcase] {root.name}: {total} -> ~{int(total * ratio)} triangles for the engine")
+
+
+def by_prefix(table, name):
+    """The value of the first entry of `table` whose key `name` starts with, or None."""
+    return next((value for prefix, value in table.items() if name.startswith(prefix)), None)
+
+
+def plain_bsdf(material):
+    """Replaces the material's nodes by a lone Principled BSDF, and returns it."""
+    material.use_nodes = True
+    nodes, links = material.node_tree.nodes, material.node_tree.links
+    nodes.clear()
+    bsdf = nodes.new("ShaderNodeBsdfPrincipled")
+    links.new(bsdf.outputs["BSDF"], nodes.new("ShaderNodeOutputMaterial").inputs["Surface"])
+    return bsdf
 
 
 def flatten_car_materials():
     """Replaces the car's procedural materials by a plain Principled BSDF the engine can show."""
     for material in bpy.data.materials:
-        values = next((v for prefix, v in ENGINE_CAR_MATERIALS.items() if material.name.startswith(prefix)), None)
+        values = by_prefix(ENGINE_CAR_MATERIALS, material.name)
         if values is None:
             continue
         color, metallic, roughness = values
-        material.use_nodes = True
-        nodes, links = material.node_tree.nodes, material.node_tree.links
-        nodes.clear()
-        bsdf = nodes.new("ShaderNodeBsdfPrincipled")
+        bsdf = plain_bsdf(material)
         bsdf.inputs["Base Color"].default_value = (*color, 1.0)
         bsdf.inputs["Metallic"].default_value = metallic
         bsdf.inputs["Roughness"].default_value = roughness
-        links.new(bsdf.outputs["BSDF"], nodes.new("ShaderNodeOutputMaterial").inputs["Surface"])
 
 
 def light_up_car_lamps():
     for material in bpy.data.materials:
-        glow = next((v for prefix, v in ENGINE_CAR_GLOW.items() if material.name.startswith(prefix)), None)
+        glow = by_prefix(ENGINE_CAR_GLOW, material.name)
         if glow is None:
             continue
         color, strength = glow
-        material.use_nodes = True
-        nodes, links = material.node_tree.nodes, material.node_tree.links
-        nodes.clear()
-        bsdf = nodes.new("ShaderNodeBsdfPrincipled")
+        bsdf = plain_bsdf(material)
         bsdf.inputs["Base Color"].default_value = (*color, 1.0)
         bsdf.inputs["Emission Color"].default_value = (*color, 1.0)
         bsdf.inputs["Emission Strength"].default_value = strength
-        links.new(bsdf.outputs["BSDF"], nodes.new("ShaderNodeOutputMaterial").inputs["Surface"])
 
 
 def add_car_lights(car):
     for name, location, color, watts in ENGINE_CAR_LIGHTS:
-        light = kit.point_light(name, (0.0, 0.0, 0.0), color, watts)
+        light = kit.point_light(name, ORIGIN, color, watts)
         light.parent = car
         light.location = location
+
+
+def drop_vertex_colors(obj):
+    """Scans may carry painted vertex colors, which engines multiply into the base color."""
+    while obj.type == MESH and obj.data.color_attributes:
+        obj.data.color_attributes.remove(obj.data.color_attributes[0])
+
+
+def is_albedo(node):
+    return node.type == "TEX_IMAGE" and node.image and ALBEDO_WORD in node.image.name.lower()
+
+
+def use_albedo_texture(material):
+    nodes, links = material.node_tree.nodes, material.node_tree.links
+    bsdf = next((n for n in nodes if n.type == "BSDF_PRINCIPLED"), None)
+    albedo = next((n for n in nodes if is_albedo(n)), None)
+    if bsdf is None or albedo is None:
+        return
+    links.new(albedo.outputs["Color"], bsdf.inputs["Base Color"])
+    # The scans derive a bump from the photo; as a glTF normal map that makes them look chromed.
+    for link in list(bsdf.inputs["Normal"].links):
+        links.remove(link)
+    bsdf.inputs["Roughness"].default_value = ENGINE_PERSON_ROUGHNESS
 
 
 def use_albedo_textures(obj):
@@ -1101,23 +1382,12 @@ def use_albedo_textures(obj):
         material = slot.material
         if material is None or not material.use_nodes:
             continue
-        nodes, links = material.node_tree.nodes, material.node_tree.links
-        # Scans may carry painted vertex colors, which engines multiply into the base color.
-        while obj.type == "MESH" and obj.data.color_attributes:
-            obj.data.color_attributes.remove(obj.data.color_attributes[0])
-        bsdf = next((n for n in nodes if n.type == "BSDF_PRINCIPLED"), None)
-        albedo = next((n for n in nodes if n.type == "TEX_IMAGE" and n.image and "albedo" in n.image.name.lower()), None)
-        if bsdf is None or albedo is None:
-            continue
-        links.new(albedo.outputs["Color"], bsdf.inputs["Base Color"])
-        # The scans derive a bump from the photo; as a glTF normal map that makes them look chromed.
-        for link in list(bsdf.inputs["Normal"].links):
-            links.remove(link)
-        bsdf.inputs["Roughness"].default_value = ENGINE_PERSON_ROUGHNESS
+        drop_vertex_colors(obj)
+        use_albedo_texture(material)
 
 
 def meshes_under(root):
-    return [obj for obj in root.children_recursive if obj.type == "MESH"]
+    return [obj for obj in root.children_recursive if obj.type == MESH]
 
 
 def bake_modifiers(root):
@@ -1136,10 +1406,14 @@ def bake_modifiers(root):
         obj.data = baked
 
 
+def has_several_materials(obj):
+    return len({slot.material for slot in obj.material_slots if slot.material}) > 1
+
+
 def split_by_material(car):
     """One object per material, so painting a car (the `tint` property colors a whole object)
     does not also color the glass or trim that shared a mesh with a painted panel."""
-    mixed = [obj for obj in meshes_under(car) if len({slot.material for slot in obj.material_slots if slot.material}) > 1]
+    mixed = [obj for obj in meshes_under(car) if has_several_materials(obj)]
     if not mixed:
         return
     bpy.ops.object.select_all(action="DESELECT")
@@ -1155,6 +1429,31 @@ def world_center(obj):
     return sum(corners, Vector()) / len(corners)
 
 
+def turns_with_wheel(obj, offset, radius):
+    """Whether a part sits at a wheel. `offset` is from the wheel's center to the part's, in car
+    space: x sideways, y along, z up."""
+    if abs(offset.x) > ENGINE_WHEEL_HALF_WIDTH or Vector((offset.y, offset.z)).length > radius * ENGINE_WHEEL_REACH:
+        return False
+    # Larger than the wheel: a body panel that happens to be centered near it.
+    return max(obj.dimensions) <= radius * BOTH_SIDES * ENGINE_WHEEL_REACH
+
+
+def add_wheel_pivot(car, index, center):
+    pivot = bpy.data.objects.new(f"{car.name} Wheel {index}", None)
+    bpy.context.collection.objects.link(pivot)
+    pivot.parent = car
+    pivot.location = car.matrix_world.inverted() @ center
+    bpy.context.view_layer.update()
+    return pivot
+
+
+def adopt(parent, child):
+    """Parents `child` to `parent` without moving it."""
+    world = child.matrix_world.copy()
+    child.parent = parent
+    child.matrix_parent_inverse = parent.matrix_world.inverted() @ world @ child.matrix_basis.inverted()
+
+
 def group_wheels(car):
     """Parents the parts of each wheel (tire, rim, brake disc) to a pivot at its axle, named
     "... Wheel N", so scripts can spin them."""
@@ -1163,28 +1462,18 @@ def group_wheels(car):
     parts = [obj for obj in meshes_under(car) if CAR_FIXED_PART_WORD not in obj.name.lower()]
     for index, tire in enumerate(tires):
         center = world_center(tire)
-        radius = max(tire.dimensions) / 2
-        pivot = bpy.data.objects.new(f"{car.name} Wheel {index}", None)
-        bpy.context.collection.objects.link(pivot)
-        pivot.parent = car
-        pivot.location = car.matrix_world.inverted() @ center
-        bpy.context.view_layer.update()
+        radius = max(tire.dimensions) * HALF
+        pivot = add_wheel_pivot(car, index, center)
         to_car = car.matrix_world.inverted().to_3x3()
         for obj in parts:
-            offset = to_car @ (world_center(obj) - center)  # car space: x sideways, y along, z up
-            if abs(offset.x) > ENGINE_WHEEL_HALF_WIDTH or Vector((offset.y, offset.z)).length > radius * ENGINE_WHEEL_REACH:
-                continue
-            if max(obj.dimensions) > radius * 2 * ENGINE_WHEEL_REACH:
-                continue  # a body panel that happens to be centered near the wheel
-            world = obj.matrix_world.copy()
-            obj.parent = pivot
-            obj.matrix_parent_inverse = pivot.matrix_world.inverted() @ world @ obj.matrix_basis.inverted()
+            if turns_with_wheel(obj, to_car @ (world_center(obj) - center), radius):
+                adopt(pivot, obj)
 
 
 def paint_car(car, color):
     for obj in meshes_under(car):
         if any(slot.material and slot.material.name.startswith(ENGINE_PAINT_PREFIXES) for slot in obj.material_slots):
-            obj["tint"] = color
+            obj[TINT] = color
 
 
 def copy_car(car, name):
@@ -1221,11 +1510,9 @@ def lighter_car(car, name, keep):
     light = copy_car(car, name)
     for obj in meshes_under(light):
         obj.data = obj.data.copy()  # its own meshes: each version is cut up separately
-        for modifier in obj.modifiers:
-            if modifier.type == "SUBSURF":
-                modifier.levels = modifier.render_levels = 0
+        set_subdivision(obj, 0)
         if keep < 1.0 and len(obj.data.polygons) >= ENGINE_DECIMATE_MIN_TRIANGLES:
-            obj.modifiers.new("FarDecimate", "DECIMATE").ratio = keep
+            obj.modifiers.new("FarDecimate", DECIMATE).ratio = keep
     return light
 
 
@@ -1233,15 +1520,23 @@ def merge_level(car, level, visible_from, visible_to):
     """Moves the parts of `level` (another version of the same car) under `car`, drawn only between
     those distances from the camera."""
     for obj in meshes_under(level):
-        obj["visible_from"] = visible_from
+        obj[VISIBLE_FROM] = visible_from
         if visible_to is not None:
-            obj["visible_to"] = visible_to
+            obj[VISIBLE_TO] = visible_to
     bpy.context.view_layer.update()
     for child in list(level.children):
-        world = child.matrix_world.copy()
-        child.parent = car
-        child.matrix_parent_inverse = car.matrix_world.inverted() @ world @ child.matrix_basis.inverted()
+        adopt(car, child)
     bpy.data.objects.remove(level)
+
+
+def join_parts(parts):
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in parts:
+        if obj.data.users > 1:
+            obj.data = obj.data.copy()  # joining writes into the mesh: not into one others share
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
 
 
 def join_by_material(objects):
@@ -1252,15 +1547,8 @@ def join_by_material(objects):
         material = obj.material_slots[0].material if obj.material_slots else None
         groups.setdefault((obj.parent, material), []).append(obj)
     for parts in groups.values():
-        if len(parts) < 2:
-            continue
-        bpy.ops.object.select_all(action="DESELECT")
-        for obj in parts:
-            if obj.data.users > 1:
-                obj.data = obj.data.copy()  # joining writes into the mesh: not into one others share
-            obj.select_set(True)
-        bpy.context.view_layer.objects.active = parts[0]
-        bpy.ops.object.join()
+        if len(parts) >= MIN_TO_JOIN:
+            join_parts(parts)
     bpy.ops.object.select_all(action="DESELECT")
 
 
@@ -1281,89 +1569,132 @@ def smooth_shading(car):
             obj.data.attributes.remove(sharp)
 
 
+def build_car_levels(car):
+    """Three versions of the car, each drawn at its own range of distances. Every car in the
+    street is a copy of this one, so they all share the three sets of meshes."""
+    near_range, mid_range = ENGINE_CAR_DETAIL_RANGES
+    middle = lighter_car(car, "CarMiddle", 1.0)
+    far = lighter_car(car, "CarFar", ENGINE_CAR_FAR_KEEP)
+    for version in (car, middle, far):
+        prepare_car(version)
+    smooth_shading(middle)
+    smooth_shading(far)
+    for obj in meshes_under(car):
+        obj[VISIBLE_TO] = near_range
+    merge_level(car, middle, near_range, mid_range)
+    merge_level(car, far, mid_range, None)
+
+
+def lighten_car():
+    car = bpy.data.objects.get(root_name(HERO_CAR))
+    if car is None:
+        return
+    fit_triangle_budget(car, ENGINE_CAR_TRIANGLES)
+    build_car_levels(car)
+    add_traffic(car)
+    paint_car(car, ENGINE_HERO_PAINT)
+    add_car_lights(car)
+
+
+def make_walker(root, name):
+    """Along the sidewalk, on legs that really walk."""
+    heading, x = ENGINE_WALKERS[name]
+    root.rotation_euler = (0.0, 0.0, math.radians(heading))
+    root.location.x = x
+    bodies = meshes_under(root)
+    if len(bodies) != 1:
+        raise SystemExit(f"{name}: expected one mesh to rig, found {len(bodies)}")
+    _, speed = walk_rig.rig_walker(bodies[0], name)
+    root["speed"] = speed  # a fact of the rig: the pace at which its feet do not slide
+
+
+def lighten_person(name):
+    root = bpy.data.objects.get(root_name(name))
+    if root is None:
+        return
+    fit_triangle_budget(root, ENGINE_PERSON_TRIANGLES)
+    bake_modifiers(root)
+    for obj in root.children_recursive:
+        use_albedo_textures(obj)
+    if name in ENGINE_WALKERS:
+        make_walker(root, name)
+
+
 def lighten_cast():
     cap_textures()
     flatten_car_materials()
     light_up_car_lamps()
-    car = bpy.data.objects.get(root_name(HERO_CAR))
-    if car is not None:
-        fit_triangle_budget(car, ENGINE_CAR_TRIANGLES)
-        # Three versions of the car, each drawn at its own range of distances. Every car in the
-        # street is a copy of this one, so they all share the three sets of meshes.
-        near_range, mid_range = ENGINE_CAR_DETAIL_RANGES
-        middle = lighter_car(car, "CarMiddle", 1.0)
-        far = lighter_car(car, "CarFar", ENGINE_CAR_FAR_KEEP)
-        for version in (car, middle, far):
-            prepare_car(version)
-        smooth_shading(middle)
-        smooth_shading(far)
-        for obj in meshes_under(car):
-            obj["visible_to"] = near_range
-        merge_level(car, middle, near_range, mid_range)
-        merge_level(car, far, mid_range, None)
-        add_traffic(car)
-        paint_car(car, ENGINE_HERO_PAINT)
-        add_car_lights(car)
+    lighten_car()
     for person in PEOPLE:
-        root = bpy.data.objects.get(root_name(person[1]))
-        if root is None:
-            continue
-        fit_triangle_budget(root, ENGINE_PERSON_TRIANGLES)
-        bake_modifiers(root)
-        for obj in root.children_recursive:
-            use_albedo_textures(obj)
-        if person[1] in ENGINE_WALKERS:  # along the sidewalk, on legs that really walk
-            heading, x = ENGINE_WALKERS[person[1]]
-            root.rotation_euler = (0.0, 0.0, math.radians(heading))
-            root.location.x = x
-            bodies = meshes_under(root)
-            if len(bodies) != 1:
-                raise SystemExit(f"{person[1]}: expected one mesh to rig, found {len(bodies)}")
-            _, speed = walk_rig.rig_walker(bodies[0], person[1])
-            root["speed"] = speed  # a fact of the rig: the pace at which its feet do not slide
+        lighten_person(person[1])
+
+
+def unit(value):
+    """Noise comes as -1..1; this brings it to 0..1."""
+    return value * HALF + HALF
+
+
+def worn_height(x, y):
+    """Height of the worn road at (x, y): a crown, broad waves and a few dips, never above 0."""
+    wave = noise.noise(Vector((x / ENGINE_ROAD_WAVE_SIZE, y / ENGINE_ROAD_WAVE_SIZE, 0.0)))  # -1..1
+    dip = unit(noise.noise(Vector((x / ENGINE_ROAD_DIP_SIZE, y / ENGINE_ROAD_DIP_SIZE, NOISE_LAYER_DIPS))))
+    dip = max(dip - ENGINE_ROAD_DIP_THRESHOLD, 0.0) / (1.0 - ENGINE_ROAD_DIP_THRESHOLD)
+    crown = ENGINE_ROAD_CROWN * (abs(x) / (ROAD_WIDTH * HALF)) ** ENGINE_ROAD_CROWN_POWER
+    return -crown - ENGINE_ROAD_WAVE_DEPTH * unit(wave) - ENGINE_ROAD_DIP_DEPTH * dip
+
+
+def sink_potholes(x, y, z):
+    """The height `z` of the road at (x, y), lowered where a pothole is."""
+    for hole_x, hole_y, radius, depth in ENGINE_POTHOLES:
+        ragged = radius * (1.0 + ENGINE_POTHOLE_EDGE_NOISE * noise.noise(
+            Vector((x / ENGINE_POTHOLE_EDGE_SCALE, y / ENGINE_POTHOLE_EDGE_SCALE, NOISE_LAYER_POTHOLES))))
+        inside = 1.0 - math.hypot(x - hole_x, y - hole_y) / ragged
+        if inside > 0.0:
+            z -= depth * min(inside * ENGINE_POTHOLE_WALL_STEEPNESS, 1.0)  # steep walls, flat bottom
+    return z
+
+
+def road_vertices():
+    vertices = []
+    for row in range(ENGINE_ROAD_ROWS + 1):
+        y = STREET_START + STREET_LENGTH * row / ENGINE_ROAD_ROWS
+        for column in range(ENGINE_ROAD_COLUMNS + 1):
+            x = -ROAD_WIDTH * HALF + ROAD_WIDTH * column / ENGINE_ROAD_COLUMNS
+            vertices.append((x, y, sink_potholes(x, y, worn_height(x, y))))
+    return vertices
+
+
+def road_faces():
+    """One quad per grid cell, as indices into road_vertices()."""
+    faces = []
+    for row in range(ENGINE_ROAD_ROWS):
+        for column in range(ENGINE_ROAD_COLUMNS):
+            a = row * (ENGINE_ROAD_COLUMNS + 1) + column
+            above = a + ENGINE_ROAD_COLUMNS + 1
+            faces.append((a, a + 1, above + 1, above))
+    return faces
+
+
+def mark_potholes():
+    for index, (x, y, radius, depth) in enumerate(ENGINE_POTHOLES):
+        kit.empty(f"Pothole{index + 1}", (x, y, 0.0), props={"tag": POTHOLE_TAG, "radius": radius, "depth": depth})
 
 
 def deform_road():
     """Replaces the flat road by a worn one: a grid with a crown, broad waves and a few dips."""
-    old = bpy.data.objects.get("Road")
+    old = bpy.data.objects.get(ROAD_NAME)
     if old is None:
         return
     material = old.active_material
     bpy.data.objects.remove(old)
-    half = ROAD_WIDTH / 2
-    columns = round(ROAD_WIDTH / ENGINE_ROAD_CELL)
-    rows = round(STREET_LENGTH / ENGINE_ROAD_CELL)
-    vertices = []
-    for row in range(rows + 1):
-        y = STREET_START + STREET_LENGTH * row / rows
-        for column in range(columns + 1):
-            x = -half + ROAD_WIDTH * column / columns
-            wave = noise.noise(Vector((x / ENGINE_ROAD_WAVE_SIZE, y / ENGINE_ROAD_WAVE_SIZE, 0.0)))  # -1..1
-            dip = noise.noise(Vector((x / ENGINE_ROAD_DIP_SIZE, y / ENGINE_ROAD_DIP_SIZE, NOISE_LAYER_DIPS))) * 0.5 + 0.5
-            dip = max(dip - ENGINE_ROAD_DIP_THRESHOLD, 0.0) / (1.0 - ENGINE_ROAD_DIP_THRESHOLD)
-            crown = ENGINE_ROAD_CROWN * (abs(x) / half) ** 2
-            z = -crown - ENGINE_ROAD_WAVE_DEPTH * (wave * 0.5 + 0.5) - ENGINE_ROAD_DIP_DEPTH * dip
-            for hole_x, hole_y, radius, depth in ENGINE_POTHOLES:
-                ragged = radius * (1.0 + ENGINE_POTHOLE_EDGE_NOISE * noise.noise(
-                    Vector((x / ENGINE_POTHOLE_EDGE_SCALE, y / ENGINE_POTHOLE_EDGE_SCALE, NOISE_LAYER_POTHOLES))))
-                inside = 1.0 - math.hypot(x - hole_x, y - hole_y) / ragged
-                if inside > 0.0:
-                    z -= depth * min(inside * ENGINE_POTHOLE_WALL_STEEPNESS, 1.0)  # steep walls, flat bottom
-            vertices.append((x, y, z))
-    faces = []
-    for row in range(rows):
-        for column in range(columns):
-            a = row * (columns + 1) + column
-            faces.append((a, a + 1, a + columns + 2, a + columns + 1))
-    mesh = bpy.data.meshes.new("Road")
-    mesh.from_pydata(vertices, [], faces)
+    mesh = bpy.data.meshes.new(ROAD_NAME)
+    mesh.from_pydata(road_vertices(), [], road_faces())
     for polygon in mesh.polygons:
         polygon.use_smooth = True
-    road = bpy.data.objects.new("Road", mesh)
+    road = bpy.data.objects.new(ROAD_NAME, mesh)
     bpy.context.collection.objects.link(road)
     road.data.materials.append(material)
-    for index, (x, y, radius, depth) in enumerate(ENGINE_POTHOLES):
-        kit.empty(f"Pothole{index + 1}", (x, y, 0.0), props={"tag": POTHOLE_TAG, "radius": radius, "depth": depth})
+    mark_potholes()
 
 
 def add_leaves():
@@ -1377,17 +1708,18 @@ def add_leaves():
         leaf = bpy.data.objects.new(f"Leaf{index + 1}", mesh)
         bpy.context.collection.objects.link(leaf)
         leaf["prefab"] = True
-        leaf["tint"] = color
+        leaf[TINT] = color
 
 
 def join_building_parts():
     """Each building's boxes (plinth, cornice, shop band, windows, frames, awnings) become one
     object per material."""
-    buildings = [obj for obj in bpy.data.objects if obj.name.startswith("Building") and obj.name.count("_") == 1]
+    buildings = [obj for obj in bpy.data.objects
+                 if obj.name.startswith(BUILDING_PREFIX) and obj.name.count("_") == 1]
     for building in buildings:
         prefix = building.name + "_"
         join_by_material([obj for obj in bpy.data.objects
-                          if obj.type == "MESH" and obj.name.startswith(prefix) and obj.parent is None])
+                          if obj.type == MESH and obj.name.startswith(prefix) and obj.parent is None])
 
 
 def dress_for_engine():
@@ -1398,30 +1730,42 @@ def dress_for_engine():
     for key, value in ENGINE_ENVIRONMENT.items():
         environment[key] = value
     for obj in bpy.data.objects:
-        if obj.type == "LIGHT" and obj.name.startswith("LampLight"):
+        if obj.type == "LIGHT" and obj.name.startswith(LAMP_LIGHT_PREFIX):
             obj.data.energy = ENGINE_LAMP_WATTS
+
+
+def bake_street_uvs():
+    for obj in bpy.context.scene.objects:
+        bake_world_uvs(obj)
+    for material in bpy.data.materials:
+        if world_mapping_node(material) is not None:
+            simplify_material(material)
+
+
+def add_engine_sun():
+    """The sky's sun becomes a real light (the engine does not light with HDRIs)."""
+    sun_location = (math.cos(SUN_TARGET_AZIMUTH) * ENGINE_SUN_DISTANCE,
+                    math.sin(SUN_TARGET_AZIMUTH) * ENGINE_SUN_DISTANCE, ENGINE_SUN_HEIGHT)
+    kit.sun("Sun", sun_location, ORIGIN, ENGINE_SUN_STRENGTH).data.color = ENGINE_SUN_COLOR
+
+
+def simplify_for_engine():
+    haze = bpy.data.objects.get(HAZE_NAME)
+    if haze is not None:
+        bpy.data.objects.remove(haze)
+    deform_road()  # before the UV bake below, which reads the road's vertices
+    bake_street_uvs()
+    decimate_scans()
+    lighten_cast()
+    join_building_parts()
 
 
 def export_for_engine():
     if bpy.data.objects.get(root_name(HERO_CAR)) is None:
         # The game (and its test) is about driving the car.
         raise SystemExit("the car is missing: run python3 -I tools/assets/fetch_ad_assets.py before exporting")
-    haze = bpy.data.objects.get("Haze")
-    if haze is not None:
-        bpy.data.objects.remove(haze)
-    deform_road()  # before the UV bake below, which reads the road's vertices
-    for obj in bpy.context.scene.objects:
-        bake_world_uvs(obj)
-    for material in bpy.data.materials:
-        if world_mapping_node(material) is not None:
-            simplify_material(material)
-    decimate_scans()
-    lighten_cast()
-    join_building_parts()
-    # The sky's sun becomes a real light (the engine does not light with HDRIs).
-    sun_location = (math.cos(SUN_TARGET_AZIMUTH) * ENGINE_SUN_DISTANCE,
-                    math.sin(SUN_TARGET_AZIMUTH) * ENGINE_SUN_DISTANCE, ENGINE_SUN_HEIGHT)
-    kit.sun("Sun", sun_location, (0.0, 0.0, 0.0), ENGINE_SUN_STRENGTH).data.color = ENGINE_SUN_COLOR
+    simplify_for_engine()
+    add_engine_sun()
     dress_for_engine()
     add_leaves()
     car = bpy.data.objects[root_name(HERO_CAR)]
@@ -1431,12 +1775,7 @@ def export_for_engine():
     kit.export_glb(os.path.join(GAME_DIR, "scene.glb"))
 
 
-def main():
-    out_dir = kit.output_path_from_argv("showcase")
-    for needed in (MODELS, TEXTURES, HDRI):
-        if not os.path.exists(needed):
-            raise SystemExit(f"{needed} is missing: run python3 -I tools/assets/fetch_showcase.py first")
-    kit.reset_scene()
+def build_scene():
     rng = random.Random(SEED)
     build_street()
     shop_fronts = build_buildings(rng)
@@ -1446,6 +1785,15 @@ def main():
     build_haze()
     build_cast()
     build_camera()
+
+
+def main():
+    out_dir = kit.output_path_from_argv("showcase")
+    for needed in (MODELS, TEXTURES, HDRI):
+        if not os.path.exists(needed):
+            raise SystemExit(f"{needed} is missing: run python3 -I tools/assets/fetch_showcase.py first")
+    kit.reset_scene()
+    build_scene()
     renders = os.path.join(out_dir, "renders")
     os.makedirs(renders, exist_ok=True)
     configure_render(os.path.join(renders, f"{SHOT}_preview.png" if PREVIEW else f"{SHOT}.png"))

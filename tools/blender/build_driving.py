@@ -27,6 +27,14 @@ GATE = (0.95, 0.95, 0.95)
 BANNER = (0.05, 0.3, 0.9)
 LIGHT = (1.0, 0.95, 0.6)
 
+HALF = 0.5                      # centers and half-extents are half a size
+Z = 2                           # index of the height in an (x, y, z) size
+# How matte each surface is (0 = mirror, 1 = chalk).
+ASPHALT_ROUGHNESS = 0.9
+PAINT_ROUGHNESS = 0.3
+GLASS_ROUGHNESS = 0.1
+TIRE_ROUGHNESS = 0.95
+
 QUARTER_TURN = math.radians(90.0)
 RAMP_ANGLE = math.radians(12.0)
 
@@ -45,6 +53,9 @@ WHEEL_WIDTH = 0.3
 WHEEL_X = 0.95
 WHEEL_Y = 1.3
 WHEEL_Z = -0.35
+# (name, x, y) of each wheel, relative to the chassis center.
+WHEELS = (("WheelFL", -WHEEL_X, WHEEL_Y), ("WheelFR", WHEEL_X, WHEEL_Y),
+          ("WheelRL", -WHEEL_X, -WHEEL_Y), ("WheelRR", WHEEL_X, -WHEEL_Y))
 
 CAR_MASS = 1200.0
 CABIN_OFFSET_Y = -0.3
@@ -63,6 +74,8 @@ GATE_DEPTH = 1.0
 GATE_MARGIN = 2.0
 BANNER_THICKNESS = 0.3
 BANNER_HEIGHT = 0.8
+GATE_WIDTH = ROAD_WIDTH + GATE_MARGIN
+GATE_SIDES = (("L", -1.0), ("R", 1.0))   # (post name suffix, which end of the gate)
 ORIGIN = (0.0, 0.0, 0.0)
 CAMERA_LOCATION = (0.0, -10.0, 5.0)
 CAMERA_PROPS = {"target": "Car", "distance": 10.0, "height": 4.0}
@@ -81,12 +94,12 @@ CHECKPOINTS = [
 def build_ground_and_roads():
     kit.box("Ground", GROUND_CENTER, (GROUND_SIZE, GROUND_SIZE, GROUND_THICKNESS), mat=kit.material("Grass", GRASS),
             props={"collider": "box"})
-    asphalt = kit.material("Asphalt", ASPHALT, roughness=0.9)
+    asphalt = kit.material("Asphalt", ASPHALT, roughness=ASPHALT_ROUGHNESS)
     length_y = LOOP_MAX_Y - LOOP_MIN_Y + ROAD_WIDTH
     length_x = LOOP_MAX_X - LOOP_MIN_X + ROAD_WIDTH
-    center_y = (LOOP_MIN_Y + LOOP_MAX_Y) / 2
-    center_x = (LOOP_MIN_X + LOOP_MAX_X) / 2
-    road_z = ROAD_THICKNESS / 2
+    center_y = (LOOP_MIN_Y + LOOP_MAX_Y) * HALF
+    center_x = (LOOP_MIN_X + LOOP_MAX_X) * HALF
+    road_z = ROAD_THICKNESS * HALF
     # Visual only: the ground collider carries the car.
     kit.box("RoadWest", (LOOP_MIN_X, center_y, road_z), (ROAD_WIDTH, length_y, ROAD_THICKNESS), mat=asphalt)
     kit.box("RoadEast", (LOOP_MAX_X, center_y, road_z), (ROAD_WIDTH, length_y, ROAD_THICKNESS), mat=asphalt)
@@ -95,41 +108,47 @@ def build_ground_and_roads():
 
 
 def build_car():
-    car = kit.box("Car", CAR_START, CHASSIS_SIZE, mat=kit.material("Paint", CAR_PAINT, roughness=0.3),
+    car = kit.box("Car", CAR_START, CHASSIS_SIZE, mat=kit.material("Paint", CAR_PAINT, roughness=PAINT_ROUGHNESS),
                   props={"body": "vehicle", "mass": CAR_MASS, "script": "car.rb", "tag": "player"}, bake_scale=True)
-    kit.box("Cabin", (0.0, CABIN_OFFSET_Y, (CHASSIS_SIZE[2] + CABIN_SIZE[2]) / 2), CABIN_SIZE,
-            mat=kit.material("Glass", GLASS, roughness=0.1), parent=car, bake_scale=True)
-    tire = kit.material("Tire", TIRE, roughness=0.95)
-    for name, x, y in (("WheelFL", -WHEEL_X, WHEEL_Y), ("WheelFR", WHEEL_X, WHEEL_Y),
-                       ("WheelRL", -WHEEL_X, -WHEEL_Y), ("WheelRR", WHEEL_X, -WHEEL_Y)):
+    kit.box("Cabin", (0.0, CABIN_OFFSET_Y, (CHASSIS_SIZE[Z] + CABIN_SIZE[Z]) * HALF), CABIN_SIZE,
+            mat=kit.material("Glass", GLASS, roughness=GLASS_ROUGHNESS), parent=car, bake_scale=True)
+    tire = kit.material("Tire", TIRE, roughness=TIRE_ROUGHNESS)
+    for name, x, y in WHEELS:
         kit.cylinder(name, (x, y, WHEEL_Z), WHEEL_RADIUS, WHEEL_WIDTH, mat=tire, parent=car,
                      rotation=(0.0, QUARTER_TURN, 0.0), props={"wheel": True})
 
 
 def build_obstacles():
-    ramp = kit.material("Ramp", RAMP)
-    kit.box("Ramp", RAMP_LOCATION, RAMP_SIZE, mat=ramp, props={"collider": "box"}).rotation_euler = (RAMP_ANGLE, 0.0, 0.0)
+    ramp = kit.box("Ramp", RAMP_LOCATION, RAMP_SIZE, mat=kit.material("Ramp", RAMP), props={"collider": "box"})
+    ramp.rotation_euler = (RAMP_ANGLE, 0.0, 0.0)
     cone = kit.material("Cone", CONE)
     for index, (x, y) in enumerate(CONE_SPOTS, start=1):
-        kit.box(f"Cone{index}", (x, y, CONE_SIZE[2] / 2), CONE_SIZE, mat=cone,
+        kit.box(f"Cone{index}", (x, y, CONE_SIZE[Z] * HALF), CONE_SIZE, mat=cone,
                 props={"body": "dynamic", "mass": CONE_MASS, "tag": "cone"})
+
+
+def along_gate(across_x, length, thickness, height):
+    """Size of a box lying along a gate, which spans the X axis or the Y axis."""
+    return (length, thickness, height) if across_x else (thickness, length, height)
+
+
+def build_gate_posts(order, x, y, across_x):
+    white = kit.material("Gate", GATE)
+    for side_name, side in GATE_SIDES:
+        offset = side * GATE_WIDTH * HALF
+        post = (x + offset, y, GATE_HEIGHT * HALF) if across_x else (x, y + offset, GATE_HEIGHT * HALF)
+        kit.cylinder(f"Checkpoint{order}Post{side_name}", post, GATE_POST_RADIUS, GATE_HEIGHT, mat=white)
 
 
 def build_checkpoint(order, location, across_x):
     """Invisible trigger gate plus its decoration (posts and a banner the race manager toggles)."""
     x, y, _ = location
-    width = ROAD_WIDTH + GATE_MARGIN
-    size = (width, GATE_DEPTH, GATE_HEIGHT) if across_x else (GATE_DEPTH, width, GATE_HEIGHT)
-    kit.empty(f"Checkpoint{order}", (x, y, GATE_HEIGHT / 2),
-              props={"trigger": True, "script": "checkpoint.rb", "order": order, "tag": "checkpoint"}).scale = size
-    white = kit.material("Gate", GATE)
-    for side_name, side in (("L", -1.0), ("R", 1.0)):
-        offset = side * width / 2
-        post = (x + offset, y, GATE_HEIGHT / 2) if across_x else (x, y + offset, GATE_HEIGHT / 2)
-        kit.cylinder(f"Checkpoint{order}Post{side_name}", post, GATE_POST_RADIUS, GATE_HEIGHT, mat=white)
-    banner = (width, BANNER_THICKNESS, BANNER_HEIGHT) if across_x else (BANNER_THICKNESS, width, BANNER_HEIGHT)
-    kit.box(f"Checkpoint{order}Banner", (x, y, GATE_HEIGHT - BANNER_HEIGHT / 2), banner,
-            mat=kit.material("Banner", BANNER))
+    trigger = kit.empty(f"Checkpoint{order}", (x, y, GATE_HEIGHT * HALF),
+                        props={"trigger": True, "script": "checkpoint.rb", "order": order, "tag": "checkpoint"})
+    trigger.scale = along_gate(across_x, GATE_WIDTH, GATE_DEPTH, GATE_HEIGHT)
+    build_gate_posts(order, x, y, across_x)
+    kit.box(f"Checkpoint{order}Banner", (x, y, GATE_HEIGHT - BANNER_HEIGHT * HALF),
+            along_gate(across_x, GATE_WIDTH, BANNER_THICKNESS, BANNER_HEIGHT), mat=kit.material("Banner", BANNER))
 
 
 def build_checkpoints():
