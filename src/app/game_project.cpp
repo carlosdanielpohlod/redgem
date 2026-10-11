@@ -21,8 +21,8 @@ namespace redgem {
 namespace {
 
 constexpr const char* kSettingsFile = "game.json";
-constexpr const char* kRunScript = "run.sh";
-constexpr const char* kGameFolder = "game";
+constexpr const char* kGameFolder = "game";      // the game's files, next to a built executable
+constexpr const char* kFallbackExecutable = "play";  // for a game whose name gives no usable file name
 constexpr const char* kTemplateScriptsFolder = "/scripts/";
 constexpr int kJsonIndent = 2;
 constexpr const char* kPlatformerTemplate = "platformer";
@@ -286,27 +286,40 @@ bool build_game(const std::filesystem::path& game_folder, const std::filesystem:
     return false;
   }
   std::filesystem::create_directories(out_dir, fs_error);
-  const std::filesystem::path binary = out_dir / engine_binary.filename();
+  const std::filesystem::path binary = out_dir / executable_name(game_dir);
   std::filesystem::copy_file(engine_binary, binary, std::filesystem::copy_options::overwrite_existing, fs_error);
   if (fs_error) {
     error = "cannot copy the engine: " + fs_error.message();
     return false;
   }
+  std::filesystem::permissions(binary, std::filesystem::perms::owner_exec | std::filesystem::perms::group_exec |
+                                           std::filesystem::perms::others_exec,
+                               std::filesystem::perm_options::add, fs_error);
   std::filesystem::remove_all(out_dir / kGameFolder, fs_error);
   std::filesystem::copy(game_dir, out_dir / kGameFolder, std::filesystem::copy_options::recursive, fs_error);
   if (fs_error) {
     error = "cannot copy the game: " + fs_error.message();
     return false;
   }
-  const std::filesystem::path run = out_dir / kRunScript;
-  const std::string script = "#!/bin/sh\n# Plays " + read_game_settings(game_dir).title +
-                             ".\ncd \"$(dirname \"$0\")\" && exec ./" + engine_binary.filename().string() + " " +
-                             kGameFolder + " --play \"$@\"\n";
-  if (!write_text_file(run, script, error)) return false;
-  std::filesystem::permissions(run, std::filesystem::perms::owner_exec | std::filesystem::perms::group_exec |
-                                        std::filesystem::perms::others_exec,
-                               std::filesystem::perm_options::add, fs_error);
   return true;
+}
+
+std::string executable_name(const std::filesystem::path& game_dir) {
+  std::string name;
+  for (const char c : normalized_folder(game_dir).filename().string()) {
+    const auto letter = static_cast<unsigned char>(c);
+    name.push_back(std::isalnum(letter) != 0 ? static_cast<char>(std::tolower(letter)) : '_');
+  }
+  // It sits next to the game's files: it cannot have their folder's name.
+  if (name.empty() || name == kGameFolder) return kFallbackExecutable;
+  return name;
+}
+
+std::optional<std::filesystem::path> bundled_game(const std::filesystem::path& executable) {
+  const std::filesystem::path game = executable.parent_path() / kGameFolder;
+  std::error_code fs_error;
+  if (!std::filesystem::exists(game / config::kSceneFileName, fs_error)) return std::nullopt;
+  return game;
 }
 
 std::vector<std::filesystem::path> find_games(const std::filesystem::path& folder) {

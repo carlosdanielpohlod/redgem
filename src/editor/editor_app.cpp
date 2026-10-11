@@ -230,7 +230,7 @@ std::optional<std::filesystem::path> EditorApp::build() {
     log::error("build failed: " + error);
     return std::nullopt;
   }
-  log::info("built " + out.string() + ": run " + (out / "run.sh").string());
+  log::info("built " + out.string() + ": run " + (out / executable_name(game)).string());
   return out;
 }
 

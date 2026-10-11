@@ -51,11 +51,37 @@ int run_editor(std::filesystem::path game) {
   }
 }
 
+int play(const redgem::EngineOptions& options) {
+  using namespace redgem;
+  auto created = Engine::create(options);
+  if (auto* error = std::get_if<std::string>(&created)) {
+    log::error(*error);
+    return kExitFailure;
+  }
+  return std::get<std::unique_ptr<Engine>>(created)->run();
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   using namespace redgem;
   const std::vector<std::string> args(argv + 1, argv + argc);
+  // A built game: started by itself, the executable plays the game that ships next to it.
+  if (args.empty()) {
+    std::error_code fs_error;
+    const std::filesystem::path self = std::filesystem::canonical(config::kSelfExecutable, fs_error);
+    if (const auto game = bundled_game(self)) {
+      apply_gpu_choice(std::nullopt);
+      try {
+        EngineOptions options;
+        options.game_dir = *game;
+        return play(options);
+      } catch (const std::exception& error) {
+        log::error(error.what());
+        return kExitFailure;
+      }
+    }
+  }
   const CliResult cli = parse_cli(args);
   if (!cli.ok) {
     std::cerr << cli.error << "\n\n" << usage();
@@ -86,20 +112,14 @@ int main(int argc, char** argv) {
           log::error(error);
           return kExitFailure;
         }
-        std::cout << "built " << options.build_dir.string() << ": run " << (options.build_dir / "run.sh").string()
-                  << "\n";
+        std::cout << "built " << options.build_dir.string() << ": run "
+                  << (options.build_dir / executable_name(options.game_dir)).string() << "\n";
         return kExitSuccess;
       }
       case RunMode::Editor:
         return run_editor(options.game_dir);
-      case RunMode::Game: {
-        auto created = Engine::create({options.game_dir, options.headless, options.test_script, options.screenshot_dir});
-        if (auto* error = std::get_if<std::string>(&created)) {
-          log::error(*error);
-          return kExitFailure;
-        }
-        return std::get<std::unique_ptr<Engine>>(created)->run();
-      }
+      case RunMode::Game:
+        return play({options.game_dir, options.headless, options.test_script, options.screenshot_dir});
     }
   } catch (const std::exception& error) {
     log::error(error.what());

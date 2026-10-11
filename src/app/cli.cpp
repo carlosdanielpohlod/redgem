@@ -14,7 +14,7 @@ std::string usage() {
          "  redgem <game_dir> --test <system_test.rb> [--screenshots <dir>] [--headless]\n"
          "  redgem --ruby-test <test_file.rb>\n"
          "  redgem new <game_dir> [--template empty|platformer]   create a game\n"
-         "  redgem build <game_dir> <out_dir>                     make a standalone copy\n"
+         "  redgem build <game_dir> <out_dir>                     make a standalone game (an executable)\n"
          "\n"
          "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting,\n"
          "                                       else the dedicated card when there is one)\n"

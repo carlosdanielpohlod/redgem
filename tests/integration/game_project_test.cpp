@@ -125,20 +125,26 @@ TEST_CASE("building a game makes a standalone folder") {
   const std::filesystem::path fake_engine = fresh("engine_binary");
   REQUIRE(write_text_file(fake_engine, "binary", error));
   REQUIRE_MESSAGE(build_game(game, out, fake_engine, error), error);
-  CHECK(std::filesystem::exists(out / fake_engine.filename()));
-  CHECK(std::filesystem::exists(out / "game" / config::kSceneFileName));
-  const auto run = out / "run.sh";
-  REQUIRE(std::filesystem::exists(run));
-  CHECK((std::filesystem::status(run).permissions() & std::filesystem::perms::owner_exec) !=
+  // The executable is named after the game and plays the game that sits next to it.
+  const auto executable = out / executable_name(game);
+  REQUIRE(std::filesystem::exists(executable));
+  CHECK((std::filesystem::status(executable).permissions() & std::filesystem::perms::owner_exec) !=
         std::filesystem::perms::none);
-  const auto script = read_text_file(run, error);
-  REQUIRE(script);
-  CHECK(script->find("--play") != std::string::npos);
+  CHECK(std::filesystem::exists(out / "game" / config::kSceneFileName));
+  CHECK(bundled_game(executable) == out / "game");
+  CHECK_FALSE(bundled_game(fake_engine).has_value());  // an executable with no game beside it
   CHECK_FALSE(build_game(fresh("not_a_game"), out, fake_engine, error));
   CHECK(find_games(game.parent_path()).size() >= 1);
   std::filesystem::remove_all(game);
   std::filesystem::remove_all(out);
   std::filesystem::remove(fake_engine);
+}
+
+TEST_CASE("a game's executable is named after its folder") {
+  CHECK(executable_name("games/platformer") == "platformer");
+  CHECK(executable_name("/home/someone/My Game/") == "my_game");
+  CHECK(executable_name("games/Super-Kart 64") == "super_kart_64");
+  CHECK(executable_name("somewhere/game") == "play");  // "game" is the folder of the game's files
 }
 
 TEST_CASE("recently opened games are remembered, newest first, and missing ones forgotten") {

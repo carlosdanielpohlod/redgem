@@ -208,7 +208,7 @@ TEST_CASE("a game is built up in the editor: new objects, an imported model, mat
   const auto build = app.build();
   REQUIRE(build.has_value());
   CHECK_FALSE(session.document().dirty());  // building saves first
-  CHECK(std::filesystem::exists(*build / "run.sh"));
+  CHECK(std::filesystem::exists(*build / executable_name(game)));
   const LoadResult built = load_gltf_scene((*build / "game" / "scene.glb").string());
   REQUIRE(built.ok);
   CHECK(built.scene.find_node("Sphere") != kNoIndex);

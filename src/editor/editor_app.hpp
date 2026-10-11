@@ -74,7 +74,7 @@ class EditorApp {
   void frame_selection();
   // Asks to leave (after the unsaved-changes dialog when needed).
   void request_exit(EditorExit action);
-  // Copies the engine and the game into "<game>-build" with a run.sh. Returns that folder.
+  // Makes a standalone game in "<game>-build": an executable and the game's files. Returns that folder.
   std::optional<std::filesystem::path> build();
   // Where objects created from the menus appear: in front of the editor camera.
   Vec3 spawn_point() const;

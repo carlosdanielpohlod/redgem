@@ -79,7 +79,7 @@ ctest --test-dir build                  # run the tests
 ```bash
 ./build/src/redgem new games/my_game --template platformer   # or --template empty
 ./build/src/redgem games/my_game                             # edit and play it
-./build/src/redgem build games/my_game dist/my_game          # standalone copy with a run.sh
+./build/src/redgem build games/my_game dist/my_game          # standalone game: dist/my_game/my_game
 ```
 
 A game is a folder: `scene.glb` (the scene, from Blender or the editor), `scripts/*.rb`,

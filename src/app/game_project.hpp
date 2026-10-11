@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -32,10 +33,18 @@ bool create_game(const std::filesystem::path& game_dir, const std::string& templ
 // ("games/foo/" -> "games/foo", whose filename is the game's name).
 std::filesystem::path normalized_folder(const std::filesystem::path& folder);
 
-// Copies the engine binary and the game into `out_dir` with a run.sh that plays it. Refuses an
-// `out_dir` that is the game folder or inside it (the copy would contain itself).
+// Makes a standalone game in `out_dir`: an executable named after the game (a copy of the engine)
+// next to a folder with the game's files. Started with no arguments, that executable plays the
+// game beside it. Refuses an `out_dir` that is the game folder or inside it (the copy would
+// contain itself).
 bool build_game(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                 const std::filesystem::path& engine_binary, std::string& error);
+
+// The file name of a game's executable: its folder name in lowercase, with anything that is not a
+// letter or a digit turned into '_' ("My Game" -> "my_game").
+std::string executable_name(const std::filesystem::path& game_dir);
+// The game a built executable ships with: the game folder next to it, when there is one.
+std::optional<std::filesystem::path> bundled_game(const std::filesystem::path& executable);
 
 // Games found in a folder (subfolders with a scene.glb), sorted by name.
 std::vector<std::filesystem::path> find_games(const std::filesystem::path& folder);
