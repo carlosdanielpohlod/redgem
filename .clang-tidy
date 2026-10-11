@@ -7,6 +7,7 @@ Checks: >
   -bugprone-narrowing-conversions,
   -bugprone-implicit-widening-of-multiplication-result,
   performance-*,
+  -performance-enum-size,
   readability-function-size,
   readability-function-cognitive-complexity,
   readability-magic-numbers,
@@ -22,6 +23,7 @@ Checks: >
   misc-unused-using-decls,
   misc-redundant-expression
 HeaderFilterRegex: '.*/(src|tests)/.*'
+ExcludeHeaderFilterRegex: '.*/(_deps|build[^/]*|\.deps)/.*'  # other people's code is not ours to lint
 CheckOptions:
   # A function fits on a small part of a screen and does one thing.
   readability-function-size.LineThreshold: 15
