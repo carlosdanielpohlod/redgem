@@ -13,14 +13,19 @@ constexpr int kWebPort = 80;
 
 }  // namespace
 
-TEST_CASE("game directory with a system test") {
-  const CliResult result = parse_cli({"games/demo", "--test", "t.rb", "--screenshots", "shots", "--headless"});
+TEST_CASE("a game played from the command line, and where its screenshots go") {
+  const CliResult result = parse_cli({"games/demo", "--play", "--screenshots", "shots"});
   REQUIRE(result.ok);
-  CHECK(result.options.mode == RunMode::Game);  // tests always play the game
+  CHECK(result.options.mode == RunMode::Game);
   CHECK(result.options.game_dir == "games/demo");
-  CHECK(result.options.test_script == std::filesystem::path("t.rb"));
   CHECK(result.options.screenshot_dir == "shots");
-  CHECK(result.options.headless);
+}
+
+TEST_CASE("the program knows nothing of tests: what runs them is another program") {
+  for (const char* option : {"--test", "--ruby-test", "--headless"}) {
+    CHECK(parse_cli({"games/demo", option, "t.rb"}).error == std::string("unknown option ") + option);
+    CHECK(usage().find(option) == std::string::npos);
+  }
 }
 
 TEST_CASE("a game directory alone opens the editor; --play runs the game") {
@@ -32,21 +37,14 @@ TEST_CASE("a game directory alone opens the editor; --play runs the game") {
 TEST_CASE("defaults") {
   const CliResult result = parse_cli({"games/demo"});
   REQUIRE(result.ok);
-  CHECK_FALSE(result.options.test_script.has_value());
+  CHECK(result.options.mode == RunMode::Editor);
   CHECK(result.options.screenshot_dir == config::kDefaultScreenshotDir);
-}
-
-TEST_CASE("ruby test mode needs no game") {
-  const CliResult result = parse_cli({"--ruby-test", "x_test.rb"});
-  REQUIRE(result.ok);
-  CHECK(result.options.mode == RunMode::RubyTests);
-  CHECK(result.options.ruby_test_file == "x_test.rb");
 }
 
 TEST_CASE("errors") {
   CHECK(parse_cli({}).ok);  // no game: the editor opens its project hub
   CHECK(parse_cli({}).options.mode == RunMode::Editor);
-  CHECK_FALSE(parse_cli({"--test"}).ok);
+  CHECK_FALSE(parse_cli({"--screenshots"}).ok);
   CHECK_FALSE(parse_cli({"a", "b"}).ok);
   CHECK_FALSE(parse_cli({"a", "--bogus"}).ok);
   CHECK(parse_cli({"--help"}).options.mode == RunMode::Help);
@@ -84,11 +82,9 @@ TEST_CASE("--gpu picks the graphics card for one run and rejects unknown names")
 
 TEST_CASE("one thing per command line: conflicting modes and swallowed options are errors") {
   CHECK_FALSE(parse_cli({"new", "games/x", "--play"}).ok);
-  CHECK_FALSE(parse_cli({"build", "games/x", "out", "--headless"}).ok);
-  CHECK_FALSE(parse_cli({"games/x", "--play", "--ruby-test", "t.rb"}).ok);
-  CHECK_FALSE(parse_cli({"games/x", "--test", "--play"}).ok);    // --play is not a test file
-  CHECK_FALSE(parse_cli({"games/x", "--headless"}).ok);          // nothing would ever end the run
-  CHECK(parse_cli({"games/x", "--play", "--test", "t.rb"}).ok);  // both mean "run the game"
+  CHECK_FALSE(parse_cli({"build", "games/x", "out", "--play"}).ok);
+  CHECK_FALSE(parse_cli({"games/x", "--screenshots", "--play"}).ok);  // --play is not a folder
+  CHECK(parse_cli({"games/x", "--play", "--play"}).ok);               // said twice, it is still one thing
   const CliResult help = parse_cli({"--help", "--play"});
   REQUIRE(help.ok);
   CHECK(help.options.mode == RunMode::Help);
@@ -135,8 +131,6 @@ TEST_CASE("-h asks for help too, and help forgets the rest of the line") {
 }
 
 TEST_CASE("what is wrong with a command line is said") {
-  CHECK(parse_cli({"games/demo", "--test"}).error == "--test needs a file");
-  CHECK(parse_cli({"--ruby-test"}).error == "--ruby-test needs a file");
   CHECK(parse_cli({"games/demo", "--screenshots"}).error == "--screenshots needs a directory");
   CHECK(parse_cli({"new", "games/demo", "--template"}).error == "--template needs a name");
   CHECK(parse_cli({"build", "a", "b", "--target", "amiga"}).error == "--target needs linux, windows or android");
@@ -145,17 +139,15 @@ TEST_CASE("what is wrong with a command line is said") {
   CHECK(parse_cli({"games/demo", "--bogus"}).error == "unknown option --bogus");
   CHECK(parse_cli({"games/demo", "extra"}).error == "unexpected argument extra");
   CHECK(parse_cli({"relay", "somewhere"}).error == "unexpected argument somewhere");
-  CHECK(parse_cli({"new", "games/demo", "--play"}).error ==
-        "choose one of: new, build, relay, --play, --test, --ruby-test");
-  CHECK(parse_cli({"games/demo", "--headless"}).error == "--headless needs --test <system_test.rb>");
+  CHECK(parse_cli({"new", "games/demo", "--play"}).error == "choose one of: new, build, relay, --play");
   CHECK(parse_cli({"--play"}).error == "missing <game_dir>");
   CHECK(parse_cli({"build", "games/demo"}).error == "missing <out_dir>");
   CHECK(parse_cli({"games/demo"}).error.empty());
 }
 
 TEST_CASE("the first thing wrong on a line is the one reported") {
-  CHECK(parse_cli({"--bogus", "--test"}).error == "unknown option --bogus");
-  CHECK(parse_cli({"--test", "--bogus"}).error == "--test needs a file");
+  CHECK(parse_cli({"--bogus", "--screenshots"}).error == "unknown option --bogus");
+  CHECK(parse_cli({"--screenshots", "--bogus"}).error == "--screenshots needs a directory");
   // A line that cannot be read is not checked for what it lacks.
   CHECK(parse_cli({"new", "--play", "--bogus"}).error == "unknown option --bogus");
 }

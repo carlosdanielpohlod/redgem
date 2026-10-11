@@ -16,14 +16,20 @@ SystemTest.define do |t|
 end
 ```
 
-Run it:
+Run it with `redgem-test`, the program that runs tests (it is built next to `redgem`):
 
 ```bash
-./build/src/redgem my_game --test tests/collect_coin_test.rb --screenshots shots
+./build/src/redgem-test my_game tests/collect_coin_test.rb --screenshots shots
 ```
 
 The command exits with an error when an assertion fails or a script raises, so it fits in any
-automated check. Add `--headless` to run without opening a window (no screenshots then).
+automated check. Add `--headless` to run without opening a window (no screenshots then);
+`redgem-test --help` lists every option.
+
+`redgem-test` is a development tool. It is not part of a built game: the program your players
+receive (what `redgem build` and the editor's Build make) contains no test code at all, and
+`SystemTest` and the rest of what tests are written with do not exist in the Ruby your game
+runs in. They are only there while `redgem-test` plays it.
 
 ## What a test can do
 
@@ -44,3 +50,27 @@ automated check. Add `--headless` to run without opening a window (no screenshot
 Inside the blocks you have the whole scripting API, so a test can also move objects or read any
 behaviour's state. What the game saves with `Save` goes to a file of the test's own, which starts
 empty: a test never sees or changes your real progress.
+
+## Testing Ruby code by itself
+
+Code that needs no running game (a formula, a helper class) can be tested without one. A file of
+unit tests defines classes that inherit from `RedGemTest::Case`; every method whose name starts
+with `test_` is a test:
+
+```ruby
+# tests/score_test.rb
+class ScoreTest < RedGemTest::Case
+  def test_a_coin_is_worth_ten_points
+    assert_equal 10, 1 * 10
+    assert_in_delta 0.5, Vector3.new(0.5, 0, 0).length
+  end
+end
+```
+
+```bash
+./build/src/redgem-test --ruby tests/score_test.rb
+```
+
+It runs in the same Ruby a game runs in, with the scripting API and an empty scene. The
+assertions are `assert`, `refute`, `assert_equal`, `assert_nil`, `assert_in_delta`,
+`assert_vector` and `assert_raises`; a system test has them too.

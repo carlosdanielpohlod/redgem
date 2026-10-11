@@ -1,10 +1,4 @@
-// Input natives, and TestInput: what a system test presses, moves and types.
-
-#include <algorithm>
-#include <cctype>
-#include <filesystem>
-#include <fstream>
-#include <sstream>
+// Input natives: what a game reads from the keyboard, the mouse and a gamepad.
 
 #include <mruby.h>
 #include <mruby/array.h>
@@ -18,10 +12,6 @@ namespace redgem {
 namespace {
 
 using namespace binding;
-
-constexpr const char* kNotesFolder = "redgem-test-notes";
-constexpr std::size_t kMaxNoteName = 40;
-constexpr std::size_t kMaxNoteBytes = 4096;
 
 InputState& input(mrb_state* mrb) { return *context(mrb).input; }
 
@@ -136,120 +126,6 @@ mrb_value input_set_mouse_locked(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(locked);
 }
 
-// --- TestInput (system tests only) ---------------------------------------------------------------
-
-ScriptedInputSource& test_input(mrb_state* mrb) {
-  ScriptedInputSource* source = context(mrb).test_input;
-  if (source == nullptr) mrb_raise(mrb, E_RUNTIME_ERROR, "TestInput is only available when running a test");
-  return *source;
-}
-
-mrb_value test_input_set(mrb_state* mrb, mrb_value) {
-  mrb_value name;
-  mrb_bool down = false;
-  mrb_get_args(mrb, "ob", &name, &down);
-  const Key key = key_named(mrb, name);
-  test_input(mrb).set_key(key, down);
-  return mrb_nil_value();
-}
-
-mrb_value test_input_move_mouse(mrb_state* mrb, mrb_value) {
-  mrb_float x = 0.0, y = 0.0;
-  mrb_get_args(mrb, "ff", &x, &y);
-  test_input(mrb).move_mouse(static_cast<float>(x), static_cast<float>(y));
-  return mrb_nil_value();
-}
-
-mrb_value test_input_set_mouse_button(mrb_state* mrb, mrb_value) {
-  mrb_value name;
-  mrb_bool down = false;
-  mrb_get_args(mrb, "ob", &name, &down);
-  const std::string button_name = to_name(mrb, name);
-  const auto button = mouse_button_from_name(button_name);
-  if (!button) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown mouse button :%s", button_name.c_str());
-  test_input(mrb).set_mouse_button(*button, down);
-  return mrb_nil_value();
-}
-
-mrb_value test_input_set_mouse_wheel(mrb_state* mrb, mrb_value) {
-  mrb_float notches = 0.0;
-  mrb_get_args(mrb, "f", &notches);
-  test_input(mrb).set_mouse_wheel(static_cast<float>(notches));
-  return mrb_nil_value();
-}
-
-mrb_value test_input_type(mrb_state* mrb, mrb_value) {
-  const char* text = nullptr;
-  mrb_get_args(mrb, "z", &text);
-  test_input(mrb).type_text(text);
-  return mrb_nil_value();
-}
-
-// Scripts cannot touch files, and two games being tested together still have to tell each other
-// things before they are connected (a room's code): notes, small named texts kept in a folder of
-// the tests' own.
-std::filesystem::path note_file(mrb_state* mrb, const char* name) {
-  const std::string note = name;
-  const bool plain =
-      !note.empty() && note.size() <= kMaxNoteName &&
-      std::all_of(note.begin(), note.end(), [](unsigned char c) { return std::isalnum(c) != 0 || c == '_'; });
-  if (!plain) mrb_raise(mrb, E_ARGUMENT_ERROR, "a note's name is made of letters, digits and _");
-  return std::filesystem::temp_directory_path() / kNotesFolder / note;
-}
-
-mrb_value test_input_leave_note(mrb_state* mrb, mrb_value) {
-  const char* name = nullptr;
-  const char* text = nullptr;
-  mrb_get_args(mrb, "zz", &name, &text);
-  test_input(mrb);  // (only a test may)
-  const std::filesystem::path file = note_file(mrb, name);
-  std::error_code ignored;
-  std::filesystem::create_directories(file.parent_path(), ignored);
-  std::ofstream(file, std::ios::binary) << text;
-  return mrb_nil_value();
-}
-
-// The note's text, or nil when nobody left one.
-mrb_value test_input_note(mrb_state* mrb, mrb_value) {
-  const char* name = nullptr;
-  mrb_get_args(mrb, "z", &name);
-  test_input(mrb);
-  std::ifstream in(note_file(mrb, name), std::ios::binary);
-  if (!in) return mrb_nil_value();
-  std::stringstream text;
-  text << in.rdbuf();
-  const std::string read = text.str().substr(0, kMaxNoteBytes);
-  return mrb_str_new(mrb, read.data(), static_cast<mrb_int>(read.size()));
-}
-
-mrb_value test_input_set_gamepad_axis(mrb_state* mrb, mrb_value) {
-  mrb_value name;
-  mrb_float value = 0.0;
-  mrb_get_args(mrb, "of", &name, &value);
-  const GamepadAxis axis = gamepad_axis_named(mrb, name);
-  test_input(mrb).set_gamepad_axis(axis, static_cast<float>(value));
-  return mrb_nil_value();
-}
-
-mrb_value test_input_set_gamepad_button(mrb_state* mrb, mrb_value) {
-  mrb_value name;
-  mrb_bool down = false;
-  mrb_get_args(mrb, "ob", &name, &down);
-  const GamepadButton button = gamepad_button_named(mrb, name);
-  test_input(mrb).set_gamepad_button(button, down);
-  return mrb_nil_value();
-}
-
-mrb_value test_input_down(mrb_state* mrb, mrb_value) {
-  const Key key = key_arg(mrb);
-  return mrb_bool_value(test_input(mrb).is_key_down(key));
-}
-
-mrb_value test_input_release_all(mrb_state* mrb, mrb_value) {
-  if (context(mrb).test_input != nullptr) context(mrb).test_input->release_all();
-  return mrb_nil_value();
-}
-
 }  // namespace
 
 namespace {
@@ -288,22 +164,6 @@ void install_gamepad_bindings(RClass* input_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, input_module, "gamepad_released?", input_gamepad_released, MRB_ARGS_REQ(1));
 }
 
-void install_test_input_bindings(mrb_state* mrb) {
-  RClass* test_input_module = mrb_define_module(mrb, "TestInput");
-  mrb_define_module_function(mrb, test_input_module, "set", test_input_set, MRB_ARGS_REQ(2));
-  mrb_define_module_function(mrb, test_input_module, "release_all", test_input_release_all, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, test_input_module, "down?", test_input_down, MRB_ARGS_REQ(1));
-  mrb_define_module_function(mrb, test_input_module, "type", test_input_type, MRB_ARGS_REQ(1));
-  mrb_define_module_function(mrb, test_input_module, "leave_note", test_input_leave_note, MRB_ARGS_REQ(2));
-  mrb_define_module_function(mrb, test_input_module, "note", test_input_note, MRB_ARGS_REQ(1));
-  mrb_define_module_function(mrb, test_input_module, "set_gamepad_axis", test_input_set_gamepad_axis, MRB_ARGS_REQ(2));
-  mrb_define_module_function(mrb, test_input_module, "set_gamepad_button", test_input_set_gamepad_button,
-                             MRB_ARGS_REQ(2));
-  mrb_define_module_function(mrb, test_input_module, "move_mouse", test_input_move_mouse, MRB_ARGS_REQ(2));
-  mrb_define_module_function(mrb, test_input_module, "set_mouse_button", test_input_set_mouse_button, MRB_ARGS_REQ(2));
-  mrb_define_module_function(mrb, test_input_module, "set_mouse_wheel", test_input_set_mouse_wheel, MRB_ARGS_REQ(1));
-}
-
 }  // namespace
 
 void install_input_bindings(mrb_state* mrb) {
@@ -311,7 +171,6 @@ void install_input_bindings(mrb_state* mrb) {
   install_key_bindings(input_module, mrb);
   install_mouse_bindings(input_module, mrb);
   install_gamepad_bindings(input_module, mrb);
-  install_test_input_bindings(mrb);
 }
 
 }  // namespace redgem

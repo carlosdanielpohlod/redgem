@@ -222,11 +222,46 @@ TEST_CASE("objects survive garbage collection every frame") {
   CHECK(ruby(*engine, "Scene.objects.map(&:name).include?('Crate')") == "true");
 }
 
-TEST_CASE("TestInput is only available while a system test drives the game") {
+TEST_CASE("a game's Ruby has nothing of what tests are written with") {
+  // This program links the engine alone, as the one games ship as does: what tests use comes from
+  // another library (src/testing), which a game never runs with.
   auto engine = sandbox();
-  const RubyResult result = engine->scripts().eval("TestInput.set(:a, true)", "input.rb");
-  CHECK_FALSE(result.ok);
-  CHECK(result.error.find("only available when running a test") != std::string::npos);
+  for (const char* name : {"TestInput", "SystemTest", "RedGemTest"}) {
+    CAPTURE(name);
+    CHECK(ruby(*engine, std::string("Object.const_defined?(:") + name + ")") == "false");
+  }
+  CHECK_FALSE(engine->scripts().eval("TestInput.set(:a, true)", "input.rb").ok);
+  CHECK(ruby(*engine, "$__redgem_system_test.nil?") == "true");
+}
+
+TEST_CASE("an engine told to step fixedly plays the same game whatever time passes") {
+  constexpr float kStall = 0.5f;  // a frame that took half a second
+  EngineOptions options;
+  options.game_dir = fixture("games/sandbox");
+  options.headless = true;
+  options.fixed_step = true;
+  ScriptedInputSource input;
+  options.input = &input;  // (with an input of its own, a headless engine follows the clock unless told)
+  auto created = Engine::create(options);
+  REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
+  Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
+  for (int i = 0; i < kOneSecondOfFrames; ++i) engine.frame(kStall);
+  CHECK(engine.script_context().time.elapsed == doctest::Approx(kOneSecondOfFrames * config::kFixedDeltaSeconds));
+  CHECK(engine.frame_seconds() == doctest::Approx(config::kFixedDeltaSeconds));
+}
+
+TEST_CASE("the input a program hands the engine is what the game reads") {
+  EngineOptions options;
+  options.game_dir = fixture("games/sandbox");
+  options.headless = true;
+  ScriptedInputSource input;
+  options.input = &input;
+  auto created = Engine::create(options);
+  REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
+  Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
+  input.set_key(Key::A, true);
+  engine.frame(config::kFixedDeltaSeconds);
+  CHECK(ruby(engine, "Input.down?(:a)") == "true");
 }
 
 TEST_CASE("prefabs stay inert until spawned, then get physics and scripts") {

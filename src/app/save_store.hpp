@@ -37,8 +37,5 @@ class SaveStore {
 // folder. The digits come from where the folder is, so that two games in folders of the same
 // name keep their own saves; they stay the same for as long as the game stays where it is.
 std::filesystem::path save_file_for(const std::filesystem::path& game_dir);
-// Where a system test's saves go instead, so a test never reads or changes a player's progress:
-// test-saves/ in the same folder of the user's own.
-std::filesystem::path test_save_file_for(const std::filesystem::path& game_dir);
 
 }  // namespace redgem

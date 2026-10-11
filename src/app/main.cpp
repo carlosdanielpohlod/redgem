@@ -114,15 +114,16 @@ int play(const redgem::EngineOptions& options) {
 }
 
 int play_game(const redgem::CliOptions& options) {
-  return play({options.game_dir, options.headless, options.test_script, options.screenshot_dir});
+  redgem::EngineOptions engine;
+  engine.game_dir = options.game_dir;
+  engine.screenshot_dir = options.screenshot_dir;
+  return play(engine);
 }
 
 int show_help(const redgem::CliOptions&) {
   std::cout << redgem::usage();
   return redgem::kExitSuccess;
 }
-
-int run_ruby_test_file(const redgem::CliOptions& options) { return redgem::run_ruby_tests(options.ruby_test_file); }
 
 int new_game(const redgem::CliOptions& options) {
   using namespace redgem;
@@ -165,10 +166,8 @@ struct Mode {
   int (*run)(const redgem::CliOptions&);
 };
 constexpr Mode kModes[] = {
-    {redgem::RunMode::Help, show_help},   {redgem::RunMode::RubyTests, run_ruby_test_file},
-    {redgem::RunMode::NewGame, new_game}, {redgem::RunMode::BuildGame, build},
-    {redgem::RunMode::Relay, run_relay},  {redgem::RunMode::Editor, run_editor},
-    {redgem::RunMode::Game, play_game},
+    {redgem::RunMode::Help, show_help},  {redgem::RunMode::NewGame, new_game},  {redgem::RunMode::BuildGame, build},
+    {redgem::RunMode::Relay, run_relay}, {redgem::RunMode::Editor, run_editor}, {redgem::RunMode::Game, play_game},
 };
 
 int run_mode(const redgem::CliOptions& options) {

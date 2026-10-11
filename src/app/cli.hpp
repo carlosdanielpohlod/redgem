@@ -7,20 +7,17 @@
 
 namespace redgem {
 
-enum class RunMode { Editor, Game, RubyTests, NewGame, BuildGame, Relay, Help };
+enum class RunMode { Editor, Game, NewGame, BuildGame, Relay, Help };
 
 struct CliOptions {
   RunMode mode = RunMode::Editor;
   std::filesystem::path game_dir;
-  std::optional<std::filesystem::path> test_script;  // system test to drive the game
-  std::filesystem::path ruby_test_file;              // RunMode::RubyTests
-  std::filesystem::path screenshot_dir;
-  bool headless = false;
-  std::string template_name = "empty";  // RunMode::NewGame
-  std::filesystem::path build_dir;      // RunMode::BuildGame
-  std::string build_target;             // --target linux|windows (empty: the system this runs on)
-  int relay_port = 0;                   // RunMode::Relay (0: the usual port)
-  std::optional<std::string> gpu;       // --gpu auto|dedicated|integrated (overrides the saved setting)
+  std::filesystem::path screenshot_dir;  // where a game's Game.screenshot pictures go
+  std::string template_name = "empty";   // RunMode::NewGame
+  std::filesystem::path build_dir;       // RunMode::BuildGame
+  std::string build_target;              // --target linux|windows (empty: the system this runs on)
+  int relay_port = 0;                    // RunMode::Relay (0: the usual port)
+  std::optional<std::string> gpu;        // --gpu auto|dedicated|integrated (overrides the saved setting)
 };
 
 struct CliResult {

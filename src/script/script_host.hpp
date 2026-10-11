@@ -60,7 +60,7 @@ class ScriptHost {
   int error_count() const { return error_count_; }
   std::size_t behaviour_count() const { return behaviours_.size(); }
 
-  // Logs a Ruby error and counts it (test runs fail when the count is not zero).
+  // Logs a Ruby error and counts it (error_count() says how many there were).
   void report_error(const std::string& where, const std::string& error);
 
  private:

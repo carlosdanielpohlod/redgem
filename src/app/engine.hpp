@@ -28,14 +28,22 @@ class Renderer;
 
 struct EngineOptions {
   std::filesystem::path game_dir;
-  bool headless = false;  // no window and no rendering of its own (tests, editor play mode)
-  std::optional<std::filesystem::path> test_script;
+  // No window and no rendering of its own: whoever runs the engine draws its frames, or nobody does.
+  bool headless = false;
+  // Where the pictures a script asks for (Game.screenshot) are written.
   std::filesystem::path screenshot_dir;
   // Editor play mode: run this in-memory scene instead of loading game_dir/scene.glb.
   const SceneDesc* scene = nullptr;
-  // Editor play mode: input comes from the editor viewport. Headless engines without it step
-  // deterministically (one fixed step per frame).
+  // Input fed by whoever runs the engine, instead of the keyboard, mouse and gamepad (the editor's
+  // viewport, a program that plays the game). It has to outlive the engine.
   const InputSource* input = nullptr;
+  // Every frame advances the game by exactly one fixed step, however long it really took: the same
+  // run gives the same game every time. Headless engines without an `input` always do.
+  bool fixed_step = false;
+  // The frames-per-second counter in the corner of the window.
+  bool show_fps = true;
+  // Whether the game may hide the pointer and keep it in the window (Input.mouse_locked).
+  bool capture_cursor = true;
   // Where Save keeps the game's data. Empty: the game's file in the user's RedGem folder.
   std::filesystem::path save_file;
   // Width over height of the screen the game fills (a phone's); 0 for a window sized by the
@@ -46,8 +54,6 @@ struct EngineOptions {
   AudioSystem* audio = nullptr;
 };
 
-enum class TestStatus { NotRunning, Running, Passed, Failed };
-
 // Wires scene, physics, scripts, input and rendering together and runs the game loop.
 class Engine {
  public:
@@ -57,21 +63,26 @@ class Engine {
   Engine(const Engine&) = delete;
   Engine& operator=(const Engine&) = delete;
 
-  // Runs until the window closes, a script quits or the system test ends. Returns the exit code.
+  // Runs until the window closes or a script quits. Returns the exit code.
   int run();
   // Copies a prefab (or any object) into the running game with physics and scripts. `world`
   // overrides the copy's position/rotation. Returns the new root object.
   ObjectId spawn(ObjectId source, const std::optional<Transform>& world, bool physics = true);
   // Simulates and renders one frame. Deterministic engines always advance exactly one fixed step.
   void frame(float frame_seconds);
+  // How long the frame before this one took, for whoever calls frame() itself: the window's
+  // clock, or one fixed step without a window.
+  float frame_seconds() const;
 
+  // Whether the window was closed or a script quit.
   bool finished() const;
-  TestStatus test_status() const { return test_status_; }
 
   Scene& scene() { return scene_; }
   PhysicsWorld& physics() { return *physics_; }
   ScriptHost& scripts() { return *scripts_; }
   ScriptContext& script_context() { return context_; }
+  // What the game reads when it has neither devices nor an `input` of its options: nothing is
+  // pressed until the code that runs the engine says so.
   ScriptedInputSource& scripted_input() { return scripted_input_; }
   // Scene currently running ("main" is scene.glb) and how many times a scene was (re)loaded.
   const std::string& scene_name() const { return context_.scene_name; }
@@ -103,8 +114,7 @@ class Engine {
   void open_saves();
   void fill_context(const std::string& game_title);
   void connect_context();
-  std::optional<std::string> start_scripts();
-  std::optional<std::string> load_system_test();
+  void start_scripts();
 
   void create_physics_bodies();
   std::filesystem::path scene_path(const std::string& name) const;
@@ -141,10 +151,6 @@ class Engine {
   void move_to(ObjectId id, const Transform& pose);
   void process_destroyed();
   void on_transform_written(ObjectId id, TransformWrite write);
-  bool test_ended() const;
-  void tick_system_test();
-  void heed_test_status(const std::string& status);
-  void fail_test(const std::string& why);
   void render();
 
   EngineOptions options_;
@@ -167,12 +173,7 @@ class Engine {
   net::NetworkSession network_;
   net::LanDiscovery discovery_;
   FixedClock clock_;
-  TestStatus test_status_ = TestStatus::NotRunning;
-  mrb_value system_test_ = mrb_nil_value();
 };
-
-// Runs a Ruby unit test file inside a bare engine VM. Returns the process exit code.
-int run_ruby_tests(const std::filesystem::path& test_file);
 
 // Where the screenshots a script asked for by name are written: `folder`/<name>.png. A name that
 // would put the file anywhere else is refused with a warning and left out.

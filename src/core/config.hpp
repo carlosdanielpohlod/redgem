@@ -41,10 +41,6 @@ inline constexpr const char* kRubyFileExtension = ".rb";
 inline constexpr const char* kDefaultScreenshotDir = "screenshots";
 inline constexpr const char* kScreenshotExtension = ".png";
 
-// --- Tests ------------------------------------------------------------------------
-// A system test that has not finished after this many frames fails.
-inline constexpr long long kMaxTestFrames = 3600;
-
 // --- Colliders without a mesh (e.g. Blender empties) -------------------------------
 inline constexpr float kDefaultColliderHalfExtent = 0.5f;
 

@@ -1,0 +1,31 @@
+#pragma once
+
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace redgem::testing {
+
+// What redgem-test was asked to run.
+enum class TestMode { SystemTest, RubyTests, Help };
+
+struct TestCliOptions {
+  TestMode mode = TestMode::SystemTest;
+  std::filesystem::path game_dir;        // TestMode::SystemTest: the game to play
+  std::filesystem::path test_file;       // the system test, or the file of Ruby unit tests
+  std::filesystem::path screenshot_dir;  // where a system test's pictures go
+  bool headless = false;                 // a system test without a window
+  std::optional<std::string> gpu;        // --gpu auto|dedicated|integrated (overrides the saved setting)
+};
+
+struct TestCliResult {
+  bool ok = false;
+  std::string error;
+  TestCliOptions options;
+};
+
+TestCliResult parse_test_cli(const std::vector<std::string>& args);
+std::string test_usage();
+
+}  // namespace redgem::testing

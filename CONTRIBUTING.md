@@ -42,6 +42,9 @@ large ones wait.
 
 1. **Tests.** A fix comes with a test that fails without it. A feature comes with tests for what
    it does, and a system test when it is something a player or an editor user sees.
+   Test code stays out of the engine: what only tests need goes in `src/testing` and
+   `ruby/testing` (the `redgem-test` tool), never in what `redgem` is built from, which is what
+   games ship as.
 2. **Clean linters.** `tools/lint.sh` runs them all and must pass:
    - C++: clang-tidy, cppcheck, clang-format (`tools/lint.sh --fix format` formats for you).
    - Ruby: rubocop. Python: ruff. Shell: shellcheck.

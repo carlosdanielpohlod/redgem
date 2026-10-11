@@ -2,10 +2,6 @@
 #include "scene/animation.hpp"
 #include "app/engine.hpp"
 
-#include <mruby.h>
-#include <mruby/string.h>
-#include <mruby/variable.h>
-
 #include <algorithm>
 #include <string>
 
@@ -21,16 +17,7 @@
 namespace redgem {
 namespace {
 
-constexpr const char* kSystemTestGlobal = "$__redgem_system_test";
 constexpr float kWheelRotationTolerance = 1e-3f;
-// What a system test answers to, and what its __tick says about how it is going.
-constexpr const char* kTestTickMethod = "__tick";
-constexpr const char* kTestFailureMethod = "failure";
-constexpr const char* kTestPassed = "passed";
-constexpr const char* kTestFailed = "failed";
-// What runs the tests of a Ruby unit test file.
-constexpr const char* kRubyTestModule = "RedGemTest";
-constexpr const char* kRunAllMethod = "run_all";
 
 Vec3 gravity() { return {0.0f, config::kGravityY, 0.0f}; }
 
@@ -47,40 +34,11 @@ bool simulated(BodyType type) {
          type == BodyType::Vehicle;
 }
 
-// What a Ruby unit test file runs against: a scene, physics, input and audio with nothing in them.
-struct BareWorld {
-  Scene scene;
-  std::unique_ptr<PhysicsWorld> physics = create_jolt_physics_world(gravity());
-  InputState input;
-  ScriptedInputSource test_input;  // lets Ruby tests exercise the system test DSL
-  RecordingAudio audio;
-  ScriptContext context;
-
-  BareWorld() {
-    context.scene = &scene;
-    context.physics = physics.get();
-    context.input = &input;
-    context.audio = &audio;
-    context.test_input = &test_input;
-  }
-};
-
-// Whether every test of the file a host loaded passes, without a script error.
-bool ruby_tests_pass(ScriptHost& host) {
-  mrb_state* mrb = host.vm().state();
-  const RubyResult failures = host.vm().call(mrb_obj_value(mrb_module_get(mrb, kRubyTestModule)), kRunAllMethod);
-  if (!failures.ok) {
-    log::error(failures.error);
-    return false;
-  }
-  return mrb_integer_p(failures.value) && mrb_integer(failures.value) == 0 && host.error_count() == 0;
-}
-
 }  // namespace
 
 Engine::Engine(const EngineOptions& options)
     : options_(options),
-      deterministic_(options.test_script.has_value() || (options.headless && options.input == nullptr)),
+      deterministic_(options.fixed_step || (options.headless && options.input == nullptr)),
       clock_(config::kFixedDeltaSeconds, config::kMaxFrameSeconds, config::kMaxFixedStepsPerFrame) {}
 
 Engine::~Engine() {
@@ -104,11 +62,13 @@ std::optional<std::string> Engine::initialize() {
   context_.screen_width = settings.window_width;
   context_.screen_height = settings.window_height;
   if (!options_.headless) open_window(settings);
-  if (!options_.headless && !options_.test_script) device_input_ = std::make_unique<RaylibInputSource>();
+  // The devices are read unless there is no window to read them in, or someone else feeds the input.
+  if (!options_.headless && options_.input == nullptr) device_input_ = std::make_unique<RaylibInputSource>();
   open_audio();
   open_saves();
   fill_context(settings.title);
-  return start_scripts();
+  start_scripts();
+  return std::nullopt;
 }
 
 std::optional<std::string> Engine::load_first_scene() {
@@ -141,7 +101,7 @@ void Engine::open_window(GameSettings settings) {
     context_.screen_width = settings.window_width;
   }
   renderer_ = std::make_unique<Renderer>(
-      RenderSettings{settings.window_width, settings.window_height, settings.title, !options_.test_script});
+      RenderSettings{settings.window_width, settings.window_height, settings.title, options_.show_fps});
   renderer_->upload(scene_desc_);
   renderer_->set_images_dir(options_.game_dir / config::kImagesDirName);
   context_.measure_text = [this](const std::string& text, int size) { return renderer_->text_width(text, size); };
@@ -156,15 +116,8 @@ void Engine::open_audio() {
 }
 
 void Engine::open_saves() {
-  std::filesystem::path save_file = options_.save_file;
-  if (save_file.empty() && options_.test_script) {
-    // A test starts from no saves at all, and leaves the player's alone.
-    save_file = test_save_file_for(options_.game_dir);
-    std::error_code ignored;
-    std::filesystem::remove(save_file, ignored);
-  }
-  if (save_file.empty()) save_file = save_file_for(options_.game_dir);
-  save_ = std::make_unique<SaveStore>(save_file);
+  save_ =
+      std::make_unique<SaveStore>(options_.save_file.empty() ? save_file_for(options_.game_dir) : options_.save_file);
 }
 
 void Engine::fill_context(const std::string& game_title) {
@@ -178,7 +131,6 @@ void Engine::fill_context(const std::string& game_title) {
   context_.audio = &audio();
   context_.physics = physics_.get();
   context_.input = &input_;
-  context_.test_input = options_.test_script ? &scripted_input_ : nullptr;
   context_.time.fixed_delta = config::kFixedDeltaSeconds;
   context_.scene_name = config::kMainSceneName;
   connect_context();
@@ -194,22 +146,10 @@ void Engine::connect_context() {
   };
 }
 
-std::optional<std::string> Engine::start_scripts() {
+void Engine::start_scripts() {
   scripts_ = std::make_unique<ScriptHost>(context_, options_.game_dir / config::kScriptsDirName);
-  if (auto error = load_system_test()) return error;
   scripts_->attach_scripts();
   scripts_->run_scene_script(context_.scene_name);
-  return std::nullopt;
-}
-
-std::optional<std::string> Engine::load_system_test() {
-  if (!options_.test_script) return std::nullopt;
-  const RubyResult loaded_test = scripts_->load_file(*options_.test_script);
-  if (!loaded_test.ok) return "cannot load system test: " + loaded_test.error;
-  system_test_ = mrb_gv_get(scripts_->vm().state(), mrb_intern_cstr(scripts_->vm().state(), kSystemTestGlobal));
-  if (mrb_nil_p(system_test_)) return "system test did not call SystemTest.define";
-  test_status_ = TestStatus::Running;
-  return std::nullopt;
 }
 
 void Engine::set_screen(int width, int height, std::function<int(const std::string&, int)> measure_text) {
@@ -340,16 +280,14 @@ WheelDesc Engine::describe_wheel(ObjectId child, const Transform& chassis) const
   return wheel;
 }
 
-bool Engine::test_ended() const { return test_status_ == TestStatus::Passed || test_status_ == TestStatus::Failed; }
-
 bool Engine::finished() const {
-  if (context_.quit_requested || test_ended()) return true;
+  if (context_.quit_requested) return true;
   return renderer_ != nullptr && renderer_->close_requested();
 }
 
+float Engine::frame_seconds() const { return renderer_ ? renderer_->frame_seconds() : config::kFixedDeltaSeconds; }
+
 void Engine::frame(float frame_seconds) {
-  tick_system_test();
-  if (test_ended()) return;
   read_input();
   context_.hud.clear();
   scripts_->start_pending();
@@ -386,8 +324,8 @@ void Engine::follow_window() {
   if (!renderer_) return;
   context_.screen_width = renderer_->screen_width();
   context_.screen_height = renderer_->screen_height();
-  // The pointer belongs to the player while a test drives the game.
-  if (!options_.test_script) renderer_->set_cursor_locked(context_.mouse_locked);
+  // (Whoever feeds the game its input may want the pointer left to the person at the machine.)
+  if (options_.capture_cursor) renderer_->set_cursor_locked(context_.mouse_locked);
 }
 
 void Engine::advance_game(float frame_seconds) {
@@ -501,35 +439,6 @@ void Engine::on_transform_written(ObjectId id, TransformWrite write) {
   }
 }
 
-void Engine::fail_test(const std::string& why) {
-  log::error(why);
-  test_status_ = TestStatus::Failed;
-}
-
-void Engine::tick_system_test() {
-  if (test_status_ != TestStatus::Running) return;
-  if (context_.time.frame >= config::kMaxTestFrames) {
-    fail_test("system test timed out after " + std::to_string(config::kMaxTestFrames) + " frames");
-    return;
-  }
-  const RubyResult result = scripts_->vm().call(system_test_, kTestTickMethod);
-  if (!result.ok) {
-    fail_test("system test crashed: " + result.error);
-  } else if (!mrb_symbol_p(result.value)) {
-    fail_test("SystemTest#__tick must return a Symbol");
-  } else {
-    heed_test_status(mrb_sym_name(scripts_->vm().state(), mrb_symbol(result.value)));
-  }
-}
-
-void Engine::heed_test_status(const std::string& status) {
-  if (status == kTestPassed) test_status_ = TestStatus::Passed;
-  if (status != kTestFailed) return;
-  const RubyResult failure = scripts_->vm().call(system_test_, kTestFailureMethod);
-  const bool readable = failure.ok && mrb_string_p(failure.value);
-  fail_test("system test failed: " + std::string(readable ? RSTRING_PTR(failure.value) : "unknown failure"));
-}
-
 void Engine::render() {
   const std::vector<std::filesystem::path> screenshots =
       screenshot_files(options_.screenshot_dir, context_.screenshot_requests);
@@ -555,25 +464,8 @@ std::vector<std::filesystem::path> screenshot_files(const std::filesystem::path&
 }
 
 int Engine::run() {
-  while (!finished()) frame(renderer_ ? renderer_->frame_seconds() : config::kFixedDeltaSeconds);
-  if (test_status_ == TestStatus::NotRunning) return kExitSuccess;
-  if (test_status_ == TestStatus::Passed && scripts_->error_count() == 0) {
-    log::info("system test passed");
-    return kExitSuccess;
-  }
-  if (scripts_->error_count() > 0) log::error(std::to_string(scripts_->error_count()) + " script error(s)");
-  return kExitFailure;
-}
-
-int run_ruby_tests(const std::filesystem::path& test_file) {
-  BareWorld world;
-  ScriptHost host(world.context, test_file.parent_path());
-  const RubyResult loaded = host.load_file(test_file);
-  if (!loaded.ok) {
-    log::error(loaded.error);
-    return kExitFailure;
-  }
-  return ruby_tests_pass(host) ? kExitSuccess : kExitFailure;
+  while (!finished()) frame(frame_seconds());
+  return kExitSuccess;
 }
 
 }  // namespace redgem

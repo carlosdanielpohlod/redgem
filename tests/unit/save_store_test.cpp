@@ -63,7 +63,7 @@ TEST_CASE("a damaged save file starts from nothing instead of stopping the game"
   CHECK(std::get<double>(*SaveStore(temp.file).get("best")) == doctest::Approx(kBestScore));
 }
 
-TEST_CASE("each game saves in a file named after its folder, and tests save somewhere else") {
+TEST_CASE("each game saves in a file named after its folder") {
   const std::filesystem::path player = save_file_for("/somewhere/games/platformer");
   CHECK(player.filename().string().rfind("platformer-", 0) == 0);
   CHECK(player.extension() == ".json");
@@ -71,9 +71,6 @@ TEST_CASE("each game saves in a file named after its folder, and tests save some
   // A built game's files sit in a folder called "game" next to its executable.
   CHECK(save_file_for("/somewhere/dist/MyGame/game").filename().string().rfind("MyGame-", 0) == 0);
   CHECK(save_file_for("/somewhere/dist/MyGame/game") == save_file_for("/somewhere/dist/MyGame"));
-  const std::filesystem::path tested = test_save_file_for("/somewhere/games/platformer");
-  CHECK(tested.filename() == player.filename());
-  CHECK(tested.parent_path() != player.parent_path());
 }
 
 TEST_CASE("two games in folders of the same name do not share a save, and one game always finds its own") {
@@ -84,15 +81,6 @@ TEST_CASE("two games in folders of the same name do not share a save, and one ga
   // The same folder, however it is written.
   CHECK(save_file_for("/home/ana/games/platformer/") == mine);
   CHECK(save_file_for("/home/ana/games/other/../platformer") == mine);
-  CHECK(test_save_file_for("/home/ana/games/platformer") != test_save_file_for("/home/ana/Downloads/platformer"));
-}
-
-TEST_CASE("test saves are kept in the user's own folder, not where every user of the machine can write") {
-  const std::filesystem::path tested = test_save_file_for("/somewhere/games/platformer");
-  const std::filesystem::path players = save_file_for("/somewhere/games/platformer");
-  CHECK(tested.parent_path().parent_path() == players.parent_path().parent_path());
-  const std::string shared = std::filesystem::temp_directory_path().string();
-  CHECK(tested.parent_path().parent_path().string().rfind(shared, 0) != 0);
 }
 
 TEST_CASE("what a save file holds that a game cannot save is left out") {

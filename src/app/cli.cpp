@@ -23,22 +23,17 @@ constexpr const char* kRelayCommand = "relay";
 constexpr const char* kHelpOption = "--help";
 constexpr const char* kShortHelpOption = "-h";
 constexpr const char* kPlayOption = "--play";
-constexpr const char* kTestOption = "--test";
-constexpr const char* kRubyTestOption = "--ruby-test";
 constexpr const char* kScreenshotsOption = "--screenshots";
 constexpr const char* kTemplateOption = "--template";
 constexpr const char* kTargetOption = "--target";
 constexpr const char* kGpuOption = "--gpu";
 constexpr const char* kPortOption = "--port";
-constexpr const char* kHeadlessOption = "--headless";
 
 constexpr const char* kUsageText =
     "usage:\n"
     "  redgem                            open the project hub (new / recent games)\n"
     "  redgem <game_dir>                 open the editor\n"
-    "  redgem <game_dir> --play          play the game\n"
-    "  redgem <game_dir> --test <system_test.rb> [--screenshots <dir>] [--headless]\n"
-    "  redgem --ruby-test <test_file.rb>\n"
+    "  redgem <game_dir> --play [--screenshots <dir>]   play the game\n"
     "  redgem new <game_dir> [--template empty|platformer]   create a game\n"
     "  redgem build <game_dir> <out_dir> [--target linux|windows|android]   make a standalone game (an executable, or "
     "an .apk)\n"
@@ -95,26 +90,6 @@ void read_help(Reading& reading) {
 
 void read_play(Reading& reading) { choose(reading, RunMode::Game); }
 
-void read_test(Reading& reading) {
-  const auto file = value(reading);
-  if (!file) {
-    fail(reading, "--test needs a file");
-    return;
-  }
-  reading.result.options.test_script = *file;
-  choose(reading, RunMode::Game);
-}
-
-void read_ruby_test(Reading& reading) {
-  const auto file = value(reading);
-  if (!file) {
-    fail(reading, "--ruby-test needs a file");
-    return;
-  }
-  choose(reading, RunMode::RubyTests);
-  reading.result.options.ruby_test_file = *file;
-}
-
 void read_screenshots(Reading& reading) {
   const auto folder = value(reading);
   if (!folder) {
@@ -160,20 +135,15 @@ void read_port(Reading& reading) {
   reading.result.options.relay_port = std::stoi(*number);
 }
 
-void read_headless(Reading& reading) {
-  reading.result.options.headless = true;
-  choose(reading, RunMode::Game);
-}
-
 struct Option {
   const char* name;
   void (*read)(Reading&);
 };
 constexpr Option kOptions[] = {
-    {kHelpOption, read_help},         {kShortHelpOption, read_help},     {kPlayOption, read_play},
-    {kTestOption, read_test},         {kRubyTestOption, read_ruby_test}, {kScreenshotsOption, read_screenshots},
-    {kTemplateOption, read_template}, {kTargetOption, read_target},      {kGpuOption, read_gpu},
-    {kPortOption, read_port},         {kHeadlessOption, read_headless},
+    {kHelpOption, read_help},         {kShortHelpOption, read_help},
+    {kPlayOption, read_play},         {kScreenshotsOption, read_screenshots},
+    {kTemplateOption, read_template}, {kTargetOption, read_target},
+    {kGpuOption, read_gpu},           {kPortOption, read_port},
 };
 
 struct Command {
@@ -235,9 +205,7 @@ bool needs_game(RunMode mode) {
 // What is wrong with a line that was read to its end; empty when nothing is.
 std::string problem_with(const Reading& reading) {
   const CliOptions& options = reading.result.options;
-  if (reading.conflict) return "choose one of: new, build, relay, --play, --test, --ruby-test";
-  // Without a window nobody can close the game: only a test ends such a run.
-  if (options.headless && !options.test_script) return "--headless needs --test <system_test.rb>";
+  if (reading.conflict) return "choose one of: new, build, relay, --play";
   if (needs_game(options.mode) && options.game_dir.empty()) return "missing <game_dir>";
   if (options.mode == RunMode::BuildGame && options.build_dir.empty()) return "missing <out_dir>";
   return {};

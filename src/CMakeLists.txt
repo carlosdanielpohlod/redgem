@@ -1,4 +1,5 @@
 # Ruby prelude embedded into the binary (order matters: later files build on earlier ones).
+# Only what a game runs on: what tests are written with lives in ruby/testing and src/testing.
 set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/kernel.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/vector3.rb
@@ -9,9 +10,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation.rb
-  ${CMAKE_SOURCE_DIR}/ruby/engine/network.rb
-  ${CMAKE_SOURCE_DIR}/ruby/engine/test_case.rb
-  ${CMAKE_SOURCE_DIR}/ruby/engine/system_test.rb)
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
 add_custom_command(
@@ -167,6 +166,12 @@ endif()
 target_compile_options(redgem PRIVATE -Wall -Wextra -Wpedantic)
 redgem_harden(redgem)
 redgem_harden_program(redgem)
+
+# What games are tested with: a library and a program of their own (redgem-test), which nothing
+# above links to. It is a tool for a developer's desk, so phones get none.
+if(NOT ANDROID)
+  add_subdirectory(testing)
+endif()
 
 # The editor's fonts are assembled into the binary (.incbin): rebuild when they change.
 set(REDGEM_EDITOR_FONT_DIR ${CMAKE_SOURCE_DIR}/assets/editor/fonts)

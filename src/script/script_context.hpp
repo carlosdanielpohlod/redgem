@@ -54,7 +54,6 @@ struct ScriptContext {
   Scene* scene = nullptr;
   PhysicsWorld* physics = nullptr;
   InputState* input = nullptr;
-  ScriptedInputSource* test_input = nullptr;  // only set when running a system test
   TimeInfo time;
   std::vector<HudItem> hud;  // cleared by the engine every rendered frame
   // The size of what the game is drawn in: the window, or the editor's Scene view while playing.

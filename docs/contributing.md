@@ -32,13 +32,23 @@ cd build && ctest --output-on-failure        # everything
 ctest -L system                              # only the system tests
 ```
 
-A system test is a Ruby file run against a game:
-`redgem <game_dir> --test <file.rb> [--screenshots <dir>] [--headless]` (`--headless` runs
-without a window; `redgem --help` lists every option).
+Tests are run by a program of their own, `redgem-test`, built beside `redgem`. A system test is
+a Ruby file run against a game:
+`redgem-test <game_dir> <file.rb> [--screenshots <dir>] [--headless]` (`--headless` runs
+without a window; `redgem-test --help` lists every option).
+
+The engine knows nothing of tests. `redgem`, which is also what every built game ships as, has no
+test code in it: what tests are written with (`TestInput`, `SystemTest`, `RedGemTest`, the runners
+and their command line) lives in `src/testing` and `ruby/testing`, a library that only
+`redgem-test` links. The engine gives it nothing but general options (`EngineOptions`: a fixed
+step per frame, an input fed by code, a save file, no FPS counter...). Keep it that way: the
+`app.ships_no_test_code` test looks into the built `redgem` and fails when test code got in.
 
 * **C++ unit + integration** (doctest): math, extras parser, glTF loading from Blender fixtures,
   scene hierarchy, physics world, Ruby VM, and a headless engine running the `sandbox` fixture game.
-* **Ruby tests** run inside the engine's mruby: `redgem --ruby-test tests/ruby/vector3_test.rb`.
+* **Tests of the test tool** (`tests/testing/`, doctest): its command line, its save file, what it
+  adds to a game's Ruby, and whole runs of passing and failing tests.
+* **Ruby tests** run inside the engine's mruby: `redgem-test --ruby tests/ruby/vector3_test.rb`.
 * **Editor system test** (`tests/editor_system/`) opens the editor window on a copy of the platformer,
   picks, edits, plays, stops, undoes and saves.
 * **System tests** (`tests/system/<game>/*_test.rb`, run against `games/<game>`) open the real game
@@ -66,7 +76,7 @@ src/physics   PhysicsWorld interface + Jolt implementation
 src/input     keys, axes/actions, keyboard, mouse, gamepad and scripted input sources
 src/net       sockets (the only place with OS socket calls), message framing and wire format, the
               host/guest session, discovery on the local network, the relay
-src/audio     sound effects and music (raylib, or a recorder for tests)
+src/audio     sound effects and music (raylib, or a recorder when there is no audio device)
 src/script    mruby VM, behaviour host, native bindings
 src/render    renderer (HDR, shadows, reflections, post-processing), shaders, environment,
               culling, graphics card choice, mesh conversion
@@ -74,7 +84,11 @@ src/editor    editor: scene document (undo, save, import), session (play mode), 
               project hub, script tabs, ImGui panels and theme (src/editor/ui)
 src/app       engine loop, game projects (templates, build, recent games), user settings and
               command line
-ruby/engine   Ruby prelude embedded in the binary (Behaviour, Vector3, test DSLs)
+src/testing   what runs tests, apart from the engine: TestInput, the system test and Ruby test
+              runners, redgem-test and its command line
+ruby/engine   Ruby prelude embedded in the binary (Behaviour, Vector3, UI, Network...)
+ruby/testing  the Ruby tests are written with (assertions, test cases, the system test DSL),
+              embedded in redgem-test only
 templates     scripts of the new-game templates (embedded in the binary)
 assets/editor fonts of the editor (Inter, JetBrains Mono; SIL Open Font License, see the license files)
 games         demo games: scene.glb, scripts and the .blend each scene was built from

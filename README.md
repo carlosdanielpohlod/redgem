@@ -35,7 +35,8 @@ end
 - **Rendering**: PBR materials, sun shadows, reflections, ambient occlusion, bloom, fog,
   skeletal animation.
 - **Physics**: rigid bodies, character controllers, vehicles, triggers, raycasts.
-- **Tests**: games are tested by scripts that play them frame by frame.
+- **Tests**: games are tested by scripts that play them frame by frame, run by a tool of their
+  own (`redgem-test`): the game your players get has no test code in it.
 
 ## Built with
 
@@ -76,6 +77,7 @@ development files.
 cmake -S . -B build -G Ninja
 cmake --build build
 ./build/src/redgem                      # project hub: open a demo or create a game
+./build/src/redgem-test --help          # the tool that runs a game's tests
 ctest --test-dir build                  # run the tests
 ```
 

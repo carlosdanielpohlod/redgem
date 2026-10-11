@@ -62,16 +62,35 @@ target_compile_options(redgem_tests PRIVATE -Wall -Wextra -Wno-unused-parameter)
 
 add_test(NAME cpp.unit_and_integration COMMAND redgem_tests)
 
-# Ruby unit tests run inside the engine's own mruby.
+# What tests are run with (src/testing, redgem-test) has tests of its own, in a program of their
+# own: redgem_tests above links the engine alone, as the program games ship as does.
+add_executable(redgem_testing_tests
+  test_main.cpp
+  testing/test_cli_test.cpp
+  testing/test_saves_test.cpp
+  testing/test_library_test.cpp)
+target_link_libraries(redgem_testing_tests PRIVATE redgem_testing doctest::doctest)
+target_include_directories(redgem_testing_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(redgem_testing_tests PRIVATE
+  REDGEM_FIXTURES_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+  REDGEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_compile_options(redgem_testing_tests PRIVATE -Wall -Wextra -Wno-unused-parameter)
+add_test(NAME cpp.testing_library COMMAND redgem_testing_tests)
+
+# The program games ship as has no test code in it.
+add_test(NAME app.ships_no_test_code
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_test_code.sh $<TARGET_FILE:redgem>)
+
+# Ruby unit tests run inside the engine's own mruby, by the test tool.
 file(GLOB REDGEM_RUBY_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ruby/*_test.rb)
 foreach(test_file IN LISTS REDGEM_RUBY_TESTS)
   get_filename_component(test_name ${test_file} NAME_WE)
-  add_test(NAME ruby.${test_name} COMMAND redgem --ruby-test ${test_file})
+  add_test(NAME ruby.${test_name} COMMAND redgem_test_tool --ruby ${test_file})
 endforeach()
 
 # Guards the harness itself: a failing Ruby test must make the process fail.
 add_test(NAME ruby.harness_reports_failures
-         COMMAND redgem --ruby-test ${CMAKE_CURRENT_SOURCE_DIR}/ruby_failing/failing_test.rb)
+         COMMAND redgem_test_tool --ruby ${CMAKE_CURRENT_SOURCE_DIR}/ruby_failing/failing_test.rb)
 # (Matched on its message: a crash or a missing binary must not count as "it failed as expected".)
 set_tests_properties(ruby.harness_reports_failures PROPERTIES
   PASS_REGULAR_EXPRESSION "FAIL HarnessFailureTest.*1 tests, 1 failures")
@@ -85,14 +104,15 @@ foreach(test_file IN LISTS REDGEM_SYSTEM_TESTS)
   get_filename_component(game_dir ${test_file} DIRECTORY)
   get_filename_component(game ${game_dir} NAME)
   add_test(NAME system.${game}.${test_name}
-           COMMAND redgem ${CMAKE_SOURCE_DIR}/games/${game} --test ${test_file}
+           COMMAND redgem_test_tool ${CMAKE_SOURCE_DIR}/games/${game} ${test_file}
                    --screenshots ${REDGEM_SCREENSHOT_DIR}/${game})
   set_tests_properties(system.${game}.${test_name} PROPERTIES LABELS system RUN_SERIAL TRUE)
 endforeach()
 
 # Multiplayer: two copies of the game run at once and play together, each driven by its own test.
 # tests/system_pairs/<game>/<name>_host_test.rb pairs up with <name>_guest_test.rb. A pair whose
-# name ends in _room also gets a relay to meet on.
+# name ends in _room also gets a relay to meet on (the relay is the engine's own program; the two
+# games are run by the test tool).
 set(REDGEM_TEST_RELAY_PORT 47841)
 file(GLOB REDGEM_PAIRED_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_pairs/*/*_host_test.rb)
 foreach(host_test IN LISTS REDGEM_PAIRED_TESTS)
@@ -106,15 +126,15 @@ foreach(host_test IN LISTS REDGEM_PAIRED_TESTS)
   endif()
   add_test(NAME system.${game}.${pair_name}_together
            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/system_pairs/run_pair.sh $<TARGET_FILE:redgem>
-                   ${CMAKE_SOURCE_DIR}/games/${game} ${host_test} ${game_dir}/${pair_name}_guest_test.rb
+                   $<TARGET_FILE:redgem_test_tool> ${CMAKE_SOURCE_DIR}/games/${game} ${host_test} ${game_dir}/${pair_name}_guest_test.rb
                    ${REDGEM_SCREENSHOT_DIR}/${game} ${relay_port})
   set_tests_properties(system.${game}.${pair_name}_together PROPERTIES LABELS system RUN_SERIAL TRUE)
 endforeach()
 
 # Guards the system test harness: a failing assertion must make the game exit with an error.
 add_test(NAME system.harness_reports_failures
-         COMMAND redgem ${CMAKE_SOURCE_DIR}/games/platformer
-                 --test ${CMAKE_CURRENT_SOURCE_DIR}/system_failing/failing_system_test.rb
+         COMMAND redgem_test_tool ${CMAKE_SOURCE_DIR}/games/platformer
+                 ${CMAKE_CURRENT_SOURCE_DIR}/system_failing/failing_system_test.rb
                  --screenshots ${REDGEM_SCREENSHOT_DIR})
 set_tests_properties(system.harness_reports_failures PROPERTIES LABELS system RUN_SERIAL TRUE
   PASS_REGULAR_EXPRESSION "system test failed: .*this must fail")
@@ -136,7 +156,7 @@ foreach(game showcase)
     foreach(test_file IN LISTS optional_tests)
       get_filename_component(test_name ${test_file} NAME_WE)
       add_test(NAME system.${game}.${test_name}
-               COMMAND redgem ${CMAKE_SOURCE_DIR}/games/${game} --test ${test_file}
+               COMMAND redgem_test_tool ${CMAKE_SOURCE_DIR}/games/${game} ${test_file}
                        --screenshots ${REDGEM_SCREENSHOT_DIR}/${game})
       set_tests_properties(system.${game}.${test_name} PROPERTIES LABELS system RUN_SERIAL TRUE)
     endforeach()

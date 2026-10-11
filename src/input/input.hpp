@@ -59,7 +59,8 @@ struct GamepadSample {
   std::array<bool, kGamepadButtonCount> buttons{};
 };
 
-// Where raw key, mouse and gamepad states come from: the real devices or a test script.
+// Where raw key, mouse and gamepad states come from: the real devices, or code that says what is
+// pressed.
 class InputSource {
  public:
   virtual ~InputSource() = default;
@@ -74,16 +75,17 @@ class InputSource {
   virtual void show_touch_controls(bool) {}
 };
 
-// Keys held down by a test (system tests drive the game through this).
+// Input fed by code: keys, a mouse and a gamepad that are wherever the program driving the game
+// last put them (the editor's play mode, anything that plays a game without a person).
 class ScriptedInputSource final : public InputSource {
  public:
   bool is_key_down(Key key) const override { return held_.count(key) != 0; }
   MouseSample mouse() const override { return mouse_; }
   GamepadSample gamepad() const override { return gamepad_; }
   std::string typed_text() const override { return typed_; }
-  // What the test "types" every frame until told otherwise.
+  // What is "typed" every frame until told otherwise.
   void type_text(std::string text) { typed_ = std::move(text); }
-  // Either of these plugs the test's gamepad in.
+  // Either of these plugs the gamepad in.
   void set_gamepad_axis(GamepadAxis axis, float value) {
     gamepad_.connected = true;
     gamepad_.axes[static_cast<std::size_t>(axis)] = value;

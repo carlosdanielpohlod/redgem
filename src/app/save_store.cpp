@@ -14,7 +14,6 @@ namespace {
 
 constexpr const char* kSavesFolder = "saves";
 constexpr const char* kSaveExtension = ".json";
-constexpr const char* kTestSavesFolder = "test-saves";  // beside the players' saves, in the user's own folder
 constexpr char kNameJoiner = '-';
 // A few digits made from where the game is, so that two games in folders of the same name do not
 // share a save.
@@ -73,11 +72,6 @@ bool write_whole(const std::filesystem::path& file, const std::string& text) {
 std::filesystem::path save_file_for(const std::filesystem::path& game_dir) {
   const std::filesystem::path named = named_folder(game_dir);
   return saves_folder() / (named.filename().string() + kNameJoiner + place_digits(named) + kSaveExtension);
-}
-
-std::filesystem::path test_save_file_for(const std::filesystem::path& game_dir) {
-  // (In the user's own folder, not in one every user of the machine can write to and guess.)
-  return recent_games_file().parent_path() / kTestSavesFolder / save_file_for(game_dir).filename();
 }
 
 void SaveStore::load() {
