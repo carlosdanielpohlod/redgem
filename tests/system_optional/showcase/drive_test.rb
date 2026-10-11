@@ -8,17 +8,17 @@ MIN_SPEED = 3.0          # m/s
 CHASE_MAX_DISTANCE = 14.0
 MIN_OBJECTS = 100
 ROAD_HALF_WIDTH = 4.5
-CAR_NAME = "Generic Sport Sedan 2022 PL (placed)"
-TRAFFIC_NAME = "TrafficBlue"
-WALKER_NAME = "Wenceslavus (placed)"
-WALKER_BONE = "Thigh.L"
+CAR_NAME = "Generic Sport Sedan 2022 PL (placed)".freeze
+TRAFFIC_NAME = "TrafficBlue".freeze
+WALKER_NAME = "Wenceslavus (placed)".freeze
+WALKER_BONE = "Thigh.L".freeze
 MIN_TRAFFIC_TRAVEL = 5.0   # meters while the hero drives
 MIN_WALK = 0.5
 MIN_WHEEL_TURN = 5.0       # degrees
 MIN_BONE_SWING = 0.01      # meters a leg bone moves relative to the walker
-MORE_WALKERS = ["Standing Survivor Girl Green Top Cowboy (placed)", "Axel Standing (placed)"]
-BYSTANDER_NAME = "Standing Cute Girl White Jacket Jeans (placed)"
-LEAF_PREFIX = "Leaf"
+MORE_WALKERS = ["Standing Survivor Girl Green Top Cowboy (placed)", "Axel Standing (placed)"].freeze
+BYSTANDER_NAME = "Standing Cute Girl White Jacket Jeans (placed)".freeze
+LEAF_PREFIX = "Leaf".freeze
 MIN_LEAVES = 100
 ORBIT_FROM_X = 400.0       # pixels: where the mouse drag starts
 ORBIT_Y = 300.0
@@ -64,15 +64,19 @@ SystemTest.define do |t|
   t.hold(:w, frames: DRIVE_FRAMES)
   t.assert("W drives the car down the avenue") { start.z - car.transform.position.z > MIN_DRIVE }
   t.assert("the car has speed") { car.get_component(ArcadeCar).speed > MIN_SPEED }
-  t.assert("the camera chases the car") { camera.transform.position.distance_to(car.transform.position) < CHASE_MAX_DISTANCE }
+  t.assert("the camera chases the car") do
+    camera.transform.position.distance_to(car.transform.position) < CHASE_MAX_DISTANCE
+  end
   t.screenshot("showcase_driving")
-  t.assert("other cars drive along the street") { traffic.transform.position.distance_to(traffic_start) > MIN_TRAFFIC_TRAVEL }
+  t.assert("other cars drive along the street") do
+    traffic.transform.position.distance_to(traffic_start) > MIN_TRAFFIC_TRAVEL
+  end
   t.assert("the pedestrian walks") { walker.transform.position.distance_to(walker_start) > MIN_WALK }
   t.assert("the other pedestrians walk too") do
-    walkers.each_with_index.all? { |person, index| person.transform.position.distance_to(walker_starts[index]) > MIN_WALK }
+    walkers.zip(walker_starts).all? { |person, from| person.transform.position.distance_to(from) > MIN_WALK }
   end
   t.assert("the leaves drift") do
-    moved = leaves.each_with_index.count { |leaf, index| leaf.transform.position.distance_to(leaf_starts[index]) > MIN_LEAF_TRAVEL }
+    moved = leaves.zip(leaf_starts).count { |leaf, from| leaf.transform.position.distance_to(from) > MIN_LEAF_TRAVEL }
     moved >= MIN_LEAVES_MOVING
   end
   t.assert("the walk animation moves the leg bones") do
@@ -96,7 +100,9 @@ SystemTest.define do |t|
   t.wait
   TestInput.set_mouse_wheel(0.0)
   t.wait
-  t.assert("the wheel moves the camera away") { camera.transform.position.distance_to(car.transform.position) > beside.length + MIN_ZOOM }
+  t.assert("the wheel moves the camera away") do
+    camera.transform.position.distance_to(car.transform.position) > beside.length + MIN_ZOOM
+  end
   TestInput.set_mouse_button(:left, false)
   t.wait(RETURN_FRAMES)
   back = camera.transform.position - car.transform.position

@@ -3,6 +3,8 @@ SETTLE_FRAMES = 30
 WALK_FRAMES = 30
 MIN_WALK = 1.0
 STILL = 0.01
+RUNNING = 1.0   # Time.scale while the game goes on
+SCALE_TOLERANCE = 0.001
 RESUME_BUTTON = 0
 
 SystemTest.define do |t|
@@ -21,7 +23,7 @@ SystemTest.define do |t|
 
   x, y, width, height = menu.button_box(RESUME_BUTTON)
   t.click(x + width / 2, y + height / 2)
-  t.assert("clicking Resume closes the menu") { !menu.open? && Time.scale == 1.0 }
+  t.assert("clicking Resume closes the menu") { !menu.open? && (Time.scale - RUNNING).abs < SCALE_TOLERANCE }
   t.hold(:w, frames: WALK_FRAMES)
   t.assert("the game goes on") { player.transform.position.distance_to(frozen_at) > MIN_WALK }
 end

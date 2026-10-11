@@ -22,10 +22,15 @@ class IdlePerson < Behaviour
 
   def update(_dt)
     time = Time.elapsed
-    breath = Math.sin(time / BREATH_SECONDS * FULL_TURN + @phase) * BREATH_HEIGHT
-    look = Math.sin(time / @pace * FULL_TURN + @phase) * @look
-    lean = Math.sin(time / (@pace * LEAN_PACE) * FULL_TURN + @phase) * LEAN_DEGREES
-    transform.position = Vector3.new(@position.x, @position.y + breath, @position.z)
+    breath = sway(time, BREATH_SECONDS, BREATH_HEIGHT)
+    look = sway(time, @pace, @look)
+    lean = sway(time, @pace * LEAN_PACE, LEAN_DEGREES)
+    transform.position = @position.with(y: @position.y + breath)
     transform.rotation = Vector3.new(lean, @yaw + look, 0)
   end
+
+  private
+
+  # Something that goes back and forth by up to `size`, once every `seconds`.
+  def sway(time, seconds, size) = Math.sin(time / seconds * FULL_TURN + @phase) * size
 end

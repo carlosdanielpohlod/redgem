@@ -8,7 +8,9 @@ CHECKPOINTS_IN_LAP = 4
 SystemTest.define do |t|
   race = RaceManager.instance
   t.wait(SETTLE_FRAMES)
-  t.assert("race starts at checkpoint 1 of 4") { race.next_checkpoint == FIRST && race.total_checkpoints == CHECKPOINTS_IN_LAP }
+  t.assert("race starts at checkpoint 1 of 4") do
+    race.next_checkpoint == FIRST && race.total_checkpoints == CHECKPOINTS_IN_LAP
+  end
   t.assert("only the next banner is shown") do
     Scene.find("Checkpoint1Banner").visible && !Scene.find("Checkpoint2Banner").visible
   end

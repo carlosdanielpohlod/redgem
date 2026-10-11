@@ -8,16 +8,29 @@ class SystemTestDslTest < RedGemTest::Case
     statuses
   end
 
+  # A test that notes a step, waits two frames and notes another.
+  def two_steps(steps)
+    proc do |t|
+      steps << :a
+      t.wait(2)
+      steps << :b
+    end
+  end
+
   def test_running_until_the_block_finishes
     steps = []
-    test = SystemTest.new(proc { |t| steps << :a; t.wait(2); steps << :b })
-    assert_equal [:running, :running, :passed], run_until_done(test)
+    test = SystemTest.new(two_steps(steps))
+    assert_equal %i[running running passed], run_until_done(test)
     assert_equal %i[a b], steps
   end
 
   def test_failed_assertion_fails_the_test
-    test = SystemTest.new(proc { |t| t.wait; t.assert("must be true") { false } })
-    assert_equal [:running, :failed], run_until_done(test)
+    script = proc do |t|
+      t.wait
+      t.assert("must be true") { false }
+    end
+    test = SystemTest.new(script)
+    assert_equal %i[running failed], run_until_done(test)
     assert test.failure.include?("must be true")
   end
 
@@ -46,13 +59,12 @@ class SystemTestDslTest < RedGemTest::Case
 
   def test_hold_keeps_keys_down_for_the_given_frames
     test = SystemTest.new(proc { |t| t.hold(:a, :d, frames: 2) })
-    assert_equal [:running, :running, :passed], run_until_done(test)
+    assert_equal %i[running running passed], run_until_done(test)
   end
 
   def test_hold_until_stops_when_the_condition_holds
-    ticks = 0
-    held = []
-    test = SystemTest.new(proc { |t| t.hold_until(:w, frames: 10) { held << TestInput.down?(:w); (ticks += 1) >= 3 } })
+    held = []  # whether the key was down, every time the condition was asked
+    test = SystemTest.new(proc { |t| t.hold_until(:w, frames: 10) { (held << TestInput.down?(:w)).size >= 3 } })
     statuses = run_until_done(test)
     assert_equal :passed, statuses.last
     assert_equal 3, statuses.size

@@ -18,9 +18,7 @@ class SceneScript
   def find_all(tag) = Scene.find_all(tag)
 
   # Like find, for objects the scene cannot work without.
-  def find!(name)
-    find(name) || raise(ArgumentError, "#{self.class}: the scene has no object named #{name.inspect}")
-  end
+  def find!(name) = Scene.find!(name, wanted_by: self.class)
 
   def self.__run(klass)
     raise TypeError, "#{klass} must inherit from SceneScript" unless klass <= SceneScript

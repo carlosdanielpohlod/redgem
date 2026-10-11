@@ -4,10 +4,9 @@ class TrafficController < Behaviour
   # All-red gap between phases so the crossroad clears.
   CLEARANCE = 1.5
   AXES = %w[avenue street].freeze
+  HOME = "TrafficController".freeze   # the object it lives on
 
-  def self.instance
-    Scene.find("TrafficController")&.get_component(TrafficController)
-  end
+  def self.instance = Scene.find!(HOME).get_component(TrafficController)
 
   def start
     @cycle = prop(:cycle, DEFAULT_CYCLE)

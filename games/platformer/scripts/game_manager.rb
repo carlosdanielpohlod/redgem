@@ -14,18 +14,19 @@ class GameManager < Behaviour
   BEST_TIME_KEY = :best_time
   BEST_RIGHT_MARGIN = 20   # pixels between the best time and the screen's right edge
 
+  HOME = "GameManager".freeze   # the object it lives on
+  COIN_TAG = :coin
+
   attr_reader :coins, :total_coins, :best_time, :collected
 
-  def self.instance
-    Scene.find("GameManager")&.get_component(GameManager)
-  end
+  def self.instance = Scene.find!(HOME).get_component(GameManager)
 
   def start
     @coins = 0
     @collected = []   # names of the coins picked up
-    @total_coins = Scene.find_all(:coin).size
+    @total_coins = Scene.find_all(COIN_TAG).size
     @won = false
-    @need_coins_until = nil
+    @need_coins_until = 0.0
     @started_at = Time.elapsed
     @best_time = Save[BEST_TIME_KEY]
   end
@@ -42,11 +43,9 @@ class GameManager < Behaviour
   def won? = @won
 
   def reached_goal
-    if all_coins?
-      win(mine: true)
-    else
-      @need_coins_until = Time.elapsed + NEED_COINS_SECONDS
-    end
+    return win(mine: true) if all_coins?
+
+    @need_coins_until = Time.elapsed + NEED_COINS_SECONDS
   end
 
   # The game is won: by this machine's hero (`mine`), or by another player's.
@@ -55,26 +54,38 @@ class GameManager < Behaviour
 
     @won = true
     @finished_at = Time.elapsed
-    CoOp.instance&.won if mine
-    record = @best_time.nil? || run_time < @best_time
+    CoOp.instance.won if mine
+    record = record?
     Save[BEST_TIME_KEY] = @best_time = run_time if record
-    GameMenu.instance&.finish(record ? format("New record: %.1f s!", run_time) : "You win!")
+    GameMenu.instance.finish(record ? format("New record: %<seconds>.1f s!", seconds: run_time) : "You win!")
   end
 
   def update(_dt)
     UI.text("Coins #{@coins}/#{@total_coins}", x: HUD_X, y: COINS_Y, size: HUD_SIZE, color: :gold)
-    if @best_time
-      UI.text(format("Best %.1f s", @best_time), x: UI.width - BEST_RIGHT_MARGIN, y: COINS_Y, size: HUD_SIZE,
-              align: :right)
-    end
-    if run_time < HINT_SECONDS
-      UI.text("WASD / arrows or a gamepad to move, Space or A to jump. Grab every coin, then reach the flag!",
-              x: HUD_X, y: HINT_Y, size: HINT_SIZE)
-    end
-    if @won
-      UI.text("YOU WIN!", x: BANNER_X, y: BANNER_Y, size: BANNER_SIZE, color: :yellow)
-    elsif @need_coins_until && Time.elapsed < @need_coins_until
-      UI.text("Collect all the coins first!", x: BANNER_X, y: BANNER_Y, size: HUD_SIZE, color: :orange)
-    end
+    draw_best_time if @best_time
+    draw_hint if run_time < HINT_SECONDS
+    draw_banner
+  end
+
+  private
+
+  # Whether the run that just ended is the fastest so far.
+  def record? = @best_time.nil? || run_time < @best_time
+
+  def draw_best_time
+    text = format("Best %<seconds>.1f s", seconds: @best_time)
+    UI.text(text, x: UI.width - BEST_RIGHT_MARGIN, y: COINS_Y, size: HUD_SIZE, align: :right)
+  end
+
+  def draw_hint
+    UI.text("WASD / arrows or a gamepad to move, Space or A to jump. Grab every coin, then reach the flag!",
+            x: HUD_X, y: HINT_Y, size: HINT_SIZE)
+  end
+
+  def draw_banner
+    return UI.text("YOU WIN!", x: BANNER_X, y: BANNER_Y, size: BANNER_SIZE, color: :yellow) if @won
+    return unless Time.elapsed < @need_coins_until
+
+    UI.text("Collect all the coins first!", x: BANNER_X, y: BANNER_Y, size: HUD_SIZE, color: :orange)
   end
 end

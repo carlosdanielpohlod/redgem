@@ -40,6 +40,8 @@ class Behaviour
   end
 
   def find(name) = Scene.find(name)
+  # Like find, for an object this behaviour cannot work without: a wrong name is an error.
+  def find!(name) = Scene.find!(name, wanted_by: self.class)
   def find_all(tag) = Scene.find_all(tag)
   def destroy(target = game_object) = target.destroy
   def get_component(klass) = game_object.get_component(klass)
@@ -74,7 +76,7 @@ class Behaviour
     @running_timers&.each(&:cancel)
   end
 
-  EASES = [:smooth, :linear].freeze
+  EASES = %i[smooth linear].freeze
 
   # Something waiting to happen (see after, every).
   class Timer
@@ -96,25 +98,38 @@ class Behaviour
       return true if @cancelled
 
       @waited += dt
-      fired = 0
-      while @waited >= @seconds
-        @block.call
-        return true unless @repeats && !@cancelled
+      catch_up
+    end
+
+    private
+
+    # Runs the block for every time it came due; true once it has nothing left to do.
+    def catch_up
+      runs_per_frame.times do
+        return false if @waited < @seconds
+        return true unless run_and_repeat?
 
         @waited -= @seconds
-        fired += 1
-        # every(0) runs once a frame, and a tiny interval a few times: never forever.
-        next if @seconds.positive? && fired < MAX_RUNS_PER_FRAME
-
-        @waited = 0.0
-        break
       end
+      @waited = 0.0
       false
+    end
+
+    # every(0) runs once a frame, and a tiny interval a few times: never forever.
+    def runs_per_frame = @seconds.positive? ? MAX_RUNS_PER_FRAME : 1
+
+    # Runs the block; true when it is to run again later.
+    def run_and_repeat?
+      @block.call
+      @repeats && !@cancelled
     end
   end
 
   # Something happening over a while (see tween).
   class Tween < Timer
+    SMOOTH_END = 3.0     # the two numbers of the smoothstep curve
+    SMOOTH_SLOPE = 2.0
+
     def initialize(seconds, ease, block)
       super(seconds, false, block)
       @ease = ease
@@ -125,9 +140,12 @@ class Behaviour
 
       @waited += dt
       progress = @seconds.positive? ? [@waited / @seconds, 1.0].min : 1.0
-      @block.call(@ease == :linear ? progress : progress * progress * (3.0 - 2.0 * progress))
+      @block.call(@ease == :linear ? progress : Tween.smooth(progress))
       progress >= 1.0
     end
+
+    # Progress (0 to 1) that starts and ends gently: the "smoothstep" curve, 3t^2 - 2t^3.
+    def self.smooth(progress) = progress * progress * (SMOOTH_END - SMOOTH_SLOPE * progress)
   end
 
   def inspect = "#<#{self.class} on #{game_object.inspect}>"

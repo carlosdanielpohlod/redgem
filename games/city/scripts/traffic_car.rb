@@ -4,7 +4,7 @@
 class TrafficCar < Behaviour
   DEFAULT_SPEED = 9.0
   DEFAULT_HALF_LENGTH = 60.0   # meters, when the builder did not say how long the road is
-  DEFAULT_AXIS = "avenue"
+  DEFAULT_AXIS = "avenue".freeze
   FULL_ROAD = 2.0              # a car leaving one end comes back at the other: two half lengths
   ACCELERATION = 6.0       # m/s^2
   BRAKING = 14.0           # m/s^2
@@ -54,8 +54,7 @@ class TrafficCar < Behaviour
   end
 
   def red_light_ahead?
-    controller = TrafficController.instance
-    return false if controller.nil? || controller.green?(@axis)
+    return false if TrafficController.instance.green?(@axis)
 
     distance_to_line = -STOP_LINE - along
     distance_to_line > -COMMIT_DISTANCE && distance_to_line < braking_distance + STOP_MARGIN
@@ -68,7 +67,7 @@ class TrafficCar < Behaviour
       offset = other.transform.position - transform.position
       ahead = offset.dot(@direction)
       sideways = (offset - @direction * ahead).length
-      ahead > 0 && ahead < SAFE_GAP + braking_distance && sideways < LANE_WIDTH
+      ahead.positive? && ahead < SAFE_GAP + braking_distance && sideways < LANE_WIDTH
     end
   end
 

@@ -28,7 +28,7 @@ SystemTest.define do |t|
   player.transform.position = goal.transform.position
   t.wait_until(frames: GOAL_FRAMES, message: "goal did not register") { manager.won? }
   t.assert("the first win is the record, and it is saved") do
-    manager.best_time && manager.best_time.positive? && Save[:best_time] == manager.best_time
+    manager.best_time&.positive? && Save[:best_time] == manager.best_time
   end
   t.screenshot("win_game")
 end

@@ -70,6 +70,9 @@ Naming/MethodParameterName:
 # Arithmetic is written as in a formula: * and / before + and -.
 Lint/AmbiguousOperatorPrecedence:
   Enabled: false
+# mruby's File has no File.write: a file is written through File.open.
+Style/FileWrite:
+  Enabled: false
 # A behaviour's `update(dt)` returns nothing in particular, whatever its last line is.
 Style/CommentedKeyword:
   Enabled: false

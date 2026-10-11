@@ -3,7 +3,7 @@
 # With a relay (see MainScene) games can also be hosted online: the others only need the code.
 class MultiplayerScreen
   SERVER_KEY = :server              # the last address joined, kept between runs
-  DEFAULT_SERVER = "127.0.0.1"
+  DEFAULT_SERVER = "127.0.0.1".freeze
   ROOM_CODE_LETTERS = 6
   STATUS_SIZE = 22
   STATUS_ABOVE_FIELD = 34           # pixels from the status line's top to the address field
@@ -89,13 +89,14 @@ class MultiplayerScreen
     return @failed ? "Could not join #{@address}" : hint unless Network.online?
 
     others = Network.peers.size
-    "#{place}: #{others} other player#{'s' unless others == 1}"
+    "#{place}: #{others} other #{others == 1 ? "player" : "players"}"
   end
 
   def hint = relay? ? "Type a room's code or the host's address" : "Type the host's address to join a game"
 
   def place
     return "Room #{Network.room}" if Network.room
+
     Network.host? ? "Hosting on port #{Network.port}" : "In the game at #{@address}"
   end
 
@@ -105,12 +106,14 @@ class MultiplayerScreen
     title = games.empty? ? "Looking for games nearby..." : "Games nearby"
     UI.text(title, x: x, y: y - STATUS_ABOVE_FIELD, size: NEARBY_TITLE_SIZE, color: :gray)
     games.each_with_index do |game, index|
-      label = "#{game[:name]} (#{game[:players]})"
-      next unless UI.button(label, x: x, y: y + index * (height + GameMenu::BUTTON_GAP), width: width, height: height)
-
-      starting
-      @address = game[:address]
-      Network.join(game[:address], port: game[:port])
+      top = y + index * (height + GameMenu::BUTTON_GAP)
+      join_found(game) if UI.button("#{game[:name]} (#{game[:players]})", x: x, y: top, width: width, height: height)
     end
+  end
+
+  def join_found(game)
+    starting
+    @address = game[:address]
+    Network.join(game[:address], port: game[:port])
   end
 end

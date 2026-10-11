@@ -2,7 +2,8 @@
 # others' and shares the coins. Whoever reaches the flag with every coin collected wins for all.
 # Start or join a game from the pause menu (Esc > Multiplayer). Lives on the GameManager.
 class CoOp < Behaviour
-  HERO = "Player"
+  HERO = "Player".freeze
+  HERO_KEY_PREFIX = "hero-".freeze   # a hero is called this on the network, followed by its machine's id
   # What the other players' heroes look like, by turns.
   TINTS = [[0.45, 0.75, 1.0], [0.55, 1.0, 0.6], [1.0, 0.6, 0.9], [1.0, 0.9, 0.5]].freeze
   COIN = :coin              # a coin was picked up: its name
@@ -11,17 +12,12 @@ class CoOp < Behaviour
 
   attr_reader :ghosts
 
-  def self.instance = GameManager.instance&.get_component(CoOp)
+  def self.instance = GameManager.instance.get_component(CoOp)
 
   def start
     @ghosts = {}
-    Network.on_connect { enter }
-    Network.on_join { |peer| welcome(peer) }
-    Network.on_leave { |peer| @ghosts.delete(peer)&.destroy }
-    Network.on_disconnect { leave }
-    Network.on(COIN) { |name, _from| take(name) }
-    Network.on(COINS_GONE) { |names, _from| names.each { |name| take(name) } }
-    Network.on(WON) { GameManager.instance.win(mine: false) }
+    follow_the_players
+    follow_the_game
     enter if Network.online?
   end
 
@@ -31,7 +27,22 @@ class CoOp < Behaviour
 
   private
 
-  def hero_key(peer) = "hero-#{peer}"
+  # Who comes into the game and who leaves it.
+  def follow_the_players
+    Network.on_connect { enter }
+    Network.on_join { |peer| welcome(peer) }
+    Network.on_leave { |peer| @ghosts.delete(peer)&.destroy }
+    Network.on_disconnect { leave }
+  end
+
+  # What the other players' heroes did.
+  def follow_the_game
+    Network.on(COIN) { |name, _from| take(name) }
+    Network.on(COINS_GONE) { |names, _from| names.each { |name| take(name) } }
+    Network.on(WON) { GameManager.instance.win(mine: false) }
+  end
+
+  def hero_key(peer) = "#{HERO_KEY_PREFIX}#{peer}"
 
   # In a game: this machine's hero becomes visible to the others, and theirs appear here.
   def enter
@@ -56,7 +67,12 @@ class CoOp < Behaviour
     @ghosts[peer] = ghost
   end
 
-  def take(name) = Scene.find(name)&.get_component(Coin)&.collect
+  def take(name)
+    coin = Scene.find(name)
+    return unless coin  # already picked up here
+
+    coin.get_component(Coin).collect
+  end
 
   def leave
     @ghosts.each_value(&:destroy)

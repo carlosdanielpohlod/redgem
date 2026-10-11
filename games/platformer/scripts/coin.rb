@@ -3,10 +3,8 @@ class Coin < Behaviour
   SPIN_DEGREES_PER_SECOND = 180.0
   BOB_HEIGHT = 0.15
   BOB_SPEED = 3.0
-  SPARKS = 24
-  SPARK_SPEED = 3.5
-  SPARK_SIZE = 0.3
-  SPARK_SPIN = 240.0   # degrees per second
+  # What a collected coin bursts into (speed in m/s, size in meters, spin in degrees per second).
+  SPARKS = { count: 24, color: :gold, speed: 3.5, size: 0.3, glow: true, image: :spark, spin: 240.0 }.freeze
 
   def start
     @base = transform.position
@@ -23,15 +21,14 @@ class Coin < Behaviour
     player = other.get_component(Player)
     return if player.nil? || player.ghost?  # another player's coin is theirs to report
 
-    CoOp.instance&.collected(name)
+    CoOp.instance.collected(name)
     collect
   end
 
   # Counts the coin and takes it out of the level (also when another player picked it up).
   def collect
-    GameManager.instance&.collect_coin(name)
-    Particles.burst(transform.position, count: SPARKS, color: :gold, speed: SPARK_SPEED, size: SPARK_SIZE, glow: true,
-                    image: :spark, spin: SPARK_SPIN)
+    GameManager.instance.collect_coin(name)
+    Particles.burst(transform.position, **SPARKS)
     destroy
   end
 end

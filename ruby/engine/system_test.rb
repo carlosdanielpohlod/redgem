@@ -35,10 +35,7 @@ class SystemTest
     @finished = !@fiber.alive?
     @finished ? result : :running
   rescue Exception => e # rubocop:disable Lint/RescueException
-    @finished = true
-    @failure = "#{e.class}: #{e.message}"
-    TestInput.release_all
-    :failed
+    fail_with(e)
   end
 
   def wait(frames = 1)
@@ -121,6 +118,14 @@ class SystemTest
   def log(message) = Debug.log("[test] #{message}")
 
   private
+
+  # The test is over: no key stays down for whatever runs next.
+  def fail_with(error)
+    @finished = true
+    @failure = "#{error.class}: #{error.message}"
+    TestInput.release_all
+    :failed
+  end
 
   def result
     @failure ? :failed : :passed

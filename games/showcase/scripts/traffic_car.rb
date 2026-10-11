@@ -30,6 +30,7 @@ class TrafficCar < Behaviour
   ON_THE_LINE = 0.005       # meters: close enough to be there
   MIN_TURNING_SPEED = 0.2   # below this the car keeps pointing where it did
   DEGREES_PER_RADIAN = 180.0 / Math::PI
+  HALF = 0.5
 
   # Another car, as seen from this one: `ahead` is how far its center is down the lane (negative:
   # behind), `gap` the room between the bumpers, `speed` how fast it goes this car's way.
@@ -40,32 +41,49 @@ class TrafficCar < Behaviour
   def start
     @cruise = prop(:speed, DEFAULT_SPEED)
     @speed = @cruise
-    @face = prop(:reversed, false) ? -1.0 : 1.0
-    @heading = (transform.forward * @face).z.negative? ? -1.0 : 1.0  # which way along Z it drives
-    @lane_x = transform.position.x
-    @inward = @lane_x.positive? ? -1.0 : 1.0                         # toward the middle of the road
-    @min_x = prop(:min_x, -DEFAULT_BOUND)
-    @max_x = prop(:max_x, DEFAULT_BOUND)
-    @target_x = @lane_x
     @steering = 0.0
-    @min_z = prop(:min_z, -DEFAULT_BOUND)
-    @max_z = prop(:max_z, DEFAULT_BOUND)
     @body = get_component(CarBody)
+    find_the_lane
+    read_the_street
   end
 
   def update(dt)
     position = transform.position
     neighbours = neighbours_of(position)
-    limit = [@cruise, allowed_speed(position, neighbours)].min
-    @speed = approach(@speed, limit, (limit < @speed ? BRAKING : ACCELERATION) * dt)
-    sideways = steer_toward(passing_x(neighbours), position.x, dt)
-    x = position.x + sideways * dt
-    transform.position = Vector3.new(x, position.y, around_the_street(position.z + @heading * @speed * dt))
-    point_along(sideways)
-    @body.velocity = Vector3.new(sideways, 0, @heading * @speed) if @body
+    keep_pace(allowed_speed(position, neighbours), dt)
+    advance(position, steer_toward(passing_x(neighbours), position.x, dt), dt)
   end
 
   private
+
+  def find_the_lane
+    @face = prop(:reversed, false) ? -1.0 : 1.0
+    @heading = (transform.forward * @face).z.negative? ? -1.0 : 1.0  # which way along Z it drives
+    @lane_x = transform.position.x
+    @inward = @lane_x.positive? ? -1.0 : 1.0                         # toward the middle of the road
+    @target_x = @lane_x
+  end
+
+  def read_the_street
+    @min_x = prop(:min_x, -DEFAULT_BOUND)
+    @max_x = prop(:max_x, DEFAULT_BOUND)
+    @min_z = prop(:min_z, -DEFAULT_BOUND)
+    @max_z = prop(:max_z, DEFAULT_BOUND)
+  end
+
+  # Speeds up or brakes toward its cruising speed, or what the cars ahead allow if that is less.
+  def keep_pace(allowed, dt)
+    limit = [@cruise, allowed].min
+    @speed = approach(@speed, limit, (limit < @speed ? BRAKING : ACCELERATION) * dt)
+  end
+
+  # Moves the car for this frame: down its lane, and `sideways` (m/s) across the road.
+  def advance(position, sideways, dt)
+    z = around_the_street(position.z + @heading * @speed * dt)
+    transform.position = Vector3.new(position.x + sideways * dt, position.y, z)
+    point_along(sideways)
+    @body.velocity = Vector3.new(sideways, 0, @heading * @speed) if @body
+  end
 
   def street_length = @max_z - @min_z
 
@@ -76,18 +94,26 @@ class TrafficCar < Behaviour
     z
   end
 
-  # The other cars near this one. The lane is a loop (cars come back around), so a car close to the
-  # far end of the street is right ahead of one about to leave at this end.
   def neighbours_of(position)
     return [] unless @body
 
-    @body.others.map do |other|
-      footprint = other.footprint
-      ahead = ((footprint.z - position.z) * @heading) % street_length
-      ahead -= street_length if ahead > street_length * 0.5
-      gap = ahead.abs - @body.half_length - footprint.half_extent_z
-      Neighbour.new(footprint, ahead, gap, other.velocity.z * @heading)
-    end
+    @body.others.map { |other| neighbour(other, position.z) }
+  end
+
+  # Another car as seen from this one, which is at `z` down the street.
+  def neighbour(other, z)
+    footprint = other.footprint
+    ahead = distance_ahead(footprint.z - z)
+    gap = ahead.abs - @body.half_length - footprint.half_extent_z
+    Neighbour.new(footprint, ahead, gap, other.velocity.z * @heading)
+  end
+
+  # How far down the lane something `offset_z` away along Z is. The lane is a loop (cars come back
+  # around), so a car close to the far end of the street is right ahead of one about to leave at
+  # this end.
+  def distance_ahead(offset_z)
+    ahead = (offset_z * @heading) % street_length
+    ahead > street_length * HALF ? ahead - street_length : ahead
   end
 
   # How far apart (sideways) the centers must be for this car to clear another.
@@ -95,14 +121,20 @@ class TrafficCar < Behaviour
 
   # The fastest it may go and still stop behind whatever is in its way.
   def allowed_speed(position, neighbours)
-    in_the_way = neighbours.select do |neighbour|
-      neighbour.ahead.positive? && neighbour.gap < LOOK_AHEAD &&
-        (neighbour.footprint.x - position.x).abs < room_beside(neighbour) + LANE_MARGIN
-    end
-    in_the_way.map do |neighbour|
-      room = [neighbour.gap - STOP_GAP, 0.0].max
-      [neighbour.speed, 0.0].max + Math.sqrt(2.0 * PLANNED_BRAKING * room)
-    end.min || @cruise
+    in_the_way = neighbours.select { |neighbour| in_the_way?(neighbour, position.x) }
+    in_the_way.map { |neighbour| speed_behind(neighbour) }.min || @cruise
+  end
+
+  def in_the_way?(neighbour, x)
+    neighbour.ahead.positive? && neighbour.gap < LOOK_AHEAD &&
+      (neighbour.footprint.x - x).abs < room_beside(neighbour) + LANE_MARGIN
+  end
+
+  # The speed from which it still stops in the room left behind a car: v^2 = 2 a d, on top of
+  # what that car does itself.
+  def speed_behind(neighbour)
+    room = [neighbour.gap - STOP_GAP, 0.0].max
+    [neighbour.speed, 0.0].max + Math.sqrt(2.0 * PLANNED_BRAKING * room)
   end
 
   # Where across the road it wants to be: its lane, or the nearest line that clears the standing
@@ -110,14 +142,24 @@ class TrafficCar < Behaviour
   def passing_x(neighbours)
     return @lane_x unless @body
 
-    standing = neighbours.select do |neighbour|
-      neighbour.speed.abs < STANDING_SPEED && neighbour.gap < PASS_AHEAD &&
-        (neighbour.ahead.positive? || neighbour.gap < PASSED_BY)
-    end
+    standing = cars_to_pass(neighbours)
     return @target_x if committed?(standing)
 
+    @target_x = lines_past(standing).find { |x| clear_line?(x, standing, neighbours) } || @lane_x
+  end
+
+  def cars_to_pass(neighbours) = neighbours.select { |neighbour| to_pass?(neighbour) }
+
+  # A standing car ahead, or one it is still beside.
+  def to_pass?(neighbour)
+    neighbour.speed.abs < STANDING_SPEED && neighbour.gap < PASS_AHEAD &&
+      (neighbour.ahead.positive? || neighbour.gap < PASSED_BY)
+  end
+
+  # The lines it could drive along to get past them, the nearest to its lane first.
+  def lines_past(standing)
     lines = [@lane_x] + standing.map { |neighbour| neighbour.footprint.x + @inward * passing_room(neighbour) }
-    @target_x = lines.sort_by { |x| (x - @lane_x).abs }.find { |x| clear_line?(x, standing, neighbours) } || @lane_x
+    lines.sort_by { |x| (x - @lane_x).abs }
   end
 
   def passing_room(neighbour) = room_beside(neighbour) + SIDE_GAP
@@ -129,25 +171,40 @@ class TrafficCar < Behaviour
     @target_x != @lane_x && standing.any? { |neighbour| neighbour.gap < COMMITTED_GAP && beside?(neighbour, @lane_x) }
   end
 
+  # Whether it can drive along the line at `x`: on the road, past the standing cars, and either on
+  # its own half of the road or with nobody coming on the other.
   def clear_line?(x, standing, neighbours)
-    return false if x < @min_x || x > @max_x || standing.any? { |neighbour| beside?(neighbour, x) }
+    return false unless x.between?(@min_x, @max_x) && free_of?(standing, x)
 
-    own_half = x * -@inward >= @body.half_width + CENTER_GAP - NEARLY
-    own_half || neighbours.none? do |neighbour|
-      neighbour.speed < -STANDING_SPEED && neighbour.ahead > -PASSED_BY && neighbour.gap < ONCOMING_CLEAR &&
-        beside?(neighbour, x)
-    end
+    own_half?(x) || free_of?(neighbours.select { |neighbour| oncoming?(neighbour) }, x)
+  end
+
+  # Whether none of those cars is in the way of driving along the line at `x`.
+  def free_of?(cars, x) = cars.none? { |neighbour| beside?(neighbour, x) }
+
+  def own_half?(x) = x * -@inward >= @body.half_width + CENTER_GAP - NEARLY
+
+  def oncoming?(neighbour)
+    neighbour.speed < -STANDING_SPEED && neighbour.ahead > -PASSED_BY && neighbour.gap < ONCOMING_CLEAR
   end
 
   # The sideways speed (m/s) that takes the car toward the line at `goal`, easing in and out.
   def steer_toward(goal, x, dt)
     off = goal - x
-    wanted = off.abs < ON_THE_LINE ? 0.0 : [SIDEWAYS_SHARE, off.abs / STRAIGHTEN_OVER].min * (off.negative? ? -1.0 : 1.0)
-    @steering = approach(@steering, wanted, STEERING_RATE * dt)
+    @steering = approach(@steering, wanted_steering(off), STEERING_RATE * dt)
     sideways = @steering * @speed
     reach = off.abs / dt
-    dt.positive? && sideways.abs > reach ? reach * (off.negative? ? -1.0 : 1.0) : sideways  # never past the line
+    dt.positive? && sideways.abs > reach ? reach * side_of(off) : sideways  # never past the line
   end
+
+  # The share of its speed it wants to go sideways with, `off` meters from the line it heads for.
+  def wanted_steering(off)
+    return 0.0 if off.abs < ON_THE_LINE
+
+    [SIDEWAYS_SHARE, off.abs / STRAIGHTEN_OVER].min * side_of(off)
+  end
+
+  def side_of(offset) = offset.negative? ? -1.0 : 1.0
 
   # Turns the nose the way the car is really going (a little sideways while changing lanes).
   def point_along(sideways)

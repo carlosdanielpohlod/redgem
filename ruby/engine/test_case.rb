@@ -3,6 +3,7 @@ module RedGemTest
   class Failure < StandardError; end
 
   DEFAULT_DELTA = 0.001
+  TEST_PREFIX = "test_".freeze   # what the name of a method that is a test starts with
 
   module Assertions
     def assert(condition, message = "assertion failed")
@@ -55,23 +56,25 @@ module RedGemTest
 
   # Runs every test_* method of every Case subclass. Returns the number of failures.
   def self.run_all
-    failures = 0
-    total = 0
-    cases.each do |klass|
-      klass.instance_methods(false).select { |m| m.to_s.start_with?("test_") }.sort.each do |method|
-        total += 1
-        begin
-          instance = klass.new
-          instance.setup
-          instance.__send__(method)
-          Debug.log("PASS #{klass}##{method}")
-        rescue Exception => e # rubocop:disable Lint/RescueException
-          failures += 1
-          Debug.error("FAIL #{klass}##{method}: #{e.class}: #{e.message}")
-        end
-      end
-    end
-    Debug.log("#{total} tests, #{failures} failures")
+    tests = cases.flat_map { |klass| tests_of(klass).map { |method| [klass, method] } }
+    failures = tests.count { |klass, method| !passes?(klass, method) }
+    Debug.log("#{tests.size} tests, #{failures} failures")
     failures
+  end
+
+  def self.tests_of(klass)
+    klass.instance_methods(false).select { |method| method.to_s.start_with?(TEST_PREFIX) }.sort
+  end
+
+  # Runs one test on a fresh instance of its case, and says how it went.
+  def self.passes?(klass, method)
+    instance = klass.new
+    instance.setup
+    instance.__send__(method)
+    Debug.log("PASS #{klass}##{method}")
+    true
+  rescue Exception => e # rubocop:disable Lint/RescueException
+    Debug.error("FAIL #{klass}##{method}: #{e.class}: #{e.message}")
+    false
   end
 end

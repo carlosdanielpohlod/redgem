@@ -26,12 +26,23 @@ module Network
   MAX_SPAWNS_PER_PEER = 64   # objects one machine may have spawned at a time
 
   # What the engine's own messages are called. Games' names never start with "$".
-  RESERVED = "$"
-  SYNC = "$sync"          # where an object is: [key, position, rotation]
-  SPAWN = "$spawn"        # an object to create: [key, template, owner, position, rotation]
-  SPAWNED = "$spawned"    # the host to a newcomer: every object spawned so far
-  DESPAWN = "$despawn"    # objects that are gone: their keys
-  RESEND = "$resend"      # to the host: send the spawned objects again (after loading a level)
+  RESERVED = "$".freeze
+  SYNC = "$sync".freeze          # where an object is: [key, position, rotation]
+  SPAWN = "$spawn".freeze        # an object to create: [key, template, owner, position, rotation]
+  SPAWNED = "$spawned".freeze    # the host to a newcomer: every object spawned so far
+  DESPAWN = "$despawn".freeze    # objects that are gone: their keys
+  RESEND = "$resend".freeze      # to the host: send the spawned objects again (after loading a level)
+  # Who answers each of them (see the methods of those names).
+  ENGINE_MESSAGES = {
+    SYNC => :receive_sync, SPAWN => :receive_spawn, SPAWNED => :receive_spawned,
+    DESPAWN => :receive_despawn, RESEND => :receive_resend
+  }.freeze
+  # What the engine does about what happens on the network, before the game hears of it.
+  REACTIONS = {
+    connected: :enter_game, joined: :send_spawned_to, left: :remove_objects_of, disconnected: :keep_only_my_objects
+  }.freeze
+  RECORD_SIZE = 5         # parts of a spawn record: key, template, owner, position, rotation
+  VECTOR_SIZE = 3         # numbers a position or a rotation travels as: x, y, z
 
   @handlers = {}
   @listeners = {}
@@ -128,25 +139,17 @@ module Network
 
     # Called by the engine for everything that happens on the network.
     def __event(kind, peer, name, data)
-      case kind
-      when :connected then enter_game
-      when :message then receive(name, data, peer)
-      when :joined then __deliver(SPAWNED, spawned_records, peer) if host?
-      when :left then remove_objects_of(peer)
-      when :disconnected then keep_only_my_objects
-      end
-      (@listeners[kind] || []).dup.each { |block| block.call(peer) } unless kind == :message
+      return receive(name, data, peer) if kind == :message
+
+      __send__(REACTIONS[kind], peer) if REACTIONS[kind]
+      (@listeners[kind] || []).dup.each { |block| block.call(peer) }
     end
 
     # Called by the engine when a level is loaded: its objects and handlers are gone. The others
     # are told that this machine's spawned objects went with it, and the host is asked for the
     # objects this machine should see again.
     def __scene_reset
-      if online?
-        mine = @spawned.to_a.select { |_key, entry| entry[:owner] == id }.map(&:first)
-        __deliver(DESPAWN, mine, :all) unless mine.empty?
-        __deliver(RESEND, nil, :host) unless host?
-      end
+      announce_scene_reset if online?
       @handlers = {}
       @listeners = {}
       @synced = {}
@@ -170,7 +173,13 @@ module Network
       [address, (port || DEFAULT_RELAY_PORT).to_i]
     end
 
-    def enter_game
+    def announce_scene_reset
+      mine = keys_spawned_by(id)
+      __deliver(DESPAWN, mine, :all) unless mine.empty?
+      __deliver(RESEND, nil, :host) unless host?
+    end
+
+    def enter_game(_peer)
       @my_id = id
       adopt_local_objects
     end
@@ -180,34 +189,71 @@ module Network
       "#{template}##{id}.#{@spawn_count}"
     end
 
+    # A message came: one of the engine's own, or one for the game's handlers.
     def receive(name, data, from)
-      case name
-      when SYNC then @synced[data[0]]&.__receive(data[1], data[2], from) if data.is_a?(Array)
-      when SPAWN then place(data) if spawn_allowed?(data, from)
-      when SPAWNED then data.each { |record| place(record) if spawn_allowed?(record, from) } if from == HOST
-      when DESPAWN then remove_objects(data, from) if data.is_a?(Array)
-      when RESEND then __deliver(SPAWNED, spawned_records, from) if host?
-      else (@handlers[name] || []).dup.each { |block| block.call(data, from) }
-      end
+      engine_message = ENGINE_MESSAGES[name]
+      return __send__(engine_message, data, from) if engine_message
+
+      (@handlers[name] || []).dup.each { |block| block.call(data, from) }
+    end
+
+    def receive_sync(data, from)
+      @synced[data[0]]&.__receive(data[1], data[2], from) if data.is_a?(Array)
+    end
+
+    def receive_spawn(record, from)
+      place(record) if spawn_allowed?(record, from)
+    end
+
+    # Only the host knows every object spawned so far.
+    def receive_spawned(records, from)
+      records.each { |record| receive_spawn(record, from) } if from == HOST
+    end
+
+    def receive_despawn(keys, from)
+      remove_objects(keys, from) if keys.is_a?(Array)
+    end
+
+    def receive_resend(_nothing, from) = send_spawned_to(from)
+
+    # The host tells a machine (a newcomer, or one that asked again) what is spawned.
+    def send_spawned_to(peer)
+      __deliver(SPAWNED, spawned_records, peer) if host?
     end
 
     # Whether an object another machine asks for may be created here: only for itself (the host
     # speaks for everyone), from a template this level has and this game spawns, and not too many
     # of them.
     def spawn_allowed?(record, from)
-      return false unless record.is_a?(Array) && record.size == 5
+      return false unless well_formed?(record)
 
-      key, template, owner, position, rotation = record
-      return false unless key.is_a?(String) && template.is_a?(String) && owner.is_a?(Integer) && owner >= HOST
-      return false unless owner == from || from == HOST
-      return false unless [position, rotation].all? { |part| part.nil? || vector?(part) }
-      source = Scene.find(template)
-      return false unless source && (@spawnable.include?(template) || source.props[:prefab])
-
-      @spawned.to_a.count { |_key, entry| entry[:owner] == owner } < MAX_SPAWNS_PER_PEER
+      _key, template, owner = record
+      speaks_for?(from, owner) && spawnable?(template) && spawned_by(owner).size < MAX_SPAWNS_PER_PEER
     end
 
-    def vector?(part) = part.is_a?(Array) && part.size == 3 && part.all? { |number| number.is_a?(Numeric) }
+    def well_formed?(record) = record.is_a?(Array) && record.size == RECORD_SIZE && right_parts?(*record)
+
+    def right_parts?(key, template, owner, position, rotation)
+      [key, template].all?(String) && peer_id?(owner) && [position, rotation].all? { |part| part.nil? || vector?(part) }
+    end
+
+    def peer_id?(owner) = owner.is_a?(Integer) && owner >= HOST
+
+    def speaks_for?(peer, owner) = peer == owner || peer == HOST
+
+    def spawnable?(template)
+      source = Scene.find(template)
+      return false unless source
+
+      @spawnable.include?(template) || source.props[:prefab]
+    end
+
+    def vector?(part) = part.is_a?(Array) && part.size == VECTOR_SIZE && part.all?(Numeric)
+
+    # What `owner` has spawned: [key, entry] pairs.
+    def spawned_by(owner) = @spawned.to_a.select { |_key, entry| entry[:owner] == owner }
+
+    def keys_spawned_by(owner) = spawned_by(owner).map(&:first)
 
     def place(record)
       key, template, owner, position, rotation = record
@@ -234,20 +280,20 @@ module Network
     # This machine just got into a game: what it spawned while in none becomes its own there, under
     # names nobody else uses, and the others are told.
     def adopt_local_objects
-      @spawned.to_a.each do |key, entry|
-        next unless entry[:owner] == LOCAL && entry[:object].alive?
+      spawned_by(LOCAL).each { |key, entry| adopt(key, entry) if entry[:object].alive? }
+    end
 
-        @spawned.delete(key)
-        entry[:owner] = id
-        key = next_key(entry[:template])
-        @spawned[key] = entry
-        entry[:object].get_component(NetworkSync)&.assign(owner: id, key: key)
-        __deliver(SPAWN, record_of(key, entry), :all)
-      end
+    def adopt(local_key, entry)
+      @spawned.delete(local_key)
+      entry[:owner] = id
+      key = next_key(entry[:template])
+      @spawned[key] = entry
+      entry[:object].get_component(NetworkSync).assign(owner: id, key: key)
+      __deliver(SPAWN, record_of(key, entry), :all)
     end
 
     def remove_objects_of(peer)
-      @spawned.to_a.each { |key, entry| remove(key) if entry[:owner] == peer }
+      keys_spawned_by(peer).each { |key| remove(key) }
     end
 
     def remove_objects(keys, owner)
@@ -260,10 +306,10 @@ module Network
 
     # The game is gone: what this machine was moving stays, as its own; the rest leaves with the
     # others.
-    def keep_only_my_objects
+    def keep_only_my_objects(_peer)
       @spawned.to_a.each do |key, entry|
         sync = entry[:object].get_component(NetworkSync)
-        next remove(key) unless sync&.owner == @my_id
+        next remove(key) unless sync.owner == @my_id
 
         entry[:owner] = LOCAL
         sync.owner = LOCAL
@@ -309,6 +355,11 @@ class NetworkSync < Behaviour
 
   def on_destroy = Network.__forget(self)
 
+  # An angle part of the way to another, the short way round.
+  def self.toward(from, to, share)
+    from + ((to - from + HALF_TURN) % FULL_TURN - HALF_TURN) * share
+  end
+
   def update(dt)
     return follow(dt) unless mine?
     return unless Network.online?
@@ -333,17 +384,19 @@ class NetworkSync < Behaviour
   def follow(dt)
     return unless @position
 
-    here = transform.position
     closer = [SMOOTHING * dt, 1.0].min
-    far = here.distance_to(@position) > SNAP_DISTANCE
-    transform.position = far ? @position : here.lerp(@position, closer)
-    turned = transform.rotation
-    transform.rotation = Vector3.new(toward(turned.x, @rotation.x, closer), toward(turned.y, @rotation.y, closer),
-                                     toward(turned.z, @rotation.z, closer))
+    transform.position = position_closer(closer)
+    transform.rotation = rotation_closer(closer)
   end
 
-  # An angle part of the way to another, the short way round.
-  def toward(from, to, share)
-    from + ((to - from + HALF_TURN) % FULL_TURN - HALF_TURN) * share
+  # Part of the way to where the owner says it is; all the way when it fell too far behind.
+  def position_closer(share)
+    here = transform.position
+    here.distance_to(@position) > SNAP_DISTANCE ? @position : here.lerp(@position, share)
+  end
+
+  def rotation_closer(share)
+    angles = transform.rotation.to_a.zip(@rotation.to_a)
+    Vector3[*angles.map { |from, to| NetworkSync.toward(from, to, share) }]
   end
 end

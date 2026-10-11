@@ -14,19 +14,22 @@ class RaceManager < Behaviour
   BANNER_SIZE = 56
   BANNER_SECONDS = 3.0
 
+  HOME = "RaceManager".freeze   # the object it lives on
+  CAR = "Car".freeze
+  CHECKPOINT_TAG = :checkpoint
+  NO_LAP_YET = "--".freeze      # shown as the best lap before one is finished
+
   attr_reader :next_checkpoint, :total_checkpoints, :laps
 
-  def self.instance
-    Scene.find("RaceManager")&.get_component(RaceManager)
-  end
+  def self.instance = Scene.find!(HOME).get_component(RaceManager)
 
   def start
-    @total_checkpoints = Scene.find_all(:checkpoint).size
+    @total_checkpoints = Scene.find_all(CHECKPOINT_TAG).size
     @next_checkpoint = FIRST_CHECKPOINT
     @laps = []
     @lap_started_at = Time.elapsed
-    @banner_until = nil
-    @car = Scene.find("Car")&.get_component(Car)
+    @banner_until = 0.0
+    @car = Scene.find!(CAR).get_component(Car)
     highlight_next
   end
 
@@ -34,11 +37,8 @@ class RaceManager < Behaviour
   def reach(order)
     return unless order == @next_checkpoint
 
-    if @next_checkpoint == @total_checkpoints
-      @laps << Time.elapsed - @lap_started_at
-      @lap_started_at = Time.elapsed
-      @banner_until = Time.elapsed + BANNER_SECONDS
-      @next_checkpoint = FIRST_CHECKPOINT
+    if order == @total_checkpoints
+      finish_lap
     else
       @next_checkpoint += 1
     end
@@ -48,21 +48,42 @@ class RaceManager < Behaviour
   def best_lap = @laps.min
 
   def update(_dt)
-    UI.text(format("%3d km/h", @car ? @car.speed_kmh.abs.round : 0), x: HUD_X, y: SPEED_Y, size: HUD_SIZE, color: :yellow)
+    draw_speed
     UI.text("Checkpoint #{@next_checkpoint}/#{@total_checkpoints}", x: HUD_X, y: CHECKPOINT_Y, size: HUD_SIZE)
-    UI.text(format("Lap %.1fs  Best %s", Time.elapsed - @lap_started_at, best_lap ? format("%.1fs", best_lap) : "--"),
-            x: HUD_X, y: LAP_Y, size: HUD_SIZE)
-    if Time.elapsed < HINT_SECONDS
-      UI.text("W/S throttle, A/D steer, Space hand brake, R reset. Follow the blue banners!",
-              x: HUD_X, y: HINT_Y, size: HINT_SIZE)
-    end
-    return unless @banner_until && Time.elapsed < @banner_until
-
-    UI.text(format("LAP %d: %.1fs", @laps.size, @laps.last), x: BANNER_X, y: BANNER_Y, size: BANNER_SIZE,
-                                                            color: :green)
+    draw_lap_times
+    draw_hint if Time.elapsed < HINT_SECONDS
+    draw_lap_banner if Time.elapsed < @banner_until
   end
 
   private
+
+  def finish_lap
+    @laps << Time.elapsed - @lap_started_at
+    @lap_started_at = Time.elapsed
+    @banner_until = Time.elapsed + BANNER_SECONDS
+    @next_checkpoint = FIRST_CHECKPOINT
+  end
+
+  def draw_speed
+    speed = format("%<kmh>3d km/h", kmh: @car.speed_kmh.abs.round)
+    UI.text(speed, x: HUD_X, y: SPEED_Y, size: HUD_SIZE, color: :yellow)
+  end
+
+  def draw_lap_times
+    best = best_lap ? format("%<seconds>.1fs", seconds: best_lap) : NO_LAP_YET
+    times = format("Lap %<seconds>.1fs  Best %<best>s", seconds: Time.elapsed - @lap_started_at, best: best)
+    UI.text(times, x: HUD_X, y: LAP_Y, size: HUD_SIZE)
+  end
+
+  def draw_hint
+    UI.text("W/S throttle, A/D steer, Space hand brake, R reset. Follow the blue banners!",
+            x: HUD_X, y: HINT_Y, size: HINT_SIZE)
+  end
+
+  def draw_lap_banner
+    lap = format("LAP %<number>d: %<seconds>.1fs", number: @laps.size, seconds: @laps.last)
+    UI.text(lap, x: BANNER_X, y: BANNER_Y, size: BANNER_SIZE, color: :green)
+  end
 
   # Only the banner of the gate to cross next is shown.
   def highlight_next

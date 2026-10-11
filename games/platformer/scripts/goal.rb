@@ -4,6 +4,6 @@ class Goal < Behaviour
     player = other.get_component(Player)
     return if player.nil? || player.ghost?
 
-    GameManager.instance&.reached_goal
+    GameManager.instance.reached_goal
   end
 end

@@ -1,13 +1,13 @@
 # Cars on the showcase street never drive through each other: traffic follows the car in front,
 # goes around a standing car when nobody is coming, stops behind it when there is no room, and the
 # player's car bounces off what it hits.
-CAR_NAME = "Generic Sport Sedan 2022 PL (placed)"
-FOLLOWER = "TrafficWhite"       # faster ...
-LEADER = "TrafficBlue"          # ... than the car it shares a lane with
+CAR_NAME = "Generic Sport Sedan 2022 PL (placed)".freeze
+FOLLOWER = "TrafficWhite".freeze   # faster ...
+LEADER = "TrafficBlue".freeze      # ... than the car it shares a lane with
 LANE_X = -1.2                   # the middle of that lane (it drives toward +Z)
 # Where the other lane's cars (driving toward -Z) are sent meanwhile: already past the leader.
 ONCOMING = { "TrafficGrey" => -175.0, "TrafficGreen" => -165.0 }.freeze
-SAME_WAY = "TrafficGreen"       # the last car of the player's lane, slower than the player can go
+SAME_WAY = "TrafficGreen".freeze   # the last car of the player's lane, slower than the player can go
 SETTLE_FRAMES = 10
 STOP_FRAMES = 90                # of hard braking: from top speed to a stop
 MAX_OVERLAP = 0.05              # meters two cars may sink into each other for a frame
@@ -32,7 +32,8 @@ TOUCHING = 1.5
 QUARTER = 0.25
 
 def square(x, z, along_x = 0.0, along_z = 1.0)
-  Footprint.new(x: x, z: z, along_x: along_x, along_z: along_z, half_length: SQUARE_SIDE / 2, half_width: SQUARE_SIDE / 2)
+  half = SQUARE_SIDE / 2
+  Footprint.new(x: x, z: z, along_x: along_x, along_z: along_z, half_length: half, half_width: half)
 end
 
 SystemTest.define do |t|
@@ -45,7 +46,8 @@ SystemTest.define do |t|
   t.assert("a turned rectangle reaches further across") do
     diagonal = Math.sqrt(QUARTER * 2)  # a square turned 45 degrees
     turned = square(0, 0, diagonal, diagonal)
-    (turned.half_extent_x - SQUARE_SIDE * diagonal).abs < MAX_OVERLAP && turned.touches?(square(SQUARE_SIDE + QUARTER, 0))
+    reaches = (turned.half_extent_x - SQUARE_SIDE * diagonal).abs < MAX_OVERLAP
+    reaches && turned.touches?(square(SQUARE_SIDE + QUARTER, 0))
   end
 
   bodies = Scene.objects.map { |object| object.get_component(CarBody) }.compact

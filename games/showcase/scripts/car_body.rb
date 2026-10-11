@@ -22,7 +22,10 @@ class CarBody < Behaviour
 
   # The bodies of all the other cars in the scene.
   def others
-    @others ||= Scene.objects.map { |object| object.get_component(CarBody) }
-                     .reject { |body| body.nil? || body.equal?(self) }
+    @others ||= all_bodies.reject { |body| body.equal?(self) }
   end
+
+  private
+
+  def all_bodies = Scene.objects.filter_map { |object| object.get_component(CarBody) }
 end

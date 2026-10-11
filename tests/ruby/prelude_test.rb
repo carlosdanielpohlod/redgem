@@ -2,7 +2,8 @@ class FakeBehaviour < Behaviour; end
 
 class PreludeTest < RedGemTest::Case
   def test_engine_modules_exist
-    [GameObject, Transform, CharacterController, Rigidbody, Vehicle, Behaviour].each { |klass| assert klass.is_a?(Class) }
+    classes = [GameObject, Transform, CharacterController, Rigidbody, Vehicle, Behaviour]
+    classes.each { |klass| assert klass.is_a?(Class) }
     [Scene, Camera, Input, UI, Debug, Game, Physics, TestInput].each { |mod| assert mod.is_a?(Module) }
   end
 

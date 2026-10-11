@@ -30,8 +30,9 @@ class Vector3
   def +(other) = Vector3.new(@x + other.x, @y + other.y, @z + other.z)
   def -(other) = Vector3.new(@x - other.x, @y - other.y, @z - other.z)
   def -@ = Vector3.new(-@x, -@y, -@z)
-  def *(scalar) = Vector3.new(@x * scalar, @y * scalar, @z * scalar)
-  def /(scalar) = Vector3.new(@x / scalar, @y / scalar, @z / scalar)
+  # Longer or shorter: here the other side is a number, not a vector.
+  def *(other) = Vector3.new(@x * other, @y * other, @z * other)
+  def /(other) = Vector3.new(@x / other, @y / other, @z / other)
 
   def dot(other) = @x * other.x + @y * other.y + @z * other.z
 
@@ -71,6 +72,6 @@ class Vector3
 
   def to_a = [@x, @y, @z]
 
-  def to_s = format("(%.3f, %.3f, %.3f)", @x, @y, @z)
-  def inspect = "Vector3#{to_s}"
+  def to_s = format("(%<x>.3f, %<y>.3f, %<z>.3f)", x: @x, y: @y, z: @z)
+  def inspect = "Vector3#{self}"
 end

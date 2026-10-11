@@ -24,10 +24,7 @@ class Player < Behaviour
     return if dt.zero?  # a menu is open: its buttons are not the hero's
     return if ghost?
 
-    direction = Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).clamped
-    character.move(direction * prop(:speed, SPEED))
-    character.jump(prop(:jump_speed, JUMP_SPEED)) if Input.action_pressed?(:jump) && character.grounded?
-    face(direction) unless direction == Vector3.zero
+    move(Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).clamped)
     respawn if transform.position.y < FALL_LIMIT
   end
 
@@ -37,6 +34,17 @@ class Player < Behaviour
   end
 
   private
+
+  # Walks, jumps and turns the way the player asks.
+  def move(direction)
+    character.move(direction * prop(:speed, SPEED))
+    jump if jump_asked?
+    face(direction) unless direction == Vector3.zero
+  end
+
+  def jump_asked? = Input.action_pressed?(:jump) && character.grounded?
+
+  def jump = character.jump(prop(:jump_speed, JUMP_SPEED))
 
   # Turns the hero so its forward (-Z) points along the movement direction.
   def face(direction)

@@ -1,7 +1,7 @@
 # Two machines play the platformer in a room on a relay (which the test runner starts); this one
 # opens the room and leaves its code where the other test finds it (see co_op_room_guest_test.rb).
-RELAY = "127.0.0.1:47841"
-CODE_FILE = "/tmp/redgem_test_room_code.txt"
+RELAY = "127.0.0.1:47841".freeze
+CODE_FILE = "/tmp/redgem_test_room_code.txt".freeze
 SETTLE_FRAMES = 30
 JOIN_FRAMES = 1800        # the other game may still be starting
 CODE_LETTERS = 6

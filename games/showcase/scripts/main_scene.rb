@@ -8,21 +8,25 @@ class MainScene < SceneScript
   CURB_WIDTH = 0.3
   CURB_HEIGHT = 0.15
   SIDEWALK_WIDTH = 4.5
-  STREET_ENDS = { min_z: -184.0, max_z: 24.0 }  # where cars turn back or come around
+  STREET_ENDS = { min_z: -184.0, max_z: 24.0 }.freeze  # where cars turn back or come around
+  SIDES = [-1.0, 1.0].freeze                    # of the street: left and right
 
   # Every car is a copy of the same model, whose nose points along its -forward.
-  HERO_CAR = "Generic Sport Sedan 2022 PL (placed)"
-  CAR_SIZE = { length: 5.3, width: 2.1 }
-  CAR_FACES = { reversed: true }
+  HERO_CAR = "Generic Sport Sedan 2022 PL (placed)".freeze
+  CAR_SIZE = { length: 5.3, width: 2.1 }.freeze
+  CAR_FACES = { reversed: true }.freeze
   CURB_CLEARANCE = 1.1                          # from the player's car's center to the curb
+  DRIVING_SIDE = ROAD_HALF_WIDTH - CURB_CLEARANCE
+  # Where a car may be: how far across the road its center goes, and the ends of the street.
+  ROAD = { min_x: -DRIVING_SIDE, max_x: DRIVING_SIDE, **STREET_ENDS }.freeze
   TRAFFIC = {                                   # m/s
     "TrafficBlue" => 10.0, "TrafficWhite" => 12.0, "TrafficBeige" => 11.0,
     "TrafficGrey" => 7.0, "TrafficGreen" => 9.0
   }.freeze
-  PARKED_TAG = "parked"
+  PARKED_TAG = "parked".freeze
 
   # People: how far the walkers go before turning back; how the others look around.
-  PERSON_FACES = { reversed: true }
+  PERSON_FACES = { reversed: true }.freeze
   WALKERS = {
     "Wenceslavus (placed)" => 16.0,
     "Luke (placed)" => 13.0,
@@ -56,6 +60,7 @@ class MainScene < SceneScript
   LOOKS = [3.0, 8.0].freeze                     # how bystanders look around: degrees ...
   PACES = [6.0, 10.0].freeze                    # ... and seconds per cycle
   WALK_CYCLE = 1.25                             # seconds: copies start out of step within it
+  EVEN_ODDS = 0.5                               # a walker is as likely to face one way as the other
 
   def setup
     drive_cars
@@ -66,20 +71,23 @@ class MainScene < SceneScript
   private
 
   def drive_cars
+    drive_the_hero
+    TRAFFIC.each { |name, speed| add_traffic(find!(name), speed) }
+    find_all(PARKED_TAG).each { |car| car.add_component(CarBody, **CAR_SIZE) }
+  end
+
+  def drive_the_hero
     hero = find!(HERO_CAR)
-    side = ROAD_HALF_WIDTH - CURB_CLEARANCE
     hero.add_component(CarBody, **CAR_SIZE)
-    hero.add_component(ArcadeCar, min_x: -side, max_x: side, **STREET_ENDS, **CAR_FACES)
+    hero.add_component(ArcadeCar, **ROAD, **CAR_FACES)
     hero.add_component(SpinningWheels, **CAR_FACES)
     Camera.main.add_component(ChaseCamera, target: hero)
+  end
 
-    TRAFFIC.each do |name, speed|
-      car = find!(name)
-      car.add_component(CarBody, **CAR_SIZE)
-      car.add_component(TrafficCar, speed: speed, min_x: -side, max_x: side, **STREET_ENDS, **CAR_FACES)
-      car.add_component(SpinningWheels, **CAR_FACES)
-    end
-    find_all(PARKED_TAG).each { |car| car.add_component(CarBody, **CAR_SIZE) }
+  def add_traffic(car, speed)
+    car.add_component(CarBody, **CAR_SIZE)
+    car.add_component(TrafficCar, speed: speed, **ROAD, **CAR_FACES)
+    car.add_component(SpinningWheels, **CAR_FACES)
   end
 
   def move_people
@@ -90,35 +98,38 @@ class MainScene < SceneScript
 
   def fill_the_sidewalks
     @random = Random.new(CROWD_SEED)
-    walkers = WALKERS.keys.map { |name| find!(name) }
-    bystanders = BYSTANDERS.keys.map { |name| find!(name) }
-    crowd_spots.each_with_index do |(side, z), index|
-      if @random.rand < WALKER_SHARE
-        add_walker(walkers[index % walkers.size], side, z)
-      else
-        add_bystander(bystanders[index % bystanders.size], side, z)
-      end
-    end
+    @walkers = WALKERS.keys.map { |name| find!(name) }
+    @bystanders = BYSTANDERS.keys.map { |name| find!(name) }
+    crowd_spots.each_with_index { |(side, z), index| add_person(index, side, z) }
+  end
+
+  # One more of the crowd: a copy of one of the walkers or of the bystanders, by turns.
+  def add_person(index, side, z)
+    return add_walker(@walkers[index % @walkers.size], side, z) if @random.rand < WALKER_SHARE
+
+    add_bystander(@bystanders[index % @bystanders.size], side, z)
   end
 
   # [side (-1 left, 1 right), z] of every spot of the crowd.
   def crowd_spots
-    spots = []
-    lamp_z = FIRST_LAMP_Z
-    while lamp_z > CROWD_TO_Z
-      CROWD_SPOTS.each do |offset|
-        z = lamp_z - offset
-        [-1.0, 1.0].each { |side| spots << [side, z] } if z <= CROWD_FROM_Z && z >= CROWD_TO_Z
-      end
-      lamp_z -= LAMP_SPACING
-    end
-    spots
+    crowded = spots_by_the_lamps.select { |z| z.between?(CROWD_TO_Z, CROWD_FROM_Z) }
+    crowded.flat_map { |z| SIDES.map { |side| [side, z] } }
+  end
+
+  # How far down the street the spots are: a few after every lamp.
+  def spots_by_the_lamps = lamps.flat_map { |lamp_z| CROWD_SPOTS.map { |offset| lamp_z - offset } }
+
+  # How far down the street every lamp is, as far as the crowd goes.
+  def lamps
+    lamps = [FIRST_LAMP_Z]
+    lamps << lamps.last - LAMP_SPACING while lamps.last - LAMP_SPACING > CROWD_TO_Z
+    lamps
   end
 
   def between(range) = range[0] + (range[1] - range[0]) * @random.rand
 
   def add_walker(original, side, z)
-    yaw = WALKING_LANES.keys[@random.rand < 0.5 ? 0 : 1]
+    yaw = WALKING_LANES.keys[@random.rand < EVEN_ODDS ? 0 : 1]
     walker = copy_of(original, side * WALKING_LANES[yaw], z, yaw)
     walker.animation_offset = @random.rand * WALK_CYCLE
     walker.add_component(Pedestrian, distance: between(WALK_DISTANCES), **PERSON_FACES)

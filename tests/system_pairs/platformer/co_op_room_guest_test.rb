@@ -1,7 +1,7 @@
 # Two machines play the platformer in a room on a relay; this one joins with the room's code
 # (see co_op_room_host_test.rb, which opens the room and leaves the code in a file).
-RELAY = "127.0.0.1:47841"
-CODE_FILE = "/tmp/redgem_test_room_code.txt"
+RELAY = "127.0.0.1:47841".freeze
+CODE_FILE = "/tmp/redgem_test_room_code.txt".freeze
 SETTLE_FRAMES = 30
 JOIN_FRAMES = 1800        # the other game may still be starting
 RETRY_FRAMES = 20
@@ -15,7 +15,7 @@ SystemTest.define do |t|
   Network.relay = RELAY
   code = nil
   t.wait_until(frames: JOIN_FRAMES, message: "the host never opened a room") do
-    code = File.open(CODE_FILE) { |file| file.read } if File.exist?(CODE_FILE)
+    code = File.read(CODE_FILE) if File.exist?(CODE_FILE)
     code.to_s.size == CODE_LETTERS
   end
   t.wait_until(frames: JOIN_FRAMES, message: "could not join the room") do

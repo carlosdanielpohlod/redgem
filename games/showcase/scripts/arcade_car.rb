@@ -1,10 +1,9 @@
 # Arcade driving for a car without wheel physics: W/S accelerate and brake (then reverse),
 # A/D steer, Space is a hard brake. With a gamepad: the triggers accelerate and brake, the left
-# stick steers, A is the hard brake. The body leans into what the car is doing (it squats when it
-# accelerates, dives when it brakes, rolls in turns), the engine is heard climbing through its
-# gears, and a speedometer is drawn. The car stays inside the street, cannot drive through other
-# cars (it needs a CarBody on the same object for that) and drops into potholes: the scene's
-# objects tagged "pothole", each with its `radius` and `depth` in meters.
+# stick steers, A is the hard brake. The body leans into what the car is doing (BodySprings), the
+# engine is heard climbing through its gears (EngineSound), and a speedometer is drawn
+# (Speedometer). The car stays inside the street, cannot drive through other cars (it needs a
+# CarBody on the same object for that) and drops into potholes (Potholes).
 # Settings: reversed (the model's nose points along -forward), min_x, max_x, min_z, max_z (street
 # bounds in meters).
 class ArcadeCar < Behaviour
@@ -20,115 +19,88 @@ class ArcadeCar < Behaviour
   FULL_STEER_SPEED = 6.0    # below this speed the car turns less (it cannot turn standing still)
   HIGH_SPEED_STEER = 0.55   # share of the steering left at top speed: steadier when fast
   BOUNCE = -0.25            # speed kept (reversed) after hitting the street's edge
-  KMH_PER_MS = 3.6
   DEFAULT_BOUND = 1000.0
-  POTHOLE_TAG = "pothole"
   HEAD_ON = 0.5             # hitting a car more squarely than this (cosine) bounces off it ...
   SCRAPE_DRAG = 12.0        # ... a glancing touch only slows the car down, by this many m/s^2
   CRASH_SPARKS = 28         # let out where the car hits another squarely ...
   SCRAPE_SPARKS = 2         # ... and every frame it scrapes along one
-  SPARK_SPEED = 6.0
-  SPARK_LIFE = 0.5
-  SPARK_SIZE = 0.22
-  SPARK_SPIN = 360.0        # degrees per second
-  SMOKE_MIN_SPEED = 8.0     # m/s above which hard braking smokes the tires
-  SMOKE_SECONDS = 0.04      # between puffs
-  SMOKE_SIZE = 1.3
-  SMOKE_LIFE = 1.4
-  SMOKE_ALPHA = 70
-  SMOKE_COLOR = [120, 120, 124].freeze   # in the dusk's light, white smoke would shine
-  SMOKE_HEIGHT = 0.45       # meters above the road
-  SMOKE_SPEED = 0.8
-  SMOKE_RISE = -0.04        # share of gravity, upside down: it drifts up
-  SMOKE_SPIN = 50.0
-  REAR_AXLE = 1.3           # meters behind the car's middle
-  SPARK_HEIGHT = 0.5        # meters above the road: bumper height
   SCRAPE_MIN_SPEED = 2.0    # m/s below which a scrape throws no sparks
-  POTHOLE_DROP = 0.7        # share of a pothole's depth the car body follows (the suspension takes the rest)
+  SPARK_HEIGHT = 0.5        # meters above the road: bumper height
+  # Metal on metal (speed in m/s, life in seconds, size in meters, spread and spin in degrees).
+  SPARKS = {
+    color: :orange, glow: true, spread: 60, speed: 6.0, life: 0.5, size: 0.22, image: :spark, spin: 360.0
+  }.freeze
   POTHOLE_PITCH = 14.0      # degrees of nose dip per meter of drop
   DEGREES_PER_RADIAN = 180.0 / Math::PI
-
-  # The body on its springs.
-  SQUAT_PER_ACCELERATION = 0.16   # degrees of pitch per m/s^2 (nose up accelerating, down braking)
-  MAX_BODY_PITCH = 3.2
-  ROLL_PER_TURN = 0.11            # degrees of roll per (degree per second of turning x m/s of speed) / 10
-  MAX_BODY_ROLL = 4.5
-  SPRING_QUICKNESS = 6.0          # how fast the body settles (per second)
-
-  # The engine: top speed of each gear (m/s); the pitch of its sound across a gear.
-  GEARS = [9.0, 16.0, 23.0, 30.5].freeze
-  IDLE_PITCH = 0.55
-  LOW_REV_PITCH = 0.8
-  HIGH_REV_PITCH = 1.55
-  ENGINE_SOUND = :engine
-  IDLE_VOLUME = 0.22
-  DRIVING_VOLUME = 0.5
-  VOLUME_QUICKNESS = 4.0
-
-  # The speedometer, in the bottom right corner.
-  PANEL_WIDTH = 230
-  PANEL_HEIGHT = 104
-  PANEL_MARGIN = 28
-  PANEL_ALPHA = 150
-  PANEL_RADIUS = 14
-  SPEED_SIZE = 64
-  UNIT_SIZE = 20
-  GEAR_SIZE = 34
-  BAR_HEIGHT = 6
-  BAR_INSET = 18
   HINT_SIZE = 18
   HINT_X = 24
   HINT_Y = 24
-  HINT_SECONDS = 9.0
+  HINT_SECONDS = 9.0        # how long the keys are shown after the game starts
+  KEYBOARD_HINT = "W/S accelerate and brake   A/D steer   Space hard brake   Mouse looks around".freeze
+  GAMEPAD_HINT =
+    "Triggers accelerate and brake   Left stick steers   A hard brake   Right stick looks around".freeze
 
   attr_reader :speed
 
   def start
     @speed = 0.0
-    # From the forward vector, not the Euler angles: a half turn can read as "flipped, yaw 0".
+    @steering = 0.0      # -1..1, where the wheel is
+    @hole_pitch = 0.0    # degrees, from a pothole
+    @face = facing
+    @yaw = heading
+    @ride_height = transform.position.y
+    read_the_street
+    gather_parts
+  end
+
+  # Where the car's nose points (flat, normalized). Usable before start (the camera may start first).
+  def nose = (transform.forward * facing).flat.normalized
+
+  # The gear the engine is in (1 is the first).
+  def gear = EngineSound.gear(@speed)
+
+  def update(dt)
+    drive(dt) unless dt.zero?  # paused
+    draw_hud
+  end
+
+  private
+
+  # 1 when the model's nose points along its forward, -1 when it points the other way.
+  def facing = prop(:reversed, false) ? -1.0 : 1.0
+
+  # The yaw the car starts at, in degrees. From the forward vector, not the Euler angles: a half
+  # turn can read as "flipped, yaw 0".
+  def heading
     forward = transform.forward
-    @yaw = Math.atan2(-forward.x, -forward.z) * DEGREES_PER_RADIAN
-    @face = prop(:reversed, false) ? -1.0 : 1.0
+    Math.atan2(-forward.x, -forward.z) * DEGREES_PER_RADIAN
+  end
+
+  def read_the_street
     @min_x = prop(:min_x, -DEFAULT_BOUND)
     @max_x = prop(:max_x, DEFAULT_BOUND)
     @min_z = prop(:min_z, -DEFAULT_BOUND)
     @max_z = prop(:max_z, DEFAULT_BOUND)
-    @ride_height = transform.position.y
-    @steering = 0.0      # -1..1, where the wheel is
-    @body_pitch = 0.0    # degrees, from accelerating and braking
-    @body_roll = 0.0     # degrees, from turning
-    @hole_pitch = 0.0    # degrees, from a pothole
-    @volume = IDLE_VOLUME
-    @potholes = find_all(POTHOLE_TAG).map do |hole|
-      [hole.transform.position.x, hole.transform.position.z, hole.props[:radius].to_f, hole.props[:depth].to_f]
-    end
+  end
+
+  def gather_parts
+    @potholes = Potholes.new
     @body = get_component(CarBody)
-    Audio.music(ENGINE_SOUND, loop: true, volume: @volume)
+    @springs = BodySprings.new
+    @tire_smoke = TireSmoke.new
+    @speedometer = Speedometer.new
+    @engine = EngineSound.new
   end
 
-  # Where the car's nose points (flat, normalized). Usable before start (the camera may start first).
-  def nose
-    sign = prop(:reversed, false) ? -1.0 : 1.0
-    (transform.forward * sign).flat.normalized
-  end
-
-  # The gear the engine is in (1 is the first).
-  def gear = GEARS.index { |top| @speed.abs < top }.to_i + 1
-
-  def update(dt)
-    return draw_hud if dt.zero?  # paused
-
+  def drive(dt)
     before = @speed
     throttle = pedals
     accelerate(throttle, dt)
     turning = steer(Input.axis(:horizontal), dt)
     move(dt)
     lean((@speed - before) / dt, turning, dt)
-    sound(throttle, dt)
-    draw_hud
+    @engine.rev(@speed, throttle, dt)
   end
-
-  private
 
   # From -1 (brake, then reverse) to 1 (full throttle): a gamepad's triggers, or the keys. The
   # triggers come first: the stick that steers also moves the :vertical axis a little.
@@ -138,40 +110,60 @@ class ArcadeCar < Behaviour
   end
 
   def accelerate(throttle, dt)
-    if Input.action?(:jump)  # Space, or a gamepad's A
-      tire_smoke(dt)
-      @speed = approach(@speed, 0.0, HARD_BRAKING * dt)
-    elsif throttle.zero?
-      @speed = approach(@speed, 0.0, ROLLING_DRAG * dt)
-    elsif throttle * @speed < 0.0
-      @speed = approach(@speed, 0.0, BRAKING * dt)  # pressing against the motion brakes first
-    else
-      # Strong off the line, running out of breath toward top speed.
-      breath = 1.0 - (1.0 - TOP_END_SHARE) * (@speed.abs / MAX_SPEED)
-      @speed = (@speed + throttle * ACCELERATION * breath * dt).clamp(-MAX_REVERSE_SPEED, MAX_SPEED)
-    end
+    return hard_brake(dt) if Input.action?(:jump)  # Space, or a gamepad's A
+    return slow_down(ROLLING_DRAG, dt) if throttle.zero?
+    return slow_down(BRAKING, dt) if (throttle * @speed).negative?  # pressing against the motion brakes first
+
+    speed_up(throttle, dt)
+  end
+
+  def hard_brake(dt)
+    @tire_smoke.puff(transform.position, flat_nose, @speed, dt)
+    slow_down(HARD_BRAKING, dt)
+  end
+
+  def slow_down(braking, dt)
+    @speed = approach(@speed, 0.0, braking * dt)
+  end
+
+  # Strong off the line, running out of breath toward top speed.
+  def speed_up(throttle, dt)
+    breath = 1.0 - (1.0 - TOP_END_SHARE) * (@speed.abs / MAX_SPEED)
+    @speed = (@speed + throttle * ACCELERATION * breath * dt).clamp(-MAX_REVERSE_SPEED, MAX_SPEED)
   end
 
   # Turns the car; returns how fast it is turning, in degrees per second (left positive).
   def steer(direction, dt)
     @steering += (direction - @steering) * [STEERING_QUICKNESS * dt, 1.0].min
-    grip = [@speed.abs / FULL_STEER_SPEED, 1.0].min
-    steadiness = 1.0 - (1.0 - HIGH_SPEED_STEER) * (@speed.abs / MAX_SPEED)
-    sign = @speed.negative? ? -1.0 : 1.0  # reversing turns the other way, like a real car
-    turning = -@steering * STEER_DEGREES_PER_SECOND * grip * steadiness * sign
+    turning = -@steering * STEER_DEGREES_PER_SECOND * grip * steadiness * rolling
     @yaw += turning * dt
     turning
   end
 
+  # How much of the steering the car's speed leaves it: none standing still ...
+  def grip = [@speed.abs / FULL_STEER_SPEED, 1.0].min
+
+  # ... and less again when fast.
+  def steadiness = 1.0 - (1.0 - HIGH_SPEED_STEER) * (@speed.abs / MAX_SPEED)
+
+  # Which way the car rolls: 1 forward, -1 in reverse (where it also turns the other way, like a
+  # real car).
+  def rolling = @speed.negative? ? -1.0 : 1.0
+
   def move(dt)
     target = transform.position + flat_nose * (@speed * dt)
-    clamped = inside_the_street(target)
-    @speed *= BOUNCE if clamped.x != target.x || clamped.z != target.z
-    clamped = inside_the_street(clear_of_cars(clamped, dt))
+    on_the_street = inside_the_street(target)
+    @speed *= BOUNCE unless on_the_street == target
+    clear = inside_the_street(clear_of_cars(on_the_street, dt))
     @body.velocity = flat_nose * @speed if @body
-    drop = pothole_drop(clamped)
-    @hole_pitch = drop * POTHOLE_PITCH * (@speed.negative? ? -1.0 : 1.0)
-    transform.position = Vector3.new(clamped.x, @ride_height - drop, clamped.z)
+    settle_at(clear)
+  end
+
+  # Puts the car there, sunk into the pothole under it if there is one.
+  def settle_at(position)
+    drop = @potholes.drop_at(position)
+    @hole_pitch = drop * POTHOLE_PITCH * rolling
+    transform.position = Vector3.new(position.x, @ride_height - drop, position.z)
   end
 
   # Where the nose points, from the heading alone (the body's lean must not steer the car).
@@ -182,101 +174,61 @@ class ArcadeCar < Behaviour
 
   # The body on its springs: it pitches with acceleration and rolls out of turns.
   def lean(acceleration, turning, dt)
-    settle = [SPRING_QUICKNESS * dt, 1.0].min
-    pitch = (-acceleration * SQUAT_PER_ACCELERATION).clamp(-MAX_BODY_PITCH, MAX_BODY_PITCH)
-    roll = (turning * @speed * ROLL_PER_TURN / 10.0).clamp(-MAX_BODY_ROLL, MAX_BODY_ROLL)
-    @body_pitch += (pitch - @body_pitch) * settle
-    @body_roll += (roll - @body_roll) * settle
-    transform.rotation = Vector3.new((@body_pitch + @hole_pitch) * @face, @yaw, @body_roll * @face)
-  end
-
-  # The engine's note climbs through each gear and drops when the next one comes in.
-  def sound(throttle, dt)
-    bottom = gear == 1 ? 0.0 : GEARS[gear - 2]
-    top = GEARS[[gear - 1, GEARS.size - 1].min]
-    revs = ((@speed.abs - bottom) / (top - bottom)).clamp(0.0, 1.0)
-    moving = @speed.abs > 0.5
-    Audio.music_pitch = moving ? LOW_REV_PITCH + (HIGH_REV_PITCH - LOW_REV_PITCH) * revs : IDLE_PITCH
-    loudness = throttle.zero? ? IDLE_VOLUME : DRIVING_VOLUME
-    @volume += (loudness - @volume) * [VOLUME_QUICKNESS * dt, 1.0].min
-    Audio.music_volume = @volume
+    @springs.lean(acceleration, turning, @speed, dt)
+    pitch = @springs.pitch + @hole_pitch
+    transform.rotation = Vector3.new(pitch * @face, @yaw, @springs.roll * @face)
   end
 
   def inside_the_street(position)
     Vector3.new(position.x.clamp(@min_x, @max_x), position.y, position.z.clamp(@min_z, @max_z))
   end
 
-  # Moves the car out of any car it would overlap at `position`. Driving into one squarely bounces
-  # off it; touching one sideways scrapes along it.
+  # Moves the car out of any car it would overlap at `position`.
   def clear_of_cars(position, dt)
     return position unless @body
 
-    @body.others.each do |other|
-      push = @body.footprint(position).push_out_of(other.footprint)
-      next unless push
-
-      shove = Vector3.new(push[0], 0, push[1])
-      position += shove
-      travel = flat_nose * (@speed.negative? ? -1.0 : 1.0)
-      squareness = -shove.normalized.dot(travel)
-      touched = position - shove.normalized * @body.half_width + Vector3.up * SPARK_HEIGHT
-      if squareness > HEAD_ON
-        sparks(touched, shove, CRASH_SPARKS)
-        @speed *= BOUNCE
-      elsif squareness.positive?
-        sparks(touched, shove, SCRAPE_SPARKS) if @speed.abs > SCRAPE_MIN_SPEED
-        @speed = approach(@speed, 0.0, SCRAPE_DRAG * dt)
-      end
-    end
-    position
+    @body.others.reduce(position) { |clear, other| clear_of(other, clear, dt) }
   end
 
-  # Metal on metal: sparks thrown back from where the cars touch.
-  def sparks(at, away, count)
-    Particles.burst(at, count: count, color: :orange, glow: true, direction: away + Vector3.up, spread: 60,
-                    speed: SPARK_SPEED, life: SPARK_LIFE, size: SPARK_SIZE, image: :spark, spin: SPARK_SPIN)
+  # `position`, moved out of one car if the two overlap there.
+  def clear_of(other, position, dt)
+    push = @body.footprint(position).push_out_of(other.footprint)
+    return position unless push
+
+    shove = Vector3.new(push[0], 0, push[1])
+    hit(position + shove, shove, dt)
+    position + shove
   end
 
-  # Locked wheels at speed: puffs of smoke left behind the rear axle.
-  def tire_smoke(dt)
-    @smoke_wait = (@smoke_wait || 0.0) - dt
-    return unless @smoke_wait <= 0.0 && @speed.abs > SMOKE_MIN_SPEED
+  # Driving into a car squarely bounces off it; touching one sideways scrapes along it.
+  def hit(position, shove, dt)
+    squareness = -shove.normalized.dot(flat_nose * rolling)
+    touched = position - shove.normalized * @body.half_width + Vector3.up * SPARK_HEIGHT
+    return crash(touched, shove) if squareness > HEAD_ON
 
-    @smoke_wait = SMOKE_SECONDS
-    Particles.burst(transform.position - flat_nose * REAR_AXLE + Vector3.up * SMOKE_HEIGHT, count: 1, image: :smoke,
-                    color: SMOKE_COLOR, alpha: SMOKE_ALPHA,
-                    speed: SMOKE_SPEED, life: SMOKE_LIFE, size: SMOKE_SIZE, gravity: SMOKE_RISE, spin: SMOKE_SPIN)
+    scrape(touched, shove, dt) if squareness.positive?
   end
 
-  # How far the car sinks at a position: the deepest pothole under it, eased toward its edge.
-  def pothole_drop(position)
-    @potholes.map do |x, z, radius, depth|
-      distance = Math.sqrt((position.x - x)**2 + (position.z - z)**2)
-      distance < radius ? depth * POTHOLE_DROP * (1.0 - distance / radius) : 0.0
-    end.max || 0.0
+  def crash(touched, shove)
+    sparks(touched, shove, CRASH_SPARKS)
+    @speed *= BOUNCE
+  end
+
+  def scrape(touched, shove, dt)
+    sparks(touched, shove, SCRAPE_SPARKS) if @speed.abs > SCRAPE_MIN_SPEED
+    slow_down(SCRAPE_DRAG, dt)
+  end
+
+  # Sparks thrown back from where the cars touch.
+  def sparks(from, away, count)
+    Particles.burst(from, count: count, direction: away + Vector3.up, **SPARKS)
   end
 
   def draw_hud
-    x = UI.width - PANEL_WIDTH - PANEL_MARGIN
-    y = UI.height - PANEL_HEIGHT - PANEL_MARGIN
-    UI.rect(x: x, y: y, width: PANEL_WIDTH, height: PANEL_HEIGHT, color: :black, alpha: PANEL_ALPHA, radius: PANEL_RADIUS)
-    speed = (@speed.abs * KMH_PER_MS).round.to_s
-    UI.text(speed, x: x + PANEL_WIDTH - BAR_INSET - 62, y: y + 12, size: SPEED_SIZE, align: :right)
-    UI.text("km/h", x: x + PANEL_WIDTH - BAR_INSET, y: y + 50, size: UNIT_SIZE, color: :gray, align: :right)
-    UI.text(@speed.negative? ? "R" : gear.to_s, x: x + BAR_INSET, y: y + 26, size: GEAR_SIZE, color: :ruby)
-    # How far up the speed range the car is.
-    track = PANEL_WIDTH - BAR_INSET * 2
-    UI.rect(x: x + BAR_INSET, y: y + PANEL_HEIGHT - BAR_INSET, width: track, height: BAR_HEIGHT, color: :gray, alpha: 110, radius: 3)
-    filled = (track * (@speed.abs / MAX_SPEED)).to_i
-    UI.rect(x: x + BAR_INSET, y: y + PANEL_HEIGHT - BAR_INSET, width: filled, height: BAR_HEIGHT, color: :ruby, radius: 3) if filled.positive?
+    @speedometer.draw(@speed, MAX_SPEED, gear)
     return unless Time.elapsed < HINT_SECONDS
 
-    hint = if Input.gamepad?
-             "Triggers accelerate and brake   Left stick steers   A hard brake   Right stick looks around"
-           else
-             "W/S accelerate and brake   A/D steer   Space hard brake   Mouse looks around"
-           end
-    UI.text(hint, x: HINT_X, y: HINT_Y, size: HINT_SIZE)
+    UI.text(Input.gamepad? ? GAMEPAD_HINT : KEYBOARD_HINT, x: HINT_X, y: HINT_Y, size: HINT_SIZE)
   end
 
   def approach(value, goal, step)

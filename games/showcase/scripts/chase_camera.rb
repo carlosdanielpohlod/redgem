@@ -17,7 +17,7 @@ class ChaseCamera < Behaviour
   ZOOM_PER_NOTCH = 0.9        # meters per notch of the wheel
   MIN_DISTANCE = 3.5
   MAX_DISTANCE = 16.0
-  ORBIT_BUTTONS = [:left, :right].freeze
+  ORBIT_BUTTONS = %i[left right].freeze
   DEGREES_PER_RADIAN = 180.0 / Math::PI
   # What speed does to the picture, from SLOW (nothing) to FAST (all of it), in m/s.
   SLOW = 9.0
@@ -31,15 +31,12 @@ class ChaseCamera < Behaviour
   FOV_QUICKNESS = 3.0
 
   def start
-    target = prop(:target, "")
-    @target = target.is_a?(GameObject) ? target : find(target)
-    @car = @target&.get_component(ArcadeCar)
+    @target = target_object
+    @car = @target.get_component(ArcadeCar)
     @distance = prop(:distance, DEFAULT_DISTANCE)
     @height = prop(:height, DEFAULT_HEIGHT)
     @smoothing = prop(:smoothing, DEFAULT_SMOOTHING)
-    @orbit_yaw = 0.0    # degrees around the car, away from straight behind it
-    @orbit_pitch = 0.0  # degrees above the usual view
-    @fov = CALM_FOV
+    look_straight_ahead
     follow(MAX_BLEND) if @car
   end
 
@@ -59,6 +56,18 @@ class ChaseCamera < Behaviour
 
   private
 
+  # The car to follow: the setting is the object itself, or its name (which must be right).
+  def target_object
+    target = prop(:target, "")
+    target.is_a?(GameObject) ? target : find!(target)
+  end
+
+  def look_straight_ahead
+    @orbit_yaw = 0.0    # degrees around the car, away from straight behind it
+    @orbit_pitch = 0.0  # degrees above the usual view
+    @fov = CALM_FOV
+  end
+
   def orbiting? = ORBIT_BUTTONS.any? { |button| Input.mouse_down?(button) }
 
   # A gamepad's right stick, pushed away from its center.
@@ -66,44 +75,62 @@ class ChaseCamera < Behaviour
 
   def look_around(dt)
     @distance = (@distance - Input.mouse_wheel * ZOOM_PER_NOTCH).clamp(MIN_DISTANCE, MAX_DISTANCE)
+    return orbit(Input.mouse_dx * ORBIT_DEGREES_PER_PIXEL, Input.mouse_dy * ORBIT_DEGREES_PER_PIXEL) if orbiting?
+
     stick_x, stick_y = stick
-    if orbiting?
-      @orbit_yaw -= Input.mouse_dx * ORBIT_DEGREES_PER_PIXEL
-      @orbit_pitch = (@orbit_pitch + Input.mouse_dy * ORBIT_DEGREES_PER_PIXEL).clamp(MIN_PITCH, MAX_PITCH)
-    elsif !stick_x.zero? || !stick_y.zero?
-      @orbit_yaw -= stick_x * STICK_DEGREES_PER_SECOND * dt
-      @orbit_pitch = (@orbit_pitch + stick_y * STICK_DEGREES_PER_SECOND * dt).clamp(MIN_PITCH, MAX_PITCH)
-    else
-      ease = [RETURN_SPEED * dt, MAX_BLEND].min
-      @orbit_yaw -= @orbit_yaw * ease
-      @orbit_pitch -= @orbit_pitch * ease
-    end
+    return swing_back(dt) if stick_x.zero? && stick_y.zero?
+
+    orbit(stick_x * STICK_DEGREES_PER_SECOND * dt, stick_y * STICK_DEGREES_PER_SECOND * dt)
+  end
+
+  # Turns the camera around the car, by degrees: sideways and up.
+  def orbit(sideways, upward)
+    @orbit_yaw -= sideways
+    @orbit_pitch = (@orbit_pitch + upward).clamp(MIN_PITCH, MAX_PITCH)
+  end
+
+  # Nobody is looking around: back behind the car, little by little.
+  def swing_back(dt)
+    ease = [RETURN_SPEED * dt, MAX_BLEND].min
+    @orbit_yaw -= @orbit_yaw * ease
+    @orbit_pitch -= @orbit_pitch * ease
   end
 
   # Where the camera sits: behind the car's nose, turned around it by the mouse.
   def seat
+    pitch = @orbit_pitch / DEGREES_PER_RADIAN
+    @target.transform.position + behind * (@distance * Math.cos(pitch)) +
+      Vector3.up * (@height + @distance * Math.sin(pitch))
+  end
+
+  # The way from the car to the camera, flat on the road.
+  def behind
     nose = @car.nose
     yaw = (Math.atan2(nose.x, nose.z) * DEGREES_PER_RADIAN + @orbit_yaw) / DEGREES_PER_RADIAN
-    pitch = @orbit_pitch / DEGREES_PER_RADIAN
-    back = Vector3.new(-Math.sin(yaw), 0, -Math.cos(yaw))
-    @target.transform.position + back * (@distance * Math.cos(pitch)) +
-      Vector3.up * (@height + @distance * Math.sin(pitch))
+    Vector3.new(-Math.sin(yaw), 0, -Math.cos(yaw))
   end
 
   # 0 when slow, 1 at full speed.
   def rush = ((@car.speed.abs - SLOW) / (FAST - SLOW)).clamp(0.0, 1.0)
 
   def feel_the_speed(dt)
+    widen_the_view(dt)
+    Camera.motion_blur = orbiting? ? 0.0 : FULL_STREAKS * rush
+    tremble(SHAKE * rush) unless orbiting?
+  end
+
+  def widen_the_view(dt)
     @fov += (CALM_FOV + (FAST_FOV - CALM_FOV) * rush - @fov) * [FOV_QUICKNESS * dt, MAX_BLEND].min
     Camera.fov = @fov
-    Camera.motion_blur = orbiting? ? 0.0 : FULL_STREAKS * rush
-    tremble = SHAKE * rush
-    return if tremble.zero? || orbiting?
+  end
+
+  # Shakes the camera by up to `size` meters, sideways and up and down.
+  def tremble(size)
+    return if size.zero?
 
     time = Time.elapsed * SHAKE_SPEED
-    transform.position = transform.position +
-                         transform.right * (Math.sin(time) * tremble) +
-                         Vector3.up * (Math.sin(time * SHAKE_VERTICAL) * tremble)
+    sideways = transform.right * (Math.sin(time) * size)
+    transform.position = transform.position + sideways + Vector3.up * (Math.sin(time * SHAKE_VERTICAL) * size)
   end
 
   def follow(blend)

@@ -11,7 +11,7 @@ class Caption < Behaviour
 
   def update(_dt)
     UI.text("RedGem City", x: MARGIN, y: TITLE_Y, size: TITLE_SIZE)
-    light = TrafficController.instance&.green_axis
+    light = TrafficController.instance.green_axis
     UI.text(LABELS.fetch(light, "All red"), x: MARGIN, y: STATUS_Y, size: STATUS_SIZE, color: light ? :green : :red)
     UI.text("Models: Kenney (CC0)", x: MARGIN, y: WINDOW_HEIGHT - CREDITS_Y_FROM_BOTTOM, size: STATUS_SIZE,
                                     color: :gray)

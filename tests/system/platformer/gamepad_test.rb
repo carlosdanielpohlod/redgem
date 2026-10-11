@@ -8,6 +8,8 @@ HALFWAY = -0.5
 MIN_WALK = 1.5        # meters covered by a full push
 MIN_JUMP = 0.3
 STILL = 0.01
+RUNNING = 1.0         # Time.scale while the game goes on
+SCALE_TOLERANCE = 0.001
 
 SystemTest.define do |t|
   player = Scene.find("Player")
@@ -39,7 +41,7 @@ SystemTest.define do |t|
   t.assert("the game is frozen while paused") { player.transform.position.distance_to(frozen_at) < STILL }
   t.press_button(:a)
   t.wait
-  t.assert("A picks Resume") { !menu.open? && Time.scale == 1.0 }
+  t.assert("A picks Resume") { !menu.open? && (Time.scale - RUNNING).abs < SCALE_TOLERANCE }
   t.wait(JUMP_FRAMES)
   t.assert("... without making the hero jump") { player.transform.position.y < ground + MIN_JUMP }
 end

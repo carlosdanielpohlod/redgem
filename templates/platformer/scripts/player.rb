@@ -1,4 +1,5 @@
-# The hero: WASD / arrows or a gamepad's left stick to walk, Space or the gamepad's A to jump. Needs body = "character" on the object.
+# The hero: WASD / arrows or a gamepad's left stick to walk, Space or the gamepad's A to jump.
+# Needs body = "character" on the object.
 class Player < Behaviour
   SPEED = 6.0
   JUMP_SPEED = 8.0
@@ -19,24 +20,36 @@ class Player < Behaviour
   def collect_coin
     @coins += 1
     Audio.play(:coin)
-    GameMenu.instance&.finish("You got every coin!") if @coins == @total
+    GameMenu.instance.finish("You got every coin!") if @coins == @total
   end
 
   def update(dt)
     return draw_hud if dt.zero?  # a menu is open: its buttons are not the hero's
 
-    direction = Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).clamped
-    character.move(direction * prop(:speed, SPEED))
-    if Input.action_pressed?(:jump) && character.grounded?
-      character.jump(prop(:jump_speed, JUMP_SPEED))
-      Audio.play(:jump)
-    end
-    unless direction == Vector3.zero
-      transform.rotation = Vector3.new(0, Math.atan2(-direction.x, -direction.z) * DEGREES_PER_RADIAN, 0)
-    end
+    move(Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).clamped)
     transform.position = @spawn if transform.position.y < FALL_LIMIT
     draw_hud
   end
 
   def draw_hud = UI.text("Coins: #{@coins}/#{@total}", x: HUD_X, y: HUD_Y, size: HUD_SIZE, color: :gold)
+
+  private
+
+  # Walks, jumps and turns the way the player asks.
+  def move(direction)
+    character.move(direction * prop(:speed, SPEED))
+    jump if Input.action_pressed?(:jump) && character.grounded?
+    face(direction) unless direction == Vector3.zero
+  end
+
+  def jump
+    character.jump(prop(:jump_speed, JUMP_SPEED))
+    Audio.play(:jump)
+  end
+
+  # Turns the hero so its forward (-Z) points along the movement direction.
+  def face(direction)
+    yaw = Math.atan2(-direction.x, -direction.z) * DEGREES_PER_RADIAN
+    transform.rotation = Vector3.new(0, yaw, 0)
+  end
 end

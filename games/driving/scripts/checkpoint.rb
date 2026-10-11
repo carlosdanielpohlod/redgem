@@ -5,6 +5,6 @@ class Checkpoint < Behaviour
   def on_trigger_enter(other)
     return unless other.get_component(Car)
 
-    RaceManager.instance&.reach(order)
+    RaceManager.instance.reach(order)
   end
 end

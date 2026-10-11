@@ -21,17 +21,21 @@ class Footprint
   # (Separating axes: two rectangles are apart when their shadows on one of their sides' directions
   # do not overlap.)
   def push_out_of(other)
-    shortest = nil
+    overlaps = []
     (axes + other.axes).each do |axis_x, axis_z|
-      offset = (@x - other.x) * axis_x + (@z - other.z) * axis_z
-      overlap = reach(axis_x, axis_z) + other.reach(axis_x, axis_z) - offset.abs
-      return nil unless overlap.positive?
-      next if shortest && overlap >= shortest[0]
-
-      away = offset.negative? ? -1.0 : 1.0
-      shortest = [overlap, axis_x * away, axis_z * away]
+      overlaps << overlap_along(axis_x, axis_z, other)
+      return nil unless overlaps.last.first.positive?
     end
-    [shortest[1] * shortest[0], shortest[2] * shortest[0]]
+    depth, away_x, away_z = overlaps.min_by(&:first)
+    [away_x * depth, away_z * depth]
+  end
+
+  # How deep the two rectangles are into each other along a direction, and which way along it
+  # leads this one out: [depth, away_x, away_z]. They are apart when the depth is not positive.
+  def overlap_along(axis_x, axis_z, other)
+    offset = (@x - other.x) * axis_x + (@z - other.z) * axis_z
+    away = offset.negative? ? -1.0 : 1.0
+    [reach(axis_x, axis_z) + other.reach(axis_x, axis_z) - offset.abs, axis_x * away, axis_z * away]
   end
 
   def touches?(other) = !push_out_of(other).nil?

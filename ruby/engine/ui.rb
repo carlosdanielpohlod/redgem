@@ -30,10 +30,19 @@ module UI
   BUTTON_TEXT_SHARE = 0.42   # text height as a share of the button's height
   FIELD_MAX_LENGTH = 64
   FIELD_PADDING = 14         # pixels between a text field's edge and its text
-  FIELD_CARET = "_"
+  FIELD_CARET = "_".freeze
   CONTINUATION_MASK = 0xC0
   CONTINUATION_BITS = 0x80
   PRESSED_SHADE = 0.8        # a held button is this much darker
+
+  # A color [r, g, b] darkened to a share of its brightness.
+  def self.shade(color, share) = rgb(color).map { |channel| (channel * share).to_i }
+
+  # How tall the text of a button or a text field of that height is.
+  def self.label_size(height) = (height * BUTTON_TEXT_SHARE).to_i
+
+  # Where something `size` tall starts to sit in the middle of a span from `start`, `length` long.
+  def self.centered(start, length, size) = start + (length - size) / 2
 
   def self.rgb(color)
     color.is_a?(Array) ? color : COLORS.fetch(color) { raise ArgumentError, "unknown color #{color.inspect}" }
@@ -70,8 +79,8 @@ module UI
     value = chop(value) if Input.pressed?(:backspace)
     value = chop(value) while letters(value) > max_length
     rect(x: x, y: y, width: width, height: height, color: color, alpha: BUTTON_ALPHA, radius: BUTTON_RADIUS)
-    size = (height * BUTTON_TEXT_SHARE).to_i
-    text(value + FIELD_CARET, x: x + FIELD_PADDING, y: y + (height - size) / 2, size: size, color: text_color)
+    size = label_size(height)
+    text(value + FIELD_CARET, x: x + FIELD_PADDING, y: centered(y, height, size), size: size, color: text_color)
     value
   end
 
@@ -97,11 +106,13 @@ module UI
   def self.button(label, x:, y:, width:, height:, color: BUTTON_COLOR, hover_color: BUTTON_HOVER_COLOR,
                   text_color: :white, size: nil)
     over = mouse_over?(x: x, y: y, width: width, height: height)
-    fill = rgb(over ? hover_color : color)
-    fill = fill.map { |channel| (channel * PRESSED_SHADE).to_i } if over && Input.mouse_down?(:left)
+    fill = button_fill(over ? hover_color : color, pressed: over && Input.mouse_down?(:left))
     rect(x: x, y: y, width: width, height: height, color: fill, alpha: BUTTON_ALPHA, radius: BUTTON_RADIUS)
-    size ||= (height * BUTTON_TEXT_SHARE).to_i
-    text(label, x: x + width / 2, y: y + (height - size) / 2, size: size, color: text_color, align: :center)
+    size ||= label_size(height)
+    text(label, x: centered(x, width, 0), y: centered(y, height, size), size: size, color: text_color, align: :center)
     over && Input.mouse_released?(:left)
   end
+
+  # A held button is darker.
+  def self.button_fill(color, pressed:) = pressed ? shade(color, PRESSED_SHADE) : rgb(color)
 end
