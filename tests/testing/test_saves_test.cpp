@@ -4,7 +4,7 @@
 #include <fstream>
 #include <string>
 
-#include "app/save_store.hpp"
+#include "app/save_location.hpp"
 #include "testing/test_saves.hpp"
 
 using namespace redgem;

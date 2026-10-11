@@ -7,7 +7,6 @@
 #include <map>
 #include <set>
 
-#include "core/config.hpp"
 #include "core/log.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
@@ -15,6 +14,7 @@
 #include "editor/ui/panels.hpp"
 #include "editor/ui/style.hpp"
 #include "physics/body_config.hpp"
+#include "scene/props.hpp"
 #include "script/script_naming.hpp"
 
 namespace redgem::ui {
@@ -22,14 +22,12 @@ namespace {
 
 using namespace editor_config;
 
-constexpr const char* kBodyTypes[] = {"static", "dynamic", "kinematic", "character", "vehicle"};
+// What each of props::kBodyTypes is for, in their order.
 constexpr const char* kBodyDescriptions[] = {"Never moves (floors, walls)", "Falls and gets pushed (crates, balls)",
                                              "Moved by scripts, pushes others", "Walks and jumps (CharacterController)",
                                              "Drives on its wheel children"};
-constexpr const char* kColliders[] = {"box", "sphere", "capsule", "mesh"};
-constexpr int kDefaultBody = 0;                  // "static": what an object with a collider and no body is
-constexpr int kDefaultCollider = 0;              // "box"
-constexpr const char* kVehicleBody = "vehicle";  // wheels are children of an object with this body
+constexpr int kDefaultBody = 0;                                          // the first of props::kBodyTypes
+constexpr int kDefaultCollider = 0;                                      // the first of props::kColliders
 constexpr const char* kLightTypes[] = {"Directional", "Point", "Spot"};  // in LightType's order
 constexpr const char* kPropertyTypes[] = {"Number", "Text", "Toggle"};
 constexpr int kNumberType = 0;  // positions in kPropertyTypes
@@ -85,10 +83,9 @@ enum Channel { kRed, kGreen, kBlue, kAlpha };
 
 // Properties edited by dedicated widgets instead of the generic list.
 const std::set<std::string>& reserved_props() {
-  static const std::set<std::string> keys = {config::kPropScript,  config::kPropBody,        config::kPropCollider,
-                                             config::kPropTrigger, config::kPropMass,        config::kPropTag,
-                                             config::kPropWheel,   config::kPropVisible,     config::kPropPrefab,
-                                             config::kPropTerrain, config::kPropTerrainSize, config::kPropTerrainCells};
+  static const std::set<std::string> keys = {
+      props::kScript, props::kBody,    props::kCollider, props::kTrigger, props::kMass,        props::kTag,
+      props::kWheel,  props::kVisible, props::kPrefab,   props::kTerrain, props::kTerrainSize, props::kTerrainCells};
   return keys;
 }
 
@@ -170,7 +167,7 @@ std::optional<PropertyValue> text_or_nothing(const std::string& text) {
 }
 
 bool has_physics(const PropertyMap& props) {
-  return body_config_from_props(props).wants_physics() || props.count(config::kPropCollider) != 0;
+  return body_config_from_props(props).wants_physics() || props.count(props::kCollider) != 0;
 }
 
 // --- Widgets -----------------------------------------------------------------------------------
@@ -218,7 +215,7 @@ bool choose(const char* id, Enum& value, const char* const (&names)[Count]) {
 
 // The scripts attached to an object, in order.
 std::vector<std::string> scripts_of(EditorSession& session, int index) {
-  return split_script_list(get_string(session.document().node(index).props, config::kPropScript).value_or(""));
+  return split_script_list(get_string(session.document().node(index).props, props::kScript).value_or(""));
 }
 
 const char* object_icon(const NodeDesc& node) {
@@ -244,24 +241,24 @@ void draw_name_field(EditorSession& session, int index) {
 }
 
 void draw_tag_field(EditorSession& session, int index) {
-  const std::string current = get_string(session.document().node(index).props, config::kPropTag).value_or("");
+  const std::string current = get_string(session.document().node(index).props, props::kTag).value_or("");
   property_label("Tag");
   const auto tag = text_field(kTagId, index, current, "untagged");
   if (!tag || !is_object(session, tag->object)) return;
-  set_or_remove(session, tag->object, config::kPropTag, text_or_nothing(tag->text));
+  set_or_remove(session, tag->object, props::kTag, text_or_nothing(tag->text));
 }
 
 // Visible and Template, side by side.
 void draw_flags(EditorSession& session, int index) {
   const PropertyMap& props = session.document().node(index).props;
-  bool visible = get_bool(props, config::kPropVisible).value_or(true);
+  bool visible = get_bool(props, props::kVisible).value_or(true);
   if (ImGui::Checkbox("Visible", &visible)) {
-    set_or_remove(session, index, config::kPropVisible, flag_or_nothing(!visible, false));
+    set_or_remove(session, index, props::kVisible, flag_or_nothing(!visible, false));
   }
   ImGui::SameLine();
-  bool prefab = get_bool(props, config::kPropPrefab).value_or(false);
+  bool prefab = get_bool(props, props::kPrefab).value_or(false);
   if (ImGui::Checkbox("Template", &prefab)) {
-    set_or_remove(session, index, config::kPropPrefab, flag_or_nothing(prefab, true));
+    set_or_remove(session, index, props::kPrefab, flag_or_nothing(prefab, true));
   }
   tooltip("Templates are hidden in the game and copied with Scene.spawn(\"Name\", position: ...).");
 }
@@ -431,7 +428,7 @@ void draw_camera(EditorSession& session, int index) {
 // --- Scripts -----------------------------------------------------------------------------------
 
 void write_scripts(EditorSession& session, int index, const std::vector<std::string>& scripts) {
-  set_or_remove(session, index, config::kPropScript, text_or_nothing(join_script_list(scripts)));
+  set_or_remove(session, index, props::kScript, text_or_nothing(join_script_list(scripts)));
 }
 
 // The card of one attached script: a button that opens it, or a warning when its file is gone.
@@ -473,7 +470,7 @@ void draw_scripts(PanelContext& context, int index) {
 void remove_physics(EditorSession& session, int index) {
   SceneDocument& doc = session.document();
   doc.checkpoint();
-  for (const char* key : {config::kPropBody, config::kPropCollider, config::kPropMass, config::kPropTrigger}) {
+  for (const char* key : {props::kBody, props::kCollider, props::kMass, props::kTrigger}) {
     if (doc.node(index).props.count(key) != 0) doc.remove_prop(index, key, false);
   }
   doc.drop_checkpoint_if_unchanged();
@@ -513,7 +510,7 @@ void draw_terrain(PanelContext& context, int index) {
 bool draw_trigger_row(EditorSession& session, int index, bool& trigger) {
   property_label("Trigger");
   if (ImGui::Checkbox(kTriggerId, &trigger)) {
-    set_or_remove(session, index, config::kPropTrigger, flag_or_nothing(trigger, true));
+    set_or_remove(session, index, props::kTrigger, flag_or_nothing(trigger, true));
     return true;
   }
   tooltip("Detects overlaps (on_trigger_enter) instead of colliding.");
@@ -521,12 +518,12 @@ bool draw_trigger_row(EditorSession& session, int index, bool& trigger) {
 }
 
 bool draw_body_row(EditorSession& session, int index, const PropertyMap& props) {
-  const int count = static_cast<int>(std::size(kBodyTypes));
-  const std::string current = get_string(props, config::kPropBody).value_or(kBodyTypes[kDefaultBody]);
-  int type = editor_logic::index_of(kBodyTypes, count, current, kDefaultBody);
+  const int count = static_cast<int>(std::size(props::kBodyTypes));
+  const std::string current = get_string(props, props::kBody).value_or(props::kBodyTypes[kDefaultBody]);
+  int type = editor_logic::index_of(props::kBodyTypes, count, current, kDefaultBody);
   property_label("Body");
-  if (ImGui::Combo(kBodyId, &type, kBodyTypes, count)) {
-    set_or_remove(session, index, config::kPropBody, PropertyValue(std::string(kBodyTypes[type])));
+  if (ImGui::Combo(kBodyId, &type, props::kBodyTypes, count)) {
+    set_or_remove(session, index, props::kBody, PropertyValue(std::string(props::kBodyTypes[type])));
     return true;
   }
   tooltip(kBodyDescriptions[type]);
@@ -534,12 +531,12 @@ bool draw_body_row(EditorSession& session, int index, const PropertyMap& props) 
 }
 
 bool draw_collider_row(EditorSession& session, int index, const PropertyMap& props) {
-  const int count = static_cast<int>(std::size(kColliders));
-  const std::string current = get_string(props, config::kPropCollider).value_or(kColliders[kDefaultCollider]);
-  int collider = editor_logic::index_of(kColliders, count, current, kDefaultCollider);
+  const int count = static_cast<int>(std::size(props::kColliders));
+  const std::string current = get_string(props, props::kCollider).value_or(props::kColliders[kDefaultCollider]);
+  int collider = editor_logic::index_of(props::kColliders, count, current, kDefaultCollider);
   property_label("Collider");
-  if (!ImGui::Combo(kColliderId, &collider, kColliders, count)) return false;
-  set_or_remove(session, index, config::kPropCollider, PropertyValue(std::string(kColliders[collider])));
+  if (!ImGui::Combo(kColliderId, &collider, props::kColliders, count)) return false;
+  set_or_remove(session, index, props::kCollider, PropertyValue(std::string(props::kColliders[collider])));
   return true;
 }
 
@@ -547,13 +544,13 @@ void draw_mass_row(EditorSession& session, int index, float mass) {
   property_label("Mass");
   if (!ImGui::DragFloat(kMassId, &mass, kDragSpeedNumber, kMinMass, FLT_MAX, "%.2f kg")) return;
   g_stream.before_change(session.document());
-  session.document().set_prop(index, config::kPropMass, static_cast<double>(std::max(mass, kMinMass)), false);
+  session.document().set_prop(index, props::kMass, static_cast<double>(std::max(mass, kMinMass)), false);
 }
 
 // The rows of the Physics card, until one of them changes the object.
 void draw_physics_rows(EditorSession& session, int index, const BodyConfig& body) {
   const PropertyMap& props = session.document().node(index).props;
-  bool trigger = get_bool(props, config::kPropTrigger).value_or(false);
+  bool trigger = get_bool(props, props::kTrigger).value_or(false);
   if (draw_trigger_row(session, index, trigger)) return;
   if (!trigger && draw_body_row(session, index, props)) return;
   if (draw_collider_row(session, index, props)) return;
@@ -580,14 +577,13 @@ void draw_physics(EditorSession& session, int index) {
 void draw_wheel(EditorSession& session, int index) {
   const NodeDesc& node = session.document().node(index);
   if (node.parent == kNoIndex) return;
-  const auto parent_body = get_string(session.document().node(node.parent).props, config::kPropBody);
-  const bool is_wheel = get_bool(node.props, config::kPropWheel).value_or(false);
-  if (parent_body != std::optional<std::string>(kVehicleBody) && !is_wheel) return;
+  const auto parent_body = get_string(session.document().node(node.parent).props, props::kBody);
+  const bool is_wheel = get_bool(node.props, props::kWheel).value_or(false);
+  if (parent_body != std::optional<std::string>(props::kBodyVehicle) && !is_wheel) return;
   if (!component_header(ICON_FA_CAR, "Vehicle wheel")) return;
   bool wheel = is_wheel;
   property_label("Is a wheel");
-  if (ImGui::Checkbox(kWheelId, &wheel))
-    set_or_remove(session, index, config::kPropWheel, flag_or_nothing(wheel, true));
+  if (ImGui::Checkbox(kWheelId, &wheel)) set_or_remove(session, index, props::kWheel, flag_or_nothing(wheel, true));
 }
 
 // --- Custom properties -------------------------------------------------------------------------
@@ -715,9 +711,9 @@ void add_property_menu(EditorSession& session, int index) {
 }
 
 void add_body_menu(EditorSession& session, int index) {
-  for (int i = 0; i < static_cast<int>(std::size(kBodyTypes)); ++i) {
-    if (ImGui::MenuItem(kBodyTypes[i])) {
-      set_or_remove(session, index, config::kPropBody, PropertyValue(std::string(kBodyTypes[i])));
+  for (int i = 0; i < static_cast<int>(std::size(props::kBodyTypes)); ++i) {
+    if (ImGui::MenuItem(props::kBodyTypes[i])) {
+      set_or_remove(session, index, props::kBody, PropertyValue(std::string(props::kBodyTypes[i])));
     }
     tooltip(kBodyDescriptions[i]);
   }
@@ -730,7 +726,7 @@ void draw_component_choices(PanelContext& context, int index) {
   const bool no_physics = !has_physics(session.document().node(index).props);
   menu(ICON_FA_WEIGHT_HANGING "  Physics body", [&session, index] { add_body_menu(session, index); }, no_physics);
   if (ImGui::MenuItem(ICON_FA_BULLSEYE "  Trigger", nullptr, false, no_physics)) {
-    set_or_remove(session, index, config::kPropTrigger, PropertyValue(true));
+    set_or_remove(session, index, props::kTrigger, PropertyValue(true));
   }
   menu(ICON_FA_SLIDERS "  Property", [&session, index] { add_property_menu(session, index); });
 }

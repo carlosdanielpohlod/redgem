@@ -1,14 +1,11 @@
 #pragma once
 
+#include "core/embed.hpp"
+
 namespace redgem::fonts {
 
-// A TrueType file built into the binary.
-struct EmbeddedFont {
-  const unsigned char* data = nullptr;
-  int size = 0;
-};
-
-EmbeddedFont interface_font();  // Inter
-EmbeddedFont code_font();       // JetBrains Mono
+// The font the editor shows code in (JetBrains Mono), built into the program. (The interface's
+// own font is the one games draw texts with: render/ui_font.hpp.)
+EmbeddedFile code_font();
 
 }  // namespace redgem::fonts

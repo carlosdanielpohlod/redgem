@@ -2,7 +2,8 @@
 
 #include <cmath>
 
-#include "core/config.hpp"
+#include "scene/scene_config.hpp"
+#include "scene/props.hpp"
 
 namespace redgem {
 namespace {
@@ -247,11 +248,11 @@ const std::vector<PrimitiveShape>& all_primitives() {
 const char* primitive_collider(PrimitiveShape shape) {
   switch (shape) {
     case PrimitiveShape::Sphere:
-      return config::kColliderSphere;
+      return props::kColliderSphere;
     case PrimitiveShape::Capsule:
-      return config::kColliderCapsule;
+      return props::kColliderCapsule;
     default:
-      return config::kColliderBox;
+      return props::kColliderBox;
   }
 }
 

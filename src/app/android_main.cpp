@@ -13,8 +13,9 @@
 #include <string>
 #include <vector>
 
+#include "app/android_bundle.hpp"
 #include "app/engine.hpp"
-#include "app/game_project.hpp"
+#include "app/bundled_game.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "core/platform.hpp"
@@ -26,9 +27,9 @@ namespace {
 
 using namespace redgem;
 
-constexpr const char* kHomeVariable = "HOME";
-constexpr const char* kManifestAsset = "game.files";  // the paths of the game's files, one per line
-constexpr const char* kStampAsset = "game.stamp";     // changes with every build of the APK
+// Where saves and settings are kept inside the app's own storage (where they have always been:
+// moving them would lose the saves of the games already installed).
+constexpr const char* kUserDataFolder = ".config/redgem";
 constexpr std::size_t kCopyChunkBytes = 64 * 1024;
 
 std::string read_asset(AAssetManager* assets, const std::string& name) {
@@ -66,7 +67,7 @@ std::string read_file(const std::filesystem::path& file) {
 // Copies the files the APK's list names into `home`. How many there were; 0, with the reason
 // logged, when the game could not be unpacked.
 int copy_game_files(AAssetManager* assets, const std::filesystem::path& home) {
-  std::istringstream manifest(read_asset(assets, kManifestAsset));
+  std::istringstream manifest(read_asset(assets, kAndroidManifestAsset));
   int copied = 0;
   for (std::string path; std::getline(manifest, path);) {
     if (path.empty()) continue;
@@ -82,8 +83,8 @@ int copy_game_files(AAssetManager* assets, const std::filesystem::path& home) {
 
 // Copies the game out of the APK unless this build of it is already there.
 bool unpack_game(AAssetManager* assets, const std::filesystem::path& home) {
-  const std::string stamp = read_asset(assets, kStampAsset);
-  const std::filesystem::path stamp_file = home / kStampAsset;
+  const std::string stamp = read_asset(assets, kAndroidStampAsset);
+  const std::filesystem::path stamp_file = home / kAndroidStampAsset;
   if (!stamp.empty() && read_file(stamp_file) == stamp) return true;
   std::error_code ignored;
   std::filesystem::remove_all(home / kBundledGameFolder, ignored);
@@ -121,8 +122,15 @@ int play_unpacked_game(const android_app* app) {
 int main(int, char**) {
   const android_app* app = GetAndroidApp();
   const std::filesystem::path home = app->activity->internalDataPath;
-  // Saves and settings live in the app's storage, and the game's files are found from there.
-  platform::set_environment(kHomeVariable, home.string(), true);
+  // Saves and settings live in the app's storage: the platform layer is told where.
+  platform::set_user_data_dir(home / kUserDataFolder);
+  // The game is played from a path relative to the app's storage ("game"), with that storage as
+  // the working folder. It cannot be an absolute path: raylib opens every file it loads on Android
+  // (pictures, sounds, music) through its own fopen, which first looks in the APK's assets and
+  // then prepends the app's storage path to whatever name it was given, absolute or not. The
+  // engine's own reading (the scene, the scripts, game.json) goes through the C++ library, which
+  // resolves a relative path against the working folder. Changing to the storage folder is what
+  // makes both mean the same file.
   if (chdir(home.c_str()) != 0 || !unpack_game(app->activity->assetManager, home)) {
     log::error("the game could not be unpacked into " + home.string());
     return kExitFailure;

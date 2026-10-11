@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "core/config.hpp"
 #include "render/render_math.hpp"
 #include "test_support.hpp"
 

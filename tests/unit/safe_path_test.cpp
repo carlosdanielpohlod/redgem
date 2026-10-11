@@ -4,9 +4,9 @@
 #include <fstream>
 #include <string>
 
-#include "audio/audio.hpp"
 #include "app/engine.hpp"
 #include "core/safe_path.hpp"
+#include "testing/recording_audio.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -67,7 +67,7 @@ TEST_CASE("an asset is found by a safe name only, and a refused name is said in 
 
 TEST_CASE("a sound outside the sounds folder is not played") {
   const Scratch scratch;
-  RecordingAudio audio;
+  testing::RecordingAudio audio;
   audio.set_sounds_dir(scratch.assets);
   CHECK(audio.play_sound("jump", 1.0f, 1.0f));
   CHECK_FALSE(audio.play_sound("../secret", 1.0f, 1.0f));

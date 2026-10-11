@@ -2,6 +2,8 @@
 
 #include <filesystem>
 
+#include "render/gpu_select.hpp"
+
 namespace redgem::testing {
 
 struct SystemTestOptions {
@@ -9,6 +11,7 @@ struct SystemTestOptions {
   std::filesystem::path test_file;       // a Ruby file that calls SystemTest.define
   std::filesystem::path screenshot_dir;  // where the test's t.screenshot pictures go
   bool headless = false;                 // no window (and so no pictures)
+  GpuChoice gpu = GpuChoice::Auto;       // the graphics card the window opens on
 };
 
 // Plays a game with a system test at the controls: the real game, frame by frame, with the keys,

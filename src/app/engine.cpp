@@ -6,11 +6,14 @@
 #include <string>
 
 #include "core/config.hpp"
+#include "physics/physics_config.hpp"
+#include "scene/props.hpp"
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
 #include "input/raylib_input_source.hpp"
 #include "physics/body_config.hpp"
-#include "app/game_project.hpp"
+#include "app/save_location.hpp"
+#include "render/gpu_profile.hpp"
 #include "render/renderer.hpp"
 #include "scene/gltf_loader.hpp"
 
@@ -20,14 +23,6 @@ namespace {
 constexpr float kWheelRotationTolerance = 1e-3f;
 
 Vec3 gravity() { return {0.0f, config::kGravityY, 0.0f}; }
-
-Bounds default_bounds() {
-  const Vec3 half = Vec3::one() * config::kDefaultColliderHalfExtent;
-  Bounds bounds;
-  bounds.include(-half);
-  bounds.include(half);
-  return bounds;
-}
 
 bool simulated(BodyType type) {
   return type == BodyType::Dynamic || type == BodyType::Character || type == BodyType::Static ||
@@ -77,7 +72,7 @@ std::optional<std::string> Engine::load_first_scene() {
     return std::nullopt;
   }
   const std::filesystem::path scene_path = options_.game_dir / config::kSceneFileName;
-  LoadResult loaded = load_gltf_scene(scene_path.string());
+  LoadResult loaded = load_gltf_scene(scene_path.string(), gpu_profile::kMaxSkinJoints);
   if (!loaded.ok) return loaded.error;
   for (const std::string& warning : loaded.warnings) log::warning(warning);
   scene_desc_ = std::move(loaded.scene);
@@ -100,8 +95,9 @@ void Engine::open_window(GameSettings settings) {
         static_cast<int>(std::lround(static_cast<float>(settings.window_height) * options_.screen_aspect));
     context_.screen_width = settings.window_width;
   }
-  renderer_ = std::make_unique<Renderer>(
-      RenderSettings{settings.window_width, settings.window_height, settings.title, options_.show_fps});
+  RenderSettings window{settings.window_width, settings.window_height, settings.title, options_.show_fps};
+  window.gpu = options_.gpu;
+  renderer_ = std::make_unique<Renderer>(window);
   renderer_->upload(scene_desc_);
   renderer_->set_images_dir(options_.game_dir / config::kImagesDirName);
   context_.measure_text = [this](const std::string& text, int size) { return renderer_->text_width(text, size); };
@@ -110,7 +106,7 @@ void Engine::open_window(GameSettings settings) {
 void Engine::open_audio() {
   if (options_.audio == nullptr) {
     owned_audio_ =
-        options_.headless ? std::unique_ptr<AudioSystem>(std::make_unique<RecordingAudio>()) : create_raylib_audio();
+        options_.headless ? std::unique_ptr<AudioSystem>(std::make_unique<NullAudio>()) : create_raylib_audio();
   }
   audio().set_sounds_dir(options_.game_dir / config::kSoundsDirName);
 }
@@ -173,7 +169,7 @@ bool Engine::safe_scene_name(const std::string& name) {
 
 void Engine::load_scene(const std::string& name) {
   if (!safe_scene_name(name)) return;
-  LoadResult loaded = load_gltf_scene(scene_path(name).string());
+  LoadResult loaded = load_gltf_scene(scene_path(name).string(), gpu_profile::kMaxSkinJoints);
   if (!loaded.ok) {
     log::error("cannot load scene '" + name + "': " + loaded.error);
     return;
@@ -234,7 +230,7 @@ BodyDesc Engine::describe_body(ObjectId id, BodyConfig config) const {
 }
 
 Bounds Engine::bounds_of(const GameObject& object) const {
-  return object.mesh != kNoIndex ? scene_desc_.meshes[object.mesh].bounds : default_bounds();
+  return object.mesh != kNoIndex ? scene_desc_.meshes[object.mesh].bounds : default_collider_bounds();
 }
 
 ObjectId Engine::spawn(ObjectId source, const std::optional<Transform>& world, bool physics) {
@@ -257,7 +253,7 @@ std::vector<WheelDesc> Engine::collect_wheels(ObjectId vehicle) const {
   std::vector<WheelDesc> wheels;
   for (const ObjectId child : scene_.at(vehicle).children) {
     const GameObject& object = scene_.at(child);
-    if (!get_bool(object.props, config::kPropWheel).value_or(false)) continue;
+    if (!get_bool(object.props, props::kWheel).value_or(false)) continue;
     if (!approx_equal(object.local.rotation, Quat::identity(), kWheelRotationTolerance)) {
       log::warning("wheel '" + object.name +
                    "' has an unapplied rotation; apply it in Blender (Ctrl+A) so its "
@@ -445,9 +441,23 @@ void Engine::render() {
   context_.screenshot_requests.clear();
   if (renderer_) {
     renderer_->set_motion_blur(context_.motion_blur);
+    const TouchLayout* touch = device_input_ ? device_input_->touch_layout() : nullptr;
     renderer_->draw(scene_, context_.hud, screenshots, &particles_,
-                    device_input_ ? device_input_->touch_layout() : nullptr);
+                    touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>());
   }
+}
+
+std::vector<ControlCircle> control_circles(const TouchLayout& layout) {
+  const auto button = [](const TouchCircle& at) {
+    return ControlCircle{at.x, at.y, at.radius,
+                         at.pressed ? ControlCircle::Look::Pressed : ControlCircle::Look::Resting};
+  };
+  const TouchCircle& base = layout.stick_base;
+  return {{base.x, base.y, base.radius, ControlCircle::Look::Base},
+          button(layout.stick_knob),
+          button(layout.a),
+          button(layout.b),
+          button(layout.start)};
 }
 
 std::vector<std::filesystem::path> screenshot_files(const std::filesystem::path& folder,

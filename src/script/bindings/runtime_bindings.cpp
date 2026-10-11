@@ -4,7 +4,7 @@
 #include <mruby/array.h>
 #include <mruby/string.h>
 
-#include "core/config.hpp"
+#include "script/script_config.hpp"
 #include "core/log.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"

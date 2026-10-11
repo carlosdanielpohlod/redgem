@@ -3,6 +3,8 @@
 #include <cstdlib>
 
 #include "core/log.hpp"
+#include "core/platform.hpp"
+#include "core/files.hpp"
 #include "editor/script_files.hpp"
 
 namespace redgem {
@@ -66,7 +68,7 @@ void ScriptEditor::check_syntax() {
 
 void ScriptEditor::open_externally() const {
   if (!is_open()) return;
-  open_in_system(path());
+  platform::open_in_system(path());
 }
 
 }  // namespace redgem

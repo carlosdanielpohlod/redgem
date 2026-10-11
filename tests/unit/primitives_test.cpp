@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include "core/config.hpp"
+#include "scene/scene_config.hpp"
 #include "scene/primitives.hpp"
 #include "test_support.hpp"
 

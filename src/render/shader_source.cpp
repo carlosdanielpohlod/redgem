@@ -1,16 +1,11 @@
 #include "render/shader_source.hpp"
 
-#include "core/config.hpp"
+#include "render/gpu_profile.hpp"
 #include "render/shaders.hpp"
 
 namespace redgem::shaders {
 namespace {
 
-#if defined(GRAPHICS_API_OPENGL_ES3)
-constexpr const char* kHeaderOfThisGpu = kMobileHeader;
-#else
-constexpr const char* kHeaderOfThisGpu = kDesktopVersionLine;
-#endif
 constexpr const char* kDefine = "\n#define ";
 constexpr const char* kNameValueSeparator = " ";
 
@@ -28,7 +23,7 @@ std::string with_header(const std::string& source, const std::string& header, in
 }
 
 std::string for_this_gpu(const char* source) {
-  return with_header(source, kHeaderOfThisGpu, config::kMaxSkinJoints, kMaxPointLights);
+  return with_header(source, gpu_profile::kShaderHeader, gpu_profile::kMaxSkinJoints, kMaxPointLights);
 }
 
 }  // namespace redgem::shaders

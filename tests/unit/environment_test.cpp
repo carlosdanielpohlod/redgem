@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
-#include "core/config.hpp"
+#include "render/render_config.hpp"
+#include "scene/props.hpp"
 #include "render/environment.hpp"
 #include "test_support.hpp"
 
@@ -173,7 +174,7 @@ TEST_CASE("the lights of prefabs do not shine until they are spawned") {
   SceneDesc desc;
   NodeDesc lamp = light_node(LightType::Point, kLampWatts);
   NodeDesc prefab_lamp = light_node(LightType::Point, kLampWatts);
-  prefab_lamp.props[config::kPropPrefab] = true;
+  prefab_lamp.props[props::kPrefab] = true;
   desc.nodes = {lamp, prefab_lamp};
   CHECK(scene_lights(Scene::from_desc(desc)).points.size() == kOneLamp);
 }

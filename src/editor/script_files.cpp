@@ -1,14 +1,9 @@
 #include "editor/script_files.hpp"
 
-#include "core/platform.hpp"
-
 #include <cctype>
-#include <cstdlib>
-#include <fstream>
-#include <sstream>
 
 #include "core/config.hpp"
-#include "core/log.hpp"
+#include "core/files.hpp"
 #include "script/script_naming.hpp"
 
 namespace redgem {
@@ -75,32 +70,6 @@ std::optional<std::string> create_script(const std::filesystem::path& scripts_di
   std::filesystem::create_directories(scripts_dir, fs_error);
   if (!write_text_file(path, script_template(file_name), error)) return std::nullopt;
   return file_name;
-}
-
-std::optional<std::string> read_text_file(const std::filesystem::path& path, std::string& error) {
-  std::ifstream in(path, std::ios::binary);
-  if (!in) {
-    error = "cannot read " + path.string();
-    return std::nullopt;
-  }
-  std::stringstream buffer;
-  buffer << in.rdbuf();
-  return buffer.str();
-}
-
-bool write_text_file(const std::filesystem::path& path, const std::string& text, std::string& error) {
-  std::ofstream out(path, std::ios::binary | std::ios::trunc);
-  if (!out || !out.write(text.data(), static_cast<std::streamsize>(text.size()))) {
-    error = "cannot write " + path.string();
-    return false;
-  }
-  return true;
-}
-
-void open_in_system(const std::filesystem::path& path) {
-  // (The desktop opens it: the command is the platform's own, with the path quoted.)
-  const int status = std::system(platform::open_command(path).c_str());  // NOLINT(bugprone-command-processor)
-  if (status != 0) log::warning("could not open " + path.string());
 }
 
 }  // namespace redgem

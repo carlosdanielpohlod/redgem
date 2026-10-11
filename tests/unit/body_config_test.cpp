@@ -3,8 +3,9 @@
 #include <string>
 #include <utility>
 
-#include "core/config.hpp"
+#include "physics/physics_config.hpp"
 #include "physics/body_config.hpp"
+#include "scene/props.hpp"
 
 using namespace redgem;
 
@@ -78,11 +79,32 @@ TEST_CASE("body types have the names scenes use, but none cannot be asked for") 
   CHECK(none.warnings.size() == 1);
 }
 
+TEST_CASE("every body type and collider a list offers is one the physics knows") {
+  for (const char* name : props::kBodyTypes) {
+    CAPTURE(name);
+    const BodyConfig config = body_config_from_props({{"body", std::string(name)}});
+    CHECK(std::string(body_type_name(config.type)) == name);
+    CHECK(config.warnings.empty());
+  }
+  for (const char* name : props::kColliders) {
+    CAPTURE(name);
+    CHECK(body_config_from_props({{"collider", std::string(name)}}).warnings.empty());
+  }
+  CHECK(body_config_from_props({{"body", std::string(props::kBodyStatic)}}).type == BodyType::Static);
+}
+
+TEST_CASE("an object without a mesh collides as a small cube around it") {
+  const Bounds bounds = default_collider_bounds();
+  CHECK(bounds.half_extents().x == doctest::Approx(config::kDefaultColliderHalfExtent));
+  CHECK(bounds.half_extents().y == doctest::Approx(config::kDefaultColliderHalfExtent));
+  CHECK(bounds.half_extents().z == doctest::Approx(config::kDefaultColliderHalfExtent));
+}
+
 TEST_CASE("each collider name gives its shape") {
-  const std::pair<const char*, ColliderShape> colliders[] = {{config::kColliderBox, ColliderShape::Box},
-                                                             {config::kColliderSphere, ColliderShape::Sphere},
-                                                             {config::kColliderCapsule, ColliderShape::Capsule},
-                                                             {config::kColliderMesh, ColliderShape::Mesh}};
+  const std::pair<const char*, ColliderShape> colliders[] = {{props::kColliderBox, ColliderShape::Box},
+                                                             {props::kColliderSphere, ColliderShape::Sphere},
+                                                             {props::kColliderCapsule, ColliderShape::Capsule},
+                                                             {props::kColliderMesh, ColliderShape::Mesh}};
   for (const auto& [name, shape] : colliders) {
     CAPTURE(name);
     const BodyConfig config = body_config_from_props({{"collider", std::string(name)}});

@@ -12,10 +12,17 @@
 #include <nlohmann/json.hpp>
 
 #include "app/engine.hpp"
-#include "app/game_project.hpp"
-#include "app/notices.hpp"
+#include "app/bundled_game.hpp"
+#include "app/game_settings.hpp"
+#include "project/game_build.hpp"
+#include "project/game_templates.hpp"
+#include "project/recent_games.hpp"
+#include "project/notices.hpp"
 #include "audio/audio.hpp"
 #include "core/config.hpp"
+#include "app/app_config.hpp"
+#include "core/files.hpp"
+#include "core/platform.hpp"
 #include "editor/script_files.hpp"
 #include "scene/gltf_loader.hpp"
 #include "test_support.hpp"
@@ -204,7 +211,7 @@ TEST_CASE("recently opened games are remembered, newest first, and missing ones 
   CHECK(recent[1].filename() == "second");
   std::filesystem::remove_all(root / "second");
   CHECK(read_recent_games(file).size() == 1);
-  CHECK(recent_games_file().filename() == "recent.json");
+  CHECK(recent_games_file() == platform::user_data_dir() / "recent.json");
   CHECK(default_games_folder().filename() == "RedGemGames");
   std::filesystem::remove_all(root);
 }

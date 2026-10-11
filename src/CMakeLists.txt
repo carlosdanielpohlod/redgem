@@ -32,7 +32,7 @@ add_custom_command(
   COMMENT "Embedding game templates"
   VERBATIM)
 
-# The licenses that travel with every built game (see app/notices.hpp), embedded in the binary.
+# The licenses that travel with every built game (see project/notices.hpp), embedded in the binary.
 set(REDGEM_LICENSE_SOURCES ${CMAKE_SOURCE_DIR}/LICENSE ${CMAKE_SOURCE_DIR}/THIRD_PARTY_LICENSES.md)
 set(REDGEM_LICENSES_HEADER ${REDGEM_GENERATED_DIR}/generated/licenses.hpp)
 add_custom_command(
@@ -47,10 +47,10 @@ add_library(redgem_engine STATIC
   ${REDGEM_PRELUDE_HEADER}
   ${REDGEM_TEMPLATES_HEADER}
   ${REDGEM_LICENSES_HEADER}
-  app/notices.cpp
   core/log.cpp
   core/xml_writer.cpp
   core/platform.cpp
+  core/files.cpp
   core/safe_path.cpp
   core/math.cpp
   core/fixed_clock.cpp
@@ -106,6 +106,7 @@ add_library(redgem_engine STATIC
   render/shader_source.cpp
   render/environment.cpp
   render/gpu_select.cpp
+  render/ui_font.cpp
   render/culling.cpp
   editor/glb_file.cpp
   editor/gltf_json.cpp
@@ -113,7 +114,6 @@ add_library(redgem_engine STATIC
   editor/scene_document.cpp
   editor/editor_camera.cpp
   editor/editor_logic.cpp
-  editor/window_picture.cpp
   editor/picking.cpp
   editor/editor_session.cpp
   editor/console_log.cpp
@@ -122,7 +122,6 @@ add_library(redgem_engine STATIC
   editor/script_editor.cpp
   editor/script_workspace.cpp
   editor/project_files.cpp
-  editor/project_hub.cpp
   editor/ui/script_editor_panel.cpp
   editor/ui/hierarchy_panel.cpp
   editor/ui/inspector_panel.cpp
@@ -131,12 +130,20 @@ add_library(redgem_engine STATIC
   editor/ui/create_menu.cpp
   editor/ui/style.cpp
   editor/ui/embedded_fonts.cpp
-  app/game_project.cpp
-  app/save_store.cpp
-  app/android_package.cpp
+  app/game_settings.cpp
+  app/bundled_game.cpp
+  storage/save_store.cpp
+  app/save_location.cpp
   app/user_settings.cpp
-  app/cli.cpp
-  app/engine.cpp)
+  app/engine.cpp
+  project/notices.cpp
+  project/game_templates.cpp
+  project/game_build.cpp
+  project/android_package.cpp
+  project/recent_games.cpp
+  project/project_hub.cpp
+  project/editor_setup.cpp
+  project/cli.cpp)
 
 target_include_directories(redgem_engine PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
@@ -158,7 +165,7 @@ if(ANDROID)
   target_include_directories(redgem SYSTEM PRIVATE ${ANDROID_NDK}/sources/android/native_app_glue)
   target_link_options(redgem PRIVATE -u ANativeActivity_onCreate)
 else()
-  add_executable(redgem app/main.cpp)
+  add_executable(redgem project/main.cpp)
   target_link_libraries(redgem PRIVATE redgem_engine)
   # On Windows it is what games ship as: a windowed program, with no console window behind it.
   set_target_properties(redgem PROPERTIES WIN32_EXECUTABLE ON)
@@ -173,8 +180,20 @@ if(NOT ANDROID)
   add_subdirectory(testing)
 endif()
 
-# The editor's fonts are assembled into the binary (.incbin): rebuild when they change.
-set(REDGEM_EDITOR_FONT_DIR ${CMAKE_SOURCE_DIR}/assets/editor/fonts)
+# The oldest Android a game's app runs on is written once, in a file the build of the engine for
+# Android (tools/android/build_runtime.sh) reads as well: the app's manifest and the engine inside
+# it always agree.
+file(STRINGS ${CMAKE_SOURCE_DIR}/tools/android/min_api.txt REDGEM_ANDROID_MIN_API LIMIT_COUNT 1)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tools/android/min_api.txt)
+set_source_files_properties(project/android_package.cpp PROPERTIES
+  COMPILE_DEFINITIONS "REDGEM_ANDROID_MIN_API=${REDGEM_ANDROID_MIN_API}")
+
+# The fonts are assembled into the binary (core/embed.hpp): rebuild when they change. The one
+# texts are drawn with belongs to the renderer and is in every game; the code font is the editor's.
+set(REDGEM_FONT_DIR ${CMAKE_SOURCE_DIR}/assets/editor/fonts)
+set_source_files_properties(render/ui_font.cpp PROPERTIES
+  COMPILE_DEFINITIONS "REDGEM_UI_FONT_FILE=\"${REDGEM_FONT_DIR}/InterVariable.ttf\""
+  OBJECT_DEPENDS "${REDGEM_FONT_DIR}/InterVariable.ttf")
 set_source_files_properties(editor/ui/embedded_fonts.cpp PROPERTIES
-  COMPILE_DEFINITIONS "REDGEM_EDITOR_FONT_DIR=\"${REDGEM_EDITOR_FONT_DIR}\""
-  OBJECT_DEPENDS "${REDGEM_EDITOR_FONT_DIR}/InterVariable.ttf;${REDGEM_EDITOR_FONT_DIR}/JetBrainsMono-Regular.ttf")
+  COMPILE_DEFINITIONS "REDGEM_CODE_FONT_FILE=\"${REDGEM_FONT_DIR}/JetBrainsMono-Regular.ttf\""
+  OBJECT_DEPENDS "${REDGEM_FONT_DIR}/JetBrainsMono-Regular.ttf")

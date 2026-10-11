@@ -8,11 +8,12 @@
 
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
-#include "editor/ui/embedded_fonts.hpp"
 #include "render/image_header.hpp"
 #include "render/mesh_builder.hpp"
 #include "render/shader_source.hpp"
 #include "render/shaders.hpp"
+#include "render/ui_font.hpp"
+#include "render/render_config.hpp"
 
 namespace redgem {
 namespace {
@@ -425,7 +426,7 @@ void Renderer::Impl::upload_new_meshes(const SceneDesc& desc) {
 // --- Texts and pictures -----------------------------------------------------------------------
 
 void Renderer::Impl::load_ui_font() {
-  const fonts::EmbeddedFont inter = fonts::interface_font();
+  const EmbeddedFile inter = embedded_ui_font();
   std::vector<int> letters = ui_letters();  // (not const: raylib takes them as plain int*)
   ui_font = LoadFontFromMemory(kFontFileType, inter.data, inter.size, kUiFontPixels, letters.data(),
                                static_cast<int>(letters.size()));

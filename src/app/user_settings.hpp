@@ -4,17 +4,9 @@
 #include <optional>
 #include <string>
 
+#include "render/gpu_select.hpp"
+
 namespace redgem {
-
-// Which graphics card draws the editor and the games on machines that have two.
-enum class GpuChoice {
-  Auto,        // the dedicated card when there is one (the default)
-  Dedicated,   // same as Auto today; kept apart so the choice survives a change of default
-  Integrated,  // the low-power card: cooler and quieter, much slower
-};
-
-const char* gpu_choice_name(GpuChoice choice);  // "auto", "dedicated", "integrated"
-std::optional<GpuChoice> gpu_choice_from_name(const std::string& name);
 
 // Preferences of this user on this machine (not of a game): ~/.config/redgem/settings.json.
 struct UserSettings {
@@ -31,8 +23,9 @@ bool write_user_settings(const std::filesystem::path& file, const UserSettings& 
 GpuChoice resolve_gpu_choice(const std::optional<std::string>& command_line,
                              const std::optional<std::string>& environment, const UserSettings& settings);
 
-// Resolves the choice for this process and publishes it (as REDGEM_GPU) for the renderer,
-// which reads it when it opens the window. Call before any window is created.
-GpuChoice apply_gpu_choice(const std::optional<std::string>& command_line);
+// The card for this run of the program: what its command line asked for, else what the user's
+// environment (REDGEM_GPU, read here and nowhere else) or saved settings say. Whoever opens a
+// window is handed the answer.
+GpuChoice gpu_choice_for_run(const std::optional<std::string>& command_line);
 
 }  // namespace redgem

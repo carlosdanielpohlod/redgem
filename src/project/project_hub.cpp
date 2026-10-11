@@ -1,4 +1,4 @@
-#include "editor/project_hub.hpp"
+#include "project/project_hub.hpp"
 
 #include <imgui.h>
 #include <imgui_stdlib.h>
@@ -7,14 +7,16 @@
 
 #include <algorithm>
 
-#include "app/game_project.hpp"
+#include "app/game_settings.hpp"
+#include "core/files.hpp"
+#include "project/game_templates.hpp"
+#include "project/recent_games.hpp"
 #include "core/platform.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/ui/style.hpp"
-#include "editor/window_picture.hpp"
 #include "render/gpu_select.hpp"
 
 namespace redgem {
@@ -107,7 +109,7 @@ bool accent_button(const char* label, float width) {
 }  // namespace
 
 ProjectHub::ProjectHub(Options options) : options_(std::move(options)), template_(kDefaultTemplate) {
-  prefer_discrete_gpu();
+  prefer_discrete_gpu(options_.gpu);
   SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
   InitWindow(kHubWidth, kHubHeight, kHubTitle);
   SetExitKey(KEY_NULL);  // Esc leaves text fields; only the close button quits
@@ -182,10 +184,6 @@ void ProjectHub::frame() {
   rlImGuiBegin();
   draw();
   rlImGuiEnd();
-  if (screenshot_) {
-    save_window_picture(*screenshot_);
-    screenshot_.reset();
-  }
   EndDrawing();
 }
 

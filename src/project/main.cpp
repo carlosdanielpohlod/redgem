@@ -1,3 +1,7 @@
+// redgem: one program for everything a game is made and played with. It opens the editor and the
+// project hub, does what the command line asks (new, build, relay, --play) and, started with no
+// arguments beside a game's files, plays that game.
+
 #include <chrono>
 #include <thread>
 #include <exception>
@@ -9,13 +13,16 @@
 
 #include "net/relay_server.hpp"
 #include "core/exit_codes.hpp"
-#include "app/cli.hpp"
+#include "project/cli.hpp"
 #include "app/engine.hpp"
-#include "app/game_project.hpp"
+#include "app/bundled_game.hpp"
+#include "project/editor_setup.hpp"
+#include "project/game_build.hpp"
+#include "project/game_templates.hpp"
+#include "project/recent_games.hpp"
 #include "app/user_settings.hpp"
 #include "editor/editor_app.hpp"
-#include "editor/project_hub.hpp"
-#include "core/config.hpp"
+#include "project/project_hub.hpp"
 #include "core/log.hpp"
 #include "core/platform.hpp"
 
@@ -26,13 +33,13 @@ constexpr float kRelayPollSeconds = 0.005f;  // between looks at the relay's con
 
 // The game to open: the one given, else the one picked in the project hub (which shows why the
 // last one did not open). False when the hub was closed instead.
-bool pick_game(std::filesystem::path& game, std::string& hub_message) {
+bool pick_game(std::filesystem::path& game, std::string& hub_message, redgem::GpuChoice gpu) {
   using namespace redgem;
   if (!game.empty()) {
     remember_game(recent_games_file(), game);
     return true;
   }
-  ProjectHub hub({default_games_folder(), recent_games_file()});
+  ProjectHub hub({default_games_folder(), recent_games_file(), gpu});
   hub.show_error(hub_message);
   hub_message.clear();
   const auto chosen = hub.run();
@@ -42,9 +49,10 @@ bool pick_game(std::filesystem::path& game, std::string& hub_message) {
 
 // One game in the editor, until the editor is left. The exit code, or nullopt to go (back) to the
 // hub: a broken game from the command line exits; from the hub it returns there.
-std::optional<int> edit_game(const std::filesystem::path& game, bool from_command_line, std::string& hub_message) {
+std::optional<int> edit_game(const std::filesystem::path& game, bool from_command_line, std::string& hub_message,
+                             redgem::GpuChoice gpu) {
   using namespace redgem;
-  auto created = EditorApp::create(game);
+  auto created = EditorApp::create(game, editor_options(gpu));
   if (auto* error = std::get_if<std::string>(&created)) {
     log::error(*error);
     if (from_command_line) return kExitFailure;
@@ -62,8 +70,10 @@ int run_editor(const redgem::CliOptions& options) {
   std::filesystem::path game = options.game_dir;
   bool from_command_line = !game.empty();
   std::string hub_message;  // why the last game did not open, shown in the hub
-  while (pick_game(game, hub_message)) {
-    if (const auto code = edit_game(game, from_command_line, hub_message)) return *code;
+  // Chosen once, before the first window: the hub and every editor opened from it use the same card.
+  const redgem::GpuChoice gpu = redgem::gpu_choice_for_run(options.gpu);
+  while (pick_game(game, hub_message, gpu)) {
+    if (const auto code = edit_game(game, from_command_line, hub_message, gpu)) return *code;
     from_command_line = false;
     game.clear();  // back to the hub
   }
@@ -114,10 +124,7 @@ int play(const redgem::EngineOptions& options) {
 }
 
 int play_game(const redgem::CliOptions& options) {
-  redgem::EngineOptions engine;
-  engine.game_dir = options.game_dir;
-  engine.screenshot_dir = options.screenshot_dir;
-  return play(engine);
+  return play(redgem::developer_play_options(options, redgem::gpu_choice_for_run(options.gpu)));
 }
 
 int show_help(const redgem::CliOptions&) {
@@ -194,9 +201,9 @@ std::optional<int> play_bundled_game(const std::vector<std::string>& args) {
   if (!args.empty()) return std::nullopt;
   const auto game = bundled_game(platform::executable_path());
   if (!game) return std::nullopt;
-  apply_gpu_choice(std::nullopt);
   EngineOptions options;
   options.game_dir = *game;
+  options.gpu = gpu_choice_for_run(std::nullopt);
   return reporting_errors([&options] { return play(options); });
 }
 
@@ -209,7 +216,6 @@ int run_command_line(const std::vector<std::string>& args) {
     std::cerr << cli.error << "\n\n" << usage();
     return kExitUsage;
   }
-  apply_gpu_choice(cli.options.gpu);
   return run_mode(cli.options);
 }
 

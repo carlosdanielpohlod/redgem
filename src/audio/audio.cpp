@@ -2,6 +2,7 @@
 
 #include <raylib.h>
 
+#include <map>
 #include <set>
 
 #include "core/log.hpp"
@@ -109,18 +110,6 @@ class RaylibAudio final : public AudioSystem {
 std::optional<std::filesystem::path> find_sound_file(const std::filesystem::path& sounds_dir, const std::string& name) {
   // (A name that reaches outside the sounds folder finds nothing.)
   return find_asset_file(sounds_dir, name, kSoundExtensions);
-}
-
-bool RecordingAudio::play_sound(const std::string& name, float, float) {
-  if (!find_sound_file(sounds_dir_, name)) return false;
-  played_.push_back(name);
-  return true;
-}
-
-bool RecordingAudio::play_music(const std::string& name, bool, float) {
-  if (!find_sound_file(sounds_dir_, name)) return false;
-  music_ = name;
-  return true;
 }
 
 std::unique_ptr<AudioSystem> create_raylib_audio() { return std::make_unique<RaylibAudio>(); }

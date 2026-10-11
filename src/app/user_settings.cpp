@@ -7,41 +7,19 @@
 
 #include <nlohmann/json.hpp>
 
-#include "app/game_project.hpp"
-#include "editor/script_files.hpp"
+#include "core/files.hpp"
 
 namespace redgem {
 namespace {
 
 constexpr const char* kSettingsFileName = "settings.json";
 constexpr const char* kGpuKey = "gpu";
-constexpr const char* kGpuVariable = "REDGEM_GPU";
+constexpr const char* kGpuVariable = "REDGEM_GPU";  // the user's choice of card for what is started from a shell
 constexpr int kJsonIndent = 2;
-
-struct NamedChoice {
-  GpuChoice choice;
-  const char* name;
-};
-constexpr NamedChoice kChoices[] = {
-    {GpuChoice::Auto, "auto"}, {GpuChoice::Dedicated, "dedicated"}, {GpuChoice::Integrated, "integrated"}};
 
 }  // namespace
 
-const char* gpu_choice_name(GpuChoice choice) {
-  for (const NamedChoice& named : kChoices) {
-    if (named.choice == choice) return named.name;
-  }
-  return kChoices[0].name;
-}
-
-std::optional<GpuChoice> gpu_choice_from_name(const std::string& name) {
-  for (const NamedChoice& named : kChoices) {
-    if (name == named.name) return named.choice;
-  }
-  return std::nullopt;
-}
-
-std::filesystem::path user_settings_file() { return recent_games_file().parent_path() / kSettingsFileName; }
+std::filesystem::path user_settings_file() { return platform::user_data_dir() / kSettingsFileName; }
 
 UserSettings read_user_settings(const std::filesystem::path& file) {
   UserSettings settings;
@@ -71,13 +49,11 @@ GpuChoice resolve_gpu_choice(const std::optional<std::string>& command_line,
   return settings.gpu;
 }
 
-GpuChoice apply_gpu_choice(const std::optional<std::string>& command_line) {
+GpuChoice gpu_choice_for_run(const std::optional<std::string>& command_line) {
   const char* variable = std::getenv(kGpuVariable);
   const std::optional<std::string> environment =
       variable != nullptr ? std::optional<std::string>(variable) : std::nullopt;
-  const GpuChoice choice = resolve_gpu_choice(command_line, environment, read_user_settings(user_settings_file()));
-  platform::set_environment(kGpuVariable, gpu_choice_name(choice), true);
-  return choice;
+  return resolve_gpu_choice(command_line, environment, read_user_settings(user_settings_file()));
 }
 
 }  // namespace redgem

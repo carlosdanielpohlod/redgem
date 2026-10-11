@@ -1,4 +1,4 @@
-#include "app/android_package.hpp"
+#include "project/android_package.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -10,14 +10,16 @@
 #include <string_view>
 #include <vector>
 
-#include "app/game_project.hpp"
-#include "app/notices.hpp"
+#include "app/android_bundle.hpp"
+#include "core/files.hpp"
+#include "app/bundled_game.hpp"
+#include "project/game_build.hpp"
+#include "app/game_settings.hpp"
+#include "project/notices.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "core/platform.hpp"
 #include "core/xml_writer.hpp"
-
-#include <nlohmann/json.hpp>
 
 namespace redgem {
 
@@ -37,7 +39,6 @@ constexpr const char* kKeyOwner = "CN=RedGem";            // who the engine's ow
 constexpr const char* kPasswordFromEnvironment = "env:";  // apksigner: the password is in this variable
 constexpr const char* kPackagePrefix = "com.redgem.";
 constexpr const char* kFallbackPackage = "game";
-constexpr const char* kLibraryFile = "libredgem.so";
 constexpr const char* kAssetsFolder = "assets";
 constexpr const char* kLibrariesFolder = "lib";
 constexpr const char* kManifestFile = "AndroidManifest.xml";
@@ -51,21 +52,13 @@ constexpr const char* kKeystoreFile = "android-debug.keystore";
 constexpr const char* kKeyAlias = "redgem";
 constexpr const char* kKeyPassword = "redgem-debug";
 constexpr const char* kEnginePasswordVariable = "REDGEM_ENGINE_KEY_PASSWORD";
-constexpr const char* kAndroidSection = "android";
-constexpr const char* kSettingsFileName = "game.json";
-// What the section says.
-constexpr const char* kPackageKey = "package";
-constexpr const char* kVersionCodeKey = "version_code";
-constexpr const char* kVersionNameKey = "version_name";
-constexpr const char* kKeystoreKey = "keystore";
-constexpr const char* kKeyAliasKey = "key_alias";
-constexpr char kPackageSeparator = '.';
 constexpr char kPackageJoiner = '_';
 constexpr const char* kHashFormat = "%06x";  // six hex digits
-constexpr std::size_t kMaxPackageLength = 150;
 constexpr int kKeyValidityDays = 10000;
-constexpr int kZipAlignment = 4;    // bytes: what Android wants uncompressed entries aligned to
-constexpr int kMinAndroidApi = 26;  // Android 8 (the engine is built for it, see tools/android)
+constexpr int kZipAlignment = 4;  // bytes: what Android wants uncompressed entries aligned to
+// The oldest Android the app runs on: the one the engine is built for. It is written once, in
+// tools/android/min_api.txt, which the build of the engine for Android reads as well.
+constexpr int kMinAndroidApi = REDGEM_ANDROID_MIN_API;
 constexpr int kTargetAndroidApi = 34;
 constexpr int kKeyBits = 2048;
 // The manifest's elements and attributes, by the names Android gives them.
@@ -119,15 +112,9 @@ constexpr const char* kHandledChanges =
 constexpr const char* kOpenGlEs3 = "0x00030000";           // what the manifest calls OpenGL ES 3.0
 constexpr const char* kStageFolder = ".redgem-apk-stage";  // inside the output folder, gone when the build ends
 constexpr const char* kToolLog = "tool-output.log";
-constexpr std::size_t kShownToolLines = 12;  // of a failed tool's output
-constexpr const char* kLineBreaks = "\n\r";  // what the list of an app's files is split at
-constexpr char kSkippedFolderPrefix = '_';   // the SDK's packer leaves such folders out
-// The SDK's tools are run through a POSIX shell.
-#ifdef _WIN32
-constexpr bool kBuildsOnThisSystem = false;
-#else
-constexpr bool kBuildsOnThisSystem = true;
-#endif
+constexpr std::size_t kShownToolLines = 12;       // of a failed tool's output
+constexpr const char* kLineBreaks = "\n\r";       // what the list of an app's files is split at
+constexpr char kSkippedFolderPrefix = '_';        // the SDK's packer leaves such folders out
 constexpr std::uint32_t kHashSeed = 2166136261u;  // FNV-1a
 constexpr std::uint32_t kHashPrime = 16777619u;
 constexpr std::uint32_t kHashShown = 0xFFFFFF;  // six hex digits of it
@@ -289,83 +276,9 @@ std::string android_package_name(const std::filesystem::path& game_dir) {
 
 namespace {
 
-// A part of an app's id: a small letter followed by small letters, digits or underscores.
-bool valid_package_part(std::string_view part) {
-  if (part.empty() || std::islower(static_cast<unsigned char>(part.front())) == 0) return false;
-  return std::all_of(part.begin() + 1, part.end(),
-                     [](unsigned char letter) { return small_letter_or_digit(letter) || letter == kPackageJoiner; });
-}
-
-// An app's id is at least two parts joined by dots, each a small letter followed by small
-// letters, digits or underscores ("com.mystudio.my_game").
-bool valid_package(const std::string& package) {
-  if (package.size() > kMaxPackageLength || package.find(kPackageSeparator) == std::string::npos) return false;
-  std::string_view rest = package;
-  for (std::size_t dot = rest.find(kPackageSeparator); dot != std::string_view::npos;
-       dot = rest.find(kPackageSeparator)) {
-    if (!valid_package_part(rest.substr(0, dot))) return false;
-    rest.remove_prefix(dot + 1);
-  }
-  return valid_package_part(rest);
-}
-
 bool in_environment(const char* variable) {
   const char* value = std::getenv(variable);
   return value != nullptr && *value != '\0';
-}
-
-std::string settings_place() { return std::string(kSettingsFileName) + ": android."; }
-
-// A text the section may hold under `key`, left as it is when it does not.
-bool read_text(const nlohmann::json& section, const char* key, std::string& into, std::string& error) {
-  if (!section.contains(key)) return true;
-  if (!section[key].is_string()) {
-    error = settings_place() + key + " must be a text";
-    return false;
-  }
-  into = section[key].get<std::string>();
-  return true;
-}
-
-bool read_version_code(const nlohmann::json& section, int& into, std::string& error) {
-  if (!section.contains(kVersionCodeKey)) return true;
-  const nlohmann::json& code = section[kVersionCodeKey];
-  if (!code.is_number_integer() || code < 1) {
-    error = settings_place() + "version_code must be a whole number, 1 or more";
-    return false;
-  }
-  into = code.get<int>();
-  return true;
-}
-
-bool read_section(const nlohmann::json& section, AndroidSettings& settings, std::string& error) {
-  if (!section.is_object()) {
-    error = std::string(kSettingsFileName) + ": android must be a section ({ ... })";
-    return false;
-  }
-  std::string keystore;
-  if (!read_text(section, kPackageKey, settings.package, error) ||
-      !read_text(section, kVersionNameKey, settings.version_name, error) ||
-      !read_text(section, kKeystoreKey, keystore, error) ||
-      !read_text(section, kKeyAliasKey, settings.key_alias, error)) {
-    return false;
-  }
-  settings.keystore = keystore;
-  return read_version_code(section, settings.version_code, error);
-}
-
-// Whether what was read can be used together.
-bool check_settings(const AndroidSettings& settings, std::string& error) {
-  if (!settings.package.empty() && !valid_package(settings.package)) {
-    error = settings_place() +
-            "package must look like com.mystudio.mygame (small letters, digits and _, parts joined by dots)";
-    return false;
-  }
-  if (!settings.keystore.empty() && settings.key_alias.empty()) {
-    error = settings_place() + "key_alias is needed with a keystore: the name of the key inside it";
-    return false;
-  }
-  return true;
 }
 
 // The engine's own key. (The tools read its password from the environment, where this process puts it.)
@@ -413,12 +326,10 @@ std::optional<SigningKey> developer_key(const std::filesystem::path& game_dir, c
 }  // namespace
 
 bool read_android_settings(const std::filesystem::path& game_dir, AndroidSettings& settings, std::string& error) {
-  settings = AndroidSettings{};
-  std::ifstream in(game_dir / kSettingsFileName);
-  if (!in) return true;
-  const nlohmann::json json = nlohmann::json::parse(in, nullptr, false);
-  if (!json.is_object() || !json.contains(kAndroidSection)) return true;
-  return read_section(json[kAndroidSection], settings, error) && check_settings(settings, error);
+  const GameManifest manifest = read_game_manifest(game_dir);
+  settings = manifest.settings.android;
+  if (!manifest.android_error.empty()) error = manifest.android_error;
+  return manifest.android_error.empty();
 }
 
 std::optional<SigningKey> signing_key_for(const std::filesystem::path& game_dir, const AndroidSettings& settings,
@@ -481,7 +392,7 @@ std::map<std::string, std::filesystem::path> android_runtimes(const std::filesys
   std::map<std::string, std::filesystem::path> runtimes;
   std::error_code fs_error;
   for (const auto& entry : std::filesystem::directory_iterator(runtimes_dir, fs_error)) {
-    const std::filesystem::path library = entry.path() / kLibraryFile;
+    const std::filesystem::path library = entry.path() / android_library_file();
     if (std::filesystem::is_regular_file(library, fs_error)) runtimes[entry.path().filename().string()] = library;
   }
   return runtimes;
@@ -544,7 +455,7 @@ bool stage_runtimes(const std::map<std::string, std::filesystem::path>& runtimes
                     const std::filesystem::path& stage_dir, std::string& error) {
   for (const auto& [abi, library] : runtimes) {
     std::error_code fs_error;
-    if (copy_over(library, stage_dir / kLibrariesFolder / abi / kLibraryFile, fs_error)) continue;
+    if (copy_over(library, stage_dir / kLibrariesFolder / abi / android_library_file(), fs_error)) continue;
     error = "cannot copy the engine for " + abi + ": " + fs_error.message();
     return false;
   }
@@ -553,10 +464,14 @@ bool stage_runtimes(const std::map<std::string, std::filesystem::path>& runtimes
 
 // The app's manifest, from what the game says about its app (and about itself).
 bool manifest_for(const std::filesystem::path& game_dir, std::string& manifest, std::string& error) {
-  AndroidSettings settings;
-  if (!read_android_settings(game_dir, settings, error)) return false;
+  const GameManifest game = read_game_manifest(game_dir);
+  if (!game.android_error.empty()) {
+    error = game.android_error;
+    return false;
+  }
+  const AndroidSettings& settings = game.settings.android;
   const std::string package = settings.package.empty() ? android_package_name(game_dir) : settings.package;
-  manifest = android_manifest(package, read_game_settings(game_dir).title, settings);
+  manifest = android_manifest(package, game.settings.title, settings);
   return true;
 }
 
@@ -692,13 +607,13 @@ bool build_apk(const std::filesystem::path& game_dir, const std::filesystem::pat
 std::optional<SigningKey> signing_key_of(const std::filesystem::path& game_dir, std::string& error) {
   AndroidSettings settings;
   if (!read_android_settings(normalized_folder(game_dir), settings, error)) return std::nullopt;
-  return signing_key_for(normalized_folder(game_dir), settings, recent_games_file().parent_path() / kKeystoreFile,
-                         error);
+  return signing_key_for(normalized_folder(game_dir), settings, platform::user_data_dir() / kKeystoreFile, error);
 }
 
 // Whether a build may start: on a system that has the tools, and not into the game itself.
 bool can_build(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir, std::string& error) {
-  if (!kBuildsOnThisSystem) {
+  // (The SDK's tools are run through a POSIX shell.)
+  if (!platform::has_posix_shell()) {
     error = "Android games are built on Linux";
     return false;
   }

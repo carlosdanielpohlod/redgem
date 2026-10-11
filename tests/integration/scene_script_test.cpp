@@ -58,6 +58,11 @@ std::string ruby(Engine& engine, const std::string& code) {
   return RSTRING_PTR(mrb_obj_as_string(mrb, result.value));
 }
 
+// How many behaviours run in the game, counted where a game would count them.
+int behaviour_count(Engine& engine) {
+  return std::stoi(ruby(engine, "Scene.objects.inject(0) { |total, object| total + object.behaviours.size }"));
+}
+
 float x_of(Engine& engine, const std::string& name) {
   const ObjectId id = engine.scene().find(name);
   REQUIRE(id != kNoObject);
@@ -78,7 +83,7 @@ TEST_CASE("the scene script adds behaviours before anything starts") {
   const SceneDesc scene = bare_scene();
   auto engine = directed(scene);
   CHECK(engine->scripts().error_count() == 0);
-  CHECK(engine->scripts().behaviour_count() == kMovers);
+  CHECK(behaviour_count(*engine) == kMovers);
   CHECK(ruby(*engine, "$scene_setups") == "1");
   CHECK(ruby(*engine, "$movers_started_before_setup.inspect") == "nil");
   CHECK(ruby(*engine, "$mover_starts.inspect") == "nil");  // start waits for the first frame
@@ -101,7 +106,7 @@ TEST_CASE("add_component works while the game runs and returns the behaviour") {
   auto engine = directed(scene);
   frames(*engine, 1);
   CHECK(ruby(*engine, "Scene.find('Plain').add_component(Mover, speed: 3.0).class") == "Mover");
-  CHECK(engine->scripts().behaviour_count() == kMovers + 1);
+  CHECK(behaviour_count(*engine) == kMovers + 1);
   CHECK(ruby(*engine, "Scene.find('Plain').behaviours.size") == "2");
   frames(*engine, 1);
   CHECK(ruby(*engine, "$mover_starts") == std::to_string(kMovers + 1));
@@ -115,7 +120,7 @@ TEST_CASE("add_component refuses what is not a Behaviour class") {
   CHECK(ruby(*engine, "Scene.find('Plain').add_component('mover.rb').inspect") == "nil");
   CHECK(engine->scripts().error_count() == 2);
   CHECK(capture.contains("must inherit from Behaviour"));
-  CHECK(engine->scripts().behaviour_count() == kMovers);
+  CHECK(behaviour_count(*engine) == kMovers);
 }
 
 TEST_CASE("classes of the game's scripts load on first use; unknown names still fail") {

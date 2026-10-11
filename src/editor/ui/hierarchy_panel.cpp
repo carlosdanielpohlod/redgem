@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-#include "core/config.hpp"
+#include "scene/props.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/ui/panels.hpp"
@@ -39,7 +39,7 @@ struct Pending {
 const char* icon_of(const NodeDesc& node) {
   if (node.camera) return ICON_FA_VIDEO;
   if (node.light) return node.light->type == LightType::Directional ? ICON_FA_SUN : ICON_FA_LIGHTBULB;
-  if (get_bool(node.props, config::kPropPrefab).value_or(false)) return ICON_FA_CUBES;
+  if (get_bool(node.props, props::kPrefab).value_or(false)) return ICON_FA_CUBES;
   if (node.mesh != kNoIndex) return ICON_FA_CUBE;
   return node.children.empty() ? ICON_FA_CIRCLE_DOT : ICON_FA_LAYER_GROUP;
 }
@@ -89,9 +89,9 @@ RowLabel label_of(const NodeDesc& node) {
   RowLabel label;
   label.name = node.name;
   label.icon = icon_of(node);
-  label.template_object = get_bool(node.props, config::kPropPrefab).value_or(false);
-  label.hidden = !get_bool(node.props, config::kPropVisible).value_or(true);
-  label.has_script = get_string(node.props, config::kPropScript).has_value();
+  label.template_object = get_bool(node.props, props::kPrefab).value_or(false);
+  label.hidden = !get_bool(node.props, props::kVisible).value_or(true);
+  label.has_script = get_string(node.props, props::kScript).has_value();
   return label;
 }
 

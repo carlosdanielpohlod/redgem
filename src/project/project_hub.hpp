@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "render/gpu_select.hpp"
+
 namespace redgem {
 
 // The window shown when the editor starts without a game: recent games, a new game from a
@@ -15,6 +17,7 @@ class ProjectHub {
   struct Options {
     std::filesystem::path games_folder;  // where new games go (and games are listed from)
     std::filesystem::path recent_file;   // recently opened games
+    GpuChoice gpu = GpuChoice::Auto;     // the graphics card the window opens on
   };
   explicit ProjectHub(Options options);
   ~ProjectHub();
@@ -23,6 +26,7 @@ class ProjectHub {
 
   // Runs until a game is chosen or the window is closed (nullopt).
   std::optional<std::filesystem::path> run();
+  // One frame of the hub's window: what run() is a loop of.
   void frame();
 
   // Commands, the same ones the buttons use. Both choose the game on success.
@@ -35,7 +39,6 @@ class ProjectHub {
   const std::string& error() const { return error_; }
   // Shows a message in the hub's error area (e.g. why the game picked last time did not open).
   void show_error(const std::string& message) { error_ = message; }
-  void request_screenshot(const std::filesystem::path& path) { screenshot_ = path; }
 
  private:
   void refresh_games();
@@ -52,7 +55,6 @@ class ProjectHub {
   std::vector<std::filesystem::path> games_;
   std::vector<std::string> titles_;  // game.json titles, read once
   std::optional<std::filesystem::path> chosen_;
-  std::optional<std::filesystem::path> screenshot_;
   std::string error_;
   std::string new_name_;
   std::string template_;

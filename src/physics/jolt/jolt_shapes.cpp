@@ -9,7 +9,8 @@
 #include <algorithm>
 #include <cmath>
 
-#include "core/config.hpp"
+#include "physics/physics_config.hpp"
+#include "scene/scene_config.hpp"
 
 namespace redgem::jolt {
 namespace {

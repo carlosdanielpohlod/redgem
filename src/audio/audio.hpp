@@ -1,11 +1,9 @@
 #pragma once
 
 #include <filesystem>
-#include <map>
 #include <memory>
 #include <optional>
 #include <string>
-#include <vector>
 
 namespace redgem {
 
@@ -31,31 +29,17 @@ class AudioSystem {
 // Finds the file of a sound name; nullopt when no supported file exists.
 std::optional<std::filesystem::path> find_sound_file(const std::filesystem::path& sounds_dir, const std::string& name);
 
-// No audio device (tests, headless runs): resolves files and records what would have played.
-class RecordingAudio final : public AudioSystem {
+// No audio device (an engine without a window): nothing plays, and every sound is said to be missing.
+class NullAudio final : public AudioSystem {
  public:
-  bool play_sound(const std::string& name, float volume, float pitch) override;
-  bool play_music(const std::string& name, bool loop, float volume) override;
-  void stop_music() override { music_.reset(); }
-  void set_music_pitch(float pitch) override { music_pitch_ = pitch; }
-  void set_music_volume(float volume) override { music_volume_ = volume; }
-  float music_pitch() const { return music_pitch_; }
-  float music_volume() const { return music_volume_; }
-  void set_master_volume(float volume) override { master_volume_ = volume; }
+  bool play_sound(const std::string&, float, float) override { return false; }
+  bool play_music(const std::string&, bool, float) override { return false; }
+  void stop_music() override {}
+  void set_music_pitch(float) override {}
+  void set_music_volume(float) override {}
+  void set_master_volume(float) override {}
   void update() override {}
-  void set_sounds_dir(const std::filesystem::path& dir) override { sounds_dir_ = dir; }
-
-  const std::vector<std::string>& played() const { return played_; }
-  const std::optional<std::string>& music() const { return music_; }
-  float master_volume() const { return master_volume_; }
-
- private:
-  std::filesystem::path sounds_dir_;
-  std::vector<std::string> played_;
-  std::optional<std::string> music_;
-  float master_volume_ = 1.0f;
-  float music_pitch_ = 1.0f;
-  float music_volume_ = 1.0f;
+  void set_sounds_dir(const std::filesystem::path&) override {}
 };
 
 // Plays through raylib. Falls back to silence when no audio device is available.

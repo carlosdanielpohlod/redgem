@@ -3,7 +3,7 @@
 #include <Jolt/Physics/Vehicle/VehicleCollisionTester.h>
 #include <Jolt/Physics/Vehicle/WheeledVehicleController.h>
 
-#include "core/config.hpp"
+#include "physics/physics_config.hpp"
 #include "physics/jolt/jolt_shapes.hpp"
 
 namespace redgem::jolt {

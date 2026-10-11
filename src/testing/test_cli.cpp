@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <iterator>
 
-#include "app/game_project.hpp"
+#include "core/files.hpp"
 #include "app/user_settings.hpp"
 #include "core/config.hpp"
 

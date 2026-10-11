@@ -104,3 +104,17 @@ TEST_CASE("skeletons, vertex weights and animations are loaded") {
   CHECK(rigid.scene.skins.empty());
   CHECK(rigid.scene.animations.empty());
 }
+
+TEST_CASE("a scene loaded for a drawer that moves fewer joints has the others follow the last one kept") {
+  const LoadResult whole = load_gltf_scene(fixture("skinned.glb"));
+  REQUIRE(whole.ok);
+  CHECK(whole.warnings.empty());
+  const LoadResult limited = load_gltf_scene(fixture("skinned.glb"), 1);  // the skeleton has two joints
+  REQUIRE(limited.ok);
+  REQUIRE(limited.warnings.size() == 1);
+  CHECK(limited.warnings.front().find("more than 1 joints") != std::string::npos);
+  bool beyond_the_first = false;
+  for (const std::uint8_t joint : whole.scene.meshes[0].primitives[0].joints) beyond_the_first |= joint > 0;
+  CHECK(beyond_the_first);
+  for (const std::uint8_t joint : limited.scene.meshes[0].primitives[0].joints) CHECK(joint == 0);
+}

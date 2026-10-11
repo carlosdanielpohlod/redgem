@@ -4,7 +4,9 @@
 #include <filesystem>
 #include <fstream>
 
-#include "app/save_store.hpp"
+#include "app/save_location.hpp"
+#include "core/platform.hpp"
+#include "storage/save_store.hpp"
 
 using namespace redgem;
 
@@ -67,7 +69,7 @@ TEST_CASE("each game saves in a file named after its folder") {
   const std::filesystem::path player = save_file_for("/somewhere/games/platformer");
   CHECK(player.filename().string().rfind("platformer-", 0) == 0);
   CHECK(player.extension() == ".json");
-  CHECK(player.parent_path().filename() == "saves");
+  CHECK(player.parent_path() == platform::user_data_dir() / "saves");
   // A built game's files sit in a folder called "game" next to its executable.
   CHECK(save_file_for("/somewhere/dist/MyGame/game").filename().string().rfind("MyGame-", 0) == 0);
   CHECK(save_file_for("/somewhere/dist/MyGame/game") == save_file_for("/somewhere/dist/MyGame"));

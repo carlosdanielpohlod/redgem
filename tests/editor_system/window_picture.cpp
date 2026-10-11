@@ -1,12 +1,10 @@
-#include "editor/window_picture.hpp"
+#include "window_picture.hpp"
 
 #include <raylib.h>
-#include <rlgl.h>
 
-namespace redgem {
+namespace redgem::test {
 
 bool save_window_picture(const std::filesystem::path& path) {
-  rlDrawRenderBatchActive();
   Image image = LoadImageFromScreen();
   std::filesystem::create_directories(path.parent_path());
   const bool written = ExportImage(image, path.string().c_str());
@@ -14,4 +12,4 @@ bool save_window_picture(const std::filesystem::path& path) {
   return written;
 }
 
-}  // namespace redgem
+}  // namespace redgem::test

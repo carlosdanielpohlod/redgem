@@ -9,7 +9,10 @@
 #include <utility>
 
 #include "render/culling.hpp"
+#include "render/gpu_profile.hpp"
 #include "render/shaders.hpp"
+#include "render/render_config.hpp"
+#include "scene/scene_config.hpp"
 
 namespace redgem {
 namespace {
@@ -126,7 +129,7 @@ bool Renderer::Impl::pose_skeleton(const Scene& scene, const GameObject& object)
   if (object.skin < 0 || static_cast<std::size_t>(object.skin) >= skins.size()) return false;
   const SkinDesc& skin = skins[static_cast<std::size_t>(object.skin)];
   const std::size_t count =
-      std::min({object.joints.size(), skin.inverse_bind.size(), static_cast<std::size_t>(config::kMaxSkinJoints)});
+      std::min({object.joints.size(), skin.inverse_bind.size(), static_cast<std::size_t>(gpu_profile::kMaxSkinJoints)});
   bone_matrices.resize(count);
   for (std::size_t j = 0; j < count; ++j) {
     if (!scene.is_alive(object.joints[j])) return false;

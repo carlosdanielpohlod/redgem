@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "app/engine.hpp"
+
 namespace redgem {
 
 enum class RunMode { Editor, Game, NewGame, BuildGame, Relay, Help };
@@ -27,6 +29,9 @@ struct CliResult {
 };
 
 CliResult parse_cli(const std::vector<std::string>& args);
+// The engine a game is played with from the command line (--play): the developer's way to play,
+// so it comes with what a developer watches (the frames-per-second counter).
+EngineOptions developer_play_options(const CliOptions& options, GpuChoice gpu = GpuChoice::Auto);
 std::string usage();
 
 }  // namespace redgem

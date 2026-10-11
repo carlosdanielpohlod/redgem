@@ -10,11 +10,13 @@
 #include <set>
 #include <utility>
 
-#include "core/config.hpp"
+#include "scene/scene_config.hpp"
 #include "core/log.hpp"
 #include "editor/gltf_json.hpp"
 #include "editor/model_import.hpp"
+#include "render/gpu_profile.hpp"
 #include "scene/gltf_loader.hpp"
+#include "scene/props.hpp"
 
 namespace redgem {
 namespace {
@@ -34,8 +36,8 @@ constexpr int kUnsignedIntComponent = 5125;       // glTF componentType UNSIGNED
 constexpr int kOnlyPrimitive = 0;                 // a terrain's mesh is a single piece
 constexpr float kCameraNear = 0.1f;               // meters: clip planes of a new camera
 constexpr float kCameraFar = 1000.0f;
-constexpr float kInfiniteRange = 0.0f;            // glTF: a light without a range reaches as far as its strength allows
-constexpr const char* kTerrainCollider = "mesh";  // things stand on the ground as it is shaped
+constexpr float kInfiniteRange = 0.0f;  // glTF: a light without a range reaches as far as its strength allows
+constexpr const char* kTerrainCollider = props::kColliderMesh;  // things stand on the ground as it is shaped
 
 // json[key] as a list (empty when the file has none).
 nlohmann::json list_of(const nlohmann::json& json, const char* key) { return json.value(key, nlohmann::json::array()); }
@@ -278,7 +280,7 @@ std::variant<SceneDocument, std::string> SceneDocument::open(const std::filesyst
 }
 
 std::variant<SceneDocument, std::string> SceneDocument::open_file(const std::filesystem::path& path) {
-  LoadResult loaded = load_gltf_scene(path.string());
+  LoadResult loaded = load_gltf_scene(path.string(), gpu_profile::kMaxSkinJoints);
   if (!loaded.ok) return loaded.error;
   for (const std::string& warning : loaded.warnings) log::warning(warning);
   std::string error;
@@ -338,9 +340,9 @@ void SceneDocument::mark_reshaped(int mesh) {
 std::optional<TerrainGrid> SceneDocument::terrain_grid(int node) const {
   if (node < 0 || node >= node_count()) return std::nullopt;
   const NodeDesc& desc = desc_.nodes[static_cast<std::size_t>(node)];
-  if (!get_bool(desc.props, config::kPropTerrain).value_or(false) || desc.mesh == kNoIndex) return std::nullopt;
-  const TerrainGrid grid{static_cast<float>(get_number(desc.props, config::kPropTerrainSize).value_or(0.0)),
-                         static_cast<int>(get_number(desc.props, config::kPropTerrainCells).value_or(0.0))};
+  if (!get_bool(desc.props, props::kTerrain).value_or(false) || desc.mesh == kNoIndex) return std::nullopt;
+  const TerrainGrid grid{static_cast<float>(get_number(desc.props, props::kTerrainSize).value_or(0.0)),
+                         static_cast<int>(get_number(desc.props, props::kTerrainCells).value_or(0.0))};
   const MeshDesc& mesh = desc_.meshes.at(static_cast<std::size_t>(desc.mesh));
   if (mesh.primitives.size() != 1 || !grid.fits(mesh.primitives.front())) return std::nullopt;
   return grid;
@@ -832,7 +834,7 @@ int SceneDocument::add_primitive(PrimitiveShape shape, const std::string& name, 
   geometry.material = append_plain_material(name, color, kDefaultRoughness);
   NodeDesc node = named_node(name, parent);
   node.mesh = append_mesh(name, geometry);
-  node.props[config::kPropCollider] = std::string(primitive_collider(shape));
+  node.props[props::kCollider] = std::string(primitive_collider(shape));
   return append_node(std::move(node));
 }
 
@@ -842,10 +844,10 @@ int SceneDocument::add_terrain(const std::string& name, const TerrainGrid& grid,
   geometry.material = append_plain_material(name, color, kTerrainRoughness);
   NodeDesc node = named_node(name, parent);
   node.mesh = append_mesh(name, geometry);
-  node.props[config::kPropTerrain] = true;
-  node.props[config::kPropTerrainSize] = static_cast<double>(grid.size);
-  node.props[config::kPropTerrainCells] = static_cast<double>(grid.cells);
-  node.props[config::kPropCollider] = std::string(kTerrainCollider);
+  node.props[props::kTerrain] = true;
+  node.props[props::kTerrainSize] = static_cast<double>(grid.size);
+  node.props[props::kTerrainCells] = static_cast<double>(grid.cells);
+  node.props[props::kCollider] = std::string(kTerrainCollider);
   return append_node(std::move(node));
 }
 
@@ -1006,7 +1008,7 @@ int SceneDocument::import_model_file(const std::filesystem::path& path, std::str
     error = "invalid parent object";
     return kNoIndex;
   }
-  const LoadResult loaded = load_gltf_scene(path.string());
+  const LoadResult loaded = load_gltf_scene(path.string(), gpu_profile::kMaxSkinJoints);
   if (!loaded.ok) {
     error = loaded.error;
     return kNoIndex;

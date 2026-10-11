@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include "core/config.hpp"
+#include "physics/physics_config.hpp"
 #include "physics/jolt/jolt_vehicle.hpp"
 #include "physics/physics_world.hpp"
 

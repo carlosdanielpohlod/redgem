@@ -9,7 +9,7 @@
 #include <optional>
 #include <unordered_map>
 
-#include "core/config.hpp"
+#include "scene/scene_config.hpp"
 #include "core/safe_path.hpp"
 #include "scene/extras_parser.hpp"
 #include "scene/gltf_checks.hpp"
@@ -28,7 +28,7 @@ constexpr const char* kJpegExtension = ".jpg";
 constexpr const char* kPngExtension = ".png";
 constexpr float kOpaqueAlpha = 1.0f;
 constexpr int kJointsPerVertex = config::kJointsPerVertex;
-constexpr cgltf_uint kMaxJointIndex = config::kMaxSkinJoints - 1;
+constexpr cgltf_uint kMaxJointByte = 255;  // the highest joint index a vertex can name
 constexpr std::array<float, kFloatsPerMatrix> kIdentityMatrix = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 
 struct CgltfDeleter {
@@ -145,7 +145,7 @@ std::vector<std::uint8_t> to_joint_bytes(const cgltf_accessor* accessor) {
     cgltf_uint joints[kJointsPerVertex] = {};
     cgltf_accessor_read_uint(accessor, v, joints, kJointsPerVertex);
     for (int j = 0; j < kJointsPerVertex; ++j) {
-      out[v * kJointsPerVertex + j] = static_cast<std::uint8_t>(std::min<cgltf_uint>(joints[j], kMaxJointIndex));
+      out[v * kJointsPerVertex + j] = static_cast<std::uint8_t>(std::min<cgltf_uint>(joints[j], kMaxJointByte));
     }
   }
   return out;
@@ -245,11 +245,15 @@ class Loader {
   Loader(const cgltf_data& data, std::filesystem::path base_dir, LoadResult& result)
       : data_(data), base_dir_(std::move(base_dir)), result_(result) {}
 
+  // How many joints of a skeleton are kept (see load_gltf_scene).
+  void set_max_skin_joints(int joints) { max_skin_joints_ = static_cast<cgltf_uint>(std::max(joints, 1)); }
+
   // Fills the result; returns what made the file unusable, or an empty text.
   std::string run() {
     load_images();
     load_materials();
     load_meshes();
+    limit_joints();
     load_nodes();
     load_skins();
     load_animations();
@@ -355,6 +359,16 @@ class Loader {
     for (cgltf_size i = 0; i < data_.meshes_count; ++i) result_.scene.meshes.push_back(load_mesh(data_.meshes[i]));
   }
 
+  // Vertices of the joints that are not kept follow the last one that is.
+  void limit_joints() {
+    const auto last_kept = static_cast<std::uint8_t>(std::min(max_skin_joints_ - 1, kMaxJointByte));
+    for (MeshDesc& mesh : result_.scene.meshes) {
+      for (PrimitiveDesc& primitive : mesh.primitives) {
+        for (std::uint8_t& joint : primitive.joints) joint = std::min(joint, last_kept);
+      }
+    }
+  }
+
   // A mesh exported without normals is lit as if it faced up everywhere.
   void ensure_normals(PrimitiveDesc& primitive, const std::string& mesh_name) {
     if (primitive.normals.size() == primitive.positions.size()) return;
@@ -420,8 +434,8 @@ class Loader {
     if (skin.inverse_bind_matrices != nullptr && inverse_binds_of(skin, skin.joints_count) == nullptr) {
       warn("skin " + std::to_string(index) + " has no usable inverse bind matrix for each of its joints: none is used");
     }
-    if (skin.joints_count <= kMaxJointIndex + 1) return;
-    warn("skin " + std::to_string(index) + " has more than " + std::to_string(kMaxJointIndex + 1) +
+    if (skin.joints_count <= max_skin_joints_) return;
+    warn("skin " + std::to_string(index) + " has more than " + std::to_string(max_skin_joints_) +
          " joints: vertices of the extra ones follow the last supported joint");
   }
 
@@ -562,6 +576,7 @@ class Loader {
   LoadResult& result_;
   std::vector<bool> added_;  // by glTF node index: already in the scene
   std::string problem_;      // what made the file unusable, when something did
+  cgltf_uint max_skin_joints_ = config::kMaxSkinJoints;
 };
 
 // One step of opening a file: false (and why, in `error`) when it failed.
@@ -599,11 +614,13 @@ CgltfPtr open_gltf(const std::string& path, std::string& error) {
 
 }  // namespace
 
-LoadResult load_gltf_scene(const std::string& path) {
+LoadResult load_gltf_scene(const std::string& path, int max_skin_joints) {
   LoadResult result;
   const CgltfPtr data = open_gltf(path, result.error);
   if (data == nullptr) return result;
-  result.ok = sound(Loader(*data, folder_of(path), result).run(), path, result.error);
+  Loader loader(*data, folder_of(path), result);
+  loader.set_max_skin_joints(std::min(max_skin_joints, config::kMaxSkinJoints));
+  result.ok = sound(loader.run(), path, result.error);
   if (!result.ok) result.scene = SceneDesc{};
   return result;
 }

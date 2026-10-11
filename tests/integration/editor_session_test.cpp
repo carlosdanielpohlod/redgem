@@ -4,7 +4,9 @@
 #include <chrono>
 
 #include "core/config.hpp"
+#include "scene/props.hpp"
 #include "editor/editor_session.hpp"
+#include "core/files.hpp"
 #include "editor/script_files.hpp"
 #include "test_support.hpp"
 
@@ -234,7 +236,7 @@ TEST_CASE("objects created from the menus are placed, selected and undoable") {
   session->attach_script(moved, "lift.rb");
   session->attach_script(moved, "kid.rb");
   session->attach_script(moved, "lift.rb");  // already there
-  CHECK(get_string(session->document().node(moved).props, config::kPropScript) == "lift.rb, kid.rb");
+  CHECK(get_string(session->document().node(moved).props, props::kScript) == "lift.rb, kid.rb");
   std::filesystem::remove_all(dir);
 }
 

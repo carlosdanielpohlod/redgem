@@ -5,6 +5,8 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "render/renderer.hpp"
+#include "testing/recording_audio.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -31,10 +33,12 @@ constexpr float kPushSpeed = 5.0f;
 constexpr float kQuarterTurnDegrees = 90.0f;
 constexpr float kTeleportHeadroom = 1.0f;
 
-std::unique_ptr<Engine> sandbox() {
+// The sandbox game without a window, playing through `audio` when one is given.
+std::unique_ptr<Engine> sandbox(AudioSystem* audio = nullptr) {
   EngineOptions options;
   options.game_dir = fixture("games/sandbox");
   options.headless = true;
+  options.audio = audio;
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   return std::move(std::get<std::unique_ptr<Engine>>(created));
@@ -51,6 +55,11 @@ std::string ruby(Engine& engine, const std::string& code) {
   return RSTRING_PTR(mrb_obj_as_string(mrb, result.value));
 }
 
+// How many behaviours run in the game, counted where a game would count them.
+int behaviour_count(Engine& engine) {
+  return std::stoi(ruby(engine, "Scene.objects.inject(0) { |total, object| total + object.behaviours.size }"));
+}
+
 Vec3 position_of(Engine& engine, const std::string& name) {
   const ObjectId id = engine.scene().find(name);
   REQUIRE(id != kNoObject);
@@ -62,7 +71,7 @@ Vec3 position_of(Engine& engine, const std::string& name) {
 TEST_CASE("sandbox attaches behaviours and reports the missing script") {
   test::LogCapture capture;
   auto engine = sandbox();
-  CHECK(engine->scripts().behaviour_count() == kExpectedBehaviours);
+  CHECK(behaviour_count(*engine) == kExpectedBehaviours);
   CHECK(engine->scripts().error_count() == 1);
   CHECK(capture.contains("does_not_exist.rb"));
 }
@@ -318,11 +327,11 @@ TEST_CASE("Game.load_scene switches scenes at the end of the frame and keeps Rub
 
 TEST_CASE("sounds are looked up in the game's sounds folder") {
   constexpr float kHalfVolume = 0.5f;
-  auto engine = sandbox();
+  testing::RecordingAudio recording;  // made first: the engine plays through it until its end
+  auto engine = sandbox(&recording);
   CHECK(ruby(*engine, "Audio.play(:beep)") == "true");
   CHECK(ruby(*engine, "Audio.play(:nope)") == "false");
   CHECK(ruby(*engine, "Audio.music('beep', loop: false)") == "true");
-  auto& recording = dynamic_cast<RecordingAudio&>(engine->audio());
   CHECK(recording.played() == std::vector<std::string>{"beep"});
   CHECK(recording.music() == "beep");
   // Music can be bent while it plays (an engine's note following the car's speed).
@@ -333,6 +342,20 @@ TEST_CASE("sounds are looked up in the game's sounds folder") {
   ruby(*engine, "Audio.stop_music; Audio.volume = " + std::to_string(kHalfVolume));
   CHECK_FALSE(recording.music().has_value());
   CHECK(recording.master_volume() == doctest::Approx(kHalfVolume));
+}
+
+TEST_CASE("an engine without a window and without an audio of its options is silent") {
+  auto engine = sandbox();
+  const int errors_before = engine->scripts().error_count();
+  CHECK(ruby(*engine, "Audio.play(:beep)") == "false");
+  CHECK(ruby(*engine, "Audio.music('beep', loop: false)") == "false");
+  ruby(*engine, "Audio.music_pitch = 1.5; Audio.stop_music; Audio.volume = 0.5");  // asked of nobody: no harm
+  CHECK(engine->scripts().error_count() == errors_before);
+}
+
+TEST_CASE("the frames-per-second counter is for whoever asks for it") {
+  CHECK_FALSE(EngineOptions{}.show_fps);
+  CHECK_FALSE(RenderSettings{}.show_fps);
 }
 
 TEST_CASE("the scene's animations play: bones move over time and loop") {
@@ -358,4 +381,22 @@ TEST_CASE("the scene's animations play: bones move over time and loop") {
   for (int i = 0; i < kHalfSecondFrames + 1; ++i) engine.frame(config::kFixedDeltaSeconds);
   CHECK(std::fabs(engine.scene().at(upper).local.rotation.x - rest.x) < kMinTurn);
   std::filesystem::remove_all(game);
+}
+
+TEST_CASE("a touch screen's controls reach the renderer as plain circles, the stick's ring under the rest") {
+  TouchLayout layout;
+  layout.stick_base = {100.0f, 500.0f, 90.0f, true};  // (a finger on the ring does not light it up)
+  layout.stick_knob = {120.0f, 480.0f, 40.0f, true};
+  layout.a = {1100.0f, 520.0f, 50.0f, false};
+  layout.b = {1200.0f, 440.0f, 50.0f, true};
+  layout.start = {640.0f, 60.0f, 30.0f, false};
+  const std::vector<ControlCircle> circles = control_circles(layout);
+  REQUIRE(circles.size() == 5);
+  CHECK(circles[0].look == ControlCircle::Look::Base);
+  CHECK(circles[0].radius == doctest::Approx(layout.stick_base.radius));
+  CHECK(circles[1].look == ControlCircle::Look::Pressed);
+  CHECK(circles[1].x == doctest::Approx(layout.stick_knob.x));
+  CHECK(circles[2].look == ControlCircle::Look::Resting);
+  CHECK(circles[3].look == ControlCircle::Look::Pressed);
+  CHECK(circles[4].y == doctest::Approx(layout.start.y));
 }

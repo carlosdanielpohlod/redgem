@@ -1,13 +1,13 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
 #include <variant>
 #include <vector>
 
-#include "app/game_project.hpp"
 #include "audio/audio.hpp"
 #include "editor/console_log.hpp"
 #include "editor/editor_camera.hpp"
@@ -16,6 +16,7 @@
 #include "editor/script_workspace.hpp"
 #include "editor/ui/panels.hpp"
 #include "input/raylib_input_source.hpp"
+#include "render/gpu_select.hpp"
 
 namespace redgem {
 
@@ -25,6 +26,36 @@ enum class GizmoMode { Translate, Rotate, Scale };
 
 // Why the editor window closed: quit, or go back to the project hub (New / Open game).
 enum class EditorExit { Quit, OpenHub };
+
+// How long the frame about to be drawn counts for, in seconds; asked once a frame.
+using FrameClock = std::function<float()>;
+// The time the window measured between its last two frames.
+FrameClock window_frame_clock();
+
+// One way of making a standalone game, as Build Game offers it. The editor only knows that such
+// ways exist: whoever opens it says which, and does the building.
+struct BuildChoice {
+  std::string name;   // the system built for ("linux"): how the build is spoken of, and its folder named
+  std::string label;  // what the menu shows
+  // Whether it is for the system the editor runs on (the build then needs no system in its folder's name).
+  bool for_this_system = false;
+  // Builds the game in `game_dir` into `out_dir`. The game's executable (or app), or nullopt
+  // with `error` saying why not.
+  std::function<std::optional<std::filesystem::path>(const std::filesystem::path& game_dir,
+                                                     const std::filesystem::path& out_dir, std::string& error)>
+      build;
+};
+
+// What whoever opens the editor decides for it.
+struct EditorOptions {
+  // How long each frame counts for: the window's own time unless whoever drives the editor steps
+  // it at a pace of its own.
+  FrameClock clock = window_frame_clock();
+  // The graphics card the window opens on, where the machine has two.
+  GpuChoice gpu = GpuChoice::Auto;
+  // The ways of building a game, in the order Build Game lists them. None: the editor builds nothing.
+  std::vector<BuildChoice> builds;
+};
 
 // Keyboard and mouse reach the game only while the Scene view has focus during play. The game
 // sees the mouse in the view's own pixels, as if the view were its window.
@@ -50,15 +81,21 @@ class GatedInputSource final : public InputSource {
 // Console and script tabs, status bar.
 class EditorApp {
  public:
-  static std::variant<std::unique_ptr<EditorApp>, std::string> create(const std::filesystem::path& game_dir);
+  static std::variant<std::unique_ptr<EditorApp>, std::string> create(const std::filesystem::path& game_dir,
+                                                                      EditorOptions options = {});
   ~EditorApp();
   EditorApp(const EditorApp&) = delete;
   EditorApp& operator=(const EditorApp&) = delete;
 
-  // Runs until the window is closed. Returns the process exit code.
+  // Runs until the window is closed: frame() after frame() until finished(). Returns the process
+  // exit code.
   int run();
-  // One editor frame (input, simulation while playing, UI, rendering).
+  // One editor frame (input, simulation while playing, UI, rendering). What run() is a loop of,
+  // for whoever drives the editor a frame at a time.
   void frame();
+  // Whether the editor is done: leaving was asked for and nothing unsaved stands in the way (there
+  // was nothing, or the user chose Save / Discard).
+  bool finished() const { return quit_confirmed_; }
 
   EditorSession& session() { return *session_; }
   EditorCamera& camera() { return camera_; }
@@ -83,8 +120,6 @@ class EditorApp {
   const ProjectFiles& files() const { return files_; }
   bool close_requested() const;
   EditorExit exit_action() const { return exit_action_; }
-  // True once the window is about to close (nothing unsaved, or the user chose Save / Discard).
-  bool exit_confirmed() const { return quit_confirmed_; }
 
   // Commands, the same ones the menus and shortcuts use.
   void play();
@@ -94,9 +129,12 @@ class EditorApp {
   void frame_selection();
   // Asks to leave (after the unsaved-changes dialog when needed).
   void request_exit(EditorExit action);
-  // Makes a standalone game for a system in a folder next to the game ("<game>-build", or
-  // "<game>-build-windows"). Returns that folder.
-  std::optional<std::filesystem::path> build(BuildTarget target = host_build_target());
+  // Makes a standalone game in a folder next to the game ("<game>-build", or "<game>-build-windows"
+  // for another system), in one of the ways the editor was opened with. Returns that folder.
+  std::optional<std::filesystem::path> build(const BuildChoice& choice);
+  // The same, for the system the editor runs on.
+  std::optional<std::filesystem::path> build();
+  const std::vector<BuildChoice>& builds() const { return builds_; }
   // Where objects created from the menus appear: in front of the editor camera.
   Vec3 spawn_point() const;
   // Re-reads the game folder (scripts, models, sounds, scenes).
@@ -105,15 +143,10 @@ class EditorApp {
   ObjectId pick_at(float x, float y);
   float viewport_width() const;
   float viewport_height() const;
-  // Makes every frame count as this long, whatever it really took (tests and recordings step the
-  // editor at an even pace). nullopt goes back to real time.
-  void set_frame_seconds(std::optional<float> seconds) { fixed_frame_seconds_ = seconds; }
-  // Writes the whole editor window to a PNG at the end of the next frame.
-  void request_screenshot(const std::filesystem::path& path) { screenshot_ = path; }
 
  private:
   EditorApp() = default;
-  void open_window();
+  void open_window(GpuChoice gpu);
   bool editing() const;  // not playing
   ui::PanelContext panel_context();
   // Before drawing: files changed outside, input, the running game.
@@ -192,8 +225,7 @@ class EditorApp {
   void draw_shortcuts_dialog();
   bool editing_blocked() const;
   void save_scripts();
-  void take_requested_screenshot();
-  float frame_seconds() const;
+  float frame_seconds() const { return frame_seconds_; }
 
   std::unique_ptr<ConsoleLog> console_;
   std::unique_ptr<Renderer> renderer_;
@@ -216,8 +248,9 @@ class EditorApp {
   bool gizmo_local_ = false;  // gizmo axes of the object instead of the world
   EditorExit exit_action_ = EditorExit::Quit;
   bool shortcuts_open_ = false;
-  std::optional<std::filesystem::path> screenshot_;
-  std::optional<float> fixed_frame_seconds_;
+  FrameClock clock_;
+  std::vector<BuildChoice> builds_;
+  float frame_seconds_ = 0.0f;  // what the clock said of the frame being drawn
   struct Viewport;
   std::unique_ptr<Viewport> viewport_;
   long long frame_count_ = 0;

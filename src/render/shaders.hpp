@@ -75,7 +75,7 @@ inline constexpr int kMaxPointLights = 16;
 
 // Foliage (windAmount > 0) sways: higher parts move more, each tree with its own phase.
 // Skinned meshes (skinned > 0.5) are placed by their skeleton: each vertex follows up to four
-// bones, whose matrices already lead to world space. MAX_BONES is config::kMaxSkinJoints, defined
+// bones, whose matrices already lead to world space. MAX_BONES is gpu_profile::kMaxSkinJoints, defined
 // for every shader when it is compiled (see shader_source.hpp).
 inline constexpr const char* kLitVertex = R"GLSL(
 #version 330

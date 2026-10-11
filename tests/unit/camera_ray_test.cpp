@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-#include "core/config.hpp"
+#include "scene/scene_config.hpp"
 #include "scene/camera_ray.hpp"
 #include "test_support.hpp"
 

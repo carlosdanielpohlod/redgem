@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <cmath>
 
-#include "core/config.hpp"
-
 namespace redgem {
 namespace {
 

@@ -28,7 +28,14 @@ if [[ ! -x "${VENV}/bin/clang-tidy" ]]; then
   python3 -m venv "${VENV}" && "${VENV}/bin/pip" install -q clang-tidy clang-format ruff shellcheck-py || exit 1
 fi
 
-cpp_sources() { git ls-files 'src/*.cpp' 'src/*.hpp' 'tests/*.cpp' 'tests/*.hpp'; }
+# The files git knows that are still there: one deleted and not committed yet is not there to lint.
+tracked() {
+  local file
+  git ls-files "$@" | while IFS= read -r file; do
+    if [[ -f "${file}" ]]; then echo "${file}"; fi
+  done
+}
+cpp_sources() { tracked 'src/*.cpp' 'src/*.hpp' 'tests/*.cpp' 'tests/*.hpp'; }
 failed=()
 
 run() {
@@ -49,14 +56,14 @@ lint_format() {
 lint_cpp() {
   [[ -f "${BUILD_DIR}/compile_commands.json" ]] || { echo "build the engine first (cmake -S . -B build)"; return 1; }
   # (android_main.cpp is only built for Android: its headers are not on this machine's compiler.)
-  git ls-files 'src/*.cpp' | grep -v 'android_main.cpp' | xargs -P "${JOBS}" -n 4 "${VENV}/bin/clang-tidy" -p "${BUILD_DIR}" --quiet --warnings-as-errors='*' &&
+  tracked 'src/*.cpp' | grep -v 'android_main.cpp' | xargs -P "${JOBS}" -n 4 "${VENV}/bin/clang-tidy" -p "${BUILD_DIR}" --quiet --warnings-as-errors='*' &&
     cppcheck --quiet --error-exitcode=1 --std=c++17 --language=c++ --enable=warning,performance,portability \
       --inline-suppr --suppress=missingIncludeSystem -I src -j "${JOBS}" src
 }
 
 lint_ruby() { rubocop --format quiet ruby games templates tests; }
 lint_python() { "${VENV}/bin/ruff" check tools; }
-lint_shell() { git ls-files '*.sh' | xargs "${VENV}/bin/shellcheck"; }
+lint_shell() { tracked '*.sh' | xargs "${VENV}/bin/shellcheck"; }
 
 for linter in "${wanted[@]}"; do
   case "${linter}" in

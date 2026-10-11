@@ -6,7 +6,7 @@
 #include <mruby/array.h>
 #include <mruby/string.h>
 
-#include "app/save_store.hpp"
+#include "storage/save_store.hpp"
 #include "core/log.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"

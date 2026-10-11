@@ -1,7 +1,12 @@
 #include <doctest/doctest.h>
 
-#include "app/cli.hpp"
-#include "app/game_project.hpp"
+#include "project/cli.hpp"
+#include "app/bundled_game.hpp"
+#include "app/game_settings.hpp"
+#include "core/files.hpp"
+#include "project/game_build.hpp"
+#include "project/game_templates.hpp"
+#include "project/recent_games.hpp"
 #include "core/config.hpp"
 
 using namespace redgem;
@@ -18,6 +23,12 @@ TEST_CASE("a game played from the command line, and where its screenshots go") {
   REQUIRE(result.ok);
   CHECK(result.options.mode == RunMode::Game);
   CHECK(result.options.game_dir == "games/demo");
+  // It is the developer who plays this way: the frame counter is on, as it is nowhere else.
+  const EngineOptions engine = developer_play_options(result.options);
+  CHECK(engine.game_dir == "games/demo");
+  CHECK(engine.screenshot_dir == "shots");
+  CHECK(engine.show_fps);
+  CHECK(developer_play_options(result.options, GpuChoice::Integrated).gpu == GpuChoice::Integrated);
   CHECK(result.options.screenshot_dir == "shots");
 }
 

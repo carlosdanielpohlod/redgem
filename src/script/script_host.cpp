@@ -8,7 +8,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "core/config.hpp"
+#include "scene/props.hpp"
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
 #include "generated/ruby_prelude.hpp"
@@ -151,7 +151,7 @@ void ScriptHost::dispatch(const net::NetworkEvent& event) {
 
 void ScriptHost::attach_object(ObjectId id) {
   if (context_.scene->is_prefab(id)) return;  // templates stay inert until spawned
-  const auto scripts = get_string(context_.scene->at(id).props, config::kPropScript);
+  const auto scripts = get_string(context_.scene->at(id).props, props::kScript);
   if (!scripts) return;
   for (const std::string& script : split_script_list(*scripts)) attach(id, script);
 }

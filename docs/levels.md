@@ -55,7 +55,7 @@ copies sharing one mesh (cars, crates) can each have their own color.
 **Graphics card.** On laptops with two cards the engine asks for the dedicated one and logs which
 card it got. To choose: Edit > Graphics Card in the editor (saved in
 `~/.config/redgem/settings.json`, used from the next start), the `REDGEM_GPU` environment
-variable, or `--gpu auto|dedicated|integrated` for one run. The command line wins over the
+variable (read by `redgem` and `redgem-test`), or `--gpu auto|dedicated|integrated` for one run. The command line wins over the
 environment, which wins over the saved setting.
 
 **Performance.** Objects outside the view, and parts too small to see from where the camera is, are

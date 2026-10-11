@@ -9,7 +9,9 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENGINE_DIR="${REPO_ROOT}/build/src"
 NDK="${REPO_ROOT}/.deps/android-ndk"
-MIN_ANDROID_API=26   # Android 8: every 64-bit device of the last years
+# The oldest Android the engine is built for (26 is Android 8: every 64-bit device of the last
+# years). Written once, in a file the packer of the apps reads as well (see src/CMakeLists.txt).
+MIN_ANDROID_API="$(tr -d '[:space:]' <"${REPO_ROOT}/tools/android/min_api.txt")"
 ABIS=("$@")
 if [[ ${#ABIS[@]} -eq 0 ]]; then
   ABIS=(arm64-v8a x86_64)

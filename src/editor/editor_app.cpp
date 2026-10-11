@@ -10,17 +10,17 @@
 
 #include <algorithm>
 
-#include "app/game_project.hpp"
 #include "app/user_settings.hpp"
 #include "core/config.hpp"
+#include "scene/scene_config.hpp"
 #include "core/log.hpp"
+#include "core/platform.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/picking.hpp"
 #include "editor/script_files.hpp"
 #include "editor/ui/panels.hpp"
 #include "editor/ui/style.hpp"
-#include "editor/window_picture.hpp"
 #include "physics/body_config.hpp"
 #include "render/renderer.hpp"
 
@@ -50,6 +50,7 @@ constexpr const char* kStatusBarId = "##status";
 constexpr const char* kShortcutsTableId = "shortcuts";
 constexpr const char* kAnyPopup = "";  // with ImGuiPopupFlags_AnyPopupId: whichever popup is open
 constexpr const char* kBuildPopup = "build_target";
+constexpr const char* kNoBuilds = "No way of building was given to this editor.";
 constexpr const char* kUnsavedPopup = "Unsaved changes";
 constexpr const char* kExternalChangePopup = "Scene changed on disk";
 constexpr const char* kShortcutsPopup = "Keyboard shortcuts";
@@ -90,17 +91,6 @@ constexpr GpuOption kGpuOptions[] = {
 // Where each channel is in a color given as four numbers.
 enum ColorChannel { kRed, kGreen, kBlue, kAlpha };
 
-// The systems a game can be built for, as the Build menus offer them.
-struct BuildOption {
-  BuildTarget target;
-  const char* label;
-};
-constexpr BuildOption kBuildOptions[] = {
-    {BuildTarget::Linux, ICON_FA_DESKTOP "  For Linux"},
-    {BuildTarget::Windows, ICON_FA_DESKTOP "  For Windows (.exe)"},
-    {BuildTarget::Android, ICON_FA_MOBILE_SCREEN "  For Android (.apk)"},
-};
-
 // What the gizmo can do: the key that picks each mode and its toolbar button.
 struct GizmoTool {
   GizmoMode mode;
@@ -129,17 +119,9 @@ Matrix model_matrix(const Transform& t) {
   return MatrixMultiply(MatrixMultiply(scale, rotation), translation);
 }
 
-Bounds unit_bounds() {
-  Bounds bounds;
-  const Vec3 half = Vec3::one() * config::kDefaultColliderHalfExtent;
-  bounds.include(-half);
-  bounds.include(half);
-  return bounds;
-}
-
 // The box drawn around an object: its mesh's, or a small one for objects without a mesh.
 Bounds bounds_of(const GameObject& object, const SceneDesc& desc) {
-  return object.mesh != kNoIndex ? desc.meshes[object.mesh].bounds : unit_bounds();
+  return object.mesh != kNoIndex ? desc.meshes[object.mesh].bounds : default_collider_bounds();
 }
 
 // Wireframe of a box given in an object's local space.
@@ -148,13 +130,14 @@ void draw_box(const Transform& world, const Bounds& bounds, ::Color color) {
   for (const auto& edge : kBoxEdgeCorners) DrawLine3D(rl(corners[edge[0]]), rl(corners[edge[1]]), color);
 }
 
-RenderSettings window_settings() {
+RenderSettings window_settings(GpuChoice gpu) {
   RenderSettings settings;
   settings.width = kWindowWidth;
   settings.height = kWindowHeight;
   settings.title = kWindowTitle;
   settings.show_fps = false;
   settings.resizable = true;
+  settings.gpu = gpu;
   return settings;
 }
 
@@ -307,21 +290,28 @@ struct EditorApp::Viewport {
   }
 };
 
-std::variant<std::unique_ptr<EditorApp>, std::string> EditorApp::create(const std::filesystem::path& game_dir) {
+FrameClock window_frame_clock() {
+  return [] { return GetFrameTime(); };
+}
+
+std::variant<std::unique_ptr<EditorApp>, std::string> EditorApp::create(const std::filesystem::path& game_dir,
+                                                                        EditorOptions options) {
   std::unique_ptr<EditorApp> app(new EditorApp());
+  app->clock_ = std::move(options.clock);
+  app->builds_ = std::move(options.builds);
   app->console_ = std::make_unique<ConsoleLog>();
   auto opened = EditorSession::open(game_dir);
   if (auto* error = std::get_if<std::string>(&opened)) return *error;
   app->session_ = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
   app->scripts_ = std::make_unique<ScriptWorkspace>(game_dir / config::kScriptsDirName);
-  app->open_window();
+  app->open_window(options.gpu);
   log::info("editing " + app->session_->document().path().string());
   return app;
 }
 
 // The window, and what draws and sounds in it, for the game just opened.
-void EditorApp::open_window() {
-  renderer_ = std::make_unique<Renderer>(window_settings());
+void EditorApp::open_window(GpuChoice gpu) {
+  renderer_ = std::make_unique<Renderer>(window_settings(gpu));
   renderer_->upload(session_->scene_desc());
   renderer_->set_images_dir(session_->game_dir() / config::kImagesDirName);
   viewport_ = std::make_unique<Viewport>();
@@ -344,11 +334,10 @@ bool EditorApp::close_requested() const { return WindowShouldClose(); }
 void EditorApp::rescan_files() { files_ = ProjectFiles::scan(session_->game_dir()); }
 
 int EditorApp::run() {
-  while (true) {
+  while (!finished()) {
     // raylib reports the close button for a single frame, so remember it.
     if (close_requested()) request_exit(EditorExit::Quit);
     frame();
-    if (quit_confirmed_) break;
   }
   return kExitSuccess;
 }
@@ -409,25 +398,33 @@ void EditorApp::request_exit(EditorExit action) {
   }
 }
 
-std::optional<std::filesystem::path> EditorApp::build(BuildTarget target) {
+std::optional<std::filesystem::path> EditorApp::build(const BuildChoice& choice) {
   if (session_->document().dirty()) save();
   const std::filesystem::path game = session_->game_dir();
-  std::filesystem::path out =
-      game.parent_path() / editor_logic::build_folder_name(game.filename().string(), build_target_name(target),
-                                                           target == host_build_target());
+  std::filesystem::path out = game.parent_path() / editor_logic::build_folder_name(game.filename().string(),
+                                                                                   choice.name, choice.for_this_system);
   std::string error;
-  const auto executable = build_game_for(game, out, target, error);
+  const auto executable = choice.build(game, out, error);
   if (!executable) {
     log::error("build failed: " + error);
     return std::nullopt;
   }
-  log::info(std::string("built for ") + build_target_name(target) + ": " + executable->string());
+  log::info("built for " + choice.name + ": " + executable->string());
   return out;
 }
 
+std::optional<std::filesystem::path> EditorApp::build() {
+  const auto own =
+      std::find_if(builds_.begin(), builds_.end(), [](const BuildChoice& choice) { return choice.for_this_system; });
+  if (own != builds_.end()) return build(*own);
+  log::error("build failed: this editor was not given a way to build for this system");
+  return std::nullopt;
+}
+
 void EditorApp::draw_build_targets() {
-  for (const BuildOption& option : kBuildOptions) {
-    if (ImGui::MenuItem(option.label)) build(option.target);
+  if (builds_.empty()) ImGui::TextColored(ui::muted_color(), "%s", kNoBuilds);
+  for (const BuildChoice& choice : builds_) {
+    if (ImGui::MenuItem(choice.label.c_str())) build(choice);
   }
 }
 
@@ -470,15 +467,13 @@ float EditorApp::viewport_height() const { return static_cast<float>(viewport_->
 
 // --- Frame -----------------------------------------------------------------------------------
 
-float EditorApp::frame_seconds() const { return fixed_frame_seconds_.value_or(GetFrameTime()); }
-
 void EditorApp::frame() {
   ++frame_count_;
+  frame_seconds_ = clock_();
   update_before_drawing();
   BeginDrawing();
   ClearBackground(rgba(kViewportBackground));
   draw_interface();
-  take_requested_screenshot();
   EndDrawing();
 }
 
@@ -511,12 +506,6 @@ void EditorApp::end_abandoned_gizmo_drag() {
   if (gizmo_drawn_ || !gizmo_dragging_) return;
   gizmo_dragging_ = false;
   session_->document().drop_checkpoint_if_unchanged();
-}
-
-void EditorApp::take_requested_screenshot() {
-  if (!screenshot_) return;
-  if (!save_window_picture(*screenshot_)) log::error("cannot write " + screenshot_->string());
-  screenshot_.reset();
 }
 
 void EditorApp::check_files_on_disk() {
@@ -841,7 +830,7 @@ void EditorApp::draw_file_menu() {
 void EditorApp::draw_game_file_items() {
   if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK "  Save Scene", kKeysSave, false, editing())) save();
   ui::menu(ICON_FA_BOX_ARCHIVE "  Build Game", [this] { draw_build_targets(); }, editing());
-  if (ImGui::MenuItem(ICON_FA_FOLDER "  Show Game Folder")) open_in_system(session_->game_dir());
+  if (ImGui::MenuItem(ICON_FA_FOLDER "  Show Game Folder")) platform::open_in_system(session_->game_dir());
 }
 
 void EditorApp::draw_edit_menu() {

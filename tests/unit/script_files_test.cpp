@@ -5,6 +5,7 @@
 
 #include "editor/script_editor.hpp"
 #include "editor/script_workspace.hpp"
+#include "core/files.hpp"
 #include "editor/script_files.hpp"
 
 using namespace redgem;

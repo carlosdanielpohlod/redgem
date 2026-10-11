@@ -3,10 +3,11 @@
 #include <algorithm>
 #include <utility>
 
-#include "app/game_project.hpp"
+#include "core/files.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "editor/editor_logic.hpp"
+#include "scene/props.hpp"
 #include "script/script_naming.hpp"
 
 namespace redgem {
@@ -37,12 +38,15 @@ constexpr float kNewCameraFov = 0.87f;                        // ~50 degrees
 constexpr Vec3 kNewSunDirection{-0.4f, -1.0f, -0.6f};
 
 // What GameObject > Environment starts with: a sunset (colors as "#rrggbb").
-constexpr const char* kEnvironmentProp = "environment";
-constexpr std::pair<const char*, const char*> kSunsetColors[] = {
-    {"sky_top", "#33457f"}, {"sky_horizon", "#ffab73"}, {"ground_color", "#4a3c3a"}, {"fog_color", "#e8a988"}};
+constexpr std::pair<const char*, const char*> kSunsetColors[] = {{props::environment::kSkyTop, "#33457f"},
+                                                                 {props::environment::kSkyHorizon, "#ffab73"},
+                                                                 {props::environment::kGroundColor, "#4a3c3a"},
+                                                                 {props::environment::kFogColor, "#e8a988"}};
 constexpr std::pair<const char*, double> kSunsetNumbers[] = {
-    {"fog_density", 0.003}, {"ambient", 0.8},  {"exposure", 1.0}, {"bloom", 0.45},
-    {"vignette", 0.35},     {"sun_glow", 1.6}, {"wind", 0.6}};
+    {props::environment::kFogDensity, 0.003}, {props::environment::kAmbient, 0.8},
+    {props::environment::kExposure, 1.0},     {props::environment::kBloom, 0.45},
+    {props::environment::kVignette, 0.35},    {props::environment::kSunGlow, 1.6},
+    {props::environment::kWind, 0.6}};
 
 const char* light_name(LightType type) {
   return type == LightType::Directional ? "Sun" : type == LightType::Spot ? "Spot Light" : "Point Light";
@@ -175,7 +179,7 @@ ObjectId EditorSession::create_camera(Vec3 position) {
 
 ObjectId EditorSession::find_environment() const {
   for (int i = 0; i < document_.node_count(); ++i) {
-    if (get_bool(document_.node(i).props, kEnvironmentProp).value_or(false)) return i;
+    if (get_bool(document_.node(i).props, props::kEnvironment).value_or(false)) return i;
   }
   return kNoObject;
 }
@@ -188,7 +192,7 @@ ObjectId EditorSession::create_environment() {
     return existing;
   }
   const int node = document_.add_empty(document_.unique_name(kNewEnvironmentName));
-  document_.set_prop(node, kEnvironmentProp, true, false);  // same undo step as the creation
+  document_.set_prop(node, props::kEnvironment, true, false);  // same undo step as the creation
   for (const auto& [key, value] : kSunsetColors) document_.set_prop(node, key, std::string(value), false);
   for (const auto& [key, value] : kSunsetNumbers) document_.set_prop(node, key, value, false);
   return place_new(node, Vec3::zero());
@@ -226,10 +230,10 @@ void EditorSession::reparent(ObjectId child, ObjectId parent) {
 void EditorSession::attach_script(ObjectId id, const std::string& file) {
   if (play_state_ != PlayState::Editing || id == kNoObject) return;
   std::vector<std::string> scripts =
-      split_script_list(get_string(document_.node(id).props, config::kPropScript).value_or(""));
+      split_script_list(get_string(document_.node(id).props, props::kScript).value_or(""));
   if (std::find(scripts.begin(), scripts.end(), file) != scripts.end()) return;
   scripts.push_back(file);
-  document_.set_prop(id, config::kPropScript, join_script_list(scripts));
+  document_.set_prop(id, props::kScript, join_script_list(scripts));
   refresh_preview();
 }
 

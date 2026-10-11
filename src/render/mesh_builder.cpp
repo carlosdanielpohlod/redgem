@@ -5,7 +5,8 @@
 #include <cstring>
 #include <unordered_map>
 
-#include "core/config.hpp"
+#include "render/render_config.hpp"
+#include "scene/scene_config.hpp"
 
 namespace redgem {
 namespace {

@@ -2,7 +2,8 @@
 
 #include <string>
 
-#include "core/config.hpp"
+#include "scene/scene_config.hpp"
+#include "render/gpu_profile.hpp"
 #include "render/shader_source.hpp"
 #include "render/shaders.hpp"
 
@@ -62,7 +63,7 @@ TEST_CASE("text without a version line is left as it is") {
 
 TEST_CASE("every engine shader is prepared with a version first and the engine's own limits") {
   const std::string bones =
-      std::string(kDefineWord) + shaders::kBoneLimitName + " " + std::to_string(config::kMaxSkinJoints) + "\n";
+      std::string(kDefineWord) + shaders::kBoneLimitName + " " + std::to_string(gpu_profile::kMaxSkinJoints) + "\n";
   const std::string lights =
       std::string(kDefineWord) + shaders::kPointLightLimitName + " " + std::to_string(shaders::kMaxPointLights) + "\n";
   for (const char* source : kEngineShaders) {
@@ -78,4 +79,11 @@ TEST_CASE("no engine shader sets a limit of its own that could disagree with the
     CHECK_FALSE(contains(source, std::string(kDefineWord) + shaders::kPointLightLimitName));
     CHECK_FALSE(contains(source, std::string(kDefineWord) + shaders::kBoneLimitName));
   }
+}
+
+TEST_CASE("the shaders start with what this build's graphics API wants, and hold its number of bones") {
+  const std::string prepared = shaders::for_this_gpu(shaders::kLitVertex);
+  CHECK(starts_with(prepared, gpu_profile::kShaderHeader));
+  CHECK(gpu_profile::kMaxSkinJoints > 0);
+  CHECK(gpu_profile::kMaxSkinJoints <= config::kMaxSkinJoints);
 }

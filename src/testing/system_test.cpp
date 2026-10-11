@@ -12,6 +12,7 @@
 #include "app/engine.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
+#include "testing/recording_audio.hpp"
 #include "testing/test_library.hpp"
 #include "testing/test_saves.hpp"
 
@@ -31,7 +32,7 @@ constexpr const char* kFailed = "failed";
 enum class Status { Running, Passed, Failed };
 
 // An engine as a test needs it: the same run every time, with the test at the controls.
-EngineOptions engine_options(const SystemTestOptions& options, const ScriptedInputSource& input) {
+EngineOptions engine_options(const SystemTestOptions& options, const ScriptedInputSource& input, AudioSystem* audio) {
   EngineOptions engine;
   engine.game_dir = options.game_dir;
   engine.headless = options.headless;
@@ -39,7 +40,8 @@ EngineOptions engine_options(const SystemTestOptions& options, const ScriptedInp
   engine.input = &input;  // the devices are not read: a key touched by accident changes nothing
   engine.save_file = fresh_test_save_file(options.game_dir);
   engine.fixed_step = true;
-  engine.show_fps = false;        // a number that changes from run to run has no place in a picture
+  engine.audio = audio;
+  engine.gpu = options.gpu;
   engine.capture_cursor = false;  // the pointer stays with whoever sits at the machine
   return engine;
 }
@@ -141,7 +143,9 @@ int play_test(Engine& engine, ScriptedInputSource& input, const std::filesystem:
 
 int run_system_test(const SystemTestOptions& options) {
   ScriptedInputSource input;  // what TestInput sets and the game reads; made first, so it outlives the engine
-  auto created = Engine::create(engine_options(options, input));
+  // Without a window there is no device either: the game still finds its sounds, and hears none.
+  RecordingAudio silent;
+  auto created = Engine::create(engine_options(options, input, options.headless ? &silent : nullptr));
   if (auto* error = std::get_if<std::string>(&created)) {
     log::error(*error);
     return kExitFailure;

@@ -20,10 +20,4 @@ std::string script_template(const std::string& file_name);
 std::optional<std::string> create_script(const std::filesystem::path& scripts_dir, const std::string& name,
                                          std::string& error);
 
-std::optional<std::string> read_text_file(const std::filesystem::path& path, std::string& error);
-// Opens a file or folder with the desktop's default application (xdg-open), without waiting.
-void open_in_system(const std::filesystem::path& path);
-
-bool write_text_file(const std::filesystem::path& path, const std::string& text, std::string& error);
-
 }  // namespace redgem

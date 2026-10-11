@@ -8,6 +8,7 @@
 #include "audio/audio.hpp"
 #include "input/input.hpp"
 #include "physics/physics_world.hpp"
+#include "render/hud.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
 
@@ -32,21 +33,6 @@ struct TimeInfo {
   // How fast game time runs (Time.scale): 0 pauses the game, 1 is normal. Menus keep working
   // while paused: behaviours are still updated, with a delta of 0.
   float scale = 1.0f;
-};
-
-// One thing drawn over the game this frame (UI.text, UI.rect, UI.image), in pixels from the
-// top-left corner.
-struct HudItem {
-  enum class Kind { Text, Rect, Image };
-  Kind kind = Kind::Text;
-  std::string text;  // the text, or the image's name (a file in the game's images/ folder)
-  int x = 0;
-  int y = 0;
-  int width = 0;  // rectangles and images
-  int height = 0;
-  int size = 0;         // text height
-  float radius = 0.0f;  // rounded corners of a rectangle, in pixels
-  Color color;
 };
 
 // Everything the Ruby bindings are allowed to touch. Owned by the engine.

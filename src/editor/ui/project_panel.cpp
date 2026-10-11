@@ -5,6 +5,7 @@
 
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "core/platform.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/script_files.hpp"
@@ -186,7 +187,7 @@ void draw_folder_bar(PanelContext& context, const FolderInfo& info) {
   if (!ImGui::SmallButton(ICON_FA_FOLDER_OPEN "  Open folder")) return;
   std::error_code fs_error;
   std::filesystem::create_directories(game_dir / info.dir, fs_error);
-  open_in_system(game_dir / info.dir);
+  platform::open_in_system(game_dir / info.dir);
 }
 
 // The current folder's files as a grid of tiles.

@@ -4,15 +4,12 @@
 #include <fstream>
 
 #include "app/user_settings.hpp"
+#include "core/platform.hpp"
 
 using namespace redgem;
 
-TEST_CASE("graphics card choices have stable names") {
-  for (const GpuChoice choice : {GpuChoice::Auto, GpuChoice::Dedicated, GpuChoice::Integrated}) {
-    CHECK(gpu_choice_from_name(gpu_choice_name(choice)) == choice);
-  }
-  CHECK_FALSE(gpu_choice_from_name("fastest").has_value());
-  CHECK_FALSE(gpu_choice_from_name("").has_value());
+TEST_CASE("the user's settings are a file of the user's RedGem folder") {
+  CHECK(user_settings_file() == platform::user_data_dir() / "settings.json");
 }
 
 TEST_CASE("the command line beats the environment, which beats the saved setting") {
@@ -25,6 +22,12 @@ TEST_CASE("the command line beats the environment, which beats the saved setting
   CHECK(resolve_gpu_choice(std::string("turbo"), std::string("dedicated"), saved) == GpuChoice::Dedicated);
   CHECK(resolve_gpu_choice(std::nullopt, std::string(""), saved) == GpuChoice::Integrated);
   CHECK(resolve_gpu_choice(std::nullopt, std::nullopt, UserSettings{}) == GpuChoice::Auto);
+}
+
+TEST_CASE("a run's card is the one its command line names, whatever else is set") {
+  // (The environment and the saved file are the machine's own: only what beats them both is checked.)
+  CHECK(gpu_choice_for_run(std::string("integrated")) == GpuChoice::Integrated);
+  CHECK(gpu_choice_for_run(std::string("dedicated")) == GpuChoice::Dedicated);
 }
 
 TEST_CASE("settings are saved and read back; broken files give the defaults") {

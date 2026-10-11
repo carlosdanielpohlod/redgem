@@ -10,15 +10,18 @@
 #include "audio/audio.hpp"
 #include "core/fixed_clock.hpp"
 #include "input/input.hpp"
+#include "input/touch_controls.hpp"
 #include "net/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
+#include "render/gpu_select.hpp"
+#include "render/hud.hpp"
 #include "scene/animation_player.hpp"
 #include "scene/particles.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
-#include "app/game_project.hpp"
-#include "app/save_store.hpp"
+#include "app/game_settings.hpp"
+#include "storage/save_store.hpp"
 #include "script/script_context.hpp"
 #include "script/script_host.hpp"
 
@@ -40,17 +43,21 @@ struct EngineOptions {
   // Every frame advances the game by exactly one fixed step, however long it really took: the same
   // run gives the same game every time. Headless engines without an `input` always do.
   bool fixed_step = false;
-  // The frames-per-second counter in the corner of the window.
-  bool show_fps = true;
+  // The frames-per-second counter in the corner of the window: for whoever makes the game, never
+  // for who plays it.
+  bool show_fps = false;
   // Whether the game may hide the pointer and keep it in the window (Input.mouse_locked).
   bool capture_cursor = true;
+  // The graphics card the window is opened on, where the machine has two.
+  GpuChoice gpu = GpuChoice::Auto;
   // Where Save keeps the game's data. Empty: the game's file in the user's RedGem folder.
   std::filesystem::path save_file;
   // Width over height of the screen the game fills (a phone's); 0 for a window sized by the
   // game's settings.
   float screen_aspect = 0.0f;
-  // Editor play mode: the editor's audio device. Otherwise the engine opens its own (or, headless,
-  // records what would play).
+  // The audio to play through, instead of the engine's own: the editor's device in play mode, or
+  // what a test listens with. Without one the engine opens the machine's device, and a headless
+  // engine stays silent.
   AudioSystem* audio = nullptr;
 };
 
@@ -174,6 +181,10 @@ class Engine {
   net::LanDiscovery discovery_;
   FixedClock clock_;
 };
+
+// A touch screen's controls as the renderer draws them: the stick's ring first, then what lies
+// over it (the knob, the buttons), each brighter while a finger is on it.
+std::vector<ControlCircle> control_circles(const TouchLayout& layout);
 
 // Where the screenshots a script asked for by name are written: `folder`/<name>.png. A name that
 // would put the file anywhere else is refused with a warning and left out.

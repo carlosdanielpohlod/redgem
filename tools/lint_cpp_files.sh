@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs clang-tidy on some C++ files or folders only and prints one line per finding: what to
 # use while working on a part of the engine (tools/lint.sh checks everything).
-#   tools/lint_cpp_files.sh src/net src/app/cli.cpp
+#   tools/lint_cpp_files.sh src/net src/project/cli.cpp
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,7 +11,10 @@ cd "${REPO_ROOT}" || exit 1
 files=()
 for target in "$@"; do
   if [[ -d "${target}" ]]; then
-    while IFS= read -r file; do files+=("${file}"); done < <(git ls-files "${target}/*.cpp"; git ls-files --others --exclude-standard "${target}/*.cpp")
+    # (A file deleted and not committed yet is still listed: it is not there to lint.)
+    while IFS= read -r file; do
+      if [[ -f "${file}" ]]; then files+=("${file}"); fi
+    done < <(git ls-files "${target}/*.cpp"; git ls-files --others --exclude-standard "${target}/*.cpp")
   else
     files+=("${target}")
   fi

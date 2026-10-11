@@ -5,16 +5,14 @@
 #include <optional>
 #include <string>
 
+#include "app/android_bundle.hpp"
+#include "app/game_settings.hpp"
+
 namespace redgem {
 
 // Packing a game as an Android app (.apk): the game's files as the app's assets, the engine built
 // for each kind of processor as its native library, signed so a phone accepts it. The packing
 // itself is done by the Android SDK's own tools and Java's keytool, which must be installed.
-
-// What is inside the APK besides the game.
-inline constexpr const char* kAndroidManifestAsset = "game.files";  // the game's files, one path per line
-inline constexpr const char* kAndroidStampAsset = "game.stamp";     // changes with every build
-inline constexpr const char* kAndroidLibraryName = "redgem";        // lib/<abi>/libredgem.so
 
 struct AndroidTools {
   std::filesystem::path aapt;   // adds files to an APK
@@ -30,20 +28,8 @@ std::optional<AndroidTools> find_android_tools(const std::filesystem::path& sdk,
 // The SDK folder the environment points at; empty when it points nowhere.
 std::filesystem::path android_sdk_from_environment();
 
-// What a game says about its Android app, in the "android" section of its game.json. All of it
-// is optional: a game that says nothing gets an id made from its folder name, version 1.0, and
-// a key the engine makes on this machine.
-//   "android": { "package": "com.mystudio.mygame", "version_code": 3, "version_name": "1.2",
-//                "keystore": "release.keystore", "key_alias": "mygame" }
-struct AndroidSettings {
-  std::string package;               // the app's id; empty for one made from the folder name
-  int version_code = 1;              // goes up with every release: Android updates only to higher ones
-  std::string version_name = "1.0";  // what players see
-  std::filesystem::path
-      keystore;           // the developer's own signing key (relative to the game folder); empty for the engine's
-  std::string key_alias;  // the key's name inside that keystore
-};
-// Reads them; false, with `error` set, when something there cannot be used.
+// What the game says about its Android app (see AndroidSettings in app/game_settings.hpp); false,
+// with `error` set, when something there cannot be used.
 bool read_android_settings(const std::filesystem::path& game_dir, AndroidSettings& settings, std::string& error);
 
 // The key an APK is signed with. Its passwords are never written down or put on a command line:

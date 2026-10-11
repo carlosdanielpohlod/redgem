@@ -6,8 +6,7 @@
 #include <optional>
 #include <string>
 
-#include "audio/audio.hpp"
-#include "core/config.hpp"
+#include "physics/physics_config.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "input/input.hpp"
@@ -15,6 +14,7 @@
 #include "scene/scene.hpp"
 #include "script/script_context.hpp"
 #include "script/script_host.hpp"
+#include "testing/recording_audio.hpp"
 #include "testing/test_library.hpp"
 
 namespace redgem::testing {

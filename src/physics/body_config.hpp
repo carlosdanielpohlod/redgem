@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "scene/scene_desc.hpp"
 #include "scene/property.hpp"
 
 namespace redgem {
@@ -29,6 +30,10 @@ struct BodyConfig {
 //  - vehicles always use a box chassis; their wheels are child objects with `wheel = true`.
 BodyConfig body_config_from_props(const PropertyMap& props);
 
+// What the `body` property calls a type (scene/props.hpp has the words).
 const char* body_type_name(BodyType type);
+
+// The box an object without a mesh (an empty) collides as and is drawn as: a small cube around it.
+Bounds default_collider_bounds();
 
 }  // namespace redgem

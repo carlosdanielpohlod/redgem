@@ -12,7 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "core/config.hpp"
+#include "render/render_config.hpp"
+#include "scene/scene_config.hpp"
 #include "core/log.hpp"
 #include "render/gpu_select.hpp"
 #include "render/render_math.hpp"
@@ -80,9 +81,9 @@ void draw_hud_rect(const HudItem& item) {
   }
 }
 
-void draw_touch_circle(const TouchCircle& at, unsigned char resting, unsigned char pressed) {
-  const ::Color fill{kTouchShade, kTouchShade, kTouchShade, at.pressed ? pressed : resting};
-  DrawCircleV({at.x, at.y}, at.radius, fill);
+unsigned char control_alpha(ControlCircle::Look look) {
+  if (look == ControlCircle::Look::Base) return kTouchBaseAlpha;
+  return look == ControlCircle::Look::Pressed ? kTouchPressedAlpha : kTouchRestingAlpha;
 }
 
 // Writes what is on screen now to every path asked for.
@@ -108,7 +109,7 @@ void move_vertices(const Mesh& mesh, const PrimitiveDesc& primitive) {
 
 Renderer::Renderer(const RenderSettings& settings) : impl_(std::make_unique<Impl>()) {
   impl_->settings = settings;
-  prefer_discrete_gpu();
+  prefer_discrete_gpu(settings.gpu);
   open_window(settings);
   SetExitKey(KEY_NULL);  // games decide when to quit
   SetTargetFPS(config::kTargetFps);
@@ -217,20 +218,20 @@ void Renderer::set_cursor_locked(bool locked) {
   }
 }
 
-void Renderer::draw_touch_controls(const TouchLayout& controls) {
-  draw_touch_circle(controls.stick_base, kTouchBaseAlpha, kTouchBaseAlpha);
-  for (const TouchCircle* button : {&controls.stick_knob, &controls.a, &controls.b, &controls.start}) {
-    draw_touch_circle(*button, kTouchRestingAlpha, kTouchPressedAlpha);
+void Renderer::draw_controls(const std::vector<ControlCircle>& controls) {
+  for (const ControlCircle& circle : controls) {
+    const ::Color fill{kTouchShade, kTouchShade, kTouchShade, control_alpha(circle.look)};
+    DrawCircleV({circle.x, circle.y}, circle.radius, fill);
   }
 }
 
 void Renderer::draw(const Scene& scene, const std::vector<HudItem>& hud,
                     const std::vector<std::filesystem::path>& screenshot_paths, const ParticleSystem* particles,
-                    const TouchLayout* touch) {
+                    const std::vector<ControlCircle>& controls) {
   BeginDrawing();
   draw_world(scene, impl_->camera_for(scene), nullptr, particles);
   draw_hud(hud);
-  if (touch != nullptr) draw_touch_controls(*touch);
+  draw_controls(controls);
   if (impl_->settings.show_fps) DrawFPS(config::kFpsCounterX, config::kFpsCounterY);
   if (!screenshot_paths.empty()) save_screenshots(screenshot_paths);
   EndDrawing();

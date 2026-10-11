@@ -4,6 +4,7 @@
 
 #include "editor/editor_config.hpp"
 #include "editor/ui/embedded_fonts.hpp"
+#include "render/ui_font.hpp"
 #include "extras/FA6FreeSolidFontData.h"
 
 namespace redgem::ui {
@@ -76,7 +77,7 @@ void merge_icons(float size) {
                                                        size * kIconScale, &icons, kIconRanges);
 }
 
-ImFont* add_font(const fonts::EmbeddedFont& font, float size) {
+ImFont* add_font(const EmbeddedFile& font, float size) {
   ImFontConfig config;
   config.FontDataOwnedByAtlas = false;  // the data lives in the binary
   ImFont* added =
@@ -185,7 +186,7 @@ void apply_borders(ImGuiStyle& style) {
 }  // namespace
 
 void load_fonts() {
-  add_font(fonts::interface_font(), kInterfaceFontSize);  // the first font is the default
+  add_font(embedded_ui_font(), kInterfaceFontSize);  // the first font is the default
   g_code_font = add_font(fonts::code_font(), kCodeFontSize);
 }
 

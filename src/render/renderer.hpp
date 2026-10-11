@@ -7,11 +7,11 @@
 #include <string>
 #include <vector>
 
-#include "input/touch_controls.hpp"
+#include "render/gpu_select.hpp"
+#include "render/hud.hpp"
 #include "scene/particles.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
-#include "script/script_context.hpp"
 
 namespace redgem {
 
@@ -19,8 +19,9 @@ struct RenderSettings {
   int width = 0;
   int height = 0;
   std::string title;
-  bool show_fps = true;
+  bool show_fps = false;  // a developer's counter: only who asks for it gets it
   bool resizable = false;
+  GpuChoice gpu = GpuChoice::Auto;  // the card asked for, before the window opens
 };
 
 // Owns the window and every GPU resource. Only one instance may exist at a time.
@@ -63,11 +64,12 @@ class Renderer {
   // Prefabs (spawn templates) are hidden in games and shown in the editor.
   void set_show_prefabs(bool show);
   // Draws a touch screen's controls over everything: see-through, brighter where a finger is.
-  void draw_touch_controls(const TouchLayout& controls);
-  // Draws one full game frame. Screenshots requested for this frame are written to `screenshot_paths`.
+  void draw_controls(const std::vector<ControlCircle>& controls);
+  // Draws one full game frame, with the touch controls given (none on a machine that shows none)
+  // over it. Screenshots requested for this frame are written to `screenshot_paths`.
   void draw(const Scene& scene, const std::vector<HudItem>& hud,
             const std::vector<std::filesystem::path>& screenshot_paths, const ParticleSystem* particles = nullptr,
-            const TouchLayout* touch = nullptr);
+            const std::vector<ControlCircle>& controls = {});
 
   bool close_requested() const;
   float frame_seconds() const;

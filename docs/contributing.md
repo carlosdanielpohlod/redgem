@@ -69,23 +69,29 @@ Test fixtures are regenerated with
 ## Layout
 
 ```
-src/core      constants (config.hpp), math, logging, fixed timestep clock
+src/core      what everything shares: math, logging, the fixed timestep clock, files, the platform
+              layer (the only place, with src/net/socket.cpp, that asks which system this is),
+              embedding files in the binary, the game folder's layout (config.hpp)
 src/scene     glTF loader (meshes, skeletons, animations), Blender extras parser, scene graph,
-              animation playback, particles
+              animation playback, particles; the custom properties scenes carry (props.hpp)
 src/physics   PhysicsWorld interface + Jolt implementation
 src/input     keys, axes/actions, keyboard, mouse, gamepad and scripted input sources
 src/net       sockets (the only place with OS socket calls), message framing and wire format, the
               host/guest session, discovery on the local network, the relay
-src/audio     sound effects and music (raylib, or a recorder when there is no audio device)
-src/script    mruby VM, behaviour host, native bindings
+src/audio     sound effects and music (raylib, or silence when there is no audio device)
+src/storage   what a game keeps between runs (the save store)
 src/render    renderer (HDR, shadows, reflections, post-processing), shaders, environment,
-              culling, graphics card choice, mesh conversion
+              culling, graphics card choice, mesh conversion, what differs per graphics API
+              (gpu_profile.hpp), the font texts are drawn with
+src/script    mruby VM, behaviour host, native bindings
+src/app       what plays a game: the engine loop, game.json, the game beside a built executable,
+              where saves go, user settings, the Android entry point
 src/editor    editor: scene document (undo, save, import), session (play mode), camera, picking,
-              project hub, script tabs, ImGui panels and theme (src/editor/ui)
-src/app       engine loop, game projects (templates, build, recent games), user settings and
-              command line
+              script tabs, ImGui panels and theme (src/editor/ui)
+src/project   the tools around a game: new games from templates, builds (desktop and Android),
+              recent games and the project hub, the command line, the program's entry point
 src/testing   what runs tests, apart from the engine: TestInput, the system test and Ruby test
-              runners, redgem-test and its command line
+              runners, the audio tests listen with, redgem-test and its command line
 ruby/engine   Ruby prelude embedded in the binary (Behaviour, Vector3, UI, Network...)
 ruby/testing  the Ruby tests are written with (assertions, test cases, the system test DSL),
               embedded in redgem-test only
@@ -98,6 +104,12 @@ tools/assets  downloaders of the free assets the demos use
 tests         unit, integration, Ruby and system tests, with their fixtures
 cmake         dependencies (pinned versions) and file embedding
 ```
+
+The folders of `src` are layers, in the order above: each includes only itself and what is below
+it (`core`; then `scene`, `net`, `input`, `audio`, `physics`, `storage`; then `render` and
+`script`; then `app`; then `editor`, `project`; `testing` sees everything and nothing sees it).
+Each layer keeps its own numbers in a `<layer>_config.hpp` next to its code.
+`tests/include_directions.sh` holds the table and fails the test suite on an include that goes up.
 
 ## Not there yet
 

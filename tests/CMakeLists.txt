@@ -3,7 +3,11 @@ add_executable(redgem_tests
   unit/math_test.cpp
   unit/fixed_clock_test.cpp
   unit/log_test.cpp
+  unit/files_test.cpp
+  unit/embed_test.cpp
+  unit/platform_test.cpp
   unit/property_test.cpp
+  unit/props_test.cpp
   unit/extras_parser_test.cpp
   unit/transform_test.cpp
   unit/scene_test.cpp
@@ -15,6 +19,7 @@ add_executable(redgem_tests
   unit/input_test.cpp
   unit/script_naming_test.cpp
   unit/cli_test.cpp
+  unit/editor_setup_test.cpp
   unit/mesh_builder_test.cpp
   unit/scene_document_test.cpp
   unit/scene_tree_test.cpp
@@ -37,6 +42,7 @@ add_executable(redgem_tests
   unit/xml_writer_test.cpp
   unit/touch_controls_test.cpp
   unit/android_package_test.cpp
+  unit/game_settings_test.cpp
   unit/frame_buffer_test.cpp
   unit/wire_test.cpp
   unit/lan_discovery_test.cpp
@@ -76,6 +82,17 @@ target_compile_definitions(redgem_testing_tests PRIVATE
   REDGEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_compile_options(redgem_testing_tests PRIVATE -Wall -Wextra -Wno-unused-parameter)
 add_test(NAME cpp.testing_library COMMAND redgem_testing_tests)
+
+# The engine's layers only include what is below them (the table is in the script).
+add_test(NAME layering.include_directions
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/include_directions.sh ${CMAKE_SOURCE_DIR}/src)
+# Guards the check itself: a low layer that includes a higher one must fail it.
+add_test(NAME layering.check_catches_upward_includes
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/include_directions.sh
+                 ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/include_directions/src)
+# (Matched on its message: a script that did not run must not count as "it failed as expected".)
+set_tests_properties(layering.check_catches_upward_includes PROPERTIES
+  PASS_REGULAR_EXPRESSION "forbidden include: src/core/upward.hpp includes render/picture.hpp")
 
 # The program games ship as has no test code in it.
 add_test(NAME app.ships_no_test_code
@@ -140,7 +157,7 @@ set_tests_properties(system.harness_reports_failures PROPERTIES LABELS system RU
   PASS_REGULAR_EXPRESSION "system test failed: .*this must fail")
 
 # The editor window itself, driven by a doctest program.
-add_executable(redgem_editor_system_tests editor_system/editor_window_test.cpp)
+add_executable(redgem_editor_system_tests editor_system/editor_window_test.cpp editor_system/window_picture.cpp)
 target_link_libraries(redgem_editor_system_tests PRIVATE redgem_engine doctest::doctest)
 target_compile_definitions(redgem_editor_system_tests PRIVATE
   REDGEM_PLATFORMER_DIR="${CMAKE_SOURCE_DIR}/games/platformer"

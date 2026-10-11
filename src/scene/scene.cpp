@@ -4,7 +4,7 @@
 
 #include <stdexcept>
 
-#include "core/config.hpp"
+#include "scene/props.hpp"
 
 namespace redgem {
 
@@ -37,14 +37,14 @@ void copy_parts(const NodeDesc& node, const SceneDesc& desc, GameObject& object)
 // What a node's custom properties say about the object itself.
 void apply_props(const PropertyMap& props, GameObject& object) {
   object.props = props;
-  object.tag = get_string(props, config::kPropTag).value_or("");
-  object.visible = get_bool(props, config::kPropVisible).value_or(true);
-  object.prefab = get_bool(props, config::kPropPrefab).value_or(false);
-  if (const auto tint = get_string(props, config::kPropTint)) {
+  object.tag = get_string(props, props::kTag).value_or("");
+  object.visible = get_bool(props, props::kVisible).value_or(true);
+  object.prefab = get_bool(props, props::kPrefab).value_or(false);
+  if (const auto tint = get_string(props, props::kTint)) {
     object.tint = parse_hex_color(*tint).value_or(Vec3::one());
   }
-  if (const auto from = get_number(props, config::kPropVisibleFrom)) object.visible_from = static_cast<float>(*from);
-  if (const auto to = get_number(props, config::kPropVisibleTo)) object.visible_to = static_cast<float>(*to);
+  if (const auto from = get_number(props, props::kVisibleFrom)) object.visible_from = static_cast<float>(*from);
+  if (const auto to = get_number(props, props::kVisibleTo)) object.visible_to = static_cast<float>(*to);
 }
 
 // A copy before it gets its place in the scene: live, on its own, following no animation ahead.
@@ -52,7 +52,7 @@ GameObject detached_copy(const GameObject& original) {
   GameObject copy = original;
   copy.children.clear();
   copy.prefab = false;
-  copy.props.erase(config::kPropPrefab);
+  copy.props.erase(props::kPrefab);
   // A copy of a copy still follows the animations of the first original.
   copy.copy_of = original.copy_of == kNoObject ? original.id : original.copy_of;
   copy.animation_offset = 0.0f;

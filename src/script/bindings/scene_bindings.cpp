@@ -5,7 +5,7 @@
 #include <mruby/hash.h>
 #include <mruby/string.h>
 
-#include "core/config.hpp"
+#include "scene/scene_config.hpp"
 #include "core/log.hpp"
 #include "scene/camera_ray.hpp"
 #include "script/bindings/binding_helpers.hpp"

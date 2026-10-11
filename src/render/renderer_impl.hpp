@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "core/config.hpp"
+#include "scene/scene_config.hpp"
 #include "render/environment.hpp"
 #include "render/render_math.hpp"
 #include "render/renderer.hpp"

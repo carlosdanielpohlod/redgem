@@ -2,8 +2,8 @@
 
 #include <system_error>
 
-#include "app/game_project.hpp"
-#include "app/save_store.hpp"
+#include "app/save_location.hpp"
+#include "core/platform.hpp"
 
 namespace redgem::testing {
 namespace {
@@ -14,7 +14,7 @@ constexpr const char* kTestSavesFolder = "test-saves";  // beside the players' s
 
 std::filesystem::path test_save_file_for(const std::filesystem::path& game_dir) {
   // (In the user's own folder, not in one every user of the machine can write to and guess.)
-  return recent_games_file().parent_path() / kTestSavesFolder / save_file_for(game_dir).filename();
+  return platform::user_data_dir() / kTestSavesFolder / save_file_for(game_dir).filename();
 }
 
 std::filesystem::path fresh_test_save_file(const std::filesystem::path& game_dir) {

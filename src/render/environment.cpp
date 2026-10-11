@@ -4,30 +4,11 @@
 #include <cctype>
 #include <cmath>
 
-#include "core/config.hpp"
+#include "render/render_config.hpp"
+#include "scene/props.hpp"
 
 namespace redgem {
 namespace {
-
-// The custom properties of an environment object.
-constexpr const char* kEnvironmentProp = "environment";
-constexpr const char* kSkyTopProp = "sky_top";
-constexpr const char* kSkyHorizonProp = "sky_horizon";
-constexpr const char* kGroundColorProp = "ground_color";
-constexpr const char* kFogColorProp = "fog_color";
-constexpr const char* kFogDensityProp = "fog_density";
-constexpr const char* kAmbientProp = "ambient";
-constexpr const char* kExposureProp = "exposure";
-constexpr const char* kBloomProp = "bloom";
-constexpr const char* kVignetteProp = "vignette";
-constexpr const char* kSunGlowProp = "sun_glow";
-constexpr const char* kWindProp = "wind";
-constexpr const char* kShadowsProp = "shadows";
-constexpr const char* kAmbientOcclusionProp = "ambient_occlusion";
-constexpr const char* kContrastProp = "contrast";
-constexpr const char* kSaturationProp = "saturation";
-constexpr const char* kGrainProp = "grain";
-constexpr const char* kAberrationProp = "aberration";
 
 // A clear day (linear colors).
 constexpr Vec3 kDaySkyTop{0.16f, 0.36f, 0.78f};
@@ -51,22 +32,22 @@ struct NumberProp {
   float Environment::* value;
 };
 constexpr NumberProp kNumberProps[] = {
-    {kFogDensityProp, &Environment::fog_density},
-    {kAmbientProp, &Environment::ambient},
-    {kExposureProp, &Environment::exposure},
-    {kBloomProp, &Environment::bloom},
-    {kSunGlowProp, &Environment::sun_glow},
-    {kWindProp, &Environment::wind},
-    {kContrastProp, &Environment::contrast},
-    {kSaturationProp, &Environment::saturation},
-    {kGrainProp, &Environment::grain},
-    {kAberrationProp, &Environment::aberration},
+    {props::environment::kFogDensity, &Environment::fog_density},
+    {props::environment::kAmbient, &Environment::ambient},
+    {props::environment::kExposure, &Environment::exposure},
+    {props::environment::kBloom, &Environment::bloom},
+    {props::environment::kSunGlow, &Environment::sun_glow},
+    {props::environment::kWind, &Environment::wind},
+    {props::environment::kContrast, &Environment::contrast},
+    {props::environment::kSaturation, &Environment::saturation},
+    {props::environment::kGrain, &Environment::grain},
+    {props::environment::kAberration, &Environment::aberration},
 };
 // The ones that are a 0..1 strength.
 constexpr NumberProp kStrengthProps[] = {
-    {kVignetteProp, &Environment::vignette},
-    {kShadowsProp, &Environment::shadows},
-    {kAmbientOcclusionProp, &Environment::ambient_occlusion},
+    {props::environment::kVignette, &Environment::vignette},
+    {props::environment::kShadows, &Environment::shadows},
+    {props::environment::kAmbientOcclusion, &Environment::ambient_occlusion},
 };
 
 void read_color(const PropertyMap& props, const char* key, Vec3& out) {
@@ -155,11 +136,11 @@ Environment default_environment() {
 
 Environment environment_from_props(const PropertyMap& props) {
   Environment env = default_environment();
-  read_color(props, kSkyTopProp, env.sky_top);
-  read_color(props, kSkyHorizonProp, env.sky_horizon);
-  read_color(props, kGroundColorProp, env.ground);
+  read_color(props, props::environment::kSkyTop, env.sky_top);
+  read_color(props, props::environment::kSkyHorizon, env.sky_horizon);
+  read_color(props, props::environment::kGroundColor, env.ground);
   env.fog_color = env.sky_horizon;  // fog fades into the horizon unless given its own color
-  read_color(props, kFogColorProp, env.fog_color);
+  read_color(props, props::environment::kFogColor, env.fog_color);
   for (const NumberProp& prop : kNumberProps) read_number(props, prop.key, env.*prop.value);
   for (const NumberProp& prop : kStrengthProps) read_strength(props, prop.key, env.*prop.value);
   return env;
@@ -168,7 +149,7 @@ Environment environment_from_props(const PropertyMap& props) {
 Environment scene_environment(const Scene& scene) {
   for (const ObjectId id : scene.alive_ids()) {
     const PropertyMap& props = scene.at(id).props;
-    if (get_bool(props, kEnvironmentProp).value_or(false)) return environment_from_props(props);
+    if (get_bool(props, props::kEnvironment).value_or(false)) return environment_from_props(props);
   }
   return default_environment();
 }

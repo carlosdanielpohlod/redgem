@@ -5,7 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "core/config.hpp"
+#include "render/render_config.hpp"
+#include "scene/scene_config.hpp"
 #include "render/mesh_builder.hpp"
 
 using namespace redgem;

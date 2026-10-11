@@ -4,7 +4,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "app/android_package.hpp"
+#include "project/android_package.hpp"
 #include "core/platform.hpp"
 #include "test_support.hpp"
 
@@ -40,6 +40,23 @@ std::string read(const std::filesystem::path& file) {
 }
 
 }  // namespace
+
+TEST_CASE("the packer and the engine inside the app call what the app carries by the same names") {
+  CHECK(std::string(kAndroidManifestAsset) == "game.files");
+  CHECK(std::string(kAndroidStampAsset) == "game.stamp");
+  // The library's file is made from the name the manifest gives Android: they cannot drift apart.
+  CHECK(android_library_file() == "libredgem.so");
+  CHECK(android_manifest("com.redgem.game", "Game").find("android:value=\"redgem\"") != std::string::npos);
+}
+
+TEST_CASE("the app asks for the Android the engine is built for") {
+  // One file says which: the engine's build for Android reads it too (tools/android/build_runtime.sh).
+  std::string oldest;
+  std::ifstream(fixture("../../tools/android/min_api.txt")) >> oldest;
+  REQUIRE_FALSE(oldest.empty());
+  const std::string manifest = android_manifest("com.redgem.game", "Game");
+  CHECK(manifest.find("android:minSdkVersion=\"" + oldest + "\"") != std::string::npos);
+}
 
 TEST_CASE("an app's id is made of the game's letters and digits") {
   CHECK(android_package_name("games/platformer") == "com.redgem.platformer");

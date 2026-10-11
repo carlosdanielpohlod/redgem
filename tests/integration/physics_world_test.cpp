@@ -6,6 +6,7 @@
 #include <string>
 
 #include "core/config.hpp"
+#include "physics/physics_config.hpp"
 #include "physics/physics_world.hpp"
 
 using namespace redgem;

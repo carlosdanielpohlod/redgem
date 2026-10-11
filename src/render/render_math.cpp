@@ -5,7 +5,7 @@
 #include <cmath>
 #include <cstring>
 
-#include "core/config.hpp"
+#include "scene/scene_config.hpp"
 
 namespace redgem::render_math {
 namespace {

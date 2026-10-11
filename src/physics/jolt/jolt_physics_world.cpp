@@ -23,7 +23,7 @@
 #include <set>
 #include <utility>
 
-#include "core/config.hpp"
+#include "physics/physics_config.hpp"
 #include "core/log.hpp"
 #include "physics/jolt/jolt_shapes.hpp"
 #include "physics/jolt/jolt_vehicle.hpp"

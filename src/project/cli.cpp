@@ -1,6 +1,7 @@
-#include "app/cli.hpp"
+#include "project/cli.hpp"
 
-#include "app/game_project.hpp"
+#include "core/files.hpp"
+#include "project/game_build.hpp"
 #include "app/user_settings.hpp"
 #include "core/config.hpp"
 
@@ -216,6 +217,15 @@ std::string problem_with(const Reading& reading) {
 std::string usage() {
   return std::string(kUsageText) + "  <game_dir> holds " + config::kSceneFileName + " (exported from Blender) and a " +
          config::kScriptsDirName + "/ folder.\n";
+}
+
+EngineOptions developer_play_options(const CliOptions& options, GpuChoice gpu) {
+  EngineOptions engine;
+  engine.game_dir = options.game_dir;
+  engine.screenshot_dir = options.screenshot_dir;
+  engine.show_fps = true;
+  engine.gpu = gpu;
+  return engine;
 }
 
 CliResult parse_cli(const std::vector<std::string>& args) {

@@ -2,10 +2,14 @@
 
 #include <optional>
 
-#include "core/config.hpp"
+#include "physics/physics_config.hpp"
+#include "scene/props.hpp"
 
 namespace redgem {
 namespace {
+
+constexpr const char* kNoBody = "none";  // said in messages only
+constexpr const char* kUnknownBody = "unknown";
 
 // What the `body` property calls each type. An object without the property has none; "none"
 // itself cannot be asked for.
@@ -14,8 +18,12 @@ struct BodyTypeName {
   const char* name;
 };
 constexpr BodyTypeName kBodyTypeNames[] = {
-    {BodyType::None, "none"},           {BodyType::Static, "static"},       {BodyType::Dynamic, "dynamic"},
-    {BodyType::Kinematic, "kinematic"}, {BodyType::Character, "character"}, {BodyType::Vehicle, "vehicle"},
+    {BodyType::None, kNoBody},
+    {BodyType::Static, props::kBodyStatic},
+    {BodyType::Dynamic, props::kBodyDynamic},
+    {BodyType::Kinematic, props::kBodyKinematic},
+    {BodyType::Character, props::kBodyCharacter},
+    {BodyType::Vehicle, props::kBodyVehicle},
 };
 
 struct ColliderName {
@@ -23,10 +31,10 @@ struct ColliderName {
   const char* name;
 };
 constexpr ColliderName kColliderNames[] = {
-    {ColliderShape::Box, config::kColliderBox},
-    {ColliderShape::Sphere, config::kColliderSphere},
-    {ColliderShape::Capsule, config::kColliderCapsule},
-    {ColliderShape::Mesh, config::kColliderMesh},
+    {ColliderShape::Box, props::kColliderBox},
+    {ColliderShape::Sphere, props::kColliderSphere},
+    {ColliderShape::Capsule, props::kColliderCapsule},
+    {ColliderShape::Mesh, props::kColliderMesh},
 };
 
 std::optional<BodyType> parse_body_type(const std::string& name) {
@@ -44,7 +52,7 @@ std::optional<ColliderShape> parse_collider(const std::string& name) {
 }
 
 void read_body_type(const PropertyMap& props, BodyConfig& config) {
-  const std::optional<std::string> body = get_string(props, config::kPropBody);
+  const std::optional<std::string> body = get_string(props, props::kBody);
   if (!body) return;
   const std::optional<BodyType> parsed = parse_body_type(*body);
   if (!parsed) config.warnings.push_back("unknown body type '" + *body + "'");
@@ -53,7 +61,7 @@ void read_body_type(const PropertyMap& props, BodyConfig& config) {
 
 // A character with no collider asked for gets its capsule here.
 void read_collider(const PropertyMap& props, BodyConfig& config) {
-  const std::optional<std::string> collider = get_string(props, config::kPropCollider);
+  const std::optional<std::string> collider = get_string(props, props::kCollider);
   if (!collider) {
     if (config.type == BodyType::Character) config.collider = ColliderShape::Capsule;
     return;
@@ -97,7 +105,7 @@ void settle_collider(BodyConfig& config) {
 
 void read_mass(const PropertyMap& props, BodyConfig& config) {
   const float default_mass = config.type == BodyType::Vehicle ? config::kVehicleDefaultMass : config::kDefaultBodyMass;
-  const std::optional<double> mass = get_number(props, config::kPropMass);
+  const std::optional<double> mass = get_number(props, props::kMass);
   config.mass = mass ? static_cast<float>(*mass) : default_mass;
   if (config.mass <= 0.0f) {
     config.warnings.push_back("mass must be positive, using " + std::to_string(default_mass));
@@ -111,12 +119,20 @@ const char* body_type_name(BodyType type) {
   for (const BodyTypeName& known : kBodyTypeNames) {
     if (known.type == type) return known.name;
   }
-  return "unknown";
+  return kUnknownBody;
+}
+
+Bounds default_collider_bounds() {
+  const Vec3 half = Vec3::one() * config::kDefaultColliderHalfExtent;
+  Bounds bounds;
+  bounds.include(-half);
+  bounds.include(half);
+  return bounds;
 }
 
 BodyConfig body_config_from_props(const PropertyMap& props) {
   BodyConfig config;
-  config.trigger = get_bool(props, config::kPropTrigger).value_or(false);
+  config.trigger = get_bool(props, props::kTrigger).value_or(false);
   read_body_type(props, config);
   read_collider(props, config);
   apply_trigger(config);
