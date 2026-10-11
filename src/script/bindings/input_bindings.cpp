@@ -1,5 +1,11 @@
 // Input natives, and TestInput: what a system test presses, moves and types.
 
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+
 #include <mruby.h>
 #include <mruby/array.h>
 #include <mruby/string.h>
@@ -12,6 +18,10 @@ namespace redgem {
 namespace {
 
 using namespace binding;
+
+constexpr const char* kNotesFolder = "redgem-test-notes";
+constexpr std::size_t kMaxNoteName = 40;
+constexpr std::size_t kMaxNoteBytes = 4096;
 
 InputState& input(mrb_state* mrb) { return *context(mrb).input; }
 
@@ -175,6 +185,42 @@ mrb_value test_input_type(mrb_state* mrb, mrb_value) {
   return mrb_nil_value();
 }
 
+// Scripts cannot touch files, and two games being tested together still have to tell each other
+// things before they are connected (a room's code): notes, small named texts kept in a folder of
+// the tests' own.
+std::filesystem::path note_file(mrb_state* mrb, const char* name) {
+  const std::string note = name;
+  const bool plain = !note.empty() && note.size() <= kMaxNoteName &&
+                     std::all_of(note.begin(), note.end(), [](unsigned char c) { return std::isalnum(c) != 0 || c == '_'; });
+  if (!plain) mrb_raise(mrb, E_ARGUMENT_ERROR, "a note's name is made of letters, digits and _");
+  return std::filesystem::temp_directory_path() / kNotesFolder / note;
+}
+
+mrb_value test_input_leave_note(mrb_state* mrb, mrb_value) {
+  const char* name = nullptr;
+  const char* text = nullptr;
+  mrb_get_args(mrb, "zz", &name, &text);
+  test_input(mrb);  // (only a test may)
+  const std::filesystem::path file = note_file(mrb, name);
+  std::error_code ignored;
+  std::filesystem::create_directories(file.parent_path(), ignored);
+  std::ofstream(file, std::ios::binary) << text;
+  return mrb_nil_value();
+}
+
+// The note's text, or nil when nobody left one.
+mrb_value test_input_note(mrb_state* mrb, mrb_value) {
+  const char* name = nullptr;
+  mrb_get_args(mrb, "z", &name);
+  test_input(mrb);
+  std::ifstream in(note_file(mrb, name), std::ios::binary);
+  if (!in) return mrb_nil_value();
+  std::stringstream text;
+  text << in.rdbuf();
+  const std::string read = text.str().substr(0, kMaxNoteBytes);
+  return mrb_str_new(mrb, read.data(), static_cast<mrb_int>(read.size()));
+}
+
 mrb_value test_input_set_gamepad_axis(mrb_state* mrb, mrb_value) {
   mrb_value name;
   mrb_float value = 0.0;
@@ -247,6 +293,8 @@ void install_test_input_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, test_input_module, "release_all", test_input_release_all, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, test_input_module, "down?", test_input_down, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, test_input_module, "type", test_input_type, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, test_input_module, "leave_note", test_input_leave_note, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, test_input_module, "note", test_input_note, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, test_input_module, "set_gamepad_axis", test_input_set_gamepad_axis, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, test_input_module, "set_gamepad_button", test_input_set_gamepad_button,
                              MRB_ARGS_REQ(2));

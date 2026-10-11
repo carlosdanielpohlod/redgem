@@ -2,13 +2,17 @@
 # C++ exceptions are enabled so Ruby errors unwind C++ frames safely.
 
 # What the engine uses of mruby, for every system it is built for.
+# A game's scripts are code someone else may have written, so the Ruby they run in can compute,
+# and reach the engine, and nothing else. Left out on purpose: files, directories, sockets and
+# processes (the stdlib-io gembox: File, IO, Dir, sockets, backticks, IO.popen), and running
+# text as code (mruby-eval, mruby-binding). A script has no way to touch the player's files or
+# start a program.
 def redgem_gems(conf)
   conf.gembox 'stdlib'
   conf.gembox 'stdlib-ext'
-  conf.gembox 'stdlib-io'
   conf.gembox 'math'
-  conf.gembox 'metaprog'
-  conf.gem core: 'mruby-compiler'
+  conf.gem core: 'mruby-metaprog'   # __send__, instance_variable_set, const_get: the prelude uses them
+  conf.gem core: 'mruby-compiler'   # the engine compiles the scripts itself
   conf.gem core: 'mruby-error'
   conf.enable_cxx_exception
 end

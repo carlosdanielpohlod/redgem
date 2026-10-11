@@ -12,7 +12,7 @@ SCREENSHOTS="$5"
 RELAY_PORT="${6:-}"
 
 # Where a test that opens a room leaves its code for the other: a code from an earlier run opens nothing.
-rm -f /tmp/redgem_test_room_code.txt
+rm -rf "${TMPDIR:-/tmp}/redgem-test-notes"
 relay=""
 if [[ -n "${RELAY_PORT}" ]]; then
   "${ENGINE}" relay --port "${RELAY_PORT}" &

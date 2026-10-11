@@ -1,7 +1,7 @@
 # Two machines play the platformer in a room on a relay (which the test runner starts); this one
 # opens the room and leaves its code where the other test finds it (see co_op_room_guest_test.rb).
 RELAY = "127.0.0.1:47841".freeze
-CODE_FILE = "/tmp/redgem_test_room_code.txt".freeze
+CODE_NOTE = "room_code"   # where the host test leaves the code for the guest test
 SETTLE_FRAMES = 30
 JOIN_FRAMES = 1800        # the other game may still be starting
 CODE_LETTERS = 6
@@ -18,7 +18,7 @@ SystemTest.define do |t|
   t.assert("the room has a code, and whoever opened it hosts the game") do
     Network.room.size == CODE_LETTERS && Network.host? && Network.id == 1
   end
-  File.open(CODE_FILE, "w") { |file| file.write(Network.room) }
+  TestInput.leave_note(CODE_NOTE, Network.room)
   guest_done = false
   Network.on(:seen_it_all) { guest_done = true }
 
