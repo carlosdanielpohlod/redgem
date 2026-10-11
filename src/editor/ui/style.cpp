@@ -17,6 +17,7 @@ ImFont* g_code_font = nullptr;
 constexpr float kIconScale = 0.9f;
 constexpr float kIconOffsetY = 1.0f;
 constexpr float kIconMinAdvance = 1.25f;  // icons get a fixed width (in font sizes) so they line up
+constexpr ImWchar kRangesEnd = 0;         // ImGui: closes a list of glyph ranges
 
 // Palette: neutral slate grays with a ruby accent.
 constexpr ImVec4 kText{0.90f, 0.91f, 0.93f, 1.0f};
@@ -59,6 +60,8 @@ constexpr float kTabBarOverline = 2.0f;
 constexpr float kTreeLinesSize = 1.0f;
 constexpr float kSeparatorTextPadding = 0.0f;
 constexpr float kDisabledAlpha = 0.45f;
+constexpr int kActiveButtonColors = 2;  // style colors icon_button pushes for a pressed button
+constexpr const char* kHeaderLabelFormat = "%s  %s###%s";  // icon, title, and the title again as the id
 
 ImFont* add_font(const fonts::EmbeddedFont& font, float size) {
   ImGuiIO& io = ImGui::GetIO();
@@ -66,7 +69,7 @@ ImFont* add_font(const fonts::EmbeddedFont& font, float size) {
   config.FontDataOwnedByAtlas = false;  // the data lives in the binary
   ImFont* added = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(font.data), font.size, size, &config);
 
-  static const ImWchar kIconRanges[] = {ICON_MIN_FA, ICON_MAX_FA, 0};
+  static const ImWchar kIconRanges[] = {ICON_MIN_FA, ICON_MAX_FA, kRangesEnd};
   ImFontConfig icons;
   icons.MergeMode = true;
   icons.PixelSnapH = true;
@@ -78,17 +81,69 @@ ImFont* add_font(const fonts::EmbeddedFont& font, float size) {
   return added;
 }
 
-}  // namespace
+// Which color of the palette each part of the interface gets.
+struct ThemeColor {
+  ImGuiCol slot;
+  ImVec4 color;
+};
+constexpr ThemeColor kThemeColors[] = {
+    {ImGuiCol_Text, kText},
+    {ImGuiCol_TextDisabled, kTextDisabled},
+    {ImGuiCol_WindowBg, kWindow},
+    {ImGuiCol_ChildBg, kTransparent},
+    {ImGuiCol_PopupBg, kPopup},
+    {ImGuiCol_Border, kBorder},
+    {ImGuiCol_BorderShadow, kTransparent},
+    {ImGuiCol_FrameBg, kFrame},
+    {ImGuiCol_FrameBgHovered, kFrameHover},
+    {ImGuiCol_FrameBgActive, kFrameActive},
+    {ImGuiCol_TitleBg, kPanelDark},
+    {ImGuiCol_TitleBgActive, kPanelDark},
+    {ImGuiCol_TitleBgCollapsed, kPanelDark},
+    {ImGuiCol_MenuBarBg, kPanelDark},
+    {ImGuiCol_ScrollbarBg, kTransparent},
+    {ImGuiCol_ScrollbarGrab, kScrollbar},
+    {ImGuiCol_ScrollbarGrabHovered, kHeaderHover},
+    {ImGuiCol_ScrollbarGrabActive, kAccentSoft},
+    {ImGuiCol_CheckMark, kAccent},
+    {ImGuiCol_SliderGrab, kAccent},
+    {ImGuiCol_SliderGrabActive, kAccentHover},
+    {ImGuiCol_Button, kFrame},
+    {ImGuiCol_ButtonHovered, kFrameHover},
+    {ImGuiCol_ButtonActive, kAccentSoft},
+    {ImGuiCol_Header, kHeader},
+    {ImGuiCol_HeaderHovered, kHeaderHover},
+    {ImGuiCol_HeaderActive, kAccentSoft},
+    {ImGuiCol_Separator, kBorder},
+    {ImGuiCol_SeparatorHovered, kAccentSoft},
+    {ImGuiCol_SeparatorActive, kAccent},
+    {ImGuiCol_ResizeGrip, kTransparent},
+    {ImGuiCol_ResizeGripHovered, kAccentSoft},
+    {ImGuiCol_ResizeGripActive, kAccent},
+    {ImGuiCol_InputTextCursor, kText},
+    {ImGuiCol_Tab, kPanelDark},
+    {ImGuiCol_TabHovered, kHeaderHover},
+    {ImGuiCol_TabSelected, kWindow},
+    {ImGuiCol_TabSelectedOverline, kAccent},
+    {ImGuiCol_TabDimmed, kPanelDark},
+    {ImGuiCol_TabDimmedSelected, kWindow},
+    {ImGuiCol_TabDimmedSelectedOverline, kBorder},
+    {ImGuiCol_DockingPreview, kAccentSoft},
+    {ImGuiCol_DockingEmptyBg, kPanelDark},
+    {ImGuiCol_TableHeaderBg, kHeader},
+    {ImGuiCol_TableBorderStrong, kBorder},
+    {ImGuiCol_TableBorderLight, kBorder},
+    {ImGuiCol_TextSelectedBg, kAccentSoft},
+    {ImGuiCol_TextLink, kAccentHover},
+    {ImGuiCol_TreeLines, kBorder},
+    {ImGuiCol_DragDropTarget, kAccent},
+    {ImGuiCol_DragDropTargetBg, kAccentFaint},
+    {ImGuiCol_NavCursor, kAccent},
+    {ImGuiCol_ModalWindowDimBg, kModalDim},
+    {ImGuiCol_UnsavedMarker, kAccent},
+};
 
-void load_fonts() {
-  add_font(fonts::interface_font(), kInterfaceFontSize);  // the first font is the default
-  g_code_font = add_font(fonts::code_font(), kCodeFontSize);
-}
-
-ImFont* code_font() { return g_code_font; }
-
-void apply_theme() {
-  ImGuiStyle& style = ImGui::GetStyle();
+void apply_spacing(ImGuiStyle& style) {
   style.WindowPadding = kWindowPadding;
   style.FramePadding = kFramePadding;
   style.ItemSpacing = kItemSpacing;
@@ -97,6 +152,10 @@ void apply_theme() {
   style.IndentSpacing = kIndentSpacing;
   style.ScrollbarSize = kScrollbarSize;
   style.GrabMinSize = kGrabMinSize;
+  style.SeparatorTextPadding.x = kSeparatorTextPadding;
+}
+
+void apply_shapes(ImGuiStyle& style) {
   style.WindowRounding = kLargeRounding;
   style.ChildRounding = kSmallRounding;
   style.FrameRounding = kSmallRounding;
@@ -111,66 +170,25 @@ void apply_theme() {
   style.TabBarOverlineSize = kTabBarOverline;
   style.DockingSeparatorSize = kBorderSize;
   style.WindowMenuButtonPosition = ImGuiDir_None;  // docked panels show just their title
-  style.SeparatorTextPadding.x = kSeparatorTextPadding;
   style.TreeLinesFlags = ImGuiTreeNodeFlags_DrawLinesToNodes;
   style.TreeLinesSize = kTreeLinesSize;
   style.DisabledAlpha = kDisabledAlpha;
+}
 
-  ImVec4* colors = style.Colors;
-  colors[ImGuiCol_Text] = kText;
-  colors[ImGuiCol_TextDisabled] = kTextDisabled;
-  colors[ImGuiCol_WindowBg] = kWindow;
-  colors[ImGuiCol_ChildBg] = kTransparent;
-  colors[ImGuiCol_PopupBg] = kPopup;
-  colors[ImGuiCol_Border] = kBorder;
-  colors[ImGuiCol_BorderShadow] = kTransparent;
-  colors[ImGuiCol_FrameBg] = kFrame;
-  colors[ImGuiCol_FrameBgHovered] = kFrameHover;
-  colors[ImGuiCol_FrameBgActive] = kFrameActive;
-  colors[ImGuiCol_TitleBg] = kPanelDark;
-  colors[ImGuiCol_TitleBgActive] = kPanelDark;
-  colors[ImGuiCol_TitleBgCollapsed] = kPanelDark;
-  colors[ImGuiCol_MenuBarBg] = kPanelDark;
-  colors[ImGuiCol_ScrollbarBg] = kTransparent;
-  colors[ImGuiCol_ScrollbarGrab] = kScrollbar;
-  colors[ImGuiCol_ScrollbarGrabHovered] = kHeaderHover;
-  colors[ImGuiCol_ScrollbarGrabActive] = kAccentSoft;
-  colors[ImGuiCol_CheckMark] = kAccent;
-  colors[ImGuiCol_SliderGrab] = kAccent;
-  colors[ImGuiCol_SliderGrabActive] = kAccentHover;
-  colors[ImGuiCol_Button] = kFrame;
-  colors[ImGuiCol_ButtonHovered] = kFrameHover;
-  colors[ImGuiCol_ButtonActive] = kAccentSoft;
-  colors[ImGuiCol_Header] = kHeader;
-  colors[ImGuiCol_HeaderHovered] = kHeaderHover;
-  colors[ImGuiCol_HeaderActive] = kAccentSoft;
-  colors[ImGuiCol_Separator] = kBorder;
-  colors[ImGuiCol_SeparatorHovered] = kAccentSoft;
-  colors[ImGuiCol_SeparatorActive] = kAccent;
-  colors[ImGuiCol_ResizeGrip] = kTransparent;
-  colors[ImGuiCol_ResizeGripHovered] = kAccentSoft;
-  colors[ImGuiCol_ResizeGripActive] = kAccent;
-  colors[ImGuiCol_InputTextCursor] = kText;
-  colors[ImGuiCol_Tab] = kPanelDark;
-  colors[ImGuiCol_TabHovered] = kHeaderHover;
-  colors[ImGuiCol_TabSelected] = kWindow;
-  colors[ImGuiCol_TabSelectedOverline] = kAccent;
-  colors[ImGuiCol_TabDimmed] = kPanelDark;
-  colors[ImGuiCol_TabDimmedSelected] = kWindow;
-  colors[ImGuiCol_TabDimmedSelectedOverline] = kBorder;
-  colors[ImGuiCol_DockingPreview] = kAccentSoft;
-  colors[ImGuiCol_DockingEmptyBg] = kPanelDark;
-  colors[ImGuiCol_TableHeaderBg] = kHeader;
-  colors[ImGuiCol_TableBorderStrong] = kBorder;
-  colors[ImGuiCol_TableBorderLight] = kBorder;
-  colors[ImGuiCol_TextSelectedBg] = kAccentSoft;
-  colors[ImGuiCol_TextLink] = kAccentHover;
-  colors[ImGuiCol_TreeLines] = kBorder;
-  colors[ImGuiCol_DragDropTarget] = kAccent;
-  colors[ImGuiCol_DragDropTargetBg] = kAccentFaint;
-  colors[ImGuiCol_NavCursor] = kAccent;
-  colors[ImGuiCol_ModalWindowDimBg] = kModalDim;
-  colors[ImGuiCol_UnsavedMarker] = kAccent;
+}  // namespace
+
+void load_fonts() {
+  add_font(fonts::interface_font(), kInterfaceFontSize);  // the first font is the default
+  g_code_font = add_font(fonts::code_font(), kCodeFontSize);
+}
+
+ImFont* code_font() { return g_code_font; }
+
+void apply_theme() {
+  ImGuiStyle& style = ImGui::GetStyle();
+  apply_spacing(style);
+  apply_shapes(style);
+  for (const ThemeColor& entry : kThemeColors) style.Colors[entry.slot] = entry.color;
 }
 
 ImVec4 accent_color() { return kAccent; }
@@ -183,13 +201,13 @@ void property_label(const char* text) {
   ImGui::AlignTextToFramePadding();
   ImGui::TextColored(kMuted, "%s", text);
   ImGui::SameLine(kLabelColumnWidth);
-  ImGui::SetNextItemWidth(-1.0f);
+  ImGui::SetNextItemWidth(kFillWidth);
 }
 
 bool component_header(const char* icon, const char* title, bool* removed) {
   ImGui::Spacing();
   char label[kTextBufferSize];
-  ImFormatString(label, sizeof(label), "%s  %s###%s", icon, title, title);
+  ImFormatString(label, sizeof(label), kHeaderLabelFormat, icon, title, title);
   bool visible = true;
   const bool open = ImGui::CollapsingHeader(label, removed != nullptr ? &visible : nullptr,
                                             ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth);
@@ -204,7 +222,7 @@ bool icon_button(const char* icon, const char* tip, bool active) {
   }
   const float side = ImGui::GetFrameHeight();
   const bool pressed = ImGui::Button(icon, ImVec2(side * kIconButtonWidth, side));
-  if (active) ImGui::PopStyleColor(2);
+  if (active) ImGui::PopStyleColor(kActiveButtonColors);
   tooltip(tip);
   return pressed;
 }

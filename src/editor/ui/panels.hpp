@@ -6,6 +6,7 @@
 #include "audio/audio.hpp"
 #include "core/math.hpp"
 #include "editor/console_log.hpp"
+#include "editor/editor_config.hpp"
 #include "editor/editor_session.hpp"
 #include "editor/project_files.hpp"
 #include "editor/script_workspace.hpp"
@@ -18,8 +19,9 @@ namespace redgem::ui {
 struct TerrainTool {
   bool sculpting = false;  // while on, dragging the left button over the selected terrain reshapes it
   SculptMode mode = SculptMode::Raise;
-  float radius = 6.0f;     // meters
-  float strength = 4.0f;   // meters per second for Raise and Lower; how fast Smooth and Flatten act
+  float radius = editor_config::kDefaultBrushRadius;  // meters
+  // Meters per second for Raise and Lower; how fast Smooth and Flatten act.
+  float strength = editor_config::kDefaultBrushStrength;
 };
 
 // What every panel works with.
@@ -70,6 +72,11 @@ void reset_hierarchy_state();
 void reset_inspector_state();
 void reset_project_state();
 void reset_script_tabs_state();
+
+// Adds a model of the game's models/ folder to the scene at a world position, optionally under
+// another object. Says why in the console when it cannot. Returns the new object or kNoObject.
+ObjectId import_model(EditorSession& session, const std::string& model_file, Vec3 position,
+                      ObjectId parent = kNoObject);
 
 // Opens a script in its own tab (or brings the tab to the front).
 void open_script(ScriptWorkspace& scripts, const std::string& file_name);

@@ -40,6 +40,7 @@ class ProjectHub {
  private:
   void refresh_games();
   void draw();
+  void draw_title();
   void draw_new_game(float width);
   void draw_games();
 

@@ -71,6 +71,13 @@ inline constexpr float kMaxFovDegrees = 150.0f;
 inline constexpr float kMinClipDistance = 0.001f;
 inline constexpr int kTextBufferSize = 256;
 inline constexpr float kLabelColumnWidth = 104.0f;
+inline constexpr float kFillWidth = -1.0f;  // ImGui: a widget this wide takes the rest of its row
+// What a script may be called, as shown under a name that is not one.
+inline constexpr const char* kScriptNameRule = "lowercase letters, digits and _ only";
+
+// The terrain brush as it starts.
+inline constexpr float kDefaultBrushRadius = 6.0f;    // meters
+inline constexpr float kDefaultBrushStrength = 4.0f;  // meters per second
 
 // Project panel.
 inline constexpr float kFolderColumnWidth = 150.0f;
@@ -87,6 +94,17 @@ inline constexpr float kHubPadding = 24.0f;
 
 // Folder next to the game where Build puts the standalone game ("<game>-build").
 inline constexpr const char* kBuildSuffix = "-build";
+
+// Keys of the commands, as menus and the shortcuts list show them.
+inline constexpr const char* kKeysSave = "Ctrl+S";
+inline constexpr const char* kKeysUndo = "Ctrl+Z";
+inline constexpr const char* kKeysRedo = "Ctrl+Y";
+inline constexpr const char* kKeysDuplicate = "Ctrl+D";
+inline constexpr const char* kKeysDelete = "Del";
+inline constexpr const char* kKeysFrame = "F";
+inline constexpr const char* kKeysHierarchy = "Ctrl+B";
+inline constexpr const char* kKeysInspector = "Ctrl+Alt+B";
+inline constexpr const char* kKeysBottomPanel = "Ctrl+J";
 
 // Drag and drop payloads.
 inline constexpr const char* kPayloadNode = "REDGEM_NODE";

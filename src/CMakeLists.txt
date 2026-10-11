@@ -87,8 +87,12 @@ add_library(redgem_engine STATIC
   render/gpu_select.cpp
   render/culling.cpp
   editor/glb_file.cpp
+  editor/gltf_json.cpp
+  editor/model_import.cpp
   editor/scene_document.cpp
   editor/editor_camera.cpp
+  editor/editor_logic.cpp
+  editor/window_picture.cpp
   editor/picking.cpp
   editor/editor_session.cpp
   editor/console_log.cpp

@@ -3,19 +3,18 @@
 #include <imgui.h>
 #include <imgui_stdlib.h>
 #include <raylib.h>
-#include <rlgl.h>
 #include <rlImGui.h>
 
 #include <algorithm>
-#include <cctype>
-#include <cstdlib>
 
 #include "app/game_project.hpp"
 #include "core/platform.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "editor/editor_config.hpp"
+#include "editor/editor_logic.hpp"
 #include "editor/ui/style.hpp"
+#include "editor/window_picture.hpp"
 #include "render/gpu_select.hpp"
 
 namespace redgem {
@@ -23,25 +22,31 @@ namespace {
 
 using namespace editor_config;
 
-constexpr int kHubFps = 60;
+constexpr int kHubFps = 60;                // frames per second: the hub only redraws a form
 constexpr const char* kDefaultTemplate = "platformer";
+constexpr const char* kEmptyTemplate = "empty";
 constexpr const char* kDefaultGameName = "My Game";
-constexpr float kTemplateCardHeight = 58.0f;
-constexpr float kCenter = 0.5f;
-constexpr float kOpenButtonWidth = 90.0f;
+constexpr float kTemplateCardHeight = 58.0f;  // pixels
+constexpr float kOpenButtonWidth = 90.0f;     // pixels
 constexpr float kCardTextLines = 2.0f;     // title and detail
 constexpr float kCardIconColumn = 2.0f;    // icon column width, in icon buttons
 constexpr float kOpenFooterRows = 2.0f;    // "Open a game folder" heading and its path field
-constexpr const char* kHomePrefix = "~/";
+constexpr int kWindowStyleVars = 2;        // padding and rounding of the hub's only window
+constexpr int kButtonColors = 2;           // normal and hovered color of the Create button
+constexpr const char* kHubWindowId = "##hub";
+constexpr const char* kNewGameId = "new";
+constexpr const char* kGamesId = "games";
+constexpr const char* kGameListId = "list";
+constexpr const char* kCardId = "##card";
+constexpr const char* kNameId = "##name";
+constexpr const char* kPathId = "##path";
 
-const char* template_icon(const std::string& name) { return name == "empty" ? ICON_FA_CUBE : ICON_FA_PERSON_RUNNING; }
+const char* template_icon(const std::string& name) {
+  return name == kEmptyTemplate ? ICON_FA_CUBE : ICON_FA_PERSON_RUNNING;
+}
 
-// "~/RedGemGames/x" reads better than the full home path.
 std::string pretty_path(const std::filesystem::path& path) {
-  const std::string home = platform::home_dir().string();
-  const std::string text = path.string();
-  if (!home.empty() && text.rfind(home, 0) == 0) return "~" + text.substr(home.size());
-  return text;
+  return editor_logic::pretty_path(path.string(), platform::home_dir().string());
 }
 
 // A full-width selectable card with an icon, a title and a muted second line.
@@ -49,14 +54,15 @@ bool card(const char* id, const char* icon, const std::string& title, const std:
           float height) {
   ImGui::PushID(id);
   const ImVec2 start = ImGui::GetCursorScreenPos();
-  const bool clicked = ImGui::Selectable("##card", selected, ImGuiSelectableFlags_AllowDoubleClick,
+  const bool clicked = ImGui::Selectable(kCardId, selected, ImGuiSelectableFlags_AllowDoubleClick,
                                          ImVec2(ImGui::GetContentRegionAvail().x, height));
   ImDrawList* draw = ImGui::GetWindowDrawList();
   const ImGuiStyle& style = ImGui::GetStyle();
   const float line = ImGui::GetTextLineHeight();
-  const float text_top = start.y + (height - line * kCardTextLines - style.ItemSpacing.y) * kCenter;
+  // The two lines and the gap between them, centered in the card.
+  const float text_top = start.y + editor_logic::centered_start(height - line * kCardTextLines, style.ItemSpacing.y);
   const float icon_width = ImGui::GetFontSize() * kIconButtonWidth * kCardIconColumn;
-  draw->AddText(ImVec2(start.x + style.FramePadding.x, start.y + (height - line) * kCenter),
+  draw->AddText(ImVec2(start.x + style.FramePadding.x, start.y + editor_logic::centered_start(height, line)),
                 ImGui::GetColorU32(ui::accent_color()), icon);
   draw->AddText(ImVec2(start.x + icon_width, text_top), ImGui::GetColorU32(ImGuiCol_Text), title.c_str());
   draw->AddText(ImVec2(start.x + icon_width, text_top + line + style.ItemSpacing.y),
@@ -124,11 +130,7 @@ bool ProjectHub::create_game(const std::string& name, const std::string& templat
 }
 
 bool ProjectHub::open_game(const std::filesystem::path& typed) {
-  // "~/games/x" as typed in the path field.
-  const std::string text = typed.string();
-  const std::string prefix = kHomePrefix;
-  const std::filesystem::path game_dir =
-      normalized_folder(text.rfind(prefix, 0) == 0 ? platform::home_dir() / text.substr(prefix.size()) : typed);
+  const std::filesystem::path game_dir = normalized_folder(editor_logic::expand_home(typed, platform::home_dir()));
   std::error_code fs_error;
   if (!std::filesystem::exists(game_dir / config::kSceneFileName, fs_error)) {
     error_ = pretty_path(game_dir) + " is not a game (it has no " + config::kSceneFileName + ")";
@@ -148,11 +150,7 @@ void ProjectHub::frame() {
   draw();
   rlImGuiEnd();
   if (screenshot_) {
-    rlDrawRenderBatchActive();
-    Image image = LoadImageFromScreen();
-    std::filesystem::create_directories(screenshot_->parent_path());
-    ExportImage(image, screenshot_->string().c_str());
-    UnloadImage(image);
+    save_window_picture(*screenshot_);
     screenshot_.reset();
   }
   EndDrawing();
@@ -164,15 +162,25 @@ void ProjectHub::draw() {
   ImGui::SetNextWindowSize(viewport->WorkSize);
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kHubPadding, kHubPadding));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-  ImGui::Begin("##hub", nullptr,
+  ImGui::Begin(kHubWindowId, nullptr,
                ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
-  ImGui::PopStyleVar(2);
+  ImGui::PopStyleVar(kWindowStyleVars);
+  draw_title();
+  ImGui::BeginChild(kNewGameId, ImVec2(kHubSidebarWidth, 0.0f));
+  draw_new_game(kHubSidebarWidth);
+  ImGui::EndChild();
+  ImGui::SameLine(0.0f, kHubPadding);
+  ImGui::BeginChild(kGamesId);
+  draw_games();
+  ImGui::EndChild();
+  ImGui::End();
+}
 
-  // Title.
+void ProjectHub::draw_title() {
   ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * kTitleFontScale);
   ImGui::TextColored(ui::accent_color(), ICON_FA_GEM);
   ImGui::SameLine();
-  ImGui::TextUnformatted("RedGem");
+  ImGui::TextUnformatted(kHubTitle);
   ImGui::PopFont();
   ImGui::SameLine();
   ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
@@ -180,27 +188,17 @@ void ProjectHub::draw() {
   ImGui::Spacing();
   ImGui::Separator();
   ImGui::Spacing();
-
-  ImGui::BeginChild("new", ImVec2(kHubSidebarWidth, 0.0f));
-  draw_new_game(kHubSidebarWidth);
-  ImGui::EndChild();
-  ImGui::SameLine(0.0f, kHubPadding);
-  ImGui::BeginChild("games");
-  draw_games();
-  ImGui::EndChild();
-  ImGui::End();
 }
 
 void ProjectHub::draw_new_game(float width) {
   ImGui::SeparatorText(ICON_FA_FILE_CIRCLE_PLUS "  New game");
   ImGui::TextColored(ui::muted_color(), "Name");
-  ImGui::SetNextItemWidth(-1.0f);
-  const bool entered = ImGui::InputText("##name", &new_name_, ImGuiInputTextFlags_EnterReturnsTrue);
+  ImGui::SetNextItemWidth(kFillWidth);
+  const bool entered = ImGui::InputText(kNameId, &new_name_, ImGuiInputTextFlags_EnterReturnsTrue);
   ImGui::Spacing();
   ImGui::TextColored(ui::muted_color(), "Start from");
   for (const std::string& name : game_templates()) {
-    std::string title = name;
-    title[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(title[0])));
+    const std::string title = editor_logic::capitalized(name);
     if (card(name.c_str(), template_icon(name), title, template_description(name), template_ == name,
              kTemplateCardHeight)) {
       template_ = name;
@@ -212,20 +210,19 @@ void ProjectHub::draw_new_game(float width) {
   ImGui::PushStyleColor(ImGuiCol_Button, ui::accent_color());
   ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ui::accent_color());
   const bool pressed = ImGui::Button(ICON_FA_PLUS "  Create game", ImVec2(width, 0.0f));
-  ImGui::PopStyleColor(2);
+  ImGui::PopStyleColor(kButtonColors);
   if (pressed || entered) create_game(new_name_, template_);
-  if (!error_.empty()) {
-    ImGui::Spacing();
-    ImGui::PushStyleColor(ImGuiCol_Text, ui::error_color());
-    ImGui::TextWrapped(ICON_FA_CIRCLE_XMARK "  %s", error_.c_str());
-    ImGui::PopStyleColor();
-  }
+  if (error_.empty()) return;
+  ImGui::Spacing();
+  ImGui::PushStyleColor(ImGuiCol_Text, ui::error_color());
+  ImGui::TextWrapped(ICON_FA_CIRCLE_XMARK "  %s", error_.c_str());
+  ImGui::PopStyleColor();
 }
 
 void ProjectHub::draw_games() {
   ImGui::SeparatorText(ICON_FA_GAMEPAD "  Games");
   const float footer = ImGui::GetFrameHeightWithSpacing() * kOpenFooterRows + ImGui::GetStyle().ItemSpacing.y;
-  ImGui::BeginChild("list", ImVec2(0.0f, -footer));
+  ImGui::BeginChild(kGameListId, ImVec2(0.0f, -footer));
   if (games_.empty()) {
     ImGui::TextColored(ui::muted_color(), "No games yet. Create one on the left.");
   }
@@ -241,7 +238,7 @@ void ProjectHub::draw_games() {
   ImGui::SeparatorText(ICON_FA_FOLDER_OPEN "  Open a game folder");
   ImGui::SetNextItemWidth(-kOpenButtonWidth - ImGui::GetStyle().ItemSpacing.x);
   const bool entered =
-      ImGui::InputTextWithHint("##path", "/path/to/game", &open_path_, ImGuiInputTextFlags_EnterReturnsTrue);
+      ImGui::InputTextWithHint(kPathId, "/path/to/game", &open_path_, ImGuiInputTextFlags_EnterReturnsTrue);
   ImGui::SameLine();
   if (ImGui::Button("Open", ImVec2(kOpenButtonWidth, 0.0f)) || entered) open_game(open_path_);
 }

@@ -94,7 +94,6 @@ class EditorApp {
   void frame_selection();
   // Asks to leave (after the unsaved-changes dialog when needed).
   void request_exit(EditorExit action);
-  // Makes a standalone game in "<game>-build": an executable and the game's files. Returns that folder.
   // Makes a standalone game for a system in a folder next to the game ("<game>-build", or
   // "<game>-build-windows"). Returns that folder.
   std::optional<std::filesystem::path> build(BuildTarget target = host_build_target());
@@ -114,23 +113,49 @@ class EditorApp {
 
  private:
   EditorApp() = default;
+  bool editing() const;  // not playing
+  ui::PanelContext panel_context();
+  // Before drawing: files changed outside, input, the running game.
+  void check_files_on_disk();
   void handle_shortcuts();
   void update_camera();
+  void feed_game();
+  // The Scene view's picture.
   void render_viewport_texture();
+  void aim_viewport_camera(const Scene& scene);
+  void sync_renderer_assets();
   void draw_overlays();
-  void draw_dockspace();
+  void draw_object_marks();
+  // The interface, top to bottom.
   void draw_menu_bar();
-  void draw_toolbar();
+  void draw_file_menu();
+  void draw_edit_menu();
+  void draw_view_menu();
   void draw_graphics_card_menu();
   void draw_build_targets();
+  void draw_toolbar();
+  void draw_gizmo_tools();
+  void draw_play_controls();
+  void draw_game_tools();
   void draw_status_bar();
-  void draw_viewport_drop_target(float x, float y);
+  void draw_dockspace();
+  void build_default_layout(unsigned int dock);
   void apply_pending_split();
   unsigned int new_script_dock() const;
+  void draw_panels();
   void draw_viewport_window();
+  void draw_viewport_image();
+  void draw_viewport_drop_target();
+  void draw_viewport_hint(bool playing);
+  void use_viewport_tools();
+  void use_brush();
   void draw_gizmo(float x, float y, float width, float height);
+  void apply_gizmo_drag(const Transform& world);
   void update_title();
   void draw_dialogs();
+  void draw_unsaved_dialog();
+  void draw_external_change_dialog();
+  void draw_shortcuts_dialog();
   bool editing_blocked() const;
   float frame_seconds() const;
 

@@ -14,16 +14,30 @@ namespace {
 // State kept between frames. Reset when another game is opened (see reset_script_tabs_state).
 std::string g_pending_close;  // a tab closed with unsaved changes, waiting for the dialog
 
-
 constexpr const char* kCloseScriptPopup = "Unsaved script";
+constexpr const char* kCodeId = "##code";
+constexpr const char* kWindowIdPrefix = "###script:";  // ImGui: what follows ### is the window's identity
 
 void save(ScriptEditor& editor) {
   std::string error;
   if (!editor.save(error)) log::error(error);
 }
 
+// Where the script stands: changed outside, broken, saved and fine, or being edited.
+void draw_status(const ScriptEditor& editor) {
+  if (editor.changed_on_disk()) {
+    ImGui::TextColored(warning_color(), ICON_FA_TRIANGLE_EXCLAMATION "  Changed outside the editor: Save keeps this, Revert loads the file");
+  } else if (!editor.syntax_error().empty()) {
+    ImGui::TextColored(error_color(), ICON_FA_CIRCLE_XMARK "  %s", editor.syntax_error().c_str());
+  } else if (!editor.modified()) {
+    ImGui::TextColored(success_color(), ICON_FA_CIRCLE_CHECK "  Syntax OK");
+  } else {
+    ImGui::TextColored(muted_color(), "Unsaved changes");
+  }
+}
+
 void draw_body(ScriptEditor& editor, const std::string& window_name, ScriptTabsResult& result) {
-  if (ImGui::SmallButton(ICON_FA_FLOPPY_DISK "  Save")) save(editor);
+  if (ImGui::SmallButton(kSaveLabel)) save(editor);
   tooltip("Ctrl+S. Play saves and reloads scripts too.");
   ImGui::SameLine();
   ImGui::BeginDisabled(!editor.modified());
@@ -35,17 +49,10 @@ void draw_body(ScriptEditor& editor, const std::string& window_name, ScriptTabsR
   ImGui::SameLine();
   if (ImGui::SmallButton(ICON_FA_ARROW_UP_RIGHT_FROM_SQUARE "  Open externally")) editor.open_externally();
   ImGui::SameLine();
-  if (editor.changed_on_disk()) {
-    ImGui::TextColored(warning_color(), ICON_FA_TRIANGLE_EXCLAMATION "  Changed outside the editor: Save keeps this, Revert loads the file");
-  } else if (!editor.syntax_error().empty()) {
-    ImGui::TextColored(error_color(), ICON_FA_CIRCLE_XMARK "  %s", editor.syntax_error().c_str());
-  } else if (!editor.modified()) {
-    ImGui::TextColored(success_color(), ICON_FA_CIRCLE_CHECK "  Syntax OK");
-  } else {
-    ImGui::TextColored(muted_color(), "Unsaved changes");
-  }
+  draw_status(editor);
   ImGui::PushFont(code_font(), 0.0f);
-  ImGui::InputTextMultiline("##code", &editor.text(), ImVec2(-1.0f, -1.0f), ImGuiInputTextFlags_AllowTabInput);
+  ImGui::InputTextMultiline(kCodeId, &editor.text(), ImVec2(editor_config::kFillWidth, editor_config::kFillWidth),
+                            ImGuiInputTextFlags_AllowTabInput);
   ImGui::PopFont();
   const ImGuiIO& io = ImGui::GetIO();
   if (ImGui::IsItemActive() && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false)) save(editor);
@@ -62,7 +69,7 @@ void draw_close_dialog(ScriptWorkspace& scripts, std::string& pending_close) {
   ImGui::Spacing();
   ScriptEditor* editor = scripts.find(pending_close);
   bool done = editor == nullptr;
-  if (ImGui::Button(ICON_FA_FLOPPY_DISK "  Save") && editor != nullptr) {
+  if (ImGui::Button(kSaveLabel) && editor != nullptr) {
     std::string error;
     if (editor->save(error)) {
       scripts.close(pending_close);
@@ -72,12 +79,12 @@ void draw_close_dialog(ScriptWorkspace& scripts, std::string& pending_close) {
     done = true;
   }
   ImGui::SameLine();
-  if (ImGui::Button("Discard")) {
+  if (ImGui::Button(kDiscardLabel)) {
     scripts.close(pending_close);
     done = true;
   }
   ImGui::SameLine();
-  if (ImGui::Button("Cancel")) done = true;
+  if (ImGui::Button(kCancelLabel)) done = true;
   if (done) {
     pending_close.clear();
     ImGui::CloseCurrentPopup();
@@ -89,7 +96,7 @@ void draw_close_dialog(ScriptWorkspace& scripts, std::string& pending_close) {
 
 std::string script_window_name(const std::string& file_name) {
   // The part after ### is the window's identity: the title can change, its place in the layout stays.
-  return std::string(ICON_FA_GEM "  ") + file_name + "###script:" + file_name;
+  return std::string(ICON_FA_GEM "  ") + file_name + kWindowIdPrefix + file_name;
 }
 
 ScriptTabsResult draw_script_tabs(ScriptWorkspace& scripts, unsigned int new_tab_dock) {
@@ -109,12 +116,11 @@ ScriptTabsResult draw_script_tabs(ScriptWorkspace& scripts, unsigned int new_tab
       draw_body(editor, name, result);
     }
     ImGui::End();
-    if (!open) {
-      if (editor.modified()) {
-        pending_close = editor.file_name();
-      } else {
-        closed.push_back(editor.file_name());
-      }
+    if (open) continue;
+    if (editor.modified()) {
+      pending_close = editor.file_name();
+    } else {
+      closed.push_back(editor.file_name());
     }
   }
   for (const std::string& file : closed) scripts.close(file);
@@ -122,8 +128,6 @@ ScriptTabsResult draw_script_tabs(ScriptWorkspace& scripts, unsigned int new_tab
   return result;
 }
 
-void reset_script_tabs_state() {
-  g_pending_close.clear();
-}
+void reset_script_tabs_state() { g_pending_close.clear(); }
 
 }  // namespace redgem::ui

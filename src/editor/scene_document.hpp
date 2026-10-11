@@ -15,6 +15,11 @@
 
 namespace redgem {
 
+namespace model_import {
+struct JsonOffsets;
+struct DescOffsets;
+}  // namespace model_import
+
 // The scene being edited: the loaded glTF plus editor changes, with undo/redo and saving back
 // into the same .glb. Existing meshes and textures are kept as they are; created primitives and
 // imported models append theirs.
@@ -112,14 +117,21 @@ class SceneDocument {
   SceneDocument() = default;
   void touch();
   Snapshot snapshot() const;
+  // Goes back to a snapshot (its nodes are moved out of it).
+  void restore(Snapshot& state);
   // Puts the terrains back as a snapshot had them.
   void restore_shapes(const std::map<int, MeshShape>& shapes);
+  // A mesh whose vertices changed: new bounds, and the renderer and the next save get to know.
+  void mark_reshaped(int mesh);
   // Writes a reshaped mesh's vertices over its old ones in the binary chunk (same count, so the
   // file does not grow).
   bool store_mesh_vertices(int mesh, std::string& error);
   bool sync_glb(std::string& error);
   // Writes every node's light and camera into the glTF arrays (copies get their own entry).
   void sync_lights_and_cameras();
+  // Writes the nodes in editor order; returns the numbers of the top-level ones.
+  nlohmann::json sync_nodes();
+  void sync_materials();
   // source_node number -> current node index (kNoIndex for deleted nodes).
   std::vector<int> current_node_indices() const;
   // Remembers which source nodes the description's skins and animations (from `first_skin` /
@@ -130,12 +142,38 @@ class SceneDocument {
   void refresh_node_references();
   // Writes skins and animations into the glTF JSON with current node numbers.
   void sync_skins_and_animations(nlohmann::json& json) const;
+  // Points every node at its skin's number in the file (`written`: skin index -> that number, or
+  // kNoIndex for a skin left out).
+  void sync_node_skins(nlohmann::json& json, const std::vector<int>& written) const;
+  // The copies made by duplicate() (`count` nodes from `first_copy` on) become nodes of their own
+  // in the file, with skeletons of their own. `copy_of`: node index -> its copy, or kNoIndex.
+  void give_copies_own_source_nodes(int first_copy, std::size_t count);
+  void give_copies_own_skins(int first_copy, std::size_t count, const std::vector<int>& copy_of);
+  // Index of a copy of a skin that moves the copied bones; nullopt when some of its bones were
+  // not copied.
+  std::optional<int> copy_skin(int original, const std::vector<int>& copy_of);
+  // The three steps of import_model: where the model's entries will start, its glTF JSON, and its
+  // scene description under a new object called `name`.
+  model_import::JsonOffsets import_offsets() const;
+  void append_model_json(const nlohmann::json& model, const model_import::JsonOffsets& offsets,
+                         const std::filesystem::path& model_dir);
+  int append_model_description(const SceneDesc& model, const model_import::JsonOffsets& json_offsets,
+                               const std::string& name, int parent);
+  void append_model_nodes(const SceneDesc& model, const model_import::DescOffsets& offsets);
   int append_node(NodeDesc node);
   void restore_materials(const std::vector<MaterialDesc>& snapshot);
   int append_material(const MaterialDesc& material);
+  // A material with just a color and a roughness (what new shapes and terrains get).
+  int append_plain_material(const std::string& name, Color color, float roughness);
   int append_mesh(const std::string& name, const PrimitiveDesc& primitive);
+  // Appends raw bytes to the binary chunk, aligned; returns where they start.
+  std::size_t append_binary(const std::uint8_t* data, std::size_t bytes);
   // Appends raw bytes to the binary chunk as a new buffer view; returns its index.
   int append_buffer_view(const void* data, std::size_t bytes, int target);
+  // Describes a buffer view's elements; returns the accessor's index.
+  int append_accessor(int view, int component, std::size_t count, const char* type);
+  // One float stream of a mesh (positions, normals, texture coordinates) as a new accessor.
+  int append_vertex_stream(const std::vector<float>& values, std::size_t vertices, const char* type);
 
   std::filesystem::path path_;
   GlbFile glb_;
@@ -161,5 +199,23 @@ class SceneDocument {
   std::set<int> changed_meshes_;  // reshaped since the renderer last asked
   std::set<int> unsaved_meshes_;  // reshaped since the last save
 };
+
+// Pieces of SceneDocument that need no document. Declared here for the unit tests.
+namespace scene_document_detail {
+
+// "Crate" and 1 -> "Crate.001".
+std::string numbered_name(const std::string& base, int number);
+// Indices of `index` and all its descendants, parents first.
+std::vector<int> subtree(const std::vector<NodeDesc>& nodes, int index);
+// Where a node is in the world, following its parents.
+Transform world_of(const std::vector<NodeDesc>& nodes, int index);
+// The indices 0..count-1 in order without `removed`, and with `last` moved to the end.
+std::vector<int> order_without(int count, const std::vector<int>& removed);
+std::vector<int> order_with_last(int count, const std::vector<int>& last);
+// The nodes listed by `order` (old indices), with parents and children renumbered to match.
+// Children left out of the order are dropped from their parent.
+std::vector<NodeDesc> nodes_in_order(const std::vector<NodeDesc>& nodes, const std::vector<int>& order);
+
+}  // namespace scene_document_detail
 
 }  // namespace redgem

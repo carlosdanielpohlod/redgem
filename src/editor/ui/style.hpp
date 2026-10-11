@@ -13,6 +13,13 @@ void load_fonts();
 void apply_theme();
 ImFont* code_font();
 
+// Labels of commands that several menus and dialogs offer.
+inline constexpr const char* kSaveLabel = ICON_FA_FLOPPY_DISK "  Save";
+inline constexpr const char* kDiscardLabel = "Discard";
+inline constexpr const char* kCancelLabel = "Cancel";
+inline constexpr const char* kDuplicateLabel = ICON_FA_CLONE "  Duplicate";
+inline constexpr const char* kDeleteLabel = ICON_FA_TRASH "  Delete";
+
 // Palette, for panels that draw their own accents.
 ImVec4 accent_color();
 ImVec4 muted_color();

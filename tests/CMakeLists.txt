@@ -14,6 +14,10 @@ add_executable(redgem_tests
   unit/cli_test.cpp
   unit/mesh_builder_test.cpp
   unit/scene_document_test.cpp
+  unit/scene_tree_test.cpp
+  unit/gltf_json_test.cpp
+  unit/model_import_test.cpp
+  unit/editor_logic_test.cpp
   unit/editor_camera_test.cpp
   unit/script_files_test.cpp
   unit/primitives_test.cpp

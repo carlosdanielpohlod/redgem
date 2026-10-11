@@ -1,13 +1,12 @@
 #include "editor/editor_session.hpp"
 
-#include <cmath>
-
 #include <algorithm>
 #include <utility>
 
 #include "app/game_project.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "editor/editor_logic.hpp"
 #include "script/script_naming.hpp"
 
 namespace redgem {
@@ -20,13 +19,18 @@ std::filesystem::file_time_type write_time(const std::filesystem::path& path) {
 }
 
 // Defaults of objects created from the editor's menus.
+constexpr const char* kNewEmptyName = "GameObject";
+constexpr const char* kNewTerrainName = "Terrain";
+constexpr const char* kNewCameraName = "Camera";
+constexpr const char* kNewEnvironmentName = "Environment";
 constexpr float kNewTerrainSize = 100.0f;   // meters across
 constexpr int kNewTerrainCells = 64;        // quads per side: about 1.5 m each
 constexpr Color kNewTerrainColor{0.33f, 0.46f, 0.25f, 1.0f};  // grass
+constexpr float kGroundLevel = 0.0f;         // meters: new terrains lie at y = 0
 constexpr float kTerrainRayReach = 2000.0f;  // meters a ray is followed looking for the ground
-constexpr Color kNewShapeColor{0.8f, 0.8f, 0.8f, 1.0f};
-constexpr Color kNewLightColor{1.0f, 1.0f, 1.0f, 1.0f};
-constexpr float kNewSunIntensity = 3.0f;
+constexpr Color kNewShapeColor{0.8f, 0.8f, 0.8f, 1.0f};  // light gray
+constexpr Color kNewLightColor{1.0f, 1.0f, 1.0f, 1.0f};  // white
+constexpr float kNewSunIntensity = 3.0f;     // W/m2, like Blender's sun strength
 constexpr float kNewLampIntensity = 500.0f;  // watts, like Blender's default point light
 constexpr float kNewCameraFov = 0.87f;       // ~50 degrees
 // New suns shine down at an angle instead of straight along -Z.
@@ -96,7 +100,7 @@ ObjectId EditorSession::place_new(int node, Vec3 position) {
 
 ObjectId EditorSession::create_empty(Vec3 position) {
   if (play_state_ != PlayState::Editing) return kNoObject;
-  return place_new(document_->add_empty(document_->unique_name("GameObject")), position);
+  return place_new(document_->add_empty(document_->unique_name(kNewEmptyName)), position);
 }
 
 ObjectId EditorSession::create_primitive(PrimitiveShape shape, Vec3 position) {
@@ -107,47 +111,34 @@ ObjectId EditorSession::create_primitive(PrimitiveShape shape, Vec3 position) {
 
 ObjectId EditorSession::create_terrain(Vec3 position) {
   if (play_state_ != PlayState::Editing) return kNoObject;
-  const int node = document_->add_terrain(document_->unique_name("Terrain"), {kNewTerrainSize, kNewTerrainCells},
-                                          kNewTerrainColor);
-  return place_new(node, {position.x, 0.0f, position.z});  // ground level, wherever the camera looks from
+  const int node = document_->add_terrain(document_->unique_name(kNewTerrainName),
+                                          {kNewTerrainSize, kNewTerrainCells}, kNewTerrainColor);
+  return place_new(node, {position.x, kGroundLevel, position.z});  // wherever the camera looks from
 }
 
 bool EditorSession::is_terrain(ObjectId id) const { return document_->terrain_grid(id).has_value(); }
 
-namespace {
-
-// A point of the world in an object's own space, and back.
-Vec3 to_local(const Transform& world, Vec3 point) {
-  const Vec3 offset = rotate(conjugate(world.rotation), point - world.position);
-  return {offset.x / world.scale.x, offset.y / world.scale.y, offset.z / world.scale.z};
+std::string EditorSession::selected_name() const {
+  return selection_ != kNoObject ? document_->node(selection_).name : "";
 }
-
-Vec3 to_world(const Transform& world, Vec3 point) {
-  return world.position + rotate(world.rotation, hadamard(point, world.scale));
-}
-
-}  // namespace
 
 std::optional<Vec3> EditorSession::terrain_hit(ObjectId terrain, Vec3 origin, Vec3 direction) const {
   const auto grid = document_->terrain_grid(terrain);
   if (!grid) return std::nullopt;
   const Transform world = preview_.world_transform(terrain);
-  const Vec3 local_origin = to_local(world, origin);
-  const Vec3 local_direction = normalize(to_local(world, origin + direction) - local_origin);
+  const Vec3 local_origin = editor_logic::to_local(world, origin);
+  const Vec3 local_direction = normalize(editor_logic::to_local(world, origin + direction) - local_origin);
   const PrimitiveDesc& ground = document_->desc().meshes[static_cast<std::size_t>(document_->node(terrain).mesh)].primitives.front();
   const auto hit = terrain_raycast(ground, *grid, local_origin, local_direction, kTerrainRayReach);
   if (!hit) return std::nullopt;
-  return to_world(world, *hit);
+  return editor_logic::to_world(world, *hit);
 }
 
 bool EditorSession::sculpt_terrain(ObjectId terrain, Vec3 world_point, float radius, float amount, SculptMode mode) {
   if (play_state_ != PlayState::Editing || !document_->terrain_grid(terrain)) return false;
-  const Transform world = preview_.world_transform(terrain);
-  const Vec3 local = to_local(world, world_point);
   // A scaled terrain: the brush is in meters of the world, the grid in its own.
-  const bool meters = mode == SculptMode::Raise || mode == SculptMode::Lower;
-  const TerrainBrush brush{local.x, local.z, radius / std::fabs(world.scale.x),
-                           meters ? amount / std::fabs(world.scale.y) : amount, mode};
+  const TerrainBrush brush =
+      editor_logic::local_brush(preview_.world_transform(terrain), world_point, radius, amount, mode);
   if (!document_->sculpt_terrain(terrain, brush)) return false;
   refresh_preview();
   return true;
@@ -167,7 +158,7 @@ ObjectId EditorSession::create_light(LightType type, Vec3 position) {
 
 ObjectId EditorSession::create_camera(Vec3 position) {
   if (play_state_ != PlayState::Editing) return kNoObject;
-  return place_new(document_->add_camera(document_->unique_name("Camera"), kNewCameraFov), position);
+  return place_new(document_->add_camera(document_->unique_name(kNewCameraName), kNewCameraFov), position);
 }
 
 ObjectId EditorSession::create_environment() {
@@ -178,7 +169,7 @@ ObjectId EditorSession::create_environment() {
       return i;
     }
   }
-  const int node = document_->add_empty(document_->unique_name("Environment"));
+  const int node = document_->add_empty(document_->unique_name(kNewEnvironmentName));
   document_->set_prop(node, kEnvironmentProp, true, false);  // same undo step as the creation
   for (const auto& [key, value] : kSunsetColors) document_->set_prop(node, key, std::string(value), false);
   for (const auto& [key, value] : kSunsetNumbers) document_->set_prop(node, key, value, false);
@@ -204,7 +195,7 @@ ObjectId EditorSession::import_model(const std::filesystem::path& path, Vec3 pos
 void EditorSession::reparent(ObjectId child, ObjectId parent) {
   if (play_state_ != PlayState::Editing || child == kNoObject) return;
   const bool child_selected = selection_ == child;
-  const std::string selected = selection_ != kNoObject ? document_->node(selection_).name : "";
+  const std::string selected = selected_name();
   const int moved = document_->reparent(child, parent);
   refresh_preview();
   if (child_selected) {
@@ -226,7 +217,7 @@ void EditorSession::attach_script(ObjectId id, const std::string& file) {
 
 void EditorSession::undo() {
   if (play_state_ != PlayState::Editing) return;
-  const std::string selected = selection_ != kNoObject ? document_->node(selection_).name : "";
+  const std::string selected = selected_name();
   if (!document_->undo()) return;
   refresh_preview();
   select_by_name(selected);  // indices may have shifted; names are unique
@@ -234,7 +225,7 @@ void EditorSession::undo() {
 
 void EditorSession::redo() {
   if (play_state_ != PlayState::Editing) return;
-  const std::string selected = selection_ != kNoObject ? document_->node(selection_).name : "";
+  const std::string selected = selected_name();
   if (!document_->redo()) return;
   refresh_preview();
   select_by_name(selected);
@@ -308,7 +299,7 @@ bool EditorSession::reload_from_disk() {
     log::error("cannot reload " + path.string() + ": " + *error);
     return false;
   }
-  const std::string selected = selection_ != kNoObject ? document_->node(selection_).name : "";
+  const std::string selected = selected_name();
   document_.emplace(std::move(std::get<SceneDocument>(opened)));
   loaded_write_time_ = write_time(path);
   external_change_pending_ = false;

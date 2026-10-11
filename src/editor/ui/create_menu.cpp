@@ -21,6 +21,14 @@ const char* shape_icon(PrimitiveShape shape) {
 
 }  // namespace
 
+ObjectId import_model(EditorSession& session, const std::string& model_file, Vec3 position, ObjectId parent) {
+  std::string error;
+  const std::filesystem::path path = session.game_dir() / config::kModelsDirName / model_file;
+  const ObjectId imported = session.import_model(path, position, error, parent);
+  if (imported == kNoObject) log::error("cannot import " + model_file + ": " + error);
+  return imported;
+}
+
 void draw_create_menu(PanelContext& context) {
   EditorSession& session = context.session;
   const Vec3 at = context.spawn_point;
@@ -46,11 +54,7 @@ void draw_create_menu(PanelContext& context) {
   ImGui::Separator();
   if (ImGui::BeginMenu(ICON_FA_FILE_IMPORT "  Model from models/", !context.files.models.empty())) {
     for (const std::string& model : context.files.models) {
-      if (!ImGui::MenuItem(model.c_str())) continue;
-      std::string error;
-      if (session.import_model(session.game_dir() / config::kModelsDirName / model, at, error) == kNoObject) {
-        log::error("cannot import " + model + ": " + error);
-      }
+      if (ImGui::MenuItem(model.c_str())) import_model(session, model, at);
     }
     ImGui::EndMenu();
   }

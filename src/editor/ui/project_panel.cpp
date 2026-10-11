@@ -6,6 +6,7 @@
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "editor/editor_config.hpp"
+#include "editor/editor_logic.hpp"
 #include "editor/script_files.hpp"
 #include "editor/ui/panels.hpp"
 #include "editor/ui/style.hpp"
@@ -15,11 +16,15 @@ namespace {
 
 using namespace editor_config;
 
-constexpr float kFullVolume = 1.0f;
+constexpr float kFullVolume = 1.0f;            // sound previews play as recorded
 constexpr float kNormalPitch = 1.0f;
-constexpr float kTileLabelPadding = 4.0f;
-constexpr float kNewScriptFieldWidth = 180.0f;
-constexpr float kCenter = 0.5f;
+constexpr float kTileLabelPadding = 4.0f;      // pixels between a tile's edge and its icon and name
+constexpr float kNewScriptFieldWidth = 180.0f; // pixels
+constexpr const char* kNewScriptPopup = "new_script";
+constexpr const char* kFoldersId = "folders";
+constexpr const char* kFilesId = "files";
+constexpr const char* kTileId = "##tile";
+constexpr const char* kNewScriptNameId = "##name";
 
 enum class Folder { Scripts, Models, Sounds, Scenes };
 
@@ -60,7 +65,7 @@ const std::vector<std::string>& files_of(const ProjectFiles& files, Folder folde
 bool tile(const char* icon, const std::string& name, const char* payload_type) {
   ImGui::PushID(name.c_str());
   const ImVec2 start = ImGui::GetCursorScreenPos();
-  ImGui::Selectable("##tile", false, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(kTileWidth, kTileHeight));
+  ImGui::Selectable(kTileId, false, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(kTileWidth, kTileHeight));
   const bool opened = ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
   if (payload_type != nullptr && ImGui::BeginDragDropSource()) {
     ImGui::SetDragDropPayload(payload_type, name.c_str(), name.size() + 1);
@@ -73,12 +78,12 @@ bool tile(const char* icon, const std::string& name, const char* payload_type) {
   ImFont* font = ImGui::GetFont();
   const float icon_size = ImGui::GetFontSize() * kTileIconScale;
   const ImVec2 icon_extent = font->CalcTextSizeA(icon_size, FLT_MAX, 0.0f, icon);
-  const ImVec2 icon_pos(start.x + (kTileWidth - icon_extent.x) * kCenter, start.y + kTileLabelPadding);
+  const ImVec2 icon_pos(start.x + editor_logic::centered_start(kTileWidth, icon_extent.x), start.y + kTileLabelPadding);
   draw->AddText(font, icon_size, icon_pos, ImGui::GetColorU32(muted_color()), icon);
   // The name, centered and clipped to the tile.
   const float text_y = start.y + kTileHeight - ImGui::GetTextLineHeight() - kTileLabelPadding;
   const ImVec2 name_size = ImGui::CalcTextSize(name.c_str());
-  const float text_x = start.x + std::max(kTileLabelPadding, (kTileWidth - name_size.x) * kCenter);
+  const float text_x = start.x + std::max(kTileLabelPadding, editor_logic::centered_start(kTileWidth, name_size.x));
   const ImVec4 clip(start.x + kTileLabelPadding, start.y, start.x + kTileWidth - kTileLabelPadding,
                     start.y + kTileHeight);
   draw->AddText(font, ImGui::GetFontSize(), ImVec2(text_x, text_y), ImGui::GetColorU32(ImGuiCol_Text),
@@ -87,30 +92,35 @@ bool tile(const char* icon, const std::string& name, const char* payload_type) {
   return opened;
 }
 
+// Makes scripts/<name>.rb and opens it in a tab.
+void create_and_open_script(PanelContext& context, std::string& name) {
+  std::string error;
+  const auto file = create_script(context.scripts.scripts_dir(), name, error);
+  if (!file) {
+    log::error(error);
+    return;
+  }
+  log::info("created " + *file);
+  open_script(context.scripts, *file);
+  context.files_changed = true;
+  name.clear();
+  ImGui::CloseCurrentPopup();
+}
+
 void new_script_popup(PanelContext& context) {
   std::string& name = g_new_script_name;
-  if (!ImGui::BeginPopup("new_script")) return;
+  if (!ImGui::BeginPopup(kNewScriptPopup)) return;
   ImGui::TextUnformatted("New Ruby behaviour");
   ImGui::SetNextItemWidth(kNewScriptFieldWidth);
   if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
-  const bool entered = ImGui::InputTextWithHint("##name", "enemy_ai", &name, ImGuiInputTextFlags_EnterReturnsTrue);
+  const bool entered =
+      ImGui::InputTextWithHint(kNewScriptNameId, "enemy_ai", &name, ImGuiInputTextFlags_EnterReturnsTrue);
   const bool valid = valid_script_name(name);
   ImGui::SameLine();
   ImGui::BeginDisabled(!valid);
-  if (ImGui::Button("Create") || (entered && valid)) {
-    std::string error;
-    if (const auto file = create_script(context.scripts.scripts_dir(), name, error)) {
-      log::info("created " + *file);
-      open_script(context.scripts, *file);
-      context.files_changed = true;
-      name.clear();
-      ImGui::CloseCurrentPopup();
-    } else {
-      log::error(error);
-    }
-  }
+  if (ImGui::Button("Create") || (entered && valid)) create_and_open_script(context, name);
   ImGui::EndDisabled();
-  if (!name.empty() && !valid) ImGui::TextColored(muted_color(), "lowercase letters, digits and _ only");
+  if (!name.empty() && !valid) ImGui::TextColored(muted_color(), "%s", kScriptNameRule);
   ImGui::EndPopup();
 }
 
@@ -118,14 +128,7 @@ void open_file(PanelContext& context, Folder folder, const std::string& name) {
   EditorSession& session = context.session;
   switch (folder) {
     case Folder::Scripts: open_script(context.scripts, name); break;
-    case Folder::Models: {
-      std::string error;
-      if (session.import_model(session.game_dir() / config::kModelsDirName / name, context.spawn_point, error) ==
-          kNoObject) {
-        log::error("cannot import " + name + ": " + error);
-      }
-      break;
-    }
+    case Folder::Models: import_model(session, name, context.spawn_point); break;
     case Folder::Sounds:
       if (context.audio != nullptr) {
         context.audio->set_sounds_dir(session.game_dir() / config::kSoundsDirName);
@@ -138,54 +141,70 @@ void open_file(PanelContext& context, Folder folder, const std::string& name) {
   }
 }
 
-}  // namespace
+const FolderInfo& info_of(Folder folder) {
+  return *std::find_if(std::begin(kFolders), std::end(kFolders),
+                       [folder](const FolderInfo& info) { return info.folder == folder; });
+}
 
-void draw_project(PanelContext& context) {
-  Folder& current = g_folder;
-  ImGui::Begin(kProjectWindow);
-  const std::filesystem::path game_dir = context.session.game_dir();
+// What can be dragged out of a folder's tiles (nullptr: nothing).
+const char* payload_of(Folder folder) {
+  if (folder == Folder::Scripts) return kPayloadScript;
+  return folder == Folder::Models ? kPayloadModel : nullptr;
+}
 
-  // Folders.
-  ImGui::BeginChild("folders", ImVec2(kFolderColumnWidth, 0.0f), ImGuiChildFlags_ResizeX);
+// The list of folders on the left, each with how many files it holds.
+void draw_folders(const ProjectFiles& files) {
+  ImGui::BeginChild(kFoldersId, ImVec2(kFolderColumnWidth, 0.0f), ImGuiChildFlags_ResizeX);
   for (const FolderInfo& info : kFolders) {
     const std::string label = std::string(info.icon) + "  " + info.title + "  (" +
-                              std::to_string(files_of(context.files, info.folder).size()) + ")";
-    if (ImGui::Selectable(label.c_str(), current == info.folder)) current = info.folder;
+                              std::to_string(files_of(files, info.folder).size()) + ")";
+    if (ImGui::Selectable(label.c_str(), g_folder == info.folder)) g_folder = info.folder;
   }
   ImGui::EndChild();
-  ImGui::SameLine();
+}
 
-  // Files of the current folder.
-  const FolderInfo& info = *std::find_if(std::begin(kFolders), std::end(kFolders),
-                                         [](const FolderInfo& f) { return f.folder == current; });
-  ImGui::BeginGroup();
+// The current folder's path and its buttons.
+void draw_folder_bar(PanelContext& context, const FolderInfo& info) {
+  const std::filesystem::path game_dir = context.session.game_dir();
   ImGui::AlignTextToFramePadding();
   ImGui::TextColored(muted_color(), "%s / %s", game_dir.filename().string().c_str(), info.dir);
   ImGui::SameLine();
-  if (current == Folder::Scripts) {
-    if (ImGui::SmallButton(ICON_FA_PLUS "  New script")) ImGui::OpenPopup("new_script");
+  if (info.folder == Folder::Scripts) {
+    if (ImGui::SmallButton(ICON_FA_PLUS "  New script")) ImGui::OpenPopup(kNewScriptPopup);
     new_script_popup(context);
     ImGui::SameLine();
   }
-  if (ImGui::SmallButton(ICON_FA_FOLDER_OPEN "  Open folder")) {
-    std::error_code fs_error;
-    std::filesystem::create_directories(game_dir / info.dir, fs_error);
-    open_in_system(game_dir / info.dir);
-  }
-  ImGui::BeginChild("files");
-  const std::vector<std::string>& names = files_of(context.files, current);
+  if (!ImGui::SmallButton(ICON_FA_FOLDER_OPEN "  Open folder")) return;
+  std::error_code fs_error;
+  std::filesystem::create_directories(game_dir / info.dir, fs_error);
+  open_in_system(game_dir / info.dir);
+}
+
+// The current folder's files as a grid of tiles.
+void draw_tiles(PanelContext& context, const FolderInfo& info) {
+  ImGui::BeginChild(kFilesId);
+  const std::vector<std::string>& names = files_of(context.files, info.folder);
   if (names.empty()) ImGui::TextColored(muted_color(), "%s", info.hint);
-  const char* payload = current == Folder::Scripts  ? kPayloadScript
-                        : current == Folder::Models ? kPayloadModel
-                                                    : nullptr;
   const float spacing = ImGui::GetStyle().ItemSpacing.x;
-  const int columns = std::max(1, static_cast<int>((ImGui::GetContentRegionAvail().x + spacing) / (kTileWidth + spacing)));
+  const int columns = editor_logic::tile_columns(ImGui::GetContentRegionAvail().x, spacing, kTileWidth);
   int column = 0;
   for (const std::string& name : names) {
     if (column++ % columns != 0) ImGui::SameLine();
-    if (tile(info.icon, name, payload)) open_file(context, current, name);
+    if (tile(info.icon, name, payload_of(info.folder))) open_file(context, info.folder, name);
   }
   ImGui::EndChild();
+}
+
+}  // namespace
+
+void draw_project(PanelContext& context) {
+  ImGui::Begin(kProjectWindow);
+  draw_folders(context.files);
+  ImGui::SameLine();
+  const FolderInfo& info = info_of(g_folder);
+  ImGui::BeginGroup();
+  draw_folder_bar(context, info);
+  draw_tiles(context, info);
   ImGui::EndGroup();
   ImGui::End();
 }

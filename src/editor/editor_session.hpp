@@ -93,6 +93,9 @@ class EditorSession {
  private:
   EditorSession() = default;
   ObjectId place_new(int node, Vec3 position);
+  // Name of the selected object ("" without one): how the selection is found again after an edit
+  // that renumbers the objects.
+  std::string selected_name() const;
 
   std::filesystem::path game_dir_;
   std::optional<SceneDocument> document_;
