@@ -67,15 +67,16 @@ inline constexpr const char* kSaturation = "saturation";
 inline constexpr const char* kGrain = "grain";
 inline constexpr const char* kAberration = "aberration";
 inline constexpr const char* kMotionBlur = "motionBlur";
-inline constexpr const char* kGradeTime = "time";
+inline constexpr const char* kGradeTime = kTime;  // the tone mapping shader names its clock the same
 
-// Must match MAX_POINT_LIGHTS in the lit fragment shader.
+// The most point lights that light a surface at once: MAX_POINT_LIGHTS in the shaders, defined
+// for every shader when it is compiled (see shader_source.hpp).
 inline constexpr int kMaxPointLights = 16;
 
 // Foliage (windAmount > 0) sways: higher parts move more, each tree with its own phase.
 // Skinned meshes (skinned > 0.5) are placed by their skeleton: each vertex follows up to four
 // bones, whose matrices already lead to world space. MAX_BONES is config::kMaxSkinJoints, defined
-// for every shader when it is compiled (see the renderer).
+// for every shader when it is compiled (see shader_source.hpp).
 inline constexpr const char* kLitVertex = R"GLSL(
 #version 330
 in vec3 vertexPosition;
@@ -106,11 +107,12 @@ const float WIND_GUST = 0.4;
 const float WIND_HEIGHT_FULL = 6.0;     // meters above the ground where the sway is strongest
 const float WIND_REACH = 0.12;          // meters of sway at full height and wind 1
 const float WIND_LIFT = 0.3;            // vertical share of the motion
+const float SWITCH_ON = 0.5;            // switches arrive as floats: on when above this
 
 void main() {
   mat4 toWorld = matModel;
   mat3 normalToWorld = mat3(matNormal);
-  if (skinned > 0.5) {
+  if (skinned > SWITCH_ON) {
     toWorld = boneMatrices[int(vertexBoneIds.x)] * vertexBoneWeights.x + boneMatrices[int(vertexBoneIds.y)] * vertexBoneWeights.y +
               boneMatrices[int(vertexBoneIds.z)] * vertexBoneWeights.z + boneMatrices[int(vertexBoneIds.w)] * vertexBoneWeights.w;
     normalToWorld = mat3(toWorld);  // good enough for normals: they are normalized, and rigs are not sheared
@@ -135,11 +137,11 @@ void main() {
 // Physically based shading (GGX / Smith / Schlick, glTF metallic-roughness) with a sun, the
 // nearest point lights, a sky-gradient ambient + reflection, emission (factor x map) and
 // exponential fog. Normal maps (no tangents needed: the frame comes from screen-space derivatives),
-// roughness/metallic maps (glTF: G and B), occlusion maps (R) and soft sun shadows. Base colors from glTF are linear; textures are sRGB. The output is linear HDR:
-// exposure, bloom, tone mapping and gamma happen in the post-processing passes.
+// roughness/metallic maps (glTF: G and B), occlusion maps (R) and soft sun shadows. Base colors from glTF are linear;
+// textures are sRGB. The output is linear HDR: exposure, bloom, tone mapping and gamma happen in the post-processing
+// passes.
 inline constexpr const char* kLitFragment = R"GLSL(
 #version 330
-#define MAX_POINT_LIGHTS 16
 in vec3 fragPosition;
 in vec2 fragTexCoord;
 in vec4 fragColor;
@@ -207,6 +209,11 @@ const float REFLECTION_DIFFUSE_LOD = 8.0;
 const float REFLECTION_DIFFUSE_MIX = 0.5; // how much the surroundings (not just the sky) color the ambient light
 const float MAX_REFLECTION = 12.0;       // the sun's disc must not turn glossy surfaces into mirrors of it
 const float TWO_PI = 6.28318531;
+const float SWITCH_ON = 0.5;             // switches arrive as floats: on when above this
+const float HALF = 0.5;                  // -1..1 becomes 0..1 when halved and moved up by a half
+const float NORMAL_MAP_RANGE = 2.0;      // a normal map stores -1..1 as 0..1
+const float SPECULAR_DIVISOR = 4.0;      // Cook-Torrance: D G F / (4 nv nl)
+const int SHADOW_TAPS_ACROSS = SHADOW_KERNEL + 1 + SHADOW_KERNEL;  // the texel itself and its neighbours on both sides
 
 float distributionGGX(float nh, float a) {
   float a2 = a * a;
@@ -228,7 +235,7 @@ vec3 shade(vec3 n, vec3 v, vec3 l, vec3 radiance, vec3 albedo, vec3 f0, float ro
   float nv = max(dot(n, v), EPSILON);
   vec3 f = fresnel(max(dot(h, v), 0.0), f0);
   float a = rough * rough;
-  vec3 specular = distributionGGX(max(dot(n, h), 0.0), a) * geometrySmith(nv, nl, rough) * f / (4.0 * nv * nl + EPSILON);
+  vec3 specular = distributionGGX(max(dot(n, h), 0.0), a) * geometrySmith(nv, nl, rough) * f / (SPECULAR_DIVISOR * nv * nl + EPSILON);
   vec3 diffuse = (1.0 - f) * (1.0 - metal) * albedo / PI;
   return (diffuse + specular) * radiance * nl;
 }
@@ -236,7 +243,7 @@ vec3 shade(vec3 n, vec3 v, vec3 l, vec3 radiance, vec3 albedo, vec3 f0, float ro
 // Bends the surface normal by a tangent-space normal map, building the tangent frame from the
 // screen-space derivatives of position and UV.
 vec3 mappedNormal(vec3 n, vec3 position, vec2 uv) {
-  vec3 detail = texture(normalMap, uv).xyz * 2.0 - 1.0;
+  vec3 detail = texture(normalMap, uv).xyz * NORMAL_MAP_RANGE - 1.0;
   detail.xy *= normalScale;
   vec3 dp1 = dFdx(position);
   vec3 dp2 = dFdy(position);
@@ -255,7 +262,7 @@ vec3 mappedNormal(vec3 n, vec3 position, vec2 uv) {
 float sunVisibility(vec3 position, vec3 n, vec3 toSun) {
   if (shadowStrength <= 0.0) return 1.0;
   vec4 clip = lightViewProjection * vec4(position + n * SHADOW_NORMAL_OFFSET, 1.0);
-  vec3 coords = clip.xyz / clip.w * 0.5 + 0.5;
+  vec3 coords = clip.xyz / clip.w * HALF + HALF;
   if (coords.z > 1.0) return 1.0;
   vec2 border = min(coords.xy, 1.0 - coords.xy);
   float inside = smoothstep(0.0, SHADOW_FADE, min(border.x, border.y));
@@ -268,13 +275,13 @@ float sunVisibility(vec3 position, vec3 n, vec3 toSun) {
       lit += coords.z - bias > nearest ? 0.0 : 1.0;
     }
   }
-  float taps = float((2 * SHADOW_KERNEL + 1) * (2 * SHADOW_KERNEL + 1));
+  float taps = float(SHADOW_TAPS_ACROSS * SHADOW_TAPS_ACROSS);
   return mix(1.0, lit / taps, shadowStrength * inside);
 }
 
 // Where a direction falls on the panorama. Must match the capture (kPanoramaFragment).
 vec2 panoramaUv(vec3 d) {
-  return vec2(atan(d.x, -d.z) / TWO_PI + 0.5, asin(clamp(d.y, -1.0, 1.0)) / PI + 0.5);
+  return vec2(atan(d.x, -d.z) / TWO_PI + HALF, asin(clamp(d.y, -1.0, 1.0)) / PI + HALF);
 }
 
 vec3 surroundings(vec3 direction, float lod) {
@@ -296,7 +303,7 @@ void main() {
   vec3 albedo = pow(texel.rgb, vec3(GAMMA)) * colDiffuse.rgb * fragColor.rgb * tint;
   float rough = roughness;
   float metal = metallic;
-  if (hasSurfaceMap > 0.5) {
+  if (hasSurfaceMap > SWITCH_ON) {
     vec3 surface = texture(surfaceMap, fragTexCoord).rgb;
     rough *= surface.g;
     metal *= surface.b;
@@ -306,7 +313,7 @@ void main() {
   vec3 n = normalize(fragNormal);
   if (!gl_FrontFacing) n = -n;  // double-sided surfaces (leaves) are lit on both sides
   vec3 flatNormal = n;
-  if (hasNormalMap > 0.5) n = mappedNormal(n, fragPosition, fragTexCoord);
+  if (hasNormalMap > SWITCH_ON) n = mappedNormal(n, fragPosition, fragTexCoord);
   vec3 v = normalize(viewPos - fragPosition);
   vec3 f0 = mix(vec3(DIELECTRIC_F0), albedo, metal);
 
@@ -336,7 +343,7 @@ void main() {
   color += (diffuseAmbient + specularAmbient) * ambientStrength * occlusion;
 
   vec3 glow = emissive;
-  if (hasEmissiveMap > 0.5) glow *= pow(texture(emissiveMap, fragTexCoord).rgb, vec3(GAMMA));
+  if (hasEmissiveMap > SWITCH_ON) glow *= pow(texture(emissiveMap, fragTexCoord).rgb, vec3(GAMMA));
   color += glow;
 
   float fog = 1.0 - exp(-fogDensity * length(viewPos - fragPosition));
@@ -422,9 +429,10 @@ const float GAMMA = 2.2;
 const float SOFT_FROM = 0.55;  // share of the radius where the dot starts fading out
 const vec2 CENTER = vec2(0.5);
 const float RADIUS = 0.5;      // of the square, in texture coordinates
+const float SWITCH_ON = 0.5;   // switches arrive as floats: on when above this
 void main() {
   vec4 shape;
-  if (textured > 0.5) {
+  if (textured > SWITCH_ON) {
     shape = texture(texture0, fragTexCoord);
   } else {
     float fromCenter = length(fragTexCoord - CENTER) / RADIUS;
@@ -447,16 +455,17 @@ out vec4 finalColor;
 const float PI = 3.14159265;
 const float TWO_PI = 6.28318531;
 const float FACE_EDGE = 1.0;
+const float HALF = 0.5;      // the middle of the picture; also what turns -1..1 into 0..1
 void main() {
   vec2 uv = gl_FragCoord.xy / targetSize;
-  float longitude = (uv.x - 0.5) * TWO_PI;
-  float latitude = (uv.y - 0.5) * PI;
+  float longitude = (uv.x - HALF) * TWO_PI;
+  float latitude = (uv.y - HALF) * PI;
   vec3 d = vec3(cos(latitude) * sin(longitude), sin(latitude), -cos(latitude) * cos(longitude));
   float along = dot(d, faceForward);
   if (along <= 0.0) discard;
   vec2 onFace = vec2(dot(d, faceRight), dot(d, faceUp)) / along;
   if (max(abs(onFace.x), abs(onFace.y)) > FACE_EDGE) discard;
-  finalColor = vec4(texture(texture0, onFace * 0.5 + 0.5).rgb, 1.0);
+  finalColor = vec4(texture(texture0, onFace * HALF + HALF).rgb, 1.0);
 }
 )GLSL";
 
@@ -482,18 +491,26 @@ const float INNER_REACH = 0.25;      // the first samples stay this close (fract
 const float SKY_DEPTH = 0.99999;
 const float FAR_FADE_START = 60.0;   // meters: the effect fades out with distance (it gets noisy)
 const float FAR_FADE_END = 110.0;
+const float HALF = 0.5;              // -1..1 becomes 0..1 when halved and moved up by a half
+const float CLIP_RANGE = 2.0;        // 0..1 becomes -1..1 when doubled and moved down by one
+const float LINEAR_DEPTH_SCALE = 2.0;  // of a perspective view: depth = 2 n f / (f + n - z (f - n))
+const float SAMPLE_MIDDLE = 0.5;     // each sample sits in the middle of its share of the disc
+const float NEARLY_VERTICAL = 0.99;  // |y| of a normal beyond which Y cannot give it a tangent
+const float MIN_DEPTH_GAP = 0.0001;  // meters: keeps the range test from dividing by zero
+const vec2 NOISE_DIRECTION = vec2(12.9898, 78.233);  // the usual one-line hash: a sine too fast to follow
+const float NOISE_SCALE = 43758.5453;
 
 float viewDepth(vec2 uv) {
-  float ndc = texture(texture0, uv).r * 2.0 - 1.0;
-  return 2.0 * nearPlane * farPlane / (farPlane + nearPlane - ndc * (farPlane - nearPlane));
+  float ndc = texture(texture0, uv).r * CLIP_RANGE - 1.0;
+  return LINEAR_DEPTH_SCALE * nearPlane * farPlane / (farPlane + nearPlane - ndc * (farPlane - nearPlane));
 }
 
 vec3 viewPosition(vec2 uv) {
   float depth = viewDepth(uv);
-  return vec3((uv * 2.0 - 1.0) * vec2(tanHalfFov * aspect, tanHalfFov) * depth, -depth);
+  return vec3((uv * CLIP_RANGE - 1.0) * vec2(tanHalfFov * aspect, tanHalfFov) * depth, -depth);
 }
 
-float noise(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+float noise(vec2 p) { return fract(sin(dot(p, NOISE_DIRECTION)) * NOISE_SCALE); }
 
 void main() {
   vec2 uv = gl_FragCoord.xy / targetSize;
@@ -504,21 +521,21 @@ void main() {
   vec3 position = viewPosition(uv);
   vec3 normal = normalize(cross(dFdx(position), dFdy(position)));
   if (normal.z < 0.0) normal = -normal;  // toward the camera
-  vec3 tangent = normalize(abs(normal.y) < 0.99 ? cross(normal, vec3(0.0, 1.0, 0.0)) : cross(normal, vec3(1.0, 0.0, 0.0)));
+  vec3 tangent = normalize(abs(normal.y) < NEARLY_VERTICAL ? cross(normal, vec3(0.0, 1.0, 0.0)) : cross(normal, vec3(1.0, 0.0, 0.0)));
   vec3 bitangent = cross(normal, tangent);
   float spin = noise(gl_FragCoord.xy) * TWO_PI;
   float occluded = 0.0;
   for (int i = 0; i < SAMPLES; ++i) {
-    float fraction = (float(i) + 0.5) / float(SAMPLES);
+    float fraction = (float(i) + SAMPLE_MIDDLE) / float(SAMPLES);
     float ring = sqrt(fraction);
     float angle = spin + float(i) * GOLDEN_ANGLE;
     vec3 hemisphere = vec3(cos(angle) * ring, sin(angle) * ring, sqrt(1.0 - fraction));
     vec3 probe = position + (tangent * hemisphere.x + bitangent * hemisphere.y + normal * hemisphere.z) *
                                 RADIUS * mix(INNER_REACH, 1.0, fraction);
     if (probe.z > -nearPlane) continue;  // behind the camera: nothing to compare with
-    vec2 probeUv = probe.xy / (-probe.z * vec2(tanHalfFov * aspect, tanHalfFov)) * 0.5 + 0.5;
+    vec2 probeUv = probe.xy / (-probe.z * vec2(tanHalfFov * aspect, tanHalfFov)) * HALF + HALF;
     float sceneZ = -viewDepth(probeUv);
-    float inRange = smoothstep(0.0, 1.0, RADIUS / max(abs(position.z - sceneZ), 0.0001));
+    float inRange = smoothstep(0.0, 1.0, RADIUS / max(abs(position.z - sceneZ), MIN_DEPTH_GAP));
     occluded += (sceneZ >= probe.z + BIAS ? 1.0 : 0.0) * inRange;
   }
   float open = 1.0 - occluded / float(SAMPLES);
@@ -603,7 +620,12 @@ const float ACES_E = 0.14;
 const float VIGNETTE_START = 0.35;  // distance from the center where the darkening begins
 const float VIGNETTE_END = 1.0;
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
-float noise(vec2 at) { return fract(sin(dot(at, vec2(12.9898, 78.233))) * 43758.5453); }
+const vec2 MIDDLE = vec2(0.5);        // of the picture, in texture coordinates
+const float EDGE_DISTANCE = 2.0;      // distances from the middle are counted so that the edges are at 1
+const float NOISE_MIDDLE = 0.5;       // noise is 0..1: around this it darkens as often as it lightens
+const vec2 NOISE_DIRECTION = vec2(12.9898, 78.233);  // the usual one-line hash: a sine too fast to follow
+const float NOISE_SCALE = 43758.5453;
+float noise(vec2 at) { return fract(sin(dot(at, NOISE_DIRECTION)) * NOISE_SCALE); }
 
 // The lit scene at a point, with the lens's color fringes: red and blue land a little apart.
 vec3 lens(vec2 at, vec2 fromMiddle) {
@@ -612,11 +634,11 @@ vec3 lens(vec2 at, vec2 fromMiddle) {
 }
 
 void main() {
-  vec2 fromMiddle = fragTexCoord - vec2(0.5);
+  vec2 fromMiddle = fragTexCoord - MIDDLE;
   vec3 scene = lens(fragTexCoord, fromMiddle);
   if (motionBlur > 0.0) {
     // Speed: everything streaks away from where the camera is heading, more toward the edges.
-    float streak = motionBlur * BLUR_REACH * smoothstep(BLUR_CLEAR_RADIUS, 1.0, length(fromMiddle) * 2.0);
+    float streak = motionBlur * BLUR_REACH * smoothstep(BLUR_CLEAR_RADIUS, 1.0, length(fromMiddle) * EDGE_DISTANCE);
     // Each pixel starts its taps at a slightly different place: the steps between them then show
     // as fine noise instead of bands.
     float start = noise(gl_FragCoord.xy + fract(time) * NOISE_DRIFT);
@@ -628,13 +650,13 @@ void main() {
   scene *= mix(1.0, texture(occlusionTexture, fragTexCoord).r, occlusionAmount);
   vec3 color = (scene + texture(bloomTexture, fragTexCoord).rgb * bloomStrength) * exposure;
   color = clamp((color * (ACES_A * color + ACES_B)) / (color * (ACES_C * color + ACES_D) + ACES_E), 0.0, 1.0);
-  float fromCenter = length(fragTexCoord - vec2(0.5)) * 2.0;
+  float fromCenter = length(fragTexCoord - MIDDLE) * EDGE_DISTANCE;
   color *= 1.0 - vignette * smoothstep(VIGNETTE_START, VIGNETTE_END + VIGNETTE_START, fromCenter);
   color = pow(color, vec3(1.0 / GAMMA));
   // The grade: on the picture as the eye sees it.
   color = mix(vec3(dot(color, LUMA)), color, saturation);
   color = (color - MID_GREY) * contrast + MID_GREY;
-  color += (noise(gl_FragCoord.xy + fract(time) * NOISE_DRIFT) - 0.5) * grain * GRAIN_SCALE;
+  color += (noise(gl_FragCoord.xy + fract(time) * NOISE_DRIFT) - NOISE_MIDDLE) * grain * GRAIN_SCALE;
   color = clamp(color, 0.0, 1.0);
   finalColor = vec4(color, dot(color, LUMA));
 }
@@ -654,6 +676,8 @@ const float REDUCE_MUL = 0.125;
 const float REDUCE_MIN = 0.0078125;
 const float NEAR_TAP = 0.1666667;       // 1/3 - 1/2
 const float FAR_TAP = 0.5;
+const float AVERAGE_OF_TWO = 0.5;
+const float AVERAGE_OF_FOUR = 0.25;
 void main() {
   vec4 center = texture(texture0, fragTexCoord);
   float lumaNW = texture(texture0, fragTexCoord + vec2(-1.0, -1.0) * texelSize).a;
@@ -667,11 +691,11 @@ void main() {
     return;
   }
   vec2 dir = vec2(-((lumaNW + lumaNE) - (lumaSW + lumaSE)), (lumaNW + lumaSW) - (lumaNE + lumaSE));
-  float reduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * 0.25 * REDUCE_MUL, REDUCE_MIN);
+  float reduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * AVERAGE_OF_FOUR * REDUCE_MUL, REDUCE_MIN);
   float scale = 1.0 / (min(abs(dir.x), abs(dir.y)) + reduce);
   dir = clamp(dir * scale, vec2(-SPAN_MAX), vec2(SPAN_MAX)) * texelSize;
-  vec4 near = 0.5 * (texture(texture0, fragTexCoord + dir * -NEAR_TAP) + texture(texture0, fragTexCoord + dir * NEAR_TAP));
-  vec4 far = 0.5 * near + 0.25 * (texture(texture0, fragTexCoord + dir * -FAR_TAP) + texture(texture0, fragTexCoord + dir * FAR_TAP));
+  vec4 near = AVERAGE_OF_TWO * (texture(texture0, fragTexCoord + dir * -NEAR_TAP) + texture(texture0, fragTexCoord + dir * NEAR_TAP));
+  vec4 far = AVERAGE_OF_TWO * near + AVERAGE_OF_FOUR * (texture(texture0, fragTexCoord + dir * -FAR_TAP) + texture(texture0, fragTexCoord + dir * FAR_TAP));
   finalColor = vec4((far.a < lumaMin || far.a > lumaMax) ? near.rgb : far.rgb, 1.0);
 }
 )GLSL";

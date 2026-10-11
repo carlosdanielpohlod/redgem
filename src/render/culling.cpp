@@ -5,7 +5,13 @@ namespace {
 
 constexpr int kMatrixSize = 4;
 constexpr int kAxes = 3;
-constexpr int kW = 3;  // the row the others are compared against (clip-space w)
+constexpr int kSidesPerAxis = 2;  // each axis has a plane on its positive and on its negative side
+constexpr int kW = 3;             // the row the others are compared against (clip-space w)
+// The columns of the matrix a plane's four numbers come from.
+constexpr int kX = 0;
+constexpr int kY = 1;
+constexpr int kZ = 2;
+constexpr int kDistance = 3;
 
 }  // namespace
 
@@ -14,17 +20,18 @@ Frustum frustum_from_matrix(const float* m) {
   const auto row = [m](int r, int column) { return m[column * kMatrixSize + r]; };
   Frustum frustum;
   for (int axis = 0; axis < kAxes; ++axis) {
-    for (int side = 0; side < 2; ++side) {
+    for (int side = 0; side < kSidesPerAxis; ++side) {
       const float sign = side == 0 ? 1.0f : -1.0f;
       Frustum::Plane plane;
-      plane.normal = {row(kW, 0) + sign * row(axis, 0), row(kW, 1) + sign * row(axis, 1), row(kW, 2) + sign * row(axis, 2)};
-      plane.distance = row(kW, 3) + sign * row(axis, 3);
+      plane.normal = {row(kW, kX) + sign * row(axis, kX), row(kW, kY) + sign * row(axis, kY),
+                      row(kW, kZ) + sign * row(axis, kZ)};
+      plane.distance = row(kW, kDistance) + sign * row(axis, kDistance);
       const float scale = length(plane.normal);
       if (scale > 0.0f) {
         plane.normal = plane.normal * (1.0f / scale);
         plane.distance /= scale;
       }
-      frustum.planes[static_cast<std::size_t>(axis * 2 + side)] = plane;
+      frustum.planes[static_cast<std::size_t>(axis * kSidesPerAxis + side)] = plane;
     }
   }
   return frustum;

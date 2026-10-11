@@ -10,123 +10,177 @@
 namespace redgem {
 namespace {
 
+// Room for `count` values, all zero (from raylib's allocator: raylib frees the mesh).
+template <typename T>
+T* zeroed_array(std::size_t count) {
+  return static_cast<T*>(MemAlloc(static_cast<unsigned int>(count * sizeof(T))));
+}
+
 template <typename T>
 T* copy_array(const T* data, std::size_t count) {
-  auto* out = static_cast<T*>(MemAlloc(static_cast<unsigned int>(count * sizeof(T))));
+  T* out = zeroed_array<T>(count);
   std::memcpy(out, data, count * sizeof(T));
   return out;
 }
 
+std::size_t vertex_count_of(const PrimitiveDesc& primitive) {
+  return primitive.positions.size() / config::kFloatsPerPosition;
+}
+
+// The optional data a primitive carries for every one of its vertices (data of another length
+// is as good as none).
+struct VertexData {
+  bool texcoords = false;
+  bool colors = false;
+  bool skin = false;
+};
+
+VertexData vertex_data_of(const PrimitiveDesc& primitive) {
+  const std::size_t vertex_count = vertex_count_of(primitive);
+  const std::size_t influences = vertex_count * config::kJointsPerVertex;
+  VertexData has;
+  has.texcoords = primitive.texcoords.size() == vertex_count * config::kFloatsPerTexcoord;
+  has.colors = primitive.colors.size() == vertex_count * config::kChannelsPerColor;
+  has.skin = primitive.joints.size() == influences && primitive.weights.size() == influences;
+  return has;
+}
+
+// Vertices without a color of their own are white: the material's color shows unchanged.
+unsigned char* white_colors(std::size_t channel_count) {
+  auto* colors = zeroed_array<unsigned char>(channel_count);
+  std::memset(colors, config::kMaxColorByte, channel_count);
+  return colors;
+}
+
+// raylib meshes use 16-bit indices (build_mesh has checked that they fit).
+unsigned short* short_indices(const std::vector<std::uint32_t>& indices) {
+  auto* out = zeroed_array<unsigned short>(indices.size());
+  for (std::size_t i = 0; i < indices.size(); ++i) out[i] = static_cast<unsigned short>(indices[i]);
+  return out;
+}
+
+// Appends the `width` values vertex `source` has in `in` to `out`.
+template <typename T>
+void append_vertex_values(std::vector<T>& out, const std::vector<T>& in, std::uint32_t source, std::size_t width) {
+  const auto begin = in.begin() + static_cast<std::ptrdiff_t>(source * width);
+  out.insert(out.end(), begin, begin + static_cast<std::ptrdiff_t>(width));
+}
+
+// Cuts a primitive into pieces, one triangle at a time: a triangle that would take the piece
+// being filled over the limit starts the next one.
+class PrimitiveSplitter {
+ public:
+  PrimitiveSplitter(const PrimitiveDesc& source, std::size_t max_vertices)
+      : source_(source), has_(vertex_data_of(source)), max_vertices_(max_vertices) {
+    start_piece();
+  }
+
+  // Adds the triangle whose three corners start at `first` in the source's indices.
+  void add_triangle(std::size_t first) {
+    if (remap_.size() + new_vertices(first) > max_vertices_) {
+      pieces_.push_back(std::move(piece_));
+      start_piece();
+    }
+    for (std::size_t corner = 0; corner < config::kVerticesPerTriangle; ++corner) {
+      const std::uint32_t vertex = source_.indices[first + corner];
+      const auto [place, inserted] = remap_.emplace(vertex, static_cast<std::uint32_t>(remap_.size()));
+      if (inserted) copy_vertex(vertex);
+      piece_.indices.push_back(place->second);
+    }
+  }
+
+  std::vector<PrimitiveDesc> finish() {
+    if (!piece_.indices.empty()) pieces_.push_back(std::move(piece_));
+    return std::move(pieces_);
+  }
+
+ private:
+  void start_piece() {
+    piece_ = PrimitiveDesc{};
+    piece_.material = source_.material;
+    remap_.clear();
+  }
+
+  // How many of a triangle's corners the piece being filled does not hold yet.
+  std::size_t new_vertices(std::size_t first) const {
+    std::size_t count = 0;
+    for (std::size_t corner = 0; corner < config::kVerticesPerTriangle; ++corner) {
+      count += remap_.count(source_.indices[first + corner]) == 0 ? 1 : 0;
+    }
+    return count;
+  }
+
+  void copy_vertex(std::uint32_t vertex) {
+    append_vertex_values(piece_.positions, source_.positions, vertex, config::kFloatsPerPosition);
+    append_vertex_values(piece_.normals, source_.normals, vertex, config::kFloatsPerNormal);
+    if (has_.texcoords) append_vertex_values(piece_.texcoords, source_.texcoords, vertex, config::kFloatsPerTexcoord);
+    if (has_.colors) append_vertex_values(piece_.colors, source_.colors, vertex, config::kChannelsPerColor);
+    if (!has_.skin) return;
+    append_vertex_values(piece_.joints, source_.joints, vertex, config::kJointsPerVertex);
+    append_vertex_values(piece_.weights, source_.weights, vertex, config::kJointsPerVertex);
+  }
+
+  const PrimitiveDesc& source_;
+  VertexData has_;
+  std::size_t max_vertices_;
+  std::vector<PrimitiveDesc> pieces_;
+  PrimitiveDesc piece_;                                     // the one being filled
+  std::unordered_map<std::uint32_t, std::uint32_t> remap_;  // source vertex -> its index in the piece
+};
+
 }  // namespace
 
-std::optional<Mesh> build_mesh(const PrimitiveDesc& primitive, std::string& error) {
-  const std::size_t vertex_count = primitive.positions.size() / config::kFloatsPerPosition;
-  if (vertex_count == 0) {
-    error = "primitive has no vertices";
-    return std::nullopt;
-  }
+std::string primitive_problem(const PrimitiveDesc& primitive) {
+  const std::size_t vertex_count = vertex_count_of(primitive);
+  if (vertex_count == 0) return "primitive has no vertices";
   if (vertex_count > config::kMaxVerticesPerMesh) {
-    error = "primitive has " + std::to_string(vertex_count) + " vertices, the limit is " +
-            std::to_string(config::kMaxVerticesPerMesh);
-    return std::nullopt;
+    return "primitive has " + std::to_string(vertex_count) + " vertices, the limit is " +
+           std::to_string(config::kMaxVerticesPerMesh);
   }
   const bool bad_index = std::any_of(primitive.indices.begin(), primitive.indices.end(),
                                      [vertex_count](std::uint32_t index) { return index >= vertex_count; });
   if (bad_index || primitive.indices.size() % config::kVerticesPerTriangle != 0) {
-    error = "primitive has invalid triangle indices";
+    return "primitive has invalid triangle indices";
+  }
+  return {};
+}
+
+std::optional<Mesh> build_mesh(const PrimitiveDesc& primitive, std::string& error) {
+  const std::string problem = primitive_problem(primitive);
+  if (!problem.empty()) {
+    error = problem;
     return std::nullopt;
   }
+  const std::size_t vertex_count = vertex_count_of(primitive);
+  const std::size_t texcoord_count = vertex_count * config::kFloatsPerTexcoord;
+  const std::size_t color_count = vertex_count * config::kChannelsPerColor;
+  const VertexData has = vertex_data_of(primitive);
 
   Mesh mesh{};
   mesh.vertexCount = static_cast<int>(vertex_count);
   mesh.triangleCount = static_cast<int>(primitive.indices.size() / config::kVerticesPerTriangle);
   mesh.vertices = copy_array(primitive.positions.data(), primitive.positions.size());
   mesh.normals = copy_array(primitive.normals.data(), primitive.normals.size());
-
-  const std::size_t texcoord_count = vertex_count * config::kFloatsPerTexcoord;
-  if (primitive.texcoords.size() == texcoord_count) {
-    mesh.texcoords = copy_array(primitive.texcoords.data(), texcoord_count);
-  } else {
-    mesh.texcoords = static_cast<float*>(MemAlloc(static_cast<unsigned int>(texcoord_count * sizeof(float))));
-  }
-
-  const std::size_t color_count = vertex_count * config::kChannelsPerColor;
-  if (primitive.colors.size() == color_count) {
-    mesh.colors = copy_array(primitive.colors.data(), color_count);
-  } else {
-    mesh.colors = static_cast<unsigned char*>(MemAlloc(static_cast<unsigned int>(color_count)));
-    std::memset(mesh.colors, config::kMaxColorByte, color_count);
-  }
-
+  mesh.texcoords =
+      has.texcoords ? copy_array(primitive.texcoords.data(), texcoord_count) : zeroed_array<float>(texcoord_count);
+  mesh.colors = has.colors ? copy_array(primitive.colors.data(), color_count) : white_colors(color_count);
   // Skinned meshes carry their joints and weights to the GPU (raylib's bone attributes).
-  const std::size_t influence_count = vertex_count * config::kJointsPerVertex;
-  if (primitive.joints.size() == influence_count && primitive.weights.size() == influence_count) {
-    mesh.boneIds = copy_array(primitive.joints.data(), influence_count);
-    mesh.boneWeights = copy_array(primitive.weights.data(), influence_count);
+  if (has.skin) {
+    mesh.boneIds = copy_array(primitive.joints.data(), primitive.joints.size());
+    mesh.boneWeights = copy_array(primitive.weights.data(), primitive.weights.size());
   }
-
-  mesh.indices = static_cast<unsigned short*>(
-      MemAlloc(static_cast<unsigned int>(primitive.indices.size() * sizeof(unsigned short))));
-  for (std::size_t i = 0; i < primitive.indices.size(); ++i) {
-    mesh.indices[i] = static_cast<unsigned short>(primitive.indices[i]);
-  }
+  mesh.indices = short_indices(primitive.indices);
   return mesh;
 }
 
 std::vector<PrimitiveDesc> split_primitive(const PrimitiveDesc& primitive, std::size_t max_vertices) {
-  const std::size_t vertex_count = primitive.positions.size() / config::kFloatsPerPosition;
-  if (vertex_count <= max_vertices) return {primitive};
-  const bool has_texcoords = primitive.texcoords.size() == vertex_count * config::kFloatsPerTexcoord;
-  const bool has_colors = primitive.colors.size() == vertex_count * config::kChannelsPerColor;
-  const std::size_t influences = vertex_count * config::kJointsPerVertex;
-  const bool has_skin = primitive.joints.size() == influences && primitive.weights.size() == influences;
-
-  std::vector<PrimitiveDesc> pieces;
-  PrimitiveDesc piece;
-  std::unordered_map<std::uint32_t, std::uint32_t> remap;
-  auto start_piece = [&] {
-    piece = PrimitiveDesc{};
-    piece.material = primitive.material;
-    remap.clear();
-  };
-  auto copy_vertex = [&](std::uint32_t source) {
-    auto append = [source](std::vector<float>& out, const std::vector<float>& in, std::size_t width) {
-      out.insert(out.end(), in.begin() + static_cast<std::ptrdiff_t>(source * width),
-                 in.begin() + static_cast<std::ptrdiff_t>((source + 1) * width));
-    };
-    append(piece.positions, primitive.positions, config::kFloatsPerPosition);
-    append(piece.normals, primitive.normals, config::kFloatsPerNormal);
-    if (has_texcoords) append(piece.texcoords, primitive.texcoords, config::kFloatsPerTexcoord);
-    if (has_colors) {
-      const auto begin = primitive.colors.begin() + static_cast<std::ptrdiff_t>(source * config::kChannelsPerColor);
-      piece.colors.insert(piece.colors.end(), begin, begin + config::kChannelsPerColor);
-    }
-    if (has_skin) {
-      const auto joint = primitive.joints.begin() + static_cast<std::ptrdiff_t>(source * config::kJointsPerVertex);
-      piece.joints.insert(piece.joints.end(), joint, joint + config::kJointsPerVertex);
-      append(piece.weights, primitive.weights, config::kJointsPerVertex);
-    }
-  };
-  start_piece();
-  for (std::size_t i = 0; i + config::kVerticesPerTriangle <= primitive.indices.size();
-       i += config::kVerticesPerTriangle) {
-    std::size_t new_vertices = 0;
-    for (std::size_t k = 0; k < config::kVerticesPerTriangle; ++k) {
-      new_vertices += remap.count(primitive.indices[i + k]) == 0 ? 1 : 0;
-    }
-    if (remap.size() + new_vertices > max_vertices) {
-      pieces.push_back(std::move(piece));
-      start_piece();
-    }
-    for (std::size_t k = 0; k < config::kVerticesPerTriangle; ++k) {
-      const std::uint32_t source = primitive.indices[i + k];
-      auto [it, inserted] = remap.emplace(source, static_cast<std::uint32_t>(remap.size()));
-      if (inserted) copy_vertex(source);
-      piece.indices.push_back(it->second);
-    }
+  if (vertex_count_of(primitive) <= max_vertices) return {primitive};
+  PrimitiveSplitter splitter(primitive, max_vertices);
+  for (std::size_t first = 0; first + config::kVerticesPerTriangle <= primitive.indices.size();
+       first += config::kVerticesPerTriangle) {
+    splitter.add_triangle(first);
   }
-  if (!piece.indices.empty()) pieces.push_back(std::move(piece));
-  return pieces;
+  return splitter.finish();
 }
 
 void free_cpu_mesh(Mesh& mesh) {

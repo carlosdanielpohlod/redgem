@@ -16,7 +16,7 @@ constexpr float kIdentity[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
 TEST_CASE("spheres outside the view volume are culled, touching ones are kept") {
   const Frustum frustum = frustum_from_matrix(kIdentity);
   CHECK(sphere_in_frustum(frustum, Vec3::zero(), 0.5f));
-  CHECK(sphere_in_frustum(frustum, {1.5f, 0.0f, 0.0f}, 1.0f));   // crosses the right side
+  CHECK(sphere_in_frustum(frustum, {1.5f, 0.0f, 0.0f}, 1.0f));  // crosses the right side
   CHECK_FALSE(sphere_in_frustum(frustum, {3.0f, 0.0f, 0.0f}, 1.0f));
   CHECK_FALSE(sphere_in_frustum(frustum, {0.0f, -2.6f, 0.0f}, 1.5f));
   CHECK_FALSE(sphere_in_frustum(frustum, {0.0f, 0.0f, 5.0f}, 0.1f));
@@ -33,10 +33,10 @@ TEST_CASE("a translated view volume moves with its matrix") {
 TEST_CASE("small far things are not worth drawing; near or big ones are") {
   constexpr float kMinAngle = 0.01f;
   const Vec3 viewer = Vec3::zero();
-  CHECK(too_small_to_see({0.0f, 0.0f, -100.0f}, 0.05f, viewer, kMinAngle));        // a bolt at 100 m
-  CHECK_FALSE(too_small_to_see({0.0f, 0.0f, -100.0f}, 5.0f, viewer, kMinAngle));    // a house at 100 m
-  CHECK_FALSE(too_small_to_see({0.0f, 0.0f, -2.0f}, 0.05f, viewer, kMinAngle));     // a bolt up close
-  CHECK_FALSE(too_small_to_see({0.0f, 0.0f, -0.01f}, 0.05f, viewer, kMinAngle));    // the viewer is inside it
+  CHECK(too_small_to_see({0.0f, 0.0f, -100.0f}, 0.05f, viewer, kMinAngle));       // a bolt at 100 m
+  CHECK_FALSE(too_small_to_see({0.0f, 0.0f, -100.0f}, 5.0f, viewer, kMinAngle));  // a house at 100 m
+  CHECK_FALSE(too_small_to_see({0.0f, 0.0f, -2.0f}, 0.05f, viewer, kMinAngle));   // a bolt up close
+  CHECK_FALSE(too_small_to_see({0.0f, 0.0f, -0.01f}, 0.05f, viewer, kMinAngle));  // the viewer is inside it
 }
 
 TEST_CASE("levels of detail are drawn only within their range of distances") {
@@ -57,4 +57,15 @@ TEST_CASE("levels of detail are drawn only within their range of distances") {
   const Vec3 boundary{0.0f, 2.0f, -kNear};
   CHECK(outside_distance_range(boundary, viewer, 0.0f, kNear));
   CHECK_FALSE(outside_distance_range(boundary, viewer, kNear, kFar));
+}
+
+TEST_CASE("a view volume is six planes whose normals point inward and have length one") {
+  constexpr float kStretch = 4.0f;  // a matrix that scales x: its planes must still be normalized
+  constexpr float kStretched[16] = {kStretch, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+  const Frustum frustum = frustum_from_matrix(kStretched);
+  CHECK(frustum.planes.size() == kFrustumPlanes);
+  for (const Frustum::Plane& plane : frustum.planes) {
+    CHECK(length(plane.normal) == doctest::Approx(1.0f));
+    CHECK(dot(plane.normal, Vec3::zero()) + plane.distance > 0.0f);  // the middle of the view is inside
+  }
 }

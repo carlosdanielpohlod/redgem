@@ -9,7 +9,25 @@
 namespace redgem {
 namespace {
 
+// The custom properties of an environment object.
 constexpr const char* kEnvironmentProp = "environment";
+constexpr const char* kSkyTopProp = "sky_top";
+constexpr const char* kSkyHorizonProp = "sky_horizon";
+constexpr const char* kGroundColorProp = "ground_color";
+constexpr const char* kFogColorProp = "fog_color";
+constexpr const char* kFogDensityProp = "fog_density";
+constexpr const char* kAmbientProp = "ambient";
+constexpr const char* kExposureProp = "exposure";
+constexpr const char* kBloomProp = "bloom";
+constexpr const char* kVignetteProp = "vignette";
+constexpr const char* kSunGlowProp = "sun_glow";
+constexpr const char* kWindProp = "wind";
+constexpr const char* kShadowsProp = "shadows";
+constexpr const char* kAmbientOcclusionProp = "ambient_occlusion";
+constexpr const char* kContrastProp = "contrast";
+constexpr const char* kSaturationProp = "saturation";
+constexpr const char* kGrainProp = "grain";
+constexpr const char* kAberrationProp = "aberration";
 
 // A clear day (linear colors).
 constexpr Vec3 kDaySkyTop{0.16f, 0.36f, 0.78f};
@@ -25,7 +43,7 @@ constexpr float kDayWind = 0.4f;
 constexpr float kDayShadows = 1.0f;
 constexpr float kDayAmbientOcclusion = 0.8f;
 constexpr float kNeutralGrade = 1.0f;  // contrast and saturation that change nothing
-constexpr float kFullShadows = 1.0f;  // the most a 0..1 strength (shadows, occlusion, vignette) can be
+constexpr float kFullShadows = 1.0f;   // the most a 0..1 strength (shadows, occlusion, vignette) can be
 
 void read_color(const PropertyMap& props, const char* key, Vec3& out) {
   if (const auto text = get_string(props, key)) {
@@ -35,6 +53,27 @@ void read_color(const PropertyMap& props, const char* key, Vec3& out) {
 
 void read_number(const PropertyMap& props, const char* key, float& out) {
   if (const auto value = get_number(props, key)) out = std::max(static_cast<float>(*value), 0.0f);
+}
+
+// A 0..1 strength: anything above full counts as full.
+void read_strength(const PropertyMap& props, const char* key, float& out) {
+  read_number(props, key, out);
+  out = std::min(out, kFullShadows);
+}
+
+// The sun scenes without a directional light get.
+SceneLights default_lights() {
+  SceneLights lights;
+  lights.sun_direction =
+      normalize(Vec3{config::kDefaultSunDirectionX, config::kDefaultSunDirectionY, config::kDefaultSunDirectionZ});
+  lights.sun_color = Vec3::one() * config::kDefaultSunIntensity;
+  return lights;
+}
+
+PointLight point_light(const LightDesc& light, Vec3 position) {
+  const Vec3 color{light.color.r, light.color.g, light.color.b};
+  return {position, color * (light.intensity * config::kPointWattScale),
+          light.range > 0.0f ? light.range : config::kDefaultPointLightRange};
 }
 
 }  // namespace
@@ -61,27 +100,24 @@ Environment default_environment() {
 
 Environment environment_from_props(const PropertyMap& props) {
   Environment env = default_environment();
-  read_color(props, "sky_top", env.sky_top);
-  read_color(props, "sky_horizon", env.sky_horizon);
-  read_color(props, "ground_color", env.ground);
+  read_color(props, kSkyTopProp, env.sky_top);
+  read_color(props, kSkyHorizonProp, env.sky_horizon);
+  read_color(props, kGroundColorProp, env.ground);
   env.fog_color = env.sky_horizon;  // fog fades into the horizon unless given its own color
-  read_color(props, "fog_color", env.fog_color);
-  read_number(props, "fog_density", env.fog_density);
-  read_number(props, "ambient", env.ambient);
-  read_number(props, "exposure", env.exposure);
-  read_number(props, "bloom", env.bloom);
-  read_number(props, "vignette", env.vignette);
-  env.vignette = std::min(env.vignette, kFullShadows);
-  read_number(props, "sun_glow", env.sun_glow);
-  read_number(props, "wind", env.wind);
-  read_number(props, "shadows", env.shadows);
-  env.shadows = std::min(env.shadows, kFullShadows);
-  read_number(props, "ambient_occlusion", env.ambient_occlusion);
-  env.ambient_occlusion = std::min(env.ambient_occlusion, kFullShadows);
-  read_number(props, "contrast", env.contrast);
-  read_number(props, "saturation", env.saturation);
-  read_number(props, "grain", env.grain);
-  read_number(props, "aberration", env.aberration);
+  read_color(props, kFogColorProp, env.fog_color);
+  read_number(props, kFogDensityProp, env.fog_density);
+  read_number(props, kAmbientProp, env.ambient);
+  read_number(props, kExposureProp, env.exposure);
+  read_number(props, kBloomProp, env.bloom);
+  read_strength(props, kVignetteProp, env.vignette);
+  read_number(props, kSunGlowProp, env.sun_glow);
+  read_number(props, kWindProp, env.wind);
+  read_strength(props, kShadowsProp, env.shadows);
+  read_strength(props, kAmbientOcclusionProp, env.ambient_occlusion);
+  read_number(props, kContrastProp, env.contrast);
+  read_number(props, kSaturationProp, env.saturation);
+  read_number(props, kGrainProp, env.grain);
+  read_number(props, kAberrationProp, env.aberration);
   return env;
 }
 
@@ -108,6 +144,27 @@ std::vector<PointLight> nearest_lights(std::vector<PointLight> lights, Vec3 view
     for (PointLight& light : lights) {
       light.color = light.color * std::clamp((cut - reach(light)) / fade_distance, 0.0f, 1.0f);
     }
+  }
+  return lights;
+}
+
+SceneLights scene_lights(const Scene& scene) {
+  SceneLights lights = default_lights();
+  bool sun_found = false;
+  for (const ObjectId id : scene.alive_ids()) {
+    const GameObject& object = scene.at(id);
+    if (!object.light || object.prefab) continue;
+    const LightDesc& light = *object.light;
+    const Transform world = scene.world_transform(id);
+    if (light.type != LightType::Directional) {
+      lights.points.push_back(point_light(light, world.position));
+      continue;
+    }
+    if (sun_found) continue;
+    sun_found = true;
+    lights.sun_direction = world.forward();
+    lights.sun_color =
+        Vec3{light.color.r, light.color.g, light.color.b} * (light.intensity * config::kSunStrengthScale);
   }
   return lights;
 }

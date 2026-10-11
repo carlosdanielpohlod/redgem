@@ -6,6 +6,8 @@
 
 namespace redgem {
 
+inline constexpr int kFrustumPlanes = 6;  // left, right, bottom, top, near, far
+
 // The six planes of a view volume, each as (normal, distance): a point p is inside when
 // dot(normal, p) + distance >= 0 for all of them.
 struct Frustum {
@@ -13,7 +15,7 @@ struct Frustum {
     Vec3 normal;
     float distance = 0.0f;
   };
-  std::array<Plane, 6> planes;
+  std::array<Plane, kFrustumPlanes> planes;
 };
 
 // From a view-projection matrix in column-major order (OpenGL / raylib's MatrixToFloatV).

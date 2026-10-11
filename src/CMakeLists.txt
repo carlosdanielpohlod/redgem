@@ -83,6 +83,11 @@ add_library(redgem_engine STATIC
   script/bindings/network_bindings.cpp
   render/mesh_builder.cpp
   render/renderer.cpp
+  render/renderer_setup.cpp
+  render/renderer_scene.cpp
+  render/renderer_passes.cpp
+  render/render_math.cpp
+  render/shader_source.cpp
   render/environment.cpp
   render/gpu_select.cpp
   render/culling.cpp

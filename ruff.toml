@@ -1,0 +1,17 @@
+# What `tools/lint.sh` holds the Python tools to (asset and scene builders run by hand or by Blender).
+line-length = 120
+target-version = "py310"
+extend-exclude = ["build", "build-*", ".deps", ".private"]
+
+[lint]
+select = ["E", "F", "W", "B", "C90", "PLR", "SIM", "UP", "N"]
+ignore = ["PLR0913"]  # builders take many named settings
+
+[lint.mccabe]
+max-complexity = 8
+
+[lint.pylint]
+max-statements = 25
+max-branches = 6
+max-returns = 4
+allow-magic-value-types = ["str", "bytes"]

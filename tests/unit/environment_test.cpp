@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include "core/config.hpp"
 #include "render/environment.hpp"
 #include "test_support.hpp"
 
@@ -28,7 +29,7 @@ TEST_CASE("an environment object overrides only what it sets") {
   props["sky_horizon"] = std::string("#ff8000");
   props["fog_density"] = kFog;
   props["bloom"] = kBloom;
-  props["exposure"] = -3.0;            // negative strengths make no sense: clamped to 0
+  props["exposure"] = -3.0;                // negative strengths make no sense: clamped to 0
   props["sky_top"] = std::string("oops");  // malformed: keeps the default
   const Environment env = environment_from_props(props);
   CHECK(env.sky_horizon.x == doctest::Approx(1.0f));
@@ -78,9 +79,9 @@ TEST_CASE("lights about to be dropped are dimmed, so they do not pop when the vi
   constexpr float kRange = 5.0f;
   constexpr float kFade = 10.0f;
   const std::vector<PointLight> lights = {
-      {{10.0f, 0.0f, 0.0f}, Vec3::one(), kRange},   // well inside
-      {{28.0f, 0.0f, 0.0f}, Vec3::one(), kRange},   // 2 m before the cut: mostly faded
-      {{30.0f, 0.0f, 0.0f}, Vec3::one(), kRange},   // left out: marks the cut
+      {{10.0f, 0.0f, 0.0f}, Vec3::one(), kRange},  // well inside
+      {{28.0f, 0.0f, 0.0f}, Vec3::one(), kRange},  // 2 m before the cut: mostly faded
+      {{30.0f, 0.0f, 0.0f}, Vec3::one(), kRange},  // left out: marks the cut
   };
   const auto kept = nearest_lights(lights, Vec3::zero(), 2, kFade);
   REQUIRE(kept.size() == 2);
@@ -102,4 +103,86 @@ TEST_CASE("the picture's grade is neutral unless the environment sets one") {
   CHECK(graded.saturation == doctest::Approx(0.5f));
   CHECK(graded.grain == doctest::Approx(0.4f));
   CHECK(graded.aberration == doctest::Approx(0.7f));
+}
+
+namespace {
+
+constexpr float kSunWatts = 5.0f;      // W/m^2, as exported
+constexpr float kLampWatts = 1000.0f;  // Watts
+constexpr float kLampRange = 12.0f;    // meters
+constexpr Vec3 kLampPlace{4.0f, 3.0f, -2.0f};
+constexpr redgem::Color kWarm{1.0f, 0.5f, 0.25f, 1.0f};
+constexpr float kQuarterTurnDown = -90.0f;  // degrees around x: looking straight down
+constexpr double kTooStrong = 3.0;          // more than a 0..1 strength can be
+constexpr float kFull = 1.0f;
+constexpr std::size_t kOneLamp = 1;
+
+NodeDesc light_node(LightType type, float intensity) {
+  NodeDesc node;
+  LightDesc light;
+  light.type = type;
+  light.color = kWarm;
+  light.intensity = intensity;
+  node.light = light;
+  return node;
+}
+
+Vec3 default_sun_direction() {
+  return normalize(Vec3{config::kDefaultSunDirectionX, config::kDefaultSunDirectionY, config::kDefaultSunDirectionZ});
+}
+
+}  // namespace
+
+TEST_CASE("a scene without lights is lit by a default sun and nothing else") {
+  const SceneLights lights = scene_lights(Scene::from_desc(SceneDesc{}));
+  CHECK(approx_equal(lights.sun_direction, default_sun_direction(), kTolerance));
+  CHECK(approx_equal(lights.sun_color, Vec3::one() * config::kDefaultSunIntensity, kTolerance));
+  CHECK(lights.points.empty());
+}
+
+TEST_CASE("the first directional light is the sun, shining the way it points") {
+  SceneDesc desc;
+  NodeDesc sun = light_node(LightType::Directional, kSunWatts);
+  sun.local.rotation = quat_from_euler_degrees({kQuarterTurnDown, 0.0f, 0.0f});
+  NodeDesc second_sun = light_node(LightType::Directional, kLampWatts);
+  desc.nodes = {sun, second_sun};
+  const SceneLights lights = scene_lights(Scene::from_desc(desc));
+  CHECK(approx_equal(lights.sun_direction, -Vec3::up(), kTolerance));
+  const float strength = kSunWatts * config::kSunStrengthScale;
+  CHECK(approx_equal(lights.sun_color, Vec3{kWarm.r, kWarm.g, kWarm.b} * strength, kTolerance));
+  CHECK(lights.points.empty());  // a second sun is ignored, not turned into a lamp
+}
+
+TEST_CASE("every other light shines from where it is, as far as its range or the default one") {
+  SceneDesc desc;
+  NodeDesc lamp = light_node(LightType::Point, kLampWatts);
+  lamp.local.position = kLampPlace;
+  lamp.light->range = kLampRange;
+  NodeDesc unbounded = light_node(LightType::Point, kLampWatts);
+  desc.nodes = {lamp, unbounded};
+  const SceneLights lights = scene_lights(Scene::from_desc(desc));
+  REQUIRE(lights.points.size() == desc.nodes.size());
+  CHECK(approx_equal(lights.points[0].position, kLampPlace, kTolerance));
+  CHECK(lights.points[0].range == doctest::Approx(kLampRange));
+  const float strength = kLampWatts * config::kPointWattScale;
+  CHECK(approx_equal(lights.points[0].color, Vec3{kWarm.r, kWarm.g, kWarm.b} * strength, kTolerance));
+  CHECK(lights.points[1].range == doctest::Approx(config::kDefaultPointLightRange));
+}
+
+TEST_CASE("the lights of prefabs do not shine until they are spawned") {
+  SceneDesc desc;
+  NodeDesc lamp = light_node(LightType::Point, kLampWatts);
+  NodeDesc prefab_lamp = light_node(LightType::Point, kLampWatts);
+  prefab_lamp.props[config::kPropPrefab] = true;
+  desc.nodes = {lamp, prefab_lamp};
+  CHECK(scene_lights(Scene::from_desc(desc)).points.size() == kOneLamp);
+}
+
+TEST_CASE("strengths that go from none to full are held at full") {
+  const Environment env = environment_from_props(
+      {{"shadows", kTooStrong}, {"vignette", kTooStrong}, {"ambient_occlusion", kTooStrong}, {"bloom", kTooStrong}});
+  CHECK(env.shadows == doctest::Approx(kFull));
+  CHECK(env.vignette == doctest::Approx(kFull));
+  CHECK(env.ambient_occlusion == doctest::Approx(kFull));
+  CHECK(env.bloom == doctest::Approx(kTooStrong));  // a plain amount: as much as asked
 }
