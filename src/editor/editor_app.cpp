@@ -133,6 +133,7 @@ std::variant<std::unique_ptr<EditorApp>, std::string> EditorApp::create(const st
   settings.resizable = true;
   app->renderer_ = std::make_unique<Renderer>(settings);
   app->renderer_->upload(app->session_->scene_desc());
+  app->renderer_->set_images_dir(app->session_->game_dir() / config::kImagesDirName);
   app->viewport_ = std::make_unique<Viewport>();
   app->audio_ = create_raylib_audio();
 
@@ -272,6 +273,16 @@ void EditorApp::frame() {
   handle_shortcuts();
   update_camera();
   game_input_.enabled = viewport_->focused && session_->play_state() == PlayState::Playing;
+  game_input_.origin_x = viewport_->screen_x;
+  game_input_.origin_y = viewport_->screen_y;
+  if (Engine* runtime = session_->runtime()) {
+    runtime->set_screen(viewport_->width, viewport_->height,
+                        [this](const std::string& text, int size) { return renderer_->text_width(text, size); });
+    // A game that locks the pointer gets it while it has the focus; Esc (Stop) gives it back.
+    renderer_->set_cursor_locked(game_input_.enabled && runtime->mouse_locked());
+  } else {
+    renderer_->set_cursor_locked(false);
+  }
   session_->tick(frame_seconds());
   render_viewport_texture();
   update_title();

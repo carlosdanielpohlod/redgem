@@ -69,11 +69,18 @@ std::optional<std::string> Engine::initialize() {
   physics_ = create_jolt_physics_world(gravity());
   create_physics_bodies();
 
+  // Until a window or the editor's view says otherwise, the game is as big as its settings say.
+  const GameSettings window = read_game_settings(options_.game_dir);
+  context_.screen_width = window.window_width;
+  context_.screen_height = window.window_height;
+
   if (!options_.headless) {
     const GameSettings settings = read_game_settings(options_.game_dir);
     renderer_ = std::make_unique<Renderer>(RenderSettings{settings.window_width, settings.window_height,
                                                           settings.title, !options_.test_script});
     renderer_->upload(scene_desc_);
+    renderer_->set_images_dir(options_.game_dir / config::kImagesDirName);
+    context_.measure_text = [this](const std::string& text, int size) { return renderer_->text_width(text, size); };
   }
   if (!options_.headless && !options_.test_script) device_input_ = std::make_unique<RaylibInputSource>();
 
@@ -105,6 +112,12 @@ std::optional<std::string> Engine::initialize() {
   scripts_->attach_scripts();
   scripts_->run_scene_script(context_.scene_name);
   return std::nullopt;
+}
+
+void Engine::set_screen(int width, int height, std::function<int(const std::string&, int)> measure_text) {
+  context_.screen_width = width;
+  context_.screen_height = height;
+  context_.measure_text = std::move(measure_text);
 }
 
 AudioSystem& Engine::audio() { return options_.audio != nullptr ? *options_.audio : *owned_audio_; }
@@ -220,10 +233,26 @@ void Engine::frame(float frame_seconds) {
   context_.hud.clear();
   scripts_->start_pending();
 
-  const int steps = deterministic_ ? 1 : clock_.advance(frame_seconds);
+  if (renderer_) {
+    context_.screen_width = renderer_->screen_width();
+    context_.screen_height = renderer_->screen_height();
+    // The pointer belongs to the player while a test drives the game.
+    if (!options_.test_script) renderer_->set_cursor_locked(context_.mouse_locked);
+  }
+  // Time.scale slows or stops the simulation (0 pauses it); behaviours still get their update,
+  // with a shorter delta, so menus work while the game is paused.
+  const float scale = context_.time.scale;
+  int steps = 0;
+  if (deterministic_) {
+    pending_steps_ += scale;
+    steps = static_cast<int>(pending_steps_);
+    pending_steps_ -= static_cast<float>(steps);
+  } else {
+    steps = clock_.advance(frame_seconds * scale);
+  }
   for (int i = 0; i < steps; ++i) fixed_step(config::kFixedDeltaSeconds);
 
-  const float delta = deterministic_ ? config::kFixedDeltaSeconds : frame_seconds;
+  const float delta = (deterministic_ ? config::kFixedDeltaSeconds : frame_seconds) * scale;
   context_.time.delta = delta;
   // Every animation of the scene plays in a loop; scripts run after and may override poses.
   animation_time_ += delta;  // (restarted by load_scene, so it stays precise)

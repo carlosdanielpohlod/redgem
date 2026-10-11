@@ -4,8 +4,9 @@
 
 Knowing this up front saves time:
 
-- **Input** is keyboard only. There is no mouse or gamepad input for games.
-- **In-game interface** is text (`UI.text`). There are no buttons, images or menus.
+- **Input** is keyboard and mouse. There is no gamepad input.
+- **In-game interface** is texts, rectangles, images and buttons you draw each frame. There are no
+  text fields, sliders or layout containers.
 - **Saving progress** has no API.
 - **Particles** do not exist; small effects are objects moved by a script.
 - **Animation:** every animation in a level loops all the time. You cannot pick which one plays.

@@ -21,13 +21,23 @@ struct TimeInfo {
   float fixed_delta = 0.0f;
   double elapsed = 0.0;
   long long frame = 0;
+  // How fast game time runs (Time.scale): 0 pauses the game, 1 is normal. Menus keep working
+  // while paused: behaviours are still updated, with a delta of 0.
+  float scale = 1.0f;
 };
 
-struct HudText {
-  std::string text;
+// One thing drawn over the game this frame (UI.text, UI.rect, UI.image), in pixels from the
+// top-left corner.
+struct HudItem {
+  enum class Kind { Text, Rect, Image };
+  Kind kind = Kind::Text;
+  std::string text;  // the text, or the image's name (a file in the game's images/ folder)
   int x = 0;
   int y = 0;
-  int size = 0;
+  int width = 0;   // rectangles and images
+  int height = 0;
+  int size = 0;    // text height
+  float radius = 0.0f;  // rounded corners of a rectangle, in pixels
   Color color;
 };
 
@@ -38,7 +48,14 @@ struct ScriptContext {
   InputState* input = nullptr;
   ScriptedInputSource* test_input = nullptr;  // only set when running a system test
   TimeInfo time;
-  std::vector<HudText> hud;                    // cleared by the engine every rendered frame
+  std::vector<HudItem> hud;                    // cleared by the engine every rendered frame
+  // The size of what the game is drawn in: the window, or the editor's Scene view while playing.
+  int screen_width = 0;
+  int screen_height = 0;
+  // Width of a text in pixels at a size (the renderer's font; an estimate without one).
+  std::function<int(const std::string&, int)> measure_text;
+  // Input.mouse_locked: the pointer is hidden and kept in the window (first-person cameras).
+  bool mouse_locked = false;
   std::vector<std::string> screenshot_requests;
   bool quit_requested = false;
   // Called when a script writes a transform, so physics can follow.

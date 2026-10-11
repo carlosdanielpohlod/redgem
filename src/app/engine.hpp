@@ -67,7 +67,12 @@ class Engine {
   const SceneDesc& scene_desc() const { return scene_desc_; }
   AudioSystem& audio();
   // HUD drawn by scripts during the last frame.
-  const std::vector<HudText>& hud() const { return context_.hud; }
+  const std::vector<HudItem>& hud() const { return context_.hud; }
+  // For whoever draws a headless engine's frames (the editor's Scene view): the size of that
+  // view and how to measure the texts drawn in it. Engines with their own window know both.
+  void set_screen(int width, int height, std::function<int(const std::string&, int)> measure_text);
+  // Whether the game asked for the pointer to be hidden and kept (Input.mouse_locked = true).
+  bool mouse_locked() const { return context_.mouse_locked; }
 
  private:
   explicit Engine(const EngineOptions& options);
@@ -98,6 +103,7 @@ class Engine {
   std::unique_ptr<ScriptHost> scripts_;
   std::unique_ptr<Renderer> renderer_;
   std::unique_ptr<AudioSystem> owned_audio_;
+  float pending_steps_ = 0.0f;  // fixed steps owed while Time.scale slows a deterministic run
   int scene_generation_ = 0;
   float animation_time_ = 0.0f;  // seconds the scene's animations have been playing
   FixedClock clock_;

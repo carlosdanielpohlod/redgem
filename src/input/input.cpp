@@ -44,6 +44,15 @@ void InputState::update(const InputSource& source) {
   for (const Key key : all_keys()) {
     if (source.is_key_down(key)) current_.insert(key);
   }
+  previous_mouse_ = mouse_;
+  mouse_ = source.mouse();
+}
+
+std::optional<MouseButton> mouse_button_from_name(const std::string& name) {
+  if (name == "left") return MouseButton::Left;
+  if (name == "right") return MouseButton::Right;
+  if (name == "middle") return MouseButton::Middle;
+  return std::nullopt;
 }
 
 std::optional<float> InputState::axis(const std::string& name) const {

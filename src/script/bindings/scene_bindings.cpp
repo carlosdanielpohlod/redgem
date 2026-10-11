@@ -5,6 +5,9 @@
 #include <mruby/hash.h>
 #include <mruby/string.h>
 
+#include <cmath>
+
+#include "core/config.hpp"
 #include "core/log.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
@@ -14,6 +17,10 @@ namespace redgem {
 namespace {
 
 using namespace binding;
+
+constexpr float kHalf = 0.5f;
+constexpr float kFullSpan = 2.0f;  // a screen spans -1..1
+constexpr float kHalfSpan = 1.0f;
 
 void notify_transform_written(mrb_state* mrb, ObjectId id, TransformWrite write) {
   ScriptContext& ctx = context(mrb);
@@ -256,6 +263,28 @@ mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
 
 mrb_value camera_main(mrb_state* mrb, mrb_value) { return object_or_nil(mrb, scene(mrb).main_camera()); }
 
+// The ray that leaves the main camera through a point of the screen: [origin, direction].
+mrb_value camera_screen_ray(mrb_state* mrb, mrb_value) {
+  mrb_float x = 0.0, y = 0.0;
+  mrb_get_args(mrb, "ff", &x, &y);
+  const ScriptContext& ctx = context(mrb);
+  const ObjectId id = scene(mrb).main_camera();
+  if (id == kNoObject || ctx.screen_width <= 0 || ctx.screen_height <= 0) return mrb_nil_value();
+  const Transform world = scene(mrb).world_transform(id);
+  const float fov = scene(mrb).at(id).camera->fov_y_radians;
+  const float tan_half = std::tan((fov > 0.0f ? fov : degrees_to_radians(config::kDefaultFovYDegrees)) * kHalf);
+  const float aspect = static_cast<float>(ctx.screen_width) / static_cast<float>(ctx.screen_height);
+  // From pixels to -1..1 across the screen, up positive.
+  const float across = (static_cast<float>(x) / static_cast<float>(ctx.screen_width)) * kFullSpan - kHalfSpan;
+  const float upward = kHalfSpan - (static_cast<float>(y) / static_cast<float>(ctx.screen_height)) * kFullSpan;
+  const Vec3 direction =
+      normalize(world.forward() + world.right() * (across * tan_half * aspect) + world.up() * (upward * tan_half));
+  mrb_value ray = mrb_ary_new_capa(mrb, 2);
+  mrb_ary_push(mrb, ray, vec3_value(mrb, world.position));
+  mrb_ary_push(mrb, ray, vec3_value(mrb, direction));
+  return ray;
+}
+
 }  // namespace
 
 void install_scene_bindings(mrb_state* mrb) {
@@ -300,6 +329,7 @@ void install_scene_bindings(mrb_state* mrb) {
 
   RClass* camera_module = mrb_define_module(mrb, "Camera");
   mrb_define_module_function(mrb, camera_module, "main", camera_main, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, camera_module, "screen_ray", camera_screen_ray, MRB_ARGS_REQ(2));
 }
 
 }  // namespace redgem

@@ -13,11 +13,13 @@ class Player < Behaviour
   def start
     @spawn = transform.position
     @coins = 0
+    @total = find_all(:coin).size
   end
 
   def collect_coin
     @coins += 1
     Audio.play(:coin)
+    GameMenu.instance&.finish("You got every coin!") if @coins == @total
   end
 
   def update(_dt)
@@ -31,6 +33,6 @@ class Player < Behaviour
       transform.rotation = Vector3.new(0, Math.atan2(-direction.x, -direction.z) * DEGREES_PER_RADIAN, 0)
     end
     transform.position = @spawn if transform.position.y < FALL_LIMIT
-    UI.text("Coins: #{@coins}", x: HUD_X, y: HUD_Y, size: HUD_SIZE, color: :gold)
+    UI.text("Coins: #{@coins}/#{@total}", x: HUD_X, y: HUD_Y, size: HUD_SIZE, color: :gold)
   end
 end

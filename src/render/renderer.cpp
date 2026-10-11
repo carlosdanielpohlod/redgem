@@ -9,11 +9,16 @@
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
+#include <filesystem>
 #include <stdexcept>
+#include <string>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "editor/ui/embedded_fonts.hpp"
 #include "render/culling.hpp"
 #include "render/environment.hpp"
 #include "render/gpu_select.hpp"
@@ -123,6 +128,13 @@ struct GpuPrimitive {
 
 }  // namespace
 
+// Texts drawn by games (UI.text): rasterized at this height and scaled to the size asked for.
+constexpr int kUiFontPixels = 72;
+constexpr int kUiFirstLetter = 32;    // space
+constexpr int kUiLastLetter = 255;    // through Latin-1: accented letters
+constexpr float kUiLetterSpacing = 0.0f;  // extra space between letters, as a share of the text size
+constexpr int kUiCornerSegments = 8;
+constexpr float kDiameterPerRadius = 2.0f;
 constexpr int kNoMaterialYet = -2;  // no material index (kNoIndex is the fallback material)
 
 struct Renderer::Impl {
@@ -194,6 +206,10 @@ struct Renderer::Impl {
   // Post-processing targets, sized like the output.
   RenderTexture2D hdr{};      // the lit scene, linear HDR, with depth
   std::vector<Transform> worlds;  // every object's world transform this frame (see place_objects)
+  Font ui_font{};
+  bool owns_ui_font = false;
+  std::filesystem::path images_dir;
+  std::unordered_map<std::string, Texture2D> ui_images;  // by name; id 0 = looked for and not found
   RenderTexture2D bloom_a{};  // bright parts, blurred (ping-pong with bloom_b)
   RenderTexture2D bloom_b{};
   RenderTexture2D ldr{};      // tone mapped, luma in alpha, before anti-aliasing
@@ -290,6 +306,9 @@ struct Renderer::Impl {
     sky_material = Material{};
     if (sky_mesh.vaoId != 0) UnloadMesh(sky_mesh);
     sky_mesh = Mesh{};
+    release_ui_images();
+    if (owns_ui_font) UnloadFont(ui_font);
+    owns_ui_font = false;
     if (shadow.id != 0) {
       rlUnloadTexture(shadow.depth.id);
       rlUnloadFramebuffer(shadow.id);
@@ -625,6 +644,49 @@ struct Renderer::Impl {
     }
   }
 
+  // The font of the game's texts: the interface font, rasterized large and scaled down smoothly.
+  void load_ui_font() {
+    const fonts::EmbeddedFont inter = fonts::interface_font();
+    std::vector<int> letters;
+    for (int code = kUiFirstLetter; code <= kUiLastLetter; ++code) letters.push_back(code);
+    ui_font = LoadFontFromMemory(".ttf", inter.data, inter.size, kUiFontPixels, letters.data(), static_cast<int>(letters.size()));
+    if (ui_font.texture.id == 0) {
+      ui_font = GetFontDefault();
+      return;
+    }
+    GenTextureMipmaps(&ui_font.texture);
+    SetTextureFilter(ui_font.texture, TEXTURE_FILTER_TRILINEAR);
+    owns_ui_font = true;
+  }
+
+  // The picture UI.image asks for by name, loaded on first use. Null (reported once) when the
+  // game's images folder has no such file.
+  const Texture2D* ui_image(const std::string& name) {
+    const auto found = ui_images.find(name);
+    if (found != ui_images.end()) return found->second.id != 0 ? &found->second : nullptr;
+    Texture2D picture{};
+    for (const char* extension : {"", ".png", ".jpg", ".jpeg"}) {
+      const std::filesystem::path file = images_dir / (name + extension);
+      std::error_code fs_error;
+      if (!std::filesystem::is_regular_file(file, fs_error)) continue;
+      picture = LoadTexture(file.string().c_str());
+      break;
+    }
+    if (picture.id == 0) {
+      log::error("UI.image: no picture named '" + name + "' in " + images_dir.string());
+    } else {
+      SetTextureFilter(picture, TEXTURE_FILTER_BILINEAR);
+    }
+    return ui_images.emplace(name, picture).first->second.id != 0 ? &ui_images.at(name) : nullptr;
+  }
+
+  void release_ui_images() {
+    for (auto& [name, picture] : ui_images) {
+      if (picture.id != 0) UnloadTexture(picture);
+    }
+    ui_images.clear();
+  }
+
   // Fills bone_matrices for an object's skeleton: where each of its joints is now, times the
   // skin's inverse bind matrix. False when the object has no (usable) skeleton.
   bool pose_skeleton(const Scene& scene, const GameObject& object) {
@@ -841,6 +903,7 @@ Renderer::Renderer(const RenderSettings& settings) : impl_(std::make_unique<Impl
   SetExitKey(KEY_NULL);  // games decide when to quit
   SetTargetFPS(config::kTargetFps);
   impl_->load_shader();
+  impl_->load_ui_font();
 }
 
 Renderer::~Renderer() {
@@ -941,13 +1004,66 @@ void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const Rend
   impl_->post_process(env, output);
 }
 
-void Renderer::draw_hud(const std::vector<HudText>& hud) {
-  for (const HudText& text : hud) {
-    DrawText(text.text.c_str(), text.x, text.y, text.size, to_raylib(text.color));
+void Renderer::draw_hud(const std::vector<HudItem>& hud) {
+  for (const HudItem& item : hud) {
+    const ::Color color = to_raylib(item.color);
+    switch (item.kind) {
+      case HudItem::Kind::Text:
+        DrawTextEx(impl_->ui_font, item.text.c_str(), {static_cast<float>(item.x), static_cast<float>(item.y)},
+                   static_cast<float>(item.size), static_cast<float>(item.size) * kUiLetterSpacing, color);
+        break;
+      case HudItem::Kind::Rect: {
+        const Rectangle box{static_cast<float>(item.x), static_cast<float>(item.y), static_cast<float>(item.width),
+                            static_cast<float>(item.height)};
+        const float shorter = std::min(box.width, box.height);
+        if (item.radius > 0.0f && shorter > 0.0f) {
+          DrawRectangleRounded(box, std::min(item.radius * kDiameterPerRadius / shorter, 1.0f), kUiCornerSegments, color);
+        } else {
+          DrawRectangleRec(box, color);
+        }
+        break;
+      }
+      case HudItem::Kind::Image: {
+        const Texture2D* picture = impl_->ui_image(item.text);
+        if (picture == nullptr) break;
+        // Missing sizes follow the picture's own shape.
+        float width = static_cast<float>(item.width);
+        float height = static_cast<float>(item.height);
+        const float shape = static_cast<float>(picture->width) / static_cast<float>(picture->height);
+        if (width <= 0.0f && height <= 0.0f) width = static_cast<float>(picture->width), height = static_cast<float>(picture->height);
+        if (width <= 0.0f) width = height * shape;
+        if (height <= 0.0f) height = width / shape;
+        DrawTexturePro(*picture, {0.0f, 0.0f, static_cast<float>(picture->width), static_cast<float>(picture->height)},
+                       {static_cast<float>(item.x), static_cast<float>(item.y), width, height}, {0.0f, 0.0f}, 0.0f, color);
+        break;
+      }
+    }
   }
 }
 
-void Renderer::draw(const Scene& scene, const std::vector<HudText>& hud,
+void Renderer::set_images_dir(const std::filesystem::path& dir) {
+  impl_->release_ui_images();
+  impl_->images_dir = dir;
+}
+
+int Renderer::text_width(const std::string& text, int size) const {
+  const float text_size = static_cast<float>(size);
+  return static_cast<int>(std::ceil(MeasureTextEx(impl_->ui_font, text.c_str(), text_size, text_size * kUiLetterSpacing).x));
+}
+
+int Renderer::screen_width() const { return GetRenderWidth(); }
+int Renderer::screen_height() const { return GetRenderHeight(); }
+
+void Renderer::set_cursor_locked(bool locked) {
+  if (locked == IsCursorHidden()) return;
+  if (locked) {
+    DisableCursor();
+  } else {
+    EnableCursor();
+  }
+}
+
+void Renderer::draw(const Scene& scene, const std::vector<HudItem>& hud,
                     const std::vector<std::filesystem::path>& screenshot_paths) {
   BeginDrawing();
   draw_world(scene, impl_->camera_for(scene));

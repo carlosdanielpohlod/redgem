@@ -24,11 +24,21 @@ enum class GizmoMode { Translate, Rotate, Scale };
 // Why the editor window closed: quit, or go back to the project hub (New / Open game).
 enum class EditorExit { Quit, OpenHub };
 
-// Keyboard reaches the game only while the viewport has focus during play.
+// Keyboard and mouse reach the game only while the Scene view has focus during play. The game
+// sees the mouse in the view's own pixels, as if the view were its window.
 class GatedInputSource final : public InputSource {
  public:
   bool is_key_down(Key key) const override { return enabled && device.is_key_down(key); }
+  MouseSample mouse() const override {
+    MouseSample sample = device.mouse();
+    sample.x -= origin_x;
+    sample.y -= origin_y;
+    if (!enabled) sample.buttons = {}, sample.wheel = 0.0f;
+    return sample;
+  }
   bool enabled = false;
+  float origin_x = 0.0f;  // where the Scene view's image starts in the window
+  float origin_y = 0.0f;
   RaylibInputSource device;
 };
 

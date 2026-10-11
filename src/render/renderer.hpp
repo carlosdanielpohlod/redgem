@@ -41,11 +41,21 @@ class Renderer {
   // be called between BeginTextureMode/EndTextureMode. The scene's depth is copied to `output`,
   // so overlays drawn into it afterwards are hidden behind objects.
   void draw_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output = nullptr);
-  void draw_hud(const std::vector<HudText>& hud);
+  // Draws what scripts put on screen this frame: texts, rectangles and images.
+  void draw_hud(const std::vector<HudItem>& hud);
+  // Where UI.image looks for pictures (the game's images/ folder).
+  void set_images_dir(const std::filesystem::path& dir);
+  // Width in pixels of a text drawn by draw_hud at that size.
+  int text_width(const std::string& text, int size) const;
+  // Size of the window's drawing area.
+  int screen_width() const;
+  int screen_height() const;
+  // Hides the pointer and keeps it in the window (first-person cameras), or gives it back.
+  void set_cursor_locked(bool locked);
   // Prefabs (spawn templates) are hidden in games and shown in the editor.
   void set_show_prefabs(bool show);
   // Draws one full game frame. Screenshots requested for this frame are written to `screenshot_paths`.
-  void draw(const Scene& scene, const std::vector<HudText>& hud,
+  void draw(const Scene& scene, const std::vector<HudItem>& hud,
             const std::vector<std::filesystem::path>& screenshot_paths);
 
   bool close_requested() const;

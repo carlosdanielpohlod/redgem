@@ -34,6 +34,7 @@ class GameManager < Behaviour
   def reached_goal
     if all_coins?
       @won = true
+      GameMenu.instance&.finish("You win!")
     else
       @need_coins_until = Time.elapsed + NEED_COINS_SECONDS
     end

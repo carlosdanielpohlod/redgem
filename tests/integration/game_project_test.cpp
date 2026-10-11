@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <mruby.h>
+#include <mruby/array.h>
 #include <mruby/string.h>
 
 #include <filesystem>
@@ -79,6 +80,24 @@ TEST_CASE("the platformer template is playable") {
   REQUIRE(player != kNoObject);
   const Vec3 start = engine->scene().world_transform(player).position;
   engine->scripted_input().set_key(Key::W, true);  // forward, through the first coin
+
+  // The game opens on its title screen: nothing moves until Play is clicked.
+  for (int i = 0; i < kWalkFrames; ++i) engine->frame(config::kFixedDeltaSeconds);
+  CHECK(length(engine->scene().world_transform(player).position - start) < kMinWalk);
+  const RubyResult title = engine->scripts().eval("Scene.find('Menu').props[:title]", "title.rb");
+  REQUIRE(title.ok);
+  CHECK(std::string(RSTRING_PTR(title.value)) == dir.filename().string());  // the game's name
+  const RubyResult play = engine->scripts().eval(
+      "box = GameMenu.instance.button_box(0); [box[0] + box[2] / 2, box[1] + box[3] / 2]", "play_button.rb");
+  REQUIRE_MESSAGE(play.ok, play.error);
+  mrb_state* mrb = engine->scripts().vm().state();
+  engine->scripted_input().move_mouse(static_cast<float>(mrb_as_float(mrb, mrb_ary_entry(play.value, 0))),
+                                      static_cast<float>(mrb_as_float(mrb, mrb_ary_entry(play.value, 1))));
+  engine->scripted_input().set_mouse_button(MouseButton::Left, true);
+  engine->frame(config::kFixedDeltaSeconds);
+  engine->scripted_input().set_mouse_button(MouseButton::Left, false);
+  engine->frame(config::kFixedDeltaSeconds);
+
   for (int i = 0; i < kWalkFrames; ++i) engine->frame(config::kFixedDeltaSeconds);
   CHECK(length(engine->scene().world_transform(player).position - start) > kMinWalk);
   const RubyResult coins = engine->scripts().eval("Scene.find('Player').get_component(Player).coins", "coins.rb");

@@ -3,6 +3,7 @@
 #include <mruby.h>
 #include <mruby/string.h>
 
+#include "core/config.hpp"
 #include "core/log.hpp"
 #include "input/keys.hpp"
 #include "script/bindings/binding_helpers.hpp"
@@ -59,6 +60,33 @@ mrb_value input_action_pressed(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(*value);
 }
 
+MouseButton button_arg(mrb_state* mrb) {
+  const std::string name = name_arg(mrb);
+  const auto button = mouse_button_from_name(name);
+  if (!button) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown mouse button :%s (use :left, :right or :middle)", name.c_str());
+  return *button;
+}
+
+mrb_value input_mouse_x(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, input(mrb).mouse_x()); }
+mrb_value input_mouse_y(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, input(mrb).mouse_y()); }
+mrb_value input_mouse_dx(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, input(mrb).mouse_dx()); }
+mrb_value input_mouse_dy(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, input(mrb).mouse_dy()); }
+mrb_value input_mouse_wheel(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, input(mrb).mouse_wheel()); }
+mrb_value input_mouse_down(mrb_state* mrb, mrb_value) { return mrb_bool_value(input(mrb).mouse_down(button_arg(mrb))); }
+mrb_value input_mouse_pressed(mrb_state* mrb, mrb_value) {
+  return mrb_bool_value(input(mrb).mouse_pressed(button_arg(mrb)));
+}
+mrb_value input_mouse_released(mrb_state* mrb, mrb_value) {
+  return mrb_bool_value(input(mrb).mouse_released(button_arg(mrb)));
+}
+mrb_value input_mouse_locked(mrb_state* mrb, mrb_value) { return mrb_bool_value(context(mrb).mouse_locked); }
+mrb_value input_set_mouse_locked(mrb_state* mrb, mrb_value) {
+  mrb_bool locked = false;
+  mrb_get_args(mrb, "b", &locked);
+  context(mrb).mouse_locked = locked;
+  return mrb_bool_value(locked);
+}
+
 // --- Time ------------------------------------------------------------------------------------
 
 mrb_value time_delta(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, context(mrb).time.delta); }
@@ -66,19 +94,80 @@ mrb_value time_fixed_delta(mrb_state* mrb, mrb_value) { return mrb_float_value(m
 mrb_value time_elapsed(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, context(mrb).time.elapsed); }
 mrb_value time_frame(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, context(mrb).time.frame); }
 
+mrb_value time_scale(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, context(mrb).time.scale); }
+mrb_value time_set_scale(mrb_state* mrb, mrb_value) {
+  mrb_float scale = 1.0;
+  mrb_get_args(mrb, "f", &scale);
+  if (scale < 0.0) mrb_raise(mrb, E_ARGUMENT_ERROR, "Time.scale cannot be negative");
+  context(mrb).time.scale = static_cast<float>(scale);
+  return mrb_float_value(mrb, scale);
+}
+
 // --- UI ----------------------------------------------------------------------------------------
+
+Color color_from(mrb_int r, mrb_int g, mrb_int b, mrb_int a) {
+  return {static_cast<float>(r) / kMaxColorChannel, static_cast<float>(g) / kMaxColorChannel,
+          static_cast<float>(b) / kMaxColorChannel, static_cast<float>(a) / kMaxColorChannel};
+}
+
+mrb_value ui_rect(mrb_state* mrb, mrb_value) {
+  mrb_int x = 0, y = 0, width = 0, height = 0, r = 0, g = 0, b = 0, a = 0;
+  mrb_float radius = 0.0;
+  mrb_get_args(mrb, "iiiiiiiif", &x, &y, &width, &height, &r, &g, &b, &a, &radius);
+  HudItem item;
+  item.kind = HudItem::Kind::Rect;
+  item.x = static_cast<int>(x);
+  item.y = static_cast<int>(y);
+  item.width = static_cast<int>(width);
+  item.height = static_cast<int>(height);
+  item.radius = static_cast<float>(radius);
+  item.color = color_from(r, g, b, a);
+  context(mrb).hud.push_back(std::move(item));
+  return mrb_nil_value();
+}
+
+mrb_value ui_image(mrb_state* mrb, mrb_value) {
+  const char* name = nullptr;
+  mrb_int x = 0, y = 0, width = 0, height = 0, a = 0;
+  mrb_get_args(mrb, "ziiiii", &name, &x, &y, &width, &height, &a);
+  HudItem item;
+  item.kind = HudItem::Kind::Image;
+  item.text = name;
+  item.x = static_cast<int>(x);
+  item.y = static_cast<int>(y);
+  item.width = static_cast<int>(width);
+  item.height = static_cast<int>(height);
+  item.color = color_from(static_cast<mrb_int>(kMaxColorChannel), static_cast<mrb_int>(kMaxColorChannel),
+                          static_cast<mrb_int>(kMaxColorChannel), a);
+  context(mrb).hud.push_back(std::move(item));
+  return mrb_nil_value();
+}
+
+mrb_value ui_width(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, context(mrb).screen_width); }
+mrb_value ui_height(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, context(mrb).screen_height); }
+
+mrb_value ui_text_width(mrb_state* mrb, mrb_value) {
+  const char* text = nullptr;
+  mrb_int size = 0;
+  mrb_get_args(mrb, "zi", &text, &size);
+  const ScriptContext& ctx = context(mrb);
+  // Without a renderer (headless runs) there is no font to measure with: a usual width per letter.
+  const int width = ctx.measure_text ? ctx.measure_text(text, static_cast<int>(size))
+                                     : static_cast<int>(static_cast<float>(std::string(text).size()) *
+                                                        static_cast<float>(size) * config::kEstimatedLetterWidth);
+  return mrb_int_value(mrb, width);
+}
 
 mrb_value ui_text(mrb_state* mrb, mrb_value) {
   const char* text = nullptr;
   mrb_int x = 0, y = 0, size = 0, r = 0, g = 0, b = 0, a = 0;
   mrb_get_args(mrb, "ziiiiiii", &text, &x, &y, &size, &r, &g, &b, &a);
-  HudText hud;
+  HudItem hud;
   hud.text = text;
   hud.x = static_cast<int>(x);
   hud.y = static_cast<int>(y);
   hud.size = static_cast<int>(size);
-  hud.color = {static_cast<float>(r) / kMaxColorChannel, static_cast<float>(g) / kMaxColorChannel,
-               static_cast<float>(b) / kMaxColorChannel, static_cast<float>(a) / kMaxColorChannel};
+  hud.color = color_from(r, g, b, a);
   context(mrb).hud.push_back(std::move(hud));
   return mrb_nil_value();
 }
@@ -180,6 +269,31 @@ mrb_value test_input_set(mrb_state* mrb, mrb_value) {
   return mrb_nil_value();
 }
 
+mrb_value test_input_move_mouse(mrb_state* mrb, mrb_value) {
+  mrb_float x = 0.0, y = 0.0;
+  mrb_get_args(mrb, "ff", &x, &y);
+  test_input(mrb).move_mouse(static_cast<float>(x), static_cast<float>(y));
+  return mrb_nil_value();
+}
+
+mrb_value test_input_set_mouse_button(mrb_state* mrb, mrb_value) {
+  mrb_value name;
+  mrb_bool down = false;
+  mrb_get_args(mrb, "ob", &name, &down);
+  const std::string button_name = to_name(mrb, name);
+  const auto button = mouse_button_from_name(button_name);
+  if (!button) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown mouse button :%s", button_name.c_str());
+  test_input(mrb).set_mouse_button(*button, down);
+  return mrb_nil_value();
+}
+
+mrb_value test_input_set_mouse_wheel(mrb_state* mrb, mrb_value) {
+  mrb_float notches = 0.0;
+  mrb_get_args(mrb, "f", &notches);
+  test_input(mrb).set_mouse_wheel(static_cast<float>(notches));
+  return mrb_nil_value();
+}
+
 mrb_value test_input_down(mrb_state* mrb, mrb_value) {
   const Key key = key_arg(mrb);
   return mrb_bool_value(test_input(mrb).is_key_down(key));
@@ -200,6 +314,16 @@ void install_runtime_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, input_module, "axis", input_axis, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, input_module, "action?", input_action, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, input_module, "action_pressed?", input_action_pressed, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, input_module, "mouse_x", input_mouse_x, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, input_module, "mouse_y", input_mouse_y, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, input_module, "mouse_dx", input_mouse_dx, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, input_module, "mouse_dy", input_mouse_dy, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, input_module, "mouse_wheel", input_mouse_wheel, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, input_module, "mouse_down?", input_mouse_down, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, input_module, "mouse_pressed?", input_mouse_pressed, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, input_module, "mouse_released?", input_mouse_released, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, input_module, "mouse_locked?", input_mouse_locked, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, input_module, "mouse_locked=", input_set_mouse_locked, MRB_ARGS_REQ(1));
 
   // mruby-time already defines the Time class; the game clock lives on it as class methods.
   RClass* time_class = mrb_define_class(mrb, "Time", mrb->object_class);
@@ -207,9 +331,16 @@ void install_runtime_bindings(mrb_state* mrb) {
   mrb_define_class_method(mrb, time_class, "fixed_delta", time_fixed_delta, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, time_class, "elapsed", time_elapsed, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, time_class, "frame", time_frame, MRB_ARGS_NONE());
+  mrb_define_class_method(mrb, time_class, "scale", time_scale, MRB_ARGS_NONE());
+  mrb_define_class_method(mrb, time_class, "scale=", time_set_scale, MRB_ARGS_REQ(1));
 
   RClass* ui_module = mrb_define_module(mrb, "UI");
   mrb_define_module_function(mrb, ui_module, "__text", ui_text, MRB_ARGS_REQ(8));
+  mrb_define_module_function(mrb, ui_module, "__rect", ui_rect, MRB_ARGS_REQ(9));
+  mrb_define_module_function(mrb, ui_module, "__image", ui_image, MRB_ARGS_REQ(6));
+  mrb_define_module_function(mrb, ui_module, "__text_width", ui_text_width, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, ui_module, "width", ui_width, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, ui_module, "height", ui_height, MRB_ARGS_NONE());
 
   RClass* debug_module = mrb_define_module(mrb, "Debug");
   mrb_define_module_function(mrb, debug_module, "log", debug_log, MRB_ARGS_REQ(1));
@@ -233,6 +364,9 @@ void install_runtime_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, test_input_module, "set", test_input_set, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, test_input_module, "release_all", test_input_release_all, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, test_input_module, "down?", test_input_down, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, test_input_module, "move_mouse", test_input_move_mouse, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, test_input_module, "set_mouse_button", test_input_set_mouse_button, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, test_input_module, "set_mouse_wheel", test_input_set_mouse_wheel, MRB_ARGS_REQ(1));
 }
 
 }  // namespace redgem

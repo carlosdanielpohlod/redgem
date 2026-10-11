@@ -28,6 +28,7 @@ add_executable(redgem_tests
   integration/ruby_vm_test.cpp
   integration/engine_headless_test.cpp
   integration/scene_script_test.cpp
+  integration/ui_input_test.cpp
   integration/editor_session_test.cpp
   integration/game_project_test.cpp)
 target_link_libraries(redgem_tests PRIVATE redgem_engine doctest::doctest)

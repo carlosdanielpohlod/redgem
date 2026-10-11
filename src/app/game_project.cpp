@@ -26,6 +26,8 @@ constexpr const char* kFallbackExecutable = "play";  // for a game whose name gi
 constexpr const char* kTemplateScriptsFolder = "/scripts/";
 constexpr int kJsonIndent = 2;
 constexpr const char* kPlatformerTemplate = "platformer";
+constexpr const char* kMenuObject = "Menu";  // carries the template's game_menu.rb
+constexpr const char* kMenuTitleProp = "title";
 constexpr float kDegreesQuarter = 90.0f;
 
 // Colors (linear) and layout of the templates.
@@ -135,6 +137,9 @@ void build_platformer(SceneDocument& doc) {
   add_sun_and_camera(doc, kFollowCamera, kHeroPosition);
   const int camera = doc.desc().find_node("Camera");
   doc.set_prop(camera, config::kPropScript, std::string("follow_camera.rb"));
+  // Title screen, pause and end screen: its title is filled in when the game is created.
+  const int menu = doc.add_empty(kMenuObject);
+  doc.set_prop(menu, config::kPropScript, std::string("game_menu.rb"));
 }
 
 const std::map<std::string, std::function<void(SceneDocument&)>>& builders() {
@@ -238,7 +243,7 @@ bool create_game(const std::filesystem::path& game_dir, const std::string& templ
     return false;
   }
   for (const char* folder : {config::kScriptsDirName, config::kSoundsDirName, config::kScenesDirName,
-                             config::kModelsDirName}) {
+                             config::kModelsDirName, config::kImagesDirName}) {
     std::filesystem::create_directories(game_dir / folder);
   }
   const std::string prefix = template_name + kTemplateScriptsFolder;
@@ -256,6 +261,9 @@ bool create_game(const std::filesystem::path& game_dir, const std::string& templ
   }
   SceneDocument doc = SceneDocument::create_empty(game_dir / config::kSceneFileName);
   builder->second(doc);
+  if (const int menu = doc.desc().find_node(kMenuObject); menu != kNoIndex) {
+    doc.set_prop(menu, kMenuTitleProp, read_game_settings(game_dir).title);
+  }
   if (!doc.save(error)) return false;
   GameSettings settings = read_game_settings(game_dir);
   return write_game_settings(game_dir, settings, error);

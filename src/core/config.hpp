@@ -11,6 +11,9 @@ namespace redgem::config {
 inline constexpr int kWindowWidth = 1280;
 inline constexpr int kWindowHeight = 720;
 inline constexpr const char* kWindowTitle = "RedGem";
+// Width of a letter as a share of the text size, to estimate text widths when there is no font
+// to measure with (headless runs).
+inline constexpr float kEstimatedLetterWidth = 0.55f;
 inline constexpr int kTargetFps = 60;
 
 // --- Time ---------------------------------------------------------------------
@@ -23,6 +26,7 @@ inline constexpr int kMaxFixedStepsPerFrame = 8;
 inline constexpr const char* kSceneFileName = "scene.glb";
 // The running program's own file (Linux): what Build copies next to a game.
 inline constexpr const char* kSelfExecutable = "/proc/self/exe";
+inline constexpr const char* kImagesDirName = "images";  // pictures drawn with UI.image
 inline constexpr const char* kScriptsDirName = "scripts";
 inline constexpr const char* kSoundsDirName = "sounds";
 inline constexpr const char* kScenesDirName = "scenes";

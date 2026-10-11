@@ -32,6 +32,7 @@ automated check. Add `--headless` to run without opening a window (no screenshot
 | `t.wait(frames)` | Lets the game run |
 | `t.hold(:w, :a, frames: 60)` | Holds keys for that long |
 | `t.press(:space)` | Taps a key |
+| `t.move_mouse(x, y)`, `t.click(x, y)` | Moves the mouse; clicks there with the left button |
 | `t.hold_until(:w, frames: 300) { ... }` | Holds keys until the block is true |
 | `t.wait_until(frames: 120) { ... }` | Waits until the block is true, or fails |
 | `t.assert("message") { ... }` | Fails the test when the block is false |

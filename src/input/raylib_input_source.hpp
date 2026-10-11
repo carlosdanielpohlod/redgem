@@ -4,10 +4,11 @@
 
 namespace redgem {
 
-// Reads the real keyboard through raylib. Requires an open window.
+// Reads the real keyboard and mouse through raylib. Requires an open window.
 class RaylibInputSource final : public InputSource {
  public:
   bool is_key_down(Key key) const override;
+  MouseSample mouse() const override;
 };
 
 }  // namespace redgem

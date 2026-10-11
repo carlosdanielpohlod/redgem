@@ -53,6 +53,18 @@ class SystemTest
 
   def press(key) = hold(key, frames: 1)
 
+  def move_mouse(x, y) = TestInput.move_mouse(x.to_f, y.to_f)
+
+  # Moves the mouse there and clicks: down for a frame, up for the next (what UI.button waits for).
+  def click(x, y, button: :left)
+    move_mouse(x, y)
+    wait
+    TestInput.set_mouse_button(button, true)
+    wait
+    TestInput.set_mouse_button(button, false)
+    wait
+  end
+
   # Keeps keys down until the block is true (or fails after `frames`).
   def hold_until(*keys, frames: DEFAULT_WAIT_UNTIL_FRAMES, message: "condition not met", &condition)
     keys.each { |key| TestInput.set(key, true) }
