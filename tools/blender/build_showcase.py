@@ -10,8 +10,8 @@ Optional environment variables:
   SHOWCASE_RENDER=0    skip the Cycles render
   SHOWCASE_EXPORT=0    skip exporting the real-time version to games/showcase (opened by the editor)
   SHOWCASE_SHOT=ad     which camera: "ad" (car and people, default), "hero" (the car), "street"
-The render needs an NVIDIA RTX card (Cycles with OptiX) and the export about 4.5 GB of memory:
-close the editor first, and consider BLENDER_MEMORY_MAX=6500M (see run.sh).
+The render needs an NVIDIA RTX card (Cycles with OptiX) and the export about 7 GB of memory:
+close the editor first, and consider BLENDER_MEMORY_MAX=8500M (see run.sh).
 Everything is in meters, Blender axes: the street runs along +Y, the camera looks down it toward
 the sunset.
 """
