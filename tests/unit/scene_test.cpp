@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <cmath>
 #include <stdexcept>
 
 #include "scene/scene.hpp"
@@ -113,4 +114,23 @@ TEST_CASE("a copied character is deformed by its own bones, not the template's")
   CHECK(scene.at(copied_body).skin == 0);
   CHECK(scene.at(copied_body).joints == std::vector<ObjectId>{copied_bone, 3});
   CHECK(scene.at(2).joints == std::vector<ObjectId>{1, 3});  // the template is untouched
+}
+
+TEST_CASE("objects read their range of visible distances from props, and copies keep it") {
+  constexpr double kFrom = 15.0;
+  constexpr double kTo = 45.0;
+  SceneDesc desc;
+  NodeDesc level;
+  level.name = "CarMid";
+  level.props = {{"visible_from", kFrom}, {"visible_to", kTo}};
+  NodeDesc plain;
+  plain.name = "Plain";
+  desc.nodes = {level, plain};
+  Scene scene = Scene::from_desc(desc);
+  CHECK(scene.at(0).visible_from == doctest::Approx(kFrom));
+  CHECK(scene.at(0).visible_to == doctest::Approx(kTo));
+  CHECK(scene.at(1).visible_from == doctest::Approx(0.0));
+  CHECK(std::isinf(scene.at(1).visible_to));  // no limit unless the scene sets one
+  const ObjectId copy = scene.clone(0).front();
+  CHECK(scene.at(copy).visible_to == doctest::Approx(kTo));
 }

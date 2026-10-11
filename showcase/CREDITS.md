@@ -41,5 +41,5 @@ tools/blender/run.sh build_showcase.py showcase
 This renders with Cycles on an NVIDIA RTX card (OptiX) and then exports the playable scene to
 `games/showcase`. `SHOWCASE_PREVIEW=1` gives a quick preview, `SHOWCASE_SHOT=ad|hero|street` picks
 the camera, `SHOWCASE_RENDER=0` skips the render and `SHOWCASE_EXPORT=0` the export. The export
-needs about 4.5 GB of memory: close the editor first (`BLENDER_MEMORY_MAX=6500M` makes Blender
+needs about 7 GB of memory: close the editor first (`BLENDER_MEMORY_MAX=8500M` makes Blender
 stop instead of freezing the machine if it runs out).

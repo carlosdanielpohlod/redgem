@@ -42,4 +42,9 @@ bool too_small_to_see(Vec3 center, float radius, Vec3 viewer, float min_angle) {
   return distance > radius && radius < distance * min_angle;
 }
 
+bool outside_distance_range(Vec3 center, Vec3 viewer, float from, float to) {
+  const float distance = length(center - viewer);
+  return distance < from || distance >= to;
+}
+
 }  // namespace redgem

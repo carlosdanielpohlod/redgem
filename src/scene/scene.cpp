@@ -32,6 +32,8 @@ Scene Scene::from_desc(const SceneDesc& desc) {
     if (const auto tint = get_string(node.props, config::kPropTint)) {
       object.tint = parse_hex_color(*tint).value_or(Vec3::one());
     }
+    if (const auto from = get_number(node.props, config::kPropVisibleFrom)) object.visible_from = static_cast<float>(*from);
+    if (const auto to = get_number(node.props, config::kPropVisibleTo)) object.visible_to = static_cast<float>(*to);
     // Parents come first, so a prefab's descendants inherit the flag.
     object.prefab = get_bool(node.props, config::kPropPrefab).value_or(false) ||
                     (node.parent != kNoIndex && scene.objects_[node.parent].prefab);

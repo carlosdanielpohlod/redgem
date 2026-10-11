@@ -16,11 +16,11 @@ that happens in it is set up in `games/showcase/scripts/main_scene.rb`:
 ```bash
 python3 -I tools/assets/fetch_showcase.py      # street: Poly Haven and ambientCG (CC0)
 python3 -I tools/assets/fetch_ad_assets.py     # car and people: BlenderKit (see showcase/CREDITS.md)
-SHOWCASE_RENDER=0 BLENDER_MEMORY_MAX=6500M tools/blender/run.sh build_showcase.py showcase
+SHOWCASE_RENDER=0 BLENDER_MEMORY_MAX=8500M tools/blender/run.sh build_showcase.py showcase
 ./build/src/redgem games/showcase           # then Play: WASD drives, Space brakes
 ```
 
-The export needs about 4.5 GB of memory (close the editor first); without `SHOWCASE_RENDER=0` it
+The export needs about 7 GB of memory (close the editor first); without `SHOWCASE_RENDER=0` it
 also renders `showcase/renders/ad.png` with Cycles, which needs an NVIDIA RTX card.
 `games/city` is rebuilt
 with `tools/assets/fetch_kenney.sh` and `tools/blender/run.sh build_city.py games/city`.

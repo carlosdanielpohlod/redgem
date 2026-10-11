@@ -53,6 +53,11 @@ inline constexpr const char* kPropVisible = "visible";
 inline constexpr const char* kPropWheel = "wheel";
 inline constexpr const char* kPropPrefab = "prefab";
 inline constexpr const char* kPropTint = "tint";
+// Levels of detail: an object is drawn only while its distance from the camera (meters) is at
+// least `visible_from` and less than `visible_to`. Several versions of a model, each with its own
+// range, make a detailed one up close and a light one far away.
+inline constexpr const char* kPropVisibleFrom = "visible_from";
+inline constexpr const char* kPropVisibleTo = "visible_to";
 
 // --- Physics --------------------------------------------------------------------
 inline constexpr float kGravityY = -20.0f;

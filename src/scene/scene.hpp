@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <limits>
 #include <unordered_map>
 #include <vector>
 
@@ -31,6 +32,9 @@ struct GameObject {
   PropertyMap props;
   bool visible = true;
   Vec3 tint = Vec3::one();  // multiplies the colors of this object's mesh (prop `tint = "#rrggbb"`)
+  // Drawn only while this far from the camera, in meters (props `visible_from`, `visible_to`).
+  float visible_from = 0.0f;
+  float visible_to = std::numeric_limits<float>::infinity();
   bool prefab = false;  // a template for Scene.spawn: not simulated, not drawn
   // For objects made by clone(): the object of the loaded scene this one copies (animations of
   // the original also move its copies) and the root of the copy it belongs to.

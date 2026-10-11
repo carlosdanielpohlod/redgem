@@ -123,6 +123,8 @@ struct GpuPrimitive {
 
 }  // namespace
 
+constexpr int kNoMaterialYet = -2;  // no material index (kNoIndex is the fallback material)
+
 struct Renderer::Impl {
   RenderSettings settings;
   Shader shader{};
@@ -191,6 +193,7 @@ struct Renderer::Impl {
   Material sky_material{};
   // Post-processing targets, sized like the output.
   RenderTexture2D hdr{};      // the lit scene, linear HDR, with depth
+  std::vector<Transform> worlds;  // every object's world transform this frame (see place_objects)
   RenderTexture2D bloom_a{};  // bright parts, blurred (ping-pong with bloom_b)
   RenderTexture2D bloom_b{};
   RenderTexture2D ldr{};      // tone mapped, luma in alpha, before anti-aliasing
@@ -605,6 +608,23 @@ struct Renderer::Impl {
     sun_travel = to_raylib(sun_direction);
   }
 
+  // Where every object is in the world this frame, worked out once: each of the frame's passes
+  // (shadows, reflections, the view) would otherwise walk every object's chain of parents again.
+  void place_objects(const Scene& scene) {
+    const std::size_t count = scene.size();
+    worlds.resize(count);
+    for (std::size_t i = 0; i < count; ++i) {
+      const GameObject& object = scene.at(static_cast<ObjectId>(i));
+      if (object.destroyed) continue;
+      // Parents are created before their children, so theirs is already there (when it is not,
+      // e.g. after a reparent, ask the scene).
+      const bool parent_placed = object.parent != kNoObject && static_cast<std::size_t>(object.parent) < i;
+      worlds[i] = object.parent == kNoObject ? object.local
+                  : parent_placed          ? combine(worlds[static_cast<std::size_t>(object.parent)], object.local)
+                                           : scene.world_transform(object.id);
+    }
+  }
+
   // Fills bone_matrices for an object's skeleton: where each of its joints is now, times the
   // skin's inverse bind matrix. False when the object has no (usable) skeleton.
   bool pose_skeleton(const Scene& scene, const GameObject& object) {
@@ -616,7 +636,7 @@ struct Renderer::Impl {
     for (std::size_t j = 0; j < count; ++j) {
       if (!scene.is_alive(object.joints[j])) return false;
       bone_matrices[j] = MatrixMultiply(from_column_major(skin.inverse_bind[j]),
-                                        model_matrix(scene.world_transform(object.joints[j])));
+                                        model_matrix(worlds[static_cast<std::size_t>(object.joints[j])]));
     }
     return count > 0;
   }
@@ -626,11 +646,14 @@ struct Renderer::Impl {
   void draw_objects(const Scene& scene, bool depth_pass, Vec3 viewer, float detail_angle = 0.0f) {
     const Frustum frustum = frustum_from_matrix(MatrixToFloatV(MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection())).v);
     const float min_angle = detail_angle > 0.0f ? detail_angle : depth_pass ? kMinShadowAngle : kMinVisibleAngle;
-    for (const ObjectId id : scene.alive_ids()) {
-      const GameObject& object = scene.at(id);
-      if (object.mesh == kNoIndex || !object.visible || (object.prefab && !show_prefabs)) continue;
+    const std::size_t count = std::min(scene.size(), worlds.size());
+    int last_material = kNoMaterialYet;
+    bool last_two_sided = false;
+    for (std::size_t slot = 0; slot < count; ++slot) {
+      const GameObject& object = scene.at(static_cast<ObjectId>(slot));
+      if (object.destroyed || object.mesh == kNoIndex || !object.visible || (object.prefab && !show_prefabs)) continue;
       if (static_cast<std::size_t>(object.mesh) >= meshes.size()) continue;
-      const Transform world = scene.world_transform(id);
+      const Transform& world = worlds[slot];
       const bool skinned = pose_skeleton(scene, object);
       const Bounds& bounds = mesh_bounds[static_cast<std::size_t>(object.mesh)];
       if (bounds.valid) {
@@ -647,6 +670,9 @@ struct Renderer::Impl {
         }
         const float radius = length(bounds.max - bounds.min) * kHalfFactor * stretch;
         if (!sphere_in_frustum(frustum, center, radius) || too_small_to_see(center, radius, viewer, min_angle)) continue;
+        if (outside_distance_range(center, viewer, object.visible_from, object.visible_to)) continue;
+      } else if (outside_distance_range(world.position, viewer, object.visible_from, object.visible_to)) {
+        continue;
       }
       const Matrix transform = model_matrix(world);
 
@@ -657,7 +683,12 @@ struct Renderer::Impl {
       for (const GpuPrimitive& primitive : meshes[object.mesh]) {
         Material material = primitive.material == kNoIndex ? fallback_material : materials[primitive.material];
         if (depth_pass) material.shader = depth_shader;
-        const bool two_sided = apply_material(primitive.material, depth_pass);
+        // Consecutive parts often share a material: its uniforms are already set.
+        if (primitive.material != last_material) {
+          last_two_sided = apply_material(primitive.material, depth_pass);
+          last_material = primitive.material;
+        }
+        const bool two_sided = last_two_sided;
         if (two_sided) rlDisableBackfaceCulling();
         // Per part: a skinned object may still have parts without bone weights, which stay rigid.
         Mesh mesh = primitive.mesh;
@@ -891,6 +922,7 @@ void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const Rend
   impl_->ensure_targets(width, height);
   const Environment env = scene_environment(scene);
   const Vec3 viewer{camera.position.x, camera.position.y, camera.position.z};
+  impl_->place_objects(scene);
   impl_->apply_lights(scene, env, viewer);
   const Vector3 view_position = camera.position;
 

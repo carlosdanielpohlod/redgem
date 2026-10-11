@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <limits>
+
 #include "render/culling.hpp"
 
 using namespace redgem;
@@ -35,4 +37,24 @@ TEST_CASE("small far things are not worth drawing; near or big ones are") {
   CHECK_FALSE(too_small_to_see({0.0f, 0.0f, -100.0f}, 5.0f, viewer, kMinAngle));    // a house at 100 m
   CHECK_FALSE(too_small_to_see({0.0f, 0.0f, -2.0f}, 0.05f, viewer, kMinAngle));     // a bolt up close
   CHECK_FALSE(too_small_to_see({0.0f, 0.0f, -0.01f}, 0.05f, viewer, kMinAngle));    // the viewer is inside it
+}
+
+TEST_CASE("levels of detail are drawn only within their range of distances") {
+  constexpr float kNear = 15.0f;
+  constexpr float kFar = 45.0f;
+  const Vec3 viewer{0.0f, 2.0f, 0.0f};
+  const Vec3 close{0.0f, 2.0f, -5.0f};
+  const Vec3 middle{0.0f, 2.0f, -30.0f};
+  const Vec3 distant{0.0f, 2.0f, -80.0f};
+  // The detailed version, the middle one and the light one of the same model.
+  CHECK_FALSE(outside_distance_range(close, viewer, 0.0f, kNear));
+  CHECK(outside_distance_range(middle, viewer, 0.0f, kNear));
+  CHECK_FALSE(outside_distance_range(middle, viewer, kNear, kFar));
+  CHECK(outside_distance_range(close, viewer, kNear, kFar));
+  CHECK(outside_distance_range(distant, viewer, kNear, kFar));
+  CHECK_FALSE(outside_distance_range(distant, viewer, kFar, std::numeric_limits<float>::infinity()));
+  // Exactly at a boundary, one version shows: never both, never none.
+  const Vec3 boundary{0.0f, 2.0f, -kNear};
+  CHECK(outside_distance_range(boundary, viewer, 0.0f, kNear));
+  CHECK_FALSE(outside_distance_range(boundary, viewer, kNear, kFar));
 }

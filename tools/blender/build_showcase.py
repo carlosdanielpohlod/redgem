@@ -51,7 +51,11 @@ ENGINE_DECIMATE = {
     "concrete_road_barrier": 0.3,
     "potted_plant_02": 0.35,
 }
-ENGINE_TRAFFIC_SUBSURF_LEVELS = 1  # 0 makes the other cars four times lighter, but faceted up close
+# The car comes in three levels of detail. Up close it has one level of subdivision (2.8M
+# triangles); further away, none (a quarter of that, faceted only from near); far away, a fraction
+# of that. (near until, middle until) in meters from the camera.
+ENGINE_CAR_DETAIL_RANGES = (14.0, 45.0)
+ENGINE_CAR_FAR_KEEP = 0.15         # share of the unsubdivided car's triangles kept far away
 PARKED_TAG = "parked"
 ENGINE_SUN_DISTANCE = 100.0
 ENGINE_SUN_HEIGHT = 14.0
@@ -1205,22 +1209,61 @@ def add_traffic(model):
             other["tag"] = PARKED_TAG
 
 
-def lighter_car(car):
-    """A copy of the car without its subdivision: a quarter of the triangles, for the cars that are
-    not the player's. (Before the modifiers are baked: the copy shares the meshes, not the stack.)"""
-    light = copy_car(car, "TrafficModel")
+def lighter_car(car, name, keep):
+    """A copy of the car without its subdivision, for when it is seen from further away: a quarter
+    of the triangles, or less with `keep` below 1. (Made before the modifiers are baked: the copy
+    shares the meshes, not the stack.)"""
+    light = copy_car(car, name)
     for obj in meshes_under(light):
-        obj.data = obj.data.copy()  # its own meshes: the two cars are then cut up separately
+        obj.data = obj.data.copy()  # its own meshes: each version is cut up separately
         for modifier in obj.modifiers:
             if modifier.type == "SUBSURF":
-                modifier.levels = modifier.render_levels = ENGINE_TRAFFIC_SUBSURF_LEVELS
+                modifier.levels = modifier.render_levels = 0
+        if keep < 1.0 and len(obj.data.polygons) >= ENGINE_DECIMATE_MIN_TRIANGLES:
+            obj.modifiers.new("FarDecimate", "DECIMATE").ratio = keep
     return light
+
+
+def merge_level(car, level, visible_from, visible_to):
+    """Moves the parts of `level` (another version of the same car) under `car`, drawn only between
+    those distances from the camera."""
+    for obj in meshes_under(level):
+        obj["visible_from"] = visible_from
+        if visible_to is not None:
+            obj["visible_to"] = visible_to
+    bpy.context.view_layer.update()
+    for child in list(level.children):
+        world = child.matrix_world.copy()
+        child.parent = car
+        child.matrix_parent_inverse = car.matrix_world.inverted() @ world @ child.matrix_basis.inverted()
+    bpy.data.objects.remove(level)
+
+
+def join_by_material(objects):
+    """Joins the mesh objects that share a parent and a material: what the engine pays for is the
+    number of things it draws, far more than their triangles."""
+    groups = {}
+    for obj in objects:
+        material = obj.material_slots[0].material if obj.material_slots else None
+        groups.setdefault((obj.parent, material), []).append(obj)
+    for parts in groups.values():
+        if len(parts) < 2:
+            continue
+        bpy.ops.object.select_all(action="DESELECT")
+        for obj in parts:
+            if obj.data.users > 1:
+                obj.data = obj.data.copy()  # joining writes into the mesh: not into one others share
+            obj.select_set(True)
+        bpy.context.view_layer.objects.active = parts[0]
+        bpy.ops.object.join()
+    bpy.ops.object.select_all(action="DESELECT")
 
 
 def prepare_car(car):
     bake_modifiers(car)
     split_by_material(car)
     group_wheels(car)
+    join_by_material(meshes_under(car))  # a few dozen objects per car instead of hundreds
 
 
 def smooth_shading(car):
@@ -1240,17 +1283,20 @@ def lighten_cast():
     car = bpy.data.objects.get(root_name(HERO_CAR))
     if car is not None:
         fit_triangle_budget(car, ENGINE_CAR_TRIANGLES)
-        if ENGINE_TRAFFIC_SUBSURF_LEVELS == ENGINE_SUBSURF_LEVELS:
-            prepare_car(car)
-            add_traffic(car)  # every car shares the player's meshes
-        else:
-            model = lighter_car(car)
-            prepare_car(car)
-            prepare_car(model)
-            smooth_shading(model)
-            add_traffic(model)
-            for obj in [model] + list(model.children_recursive):
-                bpy.data.objects.remove(obj)
+        # Three versions of the car, each drawn at its own range of distances. Every car in the
+        # street is a copy of this one, so they all share the three sets of meshes.
+        near_range, mid_range = ENGINE_CAR_DETAIL_RANGES
+        middle = lighter_car(car, "CarMiddle", 1.0)
+        far = lighter_car(car, "CarFar", ENGINE_CAR_FAR_KEEP)
+        for version in (car, middle, far):
+            prepare_car(version)
+        smooth_shading(middle)
+        smooth_shading(far)
+        for obj in meshes_under(car):
+            obj["visible_to"] = near_range
+        merge_level(car, middle, near_range, mid_range)
+        merge_level(car, far, mid_range, None)
+        add_traffic(car)
         paint_car(car, ENGINE_HERO_PAINT)
         add_car_lights(car)
     for person in PEOPLE:
@@ -1329,6 +1375,16 @@ def add_leaves():
         leaf["tint"] = color
 
 
+def join_building_parts():
+    """Each building's boxes (plinth, cornice, shop band, windows, frames, awnings) become one
+    object per material."""
+    buildings = [obj for obj in bpy.data.objects if obj.name.startswith("Building") and obj.name.count("_") == 1]
+    for building in buildings:
+        prefix = building.name + "_"
+        join_by_material([obj for obj in bpy.data.objects
+                          if obj.type == "MESH" and obj.name.startswith(prefix) and obj.parent is None])
+
+
 def dress_for_engine():
     """Sunset mood with what the engine has: an environment object, a warm sun, brighter street
     lamps."""
@@ -1356,6 +1412,7 @@ def export_for_engine():
             simplify_material(material)
     decimate_scans()
     lighten_cast()
+    join_building_parts()
     # The sky's sun becomes a real light (the engine does not light with HDRIs).
     sun_location = (math.cos(SUN_TARGET_AZIMUTH) * ENGINE_SUN_DISTANCE,
                     math.sin(SUN_TARGET_AZIMUTH) * ENGINE_SUN_DISTANCE, ENGINE_SUN_HEIGHT)

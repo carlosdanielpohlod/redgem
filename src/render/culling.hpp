@@ -26,4 +26,8 @@ bool sphere_in_frustum(const Frustum& frustum, Vec3 center, float radius);
 // viewer: small parts of far objects are not worth drawing.
 bool too_small_to_see(Vec3 center, float radius, Vec3 viewer, float min_angle);
 
+// True when `center` is not within [from, to) meters of the viewer: the object's level of detail
+// is meant for another distance.
+bool outside_distance_range(Vec3 center, Vec3 viewer, float from, float to);
+
 }  // namespace redgem

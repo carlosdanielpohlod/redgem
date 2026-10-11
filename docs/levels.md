@@ -57,7 +57,9 @@ variable, or `--gpu auto|dedicated|integrated` for one run. The command line win
 environment, which wins over the saved setting.
 
 **Performance.** Objects outside the view, and parts too small to see from where the camera is, are
-not drawn.
+not drawn. What costs most is the number of separate objects on screen, more than their triangles:
+join the parts of a model that share a material, and give heavy models lighter versions for far
+away with `visible_from` and `visible_to`.
 
 ## Editing the level in Blender
 
@@ -83,6 +85,7 @@ regenerates a whole level from code; `tools/blender/scene_kit.py` has helpers to
 | `tag`      | string                                         | Used by `Scene.find_all(tag)` and `game_object.tag?` |
 | `visible`  | `false`                                        | Hide the mesh (the object still exists) |
 | `prefab`   | `true`                                         | A template: hidden and inert in the game, copied by `Scene.spawn` |
+| `visible_from`, `visible_to` | meters                          | The object is drawn only while that far from the camera: give a model a detailed version up close and a light one far away |
 | `tint`     | `"#rrggbb"`                                    | Multiplies the colors of this object's mesh (copies sharing a mesh can differ) |
 | `environment` | `true`                                      | This object's properties set the sky, fog and effects (see "Look of a scene") |
 | anything   | number / string / bool                         | Available in Ruby as `props[:name]` / `prop(:name, default)` |
