@@ -34,6 +34,8 @@ class Renderer {
   // Uploads assets added to `desc` since the last upload/sync and refreshes every material's values
   // (cheap enough to call every frame in the editor).
   void sync(const SceneDesc& desc);
+  // Uploads again the vertices of a mesh that was reshaped (a sculpted terrain).
+  void refresh_mesh(const SceneDesc& desc, int mesh);
   // Camera of the scene's main camera object (or a default one).
   Camera3D scene_camera(const Scene& scene) const;
   // Draws the scene with its environment (sky, fog) and post-processing (bloom, tone mapping,

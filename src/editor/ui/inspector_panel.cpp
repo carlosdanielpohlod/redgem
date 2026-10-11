@@ -39,12 +39,19 @@ constexpr float kAddComponentWidth = 0.7f;  // of the panel width
 constexpr float kCenter = 0.5f;
 constexpr float kNoLowerLimit = 0.0f;  // intensities, ranges, clip distances and glow are never negative
 constexpr float kPopupFieldWidth = 160.0f;
+constexpr const char* kSculptModes[] = {"Raise", "Lower", "Smooth", "Flatten"};  // in SculptMode's order
+constexpr float kMinBrushRadius = 1.0f;     // meters
+constexpr float kMaxBrushRadius = 30.0f;
+constexpr float kMinBrushStrength = 0.5f;
+constexpr float kMaxBrushStrength = 20.0f;
+constexpr float kFillWidth = -1.0f;         // ImGui: take the rest of the row
 
 // Properties edited by dedicated widgets instead of the generic list.
 const std::set<std::string>& reserved_props() {
   static const std::set<std::string> keys = {
       config::kPropScript, config::kPropBody, config::kPropCollider, config::kPropTrigger, config::kPropMass,
-      config::kPropTag,    config::kPropWheel, config::kPropVisible, config::kPropPrefab};
+      config::kPropTag,    config::kPropWheel, config::kPropVisible, config::kPropPrefab,
+      config::kPropTerrain, config::kPropTerrainSize, config::kPropTerrainCells};
   return keys;
 }
 
@@ -348,6 +355,28 @@ void remove_physics(EditorSession& session, int index) {
   session.refresh_preview();
 }
 
+// The brush that sculpts a terrain in the Scene view.
+void draw_terrain(PanelContext& context, int index) {
+  if (context.terrain == nullptr || !context.session.is_terrain(index)) return;
+  if (!component_header(ICON_FA_MOUNTAIN, "Terrain")) return;
+  TerrainTool& tool = *context.terrain;
+  property_label("Sculpt");
+  ImGui::Checkbox("##sculpt", &tool.sculpting);
+  tooltip("While on, drag the left mouse button over the terrain in the Scene view. Shift reverses Raise and Lower.");
+  property_label("Brush");
+  int mode = static_cast<int>(tool.mode);
+  ImGui::SetNextItemWidth(kFillWidth);
+  if (ImGui::Combo("##mode", &mode, kSculptModes, static_cast<int>(std::size(kSculptModes)))) {
+    tool.mode = static_cast<SculptMode>(mode);
+  }
+  property_label("Radius");
+  ImGui::SetNextItemWidth(kFillWidth);
+  ImGui::SliderFloat("##radius", &tool.radius, kMinBrushRadius, kMaxBrushRadius, "%.1f m");
+  property_label("Strength");
+  ImGui::SetNextItemWidth(kFillWidth);
+  ImGui::SliderFloat("##strength", &tool.strength, kMinBrushStrength, kMaxBrushStrength, "%.1f");
+}
+
 void draw_physics(EditorSession& session, int index) {
   const PropertyMap& props = session.document().node(index).props;
   const BodyConfig body = body_config_from_props(props);
@@ -588,6 +617,7 @@ void draw_inspector(PanelContext& context) {
     draw_mesh(session, index);
     draw_light(session, index);
     draw_camera(session, index);
+    draw_terrain(context, index);
     draw_scripts(context, index);
     draw_physics(session, index);
     draw_wheel(session, index);

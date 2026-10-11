@@ -1,5 +1,7 @@
 #include "editor/editor_session.hpp"
 
+#include <cmath>
+
 #include <algorithm>
 #include <utility>
 
@@ -18,6 +20,10 @@ std::filesystem::file_time_type write_time(const std::filesystem::path& path) {
 }
 
 // Defaults of objects created from the editor's menus.
+constexpr float kNewTerrainSize = 100.0f;   // meters across
+constexpr int kNewTerrainCells = 64;        // quads per side: about 1.5 m each
+constexpr Color kNewTerrainColor{0.33f, 0.46f, 0.25f, 1.0f};  // grass
+constexpr float kTerrainRayReach = 2000.0f;  // meters a ray is followed looking for the ground
 constexpr Color kNewShapeColor{0.8f, 0.8f, 0.8f, 1.0f};
 constexpr Color kNewLightColor{1.0f, 1.0f, 1.0f, 1.0f};
 constexpr float kNewSunIntensity = 3.0f;
@@ -97,6 +103,54 @@ ObjectId EditorSession::create_primitive(PrimitiveShape shape, Vec3 position) {
   if (play_state_ != PlayState::Editing) return kNoObject;
   const std::string name = document_->unique_name(primitive_name(shape));
   return place_new(document_->add_primitive(shape, name, kNewShapeColor), position);
+}
+
+ObjectId EditorSession::create_terrain(Vec3 position) {
+  if (play_state_ != PlayState::Editing) return kNoObject;
+  const int node = document_->add_terrain(document_->unique_name("Terrain"), {kNewTerrainSize, kNewTerrainCells},
+                                          kNewTerrainColor);
+  return place_new(node, {position.x, 0.0f, position.z});  // ground level, wherever the camera looks from
+}
+
+bool EditorSession::is_terrain(ObjectId id) const { return document_->terrain_grid(id).has_value(); }
+
+namespace {
+
+// A point of the world in an object's own space, and back.
+Vec3 to_local(const Transform& world, Vec3 point) {
+  const Vec3 offset = rotate(conjugate(world.rotation), point - world.position);
+  return {offset.x / world.scale.x, offset.y / world.scale.y, offset.z / world.scale.z};
+}
+
+Vec3 to_world(const Transform& world, Vec3 point) {
+  return world.position + rotate(world.rotation, hadamard(point, world.scale));
+}
+
+}  // namespace
+
+std::optional<Vec3> EditorSession::terrain_hit(ObjectId terrain, Vec3 origin, Vec3 direction) const {
+  const auto grid = document_->terrain_grid(terrain);
+  if (!grid) return std::nullopt;
+  const Transform world = preview_.world_transform(terrain);
+  const Vec3 local_origin = to_local(world, origin);
+  const Vec3 local_direction = normalize(to_local(world, origin + direction) - local_origin);
+  const PrimitiveDesc& ground = document_->desc().meshes[static_cast<std::size_t>(document_->node(terrain).mesh)].primitives.front();
+  const auto hit = terrain_raycast(ground, *grid, local_origin, local_direction, kTerrainRayReach);
+  if (!hit) return std::nullopt;
+  return to_world(world, *hit);
+}
+
+bool EditorSession::sculpt_terrain(ObjectId terrain, Vec3 world_point, float radius, float amount, SculptMode mode) {
+  if (play_state_ != PlayState::Editing || !document_->terrain_grid(terrain)) return false;
+  const Transform world = preview_.world_transform(terrain);
+  const Vec3 local = to_local(world, world_point);
+  // A scaled terrain: the brush is in meters of the world, the grid in its own.
+  const bool meters = mode == SculptMode::Raise || mode == SculptMode::Lower;
+  const TerrainBrush brush{local.x, local.z, radius / std::fabs(world.scale.x),
+                           meters ? amount / std::fabs(world.scale.y) : amount, mode};
+  if (!document_->sculpt_terrain(terrain, brush)) return false;
+  refresh_preview();
+  return true;
 }
 
 ObjectId EditorSession::create_light(LightType type, Vec3 position) {

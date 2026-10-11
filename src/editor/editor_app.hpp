@@ -13,6 +13,7 @@
 #include "editor/editor_session.hpp"
 #include "editor/project_files.hpp"
 #include "editor/script_workspace.hpp"
+#include "editor/ui/panels.hpp"
 #include "input/raylib_input_source.hpp"
 
 namespace redgem {
@@ -67,6 +68,12 @@ class EditorApp {
     bool bottom = true;     // Project and Console (Ctrl+J)
   };
   PanelVisibility& panels() { return panels_; }
+  // The terrain brush (what the Inspector's Terrain card edits).
+  ui::TerrainTool& terrain_tool() { return terrain_tool_; }
+  // One step of a brush stroke on the selected terrain where a ray of the Scene view meets it
+  // (viewport pixels, like pick_at); `seconds` is how long the brush was held there. Returns
+  // where it touched the ground.
+  std::optional<Vec3> sculpt_at(float x, float y, float seconds);
   // Moves a script tab into a new split on the right of its group (next frame).
   void split_script_right(const std::string& file_name);
   GizmoMode gizmo_mode() const { return gizmo_; }
@@ -128,6 +135,9 @@ class EditorApp {
   std::unique_ptr<EditorSession> session_;
   std::unique_ptr<ScriptWorkspace> scripts_;
   PanelVisibility panels_;
+  ui::TerrainTool terrain_tool_;
+  bool stroke_started_ = false;       // a brush stroke is in progress (one undo step)
+  std::optional<Vec3> brush_point_;   // where the brush is on the ground this frame, if it is over it
   std::optional<std::string> pending_split_;  // window name of a script tab to split off
   unsigned int center_dock_ = 0;              // where the Scene and new script tabs start
   unsigned int script_dock_ = 0;              // dock of the last focused script tab

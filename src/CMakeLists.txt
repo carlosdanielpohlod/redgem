@@ -44,6 +44,7 @@ add_library(redgem_engine STATIC
   scene/cgltf_impl.cpp
   scene/scene.cpp
   scene/animation.cpp
+  scene/terrain.cpp
   scene/primitives.cpp
   physics/body_config.cpp
   physics/jolt/jolt_shapes.cpp

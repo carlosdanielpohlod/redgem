@@ -10,7 +10,17 @@
 #include "editor/project_files.hpp"
 #include "editor/script_workspace.hpp"
 
+#include "scene/terrain.hpp"
+
 namespace redgem::ui {
+
+// The terrain brush: set up in the Inspector, used in the Scene view.
+struct TerrainTool {
+  bool sculpting = false;  // while on, dragging the left button over the selected terrain reshapes it
+  SculptMode mode = SculptMode::Raise;
+  float radius = 6.0f;     // meters
+  float strength = 4.0f;   // meters per second for Raise and Lower; how fast Smooth and Flatten act
+};
 
 // What every panel works with.
 struct PanelContext {
@@ -20,6 +30,7 @@ struct PanelContext {
   Vec3 spawn_point;              // where new objects appear (in front of the editor camera)
   AudioSystem* audio = nullptr;  // sound previews in the Project panel
   bool files_changed = false;    // set by panels that create files: the editor rescans the game
+  TerrainTool* terrain = nullptr;
 };
 
 // Tree of scene objects with search. Click selects, double click asks to frame it, drag to

@@ -8,6 +8,7 @@
 
 #include "app/engine.hpp"
 #include "editor/scene_document.hpp"
+#include "scene/terrain.hpp"
 #include "input/input.hpp"
 #include "scene/scene.hpp"
 
@@ -45,6 +46,15 @@ class EditorSession {
   ObjectId create_primitive(PrimitiveShape shape, Vec3 position);
   ObjectId create_light(LightType type, Vec3 position);
   ObjectId create_camera(Vec3 position);
+  // Flat ground to sculpt, centered under `position`.
+  ObjectId create_terrain(Vec3 position);
+  bool is_terrain(ObjectId id) const;
+  // Where a ray in the world meets a terrain's ground (in the world).
+  std::optional<Vec3> terrain_hit(ObjectId terrain, Vec3 origin, Vec3 direction) const;
+  // One brush stroke on a terrain around a point of the world: `radius` in meters, `amount` in
+  // meters (Raise, Lower) or as a 0..1 share (Smooth, Flatten). Call document().checkpoint() once
+  // when a stroke begins. False when nothing changed or while playing.
+  bool sculpt_terrain(ObjectId terrain, Vec3 world_point, float radius, float amount, SculptMode mode);
   // An object whose properties set the scene's sky, fog and effects (see render/environment.hpp),
   // filled with a sunset to start from. Selects the existing one if the scene already has it.
   ObjectId create_environment();

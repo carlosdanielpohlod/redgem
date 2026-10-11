@@ -1,5 +1,7 @@
 #include "editor/scene_document.hpp"
 
+#include <cstring>
+
 #include <algorithm>
 #include <cstdio>
 #include <functional>
@@ -15,6 +17,7 @@
 namespace redgem {
 namespace {
 
+constexpr float kTerrainRoughness = 0.95f;  // ground: no shine
 constexpr std::size_t kMaxUndoSteps = 200;
 constexpr int kFirstCopySuffix = 1;
 constexpr int kSuffixDigits = 3;
@@ -189,10 +192,90 @@ std::variant<SceneDocument, std::string> SceneDocument::open(const std::filesyst
 }
 
 void SceneDocument::checkpoint() {
-  undo_.push_back({desc_.nodes, desc_.materials, version_});
+  undo_.push_back(snapshot());
   if (undo_.size() > kMaxUndoSteps) undo_.erase(undo_.begin());
   redo_.clear();
   changed_since_checkpoint_ = false;
+}
+
+SceneDocument::Snapshot SceneDocument::snapshot() const {
+  Snapshot state{desc_.nodes, desc_.materials, version_, {}};
+  for (int i = 0; i < node_count(); ++i) {
+    if (!terrain_grid(i)) continue;
+    const PrimitiveDesc& ground = desc_.meshes[static_cast<std::size_t>(desc_.nodes[i].mesh)].primitives.front();
+    state.shapes[desc_.nodes[i].mesh] = {ground.positions, ground.normals};
+  }
+  return state;
+}
+
+void SceneDocument::restore_shapes(const std::map<int, MeshShape>& shapes) {
+  for (const auto& [mesh, shape] : shapes) {
+    MeshDesc& target = desc_.meshes.at(static_cast<std::size_t>(mesh));
+    PrimitiveDesc& ground = target.primitives.front();
+    if (ground.positions == shape.positions) continue;
+    ground.positions = shape.positions;
+    ground.normals = shape.normals;
+    target.bounds = mesh_bounds_of(ground);
+    changed_meshes_.insert(mesh);
+    unsaved_meshes_.insert(mesh);
+  }
+}
+
+std::optional<TerrainGrid> SceneDocument::terrain_grid(int node) const {
+  if (node < 0 || node >= node_count()) return std::nullopt;
+  const NodeDesc& desc = desc_.nodes[static_cast<std::size_t>(node)];
+  if (!get_bool(desc.props, config::kPropTerrain).value_or(false) || desc.mesh == kNoIndex) return std::nullopt;
+  const TerrainGrid grid{static_cast<float>(get_number(desc.props, config::kPropTerrainSize).value_or(0.0)),
+                         static_cast<int>(get_number(desc.props, config::kPropTerrainCells).value_or(0.0))};
+  const MeshDesc& mesh = desc_.meshes.at(static_cast<std::size_t>(desc.mesh));
+  if (mesh.primitives.size() != 1 || !grid.fits(mesh.primitives.front())) return std::nullopt;
+  return grid;
+}
+
+bool SceneDocument::sculpt_terrain(int node, const TerrainBrush& brush) {
+  const auto grid = terrain_grid(node);
+  if (!grid) return false;
+  const int mesh = desc_.nodes[static_cast<std::size_t>(node)].mesh;
+  MeshDesc& target = desc_.meshes[static_cast<std::size_t>(mesh)];
+  if (!redgem::sculpt_terrain(target.primitives.front(), *grid, brush)) return false;
+  target.bounds = mesh_bounds_of(target.primitives.front());
+  changed_meshes_.insert(mesh);
+  unsaved_meshes_.insert(mesh);
+  touch();
+  return true;
+}
+
+std::vector<int> SceneDocument::take_changed_meshes() {
+  std::vector<int> changed(changed_meshes_.begin(), changed_meshes_.end());
+  changed_meshes_.clear();
+  return changed;
+}
+
+bool SceneDocument::store_mesh_vertices(int mesh, std::string& error) {
+  const MeshDesc& source = desc_.meshes.at(static_cast<std::size_t>(mesh));
+  const PrimitiveDesc& ground = source.primitives.front();
+  const nlohmann::json& attributes = glb_.json["meshes"][static_cast<std::size_t>(mesh)]["primitives"][0]["attributes"];
+  nlohmann::json& accessors = glb_.json["accessors"];
+  const std::pair<const char*, const std::vector<float>*> streams[] = {{"POSITION", &ground.positions},
+                                                                      {"NORMAL", &ground.normals}};
+  for (const auto& [name, values] : streams) {
+    const nlohmann::json& accessor = accessors[attributes.at(name).get<std::size_t>()];
+    const nlohmann::json& view = glb_.json["bufferViews"][accessor.at("bufferView").get<std::size_t>()];
+    const std::size_t offset = view.value("byteOffset", std::size_t{0}) + accessor.value("byteOffset", std::size_t{0});
+    const std::size_t bytes = values->size() * sizeof(float);
+    const bool packed = !view.contains("byteStride") ||
+                        view["byteStride"].get<std::size_t>() == config::kFloatsPerPosition * sizeof(float);
+    if (!packed || accessor.at("count").get<std::size_t>() * config::kFloatsPerPosition != values->size() ||
+        offset + bytes > glb_.bin.size()) {
+      error = "cannot save the shape of '" + source.name + "': its vertices are not stored the way the editor writes them";
+      return false;
+    }
+    std::memcpy(glb_.bin.data() + offset, values->data(), bytes);
+  }
+  nlohmann::json& position = accessors[attributes.at("POSITION").get<std::size_t>()];
+  position["min"] = {source.bounds.min.x, source.bounds.min.y, source.bounds.min.z};
+  position["max"] = {source.bounds.max.x, source.bounds.max.y, source.bounds.max.z};
+  return true;
 }
 
 void SceneDocument::touch() {
@@ -328,10 +411,11 @@ void SceneDocument::remove(int index) {
 
 bool SceneDocument::undo() {
   if (undo_.empty()) return false;
-  redo_.push_back({std::move(desc_.nodes), desc_.materials, version_});
+  redo_.push_back(snapshot());
   desc_.nodes = std::move(undo_.back().nodes);
   refresh_node_references();
   restore_materials(undo_.back().materials);
+  restore_shapes(undo_.back().shapes);
   version_ = undo_.back().version;
   undo_.pop_back();
   changed_since_checkpoint_ = false;
@@ -340,10 +424,11 @@ bool SceneDocument::undo() {
 
 bool SceneDocument::redo() {
   if (redo_.empty()) return false;
-  undo_.push_back({std::move(desc_.nodes), desc_.materials, version_});
+  undo_.push_back(snapshot());
   desc_.nodes = std::move(redo_.back().nodes);
   refresh_node_references();
   restore_materials(redo_.back().materials);
+  restore_shapes(redo_.back().shapes);
   version_ = redo_.back().version;
   redo_.pop_back();
   changed_since_checkpoint_ = false;
@@ -686,6 +771,25 @@ int SceneDocument::add_primitive(PrimitiveShape shape, const std::string& name, 
   return append_node(std::move(node));
 }
 
+int SceneDocument::add_terrain(const std::string& name, const TerrainGrid& grid, Color color, int parent) {
+  checkpoint();
+  MaterialDesc material;
+  material.name = name;
+  material.base_color = color;
+  material.roughness = kTerrainRoughness;
+  PrimitiveDesc geometry = make_terrain(grid);
+  geometry.material = append_material(material);
+  NodeDesc node;
+  node.name = name;
+  node.parent = parent;
+  node.mesh = append_mesh(name, geometry);
+  node.props[config::kPropTerrain] = true;
+  node.props[config::kPropTerrainSize] = static_cast<double>(grid.size);
+  node.props[config::kPropTerrainCells] = static_cast<double>(grid.cells);
+  node.props[config::kPropCollider] = std::string("mesh");  // things stand on the ground as it is shaped
+  return append_node(std::move(node));
+}
+
 int SceneDocument::add_light(LightType type, const std::string& name, Color color, float intensity, int parent) {
   checkpoint();
   nlohmann::json& lights = glb_.json["extensions"][kLightsExtension]["lights"];
@@ -979,7 +1083,11 @@ bool SceneDocument::save(std::string& error) { return save_as(path_, error); }
 
 bool SceneDocument::save_as(const std::filesystem::path& path, std::string& error) {
   if (!sync_glb(error)) return false;
+  for (const int mesh : unsaved_meshes_) {
+    if (!store_mesh_vertices(mesh, error)) return false;
+  }
   if (!write_glb(path, glb_, error)) return false;
+  unsaved_meshes_.clear();
   path_ = path;
   saved_version_ = version_;
   return true;

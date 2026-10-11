@@ -308,3 +308,82 @@ TEST_CASE("scripts open in tabs that split side by side, and the side panels hid
   CHECK(app.console().error_count() == 0);
   std::filesystem::remove_all(game);
 }
+
+TEST_CASE("a terrain is created, sculpted with the brush in the Scene view, and things land on its hills") {
+  constexpr float kBrushSeconds = 1.0f;
+  constexpr float kMinHill = 2.0f;        // meters raised by a second of the default brush
+  constexpr float kDropHeight = 12.0f;
+  constexpr float kBallRadius = 0.5f;     // half of the 1 m crate
+  constexpr float kRestTolerance = 0.4f;
+  constexpr int kFallFrames = 240;
+  constexpr int kFlattenPasses = 4;
+  constexpr float kFullFlatten = 1.0f;
+  constexpr float kShoulder = 2.0f;       // meters from the middle of the plateau
+  const std::filesystem::path game = copy_game();
+  auto created = EditorApp::create(game);
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  EditorSession& session = app.session();
+  app.set_frame_seconds(config::kFixedDeltaSeconds);
+  run(app, kWarmupFrames);
+
+  // GameObject > Terrain, away from the level; the camera looks down at it.
+  const Vec3 place{200.0f, 0.0f, 0.0f};
+  const ObjectId terrain = session.create_terrain(place);
+  REQUIRE(terrain != kNoObject);
+  CHECK(session.is_terrain(terrain));
+  CHECK(session.selection() == terrain);
+  app.camera().look_at(place + Vec3{0.0f, 40.0f, 30.0f}, place);
+  run(app, kFrameFrames);
+
+  // Hovering shows where the brush is without changing anything; holding it raises the ground.
+  const float center_x = app.viewport_width() * kViewportCenter;
+  const float center_y = app.viewport_height() * kViewportCenter;
+  const auto hovered = app.sculpt_at(center_x, center_y, 0.0f);
+  REQUIRE(hovered.has_value());
+  CHECK(std::fabs(hovered->y) < kTolerance);
+  const auto still_flat = session.terrain_hit(terrain, *hovered + Vec3{0.0f, kDropHeight, 0.0f}, {0.0f, -1.0f, 0.0f});
+  REQUIRE(still_flat.has_value());
+  CHECK(std::fabs(still_flat->y) < kTolerance);  // hovering sculpts nothing
+  const auto brushed = app.sculpt_at(center_x, center_y, kBrushSeconds);
+  REQUIRE(brushed.has_value());
+  const auto peak = session.terrain_hit(terrain, *brushed + Vec3{0.0f, kDropHeight, 0.0f}, {0.0f, -1.0f, 0.0f});
+  REQUIRE(peak.has_value());
+  CHECK(peak->y > kMinHill);
+  // The Flatten brush turns the rounded top into a plateau (something to stand on).
+  for (int pass = 0; pass < kFlattenPasses; ++pass) {
+    CHECK(session.sculpt_terrain(terrain, *peak, app.terrain_tool().radius, kFullFlatten, SculptMode::Flatten));
+  }
+  const auto top = session.terrain_hit(terrain, *brushed + Vec3{0.0f, kDropHeight, 0.0f}, {0.0f, -1.0f, 0.0f});
+  REQUIRE(top.has_value());
+  const auto shoulder = session.terrain_hit(terrain, *brushed + Vec3{kShoulder, kDropHeight, 0.0f}, {0.0f, -1.0f, 0.0f});
+  REQUIRE(shoulder.has_value());
+  CHECK(top->y - shoulder->y < kRestTolerance);  // level around the middle
+  run(app, kFrameFrames);  // the renderer picks the new shape up
+  app.request_screenshot(screenshot("editor_terrain"));
+  run(app, 1);
+
+  // A crate dropped over the hill comes to rest on its top, not on the flat ground the terrain
+  // started as: the collider follows the sculpted shape.
+  const ObjectId ball = session.create_primitive(PrimitiveShape::Cube, *top + Vec3{0.0f, kDropHeight, 0.0f});
+  session.document().set_prop(ball, config::kPropBody, std::string("dynamic"));
+  session.refresh_preview();
+  app.play();
+  REQUIRE(session.play_state() == PlayState::Playing);
+  run(app, kFallFrames);
+  const ObjectId live_ball = session.scene().find(session.document().node(ball).name);
+  REQUIRE(live_ball != kNoObject);
+  const Vec3 rest = session.scene().world_transform(live_ball).position;
+  CHECK(rest.y > kMinHill * kViewportCenter);  // well above the flat ground
+  CHECK(rest.y < top->y + kBallRadius + kRestTolerance);
+  app.stop();
+
+  // Undo takes it all back: the crate and its body, then the brush strokes.
+  while (session.document().can_undo() && session.is_terrain(terrain)) session.undo();
+  session.redo();  // the terrain itself comes back, flat as it was created
+  const auto flat = session.terrain_hit(terrain, *brushed + Vec3{0.0f, kDropHeight, 0.0f}, {0.0f, -1.0f, 0.0f});
+  REQUIRE(flat.has_value());
+  CHECK(std::fabs(flat->y) < kTolerance);
+  CHECK(app.console().error_count() == 0);
+  std::filesystem::remove_all(game);
+}

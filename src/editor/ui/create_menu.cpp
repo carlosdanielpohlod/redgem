@@ -39,6 +39,8 @@ void draw_create_menu(PanelContext& context) {
     ImGui::EndMenu();
   }
   if (ImGui::MenuItem(ICON_FA_VIDEO "  Camera")) session.create_camera(at);
+  if (ImGui::MenuItem(ICON_FA_MOUNTAIN "  Terrain")) session.create_terrain(at);
+  tooltip("Ground you can sculpt: select it and turn Sculpt on in the Inspector");
   if (ImGui::MenuItem(ICON_FA_CLOUD_SUN "  Environment")) session.create_environment();
   tooltip("Sky, fog, bloom and wind of the scene, as properties (colors are #rrggbb).");
   ImGui::Separator();

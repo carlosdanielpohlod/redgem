@@ -55,6 +55,10 @@ inline constexpr const char* kPropTag = "tag";
 inline constexpr const char* kPropMass = "mass";
 inline constexpr const char* kPropVisible = "visible";
 inline constexpr const char* kPropWheel = "wheel";
+// A terrain: a square grid mesh made in the editor, whose ground can be sculpted there.
+inline constexpr const char* kPropTerrain = "terrain";
+inline constexpr const char* kPropTerrainSize = "terrain_size";    // meters across
+inline constexpr const char* kPropTerrainCells = "terrain_cells";  // quads per side
 inline constexpr const char* kPropPrefab = "prefab";
 inline constexpr const char* kPropTint = "tint";
 // Levels of detail: an object is drawn only while its distance from the camera (meters) is at

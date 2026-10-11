@@ -27,6 +27,11 @@ namespace {
 
 using namespace editor_config;
 
+constexpr float kSmoothingPerStrength = 0.5f;  // Smooth and Flatten: share of the way per second, per unit of strength
+constexpr float kBrushLift = 0.05f;            // meters the brush ring floats above the ground
+constexpr float kBrushPoleShare = 0.25f;       // height of the brush's center mark, as a share of its radius
+constexpr Vector3 kWorldRight{1.0f, 0.0f, 0.0f};
+constexpr float kQuarterTurn = 90.0f;          // degrees: lays a circle flat
 constexpr int kExitSuccess = 0;
 constexpr int kCubeCorners = 8;
 constexpr int kCubeEdges = 12;
@@ -254,6 +259,26 @@ ObjectId EditorApp::pick_at(float x, float y) {
   return hit;
 }
 
+std::optional<Vec3> EditorApp::sculpt_at(float x, float y, float seconds) {
+  const ObjectId terrain = session_->selection();
+  const Ray ray = GetScreenToWorldRayEx({x, y}, viewport_->camera, viewport_->width, viewport_->height);
+  const auto point = session_->terrain_hit(terrain, {ray.position.x, ray.position.y, ray.position.z},
+                                           normalize(Vec3{ray.direction.x, ray.direction.y, ray.direction.z}));
+  if (!point || seconds <= 0.0f) return point;
+  if (!stroke_started_) {
+    session_->document().checkpoint();  // one undo step per stroke
+    stroke_started_ = true;
+  }
+  SculptMode mode = terrain_tool_.mode;
+  if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) {  // Shift digs with Raise and piles up with Lower
+    mode = mode == SculptMode::Raise ? SculptMode::Lower : mode == SculptMode::Lower ? SculptMode::Raise : mode;
+  }
+  const bool meters = mode == SculptMode::Raise || mode == SculptMode::Lower;
+  const float amount = terrain_tool_.strength * seconds * (meters ? 1.0f : kSmoothingPerStrength);
+  session_->sculpt_terrain(terrain, *point, terrain_tool_.radius, amount, mode);
+  return point;
+}
+
 float EditorApp::viewport_width() const { return static_cast<float>(viewport_->width); }
 float EditorApp::viewport_height() const { return static_cast<float>(viewport_->height); }
 
@@ -297,6 +322,7 @@ void EditorApp::frame() {
   draw_status_bar();
   draw_dockspace();
   ui::PanelContext context{*session_, *scripts_, files_, spawn_point(), audio_.get()};
+  context.terrain = &terrain_tool_;
   if (panels_.hierarchy && ui::draw_hierarchy(context).frame_requested) frame_selection();
   if (panels_.inspector) ui::draw_inspector(context);
   if (panels_.bottom) {
@@ -477,6 +503,9 @@ void EditorApp::render_viewport_texture() {
     }
   } else {
     renderer_->sync(session_->scene_desc());  // objects and materials created in the editor
+    for (const int mesh : session_->document().take_changed_meshes()) {
+      renderer_->refresh_mesh(session_->scene_desc(), mesh);  // sculpted terrain
+    }
   }
   renderer_->draw_world(scene, view.camera, &view.target);
   BeginTextureMode(view.target);  // overlays and HUD go on top of the finished image
@@ -514,6 +543,13 @@ void EditorApp::draw_overlays() {
     const GameObject& object = scene.at(selected);
     const Bounds bounds = object.mesh != kNoIndex ? desc.meshes[object.mesh].bounds : unit_bounds();
     draw_box(scene.world_transform(selected), bounds, rgba(kSelectionColor));
+  }
+  if (brush_point_) {
+    // The brush: a ring lying on the ground, and its center.
+    DrawCircle3D(rl(*brush_point_ + Vec3::up() * kBrushLift), terrain_tool_.radius, kWorldRight, kQuarterTurn,
+                 rgba(kSelectionColor));
+    DrawLine3D(rl(*brush_point_), rl(*brush_point_ + Vec3::up() * terrain_tool_.radius * kBrushPoleShare),
+               rgba(kSelectionColor));
   }
 }
 
@@ -830,7 +866,21 @@ void EditorApp::draw_viewport_window() {
     draw->AddRect(origin, end, ImGui::GetColorU32(ui::accent_color()), 0.0f, 0, kPlayBorderThickness);
   }
 
-  if (!playing) {
+  // Sculpting takes the left button over from the gizmo and from picking.
+  const bool sculpting = !playing && terrain_tool_.sculpting && session_->is_terrain(session_->selection());
+  brush_point_.reset();
+  if (sculpting) {
+    const Vector2 mouse = GetMousePosition();
+    const bool brushing = view.hovered && ImGui::IsMouseDown(ImGuiMouseButton_Left);
+    if (view.hovered) {
+      brush_point_ = sculpt_at(mouse.x - origin.x, mouse.y - origin.y, brushing ? frame_seconds() : 0.0f);
+    }
+    if (!brushing && stroke_started_) {
+      stroke_started_ = false;
+      session_->document().drop_checkpoint_if_unchanged();
+    }
+  } else if (!playing) {
+    stroke_started_ = false;
     if (session_->selection() != kNoObject) draw_gizmo(origin.x, origin.y, image_size.x, image_size.y);
     if (view.hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGuizmo::IsOver() && !ImGuizmo::IsUsing()) {
       const Vector2 mouse = GetMousePosition();

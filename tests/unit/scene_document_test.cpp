@@ -717,3 +717,63 @@ TEST_CASE("a duplicated character has its own skeleton, also after the original 
   CHECK(joint_names(loaded.scene, "Arm.001") == std::vector<std::string>{"Lower.001", "Upper.001"});
   std::filesystem::remove(out);
 }
+
+TEST_CASE("a terrain is sculpted, undone, saved and read back with its shape") {
+  constexpr TerrainGrid kGrid{40.0f, 20};
+  constexpr Color kGrass{0.3f, 0.5f, 0.2f, 1.0f};
+  constexpr float kLift = 3.0f;
+  constexpr TerrainBrush kHill{0.0f, 0.0f, 6.0f, kLift, SculptMode::Raise};
+  const std::filesystem::path path = temp_copy_path("terrain");
+  SceneDocument doc = SceneDocument::create_empty(path);
+  const int terrain = doc.add_terrain("Terrain", kGrid, kGrass);
+  REQUIRE(doc.terrain_grid(terrain).has_value());
+  CHECK(doc.terrain_grid(terrain)->cells == kGrid.cells);
+  CHECK(std::get<std::string>(doc.node(terrain).props.at("collider")) == "mesh");
+  const int mesh = doc.node(terrain).mesh;
+  const auto height = [&doc, mesh, &kGrid] {
+    return terrain_height(doc.desc().meshes[static_cast<std::size_t>(mesh)].primitives.front(), kGrid, 0.0f, 0.0f);
+  };
+  const int cube = doc.add_primitive(PrimitiveShape::Cube, "Crate", kGrass);
+  CHECK_FALSE(doc.terrain_grid(cube).has_value());
+  CHECK_FALSE(doc.sculpt_terrain(cube, kHill));  // only terrains are sculpted
+  std::string error;
+  REQUIRE_MESSAGE(doc.save(error), error);
+  const auto flat_size = std::filesystem::file_size(path);
+  doc.take_changed_meshes();
+
+  // One stroke, streamed in two steps, is one undo step.
+  doc.checkpoint();
+  REQUIRE(doc.sculpt_terrain(terrain, kHill));
+  REQUIRE(doc.sculpt_terrain(terrain, kHill));
+  CHECK(height() == doctest::Approx(kLift * 2.0f));
+  CHECK(doc.dirty());
+  CHECK(doc.take_changed_meshes() == std::vector<int>{mesh});  // the renderer is told once
+  CHECK(doc.take_changed_meshes().empty());
+  CHECK(doc.desc().meshes[static_cast<std::size_t>(mesh)].bounds.max.y == doctest::Approx(kLift * 2.0f));
+
+  REQUIRE(doc.undo());
+  CHECK(height() == doctest::Approx(0.0f));
+  CHECK(doc.take_changed_meshes() == std::vector<int>{mesh});
+  REQUIRE(doc.redo());
+  CHECK(height() == doctest::Approx(kLift * 2.0f));
+
+  // Saving writes the new shape over the old one: the file does not grow, and loads sculpted.
+  REQUIRE_MESSAGE(doc.save(error), error);
+  CHECK(std::filesystem::file_size(path) == flat_size);
+  const LoadResult loaded = load_gltf_scene(path.string());
+  REQUIRE(loaded.ok);
+  const int node = loaded.scene.find_node("Terrain");
+  REQUIRE(node != kNoIndex);
+  const MeshDesc& saved = loaded.scene.meshes[static_cast<std::size_t>(loaded.scene.nodes[static_cast<std::size_t>(node)].mesh)];
+  CHECK(terrain_height(saved.primitives.front(), kGrid, 0.0f, 0.0f) == doctest::Approx(kLift * 2.0f));
+  CHECK(saved.bounds.max.y == doctest::Approx(kLift * 2.0f));
+
+  // Opened again, it is still a terrain that can be sculpted.
+  auto reopened = SceneDocument::open(path);
+  REQUIRE(std::holds_alternative<SceneDocument>(reopened));
+  SceneDocument& again = std::get<SceneDocument>(reopened);
+  const int same = again.desc().find_node("Terrain");
+  REQUIRE(again.terrain_grid(same).has_value());
+  CHECK(again.sculpt_terrain(same, {0.0f, 0.0f, 6.0f, 1.0f, SculptMode::Lower}));
+  std::filesystem::remove(path);
+}

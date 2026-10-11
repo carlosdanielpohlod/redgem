@@ -21,7 +21,8 @@ icons):
   Light (type, color, intensity, range), Camera (field of view, clipping), one card per Ruby script,
   Physics (body, trigger, collider, mass), vehicle wheels and custom properties. **Add Component**
   adds scripts (existing or new), a physics body, a trigger or a property.
-* **GameObject menu**: empty objects, cube / sphere / plane / cylinder / capsule (with colliders),
+* **GameObject menu**: terrain you sculpt with a brush (see [Levels](levels.md#terrain)), empty
+  objects, cube / sphere / plane / cylinder / capsule (with colliders),
   directional / point / spot lights, cameras, and models from `models/`.
 * **Project**: the game's scripts, models, sounds and scenes. Double click a script to edit it, a
   model to add it to the scene, a sound to hear it. *New script* creates a `Behaviour` from a

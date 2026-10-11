@@ -135,6 +135,9 @@ constexpr int kUiLastLetter = 255;    // through Latin-1: accented letters
 constexpr float kUiLetterSpacing = 0.0f;  // extra space between letters, as a share of the text size
 constexpr int kUiCornerSegments = 8;
 constexpr float kDiameterPerRadius = 2.0f;
+// raylib's vertex buffer slots for a mesh's positions and normals.
+constexpr int kPositionBuffer = 0;
+constexpr int kNormalBuffer = 2;
 constexpr int kNoLocation = -1;       // a uniform the shader does not have
 constexpr int kTriangleCorners = 3;
 constexpr float kMaxColorByte = 255.0f;
@@ -1052,6 +1055,24 @@ void Renderer::sync(const SceneDesc& desc) {
     impl_->meshes.push_back(std::move(primitives));
     impl_->mesh_bounds.push_back(mesh_desc.bounds);
   }
+}
+
+void Renderer::refresh_mesh(const SceneDesc& desc, int mesh) {
+  if (mesh < 0 || static_cast<std::size_t>(mesh) >= impl_->meshes.size() ||
+      static_cast<std::size_t>(mesh) >= desc.meshes.size()) {
+    return;
+  }
+  const MeshDesc& source = desc.meshes[static_cast<std::size_t>(mesh)];
+  std::vector<GpuPrimitive>& parts = impl_->meshes[static_cast<std::size_t>(mesh)];
+  for (std::size_t i = 0; i < std::min(parts.size(), source.primitives.size()); ++i) {
+    const PrimitiveDesc& primitive = source.primitives[i];
+    // Same vertices in the same order, only moved: write over the buffers already on the card.
+    if (static_cast<int>(primitive.positions.size() / config::kFloatsPerPosition) != parts[i].mesh.vertexCount) continue;
+    const int bytes = static_cast<int>(primitive.positions.size() * sizeof(float));
+    UpdateMeshBuffer(parts[i].mesh, kPositionBuffer, primitive.positions.data(), bytes, 0);
+    UpdateMeshBuffer(parts[i].mesh, kNormalBuffer, primitive.normals.data(), bytes, 0);
+  }
+  impl_->mesh_bounds[static_cast<std::size_t>(mesh)] = source.bounds;
 }
 
 Camera3D Renderer::scene_camera(const Scene& scene) const { return impl_->camera_for(scene); }

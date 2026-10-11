@@ -61,6 +61,28 @@ not drawn. What costs most is the number of separate objects on screen, more tha
 join the parts of a model that share a material, and give heavy models lighter versions for far
 away with `visible_from` and `visible_to`.
 
+## Terrain
+
+**GameObject > Terrain** adds a square of ground, 100 m across, that you shape with a brush.
+
+1. Select the terrain. In the Inspector's **Terrain** card, tick **Sculpt**.
+2. Drag the left mouse button over the ground in the Scene view. A ring shows the brush.
+3. Pick what the brush does:
+
+| Brush | Effect |
+|-------|--------|
+| Raise | Piles ground up under the brush (hold Shift to dig instead) |
+| Lower | Digs (hold Shift to pile up) |
+| Smooth | Softens bumps and edges |
+| Flatten | Levels the ground to the height at the brush's center: plateaus, roads |
+
+*Radius* is the size of the brush in meters, *Strength* how fast it works. Each stroke is one
+undo step. Untick Sculpt to select and move objects again.
+
+The terrain's collider follows its shape, so characters walk and things roll on the hills you
+make. Its color and roughness are in the Mesh card, like any object's. A terrain is made and
+shaped in the editor; one re-exported from Blender is an ordinary mesh.
+
 ## Editing the level in Blender
 
 ```bash

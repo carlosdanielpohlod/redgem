@@ -1,6 +1,9 @@
 #pragma once
 
 #include <filesystem>
+#include <map>
+#include <optional>
+#include <set>
 #include <string>
 #include <variant>
 #include <vector>
@@ -8,6 +11,7 @@
 #include "editor/glb_file.hpp"
 #include "scene/primitives.hpp"
 #include "scene/scene_desc.hpp"
+#include "scene/terrain.hpp"
 
 namespace redgem {
 
@@ -50,6 +54,15 @@ class SceneDocument {
   int add_primitive(PrimitiveShape shape, const std::string& name, Color color, int parent = kNoIndex);
   int add_light(LightType type, const std::string& name, Color color, float intensity, int parent = kNoIndex);
   int add_camera(const std::string& name, float fov_y_radians, int parent = kNoIndex);
+  // A terrain: flat ground of `color` that can be sculpted, with a collider that follows its shape.
+  int add_terrain(const std::string& name, const TerrainGrid& grid, Color color, int parent = kNoIndex);
+  // The grid of a terrain node; nullopt when the node is not a terrain made here.
+  std::optional<TerrainGrid> terrain_grid(int node) const;
+  // One brush stroke on a terrain, in the terrain's own space. Like a gizmo drag, it is not
+  // recorded by itself: call checkpoint() once when a stroke begins. False when nothing changed.
+  bool sculpt_terrain(int node, const TerrainBrush& brush);
+  // Meshes reshaped since the last call (the renderer has to upload their vertices again).
+  std::vector<int> take_changed_meshes();
   // Moves a node (and its children) under `new_parent` (kNoIndex = scene root), keeping its world
   // placement. Returns the node's new index (nodes keep parents before children). Refuses cycles
   // and invalid indices (returns `index` unchanged).
@@ -84,14 +97,26 @@ class SceneDocument {
   std::string unique_name(const std::string& base) const;
 
  private:
+  // The vertices of a mesh that can be reshaped (a terrain).
+  struct MeshShape {
+    std::vector<float> positions;
+    std::vector<float> normals;
+  };
   struct Snapshot {
     std::vector<NodeDesc> nodes;
     std::vector<MaterialDesc> materials;
     long long version = 0;
+    std::map<int, MeshShape> shapes;  // of every terrain, by mesh index
   };
 
   SceneDocument() = default;
   void touch();
+  Snapshot snapshot() const;
+  // Puts the terrains back as a snapshot had them.
+  void restore_shapes(const std::map<int, MeshShape>& shapes);
+  // Writes a reshaped mesh's vertices over its old ones in the binary chunk (same count, so the
+  // file does not grow).
+  bool store_mesh_vertices(int mesh, std::string& error);
   bool sync_glb(std::string& error);
   // Writes every node's light and camera into the glTF arrays (copies get their own entry).
   void sync_lights_and_cameras();
@@ -133,6 +158,8 @@ class SceneDocument {
   long long next_version_ = 0;
   long long saved_version_ = 0;
   bool changed_since_checkpoint_ = false;
+  std::set<int> changed_meshes_;  // reshaped since the renderer last asked
+  std::set<int> unsaved_meshes_;  // reshaped since the last save
 };
 
 }  // namespace redgem

@@ -21,6 +21,7 @@ add_executable(redgem_tests
   unit/environment_test.cpp
   unit/gpu_select_test.cpp
   unit/culling_test.cpp
+  unit/terrain_test.cpp
   unit/animation_test.cpp
   unit/user_settings_test.cpp
   integration/physics_world_test.cpp
