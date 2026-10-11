@@ -16,6 +16,7 @@
 #include "scene/particles.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
+#include "app/game_project.hpp"
 #include "app/save_store.hpp"
 #include "script/script_context.hpp"
 #include "script/script_host.hpp"
@@ -92,18 +93,55 @@ class Engine {
  private:
   explicit Engine(const EngineOptions& options);
 
+  // Starting up, in this order.
   std::optional<std::string> initialize();
+  std::optional<std::string> load_first_scene();
+  void build_world();
+  void open_window(GameSettings settings);
+  void open_audio();
+  void open_saves();
+  void fill_context(const std::string& game_title);
+  void connect_context();
+  std::optional<std::string> start_scripts();
+  std::optional<std::string> load_system_test();
+
   void create_physics_bodies();
   std::filesystem::path scene_path(const std::string& name) const;
   void load_scene(const std::string& name);
+  // Makes a scene that was loaded the one that runs, under `name`.
+  void switch_to(const std::string& name, SceneDesc desc);
+  // Puts a newly loaded scene, with its bodies, in place of the running one.
+  void replace_world(SceneDesc desc);
   void create_body(ObjectId id);
+  BodyDesc describe_body(ObjectId id, BodyConfig config) const;
+  // An object's mesh bounds, or the default collider's when it has no mesh.
+  Bounds bounds_of(const GameObject& object) const;
   std::vector<WheelDesc> collect_wheels(ObjectId vehicle) const;
+  WheelDesc describe_wheel(ObjectId child, const Transform& chassis) const;
+
+  // The parts of a frame, in the order frame() runs them.
+  void read_input();
+  const InputSource& input_source() const;
+  void poll_network(float frame_seconds);
+  void follow_window();
+  void advance_game(float frame_seconds);
+  // Fixed steps to run this frame, with the game's time scaled by `scale`.
+  int fixed_steps_due(float frame_seconds, float scale);
+  void update_frame(float delta);
+  void switch_scene_if_asked();
+
   void fixed_step(float dt);
   void push_poses_to_physics();
   void pull_poses_from_physics();
+  void follow_body(ObjectId id, const Transform& pose, BodyType type);
+  // Moves and turns an object to where physics has it, keeping its scale.
+  void move_to(ObjectId id, const Transform& pose);
   void process_destroyed();
   void on_transform_written(ObjectId id, TransformWrite write);
+  bool test_ended() const;
   void tick_system_test();
+  void heed_test_status(const std::string& status);
+  void fail_test(const std::string& why);
   void render();
 
   EngineOptions options_;

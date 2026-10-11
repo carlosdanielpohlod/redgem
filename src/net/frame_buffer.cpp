@@ -8,6 +8,22 @@ constexpr std::size_t kLengthBytes = 4;
 constexpr int kBitsPerByte = 8;
 constexpr std::uint32_t kByteMask = 0xFF;
 
+// The length the first bytes of a stream announce.
+std::size_t announced_length(const std::vector<std::uint8_t>& bytes) {
+  std::size_t length = 0;
+  for (std::size_t i = 0; i < kLengthBytes; ++i) length = (length << kBitsPerByte) | bytes[i];
+  return length;
+}
+
+// Takes the first message, `length` long, off the front of the stream.
+std::string take_message(std::vector<std::uint8_t>& bytes, std::size_t length) {
+  const auto first = bytes.begin() + static_cast<std::ptrdiff_t>(kLengthBytes);
+  const auto last = first + static_cast<std::ptrdiff_t>(length);
+  std::string message(first, last);
+  bytes.erase(bytes.begin(), last);
+  return message;
+}
+
 }  // namespace
 
 std::vector<std::uint8_t> frame(const std::string& message) {
@@ -28,18 +44,14 @@ void FrameBuffer::append(const std::uint8_t* bytes, std::size_t count) {
 
 std::optional<std::string> FrameBuffer::next() {
   if (broken_ || bytes_.size() < kLengthBytes) return std::nullopt;
-  std::size_t length = 0;
-  for (std::size_t i = 0; i < kLengthBytes; ++i) length = (length << kBitsPerByte) | bytes_[i];
+  const std::size_t length = announced_length(bytes_);
   if (length > kMaxFrameBytes) {
     broken_ = true;
     bytes_.clear();
     return std::nullopt;
   }
   if (bytes_.size() < kLengthBytes + length) return std::nullopt;
-  const auto first = bytes_.begin() + static_cast<std::ptrdiff_t>(kLengthBytes);
-  std::string message(first, first + static_cast<std::ptrdiff_t>(length));
-  bytes_.erase(bytes_.begin(), first + static_cast<std::ptrdiff_t>(length));
-  return message;
+  return take_message(bytes_, length);
 }
 
 }  // namespace redgem::net

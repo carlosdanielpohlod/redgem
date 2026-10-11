@@ -13,7 +13,33 @@ namespace {
 constexpr const char* kSavesFolder = "saves";
 constexpr const char* kSaveExtension = ".json";
 constexpr const char* kTestSavesFolder = "redgem-test-saves";
+constexpr const char* kPartialSuffix = ".part";  // of a save still being written
 constexpr int kIndent = 2;
+
+// What a save file holds under one key, when it is something a game can save.
+std::optional<PropertyValue> saved_value(const nlohmann::json& value) {
+  if (value.is_boolean()) return PropertyValue(value.get<bool>());
+  if (value.is_number()) return PropertyValue(value.get<double>());
+  if (value.is_string()) return PropertyValue(value.get<std::string>());
+  return std::nullopt;
+}
+
+nlohmann::json as_json(const std::map<std::string, PropertyValue>& values) {
+  nlohmann::json json = nlohmann::json::object();
+  for (const auto& [key, value] : values) {
+    std::visit([&json, &key = key](const auto& held) { json[key] = held; }, value);
+  }
+  return json;
+}
+
+// False when not all of the text reached the disk.
+bool write_whole(const std::filesystem::path& file, const std::string& text) {
+  std::ofstream out(file);
+  if (!out) return false;
+  out << text;
+  out.close();  // a full disk shows here: the file being replaced must not be lost to half a one
+  return static_cast<bool>(out);
+}
 
 }  // namespace
 
@@ -39,39 +65,18 @@ void SaveStore::load() {
     return;
   }
   for (const auto& [key, value] : json.items()) {
-    if (value.is_boolean()) {
-      values_[key] = value.get<bool>();
-    } else if (value.is_number()) {
-      values_[key] = value.get<double>();
-    } else if (value.is_string()) {
-      values_[key] = value.get<std::string>();
-    }
+    if (const auto kept = saved_value(value)) values_[key] = *kept;
   }
 }
 
 bool SaveStore::write() const {
-  nlohmann::json json = nlohmann::json::object();
-  for (const auto& [key, value] : values_) {
-    if (const auto* flag = std::get_if<bool>(&value)) {
-      json[key] = *flag;
-    } else if (const auto* number = std::get_if<double>(&value)) {
-      json[key] = *number;
-    } else {
-      json[key] = std::get<std::string>(value);
-    }
-  }
   std::error_code fs_error;
   std::filesystem::create_directories(file_.parent_path(), fs_error);
   // Written beside the file and moved over it: a crash mid-write never leaves half a save.
-  const std::filesystem::path partial = file_.string() + ".part";
-  {
-    std::ofstream out(partial);
-    if (!out) return false;
-    // (Text that is not valid UTF-8 is saved with the broken parts replaced, instead of not at all.)
-    out << json.dump(kIndent, ' ', false, nlohmann::json::error_handler_t::replace) << "\n";
-    out.close();  // a full disk shows here: the file being replaced must not be lost to half a one
-    if (!out) return false;
-  }
+  const std::filesystem::path partial = file_.string() + kPartialSuffix;
+  // (Text that is not valid UTF-8 is saved with the broken parts replaced, instead of not at all.)
+  const std::string text = as_json(values_).dump(kIndent, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
+  if (!write_whole(partial, text)) return false;
   std::filesystem::rename(partial, file_, fs_error);
   return !fs_error;
 }
@@ -104,6 +109,7 @@ bool SaveStore::clear() {
 std::vector<std::string> SaveStore::keys() {
   load();
   std::vector<std::string> names;
+  names.reserve(values_.size());
   for (const auto& [key, value] : values_) names.push_back(key);
   return names;
 }

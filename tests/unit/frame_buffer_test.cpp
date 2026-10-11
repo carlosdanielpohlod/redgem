@@ -51,3 +51,34 @@ TEST_CASE("a message announced as longer than allowed breaks the buffer for good
   buffer.append(fine.data(), fine.size());
   CHECK_FALSE(buffer.next().has_value());
 }
+
+TEST_CASE("an empty message and the longest one allowed both come back whole") {
+  FrameBuffer buffer;
+  const std::vector<std::uint8_t> empty = frame("");
+  CHECK(empty.size() == kLengthBytes);
+  buffer.append(empty.data(), empty.size());
+  CHECK(buffer.next() == std::string());
+  const std::string longest(kMaxFrameBytes, 'x');
+  const std::vector<std::uint8_t> bytes = frame(longest);
+  buffer.append(bytes.data(), bytes.size());
+  CHECK(buffer.next() == longest);
+  CHECK_FALSE(buffer.broken());
+}
+
+TEST_CASE("one byte more than allowed breaks the buffer before any of the message is kept") {
+  FrameBuffer buffer;
+  const std::vector<std::uint8_t> bytes = frame(std::string(kMaxFrameBytes + 1, 'x'));
+  buffer.append(bytes.data(), kLengthBytes);
+  CHECK_FALSE(buffer.next().has_value());
+  CHECK(buffer.broken());
+}
+
+TEST_CASE("a length still arriving is waited for") {
+  FrameBuffer buffer;
+  const std::vector<std::uint8_t> bytes = frame("late");
+  buffer.append(bytes.data(), kLengthBytes - 1);
+  CHECK_FALSE(buffer.next().has_value());
+  CHECK_FALSE(buffer.broken());
+  buffer.append(bytes.data() + kLengthBytes - 1, bytes.size() - (kLengthBytes - 1));
+  CHECK(buffer.next() == std::string("late"));
+}

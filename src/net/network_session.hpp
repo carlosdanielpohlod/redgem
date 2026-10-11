@@ -72,7 +72,7 @@ class NetworkSession {
     Socket socket;
     FrameBuffer incoming;
     std::vector<std::uint8_t> outgoing;
-    int peer = 0;            // 0 on the host until the newcomer said hello and was let in
+    int peer = 0;              // 0 on the host until the newcomer said hello and was let in
     float waiting_for = 0.0f;  // seconds a newcomer has kept the host waiting for that hello
     float quiet_for = 0.0f;    // seconds since anything arrived from it
     float since_said = 0.0f;   // seconds since anything was sent to it
@@ -82,6 +82,10 @@ class NetworkSession {
   bool connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello, std::string& error);
   // Whether this machine passes the others' messages on itself (a host reached directly).
   bool relaying() const { return id_ == kHostId && !through_relay_; }
+  void announce_hosting(std::vector<NetworkEvent>& events);
+  // One link's turn in a poll: what arrived is read and handled, what waits is sent.
+  void serve(Link& link, float seconds, std::vector<NetworkEvent>& events);
+  void receive_newcomers(float seconds);
   void accept_newcomers();
   void admit(Link& link, std::vector<NetworkEvent>& events);
   void drop_silent_newcomers(float seconds);
@@ -92,8 +96,20 @@ class NetworkSession {
   void pump(Link& link);
   void handle(Link& link, const std::string& text, std::vector<NetworkEvent>& events);
   void handle_as_host(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  void hear_newcomer(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  // Sends a peer's message on to whom it is for; true when that includes this machine.
+  bool pass_on(int from, int to, const nlohmann::json& message);
   void handle_as_guest(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  void accept_welcome(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  void hear_game_message(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  void peer_arrived(int peer, std::vector<NetworkEvent>& events);
+  void peer_left(int peer, std::vector<NetworkEvent>& events);
   void drop_closed_links(std::vector<NetworkEvent>& events);
+  void end_game_if_host_gone(std::vector<NetworkEvent>& events);
+  // Forgets the links that closed; whose they were, in the order they were held (0: never let in).
+  std::vector<int> take_closed_links();
+  bool send_through_host(const nlohmann::json& message, int to);
+  bool send_as_host(const nlohmann::json& message, int to);
   void queue(Link& link, const nlohmann::json& message);
   void queue_for_everyone_but(int peer, const nlohmann::json& message);
   Link* link_to(int peer);
@@ -104,8 +120,8 @@ class NetworkSession {
   std::uint16_t port_ = 0;
   float connecting_for_ = 0.0f;
   bool announce_hosting_ = false;
-  bool through_relay_ = false;   // the game is a room on a relay
-  bool opening_room_ = false;    // ... which this machine asked to open
+  bool through_relay_ = false;  // the game is a room on a relay
+  bool opening_room_ = false;   // ... which this machine asked to open
   std::string room_;
   Socket listener_;
   std::vector<Link> links_;

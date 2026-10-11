@@ -35,6 +35,8 @@ add_executable(redgem_tests
   unit/touch_controls_test.cpp
   unit/android_package_test.cpp
   unit/frame_buffer_test.cpp
+  unit/wire_test.cpp
+  unit/lan_discovery_test.cpp
   unit/particles_test.cpp
   unit/animation_player_test.cpp
   unit/camera_ray_test.cpp

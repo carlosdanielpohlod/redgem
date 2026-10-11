@@ -6,6 +6,13 @@
 
 using namespace redgem;
 
+namespace {
+
+constexpr int kLargestPort = 65535;
+constexpr int kWebPort = 80;
+
+}  // namespace
+
 TEST_CASE("game directory with a system test") {
   const CliResult result = parse_cli({"games/demo", "--test", "t.rb", "--screenshots", "shots", "--headless"});
   REQUIRE(result.ok);
@@ -115,4 +122,66 @@ TEST_CASE("android is a build target") {
   CHECK(android.options.build_target == "android");
   CHECK(build_target_from_name("android") == BuildTarget::Android);
   CHECK(std::string(build_target_name(BuildTarget::Android)) == "android");
+}
+
+TEST_CASE("-h asks for help too, and help forgets the rest of the line") {
+  const CliResult help = parse_cli({"games/demo", "--screenshots", "shots", "-h"});
+  REQUIRE(help.ok);
+  CHECK(help.options.mode == RunMode::Help);
+  CHECK(help.options.game_dir.empty());
+  CHECK(help.options.screenshot_dir.empty());
+  CHECK(help.error.empty());
+}
+
+TEST_CASE("what is wrong with a command line is said") {
+  CHECK(parse_cli({"games/demo", "--test"}).error == "--test needs a file");
+  CHECK(parse_cli({"--ruby-test"}).error == "--ruby-test needs a file");
+  CHECK(parse_cli({"games/demo", "--screenshots"}).error == "--screenshots needs a directory");
+  CHECK(parse_cli({"new", "games/demo", "--template"}).error == "--template needs a name");
+  CHECK(parse_cli({"build", "a", "b", "--target", "amiga"}).error == "--target needs linux, windows or android");
+  CHECK(parse_cli({"games/demo", "--gpu", "turbo"}).error == "--gpu needs auto, dedicated or integrated");
+  CHECK(parse_cli({"relay", "--port", "many"}).error == "--port needs a number up to 65535");
+  CHECK(parse_cli({"games/demo", "--bogus"}).error == "unknown option --bogus");
+  CHECK(parse_cli({"games/demo", "extra"}).error == "unexpected argument extra");
+  CHECK(parse_cli({"relay", "somewhere"}).error == "unexpected argument somewhere");
+  CHECK(parse_cli({"new", "games/demo", "--play"}).error == "choose one of: new, build, relay, --play, --test, --ruby-test");
+  CHECK(parse_cli({"games/demo", "--headless"}).error == "--headless needs --test <system_test.rb>");
+  CHECK(parse_cli({"--play"}).error == "missing <game_dir>");
+  CHECK(parse_cli({"build", "games/demo"}).error == "missing <out_dir>");
+  CHECK(parse_cli({"games/demo"}).error.empty());
+}
+
+TEST_CASE("the first thing wrong on a line is the one reported") {
+  CHECK(parse_cli({"--bogus", "--test"}).error == "unknown option --bogus");
+  CHECK(parse_cli({"--test", "--bogus"}).error == "--test needs a file");
+  // A line that cannot be read is not checked for what it lacks.
+  CHECK(parse_cli({"new", "--play", "--bogus"}).error == "unknown option --bogus");
+}
+
+TEST_CASE("a subcommand is only the first word of the line") {
+  const CliResult folder = parse_cli({"games/demo", "--play", "--screenshots", "new"});
+  REQUIRE(folder.ok);
+  CHECK(folder.options.mode == RunMode::Game);
+  CHECK(folder.options.screenshot_dir == "new");
+  // A second folder has no place on a line that builds nothing.
+  CHECK_FALSE(parse_cli({"games/demo", "build"}).ok);
+  CHECK(parse_cli({"build", "relay", "new"}).options.game_dir == "relay");
+}
+
+TEST_CASE("a port is a number of at most five digits, up to the largest there is") {
+  CHECK(parse_cli({"relay", "--port", "65535"}).options.relay_port == kLargestPort);
+  CHECK(parse_cli({"relay", "--port", "00080"}).options.relay_port == kWebPort);
+  CHECK_FALSE(parse_cli({"relay", "--port", "65536"}).ok);
+  CHECK_FALSE(parse_cli({"relay", "--port", "000080"}).ok);
+  CHECK_FALSE(parse_cli({"relay", "--port", "80a"}).ok);
+  CHECK_FALSE(parse_cli({"relay", "--port", "-80"}).ok);  // (read as an option, so --port has no value)
+  CHECK_FALSE(parse_cli({"relay", "--port", "8 0"}).ok);
+}
+
+TEST_CASE("the usage text names the scene file and the scripts folder") {
+  const std::string text = usage();
+  CHECK(text.rfind("usage:", 0) == 0);
+  CHECK(text.find(config::kSceneFileName) != std::string::npos);
+  CHECK(text.find(std::string(config::kScriptsDirName) + "/ folder") != std::string::npos);
+  CHECK(text.find("redgem relay") != std::string::npos);
 }

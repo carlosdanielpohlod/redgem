@@ -48,7 +48,8 @@ lint_format() {
 
 lint_cpp() {
   [[ -f "${BUILD_DIR}/compile_commands.json" ]] || { echo "build the engine first (cmake -S . -B build)"; return 1; }
-  git ls-files 'src/*.cpp' | xargs -P "${JOBS}" -n 4 "${VENV}/bin/clang-tidy" -p "${BUILD_DIR}" --quiet --warnings-as-errors='*' &&
+  # (android_main.cpp is only built for Android: its headers are not on this machine's compiler.)
+  git ls-files 'src/*.cpp' | grep -v 'android_main.cpp' | xargs -P "${JOBS}" -n 4 "${VENV}/bin/clang-tidy" -p "${BUILD_DIR}" --quiet --warnings-as-errors='*' &&
     cppcheck --quiet --error-exitcode=1 --std=c++17 --language=c++ --enable=warning,performance,portability \
       --inline-suppr --suppress=missingIncludeSystem -I src -j "${JOBS}" src
 }

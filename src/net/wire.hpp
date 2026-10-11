@@ -50,11 +50,11 @@ inline constexpr const char* kData = "d";
 inline constexpr const char* kPeers = "p";
 inline constexpr const char* kRoom = "r";
 inline constexpr const char* kGameMessage = "m";
-inline constexpr const char* kHello = "h";     // a newcomer: let me in (to a relay: into this room)
-inline constexpr const char* kWelcome = "w";   // to a newcomer: your id, and who else is here
-inline constexpr const char* kArrived = "j";   // to the others: someone joined
-inline constexpr const char* kGone = "l";      // to the others: someone left
-inline constexpr const char* kPing = "i";      // nothing to say: I am here
+inline constexpr const char* kHello = "h";    // a newcomer: let me in (to a relay: into this room)
+inline constexpr const char* kWelcome = "w";  // to a newcomer: your id, and who else is here
+inline constexpr const char* kArrived = "j";  // to the others: someone joined
+inline constexpr const char* kGone = "l";     // to the others: someone left
+inline constexpr const char* kPing = "i";     // nothing to say: I am here
 
 // The lowest id no machine in `taken` has, for a newcomer; 0 when the game is full. Ids are
 // handed out again once free, so they never outgrow what a message may carry.
@@ -64,6 +64,9 @@ nlohmann::json game_message(const std::string& name, const nlohmann::json& data,
 // Whether what arrived is a message of ours, every field of the kind it should be. Anything else
 // comes from a broken or hostile program, and nothing of it is used.
 bool well_formed(const nlohmann::json& message);
+// Whether the id a welcome hands this machine can be its own: only the host is 1 (as is whoever
+// opened a room on a relay, who can be nothing else), and nobody is 0.
+bool own_id_believable(int given, bool through_relay, bool opening_room);
 // A message as the bytes that travel: framed, with text that is not valid UTF-8 replaced instead
 // of refused.
 std::vector<std::uint8_t> packed(const nlohmann::json& message);

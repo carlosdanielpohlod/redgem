@@ -72,3 +72,39 @@ TEST_CASE("each game saves in a file named after its folder, and tests save some
   CHECK(tested.filename() == "platformer.json");
   CHECK(tested.parent_path() != player.parent_path());
 }
+
+TEST_CASE("what a save file holds that a game cannot save is left out") {
+  const TempSave temp;
+  std::filesystem::create_directories(temp.file.parent_path());
+  std::ofstream(temp.file) << R"({"best": 1250.0, "name": "Ana", "muted": true, "list": [1, 2], "nothing": null,
+                                  "inner": {"a": 1}})";
+  SaveStore store(temp.file);
+  CHECK(store.keys() == std::vector<std::string>{"best", "muted", "name"});
+  CHECK(std::get<double>(*store.get("best")) == doctest::Approx(kBestScore));
+  CHECK(std::get<std::string>(*store.get("name")) == "Ana");
+  CHECK(std::get<bool>(*store.get("muted")));
+  CHECK_FALSE(store.get("list").has_value());
+}
+
+TEST_CASE("a save is written whole: every kind of value, and no half-written file beside it") {
+  const TempSave temp;
+  SaveStore store(temp.file);
+  REQUIRE(store.set("volume", kVolume));
+  REQUIRE(store.set("name", std::string("Ana")));
+  REQUIRE(store.set("muted", false));
+  CHECK_FALSE(std::filesystem::exists(temp.file.string() + ".part"));
+  SaveStore again(temp.file);
+  CHECK(std::get<double>(*again.get("volume")) == doctest::Approx(kVolume));
+  CHECK(std::get<std::string>(*again.get("name")) == "Ana");
+  CHECK_FALSE(std::get<bool>(*again.get("muted")));
+}
+
+TEST_CASE("a save that cannot be written says so and keeps the value for this run") {
+  const TempSave temp;
+  // A file where the save's folder should be: nothing can be written under it.
+  std::filesystem::create_directories(temp.dir);
+  std::ofstream(temp.dir / "nested") << "in the way";
+  SaveStore store(temp.file);
+  CHECK_FALSE(store.set("best", kBestScore));
+  CHECK(std::get<double>(*store.get("best")) == doctest::Approx(kBestScore));
+}

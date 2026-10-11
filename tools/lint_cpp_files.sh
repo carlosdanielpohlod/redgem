@@ -18,5 +18,6 @@ for target in "$@"; do
 done
 [[ ${#files[@]} -gt 0 ]] || { echo "usage: lint_cpp_files.sh <file or folder>..."; exit 2; }
 
-printf '%s\n' "${files[@]}" | xargs -P "${JOBS}" -n 2 .deps/lint-venv/bin/clang-tidy -p build --quiet 2>/dev/null |
+# (android_main.cpp is only built for Android: its headers are not on this machine's compiler.)
+printf '%s\n' "${files[@]}" | grep -v 'android_main.cpp' | xargs -P "${JOBS}" -n 2 .deps/lint-venv/bin/clang-tidy -p build --quiet 2>/dev/null |
   grep -E "warning:|error:" | sed "s|${REPO_ROOT}/||" | sort -u

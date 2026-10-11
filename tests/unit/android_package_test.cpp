@@ -13,6 +13,9 @@ using redgem::test::fixture;
 
 namespace {
 
+constexpr std::size_t kTooLongPackagePart = 150;  // with "com." before it, past what an id may be
+constexpr std::size_t kIdDigits = 6;              // hex digits that tell alike names apart
+
 // A folder of the test's own, removed when the test ends.
 struct Scratch {
   std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-android-package-test";
@@ -211,4 +214,58 @@ TEST_CASE("a game is signed with its developer's key when it names one, else wit
   CHECK(signing_key_for(scratch.dir, own, engine_key, error)->key_password_variable == kKeyPasswordVariable);
   platform::set_environment(kKeystorePasswordVariable, "", true);
   platform::set_environment(kKeyPasswordVariable, "", true);
+}
+
+TEST_CASE("an app id's parts each start with a small letter, and none is empty") {
+  const Scratch scratch;
+  AndroidSettings settings;
+  std::string error;
+  for (const char* good : {"com.game", "a.b", "com.my_studio.game_2", "c0m.g4me"}) {
+    CAPTURE(good);
+    scratch.file("game.json", std::string(R"({"android": {"package": ")") + good + R"("}})");
+    CHECK_MESSAGE(read_android_settings(scratch.dir, settings, error), error);
+    CHECK(settings.package == good);
+  }
+  for (const char* bad : {"game", ".com.game", "com.game.", "com.Game", "com._game", "com.my-game", "com.my game",
+                          "com.game.2d"}) {
+    CAPTURE(bad);
+    scratch.file("game.json", std::string(R"({"android": {"package": ")") + bad + R"("}})");
+    CHECK_FALSE(read_android_settings(scratch.dir, settings, error));
+    CHECK(error.find("android.package") != std::string::npos);
+  }
+  // An id longer than Android takes, however well made.
+  scratch.file("game.json", R"({"android": {"package": "com.)" + std::string(kTooLongPackagePart, 'a') + R"("}})");
+  CHECK_FALSE(read_android_settings(scratch.dir, settings, error));
+}
+
+TEST_CASE("what a game's android section gets wrong is named") {
+  const Scratch scratch;
+  AndroidSettings settings;
+  std::string error;
+  const auto complaint = [&](const char* json) {
+    scratch.file("game.json", json);
+    CHECK_FALSE(read_android_settings(scratch.dir, settings, error));
+    return error;
+  };
+  CHECK(complaint(R"({"android": []})") == "game.json: android must be a section ({ ... })");
+  CHECK(complaint(R"({"android": {"package": 7}})") == "game.json: android.package must be a text");
+  CHECK(complaint(R"({"android": {"version_name": 2}})") == "game.json: android.version_name must be a text");
+  CHECK(complaint(R"({"android": {"key_alias": true}})") == "game.json: android.key_alias must be a text");
+  CHECK(complaint(R"({"android": {"version_code": 1.5}})").find("android.version_code") != std::string::npos);
+  CHECK(complaint(R"({"android": {"keystore": "k.jks"}})").find("android.key_alias is needed") != std::string::npos);
+  // A file that is not JSON, or says nothing about Android, is a game with nothing to say.
+  scratch.file("game.json", "{ not json");
+  CHECK(read_android_settings(scratch.dir, settings, error));
+  scratch.file("game.json", R"({"title": "Mine"})");
+  CHECK(read_android_settings(scratch.dir, settings, error));
+  CHECK(settings.version_name == "1.0");
+}
+
+TEST_CASE("an app's id starts with a letter and tells apart names that differ only in what it drops") {
+  CHECK(android_package_name("games/42") == "com.redgem.game42");
+  CHECK(android_package_name("games/Maze") != android_package_name("games/maze"));
+  CHECK(android_package_name("games/Maze").rfind("com.redgem.maze_", 0) == 0);
+  const std::string id = android_package_name("games/My Game");
+  CHECK(id.size() == std::string("com.redgem.mygame_").size() + kIdDigits);
+  CHECK(id.find_first_not_of("0123456789abcdef", id.size() - kIdDigits) == std::string::npos);
 }

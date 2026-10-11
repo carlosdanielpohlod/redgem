@@ -27,8 +27,8 @@ namespace {
 using namespace redgem;
 
 constexpr const char* kHomeVariable = "HOME";
-constexpr const char* kManifestAsset = "game.files";   // the paths of the game's files, one per line
-constexpr const char* kStampAsset = "game.stamp";      // changes with every build of the APK
+constexpr const char* kManifestAsset = "game.files";  // the paths of the game's files, one per line
+constexpr const char* kStampAsset = "game.stamp";     // changes with every build of the APK
 constexpr std::size_t kCopyChunkBytes = 64 * 1024;
 
 std::string read_asset(AAssetManager* assets, const std::string& name) {
@@ -55,31 +55,40 @@ bool copy_asset(AAssetManager* assets, const std::string& name, const std::files
   return static_cast<bool>(out);
 }
 
-// Copies the game out of the APK unless this build of it is already there.
-bool unpack_game(AAssetManager* assets, const std::filesystem::path& home) {
-  const std::string stamp = read_asset(assets, kStampAsset);
-  const std::filesystem::path stamp_file = home / kStampAsset;
-  std::ifstream unpacked(stamp_file);
-  std::stringstream unpacked_stamp;
-  unpacked_stamp << unpacked.rdbuf();
-  if (!stamp.empty() && unpacked_stamp.str() == stamp) return true;
+// What a file says; nothing when it is not there.
+std::string read_file(const std::filesystem::path& file) {
+  std::ifstream in(file);
+  std::stringstream text;
+  text << in.rdbuf();
+  return text.str();
+}
 
-  std::error_code ignored;
-  std::filesystem::remove_all(home / kBundledGameFolder, ignored);
+// Copies the files the APK's list names into `home`. How many there were; 0, with the reason
+// logged, when the game could not be unpacked.
+int copy_game_files(AAssetManager* assets, const std::filesystem::path& home) {
   std::istringstream manifest(read_asset(assets, kManifestAsset));
   int copied = 0;
   for (std::string path; std::getline(manifest, path);) {
     if (path.empty()) continue;
     if (!copy_asset(assets, path, home / path)) {
       log::error("cannot unpack " + path);
-      return false;
+      return 0;
     }
     ++copied;
   }
-  if (copied == 0) {
-    log::error("the app carries no game files");
-    return false;
-  }
+  if (copied == 0) log::error("the app carries no game files");
+  return copied;
+}
+
+// Copies the game out of the APK unless this build of it is already there.
+bool unpack_game(AAssetManager* assets, const std::filesystem::path& home) {
+  const std::string stamp = read_asset(assets, kStampAsset);
+  const std::filesystem::path stamp_file = home / kStampAsset;
+  if (!stamp.empty() && read_file(stamp_file) == stamp) return true;
+  std::error_code ignored;
+  std::filesystem::remove_all(home / kBundledGameFolder, ignored);
+  const int copied = copy_game_files(assets, home);
+  if (copied == 0) return false;
   // (If the stamp cannot be written the game still runs: it is only unpacked again next time.)
   std::ofstream(stamp_file) << stamp;
   log::info("unpacked " + std::to_string(copied) + " game files");
@@ -94,6 +103,19 @@ float screen_aspect(const android_app* app) {
   return std::max(one_side, other_side) / std::min(one_side, other_side);
 }
 
+// Plays the game that was unpacked into the app's storage, on the whole screen.
+int play_unpacked_game(const android_app* app) {
+  EngineOptions options;
+  options.game_dir = kBundledGameFolder;
+  options.screen_aspect = screen_aspect(app);
+  auto created = Engine::create(options);
+  if (auto* error = std::get_if<std::string>(&created)) {
+    log::error(*error);
+    return kExitFailure;
+  }
+  return std::get<std::unique_ptr<Engine>>(created)->run();
+}
+
 }  // namespace
 
 int main(int, char**) {
@@ -106,15 +128,7 @@ int main(int, char**) {
     return kExitFailure;
   }
   try {
-    EngineOptions options;
-    options.game_dir = kBundledGameFolder;
-    options.screen_aspect = screen_aspect(app);
-    auto created = Engine::create(options);
-    if (auto* error = std::get_if<std::string>(&created)) {
-      log::error(*error);
-      return kExitFailure;
-    }
-    return std::get<std::unique_ptr<Engine>>(created)->run();
+    return play_unpacked_game(app);
   } catch (const std::exception& error) {
     log::error(error.what());
     return kExitFailure;
