@@ -10,6 +10,7 @@
 
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "core/safe_path.hpp"
 #include "generated/ruby_prelude.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
@@ -146,8 +147,16 @@ void ScriptHost::attach_object(ObjectId id) {
   for (const std::string& script : split_script_list(*scripts)) attach(id, script);
 }
 
+// The name comes from the scene's file: it is a script of the game's own folder or nothing.
+bool ScriptHost::in_scripts_folder(const std::string& script) {
+  if (safe_asset_name(script)) return true;
+  report_error("loading a script", "the name '" + printable(script) + "' reaches outside the scripts folder");
+  return false;
+}
+
 bool ScriptHost::require_script(const std::string& script) {
   if (loaded_scripts_.count(script) != 0) return true;
+  if (!in_scripts_folder(script)) return false;
   // A script that uses its own class before defining it would otherwise load itself forever.
   if (!loading_scripts_.insert(script).second) return false;
   const std::filesystem::path path = scripts_dir_ / script;

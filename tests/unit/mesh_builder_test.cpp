@@ -215,3 +215,23 @@ TEST_CASE("a split primitive without optional data gets none made up") {
     CHECK(piece.weights.empty());
   }
 }
+
+TEST_CASE("a primitive whose indices cannot be trusted is not cut into pieces") {
+  constexpr std::size_t kSmallPieces = 2;  // fewer vertices than the triangle has: it would be split
+  PrimitiveDesc out_of_range = triangle();
+  out_of_range.indices = {0, 1, 4000000};
+  const std::vector<PrimitiveDesc> kept = split_primitive(out_of_range, kSmallPieces);
+  REQUIRE(kept.size() == 1);
+  CHECK(kept[0].indices == out_of_range.indices);
+  CHECK(kept[0].positions == out_of_range.positions);
+  std::string error;
+  CHECK_FALSE(build_mesh(kept[0], error).has_value());
+
+  // Vertices that do not all have a normal are no better: every piece copies one per vertex.
+  PrimitiveDesc short_normals = triangle();
+  short_normals.normals.resize(3);
+  CHECK(primitive_shape_problem(short_normals).find("normal") != std::string::npos);
+  CHECK(split_primitive(short_normals, kSmallPieces).size() == 1);
+  CHECK_FALSE(build_mesh(short_normals, error).has_value());
+  CHECK(primitive_shape_problem(triangle()).empty());
+}

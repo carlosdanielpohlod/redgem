@@ -130,6 +130,13 @@ class SceneDocument {
   // Writes floats over the ones an accessor points at. False when they are not stored the way
   // the editor writes them (packed, and as many).
   bool store_stream(std::size_t accessor_index, const std::vector<float>& values);
+  // open, import_model and save_as themselves. Those three catch what these throw when a file
+  // holds something else than glTF says it should, and report it like any other error.
+  static std::variant<SceneDocument, std::string> open_file(const std::filesystem::path& path);
+  int import_model_file(const std::filesystem::path& path, std::string& error, int parent);
+  bool save_file(const std::filesystem::path& path, std::string& error);
+  // Takes out of the file what an import that failed half way had already added to it.
+  void forget_model(const model_import::JsonOffsets& offsets, std::size_t bin_size, std::size_t animations);
   bool sync_glb(std::string& error);
   void sync_buffer();
   // Writes every node's light and camera into the glTF arrays (copies get their own entry).

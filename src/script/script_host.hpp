@@ -76,6 +76,8 @@ class ScriptHost {
   void attach(ObjectId object, const std::string& script);
   mrb_value instantiate(ObjectId object, RClass* klass, const std::string& class_name);
   bool require_script(const std::string& script);
+  // Whether a script's name stays inside the game's scripts folder (an error is reported when not).
+  bool in_scripts_folder(const std::string& script);
   void invoke(std::size_t index, const char* method, std::initializer_list<mrb_value> args);
   void invoke_on_object(ObjectId object, const char* method, std::initializer_list<mrb_value> args);
   bool runnable(const BehaviourSlot& slot) const;

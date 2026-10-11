@@ -20,6 +20,9 @@ constexpr std::uint8_t kBinPadding = 0;
 constexpr const char* kTempSuffix = ".tmp";
 constexpr int kCompactIndent = -1;
 constexpr bool kAsciiOnly = false;
+// How deep a file's JSON may be nested. glTF itself goes a handful of levels down; walking,
+// copying and writing a document takes stack for every level, so a file does not get to choose more.
+constexpr int kMaxJsonDepth = 64;
 
 std::uint32_t read_u32(const std::vector<std::uint8_t>& data, std::size_t offset) {
   std::uint32_t value = 0;
@@ -88,6 +91,19 @@ bool is_glb(const std::vector<std::uint8_t>& data) {
          read_u32(data, sizeof(std::uint32_t)) == kGlbVersion;
 }
 
+// A chunk's JSON; a discarded value when it is not JSON, or nested deeper than kMaxJsonDepth.
+template <typename Iterator>
+nlohmann::json parse_shallow_json(Iterator first, Iterator last) {
+  bool too_deep = false;
+  const nlohmann::json::parser_callback_t keep_shallow = [&too_deep](int depth, nlohmann::json::parse_event_t,
+                                                                     nlohmann::json&) {
+    too_deep = too_deep || depth > kMaxJsonDepth;
+    return !too_deep;  // (what is refused is not built either: nothing deep is ever held)
+  };
+  nlohmann::json parsed = nlohmann::json::parse(first, last, keep_shallow, false);
+  return too_deep ? nlohmann::json(nlohmann::json::value_t::discarded) : parsed;
+}
+
 // Reads the chunk whose data starts at `begin` into `glb`. False when its JSON cannot be parsed.
 bool read_chunk(const std::vector<std::uint8_t>& data, std::uint32_t type, std::size_t begin, std::size_t length,
                 GlbFile& glb, bool& has_json) {
@@ -95,7 +111,7 @@ bool read_chunk(const std::vector<std::uint8_t>& data, std::uint32_t type, std::
   const auto last = data.begin() + static_cast<std::ptrdiff_t>(begin + length);
   if (type == kChunkBin) glb.bin.assign(first, last);
   if (type != kChunkJson) return true;
-  glb.json = nlohmann::json::parse(first, last, nullptr, false);
+  glb.json = parse_shallow_json(first, last);
   if (glb.json.is_discarded()) return false;
   has_json = true;
   return true;
@@ -109,8 +125,8 @@ std::string read_chunks(const std::vector<std::uint8_t>& data, GlbFile& glb) {
     const std::uint32_t length = read_u32(data, offset);
     const std::uint32_t type = read_u32(data, offset + sizeof(std::uint32_t));
     const std::size_t begin = offset + kChunkHeaderBytes;
-    if (begin + length > data.size()) return " has a truncated chunk";
-    if (!read_chunk(data, type, begin, length, glb, has_json)) return " has invalid JSON";
+    if (length > data.size() - begin) return " has a truncated chunk";
+    if (!read_chunk(data, type, begin, length, glb, has_json)) return " has invalid or too deeply nested JSON";
     offset = begin + glb_padded_size(length);
   }
   return has_json ? "" : " has no JSON chunk";

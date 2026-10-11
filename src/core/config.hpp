@@ -11,6 +11,9 @@ namespace redgem::config {
 inline constexpr int kWindowWidth = 1280;
 inline constexpr int kWindowHeight = 720;
 inline constexpr const char* kWindowTitle = "RedGem";
+// What a game may ask for as a side of its window, in pixels (its game.json is not trusted to be sane).
+inline constexpr int kMinWindowSide = 320;
+inline constexpr int kMaxWindowSide = 16384;
 // Width of a letter as a share of the text size, to estimate text widths when there is no font
 // to measure with (headless runs).
 inline constexpr float kEstimatedLetterWidth = 0.55f;

@@ -11,6 +11,7 @@
 
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "core/safe_path.hpp"
 #include "input/raylib_input_source.hpp"
 #include "physics/body_config.hpp"
 #include "app/game_project.hpp"
@@ -162,7 +163,8 @@ void Engine::open_saves() {
     std::error_code ignored;
     std::filesystem::remove(save_file, ignored);
   }
-  save_ = std::make_unique<SaveStore>(save_file.empty() ? save_file_for(options_.game_dir) : save_file);
+  if (save_file.empty()) save_file = save_file_for(options_.game_dir);
+  save_ = std::make_unique<SaveStore>(save_file);
 }
 
 void Engine::fill_context(const std::string& game_title) {
@@ -187,7 +189,9 @@ void Engine::connect_context() {
   context_.spawn = [this](ObjectId source, const std::optional<Transform>& world, bool physics) {
     return spawn(source, world, physics);
   };
-  context_.scene_exists = [this](const std::string& name) { return std::filesystem::exists(scene_path(name)); };
+  context_.scene_exists = [this](const std::string& name) {
+    return safe_scene_name(name) && std::filesystem::exists(scene_path(name));
+  };
 }
 
 std::optional<std::string> Engine::start_scripts() {
@@ -221,7 +225,14 @@ std::filesystem::path Engine::scene_path(const std::string& name) const {
   return options_.game_dir / config::kScenesDirName / (name + config::kSceneExtension);
 }
 
+bool Engine::safe_scene_name(const std::string& name) {
+  if (safe_asset_name(name)) return true;
+  warn_of_unsafe_asset_name(name);
+  return false;
+}
+
 void Engine::load_scene(const std::string& name) {
+  if (!safe_scene_name(name)) return;
   LoadResult loaded = load_gltf_scene(scene_path(name).string());
   if (!loaded.ok) {
     log::error("cannot load scene '" + name + "': " + loaded.error);
@@ -520,17 +531,27 @@ void Engine::heed_test_status(const std::string& status) {
 }
 
 void Engine::render() {
-  std::vector<std::filesystem::path> screenshots;
-  screenshots.reserve(context_.screenshot_requests.size());
-  for (const std::string& name : context_.screenshot_requests) {
-    screenshots.push_back(options_.screenshot_dir / (name + config::kScreenshotExtension));
-  }
+  const std::vector<std::filesystem::path> screenshots =
+      screenshot_files(options_.screenshot_dir, context_.screenshot_requests);
   context_.screenshot_requests.clear();
   if (renderer_) {
     renderer_->set_motion_blur(context_.motion_blur);
     renderer_->draw(scene_, context_.hud, screenshots, &particles_,
                     device_input_ ? device_input_->touch_layout() : nullptr);
   }
+}
+
+std::vector<std::filesystem::path> screenshot_files(const std::filesystem::path& folder,
+                                                    const std::vector<std::string>& names) {
+  std::vector<std::filesystem::path> files;
+  for (const std::string& name : names) {
+    if (safe_asset_name(name)) {
+      files.push_back(folder / (name + config::kScreenshotExtension));
+    } else {
+      warn_of_unsafe_asset_name(name);
+    }
+  }
+  return files;
 }
 
 int Engine::run() {

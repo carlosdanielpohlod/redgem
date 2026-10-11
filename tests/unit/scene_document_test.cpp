@@ -6,6 +6,10 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <optional>
+#include <variant>
+
+#include <nlohmann/json.hpp>
 
 #include "editor/glb_file.hpp"
 #include "editor/scene_document.hpp"
@@ -777,4 +781,139 @@ TEST_CASE("a terrain is sculpted, undone, saved and read back with its shape") {
   REQUIRE(again.terrain_grid(same).has_value());
   CHECK(again.sculpt_terrain(same, {0.0f, 0.0f, 6.0f, 1.0f, SculptMode::Lower}));
   std::filesystem::remove(path);
+}
+
+namespace {
+
+// A copy of a .glb with its JSON changed by `change`, in a temporary file.
+template <typename Change>
+std::filesystem::path changed_copy(const std::filesystem::path& source, const std::string& name, Change change) {
+  std::string error;
+  std::optional<GlbFile> glb = read_glb(source, error);
+  REQUIRE_MESSAGE(glb.has_value(), error);
+  change(glb->json);
+  const std::filesystem::path path = temp_copy_path(name);
+  REQUIRE_MESSAGE(write_glb(path, *glb, error), error);
+  return path;
+}
+
+// A .glb whose JSON chunk is `text`, written byte by byte (no JSON library walks it).
+std::filesystem::path raw_glb(const std::string& name, std::string text) {
+  constexpr std::uint32_t kMagic = 0x46546C67;
+  constexpr std::uint32_t kVersion = 2;
+  constexpr std::uint32_t kJsonChunk = 0x4E4F534A;
+  text.resize(glb_padded_size(text.size()), ' ');
+  const std::uint32_t header[] = {kMagic, kVersion,
+                                  static_cast<std::uint32_t>(kGlbHeaderBytes + kGlbChunkHeaderBytes + text.size()),
+                                  static_cast<std::uint32_t>(text.size()), kJsonChunk};
+  const std::filesystem::path path = temp_copy_path(name);
+  std::ofstream out(path, std::ios::binary);
+  out.write(reinterpret_cast<const char*>(header), sizeof(header));
+  out << text;
+  return path;
+}
+
+}  // namespace
+
+TEST_CASE("a terrain whose file says its vertices start before the data is not saved over other memory") {
+  constexpr TerrainGrid kGrid{40.0f, 20};
+  constexpr Color kGrass{0.3f, 0.5f, 0.2f, 1.0f};
+  constexpr TerrainBrush kHill{0.0f, 0.0f, 6.0f, 3.0f, SculptMode::Raise};
+  constexpr int kBeforeTheData = -8;
+  const std::filesystem::path made = temp_copy_path("terrain_source");
+  SceneDocument fresh = SceneDocument::create_empty(made);
+  fresh.add_terrain("Terrain", kGrid, kGrass);
+  std::string error;
+  REQUIRE_MESSAGE(fresh.save(error), error);
+  // The loader reads a negative offset as zero, where the terrain's positions are: the scene opens.
+  const std::filesystem::path path = changed_copy(made, "terrain_negative", [&](nlohmann::json& json) {
+    const int accessor = json["meshes"][0]["primitives"][0]["attributes"]["POSITION"];
+    const int view = json["accessors"][accessor]["bufferView"];
+    REQUIRE(json["bufferViews"][view]["byteOffset"] == 0);
+    json["bufferViews"][view]["byteOffset"] = kBeforeTheData;
+  });
+  auto opened = SceneDocument::open(path);
+  REQUIRE(std::holds_alternative<SceneDocument>(opened));
+  SceneDocument& doc = std::get<SceneDocument>(opened);
+  const int terrain = doc.desc().find_node("Terrain");
+  REQUIRE(doc.terrain_grid(terrain).has_value());
+  REQUIRE(doc.sculpt_terrain(terrain, kHill));
+  const auto size_before = std::filesystem::file_size(path);
+  CHECK_FALSE(doc.save(error));
+  CHECK(error.find("cannot save the shape") != std::string::npos);
+  CHECK(std::filesystem::file_size(path) == size_before);  // the file is as it was
+  std::filesystem::remove(made);
+  std::filesystem::remove(path);
+}
+
+TEST_CASE("a scene whose 'scene' names none of its scenes opens and saves, or is refused: never fatal") {
+  constexpr int kNoSuchScene = 40;
+  // (The loader takes a negative "scene" as none given; the editor's reading of the file is its own.)
+  const std::filesystem::path negative =
+      changed_copy(fixture("hierarchy.glb"), "negative_scene", [](nlohmann::json& json) { json["scene"] = -1; });
+  auto opened = SceneDocument::open(negative);
+  if (auto* refused = std::get_if<std::string>(&opened)) FAIL(*refused);
+  std::string error;
+  CHECK_MESSAGE(std::get<SceneDocument>(opened).save(error), error);
+  const LoadResult saved = load_gltf_scene(negative.string());
+  REQUIRE_MESSAGE(saved.ok, saved.error);
+  CHECK(saved.scene.find_node("Root") != kNoIndex);
+
+  const std::filesystem::path beyond = changed_copy(fixture("hierarchy.glb"), "no_such_scene",
+                                                    [&](nlohmann::json& json) { json["scene"] = kNoSuchScene; });
+  CHECK(std::holds_alternative<std::string>(SceneDocument::open(beyond)));
+  std::filesystem::remove(negative);
+  std::filesystem::remove(beyond);
+}
+
+TEST_CASE("a model that holds something else where glTF wants an index is refused or imported, never fatal") {
+  constexpr Color kGray{0.5f, 0.5f, 0.5f, 1.0f};
+  const std::filesystem::path out = temp_copy_path("import_target");
+  SceneDocument doc = SceneDocument::create_empty(out);
+  doc.add_primitive(PrimitiveShape::Plane, "Floor", kGray);
+  std::string error;
+  REQUIRE_MESSAGE(doc.save(error), error);
+  const std::size_t meshes_before = doc.desc().meshes.size();
+  const int nodes_before = doc.node_count();
+
+  // (The loader reads "null" as zero; the editor's own reading of the file is stricter.)
+  const std::filesystem::path broken = changed_copy(fixture("hierarchy.glb"), "broken_model", [](nlohmann::json& json) {
+    json["meshes"][0]["primitives"][0]["attributes"]["POSITION"] = nullptr;
+  });
+  CHECK(doc.import_model(broken, error) == kNoIndex);
+  CHECK(error.find("cannot be used") != std::string::npos);
+  // Nothing of the model stayed behind: the scene saves and loads as it was.
+  CHECK(doc.desc().meshes.size() == meshes_before);
+  CHECK(doc.node_count() == nodes_before);
+  REQUIRE_MESSAGE(doc.save(error), error);
+  const LoadResult loaded = load_gltf_scene(out.string());
+  REQUIRE_MESSAGE(loaded.ok, loaded.error);
+  CHECK(loaded.scene.meshes.size() == meshes_before);
+  CHECK(loaded.scene.nodes.size() == static_cast<std::size_t>(nodes_before));
+
+  const std::filesystem::path odd = changed_copy(fixture("hierarchy.glb"), "odd_model", [](nlohmann::json& json) {
+    json["nodes"][0]["camera"] = nullptr;
+    json["materials"][0]["normalTexture"] = {{"index", nullptr}};
+  });
+  CHECK_NOTHROW(doc.import_model(odd, error));
+  CHECK_MESSAGE(doc.save(error), error);
+  CHECK(load_gltf_scene(out.string()).ok);
+  for (const auto& file : {out, broken, odd}) std::filesystem::remove(file);
+}
+
+TEST_CASE("a .glb whose JSON is nested very deep is refused when read") {
+  constexpr std::size_t kVeryDeep = 100000;
+  constexpr std::size_t kFewLevels = 12;
+  const auto nested = [](std::size_t depth) {
+    return R"({"asset":{"version":"2.0"},"extras":)" + std::string(depth, '[') + std::string(depth, ']') + "}";
+  };
+  std::string error;
+  const std::filesystem::path deep = raw_glb("deep_json", nested(kVeryDeep));
+  CHECK_FALSE(read_glb(deep, error).has_value());
+  CHECK(error.find("nested") != std::string::npos);
+  CHECK(std::holds_alternative<std::string>(SceneDocument::open(deep)));
+  const std::filesystem::path shallow = raw_glb("shallow_json", nested(kFewLevels));
+  CHECK(read_glb(shallow, error).has_value());
+  std::filesystem::remove(deep);
+  std::filesystem::remove(shallow);
 }

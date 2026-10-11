@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <filesystem>
+#include <stdexcept>
 #include <string>
 
 #include "editor/gltf_json.hpp"
@@ -254,4 +255,50 @@ TEST_CASE("skeleton joints and animation channels follow the imported objects") 
   animation.channels.resize(1);
   animation.channels[0].node = kLocal;
   CHECK(imported_animation(animation, desc_offsets()).channels[0].node == kLocal + kNodesInScene);
+}
+
+TEST_CASE("what a model holds in place of an index is taken out, not shifted and not an error") {
+  for (const json& other : {json("3"), json(nullptr), json(-2), json(1.5), json({1, 2})}) {
+    CAPTURE(other.dump());
+    json object = {{kMesh, other}, {kName, "Crate"}};
+    shift_index(object, kMesh, kMeshesInScene);
+    CHECK_FALSE(object.contains(kMesh));
+    CHECK(object[kName] == "Crate");
+  }
+  json not_an_object = json::array({1, 2});
+  shift_index(not_an_object, kMesh, kMeshesInScene);
+  CHECK(not_an_object == json::array({1, 2}));
+  const json view = imported_buffer_view({{kByteOffset, -8}}, json_offsets());
+  CHECK(view[kByteOffset] == kBytesInScene);
+}
+
+TEST_CASE("a mesh or a skeleton that points at nothing stops the import with an error to report") {
+  const json mesh = {{kPrimitives, {{{kAttributes, {{kPositionAttribute, nullptr}}}}}}};
+  CHECK_THROWS_AS(imported_mesh(mesh, json_offsets()), std::exception);
+  CHECK_THROWS_AS(imported_skin({{kJoints, {0, "one"}}}, json_offsets()), std::exception);
+}
+
+TEST_CASE("a material nested very deep is walked a few levels and no further") {
+  constexpr int kVeryDeep = 150000;
+  json material = {{kNormalTexture, {{kIndex, kLocal}}}};
+  for (int i = 0; i < kVeryDeep; ++i) {
+    json outer = json::object();
+    outer[kExtensions] = std::move(material);
+    material = std::move(outer);
+  }
+  shift_texture_refs(material, kTexturesInScene);  // comes back
+  CHECK(material.contains(kExtensions));
+}
+
+TEST_CASE("a model's picture outside the scene's folder does not come along, nor one that is no file name") {
+  const std::filesystem::path scene_dir = "/games/demo";
+  const std::filesystem::path model_dir = scene_dir / "models";
+  for (const json& uri : {json("../../secret.png"), json("/etc/passwd"), json("textures/../../../x.png"), json(7)}) {
+    CAPTURE(uri.dump());
+    const json image = imported_image({{kUri, uri}, {kName, "Wood"}}, json_offsets(), model_dir, scene_dir);
+    CHECK_FALSE(image.contains(kUri));
+    CHECK(image[kName] == "Wood");
+  }
+  const json up_and_back = imported_image({{kUri, "../images/wood.png"}}, json_offsets(), model_dir, scene_dir);
+  CHECK(up_and_back[kUri] == "images/wood.png");
 }

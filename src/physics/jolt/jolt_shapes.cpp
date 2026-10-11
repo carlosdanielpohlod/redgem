@@ -58,6 +58,8 @@ ShapeResult build_mesh(const BodyDesc& desc) {
   JPH::VertexList vertices;
   JPH::IndexedTriangleList triangles;
   for (const PrimitiveDesc& primitive : desc.mesh->primitives) {
+    // (Indices that do not name the primitive's own vertices would make triangles out of nothing.)
+    if (!primitive_shape_problem(primitive).empty()) continue;
     const auto base = static_cast<JPH::uint32>(vertices.size());
     add_scaled_vertices(primitive, desc.world.scale, vertices);
     add_triangles(primitive, base, triangles);

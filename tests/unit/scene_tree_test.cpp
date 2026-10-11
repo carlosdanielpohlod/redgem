@@ -104,3 +104,24 @@ TEST_CASE("chunk sizes of a .glb are rounded up to four bytes") {
   CHECK(glb_padded_size(kChunkAlignment) == kChunkAlignment);
   CHECK(glb_padded_size(kUnaligned) == kNextAligned);
 }
+
+TEST_CASE("a very deep tree is walked without using up the stack") {
+  constexpr int kDepth = 200000;
+  constexpr Vec3 kStep{0.0f, 1.0f, 0.0f};
+  std::vector<NodeDesc> chain;
+  chain.reserve(kDepth);
+  for (int i = 0; i < kDepth; ++i) {
+    chain.push_back(node("n", i - 1, i + 1 < kDepth ? std::vector<int>{i + 1} : std::vector<int>{}, kStep));
+  }
+  const std::vector<int> all = subtree(chain, 0);
+  REQUIRE(all.size() == static_cast<std::size_t>(kDepth));
+  CHECK(all.front() == 0);
+  CHECK(all.back() == kDepth - 1);
+  CHECK(world_of(chain, kDepth - 1).position.y == doctest::Approx(static_cast<float>(kDepth)));
+}
+
+TEST_CASE("links that go round in a circle do not make a walk endless") {
+  std::vector<NodeDesc> circle = {node("A", 1, {1}), node("B", 0, {0})};
+  CHECK(subtree(circle, 0).size() == circle.size());
+  world_of(circle, 0);  // comes back
+}

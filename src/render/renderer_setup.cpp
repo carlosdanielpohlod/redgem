@@ -7,7 +7,9 @@
 #include <utility>
 
 #include "core/log.hpp"
+#include "core/safe_path.hpp"
 #include "editor/ui/embedded_fonts.hpp"
+#include "render/image_header.hpp"
 #include "render/mesh_builder.hpp"
 #include "render/shader_source.hpp"
 #include "render/shaders.hpp"
@@ -61,6 +63,19 @@ std::optional<GpuPrimitive> upload_primitive(const PrimitiveDesc& primitive, con
   UploadMesh(&*mesh, false);
   return GpuPrimitive{*mesh, primitive.material};
 }
+
+// An encoded picture, decoded. An empty image (and a warning) for one that is not a PNG or JPEG
+// within the size limits: its header is read first, so that nothing oversized is ever decoded.
+Image decode_picture(const std::string& file_extension, const std::vector<std::uint8_t>& encoded) {
+  if (!decodable_image(encoded.data(), encoded.size())) {
+    log::warning("a picture is left out: it is not a PNG or JPEG of at most " + std::to_string(kMaxImageSide) + " x " +
+                 std::to_string(kMaxImageSide) + " pixels");
+    return Image{};
+  }
+  return LoadImageFromMemory(file_extension.c_str(), encoded.data(), static_cast<int>(encoded.size()));
+}
+
+bool in_range(int index, std::size_t size) { return index >= 0 && static_cast<std::size_t>(index) < size; }
 
 // The codes of the letters the game's font holds.
 std::vector<int> ui_letters() {
@@ -345,8 +360,7 @@ void Renderer::Impl::ensure_targets(int width, int height) {
 Texture2D Renderer::Impl::load_texture(const ImageData& image) {
   Texture2D texture{};
   if (image.encoded.empty()) return texture;
-  Image decoded =
-      LoadImageFromMemory(image.file_extension.c_str(), image.encoded.data(), static_cast<int>(image.encoded.size()));
+  Image decoded = decode_picture(image.file_extension, image.encoded);
   if (IsImageValid(decoded)) {
     texture = LoadTextureFromImage(decoded);
     GenTextureMipmaps(&texture);
@@ -370,7 +384,8 @@ Material Renderer::Impl::load_material(const MaterialDesc& source) {
                                       {MATERIAL_MAP_ROUGHNESS, source.metallic_roughness_image},
                                       {MATERIAL_MAP_OCCLUSION, source.occlusion_image}};
   for (const auto& [slot, image] : maps) {
-    if (image != kNoIndex && textures[image].id != 0) material.maps[slot].texture = textures[image];
+    // (A material may come from anywhere: it gets a texture only for an image the scene really has.)
+    if (in_range(image, textures.size()) && textures[image].id != 0) material.maps[slot].texture = textures[image];
   }
   return material;
 }
@@ -423,14 +438,17 @@ void Renderer::Impl::load_ui_font() {
   owns_ui_font = true;
 }
 
-// The first file of the images folder that `name` can mean, as a texture (id 0 when none does).
+// The first file of the images folder that `name` can mean, as a texture (id 0 when none does,
+// when the name reaches outside that folder, or when the file is not a picture that is decoded).
 Texture2D Renderer::Impl::load_picture(const std::string& name) const {
-  for (const char* extension : kPictureExtensions) {
-    const std::filesystem::path file = images_dir / (name + extension);
-    std::error_code fs_error;
-    if (std::filesystem::is_regular_file(file, fs_error)) return LoadTexture(file.string().c_str());
-  }
-  return Texture2D{};
+  const std::optional<std::filesystem::path> file = find_asset_file(images_dir, name, kPictureExtensions);
+  if (!file) return Texture2D{};
+  const std::optional<std::vector<std::uint8_t>> encoded = read_file_up_to(*file, kMaxEncodedImageBytes);
+  if (!encoded) return Texture2D{};
+  Image decoded = decode_picture(file->extension().string(), *encoded);
+  const Texture2D texture = IsImageValid(decoded) ? LoadTextureFromImage(decoded) : Texture2D{};
+  UnloadImage(decoded);
+  return texture;
 }
 
 const Texture2D* Renderer::Impl::ui_image(const std::string& name) {

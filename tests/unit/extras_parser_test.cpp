@@ -1,5 +1,9 @@
 #include <doctest/doctest.h>
 
+#include <chrono>
+#include <string>
+#include <vector>
+
 #include "scene/extras_parser.hpp"
 
 using namespace redgem;
@@ -57,4 +61,46 @@ TEST_CASE("skipped values may hold anything, empty or nested") {
   REQUIRE(result.ok);
   CHECK(result.skipped_keys == std::vector<std::string>{"a", "b", "c"});
   CHECK(get_number(result.properties, "ok") == doctest::Approx(2.0));
+}
+
+TEST_CASE("only JSON numbers are numbers: no infinity, no not-a-number, no hexadecimal, nothing endless") {
+  for (const char* text : {R"({"a": 1e999})", R"({"a": -1e999})", R"({"a": 0x10})", R"({"a": -inf})", R"({"a": -nan})",
+                           R"({"a": [inf]})", R"({"a": [nan]})", R"({"a": 1e})", R"({"a": -})"}) {
+    CAPTURE(text);
+    CHECK_FALSE(parse_extras(text).ok);
+  }
+  CHECK_FALSE(parse_extras(R"({"a": )" + std::string(200, '9') + "}").ok);
+  const ExtrasParseResult fine = parse_extras(R"({"a": -12.5e-1, "b": 3, "c": [0.5, 1E2]})");
+  REQUIRE(fine.ok);
+  CHECK(get_number(fine.properties, "a") == doctest::Approx(-1.25));
+  CHECK(get_number(fine.properties, "b") == doctest::Approx(3.0));
+}
+
+TEST_CASE("a value nested deeper than the limit is an error, not a stack that runs out") {
+  constexpr std::size_t kVeryDeep = 200000;
+  constexpr std::size_t kShallow = 20;
+  const auto nested = [](std::size_t depth) {
+    return R"({"a": )" + std::string(depth, '[') + std::string(depth, ']') + "}";
+  };
+  const ExtrasParseResult deep = parse_extras(nested(kVeryDeep));
+  CHECK_FALSE(deep.ok);
+  CHECK(deep.error.find("nested") != std::string::npos);
+  const ExtrasParseResult shallow = parse_extras(nested(kShallow));
+  CHECK(shallow.ok);
+  CHECK(shallow.skipped_keys == std::vector<std::string>{"a"});
+  // Nesting is counted as it closes: many values side by side are not deep.
+  CHECK(parse_extras(R"({"a": [[1], [2], [[3]], {"b": [4]}], "c": [[5]]})").ok);
+}
+
+TEST_CASE("many numbers in a long text are read in the time it takes to read the text once") {
+  constexpr std::size_t kNumbers = 1500000;
+  constexpr double kGenerousSeconds = 5.0;  // a copy of the rest of the text per number takes minutes
+  std::string text = R"({"points": [)";
+  for (std::size_t i = 0; i < kNumbers; ++i) text += "1.5,";
+  text += "2]}";
+  const auto started = std::chrono::steady_clock::now();
+  const ExtrasParseResult result = parse_extras(text);
+  const std::chrono::duration<double> took = std::chrono::steady_clock::now() - started;
+  CHECK(result.ok);
+  CHECK(took.count() < kGenerousSeconds);
 }

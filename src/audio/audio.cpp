@@ -5,6 +5,7 @@
 #include <set>
 
 #include "core/log.hpp"
+#include "core/safe_path.hpp"
 
 namespace redgem {
 namespace {
@@ -106,11 +107,8 @@ class RaylibAudio final : public AudioSystem {
 }  // namespace
 
 std::optional<std::filesystem::path> find_sound_file(const std::filesystem::path& sounds_dir, const std::string& name) {
-  for (const char* extension : kSoundExtensions) {
-    std::filesystem::path candidate = sounds_dir / (name + extension);
-    if (std::filesystem::exists(candidate)) return candidate;
-  }
-  return std::nullopt;
+  // (A name that reaches outside the sounds folder finds nothing.)
+  return find_asset_file(sounds_dir, name, kSoundExtensions);
 }
 
 bool RecordingAudio::play_sound(const std::string& name, float, float) {

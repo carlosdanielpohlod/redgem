@@ -328,8 +328,9 @@ Save.clear                            # start from nothing
 Whole numbers come back as integers (a saved `12.0` is read as `12`): call `.to_f` on a value you
 divide.
 
-The file is written on every change, to `.config/redgem/saves/<game>.json` in the player's home
-folder. Tests get a save file of their own, empty at the start of each test.
+The file is written on every change, to `.config/redgem/saves/<game>-<digits>.json` in the player's
+home folder. The digits come from where the game's folder is, so two games in folders of the same
+name keep their own saves. Tests get a save file of their own, empty at the start of each test.
 
 ## Keep score across objects
 

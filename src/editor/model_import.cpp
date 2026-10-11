@@ -1,6 +1,8 @@
 #include "editor/model_import.hpp"
 
 #include <algorithm>
+#include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -13,7 +15,9 @@ using namespace gltf_json;
 
 constexpr std::string_view kTextureSuffix = "Texture";  // "baseColorTexture", "normalTexture"...
 constexpr std::string_view kDataUriPrefix = "data:";    // an image stored inside the JSON itself
-constexpr int kOnlyBuffer = 0;                          // a .glb keeps everything in its first buffer
+constexpr const char* kParentStep = "..";               // how a path says "one folder up"
+// How deep a material's extensions are walked for texture references (they nest a few levels).
+constexpr int kMaxMaterialDepth = 64;
 
 bool ends_with(std::string_view text, std::string_view suffix) {
   return text.size() >= suffix.size() && text.compare(text.size() - suffix.size(), suffix.size(), suffix) == 0;
@@ -23,6 +27,37 @@ bool starts_with(std::string_view text, std::string_view prefix) { return text.r
 
 int shifted(int index, int offset) { return index == kNoIndex ? kNoIndex : index + offset; }
 
+// An index the model gives, moved past what the scene already holds; null when it is no index
+// (see gltf_json::index_from), so that nothing made up is written into the scene.
+nlohmann::json shifted_json(const nlohmann::json& index, int offset) {
+  const std::optional<int> number = index_from(index);
+  return number ? nlohmann::json(*number + offset) : nlohmann::json();
+}
+
+// The same for an index a mesh or a skeleton cannot do without: the import stops (the editor
+// reports it) instead of going on with a model that points at nothing.
+nlohmann::json shifted_required(const nlohmann::json& index, int offset) {
+  const std::optional<int> number = index_from(index);
+  if (!number) throw std::invalid_argument("the model holds something that is not an index where glTF wants one");
+  return *number + offset;
+}
+
+void shift_texture_refs_within(nlohmann::json& value, int offset, int depth) {
+  if (!value.is_object() || depth > kMaxMaterialDepth) return;
+  for (auto& [key, child] : value.items()) {
+    if (ends_with(key, kTextureSuffix) && child.is_object()) shift_index(child, kIndex, offset);
+    shift_texture_refs_within(child, offset, depth + 1);
+  }
+}
+
+// Where the scene finds a file the model names from its own folder; empty when that is outside
+// the scene's folder, which a scene's pictures never are.
+std::string uri_from_scene(const std::filesystem::path& file, const std::filesystem::path& scene_dir) {
+  const std::filesystem::path relative = file.lexically_normal().lexically_relative(scene_dir.lexically_normal());
+  if (relative.empty() || relative.is_absolute() || *relative.begin() == kParentStep) return {};
+  return relative.generic_string();
+}
+
 }  // namespace
 
 bool has_several_buffers(const nlohmann::json& model) {
@@ -30,16 +65,17 @@ bool has_several_buffers(const nlohmann::json& model) {
 }
 
 void shift_index(nlohmann::json& object, const char* key, int offset) {
-  if (object.contains(key)) object[key] = object[key].get<int>() + offset;
-}
-
-void shift_texture_refs(nlohmann::json& value, int offset) {
-  if (!value.is_object()) return;
-  for (auto& [key, child] : value.items()) {
-    if (ends_with(key, kTextureSuffix) && child.is_object()) shift_index(child, kIndex, offset);
-    shift_texture_refs(child, offset);
+  if (!object.is_object() || !object.contains(key)) return;
+  const nlohmann::json moved = shifted_json(object[key], offset);
+  // (What is there but is no index is taken out: left in, it would be read as some index later.)
+  if (moved.is_null()) {
+    object.erase(key);
+  } else {
+    object[key] = moved;
   }
 }
+
+void shift_texture_refs(nlohmann::json& value, int offset) { shift_texture_refs_within(value, offset, 0); }
 
 void merge_string_list(nlohmann::json& into, const nlohmann::json& from, const char* key) {
   if (!from.contains(key)) return;
@@ -51,7 +87,10 @@ void merge_string_list(nlohmann::json& into, const nlohmann::json& from, const c
 
 nlohmann::json imported_buffer_view(nlohmann::json view, const JsonOffsets& offsets) {
   view[kBuffer] = kOnlyBuffer;
-  view[kByteOffset] = view.value(kByteOffset, 0) + offsets.bin;
+  // (An offset that is not a whole number of zero or more is no offset: the view starts at its data.)
+  const auto offset = view.find(kByteOffset);
+  const bool given = offset != view.end() && offset->is_number_integer() && *offset >= 0;
+  view[kByteOffset] = (given ? offset->get<std::size_t>() : 0) + offsets.bin;
   return view;
 }
 
@@ -68,9 +107,15 @@ nlohmann::json imported_image(nlohmann::json image, const JsonOffsets& offsets, 
                               const std::filesystem::path& scene_dir) {
   shift_index(image, kBufferView, offsets.buffer_views);
   if (!image.contains(kUri)) return image;
-  const std::string uri = image[kUri].get<std::string>();
+  const std::string uri = image[kUri].is_string() ? image[kUri].get<std::string>() : std::string();
   if (starts_with(uri, kDataUriPrefix)) return image;
-  image[kUri] = (model_dir / uri).lexically_relative(scene_dir).generic_string();
+  const std::string from_scene = uri_from_scene(model_dir / uri, scene_dir);
+  // (A picture outside the scene's folder is not the scene's to read: the image comes without one.)
+  if (uri.empty() || from_scene.empty()) {
+    image.erase(kUri);
+  } else {
+    image[kUri] = from_scene;
+  }
   return image;
 }
 
@@ -89,7 +134,8 @@ nlohmann::json imported_material(nlohmann::json material, const JsonOffsets& off
 
 nlohmann::json imported_mesh(nlohmann::json mesh, const JsonOffsets& offsets) {
   for (nlohmann::json& primitive : mesh[kPrimitives]) {
-    for (auto& [name, accessor] : primitive[kAttributes].items()) accessor = accessor.get<int>() + offsets.accessors;
+    for (auto& [name, accessor] : primitive[kAttributes].items())
+      accessor = shifted_required(accessor, offsets.accessors);
     shift_index(primitive, kIndices, offsets.accessors);
     shift_index(primitive, kMaterial, offsets.materials);
     primitive.erase(kTargets);
@@ -110,7 +156,7 @@ nlohmann::json imported_node(nlohmann::json node, const JsonOffsets& offsets) {
 }
 
 nlohmann::json imported_skin(nlohmann::json skin, const JsonOffsets& offsets) {
-  for (nlohmann::json& joint : skin[kJoints]) joint = joint.get<int>() + offsets.nodes;
+  for (nlohmann::json& joint : skin[kJoints]) joint = shifted_required(joint, offsets.nodes);
   shift_index(skin, kSkeleton, offsets.nodes);
   shift_index(skin, kInverseBindMatrices, offsets.accessors);
   return skin;

@@ -5,6 +5,7 @@
 #include <mruby/string.h>
 
 #include <filesystem>
+#include <algorithm>
 #include <fstream>
 
 #include <nlohmann/json.hpp>
@@ -282,5 +283,68 @@ TEST_CASE("a built game never carries a signing key left in its folder") {
   CHECK(signing_key_file("keys/upload.jks"));
   CHECK(signing_key_file("release.p12"));
   CHECK_FALSE(signing_key_file("scene.glb"));
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("a game.json that holds the wrong kinds of things is read as far as it makes sense") {
+  constexpr int kHuge = 2000000000;
+  const auto dir = fresh("odd_settings");
+  std::filesystem::create_directories(dir);
+  const auto settings_of = [&dir](const std::string& text) {
+    std::ofstream(dir / "game.json") << text;
+    return read_game_settings(dir);
+  };
+  const GameSettings wrong = settings_of(R"({"title": 5, "window_width": "wide", "window_height": [720]})");
+  CHECK(wrong.title == dir.filename().string());
+  CHECK(wrong.window_width == config::kWindowWidth);
+  CHECK(wrong.window_height == config::kWindowHeight);
+  const GameSettings fractional = settings_of(R"({"title": {"a": 1}, "window_width": 800.5, "window_height": null})");
+  CHECK(fractional.window_width == config::kWindowWidth);
+  CHECK(fractional.window_height == config::kWindowHeight);
+
+  // A window is neither a speck nor larger than any screen.
+  const GameSettings tiny = settings_of(R"({"window_width": 0, "window_height": -600})");
+  CHECK(tiny.window_width == config::kMinWindowSide);
+  CHECK(tiny.window_height == config::kMinWindowSide);
+  const GameSettings vast =
+      settings_of(R"({"window_width": )" + std::to_string(kHuge) + R"(, "window_height": 99999999999999999999})");
+  CHECK(vast.window_width == config::kMaxWindowSide);
+  CHECK(vast.window_height >= config::kMinWindowSide);
+  CHECK(vast.window_height <= config::kMaxWindowSide);
+
+  CHECK(settings_of("{\"title\": \"Line\\nbreak\\u001b[2J\"}").title == "Line?break?[2J");
+  CHECK(settings_of("[1, 2]").title == dir.filename().string());
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("a built game holds the game's own files: nothing hidden, no backups, nothing a link points at") {
+  const std::filesystem::path dir = fresh("build_tidy");
+  std::filesystem::create_directories(dir / "outside");
+  std::filesystem::copy(redgem::test::fixture("games/sandbox"), dir / "game_src",
+                        std::filesystem::copy_options::recursive);
+  const std::filesystem::path game = dir / "game_src";
+  std::ofstream(dir / "outside" / "passwords.txt") << "secret";
+  std::ofstream(game / ".env") << "TOKEN=secret";
+  std::filesystem::create_directories(game / ".git");
+  std::ofstream(game / ".git" / "config") << "x";
+  std::ofstream(game / "scripts" / "probe.rb~") << "x";
+  std::ofstream(game / "notes.txt") << "kept";
+  std::filesystem::create_symlink(dir / "outside" / "passwords.txt", game / "linked.txt");
+  std::filesystem::create_directory_symlink(dir / "outside", game / "linked_folder");
+  std::ofstream(dir / "engine") << "engine";
+  std::string error;
+  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", host_build_target(), error), error);
+  const std::filesystem::path built = dir / "out" / "game";
+  CHECK(std::filesystem::exists(built / "scene.glb"));
+  CHECK(std::filesystem::exists(built / "scenes" / "level2.glb"));
+  CHECK(std::filesystem::exists(built / "notes.txt"));
+  for (const char* left_behind : {".env", ".git", "scripts/probe.rb~", "linked.txt", "linked_folder"}) {
+    CAPTURE(left_behind);
+    CHECK_FALSE(std::filesystem::exists(std::filesystem::symlink_status(built / left_behind)));
+  }
+  const std::vector<std::filesystem::path> shipped = shipped_files(game);
+  CHECK(std::find(shipped.begin(), shipped.end(), "notes.txt") != shipped.end());
+  CHECK(std::find(shipped.begin(), shipped.end(), "linked.txt") == shipped.end());
+  CHECK(std::is_sorted(shipped.begin(), shipped.end()));
   std::filesystem::remove_all(dir);
 }

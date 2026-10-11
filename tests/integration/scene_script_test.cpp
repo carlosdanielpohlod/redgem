@@ -3,6 +3,10 @@
 #include <mruby.h>
 #include <mruby/string.h>
 
+#include <filesystem>
+#include <fstream>
+#include <variant>
+
 #include "app/engine.hpp"
 #include "core/config.hpp"
 #include "script/script_naming.hpp"
@@ -150,4 +154,31 @@ TEST_CASE("a scene script of the wrong kind is reported") {
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   CHECK(std::get<std::unique_ptr<Engine>>(created)->scripts().error_count() == 1);
   CHECK(capture.contains("must inherit from SceneScript"));
+}
+
+TEST_CASE("an object's script is a file of the game's scripts folder, or it is not loaded") {
+  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem-script-outside-test";
+  std::filesystem::remove_all(game);
+  std::filesystem::create_directories(game / "scripts");
+  std::ofstream(game / "outside.rb") << "$outside_ran = true\nclass Outside < Behaviour\nend\n";
+  std::ofstream(game / "scripts" / "inside.rb") << "$inside_ran = true\nclass Inside < Behaviour\nend\n";
+  SceneDesc scene = bare_scene();
+  scene.nodes[0].props = {{"script", std::string("../outside.rb")}};
+  scene.nodes[1].props = {{"script", std::string((game / "outside.rb").string())}};
+  scene.nodes[2].props = {{"script", std::string("inside.rb")}};
+  test::LogCapture capture;
+  EngineOptions options;
+  options.game_dir = game;
+  options.headless = true;
+  options.scene = &scene;
+  auto created = Engine::create(options);
+  REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
+  Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
+  CHECK(ruby(engine, "$outside_ran.inspect") == "nil");
+  CHECK(ruby(engine, "$inside_ran.inspect") == "true");
+  CHECK(engine.scripts().error_count() == 2);
+  CHECK(capture.contains("outside the scripts folder"));
+  // Nor does a scene outside the game's folders load.
+  CHECK_FALSE(engine.scripts().eval("Game.load_scene('../../elsewhere')", "test.rb").ok);
+  std::filesystem::remove_all(game);
 }

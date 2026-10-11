@@ -39,12 +39,14 @@ add_library(redgem_engine STATIC
   core/log.cpp
   core/xml_writer.cpp
   core/platform.cpp
+  core/safe_path.cpp
   core/math.cpp
   core/fixed_clock.cpp
   scene/property.cpp
   scene/extras_parser.cpp
   scene/transform.cpp
   scene/scene_desc.cpp
+  scene/gltf_checks.cpp
   scene/gltf_loader.cpp
   scene/cgltf_impl.cpp
   scene/scene.cpp
@@ -83,6 +85,7 @@ add_library(redgem_engine STATIC
   script/bindings/save_bindings.cpp
   script/bindings/network_bindings.cpp
   render/mesh_builder.cpp
+  render/image_header.cpp
   render/renderer.cpp
   render/renderer_setup.cpp
   render/renderer_scene.cpp

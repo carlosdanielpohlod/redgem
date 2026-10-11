@@ -313,3 +313,107 @@ TEST_CASE("only the scene the engine loads is kept, with the new top-level nodes
   keep_active_scene(sceneless, json({0}));
   CHECK(sceneless[kScenes][0][kNodes] == json({0}));
 }
+
+TEST_CASE("a file's 'scene' that names none of its scenes, or is no number, keeps a scene made here") {
+  constexpr int kNoSuchScene = 7;
+  for (const json& scene : {json(-1), json(kNoSuchScene), json("first"), json(nullptr), json(1.5)}) {
+    CAPTURE(scene.dump());
+    json document = {{kScene, scene}, {kScenes, {{{kName, "Level"}}}}};
+    keep_active_scene(document, json({0}));
+    REQUIRE(document[kScenes].size() == 1);
+    CHECK(document[kScenes][0][kNodes] == json({0}));
+    CHECK_FALSE(document[kScenes][0].contains(kName));
+    CHECK(document[kScene] == 0);
+  }
+  json not_a_list = {{kScene, 0}, {kScenes, "none"}};
+  keep_active_scene(not_a_list, json({0}));
+  CHECK(not_a_list[kScenes].size() == 1);
+}
+
+TEST_CASE("an index is a whole number of zero or more, whatever else a file holds in its place") {
+  constexpr int kIndex = 12;
+  CHECK(index_from(json(kIndex)) == kIndex);
+  CHECK(index_from(json(0u)) == 0);
+  for (const json& other :
+       {json(-1), json(1.5), json("3"), json(nullptr), json(true), json({1}), json(kMaxIndex + 1)}) {
+    CAPTURE(other.dump());
+    CHECK_FALSE(index_from(other).has_value());
+  }
+}
+
+TEST_CASE("a skin or an animation that names a node with something that is no index loses it, without an error") {
+  const std::vector<int> current = {0, 1};
+  CHECK_FALSE(skin_with_current_nodes({{kJoints, {0, "one"}}}, current).has_value());
+  CHECK_FALSE(skin_with_current_nodes({{kJoints, {0, -1}}}, current).has_value());
+  const json channel = {{kTarget, {{kNode, nullptr}}}};
+  CHECK_FALSE(animation_with_current_nodes({{kChannels, {channel}}}, current).has_value());
+}
+
+namespace {
+
+constexpr std::size_t kStreamFloats = 9;  // three vertices
+constexpr std::size_t kStreamBytes = kStreamFloats * sizeof(float);
+constexpr std::size_t kViewAt = 64;  // bytes into the binary chunk
+constexpr std::size_t kChunkBytes = 256;
+
+// A file with one accessor of three packed positions in a buffer view at kViewAt.
+json positions_file() {
+  return {{kAccessors, {{{kBufferView, 0}, {kComponentType, kFloatComponent}, {kCount, 3}, {kType, kVec3Type}}}},
+          {kBufferViews, {{{kBuffer, 0}, {kByteOffset, kViewAt}, {kByteLength, kStreamBytes}}}}};
+}
+
+std::optional<std::size_t> offset_in(const json& file) {
+  return vec3_stream_offset(file, 0, kStreamFloats, kChunkBytes);
+}
+
+}  // namespace
+
+TEST_CASE("vertices are written back only where the file really keeps them") {
+  CHECK(offset_in(positions_file()) == kViewAt);
+  json with_accessor_offset = positions_file();
+  with_accessor_offset[kBufferViews][0][kByteLength] = kStreamBytes + 4;
+  with_accessor_offset[kAccessors][0][kByteOffset] = 4;
+  CHECK(offset_in(with_accessor_offset) == kViewAt + 4);
+  CHECK_FALSE(vec3_stream_offset(positions_file(), 1, kStreamFloats, kChunkBytes).has_value());
+  CHECK_FALSE(vec3_stream_offset(positions_file(), 0, kStreamFloats + 3, kChunkBytes).has_value());
+  CHECK_FALSE(vec3_stream_offset(positions_file(), 0, kStreamFloats, kViewAt + kStreamBytes - 1).has_value());
+}
+
+TEST_CASE("an offset before the start of the data is refused instead of becoming a huge one") {
+  for (const char* owner : {kBufferViews, kAccessors}) {
+    for (const json& offset : {json(-8), json(-1), json("8"), json(8.5), json(nullptr)}) {
+      CAPTURE(owner);
+      CAPTURE(offset.dump());
+      json file = positions_file();
+      file[owner][0][kByteOffset] = offset;
+      CHECK_FALSE(offset_in(file).has_value());
+    }
+  }
+}
+
+TEST_CASE("vertices are not written into data kept any other way than the editor keeps it") {
+  const std::pair<const char*, json> changes[] = {
+      {kComponentType, 5123}, {kType, kVec2Type}, {kType, 3},        {kCount, 4},
+      {kCount, -3},           {kBufferView, 5},   {kBufferView, -1}, {kBufferView, "0"}};
+  for (const auto& [key, value] : changes) {
+    CAPTURE(key);
+    CAPTURE(value.dump());
+    json file = positions_file();
+    file[kAccessors][0][key] = value;
+    CHECK_FALSE(offset_in(file).has_value());
+  }
+  const std::pair<const char*, json> view_changes[] = {
+      {kBuffer, 1}, {kByteStride, 16}, {kByteLength, kStreamBytes - 1}, {kByteLength, -1}, {kByteOffset, kChunkBytes}};
+  for (const auto& [key, value] : view_changes) {
+    CAPTURE(key);
+    CAPTURE(value.dump());
+    json file = positions_file();
+    file[kBufferViews][0][key] = value;
+    CHECK_FALSE(offset_in(file).has_value());
+  }
+  json no_buffer = positions_file();
+  no_buffer[kBufferViews][0].erase(kBuffer);
+  CHECK_FALSE(offset_in(no_buffer).has_value());
+  CHECK_FALSE(offset_in(json::array()).has_value());
+  CHECK_FALSE(offset_in(json{{kAccessors, 3}}).has_value());
+}

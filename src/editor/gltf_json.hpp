@@ -3,6 +3,8 @@
 // The glTF JSON the editor writes when it saves a scene. Everything here works on JSON values
 // alone (no document, no file), so each piece can be tested by itself.
 
+#include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <set>
 #include <vector>
@@ -99,6 +101,12 @@ inline constexpr const char* kVec3Type = "VEC3";
 inline constexpr const char* kVec2Type = "VEC2";
 inline constexpr const char* kScalarType = "SCALAR";
 
+// What else an accessor and a buffer view say.
+inline constexpr int kFloatComponent = 5126;  // glTF componentType FLOAT
+inline constexpr int kOnlyBuffer = 0;         // a .glb keeps everything in its first buffer
+// The highest number taken as an index into one of the file's lists (far more entries than a file holds).
+inline constexpr std::size_t kMaxIndex = 1u << 30;
+
 // Values of "type" on lights and cameras.
 inline constexpr const char* kDirectionalLight = "directional";
 inline constexpr const char* kPointLight = "point";
@@ -116,6 +124,18 @@ inline constexpr const char* kDefaultSceneName = "Scene";
 
 // A scene with no objects yet.
 nlohmann::json empty_document();
+
+// What a file gives as an index into one of its lists: a whole number, zero or more and not
+// absurdly large. nullopt for anything else (a text, a fraction, a negative number): a file may
+// hold any JSON where glTF wants an index.
+std::optional<int> index_from(const nlohmann::json& value);
+
+// Where in a .glb's binary chunk of `bin_size` bytes an accessor keeps `float_count` floats, when
+// it keeps them the way the editor writes positions and normals: three floats a vertex, packed,
+// in the file's only buffer, wholly inside its buffer view and the chunk. nullopt for anything
+// else, so that nothing is ever written where the file merely says its data is.
+std::optional<std::size_t> vec3_stream_offset(const nlohmann::json& gltf, std::size_t accessor_index,
+                                              std::size_t float_count, std::size_t bin_size);
 
 // A custom property as glTF extras hold it (a flag, a number or a text).
 nlohmann::json property_json(const PropertyValue& value);

@@ -66,6 +66,11 @@ struct PrimitiveDesc {
   int material = kNoIndex;
 };
 
+// What keeps a primitive from being drawn or collided with: no vertices, normals that are not one
+// per vertex, or indices that do not make whole triangles of the vertices it has. Empty when
+// nothing does. Everything that walks a primitive's indices relies on this having been checked.
+std::string primitive_shape_problem(const PrimitiveDesc& primitive);
+
 struct Bounds {
   Vec3 min = Vec3::zero();
   Vec3 max = Vec3::zero();

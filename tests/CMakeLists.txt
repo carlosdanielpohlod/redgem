@@ -8,6 +8,9 @@ add_executable(redgem_tests
   unit/transform_test.cpp
   unit/scene_test.cpp
   unit/gltf_loader_test.cpp
+  unit/gltf_loader_safety_test.cpp
+  unit/safe_path_test.cpp
+  unit/image_header_test.cpp
   unit/body_config_test.cpp
   unit/input_test.cpp
   unit/script_naming_test.cpp

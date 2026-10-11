@@ -4,10 +4,11 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <functional>
+#include <exception>
 #include <map>
 #include <optional>
 #include <set>
+#include <utility>
 
 #include "core/config.hpp"
 #include "core/log.hpp"
@@ -29,9 +30,7 @@ constexpr int kSuffixBufferSize = 16;             // characters: room for a dot 
 constexpr const char* kSuffixFormat = ".%0*d";    // a dot and the number, zero-padded to those digits
 constexpr int kArrayBufferTarget = 34962;         // glTF bufferView.target for vertex data
 constexpr int kElementArrayBufferTarget = 34963;  // ... and for indices
-constexpr int kFloatComponent = 5126;             // glTF componentType FLOAT
 constexpr int kUnsignedIntComponent = 5125;       // glTF componentType UNSIGNED_INT
-constexpr int kOnlyBuffer = 0;                    // a .glb keeps everything in its first buffer
 constexpr int kOnlyPrimitive = 0;                 // a terrain's mesh is a single piece
 constexpr float kCameraNear = 0.1f;               // meters: clip planes of a new camera
 constexpr float kCameraFar = 1000.0f;
@@ -121,6 +120,18 @@ bool same_nodes(const std::vector<NodeDesc>& a, const std::vector<NodeDesc>& b) 
   return true;
 }
 
+// What a file that holds something else than glTF says it should is reported as.
+std::string unusable(const std::filesystem::path& path, const std::exception& problem) {
+  return path.string() + " cannot be used: " + problem.what();
+}
+
+// Shortens json[key] to its first `count` entries.
+void keep_first(nlohmann::json& json, const char* key, int count) {
+  if (!json.contains(key) || !json[key].is_array()) return;
+  nlohmann::json& list = json[key];
+  while (static_cast<int>(list.size()) > count) list.erase(list.size() - 1);
+}
+
 // For each old index, where `order` puts it (kNoIndex when it is left out).
 std::vector<int> positions_in(const std::vector<int>& order, std::size_t count) {
   std::vector<int> position(count, kNoIndex);
@@ -202,19 +213,30 @@ std::string numbered_name(const std::string& base, int number) {
   return base + buffer;
 }
 
+// (A list of nodes still to visit, not a function calling itself: however deep a scene is nested,
+// walking it takes no more stack. Never more nodes than there are, whatever their links say.)
 std::vector<int> subtree(const std::vector<NodeDesc>& nodes, int index) {
   std::vector<int> out;
-  std::function<void(int)> visit = [&](int i) {
-    out.push_back(i);
-    for (const int child : nodes[i].children) visit(child);
-  };
-  visit(index);
+  std::vector<int> pending = {index};
+  while (!pending.empty() && out.size() < nodes.size()) {
+    const int next = pending.back();
+    pending.pop_back();
+    out.push_back(next);
+    const std::vector<int>& children = nodes[next].children;
+    pending.insert(pending.end(), children.rbegin(), children.rend());  // the first child comes out first
+  }
   return out;
 }
 
+// (Up from the node to its top-level ancestor, then the placements combined from the top down.)
 Transform world_of(const std::vector<NodeDesc>& nodes, int index) {
-  const NodeDesc& node = nodes[index];
-  return node.parent == kNoIndex ? node.local : combine(world_of(nodes, node.parent), node.local);
+  std::vector<int> chain;
+  for (int node = index; node != kNoIndex && chain.size() < nodes.size(); node = nodes[node].parent) {
+    chain.push_back(node);
+  }
+  Transform world = nodes[chain.back()].local;
+  for (auto node = chain.rbegin() + 1; node != chain.rend(); ++node) world = combine(world, nodes[*node].local);
+  return world;
 }
 
 std::vector<int> order_without(int count, const std::vector<int>& removed) {
@@ -248,6 +270,14 @@ std::vector<NodeDesc> nodes_in_order(const std::vector<NodeDesc>& nodes, const s
 using namespace scene_document_detail;
 
 std::variant<SceneDocument, std::string> SceneDocument::open(const std::filesystem::path& path) {
+  try {
+    return open_file(path);
+  } catch (const std::exception& problem) {
+    return unusable(path, problem);
+  }
+}
+
+std::variant<SceneDocument, std::string> SceneDocument::open_file(const std::filesystem::path& path) {
   LoadResult loaded = load_gltf_scene(path.string());
   if (!loaded.ok) return loaded.error;
   for (const std::string& warning : loaded.warnings) log::warning(warning);
@@ -350,15 +380,11 @@ bool SceneDocument::store_mesh_vertices(int mesh, std::string& error) {
 }
 
 bool SceneDocument::store_stream(std::size_t accessor_index, const std::vector<float>& values) {
-  const nlohmann::json& accessor = glb_.json[kAccessors][accessor_index];
-  const nlohmann::json& view = glb_.json[kBufferViews][accessor.at(kBufferView).get<std::size_t>()];
-  const std::size_t offset = view.value(kByteOffset, std::size_t{0}) + accessor.value(kByteOffset, std::size_t{0});
-  const std::size_t bytes = values.size() * sizeof(float);
-  const bool packed =
-      !view.contains(kByteStride) || view[kByteStride].get<std::size_t>() == config::kFloatsPerPosition * sizeof(float);
-  const bool same_count = accessor.at(kCount).get<std::size_t>() * config::kFloatsPerPosition == values.size();
-  if (!packed || !same_count || offset + bytes > glb_.bin.size()) return false;
-  std::memcpy(glb_.bin.data() + offset, values.data(), bytes);
+  // (Where the bytes go is worked out from what the file says, and checked against the chunk itself.)
+  const std::optional<std::size_t> offset =
+      vec3_stream_offset(glb_.json, accessor_index, values.size(), glb_.bin.size());
+  if (!offset) return false;
+  std::memcpy(glb_.bin.data() + *offset, values.data(), values.size() * sizeof(float));
   return true;
 }
 
@@ -967,6 +993,15 @@ void SceneDocument::append_model_nodes(const SceneDesc& model, const model_impor
 }
 
 int SceneDocument::import_model(const std::filesystem::path& path, std::string& error, int parent) {
+  try {
+    return import_model_file(path, error, parent);
+  } catch (const std::exception& problem) {
+    error = unusable(path, problem);
+    return kNoIndex;
+  }
+}
+
+int SceneDocument::import_model_file(const std::filesystem::path& path, std::string& error, int parent) {
   if (parent < kNoIndex || parent >= node_count()) {
     error = "invalid parent object";
     return kNoIndex;
@@ -984,10 +1019,33 @@ int SceneDocument::import_model(const std::filesystem::path& path, std::string& 
 int SceneDocument::append_model(const SceneDesc& scene, const GlbFile& source, const std::filesystem::path& path,
                                 int parent) {
   model_import::JsonOffsets offsets = import_offsets();
+  const std::size_t bin_size = glb_.bin.size();
+  const std::size_t animations = source_animations_.size();
   offsets.bin = append_binary(source.bin.data(), source.bin.size());
-  append_model_json(source.json, offsets, path.parent_path());
+  try {
+    append_model_json(source.json, offsets, path.parent_path());
+  } catch (const std::exception&) {
+    forget_model(offsets, bin_size, animations);
+    throw;
+  }
   checkpoint();
   return append_model_description(scene, offsets, path.stem().string(), parent);
+}
+
+void SceneDocument::forget_model(const model_import::JsonOffsets& offsets, std::size_t bin_size,
+                                 std::size_t animations) {
+  glb_.bin.resize(bin_size);
+  const std::pair<const char*, int> lists[] = {{kBufferViews, offsets.buffer_views},
+                                               {kAccessors, offsets.accessors},
+                                               {kImages, offsets.images},
+                                               {kSamplers, offsets.samplers},
+                                               {kTextures, offsets.textures},
+                                               {kMaterials, offsets.materials},
+                                               {kMeshes, offsets.meshes}};
+  for (const auto& [key, count] : lists) keep_first(glb_.json, key, count);
+  while (static_cast<int>(source_nodes_.size()) > offsets.nodes) source_nodes_.erase(source_nodes_.size() - 1);
+  while (static_cast<int>(source_skins_.size()) > offsets.skins) source_skins_.erase(source_skins_.size() - 1);
+  while (source_animations_.size() > animations) source_animations_.erase(source_animations_.size() - 1);
 }
 
 int SceneDocument::material_of(int node) const {
@@ -1011,6 +1069,15 @@ void SceneDocument::set_material(int index, const MaterialDesc& material, bool r
 bool SceneDocument::save(std::string& error) { return save_as(path_, error); }
 
 bool SceneDocument::save_as(const std::filesystem::path& path, std::string& error) {
+  try {
+    return save_file(path, error);
+  } catch (const std::exception& problem) {
+    error = unusable(path, problem);
+    return false;
+  }
+}
+
+bool SceneDocument::save_file(const std::filesystem::path& path, std::string& error) {
   if (!sync_glb(error)) return false;
   for (const int mesh : unsaved_meshes_) {
     if (!store_mesh_vertices(mesh, error)) return false;

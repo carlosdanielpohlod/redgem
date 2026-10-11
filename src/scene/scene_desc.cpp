@@ -2,7 +2,29 @@
 
 #include <algorithm>
 
+#include "core/config.hpp"
+
 namespace redgem {
+namespace {
+
+bool whole_triangles_of(const std::vector<std::uint32_t>& indices, std::size_t vertex_count) {
+  if (indices.size() % config::kVerticesPerTriangle != 0) return false;
+  return std::all_of(indices.begin(), indices.end(),
+                     [vertex_count](std::uint32_t index) { return index < vertex_count; });
+}
+
+}  // namespace
+
+std::string primitive_shape_problem(const PrimitiveDesc& primitive) {
+  const std::size_t vertex_count = primitive.positions.size() / config::kFloatsPerPosition;
+  if (vertex_count == 0) return "primitive has no vertices";
+  if (primitive.positions.size() % config::kFloatsPerPosition != 0 ||
+      primitive.normals.size() != primitive.positions.size()) {
+    return "primitive has vertices without a whole position and normal";
+  }
+  if (!whole_triangles_of(primitive.indices, vertex_count)) return "primitive has invalid triangle indices";
+  return {};
+}
 
 void Bounds::include(Vec3 point) {
   if (!valid) {

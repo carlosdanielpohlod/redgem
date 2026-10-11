@@ -270,3 +270,26 @@ TEST_CASE("an app's id starts with a letter and tells apart names that differ on
   CHECK(id.size() == std::string("com.redgem.mygame_").size() + kIdDigits);
   CHECK(id.find_first_not_of("0123456789abcdef", id.size() - kIdDigits) == std::string::npos);
 }
+
+TEST_CASE("an app holds no file a link points at, and no file whose name would break its list of files") {
+  const Scratch scratch;
+  const std::map<std::string, std::filesystem::path> runtimes = {
+      {"x86_64", scratch.file("built/libredgem.so", "engine")}};
+  const std::filesystem::path stage = scratch.dir / "stage";
+  const std::filesystem::path game = scratch.dir / "game_src";
+  std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
+  scratch.file("outside/passwords.txt", "secret");
+  std::filesystem::create_symlink(scratch.dir / "outside" / "passwords.txt", game / "linked.txt");
+  std::filesystem::create_directory_symlink(scratch.dir / "outside", game / "linked_folder");
+  std::string error;
+  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", stage, error), error);
+  CHECK(std::filesystem::exists(stage / "assets/game/scene.glb"));
+  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/linked.txt"));
+  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/linked_folder"));
+  CHECK(read(stage / "assets/game.files").find("linked") == std::string::npos);
+
+  std::ofstream(game / "scripts" / "two\nlines.rb") << "x";
+  CHECK_FALSE(stage_android_game(game, runtimes, "stamp", stage, error));
+  CHECK(error.find("line break") != std::string::npos);
+  CHECK(error.find("scripts") != std::string::npos);
+}

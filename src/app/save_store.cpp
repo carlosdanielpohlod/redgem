@@ -1,5 +1,7 @@
 #include "app/save_store.hpp"
 
+#include <cstdint>
+#include <cstdio>
 #include <fstream>
 
 #include <nlohmann/json.hpp>
@@ -12,7 +14,32 @@ namespace {
 
 constexpr const char* kSavesFolder = "saves";
 constexpr const char* kSaveExtension = ".json";
-constexpr const char* kTestSavesFolder = "redgem-test-saves";
+constexpr const char* kTestSavesFolder = "test-saves";  // beside the players' saves, in the user's own folder
+constexpr char kNameJoiner = '-';
+// A few digits made from where the game is, so that two games in folders of the same name do not
+// share a save.
+constexpr std::uint32_t kHashSeed = 2166136261u;  // FNV-1a
+constexpr std::uint32_t kHashPrime = 16777619u;
+constexpr const char* kHashFormat = "%08x";  // eight hex digits
+
+// The folder a game is known by: a built game's files sit in a folder called "game", and it is
+// the folder around that one.
+std::filesystem::path named_folder(const std::filesystem::path& game_dir) {
+  std::error_code fs_error;
+  std::filesystem::path named = normalized_folder(std::filesystem::weakly_canonical(game_dir, fs_error));
+  if (fs_error) named = normalized_folder(std::filesystem::absolute(game_dir, fs_error));
+  return named.filename() == kBundledGameFolder ? named.parent_path() : named;
+}
+
+std::string place_digits(const std::filesystem::path& folder) {
+  std::uint32_t hash = kHashSeed;
+  for (const char c : folder.generic_string()) hash = (hash ^ static_cast<unsigned char>(c)) * kHashPrime;
+  char digits[sizeof("ffffffff")];
+  std::snprintf(digits, sizeof(digits), kHashFormat, hash);
+  return digits;
+}
+
+std::filesystem::path saves_folder() { return recent_games_file().parent_path() / kSavesFolder; }
 constexpr const char* kPartialSuffix = ".part";  // of a save still being written
 constexpr int kIndent = 2;
 
@@ -44,14 +71,13 @@ bool write_whole(const std::filesystem::path& file, const std::string& text) {
 }  // namespace
 
 std::filesystem::path save_file_for(const std::filesystem::path& game_dir) {
-  // A built game's files sit in a folder called "game": its name is the folder around it.
-  std::filesystem::path named = normalized_folder(std::filesystem::absolute(game_dir));
-  if (named.filename() == kBundledGameFolder) named = named.parent_path();
-  return recent_games_file().parent_path() / kSavesFolder / (named.filename().string() + kSaveExtension);
+  const std::filesystem::path named = named_folder(game_dir);
+  return saves_folder() / (named.filename().string() + kNameJoiner + place_digits(named) + kSaveExtension);
 }
 
 std::filesystem::path test_save_file_for(const std::filesystem::path& game_dir) {
-  return std::filesystem::temp_directory_path() / kTestSavesFolder / save_file_for(game_dir).filename();
+  // (In the user's own folder, not in one every user of the machine can write to and guess.)
+  return recent_games_file().parent_path() / kTestSavesFolder / save_file_for(game_dir).filename();
 }
 
 void SaveStore::load() {

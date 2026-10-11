@@ -5,14 +5,14 @@
 #include <cgltf.h>
 
 #include <filesystem>
-#include <fstream>
-#include <iterator>
 #include <memory>
 #include <optional>
 #include <unordered_map>
 
 #include "core/config.hpp"
+#include "core/safe_path.hpp"
 #include "scene/extras_parser.hpp"
+#include "scene/gltf_checks.hpp"
 
 namespace redgem {
 namespace {
@@ -26,7 +26,6 @@ constexpr int kAlphaChannel = 3;
 constexpr const char* kJpegMimeType = "image/jpeg";
 constexpr const char* kJpegExtension = ".jpg";
 constexpr const char* kPngExtension = ".png";
-constexpr const char* kDataUriPrefix = "data:";  // an image written into the .gltf's own text
 constexpr float kOpaqueAlpha = 1.0f;
 constexpr int kJointsPerVertex = config::kJointsPerVertex;
 constexpr cgltf_uint kMaxJointIndex = config::kMaxSkinJoints - 1;
@@ -62,7 +61,9 @@ std::string describe(cgltf_result result) {
   return "unknown error";
 }
 
+// The floats of an accessor; none for one that cannot be read (see gltf_checks::readable).
 std::vector<float> unpack_floats(const cgltf_accessor* accessor) {
+  if (!gltf_checks::readable(accessor)) return {};
   const cgltf_size components = cgltf_num_components(accessor->type);
   std::vector<float> out(accessor->count * components);
   cgltf_accessor_unpack_floats(accessor, out.data(), out.size());
@@ -137,14 +138,8 @@ std::vector<std::uint8_t> embedded_bytes(const cgltf_buffer_view& view) {
   return {bytes, bytes + view.size};
 }
 
-std::vector<std::uint8_t> file_bytes(const std::filesystem::path& file) {
-  std::ifstream in(file, std::ios::binary);
-  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
-
-bool names_a_file(const char* uri) { return uri != nullptr && std::string(uri).rfind(kDataUriPrefix, 0) != 0; }
-
 std::vector<std::uint8_t> to_joint_bytes(const cgltf_accessor* accessor) {
+  if (!gltf_checks::readable(accessor)) return {};
   std::vector<std::uint8_t> out(accessor->count * kJointsPerVertex);
   for (cgltf_size v = 0; v < accessor->count; ++v) {
     cgltf_uint joints[kJointsPerVertex] = {};
@@ -158,6 +153,7 @@ std::vector<std::uint8_t> to_joint_bytes(const cgltf_accessor* accessor) {
 
 std::vector<std::uint8_t> to_rgba_bytes(const cgltf_accessor* accessor) {
   const std::vector<float> floats = unpack_floats(accessor);
+  if (floats.empty()) return {};
   const cgltf_size components = cgltf_num_components(accessor->type);
   std::vector<std::uint8_t> out(accessor->count * kRgbaComponents);
   for (cgltf_size v = 0; v < accessor->count; ++v) {
@@ -178,6 +174,30 @@ std::vector<float>* floats_of(cgltf_attribute_type type, PrimitiveDesc& primitiv
   return type == cgltf_attribute_type_weights ? &primitive.weights : nullptr;
 }
 
+// The kinds of element glTF gives the attributes that are read: what is read as three floats a
+// vertex has to be three floats a vertex.
+struct AttributeKind {
+  cgltf_attribute_type attribute;
+  cgltf_type kind;
+};
+constexpr AttributeKind kAttributeKinds[] = {
+    {cgltf_attribute_type_position, cgltf_type_vec3}, {cgltf_attribute_type_normal, cgltf_type_vec3},
+    {cgltf_attribute_type_texcoord, cgltf_type_vec2}, {cgltf_attribute_type_joints, cgltf_type_vec4},
+    {cgltf_attribute_type_weights, cgltf_type_vec4},  {cgltf_attribute_type_color, cgltf_type_vec3},
+    {cgltf_attribute_type_color, cgltf_type_vec4},
+};
+
+// Whether an attribute's elements are of a kind glTF gives it (any kind, for one that is not read).
+bool right_kind(const cgltf_attribute& attribute) {
+  bool read = false;
+  for (const AttributeKind& known : kAttributeKinds) {
+    if (known.attribute != attribute.type) continue;
+    if (known.kind == attribute.data->type) return true;
+    read = true;
+  }
+  return !read;
+}
+
 // Only the first set of each attribute is kept (TEXCOORD_0, COLOR_0...).
 void read_attribute(const cgltf_attribute& attribute, PrimitiveDesc& out) {
   if (attribute.index != 0) return;
@@ -186,9 +206,11 @@ void read_attribute(const cgltf_attribute& attribute, PrimitiveDesc& out) {
   if (attribute.type == cgltf_attribute_type_joints) out.joints = to_joint_bytes(attribute.data);
 }
 
-// The triangles' corners: as the file lists them, or every vertex in turn when it lists none.
+// The triangles' corners: as the file lists them (none when its list cannot be read), or every
+// vertex in turn when it lists none.
 std::vector<std::uint32_t> read_indices(const cgltf_primitive& primitive, std::size_t vertex_count) {
   const bool listed = primitive.indices != nullptr;
+  if (listed && !gltf_checks::readable(primitive.indices)) return {};
   std::vector<std::uint32_t> indices(listed ? primitive.indices->count : vertex_count);
   for (std::size_t k = 0; k < indices.size(); ++k) {
     indices[k] = static_cast<std::uint32_t>(listed ? cgltf_accessor_read_index(primitive.indices, k) : k);
@@ -196,26 +218,42 @@ std::vector<std::uint32_t> read_indices(const cgltf_primitive& primitive, std::s
   return indices;
 }
 
-std::array<float, kFloatsPerMatrix> inverse_bind_of(const cgltf_skin& skin, cgltf_size joint) {
+// The accessor holding a skin's inverse bind matrices, when it has a 4x4 matrix of floats for
+// each of `joints` joints; null otherwise (the joints then get the identity).
+const cgltf_accessor* inverse_binds_of(const cgltf_skin& skin, cgltf_size joints) {
+  const cgltf_accessor* matrices = skin.inverse_bind_matrices;
+  const bool usable = gltf_checks::readable(matrices) && matrices->type == cgltf_type_mat4 &&
+                      matrices->component_type == cgltf_component_type_r_32f && matrices->count >= joints;
+  return usable ? matrices : nullptr;
+}
+
+std::array<float, kFloatsPerMatrix> inverse_bind_of(const cgltf_accessor* matrices, cgltf_size joint) {
   std::array<float, kFloatsPerMatrix> matrix = kIdentityMatrix;
-  if (skin.inverse_bind_matrices != nullptr) {
-    cgltf_accessor_read_float(skin.inverse_bind_matrices, joint, matrix.data(), matrix.size());
-  }
+  if (matrices != nullptr) cgltf_accessor_read_float(matrices, joint, matrix.data(), matrix.size());
   return matrix;
 }
+
+// A node waiting to be added to the scene: under which parent, and how deep that puts it.
+struct PendingNode {
+  const cgltf_node* node = nullptr;
+  int parent = kNoIndex;
+  int depth = 0;
+};
 
 class Loader {
  public:
   Loader(const cgltf_data& data, std::filesystem::path base_dir, LoadResult& result)
       : data_(data), base_dir_(std::move(base_dir)), result_(result) {}
 
-  void run() {
+  // Fills the result; returns what made the file unusable, or an empty text.
+  std::string run() {
     load_images();
     load_materials();
     load_meshes();
     load_nodes();
     load_skins();
     load_animations();
+    return problem_;
   }
 
  private:
@@ -231,9 +269,9 @@ class Loader {
     out.file_extension = text_or(image.mime_type, "") == kJpegMimeType ? kJpegExtension : kPngExtension;
     if (image.buffer_view != nullptr) {
       out.encoded = embedded_bytes(*image.buffer_view);
-    } else if (names_a_file(image.uri)) {
-      const std::filesystem::path file = base_dir_ / image.uri;
-      out.encoded = file_bytes(file);
+    } else if (const std::filesystem::path file = gltf_checks::file_of_uri(image.uri, base_dir_); !file.empty()) {
+      // (Only a picture file of the scene's own folder, and not one of any size.)
+      out.encoded = read_file_up_to(file, gltf_checks::kMaxImageFileBytes).value_or(std::vector<std::uint8_t>());
       if (file.has_extension()) out.file_extension = file.extension().string();
     }
     return out;
@@ -293,16 +331,24 @@ class Loader {
 
   MeshDesc load_mesh(const cgltf_mesh& mesh) {
     MeshDesc out;
-    out.name = text_or(mesh.name, "");
+    out.name = printable(text_or(mesh.name, ""));
     for (cgltf_size p = 0; p < mesh.primitives_count; ++p) {
       const cgltf_primitive& primitive = mesh.primitives[p];
       if (primitive.type != cgltf_primitive_type_triangles) {
         warn("mesh '" + out.name + "': skipping non-triangle primitive");
         continue;
       }
-      out.primitives.push_back(load_primitive(primitive, out));
+      if (std::optional<PrimitiveDesc> loaded = load_primitive(primitive, out.name)) keep_primitive(out, *loaded);
     }
     return out;
+  }
+
+  void keep_primitive(MeshDesc& mesh, PrimitiveDesc& primitive) {
+    const std::size_t vertex_count = primitive.positions.size() / config::kFloatsPerPosition;
+    for (std::size_t v = 0; v < vertex_count; ++v) {
+      mesh.bounds.include(vec3_from(&primitive.positions[v * config::kFloatsPerPosition]));
+    }
+    mesh.primitives.push_back(std::move(primitive));
   }
 
   void load_meshes() {
@@ -318,16 +364,34 @@ class Loader {
     for (std::size_t v = 0; v < vertex_count; ++v) primitive.normals[v * config::kFloatsPerNormal + kYOffset] = 1.0f;
   }
 
-  PrimitiveDesc load_primitive(const cgltf_primitive& primitive, MeshDesc& mesh) {
+  // False when one of the attributes that are read is not of the kind glTF gives it.
+  static bool read_attributes(const cgltf_primitive& primitive, PrimitiveDesc& out) {
+    for (cgltf_size a = 0; a < primitive.attributes_count; ++a) {
+      const cgltf_attribute& attribute = primitive.attributes[a];
+      if (attribute.index == 0 && !right_kind(attribute)) return false;
+      read_attribute(attribute, out);
+    }
+    return true;
+  }
+
+  std::nullopt_t dropped(const std::string& mesh_name, const std::string& why) {
+    warn("mesh '" + mesh_name + "': a part is left out (" + why + ")");
+    return std::nullopt;
+  }
+
+  // A part of a mesh, checked here once so that everything using the scene can trust it: its
+  // vertices are whole, its triangles are whole and name only vertices it has. Anything else is
+  // left out with a warning.
+  std::optional<PrimitiveDesc> load_primitive(const cgltf_primitive& primitive, const std::string& mesh_name) {
     PrimitiveDesc out;
     out.material = index_of(primitive.material, data_.materials);
-    for (cgltf_size a = 0; a < primitive.attributes_count; ++a) read_attribute(primitive.attributes[a], out);
-    const std::size_t vertex_count = out.positions.size() / config::kFloatsPerPosition;
-    ensure_normals(out, mesh.name);
-    out.indices = read_indices(primitive, vertex_count);
-    for (std::size_t v = 0; v < vertex_count; ++v) {
-      mesh.bounds.include(vec3_from(&out.positions[v * config::kFloatsPerPosition]));
-    }
+    if (!read_attributes(primitive, out)) return dropped(mesh_name, "an attribute is not of the kind glTF gives it");
+    if (out.positions.empty()) return dropped(mesh_name, "its positions cannot be read");
+    ensure_normals(out, mesh_name);
+    out.indices = read_indices(primitive, out.positions.size() / config::kFloatsPerPosition);
+    if (out.indices.empty()) return dropped(mesh_name, "its triangles cannot be read");
+    const std::string problem = primitive_shape_problem(out);
+    if (!problem.empty()) return dropped(mesh_name, problem);
     return out;
   }
 
@@ -343,14 +407,19 @@ class Loader {
 
   SkinDesc load_skin(const cgltf_skin& skin, const std::vector<int>& nodes) const {
     SkinDesc out;
-    for (cgltf_size j = 0; j < skin.joints_count; ++j) {
+    const cgltf_size joints = std::min<cgltf_size>(skin.joints_count, gltf_checks::kMaxJointsPerSkin);
+    const cgltf_accessor* matrices = inverse_binds_of(skin, joints);
+    for (cgltf_size j = 0; j < joints; ++j) {
       out.joints.push_back(nodes[static_cast<std::size_t>(index_of(skin.joints[j], data_.nodes))]);
-      out.inverse_bind.push_back(inverse_bind_of(skin, j));
+      out.inverse_bind.push_back(inverse_bind_of(matrices, j));
     }
     return out;
   }
 
   void warn_of_extra_joints(const cgltf_skin& skin, cgltf_size index) {
+    if (skin.inverse_bind_matrices != nullptr && inverse_binds_of(skin, skin.joints_count) == nullptr) {
+      warn("skin " + std::to_string(index) + " has no usable inverse bind matrix for each of its joints: none is used");
+    }
     if (skin.joints_count <= kMaxJointIndex + 1) return;
     warn("skin " + std::to_string(index) + " has more than " + std::to_string(kMaxJointIndex + 1) +
          " joints: vertices of the extra ones follow the last supported joint");
@@ -393,7 +462,7 @@ class Loader {
 
   AnimationDesc load_animation(const cgltf_animation& animation, cgltf_size index, const std::vector<int>& nodes) {
     AnimationDesc out;
-    out.name = text_or(animation.name, "animation_" + std::to_string(index));
+    out.name = printable(text_or(animation.name, "animation_" + std::to_string(index)));
     for (cgltf_size c = 0; c < animation.channels_count; ++c) {
       std::optional<AnimationChannel> track = load_channel(animation.channels[c], out.name, nodes);
       if (!track) continue;
@@ -419,13 +488,14 @@ class Loader {
 
   void load_nodes() {
     const cgltf_scene* scene = default_scene();
+    added_.assign(data_.nodes_count, false);
     if (scene == nullptr) return add_parentless_nodes();
-    for (cgltf_size i = 0; i < scene->nodes_count; ++i) add_node(*scene->nodes[i], kNoIndex);
+    for (cgltf_size i = 0; i < scene->nodes_count; ++i) add_tree(*scene->nodes[i]);
   }
 
   void add_parentless_nodes() {
     for (cgltf_size i = 0; i < data_.nodes_count; ++i) {
-      if (data_.nodes[i].parent == nullptr) add_node(data_.nodes[i], kNoIndex);
+      if (data_.nodes[i].parent == nullptr) add_tree(data_.nodes[i]);
     }
   }
 
@@ -444,7 +514,7 @@ class Loader {
 
   NodeDesc read_node(const cgltf_node& node, int parent, int index) {
     NodeDesc out;
-    out.name = text_or(node.name, "node_" + std::to_string(index));
+    out.name = printable(text_or(node.name, "node_" + std::to_string(index)));
     out.parent = parent;
     out.local = read_local_transform(node);
     out.mesh = index_of(node.mesh, data_.meshes);
@@ -457,16 +527,41 @@ class Loader {
     return out;
   }
 
-  void add_node(const cgltf_node& node, int parent) {
+  // Adds a top-level node and everything under it, parents first and children in the file's
+  // order. A list of work to do instead of a function calling itself: a file decides how deep its
+  // nodes are nested, and must not decide how much stack is used.
+  void add_tree(const cgltf_node& root) {
+    std::vector<PendingNode> pending = {{&root, kNoIndex, 1}};
+    while (!pending.empty() && problem_.empty()) {
+      const PendingNode next = pending.back();
+      pending.pop_back();
+      add_node(next, pending);
+    }
+  }
+
+  // Adds one node and queues its children. A node is added once, however often the file lists it.
+  void add_node(const PendingNode& next, std::vector<PendingNode>& pending) {
+    const auto source = static_cast<std::size_t>(index_of(next.node, data_.nodes));
+    if (added_[source]) return;
+    if (next.depth > gltf_checks::kMaxNodeDepth) {
+      problem_ = "its nodes are nested more than " + std::to_string(gltf_checks::kMaxNodeDepth) + " deep";
+      return;
+    }
+    added_[source] = true;
     const int index = static_cast<int>(result_.scene.nodes.size());
-    result_.scene.nodes.push_back(read_node(node, parent, index));
-    if (parent != kNoIndex) result_.scene.nodes[parent].children.push_back(index);
-    for (cgltf_size c = 0; c < node.children_count; ++c) add_node(*node.children[c], index);
+    result_.scene.nodes.push_back(read_node(*next.node, next.parent, index));
+    if (next.parent != kNoIndex) result_.scene.nodes[next.parent].children.push_back(index);
+    // (Last child first: the list hands back the first child next.)
+    for (cgltf_size c = next.node->children_count; c > 0; --c) {
+      pending.push_back({next.node->children[c - 1], index, next.depth + 1});
+    }
   }
 
   const cgltf_data& data_;
   std::filesystem::path base_dir_;
   LoadResult& result_;
+  std::vector<bool> added_;  // by glTF node index: already in the scene
+  std::string problem_;      // what made the file unusable, when something did
 };
 
 // One step of opening a file: false (and why, in `error`) when it failed.
@@ -476,7 +571,18 @@ bool succeeded(cgltf_result status, const char* failure, const std::string& path
   return false;
 }
 
-// The file parsed, with its buffers, and checked; null (and why, in `error`) when any of that fails.
+// One of the loader's own checks: false (and what is wrong, in `error`) when it found something.
+bool sound(const std::string& problem, const std::string& path, std::string& error) {
+  if (problem.empty()) return true;
+  error = "invalid glTF '" + path + "': " + problem;
+  return false;
+}
+
+std::filesystem::path folder_of(const std::string& path) { return std::filesystem::path(path).parent_path(); }
+
+// The file parsed, with its buffers, and checked; null (and why, in `error`) when any of that
+// fails. The loader's own checks come before the library's: those do sums that a file can make
+// wrap around, and then read where the wrapped sum points.
 CgltfPtr open_gltf(const std::string& path, std::string& error) {
   cgltf_options options{};
   cgltf_data* raw = nullptr;
@@ -484,7 +590,9 @@ CgltfPtr open_gltf(const std::string& path, std::string& error) {
   CgltfPtr data(raw);
   const bool opened =
       succeeded(parsed, "cannot parse", path, error) &&
+      sound(gltf_checks::buffer_file_problem(*data, folder_of(path)), path, error) &&
       succeeded(cgltf_load_buffers(&options, data.get(), path.c_str()), "cannot load buffers of", path, error) &&
+      sound(gltf_checks::data_problem(*data), path, error) &&
       succeeded(cgltf_validate(data.get()), "invalid glTF", path, error);
   return opened ? std::move(data) : nullptr;
 }
@@ -495,8 +603,8 @@ LoadResult load_gltf_scene(const std::string& path) {
   LoadResult result;
   const CgltfPtr data = open_gltf(path, result.error);
   if (data == nullptr) return result;
-  Loader(*data, std::filesystem::path(path).parent_path(), result).run();
-  result.ok = true;
+  result.ok = sound(Loader(*data, folder_of(path), result).run(), path, result.error);
+  if (!result.ok) result.scene = SceneDesc{};
   return result;
 }
 

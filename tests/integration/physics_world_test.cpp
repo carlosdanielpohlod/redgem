@@ -1,6 +1,9 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <string>
 
 #include "core/config.hpp"
 #include "physics/physics_world.hpp"
@@ -169,4 +172,29 @@ TEST_CASE("several physics worlds can live at the same time") {
   REQUIRE(first->raycast(kAboveGround, kDown, kRayLength, kNoObject).has_value());
   REQUIRE_FALSE(first->add_object(body(kCrate, {{"body", std::string("dynamic")}}, kDropHeight, kCrateHalfExtents)));
   run(*first, kOneStep);
+}
+
+TEST_CASE("a mesh collider is made only of triangles that name the mesh's own vertices") {
+  constexpr std::uint32_t kNoSuchVertex = 4000000;
+  PrimitiveDesc floor;
+  floor.positions = {-5, 0, -5, 5, 0, -5, 5, 0, 5, -5, 0, 5};
+  floor.normals = {0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0};
+  floor.indices = {0, 2, 1, 0, 3, 2};
+  PrimitiveDesc broken = floor;
+  broken.indices = {0, 1, kNoSuchVertex};
+  MeshDesc mesh;
+  mesh.primitives = {broken};
+  BodyDesc desc = body(kGround, {{"collider", std::string("mesh")}}, {0, 0, 0}, {5, 0.5f, 5});
+  desc.mesh = &mesh;
+  auto world = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f});
+  const std::optional<std::string> refused = world->add_object(desc);
+  REQUIRE(refused.has_value());
+  CHECK(refused->find("no triangles") != std::string::npos);
+
+  // The sound part of a mesh still makes ground to stand on.
+  mesh.primitives = {broken, floor};
+  REQUIRE_FALSE(world->add_object(desc));
+  REQUIRE_FALSE(world->add_object(body(kCrate, {{"body", std::string("dynamic")}}, kDropHeight, kCrateHalfExtents)));
+  run(*world, kSettleSteps);
+  CHECK(world->simulated_pose(kCrate)->position.y == doctest::Approx(kCrateHalfExtents.y).epsilon(kPositionTolerance));
 }

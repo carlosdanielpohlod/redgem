@@ -147,17 +147,11 @@ class PrimitiveSplitter {
 
 std::string primitive_problem(const PrimitiveDesc& primitive) {
   const std::size_t vertex_count = vertex_count_of(primitive);
-  if (vertex_count == 0) return "primitive has no vertices";
   if (vertex_count > config::kMaxVerticesPerMesh) {
     return "primitive has " + std::to_string(vertex_count) + " vertices, the limit is " +
            std::to_string(config::kMaxVerticesPerMesh);
   }
-  const bool bad_index = std::any_of(primitive.indices.begin(), primitive.indices.end(),
-                                     [vertex_count](std::uint32_t index) { return index >= vertex_count; });
-  if (bad_index || primitive.indices.size() % config::kVerticesPerTriangle != 0) {
-    return "primitive has invalid triangle indices";
-  }
-  return {};
+  return primitive_shape_problem(primitive);
 }
 
 std::optional<Mesh> build_mesh(const PrimitiveDesc& primitive, std::string& error) {
@@ -178,6 +172,9 @@ std::optional<Mesh> build_mesh(const PrimitiveDesc& primitive, std::string& erro
 
 std::vector<PrimitiveDesc> split_primitive(const PrimitiveDesc& primitive, std::size_t max_vertices) {
   if (vertex_count_of(primitive) <= max_vertices) return {primitive};
+  // A primitive whose indices cannot be trusted is handed back whole: cutting it up would follow
+  // them out of its vertices. (build_mesh then says what is wrong with it.)
+  if (!primitive_shape_problem(primitive).empty()) return {primitive};
   PrimitiveSplitter splitter(primitive, max_vertices);
   for (std::size_t first = 0; first + config::kVerticesPerTriangle <= primitive.indices.size();
        first += config::kVerticesPerTriangle) {

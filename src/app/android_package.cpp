@@ -117,9 +117,8 @@ constexpr const char* kOpenGlEs3 = "0x00030000";           // what the manifest 
 constexpr const char* kStageFolder = ".redgem-apk-stage";  // inside the output folder, gone when the build ends
 constexpr const char* kToolLog = "tool-output.log";
 constexpr std::size_t kShownToolLines = 12;  // of a failed tool's output
-constexpr char kHiddenPrefix = '.';
-constexpr char kBackupSuffix = '~';
-constexpr char kSkippedFolderPrefix = '_';  // the SDK's packer leaves such folders out
+constexpr const char* kLineBreaks = "\n\r";  // what the list of an app's files is split at
+constexpr char kSkippedFolderPrefix = '_';   // the SDK's packer leaves such folders out
 // The SDK's tools are run through a POSIX shell.
 #ifdef _WIN32
 constexpr bool kBuildsOnThisSystem = false;
@@ -186,16 +185,6 @@ std::filesystem::path newest_in(const std::filesystem::path& folder) {
     return version_of(a.filename().string()) < version_of(b.filename().string());
   };
   return entries.empty() ? std::filesystem::path() : *std::max_element(entries.begin(), entries.end(), older);
-}
-
-// Files that are not part of a game (hidden ones, editors' backups) or must never leave the
-// developer's machine (signing keys) stay out of the APK.
-bool leftover(const std::filesystem::path& relative) {
-  for (const std::filesystem::path& part : relative) {
-    const std::string name = part.string();
-    if (!name.empty() && (name.front() == kHiddenPrefix || name.back() == kBackupSuffix)) return true;
-  }
-  return signing_key_file(relative);
 }
 
 // Whether a file sits in a folder the SDK's packer silently leaves out of an APK.
@@ -497,9 +486,19 @@ bool copy_over(const std::filesystem::path& from, const std::filesystem::path& t
   return !fs_error;
 }
 
+// The app finds its files by a list with one path a line: a name with a line break in it would
+// read as two other files. False, with `error` set, for such a name.
+bool can_be_listed(const std::filesystem::path& relative, std::string& error) {
+  if (relative.generic_string().find_first_of(kLineBreaks) == std::string::npos) return true;
+  error = "a file in '" + relative.parent_path().generic_string() +
+          "' has a line break in its name and cannot go into an Android app. Rename the file.";
+  return false;
+}
+
 // Copies one of the game's files into the app's assets. False, with `error` set, when it cannot go.
 bool stage_file(const std::filesystem::path& file, const std::filesystem::path& relative,
                 const std::filesystem::path& assets, std::string& error) {
+  if (!can_be_listed(relative, error)) return false;
   if (in_skipped_folder(relative)) {
     error = relative.generic_string() +
             " cannot go into an Android app: folders starting with '_' are left out of "
@@ -516,12 +515,9 @@ bool stage_file(const std::filesystem::path& file, const std::filesystem::path& 
 // cannot list what is inside its own APK, so the list of the game's files travels with it.
 bool stage_files(const std::filesystem::path& game_dir, const std::filesystem::path& assets,
                  std::vector<std::string>& files, std::string& error) {
-  std::error_code fs_error;
-  for (const auto& entry : std::filesystem::recursive_directory_iterator(game_dir, fs_error)) {
-    if (!entry.is_regular_file(fs_error)) continue;
-    const std::filesystem::path relative = entry.path().lexically_relative(game_dir);
-    if (leftover(relative)) continue;
-    if (!stage_file(entry.path(), relative, assets, error)) return false;
+  // (The same files as any other build of the game: no links, hidden files, backups or keys.)
+  for (const std::filesystem::path& relative : shipped_files(game_dir)) {
+    if (!stage_file(game_dir / relative, relative, assets, error)) return false;
     files.push_back((std::filesystem::path(kBundledGameFolder) / relative).generic_string());
   }
   return true;

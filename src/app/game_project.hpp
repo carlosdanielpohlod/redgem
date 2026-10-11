@@ -62,6 +62,12 @@ std::optional<std::filesystem::path> build_game_for(const std::filesystem::path&
 // must not go into the game it copies).
 bool folder_inside(const std::filesystem::path& folder, const std::filesystem::path& outer);
 
+// The files of a game that go into a build of it, as paths inside its folder, sorted. Every build
+// (a folder for a computer, an app for a phone) ships these and nothing else: regular files only,
+// never what a link points at, nor hidden files and folders (.git, .env), editors' backups
+// (name~) or signing keys.
+std::vector<std::filesystem::path> shipped_files(const std::filesystem::path& game_dir);
+
 // Whether a file is a key for signing apps (.keystore, .jks, .p12). A build never copies one:
 // whoever has it can pass their app off as the developer's.
 bool signing_key_file(const std::filesystem::path& file);

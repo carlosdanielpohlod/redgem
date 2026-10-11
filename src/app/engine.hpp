@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <variant>
+#include <vector>
 
 #include "audio/audio.hpp"
 #include "core/fixed_clock.hpp"
@@ -107,6 +108,8 @@ class Engine {
 
   void create_physics_bodies();
   std::filesystem::path scene_path(const std::string& name) const;
+  // Whether a script's scene name stays inside the game's folders (a warning says so when not).
+  static bool safe_scene_name(const std::string& name);
   void load_scene(const std::string& name);
   // Makes a scene that was loaded the one that runs, under `name`.
   void switch_to(const std::string& name, SceneDesc desc);
@@ -170,5 +173,10 @@ class Engine {
 
 // Runs a Ruby unit test file inside a bare engine VM. Returns the process exit code.
 int run_ruby_tests(const std::filesystem::path& test_file);
+
+// Where the screenshots a script asked for by name are written: `folder`/<name>.png. A name that
+// would put the file anywhere else is refused with a warning and left out.
+std::vector<std::filesystem::path> screenshot_files(const std::filesystem::path& folder,
+                                                    const std::vector<std::string>& names);
 
 }  // namespace redgem

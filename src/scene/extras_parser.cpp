@@ -1,6 +1,8 @@
 #include "scene/extras_parser.hpp"
 
+#include <array>
 #include <cctype>
+#include <cmath>
 #include <cstdlib>
 #include <stdexcept>
 
@@ -20,6 +22,12 @@ constexpr int kTwelveBits = 12;
 constexpr std::string_view kTrueLiteral = "true";
 constexpr std::string_view kFalseLiteral = "false";
 constexpr std::string_view kNullLiteral = "null";
+// What a JSON number is written with. (No letters but e: "inf", "nan" and hexadecimal are not numbers here.)
+constexpr std::string_view kNumberCharacters = "+-0123456789.eE";
+// The longest number read, in characters: more digits than a double can tell apart, with room to spare.
+constexpr std::size_t kMaxNumberLength = 64;
+// How deep the arrays and objects of a value that is skipped may be nested: each level takes stack.
+constexpr int kMaxNesting = 64;
 
 // The one-letter escapes of a JSON string: what follows the backslash, and what it stands for.
 struct Escape {
@@ -145,12 +153,23 @@ class JsonReader {
     fail("invalid literal");
   }
 
+  // The characters of the number starting here. (Only they are copied: the rest of the text can
+  // be long, and there can be many numbers in it.)
+  std::string_view number_text() const {
+    const std::size_t end = text_.find_first_not_of(kNumberCharacters, pos_);
+    const std::string_view written = text_.substr(pos_, end == std::string_view::npos ? end : end - pos_);
+    if (written.empty() || written.size() > kMaxNumberLength) fail("invalid number");
+    return written;
+  }
+
   double parse_number() {
-    const std::string rest(text_.substr(pos_));
+    const std::string_view written = number_text();
+    std::array<char, kMaxNumberLength + 1> digits{};  // zeros: the copy ends where the number does
+    written.copy(digits.data(), written.size());
     char* end = nullptr;
-    const double value = std::strtod(rest.c_str(), &end);
-    if (end == rest.c_str()) fail("invalid number");
-    pos_ += static_cast<std::size_t>(end - rest.c_str());
+    const double value = std::strtod(digits.data(), &end);
+    if (end != digits.data() + written.size() || !std::isfinite(value)) fail("invalid number");
+    pos_ += written.size();
     return value;
   }
 
@@ -169,9 +188,15 @@ class JsonReader {
   // An array or an object, from its opening bracket to its closing one.
   void skip_container(char open) {
     const char close = open == '[' ? ']' : '}';
+    if (++nesting_ > kMaxNesting) fail("nested too deeply");
     ++pos_;
     skip_whitespace();
-    if (try_consume(close)) return;
+    if (!try_consume(close)) skip_elements(open, close);
+    --nesting_;
+  }
+
+  // What a container whose opening bracket was read holds, up to and including its closing one.
+  void skip_elements(char open, char close) {
     do {
       skip_whitespace();
       if (open == '{') parse_key();
@@ -219,6 +244,7 @@ class JsonReader {
 
   std::string_view text_;
   std::size_t pos_ = 0;
+  int nesting_ = 0;  // how many arrays and objects being skipped are open
 };
 
 bool is_blank(std::string_view text) {

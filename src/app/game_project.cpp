@@ -17,6 +17,7 @@
 
 #include "core/platform.hpp"
 #include "core/config.hpp"
+#include "core/safe_path.hpp"
 #include "editor/scene_document.hpp"
 #include "editor/script_files.hpp"
 #include "generated/templates.hpp"
@@ -33,6 +34,8 @@ constexpr const char* kLinuxTarget = "linux";
 constexpr const char* kWindowsTarget = "windows";
 constexpr const char* kAndroidTarget = "android";
 constexpr const char* kSigningKeyExtensions[] = {".keystore", ".jks", ".p12"};
+constexpr char kHiddenPrefix = '.';                  // of files and folders that are not part of a game (.git, .env)
+constexpr char kBackupSuffix = '~';                  // of the copies editors leave behind
 constexpr const char* kParentFolder = "..";          // how a path says "one folder up"
 constexpr const char* kRuntimesFolder = "runtimes";  // engines for other systems, next to this one
 constexpr const char* kRuntimeName = "redgem";
@@ -257,18 +260,26 @@ nlohmann::json read_json(const std::filesystem::path& file) {
   return nlohmann::json::parse(in, nullptr, false);
 }
 
+// A side of the game's window as game.json gives it, kept to what a window can be; `fallback`
+// when the file gives none, or something that is not a whole number.
+int window_size(const nlohmann::json& json, const char* key, int fallback) {
+  if (!json.contains(key) || !json[key].is_number_integer()) return fallback;
+  const auto asked = json[key].get<std::int64_t>();
+  return static_cast<int>(std::clamp<std::int64_t>(asked, config::kMinWindowSide, config::kMaxWindowSide));
+}
+
 bool is_empty_dir(const std::filesystem::path& dir) {
   return !std::filesystem::exists(dir) || (std::filesystem::is_directory(dir) && std::filesystem::is_empty(dir));
 }
 
-// A copy of a game goes to other people: a signing key left in its folder does not go with it.
-void remove_signing_keys(const std::filesystem::path& folder) {
+// Whether a file or folder of a game goes into a build of it. A copy of a game goes to other
+// people: not what a link points at (that can be anything on the machine that builds), not hidden
+// files and folders, not editors' backups, not a signing key left in the folder.
+bool ships(const std::filesystem::directory_entry& entry) {
   std::error_code fs_error;
-  std::vector<std::filesystem::path> keys;
-  for (const auto& entry : std::filesystem::recursive_directory_iterator(folder, fs_error)) {
-    if (entry.is_regular_file(fs_error) && signing_key_file(entry.path())) keys.push_back(entry.path());
-  }
-  for (const std::filesystem::path& key : keys) std::filesystem::remove(key, fs_error);
+  const std::string name = entry.path().filename().string();
+  const bool leftover = !name.empty() && (name.front() == kHiddenPrefix || name.back() == kBackupSuffix);
+  return !entry.is_symlink(fs_error) && !leftover && !signing_key_file(entry.path());
 }
 
 }  // namespace
@@ -280,9 +291,11 @@ GameSettings read_game_settings(const std::filesystem::path& game_dir) {
   settings.window_height = config::kWindowHeight;
   const nlohmann::json json = read_json(game_dir / kSettingsFile);
   if (!json.is_object()) return settings;
-  settings.title = json.value(kTitleKey, settings.title);
-  settings.window_width = json.value(kWindowWidthKey, settings.window_width);
-  settings.window_height = json.value(kWindowHeightKey, settings.window_height);
+  // The file may hold anything under these names: each is used only when it is what it should be.
+  if (json.contains(kTitleKey) && json[kTitleKey].is_string())
+    settings.title = printable(json[kTitleKey].get<std::string>());
+  settings.window_width = window_size(json, kWindowWidthKey, settings.window_width);
+  settings.window_height = window_size(json, kWindowHeightKey, settings.window_height);
   return settings;
 }
 
@@ -455,16 +468,18 @@ bool copy_engine(const std::filesystem::path& engine_binary, const std::filesyst
   return true;
 }
 
-// A fresh copy of the game's files in `bundle`, without its signing keys.
+// A fresh copy in `bundle` of the files of the game that ship (see shipped_files).
 bool copy_game(const std::filesystem::path& game_dir, const std::filesystem::path& bundle, std::string& error) {
   std::error_code fs_error;
   std::filesystem::remove_all(bundle, fs_error);
-  std::filesystem::copy(game_dir, bundle, std::filesystem::copy_options::recursive, fs_error);
-  if (fs_error) {
-    error = "cannot copy the game: " + fs_error.message();
+  std::filesystem::create_directories(bundle, fs_error);
+  for (const std::filesystem::path& file : shipped_files(game_dir)) {
+    std::filesystem::create_directories((bundle / file).parent_path(), fs_error);
+    std::filesystem::copy_file(game_dir / file, bundle / file, fs_error);
+    if (!fs_error) continue;
+    error = "cannot copy the game: " + file.generic_string() + ": " + fs_error.message();
     return false;
   }
-  remove_signing_keys(bundle);
   return true;
 }
 
@@ -491,6 +506,22 @@ bool build_game(const std::filesystem::path& game_folder, const std::filesystem:
   const std::filesystem::path binary =
       out_dir / platform::executable_file_name(executable_name(game_dir), target == BuildTarget::Windows);
   return copy_engine(engine_binary, binary, error) && copy_game(game_dir, out_dir / kBundledGameFolder, error);
+}
+
+std::vector<std::filesystem::path> shipped_files(const std::filesystem::path& game_dir) {
+  std::vector<std::filesystem::path> files;
+  std::error_code fs_error;
+  std::error_code unreadable;  // (one entry that cannot be looked at does not end the walk)
+  std::filesystem::recursive_directory_iterator walk(game_dir, fs_error);
+  for (; !fs_error && walk != std::filesystem::end(walk); walk.increment(fs_error)) {
+    if (!ships(*walk)) {
+      walk.disable_recursion_pending();  // nothing inside a folder that stays behind is looked at
+    } else if (walk->is_regular_file(unreadable)) {
+      files.push_back(walk->path().lexically_relative(game_dir));
+    }
+  }
+  std::sort(files.begin(), files.end());
+  return files;
 }
 
 bool signing_key_file(const std::filesystem::path& file) {
