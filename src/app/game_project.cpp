@@ -1,6 +1,7 @@
 #include "app/game_project.hpp"
 
 #include "app/android_package.hpp"
+#include "app/notices.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -505,7 +506,8 @@ bool build_game(const std::filesystem::path& game_folder, const std::filesystem:
   std::filesystem::create_directories(out_dir, fs_error);
   const std::filesystem::path binary =
       out_dir / platform::executable_file_name(executable_name(game_dir), target == BuildTarget::Windows);
-  return copy_engine(engine_binary, binary, error) && copy_game(game_dir, out_dir / kBundledGameFolder, error);
+  return copy_engine(engine_binary, binary, error) && copy_game(game_dir, out_dir / kBundledGameFolder, error) &&
+         write_notices(out_dir, error);
 }
 
 std::vector<std::filesystem::path> shipped_files(const std::filesystem::path& game_dir) {

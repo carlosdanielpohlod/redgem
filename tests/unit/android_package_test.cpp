@@ -121,6 +121,7 @@ TEST_CASE("a game is laid out as an APK's contents: its files, their list, a sta
   CHECK(std::filesystem::exists(stage / "assets/game/scene.glb"));
   CHECK(read(stage / "lib/x86_64/libredgem.so") == "engine");
   CHECK(read(stage / "assets/game.stamp") == "stamp-1");
+  CHECK(read(stage / "assets/licenses/LICENSE").find("MIT License") != std::string::npos);  // travels inside the app
   CHECK(read(stage / "AndroidManifest.xml").find("com.redgem.sandbox") != std::string::npos);
   // Every file of the game is listed, by its path inside the APK's assets.
   const std::string listing = read(stage / "assets/game.files");

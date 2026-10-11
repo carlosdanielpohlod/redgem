@@ -33,9 +33,22 @@ add_custom_command(
   COMMENT "Embedding game templates"
   VERBATIM)
 
+# The licenses that travel with every built game (see app/notices.hpp), embedded in the binary.
+set(REDGEM_LICENSE_SOURCES ${CMAKE_SOURCE_DIR}/LICENSE ${CMAKE_SOURCE_DIR}/THIRD_PARTY_LICENSES.md)
+set(REDGEM_LICENSES_HEADER ${REDGEM_GENERATED_DIR}/generated/licenses.hpp)
+add_custom_command(
+  OUTPUT ${REDGEM_LICENSES_HEADER}
+  COMMAND ${CMAKE_COMMAND} -DOUTPUT=${REDGEM_LICENSES_HEADER} -DROOT=${CMAKE_SOURCE_DIR}
+          -DNAME=kLicenseFiles "-DSOURCES=${REDGEM_LICENSE_SOURCES}" -P ${CMAKE_SOURCE_DIR}/cmake/EmbedFiles.cmake
+  DEPENDS ${REDGEM_LICENSE_SOURCES} ${CMAKE_SOURCE_DIR}/cmake/EmbedFiles.cmake
+  COMMENT "Embedding the licenses"
+  VERBATIM)
+
 add_library(redgem_engine STATIC
   ${REDGEM_PRELUDE_HEADER}
   ${REDGEM_TEMPLATES_HEADER}
+  ${REDGEM_LICENSES_HEADER}
+  app/notices.cpp
   core/log.cpp
   core/xml_writer.cpp
   core/platform.cpp

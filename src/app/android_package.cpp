@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "app/game_project.hpp"
+#include "app/notices.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "core/platform.hpp"
@@ -590,8 +591,9 @@ bool stage_android_game(const std::filesystem::path& game_folder,
   const std::filesystem::path assets = fresh_assets_folder(stage_dir);
   std::vector<std::string> files;
   std::string manifest;
+  // (The licenses of what the app contains go inside it, beside the game.)
   const bool staged = stage_files(game_dir, assets, files, error) && stage_runtimes(runtimes, stage_dir, error) &&
-                      manifest_for(game_dir, manifest, error);
+                      manifest_for(game_dir, manifest, error) && write_notices(assets, error);
   if (!staged) return false;
   const bool written = write_text(assets / kAndroidManifestAsset, listing_of(std::move(files))) &&
                        write_text(assets / kAndroidStampAsset, stamp) &&

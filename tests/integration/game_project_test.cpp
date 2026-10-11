@@ -7,11 +7,13 @@
 #include <filesystem>
 #include <algorithm>
 #include <fstream>
+#include <sstream>
 
 #include <nlohmann/json.hpp>
 
 #include "app/engine.hpp"
 #include "app/game_project.hpp"
+#include "app/notices.hpp"
 #include "audio/audio.hpp"
 #include "core/config.hpp"
 #include "editor/script_files.hpp"
@@ -346,5 +348,31 @@ TEST_CASE("a built game holds the game's own files: nothing hidden, no backups, 
   CHECK(std::find(shipped.begin(), shipped.end(), "notes.txt") != shipped.end());
   CHECK(std::find(shipped.begin(), shipped.end(), "linked.txt") == shipped.end());
   CHECK(std::is_sorted(shipped.begin(), shipped.end()));
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("a built game carries the licenses of what it contains") {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-build-notices-test";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  std::ofstream(dir / "engine") << "engine";
+  std::string error;
+  REQUIRE_MESSAGE(
+      build_game(redgem::test::fixture("games/sandbox"), dir / "out", dir / "engine", host_build_target(), error),
+      error);
+  const auto text_of = [&dir](const char* file) {
+    std::ifstream in(dir / "out" / kNoticesFolder / file);
+    std::stringstream text;
+    text << in.rdbuf();
+    return text.str();
+  };
+  CHECK(text_of("LICENSE").find("MIT License") != std::string::npos);
+  // Every project the engine is built on is named, with its license text.
+  const std::string others = text_of("THIRD_PARTY_LICENSES.md");
+  for (const char* project :
+       {"raylib", "Jolt Physics", "mruby", "cgltf", "nlohmann/json", "Inter", "Font Awesome Free"}) {
+    CAPTURE(project);
+    CHECK(others.find(project) != std::string::npos);
+  }
   std::filesystem::remove_all(dir);
 }
