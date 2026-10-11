@@ -183,7 +183,7 @@ TEST_CASE("undoing back to the saved state makes the document clean again") {
 
 TEST_CASE("a drag that changes nothing leaves no undo step") {
   SceneDocument doc = open_fixture();
-  doc.checkpoint();  // the gizmo or a field was grabbed...
+  doc.checkpoint();                    // the gizmo or a field was grabbed...
   doc.drop_checkpoint_if_unchanged();  // ...and released without moving
   CHECK_FALSE(doc.can_undo());
   CHECK_FALSE(doc.dirty());
@@ -764,7 +764,8 @@ TEST_CASE("a terrain is sculpted, undone, saved and read back with its shape") {
   REQUIRE(loaded.ok);
   const int node = loaded.scene.find_node("Terrain");
   REQUIRE(node != kNoIndex);
-  const MeshDesc& saved = loaded.scene.meshes[static_cast<std::size_t>(loaded.scene.nodes[static_cast<std::size_t>(node)].mesh)];
+  const MeshDesc& saved =
+      loaded.scene.meshes[static_cast<std::size_t>(loaded.scene.nodes[static_cast<std::size_t>(node)].mesh)];
   CHECK(terrain_height(saved.primitives.front(), kGrid, 0.0f, 0.0f) == doctest::Approx(kLift * 2.0f));
   CHECK(saved.bounds.max.y == doctest::Approx(kLift * 2.0f));
 

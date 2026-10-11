@@ -311,14 +311,14 @@ TEST_CASE("scripts open in tabs that split side by side, and the side panels hid
 
 TEST_CASE("a terrain is created, sculpted with the brush in the Scene view, and things land on its hills") {
   constexpr float kBrushSeconds = 1.0f;
-  constexpr float kMinHill = 2.0f;        // meters raised by a second of the default brush
+  constexpr float kMinHill = 2.0f;  // meters raised by a second of the default brush
   constexpr float kDropHeight = 12.0f;
-  constexpr float kBallRadius = 0.5f;     // half of the 1 m crate
+  constexpr float kBallRadius = 0.5f;  // half of the 1 m crate
   constexpr float kRestTolerance = 0.4f;
   constexpr int kFallFrames = 240;
   constexpr int kFlattenPasses = 4;
   constexpr float kFullFlatten = 1.0f;
-  constexpr float kShoulder = 2.0f;       // meters from the middle of the plateau
+  constexpr float kShoulder = 2.0f;  // meters from the middle of the plateau
   const std::filesystem::path game = copy_game();
   auto created = EditorApp::create(game);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
@@ -356,10 +356,11 @@ TEST_CASE("a terrain is created, sculpted with the brush in the Scene view, and 
   }
   const auto top = session.terrain_hit(terrain, *brushed + Vec3{0.0f, kDropHeight, 0.0f}, {0.0f, -1.0f, 0.0f});
   REQUIRE(top.has_value());
-  const auto shoulder = session.terrain_hit(terrain, *brushed + Vec3{kShoulder, kDropHeight, 0.0f}, {0.0f, -1.0f, 0.0f});
+  const auto shoulder =
+      session.terrain_hit(terrain, *brushed + Vec3{kShoulder, kDropHeight, 0.0f}, {0.0f, -1.0f, 0.0f});
   REQUIRE(shoulder.has_value());
   CHECK(top->y - shoulder->y < kRestTolerance);  // level around the middle
-  run(app, kFrameFrames);  // the renderer picks the new shape up
+  run(app, kFrameFrames);                        // the renderer picks the new shape up
   app.request_screenshot(screenshot("editor_terrain"));
   run(app, 1);
 

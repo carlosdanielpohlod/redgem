@@ -52,8 +52,8 @@ TEST_CASE("every template creates a game that loads and whose scripts compile") 
     REQUIRE_MESSAGE(loaded.ok, loaded.error);
     CHECK(loaded.scene.find_node("Camera") != kNoIndex);
     CHECK(loaded.scene.find_node("Sun") != kNoIndex);
-    for (const char* folder : {config::kScriptsDirName, config::kSoundsDirName, config::kScenesDirName,
-                               config::kModelsDirName}) {
+    for (const char* folder :
+         {config::kScriptsDirName, config::kSoundsDirName, config::kScenesDirName, config::kModelsDirName}) {
       CHECK(std::filesystem::is_directory(dir / folder));
     }
     RubyVm vm;
@@ -165,7 +165,7 @@ TEST_CASE("building a game makes a standalone folder") {
   const std::filesystem::path install = fresh("install");
   std::filesystem::create_directories(install / "runtimes" / "windows");
   CHECK(runtime_for(BuildTarget::Linux, install / "redgem") == install / "redgem");  // this system: itself
-  CHECK_FALSE(runtime_for(BuildTarget::Windows, install / "redgem").has_value());   // not built yet
+  CHECK_FALSE(runtime_for(BuildTarget::Windows, install / "redgem").has_value());    // not built yet
   REQUIRE(write_text_file(install / "runtimes" / "windows" / "redgem.exe", "binary", error));
   CHECK(runtime_for(BuildTarget::Windows, install / "redgem") == install / "runtimes" / "windows" / "redgem.exe");
   CHECK(build_target_from_name("windows") == BuildTarget::Windows);
@@ -253,7 +253,8 @@ TEST_CASE("saving a game's settings keeps what else its game.json says") {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-settings-keep-test";
   std::filesystem::remove_all(dir);
   std::filesystem::create_directories(dir);
-  std::ofstream(dir / "game.json") << R"({"title": "Old", "android": {"package": "com.mystudio.mine"}, "notes": [1, 2]})";
+  std::ofstream(dir / "game.json")
+      << R"({"title": "Old", "android": {"package": "com.mystudio.mine"}, "notes": [1, 2]})";
   GameSettings settings = read_game_settings(dir);
   settings.title = "New";
   std::string error;
@@ -270,7 +271,8 @@ TEST_CASE("a built game never carries a signing key left in its folder") {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-build-keys-test";
   std::filesystem::remove_all(dir);
   std::filesystem::create_directories(dir);
-  std::filesystem::copy(redgem::test::fixture("games/sandbox"), dir / "game_src", std::filesystem::copy_options::recursive);
+  std::filesystem::copy(redgem::test::fixture("games/sandbox"), dir / "game_src",
+                        std::filesystem::copy_options::recursive);
   std::ofstream(dir / "game_src" / "release.keystore") << "secret";
   std::ofstream(dir / "engine") << "engine";
   std::string error;

@@ -66,7 +66,7 @@ nlohmann::json imported_skin(nlohmann::json skin, const JsonOffsets& offsets);
 nlohmann::json imported_animation(nlohmann::json animation, const JsonOffsets& offsets);
 
 // The same entries of the scene description.
-MaterialDesc imported_material(MaterialDesc material, const DescOffsets& offsets);
+MaterialDesc imported_material(const MaterialDesc& original, const DescOffsets& offsets);
 MeshDesc imported_mesh(MeshDesc mesh, const DescOffsets& offsets);
 // The node keeps its place in the model's tree; the model's top-level nodes go under the root.
 NodeDesc imported_node(NodeDesc node, const DescOffsets& offsets);

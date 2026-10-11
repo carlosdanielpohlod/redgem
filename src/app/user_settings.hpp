@@ -13,7 +13,7 @@ enum class GpuChoice {
   Integrated,  // the low-power card: cooler and quieter, much slower
 };
 
-const char* gpu_choice_name(GpuChoice choice);                         // "auto", "dedicated", "integrated"
+const char* gpu_choice_name(GpuChoice choice);  // "auto", "dedicated", "integrated"
 std::optional<GpuChoice> gpu_choice_from_name(const std::string& name);
 
 // Preferences of this user on this machine (not of a game): ~/.config/redgem/settings.json.
@@ -28,8 +28,8 @@ bool write_user_settings(const std::filesystem::path& file, const UserSettings& 
 
 // The card to use: what the command line asked for, else the REDGEM_GPU environment variable,
 // else the saved setting, else Auto. Unknown names are ignored.
-GpuChoice resolve_gpu_choice(const std::optional<std::string>& command_line, const std::optional<std::string>& environment,
-                             const UserSettings& settings);
+GpuChoice resolve_gpu_choice(const std::optional<std::string>& command_line,
+                             const std::optional<std::string>& environment, const UserSettings& settings);
 
 // Resolves the choice for this process and publishes it (as REDGEM_GPU) for the renderer,
 // which reads it when it opens the window. Call before any window is created.

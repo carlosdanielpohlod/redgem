@@ -42,7 +42,8 @@ TEST_CASE("every primitive is a valid closed-or-flat triangle mesh with unit nor
       const Vec3 c = at(p.positions, p.indices[i + 2]);
       const Vec3 face = cross(b - a, c - a);
       if (length(face) < kTolerance * kTolerance) continue;  // degenerate pole triangles
-      const Vec3 normal = at(p.normals, p.indices[i]) + at(p.normals, p.indices[i + 1]) + at(p.normals, p.indices[i + 2]);
+      const Vec3 normal =
+          at(p.normals, p.indices[i]) + at(p.normals, p.indices[i + 1]) + at(p.normals, p.indices[i + 2]);
       CHECK(dot(face, normal) > 0.0f);
     }
   }

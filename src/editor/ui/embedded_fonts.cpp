@@ -16,13 +16,14 @@
 #define REDGEM_INTERFACE_FONT_FILE "InterVariable.ttf"
 #define REDGEM_CODE_FONT_FILE "JetBrainsMono-Regular.ttf"
 
-#define REDGEM_EMBED_FILE(symbol, file)                       \
-  __asm__(REDGEM_READONLY_SECTION                                \
-          ".global " #symbol "\n"                                \
-          ".balign " REDGEM_FONT_ALIGNMENT "\n" #symbol ":\n"    \
-          ".incbin \"" REDGEM_EDITOR_FONT_DIR "/" file "\"\n" \
-          ".global " #symbol "_end\n" #symbol "_end:\n"          \
-          REDGEM_BACK_TO_CODE)
+#define REDGEM_EMBED_FILE(symbol, file)                                         \
+  __asm__(REDGEM_READONLY_SECTION ".global " #symbol                            \
+                                  "\n"                                          \
+                                  ".balign " REDGEM_FONT_ALIGNMENT "\n" #symbol \
+                                  ":\n"                                         \
+                                  ".incbin \"" REDGEM_EDITOR_FONT_DIR "/" file  \
+                                  "\"\n"                                        \
+                                  ".global " #symbol "_end\n" #symbol "_end:\n" REDGEM_BACK_TO_CODE)
 
 REDGEM_EMBED_FILE(redgem_font_inter, REDGEM_INTERFACE_FONT_FILE);
 REDGEM_EMBED_FILE(redgem_font_mono, REDGEM_CODE_FONT_FILE);

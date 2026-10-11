@@ -7,7 +7,7 @@ namespace redgem {
 
 // Per-frame controls of the editor fly camera (already scaled to the frame).
 struct FlyInput {
-  float look_x = 0.0f;   // mouse delta in pixels while looking (right mouse button held)
+  float look_x = 0.0f;  // mouse delta in pixels while looking (right mouse button held)
   float look_y = 0.0f;
   float forward = 0.0f;  // -1..1 (W/S)
   float right = 0.0f;    // -1..1 (D/A)

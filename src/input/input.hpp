@@ -29,7 +29,20 @@ struct MouseSample {
 // A gamepad's sticks and triggers, and its buttons (named as on an Xbox pad: A is the bottom one).
 enum class GamepadAxis { LeftX, LeftY, RightX, RightY, LeftTrigger, RightTrigger };
 enum class GamepadButton {
-  A, B, X, Y, LeftBumper, RightBumper, Back, Start, DpadUp, DpadDown, DpadLeft, DpadRight, LeftStick, RightStick
+  A,
+  B,
+  X,
+  Y,
+  LeftBumper,
+  RightBumper,
+  Back,
+  Start,
+  DpadUp,
+  DpadDown,
+  DpadLeft,
+  DpadRight,
+  LeftStick,
+  RightStick
 };
 inline constexpr std::size_t kGamepadAxisCount = 6;
 inline constexpr std::size_t kGamepadButtonCount = 14;

@@ -20,10 +20,14 @@ struct LevelStyle {
 
 LevelStyle style_of(log::Level level) {
   switch (level) {
-    case log::Level::Error: return {ICON_FA_CIRCLE_XMARK, error_color()};
-    case log::Level::Warning: return {ICON_FA_TRIANGLE_EXCLAMATION, warning_color()};
-    case log::Level::Debug: return {ICON_FA_BUG, muted_color()};
-    case log::Level::Info: break;
+    case log::Level::Error:
+      return {ICON_FA_CIRCLE_XMARK, error_color()};
+    case log::Level::Warning:
+      return {ICON_FA_TRIANGLE_EXCLAMATION, warning_color()};
+    case log::Level::Debug:
+      return {ICON_FA_BUG, muted_color()};
+    case log::Level::Info:
+      break;
   }
   return {ICON_FA_CIRCLE_INFO, muted_color()};
 }
@@ -59,7 +63,8 @@ void draw_filters(ConsoleLog& console) {
   if (ImGui::SmallButton(ICON_FA_BAN "  Clear")) console.clear();
   const long long info = count_of(console, log::Level::Info) + count_of(console, log::Level::Debug);
   filter_button(ICON_FA_CIRCLE_INFO, info, g_filters.info, ImGui::GetStyleColorVec4(ImGuiCol_Text));
-  filter_button(ICON_FA_TRIANGLE_EXCLAMATION, count_of(console, log::Level::Warning), g_filters.warnings, warning_color());
+  filter_button(ICON_FA_TRIANGLE_EXCLAMATION, count_of(console, log::Level::Warning), g_filters.warnings,
+                warning_color());
   filter_button(ICON_FA_CIRCLE_XMARK, count_of(console, log::Level::Error), g_filters.errors, error_color());
 }
 

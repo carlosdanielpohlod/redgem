@@ -15,8 +15,8 @@ using redgem::test::kTolerance;
 namespace {
 
 constexpr int kOneSecondOfFrames = 60;
-constexpr double kTunedSpeed = 5.0;   // the "Tuned" object's own property
-constexpr float kWalkerSpeed = 2.0f;  // tests/fixtures/games/directed/scripts/main_scene.rb
+constexpr double kTunedSpeed = 5.0;    // the "Tuned" object's own property
+constexpr float kWalkerSpeed = 2.0f;   // tests/fixtures/games/directed/scripts/main_scene.rb
 constexpr float kDefaultSpeed = 1.0f;  // .../mover.rb
 constexpr float kTravelTolerance = 0.02f;
 constexpr int kMovers = 3;

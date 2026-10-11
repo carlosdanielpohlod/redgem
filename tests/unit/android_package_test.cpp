@@ -99,7 +99,8 @@ TEST_CASE("the engines built for Android are found by kind of processor") {
 
 TEST_CASE("a game is laid out as an APK's contents: its files, their list, a stamp, the engine, the manifest") {
   const Scratch scratch;
-  const std::map<std::string, std::filesystem::path> runtimes = {{"x86_64", scratch.file("built/libredgem.so", "engine")}};
+  const std::map<std::string, std::filesystem::path> runtimes = {
+      {"x86_64", scratch.file("built/libredgem.so", "engine")}};
   const std::filesystem::path stage = scratch.dir / "stage";
   std::string error;
   REQUIRE_MESSAGE(stage_android_game(fixture("games/sandbox"), runtimes, "stamp-1", stage, error), error);
@@ -226,8 +227,8 @@ TEST_CASE("an app id's parts each start with a small letter, and none is empty")
     CHECK_MESSAGE(read_android_settings(scratch.dir, settings, error), error);
     CHECK(settings.package == good);
   }
-  for (const char* bad : {"game", ".com.game", "com.game.", "com.Game", "com._game", "com.my-game", "com.my game",
-                          "com.game.2d"}) {
+  for (const char* bad :
+       {"game", ".com.game", "com.game.", "com.Game", "com._game", "com.my-game", "com.my game", "com.game.2d"}) {
     CAPTURE(bad);
     scratch.file("game.json", std::string(R"({"android": {"package": ")") + bad + R"("}})");
     CHECK_FALSE(read_android_settings(scratch.dir, settings, error));

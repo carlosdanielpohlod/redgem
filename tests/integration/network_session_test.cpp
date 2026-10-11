@@ -10,20 +10,20 @@ using namespace redgem::net;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;                       // of polling, a millisecond apart
+constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
 constexpr std::chrono::milliseconds kRoundPause{1};
 constexpr float kRoundSeconds = 0.001f;
-constexpr float kPastJoinTimeout = 6.0f;               // seconds: longer than a join waits
+constexpr float kPastJoinTimeout = 6.0f;  // seconds: longer than a join waits
 constexpr const char* kLocalhost = "127.0.0.1";
 constexpr int kFirstGuest = kHostId + 1;
 constexpr int kSecondGuest = kHostId + 2;
-constexpr std::size_t kBigMessageBytes = 300 * 1024;   // more than one read or write takes
-constexpr int kTooDeep = kMaxDataDepth + 4;            // arrays inside arrays
+constexpr std::size_t kBigMessageBytes = 300 * 1024;  // more than one read or write takes
+constexpr int kTooDeep = kMaxDataDepth + 4;           // arrays inside arrays
 constexpr std::size_t kTooLongName = kMaxNameBytes + 1;
-constexpr int kManyVisits = 300;                       // more than the largest id there is
-constexpr float kQuietStep = 4.0f;                     // seconds
+constexpr int kManyVisits = 300;    // more than the largest id there is
+constexpr float kQuietStep = 4.0f;  // seconds
 constexpr float kPastSilenceTimeout = kSilenceTimeoutSeconds + 3.0f * kQuietStep;
-constexpr std::size_t kShownBytes = 60;                // of a bad message, when a check fails
+constexpr std::size_t kShownBytes = 60;  // of a bad message, when a check fails
 
 // Sessions on this machine, and everything that happened to each.
 struct Table {
@@ -145,8 +145,8 @@ TEST_CASE("messages arrive in the order they were sent, however long they are") 
   const std::string big(kBigMessageBytes, 'x');
   CHECK(party.host.send("first", big));
   CHECK(party.host.send("second", 2));
-  REQUIRE(party.table.until(
-      [&party] { return party.table.count(Party::kFirstSeat, NetworkEvent::Kind::Message) == 2; }));
+  REQUIRE(
+      party.table.until([&party] { return party.table.count(Party::kFirstSeat, NetworkEvent::Kind::Message) == 2; }));
   std::vector<std::string> names;
   for (const NetworkEvent& event : party.table.events[Party::kFirstSeat]) {
     if (event.kind == NetworkEvent::Kind::Message) names.push_back(event.name);
@@ -319,8 +319,8 @@ TEST_CASE("what cannot be received is not sent") {
   for (int i = 0; i < kTooDeep; ++i) deep = nlohmann::json::array({deep});
   CHECK_FALSE(party.host.send("deep", deep));
   CHECK(party.host.send("text", std::string("broken \xff utf-8")));  // sent with the bad byte replaced
-  REQUIRE(party.table.until(
-      [&party] { return party.table.count(Party::kFirstSeat, NetworkEvent::Kind::Message) == 1; }));
+  REQUIRE(
+      party.table.until([&party] { return party.table.count(Party::kFirstSeat, NetworkEvent::Kind::Message) == 1; }));
   CHECK(party.table.last(Party::kFirstSeat, NetworkEvent::Kind::Message)->name == "text");
 }
 

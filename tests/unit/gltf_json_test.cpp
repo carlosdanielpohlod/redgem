@@ -22,7 +22,7 @@ constexpr int kCameraIndex = 3;
 constexpr int kFirstChild = 7;
 constexpr int kSecondChild = 8;
 constexpr double kSpeed = 2.5;
-constexpr int kStaleExtra = 99;        // a scalar extra the node no longer has as a property
+constexpr int kStaleExtra = 99;  // a scalar extra the node no longer has as a property
 constexpr float kMetallic = 0.25f;
 constexpr float kRoughness = 0.75f;
 constexpr Color kOrange{1.0f, 0.5f, 0.0f, 1.0f};
@@ -32,16 +32,16 @@ constexpr Vec3 kBrightFactor{1.0f, 0.5f, 0.0f};
 constexpr Vec3 kDimGlow{0.5f, 0.25f, 0.0f};
 constexpr float kNoExtraStrength = 1.0f;
 constexpr float kLampWatts = 500.0f;
-constexpr float kLampRange = 12.0f;    // meters
+constexpr float kLampRange = 12.0f;  // meters
 constexpr float kNoRange = 0.0f;
 constexpr float kFovRadians = 0.9f;
-constexpr float kNear = 0.1f;          // meters
+constexpr float kNear = 0.1f;  // meters
 constexpr float kFar = 250.0f;
 constexpr float kInfiniteFar = 0.0f;
-constexpr int kNodesLoaded = 4;        // nodes a file had when it was read, in the skin tests
+constexpr int kNodesLoaded = 4;  // nodes a file had when it was read, in the skin tests
 constexpr int kDeletedNode = 2;
-constexpr int kNeverLoaded = 9;        // a number no node of the file had
-constexpr int kMovedTo = 5;            // where node 1 of the file is now
+constexpr int kNeverLoaded = 9;  // a number no node of the file had
+constexpr int kMovedTo = 5;      // where node 1 of the file is now
 constexpr int kActiveScene = 1;
 constexpr const char* kOtherExtension = "KHR_other";
 constexpr const char* kDoubleSided = "doubleSided";
@@ -110,7 +110,8 @@ TEST_CASE("a node without mesh, camera, children or properties is saved without 
 }
 
 TEST_CASE("saving a node keeps the fields the editor does not edit and replaces its matrix") {
-  const json original = {{kMatrix, json::array()}, {kWeights, {kSpeed}}, {kExtensions, {{kOtherExtension, json::object()}}}};
+  const json original = {
+      {kMatrix, json::array()}, {kWeights, {kSpeed}}, {kExtensions, {{kOtherExtension, json::object()}}}};
   const json saved = node_json(placed_node(), original);
   CHECK_FALSE(saved.contains(kMatrix));
   CHECK(saved[kWeights] == json({kSpeed}));
@@ -297,7 +298,8 @@ TEST_CASE("an animation loses the channels of deleted nodes, and goes when none 
 }
 
 TEST_CASE("only the scene the engine loads is kept, with the new top-level nodes") {
-  json document = {{kScene, kActiveScene}, {kScenes, {{{kName, "Unused"}}, {{kName, "Level"}, {kNodes, {kFirstChild}}}}}};
+  json document = {{kScene, kActiveScene},
+                   {kScenes, {{{kName, "Unused"}}, {{kName, "Level"}, {kNodes, {kFirstChild}}}}}};
   CHECK(has_several_scenes(document));
   keep_active_scene(document, json({0, kMovedTo}));
   CHECK_FALSE(has_several_scenes(document));

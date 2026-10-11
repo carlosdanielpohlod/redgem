@@ -15,9 +15,9 @@ struct TerrainGrid {
   float size = 0.0f;
   int cells = 0;
 
-  int side() const { return cells + 1; }                     // vertices per row
+  int side() const { return cells + 1; }  // vertices per row
   float spacing() const { return size / static_cast<float>(cells); }
-  bool fits(const PrimitiveDesc& mesh) const;                // is `mesh` a grid of this shape?
+  bool fits(const PrimitiveDesc& mesh) const;  // is `mesh` a grid of this shape?
 };
 
 // What a brush does to the ground under it.

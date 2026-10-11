@@ -16,12 +16,13 @@ TEST_CASE("elements nest, indented, with their attributes in the order they were
   XmlElement& application = root.child("application");
   application.child("activity").attribute("name", "Main");
   application.child("service");
-  CHECK(root.text() == "<manifest package=\"com.mystudio.game\" version=\"2\">\n"
-                       "  <application>\n"
-                       "    <activity name=\"Main\"/>\n"
-                       "    <service/>\n"
-                       "  </application>\n"
-                       "</manifest>\n");
+  CHECK(root.text() ==
+        "<manifest package=\"com.mystudio.game\" version=\"2\">\n"
+        "  <application>\n"
+        "    <activity name=\"Main\"/>\n"
+        "    <service/>\n"
+        "  </application>\n"
+        "</manifest>\n");
 }
 
 TEST_CASE("values may hold anything: what XML gives a meaning to is written out") {

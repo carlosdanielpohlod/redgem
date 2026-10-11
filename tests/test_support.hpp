@@ -16,9 +16,8 @@ inline std::string fixture(const std::string& relative) { return std::string(RED
 class LogCapture {
  public:
   LogCapture() {
-    previous_ = log::set_sink([this](log::Level level, const std::string& message) {
-      messages_.emplace_back(level, message);
-    });
+    previous_ =
+        log::set_sink([this](log::Level level, const std::string& message) { messages_.emplace_back(level, message); });
   }
   ~LogCapture() { log::set_sink(std::move(previous_)); }
   LogCapture(const LogCapture&) = delete;

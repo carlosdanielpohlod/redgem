@@ -127,7 +127,8 @@ nlohmann::json imported_animation(nlohmann::json animation, const JsonOffsets& o
   return animation;
 }
 
-MaterialDesc imported_material(MaterialDesc material, const DescOffsets& offsets) {
+MaterialDesc imported_material(const MaterialDesc& original, const DescOffsets& offsets) {
+  MaterialDesc material = original;
   for (int* image : {&material.base_color_image, &material.metallic_roughness_image, &material.normal_image,
                      &material.occlusion_image, &material.emissive_image}) {
     *image = shifted(*image, offsets.images);

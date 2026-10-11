@@ -67,9 +67,8 @@ TEST_CASE("TRS matrices decompose back into the transform") {
   const Vec3 x = rotate(t.rotation, Vec3::right()) * t.scale.x;
   const Vec3 y = rotate(t.rotation, Vec3::up()) * t.scale.y;
   const Vec3 z = rotate(t.rotation, Vec3::back()) * t.scale.z;
-  const float m[] = {x.x,         x.y,         x.z,         kZero, y.x, y.y, y.z, kZero,
-                     z.x,         z.y,         z.z,         kZero,
-                     kPosition.x, kPosition.y, kPosition.z, kOne};
+  const float m[] = {x.x, x.y, x.z, kZero, y.x,         y.y,         y.z,         kZero,
+                     z.x, z.y, z.z, kZero, kPosition.x, kPosition.y, kPosition.z, kOne};
   const Transform back = transform_from_matrix(m);
   CHECK(approx_equal(back.position, t.position, kDecomposeTolerance));
   CHECK(approx_equal(back.scale, t.scale, kDecomposeTolerance));

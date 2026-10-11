@@ -15,31 +15,31 @@ using redgem::test::kTolerance;
 
 namespace {
 
-constexpr float kBarWidth = 400.0f;        // pixels
+constexpr float kBarWidth = 400.0f;  // pixels
 constexpr float kGroupWidth = 100.0f;
-constexpr float kGroupStart = 150.0f;      // where a group that wide starts when centered in the bar
-constexpr float kViewX = 300.0f;           // a Scene view somewhere in the window, pixels
+constexpr float kGroupStart = 150.0f;  // where a group that wide starts when centered in the bar
+constexpr float kViewX = 300.0f;       // a Scene view somewhere in the window, pixels
 constexpr float kViewY = 80.0f;
 constexpr float kViewHeight = 600.0f;
 constexpr float kTextWidth = 220.0f;
 constexpr float kTextHeight = 15.0f;
-constexpr float kBothSides = 2.0f;         // the pill pads its text on the two sides
-constexpr float kTile = 100.0f;            // pixels: a tile's width
-constexpr float kGap = 10.0f;              // between tiles
-constexpr float kRoomForThree = 320.0f;    // three tiles and their two gaps
+constexpr float kBothSides = 2.0f;       // the pill pads its text on the two sides
+constexpr float kTile = 100.0f;          // pixels: a tile's width
+constexpr float kGap = 10.0f;            // between tiles
+constexpr float kRoomForThree = 320.0f;  // three tiles and their two gaps
 constexpr float kRoomForTwoAndABit = 319.0f;
 constexpr float kTooNarrow = 50.0f;
 constexpr int kThreeColumns = 3;
 constexpr int kTwoColumns = 2;
-constexpr int kUnknown = 7;                // what index_of answers for a name it does not know
-constexpr int kWood = 4;                   // material indices
+constexpr int kUnknown = 7;  // what index_of answers for a name it does not know
+constexpr int kWood = 4;     // material indices
 constexpr int kMetal = 2;
 constexpr Vec3 kBoxMin{-1.0f, -2.0f, -3.0f};
 constexpr Vec3 kBoxMax{1.0f, 2.0f, 3.0f};
 constexpr Vec3 kPlace{10.0f, 0.0f, -5.0f};
 constexpr Vec3 kTwiceAsBig{2.0f, 2.0f, 2.0f};
-constexpr int kAllMax = 7;                 // the corner with every bit set
-constexpr int kMaxOnY = 2;                 // the corner with only the y bit set
+constexpr int kAllMax = 7;  // the corner with every bit set
+constexpr int kMaxOnY = 2;  // the corner with only the y bit set
 constexpr float kQuarterTurnDegrees = 90.0f;
 constexpr Vec3 kCameraPlace{0.0f, 10.0f, 0.0f};
 constexpr Vec3 kDownAndForward{0.0f, -0.5f, -0.5f};
@@ -47,17 +47,17 @@ constexpr Vec3 kHitOnGround{0.0f, 0.0f, -10.0f};
 constexpr Vec3 kAlmostLevel{0.0f, -0.001f, -1.0f};  // meets the ground ten kilometers away
 constexpr Vec3 kUpwards{0.0f, 0.5f, -0.5f};
 constexpr Vec3 kSpawn{1.0f, 2.0f, 3.0f};
-constexpr float kStrength = 4.0f;          // meters per second
+constexpr float kStrength = 4.0f;  // meters per second
 constexpr float kHeldSeconds = 0.5f;
-constexpr float kRaisedMeters = 2.0f;      // strength x seconds
-constexpr float kBrushRadius = 6.0f;       // meters, in the world
+constexpr float kRaisedMeters = 2.0f;  // strength x seconds
+constexpr float kBrushRadius = 6.0f;   // meters, in the world
 constexpr Vec3 kTerrainPlace{100.0f, 0.0f, 50.0f};
 constexpr Vec3 kTerrainScale{2.0f, 4.0f, 2.0f};
 constexpr Vec3 kPointOnTerrain{104.0f, 0.0f, 56.0f};
-constexpr float kLocalX = 2.0f;            // that point in the terrain's own space
+constexpr float kLocalX = 2.0f;  // that point in the terrain's own space
 constexpr float kLocalZ = 3.0f;
-constexpr float kLocalRadius = 3.0f;       // the radius, halved by the terrain's scale
-constexpr float kLocalMeters = 0.5f;       // two meters, quartered by its height scale
+constexpr float kLocalRadius = 3.0f;               // the radius, halved by the terrain's scale
+constexpr float kLocalMeters = 0.5f;               // two meters, quartered by its height scale
 constexpr Vec3 kMirroredScale{-2.0f, 0.0f, 3.0f};  // one part below the smallest scale, one at nothing
 constexpr float kSmallestScale = 0.001f;
 constexpr Vec3 kUsableScale{0.001f, 0.001f, 3.0f};

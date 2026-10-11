@@ -143,8 +143,9 @@ TEST_CASE("Time.scale 0 pauses the game while behaviours keep being updated") {
   CHECK(moving_x > 0.0f);  // the fixture's scene script makes it walk
   ruby(*engine, "$updates_while_paused = 0; Time.scale = 0");
   const std::string paused_at = ruby(*engine, "Time.elapsed");
-  ruby(*engine, "class Counter < Behaviour; def update(dt); $updates_while_paused += 1; $paused_delta = dt; end; end;"
-                "Scene.find('Plain').add_component(Counter)");
+  ruby(*engine,
+       "class Counter < Behaviour; def update(dt); $updates_while_paused += 1; $paused_delta = dt; end; end;"
+       "Scene.find('Plain').add_component(Counter)");
   for (int i = 0; i < kPausedFrames; ++i) frame(*engine);
   CHECK(engine->scene().world_transform(engine->scene().find("Walker")).position.x == doctest::Approx(moving_x));
   CHECK(ruby(*engine, "Time.elapsed") == paused_at);

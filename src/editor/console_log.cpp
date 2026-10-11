@@ -21,9 +21,8 @@ ConsoleLog::ConsoleLog() {
 ConsoleLog::~ConsoleLog() { log::set_sink(std::move(previous_)); }
 
 std::size_t ConsoleLog::error_count() const {
-  return static_cast<std::size_t>(std::count_if(entries_.begin(), entries_.end(), [](const ConsoleEntry& entry) {
-    return entry.level == log::Level::Error;
-  }));
+  return static_cast<std::size_t>(std::count_if(
+      entries_.begin(), entries_.end(), [](const ConsoleEntry& entry) { return entry.level == log::Level::Error; }));
 }
 
 }  // namespace redgem

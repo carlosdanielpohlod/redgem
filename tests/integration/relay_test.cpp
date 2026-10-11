@@ -12,21 +12,21 @@ using namespace redgem::net;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;                      // of polling, a millisecond apart
+constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
 constexpr std::chrono::milliseconds kRoundPause{1};
 constexpr float kRoundSeconds = 0.001f;
 constexpr float kPastJoinTimeout = 6.0f;
-constexpr float kPastForgetting = 4.0f;               // seconds after which a silent game is forgotten
+constexpr float kPastForgetting = 4.0f;  // seconds after which a silent game is forgotten
 constexpr int kSettleRounds = 50;
-constexpr int kTooManyGuesses = 12;                   // more wrong room codes than one address is allowed
+constexpr int kTooManyGuesses = 12;  // more wrong room codes than one address is allowed
 constexpr int kRoomsPerAddress = 8;
-constexpr float kPastKeptOut = 125.0f;                // seconds an address stays out for guessing
+constexpr float kPastKeptOut = 125.0f;  // seconds an address stays out for guessing
 constexpr float kQuietStep = 4.0f;
-constexpr float kAskAgain = 1.1f;                     // seconds: past the pause between searches
+constexpr float kAskAgain = 1.1f;  // seconds: past the pause between searches
 constexpr const char* kLocalhost = "127.0.0.1";
-constexpr std::uint16_t kTestDiscoveryPort = 47831;   // not the real one: a game may be open on this machine
+constexpr std::uint16_t kTestDiscoveryPort = 47831;  // not the real one: a game may be open on this machine
 constexpr std::uint16_t kGamePort = 7777;
-constexpr std::size_t kWelcomeBytes = 4096;           // plenty for a relay's first answer
+constexpr std::size_t kWelcomeBytes = 4096;  // plenty for a relay's first answer
 
 // A relay and the sessions talking through it, with everything that happened to each.
 struct Meeting {

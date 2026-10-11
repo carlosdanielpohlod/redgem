@@ -17,8 +17,9 @@ ScriptEditor* ScriptWorkspace::open(const std::string& file_name, std::string& e
 }
 
 ScriptEditor* ScriptWorkspace::find(const std::string& file_name) {
-  const auto found = std::find_if(tabs_.begin(), tabs_.end(),
-                                  [&](const std::unique_ptr<ScriptEditor>& tab) { return tab->file_name() == file_name; });
+  const auto found = std::find_if(tabs_.begin(), tabs_.end(), [&](const std::unique_ptr<ScriptEditor>& tab) {
+    return tab->file_name() == file_name;
+  });
   return found == tabs_.end() ? nullptr : found->get();
 }
 
@@ -30,7 +31,8 @@ void ScriptWorkspace::close(const std::string& file_name) {
 }
 
 bool ScriptWorkspace::any_modified() const {
-  return std::any_of(tabs_.begin(), tabs_.end(), [](const std::unique_ptr<ScriptEditor>& tab) { return tab->modified(); });
+  return std::any_of(tabs_.begin(), tabs_.end(),
+                     [](const std::unique_ptr<ScriptEditor>& tab) { return tab->modified(); });
 }
 
 bool ScriptWorkspace::save_all(std::string& error) {

@@ -86,9 +86,9 @@ TEST_CASE("one thing per command line: conflicting modes and swallowed options a
   CHECK_FALSE(parse_cli({"new", "games/x", "--play"}).ok);
   CHECK_FALSE(parse_cli({"build", "games/x", "out", "--headless"}).ok);
   CHECK_FALSE(parse_cli({"games/x", "--play", "--ruby-test", "t.rb"}).ok);
-  CHECK_FALSE(parse_cli({"games/x", "--test", "--play"}).ok);      // --play is not a test file
-  CHECK_FALSE(parse_cli({"games/x", "--headless"}).ok);            // nothing would ever end the run
-  CHECK(parse_cli({"games/x", "--play", "--test", "t.rb"}).ok);    // both mean "run the game"
+  CHECK_FALSE(parse_cli({"games/x", "--test", "--play"}).ok);    // --play is not a test file
+  CHECK_FALSE(parse_cli({"games/x", "--headless"}).ok);          // nothing would ever end the run
+  CHECK(parse_cli({"games/x", "--play", "--test", "t.rb"}).ok);  // both mean "run the game"
   const CliResult help = parse_cli({"--help", "--play"});
   REQUIRE(help.ok);
   CHECK(help.options.mode == RunMode::Help);
@@ -144,7 +144,8 @@ TEST_CASE("what is wrong with a command line is said") {
   CHECK(parse_cli({"games/demo", "--bogus"}).error == "unknown option --bogus");
   CHECK(parse_cli({"games/demo", "extra"}).error == "unexpected argument extra");
   CHECK(parse_cli({"relay", "somewhere"}).error == "unexpected argument somewhere");
-  CHECK(parse_cli({"new", "games/demo", "--play"}).error == "choose one of: new, build, relay, --play, --test, --ruby-test");
+  CHECK(parse_cli({"new", "games/demo", "--play"}).error ==
+        "choose one of: new, build, relay, --play, --test, --ruby-test");
   CHECK(parse_cli({"games/demo", "--headless"}).error == "--headless needs --test <system_test.rb>");
   CHECK(parse_cli({"--play"}).error == "missing <game_dir>");
   CHECK(parse_cli({"build", "games/demo"}).error == "missing <out_dir>");

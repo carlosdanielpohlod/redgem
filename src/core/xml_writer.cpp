@@ -7,6 +7,20 @@ namespace {
 constexpr const char* kDeclaration = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
 constexpr const char* kIndent = "  ";
 
+// The characters XML gives a meaning to, and how each is written when it is only text.
+struct Escape {
+  char character;
+  const char* written;
+};
+constexpr Escape kEscapes[] = {{'&', "&amp;"}, {'<', "&lt;"}, {'>', "&gt;"}, {'"', "&quot;"}};
+
+std::string written_out(char c) {
+  for (const Escape& escape : kEscapes) {
+    if (escape.character == c) return escape.written;
+  }
+  return std::string(1, c);
+}
+
 std::string indentation(int depth) {
   std::string spaces;
   for (int level = 0; level < depth; ++level) spaces += kIndent;
@@ -17,15 +31,7 @@ std::string indentation(int depth) {
 
 std::string xml_escaped(const std::string& text) {
   std::string out;
-  for (const char c : text) {
-    switch (c) {
-      case '&': out += "&amp;"; break;
-      case '<': out += "&lt;"; break;
-      case '>': out += "&gt;"; break;
-      case '"': out += "&quot;"; break;
-      default: out += c;
-    }
-  }
+  for (const char c : text) out += written_out(c);
   return out;
 }
 

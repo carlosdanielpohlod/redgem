@@ -216,7 +216,8 @@ TEST_CASE("what scripts save is there in the next run") {
     CHECK(fails(*engine, "Save[:position] = Vector3.zero"));  // only numbers, texts and true/false
   }
   auto engine = engine_for(scene, temp.file);
-  CHECK(ruby(*engine, "[Save[:best], Save[:name], Save[:muted], Save[:volume]].inspect") == "[1200, \"Ana\", true, 0.5]");
+  CHECK(ruby(*engine, "[Save[:best], Save[:name], Save[:muted], Save[:volume]].inspect") ==
+        "[1200, \"Ana\", true, 0.5]");
   CHECK(ruby(*engine, "Save.keys.inspect") == "[:best, :muted, :name, :volume]");
   ruby(*engine, "Save.delete(:name)");
   CHECK(ruby(*engine, "Save[:name].inspect") == "nil");
@@ -240,8 +241,9 @@ TEST_CASE("scripts read the gamepad, and the usual axes and actions follow it") 
   CHECK(ruby(*engine, "Input.gamepad?") == "true");
   CHECK(ruby(*engine, "[Input.gamepad_axis(:left_x), Input.axis(:horizontal), Input.gamepad_axis(:right_trigger)]") ==
         "[0.5, 0.5, 1.0]");
-  CHECK(ruby(*engine, "[Input.gamepad_down?(:a), Input.gamepad_pressed?(:a), Input.action?(:jump), "
-                      "Input.action_pressed?(:jump), Input.gamepad_down?(:b)]") == "[true, true, true, true, false]");
+  CHECK(ruby(*engine,
+             "[Input.gamepad_down?(:a), Input.gamepad_pressed?(:a), Input.action?(:jump), "
+             "Input.action_pressed?(:jump), Input.gamepad_down?(:b)]") == "[true, true, true, true, false]");
   input.set_gamepad_button(GamepadButton::A, false);
   frames(*engine, 1);
   CHECK(ruby(*engine, "[Input.gamepad_released?(:a), Input.action?(:jump)]") == "[true, false]");
@@ -300,7 +302,8 @@ TEST_CASE("an object plays a clip of its own, fading into it, with another mixed
   ajar.channels = {hold};
   scene.animations.push_back(ajar);
   auto engine = engine_for(scene, temp.file);
-  ruby(*engine, "Animation.stop(:Ajar); Animation.pause(:Open); $door = Scene.find('Door')");  // the scene holds it shut
+  ruby(*engine,
+       "Animation.stop(:Ajar); Animation.pause(:Open); $door = Scene.find('Door')");  // the scene holds it shut
   frames(*engine, 1);
   CHECK(door_x(*engine) == doctest::Approx(0.0f));
   CHECK(ruby(*engine, "$door.animation.clip.inspect") == "nil");
@@ -338,8 +341,9 @@ TEST_CASE("scripts let out bursts of particles, which fly for a while and are go
   frames(*engine, 1);
   CHECK(ruby(*engine, "Particles.count") == "0");
   CHECK(ruby(*engine, "Particles.burst(Vector3.new(1, 2, 3))") == "12");
-  CHECK(ruby(*engine, "Particles.burst([0, 0, 0], count: 30, color: :gold, glow: true, life: 0.2, size: 0.3, "
-                      "speed: 5, spread: 20, direction: Vector3.forward, gravity: 0, alpha: 128)") == "30");
+  CHECK(ruby(*engine,
+             "Particles.burst([0, 0, 0], count: 30, color: :gold, glow: true, life: 0.2, size: 0.3, "
+             "speed: 5, spread: 20, direction: Vector3.forward, gravity: 0, alpha: 128)") == "30");
   CHECK(ruby(*engine, "Particles.count") == "42");
   const std::vector<Particle>& particles = engine->particles().particles();
   REQUIRE(particles.size() == 42);
@@ -347,9 +351,9 @@ TEST_CASE("scripts let out bursts of particles, which fly for a while and are go
   CHECK(particles.front().position.y == doctest::Approx(2.0f));
   const Particle& spark = particles.back();
   CHECK(spark.glow);
-  CHECK(spark.color.b == doctest::Approx(0.0f));       // gold has no blue
+  CHECK(spark.color.b == doctest::Approx(0.0f));  // gold has no blue
   CHECK(spark.color.a == doctest::Approx(128.0f / 255.0f));
-  CHECK(spark.velocity.z < 0.0f);                      // forward is -z
+  CHECK(spark.velocity.z < 0.0f);  // forward is -z
 
   frames(*engine, kHalfSecond);  // the short-lived sparks are over, the others still falling
   CHECK(ruby(*engine, "Particles.count") == "12");

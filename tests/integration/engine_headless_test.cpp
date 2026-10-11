@@ -21,11 +21,11 @@ constexpr float kPositionTolerance = 0.05f;
 constexpr float kMinWalkDistance = 3.0f;
 constexpr float kMinJumpHeight = 0.5f;
 constexpr float kCrateRestHeight = 0.5f;  // half of the 1m crate above ground level 0
-constexpr float kLiftSpeed = 1.0f;  // tests/fixtures/games/sandbox/scripts/lift.rb
+constexpr float kLiftSpeed = 1.0f;        // tests/fixtures/games/sandbox/scripts/lift.rb
 constexpr float kTeleportX = -2.0f;
 constexpr float kTeleportMinY = 5.0f;
 constexpr float kFallenBelowY = -5.0f;
-constexpr int kExpectedBehaviours = 9;  // probe, coin, lift, family, kid, gc_stress, sensor, spawner, broken
+constexpr int kExpectedBehaviours = 9;    // probe, coin, lift, family, kid, gc_stress, sensor, spawner, broken
 constexpr int kExpectedScriptErrors = 2;  // the missing script and the broken one
 constexpr float kPushSpeed = 5.0f;
 constexpr float kQuarterTurnDegrees = 90.0f;
@@ -140,8 +140,8 @@ TEST_CASE("turning while walking keeps the jump going") {
 TEST_CASE("rotating a moving rigidbody keeps its velocity") {
   auto engine = sandbox();
   frames(*engine, kSettleFrames);
-  ruby(*engine, "$crate = Scene.find('Crate'); $crate.rigidbody.velocity = Vector3.new(" +
-                    std::to_string(kPushSpeed) + ", 0, 0)");
+  ruby(*engine, "$crate = Scene.find('Crate'); $crate.rigidbody.velocity = Vector3.new(" + std::to_string(kPushSpeed) +
+                    ", 0, 0)");
   ruby(*engine, "$crate.transform.rotation = Vector3.new(0, " + std::to_string(kQuarterTurnDegrees) + ", 0)");
   CHECK(std::stof(ruby(*engine, "$crate.rigidbody.velocity.x")) == doctest::Approx(kPushSpeed));
 }
@@ -193,8 +193,8 @@ TEST_CASE("natives reject invalid objects with Ruby errors instead of crashing")
       engine->scripts().eval("GameObject.allocate.tap { |o| o.instance_variable_set(:@id, 9999) }.name", "bad.rb");
   CHECK_FALSE(result.ok);
   CHECK(result.error.find("9999") != std::string::npos);
-  const RubyResult destroyed = engine->scripts().eval(
-      "kid = Scene.find('Kid'); kid.destroy; $kid_ref = kid", "destroy.rb");
+  const RubyResult destroyed =
+      engine->scripts().eval("kid = Scene.find('Kid'); kid.destroy; $kid_ref = kid", "destroy.rb");
   REQUIRE(destroyed.ok);
   frames(*engine, 1);
   CHECK_FALSE(engine->scripts().eval("$kid_ref.transform.position", "dead.rb").ok);
@@ -234,8 +234,8 @@ TEST_CASE("prefabs stay inert until spawned, then get physics and scripts") {
   constexpr float kSpawnHeight = 6.0f;
   auto engine = sandbox();
   frames(*engine, 1);
-  CHECK(ruby(*engine, "Scene.find_all(:bullet).size") == "0");      // the template is not a live bullet
-  CHECK(ruby(*engine, "$bullet_starts.inspect") == "nil");          // and runs no script
+  CHECK(ruby(*engine, "Scene.find_all(:bullet).size") == "0");  // the template is not a live bullet
+  CHECK(ruby(*engine, "$bullet_starts.inspect") == "nil");      // and runs no script
   const ObjectId prefab = engine->scene().find("Bullet");
   CHECK_FALSE(engine->physics().has_object(prefab));
 
@@ -244,7 +244,7 @@ TEST_CASE("prefabs stay inert until spawned, then get physics and scripts") {
   CHECK(ruby(*engine, "$bullet_starts") == "1");
   CHECK(ruby(*engine, "Scene.find_all(:bullet).size") == "1");
   CHECK(std::stof(ruby(*engine, "$shot.transform.position.y")) < kSpawnHeight - 1.0f);  // it fell: physics works
-  CHECK(engine->scene().world_transform(prefab).position.y > 0.0f);  // the template did not move
+  CHECK(engine->scene().world_transform(prefab).position.y > 0.0f);                     // the template did not move
 }
 
 TEST_CASE("objects spawned from inside update start on the next frame") {
@@ -302,7 +302,7 @@ TEST_CASE("sounds are looked up in the game's sounds folder") {
 
 TEST_CASE("the scene's animations play: bones move over time and loop") {
   constexpr int kHalfSecondFrames = 30;
-  constexpr float kMinTurn = 0.2f;   // of the quaternion's x: the upper bone bends around X
+  constexpr float kMinTurn = 0.2f;  // of the quaternion's x: the upper bone bends around X
   const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_animated_game";
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game);

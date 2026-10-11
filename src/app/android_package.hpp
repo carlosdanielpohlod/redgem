@@ -12,16 +12,16 @@ namespace redgem {
 // itself is done by the Android SDK's own tools and Java's keytool, which must be installed.
 
 // What is inside the APK besides the game.
-inline constexpr const char* kAndroidManifestAsset = "game.files";   // the game's files, one path per line
-inline constexpr const char* kAndroidStampAsset = "game.stamp";      // changes with every build
-inline constexpr const char* kAndroidLibraryName = "redgem";         // lib/<abi>/libredgem.so
+inline constexpr const char* kAndroidManifestAsset = "game.files";  // the game's files, one path per line
+inline constexpr const char* kAndroidStampAsset = "game.stamp";     // changes with every build
+inline constexpr const char* kAndroidLibraryName = "redgem";        // lib/<abi>/libredgem.so
 
 struct AndroidTools {
-  std::filesystem::path aapt;        // adds files to an APK
-  std::filesystem::path aapt2;       // makes the APK from the manifest and assets
+  std::filesystem::path aapt;   // adds files to an APK
+  std::filesystem::path aapt2;  // makes the APK from the manifest and assets
   std::filesystem::path zipalign;
   std::filesystem::path apksigner;
-  std::filesystem::path platform;    // android.jar of an installed platform
+  std::filesystem::path platform;  // android.jar of an installed platform
 };
 
 // The SDK's tools, from ANDROID_HOME or ANDROID_SDK_ROOT (the newest build-tools and platform
@@ -36,11 +36,12 @@ std::filesystem::path android_sdk_from_environment();
 //   "android": { "package": "com.mystudio.mygame", "version_code": 3, "version_name": "1.2",
 //                "keystore": "release.keystore", "key_alias": "mygame" }
 struct AndroidSettings {
-  std::string package;              // the app's id; empty for one made from the folder name
-  int version_code = 1;             // goes up with every release: Android updates only to higher ones
-  std::string version_name = "1.0"; // what players see
-  std::filesystem::path keystore;   // the developer's own signing key (relative to the game folder); empty for the engine's
-  std::string key_alias;            // the key's name inside that keystore
+  std::string package;               // the app's id; empty for one made from the folder name
+  int version_code = 1;              // goes up with every release: Android updates only to higher ones
+  std::string version_name = "1.0";  // what players see
+  std::filesystem::path
+      keystore;           // the developer's own signing key (relative to the game folder); empty for the engine's
+  std::string key_alias;  // the key's name inside that keystore
 };
 // Reads them; false, with `error` set, when something there cannot be used.
 bool read_android_settings(const std::filesystem::path& game_dir, AndroidSettings& settings, std::string& error);
@@ -70,7 +71,8 @@ std::optional<SigningKey> signing_key_for(const std::filesystem::path& game_dir,
 // A name with no letter to start with gets "game" before it.
 std::string android_package_name(const std::filesystem::path& game_dir);
 // The app's AndroidManifest.xml: a full-screen, landscape native activity running the engine.
-std::string android_manifest(const std::string& package, const std::string& label, const AndroidSettings& settings = {});
+std::string android_manifest(const std::string& package, const std::string& label,
+                             const AndroidSettings& settings = {});
 
 // The engines built for Android, by kind of processor ("arm64-v8a" -> .../libredgem.so), found
 // in `runtimes_dir`/<abi>/. Empty when none is built.

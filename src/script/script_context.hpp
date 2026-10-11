@@ -17,7 +17,7 @@ class SaveStore;
 namespace net {
 class NetworkSession;
 class LanDiscovery;
-}
+}  // namespace net
 class AnimationPlayer;
 class ParticleSystem;
 
@@ -42,9 +42,9 @@ struct HudItem {
   std::string text;  // the text, or the image's name (a file in the game's images/ folder)
   int x = 0;
   int y = 0;
-  int width = 0;   // rectangles and images
+  int width = 0;  // rectangles and images
   int height = 0;
-  int size = 0;    // text height
+  int size = 0;         // text height
   float radius = 0.0f;  // rounded corners of a rectangle, in pixels
   Color color;
 };
@@ -56,7 +56,7 @@ struct ScriptContext {
   InputState* input = nullptr;
   ScriptedInputSource* test_input = nullptr;  // only set when running a system test
   TimeInfo time;
-  std::vector<HudItem> hud;                    // cleared by the engine every rendered frame
+  std::vector<HudItem> hud;  // cleared by the engine every rendered frame
   // The size of what the game is drawn in: the window, or the editor's Scene view while playing.
   int screen_width = 0;
   int screen_height = 0;

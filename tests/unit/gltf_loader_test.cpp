@@ -94,9 +94,10 @@ TEST_CASE("skeletons, vertex weights and animations are loaded") {
   const AnimationDesc& wave = scene.animations[0];
   CHECK(wave.name == "Wave");
   CHECK(wave.duration == doctest::Approx(kWaveSeconds));
-  const bool turns_upper = std::any_of(wave.channels.begin(), wave.channels.end(), [&](const AnimationChannel& channel) {
-    return channel.path == AnimationPath::Rotation && scene.nodes[channel.node].name == "Upper";
-  });
+  const bool turns_upper =
+      std::any_of(wave.channels.begin(), wave.channels.end(), [&](const AnimationChannel& channel) {
+        return channel.path == AnimationPath::Rotation && scene.nodes[channel.node].name == "Upper";
+      });
   CHECK(turns_upper);
   // Rigid scenes have neither.
   const LoadResult rigid = load_gltf_scene(fixture("hierarchy.glb"));

@@ -27,12 +27,12 @@ constexpr int kSkinsInFile = 90;
 constexpr std::size_t kBytesInScene = 1024;
 constexpr int kSkinsInScene = 5;
 constexpr int kNodesInScene = 12;
-constexpr int kRoot = 11;                 // the object an imported model goes under
-constexpr int kLocal = 3;                 // an index inside the model's own lists
+constexpr int kRoot = 11;  // the object an imported model goes under
+constexpr int kLocal = 3;  // an index inside the model's own lists
 constexpr int kOtherLocal = 4;
-constexpr int kViewOffset = 256;          // bytes: where a buffer view starts in the model's own data
+constexpr int kViewOffset = 256;  // bytes: where a buffer view starts in the model's own data
 constexpr int kOtherBuffer = 2;
-constexpr int kParts = 2;                 // pieces of a mesh: one with a material, one without
+constexpr int kParts = 2;  // pieces of a mesh: one with a material, one without
 constexpr const char* kNormalTexture = "normalTexture";
 constexpr const char* kBaseColorTexture = "baseColorTexture";
 constexpr const char* kClearcoat = "KHR_materials_clearcoat";
@@ -143,7 +143,8 @@ TEST_CASE("an image file is pointed at from the scene's folder, and images insid
 }
 
 TEST_CASE("textures point at the shifted samplers and images, also through their extensions") {
-  const json texture = {{kSampler, kLocal}, {kSource, kOtherLocal}, {kExtensions, {{kWebpExtension, {{kSource, kLocal}}}}}};
+  const json texture = {
+      {kSampler, kLocal}, {kSource, kOtherLocal}, {kExtensions, {{kWebpExtension, {{kSource, kLocal}}}}}};
   const json imported = imported_texture(texture, json_offsets());
   CHECK(imported[kSampler] == kLocal + kSamplersInScene);
   CHECK(imported[kSource] == kOtherLocal + kImagesInScene);
@@ -155,7 +156,8 @@ TEST_CASE("meshes point at the shifted accessors and materials, and lose their m
                           {kIndices, kLocal},
                           {kMaterial, kOtherLocal},
                           {kTargets, {json::object()}}};
-  const json mesh = {{kPrimitives, {primitive}}, {kWeights, {0, 1}}, {kExtras, {{kTargetNames, {"smile"}}, {kName, "kept"}}}};
+  const json mesh = {
+      {kPrimitives, {primitive}}, {kWeights, {0, 1}}, {kExtras, {{kTargetNames, {"smile"}}, {kName, "kept"}}}};
   const json imported = imported_mesh(mesh, json_offsets());
   const json& part = imported[kPrimitives][0];
   CHECK(part[kAttributes][kPositionAttribute] == kLocal + kAccessorsInScene);
@@ -169,12 +171,8 @@ TEST_CASE("meshes point at the shifted accessors and materials, and lose their m
 }
 
 TEST_CASE("a model's nodes keep their mesh and skin, and come without camera, light or children") {
-  const json node = {{kName, "Arm"},
-                     {kMesh, kLocal},
-                     {kSkin, kOtherLocal},
-                     {kCamera, 0},
-                     {kWeights, {0, 1}},
-                     {kExtensions, {{kLightsExtension, {{kLight, 0}}}}},
+  const json node = {{kName, "Arm"},       {kMesh, kLocal},    {kSkin, kOtherLocal},
+                     {kCamera, 0},         {kWeights, {0, 1}}, {kExtensions, {{kLightsExtension, {{kLight, 0}}}}},
                      {kChildren, {kLocal}}};
   const json imported = imported_node(node, json_offsets());
   CHECK(imported == json({{kName, "Arm"}, {kMesh, kLocal + kMeshesInScene}, {kSkin, kOtherLocal + kSkinsInFile}}));
@@ -249,7 +247,8 @@ TEST_CASE("an imported object goes under the model's root or keeps its parent, w
 TEST_CASE("skeleton joints and animation channels follow the imported objects") {
   SkinDesc skin;
   skin.joints = {0, kLocal, kNoIndex};
-  CHECK(imported_skin(skin, desc_offsets()).joints == std::vector<int>{kNodesInScene, kLocal + kNodesInScene, kNoIndex});
+  CHECK(imported_skin(skin, desc_offsets()).joints ==
+        std::vector<int>{kNodesInScene, kLocal + kNodesInScene, kNoIndex});
 
   AnimationDesc animation;
   animation.channels.resize(1);

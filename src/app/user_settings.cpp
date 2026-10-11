@@ -62,8 +62,8 @@ bool write_user_settings(const std::filesystem::path& file, const UserSettings& 
   return write_text_file(file, json.dump(kJsonIndent) + "\n", error);
 }
 
-GpuChoice resolve_gpu_choice(const std::optional<std::string>& command_line, const std::optional<std::string>& environment,
-                             const UserSettings& settings) {
+GpuChoice resolve_gpu_choice(const std::optional<std::string>& command_line,
+                             const std::optional<std::string>& environment, const UserSettings& settings) {
   for (const std::optional<std::string>* source : {&command_line, &environment}) {
     if (!source->has_value()) continue;
     if (const auto choice = gpu_choice_from_name(**source)) return *choice;
@@ -73,7 +73,8 @@ GpuChoice resolve_gpu_choice(const std::optional<std::string>& command_line, con
 
 GpuChoice apply_gpu_choice(const std::optional<std::string>& command_line) {
   const char* variable = std::getenv(kGpuVariable);
-  const std::optional<std::string> environment = variable != nullptr ? std::optional<std::string>(variable) : std::nullopt;
+  const std::optional<std::string> environment =
+      variable != nullptr ? std::optional<std::string>(variable) : std::nullopt;
   const GpuChoice choice = resolve_gpu_choice(command_line, environment, read_user_settings(user_settings_file()));
   platform::set_environment(kGpuVariable, gpu_choice_name(choice), true);
   return choice;

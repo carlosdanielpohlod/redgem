@@ -95,7 +95,8 @@ TEST_CASE("wheels are grouped into front and rear axles by position") {
 }
 
 TEST_CASE("vehicles default to a car-like mass") {
-  CHECK(body_config_from_props({{"body", std::string("vehicle")}}).mass == doctest::Approx(config::kVehicleDefaultMass));
+  CHECK(body_config_from_props({{"body", std::string("vehicle")}}).mass ==
+        doctest::Approx(config::kVehicleDefaultMass));
 }
 
 TEST_CASE("a car settles on its wheels and drives forward") {

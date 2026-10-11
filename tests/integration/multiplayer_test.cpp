@@ -18,11 +18,11 @@ using redgem::test::fixture;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;                      // of one frame on every machine, a millisecond apart
+constexpr int kMaxRounds = 3000;  // of one frame on every machine, a millisecond apart
 constexpr std::chrono::milliseconds kRoundPause{1};
-constexpr int kSettleRounds = 90;                     // frames for a watched object to close in
-constexpr float kBallStart = 3.0f;                    // where the ball's template sits, along x
-constexpr float kNear = 0.05f;                        // meters: "the same place" across machines
+constexpr int kSettleRounds = 90;   // frames for a watched object to close in
+constexpr float kBallStart = 3.0f;  // where the ball's template sits, along x
+constexpr float kNear = 0.05f;      // meters: "the same place" across machines
 
 // A camera, a platform the host moves, and a ball to spawn copies of.
 SceneDesc small_scene() {
@@ -142,11 +142,13 @@ TEST_CASE("scripts send each other named messages carrying Ruby values") {
   auto [host, guest] = lan.host_and_guest();
   ruby(*host, "$got = []; Network.on(:hit) { |data, from| $got << [data, from] }");
   ruby(*guest, "$got = []; Network.on(:hit) { |data, from| $got << [data, from] }");
-  CHECK(ruby(*guest, "Network.emit(:hit, { damage: 3, at: Vector3.new(1, 2, 3), tags: [:fire, 'big'], crit: true, "
-                     "note: nil, power: 0.5 })") == "true");
+  CHECK(ruby(*guest,
+             "Network.emit(:hit, { damage: 3, at: Vector3.new(1, 2, 3), tags: [:fire, 'big'], crit: true, "
+             "note: nil, power: 0.5 })") == "true");
   REQUIRE(lan.until([&] { return ruby(*host, "$got.size") == "1"; }));
-  CHECK(ruby(*host, "data, from = $got.first; [from, data[:damage], data[:at].class, data[:at].y, data[:tags], "
-                    "data[:crit], data[:note], data[:power]].inspect") ==
+  CHECK(ruby(*host,
+             "data, from = $got.first; [from, data[:damage], data[:at].class, data[:at].y, data[:tags], "
+             "data[:crit], data[:note], data[:power]].inspect") ==
         "[2, 3, Vector3, 2.0, [\"fire\", \"big\"], true, nil, 0.5]");
 
   // To one machine, by id or as :host; plain values travel too.
@@ -184,7 +186,8 @@ TEST_CASE("an object with a NetworkSync is moved by its owner and follows on the
   CHECK(ruby(*host, "[$sync.mine?, $sync.owner, $sync.key].inspect") == "[true, 1, \"Platform\"]");
   CHECK(ruby(*guest, "$sync.mine?") == "false");
 
-  ruby(*host, "$platform.transform.position = Vector3.new(2, 1, 0); $platform.transform.rotation = Vector3.new(0, 90, 0)");
+  ruby(*host,
+       "$platform.transform.position = Vector3.new(2, 1, 0); $platform.transform.rotation = Vector3.new(0, 90, 0)");
   lan.rounds(kSettleRounds);
   CHECK(x_of(*guest, "$platform") == doctest::Approx(2.0f).epsilon(kNear));
   CHECK(std::stof(ruby(*guest, "$platform.transform.rotation.y")) == doctest::Approx(90.0f).epsilon(kNear));
@@ -203,7 +206,8 @@ TEST_CASE("Network.spawn creates an object on every machine, for late joiners to
   auto [host, guest] = lan.host_and_guest();
   ruby(*guest, "$mine = Network.spawn('Ball', position: Vector3.new(5, 0, 0))");
   REQUIRE(lan.until([&] { return ruby(*host, "Scene.objects.count { |o| o.name == 'Ball' }") == "2"; }));
-  ruby(*host, "$theirs = Scene.objects.select { |o| o.name == 'Ball' }.last; $sync = $theirs.get_component(NetworkSync)");
+  ruby(*host,
+       "$theirs = Scene.objects.select { |o| o.name == 'Ball' }.last; $sync = $theirs.get_component(NetworkSync)");
   lan.round();
   CHECK(ruby(*host, "[$sync.owner, $sync.mine?]") == "[2, false]");
   CHECK(ruby(*guest, "$mine.get_component(NetworkSync).mine?") == "true");
@@ -224,9 +228,8 @@ TEST_CASE("Network.spawn creates an object on every machine, for late joiners to
 
   // Its owner leaves: the ball goes with them, everywhere else.
   ruby(*guest, "Network.leave");
-  REQUIRE(lan.until([&] {
-    return ruby(*host, "$theirs.alive?") == "false" && ruby(late, "$theirs.alive?") == "false";
-  }));
+  REQUIRE(
+      lan.until([&] { return ruby(*host, "$theirs.alive?") == "false" && ruby(late, "$theirs.alive?") == "false"; }));
   CHECK(ruby(*host, "$log.last.inspect") == "[:left, 2]");
   CHECK(ruby(late, "$log.last.inspect") == "[:left, 2]");
   // On the machine that left it is still there, and still its own.
@@ -315,7 +318,8 @@ TEST_CASE("offline, everything is this machine's; what it spawned then joins the
 
   // Out of the game again it is the guest's alone, and can go into the next game.
   ruby(guest, "Network.leave");
-  CHECK(ruby(guest, "[$ball.alive?, $ball.get_component(NetworkSync).owner, $sync.mine?].inspect") == "[true, 0, true]");
+  CHECK(ruby(guest, "[$ball.alive?, $ball.get_component(NetworkSync).owner, $sync.mine?].inspect") ==
+        "[true, 0, true]");
   REQUIRE(lan.until([&] { return ruby(host, "$theirs.alive?") == "false"; }));
 }
 

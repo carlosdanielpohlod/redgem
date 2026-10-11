@@ -45,7 +45,7 @@ struct WheelPose {
 enum class ContactPhase { Enter, Exit };
 
 struct ContactEvent {
-  ObjectId self = kNoObject;   // for triggers: the trigger volume
+  ObjectId self = kNoObject;  // for triggers: the trigger volume
   ObjectId other = kNoObject;
   ContactPhase phase = ContactPhase::Enter;
   bool trigger = false;
@@ -100,8 +100,7 @@ class PhysicsWorld {
   virtual float vehicle_forward_speed(ObjectId object) const = 0;
   virtual std::vector<WheelPose> wheel_poses(ObjectId object) const = 0;
 
-  virtual std::optional<RaycastHit> raycast(Vec3 origin, Vec3 direction, float max_distance,
-                                            ObjectId ignore) const = 0;
+  virtual std::optional<RaycastHit> raycast(Vec3 origin, Vec3 direction, float max_distance, ObjectId ignore) const = 0;
 };
 
 std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity);
