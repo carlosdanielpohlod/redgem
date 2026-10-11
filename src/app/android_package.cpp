@@ -11,6 +11,10 @@
 
 #include "app/game_project.hpp"
 #include "core/config.hpp"
+#include "core/platform.hpp"
+#include "core/xml_writer.hpp"
+
+#include <nlohmann/json.hpp>
 
 namespace redgem {
 
@@ -30,15 +34,67 @@ constexpr const char* kUnsignedApk = "unsigned.apk";
 constexpr const char* kAlignedApk = "aligned.apk";
 constexpr const char* kApkExtension = ".apk";
 constexpr const char* kKeystoreFile = "android-debug.keystore";
-// The key the APK is signed with lives in the user's RedGem folder; these open it. It only says
-// "the same person built this again", so its password is no secret.
+// The engine's own key lives in the user's RedGem folder, on the machine that made it. It only
+// says "the same machine built this again", so its password is no secret; it reaches the tools
+// through the environment all the same, like a developer's own.
 constexpr const char* kKeyAlias = "redgem";
 constexpr const char* kKeyPassword = "redgem-debug";
+constexpr const char* kEnginePasswordVariable = "REDGEM_ENGINE_KEY_PASSWORD";
+constexpr const char* kAndroidSection = "android";
+constexpr const char* kSettingsFileName = "game.json";
+constexpr std::size_t kMaxPackageLength = 150;
 constexpr int kKeyValidityDays = 10000;
 constexpr int kZipAlignment = 4;       // bytes: what Android wants uncompressed entries aligned to
 constexpr int kMinAndroidApi = 26;     // Android 8 (the engine is built for it, see tools/android)
 constexpr int kTargetAndroidApi = 34;
 constexpr int kKeyBits = 2048;
+// The manifest's elements and attributes, by the names Android gives them.
+namespace tag {
+constexpr const char* kManifest = "manifest";
+constexpr const char* kUsesSdk = "uses-sdk";
+constexpr const char* kUsesFeature = "uses-feature";
+constexpr const char* kUsesPermission = "uses-permission";
+constexpr const char* kApplication = "application";
+constexpr const char* kActivity = "activity";
+constexpr const char* kMetaData = "meta-data";
+constexpr const char* kIntentFilter = "intent-filter";
+constexpr const char* kAction = "action";
+constexpr const char* kCategory = "category";
+}  // namespace tag
+namespace attr {
+constexpr const char* kAndroidNamespace = "xmlns:android";
+constexpr const char* kPackage = "package";
+constexpr const char* kVersionCode = "android:versionCode";
+constexpr const char* kVersionName = "android:versionName";
+constexpr const char* kMinSdk = "android:minSdkVersion";
+constexpr const char* kTargetSdk = "android:targetSdkVersion";
+constexpr const char* kGlEsVersion = "android:glEsVersion";
+constexpr const char* kRequired = "android:required";
+constexpr const char* kName = "android:name";
+constexpr const char* kValue = "android:value";
+constexpr const char* kLabel = "android:label";
+constexpr const char* kHasCode = "android:hasCode";
+constexpr const char* kExtractNativeLibs = "android:extractNativeLibs";
+constexpr const char* kTheme = "android:theme";
+constexpr const char* kExported = "android:exported";
+constexpr const char* kOrientation = "android:screenOrientation";
+constexpr const char* kConfigChanges = "android:configChanges";
+}  // namespace attr
+// The values that go in them.
+constexpr const char* kAndroidNamespace = "http://schemas.android.com/apk/res/android";
+constexpr const char* kYes = "true";
+constexpr const char* kNo = "false";
+constexpr const char* kInternetPermission = "android.permission.INTERNET";
+constexpr const char* kFullScreenTheme = "@android:style/Theme.NoTitleBar.Fullscreen";
+constexpr const char* kNativeActivity = "android.app.NativeActivity";
+constexpr const char* kLibraryNameKey = "android.app.lib_name";
+constexpr const char* kLandscape = "sensorLandscape";
+constexpr const char* kMainAction = "android.intent.action.MAIN";
+constexpr const char* kLauncherCategory = "android.intent.category.LAUNCHER";
+// Changes around the game that it rides out instead of being started over.
+constexpr const char* kHandledChanges =
+    "orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|keyboard|navigation|uiMode|density|"
+    "fontScale|locale|layoutDirection|touchscreen";
 constexpr const char* kOpenGlEs3 = "0x00030000";        // what the manifest calls OpenGL ES 3.0
 constexpr const char* kStageFolder = ".redgem-apk-stage";  // inside the output folder, gone when the build ends
 constexpr const char* kToolLog = "tool-output.log";
@@ -55,6 +111,9 @@ std::string quoted(const std::filesystem::path& path) {
   for (const char c : path.string()) out += c == '\'' ? std::string("'\\''") : std::string(1, c);
   return out + "'";
 }
+
+// A text as one word of a command, whatever is in it.
+std::string shell_word(const std::string& text) { return quoted(std::filesystem::path(text)); }
 
 // Runs a tool, keeping what it says in `log`. When it fails, `error` is what it was doing and the
 // last lines it said (not the command itself, which may carry a password).
@@ -97,27 +156,14 @@ std::filesystem::path newest_in(const std::filesystem::path& folder) {
   return entries.empty() ? std::filesystem::path() : *std::max_element(entries.begin(), entries.end(), older);
 }
 
-std::string xml_escaped(const std::string& text) {
-  std::string out;
-  for (const char c : text) {
-    switch (c) {
-      case '&': out += "&amp;"; break;
-      case '<': out += "&lt;"; break;
-      case '>': out += "&gt;"; break;
-      case '"': out += "&quot;"; break;
-      default: out += c;
-    }
-  }
-  return out;
-}
-
-// Files that are not part of a game (hidden ones, editors' backups) stay out of the APK.
+// Files that are not part of a game (hidden ones, editors' backups) or must never leave the
+// developer's machine (signing keys) stay out of the APK.
 bool leftover(const std::filesystem::path& relative) {
   for (const std::filesystem::path& part : relative) {
     const std::string name = part.string();
     if (!name.empty() && (name.front() == kHiddenPrefix || name.back() == kBackupSuffix)) return true;
   }
-  return false;
+  return signing_key_file(relative);
 }
 
 // Whether a file sits in a folder the SDK's packer silently leaves out of an APK.
@@ -189,30 +235,151 @@ std::string android_package_name(const std::filesystem::path& game_dir) {
   return kPackagePrefix + name + "_" + digits;
 }
 
-std::string android_manifest(const std::string& package, const std::string& label) {
-  return std::string("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n") +
-         "<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"" + package +
-         "\" android:versionCode=\"1\" android:versionName=\"1.0\">\n" +
-         "  <uses-sdk android:minSdkVersion=\"" + std::to_string(kMinAndroidApi) + "\" android:targetSdkVersion=\"" +
-         std::to_string(kTargetAndroidApi) + "\"/>\n" +
-         "  <uses-feature android:glEsVersion=\"" + kOpenGlEs3 + "\" android:required=\"true\"/>\n" +
-         "  <uses-permission android:name=\"android.permission.INTERNET\"/>\n" +
-         "  <application android:label=\"" + xml_escaped(label) +
-         "\" android:hasCode=\"false\" android:extractNativeLibs=\"true\"" +
-         " android:theme=\"@android:style/Theme.NoTitleBar.Fullscreen\">\n" +
-         "    <activity android:name=\"android.app.NativeActivity\" android:exported=\"true\"" +
-         " android:screenOrientation=\"sensorLandscape\"" +
-         // (Whatever changes around the game, it keeps running instead of being started over.)
-         " android:configChanges=\"orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|keyboard|"
-         "navigation|uiMode|density|fontScale|locale|layoutDirection|touchscreen\">\n" +
-         "      <meta-data android:name=\"android.app.lib_name\" android:value=\"" + kAndroidLibraryName + "\"/>\n" +
-         "      <intent-filter>\n" +
-         "        <action android:name=\"android.intent.action.MAIN\"/>\n" +
-         "        <category android:name=\"android.intent.category.LAUNCHER\"/>\n" +
-         "      </intent-filter>\n" +
-         "    </activity>\n" +
-         "  </application>\n" +
-         "</manifest>\n";
+namespace {
+
+// An app's id is at least two parts joined by dots, each a small letter followed by small
+// letters, digits or underscores ("com.mystudio.my_game").
+bool valid_package(const std::string& package) {
+  if (package.empty() || package.size() > kMaxPackageLength || package.find('.') == std::string::npos) return false;
+  bool part_start = true;
+  for (const char c : package) {
+    const auto letter = static_cast<unsigned char>(c);
+    if (c == '.') {
+      if (part_start) return false;  // an empty part
+      part_start = true;
+    } else if (part_start) {
+      if (std::islower(letter) == 0) return false;
+      part_start = false;
+    } else if (std::islower(letter) == 0 && std::isdigit(letter) == 0 && c != '_') {
+      return false;
+    }
+  }
+  return !part_start;
+}
+
+bool in_environment(const char* variable) {
+  const char* value = std::getenv(variable);
+  return value != nullptr && *value != '\0';
+}
+
+}  // namespace
+
+bool read_android_settings(const std::filesystem::path& game_dir, AndroidSettings& settings, std::string& error) {
+  settings = AndroidSettings{};
+  std::ifstream in(game_dir / kSettingsFileName);
+  if (!in) return true;
+  const nlohmann::json json = nlohmann::json::parse(in, nullptr, false);
+  if (!json.is_object() || !json.contains(kAndroidSection)) return true;
+  const nlohmann::json& section = json[kAndroidSection];
+  const std::string where = std::string(kSettingsFileName) + ": android.";
+  const auto text = [&](const char* key, std::string& into) {
+    if (!section.contains(key)) return true;
+    if (!section[key].is_string()) {
+      error = where + key + " must be a text";
+      return false;
+    }
+    into = section[key].get<std::string>();
+    return true;
+  };
+  std::string keystore;
+  if (!section.is_object()) {
+    error = std::string(kSettingsFileName) + ": android must be a section ({ ... })";
+    return false;
+  }
+  if (!text("package", settings.package) || !text("version_name", settings.version_name) ||
+      !text("keystore", keystore) || !text("key_alias", settings.key_alias)) {
+    return false;
+  }
+  settings.keystore = keystore;
+  if (section.contains("version_code")) {
+    if (!section["version_code"].is_number_integer() || section["version_code"] < 1) {
+      error = where + "version_code must be a whole number, 1 or more";
+      return false;
+    }
+    settings.version_code = section["version_code"].get<int>();
+  }
+  if (!settings.package.empty() && !valid_package(settings.package)) {
+    error = where + "package must look like com.mystudio.mygame (small letters, digits and _, parts joined by dots)";
+    return false;
+  }
+  if (!settings.keystore.empty() && settings.key_alias.empty()) {
+    error = where + "key_alias is needed with a keystore: the name of the key inside it";
+    return false;
+  }
+  return true;
+}
+
+std::optional<SigningKey> signing_key_for(const std::filesystem::path& game_dir, const AndroidSettings& settings,
+                                          const std::filesystem::path& engine_keystore, std::string& error) {
+  SigningKey key;
+  if (settings.keystore.empty()) {
+    // (The tools read it from the environment, where this process puts it.)
+    platform::set_environment(kEnginePasswordVariable, kKeyPassword, true);
+    key.keystore = engine_keystore;
+    key.alias = kKeyAlias;
+    key.store_password_variable = kEnginePasswordVariable;
+    key.key_password_variable = kEnginePasswordVariable;
+    return key;
+  }
+  std::error_code fs_error;
+  key.keystore = std::filesystem::absolute(settings.keystore.is_absolute() ? settings.keystore : game_dir / settings.keystore, fs_error);
+  if (!std::filesystem::is_regular_file(key.keystore, fs_error)) {
+    error = "the keystore " + key.keystore.string() + " does not exist";
+    return std::nullopt;
+  }
+  if (!in_environment(kKeystorePasswordVariable)) {
+    error = std::string("the keystore's password is not known: put it in the environment as ") + kKeystorePasswordVariable +
+            " (and the key's own in " + kKeyPasswordVariable + ", when it differs)";
+    return std::nullopt;
+  }
+  key.alias = settings.key_alias;
+  key.store_password_variable = kKeystorePasswordVariable;
+  key.key_password_variable = in_environment(kKeyPasswordVariable) ? kKeyPasswordVariable : kKeystorePasswordVariable;
+  return key;
+}
+
+namespace {
+
+// What the app needs from the phone: a recent enough Android, OpenGL ES 3, and the network.
+void add_requirements(XmlElement& manifest) {
+  manifest.child(tag::kUsesSdk)
+      .attribute(attr::kMinSdk, std::to_string(kMinAndroidApi))
+      .attribute(attr::kTargetSdk, std::to_string(kTargetAndroidApi));
+  manifest.child(tag::kUsesFeature).attribute(attr::kGlEsVersion, kOpenGlEs3).attribute(attr::kRequired, kYes);
+  manifest.child(tag::kUsesPermission).attribute(attr::kName, kInternetPermission);  // multiplayer
+}
+
+// The one screen of the app: full, sideways, the system's native activity running the engine's
+// library, opened from the phone's launcher.
+void add_activity(XmlElement& application) {
+  XmlElement& activity = application.child(tag::kActivity);
+  activity.attribute(attr::kName, kNativeActivity)
+      .attribute(attr::kExported, kYes)
+      .attribute(attr::kOrientation, kLandscape)
+      .attribute(attr::kConfigChanges, kHandledChanges);
+  activity.child(tag::kMetaData).attribute(attr::kName, kLibraryNameKey).attribute(attr::kValue, kAndroidLibraryName);
+  XmlElement& launcher = activity.child(tag::kIntentFilter);
+  launcher.child(tag::kAction).attribute(attr::kName, kMainAction);
+  launcher.child(tag::kCategory).attribute(attr::kName, kLauncherCategory);
+}
+
+}  // namespace
+
+std::string android_manifest(const std::string& package, const std::string& label, const AndroidSettings& settings) {
+  XmlElement manifest(tag::kManifest);
+  manifest.attribute(attr::kAndroidNamespace, kAndroidNamespace)
+      .attribute(attr::kPackage, package)
+      .attribute(attr::kVersionCode, std::to_string(settings.version_code))
+      .attribute(attr::kVersionName, settings.version_name);
+  add_requirements(manifest);
+  // (No Java of its own: hasCode is off.)
+  XmlElement& application = manifest.child(tag::kApplication);
+  application.attribute(attr::kLabel, label)
+      .attribute(attr::kHasCode, kNo)
+      .attribute(attr::kExtractNativeLibs, kYes)
+      .attribute(attr::kTheme, kFullScreenTheme);
+  add_activity(application);
+  return manifest.document();
 }
 
 std::map<std::string, std::filesystem::path> android_runtimes(const std::filesystem::path& runtimes_dir) {
@@ -273,8 +440,10 @@ bool stage_android_game(const std::filesystem::path& game_folder,
       return false;
     }
   }
-  const std::string manifest =
-      android_manifest(android_package_name(game_dir), read_game_settings(game_dir).title);
+  AndroidSettings settings;
+  if (!read_android_settings(game_dir, settings, error)) return false;
+  const std::string package = settings.package.empty() ? android_package_name(game_dir) : settings.package;
+  const std::string manifest = android_manifest(package, read_game_settings(game_dir).title, settings);
   if (!write_text(assets / kAndroidManifestAsset, listing) || !write_text(assets / kAndroidStampAsset, stamp) ||
       !write_text(stage_dir / kManifestFile, manifest)) {
     error = "cannot write into " + stage_dir.string();
@@ -283,18 +452,19 @@ bool stage_android_game(const std::filesystem::path& game_folder,
   return true;
 }
 
-bool pack_android_apk(const AndroidTools& tools, const std::filesystem::path& stage_dir,
-                      const std::filesystem::path& keystore, const std::filesystem::path& apk, std::string& error) {
+bool pack_android_apk(const AndroidTools& tools, const std::filesystem::path& stage_dir, const SigningKey& key,
+                      const std::filesystem::path& apk, std::string& error) {
   const std::filesystem::path unsigned_apk = stage_dir / kUnsignedApk;
   const std::filesystem::path aligned_apk = stage_dir / kAlignedApk;
   const std::filesystem::path log = stage_dir / kToolLog;
   std::error_code fs_error;
-  if (!std::filesystem::exists(keystore, fs_error)) {
-    std::filesystem::create_directories(keystore.parent_path(), fs_error);
-    const std::string make_key = "keytool -genkeypair -keystore " + quoted(keystore) + " -storepass " + kKeyPassword +
-                                 " -keypass " + kKeyPassword + " -alias " + kKeyAlias +
-                                 " -keyalg RSA -keysize " + std::to_string(kKeyBits) + " -validity " + std::to_string(kKeyValidityDays) +
-                                 " -dname 'CN=RedGem'";
+  // Only the engine's own key is ever made here; a developer's is theirs to make and keep.
+  if (!std::filesystem::exists(key.keystore, fs_error)) {
+    std::filesystem::create_directories(key.keystore.parent_path(), fs_error);
+    const std::string make_key = "keytool -genkeypair -keystore " + quoted(key.keystore) + " -storepass:env " +
+                                 key.store_password_variable + " -keypass:env " + key.key_password_variable +
+                                 " -alias " + shell_word(key.alias) + " -keyalg RSA -keysize " + std::to_string(kKeyBits) +
+                                 " -validity " + std::to_string(kKeyValidityDays) + " -dname 'CN=RedGem'";
     if (!run(make_key, log, "making the signing key (is Java installed?)", error)) return false;
   }
   const std::string link = quoted(tools.aapt2) + " link -o " + quoted(unsigned_apk) + " --manifest " +
@@ -311,8 +481,9 @@ bool pack_android_apk(const AndroidTools& tools, const std::filesystem::path& st
                             quoted(unsigned_apk) + " " + quoted(aligned_apk);
   if (!run(align, log, "aligning the APK", error)) return false;
   std::filesystem::create_directories(apk.parent_path(), fs_error);
-  const std::string sign = quoted(tools.apksigner) + " sign --ks " + quoted(keystore) + " --ks-pass pass:" +
-                           kKeyPassword + " --key-pass pass:" + kKeyPassword + " --v4-signing-enabled false --out " + quoted(apk) + " " +
+  const std::string sign = quoted(tools.apksigner) + " sign --ks " + quoted(key.keystore) + " --ks-key-alias " +
+                           shell_word(key.alias) + " --ks-pass env:" + key.store_password_variable + " --key-pass env:" +
+                           key.key_password_variable + " --v4-signing-enabled false --out " + quoted(apk) + " " +
                            quoted(aligned_apk);
   return run(sign, log, "signing the APK", error);
 }
@@ -334,11 +505,15 @@ std::optional<std::filesystem::path> build_android_game(const std::filesystem::p
   const std::filesystem::path out = std::filesystem::absolute(normalized_folder(out_dir), fs_error);
   const std::filesystem::path stage = out / kStageFolder;
   const std::filesystem::path apk = out / (executable_name(game_dir) + kApkExtension);
-  const std::filesystem::path keystore = recent_games_file().parent_path() / kKeystoreFile;
+  AndroidSettings settings;
+  if (!read_android_settings(normalized_folder(game_dir), settings, error)) return std::nullopt;
+  const auto key = signing_key_for(normalized_folder(game_dir), settings,
+                                   recent_games_file().parent_path() / kKeystoreFile, error);
+  if (!key) return std::nullopt;
   // (The stamp only has to differ from the last build's.)
   const std::string stamp = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
   const bool built = stage_android_game(game_dir, android_runtimes(runtimes_dir), stamp, stage, error) &&
-                     pack_android_apk(*tools, stage, keystore, apk, error);
+                     pack_android_apk(*tools, stage, *key, apk, error);
   std::filesystem::remove_all(stage, fs_error);  // whether it worked or not
   if (!built) return std::nullopt;
   return apk;

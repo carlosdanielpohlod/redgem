@@ -57,8 +57,41 @@ What changes on a phone:
 - There is no on-screen keyboard yet, so text fields cannot be typed in.
 - Phones are slower than computers: keep levels light (few lights, modest textures) and test on
   a real device. It needs Android 8 or later with OpenGL ES 3.
-- The APK is signed with a key made on your machine, good for your own devices and for sharing the
-  file. Publishing on a store needs your own key and its packaging rules.
+- The APK is signed with a key the engine makes on your machine the first time
+  (`~/.config/redgem/android-debug.keystore`). It never leaves your machine and is different on
+  everyone's; it is good for your own devices and for sharing the file.
+
+### Your own app id, version and key
+
+A game says these in the `android` section of its `game.json`; all are optional:
+
+```json
+{
+  "title": "My Game",
+  "android": {
+    "package": "com.mystudio.mygame",
+    "version_code": 3,
+    "version_name": "1.2",
+    "keystore": "../keys/release.keystore",
+    "key_alias": "mygame"
+  }
+}
+```
+
+- `package` is the app's id on the phone. Without it the id comes from the game's folder name.
+- `version_code` goes up with every release: a phone only updates to a higher one.
+- `keystore` and `key_alias` sign the app with a key of your own, which is what a release needs:
+  players can only update a game signed with the same key as the one they have. Make it once with
+  Java's `keytool` and keep it safe (and backed up): there is no getting it back.
+- The key's password is never written in a file. Give it when building:
+
+```bash
+REDGEM_KEYSTORE_PASSWORD='...' ./build/src/redgem build my_game dist/android --target android
+```
+
+  (`REDGEM_KEY_PASSWORD` too, when the key has a password of its own.)
+- Keep the keystore outside the game's folder. If one is left there anyway, builds leave it out:
+  a signing key never travels with a game.
 
 ## Notes
 

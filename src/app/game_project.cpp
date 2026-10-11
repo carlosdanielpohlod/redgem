@@ -27,6 +27,7 @@ constexpr const char* kSettingsFile = "game.json";
 constexpr const char* kLinuxTarget = "linux";
 constexpr const char* kWindowsTarget = "windows";
 constexpr const char* kAndroidTarget = "android";
+constexpr const char* kSigningKeyExtensions[] = {".keystore", ".jks", ".p12"};
 constexpr const char* kRuntimesFolder = "runtimes";  // engines for other systems, next to this one
 constexpr const char* kRuntimeName = "redgem";
 constexpr const char* kFallbackExecutable = "play";  // for a game whose name gives no usable file name
@@ -193,6 +194,16 @@ bool is_empty_dir(const std::filesystem::path& dir) {
          (std::filesystem::is_directory(dir) && std::filesystem::is_empty(dir));
 }
 
+// A copy of a game goes to other people: a signing key left in its folder does not go with it.
+void remove_signing_keys(const std::filesystem::path& folder) {
+  std::error_code fs_error;
+  std::vector<std::filesystem::path> keys;
+  for (const auto& entry : std::filesystem::recursive_directory_iterator(folder, fs_error)) {
+    if (entry.is_regular_file(fs_error) && signing_key_file(entry.path())) keys.push_back(entry.path());
+  }
+  for (const std::filesystem::path& key : keys) std::filesystem::remove(key, fs_error);
+}
+
 }  // namespace
 
 GameSettings read_game_settings(const std::filesystem::path& game_dir) {
@@ -211,9 +222,15 @@ GameSettings read_game_settings(const std::filesystem::path& game_dir) {
 }
 
 bool write_game_settings(const std::filesystem::path& game_dir, const GameSettings& settings, std::string& error) {
-  const nlohmann::json json = {{"title", settings.title},
-                               {"window_width", settings.window_width},
-                               {"window_height", settings.window_height}};
+  // What else the file holds (its "android" section...) stays as it is.
+  nlohmann::json json = nlohmann::json::object();
+  if (std::ifstream in(game_dir / kSettingsFile); in) {
+    const nlohmann::json existing = nlohmann::json::parse(in, nullptr, false);
+    if (existing.is_object()) json = existing;
+  }
+  json["title"] = settings.title;
+  json["window_width"] = settings.window_width;
+  json["window_height"] = settings.window_height;
   return write_text_file(game_dir / kSettingsFile, json.dump(kJsonIndent) + "\n", error);
 }
 
@@ -366,7 +383,14 @@ bool build_game(const std::filesystem::path& game_folder, const std::filesystem:
     error = "cannot copy the game: " + fs_error.message();
     return false;
   }
+  remove_signing_keys(out_dir / kBundledGameFolder);
   return true;
+}
+
+bool signing_key_file(const std::filesystem::path& file) {
+  const std::string extension = file.extension().string();
+  return std::any_of(std::begin(kSigningKeyExtensions), std::end(kSigningKeyExtensions),
+                     [&extension](const char* known) { return extension == known; });
 }
 
 bool folder_inside(const std::filesystem::path& folder, const std::filesystem::path& outer) {

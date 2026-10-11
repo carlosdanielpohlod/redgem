@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include "app/android_package.hpp"
+#include "core/platform.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -123,11 +124,15 @@ TEST_CASE("a game is laid out as an APK's contents: its files, their list, a sta
   std::filesystem::create_directories(game / ".git");
   std::ofstream(game / ".git" / "config") << "x";
   std::ofstream(game / "scripts" / "probe.rb~") << "x";
+  std::ofstream(game / "release.keystore") << "the developer's signing key";  // never leaves their machine
+  std::ofstream(game / "upload.jks") << "another";
   REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp-2", stage, error), error);
   const std::string tidy = read(stage / "assets/game.files");
   CHECK(tidy == listing);
   CHECK_FALSE(std::filesystem::exists(stage / "assets/game/.gitignore"));
   CHECK_FALSE(std::filesystem::exists(stage / "assets/game/.git"));
+  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/release.keystore"));
+  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/upload.jks"));
   // A folder the SDK would silently leave out is refused, by name.
   std::filesystem::create_directories(game / "_shared");
   std::ofstream(game / "_shared" / "data.txt") << "x";
@@ -139,4 +144,71 @@ TEST_CASE("a game is laid out as an APK's contents: its files, their list, a sta
   CHECK(error.find("is not a game") != std::string::npos);
   CHECK_FALSE(stage_android_game(fixture("games/sandbox"), {}, "s", stage, error));
   CHECK(error.find("build_runtime.sh") != std::string::npos);
+}
+
+TEST_CASE("a game says its own app id, version and signing key in game.json") {
+  const Scratch scratch;
+  AndroidSettings settings;
+  std::string error;
+  // Nothing said: nothing to use.
+  REQUIRE(read_android_settings(scratch.dir, settings, error));
+  CHECK(settings.package.empty());
+  CHECK(settings.version_code == 1);
+  CHECK(settings.keystore.empty());
+
+  scratch.file("game.json", R"({"title": "Mine", "android": {"package": "com.mystudio.my_game", "version_code": 7,
+                                "version_name": "1.4", "keystore": "keys/release.keystore", "key_alias": "mine"}})");
+  REQUIRE_MESSAGE(read_android_settings(scratch.dir, settings, error), error);
+  CHECK(settings.package == "com.mystudio.my_game");
+  CHECK(settings.version_code == 7);
+  CHECK(settings.version_name == "1.4");
+  CHECK(settings.keystore == "keys/release.keystore");
+  CHECK(settings.key_alias == "mine");
+  const std::string manifest = android_manifest(settings.package, "Mine", settings);
+  CHECK(manifest.find("package=\"com.mystudio.my_game\"") != std::string::npos);
+  CHECK(manifest.find("android:versionCode=\"7\" android:versionName=\"1.4\"") != std::string::npos);
+
+  // What cannot be used is refused, saying what is wrong.
+  for (const char* bad : {R"({"android": {"package": "MyGame"}})", R"({"android": {"package": "com..game"}})",
+                          R"({"android": {"package": "com.9lives"}})", R"({"android": {"version_code": 0}})",
+                          R"({"android": {"version_code": "three"}})", R"({"android": {"keystore": "k.keystore"}})",
+                          R"({"android": "yes"})"}) {
+    CAPTURE(bad);
+    scratch.file("game.json", bad);
+    CHECK_FALSE(read_android_settings(scratch.dir, settings, error));
+    CHECK(error.find("game.json") != std::string::npos);
+  }
+}
+
+TEST_CASE("a game is signed with its developer's key when it names one, else with this machine's") {
+  const Scratch scratch;
+  const std::filesystem::path engine_key = scratch.dir / "engine.keystore";
+  std::string error;
+  AndroidSettings plain;
+  const auto engines = signing_key_for(scratch.dir, plain, engine_key, error);
+  REQUIRE(engines.has_value());
+  CHECK(engines->keystore == engine_key);  // (made on first use)
+
+  AndroidSettings own;
+  own.keystore = "keys/release.keystore";
+  own.key_alias = "mine";
+  platform::set_environment(kKeystorePasswordVariable, "", true);
+  CHECK_FALSE(signing_key_for(scratch.dir, own, engine_key, error).has_value());
+  CHECK(error.find("does not exist") != std::string::npos);
+  scratch.file("keys/release.keystore");
+  CHECK_FALSE(signing_key_for(scratch.dir, own, engine_key, error).has_value());
+  CHECK(error.find(kKeystorePasswordVariable) != std::string::npos);  // where the password goes
+
+  platform::set_environment(kKeystorePasswordVariable, "secret", true);
+  platform::set_environment(kKeyPasswordVariable, "", true);
+  const auto theirs = signing_key_for(scratch.dir, own, engine_key, error);
+  REQUIRE(theirs.has_value());
+  CHECK(theirs->keystore == std::filesystem::absolute(scratch.dir / "keys/release.keystore"));
+  CHECK(theirs->alias == "mine");
+  CHECK(theirs->store_password_variable == kKeystorePasswordVariable);
+  CHECK(theirs->key_password_variable == kKeystorePasswordVariable);  // the key's own was not given
+  platform::set_environment(kKeyPasswordVariable, "another", true);
+  CHECK(signing_key_for(scratch.dir, own, engine_key, error)->key_password_variable == kKeyPasswordVariable);
+  platform::set_environment(kKeystorePasswordVariable, "", true);
+  platform::set_environment(kKeyPasswordVariable, "", true);
 }

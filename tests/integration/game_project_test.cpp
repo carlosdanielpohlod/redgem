@@ -5,6 +5,9 @@
 #include <mruby/string.h>
 
 #include <filesystem>
+#include <fstream>
+
+#include <nlohmann/json.hpp>
 
 #include "app/engine.hpp"
 #include "app/game_project.hpp"
@@ -244,4 +247,38 @@ TEST_CASE("the platformer template comes with the sounds its scripts play") {
   auto engine = play_headless(game);
   for (int i = 0; i < kWalkFrames; ++i) engine->frame(config::kFixedDeltaSeconds);
   std::filesystem::remove_all(game);
+}
+
+TEST_CASE("saving a game's settings keeps what else its game.json says") {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-settings-keep-test";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  std::ofstream(dir / "game.json") << R"({"title": "Old", "android": {"package": "com.mystudio.mine"}, "notes": [1, 2]})";
+  GameSettings settings = read_game_settings(dir);
+  settings.title = "New";
+  std::string error;
+  REQUIRE_MESSAGE(write_game_settings(dir, settings, error), error);
+  std::ifstream in(dir / "game.json");
+  const nlohmann::json saved = nlohmann::json::parse(in);
+  CHECK(saved["title"] == "New");
+  CHECK(saved["android"]["package"] == "com.mystudio.mine");
+  CHECK(saved["notes"].size() == 2);
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("a built game never carries a signing key left in its folder") {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-build-keys-test";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  std::filesystem::copy(redgem::test::fixture("games/sandbox"), dir / "game_src", std::filesystem::copy_options::recursive);
+  std::ofstream(dir / "game_src" / "release.keystore") << "secret";
+  std::ofstream(dir / "engine") << "engine";
+  std::string error;
+  REQUIRE_MESSAGE(build_game(dir / "game_src", dir / "out", dir / "engine", host_build_target(), error), error);
+  CHECK(std::filesystem::exists(dir / "out" / "game" / "scene.glb"));
+  CHECK_FALSE(std::filesystem::exists(dir / "out" / "game" / "release.keystore"));
+  CHECK(signing_key_file("keys/upload.jks"));
+  CHECK(signing_key_file("release.p12"));
+  CHECK_FALSE(signing_key_file("scene.glb"));
+  std::filesystem::remove_all(dir);
 }

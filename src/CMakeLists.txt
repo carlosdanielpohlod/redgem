@@ -37,6 +37,7 @@ add_library(redgem_engine STATIC
   ${REDGEM_PRELUDE_HEADER}
   ${REDGEM_TEMPLATES_HEADER}
   core/log.cpp
+  core/xml_writer.cpp
   core/platform.cpp
   core/math.cpp
   core/fixed_clock.cpp

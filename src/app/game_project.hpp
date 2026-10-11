@@ -62,6 +62,10 @@ std::optional<std::filesystem::path> build_game_for(const std::filesystem::path&
 // must not go into the game it copies).
 bool folder_inside(const std::filesystem::path& folder, const std::filesystem::path& outer);
 
+// Whether a file is a key for signing apps (.keystore, .jks, .p12). A build never copies one:
+// whoever has it can pass their app off as the developer's.
+bool signing_key_file(const std::filesystem::path& file);
+
 // The name of a game's executable: its folder name in lowercase, with anything that is not a
 // letter or a digit turned into '_' ("My Game" -> "my_game"). On Windows the file adds ".exe".
 std::string executable_name(const std::filesystem::path& game_dir);
