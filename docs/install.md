@@ -25,7 +25,7 @@ Wherever this manual says `./build/src/redgem ...`, write `bin/redgem ...` (or `
 You need [Docker](https://docs.docker.com/engine/install/) and a desktop session using X11.
 
 ```bash
-git clone <repository URL> redgem
+git clone https://github.com/carlosdanielpohlod/redgem.git
 cd redgem
 tools/docker/editor.sh
 ```
