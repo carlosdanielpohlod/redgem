@@ -448,6 +448,30 @@ TEST_CASE("a game has only so many spawned objects, whoever they are for") {
   CHECK(host.scripts().error_count() == 0);
 }
 
+TEST_CASE("a spawned object its owner destroys is gone on every machine, and its place is free again") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  Engine& third = lan.add_machine();
+  lan.join(third, *host);
+  ruby(*guest, "$mine = Network.spawn('Ball')");
+  const auto balls_everywhere = [&](const std::string& count) {
+    return balls_spawned_on(*host) == count && balls_spawned_on(third) == count;
+  };
+  REQUIRE(lan.until([&] { return balls_everywhere("1"); }));
+
+  ruby(*guest, "$mine.destroy");
+  CHECK(lan.until([&] { return balls_everywhere("0"); }));
+  CHECK(balls_spawned_on(*guest) == "0");
+
+  // A machine that only watches the object cannot take it from the others by destroying its copy.
+  ruby(*guest, "$mine = Network.spawn('Ball')");
+  REQUIRE(lan.until([&] { return balls_everywhere("1"); }));
+  ruby(*host, "Scene.objects.select { |o| o.name == 'Ball' }.last.destroy");
+  lan.rounds(kSettleRounds);
+  CHECK(balls_spawned_on(third) == "1");
+  CHECK(ruby(*guest, "$mine.alive?") == "true");
+}
+
 TEST_CASE("an object that goes by a spawned object's key does not take it along when it is destroyed") {
   Lan lan;
   Engine& host = lan.add_machine();

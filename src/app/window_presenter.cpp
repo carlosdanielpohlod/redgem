@@ -1,3 +1,4 @@
+#include "app/scene_files.hpp"
 #include "app/window_presenter.hpp"
 
 #include <cmath>

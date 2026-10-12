@@ -138,7 +138,8 @@ module Network
     # spawned as this very object is forgotten with it.)
     def __forget(sync)
       __untrack(sync)
-      @spawned.delete(sync.key) if @spawned[sync.key] && @spawned[sync.key][:object] == sync.game_object
+      entry = @spawned[sync.key]
+      forget_spawned(sync.key, entry) if entry && entry[:object] == sync.game_object
     end
 
     # Called by the engine for everything that happens on the network.
@@ -168,6 +169,12 @@ module Network
     private
 
     def listen(kind, block) = (@listeners[kind] ||= []) << block
+
+    # A spawned object was destroyed here: when it was this machine's, the others lose it too.
+    def forget_spawned(key, entry)
+      @spawned.delete(key)
+      __deliver(DESPAWN, [key], :all) if online? && entry[:owner] == id
+    end
 
     def refuse_spawn(template, owner)
       Debug.warn("Network.spawn(#{template}): machine #{owner} or the game has all the spawned objects it may")

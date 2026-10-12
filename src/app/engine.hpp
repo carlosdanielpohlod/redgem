@@ -10,7 +10,6 @@
 #include "audio/audio.hpp"
 #include "core/fixed_clock.hpp"
 #include "input/input.hpp"
-#include "input/touch_controls.hpp"
 #include "net/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
@@ -46,10 +45,6 @@ struct EngineOptions {
   // What the game sounds through, which has to outlive the engine. Without one it is silent.
   AudioSystem* audio = nullptr;
 };
-
-// A game's scene.glb, read (what the loader has to say about it is logged); the error when it
-// cannot be read.
-std::variant<SceneDesc, std::string> read_game_scene(const std::filesystem::path& game_dir);
 
 // Wires scene, physics, scripts and input together and runs the game loop. It opens no window and
 // draws nothing: each frame is handed to its presenter.
@@ -109,21 +104,10 @@ class Engine {
   void connect_context();
   void start_scripts();
 
-  void create_physics_bodies();
-  std::filesystem::path scene_path(const std::string& name) const;
-  // Whether a script's scene name stays inside the game's folders (a warning says so when not).
-  static bool safe_scene_name(const std::string& name);
-  void load_scene(const std::string& name);
   // Makes a scene that was loaded the one that runs, under `name`.
   void switch_to(const std::string& name, SceneDesc desc);
   // Puts a newly loaded scene, with its bodies, in place of the running one.
   void replace_world(SceneDesc desc);
-  void create_body(ObjectId id);
-  BodyDesc describe_body(ObjectId id, BodyConfig config) const;
-  // An object's mesh bounds, or the default collider's when it has no mesh.
-  Bounds bounds_of(const GameObject& object) const;
-  std::vector<WheelDesc> collect_wheels(ObjectId vehicle) const;
-  WheelDesc describe_wheel(ObjectId child, const Transform& chassis) const;
 
   // The parts of a frame, in the order frame() runs them.
   void read_input();
@@ -137,13 +121,7 @@ class Engine {
   void switch_scene_if_asked();
 
   void fixed_step(float dt);
-  void push_poses_to_physics();
-  void pull_poses_from_physics();
-  void follow_body(ObjectId id, const Transform& pose, BodyType type);
-  // Moves and turns an object to where physics has it, keeping its scale.
-  void move_to(ObjectId id, const Transform& pose);
   void process_destroyed();
-  void on_transform_written(ObjectId id, TransformWrite write);
 
   EngineOptions options_;
   std::filesystem::path images_dir_;
@@ -167,9 +145,5 @@ class Engine {
   net::LanDiscovery discovery_;
   FixedClock clock_;
 };
-
-// A touch screen's controls as they are drawn: the stick's ring first, then what lies over it
-// (the knob, the buttons), each brighter while a finger is on it.
-std::vector<ControlCircle> control_circles(const TouchLayout& layout);
 
 }  // namespace redgem

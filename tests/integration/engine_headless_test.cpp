@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <fstream>
 
+#include "app/scene_files.hpp"
+#include "app/touch_circles.hpp"
 #include "app/engine.hpp"
 #include "core/config.hpp"
 #include "core/exit_codes.hpp"

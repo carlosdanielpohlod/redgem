@@ -5,6 +5,7 @@
 #include <mruby/string.h>
 
 #include "app/engine.hpp"
+#include "input/touch_controls.hpp"
 #include "core/config.hpp"
 #include "test_support.hpp"
 

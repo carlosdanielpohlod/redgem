@@ -23,8 +23,15 @@ add_custom_command(
   VERBATIM)
 
 # Starting points for new games: every file of templates/<name>/ is built into the program as it
-# is. A template is a game folder; the program knows none of its files by name.
-file(GLOB_RECURSE REDGEM_TEMPLATE_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/templates/*)
+# is. A template is a game folder with a template.json; the program knows none of its files by
+# name. (A folder without that file, such as a build made beside a template, is not one.)
+file(GLOB REDGEM_TEMPLATE_INFOS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/templates/*/template.json)
+set(REDGEM_TEMPLATE_SOURCES "")
+foreach(info IN LISTS REDGEM_TEMPLATE_INFOS)
+  get_filename_component(template_dir ${info} DIRECTORY)
+  file(GLOB_RECURSE template_files CONFIGURE_DEPENDS ${template_dir}/*)
+  list(APPEND REDGEM_TEMPLATE_SOURCES ${template_files})
+endforeach()
 # (In a folder of their own, which only the tools' library is given.)
 set(REDGEM_PROJECT_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_project_include)
 set(REDGEM_TEMPLATES_HEADER ${REDGEM_PROJECT_GENERATED_DIR}/generated/templates.hpp)
@@ -160,7 +167,10 @@ redgem_add_library(redgem_runtime
   app/presenter.cpp
   app/frame_painter.cpp
   app/window_presenter.cpp
-  app/engine.cpp)
+  app/engine.cpp
+  app/scene_bodies.cpp
+  app/scene_files.cpp
+  app/touch_circles.cpp)
 # (The prelude is the runtime's alone: no other library is given the folder it is generated in.)
 target_include_directories(redgem_runtime PRIVATE ${REDGEM_GENERATED_DIR})
 target_link_libraries(redgem_runtime PUBLIC redgem_net raylib Jolt mruby_lib cgltf_headers nlohmann_json::nlohmann_json m)

@@ -58,6 +58,7 @@ add_executable(redgem_tests
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp
   integration/engine_headless_test.cpp
+  integration/scene_parts_test.cpp
   integration/presenter_test.cpp
   integration/scene_script_test.cpp
   integration/ui_input_test.cpp
