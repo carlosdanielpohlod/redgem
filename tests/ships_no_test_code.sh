@@ -7,7 +7,7 @@ set -uo pipefail
 
 PROGRAM="$1"
 # The Ruby modules of tests, the flags that once ran them, a native and a log line of theirs.
-MARKERS=("TestInput" "SystemTest" "RedGemTest" "--ruby-test" "--test" "--headless" "leave_note" "system test" "test-saves" "redgem-test-notes")
+MARKERS=("TestInput" "TestScreen" "SystemTest" "RedGemTest" "--ruby-test" "--test" "--headless" "leave_note" "system test" "test-saves" "redgem-test-notes")
 
 [[ -f "${PROGRAM}" ]] || { echo "no program at ${PROGRAM}"; exit 2; }
 command -v strings >/dev/null || { echo "strings is needed (binutils)"; exit 2; }

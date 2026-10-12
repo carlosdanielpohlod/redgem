@@ -32,6 +32,7 @@ add_executable(redgem_tests
   unit/project_files_test.cpp
   unit/environment_test.cpp
   unit/gpu_select_test.cpp
+  unit/window_test.cpp
   unit/culling_test.cpp
   unit/render_math_test.cpp
   unit/shader_source_test.cpp
@@ -53,6 +54,7 @@ add_executable(redgem_tests
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp
   integration/engine_headless_test.cpp
+  integration/presenter_test.cpp
   integration/scene_script_test.cpp
   integration/ui_input_test.cpp
   integration/gameplay_api_test.cpp
@@ -74,6 +76,7 @@ add_executable(redgem_testing_tests
   test_main.cpp
   testing/test_cli_test.cpp
   testing/test_saves_test.cpp
+  testing/frame_pictures_test.cpp
   testing/test_library_test.cpp)
 target_link_libraries(redgem_testing_tests PRIVATE redgem_testing doctest::doctest)
 target_include_directories(redgem_testing_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

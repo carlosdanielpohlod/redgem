@@ -41,11 +41,14 @@ The engine knows nothing of tests. `redgem`, which is also what every built game
 test code in it: what tests are written with (`TestInput`, `SystemTest`, `RedGemTest`, the runners
 and their command line) lives in `src/testing` and `ruby/testing`, a library that only
 `redgem-test` links. The engine gives it nothing but general options (`EngineOptions`: a fixed
-step per frame, an input fed by code, a save file, no FPS counter...). Keep it that way: the
-`app.ships_no_test_code` test looks into the built `redgem` and fails when test code got in.
+step per frame, an input fed by code, a save file, who shows the game) and the window a game is
+shown in tells whoever asks when a frame is drawn; the pictures a test takes (`t.screenshot`) are
+written by the test tool from there. Keep it that way: the `app.ships_no_test_code` test looks
+into the built `redgem` and fails when test code got in.
 
 * **C++ unit + integration** (doctest): math, extras parser, glTF loading from Blender fixtures,
-  scene hierarchy, physics world, Ruby VM, and a headless engine running the `sandbox` fixture game.
+  scene hierarchy, physics world, Ruby VM, and an engine nobody shows running the `sandbox` fixture
+  game (and one shown by a presenter that records what it is handed).
 * **Tests of the test tool** (`tests/testing/`, doctest): its command line, its save file, what it
   adds to a game's Ruby, and whole runs of passing and failing tests.
 * **Ruby tests** run inside the engine's mruby: `redgem-test --ruby tests/ruby/vector3_test.rb`.
@@ -80,18 +83,24 @@ src/net       sockets (the only place with OS socket calls), message framing and
               host/guest session, discovery on the local network, the relay
 src/audio     sound effects and music (raylib, or silence when there is no audio device)
 src/storage   what a game keeps between runs (the save store)
-src/render    renderer (HDR, shadows, reflections, post-processing), shaders, environment,
-              culling, graphics card choice, mesh conversion, what differs per graphics API
-              (gpu_profile.hpp), the font texts are drawn with
+src/render    the window (window.hpp: the only place that opens one, with its graphics card, frame
+              pace and pointer), the renderer that draws in it and owns what is on the card (HDR,
+              shadows, reflections, post-processing), shaders, environment, culling, mesh
+              conversion, what differs per graphics API (gpu_profile.hpp), the font texts are
+              drawn with
 src/script    mruby VM, behaviour host, native bindings
-src/app       what plays a game: the engine loop, game.json, the game beside a built executable,
-              where saves go, user settings, the Android entry point
+src/app       what plays a game: the engine loop, which draws nothing and hands each frame
+              (FrameView) to a presenter (presenter.hpp); the presenter that shows a game in a
+              window of its own and the painter every drawing presenter shares; game.json, the
+              game beside a built executable, where saves go, user settings, the Android entry
+              point
 src/editor    editor: scene document (undo, save, import), session (play mode), camera, picking,
               script tabs, ImGui panels and theme (src/editor/ui)
 src/project   the tools around a game: new games from templates, builds (desktop and Android),
               recent games and the project hub, the command line, the program's entry point
-src/testing   what runs tests, apart from the engine: TestInput, the system test and Ruby test
-              runners, the audio tests listen with, redgem-test and its command line
+src/testing   what runs tests, apart from the engine: TestInput, the pictures a test takes of the
+              game (TestScreen), the system test and Ruby test runners, the audio tests listen
+              with, redgem-test and its command line
 ruby/engine   Ruby prelude embedded in the binary (Behaviour, Vector3, UI, Network...)
 ruby/testing  the Ruby tests are written with (assertions, test cases, the system test DSL),
               embedded in redgem-test only
@@ -109,6 +118,13 @@ The folders of `src` are layers, in the order above: each includes only itself a
 it (`core`; then `scene`, `net`, `input`, `audio`, `physics`, `storage`; then `render` and
 `script`; then `app`; then `editor`, `project`; `testing` sees everything and nothing sees it).
 Each layer keeps its own numbers in a `<layer>_config.hpp` next to its code.
+
+A program opens one window, through `Window`, and makes what draws in it afterwards (a `Renderer`,
+the editor's `ui::Interface`): the project hub, the editor and a played game each do. The engine
+never does: it is given a `Presenter`. `WindowPresenter` shows a game in its own window (a built
+game, `redgem --play`, `redgem-test`), the editor's Scene view is another (`EditorApp::GameView`),
+and without one nobody shows the game (`NullPresenter`: tests, servers). What a game can show is
+a field of `FrameView`, drawn in `FramePainter`: added there, it reaches every presenter.
 `tests/include_directions.sh` holds the table and fails the test suite on an include that goes up.
 
 ## Not there yet

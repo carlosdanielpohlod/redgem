@@ -24,7 +24,6 @@ constexpr const char* kRelayCommand = "relay";
 constexpr const char* kHelpOption = "--help";
 constexpr const char* kShortHelpOption = "-h";
 constexpr const char* kPlayOption = "--play";
-constexpr const char* kScreenshotsOption = "--screenshots";
 constexpr const char* kTemplateOption = "--template";
 constexpr const char* kTargetOption = "--target";
 constexpr const char* kGpuOption = "--gpu";
@@ -34,7 +33,7 @@ constexpr const char* kUsageText =
     "usage:\n"
     "  redgem                            open the project hub (new / recent games)\n"
     "  redgem <game_dir>                 open the editor\n"
-    "  redgem <game_dir> --play [--screenshots <dir>]   play the game\n"
+    "  redgem <game_dir> --play          play the game\n"
     "  redgem new <game_dir> [--template empty|platformer]   create a game\n"
     "  redgem build <game_dir> <out_dir> [--target linux|windows|android]   make a standalone game (an executable, or "
     "an .apk)\n"
@@ -91,15 +90,6 @@ void read_help(Reading& reading) {
 
 void read_play(Reading& reading) { choose(reading, RunMode::Game); }
 
-void read_screenshots(Reading& reading) {
-  const auto folder = value(reading);
-  if (!folder) {
-    fail(reading, "--screenshots needs a directory");
-    return;
-  }
-  reading.result.options.screenshot_dir = *folder;
-}
-
 void read_template(Reading& reading) {
   const auto name = value(reading);
   if (!name) {
@@ -141,10 +131,9 @@ struct Option {
   void (*read)(Reading&);
 };
 constexpr Option kOptions[] = {
-    {kHelpOption, read_help},         {kShortHelpOption, read_help},
-    {kPlayOption, read_play},         {kScreenshotsOption, read_screenshots},
-    {kTemplateOption, read_template}, {kTargetOption, read_target},
-    {kGpuOption, read_gpu},           {kPortOption, read_port},
+    {kHelpOption, read_help},         {kShortHelpOption, read_help}, {kPlayOption, read_play},
+    {kTemplateOption, read_template}, {kTargetOption, read_target},  {kGpuOption, read_gpu},
+    {kPortOption, read_port},
 };
 
 struct Command {
@@ -219,18 +208,16 @@ std::string usage() {
          config::kScriptsDirName + "/ folder.\n";
 }
 
-EngineOptions developer_play_options(const CliOptions& options, GpuChoice gpu) {
-  EngineOptions engine;
-  engine.game_dir = options.game_dir;
-  engine.screenshot_dir = options.screenshot_dir;
-  engine.show_fps = true;
-  engine.gpu = gpu;
-  return engine;
+GameWindowOptions developer_play_options(const CliOptions& options, GpuChoice gpu) {
+  GameWindowOptions window;
+  window.game_dir = options.game_dir;
+  window.show_fps = true;
+  window.gpu = gpu;
+  return window;
 }
 
 CliResult parse_cli(const std::vector<std::string>& args) {
   Reading reading{args};
-  reading.result.options.screenshot_dir = config::kDefaultScreenshotDir;
   read_command(reading);
   while (!reading.done && reading.next < args.size()) read_argument(reading);
   if (reading.done) return reading.result;

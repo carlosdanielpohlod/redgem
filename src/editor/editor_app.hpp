@@ -21,6 +21,10 @@
 namespace redgem {
 
 class Renderer;
+class Window;
+namespace ui {
+class Interface;
+}
 
 enum class GizmoMode { Translate, Rotate, Scale };
 
@@ -29,8 +33,6 @@ enum class EditorExit { Quit, OpenHub };
 
 // How long the frame about to be drawn counts for, in seconds; asked once a frame.
 using FrameClock = std::function<float()>;
-// The time the window measured between its last two frames.
-FrameClock window_frame_clock();
 
 // One way of making a standalone game, as Build Game offers it. The editor only knows that such
 // ways exist: whoever opens it says which, and does the building.
@@ -48,9 +50,9 @@ struct BuildChoice {
 
 // What whoever opens the editor decides for it.
 struct EditorOptions {
-  // How long each frame counts for: the window's own time unless whoever drives the editor steps
-  // it at a pace of its own.
-  FrameClock clock = window_frame_clock();
+  // How long each frame counts for, for whoever drives the editor at a pace of its own. Empty:
+  // the time the window measured between its last two frames.
+  FrameClock clock;
   // The graphics card the window opens on, where the machine has two.
   GpuChoice gpu = GpuChoice::Auto;
   // The ways of building a game, in the order Build Game lists them. None: the editor builds nothing.
@@ -71,6 +73,8 @@ class GatedInputSource final : public InputSource {
   }
   GamepadSample gamepad() const override { return enabled ? device.gamepad() : GamepadSample{}; }
   std::string typed_text() const override { return enabled ? device.typed_text() : std::string(); }
+  const TouchLayout* touch_layout() const override { return enabled ? device.touch_layout() : nullptr; }
+  void show_touch_controls(bool show) override { device.show_touch_controls(show); }
   bool enabled = false;
   float origin_x = 0.0f;  // where the Scene view's image starts in the window
   float origin_y = 0.0f;
@@ -146,7 +150,7 @@ class EditorApp {
 
  private:
   EditorApp() = default;
-  void open_window(GpuChoice gpu);
+  void open_window(GpuChoice gpu, FrameClock clock);
   bool editing() const;  // not playing
   ui::PanelContext panel_context();
   // Before drawing: files changed outside, input, the running game.
@@ -159,11 +163,13 @@ class EditorApp {
   void handle_gizmo_keys();
   void update_camera();
   void feed_game();
+  // The view the game was shown in is done with: the renderer goes back to the edited scene.
+  void retire_game_view();
   // The Scene view's picture.
   void render_viewport_texture();
-  void aim_viewport_camera(const Scene& scene);
+  void draw_edited_scene();
+  void aim_viewport_camera();
   void sync_renderer_assets();
-  void draw_over_world(Engine* playing);
   void draw_overlays();
   void draw_object_marks();
   void draw_selection_box();
@@ -228,9 +234,11 @@ class EditorApp {
   float frame_seconds() const { return frame_seconds_; }
 
   std::unique_ptr<ConsoleLog> console_;
+  // The window, then what draws in it: made in this order, released in the opposite one.
+  std::unique_ptr<Window> window_;
   std::unique_ptr<Renderer> renderer_;
+  std::unique_ptr<ui::Interface> interface_;
   std::unique_ptr<AudioSystem> audio_;
-  int runtime_scene_generation_ = 0;  // which runtime scene the renderer's assets belong to
   std::unique_ptr<EditorSession> session_;
   std::unique_ptr<ScriptWorkspace> scripts_;
   PanelVisibility panels_;
@@ -253,6 +261,8 @@ class EditorApp {
   float frame_seconds_ = 0.0f;  // what the clock said of the frame being drawn
   struct Viewport;
   std::unique_ptr<Viewport> viewport_;
+  class GameView;
+  std::unique_ptr<GameView> game_view_;  // who shows the running game, while one runs
   long long frame_count_ = 0;
   bool layout_built_ = false;
   bool gizmo_dragging_ = false;

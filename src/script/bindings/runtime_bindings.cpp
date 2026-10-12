@@ -74,10 +74,9 @@ mrb_value ui_text_width(mrb_state* mrb, mrb_value) {
   mrb_int size = 0;
   mrb_get_args(mrb, "zi", &text, &size);
   const ScriptContext& ctx = context(mrb);
-  // Without a renderer (headless runs) there is no font to measure with: a usual width per letter.
+  // Without anyone to measure it (a context with no engine around it): a usual width per letter.
   const int width = ctx.measure_text ? ctx.measure_text(text, static_cast<int>(size))
-                                     : static_cast<int>(static_cast<float>(std::string(text).size()) *
-                                                        static_cast<float>(size) * config::kEstimatedLetterWidth);
+                                     : estimated_text_width(text, static_cast<int>(size));
   return mrb_int_value(mrb, width);
 }
 
@@ -122,11 +121,6 @@ mrb_value debug_error(mrb_state* mrb, mrb_value) {
 
 mrb_value game_quit(mrb_state* mrb, mrb_value) {
   context(mrb).quit_requested = true;
-  return mrb_nil_value();
-}
-
-mrb_value game_screenshot(mrb_state* mrb, mrb_value) {
-  context(mrb).screenshot_requests.push_back(name_arg(mrb));
   return mrb_nil_value();
 }
 
@@ -225,7 +219,6 @@ void install_debug_bindings(mrb_state* mrb) {
 void install_game_bindings(mrb_state* mrb) {
   RClass* game_module = mrb_define_module(mrb, "Game");
   mrb_define_module_function(mrb, game_module, "quit", game_quit, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, game_module, "screenshot", game_screenshot, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, game_module, "load_scene", game_load_scene, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, game_module, "scene_name", game_scene_name, MRB_ARGS_NONE());
 }

@@ -24,7 +24,5 @@ inline constexpr const char* kMainSceneName = "main";  // the game's scene.glb
 // scripts/<scene>_scene.rb sets a scene up from Ruby when it loads (see ruby/engine/scene_script.rb).
 inline constexpr const char* kSceneScriptSuffix = "_scene";
 inline constexpr const char* kRubyFileExtension = ".rb";
-inline constexpr const char* kDefaultScreenshotDir = "screenshots";
-inline constexpr const char* kScreenshotExtension = ".png";
 
 }  // namespace redgem::config

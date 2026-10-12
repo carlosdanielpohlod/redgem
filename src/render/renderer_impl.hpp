@@ -79,7 +79,6 @@ struct Renderer::Impl {
   using GpuPrimitive = render_detail::GpuPrimitive;
   using ObjectPass = render_detail::ObjectPass;
 
-  RenderSettings settings;
   Shader shader{};
   Shader depth_shader{};
   Shader sky_shader{};

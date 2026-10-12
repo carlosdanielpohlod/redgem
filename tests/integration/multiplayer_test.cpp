@@ -68,7 +68,7 @@ struct Lan {
   Engine& add_machine() {
     EngineOptions options;
     options.game_dir = fixture("games/sandbox");
-    options.headless = true;
+    options.fixed_step = true;
     if (!level_from_files) options.scene = &scene;
     options.save_file = dir / ("save" + std::to_string(machines.size()) + ".json");
     auto created = Engine::create(options);

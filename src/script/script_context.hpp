@@ -9,6 +9,7 @@
 #include "input/input.hpp"
 #include "physics/physics_world.hpp"
 #include "render/hud.hpp"
+#include "script/script_config.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
 
@@ -45,7 +46,7 @@ struct ScriptContext {
   // The size of what the game is drawn in: the window, or the editor's Scene view while playing.
   int screen_width = 0;
   int screen_height = 0;
-  // Width of a text in pixels at a size (the renderer's font; an estimate without one).
+  // Width of a text in pixels at a size (the font it is drawn with; estimated_text_width without one).
   std::function<int(const std::string&, int)> measure_text;
   // Input.mouse_locked: the pointer is hidden and kept in the window (first-person cameras).
   bool mouse_locked = false;
@@ -64,7 +65,6 @@ struct ScriptContext {
   net::LanDiscovery* discovery = nullptr;
   // What the game is called (game.json): how a hosted game shows up to others unless named.
   std::string game_title;
-  std::vector<std::string> screenshot_requests;
   bool quit_requested = false;
   // Called when a script writes a transform, so physics can follow.
   std::function<void(ObjectId, TransformWrite)> on_transform_written;
@@ -78,5 +78,10 @@ struct ScriptContext {
   std::optional<std::string> requested_scene;
   std::function<bool(const std::string&)> scene_exists;
 };
+
+// How wide a text of that size is taken to be when there is no font to measure it with.
+inline int estimated_text_width(const std::string& text, int size) {
+  return static_cast<int>(static_cast<float>(text.size()) * static_cast<float>(size) * config::kEstimatedLetterWidth);
+}
 
 }  // namespace redgem

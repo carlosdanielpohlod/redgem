@@ -5,7 +5,6 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <rlgl.h>
-#include <rlImGui.h>
 #include <ImGuizmo.h>
 
 #include <algorithm>
@@ -19,10 +18,13 @@
 #include "editor/editor_logic.hpp"
 #include "editor/picking.hpp"
 #include "editor/script_files.hpp"
+#include "editor/ui/interface.hpp"
 #include "editor/ui/panels.hpp"
 #include "editor/ui/style.hpp"
 #include "physics/body_config.hpp"
+#include "app/frame_painter.hpp"
 #include "render/renderer.hpp"
+#include "render/window.hpp"
 
 namespace redgem {
 namespace {
@@ -130,24 +132,14 @@ void draw_box(const Transform& world, const Bounds& bounds, ::Color color) {
   for (const auto& edge : kBoxEdgeCorners) DrawLine3D(rl(corners[edge[0]]), rl(corners[edge[1]]), color);
 }
 
-RenderSettings window_settings(GpuChoice gpu) {
-  RenderSettings settings;
+WindowSettings window_settings(GpuChoice gpu) {
+  WindowSettings settings;
   settings.width = kWindowWidth;
   settings.height = kWindowHeight;
   settings.title = kWindowTitle;
-  settings.show_fps = false;
   settings.resizable = true;
   settings.gpu = gpu;
   return settings;
-}
-
-void setup_interface() {
-  rlImGuiSetLoadFontsCallback(ui::load_fonts);
-  rlImGuiSetup(true);
-  ui::apply_theme();
-  ImGuiIO& io = ImGui::GetIO();
-  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-  io.IniFilename = nullptr;  // the default layout is rebuilt on every start
 }
 
 // Start looking through the scene's own camera, like the game would.
@@ -290,46 +282,80 @@ struct EditorApp::Viewport {
   }
 };
 
-FrameClock window_frame_clock() {
-  return [] { return GetFrameTime(); };
-}
+// Shows the running game in the Scene view, as a window of its own would: the view is the
+// game's screen, drawn with the editor's renderer into the view's picture.
+class EditorApp::GameView final : public Presenter {
+ public:
+  GameView(Window& window, Renderer& renderer, Viewport& view, const GatedInputSource& input)
+      : window_(window), renderer_(renderer), view_(view), input_(input), painter_(renderer) {
+    // The game starts from the scene being edited, which the renderer already holds.
+    painter_.assume_uploaded(kFirstSceneGeneration);
+  }
+
+  SurfaceSize surface_size() const override { return {view_.width, view_.height}; }
+  int text_width(const std::string& text, int size) const override { return renderer_.text_width(text, size); }
+  // A game that locks the pointer gets it while it has the focus; Esc (Stop) gives it back.
+  void capture_cursor(bool wanted) override { window_.set_cursor_locked(input_.enabled && wanted); }
+  void present(const FrameView& view) override {
+    if (view_.target.id == 0) return;   // the view was not laid out yet: there is nothing to draw into
+    renderer_.set_show_prefabs(false);  // templates are edited in the editor, hidden in the game
+    view_.camera = renderer_.scene_camera(view.scene);
+    painter_.paint(view, &view_.target);
+  }
+  // The view is there for as long as the editor is: closing the window is the editor's business.
+  bool open() const override { return true; }
+  float frame_seconds() const override { return window_.frame_seconds(); }
+
+  // Whether the game loaded another scene, whose assets took the place of the edited scene's.
+  bool switched_scene() const { return painter_.uploaded_generation() != kFirstSceneGeneration; }
+
+ private:
+  Window& window_;
+  Renderer& renderer_;
+  Viewport& view_;
+  const GatedInputSource& input_;
+  FramePainter painter_;
+};
 
 std::variant<std::unique_ptr<EditorApp>, std::string> EditorApp::create(const std::filesystem::path& game_dir,
                                                                         EditorOptions options) {
   std::unique_ptr<EditorApp> app(new EditorApp());
-  app->clock_ = std::move(options.clock);
   app->builds_ = std::move(options.builds);
   app->console_ = std::make_unique<ConsoleLog>();
   auto opened = EditorSession::open(game_dir);
   if (auto* error = std::get_if<std::string>(&opened)) return *error;
   app->session_ = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
   app->scripts_ = std::make_unique<ScriptWorkspace>(game_dir / config::kScriptsDirName);
-  app->open_window(options.gpu);
+  app->open_window(options.gpu, std::move(options.clock));
   log::info("editing " + app->session_->document().path().string());
   return app;
 }
 
 // The window, and what draws and sounds in it, for the game just opened.
-void EditorApp::open_window(GpuChoice gpu) {
-  renderer_ = std::make_unique<Renderer>(window_settings(gpu));
+void EditorApp::open_window(GpuChoice gpu, FrameClock clock) {
+  window_ = std::make_unique<Window>(window_settings(gpu));
+  clock_ = clock ? std::move(clock) : [this] { return window_->frame_seconds(); };
+  renderer_ = std::make_unique<Renderer>(*window_);
   renderer_->upload(session_->scene_desc());
   renderer_->set_images_dir(session_->game_dir() / config::kImagesDirName);
   viewport_ = std::make_unique<Viewport>();
   audio_ = create_raylib_audio();
-  setup_interface();
+  interface_ = std::make_unique<ui::Interface>(*window_, ui::Interface::Layout::Dockable);
   look_through_main_camera(camera_, session_->scene());
   rescan_files();
   ui::reset_panel_state();  // the hub may open several games in one run
 }
 
 EditorApp::~EditorApp() {
-  session_.reset();
+  session_.reset();  // the running game, if any, goes before who shows it
+  game_view_.reset();
   viewport_.reset();  // GPU resources go before the window
-  if (renderer_) rlImGuiShutdown();
+  interface_.reset();
   renderer_.reset();
+  window_.reset();
 }
 
-bool EditorApp::close_requested() const { return WindowShouldClose(); }
+bool EditorApp::close_requested() const { return window_->close_requested(); }
 
 void EditorApp::rescan_files() { files_ = ProjectFiles::scan(session_->game_dir()); }
 
@@ -358,19 +384,25 @@ void EditorApp::play() {
   save_scripts();  // like an IDE "save all": the game must run the code on screen
   rescan_files();
   std::string error;
-  if (!session_->play(game_input_, error, audio_.get())) {
+  game_view_ = std::make_unique<GameView>(*window_, *renderer_, *viewport_, game_input_);
+  if (!session_->play({game_input_, audio_.get(), game_view_.get()}, error)) {
     log::error("cannot play: " + error);
+    game_view_.reset();
     return;
   }
-  runtime_scene_generation_ = 0;
   ImGui::SetWindowFocus(kViewportWindow);  // the game gets the keyboard right away
 }
 
 void EditorApp::stop() {
-  const bool switched_scene = session_->runtime() != nullptr && session_->runtime()->scene_generation() > 0;
   session_->stop();
   audio_->stop_music();
-  if (switched_scene) renderer_->upload(session_->scene_desc());  // back to the edited scene's assets
+  retire_game_view();
+}
+
+void EditorApp::retire_game_view() {
+  if (!game_view_) return;
+  if (game_view_->switched_scene()) renderer_->upload(session_->scene_desc());  // back to the edited scene's assets
+  game_view_.reset();
 }
 
 void EditorApp::toggle_pause() { session_->pause(session_->play_state() == PlayState::Playing); }
@@ -471,10 +503,10 @@ void EditorApp::frame() {
   ++frame_count_;
   frame_seconds_ = clock_();
   update_before_drawing();
-  BeginDrawing();
+  window_->begin_frame();
   ClearBackground(rgba(kViewportBackground));
   draw_interface();
-  EndDrawing();
+  window_->end_frame();
 }
 
 void EditorApp::update_before_drawing() {
@@ -483,12 +515,13 @@ void EditorApp::update_before_drawing() {
   update_camera();
   feed_game();
   session_->tick(frame_seconds());
+  if (session_->runtime() == nullptr) retire_game_view();  // the game quit by itself
   render_viewport_texture();
   update_title();
 }
 
 void EditorApp::draw_interface() {
-  rlImGuiBegin();
+  interface_->begin_frame();
   ImGuizmo::BeginFrame();
   gizmo_drawn_ = false;
   draw_menu_bar();
@@ -498,7 +531,7 @@ void EditorApp::draw_interface() {
   draw_panels();
   end_abandoned_gizmo_drag();
   draw_dialogs();
-  rlImGuiEnd();
+  interface_->end_frame();
 }
 
 // A drag that ended without the gizmo being drawn (the selection was cleared, play started).
@@ -518,22 +551,13 @@ void EditorApp::check_files_on_disk() {
   }
 }
 
-// The running game sees the Scene view as its window: its input, its size and its pointer.
+// The running game reads its keys and mouse through the Scene view, while the view has the focus.
 void EditorApp::feed_game() {
   game_input_.enabled = viewport_->focused && session_->play_state() == PlayState::Playing;
   game_input_.origin_x = viewport_->screen_x;
   game_input_.origin_y = viewport_->screen_y;
-  Engine* runtime = session_->runtime();
-  if (runtime == nullptr) {
-    renderer_->set_cursor_locked(false);
-    renderer_->set_motion_blur(kNoMotionBlur);
-    return;
-  }
-  runtime->set_screen(viewport_->width, viewport_->height,
-                      [this](const std::string& text, int size) { return renderer_->text_width(text, size); });
-  // A game that locks the pointer gets it while it has the focus; Esc (Stop) gives it back.
-  renderer_->set_cursor_locked(game_input_.enabled && runtime->mouse_locked());
-  renderer_->set_motion_blur(runtime->motion_blur());
+  // Nobody playing asks for the pointer: it goes back to the person at the machine.
+  if (!game_input_.enabled) window_->set_cursor_locked(false);
 }
 
 void EditorApp::draw_panels() {
@@ -643,7 +667,7 @@ void EditorApp::update_title() {
       editor_logic::window_title(session_->game_dir().filename().string(), session_->document().dirty(), !editing());
   if (title == title_) return;
   title_ = title;
-  SetWindowTitle(title_.c_str());
+  window_->set_title(title_);
 }
 
 void EditorApp::handle_shortcuts() {
@@ -704,38 +728,32 @@ void EditorApp::update_camera() {
 }
 
 void EditorApp::render_viewport_texture() {
-  Viewport& view = *viewport_;
-  if (view.target.id == 0) return;
-  const Scene& scene = session_->scene();
-  const bool edit = editing();
-  aim_viewport_camera(scene);
-  renderer_->set_show_prefabs(edit);  // templates are edited in the editor, hidden in the game
-  sync_renderer_assets();
-  Engine* playing = edit ? nullptr : session_->runtime();
-  renderer_->draw_world(scene, view.camera, &view.target, playing != nullptr ? &playing->particles() : nullptr);
-  draw_over_world(playing);
+  if (viewport_->target.id == 0) return;
+  Engine* runtime = session_->runtime();
+  if (runtime == nullptr) {
+    draw_edited_scene();
+  } else if (session_->play_state() == PlayState::Paused) {
+    runtime->present();  // a running game shows each of its frames itself (GameView); a paused one has none
+  }
 }
 
-// Overlays (while editing) or the game's HUD go on top of the finished image.
-void EditorApp::draw_over_world(Engine* playing) {
-  BeginTextureMode(viewport_->target);
-  if (editing()) {
-    BeginMode3D(viewport_->camera);
-    draw_overlays();
-    EndMode3D();
-  } else if (playing != nullptr) {
-    renderer_->draw_hud(playing->hud());
-  }
+// The scene as it is edited, through the editor's camera, with the editor's marks over it.
+void EditorApp::draw_edited_scene() {
+  Viewport& view = *viewport_;
+  aim_viewport_camera();
+  renderer_->set_show_prefabs(true);  // templates are edited in the editor, hidden in the game
+  renderer_->set_motion_blur(kNoMotionBlur);
+  sync_renderer_assets();
+  renderer_->draw_world(session_->scene(), view.camera, &view.target);
+  BeginTextureMode(view.target);
+  BeginMode3D(view.camera);
+  draw_overlays();
+  EndMode3D();
   EndTextureMode();
 }
 
-// The editor's fly camera while editing, the game's own camera while playing.
-void EditorApp::aim_viewport_camera(const Scene& scene) {
+void EditorApp::aim_viewport_camera() {
   Camera3D& camera = viewport_->camera;
-  if (!editing()) {
-    camera = renderer_->scene_camera(scene);
-    return;
-  }
   camera.position = rl(camera_.position());
   camera.target = rl(camera_.target());
   camera.up = kWorldUp;
@@ -743,19 +761,12 @@ void EditorApp::aim_viewport_camera(const Scene& scene) {
   camera.projection = CAMERA_PERSPECTIVE;
 }
 
+// Objects and materials created in the editor, and terrain that was sculpted.
 void EditorApp::sync_renderer_assets() {
-  Engine* runtime = session_->runtime();
-  if (runtime == nullptr) {
-    renderer_->sync(session_->scene_desc());  // objects and materials created in the editor
-    for (const int mesh : session_->document().take_changed_meshes()) {
-      renderer_->refresh_mesh(session_->scene_desc(), mesh);  // sculpted terrain
-    }
-    return;
+  renderer_->sync(session_->scene_desc());
+  for (const int mesh : session_->document().take_changed_meshes()) {
+    renderer_->refresh_mesh(session_->scene_desc(), mesh);
   }
-  // The game may have loaded another scene: draw with that scene's meshes and materials.
-  if (runtime->scene_generation() == runtime_scene_generation_) return;
-  runtime_scene_generation_ = runtime->scene_generation();
-  renderer_->upload(runtime->scene_desc());
 }
 
 void EditorApp::draw_overlays() {

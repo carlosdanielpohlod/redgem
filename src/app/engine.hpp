@@ -14,54 +14,41 @@
 #include "net/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
-#include "render/gpu_select.hpp"
 #include "render/hud.hpp"
 #include "scene/animation_player.hpp"
 #include "scene/particles.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
 #include "app/game_settings.hpp"
+#include "app/presenter.hpp"
 #include "storage/save_store.hpp"
 #include "script/script_context.hpp"
 #include "script/script_host.hpp"
 
 namespace redgem {
 
-class Renderer;
-
 struct EngineOptions {
   std::filesystem::path game_dir;
-  // No window and no rendering of its own: whoever runs the engine draws its frames, or nobody does.
-  bool headless = false;
-  // Where the pictures a script asks for (Game.screenshot) are written.
-  std::filesystem::path screenshot_dir;
-  // Editor play mode: run this in-memory scene instead of loading game_dir/scene.glb.
+  // Who shows the game, which has to outlive the engine. Without one nobody does (a test, a
+  // server): the game is as big as its settings say and every frame takes one fixed step.
+  Presenter* presenter = nullptr;
+  // Run this in-memory scene instead of loading game_dir/scene.glb (a scene being edited).
   const SceneDesc* scene = nullptr;
-  // Input fed by whoever runs the engine, instead of the keyboard, mouse and gamepad (the editor's
-  // viewport, a program that plays the game). It has to outlive the engine.
-  const InputSource* input = nullptr;
+  // Where the game's keys, mouse and gamepad come from, which has to outlive the engine: the
+  // devices of the window it is shown in, a view that hands on what happens inside it, a program
+  // that plays the game. Without one nothing is pressed until scripted_input() says so.
+  InputSource* input = nullptr;
   // Every frame advances the game by exactly one fixed step, however long it really took: the same
-  // run gives the same game every time. Headless engines without an `input` always do.
+  // run gives the same game every time. Nothing else selects it.
   bool fixed_step = false;
-  // The frames-per-second counter in the corner of the window: for whoever makes the game, never
-  // for who plays it.
-  bool show_fps = false;
-  // Whether the game may hide the pointer and keep it in the window (Input.mouse_locked).
-  bool capture_cursor = true;
-  // The graphics card the window is opened on, where the machine has two.
-  GpuChoice gpu = GpuChoice::Auto;
   // Where Save keeps the game's data. Empty: the game's file in the user's RedGem folder.
   std::filesystem::path save_file;
-  // Width over height of the screen the game fills (a phone's); 0 for a window sized by the
-  // game's settings.
-  float screen_aspect = 0.0f;
-  // The audio to play through, instead of the engine's own: the editor's device in play mode, or
-  // what a test listens with. Without one the engine opens the machine's device, and a headless
-  // engine stays silent.
+  // What the game sounds through, which has to outlive the engine. Without one it is silent.
   AudioSystem* audio = nullptr;
 };
 
-// Wires scene, physics, scripts, input and rendering together and runs the game loop.
+// Wires scene, physics, scripts and input together and runs the game loop. It opens no window and
+// draws nothing: each frame is handed to its presenter.
 class Engine {
  public:
   // Returns the engine or an error message.
@@ -70,44 +57,36 @@ class Engine {
   Engine(const Engine&) = delete;
   Engine& operator=(const Engine&) = delete;
 
-  // Runs until the window closes or a script quits. Returns the exit code.
+  // Runs until the presenter has nowhere left to show the game or a script quits, each frame as
+  // long as the presenter says the last one took. Returns the exit code.
   int run();
   // Copies a prefab (or any object) into the running game with physics and scripts. `world`
   // overrides the copy's position/rotation. Returns the new root object.
   ObjectId spawn(ObjectId source, const std::optional<Transform>& world, bool physics = true);
-  // Simulates and renders one frame. Deterministic engines always advance exactly one fixed step.
+  // Simulates one frame and hands it to the presenter. With fixed_step it always advances
+  // exactly one fixed step.
   void frame(float frame_seconds);
-  // How long the frame before this one took, for whoever calls frame() itself: the window's
-  // clock, or one fixed step without a window.
-  float frame_seconds() const;
+  // Hands the game as it is now to the presenter again, without advancing it (a paused game
+  // whose view has to be drawn anew).
+  void present();
 
-  // Whether the window was closed or a script quit.
+  // Whether a script quit or the presenter has nowhere left to show the game.
   bool finished() const;
 
   Scene& scene() { return scene_; }
   PhysicsWorld& physics() { return *physics_; }
   ScriptHost& scripts() { return *scripts_; }
   ScriptContext& script_context() { return context_; }
-  // What the game reads when it has neither devices nor an `input` of its options: nothing is
-  // pressed until the code that runs the engine says so.
+  // What the game reads without an `input` of its options: nothing is pressed until the code
+  // that runs the engine says so.
   ScriptedInputSource& scripted_input() { return scripted_input_; }
-  // Scene currently running ("main" is scene.glb) and how many times a scene was (re)loaded.
+  // Scene currently running ("main" is scene.glb).
   const std::string& scene_name() const { return context_.scene_name; }
-  int scene_generation() const { return scene_generation_; }
-  const SceneDesc& scene_desc() const { return scene_desc_; }
   AudioSystem& audio();
+  // Who shows the game: the presenter of its options, or the nobody it made for itself.
+  Presenter& presenter() { return *presenter_; }
   AnimationPlayer& animations() { return animations_; }
   net::NetworkSession& network() { return network_; }
-  const ParticleSystem& particles() const { return particles_; }
-  // HUD drawn by scripts during the last frame.
-  const std::vector<HudItem>& hud() const { return context_.hud; }
-  // For whoever draws a headless engine's frames (the editor's Scene view): the size of that
-  // view and how to measure the texts drawn in it. Engines with their own window know both.
-  void set_screen(int width, int height, std::function<int(const std::string&, int)> measure_text);
-  // Whether the game asked for the pointer to be hidden and kept (Input.mouse_locked = true).
-  bool mouse_locked() const { return context_.mouse_locked; }
-  // The speed streaks the game asked for (Camera.motion_blur), for whoever draws its frames.
-  float motion_blur() const { return context_.motion_blur; }
 
  private:
   explicit Engine(const EngineOptions& options);
@@ -116,7 +95,7 @@ class Engine {
   std::optional<std::string> initialize();
   std::optional<std::string> load_first_scene();
   void build_world();
-  void open_window(GameSettings settings);
+  void open_presenter(const GameSettings& settings);
   void open_audio();
   void open_saves();
   void fill_context(const std::string& game_title);
@@ -141,9 +120,9 @@ class Engine {
 
   // The parts of a frame, in the order frame() runs them.
   void read_input();
-  const InputSource& input_source() const;
+  InputSource& input_source();
   void poll_network(float frame_seconds);
-  void follow_window();
+  void follow_presenter();
   void advance_game(float frame_seconds);
   // Fixed steps to run this frame, with the game's time scaled by `scale`.
   int fixed_steps_due(float frame_seconds, float scale);
@@ -158,37 +137,32 @@ class Engine {
   void move_to(ObjectId id, const Transform& pose);
   void process_destroyed();
   void on_transform_written(ObjectId id, TransformWrite write);
-  void render();
 
   EngineOptions options_;
-  bool deterministic_ = false;
+  std::filesystem::path images_dir_;
+  std::unique_ptr<Presenter> own_presenter_;  // the nobody that shows a game given no presenter
+  Presenter* presenter_ = nullptr;
   SceneDesc scene_desc_;
   Scene scene_;
   std::unique_ptr<PhysicsWorld> physics_;
   InputState input_;
   ScriptedInputSource scripted_input_;
-  std::unique_ptr<InputSource> device_input_;
   ScriptContext context_;
   std::unique_ptr<ScriptHost> scripts_;
-  std::unique_ptr<Renderer> renderer_;
   std::unique_ptr<AudioSystem> owned_audio_;
   std::unique_ptr<SaveStore> save_;
-  float pending_steps_ = 0.0f;  // fixed steps owed while Time.scale slows a deterministic run
-  int scene_generation_ = 0;
+  float pending_steps_ = 0.0f;  // fixed steps owed while Time.scale slows a fixed-step run
+  int scene_generation_ = kFirstSceneGeneration;
   AnimationPlayer animations_;
   ParticleSystem particles_;
+  std::vector<ControlCircle> controls_;  // the touch controls of the frame being shown
   net::NetworkSession network_;
   net::LanDiscovery discovery_;
   FixedClock clock_;
 };
 
-// A touch screen's controls as the renderer draws them: the stick's ring first, then what lies
-// over it (the knob, the buttons), each brighter while a finger is on it.
+// A touch screen's controls as they are drawn: the stick's ring first, then what lies over it
+// (the knob, the buttons), each brighter while a finger is on it.
 std::vector<ControlCircle> control_circles(const TouchLayout& layout);
-
-// Where the screenshots a script asked for by name are written: `folder`/<name>.png. A name that
-// would put the file anywhere else is refused with a warning and left out.
-std::vector<std::filesystem::path> screenshot_files(const std::filesystem::path& folder,
-                                                    const std::vector<std::string>& names);
 
 }  // namespace redgem

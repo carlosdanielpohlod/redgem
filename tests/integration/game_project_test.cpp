@@ -44,7 +44,7 @@ std::filesystem::path fresh(const std::string& name) {
 std::unique_ptr<Engine> play_headless(const std::filesystem::path& game) {
   EngineOptions options;
   options.game_dir = game;
-  options.headless = true;
+  options.fixed_step = true;
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   return std::move(std::get<std::unique_ptr<Engine>>(created));

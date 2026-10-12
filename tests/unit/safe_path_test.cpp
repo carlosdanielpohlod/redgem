@@ -76,15 +76,6 @@ TEST_CASE("a sound outside the sounds folder is not played") {
   CHECK_FALSE(find_sound_file(scratch.assets, "../secret").has_value());
 }
 
-TEST_CASE("a screenshot is written in the screenshots folder or not at all") {
-  const std::filesystem::path folder = "/shots";
-  const LogCapture log;
-  const std::vector<std::filesystem::path> files =
-      screenshot_files(folder, {"title", "../../home/me/.bashrc", "levels/first", "/tmp/x"});
-  CHECK(files == std::vector<std::filesystem::path>{folder / "title.png", folder / "levels/first.png"});
-  CHECK(log.count(log::Level::Warning) == 2);
-}
-
 TEST_CASE("a file is inside a folder only when it really is, links and '..' followed") {
   const Scratch scratch;
   std::filesystem::create_symlink(scratch.dir / "secret.png", scratch.assets / "link.png");

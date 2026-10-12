@@ -14,7 +14,7 @@
 #include <vector>
 
 #include "app/android_bundle.hpp"
-#include "app/engine.hpp"
+#include "app/window_presenter.hpp"
 #include "app/bundled_game.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
@@ -106,15 +106,10 @@ float screen_aspect(const android_app* app) {
 
 // Plays the game that was unpacked into the app's storage, on the whole screen.
 int play_unpacked_game(const android_app* app) {
-  EngineOptions options;
+  GameWindowOptions options;
   options.game_dir = kBundledGameFolder;
   options.screen_aspect = screen_aspect(app);
-  auto created = Engine::create(options);
-  if (auto* error = std::get_if<std::string>(&created)) {
-    log::error(*error);
-    return kExitFailure;
-  }
-  return std::get<std::unique_ptr<Engine>>(created)->run();
+  return play_in_window(options);
 }
 
 }  // namespace

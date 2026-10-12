@@ -6,6 +6,7 @@
 #include "core/files.hpp"
 #include "app/user_settings.hpp"
 #include "core/config.hpp"
+#include "testing/testing_config.hpp"
 
 namespace redgem::testing {
 namespace {

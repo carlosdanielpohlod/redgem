@@ -110,8 +110,9 @@ class SystemTest
     raise RedGemTest::Failure, args.first || "assertion failed" unless block.call
   end
 
+  # Saves a picture of the next frame the game draws, as <name>.png in the screenshots folder.
   def screenshot(name)
-    Game.screenshot(name)
+    TestScreen.capture(name.to_s)
     wait
   end
 

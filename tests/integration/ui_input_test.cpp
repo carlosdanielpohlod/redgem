@@ -24,6 +24,9 @@ constexpr float kRayTolerance = 1e-3f;
 constexpr const char* kButton = "UI.button('Go', x: 100, y: 50, width: 200, height: 60)";
 constexpr float kOutsideX = 500.0f;
 
+// Nobody draws these games: they are told how big a screen they are on.
+NullPresenter screen({kScreenWidth, kScreenHeight});
+
 // A camera looking down -Z and one object, with no scripts of their own.
 SceneDesc small_scene() {
   SceneDesc desc;
@@ -43,13 +46,12 @@ SceneDesc small_scene() {
 std::unique_ptr<Engine> engine_for(const SceneDesc& scene) {
   EngineOptions options;
   options.game_dir = fixture("games/directed");
-  options.headless = true;
+  options.fixed_step = true;
   options.scene = &scene;
+  options.presenter = &screen;
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
-  auto engine = std::move(std::get<std::unique_ptr<Engine>>(created));
-  engine->set_screen(kScreenWidth, kScreenHeight, nullptr);
-  return engine;
+  return std::move(std::get<std::unique_ptr<Engine>>(created));
 }
 
 void frame(Engine& engine) { engine.frame(config::kFixedDeltaSeconds); }
@@ -120,7 +122,7 @@ TEST_CASE("texts, rectangles and images are queued for the frame, and the screen
   ruby(*engine, "UI.rect(x: 10, y: 20, width: 300, height: 40, color: :ruby, alpha: 128, radius: 8)");
   ruby(*engine, "UI.image(:logo, x: 5, y: 6, width: 64)");
   ruby(*engine, "UI.text('Centered', x: 400, y: 10, size: 20, align: :center)");
-  const std::vector<HudItem>& hud = engine->hud();
+  const std::vector<HudItem>& hud = engine->script_context().hud;
   REQUIRE(hud.size() == 3);
   CHECK(hud[0].kind == HudItem::Kind::Rect);
   CHECK(hud[0].width == 300);
@@ -180,9 +182,9 @@ TEST_CASE("scripts set the camera's field of view and the picture's speed streak
   CHECK(radians_to_degrees(engine->scene().at(camera).camera->fov_y_radians) == doctest::Approx(70.0f));
   CHECK_FALSE(engine->scripts().eval("Camera.fov = 400", "bad_fov.rb").ok);
 
-  CHECK(engine->motion_blur() == doctest::Approx(0.0f));
+  CHECK(engine->script_context().motion_blur == doctest::Approx(0.0f));
   ruby(*engine, "Camera.motion_blur = 0.6");
-  CHECK(engine->motion_blur() == doctest::Approx(0.6f));
+  CHECK(engine->script_context().motion_blur == doctest::Approx(0.6f));
   ruby(*engine, "Camera.motion_blur = 9");  // kept within 0..1
-  CHECK(engine->motion_blur() == doctest::Approx(1.0f));
+  CHECK(engine->script_context().motion_blur == doctest::Approx(1.0f));
 }

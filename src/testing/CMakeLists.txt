@@ -22,6 +22,7 @@ add_library(redgem_testing STATIC
   ${REDGEM_TESTING_RUBY_HEADER}
   test_input_bindings.cpp
   test_notes.cpp
+  frame_pictures.cpp
   test_library.cpp
   test_saves.cpp
   ruby_tests.cpp

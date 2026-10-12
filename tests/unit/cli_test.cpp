@@ -18,22 +18,22 @@ constexpr int kWebPort = 80;
 
 }  // namespace
 
-TEST_CASE("a game played from the command line, and where its screenshots go") {
-  const CliResult result = parse_cli({"games/demo", "--play", "--screenshots", "shots"});
+TEST_CASE("a game played from the command line") {
+  const CliResult result = parse_cli({"games/demo", "--play"});
   REQUIRE(result.ok);
   CHECK(result.options.mode == RunMode::Game);
   CHECK(result.options.game_dir == "games/demo");
   // It is the developer who plays this way: the frame counter is on, as it is nowhere else.
-  const EngineOptions engine = developer_play_options(result.options);
-  CHECK(engine.game_dir == "games/demo");
-  CHECK(engine.screenshot_dir == "shots");
-  CHECK(engine.show_fps);
+  const GameWindowOptions window = developer_play_options(result.options);
+  CHECK(window.game_dir == "games/demo");
+  CHECK(window.show_fps);
+  CHECK(window.capture_cursor);
   CHECK(developer_play_options(result.options, GpuChoice::Integrated).gpu == GpuChoice::Integrated);
-  CHECK(result.options.screenshot_dir == "shots");
 }
 
 TEST_CASE("the program knows nothing of tests: what runs them is another program") {
-  for (const char* option : {"--test", "--ruby-test", "--headless"}) {
+  // (Taking pictures of a game is something tests do: --screenshots went with them.)
+  for (const char* option : {"--test", "--ruby-test", "--headless", "--screenshots"}) {
     CHECK(parse_cli({"games/demo", option, "t.rb"}).error == std::string("unknown option ") + option);
     CHECK(usage().find(option) == std::string::npos);
   }
@@ -49,13 +49,13 @@ TEST_CASE("defaults") {
   const CliResult result = parse_cli({"games/demo"});
   REQUIRE(result.ok);
   CHECK(result.options.mode == RunMode::Editor);
-  CHECK(result.options.screenshot_dir == config::kDefaultScreenshotDir);
+  CHECK(result.options.template_name == "empty");
 }
 
 TEST_CASE("errors") {
   CHECK(parse_cli({}).ok);  // no game: the editor opens its project hub
   CHECK(parse_cli({}).options.mode == RunMode::Editor);
-  CHECK_FALSE(parse_cli({"--screenshots"}).ok);
+  CHECK_FALSE(parse_cli({"--template"}).ok);
   CHECK_FALSE(parse_cli({"a", "b"}).ok);
   CHECK_FALSE(parse_cli({"a", "--bogus"}).ok);
   CHECK(parse_cli({"--help"}).options.mode == RunMode::Help);
@@ -94,8 +94,8 @@ TEST_CASE("--gpu picks the graphics card for one run and rejects unknown names")
 TEST_CASE("one thing per command line: conflicting modes and swallowed options are errors") {
   CHECK_FALSE(parse_cli({"new", "games/x", "--play"}).ok);
   CHECK_FALSE(parse_cli({"build", "games/x", "out", "--play"}).ok);
-  CHECK_FALSE(parse_cli({"games/x", "--screenshots", "--play"}).ok);  // --play is not a folder
-  CHECK(parse_cli({"games/x", "--play", "--play"}).ok);               // said twice, it is still one thing
+  CHECK_FALSE(parse_cli({"games/x", "--gpu", "--play"}).ok);  // --play is not a graphics card
+  CHECK(parse_cli({"games/x", "--play", "--play"}).ok);       // said twice, it is still one thing
   const CliResult help = parse_cli({"--help", "--play"});
   REQUIRE(help.ok);
   CHECK(help.options.mode == RunMode::Help);
@@ -133,16 +133,15 @@ TEST_CASE("android is a build target") {
 }
 
 TEST_CASE("-h asks for help too, and help forgets the rest of the line") {
-  const CliResult help = parse_cli({"games/demo", "--screenshots", "shots", "-h"});
+  const CliResult help = parse_cli({"games/demo", "--gpu", "integrated", "-h"});
   REQUIRE(help.ok);
   CHECK(help.options.mode == RunMode::Help);
   CHECK(help.options.game_dir.empty());
-  CHECK(help.options.screenshot_dir.empty());
+  CHECK_FALSE(help.options.gpu.has_value());
   CHECK(help.error.empty());
 }
 
 TEST_CASE("what is wrong with a command line is said") {
-  CHECK(parse_cli({"games/demo", "--screenshots"}).error == "--screenshots needs a directory");
   CHECK(parse_cli({"new", "games/demo", "--template"}).error == "--template needs a name");
   CHECK(parse_cli({"build", "a", "b", "--target", "amiga"}).error == "--target needs linux, windows or android");
   CHECK(parse_cli({"games/demo", "--gpu", "turbo"}).error == "--gpu needs auto, dedicated or integrated");
@@ -157,17 +156,19 @@ TEST_CASE("what is wrong with a command line is said") {
 }
 
 TEST_CASE("the first thing wrong on a line is the one reported") {
-  CHECK(parse_cli({"--bogus", "--screenshots"}).error == "unknown option --bogus");
-  CHECK(parse_cli({"--screenshots", "--bogus"}).error == "--screenshots needs a directory");
+  CHECK(parse_cli({"--bogus", "--template"}).error == "unknown option --bogus");
+  CHECK(parse_cli({"--template", "--bogus"}).error == "--template needs a name");
   // A line that cannot be read is not checked for what it lacks.
   CHECK(parse_cli({"new", "--play", "--bogus"}).error == "unknown option --bogus");
 }
 
 TEST_CASE("a subcommand is only the first word of the line") {
-  const CliResult folder = parse_cli({"games/demo", "--play", "--screenshots", "new"});
+  const CliResult folder = parse_cli({"games/demo", "--play", "--gpu", "auto"});
   REQUIRE(folder.ok);
   CHECK(folder.options.mode == RunMode::Game);
-  CHECK(folder.options.screenshot_dir == "new");
+  const CliResult named_new = parse_cli({"new", "games/demo", "--template", "new"});
+  REQUIRE(named_new.ok);
+  CHECK(named_new.options.template_name == "new");
   // A second folder has no place on a line that builds nothing.
   CHECK_FALSE(parse_cli({"games/demo", "build"}).ok);
   CHECK(parse_cli({"build", "relay", "new"}).options.game_dir == "relay");

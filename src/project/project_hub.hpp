@@ -6,12 +6,14 @@
 #include <string>
 #include <vector>
 
+#include "editor/ui/interface.hpp"
 #include "render/gpu_select.hpp"
+#include "render/window.hpp"
 
 namespace redgem {
 
 // The window shown when the editor starts without a game: recent games, a new game from a
-// template, or any game folder. Owns its own window (closed when destroyed).
+// template, or any game folder. Opens a window of its own (closed when destroyed).
 class ProjectHub {
  public:
   struct Options {
@@ -19,8 +21,8 @@ class ProjectHub {
     std::filesystem::path recent_file;   // recently opened games
     GpuChoice gpu = GpuChoice::Auto;     // the graphics card the window opens on
   };
+  // Throws std::runtime_error when no window can be opened.
   explicit ProjectHub(Options options);
-  ~ProjectHub();
   ProjectHub(const ProjectHub&) = delete;
   ProjectHub& operator=(const ProjectHub&) = delete;
 
@@ -52,6 +54,8 @@ class ProjectHub {
   void draw_open_folder();
 
   Options options_;
+  Window window_;
+  ui::Interface interface_;  // (made after the window, shut down before it closes)
   std::vector<std::filesystem::path> games_;
   std::vector<std::string> titles_;  // game.json titles, read once
   std::optional<std::filesystem::path> chosen_;

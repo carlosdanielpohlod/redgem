@@ -10,11 +10,9 @@
 #include "scene/props.hpp"
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
-#include "input/raylib_input_source.hpp"
 #include "physics/body_config.hpp"
 #include "app/save_location.hpp"
 #include "render/gpu_profile.hpp"
-#include "render/renderer.hpp"
 #include "scene/gltf_loader.hpp"
 
 namespace redgem {
@@ -33,14 +31,14 @@ bool simulated(BodyType type) {
 
 Engine::Engine(const EngineOptions& options)
     : options_(options),
-      deterministic_(options.fixed_step || (options.headless && options.input == nullptr)),
+      images_dir_(options.game_dir / config::kImagesDirName),
+      presenter_(options.presenter),
       clock_(config::kFixedDeltaSeconds, config::kMaxFrameSeconds, config::kMaxFixedStepsPerFrame) {}
 
 Engine::~Engine() {
   // Scripts reference the scene and physics through the context: tear them down first.
   scripts_.reset();
   physics_.reset();
-  renderer_.reset();
 }
 
 std::variant<std::unique_ptr<Engine>, std::string> Engine::create(const EngineOptions& options) {
@@ -52,13 +50,8 @@ std::variant<std::unique_ptr<Engine>, std::string> Engine::create(const EngineOp
 std::optional<std::string> Engine::initialize() {
   if (auto error = load_first_scene()) return error;
   build_world();
-  // Until a window or the editor's view says otherwise, the game is as big as its settings say.
   const GameSettings settings = read_game_settings(options_.game_dir);
-  context_.screen_width = settings.window_width;
-  context_.screen_height = settings.window_height;
-  if (!options_.headless) open_window(settings);
-  // The devices are read unless there is no window to read them in, or someone else feeds the input.
-  if (!options_.headless && options_.input == nullptr) device_input_ = std::make_unique<RaylibInputSource>();
+  open_presenter(settings);
   open_audio();
   open_saves();
   fill_context(settings.title);
@@ -87,27 +80,20 @@ void Engine::build_world() {
   create_physics_bodies();
 }
 
-void Engine::open_window(GameSettings settings) {
-  // A screen that is not a window has its own shape: the game keeps its height and gets the
-  // width that fills it.
-  if (options_.screen_aspect > 0.0f) {
-    settings.window_width =
-        static_cast<int>(std::lround(static_cast<float>(settings.window_height) * options_.screen_aspect));
-    context_.screen_width = settings.window_width;
+void Engine::open_presenter(const GameSettings& settings) {
+  if (presenter_ == nullptr) {
+    // Shown by nobody, the game is as big as its settings say.
+    own_presenter_ = std::make_unique<NullPresenter>(SurfaceSize{settings.window_width, settings.window_height});
+    presenter_ = own_presenter_.get();
   }
-  RenderSettings window{settings.window_width, settings.window_height, settings.title, options_.show_fps};
-  window.gpu = options_.gpu;
-  renderer_ = std::make_unique<Renderer>(window);
-  renderer_->upload(scene_desc_);
-  renderer_->set_images_dir(options_.game_dir / config::kImagesDirName);
-  context_.measure_text = [this](const std::string& text, int size) { return renderer_->text_width(text, size); };
+  const SurfaceSize size = presenter_->surface_size();
+  context_.screen_width = size.width;
+  context_.screen_height = size.height;
+  context_.measure_text = [this](const std::string& text, int size) { return presenter_->text_width(text, size); };
 }
 
 void Engine::open_audio() {
-  if (options_.audio == nullptr) {
-    owned_audio_ =
-        options_.headless ? std::unique_ptr<AudioSystem>(std::make_unique<NullAudio>()) : create_raylib_audio();
-  }
+  if (options_.audio == nullptr) owned_audio_ = std::make_unique<NullAudio>();
   audio().set_sounds_dir(options_.game_dir / config::kSoundsDirName);
 }
 
@@ -146,12 +132,6 @@ void Engine::start_scripts() {
   scripts_ = std::make_unique<ScriptHost>(context_, options_.game_dir / config::kScriptsDirName);
   scripts_->attach_scripts();
   scripts_->run_scene_script(context_.scene_name);
-}
-
-void Engine::set_screen(int width, int height, std::function<int(const std::string&, int)> measure_text) {
-  context_.screen_width = width;
-  context_.screen_height = height;
-  context_.measure_text = std::move(measure_text);
 }
 
 AudioSystem& Engine::audio() { return options_.audio != nullptr ? *options_.audio : *owned_audio_; }
@@ -198,7 +178,6 @@ void Engine::replace_world(SceneDesc desc) {
   physics_ = create_jolt_physics_world(gravity());
   context_.physics = physics_.get();
   create_physics_bodies();
-  if (renderer_) renderer_->upload(scene_desc_);
 }
 
 void Engine::create_physics_bodies() {
@@ -276,34 +255,28 @@ WheelDesc Engine::describe_wheel(ObjectId child, const Transform& chassis) const
   return wheel;
 }
 
-bool Engine::finished() const {
-  if (context_.quit_requested) return true;
-  return renderer_ != nullptr && renderer_->close_requested();
-}
-
-float Engine::frame_seconds() const { return renderer_ ? renderer_->frame_seconds() : config::kFixedDeltaSeconds; }
+bool Engine::finished() const { return context_.quit_requested || !presenter_->open(); }
 
 void Engine::frame(float frame_seconds) {
   read_input();
   context_.hud.clear();
   scripts_->start_pending();
   poll_network(frame_seconds);
-  follow_window();
+  follow_presenter();
   advance_game(frame_seconds);
-  render();
+  present();
   audio().update();
   ++context_.time.frame;
   switch_scene_if_asked();
 }
 
 void Engine::read_input() {
-  if (device_input_) device_input_->show_touch_controls(context_.touch_controls);
+  input_source().show_touch_controls(context_.touch_controls);
   input_.update(input_source());
 }
 
-const InputSource& Engine::input_source() const {
+InputSource& Engine::input_source() {
   if (options_.input != nullptr) return *options_.input;
-  if (device_input_) return *device_input_;
   return scripted_input_;
 }
 
@@ -316,12 +289,11 @@ void Engine::poll_network(float frame_seconds) {
   discovery_.update(frame_seconds);
 }
 
-void Engine::follow_window() {
-  if (!renderer_) return;
-  context_.screen_width = renderer_->screen_width();
-  context_.screen_height = renderer_->screen_height();
-  // (Whoever feeds the game its input may want the pointer left to the person at the machine.)
-  if (options_.capture_cursor) renderer_->set_cursor_locked(context_.mouse_locked);
+void Engine::follow_presenter() {
+  const SurfaceSize size = presenter_->surface_size();
+  context_.screen_width = size.width;
+  context_.screen_height = size.height;
+  presenter_->capture_cursor(context_.mouse_locked);
 }
 
 void Engine::advance_game(float frame_seconds) {
@@ -332,12 +304,12 @@ void Engine::advance_game(float frame_seconds) {
   for (int i = 0; i < steps; ++i) fixed_step(config::kFixedDeltaSeconds);
   // A long stall (a dragged window, a loading hitch) counts as one long frame, not as seconds of game.
   const float unscaled =
-      deterministic_ ? config::kFixedDeltaSeconds : std::min(frame_seconds, config::kMaxFrameSeconds);
+      options_.fixed_step ? config::kFixedDeltaSeconds : std::min(frame_seconds, config::kMaxFrameSeconds);
   update_frame(unscaled * scale);
 }
 
 int Engine::fixed_steps_due(float frame_seconds, float scale) {
-  if (!deterministic_) return clock_.advance(frame_seconds * scale);
+  if (!options_.fixed_step) return clock_.advance(frame_seconds * scale);
   pending_steps_ += scale;
   const int steps = static_cast<int>(pending_steps_);
   pending_steps_ -= static_cast<float>(steps);
@@ -435,16 +407,11 @@ void Engine::on_transform_written(ObjectId id, TransformWrite write) {
   }
 }
 
-void Engine::render() {
-  const std::vector<std::filesystem::path> screenshots =
-      screenshot_files(options_.screenshot_dir, context_.screenshot_requests);
-  context_.screenshot_requests.clear();
-  if (renderer_) {
-    renderer_->set_motion_blur(context_.motion_blur);
-    const TouchLayout* touch = device_input_ ? device_input_->touch_layout() : nullptr;
-    renderer_->draw(scene_, context_.hud, screenshots, &particles_,
-                    touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>());
-  }
+void Engine::present() {
+  const TouchLayout* touch = input_source().touch_layout();
+  controls_ = touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>();
+  presenter_->present(
+      {scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur, controls_, images_dir_});
 }
 
 std::vector<ControlCircle> control_circles(const TouchLayout& layout) {
@@ -460,21 +427,8 @@ std::vector<ControlCircle> control_circles(const TouchLayout& layout) {
           button(layout.start)};
 }
 
-std::vector<std::filesystem::path> screenshot_files(const std::filesystem::path& folder,
-                                                    const std::vector<std::string>& names) {
-  std::vector<std::filesystem::path> files;
-  for (const std::string& name : names) {
-    if (safe_asset_name(name)) {
-      files.push_back(folder / (name + config::kScreenshotExtension));
-    } else {
-      warn_of_unsafe_asset_name(name);
-    }
-  }
-  return files;
-}
-
 int Engine::run() {
-  while (!finished()) frame(frame_seconds());
+  while (!finished()) frame(presenter_->frame_seconds());
   return kExitSuccess;
 }
 

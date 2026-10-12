@@ -27,10 +27,9 @@ constexpr float kMouseY = 34.0f;
 std::string source_file(const std::string& relative) { return std::string(REDGEM_SOURCE_DIR) + "/" + relative; }
 
 // A game running as the test tool runs it: its input comes from `input`.
-std::unique_ptr<Engine> sandbox(const ScriptedInputSource& input) {
+std::unique_ptr<Engine> sandbox(ScriptedInputSource& input) {
   EngineOptions options;
   options.game_dir = fixture("games/sandbox");
-  options.headless = true;
   options.fixed_step = true;
   options.input = &input;
   auto created = Engine::create(options);

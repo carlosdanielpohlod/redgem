@@ -52,15 +52,15 @@ const char* light_name(LightType type) {
   return type == LightType::Directional ? "Sun" : type == LightType::Spot ? "Spot Light" : "Point Light";
 }
 
-// A game running inside the editor: no window of its own, the edited scene instead of the file.
-EngineOptions runtime_options(const std::filesystem::path& game_dir, const SceneDesc& scene, const InputSource& input,
-                              AudioSystem* audio) {
+// A game running inside the editor: the edited scene instead of the file, with the editor's devices.
+EngineOptions runtime_options(const std::filesystem::path& game_dir, const SceneDesc& scene,
+                              const PlayDevices& devices) {
   EngineOptions options;
   options.game_dir = game_dir;
-  options.headless = true;
   options.scene = &scene;
-  options.input = &input;
-  options.audio = audio;
+  options.input = &devices.input;
+  options.audio = devices.audio;
+  options.presenter = devices.presenter;
   return options;
 }
 
@@ -262,9 +262,9 @@ bool EditorSession::save(std::string& error) {
   return true;
 }
 
-bool EditorSession::play(const InputSource& input, std::string& error, AudioSystem* audio) {
+bool EditorSession::play(const PlayDevices& devices, std::string& error) {
   if (play_state_ != PlayState::Editing) return true;
-  auto created = Engine::create(runtime_options(game_dir_, document_.desc(), input, audio));
+  auto created = Engine::create(runtime_options(game_dir_, document_.desc(), devices));
   if (auto* message = std::get_if<std::string>(&created)) {
     error = *message;
     return false;

@@ -2,6 +2,7 @@
 
 #include "core/config.hpp"
 #include "testing/test_cli.hpp"
+#include "testing/testing_config.hpp"
 
 using namespace redgem::testing;
 

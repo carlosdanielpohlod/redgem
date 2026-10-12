@@ -1,21 +1,15 @@
 #include "render/renderer.hpp"
 
 #include <raylib.h>
-#include <rlgl.h>
 
 #include <algorithm>
 #include <cmath>
-#include <cstdarg>
-#include <cstdio>
 #include <filesystem>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "render/render_config.hpp"
 #include "scene/scene_config.hpp"
-#include "core/log.hpp"
-#include "render/gpu_select.hpp"
 #include "render/render_math.hpp"
 #include "render/renderer_impl.hpp"
 
@@ -30,7 +24,6 @@ constexpr unsigned char kTouchShade = config::kMaxColorByte;
 constexpr unsigned char kTouchBaseAlpha = 28;
 constexpr unsigned char kTouchRestingAlpha = 70;
 constexpr unsigned char kTouchPressedAlpha = 150;
-constexpr int kTraceLineLength = 512;     // characters of a raylib log line that are kept
 constexpr float kUiLetterSpacing = 0.0f;  // extra space between letters, as a share of the text size
 constexpr int kUiCornerSegments = 8;      // straight pieces each rounded corner is drawn with
 constexpr float kNoMotionBlur = 0.0f;
@@ -38,33 +31,6 @@ constexpr float kFullMotionBlur = 1.0f;
 // raylib's vertex buffer slots for a mesh's positions and normals.
 constexpr int kPositionBuffer = 0;
 constexpr int kNormalBuffer = 2;
-
-// Passes on raylib's warnings and the one line that says which graphics card draws the game.
-void report_graphics_card(int level, const char* format, va_list args) {
-  char line[kTraceLineLength];
-  std::vsnprintf(line, sizeof(line), format, args);
-  const std::string text = line;
-  if (const auto card = render_math::graphics_card_name(text)) {
-    log::info("graphics card: " + *card);
-  } else if (level >= LOG_WARNING) {
-    log::warning(text);
-  }
-}
-
-// Opens the window. raylib names the graphics card only at its most verbose level: listen while
-// it opens.
-void open_window(const RenderSettings& settings) {
-  SetTraceLogCallback(report_graphics_card);
-  SetTraceLogLevel(LOG_INFO);
-  // No multisampling: the scene is drawn into off-screen targets and smoothed by the FXAA pass.
-  unsigned int flags = FLAG_VSYNC_HINT;
-  if (settings.resizable) flags |= FLAG_WINDOW_RESIZABLE;
-  SetConfigFlags(flags);
-  InitWindow(settings.width, settings.height, settings.title.c_str());
-  SetTraceLogCallback(nullptr);
-  SetTraceLogLevel(LOG_WARNING);
-  if (!IsWindowReady()) throw std::runtime_error("cannot open the game window");
-}
 
 Rectangle box_of(const HudItem& item) {
   return {static_cast<float>(item.x), static_cast<float>(item.y), static_cast<float>(item.width),
@@ -86,17 +52,6 @@ unsigned char control_alpha(ControlCircle::Look look) {
   return look == ControlCircle::Look::Pressed ? kTouchPressedAlpha : kTouchRestingAlpha;
 }
 
-// Writes what is on screen now to every path asked for.
-void save_screenshots(const std::vector<std::filesystem::path>& paths) {
-  rlDrawRenderBatchActive();
-  Image frame = LoadImageFromScreen();
-  for (const std::filesystem::path& path : paths) {
-    std::filesystem::create_directories(path.parent_path());
-    if (!ExportImage(frame, path.string().c_str())) log::error("cannot write screenshot " + path.string());
-  }
-  UnloadImage(frame);
-}
-
 // Same vertices in the same order, only moved: write over the buffers already on the card.
 void move_vertices(const Mesh& mesh, const PrimitiveDesc& primitive) {
   if (static_cast<int>(primitive.positions.size() / config::kFloatsPerPosition) != mesh.vertexCount) return;
@@ -107,20 +62,12 @@ void move_vertices(const Mesh& mesh, const PrimitiveDesc& primitive) {
 
 }  // namespace
 
-Renderer::Renderer(const RenderSettings& settings) : impl_(std::make_unique<Impl>()) {
-  impl_->settings = settings;
-  prefer_discrete_gpu(settings.gpu);
-  open_window(settings);
-  SetExitKey(KEY_NULL);  // games decide when to quit
-  SetTargetFPS(config::kTargetFps);
+Renderer::Renderer(const Window&) : impl_(std::make_unique<Impl>()) {
   impl_->load_pipeline();
   impl_->load_ui_font();
 }
 
-Renderer::~Renderer() {
-  impl_->release();
-  CloseWindow();
-}
+Renderer::~Renderer() { impl_->release(); }
 
 void Renderer::upload(const SceneDesc& desc) {
   impl_->release_assets();
@@ -206,18 +153,6 @@ int Renderer::text_width(const std::string& text, int size) const {
       std::ceil(MeasureTextEx(impl_->ui_font, text.c_str(), text_size, text_size * kUiLetterSpacing).x));
 }
 
-int Renderer::screen_width() const { return GetRenderWidth(); }
-int Renderer::screen_height() const { return GetRenderHeight(); }
-
-void Renderer::set_cursor_locked(bool locked) {
-  if (locked == IsCursorHidden()) return;
-  if (locked) {
-    DisableCursor();
-  } else {
-    EnableCursor();
-  }
-}
-
 void Renderer::draw_controls(const std::vector<ControlCircle>& controls) {
   for (const ControlCircle& circle : controls) {
     const ::Color fill{kTouchShade, kTouchShade, kTouchShade, control_alpha(circle.look)};
@@ -225,22 +160,6 @@ void Renderer::draw_controls(const std::vector<ControlCircle>& controls) {
   }
 }
 
-void Renderer::draw(const Scene& scene, const std::vector<HudItem>& hud,
-                    const std::vector<std::filesystem::path>& screenshot_paths, const ParticleSystem* particles,
-                    const std::vector<ControlCircle>& controls) {
-  BeginDrawing();
-  draw_world(scene, impl_->camera_for(scene), nullptr, particles);
-  draw_hud(hud);
-  draw_controls(controls);
-  if (impl_->settings.show_fps) DrawFPS(config::kFpsCounterX, config::kFpsCounterY);
-  if (!screenshot_paths.empty()) save_screenshots(screenshot_paths);
-  EndDrawing();
-}
-
 void Renderer::set_show_prefabs(bool show) { impl_->show_prefabs = show; }
-
-bool Renderer::close_requested() const { return WindowShouldClose(); }
-
-float Renderer::frame_seconds() const { return GetFrameTime(); }
 
 }  // namespace redgem

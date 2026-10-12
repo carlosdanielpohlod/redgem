@@ -10,8 +10,10 @@
 #include <variant>
 
 #include "app/engine.hpp"
+#include "app/window_presenter.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
+#include "testing/frame_pictures.hpp"
 #include "testing/recording_audio.hpp"
 #include "testing/test_library.hpp"
 #include "testing/test_saves.hpp"
@@ -31,25 +33,47 @@ constexpr const char* kFailed = "failed";
 
 enum class Status { Running, Passed, Failed };
 
+// What a game under test is shown in and heard through: a real window with the machine's sound,
+// or nothing at all.
+class Stage {
+ public:
+  Stage(const SystemTestOptions& options, FramePictures& pictures) {
+    if (options.headless) return;
+    GameWindowOptions window;
+    window.game_dir = options.game_dir;
+    window.gpu = options.gpu;
+    window.capture_cursor = false;  // the pointer stays with whoever sits at the machine
+    window.on_frame_drawn = [&pictures] { pictures.save_pending(); };
+    window_ = std::make_unique<WindowPresenter>(window);
+    speakers_ = create_raylib_audio();
+  }
+  // Null when nobody shows the game.
+  Presenter* presenter() { return window_.get(); }
+  // Without a window there is no device either: the game still finds its sounds, and hears none.
+  AudioSystem* audio() { return window_ ? speakers_.get() : &silent_; }
+
+ private:
+  std::unique_ptr<WindowPresenter> window_;
+  std::unique_ptr<AudioSystem> speakers_;
+  RecordingAudio silent_;
+};
+
 // An engine as a test needs it: the same run every time, with the test at the controls.
-EngineOptions engine_options(const SystemTestOptions& options, const ScriptedInputSource& input, AudioSystem* audio) {
+EngineOptions engine_options(const SystemTestOptions& options, ScriptedInputSource& input, Stage& stage) {
   EngineOptions engine;
   engine.game_dir = options.game_dir;
-  engine.headless = options.headless;
-  engine.screenshot_dir = options.screenshot_dir;
+  engine.presenter = stage.presenter();
   engine.input = &input;  // the devices are not read: a key touched by accident changes nothing
   engine.save_file = fresh_test_save_file(options.game_dir);
   engine.fixed_step = true;
-  engine.audio = audio;
-  engine.gpu = options.gpu;
-  engine.capture_cursor = false;  // the pointer stays with whoever sits at the machine
+  engine.audio = stage.audio();
   return engine;
 }
 
 // One system test playing one game, from the first frame to the verdict.
 class SystemTestRun {
  public:
-  explicit SystemTestRun(Engine& engine) : engine_(engine) {}
+  SystemTestRun(Engine& engine, FramePictures& pictures) : engine_(engine), pictures_(pictures) {}
 
   // Reads the test's file. Returns what is wrong with it, if anything is.
   std::optional<std::string> load(const std::filesystem::path& file);
@@ -64,6 +88,7 @@ class SystemTestRun {
   RubyVm& vm() { return engine_.scripts().vm(); }
 
   Engine& engine_;
+  FramePictures& pictures_;
   mrb_value test_ = mrb_nil_value();  // (the global keeps it from Ruby's garbage collector)
   Status status_ = Status::Running;
 };
@@ -82,7 +107,8 @@ int SystemTestRun::play() {
     // The test moves first, so what it presses is what the game reads in the same frame.
     tick();
     if (status_ != Status::Running) break;
-    engine_.frame(engine_.frame_seconds());
+    engine_.frame(engine_.presenter().frame_seconds());
+    pictures_.forget_pending();  // (whatever the frame's picture was not taken of is not coming)
   }
   return verdict();
 }
@@ -128,9 +154,10 @@ int SystemTestRun::verdict() const {
 }
 
 // The test's file, loaded into a game that is ready to play, and played.
-int play_test(Engine& engine, ScriptedInputSource& input, const std::filesystem::path& test_file) {
-  SystemTestRun run(engine);
-  std::optional<std::string> error = load_test_library(engine.scripts(), input);
+int play_test(Engine& engine, ScriptedInputSource& input, FramePictures& pictures,
+              const std::filesystem::path& test_file) {
+  SystemTestRun run(engine, pictures);
+  std::optional<std::string> error = load_test_library(engine.scripts(), input, &pictures);
   if (!error) error = run.load(test_file);
   if (error) {
     log::error(*error);
@@ -142,15 +169,17 @@ int play_test(Engine& engine, ScriptedInputSource& input, const std::filesystem:
 }  // namespace
 
 int run_system_test(const SystemTestOptions& options) {
-  ScriptedInputSource input;  // what TestInput sets and the game reads; made first, so it outlives the engine
-  // Without a window there is no device either: the game still finds its sounds, and hears none.
-  RecordingAudio silent;
-  auto created = Engine::create(engine_options(options, input, options.headless ? &silent : nullptr));
+  // Made before the engine, so they outlive it: what TestInput sets and the game reads, the
+  // pictures the test asks for, and where the game is shown.
+  ScriptedInputSource input;
+  FramePictures pictures(options.screenshot_dir);
+  Stage stage(options, pictures);
+  auto created = Engine::create(engine_options(options, input, stage));
   if (auto* error = std::get_if<std::string>(&created)) {
     log::error(*error);
     return kExitFailure;
   }
-  return play_test(*std::get<std::unique_ptr<Engine>>(created), input, options.test_file);
+  return play_test(*std::get<std::unique_ptr<Engine>>(created), input, pictures, options.test_file);
 }
 
 }  // namespace redgem::testing

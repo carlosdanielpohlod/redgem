@@ -67,7 +67,7 @@ TEST_CASE("play runs the edited scene and stop restores it") {
 
   ScriptedInputSource input;
   std::string error;
-  REQUIRE_MESSAGE(session->play(input, error), error);
+  REQUIRE_MESSAGE(session->play({input}, error), error);
   CHECK(session->play_state() == PlayState::Playing);
   CHECK(y_of(*session, "Crate") == doctest::Approx(kRaisedCrateY));  // starts from the edit
   play_frames(*session, kSettleFrames);
@@ -89,7 +89,7 @@ TEST_CASE("pause freezes the game") {
   auto session = open(dir);
   ScriptedInputSource input;
   std::string error;
-  REQUIRE(session->play(input, error));
+  REQUIRE(session->play({input}, error));
   play_frames(*session, 1);
   session->pause(true);
   const float frozen = y_of(*session, "Crate");
@@ -196,7 +196,7 @@ TEST_CASE("a script written in the editor runs when the game plays") {
   const float start_y = y_of(*session, "Ground");
 
   ScriptedInputSource input;
-  REQUIRE(session->play(input, error));
+  REQUIRE(session->play({input}, error));
   play_frames(*session, kSettleFrames);
   CHECK(y_of(*session, "Ground") > start_y + kMinScriptRise);
   CHECK(session->runtime()->scripts().error_count() == kExpectedScriptErrors);  // only the sandbox's known ones
@@ -252,7 +252,7 @@ TEST_CASE("a model from models/ is imported into the scene and plays") {
   CHECK(session->selection() == model);
   REQUIRE(session->save(error));
   ScriptedInputSource input;
-  REQUIRE(session->play(input, error));
+  REQUIRE(session->play({input}, error));
   CHECK(session->scene().find("Child") != kNoObject);
   session->stop();
   std::filesystem::remove_all(dir);

@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "render/gpu_select.hpp"
 #include "render/hud.hpp"
 #include "scene/particles.hpp"
 #include "scene/scene.hpp"
@@ -15,19 +14,15 @@
 
 namespace redgem {
 
-struct RenderSettings {
-  int width = 0;
-  int height = 0;
-  std::string title;
-  bool show_fps = false;  // a developer's counter: only who asks for it gets it
-  bool resizable = false;
-  GpuChoice gpu = GpuChoice::Auto;  // the card asked for, before the window opens
-};
+class Window;
 
-// Owns the window and every GPU resource. Only one instance may exist at a time.
+// Owns every GPU resource a game is drawn with (shaders, targets, meshes, textures, fonts,
+// pictures) and draws with them. It draws in whatever window is open: that window is somebody
+// else's, and has to outlive the renderer. Only one instance may exist at a time.
 class Renderer {
  public:
-  explicit Renderer(const RenderSettings& settings);
+  // `window` is the open window it draws in: asked for so that there is one.
+  explicit Renderer(const Window& window);
   ~Renderer();
   Renderer(const Renderer&) = delete;
   Renderer& operator=(const Renderer&) = delete;
@@ -56,23 +51,10 @@ class Renderer {
   void set_images_dir(const std::filesystem::path& dir);
   // Width in pixels of a text drawn by draw_hud at that size.
   int text_width(const std::string& text, int size) const;
-  // Size of the window's drawing area.
-  int screen_width() const;
-  int screen_height() const;
-  // Hides the pointer and keeps it in the window (first-person cameras), or gives it back.
-  void set_cursor_locked(bool locked);
   // Prefabs (spawn templates) are hidden in games and shown in the editor.
   void set_show_prefabs(bool show);
   // Draws a touch screen's controls over everything: see-through, brighter where a finger is.
   void draw_controls(const std::vector<ControlCircle>& controls);
-  // Draws one full game frame, with the touch controls given (none on a machine that shows none)
-  // over it. Screenshots requested for this frame are written to `screenshot_paths`.
-  void draw(const Scene& scene, const std::vector<HudItem>& hud,
-            const std::vector<std::filesystem::path>& screenshot_paths, const ParticleSystem* particles = nullptr,
-            const std::vector<ControlCircle>& controls = {});
-
-  bool close_requested() const;
-  float frame_seconds() const;
 
  private:
   struct Impl;

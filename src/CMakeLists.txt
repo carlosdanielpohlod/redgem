@@ -106,6 +106,7 @@ add_library(redgem_engine STATIC
   render/shader_source.cpp
   render/environment.cpp
   render/gpu_select.cpp
+  render/window.cpp
   render/ui_font.cpp
   render/culling.cpp
   editor/glb_file.cpp
@@ -129,12 +130,16 @@ add_library(redgem_engine STATIC
   editor/ui/project_panel.cpp
   editor/ui/create_menu.cpp
   editor/ui/style.cpp
+  editor/ui/interface.cpp
   editor/ui/embedded_fonts.cpp
   app/game_settings.cpp
   app/bundled_game.cpp
   storage/save_store.cpp
   app/save_location.cpp
   app/user_settings.cpp
+  app/presenter.cpp
+  app/frame_painter.cpp
+  app/window_presenter.cpp
   app/engine.cpp
   project/notices.cpp
   project/game_templates.cpp

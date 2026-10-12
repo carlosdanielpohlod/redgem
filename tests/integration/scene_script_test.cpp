@@ -40,7 +40,7 @@ SceneDesc bare_scene() {
 std::unique_ptr<Engine> directed(const SceneDesc& scene) {
   EngineOptions options;
   options.game_dir = fixture("games/directed");
-  options.headless = true;
+  options.fixed_step = true;
   options.scene = &scene;
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
@@ -137,7 +137,7 @@ TEST_CASE("classes of the game's scripts load on first use; unknown names still 
 TEST_CASE("each scene runs its own script when it loads") {
   EngineOptions options;
   options.game_dir = fixture("games/sandbox");
-  options.headless = true;
+  options.fixed_step = true;
   auto created = Engine::create(options);
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
@@ -153,7 +153,7 @@ TEST_CASE("a scene script of the wrong kind is reported") {
   const SceneDesc scene = bare_scene();
   EngineOptions options;
   options.game_dir = fixture("games/misdirected");
-  options.headless = true;
+  options.fixed_step = true;
   options.scene = &scene;
   auto created = Engine::create(options);
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
@@ -174,7 +174,7 @@ TEST_CASE("an object's script is a file of the game's scripts folder, or it is n
   test::LogCapture capture;
   EngineOptions options;
   options.game_dir = game;
-  options.headless = true;
+  options.fixed_step = true;
   options.scene = &scene;
   auto created = Engine::create(options);
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));

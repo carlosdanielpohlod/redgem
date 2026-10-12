@@ -14,7 +14,7 @@
 #include "net/relay_server.hpp"
 #include "core/exit_codes.hpp"
 #include "project/cli.hpp"
-#include "app/engine.hpp"
+#include "app/window_presenter.hpp"
 #include "app/bundled_game.hpp"
 #include "project/editor_setup.hpp"
 #include "project/game_build.hpp"
@@ -113,18 +113,8 @@ int run_relay(const redgem::CliOptions& options) {
   serve_until_stopped(relay);
 }
 
-int play(const redgem::EngineOptions& options) {
-  using namespace redgem;
-  auto created = Engine::create(options);
-  if (auto* error = std::get_if<std::string>(&created)) {
-    log::error(*error);
-    return kExitFailure;
-  }
-  return std::get<std::unique_ptr<Engine>>(created)->run();
-}
-
 int play_game(const redgem::CliOptions& options) {
-  return play(redgem::developer_play_options(options, redgem::gpu_choice_for_run(options.gpu)));
+  return redgem::play_in_window(redgem::developer_play_options(options, redgem::gpu_choice_for_run(options.gpu)));
 }
 
 int show_help(const redgem::CliOptions&) {
@@ -201,10 +191,10 @@ std::optional<int> play_bundled_game(const std::vector<std::string>& args) {
   if (!args.empty()) return std::nullopt;
   const auto game = bundled_game(platform::executable_path());
   if (!game) return std::nullopt;
-  EngineOptions options;
+  GameWindowOptions options;
   options.game_dir = *game;
   options.gpu = gpu_choice_for_run(std::nullopt);
-  return reporting_errors([&options] { return play(options); });
+  return reporting_errors([&options] { return play_in_window(options); });
 }
 
 // What the command line asks for, done. (Reading the line is inside the same net as the running:

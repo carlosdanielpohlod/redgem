@@ -5,7 +5,7 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
-#include "render/renderer.hpp"
+#include "app/window_presenter.hpp"
 #include "testing/recording_audio.hpp"
 #include "test_support.hpp"
 
@@ -33,11 +33,11 @@ constexpr float kPushSpeed = 5.0f;
 constexpr float kQuarterTurnDegrees = 90.0f;
 constexpr float kTeleportHeadroom = 1.0f;
 
-// The sandbox game without a window, playing through `audio` when one is given.
+// The sandbox game shown by nobody, a fixed step each frame, playing through `audio` when one is given.
 std::unique_ptr<Engine> sandbox(AudioSystem* audio = nullptr) {
   EngineOptions options;
   options.game_dir = fixture("games/sandbox");
-  options.headless = true;
+  options.fixed_step = true;
   options.audio = audio;
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
@@ -247,22 +247,31 @@ TEST_CASE("an engine told to step fixedly plays the same game whatever time pass
   constexpr float kStall = 0.5f;  // a frame that took half a second
   EngineOptions options;
   options.game_dir = fixture("games/sandbox");
-  options.headless = true;
   options.fixed_step = true;
   ScriptedInputSource input;
-  options.input = &input;  // (with an input of its own, a headless engine follows the clock unless told)
+  options.input = &input;
   auto created = Engine::create(options);
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
   for (int i = 0; i < kOneSecondOfFrames; ++i) engine.frame(kStall);
   CHECK(engine.script_context().time.elapsed == doctest::Approx(kOneSecondOfFrames * config::kFixedDeltaSeconds));
-  CHECK(engine.frame_seconds() == doctest::Approx(config::kFixedDeltaSeconds));
+}
+
+TEST_CASE("only fixed_step selects fixed stepping: without it the game follows the time it is given") {
+  constexpr float kHalfStep = config::kFixedDeltaSeconds / 2.0f;
+  constexpr int kFrames = 20;
+  EngineOptions options;
+  options.game_dir = fixture("games/sandbox");  // (no input, no presenter, no audio: none of them decides)
+  auto created = Engine::create(options);
+  REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
+  Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
+  for (int i = 0; i < kFrames; ++i) engine.frame(kHalfStep);
+  CHECK(engine.script_context().time.elapsed == doctest::Approx(kFrames * kHalfStep).epsilon(0.1));
 }
 
 TEST_CASE("the input a program hands the engine is what the game reads") {
   EngineOptions options;
   options.game_dir = fixture("games/sandbox");
-  options.headless = true;
   ScriptedInputSource input;
   options.input = &input;
   auto created = Engine::create(options);
@@ -312,7 +321,6 @@ TEST_CASE("Game.load_scene switches scenes at the end of the frame and keeps Rub
   CHECK(engine->scene().find("Hero") != kNoObject);  // still the old scene until the frame ends
   frames(*engine, 1);
   CHECK(engine->scene_name() == "level2");
-  CHECK(engine->scene_generation() == 1);
   CHECK(engine->scene().find("Hero") == kNoObject);
   CHECK(engine->scene().find("Level2Marker") != kNoObject);
   frames(*engine, 1);
@@ -344,7 +352,7 @@ TEST_CASE("sounds are looked up in the game's sounds folder") {
   CHECK(recording.master_volume() == doctest::Approx(kHalfVolume));
 }
 
-TEST_CASE("an engine without a window and without an audio of its options is silent") {
+TEST_CASE("an engine without an audio of its options is silent") {
   auto engine = sandbox();
   const int errors_before = engine->scripts().error_count();
   CHECK(ruby(*engine, "Audio.play(:beep)") == "false");
@@ -353,10 +361,7 @@ TEST_CASE("an engine without a window and without an audio of its options is sil
   CHECK(engine->scripts().error_count() == errors_before);
 }
 
-TEST_CASE("the frames-per-second counter is for whoever asks for it") {
-  CHECK_FALSE(EngineOptions{}.show_fps);
-  CHECK_FALSE(RenderSettings{}.show_fps);
-}
+TEST_CASE("the frames-per-second counter is for whoever asks for it") { CHECK_FALSE(GameWindowOptions{}.show_fps); }
 
 TEST_CASE("the scene's animations play: bones move over time and loop") {
   constexpr int kHalfSecondFrames = 30;
@@ -367,7 +372,7 @@ TEST_CASE("the scene's animations play: bones move over time and loop") {
   std::filesystem::copy_file(fixture("skinned.glb"), game / "scene.glb");
   EngineOptions options;
   options.game_dir = game;
-  options.headless = true;
+  options.fixed_step = true;
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   Engine& engine = *std::get<std::unique_ptr<Engine>>(created);

@@ -16,8 +16,16 @@ namespace redgem {
 
 enum class PlayState { Editing, Playing, Paused };
 
+// What a game played from the editor is played with. Everything but the input may be missing:
+// the game is then silent, or shown by nobody.
+struct PlayDevices {
+  InputSource& input;              // feeds the game (the editor gates it by viewport focus)
+  AudioSystem* audio = nullptr;    // what the game sounds through
+  Presenter* presenter = nullptr;  // who shows the game (the editor's Scene view)
+};
+
 // Everything the editor does, minus the UI: the document, selection, preview scene and play mode.
-// Play runs the edited scene in a headless Engine; Stop throws that runtime away, so the document
+// Play runs a copy of the edited scene in an Engine; Stop throws that runtime away, so the document
 // is exactly as it was before Play.
 class EditorSession {
  public:
@@ -71,9 +79,8 @@ class EditorSession {
   bool save(std::string& error);
 
   PlayState play_state() const { return play_state_; }
-  // `input` feeds the game while playing (the editor gates it by viewport focus).
-  // `audio` may be null (the game then records sounds instead of playing them).
-  bool play(const InputSource& input, std::string& error, AudioSystem* audio = nullptr);
+  // Starts the game on the scene as it is edited now. What `devices` names has to outlive the play.
+  bool play(const PlayDevices& devices, std::string& error);
   void pause(bool paused);
   void stop();
   // Advances the running game; does nothing while editing or paused.

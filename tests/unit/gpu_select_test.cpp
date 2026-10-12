@@ -1,7 +1,7 @@
 #include <doctest/doctest.h>
 
 #include "render/gpu_select.hpp"
-#include "render/renderer.hpp"
+#include "render/window.hpp"
 
 using namespace redgem;
 
@@ -28,5 +28,5 @@ TEST_CASE("graphics card choices have stable names") {
 }
 
 TEST_CASE("whoever opens a window is asked which card, and says the dedicated one unless told otherwise") {
-  CHECK(RenderSettings{}.gpu == GpuChoice::Auto);
+  CHECK(WindowSettings{}.gpu == GpuChoice::Auto);
 }

@@ -45,10 +45,11 @@ runs in. They are only there while `redgem-test` plays it.
 | `t.hold_until(:w, frames: 300) { ... }` | Holds keys until the block is true |
 | `t.wait_until(frames: 120) { ... }` | Waits until the block is true, or fails |
 | `t.assert("message") { ... }` | Fails the test when the block is false |
-| `t.screenshot("name")` | Saves `name.png` in the screenshots folder |
+| `t.screenshot("name")` | Saves a picture of the next frame as `name.png` in the screenshots folder (`--screenshots <dir>`, `screenshots` unless said) |
 
 Inside the blocks you have the whole scripting API, so a test can also move objects or read any
-behaviour's state. What the game saves with `Save` goes to a file of the test's own, which starts
+behaviour's state. Taking pictures is something only tests do: a game's own scripts have no call
+for it. What the game saves with `Save` goes to a file of the test's own, which starts
 empty: a test never sees or changes your real progress.
 
 ## Testing Ruby code by itself

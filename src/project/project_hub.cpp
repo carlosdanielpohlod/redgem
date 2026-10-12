@@ -3,7 +3,6 @@
 #include <imgui.h>
 #include <imgui_stdlib.h>
 #include <raylib.h>
-#include <rlImGui.h>
 
 #include <algorithm>
 
@@ -24,7 +23,6 @@ namespace {
 
 using namespace editor_config;
 
-constexpr int kHubFps = 60;  // frames per second: the hub only redraws a form
 constexpr const char* kDefaultTemplate = "platformer";
 constexpr const char* kEmptyTemplate = "empty";
 constexpr const char* kDefaultGameName = "My Game";
@@ -106,25 +104,27 @@ bool accent_button(const char* label, float width) {
   return pressed;
 }
 
-}  // namespace
-
-ProjectHub::ProjectHub(Options options) : options_(std::move(options)), template_(kDefaultTemplate) {
-  prefer_discrete_gpu(options_.gpu);
-  SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT);
-  InitWindow(kHubWidth, kHubHeight, kHubTitle);
-  SetExitKey(KEY_NULL);  // Esc leaves text fields; only the close button quits
-  SetTargetFPS(kHubFps);
-  rlImGuiSetLoadFontsCallback(ui::load_fonts);
-  rlImGuiSetup(true);
-  ui::apply_theme();
-  ImGui::GetIO().IniFilename = nullptr;
-  new_name_ = kDefaultGameName;
-  refresh_games();
+// The hub's window: a form, drawn straight into it.
+WindowSettings hub_window(GpuChoice gpu) {
+  WindowSettings settings;
+  settings.width = kHubWidth;
+  settings.height = kHubHeight;
+  settings.title = kHubTitle;
+  settings.resizable = true;
+  settings.smooth_edges = true;
+  settings.gpu = gpu;
+  return settings;
 }
 
-ProjectHub::~ProjectHub() {
-  rlImGuiShutdown();
-  CloseWindow();
+}  // namespace
+
+ProjectHub::ProjectHub(Options options)
+    : options_(std::move(options)),
+      window_(hub_window(options_.gpu)),
+      interface_(window_, ui::Interface::Layout::Fixed),
+      new_name_(kDefaultGameName),
+      template_(kDefaultTemplate) {
+  refresh_games();
 }
 
 void ProjectHub::refresh_games() {
@@ -141,11 +141,7 @@ void ProjectHub::refresh_games() {
 }
 
 std::optional<std::filesystem::path> ProjectHub::run() {
-  if (!IsWindowReady()) {
-    log::error("cannot open a window for the project hub");
-    return std::nullopt;
-  }
-  while (!chosen_ && !WindowShouldClose()) frame();
+  while (!chosen_ && !window_.close_requested()) frame();
   return chosen_;
 }
 
@@ -178,13 +174,13 @@ bool ProjectHub::open_game(const std::filesystem::path& typed) {
 }
 
 void ProjectHub::frame() {
-  BeginDrawing();
+  window_.begin_frame();
   const ImVec4 background = ImGui::GetStyle().Colors[ImGuiCol_WindowBg];
   ClearBackground(ColorFromNormalized({background.x, background.y, background.z, background.w}));
-  rlImGuiBegin();
+  interface_.begin_frame();
   draw();
-  rlImGuiEnd();
-  EndDrawing();
+  interface_.end_frame();
+  window_.end_frame();
 }
 
 void ProjectHub::draw() {

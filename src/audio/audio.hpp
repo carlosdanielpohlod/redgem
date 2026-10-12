@@ -29,7 +29,7 @@ class AudioSystem {
 // Finds the file of a sound name; nullopt when no supported file exists.
 std::optional<std::filesystem::path> find_sound_file(const std::filesystem::path& sounds_dir, const std::string& name);
 
-// No audio device (an engine without a window): nothing plays, and every sound is said to be missing.
+// No audio device (a game nobody listens to): nothing plays, and every sound is said to be missing.
 class NullAudio final : public AudioSystem {
  public:
   bool play_sound(const std::string&, float, float) override { return false; }

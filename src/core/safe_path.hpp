@@ -12,7 +12,7 @@
 
 namespace redgem {
 
-// Whether a name given by a script (a sound, a picture, a scene, a script file, a screenshot) can
+// Whether a name given by a script (a sound, a picture, a scene, a script file) can
 // be joined to one of the game's folders and stay inside it: not empty, not absolute, no ".." step,
 // no backslash, no ':' (drive letters, alternate streams) and no NUL. Subfolders ("ui/heart") are fine.
 bool safe_asset_name(std::string_view name);

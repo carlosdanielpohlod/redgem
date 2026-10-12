@@ -58,7 +58,7 @@ struct TempSave {
 std::unique_ptr<Engine> engine_for(const SceneDesc& scene, const std::filesystem::path& save_file) {
   EngineOptions options;
   options.game_dir = fixture("games/sandbox");
-  options.headless = true;
+  options.fixed_step = true;
   options.scene = &scene;
   options.save_file = save_file;
   auto created = Engine::create(options);
@@ -345,7 +345,7 @@ TEST_CASE("scripts let out bursts of particles, which fly for a while and are go
              "Particles.burst([0, 0, 0], count: 30, color: :gold, glow: true, life: 0.2, size: 0.3, "
              "speed: 5, spread: 20, direction: Vector3.forward, gravity: 0, alpha: 128)") == "30");
   CHECK(ruby(*engine, "Particles.count") == "42");
-  const std::vector<Particle>& particles = engine->particles().particles();
+  const std::vector<Particle>& particles = engine->script_context().particles->particles();
   REQUIRE(particles.size() == 42);
   CHECK_FALSE(particles.front().glow);
   CHECK(particles.front().position.y == doctest::Approx(2.0f));
@@ -357,15 +357,15 @@ TEST_CASE("scripts let out bursts of particles, which fly for a while and are go
 
   frames(*engine, kHalfSecond);  // the short-lived sparks are over, the others still falling
   CHECK(ruby(*engine, "Particles.count") == "12");
-  CHECK(engine->particles().particles().front().position.y < 2.0f);
+  CHECK(engine->script_context().particles->particles().front().position.y < 2.0f);
   frames(*engine, kFramesPerSecond);
   CHECK(ruby(*engine, "Particles.count") == "0");
 
   // With a picture from the game's images/ folder, each one turning.
   ruby(*engine, "Particles.burst(Vector3.zero, count: 3, image: :smoke, spin: 90)");
-  CHECK(engine->particles().images() == std::vector<std::string>{"smoke"});
-  CHECK(engine->particles().particles().back().image == 0);
-  CHECK(engine->particles().particles().back().spin != 0.0f);
+  CHECK(engine->script_context().particles->images() == std::vector<std::string>{"smoke"});
+  CHECK(engine->script_context().particles->particles().back().image == 0);
+  CHECK(engine->script_context().particles->particles().back().spin != 0.0f);
 
   ruby(*engine, "Particles.burst(Vector3.zero); Particles.clear");
   CHECK(ruby(*engine, "Particles.count") == "0");
@@ -381,7 +381,7 @@ TEST_CASE("particles stay put while the game is paused") {
   ruby(*engine, "Particles.burst(Vector3.zero, life: 0.3); Time.scale = 0");
   frames(*engine, kFramesPerSecond);
   CHECK(ruby(*engine, "Particles.count") == "12");
-  CHECK(engine->particles().particles().front().age == doctest::Approx(0.0f));
+  CHECK(engine->script_context().particles->particles().front().age == doctest::Approx(0.0f));
 }
 
 TEST_CASE("scripts read what is typed, and a text field keeps it") {
@@ -399,7 +399,7 @@ TEST_CASE("scripts read what is typed, and a text field keeps it") {
   frames(*engine, 1);
   CHECK(ruby(*engine, "Input.text") == "");
   CHECK(ruby(*engine, field) == "Ana");
-  CHECK(engine->hud().size() == 2);  // the box and its text
+  CHECK(engine->script_context().hud.size() == 2);  // the box and its text
   input.set_key(Key::Backspace, true);
   frames(*engine, 1);
   CHECK(ruby(*engine, field) == "An");
