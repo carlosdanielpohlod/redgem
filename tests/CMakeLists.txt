@@ -42,11 +42,13 @@ add_executable(redgem_tests
   unit/save_store_test.cpp
   unit/xml_writer_test.cpp
   unit/touch_controls_test.cpp
+  unit/touch_input_source_test.cpp
   unit/android_package_test.cpp
   unit/game_settings_test.cpp
   unit/frame_buffer_test.cpp
   unit/wire_test.cpp
   unit/lan_discovery_test.cpp
+  unit/relay_program_test.cpp
   unit/particles_test.cpp
   unit/animation_player_test.cpp
   unit/camera_ray_test.cpp
@@ -63,15 +65,20 @@ add_executable(redgem_tests
   integration/relay_test.cpp
   integration/editor_session_test.cpp
   integration/game_project_test.cpp)
-target_link_libraries(redgem_tests PRIVATE redgem_engine doctest::doctest)
+target_link_libraries(redgem_tests PRIVATE redgem_project doctest::doctest)
 target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_definitions(redgem_tests PRIVATE REDGEM_FIXTURES_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures")
+# The tests of builds copy the real player, and look for it where a build does: beside redgem.
+add_dependencies(redgem_tests redgem_player redgem)
+target_compile_definitions(redgem_tests PRIVATE
+  REDGEM_FIXTURES_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+  REDGEM_PLAYER_FILE="$<TARGET_FILE:redgem_player>"
+  REDGEM_EDITOR_FILE="$<TARGET_FILE:redgem>")
 target_compile_options(redgem_tests PRIVATE -Wall -Wextra -Wno-unused-parameter)
 
 add_test(NAME cpp.unit_and_integration COMMAND redgem_tests)
 
 # What tests are run with (src/testing, redgem-test) has tests of its own, in a program of their
-# own: redgem_tests above links the engine alone, as the program games ship as does.
+# own: redgem_tests above links the engine and its tools, and nothing of what tests are run with.
 add_executable(redgem_testing_tests
   test_main.cpp
   testing/test_cli_test.cpp
@@ -97,9 +104,45 @@ add_test(NAME layering.check_catches_upward_includes
 set_tests_properties(layering.check_catches_upward_includes PROPERTIES
   PASS_REGULAR_EXPRESSION "forbidden include: src/core/upward.hpp includes render/picture.hpp")
 
-# The program games ship as has no test code in it.
+# Neither the program games ship as nor the one they are made with has test code in it.
 add_test(NAME app.ships_no_test_code
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_test_code.sh $<TARGET_FILE:redgem>)
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_test_code.sh $<TARGET_FILE:redgem_player> $<TARGET_FILE:redgem>)
+# Guards the check itself: the test tool, which is made of test code, must fail it.
+add_test(NAME app.check_catches_test_code
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_test_code.sh $<TARGET_FILE:redgem_test_tool>)
+# (Matched on its message: a script that did not run must not count as "it failed as expected".)
+set_tests_properties(app.check_catches_test_code PROPERTIES
+  PASS_REGULAR_EXPRESSION "test code in .*redgem-test: \"SystemTest\"")
+
+# The program games ship as has none of the tools games are made with in it (no editor, no project
+# hub, no templates, no packer of phone apps, no relay), and the relay has nothing that draws.
+add_test(NAME app.player_ships_no_tools
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh player $<TARGET_FILE:redgem_player>)
+add_test(NAME app.relay_ships_no_game
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh relay $<TARGET_FILE:redgem_relay>)
+# Guards the check itself: redgem, which is the tools, must fail it, with every kind of tool
+# found (in the order the script looks for them); so must the relay, for the one thing of its own
+# that is no player's; and the player, which draws and runs scripts, is no relay.
+add_test(NAME app.check_catches_tools
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh player $<TARGET_FILE:redgem>)
+# (Matched on its messages: a script that did not run must not count as "it failed as expected".)
+set_tests_properties(app.check_catches_tools PROPERTIES
+  PASS_REGULAR_EXPRESSION "found in [^\n]*redgem: \"Dear ImGui\".*found in [^\n]*redgem: \"Hierarchy\".*found in [^\n]*redgem: \"Create game\".*found in [^\n]*redgem: \"apksigner\".*found in [^\n]*redgem: \"class Spinner < Behaviour\".*found in [^\n]*redgem: \"cannot import\".*found in [^\n]*redgem: \"--template\".*found in [^\n]*redgem: \"THIRD_PARTY_LICENSES\"")
+add_test(NAME app.check_catches_the_relay
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh player $<TARGET_FILE:redgem_relay>)
+set_tests_properties(app.check_catches_the_relay PROPERTIES
+  PASS_REGULAR_EXPRESSION "found in [^\n]*redgem-relay: \"relay listening on port\"")
+add_test(NAME app.check_catches_a_game_in_the_relay
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh relay $<TARGET_FILE:redgem_player>)
+set_tests_properties(app.check_catches_a_game_in_the_relay PROPERTIES
+  PASS_REGULAR_EXPRESSION "found in .*redgem-player: \"raylib\"")
+
+# The relay's command line, as the program itself answers it.
+add_test(NAME relay.help COMMAND redgem_relay --help)
+set_tests_properties(relay.help PROPERTIES PASS_REGULAR_EXPRESSION "usage:.*redgem-relay \\[--port <number>\\]")
+add_test(NAME relay.refuses_what_it_does_not_understand COMMAND redgem_relay --port many)
+set_tests_properties(relay.refuses_what_it_does_not_understand PROPERTIES
+  PASS_REGULAR_EXPRESSION "--port needs a number up to 65535")
 
 # Ruby unit tests run inside the engine's own mruby, by the test tool.
 file(GLOB REDGEM_RUBY_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ruby/*_test.rb)
@@ -131,8 +174,8 @@ endforeach()
 
 # Multiplayer: two copies of the game run at once and play together, each driven by its own test.
 # tests/system_pairs/<game>/<name>_host_test.rb pairs up with <name>_guest_test.rb. A pair whose
-# name ends in _room also gets a relay to meet on (the relay is the engine's own program; the two
-# games are run by the test tool).
+# name ends in _room also gets a relay to meet on (the relay is the engine's own program,
+# redgem-relay; the two games are run by the test tool).
 set(REDGEM_TEST_RELAY_PORT 47841)
 file(GLOB REDGEM_PAIRED_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_pairs/*/*_host_test.rb)
 foreach(host_test IN LISTS REDGEM_PAIRED_TESTS)
@@ -145,7 +188,7 @@ foreach(host_test IN LISTS REDGEM_PAIRED_TESTS)
     set(relay_port ${REDGEM_TEST_RELAY_PORT})
   endif()
   add_test(NAME system.${game}.${pair_name}_together
-           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/system_pairs/run_pair.sh $<TARGET_FILE:redgem>
+           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/system_pairs/run_pair.sh $<TARGET_FILE:redgem_relay>
                    $<TARGET_FILE:redgem_test_tool> ${CMAKE_SOURCE_DIR}/games/${game} ${host_test} ${game_dir}/${pair_name}_guest_test.rb
                    ${REDGEM_SCREENSHOT_DIR}/${game} ${relay_port})
   set_tests_properties(system.${game}.${pair_name}_together PROPERTIES LABELS system RUN_SERIAL TRUE)
@@ -161,11 +204,16 @@ set_tests_properties(system.harness_reports_failures PROPERTIES LABELS system RU
 
 # The editor window itself, driven by a doctest program.
 add_executable(redgem_editor_system_tests editor_system/editor_window_test.cpp editor_system/window_picture.cpp)
-target_link_libraries(redgem_editor_system_tests PRIVATE redgem_engine doctest::doctest)
+target_link_libraries(redgem_editor_system_tests PRIVATE redgem_project doctest::doctest)
+# It stands where the editor does, beside the player: its Build finds the player as redgem's does.
+add_dependencies(redgem_editor_system_tests redgem_player)
+set_target_properties(redgem_editor_system_tests PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:redgem_player>)
 target_compile_definitions(redgem_editor_system_tests PRIVATE
   REDGEM_PLATFORMER_DIR="${CMAKE_SOURCE_DIR}/games/platformer"
   REDGEM_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
-  REDGEM_SCREENSHOT_DIR="${REDGEM_SCREENSHOT_DIR}")
+  REDGEM_SCREENSHOT_DIR="${REDGEM_SCREENSHOT_DIR}"
+  REDGEM_PLAYER_FILE="$<TARGET_FILE:redgem_player>")
 add_test(NAME system.editor.window COMMAND redgem_editor_system_tests)
 set_tests_properties(system.editor.window PROPERTIES LABELS system RUN_SERIAL TRUE)
 

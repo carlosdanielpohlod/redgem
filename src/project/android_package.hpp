@@ -60,8 +60,9 @@ std::string android_package_name(const std::filesystem::path& game_dir);
 std::string android_manifest(const std::string& package, const std::string& label,
                              const AndroidSettings& settings = {});
 
-// The engines built for Android, by kind of processor ("arm64-v8a" -> .../libredgem.so), found
-// in `runtimes_dir`/<abi>/. Empty when none is built.
+// The players built for Android (the runtime as a library the system loads, see
+// app/android_main.cpp), by kind of processor ("arm64-v8a" -> .../libredgem.so), found in
+// `runtimes_dir`/<abi>/. Empty when there is none.
 std::map<std::string, std::filesystem::path> android_runtimes(const std::filesystem::path& runtimes_dir);
 
 // Lays out in `stage_dir` what goes into the APK: assets/game/... (a copy of the game, without

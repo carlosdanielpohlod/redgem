@@ -52,7 +52,7 @@ module Network
 
   class << self
     # Where machines meet over the internet: "relay.example.com", or "relay.example.com:9000".
-    # Anyone can run one with `redgem relay`.
+    # Anyone can run one with `redgem-relay`.
     attr_accessor :relay
 
     # The port games look for each other on. Every copy of a game must use the same one; another

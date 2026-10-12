@@ -64,13 +64,17 @@ Network.join(room: "K7QM3P")             # on the others
 Everything else is the same in a room: messages, `NetworkSync`, `Network.spawn`. Whoever opened
 the room is the host; when they leave, the room closes.
 
-The relay comes with the engine. On any machine the players can reach (a small rented server is
-enough, it only passes messages on):
+The relay comes with the engine, as a program of its own: `redgem-relay`. It is small, opens no
+window and needs no graphics card or display, so it runs on any machine the players can reach (a
+small rented server is enough, it only passes messages on):
 
 ```bash
-./build/src/redgem relay               # listens on port 7778; --port picks another
+./build/src/redgem-relay               # listens on port 7778; --port <number> picks another
 docker compose up relay                # or with Docker
 ```
+
+While nobody talks to it the relay sleeps: it wakes when a machine connects or says something,
+and about once a second to let go of machines that went silent.
 
 The relay expects strangers: one address can only open a few rooms and hold a few connections,
 guessing room codes gets it kept out for a while, and a machine that goes silent is let go.

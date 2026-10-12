@@ -5,8 +5,9 @@
 #include <string>
 #include <vector>
 
-// Making a standalone game out of a game folder: the engine and the game's files, for the system
-// asked for.
+// Making a standalone game out of a game folder: the player (the program that plays a game and
+// nothing else, redgem-player) and the game's files, for the system asked for. A build never
+// copies the program that makes it: the editor and the other tools stay with whoever makes games.
 namespace redgem {
 
 // The systems a game can be built for.
@@ -16,19 +17,26 @@ std::optional<BuildTarget> build_target_from_name(const std::string& name);
 const char* build_target_name(BuildTarget target);
 // The system this program runs on.
 BuildTarget host_build_target();
-// The engine a build for `target` ships: this program (`self`) for the system it runs on;
-// otherwise the runtime built for that system, in runtimes/<target>/ next to this program
-// (tools/windows/build_runtime.sh makes the Windows one). nullopt when that runtime is missing.
-// (Android is packed differently, see android_package.hpp: this has no single runtime for it.)
+// Where the player a build for `target` ships is looked for, from the program that builds
+// (`self`): beside it for the system it runs on (redgem-player), otherwise in runtimes/<target>/
+// beside it (runtimes/windows/redgem-player.exe). The same in a build folder and in an
+// installation, which keep their programs together. (Android is packed differently, see
+// android_package.hpp: its players are libraries, one per kind of processor, in
+// runtimes/android/<abi>/.)
+std::filesystem::path runtime_location(BuildTarget target, const std::filesystem::path& self);
+// That player, when it is there; nullopt when it is missing (and always for Android).
 std::optional<std::filesystem::path> runtime_for(BuildTarget target, const std::filesystem::path& self);
+// What to tell someone whose build found no player at `looked_for`: which file is missing, and
+// how it is made from the engine's sources.
+std::string missing_runtime_message(BuildTarget target, const std::filesystem::path& looked_for);
 
-// Makes a standalone game in `out_dir`: an executable named after the game (a copy of
-// `engine_binary`, with .exe for Windows) next to a folder with the game's files. Started with
-// no arguments, that executable plays the game beside it. Refuses an `out_dir` that is the game
-// folder or inside it (the copy would contain itself).
+// Makes a standalone game in `out_dir`: an executable named after the game (a copy of `player`,
+// with .exe for Windows) next to a folder with the game's files. Started, that executable plays
+// the game beside it. Refuses an `out_dir` that is the game folder or inside it (the copy would
+// contain itself).
 bool build_game(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
-                const std::filesystem::path& engine_binary, BuildTarget target, std::string& error);
-// Everything a build needs, for the editor and the command line: finds the runtime for `target`
+                const std::filesystem::path& player, BuildTarget target, std::string& error);
+// Everything a build needs, for the editor and the command line: finds the player for `target`
 // and builds. Returns the game's executable (for Android, its .apk), or nullopt with `error` set.
 std::optional<std::filesystem::path> build_game_for(const std::filesystem::path& game_dir,
                                                     const std::filesystem::path& out_dir, BuildTarget target,

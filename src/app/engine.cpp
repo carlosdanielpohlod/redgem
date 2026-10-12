@@ -272,6 +272,8 @@ void Engine::frame(float frame_seconds) {
 
 void Engine::read_input() {
   input_source().show_touch_controls(context_.touch_controls);
+  const SurfaceSize surface = presenter_->surface_size();
+  input_source().fit_surface(static_cast<float>(surface.width), static_cast<float>(surface.height));
   input_.update(input_source());
 }
 

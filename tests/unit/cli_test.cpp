@@ -11,13 +11,6 @@
 
 using namespace redgem;
 
-namespace {
-
-constexpr int kLargestPort = 65535;
-constexpr int kWebPort = 80;
-
-}  // namespace
-
 TEST_CASE("a game played from the command line") {
   const CliResult result = parse_cli({"games/demo", "--play"});
   REQUIRE(result.ok);
@@ -109,19 +102,13 @@ TEST_CASE("game folders are normalized: a trailing slash does not lose the game'
   CHECK(build.options.build_dir.filename() == "demo");
 }
 
-TEST_CASE("relay runs a meeting point, on a port of choice") {
-  const CliResult plain = parse_cli({"relay"});
-  REQUIRE(plain.ok);
-  CHECK(plain.options.mode == RunMode::Relay);
-  CHECK(plain.options.relay_port == 0);
-  const CliResult chosen = parse_cli({"relay", "--port", "9000"});
-  REQUIRE(chosen.ok);
-  CHECK(chosen.options.relay_port == 9000);
-  CHECK_FALSE(parse_cli({"relay", "--port", "70000"}).ok);
-  CHECK_FALSE(parse_cli({"relay", "--port", "many"}).ok);
-  CHECK_FALSE(parse_cli({"relay", "--port"}).ok);
-  CHECK_FALSE(parse_cli({"relay", "--port", ""}).ok);  // (an empty word once ended the program)
-  CHECK_FALSE(parse_cli({"relay", "somewhere"}).ok);
+TEST_CASE("the relay is a program of its own: here its name is a folder like any other") {
+  const CliResult relay = parse_cli({"relay"});
+  REQUIRE(relay.ok);
+  CHECK(relay.options.mode == RunMode::Editor);
+  CHECK(relay.options.game_dir == "relay");
+  CHECK(parse_cli({"relay", "--port", "9000"}).error == "unknown option --port");
+  CHECK(usage().find("redgem-relay") != std::string::npos);
 }
 
 TEST_CASE("android is a build target") {
@@ -145,11 +132,9 @@ TEST_CASE("what is wrong with a command line is said") {
   CHECK(parse_cli({"new", "games/demo", "--template"}).error == "--template needs a name");
   CHECK(parse_cli({"build", "a", "b", "--target", "amiga"}).error == "--target needs linux, windows or android");
   CHECK(parse_cli({"games/demo", "--gpu", "turbo"}).error == "--gpu needs auto, dedicated or integrated");
-  CHECK(parse_cli({"relay", "--port", "many"}).error == "--port needs a number up to 65535");
   CHECK(parse_cli({"games/demo", "--bogus"}).error == "unknown option --bogus");
   CHECK(parse_cli({"games/demo", "extra"}).error == "unexpected argument extra");
-  CHECK(parse_cli({"relay", "somewhere"}).error == "unexpected argument somewhere");
-  CHECK(parse_cli({"new", "games/demo", "--play"}).error == "choose one of: new, build, relay, --play");
+  CHECK(parse_cli({"new", "games/demo", "--play"}).error == "choose one of: new, build, --play");
   CHECK(parse_cli({"--play"}).error == "missing <game_dir>");
   CHECK(parse_cli({"build", "games/demo"}).error == "missing <out_dir>");
   CHECK(parse_cli({"games/demo"}).error.empty());
@@ -174,20 +159,9 @@ TEST_CASE("a subcommand is only the first word of the line") {
   CHECK(parse_cli({"build", "relay", "new"}).options.game_dir == "relay");
 }
 
-TEST_CASE("a port is a number of at most five digits, up to the largest there is") {
-  CHECK(parse_cli({"relay", "--port", "65535"}).options.relay_port == kLargestPort);
-  CHECK(parse_cli({"relay", "--port", "00080"}).options.relay_port == kWebPort);
-  CHECK_FALSE(parse_cli({"relay", "--port", "65536"}).ok);
-  CHECK_FALSE(parse_cli({"relay", "--port", "000080"}).ok);
-  CHECK_FALSE(parse_cli({"relay", "--port", "80a"}).ok);
-  CHECK_FALSE(parse_cli({"relay", "--port", "-80"}).ok);  // (read as an option, so --port has no value)
-  CHECK_FALSE(parse_cli({"relay", "--port", "8 0"}).ok);
-}
-
 TEST_CASE("the usage text names the scene file and the scripts folder") {
   const std::string text = usage();
   CHECK(text.rfind("usage:", 0) == 0);
   CHECK(text.find(config::kSceneFileName) != std::string::npos);
   CHECK(text.find(std::string(config::kScriptsDirName) + "/ folder") != std::string::npos);
-  CHECK(text.find("redgem relay") != std::string::npos);
 }

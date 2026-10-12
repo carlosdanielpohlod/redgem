@@ -73,6 +73,9 @@ class InputSource {
   virtual const struct TouchLayout* touch_layout() const { return nullptr; }
   // Shows or hides a touch screen's controls (a game with a touch interface of its own hides them).
   virtual void show_touch_controls(bool) {}
+  // Says how large what the game is drawn on is, in pixels, every frame: what is laid out over
+  // the game (a touch screen's controls) is laid out on that, wherever on a window it sits.
+  virtual void fit_surface(float, float) {}
 };
 
 // Input fed by code: keys, a mouse and a gamepad that are wherever the program driving the game

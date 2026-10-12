@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <set>
@@ -7,13 +8,19 @@
 
 #include "net/lan_discovery.hpp"
 #include "net/network_session.hpp"
+#include "net/relay_program.hpp"
 #include "net/relay_server.hpp"
 
 using namespace redgem::net;
 
 namespace {
 
-constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
+constexpr float kShortWaitSeconds = 0.05f;
+constexpr std::chrono::milliseconds kShortWait{50};
+constexpr float kLongWaitSeconds = 5.0f;  // far longer than anything here takes to arrive
+constexpr std::chrono::milliseconds kLongWait{2500};
+constexpr std::chrono::milliseconds kPromptly{500};  // well under the second an idle relay sleeps
+constexpr int kMaxRounds = 3000;                     // of polling, a millisecond apart
 constexpr std::chrono::milliseconds kRoundPause{1};
 constexpr float kRoundSeconds = 0.001f;
 constexpr float kPastJoinTimeout = 6.0f;
@@ -153,6 +160,108 @@ struct RawMachine {
 };
 
 }  // namespace
+
+TEST_CASE("an idle relay sleeps for as long as it is told when nothing arrives") {
+  Meeting meeting;
+  const auto before = std::chrono::steady_clock::now();
+  CHECK_FALSE(meeting.relay.wait(kShortWaitSeconds));
+  const auto slept = std::chrono::steady_clock::now() - before;
+  CHECK(slept >= kShortWait);
+  CHECK(slept < kLongWait);
+}
+
+TEST_CASE("a relay's wait ends as soon as someone connects") {
+  Meeting meeting;
+  Socket caller;
+  std::thread late([&] {
+    std::this_thread::sleep_for(kArrivalPause);
+    std::string error;
+    caller = Socket::connect_to(kLocalhost, meeting.relay.port(), error);
+  });
+  const auto before = std::chrono::steady_clock::now();
+  const bool woken = meeting.relay.wait(kLongWaitSeconds);
+  const auto slept = std::chrono::steady_clock::now() - before;
+  late.join();
+  CHECK(woken);
+  CHECK(slept >= kArrivalPause);  // it slept until the call, not through it
+  CHECK(slept < kLongWait);
+  meeting.relay.poll(kRoundSeconds);
+  CHECK(meeting.relay.connection_count() == 1);
+}
+
+TEST_CASE("a relay's wait ends when a machine it knows says something, or hangs up") {
+  Meeting meeting;
+  RawMachine machine(meeting);
+  REQUIRE(meeting.until([&] { return meeting.relay.connection_count() == 1; }));
+  // Connected and silent: only the time ends the wait.
+  CHECK_FALSE(meeting.relay.wait(kShortWaitSeconds));
+  std::vector<std::uint8_t> words = frame(R"({"k":"h","r":"new"})");
+  REQUIRE(machine.socket.write(words) == IoStatus::Ok);
+  CHECK(meeting.relay.wait(kLongWaitSeconds));
+  meeting.relay.poll(kRoundSeconds);
+  CHECK(meeting.relay.room_count() == 1);
+  // What the relay answered has gone out: it sleeps again, until the machine hangs up.
+  CHECK_FALSE(meeting.relay.wait(kShortWaitSeconds));
+  machine.socket.close();
+  CHECK(meeting.relay.wait(kLongWaitSeconds));
+  meeting.relay.poll(kRoundSeconds);
+  CHECK(meeting.relay.connection_count() == 0);
+}
+
+TEST_CASE("a relay with messages still to handle does not sleep on them") {
+  Meeting meeting;
+  RawMachine opener(meeting), flooder(meeting);
+  const std::string code = opener.open_room();
+  REQUIRE(flooder.say(R"({"k":"h","r":")" + code + R"("})"));
+  CHECK(opener.next_message()["k"] == "j");
+  // More messages at once than one poll handles: the rest wait inside the relay, not in a socket.
+  std::vector<std::uint8_t> flood;
+  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x"})");
+  for (int i = 0; i < kFloodMessages; ++i) flood.insert(flood.end(), tiny.begin(), tiny.end());
+  while (!flood.empty()) REQUIRE(flooder.socket.write(flood) != IoStatus::Closed);
+  std::this_thread::sleep_for(kArrivalPause);
+  meeting.relay.poll(kRoundSeconds);
+  const auto before = std::chrono::steady_clock::now();
+  CHECK(meeting.relay.wait(kLongWaitSeconds));
+  CHECK(std::chrono::steady_clock::now() - before < kShortWait);
+}
+
+TEST_CASE("a wait on no socket at all is a plain sleep, and a wait of no time does not sleep") {
+  const auto before = std::chrono::steady_clock::now();
+  CHECK_FALSE(Socket::wait({}, kShortWaitSeconds));
+  CHECK(std::chrono::steady_clock::now() - before >= kShortWait);
+  const Socket closed;
+  CHECK_FALSE(Socket::wait({{&closed, true}, {nullptr, false}}, 0.0f));
+  Meeting meeting;
+  const auto again = std::chrono::steady_clock::now();
+  CHECK_FALSE(meeting.relay.wait(0.0f));
+  CHECK_FALSE(meeting.relay.wait(-1.0f));  // (never "for ever")
+  CHECK(std::chrono::steady_clock::now() - again < kShortWait);
+}
+
+TEST_CASE("the relay program's turns sleep until there is work, then do it") {
+  Meeting meeting;
+  std::atomic<bool> stopped{false};
+  // (Only this thread touches the relay while it runs.)
+  std::thread program([&] {
+    while (!stopped) serve_relay_once(meeting.relay, kRoundSeconds);
+  });
+  NetworkSession opener;
+  std::string error;
+  REQUIRE_MESSAGE(opener.host_room(kLocalhost, meeting.relay.port(), error), error);
+  const auto before = std::chrono::steady_clock::now();
+  for (int round = 0; round < kMaxRounds && opener.state() != NetworkSession::State::Online; ++round) {
+    opener.poll(kRoundSeconds);
+    std::this_thread::sleep_for(kRoundPause);
+  }
+  const auto took = std::chrono::steady_clock::now() - before;
+  stopped = true;
+  program.join();
+  CHECK(opener.state() == NetworkSession::State::Online);
+  // Each turn may sleep a second: a room opened in a fraction of one means arrivals ended the sleeps.
+  CHECK(took < kPromptly);
+  CHECK(meeting.relay.room_count() == 1);
+}
 
 TEST_CASE("a room's code is letters easy to read aloud, and no two rooms get the same") {
   std::set<std::string> codes;

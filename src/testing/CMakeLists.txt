@@ -1,6 +1,6 @@
-# What games are tested with. None of this is part of the engine or of the program games ship
-# as: the redgem target must never link to redgem_testing (tests/ships_no_test_code.sh checks the
-# program that came out).
+# What games are tested with. None of this is part of the engine, of the program games ship as
+# (redgem-player) or of the one they are made with (redgem): neither target must ever link to
+# redgem_testing (tests/ships_no_test_code.sh checks the programs that came out).
 
 # The Ruby that tests are written with (order matters: the system test DSL uses the assertions).
 set(REDGEM_TESTING_RUBY_SOURCES
@@ -29,7 +29,8 @@ add_library(redgem_testing STATIC
   system_test.cpp
   test_cli.cpp)
 target_include_directories(redgem_testing PRIVATE ${REDGEM_TESTING_GENERATED_DIR})
-target_link_libraries(redgem_testing PUBLIC redgem_engine)
+# (It plays games as the player does: the runtime is all it stands on.)
+target_link_libraries(redgem_testing PUBLIC redgem_runtime)
 target_compile_options(redgem_testing PRIVATE -Wall -Wextra -Wpedantic -Wno-unused-parameter)
 redgem_harden(redgem_testing)
 
@@ -42,3 +43,5 @@ target_link_libraries(redgem_test_tool PRIVATE redgem_testing)
 target_compile_options(redgem_test_tool PRIVATE -Wall -Wextra -Wpedantic)
 redgem_harden(redgem_test_tool)
 redgem_harden_program(redgem_test_tool)
+install(TARGETS redgem_test_tool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        COMPONENT ${REDGEM_INSTALL_COMPONENT})

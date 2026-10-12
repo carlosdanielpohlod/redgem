@@ -32,7 +32,8 @@ std::string random_room_code();
 // (home routers let connections out, not in). Every machine connects out to the relay; the
 // first opens a room and gets a short code, the others join with the code, and the relay passes
 // their messages on. It does for a room what a host does for the machines that joined it, so
-// the machines talk to it exactly as guests talk to a host. `redgem relay` runs one.
+// the machines talk to it exactly as guests talk to a host. The redgem-relay program runs one
+// (net/relay_program.hpp).
 // It faces the internet, so it trusts nobody: what one address may open, try and pile up is
 // limited, silent machines are let go, and a room ends with whoever opened it.
 class RelayServer {
@@ -45,6 +46,11 @@ class RelayServer {
   std::uint16_t port() const { return port_; }
   // Moves messages in and out; `seconds` since the last call.
   void poll(float seconds);
+  // Sleeps until there is something for poll to do: someone connects, a machine says something
+  // or hangs up, or one that could not be sent to can again; for `seconds` at most (what poll
+  // does by the clock, letting silent machines go and asking the quiet ones if they are there,
+  // still needs calling now and then). True when it was not the time that ended the wait.
+  bool wait(float seconds) const;
 
   std::size_t room_count() const { return rooms_.size(); }
   std::size_t connection_count() const { return members_.size(); }

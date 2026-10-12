@@ -50,6 +50,14 @@ std::unique_ptr<Engine> play_headless(const std::filesystem::path& game) {
   return std::move(std::get<std::unique_ptr<Engine>>(created));
 }
 
+// The whole of a file, byte for byte.
+std::string bytes_of(const std::filesystem::path& file) {
+  std::ifstream in(file, std::ios::binary);
+  std::stringstream bytes;
+  bytes << in.rdbuf();
+  return bytes.str();
+}
+
 }  // namespace
 
 TEST_CASE("every template creates a game that loads and whose scripts compile") {
@@ -153,7 +161,7 @@ TEST_CASE("building a game makes a standalone folder") {
   const auto out = fresh("built");
   std::string error;
   REQUIRE(create_game(game, "empty", error));
-  // Any file stands in for the engine binary here.
+  // Any file stands in for the player here.
   const std::filesystem::path fake_engine = fresh("engine_binary");
   REQUIRE(write_text_file(fake_engine, "binary", error));
   REQUIRE_MESSAGE(build_game(game, out, fake_engine, BuildTarget::Linux, error), error);
@@ -167,25 +175,88 @@ TEST_CASE("building a game makes a standalone folder") {
   CHECK_FALSE(bundled_game(fake_engine).has_value());  // an executable with no game beside it
   CHECK_FALSE(build_game(fresh("not_a_game"), out, fake_engine, BuildTarget::Linux, error));
 
-  // For Windows the executable is an .exe, made from the Windows runtime kept next to the engine.
+  // For Windows the executable is an .exe, made from the Windows player kept beside the editor.
   const auto windows_out = fresh("built_windows");
   REQUIRE_MESSAGE(build_game(game, windows_out, fake_engine, BuildTarget::Windows, error), error);
   CHECK(std::filesystem::exists(windows_out / (executable_name(game) + ".exe")));
   CHECK(std::filesystem::exists(windows_out / "game" / config::kSceneFileName));
-  const std::filesystem::path install = fresh("install");
-  std::filesystem::create_directories(install / "runtimes" / "windows");
-  CHECK(runtime_for(BuildTarget::Linux, install / "redgem") == install / "redgem");  // this system: itself
-  CHECK_FALSE(runtime_for(BuildTarget::Windows, install / "redgem").has_value());    // not built yet
-  REQUIRE(write_text_file(install / "runtimes" / "windows" / "redgem.exe", "binary", error));
-  CHECK(runtime_for(BuildTarget::Windows, install / "redgem") == install / "runtimes" / "windows" / "redgem.exe");
   CHECK(build_target_from_name("windows") == BuildTarget::Windows);
   CHECK_FALSE(build_target_from_name("amiga").has_value());
   std::filesystem::remove_all(windows_out);
-  std::filesystem::remove_all(install);
   CHECK(find_games(game.parent_path()).size() >= 1);
   std::filesystem::remove_all(game);
   std::filesystem::remove_all(out);
   std::filesystem::remove(fake_engine);
+}
+
+TEST_CASE("a build ships the player kept beside the program that builds, never that program") {
+  const std::filesystem::path install = fresh("install") / "bin";
+  const std::filesystem::path editor = install / "redgem";
+  const std::filesystem::path windows_player = install / "runtimes" / "windows" / "redgem-player.exe";
+  std::filesystem::create_directories(windows_player.parent_path());
+  std::string error;
+  REQUIRE(write_text_file(editor, "editor", error));
+  // Where each is looked for: the same in a build folder and in an installation.
+  CHECK(runtime_location(BuildTarget::Linux, editor) == install / "redgem-player");
+  CHECK(runtime_location(BuildTarget::Windows, editor) == windows_player);
+  CHECK(runtime_location(BuildTarget::Android, editor) == install / "runtimes" / "android");
+  // Nothing there yet: no build, and above all not one made of the editor itself.
+  CHECK_FALSE(runtime_for(BuildTarget::Linux, editor).has_value());
+  CHECK_FALSE(runtime_for(BuildTarget::Windows, editor).has_value());
+  REQUIRE(write_text_file(install / "redgem-player", "player", error));
+  REQUIRE(write_text_file(windows_player, "windows player", error));
+  CHECK(runtime_for(BuildTarget::Linux, editor) == install / "redgem-player");
+  CHECK(runtime_for(BuildTarget::Windows, editor) == windows_player);
+  CHECK_FALSE(runtime_for(BuildTarget::Android, editor).has_value());  // (packed another way)
+  std::filesystem::remove_all(install.parent_path());
+}
+
+TEST_CASE("a build with no player to ship says which file is missing and how it is made") {
+  const std::filesystem::path missing = "/opt/redgem/bin/runtimes/windows/redgem-player.exe";
+  const std::string windows = missing_runtime_message(BuildTarget::Windows, missing);
+  CHECK(windows.find("cannot build for windows") != std::string::npos);
+  CHECK(windows.find(missing.string()) != std::string::npos);
+  CHECK(windows.find("comes with the editor") != std::string::npos);
+  CHECK(windows.find("tools/windows/build_runtime.sh") != std::string::npos);
+  const std::string own = missing_runtime_message(host_build_target(), "/opt/redgem/bin/redgem-player");
+  CHECK(own.find("/opt/redgem/bin/redgem-player") != std::string::npos);
+  CHECK(own.find("build_runtime.sh") == std::string::npos);  // nothing to cross-build
+  CHECK(own.find("redgem-player target") != std::string::npos);
+  // This test program has no player beside it: the build it is asked for says so.
+  std::string error;
+  const auto built =
+      build_game_for(redgem::test::fixture("games/sandbox"), fresh("no_player"), host_build_target(), error);
+  CHECK_FALSE(built.has_value());
+  CHECK(error.find(runtime_location(host_build_target(), platform::executable_path()).string()) != std::string::npos);
+  CHECK_FALSE(std::filesystem::exists(fresh("no_player")));
+}
+
+TEST_CASE("the game built from the sandbox is the real player under the game's name, beside its files") {
+  const std::filesystem::path player = REDGEM_PLAYER_FILE;
+  const std::filesystem::path editor = REDGEM_EDITOR_FILE;
+  REQUIRE(std::filesystem::is_regular_file(player));
+  // The build finds it where the editor of this build would: beside redgem.
+  REQUIRE(runtime_for(host_build_target(), editor) == player);
+  const std::filesystem::path out = fresh("built_sandbox");
+  std::string error;
+  const std::filesystem::path game = redgem::test::fixture("games/sandbox");
+  REQUIRE_MESSAGE(build_game(game, out, *runtime_for(host_build_target(), editor), host_build_target(), error), error);
+  const std::filesystem::path executable =
+      out / platform::executable_file_name(executable_name(game), platform::is_windows());
+  REQUIRE(std::filesystem::is_regular_file(executable));
+  CHECK(executable.stem() == "sandbox");
+  CHECK(std::filesystem::file_size(executable) == std::filesystem::file_size(player));
+  CHECK(bytes_of(executable) == bytes_of(player));
+  // Not the program games are made with, which is another file altogether.
+  CHECK(std::filesystem::file_size(executable) < std::filesystem::file_size(editor));
+  CHECK(bytes_of(executable).find("Dear ImGui") == std::string::npos);
+  CHECK(bytes_of(editor).find("Dear ImGui") != std::string::npos);
+  CHECK(bundled_game(executable) == out / "game");
+  for (const std::filesystem::path& file : shipped_files(game)) {
+    CAPTURE(file);
+    CHECK(bytes_of(out / "game" / file) == bytes_of(game / file));
+  }
+  std::filesystem::remove_all(out);
 }
 
 TEST_CASE("a game's executable is named after its folder") {

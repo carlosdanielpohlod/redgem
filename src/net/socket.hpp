@@ -13,10 +13,18 @@ enum class IoStatus {
   Closed       // the other side is gone (or never answered)
 };
 
+class Socket;
+
+// A socket a wait watches: always for what arrives on it, and, when `sending`, for room to send.
+struct Watched {
+  const Socket* socket = nullptr;
+  bool sending = false;
+};
+
 // A TCP connection, or a port being listened on. A game calls these every frame, so nothing here
-// waits, with one exception: connect_to looks a machine's name up first, which can take a moment
-// (an address in numbers, like 192.168.0.12, never does). The one place the operating systems'
-// socket calls are used.
+// waits, with two exceptions: connect_to looks a machine's name up first, which can take a moment
+// (an address in numbers, like 192.168.0.12, never does), and wait is there to wait. The one
+// place the operating systems' socket calls are used.
 class Socket {
  public:
   Socket() = default;
@@ -46,6 +54,12 @@ class Socket {
   // The address, in numbers, of the machine at the other end; empty when there is none.
   std::string peer_address() const;
   void close();
+
+  // Sleeps until something happens on one of `sockets` (bytes arrive, someone connects, the other
+  // side hangs up, or one that is `sending` can send again), for `seconds` at most. True when a
+  // socket ended the wait, false when the time did. For a program with nothing else to do
+  // meanwhile (a relay): a game, which draws frames, never calls it.
+  static bool wait(const std::vector<Watched>& sockets, float seconds);
 
  private:
   static constexpr std::intptr_t kNoHandle = -1;

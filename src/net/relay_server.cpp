@@ -64,6 +64,16 @@ void RelayServer::poll(float seconds) {
   drop_closed_members();
 }
 
+bool RelayServer::wait(float seconds) const {
+  std::vector<Watched> watched{{&listener_, false}};
+  for (const auto& member : members_) {
+    // Messages that arrived and still wait their turn (see kMaxMessagesPerPoll) are work for now.
+    if (member->incoming.message_waiting()) return true;
+    watched.push_back({&member->socket, !member->outgoing.empty()});
+  }
+  return Socket::wait(watched, seconds);
+}
+
 void RelayServer::serve(Member& member, float seconds) {
   if (member.peer == 0) await_room_choice(member, seconds);
   member.allowance = std::min(kRelayBurstBytes, member.allowance + seconds * kRelayBytesPerSecond);

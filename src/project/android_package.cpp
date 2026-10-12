@@ -41,6 +41,7 @@ constexpr const char* kPackagePrefix = "com.redgem.";
 constexpr const char* kFallbackPackage = "game";
 constexpr const char* kAssetsFolder = "assets";
 constexpr const char* kLibrariesFolder = "lib";
+constexpr const char* kAnyAbi = "<abi>";  // stands for a kind of processor in a path shown to people
 constexpr const char* kManifestFile = "AndroidManifest.xml";
 constexpr const char* kUnsignedApk = "unsigned.apk";
 constexpr const char* kAlignedApk = "aligned.apk";
@@ -456,7 +457,7 @@ bool stage_runtimes(const std::map<std::string, std::filesystem::path>& runtimes
   for (const auto& [abi, library] : runtimes) {
     std::error_code fs_error;
     if (copy_over(library, stage_dir / kLibrariesFolder / abi / android_library_file(), fs_error)) continue;
-    error = "cannot copy the engine for " + abi + ": " + fs_error.message();
+    error = "cannot copy the player for " + abi + ": " + fs_error.message();
     return false;
   }
   return true;
@@ -484,6 +485,11 @@ std::filesystem::path fresh_assets_folder(const std::filesystem::path& stage_dir
   return assets;
 }
 
+// Where a player for Android is looked for under `runtimes_dir`, whatever its kind of processor.
+std::filesystem::path any_runtime_in(const std::filesystem::path& runtimes_dir) {
+  return runtimes_dir / kAnyAbi / android_library_file();
+}
+
 // What is checked before anything is staged.
 bool can_stage(const std::filesystem::path& game_dir, const std::map<std::string, std::filesystem::path>& runtimes,
                std::string& error) {
@@ -492,7 +498,7 @@ bool can_stage(const std::filesystem::path& game_dir, const std::map<std::string
     error = game_dir.string() + " is not a game (no " + config::kSceneFileName + ")";
     return false;
   }
-  if (runtimes.empty()) error = "the android runtime is not built yet: run tools/android/build_runtime.sh";
+  if (runtimes.empty()) error = missing_runtime_message(BuildTarget::Android, any_runtime_in({}));
   return !runtimes.empty();
 }
 
@@ -591,13 +597,13 @@ bool pack_android_apk(const AndroidTools& tools, const std::filesystem::path& st
 namespace {
 
 // Stages and packs the game in a folder of its own beside the APK, gone when the build ends.
-bool build_apk(const std::filesystem::path& game_dir, const std::filesystem::path& runtimes_dir,
+bool build_apk(const std::filesystem::path& game_dir, const std::map<std::string, std::filesystem::path>& runtimes,
                const AndroidTools& tools, const SigningKey& key, const std::filesystem::path& apk, std::string& error) {
   const std::filesystem::path stage = apk.parent_path() / kStageFolder;
   // (The stamp only has to differ from the last build's.)
   const std::string stamp = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
-  const bool built = stage_android_game(game_dir, android_runtimes(runtimes_dir), stamp, stage, error) &&
-                     pack_android_apk(tools, stage, key, apk, error);
+  const bool built =
+      stage_android_game(game_dir, runtimes, stamp, stage, error) && pack_android_apk(tools, stage, key, apk, error);
   std::error_code fs_error;
   std::filesystem::remove_all(stage, fs_error);  // whether it worked or not
   return built;
@@ -608,6 +614,21 @@ std::optional<SigningKey> signing_key_of(const std::filesystem::path& game_dir, 
   AndroidSettings settings;
   if (!read_android_settings(normalized_folder(game_dir), settings, error)) return std::nullopt;
   return signing_key_for(normalized_folder(game_dir), settings, platform::user_data_dir() / kKeystoreFile, error);
+}
+
+// The players a build packs; none, with the folder they were looked for in said, when it is empty.
+std::map<std::string, std::filesystem::path> runtimes_to_pack(const std::filesystem::path& runtimes_dir,
+                                                              std::string& error) {
+  auto runtimes = android_runtimes(runtimes_dir);
+  if (runtimes.empty()) error = missing_runtime_message(BuildTarget::Android, any_runtime_in(runtimes_dir));
+  return runtimes;
+}
+
+// The file a game's app is written to in `out_dir`, named after the game.
+std::filesystem::path apk_in(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir) {
+  std::error_code fs_error;
+  const std::filesystem::path out = std::filesystem::absolute(normalized_folder(out_dir), fs_error);
+  return out / (executable_name(game_dir) + kApkExtension);
 }
 
 // Whether a build may start: on a system that has the tools, and not into the game itself.
@@ -628,14 +649,14 @@ std::optional<std::filesystem::path> build_android_game(const std::filesystem::p
                                                         const std::filesystem::path& out_dir,
                                                         const std::filesystem::path& runtimes_dir, std::string& error) {
   if (!can_build(game_dir, out_dir, error)) return std::nullopt;
+  const auto runtimes = runtimes_to_pack(runtimes_dir, error);
+  if (runtimes.empty()) return std::nullopt;
   const auto tools = find_android_tools(android_sdk_from_environment(), error);
   if (!tools) return std::nullopt;
   const auto key = signing_key_of(game_dir, error);
   if (!key) return std::nullopt;
-  std::error_code fs_error;
-  const std::filesystem::path out = std::filesystem::absolute(normalized_folder(out_dir), fs_error);
-  std::filesystem::path apk = out / (executable_name(game_dir) + kApkExtension);
-  if (!build_apk(game_dir, runtimes_dir, *tools, *key, apk, error)) return std::nullopt;
+  std::filesystem::path apk = apk_in(game_dir, out_dir);
+  if (!build_apk(game_dir, runtimes, *tools, *key, apk, error)) return std::nullopt;
   return apk;
 }
 

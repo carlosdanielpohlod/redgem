@@ -123,12 +123,12 @@ foreach(dep imgui rlimgui imguizmo)
   endif()
 endforeach()
 
+# (Without imgui_demo.cpp: the editor shows none of the library's demonstration windows.)
 add_library(imgui_stack STATIC
   ${imgui_SOURCE_DIR}/imgui.cpp
   ${imgui_SOURCE_DIR}/imgui_draw.cpp
   ${imgui_SOURCE_DIR}/imgui_tables.cpp
   ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-  ${imgui_SOURCE_DIR}/imgui_demo.cpp
   ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
   ${rlimgui_SOURCE_DIR}/rlImGui.cpp
   ${imguizmo_SOURCE_DIR}/src/ImGuizmo.cpp)

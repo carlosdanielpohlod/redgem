@@ -20,8 +20,8 @@ constexpr const char* kSigningKeyExtensions[] = {".keystore", ".jks", ".p12"};
 constexpr char kHiddenPrefix = '.';                  // of files and folders that are not part of a game (.git, .env)
 constexpr char kBackupSuffix = '~';                  // of the copies editors leave behind
 constexpr const char* kParentFolder = "..";          // how a path says "one folder up"
-constexpr const char* kRuntimesFolder = "runtimes";  // engines for other systems, next to this one
-constexpr const char* kRuntimeName = "redgem";
+constexpr const char* kRuntimesFolder = "runtimes";  // players for other systems, next to this program
+constexpr const char* kPlayerName = "redgem-player";
 constexpr const char* kFallbackExecutable = "play";  // for a game whose name gives no usable file name
 
 // Whether a file or folder of a game goes into a build of it. A copy of a game goes to other
@@ -32,6 +32,17 @@ bool ships(const std::filesystem::directory_entry& entry) {
   const std::string name = entry.path().filename().string();
   const bool leftover = !name.empty() && (name.front() == kHiddenPrefix || name.back() == kBackupSuffix);
   return !entry.is_symlink(fs_error) && !leftover && !signing_key_file(entry.path());
+}
+
+// What is built is a game, and not into itself.
+bool can_build(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir, std::string& error) {
+  if (!std::filesystem::exists(game_dir / config::kSceneFileName)) {
+    error = game_dir.string() + " is not a game (no " + config::kSceneFileName + ")";
+    return false;
+  }
+  if (!folder_inside(out_dir, game_dir)) return true;
+  error = "cannot build into " + out_dir.string() + ": it is inside the game folder";
+  return false;
 }
 
 }  // namespace
@@ -57,27 +68,43 @@ const char* build_target_name(BuildTarget target) {
 
 BuildTarget host_build_target() { return platform::is_windows() ? BuildTarget::Windows : BuildTarget::Linux; }
 
+std::filesystem::path runtime_location(BuildTarget target, const std::filesystem::path& self) {
+  const std::filesystem::path beside = self.parent_path();
+  if (target == BuildTarget::Android) return beside / kRuntimesFolder / kAndroidTarget;
+  const std::string player = platform::executable_file_name(kPlayerName, target == BuildTarget::Windows);
+  if (target == host_build_target()) return beside / player;
+  return beside / kRuntimesFolder / build_target_name(target) / player;
+}
+
 std::optional<std::filesystem::path> runtime_for(BuildTarget target, const std::filesystem::path& self) {
-  if (target == host_build_target()) return self;
   if (target == BuildTarget::Android) return std::nullopt;
-  std::filesystem::path runtime = self.parent_path() / kRuntimesFolder / build_target_name(target) /
-                                  platform::executable_file_name(kRuntimeName, target == BuildTarget::Windows);
+  std::filesystem::path runtime = runtime_location(target, self);
   std::error_code fs_error;
   if (!std::filesystem::is_regular_file(runtime, fs_error)) return std::nullopt;
   return runtime;
 }
 
+std::string missing_runtime_message(BuildTarget target, const std::filesystem::path& looked_for) {
+  const std::string name = build_target_name(target);
+  // The player for the system the engine was built on comes out of that same build.
+  const std::string made_by = target == host_build_target() ? std::string("building its redgem-player target")
+                                                            : "running tools/" + name + "/build_runtime.sh";
+  return "cannot build for " + name + ": the player for it is missing (looked for " + looked_for.string() +
+         "). It comes with the editor; an engine built from its sources gets it by " + made_by;
+}
+
 std::optional<std::filesystem::path> build_game_for(const std::filesystem::path& game_dir,
                                                     const std::filesystem::path& out_dir, BuildTarget target,
                                                     std::string& error) {
+  const std::filesystem::path self = platform::executable_path();
   if (target == BuildTarget::Android) {
-    const std::filesystem::path runtimes = platform::executable_path().parent_path() / kRuntimesFolder / kAndroidTarget;
-    return build_android_game(game_dir, out_dir, runtimes, error);
+    return build_android_game(game_dir, out_dir, runtime_location(target, self), error);
   }
-  const auto runtime = runtime_for(target, platform::executable_path());
+  // (What is wrong with the game is said before what is missing here: it is the nearer mistake.)
+  if (!can_build(normalized_folder(game_dir), normalized_folder(out_dir), error)) return std::nullopt;
+  const auto runtime = runtime_for(target, self);
   if (!runtime) {
-    error = std::string("the ") + build_target_name(target) + " runtime is not built yet: run tools/" +
-            build_target_name(target) + "/build_runtime.sh";
+    error = missing_runtime_message(target, runtime_location(target, self));
     return std::nullopt;
   }
   if (!build_game(game_dir, out_dir, *runtime, target, error)) return std::nullopt;
@@ -87,12 +114,12 @@ std::optional<std::filesystem::path> build_game_for(const std::filesystem::path&
 
 namespace {
 
-// The engine as the game's executable, allowed to run.
-bool copy_engine(const std::filesystem::path& engine_binary, const std::filesystem::path& binary, std::string& error) {
+// The player as the game's executable, allowed to run.
+bool copy_player(const std::filesystem::path& player, const std::filesystem::path& binary, std::string& error) {
   std::error_code fs_error;
-  std::filesystem::copy_file(engine_binary, binary, std::filesystem::copy_options::overwrite_existing, fs_error);
+  std::filesystem::copy_file(player, binary, std::filesystem::copy_options::overwrite_existing, fs_error);
   if (fs_error) {
-    error = "cannot copy the engine: " + fs_error.message();
+    error = "cannot copy the player " + player.string() + ": " + fs_error.message();
     return false;
   }
   std::filesystem::permissions(
@@ -117,21 +144,10 @@ bool copy_game(const std::filesystem::path& game_dir, const std::filesystem::pat
   return true;
 }
 
-// What is built is a game, and not into itself.
-bool can_build(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir, std::string& error) {
-  if (!std::filesystem::exists(game_dir / config::kSceneFileName)) {
-    error = game_dir.string() + " is not a game (no " + config::kSceneFileName + ")";
-    return false;
-  }
-  if (!folder_inside(out_dir, game_dir)) return true;
-  error = "cannot build into " + out_dir.string() + ": it is inside the game folder";
-  return false;
-}
-
 }  // namespace
 
 bool build_game(const std::filesystem::path& game_folder, const std::filesystem::path& out_folder,
-                const std::filesystem::path& engine_binary, BuildTarget target, std::string& error) {
+                const std::filesystem::path& player, BuildTarget target, std::string& error) {
   const std::filesystem::path game_dir = normalized_folder(game_folder);
   const std::filesystem::path out_dir = normalized_folder(out_folder);
   if (!can_build(game_dir, out_dir, error)) return false;
@@ -139,7 +155,7 @@ bool build_game(const std::filesystem::path& game_folder, const std::filesystem:
   std::filesystem::create_directories(out_dir, fs_error);
   const std::filesystem::path binary =
       out_dir / platform::executable_file_name(executable_name(game_dir), target == BuildTarget::Windows);
-  return copy_engine(engine_binary, binary, error) && copy_game(game_dir, out_dir / kBundledGameFolder, error) &&
+  return copy_player(player, binary, error) && copy_game(game_dir, out_dir / kBundledGameFolder, error) &&
          write_notices(out_dir, error);
 }
 

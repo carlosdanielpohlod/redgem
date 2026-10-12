@@ -50,7 +50,7 @@ class WindowPresenter final : public Presenter {
   bool open() const override { return !window_.close_requested(); }
   float frame_seconds() const override { return window_.frame_seconds(); }
 
-  // The keyboard, mouse and gamepad of the window (and, on a touch screen, its on-screen controls).
+  // The keyboard, mouse and gamepad of the window.
   InputSource& devices() { return devices_; }
 
  private:
@@ -64,5 +64,8 @@ class WindowPresenter final : public Presenter {
 // Plays a game in a window of its own, with the machine's devices and sound, until the window
 // is closed or the game quits. Returns the process exit code.
 int play_in_window(const GameWindowOptions& options);
+// The same, with the game reading `input` instead of the window's own devices: for a program
+// whose screen brings more than a keyboard, a mouse and a gamepad (a touch screen).
+int play_in_window(const GameWindowOptions& options, InputSource& input);
 
 }  // namespace redgem

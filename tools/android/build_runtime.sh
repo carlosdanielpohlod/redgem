@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Builds the engine for Android (libredgem.so) from Linux, once per kind of processor, and puts
-# it where Build looks for it: runtimes/android/<abi>/ next to the Linux engine. After this,
+# Builds the player for Android (libredgem.so: the runtime alone, as the library a game's app
+# loads) from Linux, once per kind of processor, and puts it where Build looks for it:
+# runtimes/android/<abi>/ beside the Linux programs. After this,
 # `redgem build <game> <out> --target android` makes .apk games.
 #   tools/android/build_runtime.sh              # phones (arm64-v8a) and emulators (x86_64)
 #   tools/android/build_runtime.sh x86_64       # only one
@@ -30,5 +31,5 @@ for abi in "${ABIS[@]}"; do
   # Without its debugging information: a tenth of the size, and it goes into every game's APK.
   "${NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" -o "${ENGINE_DIR}/runtimes/android/${abi}/libredgem.so" \
     "${build_dir}/src/libredgem.so"
-  echo "Android runtime ready: ${ENGINE_DIR}/runtimes/android/${abi}/libredgem.so"
+  echo "Android player ready: ${ENGINE_DIR}/runtimes/android/${abi}/libredgem.so"
 done

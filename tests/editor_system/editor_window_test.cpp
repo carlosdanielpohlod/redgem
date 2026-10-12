@@ -10,6 +10,7 @@
 #include "app/bundled_game.hpp"
 #include "app/game_settings.hpp"
 #include "core/files.hpp"
+#include "core/platform.hpp"
 #include "project/editor_setup.hpp"
 #include "project/game_build.hpp"
 #include "project/game_templates.hpp"
@@ -227,7 +228,11 @@ TEST_CASE("a game is built up in the editor: new objects, an imported model, mat
   const auto build = app.build();
   REQUIRE(build.has_value());
   CHECK_FALSE(session.document().dirty());  // building saves first
-  CHECK(std::filesystem::exists(*build / executable_name(game)));
+  // What it built is the player under the game's name: not this program, which is the editor.
+  const std::filesystem::path built_program = *build / executable_name(game);
+  REQUIRE(std::filesystem::exists(built_program));
+  CHECK(std::filesystem::file_size(built_program) == std::filesystem::file_size(REDGEM_PLAYER_FILE));
+  CHECK(std::filesystem::file_size(built_program) != std::filesystem::file_size(platform::executable_path()));
   const LoadResult built = load_gltf_scene((*build / "game" / "scene.glb").string());
   REQUIRE(built.ok);
   CHECK(built.scene.find_node("Sphere") != kNoIndex);

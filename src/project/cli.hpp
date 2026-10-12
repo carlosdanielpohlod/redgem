@@ -9,7 +9,7 @@
 
 namespace redgem {
 
-enum class RunMode { Editor, Game, NewGame, BuildGame, Relay, Help };
+enum class RunMode { Editor, Game, NewGame, BuildGame, Help };
 
 struct CliOptions {
   RunMode mode = RunMode::Editor;
@@ -17,7 +17,6 @@ struct CliOptions {
   std::string template_name = "empty";  // RunMode::NewGame
   std::filesystem::path build_dir;      // RunMode::BuildGame
   std::string build_target;             // --target linux|windows (empty: the system this runs on)
-  int relay_port = 0;                   // RunMode::Relay (0: the usual port)
   std::optional<std::string> gpu;       // --gpu auto|dedicated|integrated (overrides the saved setting)
 };
 

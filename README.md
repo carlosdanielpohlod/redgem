@@ -36,7 +36,7 @@ end
   skeletal animation.
 - **Physics**: rigid bodies, character controllers, vehicles, triggers, raycasts.
 - **Tests**: games are tested by scripts that play them frame by frame, run by a tool of their
-  own (`redgem-test`): the game your players get has no test code in it.
+  own (`redgem-test`): the game your players get has no test code in it, and no editor either.
 
 ## Built with
 
@@ -78,6 +78,7 @@ cmake -S . -B build -G Ninja
 cmake --build build
 ./build/src/redgem                      # project hub: open a demo or create a game
 ./build/src/redgem-test --help          # the tool that runs a game's tests
+./build/src/redgem-relay                # the meeting point for multiplayer games over the internet
 ctest --test-dir build                  # run the tests
 ```
 
@@ -90,6 +91,9 @@ ctest --test-dir build                  # run the tests
 ./build/src/redgem build games/my_game dist/win --target windows   # a Windows .exe (see docs/shipping.md)
 ./build/src/redgem build games/my_game dist/apk --target android   # an Android .apk
 ```
+
+A built game is a copy of `redgem-player`, the small program that plays a game and nothing else,
+next to the game's files: the editor and the other tools stay with you.
 
 A game is a folder: `scene.glb` (the scene, from Blender or the editor), `scripts/*.rb`,
 `models/`, `sounds/` and `game.json`.

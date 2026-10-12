@@ -37,4 +37,4 @@ services:
     security_opt: ["no-new-privileges:true"]
     ports:
       - "7778:7778"
-    command: build/src/redgem relay
+    command: build/src/redgem-relay

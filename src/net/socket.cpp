@@ -1,6 +1,10 @@
 #include "net/socket.hpp"
 
+#include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <cstring>
+#include <thread>
 #include <utility>
 
 #ifdef _WIN32
@@ -27,6 +31,8 @@ constexpr std::size_t kReadChunkBytes = 16 * 1024;
 constexpr int kEnabled = 1;
 constexpr std::size_t kDatagramBytes = 2048;  // more than any message games on a network exchange to find each other
 constexpr std::intptr_t kInvalidSocket = -1;
+constexpr float kMillisecondsPerSecond = 1000.0f;
+constexpr float kLongestWaitSeconds = 3600.0f;  // a wait asked to last longer is cut to this
 
 #ifdef _WIN32
 using NativeSocket = SOCKET;
@@ -68,6 +74,17 @@ int connection_answered(NativeSocket socket) {
 }
 
 std::string last_error() { return "socket error " + std::to_string(WSAGetLastError()); }
+
+using Waiting = WSAPOLLFD;
+// (Windows refuses a wait that also asks for urgent data, which POLLIN would: only the usual kind.)
+constexpr short kArrivals = POLLRDNORM;
+constexpr short kRoomToSend = POLLWRNORM;
+
+// Sleeps until one of `waiting` has what it waits for, `milliseconds` at most. How many have;
+// negative when the system refused.
+int wait_native(std::vector<Waiting>& waiting, int milliseconds) {
+  return WSAPoll(waiting.data(), static_cast<ULONG>(waiting.size()), milliseconds);
+}
 #else
 using NativeSocket = int;
 using Length = socklen_t;
@@ -92,7 +109,24 @@ int connection_answered(NativeSocket socket) {
   pollfd waiting{socket, POLLOUT, 0};
   return poll(&waiting, 1, 0);
 }
+
+using Waiting = pollfd;
+constexpr short kArrivals = POLLIN;
+constexpr short kRoomToSend = POLLOUT;
+
+// Sleeps until one of `waiting` has what it waits for, `milliseconds` at most. How many have;
+// negative when the system refused (or a signal cut the sleep short).
+int wait_native(std::vector<Waiting>& waiting, int milliseconds) {
+  return poll(waiting.data(), static_cast<nfds_t>(waiting.size()), milliseconds);
+}
 #endif
+
+// A wait's length as the system takes it: whole milliseconds, rounded up so that a short wait
+// still sleeps, and never negative (which the system reads as "for ever").
+int wait_milliseconds(float seconds) {
+  if (!(seconds > 0.0f)) return 0;
+  return static_cast<int>(std::ceil(std::min(seconds, kLongestWaitSeconds) * kMillisecondsPerSecond));
+}
 
 NativeSocket native(std::intptr_t handle) { return static_cast<NativeSocket>(handle); }
 
@@ -307,6 +341,22 @@ IoStatus Socket::write(std::vector<std::uint8_t>& bytes) {
 }
 
 std::uint16_t Socket::local_port() const { return valid() ? bound_port(native(handle_)) : 0; }
+
+bool Socket::wait(const std::vector<Watched>& sockets, float seconds) {
+  std::vector<Waiting> waiting;
+  for (const Watched& watched : sockets) {
+    if (watched.socket == nullptr || !watched.socket->valid()) continue;
+    const short events = watched.sending ? static_cast<short>(kArrivals | kRoomToSend) : kArrivals;
+    waiting.push_back({native(watched.socket->handle_), events, 0});
+  }
+  const int milliseconds = wait_milliseconds(seconds);
+  if (waiting.empty()) {
+    // With nothing to watch only the time can end the wait (and Windows refuses an empty list).
+    std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
+    return false;
+  }
+  return wait_native(waiting, milliseconds) > 0;
+}
 
 // --- Datagrams -----------------------------------------------------------------------------
 

@@ -32,19 +32,20 @@ cd build && ctest --output-on-failure        # everything
 ctest -L system                              # only the system tests
 ```
 
-Tests are run by a program of their own, `redgem-test`, built beside `redgem`. A system test is
+Tests are run by a program of their own, `redgem-test`, built beside `redgem` (see
+[Libraries and programs](#libraries-and-programs)). A system test is
 a Ruby file run against a game:
 `redgem-test <game_dir> <file.rb> [--screenshots <dir>] [--headless]` (`--headless` runs
 without a window; `redgem-test --help` lists every option).
 
-The engine knows nothing of tests. `redgem`, which is also what every built game ships as, has no
-test code in it: what tests are written with (`TestInput`, `SystemTest`, `RedGemTest`, the runners
-and their command line) lives in `src/testing` and `ruby/testing`, a library that only
+The engine knows nothing of tests. Neither `redgem` nor `redgem-player`, which is what every
+built game ships as, has test code in it: what tests are written with (`TestInput`, `SystemTest`,
+`RedGemTest`, the runners and their command line) lives in `src/testing` and `ruby/testing`, a library that only
 `redgem-test` links. The engine gives it nothing but general options (`EngineOptions`: a fixed
 step per frame, an input fed by code, a save file, who shows the game) and the window a game is
 shown in tells whoever asks when a frame is drawn; the pictures a test takes (`t.screenshot`) are
 written by the test tool from there. Keep it that way: the `app.ships_no_test_code` test looks
-into the built `redgem` and fails when test code got in.
+into the built `redgem-player` and `redgem` and fails when test code got in.
 
 * **C++ unit + integration** (doctest): math, extras parser, glTF loading from Blender fixtures,
   scene hierarchy, physics world, Ruby VM, and an engine nobody shows running the `sandbox` fixture
@@ -78,9 +79,12 @@ src/core      what everything shares: math, logging, the fixed timestep clock, f
 src/scene     glTF loader (meshes, skeletons, animations), Blender extras parser, scene graph,
               animation playback, particles; the custom properties scenes carry (props.hpp)
 src/physics   PhysicsWorld interface + Jolt implementation
-src/input     keys, axes/actions, keyboard, mouse, gamepad and scripted input sources
+src/input     keys, axes/actions, keyboard, mouse, gamepad and scripted input sources; a touch
+              screen's on-screen controls (touch_input_source.hpp), which only the program for
+              a touch screen puts in front of the others
 src/net       sockets (the only place with OS socket calls), message framing and wire format, the
-              host/guest session, discovery on the local network, the relay
+              host/guest session, discovery on the local network, the relay and the entry point
+              of its program (relay_main.cpp)
 src/audio     sound effects and music (raylib, or silence when there is no audio device)
 src/storage   what a game keeps between runs (the save store)
 src/render    the window (window.hpp: the only place that opens one, with its graphics card, frame
@@ -92,19 +96,20 @@ src/script    mruby VM, behaviour host, native bindings
 src/app       what plays a game: the engine loop, which draws nothing and hands each frame
               (FrameView) to a presenter (presenter.hpp); the presenter that shows a game in a
               window of its own and the painter every drawing presenter shares; game.json, the
-              game beside a built executable, where saves go, user settings, the Android entry
-              point
+              game beside a built executable, where saves go, user settings, the entry points of
+              the player (player_main.cpp; on Android, android_main.cpp)
 src/editor    editor: scene document (undo, save, import), session (play mode), camera, picking,
               script tabs, ImGui panels and theme (src/editor/ui)
 src/project   the tools around a game: new games from templates, builds (desktop and Android),
-              recent games and the project hub, the command line, the program's entry point
+              recent games and the project hub, the command line, the entry point of redgem
+              (main.cpp)
 src/testing   what runs tests, apart from the engine: TestInput, the pictures a test takes of the
               game (TestScreen), the system test and Ruby test runners, the audio tests listen
               with, redgem-test and its command line
-ruby/engine   Ruby prelude embedded in the binary (Behaviour, Vector3, UI, Network...)
+ruby/engine   Ruby prelude embedded in the runtime (Behaviour, Vector3, UI, Network...)
 ruby/testing  the Ruby tests are written with (assertions, test cases, the system test DSL),
               embedded in redgem-test only
-templates     scripts of the new-game templates (embedded in the binary)
+templates     scripts of the new-game templates (embedded in redgem, with the tools)
 assets/editor fonts of the editor (Inter, JetBrains Mono; SIL Open Font License, see the license files)
 games         demo games: scene.glb, scripts and the .blend each scene was built from
 showcase      renders of the showcase scene and the credits of its assets
@@ -119,10 +124,49 @@ it (`core`; then `scene`, `net`, `input`, `audio`, `physics`, `storage`; then `r
 `script`; then `app`; then `editor`, `project`; `testing` sees everything and nothing sees it).
 Each layer keeps its own numbers in a `<layer>_config.hpp` next to its code.
 
+## Libraries and programs
+
+The folders are built into a few static libraries, one on top of the other, and each program
+links only the ones it is made of (`src/CMakeLists.txt`):
+
+```
+redgem_core     src/core                                           links nothing of the engine's
+redgem_net      src/net                                            redgem_core, the JSON library
+redgem_runtime  scene, physics, audio, input, storage, render,     redgem_net, raylib, Jolt, mruby,
+                script, app, and the Ruby prelude                  cgltf, the JSON library
+redgem_editor   src/editor                                         redgem_runtime, Dear ImGui
+redgem_project  src/project (without main.cpp), the templates      redgem_editor
+                and the licenses
+redgem_testing  src/testing, ruby/testing                          redgem_runtime
+```
+
+```
+redgem-player   src/app/player_main.cpp    redgem_runtime   what players receive: plays the game in
+                                                            the game/ folder beside it, nothing else
+redgem          src/project/main.cpp       redgem_project   the editor, the project hub, the command
+                                                            line (new, build, --play)
+redgem-relay    src/net/relay_main.cpp     redgem_net       the meeting point for games over the
+                                                            internet: no window, for servers
+redgem-test     src/testing/main.cpp       redgem_testing   runs a game's tests
+libredgem.so    src/app/android_main.cpp   redgem_runtime   the player on Android, loaded by the app
+```
+
+A built game is a copy of the player, never of the program that builds it: `redgem build` and
+the editor's Build take `redgem-player` from beside `redgem`, or `runtimes/<system>/` there for
+another system (`tools/windows/build_runtime.sh`, `tools/android/build_runtime.sh` build those).
+`cmake --install build --component redgem --prefix <folder>` puts the four programs in
+`<folder>/bin` and the players for other systems in `<folder>/bin/runtimes`, where the same
+lookups find them.
+
+Keep what players receive small: nothing the player links may include `editor/` or `project/`
+(the include directions below say so, and linking proves it). The tests `app.player_ships_no_tools`
+and `app.relay_ships_no_game` look into the built programs (`tests/ships_no_tools.sh`) for texts
+only the tools, or only a game, have.
+
 A program opens one window, through `Window`, and makes what draws in it afterwards (a `Renderer`,
 the editor's `ui::Interface`): the project hub, the editor and a played game each do. The engine
-never does: it is given a `Presenter`. `WindowPresenter` shows a game in its own window (a built
-game, `redgem --play`, `redgem-test`), the editor's Scene view is another (`EditorApp::GameView`),
+never does: it is given a `Presenter`. `WindowPresenter` shows a game in its own window
+(`redgem-player`, `redgem --play`, `redgem-test`), the editor's Scene view is another (`EditorApp::GameView`),
 and without one nobody shows the game (`NullPresenter`: tests, servers). What a game can show is
 a field of `FrameView`, drawn in `FramePainter`: added there, it reaches every presenter.
 `tests/include_directions.sh` holds the table and fails the test suite on an include that goes up.

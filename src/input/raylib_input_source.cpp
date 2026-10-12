@@ -36,16 +36,6 @@ GamepadSample read_gamepad() {
   return sample;
 }
 
-#if defined(PLATFORM_ANDROID)
-std::vector<TouchPoint> read_touches() {
-  std::vector<TouchPoint> touches;
-  for (int i = 0; i < GetTouchPointCount(); ++i) {
-    const Vector2 at = GetTouchPosition(i);
-    touches.push_back({GetTouchPointId(i), at.x, at.y});
-  }
-  return touches;
-}
-#endif
 }  // namespace
 
 bool RaylibInputSource::is_key_down(Key key) const { return IsKeyDown(static_cast<int>(key)); }
@@ -72,16 +62,7 @@ std::string RaylibInputSource::typed_text() const {
   return text;
 }
 
-const TouchLayout* RaylibInputSource::touch_layout() const { return touch_shown_ ? &touch_.layout() : nullptr; }
-
 GamepadSample RaylibInputSource::gamepad() const {
-  touch_shown_ = false;
-#if defined(PLATFORM_ANDROID)
-  if (!IsGamepadAvailable(kFirstGamepad) && touch_wanted_) {
-    touch_shown_ = true;
-    return touch_.update(read_touches(), static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight()));
-  }
-#endif
   return IsGamepadAvailable(kFirstGamepad) ? read_gamepad() : GamepadSample{};
 }
 

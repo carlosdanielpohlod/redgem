@@ -1,5 +1,5 @@
 # Builds RedGem and its tests. tools/docker/editor.sh opens the editor; `docker compose run --rm test`
-# runs the tests.
+# runs the tests; `docker compose up relay` runs redgem-relay.
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive

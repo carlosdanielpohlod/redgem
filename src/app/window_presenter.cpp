@@ -42,14 +42,15 @@ void WindowPresenter::present(const FrameView& view) {
   window_.end_frame();
 }
 
-int play_in_window(const GameWindowOptions& options) {
-  // The window first and last: the engine shows, reads and sounds through what is made here.
-  WindowPresenter window(options);
+namespace {
+
+// Plays the game of `window` in it, read from `input`, with the machine's sound.
+int play(WindowPresenter& window, InputSource& input, const std::filesystem::path& game_dir) {
   const std::unique_ptr<AudioSystem> audio = create_raylib_audio();
   EngineOptions game;
-  game.game_dir = options.game_dir;
+  game.game_dir = game_dir;
   game.presenter = &window;
-  game.input = &window.devices();
+  game.input = &input;
   game.audio = audio.get();
   auto created = Engine::create(game);
   if (const auto* error = std::get_if<std::string>(&created)) {
@@ -57,6 +58,19 @@ int play_in_window(const GameWindowOptions& options) {
     return kExitFailure;
   }
   return std::get<std::unique_ptr<Engine>>(created)->run();
+}
+
+}  // namespace
+
+int play_in_window(const GameWindowOptions& options) {
+  // The window first and last: the engine shows, reads and sounds through what is made here.
+  WindowPresenter window(options);
+  return play(window, window.devices(), options.game_dir);
+}
+
+int play_in_window(const GameWindowOptions& options, InputSource& input) {
+  WindowPresenter window(options);
+  return play(window, input, options.game_dir);
 }
 
 }  // namespace redgem

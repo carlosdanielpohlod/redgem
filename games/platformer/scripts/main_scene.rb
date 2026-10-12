@@ -3,7 +3,7 @@
 # playing together over the network.
 class MainScene < SceneScript
   # Where games meet to be played over the internet ("relay.example.com", a machine running
-  # `redgem relay`). With none, the game is played on a local network, or by the host's address.
+  # `redgem-relay`). With none, the game is played on a local network, or by the host's address.
   RELAY = nil
 
   def setup

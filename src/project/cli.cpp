@@ -12,22 +12,17 @@ namespace redgem {
 
 namespace {
 
-constexpr std::size_t kPortDigits = 5;
-constexpr int kLargestPort = 65535;
-constexpr const char* kDigits = "0123456789";
 constexpr char kOptionMark = '-';  // what every option starts with
 
 // The words of a command line.
 constexpr const char* kNewCommand = "new";
 constexpr const char* kBuildCommand = "build";
-constexpr const char* kRelayCommand = "relay";
 constexpr const char* kHelpOption = "--help";
 constexpr const char* kShortHelpOption = "-h";
 constexpr const char* kPlayOption = "--play";
 constexpr const char* kTemplateOption = "--template";
 constexpr const char* kTargetOption = "--target";
 constexpr const char* kGpuOption = "--gpu";
-constexpr const char* kPortOption = "--port";
 
 constexpr const char* kUsageText =
     "usage:\n"
@@ -37,10 +32,11 @@ constexpr const char* kUsageText =
     "  redgem new <game_dir> [--template empty|platformer]   create a game\n"
     "  redgem build <game_dir> <out_dir> [--target linux|windows|android]   make a standalone game (an executable, or "
     "an .apk)\n"
-    "  redgem relay [--port <number>]    run a meeting point for multiplayer games over the internet\n"
     "\n"
     "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting,\n"
     "                                       else the dedicated card when there is one)\n"
+    "\n"
+    "  Where multiplayer games meet over the internet is a program of its own: redgem-relay.\n"
     "\n";
 
 // A command line being read: what was understood so far, and how far the reading got.
@@ -74,11 +70,6 @@ bool is_option(const std::string& arg) { return !arg.empty() && arg[0] == kOptio
 std::optional<std::string> value(Reading& reading) {
   if (reading.next >= reading.args.size() || is_option(reading.args[reading.next])) return std::nullopt;
   return reading.args[reading.next++];
-}
-
-bool is_port(const std::string& text) {
-  return !text.empty() && text.find_first_not_of(kDigits) == std::string::npos && text.size() <= kPortDigits &&
-         std::stoi(text) <= kLargestPort;
 }
 
 void read_help(Reading& reading) {
@@ -117,15 +108,6 @@ void read_gpu(Reading& reading) {
   reading.result.options.gpu = *name;
 }
 
-void read_port(Reading& reading) {
-  const auto number = value(reading);
-  if (!number || !is_port(*number)) {
-    fail(reading, "--port needs a number up to 65535");
-    return;
-  }
-  reading.result.options.relay_port = std::stoi(*number);
-}
-
 struct Option {
   const char* name;
   void (*read)(Reading&);
@@ -133,15 +115,13 @@ struct Option {
 constexpr Option kOptions[] = {
     {kHelpOption, read_help},         {kShortHelpOption, read_help}, {kPlayOption, read_play},
     {kTemplateOption, read_template}, {kTargetOption, read_target},  {kGpuOption, read_gpu},
-    {kPortOption, read_port},
 };
 
 struct Command {
   const char* word;
   RunMode mode;
 };
-constexpr Command kCommands[] = {
-    {kNewCommand, RunMode::NewGame}, {kBuildCommand, RunMode::BuildGame}, {kRelayCommand, RunMode::Relay}};
+constexpr Command kCommands[] = {{kNewCommand, RunMode::NewGame}, {kBuildCommand, RunMode::BuildGame}};
 
 const Option* find_option(const std::string& arg) {
   const auto* found = std::find_if(std::begin(kOptions), std::end(kOptions),
@@ -162,7 +142,6 @@ void read_command(Reading& reading) {
 // Where an argument that is no option goes: the game's folder, then (for a build) the folder to
 // build into. nullptr when the line has no place for it.
 std::filesystem::path* place_for_folder(CliOptions& options) {
-  if (options.mode == RunMode::Relay) return nullptr;
   if (options.game_dir.empty()) return &options.game_dir;
   if (options.mode == RunMode::BuildGame && options.build_dir.empty()) return &options.build_dir;
   return nullptr;
@@ -195,7 +174,7 @@ bool needs_game(RunMode mode) {
 // What is wrong with a line that was read to its end; empty when nothing is.
 std::string problem_with(const Reading& reading) {
   const CliOptions& options = reading.result.options;
-  if (reading.conflict) return "choose one of: new, build, relay, --play";
+  if (reading.conflict) return "choose one of: new, build, --play";
   if (needs_game(options.mode) && options.game_dir.empty()) return "missing <game_dir>";
   if (options.mode == RunMode::BuildGame && options.build_dir.empty()) return "missing <out_dir>";
   return {};

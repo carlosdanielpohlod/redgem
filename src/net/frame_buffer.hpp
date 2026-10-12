@@ -21,6 +21,8 @@ class FrameBuffer {
   void append(const std::uint8_t* bytes, std::size_t count);
   // The next whole message, if all of it has arrived.
   std::optional<std::string> next();
+  // Whether next() has something to give (or to refuse) without anything more arriving.
+  bool message_waiting() const;
   // True once a message longer than kMaxFrameBytes was announced: nothing more can be trusted.
   bool broken() const { return broken_; }
   // The bytes that arrived and are not part of a message taken yet.

@@ -10,26 +10,34 @@ This makes a folder with an executable named after your game (`dist/my_game/my_g
 `game/` folder with its files. Whoever receives the folder runs the executable: they do not need
 RedGem, Ruby or Blender installed.
 
+That executable is the **player**: a copy of `redgem-player`, a small program that plays the game
+in the `game/` folder beside it and does nothing else. The editor, the project hub and the other
+tools you make the game with are not in it. A build looks for the player beside the `redgem`
+program that builds: `redgem-player` in the same folder for the system you are on, and
+`runtimes/<system>/` in that folder for the others (`runtimes/windows/redgem-player.exe`,
+`runtimes/android/<abi>/libredgem.so`). When one is missing the build says which file it looked
+for.
+
 ## For Windows
 
 RedGem runs on Linux, and builds games for Linux, Windows and Android. In the editor, **Build**
 asks which one; from a terminal:
 
 ```bash
-tools/windows/build_runtime.sh                                   # once: builds the engine for Windows
+tools/windows/build_runtime.sh                                   # once: builds the player for Windows
 ./build/src/redgem build my_game dist/my_game_win --target windows
 ```
 
 The first command downloads a Windows compiler into the project (no administrator rights
-needed) and builds `redgem.exe`; it takes a few minutes and is only needed once, or again after
-updating RedGem. The build then makes `dist/my_game_win/my_game.exe` next to its `game/` folder.
+needed) and builds `redgem-player.exe` into `build/src/runtimes/windows/`; it takes a few minutes
+and is only needed once, or again after updating RedGem. The build then makes `dist/my_game_win/my_game.exe` next to its `game/` folder.
 It needs 64-bit Windows 10 or later and a graphics card with OpenGL 3.3; nothing has to be
 installed with it.
 
 ## For Android
 
 ```bash
-tools/android/build_runtime.sh                                   # once: builds the engine for Android
+tools/android/build_runtime.sh                                   # once: builds the player for Android
 ./build/src/redgem build my_game dist/my_game_android --target android
 ```
 
@@ -105,3 +113,16 @@ REDGEM_KEYSTORE_PASSWORD='...' ./build/src/redgem build my_game dist/android --t
 - Everything in the game folder is copied, including the scripts as plain `.rb` files.
 - Check the licenses of the models and sounds you include. A license that allows using an asset
   in a game does not always allow shipping its original file.
+
+## Installing RedGem somewhere else
+
+`cmake --install build --component redgem --prefix <folder>` copies the programs out of the
+build folder, laid out the way builds expect:
+
+```
+<folder>/bin/redgem            the editor, the project hub and the command line
+<folder>/bin/redgem-player     what a game built for this system is a copy of
+<folder>/bin/redgem-relay      the meeting point for games over the internet
+<folder>/bin/redgem-test       the tool that runs a game's tests
+<folder>/bin/runtimes/         the players for other systems that were built before installing
+```

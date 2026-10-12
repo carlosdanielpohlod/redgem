@@ -40,6 +40,12 @@ void FrameBuffer::append(const std::uint8_t* bytes, std::size_t count) {
   bytes_.insert(bytes_.end(), bytes, bytes + count);
 }
 
+bool FrameBuffer::message_waiting() const {
+  if (broken_ || buffered() < kLengthBytes) return false;
+  const std::size_t length = announced_length(bytes_, taken_);
+  return length > kMaxFrameBytes || buffered() >= kLengthBytes + length;
+}
+
 std::optional<std::string> FrameBuffer::next() {
   if (broken_ || buffered() < kLengthBytes) return std::nullopt;
   const std::size_t length = announced_length(bytes_, taken_);

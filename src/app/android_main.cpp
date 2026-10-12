@@ -1,5 +1,6 @@
-// The engine's entry point on Android. The game's files travel inside the APK; on the first run
-// (and after every update) they are copied to the app's own storage, and the game plays from there.
+// The player's entry point on Android (the library a game's app loads, made of the runtime alone). The game's files
+// travel inside the APK; on the first run (and after every update) they are copied to the app's own storage, and the
+// game plays from there.
 
 #include <android/asset_manager.h>
 #include <android/configuration.h>
@@ -19,6 +20,8 @@
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "core/platform.hpp"
+#include "input/raylib_input_source.hpp"
+#include "input/touch_input_source.hpp"
 
 // The running activity, kept by raylib's Android layer.
 extern "C" struct android_app* GetAndroidApp(void);
@@ -104,12 +107,15 @@ float screen_aspect(const android_app* app) {
   return std::max(one_side, other_side) / std::min(one_side, other_side);
 }
 
-// Plays the game that was unpacked into the app's storage, on the whole screen.
+// Plays the game that was unpacked into the app's storage, on the whole screen, with on-screen
+// controls for whoever has no gamepad.
 int play_unpacked_game(const android_app* app) {
   GameWindowOptions options;
   options.game_dir = kBundledGameFolder;
   options.screen_aspect = screen_aspect(app);
-  return play_in_window(options);
+  const RaylibInputSource devices;
+  TouchInputSource touch_screen(devices);
+  return play_in_window(options, touch_screen);
 }
 
 }  // namespace

@@ -1,9 +1,8 @@
-// redgem: one program for everything a game is made and played with. It opens the editor and the
-// project hub, does what the command line asks (new, build, relay, --play) and, started with no
-// arguments beside a game's files, plays that game.
+// redgem: the program games are made with. It opens the editor and the project hub and does what
+// the command line asks (new, build, --play). What players receive is another program,
+// redgem-player, which a build copies next to the game's files; where games meet over the
+// internet is a third, redgem-relay.
 
-#include <chrono>
-#include <thread>
 #include <exception>
 #include <filesystem>
 #include <iostream>
@@ -11,11 +10,9 @@
 #include <string>
 #include <vector>
 
-#include "net/relay_server.hpp"
 #include "core/exit_codes.hpp"
 #include "project/cli.hpp"
 #include "app/window_presenter.hpp"
-#include "app/bundled_game.hpp"
 #include "project/editor_setup.hpp"
 #include "project/game_build.hpp"
 #include "project/game_templates.hpp"
@@ -27,9 +24,6 @@
 #include "core/platform.hpp"
 
 namespace {
-
-constexpr int kExitUsage = 2;
-constexpr float kRelayPollSeconds = 0.005f;  // between looks at the relay's connections
 
 // The game to open: the one given, else the one picked in the project hub (which shows why the
 // last one did not open). False when the hub was closed instead.
@@ -78,39 +72,6 @@ int run_editor(const redgem::CliOptions& options) {
     game.clear();  // back to the hub
   }
   return redgem::kExitSuccess;
-}
-
-void report_rooms(const redgem::net::RelayServer& relay, std::size_t& rooms) {
-  using namespace redgem;
-  if (relay.room_count() == rooms) return;
-  rooms = relay.room_count();
-  log::info(std::to_string(rooms) + " room(s) open, " + std::to_string(relay.connection_count()) + " machine(s)");
-}
-
-[[noreturn]] void serve_until_stopped(redgem::net::RelayServer& relay) {
-  std::size_t rooms = 0;
-  auto before = std::chrono::steady_clock::now();
-  for (;;) {
-    const auto now = std::chrono::steady_clock::now();
-    relay.poll(std::chrono::duration<float>(now - before).count());
-    before = now;
-    report_rooms(relay, rooms);
-    std::this_thread::sleep_for(std::chrono::duration<float>(kRelayPollSeconds));
-  }
-}
-
-// A meeting point for games over the internet (see RelayServer): runs until it is stopped.
-int run_relay(const redgem::CliOptions& options) {
-  using namespace redgem;
-  net::RelayServer relay;
-  std::string error;
-  const auto wanted = static_cast<std::uint16_t>(options.relay_port != 0 ? options.relay_port : net::kDefaultRelayPort);
-  if (!relay.start(wanted, error)) {
-    log::error("cannot listen on port " + std::to_string(wanted) + ": " + error);
-    return kExitFailure;
-  }
-  log::info("relay listening on port " + std::to_string(relay.port()) + " (Ctrl+C stops it)");
-  serve_until_stopped(relay);
 }
 
 int play_game(const redgem::CliOptions& options) {
@@ -163,8 +124,8 @@ struct Mode {
   int (*run)(const redgem::CliOptions&);
 };
 constexpr Mode kModes[] = {
-    {redgem::RunMode::Help, show_help},  {redgem::RunMode::NewGame, new_game},  {redgem::RunMode::BuildGame, build},
-    {redgem::RunMode::Relay, run_relay}, {redgem::RunMode::Editor, run_editor}, {redgem::RunMode::Game, play_game},
+    {redgem::RunMode::Help, show_help},    {redgem::RunMode::NewGame, new_game}, {redgem::RunMode::BuildGame, build},
+    {redgem::RunMode::Editor, run_editor}, {redgem::RunMode::Game, play_game},
 };
 
 int run_mode(const redgem::CliOptions& options) {
@@ -185,18 +146,6 @@ int reporting_errors(Run run) {
   }
 }
 
-// A built game: started by itself, the executable plays the game that ships next to it.
-std::optional<int> play_bundled_game(const std::vector<std::string>& args) {
-  using namespace redgem;
-  if (!args.empty()) return std::nullopt;
-  const auto game = bundled_game(platform::executable_path());
-  if (!game) return std::nullopt;
-  GameWindowOptions options;
-  options.game_dir = *game;
-  options.gpu = gpu_choice_for_run(std::nullopt);
-  return reporting_errors([&options] { return play_in_window(options); });
-}
-
 // What the command line asks for, done. (Reading the line is inside the same net as the running:
 // nothing a user types ends the program without a word.)
 int run_command_line(const std::vector<std::string>& args) {
@@ -213,6 +162,5 @@ int run_command_line(const std::vector<std::string>& args) {
 
 int main(int argc, char** argv) {
   const std::vector<std::string> args(argv + 1, argv + argc);
-  if (const auto code = play_bundled_game(args)) return *code;
   return reporting_errors([&args] { return run_command_line(args); });
 }
