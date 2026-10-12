@@ -14,6 +14,7 @@ import itertools
 import math
 import os
 import random
+import re
 import sys
 
 import bpy
@@ -304,6 +305,11 @@ def build_world():
     kit.empty("Caption", ORIGIN, props={"script": "caption.rb"})
 
 
+# What is left in the file of a texture's first location: text up to its end that names the
+# folder the kits are downloaded to.
+OLD_PATH = re.compile(rb"[^\x00]*/\.deps/assets/[^\x00]*")
+
+
 def save_blend(blend):
     """The Kenney textures (CC0) travel inside the .blend, referenced by relative paths: the file
     then opens anywhere and does not record where this checkout lives."""
@@ -317,6 +323,17 @@ def save_blend(blend):
         for packed in image.packed_files:
             packed.filepath = neutral
     bpy.ops.wm.save_as_mainfile(filepath=blend)
+    blank_old_paths(blend)
+
+
+def blank_old_paths(blend):
+    """A shorter path written over a longer one leaves the longer one's tail in the file, after
+    the end of the text: those leftovers are blanked."""
+    with open(blend, "rb") as file:
+        data = file.read()
+    blanked = OLD_PATH.sub(lambda found: bytes(len(found.group())), data)
+    with open(blend, "wb") as file:
+        file.write(blanked)
 
 
 def main():
