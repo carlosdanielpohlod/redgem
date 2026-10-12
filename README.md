@@ -4,6 +4,17 @@ A 3D game engine and editor where games are written in **Ruby**, the most human-
 language. Build levels in the editor or in **Blender**, write the gameplay in Ruby, press Play,
 ship a standalone game.
 
+> **Experimental.** RedGem is a young engine: expect rough edges, and see the
+> [known limitations](KNOWN_LIMITATIONS.md). It is not written from zero: it puts together
+> open source projects such as Blender, Jolt Physics, raylib and mruby ([Built with](#built-with)).
+
+<p align="center">
+  <a href="https://carlosdanielpohlod.github.io/redgem-site/#demo"><img src="https://carlosdanielpohlod.github.io/redgem-site/assets/poster.jpg" alt="Watch the RedGem demo video" width="720"></a><br>
+  <a href="https://carlosdanielpohlod.github.io/redgem-site/#demo">Watch the demo</a> ·
+  <a href="https://carlosdanielpohlod.github.io/redgem-site/">Site</a> ·
+  <a href="https://carlosdanielpohlod.github.io/redgem-site/manual/">Manual</a>
+</p>
+
 ```ruby
 class Coin < Behaviour
   SPIN_DEGREES_PER_SECOND = 180.0
@@ -63,6 +74,17 @@ The engine itself is **C++17**, built with CMake. Demo assets come from
 
 ## Quick start
 
+**Download and run**, nothing to install:
+
+| System | Download | Then |
+|--------|----------|------|
+| Linux (x86_64) | [redgem-linux-x86_64.tar.gz](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.tar.gz) | unpack, run `bin/redgem` |
+| Windows (x86_64) | [redgem-windows-x86_64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-windows-x86_64.zip) | unpack, run `redgem.exe` |
+
+The project hub opens: pick *Platformer* under *New game* and press Play. The Linux download is
+the tested one and builds games for Linux, Windows and Android; the Windows one has only been
+tried under Wine so far. Details in [docs/install.md](docs/install.md).
+
 With Docker, on Linux:
 
 ```bash
@@ -107,6 +129,16 @@ Small games and scenes that ship with the engine, each with its scripts and test
 - `games/city`: a crossroad where cars obey traffic lights and brake for each other.
 - `games/showcase`: a detailed street at dusk to drive through (built from downloaded assets,
   see [docs/contributing.md](docs/contributing.md)).
+
+## Contributing
+
+Small pull requests are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) says how, and
+[KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md) lists what is missing or wrong today.
+
+## License
+
+RedGem is [MIT licensed](LICENSE). The projects it is built on keep their own licenses, listed
+in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md); every built game carries them too.
 
 ## Documentation
 

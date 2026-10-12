@@ -12,7 +12,7 @@ Knowing this up front saves time:
   no animation events and no inverse kinematics.
 - **Multiplayer** has no matchmaking and no lag compensation; playing over the internet needs a
   relay you run, or a forwarded port (see [Multiplayer](scripting/multiplayer.md)).
-- **Platforms:** the editor runs on Linux. Games are built for Linux, Windows and Android (no
+- **Platforms:** the editor is developed on Linux; the Windows download is experimental. Games are built for Linux, Windows and Android (no
   iOS, no web).
 - Scripts are loaded when you press Play; they are not reloaded while the game runs.
 

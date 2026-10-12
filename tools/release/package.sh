@@ -68,13 +68,12 @@ package_windows() {
 }
 
 main() {
-  local work
-  work="$(mktemp -d)"
-  trap "rm -rf '${work}'" EXIT
+  WORK_DIR="$(mktemp -d)"
+  trap 'rm -rf "${WORK_DIR}"' EXIT
   rm -rf "${OUT_DIR}"
-  mkdir -p "${OUT_DIR}" "${work}/linux" "${work}/windows"
-  package_linux "${work}/linux"
-  package_windows "${work}/windows"
+  mkdir -p "${OUT_DIR}" "${WORK_DIR}/linux" "${WORK_DIR}/windows"
+  package_linux "${WORK_DIR}/linux"
+  package_windows "${WORK_DIR}/windows"
   ls -l "${OUT_DIR}"
 }
 

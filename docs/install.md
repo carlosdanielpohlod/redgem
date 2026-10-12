@@ -1,8 +1,26 @@
 # Install
 
-RedGem runs on Linux. Pick one of the two ways below.
+RedGem is experimental. The editor is developed on Linux; there is a Windows download too.
+Pick one of the ways below.
 
-## With Docker (easiest)
+## Download (easiest)
+
+| System | Download |
+|--------|----------|
+| Linux (x86_64) | [redgem-linux-x86_64.tar.gz](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.tar.gz) |
+| Windows (x86_64) | [redgem-windows-x86_64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-windows-x86_64.zip) |
+
+Unpack it anywhere and run `bin/redgem` (Linux) or `redgem.exe` (Windows). Nothing is installed:
+delete the folder to remove it. The demos are in its `games/` folder.
+
+- **Linux** needs a desktop with OpenGL 3.3, a processor with AVX2 and glibc 2.39 or newer
+  (Ubuntu 24.04 and later). It builds games for Linux, Windows and Android.
+- **Windows** is compiled from Linux and has only been tried under Wine, not on a real Windows
+  machine yet. It builds games for Windows.
+
+Wherever this manual says `./build/src/redgem ...`, write `bin/redgem ...` (or `redgem.exe ...`).
+
+## With Docker
 
 You need [Docker](https://docs.docker.com/engine/install/) and a desktop session using X11.
 

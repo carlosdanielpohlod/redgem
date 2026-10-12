@@ -1,0 +1,67 @@
+# Known limitations
+
+RedGem is experimental. This is what is missing or known to be wrong today: good places to
+start if you want to [contribute](CONTRIBUTING.md). If you fix one, remove it from this list in
+the same pull request.
+
+## Platforms
+
+- The editor is developed and tested on Linux. The Windows download is compiled from Linux and
+  has only been tried under Wine, never on a real Windows machine.
+- No macOS, iOS, web or console builds.
+- The Linux programs need a processor with AVX2 and glibc 2.39 or newer.
+- Android games have been run on an emulator only, not on phones. Characters are limited to 48
+  bones there. The touch controls have one fixed layout (a stick and three buttons).
+- Once, right after an emulator cold boot, an Android game stopped in its audio thread. It did
+  not happen again in the runs that followed and has no fix.
+
+## Rendering and animation
+
+- No blend trees or animation state machines: scripts choose and mix clips themselves.
+- Particles are not lit and cast no shadows.
+- Images must be PNG or JPEG, at most 8192 pixels a side.
+
+## Multiplayer
+
+- Nobody runs a public relay: to play over the internet someone has to run `redgem-relay` on a
+  machine the players can reach.
+- Messages are JSON over TCP. There is no prediction or lag compensation: fast action games
+  will feel the delay.
+- A relay accepts 24 connections and 8 rooms per address, and a game hosted directly lets 4
+  machines per address wait to join at the same time. Players behind one shared address (a
+  campus, some mobile networks) can run into both.
+- Two `NetworkSync` components given the same key: the second silently takes the first one's
+  place.
+
+## Scripting
+
+- Scripts run on mruby, not on the Ruby you install on your machine: no gems, no `require`, no
+  files, sockets or `eval` (on purpose: a game cannot touch the player's machine).
+- `a&.b.c` does not stop at `a` being nil as it does in other Rubies: write `a&.b&.c`.
+- All text the engine and editor show is English. Games translate their own texts.
+
+## Editor
+
+- A long session with many model imports uses more and more memory until the editor is closed:
+  what was deleted is kept for undo.
+- Lights and cameras of deleted objects keep their entries in the saved scene file.
+- Typing a value into an Inspector field (Ctrl+click) and then clicking another object may give
+  the value to the newly selected object. Seen in the code, not confirmed by a test.
+- After Stop, the volume and music pitch a game set stay in the editor's audio.
+- In Docker the editor has no sound.
+
+## Loading and files
+
+- A scene has limits per part (elements, nodes, depth, joints) but no limit on the memory it
+  needs as a whole: a huge scene is not refused, it runs out of memory.
+- While a game is being developed, symbolic links inside its asset folders are followed. Built
+  games do not carry them.
+
+## Tools
+
+- `redgem-test --ruby <file>` cannot load a game's own classes, only the engine's.
+- The Blender scene builders do not write the same bytes twice (vertex and UV order change
+  between runs), so regenerating a demo scene shows up as a change.
+- The showcase demo is built from downloaded assets that may not be passed on, so it is not in
+  the downloads and its tests are skipped without it.
+- The scripts that record the site's video are not part of the repository.
