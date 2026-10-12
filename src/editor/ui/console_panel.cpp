@@ -32,19 +32,6 @@ LevelStyle style_of(log::Level level) {
   return {ICON_FA_CIRCLE_INFO, muted_color()};
 }
 
-// Which kinds of messages are listed (the buttons at the top toggle them).
-struct Filters {
-  bool info = true;
-  bool warnings = true;
-  bool errors = true;
-
-  bool shows(log::Level level) const {
-    if (level == log::Level::Error) return errors;
-    return level == log::Level::Warning ? warnings : info;
-  }
-};
-Filters g_filters;
-
 long long count_of(const ConsoleLog& console, log::Level level) {
   return std::count_if(console.entries().begin(), console.entries().end(),
                        [level](const ConsoleEntry& entry) { return entry.level == level; });
@@ -59,13 +46,13 @@ void filter_button(const char* icon, long long count, bool& shown, ImVec4 color)
   ImGui::PopStyleColor();
 }
 
-void draw_filters(ConsoleLog& console) {
+void draw_filters(ConsoleLog& console, ConsoleFilters& filters) {
   if (ImGui::SmallButton(ICON_FA_BAN "  Clear")) console.clear();
   const long long info = count_of(console, log::Level::Info) + count_of(console, log::Level::Debug);
-  filter_button(ICON_FA_CIRCLE_INFO, info, g_filters.info, ImGui::GetStyleColorVec4(ImGuiCol_Text));
-  filter_button(ICON_FA_TRIANGLE_EXCLAMATION, count_of(console, log::Level::Warning), g_filters.warnings,
+  filter_button(ICON_FA_CIRCLE_INFO, info, filters.info, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+  filter_button(ICON_FA_TRIANGLE_EXCLAMATION, count_of(console, log::Level::Warning), filters.warnings,
                 warning_color());
-  filter_button(ICON_FA_CIRCLE_XMARK, count_of(console, log::Level::Error), g_filters.errors, error_color());
+  filter_button(ICON_FA_CIRCLE_XMARK, count_of(console, log::Level::Error), filters.errors, error_color());
 }
 
 void draw_entry(const ConsoleEntry& entry) {
@@ -81,16 +68,16 @@ void draw_entry(const ConsoleEntry& entry) {
 
 }  // namespace
 
-void draw_console(ConsoleLog& console) {
+void draw_console(ConsoleLog& console, ConsoleState& state) {
   ImGui::Begin(editor_config::kConsoleWindow);
-  draw_filters(console);
+  draw_filters(console, state.filters);
   ImGui::Separator();
 
   ImGui::BeginChild(kLogId, ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
   const bool at_bottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY();
   ImGui::PushFont(code_font(), 0.0f);
   for (const ConsoleEntry& entry : console.entries()) {
-    if (g_filters.shows(entry.level)) draw_entry(entry);
+    if (state.filters.shows(entry.level)) draw_entry(entry);
   }
   ImGui::PopFont();
   if (at_bottom) ImGui::SetScrollHereY(kScrollToBottom);

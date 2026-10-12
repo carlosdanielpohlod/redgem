@@ -25,7 +25,7 @@ A game is a folder:
 | `models/*.glb` | Models you can drop into a level |
 | `sounds/` | `.wav`, `.ogg`, `.mp3` or `.flac` files |
 | `images/` | Pictures for menus and the HUD (`.png`, `.jpg`) |
-| `game.json` | Window title and size |
+| `game.json` | The game's id, title and window size |
 
 The editor reads and writes these files directly. There is no project database and no import
 step: what you see in the folder is the game.

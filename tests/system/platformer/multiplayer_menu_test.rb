@@ -13,7 +13,7 @@ SystemTest.define do |t|
     t.click(x + width / 2, y + height / 2)
   end
   t.wait(SETTLE_FRAMES)
-  menu.multiplayer.port = PORT
+  menu.screens[:multiplayer].port = PORT
   t.press(:escape)
   t.wait
   press.call(MULTIPLAYER_BUTTON)
@@ -21,17 +21,17 @@ SystemTest.define do |t|
     menu.screen == :multiplayer && !Network.online? && Network.searching?
   end
 
-  address = menu.multiplayer.address
+  address = menu.screens[:multiplayer].address
   t.type("9pç")
   t.wait
   t.assert("typing goes into the address (P included) and the screen stays") do
-    menu.multiplayer.address == "#{address}9pç" && menu.screen == :multiplayer
+    menu.screens[:multiplayer].address == "#{address}9pç" && menu.screen == :multiplayer
   end
   3.times do
     t.press(:backspace)
     t.wait  # the key comes up before it goes down again
   end
-  t.assert("backspace takes it out again, a whole letter at a time") { menu.multiplayer.address == address }
+  t.assert("backspace takes it out again, a whole letter at a time") { menu.screens[:multiplayer].address == address }
 
   press.call(HOST_BUTTON)
   t.assert("Host a game starts one, and the looking stops") do

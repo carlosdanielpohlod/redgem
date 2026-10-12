@@ -71,3 +71,59 @@ TEST_CASE("saving the settings leaves the Android section of the file as it was"
   CHECK(saved.android.package == "com.studio.coins");
   std::filesystem::remove_all(game.parent_path());
 }
+
+TEST_CASE("a game's id is read from game.json, and a game without one has none") {
+  CHECK(read_game_manifest(game_saying("")).settings.id.empty());
+  CHECK(read_game_manifest(game_saying(R"({"title": "Coins!"})")).settings.id.empty());
+  const GameManifest manifest = read_game_manifest(game_saying(R"({"id": "com.studio.coins"})"));
+  CHECK(manifest.settings.id == "com.studio.coins");
+  CHECK(manifest.id_error.empty());
+  CHECK(read_game_settings(game_saying(R"({"id": "coin-rush-3fa2c1b0"})")).id == "coin-rush-3fa2c1b0");
+}
+
+TEST_CASE("an id is small letters, digits, dots, dashes and underscores, between letters or digits") {
+  for (const char* good : {"a", "coins", "coin-rush", "coin_rush", "com.studio.coins", "3d-maze", "a.b-c_d9"}) {
+    CAPTURE(good);
+    CHECK(valid_game_id(good));
+  }
+  for (const char* bad : {"", "Coins", "coin rush", "../coins", "a/b", "a\\b", ".coins", "coins.", "-coins", "coins_",
+                          "a..b", "coins\n", "c\xc3\xa7"}) {
+    CAPTURE(bad);
+    CHECK_FALSE(valid_game_id(bad));
+  }
+  CHECK(valid_game_id(std::string(kMaxGameIdLength, 'a')));
+  CHECK_FALSE(valid_game_id(std::string(kMaxGameIdLength + 1, 'a')));
+}
+
+TEST_CASE("an id that cannot be used is said, and the game has none: the rest of its settings stand") {
+  for (const char* json : {R"({"title": "Coins!", "id": "Coin Rush"})", R"({"title": "Coins!", "id": 7})",
+                           R"({"title": "Coins!", "id": "../../other"})"}) {
+    CAPTURE(json);
+    const GameManifest manifest = read_game_manifest(game_saying(json));
+    CHECK(manifest.id_error.find("game.json: id must look like com.mystudio.mygame or my-game") == 0);
+    CHECK(manifest.settings.id.empty());
+    CHECK(manifest.settings.title == "Coins!");
+    CHECK(manifest.android_error.empty());
+  }
+}
+
+TEST_CASE("saving the settings keeps the game's id, and writes one given to a game that had none") {
+  const std::filesystem::path game = game_saying(R"({"id": "com.studio.coins", "title": "Coins!"})");
+  GameSettings settings = read_game_settings(game);
+  settings.title = "Renamed";
+  std::string error;
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  CHECK(read_game_settings(game).id == "com.studio.coins");
+  CHECK(read_game_settings(game).title == "Renamed");
+  // Settings that carry no id leave the file's alone.
+  settings.id.clear();
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  CHECK(read_game_settings(game).id == "com.studio.coins");
+
+  const std::filesystem::path plain = game_saying(R"({"title": "Coins!"})");
+  settings = read_game_settings(plain);
+  settings.id = "coins-3fa2c1b0";
+  REQUIRE_MESSAGE(write_game_settings(plain, settings, error), error);
+  CHECK(read_game_settings(plain).id == "coins-3fa2c1b0");
+  std::filesystem::remove_all(plain.parent_path());
+}

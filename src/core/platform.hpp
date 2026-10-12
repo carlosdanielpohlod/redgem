@@ -34,6 +34,11 @@ std::string open_command(const std::filesystem::path& path);
 // and warnings on its error stream), or the system's own log where programs have no terminal (a
 // phone: adb logcat). What log:: writes to until someone installs a sink of their own.
 void write_log(log::Level level, const std::string& message);
+// A message as write_log shows it. What a message says may come from a game's scripts and files,
+// which are not trusted: its control characters (a terminal's escapes) become '?', and the lines
+// after its first are set in from the margin, so that nothing inside a message drives the
+// terminal or reads as a message of the engine's own.
+std::string log_text(const std::string& message);
 
 // Whether this program runs on Windows: what it builds games for by default, and how files are named.
 bool is_windows();

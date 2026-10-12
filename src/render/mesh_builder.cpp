@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 #include <unordered_map>
 
 #include "render/render_config.hpp"
@@ -182,6 +183,15 @@ std::vector<PrimitiveDesc> split_primitive(const PrimitiveDesc& primitive, std::
     splitter.add_triangle(first);
   }
   return splitter.finish();
+}
+
+std::vector<PrimitiveDesc> mesh_pieces(const MeshDesc& mesh, std::size_t max_vertices) {
+  std::vector<PrimitiveDesc> pieces;
+  for (const PrimitiveDesc& primitive : mesh.primitives) {
+    std::vector<PrimitiveDesc> split = split_primitive(primitive, max_vertices);
+    pieces.insert(pieces.end(), std::make_move_iterator(split.begin()), std::make_move_iterator(split.end()));
+  }
+  return pieces;
 }
 
 void free_cpu_mesh(Mesh& mesh) {

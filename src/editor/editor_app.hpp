@@ -110,6 +110,9 @@ class EditorApp {
     bool bottom = true;     // Project and Console (Ctrl+J)
   };
   PanelVisibility& panels() { return panels_; }
+  // What the panels remember between frames (searches, half-typed names, the console's filters):
+  // this editor's own, new with every game opened.
+  ui::PanelState& panel_state() { return panel_state_; }
   // The terrain brush (what the Inspector's Terrain card edits).
   ui::TerrainTool& terrain_tool() { return terrain_tool_; }
   // One step of a brush stroke on the selected terrain where a ray of the Scene view meets it
@@ -240,6 +243,7 @@ class EditorApp {
   std::unique_ptr<EditorSession> session_;
   std::unique_ptr<ScriptWorkspace> scripts_;
   PanelVisibility panels_;
+  ui::PanelState panel_state_;
   ui::TerrainTool terrain_tool_;
   bool stroke_started_ = false;               // a brush stroke is in progress (one undo step)
   std::optional<Vec3> brush_point_;           // where the brush is on the ground this frame, if it is over it

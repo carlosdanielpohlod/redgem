@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "editor/editor_logic.hpp"
+
 namespace redgem {
 namespace {
 
@@ -18,6 +20,13 @@ constexpr Vec3 kStartPosition{0.0f, 8.0f, 14.0f};
 constexpr Vec3 kStartTarget{0.0f, 0.0f, 0.0f};
 
 }  // namespace
+
+void steer(FlyInput& input, const FlyKeys& keys) {
+  input.forward = editor_logic::fly_axis(keys.back, keys.forward);
+  input.right = editor_logic::fly_axis(keys.left, keys.right);
+  input.up = editor_logic::fly_axis(keys.down, keys.up);
+  input.fast = keys.left_shift || keys.right_shift;
+}
 
 EditorCamera::EditorCamera() { look_at(kStartPosition, kStartTarget); }
 

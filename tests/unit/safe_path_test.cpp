@@ -108,4 +108,10 @@ TEST_CASE("text from a file is shown without control characters, other letters u
   CHECK(printable("Crate") == "Crate");
   CHECK(printable("caf\xc3\xa9") == "caf\xc3\xa9");
   CHECK(printable("a\nb\tc\x1b[31m\x7f") == "a?b?c?[31m?");
+  // The control characters past the letters, which some terminals obey like escapes.
+  CHECK(printable("a\xc2\x9b"
+                  "31m") == "a??31m");
+  CHECK(printable("\xc2\xa9 \xc2") == "\xc2\xa9 \xc2");  // (c) is a letter; half a letter is left alone
+  // A message of several lines keeps its lines and tabs, and nothing else of the kind.
+  CHECK(printable_lines("a\nb\tc\x1b[31m\r\x7f\xc2\x85") == "a\nb\tc?[31m????");
 }

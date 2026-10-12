@@ -12,7 +12,8 @@ namespace {
 
 using namespace editor_config;
 
-ImFont* g_code_font = nullptr;
+// The fonts, in the order load_fonts adds them to the interface's own list.
+constexpr int kCodeFontSlot = 1;  // after the interface's font, which is the default
 
 // Icons are a bit smaller than the text and nudged down to sit on its baseline.
 constexpr float kIconScale = 0.9f;
@@ -77,13 +78,11 @@ void merge_icons(float size) {
                                                        size * kIconScale, &icons, kIconRanges);
 }
 
-ImFont* add_font(const EmbeddedFile& font, float size) {
+void add_font(const EmbeddedFile& font, float size) {
   ImFontConfig config;
   config.FontDataOwnedByAtlas = false;  // the data lives in the binary
-  ImFont* added =
-      ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(font.data), font.size, size, &config);
+  ImGui::GetIO().Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(font.data), font.size, size, &config);
   merge_icons(size);
-  return added;
 }
 
 // Which color of the palette each part of the interface gets.
@@ -187,10 +186,10 @@ void apply_borders(ImGuiStyle& style) {
 
 void load_fonts() {
   add_font(embedded_ui_font(), kInterfaceFontSize);  // the first font is the default
-  g_code_font = add_font(fonts::code_font(), kCodeFontSize);
+  add_font(fonts::code_font(), kCodeFontSize);       // kCodeFontSlot
 }
 
-ImFont* code_font() { return g_code_font; }
+ImFont* code_font() { return ImGui::GetIO().Fonts->Fonts[kCodeFontSlot]; }
 
 void apply_theme() {
   ImGuiStyle& style = ImGui::GetStyle();

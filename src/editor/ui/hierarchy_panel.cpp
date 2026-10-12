@@ -14,9 +14,6 @@ namespace {
 
 using namespace editor_config;
 
-// State kept between frames. Reset when another game is opened (see reset_hierarchy_state).
-std::string g_filter;
-
 constexpr float kRootDropMinHeight = 40.0f;  // pixels: the empty space below the tree is never smaller
 constexpr float kRootDropMinWidth = 1.0f;    // ImGui refuses zero-sized buttons
 constexpr const char* kCreatePopup = "create";
@@ -198,7 +195,7 @@ void draw_search_bar(PanelContext& context) {
   popup(kCreatePopup, [&context] { draw_create_menu(context); });
   ImGui::SameLine();
   ImGui::SetNextItemWidth(kFillWidth);
-  ImGui::InputTextWithHint(kSearchId, ICON_FA_MAGNIFYING_GLASS "  Search", &g_filter);
+  ImGui::InputTextWithHint(kSearchId, ICON_FA_MAGNIFYING_GLASS "  Search", &context.state.hierarchy.filter);
 }
 
 // The whole tree, or a flat list of the objects whose name matches the search.
@@ -222,10 +219,11 @@ void draw_matches(PanelContext& context, const std::string& wanted, HierarchyRes
 
 // The whole tree, or a flat list of the objects whose name matches the search.
 void draw_objects(PanelContext& context, HierarchyResult& result, Pending& pending) {
-  if (g_filter.empty()) {
+  const std::string& filter = context.state.hierarchy.filter;
+  if (filter.empty()) {
     draw_whole_tree(context, result, pending);
   } else {
-    draw_matches(context, editor_logic::lowercase(g_filter), result, pending);
+    draw_matches(context, editor_logic::lowercase(filter), result, pending);
   }
 }
 
@@ -258,7 +256,5 @@ HierarchyResult draw_hierarchy(PanelContext& context) {
   apply(context, pending);
   return result;
 }
-
-void reset_hierarchy_state() { g_filter.clear(); }
 
 }  // namespace redgem::ui

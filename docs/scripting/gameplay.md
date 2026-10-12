@@ -194,9 +194,31 @@ The usual flow of a game is made of three things:
 - **Other screens and levels:** `Game.load_scene("level2")` to move on, and
   `Game.load_scene(Game.scene_name)` to restart the current one.
 
-The Platformer template ships all of this in `scripts/game_menu.rb`: a title screen, a pause
-menu on Esc or P, and an end screen. Copy it into your game and call
-`GameMenu.instance.finish("You win!")` when the game ends.
+`GameMenu` is all of this, ready made: a title screen, a pause menu on Esc, P or a gamepad's
+Start, and an end screen. Put it on an object from the scene's script, and end the game from
+anywhere:
+
+```ruby
+class MainScene < SceneScript
+  def setup
+    Camera.main.add_component(GameMenu)   # title: "...", start_open: false
+  end
+end
+
+GameMenu.instance.finish("You win!")
+```
+
+Its screens are `:title`, `:pause` and `:over`. A game adds options and screens of its own:
+
+```ruby
+menu = GameMenu.instance
+menu.screens[:credits] = GameMenu::Screen.new(heading: "Made by Ana", back: -> { menu.show(:pause) })
+menu.screens[:pause].add_option("Credits", index: 1) { menu.show(:credits) }
+```
+
+`back` is what the pause keys do on that screen. A screen that draws more than buttons is a
+subclass of `GameMenu::Screen` (`draw`, `space_above`, `opened`, `closed`, `typing?`): the
+platformer's multiplayer screen, `games/platformer/scripts/multiplayer_screen.rb`, is one.
 
 ## Play sounds and music
 
@@ -328,9 +350,11 @@ Save.clear                            # start from nothing
 Whole numbers come back as integers (a saved `12.0` is read as `12`): call `.to_f` on a value you
 divide.
 
-The file is written on every change, to `.config/redgem/saves/<game>-<digits>.json` in the player's
-home folder. The digits come from where the game's folder is, so two games in folders of the same
-name keep their own saves. Tests get a save file of their own, empty at the start of each test.
+The file is written on every change, to `.config/redgem/saves/by-id/<id>.json` in the player's
+home folder, where `<id>` is the game's `id` from its `game.json`: the save stays with the game
+when its folder is moved or renamed. A game with no `id` saves to
+`.config/redgem/saves/<folder>-<digits>.json`, with digits made from where its folder is. Tests
+get a save file of their own, empty at the start of each test.
 
 ## Keep score across objects
 

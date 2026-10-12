@@ -40,7 +40,8 @@ constexpr const char* kUsageText =
 
 // A command line being read: what was understood so far, and how far the reading got.
 struct Reading {
-  // cppcheck-suppress uninitMemberVarNoCtor ; a reference: whoever makes one has to give it
+  explicit Reading(const std::vector<std::string>& line) : args(line) {}
+
   const std::vector<std::string>& args;
   std::size_t next = 0;  // the argument to read next
   TestCliResult result;
@@ -168,7 +169,7 @@ std::string problem_with(const TestCliOptions& options) {
 std::string test_usage() { return kUsageText; }
 
 TestCliResult parse_test_cli(const std::vector<std::string>& args) {
-  Reading reading{args};
+  Reading reading(args);
   reading.result.options.screenshot_dir = config::kDefaultScreenshotDir;
   while (!reading.done && reading.next < args.size()) read_argument(reading);
   if (reading.done) return reading.result;

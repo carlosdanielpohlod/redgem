@@ -114,6 +114,7 @@ class EditorSession {
   ObjectId selection_ = kNoObject;
   PlayState play_state_ = PlayState::Editing;
   std::unique_ptr<Engine> runtime_;
+  AudioSystem* game_audio_ = nullptr;  // what the running game sounds through, when it has something
   std::filesystem::file_time_type loaded_write_time_{};
   bool external_change_pending_ = false;
 };

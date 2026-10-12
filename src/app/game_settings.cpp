@@ -16,6 +16,7 @@ namespace redgem {
 namespace {
 
 // What game.json says.
+constexpr const char* kIdKey = "id";
 constexpr const char* kTitleKey = "title";
 constexpr const char* kWindowWidthKey = "window_width";
 constexpr const char* kWindowHeightKey = "window_height";
@@ -30,6 +31,8 @@ constexpr const char* kKeyAliasKey = "key_alias";
 constexpr char kPackageSeparator = '.';
 constexpr char kPackageJoiner = '_';
 constexpr std::size_t kMaxPackageLength = 150;
+constexpr std::string_view kIdMarks = ".-_";  // what an id may hold besides small letters and digits
+constexpr std::string_view kTwoSeparators = "..";
 
 // What a JSON file holds; a discarded value (no object, no array) when it is missing or broken.
 nlohmann::json read_json(const std::filesystem::path& file) {
@@ -48,24 +51,26 @@ int window_size(const nlohmann::json& json, const char* key, int fallback) {
 
 bool small_letter_or_digit(unsigned char letter) { return std::islower(letter) != 0 || std::isdigit(letter) != 0; }
 
+bool id_letter(unsigned char letter) {
+  return small_letter_or_digit(letter) || kIdMarks.find(static_cast<char>(letter)) != std::string_view::npos;
+}
+
+// The game's id, when the file has one that can be used; what is wrong with it otherwise.
+std::string read_id(const nlohmann::json& json, std::string& id) {
+  if (!json.contains(kIdKey)) return {};
+  if (json[kIdKey].is_string() && valid_game_id(json[kIdKey].get<std::string>())) {
+    id = json[kIdKey].get<std::string>();
+    return {};
+  }
+  return std::string(kGameSettingsFile) +
+         ": id must look like com.mystudio.mygame or my-game (small letters, digits, '.', '-' and '_')";
+}
+
 // A part of an app's id: a small letter followed by small letters, digits or underscores.
 bool valid_package_part(std::string_view part) {
   if (part.empty() || std::islower(static_cast<unsigned char>(part.front())) == 0) return false;
   return std::all_of(part.begin() + 1, part.end(),
                      [](unsigned char letter) { return small_letter_or_digit(letter) || letter == kPackageJoiner; });
-}
-
-// An app's id is at least two parts joined by dots, each a small letter followed by small
-// letters, digits or underscores ("com.mystudio.my_game").
-bool valid_package(const std::string& package) {
-  if (package.size() > kMaxPackageLength || package.find(kPackageSeparator) == std::string::npos) return false;
-  std::string_view rest = package;
-  for (std::size_t dot = rest.find(kPackageSeparator); dot != std::string_view::npos;
-       dot = rest.find(kPackageSeparator)) {
-    if (!valid_package_part(rest.substr(0, dot))) return false;
-    rest.remove_prefix(dot + 1);
-  }
-  return valid_package_part(rest);
 }
 
 std::string settings_place() { return std::string(kGameSettingsFile) + ": android."; }
@@ -110,7 +115,7 @@ bool read_section(const nlohmann::json& section, AndroidSettings& settings, std:
 
 // Whether what was read can be used together.
 bool check_settings(const AndroidSettings& settings, std::string& error) {
-  if (!settings.package.empty() && !valid_package(settings.package)) {
+  if (!settings.package.empty() && !valid_android_package(settings.package)) {
     error = settings_place() +
             "package must look like com.mystudio.mygame (small letters, digits and _, parts joined by dots)";
     return false;
@@ -148,16 +153,37 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   const nlohmann::json json = read_json(game_dir / kGameSettingsFile);
   if (!json.is_object()) return manifest;
   read_window(json, manifest.settings);
+  manifest.id_error = read_id(json, manifest.settings.id);
   manifest.android_error = read_android(json, manifest.settings.android);
   return manifest;
+}
+
+bool valid_android_package(const std::string& package) {
+  if (package.size() > kMaxPackageLength || package.find(kPackageSeparator) == std::string::npos) return false;
+  std::string_view rest = package;
+  for (std::size_t dot = rest.find(kPackageSeparator); dot != std::string_view::npos;
+       dot = rest.find(kPackageSeparator)) {
+    if (!valid_package_part(rest.substr(0, dot))) return false;
+    rest.remove_prefix(dot + 1);
+  }
+  return valid_package_part(rest);
+}
+
+bool valid_game_id(const std::string& id) {
+  if (id.empty() || id.size() > kMaxGameIdLength || id.find(kTwoSeparators) != std::string::npos) return false;
+  const auto first = static_cast<unsigned char>(id.front());
+  const auto last = static_cast<unsigned char>(id.back());
+  return small_letter_or_digit(first) && small_letter_or_digit(last) && std::all_of(id.begin(), id.end(), id_letter);
 }
 
 GameSettings read_game_settings(const std::filesystem::path& game_dir) { return read_game_manifest(game_dir).settings; }
 
 bool write_game_settings(const std::filesystem::path& game_dir, const GameSettings& settings, std::string& error) {
-  // What else the file holds (its "android" section...) stays as it is.
+  // What else the file holds (its "android" section, an id these settings have none for...) stays
+  // as it is.
   nlohmann::json json = read_json(game_dir / kGameSettingsFile);
   if (!json.is_object()) json = nlohmann::json::object();
+  if (!settings.id.empty()) json[kIdKey] = settings.id;
   json[kTitleKey] = settings.title;
   json[kWindowWidthKey] = settings.window_width;
   json[kWindowHeightKey] = settings.window_height;

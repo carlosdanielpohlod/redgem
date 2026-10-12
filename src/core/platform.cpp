@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "core/log.hpp"
+#include "core/safe_path.hpp"
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -35,6 +36,9 @@ constexpr const char* kLogTag = "redgem";  // what the system's log files the en
 #else
 constexpr const char* kLogPrefix = "[redgem] ";
 #endif
+constexpr char kLineBreak = '\n';
+// What the lines of a message after its first start with: only a message starts with the mark.
+constexpr const char* kContinuation = "\n  ";
 
 #ifdef _WIN32
 constexpr bool kWindows = true;
@@ -109,6 +113,18 @@ std::string open_command(const std::filesystem::path& path) {
 #endif
 }
 
+std::string log_text(const std::string& message) {
+  std::string text;
+  for (const char c : printable_lines(message)) {
+    if (c == kLineBreak) {
+      text += kContinuation;
+    } else {
+      text.push_back(c);
+    }
+  }
+  return text;
+}
+
 #ifdef __ANDROID__
 // An Android app has no terminal: its messages go to the system's log (adb logcat).
 void write_log(log::Level level, const std::string& message) {
@@ -116,12 +132,12 @@ void write_log(log::Level level, const std::string& message) {
                        : level == log::Level::Warning ? ANDROID_LOG_WARN
                        : level == log::Level::Info    ? ANDROID_LOG_INFO
                                                       : ANDROID_LOG_DEBUG;
-  __android_log_write(priority, kLogTag, message.c_str());
+  __android_log_write(priority, kLogTag, log_text(message).c_str());
 }
 #else
 void write_log(log::Level level, const std::string& message) {
   std::ostream& out = (level == log::Level::Error || level == log::Level::Warning) ? std::cerr : std::cout;
-  out << kLogPrefix << log::level_name(level) << ": " << message << '\n' << std::flush;
+  out << kLogPrefix << log::level_name(level) << ": " << log_text(message) << kLineBreak << std::flush;
 }
 #endif
 

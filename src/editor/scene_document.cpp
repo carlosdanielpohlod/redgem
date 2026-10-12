@@ -12,6 +12,7 @@
 
 #include "scene/scene_config.hpp"
 #include "core/log.hpp"
+#include "editor/glb_compact.hpp"
 #include "editor/gltf_json.hpp"
 #include "editor/model_import.hpp"
 #include "render/gpu_profile.hpp"
@@ -1084,7 +1085,10 @@ bool SceneDocument::save_file(const std::filesystem::path& path, std::string& er
   for (const int mesh : unsaved_meshes_) {
     if (!store_mesh_vertices(mesh, error)) return false;
   }
-  if (!write_glb(path, glb_, error)) return false;
+  // What nothing uses any more (a deleted object's mesh, an import that was undone) stays out of
+  // the file. It stays in the document: undo and redo can bring back what used it.
+  const std::optional<GlbFile> lean = without_unused(glb_);
+  if (!write_glb(path, lean ? *lean : glb_, error)) return false;
   unsaved_meshes_.clear();
   path_ = path;
   saved_version_ = version_;

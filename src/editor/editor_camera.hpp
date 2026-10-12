@@ -17,6 +17,20 @@ struct FlyInput {
   float dt = 0.0f;
 };
 
+// The keys the fly camera is steered with, each down or not.
+struct FlyKeys {
+  bool forward = false;  // W
+  bool back = false;     // S
+  bool left = false;     // A
+  bool right = false;    // D
+  bool up = false;       // E
+  bool down = false;     // Q
+  bool left_shift = false;
+  bool right_shift = false;
+};
+// What the keys ask of the camera: where to fly, and fast with either Shift.
+void steer(FlyInput& input, const FlyKeys& keys);
+
 // Fly-through scene camera: hold right mouse to look around and fly with WASD/QE, wheel to dolly.
 class EditorCamera {
  public:

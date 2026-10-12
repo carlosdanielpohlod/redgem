@@ -2,6 +2,7 @@
 
 #include "core/files.hpp"
 #include "project/game_build.hpp"
+#include "project/game_templates.hpp"
 #include "app/user_settings.hpp"
 #include "core/config.hpp"
 
@@ -24,12 +25,16 @@ constexpr const char* kTemplateOption = "--template";
 constexpr const char* kTargetOption = "--target";
 constexpr const char* kGpuOption = "--gpu";
 
-constexpr const char* kUsageText =
+// The usage, around the one line that lists the templates there are.
+constexpr const char* kUsageStart =
     "usage:\n"
     "  redgem                            open the project hub (new / recent games)\n"
     "  redgem <game_dir>                 open the editor\n"
     "  redgem <game_dir> --play          play the game\n"
-    "  redgem new <game_dir> [--template empty|platformer]   create a game\n"
+    "  redgem new <game_dir> [--template ";
+constexpr const char* kTemplateSeparator = "|";
+constexpr const char* kUsageEnd =
+    "]   create a game\n"
     "  redgem build <game_dir> <out_dir> [--target linux|windows|android]   make a standalone game (an executable, or "
     "an .apk)\n"
     "\n"
@@ -41,7 +46,8 @@ constexpr const char* kUsageText =
 
 // A command line being read: what was understood so far, and how far the reading got.
 struct Reading {
-  // cppcheck-suppress uninitMemberVarNoCtor ; a reference: whoever makes one has to give it
+  explicit Reading(const std::vector<std::string>& line) : args(line) {}
+
   const std::vector<std::string>& args;
   std::size_t next = 0;  // the argument to read next
   CliResult result;
@@ -183,8 +189,8 @@ std::string problem_with(const Reading& reading) {
 }  // namespace
 
 std::string usage() {
-  return std::string(kUsageText) + "  <game_dir> holds " + config::kSceneFileName + " (exported from Blender) and a " +
-         config::kScriptsDirName + "/ folder.\n";
+  return kUsageStart + template_names(kTemplateSeparator) + kUsageEnd + "  <game_dir> holds " + config::kSceneFileName +
+         " (exported from Blender) and a " + config::kScriptsDirName + "/ folder.\n";
 }
 
 GameWindowOptions developer_play_options(const CliOptions& options, GpuChoice gpu) {
@@ -196,7 +202,7 @@ GameWindowOptions developer_play_options(const CliOptions& options, GpuChoice gp
 }
 
 CliResult parse_cli(const std::vector<std::string>& args) {
-  Reading reading{args};
+  Reading reading(args);
   read_command(reading);
   while (!reading.done && reading.next < args.size()) read_argument(reading);
   if (reading.done) return reading.result;

@@ -262,6 +262,38 @@ TEST_CASE("leaving with unsaved edits asks first") {
   std::filesystem::remove_all(game);
 }
 
+TEST_CASE("another game opens with panels that remember nothing of the last one") {
+  const std::filesystem::path game = copy_game();
+  {
+    auto created = EditorApp::create(game, editor_options(GpuChoice::Auto));
+    if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+    EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
+    run(app, kWarmupFrames);
+    // What a user leaves behind: errors hidden in the Console, a search in the Hierarchy, the
+    // Project panel on another folder, a name half typed.
+    ui::PanelState& state = app.panel_state();
+    state.console.filters.errors = false;
+    state.console.filters.info = false;
+    state.hierarchy.filter = "Coin";
+    state.project.folder = ui::ProjectFolder::Sounds;
+    state.inspector.new_property_key = "spe";
+    run(app, kFrameFrames);
+    CHECK_FALSE(app.panel_state().console.filters.shows(log::Level::Error));
+  }
+  auto created = EditorApp::create(game, editor_options(GpuChoice::Auto));
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  run(app, kWarmupFrames);
+  const ui::PanelState& state = app.panel_state();
+  for (const log::Level level : {log::Level::Info, log::Level::Warning, log::Level::Error}) {
+    CHECK(state.console.filters.shows(level));
+  }
+  CHECK(state.hierarchy.filter.empty());
+  CHECK(state.project.folder == ui::ProjectFolder::Scripts);
+  CHECK(state.inspector.new_property_key.empty());
+  std::filesystem::remove_all(game);
+}
+
 TEST_CASE("the project hub creates a game from a template and lists it next time") {
   const std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem_hub";
   std::filesystem::remove_all(root);

@@ -5,6 +5,7 @@
 #include <raylib.h>
 
 #include <algorithm>
+#include <iterator>
 
 #include "app/game_settings.hpp"
 #include "core/files.hpp"
@@ -23,8 +24,7 @@ namespace {
 
 using namespace editor_config;
 
-constexpr const char* kDefaultTemplate = "platformer";
-constexpr const char* kEmptyTemplate = "empty";
+constexpr const char* kSuggestedTemplate = "platformer";  // the one chosen when the hub opens
 constexpr const char* kDefaultGameName = "My Game";
 constexpr float kTemplateCardHeight = 58.0f;  // pixels
 constexpr float kOpenButtonWidth = 90.0f;     // pixels
@@ -41,8 +41,17 @@ constexpr const char* kCardId = "##card";
 constexpr const char* kNameId = "##name";
 constexpr const char* kPathId = "##path";
 
+// The icons a template can ask for by name (its template.json); the first stands in for any other.
+struct NamedIcon {
+  const char* name;
+  const char* icon;
+};
+constexpr NamedIcon kTemplateIcons[] = {{"cube", ICON_FA_CUBE}, {"person-running", ICON_FA_PERSON_RUNNING}};
+
 const char* template_icon(const std::string& name) {
-  return name == kEmptyTemplate ? ICON_FA_CUBE : ICON_FA_PERSON_RUNNING;
+  const auto* found = std::find_if(std::begin(kTemplateIcons), std::end(kTemplateIcons),
+                                   [&name](const NamedIcon& known) { return name == known.name; });
+  return found != std::end(kTemplateIcons) ? found->icon : std::begin(kTemplateIcons)->icon;
 }
 
 std::string pretty_path(const std::filesystem::path& path) {
@@ -123,7 +132,7 @@ ProjectHub::ProjectHub(Options options)
       window_(hub_window(options_.gpu)),
       interface_(window_, ui::Interface::Layout::Fixed),
       new_name_(kDefaultGameName),
-      template_(kDefaultTemplate) {
+      template_(kSuggestedTemplate) {
   refresh_games();
 }
 
@@ -228,11 +237,10 @@ void ProjectHub::draw_new_game(float width) {
 // What a new game starts from: one card per template, the chosen one selected.
 void ProjectHub::draw_templates() {
   ImGui::TextColored(ui::muted_color(), "Start from");
-  for (const std::string& name : game_templates()) {
-    const std::string title = editor_logic::capitalized(name);
-    const std::string description = template_description(name);
-    const CardLabel label{name.c_str(), template_icon(name), title, description};
-    if (card(label, template_ == name, kTemplateCardHeight)) template_ = name;
+  for (const GameTemplate& known : game_templates()) {
+    const std::string title = editor_logic::capitalized(known.name);
+    const CardLabel label{known.name.c_str(), template_icon(known.icon), title, known.description};
+    if (card(label, template_ == known.name, kTemplateCardHeight)) template_ = known.name;
   }
 }
 

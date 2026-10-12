@@ -46,6 +46,36 @@ TEST_CASE("fly camera moves along its own axes") {
   CHECK(approx_equal(camera.forward(), Vec3::right(), kTolerance));
 }
 
+TEST_CASE("either Shift makes the fly camera fast, and its keys steer it") {
+  const auto steered = [](const FlyKeys& keys) {
+    FlyInput input;
+    steer(input, keys);
+    return input;
+  };
+  FlyKeys keys;
+  CHECK_FALSE(steered(keys).fast);
+  keys.left_shift = true;
+  CHECK(steered(keys).fast);
+  keys.left_shift = false;
+  keys.right_shift = true;
+  CHECK(steered(keys).fast);
+  keys.forward = keys.right = keys.down = true;
+  const FlyInput input = steered(keys);
+  CHECK(input.forward == kFullInput);
+  CHECK(input.right == kFullInput);
+  CHECK(input.up == -kFullInput);
+  // Fast covers more ground in the same time.
+  EditorCamera slow;
+  EditorCamera fast;
+  FlyInput walk;
+  walk.forward = kFullInput;
+  walk.dt = kOneSecond;
+  slow.update(walk);
+  walk.fast = true;
+  fast.update(walk);
+  CHECK(length(fast.position() - EditorCamera().position()) > length(slow.position() - EditorCamera().position()));
+}
+
 TEST_CASE("framing keeps the target in the center of the view") {
   EditorCamera camera;
   camera.frame(kTarget, kFrameRadius);

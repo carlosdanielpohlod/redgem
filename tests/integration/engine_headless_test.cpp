@@ -3,8 +3,12 @@
 #include <mruby.h>
 #include <mruby/string.h>
 
+#include <filesystem>
+#include <fstream>
+
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "core/exit_codes.hpp"
 #include "app/window_presenter.hpp"
 #include "testing/recording_audio.hpp"
 #include "test_support.hpp"
@@ -311,6 +315,49 @@ TEST_CASE("objects spawned from inside update start on the next frame") {
   CHECK(ruby(*engine, "Scene.find_all(:bullet).size") == std::to_string(kSpawnFrames));
   CHECK(ruby(*engine, "$bullet_starts") == std::to_string(kSpawnFrames));
   CHECK(engine->scripts().error_count() == kExpectedScriptErrors);
+}
+
+TEST_CASE("a game whose scene cannot be read says so before any window is opened") {
+  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_engine_broken_scene";
+  std::filesystem::remove_all(game);
+  std::filesystem::create_directories(game);
+  std::ofstream(game / config::kSceneFileName) << "this is no scene";
+  CHECK(std::holds_alternative<std::string>(read_game_scene(game)));
+  CHECK(std::holds_alternative<SceneDesc>(read_game_scene(fixture("games/sandbox"))));
+  test::LogCapture log;
+  GameWindowOptions options;
+  options.game_dir = game;
+  CHECK(play_in_window(options) == kExitFailure);
+  CHECK(log.count(log::Level::Error) == 1);
+  CHECK(log.contains(config::kSceneFileName));
+  // A window says which graphics card it opened on: none did.
+  CHECK_FALSE(log.contains("graphics card"));
+  CHECK(log.count(log::Level::Info) == 0);
+  ScriptedInputSource input;
+  CHECK(play_in_window(options, input) == kExitFailure);  // the same for a screen with devices of its own
+  CHECK_FALSE(log.contains("graphics card"));
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("a game whose id cannot be used still plays, and is told") {
+  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_engine_bad_id";
+  std::filesystem::remove_all(game);
+  std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
+  std::ofstream(game / kGameSettingsFile) << R"({"id": "Not An Id"})";
+  test::LogCapture log;
+  EngineOptions options;
+  options.game_dir = game;
+  options.fixed_step = true;
+  auto created = Engine::create(options);
+  REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
+  CHECK(log.contains("game.json: id must look like"));
+  CHECK(log.contains("the game's save goes by where its folder is"));
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("Game.title is what the game is called: its folder's name unless game.json says another") {
+  auto engine = sandbox();
+  CHECK(ruby(*engine, "Game.title") == "sandbox");
 }
 
 TEST_CASE("Game.load_scene switches scenes at the end of the frame and keeps Ruby globals") {

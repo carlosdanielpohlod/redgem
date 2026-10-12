@@ -5,6 +5,7 @@
 #include <string>
 
 #include "app/bundled_game.hpp"
+#include "app/game_settings.hpp"
 #include "core/files.hpp"
 #include "core/platform.hpp"
 
@@ -12,6 +13,9 @@ namespace redgem {
 namespace {
 
 constexpr const char* kSavesFolder = "saves";
+// The saves of games with an id, apart from those named after folders: no name of one kind can
+// be a name of the other.
+constexpr const char* kSavesByIdFolder = "by-id";
 constexpr const char* kSaveExtension = ".json";
 constexpr char kNameJoiner = '-';
 // A few digits made from where the game is, so that two games in folders of the same name do not
@@ -37,10 +41,13 @@ std::string place_digits(const std::filesystem::path& folder) {
   return digits;
 }
 
-std::filesystem::path saves_folder() { return platform::user_data_dir() / kSavesFolder; }
 }  // namespace
 
+std::filesystem::path saves_folder() { return platform::user_data_dir() / kSavesFolder; }
+
 std::filesystem::path save_file_for(const std::filesystem::path& game_dir) {
+  const std::string id = read_game_settings(game_dir).id;
+  if (!id.empty()) return saves_folder() / kSavesByIdFolder / (id + kSaveExtension);
   const std::filesystem::path named = named_folder(game_dir);
   return saves_folder() / (named.filename().string() + kNameJoiner + place_digits(named) + kSaveExtension);
 }

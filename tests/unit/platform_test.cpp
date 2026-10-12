@@ -59,6 +59,19 @@ TEST_CASE("the platform says what this system is, for what is built and run diff
   CHECK(platform::has_posix_shell() != platform::is_windows());
 }
 
+TEST_CASE("what a game makes the engine say cannot drive the terminal, nor pass for the engine's own messages") {
+  CHECK(platform::log_text("coin collected") == "coin collected");
+  CHECK(platform::log_text("caf\xc3\xa9") == "caf\xc3\xa9");
+  // Escapes that would clear the screen, rename the window or move the cursor are shown, not obeyed.
+  CHECK(platform::log_text("\x1b[2J\x1b]0;title\x07 back\b\r") == "?[2J?]0;title? back??");
+  CHECK(platform::log_text("\xc2\x9b"
+                           "2J") == "??2J");
+  // A script error keeps its backtrace, each line set in: only a message starts at the margin.
+  CHECK(platform::log_text("update: boom\n    from player.rb:3") == "update: boom\n      from player.rb:3");
+  CHECK(platform::log_text("ok\n[redgem] error: all your saves are gone") ==
+        "ok\n  [redgem] error: all your saves are gone");
+}
+
 TEST_CASE("messages nobody takes are shown by the platform, and taken ones are not") {
   int taken = 0;
   log::Sink previous = log::set_sink([&taken](log::Level, const std::string&) { ++taken; });

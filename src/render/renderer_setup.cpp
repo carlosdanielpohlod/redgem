@@ -53,16 +53,16 @@ constexpr std::pair<int, const char*> kKnownUniforms[] = {
     {SHADER_LOC_MAP_OCCLUSION, shaders::kOcclusionMap}, {SHADER_LOC_BONE_MATRICES, shaders::kBoneMatrices},
 };
 
-// One part of a mesh, on the graphics card. A part that cannot be drawn is reported and left out.
-std::optional<GpuPrimitive> upload_primitive(const PrimitiveDesc& primitive, const std::string& mesh_name) {
+// One piece of a mesh, on the graphics card. A piece that cannot be drawn is reported and left out.
+std::optional<GpuPrimitive> upload_piece(const PrimitiveDesc& piece, std::size_t number, const std::string& mesh_name) {
   std::string error;
-  std::optional<Mesh> mesh = build_mesh(primitive, error);
+  std::optional<Mesh> mesh = build_mesh(piece, error);
   if (!mesh) {
     log::warning("mesh '" + mesh_name + "': " + error);
     return std::nullopt;
   }
   UploadMesh(&*mesh, false);
-  return GpuPrimitive{*mesh, primitive.material};
+  return GpuPrimitive{*mesh, piece.material, number};
 }
 
 // An encoded picture, decoded. An empty image (and a warning) for one that is not a PNG or JPEG
@@ -408,10 +408,9 @@ void Renderer::Impl::refresh_material_values(const SceneDesc& desc) {
 // The parts of a mesh, on the graphics card.
 std::vector<GpuPrimitive> Renderer::Impl::upload_mesh(const MeshDesc& mesh_desc) {
   std::vector<GpuPrimitive> primitives;
-  for (const PrimitiveDesc& source : mesh_desc.primitives) {
-    for (const PrimitiveDesc& primitive : split_primitive(source, config::kMaxVerticesPerMesh)) {
-      if (const auto uploaded = upload_primitive(primitive, mesh_desc.name)) primitives.push_back(*uploaded);
-    }
+  const std::vector<PrimitiveDesc> pieces = mesh_pieces(mesh_desc, config::kMaxVerticesPerMesh);
+  for (std::size_t number = 0; number < pieces.size(); ++number) {
+    if (const auto uploaded = upload_piece(pieces[number], number, mesh_desc.name)) primitives.push_back(*uploaded);
   }
   return primitives;
 }

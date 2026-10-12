@@ -7,6 +7,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation.rb
@@ -21,16 +22,17 @@ add_custom_command(
   COMMENT "Embedding the Ruby prelude"
   VERBATIM)
 
-# Starting points for new games (templates/<name>/scripts/*.rb), embedded in the binary.
-file(GLOB_RECURSE REDGEM_TEMPLATE_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/templates/*.rb)
+# Starting points for new games: every file of templates/<name>/ is built into the program as it
+# is. A template is a game folder; the program knows none of its files by name.
+file(GLOB_RECURSE REDGEM_TEMPLATE_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/templates/*)
 # (In a folder of their own, which only the tools' library is given.)
 set(REDGEM_PROJECT_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_project_include)
 set(REDGEM_TEMPLATES_HEADER ${REDGEM_PROJECT_GENERATED_DIR}/generated/templates.hpp)
 add_custom_command(
   OUTPUT ${REDGEM_TEMPLATES_HEADER}
   COMMAND ${CMAKE_COMMAND} -DOUTPUT=${REDGEM_TEMPLATES_HEADER} -DROOT=${CMAKE_SOURCE_DIR}/templates
-          -DNAME=kTemplateFiles "-DSOURCES=${REDGEM_TEMPLATE_SOURCES}" -P ${CMAKE_SOURCE_DIR}/cmake/EmbedFiles.cmake
-  DEPENDS ${REDGEM_TEMPLATE_SOURCES} ${CMAKE_SOURCE_DIR}/cmake/EmbedFiles.cmake
+          -DNAME=template_files "-DSOURCES=${REDGEM_TEMPLATE_SOURCES}" -P ${CMAKE_SOURCE_DIR}/cmake/EmbedFolder.cmake
+  DEPENDS ${REDGEM_TEMPLATE_SOURCES} ${CMAKE_SOURCE_DIR}/cmake/EmbedFolder.cmake
   COMMENT "Embedding game templates"
   VERBATIM)
 
@@ -170,11 +172,13 @@ endif()
 if(NOT ANDROID)
   redgem_add_library(redgem_editor
     editor/glb_file.cpp
+    editor/glb_compact.cpp
     editor/gltf_json.cpp
     editor/model_import.cpp
     editor/scene_document.cpp
     editor/editor_camera.cpp
     editor/editor_logic.cpp
+    editor/edit_stream.cpp
     editor/picking.cpp
     editor/editor_session.cpp
     editor/console_log.cpp

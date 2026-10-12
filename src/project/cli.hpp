@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "app/window_presenter.hpp"
+#include "project/game_templates.hpp"
 
 namespace redgem {
 
@@ -14,10 +15,10 @@ enum class RunMode { Editor, Game, NewGame, BuildGame, Help };
 struct CliOptions {
   RunMode mode = RunMode::Editor;
   std::filesystem::path game_dir;
-  std::string template_name = "empty";  // RunMode::NewGame
-  std::filesystem::path build_dir;      // RunMode::BuildGame
-  std::string build_target;             // --target linux|windows (empty: the system this runs on)
-  std::optional<std::string> gpu;       // --gpu auto|dedicated|integrated (overrides the saved setting)
+  std::string template_name = kDefaultTemplate;  // RunMode::NewGame
+  std::filesystem::path build_dir;               // RunMode::BuildGame
+  std::string build_target;                      // --target linux|windows (empty: the system this runs on)
+  std::optional<std::string> gpu;                // --gpu auto|dedicated|integrated (overrides the saved setting)
 };
 
 struct CliResult {

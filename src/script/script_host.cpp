@@ -25,6 +25,7 @@ constexpr const char* kUpdateEntry = "__update";  // Behaviour#__update: its tim
 constexpr const char* kNetworkModule = "Network";
 constexpr const char* kNetworkEventEntry = "__event";
 constexpr const char* kSceneResetEntry = "__scene_reset";
+constexpr const char* kRemoveBehavioursEntry = "__remove_behaviours";  // GameObject's, in the prelude
 
 // What Ruby calls each kind of network event.
 struct EventName {
@@ -329,7 +330,9 @@ void ScriptHost::detach(ObjectId object) {
   for (BehaviourSlot& slot : behaviours_) {
     if (slot.object == object) slot.enabled = false;
   }
-  vm_.call(object_value(object), "__remove_behaviours");
+  const RubyResult removed = vm_.call(object_value(object), kRemoveBehavioursEntry);
+  if (removed.ok) return;
+  report_error("taking the behaviours off '" + context_.scene->at(object).name + "'", removed.error);
 }
 
 }  // namespace redgem

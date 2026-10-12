@@ -50,3 +50,15 @@ TEST_CASE("every test starts from no saves at all") {
   CHECK_FALSE(std::filesystem::exists(file));
   CHECK(fresh_test_save_file(game) == file);  // nothing to empty is no error
 }
+
+TEST_CASE("a game with an id is tested with a save of its id's, apart from the saves named after folders") {
+  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem-testing-tests-id" / "a_game";
+  std::filesystem::create_directories(game);
+  std::ofstream(game / "game.json") << R"({"id": "com.studio.coins"})";
+  const std::filesystem::path tested = test_save_file_for(game);
+  CHECK(tested.filename() == "com.studio.coins.json");
+  CHECK(tested.lexically_relative(tested.parent_path().parent_path()) ==
+        save_file_for(game).lexically_relative(saves_folder()));
+  CHECK(tested != save_file_for(game));
+  std::filesystem::remove_all(game.parent_path());
+}

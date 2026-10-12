@@ -40,6 +40,8 @@ inline constexpr int kMaterialMaps[] = {MATERIAL_MAP_ALBEDO, MATERIAL_MAP_EMISSI
 struct GpuPrimitive {
   Mesh mesh{};
   int material = kNoIndex;
+  // Which of the mesh's pieces it is (see mesh_pieces): a piece that cannot be drawn has no part.
+  std::size_t piece = 0;
 };
 
 // One pass over the scene's objects: what it is drawn with, what it can see, and the material

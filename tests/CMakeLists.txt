@@ -24,8 +24,10 @@ add_executable(redgem_tests
   unit/scene_document_test.cpp
   unit/scene_tree_test.cpp
   unit/gltf_json_test.cpp
+  unit/glb_compact_test.cpp
   unit/model_import_test.cpp
   unit/editor_logic_test.cpp
+  unit/edit_stream_test.cpp
   unit/editor_camera_test.cpp
   unit/script_files_test.cpp
   unit/primitives_test.cpp
@@ -72,6 +74,7 @@ target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 add_dependencies(redgem_tests redgem_player redgem)
 target_compile_definitions(redgem_tests PRIVATE
   REDGEM_FIXTURES_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+  REDGEM_TEMPLATES_DIR="${CMAKE_SOURCE_DIR}/templates"
   REDGEM_PLAYER_FILE="$<TARGET_FILE:redgem_player>"
   REDGEM_EDITOR_FILE="$<TARGET_FILE:redgem>")
 target_compile_options(redgem_tests PRIVATE -Wall -Wextra -Wno-unused-parameter)
@@ -171,6 +174,25 @@ foreach(test_file IN LISTS REDGEM_SYSTEM_TESTS)
            COMMAND redgem_test_tool ${CMAKE_SOURCE_DIR}/games/${game} ${test_file}
                    --screenshots ${REDGEM_SCREENSHOT_DIR}/${game})
   set_tests_properties(system.${game}.${test_name} PROPERTIES LABELS system RUN_SERIAL TRUE)
+endforeach()
+
+# The templates: a game is made from each as `redgem new` makes it, and played by the tests of
+# tests/system_templates/<template>/. A template with no test of its own stops the build.
+file(GLOB REDGEM_TEMPLATES CONFIGURE_DEPENDS LIST_DIRECTORIES true ${CMAKE_SOURCE_DIR}/templates/*)
+foreach(template_dir IN LISTS REDGEM_TEMPLATES)
+  get_filename_component(template ${template_dir} NAME)
+  file(GLOB template_tests CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_templates/${template}/*_test.rb)
+  if(NOT template_tests)
+    message(FATAL_ERROR "the template '${template}' has no system test in tests/system_templates/${template}/")
+  endif()
+  foreach(test_file IN LISTS template_tests)
+    get_filename_component(test_name ${test_file} NAME_WE)
+    add_test(NAME system.template.${template}.${test_name}
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/system_templates/run_template.sh $<TARGET_FILE:redgem>
+                     $<TARGET_FILE:redgem_test_tool> ${template} ${test_file}
+                     ${REDGEM_SCREENSHOT_DIR}/template_${template})
+    set_tests_properties(system.template.${template}.${test_name} PROPERTIES LABELS system RUN_SERIAL TRUE)
+  endforeach()
 endforeach()
 
 # Multiplayer: two copies of the game run at once and play together, each driven by its own test.

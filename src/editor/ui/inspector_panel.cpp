@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <map>
 #include <set>
 
 #include "core/log.hpp"
@@ -89,25 +88,11 @@ const std::set<std::string>& reserved_props() {
   return keys;
 }
 
-// Undo for widgets whose edits stream in (drags, sliders, color pickers): one undo step per
-// interaction, taken just before its first change, and dropped if it ends where it started.
-class EditStream {
- public:
-  void before_change(SceneDocument& doc) {
-    if (doc_ == &doc) return;
-    doc.checkpoint();
-    doc_ = &doc;
-  }
-  void end_frame() {
-    if (doc_ == nullptr || ImGui::IsAnyItemActive()) return;
-    doc_->drop_checkpoint_if_unchanged();
-    doc_ = nullptr;
-  }
-
- private:
-  SceneDocument* doc_ = nullptr;  // the document of the interaction in progress
-};
-EditStream g_stream;
+// Call before a held widget (a drag, a slider, a color picker) changes the selected object: the
+// whole interaction is one undo step (see EditStream).
+void streamed_edit(PanelContext& context) {
+  context.state.inspector.edits.before_change(context.session.document(), context.session.selection());
+}
 
 bool is_object(EditorSession& session, int index) { return index >= 0 && index < session.document().node_count(); }
 
@@ -118,23 +103,11 @@ struct TextEdit {
   std::string text;
 };
 
-// What a text field is doing between frames.
-struct TextFieldState {
-  std::string buffer;
-  std::string original;
-  int object = kNoIndex;
-  bool editing = false;
-};
-// State kept between frames. Reset when another game is opened (see reset_inspector_state).
-std::map<ImGuiID, TextFieldState> g_text_fields;
-std::string g_new_script_name;
-std::string g_new_property_key;
-int g_new_property_type = kNumberType;
-
 // Commits a text field when the user leaves it. Each field keeps its own buffer, so moving from one
 // field to another never loses typing; clicking another object commits to the one being edited.
-std::optional<TextEdit> text_field(const char* id, int object, const std::string& current, const char* hint = "") {
-  TextFieldState& field = g_text_fields[ImGui::GetID(id)];
+std::optional<TextEdit> text_field(InspectorState& state, const char* id, int object, const std::string& current,
+                                   const char* hint = "") {
+  TextFieldState& field = state.text_fields[ImGui::GetID(id)];
   if (!field.editing) field = {current, current, object, false};  // follow the document while idle
   ImGui::InputTextWithHint(id, hint, &field.buffer);
   if (ImGui::IsItemActive()) {
@@ -228,24 +201,25 @@ const char* object_icon(const NodeDesc& node) {
 // --- Header ------------------------------------------------------------------------------------
 
 // The object's icon and its name. A name already taken gets a number; an empty one is refused.
-void draw_name_field(EditorSession& session, int index) {
-  const NodeDesc& node = session.document().node(index);
+void draw_name_field(PanelContext& context, int index) {
+  const NodeDesc& node = context.session.document().node(index);
   ImGui::AlignTextToFramePadding();
   ImGui::TextColored(accent_color(), "%s", object_icon(node));
   ImGui::SameLine();
   ImGui::SetNextItemWidth(kFillWidth);
-  const auto name = text_field(kNameId, index, node.name);
-  if (!name || !is_object(session, name->object)) return;
-  if (!name->text.empty()) session.document().set_name(name->object, session.document().unique_name(name->text));
-  session.refresh_preview();
+  const auto name = text_field(context.state.inspector, kNameId, index, node.name);
+  if (!name || !is_object(context.session, name->object)) return;
+  if (!name->text.empty())
+    context.session.document().set_name(name->object, context.session.document().unique_name(name->text));
+  context.session.refresh_preview();
 }
 
-void draw_tag_field(EditorSession& session, int index) {
-  const std::string current = get_string(session.document().node(index).props, props::kTag).value_or("");
+void draw_tag_field(PanelContext& context, int index) {
+  const std::string current = get_string(context.session.document().node(index).props, props::kTag).value_or("");
   property_label("Tag");
-  const auto tag = text_field(kTagId, index, current, "untagged");
-  if (!tag || !is_object(session, tag->object)) return;
-  set_or_remove(session, tag->object, props::kTag, text_or_nothing(tag->text));
+  const auto tag = text_field(context.state.inspector, kTagId, index, current, "untagged");
+  if (!tag || !is_object(context.session, tag->object)) return;
+  set_or_remove(context.session, tag->object, props::kTag, text_or_nothing(tag->text));
 }
 
 // Visible and Template, side by side.
@@ -263,10 +237,10 @@ void draw_flags(EditorSession& session, int index) {
   tooltip("Templates are hidden in the game and copied with Scene.spawn(\"Name\", position: ...).");
 }
 
-void draw_header(EditorSession& session, int index) {
-  draw_name_field(session, index);
-  draw_tag_field(session, index);
-  draw_flags(session, index);
+void draw_header(PanelContext& context, int index) {
+  draw_name_field(context, index);
+  draw_tag_field(context, index);
+  draw_flags(context.session, index);
 }
 
 // --- Transform ---------------------------------------------------------------------------------
@@ -286,17 +260,17 @@ bool drag_scale(Vec3& scale) {
   return true;
 }
 
-void draw_transform(EditorSession& session, int index) {
+void draw_transform(PanelContext& context, int index) {
   if (!component_header(ICON_FA_UP_DOWN_LEFT_RIGHT, "Transform")) return;
-  SceneDocument& doc = session.document();
+  SceneDocument& doc = context.session.document();
   Transform local = doc.node(index).local;
   const bool moved = drag_vec3("Position", kPositionId, local.position, kDragSpeedPosition);
   const bool rotated = drag_rotation(local.rotation);
   const bool scaled = drag_scale(local.scale);
   if (!moved && !rotated && !scaled) return;
-  g_stream.before_change(doc);
+  streamed_edit(context);
   doc.set_local(index, local, false);
-  session.refresh_preview();
+  context.session.refresh_preview();
 }
 
 // --- Mesh and materials ------------------------------------------------------------------------
@@ -330,29 +304,29 @@ void draw_texture_note(const MaterialDesc& material) {
   ImGui::TextColored(muted_color(), ICON_FA_IMAGE "  Textured%s", normal_map);
 }
 
-void draw_material(EditorSession& session, int material) {
-  SceneDocument& doc = session.document();
+void draw_material(PanelContext& context, int material) {
+  SceneDocument& doc = context.session.document();
   MaterialDesc edited = doc.material(material);
   ImGui::PushID(material);
   draw_material_title(doc, material);
   const bool changed = draw_material_fields(edited);
   draw_texture_note(edited);
   if (changed) {
-    g_stream.before_change(doc);
+    streamed_edit(context);
     edited.emissive = editor_logic::at_least(edited.emissive, kNoLowerLimit);
     doc.set_material(material, edited, false);
   }
   ImGui::PopID();
 }
 
-void draw_mesh(EditorSession& session, int index) {
-  const NodeDesc& node = session.document().node(index);
+void draw_mesh(PanelContext& context, int index) {
+  const NodeDesc& node = context.session.document().node(index);
   if (node.mesh == kNoIndex) return;
   if (!component_header(ICON_FA_CUBE, "Mesh")) return;
-  const MeshDesc& mesh = session.scene_desc().meshes[node.mesh];
+  const MeshDesc& mesh = context.session.scene_desc().meshes[node.mesh];
   property_label("Mesh");
   ImGui::TextUnformatted(mesh.name.empty() ? "(unnamed)" : mesh.name.c_str());
-  for (const int material : editor_logic::materials_of(mesh)) draw_material(session, material);
+  for (const int material : editor_logic::materials_of(mesh)) draw_material(context, material);
 }
 
 // --- Light and camera --------------------------------------------------------------------------
@@ -379,17 +353,17 @@ bool draw_light_fields(LightDesc& light) {
   return changed;
 }
 
-void draw_light(EditorSession& session, int index) {
-  const NodeDesc& node = session.document().node(index);
+void draw_light(PanelContext& context, int index) {
+  const NodeDesc& node = context.session.document().node(index);
   if (!node.light) return;
   LightDesc light = *node.light;
   if (!component_header(ICON_FA_LIGHTBULB, "Light")) return;
   if (!draw_light_fields(light)) return;
-  g_stream.before_change(session.document());
+  streamed_edit(context);
   light.intensity = std::max(light.intensity, kNoLowerLimit);
   light.range = std::max(light.range, kNoLowerLimit);
-  session.document().set_light(index, light, false);
-  session.refresh_preview();
+  context.session.document().set_light(index, light, false);
+  context.session.refresh_preview();
 }
 
 bool draw_camera_fields(CameraDesc& camera, float& fov_degrees) {
@@ -409,20 +383,20 @@ void draw_main_camera_note(const EditorSession& session, int index) {
   ImGui::TextColored(muted_color(), ICON_FA_STAR "  The game starts with this camera");
 }
 
-void draw_camera(EditorSession& session, int index) {
-  const NodeDesc& node = session.document().node(index);
+void draw_camera(PanelContext& context, int index) {
+  const NodeDesc& node = context.session.document().node(index);
   if (!node.camera) return;
   CameraDesc camera = *node.camera;
   if (!component_header(ICON_FA_VIDEO, "Camera")) return;
   float fov = camera.fov_y_radians * kRadiansToDegrees;
   const bool changed = draw_camera_fields(camera, fov);
-  draw_main_camera_note(session, index);
+  draw_main_camera_note(context.session, index);
   if (!changed) return;
-  g_stream.before_change(session.document());
+  streamed_edit(context);
   camera.fov_y_radians = std::clamp(fov, kMinFovDegrees, kMaxFovDegrees) / kRadiansToDegrees;
   camera.near_plane = std::max(camera.near_plane, kMinClipDistance);
-  session.document().set_camera(index, camera, false);
-  session.refresh_preview();
+  context.session.document().set_camera(index, camera, false);
+  context.session.refresh_preview();
 }
 
 // --- Scripts -----------------------------------------------------------------------------------
@@ -540,36 +514,36 @@ bool draw_collider_row(EditorSession& session, int index, const PropertyMap& pro
   return true;
 }
 
-void draw_mass_row(EditorSession& session, int index, float mass) {
+void draw_mass_row(PanelContext& context, int index, float mass) {
   property_label("Mass");
   if (!ImGui::DragFloat(kMassId, &mass, kDragSpeedNumber, kMinMass, FLT_MAX, "%.2f kg")) return;
-  g_stream.before_change(session.document());
-  session.document().set_prop(index, props::kMass, static_cast<double>(std::max(mass, kMinMass)), false);
+  streamed_edit(context);
+  context.session.document().set_prop(index, props::kMass, static_cast<double>(std::max(mass, kMinMass)), false);
 }
 
 // The rows of the Physics card, until one of them changes the object.
-void draw_physics_rows(EditorSession& session, int index, const BodyConfig& body) {
-  const PropertyMap& props = session.document().node(index).props;
+void draw_physics_rows(PanelContext& context, int index, const BodyConfig& body) {
+  const PropertyMap& props = context.session.document().node(index).props;
   bool trigger = get_bool(props, props::kTrigger).value_or(false);
-  if (draw_trigger_row(session, index, trigger)) return;
-  if (!trigger && draw_body_row(session, index, props)) return;
-  if (draw_collider_row(session, index, props)) return;
-  if (body.type == BodyType::Dynamic || body.type == BodyType::Vehicle) draw_mass_row(session, index, body.mass);
+  if (draw_trigger_row(context.session, index, trigger)) return;
+  if (!trigger && draw_body_row(context.session, index, props)) return;
+  if (draw_collider_row(context.session, index, props)) return;
+  if (body.type == BodyType::Dynamic || body.type == BodyType::Vehicle) draw_mass_row(context, index, body.mass);
   for (const std::string& warning : body.warnings) {
     ImGui::TextColored(warning_color(), ICON_FA_TRIANGLE_EXCLAMATION "  %s", warning.c_str());
   }
 }
 
-void draw_physics(EditorSession& session, int index) {
-  const PropertyMap& props = session.document().node(index).props;
+void draw_physics(PanelContext& context, int index) {
+  const PropertyMap& props = context.session.document().node(index).props;
   if (!has_physics(props)) return;
   const BodyConfig body = body_config_from_props(props);
   bool removed = false;
   const bool open = component_header(ICON_FA_WEIGHT_HANGING, "Physics", &removed);
   if (removed) {
-    remove_physics(session, index);
+    remove_physics(context.session, index);
   } else if (open) {
-    draw_physics_rows(session, index, body);
+    draw_physics_rows(context, index, body);
   }
 }
 
@@ -595,33 +569,33 @@ void draw_flag_value(EditorSession& session, int index, const std::string& key, 
   if (ImGui::Checkbox(kValueId, &flag)) set_or_remove(session, index, key.c_str(), PropertyValue(flag));
 }
 
-void draw_number_value(EditorSession& session, int index, const std::string& key, double number) {
+void draw_number_value(PanelContext& context, int index, const std::string& key, double number) {
   if (!ImGui::DragScalar(kValueId, ImGuiDataType_Double, &number, kDragSpeedNumber)) return;
-  g_stream.before_change(session.document());
-  session.document().set_prop(index, key, number, false);
+  streamed_edit(context);
+  context.session.document().set_prop(index, key, number, false);
 }
 
-void draw_text_value(EditorSession& session, int index, const std::string& key, const std::string& current) {
-  const auto text = text_field(kValueId, index, current);
-  if (!text || !is_object(session, text->object)) return;
-  set_or_remove(session, text->object, key.c_str(), PropertyValue(text->text));
+void draw_text_value(PanelContext& context, int index, const std::string& key, const std::string& current) {
+  const auto text = text_field(context.state.inspector, kValueId, index, current);
+  if (!text || !is_object(context.session, text->object)) return;
+  set_or_remove(context.session, text->object, key.c_str(), PropertyValue(text->text));
 }
 
 // The widget of one custom property, by what it holds: a checkbox, a number or a text field.
-void draw_custom_value(EditorSession& session, int index, const std::string& key, const PropertyValue& value) {
+void draw_custom_value(PanelContext& context, int index, const std::string& key, const PropertyValue& value) {
   if (const auto* flag = std::get_if<bool>(&value)) {
-    draw_flag_value(session, index, key, *flag);
+    draw_flag_value(context.session, index, key, *flag);
   } else if (const auto* number = std::get_if<double>(&value)) {
-    draw_number_value(session, index, key, *number);
+    draw_number_value(context, index, key, *number);
   } else {
-    draw_text_value(session, index, key, std::get<std::string>(value));
+    draw_text_value(context, index, key, std::get<std::string>(value));
   }
 }
 
 // One custom property: a button that removes it, its name and its value.
-void draw_custom_row(EditorSession& session, int index, const std::string& key, const PropertyValue& value) {
+void draw_custom_row(PanelContext& context, int index, const std::string& key, const PropertyValue& value) {
   if (ImGui::SmallButton(ICON_FA_XMARK)) {
-    set_or_remove(session, index, key.c_str(), std::nullopt);
+    set_or_remove(context.session, index, key.c_str(), std::nullopt);
     return;
   }
   tooltip("Remove");
@@ -630,18 +604,18 @@ void draw_custom_row(EditorSession& session, int index, const std::string& key, 
   ImGui::TextColored(muted_color(), "%s", key.c_str());
   ImGui::SameLine(kLabelColumnWidth);
   ImGui::SetNextItemWidth(kFillWidth);
-  draw_custom_value(session, index, key, value);
+  draw_custom_value(context, index, key, value);
 }
 
-void draw_custom_props(EditorSession& session, int index) {
-  const PropertyMap props = session.document().node(index).props;  // copy: edits change the map
+void draw_custom_props(PanelContext& context, int index) {
+  const PropertyMap props = context.session.document().node(index).props;  // copy: edits change the map
   const bool any = std::any_of(props.begin(), props.end(), [](const auto& entry) { return is_custom(entry.first); });
   if (!any) return;
   if (!component_header(ICON_FA_SLIDERS, "Properties")) return;
   for (const auto& [key, value] : props) {
     if (!is_custom(key)) continue;
     ImGui::PushID(key.c_str());
-    draw_custom_row(session, index, key, value);
+    draw_custom_row(context, index, key, value);
     ImGui::PopID();
   }
   ImGui::TextColored(muted_color(), "Read them in Ruby with prop(:name).");
@@ -675,7 +649,7 @@ void draw_attachable_scripts(PanelContext& context, int index, const std::vector
 
 void add_script_menu(PanelContext& context, int index) {
   const std::vector<std::string> attached = scripts_of(context.session, index);
-  std::string& new_name = g_new_script_name;
+  std::string& new_name = context.state.inspector.new_script_name;
   ImGui::SetNextItemWidth(kPopupFieldWidth);
   if (draw_new_script_form(kNewScriptId, "new_script_name", ICON_FA_PLUS " New", new_name)) {
     create_and_attach_script(context, index, new_name);
@@ -695,15 +669,16 @@ bool can_add_property(const PropertyMap& props, const std::string& key) {
   return !key.empty() && reserved_props().count(key) == 0 && props.count(key) == 0;
 }
 
-void add_property_menu(EditorSession& session, int index) {
-  std::string& key = g_new_property_key;
+void add_property_menu(PanelContext& context, int index) {
+  InspectorState& state = context.state.inspector;
+  std::string& key = state.new_property_key;
   ImGui::SetNextItemWidth(kPopupFieldWidth);
   ImGui::InputTextWithHint(kNewPropertyId, "name", &key);
   ImGui::SetNextItemWidth(kPopupFieldWidth);
-  ImGui::Combo(kTypeId, &g_new_property_type, kPropertyTypes, static_cast<int>(std::size(kPropertyTypes)));
-  ImGui::BeginDisabled(!can_add_property(session.document().node(index).props, key));
+  ImGui::Combo(kTypeId, &state.new_property_type, kPropertyTypes, static_cast<int>(std::size(kPropertyTypes)));
+  ImGui::BeginDisabled(!can_add_property(context.session.document().node(index).props, key));
   if (ImGui::Button(ICON_FA_PLUS " Add property")) {
-    set_or_remove(session, index, key.c_str(), initial_value(g_new_property_type));
+    set_or_remove(context.session, index, key.c_str(), initial_value(state.new_property_type));
     key.clear();
     ImGui::CloseCurrentPopup();
   }
@@ -728,7 +703,7 @@ void draw_component_choices(PanelContext& context, int index) {
   if (ImGui::MenuItem(ICON_FA_BULLSEYE "  Trigger", nullptr, false, no_physics)) {
     set_or_remove(session, index, props::kTrigger, PropertyValue(true));
   }
-  menu(ICON_FA_SLIDERS "  Property", [&session, index] { add_property_menu(session, index); });
+  menu(ICON_FA_SLIDERS "  Property", [&context, index] { add_property_menu(context, index); });
 }
 
 void draw_add_component(PanelContext& context, int index) {
@@ -766,16 +741,16 @@ void draw_runtime_view(EditorSession& session, int index) {
 // The selection as cards, one per component it has.
 void draw_components(PanelContext& context, int index) {
   EditorSession& session = context.session;
-  draw_header(session, index);
-  draw_transform(session, index);
-  draw_mesh(session, index);
-  draw_light(session, index);
-  draw_camera(session, index);
+  draw_header(context, index);
+  draw_transform(context, index);
+  draw_mesh(context, index);
+  draw_light(context, index);
+  draw_camera(context, index);
   draw_terrain(context, index);
   draw_scripts(context, index);
-  draw_physics(session, index);
+  draw_physics(context, index);
   draw_wheel(session, index);
-  draw_custom_props(session, index);
+  draw_custom_props(context, index);
   draw_add_component(context, index);
 }
 
@@ -789,7 +764,6 @@ void draw_selection(PanelContext& context, int index) {
     ImGui::TextUnformatted(session.document().node(index).name.c_str());
     draw_runtime_view(session, index);
   }
-  g_stream.end_frame();
 }
 
 }  // namespace
@@ -808,21 +782,6 @@ void draw_inspector(PanelContext& context) {
     draw_selection(context, index);
   }
   ImGui::End();
-}
-
-void reset_inspector_state() {
-  g_text_fields.clear();
-  g_new_script_name.clear();
-  g_new_property_key.clear();
-  g_new_property_type = kNumberType;
-  g_stream = EditStream{};  // it points at the previous game's document
-}
-
-void reset_panel_state() {
-  reset_hierarchy_state();
-  reset_inspector_state();
-  reset_project_state();
-  reset_script_tabs_state();
 }
 
 }  // namespace redgem::ui

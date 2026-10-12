@@ -22,7 +22,8 @@ std::filesystem::path emptied(const std::filesystem::path& file) {
 
 std::filesystem::path test_save_file_for(const std::filesystem::path& game_dir) {
   // (In the user's own folder, not in one every user of the machine can write to and guess.)
-  return platform::user_data_dir() / kTestSavesFolder / save_file_for(game_dir).filename();
+  // Laid out as the players' saves are: a game with an id and one without never share a file.
+  return platform::user_data_dir() / kTestSavesFolder / save_file_for(game_dir).lexically_relative(saves_folder());
 }
 
 std::filesystem::path fresh_test_save_file(const std::filesystem::path& game_dir) {

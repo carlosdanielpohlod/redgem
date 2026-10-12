@@ -1,7 +1,8 @@
 # The pause menu's multiplayer screen: host a game, join one found on the same network with a
 # click, or type an address (or, with a relay, a room's code) and join that.
 # With a relay (see MainScene) games can also be hosted online: the others only need the code.
-class MultiplayerScreen
+class MultiplayerScreen < GameMenu::Screen
+  HEADING = "Multiplayer".freeze
   SERVER_KEY = :server              # the last address joined, kept between runs
   DEFAULT_SERVER = "127.0.0.1".freeze
   ROOM_CODE_LETTERS = 6
@@ -16,7 +17,9 @@ class MultiplayerScreen
   attr_reader :address
   attr_accessor :port               # the port games are hosted on and joined at
 
-  def initialize(title:, relay:)
+  # `menu` is the GameMenu it is a screen of; `title` is what a hosted game is called.
+  def initialize(menu, title:, relay:)
+    super(heading: HEADING, back: -> { menu.show(:pause) })
     @title = title
     @relay = relay.to_s
     @address = Save.get(SERVER_KEY, DEFAULT_SERVER).to_s
@@ -28,13 +31,15 @@ class MultiplayerScreen
 
   # What the screen offers: [label, what it does].
   def options
-    list = [["Host a game", :host_game]]
-    list << ["Host online", :host_room] if relay?
-    list + [["Join", :join_game], ["Leave the game", :leave_game], ["Back", :back]]
+    list = [["Host a game", -> { host_game }]]
+    list << ["Host online", -> { host_room }] if relay?
+    list + [["Join", -> { join_game }], ["Leave the game", -> { leave_game }], ["Back", back]]
   end
 
   def opened = Network.search
   def closed = Network.stop_search
+  def space_above = HEIGHT_ABOVE_BUTTONS
+  def typing? = true   # the address: there P is a letter
 
   # Looks for games only while there is one to look for: offline, with the screen open.
   def keep_looking

@@ -1,0 +1,167 @@
+# A game's menus: a title screen, a pause menu (Esc, P or a gamepad's Start) and an end screen.
+# While a menu is open the game is frozen (Time.scale = 0); its options are buttons, and a
+# gamepad's A picks the first one.
+#
+#   Camera.main.add_component(GameMenu)        # in a scene script's setup
+#   GameMenu.instance.finish("You win!")       # from any script: the end screen
+#
+# Settings: title (shown on the title screen: the game's own title unless given), start_open
+# (false starts the game right away).
+#
+# The screens are :title, :pause and :over. A game changes them and adds its own:
+#
+#   menu.screens[:pause].add_option("Credits", index: 1) { menu.show(:credits) }
+#   menu.screens[:credits] = GameMenu::Screen.new(heading: "Credits", back: -> { menu.show(:pause) })
+class GameMenu < Behaviour
+  BUTTON_WIDTH = 280
+  BUTTON_HEIGHT = 58
+  BUTTON_GAP = 16
+  TITLE_SIZE = 72
+  TITLE_ABOVE_BUTTONS = 130   # pixels from the title's top to the first button
+  FIRST_BUTTON_SHARE = 0.46   # where the first button sits, as a share of the screen's height
+  SHADE_ALPHA = 170           # how dark the game gets behind a menu
+  PAUSE_KEYS = %i[escape p].freeze
+  BACK_KEY = :escape
+  PAUSE_BUTTON = :start
+  CONFIRM_BUTTON = :a
+  RUNNING = 1.0
+  FROZEN = 0.0
+  LAST = -1                   # where an option is added unless said: after the others
+
+  # One screen of the menu: a heading and, under it, its options as buttons. A screen that shows
+  # more than that is a subclass (see what it can say about itself below).
+  class Screen
+    attr_accessor :heading
+    attr_reader :options, :back
+
+    # options: [[label, what it does (anything with `call`)], ...]. back: what the pause keys do
+    # while the screen is open (nothing unless given).
+    def initialize(heading: "", options: [], back: nil)
+      @heading = heading
+      @options = options
+      @back = back
+    end
+
+    # Adds an option at a place among the others (index 0 is the first button).
+    def add_option(label, index: LAST, &action) = @options.insert(index, [label, action])
+
+    def opened; end                # it was just shown
+    def closed; end                # another screen took its place, or the game went on
+    def draw(_first_button); end   # what else it shows; the first button is at [x, y, width, height]
+    def space_above = 0            # pixels kept for that between its heading and its buttons
+    def typing? = false            # letters are typed into it: of the pause keys, only Esc is one
+  end
+
+  # The name of the open screen; nil while the game goes on.
+  attr_reader :screen
+  # Every screen by its name.
+  attr_reader :screens
+
+  def self.instance
+    holder = Scene.objects.find { |object| object.get_component(GameMenu) }
+    raise ArgumentError, "no object of the scene has a GameMenu" unless holder
+
+    holder.get_component(GameMenu)
+  end
+
+  def initialize
+    super
+    @screen = nil
+    quit = ["Quit", -> { Game.quit }]
+    @screens = { title: Screen.new(options: [["Play", -> { resume }], quit]),
+                 pause: pause_screen(quit),
+                 over: Screen.new(options: [["Play again", -> { restart }], quit]) }
+  end
+
+  def start
+    @screens[:title].heading = prop(:title, Game.title)
+    show(:title) if prop(:start_open, true)
+  end
+
+  def open? = !@screen.nil?
+
+  # Opens a screen by its name and freezes the game.
+  def show(name)
+    open_screen&.closed
+    @screen = name
+    Time.scale = FROZEN
+    open_screen.opened
+  end
+
+  # Closes the menu: the game goes on.
+  def resume
+    open_screen&.closed
+    @screen = nil
+    Time.scale = RUNNING
+  end
+
+  # Starts the scene over.
+  def restart
+    Time.scale = RUNNING
+    Game.load_scene(Game.scene_name)
+  end
+
+  # Ends the game with a message and offers to play again.
+  def finish(message)
+    @screens[:over].heading = message
+    show(:over)
+  end
+
+  def update(_dt)
+    go_back if pause_pressed?
+    draw(open_screen) if open?
+  end
+
+  # Where the button at `index` of the open screen is: [x, y, width, height].
+  def button_box(index)
+    x = (UI.width - BUTTON_WIDTH) / 2
+    y = (UI.height * FIRST_BUTTON_SHARE).to_i + index * (BUTTON_HEIGHT + BUTTON_GAP)
+    [x, y, BUTTON_WIDTH, BUTTON_HEIGHT]
+  end
+
+  private
+
+  def pause_screen(quit)
+    options = [["Resume", -> { resume }], ["Restart", -> { restart }], quit]
+    Screen.new(heading: "Paused", options: options, back: -> { resume })
+  end
+
+  def open_screen = @screens[@screen]
+
+  def pause_keys = open? && open_screen.typing? ? [BACK_KEY] : PAUSE_KEYS
+
+  def pause_pressed? = pause_keys.any? { |key| Input.pressed?(key) } || Input.gamepad_pressed?(PAUSE_BUTTON)
+
+  # The pause keys open the pause menu while the game goes on; on a screen they do what it says.
+  def go_back
+    return show(:pause) unless open?
+
+    open_screen.back&.call
+  end
+
+  def draw(screen)
+    UI.rect(x: 0, y: 0, width: UI.width, height: UI.height, color: :black, alpha: SHADE_ALPHA)
+    heading_y = button_box(0)[1] - screen.space_above - TITLE_ABOVE_BUTTONS
+    UI.text(screen.heading, x: UI.width / 2, y: heading_y, size: TITLE_SIZE, align: :center)
+    screen.draw(button_box(0))
+    chosen = clicked(screen.options) || confirmed(screen.options)
+    chosen&.call
+  end
+
+  # Draws the options as buttons; returns what the clicked one does, if one was.
+  def clicked(options)
+    chosen = nil
+    options.each_with_index { |(label, action), index| chosen = action if button?(label, index) }
+    chosen
+  end
+
+  def button?(label, index)
+    x, y, width, height = button_box(index)
+    UI.button(label, x: x, y: y, width: width, height: height)
+  end
+
+  # A gamepad's A picks the first option.
+  def confirmed(options)
+    options.first.last if Input.gamepad_pressed?(CONFIRM_BUTTON)
+  end
+end

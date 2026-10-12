@@ -19,6 +19,8 @@ namespace redgem {
 namespace {
 
 constexpr float kWheelRotationTolerance = 1e-3f;
+// What follows the word that a game's id cannot be used.
+constexpr const char* kSavedByFolderNote = ". Until it is put right, the game's save goes by where its folder is";
 
 Vec3 gravity() { return {0.0f, config::kGravityY, 0.0f}; }
 
@@ -41,35 +43,37 @@ Engine::~Engine() {
   physics_.reset();
 }
 
-std::variant<std::unique_ptr<Engine>, std::string> Engine::create(const EngineOptions& options) {
-  std::unique_ptr<Engine> engine(new Engine(options));
-  if (auto error = engine->initialize()) return *error;
-  return engine;
-}
-
-std::optional<std::string> Engine::initialize() {
-  if (auto error = load_first_scene()) return error;
-  build_world();
-  const GameSettings settings = read_game_settings(options_.game_dir);
-  open_presenter(settings);
-  open_audio();
-  open_saves();
-  fill_context(settings.title);
-  start_scripts();
-  return std::nullopt;
-}
-
-std::optional<std::string> Engine::load_first_scene() {
-  if (options_.scene != nullptr) {
-    scene_desc_ = *options_.scene;
-    return std::nullopt;
-  }
-  const std::filesystem::path scene_path = options_.game_dir / config::kSceneFileName;
+std::variant<SceneDesc, std::string> read_game_scene(const std::filesystem::path& game_dir) {
+  const std::filesystem::path scene_path = game_dir / config::kSceneFileName;
   LoadResult loaded = load_gltf_scene(scene_path.string(), gpu_profile::kMaxSkinJoints);
   if (!loaded.ok) return loaded.error;
   for (const std::string& warning : loaded.warnings) log::warning(warning);
-  scene_desc_ = std::move(loaded.scene);
-  return std::nullopt;
+  return std::move(loaded.scene);
+}
+
+std::variant<std::unique_ptr<Engine>, std::string> Engine::create(const EngineOptions& options) {
+  if (options.scene != nullptr) return create(options, SceneDesc(*options.scene));
+  auto scene = read_game_scene(options.game_dir);
+  if (auto* error = std::get_if<std::string>(&scene)) return *error;
+  return create(options, std::move(std::get<SceneDesc>(scene)));
+}
+
+std::unique_ptr<Engine> Engine::create(const EngineOptions& options, SceneDesc scene) {
+  std::unique_ptr<Engine> engine(new Engine(options));
+  engine->scene_desc_ = std::move(scene);
+  engine->initialize();
+  return engine;
+}
+
+void Engine::initialize() {
+  build_world();
+  const GameManifest manifest = read_game_manifest(options_.game_dir);
+  if (!manifest.id_error.empty()) log::warning(manifest.id_error + kSavedByFolderNote);
+  open_presenter(manifest.settings);
+  open_audio();
+  open_saves();
+  fill_context(manifest.settings.title);
+  start_scripts();
 }
 
 void Engine::build_world() {

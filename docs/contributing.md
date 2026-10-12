@@ -68,6 +68,9 @@ SystemTest.define do |t|
 end
 ```
 
+A template is tested as the game it makes: `tests/system_templates/<template>/*_test.rb` run
+against a game created from it by `redgem new`. Every template needs at least one.
+
 Test fixtures are regenerated with
 `tools/blender/run.sh build_test_fixtures.py tests/fixtures`.
 
@@ -110,7 +113,9 @@ src/testing   what runs tests, apart from the engine: TestInput, the pictures a 
 ruby/engine   Ruby prelude embedded in the runtime (Behaviour, Vector3, UI, Network...)
 ruby/testing  the Ruby tests are written with (assertions, test cases, the system test DSL),
               embedded in redgem-test only
-templates     scripts of the new-game templates (embedded in redgem, with the tools)
+templates     the new-game templates: each folder is a whole game (scene, scripts, sounds) and a
+              template.json about it, embedded in redgem as it is; a new game is a copy of one.
+              A template is edited like any game: redgem templates/platformer
 assets/editor fonts of the editor (Inter, JetBrains Mono; SIL Open Font License, see the license files)
 games         demo games: scene.glb, scripts and the .blend each scene was built from
 showcase      renders of the showcase scene and the credits of its assets

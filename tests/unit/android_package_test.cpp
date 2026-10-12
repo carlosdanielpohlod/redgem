@@ -2,9 +2,11 @@
 
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <sstream>
 
 #include "project/android_package.hpp"
+#include "app/game_settings.hpp"
 #include "core/platform.hpp"
 #include "test_support.hpp"
 
@@ -71,6 +73,47 @@ TEST_CASE("an app's id is made of the game's letters and digits") {
   CHECK(spaced != android_package_name("games/mygame"));
   CHECK(spaced == android_package_name("elsewhere/My Game"));  // the same game, wherever it is
   CHECK(android_package_name("games/---").rfind("com.redgem.game_", 0) == 0);
+}
+
+TEST_CASE("an app is named by its game's id, unless the game gives the app a package of its own") {
+  GameSettings settings;
+  // No id: the folder's name, as ever.
+  CHECK(android_package_for(settings, "games/platformer") == "com.redgem.platformer");
+  // An id that reads as an app's id is the app's id; the folder no longer matters.
+  settings.id = "com.mystudio.coin_rush";
+  CHECK(android_package_for(settings, "games/platformer") == "com.mystudio.coin_rush");
+  CHECK(android_package_for(settings, "elsewhere/Renamed") == "com.mystudio.coin_rush");
+  // Any other id is made into one, the same wherever the game is.
+  settings.id = "coin-rush-3fa2c1b0";
+  const std::string made = android_package_for(settings, "games/platformer");
+  CHECK(made == android_package_from("coin-rush-3fa2c1b0"));
+  CHECK(made.rfind("com.redgem.coinrush3fa2c1b0_", 0) == 0);
+  CHECK(valid_android_package(made));
+  CHECK(made == android_package_for(settings, "elsewhere/Renamed"));
+  settings.id = "com.9lives";  // dots, but no app's id: a part starts with a digit
+  CHECK(valid_android_package(android_package_for(settings, "games/platformer")));
+  CHECK(android_package_for(settings, "games/platformer") != "com.9lives");
+  settings.id = "coins";
+  CHECK(android_package_for(settings, "games/platformer") == "com.redgem.coins");
+  // What the game says of its app comes first.
+  settings.android.package = "com.other.app";
+  CHECK(android_package_for(settings, "games/platformer") == "com.other.app");
+}
+
+TEST_CASE("the app packed from a game with an id carries it, and a bad id stops the packing") {
+  const Scratch scratch;
+  const std::map<std::string, std::filesystem::path> runtimes = {
+      {"x86_64", scratch.file("built/libredgem.so", "engine")}};
+  const std::filesystem::path game = scratch.dir / "My Game";
+  std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
+  std::ofstream(game / "game.json") << R"({"id": "com.mystudio.sandbox"})";
+  std::string error;
+  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", scratch.dir / "stage", error), error);
+  CHECK(read(scratch.dir / "stage" / "AndroidManifest.xml").find("package=\"com.mystudio.sandbox\"") !=
+        std::string::npos);
+  std::ofstream(game / "game.json") << R"({"id": "My Sandbox"})";
+  CHECK_FALSE(stage_android_game(game, runtimes, "stamp", scratch.dir / "stage", error));
+  CHECK(error.find("game.json: id must look like") == 0);
 }
 
 TEST_CASE("the manifest describes a full-screen native activity running the engine") {

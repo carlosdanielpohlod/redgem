@@ -8,6 +8,7 @@
 #include "editor/editor_session.hpp"
 #include "core/files.hpp"
 #include "editor/script_files.hpp"
+#include "testing/recording_audio.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -53,6 +54,31 @@ float y_of(const EditorSession& session, const std::string& name) {
 }
 
 }  // namespace
+
+TEST_CASE("a game's music ends with the game, whether Stop ends it or the game quits by itself") {
+  test::LogCapture quiet;
+  const auto dir = copy_sandbox("music");
+  auto session = open(dir);
+  ScriptedInputSource input;
+  testing::RecordingAudio audio;
+  std::string error;
+  for (const bool quits_by_itself : {true, false}) {
+    CAPTURE(quits_by_itself);
+    REQUIRE_MESSAGE(session->play({input, &audio}, error), error);
+    REQUIRE(session->runtime()->scripts().eval("Audio.music(:beep)", "music.rb").ok);
+    play_frames(*session, 1);
+    REQUIRE(audio.music() == std::optional<std::string>("beep"));
+    if (quits_by_itself) {
+      REQUIRE(session->runtime()->scripts().eval("Game.quit", "quit.rb").ok);
+      play_frames(*session, 1);
+    } else {
+      session->stop();
+    }
+    CHECK(session->play_state() == PlayState::Editing);
+    CHECK_FALSE(audio.music().has_value());
+  }
+  std::filesystem::remove_all(dir);
+}
 
 TEST_CASE("play runs the edited scene and stop restores it") {
   test::LogCapture quiet;

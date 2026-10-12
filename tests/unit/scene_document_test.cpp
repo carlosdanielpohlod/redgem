@@ -257,6 +257,21 @@ TEST_CASE("written .glb files follow the binary layout") {
   std::filesystem::remove(out);
 }
 
+TEST_CASE("a scene too big for the lengths a .glb is written with is refused, not cut short") {
+  constexpr std::uint64_t kLimit = 0xFFFFFFFFull;  // what 32 bits can say
+  constexpr std::uint64_t kHeaders = kGlbHeaderBytes + 2 * kGlbChunkHeaderBytes;
+  constexpr std::uint64_t kJsonBytes = 1024;
+  CHECK(fits_in_glb(kJsonBytes, 0));
+  CHECK(fits_in_glb(kJsonBytes, kLimit - kHeaders - kJsonBytes));
+  CHECK_FALSE(fits_in_glb(kJsonBytes, kLimit - kHeaders - kJsonBytes + kGlbAlignment));
+  CHECK_FALSE(fits_in_glb(kJsonBytes, kLimit + 1));  // would be written as a length of nothing
+  CHECK_FALSE(fits_in_glb(kLimit + 1, 0));
+  CHECK_FALSE(fits_in_glb(kLimit, kLimit));
+  // A file with no binary chunk has no header for one.
+  CHECK(fits_in_glb(kLimit - kGlbHeaderBytes - kGlbChunkHeaderBytes, 0));
+  CHECK_FALSE(fits_in_glb(kLimit - kGlbHeaderBytes - kGlbChunkHeaderBytes + 1, 0));
+}
+
 TEST_CASE("an empty scene cannot be saved") {
   SceneDocument doc = open_fixture();
   while (doc.node_count() > 0) doc.remove(0);

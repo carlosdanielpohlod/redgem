@@ -11,9 +11,6 @@
 namespace redgem::ui {
 namespace {
 
-// State kept between frames. Reset when another game is opened (see reset_script_tabs_state).
-std::string g_pending_close;  // a tab closed with unsaved changes, waiting for the dialog
-
 constexpr const char* kCloseScriptPopup = "Unsaved script";
 constexpr const char* kCodeId = "##code";
 constexpr const char* kWindowIdPrefix = "###script:";  // ImGui: what follows ### is the window's identity
@@ -143,23 +140,21 @@ std::string script_window_name(const std::string& file_name) {
   return std::string(ICON_FA_GEM "  ") + file_name + kWindowIdPrefix + file_name;
 }
 
-ScriptTabsResult draw_script_tabs(ScriptWorkspace& scripts, unsigned int new_tab_dock) {
+ScriptTabsResult draw_script_tabs(ScriptWorkspace& scripts, ScriptTabsState& state, unsigned int new_tab_dock) {
   ScriptTabsResult result;
   const std::optional<std::string> focus = scripts.take_focus_request();
   std::vector<std::string> closed;
   for (const auto& tab : scripts.tabs()) {
     if (draw_tab(*tab, new_tab_dock, focus == tab->file_name(), result)) continue;
     if (tab->modified()) {
-      g_pending_close = tab->file_name();  // asked about first (see draw_close_dialog)
+      state.pending_close = tab->file_name();  // asked about first (see draw_close_dialog)
     } else {
       closed.push_back(tab->file_name());
     }
   }
   for (const std::string& file : closed) scripts.close(file);
-  draw_close_dialog(scripts, g_pending_close);
+  draw_close_dialog(scripts, state.pending_close);
   return result;
 }
-
-void reset_script_tabs_state() { g_pending_close.clear(); }
 
 }  // namespace redgem::ui

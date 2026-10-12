@@ -112,6 +112,20 @@ Vec3 vec(Vector3 v) { return {v.x, v.y, v.z}; }
 
 bool ctrl_down() { return IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL); }
 bool shift_down() { return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT); }
+
+// The fly camera's keys, as the keyboard has them now.
+FlyKeys fly_keys() {
+  FlyKeys keys;
+  keys.forward = IsKeyDown(KEY_W);
+  keys.back = IsKeyDown(KEY_S);
+  keys.left = IsKeyDown(KEY_A);
+  keys.right = IsKeyDown(KEY_D);
+  keys.up = IsKeyDown(KEY_E);
+  keys.down = IsKeyDown(KEY_Q);
+  keys.left_shift = IsKeyDown(KEY_LEFT_SHIFT);
+  keys.right_shift = IsKeyDown(KEY_RIGHT_SHIFT);
+  return keys;
+}
 bool alt_down() { return IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT); }
 
 Matrix model_matrix(const Transform& t) {
@@ -343,7 +357,6 @@ void EditorApp::open_window(GpuChoice gpu, FrameClock clock) {
   interface_ = std::make_unique<ui::Interface>(*window_, ui::Interface::Layout::Dockable);
   look_through_main_camera(camera_, session_->scene());
   rescan_files();
-  ui::reset_panel_state();  // the hub may open several games in one run
 }
 
 EditorApp::~EditorApp() {
@@ -395,7 +408,6 @@ void EditorApp::play() {
 
 void EditorApp::stop() {
   session_->stop();
-  audio_->stop_music();
   retire_game_view();
 }
 
@@ -410,7 +422,7 @@ void EditorApp::toggle_pause() { session_->pause(session_->play_state() == PlayS
 bool EditorApp::editing() const { return session_->play_state() == PlayState::Editing; }
 
 ui::PanelContext EditorApp::panel_context() {
-  ui::PanelContext context{*session_, *scripts_, files_, spawn_point(), audio_.get()};
+  ui::PanelContext context{*session_, *scripts_, files_, panel_state_, spawn_point(), audio_.get()};
   context.terrain = &terrain_tool_;
   return context;
 }
@@ -571,13 +583,16 @@ void EditorApp::draw_panels() {
 void EditorApp::draw_side_panels(ui::PanelContext& context) {
   if (panels_.hierarchy && ui::draw_hierarchy(context).frame_requested) frame_selection();
   if (panels_.inspector) ui::draw_inspector(context);
+  // Whatever is selected, and whether or not the Inspector is shown: a drag is over once its
+  // widget is let go.
+  panel_state_.inspector.edits.end_frame(ImGui::IsAnyItemActive());
   if (!panels_.bottom) return;
   ui::draw_project(context);
-  ui::draw_console(*console_);
+  ui::draw_console(*console_, panel_state_.console);
 }
 
 void EditorApp::draw_script_tabs() {
-  const ui::ScriptTabsResult tabs = ui::draw_script_tabs(*scripts_, new_script_dock());
+  const ui::ScriptTabsResult tabs = ui::draw_script_tabs(*scripts_, panel_state_.script_tabs, new_script_dock());
   if (tabs.focused_dock != 0) script_dock_ = tabs.focused_dock;
   if (tabs.split_right) pending_split_ = tabs.split_right;
 }
@@ -719,10 +734,7 @@ void EditorApp::update_camera() {
     const Vector2 delta = GetMouseDelta();
     input.look_x = delta.x;
     input.look_y = delta.y;
-    input.forward = editor_logic::fly_axis(IsKeyDown(KEY_S), IsKeyDown(KEY_W));
-    input.right = editor_logic::fly_axis(IsKeyDown(KEY_A), IsKeyDown(KEY_D));
-    input.up = editor_logic::fly_axis(IsKeyDown(KEY_Q), IsKeyDown(KEY_E));
-    input.fast = IsKeyDown(KEY_LEFT_SHIFT);
+    steer(input, fly_keys());
   }
   camera_.update(input);
 }

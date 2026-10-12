@@ -15,6 +15,12 @@ constexpr std::string_view kForbiddenCharacters{"\\:\0", 3};
 constexpr unsigned char kFirstPrintable = 0x20;  // space: everything below is a control character
 constexpr unsigned char kDelete = 0x7F;          // the one control character above the letters
 constexpr char kControlStandIn = '?';
+// In UTF-8 the second set of control characters (U+0080 to U+009F, which some terminals obey as
+// they do escapes) is this byte followed by one of a range.
+constexpr unsigned char kSecondSetLead = 0xC2;
+constexpr unsigned char kSecondSetFirst = 0x80;
+constexpr unsigned char kSecondSetLast = 0x9F;
+constexpr std::string_view kLineMarks = "\n\t";  // the control characters a message of several lines is made with
 
 bool has_parent_step(std::string_view name) {
   for (;;) {
@@ -28,6 +34,26 @@ bool has_parent_step(std::string_view name) {
 bool is_control(char c) {
   const auto byte = static_cast<unsigned char>(c);
   return byte < kFirstPrintable || byte == kDelete;
+}
+
+// Whether the two bytes at `at` are a control character of the second set.
+bool is_second_set_control(std::string_view text, std::size_t at) {
+  if (static_cast<unsigned char>(text[at]) != kSecondSetLead || at + 1 >= text.size()) return false;
+  const auto next = static_cast<unsigned char>(text[at + 1]);
+  return next >= kSecondSetFirst && next <= kSecondSetLast;
+}
+
+// The text with '?' for each of its control characters, but for those of `kept`.
+std::string without_controls(std::string_view text, std::string_view kept) {
+  std::string shown(text);
+  for (std::size_t i = 0; i < shown.size(); ++i) {
+    if (is_second_set_control(shown, i)) {
+      shown[i] = shown[i + 1] = kControlStandIn;
+    } else if (is_control(shown[i]) && kept.find(shown[i]) == std::string_view::npos) {
+      shown[i] = kControlStandIn;
+    }
+  }
+  return shown;
 }
 
 }  // namespace
@@ -69,12 +95,8 @@ std::optional<std::vector<std::uint8_t>> read_file_up_to(const std::filesystem::
   return bytes;
 }
 
-std::string printable(std::string_view text) {
-  std::string shown(text);
-  for (char& c : shown) {
-    if (is_control(c)) c = kControlStandIn;
-  }
-  return shown;
-}
+std::string printable(std::string_view text) { return without_controls(text, {}); }
+
+std::string printable_lines(std::string_view text) { return without_controls(text, kLineMarks); }
 
 }  // namespace redgem

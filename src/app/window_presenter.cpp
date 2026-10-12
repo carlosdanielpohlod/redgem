@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <memory>
+#include <optional>
 #include <string>
 #include <variant>
 
@@ -44,33 +45,42 @@ void WindowPresenter::present(const FrameView& view) {
 
 namespace {
 
-// Plays the game of `window` in it, read from `input`, with the machine's sound.
-int play(WindowPresenter& window, InputSource& input, const std::filesystem::path& game_dir) {
+// The game's first scene; nothing, with the reason logged, when it cannot be read.
+std::optional<SceneDesc> first_scene(const std::filesystem::path& game_dir) {
+  auto scene = read_game_scene(game_dir);
+  if (auto* read = std::get_if<SceneDesc>(&scene)) return std::move(*read);
+  log::error(std::get<std::string>(scene));
+  return std::nullopt;
+}
+
+// Plays the game of `window` in it from `scene`, read from `input`, with the machine's sound.
+int play(WindowPresenter& window, InputSource& input, const std::filesystem::path& game_dir, SceneDesc scene) {
   const std::unique_ptr<AudioSystem> audio = create_raylib_audio();
   EngineOptions game;
   game.game_dir = game_dir;
   game.presenter = &window;
   game.input = &input;
   game.audio = audio.get();
-  auto created = Engine::create(game);
-  if (const auto* error = std::get_if<std::string>(&created)) {
-    log::error(*error);
-    return kExitFailure;
-  }
-  return std::get<std::unique_ptr<Engine>>(created)->run();
+  return Engine::create(game, std::move(scene))->run();
 }
 
 }  // namespace
 
+// The scene is read before the window is made: a game that cannot start says so with no window
+// opening and closing first. Then the window, first and last: the engine shows, reads and sounds
+// through what is made here.
 int play_in_window(const GameWindowOptions& options) {
-  // The window first and last: the engine shows, reads and sounds through what is made here.
+  std::optional<SceneDesc> scene = first_scene(options.game_dir);
+  if (!scene) return kExitFailure;
   WindowPresenter window(options);
-  return play(window, window.devices(), options.game_dir);
+  return play(window, window.devices(), options.game_dir, std::move(*scene));
 }
 
 int play_in_window(const GameWindowOptions& options, InputSource& input) {
+  std::optional<SceneDesc> scene = first_scene(options.game_dir);
+  if (!scene) return kExitFailure;
   WindowPresenter window(options);
-  return play(window, input, options.game_dir);
+  return play(window, input, options.game_dir, std::move(*scene));
 }
 
 }  // namespace redgem

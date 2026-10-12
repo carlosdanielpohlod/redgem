@@ -47,12 +47,20 @@ struct EngineOptions {
   AudioSystem* audio = nullptr;
 };
 
+// A game's scene.glb, read (what the loader has to say about it is logged); the error when it
+// cannot be read.
+std::variant<SceneDesc, std::string> read_game_scene(const std::filesystem::path& game_dir);
+
 // Wires scene, physics, scripts and input together and runs the game loop. It opens no window and
 // draws nothing: each frame is handed to its presenter.
 class Engine {
  public:
   // Returns the engine or an error message.
   static std::variant<std::unique_ptr<Engine>, std::string> create(const EngineOptions& options);
+  // The engine of a game whose first scene was already read (see read_game_scene): for whoever
+  // has to know that the game can start before making what it is shown in. `options.scene` is
+  // not looked at.
+  static std::unique_ptr<Engine> create(const EngineOptions& options, SceneDesc scene);
   ~Engine();
   Engine(const Engine&) = delete;
   Engine& operator=(const Engine&) = delete;
@@ -91,9 +99,8 @@ class Engine {
  private:
   explicit Engine(const EngineOptions& options);
 
-  // Starting up, in this order.
-  std::optional<std::string> initialize();
-  std::optional<std::string> load_first_scene();
+  // Starting up, in this order (the first scene is in place by then).
+  void initialize();
   void build_world();
   void open_presenter(const GameSettings& settings);
   void open_audio();

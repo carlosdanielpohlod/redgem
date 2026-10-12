@@ -86,7 +86,8 @@ A game says these in the `android` section of its `game.json`; all are optional:
 }
 ```
 
-- `package` is the app's id on the phone. Without it the id comes from the game's folder name.
+- `package` is the app's id on the phone. Without it the app goes by the game's `id` (see below),
+  and a game with no `id` by its folder name.
 - `version_code` goes up with every release: a phone only updates to a higher one.
 - `keystore` and `key_alias` sign the app with a key of your own, which is what a release needs:
   players can only update a game signed with the same key as the one they have. Make it once with
@@ -104,11 +105,18 @@ REDGEM_KEYSTORE_PASSWORD='...' ./build/src/redgem build my_game dist/android --t
 ## Notes
 
 - The executable needs the `game/` folder next to it.
-- `game.json` sets the window title and size:
+- `game.json` says what the game is and how its window opens:
 
 ```json
-{ "title": "My Game", "window_width": 1280, "window_height": 720 }
+{ "id": "com.mystudio.mygame", "title": "My Game", "window_width": 1280, "window_height": 720 }
 ```
+
+- `id` is what the game is known by: its save follows it when the folder is moved or renamed, and
+  its Android app is named after it. `redgem new` writes one (`my-game-3fa2c1b0`); change it to
+  your own before the first release and leave it alone after. It is small letters, digits, `.`,
+  `-` and `_`, starting and ending with a letter or a digit. Two games with the same `id` share
+  a save: a game started as a copy of another needs a new one. A game with no `id` keeps its
+  save by where its folder is, and starts a new save when it is given one.
 
 - Everything in the game folder is copied, including the scripts as plain `.rb` files.
 - Check the licenses of the models and sounds you include. A license that allows using an asset

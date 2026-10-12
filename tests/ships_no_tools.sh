@@ -18,7 +18,7 @@ TOOLS=(
   "Build Game" "Hierarchy" "Inspector" "Unsaved changes"
   "New Game..." "Create game" "No games yet. Create one on the left."
   "apksigner" "keytool" "zipalign" "AndroidManifest.xml" "android-debug.keystore"
-  "class Spinner < Behaviour" "class GameMenu < Behaviour"
+  "class Spinner < Behaviour" "class FollowCamera < Behaviour"
   "cannot import" "cannot build for" "redgem build <game_dir>" "--template"
   "THIRD_PARTY_LICENSES"
   "relay listening on port"

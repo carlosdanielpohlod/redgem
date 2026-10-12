@@ -236,3 +236,37 @@ TEST_CASE("a primitive whose indices cannot be trusted is not cut into pieces") 
   CHECK_FALSE(build_mesh(short_normals, error).has_value());
   CHECK(primitive_shape_problem(triangle()).empty());
 }
+
+TEST_CASE("a mesh's pieces line up with themselves after its vertices move, also where a primitive is split") {
+  constexpr float kLift = 5.0f;
+  MeshDesc mesh;
+  mesh.primitives = {triangle(), numbered_strip(), triangle()};
+  const std::vector<PrimitiveDesc> pieces = mesh_pieces(mesh, kSplitMaxVertices);
+  const std::size_t strip_pieces = split_primitive(numbered_strip(), kSplitMaxVertices).size();
+  REQUIRE(strip_pieces > 1);
+  REQUIRE(pieces.size() == strip_pieces + 2);
+  // In order: the first primitive whole, the pieces of the second, the third whole.
+  CHECK(pieces.front().positions == triangle().positions);
+  CHECK(pieces.back().positions == triangle().positions);
+  CHECK(pieces[1].positions.size() < numbered_strip().positions.size());
+
+  // The mesh reshaped (every vertex lifted): the same pieces, each with as many vertices as
+  // before and every one of them lifted. A piece is never the primitive of the same number.
+  MeshDesc lifted = mesh;
+  for (PrimitiveDesc& primitive : lifted.primitives) {
+    for (std::size_t y = 1; y < primitive.positions.size(); y += config::kFloatsPerPosition) {
+      primitive.positions[y] += kLift;
+    }
+  }
+  const std::vector<PrimitiveDesc> moved = mesh_pieces(lifted, kSplitMaxVertices);
+  REQUIRE(moved.size() == pieces.size());
+  for (std::size_t i = 0; i < pieces.size(); ++i) {
+    CAPTURE(i);
+    REQUIRE(moved[i].positions.size() == pieces[i].positions.size());
+    CHECK(moved[i].indices == pieces[i].indices);
+    for (std::size_t y = 1; y < moved[i].positions.size(); y += config::kFloatsPerPosition) {
+      CHECK(moved[i].positions[y] == doctest::Approx(pieces[i].positions[y] + kLift));
+    }
+  }
+  CHECK(moved[2].positions.size() != lifted.primitives[2].positions.size());
+}

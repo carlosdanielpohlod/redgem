@@ -394,7 +394,7 @@ bool Datagrams::send_to(const std::string& address, std::uint16_t port, const st
   if (inet_pton(AF_INET, address.c_str(), &to.sin_addr) != 1) return false;
   const auto sent = sendto(native(handle_), message.data(), static_cast<int>(message.size()), kSendFlags,
                            reinterpret_cast<const sockaddr*>(&to), sizeof(to));
-  return sent == static_cast<decltype(sent)>(message.size());
+  return sent >= 0 && static_cast<std::size_t>(sent) == message.size();
 }
 
 bool Datagrams::receive(std::string& message, std::string& from_address, std::uint16_t& from_port) {

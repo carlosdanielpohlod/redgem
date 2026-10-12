@@ -49,5 +49,8 @@ std::optional<std::vector<std::uint8_t>> read_file_up_to(const std::filesystem::
 // A text that came from a file, as it can be shown in a log: control characters (line breaks,
 // terminal escapes) become '?', so a name cannot fake log lines or drive the terminal.
 std::string printable(std::string_view text);
+// The same for a message of several lines (a script's error with its backtrace): line breaks and
+// tabs stay, every other control character becomes '?'.
+std::string printable_lines(std::string_view text);
 
 }  // namespace redgem

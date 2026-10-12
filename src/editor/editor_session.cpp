@@ -270,6 +270,7 @@ bool EditorSession::play(const PlayDevices& devices, std::string& error) {
     return false;
   }
   runtime_ = std::move(std::get<std::unique_ptr<Engine>>(created));
+  game_audio_ = devices.audio;
   play_state_ = PlayState::Playing;
   log::info("play");
   return true;
@@ -283,6 +284,9 @@ void EditorSession::pause(bool paused) {
 void EditorSession::stop() {
   if (play_state_ == PlayState::Editing) return;
   runtime_.reset();
+  // The game's music ends with the game, whoever ended it: Stop, or the game itself (Game.quit).
+  if (game_audio_ != nullptr) game_audio_->stop_music();
+  game_audio_ = nullptr;
   play_state_ = PlayState::Editing;
   refresh_preview();
   log::info("stop");

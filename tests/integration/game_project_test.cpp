@@ -60,8 +60,50 @@ std::string bytes_of(const std::filesystem::path& file) {
 
 }  // namespace
 
+TEST_CASE("the templates are the folders of templates/, each with a word about itself") {
+  std::vector<std::string> folders;
+  for (const auto& entry : std::filesystem::directory_iterator(REDGEM_TEMPLATES_DIR)) {
+    if (entry.is_directory()) folders.push_back(entry.path().filename().string());
+  }
+  std::sort(folders.begin(), folders.end());
+  std::vector<std::string> names;
+  for (const GameTemplate& known : game_templates()) {
+    names.push_back(known.name);
+    CHECK_FALSE(known.description.empty());
+    CHECK_FALSE(known.icon.empty());
+  }
+  CHECK(names == folders);
+  CHECK(template_names("|") == "empty|platformer");
+  // What a new game starts from when nothing else is asked for is one of them.
+  CHECK(std::find(names.begin(), names.end(), kDefaultTemplate) != names.end());
+}
+
+TEST_CASE("a new game is its template's folder, file for file, and a game.json of its own") {
+  for (const GameTemplate& known : game_templates()) {
+    CAPTURE(known.name);
+    const std::filesystem::path source = std::filesystem::path(REDGEM_TEMPLATES_DIR) / known.name;
+    const auto dir = fresh("copy_of_" + known.name);
+    std::string error;
+    REQUIRE_MESSAGE(create_game(dir, known.name, error), error);
+    std::size_t copied = 0;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(source)) {
+      if (!entry.is_regular_file() || entry.path().filename() == "template.json") continue;
+      const std::filesystem::path file = std::filesystem::relative(entry.path(), source);
+      CAPTURE(file);
+      CHECK(bytes_of(dir / file) == bytes_of(entry.path()));
+      ++copied;
+    }
+    CHECK(copied > 1);
+    // What a template says about itself is the template's, not the game's.
+    CHECK_FALSE(std::filesystem::exists(dir / "template.json"));
+    CHECK(std::filesystem::exists(dir / kGameSettingsFile));
+    std::filesystem::remove_all(dir);
+  }
+}
+
 TEST_CASE("every template creates a game that loads and whose scripts compile") {
-  for (const std::string& name : game_templates()) {
+  for (const GameTemplate& known : game_templates()) {
+    const std::string& name = known.name;
     CAPTURE(name);
     const auto dir = fresh("template_" + name);
     std::string error;
@@ -70,8 +112,8 @@ TEST_CASE("every template creates a game that loads and whose scripts compile") 
     REQUIRE_MESSAGE(loaded.ok, loaded.error);
     CHECK(loaded.scene.find_node("Camera") != kNoIndex);
     CHECK(loaded.scene.find_node("Sun") != kNoIndex);
-    for (const char* folder :
-         {config::kScriptsDirName, config::kSoundsDirName, config::kScenesDirName, config::kModelsDirName}) {
+    for (const char* folder : {config::kScriptsDirName, config::kSoundsDirName, config::kScenesDirName,
+                               config::kModelsDirName, config::kImagesDirName}) {
       CHECK(std::filesystem::is_directory(dir / folder));
     }
     RubyVm vm;
@@ -92,6 +134,25 @@ TEST_CASE("every template creates a game that loads and whose scripts compile") 
   }
 }
 
+TEST_CASE("a new game gets an id of its own, made from its name") {
+  const std::filesystem::path root = fresh("ids");
+  std::string error;
+  REQUIRE_MESSAGE(create_game(root / "here" / "Coin Rush", "empty", error), error);
+  REQUIRE_MESSAGE(create_game(root / "there" / "Coin Rush", "empty", error), error);
+  const GameManifest here = read_game_manifest(root / "here" / "Coin Rush");
+  const GameManifest there = read_game_manifest(root / "there" / "Coin Rush");
+  CHECK(here.id_error.empty());
+  CHECK(valid_game_id(here.settings.id));
+  CHECK(here.settings.id.rfind("coin-rush-", 0) == 0);
+  // Two games given the same name are still two games.
+  CHECK(here.settings.id != there.settings.id);
+  CHECK(valid_game_id(new_game_id("---")));
+  CHECK(new_game_id("---").rfind("game-", 0) == 0);
+  CHECK(new_game_id(" My  Game_2 ").rfind("my-game-2-", 0) == 0);
+  CHECK(valid_game_id(new_game_id(std::string(64, 'A'))));
+  std::filesystem::remove_all(root);
+}
+
 TEST_CASE("the platformer template is playable") {
   const auto dir = fresh("platformer_play");
   std::string error;
@@ -105,8 +166,8 @@ TEST_CASE("the platformer template is playable") {
   // The game opens on its title screen: nothing moves until Play is clicked.
   for (int i = 0; i < kWalkFrames; ++i) engine->frame(config::kFixedDeltaSeconds);
   CHECK(length(engine->scene().world_transform(player).position - start) < kMinWalk);
-  const RubyResult title = engine->scripts().eval("Scene.find('Menu').props[:title]", "title.rb");
-  REQUIRE(title.ok);
+  const RubyResult title = engine->scripts().eval("GameMenu.instance.screens[:title].heading", "title.rb");
+  REQUIRE_MESSAGE(title.ok, title.error);
   CHECK(std::string(RSTRING_PTR(title.value)) == dir.filename().string());  // the game's name
   const RubyResult play = engine->scripts().eval(
       "box = GameMenu.instance.button_box(0); [box[0] + box[2] / 2, box[1] + box[3] / 2]", "play_button.rb");
@@ -136,6 +197,7 @@ TEST_CASE("games are not created over existing work or from unknown templates") 
   CHECK_FALSE(create_game(dir, "empty", error));
   CHECK(error.find("not empty") != std::string::npos);
   CHECK_FALSE(create_game(fresh("nope"), "racing", error));
+  CHECK(error == "unknown template 'racing': the templates are empty, platformer");
   std::filesystem::remove_all(dir);
 }
 
@@ -148,7 +210,10 @@ TEST_CASE("game.json settings round trip with defaults") {
   CHECK(defaults.title == dir.filename().string());
   CHECK(defaults.window_width == config::kWindowWidth);
   std::string error;
-  REQUIRE(write_game_settings(dir, {"My Game", kWidth, kHeight}, error));
+  defaults.title = "My Game";
+  defaults.window_width = kWidth;
+  defaults.window_height = kHeight;
+  REQUIRE(write_game_settings(dir, defaults, error));
   const GameSettings saved = read_game_settings(dir);
   CHECK(saved.title == "My Game");
   CHECK(saved.window_width == kWidth);
@@ -287,7 +352,7 @@ TEST_CASE("recently opened games are remembered, newest first, and missing ones 
   std::filesystem::remove_all(root);
 }
 
-TEST_CASE("game names must make plain folder names, and every template is described") {
+TEST_CASE("game names must make plain folder names") {
   CHECK(valid_game_name("My Game"));
   CHECK(valid_game_name("space-race_2"));
   CHECK_FALSE(valid_game_name(""));
@@ -295,7 +360,6 @@ TEST_CASE("game names must make plain folder names, and every template is descri
   CHECK_FALSE(valid_game_name("../escape"));
   CHECK_FALSE(valid_game_name("a/b"));
   CHECK_FALSE(valid_game_name(std::string(100, 'a')));
-  for (const std::string& name : game_templates()) CHECK_FALSE(template_description(name).empty());
 }
 
 TEST_CASE("a game is never built into itself") {

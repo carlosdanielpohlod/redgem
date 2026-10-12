@@ -263,16 +263,25 @@ std::optional<AndroidTools> find_android_tools(const std::filesystem::path& sdk,
   return std::nullopt;
 }
 
-std::string android_package_name(const std::filesystem::path& game_dir) {
-  const std::string folder = normalized_folder(game_dir).filename().string();
-  std::string name = letters_and_digits(folder);
+std::string android_package_from(const std::string& name) {
+  std::string part = letters_and_digits(name);
   // A part of an app's id starts with a letter.
-  if (name.empty() || std::isalpha(static_cast<unsigned char>(name.front())) == 0) name = kFallbackPackage + name;
+  if (part.empty() || std::isalpha(static_cast<unsigned char>(part.front())) == 0) part = kFallbackPackage + part;
   // Nothing but small letters and digits: the name is the id as it is.
-  if (std::all_of(folder.begin(), folder.end(), small_letter_or_digit)) return kPackagePrefix + name;
+  if (std::all_of(name.begin(), name.end(), small_letter_or_digit)) return kPackagePrefix + part;
   // "My Game", "my-game" and "mygame" are three games: what was dropped from the name comes
   // back as a few digits, so one does not install over another.
-  return kPackagePrefix + name + kPackageJoiner + name_digits(folder);
+  return kPackagePrefix + part + kPackageJoiner + name_digits(name);
+}
+
+std::string android_package_name(const std::filesystem::path& game_dir) {
+  return android_package_from(normalized_folder(game_dir).filename().string());
+}
+
+std::string android_package_for(const GameSettings& settings, const std::filesystem::path& game_dir) {
+  if (!settings.android.package.empty()) return settings.android.package;
+  if (settings.id.empty()) return android_package_name(game_dir);
+  return valid_android_package(settings.id) ? settings.id : android_package_from(settings.id);
 }
 
 namespace {
@@ -466,13 +475,10 @@ bool stage_runtimes(const std::map<std::string, std::filesystem::path>& runtimes
 // The app's manifest, from what the game says about its app (and about itself).
 bool manifest_for(const std::filesystem::path& game_dir, std::string& manifest, std::string& error) {
   const GameManifest game = read_game_manifest(game_dir);
-  if (!game.android_error.empty()) {
-    error = game.android_error;
-    return false;
-  }
-  const AndroidSettings& settings = game.settings.android;
-  const std::string package = settings.package.empty() ? android_package_name(game_dir) : settings.package;
-  manifest = android_manifest(package, game.settings.title, settings);
+  // (An id that cannot be used is no id to name the app by: the build says so instead of guessing.)
+  error = game.android_error.empty() ? game.id_error : game.android_error;
+  if (!error.empty()) return false;
+  manifest = android_manifest(android_package_for(game.settings, game_dir), game.settings.title, game.settings.android);
   return true;
 }
 

@@ -27,7 +27,7 @@ constexpr const char* kFilesId = "files";
 constexpr const char* kTileId = "##tile";
 constexpr const char* kNewScriptNameId = "##name";
 
-enum class Folder { Scripts, Models, Sounds, Scenes };
+using Folder = ProjectFolder;
 
 // What a double click on a file of each folder does.
 void edit_script(PanelContext& context, const std::string& name) { open_script(context.scripts, name); }
@@ -65,10 +65,6 @@ constexpr FolderInfo kFolders[] = {
     {Folder::Scenes, ICON_FA_MAP, "Scenes", config::kScenesDirName,
      "Extra levels: scenes/<name>.glb, loaded with Game.load_scene(\"name\").", explain_scene},
 };
-
-// State kept between frames. Reset when another game is opened (see reset_project_state).
-std::string g_new_script_name;
-Folder g_folder = Folder::Scripts;
 
 const std::vector<std::string>& files_of(const ProjectFiles& files, Folder folder) {
   switch (folder) {
@@ -142,7 +138,7 @@ void create_and_open_script(PanelContext& context, std::string& name) {
 }
 
 void new_script_popup(PanelContext& context) {
-  std::string& name = g_new_script_name;
+  std::string& name = context.state.project.new_script_name;
   if (!ImGui::BeginPopup(kNewScriptPopup)) return;
   ImGui::TextUnformatted("New Ruby behaviour");
   ImGui::SetNextItemWidth(kNewScriptFieldWidth);
@@ -163,12 +159,12 @@ const char* payload_of(Folder folder) {
 }
 
 // The list of folders on the left, each with how many files it holds.
-void draw_folders(const ProjectFiles& files) {
+void draw_folders(const ProjectFiles& files, Folder& current) {
   ImGui::BeginChild(kFoldersId, ImVec2(kFolderColumnWidth, 0.0f), ImGuiChildFlags_ResizeX);
   for (const FolderInfo& info : kFolders) {
     const std::string label =
         std::string(info.icon) + "  " + info.title + "  (" + std::to_string(files_of(files, info.folder).size()) + ")";
-    if (ImGui::Selectable(label.c_str(), g_folder == info.folder)) g_folder = info.folder;
+    if (ImGui::Selectable(label.c_str(), current == info.folder)) current = info.folder;
   }
   ImGui::EndChild();
 }
@@ -220,19 +216,14 @@ bool draw_new_script_form(const char* id, const char* hint, const char* button_l
 
 void draw_project(PanelContext& context) {
   ImGui::Begin(kProjectWindow);
-  draw_folders(context.files);
+  draw_folders(context.files, context.state.project.folder);
   ImGui::SameLine();
-  const FolderInfo& info = info_of(g_folder);
+  const FolderInfo& info = info_of(context.state.project.folder);
   ImGui::BeginGroup();
   draw_folder_bar(context, info);
   draw_tiles(context, info);
   ImGui::EndGroup();
   ImGui::End();
-}
-
-void reset_project_state() {
-  g_new_script_name.clear();
-  g_folder = Folder::Scripts;
 }
 
 }  // namespace redgem::ui

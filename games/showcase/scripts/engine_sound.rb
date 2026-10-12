@@ -11,8 +11,9 @@ class EngineSound
   DRIVING_VOLUME = 0.5
   VOLUME_QUICKNESS = 4.0    # how fast the loudness follows the throttle (per second)
 
-  # The gear the engine is in at a speed (1 is the first).
-  def self.gear(speed) = GEARS.index { |top| speed.abs < top }.to_i + 1
+  # The gear the engine is in at a speed (1 is the first). Past the last gear's top speed it
+  # stays in that one.
+  def self.gear(speed) = (GEARS.index { |top| speed.abs < top } || GEARS.size - 1) + 1
 
   def initialize
     @volume = IDLE_VOLUME

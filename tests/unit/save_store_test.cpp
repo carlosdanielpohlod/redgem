@@ -85,6 +85,44 @@ TEST_CASE("two games in folders of the same name do not share a save, and one ga
   CHECK(save_file_for("/home/ana/games/other/../platformer") == mine);
 }
 
+TEST_CASE("a game with an id keeps its save wherever its folder goes and whatever it is renamed to") {
+  const std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-save-location-test";
+  std::filesystem::remove_all(root);
+  std::filesystem::create_directories(root / "here" / "coins");
+  std::ofstream(root / "here" / "coins" / "game.json") << R"({"id": "com.studio.coins"})";
+  const std::filesystem::path before = save_file_for(root / "here" / "coins");
+  CHECK(before == saves_folder() / "by-id" / "com.studio.coins.json");
+  std::filesystem::create_directories(root / "there");
+  std::filesystem::rename(root / "here" / "coins", root / "there" / "Coin Rush");
+  CHECK(save_file_for(root / "there" / "Coin Rush") == before);
+  // A built game carries its game.json in its "game" folder: the same game, the same save.
+  std::filesystem::create_directories(root / "dist" / "CoinRush");
+  std::filesystem::copy(root / "there" / "Coin Rush", root / "dist" / "CoinRush" / "game");
+  CHECK(save_file_for(root / "dist" / "CoinRush" / "game") == before);
+  std::filesystem::remove_all(root);
+}
+
+TEST_CASE("a save is only ever looked for in one place: a game takes no other's") {
+  const std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-save-location-test";
+  std::filesystem::remove_all(root);
+  const std::filesystem::path game = root / "coins";
+  std::filesystem::create_directories(game);
+  const std::filesystem::path by_folder = save_file_for(game);
+  CHECK(by_folder.parent_path() == saves_folder());
+  // Given an id, the game starts a save of its own: the one named after its folder stays behind.
+  std::ofstream(game / "game.json") << R"({"id": "coins-3fa2c1b0"})";
+  const std::filesystem::path by_id = save_file_for(game);
+  CHECK(by_id != by_folder);
+  CHECK(by_id.parent_path() == saves_folder() / "by-id");
+  // No folder's name, wherever the folder is, names a file among the saves kept by id.
+  std::filesystem::create_directories(root / "by-id");
+  CHECK(save_file_for(root / "by-id").parent_path() == saves_folder());
+  // An id that cannot be used is no id: the save goes by the folder, as before.
+  std::ofstream(game / "game.json") << R"({"id": "../../elsewhere"})";
+  CHECK(save_file_for(game) == by_folder);
+  std::filesystem::remove_all(root);
+}
+
 TEST_CASE("what a save file holds that a game cannot save is left out") {
   const TempSave temp;
   std::filesystem::create_directories(temp.file.parent_path());

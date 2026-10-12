@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "render/mesh_builder.hpp"
 #include "render/render_config.hpp"
 #include "scene/scene_config.hpp"
 #include "render/render_math.hpp"
@@ -86,9 +87,10 @@ void Renderer::refresh_mesh(const SceneDesc& desc, int mesh) {
   const auto index = static_cast<std::size_t>(mesh);
   if (mesh < 0 || index >= impl_->meshes.size() || index >= desc.meshes.size()) return;
   const MeshDesc& source = desc.meshes[index];
-  const std::vector<GpuPrimitive>& parts = impl_->meshes[index];
-  for (std::size_t i = 0; i < std::min(parts.size(), source.primitives.size()); ++i) {
-    move_vertices(parts[i].mesh, source.primitives[i]);
+  // The mesh is cut as it was when it was uploaded: each part gets the piece it was made from.
+  const std::vector<PrimitiveDesc> pieces = mesh_pieces(source, config::kMaxVerticesPerMesh);
+  for (const GpuPrimitive& part : impl_->meshes[index]) {
+    if (part.piece < pieces.size()) move_vertices(part.mesh, pieces[part.piece]);
   }
   impl_->mesh_bounds[index] = source.bounds;
 }

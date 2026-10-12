@@ -107,6 +107,50 @@ TEST_CASE("after runs a block once, later; every keeps running it; both can be c
   CHECK(ruby(*engine, "[$once, $ticks, $ticker.cancelled?]") == "[1, 7, true]");
 }
 
+TEST_CASE("an object whose behaviours cannot be taken off it says so, and the game goes on") {
+  const TempSave temp;
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene, temp.file);
+  frames(*engine, 1);
+  // A game's own code got in the way of the engine's bookkeeping.
+  ruby(*engine, R"(
+    class GameObject
+      def __remove_behaviours = raise("not letting go")
+    end
+    Scene.find('Door').destroy
+  )");
+  const int errors_before = engine->scripts().error_count();
+  test::LogCapture log;
+  frames(*engine, 1);
+  CHECK(engine->scripts().error_count() == errors_before + 1);
+  CHECK(log.contains("taking the behaviours off 'Door'"));
+  CHECK(log.contains("not letting go"));
+  CHECK(engine->scene().find("Door") == kNoObject);  // destroyed all the same
+  frames(*engine, kHalfSecond);
+  CHECK(ruby(*engine, "Scene.find('Host').alive?") == "true");
+}
+
+TEST_CASE("the showcase's engine stays in its top gear, however fast the car goes") {
+  const TempSave temp;
+  const SceneDesc scene = small_scene();
+  test::LogCapture quiet;  // (the game's own scene script finds nothing of its level here)
+  EngineOptions options;
+  options.game_dir = fixture("../../games/showcase");  // its scripts, on a scene that loads at once
+  options.fixed_step = true;
+  options.scene = &scene;
+  options.save_file = temp.file;
+  auto created = Engine::create(options);
+  REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
+  Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
+  CHECK(ruby(engine, "[0.0, 8.9, 9.0, 22.9, 23.0, 30.4].map { |speed| EngineSound.gear(speed) }") ==
+        "[1, 1, 2, 3, 4, 4]");
+  // At the top gear's top speed and beyond it (and backwards): still the top gear, not the first.
+  CHECK(ruby(engine, "[30.5, 31.0, 300.0, -300.0].map { |speed| EngineSound.gear(speed) }") == "[4, 4, 4, 4]");
+  CHECK(ruby(engine, "EngineSound.gear(1000.0) == EngineSound::GEARS.size") == "true");
+  // There the engine is at the top of its revs.
+  CHECK(ruby(engine, "EngineSound.new.__send__(:revs, 300.0)") == "1.0");
+}
+
 TEST_CASE("a tween calls its block every frame, from 0 to exactly 1") {
   const TempSave temp;
   const SceneDesc scene = small_scene();

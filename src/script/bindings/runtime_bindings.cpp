@@ -184,6 +184,8 @@ mrb_value game_load_scene(mrb_state* mrb, mrb_value) {
 
 mrb_value game_scene_name(mrb_state* mrb, mrb_value) { return mrb_str_new_cstr(mrb, context(mrb).scene_name.c_str()); }
 
+mrb_value game_title(mrb_state* mrb, mrb_value) { return binding::text_value(mrb, context(mrb).game_title); }
+
 }  // namespace
 
 namespace {
@@ -221,6 +223,7 @@ void install_game_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, game_module, "quit", game_quit, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, game_module, "load_scene", game_load_scene, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, game_module, "scene_name", game_scene_name, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, game_module, "title", game_title, MRB_ARGS_NONE());
 }
 
 void install_audio_bindings(mrb_state* mrb) {

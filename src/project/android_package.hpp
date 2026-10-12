@@ -56,6 +56,12 @@ std::optional<SigningKey> signing_key_for(const std::filesystem::path& game_dir,
 // back as a few digits, so "My Game" and "my-game" stay two apps ("com.redgem.mygame_3fa2c1").
 // A name with no letter to start with gets "game" before it.
 std::string android_package_name(const std::filesystem::path& game_dir);
+// The same, made from any name instead of a folder's.
+std::string android_package_from(const std::string& name);
+// The id of a game's app: the package its game.json gives the app; else the game's own id, as it
+// is when it reads as an app's id ("com.mystudio.mygame") and made into one when it does not
+// ("my-game" -> "com.redgem.mygame_3fa2c1"); else the one made from its folder's name.
+std::string android_package_for(const GameSettings& settings, const std::filesystem::path& game_dir);
 // The app's AndroidManifest.xml: a full-screen, landscape native activity running the engine.
 std::string android_manifest(const std::string& package, const std::string& label,
                              const AndroidSettings& settings = {});
