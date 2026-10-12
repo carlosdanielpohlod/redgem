@@ -41,7 +41,8 @@ TEST_CASE("help wins over anything else on the line, and says how the tool is us
     CHECK(result.options.game_dir.empty());
   }
   const std::string usage = test_usage();
-  CHECK(usage.find("redgem-test <game_dir> <system_test.rb> [--screenshots <dir>] [--headless]") != std::string::npos);
+  CHECK(usage.find("redgem-test <game_dir> <system_test.rb> [--screenshots <dir>] [--headless] [--work <dir>]") !=
+        std::string::npos);
   CHECK(usage.find("redgem-test --ruby <test_file.rb>") != std::string::npos);
   CHECK(usage.find("development tool") != std::string::npos);
 }
@@ -60,6 +61,16 @@ TEST_CASE("what is wrong with a test command line is said") {
   CHECK(parse_test_cli({"--ruby", "x_test.rb", "--headless"}).error ==
         "--headless is for system tests (Ruby tests never open a window)");
   CHECK(parse_test_cli({"games/demo", "t.rb"}).error.empty());
+}
+
+TEST_CASE("a system test can be given a folder of its run's own; Ruby tests have no use for one") {
+  CHECK(parse_test_cli({"games/demo", "t.rb"}).options.work_dir.empty());
+  const TestCliResult result = parse_test_cli({"games/demo", "t.rb", "--work", "/tmp/run"});
+  REQUIRE(result.ok);
+  CHECK(result.options.work_dir == "/tmp/run");
+  CHECK(parse_test_cli({"games/demo", "t.rb", "--work"}).error == "--work needs a directory");
+  CHECK(parse_test_cli({"--ruby", "x_test.rb", "--work", "/tmp/run"}).error ==
+        "--work is for system tests (Ruby tests leave nothing behind)");
 }
 
 TEST_CASE("the flags the engine's own program once had mean nothing here either") {

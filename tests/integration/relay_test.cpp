@@ -6,6 +6,11 @@
 #include <set>
 #include <thread>
 
+#ifndef _WIN32
+#include <sys/resource.h>
+#include <unistd.h>
+#endif
+
 #include "net/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "net/relay_program.hpp"
@@ -26,7 +31,10 @@ constexpr float kRoundSeconds = 0.001f;
 constexpr float kPastJoinTimeout = 6.0f;
 constexpr float kPastForgetting = 4.0f;  // seconds after which a silent game is forgotten
 constexpr int kSettleRounds = 50;
-constexpr int kTooManyGuesses = 12;  // more wrong room codes than one address is allowed
+constexpr int kTooManyGuesses = 2 * kMaxPeers + 2;  // more wrong room codes than one address is allowed
+constexpr int kPartyGuests = kMaxPeers - 1;         // everyone a room has places for besides its opener
+constexpr int kBroadcasts = 4;
+constexpr std::size_t kBroadcastBytes = 256 * 1024;
 constexpr int kRoomsPerAddress = 8;
 constexpr float kPastKeptOut = 125.0f;  // seconds an address stays out for guessing
 constexpr float kQuietStep = 4.0f;
@@ -575,3 +583,133 @@ TEST_CASE("a room whose opener goes silent is closed, and its guests are told th
   CHECK(meeting.relay.room_count() == 0);
   CHECK(meeting.relay.connection_count() == 0);
 }
+
+namespace {
+
+// A room's opener and as many guests as it has places for, all from this machine's one address.
+struct Party {
+  Meeting meeting;
+  NetworkSession opener;
+  std::vector<std::unique_ptr<NetworkSession>> guests;
+
+  Party() {
+    std::string error;
+    meeting.seat(opener);
+    REQUIRE_MESSAGE(opener.host_room(kLocalhost, meeting.relay.port(), error), error);
+    REQUIRE(meeting.until([this] { return opener.state() == NetworkSession::State::Online; }));
+    for (int i = 0; i < kPartyGuests; ++i) {
+      guests.push_back(std::make_unique<NetworkSession>());
+      meeting.seat(*guests.back());
+    }
+  }
+
+  // Every guest asks for the room with `code` in the same moment; true once none is still trying.
+  bool everyone_tries(const std::string& code) {
+    std::string error;
+    for (const auto& guest : guests)
+      REQUIRE_MESSAGE(guest->join_room(kLocalhost, meeting.relay.port(), code, error), error);
+    return meeting.until([this] { return in_state(NetworkSession::State::Connecting) == 0; });
+  }
+
+  int in_state(NetworkSession::State state) const {
+    int total = 0;
+    for (const auto& guest : guests) total += guest->state() == state ? 1 : 0;
+    return total;
+  }
+};
+
+}  // namespace
+
+TEST_CASE("a whole party behind one address joins a room at once, and hears all its host says") {
+  Party party;
+  REQUIRE(party.everyone_tries(party.opener.room()));
+  CHECK(party.in_state(NetworkSession::State::Online) == kPartyGuests);
+  REQUIRE(party.meeting.until([&party] { return party.opener.peers().size() == kPartyGuests; }));
+  // The host says a lot to everyone in one go: the relay takes it as one machine's talk.
+  for (int i = 0; i < kBroadcasts; ++i) CHECK(party.opener.send("level", std::string(kBroadcastBytes, 'x')));
+  REQUIRE(party.meeting.until([&party] {
+    return party.meeting.count(kPartyGuests, NetworkEvent::Kind::Message) == kBroadcasts &&
+           party.meeting.count(1, NetworkEvent::Kind::Message) == kBroadcasts;
+  }));
+  CHECK(party.in_state(NetworkSession::State::Online) == kPartyGuests);
+  CHECK(party.opener.state() == NetworkSession::State::Online);
+}
+
+TEST_CASE("a whole party getting a room's code wrong, twice, is not kept out for guessing") {
+  Party party;
+  for (const char* misheard : {"WRONG1", "WRONG2"}) {
+    REQUIRE(party.everyone_tries(misheard));
+    CHECK(party.in_state(NetworkSession::State::Offline) == kPartyGuests);
+  }
+  REQUIRE(party.everyone_tries(party.opener.room()));
+  CHECK(party.in_state(NetworkSession::State::Online) == kPartyGuests);
+}
+
+TEST_CASE("what a machine said before it hung up is passed on to its room, and then it is gone") {
+  Meeting meeting;
+  RawMachine opener(meeting), talker(meeting);
+  const std::string code = opener.open_room();
+  REQUIRE(talker.say(R"({"k":"h","r":")" + code + R"("})"));
+  CHECK(opener.next_message()["k"] == "j");
+  std::vector<std::uint8_t> last_words;
+  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x"})");
+  for (int i = 0; i < kFloodMessages; ++i) last_words.insert(last_words.end(), tiny.begin(), tiny.end());
+  while (!last_words.empty()) REQUIRE(talker.socket.write(last_words) != IoStatus::Closed);
+  talker.socket.close();
+  int passed_on = 0;
+  nlohmann::json heard = opener.next_message();
+  for (; heard["k"] == "m"; heard = opener.next_message()) ++passed_on;
+  CHECK(passed_on == kFloodMessages);  // more than one poll handles: none was lost to the hanging up
+  CHECK(heard["k"] == "l");
+}
+
+#ifndef _WIN32
+namespace {
+
+constexpr rlim_t kFewDescriptors = 64;
+
+// While one of these lives the process can open nothing: no file, and no connection either.
+struct NoDescriptorsLeft {
+  rlimit before{};
+  std::vector<int> taken;
+
+  NoDescriptorsLeft() {
+    REQUIRE(getrlimit(RLIMIT_NOFILE, &before) == 0);
+    rlimit few = before;
+    few.rlim_cur = std::min(before.rlim_cur, kFewDescriptors);
+    REQUIRE(setrlimit(RLIMIT_NOFILE, &few) == 0);
+    for (int descriptor = dup(STDIN_FILENO); descriptor >= 0; descriptor = dup(STDIN_FILENO)) {
+      taken.push_back(descriptor);
+    }
+  }
+  ~NoDescriptorsLeft() {
+    for (const int descriptor : taken) ::close(descriptor);
+    setrlimit(RLIMIT_NOFILE, &before);
+  }
+};
+
+}  // namespace
+
+TEST_CASE("a relay that cannot take a newcomer rests before it asks again, instead of never sleeping") {
+  Meeting meeting;
+  std::string error;
+  Socket caller = Socket::connect_to(kLocalhost, meeting.relay.port(), error);
+  REQUIRE(meeting.relay.wait(kLongWaitSeconds));  // the caller is there to be taken
+  {
+    const NoDescriptorsLeft nothing_to_give;
+    meeting.relay.poll(kRoundSeconds);
+    CHECK(meeting.relay.connection_count() == 0);
+    // The caller still waits, and would end every wait at once: the relay sleeps a moment anyway.
+    const auto before = std::chrono::steady_clock::now();
+    CHECK_FALSE(meeting.relay.wait(kLongWaitSeconds));
+    const auto slept = std::chrono::steady_clock::now() - before;
+    CHECK(slept >= std::chrono::duration<float>(kAcceptRestSeconds / 2.0f));
+    CHECK(slept < kLongWait);
+  }
+  // The rest is not over yet, then it is: the caller is taken.
+  meeting.relay.poll(kRoundSeconds);
+  CHECK(meeting.relay.connection_count() == 0);
+  meeting.relay.poll(kAcceptRestSeconds);
+  CHECK(meeting.relay.connection_count() == 1);
+}
+#endif

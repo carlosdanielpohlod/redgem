@@ -9,6 +9,14 @@ namespace redgem::testing {
 namespace {
 
 constexpr const char* kTestSavesFolder = "test-saves";  // beside the players' saves, in the user's own folder
+constexpr const char* kWorkSavesFolder = "saves";       // in a run's own folder
+constexpr const char* kSaveExtension = ".json";
+
+std::filesystem::path emptied(const std::filesystem::path& file) {
+  std::error_code ignored;
+  std::filesystem::remove(file, ignored);
+  return file;
+}
 
 }  // namespace
 
@@ -18,10 +26,12 @@ std::filesystem::path test_save_file_for(const std::filesystem::path& game_dir) 
 }
 
 std::filesystem::path fresh_test_save_file(const std::filesystem::path& game_dir) {
-  const std::filesystem::path file = test_save_file_for(game_dir);
-  std::error_code ignored;
-  std::filesystem::remove(file, ignored);
-  return file;
+  return emptied(test_save_file_for(game_dir));
+}
+
+std::filesystem::path fresh_save_file_in(const std::filesystem::path& work_dir,
+                                         const std::filesystem::path& test_file) {
+  return emptied(work_dir / kWorkSavesFolder / (test_file.stem().string() + kSaveExtension));
 }
 
 }  // namespace redgem::testing

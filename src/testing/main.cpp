@@ -24,8 +24,8 @@ int run_tests(const testing::TestCliOptions& options) {
     return kExitSuccess;
   }
   if (options.mode == testing::TestMode::RubyTests) return testing::run_ruby_tests(options.test_file);
-  return testing::run_system_test(
-      {options.game_dir, options.test_file, options.screenshot_dir, options.headless, gpu_choice_for_run(options.gpu)});
+  return testing::run_system_test({options.game_dir, options.test_file, options.screenshot_dir, options.headless,
+                                   gpu_choice_for_run(options.gpu), options.work_dir});
 }
 
 int run_command_line(const std::vector<std::string>& args) {

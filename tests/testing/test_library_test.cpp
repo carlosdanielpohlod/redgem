@@ -3,6 +3,8 @@
 #include <mruby.h>
 #include <mruby/string.h>
 
+#include <filesystem>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <variant>
@@ -13,6 +15,7 @@
 #include "testing/ruby_tests.hpp"
 #include "testing/system_test.hpp"
 #include "testing/test_library.hpp"
+#include "testing/test_notes.hpp"
 
 using namespace redgem;
 using namespace redgem::testing;
@@ -114,6 +117,28 @@ TEST_CASE("notes go from one test to another, by plain names only") {
   CHECK(ruby(*engine, "TestInput.note('nobody_left_this_one').inspect") == "nil");
   CHECK_FALSE(engine->scripts().eval("TestInput.leave_note('../outside', 'x')", "t.rb").ok);
   CHECK_FALSE(engine->scripts().eval("TestInput.note('/etc/passwd')", "t.rb").ok);
+}
+
+TEST_CASE("a run with a folder of its own keeps its notes there, whole, away from every other run's") {
+  const std::filesystem::path shared = notes_folder();
+  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-tests-work";
+  std::filesystem::remove_all(work);
+  ScriptedInputSource input;
+  auto engine = sandbox(input);
+  REQUIRE_FALSE(load_test_library(engine->scripts(), input).has_value());
+  ruby(*engine, "TestInput.leave_note('shared_note', 'everyone')");
+  keep_notes_in(notes_folder_in(work));
+  CHECK(notes_folder().string().rfind(work.string(), 0) == 0);
+  CHECK(ruby(*engine, "TestInput.note('shared_note').inspect") == "nil");
+  ruby(*engine, "TestInput.leave_note('own_note', 'ours')");
+  CHECK(ruby(*engine, "TestInput.note('own_note')") == "ours");
+  // (Only the note itself is left: nothing half-written beside it.)
+  CHECK(std::distance(std::filesystem::directory_iterator(notes_folder()), std::filesystem::directory_iterator()) == 1);
+  keep_notes_in({});
+  CHECK(notes_folder() == shared);
+  CHECK(ruby(*engine, "TestInput.note('own_note').inspect") == "nil");
+  std::filesystem::remove(shared / "shared_note");
+  std::filesystem::remove_all(work);
 }
 
 TEST_CASE("a file of Ruby unit tests passes or fails as its tests do") {

@@ -60,6 +60,7 @@ add_executable(redgem_tests
   integration/scene_script_test.cpp
   integration/ui_input_test.cpp
   integration/gameplay_api_test.cpp
+  integration/connection_test.cpp
   integration/network_session_test.cpp
   integration/multiplayer_test.cpp
   integration/relay_test.cpp
@@ -175,22 +176,22 @@ endforeach()
 # Multiplayer: two copies of the game run at once and play together, each driven by its own test.
 # tests/system_pairs/<game>/<name>_host_test.rb pairs up with <name>_guest_test.rb. A pair whose
 # name ends in _room also gets a relay to meet on (the relay is the engine's own program,
-# redgem-relay; the two games are run by the test tool).
-set(REDGEM_TEST_RELAY_PORT 47841)
+# redgem-relay; the two games are run by the test tool). Each run has a folder and ports of its
+# own (see run_pair.sh).
 file(GLOB REDGEM_PAIRED_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_pairs/*/*_host_test.rb)
 foreach(host_test IN LISTS REDGEM_PAIRED_TESTS)
   get_filename_component(game_dir ${host_test} DIRECTORY)
   get_filename_component(game ${game_dir} NAME)
   get_filename_component(host_name ${host_test} NAME_WE)
   string(REGEX REPLACE "_host_test$" "" pair_name ${host_name})
-  set(relay_port "")
+  set(with_relay "")
   if(pair_name MATCHES "_room$")
-    set(relay_port ${REDGEM_TEST_RELAY_PORT})
+    set(with_relay relay)
   endif()
   add_test(NAME system.${game}.${pair_name}_together
            COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/system_pairs/run_pair.sh $<TARGET_FILE:redgem_relay>
                    $<TARGET_FILE:redgem_test_tool> ${CMAKE_SOURCE_DIR}/games/${game} ${host_test} ${game_dir}/${pair_name}_guest_test.rb
-                   ${REDGEM_SCREENSHOT_DIR}/${game} ${relay_port})
+                   ${REDGEM_SCREENSHOT_DIR}/${game} ${with_relay})
   set_tests_properties(system.${game}.${pair_name}_together PROPERTIES LABELS system RUN_SERIAL TRUE)
 endforeach()
 
@@ -217,16 +218,28 @@ target_compile_definitions(redgem_editor_system_tests PRIVATE
 add_test(NAME system.editor.window COMMAND redgem_editor_system_tests)
 set_tests_properties(system.editor.window PROPERTIES LABELS system RUN_SERIAL TRUE)
 
-# Games whose scene is generated from downloaded assets (not committed) are tested when present.
+# Games whose scene is generated from downloaded assets (not committed) are tested when it is
+# there, and reported as skipped when it is not: a test that did not run never counts as passed.
+set(REDGEM_RUN_IF_BUILT ${CMAKE_CURRENT_SOURCE_DIR}/system_optional/run_if_built.sh)
+set(REDGEM_SKIPPED_EXIT_CODE 77)  # what run_if_built.sh ends with when the scene is missing
 foreach(game showcase)
-  if(EXISTS ${CMAKE_SOURCE_DIR}/games/${game}/scene.glb)
-    file(GLOB optional_tests CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_optional/${game}/*_test.rb)
-    foreach(test_file IN LISTS optional_tests)
-      get_filename_component(test_name ${test_file} NAME_WE)
-      add_test(NAME system.${game}.${test_name}
-               COMMAND redgem_test_tool ${CMAKE_SOURCE_DIR}/games/${game} ${test_file}
-                       --screenshots ${REDGEM_SCREENSHOT_DIR}/${game})
-      set_tests_properties(system.${game}.${test_name} PROPERTIES LABELS system RUN_SERIAL TRUE)
-    endforeach()
-  endif()
+  file(GLOB optional_tests CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_optional/${game}/*_test.rb)
+  foreach(test_file IN LISTS optional_tests)
+    get_filename_component(test_name ${test_file} NAME_WE)
+    add_test(NAME system.${game}.${test_name}
+             COMMAND ${REDGEM_RUN_IF_BUILT} ${CMAKE_SOURCE_DIR}/games/${game}/scene.glb
+                     $<TARGET_FILE:redgem_test_tool> ${CMAKE_SOURCE_DIR}/games/${game} ${test_file}
+                     --screenshots ${REDGEM_SCREENSHOT_DIR}/${game})
+    set_tests_properties(system.${game}.${test_name} PROPERTIES LABELS system RUN_SERIAL TRUE
+      SKIP_RETURN_CODE ${REDGEM_SKIPPED_EXIT_CODE})
+  endforeach()
 endforeach()
+# Guards the skipping itself: without the scene the test is not run and says so, with the exit
+# code that means "skipped"; with it, the test is run.
+add_test(NAME system.optional_tests_without_their_scene_are_skipped
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/system_optional/skips_without_scene.sh
+                 ${REDGEM_RUN_IF_BUILT} ${REDGEM_SKIPPED_EXIT_CODE})
+
+# The tools that are scripts.
+add_test(NAME tools.blender_runs_in_a_home_of_its_own
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/blender_home.sh ${CMAKE_SOURCE_DIR}/tools/blender/run.sh)

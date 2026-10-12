@@ -11,10 +11,10 @@ class SceneTest < RedGemTest::Case
 
   # The unit tests run in an empty scene, so the engine's own lookup stands aside for one name.
   def with_an_object_named(name, object)
-    Scene.instance_variable_set(:@stand_in, [name, object])
+    $stand_in = [name, object]
     class << Scene
       alias_method :find_in_the_scene, :find
-      def find(name) = name == @stand_in.first ? @stand_in.last : find_in_the_scene(name)
+      def find(name) = name == $stand_in.first ? $stand_in.last : find_in_the_scene(name)
     end
     yield
   ensure

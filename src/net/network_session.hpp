@@ -7,7 +7,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "net/frame_buffer.hpp"
+#include "net/connection.hpp"
 #include "net/socket.hpp"
 #include "net/wire.hpp"
 
@@ -69,15 +69,8 @@ class NetworkSession {
  private:
   // A connection: the host's to each machine that joined, a joiner's to the host.
   struct Link {
-    Socket socket;
-    FrameBuffer incoming;
-    std::vector<std::uint8_t> outgoing;
-    std::string address;       // where a newcomer connected from
-    int peer = 0;              // 0 on the host until the newcomer said hello and was let in
-    float waiting_for = 0.0f;  // seconds a newcomer has kept the host waiting for that hello
-    float quiet_for = 0.0f;    // seconds since anything arrived from it
-    float since_said = 0.0f;   // seconds since anything was sent to it
-    bool closed = false;
+    Connection connection;
+    int peer = 0;  // 0 on the host until the newcomer said hello and was let in
   };
 
   bool connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello, std::string& error);
@@ -92,13 +85,8 @@ class NetworkSession {
   bool room_to_wait(const std::string& address) const;
   void admit(Link& link, std::vector<NetworkEvent>& events);
   void drop_silent_newcomers(float seconds);
-  // Says "I am here" over links that had nothing to carry lately, and gives up on silent ones.
-  void keep_in_touch(Link& link, float seconds);
   void await_connection(float seconds, std::vector<NetworkEvent>& events);
-  // Reads and writes what the link can right now; marks it closed when the other side is gone.
-  void pump(Link& link);
-  void take_in(Link& link);
-  void handle(Link& link, const std::string& text, std::vector<NetworkEvent>& events);
+  void handle(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
   void handle_as_host(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
   void hear_newcomer(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
   // Sends a peer's message on to whom it is for; true when that includes this machine.
@@ -114,7 +102,6 @@ class NetworkSession {
   std::vector<int> take_closed_links();
   bool send_through_host(const nlohmann::json& message, int to);
   bool send_as_host(const nlohmann::json& message, int to);
-  void queue(Link& link, const nlohmann::json& message);
   void queue_for_everyone_but(int peer, const nlohmann::json& message);
   Link* link_to(int peer);
   void go_offline();

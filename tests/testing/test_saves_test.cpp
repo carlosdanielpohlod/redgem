@@ -26,6 +26,20 @@ TEST_CASE("test saves are kept in the user's own folder, not where every user of
   CHECK(tested.parent_path().parent_path().string().rfind(shared, 0) != 0);
 }
 
+TEST_CASE("tests run in a folder of their own save there, each in a file of its own, starting from nothing") {
+  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-tests-work";
+  const std::filesystem::path host = fresh_save_file_in(work, "tests/pairs/co_op_host_test.rb");
+  const std::filesystem::path guest = fresh_save_file_in(work, "tests/pairs/co_op_guest_test.rb");
+  CHECK(host != guest);
+  CHECK(host.string().rfind(work.string(), 0) == 0);
+  CHECK(host.filename() == "co_op_host_test.json");
+  std::filesystem::create_directories(host.parent_path());
+  std::ofstream(host) << "{\"best\": 3}";
+  CHECK(fresh_save_file_in(work, "tests/pairs/co_op_host_test.rb") == host);
+  CHECK_FALSE(std::filesystem::exists(host));
+  std::filesystem::remove_all(work);
+}
+
 TEST_CASE("every test starts from no saves at all") {
   const std::filesystem::path game = "/nowhere/redgem-testing-tests/a_game";
   const std::filesystem::path file = test_save_file_for(game);

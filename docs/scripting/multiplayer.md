@@ -140,7 +140,8 @@ touches is decided on its owner's machine and told to the others in a message.
 A machine only creates for others what the game itself spawns: templates it has passed to
 `Network.spawn`, `prefab = true` objects, and the ones named with
 `Network.allow_spawn("Hero", "Bullet")` (worth saying in a scene script's `setup`). And each
-machine can only spawn objects of its own.
+machine can only spawn objects of its own: 64 at a time, 512 in the whole game. Past that
+`Network.spawn` makes nothing and returns `nil`.
 
 Loading a level happens on one machine: its spawned objects go away everywhere, and it is shown
 the others' again. To change level together, send a message and load it on every machine.

@@ -16,8 +16,10 @@ constexpr std::size_t kMaxRooms = 256;
 // What one address may do. (Players in one house share an address: a whole party fits.)
 constexpr int kMaxConnectionsPerAddress = 24;
 constexpr int kMaxRoomsPerAddress = 8;
-constexpr float kMaxWrongCodes = 10.0f;           // wrong guesses at a room code before being kept out ...
-constexpr float kKeptOutSeconds = 120.0f;         // ... for this long
+// Wrong guesses at a room code before an address is kept out: a whole party behind one address may
+// each get the code wrong twice (someone read it out badly). Guessing a room takes millions more.
+constexpr float kMaxWrongCodes = 2.0f * kMaxPeers;
+constexpr float kKeptOutSeconds = 120.0f;         // kept out for this long
 constexpr float kForgetWrongCodeSeconds = 30.0f;  // one wrong guess is forgotten after this
 // What may wait to be sent to one machine: two of the longest messages. A relay holds many
 // machines' queues at once, so it is far stricter than a game is with its few.
@@ -25,12 +27,6 @@ constexpr std::size_t kMaxPendingPerMember = 2 * kMaxFrameBytes;
 // Letters and digits that are not mistaken for one another when read aloud or typed (no I, O, 0, 1).
 constexpr std::string_view kCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 constexpr int kCodeTries = 64;  // at finding a code no open room has
-
-// What a member holds: what arrived from it and was not handled yet, and what waits to be sent to it.
-template <typename Member>
-std::size_t held_by(const Member& member) {
-  return member.closed ? 0 : member.incoming.buffered() + member.outgoing.size();
-}
 
 }  // namespace
 
@@ -44,7 +40,7 @@ std::string random_room_code() {
 
 bool RelayServer::has_opener(const std::vector<Member*>& inside) {
   return std::any_of(inside.begin(), inside.end(),
-                     [](const Member* member) { return member->peer == kHostId && !member->closed; });
+                     [](const Member* member) { return member->peer == kHostId && !member->connection.closed(); });
 }
 
 bool RelayServer::start(std::uint16_t port, std::string& error) {
@@ -57,6 +53,7 @@ bool RelayServer::start(std::uint16_t port, std::string& error) {
 void RelayServer::poll(float seconds) {
   if (!listener_.valid()) return;
   forgive_visitors(seconds);
+  accept_rest_ = std::max(0.0f, accept_rest_ - seconds);
   accept_newcomers();
   // By index: nothing below adds members, but entering a room touches other members.
   for (std::size_t i = 0; i < members_.size(); ++i) serve(*members_[i], seconds);
@@ -65,47 +62,47 @@ void RelayServer::poll(float seconds) {
 }
 
 bool RelayServer::wait(float seconds) const {
-  std::vector<Watched> watched{{&listener_, false}};
+  // (A newcomer that cannot be taken would end every wait at once: it is not watched for a while.)
+  const bool resting = accept_rest_ > 0.0f;
+  std::vector<Watched> watched;
+  if (!resting) watched.push_back({&listener_, false});
   for (const auto& member : members_) {
     // Messages that arrived and still wait their turn (see kMaxMessagesPerPoll) are work for now.
-    if (member->incoming.message_waiting()) return true;
-    watched.push_back({&member->socket, !member->outgoing.empty()});
+    if (member->connection.message_waiting()) return true;
+    watched.push_back(member->connection.watched());
   }
-  return Socket::wait(watched, seconds);
+  return Socket::wait(watched, resting ? std::min(seconds, accept_rest_) : seconds);
 }
 
 void RelayServer::serve(Member& member, float seconds) {
-  if (member.peer == 0) await_room_choice(member, seconds);
+  Connection& connection = member.connection;
+  if (member.peer == 0) connection.keep_waiting(seconds);  // for it to say which room
   member.allowance = std::min(kRelayBurstBytes, member.allowance + seconds * kRelayBytesPerSecond);
-  pump(member);
-  if (member.peer != 0) keep_in_touch(member, seconds);
+  charge(member, connection.pump());
+  if (member.peer != 0) connection.keep_in_touch(seconds);
   // (Only so many a poll: the rest wait for the next one, see kMaxMessagesPerPoll.)
-  for (int handled = 0; handled < kMaxMessagesPerPoll && !member.closed; ++handled) {
-    const auto text = member.incoming.next();
-    if (!text) break;
-    handle(member, *text);
-  }
-  if (member.incoming.broken()) member.closed = true;
-}
-
-void RelayServer::await_room_choice(Member& member, float seconds) {
-  member.waiting_for += seconds;
-  if (member.waiting_for > kJoinTimeoutSeconds) member.closed = true;  // connected and said nothing
+  while (const auto message = connection.next_message()) handle(member, *message);
 }
 
 void RelayServer::accept_newcomers() {
-  for (Socket guest = listener_.accept(); guest.valid(); guest = listener_.accept()) {
-    const std::string address = guest.peer_address();
-    const auto visitor = visitors_.find(address);
-    const bool kept_out = visitor != visitors_.end() && visitor->second.kept_out_for > 0.0f;
-    // Full, kept out for guessing, or too many from one place: hung up on.
-    if (members_.size() >= kMaxConnections || kept_out || connections_from(address) >= kMaxConnectionsPerAddress)
-      continue;
+  if (accept_rest_ > 0.0f) return;
+  Socket guest;
+  IoStatus taken = listener_.accept(guest);
+  for (; taken == IoStatus::Ok; taken = listener_.accept(guest)) {
+    if (!room_for(guest.peer_address())) continue;  // hung up on
     auto member = std::make_unique<Member>();
-    member->socket = std::move(guest);
-    member->address = address;
+    member->connection = Connection::accepted(std::move(guest), kMaxPendingPerMember);
     members_.push_back(std::move(member));
   }
+  // Someone is waiting and the system has no connection to give: asked again after a rest.
+  if (taken == IoStatus::Closed) accept_rest_ = kAcceptRestSeconds;
+}
+
+bool RelayServer::room_for(const std::string& address) const {
+  const auto visitor = visitors_.find(address);
+  const bool kept_out = visitor != visitors_.end() && visitor->second.kept_out_for > 0.0f;
+  // Not when full, kept out for guessing, or with too many from one place already.
+  return members_.size() < kMaxConnections && !kept_out && connections_from(address) < kMaxConnectionsPerAddress;
 }
 
 void RelayServer::forgive_visitors(float seconds) {
@@ -117,76 +114,42 @@ void RelayServer::forgive_visitors(float seconds) {
   }
 }
 
-void RelayServer::keep_in_touch(Member& member, float seconds) {
-  member.quiet_for += seconds;
-  member.since_said += seconds;
-  if (member.quiet_for > kSilenceTimeoutSeconds) {
-    member.closed = true;  // gone without a goodbye
-  } else if (member.since_said >= kPingEverySeconds) {
-    queue(member, {{kKind, kPing}});
-  }
-}
-
 int RelayServer::connections_from(const std::string& address) const {
   return static_cast<int>(std::count_if(members_.begin(), members_.end(), [&address](const auto& member) {
-    return !member->closed && member->address == address;
+    return !member->connection.closed() && member->connection.address() == address;
   }));
 }
 
 int RelayServer::rooms_opened_by(const std::string& address) const {
   return static_cast<int>(std::count_if(members_.begin(), members_.end(), [&address](const auto& member) {
-    return !member->closed && member->peer == kHostId && member->address == address;
+    return !member->connection.closed() && member->peer == kHostId && member->connection.address() == address;
   }));
-}
-
-void RelayServer::pump(Member& member) {
-  take_in(member);
-  if (!member.closed && member.socket.write(member.outgoing) == IoStatus::Closed) member.closed = true;
-}
-
-void RelayServer::take_in(Member& member) {
-  // With that much of its talk still to handle, a machine's next words wait in the connection
-  // (and it is not silent).
-  if (member.incoming.buffered() >= kMaxReadBytesPerPoll) {
-    member.quiet_for = 0.0f;
-    return;
-  }
-  std::vector<std::uint8_t> arrived;
-  if (member.socket.read(arrived, kMaxReadBytesPerPoll) == IoStatus::Closed) member.closed = true;
-  if (!arrived.empty()) member.quiet_for = 0.0f;
-  member.incoming.append(arrived.data(), arrived.size());
-  charge(member, arrived.size());
 }
 
 void RelayServer::charge(Member& member, std::size_t bytes) {
   member.allowance -= static_cast<float>(bytes);
-  if (member.allowance < 0.0f) member.closed = true;  // no game talks this much: a flood
+  if (member.allowance < 0.0f) member.connection.close();  // no game talks this much: a flood
 }
 
 void RelayServer::shed_load() {
   std::size_t held = 0;
-  for (const auto& member : members_) held += held_by(*member);
+  for (const auto& member : members_) held += member->connection.held();
   // Whoever holds less than an even share is never the reason: with every machine under it the
   // total fits. The newest above it go first; those who were here before keep playing.
   const std::size_t share = max_buffered_bytes_ / kMaxConnections;
   for (auto member = members_.rbegin(); member != members_.rend() && held > max_buffered_bytes_; ++member) {
-    const std::size_t holding = held_by(**member);
+    const std::size_t holding = (*member)->connection.held();
     if (holding <= share) continue;
-    (*member)->closed = true;
+    (*member)->connection.close();
     held -= holding;
   }
 }
 
-void RelayServer::handle(Member& member, const std::string& text) {
-  const nlohmann::json message = nlohmann::json::parse(text, nullptr, false);
-  if (!well_formed(message)) {
-    member.closed = true;
-    return;
-  }
+void RelayServer::handle(Member& member, const nlohmann::json& message) {
   try {
     act_on(member, message);
   } catch (const nlohmann::json::exception&) {
-    member.closed = true;  // (well_formed should have caught it: one machine never takes the relay down)
+    member.connection.close();  // (well_formed should have caught it: one machine never takes the relay down)
   }
 }
 
@@ -201,7 +164,7 @@ void RelayServer::act_on(Member& member, const nlohmann::json& message) {
 void RelayServer::hear_newcomer(Member& member, const nlohmann::json& message) {
   // A newcomer's first words say which room; anything else and it is not let in.
   if (message[kKind] != kHello || !message.contains(kRoom)) {
-    member.closed = true;
+    member.connection.close();
     return;
   }
   enter_room(member, message[kRoom]);
@@ -218,24 +181,25 @@ void RelayServer::enter_room(Member& member, const std::string& wanted) {
 }
 
 void RelayServer::open_room(Member& member) {
-  const bool room_to_give = rooms_.size() < kMaxRooms && rooms_opened_by(member.address) < kMaxRoomsPerAddress;
+  const bool room_to_give =
+      rooms_.size() < kMaxRooms && rooms_opened_by(member.connection.address()) < kMaxRoomsPerAddress;
   const std::string code = room_to_give ? new_room_code() : std::string();
   if (code.empty()) {
-    member.closed = true;
+    member.connection.close();
     return;
   }
   rooms_[code] = true;
   member.room = code;
   member.peer = kHostId;
-  queue(member, {{kKind, kWelcome}, {kTo, member.peer}, {kPeers, std::vector<int>{}}, {kRoom, code}});
+  member.connection.send({{kKind, kWelcome}, {kTo, member.peer}, {kPeers, std::vector<int>{}}, {kRoom, code}});
 }
 
 void RelayServer::note_wrong_code(Member& member) {
   // A wrong code may be a typo; many are someone trying every code there is.
-  Visitor& visitor = visitors_[member.address];
+  Visitor& visitor = visitors_[member.connection.address()];
   visitor.wrong_codes += 1.0f;
   if (visitor.wrong_codes >= kMaxWrongCodes) visitor.kept_out_for = kKeptOutSeconds;
-  member.closed = true;
+  member.connection.close();
 }
 
 void RelayServer::join_room(Member& member, const std::string& room) {
@@ -243,12 +207,12 @@ void RelayServer::join_room(Member& member, const std::string& room) {
   for (const Member* other : members_of(room)) ids.push_back(other->peer);
   const int id = free_peer_id(ids);
   if (id == 0) {
-    member.closed = true;  // a full room
+    member.connection.close();  // a full room
     return;
   }
   member.room = room;
   member.peer = id;
-  queue(member, {{kKind, kWelcome}, {kTo, member.peer}, {kPeers, ids}, {kRoom, room}});
+  member.connection.send({{kKind, kWelcome}, {kTo, member.peer}, {kPeers, ids}, {kRoom, room}});
   tell_room(room, member.peer, {{kKind, kArrived}, {kFrom, member.peer}});
 }
 
@@ -258,7 +222,7 @@ void RelayServer::pass_on(Member& sender, const nlohmann::json& message) {
   const nlohmann::json passed_on =
       game_message(message[kName], message.value(kData, nlohmann::json()), sender.peer, to);
   for (Member* other : members_of(sender.room)) {
-    if (other->peer != sender.peer && (to == kEveryone || other->peer == to)) queue(*other, passed_on);
+    if (other->peer != sender.peer && (to == kEveryone || other->peer == to)) other->connection.send(passed_on);
   }
 }
 
@@ -270,7 +234,7 @@ void RelayServer::drop_closed_members() {
     changed = tell_rooms_who_left();
   }
   members_.erase(std::remove_if(members_.begin(), members_.end(),
-                                [](const std::unique_ptr<Member>& member) { return member->closed; }),
+                                [](const std::unique_ptr<Member>& member) { return member->connection.closed(); }),
                  members_.end());
 }
 
@@ -282,7 +246,7 @@ void RelayServer::close_rooms_without_opener() {
       ++room;
       continue;
     }
-    for (Member* member : inside) member->closed = true;
+    for (Member* member : inside) member->connection.close();
     room = rooms_.erase(room);
   }
 }
@@ -290,7 +254,7 @@ void RelayServer::close_rooms_without_opener() {
 bool RelayServer::tell_rooms_who_left() {
   bool told = false;
   for (const auto& member : members_) {
-    if (!member->closed || member->farewelled) continue;
+    if (!member->connection.closed() || member->farewelled) continue;
     member->farewelled = true;
     if (member->peer < kFirstGuestId || rooms_.count(member->room) == 0) continue;
     tell_room(member->room, member->peer, {{kKind, kGone}, {kFrom, member->peer}});
@@ -299,28 +263,16 @@ bool RelayServer::tell_rooms_who_left() {
   return told;
 }
 
-void RelayServer::queue(Member& member, const nlohmann::json& message) {
-  const std::vector<std::uint8_t> bytes = packed(message);
-  member.outgoing.insert(member.outgoing.end(), bytes.begin(), bytes.end());
-  member.since_said = 0.0f;
-  if (member.outgoing.size() > kMaxPendingPerMember) {
-    member.closed = true;  // it stopped listening
-    member.outgoing.clear();
-    return;
-  }
-  if (member.socket.write(member.outgoing) == IoStatus::Closed) member.closed = true;
-}
-
 void RelayServer::tell_room(const std::string& room, int except, const nlohmann::json& message) {
   for (Member* member : members_of(room)) {
-    if (member->peer != except && !member->closed) queue(*member, message);
+    if (member->peer != except) member->connection.send(message);
   }
 }
 
 std::vector<RelayServer::Member*> RelayServer::members_of(const std::string& room) {
   std::vector<Member*> found;
   for (const auto& member : members_) {
-    if (member->peer != 0 && !member->closed && member->room == room) found.push_back(member.get());
+    if (member->peer != 0 && !member->connection.closed() && member->room == room) found.push_back(member.get());
   }
   return found;
 }

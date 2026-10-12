@@ -88,6 +88,7 @@ redgem_add_library(redgem_net
   net/frame_buffer.cpp
   net/socket.cpp
   net/wire.cpp
+  net/connection.cpp
   net/network_session.cpp
   net/lan_discovery.cpp
   net/relay_server.cpp

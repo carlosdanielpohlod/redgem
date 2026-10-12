@@ -20,17 +20,20 @@ constexpr const char* kRubyOption = "--ruby";
 constexpr const char* kScreenshotsOption = "--screenshots";
 constexpr const char* kHeadlessOption = "--headless";
 constexpr const char* kGpuOption = "--gpu";
+constexpr const char* kWorkOption = "--work";
 
 constexpr const char* kUsageText =
     "redgem-test runs the tests of a game. It is a development tool: built games do not have it.\n"
     "\n"
     "usage:\n"
-    "  redgem-test <game_dir> <system_test.rb> [--screenshots <dir>] [--headless]\n"
+    "  redgem-test <game_dir> <system_test.rb> [--screenshots <dir>] [--headless] [--work <dir>]\n"
     "                                    play the game with a system test at the controls\n"
     "  redgem-test --ruby <test_file.rb>    run a file of Ruby unit tests\n"
     "\n"
     "  --screenshots <dir>   where the test's pictures go (default: screenshots)\n"
     "  --headless            no window: faster, and takes no pictures\n"
+    "  --work <dir>          a folder of this run's own for its save file and its notes to the tests\n"
+    "                        run with it (default: folders every run on this machine shares)\n"
     "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting)\n"
     "\n"
     "It exits with 0 when the tests pass and with 1 when they do not.\n";
@@ -84,6 +87,15 @@ void read_screenshots(Reading& reading) {
   reading.result.options.screenshot_dir = *folder;
 }
 
+void read_work(Reading& reading) {
+  const auto folder = value(reading);
+  if (!folder) {
+    fail(reading, "--work needs a directory");
+    return;
+  }
+  reading.result.options.work_dir = *folder;
+}
+
 void read_headless(Reading& reading) { reading.result.options.headless = true; }
 
 void read_gpu(Reading& reading) {
@@ -103,6 +115,7 @@ constexpr Option kOptions[] = {
     {kHelpOption, read_help},         {kShortHelpOption, read_help},
     {kRubyOption, read_ruby},         {kScreenshotsOption, read_screenshots},
     {kHeadlessOption, read_headless}, {kGpuOption, read_gpu},
+    {kWorkOption, read_work},
 };
 
 const Option* find_option(const std::string& arg) {
@@ -134,12 +147,17 @@ void read_argument(Reading& reading) {
   }
 }
 
+// What is wrong with a line that asks for a file of Ruby tests; empty when nothing is.
+std::string problem_with_ruby_tests(const TestCliOptions& options) {
+  if (!options.game_dir.empty()) return "--ruby runs one file of Ruby tests, without a game";
+  if (options.headless) return "--headless is for system tests (Ruby tests never open a window)";
+  if (!options.work_dir.empty()) return "--work is for system tests (Ruby tests leave nothing behind)";
+  return {};
+}
+
 // What is wrong with a line that was read to its end; empty when nothing is.
 std::string problem_with(const TestCliOptions& options) {
-  const bool ruby = options.mode == TestMode::RubyTests;
-  if (ruby && !options.game_dir.empty()) return "--ruby runs one file of Ruby tests, without a game";
-  if (ruby && options.headless) return "--headless is for system tests (Ruby tests never open a window)";
-  if (ruby) return {};
+  if (options.mode == TestMode::RubyTests) return problem_with_ruby_tests(options);
   if (options.game_dir.empty()) return "missing <game_dir>";
   if (options.test_file.empty()) return "missing <system_test.rb>";
   return {};

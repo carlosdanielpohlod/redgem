@@ -16,7 +16,15 @@
 namespace redgem::testing {
 namespace {
 
-constexpr const char* kNotesFolder = "redgem-test-notes";  // tests/system_pairs/run_pair.sh empties it
+constexpr const char* kNotesFolder = "redgem-test-notes";  // among the temporary files, unless a run has its own
+constexpr const char* kWorkNotesFolder = "notes";          // in a run's own folder (tests/system_pairs/run_pair.sh)
+constexpr const char* kUnfinishedMark = ".part";           // (no note's name has a dot: see note_file)
+
+// The folder keep_notes_in gave; empty until it gives one.
+std::filesystem::path& given_notes_folder() {
+  static std::filesystem::path folder;
+  return folder;
+}
 constexpr std::size_t kMaxNoteName = 40;
 constexpr std::size_t kMaxNoteBytes = 4096;
 constexpr char kWordJoiner = '_';  // the one character a note's name may have besides letters and digits
@@ -38,7 +46,10 @@ mrb_value leave_note(mrb_state* mrb, mrb_value) {
   const std::filesystem::path file = note_file(mrb, name);
   std::error_code ignored;
   std::filesystem::create_directories(file.parent_path(), ignored);
-  std::ofstream(file, std::ios::binary) << text;
+  // Written whole under another name first: whoever reads a note never finds half of one.
+  const std::filesystem::path unfinished = file.string() + kUnfinishedMark;
+  std::ofstream(unfinished, std::ios::binary) << text;
+  std::filesystem::rename(unfinished, file, ignored);
   return mrb_nil_value();
 }
 
@@ -56,7 +67,14 @@ mrb_value read_note(mrb_state* mrb, mrb_value) {
 
 }  // namespace
 
-std::filesystem::path notes_folder() { return std::filesystem::temp_directory_path() / kNotesFolder; }
+std::filesystem::path notes_folder() {
+  if (!given_notes_folder().empty()) return given_notes_folder();
+  return std::filesystem::temp_directory_path() / kNotesFolder;
+}
+
+void keep_notes_in(const std::filesystem::path& folder) { given_notes_folder() = folder; }
+
+std::filesystem::path notes_folder_in(const std::filesystem::path& work_dir) { return work_dir / kWorkNotesFolder; }
 
 void install_test_notes(mrb_state* mrb, RClass* test_input_module) {
   mrb_define_module_function(mrb, test_input_module, "leave_note", leave_note, MRB_ARGS_REQ(2));

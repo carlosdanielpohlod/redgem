@@ -35,8 +35,9 @@ ctest -L system                              # only the system tests
 Tests are run by a program of their own, `redgem-test`, built beside `redgem` (see
 [Libraries and programs](#libraries-and-programs)). A system test is
 a Ruby file run against a game:
-`redgem-test <game_dir> <file.rb> [--screenshots <dir>] [--headless]` (`--headless` runs
-without a window; `redgem-test --help` lists every option).
+`redgem-test <game_dir> <file.rb> [--screenshots <dir>] [--headless] [--work <dir>]` (`--headless`
+runs without a window, `--work` gives the run a folder of its own for its save file and notes;
+`redgem-test --help` lists every option).
 
 The engine knows nothing of tests. Neither `redgem` nor `redgem-player`, which is what every
 built game ships as, has test code in it: what tests are written with (`TestInput`, `SystemTest`,

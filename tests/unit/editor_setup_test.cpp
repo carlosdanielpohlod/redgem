@@ -4,10 +4,26 @@
 #include <set>
 #include <string>
 
+#include "editor/editor_app.hpp"
 #include "project/editor_setup.hpp"
 #include "project/game_build.hpp"
 
 using namespace redgem;
+
+namespace {
+
+constexpr float kViewWidth = 1280.0f;
+constexpr float kViewHeight = 720.0f;
+
+}  // namespace
+
+TEST_CASE("a game played in the editor has no touch screen: no controls are laid over it, whatever it asks") {
+  GatedInputSource input;
+  input.enabled = true;
+  input.show_touch_controls(true);
+  input.fit_surface(kViewWidth, kViewHeight);
+  CHECK(input.touch_layout() == nullptr);
+}
 
 TEST_CASE("the editor is opened able to build for every system a game can be built for") {
   const std::vector<BuildChoice> choices = build_choices();

@@ -25,6 +25,9 @@ constexpr int kSettleRounds = 90;   // frames for a watched object to close in
 constexpr float kBallStart = 3.0f;  // where the ball's template sits, along x
 constexpr float kNear = 0.05f;      // meters: "the same place" across machines
 constexpr std::size_t kManyTexts = 64;
+constexpr float kFarAlong = 40.0f;            // where a hero is moved to, along x
+constexpr int kAsksTooMany = 2;               // for what is spawned, beyond the answers a machine has saved up
+constexpr int kRoundsForOneMoreAnswer = 150;  // frames: past the two seconds of game time that earn one
 
 // A camera, a platform the host moves, and a ball to spawn copies of.
 SceneDesc small_scene() {
@@ -346,11 +349,14 @@ TEST_CASE("a machine only spawns for others what this game spawns, and only for 
   ruby(*guest, "Network.__deliver(Network::SPAWN, 'nonsense', :all)");
   ruby(*guest, "Network.__deliver(Network::SPAWN, ['Ball#2.4', 'Ball', 2, 'here', nil], :all)");
   ruby(*guest, "Network.__deliver(Network::SYNC, 'nonsense', :all)");
+  // ... or a template the game does spawn, in a level that has none.
+  ruby(*guest, "Network.__deliver(Network::SPAWN, ['Crate#2.6', 'Crate', 2, nil, nil], :all)");
   ruby(*guest, "Network.emit(:done)");
   ruby(*host, "$done = false; Network.on(:done) { $done = true }");
   REQUIRE(lan.until([&] { return ruby(*host, "$done") == "true"; }));
   CHECK(balls_on_host() == "1");
   CHECK(ruby(*host, "Scene.objects.count { |o| o.name == 'Platform' }") == "1");
+  CHECK(ruby(*host, "Scene.find('Crate').nil?") == "true");
   CHECK(host->scripts().error_count() == 0);
   // What it may ask for: its own ball.
   ruby(*guest, "Network.__deliver(Network::SPAWN, ['Ball#2.5', 'Ball', 2, [1, 0, 0], nil], :all)");
@@ -372,8 +378,10 @@ TEST_CASE("a spawned object's key is its maker's to give: nobody takes the key s
   Lan lan;
   auto [host, guest] = lan.host_and_guest();
   const auto balls_on_host = [&] { return ruby(*host, "Scene.objects.count { |o| o.name == 'Ball' }"); };
-  // The host's own hero, kept in the same place everywhere under a key of the game's choosing.
-  ruby(*host, "$hero = Scene.find('Platform').add_component(NetworkSync, key: 'hero-1')");
+  // The guest's hero, kept in the same place everywhere under a key of the game's choosing.
+  for (Engine* machine : {host, guest}) {
+    ruby(*machine, "$hero = Scene.find('Platform'); $hero.add_component(NetworkSync, owner: 2, key: 'hero-1')");
+  }
   lan.round();
   // A guest asks for objects of its own under that key, under keys the host will give later,
   // under keys written as no machine writes them, and somewhere no object can be.
@@ -385,7 +393,10 @@ TEST_CASE("a spawned object's key is its maker's to give: nobody takes the key s
   heard_out(lan, *guest, *host);
   lan.round();
   CHECK(balls_on_host() == "1");
-  CHECK(ruby(*host, "Network.instance_variable_get(:@synced)['hero-1'].equal?($hero)") == "true");
+  // The hero still is what goes by its key: where the guest moves it, the host sees it go.
+  ruby(*guest, "$hero.transform.position = Vector3.new(" + std::to_string(kFarAlong) + ", 0, 0)");
+  lan.rounds(kSettleRounds);
+  CHECK(x_of(*host, "$hero") == doctest::Approx(kFarAlong).epsilon(kNear));
   // Its own key works, once: saying it again makes no second object.
   ruby(*guest, "2.times { Network.__deliver(Network::SPAWN, ['Ball#2.1', 'Ball', 2, nil, nil], :all) }");
   heard_out(lan, *guest, *host);
@@ -394,6 +405,84 @@ TEST_CASE("a spawned object's key is its maker's to give: nobody takes the key s
   ruby(*host, "$ball = Network.spawn('Ball')");
   CHECK(ruby(*host, "$ball.get_component(NetworkSync).key") == "Ball#1.1");
   CHECK(balls_on_host() == "3");
+  CHECK(host->scripts().error_count() == 0);
+}
+
+namespace {
+
+// The copies of the ball's template a machine has.
+std::string balls_spawned_on(Engine& machine) {
+  return ruby(machine, "Scene.objects.count { |o| o.name == 'Ball' } - 1");
+}
+
+}  // namespace
+
+TEST_CASE("a machine has only so many spawned objects, by its own count as by everyone else's") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  const std::string most = ruby(*guest, "Network::MAX_SPAWNS_PER_PEER");
+  ruby(*guest, "$made = Array.new(Network::MAX_SPAWNS_PER_PEER + 1) { Network.spawn('Ball') }");
+  // One too many: nothing was made for it, here or on the host.
+  CHECK(ruby(*guest, "[$made.compact.size, $made.last.nil?].inspect") == "[" + most + ", true]");
+  heard_out(lan, *guest, *host);
+  CHECK(balls_spawned_on(*guest) == most);
+  CHECK(balls_spawned_on(*host) == most);
+  // A guest that does not count is counted by the others.
+  ruby(*guest, "Network.__deliver(Network::SPAWN, ['Ball#2.999', 'Ball', 2, nil, nil], :all)");
+  heard_out(lan, *guest, *host);
+  CHECK(balls_spawned_on(*host) == most);
+  CHECK(host->scripts().error_count() + guest->scripts().error_count() == 0);
+}
+
+TEST_CASE("a game has only so many spawned objects, whoever they are for") {
+  Lan lan;
+  Engine& host = lan.add_machine();
+  REQUIRE(ruby(host, "Network.host(port: 0)") == "true");
+  ruby(host, R"(
+    owners = 1..(Network::MAX_SPAWNS / Network::MAX_SPAWNS_PER_PEER)
+    $made = owners.flat_map { |owner| Array.new(Network::MAX_SPAWNS_PER_PEER) { Network.spawn('Ball', owner: owner) } }
+    $one_more = Network.spawn('Ball', owner: owners.last + 1)
+  )");
+  CHECK(ruby(host, "[$made.compact.size == Network::MAX_SPAWNS, $one_more.nil?].inspect") == "[true, true]");
+  CHECK(balls_spawned_on(host) == ruby(host, "Network::MAX_SPAWNS"));
+  CHECK(host.scripts().error_count() == 0);
+}
+
+TEST_CASE("an object that goes by a spawned object's key does not take it along when it is destroyed") {
+  Lan lan;
+  Engine& host = lan.add_machine();
+  REQUIRE(ruby(host, "Network.host(port: 0)") == "true");
+  ruby(host, "$ball = Network.spawn('Ball'); $key = $ball.get_component(NetworkSync).key");
+  ruby(host, "Scene.find('Platform').add_component(NetworkSync, key: $key)");
+  lan.round();
+  ruby(host, "Scene.find('Platform').destroy");
+  lan.round();
+  // The ball is still one of the game's spawned objects: whoever joins now is shown it.
+  Engine& guest = lan.add_machine();
+  lan.join(guest, host);
+  REQUIRE(lan.until([&guest] { return balls_spawned_on(guest) == "1"; }));
+}
+
+TEST_CASE("a machine that keeps asking what is spawned is answered a few times, then only now and then") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  ruby(*host, "Network.spawn('Ball')");
+  REQUIRE(lan.until([&] { return balls_spawned_on(*guest) == "1"; }));
+  // The guest loses its copy and asks the host again: an answer brings the copy back.
+  const auto answered = [&] {
+    ruby(*guest, "Scene.objects.select { |o| o.name == 'Ball' }.drop(1).each(&:destroy)");
+    lan.round();  // (the copy is gone with the frame)
+    ruby(*guest, "Network.__deliver(Network::RESEND, nil, :host)");
+    heard_out(lan, *guest, *host);
+    heard_out(lan, *host, *guest);
+    return balls_spawned_on(*guest) == "1";
+  };
+  const int saved_up = std::stoi(ruby(*host, "Network::Resends::SAVED_UP"));
+  int answers = 0;
+  for (int ask = 0; ask < saved_up + kAsksTooMany; ++ask) answers += answered() ? 1 : 0;
+  CHECK(answers == saved_up);  // asking costs a few bytes and answering a whole list: not as often as asked
+  lan.rounds(kRoundsForOneMoreAnswer);
+  CHECK(answered());
   CHECK(host->scripts().error_count() == 0);
 }
 

@@ -40,7 +40,7 @@ module Network
   }.freeze
   # What the engine does about what happens on the network, before the game hears of it.
   REACTIONS = {
-    connected: :enter_game, joined: :send_spawned_to, left: :remove_objects_of, disconnected: :keep_only_my_objects
+    connected: :enter_game, joined: :greet, left: :remove_objects_of, disconnected: :keep_only_my_objects
   }.freeze
 
   @handlers = {}
@@ -111,7 +111,11 @@ module Network
     # Copies a template (see Scene.spawn) on every machine in the game, now and for whoever joins
     # later. The copy belongs to `owner`: that machine moves it, with its physics, and the others
     # watch it move (it gets a NetworkSync, and no physics there). It goes away with its owner.
+    # A machine has only so many at a time, and so does a game (MAX_SPAWNS_PER_PEER, MAX_SPAWNS):
+    # past that nothing is made, here or anywhere, and nil comes back.
     def spawn(template, owner: id, position: nil, rotation: nil)
+      return refuse_spawn(template, owner) unless room_for?(owner)
+
       allow_spawn(template)
       record = [next_key(template), template.to_s, owner, position&.to_a, rotation&.to_a]
       __deliver(SPAWN, record, :all)
@@ -130,10 +134,11 @@ module Network
       @synced.delete(sync.key) if @synced[sync.key].equal?(sync)
     end
 
-    # The object is gone for good.
+    # The object is gone for good. (Its key may be one a spawned object goes by too: only what was
+    # spawned as this very object is forgotten with it.)
     def __forget(sync)
       __untrack(sync)
-      @spawned.delete(sync.key)
+      @spawned.delete(sync.key) if @spawned[sync.key] && @spawned[sync.key][:object] == sync.game_object
     end
 
     # Called by the engine for everything that happens on the network.
@@ -163,6 +168,11 @@ module Network
     private
 
     def listen(kind, block) = (@listeners[kind] ||= []) << block
+
+    def refuse_spawn(template, owner)
+      Debug.warn("Network.spawn(#{template}): machine #{owner} or the game has all the spawned objects it may")
+      nil
+    end
 
     # The relay as [address, port].
     def relay_address
@@ -211,13 +221,6 @@ module Network
 
     def receive_despawn(keys, from)
       remove_objects(keys, from) if keys.is_a?(Array)
-    end
-
-    def receive_resend(_nothing, from) = send_spawned_to(from)
-
-    # The host tells a machine (a newcomer, or one that asked again) what is spawned.
-    def send_spawned_to(peer)
-      __deliver(SPAWNED, spawned_records, peer) if host?
     end
 
     # Whether an object another machine asks for may be created here: only for itself (the host
@@ -270,11 +273,6 @@ module Network
     def record_of(key, entry)
       transform = entry[:object].transform
       [key, entry[:template], entry[:owner], transform.position.to_a, transform.rotation.to_a]
-    end
-
-    # What a newcomer needs to see the objects spawned before it arrived, where they are now.
-    def spawned_records
-      @spawned.to_a.select { |_key, entry| entry[:object].alive? }.map { |key, entry| record_of(key, entry) }
     end
 
     # This machine just got into a game: what it spawned while in none becomes its own there, under
@@ -363,6 +361,60 @@ module Network
 
       # A count as it is written into a key: digits, with no sign and no zero in front.
       def count?(text) = text.size.between?(1, MAX_COUNT_DIGITS) && text.to_i.positive? && text.to_i.to_s == text
+    end
+  end
+end
+
+module Network
+  # How often the host tells one machine again what is spawned. Each machine has a few answers
+  # saved up, for levels loaded one right after the other, and earns another every few seconds:
+  # whoever asks more often than that is not answered.
+  module Resends
+    SAVED_UP = 4           # answers a machine can have waiting for it
+    SECONDS_FOR_ONE = 2.0  # of game time, to earn one more
+
+    @accounts = {}   # peer => [answers left, when that was counted]
+
+    class << self
+      # Whether `peer`, asking at `now` (seconds of game time), gets an answer; one is spent if so.
+      def answer?(peer, now)
+        left, counted_at = @accounts[peer] || [SAVED_UP, now]
+        left = [left + (now - counted_at) / SECONDS_FOR_ONE, SAVED_UP].min
+        answered = left >= 1
+        @accounts[peer] = [answered ? left - 1 : left, now]
+        answered
+      end
+
+      # Whoever comes next under that id starts with all its answers.
+      def forget(peer) = @accounts.delete(peer)
+    end
+  end
+end
+
+module Network
+  # What the host tells the others about the objects spawned so far.
+  class << self
+    private
+
+    # (Asking is one short message and the answer is every object there is: a machine is only
+    # answered as often as loading levels takes, see Resends.)
+    def receive_resend(_nothing, from)
+      send_spawned_to(from) if host? && Resends.answer?(from, Time.elapsed)
+    end
+
+    def greet(peer)
+      Resends.forget(peer)
+      send_spawned_to(peer)
+    end
+
+    # The host tells a machine (a newcomer, or one that asked again) what is spawned.
+    def send_spawned_to(peer)
+      __deliver(SPAWNED, spawned_records, peer) if host?
+    end
+
+    # What a newcomer needs to see the objects spawned before it arrived, where they are now.
+    def spawned_records
+      @spawned.to_a.select { |_key, entry| entry[:object].alive? }.map { |key, entry| record_of(key, entry) }
     end
   end
 end

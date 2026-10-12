@@ -306,7 +306,7 @@ TEST_CASE("a guest is not fooled by a host that hands out the host's own id") {
   REQUIRE(guest.join(kLocalhost, fake_host.local_port(), error));
   Socket link;
   REQUIRE(table.until([&] {
-    if (!link.valid()) link = fake_host.accept();
+    if (!link.valid()) fake_host.accept(link);
     return link.valid();
   }));
   std::vector<std::uint8_t> welcome = frame(R"({"k":"w","t":1,"p":[]})");
@@ -410,6 +410,20 @@ TEST_CASE("a flood of tiny messages from one machine is handled a poll's worth a
   CHECK(most_in_a_poll <= kMaxMessagesPerPoll);
 }
 
+TEST_CASE("what a guest said before it hung up is all heard, and only then is it gone") {
+  LoneHost lone;
+  Stranger talker(lone.host, lone.table);
+  talker.get_in(lone.host);
+  std::vector<std::uint8_t> last_words;
+  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x"})");
+  for (int i = 0; i < kFloodMessages; ++i) last_words.insert(last_words.end(), tiny.begin(), tiny.end());
+  while (!last_words.empty()) REQUIRE(talker.socket.write(last_words) != IoStatus::Closed);
+  talker.socket.close();
+  REQUIRE(lone.table.until([&lone] { return lone.table.count(0, NetworkEvent::Kind::PeerLeft) == 1; }));
+  CHECK(lone.table.count(0, NetworkEvent::Kind::Message) == kFloodMessages);  // more than one poll handles
+  CHECK(lone.table.events[0].back().kind == NetworkEvent::Kind::PeerLeft);
+}
+
 namespace {
 
 // Something that takes a guest's connection and answers as it pleases, as a hostile host would.
@@ -425,7 +439,7 @@ struct FakeHost {
     table.seat(guest);
     REQUIRE(guest.join(kLocalhost, listener.local_port(), error));
     REQUIRE(table.until([this] {
-      if (!link.valid()) link = listener.accept();
+      if (!link.valid()) listener.accept(link);
       return link.valid();
     }));
   }
@@ -470,4 +484,17 @@ TEST_CASE("a guest hears of each arrival once, and of no departure of someone it
   fake.say(R"({"k":"l","f":3})");
   REQUIRE(fake.table.until([&fake] { return fake.table.count(0, NetworkEvent::Kind::PeerLeft) == 1; }));
   CHECK(fake.guest.peers() == std::vector<int>{kHostId});
+}
+
+TEST_CASE("what a host said before it hung up is all heard, and only then is the game over") {
+  FakeHost fake;
+  fake.say(R"({"k":"w","t":2,"p":[1]})");
+  std::vector<std::uint8_t> last_words;
+  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x","f":1})");
+  for (int i = 0; i < kFloodMessages; ++i) last_words.insert(last_words.end(), tiny.begin(), tiny.end());
+  while (!last_words.empty()) REQUIRE(fake.link.write(last_words) != IoStatus::Closed);
+  fake.link.close();
+  REQUIRE(fake.table.until([&fake] { return fake.table.count(0, NetworkEvent::Kind::Disconnected) == 1; }));
+  CHECK(fake.table.count(0, NetworkEvent::Kind::Message) == kFloodMessages);
+  CHECK(fake.table.events[0].back().kind == NetworkEvent::Kind::Disconnected);
 }

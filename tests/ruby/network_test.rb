@@ -18,14 +18,17 @@ class NetworkTest < RedGemTest::Case
     ["Platform", [Float::INFINITY, 0, 0], POSITION]
   ].freeze
 
-  # Asks Network one of the questions it only asks itself.
-  def ask(question, *) = Network.__send__(question, *)
+  Said = Network::Said
+  Resends = Network::Resends
+  ASKER = 7             # a machine asking the host what is spawned
+  OTHER_ASKER = 8
+  NOON = 100.0          # seconds of game time
+  ONE_MORE = Resends::SECONDS_FOR_ONE   # what earns a machine another answer
+  LONG_AFTER = 3600.0
 
-  # Asks whether what another machine said fits.
-  def said(question, *) = Network::Said.__send__(question, *)
-
-  # As many spawned objects as asked for, all of one owner.
-  def crowd(count, owner:) = (1..count).to_h { |number| ["Ball##{owner}.#{number}", { owner: owner }] }
+  def setup
+    [ASKER, OTHER_ASKER].each { |peer| Resends.forget(peer) }
+  end
 
   def test_toward_goes_part_of_the_way
     assert_in_delta 15.0, NetworkSync.toward(10.0, 20.0, HALF)
@@ -40,82 +43,76 @@ class NetworkTest < RedGemTest::Case
   end
 
   def test_a_vector_travels_as_three_numbers
-    assert said(:vector?, POSITION)
-    assert said(:vector?, [1, 2, 3])
-    refute said(:vector?, [1.0, 2.0])
-    refute said(:vector?, [1.0, 2.0, "3"])
-    refute said(:vector?, "1, 2, 3")
+    assert Said.vector?(POSITION)
+    assert Said.vector?([1, 2, 3])
+    refute Said.vector?([1.0, 2.0])
+    refute Said.vector?([1.0, 2.0, "3"])
+    refute Said.vector?("1, 2, 3")
   end
 
   def test_a_vector_is_somewhere_an_object_can_be
-    assert said(:vector?, [FAR, -FAR, 0])
-    refute said(:vector?, [FAR * 2, 0, 0])
-    refute said(:vector?, [0, -FAR * 2, 0])
-    refute said(:vector?, [Float::INFINITY, 0, 0])
-    refute said(:vector?, [0, Float::NAN, 0])
+    assert Said.vector?([FAR, -FAR, 0])
+    refute Said.vector?([FAR * 2, 0, 0])
+    refute Said.vector?([0, -FAR * 2, 0])
+    refute Said.vector?([Float::INFINITY, 0, 0])
+    refute Said.vector?([0, Float::NAN, 0])
   end
 
   def test_peer_ids_go_from_the_host_to_a_full_game
-    assert said(:peer_id?, Network::HOST)
-    assert said(:peer_id?, 7)
-    assert said(:peer_id?, Network::Said::MAX_PEERS)
-    refute said(:peer_id?, Network::Said::MAX_PEERS + 1)
-    refute said(:peer_id?, Network::LOCAL)
-    refute said(:peer_id?, "2")
-    refute said(:peer_id?, 2.0)
-  end
-
-  def test_a_machine_speaks_for_itself
-    assert ask(:speaks_for?, 2, 2)
-    refute ask(:speaks_for?, 3, 2)
+    assert Said.peer_id?(Network::HOST)
+    assert Said.peer_id?(7)
+    assert Said.peer_id?(Network::Said::MAX_PEERS)
+    refute Said.peer_id?(Network::Said::MAX_PEERS + 1)
+    refute Said.peer_id?(Network::LOCAL)
+    refute Said.peer_id?("2")
+    refute Said.peer_id?(2.0)
   end
 
   def test_a_spawn_record_must_be_well_formed
-    assert said(:record?, RECORD)
-    assert said(:record?, ["Ball#2.1", "Ball", 2, POSITION, POSITION])
-    refute said(:record?, nil)
-    refute said(:record?, RECORD.first(4))
-    refute said(:record?, [:key, "Ball", 2, nil, nil])
-    refute said(:record?, ["Ball#2.1", "Ball", 0, nil, nil])
-    refute said(:record?, ["Ball#2.1", "Ball", 2, [1.0], nil])
-    refute said(:record?, ["Ball#2.1", "Ball", 2, nil, [FAR * 2, 0, 0]])
+    assert Said.record?(RECORD)
+    assert Said.record?(["Ball#2.1", "Ball", 2, POSITION, POSITION])
+    refute Said.record?(nil)
+    refute Said.record?(RECORD.first(4))
+    refute Said.record?([:key, "Ball", 2, nil, nil])
+    refute Said.record?(["Ball#2.1", "Ball", 0, nil, nil])
+    refute Said.record?(["Ball#2.1", "Ball", 2, [1.0], nil])
+    refute Said.record?(["Ball#2.1", "Ball", 2, nil, [FAR * 2, 0, 0]])
   end
 
   def test_a_spawned_objects_key_is_its_makers_count_of_that_template
-    assert said(:key_of?, "Ball#2.1", "Ball", 2)
-    assert said(:key_of?, "Ball#2.#{MOST_DIGITS}", "Ball", 2)
-    WRONG_KEYS.each { |key| refute said(:key_of?, key, "Ball", 2), "#{key} passed for a key of machine 2" }
-    refute said(:key_of?, "#{LONG_NAME}#2.1", LONG_NAME, 2)
+    assert Said.key_of?("Ball#2.1", "Ball", 2)
+    assert Said.key_of?("Ball#2.#{MOST_DIGITS}", "Ball", 2)
+    WRONG_KEYS.each { |key| refute Said.key_of?(key, "Ball", 2), "#{key} passed for a key of machine 2" }
+    refute Said.key_of?("#{LONG_NAME}#2.1", LONG_NAME, 2)
   end
 
   def test_where_an_object_is_comes_as_a_key_and_two_vectors
-    assert said(:placement?, ["Platform", POSITION, POSITION])
-    WRONG_PLACEMENTS.each { |data| refute said(:placement?, data), "#{data.inspect} passed for a placement" }
+    assert Said.placement?(["Platform", POSITION, POSITION])
+    WRONG_PLACEMENTS.each { |data| refute Said.placement?(data), "#{data.inspect} passed for a placement" }
   end
 
-  def test_a_spawn_of_something_the_level_does_not_have_is_refused
-    refute ask(:spawn_allowed?, RECORD, 2)
-    refute ask(:spawnable?, "Ball")
+  def test_a_machine_asking_what_is_spawned_is_answered_a_few_times_in_a_row
+    Resends::SAVED_UP.times { assert Resends.answer?(ASKER, NOON) }
+    refute Resends.answer?(ASKER, NOON), "one more than it had saved up"
+    assert Resends.answer?(OTHER_ASKER, NOON), "each machine has answers of its own"
   end
 
-  def test_nothing_is_spawned_in_an_empty_level
-    assert_equal [], ask(:spawned_by, Network::LOCAL)
-    assert_equal [], ask(:keys_spawned_by, Network::HOST)
+  def test_a_machine_that_used_its_answers_up_earns_one_every_while
+    Resends::SAVED_UP.times { Resends.answer?(ASKER, NOON) }
+    refute Resends.answer?(ASKER, NOON + ONE_MORE * HALF)
+    assert Resends.answer?(ASKER, NOON + ONE_MORE), "asking too early did not put the next answer off"
+    refute Resends.answer?(ASKER, NOON + ONE_MORE)
   end
 
-  def test_a_game_holds_only_so_many_spawned_objects
-    assert ask(:room_for?, 2)
-    Network.instance_variable_set(:@spawned, crowd(Network::MAX_SPAWNS_PER_PEER, owner: 2))
-    refute ask(:room_for?, 2)
-    assert ask(:room_for?, 3)
-    Network.instance_variable_set(:@spawned, crowd(Network::MAX_SPAWNS, owner: 2))
-    refute ask(:room_for?, 3)
-  ensure
-    Network.instance_variable_set(:@spawned, {})
+  def test_answers_are_only_saved_up_so_far
+    Resends.answer?(ASKER, NOON)
+    Resends::SAVED_UP.times { assert Resends.answer?(ASKER, LONG_AFTER) }
+    refute Resends.answer?(ASKER, LONG_AFTER)
   end
 
-  def test_engine_messages_are_answered_by_methods_that_exist
-    answers = Network::ENGINE_MESSAGES.values + Network::REACTIONS.values
-    answers.each { |answer| assert Network.respond_to?(answer, true), "Network.#{answer} is missing" }
+  def test_whoever_comes_next_under_an_id_starts_with_all_its_answers
+    Resends::SAVED_UP.times { Resends.answer?(ASKER, NOON) }
+    Resends.forget(ASKER)
+    assert Resends.answer?(ASKER, NOON)
   end
 end

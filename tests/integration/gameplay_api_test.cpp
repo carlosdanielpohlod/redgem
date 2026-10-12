@@ -202,6 +202,28 @@ TEST_CASE("a timer can call off the others, and itself; a tiny interval does not
   CHECK(ruby(*engine, "$ticks") == "2");
 }
 
+TEST_CASE("an interval shorter than a frame catches up within it; one of zero runs once a frame") {
+  const TempSave temp;
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene, temp.file);
+  ruby(*engine, R"(
+    $thirds = 0; $frames = 0; $once = 0
+    class Hurry < Behaviour
+      def start
+        every(Time.fixed_delta / 3.0 + 0.0001) { $thirds += 1 }
+        every(0) { $frames += 1 }
+        stopping = every(0) { $once += 1; stopping.cancel }
+      end
+    end
+    Scene.find('Host').add_component(Hurry)
+  )");
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "[$thirds, $frames, $once]") == "[2, 1, 1]");
+  frames(*engine, kHalfSecond);
+  CHECK(ruby(*engine, "[$frames, $once]") == "[" + std::to_string(kHalfSecond + 1) + ", 1]");  // cancelled by itself
+  CHECK(std::stoi(ruby(*engine, "$thirds")) > 2 * kHalfSecond);  // more than twice a frame, over time
+}
+
 TEST_CASE("what scripts save is there in the next run") {
   const TempSave temp;
   const SceneDesc scene = small_scene();

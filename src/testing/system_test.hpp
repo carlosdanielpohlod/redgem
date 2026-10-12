@@ -12,6 +12,10 @@ struct SystemTestOptions {
   std::filesystem::path screenshot_dir;  // where the test's t.screenshot pictures go
   bool headless = false;                 // no window (and so no pictures)
   GpuChoice gpu = GpuChoice::Auto;       // the graphics card the window opens on
+  // A folder of this run's own: its save file is kept there, and so are the notes it and the
+  // tests run with it leave each other. Empty: folders every run on this machine shares, which
+  // two runs at the same time would get in each other's way in.
+  std::filesystem::path work_dir;
 };
 
 // Plays a game with a system test at the controls: the real game, frame by frame, with the keys,

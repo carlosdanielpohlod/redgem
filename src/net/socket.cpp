@@ -279,16 +279,17 @@ Socket Socket::connect_to(const std::string& address, std::uint16_t port, std::s
   return stream;
 }
 
-Socket Socket::accept() {
-  if (!valid()) return Socket();
-  const NativeSocket guest = ::accept(native(handle_), nullptr, nullptr);
-  if (static_cast<std::intptr_t>(guest) < 0) return Socket();
-  if (!make_non_blocking(guest)) {
-    close_native(guest);
-    return Socket();
+IoStatus Socket::accept(Socket& guest) {
+  if (!valid()) return IoStatus::Closed;
+  const NativeSocket taken = ::accept(native(handle_), nullptr, nullptr);
+  if (static_cast<std::intptr_t>(taken) < 0) return would_block() ? IoStatus::WouldBlock : IoStatus::Closed;
+  guest = Socket(static_cast<std::intptr_t>(taken));
+  if (!make_non_blocking(taken)) {
+    guest.close();
+    return IoStatus::Closed;
   }
-  set_stream_options(guest);
-  return Socket(static_cast<std::intptr_t>(guest));
+  set_stream_options(taken);
+  return IoStatus::Ok;
 }
 
 std::string Socket::peer_address() const {

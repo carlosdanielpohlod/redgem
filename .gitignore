@@ -8,6 +8,11 @@ build-android/
 .deps/
 .cache/
 
+# Written by tools as they run: mruby's note of the version it was built from (which
+# cmake/Dependencies.cmake already says), the linter's cache
+cmake/*.rb.lock
+.ruff_cache/
+
 # Editor / OS
 .vscode/
 .idea/

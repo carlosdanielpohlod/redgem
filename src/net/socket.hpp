@@ -41,8 +41,10 @@ class Socket {
   static Socket connect_to(const std::string& address, std::uint16_t port, std::string& error);
 
   bool valid() const { return handle_ != kNoHandle; }
-  // Someone who connected to a listening socket; invalid when nobody is waiting.
-  Socket accept();
+  // Takes someone who connected to a listening socket into `guest`: Ok. WouldBlock when nobody is
+  // waiting; Closed when someone is and cannot be taken (the system has no connection left to
+  // give): whoever it is keeps waiting, so asking again at once gets the same answer.
+  IoStatus accept(Socket& guest);
   // Ok once connected, WouldBlock while still trying, Closed when it was refused.
   IoStatus connect_status();
   // Appends what has arrived to `into`, up to `limit` bytes a call (the rest waits for the next).

@@ -46,12 +46,10 @@ bool NetworkSession::host(std::uint16_t port, std::string& error) {
 bool NetworkSession::connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello,
                                  std::string& error) {
   leave();
-  Link link;
-  link.socket = Socket::connect_to(address, port, error);
-  if (!link.socket.valid()) return false;
-  link.peer = kHostId;
-  links_.push_back(std::move(link));
-  queue(links_.front(), hello);  // goes out once the connection is made
+  Socket socket = Socket::connect_to(address, port, error);
+  if (!socket.valid()) return false;
+  links_.push_back({Connection::calling(std::move(socket)), kHostId});
+  links_.front().connection.send(hello);  // goes out once the connection is made
   port_ = port;
   connecting_for_ = 0.0f;
   state_ = State::Connecting;
@@ -82,7 +80,7 @@ bool NetworkSession::join_room(const std::string& address, std::uint16_t port, c
 
 void NetworkSession::leave() {
   // A last try to deliver what was already said.
-  for (Link& link : links_) link.socket.write(link.outgoing);
+  for (Link& link : links_) link.connection.flush();
   go_offline();
 }
 
@@ -124,24 +122,22 @@ void NetworkSession::announce_hosting(std::vector<NetworkEvent>& events) {
 }
 
 void NetworkSession::serve(Link& link, float seconds, std::vector<NetworkEvent>& events) {
-  pump(link);
-  if (state_ == State::Online && link.peer != 0) keep_in_touch(link, seconds);
+  link.connection.pump();
+  if (state_ == State::Online && link.peer != 0) link.connection.keep_in_touch(seconds);
   // (Only so many a poll: the rest wait for the next one, see kMaxMessagesPerPoll.)
-  for (int handled = 0; handled < kMaxMessagesPerPoll && state_ != State::Offline; ++handled) {
-    const auto text = link.incoming.next();
-    if (!text) break;
-    handle(link, *text, events);
+  while (state_ != State::Offline) {
+    const auto message = link.connection.next_message();
+    if (!message) break;
+    handle(link, *message, events);
   }
-  if (link.incoming.broken()) link.closed = true;
 }
 
 void NetworkSession::accept_newcomers() {
-  for (Socket guest = listener_.accept(); guest.valid(); guest = listener_.accept()) {
-    Link link;
-    link.address = guest.peer_address();
-    if (!room_to_wait(link.address)) continue;  // too many waiting already: the newcomer is hung up on
-    link.socket = std::move(guest);
-    links_.push_back(std::move(link));  // let in when it says hello (see admit), if the game has room
+  for (Socket guest; listener_.accept(guest) == IoStatus::Ok;) {
+    // (Too many waiting already: the newcomer is hung up on.)
+    if (!room_to_wait(guest.peer_address())) continue;
+    // Let in when it says hello (see admit), if the game has room.
+    links_.push_back({Connection::accepted(std::move(guest)), 0});
   }
 }
 
@@ -149,9 +145,9 @@ bool NetworkSession::room_to_wait(const std::string& address) const {
   int waiting = 0;
   int from_there = 0;
   for (const Link& link : links_) {
-    if (link.peer != 0 || link.closed) continue;
+    if (link.peer != 0 || link.connection.closed()) continue;
     ++waiting;
-    if (link.address == address) ++from_there;
+    if (link.connection.address() == address) ++from_there;
   }
   return waiting < kMaxWaitingLinks && from_there < kMaxWaitingPerAddress;
 }
@@ -159,12 +155,12 @@ bool NetworkSession::room_to_wait(const std::string& address) const {
 void NetworkSession::admit(Link& link, std::vector<NetworkEvent>& events) {
   link.peer = free_peer_id(peers_);
   if (link.peer == 0) {
-    link.closed = true;  // full
+    link.connection.close();  // full
     return;
   }
   std::vector<int> already_here{kHostId};
   already_here.insert(already_here.end(), peers_.begin(), peers_.end());
-  queue(link, {{kKind, kWelcome}, {kTo, link.peer}, {kPeers, already_here}});
+  link.connection.send({{kKind, kWelcome}, {kTo, link.peer}, {kPeers, already_here}});
   queue_for_everyone_but(link.peer, {{kKind, kArrived}, {kFrom, link.peer}});
   peers_.push_back(link.peer);
   events.push_back(event_of(NetworkEvent::Kind::PeerJoined, link.peer));
@@ -172,57 +168,20 @@ void NetworkSession::admit(Link& link, std::vector<NetworkEvent>& events) {
 
 void NetworkSession::drop_silent_newcomers(float seconds) {
   for (Link& link : links_) {
-    if (link.peer != 0) continue;
-    link.waiting_for += seconds;
-    if (link.waiting_for > kJoinTimeoutSeconds) link.closed = true;  // connected and said nothing
+    if (link.peer == 0) link.connection.keep_waiting(seconds);
   }
 }
 
 void NetworkSession::await_connection(float seconds, std::vector<NetworkEvent>& events) {
+  // Connected to the host, the game starts when its welcome arrives (accept_welcome); refused, the
+  // link closes and the game ends with it (end_game_if_host_gone).
   connecting_for_ += seconds;
-  const IoStatus status = links_.front().socket.connect_status();
-  // Connected to the host: the game starts when its welcome arrives (accept_welcome).
-  if (status == IoStatus::Closed || connecting_for_ > kJoinTimeoutSeconds) {
-    go_offline();
-    events.push_back(event_of(NetworkEvent::Kind::Failed));
-  }
+  if (connecting_for_ <= kJoinTimeoutSeconds) return;
+  go_offline();
+  events.push_back(event_of(NetworkEvent::Kind::Failed));
 }
 
-void NetworkSession::pump(Link& link) {
-  if (state_ == State::Connecting && link.socket.connect_status() != IoStatus::Ok) return;
-  take_in(link);
-  if (!link.closed && link.socket.write(link.outgoing) == IoStatus::Closed) link.closed = true;
-}
-
-void NetworkSession::take_in(Link& link) {
-  // With that much of its talk still to handle, a machine's next words wait in the connection
-  // (and it is not silent).
-  if (link.incoming.buffered() >= kMaxReadBytesPerPoll) {
-    link.quiet_for = 0.0f;
-    return;
-  }
-  std::vector<std::uint8_t> arrived;
-  if (link.socket.read(arrived, kMaxReadBytesPerPoll) == IoStatus::Closed) link.closed = true;
-  if (!arrived.empty()) link.quiet_for = 0.0f;
-  link.incoming.append(arrived.data(), arrived.size());
-}
-
-void NetworkSession::keep_in_touch(Link& link, float seconds) {
-  link.quiet_for += seconds;
-  link.since_said += seconds;
-  if (link.quiet_for > kSilenceTimeoutSeconds) {
-    link.closed = true;  // gone without a goodbye
-  } else if (link.since_said >= kPingEverySeconds) {
-    queue(link, {{kKind, kPing}});
-  }
-}
-
-void NetworkSession::handle(Link& link, const std::string& text, std::vector<NetworkEvent>& events) {
-  const nlohmann::json message = nlohmann::json::parse(text, nullptr, false);
-  if (!well_formed(message)) {
-    link.closed = true;  // not one of ours
-    return;
-  }
+void NetworkSession::handle(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events) {
   try {
     if (relaying()) {
       handle_as_host(link, message, events);
@@ -230,7 +189,7 @@ void NetworkSession::handle(Link& link, const std::string& text, std::vector<Net
       handle_as_guest(message, events);
     }
   } catch (const nlohmann::json::exception&) {
-    link.closed = true;  // (well_formed should have caught it: a peer never takes the game down)
+    link.connection.close();  // (well_formed should have caught it: a peer never takes the game down)
   }
 }
 
@@ -249,7 +208,7 @@ void NetworkSession::handle_as_host(Link& link, const nlohmann::json& message, s
 void NetworkSession::hear_newcomer(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events) {
   // A newcomer's first words must be a hello; anything else and it is not let in.
   if (message[kKind] != kHello) {
-    link.closed = true;
+    link.connection.close();
     return;
   }
   admit(link, events);
@@ -258,7 +217,7 @@ void NetworkSession::hear_newcomer(Link& link, const nlohmann::json& message, st
 bool NetworkSession::pass_on(int from, int to, const nlohmann::json& message) {
   if (to == kEveryone) queue_for_everyone_but(from, message);
   if (to == kEveryone || to == kHostId) return true;
-  if (Link* other = link_to(to)) queue(*other, message);
+  if (Link* other = link_to(to)) other->connection.send(message);
   return false;
 }
 
@@ -284,7 +243,7 @@ void NetworkSession::accept_welcome(const nlohmann::json& message, std::vector<N
   const std::vector<int> others = message.value(kPeers, std::vector<int>{});
   const bool listed_itself = std::find(others.begin(), others.end(), given) != others.end();
   if (listed_itself || !own_id_believable(given, through_relay_, opening_room_)) {
-    links_.front().closed = true;
+    links_.front().connection.close();
     return;
   }
   id_ = given;
@@ -322,7 +281,7 @@ void NetworkSession::drop_closed_links(std::vector<NetworkEvent>& events) {
 }
 
 void NetworkSession::end_game_if_host_gone(std::vector<NetworkEvent>& events) {
-  if (links_.empty() || !links_.front().closed) return;
+  if (links_.empty() || !links_.front().connection.closed()) return;
   // The host is gone, and the game with it.
   const bool was_in = state_ == State::Online;
   go_offline();
@@ -332,9 +291,9 @@ void NetworkSession::end_game_if_host_gone(std::vector<NetworkEvent>& events) {
 std::vector<int> NetworkSession::take_closed_links() {
   std::vector<int> gone;
   for (const Link& link : links_) {
-    if (link.closed) gone.push_back(link.peer);
+    if (link.connection.closed()) gone.push_back(link.peer);
   }
-  links_.erase(std::remove_if(links_.begin(), links_.end(), [](const Link& link) { return link.closed; }),
+  links_.erase(std::remove_if(links_.begin(), links_.end(), [](const Link& link) { return link.connection.closed(); }),
                links_.end());
   return gone;
 }
@@ -348,7 +307,7 @@ bool NetworkSession::send(const std::string& name, const nlohmann::json& data, i
 bool NetworkSession::send_through_host(const nlohmann::json& message, int to) {
   // Everything goes to the host (or the relay), which passes it on.
   if (to != kEveryone && to != kHostId && std::find(peers_.begin(), peers_.end(), to) == peers_.end()) return false;
-  queue(links_.front(), message);
+  links_.front().connection.send(message);
   return true;
 }
 
@@ -359,27 +318,13 @@ bool NetworkSession::send_as_host(const nlohmann::json& message, int to) {
   }
   Link* link = link_to(to);
   if (link == nullptr) return false;
-  queue(*link, message);
+  link->connection.send(message);
   return true;
-}
-
-void NetworkSession::queue(Link& link, const nlohmann::json& message) {
-  // (Text that is not valid UTF-8 travels with the broken parts replaced, instead of not at all.)
-  const std::vector<std::uint8_t> bytes = packed(message);
-  link.outgoing.insert(link.outgoing.end(), bytes.begin(), bytes.end());
-  link.since_said = 0.0f;
-  if (link.outgoing.size() > kMaxPendingBytes) {
-    link.closed = true;  // it stopped listening: the game does not pile messages up for it forever
-    link.outgoing.clear();
-    return;
-  }
-  // Sent right away when the connection takes it; what is left goes out with the next poll.
-  if (state_ == State::Online && link.socket.write(link.outgoing) == IoStatus::Closed) link.closed = true;
 }
 
 void NetworkSession::queue_for_everyone_but(int peer, const nlohmann::json& message) {
   for (Link& link : links_) {
-    if (link.peer != peer && link.peer != 0) queue(link, message);
+    if (link.peer != peer && link.peer != 0) link.connection.send(message);
   }
 }
 

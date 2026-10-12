@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Runs a scene builder in headless Blender with a neutral HOME, so the saved .blend files
-# do not embed the developer's home directory.
+# do not embed the developer's home directory. The HOME is a new, empty folder every run, gone
+# when the run ends: nothing one run left behind reaches the next, or another one going on.
 #   tools/blender/run.sh build_platformer.py games/platformer
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NEUTRAL_HOME="/tmp/redgem-blender"
 BLENDER="${BLENDER:-blender}"
 
 if [[ $# -lt 2 ]]; then
@@ -13,7 +13,8 @@ if [[ $# -lt 2 ]]; then
   exit 2
 fi
 
-mkdir -p "${NEUTRAL_HOME}"
+NEUTRAL_HOME="$(mktemp -d "${TMPDIR:-/tmp}/redgem-blender.XXXXXX")"
+trap 'rm -rf "${NEUTRAL_HOME}"' EXIT
 # Heavy scenes can eat all the memory and freeze the machine: with BLENDER_MEMORY_MAX (e.g. 6500M)
 # Blender runs under that cap and is killed if it goes over.
 LIMIT=()

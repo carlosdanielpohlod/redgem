@@ -16,6 +16,7 @@
 #include "testing/frame_pictures.hpp"
 #include "testing/recording_audio.hpp"
 #include "testing/test_library.hpp"
+#include "testing/test_notes.hpp"
 #include "testing/test_saves.hpp"
 
 namespace redgem::testing {
@@ -64,7 +65,8 @@ EngineOptions engine_options(const SystemTestOptions& options, ScriptedInputSour
   engine.game_dir = options.game_dir;
   engine.presenter = stage.presenter();
   engine.input = &input;  // the devices are not read: a key touched by accident changes nothing
-  engine.save_file = fresh_test_save_file(options.game_dir);
+  engine.save_file = options.work_dir.empty() ? fresh_test_save_file(options.game_dir)
+                                              : fresh_save_file_in(options.work_dir, options.test_file);
   engine.fixed_step = true;
   engine.audio = stage.audio();
   return engine;
@@ -174,6 +176,7 @@ int run_system_test(const SystemTestOptions& options) {
   ScriptedInputSource input;
   FramePictures pictures(options.screenshot_dir);
   Stage stage(options, pictures);
+  if (!options.work_dir.empty()) keep_notes_in(notes_folder_in(options.work_dir));
   auto created = Engine::create(engine_options(options, input, stage));
   if (auto* error = std::get_if<std::string>(&created)) {
     log::error(*error);

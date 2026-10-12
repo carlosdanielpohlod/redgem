@@ -16,6 +16,7 @@ struct TestCliOptions {
   std::filesystem::path test_file;       // the system test, or the file of Ruby unit tests
   std::filesystem::path screenshot_dir;  // where a system test's pictures go
   bool headless = false;                 // a system test without a window
+  std::filesystem::path work_dir;        // --work: a folder of this run's own (see SystemTestOptions)
   std::optional<std::string> gpu;        // --gpu auto|dedicated|integrated (overrides the saved setting)
 };
 
