@@ -12,6 +12,7 @@
 #include "editor/console_log.hpp"
 #include "editor/editor_camera.hpp"
 #include "editor/editor_session.hpp"
+#include "editor/file_drop.hpp"
 #include "editor/project_files.hpp"
 #include "editor/script_workspace.hpp"
 #include "editor/ui/panels.hpp"
@@ -123,6 +124,9 @@ class EditorApp {
   void split_script_right(const std::string& file_name);
   GizmoMode gizmo_mode() const { return gizmo_; }
   const ProjectFiles& files() const { return files_; }
+  // Files from anywhere on the desk become the game's models and sounds (copied into its folders);
+  // the Project panel shows them, and the Console says what became of each.
+  void add_files(const std::vector<std::filesystem::path>& files);
   bool close_requested() const;
   EditorExit exit_action() const { return exit_action_; }
 
@@ -157,6 +161,9 @@ class EditorApp {
   // Before drawing: files changed outside, input, the running game.
   void update_before_drawing();
   void check_files_on_disk();
+  // Files dragged from the desktop onto the window (see add_files).
+  void take_dropped_files();
+  void report_drop(const DropReport& report);
   void handle_shortcuts();
   void handle_window_shortcuts(bool was_editing);
   void handle_editing_shortcuts();

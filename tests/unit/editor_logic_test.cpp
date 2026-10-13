@@ -84,6 +84,18 @@ PrimitiveDesc part_with(int material) {
 
 }  // namespace
 
+TEST_CASE("the Scene view's hint follows what the mouse would do there") {
+  using editor_logic::ViewportHint;
+  using editor_logic::ViewportState;
+  CHECK(editor_logic::viewport_hint(ViewportState{}) == ViewportHint::Fly);
+  CHECK(editor_logic::viewport_hint({false, false, true, false}) == ViewportHint::TerrainSelected);
+  CHECK(editor_logic::viewport_hint({false, false, true, true}) == ViewportHint::Sculpting);
+  // The brush is on but something else is selected: the mouse picks and moves as usual.
+  CHECK(editor_logic::viewport_hint({false, false, false, true}) == ViewportHint::Fly);
+  CHECK(editor_logic::viewport_hint({true, true, true, true}) == ViewportHint::GameHasKeyboard);
+  CHECK(editor_logic::viewport_hint({true, false, false, false}) == ViewportHint::ClickTheGame);
+}
+
 TEST_CASE("the window title names the game and marks unsaved changes and play mode") {
   const std::string plain = window_title("demo", false, false);
   CHECK(plain == std::string(editor_config::kWindowTitle) + " - demo");

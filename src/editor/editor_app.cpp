@@ -79,6 +79,15 @@ constexpr const char* kShortcuts[][kShortcutColumns] = {
     {kKeysBottomPanel, "Hide / show the bottom panel"},
 };
 
+// The Scene view's hints, in ViewportHint's order.
+constexpr const char* kViewportHints[] = {
+    ICON_FA_COMPUTER_MOUSE "  Right mouse + WASD to fly    F frames the selection",
+    ICON_FA_MOUNTAIN "  Terrain: turn Sculpt on in the Inspector to shape it",
+    ICON_FA_MOUNTAIN "  Sculpting: drag to shape the ground    Shift reverses    brush in the Inspector",
+    ICON_FA_GAMEPAD "  The game has the keyboard    Esc stops",
+    ICON_FA_GAMEPAD "  Click the game to give it the keyboard",
+};
+
 // Saved for this user (not in the game): which card draws the editor and the games it starts.
 struct GpuOption {
   GpuChoice choice;
@@ -523,6 +532,7 @@ void EditorApp::frame() {
 
 void EditorApp::update_before_drawing() {
   check_files_on_disk();
+  take_dropped_files();
   handle_shortcuts();
   update_camera();
   feed_game();
@@ -551,6 +561,27 @@ void EditorApp::end_abandoned_gizmo_drag() {
   if (gizmo_drawn_ || !gizmo_dragging_) return;
   gizmo_dragging_ = false;
   session_->document().drop_checkpoint_if_unchanged();
+}
+
+void EditorApp::take_dropped_files() {
+  if (!IsFileDropped()) return;
+  const FilePathList dropped = LoadDroppedFiles();
+  const std::vector<std::filesystem::path> files(dropped.paths, dropped.paths + dropped.count);
+  UnloadDroppedFiles(dropped);
+  add_files(files);
+}
+
+void EditorApp::add_files(const std::vector<std::filesystem::path>& files) {
+  report_drop(add_dropped_files(session_->game_dir(), files));
+  rescan_files();
+}
+
+void EditorApp::report_drop(const DropReport& report) {
+  for (const std::string& model : report.models) log::info("added " + model + ": drag it from Models into the scene");
+  for (const std::string& sound : report.sounds) log::info("added " + sound + " to the game's sounds");
+  for (const std::string& refused : report.refused) log::warning("not added: " + refused);
+  if (!report.models.empty()) panel_state_.project.folder = ui::ProjectFolder::Models;
+  if (report.models.empty() && !report.sounds.empty()) panel_state_.project.folder = ui::ProjectFolder::Sounds;
 }
 
 void EditorApp::check_files_on_disk() {
@@ -1138,9 +1169,9 @@ void EditorApp::draw_viewport_image() {
 // of the game's own HUD at the top).
 void EditorApp::draw_viewport_hint(bool playing) {
   const Viewport& view = *viewport_;
-  const char* hint = !playing       ? ICON_FA_COMPUTER_MOUSE "  Right mouse + WASD to fly    F frames the selection"
-                     : view.focused ? ICON_FA_GAMEPAD "  The game has the keyboard    Esc stops"
-                                    : ICON_FA_GAMEPAD "  Click the game to give it the keyboard";
+  const bool terrain_selected = session_->is_terrain(session_->selection());
+  const char* hint = kViewportHints[static_cast<int>(
+      editor_logic::viewport_hint({playing, view.focused, terrain_selected, terrain_tool_.sculpting}))];
   const ImVec2 hint_size = ImGui::CalcTextSize(hint);
   const editor_logic::Rect pill =
       editor_logic::hint_pill(view.screen_x, view.screen_y, viewport_height(), hint_size.x, hint_size.y);

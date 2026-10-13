@@ -31,6 +31,7 @@ add_executable(redgem_tests
   unit/editor_camera_test.cpp
   unit/script_files_test.cpp
   unit/primitives_test.cpp
+  unit/file_drop_test.cpp
   unit/project_files_test.cpp
   unit/environment_test.cpp
   unit/gpu_select_test.cpp

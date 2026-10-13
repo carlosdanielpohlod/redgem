@@ -196,6 +196,7 @@ if(NOT ANDROID)
     editor/script_files.cpp
     editor/script_editor.cpp
     editor/script_workspace.cpp
+    editor/file_drop.cpp
     editor/project_files.cpp
     editor/ui/script_editor_panel.cpp
     editor/ui/hierarchy_panel.cpp

@@ -59,9 +59,9 @@ constexpr FolderInfo kFolders[] = {
     {Folder::Scripts, ICON_FA_GEM, "Scripts", config::kScriptsDirName,
      "Ruby behaviours. Create one with New script, then drag it onto an object.", edit_script},
     {Folder::Models, ICON_FA_CUBES, "Models", config::kModelsDirName,
-     "Export .glb files from Blender into models/, then drag them into the scene.", add_model},
+     "Drop .glb files (exported from Blender) on this window, then drag them into the scene.", add_model},
     {Folder::Sounds, ICON_FA_VOLUME_HIGH, "Sounds", config::kSoundsDirName,
-     "Put .wav / .ogg / .mp3 / .flac files in sounds/ and play them with Audio.play(\"name\").", play_sound},
+     "Drop .wav / .ogg / .mp3 / .flac files on this window and play them with Audio.play(\"name\").", play_sound},
     {Folder::Scenes, ICON_FA_MAP, "Scenes", config::kScenesDirName,
      "Extra levels: scenes/<name>.glb, loaded with Game.load_scene(\"name\").", explain_scene},
 };

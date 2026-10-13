@@ -2,6 +2,7 @@
 
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "core/platform.hpp"
 #include "editor/ui/panels.hpp"
 #include "editor/ui/style.hpp"
 
@@ -29,6 +30,8 @@ struct LightOption {
   LightType type;
   const char* label;
 };
+constexpr const char* kHowToAddModels = "Drop .glb files (exported from Blender) on this window";
+
 constexpr LightOption kLightOptions[] = {
     {LightType::Directional, ICON_FA_SUN "  Directional (sun)"},
     {LightType::Point, ICON_FA_LIGHTBULB "  Point"},
@@ -49,21 +52,41 @@ void draw_light_items(EditorSession& session, Vec3 at) {
 }
 
 // What a scene has one of, or a few: a camera, ground, the sky.
-void draw_scenery_items(EditorSession& session, Vec3 at) {
+void draw_scenery_items(PanelContext& context) {
+  EditorSession& session = context.session;
+  const Vec3 at = context.spawn_point;
   if (ImGui::MenuItem(ICON_FA_VIDEO "  Camera")) session.create_camera(at);
-  if (ImGui::MenuItem(ICON_FA_MOUNTAIN "  Terrain")) session.create_terrain(at);
-  tooltip("Ground you can sculpt: select it and turn Sculpt on in the Inspector");
+  if (ImGui::MenuItem(ICON_FA_MOUNTAIN "  Terrain")) create_terrain(context);
+  tooltip("Ground you shape with a brush: mountains, holes, plateaus.");
   if (ImGui::MenuItem(ICON_FA_CLOUD_SUN "  Environment")) session.create_environment();
   tooltip("Sky, fog, bloom and wind of the scene, as properties (colors are #rrggbb).");
 }
 
+void open_models_folder(const EditorSession& session) {
+  const std::filesystem::path folder = session.game_dir() / config::kModelsDirName;
+  std::error_code error;
+  std::filesystem::create_directories(folder, error);
+  platform::open_in_system(folder);
+}
+
+// The game's models, and how more of them get there.
 void draw_model_items(PanelContext& context) {
   for (const std::string& model : context.files.models) {
     if (ImGui::MenuItem(model.c_str())) import_model(context.session, model, context.spawn_point);
   }
+  if (!context.files.models.empty()) ImGui::Separator();
+  ImGui::TextColored(muted_color(), "%s", kHowToAddModels);
+  if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Open the models folder")) open_models_folder(context.session);
 }
 
 }  // namespace
+
+ObjectId create_terrain(PanelContext& context) {
+  const ObjectId terrain = context.session.create_terrain(context.spawn_point);
+  // Dragging over the new ground shapes it right away.
+  if (terrain != kNoObject && context.terrain != nullptr) context.terrain->sculpting = true;
+  return terrain;
+}
 
 ObjectId import_model(EditorSession& session, const std::string& model_file, Vec3 position, ObjectId parent) {
   std::string error;
@@ -76,14 +99,12 @@ ObjectId import_model(EditorSession& session, const std::string& model_file, Vec
 void draw_create_menu(PanelContext& context) {
   EditorSession& session = context.session;
   const Vec3 at = context.spawn_point;
-  const bool no_models = context.files.models.empty();
   if (ImGui::MenuItem(ICON_FA_CIRCLE_DOT "  Empty")) session.create_empty(at);
   menu(ICON_FA_CUBE "  3D Object", [&session, at] { draw_shape_items(session, at); });
   menu(ICON_FA_LIGHTBULB "  Light", [&session, at] { draw_light_items(session, at); });
-  draw_scenery_items(session, at);
+  draw_scenery_items(context);
   ImGui::Separator();
-  menu(ICON_FA_FILE_IMPORT "  Model from models/", [&context] { draw_model_items(context); }, !no_models);
-  if (no_models) tooltip("Put .glb files (exported from Blender) in the game's models/ folder.");
+  menu(ICON_FA_FILE_IMPORT "  Model", [&context] { draw_model_items(context); });
 }
 
 }  // namespace redgem::ui

@@ -67,6 +67,9 @@ std::string script_window_name(const std::string& file_name);
 // Menu items that create objects (GameObject menu, hierarchy "+" and context menus).
 void draw_create_menu(PanelContext& context);
 
+// GameObject > Terrain: new ground where new objects appear, selected, with the brush already on.
+ObjectId create_terrain(PanelContext& context);
+
 // Adds a model of the game's models/ folder to the scene at a world position, optionally under
 // another object. Says why in the console when it cannot. Returns the new object or kNoObject.
 ObjectId import_model(EditorSession& session, const std::string& model_file, Vec3 position,

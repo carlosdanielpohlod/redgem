@@ -2,6 +2,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <filesystem>
 
 #include <imgui.h>
@@ -244,6 +245,48 @@ TEST_CASE("a game is built up in the editor: new objects, an imported model, mat
   CHECK(app.finished());
   CHECK(app.exit_action() == EditorExit::OpenHub);
   std::filesystem::remove_all(*build);
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("files dropped on the editor become the game's models and sounds, and new ground comes with the brush on") {
+  const std::filesystem::path game = copy_game();
+  const std::filesystem::path desk = std::filesystem::temp_directory_path() / "redgem_editor_desk";
+  std::filesystem::remove_all(desk);
+  std::filesystem::create_directories(desk);
+  std::filesystem::copy_file(std::filesystem::path(REDGEM_FIXTURES_DIR) / "hierarchy.glb", desk / "tower.glb");
+  std::string error;
+  REQUIRE(write_text_file(desk / "ding.wav", "a sound, as far as the desk is concerned", error));
+  REQUIRE(write_text_file(desk / "notes.txt", "not for a game", error));
+  auto created = EditorApp::create(game, editor_options(GpuChoice::Auto));
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  run(app, kWarmupFrames);
+  REQUIRE(app.files().models.empty());
+
+  app.add_files({desk / "tower.glb", desk / "ding.wav", desk / "notes.txt"});
+  CHECK(app.files().models == std::vector<std::string>{"tower.glb"});
+  CHECK(std::filesystem::exists(game / config::kSoundsDirName / "ding.wav"));
+  CHECK(app.panel_state().project.folder == ui::ProjectFolder::Models);  // where the model now shows
+  const auto warned = [&app](const std::string& text) {
+    const auto& entries = app.console().entries();
+    return std::any_of(entries.begin(), entries.end(), [&text](const ConsoleEntry& entry) {
+      return entry.level == log::Level::Warning && entry.message.find(text) != std::string::npos;
+    });
+  };
+  CHECK(warned("notes.txt"));  // left out, and said so
+  // The model is in the game's folder now: the create menu adds it to the scene from there.
+  ui::PanelContext context{app.session(), app.scripts(), app.files(), app.panel_state(), app.spawn_point()};
+  context.terrain = &app.terrain_tool();
+  CHECK(ui::import_model(app.session(), "tower.glb", app.spawn_point()) != kNoObject);
+
+  // GameObject > Terrain: the ground is selected and the brush is on, so dragging shapes it at once.
+  CHECK_FALSE(app.terrain_tool().sculpting);
+  const ObjectId terrain = ui::create_terrain(context);
+  REQUIRE(terrain != kNoObject);
+  CHECK(app.session().selection() == terrain);
+  CHECK(app.terrain_tool().sculpting);
+  run(app, kFrameFrames);
+  std::filesystem::remove_all(desk);
   std::filesystem::remove_all(game);
 }
 

@@ -49,6 +49,16 @@ float centered_start(float available, float size);
 // The dark pill behind the Scene view's hint: in the view's bottom-left corner, around a text of
 // `text_width` x `text_height`. The view starts at (view_x, view_y) and is `view_height` tall.
 Rect hint_pill(float view_x, float view_y, float view_height, float text_width, float text_height);
+// What the Scene view's hint says: how to move around, how to shape the selected terrain, or who
+// has the keyboard while the game plays.
+enum class ViewportHint { Fly, TerrainSelected, Sculpting, GameHasKeyboard, ClickTheGame };
+struct ViewportState {
+  bool playing = false;
+  bool focused = false;  // the Scene view has the keyboard
+  bool terrain_selected = false;
+  bool sculpting = false;  // the terrain brush is on
+};
+ViewportHint viewport_hint(const ViewportState& state);
 // How many tiles `tile_width` wide (with `spacing` between them) fit in a row; at least one.
 int tile_columns(float available_width, float spacing, float tile_width);
 // Share of the space left of the Hierarchy that the Inspector takes, so that it ends up

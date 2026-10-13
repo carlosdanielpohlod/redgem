@@ -23,7 +23,10 @@ icons):
   adds scripts (existing or new), a physics body, a trigger or a property.
 * **GameObject menu**: terrain you sculpt with a brush (see [Levels](levels.md#terrain)), empty
   objects, cube / sphere / plane / cylinder / capsule (with colliders),
-  directional / point / spot lights, cameras, and models from `models/`.
+  directional / point / spot lights, cameras, and the game's models.
+* **Your own models and sounds**: drop `.glb` files (exported from Blender) and `.wav` / `.ogg` /
+  `.mp3` / `.flac` files from your file manager onto the editor window. They are copied into the
+  game's `models/` and `sounds/` folders and show up in the Project panel.
 * **Project**: the game's scripts, models, sounds and scenes. Double click a script to edit it, a
   model to add it to the scene, a sound to hear it. *New script* creates a `Behaviour` from a
   template; *Open folder* shows the files.

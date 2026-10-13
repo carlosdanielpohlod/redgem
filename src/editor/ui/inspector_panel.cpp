@@ -64,6 +64,9 @@ constexpr const char* kFovId = "##fov";
 constexpr const char* kNearId = "##near";
 constexpr const char* kFarId = "##far";
 constexpr const char* kSculptId = "##sculpt";
+constexpr const char* kSculptingHelp =
+    "Drag the left mouse button over the terrain in the Scene view. Shift reverses Raise and Lower.";
+constexpr const char* kSculptOffHelp = "Turn Sculpt on to shape the ground with the mouse: mountains, holes, plateaus.";
 constexpr const char* kBrushModeId = "##mode";
 constexpr const char* kBrushRadiusId = "##radius";
 constexpr const char* kBrushStrengthId = "##strength";
@@ -474,7 +477,9 @@ void draw_terrain(PanelContext& context, int index) {
   TerrainTool& tool = *context.terrain;
   property_label("Sculpt");
   ImGui::Checkbox(kSculptId, &tool.sculpting);
-  tooltip("While on, drag the left mouse button over the terrain in the Scene view. Shift reverses Raise and Lower.");
+  ImGui::PushTextWrapPos();
+  ImGui::TextColored(muted_color(), "%s", tool.sculpting ? kSculptingHelp : kSculptOffHelp);
+  ImGui::PopTextWrapPos();
   draw_brush_mode(tool);
   draw_brush_size(tool);
 }

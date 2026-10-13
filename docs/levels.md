@@ -65,11 +65,12 @@ away with `visible_from` and `visible_to`.
 
 ## Terrain
 
-**GameObject > Terrain** adds a square of ground, 100 m across, that you shape with a brush.
+**GameObject > Terrain** adds a square of ground, 100 m across, that you shape with a brush. It
+comes selected with the brush on: mountains, holes and plateaus are a drag of the mouse away.
 
-1. Select the terrain. In the Inspector's **Terrain** card, tick **Sculpt**.
-2. Drag the left mouse button over the ground in the Scene view. A ring shows the brush.
-3. Pick what the brush does:
+1. Drag the left mouse button over the ground in the Scene view. A ring shows the brush.
+2. In the Inspector's **Terrain** card, pick what the brush does (**Sculpt** turns the brush off
+   and on again, to move the terrain itself with the gizmo):
 
 | Brush | Effect |
 |-------|--------|

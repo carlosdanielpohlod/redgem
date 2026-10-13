@@ -69,6 +69,12 @@ bool name_contains(const std::string& name, const std::string& wanted) {
 
 float centered_start(float available, float size) { return (available - size) * kCenter; }
 
+ViewportHint viewport_hint(const ViewportState& state) {
+  if (state.playing) return state.focused ? ViewportHint::GameHasKeyboard : ViewportHint::ClickTheGame;
+  if (!state.terrain_selected) return ViewportHint::Fly;
+  return state.sculpting ? ViewportHint::Sculpting : ViewportHint::TerrainSelected;
+}
+
 Rect hint_pill(float view_x, float view_y, float view_height, float text_width, float text_height) {
   Rect pill;
   pill.min_x = view_x + kOverlayMargin;
