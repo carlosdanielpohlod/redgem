@@ -1,0 +1,98 @@
+#include "render/shader_programs.hpp"
+
+#include <stdexcept>
+#include <string>
+#include <utility>
+
+#include "render/shader_source.hpp"
+#include "render/shaders/particle.hpp"
+#include "render/shaders/uniforms.hpp"
+
+namespace redgem::render_detail {
+namespace {
+
+// The uniforms raylib has a place for, under the lit shader's own names for them.
+constexpr std::pair<int, const char*> kKnownUniforms[] = {
+    {SHADER_LOC_MATRIX_MODEL, shaders::kModelMatrix},   {SHADER_LOC_MATRIX_NORMAL, shaders::kNormalMatrix},
+    {SHADER_LOC_VECTOR_VIEW, shaders::kViewPosition},   {SHADER_LOC_MAP_EMISSION, shaders::kEmissiveMap},
+    {SHADER_LOC_MAP_NORMAL, shaders::kNormalMap},       {SHADER_LOC_MAP_ROUGHNESS, shaders::kSurfaceMap},
+    {SHADER_LOC_MAP_OCCLUSION, shaders::kOcclusionMap}, {SHADER_LOC_BONE_MATRICES, shaders::kBoneMatrices},
+};
+
+// A uniform of the lit shader, and where its location is kept.
+struct LitUniform {
+  int LitUniforms::* location;
+  const char* name;
+};
+
+constexpr LitUniform kLitUniforms[] = {
+    // Per object and per material.
+    {&LitUniforms::has_normal_map, shaders::kHasNormalMap},
+    {&LitUniforms::normal_scale, shaders::kNormalScale},
+    {&LitUniforms::has_surface_map, shaders::kHasSurfaceMap},
+    {&LitUniforms::occlusion_strength, shaders::kOcclusionStrength},
+    {&LitUniforms::metallic, shaders::kMetallic},
+    {&LitUniforms::roughness, shaders::kRoughness},
+    {&LitUniforms::emissive, shaders::kEmissive},
+    {&LitUniforms::has_emissive_map, shaders::kHasEmissiveMap},
+    {&LitUniforms::alpha_cutoff, shaders::kAlphaCutoff},
+    {&LitUniforms::tint, shaders::kTint},
+    {&LitUniforms::skinned, shaders::kSkinned},
+    {&LitUniforms::wind, shaders::kWindAmount},
+    // Once per frame: lights, shadows, reflections and the sky.
+    {&LitUniforms::shadow_map, shaders::kShadowMap},
+    {&LitUniforms::light_matrix, shaders::kLightViewProjection},
+    {&LitUniforms::shadow_strength, shaders::kShadowStrength},
+    {&LitUniforms::shadow_texel, shaders::kShadowTexel},
+    {&LitUniforms::reflection_map, shaders::kReflectionMap},
+    {&LitUniforms::reflection_strength, shaders::kReflectionStrength},
+    {&LitUniforms::sun_direction, shaders::kSunDirection},
+    {&LitUniforms::sun_color, shaders::kSunColor},
+    {&LitUniforms::ambient, shaders::kAmbientStrength},
+    {&LitUniforms::point_count, shaders::kPointLightCount},
+    {&LitUniforms::point_positions, shaders::kPointLightPositions},
+    {&LitUniforms::point_colors, shaders::kPointLightColors},
+    {&LitUniforms::point_ranges, shaders::kPointLightRanges},
+    {&LitUniforms::fog_color, shaders::kFogColor},
+    {&LitUniforms::fog_density, shaders::kFogDensity},
+    {&LitUniforms::time, shaders::kTime},
+    {&LitUniforms::sky_top, shaders::kSkyTop},
+    {&LitUniforms::sky_horizon, shaders::kSkyHorizon},
+    {&LitUniforms::ground, shaders::kGroundColor},
+};
+
+}  // namespace
+
+Shader compile_shader(const char* vertex, const char* fragment, const char* name) {
+  const std::string vertex_text = vertex != nullptr ? shaders::for_this_gpu(vertex) : std::string();
+  const std::string fragment_text = shaders::for_this_gpu(fragment);
+  const Shader compiled =
+      LoadShaderFromMemory(vertex != nullptr ? vertex_text.c_str() : nullptr, fragment_text.c_str());
+  if (!IsShaderValid(compiled)) throw std::runtime_error(std::string("failed to compile the ") + name + " shader");
+  return compiled;
+}
+
+LitUniforms find_lit_uniforms(Shader& lit) {
+  for (const auto& [place, name] : kKnownUniforms) lit.locs[place] = GetShaderLocation(lit, name);
+  LitUniforms found;
+  for (const LitUniform& uniform : kLitUniforms) found.*uniform.location = GetShaderLocation(lit, uniform.name);
+  return found;
+}
+
+DepthUniforms find_depth_uniforms(Shader& depth) {
+  depth.locs[SHADER_LOC_MATRIX_MODEL] = GetShaderLocation(depth, shaders::kModelMatrix);
+  depth.locs[SHADER_LOC_BONE_MATRICES] = GetShaderLocation(depth, shaders::kBoneMatrices);
+  DepthUniforms found;
+  found.alpha_cutoff = GetShaderLocation(depth, shaders::kAlphaCutoff);
+  found.wind = GetShaderLocation(depth, shaders::kWindAmount);
+  found.time = GetShaderLocation(depth, shaders::kTime);
+  found.skinned = GetShaderLocation(depth, shaders::kSkinned);
+  return found;
+}
+
+ParticleUniforms find_particle_uniforms(const Shader& particles) {
+  return {GetShaderLocation(particles, shaders::kParticleBoost),
+          GetShaderLocation(particles, shaders::kParticleTextured)};
+}
+
+}  // namespace redgem::render_detail

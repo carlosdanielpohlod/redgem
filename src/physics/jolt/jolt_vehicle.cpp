@@ -10,6 +10,8 @@ namespace redgem::jolt {
 namespace {
 
 constexpr float kHalf = 0.5f;
+constexpr int kNeutralGear = 0;
+constexpr float kClutchDisengaged = 0.0f;
 
 bool is_front(const WheelDesc& wheel) { return wheel.center.z < 0.0f; }
 bool is_left(const WheelDesc& wheel) { return wheel.center.x < 0.0f; }
@@ -85,6 +87,16 @@ JPH::Ref<JPH::VehicleConstraint> build_vehicle(JPH::Body& chassis, const std::ve
   vehicle->SetVehicleCollisionTester(
       new JPH::VehicleCollisionTesterCastCylinder(layer, config::kVehicleWheelConvexRadiusFraction));
   return vehicle;
+}
+
+void stop_vehicle(JPH::VehicleConstraint& vehicle) {
+  for (JPH::uint i = 0; i < static_cast<JPH::uint>(vehicle.GetWheels().size()); ++i) {
+    vehicle.GetWheel(i)->SetAngularVelocity(0.0f);
+  }
+  auto* controller = static_cast<JPH::WheeledVehicleController*>(vehicle.GetController());
+  controller->SetDriverInput(0.0f, 0.0f, 0.0f, 0.0f);
+  controller->GetEngine().SetCurrentRPM(controller->GetEngine().mMinRPM);
+  controller->GetTransmission().Set(kNeutralGear, kClutchDisengaged);
 }
 
 }  // namespace redgem::jolt

@@ -1,13 +1,13 @@
 #pragma once
 
-// Prepares the GLSL in shaders.hpp for the graphics card that will compile it. Text only: no
+// Prepares the GLSL in render/shaders/ for the graphics card that will compile it. Text only: no
 // window needed, so it can be tested.
 
 #include <string>
 
 namespace redgem::shaders {
 
-// The line every shader in shaders.hpp starts from: desktop OpenGL 3.3.
+// The line every shader in render/shaders/ starts from: desktop OpenGL 3.3.
 inline constexpr const char* kDesktopVersionLine = "#version 330";
 // What phones (OpenGL ES 3) want instead: their own version, and how precise numbers are.
 inline constexpr const char* kMobileHeader =

@@ -16,11 +16,13 @@ add_executable(redgem_tests
   unit/safe_path_test.cpp
   unit/image_header_test.cpp
   unit/body_config_test.cpp
+  unit/contact_events_test.cpp
   unit/input_test.cpp
   unit/script_naming_test.cpp
   unit/cli_test.cpp
   unit/editor_setup_test.cpp
   unit/mesh_builder_test.cpp
+  unit/mesh_pieces_test.cpp
   unit/scene_document_test.cpp
   unit/scene_tree_test.cpp
   unit/gltf_json_test.cpp
@@ -43,10 +45,13 @@ add_executable(redgem_tests
   unit/file_drop_test.cpp
   unit/project_files_test.cpp
   unit/environment_test.cpp
+  unit/scene_lights_test.cpp
   unit/gpu_select_test.cpp
   unit/window_test.cpp
   unit/culling_test.cpp
   unit/render_math_test.cpp
+  unit/visibility_test.cpp
+  unit/capture_views_test.cpp
   unit/shader_source_test.cpp
   unit/terrain_test.cpp
   unit/animation_test.cpp

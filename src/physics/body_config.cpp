@@ -37,9 +37,14 @@ constexpr ColliderName kColliderNames[] = {
     {ColliderShape::Mesh, props::kColliderMesh},
 };
 
+// ("none" is what an object without the property has: it cannot be asked for.)
+bool asked_for_by(const BodyTypeName& known, const std::string& name) {
+  return known.type != BodyType::None && name == known.name;
+}
+
 std::optional<BodyType> parse_body_type(const std::string& name) {
   for (const BodyTypeName& known : kBodyTypeNames) {
-    if (known.type != BodyType::None && name == known.name) return known.type;
+    if (asked_for_by(known, name)) return known.type;
   }
   return std::nullopt;
 }
@@ -72,13 +77,16 @@ void read_collider(const PropertyMap& props, BodyConfig& config) {
     return;
   }
   config.collider = *parsed;
-  if (config.type == BodyType::None && !config.trigger) config.type = BodyType::Static;
+  if (!config.wants_physics()) config.type = BodyType::Static;
 }
+
+// A body that can change place: anything but a static one (or none at all).
+bool moves(BodyType type) { return type != BodyType::None && type != BodyType::Static; }
 
 // A trigger is a volume, not a body: whatever body type was asked for is dropped.
 void apply_trigger(BodyConfig& config) {
   if (!config.trigger) return;
-  if (config.type != BodyType::None && config.type != BodyType::Static) {
+  if (moves(config.type)) {
     config.warnings.push_back(std::string("trigger ignores body type '") + body_type_name(config.type) + "'");
   }
   config.type = BodyType::None;
@@ -89,16 +97,22 @@ void use_collider(BodyConfig& config, ColliderShape collider, const char* reason
   config.collider = collider;
 }
 
+bool is_moving_mesh(const BodyConfig& config) { return config.collider == ColliderShape::Mesh && moves(config.type); }
+
+// Whether a body of `type` was given another collider than the only one it works with.
+bool has_wrong_collider(const BodyConfig& config, BodyType type, ColliderShape only) {
+  return config.type == type && config.collider != only;
+}
+
 // Some body types only work with some colliders.
 void settle_collider(BodyConfig& config) {
-  const bool moving_mesh =
-      config.collider == ColliderShape::Mesh && config.type != BodyType::Static && config.type != BodyType::None;
-  if (moving_mesh)
+  if (is_moving_mesh(config)) {
     use_collider(config, ColliderShape::Box, "mesh collider is only supported on static bodies, using box");
-  if (config.type == BodyType::Character && config.collider != ColliderShape::Capsule) {
+  }
+  if (has_wrong_collider(config, BodyType::Character, ColliderShape::Capsule)) {
     use_collider(config, ColliderShape::Capsule, "characters always use a capsule collider");
   }
-  if (config.type == BodyType::Vehicle && config.collider != ColliderShape::Box) {
+  if (has_wrong_collider(config, BodyType::Vehicle, ColliderShape::Box)) {
     use_collider(config, ColliderShape::Box, "vehicles always use a box chassis");
   }
 }
@@ -114,6 +128,8 @@ void read_mass(const PropertyMap& props, BodyConfig& config) {
 }
 
 }  // namespace
+
+bool is_dynamic(BodyType type) { return type == BodyType::Dynamic || type == BodyType::Vehicle; }
 
 const char* body_type_name(BodyType type) {
   for (const BodyTypeName& known : kBodyTypeNames) {

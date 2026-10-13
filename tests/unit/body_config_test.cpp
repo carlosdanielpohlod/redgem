@@ -121,3 +121,32 @@ TEST_CASE("vehicles always use a box, and weigh more than other bodies by defaul
   CHECK(config.warnings.size() == 1);
   CHECK(config.mass == doctest::Approx(config::kVehicleDefaultMass));
 }
+
+TEST_CASE("forces move dynamic bodies and vehicles, and nothing else") {
+  CHECK(is_dynamic(BodyType::Dynamic));
+  CHECK(is_dynamic(BodyType::Vehicle));
+  CHECK_FALSE(is_dynamic(BodyType::None));
+  CHECK_FALSE(is_dynamic(BodyType::Static));
+  CHECK_FALSE(is_dynamic(BodyType::Kinematic));
+  CHECK_FALSE(is_dynamic(BodyType::Character));
+}
+
+TEST_CASE("a trigger that is also static, or has a collider of its own, says nothing and stays a volume") {
+  const BodyConfig still =
+      body_config_from_props({{"trigger", true}, {"body", std::string("static")}, {"collider", std::string("sphere")}});
+  CHECK(still.trigger);
+  CHECK(still.type == BodyType::None);
+  CHECK(still.collider == ColliderShape::Sphere);
+  CHECK(still.warnings.empty());
+}
+
+TEST_CASE("a mesh collider stays on what does not move and becomes a box on what does") {
+  const BodyConfig ground =
+      body_config_from_props({{"body", std::string("static")}, {"collider", std::string("mesh")}});
+  CHECK(ground.collider == ColliderShape::Mesh);
+  CHECK(ground.warnings.empty());
+  const BodyConfig lift =
+      body_config_from_props({{"body", std::string("kinematic")}, {"collider", std::string("mesh")}});
+  CHECK(lift.collider == ColliderShape::Box);
+  CHECK(lift.warnings.size() == 1);
+}

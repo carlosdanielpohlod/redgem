@@ -55,21 +55,32 @@ bool frame_at(const std::uint8_t* data, std::size_t size, std::size_t at) {
   return describes_frame(data[at + 1]) && size - at >= kFrameSizeEnd;
 }
 
+// The picture's data begins, or the file ends: no segment after this one describes the frame.
+bool ends_the_segments(std::uint8_t kind) { return kind == kJpegScan || kind == kJpegEnd; }
+
 // Where the segment after the one at `at` starts; `size` (nothing more to look at) when that one
 // is where the picture's data begins, or says it is longer than the file.
 std::size_t next_segment(const std::uint8_t* data, std::size_t size, std::size_t at) {
   const std::uint8_t kind = data[at + 1];
   if (kind == kJpegMark) return at + 1;  // marks may be padded with more 0xFF bytes
-  if (kind == kJpegScan || kind == kJpegEnd) return size;
+  if (ends_the_segments(kind)) return size;
   const std::size_t step = kSegmentLengthAt + big_endian(data + at + kSegmentLengthAt, sizeof(std::uint16_t));
   return step > size - at ? size : at + step;
 }
 
+bool starts_as_jpeg(const std::uint8_t* data, std::size_t size) {
+  return size >= kJpegSegmentsAt && data[0] == kJpegMark && data[1] == kJpegStart;
+}
+
+// Whether a segment's header is at `at`, all of it.
+bool segment_at(const std::uint8_t* data, std::size_t size, std::size_t at) {
+  return size - at >= kSegmentHeaderBytes && data[at] == kJpegMark;
+}
+
 // Walks the segments up to the one that describes the frame.
 std::optional<ImageSize> jpeg_size(const std::uint8_t* data, std::size_t size) {
-  if (size < kJpegSegmentsAt || data[0] != kJpegMark || data[1] != kJpegStart) return std::nullopt;
-  for (std::size_t at = kJpegSegmentsAt; size - at >= kSegmentHeaderBytes && data[at] == kJpegMark;
-       at = next_segment(data, size, at)) {
+  if (!starts_as_jpeg(data, size)) return std::nullopt;
+  for (std::size_t at = kJpegSegmentsAt; segment_at(data, size, at); at = next_segment(data, size, at)) {
     if (!frame_at(data, size, at)) continue;
     return ImageSize{big_endian(data + at + kFrameWidthAt, sizeof(std::uint16_t)),
                      big_endian(data + at + kFrameHeightAt, sizeof(std::uint16_t))};

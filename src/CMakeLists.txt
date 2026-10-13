@@ -124,9 +124,16 @@ redgem_add_library(redgem_runtime
   scene/terrain.cpp
   scene/primitives.cpp
   physics/body_config.cpp
+  physics/contact_events.cpp
+  physics/jolt/jolt_runtime.cpp
   physics/jolt/jolt_shapes.cpp
   physics/jolt/jolt_vehicle.cpp
   physics/jolt/jolt_physics_world.cpp
+  physics/jolt/jolt_physics_world_bodies.cpp
+  physics/jolt/jolt_physics_world_characters.cpp
+  physics/jolt/jolt_physics_world_vehicles.cpp
+  physics/jolt/jolt_physics_world_contacts.cpp
+  physics/jolt/jolt_physics_world_queries.cpp
   audio/audio.cpp
   input/keys.cpp
   input/input.cpp
@@ -148,14 +155,30 @@ redgem_add_library(redgem_runtime
   script/bindings/save_bindings.cpp
   script/bindings/network_bindings.cpp
   render/mesh_builder.cpp
+  render/mesh_pieces.cpp
   render/image_header.cpp
+  render/texture_loading.cpp
   render/renderer.cpp
-  render/renderer_setup.cpp
-  render/renderer_scene.cpp
-  render/renderer_passes.cpp
+  render/renderer_pipeline.cpp
+  render/renderer_targets.cpp
+  render/renderer_assets.cpp
+  render/renderer_pictures.cpp
+  render/renderer_frame.cpp
+  render/renderer_environment.cpp
+  render/renderer_objects.cpp
+  render/renderer_particles.cpp
+  render/renderer_shadows.cpp
+  render/renderer_reflections.cpp
+  render/renderer_post.cpp
+  render/renderer_overlay.cpp
+  render/mesh_pass.cpp
+  render/shader_programs.cpp
   render/render_math.cpp
+  render/visibility.cpp
+  render/capture_views.cpp
   render/shader_source.cpp
   render/environment.cpp
+  render/scene_lights.cpp
   render/gpu_select.cpp
   render/window.cpp
   render/ui_font.cpp

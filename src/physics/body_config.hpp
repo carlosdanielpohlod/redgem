@@ -30,6 +30,9 @@ struct BodyConfig {
 //  - vehicles always use a box chassis; their wheels are child objects with `wheel = true`.
 BodyConfig body_config_from_props(const PropertyMap& props);
 
+// Whether forces move a body of that type: dynamic bodies, and vehicles (whose chassis is one).
+bool is_dynamic(BodyType type);
+
 // What the `body` property calls a type (scene/props.hpp has the words).
 const char* body_type_name(BodyType type);
 

@@ -1,8 +1,10 @@
 #pragma once
 
-// What the renderer works out before it draws: where things are, what is worth drawing, where the
-// sun's shadow map goes, the corners of a particle. No window and no graphics card needed, so it
-// can be tested. (Values handed to raylib keep raylib's types.)
+// What the renderer works out before it draws, as the values the graphics card takes: colors and
+// matrices, a material's alpha test, the lights' arrays, the corners of a particle, the size of a
+// picture. No window and no graphics card needed, so it can be tested. (Values handed to raylib
+// keep raylib's types.) What is worth drawing is in visibility.hpp; the views captured before the
+// picture are in capture_views.hpp.
 
 #include <raylib.h>
 
@@ -14,19 +16,16 @@
 #include <vector>
 
 #include "core/math.hpp"
-#include "render/culling.hpp"
-#include "render/environment.hpp"
-#include "render/shaders.hpp"
-#include "scene/particles.hpp"
-#include "scene/scene.hpp"
+#include "render/scene_lights.hpp"
+#include "render/shaders/uniforms.hpp"
 #include "scene/scene_desc.hpp"
+#include "scene/transform.hpp"
 
 namespace redgem::render_math {
 
 inline constexpr int kMatrixFloats = 16;  // a 4x4 matrix
 inline constexpr int kColorChannels = 4;  // red, green, blue, alpha
 inline constexpr int kQuadCorners = 4;
-inline constexpr int kCubeFaces = 6;
 inline constexpr float kOn = 1.0f;  // shader switches passed as floats
 inline constexpr float kOff = 0.0f;
 inline constexpr float kNoCutoff = 0.0f;  // an alpha test that lets everything through
@@ -35,28 +34,8 @@ inline constexpr float kSquareCorners = 0.0f;  // roundness of a rectangle witho
 inline constexpr float kFullyRound = 1.0f;     // roundness whose corners meet: the short side is a half circle
 inline constexpr float kDiameterPerRadius = 2.0f;
 inline constexpr float kBlendAsCutoutThreshold = 0.35f;  // alpha below this is cut away on "blend" textures
-// Parts that look smaller than this (radius over distance from the camera, radians) are skipped:
-// a car's bolts at 50 m. Shadows of small things disappear sooner.
-inline constexpr float kMinVisibleAngle = 0.0025f;
-inline constexpr float kMinShadowAngle = 0.008f;
-inline constexpr float kSkinnedBoundsMargin = 1.5f;  // animated limbs reach beyond the bind pose
-// Sun shadows: one map covering a square of the world around where the camera looks.
-inline constexpr int kShadowMapSize = 4096;    // texels along each side
-inline constexpr float kShadowExtent = 90.0f;  // meters covered by the map (side of the square)
-inline constexpr float kShadowFocusAhead =
-    0.3f;  // the square is centered this fraction of its side ahead of the camera
-inline constexpr float kShadowSunDistance =
-    300.0f;  // meters back the sun's viewpoint sits (casters behind the camera count)
-inline constexpr float kMinSunHeight =
-    0.02f;  // below this (y of the direction to the sun) it is treated as set: no shadows
-inline constexpr float kNoShadows = 0.0f;
-inline constexpr float kNearlyVertical = 0.999f;  // |y| of a sun direction beyond which Y cannot be its "up"
 inline constexpr Vector3 kUpAxis{0.0f, 1.0f, 0.0f};
 inline constexpr Vector3 kForwardAxis{0.0f, 0.0f, 1.0f};
-// Reflections: the surroundings of the camera, captured one cube face per frame.
-inline constexpr float kReflectionEyeHeight = 1.2f;  // lowest world height (y, meters) the capture is taken from
-inline constexpr float kReflectionsOn = 1.0f;
-inline constexpr float kReflectionsOff = 0.0f;
 
 // --- Conversions -----------------------------------------------------------------------------
 
@@ -76,6 +55,9 @@ Matrix model_matrix(const Transform& t);
 std::optional<std::string> graphics_card_name(const std::string& trace_line);
 // A target `factor` times smaller than `size` pixels, never smaller than one pixel.
 int downscaled(int size, int factor);
+// Whether `index` names one of `count` things. (kNoIndex names none, and neither does an index a
+// file made up.)
+bool names_one_of(int index, std::size_t count);
 
 // --- Materials -------------------------------------------------------------------------------
 
@@ -99,85 +81,6 @@ struct PointLightUniforms {
 };
 // Lights beyond the shader's limit are left out.
 PointLightUniforms pack_point_lights(const std::vector<PointLight>& lights);
-
-// --- Where things are ------------------------------------------------------------------------
-
-// Where every object is in the world, by object id (destroyed objects keep what they had).
-// Parents are created before their children, so a parent's place is reused instead of walking
-// each object's chain of parents again.
-void world_transforms(const Scene& scene, std::vector<Transform>& worlds);
-
-// --- What is worth drawing -------------------------------------------------------------------
-
-struct BoundingSphere {
-  Vec3 center;
-  float radius = 0.0f;
-};
-// The sphere around a mesh placed in the world.
-BoundingSphere world_sphere(const Bounds& bounds, const Transform& world);
-// A skinned mesh is placed by its skeleton, not by its own node: the sphere follows the first
-// bone, with room for limbs that swing out of the bind pose's bounds.
-BoundingSphere skinned_sphere(const Bounds& bounds, const Matrix& first_bone);
-// The smallest angle (radians) a part may look to still be drawn: `asked` when positive, or the
-// usual one of the pass.
-float smallest_angle_drawn(float asked, bool depth_pass);
-// False for objects that are never drawn: destroyed, hidden, without a (known) mesh, or prefabs
-// outside the editor.
-bool has_something_to_draw(const GameObject& object, bool show_prefabs, std::size_t mesh_count);
-
-// One view of the scene: what it can see and who judges how big things look.
-struct View {
-  Frustum frustum;
-  Vec3 viewer;
-  float min_angle = 0.0f;
-};
-// True when the sphere is in the view, looks big enough and is within [from, to) meters.
-bool worth_drawing(const View& view, const BoundingSphere& sphere, float from, float to);
-
-// --- Sun shadows -----------------------------------------------------------------------------
-
-// How dark the sun's shadows are: `asked`, or none once the sun has set.
-float sun_shadow_strength(Vec3 to_sun, float asked);
-// `value` moved down to a whole number of `step`s.
-float snapped_down(float value, float step);
-// The axis the shadow map's vertical follows. A sun straight overhead has no sideways "up":
-// another axis gives the map its orientation.
-Vector3 shadow_map_vertical(Vector3 sun_axis);
-// The sun's viewpoint for the shadow map.
-struct SunView {
-  Vector3 position;
-  Vector3 target;
-  Vector3 up;
-};
-// Looks at a point ahead of the camera, moved in whole texels only: otherwise shadow edges
-// shimmer as the camera moves.
-SunView fit_sun_view(Vector3 camera_position, Vector3 camera_target, Vec3 to_sun);
-
-// --- Reflections -----------------------------------------------------------------------------
-
-// The view along one face of a cube around the camera.
-struct CubeFace {
-  Vector3 forward;
-  Vector3 up;
-};
-inline constexpr CubeFace kCubeFaceViews[kCubeFaces] = {
-    {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}}, {{-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}},
-    {{0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}}, {{0.0f, 0.0f, -1.0f}, {0.0f, 1.0f, 0.0f}},
-    {{0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}, {{0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
-};
-// The right and up of a face's picture, at right angles to its forward.
-struct FaceAxes {
-  Vector3 right;
-  Vector3 up;
-};
-FaceAxes face_axes(const CubeFace& face);
-// Where the surroundings are captured from: the camera, but not from below a height (a camera
-// near the floor would mostly capture the floor).
-Vector3 reflection_eye(Vector3 camera_position);
-// The face captured after `face`: six frames make a full turn.
-int face_after(int face);
-// Reflections switch on once all six faces exist.
-float reflection_strength(int faces_captured);
 
 // --- Particles -------------------------------------------------------------------------------
 

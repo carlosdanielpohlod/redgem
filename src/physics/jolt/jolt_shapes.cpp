@@ -98,10 +98,12 @@ ShapeResult bounds_shape(ColliderShape collider, Vec3 half, ShapeInfo& info) {
   return capsule_shape(half, info);
 }
 
-// The same shape, moved so that its center sits `offset` away from the object's origin.
+// The same shape, moved so that its center sits `offset` away from the object's origin. (What
+// could not be made, or already sits there, is handed back as it is.)
 ShapeResult moved(ShapeResult shape, Vec3 offset) {
   const auto* centered = std::get_if<JPH::RefConst<JPH::Shape>>(&shape);
-  if (centered == nullptr || length(offset) <= kEpsilon) return shape;
+  const bool stays = centered == nullptr || length(offset) <= kEpsilon;
+  if (stays) return shape;
   return finish(JPH::RotatedTranslatedShapeSettings(to_jolt(offset), JPH::Quat::sIdentity(), *centered));
 }
 

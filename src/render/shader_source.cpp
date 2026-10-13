@@ -1,7 +1,7 @@
 #include "render/shader_source.hpp"
 
 #include "render/gpu_profile.hpp"
-#include "render/shaders.hpp"
+#include "render/shaders/uniforms.hpp"
 
 namespace redgem::shaders {
 namespace {

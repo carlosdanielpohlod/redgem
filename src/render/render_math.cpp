@@ -14,19 +14,8 @@ constexpr const char* kRendererLine = "Renderer:";
 constexpr int kSmallestTarget = 1;      // pixels: a render target cannot be empty
 constexpr std::size_t kMatrixSide = 4;  // rows, and columns, of a matrix
 
-float longest_scale(Vec3 scale) { return std::max({std::fabs(scale.x), std::fabs(scale.y), std::fabs(scale.z)}); }
-
-// Half of a box's diagonal: the radius of the sphere around it.
-float half_diagonal(const Bounds& bounds) { return length(bounds.max - bounds.min) * kHalf; }
-
-// Where an object is in the world, from the places already worked out for the objects before
-// it. (When the parent is not there yet, e.g. after a reparent, ask the scene.)
-Transform placed(const Scene& scene, const GameObject& object, const std::vector<Transform>& worlds,
-                 std::size_t index) {
-  if (object.parent == kNoObject) return object.local;
-  const auto parent = static_cast<std::size_t>(object.parent);
-  return parent < index ? combine(worlds[parent], object.local) : scene.world_transform(object.id);
-}
+// A size the game left out (zero or less): the picture's own takes its place.
+bool missing(float size) { return size <= 0.0f; }
 
 }  // namespace
 
@@ -78,6 +67,8 @@ std::optional<std::string> graphics_card_name(const std::string& trace_line) {
 
 int downscaled(int size, int factor) { return std::max(size / factor, kSmallestTarget); }
 
+bool names_one_of(int index, std::size_t count) { return index >= 0 && static_cast<std::size_t>(index) < count; }
+
 // --- Materials -------------------------------------------------------------------------------
 
 AlphaTest alpha_test(const MaterialDesc& material, float wind) {
@@ -105,91 +96,6 @@ PointLightUniforms pack_point_lights(const std::vector<PointLight>& lights) {
   return packed;
 }
 
-// --- Where things are ------------------------------------------------------------------------
-
-void world_transforms(const Scene& scene, std::vector<Transform>& worlds) {
-  const std::size_t count = scene.size();
-  worlds.resize(count);
-  for (std::size_t i = 0; i < count; ++i) {
-    const GameObject& object = scene.at(static_cast<ObjectId>(i));
-    if (!object.destroyed) worlds[i] = placed(scene, object, worlds, i);
-  }
-}
-
-// --- What is worth drawing -------------------------------------------------------------------
-
-BoundingSphere world_sphere(const Bounds& bounds, const Transform& world) {
-  const Vec3 center = world.position + rotate(world.rotation, hadamard(bounds.center(), world.scale));
-  return {center, half_diagonal(bounds) * longest_scale(world.scale)};
-}
-
-BoundingSphere skinned_sphere(const Bounds& bounds, const Matrix& first_bone) {
-  const Vector3 moved = Vector3Transform(to_raylib(bounds.center()), first_bone);
-  // A scaled rig is bigger: the length of the bone's first axis says by how much.
-  const float stretch = kSkinnedBoundsMargin * Vector3Length({first_bone.m0, first_bone.m1, first_bone.m2});
-  return {to_vec3(moved), half_diagonal(bounds) * stretch};
-}
-
-float smallest_angle_drawn(float asked, bool depth_pass) {
-  if (asked > 0.0f) return asked;
-  return depth_pass ? kMinShadowAngle : kMinVisibleAngle;
-}
-
-bool has_something_to_draw(const GameObject& object, bool show_prefabs, std::size_t mesh_count) {
-  if (object.destroyed || object.mesh == kNoIndex || !object.visible) return false;
-  if (object.prefab && !show_prefabs) return false;
-  return static_cast<std::size_t>(object.mesh) < mesh_count;
-}
-
-bool worth_drawing(const View& view, const BoundingSphere& sphere, float from, float to) {
-  if (!sphere_in_frustum(view.frustum, sphere.center, sphere.radius)) return false;
-  if (too_small_to_see(sphere.center, sphere.radius, view.viewer, view.min_angle)) return false;
-  return !outside_distance_range(sphere.center, view.viewer, from, to);
-}
-
-// --- Sun shadows -----------------------------------------------------------------------------
-
-float sun_shadow_strength(Vec3 to_sun, float asked) { return to_sun.y > kMinSunHeight ? asked : kNoShadows; }
-
-float snapped_down(float value, float step) { return std::floor(value / step) * step; }
-
-Vector3 shadow_map_vertical(Vector3 sun_axis) {
-  return std::fabs(sun_axis.y) > kNearlyVertical ? kForwardAxis : kUpAxis;
-}
-
-SunView fit_sun_view(Vector3 camera_position, Vector3 camera_target, Vec3 to_sun) {
-  const Vector3 forward = Vector3Normalize(Vector3Subtract(camera_target, camera_position));
-  const Vector3 ahead = Vector3Add(camera_position, Vector3Scale(forward, kShadowExtent * kShadowFocusAhead));
-  const Vector3 sun_axis = to_raylib(to_sun);
-  const Vector3 map_vertical = shadow_map_vertical(sun_axis);
-  const Vector3 map_right = Vector3Normalize(Vector3CrossProduct(map_vertical, sun_axis));
-  const Vector3 map_up = Vector3CrossProduct(sun_axis, map_right);
-  const float texel_size = kShadowExtent / static_cast<float>(kShadowMapSize);
-  // Snapped across the map; along the sun's own axis the place does not matter to the texels.
-  const Vector3 across = Vector3Scale(map_right, snapped_down(Vector3DotProduct(ahead, map_right), texel_size));
-  const Vector3 upward = Vector3Scale(map_up, snapped_down(Vector3DotProduct(ahead, map_up), texel_size));
-  const Vector3 focus =
-      Vector3Add(Vector3Add(across, upward), Vector3Scale(sun_axis, Vector3DotProduct(ahead, sun_axis)));
-  return {Vector3Add(focus, Vector3Scale(sun_axis, kShadowSunDistance)), focus, map_vertical};
-}
-
-// --- Reflections -----------------------------------------------------------------------------
-
-FaceAxes face_axes(const CubeFace& face) {
-  const Vector3 right = Vector3Normalize(Vector3CrossProduct(face.forward, face.up));
-  return {right, Vector3CrossProduct(right, face.forward)};
-}
-
-Vector3 reflection_eye(Vector3 camera_position) {
-  return {camera_position.x, std::max(camera_position.y, kReflectionEyeHeight), camera_position.z};
-}
-
-int face_after(int face) { return (face + 1) % kCubeFaces; }
-
-float reflection_strength(int faces_captured) {
-  return faces_captured >= kCubeFaces ? kReflectionsOn : kReflectionsOff;
-}
-
 // --- Particles -------------------------------------------------------------------------------
 
 Facing facing(Vec3 eye, Vec3 target, Vec3 up) {
@@ -212,17 +118,17 @@ std::array<Vec3, kQuadCorners> particle_corners(Vec3 position, float size, float
 Size image_size(int asked_width, int asked_height, int picture_width, int picture_height) {
   Size size{static_cast<float>(asked_width), static_cast<float>(asked_height)};
   const float shape = static_cast<float>(picture_width) / static_cast<float>(picture_height);
-  if (size.width <= 0.0f && size.height <= 0.0f) {
-    size = {static_cast<float>(picture_width), static_cast<float>(picture_height)};
-  }
-  if (size.width <= 0.0f) size.width = size.height * shape;
-  if (size.height <= 0.0f) size.height = size.width / shape;
+  const bool as_large_as_it_is = missing(size.width) && missing(size.height);
+  if (as_large_as_it_is) size = {static_cast<float>(picture_width), static_cast<float>(picture_height)};
+  if (missing(size.width)) size.width = size.height * shape;
+  if (missing(size.height)) size.height = size.width / shape;
   return size;
 }
 
 float corner_roundness(float radius, float width, float height) {
   const float shorter = std::min(width, height);
-  if (radius <= 0.0f || shorter <= 0.0f) return kSquareCorners;
+  const bool nothing_to_round = radius <= 0.0f || shorter <= 0.0f;
+  if (nothing_to_round) return kSquareCorners;
   return std::min(radius * kDiameterPerRadius / shorter, kFullyRound);
 }
 

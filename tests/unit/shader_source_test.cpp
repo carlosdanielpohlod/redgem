@@ -5,7 +5,17 @@
 #include "scene/scene_config.hpp"
 #include "render/gpu_profile.hpp"
 #include "render/shader_source.hpp"
-#include "render/shaders.hpp"
+#include "render/shaders/ambient_occlusion.hpp"
+#include "render/shaders/antialias.hpp"
+#include "render/shaders/bloom.hpp"
+#include "render/shaders/lit_fragment.hpp"
+#include "render/shaders/lit_vertex.hpp"
+#include "render/shaders/panorama.hpp"
+#include "render/shaders/particle.hpp"
+#include "render/shaders/shadow_depth.hpp"
+#include "render/shaders/sky.hpp"
+#include "render/shaders/tone_mapping.hpp"
+#include "render/shaders/uniforms.hpp"
 
 using namespace redgem;
 

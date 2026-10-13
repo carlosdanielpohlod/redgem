@@ -28,4 +28,8 @@ AxleLayout layout_axles(const std::vector<WheelDesc>& wheels);
 JPH::Ref<JPH::VehicleConstraint> build_vehicle(JPH::Body& chassis, const std::vector<WheelDesc>& wheels,
                                                JPH::ObjectLayer layer);
 
+// Stills a vehicle's wheels, engine and controls. They keep their own spin: a teleported car must
+// not drive off by itself.
+void stop_vehicle(JPH::VehicleConstraint& vehicle);
+
 }  // namespace redgem::jolt
