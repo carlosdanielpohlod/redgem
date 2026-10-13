@@ -1,0 +1,82 @@
+// Live copies of a scene's objects (Scene.spawn).
+
+#include <algorithm>
+
+#include "scene/props.hpp"
+#include "scene/scene.hpp"
+
+namespace redgem {
+namespace {
+
+using CopyPair = std::pair<ObjectId, ObjectId>;
+
+// A copy before it gets its place in the scene: live, on its own, following no animation ahead.
+GameObject detached_copy(const GameObject& original) {
+  GameObject copy = original;
+  copy.children.clear();
+  copy.prefab = false;
+  copy.props.erase(props::kPrefab);
+  // A copy of a copy still follows the animations of the first original.
+  copy.copy_of = original.copy_of == kNoObject ? original.id : original.copy_of;
+  copy.animation_offset = 0.0f;
+  return copy;
+}
+
+// The copy made of `original`, or `original` itself when it is outside what was copied.
+ObjectId copy_or_original(const std::vector<CopyPair>& copies, ObjectId original) {
+  const auto copied =
+      std::find_if(copies.begin(), copies.end(), [original](const CopyPair& pair) { return pair.first == original; });
+  return copied != copies.end() ? copied->second : original;
+}
+
+}  // namespace
+
+ObjectId Scene::add_copy(ObjectId original, ObjectId parent, ObjectId root) {
+  GameObject copy = detached_copy(at(original));
+  copy.id = static_cast<ObjectId>(objects_.size());
+  copy.parent = parent;
+  copy.copy_root = root == kNoObject ? copy.id : root;
+  const ObjectId id = copy.id;
+  copies_[copy.copy_of].push_back(id);
+  objects_.push_back(std::move(copy));
+  if (parent != kNoObject) objects_[parent].children.push_back(id);
+  return id;
+}
+
+std::vector<ObjectId> Scene::clone(ObjectId source) {
+  const Transform world = world_transform(source);
+  std::vector<CopyPair> copies;  // (original, its copy)
+  // Breadth-first over the subtree; the new parent of each copy is known when it is created.
+  std::vector<CopyPair> queue = {{source, kNoObject}};  // (original, copy's parent)
+  for (std::size_t i = 0; i < queue.size(); ++i) {
+    const auto [original, parent] = queue[i];
+    const ObjectId id = add_copy(original, parent, copies.empty() ? kNoObject : copies.front().second);
+    copies.push_back({original, id});
+    for (const ObjectId child : objects_[original].children) {
+      if (!objects_[child].destroyed) queue.push_back({child, id});
+    }
+  }
+  objects_[copies.front().second].local = world;  // the root keeps its world placement
+  return with_copied_joints(copies);
+}
+
+std::vector<ObjectId> Scene::with_copied_joints(const std::vector<CopyPair>& copies) {
+  std::vector<ObjectId> created;
+  for (const auto& [original, id] : copies) {
+    for (ObjectId& joint : objects_[id].joints) joint = copy_or_original(copies, joint);
+    created.push_back(id);
+  }
+  return created;
+}
+
+std::vector<ObjectId> Scene::copies_of(ObjectId original) const {
+  std::vector<ObjectId> alive;
+  const auto found = copies_.find(original);
+  if (found == copies_.end()) return alive;
+  for (const ObjectId id : found->second) {
+    if (!objects_[id].destroyed) alive.push_back(id);
+  }
+  return alive;
+}
+
+}  // namespace redgem

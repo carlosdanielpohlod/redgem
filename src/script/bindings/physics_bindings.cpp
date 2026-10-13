@@ -17,45 +17,39 @@ constexpr mrb_float kDefaultRaycastDistance = 1000.0;
 
 PhysicsWorld& physics(mrb_state* mrb) { return *context(mrb).physics; }
 
-ObjectId body_id(mrb_state* mrb, mrb_value self) { return alive_object(mrb, self).id; }
-
 // --- CharacterController ---------------------------------------------------------------
 
 mrb_value character_move(mrb_state* mrb, mrb_value self) {
-  mrb_value velocity;
-  mrb_get_args(mrb, "o", &velocity);
-  physics(mrb).set_character_move(body_id(mrb, self), to_vec3(mrb, velocity));
+  const mrb_value velocity = single_arg(mrb);
+  physics(mrb).set_character_move(alive_id(mrb, self), to_vec3(mrb, velocity));
   return mrb_nil_value();
 }
 
 mrb_value character_jump(mrb_state* mrb, mrb_value self) {
-  mrb_float speed = 0.0;
-  mrb_get_args(mrb, "f", &speed);
-  physics(mrb).character_jump(body_id(mrb, self), static_cast<float>(speed));
+  const mrb_float speed = float_arg(mrb);
+  physics(mrb).character_jump(alive_id(mrb, self), static_cast<float>(speed));
   return mrb_nil_value();
 }
 
 mrb_value character_grounded(mrb_state* mrb, mrb_value self) {
-  return mrb_bool_value(physics(mrb).character_grounded(body_id(mrb, self)));
+  return mrb_bool_value(physics(mrb).character_grounded(alive_id(mrb, self)));
 }
 
 mrb_value body_velocity(mrb_state* mrb, mrb_value self) {
-  return vec3_value(mrb, physics(mrb).velocity(body_id(mrb, self)));
+  return vec3_value(mrb, physics(mrb).velocity(alive_id(mrb, self)));
 }
 
 // --- Rigidbody ---------------------------------------------------------------------------
 
 mrb_value rigidbody_set_velocity(mrb_state* mrb, mrb_value self) {
-  mrb_value velocity;
-  mrb_get_args(mrb, "o", &velocity);
-  physics(mrb).set_velocity(body_id(mrb, self), to_vec3(mrb, velocity));
+  const mrb_value velocity = single_arg(mrb);
+  physics(mrb).set_velocity(alive_id(mrb, self), to_vec3(mrb, velocity));
   return velocity;
 }
 
 mrb_value rigidbody_add_impulse(mrb_state* mrb, mrb_value self) {
-  mrb_value impulse;
-  mrb_get_args(mrb, "o", &impulse);
-  physics(mrb).add_impulse(body_id(mrb, self), to_vec3(mrb, impulse));
+  const mrb_value impulse = single_arg(mrb);
+  physics(mrb).add_impulse(alive_id(mrb, self), to_vec3(mrb, impulse));
   return mrb_nil_value();
 }
 
@@ -75,12 +69,12 @@ mrb_value vehicle_drive(mrb_state* mrb, mrb_value self) {
   input.steering = clamped(steering, kMinAxisInput, kMaxInput);
   input.brake = clamped(brake, kMinPedalInput, kMaxInput);
   input.handbrake = clamped(handbrake, kMinPedalInput, kMaxInput);
-  physics(mrb).set_vehicle_input(body_id(mrb, self), input);
+  physics(mrb).set_vehicle_input(alive_id(mrb, self), input);
   return mrb_nil_value();
 }
 
 mrb_value vehicle_speed(mrb_state* mrb, mrb_value self) {
-  return mrb_float_value(mrb, physics(mrb).vehicle_forward_speed(body_id(mrb, self)));
+  return mrb_float_value(mrb, physics(mrb).vehicle_forward_speed(alive_id(mrb, self)));
 }
 
 // --- Physics -------------------------------------------------------------------------------
@@ -106,10 +100,6 @@ mrb_value physics_raycast(mrb_state* mrb, mrb_value) {
       physics(mrb).raycast(to_vec3(mrb, origin), to_vec3(mrb, direction), static_cast<float>(max_distance), ignored);
   return hit ? hit_value(mrb, *hit) : mrb_nil_value();
 }
-
-}  // namespace
-
-namespace {
 
 void install_body_bindings(mrb_state* mrb) {
   RClass* character = mrb_define_class(mrb, "CharacterController", mrb->object_class);

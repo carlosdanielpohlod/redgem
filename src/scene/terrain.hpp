@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <optional>
 
 #include "core/math.hpp"
@@ -7,6 +8,9 @@
 
 namespace redgem {
 
+// What reshapes and probes a terrain is in parts: terrain.cpp (the grid and its heights),
+// terrain_sculpt.cpp (brush strokes) and terrain_raycast.cpp (where a ray meets the ground).
+//
 // A terrain is a square grid of `cells` x `cells` quads, `size` meters across, centered on its
 // object's origin, whose vertices can be raised and lowered. It is an ordinary mesh: these
 // functions build it and reshape it. Vertices are stored row by row (rows along Z, columns
@@ -18,7 +22,17 @@ struct TerrainGrid {
   int side() const { return cells + 1; }  // vertices per row
   float spacing() const { return size / static_cast<float>(cells); }
   bool fits(const PrimitiveDesc& mesh) const;  // is `mesh` a grid of this shape?
+  // Where a column is along X (or a row along Z), in the terrain's own space.
+  float coordinate(int index) const { return -size * kHalf + static_cast<float>(index) * spacing(); }
+  // Whether a point of the terrain's own space is over the terrain, its edges included.
+  bool covers(float x, float z) const;
+  // Where a vertex's floats start in a mesh's positions and normals.
+  std::size_t vertex_offset(int column, int row) const;
 };
+
+// Height of a vertex of the grid. A column or a row outside the grid counts as the nearest one
+// in it, so that the vertices on the edges have neighbours on every side.
+float vertex_height(const PrimitiveDesc& mesh, const TerrainGrid& grid, int column, int row);
 
 // What a brush does to the ground under it.
 enum class SculptMode { Raise, Lower, Smooth, Flatten };

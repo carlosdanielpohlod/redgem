@@ -8,9 +8,11 @@ add_executable(redgem_tests
   unit/platform_test.cpp
   unit/property_test.cpp
   unit/props_test.cpp
+  unit/json_scanner_test.cpp
   unit/extras_parser_test.cpp
   unit/transform_test.cpp
   unit/scene_test.cpp
+  unit/gltf_accessors_test.cpp
   unit/gltf_loader_test.cpp
   unit/gltf_loader_safety_test.cpp
   unit/safe_path_test.cpp
@@ -68,6 +70,7 @@ add_executable(redgem_tests
   unit/relay_program_test.cpp
   unit/particles_test.cpp
   unit/animation_player_test.cpp
+  unit/clip_clock_test.cpp
   unit/camera_ray_test.cpp
   integration/physics_world_test.cpp
   integration/vehicle_test.cpp
@@ -78,6 +81,8 @@ add_executable(redgem_tests
   integration/scene_script_test.cpp
   integration/ui_input_test.cpp
   integration/gameplay_api_test.cpp
+  integration/native_arguments_test.cpp
+  integration/message_values_test.cpp
   integration/connection_test.cpp
   integration/network_session_test.cpp
   integration/multiplayer_test.cpp

@@ -134,3 +134,43 @@ TEST_CASE("objects read their range of visible distances from props, and copies 
   const ObjectId copy = scene.clone(0).front();
   CHECK(scene.at(copy).visible_to == doctest::Approx(kTo));
 }
+
+TEST_CASE("an index names one of so many things only from zero up to their count") {
+  CHECK(is_index_of(0, 1));
+  CHECK(is_index_of(2, 3));
+  CHECK_FALSE(is_index_of(3, 3));
+  CHECK_FALSE(is_index_of(kNoIndex, 3));
+  CHECK_FALSE(is_index_of(0, 0));
+}
+
+TEST_CASE("what is destroyed is no longer found, by name, by tag or as the camera") {
+  Scene scene = Scene::from_desc(family());
+  const ObjectId parent = scene.find("Parent");
+  const ObjectId camera = scene.main_camera();
+  REQUIRE(parent != kNoObject);
+  REQUIRE(camera == scene.find("Camera"));
+  CHECK(scene.find_all_by_tag("enemy") == std::vector<ObjectId>{parent});
+  CHECK(scene.pending_destroy_ids().empty());
+
+  scene.request_destroy(camera);
+  CHECK(scene.pending_destroy_ids() == std::vector<ObjectId>{camera});
+  CHECK(scene.main_camera() == camera);  // still there until the step ends
+  scene.finalize_destroy(camera);
+  scene.finalize_destroy(parent);
+  CHECK(scene.pending_destroy_ids().empty());
+  CHECK(scene.main_camera() == kNoObject);
+  CHECK(scene.find("Parent") == kNoObject);
+  CHECK(scene.find_all_by_tag("enemy").empty());
+}
+
+TEST_CASE("what is under a prefab is a prefab too, and prefabs are not found by their tag") {
+  SceneDesc desc = family();
+  desc.nodes[0].props["prefab"] = true;
+  desc.nodes[1].props["tag"] = std::string("enemy");
+  const Scene scene = Scene::from_desc(desc);
+  CHECK(scene.is_prefab(scene.find("Parent")));
+  CHECK(scene.is_prefab(scene.find("Child")));
+  CHECK_FALSE(scene.is_prefab(scene.find("Camera")));
+  CHECK(scene.find_all_by_tag("enemy").empty());
+  CHECK(scene.find("Child") != kNoObject);  // by name, a template is found
+}

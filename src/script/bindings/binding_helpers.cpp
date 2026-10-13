@@ -7,6 +7,8 @@
 #include <mruby/string.h>
 #include <mruby/variable.h>
 
+#include <cmath>
+
 #include "script/script_host.hpp"
 
 namespace redgem::binding {
@@ -33,6 +35,9 @@ Vec3 vec3_from_vector(mrb_state* mrb, mrb_value vector) {
   return vec3_from(components);
 }
 
+// An Array of three: [x, y, z].
+bool is_triple(mrb_value value) { return mrb_array_p(value) && RARRAY_LEN(value) == kVectorComponents; }
+
 }  // namespace
 
 ScriptContext& context(mrb_state* mrb) { return script_host(mrb).context(); }
@@ -58,6 +63,8 @@ GameObject& alive_object(mrb_state* mrb, mrb_value self) {
   return object;
 }
 
+ObjectId alive_id(mrb_state* mrb, mrb_value self) { return alive_object(mrb, self).id; }
+
 bool is_vector3(mrb_state* mrb, mrb_value value) {
   return mrb_obj_is_kind_of(mrb, value, mrb_class_get(mrb, kVector3Class));
 }
@@ -67,7 +74,7 @@ bool is_game_object(mrb_state* mrb, mrb_value value) {
 }
 
 Vec3 to_vec3(mrb_state* mrb, mrb_value value) {
-  if (mrb_array_p(value) && RARRAY_LEN(value) == kVectorComponents) return vec3_from_array(mrb, value);
+  if (is_triple(value)) return vec3_from_array(mrb, value);
   if (!is_vector3(mrb, value)) mrb_raise(mrb, E_TYPE_ERROR, "expected a Vector3 or [x, y, z]");
   return vec3_from_vector(mrb, value);
 }
@@ -102,10 +109,29 @@ mrb_value object_or_nil(mrb_state* mrb, ObjectId object) {
   return script_host(mrb).object_value(object);
 }
 
-std::string name_arg(mrb_state* mrb) {
-  mrb_value name;
-  mrb_get_args(mrb, "o", &name);
-  return to_name(mrb, name);
+mrb_value single_arg(mrb_state* mrb) {
+  mrb_value value;
+  mrb_get_args(mrb, "o", &value);
+  return value;
+}
+
+mrb_float float_arg(mrb_state* mrb) {
+  mrb_float number = 0.0;
+  mrb_get_args(mrb, "f", &number);
+  return number;
+}
+
+bool bool_arg(mrb_state* mrb) {
+  mrb_bool flag = false;
+  mrb_get_args(mrb, "b", &flag);
+  return flag;
+}
+
+std::string name_arg(mrb_state* mrb) { return to_name(mrb, single_arg(mrb)); }
+
+double finite_number(mrb_state* mrb, mrb_value value, const char* refusal) {
+  if (!std::isfinite(mrb_float(value))) mrb_raise(mrb, E_ARGUMENT_ERROR, refusal);
+  return static_cast<double>(mrb_float(value));
 }
 
 Color color_from(mrb_int r, mrb_int g, mrb_int b, mrb_int a) {

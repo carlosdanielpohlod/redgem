@@ -18,10 +18,9 @@ bool whole_triangles_of(const std::vector<std::uint32_t>& indices, std::size_t v
 std::string primitive_shape_problem(const PrimitiveDesc& primitive) {
   const std::size_t vertex_count = primitive.positions.size() / config::kFloatsPerPosition;
   if (vertex_count == 0) return "primitive has no vertices";
-  if (primitive.positions.size() % config::kFloatsPerPosition != 0 ||
-      primitive.normals.size() != primitive.positions.size()) {
-    return "primitive has vertices without a whole position and normal";
-  }
+  const bool whole_vertices = primitive.positions.size() % config::kFloatsPerPosition == 0 &&
+                              primitive.normals.size() == primitive.positions.size();
+  if (!whole_vertices) return "primitive has vertices without a whole position and normal";
   if (!whole_triangles_of(primitive.indices, vertex_count)) return "primitive has invalid triangle indices";
   return {};
 }

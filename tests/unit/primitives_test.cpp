@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include "scene/scene_config.hpp"
+#include "scene/primitive_builder.hpp"
 #include "scene/primitives.hpp"
 #include "test_support.hpp"
 
@@ -66,4 +67,22 @@ TEST_CASE("primitive names and colliders") {
   CHECK(std::string(primitive_collider(PrimitiveShape::Sphere)) == "sphere");
   CHECK(std::string(primitive_collider(PrimitiveShape::Capsule)) == "capsule");
   CHECK(std::string(primitive_collider(PrimitiveShape::Cube)) == "box");
+}
+
+TEST_CASE("a builder numbers its vertices as they come and makes a quad of two triangles") {
+  PrimitiveBuilder builder;
+  CHECK(builder.next_index() == 0);
+  const std::uint32_t first = builder.vertex({0, 0, 0}, Vec3::up(), 0, 0);
+  builder.vertex({1, 0, 0}, Vec3::up(), 1, 0);
+  builder.vertex({1, 0, -1}, Vec3::up(), 1, 1);
+  const std::uint32_t last = builder.vertex({0, 0, -1}, Vec3::up(), 0, 1);
+  CHECK(first == 0);
+  CHECK(last == 3);
+  CHECK(builder.next_index() == 4);
+  builder.quad_from(first);
+  CHECK(builder.out.indices == std::vector<std::uint32_t>{0, 1, 2, 0, 2, 3});
+  CHECK(builder.out.positions.size() == 4u * config::kFloatsPerPosition);
+  CHECK(builder.out.normals.size() == builder.out.positions.size());
+  CHECK(builder.out.texcoords.size() == 4u * config::kFloatsPerTexcoord);
+  CHECK(primitive_shape_problem(builder.out).empty());
 }

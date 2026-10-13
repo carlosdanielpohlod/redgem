@@ -49,6 +49,8 @@ struct GameObject {
 };
 
 // Runtime object hierarchy. Ids are stable for the whole session (destroyed slots stay reserved).
+// Implemented in parts: scene.cpp (finding, placing and destroying objects), scene_from_desc.cpp
+// (the objects of a loaded file) and scene_copies.cpp (live copies).
 class Scene {
  public:
   static Scene from_desc(const SceneDesc& desc);
@@ -91,7 +93,7 @@ class Scene {
   // A copied character is deformed by its own copied bones (bones outside the copy stay shared).
   // Takes (original, its copy) pairs and returns the copies' ids, in that order.
   std::vector<ObjectId> with_copied_joints(const std::vector<std::pair<ObjectId, ObjectId>>& copies);
-  bool valid(ObjectId id) const { return id >= 0 && static_cast<std::size_t>(id) < objects_.size(); }
+  bool valid(ObjectId id) const { return is_index_of(id, objects_.size()); }
 
   std::vector<GameObject> objects_;
   std::unordered_map<ObjectId, std::vector<ObjectId>> copies_;  // original -> every copy ever made

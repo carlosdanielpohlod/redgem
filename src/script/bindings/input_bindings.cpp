@@ -1,8 +1,8 @@
 // Input natives: what a game reads from the keyboard, the mouse and a gamepad.
 
 #include <mruby.h>
-#include <mruby/array.h>
-#include <mruby/string.h>
+
+#include <optional>
 
 #include "input/keys.hpp"
 #include "script/bindings/binding_helpers.hpp"
@@ -13,39 +13,38 @@ namespace {
 
 using namespace binding;
 
+constexpr const char* kUnknownAction = "unknown action :%s";
+
 InputState& input(mrb_state* mrb) { return *context(mrb).input; }
 
-// The key, gamepad axis or gamepad button a Ruby name stands for; an ArgumentError for an unknown one.
-Key key_named(mrb_state* mrb, mrb_value name) {
-  const std::string key_name = to_name(mrb, name);
-  const auto key = key_from_name(key_name);
-  if (!key) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown key :%s", key_name.c_str());
-  return *key;
+// What a name stands for; an ArgumentError (`unknown`, which says the name where its %s is) for a
+// name that stands for nothing.
+template <typename Found>
+Found known(mrb_state* mrb, const std::optional<Found>& found, const char* unknown, const std::string& name) {
+  if (!found) mrb_raisef(mrb, E_ARGUMENT_ERROR, unknown, name.c_str());
+  return *found;
 }
 
-GamepadAxis gamepad_axis_named(mrb_state* mrb, mrb_value name) {
-  const std::string axis_name = to_name(mrb, name);
-  const auto axis = gamepad_axis_from_name(axis_name);
-  if (!axis) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown gamepad axis :%s", axis_name.c_str());
-  return *axis;
+// The single argument of a native method, as what it names.
+Key key_arg(mrb_state* mrb) {
+  const std::string name = name_arg(mrb);
+  return known(mrb, key_from_name(name), "unknown key :%s", name);
 }
 
-GamepadButton gamepad_button_named(mrb_state* mrb, mrb_value name) {
-  const std::string button_name = to_name(mrb, name);
-  const auto button = gamepad_button_from_name(button_name);
-  if (!button) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown gamepad button :%s", button_name.c_str());
-  return *button;
+GamepadAxis gamepad_axis_arg(mrb_state* mrb) {
+  const std::string name = name_arg(mrb);
+  return known(mrb, gamepad_axis_from_name(name), "unknown gamepad axis :%s", name);
 }
 
-// The single argument of a native method, which names one of those.
-mrb_value single_arg(mrb_state* mrb) {
-  mrb_value name;
-  mrb_get_args(mrb, "o", &name);
-  return name;
+GamepadButton gamepad_button_arg(mrb_state* mrb) {
+  const std::string name = name_arg(mrb);
+  return known(mrb, gamepad_button_from_name(name), "unknown gamepad button :%s", name);
 }
 
-Key key_arg(mrb_state* mrb) { return key_named(mrb, single_arg(mrb)); }
-GamepadButton gamepad_button_arg(mrb_state* mrb) { return gamepad_button_named(mrb, single_arg(mrb)); }
+MouseButton mouse_button_arg(mrb_state* mrb) {
+  const std::string name = name_arg(mrb);
+  return known(mrb, mouse_button_from_name(name), "unknown mouse button :%s (use :left, :right or :middle)", name);
+}
 
 // --- Input ---------------------------------------------------------------------------------
 
@@ -55,31 +54,17 @@ mrb_value input_released(mrb_state* mrb, mrb_value) { return mrb_bool_value(inpu
 
 mrb_value input_axis(mrb_state* mrb, mrb_value) {
   const std::string name = name_arg(mrb);
-  const auto value = input(mrb).axis(name);
-  if (!value) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown axis :%s", name.c_str());
-  return mrb_float_value(mrb, *value);
+  return mrb_float_value(mrb, known(mrb, input(mrb).axis(name), "unknown axis :%s", name));
 }
 
 mrb_value input_action(mrb_state* mrb, mrb_value) {
   const std::string name = name_arg(mrb);
-  const auto value = input(mrb).action_down(name);
-  if (!value) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown action :%s", name.c_str());
-  return mrb_bool_value(*value);
+  return mrb_bool_value(known(mrb, input(mrb).action_down(name), kUnknownAction, name));
 }
 
 mrb_value input_action_pressed(mrb_state* mrb, mrb_value) {
   const std::string name = name_arg(mrb);
-  const auto value = input(mrb).action_pressed(name);
-  if (!value) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown action :%s", name.c_str());
-  return mrb_bool_value(*value);
-}
-
-MouseButton button_arg(mrb_state* mrb) {
-  const std::string name = name_arg(mrb);
-  const auto button = mouse_button_from_name(name);
-  if (!button)
-    mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown mouse button :%s (use :left, :right or :middle)", name.c_str());
-  return *button;
+  return mrb_bool_value(known(mrb, input(mrb).action_pressed(name), kUnknownAction, name));
 }
 
 mrb_value input_mouse_x(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, input(mrb).mouse_x()); }
@@ -87,26 +72,26 @@ mrb_value input_mouse_y(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb,
 mrb_value input_mouse_dx(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, input(mrb).mouse_dx()); }
 mrb_value input_mouse_dy(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, input(mrb).mouse_dy()); }
 mrb_value input_mouse_wheel(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, input(mrb).mouse_wheel()); }
-mrb_value input_mouse_down(mrb_state* mrb, mrb_value) { return mrb_bool_value(input(mrb).mouse_down(button_arg(mrb))); }
+mrb_value input_mouse_down(mrb_state* mrb, mrb_value) {
+  return mrb_bool_value(input(mrb).mouse_down(mouse_button_arg(mrb)));
+}
 mrb_value input_mouse_pressed(mrb_state* mrb, mrb_value) {
-  return mrb_bool_value(input(mrb).mouse_pressed(button_arg(mrb)));
+  return mrb_bool_value(input(mrb).mouse_pressed(mouse_button_arg(mrb)));
 }
 mrb_value input_mouse_released(mrb_state* mrb, mrb_value) {
-  return mrb_bool_value(input(mrb).mouse_released(button_arg(mrb)));
+  return mrb_bool_value(input(mrb).mouse_released(mouse_button_arg(mrb)));
 }
 mrb_value input_touch_controls(mrb_state* mrb, mrb_value) { return mrb_bool_value(context(mrb).touch_controls); }
 mrb_value input_set_touch_controls(mrb_state* mrb, mrb_value) {
-  mrb_bool show = true;
-  mrb_get_args(mrb, "b", &show);
-  context(mrb).touch_controls = show;
-  return mrb_bool_value(show);
+  context(mrb).touch_controls = bool_arg(mrb);
+  return mrb_bool_value(context(mrb).touch_controls);
 }
 
 mrb_value input_text(mrb_state* mrb, mrb_value) { return text_value(mrb, input(mrb).typed_text()); }
 
 mrb_value input_gamepad(mrb_state* mrb, mrb_value) { return mrb_bool_value(input(mrb).gamepad_connected()); }
 mrb_value input_gamepad_axis(mrb_state* mrb, mrb_value) {
-  return mrb_float_value(mrb, input(mrb).gamepad_axis(gamepad_axis_named(mrb, single_arg(mrb))));
+  return mrb_float_value(mrb, input(mrb).gamepad_axis(gamepad_axis_arg(mrb)));
 }
 mrb_value input_gamepad_down(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(input(mrb).gamepad_down(gamepad_button_arg(mrb)));
@@ -120,15 +105,9 @@ mrb_value input_gamepad_released(mrb_state* mrb, mrb_value) {
 
 mrb_value input_mouse_locked(mrb_state* mrb, mrb_value) { return mrb_bool_value(context(mrb).mouse_locked); }
 mrb_value input_set_mouse_locked(mrb_state* mrb, mrb_value) {
-  mrb_bool locked = false;
-  mrb_get_args(mrb, "b", &locked);
-  context(mrb).mouse_locked = locked;
-  return mrb_bool_value(locked);
+  context(mrb).mouse_locked = bool_arg(mrb);
+  return mrb_bool_value(context(mrb).mouse_locked);
 }
-
-}  // namespace
-
-namespace {
 
 void install_key_bindings(RClass* input_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, input_module, "down?", input_down, MRB_ARGS_REQ(1));

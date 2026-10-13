@@ -28,6 +28,11 @@ float fade(const Particle& particle) {
   return std::clamp((lived - kFadeStart) / (1.0f - kFadeStart), 0.0f, 1.0f);
 }
 
+// Whether a burst that made `added` particles makes one more: it asks for more, and there is room.
+bool makes_one_more(const ParticleBurst& burst, int added, std::size_t flying) {
+  return added < burst.count && flying < kMaxParticles;
+}
+
 }  // namespace
 
 float Particle::size_now() const { return size * (1.0f - (1.0f - kEndSize) * fade(*this)); }
@@ -91,7 +96,7 @@ int ParticleSystem::burst(const ParticleBurst& burst) {
   const int image = image_index(burst.image);
   const BurstCone cone = burst_cone(burst.direction, burst.spread_degrees);
   int added = 0;
-  for (; added < burst.count && particles_.size() < kMaxParticles; ++added) {
+  for (; makes_one_more(burst, added, particles_.size()); ++added) {
     particles_.push_back(new_particle(burst, cone, image));
   }
   return added;

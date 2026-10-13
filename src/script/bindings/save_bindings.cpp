@@ -20,11 +20,7 @@ constexpr double kLargestSavedInteger = 9007199254740992.0;  // 2^53: whole numb
 
 // --- Save --------------------------------------------------------------------------------------
 
-SaveStore& save(mrb_state* mrb) {
-  SaveStore* store = context(mrb).save;
-  if (store == nullptr) mrb_raise(mrb, E_RUNTIME_ERROR, "Save is only available while a game runs");
-  return *store;
-}
+SaveStore& save(mrb_state* mrb) { return required(mrb, context(mrb).save, "Save is only available while a game runs"); }
 
 // Whole numbers come back as Integers: a saved count of 3 is 3, not 3.0.
 mrb_value number_value(mrb_state* mrb, double number) {
@@ -43,17 +39,13 @@ mrb_value save_get(mrb_state* mrb, mrb_value) {
   return text_value(mrb, std::get<std::string>(*value));
 }
 
-double finite_number(mrb_state* mrb, mrb_value value) {
-  if (!std::isfinite(mrb_float(value))) mrb_raise(mrb, E_ARGUMENT_ERROR, "Save cannot keep infinity or NaN");
-  return static_cast<double>(mrb_float(value));
-}
-
 // What is kept for a Ruby value; raises for one that cannot be kept.
 PropertyValue stored_value(mrb_state* mrb, mrb_value value) {
   const bool flag = mrb_true_p(value);
-  if (flag || mrb_false_p(value)) return flag;
+  const bool is_flag = flag || mrb_false_p(value);
+  if (is_flag) return flag;
   if (mrb_integer_p(value)) return static_cast<double>(mrb_integer(value));
-  if (mrb_float_p(value)) return finite_number(mrb, value);
+  if (mrb_float_p(value)) return finite_number(mrb, value, "Save cannot keep infinity or NaN");
   if (is_name(value)) return to_name(mrb, value);
   mrb_raise(mrb, E_ARGUMENT_ERROR, "Save keeps numbers, texts and true / false");
 }

@@ -68,3 +68,25 @@ TEST_CASE("arguments are made inside the protected call: failing to make them is
   CHECK(thrown.error.find("out of something") != std::string::npos);
   CHECK(vm.eval("40 + 2", "after.rb").ok);
 }
+
+TEST_CASE("checking the syntax of code says what is wrong with it, and runs nothing") {
+  RubyVm vm;
+  const RubyResult fine = vm.check_syntax("$ran = true", "fine.rb");
+  CHECK(fine.ok);
+  CHECK(mrb_nil_p(fine.value));
+  CHECK(mrb_nil_p(vm.eval("$ran", "ran.rb").value));  // it was only read
+
+  const RubyResult broken = vm.check_syntax("def broken(", "broken.rb");
+  CHECK_FALSE(broken.ok);
+  CHECK_FALSE(broken.error.empty());
+  CHECK(mrb_nil_p(broken.value));
+  CHECK(vm.eval("1", "after.rb").ok);
+}
+
+TEST_CASE("a failed call hands back nothing but its error") {
+  RubyVm vm;
+  const RubyResult failed = vm.call(vm.eval("Object.new", "new.rb").value, "no_such_method");
+  CHECK_FALSE(failed.ok);
+  CHECK(mrb_nil_p(failed.value));
+  CHECK(failed.error.find("no_such_method") != std::string::npos);
+}

@@ -94,6 +94,29 @@ mrb_value run_describe(mrb_state* mrb, void* userdata) {
   return mrb_nil_value();
 }
 
+// What went wrong, as Ruby tells it: the exception inspected, then where it came from.
+std::string describe_exception(mrb_state* mrb, mrb_value exception) {
+  mrb_bool failed = false;
+  std::string text;
+  DescribeRequest request{exception, &text};
+  // (Protected: an exception's own inspect may raise.)
+  mrb_protect_error(mrb, run_describe, &request, &failed);
+  const bool described = !failed && !text.empty();
+  return described ? text : "unknown Ruby error";
+}
+
+// Runs `body` with a Ruby error coming back as a result, instead of leaving through C++.
+RubyResult run_protected(mrb_state* mrb, mrb_protect_error_func* body, void* request) {
+  mrb_bool failed = false;
+  RubyResult result;
+  result.value = mrb_protect_error(mrb, body, request, &failed);
+  if (!failed) return result;
+  result.ok = false;
+  result.error = describe_exception(mrb, result.value);
+  result.value = mrb_nil_value();
+  return result;
+}
+
 }  // namespace
 
 RubyVm::RubyVm() : mrb_(mrb_open()) {
@@ -105,29 +128,17 @@ RubyVm::~RubyVm() { mrb_close(mrb_); }
 
 RubyResult RubyVm::check_syntax(const std::string& code, const std::string& file_name) {
   EvalRequest request{&code, &file_name, true};
-  mrb_bool failed = false;
   const int arena = mrb_gc_arena_save(mrb_);
-  RubyResult result;
-  const mrb_value outcome = mrb_protect_error(mrb_, run_eval, &request, &failed);
-  if (failed) {
-    result.ok = false;
-    result.error = describe_exception(outcome);
-  }
+  RubyResult result = run_protected(mrb_, run_eval, &request);
+  result.value = mrb_nil_value();  // nothing ran: there is nothing to hand back
   mrb_gc_arena_restore(mrb_, arena);
   return result;
 }
 
 RubyResult RubyVm::eval(const std::string& code, const std::string& file_name) {
   EvalRequest request{&code, &file_name};
-  mrb_bool failed = false;
   const int arena = mrb_gc_arena_save(mrb_);
-  RubyResult result;
-  result.value = mrb_protect_error(mrb_, run_eval, &request, &failed);
-  if (failed) {
-    result.ok = false;
-    result.error = describe_exception(result.value);
-    result.value = mrb_nil_value();
-  }
+  const RubyResult result = run_protected(mrb_, run_eval, &request);
   mrb_gc_arena_restore(mrb_, arena);
   return result;
 }
@@ -138,44 +149,18 @@ RubyResult RubyVm::call(mrb_value receiver, const char* method, std::initializer
 
 RubyResult RubyVm::call(mrb_value receiver, const char* method, const std::vector<mrb_value>& args) {
   CallRequest request{receiver, method, &args};
-  mrb_bool failed = false;
-  RubyResult result;
-  result.value = mrb_protect_error(mrb_, run_call, &request, &failed);
-  if (failed) {
-    result.ok = false;
-    result.error = describe_exception(result.value);
-    result.value = mrb_nil_value();
-  }
-  return result;
+  return run_protected(mrb_, run_call, &request);
 }
 
 RubyResult RubyVm::call_with(mrb_value receiver, const char* method, const ArgumentsMaker& make) {
   MadeCallRequest request{receiver, method, &make};
-  mrb_bool failed = false;
-  RubyResult result;
-  result.value = mrb_protect_error(mrb_, run_made_call, &request, &failed);
-  if (failed) {
-    result.ok = false;
-    result.error = describe_exception(result.value);
-    result.value = mrb_nil_value();
-  }
-  return result;
+  return run_protected(mrb_, run_made_call, &request);
 }
 
 void RubyVm::release_kept() { mrb_gv_set(mrb_, mrb_intern_cstr(mrb_, kKeepAliveGlobal), mrb_ary_new(mrb_)); }
 
 void RubyVm::keep_alive(mrb_value value) {
   mrb_ary_push(mrb_, mrb_gv_get(mrb_, mrb_intern_cstr(mrb_, kKeepAliveGlobal)), value);
-}
-
-std::string RubyVm::describe_exception(mrb_value exception) {
-  mrb_bool failed = false;
-  std::string text;
-  DescribeRequest request{exception, &text};
-  // (Protected: an exception's own inspect may raise.)
-  mrb_protect_error(mrb_, run_describe, &request, &failed);
-  if (failed || text.empty()) text = "unknown Ruby error";
-  return text;
 }
 
 }  // namespace redgem

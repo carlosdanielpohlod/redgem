@@ -1,5 +1,6 @@
 #include "script/script_naming.hpp"
 
+#include <algorithm>
 #include <cctype>
 
 #include "core/config.hpp"
@@ -7,12 +8,12 @@
 namespace redgem {
 namespace {
 
+bool is_space(char c) { return std::isspace(static_cast<unsigned char>(c)) != 0; }
+
 std::string trim(const std::string& text) {
-  std::size_t begin = 0;
-  std::size_t end = text.size();
-  while (begin < end && std::isspace(static_cast<unsigned char>(text[begin]))) ++begin;
-  while (end > begin && std::isspace(static_cast<unsigned char>(text[end - 1]))) --end;
-  return text.substr(begin, end - begin);
+  const auto first = std::find_if_not(text.begin(), text.end(), is_space);
+  const auto last = std::find_if_not(text.rbegin(), std::make_reverse_iterator(first), is_space).base();
+  return std::string(first, last);
 }
 
 std::string without_directory(const std::string& path) {
@@ -53,7 +54,8 @@ std::string script_for_class_name(const std::string& class_name) {
   std::string file;
   for (const char c : class_name) {
     const auto letter = static_cast<unsigned char>(c);
-    if (std::isupper(letter) && !file.empty()) file.push_back('_');
+    const bool starts_a_later_word = std::isupper(letter) != 0 && !file.empty();
+    if (starts_a_later_word) file.push_back('_');
     file.push_back(static_cast<char>(std::tolower(letter)));
   }
   return file + config::kRubyFileExtension;

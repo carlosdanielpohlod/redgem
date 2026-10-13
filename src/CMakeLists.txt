@@ -110,19 +110,35 @@ endif()
 redgem_add_library(redgem_runtime
   ${REDGEM_PRELUDE_HEADER}
   scene/property.cpp
+  scene/json_scanner.cpp
+  scene/json_scanner_strings.cpp
   scene/extras_parser.cpp
   scene/transform.cpp
   scene/scene_desc.cpp
   scene/gltf_checks.cpp
+  scene/gltf_accessors.cpp
   scene/gltf_loader.cpp
+  scene/gltf_reader_materials.cpp
+  scene/gltf_reader_meshes.cpp
+  scene/gltf_reader_nodes.cpp
+  scene/gltf_reader_skins.cpp
+  scene/gltf_reader_animations.cpp
   scene/cgltf_impl.cpp
   scene/scene.cpp
+  scene/scene_from_desc.cpp
+  scene/scene_copies.cpp
   scene/animation.cpp
+  scene/clip_clock.cpp
   scene/animation_player.cpp
+  scene/animation_player_characters.cpp
+  scene/animation_player_posing.cpp
   scene/camera_ray.cpp
   scene/particles.cpp
   scene/terrain.cpp
+  scene/terrain_sculpt.cpp
+  scene/terrain_raycast.cpp
   scene/primitives.cpp
+  scene/primitive_round_shapes.cpp
   physics/body_config.cpp
   physics/contact_events.cpp
   physics/jolt/jolt_runtime.cpp
@@ -144,16 +160,26 @@ redgem_add_library(redgem_runtime
   script/script_naming.cpp
   script/ruby_vm.cpp
   script/script_host.cpp
+  script/script_host_scripts.cpp
+  script/script_host_callbacks.cpp
+  script/script_host_network.cpp
   script/bindings/bindings.cpp
   script/bindings/binding_helpers.cpp
+  script/bindings/game_object_bindings.cpp
+  script/bindings/transform_bindings.cpp
   script/bindings/scene_bindings.cpp
+  script/bindings/camera_bindings.cpp
   script/bindings/physics_bindings.cpp
   script/bindings/runtime_bindings.cpp
+  script/bindings/ui_bindings.cpp
+  script/bindings/audio_bindings.cpp
   script/bindings/input_bindings.cpp
   script/bindings/animation_bindings.cpp
   script/bindings/particles_bindings.cpp
   script/bindings/save_bindings.cpp
+  script/bindings/message_values.cpp
   script/bindings/network_bindings.cpp
+  script/bindings/network_search_bindings.cpp
   render/mesh_builder.cpp
   render/mesh_pieces.cpp
   render/image_header.cpp

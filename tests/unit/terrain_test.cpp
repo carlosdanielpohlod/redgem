@@ -105,3 +105,43 @@ TEST_CASE("a ray that comes in from beside the terrain still finds the ground, u
   // And one that stops short of the ground finds nothing.
   CHECK_FALSE(terrain_raycast(mesh, kGrid, {0.0f, kAbove, 0.0f}, {0.0f, -1.0f, 0.0f}, kAbove * kHalf).has_value());
 }
+
+TEST_CASE("a grid says where its columns are, what it covers and where each vertex is kept") {
+  constexpr int kLastColumn = 20;
+  constexpr float kEdge = 20.0f;  // half of the terrain's 40 m
+  constexpr float kJustOutside = 20.5f;
+  CHECK(kGrid.coordinate(0) == doctest::Approx(-kEdge));
+  CHECK(kGrid.coordinate(kLastColumn) == doctest::Approx(kEdge));
+  CHECK(kGrid.covers(0.0f, 0.0f));
+  CHECK(kGrid.covers(kEdge, -kEdge));  // its edges are part of it
+  CHECK_FALSE(kGrid.covers(kJustOutside, 0.0f));
+  CHECK_FALSE(kGrid.covers(0.0f, -kJustOutside));
+  CHECK(kGrid.vertex_offset(0, 0) == 0u);
+  CHECK(kGrid.vertex_offset(1, 0) == 3u);
+  CHECK(kGrid.vertex_offset(0, 1) == 21u * 3u);  // rows are 21 vertices long
+}
+
+TEST_CASE("a vertex outside the grid has the height of the nearest one in it") {
+  constexpr int kLastColumn = 20;
+  constexpr float kCornerHeight = 7.0f;
+  PrimitiveDesc mesh = make_terrain(kGrid);
+  mesh.positions[kGrid.vertex_offset(kLastColumn, 0) + 1] = kCornerHeight;
+  CHECK(vertex_height(mesh, kGrid, kLastColumn, 0) == doctest::Approx(kCornerHeight));
+  CHECK(vertex_height(mesh, kGrid, kLastColumn + 1, -1) == doctest::Approx(kCornerHeight));
+  CHECK(vertex_height(mesh, kGrid, kLastColumn - 1, 0) == doctest::Approx(0.0f));
+}
+
+TEST_CASE("a mesh with the vertices of a grid in another layout is not that terrain") {
+  PrimitiveDesc mesh = make_terrain(kGrid);
+  mesh.positions[0] += 1.0f;  // the first vertex is no longer the corner
+  CHECK_FALSE(kGrid.fits(mesh));
+  CHECK(terrain_height(mesh, kGrid, 0.0f, 0.0f) == doctest::Approx(0.0f));
+  CHECK_FALSE(sculpt_terrain(mesh, kGrid, {0.0f, 0.0f, kBrushRadius, kLift, SculptMode::Raise}));
+  CHECK_FALSE(TerrainGrid{0.0f, 0}.fits(mesh));
+}
+
+TEST_CASE("the height at a point that is not a number is the height outside the terrain") {
+  const PrimitiveDesc mesh = hill();
+  CHECK(terrain_height(mesh, kGrid, std::nanf(""), 0.0f) == doctest::Approx(0.0f));
+  CHECK(terrain_height(mesh, kGrid, 0.0f, std::nanf("")) == doctest::Approx(0.0f));
+}

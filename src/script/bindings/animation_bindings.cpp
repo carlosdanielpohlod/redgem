@@ -4,6 +4,8 @@
 #include <mruby/array.h>
 #include <mruby/string.h>
 
+#include <string>
+
 #include "scene/animation_player.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
@@ -16,9 +18,7 @@ using namespace binding;
 // --- Animation ---------------------------------------------------------------------------------
 
 AnimationPlayer& animations(mrb_state* mrb) {
-  AnimationPlayer* player = context(mrb).animations;
-  if (player == nullptr) mrb_raise(mrb, E_RUNTIME_ERROR, "Animation is only available while a game runs");
-  return *player;
+  return required(mrb, context(mrb).animations, "Animation is only available while a game runs");
 }
 
 [[noreturn]] void raise_unknown_clip(mrb_state* mrb, const std::string& clip) {
@@ -32,11 +32,7 @@ std::string clip_arg(mrb_state* mrb, mrb_value name) {
   return clip;
 }
 
-std::string clip_arg(mrb_state* mrb) {
-  mrb_value name;
-  mrb_get_args(mrb, "o", &name);
-  return clip_arg(mrb, name);
-}
+std::string clip_arg(mrb_state* mrb) { return clip_arg(mrb, single_arg(mrb)); }
 
 mrb_value animation_names(mrb_state* mrb, mrb_value) {
   const mrb_value names = mrb_ary_new(mrb);
@@ -83,9 +79,6 @@ mrb_value animation_duration(mrb_state* mrb, mrb_value) {
 
 // --- The object's own animation (game_object.animation) ----------------------------------------
 
-// The object a method was called on, which must still exist.
-ObjectId character(mrb_state* mrb, mrb_value self) { return alive_object(mrb, self).id; }
-
 mrb_value game_object_animation_play(mrb_state* mrb, mrb_value self) {
   mrb_value name;
   mrb_bool loop = true, restart = false;
@@ -93,7 +86,7 @@ mrb_value game_object_animation_play(mrb_state* mrb, mrb_value self) {
   mrb_get_args(mrb, "obffb", &name, &loop, &speed, &fade, &restart);
   const std::string clip = to_name(mrb, name);
   const ClipStart how{loop, static_cast<float>(speed), static_cast<float>(fade), restart};
-  if (!animations(mrb).play_on(scene(mrb), character(mrb, self), clip, how)) raise_unknown_clip(mrb, clip);
+  if (!animations(mrb).play_on(scene(mrb), alive_id(mrb, self), clip, how)) raise_unknown_clip(mrb, clip);
   return mrb_nil_value();
 }
 
@@ -103,45 +96,40 @@ mrb_value game_object_animation_mix(mrb_state* mrb, mrb_value self) {
   mrb_float weight = 0.0, speed = 1.0;
   mrb_get_args(mrb, "ofbf", &name, &weight, &loop, &speed);
   const std::string clip = to_name(mrb, name);
-  const bool mixed = animations(mrb).mix_on(scene(mrb), character(mrb, self), clip, static_cast<float>(weight), loop,
+  const bool mixed = animations(mrb).mix_on(scene(mrb), alive_id(mrb, self), clip, static_cast<float>(weight), loop,
                                             static_cast<float>(speed));
   if (!mixed) raise_unknown_clip(mrb, clip);
   return mrb_nil_value();
 }
 
 mrb_value game_object_animation_unmix(mrb_state* mrb, mrb_value self) {
-  animations(mrb).unmix_on(scene(mrb), character(mrb, self));
+  animations(mrb).unmix_on(scene(mrb), alive_id(mrb, self));
   return mrb_nil_value();
 }
 
 mrb_value game_object_animation_pause(mrb_state* mrb, mrb_value self) {
-  animations(mrb).pause_on(scene(mrb), character(mrb, self));
+  animations(mrb).pause_on(scene(mrb), alive_id(mrb, self));
   return mrb_nil_value();
 }
 
 mrb_value game_object_animation_follow_scene(mrb_state* mrb, mrb_value self) {
-  mrb_float fade = 0.0;
-  mrb_get_args(mrb, "f", &fade);
-  animations(mrb).follow_scene(scene(mrb), character(mrb, self), static_cast<float>(fade));
+  const mrb_float fade = float_arg(mrb);
+  animations(mrb).follow_scene(scene(mrb), alive_id(mrb, self), static_cast<float>(fade));
   return mrb_nil_value();
 }
 
 mrb_value game_object_animation_clip(mrb_state* mrb, mrb_value self) {
-  const auto clip = animations(mrb).clip_on(scene(mrb), character(mrb, self));
+  const auto clip = animations(mrb).clip_on(scene(mrb), alive_id(mrb, self));
   return clip ? mrb_str_new_cstr(mrb, clip->c_str()) : mrb_nil_value();
 }
 
 mrb_value game_object_animation_playing(mrb_state* mrb, mrb_value self) {
-  return mrb_bool_value(animations(mrb).playing_on(scene(mrb), character(mrb, self)));
+  return mrb_bool_value(animations(mrb).playing_on(scene(mrb), alive_id(mrb, self)));
 }
 
 mrb_value game_object_animation_time(mrb_state* mrb, mrb_value self) {
-  return mrb_float_value(mrb, animations(mrb).time_on(scene(mrb), character(mrb, self)));
+  return mrb_float_value(mrb, animations(mrb).time_on(scene(mrb), alive_id(mrb, self)));
 }
-
-}  // namespace
-
-namespace {
 
 void install_scene_clip_bindings(mrb_state* mrb) {
   RClass* animation_module = mrb_define_module(mrb, "Animation");

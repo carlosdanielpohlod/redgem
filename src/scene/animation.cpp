@@ -126,15 +126,20 @@ void pose_object(const AnimationChannel& channel, const Playback& playback, floa
 }
 
 void pose_original(const AnimationChannel& channel, const Playback& playback, Scene& scene) {
-  if (!scene.is_alive(channel.node) || !playback.wants(channel.node)) return;
+  const bool posed = scene.is_alive(channel.node) && playback.wants(channel.node);
+  if (!posed) return;
   pose_object(channel, playback, playback.time, scene.at(channel.node));
+}
+
+// The root of a copy stays where it was put; what is inside it moves like the original.
+bool moves_like_the_original(const GameObject& copy, const Playback& playback) {
+  return copy.copy_root != copy.id && playback.wants(copy.id);
 }
 
 void pose_copies(const AnimationChannel& channel, const Playback& playback, Scene& scene) {
   for (const ObjectId copy : scene.copies_of(channel.node)) {
     GameObject& object = scene.at(copy);
-    // The root of a copy stays where it was put; what is inside it moves like the original.
-    if (object.copy_root == copy || !playback.wants(copy)) continue;
+    if (!moves_like_the_original(object, playback)) continue;
     const float ahead = playback.options.offsets ? scene.at(object.copy_root).animation_offset : 0.0f;
     pose_object(channel, playback, playback.time + ahead, object);
   }

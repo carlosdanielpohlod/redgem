@@ -15,6 +15,11 @@
 namespace redgem {
 
 // Runs the Ruby side of the game: loads scripts, instantiates behaviours and calls their callbacks.
+// Implemented in parts:
+//   script_host.cpp            the interpreter, its prelude, the objects as Ruby sees them
+//   script_host_scripts.cpp    loading the game's scripts and making behaviours of their classes
+//   script_host_callbacks.cpp  calling the behaviours: start, update, contacts, destruction
+//   script_host_network.cpp    handing network events to Ruby
 class ScriptHost {
  public:
   ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir);
@@ -69,23 +74,40 @@ class ScriptHost {
     std::string class_name;
     bool started = false;
     bool enabled = true;
+
+    // Whether its callbacks are still called: it started, and no error of its own disabled it.
+    bool active() const { return started && enabled; }
   };
 
   void load_prelude();
+  // Starts an empty cache of GameObject wrappers, which Ruby's garbage collector leaves alone.
+  void start_objects_cache();
+
+  // Scripts and the behaviours made of their classes.
   void attach(ObjectId object, const std::string& script);
   mrb_value instantiate(ObjectId object, RClass* klass, const std::string& class_name);
   bool require_script(const std::string& script);
+  // Whether the game has a script of that name.
+  bool has_script(const std::string& script) const;
   // Whether a script's name stays inside the game's scripts folder (an error is reported when not).
   bool in_scripts_folder(const std::string& script);
-  void invoke(std::size_t index, const char* method, std::initializer_list<mrb_value> args);
-  void invoke_on_object(ObjectId object, const char* method, std::initializer_list<mrb_value> args);
-  bool runnable(const BehaviourSlot& slot) const;
-  // Starts an empty cache of GameObject wrappers, which Ruby's garbage collector leaves alone.
-  void start_objects_cache();
+  // Whether a loaded script defined the class named after it (an error is reported, as one of
+  // `where`, when not).
+  bool defines_its_class(const std::string& script, const std::string& class_name, const std::string& where);
   // Whether a Ruby class is Behaviour or inherits from it.
   bool is_behaviour_class(RClass* klass);
   // Reports why a behaviour could not be created; returns nil, which stands for it.
   mrb_value not_created(const std::string& where, const std::string& error);
+
+  // Calling the behaviours.
+  void invoke(std::size_t index, const char* method, std::initializer_list<mrb_value> args);
+  void invoke_on_object(ObjectId object, const char* method, std::initializer_list<mrb_value> args);
+  // Calls `entry` with the frame's seconds on every behaviour that is running.
+  void update_running(const char* entry, float dt);
+  // Enabled, on an object that is still there.
+  bool runnable(const BehaviourSlot& slot) const;
+  // Runnable and started: its callbacks are called.
+  bool running(const BehaviourSlot& slot) const;
   void disable_failed(std::size_t index, const char* method, const std::string& error);
 
   ScriptContext& context_;

@@ -15,7 +15,8 @@ constexpr std::size_t kLargestSize = std::numeric_limits<std::size_t>::max();
 
 // a * b and a + b, when they do not wrap around.
 std::optional<std::size_t> product(std::size_t a, std::size_t b) {
-  if (b != 0 && a > kLargestSize / b) return std::nullopt;
+  const bool wraps = b != 0 && a > kLargestSize / b;
+  if (wraps) return std::nullopt;
   return a * b;
 }
 
@@ -24,9 +25,11 @@ std::optional<std::size_t> sum(std::size_t a, std::size_t b) {
   return a + b;
 }
 
+bool has_buffer(const cgltf_buffer_view* view) { return view != nullptr && view->buffer != nullptr; }
+
 // Whether a buffer view lies within its buffer.
 bool view_fits(const cgltf_buffer_view* view) {
-  if (view == nullptr || view->buffer == nullptr) return false;
+  if (!has_buffer(view)) return false;
   return view->offset <= view->buffer->size && view->size <= view->buffer->size - view->offset;
 }
 
@@ -41,10 +44,9 @@ bool base_fits(const cgltf_accessor& accessor) {
 // replace, are all inside their buffer views.
 bool sparse_fits(const cgltf_accessor& accessor) {
   const cgltf_accessor_sparse& sparse = accessor.sparse;
-  if (sparse.count > accessor.count || !view_fits(sparse.indices_buffer_view) ||
-      !view_fits(sparse.values_buffer_view)) {
-    return false;
-  }
+  const bool placed =
+      sparse.count <= accessor.count && view_fits(sparse.indices_buffer_view) && view_fits(sparse.values_buffer_view);
+  if (!placed) return false;
   const std::size_t index = cgltf_component_size(sparse.indices_component_type);
   const std::size_t element = cgltf_calc_size(accessor.type, accessor.component_type);
   return elements_fit(sparse.indices_byte_offset, index, sparse.count, index, sparse.indices_buffer_view->size) &&
@@ -55,9 +57,26 @@ bool sparse_fits(const cgltf_accessor& accessor) {
 // Whether the file a buffer names may be read whole.
 bool loadable_file(const cgltf_buffer& buffer, const std::filesystem::path& base_dir) {
   const std::filesystem::path file = file_of_uri(buffer.uri, base_dir);
-  if (file.empty() || buffer.size > kMaxBufferFileBytes) return false;
+  const bool may_be_opened = !file.empty() && buffer.size <= kMaxBufferFileBytes;
+  if (!may_be_opened) return false;
   std::error_code fs_error;
   return std::filesystem::file_size(file, fs_error) <= kMaxBufferFileBytes && !fs_error;
+}
+
+// (A buffer that names no file keeps its data in the scene's own file.)
+bool may_be_loaded(const cgltf_buffer& buffer, const std::filesystem::path& base_dir) {
+  return !names_a_file(buffer.uri) || loadable_file(buffer, base_dir);
+}
+
+bool base_reaches_past(const cgltf_accessor& accessor) {
+  return accessor.buffer_view != nullptr && !base_fits(accessor);
+}
+
+bool sparse_reaches_past(const cgltf_accessor& accessor) { return accessor.is_sparse != 0 && !sparse_fits(accessor); }
+
+// Sparse accessors and those without a buffer view are treated as absent.
+bool read_as_it_is(const cgltf_accessor* accessor) {
+  return accessor != nullptr && accessor->is_sparse == 0 && accessor->buffer_view != nullptr;
 }
 
 std::string numbered(const char* what, std::size_t index) { return std::string(what) + " " + std::to_string(index); }
@@ -79,13 +98,13 @@ std::string accessor_problem(const cgltf_accessor& accessor) {
   if (accessor.count > kMaxAccessorElements) {
     return "holds more than " + std::to_string(kMaxAccessorElements) + " elements";
   }
-  if (accessor.buffer_view != nullptr && !base_fits(accessor)) return "reaches past its buffer view";
-  if (accessor.is_sparse != 0 && !sparse_fits(accessor)) return "has sparse data that reaches past its buffer views";
+  if (base_reaches_past(accessor)) return "reaches past its buffer view";
+  if (sparse_reaches_past(accessor)) return "has sparse data that reaches past its buffer views";
   return {};
 }
 
 bool readable(const cgltf_accessor* accessor) {
-  if (accessor == nullptr || accessor->is_sparse != 0 || accessor->buffer_view == nullptr) return false;
+  if (!read_as_it_is(accessor)) return false;
   return accessor_problem(*accessor).empty() && cgltf_buffer_view_data(accessor->buffer_view) != nullptr;
 }
 
@@ -103,7 +122,7 @@ std::string data_problem(const cgltf_data& data) {
 
 std::string buffer_file_problem(const cgltf_data& data, const std::filesystem::path& base_dir) {
   for (cgltf_size i = 0; i < data.buffers_count; ++i) {
-    if (!names_a_file(data.buffers[i].uri) || loadable_file(data.buffers[i], base_dir)) continue;
+    if (may_be_loaded(data.buffers[i], base_dir)) continue;
     return numbered("buffer", i) + " names a file that is not a readable file of the scene's own folder";
   }
   return {};

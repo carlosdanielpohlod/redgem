@@ -62,14 +62,19 @@ std::optional<float> parse_hex_channel(const std::string& text, std::size_t chan
   return std::pow(srgb, kSrgbGamma);
 }
 
+bool is_written_as_a_hex_color(const std::string& text) {
+  return text.size() == kHexColorLength && text.front() == kHexColorMark;
+}
+
 }  // namespace
 
 std::optional<Vec3> parse_hex_color(const std::string& text) {
-  if (text.size() != kHexColorLength || text.front() != kHexColorMark) return std::nullopt;
+  if (!is_written_as_a_hex_color(text)) return std::nullopt;
   const std::optional<float> red = parse_hex_channel(text, kRedChannel);
   const std::optional<float> green = parse_hex_channel(text, kGreenChannel);
   const std::optional<float> blue = parse_hex_channel(text, kBlueChannel);
-  if (!red || !green || !blue) return std::nullopt;
+  const bool all_read = red && green && blue;
+  if (!all_read) return std::nullopt;
   return Vec3{*red, *green, *blue};
 }
 

@@ -16,6 +16,8 @@
 namespace redgem {
 
 inline constexpr int kNoIndex = -1;
+// Whether an index names one of `count` things (kNoIndex names none).
+inline bool is_index_of(int index, std::size_t count) { return index >= 0 && static_cast<std::size_t>(index) < count; }
 // glTF's alpha cutoff when a masked material gives none: texels less opaque than this are not drawn.
 inline constexpr float kDefaultAlphaCutoff = 0.5f;
 inline constexpr std::size_t kFloatsPerMatrix = 16;  // a 4x4 matrix

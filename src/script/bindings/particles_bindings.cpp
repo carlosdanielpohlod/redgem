@@ -16,9 +16,7 @@ using namespace binding;
 // --- Particles ---------------------------------------------------------------------------------
 
 ParticleSystem& particles(mrb_state* mrb) {
-  ParticleSystem* system = context(mrb).particles;
-  if (system == nullptr) mrb_raise(mrb, E_RUNTIME_ERROR, "Particles are only available while a game runs");
-  return *system;
+  return required(mrb, context(mrb).particles, "Particles are only available while a game runs");
 }
 
 // What Particles.__burst is called with, as mruby hands it over.

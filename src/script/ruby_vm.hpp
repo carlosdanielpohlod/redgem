@@ -44,8 +44,6 @@ class RubyVm {
   void release_kept();
 
  private:
-  std::string describe_exception(mrb_value exception);
-
   mrb_state* mrb_;
 };
 
