@@ -79,12 +79,17 @@ void draw_model_items(PanelContext& context) {
   if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Open the models folder")) open_models_folder(context.session);
 }
 
+// A terrain was made, and the editor has a brush to turn on.
+bool brush_ready(const PanelContext& context, ObjectId terrain) {
+  return terrain != kNoObject && context.terrain != nullptr;
+}
+
 }  // namespace
 
 ObjectId create_terrain(PanelContext& context) {
   const ObjectId terrain = context.session.create_terrain(context.spawn_point);
   // Dragging over the new ground shapes it right away.
-  if (terrain != kNoObject && context.terrain != nullptr) context.terrain->sculpting = true;
+  if (brush_ready(context, terrain)) context.terrain->sculpting = true;
   return terrain;
 }
 

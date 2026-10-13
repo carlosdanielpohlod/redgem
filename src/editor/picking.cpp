@@ -18,9 +18,11 @@ struct Stretch {
   float far_t = std::numeric_limits<float>::max();
 };
 
+bool between(float value, float lo, float hi) { return !(value < lo) && !(value > hi); }
+
 // Narrows `inside` to where the ray is between `lo` and `hi` on one axis. False when no part of it is.
 bool clip_to_slab(float origin, float direction, float lo, float hi, Stretch& inside) {
-  if (std::fabs(direction) < kEpsilon) return !(origin < lo) && !(origin > hi);  // along the slab: in or out for good
+  if (std::fabs(direction) < kEpsilon) return between(origin, lo, hi);  // along the slab: in or out for good
   float t0 = (lo - origin) / direction;
   float t1 = (hi - origin) / direction;
   if (t0 > t1) std::swap(t0, t1);
@@ -28,6 +30,9 @@ bool clip_to_slab(float origin, float direction, float lo, float hi, Stretch& in
   inside.far_t = std::min(inside.far_t, t1);
   return !(inside.near_t > inside.far_t);
 }
+
+// What a click can select: something drawn.
+bool pickable(const GameObject& object) { return object.mesh != kNoIndex && object.visible; }
 
 }  // namespace
 
@@ -53,10 +58,11 @@ ObjectId pick_object(const Scene& scene, const SceneDesc& desc, const PickRay& r
   float best_distance = std::numeric_limits<float>::max();
   for (const ObjectId id : scene.alive_ids()) {
     const GameObject& object = scene.at(id);
-    if (object.mesh == kNoIndex || !object.visible) continue;
+    if (!pickable(object)) continue;
     const auto hit = intersect_ray_box(ray, scene.world_transform(id), desc.meshes[object.mesh].bounds);
-    if (hit && *hit < best_distance) {
-      best_distance = *hit;
+    const float distance = hit.value_or(best_distance);
+    if (distance < best_distance) {
+      best_distance = distance;
       best = id;
     }
   }

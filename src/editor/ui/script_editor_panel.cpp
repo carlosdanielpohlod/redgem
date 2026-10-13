@@ -60,14 +60,18 @@ void draw_tab_bar(ScriptEditor& editor, const std::string& window_name, ScriptTa
   draw_status(editor);
 }
 
+// Ctrl+S, typed into the code just drawn.
+bool save_pressed_in_code() {
+  return ImGui::IsItemActive() && ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false);
+}
+
 // The code itself, filling the rest of the tab. Ctrl+S in it saves.
 void draw_code(ScriptEditor& editor) {
   ImGui::PushFont(code_font(), 0.0f);
   ImGui::InputTextMultiline(kCodeId, &editor.text(), ImVec2(editor_config::kFillWidth, editor_config::kFillWidth),
                             ImGuiInputTextFlags_AllowTabInput);
   ImGui::PopFont();
-  const ImGuiIO& io = ImGui::GetIO();
-  if (ImGui::IsItemActive() && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false)) save(editor);
+  if (save_pressed_in_code()) save(editor);
 }
 
 void draw_body(ScriptEditor& editor, const std::string& window_name, ScriptTabsResult& result) {
@@ -85,11 +89,14 @@ void save_and_close(ScriptWorkspace& scripts, ScriptEditor& editor, const std::s
   }
 }
 
+// A button was pressed for a script that is still there.
+bool still_open(bool pressed, const ScriptEditor* editor) { return pressed && editor != nullptr; }
+
 // The dialog's three buttons. True once the question is answered (or the script is gone).
 bool draw_close_choices(ScriptWorkspace& scripts, const std::string& file) {
   ScriptEditor* editor = scripts.find(file);
   bool done = editor == nullptr;
-  if (ImGui::Button(kSaveLabel) && editor != nullptr) {
+  if (still_open(ImGui::Button(kSaveLabel), editor)) {
     save_and_close(scripts, *editor, file);
     done = true;
   }

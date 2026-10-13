@@ -302,3 +302,70 @@ TEST_CASE("a model's picture outside the scene's folder does not come along, nor
   const json up_and_back = imported_image({{kUri, "../images/wood.png"}}, json_offsets(), model_dir, scene_dir);
   CHECK(up_and_back[kUri] == "images/wood.png");
 }
+
+namespace {
+
+// A scene holding one of each thing, and a model holding one more of each.
+json scene_with_one_of_each() {
+  return {{kBufferViews, json::array({json::object()})}, {kAccessors, json::array({json::object()})},
+          {kImages, json::array({json::object()})},      {kSamplers, json::array({json::object()})},
+          {kTextures, json::array({json::object()})},    {kMaterials, json::array({json::object()})},
+          {kMeshes, json::array({json::object()})},      {kExtensionsUsed, {kClearcoat}}};
+}
+
+json model_with_one_of_each() {
+  return {{kBufferViews, {{{kBuffer, 0}, {kByteOffset, kViewOffset}}}},
+          {kAccessors, {{{kBufferView, 0}}}},
+          {kImages, {{{kUri, kEmbeddedImage}}}},
+          {kSamplers, json::array({json::object()})},
+          {kTextures, {{{kSource, 0}, {kSampler, 0}}}},
+          {kMaterials, {{{kNormalTexture, {{kIndex, 0}}}}}},
+          {kMeshes, {{{kPrimitives, {{{kAttributes, {{kPositionAttribute, 0}}}, {kMaterial, 0}}}}}}},
+          {kExtensionsUsed, {kClearcoat, kWebpExtension}}};
+}
+
+JsonOffsets one_of_each() {
+  JsonOffsets offsets;
+  offsets.buffer_views = offsets.accessors = offsets.images = offsets.samplers = 1;
+  offsets.textures = offsets.materials = offsets.meshes = 1;
+  offsets.bin = kBytesInScene;
+  return offsets;
+}
+
+}  // namespace
+
+TEST_CASE("a model merged into a scene comes after the scene's own entries, pointing at its own") {
+  json scene = scene_with_one_of_each();
+  merge_model(scene, model_with_one_of_each(), one_of_each(), "models", "");
+  for (const char* list : {kBufferViews, kAccessors, kImages, kSamplers, kTextures, kMaterials, kMeshes}) {
+    CAPTURE(list);
+    CHECK(scene[list].size() == 2);
+  }
+  CHECK(scene[kBufferViews][1][kByteOffset] == kViewOffset + kBytesInScene);
+  CHECK(scene[kAccessors][1][kBufferView] == 1);
+  CHECK(scene[kTextures][1][kSource] == 1);
+  CHECK(scene[kTextures][1][kSampler] == 1);
+  CHECK(scene[kMaterials][1][kNormalTexture][kIndex] == 1);
+  CHECK(scene[kMeshes][1][kPrimitives][0][kMaterial] == 1);
+  CHECK(scene[kMeshes][1][kPrimitives][0][kAttributes][kPositionAttribute] == 1);
+  CHECK(scene[kExtensionsUsed] == json({kClearcoat, kWebpExtension}));
+}
+
+TEST_CASE("a model dropped again leaves the scene's lists as they were, extensions aside") {
+  json scene = scene_with_one_of_each();
+  merge_model(scene, model_with_one_of_each(), one_of_each(), "models", "");
+  drop_model(scene, one_of_each());
+  json expected = scene_with_one_of_each();
+  expected[kExtensionsUsed] = {kClearcoat, kWebpExtension};
+  CHECK(scene == expected);
+  json empty;
+  drop_model(empty, one_of_each());  // a scene without lists has nothing to cut
+  CHECK(empty.is_null());
+}
+
+TEST_CASE("a model whose mesh points at nothing stops the merge with an error to report") {
+  json scene = scene_with_one_of_each();
+  json model = model_with_one_of_each();
+  model[kMeshes][0][kPrimitives][0][kAttributes][kPositionAttribute] = "zero";
+  CHECK_THROWS_AS(merge_model(scene, model, one_of_each(), "models", ""), std::invalid_argument);
+}

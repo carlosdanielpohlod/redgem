@@ -21,6 +21,8 @@ class EditStream {
 
  private:
   void close();
+  // The interaction in progress is one with this object.
+  bool continues(const SceneDocument& doc, int object) const { return doc_ == &doc && object_ == object; }
 
   SceneDocument* doc_ = nullptr;  // the document of the interaction in progress
   int object_ = kNoIndex;         // what it edits

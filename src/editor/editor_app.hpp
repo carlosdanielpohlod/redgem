@@ -1,7 +1,12 @@
 #pragma once
 
+// The editor window: toolbar, Hierarchy, Scene viewport (gizmos, Play mode), Inspector, Project,
+// Console and script tabs, status bar. One class, implemented part by part (editor_frame,
+// editor_commands, editor_input, editor_menus, editor_bars, editor_layout, editor_dialogs,
+// editor_viewport, editor_scene_view). This header stays long because it lists every step of
+// those parts: they all work on the one window's state, which is declared once, here.
+
 #include <filesystem>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -11,77 +16,28 @@
 #include "audio/audio.hpp"
 #include "editor/console_log.hpp"
 #include "editor/editor_camera.hpp"
+#include "editor/editor_options.hpp"
 #include "editor/editor_session.hpp"
 #include "editor/file_drop.hpp"
+#include "editor/gated_input_source.hpp"
+#include "editor/gizmo.hpp"
 #include "editor/project_files.hpp"
 #include "editor/script_workspace.hpp"
 #include "editor/ui/panels.hpp"
-#include "input/raylib_input_source.hpp"
-#include "render/gpu_select.hpp"
 
 namespace redgem {
 
+class GameView;
 class Renderer;
+struct SceneViewport;
 class Window;
 namespace ui {
 class Interface;
 }
 
-enum class GizmoMode { Translate, Rotate, Scale };
-
 // Why the editor window closed: quit, or go back to the project hub (New / Open game).
 enum class EditorExit { Quit, OpenHub };
 
-// How long the frame about to be drawn counts for, in seconds; asked once a frame.
-using FrameClock = std::function<float()>;
-
-// One way of making a standalone game, as Build Game offers it. The editor only knows that such
-// ways exist: whoever opens it says which, and does the building.
-struct BuildChoice {
-  std::string name;   // the system built for ("linux"): how the build is spoken of, and its folder named
-  std::string label;  // what the menu shows
-  // Whether it is for the system the editor runs on (the build then needs no system in its folder's name).
-  bool for_this_system = false;
-  // Builds the game in `game_dir` into `out_dir`. The game's executable (or app), or nullopt
-  // with `error` saying why not.
-  std::function<std::optional<std::filesystem::path>(const std::filesystem::path& game_dir,
-                                                     const std::filesystem::path& out_dir, std::string& error)>
-      build;
-};
-
-// What whoever opens the editor decides for it.
-struct EditorOptions {
-  // How long each frame counts for, for whoever drives the editor at a pace of its own. Empty:
-  // the time the window measured between its last two frames.
-  FrameClock clock;
-  // The graphics card the window opens on, where the machine has two.
-  GpuChoice gpu = GpuChoice::Auto;
-  // The ways of building a game, in the order Build Game lists them. None: the editor builds nothing.
-  std::vector<BuildChoice> builds;
-};
-
-// Keyboard and mouse reach the game only while the Scene view has focus during play. The game
-// sees the mouse in the view's own pixels, as if the view were its window.
-class GatedInputSource final : public InputSource {
- public:
-  bool is_key_down(Key key) const override { return enabled && device.is_key_down(key); }
-  MouseSample mouse() const override {
-    MouseSample sample = device.mouse();
-    sample.x -= origin_x;
-    sample.y -= origin_y;
-    if (!enabled) sample.buttons = {}, sample.wheel = 0.0f;
-    return sample;
-  }
-  GamepadSample gamepad() const override { return enabled ? device.gamepad() : GamepadSample{}; }
-  std::string typed_text() const override { return enabled ? device.typed_text() : std::string(); }
-  bool enabled = false;
-  float origin_x = 0.0f;  // where the Scene view's image starts in the window
-  float origin_y = 0.0f;
-  RaylibInputSource device;
-};
-
-// The editor window: toolbar, Hierarchy, Scene viewport (gizmos, Play mode), Inspector, Project,
-// Console and script tabs, status bar.
 class EditorApp {
  public:
   static std::variant<std::unique_ptr<EditorApp>, std::string> create(const std::filesystem::path& game_dir,
@@ -122,7 +78,7 @@ class EditorApp {
   std::optional<Vec3> sculpt_at(float x, float y, float seconds);
   // Moves a script tab into a new split on the right of its group (next frame).
   void split_script_right(const std::string& file_name);
-  GizmoMode gizmo_mode() const { return gizmo_; }
+  GizmoMode gizmo_mode() const { return gizmo_.mode(); }
   const ProjectFiles& files() const { return files_; }
   // Files from anywhere on the desk become the game's models and sounds (copied into its folders);
   // the Project panel shows them, and the Console says what became of each.
@@ -156,21 +112,29 @@ class EditorApp {
  private:
   EditorApp() = default;
   void open_window(GpuChoice gpu, FrameClock clock);
-  bool editing() const;  // not playing
+  bool editing() const { return session_->editing(); }
+  bool unsaved_work() const;
   ui::PanelContext panel_context();
   // Before drawing: files changed outside, input, the running game.
   void update_before_drawing();
   void check_files_on_disk();
+  // Every so many frames, the scene is loaded again when it changed on disk. True when it was.
+  bool reloaded_from_disk();
+  bool time_to(long long every_frames) const { return frame_count_ % every_frames == 0; }
   // Files dragged from the desktop onto the window (see add_files).
   void take_dropped_files();
   void report_drop(const DropReport& report);
   void handle_shortcuts();
+  bool shortcuts_blocked() const;
   void handle_window_shortcuts(bool was_editing);
   void handle_editing_shortcuts();
   void handle_document_shortcuts();
-  void handle_gizmo_keys();
   void update_camera();
+  // Editing, with the mouse over the Scene view.
+  bool mouse_steers_camera() const;
   void feed_game();
+  // The game reads the keys and the mouse: it runs, and the Scene view has the focus.
+  bool game_has_input() const;
   // The view the game was shown in is done with: the renderer goes back to the edited scene.
   void retire_game_view();
   // The Scene view's picture.
@@ -178,10 +142,6 @@ class EditorApp {
   void draw_edited_scene();
   void aim_viewport_camera();
   void sync_renderer_assets();
-  void draw_overlays();
-  void draw_object_marks();
-  void draw_selection_box();
-  void draw_brush();
   // The interface, top to bottom.
   void draw_interface();
   void draw_menu_bar();
@@ -189,14 +149,16 @@ class EditorApp {
   void draw_game_file_items();
   void draw_edit_menu();
   void draw_undo_items();
+  bool undo_offered() const;
+  bool redo_offered() const;
   void draw_selection_items();
+  bool selection_editable() const;
   void draw_view_menu();
   void draw_game_object_menu();
   void draw_help_menu();
   void draw_graphics_card_menu();
   void draw_build_targets();
   void draw_toolbar();
-  void draw_gizmo_tools();
   void draw_play_controls();
   void draw_game_tools();
   void draw_game_name();
@@ -208,8 +170,10 @@ class EditorApp {
   void build_default_layout(unsigned int dock);
   void apply_pending_split();
   unsigned int new_script_dock() const;
+  bool script_dock_exists() const;
   void draw_panels();
   void draw_side_panels(ui::PanelContext& context);
+  void draw_hierarchy_panel(ui::PanelContext& context);
   void draw_script_tabs();
   void draw_viewport_window();
   void draw_viewport_image();
@@ -221,20 +185,31 @@ class EditorApp {
   void draw_play_border();
   void draw_viewport_hint(bool playing);
   void use_viewport_tools();
+  // The brush is on, and a terrain is selected.
+  bool sculpting() const;
   void use_brush();
-  void draw_gizmo(float x, float y, float width, float height);
-  void manipulate(float* model, float aspect);
+  bool stroke_ends(bool brushing) const { return !brushing && stroke_started_; }
+  void draw_gizmo();
+  // Something is selected, and the view has a size to draw it in.
+  bool gizmo_drawable() const;
+  // One undo step per drag, dropped when the drag ends where it started.
   void track_gizmo_drag(bool using_gizmo);
+  bool drag_begins(bool using_gizmo) const { return using_gizmo && !gizmo_dragging_; }
+  bool drag_ends(bool using_gizmo) const { return !using_gizmo && gizmo_dragging_; }
+  // A drag that ended without the gizmo being drawn (the selection was cleared, play started).
   void end_abandoned_gizmo_drag();
+  bool gizmo_drag_abandoned() const { return gizmo_dragging_ && !gizmo_drawn_; }
   void apply_gizmo_drag(const Transform& world);
   void update_title();
   void draw_dialogs();
   void draw_unsaved_dialog();
+  bool unsaved_dialog_wanted() const;
   void draw_unsaved_choices();
   void save_and_leave();
   void leave_without_saving();
   void cancel_leaving();
   void draw_external_change_dialog();
+  bool external_change_dialog_wanted() const;
   void draw_external_change_choices();
   void draw_shortcuts_dialog();
   bool editing_blocked() const;
@@ -259,18 +234,14 @@ class EditorApp {
   unsigned int script_dock_ = 0;              // dock of the last focused script tab
   EditorCamera camera_;
   GatedInputSource game_input_;
-  GizmoMode gizmo_ = GizmoMode::Translate;
+  Gizmo gizmo_;
   ProjectFiles files_;
-  bool snapping_ = false;
-  bool gizmo_local_ = false;  // gizmo axes of the object instead of the world
   EditorExit exit_action_ = EditorExit::Quit;
   bool shortcuts_open_ = false;
   FrameClock clock_;
   std::vector<BuildChoice> builds_;
   float frame_seconds_ = 0.0f;  // what the clock said of the frame being drawn
-  struct Viewport;
-  std::unique_ptr<Viewport> viewport_;
-  class GameView;
+  std::unique_ptr<SceneViewport> viewport_;
   std::unique_ptr<GameView> game_view_;  // who shows the running game, while one runs
   long long frame_count_ = 0;
   bool layout_built_ = false;

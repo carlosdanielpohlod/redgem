@@ -3,7 +3,7 @@
 namespace redgem {
 
 void EditStream::before_change(SceneDocument& doc, int object) {
-  if (doc_ == &doc && object_ == object) return;
+  if (continues(doc, object)) return;
   close();
   doc.checkpoint();
   doc_ = &doc;

@@ -351,69 +351,43 @@ TEST_CASE("a skin or an animation that names a node with something that is no in
 
 namespace {
 
-constexpr std::size_t kStreamFloats = 9;  // three vertices
-constexpr std::size_t kStreamBytes = kStreamFloats * sizeof(float);
-constexpr std::size_t kViewAt = 64;  // bytes into the binary chunk
-constexpr std::size_t kChunkBytes = 256;
-
-// A file with one accessor of three packed positions in a buffer view at kViewAt.
-json positions_file() {
-  return {{kAccessors, {{{kBufferView, 0}, {kComponentType, kFloatComponent}, {kCount, 3}, {kType, kVec3Type}}}},
-          {kBufferViews, {{{kBuffer, 0}, {kByteOffset, kViewAt}, {kByteLength, kStreamBytes}}}}};
-}
-
-std::optional<std::size_t> offset_in(const json& file) {
-  return vec3_stream_offset(file, 0, kStreamFloats, kChunkBytes);
-}
+constexpr int kTwoEntries = 2;
+constexpr int kAnIndex = 3;
 
 }  // namespace
 
-TEST_CASE("vertices are written back only where the file really keeps them") {
-  CHECK(offset_in(positions_file()) == kViewAt);
-  json with_accessor_offset = positions_file();
-  with_accessor_offset[kBufferViews][0][kByteLength] = kStreamBytes + 4;
-  with_accessor_offset[kAccessors][0][kByteOffset] = 4;
-  CHECK(offset_in(with_accessor_offset) == kViewAt + 4);
-  CHECK_FALSE(vec3_stream_offset(positions_file(), 1, kStreamFloats, kChunkBytes).has_value());
-  CHECK_FALSE(vec3_stream_offset(positions_file(), 0, kStreamFloats + 3, kChunkBytes).has_value());
-  CHECK_FALSE(vec3_stream_offset(positions_file(), 0, kStreamFloats, kViewAt + kStreamBytes - 1).has_value());
+TEST_CASE("a file's lists read as lists whether it has them or not, and are made when written to") {
+  const json file = {{kNodes, {1, 2}}, {kScene, 0}};
+  CHECK(list_of(file, kNodes).size() == kTwoEntries);
+  CHECK(list_of(file, kMeshes).empty());
+  json written = file;
+  array_at(written, kMeshes).push_back(json::object());
+  array_at(written, kScene).push_back(1);  // a number where a list belongs becomes a list
+  CHECK(written[kMeshes].size() == 1);
+  CHECK(written[kScene] == json::array({1}));
+  CHECK(last_index(written[kNodes]) == 1);
+  CHECK(last_index(json::array()) == kNoIndex);
+  CHECK(in_range(0, kTwoEntries));
+  CHECK(in_range(1, kTwoEntries));
+  CHECK_FALSE(in_range(kTwoEntries, kTwoEntries));
+  CHECK_FALSE(in_range(kNoIndex, kTwoEntries));
 }
 
-TEST_CASE("an offset before the start of the data is refused instead of becoming a huge one") {
-  for (const char* owner : {kBufferViews, kAccessors}) {
-    for (const json& offset : {json(-8), json(-1), json("8"), json(8.5), json(nullptr)}) {
-      CAPTURE(owner);
-      CAPTURE(offset.dump());
-      json file = positions_file();
-      file[owner][0][kByteOffset] = offset;
-      CHECK_FALSE(offset_in(file).has_value());
-    }
-  }
+TEST_CASE("an entry of a list is found by its number when it is an object") {
+  const json objects = {{kNodes, {{{kName, "a"}}, 1}}};
+  REQUIRE(entry_at(objects, kNodes, 0) != nullptr);
+  CHECK((*entry_at(objects, kNodes, 0))[kName] == "a");
+  CHECK(entry_at(objects, kNodes, 1) == nullptr);  // not an object
+  CHECK(entry_at(objects, kNodes, kTwoEntries) == nullptr);
+  CHECK(entry_at(objects, kNodes, "0") == nullptr);
+  CHECK(entry_at(objects, kMeshes, 0) == nullptr);
+  CHECK(entry_at(json::array(), kNodes, 0) == nullptr);
 }
 
-TEST_CASE("vertices are not written into data kept any other way than the editor keeps it") {
-  const std::pair<const char*, json> changes[] = {
-      {kComponentType, 5123}, {kType, kVec2Type}, {kType, 3},        {kCount, 4},
-      {kCount, -3},           {kBufferView, 5},   {kBufferView, -1}, {kBufferView, "0"}};
-  for (const auto& [key, value] : changes) {
-    CAPTURE(key);
-    CAPTURE(value.dump());
-    json file = positions_file();
-    file[kAccessors][0][key] = value;
-    CHECK_FALSE(offset_in(file).has_value());
-  }
-  const std::pair<const char*, json> view_changes[] = {
-      {kBuffer, 1}, {kByteStride, 16}, {kByteLength, kStreamBytes - 1}, {kByteLength, -1}, {kByteOffset, kChunkBytes}};
-  for (const auto& [key, value] : view_changes) {
-    CAPTURE(key);
-    CAPTURE(value.dump());
-    json file = positions_file();
-    file[kBufferViews][0][key] = value;
-    CHECK_FALSE(offset_in(file).has_value());
-  }
-  json no_buffer = positions_file();
-  no_buffer[kBufferViews][0].erase(kBuffer);
-  CHECK_FALSE(offset_in(no_buffer).has_value());
-  CHECK_FALSE(offset_in(json::array()).has_value());
-  CHECK_FALSE(offset_in(json{{kAccessors, 3}}).has_value());
+TEST_CASE("an index is written as a number, and taken out when there is none") {
+  json node = {{kMesh, kAnIndex}};
+  set_or_erase_index(node, kMesh, kNoIndex);
+  CHECK_FALSE(node.contains(kMesh));
+  set_or_erase_index(node, kSkin, kAnIndex);
+  CHECK(node[kSkin] == kAnIndex);
 }

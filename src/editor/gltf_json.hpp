@@ -129,13 +129,23 @@ nlohmann::json empty_document();
 // absurdly large. nullopt for anything else (a text, a fraction, a negative number): a file may
 // hold any JSON where glTF wants an index.
 std::optional<int> index_from(const nlohmann::json& value);
+// A whole number of zero or more as a size; nullopt for anything else. (Numbers read from a file
+// and numbers the editor wrote itself are kept differently by the JSON library: both are taken.)
+std::optional<std::size_t> size_from(const nlohmann::json& value);
+// Whether `index` names one of `entries` entries.
+inline bool in_range(int index, std::size_t entries) { return index >= 0 && index < static_cast<int>(entries); }
 
-// Where in a .glb's binary chunk of `bin_size` bytes an accessor keeps `float_count` floats, when
-// it keeps them the way the editor writes positions and normals: three floats a vertex, packed,
-// in the file's only buffer, wholly inside its buffer view and the chunk. nullopt for anything
-// else, so that nothing is ever written where the file merely says its data is.
-std::optional<std::size_t> vec3_stream_offset(const nlohmann::json& gltf, std::size_t accessor_index,
-                                              std::size_t float_count, std::size_t bin_size);
+// The file's lists.
+// json[key][index], when the file has such an entry and it is an object; nullptr otherwise.
+const nlohmann::json* entry_at(const nlohmann::json& json, const char* key, const nlohmann::json& index);
+// json[key] as a list (empty when the file has none).
+nlohmann::json list_of(const nlohmann::json& json, const char* key);
+// json[key], made a list when it is not one yet.
+nlohmann::json& array_at(nlohmann::json& json, const char* key);
+int last_index(const nlohmann::json& list);
+// Whether json[key] is there, and a list or an object.
+bool has_list(const nlohmann::json& json, const char* key);
+bool has_object(const nlohmann::json& json, const char* key);
 
 // A custom property as glTF extras hold it (a flag, a number or a text).
 nlohmann::json property_json(const PropertyValue& value);
@@ -159,6 +169,8 @@ void add_extension_used(nlohmann::json& json, const char* extension);
 
 // Sets `key` to `value`, or removes the key when the value is an empty list or object.
 void set_unless_empty(nlohmann::json& object, const char* key, const nlohmann::json& value);
+// Sets `key` to `index`, or removes the key for kNoIndex.
+void set_or_erase_index(nlohmann::json& object, const char* key, int index);
 
 const char* light_type_name(LightType type);
 // Writes a light's or a camera's settings over its entry, keeping the entry's other fields.

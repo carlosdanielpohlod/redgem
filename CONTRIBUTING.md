@@ -61,6 +61,9 @@ The linters enforce most of this; the rest is habit worth keeping.
   early returns instead of nested ifs.
 - **Every number and every meaningful string has a name.** A constant with a short comment
   saying what it is and its unit.
+- **A condition says what it means.** `if (!known || claimed.count(source) != 0)` is read twice;
+  `if (takes_the_entry(known, claimed, source))` once. Two or more clauses, or a negation that
+  needs a second look, go into a small function named for the meaning. One plain clause stays.
 - **Comments say why**, in plain English, where the code cannot say it itself.
 - **Names say what something is for**, not how it is built.
 - **Input from outside is not trusted.** Files (scenes, models, settings, saves) and anything

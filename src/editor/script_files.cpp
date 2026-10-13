@@ -1,5 +1,6 @@
 #include "editor/script_files.hpp"
 
+#include <algorithm>
 #include <cctype>
 
 #include "core/config.hpp"
@@ -9,13 +10,25 @@
 namespace redgem {
 namespace {
 
+// Whether a name is something followed by `extension`.
+bool has_extension(const std::string& name, const std::string& extension) {
+  return name.size() > extension.size() &&
+         name.compare(name.size() - extension.size(), extension.size(), extension) == 0;
+}
+
 std::string strip_extension(const std::string& name) {
   const std::string extension = config::kRubyFileExtension;
-  if (name.size() > extension.size() &&
-      name.compare(name.size() - extension.size(), extension.size(), extension) == 0) {
-    return name.substr(0, name.size() - extension.size());
-  }
-  return name;
+  return has_extension(name, extension) ? name.substr(0, name.size() - extension.size()) : name;
+}
+
+bool starts_lowercase(const std::string& name) {
+  return !name.empty() && std::islower(static_cast<unsigned char>(name[0])) != 0;
+}
+
+// What a script's name is made of: lowercase letters, digits and _.
+bool name_character(char c) {
+  const auto u = static_cast<unsigned char>(c);
+  return std::islower(u) != 0 || std::isdigit(u) != 0 || c == '_';
 }
 
 // What a new script holds after its first two lines (a comment with its file name and the class).
@@ -39,12 +52,8 @@ constexpr const char* kTemplateBody =
 
 bool valid_script_name(const std::string& name) {
   const std::string base = strip_extension(name);
-  if (base.empty() || !std::islower(static_cast<unsigned char>(base[0]))) return false;
-  for (const char c : base) {
-    const auto u = static_cast<unsigned char>(c);
-    if (!std::islower(u) && !std::isdigit(u) && c != '_') return false;
-  }
-  return true;
+  if (!starts_lowercase(base)) return false;
+  return std::all_of(base.begin(), base.end(), name_character);
 }
 
 std::string script_file_name(const std::string& name) { return strip_extension(name) + config::kRubyFileExtension; }

@@ -1,6 +1,5 @@
 #include "editor/model_import.hpp"
 
-#include <algorithm>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -25,8 +24,6 @@ bool ends_with(std::string_view text, std::string_view suffix) {
 
 bool starts_with(std::string_view text, std::string_view prefix) { return text.rfind(prefix, 0) == 0; }
 
-int shifted(int index, int offset) { return index == kNoIndex ? kNoIndex : index + offset; }
-
 // An index the model gives, moved past what the scene already holds; null when it is no index
 // (see gltf_json::index_from), so that nothing made up is written into the scene.
 nlohmann::json shifted_json(const nlohmann::json& index, int offset) {
@@ -42,10 +39,33 @@ nlohmann::json shifted_required(const nlohmann::json& index, int offset) {
   return *number + offset;
 }
 
+// A value of a material that may hold texture references, not too deep to be looked into.
+bool walkable(const nlohmann::json& value, int depth) { return value.is_object() && depth <= kMaxMaterialDepth; }
+
+// {"index": n} under a key ending in "Texture".
+bool texture_reference(const std::string& key, const nlohmann::json& child) {
+  return ends_with(key, kTextureSuffix) && child.is_object();
+}
+
+// A path that does not stay inside the folder it is relative to.
+bool leaves_folder(const std::filesystem::path& relative) {
+  return relative.empty() || relative.is_absolute() || *relative.begin() == kParentStep;
+}
+
+// The image names no file the scene can read.
+bool no_picture(const std::string& uri, const std::string& from_scene) { return uri.empty() || from_scene.empty(); }
+
+// Where a buffer view starts in the model's own data. (An offset that is not a whole number of
+// zero or more is no offset: the view starts at its data.)
+std::size_t own_offset(const nlohmann::json& view) {
+  const auto offset = view.find(kByteOffset);
+  return offset == view.end() ? 0 : size_from(*offset).value_or(0);
+}
+
 void shift_texture_refs_within(nlohmann::json& value, int offset, int depth) {
-  if (!value.is_object() || depth > kMaxMaterialDepth) return;
+  if (!walkable(value, depth)) return;
   for (auto& [key, child] : value.items()) {
-    if (ends_with(key, kTextureSuffix) && child.is_object()) shift_index(child, kIndex, offset);
+    if (texture_reference(key, child)) shift_index(child, kIndex, offset);
     shift_texture_refs_within(child, offset, depth + 1);
   }
 }
@@ -54,7 +74,7 @@ void shift_texture_refs_within(nlohmann::json& value, int offset, int depth) {
 // the scene's folder, which a scene's pictures never are.
 std::string uri_from_scene(const std::filesystem::path& file, const std::filesystem::path& scene_dir) {
   const std::filesystem::path relative = file.lexically_normal().lexically_relative(scene_dir.lexically_normal());
-  if (relative.empty() || relative.is_absolute() || *relative.begin() == kParentStep) return {};
+  if (leaves_folder(relative)) return {};
   return relative.generic_string();
 }
 
@@ -65,7 +85,7 @@ bool has_several_buffers(const nlohmann::json& model) {
 }
 
 void shift_index(nlohmann::json& object, const char* key, int offset) {
-  if (!object.is_object() || !object.contains(key)) return;
+  if (!object.contains(key)) return;
   const nlohmann::json moved = shifted_json(object[key], offset);
   // (What is there but is no index is taken out: left in, it would be read as some index later.)
   if (moved.is_null()) {
@@ -77,20 +97,9 @@ void shift_index(nlohmann::json& object, const char* key, int offset) {
 
 void shift_texture_refs(nlohmann::json& value, int offset) { shift_texture_refs_within(value, offset, 0); }
 
-void merge_string_list(nlohmann::json& into, const nlohmann::json& from, const char* key) {
-  if (!from.contains(key)) return;
-  for (const nlohmann::json& name : from[key]) {
-    if (!into[key].is_array()) into[key] = nlohmann::json::array();
-    if (std::find(into[key].begin(), into[key].end(), name) == into[key].end()) into[key].push_back(name);
-  }
-}
-
 nlohmann::json imported_buffer_view(nlohmann::json view, const JsonOffsets& offsets) {
   view[kBuffer] = kOnlyBuffer;
-  // (An offset that is not a whole number of zero or more is no offset: the view starts at its data.)
-  const auto offset = view.find(kByteOffset);
-  const bool given = offset != view.end() && offset->is_number_integer() && *offset >= 0;
-  view[kByteOffset] = (given ? offset->get<std::size_t>() : 0) + offsets.bin;
+  view[kByteOffset] = own_offset(view) + offsets.bin;
   return view;
 }
 
@@ -111,7 +120,7 @@ nlohmann::json imported_image(nlohmann::json image, const JsonOffsets& offsets, 
   if (starts_with(uri, kDataUriPrefix)) return image;
   const std::string from_scene = uri_from_scene(model_dir / uri, scene_dir);
   // (A picture outside the scene's folder is not the scene's to read: the image comes without one.)
-  if (uri.empty() || from_scene.empty()) {
+  if (no_picture(uri, from_scene)) {
     image.erase(kUri);
   } else {
     image[kUri] = from_scene;
@@ -141,7 +150,7 @@ nlohmann::json imported_mesh(nlohmann::json mesh, const JsonOffsets& offsets) {
     primitive.erase(kTargets);
   }
   mesh.erase(kWeights);
-  if (mesh.contains(kExtras) && mesh[kExtras].is_object()) mesh[kExtras].erase(kTargetNames);
+  if (has_object(mesh, kExtras)) mesh[kExtras].erase(kTargetNames);
   return mesh;
 }
 
@@ -170,43 +179,6 @@ nlohmann::json imported_animation(nlohmann::json animation, const JsonOffsets& o
   for (nlohmann::json& channel : animation[kChannels]) {
     if (channel.contains(kTarget)) shift_index(channel[kTarget], kNode, offsets.nodes);
   }
-  return animation;
-}
-
-MaterialDesc imported_material(const MaterialDesc& original, const DescOffsets& offsets) {
-  MaterialDesc material = original;
-  for (int* image : {&material.base_color_image, &material.metallic_roughness_image, &material.normal_image,
-                     &material.occlusion_image, &material.emissive_image}) {
-    *image = shifted(*image, offsets.images);
-  }
-  return material;
-}
-
-MeshDesc imported_mesh(MeshDesc mesh, const DescOffsets& offsets) {
-  for (PrimitiveDesc& primitive : mesh.primitives) primitive.material = shifted(primitive.material, offsets.materials);
-  return mesh;
-}
-
-NodeDesc imported_node(NodeDesc node, const DescOffsets& offsets) {
-  node.parent = node.parent == kNoIndex ? offsets.root : node.parent + offsets.nodes;
-  for (int& child : node.children) child += offsets.nodes;
-  node.mesh = shifted(node.mesh, offsets.meshes);
-  node.skin = shifted(node.skin, offsets.skins);
-  node.camera.reset();
-  node.light.reset();
-  node.source_camera = kNoIndex;
-  node.source_light = kNoIndex;
-  node.source_node = shifted(node.source_node, offsets.source_nodes);
-  return node;
-}
-
-SkinDesc imported_skin(SkinDesc skin, const DescOffsets& offsets) {
-  for (int& joint : skin.joints) joint = shifted(joint, offsets.nodes);
-  return skin;
-}
-
-AnimationDesc imported_animation(AnimationDesc animation, const DescOffsets& offsets) {
-  for (AnimationChannel& channel : animation.channels) channel.node += offsets.nodes;
   return animation;
 }
 

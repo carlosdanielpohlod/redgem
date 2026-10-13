@@ -65,6 +65,15 @@ nlohmann::json imported_node(nlohmann::json node, const JsonOffsets& offsets);
 nlohmann::json imported_skin(nlohmann::json skin, const JsonOffsets& offsets);
 nlohmann::json imported_animation(nlohmann::json animation, const JsonOffsets& offsets);
 
+// The model's buffer views, accessors, images, samplers, textures, materials and meshes added
+// to the scene's JSON, renumbered past what it holds, and the model's extensions listed with the
+// scene's. `model_dir` and `scene_dir` are where the two files are (for the pictures the model
+// names). Stops with an exception at a model that points at nothing (see shift helpers above).
+void merge_model(nlohmann::json& scene, const nlohmann::json& model, const JsonOffsets& offsets,
+                 const std::filesystem::path& model_dir, const std::filesystem::path& scene_dir);
+// Cuts those lists back to what the scene held before merge_model (an import that failed half way).
+void drop_model(nlohmann::json& scene, const JsonOffsets& offsets);
+
 // The same entries of the scene description.
 MaterialDesc imported_material(const MaterialDesc& original, const DescOffsets& offsets);
 MeshDesc imported_mesh(MeshDesc mesh, const DescOffsets& offsets);

@@ -42,8 +42,19 @@ std::string build_folder_name(const std::string& game, const std::string& target
   return is_host_target ? name : name + kTargetSeparator + target;
 }
 
+namespace {
+
+bool under_home(const std::string& path, const std::string& home) { return !home.empty() && starts_with(path, home); }
+
+// A material that is one, and not in the list yet.
+bool to_be_listed(const std::vector<int>& materials, int material) {
+  return material != kNoIndex && std::find(materials.begin(), materials.end(), material) == materials.end();
+}
+
+}  // namespace
+
 std::string pretty_path(const std::string& path, const std::string& home) {
-  if (!home.empty() && starts_with(path, home)) return kHomeShorthand + path.substr(home.size());
+  if (under_home(path, home)) return kHomeShorthand + path.substr(home.size());
   return path;
 }
 
@@ -100,8 +111,7 @@ int index_of(const char* const* names, int count, const std::string& value, int 
 std::vector<int> materials_of(const MeshDesc& mesh) {
   std::vector<int> materials;
   for (const PrimitiveDesc& primitive : mesh.primitives) {
-    const bool listed = std::find(materials.begin(), materials.end(), primitive.material) != materials.end();
-    if (primitive.material != kNoIndex && !listed) materials.push_back(primitive.material);
+    if (to_be_listed(materials, primitive.material)) materials.push_back(primitive.material);
   }
   return materials;
 }

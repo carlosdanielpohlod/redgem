@@ -38,7 +38,8 @@ bool ScriptWorkspace::any_modified() const {
 bool ScriptWorkspace::save_all(std::string& error) {
   bool ok = true;
   for (const auto& tab : tabs_) {
-    if (tab->modified() && !tab->save(error)) ok = false;
+    if (!tab->modified()) continue;
+    if (!tab->save(error)) ok = false;
   }
   return ok;
 }

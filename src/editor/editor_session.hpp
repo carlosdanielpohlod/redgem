@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -79,6 +80,8 @@ class EditorSession {
   bool save(std::string& error);
 
   PlayState play_state() const { return play_state_; }
+  // No game runs: the scene can be edited.
+  bool editing() const { return play_state_ == PlayState::Editing; }
   // Starts the game on the scene as it is edited now. What `devices` names has to outlive the play.
   bool play(const PlayDevices& devices, std::string& error);
   void pause(bool paused);
@@ -99,11 +102,24 @@ class EditorSession {
 
  private:
   EditorSession(std::filesystem::path game_dir, SceneDocument document);
+  // Whether an object can be edited now: the game is stopped, and there is one.
+  bool can_edit(ObjectId id) const { return editing() && id != kNoObject; }
+  bool can_sculpt(ObjectId terrain) const { return editing() && is_terrain(terrain); }
+  // A game runs and is not paused.
+  bool playing() const { return play_state_ == PlayState::Playing && runtime_ != nullptr; }
+  // The file on disk is another than the one loaded, and no game runs that reads the loaded one.
+  bool reload_wanted(std::filesystem::file_time_type write_time) const {
+    return write_time != loaded_write_time_ && editing();
+  }
   // The first object carrying the environment's properties, or kNoObject.
   ObjectId find_environment() const;
   // The selection after an edit that renumbers the objects: the one called `name`.
   void refresh_and_reselect(const std::string& name);
   ObjectId place_new(int node, Vec3 position);
+  // What every creation does: `add` makes the object (one undo step) and it is placed and
+  // selected, while the game is stopped (kNoObject while it runs).
+  ObjectId place_created(const std::function<int()>& add, Vec3 position);
+  int add_light(LightType type);
   // Name of the selected object ("" without one): how the selection is found again after an edit
   // that renumbers the objects.
   std::string selected_name() const;

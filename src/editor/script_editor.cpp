@@ -52,7 +52,8 @@ void ScriptEditor::sync_with_disk() {
   if (!is_open()) return;
   std::error_code error;
   const auto time = std::filesystem::last_write_time(path(), error);
-  if (error || time == disk_time_) return;
+  if (error) return;
+  if (time == disk_time_) return;
   if (modified()) {
     changed_on_disk_ = true;  // the user decides: Save keeps this text, Revert takes the file's
     return;

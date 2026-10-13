@@ -1,5 +1,6 @@
 #include "editor/glb_file.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <iterator>
@@ -141,7 +142,7 @@ std::size_t glb_padded_size(std::size_t size) {
 
 bool fits_in_glb(std::uint64_t json_bytes, std::uint64_t bin_bytes) {
   // (Each chunk on its own first: the sum below then stays far from what 64 bits hold.)
-  if (json_bytes > kMaxGlbBytes || bin_bytes > kMaxGlbBytes) return false;
+  if (std::max(json_bytes, bin_bytes) > kMaxGlbBytes) return false;
   const std::uint64_t bin_chunk = bin_bytes == 0 ? 0 : kChunkHeaderBytes + bin_bytes;
   return kHeaderBytes + kChunkHeaderBytes + json_bytes + bin_chunk <= kMaxGlbBytes;
 }

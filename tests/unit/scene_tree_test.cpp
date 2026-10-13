@@ -4,11 +4,11 @@
 #include <vector>
 
 #include "editor/glb_file.hpp"
-#include "editor/scene_document.hpp"
+#include "editor/node_tree.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
-using namespace redgem::scene_document_detail;
+using namespace redgem::node_tree;
 using redgem::test::kTolerance;
 
 namespace {
@@ -124,4 +124,36 @@ TEST_CASE("links that go round in a circle do not make a walk endless") {
   std::vector<NodeDesc> circle = {node("A", 1, {1}), node("B", 0, {0})};
   CHECK(subtree(circle, 0).size() == circle.size());
   world_of(circle, 0);  // comes back
+}
+
+TEST_CASE("an order says where each object ends up, and that the ones left out are gone") {
+  const std::vector<int> position = positions_in({kLamp, kRoot}, kNodeCount);
+  CHECK(position[kLamp] == 0);
+  CHECK(position[kRoot] == 1);
+  CHECK(position[kArm] == kNoIndex);
+  CHECK(position.size() == static_cast<std::size_t>(kNodeCount));
+}
+
+TEST_CASE("an object moved under another is placed so that it stays where it was in the world") {
+  std::vector<NodeDesc> nodes = tree();
+  const Transform under_root = local_under(nodes, kLamp, kRoot);
+  CHECK(approx_equal(under_root.position, Vec3{-kRootPlace.x, 0.0f, 0.0f}, kTolerance));
+  CHECK(approx_equal(local_under(nodes, kHand, kNoIndex).position, kHandInWorld, kTolerance));
+  move_under(nodes, kLamp, kRoot, under_root);
+  CHECK(nodes[kLamp].parent == kRoot);
+  CHECK(nodes[kRoot].children == std::vector<int>{kArm, kLeg, kLamp});
+  CHECK(approx_equal(world_of(nodes, kLamp).position, Vec3::zero(), kTolerance));
+  move_under(nodes, kHand, kNoIndex, local_under(nodes, kHand, kNoIndex));
+  CHECK(nodes[kArm].children.empty());
+  CHECK(nodes[kHand].parent == kNoIndex);
+  CHECK(approx_equal(world_of(nodes, kHand).position, kHandInWorld, kTolerance));
+}
+
+TEST_CASE("a named node starts under its parent with nothing else") {
+  const NodeDesc lamp = named_node("Lamp", kRoot);
+  CHECK(lamp.name == "Lamp");
+  CHECK(lamp.parent == kRoot);
+  CHECK(lamp.children.empty());
+  CHECK(lamp.mesh == kNoIndex);
+  CHECK(named_node("Top", kNoIndex).parent == kNoIndex);
 }

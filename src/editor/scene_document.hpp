@@ -1,5 +1,6 @@
 #pragma once
 
+#include <exception>
 #include <filesystem>
 #include <map>
 #include <optional>
@@ -32,6 +33,8 @@ class SceneDocument {
   const SceneDesc& desc() const { return desc_; }
   const NodeDesc& node(int index) const { return desc_.nodes.at(index); }
   int node_count() const { return static_cast<int>(desc_.nodes.size()); }
+  // Whether `index` is one of the nodes.
+  bool has_node(int index) const { return index >= 0 && index < node_count(); }
   const std::filesystem::path& path() const { return path_; }
   // True when the nodes or materials differ from what is on disk (undoing back to the saved
   // state clears it).
@@ -127,6 +130,8 @@ class SceneDocument {
   // Writes a reshaped mesh's vertices over its old ones in the binary chunk (same count, so the
   // file does not grow).
   bool store_mesh_vertices(int mesh, std::string& error);
+  // A terrain's positions and normals, over the ones those two accessors point at.
+  bool store_shape(std::size_t positions, std::size_t normals, const PrimitiveDesc& ground);
   // Writes floats over the ones an accessor points at. False when they are not stored the way
   // the editor writes them (packed, and as many).
   bool store_stream(std::size_t accessor_index, const std::vector<float>& values);
@@ -180,15 +185,14 @@ class SceneDocument {
   std::vector<int> point_at_copies(SkinDesc& skin, nlohmann::json& json, const std::vector<int>& copy_of) const;
   // False for invalid indices, a move into the node's own subtree and a move to where it already is.
   bool can_reparent(int index, int new_parent) const;
+  // The top level, or one of the nodes.
+  bool can_be_parent(int index) const { return index == kNoIndex || has_node(index); }
   // The three steps of import_model: where the model's entries will start, its glTF JSON, and its
   // scene description under a new object called `name`.
   model_import::JsonOffsets import_offsets() const;
   int append_model(const SceneDesc& scene, const GlbFile& source, const std::filesystem::path& path, int parent);
-  void append_model_json(const nlohmann::json& model, const model_import::JsonOffsets& offsets,
-                         const std::filesystem::path& model_dir);
-  void append_model_geometry(const nlohmann::json& model, const model_import::JsonOffsets& offsets);
-  void append_model_materials(const nlohmann::json& model, const model_import::JsonOffsets& offsets,
-                              const std::filesystem::path& model_dir);
+  // The model's nodes, skeletons and animations, kept apart like the scene's own (saving numbers
+  // them again).
   void append_model_sources(const nlohmann::json& model, const model_import::JsonOffsets& offsets);
   void append_model_assets(const SceneDesc& model, const model_import::DescOffsets& offsets);
   int append_model_description(const SceneDesc& model, const model_import::JsonOffsets& json_offsets,
@@ -199,18 +203,10 @@ class SceneDocument {
   int append_material(const MaterialDesc& material);
   // A material with just a color and a roughness (what new shapes and terrains get).
   int append_plain_material(const std::string& name, Color color, float roughness);
+  // A mesh of one part, in the description and in the file.
   int append_mesh(const std::string& name, const PrimitiveDesc& primitive);
-  // The vertex streams of a mesh as new accessors; returns the glTF "attributes" naming them.
-  nlohmann::json append_attributes(const PrimitiveDesc& primitive, const Bounds& bounds);
-  int append_indices(const std::vector<std::uint32_t>& indices);
-  // Appends raw bytes to the binary chunk, aligned; returns where they start.
-  std::size_t append_binary(const std::uint8_t* data, std::size_t bytes);
-  // Appends raw bytes to the binary chunk as a new buffer view; returns its index.
-  int append_buffer_view(const void* data, std::size_t bytes, int target);
-  // Describes a buffer view's elements; returns the accessor's index.
-  int append_accessor(int view, int component, std::size_t count, const char* type);
-  // One float stream of a mesh (positions, normals, texture coordinates) as a new accessor.
-  int append_vertex_stream(const std::vector<float>& values, std::size_t vertices, const char* type);
+  // What a file that holds something else than glTF says it should is reported as.
+  static std::string unusable(const std::filesystem::path& path, const std::exception& problem);
 
   std::filesystem::path path_;
   GlbFile glb_;
@@ -236,23 +232,5 @@ class SceneDocument {
   std::set<int> changed_meshes_;  // reshaped since the renderer last asked
   std::set<int> unsaved_meshes_;  // reshaped since the last save
 };
-
-// Pieces of SceneDocument that need no document. Declared here for the unit tests.
-namespace scene_document_detail {
-
-// "Crate" and 1 -> "Crate.001".
-std::string numbered_name(const std::string& base, int number);
-// Indices of `index` and all its descendants, parents first.
-std::vector<int> subtree(const std::vector<NodeDesc>& nodes, int index);
-// Where a node is in the world, following its parents.
-Transform world_of(const std::vector<NodeDesc>& nodes, int index);
-// The indices 0..count-1 in order without `removed`, and with `last` moved to the end.
-std::vector<int> order_without(int count, const std::vector<int>& removed);
-std::vector<int> order_with_last(int count, const std::vector<int>& last);
-// The nodes listed by `order` (old indices), with parents and children renumbered to match.
-// Children left out of the order are dropped from their parent.
-std::vector<NodeDesc> nodes_in_order(const std::vector<NodeDesc>& nodes, const std::vector<int>& order);
-
-}  // namespace scene_document_detail
 
 }  // namespace redgem

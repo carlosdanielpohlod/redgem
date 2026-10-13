@@ -182,17 +182,44 @@ endif()
 if(NOT ANDROID)
   redgem_add_library(redgem_editor
     editor/glb_file.cpp
+    editor/glb_usage.cpp
     editor/glb_compact.cpp
     editor/gltf_json.cpp
+    editor/gltf_json_entries.cpp
+    editor/glb_geometry.cpp
     editor/model_import.cpp
+    editor/model_merge.cpp
+    editor/model_import_desc.cpp
+    editor/node_tree.cpp
     editor/scene_document.cpp
+    editor/scene_document_history.cpp
+    editor/scene_document_terrain.cpp
+    editor/scene_document_edits.cpp
+    editor/scene_document_copies.cpp
+    editor/scene_document_create.cpp
+    editor/scene_document_skeletons.cpp
+    editor/scene_document_import.cpp
     editor/editor_camera.cpp
     editor/editor_logic.cpp
     editor/edit_stream.cpp
     editor/picking.cpp
     editor/editor_session.cpp
+    editor/editor_session_create.cpp
+    editor/editor_session_play.cpp
     editor/console_log.cpp
+    editor/gizmo.cpp
+    editor/scene_viewport.cpp
+    editor/scene_overlays.cpp
     editor/editor_app.cpp
+    editor/editor_frame.cpp
+    editor/editor_commands.cpp
+    editor/editor_input.cpp
+    editor/editor_menus.cpp
+    editor/editor_bars.cpp
+    editor/editor_layout.cpp
+    editor/editor_dialogs.cpp
+    editor/editor_viewport.cpp
+    editor/editor_scene_view.cpp
     editor/script_files.cpp
     editor/script_editor.cpp
     editor/script_workspace.cpp
@@ -200,11 +227,25 @@ if(NOT ANDROID)
     editor/project_files.cpp
     editor/ui/script_editor_panel.cpp
     editor/ui/hierarchy_panel.cpp
+    editor/ui/hierarchy_rows.cpp
+    editor/inspector_logic.cpp
     editor/ui/inspector_panel.cpp
+    editor/ui/inspector_widgets.cpp
+    editor/ui/inspector_object.cpp
+    editor/ui/inspector_material.cpp
+    editor/ui/inspector_light_camera.cpp
+    editor/ui/inspector_terrain.cpp
+    editor/ui/inspector_scripts.cpp
+    editor/ui/inspector_physics.cpp
+    editor/ui/inspector_properties.cpp
     editor/ui/console_panel.cpp
     editor/ui/project_panel.cpp
+    editor/ui/project_folders.cpp
+    editor/ui/new_script_form.cpp
     editor/ui/create_menu.cpp
     editor/ui/style.cpp
+    editor/ui/theme.cpp
+    editor/ui/fonts.cpp
     editor/ui/interface.cpp
     editor/ui/embedded_fonts.cpp)
   target_link_libraries(redgem_editor PUBLIC redgem_runtime imgui_stack)

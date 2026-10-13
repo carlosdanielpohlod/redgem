@@ -1,0 +1,76 @@
+#include "editor/ui/project_folders.hpp"
+
+#include <algorithm>
+
+#include "core/config.hpp"
+#include "core/log.hpp"
+#include "editor/editor_config.hpp"
+#include "editor/ui/style.hpp"
+
+namespace redgem::ui::project {
+namespace {
+
+using namespace editor_config;
+using Folder = ProjectFolder;
+
+constexpr float kFullVolume = 1.0f;  // sound previews play as recorded
+constexpr float kNormalPitch = 1.0f;
+
+// What a double click on a file of each folder does.
+void edit_script(PanelContext& context, const std::string& name) { open_script(context.scripts, name); }
+
+void add_model(PanelContext& context, const std::string& name) {
+  import_model(context.session, name, context.spawn_point);
+}
+
+void play_sound(PanelContext& context, const std::string& name) {
+  if (context.audio == nullptr) return;
+  context.audio->set_sounds_dir(context.session.game_dir() / config::kSoundsDirName);
+  context.audio->play_sound(name, kFullVolume, kNormalPitch);
+}
+
+void explain_scene(PanelContext& /*context*/, const std::string& name) {
+  log::info("load it from a script: Game.load_scene(\"" + name + "\")");
+}
+
+}  // namespace
+
+const std::vector<FolderInfo>& folders() {
+  static const std::vector<FolderInfo> all = {
+      {Folder::Scripts, ICON_FA_GEM, "Scripts", config::kScriptsDirName,
+       "Ruby behaviours. Create one with New script, then drag it onto an object.", edit_script},
+      {Folder::Models, ICON_FA_CUBES, "Models", config::kModelsDirName,
+       "Drop .glb files (exported from Blender) on this window, then drag them into the scene.", add_model},
+      {Folder::Sounds, ICON_FA_VOLUME_HIGH, "Sounds", config::kSoundsDirName,
+       "Drop .wav / .ogg / .mp3 / .flac files on this window and play them with Audio.play(\"name\").", play_sound},
+      {Folder::Scenes, ICON_FA_MAP, "Scenes", config::kScenesDirName,
+       "Extra levels: scenes/<name>.glb, loaded with Game.load_scene(\"name\").", explain_scene},
+  };
+  return all;
+}
+
+const FolderInfo& info_of(Folder folder) {
+  const std::vector<FolderInfo>& all = folders();
+  return *std::find_if(all.begin(), all.end(), [folder](const FolderInfo& info) { return info.folder == folder; });
+}
+
+const std::vector<std::string>& files_of(const ProjectFiles& files, Folder folder) {
+  switch (folder) {
+    case Folder::Models:
+      return files.models;
+    case Folder::Sounds:
+      return files.sounds;
+    case Folder::Scenes:
+      return files.scenes;
+    case Folder::Scripts:
+      break;
+  }
+  return files.scripts;
+}
+
+const char* payload_of(Folder folder) {
+  if (folder == Folder::Scripts) return kPayloadScript;
+  return folder == Folder::Models ? kPayloadModel : nullptr;
+}
+
+}  // namespace redgem::ui::project

@@ -24,11 +24,20 @@ add_executable(redgem_tests
   unit/scene_document_test.cpp
   unit/scene_tree_test.cpp
   unit/gltf_json_test.cpp
+  unit/glb_geometry_test.cpp
   unit/glb_compact_test.cpp
+  unit/glb_usage_test.cpp
   unit/model_import_test.cpp
   unit/editor_logic_test.cpp
+  unit/inspector_logic_test.cpp
+  unit/hierarchy_rows_test.cpp
+  unit/project_folders_test.cpp
+  unit/theme_test.cpp
   unit/edit_stream_test.cpp
   unit/editor_camera_test.cpp
+  unit/gated_input_source_test.cpp
+  unit/gizmo_test.cpp
+  unit/scene_overlays_test.cpp
   unit/script_files_test.cpp
   unit/primitives_test.cpp
   unit/file_drop_test.cpp
