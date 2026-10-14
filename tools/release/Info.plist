@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- RedGem.app's description, written into the Mac's download by package_macos.sh, which fills
+     in the version and the oldest macOS the programs were built for. -->
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>
+  <string>RedGem</string>
+  <key>CFBundleDisplayName</key>
+  <string>RedGem</string>
+  <key>CFBundleIdentifier</key>
+  <string>io.github.carlosdanielpohlod.redgem</string>
+  <key>CFBundleExecutable</key>
+  <string>redgem</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleShortVersionString</key>
+  <string>@VERSION@</string>
+  <key>CFBundleVersion</key>
+  <string>@VERSION@</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>@MINIMUM_SYSTEM@</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+</dict>
+</plist>

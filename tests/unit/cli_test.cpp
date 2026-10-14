@@ -119,6 +119,15 @@ TEST_CASE("android is a build target") {
   CHECK(std::string(build_target_name(BuildTarget::Android)) == "android");
 }
 
+TEST_CASE("macos is a build target") {
+  const CliResult mac = parse_cli({"build", "games/mine", "dist/mine", "--target", "macos"});
+  REQUIRE(mac.ok);
+  CHECK(mac.options.build_target == "macos");
+  CHECK(build_target_from_name("macos") == BuildTarget::MacOS);
+  CHECK(std::string(build_target_name(BuildTarget::MacOS)) == "macos");
+  CHECK(usage().find("--target linux|windows|macos|android") != std::string::npos);
+}
+
 TEST_CASE("-h asks for help too, and help forgets the rest of the line") {
   const CliResult help = parse_cli({"games/demo", "--gpu", "integrated", "-h"});
   REQUIRE(help.ok);
@@ -130,7 +139,7 @@ TEST_CASE("-h asks for help too, and help forgets the rest of the line") {
 
 TEST_CASE("what is wrong with a command line is said") {
   CHECK(parse_cli({"new", "games/demo", "--template"}).error == "--template needs a name");
-  CHECK(parse_cli({"build", "a", "b", "--target", "amiga"}).error == "--target needs linux, windows or android");
+  CHECK(parse_cli({"build", "a", "b", "--target", "amiga"}).error == "--target needs linux, windows, macos or android");
   CHECK(parse_cli({"games/demo", "--gpu", "turbo"}).error == "--gpu needs auto, dedicated or integrated");
   CHECK(parse_cli({"games/demo", "--bogus"}).error == "unknown option --bogus");
   CHECK(parse_cli({"games/demo", "extra"}).error == "unexpected argument extra");

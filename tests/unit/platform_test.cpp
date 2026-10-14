@@ -33,12 +33,38 @@ class ScopedVariable {
 }  // namespace
 
 TEST_CASE("the user's data is in the desktop's settings folder, or in .config at home") {
+  const std::filesystem::path home = "/home/someone";
+  for (const platform::Desktop desktop : {platform::Desktop::Linux, platform::Desktop::Windows}) {
+    CHECK(platform::user_data_dir_on(desktop, home, "/somewhere/settings") ==
+          std::filesystem::path("/somewhere/settings") / "redgem");
+    CHECK(platform::user_data_dir_on(desktop, home, "") == home / ".config" / "redgem");
+  }
+}
+
+TEST_CASE("on the Mac the user's data is in the Library's Application Support, whatever XDG says") {
+  const std::filesystem::path home = "/Users/someone";
+  const std::filesystem::path support = home / "Library" / "Application Support" / "RedGem";
+  CHECK(platform::user_data_dir_on(platform::Desktop::Mac, home, "") == support);
+  CHECK(platform::user_data_dir_on(platform::Desktop::Mac, home, "/somewhere/settings") == support);
+}
+
+TEST_CASE("the user's data is where this desktop keeps it") {
   {
     const ScopedVariable settings(kSettingsVariable, "/somewhere/settings");
-    CHECK(platform::user_data_dir() == std::filesystem::path("/somewhere/settings") / "redgem");
+    CHECK(platform::user_data_dir() ==
+          platform::user_data_dir_on(platform::this_desktop(), platform::home_dir(), "/somewhere/settings"));
   }
   const ScopedVariable no_settings(kSettingsVariable, "");
-  CHECK(platform::user_data_dir() == platform::home_dir() / ".config" / "redgem");
+  CHECK(platform::user_data_dir() == platform::user_data_dir_on(platform::this_desktop(), platform::home_dir(), ""));
+}
+
+TEST_CASE("each desktop opens a file with its own command, the path quoted for its shell") {
+  CHECK(platform::open_command_on(platform::Desktop::Linux, "games/My Game") ==
+        "xdg-open 'games/My Game' >/dev/null 2>&1 &");
+  CHECK(platform::open_command_on(platform::Desktop::Mac, "games/it's") == "open 'games/it'\\''s' >/dev/null 2>&1 &");
+  CHECK(platform::open_command_on(platform::Desktop::Windows, "games\\My \"Game\"") ==
+        "start \"\" \"games\\My \"\"Game\"\"\"");
+  CHECK(platform::open_command("x") == platform::open_command_on(platform::this_desktop(), "x"));
 }
 
 TEST_CASE("a system that gives the program a place of its own says where the user's data is") {
@@ -71,6 +97,8 @@ TEST_CASE("an executable's file is named as its system names programs") {
 TEST_CASE("the platform says what this system is, for what is built and run differently on it") {
   // (These tests run on a desk with a shell: the Android SDK's tools can be run from it.)
   CHECK(platform::has_posix_shell() != platform::is_windows());
+  CHECK(platform::is_windows() == (platform::this_desktop() == platform::Desktop::Windows));
+  CHECK(platform::is_mac() == (platform::this_desktop() == platform::Desktop::Mac));
 }
 
 TEST_CASE("what a game makes the engine say cannot drive the terminal, nor pass for the engine's own messages") {

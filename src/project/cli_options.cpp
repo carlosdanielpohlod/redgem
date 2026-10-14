@@ -42,7 +42,7 @@ void read_target(Reading& reading) {
   // (No name is no target's name either.)
   const std::string name = value(reading).value_or("");
   if (!build_target_from_name(name)) {
-    fail(reading, "--target needs linux, windows or android");
+    fail(reading, "--target needs linux, windows, macos or android");
     return;
   }
   reading.result.options.build_target = name;

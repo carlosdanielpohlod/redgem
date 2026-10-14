@@ -55,6 +55,17 @@ TEST_CASE("a build goes anywhere but into the game it copies") {
   CHECK_FALSE(builds_outside_game(scratch.game, scratch.game, error));
 }
 
+TEST_CASE("a player no script of the engine makes is said to come from building the engine on its system") {
+  for (const BuildTarget target : {BuildTarget::Linux, BuildTarget::MacOS}) {
+    if (target == host_build_target()) continue;  // (the one built here is its own build's target)
+    const std::string name = build_target_name(target);
+    const std::string message = missing_runtime_message(target, "/opt/redgem/bin/runtimes/" + name);
+    CAPTURE(message);
+    CHECK(message.find("building the engine on " + name) != std::string::npos);
+    CHECK(message.find("build_runtime.sh") == std::string::npos);
+  }
+}
+
 TEST_CASE("a missing player for Android is looked for under any kind of processor") {
   CHECK(any_android_runtime_in("runtimes/android") ==
         std::filesystem::path("runtimes/android") / "<abi>" / android_library_file());

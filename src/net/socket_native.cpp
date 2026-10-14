@@ -57,6 +57,8 @@ std::string last_error() { return "socket error " + std::to_string(WSAGetLastErr
 int wait_native(std::vector<Waiting>& waiting, int milliseconds) {
   return WSAPoll(waiting.data(), static_cast<ULONG>(waiting.size()), milliseconds);
 }
+
+void no_signal_on_closed(NativeSocket) {}  // (Windows sends no signals)
 #else
 void start_sockets() {}
 
@@ -80,6 +82,12 @@ int connection_answered(NativeSocket socket) {
 int wait_native(std::vector<Waiting>& waiting, int milliseconds) {
   return poll(waiting.data(), static_cast<nfds_t>(waiting.size()), milliseconds);
 }
+
+#ifdef SO_NOSIGPIPE
+void no_signal_on_closed(NativeSocket socket) { set_option(socket, SOL_SOCKET, SO_NOSIGPIPE); }
+#else
+void no_signal_on_closed(NativeSocket) {}  // (every send says so itself: kSendFlags)
+#endif
 #endif
 
 IoStatus later_or_closed() { return would_block() ? IoStatus::WouldBlock : IoStatus::Closed; }

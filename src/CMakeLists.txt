@@ -92,6 +92,7 @@ redgem_add_library(redgem_core
   core/log.cpp
   core/xml_writer.cpp
   core/platform.cpp
+  core/platform_desktop.cpp
   core/platform_log.cpp
   core/files.cpp
   core/command_line.cpp

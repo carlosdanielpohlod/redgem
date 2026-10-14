@@ -10,9 +10,10 @@
 // copies the program that makes it: the editor and the other tools stay with whoever makes games.
 namespace redgem {
 
-// The systems a game can be built for.
-enum class BuildTarget { Linux, Windows, Android };
-// "linux" / "windows" / "android" (and back); nullopt for anything else.
+// The systems a game can be built for. (A game for the Mac is built on a Mac, with the player that
+// comes with the editor there.)
+enum class BuildTarget { Linux, Windows, Android, MacOS };
+// "linux" / "windows" / "android" / "macos" (and back); nullopt for anything else.
 std::optional<BuildTarget> build_target_from_name(const std::string& name);
 const char* build_target_name(BuildTarget target);
 // The system this program runs on.

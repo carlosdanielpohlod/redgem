@@ -14,7 +14,7 @@ set(REDGEM_JSON_VERSION "v3.12.0")
 
 # --- X11 headers extracted locally by tools/setup/fetch_x11_headers.sh -------
 set(REDGEM_LOCAL_X11_INCLUDE "${CMAKE_SOURCE_DIR}/.deps/x11/usr/include")
-if(NOT WIN32 AND NOT ANDROID AND EXISTS "${REDGEM_LOCAL_X11_INCLUDE}/X11/extensions/Xrandr.h")
+if(NOT WIN32 AND NOT ANDROID AND NOT APPLE AND EXISTS "${REDGEM_LOCAL_X11_INCLUDE}/X11/extensions/Xrandr.h")
   message(STATUS "Using locally extracted X11 headers: ${REDGEM_LOCAL_X11_INCLUDE}")
   list(APPEND CMAKE_INCLUDE_PATH "${REDGEM_LOCAL_X11_INCLUDE}")
   include_directories(BEFORE SYSTEM "${REDGEM_LOCAL_X11_INCLUDE}")
@@ -62,7 +62,7 @@ set(DEBUG_RENDERER_IN_DEBUG_AND_RELEASE OFF CACHE BOOL "" FORCE)
 set(PROFILER_IN_DEBUG_AND_RELEASE OFF CACHE BOOL "" FORCE)
 set(CPP_RTTI_ENABLED ON CACHE BOOL "" FORCE)
 set(CPP_EXCEPTIONS_ENABLED ON CACHE BOOL "" FORCE)
-if(WIN32 OR ANDROID)
+if(WIN32 OR ANDROID OR APPLE)
   # Its warnings-as-errors trips on a newer compiler's notes; a dependency's warnings are not ours to fix.
   set(ENABLE_ALL_WARNINGS OFF CACHE BOOL "" FORCE)
 endif()

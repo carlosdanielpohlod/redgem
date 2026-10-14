@@ -17,7 +17,12 @@ constexpr BuildOption kBuildOptions[] = {
     {BuildTarget::Linux, ICON_FA_DESKTOP "  For Linux"},
     {BuildTarget::Windows, ICON_FA_DESKTOP "  For Windows (.exe)"},
     {BuildTarget::Android, ICON_FA_MOBILE_SCREEN "  For Android (.apk)"},
+    {BuildTarget::MacOS, ICON_FA_DESKTOP "  For macOS"},
 };
+
+// Whether the editor here offers a build for `target`: the Mac's player only comes with the
+// Mac's editor, so only there is a game built for the Mac.
+bool offered_here(BuildTarget target) { return target != BuildTarget::MacOS || target == host_build_target(); }
 
 BuildChoice choice_for(const BuildOption& option) {
   const BuildTarget target = option.target;
@@ -34,7 +39,9 @@ BuildChoice choice_for(const BuildOption& option) {
 
 std::vector<BuildChoice> build_choices() {
   std::vector<BuildChoice> choices;
-  for (const BuildOption& option : kBuildOptions) choices.push_back(choice_for(option));
+  for (const BuildOption& option : kBuildOptions) {
+    if (offered_here(option.target)) choices.push_back(choice_for(option));
+  }
   return choices;
 }
 
