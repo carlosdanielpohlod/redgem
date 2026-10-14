@@ -17,7 +17,7 @@ jobs:
   editor:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
+    timeout-minutes: 100
     strategy:
       fail-fast: false
       matrix:
@@ -70,17 +70,21 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: ./build/tests/redgem_testing_tests
 
+      # What ctest has that opens no window. (The games' system tests run on Linux: drawn by the
+      # software renderer they would take hours here.)
+      - name: Tests that open no window (ctest)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ctest --test-dir build --output-on-failure -LE system
+
+      # (About half an hour on these machines, against a minute with a graphics card.)
       - name: Editor system test (opens the editor window)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: ctest --test-dir build -R editor --output-on-failure
-
-      - name: All tests (ctest)
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: ctest --test-dir build --output-on-failure --timeout 600
+        timeout-minutes: 45
+        run: ctest --test-dir build -R '^system\.editor\.window$' --output-on-failure
 
       - name: Open the editor on a demo and take a picture of the screen
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: tools/macos/capture_window.sh "${SHOTS}/editor-${{ matrix.arch }}.png" 15 build/src/redgem "${DEMO}"
+        run: tools/macos/capture_window.sh "${SHOTS}/editor-${{ matrix.arch }}.png" 30 build/src/redgem "${DEMO}"
 
       - name: Pack the download
         id: package
@@ -94,7 +98,7 @@ jobs:
           unpacked="${RUNNER_TEMP}/unpacked"
           mkdir -p "${unpacked}"
           ditto -x -k "dist/release/redgem-macos-${{ matrix.arch }}.zip" "${unpacked}"
-          tools/macos/capture_window.sh "${SHOTS}/app-hub-${{ matrix.arch }}.png" 15 \
+          tools/macos/capture_window.sh "${SHOTS}/app-hub-${{ matrix.arch }}.png" 30 \
             open -W -n "${unpacked}/redgem/RedGem.app"
           pkill -x redgem || true
 
@@ -105,7 +109,7 @@ jobs:
           name: screens-${{ matrix.arch }}
           path: |
             dist/screens
-            build/screenshots
+            build/screenshots/editor
           if-no-files-found: warn
 
       - name: Keep the download
