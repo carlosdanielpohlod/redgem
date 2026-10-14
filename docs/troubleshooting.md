@@ -12,8 +12,14 @@ Knowing this up front saves time:
   no animation events and no inverse kinematics.
 - **Multiplayer** has no matchmaking and no lag compensation; playing over the internet needs a
   relay you run, or a forwarded port (see [Multiplayer](scripting/multiplayer.md)).
-- **Platforms:** the editor is developed on Linux; the Windows download is experimental. Games are built for Linux, Windows and Android (no
-  iOS, no web).
+- **Platforms:** the editor is developed on Linux; the Windows and macOS downloads are
+  experimental (macOS has only run on GitHub's virtual Macs, drawn by Apple's software renderer).
+  Games are built for Linux, Windows and Android, and for the Mac from the Mac's editor (no iOS,
+  no web).
+- **macOS says the app cannot be opened** ("unidentified developer", or "damaged"): the app is
+  not signed by a registered Apple developer. Right-click `RedGem.app` and choose *Open* (on
+  macOS 15 and later: *System Settings > Privacy & Security > Open Anyway*), or run
+  `xattr -dr com.apple.quarantine RedGem.app` in the unpacked folder.
 - Scripts are loaded when you press Play; they are not reloaded while the game runs.
 
 ## Common problems

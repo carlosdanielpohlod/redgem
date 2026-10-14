@@ -1,7 +1,8 @@
 RedGem 3D Engine for macOS - experimental
 
 Open RedGem.app: the project hub opens, where you create a game or open one. To open a demo,
-choose Open in the hub and pick its folder (games/platformer), or from a terminal:
+type its folder under "Open a game folder" (for example ~/Downloads/redgem/games/platformer)
+and press Open, or from a terminal, in this folder:
 
   RedGem.app/Contents/MacOS/redgem games/platformer
 
@@ -15,9 +16,10 @@ Apple account), so macOS refuses to open it the first time. Either:
   - in a terminal, in this folder: xattr -dr com.apple.quarantine RedGem.app
 
 This download has been built and tested on GitHub's Mac machines (macOS 14 on Apple Silicon,
-macOS 15 on Intel), never on a Mac someone uses every day: please report what breaks. It needs
-macOS 11 or newer and OpenGL (which macOS still has). It builds games for the Mac it runs on;
-Windows, Linux and Android builds are made from the Linux download.
+macOS 15 on Intel), which are virtual machines without a graphics card for OpenGL: there it ran
+on Apple's software renderer. It has not been tried on a real Mac yet: please report what
+breaks. It needs macOS 11 or newer. It builds games for the Mac; Windows, Linux and Android
+builds are made from the Linux download.
 
 Also in RedGem.app/Contents/MacOS/:
 

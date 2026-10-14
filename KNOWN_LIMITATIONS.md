@@ -8,7 +8,13 @@ the same pull request.
 
 - The editor is developed and tested on Linux. The Windows download is compiled from Linux and
   has only been tried under Wine, never on a real Windows machine.
-- No macOS, iOS, web or console builds.
+- The macOS downloads have only run on GitHub's virtual Macs, which have no graphics card OpenGL
+  can use: there the editor is drawn by Apple's software renderer (its system test takes about
+  half an hour instead of a minute), and the games' system tests are not run on the Mac. Never
+  tried on a real Mac. The app is not signed by a registered Apple developer nor notarized.
+- The editor on a Mac builds games for the Mac only: it carries no players for other systems.
+  A built Mac game is a plain program beside its files, not an .app.
+- No iOS, web or console builds.
 - The Linux programs need a processor with AVX2 and glibc 2.39 or newer.
 - Android games have been run on an emulator only, not on phones. Characters are limited to 48
   bones there. The touch controls have one fixed layout (a stick and three buttons).
