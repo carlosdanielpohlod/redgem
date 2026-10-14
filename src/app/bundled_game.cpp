@@ -1,13 +1,12 @@
 #include "app/bundled_game.hpp"
 
-#include "core/config.hpp"
+#include "app/scene_files.hpp"
 
 namespace redgem {
 
 std::optional<std::filesystem::path> bundled_game(const std::filesystem::path& executable) {
   std::filesystem::path game = executable.parent_path() / kBundledGameFolder;
-  std::error_code fs_error;
-  if (!std::filesystem::exists(game / config::kSceneFileName, fs_error)) return std::nullopt;
+  if (!is_game_folder(game)) return std::nullopt;
   return game;
 }
 

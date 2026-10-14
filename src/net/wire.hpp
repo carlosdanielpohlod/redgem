@@ -72,6 +72,8 @@ nlohmann::json game_message(const std::string& name, const nlohmann::json& data,
 // peers: ids there can be, each once, and fewer than a full game). Anything else comes from a
 // broken or hostile program, and nothing of it is used.
 bool well_formed(const nlohmann::json& message);
+// Whether a message that is well formed is one a game sent, under a name to hear it by.
+bool is_game_message(const nlohmann::json& message);
 // Whether the id a welcome hands this machine can be its own: only the host is 1 (as is whoever
 // opened a room on a relay, who can be nothing else), and nobody is 0.
 bool own_id_believable(int given, bool through_relay, bool opening_room);

@@ -55,9 +55,6 @@ Matrix model_matrix(const Transform& t);
 std::optional<std::string> graphics_card_name(const std::string& trace_line);
 // A target `factor` times smaller than `size` pixels, never smaller than one pixel.
 int downscaled(int size, int factor);
-// Whether `index` names one of `count` things. (kNoIndex names none, and neither does an index a
-// file made up.)
-bool names_one_of(int index, std::size_t count);
 
 // --- Materials -------------------------------------------------------------------------------
 

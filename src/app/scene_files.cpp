@@ -21,6 +21,11 @@ std::variant<SceneDesc, std::string> read_scene_file(const std::filesystem::path
 
 }  // namespace
 
+bool is_game_folder(const std::filesystem::path& folder) {
+  std::error_code fs_error;
+  return std::filesystem::exists(folder / config::kSceneFileName, fs_error);
+}
+
 std::variant<SceneDesc, std::string> read_game_scene(const std::filesystem::path& game_dir) {
   return read_scene_file(game_dir / config::kSceneFileName);
 }

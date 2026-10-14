@@ -10,14 +10,13 @@
 #include <variant>
 
 #include "app/engine.hpp"
-#include "app/window_presenter.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "testing/frame_pictures.hpp"
-#include "testing/recording_audio.hpp"
 #include "testing/test_library.hpp"
 #include "testing/test_notes.hpp"
 #include "testing/test_saves.hpp"
+#include "testing/test_stage.hpp"
 
 namespace redgem::testing {
 namespace {
@@ -33,31 +32,6 @@ constexpr const char* kPassed = "passed";
 constexpr const char* kFailed = "failed";
 
 enum class Status { Running, Passed, Failed };
-
-// What a game under test is shown in and heard through: a real window with the machine's sound,
-// or nothing at all.
-class Stage {
- public:
-  Stage(const SystemTestOptions& options, FramePictures& pictures) {
-    if (options.headless) return;
-    GameWindowOptions window;
-    window.game_dir = options.game_dir;
-    window.gpu = options.gpu;
-    window.capture_cursor = false;  // the pointer stays with whoever sits at the machine
-    window.on_frame_drawn = [&pictures] { pictures.save_pending(); };
-    window_ = std::make_unique<WindowPresenter>(window);
-    speakers_ = create_raylib_audio();
-  }
-  // Null when nobody shows the game.
-  Presenter* presenter() { return window_.get(); }
-  // Without a window there is no device either: the game still finds its sounds, and hears none.
-  AudioSystem* audio() { return window_ ? speakers_.get() : &silent_; }
-
- private:
-  std::unique_ptr<WindowPresenter> window_;
-  std::unique_ptr<AudioSystem> speakers_;
-  RecordingAudio silent_;
-};
 
 // An engine as a test needs it: the same run every time, with the test at the controls.
 EngineOptions engine_options(const SystemTestOptions& options, ScriptedInputSource& input, Stage& stage) {
@@ -145,7 +119,8 @@ void SystemTestRun::heed(const std::string& said) {
 
 int SystemTestRun::verdict() const {
   const int errors = engine_.scripts().error_count();
-  if (status_ == Status::Passed && errors == 0) {
+  const bool passed = status_ == Status::Passed && errors == 0;
+  if (passed) {
     log::info("system test passed");
     return kExitSuccess;
   }

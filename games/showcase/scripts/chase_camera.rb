@@ -47,7 +47,7 @@ class ChaseCamera < Behaviour
   end
 
   def update(dt)
-    return unless @car && @target.alive?
+    return unless following?
 
     look_around(dt)
     follow([@smoothing * dt, MAX_BLEND].min)
@@ -68,7 +68,12 @@ class ChaseCamera < Behaviour
     @fov = CALM_FOV
   end
 
+  # Whether there is a car to follow that is still in the scene.
+  def following? = @car && @target.alive?
+
   def orbiting? = ORBIT_BUTTONS.any? { |button| Input.mouse_down?(button) }
+
+  def at_rest?(stick_x, stick_y) = stick_x.zero? && stick_y.zero?
 
   # A gamepad's right stick, pushed away from its center.
   def stick = [Input.gamepad_axis(:right_x), Input.gamepad_axis(:right_y)]
@@ -78,7 +83,7 @@ class ChaseCamera < Behaviour
     return orbit(Input.mouse_dx * ORBIT_DEGREES_PER_PIXEL, Input.mouse_dy * ORBIT_DEGREES_PER_PIXEL) if orbiting?
 
     stick_x, stick_y = stick
-    return swing_back(dt) if stick_x.zero? && stick_y.zero?
+    return swing_back(dt) if at_rest?(stick_x, stick_y)
 
     orbit(stick_x * STICK_DEGREES_PER_SECOND * dt, stick_y * STICK_DEGREES_PER_SECOND * dt)
   end

@@ -49,6 +49,20 @@ TEST_CASE("a system that gives the program a place of its own says where the use
   CHECK(platform::user_data_dir() == usual);
 }
 
+TEST_CASE("an environment variable holds what it was set to, and nothing when it was never set") {
+  platform::set_environment("REDGEM_TEST_VARIABLE", "a value", true);
+  CHECK(platform::environment("REDGEM_TEST_VARIABLE") == "a value");
+  platform::set_environment("REDGEM_TEST_VARIABLE", "another", false);
+  CHECK(platform::environment("REDGEM_TEST_VARIABLE") == "a value");  // an existing value stays
+  CHECK(platform::environment("REDGEM_TEST_VARIABLE_NOBODY_SET").empty());
+}
+
+TEST_CASE("a text becomes one word of a shell command, whatever is in it") {
+  CHECK(platform::posix_shell_word("games/My Game") == "'games/My Game'");
+  CHECK(platform::posix_shell_word("it's; rm -rf ~") == "'it'\\''s; rm -rf ~'");
+  CHECK(platform::posix_shell_word("") == "''");
+}
+
 TEST_CASE("an executable's file is named as its system names programs") {
   CHECK(platform::executable_file_name("game", false) == "game");
   CHECK(platform::executable_file_name("game", true) == "game.exe");

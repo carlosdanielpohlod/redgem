@@ -78,15 +78,17 @@ Test fixtures are regenerated with
 
 ```
 src/core      what everything shares: math, logging, the fixed timestep clock, files, the platform
-              layer (the only place, with src/net/socket.cpp, that asks which system this is),
-              embedding files in the binary, the game folder's layout (config.hpp)
+              layer (the only place, with the sockets of src/net, that asks which system this is),
+              the words of a command line, embedding files in the binary, the game folder's layout
+              (config.hpp)
 src/scene     glTF loader (meshes, skeletons, animations), Blender extras parser, scene graph,
               animation playback, particles; the custom properties scenes carry (props.hpp)
 src/physics   PhysicsWorld interface + Jolt implementation
 src/input     keys, axes/actions, keyboard, mouse, gamepad and scripted input sources; a touch
               screen's on-screen controls (touch_input_source.hpp), which only the program for
               a touch screen puts in front of the others
-src/net       sockets (the only place with OS socket calls), message framing and wire format, the
+src/net       sockets (socket*.cpp and datagrams.cpp: the only place with OS socket calls, what the
+              systems spell differently being in socket_native), message framing and wire format, the
               host/guest session, discovery on the local network, the relay and the entry point
               of its program (relay_main.cpp)
 src/audio     sound effects and music (raylib, or silence when there is no audio device)

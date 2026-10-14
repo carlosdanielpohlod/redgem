@@ -4,14 +4,23 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/kernel.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/vector3.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_object.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/components.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/scene.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_screen.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation.rb
-  ${CMAKE_SOURCE_DIR}/ruby/engine/network.rb)
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_said.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawns.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawn_requests.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_resends.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_sync.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
 add_custom_command(
@@ -83,7 +92,10 @@ redgem_add_library(redgem_core
   core/log.cpp
   core/xml_writer.cpp
   core/platform.cpp
+  core/platform_log.cpp
   core/files.cpp
+  core/command_line.cpp
+  core/names.cpp
   core/safe_path.cpp
   core/math.cpp
   core/fixed_clock.cpp)
@@ -95,12 +107,20 @@ endif()
 
 redgem_add_library(redgem_net
   net/frame_buffer.cpp
+  net/socket_native.cpp
   net/socket.cpp
+  net/socket_io.cpp
+  net/datagrams.cpp
   net/wire.cpp
   net/connection.cpp
   net/network_session.cpp
+  net/network_session_host.cpp
+  net/network_session_guest.cpp
+  net/nearby_games.cpp
   net/lan_discovery.cpp
   net/relay_server.cpp
+  net/relay_server_visitors.cpp
+  net/relay_server_rooms.cpp
   net/relay_program.cpp)
 target_link_libraries(redgem_net PUBLIC redgem_core nlohmann_json::nlohmann_json)
 if(WIN32)
@@ -152,6 +172,7 @@ redgem_add_library(redgem_runtime
   physics/jolt/jolt_physics_world_queries.cpp
   audio/audio.cpp
   input/keys.cpp
+  input/devices.cpp
   input/input.cpp
   input/raylib_input_source.cpp
   input/touch_controls.cpp
@@ -209,6 +230,8 @@ redgem_add_library(redgem_runtime
   render/window.cpp
   render/ui_font.cpp
   render/culling.cpp
+  app/json_file.cpp
+  app/android_settings.cpp
   app/game_settings.cpp
   app/bundled_game.cpp
   app/save_location.cpp
@@ -217,6 +240,8 @@ redgem_add_library(redgem_runtime
   app/frame_painter.cpp
   app/window_presenter.cpp
   app/engine.cpp
+  app/engine_frame.cpp
+  app/engine_scenes.cpp
   app/scene_bodies.cpp
   app/scene_files.cpp
   app/touch_circles.cpp)
@@ -304,12 +329,27 @@ if(NOT ANDROID)
     ${REDGEM_LICENSES_HEADER}
     project/notices.cpp
     project/game_templates.cpp
+    project/game_names.cpp
     project/game_build.cpp
+    project/game_build_targets.cpp
+    project/game_build_files.cpp
     project/android_package.cpp
+    project/android_package_names.cpp
+    project/android_package_sdk.cpp
+    project/android_package_id.cpp
+    project/android_package_signing.cpp
+    project/android_package_manifest.cpp
+    project/android_package_stage.cpp
+    project/android_package_tools.cpp
     project/recent_games.cpp
     project/project_hub.cpp
+    project/project_hub_frame.cpp
+    project/project_hub_card.cpp
+    project/project_hub_panels.cpp
     project/editor_setup.cpp
-    project/cli.cpp)
+    project/editor_run.cpp
+    project/cli.cpp
+    project/cli_options.cpp)
   # (The templates and the licenses are the tools' alone, as the prelude is the runtime's.)
   target_include_directories(redgem_project PRIVATE ${REDGEM_PROJECT_GENERATED_DIR})
   target_link_libraries(redgem_project PUBLIC redgem_editor)
@@ -374,7 +414,7 @@ endif()
 # it always agree.
 file(STRINGS ${CMAKE_SOURCE_DIR}/tools/android/min_api.txt REDGEM_ANDROID_MIN_API LIMIT_COUNT 1)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tools/android/min_api.txt)
-set_source_files_properties(project/android_package.cpp PROPERTIES
+set_source_files_properties(project/android_package_manifest.cpp PROPERTIES
   COMPILE_DEFINITIONS "REDGEM_ANDROID_MIN_API=${REDGEM_ANDROID_MIN_API}")
 
 # The fonts are assembled into the binary (core/embed.hpp): rebuild when they change. The one

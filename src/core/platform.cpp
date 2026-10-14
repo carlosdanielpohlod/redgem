@@ -1,14 +1,8 @@
 #include "core/platform.hpp"
 
 #include <cstdlib>
-#include <iostream>
 
 #include "core/log.hpp"
-#include "core/safe_path.hpp"
-
-#ifdef __ANDROID__
-#include <android/log.h>
-#endif
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -31,15 +25,6 @@ std::filesystem::path& given_user_data_dir() {
   return folder;
 }
 
-#ifdef __ANDROID__
-constexpr const char* kLogTag = "redgem";  // what the system's log files the engine's messages under
-#else
-constexpr const char* kLogPrefix = "[redgem] ";
-#endif
-constexpr char kLineBreak = '\n';
-// What the lines of a message after its first start with: only a message starts with the mark.
-constexpr const char* kContinuation = "\n  ";
-
 #ifdef _WIN32
 constexpr bool kWindows = true;
 constexpr const char* kHomeVariable = "USERPROFILE";
@@ -48,6 +33,13 @@ constexpr unsigned long kMaxPathLength = 32768;  // Windows' longest path, in ch
 constexpr bool kWindows = false;
 constexpr const char* kHomeVariable = "HOME";
 constexpr const char* kSelfExecutable = "/proc/self/exe";
+#endif
+
+#ifdef _WIN32
+// Whether a variable that is not to be overwritten already has a value.
+bool keeps_its_value(const std::string& name, bool overwrite) {
+  return !overwrite && std::getenv(name.c_str()) != nullptr;
+}
 #endif
 
 // Wraps a path in quotes for the shell, escaping the quotes inside it.
@@ -79,16 +71,20 @@ std::filesystem::path executable_path() {
 #endif
 }
 
+std::string environment(const std::string& name) {
+  const char* value = std::getenv(name.c_str());
+  return value != nullptr ? value : "";
+}
+
 std::filesystem::path home_dir() {
-  const char* home = std::getenv(kHomeVariable);
-  return home != nullptr && *home != '\0' ? std::filesystem::path(home) : std::filesystem::temp_directory_path();
+  const std::string home = environment(kHomeVariable);
+  return home.empty() ? std::filesystem::temp_directory_path() : std::filesystem::path(home);
 }
 
 std::filesystem::path user_data_dir() {
   if (!given_user_data_dir().empty()) return given_user_data_dir();
-  const char* config = std::getenv(kConfigHomeVariable);
-  const std::filesystem::path settings =
-      config != nullptr && *config != '\0' ? std::filesystem::path(config) : home_dir() / kConfigFolder;
+  const std::string config = environment(kConfigHomeVariable);
+  const std::filesystem::path settings = config.empty() ? home_dir() / kConfigFolder : std::filesystem::path(config);
   return settings / kUserDataFolder;
 }
 
@@ -96,12 +92,14 @@ void set_user_data_dir(const std::filesystem::path& folder) { given_user_data_di
 
 void set_environment(const std::string& name, const std::string& value, bool overwrite) {
 #ifdef _WIN32
-  if (!overwrite && std::getenv(name.c_str()) != nullptr) return;
+  if (keeps_its_value(name, overwrite)) return;
   _putenv_s(name.c_str(), value.c_str());
 #else
   setenv(name.c_str(), value.c_str(), overwrite ? 1 : 0);
 #endif
 }
+
+std::string posix_shell_word(const std::filesystem::path& text) { return quoted(text, '\'', "'\\''"); }
 
 std::string open_command(const std::filesystem::path& path) {
 #ifdef _WIN32
@@ -109,37 +107,9 @@ std::string open_command(const std::filesystem::path& path) {
   return "start \"\" " + quoted(path, '"', "\"\"");
 #else
   // Detached, and quiet: its output is not interesting.
-  return "xdg-open " + quoted(path, '\'', "'\\''") + " >/dev/null 2>&1 &";
+  return "xdg-open " + posix_shell_word(path) + " >/dev/null 2>&1 &";
 #endif
 }
-
-std::string log_text(const std::string& message) {
-  std::string text;
-  for (const char c : printable_lines(message)) {
-    if (c == kLineBreak) {
-      text += kContinuation;
-    } else {
-      text.push_back(c);
-    }
-  }
-  return text;
-}
-
-#ifdef __ANDROID__
-// An Android app has no terminal: its messages go to the system's log (adb logcat).
-void write_log(log::Level level, const std::string& message) {
-  const int priority = level == log::Level::Error     ? ANDROID_LOG_ERROR
-                       : level == log::Level::Warning ? ANDROID_LOG_WARN
-                       : level == log::Level::Info    ? ANDROID_LOG_INFO
-                                                      : ANDROID_LOG_DEBUG;
-  __android_log_write(priority, kLogTag, log_text(message).c_str());
-}
-#else
-void write_log(log::Level level, const std::string& message) {
-  std::ostream& out = (level == log::Level::Error || level == log::Level::Warning) ? std::cerr : std::cout;
-  out << kLogPrefix << log::level_name(level) << ": " << log_text(message) << kLineBreak << std::flush;
-}
-#endif
 
 bool is_windows() { return kWindows; }
 

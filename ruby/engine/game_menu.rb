@@ -28,30 +28,6 @@ class GameMenu < Behaviour
   FROZEN = 0.0
   LAST = -1                   # where an option is added unless said: after the others
 
-  # One screen of the menu: a heading and, under it, its options as buttons. A screen that shows
-  # more than that is a subclass (see what it can say about itself below).
-  class Screen
-    attr_accessor :heading
-    attr_reader :options, :back
-
-    # options: [[label, what it does (anything with `call`)], ...]. back: what the pause keys do
-    # while the screen is open (nothing unless given).
-    def initialize(heading: "", options: [], back: nil)
-      @heading = heading
-      @options = options
-      @back = back
-    end
-
-    # Adds an option at a place among the others (index 0 is the first button).
-    def add_option(label, index: LAST, &action) = @options.insert(index, [label, action])
-
-    def opened; end                # it was just shown
-    def closed; end                # another screen took its place, or the game went on
-    def draw(_first_button); end   # what else it shows; the first button is at [x, y, width, height]
-    def space_above = 0            # pixels kept for that between its heading and its buttons
-    def typing? = false            # letters are typed into it: of the pause keys, only Esc is one
-  end
-
   # The name of the open screen; nil while the game goes on.
   attr_reader :screen
   # Every screen by its name.
@@ -128,7 +104,10 @@ class GameMenu < Behaviour
 
   def open_screen = @screens[@screen]
 
-  def pause_keys = open? && open_screen.typing? ? [BACK_KEY] : PAUSE_KEYS
+  # Letters are typed into the open screen: of the pause keys, only Esc is one there.
+  def typing? = open? && open_screen.typing?
+
+  def pause_keys = typing? ? [BACK_KEY] : PAUSE_KEYS
 
   def pause_pressed? = pause_keys.any? { |key| Input.pressed?(key) } || Input.gamepad_pressed?(PAUSE_BUTTON)
 

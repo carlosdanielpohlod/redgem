@@ -43,7 +43,7 @@ std::vector<GpuPrimitive> upload_mesh(const MeshDesc& mesh_desc) {
 // Whether `image` is one of the scene's and was decoded. (A material may come from anywhere: it
 // gets a texture only for an image the scene really has.)
 bool has_texture(const std::vector<Texture2D>& textures, int image) {
-  return render_math::names_one_of(image, textures.size()) && loaded(textures[static_cast<std::size_t>(image)]);
+  return is_index_of(image, textures.size()) && loaded(textures[static_cast<std::size_t>(image)]);
 }
 
 }  // namespace

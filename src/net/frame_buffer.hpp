@@ -29,6 +29,8 @@ class FrameBuffer {
   std::size_t buffered() const { return bytes_.size() - taken_; }
 
  private:
+  // Whether the length of the next message can be read: it arrived, and what arrives is still trusted.
+  bool length_arrived() const;
   // Forgets the bytes of the messages already taken.
   void compact();
 

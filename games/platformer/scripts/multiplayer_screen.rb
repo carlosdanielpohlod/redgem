@@ -43,7 +43,7 @@ class MultiplayerScreen < GameMenu::Screen
 
   # Looks for games only while there is one to look for: offline, with the screen open.
   def keep_looking
-    return Network.stop_search if Network.online? || Network.connecting?
+    return Network.stop_search if in_or_joining_a_game?
 
     Network.search unless Network.searching?
   end
@@ -83,6 +83,8 @@ class MultiplayerScreen < GameMenu::Screen
     @failed = false
     Network.stop_search
   end
+
+  def in_or_joining_a_game? = Network.online? || Network.connecting?
 
   def relay? = !@relay.empty?
 

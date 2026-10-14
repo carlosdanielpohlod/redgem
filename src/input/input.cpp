@@ -11,50 +11,6 @@ constexpr float kStickDeadZone = 0.2f;  // of a stick's travel
 constexpr float kAxisNegative = -1.0f;
 constexpr float kAxisPositive = 1.0f;
 
-// What Ruby calls something, and what it is.
-template <typename Value>
-struct Named {
-  const char* name = nullptr;
-  Value value{};
-};
-
-constexpr Named<GamepadAxis> kGamepadAxisNames[] = {
-    {"left_x", GamepadAxis::LeftX},
-    {"left_y", GamepadAxis::LeftY},
-    {"right_x", GamepadAxis::RightX},
-    {"right_y", GamepadAxis::RightY},
-    {"left_trigger", GamepadAxis::LeftTrigger},
-    {"right_trigger", GamepadAxis::RightTrigger},
-};
-
-constexpr Named<GamepadButton> kGamepadButtonNames[] = {
-    {"a", GamepadButton::A},
-    {"b", GamepadButton::B},
-    {"x", GamepadButton::X},
-    {"y", GamepadButton::Y},
-    {"left_bumper", GamepadButton::LeftBumper},
-    {"right_bumper", GamepadButton::RightBumper},
-    {"back", GamepadButton::Back},
-    {"start", GamepadButton::Start},
-    {"dpad_up", GamepadButton::DpadUp},
-    {"dpad_down", GamepadButton::DpadDown},
-    {"dpad_left", GamepadButton::DpadLeft},
-    {"dpad_right", GamepadButton::DpadRight},
-    {"left_stick", GamepadButton::LeftStick},
-    {"right_stick", GamepadButton::RightStick},
-};
-
-constexpr Named<MouseButton> kMouseButtonNames[] = {
-    {"left", MouseButton::Left}, {"right", MouseButton::Right}, {"middle", MouseButton::Middle}};
-
-template <typename Value, std::size_t Count>
-std::optional<Value> find_named(const Named<Value> (&table)[Count], const std::string& name) {
-  for (const Named<Value>& known : table) {
-    if (name == known.name) return known.value;
-  }
-  return std::nullopt;
-}
-
 bool any_down(const InputState& input, const std::vector<Key>& keys) {
   return std::any_of(keys.begin(), keys.end(), [&input](Key key) { return input.down(key); });
 }
@@ -69,21 +25,30 @@ float key_push(const InputState& input, const AxisBinding& binding) {
 
 // Where the binding's stick puts an axis (and by how much: it is not just on or off).
 float stick_push(const InputState& input, const AxisBinding& binding) {
-  if (!binding.stick || !input.gamepad_connected()) return 0.0f;
+  if (!binding.stick) return 0.0f;
+  if (!input.gamepad_connected()) return 0.0f;
   const float pushed = input.gamepad_axis(*binding.stick);
   if (pushed == 0.0f) return 0.0f;
   return pushed * (binding.stick_inverted ? kAxisNegative : kAxisPositive);
 }
 
-}  // namespace
+bool is_trigger(GamepadAxis axis) { return axis == GamepadAxis::LeftTrigger || axis == GamepadAxis::RightTrigger; }
 
-void ScriptedInputSource::set_key(Key key, bool down) {
-  if (down) {
-    held_.insert(key);
-  } else {
-    held_.erase(key);
-  }
+// Whether any of an action's keys or gamepad buttons is held.
+bool held(const InputState& input, const ActionBinding& binding) {
+  return any_down(input, binding.keys) ||
+         std::any_of(binding.buttons.begin(), binding.buttons.end(),
+                     [&input](GamepadButton button) { return input.gamepad_down(button); });
 }
+
+// Whether any of them went down this frame.
+bool just_pressed(const InputState& input, const ActionBinding& binding) {
+  return std::any_of(binding.keys.begin(), binding.keys.end(), [&input](Key key) { return input.pressed(key); }) ||
+         std::any_of(binding.buttons.begin(), binding.buttons.end(),
+                     [&input](GamepadButton button) { return input.gamepad_pressed(button); });
+}
+
+}  // namespace
 
 InputMap InputMap::defaults() {
   InputMap map;
@@ -120,20 +85,9 @@ void InputState::update(const InputSource& source) {
 
 float InputState::gamepad_axis(GamepadAxis axis) const {
   const float value = gamepad_.axes[static_cast<std::size_t>(axis)];
-  const bool trigger = axis == GamepadAxis::LeftTrigger || axis == GamepadAxis::RightTrigger;
-  return !trigger && std::fabs(value) < kStickDeadZone ? 0.0f : value;
-}
-
-std::optional<GamepadAxis> gamepad_axis_from_name(const std::string& name) {
-  return find_named(kGamepadAxisNames, name);
-}
-
-std::optional<GamepadButton> gamepad_button_from_name(const std::string& name) {
-  return find_named(kGamepadButtonNames, name);
-}
-
-std::optional<MouseButton> mouse_button_from_name(const std::string& name) {
-  return find_named(kMouseButtonNames, name);
+  // (Worn sticks drift around their middle; triggers rest at their end.)
+  const bool drifting = !is_trigger(axis) && std::fabs(value) < kStickDeadZone;
+  return drifting ? 0.0f : value;
 }
 
 std::optional<float> InputState::axis(const std::string& name) const {
@@ -147,16 +101,13 @@ std::optional<float> InputState::axis(const std::string& name) const {
 std::optional<bool> InputState::action_down(const std::string& name) const {
   const ActionBinding* binding = map_.action(name);
   if (binding == nullptr) return std::nullopt;
-  return any_down(*this, binding->keys) || std::any_of(binding->buttons.begin(), binding->buttons.end(),
-                                                       [this](GamepadButton button) { return gamepad_down(button); });
+  return held(*this, *binding);
 }
 
 std::optional<bool> InputState::action_pressed(const std::string& name) const {
   const ActionBinding* binding = map_.action(name);
   if (binding == nullptr) return std::nullopt;
-  return std::any_of(binding->keys.begin(), binding->keys.end(), [this](Key key) { return pressed(key); }) ||
-         std::any_of(binding->buttons.begin(), binding->buttons.end(),
-                     [this](GamepadButton button) { return gamepad_pressed(button); });
+  return just_pressed(*this, *binding);
 }
 
 }  // namespace redgem

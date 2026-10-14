@@ -20,9 +20,14 @@ class TireSmoke
   # speed (m/s).
   def puff(position, nose, speed, dt)
     @wait -= dt
-    return unless @wait <= 0.0 && speed.abs > MIN_SPEED
+    return unless due?(speed)
 
     @wait = SECONDS
     Particles.burst(position - nose * REAR_AXLE + Vector3.up * HEIGHT, **PUFF)
   end
+
+  private
+
+  # The last puff is far enough behind, and the car fast enough to smoke.
+  def due?(speed) = @wait <= 0.0 && speed.abs > MIN_SPEED
 end

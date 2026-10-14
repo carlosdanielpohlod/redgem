@@ -1,47 +1,20 @@
+// RelayServer: a poll's turn for every machine, and what keeps one machine from costing the
+// others more than its share.
+
 #include "net/relay_server.hpp"
 
 #include <algorithm>
-#include <iterator>
-#include <random>
-#include <string_view>
 
 namespace redgem::net {
 
-namespace {
-
 using namespace wire;
 
-constexpr std::size_t kMaxConnections = 1024;
-constexpr std::size_t kMaxRooms = 256;
-// What one address may do. (Players in one house share an address: a whole party fits.)
-constexpr int kMaxConnectionsPerAddress = 24;
-constexpr int kMaxRoomsPerAddress = 8;
-// Wrong guesses at a room code before an address is kept out: a whole party behind one address may
-// each get the code wrong twice (someone read it out badly). Guessing a room takes millions more.
-constexpr float kMaxWrongCodes = 2.0f * kMaxPeers;
-constexpr float kKeptOutSeconds = 120.0f;         // kept out for this long
-constexpr float kForgetWrongCodeSeconds = 30.0f;  // one wrong guess is forgotten after this
-// What may wait to be sent to one machine: two of the longest messages. A relay holds many
-// machines' queues at once, so it is far stricter than a game is with its few.
-constexpr std::size_t kMaxPendingPerMember = 2 * kMaxFrameBytes;
-// Letters and digits that are not mistaken for one another when read aloud or typed (no I, O, 0, 1).
-constexpr std::string_view kCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-constexpr int kCodeTries = 64;  // at finding a code no open room has
+namespace {
+
+// Whether a message for `to`, passed on in a room, goes to the machine that is `peer` there.
+bool is_for(int to, int peer) { return to == kEveryone || to == peer; }
 
 }  // namespace
-
-std::string random_room_code() {
-  std::random_device system_source;
-  std::uniform_int_distribution<std::size_t> letter(0, kCodeAlphabet.size() - 1);
-  std::string code;
-  for (std::size_t i = 0; i < kRoomCodeLetters; ++i) code.push_back(kCodeAlphabet[letter(system_source)]);
-  return code;
-}
-
-bool RelayServer::has_opener(const std::vector<Member*>& inside) {
-  return std::any_of(inside.begin(), inside.end(),
-                     [](const Member* member) { return member->peer == kHostId && !member->connection.closed(); });
-}
 
 bool RelayServer::start(std::uint16_t port, std::string& error) {
   listener_ = Socket::listen_on(port, error);
@@ -76,54 +49,12 @@ bool RelayServer::wait(float seconds) const {
 
 void RelayServer::serve(Member& member, float seconds) {
   Connection& connection = member.connection;
-  if (member.peer == 0) connection.keep_waiting(seconds);  // for it to say which room
+  if (!member.in_room()) connection.keep_waiting(seconds);  // for it to say which room
   member.allowance = std::min(kRelayBurstBytes, member.allowance + seconds * kRelayBytesPerSecond);
   charge(member, connection.pump());
-  if (member.peer != 0) connection.keep_in_touch(seconds);
+  if (member.in_room()) connection.keep_in_touch(seconds);
   // (Only so many a poll: the rest wait for the next one, see kMaxMessagesPerPoll.)
   while (const auto message = connection.next_message()) handle(member, *message);
-}
-
-void RelayServer::accept_newcomers() {
-  if (accept_rest_ > 0.0f) return;
-  Socket guest;
-  IoStatus taken = listener_.accept(guest);
-  for (; taken == IoStatus::Ok; taken = listener_.accept(guest)) {
-    if (!room_for(guest.peer_address())) continue;  // hung up on
-    auto member = std::make_unique<Member>();
-    member->connection = Connection::accepted(std::move(guest), kMaxPendingPerMember);
-    members_.push_back(std::move(member));
-  }
-  // Someone is waiting and the system has no connection to give: asked again after a rest.
-  if (taken == IoStatus::Closed) accept_rest_ = kAcceptRestSeconds;
-}
-
-bool RelayServer::room_for(const std::string& address) const {
-  const auto visitor = visitors_.find(address);
-  const bool kept_out = visitor != visitors_.end() && visitor->second.kept_out_for > 0.0f;
-  // Not when full, kept out for guessing, or with too many from one place already.
-  return members_.size() < kMaxConnections && !kept_out && connections_from(address) < kMaxConnectionsPerAddress;
-}
-
-void RelayServer::forgive_visitors(float seconds) {
-  for (auto visitor = visitors_.begin(); visitor != visitors_.end();) {
-    Visitor& record = visitor->second;
-    record.kept_out_for = std::max(0.0f, record.kept_out_for - seconds);
-    record.wrong_codes = std::max(0.0f, record.wrong_codes - seconds / kForgetWrongCodeSeconds);
-    visitor = record.kept_out_for <= 0.0f && record.wrong_codes <= 0.0f ? visitors_.erase(visitor) : std::next(visitor);
-  }
-}
-
-int RelayServer::connections_from(const std::string& address) const {
-  return static_cast<int>(std::count_if(members_.begin(), members_.end(), [&address](const auto& member) {
-    return !member->connection.closed() && member->connection.address() == address;
-  }));
-}
-
-int RelayServer::rooms_opened_by(const std::string& address) const {
-  return static_cast<int>(std::count_if(members_.begin(), members_.end(), [&address](const auto& member) {
-    return !member->connection.closed() && member->peer == kHostId && member->connection.address() == address;
-  }));
 }
 
 void RelayServer::charge(Member& member, std::size_t bytes) {
@@ -136,8 +67,9 @@ void RelayServer::shed_load() {
   for (const auto& member : members_) held += member->connection.held();
   // Whoever holds less than an even share is never the reason: with every machine under it the
   // total fits. The newest above it go first; those who were here before keep playing.
-  const std::size_t share = max_buffered_bytes_ / kMaxConnections;
-  for (auto member = members_.rbegin(); member != members_.rend() && held > max_buffered_bytes_; ++member) {
+  const std::size_t share = max_buffered_bytes_ / kMaxRelayConnections;
+  for (auto member = members_.rbegin(); member != members_.rend(); ++member) {
+    if (held <= max_buffered_bytes_) return;
     const std::size_t holding = (*member)->connection.held();
     if (holding <= share) continue;
     (*member)->connection.close();
@@ -154,66 +86,11 @@ void RelayServer::handle(Member& member, const nlohmann::json& message) {
 }
 
 void RelayServer::act_on(Member& member, const nlohmann::json& message) {
-  if (member.peer == 0) {
+  if (!member.in_room()) {
     hear_newcomer(member, message);
-  } else if (message[kKind] == kGameMessage && message.contains(kName)) {
+  } else if (is_game_message(message)) {
     pass_on(member, message);
   }
-}
-
-void RelayServer::hear_newcomer(Member& member, const nlohmann::json& message) {
-  // A newcomer's first words say which room; anything else and it is not let in.
-  if (message[kKind] != kHello || !message.contains(kRoom)) {
-    member.connection.close();
-    return;
-  }
-  enter_room(member, message[kRoom]);
-}
-
-void RelayServer::enter_room(Member& member, const std::string& wanted) {
-  if (wanted == kNewRoom) {
-    open_room(member);
-  } else if (rooms_.count(wanted) == 0) {
-    note_wrong_code(member);
-  } else {
-    join_room(member, wanted);
-  }
-}
-
-void RelayServer::open_room(Member& member) {
-  const bool room_to_give =
-      rooms_.size() < kMaxRooms && rooms_opened_by(member.connection.address()) < kMaxRoomsPerAddress;
-  const std::string code = room_to_give ? new_room_code() : std::string();
-  if (code.empty()) {
-    member.connection.close();
-    return;
-  }
-  rooms_[code] = true;
-  member.room = code;
-  member.peer = kHostId;
-  member.connection.send({{kKind, kWelcome}, {kTo, member.peer}, {kPeers, std::vector<int>{}}, {kRoom, code}});
-}
-
-void RelayServer::note_wrong_code(Member& member) {
-  // A wrong code may be a typo; many are someone trying every code there is.
-  Visitor& visitor = visitors_[member.connection.address()];
-  visitor.wrong_codes += 1.0f;
-  if (visitor.wrong_codes >= kMaxWrongCodes) visitor.kept_out_for = kKeptOutSeconds;
-  member.connection.close();
-}
-
-void RelayServer::join_room(Member& member, const std::string& room) {
-  std::vector<int> ids;
-  for (const Member* other : members_of(room)) ids.push_back(other->peer);
-  const int id = free_peer_id(ids);
-  if (id == 0) {
-    member.connection.close();  // a full room
-    return;
-  }
-  member.room = room;
-  member.peer = id;
-  member.connection.send({{kKind, kWelcome}, {kTo, member.peer}, {kPeers, ids}, {kRoom, room}});
-  tell_room(room, member.peer, {{kKind, kArrived}, {kFrom, member.peer}});
 }
 
 void RelayServer::pass_on(Member& sender, const nlohmann::json& message) {
@@ -222,7 +99,8 @@ void RelayServer::pass_on(Member& sender, const nlohmann::json& message) {
   const nlohmann::json passed_on =
       game_message(message[kName], message.value(kData, nlohmann::json()), sender.peer, to);
   for (Member* other : members_of(sender.room)) {
-    if (other->peer != sender.peer && (to == kEveryone || other->peer == to)) other->connection.send(passed_on);
+    if (other->peer == sender.peer) continue;
+    if (is_for(to, other->peer)) other->connection.send(passed_on);
   }
 }
 
@@ -236,53 +114,6 @@ void RelayServer::drop_closed_members() {
   members_.erase(std::remove_if(members_.begin(), members_.end(),
                                 [](const std::unique_ptr<Member>& member) { return member->connection.closed(); }),
                  members_.end());
-}
-
-void RelayServer::close_rooms_without_opener() {
-  // A room ends with the machine that opened it: everyone in it is let go.
-  for (auto room = rooms_.begin(); room != rooms_.end();) {
-    const std::vector<Member*> inside = members_of(room->first);
-    if (has_opener(inside)) {
-      ++room;
-      continue;
-    }
-    for (Member* member : inside) member->connection.close();
-    room = rooms_.erase(room);
-  }
-}
-
-bool RelayServer::tell_rooms_who_left() {
-  bool told = false;
-  for (const auto& member : members_) {
-    if (!member->connection.closed() || member->farewelled) continue;
-    member->farewelled = true;
-    if (member->peer < kFirstGuestId || rooms_.count(member->room) == 0) continue;
-    tell_room(member->room, member->peer, {{kKind, kGone}, {kFrom, member->peer}});
-    told = true;
-  }
-  return told;
-}
-
-void RelayServer::tell_room(const std::string& room, int except, const nlohmann::json& message) {
-  for (Member* member : members_of(room)) {
-    if (member->peer != except) member->connection.send(message);
-  }
-}
-
-std::vector<RelayServer::Member*> RelayServer::members_of(const std::string& room) {
-  std::vector<Member*> found;
-  for (const auto& member : members_) {
-    if (member->peer != 0 && !member->connection.closed() && member->room == room) found.push_back(member.get());
-  }
-  return found;
-}
-
-std::string RelayServer::new_room_code() const {
-  for (int attempt = 0; attempt < kCodeTries; ++attempt) {
-    const std::string code = random_room_code();
-    if (rooms_.count(code) == 0) return code;
-  }
-  return {};
 }
 
 }  // namespace redgem::net

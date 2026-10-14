@@ -111,6 +111,12 @@ TEST_CASE("data nests only so deep, under keys only so long") {
   CHECK_FALSE(wire::well_formed(json{{wire::kKind, wire::kGameMessage}, {wire::kData, nested(kMaxDataDepth + 1)}}));
 }
 
+TEST_CASE("a game's message is one of that kind with a name to hear it by") {
+  CHECK(wire::is_game_message(wire::game_message("hit", nullptr, kHostId, kEveryone)));
+  CHECK_FALSE(wire::is_game_message({{wire::kKind, wire::kGameMessage}}));
+  CHECK_FALSE(wire::is_game_message({{wire::kKind, wire::kPing}, {wire::kName, "hit"}}));
+}
+
 TEST_CASE("a newcomer gets the lowest id nobody has, and none in a full game") {
   CHECK(wire::free_peer_id({}) == kFirstGuestId);
   CHECK(wire::free_peer_id({kFirstGuestId, kOtherGuest}) == kGuest);

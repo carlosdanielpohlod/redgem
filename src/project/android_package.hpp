@@ -71,6 +71,10 @@ std::string android_manifest(const std::string& package, const std::string& labe
 // `runtimes_dir`/<abi>/. Empty when there is none.
 std::map<std::string, std::filesystem::path> android_runtimes(const std::filesystem::path& runtimes_dir);
 
+// Where a player for Android is looked for under `runtimes_dir`, whatever its kind of processor:
+// the path shown to whoever has none.
+std::filesystem::path any_android_runtime_in(const std::filesystem::path& runtimes_dir);
+
 // Lays out in `stage_dir` what goes into the APK: assets/game/... (a copy of the game, without
 // hidden files and editors' backups),
 // assets/game.files, assets/game.stamp, lib/<abi>/libredgem.so and AndroidManifest.xml.

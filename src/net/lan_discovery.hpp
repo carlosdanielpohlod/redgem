@@ -1,38 +1,16 @@
 #pragma once
 
 #include <cstdint>
-#include <optional>
 #include <string>
 #include <vector>
 
+#include "net/nearby_games.hpp"
 #include "net/socket.hpp"
 
 namespace redgem::net {
 
 // The port games on a local network ask "who is hosting?" on.
 inline constexpr std::uint16_t kDiscoveryPort = 7776;
-
-// A game found on the local network.
-struct NearbyGame {
-  std::string address;  // where to join it
-  std::uint16_t port = 0;
-  std::string name;       // what its host called it
-  int players = 0;        // machines in it, the host included
-  float seen_ago = 0.0f;  // seconds since it last answered
-};
-
-// Whether an address is one a machine on the local network has. Questions from anywhere else
-// are not answered: a game must not be made to send messages to strangers.
-bool nearby_address(const std::string& address);
-// The game an answer to a search describes, heard from the address `from`; nullopt for anything
-// that is not a whole answer (anything can arrive on a port) and for one from an address that is
-// not nearby (whoever knows the port could otherwise list games from anywhere).
-std::optional<NearbyGame> game_from_answer(const std::string& message, const std::string& from);
-// Puts a game that answered in the list: over what was known of it, or as a new one while there
-// is room and its address has not filled its share. A game on this very machine answers twice
-// (as this machine and by its address on the network): only the second, which the others see
-// too, is kept.
-void list_game(std::vector<NearbyGame>& games, const NearbyGame& game);
 
 // Lets games on the same network find each other with no address typed: a host answers whoever
 // asks, and a machine looking for games asks everyone nearby (and itself, so two games on one
@@ -55,6 +33,9 @@ class LanDiscovery {
   void update(float seconds);
 
  private:
+  // Whether a search on that port is already going.
+  bool searching_on(std::uint16_t discovery_port) const { return finder_.valid() && search_port_ == discovery_port; }
+  void forget_silent_games(float seconds);
   void answer_searches();
   void collect_answers();
   void ask_around();

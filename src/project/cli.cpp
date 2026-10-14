@@ -1,29 +1,40 @@
 #include "project/cli.hpp"
 
-#include "core/files.hpp"
-#include "project/game_build.hpp"
-#include "project/game_templates.hpp"
-#include "app/user_settings.hpp"
-#include "core/config.hpp"
-
 #include <algorithm>
 #include <iterator>
 
+#include "core/command_line.hpp"
+#include "core/config.hpp"
+#include "core/files.hpp"
+#include "project/cli_reading.hpp"
+#include "project/game_templates.hpp"
+
 namespace redgem {
+
+namespace cli {
+
+void fail(Reading& reading, const std::string& message) {
+  reading.result.ok = false;
+  reading.result.error = message;
+  reading.done = true;
+}
+
+void choose(Reading& reading, RunMode mode) {
+  CliOptions& options = reading.result.options;
+  reading.conflict = reading.conflict || (reading.mode_chosen && options.mode != mode);
+  options.mode = mode;
+  reading.mode_chosen = true;
+}
+
+}  // namespace cli
 
 namespace {
 
-constexpr char kOptionMark = '-';  // what every option starts with
+using cli::Reading;
 
-// The words of a command line.
+// The subcommands.
 constexpr const char* kNewCommand = "new";
 constexpr const char* kBuildCommand = "build";
-constexpr const char* kHelpOption = "--help";
-constexpr const char* kShortHelpOption = "-h";
-constexpr const char* kPlayOption = "--play";
-constexpr const char* kTemplateOption = "--template";
-constexpr const char* kTargetOption = "--target";
-constexpr const char* kGpuOption = "--gpu";
 
 // The usage, around the one line that lists the templates there are.
 constexpr const char* kUsageStart =
@@ -44,96 +55,11 @@ constexpr const char* kUsageEnd =
     "  Where multiplayer games meet over the internet is a program of its own: redgem-relay.\n"
     "\n";
 
-// A command line being read: what was understood so far, and how far the reading got.
-struct Reading {
-  explicit Reading(const std::vector<std::string>& line) : args(line) {}
-
-  const std::vector<std::string>& args;
-  std::size_t next = 0;  // the argument to read next
-  CliResult result;
-  bool mode_chosen = false;
-  bool conflict = false;  // two different things were asked for
-  bool done = false;      // an error or --help ended the reading
-};
-
-void fail(Reading& reading, const std::string& message) {
-  reading.result.ok = false;
-  reading.result.error = message;
-  reading.done = true;
-}
-
-// What to do is said once: by a subcommand or by one of the mode flags.
-void choose(Reading& reading, RunMode mode) {
-  CliOptions& options = reading.result.options;
-  reading.conflict = reading.conflict || (reading.mode_chosen && options.mode != mode);
-  options.mode = mode;
-  reading.mode_chosen = true;
-}
-
-bool is_option(const std::string& arg) { return !arg.empty() && arg[0] == kOptionMark; }
-
-// What the option just read was given: the next argument, unless it is missing or is itself an option.
-std::optional<std::string> value(Reading& reading) {
-  if (reading.next >= reading.args.size() || is_option(reading.args[reading.next])) return std::nullopt;
-  return reading.args[reading.next++];
-}
-
-void read_help(Reading& reading) {
-  reading.result.options = CliOptions{};
-  reading.result.options.mode = RunMode::Help;  // help wins over anything else on the line
-  reading.result.ok = true;
-  reading.done = true;
-}
-
-void read_play(Reading& reading) { choose(reading, RunMode::Game); }
-
-void read_template(Reading& reading) {
-  const auto name = value(reading);
-  if (!name) {
-    fail(reading, "--template needs a name");
-    return;
-  }
-  reading.result.options.template_name = *name;
-}
-
-void read_target(Reading& reading) {
-  const auto name = value(reading);
-  if (!name || !build_target_from_name(*name)) {
-    fail(reading, "--target needs linux, windows or android");
-    return;
-  }
-  reading.result.options.build_target = *name;
-}
-
-void read_gpu(Reading& reading) {
-  const auto name = value(reading);
-  if (!name || !gpu_choice_from_name(*name)) {
-    fail(reading, "--gpu needs auto, dedicated or integrated");
-    return;
-  }
-  reading.result.options.gpu = *name;
-}
-
-struct Option {
-  const char* name;
-  void (*read)(Reading&);
-};
-constexpr Option kOptions[] = {
-    {kHelpOption, read_help},         {kShortHelpOption, read_help}, {kPlayOption, read_play},
-    {kTemplateOption, read_template}, {kTargetOption, read_target},  {kGpuOption, read_gpu},
-};
-
 struct Command {
   const char* word;
   RunMode mode;
 };
 constexpr Command kCommands[] = {{kNewCommand, RunMode::NewGame}, {kBuildCommand, RunMode::BuildGame}};
-
-const Option* find_option(const std::string& arg) {
-  const auto* found = std::find_if(std::begin(kOptions), std::end(kOptions),
-                                   [&arg](const Option& option) { return arg == option.name; });
-  return found != std::end(kOptions) ? found : nullptr;
-}
 
 // A subcommand is the first word of the line, or it is not there.
 void read_command(Reading& reading) {
@@ -141,22 +67,33 @@ void read_command(Reading& reading) {
   const auto* command = std::find_if(std::begin(kCommands), std::end(kCommands),
                                      [&reading](const Command& known) { return reading.args.front() == known.word; });
   if (command == std::end(kCommands)) return;
-  choose(reading, command->mode);
+  cli::choose(reading, command->mode);
   reading.next = 1;
+}
+
+bool needs_game(RunMode mode) {
+  return mode == RunMode::Game || mode == RunMode::NewGame || mode == RunMode::BuildGame;
+}
+
+bool lacks_game(const CliOptions& options) { return needs_game(options.mode) && options.game_dir.empty(); }
+
+// Whether a build was asked for and the folder to build into was not given yet.
+bool lacks_out_dir(const CliOptions& options) {
+  return options.mode == RunMode::BuildGame && options.build_dir.empty();
 }
 
 // Where an argument that is no option goes: the game's folder, then (for a build) the folder to
 // build into. nullptr when the line has no place for it.
 std::filesystem::path* place_for_folder(CliOptions& options) {
   if (options.game_dir.empty()) return &options.game_dir;
-  if (options.mode == RunMode::BuildGame && options.build_dir.empty()) return &options.build_dir;
+  if (lacks_out_dir(options)) return &options.build_dir;
   return nullptr;
 }
 
 void read_folder(Reading& reading, const std::string& arg) {
   std::filesystem::path* place = place_for_folder(reading.result.options);
   if (place == nullptr) {
-    fail(reading, "unexpected argument " + arg);
+    cli::fail(reading, "unexpected argument " + arg);
     return;
   }
   *place = normalized_folder(arg);
@@ -164,25 +101,21 @@ void read_folder(Reading& reading, const std::string& arg) {
 
 void read_argument(Reading& reading) {
   const std::string& arg = reading.args[reading.next++];
-  if (const Option* option = find_option(arg)) {
+  if (const cli::Option* option = cli::find_option(arg)) {
     option->read(reading);
-  } else if (is_option(arg)) {
-    fail(reading, "unknown option " + arg);
+  } else if (command_line::is_option(arg)) {
+    cli::fail(reading, "unknown option " + arg);
   } else {
     read_folder(reading, arg);
   }
-}
-
-bool needs_game(RunMode mode) {
-  return mode == RunMode::Game || mode == RunMode::NewGame || mode == RunMode::BuildGame;
 }
 
 // What is wrong with a line that was read to its end; empty when nothing is.
 std::string problem_with(const Reading& reading) {
   const CliOptions& options = reading.result.options;
   if (reading.conflict) return "choose one of: new, build, --play";
-  if (needs_game(options.mode) && options.game_dir.empty()) return "missing <game_dir>";
-  if (options.mode == RunMode::BuildGame && options.build_dir.empty()) return "missing <out_dir>";
+  if (lacks_game(options)) return "missing <game_dir>";
+  if (lacks_out_dir(options)) return "missing <out_dir>";
   return {};
 }
 
@@ -204,7 +137,7 @@ GameWindowOptions developer_play_options(const CliOptions& options, GpuChoice gp
 CliResult parse_cli(const std::vector<std::string>& args) {
   Reading reading(args);
   read_command(reading);
-  while (!reading.done && reading.next < args.size()) read_argument(reading);
+  while (reading.more()) read_argument(reading);
   if (reading.done) return reading.result;
   reading.result.error = problem_with(reading);
   reading.result.ok = reading.result.error.empty();

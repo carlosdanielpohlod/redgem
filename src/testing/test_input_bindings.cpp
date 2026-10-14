@@ -12,6 +12,7 @@
 namespace redgem::testing {
 namespace {
 
+using binding::known;
 using binding::to_name;
 
 // Where the VM keeps the pointer to the source its TestInput drives: a variable of the module
@@ -22,9 +23,7 @@ constexpr const char* kSourceVariable = "__driven_input";
 
 Key key_named(mrb_state* mrb, mrb_value name) {
   const std::string key_name = to_name(mrb, name);
-  const auto key = key_from_name(key_name);
-  if (!key) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown key :%s", key_name.c_str());
-  return *key;
+  return known(mrb, key_from_name(key_name), "unknown key :%s", key_name);
 }
 
 mrb_value set_key(mrb_state* mrb, mrb_value) {
@@ -67,9 +66,8 @@ mrb_value set_mouse_button(mrb_state* mrb, mrb_value) {
   mrb_bool down = false;
   mrb_get_args(mrb, "ob", &name, &down);
   const std::string button_name = to_name(mrb, name);
-  const auto button = mouse_button_from_name(button_name);
-  if (!button) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown mouse button :%s", button_name.c_str());
-  driven_input(mrb).set_mouse_button(*button, down);
+  const MouseButton button = known(mrb, mouse_button_from_name(button_name), "unknown mouse button :%s", button_name);
+  driven_input(mrb).set_mouse_button(button, down);
   return mrb_nil_value();
 }
 
@@ -85,9 +83,8 @@ mrb_value set_gamepad_axis(mrb_state* mrb, mrb_value) {
   mrb_float value = 0.0;
   mrb_get_args(mrb, "of", &name, &value);
   const std::string axis_name = to_name(mrb, name);
-  const auto axis = gamepad_axis_from_name(axis_name);
-  if (!axis) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown gamepad axis :%s", axis_name.c_str());
-  driven_input(mrb).set_gamepad_axis(*axis, static_cast<float>(value));
+  const GamepadAxis axis = known(mrb, gamepad_axis_from_name(axis_name), "unknown gamepad axis :%s", axis_name);
+  driven_input(mrb).set_gamepad_axis(axis, static_cast<float>(value));
   return mrb_nil_value();
 }
 
@@ -96,9 +93,9 @@ mrb_value set_gamepad_button(mrb_state* mrb, mrb_value) {
   mrb_bool down = false;
   mrb_get_args(mrb, "ob", &name, &down);
   const std::string button_name = to_name(mrb, name);
-  const auto button = gamepad_button_from_name(button_name);
-  if (!button) mrb_raisef(mrb, E_ARGUMENT_ERROR, "unknown gamepad button :%s", button_name.c_str());
-  driven_input(mrb).set_gamepad_button(*button, down);
+  const GamepadButton button =
+      known(mrb, gamepad_button_from_name(button_name), "unknown gamepad button :%s", button_name);
+  driven_input(mrb).set_gamepad_button(button, down);
   return mrb_nil_value();
 }
 

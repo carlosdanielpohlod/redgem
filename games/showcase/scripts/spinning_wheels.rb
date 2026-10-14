@@ -8,7 +8,7 @@ class SpinningWheels < Behaviour
 
   def start
     @wheels = game_object.children.select { |child| child.name.include?("Wheel") }
-    @driver = game_object.behaviours.find { |behaviour| !behaviour.equal?(self) && behaviour.respond_to?(:speed) }
+    @driver = game_object.behaviours.find { |behaviour| drives?(behaviour) }
     @radius = prop(:wheel_radius, DEFAULT_RADIUS)
     @direction = prop(:reversed, false) ? 1.0 : -1.0
   end
@@ -19,4 +19,9 @@ class SpinningWheels < Behaviour
     degrees = @driver.speed / @radius * DEGREES_PER_RADIAN * dt * @direction
     @wheels.each { |wheel| wheel.transform.rotate(Vector3.new(degrees, 0, 0)) }
   end
+
+  private
+
+  # Whether another script of the object says how fast the car goes.
+  def drives?(behaviour) = !behaviour.equal?(self) && behaviour.respond_to?(:speed)
 end

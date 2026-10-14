@@ -3,6 +3,9 @@
 #include <chrono>
 #include <iostream>
 
+#include <algorithm>
+
+#include "core/command_line.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 
@@ -13,8 +16,6 @@ namespace {
 constexpr std::size_t kPortDigits = 5;
 constexpr int kLargestPort = 65535;
 constexpr const char* kDigits = "0123456789";
-constexpr const char* kHelpOption = "--help";
-constexpr const char* kShortHelpOption = "-h";
 constexpr const char* kPortOption = "--port";
 constexpr std::size_t kPortWords = 2;  // the option and its number
 
@@ -36,11 +37,12 @@ RelayCommand refused(const std::string& why) {
 }
 
 bool asks_for_help(const std::vector<std::string>& args) {
-  for (const std::string& arg : args) {
-    if (arg == kHelpOption || arg == kShortHelpOption) return true;
-  }
-  return false;
+  return std::any_of(args.begin(), args.end(), command_line::asks_for_help);
 }
+
+// Whether a line that starts with --port is that option and its number, and nothing more. (One
+// option, said once: anything after its value has no place on the line.)
+bool names_a_port(const std::vector<std::string>& args) { return args.size() == kPortWords && is_port(args.back()); }
 
 void report_rooms(const RelayServer& relay, std::size_t& rooms) {
   if (relay.room_count() == rooms) return;
@@ -78,10 +80,10 @@ RelayCommand parse_relay_command(const std::vector<std::string>& args) {
   RelayCommand command;
   command.ok = true;
   command.help = asks_for_help(args);
-  if (command.help || args.empty()) return command;
+  if (command.help) return command;
+  if (args.empty()) return command;
   if (args.front() != kPortOption) return refused("unexpected argument " + args.front());
-  // (One option, said once: anything after its value has no place on the line.)
-  if (args.size() != kPortWords || !is_port(args.back())) return refused("--port needs a number up to 65535");
+  if (!names_a_port(args)) return refused("--port needs a number up to 65535");
   // (Port 0 is no port to meet on: it stands for the usual one.)
   const int port = std::stoi(args.back());
   if (port != 0) command.port = static_cast<std::uint16_t>(port);

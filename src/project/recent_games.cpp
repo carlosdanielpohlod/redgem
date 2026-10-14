@@ -1,12 +1,12 @@
 #include "project/recent_games.hpp"
 
 #include <algorithm>
-#include <fstream>
 #include <string>
 
 #include <nlohmann/json.hpp>
 
-#include "core/config.hpp"
+#include "app/json_file.hpp"
+#include "app/scene_files.hpp"
 #include "core/files.hpp"
 #include "core/platform.hpp"
 
@@ -18,13 +18,6 @@ constexpr const char* kGamesFolderName = "RedGemGames";
 constexpr const char* kRecentFileName = "recent.json";
 constexpr std::size_t kMaxRecentGames = 12;
 
-// What a JSON file holds; a discarded value (no object, no array) when it is missing or broken.
-nlohmann::json read_json(const std::filesystem::path& file) {
-  std::ifstream in(file);
-  if (!in) return nlohmann::json(nlohmann::json::value_t::discarded);
-  return nlohmann::json::parse(in, nullptr, false);
-}
-
 }  // namespace
 
 std::vector<std::filesystem::path> find_games(const std::filesystem::path& folder) {
@@ -32,9 +25,8 @@ std::vector<std::filesystem::path> find_games(const std::filesystem::path& folde
   std::error_code fs_error;
   for (const auto& entry : std::filesystem::directory_iterator(folder, fs_error)) {
     // Unreadable folders (other users' temp dirs...) are simply skipped.
-    if (entry.is_directory(fs_error) && std::filesystem::exists(entry.path() / config::kSceneFileName, fs_error)) {
-      games.push_back(entry.path());
-    }
+    if (!entry.is_directory(fs_error)) continue;
+    if (is_game_folder(entry.path())) games.push_back(entry.path());
   }
   std::sort(games.begin(), games.end());
   return games;
@@ -46,13 +38,12 @@ std::filesystem::path recent_games_file() { return platform::user_data_dir() / k
 
 std::vector<std::filesystem::path> read_recent_games(const std::filesystem::path& file) {
   std::vector<std::filesystem::path> games;
-  const nlohmann::json json = read_json(file);
+  const nlohmann::json json = read_json_file(file);
   if (!json.is_array()) return games;
-  std::error_code fs_error;
   for (const nlohmann::json& entry : json) {
     if (!entry.is_string()) continue;
     const std::filesystem::path game = entry.get<std::string>();
-    if (std::filesystem::exists(game / config::kSceneFileName, fs_error)) games.push_back(game);
+    if (is_game_folder(game)) games.push_back(game);
   }
   return games;
 }

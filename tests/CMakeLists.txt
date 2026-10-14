@@ -4,6 +4,8 @@ add_executable(redgem_tests
   unit/fixed_clock_test.cpp
   unit/log_test.cpp
   unit/files_test.cpp
+  unit/command_line_test.cpp
+  unit/names_test.cpp
   unit/embed_test.cpp
   unit/platform_test.cpp
   unit/property_test.cpp
@@ -64,9 +66,13 @@ add_executable(redgem_tests
   unit/touch_input_source_test.cpp
   unit/android_package_test.cpp
   unit/game_settings_test.cpp
+  unit/json_file_test.cpp
+  unit/game_build_test.cpp
   unit/frame_buffer_test.cpp
   unit/wire_test.cpp
   unit/lan_discovery_test.cpp
+  unit/nearby_games_test.cpp
+  unit/network_event_test.cpp
   unit/relay_program_test.cpp
   unit/particles_test.cpp
   unit/animation_player_test.cpp
@@ -109,7 +115,8 @@ add_executable(redgem_testing_tests
   testing/test_cli_test.cpp
   testing/test_saves_test.cpp
   testing/frame_pictures_test.cpp
-  testing/test_library_test.cpp)
+  testing/test_library_test.cpp
+  testing/test_stage_test.cpp)
 target_link_libraries(redgem_testing_tests PRIVATE redgem_testing doctest::doctest)
 target_include_directories(redgem_testing_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(redgem_testing_tests PRIVATE

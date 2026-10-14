@@ -1,26 +1,25 @@
 #include "testing/test_cli.hpp"
 
-#include <algorithm>
-#include <iterator>
-
+#include "core/command_line.hpp"
 #include "core/files.hpp"
-#include "app/user_settings.hpp"
-#include "core/config.hpp"
+#include "testing/test_cli_reading.hpp"
 #include "testing/testing_config.hpp"
 
 namespace redgem::testing {
+
+namespace cli {
+
+void fail(Reading& reading, const std::string& message) {
+  reading.result.ok = false;
+  reading.result.error = message;
+  reading.done = true;
+}
+
+}  // namespace cli
+
 namespace {
 
-constexpr char kOptionMark = '-';  // what every option starts with
-
-// The words of a command line.
-constexpr const char* kHelpOption = "--help";
-constexpr const char* kShortHelpOption = "-h";
-constexpr const char* kRubyOption = "--ruby";
-constexpr const char* kScreenshotsOption = "--screenshots";
-constexpr const char* kHeadlessOption = "--headless";
-constexpr const char* kGpuOption = "--gpu";
-constexpr const char* kWorkOption = "--work";
+using cli::Reading;
 
 constexpr const char* kUsageText =
     "redgem-test runs the tests of a game. It is a development tool: built games do not have it.\n"
@@ -38,93 +37,6 @@ constexpr const char* kUsageText =
     "\n"
     "It exits with 0 when the tests pass and with 1 when they do not.\n";
 
-// A command line being read: what was understood so far, and how far the reading got.
-struct Reading {
-  explicit Reading(const std::vector<std::string>& line) : args(line) {}
-
-  const std::vector<std::string>& args;
-  std::size_t next = 0;  // the argument to read next
-  TestCliResult result;
-  bool done = false;  // an error or --help ended the reading
-};
-
-void fail(Reading& reading, const std::string& message) {
-  reading.result.ok = false;
-  reading.result.error = message;
-  reading.done = true;
-}
-
-bool is_option(const std::string& arg) { return !arg.empty() && arg[0] == kOptionMark; }
-
-// What the option just read was given: the next argument, unless it is missing or is itself an option.
-std::optional<std::string> value(Reading& reading) {
-  if (reading.next >= reading.args.size() || is_option(reading.args[reading.next])) return std::nullopt;
-  return reading.args[reading.next++];
-}
-
-void read_help(Reading& reading) {
-  reading.result.options = TestCliOptions{};
-  reading.result.options.mode = TestMode::Help;  // help wins over anything else on the line
-  reading.result.ok = true;
-  reading.done = true;
-}
-
-void read_ruby(Reading& reading) {
-  const auto file = value(reading);
-  if (!file) {
-    fail(reading, "--ruby needs a file");
-    return;
-  }
-  reading.result.options.mode = TestMode::RubyTests;
-  reading.result.options.test_file = *file;
-}
-
-void read_screenshots(Reading& reading) {
-  const auto folder = value(reading);
-  if (!folder) {
-    fail(reading, "--screenshots needs a directory");
-    return;
-  }
-  reading.result.options.screenshot_dir = *folder;
-}
-
-void read_work(Reading& reading) {
-  const auto folder = value(reading);
-  if (!folder) {
-    fail(reading, "--work needs a directory");
-    return;
-  }
-  reading.result.options.work_dir = *folder;
-}
-
-void read_headless(Reading& reading) { reading.result.options.headless = true; }
-
-void read_gpu(Reading& reading) {
-  const auto name = value(reading);
-  if (!name || !gpu_choice_from_name(*name)) {
-    fail(reading, "--gpu needs auto, dedicated or integrated");
-    return;
-  }
-  reading.result.options.gpu = *name;
-}
-
-struct Option {
-  const char* name;
-  void (*read)(Reading&);
-};
-constexpr Option kOptions[] = {
-    {kHelpOption, read_help},         {kShortHelpOption, read_help},
-    {kRubyOption, read_ruby},         {kScreenshotsOption, read_screenshots},
-    {kHeadlessOption, read_headless}, {kGpuOption, read_gpu},
-    {kWorkOption, read_work},
-};
-
-const Option* find_option(const std::string& arg) {
-  const auto* found = std::find_if(std::begin(kOptions), std::end(kOptions),
-                                   [&arg](const Option& option) { return arg == option.name; });
-  return found != std::end(kOptions) ? found : nullptr;
-}
-
 // An argument that is no option: the game's folder, then the system test's file.
 void read_path(Reading& reading, const std::string& arg) {
   TestCliOptions& options = reading.result.options;
@@ -133,16 +45,16 @@ void read_path(Reading& reading, const std::string& arg) {
   } else if (options.test_file.empty()) {
     options.test_file = arg;
   } else {
-    fail(reading, "unexpected argument " + arg);
+    cli::fail(reading, "unexpected argument " + arg);
   }
 }
 
 void read_argument(Reading& reading) {
   const std::string& arg = reading.args[reading.next++];
-  if (const Option* option = find_option(arg)) {
+  if (const cli::Option* option = cli::find_option(arg)) {
     option->read(reading);
-  } else if (is_option(arg)) {
-    fail(reading, "unknown option " + arg);
+  } else if (command_line::is_option(arg)) {
+    cli::fail(reading, "unknown option " + arg);
   } else {
     read_path(reading, arg);
   }
@@ -171,7 +83,7 @@ std::string test_usage() { return kUsageText; }
 TestCliResult parse_test_cli(const std::vector<std::string>& args) {
   Reading reading(args);
   reading.result.options.screenshot_dir = config::kDefaultScreenshotDir;
-  while (!reading.done && reading.next < args.size()) read_argument(reading);
+  while (reading.more()) read_argument(reading);
   if (reading.done) return reading.result;
   reading.result.error = problem_with(reading.result.options);
   reading.result.ok = reading.result.error.empty();

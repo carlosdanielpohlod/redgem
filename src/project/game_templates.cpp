@@ -1,11 +1,6 @@
 #include "project/game_templates.hpp"
 
-#include <algorithm>
-#include <cctype>
-#include <cstdint>
-#include <cstdio>
 #include <map>
-#include <random>
 #include <string_view>
 
 #include <nlohmann/json.hpp>
@@ -23,11 +18,6 @@ constexpr const char* kTemplateInfoFile = "template.json";
 constexpr const char* kDescriptionKey = "description";
 constexpr const char* kIconKey = "icon";
 constexpr char kPathSeparator = '/';  // of the paths files are built in under
-constexpr std::size_t kMaxGameNameLength = 64;
-// A new game's id.
-constexpr char kIdJoiner = '-';
-constexpr const char* kUnnamedId = "game";  // for a name with no letter or digit to make one from
-constexpr const char* kIdDigitsFormat = "%08x";
 
 // A file built into the program, as a text of its bytes.
 std::string contents_of(const EmbeddedFile& file) {
@@ -88,21 +78,6 @@ bool name_game(const std::filesystem::path& game_dir, std::string& error) {
   return write_game_settings(game_dir, settings, error);
 }
 
-// A name in small letters and digits, with one dash for whatever else was between them.
-std::string slug_of(const std::string& name) {
-  std::string slug;
-  for (const char c : name) {
-    const auto letter = static_cast<unsigned char>(c);
-    if (std::isalnum(letter) != 0) {
-      slug.push_back(static_cast<char>(std::tolower(letter)));
-    } else if (!slug.empty() && slug.back() != kIdJoiner) {
-      slug.push_back(kIdJoiner);
-    }
-  }
-  if (!slug.empty() && slug.back() == kIdJoiner) slug.pop_back();
-  return slug.empty() ? kUnnamedId : slug;
-}
-
 }  // namespace
 
 const std::vector<GameTemplate>& game_templates() {
@@ -120,18 +95,6 @@ std::string template_names(const std::string& separator) {
   std::string names;
   for (const GameTemplate& known : game_templates()) names += (names.empty() ? "" : separator) + known.name;
   return names;
-}
-
-bool valid_game_name(const std::string& name) {
-  if (name.empty() || name.size() > kMaxGameNameLength || name.front() == ' ') return false;
-  return std::all_of(name.begin(), name.end(),
-                     [](unsigned char c) { return std::isalnum(c) != 0 || c == '_' || c == '-' || c == ' '; });
-}
-
-std::string new_game_id(const std::string& name) {
-  char digits[sizeof("ffffffff")];
-  std::snprintf(digits, sizeof(digits), kIdDigitsFormat, static_cast<std::uint32_t>(std::random_device{}()));
-  return slug_of(name) + kIdJoiner + digits;
 }
 
 bool create_game(const std::filesystem::path& game_dir, const std::string& template_name, std::string& error) {

@@ -17,14 +17,6 @@ constexpr const char* kUnknownAction = "unknown action :%s";
 
 InputState& input(mrb_state* mrb) { return *context(mrb).input; }
 
-// What a name stands for; an ArgumentError (`unknown`, which says the name where its %s is) for a
-// name that stands for nothing.
-template <typename Found>
-Found known(mrb_state* mrb, const std::optional<Found>& found, const char* unknown, const std::string& name) {
-  if (!found) mrb_raisef(mrb, E_ARGUMENT_ERROR, unknown, name.c_str());
-  return *found;
-}
-
 // The single argument of a native method, as what it names.
 Key key_arg(mrb_state* mrb) {
   const std::string name = name_arg(mrb);

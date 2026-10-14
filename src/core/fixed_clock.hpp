@@ -15,6 +15,9 @@ class FixedClock {
   float alpha() const { return accumulator_ / fixed_delta_; }
 
  private:
+  // Whether one more step is to be taken this frame, with `taken` of them already.
+  bool step_due(int taken) const;
+
   float fixed_delta_;
   float max_frame_seconds_;
   int max_steps_per_frame_;

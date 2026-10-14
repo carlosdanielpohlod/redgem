@@ -18,8 +18,7 @@ class Coin < Behaviour
   end
 
   def on_trigger_enter(other)
-    player = other.get_component(Player)
-    return if player.nil? || player.ghost?  # another player's coin is theirs to report
+    return unless Player.own?(other)  # another player's coin is theirs to report
 
     CoOp.instance.collected(name)
     collect

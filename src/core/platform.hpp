@@ -23,8 +23,13 @@ std::filesystem::path user_data_dir();
 // apps). An empty path goes back to the usual one.
 void set_user_data_dir(const std::filesystem::path& folder);
 
+// What an environment variable of this process holds; nothing when it is not set, or set to nothing.
+std::string environment(const std::string& name);
 // Sets an environment variable of this process. With `overwrite` false an existing value stays.
 void set_environment(const std::string& name, const std::string& value, bool overwrite);
+
+// A text (a path, a name) as one word of a POSIX shell's command, whatever is in it.
+std::string posix_shell_word(const std::filesystem::path& text);
 
 // The shell command that opens a file or folder with the desktop's default application, without
 // waiting for it.

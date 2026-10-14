@@ -9,6 +9,9 @@
 
 namespace redgem {
 
+// Whether a folder is a game: it holds the scene a game starts with (scene.glb).
+bool is_game_folder(const std::filesystem::path& folder);
+
 // A game's scene.glb, read (what the loader has to say about it is logged); the error when it
 // cannot be read.
 std::variant<SceneDesc, std::string> read_game_scene(const std::filesystem::path& game_dir);

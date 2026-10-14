@@ -36,11 +36,22 @@ bool is_control(char c) {
   return byte < kFirstPrintable || byte == kDelete;
 }
 
+// Whether the byte at `at` is the one that starts a control character of the second set, with
+// another after it.
+bool leads_second_set(std::string_view text, std::size_t at) {
+  return static_cast<unsigned char>(text[at]) == kSecondSetLead && at + 1 < text.size();
+}
+
 // Whether the two bytes at `at` are a control character of the second set.
 bool is_second_set_control(std::string_view text, std::size_t at) {
-  if (static_cast<unsigned char>(text[at]) != kSecondSetLead || at + 1 >= text.size()) return false;
+  if (!leads_second_set(text, at)) return false;
   const auto next = static_cast<unsigned char>(text[at + 1]);
   return next >= kSecondSetFirst && next <= kSecondSetLast;
+}
+
+// A control character that is none of `kept`.
+bool is_unkept_control(char c, std::string_view kept) {
+  return is_control(c) && kept.find(c) == std::string_view::npos;
 }
 
 // The text with '?' for each of its control characters, but for those of `kept`.
@@ -49,17 +60,25 @@ std::string without_controls(std::string_view text, std::string_view kept) {
   for (std::size_t i = 0; i < shown.size(); ++i) {
     if (is_second_set_control(shown, i)) {
       shown[i] = shown[i + 1] = kControlStandIn;
-    } else if (is_control(shown[i]) && kept.find(shown[i]) == std::string_view::npos) {
+    } else if (is_unkept_control(shown[i], kept)) {
       shown[i] = kControlStandIn;
     }
   }
   return shown;
 }
 
+// A name there is, which does not start at the root of the disk.
+bool is_relative_name(std::string_view name) { return !name.empty() && name.front() != kSeparator; }
+
+// Whether a path worked out from a folder leads to somewhere inside it.
+bool stays_below(const std::filesystem::path& below) {
+  return !below.empty() && !below.is_absolute() && *below.begin() != kParentStep;
+}
+
 }  // namespace
 
 bool safe_asset_name(std::string_view name) {
-  if (name.empty() || name.front() == kSeparator) return false;
+  if (!is_relative_name(name)) return false;
   if (name.find_first_of(kForbiddenCharacters) != std::string_view::npos) return false;
   return !has_parent_step(name);
 }
@@ -77,8 +96,7 @@ std::optional<std::filesystem::path> file_inside(const std::filesystem::path& fo
   if (fs_error) return std::nullopt;
   std::filesystem::path file = std::filesystem::weakly_canonical(root / relative, fs_error);
   if (fs_error) return std::nullopt;
-  const std::filesystem::path below = file.lexically_relative(root);
-  if (below.empty() || below.is_absolute() || *below.begin() == kParentStep) return std::nullopt;
+  if (!stays_below(file.lexically_relative(root))) return std::nullopt;
   if (!std::filesystem::is_regular_file(file, fs_error)) return std::nullopt;
   return file;
 }
@@ -87,7 +105,8 @@ std::optional<std::vector<std::uint8_t>> read_file_up_to(const std::filesystem::
   std::error_code fs_error;
   if (!std::filesystem::is_regular_file(file, fs_error)) return std::nullopt;
   const std::uintmax_t size = std::filesystem::file_size(file, fs_error);
-  if (fs_error || size > max_bytes) return std::nullopt;
+  if (fs_error) return std::nullopt;
+  if (size > max_bytes) return std::nullopt;
   std::ifstream in(file, std::ios::binary);
   std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
   // (Exactly the size it had when asked: a file that grows meanwhile is not followed.)

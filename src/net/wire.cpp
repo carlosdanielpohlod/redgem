@@ -13,7 +13,8 @@ bool acceptable_at(const nlohmann::json& data, int depth);
 
 bool acceptable_members(const nlohmann::json& object, int depth) {
   for (const auto& [key, value] : object.items()) {
-    if (key.size() > kMaxNameBytes || !acceptable_at(value, depth)) return false;
+    if (key.size() > kMaxNameBytes) return false;
+    if (!acceptable_at(value, depth)) return false;
   }
   return true;
 }
@@ -23,9 +24,14 @@ bool acceptable_elements(const nlohmann::json& array, int depth) {
                      [depth](const nlohmann::json& value) { return acceptable_at(value, depth); });
 }
 
+// Whether an array or a hash found `depth` levels down may be there, and holds no more than one may.
+bool within_limits(const nlohmann::json& data, int depth) {
+  return depth < kMaxDataDepth && data.size() <= kMaxDataMembers;
+}
+
 bool acceptable_at(const nlohmann::json& data, int depth) {
   if (!data.is_structured()) return true;
-  if (depth >= kMaxDataDepth || data.size() > kMaxDataMembers) return false;
+  if (!within_limits(data, depth)) return false;
   return data.is_object() ? acceptable_members(data, depth + 1) : acceptable_elements(data, depth + 1);
 }
 
@@ -48,13 +54,18 @@ bool is_peer_id(const nlohmann::json& entry) {
   return entry.is_number_integer() && entry >= kHostId && entry <= kLargestId;
 }
 
+// A list short enough to be the others of a game, of ids there can be.
+bool is_list_of_ids(const nlohmann::json& list) {
+  return list.is_array() && list.size() < static_cast<std::size_t>(kMaxPeers) &&
+         std::all_of(list.begin(), list.end(), is_peer_id);
+}
+
 // Who else is in a game: ids there can be, each once, and never a full game's worth (whoever is
 // told is in it too).
 bool is_list_of_peers(const nlohmann::json& message, const char* key) {
   if (!message.contains(key)) return true;
   const nlohmann::json& list = message[key];
-  if (!list.is_array() || list.size() >= static_cast<std::size_t>(kMaxPeers)) return false;
-  if (!std::all_of(list.begin(), list.end(), is_peer_id)) return false;
+  if (!is_list_of_ids(list)) return false;
   std::vector<int> ids = list.get<std::vector<int>>();
   std::sort(ids.begin(), ids.end());
   return std::adjacent_find(ids.begin(), ids.end()) == ids.end();
@@ -76,8 +87,13 @@ bool well_formed(const nlohmann::json& message) {
          (!message.contains(kData) || acceptable_data(message[kData]));
 }
 
+bool is_game_message(const nlohmann::json& message) {
+  return message[kKind] == kGameMessage && message.contains(kName);
+}
+
 bool own_id_believable(int given, bool through_relay, bool opening_room) {
-  const int lowest = through_relay && opening_room ? kHostId : kFirstGuestId;
+  const bool opens_on_relay = through_relay && opening_room;
+  const int lowest = opens_on_relay ? kHostId : kFirstGuestId;
   return given >= lowest && (!opening_room || given == kHostId);
 }
 

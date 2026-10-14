@@ -19,7 +19,7 @@ class Car < Behaviour
   def update(_dt)
     handbrake = Input.action?(:jump) ? FULL : NONE
     vehicle.drive(steering: Input.axis(:horizontal), handbrake: handbrake, **pedals(Input.axis(:vertical)))
-    reset if Input.pressed?(RESET_KEY) || transform.position.y < FALL_LIMIT
+    reset if reset_asked?
   end
 
   def speed_kmh = vehicle.speed * MS_TO_KMH
@@ -31,6 +31,9 @@ class Car < Behaviour
   end
 
   private
+
+  # By the driver, or by a car that fell off the track.
+  def reset_asked? = Input.pressed?(RESET_KEY) || transform.position.y < FALL_LIMIT
 
   # The throttle and brake for what the keys ask (-1 to 1).
   def pedals(throttle)

@@ -168,16 +168,21 @@ class TrafficCar < Behaviour
 
   # Already out of its lane and next to what it is passing: no changing its mind now.
   def committed?(standing)
-    @target_x != @lane_x && standing.any? { |neighbour| neighbour.gap < COMMITTED_GAP && beside?(neighbour, @lane_x) }
+    @target_x != @lane_x && standing.any? { |neighbour| close_beside?(neighbour) }
   end
+
+  def close_beside?(neighbour) = neighbour.gap < COMMITTED_GAP && beside?(neighbour, @lane_x)
 
   # Whether it can drive along the line at `x`: on the road, past the standing cars, and either on
   # its own half of the road or with nobody coming on the other.
   def clear_line?(x, standing, neighbours)
-    return false unless x.between?(@min_x, @max_x) && free_of?(standing, x)
+    return false unless passable?(x, standing)
 
     own_half?(x) || free_of?(neighbours.select { |neighbour| oncoming?(neighbour) }, x)
   end
+
+  # On the road, and past the cars that stand in it.
+  def passable?(x, standing) = x.between?(@min_x, @max_x) && free_of?(standing, x)
 
   # Whether none of those cars is in the way of driving along the line at `x`.
   def free_of?(cars, x) = cars.none? { |neighbour| beside?(neighbour, x) }
@@ -194,7 +199,8 @@ class TrafficCar < Behaviour
     @steering = approach(@steering, wanted_steering(off), STEERING_RATE * dt)
     sideways = @steering * @speed
     reach = off.abs / dt
-    dt.positive? && sideways.abs > reach ? reach * side_of(off) : sideways  # never past the line
+    past_the_line = dt.positive? && sideways.abs > reach
+    past_the_line ? reach * side_of(off) : sideways
   end
 
   # The share of its speed it wants to go sideways with, `off` meters from the line it heads for.

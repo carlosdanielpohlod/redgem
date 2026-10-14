@@ -87,9 +87,12 @@ module UI
   # A text without its last letter: all of that letter's bytes (accented letters take several).
   def self.chop(text)
     size = text.bytesize - 1
-    size -= 1 while size.positive? && continuation?(text.getbyte(size))
+    size -= 1 while inside_letter?(text, size)
     size.positive? ? text.byteslice(0, size) : ""
   end
+
+  # Whether the byte at `index` is one of a letter's later bytes: the letter starts before it.
+  def self.inside_letter?(text, index) = index.positive? && continuation?(text.getbyte(index))
 
   # How many letters a text has, however many bytes each takes.
   def self.letters(text) = text.bytes.count { |byte| !continuation?(byte) }
@@ -106,12 +109,16 @@ module UI
   def self.button(label, x:, y:, width:, height:, color: BUTTON_COLOR, hover_color: BUTTON_HOVER_COLOR,
                   text_color: :white, size: nil)
     over = mouse_over?(x: x, y: y, width: width, height: height)
-    fill = button_fill(over ? hover_color : color, pressed: over && Input.mouse_down?(:left))
+    fill = button_fill(over ? hover_color : color, pressed: held?(over))
     rect(x: x, y: y, width: width, height: height, color: fill, alpha: BUTTON_ALPHA, radius: BUTTON_RADIUS)
     size ||= label_size(height)
     text(label, x: centered(x, width, 0), y: centered(y, height, size), size: size, color: text_color, align: :center)
-    over && Input.mouse_released?(:left)
+    clicked?(over)
   end
+
+  # What the left button of the mouse does to a button the pointer may be `over`.
+  def self.held?(over) = over && Input.mouse_down?(:left)
+  def self.clicked?(over) = over && Input.mouse_released?(:left)
 
   # A held button is darker.
   def self.button_fill(color, pressed:) = pressed ? shade(color, PRESSED_SHADE) : rgb(color)

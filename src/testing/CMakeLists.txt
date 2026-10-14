@@ -2,10 +2,12 @@
 # (redgem-player) or of the one they are made with (redgem): neither target must ever link to
 # redgem_testing (tests/ships_no_test_code.sh checks the programs that came out).
 
-# The Ruby that tests are written with (order matters: the system test DSL uses the assertions).
+# The Ruby that tests are written with (order matters: the system test DSL uses the assertions,
+# and what a test does at the controls is added to the class the DSL defines).
 set(REDGEM_TESTING_RUBY_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/testing/test_case.rb
-  ${CMAKE_SOURCE_DIR}/ruby/testing/system_test.rb)
+  ${CMAKE_SOURCE_DIR}/ruby/testing/system_test.rb
+  ${CMAKE_SOURCE_DIR}/ruby/testing/system_test_controls.rb)
 # A folder of its own, which only this library is given: the engine cannot include it by accident.
 set(REDGEM_TESTING_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_testing_include)
 set(REDGEM_TESTING_RUBY_HEADER ${REDGEM_TESTING_GENERATED_DIR}/generated/testing_ruby.hpp)
@@ -26,8 +28,10 @@ add_library(redgem_testing STATIC
   test_library.cpp
   test_saves.cpp
   ruby_tests.cpp
+  test_stage.cpp
   system_test.cpp
-  test_cli.cpp)
+  test_cli.cpp
+  test_cli_options.cpp)
 target_include_directories(redgem_testing PRIVATE ${REDGEM_TESTING_GENERATED_DIR})
 # (It plays games as the player does: the runtime is all it stands on.)
 target_link_libraries(redgem_testing PUBLIC redgem_runtime)

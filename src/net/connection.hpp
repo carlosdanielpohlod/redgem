@@ -64,6 +64,12 @@ class Connection {
   // Whether the connection is made (a call out takes a moment; a refused one counts as hung up).
   bool established();
   std::size_t take_in();
+  // Whether nothing more goes to the other side: it hung up, or was let go.
+  bool hung_up() const { return gone_ || dropped_; }
+  // Whether what waits can be written out now: to a side that is there, over a connection that is made.
+  bool can_write() const { return !hung_up() && established_; }
+  // Whether one more message may be taken this poll (see kMaxMessagesPerPoll).
+  bool takes_more() const { return !dropped_ && taken_this_poll_ < kMaxMessagesPerPoll; }
   // The other side is gone: nothing more is sent or read, but what it said is still to be taken.
   void hang_up();
 

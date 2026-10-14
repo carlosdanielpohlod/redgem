@@ -26,6 +26,11 @@ struct NetworkEvent {
   int peer = 0;
   std::string name;
   nlohmann::json data;
+
+  // Something that happened, to or about `peer`.
+  static NetworkEvent of(Kind kind, int peer = 0);
+  // What `from` said.
+  static NetworkEvent message(int from, const std::string& name, const nlohmann::json& data);
 };
 
 // One multiplayer game over TCP (Network in Ruby). One machine hosts and the others join it;
@@ -71,11 +76,26 @@ class NetworkSession {
   struct Link {
     Connection connection;
     int peer = 0;  // 0 on the host until the newcomer said hello and was let in
+
+    bool let_in() const { return peer != 0; }
+    // In the game, and not the machine that is `other` there.
+    bool is_another_than(int other) const { return let_in() && peer != other; }
+    // A newcomer that may still say hello.
+    bool waiting() const { return !let_in() && !connection.closed(); }
   };
 
   bool connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello, std::string& error);
   // Whether this machine passes the others' messages on itself (a host reached directly).
   bool relaying() const { return id_ == kHostId && !through_relay_; }
+  // Whether `peer` is one of the others in the game.
+  bool knows(int peer) const;
+  // Whether a message for `to` is one this machine, as the host, hears itself.
+  static bool reaches_host(int to) { return to == kEveryone || to == kHostId; }
+  bool offline() const { return state_ == State::Offline; }
+  // Whether the link at that place gets its turn: there is one, and the game did not end before it.
+  bool still_serving(std::size_t link) const;
+  // Whether a link is one to keep in touch with: this machine is in the game, and so is the other.
+  bool in_touch_with(const Link& link) const;
   void announce_hosting(std::vector<NetworkEvent>& events);
   // One link's turn in a poll: what arrived is read and handled, what waits is sent.
   void serve(Link& link, float seconds, std::vector<NetworkEvent>& events);
@@ -92,14 +112,30 @@ class NetworkSession {
   // Sends a peer's message on to whom it is for; true when that includes this machine.
   bool pass_on(int from, int to, const nlohmann::json& message);
   void handle_as_guest(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  // What a machine still connecting waits for: the host's welcome, with its id and who else is here.
   void accept_welcome(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  // What a machine in the game hears from its host: who came, who went, what the others said.
+  void hear_of_the_game(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  // Whether a welcome can be believed: an id this machine can have, which the list of the others lacks.
+  bool believable_welcome(int given, const std::vector<int>& others) const;
+  // Whether a host's word that `peer` arrived can be believed: nobody arrives twice, as this
+  // machine, or as nobody.
+  bool can_arrive(int peer) const { return !knows(peer) && peer != id_ && peer >= kHostId; }
   void hear_game_message(const nlohmann::json& message, std::vector<NetworkEvent>& events);
   void peer_arrived(int peer, std::vector<NetworkEvent>& events);
   void peer_left(int peer, std::vector<NetworkEvent>& events);
   void drop_closed_links(std::vector<NetworkEvent>& events);
+  // The host's part of it: the others hear who left.
+  void farewell_closed_links(std::vector<NetworkEvent>& events);
   void end_game_if_host_gone(std::vector<NetworkEvent>& events);
+  // Whether the link to the host closed, and the game with it.
+  bool host_gone() const;
   // Forgets the links that closed; whose they were, in the order they were held (0: never let in).
   std::vector<int> take_closed_links();
+  // Whether a message may go out: from a machine in a game, to someone else, within what a message may be.
+  bool can_send(const std::string& name, const nlohmann::json& data, int to) const;
+  // Whether a guest may address `to`: everyone, the host, or someone it knows of.
+  bool can_reach(int to) const { return reaches_host(to) || knows(to); }
   bool send_through_host(const nlohmann::json& message, int to);
   bool send_as_host(const nlohmann::json& message, int to);
   void queue_for_everyone_but(int peer, const nlohmann::json& message);

@@ -2,11 +2,9 @@
 
 #include "core/platform.hpp"
 
-#include <cstdlib>
-#include <fstream>
-
 #include <nlohmann/json.hpp>
 
+#include "app/json_file.hpp"
 #include "core/files.hpp"
 
 namespace redgem {
@@ -17,19 +15,18 @@ constexpr const char* kGpuKey = "gpu";
 constexpr const char* kGpuVariable = "REDGEM_GPU";  // the user's choice of card for what is started from a shell
 constexpr int kJsonIndent = 2;
 
+// Whether the settings say which card to use, in a text.
+bool names_gpu(const nlohmann::json& settings) { return settings.is_object() && holds_text(settings, kGpuKey); }
+
 }  // namespace
 
 std::filesystem::path user_settings_file() { return platform::user_data_dir() / kSettingsFileName; }
 
 UserSettings read_user_settings(const std::filesystem::path& file) {
   UserSettings settings;
-  std::ifstream in(file);
-  if (!in) return settings;
-  const nlohmann::json json = nlohmann::json::parse(in, nullptr, false);
-  if (!json.is_object()) return settings;
-  if (json.contains(kGpuKey) && json[kGpuKey].is_string()) {
-    settings.gpu = gpu_choice_from_name(json[kGpuKey].get<std::string>()).value_or(settings.gpu);
-  }
+  const nlohmann::json json = read_json_file(file);
+  if (!names_gpu(json)) return settings;
+  settings.gpu = gpu_choice_from_name(json[kGpuKey].get<std::string>()).value_or(settings.gpu);
   return settings;
 }
 
@@ -50,9 +47,8 @@ GpuChoice resolve_gpu_choice(const std::optional<std::string>& command_line,
 }
 
 GpuChoice gpu_choice_for_run(const std::optional<std::string>& command_line) {
-  const char* variable = std::getenv(kGpuVariable);
-  const std::optional<std::string> environment =
-      variable != nullptr ? std::optional<std::string>(variable) : std::nullopt;
+  const std::string variable = platform::environment(kGpuVariable);
+  const std::optional<std::string> environment = variable.empty() ? std::nullopt : std::optional(variable);
   return resolve_gpu_choice(command_line, environment, read_user_settings(user_settings_file()));
 }
 

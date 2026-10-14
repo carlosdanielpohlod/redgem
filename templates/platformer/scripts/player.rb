@@ -38,9 +38,11 @@ class Player < Behaviour
   # Walks, jumps and turns the way the player asks.
   def move(direction)
     character.move(direction * prop(:speed, SPEED))
-    jump if Input.action_pressed?(:jump) && character.grounded?
+    jump if jump_asked?
     face(direction) unless direction == Vector3.zero
   end
+
+  def jump_asked? = Input.action_pressed?(:jump) && character.grounded?
 
   def jump
     character.jump(prop(:jump_speed, JUMP_SPEED))

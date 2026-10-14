@@ -61,14 +61,16 @@ class TrafficCar < Behaviour
   end
 
   def car_ahead?
-    Scene.find_all(:car).any? do |other|
-      next false if other == game_object
+    others = Scene.find_all(:car).reject { |other| other == game_object }
+    others.any? { |other| in_my_way?(other) }
+  end
 
-      offset = other.transform.position - transform.position
-      ahead = offset.dot(@direction)
-      sideways = (offset - @direction * ahead).length
-      ahead.positive? && ahead < SAFE_GAP + braking_distance && sideways < LANE_WIDTH
-    end
+  # Whether another car is close ahead, in this car's lane.
+  def in_my_way?(other)
+    offset = other.transform.position - transform.position
+    ahead = offset.dot(@direction)
+    sideways = (offset - @direction * ahead).length
+    ahead.positive? && ahead < SAFE_GAP + braking_distance && sideways < LANE_WIDTH
   end
 
   def braking_distance = (@speed * @speed) / (2.0 * BRAKING)

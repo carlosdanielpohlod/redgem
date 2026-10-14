@@ -5,6 +5,7 @@
 
 #include <mruby.h>
 
+#include <optional>
 #include <string>
 
 #include "core/math.hpp"
@@ -55,6 +56,13 @@ void set_entry(mrb_state* mrb, mrb_value hash, const char* key, mrb_value value)
 bool is_name(mrb_value value);
 // Accepts a Symbol or a String.
 std::string to_name(mrb_state* mrb, mrb_value value);
+// What a name stands for; an ArgumentError (`unknown`, which says the name where its %s is) for a
+// name that stands for nothing.
+template <typename Found>
+Found known(mrb_state* mrb, const std::optional<Found>& found, const char* unknown, const std::string& name) {
+  if (!found) mrb_raisef(mrb, E_ARGUMENT_ERROR, unknown, name.c_str());
+  return *found;
+}
 // The single argument of a native method: any value, a number, true or false, or a name (a
 // Symbol or a String).
 mrb_value single_arg(mrb_state* mrb);

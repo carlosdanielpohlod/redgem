@@ -11,6 +11,8 @@ using redgem::test::kTolerance;
 
 namespace {
 
+constexpr int kMadeUpIndex = -7;  // what a broken file may hold
+
 SceneDesc family() {
   SceneDesc desc;
   NodeDesc parent;
@@ -140,6 +142,7 @@ TEST_CASE("an index names one of so many things only from zero up to their count
   CHECK(is_index_of(2, 3));
   CHECK_FALSE(is_index_of(3, 3));
   CHECK_FALSE(is_index_of(kNoIndex, 3));
+  CHECK_FALSE(is_index_of(kMadeUpIndex, 3));
   CHECK_FALSE(is_index_of(0, 0));
 }
 

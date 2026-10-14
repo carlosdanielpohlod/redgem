@@ -59,9 +59,11 @@ Quat quat_from_large_m22(const Matrix3& m) {
   return {(m.m02 + m.m20) / s, (m.m12 + m.m21) / s, kQuarter * s, (m.m10 - m.m01) / s};
 }
 
+bool largest_is_m00(const Matrix3& m) { return m.m00 > m.m11 && m.m00 > m.m22; }
+
 Quat quat_from_matrix(const Matrix3& m) {
   if (m.m00 + m.m11 + m.m22 > 0.0f) return quat_from_large_trace(m);
-  if (m.m00 > m.m11 && m.m00 > m.m22) return quat_from_large_m00(m);
+  if (largest_is_m00(m)) return quat_from_large_m00(m);
   if (m.m11 > m.m22) return quat_from_large_m11(m);
   return quat_from_large_m22(m);
 }

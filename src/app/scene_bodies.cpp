@@ -92,6 +92,11 @@ void follow_body(Scene& scene, PhysicsWorld& physics, ObjectId id, const Transfo
   for (const WheelPose& wheel : physics.wheel_poses(id)) move_to(scene, wheel.object, wheel.world);
 }
 
+// Whether a body goes where its object is each step, instead of the other way round.
+bool follows_its_object(PhysicsWorld& physics, ObjectId id) {
+  return physics.body_type(id) == BodyType::Kinematic || physics.is_trigger(id);
+}
+
 }  // namespace
 
 void create_all(const Source& source, PhysicsWorld& physics) {
@@ -111,9 +116,7 @@ void create(const Source& source, PhysicsWorld& physics, ObjectId id) {
 void push_poses(const Scene& scene, PhysicsWorld& physics) {
   for (const ObjectId id : scene.alive_ids()) {
     if (!physics.has_object(id)) continue;
-    if (physics.body_type(id) == BodyType::Kinematic || physics.is_trigger(id)) {
-      physics.set_target_pose(id, scene.world_transform(id));
-    }
+    if (follows_its_object(physics, id)) physics.set_target_pose(id, scene.world_transform(id));
   }
 }
 

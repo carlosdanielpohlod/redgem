@@ -4,24 +4,12 @@
 #include <filesystem>
 #include <string>
 
+#include "app/android_settings.hpp"
+
 // game.json: what a game says about itself. This is the one place that reads the file.
 namespace redgem {
 
 inline constexpr const char* kGameSettingsFile = "game.json";
-
-// What a game says about its Android app, in the "android" section of its game.json. All of it
-// is optional: a game that says nothing gets an id made from its folder name, version 1.0, and
-// a key the engine makes on this machine.
-//   "android": { "package": "com.mystudio.mygame", "version_code": 3, "version_name": "1.2",
-//                "keystore": "release.keystore", "key_alias": "mygame" }
-struct AndroidSettings {
-  std::string package;               // the app's id; empty for one made from the folder name
-  int version_code = 1;              // goes up with every release: Android updates only to higher ones
-  std::string version_name = "1.0";  // what players see
-  std::filesystem::path
-      keystore;           // the developer's own signing key (relative to the game folder); empty for the engine's
-  std::string key_alias;  // the key's name inside that keystore
-};
 
 struct GameSettings {
   std::string title;
@@ -52,10 +40,6 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir);
 // with a letter or a digit, with no two dots in a row, up to kMaxGameIdLength long.
 inline constexpr std::size_t kMaxGameIdLength = 100;
 bool valid_game_id(const std::string& id);
-// Whether a text can be an Android app's id: at least two parts joined by dots, each a small
-// letter followed by small letters, digits or underscores ("com.mystudio.my_game").
-bool valid_android_package(const std::string& package);
-
 // The settings alone, for whoever has no use for what is wrong with the file.
 GameSettings read_game_settings(const std::filesystem::path& game_dir);
 // Writes the title, the window's size and the id (when the settings have one). What else the file

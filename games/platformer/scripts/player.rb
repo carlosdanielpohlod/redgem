@@ -14,6 +14,12 @@ class Player < Behaviour
     @respawns = 0
   end
 
+  # Whether an object is the hero this machine plays: not something else, nor another player's hero.
+  def self.own?(object)
+    player = object.get_component(Player)
+    !player.nil? && !player.ghost?
+  end
+
   # Another player's hero: it goes where their machine says (see CoOp).
   def ghost?
     sync = get_component(NetworkSync)

@@ -34,10 +34,6 @@ constexpr int kWindowWidth = 1280;  // pixels
 constexpr int kQuarter = 4;
 constexpr int kQuarterWidth = 320;
 constexpr int kTinyTarget = 3;  // pixels: smaller than the factor it is divided by
-constexpr std::size_t kThreeThings = 3;
-constexpr int kLastOfThree = 2;
-constexpr int kPastTheEnd = 3;
-constexpr int kMadeUpIndex = -7;  // what a broken file may hold
 constexpr float kWind = 0.4f;
 constexpr float kMaskCutoff = 0.6f;
 constexpr int kSomeImage = 3;        // index of a texture
@@ -139,15 +135,6 @@ TEST_CASE("the graphics card's name is read from the line that names it and from
 TEST_CASE("a smaller target is a fraction of the picture but never empty") {
   CHECK(downscaled(kWindowWidth, kQuarter) == kQuarterWidth);
   CHECK(downscaled(kTinyTarget, kQuarter) == 1);
-}
-
-TEST_CASE("an index names a thing only when it is one of those there are") {
-  CHECK(names_one_of(0, kThreeThings));
-  CHECK(names_one_of(kLastOfThree, kThreeThings));
-  CHECK_FALSE(names_one_of(kPastTheEnd, kThreeThings));
-  CHECK_FALSE(names_one_of(kNoIndex, kThreeThings));
-  CHECK_FALSE(names_one_of(kMadeUpIndex, kThreeThings));
-  CHECK_FALSE(names_one_of(0, 0));
 }
 
 TEST_CASE("opaque materials are drawn whole, still and one-sided") {

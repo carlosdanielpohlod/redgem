@@ -22,6 +22,8 @@ inline constexpr std::size_t kMaxRelayBufferedBytes = 256 * 1024 * 1024;
 // a few of the longest messages. Far more than a game says; a machine past it is let go.
 inline constexpr float kRelayBytesPerSecond = 1024.0f * 1024.0f;
 inline constexpr float kRelayBurstBytes = 4.0f * kRelayBytesPerSecond;
+// Machines a relay serves at once.
+inline constexpr std::size_t kMaxRelayConnections = 1024;
 // How long a relay that could not take a newcomer (the system had no connection left to give)
 // leaves the ones waiting alone before it tries again.
 inline constexpr float kAcceptRestSeconds = 0.25f;
@@ -66,12 +68,26 @@ class RelayServer {
     int peer = 0;
     float allowance = kRelayBurstBytes;  // bytes it may still send now (see kRelayBytesPerSecond)
     bool farewelled = false;             // the others in its room were told it is gone
+
+    bool in_room() const { return peer != 0; }
+    bool connected_from(const std::string& address) const {
+      return !connection.closed() && connection.address() == address;
+    }
+    // Whether it opened a room and still holds it: a room ends with whoever opened it.
+    bool holds_room() const { return peer == kHostId && !connection.closed(); }
+    bool inside(const std::string& code) const { return in_room() && !connection.closed() && room == code; }
+    // Gone, with the others in its room not told yet.
+    bool left_untold() const { return connection.closed() && !farewelled; }
   };
   // What is remembered about an address: its wrong guesses at room codes (forgotten with time),
   // and for how long it is kept out for guessing too much.
   struct Visitor {
     float wrong_codes = 0.0f;
     float kept_out_for = 0.0f;
+
+    bool kept_out() const { return kept_out_for > 0.0f; }
+    // Nothing is held against it any more: it need not be remembered.
+    bool forgiven() const { return !kept_out() && wrong_codes <= 0.0f; }
   };
 
   void accept_newcomers();
@@ -99,6 +115,8 @@ class RelayServer {
   static bool has_opener(const std::vector<Member*>& inside);
   // Tells each room which of its members just went; true when some room was told.
   bool tell_rooms_who_left();
+  // Whether a member that left was a guest of a room that is still open: someone is there to tell.
+  bool missed_by_a_room(const Member& member) const;
   void tell_room(const std::string& room, int except, const nlohmann::json& message);
   std::vector<Member*> members_of(const std::string& room);
   // A code no open room has; empty when none was found.

@@ -44,6 +44,9 @@ class ProjectHub {
 
  private:
   void refresh_games();
+  bool waiting_for_choice() const;
+  // A path as the hub shows it, with the home folder shortened.
+  static std::string shown_path(const std::filesystem::path& path);
   void draw();
   void draw_title();
   void draw_new_game(float width);

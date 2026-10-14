@@ -1,25 +1,20 @@
+// Engine: starting a game up, part by part.
+
 #include "app/engine.hpp"
 
-#include <algorithm>
 #include <string>
 
 #include "app/save_location.hpp"
 #include "app/scene_bodies.hpp"
 #include "app/scene_files.hpp"
-#include "app/touch_circles.hpp"
 #include "core/config.hpp"
-#include "core/exit_codes.hpp"
 #include "core/log.hpp"
-#include "physics/physics_config.hpp"
-#include "scene/animation.hpp"
 
 namespace redgem {
 namespace {
 
 // What follows the word that a game's id cannot be used.
 constexpr const char* kSavedByFolderNote = ". Until it is put right, the game's save goes by where its folder is";
-
-Vec3 gravity() { return {0.0f, config::kGravityY, 0.0f}; }
 
 }  // namespace
 
@@ -64,8 +59,7 @@ void Engine::build_world() {
   scene_ = Scene::from_desc(scene_desc_);
   animations_.reset(scene_desc_.animations, scene_);
   particles_.set_gravity(gravity());
-  physics_ = create_jolt_physics_world(gravity());
-  bodies::create_all({scene_, scene_desc_}, *physics_);
+  make_bodies();
 }
 
 void Engine::open_presenter(const GameSettings& settings) {
@@ -125,165 +119,5 @@ void Engine::start_scripts() {
 }
 
 AudioSystem& Engine::audio() { return options_.audio != nullptr ? *options_.audio : *owned_audio_; }
-
-void Engine::switch_to(const std::string& name, SceneDesc desc) {
-  // The Ruby VM survives (globals, loaded classes); the objects, bodies and behaviours do not.
-  scripts_->reset_scene();
-  scripts_->scene_was_reset();
-  replace_world(std::move(desc));
-  context_.scene_name = name;
-  ++scene_generation_;
-  animations_.reset(scene_desc_.animations, scene_);
-  particles_.clear();
-  scripts_->attach_scripts();
-  scripts_->run_scene_script(name);
-}
-
-void Engine::replace_world(SceneDesc desc) {
-  scene_desc_ = std::move(desc);
-  scene_ = Scene::from_desc(scene_desc_);
-  physics_ = create_jolt_physics_world(gravity());
-  context_.physics = physics_.get();
-  bodies::create_all({scene_, scene_desc_}, *physics_);
-}
-
-ObjectId Engine::spawn(ObjectId source, const std::optional<Transform>& world, bool physics) {
-  if (!scene_.is_alive(source)) return kNoObject;
-  const std::vector<ObjectId> created = scene_.clone(source);
-  if (world) {
-    Transform placed = *world;
-    placed.scale = scene_.world_transform(created.front()).scale;
-    scene_.set_world_transform(created.front(), placed);
-  }
-  if (physics) {
-    for (const ObjectId id : created) bodies::create({scene_, scene_desc_}, *physics_, id);
-  }
-  for (const ObjectId id : created) scripts_->attach_object(id);
-  return created.front();
-}
-
-bool Engine::finished() const { return context_.quit_requested || !presenter_->open(); }
-
-void Engine::frame(float frame_seconds) {
-  read_input();
-  context_.hud.clear();
-  scripts_->start_pending();
-  poll_network(frame_seconds);
-  follow_presenter();
-  advance_game(frame_seconds);
-  present();
-  audio().update();
-  ++context_.time.frame;
-  switch_scene_if_asked();
-}
-
-void Engine::read_input() {
-  input_source().show_touch_controls(context_.touch_controls);
-  const SurfaceSize surface = presenter_->surface_size();
-  input_source().fit_surface(static_cast<float>(surface.width), static_cast<float>(surface.height));
-  input_.update(input_source());
-}
-
-InputSource& Engine::input_source() {
-  if (options_.input != nullptr) return *options_.input;
-  return scripted_input_;
-}
-
-void Engine::poll_network(float frame_seconds) {
-  // On the real clock: the network does not pause with the game.
-  for (const net::NetworkEvent& event : network_.poll(frame_seconds)) scripts_->dispatch(event);
-  // A game hosted on this machine's own port answers the neighbours looking for one.
-  if (!network_.hosting() || !network_.room().empty()) discovery_.stop_announcing();
-  discovery_.set_players(static_cast<int>(network_.peers().size()) + 1);
-  discovery_.update(frame_seconds);
-}
-
-void Engine::follow_presenter() {
-  const SurfaceSize size = presenter_->surface_size();
-  context_.screen_width = size.width;
-  context_.screen_height = size.height;
-  presenter_->capture_cursor(context_.mouse_locked);
-}
-
-void Engine::advance_game(float frame_seconds) {
-  // Time.scale slows or stops the simulation (0 pauses it); behaviours still get their update,
-  // with a shorter delta, so menus work while the game is paused.
-  const float scale = context_.time.scale;
-  const int steps = fixed_steps_due(frame_seconds, scale);
-  for (int i = 0; i < steps; ++i) fixed_step(config::kFixedDeltaSeconds);
-  // A long stall (a dragged window, a loading hitch) counts as one long frame, not as seconds of game.
-  const float unscaled =
-      options_.fixed_step ? config::kFixedDeltaSeconds : std::min(frame_seconds, config::kMaxFrameSeconds);
-  update_frame(unscaled * scale);
-}
-
-int Engine::fixed_steps_due(float frame_seconds, float scale) {
-  if (!options_.fixed_step) return clock_.advance(frame_seconds * scale);
-  pending_steps_ += scale;
-  const int steps = static_cast<int>(pending_steps_);
-  pending_steps_ -= static_cast<float>(steps);
-  return steps;
-}
-
-void Engine::update_frame(float delta) {
-  context_.time.delta = delta;
-  // Every animation of the scene plays in a loop unless a script said otherwise (Animation);
-  // scripts run after and may override poses.
-  animations_.advance(delta, scene_);
-  particles_.update(delta);
-  scripts_->update(delta);
-  process_destroyed();
-}
-
-void Engine::switch_scene_if_asked() {
-  if (!context_.requested_scene) return;
-  const std::string name = *context_.requested_scene;
-  context_.requested_scene.reset();
-  std::optional<SceneDesc> scene = read_scene(options_.game_dir, name);
-  if (!scene) return;
-  switch_to(name, std::move(*scene));
-  log::info("scene '" + name + "' loaded");
-}
-
-void Engine::fixed_step(float dt) {
-  context_.time.delta = dt;
-  scripts_->fixed_update(dt);
-  process_destroyed();
-  bodies::push_poses(scene_, *physics_);
-  physics_->step(dt);
-  bodies::pull_poses(scene_, *physics_);
-  for (const ContactEvent& event : physics_->drain_events()) {
-    if (scene_.is_alive(event.self) && scene_.is_alive(event.other)) scripts_->dispatch(event);
-  }
-  process_destroyed();
-  context_.time.elapsed += dt;
-}
-
-void Engine::process_destroyed() {
-  // on_destroy callbacks may destroy more objects, so repeat until nothing is pending.
-  for (std::vector<ObjectId> pending = scene_.pending_destroy_ids(); !pending.empty();
-       pending = scene_.pending_destroy_ids()) {
-    // Every object of the batch (e.g. a parent and its children) runs on_destroy while the
-    // whole batch is still alive, then the batch is torn down.
-    for (const ObjectId id : pending) scripts_->on_destroyed(id);
-    for (const ObjectId id : pending) scripts_->detach(id);
-    for (const ObjectId id : pending) {
-      physics_->remove_object(id);
-      scene_.finalize_destroy(id);
-    }
-  }
-}
-
-void Engine::present() {
-  const TouchLayout* touch = input_source().touch_layout();
-  controls_ = touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>();
-  presenter_->present(
-      {scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur, controls_, images_dir_});
-}
-
-int Engine::run() {
-  while (!finished()) frame(presenter_->frame_seconds());
-  return kExitSuccess;
-}
 
 }  // namespace redgem

@@ -90,11 +90,11 @@ class RaylibAudio final : public AudioSystem {
 
  private:
   std::optional<std::filesystem::path> resolve(const std::string& name) {
-    const auto file = find_sound_file(sounds_dir_, name);
-    if (!file && missing_.insert(name).second) {
-      log::warning("sound '" + name + "' not found in " + sounds_dir_.string());
-    }
-    return file;
+    auto file = find_sound_file(sounds_dir_, name);
+    if (file) return file;
+    // (Said once for each name: a game asks for the same sound every time it plays it.)
+    if (missing_.insert(name).second) log::warning("sound '" + name + "' not found in " + sounds_dir_.string());
+    return std::nullopt;
   }
 
   bool ready_ = false;

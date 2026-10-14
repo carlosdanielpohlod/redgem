@@ -42,6 +42,12 @@ std::optional<std::filesystem::path> build_game_for(const std::filesystem::path&
                                                     const std::filesystem::path& out_dir, BuildTarget target,
                                                     std::string& error);
 
+// What every build checks before it starts, each false with `error` saying why not: that what is
+// built is a game, and that the build does not go into the game it copies.
+bool is_game_to_build(const std::filesystem::path& game_dir, std::string& error);
+bool builds_outside_game(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
+                         std::string& error);
+
 // Whether `folder` is `outer` itself or somewhere inside it, by their real locations (a build
 // must not go into the game it copies).
 bool folder_inside(const std::filesystem::path& folder, const std::filesystem::path& outer);

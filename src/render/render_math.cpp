@@ -67,8 +67,6 @@ std::optional<std::string> graphics_card_name(const std::string& trace_line) {
 
 int downscaled(int size, int factor) { return std::max(size / factor, kSmallestTarget); }
 
-bool names_one_of(int index, std::size_t count) { return index >= 0 && static_cast<std::size_t>(index) < count; }
-
 // --- Materials -------------------------------------------------------------------------------
 
 AlphaTest alpha_test(const MaterialDesc& material, float wind) {

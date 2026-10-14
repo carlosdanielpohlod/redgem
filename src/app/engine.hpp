@@ -104,6 +104,10 @@ class Engine {
   void connect_context();
   void start_scripts();
 
+  static Vec3 gravity();
+  // A physics world of its own for the scene in place, with a body for every object that asks for one.
+  void make_bodies();
+
   // Makes a scene that was loaded the one that runs, under `name`.
   void switch_to(const std::string& name, SceneDesc desc);
   // Puts a newly loaded scene, with its bodies, in place of the running one.
@@ -113,6 +117,9 @@ class Engine {
   void read_input();
   InputSource& input_source();
   void poll_network(float frame_seconds);
+  // Whether the game is one the neighbours looking for a game are told of: hosted on this
+  // machine's own port, and not as a room on a relay.
+  bool found_by_neighbours() const;
   void follow_presenter();
   void advance_game(float frame_seconds);
   // Fixed steps to run this frame, with the game's time scaled by `scale`.
@@ -121,6 +128,8 @@ class Engine {
   void switch_scene_if_asked();
 
   void fixed_step(float dt);
+  // Whether a contact is between two objects that are both still there to hear of it.
+  bool both_alive(const ContactEvent& event) const;
   void process_destroyed();
 
   EngineOptions options_;

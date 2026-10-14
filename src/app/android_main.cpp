@@ -84,11 +84,16 @@ int copy_game_files(AAssetManager* assets, const std::filesystem::path& home) {
   return copied;
 }
 
+// Whether the game of this very build is in the app's storage already: its stamp is the one kept there.
+bool already_unpacked(const std::string& stamp, const std::filesystem::path& stamp_file) {
+  return !stamp.empty() && read_file(stamp_file) == stamp;
+}
+
 // Copies the game out of the APK unless this build of it is already there.
 bool unpack_game(AAssetManager* assets, const std::filesystem::path& home) {
   const std::string stamp = read_asset(assets, kAndroidStampAsset);
   const std::filesystem::path stamp_file = home / kAndroidStampAsset;
-  if (!stamp.empty() && read_file(stamp_file) == stamp) return true;
+  if (already_unpacked(stamp, stamp_file)) return true;
   std::error_code ignored;
   std::filesystem::remove_all(home / kBundledGameFolder, ignored);
   const int copied = copy_game_files(assets, home);
@@ -103,8 +108,9 @@ bool unpack_game(AAssetManager* assets, const std::filesystem::path& home) {
 float screen_aspect(const android_app* app) {
   const float one_side = static_cast<float>(AConfiguration_getScreenWidthDp(app->config));
   const float other_side = static_cast<float>(AConfiguration_getScreenHeightDp(app->config));
-  if (one_side <= 0.0f || other_side <= 0.0f) return 0.0f;
-  return std::max(one_side, other_side) / std::min(one_side, other_side);
+  // (A screen that does not say how large it is has no shape to follow.)
+  const bool measured = one_side > 0.0f && other_side > 0.0f;
+  return measured ? std::max(one_side, other_side) / std::min(one_side, other_side) : 0.0f;
 }
 
 // Plays the game that was unpacked into the app's storage, on the whole screen, with on-screen
@@ -132,7 +138,8 @@ int main(int, char**) {
   // engine's own reading (the scene, the scripts, game.json) goes through the C++ library, which
   // resolves a relative path against the working folder. Changing to the storage folder is what
   // makes both mean the same file.
-  if (chdir(home.c_str()) != 0 || !unpack_game(app->activity->assetManager, home)) {
+  const bool unpacked = chdir(home.c_str()) == 0 && unpack_game(app->activity->assetManager, home);
+  if (!unpacked) {
     log::error("the game could not be unpacked into " + home.string());
     return kExitFailure;
   }

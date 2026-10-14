@@ -14,7 +14,6 @@ namespace redgem {
 namespace {
 
 using render_detail::GpuPrimitive;
-using render_math::names_one_of;
 
 constexpr float kNoMotionBlur = 0.0f;
 constexpr float kFullMotionBlur = 1.0f;
@@ -56,7 +55,7 @@ void Renderer::sync(const SceneDesc& desc) {
 }
 
 void Renderer::refresh_mesh(const SceneDesc& desc, int mesh) {
-  const bool uploaded = names_one_of(mesh, impl_->meshes.size()) && names_one_of(mesh, desc.meshes.size());
+  const bool uploaded = is_index_of(mesh, impl_->meshes.size()) && is_index_of(mesh, desc.meshes.size());
   if (!uploaded) return;
   const auto index = static_cast<std::size_t>(mesh);
   const MeshDesc& source = desc.meshes[index];

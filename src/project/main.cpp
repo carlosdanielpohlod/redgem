@@ -4,74 +4,24 @@
 // internet is a third, redgem-relay.
 
 #include <exception>
-#include <filesystem>
 #include <iostream>
-#include <optional>
 #include <string>
 #include <vector>
 
-#include "core/exit_codes.hpp"
-#include "project/cli.hpp"
+#include "app/user_settings.hpp"
 #include "app/window_presenter.hpp"
-#include "project/editor_setup.hpp"
+#include "core/exit_codes.hpp"
+#include "core/log.hpp"
+#include "project/cli.hpp"
+#include "project/editor_run.hpp"
 #include "project/game_build.hpp"
 #include "project/game_templates.hpp"
-#include "project/recent_games.hpp"
-#include "app/user_settings.hpp"
-#include "editor/editor_app.hpp"
-#include "project/project_hub.hpp"
-#include "core/log.hpp"
-#include "core/platform.hpp"
 
 namespace {
 
-// The game to open: the one given, else the one picked in the project hub (which shows why the
-// last one did not open). False when the hub was closed instead.
-bool pick_game(std::filesystem::path& game, std::string& hub_message, redgem::GpuChoice gpu) {
-  using namespace redgem;
-  if (!game.empty()) {
-    remember_game(recent_games_file(), game);
-    return true;
-  }
-  ProjectHub hub({default_games_folder(), recent_games_file(), gpu});
-  hub.show_error(hub_message);
-  hub_message.clear();
-  const auto chosen = hub.run();
-  if (chosen) game = *chosen;
-  return chosen.has_value();
-}
-
-// One game in the editor, until the editor is left. The exit code, or nullopt to go (back) to the
-// hub: a broken game from the command line exits; from the hub it returns there.
-std::optional<int> edit_game(const std::filesystem::path& game, bool from_command_line, std::string& hub_message,
-                             redgem::GpuChoice gpu) {
-  using namespace redgem;
-  auto created = EditorApp::create(game, editor_options(gpu));
-  if (auto* error = std::get_if<std::string>(&created)) {
-    log::error(*error);
-    if (from_command_line) return kExitFailure;
-    hub_message = "Cannot open " + game.filename().string() + ": " + *error;
-    return std::nullopt;
-  }
-  EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
-  const int code = app.run();
-  if (app.exit_action() != EditorExit::OpenHub) return code;
-  return std::nullopt;
-}
-
-// The editor, with the project hub when no game is given (and for File > New / Open Game).
 int run_editor(const redgem::CliOptions& options) {
-  std::filesystem::path game = options.game_dir;
-  bool from_command_line = !game.empty();
-  std::string hub_message;  // why the last game did not open, shown in the hub
-  // Chosen once, before the first window: the hub and every editor opened from it use the same card.
-  const redgem::GpuChoice gpu = redgem::gpu_choice_for_run(options.gpu);
-  while (pick_game(game, hub_message, gpu)) {
-    if (const auto code = edit_game(game, from_command_line, hub_message, gpu)) return *code;
-    from_command_line = false;
-    game.clear();  // back to the hub
-  }
-  return redgem::kExitSuccess;
+  // (The card is chosen once, before the first window: the hub and every editor opened from it use the same.)
+  return redgem::run_editor(options.game_dir, redgem::gpu_choice_for_run(options.gpu));
 }
 
 int play_game(const redgem::CliOptions& options) {

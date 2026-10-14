@@ -64,7 +64,7 @@ float smallest_angle_drawn(float asked, bool depth_pass) {
 }
 
 bool has_something_to_draw(const GameObject& object, bool show_prefabs, std::size_t mesh_count) {
-  return may_be_drawn(object, show_prefabs) && names_one_of(object.mesh, mesh_count);
+  return may_be_drawn(object, show_prefabs) && is_index_of(object.mesh, mesh_count);
 }
 
 bool worth_drawing(const View& view, const BoundingSphere& sphere, float from, float to) {

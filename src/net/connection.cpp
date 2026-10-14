@@ -18,7 +18,8 @@ Connection Connection::calling(Socket socket) { return Connection(std::move(sock
 
 std::size_t Connection::pump() {
   taken_this_poll_ = 0;
-  if (gone_ || dropped_ || !established()) return 0;
+  if (hung_up()) return 0;
+  if (!established()) return 0;
   const std::size_t arrived = take_in();
   flush();
   return arrived;
@@ -47,7 +48,7 @@ std::size_t Connection::take_in() {
 }
 
 std::optional<nlohmann::json> Connection::next_message() {
-  if (dropped_ || taken_this_poll_ >= kMaxMessagesPerPoll) return std::nullopt;
+  if (!takes_more()) return std::nullopt;
   const auto text = incoming_.next();
   if (!text) {
     if (incoming_.broken()) close();
@@ -61,7 +62,7 @@ std::optional<nlohmann::json> Connection::next_message() {
 }
 
 void Connection::send(const nlohmann::json& message) {
-  if (gone_ || dropped_) return;
+  if (hung_up()) return;
   // (Text that is not valid UTF-8 travels with the broken parts replaced, instead of not at all.)
   const std::vector<std::uint8_t> bytes = wire::packed(message);
   outgoing_.insert(outgoing_.end(), bytes.begin(), bytes.end());
@@ -74,7 +75,7 @@ void Connection::send(const nlohmann::json& message) {
 }
 
 void Connection::flush() {
-  if (gone_ || dropped_ || !established_) return;
+  if (!can_write()) return;
   if (socket_.write(outgoing_) == IoStatus::Closed) hang_up();
 }
 

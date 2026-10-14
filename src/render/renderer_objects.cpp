@@ -17,7 +17,6 @@ using namespace render_detail;
 using render_math::kOff;
 using render_math::kOn;
 using render_math::model_matrix;
-using render_math::names_one_of;
 using render_math::to_raylib;
 
 // A switch of the lit shader: on for a material that has that texture.
@@ -26,7 +25,7 @@ float on_with(int image) { return image != kNoIndex ? kOn : kOff; }
 }  // namespace
 
 bool Renderer::Impl::pose_skeleton(const Scene& scene, const GameObject& object) {
-  if (!names_one_of(object.skin, skins.size())) return false;
+  if (!is_index_of(object.skin, skins.size())) return false;
   const SkinDesc& skin = skins[static_cast<std::size_t>(object.skin)];
   const std::size_t count =
       std::min({object.joints.size(), skin.inverse_bind.size(), static_cast<std::size_t>(gpu_profile::kMaxSkinJoints)});
@@ -42,7 +41,7 @@ bool Renderer::Impl::pose_skeleton(const Scene& scene, const GameObject& object)
 // --- Materials --------------------------------------------------------------------------------
 
 const MaterialDesc& Renderer::Impl::factors_of(int material) const {
-  const bool known = names_one_of(material, material_factors.size());
+  const bool known = is_index_of(material, material_factors.size());
   return known ? material_factors[static_cast<std::size_t>(material)] : fallback_factors;
 }
 

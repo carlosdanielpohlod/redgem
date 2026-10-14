@@ -65,23 +65,23 @@ int play(WindowPresenter& window, InputSource& input, const std::filesystem::pat
   return Engine::create(game, std::move(scene))->run();
 }
 
-}  // namespace
-
 // The scene is read before the window is made: a game that cannot start says so with no window
 // opening and closing first. Then the window, first and last: the engine shows, reads and sounds
-// through what is made here.
-int play_in_window(const GameWindowOptions& options) {
+// through what is made here. The game is read from `input`; from the window's own devices when
+// there is none.
+int play_from_first_scene(const GameWindowOptions& options, InputSource* input) {
   std::optional<SceneDesc> scene = first_scene(options.game_dir);
   if (!scene) return kExitFailure;
   WindowPresenter window(options);
-  return play(window, window.devices(), options.game_dir, std::move(*scene));
+  return play(window, input != nullptr ? *input : window.devices(), options.game_dir, std::move(*scene));
 }
 
+}  // namespace
+
+int play_in_window(const GameWindowOptions& options) { return play_from_first_scene(options, nullptr); }
+
 int play_in_window(const GameWindowOptions& options, InputSource& input) {
-  std::optional<SceneDesc> scene = first_scene(options.game_dir);
-  if (!scene) return kExitFailure;
-  WindowPresenter window(options);
-  return play(window, input, options.game_dir, std::move(*scene));
+  return play_from_first_scene(options, &input);
 }
 
 }  // namespace redgem
