@@ -11,6 +11,7 @@
 #include <unistd.h>
 #endif
 
+#include "core/platform.hpp"
 #include "net/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "net/relay_program.hpp"
@@ -124,10 +125,12 @@ struct RawMachine {
   Socket socket;
   FrameBuffer heard;
 
+  // (Connected before anything is written: a Mac refuses to send on a connection still in the making.)
   explicit RawMachine(Meeting& where) : meeting(where) {
     std::string error;
     socket = Socket::connect_to(kLocalhost, meeting.relay.port(), error);
     REQUIRE(socket.valid());
+    REQUIRE(meeting.until([this] { return socket.connect_status() == IoStatus::Ok; }));
   }
 
   // Writes all of `bytes`; false when the relay hung up first.
@@ -668,6 +671,10 @@ namespace {
 
 constexpr rlim_t kFewDescriptors = 64;
 
+// How many of the callers a system had no descriptor for it keeps waiting: one, as Linux does, or
+// none, as the Mac does (it hangs up on them).
+std::size_t callers_kept_without_descriptors() { return redgem::platform::is_mac() ? 0 : 1; }
+
 // While one of these lives the process can open nothing: no file, and no connection either.
 struct NoDescriptorsLeft {
   rlimit before{};
@@ -706,10 +713,14 @@ TEST_CASE("a relay that cannot take a newcomer rests before it asks again, inste
     CHECK(slept >= std::chrono::duration<float>(kAcceptRestSeconds / 2.0f));
     CHECK(slept < kLongWait);
   }
-  // The rest is not over yet, then it is: the caller is taken.
+  // The rest is not over yet, then it is: the caller is taken, where the system kept it waiting,
+  // and so is whoever calls next.
   meeting.relay.poll(kRoundSeconds);
   CHECK(meeting.relay.connection_count() == 0);
   meeting.relay.poll(kAcceptRestSeconds);
-  CHECK(meeting.relay.connection_count() == 1);
+  const std::size_t kept = callers_kept_without_descriptors();
+  CHECK(meeting.relay.connection_count() == kept);
+  const Socket next_caller = Socket::connect_to(kLocalhost, meeting.relay.port(), error);
+  CHECK(meeting.until([&] { return meeting.relay.connection_count() == kept + 1; }));
 }
 #endif

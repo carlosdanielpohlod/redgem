@@ -48,17 +48,17 @@ make_app() {
 }
 
 main() {
-  local arch work root
+  local arch root
   arch="$(uname -m)"
-  work="$(mktemp -d)"
-  trap 'rm -rf "${work}"' EXIT
-  root="${work}/${PACKAGE_NAME}"
+  WORK_DIR="$(mktemp -d)"
+  trap 'rm -rf "${WORK_DIR}"' EXIT
+  root="${WORK_DIR}/${PACKAGE_NAME}"
   rm -rf "${OUT_DIR}"
   mkdir -p "${OUT_DIR}" "${root}"
   make_app "${root}"
   copy_demos "${root}"
   copy_notices "${root}" README-macos.txt
-  (cd "${work}" && zip -qry "${OUT_DIR}/${PACKAGE_NAME}-macos-${arch}.zip" "${PACKAGE_NAME}")
+  (cd "${WORK_DIR}" && zip -qry "${OUT_DIR}/${PACKAGE_NAME}-macos-${arch}.zip" "${PACKAGE_NAME}")
   ls -l "${OUT_DIR}"
 }
 
