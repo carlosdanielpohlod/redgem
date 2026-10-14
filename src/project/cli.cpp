@@ -46,7 +46,8 @@ constexpr const char* kUsageStart =
 constexpr const char* kTemplateSeparator = "|";
 constexpr const char* kUsageEnd =
     "]   create a game\n"
-    "  redgem build <game_dir> <out_dir> [--target linux|windows|macos|android]   make a standalone game (an executable, or "
+    "  redgem build <game_dir> <out_dir> [--target linux|windows|macos|android]   make a standalone game (an "
+    "executable, or "
     "an .apk)\n"
     "\n"
     "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting,\n"

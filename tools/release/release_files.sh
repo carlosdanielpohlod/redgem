@@ -3,6 +3,8 @@
 # (package.sh, package_macos.sh) to source: the demos and the licenses, and the check that what
 # is packed was built.
 
+# (What the scripts that source this read: shellcheck sees no use of it here.)
+# shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT_DIR="${REPO_ROOT}/dist/release"
 PACKAGE_NAME="redgem"

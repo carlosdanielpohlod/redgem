@@ -26,19 +26,20 @@
 #define REDGEM_EMBED_ALIGNMENT "16"  // bytes: where a file's data may start
 
 // The file at `path` (a string literal), between the labels `symbol` and `symbol`_end.
-#define REDGEM_EMBED_FILE(symbol, path)                                                                             \
-  __asm__(REDGEM_EMBED_READONLY_SECTION ".global " REDGEM_EMBED_LABEL_PREFIX #symbol                                \
-                                        "\n"                                                                        \
-                                        ".balign " REDGEM_EMBED_ALIGNMENT "\n" REDGEM_EMBED_LABEL_PREFIX #symbol    \
-                                        ":\n"                                                                       \
-                                        ".incbin \"" path                                                           \
-                                        "\"\n"                                                                      \
-                                        ".global " REDGEM_EMBED_LABEL_PREFIX #symbol "_end\n" REDGEM_EMBED_LABEL_PREFIX \
-                                        #symbol "_end:\n" REDGEM_EMBED_BACK_TO_CODE);                               \
-  extern "C" {                                                                                                    \
-  extern const unsigned char(symbol)[];                                                                           \
-  extern const unsigned char symbol##_end[];                                                                      \
-  }                                                                                                               \
+#define REDGEM_EMBED_FILE(symbol, path)                                                                          \
+  __asm__(REDGEM_EMBED_READONLY_SECTION ".global " REDGEM_EMBED_LABEL_PREFIX #symbol                             \
+                                        "\n"                                                                     \
+                                        ".balign " REDGEM_EMBED_ALIGNMENT "\n" REDGEM_EMBED_LABEL_PREFIX #symbol \
+                                        ":\n"                                                                    \
+                                        ".incbin \"" path                                                        \
+                                        "\"\n"                                                                   \
+                                        ".global " REDGEM_EMBED_LABEL_PREFIX #symbol                             \
+                                        "_end\n" REDGEM_EMBED_LABEL_PREFIX #symbol                               \
+                                        "_end:\n" REDGEM_EMBED_BACK_TO_CODE);                                    \
+  extern "C" {                                                                                                   \
+  extern const unsigned char(symbol)[];                                                                          \
+  extern const unsigned char symbol##_end[];                                                                     \
+  }                                                                                                              \
   static_assert(true, "")  // (so that the line using the macro ends in a semicolon)
 
 namespace redgem {

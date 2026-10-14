@@ -63,7 +63,8 @@ bool has_posix_shell() { return !is_windows(); }
 std::filesystem::path user_data_dir_on(Desktop desktop, const std::filesystem::path& home,
                                        const std::string& config_home) {
   if (desktop == Desktop::Mac) return home / kMacLibraryFolder / kMacSupportFolder / kMacUserDataFolder;
-  const std::filesystem::path settings = config_home.empty() ? home / kConfigFolder : std::filesystem::path(config_home);
+  const std::filesystem::path settings =
+      config_home.empty() ? home / kConfigFolder : std::filesystem::path(config_home);
   return settings / kUserDataFolder;
 }
 

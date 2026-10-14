@@ -57,9 +57,10 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
+      # (Going on past the first error: every one of them is in the log.)
       - name: Build
         id: build
-        run: cmake --build build
+        run: cmake --build build -- -k 0
 
       - name: Unit and integration tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}

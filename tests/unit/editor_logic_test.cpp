@@ -233,12 +233,12 @@ TEST_CASE("a brush on a scaled terrain is measured in the terrain's own grid") {
   Transform terrain;
   terrain.position = kTerrainPlace;
   terrain.scale = kTerrainScale;
-  const TerrainBrush raise = local_brush(terrain, kPointOnTerrain, kBrushRadius, kRaisedMeters, SculptMode::Raise);
-  CHECK(raise.x == doctest::Approx(kLocalX));
-  CHECK(raise.z == doctest::Approx(kLocalZ));
-  CHECK(raise.radius == doctest::Approx(kLocalRadius));
-  CHECK(raise.amount == doctest::Approx(kLocalMeters));
-  CHECK(raise.mode == SculptMode::Raise);
+  const TerrainBrush raising = local_brush(terrain, kPointOnTerrain, kBrushRadius, kRaisedMeters, SculptMode::Raise);
+  CHECK(raising.x == doctest::Approx(kLocalX));
+  CHECK(raising.z == doctest::Approx(kLocalZ));
+  CHECK(raising.radius == doctest::Approx(kLocalRadius));
+  CHECK(raising.amount == doctest::Approx(kLocalMeters));
+  CHECK(raising.mode == SculptMode::Raise);
 
   // Smoothing is a share, not a height: the terrain's scale does not change it.
   const TerrainBrush smooth = local_brush(terrain, kPointOnTerrain, kBrushRadius, kHeldSeconds, SculptMode::Smooth);
