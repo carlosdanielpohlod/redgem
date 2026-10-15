@@ -161,7 +161,8 @@ target_link_libraries(imgui_stack PUBLIC raylib)
 add_library(cgltf_headers INTERFACE)
 target_include_directories(cgltf_headers SYSTEM INTERFACE "${cgltf_SOURCE_DIR}")
 
-find_program(REDGEM_RAKE rake REQUIRED)
+# (On Windows, rake is a batch file beside a script of the same name that only Ruby can start.)
+find_program(REDGEM_RAKE NAMES rake.bat rake REQUIRED)
 set(REDGEM_MRUBY_CONFIG "${CMAKE_SOURCE_DIR}/cmake/mruby_build_config.rb")
 set(REDGEM_MRUBY_BUILD_DIR "${CMAKE_BINARY_DIR}/mruby")
 # Built for this machine ("host"); a Windows build also cross-compiles it (see the build config).
