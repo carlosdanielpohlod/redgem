@@ -1,0 +1,122 @@
+# The editor on real Macs: built, tested, opened on screen and packed into the Mac's download, once
+# on Apple Silicon and once on Intel. Each step that checks something fails the run when it fails;
+# the steps after it still run (when the build itself worked), so that one failure does not hide
+# the others. The pictures of the screen, the tests' pictures and the download are kept as the
+# run's artifacts.
+name: macOS
+
+on:
+  push:
+    branches: [main, macos-editor]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  editor:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64 (Apple Silicon)
+            runner: macos-14
+            arch: arm64
+          - name: macOS x86_64 (Intel)
+            runner: macos-15-intel
+            arch: x86_64
+    env:
+      # The oldest macOS the programs run on (written into the app's Info.plist as well).
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+      SHOTS: ${{ github.workspace }}/dist/screens
+      # The demo the editor is opened on for its picture.
+      DEMO: ${{ github.workspace }}/games/platformer
+    steps:
+      - uses: actions/checkout@v4
+
+      # The test scripts are written for bash 4 or newer (the Mac's own is 3.2).
+      - name: Install the build tools
+        run: brew install ninja bash
+
+      # rake builds mruby.
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      # Informational only: which macOS, processor and graphics the runner has.
+      - name: Describe the machine
+        run: |
+          sw_vers
+          uname -m
+          sysctl -n machdep.cpu.brand_string
+          system_profiler SPDisplaysDataType
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      # (Going on past the first error: every one of them is in the log.)
+      - name: Build
+        id: build
+        run: cmake --build build -- -k 0
+
+      - name: Unit and integration tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ./build/tests/redgem_tests
+
+      - name: Tests of the testing library
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ./build/tests/redgem_testing_tests
+
+      # What ctest has that opens no window. (The games' system tests run on Linux: drawn by the
+      # software renderer they would take hours here.)
+      - name: Tests that open no window (ctest)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ctest --test-dir build --output-on-failure -LE system
+
+      # (About half an hour on these machines, against a minute with a graphics card.)
+      - name: Editor system test (opens the editor window)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 45
+        run: ctest --test-dir build -R '^system\.editor\.window$' --output-on-failure
+
+      - name: Open the editor on a demo and take a picture of the screen
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: tools/macos/capture_window.sh "${SHOTS}/editor-${{ matrix.arch }}.png" 30 build/src/redgem "${DEMO}"
+
+      - name: Pack the download
+        id: package
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: tools/release/package.sh
+
+      # As a double click does: through the system's launcher, with no game named (the project hub).
+      - name: Open the packed app and take a picture of the screen
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        run: |
+          unpacked="${RUNNER_TEMP}/unpacked"
+          mkdir -p "${unpacked}"
+          ditto -x -k "dist/release/redgem-macos-${{ matrix.arch }}.zip" "${unpacked}"
+          tools/macos/capture_window.sh "${SHOTS}/app-hub-${{ matrix.arch }}.png" 30 \
+            open -W -n "${unpacked}/redgem/RedGem.app"
+          pkill -x redgem || true
+
+      - name: Keep the pictures of the screen
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens-${{ matrix.arch }}
+          path: |
+            dist/screens
+            build/screenshots/editor
+          if-no-files-found: warn
+
+      - name: Keep the download
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: redgem-macos-${{ matrix.arch }}
+          path: dist/release/redgem-macos-${{ matrix.arch }}.zip
+          if-no-files-found: error

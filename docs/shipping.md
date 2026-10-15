@@ -20,7 +20,7 @@ for.
 
 ## For Windows
 
-On Linux, RedGem builds games for Linux, Windows and Android (the experimental Windows download builds Windows games). In the editor, **Build**
+On Linux, RedGem builds games for Linux, Windows and Android (the experimental Windows download builds Windows games, the macOS one Mac games: `--target macos`). In the editor, **Build**
 asks which one; from a terminal:
 
 ```bash

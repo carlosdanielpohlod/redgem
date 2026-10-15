@@ -25,7 +25,7 @@ TEST_CASE("a game played in the editor has no touch screen: no controls are laid
   CHECK(input.touch_layout() == nullptr);
 }
 
-TEST_CASE("the editor is opened able to build for every system a game can be built for") {
+TEST_CASE("the editor is opened able to build for every system it can build a game for") {
   const std::vector<BuildChoice> choices = build_choices();
   std::set<std::string> names;
   for (const BuildChoice& choice : choices) {
@@ -35,7 +35,9 @@ TEST_CASE("the editor is opened able to build for every system a game can be bui
     CHECK(static_cast<bool>(choice.build));
     names.insert(choice.name);
   }
-  CHECK(names == std::set<std::string>{"android", "linux", "windows"});
+  // (A game for the Mac is only built on a Mac.)
+  const std::set<std::string> offered{"android", "linux", "windows", build_target_name(host_build_target())};
+  CHECK(names == offered);
   CHECK(names.size() == choices.size());
 }
 

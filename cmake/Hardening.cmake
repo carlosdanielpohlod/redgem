@@ -43,8 +43,11 @@ cmake_pop_check_state()
 
 check_cxx_compiler_flag(-fPIE REDGEM_HAS_PIE_FLAG)
 # Tables of addresses made read-only once the program is loaded, and a stack no code runs from.
-check_linker_flag(CXX "-Wl,-z,relro,-z,now" REDGEM_LINKS_RELRO_NOW)
-check_linker_flag(CXX "-Wl,-z,noexecstack" REDGEM_LINKS_NOEXECSTACK)
+# (Options of the GNU and LLVM linkers for ELF programs: the Mac's linker has neither.)
+if(NOT APPLE)
+  check_linker_flag(CXX "-Wl,-z,relro,-z,now" REDGEM_LINKS_RELRO_NOW)
+  check_linker_flag(CXX "-Wl,-z,noexecstack" REDGEM_LINKS_NOEXECSTACK)
+endif()
 if(WIN32)
   # Loaded at a different address every run (anywhere in 64 bits), with no code run from data.
   check_linker_flag(CXX "-Wl,--dynamicbase,--nxcompat,--high-entropy-va" REDGEM_LINKS_WINDOWS_MITIGATIONS)

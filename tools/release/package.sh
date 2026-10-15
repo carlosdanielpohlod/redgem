@@ -5,37 +5,18 @@
 #                                       # dist/release/redgem-windows-x86_64.zip
 # Build first: cmake --build build, tools/windows/build_runtime.sh, tools/android/build_runtime.sh
 # and, for the Windows download, cmake --build build-windows --target redgem redgem_relay.
+# On a Mac it makes the Mac's download instead (package_macos.sh).
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-OUT_DIR="${REPO_ROOT}/dist/release"
+# shellcheck source=tools/release/release_files.sh
+source "$(dirname "${BASH_SOURCE[0]}")/release_files.sh"
+
 LINUX_BUILD="${REPO_ROOT}/build/src"
 WINDOWS_BUILD="${REPO_ROOT}/build-windows/src"
 WINDOWS_STRIP="${REPO_ROOT}/.deps/llvm-mingw/bin/x86_64-w64-mingw32-strip"
-PACKAGE_NAME="redgem"
 LINUX_PROGRAMS=(redgem redgem-player redgem-relay redgem-test)
 WINDOWS_PROGRAMS=(redgem.exe redgem-player.exe redgem-relay.exe)
-# (The showcase is built from downloaded assets that may not be passed on.)
-DEMOS=(platformer driving city)
-NOTICES=(LICENSE THIRD_PARTY_LICENSES.md)
-
-need() {
-  [[ -e "$1" ]] || { echo "missing $1: build it first (see the top of this script)" >&2; exit 1; }
-}
-
-# The demos as git has them: no saves, builds or editor leftovers.
-copy_demos() {
-  local demo
-  for demo in "${DEMOS[@]}"; do
-    git -C "${REPO_ROOT}" archive --format=tar --prefix="games/${demo}/" "HEAD:games/${demo}" | tar -x -C "$1"
-  done
-}
-
-copy_notices() {
-  local notice
-  for notice in "${NOTICES[@]}"; do cp "${REPO_ROOT}/${notice}" "$1/"; done
-  cp "${REPO_ROOT}/tools/release/$2" "$1/README.txt"
-}
+MAC_SYSTEM="Darwin"   # what uname says on a Mac
 
 package_linux() {
   local root="$1/${PACKAGE_NAME}" program
@@ -68,6 +49,9 @@ package_windows() {
 }
 
 main() {
+  if [[ "$(uname -s)" == "${MAC_SYSTEM}" ]]; then
+    exec "${REPO_ROOT}/tools/release/package_macos.sh"
+  fi
   WORK_DIR="$(mktemp -d)"
   trap 'rm -rf "${WORK_DIR}"' EXIT
   rm -rf "${OUT_DIR}"

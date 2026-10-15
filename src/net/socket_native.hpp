@@ -36,7 +36,11 @@ inline constexpr short kRoomToSend = POLLWRNORM;
 using NativeSocket = int;
 using Length = socklen_t;
 using Waiting = pollfd;
+#ifdef MSG_NOSIGNAL
 inline constexpr int kSendFlags = MSG_NOSIGNAL;  // a closed connection is an error to handle, not a signal
+#else
+inline constexpr int kSendFlags = 0;  // (the Mac has no such flag: each connection is told instead)
+#endif
 inline constexpr short kArrivals = POLLIN;
 inline constexpr short kRoomToSend = POLLOUT;
 #endif
@@ -63,6 +67,9 @@ int connection_answered(NativeSocket socket);
 int wait_native(std::vector<Waiting>& waiting, int milliseconds);
 
 void set_option(NativeSocket socket, int level, int option);
+// Makes sending on a connection the other side closed an error to handle, not a signal that ends
+// the program, where the send itself cannot say so (kSendFlags).
+void no_signal_on_closed(NativeSocket socket);
 // A socket of the given kind that never waits; kInvalidSocket, with `error` set, when there is none to have.
 std::intptr_t open_non_blocking(int type, int protocol, std::string& error);
 // Takes a port of this machine, on every address it has.

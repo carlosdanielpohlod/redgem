@@ -41,7 +41,8 @@ end
 - **Multiplayer**: games found by themselves on the local network, rooms by code over the
   internet through a relay that ships with the engine, named messages, objects kept in sync.
 - **Editor**: scene view with gizmos, hierarchy, inspector, Ruby code tabs, play mode, undo,
-  sculptable terrain, and one-click builds of the game for Linux, Windows and Android.
+  sculptable terrain, and one-click builds of the game for Linux, Windows and Android (and, on a
+  Mac, for the Mac).
 - **Blender as the modeling tool**: scenes are glTF files; custom properties carry gameplay data.
 - **Rendering**: PBR materials, sun shadows, reflections, ambient occlusion, bloom, fog,
   skeletal animation.
@@ -80,10 +81,13 @@ The engine itself is **C++17**, built with CMake. Demo assets come from
 |--------|----------|------|
 | Linux (x86_64) | [redgem-linux-x86_64.tar.gz](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.tar.gz) | unpack, run `bin/redgem` |
 | Windows (x86_64) | [redgem-windows-x86_64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-windows-x86_64.zip) | unpack, run `redgem.exe` |
+| macOS (Apple Silicon) | [redgem-macos-arm64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-macos-arm64.zip) | unpack, open `RedGem.app` (unsigned: see the README inside) |
+| macOS (Intel) | [redgem-macos-x86_64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-macos-x86_64.zip) | unpack, open `RedGem.app` (unsigned: see the README inside) |
 
 The project hub opens: pick *Platformer* under *New game* and press Play. The Linux download is
 the tested one and builds games for Linux, Windows and Android; the Windows one has only been
-tried under Wine so far. Details in [docs/install.md](docs/install.md).
+tried under Wine so far, and the macOS ones only on GitHub's virtual Macs (they build games for the
+Mac). Details in [docs/install.md](docs/install.md).
 
 With Docker, on Linux:
 

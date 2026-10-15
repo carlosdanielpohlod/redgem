@@ -14,7 +14,7 @@ set(REDGEM_JSON_VERSION "v3.12.0")
 
 # --- X11 headers extracted locally by tools/setup/fetch_x11_headers.sh -------
 set(REDGEM_LOCAL_X11_INCLUDE "${CMAKE_SOURCE_DIR}/.deps/x11/usr/include")
-if(NOT WIN32 AND NOT ANDROID AND EXISTS "${REDGEM_LOCAL_X11_INCLUDE}/X11/extensions/Xrandr.h")
+if(NOT WIN32 AND NOT ANDROID AND NOT APPLE AND EXISTS "${REDGEM_LOCAL_X11_INCLUDE}/X11/extensions/Xrandr.h")
   message(STATUS "Using locally extracted X11 headers: ${REDGEM_LOCAL_X11_INCLUDE}")
   list(APPEND CMAKE_INCLUDE_PATH "${REDGEM_LOCAL_X11_INCLUDE}")
   include_directories(BEFORE SYSTEM "${REDGEM_LOCAL_X11_INCLUDE}")
@@ -38,10 +38,17 @@ set(SUPPORT_FILEFORMAT_GLTF OFF CACHE BOOL "" FORCE)
 set(SUPPORT_FILEFORMAT_JPG ON CACHE BOOL "" FORCE)
 # HDRI skies (Radiance .hdr) for image based lighting.
 set(SUPPORT_FILEFORMAT_HDR ON CACHE BOOL "" FORCE)
+# On a Mac with no graphics card OpenGL can use, windows are drawn by Apple's software renderer
+# (see the script).
+set(REDGEM_RAYLIB_PATCH "")
+if(APPLE)
+  set(REDGEM_RAYLIB_PATCH PATCH_COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/PatchGlfwForMac.cmake)
+endif()
 FetchContent_Declare(raylib
   GIT_REPOSITORY https://github.com/raysan5/raylib.git
   GIT_TAG ${REDGEM_RAYLIB_TAG}
-  GIT_SHALLOW TRUE)
+  GIT_SHALLOW TRUE
+  ${REDGEM_RAYLIB_PATCH})
 
 # --- cgltf (header only) -------------------------------------------------------
 FetchContent_Declare(cgltf
@@ -62,7 +69,7 @@ set(DEBUG_RENDERER_IN_DEBUG_AND_RELEASE OFF CACHE BOOL "" FORCE)
 set(PROFILER_IN_DEBUG_AND_RELEASE OFF CACHE BOOL "" FORCE)
 set(CPP_RTTI_ENABLED ON CACHE BOOL "" FORCE)
 set(CPP_EXCEPTIONS_ENABLED ON CACHE BOOL "" FORCE)
-if(WIN32 OR ANDROID)
+if(WIN32 OR ANDROID OR APPLE)
   # Its warnings-as-errors trips on a newer compiler's notes; a dependency's warnings are not ours to fix.
   set(ENABLE_ALL_WARNINGS OFF CACHE BOOL "" FORCE)
 endif()

@@ -262,15 +262,15 @@ TEST_CASE("a build ships the player kept beside the program that builds, never t
   std::string error;
   REQUIRE(write_text_file(editor, "editor", error));
   // Where each is looked for: the same in a build folder and in an installation.
-  CHECK(runtime_location(BuildTarget::Linux, editor) == install / "redgem-player");
+  CHECK(runtime_location(host_build_target(), editor) == install / "redgem-player");
   CHECK(runtime_location(BuildTarget::Windows, editor) == windows_player);
   CHECK(runtime_location(BuildTarget::Android, editor) == install / "runtimes" / "android");
   // Nothing there yet: no build, and above all not one made of the editor itself.
-  CHECK_FALSE(runtime_for(BuildTarget::Linux, editor).has_value());
+  CHECK_FALSE(runtime_for(host_build_target(), editor).has_value());
   CHECK_FALSE(runtime_for(BuildTarget::Windows, editor).has_value());
   REQUIRE(write_text_file(install / "redgem-player", "player", error));
   REQUIRE(write_text_file(windows_player, "windows player", error));
-  CHECK(runtime_for(BuildTarget::Linux, editor) == install / "redgem-player");
+  CHECK(runtime_for(host_build_target(), editor) == install / "redgem-player");
   CHECK(runtime_for(BuildTarget::Windows, editor) == windows_player);
   CHECK_FALSE(runtime_for(BuildTarget::Android, editor).has_value());  // (packed another way)
   std::filesystem::remove_all(install.parent_path());

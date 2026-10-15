@@ -14,10 +14,12 @@ using namespace os;
 
 constexpr int kWaitingConnections = 16;  // connections the system holds until accept() takes them
 
-// A TCP connection sends small messages right away, and notices in time a machine that vanished.
+// A TCP connection sends small messages right away, notices in time a machine that vanished, and
+// survives sending to one that left.
 void set_stream_options(NativeSocket socket) {
   set_option(socket, IPPROTO_TCP, TCP_NODELAY);
   set_option(socket, SOL_SOCKET, SO_KEEPALIVE);
+  no_signal_on_closed(socket);
 }
 
 // A TCP socket that never waits and sends small messages right away.
