@@ -39,7 +39,6 @@ constexpr std::size_t kBroadcastBytes = 256 * 1024;
 constexpr int kRoomsPerAddress = 8;
 constexpr float kPastKeptOut = 125.0f;  // seconds an address stays out for guessing
 constexpr float kQuietStep = 4.0f;
-constexpr float kAskAgain = 1.1f;  // seconds: past the pause between searches
 constexpr const char* kLocalhost = "127.0.0.1";
 constexpr std::uint16_t kTestDiscoveryPort = 47831;  // not the real one: a game may be open on this machine
 constexpr std::uint16_t kGamePort = 7777;
@@ -169,6 +168,25 @@ struct RawMachine {
     return next_message()["r"];
   }
 };
+
+// What a stranger answers a search with: nonsense, half answers and answers from no game of
+// this engine, then one real answer.
+constexpr const char* kNotAnswers[] = {
+    "hello", R"({"is":"redgem"})", R"({"is":"redgem","name":7,"port":7777,"players":1})",
+    R"({"is":"redgem","name":"x","port":99999,"players":1})", R"({"is":"other","name":"x","port":7777,"players":1})"};
+constexpr const char* kRealAnswer = R"({"is":"redgem","name":"real","port":7777,"players":2})";
+
+// Answers every search that reached `listener` so far with all of the above. Every one, not just
+// the first: the first to arrive may be one a finder of the test before sent as it was closed (the
+// system can hand a datagram over a little after it was sent), whose port nobody listens on now.
+void answer_with_nonsense(Datagrams& listener) {
+  std::string question, from;
+  std::uint16_t from_port = 0;
+  while (listener.receive(question, from, from_port)) {
+    for (const char* bad : kNotAnswers) listener.send_to(kLocalhost, from_port, bad);
+    listener.send_to(kLocalhost, from_port, kRealAnswer);
+  }
+}
 
 }  // namespace
 
@@ -478,31 +496,20 @@ TEST_CASE("games on the local network are found without typing an address") {
 }
 
 TEST_CASE("what is not an answer to a search is ignored") {
-  LanDiscovery finder;
-  REQUIRE(finder.search(kTestDiscoveryPort));
   std::string error;
   Datagrams listener = Datagrams::open_on(kTestDiscoveryPort, error);
   REQUIRE(listener.valid());
-  // Whoever answers the search with nonsense, or with half an answer.
-  std::string question, from;
-  std::uint16_t from_port = 0;
-  bool asked = false;
-  for (int round = 0; round < kMaxRounds && !asked; ++round) {
-    finder.update(kAskAgain);
-    asked = listener.receive(question, from, from_port);
-    std::this_thread::sleep_for(kRoundPause);
+  {  // a search from a finder that is gone by now, the first to arrive
+    Datagrams gone = Datagrams::open_on(0, error);
+    REQUIRE(gone.send_to(kLocalhost, kTestDiscoveryPort, kSearchQuestion));
   }
-  REQUIRE(asked);
-  for (const char* bad : {"hello", R"({"is":"redgem"})", R"({"is":"redgem","name":7,"port":7777,"players":1})",
-                          R"({"is":"redgem","name":"x","port":99999,"players":1})",
-                          R"({"is":"other","name":"x","port":7777,"players":1})"}) {
-    listener.send_to(kLocalhost, from_port, bad);
-  }
-  listener.send_to(kLocalhost, from_port, R"({"is":"redgem","name":"real","port":7777,"players":2})");
+  LanDiscovery finder;
+  REQUIRE(finder.search(kTestDiscoveryPort));
   bool found = false;
   for (int round = 0; round < kMaxRounds && !found; ++round) {
     finder.update(kRoundSeconds);
     found = !finder.games().empty();
+    answer_with_nonsense(listener);
     std::this_thread::sleep_for(kRoundPause);
   }
   REQUIRE(found);
