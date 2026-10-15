@@ -20,7 +20,7 @@ void NetworkSession::await_connection(float seconds, std::vector<NetworkEvent>& 
 
 void NetworkSession::handle_as_guest(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
   if (state_ == State::Connecting) {
-    accept_welcome(message, events);  // nothing else counts before it
+    hear_while_joining(message, events);
   } else if (state_ == State::Online) {
     hear_of_the_game(message, events);
   }
@@ -36,6 +36,17 @@ void NetworkSession::hear_of_the_game(const nlohmann::json& message, std::vector
 void NetworkSession::hear_game_message(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
   events.push_back(
       NetworkEvent::message(message.value(kFrom, 0), message[kName], message.value(kData, nlohmann::json())));
+}
+
+void NetworkSession::hear_while_joining(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
+  const std::string kind = message[kKind];
+  // The host's game takes its time to decide on this machine: this machine waits for it.
+  if (kind == kConsidering) connecting_for_ = -kApprovalSeconds;
+  if (kind == kRefused) {
+    refusal_ = message.value(kReason, std::string());
+    links_.front().connection.close();  // the game ends with it, saying why (end_game_if_host_gone)
+  }
+  accept_welcome(message, events);
 }
 
 void NetworkSession::accept_welcome(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
@@ -73,8 +84,10 @@ void NetworkSession::end_game_if_host_gone(std::vector<NetworkEvent>& events) {
   if (!host_gone()) return;
   // The host is gone, and the game with it.
   const bool was_in = state_ == State::Online;
+  NetworkEvent ended = NetworkEvent::of(was_in ? NetworkEvent::Kind::Disconnected : NetworkEvent::Kind::Failed);
+  ended.name = refusal_;
   go_offline();
-  events.push_back(NetworkEvent::of(was_in ? NetworkEvent::Kind::Disconnected : NetworkEvent::Kind::Failed));
+  events.push_back(ended);
 }
 
 bool NetworkSession::send_through_host(const nlohmann::json& message, int to) {

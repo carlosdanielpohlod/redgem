@@ -14,6 +14,7 @@ constexpr int kLargestPort = 65535;
 constexpr std::size_t kMostDigits = 5;  // of any number the line takes
 constexpr const char* kDigits = "0123456789";
 constexpr const char* kNoGame = "which game? redgem-server <game_dir>";
+constexpr const char* kDataOption = "--data";
 
 // An option of the line that is given a whole number, from `least` to `most`.
 struct NumberOption {
@@ -40,7 +41,9 @@ std::string usage_text() {
          "  --max-players <number>    players in one room (default: " + number(kDefaultMaxPlayers) + ", at most " +
          number(kMostPlayersPerRoom) + ")\n" +
          "  --rooms <number>          rooms open at once, each a match of its own (default: " +
-         number(kDefaultMaxRooms) + ", at most " + number(kMostRooms) + ")\n";
+         number(kDefaultMaxRooms) + ", at most " + number(kMostRooms) + ")\n" +
+         "  --data <dir>              where the game's Save is kept, for every room (default: a folder beside\n" +
+         "                            the game's, named after it with " + kDataFolderSuffix + ")\n";
 }
 
 bool is_number(const std::string& text) {
@@ -74,8 +77,18 @@ std::string read_option(const std::vector<std::string>& args, std::size_t& next,
   return {};
 }
 
+// Reads --data and the folder it is given.
+std::string read_data_dir(const std::vector<std::string>& args, std::size_t& next, ServerSettings& settings) {
+  ++next;
+  const auto folder = command_line::option_value(args, next);
+  if (!folder) return std::string(kDataOption) + " needs a folder";
+  settings.data_dir = *folder;
+  return {};
+}
+
 // Reads the word at `next` (and an option's number); an error when it makes no sense.
 std::string read_word(const std::vector<std::string>& args, std::size_t& next, ServerSettings& settings) {
+  if (args[next] == kDataOption) return read_data_dir(args, next, settings);
   if (command_line::is_option(args[next])) return read_option(args, next, settings);
   if (!settings.game_dir.empty()) return "unexpected argument " + args[next];
   settings.game_dir = args[next++];
@@ -100,6 +113,7 @@ ServerCommand parse_server_command(const std::vector<std::string>& args) {
   command.help = std::any_of(args.begin(), args.end(), command_line::asks_for_help);
   if (!command.help) command.error = read_line(args, command.settings);
   command.ok = command.error.empty();
+  if (command.settings.data_dir.empty()) command.settings.data_dir = data_dir_beside(command.settings.game_dir);
   return command;
 }
 

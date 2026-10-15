@@ -31,6 +31,7 @@ module UI
   FIELD_MAX_LENGTH = 64
   FIELD_PADDING = 14         # pixels between a text field's edge and its text
   FIELD_CARET = "_".freeze
+  SECRET_LETTER = "*".freeze  # what a secret text field shows for each letter
   CONTINUATION_MASK = 0xC0
   CONTINUATION_BITS = 0x80
   PRESSED_SHADE = 0.8        # a held button is this much darker
@@ -71,16 +72,18 @@ module UI
     __image(name.to_s, x.to_i, y.to_i, width.to_i, height.to_i, alpha.to_i)
   end
 
-  # A box to type in. Returns the text after this frame's typing: keep it and pass it back.
+  # A box to type in. Returns the text after this frame's typing: keep it and pass it back. A
+  # secret one (a password) shows a star for each letter.
   #   @name = UI.text_field(@name, x: 40, y: 200, width: 320, height: 48)
   def self.text_field(value, x:, y:, width:, height:, max_length: FIELD_MAX_LENGTH, color: BUTTON_COLOR,
-                      text_color: :white)
+                      text_color: :white, secret: false)
     value = value.to_s + Input.text
     value = chop(value) if Input.pressed?(:backspace)
     value = chop(value) while letters(value) > max_length
     rect(x: x, y: y, width: width, height: height, color: color, alpha: BUTTON_ALPHA, radius: BUTTON_RADIUS)
     size = label_size(height)
-    text(value + FIELD_CARET, x: x + FIELD_PADDING, y: centered(y, height, size), size: size, color: text_color)
+    shown = secret ? SECRET_LETTER * letters(value) : value
+    text(shown + FIELD_CARET, x: x + FIELD_PADDING, y: centered(y, height, size), size: size, color: text_color)
     value
   end
 

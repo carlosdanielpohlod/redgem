@@ -35,6 +35,7 @@ nav:
       - Behaviours: scripting/behaviours.md
       - Gameplay recipes: scripting/gameplay.md
       - Multiplayer: scripting/multiplayer.md
+      - Online services: scripting/online-services.md
       - API reference: scripting/api.md
   - Finishing a game:
       - Testing your game: testing.md

@@ -70,6 +70,9 @@ add_executable(redgem_tests
   unit/game_build_test.cpp
   unit/frame_buffer_test.cpp
   unit/wire_test.cpp
+  unit/http_url_test.cpp
+  unit/http_message_test.cpp
+  unit/http_response_parser_test.cpp
   unit/lan_discovery_test.cpp
   unit/nearby_games_test.cpp
   unit/network_event_test.cpp
@@ -93,11 +96,15 @@ add_executable(redgem_tests
   integration/native_arguments_test.cpp
   integration/message_values_test.cpp
   integration/connection_test.cpp
+  integration/http_test_server.cpp
+  integration/http_client_test.cpp
+  integration/http_game_test.cpp
   integration/network_session_test.cpp
   integration/multiplayer_test.cpp
   integration/relay_test.cpp
   integration/lobby_test.cpp
   integration/dedicated_server_test.cpp
+  integration/connection_approval_test.cpp
   integration/editor_session_test.cpp
   integration/game_project_test.cpp)
 target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest)

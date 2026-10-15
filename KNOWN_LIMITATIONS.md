@@ -41,6 +41,25 @@ the same pull request.
   campus, some mobile networks) can run into both.
 - Two `NetworkSync` components given the same key: the second silently takes the first one's
   place.
+- A room on a relay lets everyone in: connection approval (`Network.authenticate`) works with a
+  player hosting directly and on a dedicated server only.
+- A client of version 0.2.0 joining a game that decides who comes in gives up after 5 seconds
+  if the game takes longer to decide, and is told no reason when refused.
+- A dedicated server's `Save` is one file rewritten whole on every change, and its arrays and
+  hashes hold at most 4096 entries each: fine for a few thousand players, not for more.
+
+## Web requests (HTTP)
+
+- Redirects are not followed; there are no cookies, no compression, no streaming, no uploads of
+  files: a request and its answer are each held whole in memory (at most 8 MB).
+- Looking a name up cannot be cut short: a request to a name the network takes long to answer
+  for can outlast its timeout by that long (and a game that ends waits for nobody: the request's
+  thread ends on its own).
+- On Windows the certificates come from the system's ROOT store, which Windows fills on demand:
+  an authority no program on the machine has used yet may be missing. Not tried on a real Windows
+  machine, nor on a real Android device (whose system certificates the engine reads).
+- `http://` names are checked once connected: a public address is never sent anything, but the
+  connection to it is made.
 
 ## Scripting
 

@@ -42,7 +42,7 @@ services:
 
   # A game run on a dedicated server, for players to join (see the manual's Dedicated server page):
   # the platformer demo unless GAME names another game's folder. Like the relay, it runs with no
-  # powers and nothing it can write to.
+  # powers; the one place it writes to is its data volume, where the game's saves are kept.
   server:
     build:
       context: .
@@ -57,3 +57,8 @@ services:
     security_opt: ["no-new-privileges:true"]
     ports:
       - "7777:7777"
+    volumes:
+      - server-data:/data
+
+volumes:
+  server-data:

@@ -1,7 +1,8 @@
 # The pause menu's multiplayer screen: host a game, join one found on the same network with a
 # click, or type an address (or, with a relay, a room's code) and join that.
 # With a relay (see MainScene) games can also be hosted online: the others only need the code.
-# With a dedicated server (see MainScene), Play online joins it: nobody has to host.
+# With a dedicated server (see MainScene), Play online joins it: nobody has to host. It joins as
+# the player logged in (Log in, with a backend) or as a guest (see Accounts).
 class MultiplayerScreen < GameMenu::Screen
   HEADING = "Multiplayer".freeze
   NO_SERVER = "No server to play online on yet: set SERVER in scripts/main_scene.rb".freeze
@@ -36,8 +37,13 @@ class MultiplayerScreen < GameMenu::Screen
   def options
     list = [["Host a game", -> { host_game }]]
     list << ["Host online", -> { host_room }] if relay?
-    list + [["Join", -> { join_game }], ["Play online", -> { play_online }], ["Leave the game", -> { leave_game }],
-            ["Back", back]]
+    list << ["Log in", -> { GameMenu.instance.show(:login) }] if Accounts.backend?
+    list + joining_options
+  end
+
+  def joining_options
+    [["Join", -> { join_game }], ["Play online", -> { play_online }], ["Leave the game", -> { leave_game }],
+     ["Back", back]]
   end
 
   def opened = Network.search
@@ -84,7 +90,7 @@ class MultiplayerScreen < GameMenu::Screen
     return @note = NO_SERVER if @server.empty?
 
     address, port = @server.split(":")
-    Network.join(address, port: (port || Network::DEFAULT_PORT).to_i)
+    Network.join(address, port: (port || Network::DEFAULT_PORT).to_i, auth: Accounts.auth)
   end
 
   def leave_game = Network.leave
@@ -103,12 +109,16 @@ class MultiplayerScreen < GameMenu::Screen
   # Where games meet online, and joins that fail.
   def follow_the_network
     Network.relay = @relay unless @relay.empty?
-    Network.on_fail { @failed = true }
+    Network.on_fail do |reason|
+      @failed = true
+      @reason = reason
+    end
   end
 
   # Hosting or joining (`target`): an earlier failure is history, and there is nothing left to look for.
   def starting(target = @address)
     @failed = false
+    @reason = nil
     @note = nil
     @joining = target
     Network.stop_search
@@ -124,7 +134,9 @@ class MultiplayerScreen < GameMenu::Screen
   def offline_status
     return @note if @note
 
-    @failed ? "Could not join #{@joining}" : hint
+    return "Could not join #{@joining}#{": #{@reason}" if @reason}" if @failed
+
+    hint
   end
 
   def hint = relay? ? "Type a room's code or the host's address" : "Type the host's address to join a game"

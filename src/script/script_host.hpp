@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "net/http_client.hpp"
 #include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
 #include "script/ruby_vm.hpp"
@@ -20,6 +21,7 @@ namespace redgem {
 //   script_host_scripts.cpp    loading the game's scripts and making behaviours of their classes
 //   script_host_callbacks.cpp  calling the behaviours: start, update, contacts, destruction
 //   script_host_network.cpp    handing network events to Ruby
+//   script_host_http.cpp       handing the answers of web requests to Ruby
 class ScriptHost {
  public:
   ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir);
@@ -47,7 +49,10 @@ class ScriptHost {
   void dispatch(const ContactEvent& event);
   // Hands something that happened on the network to the scripts listening for it (Network.on...).
   void dispatch(const net::NetworkEvent& event);
-  // Tells Ruby's own bookkeeping (Network handlers...) that the scene's objects are gone.
+  // Hands the answer of a web request to the block waiting for it (HTTP).
+  void dispatch(const net::HttpResult& result);
+  // Tells Ruby's own bookkeeping (Network handlers, the blocks of HTTP requests) that the scene's
+  // objects are gone.
   void scene_was_reset();
   // Runs on_destroy on the object's behaviours (they stay attached until detach()).
   void on_destroyed(ObjectId object);

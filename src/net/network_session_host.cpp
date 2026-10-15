@@ -47,11 +47,12 @@ bool NetworkSession::room_to_wait(const std::string& address) const {
 
 void NetworkSession::drop_silent_newcomers(float seconds) {
   for (Link& link : links_) {
-    if (!link.let_in()) link.connection.keep_waiting(seconds);
+    if (link.before_hello()) link.connection.keep_waiting(seconds);
   }
 }
 
 void NetworkSession::handle_as_host(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events) {
+  if (link.asking()) return;  // nothing it says counts while the game decides on it
   if (!link.let_in()) {
     hear_newcomer(link, message, events);
     return;
@@ -71,11 +72,16 @@ void NetworkSession::hear_newcomer(Link& link, const nlohmann::json& message, st
     link.connection.close();
     return;
   }
-  admit(link, events);
+  consider(link, message.value(kAuth, nlohmann::json()), events);
 }
 
 void NetworkSession::admit(Link& link, std::vector<NetworkEvent>& events) {
-  link.peer = free_peer_id(peers_);
+  let_in(link, free_peer_id(ids_taken()), events);
+}
+
+void NetworkSession::let_in(Link& link, int peer, std::vector<NetworkEvent>& events) {
+  link.peer = peer;
+  link.asking_as = 0;
   if (!link.let_in()) {
     link.connection.close();  // full
     return;

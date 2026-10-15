@@ -14,7 +14,7 @@ calls `Game.quit`, or everyone left. The next players get a new room, with a new
 
 ```bash
 ./build/src/redgem-server games/platformer      # listens on port 7777
-./build/src/redgem-server games/platformer --port 9000 --max-players 4 --rooms 16
+./build/src/redgem-server games/platformer --port 9000 --max-players 4 --rooms 16 --data /srv/platformer
 ```
 
 | Option | Default | What it is |
@@ -22,6 +22,7 @@ calls `Game.quit`, or everyone left. The next players get a new room, with a new
 | `--port` | 7777 | The TCP port players connect to (0 picks a free one) |
 | `--max-players` | 8 | Players in one room, up to 15 |
 | `--rooms` | 8 | Rooms open at once, up to 64 |
+| `--data` | `<game>-data` beside the game's folder | Where the game's `Save` is kept (`save.json`), for every room and every run |
 
 It writes what happens to its output (rooms opened and closed, how many players) and stops
 cleanly on Ctrl+C or `SIGTERM`: every room is closed and its players are told.
@@ -35,12 +36,13 @@ every room runs the whole game, so `--rooms` is what sizes the machine.
 
 ```bash
 docker build -f Dockerfile.server --build-arg GAME=games/platformer -t my-game-server .
-docker run -d --restart unless-stopped -p 7777:7777 my-game-server --rooms 4
+docker run -d --restart unless-stopped -p 7777:7777 -v my-game-data:/data my-game-server --rooms 4
 ```
 
 `GAME` is the game's folder, relative to the repository. `docker compose up server` does the same
 for the platformer (`GAME=path/to/game docker compose up server` for another). The container runs
-as an unprivileged user and writes nothing.
+as an unprivileged user and writes only to `/data`, where the game's saves are kept (a volume, so
+that they outlive the container).
 
 ## Put it on the internet
 
@@ -76,11 +78,18 @@ end
 
 `Network.host?` is true on the server: it hosts the game and owns the level's own objects, so
 what the host decides (scores, a door opening, the end of a match) is decided there. Menus never
-open on a server, and what the game saves there lasts for the match only. Call `Game.quit` on the
-server when a match is over to give its room to the next players.
+open on a server. Call `Game.quit` on the server when a match is over to give its room to the next
+players.
+
+`Save` on the server is the server's own: one file in its data folder (`--data`), shared by all
+its rooms and kept across restarts. Rooms take their turns one after the other on the server's
+one thread, so their writes never meet, and each write replaces the whole file at once (a crash
+never leaves half of it). Keep each player's data under their identity, as
+[Online services](scripting/online-services.md#saving-on-a-server) shows.
 
 The server faces the internet. It keeps every limit a hosted game and the relay have (message
 sizes, how much each player may send, connections per address, spawned objects), lets go of
 machines that stay silent and of players who say nothing to the game for five minutes (a game
-left paused counts), and keeps out addresses that guess at room codes. Messages are not encrypted
-and players are not authenticated.
+left paused counts), and keeps out addresses that guess at room codes. Messages are not encrypted.
+Players are let in without asking unless the game decides who plays: see
+[Online services](scripting/online-services.md#letting-players-in).

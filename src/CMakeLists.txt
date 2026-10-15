@@ -20,7 +20,9 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawns.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawn_requests.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_resends.rb
-  ${CMAKE_SOURCE_DIR}/ruby/engine/network_sync.rb)
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_sync.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_approval.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
 set(REDGEM_PRELUDE_HEADER ${REDGEM_GENERATED_DIR}/generated/ruby_prelude.hpp)
 add_custom_command(
@@ -67,7 +69,7 @@ add_custom_command(
 # is made of: what players receive (redgem-player) has none of the tools in it, and what runs on a
 # server (redgem-relay) has nothing that draws.
 #   redgem_core     what everything shares
-#   redgem_net      sockets, messages, the relay: no window, no scripts
+#   redgem_net      sockets, messages, the relay, web requests: no window, no scripts
 #   redgem_runtime  everything a game needs to run
 #   redgem_game_server  a game run on a server for players to join, in rooms (redgem-server)
 #   redgem_editor   the editor, with the library its interface is drawn with
@@ -119,6 +121,7 @@ redgem_add_library(redgem_net
   net/network_session_host.cpp
   net/network_session_guest.cpp
   net/network_session_server.cpp
+  net/network_session_approval.cpp
   net/room_codes.cpp
   net/code_guessers.cpp
   net/lobby.cpp
@@ -127,10 +130,23 @@ redgem_add_library(redgem_net
   net/relay_server.cpp
   net/relay_server_visitors.cpp
   net/relay_server_rooms.cpp
-  net/relay_program.cpp)
-target_link_libraries(redgem_net PUBLIC redgem_core nlohmann_json::nlohmann_json)
+  net/relay_program.cpp
+  net/http_url.cpp
+  net/http_address.cpp
+  net/http_message.cpp
+  net/http_chunks.cpp
+  net/http_response_parser.cpp
+  net/http_response_head.cpp
+  net/http_trust.cpp
+  net/http_trust_system.cpp
+  net/http_stream.cpp
+  net/http_tls.cpp
+  net/http_exchange.cpp
+  net/http_client.cpp)
+target_link_libraries(redgem_net PUBLIC redgem_core nlohmann_json::nlohmann_json mbedtls)
 if(WIN32)
-  target_link_libraries(redgem_net PUBLIC ws2_32)
+  # (crypt32: the Windows certificate store, which https:// answers are checked against.)
+  target_link_libraries(redgem_net PUBLIC ws2_32 crypt32)
 endif()
 
 redgem_add_library(redgem_runtime
@@ -190,6 +206,7 @@ redgem_add_library(redgem_runtime
   script/script_host_scripts.cpp
   script/script_host_callbacks.cpp
   script/script_host_network.cpp
+  script/script_host_http.cpp
   script/bindings/bindings.cpp
   script/bindings/binding_helpers.cpp
   script/bindings/game_object_bindings.cpp
@@ -208,6 +225,8 @@ redgem_add_library(redgem_runtime
   script/bindings/network_bindings.cpp
   script/bindings/network_search_bindings.cpp
   script/bindings/network_state_bindings.cpp
+  script/bindings/network_approval_bindings.cpp
+  script/bindings/http_bindings.cpp
   render/mesh_builder.cpp
   render/mesh_pieces.cpp
   render/image_header.cpp

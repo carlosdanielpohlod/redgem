@@ -81,7 +81,8 @@ void Engine::open_audio() {
 }
 
 void Engine::open_saves() {
-  // A server's rooms come and go, and its players keep saves of their own: nothing is written there.
+  if (options_.save != nullptr) return;  // its runner's
+  // A server's room with no store of the server's: what it saves lasts for the match.
   if (serves_a_room()) {
     save_ = std::make_unique<SaveStore>();
     return;
@@ -91,11 +92,12 @@ void Engine::open_saves() {
 }
 
 void Engine::fill_context(const std::string& game_title) {
-  context_.save = save_.get();
+  context_.save = options_.save != nullptr ? options_.save : save_.get();
   context_.animations = &animations_;
   context_.particles = &particles_;
   context_.network = &network_;
   context_.discovery = &discovery_;
+  context_.http = &http_;
   context_.game_title = game_title;
   context_.scene = &scene_;
   context_.audio = &audio();

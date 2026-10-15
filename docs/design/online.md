@@ -1,8 +1,9 @@
 # Design: online games
 
-Status: proposal. What RedGem needs so a game can be played online with accounts and saved
-data, built the way established engines do it, and generic: the engine provides the pieces, the
-game chooses its services.
+Status: implemented (see [Online services](../scripting/online-services.md) for how a game uses it,
+and "As built" at the end for where the implementation differs). What RedGem needs so a game can
+be played online with accounts and saved data, built the way established engines do it, and
+generic: the engine provides the pieces, the game chooses its services.
 
 ## What other engines do
 
@@ -125,3 +126,26 @@ No service is built into the engine and none is required.
   timeouts.
 - A server's game decides who plays; tokens are checked by the service that issued them.
 - Scripts still cannot read or write files on the player's device; only `HTTP` reaches out.
+
+## As built
+
+- **HTTP** lives in `src/net/http_*` (Mbed TLS 3.6, one thread per request), its Ruby side in
+  `ruby/engine/http.rb`. `http://` is allowed when the address a name leads to is this machine's
+  or a private network's, checked once connected (nothing is sent otherwise). Redirects are not
+  followed. On Android the certificates are not bundled: the engine reads the system's own
+  (`/apex/com.android.conscrypt/cacerts`, then `/system/etc/security/cacerts`), which every app
+  can read and which stays up to date. A level loaded while requests are on their way drops their
+  blocks (the requests still go out); a game that ends gives them up.
+- **Connection approval**: the name is `Network.player_name(peer)`; `on_fail` gets the reason. The
+  hello carries `auth` under a new key, and the host answers with two new kinds of message ("the
+  game is deciding", "refused, and why"); no version field was needed. A client of 0.2.0 joins as
+  before (it carries nothing); against a host that decides, it ignores "deciding", so it gives up
+  after its own 5 seconds if the game takes longer, and a refusal reaches it as a plain failure.
+  A room on a relay lets everyone in: the relay decides nothing.
+- **Saving on a server**: the data folder defaults to `<game>-data` beside the game's folder. One
+  `save.json` per server, shared by its rooms, written atomically on the server's one thread.
+  `Save` now keeps arrays, hashes and `Vector3` as well (the example above needs a hash);
+  hashes come back with string keys. A server's secrets (a backend's key) go in its own save.
+- **Guides**: the manual's Online services page; the platformer logs in when `ACCOUNTS` is set
+  (`scripts/accounts.rb`, `scripts/server_gate.rb`) and joins as a guest otherwise; the backend is
+  `docs/examples/backend/app.rb`.

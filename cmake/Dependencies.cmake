@@ -11,6 +11,8 @@ set(REDGEM_IMGUI_TAG   "v1.92.8-docking")
 set(REDGEM_RLIMGUI_COMMIT  "1550009359ad975927f7f0e4a3f47e3f27123ea9")
 set(REDGEM_IMGUIZMO_COMMIT "18cef5e031d8c6973d80284c67f60549fafd78c1")
 set(REDGEM_JSON_VERSION "v3.12.0")
+set(REDGEM_MBEDTLS_VERSION "3.6.7")
+set(REDGEM_MBEDTLS_SHA256 "a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6")
 
 # --- X11 headers extracted locally by tools/setup/fetch_x11_headers.sh -------
 set(REDGEM_LOCAL_X11_INCLUDE "${CMAKE_SOURCE_DIR}/.deps/x11/usr/include")
@@ -108,7 +110,20 @@ FetchContent_Declare(imguizmo
 FetchContent_Declare(nlohmann_json
   URL https://github.com/nlohmann/json/releases/download/${REDGEM_JSON_VERSION}/json.tar.xz)
 
-FetchContent_MakeAvailable(raylib cgltf JoltPhysics doctest mruby nlohmann_json)
+# --- Mbed TLS (HTTPS for the games' HTTP; its release archive, which needs no code generation) ----
+set(ENABLE_PROGRAMS OFF CACHE BOOL "" FORCE)
+set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+set(MBEDTLS_FATAL_WARNINGS OFF CACHE BOOL "" FORCE)
+set(USE_SHARED_MBEDTLS_LIBRARY OFF CACHE BOOL "" FORCE)
+set(USE_STATIC_MBEDTLS_LIBRARY ON CACHE BOOL "" FORCE)
+# Requests run on threads of their own, several at once (see the configuration file).
+set(LINK_WITH_PTHREAD ON CACHE BOOL "" FORCE)
+set(MBEDTLS_USER_CONFIG_FILE "${CMAKE_SOURCE_DIR}/cmake/mbedtls_user_config.h" CACHE FILEPATH "" FORCE)
+FetchContent_Declare(mbedtls
+  URL https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${REDGEM_MBEDTLS_VERSION}/mbedtls-${REDGEM_MBEDTLS_VERSION}.tar.bz2
+  URL_HASH SHA256=${REDGEM_MBEDTLS_SHA256})
+
+FetchContent_MakeAvailable(raylib cgltf JoltPhysics doctest mruby nlohmann_json mbedtls)
 # Skinned meshes are deformed on the GPU: raylib then uploads bone ids / weights and bone matrices
 # (off in customized builds unless asked for).
 target_compile_definitions(raylib PRIVATE RL_SUPPORT_MESH_GPU_SKINNING)

@@ -45,6 +45,12 @@ inline constexpr float kSilenceTimeoutSeconds = 45.0f;
 // for this one opens a new room.
 inline constexpr std::size_t kRoomCodeLetters = 6;
 inline constexpr const char* kNewRoom = "new";
+// Connection approval (Network.authenticate): what a newcomer's hello may carry for the game it
+// joins to decide on (a hash, at most this long written out), how long that game has to decide
+// (one that never does turns the newcomer away), and how long the reason of a refusal may be.
+inline constexpr std::size_t kMaxAuthBytes = 4096;
+inline constexpr float kApprovalSeconds = 10.0f;
+inline constexpr std::size_t kMaxReasonBytes = 256;
 
 namespace wire {
 
@@ -59,12 +65,18 @@ inline constexpr const char* kRoom = "r";
 // In a welcome: the game's host is a dedicated server, which plays nobody. (Programs that do not
 // know of it never look for it.)
 inline constexpr const char* kServer = "s";
+// In a hello: what the game joined decides on (Network.join's auth:). In a refusal: why. (Programs
+// that do not know of them never look for them: a host of version 0.2.0 lets everyone in.)
+inline constexpr const char* kAuth = "a";
+inline constexpr const char* kReason = "y";
 inline constexpr const char* kGameMessage = "m";
-inline constexpr const char* kHello = "h";    // a newcomer: let me in (to a relay: into this room)
-inline constexpr const char* kWelcome = "w";  // to a newcomer: your id, and who else is here
-inline constexpr const char* kArrived = "j";  // to the others: someone joined
-inline constexpr const char* kGone = "l";     // to the others: someone left
-inline constexpr const char* kPing = "i";     // nothing to say: I am here
+inline constexpr const char* kHello = "h";        // a newcomer: let me in (to a relay: into this room)
+inline constexpr const char* kWelcome = "w";      // to a newcomer: your id, and who else is here
+inline constexpr const char* kArrived = "j";      // to the others: someone joined
+inline constexpr const char* kGone = "l";         // to the others: someone left
+inline constexpr const char* kPing = "i";         // nothing to say: I am here
+inline constexpr const char* kConsidering = "c";  // to a newcomer: the game is deciding on your hello
+inline constexpr const char* kRefused = "x";      // to a newcomer: you are not let in, and why
 
 // The lowest id no machine in `taken` has, for a newcomer; 0 when the game is full. Ids are
 // handed out again once free, so they never outgrow what a message may carry.
@@ -75,6 +87,9 @@ nlohmann::json game_message(const std::string& name, const nlohmann::json& data,
 // peers: ids there can be, each once, and fewer than a full game). Anything else comes from a
 // broken or hostile program, and nothing of it is used.
 bool well_formed(const nlohmann::json& message);
+// Whether what a hello carries for the game to decide on can be handed to it: nothing, or a hash
+// within the limits of a message's data and kMaxAuthBytes.
+bool acceptable_auth(const nlohmann::json& auth);
 // Whether a message that is well formed is one a game sent, under a name to hear it by.
 bool is_game_message(const nlohmann::json& message);
 // Whether the id a welcome hands this machine can be its own: only the host is 1 (as is whoever

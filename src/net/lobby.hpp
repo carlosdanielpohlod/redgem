@@ -15,7 +15,8 @@ namespace redgem::net {
 // A machine that connected to a dedicated server and said which room it wants.
 struct Arrival {
   Connection connection;
-  std::string room;  // the code of the room it asks for; empty for any room with a free place
+  std::string room;     // the code of the room it asks for; empty for any room with a free place
+  nlohmann::json auth;  // what it carries for the room's game to decide on (null: nothing)
 };
 
 // How many machines from an address are in the server's rooms already.
@@ -43,6 +44,7 @@ class Lobby {
   struct Newcomer {
     Connection connection;
     std::optional<std::string> wants;  // the room it asked for, once it said ("" for any)
+    nlohmann::json auth;
 
     // Said which room it wants, and is still there to be placed.
     bool ready() const { return wants.has_value() && !connection.closed(); }

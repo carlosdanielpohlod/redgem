@@ -5,9 +5,15 @@
 #include <variant>
 
 #include "app/scene_files.hpp"
+#include "core/files.hpp"
 #include "core/log.hpp"
 
 namespace redgem::server {
+
+std::filesystem::path data_dir_beside(const std::filesystem::path& game_dir) {
+  const std::filesystem::path game = normalized_folder(game_dir);
+  return game.parent_path() / (game.filename().string() + kDataFolderSuffix);
+}
 
 bool GameServer::start(std::string& error) {
   auto scene = read_game_scene(settings_.game_dir);
@@ -16,6 +22,7 @@ bool GameServer::start(std::string& error) {
     return false;
   }
   scene_ = std::move(std::get<SceneDesc>(scene));
+  if (!settings_.data_dir.empty()) saves_ = SaveStore(settings_.data_dir / kSaveFileName);
   return lobby_.open(settings_.port, error);
 }
 

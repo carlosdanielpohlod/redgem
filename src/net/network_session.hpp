@@ -30,17 +30,21 @@ struct NetworkEvent {
     Disconnected,  // the game is gone (the host left, or the connection dropped)
     PeerJoined,    // someone else arrived
     PeerLeft,      // someone else is gone
-    Message        // `peer` sent `name` with `data`
+    Message,       // `peer` sent `name` with `data`
+    Approval       // a newcomer asks to come in as `peer`, with `data`: the game decides (see decide)
   };
   Kind kind = Kind::Message;
   int peer = 0;
-  std::string name;
+  std::string name;  // a message's; a Failed join's reason, when the host gave one
   nlohmann::json data;
+  int ticket = 0;  // an Approval's: what the decision names
 
   // Something that happened, to or about `peer`.
   static NetworkEvent of(Kind kind, int peer = 0);
   // What `from` said.
   static NetworkEvent message(int from, const std::string& name, const nlohmann::json& data);
+  // A newcomer who would be `peer` asks to come in, with what it carries for the game to decide on.
+  static NetworkEvent approval(int peer, int ticket, const nlohmann::json& auth);
 };
 
 // One multiplayer game over TCP (Network in Ruby). One machine hosts and the others join it;
@@ -57,17 +61,29 @@ class NetworkSession {
   // Starts a game others can join on `port` (0 picks a free one, see port()).
   bool host(std::uint16_t port, std::string& error);
   // Starts joining the game hosted at `address`. A Connected or Failed event tells how it went.
-  bool join(const std::string& address, std::uint16_t port, std::string& error);
+  // `auth` (a hash, or null) goes with the hello, for the game joined to decide on.
+  bool join(const std::string& address, std::uint16_t port, std::string& error, const nlohmann::json& auth = nullptr);
   // Opens a room on the relay at `address`; the Connected event comes with its code in room().
   bool host_room(const std::string& address, std::uint16_t port, std::string& error);
   // Joins the room with that code on the relay at `address`.
-  bool join_room(const std::string& address, std::uint16_t port, const std::string& code, std::string& error);
+  bool join_room(const std::string& address, std::uint16_t port, const std::string& code, std::string& error,
+                 const nlohmann::json& auth = nullptr);
   // Starts a game as a room of a dedicated server, under the room's code: this machine is the
   // host, with no player of its own.
   void serve_room(const std::string& code);
   // Lets a machine that asked the dedicated server for this room in: it is told its id, and the
-  // others of its arrival (with the next poll's events). With no place left it is let go.
-  void admit_arrival(Connection connection);
+  // others of its arrival (with the next poll's events). With no place left it is let go. When
+  // the game decides who comes in, it is asked first, with `auth` from the machine's hello.
+  void admit_arrival(Connection connection, const nlohmann::json& auth = nullptr);
+  // Connection approval, on the machine hosting (directly, or a dedicated server's room): with
+  // it, a newcomer is not let in until the game decides (an Approval event, then decide()), and is
+  // turned away when the game has not decided within kApprovalSeconds. Without it everyone is let
+  // in. It lasts while hosting other games, until turned off.
+  void require_approval(bool required) { approving_ = required; }
+  // The game's decision on the newcomer of an Approval event, named by its ticket: let in, or
+  // turned away with `reason` (cut to kMaxReasonBytes). False when there is nobody to decide on any
+  // more: the newcomer left, was decided on already, or the time to decide ran out.
+  bool decide(int ticket, bool accepted, const std::string& reason = {});
   // The code of the room this game is in, on a relay or a dedicated server; empty for a game
   // hosted directly.
   const std::string& room() const { return room_; }
@@ -90,6 +106,8 @@ class NetworkSession {
   bool serving() const { return server_hosted_ && hosting(); }
   // The others who play: everyone else, without a dedicated server.
   std::vector<int> players() const;
+  // How many newcomers the game is deciding on (connection approval).
+  std::size_t deciding() const;
   // How many of the machines in the game connected from `address` (on the host).
   int links_from(const std::string& address) const;
   // The port being hosted on, or of the game joined.
@@ -102,8 +120,16 @@ class NetworkSession {
     int peer = 0;  // 0 on the host until the newcomer said hello and was let in
     ByteAllowance allowance{kServedBytesPerSecond, kServedBurstBytes};  // on a dedicated server
     float idle_for = 0.0f;  // seconds since it last said something to the game, on a dedicated server
+    int asking_as = 0;      // the id a newcomer would have, while the game decides on it
+    int ticket = 0;         // ... and what the decision names
+    float asking_for = 0.0f;
 
     bool let_in() const { return peer != 0; }
+    bool asking() const { return asking_as != 0; }
+    // A newcomer that has not said hello yet.
+    bool before_hello() const { return !let_in() && !asking(); }
+    // Whether it is the newcomer a decision with this ticket is about, and still there to hear it.
+    bool asks_with(int number) const { return asking() && ticket == number && !connection.closed(); }
     // In the game, and not the machine that is `other` there.
     bool is_another_than(int other) const { return let_in() && peer != other; }
     // A newcomer that may still say hello.
@@ -133,11 +159,24 @@ class NetworkSession {
   // What a dedicated server's room holds its machines to: one that sends more than it may, or
   // says nothing to the game for too long, is let go.
   void police(Link& link, std::size_t bytes, float seconds);
+  // The newcomers' turn in a poll: those connecting are taken in, those the game is deciding on wait.
+  void tend_newcomers(float seconds);
   void receive_newcomers(float seconds);
   void accept_newcomers();
   // Whether one more machine from `address` may wait to say hello.
   bool room_to_wait(const std::string& address) const;
+  // A newcomer that said hello, with `auth`: let in, or put to the game when it decides who comes in.
+  void consider(Link& link, const nlohmann::json& auth, std::vector<NetworkEvent>& events);
   void admit(Link& link, std::vector<NetworkEvent>& events);
+  // Lets a newcomer in as `peer` (0: there is no place left, and it is let go).
+  void let_in(Link& link, int peer, std::vector<NetworkEvent>& events);
+  // Connection approval (network_session_approval.cpp).
+  void ask(Link& link, const nlohmann::json& auth, std::vector<NetworkEvent>& events);
+  static void refuse(Link& link, const std::string& reason);
+  void wait_for_decisions(float seconds);
+  Link* asking_link(int ticket);
+  // The ids of the others in the game and of the newcomers the game is deciding on.
+  std::vector<int> ids_taken() const;
   // What a newcomer let in as `peer` is told: its id and who else is here (and, on a dedicated
   // server, the room's code and that its host plays nobody).
   nlohmann::json welcome_for(int peer, const std::vector<int>& already_here) const;
@@ -149,6 +188,9 @@ class NetworkSession {
   // Sends a peer's message on to whom it is for; true when that includes this machine.
   bool pass_on(int from, int to, const nlohmann::json& message);
   void handle_as_guest(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  // What a machine still connecting hears: that the game is deciding on it, that it was turned
+  // away, or the welcome.
+  void hear_while_joining(const nlohmann::json& message, std::vector<NetworkEvent>& events);
   // What a machine still connecting waits for: the host's welcome, with its id and who else is here.
   void accept_welcome(const nlohmann::json& message, std::vector<NetworkEvent>& events);
   // What a machine in the game hears from its host: who came, who went, what the others said.
@@ -186,6 +228,9 @@ class NetworkSession {
   bool through_relay_ = false;  // the game is a room on a relay
   bool opening_room_ = false;   // ... which this machine asked to open
   bool server_hosted_ = false;  // the game's host is a dedicated server
+  bool approving_ = false;      // the game decides who comes in (require_approval)
+  int last_ticket_ = 0;
+  std::string refusal_;  // why the host turned this machine away, while joining
   std::string room_;
   Socket listener_;
   std::vector<Link> links_;

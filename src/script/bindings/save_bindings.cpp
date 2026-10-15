@@ -1,6 +1,6 @@
-// Save natives: what a game keeps between runs.
-
-#include <cmath>
+// Save natives: what a game keeps between runs: what a message can carry (numbers, texts,
+// true/false, Vector3, arrays and hashes of those; hashes come back with String keys). Saving nil
+// removes the key.
 
 #include <mruby.h>
 #include <mruby/array.h>
@@ -10,51 +10,30 @@
 #include "core/log.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
+#include "script/bindings/message_values.hpp"
 
 namespace redgem {
 namespace {
 
 using namespace binding;
 
-constexpr double kLargestSavedInteger = 9007199254740992.0;  // 2^53: whole numbers a double holds exactly
-
 // --- Save --------------------------------------------------------------------------------------
 
 SaveStore& save(mrb_state* mrb) { return required(mrb, context(mrb).save, "Save is only available while a game runs"); }
-
-// Whole numbers come back as Integers: a saved count of 3 is 3, not 3.0.
-mrb_value number_value(mrb_state* mrb, double number) {
-  const bool whole = std::fabs(number) <= kLargestSavedInteger && std::floor(number) == number;
-  return whole ? mrb_int_value(mrb, static_cast<mrb_int>(number)) : mrb_float_value(mrb, number);
-}
 
 mrb_value save_get(mrb_state* mrb, mrb_value) {
   mrb_value key;
   mrb_value fallback = mrb_nil_value();
   mrb_get_args(mrb, "o|o", &key, &fallback);
   const auto value = save(mrb).get(to_name(mrb, key));
-  if (!value) return fallback;
-  if (const auto* flag = std::get_if<bool>(&*value)) return mrb_bool_value(*flag);
-  if (const auto* number = std::get_if<double>(&*value)) return number_value(mrb, *number);
-  return text_value(mrb, std::get<std::string>(*value));
-}
-
-// What is kept for a Ruby value; raises for one that cannot be kept.
-PropertyValue stored_value(mrb_state* mrb, mrb_value value) {
-  const bool flag = mrb_true_p(value);
-  const bool is_flag = flag || mrb_false_p(value);
-  if (is_flag) return flag;
-  if (mrb_integer_p(value)) return static_cast<double>(mrb_integer(value));
-  if (mrb_float_p(value)) return finite_number(mrb, value, "Save cannot keep infinity or NaN");
-  if (is_name(value)) return to_name(mrb, value);
-  mrb_raise(mrb, E_ARGUMENT_ERROR, "Save keeps numbers, texts and true / false");
+  return value ? value_from(mrb, *value, HashKeys::Strings) : fallback;
 }
 
 mrb_value save_set(mrb_state* mrb, mrb_value) {
   mrb_value key;
   mrb_value value;
   mrb_get_args(mrb, "oo", &key, &value);
-  const PropertyValue stored = stored_value(mrb, value);
+  const nlohmann::json stored = json_from(mrb, value, kSaveHolder);
   if (!save(mrb).set(to_name(mrb, key), stored)) log::warning("could not write " + save(mrb).file().string());
   return value;
 }

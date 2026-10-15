@@ -19,6 +19,7 @@ class SaveStore;
 namespace net {
 class NetworkSession;
 class LanDiscovery;
+class HttpClient;
 }  // namespace net
 class AnimationPlayer;
 class ParticleSystem;
@@ -63,6 +64,8 @@ struct ScriptContext {
   net::NetworkSession* network = nullptr;
   // Finding games on the local network, and being found (Network.search, Network.host).
   net::LanDiscovery* discovery = nullptr;
+  // The game's web requests (HTTP).
+  net::HttpClient* http = nullptr;
   // What the game is called (game.json): how a hosted game shows up to others unless named.
   std::string game_title;
   bool quit_requested = false;

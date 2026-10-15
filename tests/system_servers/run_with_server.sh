@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Runs a game on a dedicated server and two copies of it that join the server, each driven by its
 # own system test: online play with nobody hosting, tested for real. Passes when both tests pass,
-# the server closes their room once both left, and it stops cleanly when asked to (SIGTERM).
+# the server closes their room once both left, and it stops cleanly when asked to (SIGTERM). A
+# test that expects the server's game to keep a player's coins names that player (its identity)
+# in a note, saved_identity: the server's save must then hold one coin for it.
 # The server is the engine's own program (redgem-server), run with no display, as on a machine
 # that has none; the games are run by the test tool. Every run keeps to itself: a folder of its
-# own among the temporary files (for the games' saves and the notes the tests leave each other),
-# and a port the system picks for the server, which the tests read from a note (server_port).
+# own among the temporary files (for the games' saves, the server's and the notes the tests leave
+# each other), and a port the system picks for the server, which the tests read from a note
+# (server_port).
 #   run_with_server.sh <redgem-server> <redgem-test> <game_dir> <first_test.rb> <second_test.rb> <screenshots_dir>
 set -uo pipefail
 
@@ -27,6 +30,9 @@ MAX_LOOKS=600                            # 30 seconds of looking, for a server t
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/redgem-server.XXXXXX")" || exit 1
 NOTES="${WORK}/notes"                    # where redgem-test --work keeps a run's notes
 LOG="${WORK}/server.log"
+DATA="${WORK}/server-data"               # the server's data folder (--data): its game's save
+SAVED_IDENTITY="${NOTES}/saved_identity"
+KEPT_COIN='"coins": 1'                   # what the server's save holds for that player
 mkdir -p "${NOTES}"
 server=""
 
@@ -48,7 +54,7 @@ server_said() {
 }
 
 env -u DISPLAY -u WAYLAND_DISPLAY "${SERVER}" "${GAME}" --port "${ANY_FREE_PORT}" \
-  --max-players "${PLAYERS_PER_ROOM}" > "${LOG}" 2>&1 &
+  --max-players "${PLAYERS_PER_ROOM}" --data "${DATA}" > "${LOG}" 2>&1 &
 server=$!
 if ! server_said "${LISTENING}"; then
   cat "${LOG}"
@@ -74,8 +80,14 @@ server=""
 cat "${LOG}"
 grep -qF -- "${STOPPED}" "${LOG}"
 stopped_status=$?
+saved_status=0
+if [[ -f "${SAVED_IDENTITY}" ]]; then
+  cat "${DATA}/save.json"
+  grep -A1 -F -- "\"$(cat "${SAVED_IDENTITY}")\"" "${DATA}/save.json" | grep -qF -- "${KEPT_COIN}"
+  saved_status=$?
+fi
 
 echo "first test exited with ${first_status}, second with ${second_status}; room closed: ${room_status};" \
-  "server exited with ${server_status}, said it stopped: ${stopped_status}"
+  "server exited with ${server_status}, said it stopped: ${stopped_status}; kept the player's coin: ${saved_status}"
 [ "${first_status}" -eq 0 ] && [ "${second_status}" -eq 0 ] && [ "${room_status}" -eq 0 ] &&
-  [ "${server_status}" -eq 0 ] && [ "${stopped_status}" -eq 0 ]
+  [ "${server_status}" -eq 0 ] && [ "${stopped_status}" -eq 0 ] && [ "${saved_status}" -eq 0 ]

@@ -153,3 +153,25 @@ TEST_CASE("a packed message is its JSON behind its length, with broken text repl
   const std::string not_utf8 = "caf\xE9";
   CHECK_NOTHROW(wire::packed(wire::game_message(not_utf8, json(), kGuest, kEveryone)));
 }
+
+TEST_CASE("what a hello carries for the game to decide on is nothing, or a small hash of message data") {
+  CHECK(wire::acceptable_auth(json()));
+  CHECK(wire::acceptable_auth(json{{"token", "abc"}, {"name", "Ana"}}));
+  CHECK(wire::acceptable_auth(json::object()));
+  CHECK_FALSE(wire::acceptable_auth(json("abc")));
+  CHECK_FALSE(wire::acceptable_auth(json::array({1, 2})));
+  CHECK_FALSE(wire::acceptable_auth(json{{"token", std::string(kMaxAuthBytes, 'a')}}));
+  json deep = json::object();
+  for (int level = 0; level <= kMaxDataDepth; ++level) deep = json{{"in", deep}};
+  CHECK_FALSE(wire::acceptable_auth(deep));
+}
+
+TEST_CASE("a refusal says why in a few words, and a hello with what a game decides on is a hello") {
+  const json refused = {{wire::kKind, wire::kRefused}, {wire::kReason, "not logged in"}};
+  CHECK(wire::well_formed(refused));
+  CHECK_FALSE(
+      wire::well_formed({{wire::kKind, wire::kRefused}, {wire::kReason, std::string(kMaxReasonBytes + 1, 'a')}}));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kRefused}, {wire::kReason, 7}}));
+  // (What a hello carries is checked where it is decided on, so that the newcomer hears why.)
+  CHECK(wire::well_formed({{wire::kKind, wire::kHello}, {wire::kAuth, {{"token", "abc"}}}}));
+}

@@ -1,7 +1,7 @@
 # A small image that runs one game on a dedicated server (redgem-server), for players to join over
 # the internet. Built from the repository's root, naming the game's folder:
 #   docker build -f Dockerfile.server --build-arg GAME=games/platformer -t platformer-server .
-#   docker run -d --restart unless-stopped -p 7777:7777 platformer-server [--rooms 4 --max-players 8]
+#   docker run -d --restart unless-stopped -p 7777:7777 -v platformer-data:/data platformer-server [--rooms 4]
 # Only the server is compiled, and the image keeps nothing but it and the game's files.
 FROM ubuntu:24.04 AS build
 
@@ -25,8 +25,11 @@ FROM ubuntu:24.04
 ARG GAME=games/platformer
 COPY --from=build /redgem/build/src/redgem-server /usr/local/bin/redgem-server
 COPY ${GAME} /game
-# It faces the internet: it runs as nobody in particular, and writes nothing (what a game saves on
-# a server is kept for the match only).
+# What the game saves (Save) is kept in /data, the one place it writes to: a volume, so that it
+# outlives the container.
+RUN mkdir /data && chown 65534:65534 /data
+VOLUME /data
+# It faces the internet: it runs as nobody in particular.
 USER 65534:65534
 EXPOSE 7777/tcp
-ENTRYPOINT ["redgem-server", "/game"]
+ENTRYPOINT ["redgem-server", "/game", "--data", "/data"]

@@ -45,9 +45,13 @@ bool is_id(const nlohmann::json& message, const char* key) {
          (message[key].is_number_integer() && message[key] >= 0 && message[key] <= kLargestId);
 }
 
-bool is_short_text(const nlohmann::json& message, const char* key) {
+bool is_text_up_to(const nlohmann::json& message, const char* key, std::size_t most_bytes) {
   return !message.contains(key) ||
-         (message[key].is_string() && message[key].get_ref<const std::string&>().size() <= kMaxNameBytes);
+         (message[key].is_string() && message[key].get_ref<const std::string&>().size() <= most_bytes);
+}
+
+bool is_short_text(const nlohmann::json& message, const char* key) {
+  return is_text_up_to(message, key, kMaxNameBytes);
 }
 
 bool is_flag(const nlohmann::json& message, const char* key) {
@@ -88,7 +92,14 @@ nlohmann::json game_message(const std::string& name, const nlohmann::json& data,
 bool well_formed(const nlohmann::json& message) {
   return has_kind(message) && is_id(message, kFrom) && is_id(message, kTo) && is_short_text(message, kName) &&
          is_list_of_peers(message, kPeers) && is_short_text(message, kRoom) && is_flag(message, kServer) &&
+         is_text_up_to(message, kReason, kMaxReasonBytes) &&
          (!message.contains(kData) || acceptable_data(message[kData]));
+}
+
+bool acceptable_auth(const nlohmann::json& auth) {
+  if (auth.is_null()) return true;
+  return auth.is_object() && acceptable_data(auth) &&
+         auth.dump(kCompact, ' ', false, nlohmann::json::error_handler_t::replace).size() <= kMaxAuthBytes;
 }
 
 bool is_game_message(const nlohmann::json& message) {

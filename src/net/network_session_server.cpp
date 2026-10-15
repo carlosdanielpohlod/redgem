@@ -15,10 +15,10 @@ void NetworkSession::serve_room(const std::string& code) {
   start_hosting();
 }
 
-void NetworkSession::admit_arrival(Connection connection) {
-  // (It said hello to the lobby already: it is let in at once.)
+void NetworkSession::admit_arrival(Connection connection, const nlohmann::json& auth) {
+  // (It said hello to the lobby already: it is let in at once, or the game is asked.)
   links_.push_back({std::move(connection), 0});
-  admit(links_.back(), pending_events_);
+  consider(links_.back(), auth, pending_events_);
 }
 
 std::vector<int> NetworkSession::players() const {

@@ -10,6 +10,7 @@
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "input/input.hpp"
+#include "net/http_client.hpp"
 #include "net/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
@@ -26,8 +27,8 @@ namespace {
 constexpr const char* kRubyTestModule = "RedGemTest";
 constexpr const char* kRunAllMethod = "run_all";
 
-// What a file of Ruby unit tests runs against: a scene, physics, input, audio and a network with
-// nothing in them.
+// What a file of Ruby unit tests runs against: a scene, physics, input, audio, a network and a web
+// client with nothing in them.
 struct BareWorld {
   Scene scene;
   std::unique_ptr<PhysicsWorld> physics = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f});
@@ -36,6 +37,7 @@ struct BareWorld {
   RecordingAudio audio;
   net::NetworkSession network;
   net::LanDiscovery discovery;
+  net::HttpClient http;
   ScriptContext context;
 
   BareWorld() {
@@ -45,6 +47,7 @@ struct BareWorld {
     context.audio = &audio;
     context.network = &network;
     context.discovery = &discovery;
+    context.http = &http;
   }
 };
 

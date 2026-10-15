@@ -16,6 +16,7 @@ void install_bindings(mrb_state* mrb) {
   install_particles_bindings(mrb);
   install_save_bindings(mrb);
   install_network_bindings(mrb);
+  install_http_bindings(mrb);
 }
 
 }  // namespace redgem

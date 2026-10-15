@@ -50,6 +50,16 @@ TEST_CASE("the server program's numbers are whole, and within what a server may 
   CHECK(parse_server_command({"game", "--port"}).error == "--port needs a number from 0 to 65535");
 }
 
+TEST_CASE("the server program keeps the game's saves beside the game, or in the folder it is given") {
+  CHECK(parse_server_command({"games/platformer"}).settings.data_dir == "games/platformer-data");
+  CHECK(parse_server_command({"/srv/game/"}).settings.data_dir == "/srv/game-data");
+  const ServerCommand chosen = parse_server_command({"--data", "/var/lib/platformer", "games/platformer"});
+  REQUIRE(chosen.ok);
+  CHECK(chosen.settings.data_dir == "/var/lib/platformer");
+  CHECK(parse_server_command({"games/platformer", "--data"}).error == "--data needs a folder");
+  CHECK(server_usage().find("--data <dir>") != std::string::npos);
+}
+
 TEST_CASE("what the server program does not understand is refused by name") {
   CHECK(parse_server_command({}).error == "which game? redgem-server <game_dir>");
   CHECK(parse_server_command({"game", "other"}).error == "unexpected argument other");

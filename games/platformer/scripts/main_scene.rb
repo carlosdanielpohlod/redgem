@@ -8,12 +8,16 @@ class MainScene < SceneScript
   # Where the game's dedicated server runs ("play.example.com", or "play.example.com:7777": a
   # machine running `redgem-server` on this game). With none, Play online says so.
   SERVER = "".freeze
+  # Where players log in before playing online (your own backend, such as the example of the
+  # manual's Online services page: "http://127.0.0.1:4567"). With none, they play as guests.
+  ACCOUNTS = "".freeze
   TITLE = "Platformer".freeze
   MULTIPLAYER_OPTION = 2   # where the pause menu offers it: after Restart
 
   def setup
     add_menu
     find!("GameManager").add_component(CoOp)
+    ServerGate.new if Network.server?
   end
 
   private
@@ -22,6 +26,7 @@ class MainScene < SceneScript
   def add_menu
     menu = Camera.main.add_component(GameMenu, title: TITLE, start_open: false)
     menu.screens[:multiplayer] = MultiplayerScreen.new(menu, title: TITLE, relay: RELAY, server: SERVER)
+    menu.screens[:login] = LoginScreen.new(menu)
     menu.screens[:pause].add_option("Multiplayer", index: MULTIPLAYER_OPTION) { menu.show(:multiplayer) }
   end
 end

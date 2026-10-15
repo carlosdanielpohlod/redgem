@@ -23,6 +23,8 @@ PROJECTS = [
      os.path.join(DEPS, "cgltf-src", "LICENSE")),
     ("nlohmann/json", "JSON", "https://github.com/nlohmann/json",
      os.path.join(DEPS, "nlohmann_json-src", "LICENSE.MIT")),
+    ("Mbed TLS", "HTTPS for the games' web requests (HTTP)", "https://www.trustedfirmware.org/projects/mbed-tls/",
+     os.path.join(DEPS, "mbedtls-src", "LICENSE")),
     ("Dear ImGui", "The editor's interface", "https://github.com/ocornut/imgui",
      os.path.join(DEPS, "imgui-src", "LICENSE.txt")),
     ("rlImGui", "Dear ImGui on raylib", "https://github.com/raylib-extras/rlImGui",
@@ -56,6 +58,8 @@ BUNDLED = [
      "Apache 2.0 with LLVM exceptions", "https://llvm.org/LICENSE.txt"),
     ("mingw-w64 runtime (linked into Windows builds)", "Zope Public License 2.1 and public domain",
      "https://www.mingw-w64.org"),
+    ("Everest and p256-m (inside Mbed TLS: elliptic curves)", "Apache 2.0",
+     "https://github.com/Mbed-TLS/mbedtls/tree/development/3rdparty"),
     ("Android native app glue (compiled into Android builds)", "Apache 2.0",
      "https://developer.android.com/ndk"),
 ]

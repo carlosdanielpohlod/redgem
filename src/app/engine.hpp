@@ -10,6 +10,7 @@
 #include "audio/audio.hpp"
 #include "core/fixed_clock.hpp"
 #include "input/input.hpp"
+#include "net/http_client.hpp"
 #include "net/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
@@ -42,11 +43,14 @@ struct EngineOptions {
   bool fixed_step = false;
   // Where Save keeps the game's data. Empty: the game's file in the user's RedGem folder.
   std::filesystem::path save_file;
+  // What Save keeps the game's data in, kept by whoever runs the engine, which it has to outlive
+  // (a dedicated server's, shared by its rooms). save_file is not looked at then.
+  SaveStore* save = nullptr;
   // What the game sounds through, which has to outlive the engine. Without one it is silent.
   AudioSystem* audio = nullptr;
   // Plays the game as a room of a dedicated server (redgem-server), under this code: online from
-  // the start as the game's host, with no player of its own (Network.server?), and what it saves
-  // kept for this match only. Empty: an ordinary game.
+  // the start as the game's host, with no player of its own (Network.server?), and, without a
+  // `save` of the server's, what it saves kept for this match only. Empty: an ordinary game.
   std::string server_room;
 };
 
@@ -123,6 +127,8 @@ class Engine {
   void read_input();
   InputSource& input_source();
   void poll_network(float frame_seconds);
+  // The answers of the game's web requests that came, each to the block waiting for it.
+  void answer_requests();
   // Whether the game is one the neighbours looking for a game are told of: hosted on this
   // machine's own port, and not as a room on a relay.
   bool found_by_neighbours() const;
@@ -158,6 +164,7 @@ class Engine {
   std::vector<ControlCircle> controls_;  // the touch controls of the frame being shown
   net::NetworkSession network_;
   net::LanDiscovery discovery_;
+  net::HttpClient http_;  // (its requests still on their way are given up with the engine)
   FixedClock clock_;
 };
 

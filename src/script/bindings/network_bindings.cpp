@@ -65,9 +65,10 @@ mrb_value network_join_room(mrb_state* mrb, mrb_value) {
   const char* address = nullptr;
   const char* code = nullptr;
   mrb_int port = 0;
-  mrb_get_args(mrb, "ziz", &address, &port, &code);
+  mrb_value auth;
+  mrb_get_args(mrb, "zizo", &address, &port, &code, &auth);
   std::string error;
-  if (network(mrb).join_room(address, port_arg(mrb, port), code, error)) return mrb_true_value();
+  if (network(mrb).join_room(address, port_arg(mrb, port), code, error, auth_arg(mrb, auth))) return mrb_true_value();
   return not_started(std::string("cannot join room ") + code + " at " + address, error);
 }
 
@@ -81,9 +82,10 @@ mrb_value network_room(mrb_state* mrb, mrb_value) {
 mrb_value network_join(mrb_state* mrb, mrb_value) {
   const char* address = nullptr;
   mrb_int port = 0;
-  mrb_get_args(mrb, "zi", &address, &port);
+  mrb_value auth;
+  mrb_get_args(mrb, "zio", &address, &port, &auth);
   std::string error;
-  if (network(mrb).join(address, port_arg(mrb, port), error)) return mrb_true_value();
+  if (network(mrb).join(address, port_arg(mrb, port), error, auth_arg(mrb, auth))) return mrb_true_value();
   return not_started(std::string("cannot join ") + address, error);
 }
 
@@ -105,9 +107,9 @@ mrb_value network_emit(mrb_state* mrb, mrb_value) {
 void install_connection_bindings(RClass* network_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, network_module, "__host", network_host, MRB_ARGS_REQ(4));
   mrb_define_module_function(mrb, network_module, "__host_room", network_host_room, MRB_ARGS_REQ(2));
-  mrb_define_module_function(mrb, network_module, "__join_room", network_join_room, MRB_ARGS_REQ(3));
+  mrb_define_module_function(mrb, network_module, "__join_room", network_join_room, MRB_ARGS_REQ(4));
   mrb_define_module_function(mrb, network_module, "room", network_room, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, network_module, "__join", network_join, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, network_module, "__join", network_join, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, network_module, "__emit", network_emit, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, network_module, "__leave", network_leave, MRB_ARGS_NONE());
 }
@@ -125,6 +127,7 @@ std::uint16_t port_arg(mrb_state* mrb, mrb_int port) {
 void install_network_bindings(mrb_state* mrb) {
   RClass* network_module = mrb_define_module(mrb, "Network");
   install_connection_bindings(network_module, mrb);
+  install_network_approval_bindings(network_module, mrb);
   install_network_search_bindings(network_module, mrb);
   install_network_state_bindings(network_module, mrb);
 }

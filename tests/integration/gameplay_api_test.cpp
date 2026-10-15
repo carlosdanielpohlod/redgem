@@ -279,12 +279,19 @@ TEST_CASE("what scripts save is there in the next run") {
     CHECK(fails(*engine, "Save[:broken] = Float::INFINITY"));
     CHECK(ruby(*engine, "Save[:huge] = 1.0e300; Save[:huge]") == "1.0e+300");
     ruby(*engine, "Save.delete(:huge)");
-    CHECK(fails(*engine, "Save[:position] = Vector3.zero"));  // only numbers, texts and true/false
+    CHECK(fails(*engine, "Save[:thing] = Object.new"));  // what a message can carry, and nothing else
+    ruby(*engine,
+         "Save[:spawn] = Vector3.new(1, 2, 3); Save[:players] = { 'user-1' => { level: 3, items: [1, 2.5] } }");
+    CHECK(ruby(*engine, "Save[:gone] = 1; Save[:gone] = nil; Save.keys.include?(:gone)") == "false");
   }
   auto engine = engine_for(scene, temp.file);
   CHECK(ruby(*engine, "[Save[:best], Save[:name], Save[:muted], Save[:volume]].inspect") ==
         "[1200, \"Ana\", true, 0.5]");
-  CHECK(ruby(*engine, "Save.keys.inspect") == "[:best, :muted, :name, :volume]");
+  CHECK(ruby(*engine, "Save.keys.inspect") == "[:best, :muted, :name, :players, :spawn, :volume]");
+  CHECK(ruby(*engine, "Save[:spawn].inspect") == "Vector3(1.000, 2.000, 3.000)");
+  // Hashes come back with String keys, whatever symbols the scripts use.
+  CHECK(ruby(*engine, "[:level, :items]; Save[:players].inspect") ==
+        "{\"user-1\" => {\"items\" => [1, 2.5], \"level\" => 3}}");
   ruby(*engine, "Save.delete(:name)");
   CHECK(ruby(*engine, "Save[:name].inspect") == "nil");
   ruby(*engine, "Save.clear");

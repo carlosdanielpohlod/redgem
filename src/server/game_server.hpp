@@ -25,12 +25,20 @@ inline constexpr int kDefaultMaxPlayers = 8;
 inline constexpr int kMostPlayersPerRoom = net::kMaxPeers - 1;
 inline constexpr int kDefaultMaxRooms = 8;
 inline constexpr int kMostRooms = 64;
+// Where a server keeps what its game saves (Save), unless told: a folder beside the game's,
+// named after it with this ("games/platformer" -> "games/platformer-data"), holding one file.
+inline constexpr const char* kDataFolderSuffix = "-data";
+inline constexpr const char* kSaveFileName = "save.json";
+
+// The folder beside the game's that keeps its saves on a server.
+std::filesystem::path data_dir_beside(const std::filesystem::path& game_dir);
 
 // What a dedicated server is asked to be.
 struct ServerSettings {
   std::filesystem::path game_dir;
   std::uint16_t port = kDefaultServerPort;  // 0 picks a free one (see GameServer::port)
   RoomLimits limits{kDefaultMaxPlayers, kDefaultMaxRooms};
+  std::filesystem::path data_dir;  // where Save is kept; empty: nothing is written (kept in memory)
 };
 
 // A game played on a server with nobody at it (redgem-server): everyone joins, nobody hosts. One
@@ -38,6 +46,9 @@ struct ServerSettings {
 // engine of its own (where Network.server? is true). A room opens for the first player who
 // needs one and closes when its match ends: the game quits (Game.quit), or everyone left. Its
 // players are told the game is gone, and the next ones get a new room, with a new game.
+// What the game saves (Save) is the server's, kept in its data folder for every room at once and
+// for the next time it runs. Rooms take their turns one after the other on the server's one
+// thread, so their writes never meet: each is written whole, at once, before the next.
 class GameServer {
  public:
   explicit GameServer(ServerSettings settings) : settings_(std::move(settings)) {}
@@ -64,8 +75,10 @@ class GameServer {
     std::unique_ptr<Engine> engine;
 
     net::NetworkSession& network() const { return engine->network(); }
-    // Whether its match is over: the game quit, or nobody is left in it.
-    bool match_over() const { return engine->finished() || network().peers().empty(); }
+    // Its places taken: by the players, and by the newcomers its game is deciding on.
+    std::size_t places_taken() const { return network().peers().size() + network().deciding(); }
+    // Whether its match is over: the game quit, or nobody is left in it (nor waiting to come in).
+    bool match_over() const { return engine->finished() || places_taken() == 0; }
   };
 
   void place(net::Arrival arrival);
@@ -80,6 +93,7 @@ class GameServer {
 
   ServerSettings settings_;
   SceneDesc scene_;  // the game's first scene, read once: every room starts from it
+  SaveStore saves_;  // shared by every room
   net::Lobby lobby_;
   std::vector<Room> rooms_;  // in the order they opened
 };

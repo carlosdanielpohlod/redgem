@@ -12,6 +12,8 @@ namespace redgem {
 namespace {
 
 constexpr const char* kNetworkModule = "Network";
+// What forgets the handlers of a scene when another takes its place.
+constexpr const char* kResettingModules[] = {kNetworkModule, "HTTP"};
 constexpr const char* kNetworkEventEntry = "__event";
 constexpr const char* kSceneResetEntry = "__scene_reset";
 
@@ -28,6 +30,7 @@ constexpr EventName kEventNames[] = {
     {net::NetworkEvent::Kind::PeerJoined, "joined"},
     {net::NetworkEvent::Kind::PeerLeft, "left"},
     {net::NetworkEvent::Kind::Message, kMessageEvent},
+    {net::NetworkEvent::Kind::Approval, "approval"},
 };
 
 const char* network_event_name(net::NetworkEvent::Kind kind) {
@@ -41,7 +44,7 @@ const char* network_event_name(net::NetworkEvent::Kind kind) {
 // for where Ruby errors are caught.
 std::vector<mrb_value> event_arguments(mrb_state* mrb, const net::NetworkEvent& event) {
   return {mrb_symbol_value(mrb_intern_cstr(mrb, network_event_name(event.kind))), mrb_int_value(mrb, event.peer),
-          binding::text_value(mrb, event.name), value_from(mrb, event.data)};
+          binding::text_value(mrb, event.name), value_from(mrb, event.data), mrb_int_value(mrb, event.ticket)};
 }
 
 mrb_value network_module(mrb_state* mrb) { return mrb_obj_value(mrb_module_get(mrb, kNetworkModule)); }
@@ -49,8 +52,10 @@ mrb_value network_module(mrb_state* mrb) { return mrb_obj_value(mrb_module_get(m
 }  // namespace
 
 void ScriptHost::scene_was_reset() {
-  const RubyResult result = vm_.call(network_module(vm_.state()), kSceneResetEntry);
-  if (!result.ok) report_error("resetting the network's handlers", result.error);
+  for (const char* name : kResettingModules) {
+    const RubyResult result = vm_.call(mrb_obj_value(mrb_module_get(vm_.state(), name)), kSceneResetEntry);
+    if (!result.ok) report_error(std::string("resetting the handlers of ") + name, result.error);
+  }
 }
 
 void ScriptHost::dispatch(const net::NetworkEvent& event) {

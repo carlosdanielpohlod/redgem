@@ -13,12 +13,26 @@ namespace {
 // Whether a text can be the code of a room to join (the word that opens a new one is no room's).
 bool names_a_room(const std::string& code) { return !code.empty() && code != kNewRoom; }
 
+// A newcomer's first words, with what the game joined decides on when there is any.
+nlohmann::json hello(const nlohmann::json& auth) {
+  nlohmann::json said = {{kKind, kHello}};
+  if (!auth.is_null()) said[kAuth] = auth;
+  return said;
+}
+
 }  // namespace
 
 NetworkEvent NetworkEvent::of(Kind kind, int peer) {
   NetworkEvent event;
   event.kind = kind;
   event.peer = peer;
+  return event;
+}
+
+NetworkEvent NetworkEvent::approval(int peer, int ticket, const nlohmann::json& auth) {
+  NetworkEvent event = of(Kind::Approval, peer);
+  event.ticket = ticket;
+  event.data = auth;
   return event;
 }
 
@@ -57,8 +71,9 @@ bool NetworkSession::connect_out(const std::string& address, std::uint16_t port,
   return true;
 }
 
-bool NetworkSession::join(const std::string& address, std::uint16_t port, std::string& error) {
-  return connect_out(address, port, {{kKind, kHello}}, error);
+bool NetworkSession::join(const std::string& address, std::uint16_t port, std::string& error,
+                          const nlohmann::json& auth) {
+  return connect_out(address, port, hello(auth), error);
 }
 
 bool NetworkSession::host_room(const std::string& address, std::uint16_t port, std::string& error) {
@@ -69,12 +84,14 @@ bool NetworkSession::host_room(const std::string& address, std::uint16_t port, s
 }
 
 bool NetworkSession::join_room(const std::string& address, std::uint16_t port, const std::string& code,
-                               std::string& error) {
+                               std::string& error, const nlohmann::json& auth) {
   if (!names_a_room(code)) {
     error = "a room's code is needed to join it";
     return false;
   }
-  if (!connect_out(address, port, {{kKind, kHello}, {kRoom, code}}, error)) return false;
+  nlohmann::json said = hello(auth);
+  said[kRoom] = code;
+  if (!connect_out(address, port, said, error)) return false;
   through_relay_ = true;
   return true;
 }
@@ -96,6 +113,7 @@ void NetworkSession::go_offline() {
   opening_room_ = false;
   server_hosted_ = false;
   room_.clear();
+  refusal_.clear();
   pending_events_.clear();
 }
 
@@ -103,7 +121,7 @@ std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
   std::vector<NetworkEvent> events;
   if (offline()) return events;
   events.swap(pending_events_);
-  receive_newcomers(seconds);
+  tend_newcomers(seconds);
   if (state_ == State::Connecting) await_connection(seconds, events);
   // By index: handling a message may add nothing to links_, but keep it obvious. (And any of
   // them may end the game: nobody after that gets a turn.)

@@ -1,8 +1,8 @@
 #include "storage/save_store.hpp"
 
+#include <cmath>
+#include <cstdint>
 #include <fstream>
-
-#include <nlohmann/json.hpp>
 
 #include "core/log.hpp"
 
@@ -12,19 +12,45 @@ namespace {
 constexpr const char* kPartialSuffix = ".part";  // of a save still being written
 constexpr int kIndent = 2;
 
-// What a save file holds under one key, when it is something a game can save.
-std::optional<PropertyValue> saved_value(const nlohmann::json& value) {
-  if (value.is_boolean()) return PropertyValue(value.get<bool>());
-  if (value.is_number()) return PropertyValue(value.get<double>());
-  if (value.is_string()) return PropertyValue(value.get<std::string>());
-  return std::nullopt;
+// Arrays in hashes in arrays...: deeper than anything Save is given. A file nested deeper is not a save.
+constexpr int kMaxDepth = 32;
+constexpr double kLargestWhole = 9007199254740992.0;  // 2^53: whole numbers a double holds exactly
+
+bool is_whole(double number) { return std::fabs(number) <= kLargestWhole && std::floor(number) == number; }
+
+bool is_whole_float(const nlohmann::json& value) { return value.is_number_float() && is_whole(value.get<double>()); }
+
+std::optional<nlohmann::json> kept(const nlohmann::json& value, int depth);
+
+// An array or a hash, each of its members as it is kept.
+std::optional<nlohmann::json> kept_members(const nlohmann::json& value, int depth) {
+  if (depth >= kMaxDepth) return std::nullopt;
+  nlohmann::json members = value;
+  for (nlohmann::json& member : members) {
+    const auto inner = kept(member, depth + 1);
+    if (!inner) return std::nullopt;
+    member = *inner;
+  }
+  return members;
 }
 
-nlohmann::json as_json(const std::map<std::string, PropertyValue>& values) {
+// A value as it is kept: whole numbers as integers; nullopt for one nested too deep.
+std::optional<nlohmann::json> kept(const nlohmann::json& value, int depth) {
+  if (value.is_structured()) return kept_members(value, depth);
+  if (is_whole_float(value)) return nlohmann::json(value.get<std::int64_t>());
+  return value;
+}
+
+// What a key of a save file holds, as it is kept; nothing for null (which stands for nothing) or
+// for what nests too deep.
+std::optional<nlohmann::json> saved_entry(const nlohmann::json& value) {
+  if (value.is_null()) return std::nullopt;
+  return kept(value, 0);
+}
+
+nlohmann::json as_json(const std::map<std::string, nlohmann::json>& values) {
   nlohmann::json json = nlohmann::json::object();
-  for (const auto& [key, value] : values) {
-    std::visit([&json, &key = key](const auto& held) { json[key] = held; }, value);
-  }
+  for (const auto& [key, value] : values) json[key] = value;
   return json;
 }
 
@@ -50,7 +76,7 @@ void SaveStore::load() {
     return;
   }
   for (const auto& [key, value] : json.items()) {
-    if (const auto kept = saved_value(value)) values_[key] = *kept;
+    if (const auto keeping = saved_entry(value)) values_[key] = *keeping;
   }
 }
 
@@ -67,16 +93,17 @@ bool SaveStore::write() const {
   return !fs_error;
 }
 
-std::optional<PropertyValue> SaveStore::get(const std::string& key) {
+std::optional<nlohmann::json> SaveStore::get(const std::string& key) {
   load();
   const auto found = values_.find(key);
   if (found == values_.end()) return std::nullopt;
   return found->second;
 }
 
-bool SaveStore::set(const std::string& key, const PropertyValue& value) {
+bool SaveStore::set(const std::string& key, const nlohmann::json& value) {
+  if (value.is_null()) return remove(key);
   load();
-  values_[key] = value;
+  values_[key] = kept(value, 0).value_or(nlohmann::json());
   return write();
 }
 

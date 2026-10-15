@@ -18,6 +18,7 @@ void Engine::frame(float frame_seconds) {
   context_.hud.clear();
   scripts_->start_pending();
   poll_network(frame_seconds);
+  answer_requests();
   follow_presenter();
   advance_game(frame_seconds);
   present();
@@ -45,6 +46,10 @@ void Engine::poll_network(float frame_seconds) {
   if (!found_by_neighbours()) discovery_.stop_announcing();
   discovery_.set_players(static_cast<int>(network_.peers().size()) + 1);
   discovery_.update(frame_seconds);
+}
+
+void Engine::answer_requests() {
+  for (const net::HttpResult& result : http_.poll()) scripts_->dispatch(result);
 }
 
 bool Engine::found_by_neighbours() const { return network_.hosting() && network_.room().empty(); }

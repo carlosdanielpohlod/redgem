@@ -21,7 +21,7 @@ Network.host                           # on one machine (port 7777; port: 9000 p
 Network.join("192.168.0.12")           # on the others: the host's address
 
 Network.on_connect { start_round }     # this machine is in the game
-Network.on_fail { show("Could not join") }
+Network.on_fail { |reason| show("Could not join: #{reason}") }  # reason: nil, or the host's
 Network.on_join { |peer| ... }         # someone else arrived
 Network.on_leave { |peer| ... }        # someone else left
 Network.on_disconnect { ... }          # the game is gone: the host left or the connection dropped
@@ -107,6 +107,10 @@ Network.on_connect do
   Network.players.each { |peer| show_hero_of(peer) }
 end
 ```
+
+To let in only players who logged in, the join carries their token and the server's game decides
+(`Network.join(address, auth: { token: token })`, `Network.authenticate`): see
+[Online services](online-services.md).
 
 ## Messages
 
@@ -202,5 +206,6 @@ and join `127.0.0.1` in the other.
 There is no matchmaking or public list of games: players are on the same network, share a room
 code, or know the host's or the server's address. No relay or server is run for you. Every message passes through the host
 (or the relay), so there is no prediction or lag compensation: fine for co-op and casual
-games, not for competitive shooters. Messages are not encrypted, and players are not
-authenticated: play with people you trust.
+games, not for competitive shooters. Messages are not encrypted. Players are not authenticated
+unless the game hosting asks for it ([Online services](online-services.md)); a room on a relay
+lets everyone in.

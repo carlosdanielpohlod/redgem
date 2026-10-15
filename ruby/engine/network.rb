@@ -18,6 +18,12 @@
 #   Network.server?                     # true on the server itself, which plays nobody
 #   Network.players                     # the others who play: Network.peers without the server
 #
+# A join may carry what the game joined decides on (a session token from a login service), and
+# that game decides who comes in (see network_approval.rb):
+#
+#   Network.join("play.example.com", auth: { token: token })
+#   Network.authenticate { |peer, auth, decide| decide.accept(identity: ...) or decide.deny("why") }
+#
 #   Network.on(:hit) { |data, from| @health -= data[:damage] }
 #   Network.emit(:hit, { damage: 3 })   # to everyone else; to: :host or to: a peer's id for one
 #
@@ -50,6 +56,8 @@ module Network
   REACTIONS = {
     connected: :enter_game, joined: :greet, left: :remove_objects_of, disconnected: :keep_only_my_objects
   }.freeze
+  # ... and after it (the game's handlers may still ask who was there).
+  AFTERWARDS = { left: :forget_player, disconnected: :forget_players }.freeze
 
   @handlers = {}
   @listeners = {}
@@ -81,13 +89,14 @@ module Network
 
     # Starts joining a game (leaving the one this machine is in): at an address, or with
     # room: "K7QM3P" on the relay (or, with an address too, on the dedicated server there).
+    # auth: (a hash) goes with it, for the game joined to decide on (Network.authenticate).
     # on_connect or on_fail tells how it went, a moment later.
-    def join(address = nil, port: DEFAULT_PORT, room: nil)
+    def join(address = nil, port: DEFAULT_PORT, room: nil, auth: nil)
       leave
-      return join_room(address, port, room) if room
+      return join_room(address, port, room, auth) if room
       raise ArgumentError, "join needs an address or a room" if address.nil?
 
-      __join(address.to_s, port.to_i)
+      __join(address.to_s, port.to_i, auth)
     end
 
     def leave
@@ -108,17 +117,17 @@ module Network
     def on(name, &block) = (@handlers[name.to_s] ||= []) << block
 
     def on_connect(&block) = listen(:connected, block)        # this machine is in the game
-    def on_fail(&block) = listen(:failed, block)              # the join did not work out
+    def on_fail(&block) = listen(:failed, block)              # |reason| the join did not work out (reason may be nil)
     def on_disconnect(&block) = listen(:disconnected, block)  # the game is gone
     def on_join(&block) = listen(:joined, block)              # |peer| someone arrived
     def on_leave(&block) = listen(:left, block)               # |peer| someone left
 
     # Called by the engine for everything that happens on the network.
-    def __event(kind, peer, name, data)
+    def __event(kind, peer, name, data, ticket = 0)
       return receive(name, data, peer) if kind == :message
+      return consider(peer, data, ticket) if kind == :approval
 
-      __send__(REACTIONS[kind], peer) if REACTIONS[kind]
-      (@listeners[kind] || []).dup.each { |block| block.call(peer) }
+      happened(kind, peer, name)
     end
 
     # Called by the engine when a level is loaded: its objects and handlers are gone. The others
@@ -141,10 +150,26 @@ module Network
 
     def listen(kind, block) = (@listeners[kind] ||= []) << block
 
+    # Someone came, went, or the game started or ended: the engine reacts, then the game's handlers
+    # hear of it (a failed join's with its reason, when there is one).
+    def happened(kind, peer, name)
+      __send__(REACTIONS[kind], peer) if REACTIONS[kind]
+      told = told_about(kind, peer, name)
+      (@listeners[kind] || []).dup.each { |block| block.call(told) }
+      __send__(AFTERWARDS[kind], peer) if AFTERWARDS[kind]
+    end
+
+    # What the handlers of an event get: the peer, or why a join failed (nil when nobody said).
+    def told_about(kind, peer, name)
+      return peer unless kind == :failed
+
+      name.to_s.empty? ? nil : name
+    end
+
     # A room by its code: on the dedicated server at `address` when there is one, on the relay otherwise.
-    def join_room(address, port, room)
+    def join_room(address, port, room, auth)
       server = address.nil? ? relay_address : [address.to_s, port.to_i]
-      __join_room(*server, room.to_s.strip.upcase)
+      __join_room(*server, room.to_s.strip.upcase, auth)
     end
 
     # The relay as [address, port].
