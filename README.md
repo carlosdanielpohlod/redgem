@@ -1,5 +1,11 @@
 <p align="center"><img src="branding/redgem-logo.svg" alt="RedGem 3D Engine" width="460"></p>
 
+<p align="center">
+  <a href="https://github.com/carlosdanielpohlod/redgem/actions/workflows/linux.yml"><img src="https://github.com/carlosdanielpohlod/redgem/actions/workflows/linux.yml/badge.svg?branch=main" alt="Linux"></a>
+  <a href="https://github.com/carlosdanielpohlod/redgem/actions/workflows/windows.yml"><img src="https://github.com/carlosdanielpohlod/redgem/actions/workflows/windows.yml/badge.svg?branch=main" alt="Windows"></a>
+  <a href="https://github.com/carlosdanielpohlod/redgem/actions/workflows/macos.yml"><img src="https://github.com/carlosdanielpohlod/redgem/actions/workflows/macos.yml/badge.svg?branch=main" alt="macOS"></a>
+</p>
+
 A 3D game engine and editor where games are written in **Ruby**, the most human-friendly
 language. Build levels in the editor or in **Blender**, write the gameplay in Ruby, press Play,
 ship a standalone game.
