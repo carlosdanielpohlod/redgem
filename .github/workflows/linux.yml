@@ -1,7 +1,8 @@
 # The engine on Linux: built, every test run (the system tests too, in windows drawn by Mesa's
 # software renderer on a virtual display) and every linter. Each step that checks something fails
 # the run when it fails; the steps after it still run (when the build itself worked), so that one
-# failure does not hide the others.
+# failure does not hide the others. What is kept between runs is saved as soon as it is made, so
+# that a run whose tests fail still speeds up the next one.
 name: Linux
 
 on:
@@ -26,7 +27,7 @@ jobs:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 1G
-      # The sources of the libraries the engine is built from, kept between runs (see Configure).
+      # The sources of the libraries the engine is built from, kept between runs.
       FETCH_DIR: ${{ github.workspace }}/.deps/fetch
       # The same versions as on the machines the engine is written on.
       CPPCHECK_VERSION: "2.22.0"
@@ -35,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # The engine's own list (docs/install.md), plus a virtual display and Mesa for the system
-      # tests, ccache, and what builds cppcheck.
+      # tests, and ccache.
       - name: Install the build tools and libraries
         run: |
           sudo apt-get update
@@ -55,14 +56,15 @@ jobs:
         run: gem install rubocop -v "${RUBOCOP_VERSION}" --no-document
 
       - name: Restore the compiler cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: .ccache
-          key: ccache-linux-${{ github.sha }}
+          key: ccache-linux-${{ github.run_id }}
           restore-keys: ccache-linux-
 
       - name: Restore the libraries' sources
-        uses: actions/cache@v4
+        id: fetch-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             .deps/fetch/*-src
@@ -74,6 +76,15 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
 
+      - name: Keep the libraries' sources
+        if: ${{ steps.fetch-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .deps/fetch/*-src
+            .deps/fetch/*-subbuild
+          key: ${{ steps.fetch-cache.outputs.cache-primary-key }}
+
       # (Going on past the first error: every one of them is in the log.)
       - name: Build
         id: build
@@ -81,6 +92,14 @@ jobs:
           ccache --zero-stats
           cmake --build build -- -k 0
           ccache --show-stats
+
+      # (Even when the build failed: what it compiled is still good.)
+      - name: Keep the compiler cache
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@v4
+        with:
+          path: .ccache
+          key: ccache-linux-${{ github.run_id }}
 
       - name: Unit and integration tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -113,13 +132,14 @@ jobs:
       - name: Restore cppcheck
         id: cppcheck-cache
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: .deps/cppcheck
           key: cppcheck-linux-${{ env.CPPCHECK_VERSION }}
 
       # Ubuntu's cppcheck is years older than the one the engine is checked with: built once.
       - name: Build cppcheck
+        id: cppcheck-build
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.cppcheck-cache.outputs.cache-hit != 'true' }}
         run: |
           curl -fsSL --retry 3 "https://github.com/danmar/cppcheck/archive/refs/tags/${CPPCHECK_VERSION}.tar.gz" | tar -xz -C "${RUNNER_TEMP}"
@@ -127,16 +147,33 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/.deps/cppcheck"
           cmake --build "${RUNNER_TEMP}/cppcheck-build" --target install
 
+      - name: Keep cppcheck
+        if: ${{ !cancelled() && steps.cppcheck-build.outcome == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .deps/cppcheck
+          key: ${{ steps.cppcheck-cache.outputs.cache-primary-key }}
+
+      # (tools/lint.sh installs the others in it, at the versions it names.)
       - name: Restore the linters
+        id: linters-cache
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: .deps/lint-venv
           key: lint-venv-linux-${{ hashFiles('tools/lint.sh') }}
 
       # (clang-tidy reads how each file is compiled from the build.)
       - name: Linters
+        id: linters
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           export PATH="${GITHUB_WORKSPACE}/.deps/cppcheck/bin:${PATH}"
           tools/lint.sh
+
+      - name: Keep the linters
+        if: ${{ !cancelled() && steps.linters.outcome != 'skipped' && steps.linters-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .deps/lint-venv
+          key: ${{ steps.linters-cache.outputs.cache-primary-key }}

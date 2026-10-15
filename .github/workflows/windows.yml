@@ -43,7 +43,8 @@ jobs:
           ruby-version: "3.3"
 
       - name: Restore the compiler
-        uses: actions/cache@v4
+        id: compiler-cache
+        uses: actions/cache/restore@v4
         with:
           path: .deps/llvm-mingw
           key: llvm-mingw-windows-${{ hashFiles('tools/windows/fetch_toolchain.sh') }}
@@ -59,15 +60,23 @@ jobs:
             echo "AR=${bin}/llvm-ar.exe"
           } >> "${GITHUB_ENV}"
 
+      - name: Keep the compiler
+        if: ${{ steps.compiler-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .deps/llvm-mingw
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
+
       - name: Restore the compiler cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: .ccache
-          key: ccache-windows-${{ github.sha }}
+          key: ccache-windows-${{ github.run_id }}
           restore-keys: ccache-windows-
 
       - name: Restore the libraries' sources
-        uses: actions/cache@v4
+        id: fetch-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             .deps/fetch/*-src
@@ -81,6 +90,15 @@ jobs:
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
 
+      - name: Keep the libraries' sources
+        if: ${{ steps.fetch-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .deps/fetch/*-src
+            .deps/fetch/*-subbuild
+          key: ${{ steps.fetch-cache.outputs.cache-primary-key }}
+
       # (Going on past the first error: every one of them is in the log.)
       - name: Build
         id: build
@@ -88,6 +106,14 @@ jobs:
           ccache --zero-stats
           cmake --build build -- -k 0
           ccache --show-stats
+
+      # (Even when the build failed: what it compiled is still good.)
+      - name: Keep the compiler cache
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@v4
+        with:
+          path: .ccache
+          key: ccache-windows-${{ github.run_id }}
 
       - name: Unit and integration tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
