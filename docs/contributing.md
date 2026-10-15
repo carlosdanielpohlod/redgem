@@ -89,8 +89,9 @@ src/input     keys, axes/actions, keyboard, mouse, gamepad and scripted input so
               a touch screen puts in front of the others
 src/net       sockets (socket*.cpp and datagrams.cpp: the only place with OS socket calls, what the
               systems spell differently being in socket_native), message framing and wire format, the
-              host/guest session, discovery on the local network, the relay and the entry point
-              of its program (relay_main.cpp)
+              host/guest session and its connection approval, discovery on the local network,
+              the relay and the entry point of its program (relay_main.cpp), and the games' web
+              requests (http_*: HTTP/1.1 over Mbed TLS, one thread per request)
 src/audio     sound effects and music (raylib, or silence when there is no audio device)
 src/storage   what a game keeps between runs (the save store)
 src/render    the window (window.hpp: the only place that opens one, with its graphics card, frame
@@ -140,7 +141,8 @@ links only the ones it is made of (`src/CMakeLists.txt`):
 
 ```
 redgem_core     src/core                                           links nothing of the engine's
-redgem_net      src/net                                            redgem_core, the JSON library
+redgem_net      src/net                                            redgem_core, the JSON library,
+                                                                   Mbed TLS
 redgem_runtime  scene, physics, audio, input, storage, render,     redgem_net, raylib, Jolt, mruby,
                 script, app, and the Ruby prelude                  cgltf, the JSON library
 redgem_game_server src/server (without server_main.cpp)            redgem_runtime

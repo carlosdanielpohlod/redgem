@@ -8,8 +8,8 @@ class MainScene < SceneScript
   # Where the game's dedicated server runs ("play.example.com", or "play.example.com:7777": a
   # machine running `redgem-server` on this game). With none, Play online says so.
   SERVER = "".freeze
-  # Where players log in before playing online (your own backend, such as the example of the
-  # manual's Online services page: "http://127.0.0.1:4567"). With none, they play as guests.
+  # Where players log in before playing online (your own backend, as the manual's Online services
+  # page shows: "http://127.0.0.1:4567"). With none, they play as guests.
   ACCOUNTS = "".freeze
   TITLE = "Platformer".freeze
   MULTIPLAYER_OPTION = 2   # where the pause menu offers it: after Restart

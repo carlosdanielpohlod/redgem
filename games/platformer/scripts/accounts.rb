@@ -1,7 +1,7 @@
-# Who plays online. With a backend (ACCOUNTS in MainScene, such as the example backend of the
-# manual's Online services page), a machine logs in to it and joins the dedicated server with the
-# token it got; without one, it joins as a guest, under an id it keeps in Save. The server's side
-# is ServerGate. The login lasts until the game is closed.
+# Who plays online. With a backend (ACCOUNTS in MainScene, as the manual's Online services page
+# shows), a machine logs in to it and joins the dedicated server with the token it got; without
+# one, it joins as a guest, under an id it keeps in Save. The server's side is ServerGate. The
+# login lasts until the game is closed.
 module Accounts
   GUEST_KEY = :guest_id
   GUEST_ID_DIGITS = 16

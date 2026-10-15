@@ -147,5 +147,5 @@ No service is built into the engine and none is required.
   `Save` now keeps arrays, hashes and `Vector3` as well (the example above needs a hash);
   hashes come back with string keys. A server's secrets (a backend's key) go in its own save.
 - **Guides**: the manual's Online services page; the platformer logs in when `ACCOUNTS` is set
-  (`scripts/accounts.rb`, `scripts/server_gate.rb`) and joins as a guest otherwise; the backend is
-  `docs/examples/backend/app.rb`.
+  (`scripts/accounts.rb`, `scripts/server_gate.rb`) and joins as a guest otherwise. The backend's
+  essential code is shown in the guide; no example app is kept in the repository.

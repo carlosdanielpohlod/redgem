@@ -40,9 +40,5 @@ dist/
 games/*-build/
 screenshots/
 
-# What the example backend (docs/examples/backend) writes as it runs
-docs/examples/backend/accounts.sqlite3
-docs/examples/backend/Gemfile.lock
-
 # What a dedicated server keeps beside the game it runs (redgem-server --data)
 games/*-data/

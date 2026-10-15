@@ -152,28 +152,51 @@ end
 
 ## With a backend of your own
 
-[`docs/examples/backend/app.rb`](../examples/backend/app.rb)
-is a whole backend in one file: Sinatra and SQLite, with accounts, sessions, each player's coins
-and a ranking. With Ruby and Bundler installed:
+A backend of your own needs only a few calls. The essentials, in Ruby with Sinatra and SQLite (a
+`players` table with `id`, `name`, `salt`, `digest` and `coins`, and a `sessions` table that ties
+tokens to players; signing up inserts a player with a random salt and the digest of its password):
 
-```bash
-cd docs/examples/backend
-bundle install
-SERVER_KEY=some-long-secret bundle exec ruby app.rb        # http://127.0.0.1:4567
-curl -X POST localhost:4567/signup -H 'Content-Type: application/json' -d '{"name":"ana","password":"secret"}'
+```ruby
+DB = SQLite3::Database.new("accounts.sqlite3", results_as_hash: true)
+
+def digest(password, salt) = OpenSSL::KDF.pbkdf2_hmac(password, salt: salt, iterations: 100_000,
+                                                                 length: 32, hash: "sha256").unpack1("H*")
+
+post "/login" do
+  name, password = JSON.parse(request.body.read).values_at("name", "password")
+  player = DB.get_first_row("SELECT * FROM players WHERE name = ?", [name.to_s])
+  correct = player && Rack::Utils.secure_compare(player["digest"], digest(password.to_s, player["salt"]))
+  halt 401, { error: "wrong name or password" }.to_json unless correct
+  token = SecureRandom.hex(32)
+  DB.execute("INSERT INTO sessions (token, player_id) VALUES (?, ?)", [token, player["id"]])
+  { token: token, id: player["id"], name: player["name"] }.to_json
+end
+
+get "/me" do   # who a token is: what the game server asks
+  token = request.env["HTTP_AUTHORIZATION"].to_s.delete_prefix("Bearer ").dup.force_encoding("UTF-8")
+  player = DB.get_first_row("SELECT players.* FROM sessions JOIN players ON players.id = player_id " \
+                            "WHERE token = ?", [token])
+  halt 401, { error: "not logged in" }.to_json unless player
+  { id: player["id"], name: player["name"] }.to_json
+end
+
+post "/progress" do   # only the game server, which holds the key
+  halt 403 unless Rack::Utils.secure_compare(request.env["HTTP_X_SERVER_KEY"].to_s, ENV.fetch("SERVER_KEY"))
+  player, coins = JSON.parse(request.body.read).values_at("player", "coins")
+  DB.execute("UPDATE players SET coins = coins + ? WHERE id = ?", [coins.to_i, player.to_i])
+  halt 204
+end
 ```
 
 | Call | Sends | Answers |
 |------|-------|---------|
-| `POST /signup` | `{name, password}` | 201 `{id, name}`, 409 when the name is taken |
 | `POST /login` | `{name, password}` | 200 `{token, id, name}`, 401 `{error}` |
 | `GET /me` | `Authorization: Bearer <token>` | 200 `{id, name}`, 401 |
 | `POST /progress` | `{player, coins}` and `X-Server-Key` | 204, 403 without the key |
-| `GET /ranking` | | 200 `[{name, coins}, ...]` |
 
-It listens on this machine only; `bundle exec ruby app.rb -o 0.0.0.0` lets the local network in.
-On the internet, put it behind HTTPS (a reverse proxy in front of it):
-games reach other machines over `https://` only.
+Sinatra listens on this machine only (`-o 0.0.0.0` lets the local network in). On the internet,
+put it behind HTTPS (a reverse proxy in front of it): games reach other machines over `https://`
+only.
 
 ### The platformer with it
 
