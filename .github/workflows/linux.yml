@@ -1,0 +1,142 @@
+# The engine on Linux: built, every test run (the system tests too, in windows drawn by Mesa's
+# software renderer on a virtual display) and every linter. Each step that checks something fails
+# the run when it fails; the steps after it still run (when the build itself worked), so that one
+# failure does not hide the others.
+name: Linux
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to the same branch makes the run of the older one pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1G
+      # The sources of the libraries the engine is built from, kept between runs (see Configure).
+      FETCH_DIR: ${{ github.workspace }}/.deps/fetch
+      # The same versions as on the machines the engine is written on.
+      CPPCHECK_VERSION: "2.22.0"
+      RUBOCOP_VERSION: "1.84.2"
+    steps:
+      - uses: actions/checkout@v4
+
+      # The engine's own list (docs/install.md), plus a virtual display and Mesa for the system
+      # tests, ccache, and what builds cppcheck.
+      - name: Install the build tools and libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build git ca-certificates xz-utils bison ccache \
+            libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libxext-dev libxfixes-dev libxrender-dev libasound2-dev \
+            libgl1-mesa-dri xvfb xauth
+          # Every compiler call goes through ccache, mruby's (built by rake) as well.
+          echo "/usr/lib/ccache" >> "${GITHUB_PATH}"
+
+      # rake builds mruby; rubocop lints the Ruby (with the Ruby the scripts are checked against).
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+      - name: Install rubocop
+        run: gem install rubocop -v "${RUBOCOP_VERSION}" --no-document
+
+      - name: Restore the compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-linux-${{ github.sha }}
+          restore-keys: ccache-linux-
+
+      - name: Restore the libraries' sources
+        uses: actions/cache@v4
+        with:
+          path: |
+            .deps/fetch/*-src
+            .deps/fetch/*-subbuild
+          key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+
+      # (Going on past the first error: every one of them is in the log.)
+      - name: Build
+        id: build
+        run: |
+          ccache --zero-stats
+          cmake --build build -- -k 0
+          ccache --show-stats
+
+      - name: Unit and integration tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ./build/tests/redgem_tests
+
+      - name: Tests of the testing library
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ./build/tests/redgem_testing_tests
+
+      # Everything else ctest has, the system tests (which open windows) included, on a virtual
+      # display drawn by Mesa's software renderer (llvmpipe: OpenGL 3.3 core, as the engine asks).
+      # (Not the two programs of the steps above again.)
+      - name: All the other tests (ctest)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          REDGEM_GPU: integrated
+        run: >
+          xvfb-run -a -s "-screen 0 1600x900x24"
+          ctest --test-dir build --output-on-failure -j 4 -E '^cpp\.'
+
+      - name: Keep the tests' pictures
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-pictures-linux
+          path: build/screenshots
+          if-no-files-found: ignore
+
+      - name: Restore cppcheck
+        id: cppcheck-cache
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/cache@v4
+        with:
+          path: .deps/cppcheck
+          key: cppcheck-linux-${{ env.CPPCHECK_VERSION }}
+
+      # Ubuntu's cppcheck is years older than the one the engine is checked with: built once.
+      - name: Build cppcheck
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.cppcheck-cache.outputs.cache-hit != 'true' }}
+        run: |
+          curl -fsSL --retry 3 "https://github.com/danmar/cppcheck/archive/refs/tags/${CPPCHECK_VERSION}.tar.gz" | tar -xz -C "${RUNNER_TEMP}"
+          cmake -S "${RUNNER_TEMP}/cppcheck-${CPPCHECK_VERSION}" -B "${RUNNER_TEMP}/cppcheck-build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/.deps/cppcheck"
+          cmake --build "${RUNNER_TEMP}/cppcheck-build" --target install
+
+      - name: Restore the linters
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/cache@v4
+        with:
+          path: .deps/lint-venv
+          key: lint-venv-linux-${{ hashFiles('tools/lint.sh') }}
+
+      # (clang-tidy reads how each file is compiled from the build.)
+      - name: Linters
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          export PATH="${GITHUB_WORKSPACE}/.deps/cppcheck/bin:${PATH}"
+          tools/lint.sh
