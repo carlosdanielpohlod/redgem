@@ -414,8 +414,7 @@ TEST_CASE("saving a game's settings keeps what else its game.json says") {
   settings.title = "New";
   std::string error;
   REQUIRE_MESSAGE(write_game_settings(dir, settings, error), error);
-  std::ifstream in(dir / "game.json");
-  const nlohmann::json saved = nlohmann::json::parse(in);
+  const nlohmann::json saved = nlohmann::json::parse(bytes_of(dir / "game.json"));
   CHECK(saved["title"] == "New");
   CHECK(saved["android"]["package"] == "com.mystudio.mine");
   CHECK(saved["notes"].size() == 2);

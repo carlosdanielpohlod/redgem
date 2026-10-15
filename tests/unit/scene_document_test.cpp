@@ -243,8 +243,11 @@ TEST_CASE("written .glb files follow the binary layout") {
   const std::filesystem::path out = temp_copy_path("layout");
   std::string error;
   REQUIRE(doc.save_as(out, error));
-  std::ifstream in(out, std::ios::binary);
-  const std::vector<char> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  std::vector<char> bytes;
+  {  // (closed before the file is removed: Windows removes no file that is open)
+    std::ifstream in(out, std::ios::binary);
+    bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+  }
   REQUIRE(bytes.size() > kGlbHeaderBytes);
   CHECK(u32_at(bytes, kLengthOffset) == bytes.size());
   std::size_t offset = kGlbHeaderBytes;
