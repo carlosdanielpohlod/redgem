@@ -45,8 +45,6 @@ class GameObject
 
   def ==(other) = other.is_a?(GameObject) && other.id == @id
 
-  # How it shows in the console and in errors: its name and id, not its insides (which point back
-  # at it through its behaviours).
   def inspect = "#<GameObject #{name.inspect} id=#{@id}>"
   alias to_s inspect
 
