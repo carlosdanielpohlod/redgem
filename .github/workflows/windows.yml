@@ -1,0 +1,105 @@
+# The engine on a real Windows machine: built with the compiler games for Windows are built with
+# (llvm-mingw, the release tools/windows/fetch_toolchain.sh pins, here the one that runs on
+# Windows), and its tests run. The system tests, which open game windows, are left to Linux and
+# macOS: this machine has no graphics card, and no software OpenGL 3.3 to draw with instead.
+name: Windows
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to the same branch makes the run of the older one pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: Windows x86_64
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1G
+      FETCH_DIR: ${{ github.workspace }}/.deps/fetch
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the build tools
+        run: choco install ninja ccache --no-progress -y
+
+      # rake builds mruby.
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Restore the compiler
+        uses: actions/cache@v4
+        with:
+          path: .deps/llvm-mingw
+          key: llvm-mingw-windows-${{ hashFiles('tools/windows/fetch_toolchain.sh') }}
+
+      # mruby's tools are built for this machine as well as for the game: with the same compiler.
+      - name: Fetch the compiler
+        run: |
+          tools/windows/fetch_toolchain.sh
+          bin="$(cygpath -m "${GITHUB_WORKSPACE}/.deps/llvm-mingw/bin")"
+          {
+            echo "CC=${bin}/x86_64-w64-mingw32-clang.exe"
+            echo "CXX=${bin}/x86_64-w64-mingw32-clang++.exe"
+            echo "AR=${bin}/llvm-ar.exe"
+          } >> "${GITHUB_ENV}"
+
+      - name: Restore the compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-windows-${{ github.sha }}
+          restore-keys: ccache-windows-
+
+      - name: Restore the libraries' sources
+        uses: actions/cache@v4
+        with:
+          path: |
+            .deps/fetch/*-src
+            .deps/fetch/*-subbuild
+          key: fetch-windows-${{ hashFiles('cmake/Dependencies.cmake') }}
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/windows.cmake
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+
+      # (Going on past the first error: every one of them is in the log.)
+      - name: Build
+        id: build
+        run: |
+          ccache --zero-stats
+          cmake --build build -- -k 0
+          ccache --show-stats
+
+      - name: Unit and integration tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ./build/tests/redgem_tests.exe
+
+      - name: Tests of the testing library
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ./build/tests/redgem_testing_tests.exe
+
+      # From ctest: the relay's and the game server's command lines, as the programs answer them,
+      # and the Ruby unit tests (run by the test tool, with no window). The rest are the system
+      # tests and checks written as shell scripts, which Windows does not start by themselves.
+      - name: The relay, the server and the Ruby tests (ctest)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ctest --test-dir build --output-on-failure -R '^(relay|server|ruby)\.'
