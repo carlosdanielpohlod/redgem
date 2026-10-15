@@ -53,7 +53,8 @@ constexpr const char* kUsageEnd =
     "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting,\n"
     "                                       else the dedicated card when there is one)\n"
     "\n"
-    "  Where multiplayer games meet over the internet is a program of its own: redgem-relay.\n"
+    "  Where multiplayer games meet over the internet is a program of its own: redgem-relay;\n"
+    "  a game run on a server for players to join is another: redgem-server.\n"
     "\n";
 
 struct Command {

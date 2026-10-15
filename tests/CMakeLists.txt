@@ -74,6 +74,9 @@ add_executable(redgem_tests
   unit/nearby_games_test.cpp
   unit/network_event_test.cpp
   unit/relay_program_test.cpp
+  unit/room_choice_test.cpp
+  unit/tick_pacer_test.cpp
+  unit/server_command_test.cpp
   unit/particles_test.cpp
   unit/animation_player_test.cpp
   unit/clip_clock_test.cpp
@@ -93,15 +96,18 @@ add_executable(redgem_tests
   integration/network_session_test.cpp
   integration/multiplayer_test.cpp
   integration/relay_test.cpp
+  integration/lobby_test.cpp
+  integration/dedicated_server_test.cpp
   integration/editor_session_test.cpp
   integration/game_project_test.cpp)
-target_link_libraries(redgem_tests PRIVATE redgem_project doctest::doctest)
+target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest)
 target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # The tests of builds copy the real player, and look for it where a build does: beside redgem.
 add_dependencies(redgem_tests redgem_player redgem)
 target_compile_definitions(redgem_tests PRIVATE
   REDGEM_FIXTURES_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
   REDGEM_TEMPLATES_DIR="${CMAKE_SOURCE_DIR}/templates"
+  REDGEM_PLATFORMER_DIR="${CMAKE_SOURCE_DIR}/games/platformer"
   REDGEM_PLAYER_FILE="$<TARGET_FILE:redgem_player>"
   REDGEM_EDITOR_FILE="$<TARGET_FILE:redgem>")
 target_compile_options(redgem_tests PRIVATE -Wall -Wextra -Wno-unused-parameter)
@@ -136,9 +142,11 @@ add_test(NAME layering.check_catches_upward_includes
 set_tests_properties(layering.check_catches_upward_includes PROPERTIES
   PASS_REGULAR_EXPRESSION "forbidden include: src/core/upward.hpp includes render/picture.hpp")
 
-# Neither the program games ship as nor the one they are made with has test code in it.
+# Neither the program games ship as, nor the one that runs them on a server, nor the one they are
+# made with has test code in it.
 add_test(NAME app.ships_no_test_code
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_test_code.sh $<TARGET_FILE:redgem_player> $<TARGET_FILE:redgem>)
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_test_code.sh $<TARGET_FILE:redgem_player>
+                 $<TARGET_FILE:redgem_server> $<TARGET_FILE:redgem>)
 # Guards the check itself: the test tool, which is made of test code, must fail it.
 add_test(NAME app.check_catches_test_code
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_test_code.sh $<TARGET_FILE:redgem_test_tool>)
@@ -152,6 +160,8 @@ add_test(NAME app.player_ships_no_tools
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh player $<TARGET_FILE:redgem_player>)
 add_test(NAME app.relay_ships_no_game
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh relay $<TARGET_FILE:redgem_relay>)
+add_test(NAME app.server_ships_no_tools
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh server $<TARGET_FILE:redgem_server>)
 # Guards the check itself: redgem, which is the tools, must fail it, with every kind of tool
 # found (in the order the script looks for them); so must the relay, for the one thing of its own
 # that is no player's; and the player, which draws and runs scripts, is no relay.
@@ -164,6 +174,15 @@ add_test(NAME app.check_catches_the_relay
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh player $<TARGET_FILE:redgem_relay>)
 set_tests_properties(app.check_catches_the_relay PROPERTIES
   PASS_REGULAR_EXPRESSION "found in [^\n]*redgem-relay: \"relay listening on port\"")
+# ... and the player is no game server, nor the game server a relay.
+add_test(NAME app.check_catches_the_server
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh player $<TARGET_FILE:redgem_server>)
+set_tests_properties(app.check_catches_the_server PROPERTIES
+  PASS_REGULAR_EXPRESSION "found in [^\n]*redgem-server: \"game server listening on port\"")
+add_test(NAME app.check_catches_a_relay_in_the_server
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh server $<TARGET_FILE:redgem_relay>)
+set_tests_properties(app.check_catches_a_relay_in_the_server PROPERTIES
+  PASS_REGULAR_EXPRESSION "found in [^\n]*redgem-relay: \"relay listening on port\"")
 add_test(NAME app.check_catches_a_game_in_the_relay
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh relay $<TARGET_FILE:redgem_player>)
 set_tests_properties(app.check_catches_a_game_in_the_relay PROPERTIES
@@ -175,6 +194,13 @@ set_tests_properties(relay.help PROPERTIES PASS_REGULAR_EXPRESSION "usage:.*redg
 add_test(NAME relay.refuses_what_it_does_not_understand COMMAND redgem_relay --port many)
 set_tests_properties(relay.refuses_what_it_does_not_understand PROPERTIES
   PASS_REGULAR_EXPRESSION "--port needs a number up to 65535")
+
+# The game server's command line, as the program itself answers it.
+add_test(NAME server.help COMMAND redgem_server --help)
+set_tests_properties(server.help PROPERTIES PASS_REGULAR_EXPRESSION "usage:.*redgem-server <game_dir>")
+add_test(NAME server.refuses_what_it_does_not_understand COMMAND redgem_server ${CMAKE_SOURCE_DIR}/games/platformer --rooms many)
+set_tests_properties(server.refuses_what_it_does_not_understand PROPERTIES
+  PASS_REGULAR_EXPRESSION "--rooms needs a number from 1 to 64")
 
 # Ruby unit tests run inside the engine's own mruby, by the test tool.
 file(GLOB REDGEM_RUBY_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ruby/*_test.rb)
@@ -243,6 +269,27 @@ foreach(host_test IN LISTS REDGEM_PAIRED_TESTS)
                    $<TARGET_FILE:redgem_test_tool> ${CMAKE_SOURCE_DIR}/games/${game} ${host_test} ${game_dir}/${pair_name}_guest_test.rb
                    ${REDGEM_SCREENSHOT_DIR}/${game} ${with_relay})
   set_tests_properties(system.${game}.${pair_name}_together PROPERTIES LABELS system RUN_SERIAL TRUE)
+endforeach()
+
+# Online play with nobody hosting: a game runs on a dedicated server (redgem-server, with no
+# display) and two copies of it join, each driven by its own test.
+# tests/system_servers/games/<game>/<name>_first_test.rb pairs up with <name>_second_test.rb, and
+# plays games/<game>; tests/system_servers/templates/<template>/ plays templates/<template> the
+# same way. Each run has a folder and a port of its own (see run_with_server.sh).
+foreach(kind games templates)
+  file(GLOB server_tests CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_servers/${kind}/*/*_first_test.rb)
+  foreach(first_test IN LISTS server_tests)
+    get_filename_component(tests_dir ${first_test} DIRECTORY)
+    get_filename_component(game ${tests_dir} NAME)
+    get_filename_component(first_name ${first_test} NAME_WE)
+    string(REGEX REPLACE "_first_test$" "" run_name ${first_name})
+    set(test_name system.${kind}.${game}.${run_name}_on_a_server)
+    add_test(NAME ${test_name}
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/system_servers/run_with_server.sh $<TARGET_FILE:redgem_server>
+                     $<TARGET_FILE:redgem_test_tool> ${CMAKE_SOURCE_DIR}/${kind}/${game} ${first_test}
+                     ${tests_dir}/${run_name}_second_test.rb ${REDGEM_SCREENSHOT_DIR}/${kind}_${game})
+    set_tests_properties(${test_name} PROPERTIES LABELS system RUN_SERIAL TRUE)
+  endforeach()
 endforeach()
 
 # Guards the system test harness: a failing assertion must make the game exit with an error.

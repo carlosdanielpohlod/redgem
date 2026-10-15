@@ -44,6 +44,10 @@ struct EngineOptions {
   std::filesystem::path save_file;
   // What the game sounds through, which has to outlive the engine. Without one it is silent.
   AudioSystem* audio = nullptr;
+  // Plays the game as a room of a dedicated server (redgem-server), under this code: online from
+  // the start as the game's host, with no player of its own (Network.server?), and what it saves
+  // kept for this match only. Empty: an ordinary game.
+  std::string server_room;
 };
 
 // Wires scene, physics, scripts and input together and runs the game loop. It opens no window and
@@ -100,6 +104,8 @@ class Engine {
   void open_presenter(const GameSettings& settings);
   void open_audio();
   void open_saves();
+  // Whether the game is a room of a dedicated server (see EngineOptions::server_room).
+  bool serves_a_room() const { return !options_.server_room.empty(); }
   void fill_context(const std::string& game_title);
   void connect_context();
   void start_scripts();

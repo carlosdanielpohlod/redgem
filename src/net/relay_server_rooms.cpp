@@ -4,8 +4,6 @@
 #include "net/relay_server.hpp"
 
 #include <algorithm>
-#include <random>
-#include <string_view>
 
 namespace redgem::net {
 
@@ -15,29 +13,14 @@ namespace {
 
 constexpr std::size_t kMaxRooms = 256;
 constexpr int kMaxRoomsPerAddress = 8;  // what one address may open
-// Letters and digits that are not mistaken for one another when read aloud or typed (no I, O, 0, 1).
-constexpr std::string_view kCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-constexpr int kCodeTries = 64;  // at finding a code no open room has
 
 // A newcomer's first words say which room it wants.
 bool asks_for_a_room(const nlohmann::json& message) { return message[kKind] == kHello && message.contains(kRoom); }
 
 }  // namespace
 
-std::string random_room_code() {
-  std::random_device system_source;
-  std::uniform_int_distribution<std::size_t> letter(0, kCodeAlphabet.size() - 1);
-  std::string code;
-  for (std::size_t i = 0; i < kRoomCodeLetters; ++i) code.push_back(kCodeAlphabet[letter(system_source)]);
-  return code;
-}
-
 std::string RelayServer::new_room_code() const {
-  for (int attempt = 0; attempt < kCodeTries; ++attempt) {
-    const std::string code = random_room_code();
-    if (rooms_.count(code) == 0) return code;
-  }
-  return {};
+  return unused_room_code([this](const std::string& code) { return rooms_.count(code) != 0; });
 }
 
 void RelayServer::hear_newcomer(Member& member, const nlohmann::json& message) {

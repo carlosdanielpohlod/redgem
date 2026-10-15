@@ -129,7 +129,8 @@ cmake         dependencies (pinned versions) and file embedding
 
 The folders of `src` are layers, in the order above: each includes only itself and what is below
 it (`core`; then `scene`, `net`, `input`, `audio`, `physics`, `storage`; then `render` and
-`script`; then `app`; then `editor`, `project`; `testing` sees everything and nothing sees it).
+`script`; then `app`; then `server`, `editor`, `project`; `testing` sees everything and nothing
+sees it).
 Each layer keeps its own numbers in a `<layer>_config.hpp` next to its code.
 
 ## Libraries and programs
@@ -142,6 +143,7 @@ redgem_core     src/core                                           links nothing
 redgem_net      src/net                                            redgem_core, the JSON library
 redgem_runtime  scene, physics, audio, input, storage, render,     redgem_net, raylib, Jolt, mruby,
                 script, app, and the Ruby prelude                  cgltf, the JSON library
+redgem_game_server src/server (without server_main.cpp)            redgem_runtime
 redgem_editor   src/editor                                         redgem_runtime, Dear ImGui
 redgem_project  src/project (without main.cpp), the templates      redgem_editor
                 and the licenses
@@ -155,6 +157,9 @@ redgem          src/project/main.cpp       redgem_project   the editor, the proj
                                                             line (new, build, --play)
 redgem-relay    src/net/relay_main.cpp     redgem_net       the meeting point for games over the
                                                             internet: no window, for servers
+redgem-server   src/server/server_main.cpp redgem_game_server
+                                                            a game run on a server for players to
+                                                            join, in rooms: no window, no display
 redgem-test     src/testing/main.cpp       redgem_testing   runs a game's tests
 libredgem.so    src/app/android_main.cpp   redgem_runtime   the player on Android, loaded by the app
 ```
@@ -162,13 +167,13 @@ libredgem.so    src/app/android_main.cpp   redgem_runtime   the player on Androi
 A built game is a copy of the player, never of the program that builds it: `redgem build` and
 the editor's Build take `redgem-player` from beside `redgem`, or `runtimes/<system>/` there for
 another system (`tools/windows/build_runtime.sh`, `tools/android/build_runtime.sh` build those).
-`cmake --install build --component redgem --prefix <folder>` puts the four programs in
+`cmake --install build --component redgem --prefix <folder>` puts the five programs in
 `<folder>/bin` and the players for other systems in `<folder>/bin/runtimes`, where the same
 lookups find them.
 
 Keep what players receive small: nothing the player links may include `editor/` or `project/`
-(the include directions below say so, and linking proves it). The tests `app.player_ships_no_tools`
-and `app.relay_ships_no_game` look into the built programs (`tests/ships_no_tools.sh`) for texts
+(the include directions below say so, and linking proves it). The tests `app.player_ships_no_tools`,
+`app.relay_ships_no_game` and `app.server_ships_no_tools` look into the built programs (`tests/ships_no_tools.sh`) for texts
 only the tools, or only a game, have.
 
 A program opens one window, through `Window`, and makes what draws in it afterwards (a `Renderer`,

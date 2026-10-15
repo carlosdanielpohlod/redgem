@@ -4,13 +4,15 @@ Games can be played together over a local network or the internet. One machine *
 and the others **join** it; every machine has an id (the host is 1, then 2, 3... as players arrive).
 Up to 16 machines play together.
 
-There are three ways for the others to get to the host, from the easiest:
+There are three ways for the others to get to the host, from the easiest, and a fourth where
+nobody hosts:
 
 | Where the players are | How they join | What it takes |
 |-----------------------|---------------|---------------|
 | On the same network (same Wi-Fi) | The game is found by itself | Nothing |
 | Anywhere | A room code like `K7QM3P` | A relay running somewhere on the internet |
 | Anywhere | The host's address | The host's router forwarding a port |
+| Anywhere | The server's address | The game running on a [dedicated server](../dedicated-server.md) |
 
 ## Host and join
 
@@ -84,6 +86,27 @@ guessing room codes gets it kept out for a while, and a machine that goes silent
 Without a relay, players anywhere can still join the host's public address
 (`Network.join("203.0.113.7")`) if the host's router forwards the game's port (7777, TCP) to the
 host's machine.
+
+## On a dedicated server
+
+A dedicated server runs the game itself, with no player, and everyone joins it
+(see [Dedicated server](../dedicated-server.md)):
+
+```ruby
+Network.join("play.example.com")                  # any room with a free place
+Network.join("play.example.com", room: "K7QM3P")  # the room a friend is in (their Network.room)
+```
+
+The server runs the same scripts with `Network.server?` true. It hosts the game (`Network.host?`,
+id 1) but plays nobody, so skip "my player" there, and use `Network.players` (everyone else
+without the server) where a game shows the other players:
+
+```ruby
+Network.on_connect do
+  spawn_my_hero unless Network.server?
+  Network.players.each { |peer| show_hero_of(peer) }
+end
+```
 
 ## Messages
 
@@ -170,13 +193,14 @@ The platformer demo plays together this way: Esc > Multiplayer hosts or joins a 
 ## Testing it
 
 The engine's own multiplayer test runs two copies of the game at once, each with its own test
-script (`tests/system_pairs/`). For a quick try on one machine, open the game twice, host in one
+script (`tests/system_pairs/`), and two copies against the game on a dedicated server
+(`tests/system_servers/`). For a quick try on one machine, open the game twice, host in one
 and join `127.0.0.1` in the other.
 
 ## What it does not do
 
 There is no matchmaking or public list of games: players are on the same network, share a room
-code, or know the host's address. No relay is run for you. Every message passes through the host
+code, or know the host's or the server's address. No relay or server is run for you. Every message passes through the host
 (or the relay), so there is no prediction or lag compensation: fine for co-op and casual
 games, not for competitive shooters. Messages are not encrypted, and players are not
 authenticated: play with people you trust.

@@ -14,6 +14,9 @@ namespace redgem {
 // one JSON file per game. Read from disk on first use, written back on every change.
 class SaveStore {
  public:
+  // Kept in memory only, for as long as the store lives: nothing is read or written (a game
+  // played on a dedicated server, whose players keep saves of their own).
+  SaveStore() = default;
   explicit SaveStore(std::filesystem::path file) : file_(std::move(file)) {}
 
   std::optional<PropertyValue> get(const std::string& key);
@@ -27,6 +30,7 @@ class SaveStore {
  private:
   void load();
   bool write() const;
+  bool in_memory() const { return file_.empty(); }
 
   std::filesystem::path file_;
   std::map<std::string, PropertyValue> values_;

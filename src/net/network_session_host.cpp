@@ -19,12 +19,6 @@ constexpr int kMaxWaitingLinks = 32;
 
 }  // namespace
 
-void NetworkSession::announce_hosting(std::vector<NetworkEvent>& events) {
-  if (!announce_hosting_) return;
-  announce_hosting_ = false;
-  events.push_back(NetworkEvent::of(NetworkEvent::Kind::Connected, id_));
-}
-
 void NetworkSession::receive_newcomers(float seconds) {
   if (!listener_.valid()) return;
   accept_newcomers();
@@ -63,6 +57,7 @@ void NetworkSession::handle_as_host(Link& link, const nlohmann::json& message, s
     return;
   }
   if (!is_game_message(message)) return;
+  link.idle_for = 0.0f;
   const int to = message.value(kTo, kEveryone);
   // Who it is from is what the host knows, not what the message claims.
   const nlohmann::json passed_on = game_message(message[kName], message.value(kData, nlohmann::json()), link.peer, to);
@@ -87,10 +82,18 @@ void NetworkSession::admit(Link& link, std::vector<NetworkEvent>& events) {
   }
   std::vector<int> already_here{kHostId};
   already_here.insert(already_here.end(), peers_.begin(), peers_.end());
-  link.connection.send({{kKind, kWelcome}, {kTo, link.peer}, {kPeers, already_here}});
+  link.connection.send(welcome_for(link.peer, already_here));
   queue_for_everyone_but(link.peer, {{kKind, kArrived}, {kFrom, link.peer}});
   peers_.push_back(link.peer);
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerJoined, link.peer));
+}
+
+nlohmann::json NetworkSession::welcome_for(int peer, const std::vector<int>& already_here) const {
+  nlohmann::json welcome = {{kKind, kWelcome}, {kTo, peer}, {kPeers, already_here}};
+  if (!server_hosted_) return welcome;
+  welcome[kRoom] = room_;
+  welcome[kServer] = true;
+  return welcome;
 }
 
 bool NetworkSession::pass_on(int from, int to, const nlohmann::json& message) {

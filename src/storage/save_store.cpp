@@ -40,7 +40,7 @@ bool write_whole(const std::filesystem::path& file, const std::string& text) {
 }  // namespace
 
 void SaveStore::load() {
-  if (loaded_) return;
+  if (loaded_ || in_memory()) return;
   loaded_ = true;
   std::ifstream in(file_);
   if (!in) return;
@@ -55,6 +55,7 @@ void SaveStore::load() {
 }
 
 bool SaveStore::write() const {
+  if (in_memory()) return true;
   std::error_code fs_error;
   std::filesystem::create_directories(file_.parent_path(), fs_error);
   // Written beside the file and moved over it: a crash mid-write never leaves half a save.

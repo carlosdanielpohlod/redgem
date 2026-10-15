@@ -131,6 +131,7 @@ build folder, laid out the way builds expect:
 <folder>/bin/redgem            the editor, the project hub and the command line
 <folder>/bin/redgem-player     what a game built for this system is a copy of
 <folder>/bin/redgem-relay      the meeting point for games over the internet
+<folder>/bin/redgem-server     runs a game on a server, for players to join (see Dedicated server)
 <folder>/bin/redgem-test       the tool that runs a game's tests
 <folder>/bin/runtimes/         the players for other systems that were built before installing
 ```

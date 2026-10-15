@@ -69,6 +69,7 @@ add_custom_command(
 #   redgem_core     what everything shares
 #   redgem_net      sockets, messages, the relay: no window, no scripts
 #   redgem_runtime  everything a game needs to run
+#   redgem_game_server  a game run on a server for players to join, in rooms (redgem-server)
 #   redgem_editor   the editor, with the library its interface is drawn with
 #   redgem_project  the tools around a game: templates, builds, the project hub, the command line
 include(Hardening)
@@ -117,6 +118,10 @@ redgem_add_library(redgem_net
   net/network_session.cpp
   net/network_session_host.cpp
   net/network_session_guest.cpp
+  net/network_session_server.cpp
+  net/room_codes.cpp
+  net/code_guessers.cpp
+  net/lobby.cpp
   net/nearby_games.cpp
   net/lan_discovery.cpp
   net/relay_server.cpp
@@ -202,6 +207,7 @@ redgem_add_library(redgem_runtime
   script/bindings/message_values.cpp
   script/bindings/network_bindings.cpp
   script/bindings/network_search_bindings.cpp
+  script/bindings/network_state_bindings.cpp
   render/mesh_builder.cpp
   render/mesh_pieces.cpp
   render/image_header.cpp
@@ -255,6 +261,16 @@ if(WIN32)
 endif()
 
 if(NOT ANDROID)
+  redgem_add_library(redgem_game_server
+    server/room_choice.cpp
+    server/tick_pacer.cpp
+    server/game_server.cpp
+    server/game_server_rooms.cpp
+    server/server_command.cpp
+    server/stop_signals.cpp
+    server/server_program.cpp)
+  target_link_libraries(redgem_game_server PUBLIC redgem_runtime)
+
   redgem_add_library(redgem_editor
     editor/glb_file.cpp
     editor/glb_usage.cpp
@@ -389,6 +405,13 @@ else()
   set_target_properties(redgem_relay PROPERTIES OUTPUT_NAME redgem-relay)
   redgem_finish_program(redgem_relay)
 
+  # redgem-server: a game run on a server with nobody at it, for players to join. It is the runtime
+  # and no tools; it never opens a window, so it needs no display and no graphics card.
+  add_executable(redgem_server server/server_main.cpp)
+  target_link_libraries(redgem_server PRIVATE redgem_game_server)
+  set_target_properties(redgem_server PROPERTIES OUTPUT_NAME redgem-server)
+  redgem_finish_program(redgem_server)
+
   # redgem: the editor, the project hub and the command line that makes and builds games.
   add_executable(redgem project/main.cpp)
   target_link_libraries(redgem PRIVATE redgem_project)
@@ -396,7 +419,7 @@ else()
   set_target_properties(redgem PROPERTIES WIN32_EXECUTABLE ON)
   redgem_finish_program(redgem)
 
-  install(TARGETS redgem redgem_player redgem_relay RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  install(TARGETS redgem redgem_player redgem_relay redgem_server RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
           COMPONENT ${REDGEM_INSTALL_COMPONENT})
   # The players for other systems, when they were built (tools/windows/build_runtime.sh,
   # tools/android/build_runtime.sh put them beside this build's programs).

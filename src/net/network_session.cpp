@@ -34,10 +34,14 @@ bool NetworkSession::host(std::uint16_t port, std::string& error) {
   listener_ = Socket::listen_on(port, error);
   if (!listener_.valid()) return false;
   port_ = listener_.local_port();
+  start_hosting();
+  return true;
+}
+
+void NetworkSession::start_hosting() {
   id_ = kHostId;
   state_ = State::Online;
-  announce_hosting_ = true;
-  return true;
+  pending_events_.push_back(NetworkEvent::of(NetworkEvent::Kind::Connected, id_));
 }
 
 bool NetworkSession::connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello,
@@ -88,16 +92,17 @@ void NetworkSession::go_offline() {
   state_ = State::Offline;
   id_ = 0;
   port_ = 0;
-  announce_hosting_ = false;
   through_relay_ = false;
   opening_room_ = false;
+  server_hosted_ = false;
   room_.clear();
+  pending_events_.clear();
 }
 
 std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
   std::vector<NetworkEvent> events;
   if (offline()) return events;
-  announce_hosting(events);
+  events.swap(pending_events_);
   receive_newcomers(seconds);
   if (state_ == State::Connecting) await_connection(seconds, events);
   // By index: handling a message may add nothing to links_, but keep it obvious. (And any of
@@ -110,7 +115,7 @@ std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
 bool NetworkSession::still_serving(std::size_t link) const { return link < links_.size() && !offline(); }
 
 void NetworkSession::serve(Link& link, float seconds, std::vector<NetworkEvent>& events) {
-  link.connection.pump();
+  police(link, link.connection.pump(), seconds);
   if (in_touch_with(link)) link.connection.keep_in_touch(seconds);
   // (Only so many a poll: the rest wait for the next one, see kMaxMessagesPerPoll.)
   while (!offline()) {

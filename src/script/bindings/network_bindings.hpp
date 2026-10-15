@@ -23,5 +23,7 @@ std::uint16_t port_arg(mrb_state* mrb, mrb_int port);
 
 // Network.search and what it finds (network_search_bindings.cpp).
 void install_network_search_bindings(RClass* network_module, mrb_state* mrb);
+// What the session is like right now: online?, host?, server?, id, peers... (network_state_bindings.cpp).
+void install_network_state_bindings(RClass* network_module, mrb_state* mrb);
 
 }  // namespace redgem

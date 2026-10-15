@@ -158,3 +158,15 @@ TEST_CASE("a save that cannot be written says so and keeps the value for this ru
   CHECK_FALSE(store.set("best", kBestScore));
   CHECK(std::get<double>(*store.get("best")) == doctest::Approx(kBestScore));
 }
+
+TEST_CASE("a store kept in memory holds what the game saves for as long as it lives, and writes nothing") {
+  SaveStore store;
+  CHECK(store.set("best", kBestScore));
+  CHECK(std::get<double>(*store.get("best")) == doctest::Approx(kBestScore));
+  CHECK(store.keys() == std::vector<std::string>{"best"});
+  CHECK(store.remove("best"));
+  CHECK(store.clear());
+  CHECK(store.file().empty());
+  CHECK_FALSE(std::filesystem::exists(".part"));  // (what writing to a file with no name would leave)
+  CHECK_FALSE(SaveStore().get("best").has_value());
+}

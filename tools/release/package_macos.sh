@@ -15,7 +15,7 @@ BUILD="${REPO_ROOT}/build/src"
 APP_NAME="RedGem.app"
 # The editor first: it is what the app starts. The others stand beside it as they do in a build
 # (a game is built with the player found beside the editor).
-PROGRAMS=(redgem redgem-player redgem-relay redgem-test)
+PROGRAMS=(redgem redgem-player redgem-relay redgem-server redgem-test)
 INFO_TEMPLATE="${REPO_ROOT}/tools/release/Info.plist"
 VERSION_MARK="@VERSION@"
 MINIMUM_MARK="@MINIMUM_SYSTEM@"

@@ -105,6 +105,7 @@ cmake --build build
 ./build/src/redgem                      # project hub: open a demo or create a game
 ./build/src/redgem-test --help          # the tool that runs a game's tests
 ./build/src/redgem-relay                # the meeting point for multiplayer games over the internet
+./build/src/redgem-server games/platformer   # a game on a dedicated server, for players to join
 ctest --test-dir build                  # run the tests
 ```
 

@@ -4,7 +4,7 @@
 #   tools/release/package.sh            # dist/release/redgem-linux-x86_64.tar.gz
 #                                       # dist/release/redgem-windows-x86_64.zip
 # Build first: cmake --build build, tools/windows/build_runtime.sh, tools/android/build_runtime.sh
-# and, for the Windows download, cmake --build build-windows --target redgem redgem_relay.
+# and, for the Windows download, cmake --build build-windows --target redgem redgem_relay redgem_server.
 # On a Mac it makes the Mac's download instead (package_macos.sh).
 set -euo pipefail
 
@@ -14,8 +14,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/release_files.sh"
 LINUX_BUILD="${REPO_ROOT}/build/src"
 WINDOWS_BUILD="${REPO_ROOT}/build-windows/src"
 WINDOWS_STRIP="${REPO_ROOT}/.deps/llvm-mingw/bin/x86_64-w64-mingw32-strip"
-LINUX_PROGRAMS=(redgem redgem-player redgem-relay redgem-test)
-WINDOWS_PROGRAMS=(redgem.exe redgem-player.exe redgem-relay.exe)
+LINUX_PROGRAMS=(redgem redgem-player redgem-relay redgem-server redgem-test)
+WINDOWS_PROGRAMS=(redgem.exe redgem-player.exe redgem-relay.exe redgem-server.exe)
 MAC_SYSTEM="Darwin"   # what uname says on a Mac
 
 package_linux() {

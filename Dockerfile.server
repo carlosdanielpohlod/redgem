@@ -1,0 +1,32 @@
+# A small image that runs one game on a dedicated server (redgem-server), for players to join over
+# the internet. Built from the repository's root, naming the game's folder:
+#   docker build -f Dockerfile.server --build-arg GAME=games/platformer -t platformer-server .
+#   docker run -d --restart unless-stopped -p 7777:7777 platformer-server [--rooms 4 --max-players 8]
+# Only the server is compiled, and the image keeps nothing but it and the game's files.
+FROM ubuntu:24.04 AS build
+
+ENV DEBIAN_FRONTEND=noninteractive
+# Compiler and build tools; Ruby and rake build mruby. The graphics library is compiled into every
+# game, so its X11 and OpenGL headers are needed to build the server, which never opens a window.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential cmake ninja-build git ca-certificates xz-utils ruby rake bison \
+      libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+      libxext-dev libxfixes-dev libxrender-dev libasound2-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /redgem
+COPY . .
+RUN cmake -S . -B build -G Ninja -DREDGEM_BUILD_TESTS=OFF \
+    && cmake --build build --target redgem_server \
+    && strip build/src/redgem-server
+
+FROM ubuntu:24.04
+# The game's folder, relative to the repository's root.
+ARG GAME=games/platformer
+COPY --from=build /redgem/build/src/redgem-server /usr/local/bin/redgem-server
+COPY ${GAME} /game
+# It faces the internet: it runs as nobody in particular, and writes nothing (what a game saves on
+# a server is kept for the match only).
+USER 65534:65534
+EXPOSE 7777/tcp
+ENTRYPOINT ["redgem-server", "/game"]

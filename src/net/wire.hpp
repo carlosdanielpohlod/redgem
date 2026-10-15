@@ -56,6 +56,9 @@ inline constexpr const char* kTo = "t";
 inline constexpr const char* kData = "d";
 inline constexpr const char* kPeers = "p";
 inline constexpr const char* kRoom = "r";
+// In a welcome: the game's host is a dedicated server, which plays nobody. (Programs that do not
+// know of it never look for it.)
+inline constexpr const char* kServer = "s";
 inline constexpr const char* kGameMessage = "m";
 inline constexpr const char* kHello = "h";    // a newcomer: let me in (to a relay: into this room)
 inline constexpr const char* kWelcome = "w";  // to a newcomer: your id, and who else is here

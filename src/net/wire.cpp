@@ -50,6 +50,10 @@ bool is_short_text(const nlohmann::json& message, const char* key) {
          (message[key].is_string() && message[key].get_ref<const std::string&>().size() <= kMaxNameBytes);
 }
 
+bool is_flag(const nlohmann::json& message, const char* key) {
+  return !message.contains(key) || message[key].is_boolean();
+}
+
 bool is_peer_id(const nlohmann::json& entry) {
   return entry.is_number_integer() && entry >= kHostId && entry <= kLargestId;
 }
@@ -83,7 +87,7 @@ nlohmann::json game_message(const std::string& name, const nlohmann::json& data,
 
 bool well_formed(const nlohmann::json& message) {
   return has_kind(message) && is_id(message, kFrom) && is_id(message, kTo) && is_short_text(message, kName) &&
-         is_list_of_peers(message, kPeers) && is_short_text(message, kRoom) &&
+         is_list_of_peers(message, kPeers) && is_short_text(message, kRoom) && is_flag(message, kServer) &&
          (!message.contains(kData) || acceptable_data(message[kData]));
 }
 

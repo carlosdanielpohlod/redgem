@@ -29,8 +29,11 @@ the same pull request.
 
 ## Multiplayer
 
-- Nobody runs a public relay: to play over the internet someone has to run `redgem-relay` on a
-  machine the players can reach.
+- Nobody runs a public relay or server: to play over the internet someone has to run
+  `redgem-relay` or `redgem-server` on a machine the players can reach.
+- A dedicated server opens a room's game when its first player arrives, which holds up the
+  server's other rooms for a moment (the time a level takes to load). Its rooms share one
+  processor core.
 - Messages are JSON over TCP. There is no prediction or lag compensation: fast action games
   will feel the delay.
 - A relay accepts 24 connections and 8 rooms per address, and a game hosted directly lets 4

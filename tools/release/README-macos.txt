@@ -25,6 +25,7 @@ Also in RedGem.app/Contents/MacOS/:
 
   redgem-player   what a built game is a copy of
   redgem-relay    the meeting point for multiplayer games over the internet
+  redgem-server   runs a game on a server, for players to join
   redgem-test     runs a game's tests
 
 The manual: https://carlosdanielpohlod.github.io/redgem-site/manual/

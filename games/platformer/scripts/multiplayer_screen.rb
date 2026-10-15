@@ -1,8 +1,10 @@
 # The pause menu's multiplayer screen: host a game, join one found on the same network with a
 # click, or type an address (or, with a relay, a room's code) and join that.
 # With a relay (see MainScene) games can also be hosted online: the others only need the code.
+# With a dedicated server (see MainScene), Play online joins it: nobody has to host.
 class MultiplayerScreen < GameMenu::Screen
   HEADING = "Multiplayer".freeze
+  NO_SERVER = "No server to play online on yet: set SERVER in scripts/main_scene.rb".freeze
   SERVER_KEY = :server              # the last address joined, kept between runs
   DEFAULT_SERVER = "127.0.0.1".freeze
   ROOM_CODE_LETTERS = 6
@@ -15,25 +17,27 @@ class MultiplayerScreen < GameMenu::Screen
   MAX_NEARBY = 4                    # games listed
 
   attr_reader :address
-  attr_accessor :port               # the port games are hosted on and joined at
+  # The port games are hosted on and joined at, and where Play online goes ("address" or "address:port").
+  attr_accessor :port, :server
 
   # `menu` is the GameMenu it is a screen of; `title` is what a hosted game is called.
-  def initialize(menu, title:, relay:)
+  def initialize(menu, title:, relay:, server:)
     super(heading: HEADING, back: -> { menu.show(:pause) })
     @title = title
     @relay = relay.to_s
+    @server = server.to_s
     @address = Save.get(SERVER_KEY, DEFAULT_SERVER).to_s
     @port = Network::DEFAULT_PORT
     @failed = false
-    Network.relay = @relay unless @relay.empty?
-    Network.on_fail { @failed = true }
+    follow_the_network
   end
 
   # What the screen offers: [label, what it does].
   def options
     list = [["Host a game", -> { host_game }]]
     list << ["Host online", -> { host_room }] if relay?
-    list + [["Join", -> { join_game }], ["Leave the game", -> { leave_game }], ["Back", back]]
+    list + [["Join", -> { join_game }], ["Play online", -> { play_online }], ["Leave the game", -> { leave_game }],
+            ["Back", back]]
   end
 
   def opened = Network.search
@@ -69,18 +73,44 @@ class MultiplayerScreen < GameMenu::Screen
   end
 
   def join_game
-    starting
+    starting(@address)
     Save[SERVER_KEY] = @address
     room_code? ? Network.join(room: @address) : Network.join(@address, port: @port)
   end
 
+  # Joins the dedicated server, in any room with a free place.
+  def play_online
+    starting(@server)
+    return @note = NO_SERVER if @server.empty?
+
+    address, port = @server.split(":")
+    Network.join(address, port: (port || Network::DEFAULT_PORT).to_i)
+  end
+
   def leave_game = Network.leave
+
+  # What is going on with the network, in a line.
+  def status
+    return "Joining #{@joining}..." if Network.connecting?
+    return offline_status unless Network.online?
+
+    others = Network.players.size
+    "#{place}: #{others} other #{others == 1 ? "player" : "players"}"
+  end
 
   private
 
-  # Hosting or joining: an earlier failure is history, and there is nothing left to look for.
-  def starting
+  # Where games meet online, and joins that fail.
+  def follow_the_network
+    Network.relay = @relay unless @relay.empty?
+    Network.on_fail { @failed = true }
+  end
+
+  # Hosting or joining (`target`): an earlier failure is history, and there is nothing left to look for.
+  def starting(target = @address)
     @failed = false
+    @note = nil
+    @joining = target
     Network.stop_search
   end
 
@@ -91,12 +121,10 @@ class MultiplayerScreen < GameMenu::Screen
   # A room's code is a few letters and digits; an address has dots (or is a longer name).
   def room_code? = relay? && @address.strip.size == ROOM_CODE_LETTERS && !@address.include?(".")
 
-  def status
-    return "Joining #{@address}..." if Network.connecting?
-    return @failed ? "Could not join #{@address}" : hint unless Network.online?
+  def offline_status
+    return @note if @note
 
-    others = Network.peers.size
-    "#{place}: #{others} other #{others == 1 ? "player" : "players"}"
+    @failed ? "Could not join #{@joining}" : hint
   end
 
   def hint = relay? ? "Type a room's code or the host's address" : "Type the host's address to join a game"
@@ -104,7 +132,7 @@ class MultiplayerScreen < GameMenu::Screen
   def place
     return "Room #{Network.room}" if Network.room
 
-    Network.host? ? "Hosting on port #{Network.port}" : "In the game at #{@address}"
+    Network.host? ? "Hosting on port #{Network.port}" : "In the game at #{@joining}"
   end
 
   # The games hosted on this network, each a button that joins it.
@@ -119,7 +147,7 @@ class MultiplayerScreen < GameMenu::Screen
   end
 
   def join_found(game)
-    starting
+    starting(game[:address])
     @address = game[:address]
     Network.join(game[:address], port: game[:port])
   end

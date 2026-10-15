@@ -3,7 +3,6 @@
 #include "script/bindings/network_bindings.hpp"
 
 #include <mruby.h>
-#include <mruby/array.h>
 
 #include "core/log.hpp"
 #include "net/lan_discovery.hpp"
@@ -103,24 +102,6 @@ mrb_value network_emit(mrb_state* mrb, mrb_value) {
   return mrb_bool_value(network(mrb).send(name, json_from(mrb, data), static_cast<int>(to)));
 }
 
-// --- What the session is like right now ----------------------------------------------------------
-
-mrb_value network_online(mrb_state* mrb, mrb_value) {
-  return mrb_bool_value(network(mrb).state() == net::NetworkSession::State::Online);
-}
-mrb_value network_connecting(mrb_state* mrb, mrb_value) {
-  return mrb_bool_value(network(mrb).state() == net::NetworkSession::State::Connecting);
-}
-mrb_value network_hosting(mrb_state* mrb, mrb_value) { return mrb_bool_value(network(mrb).hosting()); }
-mrb_value network_id(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, network(mrb).id()); }
-mrb_value network_port(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, network(mrb).port()); }
-
-mrb_value network_peers(mrb_state* mrb, mrb_value) {
-  const mrb_value peers = mrb_ary_new(mrb);
-  for (const int peer : network(mrb).peers()) mrb_ary_push(mrb, peers, mrb_int_value(mrb, peer));
-  return peers;
-}
-
 void install_connection_bindings(RClass* network_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, network_module, "__host", network_host, MRB_ARGS_REQ(4));
   mrb_define_module_function(mrb, network_module, "__host_room", network_host_room, MRB_ARGS_REQ(2));
@@ -129,15 +110,6 @@ void install_connection_bindings(RClass* network_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, network_module, "__join", network_join, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, network_module, "__emit", network_emit, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, network_module, "__leave", network_leave, MRB_ARGS_NONE());
-}
-
-void install_state_bindings(RClass* network_module, mrb_state* mrb) {
-  mrb_define_module_function(mrb, network_module, "online?", network_online, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, network_module, "connecting?", network_connecting, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, network_module, "host?", network_hosting, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, network_module, "id", network_id, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, network_module, "port", network_port, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, network_module, "peers", network_peers, MRB_ARGS_NONE());
 }
 
 }  // namespace
@@ -154,7 +126,7 @@ void install_network_bindings(mrb_state* mrb) {
   RClass* network_module = mrb_define_module(mrb, "Network");
   install_connection_bindings(network_module, mrb);
   install_network_search_bindings(network_module, mrb);
-  install_state_bindings(network_module, mrb);
+  install_network_state_bindings(network_module, mrb);
 }
 
 }  // namespace redgem

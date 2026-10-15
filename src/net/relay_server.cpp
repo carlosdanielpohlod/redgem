@@ -25,7 +25,7 @@ bool RelayServer::start(std::uint16_t port, std::string& error) {
 
 void RelayServer::poll(float seconds) {
   if (!listener_.valid()) return;
-  forgive_visitors(seconds);
+  guessers_.forgive(seconds);
   accept_rest_ = std::max(0.0f, accept_rest_ - seconds);
   accept_newcomers();
   // By index: nothing below adds members, but entering a room touches other members.
@@ -50,7 +50,7 @@ bool RelayServer::wait(float seconds) const {
 void RelayServer::serve(Member& member, float seconds) {
   Connection& connection = member.connection;
   if (!member.in_room()) connection.keep_waiting(seconds);  // for it to say which room
-  member.allowance = std::min(kRelayBurstBytes, member.allowance + seconds * kRelayBytesPerSecond);
+  member.allowance.refill(seconds);
   charge(member, connection.pump());
   if (member.in_room()) connection.keep_in_touch(seconds);
   // (Only so many a poll: the rest wait for the next one, see kMaxMessagesPerPoll.)
@@ -58,8 +58,7 @@ void RelayServer::serve(Member& member, float seconds) {
 }
 
 void RelayServer::charge(Member& member, std::size_t bytes) {
-  member.allowance -= static_cast<float>(bytes);
-  if (member.allowance < 0.0f) member.connection.close();  // no game talks this much: a flood
+  if (!member.allowance.charge(bytes)) member.connection.close();  // no game talks this much: a flood
 }
 
 void RelayServer::shed_load() {

@@ -52,6 +52,7 @@ void Engine::initialize() {
   open_audio();
   open_saves();
   fill_context(manifest.settings.title);
+  if (serves_a_room()) network_.serve_room(options_.server_room);  // before any script asks
   start_scripts();
 }
 
@@ -80,6 +81,11 @@ void Engine::open_audio() {
 }
 
 void Engine::open_saves() {
+  // A server's rooms come and go, and its players keep saves of their own: nothing is written there.
+  if (serves_a_room()) {
+    save_ = std::make_unique<SaveStore>();
+    return;
+  }
   save_ =
       std::make_unique<SaveStore>(options_.save_file.empty() ? save_file_for(options_.game_dir) : options_.save_file);
 }

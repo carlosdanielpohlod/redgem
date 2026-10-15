@@ -7,11 +7,21 @@
 
 #include <nlohmann/json.hpp>
 
+#include "net/byte_allowance.hpp"
 #include "net/connection.hpp"
 #include "net/socket.hpp"
 #include "net/wire.hpp"
 
 namespace redgem::net {
+
+// What a machine in a dedicated server's room may send: a game's talk many times over, far less
+// than a flood (on a server, every message it sends is work for the game's scripts); and at once,
+// one of the longest messages and more.
+inline constexpr float kServedBytesPerSecond = 256.0f * 1024.0f;
+inline constexpr float kServedBurstBytes = 2.0f * kMaxFrameBytes;
+// A machine in a dedicated server's room that says nothing to the game for this long (only "I am
+// here") is let go: a place in a room is for playing.
+inline constexpr float kServedIdleSeconds = 300.0f;
 
 struct NetworkEvent {
   enum class Kind {
@@ -38,7 +48,8 @@ struct NetworkEvent {
 // they were sent. Nothing here waits: call poll() every frame.
 // When the machines cannot reach each other directly they meet in a room on a relay (see
 // RelayServer): whoever opens the room is the game's host in every way but one, the relay does
-// the passing on.
+// the passing on. On a dedicated server (redgem-server) each room is a game the server hosts,
+// with no player of its own: the server hands the room the machines that asked for it.
 class NetworkSession {
  public:
   enum class State { Offline, Connecting, Online };
@@ -51,7 +62,14 @@ class NetworkSession {
   bool host_room(const std::string& address, std::uint16_t port, std::string& error);
   // Joins the room with that code on the relay at `address`.
   bool join_room(const std::string& address, std::uint16_t port, const std::string& code, std::string& error);
-  // The code of the room this game is in, on a relay; empty for a game hosted directly.
+  // Starts a game as a room of a dedicated server, under the room's code: this machine is the
+  // host, with no player of its own.
+  void serve_room(const std::string& code);
+  // Lets a machine that asked the dedicated server for this room in: it is told its id, and the
+  // others of its arrival (with the next poll's events). With no place left it is let go.
+  void admit_arrival(Connection connection);
+  // The code of the room this game is in, on a relay or a dedicated server; empty for a game
+  // hosted directly.
   const std::string& room() const { return room_; }
   // Leaves the game (ending it for everyone when hosting).
   void leave();
@@ -68,6 +86,12 @@ class NetworkSession {
   int id() const { return state_ == State::Online ? id_ : 0; }
   // Everyone else's ids.
   const std::vector<int>& peers() const { return peers_; }
+  // Whether this machine is a dedicated server's room: the game's host, with no player.
+  bool serving() const { return server_hosted_ && hosting(); }
+  // The others who play: everyone else, without a dedicated server.
+  std::vector<int> players() const;
+  // How many of the machines in the game connected from `address` (on the host).
+  int links_from(const std::string& address) const;
   // The port being hosted on, or of the game joined.
   std::uint16_t port() const { return port_; }
 
@@ -76,12 +100,18 @@ class NetworkSession {
   struct Link {
     Connection connection;
     int peer = 0;  // 0 on the host until the newcomer said hello and was let in
+    ByteAllowance allowance{kServedBytesPerSecond, kServedBurstBytes};  // on a dedicated server
+    float idle_for = 0.0f;  // seconds since it last said something to the game, on a dedicated server
 
     bool let_in() const { return peer != 0; }
     // In the game, and not the machine that is `other` there.
     bool is_another_than(int other) const { return let_in() && peer != other; }
     // A newcomer that may still say hello.
     bool waiting() const { return !let_in() && !connection.closed(); }
+    // Still there, and connected from `address`.
+    bool connected_from(const std::string& address) const {
+      return !connection.closed() && connection.address() == address;
+    }
   };
 
   bool connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello, std::string& error);
@@ -96,14 +126,21 @@ class NetworkSession {
   bool still_serving(std::size_t link) const;
   // Whether a link is one to keep in touch with: this machine is in the game, and so is the other.
   bool in_touch_with(const Link& link) const;
-  void announce_hosting(std::vector<NetworkEvent>& events);
+  // Online as the game's host, with the game told so at the next poll.
+  void start_hosting();
   // One link's turn in a poll: what arrived is read and handled, what waits is sent.
   void serve(Link& link, float seconds, std::vector<NetworkEvent>& events);
+  // What a dedicated server's room holds its machines to: one that sends more than it may, or
+  // says nothing to the game for too long, is let go.
+  void police(Link& link, std::size_t bytes, float seconds);
   void receive_newcomers(float seconds);
   void accept_newcomers();
   // Whether one more machine from `address` may wait to say hello.
   bool room_to_wait(const std::string& address) const;
   void admit(Link& link, std::vector<NetworkEvent>& events);
+  // What a newcomer let in as `peer` is told: its id and who else is here (and, on a dedicated
+  // server, the room's code and that its host plays nobody).
+  nlohmann::json welcome_for(int peer, const std::vector<int>& already_here) const;
   void drop_silent_newcomers(float seconds);
   void await_connection(float seconds, std::vector<NetworkEvent>& events);
   void handle(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events);
@@ -146,13 +183,14 @@ class NetworkSession {
   int id_ = 0;
   std::uint16_t port_ = 0;
   float connecting_for_ = 0.0f;
-  bool announce_hosting_ = false;
   bool through_relay_ = false;  // the game is a room on a relay
   bool opening_room_ = false;   // ... which this machine asked to open
+  bool server_hosted_ = false;  // the game's host is a dedicated server
   std::string room_;
   Socket listener_;
   std::vector<Link> links_;
   std::vector<int> peers_;
+  std::vector<NetworkEvent> pending_events_;  // what happened between polls, for the next one
 };
 
 }  // namespace redgem::net

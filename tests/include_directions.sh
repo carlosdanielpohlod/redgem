@@ -8,8 +8,9 @@ set -uo pipefail
 SRC="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/src}"
 
 # What each layer may include. The order is the engine's: what a game is made of, what draws and
-# scripts it, the program that plays it (app), then the tools (editor, project) and what games
-# are tested with (testing), which nothing else may know.
+# scripts it, the program that plays it (app) and the one that runs it on a server for others to
+# join (server), then the tools (editor, project) and what games are tested with (testing), which
+# nothing else may know.
 declare -A ALLOWED=(
   [core]=""
   [scene]="core"
@@ -21,6 +22,7 @@ declare -A ALLOWED=(
   [render]="core scene"
   [script]="core scene net input audio physics storage render"
   [app]="core scene net input audio physics storage render script"
+  [server]="core scene net input audio physics storage render script app"
   [editor]="core scene net input audio physics storage render script app"
   [project]="core scene net input audio physics storage render script app editor"
   [testing]="core scene net input audio physics storage render script app editor project"

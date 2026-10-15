@@ -49,6 +49,7 @@ void NetworkSession::accept_welcome(const nlohmann::json& message, std::vector<N
   }
   id_ = given;
   room_ = message.value(kRoom, std::string());
+  server_hosted_ = message.value(kServer, false);
   peers_ = others;
   state_ = State::Online;
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::Connected, id_));

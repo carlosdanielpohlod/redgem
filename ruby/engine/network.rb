@@ -10,6 +10,14 @@
 #   Network.relay = "relay.example.com"
 #   Network.host(room: true)            # Network.room is then a code like "K7QM3P" ...
 #   Network.join(room: "K7QM3P")          # ... which is all the others need
+#
+# Or on a dedicated server (redgem-server), where the game runs with nobody at it and everyone joins:
+#
+#   Network.join("play.example.com")                  # any room with a free place
+#   Network.join("play.example.com", room: "K7QM3P")  # the room a friend is in (their Network.room)
+#   Network.server?                     # true on the server itself, which plays nobody
+#   Network.players                     # the others who play: Network.peers without the server
+#
 #   Network.on(:hit) { |data, from| @health -= data[:damage] }
 #   Network.emit(:hit, { damage: 3 })   # to everyone else; to: :host or to: a peer's id for one
 #
@@ -72,10 +80,11 @@ module Network
     end
 
     # Starts joining a game (leaving the one this machine is in): at an address, or with
-    # room: "K7QM3P" on the relay. on_connect or on_fail tells how it went, a moment later.
+    # room: "K7QM3P" on the relay (or, with an address too, on the dedicated server there).
+    # on_connect or on_fail tells how it went, a moment later.
     def join(address = nil, port: DEFAULT_PORT, room: nil)
       leave
-      return __join_room(*relay_address, room.to_s.strip.upcase) if room
+      return join_room(address, port, room) if room
       raise ArgumentError, "join needs an address or a room" if address.nil?
 
       __join(address.to_s, port.to_i)
@@ -131,6 +140,12 @@ module Network
     private
 
     def listen(kind, block) = (@listeners[kind] ||= []) << block
+
+    # A room by its code: on the dedicated server at `address` when there is one, on the relay otherwise.
+    def join_room(address, port, room)
+      server = address.nil? ? relay_address : [address.to_s, port.to_i]
+      __join_room(*server, room.to_s.strip.upcase)
+    end
 
     # The relay as [address, port].
     def relay_address

@@ -23,7 +23,15 @@ class Player < Behaviour
     GameMenu.instance.finish("You got every coin!") if @coins == @total
   end
 
+  # Whether this machine plays the hero: not another player's (see Online), and none on a
+  # dedicated server, which plays nobody.
+  def played?
+    sync = get_component(NetworkSync)
+    (sync.nil? || sync.mine?) && !Network.server?
+  end
+
   def update(dt)
+    return unless played?
     return draw_hud if dt.zero?  # a menu is open: its buttons are not the hero's
 
     move(Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).clamped)

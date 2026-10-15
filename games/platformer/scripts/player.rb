@@ -17,7 +17,7 @@ class Player < Behaviour
   # Whether an object is the hero this machine plays: not something else, nor another player's hero.
   def self.own?(object)
     player = object.get_component(Player)
-    !player.nil? && !player.ghost?
+    !player.nil? && player.played?
   end
 
   # Another player's hero: it goes where their machine says (see CoOp).
@@ -26,9 +26,13 @@ class Player < Behaviour
     !sync.nil? && !sync.mine?
   end
 
+  # Whether this machine plays the hero: its own, and not on a dedicated server, which plays
+  # nobody (its copy of the hero stands by, as what the others' heroes are copied from).
+  def played? = !ghost? && !Network.server?
+
   def update(dt)
     return if dt.zero?  # a menu is open: its buttons are not the hero's
-    return if ghost?
+    return unless played?
 
     move(Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).clamped)
     respawn if transform.position.y < FALL_LIMIT

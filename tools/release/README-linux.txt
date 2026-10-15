@@ -12,6 +12,7 @@ Also here:
 
   bin/redgem-player   what a built game is a copy of
   bin/redgem-relay    the meeting point for multiplayer games over the internet
+  bin/redgem-server   runs a game on a server, for players to join (no display needed)
   bin/redgem-test     runs a game's tests
   bin/runtimes/       the players for Windows and Android games
 

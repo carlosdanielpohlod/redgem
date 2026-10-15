@@ -4,6 +4,7 @@
 # was built for words only the other libraries have.
 #   ships_no_tools.sh player <redgem-player>   what players receive: none of the tools games are made with
 #   ships_no_tools.sh relay <redgem-relay>     what runs on a server: no tools, and nothing that draws or scripts
+#   ships_no_tools.sh server <redgem-server>   a game run on a server: the runtime, and none of the tools
 set -uo pipefail
 
 KIND="${1:-}"
@@ -12,7 +13,7 @@ PROGRAM="${2:-}"
 # The tools, in the order they are reported: the library the editor's interface is drawn with,
 # texts of the editor and of the project hub, the packer of phone apps and the SDK tools it runs,
 # the scripts of the new-game templates, the model importer, the command line, the licenses that
-# a build writes beside a game, and the relay's log line.
+# a build writes beside a game, and the log lines of the relay and of the game server.
 TOOLS=(
   "Dear ImGui" "ImGui" "imgui.ini"
   "Build Game" "Hierarchy" "Inspector" "Unsaved changes"
@@ -22,6 +23,7 @@ TOOLS=(
   "cannot import" "cannot build for" "redgem build <game_dir>" "--template"
   "THIRD_PARTY_LICENSES"
   "relay listening on port"
+  "game server listening on port"
 )
 # What plays a game: the window and graphics library, the scripting language, the physics, the
 # model loader, the engine's own Ruby and its log lines.
@@ -31,7 +33,9 @@ case "${KIND}" in
   player) MARKERS=("${TOOLS[@]}") ;;
   # (The relay is the one program its own log line belongs in.)
   relay) MARKERS=("${TOOLS[@]/relay listening on port/}" "${GAME[@]}") ;;
-  *) echo "usage: ships_no_tools.sh player|relay <program>"; exit 2 ;;
+  # (The game server plays games: what plays them is in it, its own log line too.)
+  server) MARKERS=("${TOOLS[@]/game server listening on port/}") ;;
+  *) echo "usage: ships_no_tools.sh player|relay|server <program>"; exit 2 ;;
 esac
 
 [[ -f "${PROGRAM}" ]] || { echo "no program at ${PROGRAM}"; exit 2; }

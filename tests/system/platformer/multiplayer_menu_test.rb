@@ -1,9 +1,11 @@
 # The pause menu leads to the multiplayer screen: an address can be typed, a game hosted and left,
-# and Esc goes back (P does not: there it is a letter).
+# Play online says where the server is to be set (the demo has none), and Esc goes back (P does
+# not: there it is a letter).
 SETTLE_FRAMES = 30
 MULTIPLAYER_BUTTON = 2    # on the pause menu
 HOST_BUTTON = 0           # on the multiplayer screen
-LEAVE_BUTTON = 2
+PLAY_ONLINE_BUTTON = 2
+LEAVE_BUTTON = 3
 PORT = 47_822             # not the usual one: a game may be open on this machine
 
 SystemTest.define do |t|
@@ -42,6 +44,10 @@ SystemTest.define do |t|
   t.screenshot("multiplayer_menu")
   press.call(LEAVE_BUTTON)
   t.assert("Leave the game ends it") { !Network.online? }
+  press.call(PLAY_ONLINE_BUTTON)
+  t.assert("with no server set, Play online says where to set one, and joins nothing") do
+    menu.screens[:multiplayer].status == MultiplayerScreen::NO_SERVER && !Network.connecting? && !Network.online?
+  end
 
   t.press(:escape)
   t.wait

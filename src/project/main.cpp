@@ -1,7 +1,8 @@
 // redgem: the program games are made with. It opens the editor and the project hub and does what
 // the command line asks (new, build, --play). What players receive is another program,
 // redgem-player, which a build copies next to the game's files; where games meet over the
-// internet is a third, redgem-relay.
+// internet is a third, redgem-relay, and a game run on a server for players to join a fourth,
+// redgem-server.
 
 #include <exception>
 #include <iostream>

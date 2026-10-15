@@ -39,5 +39,6 @@ nav:
   - Finishing a game:
       - Testing your game: testing.md
       - Building and sharing: shipping.md
+      - Dedicated server: dedicated-server.md
   - Limits and troubleshooting: troubleshooting.md
   - Working on the engine: contributing.md

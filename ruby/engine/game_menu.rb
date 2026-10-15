@@ -6,7 +6,8 @@
 #   GameMenu.instance.finish("You win!")       # from any script: the end screen
 #
 # Settings: title (shown on the title screen: the game's own title unless given), start_open
-# (false starts the game right away).
+# (false starts the game right away). On a dedicated server nobody is there to see a menu, and the
+# game must never freeze: none opens.
 #
 # The screens are :title, :pause and :over. A game changes them and adds its own:
 #
@@ -58,6 +59,8 @@ class GameMenu < Behaviour
 
   # Opens a screen by its name and freezes the game.
   def show(name)
+    return if Network.server?
+
     open_screen&.closed
     @screen = name
     Time.scale = FROZEN

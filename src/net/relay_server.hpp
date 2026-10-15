@@ -6,7 +6,10 @@
 #include <string>
 #include <vector>
 
+#include "net/byte_allowance.hpp"
+#include "net/code_guessers.hpp"
 #include "net/connection.hpp"
+#include "net/room_codes.hpp"
 #include "net/socket.hpp"
 #include "net/wire.hpp"
 
@@ -27,11 +30,6 @@ inline constexpr std::size_t kMaxRelayConnections = 1024;
 // How long a relay that could not take a newcomer (the system had no connection left to give)
 // leaves the ones waiting alone before it tries again.
 inline constexpr float kAcceptRestSeconds = 0.25f;
-
-// A code for a new room, every letter of it drawn from the operating system's own source of
-// randomness: the code is all that keeps strangers out of a room, so nobody must be able to work
-// out the next ones from the ones they were given.
-std::string random_room_code();
 
 // A meeting point on the internet for games whose players cannot reach each other directly
 // (home routers let connections out, not in). Every machine connects out to the relay; the
@@ -66,8 +64,8 @@ class RelayServer {
     Connection connection;
     std::string room;
     int peer = 0;
-    float allowance = kRelayBurstBytes;  // bytes it may still send now (see kRelayBytesPerSecond)
-    bool farewelled = false;             // the others in its room were told it is gone
+    ByteAllowance allowance{kRelayBytesPerSecond, kRelayBurstBytes};
+    bool farewelled = false;  // the others in its room were told it is gone
 
     bool in_room() const { return peer != 0; }
     bool connected_from(const std::string& address) const {
@@ -79,21 +77,9 @@ class RelayServer {
     // Gone, with the others in its room not told yet.
     bool left_untold() const { return connection.closed() && !farewelled; }
   };
-  // What is remembered about an address: its wrong guesses at room codes (forgotten with time),
-  // and for how long it is kept out for guessing too much.
-  struct Visitor {
-    float wrong_codes = 0.0f;
-    float kept_out_for = 0.0f;
-
-    bool kept_out() const { return kept_out_for > 0.0f; }
-    // Nothing is held against it any more: it need not be remembered.
-    bool forgiven() const { return !kept_out() && wrong_codes <= 0.0f; }
-  };
-
   void accept_newcomers();
   // Whether one more machine from `address` may connect.
   bool room_for(const std::string& address) const;
-  void forgive_visitors(float seconds);
   int connections_from(const std::string& address) const;
   int rooms_opened_by(const std::string& address) const;
   // One member's turn in a poll: what arrived is read and handled, what waits is sent.
@@ -126,7 +112,7 @@ class RelayServer {
   std::uint16_t port_ = 0;
   std::vector<std::unique_ptr<Member>> members_;
   std::map<std::string, bool> rooms_;  // the codes of the open rooms
-  std::map<std::string, Visitor> visitors_;
+  CodeGuessers guessers_;
   std::size_t max_buffered_bytes_ = kMaxRelayBufferedBytes;
   float accept_rest_ = 0.0f;  // seconds until newcomers are taken again (see kAcceptRestSeconds)
 };

@@ -1,6 +1,7 @@
 # tools/docker/editor.sh             opens the editor on your X11 display, as your own user
 # docker compose run --rm test       runs the whole test suite (no display needed)
 # docker compose up relay            runs a meeting point for multiplayer games (port 7778)
+# docker compose up server           runs a game on a dedicated server (port 7777; GAME=<folder> picks it)
 services:
   # Started by tools/docker/editor.sh, which adds your user, your games folder and your settings.
   editor:
@@ -38,3 +39,21 @@ services:
     ports:
       - "7778:7778"
     command: build/src/redgem-relay
+
+  # A game run on a dedicated server, for players to join (see the manual's Dedicated server page):
+  # the platformer demo unless GAME names another game's folder. Like the relay, it runs with no
+  # powers and nothing it can write to.
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+      args:
+        GAME: ${GAME:-games/platformer}
+    image: redgem-server
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "7777:7777"

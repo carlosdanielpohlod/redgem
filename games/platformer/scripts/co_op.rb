@@ -1,6 +1,8 @@
 # Playing together over the network: every machine in the game runs its own hero, sees the
 # others' and shares the coins. Whoever reaches the flag with every coin collected wins for all.
-# Start or join a game from the pause menu (Esc > Multiplayer). Lives on the GameManager.
+# Start or join a game from the pause menu (Esc > Multiplayer). On a dedicated server the game runs
+# with no hero of its own: it keeps the coins and the win for everyone, and when the game is won it
+# ends the match, so that the next players get a new one. Lives on the GameManager.
 class CoOp < Behaviour
   HERO = "Player".freeze
   HERO_KEY_PREFIX = "hero-".freeze   # a hero is called this on the network, followed by its machine's id
@@ -9,6 +11,7 @@ class CoOp < Behaviour
   COIN = :coin              # a coin was picked up: its name
   COINS_GONE = :coins_gone  # to a newcomer: the names of the coins picked up before it arrived
   WON = :won
+  MATCH_OVER_SECONDS = 5.0  # after a win, on a dedicated server: then its players are let go
 
   attr_reader :ghosts
 
@@ -39,17 +42,26 @@ class CoOp < Behaviour
   def follow_the_game
     Network.on(COIN) { |name, _from| take(name) }
     Network.on(COINS_GONE) { |names, _from| names.each { |name| take(name) } }
-    Network.on(WON) { GameManager.instance.win(mine: false) }
+    Network.on(WON) { won_by_another }
+  end
+
+  def won_by_another
+    GameManager.instance.win(mine: false)
+    after(MATCH_OVER_SECONDS) { Game.quit } if Network.server?
   end
 
   def hero_key(peer) = "#{HERO_KEY_PREFIX}#{peer}"
 
   # In a game: this machine's hero becomes visible to the others, and theirs appear here.
   def enter
+    show_my_hero unless Network.server?
+    Network.players.each { |peer| add_ghost(peer) }
+  end
+
+  def show_my_hero
     hero = find(HERO)
     sync = hero.get_component(NetworkSync) || hero.add_component(NetworkSync)
     sync.assign(owner: Network.id, key: hero_key(Network.id))
-    Network.peers.each { |peer| add_ghost(peer) }
   end
 
   def welcome(peer)
