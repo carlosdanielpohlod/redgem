@@ -24,8 +24,10 @@ for argument in "$@"; do
 done
 [[ ${#wanted[@]} -eq 0 ]] && wanted=(format cpp ruby python shell)
 
+# Exact versions: a newer linter finds new things, and every machine (and the CI) must agree.
+LINTERS=(clang-tidy==22.1.8 clang-format==23.1.3 ruff==0.17.0 shellcheck-py==0.11.0.1)
 if [[ ! -x "${VENV}/bin/clang-tidy" ]]; then
-  python3 -m venv "${VENV}" && "${VENV}/bin/pip" install -q clang-tidy clang-format ruff shellcheck-py || exit 1
+  python3 -m venv "${VENV}" && "${VENV}/bin/pip" install -q "${LINTERS[@]}" || exit 1
 fi
 
 # The files git knows that are still there: one deleted and not committed yet is not there to lint.
