@@ -49,11 +49,13 @@ jobs:
           path: .deps/llvm-mingw
           key: llvm-mingw-windows-${{ hashFiles('tools/windows/fetch_toolchain.sh') }}
 
-      # mruby's tools are built for this machine as well as for the game: with the same compiler.
+      # mruby's tools are built for this machine as well as for the game: with the same compiler,
+      # whose libraries they load when they run (the engine's programs have them built in).
       - name: Fetch the compiler
         run: |
           tools/windows/fetch_toolchain.sh
           bin="$(cygpath -m "${GITHUB_WORKSPACE}/.deps/llvm-mingw/bin")"
+          cygpath -w "${bin}" >> "${GITHUB_PATH}"
           {
             echo "CC=${bin}/x86_64-w64-mingw32-clang.exe"
             echo "CXX=${bin}/x86_64-w64-mingw32-clang++.exe"
