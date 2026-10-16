@@ -71,7 +71,7 @@ RedGem stands on open source. Thank you to the people behind these projects.
 | [Dear ImGui](https://github.com/ocornut/imgui) 1.92.8 (docking) | The editor's interface | MIT |
 | [rlImGui](https://github.com/raylib-extras/rlImGui) | Dear ImGui on raylib | zlib |
 | [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) | Move, rotate and scale gizmos | MIT |
-| [nlohmann/json](https://github.com/nlohmann/json) 3.12.0 | Reading and writing glTF JSON and settings | MIT |
+| [nlohmann/json](https://github.com/nlohmann/json) 3.12.0 | Reading and writing glTF JSON and settings; multiplayer messages (MessagePack) | MIT |
 | [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/) 3.6.7 | HTTPS for the games' web requests | Apache 2.0 |
 | [SQLite](https://www.sqlite.org) 3.50.4 | Where a dedicated server keeps its game's saves | Public domain |
 | [doctest](https://github.com/doctest/doctest) 2.4.11 | C++ tests | MIT |

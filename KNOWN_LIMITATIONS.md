@@ -33,7 +33,7 @@ the same pull request.
 - A dedicated server runs each room on a thread of its own, up to `--threads` (the machine's
   cores by default). With more rooms open than threads, rooms share them, and a level loading in
   one holds up the others on its thread for that moment.
-- Messages are JSON over TCP: a packet lost on the way holds up the ones after it. What others
+- Messages travel over TCP: a packet lost on the way holds up the ones after it. What others
   move is shown a moment behind them (interpolated), and nothing rewinds time to judge a hit where
   its shooter saw the target (no lag compensation): fast competitive games will feel the delay.
 - Players behind one shared address (a campus, some mobile networks) count as one address: by
