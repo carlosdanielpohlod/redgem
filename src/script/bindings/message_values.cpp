@@ -39,9 +39,9 @@ std::optional<nlohmann::json> scalar_json(mrb_state* mrb, mrb_value value, const
   return std::nullopt;
 }
 
-// An array or a hash holds only so much: the other machines would refuse the message.
+// An array or a hash of a message holds only so much: the other machines would refuse the message.
 void check_members(mrb_state* mrb, mrb_int count, const ValueHolder& holder) {
-  if (count > static_cast<mrb_int>(net::kMaxDataMembers)) {
+  if (static_cast<std::size_t>(count) > holder.most_members) {
     refuse(mrb, std::string("an array or a hash of ") + holder.name + " holds too many things");
   }
 }

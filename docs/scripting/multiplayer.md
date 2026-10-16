@@ -135,7 +135,7 @@ Network.emit(:score, 120, to: :host)
 A message carries `nil`, true/false, numbers, texts, `Vector3`, and arrays and hashes of those
 (hash keys arrive as symbols; a key no script of the receiving game uses anywhere arrives as a
 text instead, so `data[:damage]` works as written and only keys nobody asked for stay texts).
-An array or a hash holds at most 4096 things. Messages arrive whole and in the order they were sent. Handlers last
+An array or a hash holds at most 4096 things (in a message: `Save` keeps any number). Messages arrive whole and in the order they were sent. Handlers last
 until the next level is loaded, so register them in a behaviour's `start` or a scene script's
 `setup`. Names starting with `$` are the engine's own.
 
