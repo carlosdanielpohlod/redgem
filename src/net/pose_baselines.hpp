@@ -63,7 +63,6 @@ class PoseReceiver {
   std::optional<Pose> take(int from, const PoseUpdate& update);
   // Forgets the objects of a machine that left.
   void forget(int peer);
-  void forget_all() { known_.clear(); }
 
  private:
   struct Known {
@@ -72,10 +71,17 @@ class PoseReceiver {
   };
   using Source = std::pair<int, std::string>;  // a machine's id, and its object's key
 
-  void remember(const Source& source, const PoseUpdate& update);
+  // Starts over what is known of an object, from the whole pose that came.
+  void start(const Source& source);
   static void apply(const PoseUpdate& update, Known& known);
 
   std::map<Source, Known> known_;
+};
+
+// Both sides of what one machine remembers of poses.
+struct PoseBaselines {
+  PoseSender sent;
+  PoseReceiver heard;
 };
 
 }  // namespace redgem::net

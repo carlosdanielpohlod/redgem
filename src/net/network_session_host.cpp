@@ -79,7 +79,7 @@ void NetworkSession::let_in(Link& link, int peer, std::vector<NetworkEvent>& eve
   already_here.insert(already_here.end(), peers_.begin(), peers_.end());
   link.connection.send(welcome_for(link.peer, already_here));
   queue_for_everyone_but(link.peer, {{kKind, kArrived}, {kFrom, link.peer}});
-  pose_sender_.start_over();  // the newcomer knows none of this machine's objects
+  poses_.sent.start_over();  // the newcomer knows none of this machine's objects
   peers_.push_back(link.peer);
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerJoined, link.peer));
 }

@@ -85,7 +85,7 @@ bool NetworkSession::believable_welcome(int given, const std::vector<int>& other
 void NetworkSession::peer_arrived(int peer, std::vector<NetworkEvent>& events) {
   // What a host says is checked like anything else.
   if (!can_arrive(peer)) return;
-  pose_sender_.start_over();  // the newcomer knows none of this machine's objects
+  poses_.sent.start_over();  // the newcomer knows none of this machine's objects
   peers_.push_back(peer);
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerJoined, peer));
 }

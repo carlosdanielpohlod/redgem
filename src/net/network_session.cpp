@@ -120,8 +120,7 @@ void NetworkSession::go_offline() {
   room_.clear();
   refusal_.clear();
   pending_events_.clear();
-  pose_sender_.start_over();
-  pose_receiver_.forget_all();
+  poses_ = PoseBaselines();
 }
 
 std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
@@ -170,7 +169,7 @@ void NetworkSession::peer_left(int peer, std::vector<NetworkEvent>& events) {
   const auto gone = std::remove(peers_.begin(), peers_.end(), peer);
   if (gone == peers_.end()) return;  // nobody the game heard of
   peers_.erase(gone, peers_.end());
-  pose_receiver_.forget(peer);
+  poses_.heard.forget(peer);
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerLeft, peer));
 }
 

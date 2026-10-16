@@ -283,8 +283,7 @@ class NetworkSession {
   std::vector<int> peers_;
   std::vector<RoomAsking> room_asking_;
   std::vector<NetworkEvent> pending_events_;  // what happened between polls, for the next one
-  PoseSender pose_sender_;
-  PoseReceiver pose_receiver_;
+  PoseBaselines poses_;
 };
 
 }  // namespace redgem::net

@@ -42,7 +42,7 @@ PoseUpdate PoseSender::change(const std::string& key, Sent& sent, const PoseStep
 
 std::optional<Pose> PoseReceiver::take(int from, const PoseUpdate& update) {
   const Source source{from, update.key};
-  if (update.whole()) remember(source, update);
+  if (update.whole()) start(source);
   const auto found = known_.find(source);
   if (found == known_.end()) return std::nullopt;
   apply(update, found->second);
@@ -55,9 +55,9 @@ void PoseReceiver::apply(const PoseUpdate& update, Known& known) {
   if (update.rotation) known.rotation = *update.rotation;
 }
 
-void PoseReceiver::remember(const Source& source, const PoseUpdate& update) {
+void PoseReceiver::start(const Source& source) {
   if (known_.size() >= kMaxRememberedPoses) known_.clear();
-  known_[source] = Known{update.position.value(), update.rotation.value()};
+  known_[source] = Known();  // (what the whole pose says is applied next)
 }
 
 void PoseReceiver::forget(int peer) {

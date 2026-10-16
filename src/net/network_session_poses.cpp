@@ -20,7 +20,7 @@ nlohmann::json placement(const std::string& key, const Pose& pose) {
 
 bool NetworkSession::send_pose(const std::string& key, Vec3 position, Quat rotation) {
   if (!can_send_pose(key)) return false;
-  return deliver(pose_message(encoded(pose_sender_.update(key, position, rotation)), id_), kEveryone);
+  return deliver(pose_message(encoded(poses_.sent.update(key, position, rotation)), id_), kEveryone);
 }
 
 void NetworkSession::hear_from_game(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
@@ -32,7 +32,7 @@ void NetworkSession::hear_from_game(const nlohmann::json& message, std::vector<N
 void NetworkSession::hear_pose(int from, const std::vector<std::uint8_t>& pose, std::vector<NetworkEvent>& events) {
   const auto update = decoded(pose);
   if (!update) return;  // not a pose: nothing of it is used
-  if (const auto whole = pose_receiver_.take(from, *update)) {
+  if (const auto whole = poses_.heard.take(from, *update)) {
     events.push_back(NetworkEvent::message(from, kPoseMessageName, placement(update->key, *whole)));
   }
 }
