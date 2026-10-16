@@ -33,11 +33,9 @@ inline constexpr int kMostRooms = 64;
 inline constexpr int kMostThreads = kMostRooms;
 // Where a server keeps what its game saves (Save), unless told: a folder beside the game's,
 // named after it with this ("games/platformer" -> "games/platformer-data"), holding a database
-// (see SaveDatabase). A server of 0.2.0 kept a JSON file there instead, which is moved into the
-// database when the server starts with one there (see save_migration.hpp).
+// (see SaveDatabase).
 inline constexpr const char* kDataFolderSuffix = "-data";
 inline constexpr const char* kSaveDatabaseName = "save.sqlite3";
-inline constexpr const char* kSaveFileName = "save.json";
 
 // The folder beside the game's that keeps its saves on a server.
 std::filesystem::path data_dir_beside(const std::filesystem::path& game_dir);

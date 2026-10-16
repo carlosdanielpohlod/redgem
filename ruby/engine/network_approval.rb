@@ -15,8 +15,7 @@
 # on within 10 seconds is turned away. The machine turned away hears why in on_fail. Without a
 # handler everyone is let in. The handler lasts until another replaces it, or `authenticate` with
 # no block turns it off, across levels too. In a room on a relay, the game of whoever opened the
-# room decides: the relay passes the joins on and the decisions back (a relay older than 0.3.0
-# lets everyone in).
+# room decides: the relay passes the joins on and the decisions back.
 module Network
   # The decision on one newcomer: accept or deny, once (what comes after does nothing).
   class Decision

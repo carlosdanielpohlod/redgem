@@ -143,13 +143,10 @@ No service is built into the engine and none is required.
   In a room on a relay the game of whoever opened it decides, and the relay decides nothing: the
   opener tells it whether its game decides (a new kind of message), the relay holds the newcomer
   with the id it would have and hands the opener what its hello carried, and passes the decision
-  back (two more). A relay of 0.2.0 ignores the opener's word and lets everyone in; an opener of
-  0.2.0 never says it decides.
-- **Saving on a server**: the data folder defaults to `<game>-data` beside the game's folder. In
-  0.2.0 it held one `save.json`, rewritten whole on every change. Since 0.3.0 it holds a SQLite
-  database (`save.sqlite3`, `src/server/save_database.*`): one row per key, each change its own
-  transaction, used by the rooms' threads one call at a time. A `save.json` found there at start is
-  moved in and kept as `save.json.migrated`. Saved arrays and hashes are no longer limited to 4096
+  back (two more).
+- **Saving on a server**: the data folder defaults to `<game>-data` beside the game's folder. It
+  holds a SQLite database (`save.sqlite3`, `src/server/save_database.*`): one row per key, each
+  change its own transaction, used by the rooms' threads one call at a time. Saved arrays and hashes are no longer limited to 4096
   things (that limit is a message's); only their nesting is.
   `Save` now keeps arrays, hashes and `Vector3` as well (the example above needs a hash);
   hashes come back with string keys. A server's secrets (a backend's key) go in its own save.

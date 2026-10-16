@@ -69,8 +69,7 @@ Network.on_join { |peer| greet(Network.identity(peer), Network.player_name(peer)
 - What a join carries is at most 4 KB once written as JSON. It is untrusted: check it with the
   service that issued it.
 - It works with a player hosting too, and in a room on a relay, where the game of whoever opened the
-  room decides: the relay decides nothing, it passes each join on and the decision back (a relay
-  older than 0.3.0 lets everyone in).
+  room decides: the relay decides nothing, it passes each join on and the decision back.
 
 ## Saving on a server
 
@@ -93,10 +92,17 @@ key per player instead (`Save["player:#{Network.identity(peer)}"]`). For queries
 ranking, send the data to a backend with `HTTP`.
 
 **Secrets of the server** (the key a backend lets only the server write with) go in the server's
-own save before it starts: write them in `<data folder>/save.json` (`{ "backend_key": "..." }`),
-and the server moves them into its database when it starts, keeping the file as
-`save.json.migrated` (delete it once the server has started). The server's game reads them with
-`Save["backend_key"]`; players' machines never see a server's saves.
+own save, written with the `sqlite3` tool while the server is stopped (each value is stored as
+JSON, so a text is in double quotes):
+
+```bash
+sqlite3 /srv/platformer-data/save.sqlite3 \
+  "CREATE TABLE IF NOT EXISTS saves (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL) WITHOUT ROWID;
+   INSERT OR REPLACE INTO saves VALUES ('backend_key', '\"some-long-secret\"');"
+```
+
+The server's game reads them with `Save["backend_key"]`; players' machines never see a server's
+saves.
 
 ## With a hosted service: Supabase
 
@@ -219,9 +225,8 @@ which joins with the token. The server checks it with `GET /me`, lets the player
 key, in the backend too:
 
 ```bash
-mkdir -p /srv/platformer-data      # once: the backend's key, in the server's own save
-echo '{ "backend_key": "some-long-secret" }' > /srv/platformer-data/save.json
-redgem-server games/platformer --data /srv/platformer-data   # moves it into the server's database
+mkdir -p /srv/platformer-data      # once: the backend's key, in the server's own save (see above)
+redgem-server games/platformer --data /srv/platformer-data
 ```
 
 With `ACCOUNTS` empty (as it ships), players join as guests, each under an id their machine keeps,

@@ -101,12 +101,8 @@ each player's data under their identity, as
 a key per player (`Save["player:#{identity}"]`) reads and writes one player instead of all of
 them.
 
-A server of version 0.2.0 kept `save.json` in the data folder instead. Whenever the server starts
-with a `save.json` there (an older server's, or one written by hand, see
-[Online services](scripting/online-services.md#saving-on-a-server)), it moves the file's values
-into the database, replacing those of the same names, and keeps the file beside it as
-`save.json.migrated`. A server that cannot move it does not start, rather than lose them. A copy of the database for a backup is taken with `sqlite3 save.sqlite3
-".backup copy.sqlite3"`, or by copying the folder while the server is stopped.
+A copy of the database for a backup is taken with `sqlite3 save.sqlite3 ".backup copy.sqlite3"`,
+or by copying the folder while the server is stopped.
 
 The server faces the internet. It keeps every limit a hosted game and the relay have (message
 sizes, how much each player may send, connections per address, spawned objects), lets go of

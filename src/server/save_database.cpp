@@ -19,9 +19,6 @@ constexpr const char* kWrite = "INSERT OR REPLACE INTO saves (key, value) VALUES
 constexpr const char* kRemove = "DELETE FROM saves WHERE key = ?1";
 constexpr const char* kClear = "DELETE FROM saves";
 constexpr const char* kKeys = "SELECT key FROM saves ORDER BY key";
-constexpr const char* kBegin = "BEGIN";
-constexpr const char* kCommit = "COMMIT";
-constexpr const char* kRollBack = "ROLLBACK";
 // Where the statements above take their values (?1, ?2), and give them back.
 constexpr int kKeyPlace = 1;
 constexpr int kValuePlace = 2;
@@ -63,12 +60,8 @@ std::optional<nlohmann::json> SaveDatabase::get(const std::string& key) {
 
 bool SaveDatabase::set(const std::string& key, const nlohmann::json& value) {
   if (value.is_null()) return remove(key);
-  const std::lock_guard<std::mutex> hold(lock_);
-  return write(key, value);
-}
-
-bool SaveDatabase::write(const std::string& key, const nlohmann::json& value) {
   const std::string text = saved::written(saved::kept(value).value_or(nlohmann::json()));
+  const std::lock_guard<std::mutex> hold(lock_);
   return SqliteStatement(database_, kWrite).bind(kKeyPlace, key).bind(kValuePlace, text).run();
 }
 
@@ -79,7 +72,7 @@ bool SaveDatabase::remove(const std::string& key) {
 
 bool SaveDatabase::clear() {
   const std::lock_guard<std::mutex> hold(lock_);
-  return execute(kClear);
+  return executed(database_, kClear);
 }
 
 std::vector<std::string> SaveDatabase::keys() {
@@ -89,18 +82,5 @@ std::vector<std::string> SaveDatabase::keys() {
   while (listing.next_row()) names.push_back(listing.text(kFirstColumn));
   return names;
 }
-
-bool SaveDatabase::set_all(const std::map<std::string, nlohmann::json>& values) {
-  const std::lock_guard<std::mutex> hold(lock_);
-  if (!execute(kBegin)) return false;
-  for (const auto& [key, value] : values) {
-    if (write(key, value)) continue;
-    execute(kRollBack);
-    return false;
-  }
-  return execute(kCommit);
-}
-
-bool SaveDatabase::execute(const char* sql) { return executed(database_, sql); }
 
 }  // namespace redgem::server

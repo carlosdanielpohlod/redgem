@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "server/save_database.hpp"
-#include "server/save_migration.hpp"
 
 using namespace redgem;
 using redgem::server::SaveDatabase;
@@ -22,7 +21,6 @@ constexpr double kVolume = 0.35;
 struct TempData {
   std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-save-database-test";
   std::filesystem::path database = dir / "data" / "save.sqlite3";
-  std::filesystem::path old_save = dir / "data" / "save.json";
   TempData() { std::filesystem::remove_all(dir); }
   ~TempData() { std::filesystem::remove_all(dir); }
 };
@@ -89,23 +87,6 @@ TEST_CASE("rooms writing at once from their own threads lose nothing") {
   const std::vector<std::string> keys = opened(temp.database)->keys();
   CHECK(keys.size() == static_cast<std::size_t>(kRooms * kWritesPerRoom + 1));
   CHECK(*database->get("room-3-199") == 199);
-}
-
-TEST_CASE("a server's old save file is moved into its database once, and kept beside it") {
-  const TempData temp;
-  std::filesystem::create_directories(temp.old_save.parent_path());
-  std::ofstream(temp.old_save) << R"({"best": 1250.0, "players": {"user-1": {"level": 3}}, "nothing": null})";
-  auto database = opened(temp.database);
-  CHECK(server::move_into(*database, temp.old_save));
-  CHECK(database->keys() == std::vector<std::string>{"best", "players"});
-  CHECK((*database->get("players"))["user-1"]["level"] == 3);
-  CHECK_FALSE(std::filesystem::exists(temp.old_save));
-  CHECK(std::filesystem::exists(temp.old_save.string() + server::kMigratedSuffix));
-
-  // Moved once: what changes afterwards is never overwritten by the old file.
-  database->set("best", 2000);
-  CHECK(server::move_into(*database, temp.old_save));
-  CHECK(*database->get("best") == 2000);
 }
 
 TEST_CASE("a database in memory keeps values for this run only, and one that cannot be opened says why") {

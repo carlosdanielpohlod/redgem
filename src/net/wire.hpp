@@ -82,8 +82,7 @@ inline constexpr const char* kPing = "i";         // nothing to say: I am here
 inline constexpr const char* kConsidering = "c";  // to a newcomer: the game is deciding on your hello
 inline constexpr const char* kRefused = "x";      // to a newcomer: you are not let in, and why
 // Connection approval in a room on a relay, which decides nothing: it passes the newcomer's hello
-// to the room's opener, and the opener's decision back. (A relay of 0.2.0 ignores what the opener
-// says, and lets everyone in; an opener of 0.2.0 never says it decides.)
+// to the room's opener, and the opener's decision back.
 inline constexpr const char* kGuarded = "g";  // opener to relay: whether its game decides who comes in (kData)
 inline constexpr const char* kAsking = "q";   // relay to opener: newcomer kFrom asks to come in, with kAuth
 inline constexpr const char* kVerdict = "v";  // opener to relay: newcomer kTo is let in (kData), or not and why

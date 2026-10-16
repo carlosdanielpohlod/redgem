@@ -1,7 +1,6 @@
 #pragma once
 
 #include <filesystem>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -32,14 +31,9 @@ class SaveDatabase final : public SaveStore {
   bool clear() override;
   std::vector<std::string> keys() override;
   std::string where() const override { return file_.string(); }
-  // Puts all of `values` in at once, in one transaction: all of them or, failing that, none.
-  bool set_all(const std::map<std::string, nlohmann::json>& values);
 
  private:
   SaveDatabase(sqlite3* database, std::filesystem::path file) : database_(database), file_(std::move(file)) {}
-  // Runs SQL that takes no values; true when it worked.
-  bool execute(const char* sql);
-  bool write(const std::string& key, const nlohmann::json& value);
 
   sqlite3* database_;
   std::filesystem::path file_;
