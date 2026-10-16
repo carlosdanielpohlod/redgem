@@ -9,6 +9,7 @@
 
 #include "editor/document/glb_file.hpp"
 #include "editor/document/scene_document.hpp"
+#include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -81,6 +82,14 @@ std::size_t vertex_floats(const SceneDesc& desc) {
     for (const PrimitiveDesc& part : mesh.primitives) floats += part.positions.size();
   }
   return floats;
+}
+
+// The vertices of the object called "Child" (the model's), as a scene holds them.
+std::vector<float> child_positions(const SceneDesc& scene) {
+  const int child = scene.find_node("Child");
+  REQUIRE(child != kNoIndex);
+  const int mesh = scene.nodes.at(static_cast<std::size_t>(child)).mesh;
+  return scene.meshes.at(static_cast<std::size_t>(mesh)).primitives.at(0).positions;
 }
 
 }  // namespace
@@ -160,8 +169,14 @@ TEST_CASE("models imported and deleted over and over: what no step can bring bac
   const int child = doc.desc().find_node("Child");
   REQUIRE(child != kNoIndex);
   CHECK_FALSE(doc.desc().meshes.at(static_cast<std::size_t>(doc.node(child).mesh)).primitives.empty());
-  // And the scene saves with it.
+  // And the scene saves with it, and with its own vertices: the imports' bytes that moved down the
+  // file as older ones were let go of (on the imports' own steps too) are still theirs.
   REQUIRE_MESSAGE(doc.save(error), error);
+  const LoadResult saved = load_gltf_scene(doc.path().string());
+  const LoadResult original = load_gltf_scene(fixture("hierarchy.glb"));
+  REQUIRE_MESSAGE(saved.ok, saved.error);
+  REQUIRE_MESSAGE(original.ok, original.error);
+  CHECK(child_positions(saved.scene) == child_positions(original.scene));
   std::filesystem::remove(doc.path());
 }
 
