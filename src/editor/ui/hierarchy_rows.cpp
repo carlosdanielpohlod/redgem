@@ -3,6 +3,7 @@
 #include <imgui.h>
 
 #include "editor/editor_config.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 #include "scene/props.hpp"
 
@@ -24,8 +25,8 @@ const char* icon_of(const NodeDesc& node) {
 
 // What can be done to the object itself.
 void draw_node_actions(bool has_parent, int index, Pending& pending) {
-  if (ImGui::MenuItem(kDuplicateLabel, kKeysDuplicate)) pending = {Pending::Kind::Duplicate, index, kNoIndex, {}};
-  if (ImGui::MenuItem(kDeleteLabel, kKeysDelete)) pending = {Pending::Kind::Delete, index, kNoIndex, {}};
+  if (ImGui::MenuItem(duplicate_label(), kKeysDuplicate)) pending = {Pending::Kind::Duplicate, index, kNoIndex, {}};
+  if (ImGui::MenuItem(delete_label(), kKeysDelete)) pending = {Pending::Kind::Delete, index, kNoIndex, {}};
   if (!has_parent) return;
   if (ImGui::MenuItem(ICON_FA_ARROW_TURN_UP "  Move to top level")) {
     pending = {Pending::Kind::Reparent, index, kNoIndex, {}};

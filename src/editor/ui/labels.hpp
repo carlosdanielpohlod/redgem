@@ -12,4 +12,11 @@ const char* label_with_id(const char* key, const char* id);
 // "<icon>  <text of key>##<id>": both.
 const char* icon_label_with_id(const char* icon, const char* key, const char* id);
 
+// Labels of commands that several menus and dialogs offer.
+const char* save_label();
+const char* discard_label();
+const char* cancel_label();
+const char* duplicate_label();
+const char* delete_label();
+
 }  // namespace redgem::ui

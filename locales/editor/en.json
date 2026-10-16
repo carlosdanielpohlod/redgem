@@ -1,4 +1,9 @@
 {
+  "editor.command.cancel": "Cancel",
+  "editor.command.delete": "Delete",
+  "editor.command.discard": "Discard",
+  "editor.command.duplicate": "Duplicate",
+  "editor.command.save": "Save",
   "editor.menu.edit": "Edit",
   "editor.menu.file": "File",
   "editor.menu.game_object": "GameObject",

@@ -6,6 +6,7 @@
 #include <tuple>
 
 #include "core/translations.hpp"
+#include "editor/ui/style.hpp"
 
 namespace redgem::ui {
 namespace {
@@ -59,5 +60,11 @@ const char* icon_label(const char* icon, const char* key) { return kept_label(ic
 const char* label_with_id(const char* key, const char* id) { return kept_label(kNone, key, id); }
 
 const char* icon_label_with_id(const char* icon, const char* key, const char* id) { return kept_label(icon, key, id); }
+
+const char* save_label() { return icon_label(ICON_FA_FLOPPY_DISK, "editor.command.save"); }
+const char* discard_label() { return tr("editor.command.discard"); }
+const char* cancel_label() { return tr("editor.command.cancel"); }
+const char* duplicate_label() { return icon_label(ICON_FA_CLONE, "editor.command.duplicate"); }
+const char* delete_label() { return icon_label(ICON_FA_TRASH, "editor.command.delete"); }
 
 }  // namespace redgem::ui

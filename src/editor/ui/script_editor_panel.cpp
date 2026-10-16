@@ -6,6 +6,7 @@
 #include "core/log.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/ui/panels.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 
 namespace redgem::ui {
@@ -36,7 +37,7 @@ void draw_status(const ScriptEditor& editor) {
 
 // Save, Revert, Split right, Open externally, and where the script stands.
 void draw_file_buttons(ScriptEditor& editor) {
-  if (ImGui::SmallButton(kSaveLabel)) save(editor);
+  if (ImGui::SmallButton(save_label())) save(editor);
   tooltip("Ctrl+S. Play saves and reloads scripts too.");
   ImGui::SameLine();
   ImGui::BeginDisabled(!editor.modified());
@@ -96,17 +97,17 @@ bool still_open(bool pressed, const ScriptEditor* editor) { return pressed && ed
 bool draw_close_choices(ScriptWorkspace& scripts, const std::string& file) {
   ScriptEditor* editor = scripts.find(file);
   bool done = editor == nullptr;
-  if (still_open(ImGui::Button(kSaveLabel), editor)) {
+  if (still_open(ImGui::Button(save_label()), editor)) {
     save_and_close(scripts, *editor, file);
     done = true;
   }
   ImGui::SameLine();
-  if (ImGui::Button(kDiscardLabel)) {
+  if (ImGui::Button(discard_label())) {
     scripts.close(file);
     done = true;
   }
   ImGui::SameLine();
-  return ImGui::Button(kCancelLabel) || done;
+  return ImGui::Button(cancel_label()) || done;
 }
 
 // Save / Discard / Cancel for a tab closed with unsaved changes.

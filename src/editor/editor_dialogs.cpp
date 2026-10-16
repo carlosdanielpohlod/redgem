@@ -7,6 +7,7 @@
 
 #include "core/log.hpp"
 #include "editor/editor_config.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 #include "render/renderer.hpp"
 
@@ -72,11 +73,11 @@ void EditorApp::draw_unsaved_dialog() {
 bool EditorApp::unsaved_dialog_wanted() const { return close_pending_ && !ImGui::IsPopupOpen(kUnsavedPopup); }
 
 void EditorApp::draw_unsaved_choices() {
-  if (ImGui::Button(ui::kSaveLabel)) save_and_leave();
+  if (ImGui::Button(ui::save_label())) save_and_leave();
   ImGui::SameLine();
-  if (ImGui::Button(ui::kDiscardLabel)) leave_without_saving();
+  if (ImGui::Button(ui::discard_label())) leave_without_saving();
   ImGui::SameLine();
-  if (ImGui::Button(ui::kCancelLabel)) cancel_leaving();
+  if (ImGui::Button(ui::cancel_label())) cancel_leaving();
 }
 
 void EditorApp::save_and_leave() {

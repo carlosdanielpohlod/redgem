@@ -9,6 +9,7 @@
 #include "core/platform.hpp"
 #include "core/translations.hpp"
 #include "editor/editor_config.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 
 namespace redgem {
@@ -103,10 +104,10 @@ bool EditorApp::redo_offered() const { return editing() && session_->document().
 
 void EditorApp::draw_selection_items() {
   const bool has_selection = session_->selection() != kNoObject;
-  if (ImGui::MenuItem(ui::kDuplicateLabel, kKeysDuplicate, false, selection_editable())) {
+  if (ImGui::MenuItem(ui::duplicate_label(), kKeysDuplicate, false, selection_editable())) {
     session_->duplicate_selection();
   }
-  if (ImGui::MenuItem(ui::kDeleteLabel, kKeysDelete, false, selection_editable())) session_->delete_selection();
+  if (ImGui::MenuItem(ui::delete_label(), kKeysDelete, false, selection_editable())) session_->delete_selection();
   ImGui::Separator();
   if (ImGui::MenuItem(ICON_FA_EXPAND "  Frame Selection", kKeysFrame, false, has_selection)) frame_selection();
 }
