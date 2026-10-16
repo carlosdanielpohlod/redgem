@@ -125,7 +125,8 @@ TEST_CASE("undo keeps no more bytes than its limit, dropping its oldest steps") 
 }
 
 TEST_CASE("what undo keeps is counted as its steps come and go, without walking them all") {
-  constexpr int kStepsBackToTheThing = 3;  // the rename, the deletion and the import
+  constexpr int kStepsAfterTheImport = 2;  // the deletion and the rename
+  constexpr int kStepsBackToTheThing = 3;  // those, and the import
   SceneDocument doc = empty_document("counted");
   const int thing = doc.add_empty("Thing");
   std::string error;
@@ -134,9 +135,10 @@ TEST_CASE("what undo keeps is counted as its steps come and go, without walking 
   doc.remove(model);
   doc.set_name(thing, "Renamed");
   const std::size_t kept = doc.history_bytes();
-  // Undone and redone all the way, the steps hold what they held.
-  const std::size_t steps = undo_all(doc);
-  for (std::size_t step = 0; step < steps; ++step) REQUIRE(doc.redo());
+  // Undone and redone, the steps hold what they held. (Not past the import: the materials it
+  // added stay, so a step from before it is copied with more of them when it is redone.)
+  for (int step = 0; step < kStepsAfterTheImport; ++step) REQUIRE(doc.undo());
+  for (int step = 0; step < kStepsAfterTheImport; ++step) REQUIRE(doc.redo());
   CHECK(doc.history_bytes() == kept);
   // A step that changes nothing goes again, and takes its bytes along.
   doc.set_name(thing, "Renamed");

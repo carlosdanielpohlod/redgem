@@ -203,7 +203,7 @@ add_test(NAME relay.help COMMAND redgem_relay --help)
 set_tests_properties(relay.help PROPERTIES PASS_REGULAR_EXPRESSION "usage:.*redgem-relay \\[--port <number>\\]")
 add_test(NAME relay.refuses_what_it_does_not_understand COMMAND redgem_relay --port many)
 set_tests_properties(relay.refuses_what_it_does_not_understand PROPERTIES
-  PASS_REGULAR_EXPRESSION "--port needs a number up to 65535")
+  PASS_REGULAR_EXPRESSION "--port needs a number from 0 to 65535")
 
 # The game server's command line, as the program itself answers it.
 add_test(NAME server.help COMMAND redgem_server --help)
