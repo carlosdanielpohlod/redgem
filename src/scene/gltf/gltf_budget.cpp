@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <optional>
 
 #include "core/image_header.hpp"
 #include "scene/gltf/gltf_checks.hpp"
@@ -76,13 +77,22 @@ std::uint64_t scene_bytes(const cgltf_data& data, const std::filesystem::path& f
   return plus(plus(size_of(file), data_bytes), accessor_bytes(data));
 }
 
+namespace {
+
+// What a picture takes once decoded; nothing for one that will not be decoded.
+std::uint64_t decoded_size(const ImageData& image) {
+  const std::uint8_t* encoded = image.encoded.data();
+  const std::size_t length = image.encoded.size();
+  if (!decodable_image(encoded, length)) return 0;
+  const std::optional<ImageSize> size = encoded_image_size(encoded, length);
+  return size ? std::uint64_t{size->width} * size->height * kBytesPerPixel : 0;
+}
+
+}  // namespace
+
 std::uint64_t decoded_bytes(const std::vector<ImageData>& images) {
   std::uint64_t bytes = 0;
-  for (const ImageData& image : images) {
-    if (!decodable_image(image.encoded.data(), image.encoded.size())) continue;
-    const ImageSize size = *encoded_image_size(image.encoded.data(), image.encoded.size());
-    bytes = plus(bytes, std::uint64_t{size.width} * size.height * kBytesPerPixel);
-  }
+  for (const ImageData& image : images) bytes = plus(bytes, decoded_size(image));
   return bytes;
 }
 
