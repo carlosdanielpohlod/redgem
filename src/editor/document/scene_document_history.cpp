@@ -8,8 +8,6 @@
 namespace redgem {
 namespace {
 
-constexpr std::size_t kMaxUndoSteps = 200;  // older steps are forgotten
-
 bool same_color(const Color& a, const Color& b) { return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a; }
 
 bool same_vec3(Vec3 a, Vec3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
@@ -54,9 +52,9 @@ bool same_nodes(const std::vector<NodeDesc>& a, const std::vector<NodeDesc>& b) 
 
 void SceneDocument::checkpoint() {
   undo_.push_back(snapshot());
-  if (undo_.size() > kMaxUndoSteps) undo_.erase(undo_.begin());
   redo_.clear();
   changed_since_checkpoint_ = false;
+  trim_history();
 }
 
 SceneDocument::Snapshot SceneDocument::snapshot() const {

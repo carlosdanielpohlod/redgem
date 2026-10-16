@@ -304,6 +304,7 @@ if(NOT ANDROID)
     editor/node_tree.cpp
     editor/document/scene_document.cpp
     editor/document/scene_document_history.cpp
+    editor/document/scene_document_memory.cpp
     editor/document/scene_document_terrain.cpp
     editor/document/scene_document_edits.cpp
     editor/document/scene_document_copies.cpp

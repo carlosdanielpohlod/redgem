@@ -40,15 +40,6 @@ void use_each_named(Json& object, const char* key, Kind kind, const Use& use) {
   for (auto& [name, reference] : named->items()) use(reference, kind);
 }
 
-// An extension may point at the file's lists in ways of its own: only `known` is looked past.
-void refuse_other_extensions(const Json& object, const char* known) {
-  const auto extensions = object.find(kExtensions);
-  if (extensions == object.end()) return;
-  for (const auto& [name, extension] : extensions->items()) {
-    if (name != known) throw NotFollowed();
-  }
-}
-
 void walk_primitive(Json& primitive, const Use& use) {
   if (primitive.contains(kExtensions)) throw NotFollowed();
   use_each_named(primitive, kAttributes, kAccessorKind, use);
@@ -128,6 +119,14 @@ Usage nothing_used(Json& doc) {
 }
 
 }  // namespace
+
+void refuse_other_extensions(const Json& object, const char* known) {
+  const auto extensions = object.find(kExtensions);
+  if (extensions == object.end()) return;
+  for (const auto& [name, extension] : extensions->items()) {
+    if (name != known) throw NotFollowed();
+  }
+}
 
 Json* lights_extension(Json& object) {
   const auto extensions = object.find(kExtensions);

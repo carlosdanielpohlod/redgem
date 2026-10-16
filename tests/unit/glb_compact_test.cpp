@@ -198,6 +198,38 @@ TEST_CASE("a deleted light's and camera's entries leave the file, and come back 
   std::filesystem::remove(file);
 }
 
+TEST_CASE("the bytes of meshes let go of leave the file kept in memory, which keeps its numbering") {
+  GlbFile glb = two_meshes_one_shown();
+  const nlohmann::json nodes = glb.json["nodes"];
+  const nlohmann::json none = nlohmann::json::array();
+  const std::optional<std::vector<bool>> images = release_meshes(glb, {0}, {nodes, none, none});
+  REQUIRE(images.has_value());
+  CHECK(*images == std::vector<bool>{false, true});
+  // The second mesh's eight bytes and its picture's four; nothing is numbered anew.
+  const std::vector<std::uint8_t> expected = {8, 9, 10, 11, 12, 13, 14, 15, 20, 21, 22, 23};
+  CHECK(glb.bin == expected);
+  CHECK(glb.json["meshes"].size() == 2);
+  REQUIRE(glb.json["bufferViews"].size() == 4);
+  CHECK(glb.json["bufferViews"][1]["byteOffset"] == 0);
+  CHECK(glb.json["bufferViews"][3]["byteOffset"] == 8);
+  // The views let go of keep their length and point at bytes there are: the file stays whole.
+  CHECK(glb.json["bufferViews"][0]["byteOffset"] == 0);
+  CHECK(glb.json["bufferViews"][0]["byteLength"] == 8);
+  // Saved, it is what it would have been.
+  const std::optional<GlbFile> lean = without_unused(glb);
+  REQUIRE(lean.has_value());
+  CHECK(lean->json == without_unused(two_meshes_one_shown())->json);
+  CHECK(lean->bin == expected);
+
+  // A node with an extension that may point at the data its own way: nothing is let go of.
+  GlbFile instanced = two_meshes_one_shown();
+  nlohmann::json other_nodes = instanced.json["nodes"];
+  other_nodes[0]["extensions"]["EXT_mesh_gpu_instancing"] = {{"attributes", {{"TRANSLATION", 0}}}};
+  CHECK_FALSE(release_meshes(instanced, {0}, {other_nodes, none, none}).has_value());
+  CHECK(instanced.bin == two_meshes_one_shown().bin);
+  CHECK(instanced.json == two_meshes_one_shown().json);
+}
+
 TEST_CASE("skeletons and animations keep their data, whichever object they move") {
   GlbFile glb = two_meshes_one_shown();
   glb.json["skins"] = {{{"joints", {0}}, {"inverseBindMatrices", 0}}};

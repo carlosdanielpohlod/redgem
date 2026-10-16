@@ -104,7 +104,77 @@ std::optional<GlbFile> lean_copy(const GlbFile& glb) {
   return lean;
 }
 
+// The file as if its objects were one for each mesh still held, with every node's extensions,
+// skeleton and animation the editor keeps: what is reached from those is still used.
+Json still_held(const Json& doc, const std::set<int>& released, const GlbSources& sources) {
+  for (const Json& node : sources.nodes) refuse_other_extensions(node, kLightsExtension);
+  Json probe = doc;
+  Json nodes = Json::array();
+  const std::size_t meshes = probe.contains(kMeshes) ? probe[kMeshes].size() : 0;
+  for (std::size_t mesh = 0; mesh < meshes; ++mesh) {
+    if (released.count(static_cast<int>(mesh)) == 0) nodes.push_back({{kMesh, mesh}});
+  }
+  probe[kNodes] = std::move(nodes);
+  probe[kSkins] = sources.skins;
+  probe[kAnimations] = sources.animations;
+  return probe;
+}
+
+// How long the longest view out of use is (each view is checked to be where the chunk has bytes).
+std::size_t longest_unused(const Json& views, const std::vector<bool>& used, std::size_t bin_size) {
+  std::size_t longest = 0;
+  for (std::size_t view = 0; view < views.size(); ++view) {
+    const auto [first, last] = bytes_of(views[view], bin_size);
+    if (!used[view]) longest = std::max(longest, last - first);
+  }
+  return longest;
+}
+
+Json views_in_use(const Json& views, const std::vector<bool>& used) {
+  Json in_use = Json::array();
+  for (std::size_t view = 0; view < views.size(); ++view) {
+    if (used[view]) in_use.push_back(views[view]);
+  }
+  return in_use;
+}
+
+// The views in use packed one after the other; the others keep their length and point at the
+// chunk's start, which is made long enough for them.
+std::vector<std::uint8_t> bytes_in_use(Json& views, const std::vector<bool>& used,
+                                       const std::vector<std::uint8_t>& bin) {
+  const std::size_t unused_length = longest_unused(views, used, bin.size());
+  Json in_use = Json::object();
+  in_use[kBufferViews] = views_in_use(views, used);
+  std::vector<std::uint8_t> packed = packed_bytes(in_use, bin);
+  packed.resize(std::max(packed.size(), unused_length));
+  std::size_t next = 0;
+  for (std::size_t view = 0; view < views.size(); ++view) {
+    views[view][kByteOffset] = used[view] ? in_use[kBufferViews][next++][kByteOffset] : Json(0);
+  }
+  return packed;
+}
+
+std::optional<std::vector<bool>> release_in_place(GlbFile& glb, const std::set<int>& released,
+                                                  const GlbSources& sources) {
+  Json probe = still_held(glb.json, released, sources);
+  const Usage usage = usage_of(probe);
+  Json views = list_of(glb.json, kBufferViews);
+  std::vector<std::uint8_t> bin = bytes_in_use(views, usage[kBufferViewKind], glb.bin);
+  set_unless_empty(glb.json, kBufferViews, views);
+  glb.bin = std::move(bin);
+  return usage[kImageKind];
+}
+
 }  // namespace
+
+std::optional<std::vector<bool>> release_meshes(GlbFile& glb, const std::set<int>& released,
+                                                const GlbSources& sources) {
+  try {
+    return release_in_place(glb, released, sources);
+  } catch (const std::exception&) {
+    return std::nullopt;
+  }
+}
 
 std::optional<GlbFile> without_unused(const GlbFile& glb) {
   try {

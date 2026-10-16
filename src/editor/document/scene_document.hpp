@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <exception>
 #include <filesystem>
 #include <map>
@@ -98,6 +99,15 @@ class SceneDocument {
   bool undo();
   bool redo();
 
+  // How much undo keeps: at most this many steps, and at most this many bytes of what only the
+  // undo and redo steps still use (their copies of the objects and terrains, the vertices of
+  // deleted objects and undone imports). The oldest steps go first; the latest one always stays.
+  // What no step can bring back any more is let go of.
+  static constexpr std::size_t kMaxUndoSteps = 200;
+  static constexpr std::size_t kMaxHistoryBytes = std::size_t{256} * 1024 * 1024;  // 256 MiB
+  // What only the undo and redo steps keep in memory now, in bytes (an estimate).
+  std::size_t history_bytes() const;
+
   bool save(std::string& error);
   bool save_as(const std::filesystem::path& path, std::string& error);
 
@@ -122,6 +132,20 @@ class SceneDocument {
   void keep_file(GlbFile glb);
   void touch();
   Snapshot snapshot() const;
+  // Keeps the history within kMaxUndoSteps and kMaxHistoryBytes, then lets go of what no step
+  // can bring back.
+  void trim_history();
+  bool history_too_long() const;
+  static std::size_t bytes_of(const std::vector<Snapshot>& steps);
+  // Which meshes the nodes of some undo or redo step use.
+  std::vector<bool> meshes_in_history() const;
+  // The meshes nothing uses, now or in any step, that are still held.
+  std::vector<int> meshes_out_of_reach() const;
+  // Frees the vertices of meshes nothing can use any more, their bytes in the binary chunk and
+  // the pictures only they showed. (They keep their numbers: nothing else is numbered anew.)
+  void release_unreachable();
+  void release_mesh(int mesh);
+  void release_images(const std::vector<bool>& used);
   // Whether two snapshots hold the same document, whatever their versions.
   static bool same_content(const Snapshot& a, const Snapshot& b);
   // Goes back to a snapshot (its nodes are moved out of it).
@@ -232,8 +256,9 @@ class SceneDocument {
   long long next_version_ = 0;
   long long saved_version_ = 0;
   bool changed_since_checkpoint_ = false;
-  std::set<int> changed_meshes_;  // reshaped since the renderer last asked
-  std::set<int> unsaved_meshes_;  // reshaped since the last save
+  std::set<int> changed_meshes_;   // reshaped since the renderer last asked
+  std::set<int> unsaved_meshes_;   // reshaped since the last save
+  std::set<int> released_meshes_;  // let go of: nothing can use them again
 };
 
 }  // namespace redgem

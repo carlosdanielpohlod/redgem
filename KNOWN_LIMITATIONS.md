@@ -67,8 +67,10 @@ the same pull request.
 
 ## Editor
 
-- A long session with many model imports uses more and more memory until the editor is closed:
-  what was deleted is kept for undo.
+- Undo keeps at most 200 steps and 256 MB, and lets go of the vertices, pictures and file data of
+  what no step can bring back. What an imported model put on the graphics card, its skeletons and
+  animations, and a few hundred bytes of description per object still stay until the editor is
+  closed.
 - Typing a value into an Inspector field (Ctrl+click) and then clicking another object may give
   the value to the newly selected object. Seen in the code, not confirmed by a test.
 - In Docker the editor has no sound.

@@ -34,6 +34,7 @@ add_executable(redgem_tests
   unit/glb_geometry_test.cpp
   unit/glb_compact_test.cpp
   unit/glb_usage_test.cpp
+  unit/undo_history_test.cpp
   unit/model_import_test.cpp
   unit/editor_logic_test.cpp
   unit/inspector_logic_test.cpp
