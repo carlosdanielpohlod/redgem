@@ -347,3 +347,13 @@ add_test(NAME system.optional_tests_without_their_scene_are_skipped
 # The tools that are scripts.
 add_test(NAME tools.blender_runs_in_a_home_of_its_own
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/blender_home.sh ${CMAKE_SOURCE_DIR}/tools/blender/run.sh)
+
+# How long a frame of a field of grass and trees takes to draw (see benchmark/field_benchmark.cpp):
+# a tool for whoever works on the renderer, built with the tests and never run by them.
+add_executable(redgem_field_benchmark
+  benchmark/field_benchmark.cpp
+  benchmark/field_scene.cpp
+  benchmark/field_placements.cpp
+  benchmark/field_textures.cpp)
+target_link_libraries(redgem_field_benchmark PRIVATE redgem_runtime)
+target_include_directories(redgem_field_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
