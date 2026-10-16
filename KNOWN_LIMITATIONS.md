@@ -6,8 +6,10 @@ the same pull request.
 
 ## Platforms
 
-- The editor is developed and tested on Linux. The Windows download is compiled from Linux and
-  has only been tried under Wine, never on a real Windows machine.
+- The editor is developed and tested on Linux. The Windows download is compiled from Linux. On a
+  real Windows machine (GitHub's, which has no graphics card) the engine is built with the same
+  compiler and its unit, integration and Ruby tests run on every change, but no window has been
+  opened there: the editor and the games have been seen running on Windows under Wine only.
 - The macOS downloads have only run on GitHub's virtual Macs, which have no graphics card OpenGL
   can use: there the editor is drawn by Apple's software renderer (its system test takes about
   half an hour instead of a minute), and the games' system tests are not run on the Mac. Never
