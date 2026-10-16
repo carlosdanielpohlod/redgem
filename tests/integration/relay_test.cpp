@@ -61,7 +61,10 @@ struct Meeting {
   std::vector<NetworkSession*> sessions;
   std::vector<std::vector<NetworkEvent>> events;
 
-  explicit Meeting(std::size_t buffered_bytes = kMaxRelayBufferedBytes) : relay(buffered_bytes) {
+  explicit Meeting(std::size_t buffered_bytes = kMaxRelayBufferedBytes) : relay(buffered_bytes) { start(); }
+  explicit Meeting(const RelayLimits& limits) : relay(limits) { start(); }
+
+  void start() {
     std::string error;
     REQUIRE_MESSAGE(relay.start(0, error), error);
   }
@@ -564,6 +567,32 @@ TEST_CASE("one address can only open so many rooms") {
   REQUIRE(meeting.until([&meeting] { return meeting.relay.room_count() == kRoomsPerAddress - 1; }));
   REQUIRE(openers.back()->host_room(kLocalhost, meeting.relay.port(), error));
   REQUIRE(meeting.until([&] { return openers.back()->state() == NetworkSession::State::Online; }));
+}
+
+TEST_CASE("a relay told how many machines and rooms one address may hold keeps to that") {
+  constexpr RelayLimits kSmallLimits{3, 1};
+  Meeting meeting(kSmallLimits);
+  NetworkSession opener, second_opener, first_guest, second_guest, one_too_many;
+  for (NetworkSession* session : {&opener, &second_opener, &first_guest, &second_guest, &one_too_many}) {
+    meeting.seat(*session);
+  }
+  std::string error;
+  const auto settled = [](NetworkSession& session) { return session.state() != NetworkSession::State::Connecting; };
+  // One room per address: the second one asked for is refused.
+  REQUIRE(opener.host_room(kLocalhost, meeting.relay.port(), error));
+  REQUIRE(meeting.until([&] { return opener.state() == NetworkSession::State::Online; }));
+  REQUIRE(second_opener.host_room(kLocalhost, meeting.relay.port(), error));
+  REQUIRE(meeting.until([&] { return settled(second_opener); }));
+  CHECK(second_opener.state() == NetworkSession::State::Offline);
+  CHECK(meeting.relay.room_count() == 1);
+  // Three machines per address: two guests join the opener, a third is hung up on.
+  for (NetworkSession* guest : {&first_guest, &second_guest, &one_too_many}) {
+    REQUIRE(guest->join_room(kLocalhost, meeting.relay.port(), opener.room(), error));
+    REQUIRE(meeting.until([&] { return settled(*guest); }));
+  }
+  CHECK(first_guest.state() == NetworkSession::State::Online);
+  CHECK(second_guest.state() == NetworkSession::State::Online);
+  CHECK(one_too_many.state() == NetworkSession::State::Offline);
 }
 
 TEST_CASE("a room whose opener goes silent is closed, and its guests are told the game is over") {

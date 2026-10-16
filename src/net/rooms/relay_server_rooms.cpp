@@ -11,9 +11,6 @@ using namespace wire;
 
 namespace {
 
-constexpr std::size_t kMaxRooms = 256;
-constexpr int kMaxRoomsPerAddress = 8;  // what one address may open
-
 // A newcomer's first words say which room it wants.
 bool asks_for_a_room(const nlohmann::json& message) { return message[kKind] == kHello && message.contains(kRoom); }
 
@@ -50,7 +47,7 @@ int RelayServer::rooms_opened_by(const std::string& address) const {
 
 void RelayServer::open_room(Member& member) {
   const bool room_to_give =
-      rooms_.size() < kMaxRooms && rooms_opened_by(member.connection.address()) < kMaxRoomsPerAddress;
+      rooms_.size() < kMaxRelayRooms && rooms_opened_by(member.connection.address()) < limits_.rooms_per_address;
   const std::string code = room_to_give ? new_room_code() : std::string();
   if (code.empty()) {
     member.connection.close();

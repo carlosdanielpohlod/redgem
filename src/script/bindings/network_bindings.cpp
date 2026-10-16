@@ -35,16 +35,23 @@ void announce_hosted_game(mrb_state* mrb, const char* name, mrb_int discovery_po
   }
 }
 
+// How many machines from one address may wait to be let in at once, as a script asked.
+int waiting_per_address(mrb_state* mrb, mrb_int asked) {
+  return static_cast<int>(from_to(mrb, static_cast<mrb_float>(asked), 1.0,
+                                  static_cast<mrb_float>(net::kMaxWaitingLinks), "Network.host's waiting_per_address"));
+}
+
 // True when the game is being hosted; false (with the reason logged) when the port cannot be used.
 // `visible` lets machines on the same network find it.
 mrb_value network_host(mrb_state* mrb, mrb_value) {
-  mrb_int port = 0, discovery_port = 0;
+  mrb_int port = 0, discovery_port = 0, waiting = 0;
   const char* name = nullptr;
   mrb_bool visible = true;
-  mrb_get_args(mrb, "izbi", &port, &name, &visible, &discovery_port);
+  mrb_get_args(mrb, "izbii", &port, &name, &visible, &discovery_port, &waiting);
+  const int per_address = waiting_per_address(mrb, waiting);
   std::string error;
   discovery(mrb).stop_announcing();  // whatever game was hosted before is no longer there to find
-  if (!network(mrb).host(port_arg(mrb, port), error)) {
+  if (!network(mrb).host(port_arg(mrb, port), error, per_address)) {
     return not_started("cannot host a game on port " + std::to_string(port), error);
   }
   if (visible) announce_hosted_game(mrb, name, discovery_port);
@@ -105,7 +112,7 @@ mrb_value network_emit(mrb_state* mrb, mrb_value) {
 }
 
 void install_connection_bindings(RClass* network_module, mrb_state* mrb) {
-  mrb_define_module_function(mrb, network_module, "__host", network_host, MRB_ARGS_REQ(4));
+  mrb_define_module_function(mrb, network_module, "__host", network_host, MRB_ARGS_REQ(5));
   mrb_define_module_function(mrb, network_module, "__host_room", network_host_room, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, network_module, "__join_room", network_join_room, MRB_ARGS_REQ(4));
   mrb_define_module_function(mrb, network_module, "room", network_room, MRB_ARGS_NONE());

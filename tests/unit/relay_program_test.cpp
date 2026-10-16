@@ -39,6 +39,27 @@ TEST_CASE("a relay's port is a number of at most five digits, up to the largest 
   CHECK_FALSE(parse_relay_command({"--port", "9000", "9001"}).ok);
 }
 
+TEST_CASE("the relay program lets one address hold as many machines and rooms as it is told, in any order") {
+  constexpr int kCampusMachines = 300;
+  constexpr int kCampusRooms = 40;
+  const RelayCommand plain = parse_relay_command({});
+  CHECK(plain.limits.connections_per_address == kDefaultConnectionsPerAddress);
+  CHECK(plain.limits.rooms_per_address == kDefaultRoomsPerAddress);
+  const RelayCommand campus =
+      parse_relay_command({"--rooms-per-address", "40", "--port", "9000", "--per-address", "300"});
+  REQUIRE(campus.ok);
+  CHECK(campus.port == kChosenPort);
+  CHECK(campus.limits.connections_per_address == kCampusMachines);
+  CHECK(campus.limits.rooms_per_address == kCampusRooms);
+  CHECK(parse_relay_command({"--per-address", "0"}).error == "--per-address needs a number from 1 to 1024");
+  CHECK(parse_relay_command({"--rooms-per-address", "257"}).error ==
+        "--rooms-per-address needs a number from 1 to 256");
+  CHECK(parse_relay_command({"--per-address"}).error == "--per-address needs a number from 1 to 1024");
+  const std::string text = relay_usage();
+  CHECK(text.find("--per-address <number>") != std::string::npos);
+  CHECK(text.find("--rooms-per-address <number>") != std::string::npos);
+}
+
 TEST_CASE("what the relay program does not understand is refused by name") {
   CHECK(parse_relay_command({"somewhere"}).error == "unexpected argument somewhere");
   CHECK(parse_relay_command({"--bogus"}).error == "unexpected argument --bogus");

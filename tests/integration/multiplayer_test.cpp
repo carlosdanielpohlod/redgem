@@ -335,6 +335,19 @@ TEST_CASE("when the host leaves the game is over for everyone, and what the othe
   CHECK(ruby(*guest, "Network.emit(:anyone)") == "false");
 }
 
+TEST_CASE("a game hosted directly lets as many machines from one address wait to join as it says") {
+  Lan lan;
+  Engine& machine = lan.add_machine();
+  CHECK(ruby(machine, "Network.host(port: 0, waiting_per_address: 32)") == "true");
+  for (const char* wrong : {"0", "33"}) {
+    CAPTURE(wrong);
+    const std::string host = std::string("Network.host(port: 0, waiting_per_address: ") + wrong + ")";
+    const RubyResult refused = machine.scripts().eval(host, "host.rb");
+    CHECK_FALSE(refused.ok);
+    CHECK(refused.error.find("waiting_per_address") != std::string::npos);
+  }
+}
+
 TEST_CASE("joining where nobody hosts fails after a moment, and a taken port cannot be hosted on") {
   Lan lan;
   Engine& host = lan.add_machine();

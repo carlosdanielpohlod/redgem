@@ -22,6 +22,13 @@ inline constexpr float kServedBurstBytes = 2.0f * kMaxFrameBytes;
 // A machine in a dedicated server's room that says nothing to the game for this long (only "I am
 // here") is let go: a place in a room is for playing.
 inline constexpr float kServedIdleSeconds = 300.0f;
+// Machines that connected to a game hosted here and have not said hello yet: how many from one
+// address unless the game says otherwise (Network.host's waiting_per_address), and how many in
+// all. They hold no place in the game, so whoever connects and keeps quiet keeps nobody out but
+// the next few from its own address; players behind one shared address joining together may
+// need more.
+inline constexpr int kDefaultWaitingPerAddress = 4;
+inline constexpr int kMaxWaitingLinks = 32;
 
 struct NetworkEvent {
   enum class Kind {
@@ -58,8 +65,9 @@ class NetworkSession {
  public:
   enum class State { Offline, Connecting, Online };
 
-  // Starts a game others can join on `port` (0 picks a free one, see port()).
-  bool host(std::uint16_t port, std::string& error);
+  // Starts a game others can join on `port` (0 picks a free one, see port()), with at most
+  // `waiting_per_address` machines from one address waiting to be let in at once.
+  bool host(std::uint16_t port, std::string& error, int waiting_per_address = kDefaultWaitingPerAddress);
   // Starts joining the game hosted at `address`. A Connected or Failed event tells how it went.
   // `auth` (a hash, or null) goes with the hello, for the game joined to decide on.
   bool join(const std::string& address, std::uint16_t port, std::string& error, const nlohmann::json& auth = nullptr);
@@ -230,6 +238,7 @@ class NetworkSession {
   bool server_hosted_ = false;  // the game's host is a dedicated server
   bool approving_ = false;      // the game decides who comes in (require_approval)
   int last_ticket_ = 0;
+  int waiting_per_address_ = kDefaultWaitingPerAddress;
   std::string refusal_;  // why the host turned this machine away, while joining
   std::string room_;
   Socket listener_;

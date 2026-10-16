@@ -37,9 +37,11 @@ the same pull request.
   processor core.
 - Messages are JSON over TCP. There is no prediction or lag compensation: fast action games
   will feel the delay.
-- A relay accepts 24 connections and 8 rooms per address, and a game hosted directly lets 4
-  machines per address wait to join at the same time. Players behind one shared address (a
-  campus, some mobile networks) can run into both.
+- Players behind one shared address (a campus, some mobile networks) count as one address: by
+  default a relay or a dedicated server lets it connect 24 machines (a relay, open 8 rooms), and a
+  game hosted directly lets 4 of them be joining at once. Whoever runs the relay, the server or
+  the game has to raise these (`--per-address`, `--rooms-per-address`,
+  `Network.host(waiting_per_address:)`).
 - A room on a relay lets everyone in: connection approval (`Network.authenticate`) works with a
   player hosting directly and on a dedicated server only.
 - A client of version 0.2.0 joining a game that decides who comes in gives up after 5 seconds

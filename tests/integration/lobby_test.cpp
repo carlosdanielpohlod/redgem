@@ -35,9 +35,9 @@ struct Door {
   std::vector<Arrival> arrivals;
   int in_rooms = 0;  // what the rooms hold of every address
 
-  Door() {
+  explicit Door(int connections_per_address = kDefaultConnectionsPerAddress) {
     std::string error;
-    REQUIRE_MESSAGE(lobby.open(0, error), error);
+    REQUIRE_MESSAGE(lobby.open(0, error, connections_per_address), error);
   }
 
   void round(float seconds = kRoundSeconds) {
@@ -141,11 +141,25 @@ TEST_CASE("an address that keeps asking for rooms nobody has is kept out of the 
 
 TEST_CASE("an address whose machines fill what one address may hold is hung up on") {
   Door door;
-  door.in_rooms = kMaxConnectionsPerAddress;
+  door.in_rooms = kDefaultConnectionsPerAddress;
   NetworkSession one_more;
   door.knock(one_more);
   REQUIRE(door.until([&one_more] { return offline(one_more); }));
   CHECK(door.arrivals.empty());
+}
+
+TEST_CASE("a server told how many machines one address may hold keeps to that number") {
+  constexpr int kFewPerAddress = 2;
+  Door door(kFewPerAddress);
+  door.in_rooms = kFewPerAddress;
+  NetworkSession refused;
+  door.knock(refused);
+  REQUIRE(door.until([&refused] { return offline(refused); }));
+  CHECK(door.arrivals.empty());
+  door.in_rooms = kFewPerAddress - 1;
+  NetworkSession welcome;
+  door.knock(welcome);
+  REQUIRE(door.until([&door] { return door.arrivals.size() == 1; }));
 }
 
 TEST_CASE("a server's room lets go of a player who says nothing to the game for minutes, and keeps one who plays") {

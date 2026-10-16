@@ -34,6 +34,7 @@ module Network
   DEFAULT_PORT = 7777
   DEFAULT_RELAY_PORT = 7778
   DISCOVERY_PORT = 7776   # where games on a local network ask each other who is hosting
+  WAITING_PER_ADDRESS = 4 # machines from one address that may wait to be let in at once (at most 32)
   EVERYONE = 0
   HOST = 1
   LOCAL = 0   # the owner of something made while this machine was in no game
@@ -80,11 +81,13 @@ module Network
     # Machines on the same network find it by themselves, under `name` (the game's title unless
     # said), unless visible: false. With room: true the game is a room on the relay instead:
     # on_connect follows, and Network.room is then the code the others join with.
-    def host(port: DEFAULT_PORT, name: nil, visible: true, room: false)
+    # waiting_per_address: how many machines behind one address (players sharing a network that
+    # reaches the internet through one address) may be joining at the same moment.
+    def host(port: DEFAULT_PORT, name: nil, visible: true, room: false, waiting_per_address: WAITING_PER_ADDRESS)
       leave
       return __host_room(*relay_address) if room
 
-      __host(port.to_i, name.to_s, visible, discovery_port)
+      __host(port.to_i, name.to_s, visible, discovery_port, waiting_per_address.to_i)
     end
 
     # Starts joining a game (leaving the one this machine is in): at an address, or with

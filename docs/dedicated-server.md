@@ -22,6 +22,7 @@ calls `Game.quit`, or everyone left. The next players get a new room, with a new
 | `--port` | 7777 | The TCP port players connect to (0 picks a free one) |
 | `--max-players` | 8 | Players in one room, up to 15 |
 | `--rooms` | 8 | Rooms open at once, up to 64 |
+| `--per-address` | 24 | Machines one address may connect, up to 1024: raise it when many players share one address (a campus, some mobile networks) |
 | `--data` | `<game>-data` beside the game's folder | Where the game's `Save` is kept (`save.json`), for every room and every run |
 
 It writes what happens to its output (rooms opened and closed, how many players) and stops

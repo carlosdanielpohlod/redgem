@@ -43,8 +43,9 @@ NetworkEvent NetworkEvent::message(int from, const std::string& name, const nloh
   return event;
 }
 
-bool NetworkSession::host(std::uint16_t port, std::string& error) {
+bool NetworkSession::host(std::uint16_t port, std::string& error, int waiting_per_address) {
   leave();
+  waiting_per_address_ = waiting_per_address;
   listener_ = Socket::listen_on(port, error);
   if (!listener_.valid()) return false;
   port_ = listener_.local_port();

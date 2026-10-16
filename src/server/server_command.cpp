@@ -30,6 +30,8 @@ constexpr NumberOption kOptions[] = {
     {"--max-players", 1, kMostPlayersPerRoom,
      [](ServerSettings& settings, int players) { settings.limits.max_players = players; }},
     {"--rooms", 1, kMostRooms, [](ServerSettings& settings, int rooms) { settings.limits.max_rooms = rooms; }},
+    {"--per-address", 1, net::kMostConnectionsPerAddress,
+     [](ServerSettings& settings, int machines) { settings.connections_per_address = machines; }},
 };
 
 std::string usage_text() {
@@ -42,6 +44,9 @@ std::string usage_text() {
          number(kMostPlayersPerRoom) + ")\n" +
          "  --rooms <number>          rooms open at once, each a match of its own (default: " +
          number(kDefaultMaxRooms) + ", at most " + number(kMostRooms) + ")\n" +
+         "  --per-address <number>    machines one address may connect (default: " +
+         number(net::kDefaultConnectionsPerAddress) + ", at most " + number(net::kMostConnectionsPerAddress) +
+         "; players\n" + "                            behind one shared address, a campus, may need more)\n" +
          "  --data <dir>              where the game's Save is kept, for every room (default: a folder beside\n" +
          "                            the game's, named after it with " + kDataFolderSuffix + ")\n";
 }

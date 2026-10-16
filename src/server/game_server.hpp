@@ -38,6 +38,7 @@ struct ServerSettings {
   std::filesystem::path game_dir;
   std::uint16_t port = kDefaultServerPort;  // 0 picks a free one (see GameServer::port)
   RoomLimits limits{kDefaultMaxPlayers, kDefaultMaxRooms};
+  int connections_per_address = net::kDefaultConnectionsPerAddress;  // machines one address may connect
   std::filesystem::path data_dir;  // where Save is kept; empty: nothing is written (kept in memory)
 };
 
