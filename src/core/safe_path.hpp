@@ -26,8 +26,8 @@ void warn_of_unsafe_asset_name(std::string_view name);
 bool through_link(const std::filesystem::path& folder, const std::filesystem::path& relative);
 
 // The file a safe `name` means in `folder`: the first of `name` + each extension that is a regular
-// file. nullopt (with a warning for a name that is refused, or for a file reached through a link)
-// when there is none.
+// file reached through no link (one that is, is warned of and passed over). nullopt (with a
+// warning for a name that is refused) when there is none.
 template <typename Extensions>
 std::optional<std::filesystem::path> find_asset_file(const std::filesystem::path& folder, const std::string& name,
                                                      const Extensions& extensions) {
@@ -39,8 +39,7 @@ std::optional<std::filesystem::path> find_asset_file(const std::filesystem::path
     std::filesystem::path candidate = folder / (name + extension);
     std::error_code fs_error;
     if (!std::filesystem::is_regular_file(candidate, fs_error)) continue;
-    if (through_link(folder, name + extension)) return std::nullopt;
-    return candidate;
+    if (!through_link(folder, name + extension)) return candidate;
   }
   return std::nullopt;
 }

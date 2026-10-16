@@ -34,9 +34,12 @@ TEST_CASE("files reached through links are not listed: built games leave them ou
   std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
   std::filesystem::create_symlink(game / "scripts" / "lift.rb", game / "scripts" / "alias.rb");
   std::filesystem::create_symlink(game / "sounds" / "beep.wav", game / "sounds" / "alias.wav");
+  // A sound whose .wav is a link and whose .ogg is not is listed: it plays the .ogg.
+  std::filesystem::create_symlink(game / "sounds" / "beep.wav", game / "sounds" / "jump.wav");
+  std::filesystem::copy_file(game / "sounds" / "beep.wav", game / "sounds" / "jump.ogg");
   const ProjectFiles files = ProjectFiles::scan(game);
   CHECK(has(files.scripts, "lift.rb"));
   CHECK_FALSE(has(files.scripts, "alias.rb"));
-  CHECK(files.sounds == std::vector<std::string>{"beep"});
+  CHECK(files.sounds == std::vector<std::string>{"beep", "jump"});
   std::filesystem::remove_all(game);
 }

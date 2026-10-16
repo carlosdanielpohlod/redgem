@@ -113,6 +113,14 @@ TEST_CASE("an asset reached through a link inside its folder is refused, as buil
   CHECK(log.count(log::Level::Warning) == 4);
 }
 
+TEST_CASE("a name whose first file is a link means the next file of that name that is none") {
+  const Scratch scratch;
+  std::filesystem::create_symlink(scratch.assets / "jump.wav", scratch.assets / "step.wav");
+  std::ofstream(scratch.assets / "step.ogg") << "step";
+  CHECK(find_sound_file(scratch.assets, "step") == scratch.assets / "step.ogg");
+  CHECK_FALSE(find_asset_file(scratch.assets, "step.wav", kExtensions).has_value());
+}
+
 TEST_CASE("a scene or a script reached through a link is refused too, with a warning naming it") {
   const Scratch scratch;
   const std::filesystem::path game = scratch.dir / "game";
