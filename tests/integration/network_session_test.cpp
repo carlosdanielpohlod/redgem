@@ -598,3 +598,60 @@ TEST_CASE("a refusal from a host of this version keeps the host's reason") {
   REQUIRE(fake.table.until([&fake] { return fake.table.count(0, NetworkEvent::Kind::Failed) == 1; }));
   CHECK(fake.table.last(0, NetworkEvent::Kind::Failed)->name == "the game is full of ghosts");
 }
+
+namespace {
+
+constexpr float kFacingDegrees = 45.0f;
+constexpr double kAngleTolerance = 0.01;  // of the angle: within half a degree of 45
+constexpr int kStillPoses = 3;
+
+// The poses a seat heard, as the game's scripts get them.
+std::vector<NetworkEvent> poses_heard(const Table& table, std::size_t seat) {
+  std::vector<NetworkEvent> poses;
+  for (const NetworkEvent& event : table.events[seat]) {
+    if (event.kind == NetworkEvent::Kind::Message && event.name == kPoseMessageName) poses.push_back(event);
+  }
+  return poses;
+}
+
+}  // namespace
+
+TEST_CASE("a pose goes to everyone else through the host, and arrives as the $sync message") {
+  Party party;
+  const redgem::Quat facing = redgem::quat_from_euler_degrees({0.0f, kFacingDegrees, 0.0f});
+  REQUIRE(party.first.send_pose("hero-2", {1.0f, 2.0f, 3.0f}, facing));
+  REQUIRE(party.table.until([&party] {
+    return poses_heard(party.table, Party::kHostSeat).size() == 1 &&
+           poses_heard(party.table, Party::kSecondSeat).size() == 1;
+  }));
+  for (const std::size_t seat : {Party::kHostSeat, Party::kSecondSeat}) {
+    const NetworkEvent pose = poses_heard(party.table, seat).back();
+    CHECK(pose.peer == kFirstGuest);
+    CHECK(pose.data[0] == "hero-2");
+    CHECK(pose.data[1][0].get<float>() == doctest::Approx(1.0f));
+    CHECK(pose.data[1][2].get<float>() == doctest::Approx(3.0f));
+    CHECK(pose.data[2][1].get<double>() == doctest::Approx(kFacingDegrees).epsilon(kAngleTolerance));
+  }
+  // Then only the move travels, and it comes out where the object is.
+  REQUIRE(party.first.send_pose("hero-2", {1.5f, 2.0f, 3.0f}, facing));
+  REQUIRE(party.table.until([&party] { return poses_heard(party.table, Party::kSecondSeat).size() == 2; }));
+  CHECK(poses_heard(party.table, Party::kSecondSeat).back().data[1][0].get<float>() == doctest::Approx(1.5f));
+  CHECK_FALSE(party.first.send_pose(std::string(kMaxPoseKeyBytes + 1, 'k'), {}, facing));
+}
+
+TEST_CASE("a machine that joins hears the others' objects whole, though they only send what changed") {
+  LoneHost lone;
+  NetworkSession mover, late;
+  lone.table.seat(mover);
+  lone.table.seat(late);
+  const std::size_t late_seat = 2;
+  std::string error;
+  REQUIRE(mover.join(kLocalhost, lone.host.port(), error));
+  REQUIRE(lone.table.until([&mover] { return mover.state() == NetworkSession::State::Online; }));
+  for (int i = 0; i < kStillPoses; ++i) mover.send_pose("crate", {5.0f, 0.0f, 0.0f}, redgem::Quat::identity());
+  REQUIRE(late.join(kLocalhost, lone.host.port(), error));
+  REQUIRE(lone.table.until([&mover] { return mover.peers().size() == 2; }));  // it heard of the newcomer
+  mover.send_pose("crate", {5.0f, 0.0f, 0.0f}, redgem::Quat::identity());
+  REQUIRE(lone.table.until([&] { return poses_heard(lone.table, late_seat).size() == 1; }));
+  CHECK(poses_heard(lone.table, late_seat).back().data[1][0].get<float>() == doctest::Approx(5.0f));
+}

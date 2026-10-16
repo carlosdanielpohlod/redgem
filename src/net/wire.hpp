@@ -89,11 +89,12 @@ inline constexpr const char* kReason = "y";
 inline constexpr const char* kGuards = "g";
 inline constexpr const char* kVersion = "v";  // in a hello, a welcome and a refusal: kProtocolVersion
 inline constexpr const char* kGameMessage = "m";
-inline constexpr const char* kHello = "h";        // a newcomer: let me in (to a relay: into this room)
-inline constexpr const char* kWelcome = "w";      // to a newcomer: your id, and who else is here
-inline constexpr const char* kArrived = "j";      // to the others: someone joined
-inline constexpr const char* kGone = "l";         // to the others: someone left
-inline constexpr const char* kPing = "i";         // nothing to say: I am here
+inline constexpr const char* kPose = "o";     // where an object is (NetworkSync): its pose in kData (pose_codec.hpp)
+inline constexpr const char* kHello = "h";    // a newcomer: let me in (to a relay: into this room)
+inline constexpr const char* kWelcome = "w";  // to a newcomer: your id, and who else is here
+inline constexpr const char* kArrived = "j";  // to the others: someone joined
+inline constexpr const char* kGone = "l";     // to the others: someone left
+inline constexpr const char* kPing = "i";     // nothing to say: I am here
 inline constexpr const char* kConsidering = "c";  // to a newcomer: the game is deciding on your hello
 inline constexpr const char* kRefused = "x";      // to a newcomer: you are not let in, and why
 // Connection approval in a room on a relay, which decides nothing: it passes the newcomer's hello
@@ -108,8 +109,9 @@ int free_peer_id(const std::vector<int>& taken);
 
 // A newcomer's first words: let me in (with what else it says added to it).
 nlohmann::json hello();
-// A message a game sent (to kEveryone unless said).
+// A message a game sent (to kEveryone unless said), and an object's pose (to everyone).
 nlohmann::json game_message(const std::string& name, const nlohmann::json& data, int from, int to);
+nlohmann::json pose_message(const std::vector<std::uint8_t>& pose, int from);
 // A message from a machine in the game as it is passed on to the others: from whom the host (or
 // relay) knows it is, whatever it claims, and to whom it says.
 nlohmann::json passed_on(const nlohmann::json& message, int from);
@@ -122,7 +124,7 @@ bool well_formed(const nlohmann::json& message);
 bool acceptable_auth(const nlohmann::json& auth);
 // What turns a newcomer away, saying why (cut to kMaxReasonBytes).
 nlohmann::json refusal(const std::string& reason);
-// Whether a message that is well formed is one a game sent, under a name to hear it by.
+// Whether a message that is well formed is one a game sent (under a name to hear it by), or a pose.
 bool is_game_message(const nlohmann::json& message);
 // The version of the protocol a well-formed message says it speaks (0 when it says none), and
 // whether that is this one's.

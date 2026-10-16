@@ -7,7 +7,7 @@ module Network
     RECORD_SIZE = 5           # parts of a spawn record: key, template, owner, position, rotation
     SYNC_SIZE = 3             # parts of what says where an object is: key, position, rotation
     VECTOR_SIZE = 3           # numbers a position or a rotation travels as: x, y, z
-    MAX_KEY_SIZE = 128        # letters in the key of a spawned object
+    MAX_KEY_SIZE = 128        # bytes in the key of an object on the network (a spawned one, any NetworkSync)
     MAX_COUNT_DIGITS = 9      # in the number such a key ends with
     MAX_DISTANCE = 1_000_000.0   # meters from the middle of a level (or degrees of a turn) an object can be at
 

@@ -42,7 +42,7 @@ module Network
 
   # What the engine's own messages are called. Games' names never start with "$".
   RESERVED = "$".freeze
-  SYNC = "$sync".freeze          # where an object is: [key, position, rotation]
+  SYNC = "$sync".freeze          # where an object is: [key, position, rotation] (sent by __pose)
   SPAWN = "$spawn".freeze        # an object to create: [key, template, owner, position, rotation]
   SPAWNED = "$spawned".freeze    # the host to a newcomer: every object spawned so far
   DESPAWN = "$despawn".freeze    # objects that are gone: their keys

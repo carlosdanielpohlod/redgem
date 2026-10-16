@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "net/pose_codec.hpp"
 #include "net/wire.hpp"
 
 namespace redgem::net {
@@ -96,6 +97,15 @@ bool is_list_of_peers(const nlohmann::json& message, const char* key) {
   return std::adjacent_find(ids.begin(), ids.end()) == ids.end();
 }
 
+bool is_pose(const nlohmann::json& data) { return data.is_binary() && data.get_binary().size() <= kMaxPoseBytes; }
+
+// What a message carries: a pose's bytes, or a game's data.
+bool carries_what_it_may(const nlohmann::json& message) {
+  if (!message.contains(wire::kData)) return true;
+  const nlohmann::json& data = message[wire::kData];
+  return message[wire::kKind] == wire::kPose ? is_pose(data) : acceptable_data(data);
+}
+
 }  // namespace
 
 bool acceptable_data(const nlohmann::json& data) { return acceptable_at(data, 0); }
@@ -106,7 +116,7 @@ bool well_formed(const nlohmann::json& message) {
   return has_kind(message) && is_id(message, kFrom) && is_id(message, kTo) && is_short_text(message, kName) &&
          is_list_of_peers(message, kPeers) && is_short_text(message, kRoom) && is_flag(message, kServer) &&
          is_flag(message, kGuards) && is_text_up_to(message, kReason, kMaxReasonBytes) && is_version(message) &&
-         (!message.contains(kData) || acceptable_data(message[kData]));
+         carries_what_it_may(message);
 }
 
 bool acceptable_auth(const nlohmann::json& auth) {
@@ -116,7 +126,9 @@ bool acceptable_auth(const nlohmann::json& auth) {
 }
 
 bool is_game_message(const nlohmann::json& message) {
-  return message[kKind] == kGameMessage && message.contains(kName);
+  const bool named_message = message[kKind] == kGameMessage && message.contains(kName);
+  const bool pose = message[kKind] == kPose && message.contains(kData);
+  return named_message || pose;
 }
 
 }  // namespace wire

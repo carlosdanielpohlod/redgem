@@ -7,8 +7,10 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/math.hpp"
 #include "net/byte_allowance.hpp"
 #include "net/connection.hpp"
+#include "net/pose_baselines.hpp"
 #include "net/socket/socket.hpp"
 #include "net/wire.hpp"
 
@@ -29,6 +31,9 @@ inline constexpr float kServedIdleSeconds = 300.0f;
 // need more.
 inline constexpr int kDefaultWaitingPerAddress = 4;
 inline constexpr int kMaxWaitingLinks = 32;
+// What a pose that arrived (send_pose) is to the game's scripts: a Message event of this name
+// (Network::SYNC), whose data is [key, position, rotation in degrees], from the object's machine.
+inline constexpr const char* kPoseMessageName = "$sync";
 
 struct NetworkEvent {
   enum class Kind {
@@ -104,6 +109,9 @@ class NetworkSession {
   // Sends a message to everyone else (kEveryone) or to one peer. False when offline or when there
   // is no such peer.
   bool send(const std::string& name, const nlohmann::json& data, int to = kEveryone);
+  // Sends everyone else where an object of this machine is (NetworkSync), in as few bytes as it
+  // takes (see pose_codec.hpp). False when offline, or for a key longer than kMaxPoseKeyBytes.
+  bool send_pose(const std::string& key, Vec3 position, Quat rotation);
 
   State state() const { return state_; }
   bool hosting() const { return state_ == State::Online && id_ == kHostId; }
@@ -227,7 +235,10 @@ class NetworkSession {
   // Whether a host's word that `peer` arrived can be believed: nobody arrives twice, as this
   // machine, or as nobody.
   bool can_arrive(int peer) const { return !knows(peer) && peer != id_ && peer >= kHostId; }
-  void hear_game_message(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  // What another machine in the game sent, passed on by the host or not: a message, or a pose
+  // (network_session_poses.cpp).
+  void hear_from_game(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  void hear_pose(int from, const std::vector<std::uint8_t>& pose, std::vector<NetworkEvent>& events);
   // The host turned this machine away: the game it was joining ends, saying why (in its own words
   // when the two speak different versions of the protocol).
   void turned_away(const nlohmann::json& refusal);
@@ -243,6 +254,10 @@ class NetworkSession {
   std::vector<int> take_closed_links();
   // Whether a message may go out: from a machine in a game, to someone else, within what a message may be.
   bool can_send(const std::string& name, const nlohmann::json& data, int to) const;
+  // Whether a pose may go out: from a machine in a game, of an object whose key a pose can carry.
+  bool can_send_pose(const std::string& key) const { return state_ == State::Online && key.size() <= kMaxPoseKeyBytes; }
+  // Sends a message, to `to` or kEveryone: through the host, or as the host.
+  bool deliver(const nlohmann::json& message, int to);
   // Whether a guest may address `to`: everyone, the host, or someone it knows of.
   bool can_reach(int to) const { return reaches_host(to) || knows(to); }
   bool send_through_host(const nlohmann::json& message, int to);
@@ -268,6 +283,8 @@ class NetworkSession {
   std::vector<int> peers_;
   std::vector<RoomAsking> room_asking_;
   std::vector<NetworkEvent> pending_events_;  // what happened between polls, for the next one
+  PoseSender pose_sender_;
+  PoseReceiver pose_receiver_;
 };
 
 }  // namespace redgem::net

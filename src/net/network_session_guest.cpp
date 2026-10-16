@@ -33,12 +33,7 @@ void NetworkSession::hear_of_the_game(const nlohmann::json& message, std::vector
   if (kind == kArrived) peer_arrived(message.value(kFrom, 0), events);
   if (kind == kGone) peer_gone(message.value(kFrom, 0), events);
   if (kind == kAsking) hear_asking(message, events);
-  if (is_game_message(message)) hear_game_message(message, events);
-}
-
-void NetworkSession::hear_game_message(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
-  events.push_back(
-      NetworkEvent::message(message.value(kFrom, 0), message[kName], message.value(kData, nlohmann::json())));
+  if (is_game_message(message)) hear_from_game(message, events);
 }
 
 void NetworkSession::hear_while_joining(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
@@ -90,6 +85,7 @@ bool NetworkSession::believable_welcome(int given, const std::vector<int>& other
 void NetworkSession::peer_arrived(int peer, std::vector<NetworkEvent>& events) {
   // What a host says is checked like anything else.
   if (!can_arrive(peer)) return;
+  pose_sender_.start_over();  // the newcomer knows none of this machine's objects
   peers_.push_back(peer);
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerJoined, peer));
 }

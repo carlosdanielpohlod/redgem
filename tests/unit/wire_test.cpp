@@ -4,6 +4,7 @@
 #include <limits>
 #include <string>
 
+#include "net/pose_codec.hpp"
 #include "net/wire.hpp"
 
 using namespace redgem::net;
@@ -48,6 +49,13 @@ TEST_CASE("what is passed on is from whom the host knows it is, to whom it says,
   CHECK(passed[wire::kName] == "score");
   CHECK(passed[wire::kData] == kPoints);
   CHECK_FALSE(passed.contains("extra"));
+  const json pose = wire::passed_on(wire::pose_message({1, 2, 3}, kHostId), kGuest);
+  CHECK(pose[wire::kKind] == wire::kPose);
+  CHECK(pose[wire::kFrom] == kGuest);
+  const std::vector<std::uint8_t>& bytes = pose[wire::kData].get_binary();
+  CHECK(bytes == std::vector<std::uint8_t>{1, 2, 3});
+  CHECK_FALSE(pose.contains(wire::kTo));
+  CHECK_FALSE(pose.contains(wire::kName));
 }
 
 TEST_CASE("only an object that says its kind in a text is a message") {
@@ -126,10 +134,19 @@ TEST_CASE("data nests only so deep, under keys only so long") {
   CHECK_FALSE(wire::well_formed(json{{wire::kKind, wire::kGameMessage}, {wire::kData, nested(kMaxDataDepth + 1)}}));
 }
 
-TEST_CASE("a game's message is one of that kind with a name to hear it by") {
+TEST_CASE("a game's message is one of that kind with a name to hear it by, or a pose") {
   CHECK(wire::is_game_message(wire::game_message("hit", nullptr, kHostId, kEveryone)));
   CHECK_FALSE(wire::is_game_message({{wire::kKind, wire::kGameMessage}}));
   CHECK_FALSE(wire::is_game_message({{wire::kKind, wire::kPing}, {wire::kName, "hit"}}));
+  CHECK(wire::is_game_message(wire::pose_message({1}, kHostId)));
+  CHECK_FALSE(wire::is_game_message({{wire::kKind, wire::kPose}}));
+}
+
+TEST_CASE("a pose carries bytes, and no more than a pose may be") {
+  CHECK(wire::well_formed(wire::pose_message(std::vector<std::uint8_t>(kMaxPoseBytes, 0), kGuest)));
+  CHECK_FALSE(wire::well_formed(wire::pose_message(std::vector<std::uint8_t>(kMaxPoseBytes + 1, 0), kGuest)));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kPose}, {wire::kData, "not bytes"}}));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kPose}, {wire::kData, json::array({1, 2})}}));
 }
 
 TEST_CASE("a game's data is never bytes, nor a number that is not one") {

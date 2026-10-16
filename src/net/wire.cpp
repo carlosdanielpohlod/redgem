@@ -14,6 +14,10 @@ nlohmann::json game_message(const std::string& name, const nlohmann::json& data,
   return message;
 }
 
+nlohmann::json pose_message(const std::vector<std::uint8_t>& pose, int from) {
+  return {{kKind, kPose}, {kFrom, from}, {kData, nlohmann::json::binary(pose)}};
+}
+
 nlohmann::json passed_on(const nlohmann::json& message, int from) {
   nlohmann::json passed = {{kKind, message[kKind]}, {kFrom, from}, {kData, message.value(kData, nlohmann::json())}};
   if (message.contains(kName)) passed[kName] = message[kName];

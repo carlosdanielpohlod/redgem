@@ -4,8 +4,10 @@ module Network
 
   class << self
     # The object goes by `key` on the network from now on. A key is one object's: another one of
-    # the scene going by it already is a mistake of the game's, refused.
+    # the scene going by it already is a mistake of the game's, refused, and so is one longer than
+    # a pose can carry (Said::MAX_KEY_SIZE bytes).
     def __track(sync, key = sync.key)
+      refuse_long(key, sync)
       refuse_taken(key, sync)
       __untrack(sync)
       @synced[key] = sync
@@ -33,6 +35,13 @@ module Network
     end
 
     private
+
+    def refuse_long(key, sync)
+      return if key.bytesize <= Said::MAX_KEY_SIZE
+
+      raise ArgumentError, "NetworkSync on #{sync.game_object.name.inspect}: the key #{key.inspect} is longer " \
+                           "than #{Said::MAX_KEY_SIZE} bytes"
+    end
 
     def refuse_taken(key, sync)
       holder = @synced[key]
@@ -125,7 +134,7 @@ class NetworkSync < Behaviour
     return if @since_sent < 1.0 / SENDS_PER_SECOND
 
     @since_sent = 0.0
-    Network.__deliver(Network::SYNC, [key, transform.position.to_a, transform.rotation.to_a], :all)
+    Network.__pose(key, transform.position, transform.rotation)
   end
 
   # Where the owner says the object is. Only the owner is believed.

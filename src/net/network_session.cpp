@@ -120,6 +120,8 @@ void NetworkSession::go_offline() {
   room_.clear();
   refusal_.clear();
   pending_events_.clear();
+  pose_sender_.start_over();
+  pose_receiver_.forget_all();
 }
 
 std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
@@ -168,6 +170,7 @@ void NetworkSession::peer_left(int peer, std::vector<NetworkEvent>& events) {
   const auto gone = std::remove(peers_.begin(), peers_.end(), peer);
   if (gone == peers_.end()) return;  // nobody the game heard of
   peers_.erase(gone, peers_.end());
+  pose_receiver_.forget(peer);
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerLeft, peer));
 }
 
@@ -181,7 +184,10 @@ void NetworkSession::drop_closed_links(std::vector<NetworkEvent>& events) {
 
 bool NetworkSession::send(const std::string& name, const nlohmann::json& data, int to) {
   if (!can_send(name, data, to)) return false;
-  const nlohmann::json message = game_message(name, data, id_, to);
+  return deliver(game_message(name, data, id_, to), to);
+}
+
+bool NetworkSession::deliver(const nlohmann::json& message, int to) {
   return relaying() ? send_as_host(message, to) : send_through_host(message, to);
 }
 

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "net/frame_buffer.hpp"
+#include "net/pose_codec.hpp"
 #include "net/wire.hpp"
 #include "net/wire_codec.hpp"
 
@@ -58,7 +59,7 @@ json message_carrying(const json& data) { return wire::game_message("x", data, k
 }  // namespace
 
 TEST_CASE("a message comes back from its bytes as it was sent") {
-  for (const json& message : {shot(), wire::hello(), wire::refusal("full"),
+  for (const json& message : {shot(), wire::hello(), wire::refusal("full"), wire::pose_message({1, 2, 3}, kGuest),
                               json{{wire::kKind, wire::kWelcome}, {wire::kTo, kGuest}, {wire::kPeers, {1, kOther}}}}) {
     CAPTURE(message.dump());
     const auto back = wire::unpacked(inside(wire::packed(message)));
@@ -131,7 +132,9 @@ TEST_CASE("an array or a map that says it holds more than one may is refused bef
 TEST_CASE("what arrives in the wrong shape is read, and then is not well formed") {
   for (const json& odd : {json::array({1, 2}), json("text"), json(kGuest), json{{wire::kKind, kGuest}},
                           message_carrying(json::binary({1, 2})), message_carrying(std::nan("")),
-                          message_carrying(std::numeric_limits<double>::infinity())}) {
+                          message_carrying(std::numeric_limits<double>::infinity()),
+                          json{{wire::kKind, wire::kPose}, {wire::kData, "not bytes"}},
+                          wire::pose_message(std::vector<std::uint8_t>(kMaxPoseBytes + 1), kGuest)}) {
     CAPTURE(odd.dump());
     const auto read = wire::unpacked(msgpack_of(odd));
     REQUIRE(read.has_value());
