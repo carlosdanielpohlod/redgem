@@ -24,7 +24,7 @@ struct KeptParts {
 };
 
 Parts parts_of(const KeptParts& kept) { return {kept.icon, kept.key, kept.id}; }
-const Parts& parts_of(const Parts& parts) { return parts; }
+Parts parts_of(const Parts& parts) { return parts; }
 
 // Orders labels by their parts, so that one is found without making a string to look for.
 struct ByParts {

@@ -28,13 +28,8 @@ std::optional<std::string> text_of(const nlohmann::json& value) {
   return text;
 }
 
-// The texts of a translation file by key; nothing when it is not one, and `error` says why.
-std::optional<TextCatalog> read_catalog(std::string_view json, std::string& error) {
-  const nlohmann::json file = nlohmann::json::parse(json.begin(), json.end(), nullptr, false);
-  if (!file.is_object()) {
-    error = "a translation file is a JSON object of keys and texts";
-    return std::nullopt;
-  }
+// The texts of a translation file's object by key; nothing when one is no text, and `error` says which.
+std::optional<TextCatalog> catalog_of(const nlohmann::json& file, std::string& error) {
   TextCatalog catalog;
   for (const auto& entry : file.items()) {
     std::optional<std::string> text = text_of(entry.value());
@@ -45,6 +40,14 @@ std::optional<TextCatalog> read_catalog(std::string_view json, std::string& erro
     catalog.emplace(entry.key(), std::move(*text));
   }
   return catalog;
+}
+
+// The texts of a translation file by key; nothing when it is not one, and `error` says why.
+std::optional<TextCatalog> read_catalog(std::string_view json, std::string& error) {
+  const nlohmann::json file = nlohmann::json::parse(json.begin(), json.end(), nullptr, false);
+  if (file.is_object()) return catalog_of(file, error);
+  error = "a translation file is a JSON object of keys and texts";
+  return std::nullopt;
 }
 
 }  // namespace
