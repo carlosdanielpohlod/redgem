@@ -6,7 +6,7 @@
 
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
-#include "render/image_header.hpp"
+#include "core/image_header.hpp"
 
 namespace redgem::render_detail {
 namespace {

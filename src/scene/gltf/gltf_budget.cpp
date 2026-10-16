@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <limits>
 
+#include "core/image_header.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 
 namespace redgem::gltf_budget {
@@ -11,6 +12,7 @@ namespace {
 constexpr std::uint64_t kMost = std::numeric_limits<std::uint64_t>::max();
 constexpr std::uint64_t kBytesPerComponent = 4;  // a float or a 32-bit index, as the engine keeps them
 constexpr std::uint64_t kBytesPerMegabyte = 1024 * 1024;
+constexpr std::uint64_t kBytesPerPixel = 4;  // red, green, blue and alpha, as pictures are decoded
 
 // a + b and a * b, staying at the largest number instead of wrapping around.
 std::uint64_t plus(std::uint64_t a, std::uint64_t b) { return a > kMost - b ? kMost : a + b; }
@@ -72,6 +74,23 @@ std::string file_size_problem(std::uint64_t bytes) {
 std::uint64_t scene_bytes(const cgltf_data& data, const std::filesystem::path& file) {
   const std::uint64_t data_bytes = plus(buffer_bytes(data), image_bytes(data, file.parent_path()));
   return plus(plus(size_of(file), data_bytes), accessor_bytes(data));
+}
+
+std::uint64_t decoded_bytes(const std::vector<ImageData>& images) {
+  std::uint64_t bytes = 0;
+  for (const ImageData& image : images) {
+    if (!decodable_image(image.encoded.data(), image.encoded.size())) continue;
+    const ImageSize size = *encoded_image_size(image.encoded.data(), image.encoded.size());
+    bytes = plus(bytes, std::uint64_t{size.width} * size.height * kBytesPerPixel);
+  }
+  return bytes;
+}
+
+std::string pictures_problem(const cgltf_data& data, const std::filesystem::path& file,
+                             const std::vector<ImageData>& images) {
+  const std::uint64_t bytes = plus(scene_bytes(data, file), decoded_bytes(images));
+  if (bytes <= kMaxSceneBytes) return {};
+  return too_much(bytes, "with its pictures decoded it would take about ");
 }
 
 std::string scene_problem(const cgltf_data& data, const std::filesystem::path& file) {

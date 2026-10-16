@@ -21,9 +21,10 @@ Knowing this up front saves time:
   macOS 15 and later: *System Settings > Privacy & Security > Open Anyway*), or run
   `xattr -dr com.apple.quarantine RedGem.app` in the unpacked folder.
 - Scripts are loaded when you press Play; they are not reloaded while the game runs.
-- **Scene size:** a scene (or a model) that would need more than 2 GB of memory to load, counting
-  its file, its pictures and its vertices as the engine keeps them, is refused with a message
-  saying how much it needs. The biggest demo scene needs about 720 MB.
+- **Scene size:** a scene (or a model) that would need more than 4 GB of memory, counting its file,
+  its vertices as the engine keeps them and its pictures as they are once decoded, is refused with
+  a message saying how much it needs. The biggest demo scene comes to about 1.8 GB. This is an
+  estimate of the memory the game holds, not a limit on the graphics card's memory.
 
 ## Common problems
 

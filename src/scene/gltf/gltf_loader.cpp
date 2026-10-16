@@ -86,7 +86,9 @@ LoadResult load_gltf_scene(const std::string& path, int max_skin_joints) {
   if (data == nullptr) return result;
   GltfReader reader(*data, folder_of(path), result);
   reader.set_max_skin_joints(std::min(max_skin_joints, config::kMaxSkinJoints));
-  result.ok = sound(reader.run(), path, result.error);
+  // (Its pictures are decoded later, once shown: what that will take is known from their headers.)
+  result.ok = sound(reader.run(), path, result.error) &&
+              sound(gltf_budget::pictures_problem(*data, path, result.scene.images), path, result.error);
   if (!result.ok) result.scene = SceneDesc{};
   return result;
 }
