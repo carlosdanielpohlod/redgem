@@ -17,6 +17,7 @@
 #include "net/network_session.hpp"
 #include "net/rooms/relay_program.hpp"
 #include "net/rooms/relay_server.hpp"
+#include "test_support.hpp"
 
 using namespace redgem::net;
 using redgem::test::wire_frame;
@@ -180,15 +181,23 @@ std::string answer(const std::string& text) {
   return {bytes.begin(), bytes.end()};
 }
 
+const std::string kVersionField = R"("v":)" + std::to_string(wire::kProtocolVersion);
+
 // What a stranger answers a search with: nonsense, half answers, answers from no game of this
-// engine and an answer as JSON text (as versions before MessagePack sent it), then one real answer.
-const std::vector<std::string> kNotAnswers = {"hello",
-                                              answer(R"({"is":"redgem"})"),
-                                              answer(R"({"is":"redgem","name":7,"port":7777,"players":1})"),
-                                              answer(R"({"is":"redgem","name":"x","port":99999,"players":1})"),
-                                              answer(R"({"is":"other","name":"x","port":7777,"players":1})"),
-                                              R"({"is":"redgem","name":"x","port":7777,"players":1})"};
-const std::string kRealAnswer = answer(R"({"is":"redgem","name":"real","port":7777,"players":2})");
+// engine, an answer as JSON text (as versions before MessagePack sent it) and one of another
+// version of the protocol, then one real answer.
+const std::vector<std::string> kNotAnswers = {
+    "hello",
+    answer(R"({"is":"redgem"})"),
+    answer(R"({"is":"redgem","name":7,"port":7777,"players":1,)" + kVersionField + "}"),
+    answer(R"({"is":"redgem","name":"x","port":99999,"players":1,)" + kVersionField + "}"),
+    answer(R"({"is":"other","name":"x","port":7777,"players":1,)" + kVersionField + "}"),
+    answer(R"({"is":"redgem","name":"x","port":7777,"players":1})"),
+    R"({"is":"redgem","name":"x","port":7777,"players":1,)" + kVersionField + "}",
+    answer(R"({"is":"redgem","name":"newer","port":7779,"players":1,"v":)" +
+           std::to_string(wire::kProtocolVersion + 1) + "}")};
+const std::string kRealAnswer =
+    answer(R"({"is":"redgem","name":"real","port":7777,"players":2,)" + kVersionField + "}");
 
 // Answers every search that reached `listener` so far with all of the above. Every one, not just
 // the first: the first to arrive may be one a finder of the test before sent as it was closed (the
@@ -510,6 +519,7 @@ TEST_CASE("games on the local network are found without typing an address") {
 }
 
 TEST_CASE("what is not an answer to a search is ignored") {
+  redgem::test::LogCapture log;
   std::string error;
   Datagrams listener = Datagrams::open_on(kTestDiscoveryPort, error);
   REQUIRE(listener.valid());
@@ -529,6 +539,10 @@ TEST_CASE("what is not an answer to a search is ignored") {
   REQUIRE(found);
   REQUIRE(finder.games().size() == 1);
   CHECK(finder.games().front().name == "real");
+  CHECK(finder.games().front().protocol == wire::kProtocolVersion);
+  // The game of another version is not listed (it could not be joined): the log says why.
+  CHECK(log.contains("\"newer\""));
+  CHECK(log.contains(wire::protocol_mismatch(wire::kProtocolVersion + 1)));
 }
 
 TEST_CASE("guessing room codes gets an address kept out for a while") {
@@ -771,3 +785,23 @@ TEST_CASE("a relay that cannot take a newcomer rests before it asks again, inste
   CHECK(meeting.until([&] { return meeting.relay.connection_count() == kept + 1; }));
 }
 #endif
+
+TEST_CASE("a relay turns away a machine of another version of the protocol, saying why") {
+  redgem::test::LogCapture log;
+  Meeting meeting;
+  RawMachine newer(meeting);
+  const int next_protocol = wire::kProtocolVersion + 1;
+  REQUIRE(newer.say(R"({"k":"h","r":"new","v":)" + std::to_string(next_protocol) + "}"));
+  const nlohmann::json refusal = newer.next_message();
+  CHECK(refusal[wire::kKind] == wire::kRefused);
+  CHECK(refusal[wire::kReason] == wire::protocol_mismatch(next_protocol));
+  CHECK(refusal[wire::kVersion] == wire::kProtocolVersion);
+  CHECK(meeting.relay.room_count() == 0);
+  CHECK(log.contains(wire::protocol_mismatch(next_protocol)));
+  // A session of this version gets its room.
+  NetworkSession opener;
+  meeting.seat(opener);
+  std::string error;
+  REQUIRE(opener.host_room(kLocalhost, meeting.relay.port(), error));
+  REQUIRE(meeting.until([&opener] { return opener.state() == NetworkSession::State::Online; }));
+}

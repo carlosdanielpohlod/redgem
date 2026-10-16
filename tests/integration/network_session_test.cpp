@@ -6,6 +6,7 @@
 
 #include "integration/wire_text.hpp"
 #include "net/network_session.hpp"
+#include "test_support.hpp"
 
 using namespace redgem::net;
 using redgem::test::wire_frame;
@@ -29,7 +30,8 @@ constexpr float kPastSilenceTimeout = kSilenceTimeoutSeconds + 3.0f * kQuietStep
 constexpr std::size_t kShownBytes = 60;          // of a bad message, when a check fails
 constexpr int kSilentStrangers = kMaxPeers - 1;  // as many as a game has places for guests
 constexpr int kFloodMessages = 3 * kMaxMessagesPerPoll / 2;
-constexpr std::chrono::milliseconds kArrivalPause{50};  // for what was written to be there to read
+constexpr std::chrono::milliseconds kArrivalPause{50};     // for what was written to be there to read
+constexpr int kNextProtocol = wire::kProtocolVersion + 1;  // what a newer version of the engine speaks
 
 // Sessions on this machine, and everything that happened to each.
 struct Table {
@@ -555,4 +557,44 @@ TEST_CASE("what a host said before it hung up is all heard, and only then is the
   REQUIRE(fake.table.until([&fake] { return fake.table.count(0, NetworkEvent::Kind::Disconnected) == 1; }));
   CHECK(fake.table.count(0, NetworkEvent::Kind::Message) == kFloodMessages);
   CHECK(fake.table.events[0].back().kind == NetworkEvent::Kind::Disconnected);
+}
+
+TEST_CASE("a newcomer of another version of the protocol is turned away, told why, and the host logs it") {
+  redgem::test::LogCapture log;
+  LoneHost lone;
+  Stranger newer(lone.host, lone.table);
+  newer.say(R"({"k":"h","v":)" + std::to_string(kNextProtocol) + "}");
+  const nlohmann::json refusal = newer.hear();
+  CHECK(refusal[wire::kKind] == wire::kRefused);
+  CHECK(refusal[wire::kVersion] == wire::kProtocolVersion);
+  CHECK(refusal[wire::kReason] == wire::protocol_mismatch(kNextProtocol));
+  CHECK(newer.hung_up_on());
+  CHECK(lone.host.peers().empty());
+  CHECK(log.contains("this game runs protocol " + std::to_string(wire::kProtocolVersion) + ", the other side " +
+                     std::to_string(kNextProtocol)));
+  // A hello that says no version at all is of none this host speaks either.
+  Stranger unversioned(lone.host, lone.table);
+  unversioned.say(R"({"k":"h","v":0})");
+  CHECK(unversioned.hear()[wire::kReason] == wire::protocol_mismatch(0));
+}
+
+TEST_CASE("a guest turned away by a host of another version says why in its own words") {
+  for (const std::string& answer : {R"({"k":"x","y":"whatever its reason","v":)" + std::to_string(kNextProtocol) + "}",
+                                    R"({"k":"w","t":2,"p":[1],"v":)" + std::to_string(kNextProtocol) + "}"}) {
+    CAPTURE(answer);
+    redgem::test::LogCapture log;
+    FakeHost fake;
+    fake.say(answer);
+    REQUIRE(fake.table.until([&fake] { return fake.table.count(0, NetworkEvent::Kind::Failed) == 1; }));
+    CHECK(fake.table.last(0, NetworkEvent::Kind::Failed)->name == wire::protocol_mismatch(kNextProtocol));
+    CHECK(fake.guest.state() == NetworkSession::State::Offline);
+    CHECK(log.contains(wire::protocol_mismatch(kNextProtocol)));
+  }
+}
+
+TEST_CASE("a refusal from a host of this version keeps the host's reason") {
+  FakeHost fake;
+  fake.say(R"({"k":"x","y":"the game is full of ghosts","v":)" + std::to_string(wire::kProtocolVersion) + "}");
+  REQUIRE(fake.table.until([&fake] { return fake.table.count(0, NetworkEvent::Kind::Failed) == 1; }));
+  CHECK(fake.table.last(0, NetworkEvent::Kind::Failed)->name == "the game is full of ghosts");
 }

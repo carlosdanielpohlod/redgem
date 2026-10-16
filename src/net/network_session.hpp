@@ -228,6 +228,9 @@ class NetworkSession {
   // machine, or as nobody.
   bool can_arrive(int peer) const { return !knows(peer) && peer != id_ && peer >= kHostId; }
   void hear_game_message(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  // The host turned this machine away: the game it was joining ends, saying why (in its own words
+  // when the two speak different versions of the protocol).
+  void turned_away(const nlohmann::json& refusal);
   void peer_arrived(int peer, std::vector<NetworkEvent>& events);
   void peer_left(int peer, std::vector<NetworkEvent>& events);
   void drop_closed_links(std::vector<NetworkEvent>& events);

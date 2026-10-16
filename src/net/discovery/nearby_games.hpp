@@ -15,6 +15,7 @@ struct NearbyGame {
   std::uint16_t port = 0;
   std::string name;       // what its host called it
   int players = 0;        // machines in it, the host included
+  int protocol = 0;       // the version of the protocol it speaks (wire::kProtocolVersion)
   float seen_ago = 0.0f;  // seconds since it last answered
 };
 
@@ -27,7 +28,7 @@ bool nearby_address(const std::string& address);
 // Whether what a host heard from the address `from` is a search it answers.
 bool search_to_answer(const std::string& message, const std::string& from);
 // What a host answers a search with (in MessagePack): its game's name (as much of it as an answer
-// holds), the port to join it on and how many are playing.
+// holds), the port to join it on, how many are playing, and the version of the protocol it speaks.
 std::string search_answer(const std::string& name, std::uint16_t game_port, int players);
 // The game an answer to a search describes, heard from the address `from`; nullopt for anything
 // that is not a whole answer (anything can arrive on a port) and for one from an address that is

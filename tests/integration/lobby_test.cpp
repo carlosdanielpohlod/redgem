@@ -6,8 +6,9 @@
 #include <thread>
 #include <vector>
 
-#include "net/rooms/lobby.hpp"
+#include "integration/wire_text.hpp"
 #include "net/network_session.hpp"
+#include "net/rooms/lobby.hpp"
 
 using namespace redgem::net;
 
@@ -188,4 +189,26 @@ TEST_CASE("a server's room lets go of a player who says nothing to the game for 
   REQUIRE(door.until([&idle] { return offline(idle); }));
   CHECK(online(playing));
   CHECK(room.players() == std::vector<int>{playing.id()});
+}
+
+TEST_CASE("a server's lobby turns away a machine of another version of the protocol, saying why") {
+  Door door;
+  std::string error;
+  Socket newer = Socket::connect_to(kLocalhost, door.lobby.port(), error);
+  REQUIRE(door.until([&newer] { return newer.connect_status() == IoStatus::Ok; }));
+  const int next_protocol = wire::kProtocolVersion + 1;
+  std::vector<std::uint8_t> hello = redgem::test::wire_frame(R"({"k":"h","v":)" + std::to_string(next_protocol) + "}");
+  REQUIRE(door.until([&] { return newer.write(hello) == IoStatus::Ok && hello.empty(); }));
+  FrameBuffer heard;
+  std::optional<std::string> refusal;
+  REQUIRE(door.until([&] {
+    std::vector<std::uint8_t> arrived;
+    newer.read(arrived, kMaxReadBytesPerPoll);
+    heard.append(arrived.data(), arrived.size());
+    refusal = heard.next();
+    return refusal.has_value();
+  }));
+  CHECK(redgem::test::message_in(*refusal)[wire::kReason] == wire::protocol_mismatch(next_protocol));
+  for (int i = 0; i < kSettleRounds; ++i) door.round();  // (a while: nobody comes out of the lobby)
+  CHECK(door.arrivals.empty());
 }

@@ -5,6 +5,8 @@
 
 #include <algorithm>
 
+#include "core/log.hpp"
+
 namespace redgem::net {
 
 using namespace wire;
@@ -43,15 +45,24 @@ void NetworkSession::hear_while_joining(const nlohmann::json& message, std::vect
   const std::string kind = message[kKind];
   // The host's game takes its time to decide on this machine: this machine waits for it.
   if (kind == kConsidering) connecting_for_ = -kApprovalSeconds;
-  if (kind == kRefused) {
-    refusal_ = message.value(kReason, std::string());
-    links_.front().connection.close();  // the game ends with it, saying why (end_game_if_host_gone)
-  }
+  if (kind == kRefused) turned_away(message);
   accept_welcome(message, events);
+}
+
+void NetworkSession::turned_away(const nlohmann::json& refusal) {
+  if (speaks_our_protocol(refusal)) {
+    refusal_ = refusal.value(kReason, std::string());
+  } else {
+    refusal_ = protocol_mismatch(protocol_of(refusal));
+    log::warning("cannot join the game: " + refusal_);
+  }
+  links_.front().connection.close();  // the game ends with it, saying why (end_game_if_host_gone)
 }
 
 void NetworkSession::accept_welcome(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
   if (message[kKind] != kWelcome) return;
+  // (A host of another version would have refused this machine: one that welcomes it is turned away.)
+  if (!speaks_our_protocol(message)) return turned_away(message);
   const int given = message.value(kTo, 0);
   // (well_formed saw to the list: ids there can be, each once. This machine is not one of the others.)
   const std::vector<int> others = message.value(kPeers, std::vector<int>{});

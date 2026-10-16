@@ -9,13 +9,26 @@
 
 #include <nlohmann/json.hpp>
 
+#include "net/wire.hpp"
 #include "net/wire_codec.hpp"
 
 namespace redgem::test {
 
-// The bytes of the message `text` says.
+// Whether a message is of a kind that says the version of the protocol: a hello or a welcome.
+inline bool says_version(const nlohmann::json& message) {
+  const nlohmann::json kind =
+      message.is_object() ? message.value(net::wire::kKind, nlohmann::json()) : nlohmann::json();
+  return kind == net::wire::kHello || kind == net::wire::kWelcome;
+}
+
+// The bytes of the message `text` says. A hello or a welcome speaks this program's version of the
+// protocol unless it says another ("v").
 inline std::vector<std::uint8_t> wire_frame(const std::string& text) {
-  return net::wire::packed(nlohmann::json::parse(text));
+  nlohmann::json message = nlohmann::json::parse(text);
+  if (says_version(message) && !message.contains(net::wire::kVersion)) {
+    message[net::wire::kVersion] = net::wire::kProtocolVersion;
+  }
+  return net::wire::packed(message);
 }
 
 // The message in the bytes of a frame (null when they are not one).

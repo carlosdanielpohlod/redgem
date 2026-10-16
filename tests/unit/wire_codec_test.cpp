@@ -58,7 +58,7 @@ json message_carrying(const json& data) { return wire::game_message("x", data, k
 }  // namespace
 
 TEST_CASE("a message comes back from its bytes as it was sent") {
-  for (const json& message : {shot(), json{{wire::kKind, wire::kHello}}, wire::refusal("full"),
+  for (const json& message : {shot(), wire::hello(), wire::refusal("full"),
                               json{{wire::kKind, wire::kWelcome}, {wire::kTo, kGuest}, {wire::kPeers, {1, kOther}}}}) {
     CAPTURE(message.dump());
     const auto back = wire::unpacked(inside(wire::packed(message)));

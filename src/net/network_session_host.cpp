@@ -61,6 +61,7 @@ void NetworkSession::hear_newcomer(Link& link, const nlohmann::json& message, st
     link.connection.close();
     return;
   }
+  if (link.connection.refused_for_protocol(message)) return;
   consider(link, message.value(kAuth, nlohmann::json()), events);
 }
 
@@ -84,7 +85,7 @@ void NetworkSession::let_in(Link& link, int peer, std::vector<NetworkEvent>& eve
 }
 
 nlohmann::json NetworkSession::welcome_for(int peer, const std::vector<int>& already_here) const {
-  nlohmann::json welcome = {{kKind, kWelcome}, {kTo, peer}, {kPeers, already_here}};
+  nlohmann::json welcome = {{kKind, kWelcome}, {kTo, peer}, {kPeers, already_here}, {kVersion, kProtocolVersion}};
   if (!server_hosted_) return welcome;
   welcome[kRoom] = room_;
   welcome[kServer] = true;

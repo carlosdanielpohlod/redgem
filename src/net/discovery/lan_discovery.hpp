@@ -39,6 +39,11 @@ class LanDiscovery {
   void answer_searches();
   void collect_answers();
   void ask_around();
+  // A game that answered: listed when it speaks this version of the protocol, said once in the
+  // log when it does not (it could not be joined).
+  void hear_of(const NearbyGame& game);
+  // Whether the log said so of that game already, or of as many as it is worth saying of.
+  bool told_of(const std::string& game) const;
 
   Datagrams announcer_;  // a host's: bound to the discovery port
   Datagrams finder_;     // a searcher's: any port, answers come back to it
@@ -48,6 +53,7 @@ class LanDiscovery {
   int players_ = 1;
   float since_asked_ = 0.0f;
   std::vector<NearbyGame> games_;
+  std::vector<std::string> other_protocols_;  // games of another version the log told of: "address:port"
 };
 
 }  // namespace redgem::net

@@ -8,6 +8,7 @@
 
 #include "core/safe_path.hpp"
 #include "net/socket/socket.hpp"
+#include "net/wire.hpp"
 #include "net/wire_codec.hpp"
 
 namespace redgem::net {
@@ -59,7 +60,8 @@ bool has_whole_number(const nlohmann::json& answer, const char* key) {
 // Anything can arrive on a port: only a well-formed answer counts.
 bool is_answer(const nlohmann::json& answer) {
   return answer.is_object() && answer.value(kMark, nlohmann::json()) == kAnswerMark && has_text(answer, kNameKey) &&
-         has_whole_number(answer, kPortKey) && has_whole_number(answer, kPlayersKey);
+         has_whole_number(answer, kPortKey) && has_whole_number(answer, kPlayersKey) &&
+         has_whole_number(answer, wire::kVersion);
 }
 
 // A whole number of an answer in 64 bits, however large it was written (one past what those hold
@@ -82,6 +84,8 @@ NearbyGame game_of(const nlohmann::json& answer, std::uint16_t port, const std::
   // (The name is shown on screens and in logs: nothing in it drives a terminal.)
   game.name = printable(answer[kNameKey].get<std::string>().substr(0, kMaxGameNameBytes));
   game.players = static_cast<int>(std::clamp<std::int64_t>(wide_number(answer[kPlayersKey]), 1, kMaxPlayersShown));
+  game.protocol =
+      static_cast<int>(std::clamp<std::int64_t>(wide_number(answer[wire::kVersion]), 0, wire::kLargestProtocolVersion));
   return game;
 }
 
@@ -125,7 +129,8 @@ std::string search_answer(const std::string& name, std::uint16_t game_port, int 
   const nlohmann::json answer = {{kMark, kAnswerMark},
                                  {kNameKey, name.substr(0, kMaxGameNameBytes)},
                                  {kPortKey, game_port},
-                                 {kPlayersKey, players}};
+                                 {kPlayersKey, players},
+                                 {wire::kVersion, wire::kProtocolVersion}};
   const std::vector<std::uint8_t> bytes = wire::msgpack(answer);
   return {bytes.begin(), bytes.end()};
 }

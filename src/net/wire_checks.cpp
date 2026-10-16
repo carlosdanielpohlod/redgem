@@ -59,6 +59,11 @@ bool is_id(const nlohmann::json& message, const char* key) {
   return !message.contains(key) || is_number_between(message[key], 0, kLargestId);
 }
 
+bool is_version(const nlohmann::json& message) {
+  return !message.contains(wire::kVersion) ||
+         is_number_between(message[wire::kVersion], 0, wire::kLargestProtocolVersion);
+}
+
 bool is_text_up_to(const nlohmann::json& message, const char* key, std::size_t most_bytes) {
   return !message.contains(key) ||
          (message[key].is_string() && message[key].get_ref<const std::string&>().size() <= most_bytes);
@@ -100,7 +105,7 @@ namespace wire {
 bool well_formed(const nlohmann::json& message) {
   return has_kind(message) && is_id(message, kFrom) && is_id(message, kTo) && is_short_text(message, kName) &&
          is_list_of_peers(message, kPeers) && is_short_text(message, kRoom) && is_flag(message, kServer) &&
-         is_flag(message, kGuards) && is_text_up_to(message, kReason, kMaxReasonBytes) &&
+         is_flag(message, kGuards) && is_text_up_to(message, kReason, kMaxReasonBytes) && is_version(message) &&
          (!message.contains(kData) || acceptable_data(message[kData]));
 }
 

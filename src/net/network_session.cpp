@@ -14,8 +14,8 @@ namespace {
 bool names_a_room(const std::string& code) { return !code.empty() && code != kNewRoom; }
 
 // A newcomer's first words, with what the game joined decides on when there is any.
-nlohmann::json hello(const nlohmann::json& auth) {
-  nlohmann::json said = {{kKind, kHello}};
+nlohmann::json hello_with(const nlohmann::json& auth) {
+  nlohmann::json said = hello();
   if (!auth.is_null()) said[kAuth] = auth;
   return said;
 }
@@ -74,11 +74,14 @@ bool NetworkSession::connect_out(const std::string& address, std::uint16_t port,
 
 bool NetworkSession::join(const std::string& address, std::uint16_t port, std::string& error,
                           const nlohmann::json& auth) {
-  return connect_out(address, port, hello(auth), error);
+  return connect_out(address, port, hello_with(auth), error);
 }
 
 bool NetworkSession::host_room(const std::string& address, std::uint16_t port, std::string& error) {
-  if (!connect_out(address, port, {{kKind, kHello}, {kRoom, kNewRoom}, {kGuards, approving_}}, error)) return false;
+  nlohmann::json said = hello();
+  said[kRoom] = kNewRoom;
+  said[kGuards] = approving_;
+  if (!connect_out(address, port, said, error)) return false;
   through_relay_ = true;
   opening_room_ = true;
   return true;
@@ -90,7 +93,7 @@ bool NetworkSession::join_room(const std::string& address, std::uint16_t port, c
     error = "a room's code is needed to join it";
     return false;
   }
-  nlohmann::json said = hello(auth);
+  nlohmann::json said = hello_with(auth);
   said[kRoom] = code;
   if (!connect_out(address, port, said, error)) return false;
   through_relay_ = true;

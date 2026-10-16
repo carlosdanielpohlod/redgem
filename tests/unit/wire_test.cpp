@@ -145,6 +145,26 @@ TEST_CASE("a game's data is never bytes, nor a number that is not one") {
   }
 }
 
+TEST_CASE("the first words of a connection say the version of the protocol") {
+  const json hello = wire::hello();
+  CHECK(hello[wire::kKind] == wire::kHello);
+  CHECK(wire::speaks_our_protocol(hello));
+  CHECK(wire::refusal("full")[wire::kVersion] == wire::kProtocolVersion);
+  CHECK(wire::protocol_of(json{{wire::kKind, wire::kHello}}) == 0);  // a hello that says none
+  CHECK_FALSE(wire::speaks_our_protocol({{wire::kKind, wire::kHello}, {wire::kVersion, wire::kProtocolVersion + 1}}));
+  CHECK(wire::protocol_mismatch(wire::kProtocolVersion + 1) ==
+        "this game runs protocol " + std::to_string(wire::kProtocolVersion) + ", the other side " +
+            std::to_string(wire::kProtocolVersion + 1));
+}
+
+TEST_CASE("a version is a whole number a version can be") {
+  CHECK(wire::well_formed({{wire::kKind, wire::kHello}, {wire::kVersion, wire::kLargestProtocolVersion}}));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kHello}, {wire::kVersion, wire::kLargestProtocolVersion + 1}}));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kHello}, {wire::kVersion, -1}}));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kHello}, {wire::kVersion, "1"}}));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kHello}, {wire::kVersion, kNotWhole}}));
+}
+
 TEST_CASE("a newcomer gets the lowest id nobody has, and none in a full game") {
   CHECK(wire::free_peer_id({}) == kFirstGuestId);
   CHECK(wire::free_peer_id({kFirstGuestId, kOtherGuest}) == kGuest);

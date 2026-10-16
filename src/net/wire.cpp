@@ -6,6 +6,8 @@
 
 namespace redgem::net::wire {
 
+nlohmann::json hello() { return {{kKind, kHello}, {kVersion, kProtocolVersion}}; }
+
 nlohmann::json game_message(const std::string& name, const nlohmann::json& data, int from, int to) {
   nlohmann::json message = {{kKind, kGameMessage}, {kName, name}, {kFrom, from}, {kData, data}};
   if (to != kEveryone) message[kTo] = to;  // (everyone, when it says nobody: the bytes are saved)
@@ -21,7 +23,15 @@ nlohmann::json passed_on(const nlohmann::json& message, int from) {
 }
 
 nlohmann::json refusal(const std::string& reason) {
-  return {{kKind, kRefused}, {kReason, reason.substr(0, kMaxReasonBytes)}};
+  return {{kKind, kRefused}, {kReason, reason.substr(0, kMaxReasonBytes)}, {kVersion, kProtocolVersion}};
+}
+
+int protocol_of(const nlohmann::json& message) { return message.value(kVersion, 0); }
+
+bool speaks_our_protocol(const nlohmann::json& message) { return protocol_of(message) == kProtocolVersion; }
+
+std::string protocol_mismatch(int theirs) {
+  return "this game runs protocol " + std::to_string(kProtocolVersion) + ", the other side " + std::to_string(theirs);
 }
 
 bool own_id_believable(int given, bool through_relay, bool opening_room) {

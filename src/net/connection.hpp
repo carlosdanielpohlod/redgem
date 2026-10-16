@@ -48,6 +48,9 @@ class Connection {
   void send(const nlohmann::json& message);
   // The same, for a message packed already (wire::packed): one that goes to many is packed once.
   void send_packed(const std::vector<std::uint8_t>& message);
+  // Turns away a newcomer whose hello is of another version of the protocol, telling it why and
+  // saying so in the log. True when it did.
+  bool refused_for_protocol(const nlohmann::json& hello);
   // One try at sending what waits (pump does it too; this is for a last word before leaving).
   void flush();
 

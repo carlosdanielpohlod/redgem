@@ -2,6 +2,8 @@
 
 #include <utility>
 
+#include "core/log.hpp"
+
 namespace redgem::net {
 
 Connection::Connection(Socket socket, std::size_t pending_limit, bool established)
@@ -80,6 +82,14 @@ void Connection::send_packed(const std::vector<std::uint8_t>& message) {
 void Connection::flush() {
   if (!can_write()) return;
   if (socket_.write(outgoing_) == IoStatus::Closed) hang_up();
+}
+
+bool Connection::refused_for_protocol(const nlohmann::json& hello) {
+  if (wire::speaks_our_protocol(hello)) return false;
+  const std::string why = wire::protocol_mismatch(wire::protocol_of(hello));
+  log::warning("turned away the machine at " + address_ + ": " + why);
+  refuse(why);
+  return true;
 }
 
 void Connection::keep_in_touch(float seconds) {
