@@ -10,6 +10,9 @@ get the first room with a free place, or a new room when every room is full. A f
 them into the same room with its code (`Network.room`). A room closes when its match ends: the game
 calls `Game.quit`, or everyone left. The next players get a new room, with a new game.
 
+Nobody runs a server for you: each game runs its own, on a machine its players can reach, as
+below. The same goes for a [relay](scripting/multiplayer.md#over-the-internet-rooms).
+
 ## Run it
 
 ```bash
