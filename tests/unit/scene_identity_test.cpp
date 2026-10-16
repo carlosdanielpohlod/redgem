@@ -38,6 +38,28 @@ bool contains(const std::vector<ObjectId>& ids, ObjectId id) {
   return std::find(ids.begin(), ids.end(), id) != ids.end();
 }
 
+// A walker that is a prefab, with a bone and a body deformed by that bone.
+SceneDesc skinned_walker() {
+  SceneDesc desc;
+  NodeDesc walker;
+  walker.name = "Walker";
+  walker.children = {1, 2};
+  walker.props = {{"prefab", true}};
+  NodeDesc bone;
+  bone.name = "Bone";
+  bone.parent = 0;
+  NodeDesc body;
+  body.name = "Body";
+  body.parent = 0;
+  body.skin = 0;
+  desc.nodes = {walker, bone, body};
+  SkinDesc skin;
+  skin.joints = {1};
+  skin.inverse_bind.resize(1);
+  desc.skins = {skin};
+  return desc;
+}
+
 }  // namespace
 
 TEST_CASE("every object has a serial no other object ever had, in any scene") {
@@ -106,26 +128,63 @@ TEST_CASE("what is pending destruction comes parents first, whatever slots they 
   CHECK(pending.back() == reused.back());
 }
 
-TEST_CASE("a copy whose bone was destroyed no longer finds it, whatever takes its slot") {
-  SceneDesc desc;
-  NodeDesc walker;
-  walker.name = "Walker";
-  walker.children = {1, 2};
-  walker.props = {{"prefab", true}};
-  NodeDesc bone;
-  bone.name = "Bone";
-  bone.parent = 0;
-  NodeDesc body;
-  body.name = "Body";
-  body.parent = 0;
-  body.skin = 0;
-  desc.nodes = {walker, bone, body};
-  SkinDesc skin;
-  skin.joints = {1};
-  skin.inverse_bind.resize(1);
-  desc.skins = {skin};
+TEST_CASE("copying a body whose bone is gone does not give the copy what took the bone's slot") {
+  Scene scene = Scene::from_desc(skinned_walker());
+  const std::vector<ObjectId> walker = scene.clone(0);  // walker, bone, body
+  REQUIRE(walker.size() == 3);
+  const ObjectHandle stale = scene.at(walker[2]).joints.front();
+  destroy_now(scene, walker[1]);                     // the bone alone
+  const ObjectId newcomer = scene.clone(0).front();  // takes the bone's slot
+  REQUIRE(newcomer == walker[1]);
+  REQUIRE(scene.resolve(stale) == kNoObject);
 
-  Scene scene = Scene::from_desc(desc);
+  const std::vector<ObjectId> again = scene.clone(walker[0]);  // walker and body: the bone is gone
+  REQUIRE(again.size() == 2);
+  const ObjectHandle copied = scene.at(again[1]).joints.front();
+  CHECK(scene.resolve(copied) == kNoObject);
+  CHECK(copied != scene.handle(newcomer));
+  CHECK(scene.resolve(stale) == kNoObject);  // the original stays as dead as it was
+}
+
+TEST_CASE("a copy of a copy is deformed by its own bones") {
+  Scene scene = Scene::from_desc(skinned_walker());
+  const std::vector<ObjectId> first = scene.clone(0);
+  const std::vector<ObjectId> second = scene.clone(first[0]);
+  REQUIRE(second.size() == 3);
+  CHECK(scene.resolve(scene.at(second[2]).joints.front()) == second[1]);
+  CHECK(scene.resolve(scene.at(first[2]).joints.front()) == first[1]);  // the first copy keeps its own
+}
+
+TEST_CASE("a copy of an object pending destruction lives on once the original is gone") {
+  Scene scene = Scene::from_desc(spawnable());
+  const std::vector<ObjectId> original = scene.clone(0);  // enemy and gun
+  scene.request_destroy(original.front());
+  const std::vector<ObjectId> copy = scene.clone(original.front());
+  REQUIRE(copy.size() == 2);
+  for (const ObjectId id : copy) CHECK_FALSE(scene.at(id).pending_destroy);
+
+  const std::vector<ObjectId> pending = scene.pending_destroy_ids();
+  CHECK(pending == original);  // only the original and its gun are on their way out
+  for (auto it = pending.rbegin(); it != pending.rend(); ++it) scene.finalize_destroy(*it);
+  for (const ObjectId id : copy) CHECK(scene.is_alive(id));
+  CHECK(scene.resolve(scene.handle(copy.front())) == copy.front());
+  CHECK(contains(scene.copies_of(0), copy.front()));
+  CHECK_FALSE(contains(scene.copies_of(0), original.front()));
+}
+
+TEST_CASE("an object that is gone cannot be copied, and trying leaves nothing behind") {
+  Scene scene = Scene::from_desc(spawnable());
+  const ObjectId gone = scene.clone(0).front();
+  destroy_now(scene, gone);
+  const std::size_t slots = scene.size();
+  CHECK(scene.clone(gone).empty());
+  CHECK(scene.clone(kNoObject).empty());
+  CHECK(scene.size() == slots);
+  CHECK(scene.copies_of(0).empty());
+}
+
+TEST_CASE("a copy whose bone was destroyed no longer finds it, whatever takes its slot") {
+  Scene scene = Scene::from_desc(skinned_walker());
   const std::vector<ObjectId> copy = scene.clone(0);  // walker, bone, body
   REQUIRE(copy.size() == 3);
   destroy_now(scene, copy[1]);                       // the bone alone

@@ -109,7 +109,8 @@ class Scene {
   // True for objects marked `prefab = true` and their descendants.
   bool is_prefab(ObjectId id) const { return valid(id) && objects_[id].prefab; }
   // Copies `source` and its descendants as live (non-prefab) objects at the root of the scene.
-  // Returns the ids of the copies, the copy of `source` first.
+  // Returns the ids of the copies, the copy of `source` first; none for a source that is not
+  // alive. Copies are new objects: one made of an object pending destruction lives on.
   std::vector<ObjectId> clone(ObjectId source);
   // The alive copies of an object of the loaded scene (see GameObject::copy_of).
   std::vector<ObjectId> copies_of(ObjectId original) const;
@@ -130,6 +131,9 @@ class Scene {
   // A copied character is deformed by its own copied bones (bones outside the copy stay shared).
   // Takes (original, its copy) pairs and returns the copies' ids, in that order.
   std::vector<ObjectId> with_copied_joints(const std::vector<std::pair<ObjectId, ObjectId>>& copies);
+  // What a copied bone handle becomes: the copy of a bone copied with it, the same bone when it
+  // lies outside the copy, and unchanged (finding nothing) when the bone is gone.
+  ObjectHandle copied_joint(ObjectHandle joint, const std::vector<std::pair<ObjectId, ObjectId>>& copies) const;
   bool valid(ObjectId id) const { return is_index_of(id, objects_.size()); }
   // A slot for a new copy: one a destroyed copy left, else a new one at the end.
   ObjectId free_slot();

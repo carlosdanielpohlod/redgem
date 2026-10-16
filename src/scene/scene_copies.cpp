@@ -11,8 +11,10 @@ namespace {
 using CopyPair = std::pair<ObjectId, ObjectId>;
 
 // A copy before it gets its place in the scene: live, on its own, following no animation ahead.
+// It starts a life of its own: an original about to be destroyed hands that on to no copy.
 GameObject detached_copy(const GameObject& original) {
   GameObject copy = original;
+  copy.pending_destroy = false;
   copy.children.clear();
   copy.prefab = false;
   copy.props.erase(props::kPrefab);
@@ -55,6 +57,7 @@ ObjectId Scene::add_copy(ObjectId original, ObjectId parent, ObjectId root) {
 }
 
 std::vector<ObjectId> Scene::clone(ObjectId source) {
+  if (!is_alive(source)) return {};
   const Transform world = world_transform(source);
   std::vector<CopyPair> copies;  // (original, its copy)
   // Breadth-first over the subtree; the new parent of each copy is known when it is created.
@@ -74,10 +77,17 @@ std::vector<ObjectId> Scene::clone(ObjectId source) {
 std::vector<ObjectId> Scene::with_copied_joints(const std::vector<CopyPair>& copies) {
   std::vector<ObjectId> created;
   for (const auto& [original, id] : copies) {
-    for (ObjectHandle& joint : objects_[id].joints) joint = handle(copy_or_original(copies, joint.id));
+    for (ObjectHandle& joint : objects_[id].joints) joint = copied_joint(joint, copies);
     created.push_back(id);
   }
   return created;
+}
+
+ObjectHandle Scene::copied_joint(ObjectHandle joint, const std::vector<CopyPair>& copies) const {
+  const ObjectId bone = resolve(joint);
+  // A bone that is gone stays gone: its slot may hold another object by now.
+  if (bone == kNoObject) return joint;
+  return handle(copy_or_original(copies, bone));
 }
 
 std::vector<ObjectId> Scene::copies_of(ObjectId original) const {
