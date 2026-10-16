@@ -13,6 +13,10 @@ namespace redgem::net::os {
 namespace {
 
 constexpr int kEnabled = 1;
+constexpr std::size_t kDiscardChunkBytes = 16 * 1024;
+// Read at most before a connection is closed anyway: a machine still sending at full speed is not
+// waited out.
+constexpr std::size_t kMostDiscardedBytes = 1024 * 1024;
 #ifdef _WIN32
 constexpr WORD kWinsockVersion = MAKEWORD(2, 2);
 #endif
@@ -91,6 +95,15 @@ void no_signal_on_closed(NativeSocket) {}  // (every send says so itself: kSendF
 #endif
 
 IoStatus later_or_closed() { return would_block() ? IoStatus::WouldBlock : IoStatus::Closed; }
+
+void discard_unread(NativeSocket socket) {
+  char chunk[kDiscardChunkBytes];
+  for (std::size_t discarded = 0; discarded < kMostDiscardedBytes;) {
+    const auto count = recv(socket, chunk, sizeof(chunk), 0);
+    if (count <= 0) return;  // nothing more for now, or nothing more ever
+    discarded += static_cast<std::size_t>(count);
+  }
+}
 
 void set_option(NativeSocket socket, int level, int option) {
   setsockopt(socket, level, option, reinterpret_cast<const char*>(&kEnabled), sizeof(kEnabled));

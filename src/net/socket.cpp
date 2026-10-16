@@ -88,6 +88,7 @@ Socket& Socket::operator=(Socket&& other) noexcept {
 
 void Socket::close() {
   if (handle_ == kNoHandle) return;
+  discard_unread(native(handle_));
   close_native(native(handle_));
   handle_ = kNoHandle;
 }
@@ -121,11 +122,11 @@ IoStatus Socket::accept(Socket& guest) {
   if (!valid()) return IoStatus::Closed;
   const NativeSocket taken = ::accept(native(handle_), nullptr, nullptr);
   if (!is_socket(taken)) return later_or_closed();
-  guest = Socket(static_cast<std::intptr_t>(taken));
   if (!make_non_blocking(taken)) {
-    guest.close();
+    close_native(taken);  // (not Socket::close, which reads: a socket that waits must not be read)
     return IoStatus::Closed;
   }
+  guest = Socket(static_cast<std::intptr_t>(taken));
   set_stream_options(taken);
   return IoStatus::Ok;
 }
