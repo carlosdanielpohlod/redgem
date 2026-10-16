@@ -1,5 +1,6 @@
 #include "editor/document/glb_usage.hpp"
 
+#include <algorithm>
 #include <string_view>
 
 namespace redgem::glb_usage {
@@ -118,6 +119,11 @@ Usage nothing_used(Json& doc) {
   return usage;
 }
 
+// What notes each reference it is given in `usage`.
+Use marking(Usage& usage) {
+  return [&usage](Json& reference, Kind kind) { usage[kind][entry_of(reference, usage[kind].size())] = true; };
+}
+
 }  // namespace
 
 void refuse_other_extensions(const Json& object, const char* known) {
@@ -146,18 +152,29 @@ std::size_t entry_of(const Json& reference, std::size_t entries) {
 void walk(Json& doc, const Usage& usage, const Use& use) {
   refuse_other_extensions(doc, kLightsExtension);
   each(doc, kNodes, [&use](Json& node) { walk_node(node, use); });
+  walk_motion(doc, use);
+  walk_from_meshes(doc, usage, use);
+}
+
+void walk_from_meshes(Json& doc, const Usage& usage, const Use& use) {
   each_used(doc, kMeshKind, usage, [&use](Json& mesh) {
     each(mesh, kPrimitives, [&use](Json& primitive) { walk_primitive(primitive, use); });
   });
-  walk_motion(doc, use);
   walk_looks(doc, usage, use);
   each_used(doc, kAccessorKind, usage, [&use](Json& accessor) { walk_accessor(accessor, use); });
 }
 
 Usage usage_of(Json& doc) {
   Usage usage = nothing_used(doc);
-  walk(doc, usage,
-       [&usage](Json& reference, Kind kind) { usage[kind][entry_of(reference, usage[kind].size())] = true; });
+  walk(doc, usage, marking(usage));
+  return usage;
+}
+
+Usage usage_of_meshes(Json& doc, const std::vector<bool>& meshes) {
+  Usage usage = nothing_used(doc);
+  const std::size_t known = std::min(meshes.size(), usage[kMeshKind].size());
+  for (std::size_t mesh = 0; mesh < known; ++mesh) usage[kMeshKind][mesh] = meshes[mesh];
+  walk_from_meshes(doc, usage, marking(usage));
   return usage;
 }
 

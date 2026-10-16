@@ -1,68 +1,18 @@
-// Part of SceneDocument: how much the undo history keeps, and letting go of what no step of it
-// can bring back (the meshes of deleted objects and undone imports, once their steps are gone).
+// Part of SceneDocument: keeping the undo history within its limits, and letting go of what no
+// step of it can bring back (the meshes of deleted objects and undone imports, once their steps
+// are gone).
 
 #include "editor/document/scene_document.hpp"
 
 #include <algorithm>
 #include <cstdint>
+#include <functional>
 
 #include "editor/document/glb_compact.hpp"
 
 namespace redgem {
-namespace {
 
-// Notes which meshes the nodes show.
-void mark_meshes(const std::vector<NodeDesc>& nodes, std::vector<bool>& used) {
-  for (const NodeDesc& node : nodes) {
-    if (is_index_of(node.mesh, used.size())) used[static_cast<std::size_t>(node.mesh)] = true;
-  }
-}
-
-std::size_t primitive_bytes(const PrimitiveDesc& part) {
-  const std::size_t floats = part.positions.size() + part.normals.size() + part.texcoords.size() + part.weights.size();
-  return floats * sizeof(float) + part.indices.size() * sizeof(std::uint32_t) + part.colors.size() + part.joints.size();
-}
-
-std::size_t mesh_bytes(const MeshDesc& mesh) {
-  std::size_t bytes = 0;
-  for (const PrimitiveDesc& part : mesh.primitives) bytes += primitive_bytes(part);
-  return bytes;
-}
-
-// A mesh some step of the history shows, and nothing now: kept only for undo and redo.
-bool kept_for_undo(bool in_history, bool in_use) { return in_history && !in_use; }
-
-}  // namespace
-
-std::size_t SceneDocument::bytes_of(const std::vector<Snapshot>& steps) {
-  std::size_t bytes = 0;
-  for (const Snapshot& step : steps) {
-    bytes += step.nodes.size() * sizeof(NodeDesc) + step.materials.size() * sizeof(MaterialDesc);
-    for (const auto& [mesh, shape] : step.shapes)
-      bytes += (shape.positions.size() + shape.normals.size()) * sizeof(float);
-  }
-  return bytes;
-}
-
-std::vector<bool> SceneDocument::meshes_in_history() const {
-  std::vector<bool> used(desc_.meshes.size(), false);
-  for (const Snapshot& step : undo_) mark_meshes(step.nodes, used);
-  for (const Snapshot& step : redo_) mark_meshes(step.nodes, used);
-  return used;
-}
-
-std::size_t SceneDocument::history_bytes() const {
-  std::size_t bytes = bytes_of(undo_) + bytes_of(redo_);
-  const std::vector<bool> in_history = meshes_in_history();
-  std::vector<bool> in_use(desc_.meshes.size(), false);
-  mark_meshes(desc_.nodes, in_use);
-  for (std::size_t mesh = 0; mesh < in_use.size(); ++mesh) {
-    if (kept_for_undo(in_history[mesh], in_use[mesh])) bytes += mesh_bytes(desc_.meshes[mesh]);
-  }
-  return bytes;
-}
-
-bool SceneDocument::history_too_long() const {
+bool SceneDocument::history_too_long() {
   if (undo_.size() > kMaxUndoSteps) return true;
   if (undo_.size() <= 1) return false;  // the latest step stays, however big
   return history_bytes() > kMaxHistoryBytes;
@@ -75,7 +25,8 @@ void SceneDocument::trim_history() {
 
 std::vector<int> SceneDocument::meshes_out_of_reach() const {
   std::vector<bool> reachable = meshes_in_history();
-  mark_meshes(desc_.nodes, reachable);
+  const std::vector<bool> in_use = meshes_in_use();
+  std::transform(reachable.begin(), reachable.end(), in_use.begin(), reachable.begin(), std::logical_or<>());
   std::vector<int> out_of_reach;
   for (std::size_t mesh = 0; mesh < reachable.size(); ++mesh) {
     if (reachable[mesh]) continue;

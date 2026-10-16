@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "editor/document/glb_file.hpp"
+#include "editor/document/glb_usage.hpp"
 #include "scene/shapes/primitives.hpp"
 #include "scene/scene_desc.hpp"
 #include "scene/shapes/terrain.hpp"
@@ -100,13 +101,15 @@ class SceneDocument {
   bool redo();
 
   // How much undo keeps: at most this many steps, and at most this many bytes of what only the
-  // undo and redo steps still use (their copies of the objects and terrains, the vertices of
-  // deleted objects and undone imports). The oldest steps go first; the latest one always stays.
+  // undo and redo steps still use (their copies of the objects and terrains; the vertices,
+  // pictures and file bytes of deleted objects and undone imports), checked as each step begins.
+  // The oldest steps go first; the latest one always stays.
   // What no step can bring back any more is let go of.
   static constexpr std::size_t kMaxUndoSteps = 200;
   static constexpr std::size_t kMaxHistoryBytes = std::size_t{256} * 1024 * 1024;  // 256 MiB
-  // What only the undo and redo steps keep in memory now, in bytes (an estimate).
-  std::size_t history_bytes() const;
+  // What only the undo and redo steps keep in memory now, in bytes: an estimate (see
+  // scene_document_history_bytes.cpp).
+  std::size_t history_bytes();
 
   bool save(std::string& error);
   bool save_as(const std::filesystem::path& path, std::string& error);
@@ -135,10 +138,16 @@ class SceneDocument {
   // Keeps the history within kMaxUndoSteps and kMaxHistoryBytes, then lets go of what no step
   // can bring back.
   void trim_history();
-  bool history_too_long() const;
+  bool history_too_long();
   static std::size_t bytes_of(const std::vector<Snapshot>& steps);
-  // Which meshes the nodes of some undo or redo step use.
+  // Which meshes the nodes use now, and in some undo or redo step.
+  std::vector<bool> meshes_in_use() const;
   std::vector<bool> meshes_in_history() const;
+  // What the meshes `meshes` hold, and what those `kept` reach and those `used` do not in the
+  // file: their bytes there, and the pictures.
+  std::size_t vertex_bytes(const std::vector<bool>& meshes) const;
+  std::size_t file_bytes(const std::vector<bool>& kept, const std::vector<bool>& used);
+  std::size_t picture_bytes(const glb_usage::Usage& kept, const glb_usage::Usage& used) const;
   // The meshes nothing uses, now or in any step, that are still held.
   std::vector<int> meshes_out_of_reach() const;
   // Frees the vertices of meshes nothing can use any more, their bytes in the binary chunk and

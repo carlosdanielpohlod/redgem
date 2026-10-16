@@ -67,7 +67,12 @@ std::size_t entry_of(const nlohmann::json& reference, std::size_t entries);
 // list after everything that points into it: the objects, then what they are made of.
 void walk(nlohmann::json& doc, const Usage& usage, const Use& use);
 
+// The same from the meshes on: what the meshes `usage` notes are made of.
+void walk_from_meshes(nlohmann::json& doc, const Usage& usage, const Use& use);
+
 // Which entries of each list the file's nodes reach, through everything in between.
 Usage usage_of(nlohmann::json& doc);
+// Which entries the meshes `meshes` (by number) reach: what they are made of.
+Usage usage_of_meshes(nlohmann::json& doc, const std::vector<bool>& meshes);
 
 }  // namespace redgem::glb_usage

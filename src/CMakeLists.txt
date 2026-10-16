@@ -306,6 +306,7 @@ if(NOT ANDROID)
     editor/document/scene_document.cpp
     editor/document/scene_document_history.cpp
     editor/document/scene_document_memory.cpp
+    editor/document/scene_document_history_bytes.cpp
     editor/document/scene_document_terrain.cpp
     editor/document/scene_document_edits.cpp
     editor/document/scene_document_copies.cpp

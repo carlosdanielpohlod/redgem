@@ -1,8 +1,13 @@
 #include <doctest/doctest.h>
 
+#include <cstdint>
 #include <filesystem>
+#include <iterator>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
+#include "editor/document/glb_file.hpp"
 #include "editor/document/scene_document.hpp"
 #include "test_support.hpp"
 
@@ -20,6 +25,44 @@ constexpr Color kGrass{0.3f, 0.5f, 0.2f, 1.0f};
 // A model imported and deleted again and again: more times than undo keeps steps for.
 constexpr int kImportCycles = static_cast<int>(SceneDocument::kMaxUndoSteps);
 constexpr int kCyclesUndoReaches = static_cast<int>(SceneDocument::kMaxUndoSteps) / 2;  // two steps each
+
+// A model of one triangle painted with a big picture: the picture is what an import of it costs.
+constexpr std::size_t kPictureBytes = 48 * 1024 * 1024;
+constexpr int kPaintedCycles = 6;  // imported and deleted: more than undo has bytes to keep
+constexpr std::uint8_t kPngStart[] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R',
+                                      0,    0,   0,   64,  0,    0,    0,    64,   8, 6, 0, 0,  0,   0,   0,   0};
+constexpr float kTriangle[] = {0, 0, 0, 1, 0, 0, 0, 1, 0};
+constexpr std::uint16_t kCorners[] = {0, 1, 2, 0};  // (the last one pads the indices to four bytes)
+
+std::filesystem::path painted_model() {
+  GlbFile glb;
+  const auto* positions = reinterpret_cast<const std::uint8_t*>(kTriangle);
+  const auto* indices = reinterpret_cast<const std::uint8_t*>(kCorners);
+  glb.bin.insert(glb.bin.end(), positions, positions + sizeof(kTriangle));
+  glb.bin.insert(glb.bin.end(), indices, indices + sizeof(kCorners));
+  const std::size_t picture_at = glb.bin.size();
+  glb.bin.insert(glb.bin.end(), std::begin(kPngStart), std::end(kPngStart));
+  glb.bin.resize(picture_at + kPictureBytes);
+  glb.json = nlohmann::json::parse(R"({
+    "asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0]}],
+    "nodes": [{"name": "Painted", "mesh": 0}],
+    "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 1, "material": 0}]}],
+    "materials": [{"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}}],
+    "textures": [{"source": 0}],
+    "images": [{"bufferView": 2, "mimeType": "image/png"}],
+    "accessors": [{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0, 0, 0], "max": [1, 1, 0]},
+                  {"bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR"}]
+  })");
+  glb.json["bufferViews"] = {
+      {{"buffer", 0}, {"byteOffset", 0}, {"byteLength", sizeof(kTriangle)}},
+      {{"buffer", 0}, {"byteOffset", sizeof(kTriangle)}, {"byteLength", 3 * sizeof(std::uint16_t)}},
+      {{"buffer", 0}, {"byteOffset", picture_at}, {"byteLength", kPictureBytes}}};
+  glb.json["buffers"] = {{{"byteLength", glb.bin.size()}}};
+  const std::filesystem::path file = std::filesystem::temp_directory_path() / "redgem_undo_painted.glb";
+  std::string error;
+  REQUIRE_MESSAGE(write_glb(file, glb, error), error);
+  return file;
+}
 
 SceneDocument empty_document(const std::string& name) {
   return SceneDocument::create_empty(std::filesystem::temp_directory_path() / ("redgem_undo_" + name + ".glb"));
@@ -94,4 +137,37 @@ TEST_CASE("models imported and deleted over and over: what no step can bring bac
   // And the scene saves with it.
   REQUIRE_MESSAGE(doc.save(error), error);
   std::filesystem::remove(doc.path());
+}
+
+TEST_CASE("the pictures of deleted imports count in what undo keeps, which stays within its limit") {
+  const std::filesystem::path model = painted_model();
+  SceneDocument doc = empty_document("pictures");
+  const int keeper = doc.add_empty("Keeper");
+  std::string error;
+  // One import, deleted: undo keeps its picture twice (the scene's copy, and its bytes in the file).
+  int painted = doc.import_model(model, error);
+  REQUIRE_MESSAGE(painted != kNoIndex, error);
+  doc.remove(painted);
+  doc.set_name(keeper, "Keeper after the first");
+  CHECK(doc.history_bytes() >= 2 * kPictureBytes);
+  for (int cycle = 0; cycle < kPaintedCycles; ++cycle) {
+    painted = doc.import_model(model, error);
+    REQUIRE_MESSAGE(painted != kNoIndex, error);
+    // (Checked as each step began: the latest one, the deletion below, may take undo past it.)
+    CHECK(doc.history_bytes() <= SceneDocument::kMaxHistoryBytes);
+    doc.remove(painted);
+  }
+  doc.set_name(keeper, "Keeper at the end");
+  CHECK(doc.history_bytes() <= SceneDocument::kMaxHistoryBytes);
+  // What undo still reaches works: the last model comes back with its picture.
+  REQUIRE(doc.undo());
+  REQUIRE(doc.undo());
+  const int back = doc.desc().find_node("Painted");
+  REQUIRE(back != kNoIndex);
+  const int material = doc.material_of(back);
+  REQUIRE(material != kNoIndex);
+  const int image = doc.material(material).base_color_image;
+  REQUIRE(image != kNoIndex);
+  CHECK(doc.desc().images.at(static_cast<std::size_t>(image)).encoded.size() == kPictureBytes);
+  std::filesystem::remove(model);
 }
