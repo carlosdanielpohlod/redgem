@@ -2,6 +2,7 @@
 
 #include <imgui.h>
 
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
@@ -25,8 +26,8 @@ const char* icon_of(const NodeDesc& node) {
 
 // What can be done to the object itself.
 void draw_node_actions(bool has_parent, int index, Pending& pending) {
-  if (ImGui::MenuItem(duplicate_label(), kKeysDuplicate)) pending = {Pending::Kind::Duplicate, index, kNoIndex, {}};
-  if (ImGui::MenuItem(delete_label(), kKeysDelete)) pending = {Pending::Kind::Delete, index, kNoIndex, {}};
+  if (ImGui::MenuItem(duplicate_label(), tr(kKeysDuplicate))) pending = {Pending::Kind::Duplicate, index, kNoIndex, {}};
+  if (ImGui::MenuItem(delete_label(), tr(kKeysDelete))) pending = {Pending::Kind::Delete, index, kNoIndex, {}};
   if (!has_parent) return;
   if (ImGui::MenuItem(icon_label(ICON_FA_ARROW_TURN_UP, "editor.hierarchy.move_to_top"))) {
     pending = {Pending::Kind::Reparent, index, kNoIndex, {}};

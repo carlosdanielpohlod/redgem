@@ -70,7 +70,7 @@ void draw_entry(const ConsoleEntry& entry) {
 }  // namespace
 
 void draw_console(ConsoleLog& console, ConsoleState& state) {
-  ImGui::Begin(editor_config::kConsoleWindow);
+  ImGui::Begin(window_title(editor_config::kConsoleTitle, editor_config::kConsoleWindow));
   draw_filters(console, state.filters);
   ImGui::Separator();
 

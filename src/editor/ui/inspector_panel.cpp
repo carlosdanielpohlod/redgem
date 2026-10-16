@@ -103,7 +103,7 @@ void open_script(ScriptWorkspace& scripts, const std::string& file_name) {
 }
 
 void draw_inspector(PanelContext& context) {
-  ImGui::Begin(kInspectorWindow);
+  ImGui::Begin(window_title(kInspectorTitle, kInspectorWindow));
   const ObjectId index = context.session.selection();
   if (index == kNoObject) {
     ImGui::TextColored(muted_color(), "%s", icon_label(ICON_FA_ARROW_POINTER, "editor.inspector.nothing_selected"));

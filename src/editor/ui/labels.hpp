@@ -9,6 +9,9 @@ namespace redgem::ui {
 const char* icon_label(const char* icon, const char* key);
 // "<text of key>##<id>": a text ImGui tells apart from the same text elsewhere in its window.
 const char* label_with_id(const char* key, const char* id);
+// "<text of key>###<id>": a docked window's name, `window` being its id ("###hierarchy"): its title
+// is the text, and ImGui knows it by the id whatever language the title is in.
+const char* window_title(const char* key, const char* window);
 // "<icon>  <text of key>##<id>": both.
 const char* icon_label_with_id(const char* icon, const char* key, const char* id);
 

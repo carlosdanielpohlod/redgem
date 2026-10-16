@@ -148,7 +148,7 @@ void draw_tiles(PanelContext& context, const FolderInfo& info) {
 }  // namespace
 
 void draw_project(PanelContext& context) {
-  ImGui::Begin(kProjectWindow);
+  ImGui::Begin(window_title(kProjectTitle, kProjectWindow));
   draw_folders(context.files, context.state.project.folder);
   ImGui::SameLine();
   const FolderInfo& info = info_of(context.state.project.folder);

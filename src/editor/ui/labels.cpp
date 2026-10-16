@@ -61,6 +61,13 @@ const char* label_with_id(const char* key, const char* id) { return kept_label(k
 
 const char* icon_label_with_id(const char* icon, const char* key, const char* id) { return kept_label(icon, key, id); }
 
+const char* window_title(const char* key, const char* window) {
+  static std::map<std::string, std::string, std::less<>> titles;
+  auto title = titles.find(std::string_view(window));
+  if (title == titles.end()) title = titles.emplace(window, tr(key) + std::string(window)).first;
+  return title->second.c_str();
+}
+
 const char* save_label() { return icon_label(ICON_FA_FLOPPY_DISK, "editor.command.save"); }
 const char* discard_label() { return tr("editor.command.discard"); }
 const char* cancel_label() { return tr("editor.command.cancel"); }

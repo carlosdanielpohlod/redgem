@@ -133,7 +133,7 @@ void draw_empty_space(PanelContext& context, Pending& pending) {
 HierarchyResult draw_hierarchy(PanelContext& context) {
   HierarchyResult result;
   Pending pending;
-  ImGui::Begin(kHierarchyWindow);
+  ImGui::Begin(window_title(kHierarchyTitle, kHierarchyWindow));
   draw_search_bar(context);
   ImGui::Separator();
   ImGui::BeginChild(kTreeId);
