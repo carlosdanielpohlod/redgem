@@ -4,6 +4,8 @@
 //   redgem_scripting_benchmark behaviours   thousands of objects, each with a behaviour that updates
 //   redgem_scripting_benchmark churn        objects spawned every frame that destroy themselves a
 //                                           second later, for minutes of game time
+//   redgem_scripting_benchmark vectors      behaviours doing a frame's worth of Vector3 math each
+//   redgem_scripting_benchmark vectors-in-place   the same math, changing vectors in place
 //   redgem_scripting_benchmark rebuild FILE  how long making the scene of a glTF file's objects
 //                                           takes (what the editor's preview does after an edit)
 //
@@ -33,6 +35,7 @@ constexpr int kFramesPerMinute = 60 * 60;  // at the fixed 60 Hz step
 constexpr int kChurnReports = 5;           // how many times the frame time is printed
 constexpr double kMicrosecondsPerSecond = 1e6;
 constexpr int kRebuilds = 200;
+constexpr int kMovers = 1000;
 
 // A behaviour that does a little work every frame, and one that leaves a second after it started.
 constexpr const char* kBehaviours = R"(
@@ -44,6 +47,40 @@ class Fleeting < Behaviour
   def update(dt)
     @left = (@left || 1.0) - dt
     destroy if @left <= 0
+  end
+end
+
+# Steering math of the kind a game does every frame: a few sums, scalings, a cross product.
+class Mover < Behaviour
+  def start
+    @velocity = Vector3.new(1, 0, 0.5)
+    @lift = Vector3.new(0, 0.1, 0)
+  end
+
+  def update(dt)
+    place = transform.position
+    8.times { place = ((place + @velocity * dt) - @lift).normalized * 2.0 + place.cross(Vector3.up) * 0.01 }
+    transform.position = place
+  end
+end
+
+# The same steps, changing vectors in place: one new vector a step instead of seven.
+class InPlaceMover < Behaviour
+  def start
+    @velocity = Vector3.new(1, 0, 0.5)
+    @lift = Vector3.new(0, 0.1, 0)
+    @up = Vector3.up
+    @step = Vector3.new
+  end
+
+  def update(dt)
+    place = transform.position
+    @step.set(@velocity.x, @velocity.y, @velocity.z).scale!(dt)
+    8.times do
+      spin = place.cross(@up).scale!(0.01)
+      place.add!(@step).sub!(@lift).normalize!.scale!(2.0).add!(spin)
+    end
+    transform.position = place
   end
 end
 
@@ -97,6 +134,15 @@ int behaviours(Engine& engine) {
   return 0;
 }
 
+int vectors(Engine& engine, const char* mover) {
+  if (!ruby(engine, spawn_code(kMovers, mover))) return 1;
+  engine.frame(redgem::config::kFixedDeltaSeconds);
+  const double seconds = seconds_per_frame(engine, kBehaviourFrames);
+  std::printf("%d %s behaviours doing Vector3 math: %.1f us a frame\n", kMovers, mover,
+              seconds * kMicrosecondsPerSecond);
+  return 0;
+}
+
 int churn(Engine& engine) {
   const std::string burst =
       "Scene.spawn('Bullet', physics: false).add_component(Burst, count: " + std::to_string(kChurnSpawnsPerFrame) + ")";
@@ -133,5 +179,7 @@ int main(int argc, char** argv) {
   std::unique_ptr<Engine> engine = sandbox(argc > 2 ? argv[2] : REDGEM_BENCHMARK_GAME);
   if (!engine || !ruby(*engine, kBehaviours)) return 1;
   if (mode == "churn") return churn(*engine);
+  if (mode == "vectors") return vectors(*engine, "Mover");
+  if (mode == "vectors-in-place") return vectors(*engine, "InPlaceMover");
   return behaviours(*engine);
 }

@@ -52,6 +52,16 @@ GameObject& alive_object(mrb_state* mrb, mrb_value self);
 // The id of the object behind `self`, which must not have been destroyed.
 ObjectId alive_id(mrb_state* mrb, mrb_value self);
 
+// What a Ruby Vector3 holds, inside the object itself (see vector3_bindings.cpp). vector3_of
+// must be given a Vector3.
+struct Vector3Value {
+  mrb_float x = 0.0;
+  mrb_float y = 0.0;
+  mrb_float z = 0.0;
+};
+Vector3Value& vector3_of(mrb_value vector);
+mrb_value new_vector3(mrb_state* mrb, const Vector3Value& v);
+
 // Accepts a Vector3 or a 3-element Array.
 Vec3 to_vec3(mrb_state* mrb, mrb_value value);
 mrb_value vec3_value(mrb_state* mrb, Vec3 v);

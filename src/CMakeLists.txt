@@ -210,6 +210,7 @@ redgem_add_library(redgem_runtime
   script/bindings/bindings.cpp
   script/bindings/binding_helpers.cpp
   script/bindings/game_object_bindings.cpp
+  script/bindings/vector3_bindings.cpp
   script/bindings/transform_bindings.cpp
   script/bindings/scene_bindings.cpp
   script/bindings/camera_bindings.cpp

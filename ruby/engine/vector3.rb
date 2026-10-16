@@ -1,14 +1,10 @@
-# Immutable-style 3D vector used across the scripting API.
+# 3D vector used across the scripting API. The engine makes the class (its three numbers live
+# inside each object) and its arithmetic: x, y, z, +, -, unary -, * and / by a number, dot,
+# cross, length, length_squared, normalized and ==, each of which makes a new Vector3; and
+# set(x, y, z), add!, sub!, scale! and normalize!, which change the vector they are called on and
+# hand it back (for math done thousands of times a frame). What is built on those is here.
 class Vector3
-  attr_reader :x, :y, :z
-
   EPSILON = 1e-6
-
-  def initialize(x = 0.0, y = 0.0, z = 0.0)
-    @x = x.to_f
-    @y = y.to_f
-    @z = z.to_f
-  end
 
   def self.[](x, y, z)
     new(x, y, z)
@@ -27,27 +23,6 @@ class Vector3
   def self.forward = new(0, 0, -1)
   def self.back = new(0, 0, 1)
 
-  def +(other) = Vector3.new(@x + other.x, @y + other.y, @z + other.z)
-  def -(other) = Vector3.new(@x - other.x, @y - other.y, @z - other.z)
-  def -@ = Vector3.new(-@x, -@y, -@z)
-  # Longer or shorter: here the other side is a number, not a vector.
-  def *(other) = Vector3.new(@x * other, @y * other, @z * other)
-  def /(other) = Vector3.new(@x / other, @y / other, @z / other)
-
-  def dot(other) = @x * other.x + @y * other.y + @z * other.z
-
-  def cross(other)
-    Vector3.new(@y * other.z - @z * other.y, @z * other.x - @x * other.z, @x * other.y - @y * other.x)
-  end
-
-  def length = Math.sqrt(dot(self))
-  def length_squared = dot(self)
-
-  def normalized
-    len = length
-    len > EPSILON ? self / len : Vector3.zero
-  end
-
   # The same direction, no longer than max_length: a half-pushed stick walks, a full one runs,
   # and two keys at once are no faster than one.
   def clamped(max_length = 1.0)
@@ -58,20 +33,16 @@ class Vector3
   def distance_to(other) = (other - self).length
 
   # Same vector with y = 0, handy for ground movement.
-  def flat = Vector3.new(@x, 0, @z)
+  def flat = Vector3.new(x, 0, z)
 
-  def with(x: @x, y: @y, z: @z) = Vector3.new(x, y, z)
+  def with(x: self.x, y: self.y, z: self.z) = Vector3.new(x, y, z)
 
   def lerp(other, t) = self + (other - self) * t
 
-  def ==(other)
-    other.is_a?(Vector3) && @x == other.x && @y == other.y && @z == other.z
-  end
-
   def approx?(other, tolerance = EPSILON) = (self - other).length <= tolerance
 
-  def to_a = [@x, @y, @z]
+  def to_a = [x, y, z]
 
-  def to_s = format("(%<x>.3f, %<y>.3f, %<z>.3f)", x: @x, y: @y, z: @z)
+  def to_s = format("(%<x>.3f, %<y>.3f, %<z>.3f)", x: x, y: y, z: z)
   def inspect = "Vector3#{self}"
 end

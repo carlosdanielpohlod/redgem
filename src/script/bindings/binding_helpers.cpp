@@ -4,6 +4,7 @@
 #include <mruby/array.h>
 #include <mruby/class.h>
 #include <mruby/hash.h>
+#include <mruby/istruct.h>
 #include <mruby/string.h>
 #include <mruby/variable.h>
 
@@ -18,8 +19,6 @@ namespace {
 
 constexpr mrb_int kVectorComponents = 3;
 constexpr float kMaxColorChannel = 255.0f;
-// Where a Vector3 keeps its components, in the order (x, y, z) they are stored in.
-constexpr const char* kComponentVariables[] = {"@x", "@y", "@z"};
 
 constexpr std::size_t kNumberTextSize = 32;
 
@@ -44,11 +43,9 @@ Vec3 vec3_from_array(mrb_state* mrb, mrb_value array) {
 }
 
 Vec3 vec3_from_vector(mrb_state* mrb, mrb_value vector) {
-  float components[kVectorComponents] = {};
-  for (mrb_int i = 0; i < kVectorComponents; ++i) {
-    components[i] = float_from(mrb, mrb_iv_get(mrb, vector, mrb_intern_cstr(mrb, kComponentVariables[i])));
-  }
-  return vec3_from(components);
+  const Vector3Value& v = vector3_of(vector);
+  return {static_cast<float>(finite(mrb, v.x)), static_cast<float>(finite(mrb, v.y)),
+          static_cast<float>(finite(mrb, v.z))};
 }
 
 // An Array of three: [x, y, z].
@@ -93,15 +90,15 @@ Vec3 to_vec3(mrb_state* mrb, mrb_value value) {
   return vec3_from_vector(mrb, value);
 }
 
-mrb_value vec3_value(mrb_state* mrb, Vec3 v) {
-  RClass* vector_class = mrb_class_get(mrb, kVector3Class);
-  mrb_value out = mrb_obj_value(mrb_obj_alloc(mrb, MRB_TT_OBJECT, vector_class));
-  const float components[kVectorComponents] = {v.x, v.y, v.z};
-  for (mrb_int i = 0; i < kVectorComponents; ++i) {
-    mrb_iv_set(mrb, out, mrb_intern_cstr(mrb, kComponentVariables[i]), mrb_float_value(mrb, components[i]));
-  }
+Vector3Value& vector3_of(mrb_value vector) { return *static_cast<Vector3Value*>(mrb_istruct_ptr(vector)); }
+
+mrb_value new_vector3(mrb_state* mrb, const Vector3Value& v) {
+  mrb_value out = mrb_obj_value(mrb_obj_alloc(mrb, MRB_TT_ISTRUCT, mrb_class_get(mrb, kVector3Class)));
+  vector3_of(out) = v;
   return out;
 }
+
+mrb_value vec3_value(mrb_state* mrb, Vec3 v) { return new_vector3(mrb, {v.x, v.y, v.z}); }
 
 mrb_value text_value(mrb_state* mrb, const std::string& text) {
   return mrb_str_new(mrb, text.data(), static_cast<mrb_int>(text.size()));
