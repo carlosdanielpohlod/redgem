@@ -372,6 +372,20 @@ add_test(NAME system.optional_tests_without_their_scene_are_skipped
 add_test(NAME tools.blender_runs_in_a_home_of_its_own
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/blender_home.sh ${CMAKE_SOURCE_DIR}/tools/blender/run.sh)
 
+# How a dedicated server holds up under players (see load/load_test.cpp): bots join a room of the
+# platformer on redgem-server and play, and what it costs is measured, a tool for whoever works on
+# the network code. load.short is a short run of it, whose numbers the CI prints. (Linux only: it
+# reads the server's processor time from /proc.)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_executable(redgem_load_test load/load_test.cpp load/load_bot.cpp load/load_report.cpp)
+  target_link_libraries(redgem_load_test PRIVATE redgem_net)
+  target_include_directories(redgem_load_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  add_test(NAME load.short
+           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/load/run_load_test.sh $<TARGET_FILE:redgem_server>
+                   $<TARGET_FILE:redgem_load_test> ${CMAKE_SOURCE_DIR}/games/platformer --seconds 5 4 8 15)
+  set_tests_properties(load.short PROPERTIES LABELS load RUN_SERIAL TRUE)
+endif()
+
 # How long a frame of a field of grass and trees takes to draw (see benchmark/field_benchmark.cpp):
 # a tool for whoever works on the renderer, built with the tests and never run by them.
 add_executable(redgem_field_benchmark
