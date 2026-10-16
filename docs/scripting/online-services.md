@@ -87,13 +87,16 @@ Network.on_leave do |peer|
 end
 ```
 
-The file is rewritten whole on every change (never half-written): right for hundreds or a few
-thousand players. Past that, or for queries such as a ranking, send the data to a backend with
-`HTTP`.
+The server keeps its saves in a database, one row per key, each written as soon as it changes:
+a hash of every player is rewritten whole when one player changes, so with many players keep a
+key per player instead (`Save["player:#{Network.identity(peer)}"]`). For queries such as a
+ranking, send the data to a backend with `HTTP`.
 
 **Secrets of the server** (the key a backend lets only the server write with) go in the server's
-own save before it starts, in `<data folder>/save.json`: `{ "backend_key": "..." }`. The server's
-game reads them with `Save["backend_key"]`; players' machines never see a server's saves.
+own save before it starts: write them in `<data folder>/save.json` (`{ "backend_key": "..." }`),
+and the server moves them into its database when it starts, keeping the file as
+`save.json.migrated` (delete it once the server has started). The server's game reads them with
+`Save["backend_key"]`; players' machines never see a server's saves.
 
 ## With a hosted service: Supabase
 
@@ -218,7 +221,7 @@ key, in the backend too:
 ```bash
 mkdir -p /srv/platformer-data      # once: the backend's key, in the server's own save
 echo '{ "backend_key": "some-long-secret" }' > /srv/platformer-data/save.json
-redgem-server games/platformer --data /srv/platformer-data
+redgem-server games/platformer --data /srv/platformer-data   # moves it into the server's database
 ```
 
 With `ACCOUNTS` empty (as it ships), players join as guests, each under an id their machine keeps,

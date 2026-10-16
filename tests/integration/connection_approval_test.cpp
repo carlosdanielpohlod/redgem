@@ -188,8 +188,10 @@ struct Gathering {
   }
 
   nlohmann::json saved_players() const {
-    SaveStore saves(files.data / server::kSaveFileName);
-    return saves.get("players").value_or(nlohmann::json());
+    std::string error;
+    const auto saves = server::SaveDatabase::open(files.data / server::kSaveDatabaseName, error);
+    REQUIRE_MESSAGE(saves != nullptr, error);
+    return saves->get("players").value_or(nlohmann::json());
   }
 };
 
@@ -374,7 +376,7 @@ TEST_CASE("a dedicated server's game decides who plays, and keeps each player's 
   ruby(ana, "Network.leave");
   REQUIRE(game.until([&game] { return game.server->room_count() == 0; }));
   CHECK(game.saved_players() == nlohmann::json{{"user-ana", {{"visits", 1}, {"name", "ana"}}}});
-  CHECK_FALSE(std::filesystem::exists(game.files.data / (std::string(server::kSaveFileName) + ".part")));
+  CHECK(std::filesystem::exists(game.files.data / server::kSaveDatabaseName));
 
   // The server stops and starts again: what it kept is there for the player's next visit.
   game.stop_server();

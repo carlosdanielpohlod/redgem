@@ -18,6 +18,7 @@ their own licenses and are not covered here.
 - **cgltf**: Loading glTF scenes. https://github.com/jkuhlmann/cgltf
 - **nlohmann/json**: JSON. https://github.com/nlohmann/json
 - **Mbed TLS**: HTTPS for the games' web requests (HTTP). https://www.trustedfirmware.org/projects/mbed-tls/
+- **SQLite**: Where a dedicated server keeps its game's saves. https://www.sqlite.org
 - **Dear ImGui**: The editor's interface. https://github.com/ocornut/imgui
 - **rlImGui**: Dear ImGui on raylib. https://github.com/raylib-extras/rlImGui
 - **ImGuizmo**: The editor's move, rotate and scale gizmos. https://github.com/CedricGuillemet/ImGuizmo
@@ -694,6 +695,19 @@ proprietary programs.  If your program is a subroutine library, you may
 consider it more useful to permit linking proprietary applications with the
 library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.
+```
+
+### SQLite
+
+```
+2001-09-15
+
+The author disclaims copyright to this source code.  In place of
+a legal notice, here is a blessing:
+
+May you do good and not evil.
+May you find forgiveness for yourself and forgive others.
+May you share freely, never taking more than you give.
 ```
 
 ### Dear ImGui

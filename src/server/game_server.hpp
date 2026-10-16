@@ -12,6 +12,7 @@
 #include "net/wire.hpp"
 #include "scene/scene_desc.hpp"
 #include "server/room_choice.hpp"
+#include "server/save_database.hpp"
 
 namespace redgem::server {
 
@@ -26,8 +27,11 @@ inline constexpr int kMostPlayersPerRoom = net::kMaxPeers - 1;
 inline constexpr int kDefaultMaxRooms = 8;
 inline constexpr int kMostRooms = 64;
 // Where a server keeps what its game saves (Save), unless told: a folder beside the game's,
-// named after it with this ("games/platformer" -> "games/platformer-data"), holding one file.
+// named after it with this ("games/platformer" -> "games/platformer-data"), holding a database
+// (see SaveDatabase). A server of 0.2.0 kept a JSON file there instead, which is moved into the
+// database the first time a newer server starts (see save_migration.hpp).
 inline constexpr const char* kDataFolderSuffix = "-data";
+inline constexpr const char* kSaveDatabaseName = "save.sqlite3";
 inline constexpr const char* kSaveFileName = "save.json";
 
 // The folder beside the game's that keeps its saves on a server.
@@ -39,7 +43,7 @@ struct ServerSettings {
   std::uint16_t port = kDefaultServerPort;  // 0 picks a free one (see GameServer::port)
   RoomLimits limits{kDefaultMaxPlayers, kDefaultMaxRooms};
   int connections_per_address = net::kDefaultConnectionsPerAddress;  // machines one address may connect
-  std::filesystem::path data_dir;  // where Save is kept; empty: nothing is written (kept in memory)
+  std::filesystem::path data_dir;  // where Save is kept; empty: nothing is written (kept in memory for this run)
 };
 
 // A game played on a server with nobody at it (redgem-server): everyone joins, nobody hosts. One
@@ -48,15 +52,14 @@ struct ServerSettings {
 // needs one and closes when its match ends: the game quits (Game.quit), or everyone left. Its
 // players are told the game is gone, and the next ones get a new room, with a new game.
 // What the game saves (Save) is the server's, kept in its data folder for every room at once and
-// for the next time it runs. Rooms take their turns one after the other on the server's one
-// thread, so their writes never meet: each is written whole, at once, before the next.
+// for the next time it runs (see SaveDatabase).
 class GameServer {
  public:
   explicit GameServer(ServerSettings settings) : settings_(std::move(settings)) {}
   GameServer(const GameServer&) = delete;
   GameServer& operator=(const GameServer&) = delete;
 
-  // Reads the game and opens the port; false with `error` when either cannot be done.
+  // Reads the game, opens its saves and the port; false with `error` when any cannot be done.
   bool start(std::string& error);
   std::uint16_t port() const { return lobby_.port(); }
   // One turn: newcomers are heard and placed, every room plays `seconds` of its match, and the
@@ -82,6 +85,7 @@ class GameServer {
     bool match_over() const { return engine->finished() || places_taken() == 0; }
   };
 
+  bool open_saves(std::string& error);
   void place(net::Arrival arrival);
   // A room opened for a newcomer; nullptr when no code was found for it.
   Room* open_room();
@@ -93,8 +97,8 @@ class GameServer {
   static void close(Room& room);
 
   ServerSettings settings_;
-  SceneDesc scene_;  // the game's first scene, read once: every room starts from it
-  SaveStore saves_;  // shared by every room
+  SceneDesc scene_;                      // the game's first scene, read once: every room starts from it
+  std::unique_ptr<SaveDatabase> saves_;  // shared by every room
   net::Lobby lobby_;
   std::vector<Room> rooms_;  // in the order they opened
 };

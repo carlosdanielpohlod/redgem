@@ -3,7 +3,8 @@
 # own system test: online play with nobody hosting, tested for real. Passes when both tests pass,
 # the server closes their room once both left, and it stops cleanly when asked to (SIGTERM). A
 # test that expects the server's game to keep a player's coins names that player (its identity)
-# in a note, saved_identity: the server's save must then hold one coin for it.
+# in a note, saved_identity: the server's save (a SQLite database, read with Python's sqlite3) must
+# then hold one coin for it.
 # The server is the engine's own program (redgem-server), run with no display, as on a machine
 # that has none; the games are run by the test tool. Every run keeps to itself: a folder of its
 # own among the temporary files (for the games' saves, the server's and the notes the tests leave
@@ -32,7 +33,7 @@ NOTES="${WORK}/notes"                    # where redgem-test --work keeps a run'
 LOG="${WORK}/server.log"
 DATA="${WORK}/server-data"               # the server's data folder (--data): its game's save
 SAVED_IDENTITY="${NOTES}/saved_identity"
-KEPT_COIN='"coins": 1'                   # what the server's save holds for that player
+SAVE="${DATA}/save.sqlite3"
 mkdir -p "${NOTES}"
 server=""
 
@@ -82,8 +83,7 @@ grep -qF -- "${STOPPED}" "${LOG}"
 stopped_status=$?
 saved_status=0
 if [[ -f "${SAVED_IDENTITY}" ]]; then
-  cat "${DATA}/save.json"
-  grep -A1 -F -- "\"$(cat "${SAVED_IDENTITY}")\"" "${DATA}/save.json" | grep -qF -- "${KEPT_COIN}"
+  python3 -I "$(dirname "${BASH_SOURCE[0]}")/kept_coin.py" "${SAVE}" "$(cat "${SAVED_IDENTITY}")"
   saved_status=$?
 fi
 

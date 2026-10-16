@@ -25,7 +25,7 @@ void GameServer::place(net::Arrival arrival) {
 GameServer::Room* GameServer::open_room() {
   EngineOptions options;
   options.game_dir = settings_.game_dir;
-  options.save = &saves_;
+  options.save = saves_.get();
   options.server_room = net::unused_room_code([this](const std::string& code) { return find_room(code) != nullptr; });
   if (options.server_room.empty()) return nullptr;
   rooms_.push_back({options.server_room, Engine::create(options, scene_)});

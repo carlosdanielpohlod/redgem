@@ -34,7 +34,7 @@ mrb_value save_set(mrb_state* mrb, mrb_value) {
   mrb_value value;
   mrb_get_args(mrb, "oo", &key, &value);
   const nlohmann::json stored = json_from(mrb, value, kSaveHolder);
-  if (!save(mrb).set(to_name(mrb, key), stored)) log::warning("could not write " + save(mrb).file().string());
+  if (!save(mrb).set(to_name(mrb, key), stored)) log::warning("could not write " + save(mrb).where());
   return value;
 }
 

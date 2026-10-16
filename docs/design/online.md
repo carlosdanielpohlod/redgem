@@ -99,8 +99,8 @@ Network.on_leave do |peer|
 end
 ```
 
-One file, rewritten on change: right for hundreds or a few thousand players. Past that, or for
-queries such as a ranking, the game sends its data to a backend with `HTTP`.
+One row per key in a database (SQLite), each written as it changes. For queries such as a
+ranking, the game sends its data to a backend with `HTTP`.
 
 ### 4. Guides, not built-in services
 
@@ -117,7 +117,6 @@ No service is built into the engine and none is required.
 
 - **Encrypted game connections** (TLS over the same mbedTLS), optional, for games that carry
   anything sensitive over the game connection.
-- **A built-in database on the server** (SQLite), if file saves plus HTTP prove not enough.
 
 ## Security
 
@@ -146,8 +145,12 @@ No service is built into the engine and none is required.
   with the id it would have and hands the opener what its hello carried, and passes the decision
   back (two more). A relay of 0.2.0 ignores the opener's word and lets everyone in; an opener of
   0.2.0 never says it decides.
-- **Saving on a server**: the data folder defaults to `<game>-data` beside the game's folder. One
-  `save.json` per server, shared by its rooms, written atomically on the server's one thread.
+- **Saving on a server**: the data folder defaults to `<game>-data` beside the game's folder. In
+  0.2.0 it held one `save.json`, rewritten whole on every change. Since 0.3.0 it holds a SQLite
+  database (`save.sqlite3`, `src/server/save_database.*`): one row per key, each change its own
+  transaction, used by the rooms' threads one call at a time. A `save.json` found there at start is
+  moved in and kept as `save.json.migrated`. Saved arrays and hashes are no longer limited to 4096
+  things (that limit is a message's); only their nesting is.
   `Save` now keeps arrays, hashes and `Vector3` as well (the example above needs a hash);
   hashes come back with string keys. A server's secrets (a backend's key) go in its own save.
 - **Guides**: the manual's Online services page; the platformer logs in when `ACCOUNTS` is set

@@ -7,6 +7,7 @@
 #include "app/scene_files.hpp"
 #include "core/files.hpp"
 #include "core/log.hpp"
+#include "server/save_migration.hpp"
 
 namespace redgem::server {
 
@@ -22,8 +23,21 @@ bool GameServer::start(std::string& error) {
     return false;
   }
   scene_ = std::move(std::get<SceneDesc>(scene));
-  if (!settings_.data_dir.empty()) saves_ = SaveStore(settings_.data_dir / kSaveFileName);
-  return lobby_.open(settings_.port, error, settings_.connections_per_address);
+  return open_saves(error) && lobby_.open(settings_.port, error, settings_.connections_per_address);
+}
+
+bool GameServer::open_saves(std::string& error) {
+  const bool kept = !settings_.data_dir.empty();
+  saves_ = SaveDatabase::open(kept ? settings_.data_dir / kSaveDatabaseName : std::filesystem::path(), error);
+  if (saves_ == nullptr) {
+    error = "cannot keep the game's saves: " + error;
+    return false;
+  }
+  // (Not moved, the old file would be moved again at the next start, over what changed since.)
+  const std::filesystem::path old_save = settings_.data_dir / kSaveFileName;
+  if (!kept || move_into(*saves_, old_save)) return true;
+  error = "cannot move the old save " + old_save.string() + " into " + saves_->where();
+  return false;
 }
 
 void GameServer::tick(float seconds) {

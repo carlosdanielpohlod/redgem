@@ -26,7 +26,7 @@ below. The same goes for a [relay](scripting/multiplayer.md#over-the-internet-ro
 | `--max-players` | 8 | Players in one room, up to 15 |
 | `--rooms` | 8 | Rooms open at once, up to 64 |
 | `--per-address` | 24 | Machines one address may connect, up to 1024: raise it when many players share one address (a campus, some mobile networks) |
-| `--data` | `<game>-data` beside the game's folder | Where the game's `Save` is kept (`save.json`), for every room and every run |
+| `--data` | `<game>-data` beside the game's folder | Where the game's `Save` is kept (`save.sqlite3`), for every room and every run |
 
 It writes what happens to its output (rooms opened and closed, how many players) and stops
 cleanly on Ctrl+C or `SIGTERM`: every room is closed and its players are told.
@@ -85,11 +85,22 @@ what the host decides (scores, a door opening, the end of a match) is decided th
 open on a server. Call `Game.quit` on the server when a match is over to give its room to the next
 players.
 
-`Save` on the server is the server's own: one file in its data folder (`--data`), shared by all
-its rooms and kept across restarts. Rooms take their turns one after the other on the server's
-one thread, so their writes never meet, and each write replaces the whole file at once (a crash
-never leaves half of it). Keep each player's data under their identity, as
-[Online services](scripting/online-services.md#saving-on-a-server) shows.
+`Save` on the server is the server's own: a SQLite database in its data folder (`--data`),
+shared by all its rooms and kept across restarts. Each key is a row of its own, written as soon as
+it changes, in a transaction (a crash keeps every change made before it, never half of one), and
+only what a script asks for is read into memory. Rooms write one at a time. Arrays and hashes
+saved there may hold any number of things (only their nesting is limited, to 16 levels). Keep
+each player's data under their identity, as
+[Online services](scripting/online-services.md#saving-on-a-server) shows; with many players,
+a key per player (`Save["player:#{identity}"]`) reads and writes one player instead of all of
+them.
+
+A server of version 0.2.0 kept `save.json` in the data folder instead. Whenever the server starts
+with a `save.json` there (an older server's, or one written by hand, see
+[Online services](scripting/online-services.md#saving-on-a-server)), it moves the file's values
+into the database, replacing those of the same names, and keeps the file beside it as
+`save.json.migrated`. A server that cannot move it does not start, rather than lose them. A copy of the database for a backup is taken with `sqlite3 save.sqlite3
+".backup copy.sqlite3"`, or by copying the folder while the server is stopped.
 
 The server faces the internet. It keeps every limit a hosted game and the relay have (message
 sizes, how much each player may send, connections per address, spawned objects), lets go of

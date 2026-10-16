@@ -204,7 +204,8 @@ redgem_add_library(redgem_runtime
   input/raylib_input_source.cpp
   input/touch_controls.cpp
   input/touch_input_source.cpp
-  storage/save_store.cpp
+  storage/saved_values.cpp
+  storage/save_file.cpp
   script/script_naming.cpp
   script/ruby_vm.cpp
   script/script_host.cpp
@@ -292,8 +293,10 @@ if(NOT ANDROID)
     server/game_server_rooms.cpp
     server/server_command.cpp
     server/stop_signals.cpp
-    server/server_program.cpp)
-  target_link_libraries(redgem_game_server PUBLIC redgem_runtime)
+    server/server_program.cpp
+    server/save_database.cpp
+    server/save_migration.cpp)
+  target_link_libraries(redgem_game_server PUBLIC redgem_runtime sqlite3)
 
   redgem_add_library(redgem_editor
     editor/document/glb_file.cpp

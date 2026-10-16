@@ -63,7 +63,8 @@ add_executable(redgem_tests
   unit/terrain_test.cpp
   unit/animation_test.cpp
   unit/user_settings_test.cpp
-  unit/save_store_test.cpp
+  unit/save_file_test.cpp
+  unit/save_database_test.cpp
   unit/xml_writer_test.cpp
   unit/touch_controls_test.cpp
   unit/touch_input_source_test.cpp

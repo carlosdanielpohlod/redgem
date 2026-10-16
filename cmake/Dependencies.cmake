@@ -13,6 +13,9 @@ set(REDGEM_IMGUIZMO_COMMIT "18cef5e031d8c6973d80284c67f60549fafd78c1")
 set(REDGEM_JSON_VERSION "v3.12.0")
 set(REDGEM_MBEDTLS_VERSION "3.6.7")
 set(REDGEM_MBEDTLS_SHA256 "a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6")
+# SQLite 3.50.4: the year it came out, and its version written in digits.
+set(REDGEM_SQLITE_RELEASE "2025/sqlite-amalgamation-3500400")
+set(REDGEM_SQLITE_SHA256 "1d3049dd0f830a025a53105fc79fd2ab9431aea99e137809d064d8ee8356b032")
 
 # --- X11 headers extracted locally by tools/setup/fetch_x11_headers.sh -------
 set(REDGEM_LOCAL_X11_INCLUDE "${CMAKE_SOURCE_DIR}/.deps/x11/usr/include")
@@ -122,6 +125,23 @@ set(MBEDTLS_USER_CONFIG_FILE "${CMAKE_SOURCE_DIR}/cmake/mbedtls_user_config.h" C
 FetchContent_Declare(mbedtls
   URL https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${REDGEM_MBEDTLS_VERSION}/mbedtls-${REDGEM_MBEDTLS_VERSION}.tar.bz2
   URL_HASH SHA256=${REDGEM_MBEDTLS_SHA256})
+
+# --- SQLite (where a dedicated server keeps its game's saves; one C file, in the public domain) ----
+# Only where the server is built: a game on a phone keeps its saves in a file.
+if(NOT ANDROID)
+  FetchContent_Declare(sqlite
+    URL https://www.sqlite.org/${REDGEM_SQLITE_RELEASE}.zip
+    URL_HASH SHA256=${REDGEM_SQLITE_SHA256})
+  FetchContent_MakeAvailable(sqlite)
+  add_library(sqlite3 STATIC ${sqlite_SOURCE_DIR}/sqlite3.c)
+  target_include_directories(sqlite3 SYSTEM PUBLIC ${sqlite_SOURCE_DIR})
+  # Several rooms use the database from their own threads (one at a time: the server's store has a
+  # lock); no extensions are loaded, so no library for loading them is linked.
+  target_compile_definitions(sqlite3 PRIVATE SQLITE_THREADSAFE=1 SQLITE_OMIT_LOAD_EXTENSION SQLITE_DQS=0
+                                             SQLITE_DEFAULT_MEMSTATUS=0)
+  find_package(Threads REQUIRED)
+  target_link_libraries(sqlite3 PUBLIC Threads::Threads)
+endif()
 
 FetchContent_MakeAvailable(raylib cgltf JoltPhysics doctest mruby nlohmann_json mbedtls)
 # Skinned meshes are deformed on the GPU: raylib then uploads bone ids / weights and bone matrices
