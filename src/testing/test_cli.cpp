@@ -27,13 +27,16 @@ constexpr const char* kUsageText =
     "usage:\n"
     "  redgem-test <game_dir> <system_test.rb> [--screenshots <dir>] [--headless] [--work <dir>]\n"
     "                                    play the game with a system test at the controls\n"
-    "  redgem-test --ruby <test_file.rb>    run a file of Ruby unit tests\n"
+    "  redgem-test --ruby <test_file.rb> [--game <game_dir>]\n"
+    "                                    run a file of Ruby unit tests\n"
     "\n"
     "  --screenshots <dir>   where the test's pictures go (default: screenshots)\n"
     "  --headless            no window: faster, and takes no pictures\n"
     "  --work <dir>          a folder of this run's own for its save file and its notes to the tests\n"
     "                        run with it (default: folders every run on this machine shares)\n"
     "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting)\n"
+    "  --game <game_dir>     the game whose classes the Ruby tests use, from its scripts folder\n"
+    "                        (default: classes come from the test file's own folder)\n"
     "\n"
     "It exits with 0 when the tests pass and with 1 when they do not.\n";
 
@@ -71,6 +74,7 @@ std::string problem_with_ruby_tests(const TestCliOptions& options) {
 // What is wrong with a line that was read to its end; empty when nothing is.
 std::string problem_with(const TestCliOptions& options) {
   if (options.mode == TestMode::RubyTests) return problem_with_ruby_tests(options);
+  if (!options.scripts_game.empty()) return "--game is for Ruby tests (a system test names its game first)";
   if (options.game_dir.empty()) return "missing <game_dir>";
   if (options.test_file.empty()) return "missing <system_test.rb>";
   return {};

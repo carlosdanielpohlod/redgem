@@ -14,6 +14,7 @@ struct TestCliOptions {
   TestMode mode = TestMode::SystemTest;
   std::filesystem::path game_dir;        // TestMode::SystemTest: the game to play
   std::filesystem::path test_file;       // the system test, or the file of Ruby unit tests
+  std::filesystem::path scripts_game;    // --game: the game whose classes Ruby unit tests use
   std::filesystem::path screenshot_dir;  // where a system test's pictures go
   bool headless = false;                 // a system test without a window
   std::filesystem::path work_dir;        // --work: a folder of this run's own (see SystemTestOptions)

@@ -219,6 +219,25 @@ foreach(test_file IN LISTS REDGEM_RUBY_TESTS)
   add_test(NAME ruby.${test_name} COMMAND redgem_test_tool --ruby ${test_file})
 endforeach()
 
+# Ruby unit tests of a game's own classes: tests/ruby_games/<game>/*_test.rb run against games/<game>.
+file(GLOB REDGEM_GAME_RUBY_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ruby_games/*/*_test.rb)
+foreach(test_file IN LISTS REDGEM_GAME_RUBY_TESTS)
+  get_filename_component(test_name ${test_file} NAME_WE)
+  get_filename_component(game_dir ${test_file} DIRECTORY)
+  get_filename_component(game ${game_dir} NAME)
+  add_test(NAME ruby.${game}.${test_name}
+           COMMAND redgem_test_tool --ruby ${test_file} --game ${CMAKE_SOURCE_DIR}/games/${game})
+endforeach()
+# Without its game, such a file knows none of the game's classes; and --game wants a game.
+add_test(NAME ruby.game_classes_need_their_game
+         COMMAND redgem_test_tool --ruby ${CMAKE_CURRENT_SOURCE_DIR}/ruby_games/platformer/mover_test.rb)
+set_tests_properties(ruby.game_classes_need_their_game PROPERTIES
+  PASS_REGULAR_EXPRESSION "uninitialized constant Mover")
+add_test(NAME ruby.game_needs_scripts
+         COMMAND redgem_test_tool --ruby ${CMAKE_CURRENT_SOURCE_DIR}/ruby_games/platformer/mover_test.rb
+                 --game ${CMAKE_SOURCE_DIR}/docs)
+set_tests_properties(ruby.game_needs_scripts PROPERTIES PASS_REGULAR_EXPRESSION "has no scripts folder")
+
 # Guards the harness itself: a failing Ruby test must make the process fail.
 add_test(NAME ruby.harness_reports_failures
          COMMAND redgem_test_tool --ruby ${CMAKE_CURRENT_SOURCE_DIR}/ruby_failing/failing_test.rb)

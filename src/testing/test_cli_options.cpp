@@ -5,6 +5,7 @@
 #include <optional>
 
 #include "core/command_line.hpp"
+#include "core/files.hpp"
 #include "render/gpu_select.hpp"
 #include "testing/test_cli_reading.hpp"
 
@@ -16,6 +17,7 @@ constexpr const char* kScreenshotsOption = "--screenshots";
 constexpr const char* kHeadlessOption = "--headless";
 constexpr const char* kGpuOption = "--gpu";
 constexpr const char* kWorkOption = "--work";
+constexpr const char* kGameOption = "--game";
 
 // What the option just read was given (see command_line::option_value).
 std::optional<std::string> value(Reading& reading) { return command_line::option_value(reading.args, reading.next); }
@@ -55,6 +57,15 @@ void read_work(Reading& reading) {
   reading.result.options.work_dir = *folder;
 }
 
+void read_game(Reading& reading) {
+  const auto folder = value(reading);
+  if (!folder) {
+    fail(reading, "--game needs a game's folder");
+    return;
+  }
+  reading.result.options.scripts_game = normalized_folder(*folder);
+}
+
 void read_headless(Reading& reading) { reading.result.options.headless = true; }
 
 void read_gpu(Reading& reading) {
@@ -75,6 +86,7 @@ constexpr Option kOptions[] = {
     {kHeadlessOption, read_headless},
     {kGpuOption, read_gpu},
     {kWorkOption, read_work},
+    {kGameOption, read_game},
 };
 
 }  // namespace

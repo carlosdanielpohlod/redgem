@@ -84,7 +84,6 @@ the same pull request.
 
 ## Tools
 
-- `redgem-test --ruby <file>` cannot load a game's own classes, only the engine's.
 - The Blender scene builders do not write the same bytes twice (vertex and UV order change
   between runs), so regenerating a demo scene shows up as a change.
 - The showcase demo is built from downloaded assets that may not be passed on, so it is not in

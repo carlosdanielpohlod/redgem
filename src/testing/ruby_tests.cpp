@@ -7,6 +7,7 @@
 #include <string>
 
 #include "physics/physics_config.hpp"
+#include "core/config.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "input/input.hpp"
@@ -70,11 +71,24 @@ std::optional<std::string> load_tests(ScriptHost& host, BareWorld& world, const 
   return std::nullopt;
 }
 
+// Where the classes the tests use load from: the game's scripts, or the test file's own folder.
+std::optional<std::filesystem::path> scripts_for(const std::filesystem::path& test_file,
+                                                 const std::filesystem::path& game_dir) {
+  if (game_dir.empty()) return test_file.parent_path();
+  std::filesystem::path scripts = game_dir / config::kScriptsDirName;
+  std::error_code error;
+  if (std::filesystem::is_directory(scripts, error)) return scripts;
+  log::error(game_dir.string() + " has no " + config::kScriptsDirName + " folder: is it a game's?");
+  return std::nullopt;
+}
+
 }  // namespace
 
-int run_ruby_tests(const std::filesystem::path& test_file) {
+int run_ruby_tests(const std::filesystem::path& test_file, const std::filesystem::path& game_dir) {
+  const std::optional<std::filesystem::path> scripts = scripts_for(test_file, game_dir);
+  if (!scripts) return kExitFailure;
   BareWorld world;
-  ScriptHost host(world.context, test_file.parent_path());
+  ScriptHost host(world.context, *scripts);
   if (const auto error = load_tests(host, world, test_file)) {
     log::error(*error);
     return kExitFailure;

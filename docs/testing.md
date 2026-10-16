@@ -75,3 +75,10 @@ end
 It runs in the same Ruby a game runs in, with the scripting API and an empty scene. The
 assertions are `assert`, `refute`, `assert_equal`, `assert_nil`, `assert_in_delta`,
 `assert_vector` and `assert_raises`; a system test has them too.
+
+To test the game's own classes, say which game they are from: they then load by name from its
+`scripts` folder, as they do when the game runs (without `--game`, from the test file's folder).
+
+```bash
+./build/src/redgem-test --ruby tests/score_test.rb --game .
+```
