@@ -80,6 +80,44 @@ class Vector3Test < RedGemTest::Case
     assert_equal Vector3.new(4, 5, 6), v.set(4, 5, 6)
   end
 
+  BIG = 3e38 # fits a float; twice it does not
+
+  def test_ordinary_arithmetic_is_unchanged
+    assert_equal Vector3.new(2, 0.5, -3), Vector3.new(4, 1, -6) / 2
+    assert_equal Vector3.new(0, 0, 1), Vector3.new(1, 0, 0).cross(Vector3.new(0, 1, 0))
+    assert_equal Vector3.new(1, 0, 0), Vector3.new(1e-5, 0, 0).normalized
+  end
+
+  def test_no_arithmetic_makes_a_vector_past_what_a_float_holds
+    big = Vector3.new(BIG, 0, 0)
+    assert_raises(ArgumentError) { big + big }
+    assert_raises(ArgumentError) { big - -big }
+    assert_raises(ArgumentError) { big * 2 }
+    assert_raises(ArgumentError) { big / 0.5 }
+    assert_raises(ArgumentError) { Vector3.new(0, BIG, 0).cross(Vector3.new(0, 0, BIG)) }
+  end
+
+  def test_a_vector_is_never_divided_by_zero
+    [0, 0.0, -0.0].each do |zero|
+      assert_raises(ArgumentError) { Vector3.one / zero }
+    end
+  end
+
+  def test_a_refused_change_in_place_leaves_every_number_as_it_was
+    v = Vector3.new(1, BIG, 2)
+    assert_raises(ArgumentError) { v.add!(Vector3.new(5, BIG, 5)) }
+    assert_raises(ArgumentError) { v.sub!(Vector3.new(5, -BIG, 5)) }
+    assert_raises(ArgumentError) { v.scale!(2) }
+    assert_equal [1.0, BIG, 2.0], v.to_a
+    assert_equal Vector3.new(2, BIG, 3), v.add!(Vector3.new(1, 0, 1))
+  end
+
+  def test_normalizing_keeps_its_contract_at_both_ends
+    assert_equal Vector3.zero, Vector3.new(1e-7, 0, 0).normalized # too short to have a direction
+    assert_in_delta 1.0, Vector3.new(BIG, BIG, BIG).normalized.length
+    assert_in_delta 1.0, Vector3.new(BIG, -BIG, BIG).normalize!.length
+  end
+
   def test_numbers_keep_their_precision
     assert_equal 0.1, Vector3.new(0.1, 0, 0).x
     assert_equal 0.0, Vector3.new.z

@@ -22,6 +22,7 @@ using binding::Vector3Value;
 static_assert(sizeof(Vector3Value) <= ISTRUCT_DATA_SIZE, "a Vector3's three numbers fit inside its Ruby object");
 
 constexpr mrb_float kShortest = 1e-6;  // a vector shorter than this has no direction to normalize to
+constexpr const char* kDividedByZero = "Vector3#/: cannot divide a vector by zero";
 
 Vector3Value& self_vector(mrb_value self) { return binding::vector3_of(self); }
 
@@ -32,15 +33,18 @@ const Vector3Value& vector_arg(mrb_state* mrb) {
   return binding::vector3_of(other);
 }
 
-mrb_value made(mrb_state* mrb, mrb_float x, mrb_float y, mrb_float z) { return binding::new_vector3(mrb, {x, y, z}); }
+// Numbers a Vector3 is to hold, held to the rule every native holds numbers to (binding::finite):
+// given to Vector3.new or #set, or worked out by its arithmetic (3e38 * 2 is past any float).
+// Nothing is made or changed when one is refused.
+Vector3Value checked(mrb_state* mrb, const Vector3Value& v) {
+  return {binding::finite(mrb, v.x), binding::finite(mrb, v.y), binding::finite(mrb, v.z)};
+}
+
+mrb_value made(mrb_state* mrb, mrb_float x, mrb_float y, mrb_float z) {
+  return binding::new_vector3(mrb, checked(mrb, {x, y, z}));
+}
 
 mrb_float dot(const Vector3Value& a, const Vector3Value& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-
-// The numbers a Vector3 is made or set from, held to the rule every native holds numbers to
-// (binding::finite): the vector is not touched when one of them is refused.
-Vector3Value checked(mrb_state* mrb, const Vector3Value& given) {
-  return {binding::finite(mrb, given.x), binding::finite(mrb, given.y), binding::finite(mrb, given.z)};
-}
 
 mrb_value vector3_initialize(mrb_state* mrb, mrb_value self) {
   Vector3Value given;
@@ -80,6 +84,7 @@ mrb_value vector3_times(mrb_state* mrb, mrb_value self) {
 mrb_value vector3_divided(mrb_state* mrb, mrb_value self) {
   const Vector3Value& a = self_vector(self);
   const mrb_float k = binding::float_arg(mrb);
+  if (k == 0.0) mrb_raise(mrb, E_ARGUMENT_ERROR, kDividedByZero);  // -0.0 too
   return made(mrb, a.x / k, a.y / k, a.z / k);
 }
 
@@ -109,7 +114,8 @@ Vector3Value unit(const Vector3Value& v) {
 }
 
 mrb_value vector3_normalized(mrb_state* mrb, mrb_value self) {
-  return binding::new_vector3(mrb, unit(self_vector(self)));
+  const Vector3Value direction = unit(self_vector(self));
+  return made(mrb, direction.x, direction.y, direction.z);
 }
 
 mrb_value vector3_equal(mrb_state* mrb, mrb_value self) {
@@ -132,21 +138,21 @@ mrb_value vector3_set(mrb_state* mrb, mrb_value self) {
 mrb_value vector3_add_in_place(mrb_state* mrb, mrb_value self) {
   Vector3Value& a = self_vector(self);
   const Vector3Value& b = vector_arg(mrb);
-  a = {a.x + b.x, a.y + b.y, a.z + b.z};
+  a = checked(mrb, {a.x + b.x, a.y + b.y, a.z + b.z});
   return self;
 }
 
 mrb_value vector3_subtract_in_place(mrb_state* mrb, mrb_value self) {
   Vector3Value& a = self_vector(self);
   const Vector3Value& b = vector_arg(mrb);
-  a = {a.x - b.x, a.y - b.y, a.z - b.z};
+  a = checked(mrb, {a.x - b.x, a.y - b.y, a.z - b.z});
   return self;
 }
 
 mrb_value vector3_scale_in_place(mrb_state* mrb, mrb_value self) {
   Vector3Value& a = self_vector(self);
   const mrb_float k = binding::float_arg(mrb);
-  a = {a.x * k, a.y * k, a.z * k};
+  a = checked(mrb, {a.x * k, a.y * k, a.z * k});
   return self;
 }
 

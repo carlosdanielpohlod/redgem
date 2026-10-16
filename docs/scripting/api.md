@@ -30,8 +30,10 @@ and [Gameplay recipes](gameplay.md).
 | `Vector3` | `Vector3.new(x, y, z)`, `Vector3.zero`, `one`, `up`, `down`, `left`, `right`, `forward`, `back`; arithmetic, `dot`, `cross`, `length`, `normalized`, `clamped(max_length = 1.0)`, `lerp`, `flat`, `with(y: 0)`, `distance_to`, `approx?`, `to_a`; in place, for math done thousands of times a frame: `set(x, y, z)`, `add!(v)`, `sub!(v)`, `scale!(k)`, `normalize!` (they change the vector and hand it back: `dup` one you got from someone else first) |
 
 Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running.
-Every native takes finite numbers only: infinity or NaN (`0.0 / 0.0`) raises an `ArgumentError`
-instead of reaching the scene. A setting with a range raises outside it and says the range
+Every native takes finite numbers a float can hold: infinity, NaN (`0.0 / 0.0`) or a number too
+large (`1e300`) raises an `ArgumentError` instead of reaching the scene. So does `Vector3`
+arithmetic whose result would leave that range, and dividing a `Vector3` by zero; a vector changed
+in place (`add!`, `scale!`...) is left as it was when that happens. A setting with a range raises outside it and says the range
 (`Camera.motion_blur must be from 0 to 1, not 3`); nothing is quietly clamped, except
 `Vehicle#drive`'s inputs, which an analog stick may push a little past full.
 Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing
