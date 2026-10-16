@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 
 #include "net/connection.hpp"
+#include "net/pose_baselines.hpp"
 
 namespace redgem::load {
 
@@ -24,8 +25,9 @@ struct BotCounts {
 };
 
 // A player that joins a dedicated server's room by its address, as a game does, and plays like
-// one: it runs in circles, its NetworkSync sending where it is SENDS_PER_SECOND times a second,
-// and fires a shot (a game message) a few times a second. Nothing here waits: tick() it often.
+// one: it runs in circles, its NetworkSync sending where it is SENDS_PER_SECOND times a second (in
+// poses that say what changed, see net/pose_codec.hpp), and fires a shot (a game message) a few
+// times a second. Nothing here waits: tick() it often.
 class LoadBot {
  public:
   explicit LoadBot(int number) : number_(number) {}
@@ -48,6 +50,7 @@ class LoadBot {
   int number_;
   int id_ = 0;
   net::Connection connection_;
+  net::PoseSender poses_;
   double next_pose_ = 0.0;
   double next_shot_ = 0.0;
   BotCounts counts_;

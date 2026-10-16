@@ -23,7 +23,6 @@ constexpr double kShotPower = 0.75;
 constexpr double kMicroseconds = 1e6;
 constexpr double kMilliseconds = 1e3;
 constexpr const char* kShot = "shot";
-constexpr const char* kPose = "$sync";  // Network::SYNC
 constexpr const char* kSentKey = "sent";
 // What a player's hero goes by on the network in the platformer (CoOp::HERO_KEY_PREFIX and the
 // player's id): the server's game moves its copy of the hero as the bot says.
@@ -37,9 +36,8 @@ Vec3 position_at(int number, double now) {
           static_cast<float>(kRunRadius * std::sin(angle))};
 }
 
-Vec3 rotation_at(double now) {
-  const float heading = radians_to_degrees(static_cast<float>(-now * kTurnsPerSecond));
-  return quat_to_euler_degrees(quat_from_euler_degrees({0.0f, heading, 0.0f}));
+Quat rotation_at(double now) {
+  return quat_from_euler_degrees({0.0f, radians_to_degrees(static_cast<float>(-now * kTurnsPerSecond)), 0.0f});
 }
 
 // A vector as Ruby's to_a gives it, numbers of 64 bits.
@@ -54,7 +52,7 @@ bool LoadBot::connect(std::uint16_t port, std::string& error) {
   net::Socket socket = net::Socket::connect_to(kLocalHost, port, error);
   if (!socket.valid()) return false;
   connection_ = net::Connection::calling(std::move(socket));
-  send({{net::wire::kKind, net::wire::kHello}});
+  send(net::wire::hello());
   return true;
 }
 
@@ -73,18 +71,18 @@ void LoadBot::hear(double now) {
 void LoadBot::hear_message(const nlohmann::json& message, double now) {
   const std::string kind = message[net::wire::kKind];
   if (kind == net::wire::kWelcome) id_ = message.value(net::wire::kTo, 0);
-  if (!net::wire::is_game_message(message)) return;
-  if (message[net::wire::kName] == kPose) ++counts_.poses_heard;
-  if (message[net::wire::kName] != kShot) return;
+  if (kind == net::wire::kArrived) poses_.start_over();  // the newcomer knows none of this bot's poses
+  if (kind == net::wire::kPose) ++counts_.poses_heard;
+  if (message.value(net::wire::kName, std::string()) != kShot) return;
   const double sent = message[net::wire::kData].value(kSentKey, 0.0) / kMicroseconds;
   counts_.latencies_ms.push_back((now - sent) * kMilliseconds);
 }
 
 void LoadBot::move(double now) {
   next_pose_ = now + 1.0 / kPosesPerSecond;
-  const nlohmann::json pose = nlohmann::json::array(
-      {kHeroKey + std::to_string(id_), numbers(position_at(number_, now)), numbers(rotation_at(now))});
-  counts_.pose_bytes += send(net::wire::game_message(kPose, pose, id_, net::kEveryone));
+  const net::PoseUpdate pose =
+      poses_.update(kHeroKey + std::to_string(id_), position_at(number_, now), rotation_at(now));
+  counts_.pose_bytes += send(net::wire::pose_message(net::encoded(pose), id_));
   ++counts_.poses_sent;
 }
 
