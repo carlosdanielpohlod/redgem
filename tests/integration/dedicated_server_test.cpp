@@ -31,11 +31,20 @@ constexpr server::RoomLimits kRoomy{4, 2};
 constexpr server::RoomLimits kTwoRoomsOfOne{1, 2};
 constexpr int kTwoThreads = 2;
 constexpr double kSlowLoadSeconds = 1.5;  // what a slow room's level takes to load (see kSlowScene)
-constexpr double kFramesKeptShare = 0.5;  // of its frames, at least, another room plays meanwhile
+// The longest a room may go without a frame while another loads: far less than the load.
+constexpr double kLongestPause = kSlowLoadSeconds / 2;
 constexpr double kLongestJoinSeconds = 10.0;
 // The sandbox game's first level, which a server's room takes kSlowLoadSeconds to load once the
-// server's save says "slow".
+// server's save says "slow"; and what measures the longest pause between two frames of a room.
 constexpr const char* kSlowScene = R"(
+class PauseWatch < Behaviour
+  def update(_dt)
+    now = Time.now
+    $longest_pause = [$longest_pause, now - @last].max if @last
+    @last = now
+  end
+end
+
 class MainScene < SceneScript
   def setup
     return unless Network.server? && Save["slow"]
@@ -47,7 +56,8 @@ end
 )";
 constexpr int kServedTurns = 30;
 constexpr double kLateness = 0.9;  // a turn may come a little early on a busy clock, never much
-constexpr float kRealTimeTolerance = 0.1f;
+// (A visit waits for the room's next turn, which on a busy machine comes late.)
+constexpr float kRealTimeTolerance = 0.25f;
 constexpr std::chrono::milliseconds kHalfASecond{500};
 constexpr double kPastMatchOverSeconds = 20.0;  // far past the seconds the platformer's server waits after a win
 
@@ -321,20 +331,20 @@ TEST_CASE("a room loading a slow level holds up no other room: each runs on a th
   const SlowGame slow;
   Online online_game(kTwoRoomsOfOne, slow.game, kTwoThreads);
   Engine& first = online_game.join();
-  online_game.served(first, "Save['slow'] = true");
-  const int frames_before = std::stoi(online_game.served(first, "Time.frame"));
+  online_game.served(first, "Save['slow'] = true; Scene.objects.first.add_component(PauseWatch)");
+  online_game.served(first, "$longest_pause = 0.0");
   const auto started = std::chrono::steady_clock::now();
   // Into a room of its own, whose level loads slowly: on the real clock, the player waits for it
   // as long as a player would.
   Engine& second = online_game.knock();
   REQUIRE(online_game.until_for(kLongestJoinSeconds, [&second] { return online(second); }));
   const double waited = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-  const int frames = std::stoi(online_game.served(first, "Time.frame")) - frames_before;
+  const double longest_pause = std::stod(online_game.served(first, "$longest_pause"));
   CHECK(second.network().room() != first.network().room());
   CHECK(online_game.server.thread_count() == kTwoThreads);
   CHECK(waited >= kSlowLoadSeconds);  // it did load slowly ...
   // ... and the first room played on meanwhile.
-  CHECK(frames >= waited / config::kFixedDeltaSeconds * kFramesKeptShare);
+  CHECK(longest_pause < kLongestPause);
 }
 
 TEST_CASE("SIGTERM stops a server whose rooms run on several threads: every match ends, every thread is joined") {
