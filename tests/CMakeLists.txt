@@ -43,6 +43,7 @@ add_executable(redgem_tests
   unit/hierarchy_rows_test.cpp
   unit/project_folders_test.cpp
   unit/theme_test.cpp
+  unit/labels_test.cpp
   unit/edit_stream_test.cpp
   unit/inspector_typing_test.cpp
   unit/editor_camera_test.cpp

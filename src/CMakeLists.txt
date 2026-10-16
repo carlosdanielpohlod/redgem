@@ -402,6 +402,7 @@ if(NOT ANDROID)
     editor/ui/new_script_form.cpp
     editor/ui/create_menu.cpp
     editor/ui/style.cpp
+    editor/ui/labels.cpp
     editor/ui/theme.cpp
     editor/ui/fonts.cpp
     editor/ui/interface.cpp
