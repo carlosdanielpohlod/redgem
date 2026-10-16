@@ -33,6 +33,19 @@ TEST_CASE("a file of Ruby unit tests needs no game") {
   CHECK(result.options.game_dir.empty());
 }
 
+TEST_CASE("a file of Ruby unit tests can use a game's own classes") {
+  const TestCliResult result = parse_test_cli({"--ruby", "x_test.rb", "--game", "games/demo/"});
+  REQUIRE(result.ok);
+  CHECK(result.options.mode == TestMode::RubyTests);
+  CHECK(result.options.scripts_game == "games/demo");
+  CHECK(result.options.game_dir.empty());
+  CHECK(parse_test_cli({"--ruby", "x_test.rb"}).options.scripts_game.empty());
+  CHECK(parse_test_cli({"--ruby", "x_test.rb", "--game"}).error == "--game needs a game's folder");
+  CHECK(parse_test_cli({"games/demo", "t.rb", "--game", "games/demo"}).error ==
+        "--game is for Ruby tests (a system test names its game first)");
+  CHECK(test_usage().find("redgem-test --ruby <test_file.rb> [--game <game_dir>]") != std::string::npos);
+}
+
 TEST_CASE("help wins over anything else on the line, and says how the tool is used") {
   for (const char* help : {"--help", "-h"}) {
     const TestCliResult result = parse_test_cli({"games/demo", help, "--bogus"});

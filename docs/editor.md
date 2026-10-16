@@ -42,6 +42,12 @@ icons):
 * **Ctrl+Z / Ctrl+Y** undo and redo, **Ctrl+D** duplicate, **Del** delete, **Ctrl+S** save. Help >
   Keyboard Shortcuts lists them all. File > New / Open Game goes back to the hub.
 
+Undo goes back up to 200 steps, and keeps at most 256 MB for them (its copies of the objects and
+terrains, and what deleted objects and undone imports were made of: vertices, pictures and their
+bytes in the scene's file; an estimate, counted as each step begins): past either, the oldest steps
+go, and what no step can bring back any more is let go of, so a long session with many imports does
+not keep growing. The latest step always stays, however big.
+
 Saving rewrites `scene.glb` in place (only the glTF JSON; meshes and textures are untouched), so the
 file still opens in Blender. When the file changes on disk (e.g. you re-export from Blender) the
 editor reloads it automatically, unless you have unsaved edits.

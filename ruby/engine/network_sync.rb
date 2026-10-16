@@ -3,7 +3,13 @@ module Network
   @synced = {}
 
   class << self
-    def __track(sync) = @synced[sync.key] = sync
+    # The object goes by `key` on the network from now on. A key is one object's: another one of
+    # the scene going by it already is a mistake of the game's, refused.
+    def __track(sync, key = sync.key)
+      refuse_taken(key, sync)
+      __untrack(sync)
+      @synced[key] = sync
+    end
 
     def __untrack(sync)
       @synced.delete(sync.key) if @synced[sync.key].equal?(sync)
@@ -28,6 +34,17 @@ module Network
 
     private
 
+    def refuse_taken(key, sync)
+      holder = @synced[key]
+      return unless holds_key?(holder, sync)
+
+      raise ArgumentError, "NetworkSync on #{sync.game_object.name.inspect}: the key #{key.inspect} is " \
+                           "#{holder.game_object.name.inspect}'s already (give each object its own)"
+    end
+
+    # Whether another object, still in the scene, goes by a key.
+    def holds_key?(holder, sync) = holder && !holder.equal?(sync) && holder.game_object.alive?
+
     # Whether what is spawned under a key is that very object (nothing may be spawned under it).
     def spawned_as?(entry, object) = entry && entry[:object] == object
 
@@ -49,7 +66,8 @@ end
 # Keeps an object in the same place on every machine in the game: the machine that owns it moves
 # it as usual, the others see it follow. Both sides need the object, with the same key.
 # Settings: owner (a peer's id; the host by default, right for the level's own moving things),
-# key (what the object is called on the network; its name by default).
+# key (what the object is called on the network; its name by default: one object's only, a second
+# NetworkSync under a key taken already raises).
 #
 #   player.add_component(NetworkSync, owner: Network.id, key: "hero-#{Network.id}")
 #   return unless get_component(NetworkSync).mine?   # only the owner reads the keyboard
@@ -73,12 +91,12 @@ class NetworkSync < Behaviour
   end
 
   # Hands the object to another owner, under another name on the network if need be. Only on this
-  # machine: the others need the same owner and name for it, by a message of the game's.
+  # machine: the others need the same owner and name for it, by a message of the game's. A name
+  # another object goes by is refused, and nothing changes.
   def assign(owner:, key: self.key)
-    Network.__untrack(self)
+    Network.__track(self, key.to_s)
     @owner = owner
     @key = key.to_s
-    Network.__track(self)
   end
 
   def on_destroy = Network.__forget(self)

@@ -109,6 +109,7 @@ TEST_CASE("a file whose every part is used, or that is not understood, is left w
   CHECK_FALSE(without_unused(instanced).has_value());
   GlbFile lit = two_meshes_one_shown();
   lit.json["nodes"][0]["extensions"]["KHR_lights_punctual"] = {{"light", 0}};  // the editor's own: looked past
+  lit.json["extensions"]["KHR_lights_punctual"]["lights"] = {{{"type", "point"}}};
   CHECK(without_unused(lit).has_value());
 
   // Something else where glTF wants an index, or data outside the file's bytes.
@@ -125,6 +126,119 @@ TEST_CASE("a file whose every part is used, or that is not understood, is left w
   const GlbFile original = two_meshes_one_shown();
   without_unused(original);
   CHECK(original.json == two_meshes_one_shown().json);
+}
+
+TEST_CASE("the lights and cameras no object carries are left out, and the others are numbered anew") {
+  GlbFile glb = two_meshes_one_shown();
+  glb.json["cameras"] = {{{"name", "Gone"}, {"type", "perspective"}}, {{"name", "Kept"}, {"type", "perspective"}}};
+  glb.json["extensions"]["KHR_lights_punctual"]["lights"] = {{{"name", "Gone"}, {"type", "point"}},
+                                                             {{"name", "Also gone"}, {"type", "spot"}},
+                                                             {{"name", "Kept"}, {"type", "point"}}};
+  glb.json["nodes"][0]["camera"] = 1;
+  glb.json["nodes"][0]["extensions"]["KHR_lights_punctual"] = {{"light", 2}};
+  glb.json["extensionsUsed"] = {"KHR_materials_clearcoat", "KHR_lights_punctual"};
+  const std::optional<GlbFile> lean = without_unused(glb);
+  REQUIRE(lean.has_value());
+  const nlohmann::json& lights = lean->json["extensions"]["KHR_lights_punctual"]["lights"];
+  REQUIRE(lights.size() == 1);
+  CHECK(lights[0]["name"] == "Kept");
+  REQUIRE(lean->json["cameras"].size() == 1);
+  CHECK(lean->json["cameras"][0]["name"] == "Kept");
+  CHECK(lean->json["nodes"][0]["camera"] == 0);
+  CHECK(lean->json["nodes"][0]["extensions"]["KHR_lights_punctual"]["light"] == 0);
+  CHECK(lean->json["extensionsUsed"] == glb.json["extensionsUsed"]);
+
+  // With no object carrying any, the lists go.
+  glb.json["nodes"][0].erase("camera");
+  glb.json["nodes"][0].erase("extensions");
+  const std::optional<GlbFile> dark = without_unused(glb);
+  REQUIRE(dark.has_value());
+  CHECK_FALSE(dark->json.contains("cameras"));
+  // And the lights extension goes with its last light (glTF wants one in it at least), from the
+  // extensions the file says it uses too.
+  CHECK_FALSE(dark->json.contains("extensions"));
+  CHECK(dark->json["extensionsUsed"] == nlohmann::json::array({"KHR_materials_clearcoat"}));
+  glb.json["extensionsUsed"] = {"KHR_lights_punctual"};
+  glb.json["extensionsRequired"] = {"KHR_lights_punctual"};
+  const std::optional<GlbFile> unlit = without_unused(glb);
+  REQUIRE(unlit.has_value());
+  CHECK_FALSE(unlit->json.contains("extensionsUsed"));
+  CHECK_FALSE(unlit->json.contains("extensionsRequired"));
+}
+
+TEST_CASE("a deleted light's and camera's entries leave the file, and come back with an undo") {
+  const std::filesystem::path file = temp_scene("deleted_light");
+  SceneDocument doc = saved_floor(file);
+  std::string error;
+  const auto lights_in_file = [&file, &error] {
+    const std::optional<GlbFile> glb = read_glb(file, error);
+    REQUIRE_MESSAGE(glb.has_value(), error);
+    const nlohmann::json& extensions = glb->json.value("extensions", nlohmann::json::object());
+    return extensions.value("KHR_lights_punctual", nlohmann::json::object())
+        .value("lights", nlohmann::json::array())
+        .size();
+  };
+  const auto cameras_in_file = [&file, &error] {
+    return read_glb(file, error)->json.value("cameras", nlohmann::json::array()).size();
+  };
+  const std::size_t lights_before = lights_in_file();
+  const std::size_t cameras_before = cameras_in_file();
+  const int lamp = doc.add_light(LightType::Point, "Lamp", kGray, 1.0f);
+  doc.add_light(LightType::Spot, "Spot", kGray, 1.0f);
+  const int camera = doc.add_camera("Watcher", 1.0f);
+  REQUIRE_MESSAGE(doc.save(error), error);
+  REQUIRE(lights_in_file() == lights_before + 2);
+  REQUIRE(cameras_in_file() == cameras_before + 1);
+  doc.remove(camera);
+  doc.remove(lamp);
+  REQUIRE_MESSAGE(doc.save(error), error);
+  CHECK(lights_in_file() == lights_before + 1);
+  CHECK(cameras_in_file() == cameras_before);
+  // The light left is still the spot's, and the file loads with it.
+  const LoadResult loaded = load_gltf_scene(file.string());
+  REQUIRE_MESSAGE(loaded.ok, loaded.error);
+  const int spot = loaded.scene.find_node("Spot");
+  REQUIRE(spot != kNoIndex);
+  REQUIRE(loaded.scene.nodes[spot].light.has_value());
+  CHECK(loaded.scene.nodes[spot].light->type == LightType::Spot);
+  REQUIRE(doc.undo());
+  REQUIRE(doc.undo());
+  REQUIRE_MESSAGE(doc.save(error), error);
+  CHECK(lights_in_file() == lights_before + 2);
+  CHECK(cameras_in_file() == cameras_before + 1);
+  std::filesystem::remove(file);
+}
+
+TEST_CASE("the bytes of meshes let go of leave the file kept in memory, which keeps its numbering") {
+  GlbFile glb = two_meshes_one_shown();
+  const nlohmann::json nodes = glb.json["nodes"];
+  const nlohmann::json none = nlohmann::json::array();
+  const std::optional<std::vector<bool>> images = release_meshes(glb, {0}, {nodes, none, none});
+  REQUIRE(images.has_value());
+  CHECK(*images == std::vector<bool>{false, true});
+  // The second mesh's eight bytes and its picture's four; nothing is numbered anew.
+  const std::vector<std::uint8_t> expected = {8, 9, 10, 11, 12, 13, 14, 15, 20, 21, 22, 23};
+  CHECK(glb.bin == expected);
+  CHECK(glb.json["meshes"].size() == 2);
+  REQUIRE(glb.json["bufferViews"].size() == 4);
+  CHECK(glb.json["bufferViews"][1]["byteOffset"] == 0);
+  CHECK(glb.json["bufferViews"][3]["byteOffset"] == 8);
+  // The views let go of keep their length and point at bytes there are: the file stays whole.
+  CHECK(glb.json["bufferViews"][0]["byteOffset"] == 0);
+  CHECK(glb.json["bufferViews"][0]["byteLength"] == 8);
+  // Saved, it is what it would have been.
+  const std::optional<GlbFile> lean = without_unused(glb);
+  REQUIRE(lean.has_value());
+  CHECK(lean->json == without_unused(two_meshes_one_shown())->json);
+  CHECK(lean->bin == expected);
+
+  // A node with an extension that may point at the data its own way: nothing is let go of.
+  GlbFile instanced = two_meshes_one_shown();
+  nlohmann::json other_nodes = instanced.json["nodes"];
+  other_nodes[0]["extensions"]["EXT_mesh_gpu_instancing"] = {{"attributes", {{"TRANSLATION", 0}}}};
+  CHECK_FALSE(release_meshes(instanced, {0}, {other_nodes, none, none}).has_value());
+  CHECK(instanced.bin == two_meshes_one_shown().bin);
+  CHECK(instanced.json == two_meshes_one_shown().json);
 }
 
 TEST_CASE("skeletons and animations keep their data, whichever object they move") {

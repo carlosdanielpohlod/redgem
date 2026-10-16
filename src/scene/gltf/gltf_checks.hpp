@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace redgem::gltf_checks {
 
@@ -42,9 +43,18 @@ bool readable(const cgltf_accessor* accessor);
 // before anything walks them.
 std::string data_problem(const cgltf_data& data);
 
-// Why a buffer's file must not be opened (it is outside `base_dir`, not a regular file, or too
-// big); empty for the buffers that can be loaded. Run before the buffers are read.
-std::string buffer_file_problem(const cgltf_data& data, const std::filesystem::path& base_dir);
+// The files a parsed scene's buffers and pictures name, by their numbers in the scene: each
+// found once for a load (see file_of_uri), however many of its steps need it. An empty path for
+// one that names no file, or none it may read.
+struct NamedFiles {
+  std::vector<std::filesystem::path> buffers;
+  std::vector<std::filesystem::path> images;
+};
+NamedFiles named_files(const cgltf_data& data, const std::filesystem::path& base_dir);
+
+// Why a buffer's file must not be opened (it is outside the scene's folder, not a regular file,
+// or too big); empty for the buffers that can be loaded. Run before the buffers are read.
+std::string buffer_file_problem(const cgltf_data& data, const NamedFiles& files);
 
 // The regular file a glTF "uri" names inside `base_dir` (percent escapes decoded); empty when it
 // names none there. A "data:" uri names no file.

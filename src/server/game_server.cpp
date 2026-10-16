@@ -23,7 +23,7 @@ bool GameServer::start(std::string& error) {
   }
   scene_ = std::move(std::get<SceneDesc>(scene));
   if (!settings_.data_dir.empty()) saves_ = SaveStore(settings_.data_dir / kSaveFileName);
-  return lobby_.open(settings_.port, error);
+  return lobby_.open(settings_.port, error, settings_.connections_per_address);
 }
 
 void GameServer::tick(float seconds) {

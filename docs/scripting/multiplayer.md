@@ -30,6 +30,10 @@ Network.on_disconnect { ... }          # the game is gone: the host left or the 
 `Network.online?`, `Network.host?`, `Network.id` and `Network.peers` (everyone else's ids) tell
 where things stand. `Network.leave` leaves the game; when the host leaves, it ends for everyone.
 
+A host lets 4 machines from one address be joining at the same moment (more are hung up on, and
+try again). Players behind one shared address (a campus, some mobile networks) joining together
+may need more: `Network.host(waiting_per_address: 16)`, up to 32.
+
 ## Games on the same network
 
 A hosted game answers the machines around it, so nobody types an address:
@@ -74,6 +78,10 @@ small rented server is enough, it only passes messages on):
 ./build/src/redgem-relay               # listens on port 7778; --port <number> picks another
 docker compose up relay                # or with Docker
 ```
+
+One address may hold 24 machines and 8 open rooms on a relay. When many players share one
+address (a campus, some mobile networks), raise them: `--per-address <number>` (up to 1024) and
+`--rooms-per-address <number>` (up to 256).
 
 While nobody talks to it the relay sleeps: it wakes when a machine connects or says something,
 and about once a second to let go of machines that went silent.
@@ -153,6 +161,9 @@ to them; the host owns them unless you say otherwise:
 find!("Lift").add_component(NetworkSync)
 find!("Ball").add_component(NetworkSync, owner: 2, key: "ball")   # key: its name on the network
 ```
+
+A key is one object's: a second `NetworkSync` under a key another object goes by already raises
+an error (the behaviour is disabled, the first object keeps the key), and so does `assign` to it.
 
 For objects created while playing, `Network.spawn` makes the copy on every machine, including the
 ones that join later, and removes it when its owner leaves:

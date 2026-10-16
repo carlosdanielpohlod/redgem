@@ -5,11 +5,13 @@
 #include <string>
 
 #include "app/engine.hpp"
+#include "app/scene_files.hpp"
 #include "core/safe_path.hpp"
 #include "testing/recording_audio.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
+using redgem::test::fixture;
 using redgem::test::LogCapture;
 
 namespace {
@@ -89,6 +91,68 @@ TEST_CASE("a file is inside a folder only when it really is, links and '..' foll
   CHECK_FALSE(file_inside(scratch.assets, "ui").has_value());
   CHECK_FALSE(file_inside(scratch.assets, "").has_value());
   CHECK_FALSE(file_inside(scratch.assets, "/dev/null").has_value());
+}
+
+TEST_CASE("an asset reached through a link inside its folder is refused, as built games leave links out") {
+  const Scratch scratch;
+  std::filesystem::create_symlink(scratch.assets / "heart.png", scratch.assets / "alias.png");
+  std::filesystem::create_directory_symlink(scratch.assets / "ui", scratch.assets / "linked_ui");
+  const LogCapture log;
+  CHECK(find_asset_file(scratch.assets, "heart", kExtensions).has_value());
+  CHECK(file_inside(scratch.assets, "ui/frame.png").has_value());
+  CHECK_FALSE(find_asset_file(scratch.assets, "alias", kExtensions).has_value());
+  CHECK_FALSE(find_asset_file(scratch.assets, "linked_ui/frame.png", kExtensions).has_value());
+  CHECK_FALSE(file_inside(scratch.assets, "alias.png").has_value());
+  CHECK_FALSE(file_inside(scratch.assets, scratch.assets / "linked_ui" / "frame.png").has_value());
+  // A warning names each link, once however often it is met (a sound is asked for at every play).
+  CHECK(log.count(log::Level::Warning) == 2);
+  CHECK(log.contains("alias.png is a symbolic link"));
+  CHECK(log.contains("linked_ui is a symbolic link"));
+  CHECK_FALSE(find_asset_file(scratch.assets, "alias", kExtensions).has_value());
+  CHECK(log.count(log::Level::Warning) == 2);
+  // Links above the folder are the machine's own (a home folder elsewhere), not the game's.
+  CHECK_FALSE(through_link(scratch.assets / "linked_ui", "frame.png"));
+  CHECK(log.count(log::Level::Warning) == 2);
+}
+
+TEST_CASE("a link on the way to a file is one even when a '..' after it steps back out of it") {
+  const Scratch scratch;
+  std::filesystem::create_directory(scratch.assets / "ui" / "inner");
+  std::filesystem::create_directory_symlink(scratch.assets / "ui" / "inner", scratch.assets / "to_inner");
+  CHECK(file_inside(scratch.assets, "ui/inner/../frame.png").has_value());
+  // ("to_inner/.." is the folder above where the link leads, ui: not the assets folder.)
+  CHECK_FALSE(file_inside(scratch.assets, "to_inner/../frame.png").has_value());
+  CHECK(through_link(scratch.assets, "to_inner/../frame.png"));
+}
+
+TEST_CASE("a name whose first file is a link means the next file of that name that is none") {
+  const Scratch scratch;
+  std::filesystem::create_symlink(scratch.assets / "jump.wav", scratch.assets / "step.wav");
+  std::ofstream(scratch.assets / "step.ogg") << "step";
+  CHECK(find_sound_file(scratch.assets, "step") == scratch.assets / "step.ogg");
+  CHECK_FALSE(find_asset_file(scratch.assets, "step.wav", kExtensions).has_value());
+}
+
+TEST_CASE("a scene or a script reached through a link is refused too, with a warning naming it") {
+  const Scratch scratch;
+  const std::filesystem::path game = scratch.dir / "game";
+  std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
+  std::filesystem::create_symlink(game / "scenes" / "level2.glb", game / "scenes" / "alias.glb");
+  std::filesystem::rename(game / "scripts" / "family.rb", scratch.dir / "family.rb");
+  std::filesystem::create_symlink(scratch.dir / "family.rb", game / "scripts" / "family.rb");
+  const LogCapture log;
+  CHECK(read_scene(game, "level2").has_value());
+  CHECK_FALSE(read_scene(game, "alias").has_value());
+  CHECK(log.contains("alias.glb is a symbolic link"));
+
+  EngineOptions options;
+  options.game_dir = game;
+  options.save_file = scratch.dir / "save.json";
+  auto created = Engine::create(options);
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
+  CHECK_FALSE(engine.scripts().eval("Family", "linked.rb").ok);
+  CHECK(log.contains("family.rb is a symbolic link"));
 }
 
 TEST_CASE("a file is read whole up to a size, and what is bigger or is not a file is not read") {

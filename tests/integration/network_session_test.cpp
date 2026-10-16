@@ -390,6 +390,20 @@ TEST_CASE("only a few machines from one address may keep a host waiting for thei
   CHECK(lone.host.peers() == std::vector<int>{kFirstGuest});
 }
 
+TEST_CASE("a host told to let more machines from one address wait for their hello lets that many wait") {
+  constexpr int kWaiting = 2 * kDefaultWaitingPerAddress;
+  NetworkSession host;
+  Table table;
+  std::string error;
+  REQUIRE(host.host(0, error, kWaiting));
+  table.seat(host);
+  std::vector<std::unique_ptr<Stranger>> silent;
+  for (int i = 0; i < kWaiting + 1; ++i) silent.push_back(std::make_unique<Stranger>(host, table));
+  CHECK(silent.back()->hung_up_on());
+  std::vector<std::uint8_t> ignored;
+  CHECK(silent[kWaiting - 1]->socket.read(ignored, kBigMessageBytes) == IoStatus::WouldBlock);
+}
+
 TEST_CASE("a flood of tiny messages from one machine is handled a poll's worth at a time") {
   LoneHost lone;
   Stranger flooder(lone.host, lone.table);

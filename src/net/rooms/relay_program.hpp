@@ -20,9 +20,11 @@ struct RelayCommand {
   std::string error;  // why not, when it is not ok
   bool help = false;
   std::uint16_t port = kDefaultRelayPort;
+  RelayLimits limits;
 };
 
-// Reads `redgem-relay [--port <number>]` (and --help, which wins over the rest of the line).
+// Reads `redgem-relay [--port <number>] [--per-address <number>] [--rooms-per-address <number>]`
+// (and --help, which wins over the rest of the line).
 RelayCommand parse_relay_command(const std::vector<std::string>& args);
 std::string relay_usage();
 

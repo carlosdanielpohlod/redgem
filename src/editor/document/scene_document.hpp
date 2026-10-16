@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <exception>
 #include <filesystem>
 #include <map>
@@ -10,6 +11,7 @@
 #include <vector>
 
 #include "editor/document/glb_file.hpp"
+#include "editor/document/glb_usage.hpp"
 #include "scene/shapes/primitives.hpp"
 #include "scene/scene_desc.hpp"
 #include "scene/shapes/terrain.hpp"
@@ -98,6 +100,17 @@ class SceneDocument {
   bool undo();
   bool redo();
 
+  // How much undo keeps: at most this many steps, and at most this many bytes of what only the
+  // undo and redo steps still use (their copies of the objects and terrains; the vertices,
+  // pictures and file bytes of deleted objects and undone imports), checked as each step begins.
+  // The oldest steps go first; the latest one always stays.
+  // What no step can bring back any more is let go of.
+  static constexpr std::size_t kMaxUndoSteps = 200;
+  static constexpr std::size_t kMaxHistoryBytes = std::size_t{256} * 1024 * 1024;  // 256 MiB
+  // What only the undo and redo steps keep in memory now, in bytes: an estimate (see
+  // scene_document_history_bytes.cpp).
+  std::size_t history_bytes();
+
   bool save(std::string& error);
   bool save_as(const std::filesystem::path& path, std::string& error);
 
@@ -116,12 +129,46 @@ class SceneDocument {
     std::vector<MaterialDesc> materials;
     long long version = 0;
     std::map<int, MeshShape> shapes;  // of every terrain, by mesh index
+    std::size_t bytes = 0;            // what all of that takes (see bytes_of), worked out as it is kept
   };
 
   SceneDocument() = default;
   void keep_file(GlbFile glb);
   void touch();
   Snapshot snapshot() const;
+  // Keeps the history within kMaxUndoSteps and kMaxHistoryBytes, then lets go of what no step
+  // can bring back.
+  void trim_history();
+  // Whether the history is past its limits, with `kept` bytes of what only its steps use (see kept_bytes).
+  bool history_too_long(std::size_t kept) const;
+  static std::size_t bytes_of(const Snapshot& step);
+  // The vertices, pictures and file bytes that only undo and redo steps use.
+  std::size_t kept_bytes();
+  // Every step goes on and off the undo and redo lists through these, which keep count of the
+  // steps' bytes and of the meshes they show as they come and go (so nothing walks every step).
+  void push_step(std::vector<Snapshot>& steps, Snapshot step);
+  Snapshot pop_step(std::vector<Snapshot>& steps);
+  void clear_redo();
+  // Drops the oldest undo step; true when a mesh no other step shows left the history with it.
+  bool drop_oldest_step();
+  // Takes a step out of the counts; true when a mesh no other step shows left the history with it.
+  bool uncount_step(const Snapshot& step);
+  bool uncount_mesh(int mesh);
+  // Which meshes the nodes use now, and in some undo or redo step.
+  std::vector<bool> meshes_in_use() const;
+  std::vector<bool> meshes_in_history() const;
+  // What the meshes `meshes` hold, and what those `kept` reach and those `used` do not in the
+  // file: their bytes there, and the pictures.
+  std::size_t vertex_bytes(const std::vector<bool>& meshes) const;
+  std::size_t file_bytes(const std::vector<bool>& kept, const std::vector<bool>& used);
+  std::size_t picture_bytes(const glb_usage::Usage& kept, const glb_usage::Usage& used) const;
+  // The meshes nothing uses, now or in any step, that are still held.
+  std::vector<int> meshes_out_of_reach() const;
+  // Frees the vertices of meshes nothing can use any more, their bytes in the binary chunk and
+  // the pictures only they showed. (They keep their numbers: nothing else is numbered anew.)
+  void release_unreachable();
+  void release_mesh(int mesh);
+  void release_images(const std::vector<bool>& used);
   // Whether two snapshots hold the same document, whatever their versions.
   static bool same_content(const Snapshot& a, const Snapshot& b);
   // Goes back to a snapshot (its nodes are moved out of it).
@@ -227,13 +274,16 @@ class SceneDocument {
   SceneDesc desc_;
   std::vector<Snapshot> undo_;
   std::vector<Snapshot> redo_;
+  std::size_t steps_bytes_ = 0;       // what the undo and redo steps hold, together
+  std::map<int, int> steps_showing_;  // by mesh: how many undo and redo steps show it (none: not listed)
   // Every distinct state of the nodes gets a version; the saved one is remembered.
   long long version_ = 0;
   long long next_version_ = 0;
   long long saved_version_ = 0;
   bool changed_since_checkpoint_ = false;
-  std::set<int> changed_meshes_;  // reshaped since the renderer last asked
-  std::set<int> unsaved_meshes_;  // reshaped since the last save
+  std::set<int> changed_meshes_;   // reshaped since the renderer last asked
+  std::set<int> unsaved_meshes_;   // reshaped since the last save
+  std::set<int> released_meshes_;  // let go of: nothing can use them again
 };
 
 }  // namespace redgem

@@ -1,4 +1,4 @@
-#include "render/image_header.hpp"
+#include "core/image_header.hpp"
 
 #include <algorithm>
 #include <array>

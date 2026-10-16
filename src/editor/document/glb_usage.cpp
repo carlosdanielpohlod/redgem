@@ -1,5 +1,6 @@
 #include "editor/document/glb_usage.hpp"
 
+#include <algorithm>
 #include <string_view>
 
 namespace redgem::glb_usage {
@@ -38,15 +39,6 @@ void use_each_named(Json& object, const char* key, Kind kind, const Use& use) {
   const auto named = object.find(key);
   if (named == object.end()) return;
   for (auto& [name, reference] : named->items()) use(reference, kind);
-}
-
-// An extension may point at the file's lists in ways of its own: only `known` is looked past.
-void refuse_other_extensions(const Json& object, const char* known) {
-  const auto extensions = object.find(kExtensions);
-  if (extensions == object.end()) return;
-  for (const auto& [name, extension] : extensions->items()) {
-    if (name != known) throw NotFollowed();
-  }
 }
 
 void walk_primitive(Json& primitive, const Use& use) {
@@ -105,17 +97,51 @@ void walk_looks(Json& doc, const Usage& usage, const Use& use) {
   each_used(doc, kImageKind, usage, [&use](Json& image) { use_if_there(image, kBufferView, kBufferViewKind, use); });
 }
 
+// What a node is drawn with, and the camera and light it carries.
+void walk_node(Json& node, const Use& use) {
+  refuse_other_extensions(node, kLightsExtension);
+  use_if_there(node, kMesh, kMeshKind, use);
+  use_if_there(node, kCamera, kCameraKind, use);
+  if (Json* lights = lights_extension(node)) use_if_there(*lights, kLight, kLightKind, use);
+}
+
+std::size_t entries_of(Json& doc, Kind kind) {
+  const Json* holder = holder_of(doc, kind);
+  if (holder == nullptr) return 0;
+  const auto list = holder->find(kListNames[kind]);
+  return list != holder->end() ? list->size() : 0;
+}
+
 // Nothing used yet, with a place for every entry of every list.
-Usage nothing_used(const Json& doc) {
+Usage nothing_used(Json& doc) {
   Usage usage;
-  for (std::size_t kind = 0; kind < kKinds; ++kind) {
-    const auto list = doc.find(kListNames[kind]);
-    usage[kind].assign(list != doc.end() ? list->size() : 0, false);
-  }
+  for (std::size_t kind = 0; kind < kKinds; ++kind) usage[kind].assign(entries_of(doc, static_cast<Kind>(kind)), false);
   return usage;
 }
 
+// What notes each reference it is given in `usage`.
+Use marking(Usage& usage) {
+  return [&usage](Json& reference, Kind kind) { usage[kind][entry_of(reference, usage[kind].size())] = true; };
+}
+
 }  // namespace
+
+void refuse_other_extensions(const Json& object, const char* known) {
+  const auto extensions = object.find(kExtensions);
+  if (extensions == object.end()) return;
+  for (const auto& [name, extension] : extensions->items()) {
+    if (name != known) throw NotFollowed();
+  }
+}
+
+Json* lights_extension(Json& object) {
+  const auto extensions = object.find(kExtensions);
+  if (extensions == object.end()) return nullptr;
+  const auto lights = extensions->find(kLightsExtension);
+  return lights != extensions->end() ? &*lights : nullptr;
+}
+
+Json* holder_of(Json& doc, Kind kind) { return kind == kLightKind ? lights_extension(doc) : &doc; }
 
 std::size_t entry_of(const Json& reference, std::size_t entries) {
   const int index = index_from(reference).value_or(kNoIndex);
@@ -125,22 +151,30 @@ std::size_t entry_of(const Json& reference, std::size_t entries) {
 
 void walk(Json& doc, const Usage& usage, const Use& use) {
   refuse_other_extensions(doc, kLightsExtension);
-  each(doc, kNodes, [&use](Json& node) {
-    refuse_other_extensions(node, kLightsExtension);
-    use_if_there(node, kMesh, kMeshKind, use);
-  });
+  each(doc, kNodes, [&use](Json& node) { walk_node(node, use); });
+  walk_motion(doc, use);
+  walk_from_meshes(doc, usage, use);
+}
+
+void walk_from_meshes(Json& doc, const Usage& usage, const Use& use) {
   each_used(doc, kMeshKind, usage, [&use](Json& mesh) {
     each(mesh, kPrimitives, [&use](Json& primitive) { walk_primitive(primitive, use); });
   });
-  walk_motion(doc, use);
   walk_looks(doc, usage, use);
   each_used(doc, kAccessorKind, usage, [&use](Json& accessor) { walk_accessor(accessor, use); });
 }
 
 Usage usage_of(Json& doc) {
   Usage usage = nothing_used(doc);
-  walk(doc, usage,
-       [&usage](Json& reference, Kind kind) { usage[kind][entry_of(reference, usage[kind].size())] = true; });
+  walk(doc, usage, marking(usage));
+  return usage;
+}
+
+Usage usage_of_meshes(Json& doc, const std::vector<bool>& meshes) {
+  Usage usage = nothing_used(doc);
+  const std::size_t known = std::min(meshes.size(), usage[kMeshKind].size());
+  for (std::size_t mesh = 0; mesh < known; ++mesh) usage[kMeshKind][mesh] = meshes[mesh];
+  walk_from_meshes(doc, usage, marking(usage));
   return usage;
 }
 

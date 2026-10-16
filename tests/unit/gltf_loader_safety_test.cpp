@@ -15,6 +15,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/image_header.hpp"
+#include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 
@@ -89,6 +91,16 @@ Gltf triangle() {
   return file;
 }
 
+// The first bytes of a PNG file saying its picture is `side` pixels square, and nothing more.
+std::vector<std::uint8_t> png_header(std::uint32_t side) {
+  std::vector<std::uint8_t> bytes = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R'};
+  for (int twice = 0; twice < 2; ++twice) {
+    for (int shift = 24; shift >= 0; shift -= 8) bytes.push_back(static_cast<std::uint8_t>(side >> shift));
+  }
+  bytes.insert(bytes.end(), {8, 6, 0, 0, 0});
+  return bytes;
+}
+
 // Writes the file and its data into the scratch game folder; returns the .gltf's path.
 std::string written(const Scratch& scratch, Gltf file) {
   file.doc["buffers"] = json::array({{{"uri", "scene.bin"}, {"byteLength", file.bin.size()}}});
@@ -151,6 +163,57 @@ TEST_CASE("an accessor that claims more elements than the limit is refused, even
   const LoadResult result = load_gltf_scene(written(scratch, file));
   CHECK_FALSE(result.ok);
   CHECK(result.error.find("elements") != std::string::npos);
+}
+
+TEST_CASE("a scene whose parts are each within their limits but too big as a whole is refused before it is read") {
+  const Scratch scratch;
+  Gltf file = triangle();
+  // Accessors as big as one may be, each a quarter of a gigabyte once read: enough of them are
+  // more than a scene may need. (Their data is not there either: the size is what refuses them.)
+  const std::uint64_t accessor_bytes = gltf_checks::kMaxAccessorElements * 4 * sizeof(float);
+  const std::uint64_t accessors = gltf_budget::kMaxSceneBytes / accessor_bytes + 1;
+  for (std::uint64_t i = 0; i < accessors; ++i)
+    file.add_accessor(0, kFloatComponent, gltf_checks::kMaxAccessorElements, "VEC4");
+  const LoadResult result = load_gltf_scene(written(scratch, file));
+  CHECK_FALSE(result.ok);
+  CHECK(result.error.find("MB of memory, more than the 4096 MB a scene may") != std::string::npos);
+  // Two fewer of them, and the scene is within the limit (and refused for what it really is).
+  file.doc["accessors"].erase(file.doc["accessors"].size() - 1);
+  file.doc["accessors"].erase(file.doc["accessors"].size() - 1);
+  const LoadResult smaller = load_gltf_scene(written(scratch, file));
+  CHECK_FALSE(smaller.ok);
+  CHECK(smaller.error.find("reaches past its buffer view") != std::string::npos);
+}
+
+TEST_CASE("pictures of a few bytes that say they are huge count for what decoding them takes") {
+  const Scratch scratch;
+  Gltf file = triangle();
+  // Each says it is as big as a picture may be: a quarter of a gigabyte once decoded.
+  const std::uint64_t decoded = std::uint64_t{kMaxImageSide} * kMaxImageSide * 4;
+  const std::uint64_t pictures = gltf_budget::kMaxSceneBytes / decoded + 1;
+  for (std::uint64_t i = 0; i < pictures; ++i) {
+    file.doc["images"].push_back({{"bufferView", file.add_view(png_header(kMaxImageSide))}, {"mimeType", "image/png"}});
+  }
+  const LoadResult result = load_gltf_scene(written(scratch, file));
+  CHECK_FALSE(result.ok);
+  CHECK(result.error.find("with its pictures decoded it would take about") != std::string::npos);
+  CHECK(result.scene.images.empty());
+  // Two fewer, and the scene loads (nothing is decoded while it does).
+  file.doc["images"].erase(file.doc["images"].size() - 1);
+  file.doc["images"].erase(file.doc["images"].size() - 1);
+  const LoadResult fewer = load_gltf_scene(written(scratch, file));
+  REQUIRE_MESSAGE(fewer.ok, fewer.error);
+  CHECK(gltf_budget::decoded_bytes(fewer.scene.images) == decoded * (pictures - 2));
+}
+
+TEST_CASE("a file bigger than a scene may be is refused before it is read") {
+  CHECK(gltf_budget::file_size_problem(gltf_budget::kMaxSceneBytes).empty());
+  CHECK(gltf_budget::file_size_problem(gltf_budget::kMaxSceneBytes + 1) ==
+        "the file alone takes 4096 MB of memory, more than the 4096 MB a scene may");
+  // A file's own size is what is looked at (a scene's file of a few bytes is far from it).
+  const Scratch scratch;
+  CHECK(gltf_budget::file_problem(written(scratch, triangle())).empty());
+  CHECK(gltf_budget::file_problem(scratch.game() / "missing.glb").empty());  // (the loader says it is missing)
 }
 
 TEST_CASE("an accessor without a buffer view is not read: the part of the mesh that needs it is left out") {
@@ -309,6 +372,24 @@ TEST_CASE("a picture is read from the scene's own folder and from nowhere else")
     CHECK(result.scene.images[outside].encoded.empty());
   }
   CHECK(warned(result, "image 1 has no readable data"));
+}
+
+TEST_CASE("the files a scene names are found once for its load, and only in its own folder") {
+  const Scratch scratch;
+  std::ofstream(scratch.game() / "wood.png") << kPictureBytes;
+  std::ofstream(scratch.dir / "secret.png") << kPictureBytes;
+  Gltf file = triangle();
+  file.doc["images"] = json::array(
+      {{{"uri", "wood.png"}}, {{"uri", "../secret.png"}}, {{"uri", "data:image/png;base64,AAAA"}}, json::object()});
+  const std::string path = written(scratch, file);
+  cgltf_options options{};
+  cgltf_data* data = nullptr;
+  REQUIRE(cgltf_parse_file(&options, path.c_str(), &data) == cgltf_result_success);
+  const gltf_checks::NamedFiles files = gltf_checks::named_files(*data, scratch.game());
+  cgltf_free(data);
+  const auto found = [&scratch](const char* name) { return std::filesystem::weakly_canonical(scratch.game() / name); };
+  CHECK(files.buffers == std::vector<std::filesystem::path>{found("scene.bin")});
+  CHECK(files.images == std::vector<std::filesystem::path>{found("wood.png"), {}, {}, {}});
 }
 
 TEST_CASE("a data file outside the scene's folder fails the load") {

@@ -22,7 +22,8 @@ bool asks_for_a_game(const nlohmann::json& message) {
 
 }  // namespace
 
-bool Lobby::open(std::uint16_t port, std::string& error) {
+bool Lobby::open(std::uint16_t port, std::string& error, int connections_per_address) {
+  connections_per_address_ = connections_per_address;
   listener_ = Socket::listen_on(port, error);
   if (!listener_.valid()) return false;
   port_ = listener_.local_port();
@@ -48,7 +49,7 @@ bool Lobby::room_to_wait(const std::string& address, const AddressCount& in_room
   const int waiting = waiting_from(address);
   // Not when full, kept out for guessing, or with too many from one place already.
   return newcomers_.size() < kMaxWaiting && !guessers_.keeps_out(address) && waiting < kMaxWaitingPerAddress &&
-         waiting + in_rooms(address) < kMaxConnectionsPerAddress;
+         waiting + in_rooms(address) < connections_per_address_;
 }
 
 int Lobby::waiting_from(const std::string& address) const {

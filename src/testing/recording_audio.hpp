@@ -41,9 +41,9 @@ class RecordingAudio final : public AudioSystem {
   std::filesystem::path sounds_dir_;
   std::vector<std::string> played_;
   std::optional<std::string> music_;
-  float master_volume_ = 1.0f;
-  float music_pitch_ = 1.0f;
-  float music_volume_ = 1.0f;
+  float master_volume_ = kFullVolume;
+  float music_pitch_ = kAsRecorded;
+  float music_volume_ = kFullVolume;
 };
 
 }  // namespace redgem::testing

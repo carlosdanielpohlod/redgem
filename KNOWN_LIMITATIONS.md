@@ -6,15 +6,16 @@ the same pull request.
 
 ## Platforms
 
-- The editor is developed and tested on Linux. The Windows download is compiled from Linux and
-  has only been tried under Wine, never on a real Windows machine.
+- The editor is developed and tested on Linux. The Windows download is compiled from Linux. On a
+  real Windows machine (GitHub's, which has no graphics card) the engine is built with the same
+  compiler and its unit, integration and Ruby tests run on every change, but no window has been
+  opened there: the editor and the games have been seen running on Windows under Wine only.
 - The macOS downloads have only run on GitHub's virtual Macs, which have no graphics card OpenGL
   can use: there the editor is drawn by Apple's software renderer (its system test takes about
   half an hour instead of a minute), and the games' system tests are not run on the Mac. Never
   tried on a real Mac. The app is not signed by a registered Apple developer nor notarized.
 - The editor on a Mac builds games for the Mac only: it carries no players for other systems.
   A built Mac game is a plain program beside its files, not an .app.
-- No iOS, web or console builds.
 - The Linux programs need a processor with AVX2 and glibc 2.39 or newer.
 - Android games have been run on an emulator only, not on phones. Characters are limited to 48
   bones there. The touch controls have one fixed layout (a stick and three buttons).
@@ -36,11 +37,11 @@ the same pull request.
   processor core.
 - Messages are JSON over TCP. There is no prediction or lag compensation: fast action games
   will feel the delay.
-- A relay accepts 24 connections and 8 rooms per address, and a game hosted directly lets 4
-  machines per address wait to join at the same time. Players behind one shared address (a
-  campus, some mobile networks) can run into both.
-- Two `NetworkSync` components given the same key: the second silently takes the first one's
-  place.
+- Players behind one shared address (a campus, some mobile networks) count as one address: by
+  default a relay or a dedicated server lets it connect 24 machines (a relay, open 8 rooms), and a
+  game hosted directly lets 4 of them be joining at once. Whoever runs the relay, the server or
+  the game has to raise these (`--per-address`, `--rooms-per-address`,
+  `Network.host(waiting_per_address:)`).
 - A room on a relay lets everyone in: connection approval (`Network.authenticate`) works with a
   player hosting directly and on a dedicated server only.
 - A client of version 0.2.0 joining a game that decides who comes in gives up after 5 seconds
@@ -70,24 +71,14 @@ the same pull request.
 
 ## Editor
 
-- A long session with many model imports uses more and more memory until the editor is closed:
-  what was deleted is kept for undo.
-- Lights and cameras of deleted objects keep their entries in the saved scene file.
-- Typing a value into an Inspector field (Ctrl+click) and then clicking another object may give
-  the value to the newly selected object. Seen in the code, not confirmed by a test.
-- After Stop, the volume and music pitch a game set stay in the editor's audio.
+- Undo keeps at most 200 steps and 256 MB, and lets go of the vertices, pictures and file data of
+  what no step can bring back. What an imported model put on the graphics card, its skeletons and
+  animations, and a few hundred bytes of description per object still stay until the editor is
+  closed.
 - In Docker the editor has no sound.
-
-## Loading and files
-
-- A scene has limits per part (elements, nodes, depth, joints) but no limit on the memory it
-  needs as a whole: a huge scene is not refused, it runs out of memory.
-- While a game is being developed, symbolic links inside its asset folders are followed. Built
-  games do not carry them.
 
 ## Tools
 
-- `redgem-test --ruby <file>` cannot load a game's own classes, only the engine's.
 - The Blender scene builders do not write the same bytes twice (vertex and UV order change
   between runs), so regenerating a demo scene shows up as a change.
 - The showcase demo is built from downloaded assets that may not be passed on, so it is not in

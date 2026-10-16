@@ -17,9 +17,11 @@ namespace redgem::net {
 // What a program that serves many machines at once (a relay, a dedicated server) allows each:
 // what may wait to be sent to one machine, two of the longest messages (it holds many machines'
 // queues at once, so it is far stricter than a game is with its few), and the connections one
-// address may hold (players in one house share an address: a whole party fits).
+// address may hold unless the program is told otherwise (players in one house share an address:
+// a whole party fits; a campus behind one address needs more), and at most.
 inline constexpr std::size_t kMaxPendingPerServed = 2 * kMaxFrameBytes;
-inline constexpr int kMaxConnectionsPerAddress = 24;
+inline constexpr int kDefaultConnectionsPerAddress = 24;
+inline constexpr int kMostConnectionsPerAddress = 1024;
 
 // One machine's end of a TCP connection that carries messages (see wire.hpp): a host's to each
 // machine that joined, a joiner's to its host, a relay's to each machine it serves. What they all

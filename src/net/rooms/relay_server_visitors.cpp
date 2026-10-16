@@ -24,7 +24,7 @@ void RelayServer::accept_newcomers() {
 bool RelayServer::room_for(const std::string& address) const {
   // Not when full, kept out for guessing, or with too many from one place already.
   return members_.size() < kMaxRelayConnections && !guessers_.keeps_out(address) &&
-         connections_from(address) < kMaxConnectionsPerAddress;
+         connections_from(address) < limits_.connections_per_address;
 }
 
 int RelayServer::connections_from(const std::string& address) const {

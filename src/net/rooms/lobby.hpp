@@ -29,8 +29,10 @@ using AddressCount = std::function<int(const std::string& address)>;
 // newcomer that keeps quiet is let go, and an address that guesses at room codes is kept out.
 class Lobby {
  public:
-  // Listens on `port` (0 picks a free one, see port()). False with `error` when it cannot.
-  bool open(std::uint16_t port, std::string& error);
+  // Listens on `port` (0 picks a free one, see port()), letting one address hold at most
+  // `connections_per_address` machines, waiting here and in the rooms. False with `error` when it
+  // cannot.
+  bool open(std::uint16_t port, std::string& error, int connections_per_address = kDefaultConnectionsPerAddress);
   std::uint16_t port() const { return port_; }
   // Takes newcomers in and hears them out: whoever said which room it wants comes back, to be
   // placed. `in_rooms` says how many from an address the rooms hold already.
@@ -63,6 +65,7 @@ class Lobby {
   std::uint16_t port_ = 0;
   std::vector<Newcomer> newcomers_;
   CodeGuessers guessers_;
+  int connections_per_address_ = kDefaultConnectionsPerAddress;
 };
 
 }  // namespace redgem::net

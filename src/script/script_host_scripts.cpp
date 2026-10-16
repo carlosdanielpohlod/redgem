@@ -32,11 +32,14 @@ void ScriptHost::attach_object(ObjectId id) {
   for (const std::string& script : split_script_list(*scripts)) attach(id, script);
 }
 
-// The name comes from the scene's file: it is a script of the game's own folder or nothing.
+// The name comes from the scene's file: it is a script of the game's own folder (reached through
+// no link, as in a built game) or nothing.
 bool ScriptHost::in_scripts_folder(const std::string& script) {
-  if (safe_asset_name(script)) return true;
-  report_error("loading a script", "the name '" + printable(script) + "' reaches outside the scripts folder");
-  return false;
+  if (!safe_asset_name(script)) {
+    report_error("loading a script", "the name '" + printable(script) + "' reaches outside the scripts folder");
+    return false;
+  }
+  return !through_link(scripts_dir_, script);
 }
 
 bool ScriptHost::has_script(const std::string& script) const {

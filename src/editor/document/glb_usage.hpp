@@ -1,7 +1,7 @@
 #pragma once
 
-// Which entries of a .glb's lists its objects reach: what the nodes draw with, what moves them,
-// and what all of that is made of.
+// Which entries of a .glb's lists its objects reach: what the nodes draw with, light and see
+// with, what moves them, and what all of that is made of.
 
 #include <array>
 #include <cstddef>
@@ -16,10 +16,21 @@
 namespace redgem::glb_usage {
 
 // The lists of a file whose entries can go unused.
-enum Kind { kMeshKind, kMaterialKind, kTextureKind, kImageKind, kSamplerKind, kAccessorKind, kBufferViewKind, kKinds };
+enum Kind {
+  kMeshKind,
+  kMaterialKind,
+  kTextureKind,
+  kImageKind,
+  kSamplerKind,
+  kAccessorKind,
+  kBufferViewKind,
+  kCameraKind,
+  kLightKind,
+  kKinds
+};
 inline constexpr std::array<const char*, kKinds> kListNames = {
-    gltf_json::kMeshes,   gltf_json::kMaterials, gltf_json::kTextures,   gltf_json::kImages,
-    gltf_json::kSamplers, gltf_json::kAccessors, gltf_json::kBufferViews};
+    gltf_json::kMeshes,    gltf_json::kMaterials,   gltf_json::kTextures, gltf_json::kImages, gltf_json::kSamplers,
+    gltf_json::kAccessors, gltf_json::kBufferViews, gltf_json::kCameras,  gltf_json::kLights};
 
 // The file points at its data in a way that is not followed here: it is left as it is.
 struct NotFollowed : std::exception {};
@@ -38,6 +49,17 @@ void each(nlohmann::json& object, const char* key, Visit visit) {
   for (nlohmann::json& entry : *list) visit(entry);
 }
 
+// What adds lights to a file or to one of its nodes (its "KHR_lights_punctual" extension);
+// nullptr when it has none.
+nlohmann::json* lights_extension(nlohmann::json& object);
+// What the list of `kind` is kept in: the file itself, or for lights the extension that adds them
+// (nullptr when the file has none).
+nlohmann::json* holder_of(nlohmann::json& doc, Kind kind);
+
+// Refuses (NotFollowed) an object with extensions other than `known`: they may point at the
+// file's lists in ways of their own.
+void refuse_other_extensions(const nlohmann::json& object, const char* known);
+
 // The entry a reference points at; refused when it points at none.
 std::size_t entry_of(const nlohmann::json& reference, std::size_t entries);
 
@@ -45,7 +67,12 @@ std::size_t entry_of(const nlohmann::json& reference, std::size_t entries);
 // list after everything that points into it: the objects, then what they are made of.
 void walk(nlohmann::json& doc, const Usage& usage, const Use& use);
 
+// The same from the meshes on: what the meshes `usage` notes are made of.
+void walk_from_meshes(nlohmann::json& doc, const Usage& usage, const Use& use);
+
 // Which entries of each list the file's nodes reach, through everything in between.
 Usage usage_of(nlohmann::json& doc);
+// Which entries the meshes `meshes` (by number) reach: what they are made of.
+Usage usage_of_meshes(nlohmann::json& doc, const std::vector<bool>& meshes);
 
 }  // namespace redgem::glb_usage

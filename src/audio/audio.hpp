@@ -7,6 +7,11 @@
 
 namespace redgem {
 
+// What the audio is at before a game changes it: every sound and music at its full volume, the
+// music at the pitch it was recorded at.
+inline constexpr float kFullVolume = 1.0f;
+inline constexpr float kAsRecorded = 1.0f;
+
 // Sound effects and music of a game, looked up by name in its sounds/ folder
 // ("jump" -> sounds/jump.wav | .ogg | .mp3 | .flac).
 class AudioSystem {

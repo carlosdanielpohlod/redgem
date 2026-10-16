@@ -13,9 +13,6 @@ namespace {
 using namespace editor_config;
 using Folder = ProjectFolder;
 
-constexpr float kFullVolume = 1.0f;  // sound previews play as recorded
-constexpr float kNormalPitch = 1.0f;
-
 // What a double click on a file of each folder does.
 void edit_script(PanelContext& context, const std::string& name) { open_script(context.scripts, name); }
 
@@ -26,7 +23,7 @@ void add_model(PanelContext& context, const std::string& name) {
 void play_sound(PanelContext& context, const std::string& name) {
   if (context.audio == nullptr) return;
   context.audio->set_sounds_dir(context.session.game_dir() / config::kSoundsDirName);
-  context.audio->play_sound(name, kFullVolume, kNormalPitch);
+  context.audio->play_sound(name, kFullVolume, kAsRecorded);  // sound previews play as recorded
 }
 
 void explain_scene(PanelContext& /*context*/, const std::string& name) {

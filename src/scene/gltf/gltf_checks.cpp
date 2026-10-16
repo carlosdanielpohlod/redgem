@@ -54,9 +54,8 @@ bool sparse_fits(const cgltf_accessor& accessor) {
                       sparse.values_buffer_view->size);
 }
 
-// Whether the file a buffer names may be read whole.
-bool loadable_file(const cgltf_buffer& buffer, const std::filesystem::path& base_dir) {
-  const std::filesystem::path file = file_of_uri(buffer.uri, base_dir);
+// Whether the file a buffer names (found already) may be read whole.
+bool loadable_file(const cgltf_buffer& buffer, const std::filesystem::path& file) {
   const bool may_be_opened = !file.empty() && buffer.size <= kMaxBufferFileBytes;
   if (!may_be_opened) return false;
   std::error_code fs_error;
@@ -64,8 +63,17 @@ bool loadable_file(const cgltf_buffer& buffer, const std::filesystem::path& base
 }
 
 // (A buffer that names no file keeps its data in the scene's own file.)
-bool may_be_loaded(const cgltf_buffer& buffer, const std::filesystem::path& base_dir) {
-  return !names_a_file(buffer.uri) || loadable_file(buffer, base_dir);
+bool may_be_loaded(const cgltf_buffer& buffer, const std::filesystem::path& file) {
+  return !names_a_file(buffer.uri) || loadable_file(buffer, file);
+}
+
+template <typename Entry>
+std::vector<std::filesystem::path> files_of(const Entry* entries, cgltf_size count,
+                                            const std::filesystem::path& base_dir) {
+  std::vector<std::filesystem::path> files;
+  files.reserve(count);
+  for (cgltf_size i = 0; i < count; ++i) files.push_back(file_of_uri(entries[i].uri, base_dir));
+  return files;
 }
 
 bool base_reaches_past(const cgltf_accessor& accessor) {
@@ -120,9 +128,13 @@ std::string data_problem(const cgltf_data& data) {
   return {};
 }
 
-std::string buffer_file_problem(const cgltf_data& data, const std::filesystem::path& base_dir) {
+NamedFiles named_files(const cgltf_data& data, const std::filesystem::path& base_dir) {
+  return {files_of(data.buffers, data.buffers_count, base_dir), files_of(data.images, data.images_count, base_dir)};
+}
+
+std::string buffer_file_problem(const cgltf_data& data, const NamedFiles& files) {
   for (cgltf_size i = 0; i < data.buffers_count; ++i) {
-    if (may_be_loaded(data.buffers[i], base_dir)) continue;
+    if (may_be_loaded(data.buffers[i], files.buffers[i])) continue;
     return numbered("buffer", i) + " names a file that is not a readable file of the scene's own folder";
   }
   return {};

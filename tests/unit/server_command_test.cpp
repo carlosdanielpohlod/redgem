@@ -50,6 +50,17 @@ TEST_CASE("the server program's numbers are whole, and within what a server may 
   CHECK(parse_server_command({"game", "--port"}).error == "--port needs a number from 0 to 65535");
 }
 
+TEST_CASE("the server program lets one address connect as many machines as it is told") {
+  constexpr int kCampus = 200;
+  CHECK(parse_server_command({"game"}).settings.connections_per_address == redgem::net::kDefaultConnectionsPerAddress);
+  const ServerCommand campus = parse_server_command({"game", "--per-address", "200"});
+  REQUIRE(campus.ok);
+  CHECK(campus.settings.connections_per_address == kCampus);
+  CHECK(parse_server_command({"game", "--per-address", "0"}).error == "--per-address needs a number from 1 to 1024");
+  CHECK(parse_server_command({"game", "--per-address", "1025"}).error == "--per-address needs a number from 1 to 1024");
+  CHECK(server_usage().find("--per-address <number>") != std::string::npos);
+}
+
 TEST_CASE("the server program keeps the game's saves beside the game, or in the folder it is given") {
   CHECK(parse_server_command({"games/platformer"}).settings.data_dir == "games/platformer-data");
   CHECK(parse_server_command({"/srv/game/"}).settings.data_dir == "/srv/game-data");

@@ -25,11 +25,21 @@ inline constexpr std::size_t kMaxRelayBufferedBytes = 256 * 1024 * 1024;
 // a few of the longest messages. Far more than a game says; a machine past it is let go.
 inline constexpr float kRelayBytesPerSecond = 1024.0f * 1024.0f;
 inline constexpr float kRelayBurstBytes = 4.0f * kRelayBytesPerSecond;
-// Machines a relay serves at once.
+// Machines a relay serves at once, and rooms it holds.
 inline constexpr std::size_t kMaxRelayConnections = 1024;
+inline constexpr std::size_t kMaxRelayRooms = 256;
+// The rooms one address may have open on a relay unless it is told otherwise.
+inline constexpr int kDefaultRoomsPerAddress = 8;
 // How long a relay that could not take a newcomer (the system had no connection left to give)
 // leaves the ones waiting alone before it tries again.
 inline constexpr float kAcceptRestSeconds = 0.25f;
+
+// What one address may hold on a relay: machines connected, and rooms open (redgem-relay's
+// --per-address and --rooms-per-address).
+struct RelayLimits {
+  int connections_per_address = kDefaultConnectionsPerAddress;
+  int rooms_per_address = kDefaultRoomsPerAddress;
+};
 
 // A meeting point on the internet for games whose players cannot reach each other directly
 // (home routers let connections out, not in). Every machine connects out to the relay; the
@@ -44,6 +54,8 @@ class RelayServer {
   RelayServer() = default;
   // A relay that holds at most `buffered_bytes` for all its machines (a small server's may be less).
   explicit RelayServer(std::size_t buffered_bytes) : max_buffered_bytes_(buffered_bytes) {}
+  // A relay that lets each address hold what `limits` say.
+  explicit RelayServer(const RelayLimits& limits) : limits_(limits) {}
 
   bool start(std::uint16_t port, std::string& error);
   std::uint16_t port() const { return port_; }
@@ -114,6 +126,7 @@ class RelayServer {
   std::map<std::string, bool> rooms_;  // the codes of the open rooms
   CodeGuessers guessers_;
   std::size_t max_buffered_bytes_ = kMaxRelayBufferedBytes;
+  RelayLimits limits_;
   float accept_rest_ = 0.0f;  // seconds until newcomers are taken again (see kAcceptRestSeconds)
 };
 

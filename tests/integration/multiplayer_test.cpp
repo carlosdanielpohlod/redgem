@@ -11,6 +11,7 @@
 #include "app/engine.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "net/network_session.hpp"
 #include "net/rooms/relay_server.hpp"
 #include "test_support.hpp"
 
@@ -262,6 +263,33 @@ TEST_CASE("an object with a NetworkSync is moved by its owner and follows on the
   CHECK(x_of(*host, "$platform") == doctest::Approx(80.0f));
 }
 
+TEST_CASE("a second NetworkSync under a key another object goes by is refused, and the first keeps it") {
+  Lan lan;
+  Engine& machine = lan.add_machine();
+  const std::string holder = "Network.instance_variable_get(:@synced)['shared'].equal?($first)";
+  // (Hosting: the objects are this machine's to send, frame after frame.)
+  REQUIRE(ruby(machine, "Network.host(port: 0)") == "true");
+  ruby(machine, "$first = Scene.find('Platform').add_component(NetworkSync, key: 'shared')");
+  lan.round();
+  const int errors_before = machine.scripts().error_count();
+  ruby(machine, "$second = Scene.find('Ball').add_component(NetworkSync, key: 'shared')");
+  lan.rounds(kSettleRounds);
+  // Its start raised, and that is the only error: it is disabled, and never updated.
+  CHECK(machine.scripts().error_count() == errors_before + 1);
+  CHECK(ruby(machine, holder) == "true");
+  // Handing an object over to a key that is taken raises, and changes nothing.
+  ruby(machine, "$ball = Scene.find('Ball').add_component(NetworkSync, key: 'ball')");
+  lan.round();
+  CHECK(ruby(machine, "begin; $ball.assign(owner: 2, key: 'shared'); rescue ArgumentError => e; e.message; end")
+            .find("is \"Platform\"'s already") != std::string::npos);
+  CHECK(ruby(machine, "[$ball.key, $ball.owner].inspect") == "[\"ball\", 1]");
+  CHECK(ruby(machine, holder) == "true");
+  // Once the first object is gone, its key is free.
+  ruby(machine, "Scene.find('Platform').destroy");
+  lan.round();
+  CHECK(ruby(machine, "$ball.assign(owner: 1, key: 'shared'); $ball.key") == "shared");
+}
+
 TEST_CASE("Network.spawn creates an object on every machine, for late joiners too, until its owner leaves") {
   Lan lan;
   auto [host, guest] = lan.host_and_guest();
@@ -309,6 +337,25 @@ TEST_CASE("when the host leaves the game is over for everyone, and what the othe
   lan.round();
   CHECK(ruby(*guest, "[$log.last, $theirs.alive?].inspect") == "[:disconnected, false]");
   CHECK(ruby(*guest, "Network.emit(:anyone)") == "false");
+}
+
+TEST_CASE("a game hosted directly lets as many machines from one address wait to join as it says") {
+  Lan lan;
+  Engine& machine = lan.add_machine();
+  // (What scripts are told is the engine's own numbers.)
+  CHECK(ruby(machine, "[Network::WAITING_PER_ADDRESS, Network::MOST_WAITING_PER_ADDRESS].inspect") ==
+        "[" + std::to_string(net::kDefaultWaitingPerAddress) + ", " + std::to_string(net::kMaxWaitingLinks) + "]");
+  CHECK(ruby(machine, "Network.host(port: 0, waiting_per_address: 32)") == "true");
+  ruby(machine, "$ended = 0; Network.on_disconnect { $ended += 1 }");
+  for (const char* wrong : {"0", "33"}) {
+    CAPTURE(wrong);
+    const std::string host = std::string("Network.host(port: 0, waiting_per_address: ") + wrong + ")";
+    const RubyResult refused = machine.scripts().eval(host, "host.rb");
+    CHECK_FALSE(refused.ok);
+    CHECK(refused.error.find("waiting_per_address") != std::string::npos);
+  }
+  // A number it does not take is refused before anything else: the game hosted goes on.
+  CHECK(ruby(machine, "[Network.host?, $ended].inspect") == "[true, 0]");
 }
 
 TEST_CASE("joining where nobody hosts fails after a moment, and a taken port cannot be hosted on") {

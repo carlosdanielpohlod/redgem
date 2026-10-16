@@ -101,6 +101,7 @@ redgem_add_library(redgem_core
   core/command_line.cpp
   core/names.cpp
   core/safe_path.cpp
+  core/image_header.cpp
   core/math.cpp
   core/fixed_clock.cpp)
 target_link_libraries(redgem_core PUBLIC m)
@@ -158,6 +159,7 @@ redgem_add_library(redgem_runtime
   scene/transform.cpp
   scene/scene_desc.cpp
   scene/gltf/gltf_checks.cpp
+  scene/gltf/gltf_budget.cpp
   scene/gltf/gltf_accessors.cpp
   scene/gltf/gltf_loader.cpp
   scene/gltf/gltf_reader_materials.cpp
@@ -230,7 +232,6 @@ redgem_add_library(redgem_runtime
   script/bindings/http_bindings.cpp
   render/mesh_builder.cpp
   render/mesh_pieces.cpp
-  render/image_header.cpp
   render/texture_loading.cpp
   render/renderer.cpp
   render/renderer_pipeline.cpp
@@ -304,6 +305,8 @@ if(NOT ANDROID)
     editor/node_tree.cpp
     editor/document/scene_document.cpp
     editor/document/scene_document_history.cpp
+    editor/document/scene_document_memory.cpp
+    editor/document/scene_document_history_bytes.cpp
     editor/document/scene_document_terrain.cpp
     editor/document/scene_document_edits.cpp
     editor/document/scene_document_copies.cpp

@@ -82,7 +82,7 @@ TEST_CASE("refreshing one node gives the preview what rebuilding it all would, a
   std::filesystem::remove_all(dir);
 }
 
-TEST_CASE("a game's music ends with the game, whether Stop ends it or the game quits by itself") {
+TEST_CASE("a game's music, volume and music pitch end with the game, whether Stop ends it or the game quits") {
   test::LogCapture quiet;
   const auto dir = copy_sandbox("music");
   auto session = open(dir);
@@ -92,9 +92,15 @@ TEST_CASE("a game's music ends with the game, whether Stop ends it or the game q
   for (const bool quits_by_itself : {true, false}) {
     CAPTURE(quits_by_itself);
     REQUIRE_MESSAGE(session->play({input, &audio}, error), error);
-    REQUIRE(session->runtime()->scripts().eval("Audio.music(:beep)", "music.rb").ok);
+    REQUIRE(session->runtime()
+                ->scripts()
+                .eval("Audio.music(:beep); Audio.volume = 0.25; Audio.music_volume = 0.5; Audio.music_pitch = 2.0",
+                      "music.rb")
+                .ok);
     play_frames(*session, 1);
     REQUIRE(audio.music() == std::optional<std::string>("beep"));
+    REQUIRE(audio.master_volume() < kFullVolume);
+    REQUIRE(audio.music_pitch() > kAsRecorded);
     if (quits_by_itself) {
       REQUIRE(session->runtime()->scripts().eval("Game.quit", "quit.rb").ok);
       play_frames(*session, 1);
@@ -103,6 +109,9 @@ TEST_CASE("a game's music ends with the game, whether Stop ends it or the game q
     }
     CHECK(session->play_state() == PlayState::Editing);
     CHECK_FALSE(audio.music().has_value());
+    CHECK(audio.master_volume() == kFullVolume);
+    CHECK(audio.music_volume() == kFullVolume);
+    CHECK(audio.music_pitch() == kAsRecorded);
   }
   std::filesystem::remove_all(dir);
 }

@@ -34,6 +34,7 @@ add_executable(redgem_tests
   unit/glb_geometry_test.cpp
   unit/glb_compact_test.cpp
   unit/glb_usage_test.cpp
+  unit/undo_history_test.cpp
   unit/model_import_test.cpp
   unit/editor_logic_test.cpp
   unit/inspector_logic_test.cpp
@@ -41,6 +42,7 @@ add_executable(redgem_tests
   unit/project_folders_test.cpp
   unit/theme_test.cpp
   unit/edit_stream_test.cpp
+  unit/inspector_typing_test.cpp
   unit/editor_camera_test.cpp
   unit/gated_input_source_test.cpp
   unit/gizmo_test.cpp
@@ -201,7 +203,7 @@ add_test(NAME relay.help COMMAND redgem_relay --help)
 set_tests_properties(relay.help PROPERTIES PASS_REGULAR_EXPRESSION "usage:.*redgem-relay \\[--port <number>\\]")
 add_test(NAME relay.refuses_what_it_does_not_understand COMMAND redgem_relay --port many)
 set_tests_properties(relay.refuses_what_it_does_not_understand PROPERTIES
-  PASS_REGULAR_EXPRESSION "--port needs a number up to 65535")
+  PASS_REGULAR_EXPRESSION "--port needs a number from 0 to 65535")
 
 # The game server's command line, as the program itself answers it.
 add_test(NAME server.help COMMAND redgem_server --help)
@@ -216,6 +218,25 @@ foreach(test_file IN LISTS REDGEM_RUBY_TESTS)
   get_filename_component(test_name ${test_file} NAME_WE)
   add_test(NAME ruby.${test_name} COMMAND redgem_test_tool --ruby ${test_file})
 endforeach()
+
+# Ruby unit tests of a game's own classes: tests/ruby_games/<game>/*_test.rb run against games/<game>.
+file(GLOB REDGEM_GAME_RUBY_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ruby_games/*/*_test.rb)
+foreach(test_file IN LISTS REDGEM_GAME_RUBY_TESTS)
+  get_filename_component(test_name ${test_file} NAME_WE)
+  get_filename_component(game_dir ${test_file} DIRECTORY)
+  get_filename_component(game ${game_dir} NAME)
+  add_test(NAME ruby.${game}.${test_name}
+           COMMAND redgem_test_tool --ruby ${test_file} --game ${CMAKE_SOURCE_DIR}/games/${game})
+endforeach()
+# Without its game, such a file knows none of the game's classes; and --game wants a game.
+add_test(NAME ruby.game_classes_need_their_game
+         COMMAND redgem_test_tool --ruby ${CMAKE_CURRENT_SOURCE_DIR}/ruby_games/platformer/mover_test.rb)
+set_tests_properties(ruby.game_classes_need_their_game PROPERTIES
+  PASS_REGULAR_EXPRESSION "uninitialized constant Mover")
+add_test(NAME ruby.game_needs_scripts
+         COMMAND redgem_test_tool --ruby ${CMAKE_CURRENT_SOURCE_DIR}/ruby_games/platformer/mover_test.rb
+                 --game ${CMAKE_SOURCE_DIR}/docs)
+set_tests_properties(ruby.game_needs_scripts PROPERTIES PASS_REGULAR_EXPRESSION "has no scripts folder")
 
 # Guards the harness itself: a failing Ruby test must make the process fail.
 add_test(NAME ruby.harness_reports_failures

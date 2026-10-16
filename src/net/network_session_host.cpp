@@ -9,16 +9,6 @@ namespace redgem::net {
 
 using namespace wire;
 
-namespace {
-
-// Machines that connected to a host and have not said hello yet: how many from one address, and
-// how many in all. They hold no place in the game (those are for who was let in), so whoever
-// connects and keeps quiet keeps nobody out but the next few from its own address.
-constexpr int kMaxWaitingPerAddress = 4;
-constexpr int kMaxWaitingLinks = 32;
-
-}  // namespace
-
 void NetworkSession::receive_newcomers(float seconds) {
   if (!listener_.valid()) return;
   accept_newcomers();
@@ -42,7 +32,7 @@ bool NetworkSession::room_to_wait(const std::string& address) const {
     ++waiting;
     if (link.connection.address() == address) ++from_there;
   }
-  return waiting < kMaxWaitingLinks && from_there < kMaxWaitingPerAddress;
+  return waiting < kMaxWaitingLinks && from_there < waiting_per_address_;
 }
 
 void NetworkSession::drop_silent_newcomers(float seconds) {

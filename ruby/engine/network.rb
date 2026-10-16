@@ -59,6 +59,8 @@ module Network
   # ... and after it (the game's handlers may still ask who was there).
   AFTERWARDS = { left: :forget_player, disconnected: :forget_players }.freeze
 
+  # (WAITING_PER_ADDRESS and MOST_WAITING_PER_ADDRESS, how many machines from one address may wait
+  # to be let in at once unless the game says and at most, are the engine's: see network_bindings.cpp.)
   @handlers = {}
   @listeners = {}
 
@@ -80,11 +82,15 @@ module Network
     # Machines on the same network find it by themselves, under `name` (the game's title unless
     # said), unless visible: false. With room: true the game is a room on the relay instead:
     # on_connect follows, and Network.room is then the code the others join with.
-    def host(port: DEFAULT_PORT, name: nil, visible: true, room: false)
+    # waiting_per_address: how many machines behind one address (players sharing a network that
+    # reaches the internet through one address) may be joining at the same moment.
+    def host(port: DEFAULT_PORT, name: nil, visible: true, room: false, waiting_per_address: WAITING_PER_ADDRESS)
+      # (A number it does not take raises before the game this machine is in is left.)
+      waiting = __waiting_per_address(waiting_per_address.to_i)
       leave
       return __host_room(*relay_address) if room
 
-      __host(port.to_i, name.to_s, visible, discovery_port)
+      __host(port.to_i, name.to_s, visible, discovery_port, waiting)
     end
 
     # Starts joining a game (leaving the one this machine is in): at an address, or with

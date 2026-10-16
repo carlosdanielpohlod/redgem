@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "render/image_header.hpp"
+#include "core/image_header.hpp"
 
 using namespace redgem;
 

@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <memory>
 
+#include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_reader.hpp"
 
@@ -58,32 +59,45 @@ bool sound(const std::string& problem, const std::string& path, std::string& err
 
 std::filesystem::path folder_of(const std::string& path) { return std::filesystem::path(path).parent_path(); }
 
-// The file parsed, with its buffers, and checked; null (and why, in `error`) when any of that
-// fails. The loader's own checks come before the library's: those do sums that a file can make
-// wrap around, and then read where the wrapped sum points.
-CgltfPtr open_gltf(const std::string& path, std::string& error) {
+// The file parsed; null (and why, in `error`) when it cannot be, or is too big for memory alone.
+CgltfPtr parsed_gltf(const std::string& path, std::string& error) {
+  if (!sound(gltf_budget::file_problem(path), path, error)) return nullptr;
   cgltf_options options{};
   cgltf_data* raw = nullptr;
   const cgltf_result parsed = cgltf_parse_file(&options, path.c_str(), &raw);
   CgltfPtr data(raw);
-  const bool opened =
-      succeeded(parsed, "cannot parse", path, error) &&
-      sound(gltf_checks::buffer_file_problem(*data, folder_of(path)), path, error) &&
-      succeeded(cgltf_load_buffers(&options, data.get(), path.c_str()), "cannot load buffers of", path, error) &&
-      sound(gltf_checks::data_problem(*data), path, error) &&
-      succeeded(cgltf_validate(data.get()), "invalid glTF", path, error);
-  return opened ? std::move(data) : nullptr;
+  if (!succeeded(parsed, "cannot parse", path, error)) return nullptr;
+  return data;
+}
+
+// The parsed file's buffers loaded, and the whole checked; false (and why, in `error`) when any of
+// that fails (a scene too big for memory is refused before its data files are read). The loader's
+// own checks come before the library's: those do sums that a file can make wrap around, and then
+// read where the wrapped sum points.
+bool loaded_and_checked(cgltf_data& data, const gltf_checks::NamedFiles& files, const std::string& path,
+                        std::string& error) {
+  cgltf_options options{};
+  return sound(gltf_checks::buffer_file_problem(data, files), path, error) &&
+         sound(gltf_budget::scene_problem(data, path, files), path, error) &&
+         succeeded(cgltf_load_buffers(&options, &data, path.c_str()), "cannot load buffers of", path, error) &&
+         sound(gltf_checks::data_problem(data), path, error) &&
+         succeeded(cgltf_validate(&data), "invalid glTF", path, error);
 }
 
 }  // namespace
 
 LoadResult load_gltf_scene(const std::string& path, int max_skin_joints) {
   LoadResult result;
-  const CgltfPtr data = open_gltf(path, result.error);
+  const CgltfPtr data = parsed_gltf(path, result.error);
   if (data == nullptr) return result;
-  GltfReader reader(*data, folder_of(path), result);
+  // (Each file the scene names is found once, for every step below.)
+  const gltf_checks::NamedFiles files = gltf_checks::named_files(*data, folder_of(path));
+  if (!loaded_and_checked(*data, files, path, result.error)) return result;
+  GltfReader reader(*data, files.images, result);
   reader.set_max_skin_joints(std::min(max_skin_joints, config::kMaxSkinJoints));
-  result.ok = sound(reader.run(), path, result.error);
+  // (Its pictures are decoded later, once shown: what that will take is known from their headers.)
+  result.ok = sound(reader.run(), path, result.error) &&
+              sound(gltf_budget::pictures_problem(*data, path, files, result.scene.images), path, result.error);
   if (!result.ok) result.scene = SceneDesc{};
   return result;
 }
