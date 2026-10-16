@@ -109,6 +109,7 @@ class SceneDocument {
   struct MeshShape {
     std::vector<float> positions;
     std::vector<float> normals;
+    bool operator==(const MeshShape& other) const { return positions == other.positions && normals == other.normals; }
   };
   struct Snapshot {
     std::vector<NodeDesc> nodes;
@@ -121,6 +122,8 @@ class SceneDocument {
   void keep_file(GlbFile glb);
   void touch();
   Snapshot snapshot() const;
+  // Whether two snapshots hold the same document, whatever their versions.
+  static bool same_content(const Snapshot& a, const Snapshot& b);
   // Goes back to a snapshot (its nodes are moved out of it).
   void restore(Snapshot& state);
   // Puts the terrains back as a snapshot had them.

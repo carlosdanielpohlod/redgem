@@ -77,10 +77,14 @@ void SceneDocument::touch() {
   }
 }
 
+bool SceneDocument::same_content(const Snapshot& a, const Snapshot& b) {
+  // Every part of a snapshot but its version, so nothing a checkpoint keeps can change unnoticed.
+  return same_nodes(a.nodes, b.nodes) && same_materials(a.materials, b.materials) && a.shapes == b.shapes;
+}
+
 void SceneDocument::drop_checkpoint_if_unchanged() {
   if (undo_.empty()) return;
-  if (!same_nodes(undo_.back().nodes, desc_.nodes)) return;
-  if (!same_materials(undo_.back().materials, desc_.materials)) return;
+  if (!same_content(undo_.back(), snapshot())) return;
   version_ = undo_.back().version;
   undo_.pop_back();
   changed_since_checkpoint_ = false;
