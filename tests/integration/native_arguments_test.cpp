@@ -91,10 +91,14 @@ TEST_CASE("numbers outside what a setter takes are refused, and the others are h
   const SceneDesc scene = small_scene();
   const auto engine = engine_for(scene);
   ScriptHost& scripts = engine->scripts();
-  CHECK(refuses(scripts, "Time.scale = -1", "Time.scale cannot be negative"));
-  CHECK(refuses(scripts, "Camera.fov = 5", "Camera.fov must be between 10 and 150 degrees"));
-  CHECK(refuses(scripts, "Camera.fov = 151", "Camera.fov must be between 10 and 150 degrees"));
-  CHECK(refuses(scripts, "Audio.music_pitch = 0", "Audio.music_pitch must be positive"));
+  // One wording for every range, with what was given.
+  CHECK(refuses(scripts, "Time.scale = -1", "Time.scale must be at least 0, not -1"));
+  CHECK(refuses(scripts, "Camera.fov = 5", "Camera.fov must be from 10 to 150, not 5"));
+  CHECK(refuses(scripts, "Camera.fov = 151", "Camera.fov must be from 10 to 150, not 151"));
+  CHECK(refuses(scripts, "Camera.motion_blur = 3", "Camera.motion_blur must be from 0 to 1, not 3"));
+  CHECK(refuses(scripts, "Audio.music_pitch = 0", "Audio.music_pitch must be more than 0, not 0"));
+  CHECK(refuses(scripts, "Audio.music_volume = -0.5", "Audio.music_volume must be at least 0, not -0.5"));
+  CHECK(refuses(scripts, "Audio.volume = -1", "Audio.volume must be at least 0, not -1"));
   CHECK(refuses(scripts, "Network.__search(70000)", "a port is a number from 0 to 65535"));
   CHECK(refuses(scripts, "Network.__search(-1)", "a port is a number from 0 to 65535"));
   CHECK(refuses(scripts, "Save.set(:best, 1.0 / 0)", "Save cannot keep infinity or NaN"));
@@ -103,12 +107,28 @@ TEST_CASE("numbers outside what a setter takes are refused, and the others are h
   CHECK(ruby(scripts, "Time.send(:scale=, 0.5)") == "0.5");
   CHECK(ruby(scripts, "Time.scale") == "0.5");
   CHECK(ruby(scripts, "Camera.send(:fov=, 90)") == "90.0");
-  CHECK(ruby(scripts, "Camera.send(:motion_blur=, 3)") == "3.0");  // handed back as given...
-  CHECK(ruby(scripts, "Camera.motion_blur") == "1.0");             // ...and kept within 0 to 1
+  CHECK(ruby(scripts, "Camera.send(:motion_blur=, 0.25)") == "0.25");
+  CHECK(ruby(scripts, "Camera.motion_blur") == "0.25");
   CHECK(ruby(scripts, "Input.send(:mouse_locked=, true)") == "true");
   CHECK(ruby(scripts, "Input.mouse_locked?") == "true");
   CHECK(ruby(scripts, "Input.send(:touch_controls=, false)") == "false");
   CHECK(ruby(scripts, "Input.touch_controls?") == "false");
+}
+
+TEST_CASE("no native takes infinity or NaN for a number, whatever the number is for") {
+  const SceneDesc scene = small_scene();
+  const auto engine = engine_for(scene);
+  ScriptHost& scripts = engine->scripts();
+  ruby(scripts, "$nan = 0.0 / 0.0; $inf = 1.0 / 0.0; $host = Scene.find('Host')");
+  for (const char* code :
+       {"Time.scale = $nan", "Camera.fov = $nan", "Camera.motion_blur = $inf", "Audio.volume = $nan",
+        "Audio.music_pitch = $inf", "$host.transform.position = [0, $nan, 0]", "$host.transform.scale = [$inf, 1, 1]",
+        "$host.transform.rotation = Vector3.new(0, $nan, 0)", "$host.tint = [$nan, 1, 1]",
+        "$host.animation_offset = $nan", "Physics.raycast([0, 0, 0], [0, -1, 0], $inf)",
+        "Physics.raycast([0, $nan, 0], [0, -1, 0])", "Camera.screen_ray($nan, 0)"}) {
+    CHECK_MESSAGE(refuses(scripts, code, "expected a finite number"), code);
+  }
+  CHECK(ruby(scripts, "$host.transform.position.y") == "0.0");  // nothing refused got through
 }
 
 TEST_CASE("a place is a Vector3 or three numbers, and nothing else") {

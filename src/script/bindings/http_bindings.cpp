@@ -47,6 +47,7 @@ mrb_value http_start(mrb_state* mrb, mrb_value) {
   mrb_value body;
   mrb_float timeout = 0.0;
   mrb_get_args(mrb, "zzHSf", &method, &url, &headers, &body, &timeout);
+  timeout = at_least(mrb, timeout, 0.0, "a web request's timeout");
   net::HttpRequest request{method, url, headers_from(mrb, headers), text_of(body), static_cast<float>(timeout)};
   std::string error;
   const int id = http(mrb).start(std::move(request), error);

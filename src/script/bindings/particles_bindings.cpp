@@ -29,11 +29,18 @@ struct BurstArgs {
   const char* image = nullptr;
 };
 
+void check_numbers(mrb_state* mrb, BurstArgs& args) {
+  for (mrb_float* number : {&args.speed, &args.spread, &args.gravity, &args.spin}) *number = finite(mrb, *number);
+  args.life = at_least(mrb, args.life, 0.0, "a burst's life");
+  args.size = at_least(mrb, args.size, 0.0, "a burst's particle size");
+}
+
 BurstArgs burst_args(mrb_state* mrb) {
   BurstArgs args;
   mrb_get_args(mrb, "ooifffffiiiibzf", &args.position, &args.direction, &args.count, &args.speed, &args.spread,
                &args.life, &args.size, &args.gravity, &args.r, &args.g, &args.b, &args.a, &args.glow, &args.image,
                &args.spin);
+  check_numbers(mrb, args);
   return args;
 }
 

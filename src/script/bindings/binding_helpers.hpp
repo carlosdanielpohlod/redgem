@@ -2,6 +2,14 @@
 
 // Helpers for native methods. Errors are raised as Ruby exceptions (never C++ exceptions),
 // so they can only be used inside functions called from Ruby.
+//
+// What every native holds the scripts' arguments to:
+//   - a number is finite: infinity and NaN are refused wherever they would go (float_arg,
+//     to_vec3, finite for the rest), so they never reach the scene, physics or the renderer;
+//   - a number with a range of its own is refused outside it, saying the range and what was given
+//     (at_least, more_than, from_to), never quietly clamped (a steering input is the exception:
+//     an analog stick may go a little past full, see Vehicle#drive);
+//   - an object is one that is still there (alive_object, alive_id).
 
 #include <mruby.h>
 
@@ -66,8 +74,16 @@ Found known(mrb_state* mrb, const std::optional<Found>& found, const char* unkno
   if (!found) mrb_raisef(mrb, E_ARGUMENT_ERROR, unknown, name.c_str());
   return *found;
 }
-// The single argument of a native method: any value, a number, true or false, or a name (a
-// Symbol or a String).
+// A number a script handed a native, when finite: an ArgumentError naming the native otherwise.
+mrb_float finite(mrb_state* mrb, mrb_float value);
+// A finite number within a range of its own: an ArgumentError saying "<what> must be ..., not
+// <value>" otherwise.
+mrb_float at_least(mrb_state* mrb, mrb_float value, mrb_float low, const char* what);
+mrb_float more_than(mrb_state* mrb, mrb_float value, mrb_float low, const char* what);
+mrb_float from_to(mrb_state* mrb, mrb_float value, mrb_float low, mrb_float high, const char* what);
+
+// The single argument of a native method: any value, a finite number, true or false, or a name
+// (a Symbol or a String).
 mrb_value single_arg(mrb_state* mrb);
 mrb_float float_arg(mrb_state* mrb);
 bool bool_arg(mrb_state* mrb);

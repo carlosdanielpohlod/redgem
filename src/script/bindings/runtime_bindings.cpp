@@ -21,8 +21,7 @@ mrb_value time_frame(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, cont
 
 mrb_value time_scale(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, context(mrb).time.scale); }
 mrb_value time_set_scale(mrb_state* mrb, mrb_value) {
-  const mrb_float scale = float_arg(mrb);
-  if (scale < 0.0) mrb_raise(mrb, E_ARGUMENT_ERROR, "Time.scale cannot be negative");
+  const mrb_float scale = at_least(mrb, float_arg(mrb), 0.0, "Time.scale");
   context(mrb).time.scale = static_cast<float>(scale);
   return mrb_float_value(mrb, scale);
 }

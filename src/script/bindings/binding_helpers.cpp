@@ -8,6 +8,8 @@
 #include <mruby/variable.h>
 
 #include <cmath>
+#include <cstdio>
+#include <string>
 
 #include "script/script_host.hpp"
 
@@ -19,7 +21,21 @@ constexpr float kMaxColorChannel = 255.0f;
 // Where a Vector3 keeps its components, in the order (x, y, z) they are stored in.
 constexpr const char* kComponentVariables[] = {"@x", "@y", "@z"};
 
-float float_from(mrb_state* mrb, mrb_value value) { return static_cast<float>(mrb_as_float(mrb, value)); }
+constexpr std::size_t kNumberTextSize = 32;
+
+float float_from(mrb_state* mrb, mrb_value value) { return static_cast<float>(finite(mrb, mrb_as_float(mrb, value))); }
+
+// A number as a script would write it: 5, -0.5, 150.
+std::string number_text(mrb_float value) {
+  char text[kNumberTextSize];
+  std::snprintf(text, sizeof text, "%g", value);
+  return text;
+}
+
+[[noreturn]] void refuse(mrb_state* mrb, const char* what, const std::string& range, mrb_float value) {
+  const std::string message = std::string(what) + " must be " + range + ", not " + number_text(value);
+  mrb_raise(mrb, E_ARGUMENT_ERROR, message.c_str());
+}
 
 Vec3 vec3_from_array(mrb_state* mrb, mrb_value array) {
   float components[kVectorComponents] = {};
@@ -116,10 +132,34 @@ mrb_value single_arg(mrb_state* mrb) {
   return value;
 }
 
+mrb_float finite(mrb_state* mrb, mrb_float value) {
+  if (!std::isfinite(value)) {
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "%n: expected a finite number, not %v", mrb_get_mid(mrb),
+               mrb_float_value(mrb, value));
+  }
+  return value;
+}
+
+mrb_float at_least(mrb_state* mrb, mrb_float value, mrb_float low, const char* what) {
+  if (finite(mrb, value) < low) refuse(mrb, what, "at least " + number_text(low), value);
+  return value;
+}
+
+mrb_float more_than(mrb_state* mrb, mrb_float value, mrb_float low, const char* what) {
+  if (finite(mrb, value) <= low) refuse(mrb, what, "more than " + number_text(low), value);
+  return value;
+}
+
+mrb_float from_to(mrb_state* mrb, mrb_float value, mrb_float low, mrb_float high, const char* what) {
+  const bool inside = finite(mrb, value) >= low && value <= high;
+  if (!inside) refuse(mrb, what, "from " + number_text(low) + " to " + number_text(high), value);
+  return value;
+}
+
 mrb_float float_arg(mrb_state* mrb) {
   mrb_float number = 0.0;
   mrb_get_args(mrb, "f", &number);
-  return number;
+  return finite(mrb, number);
 }
 
 bool bool_arg(mrb_state* mrb) {

@@ -30,6 +30,10 @@ and [Gameplay recipes](gameplay.md).
 | `Vector3` | `Vector3.new(x, y, z)`, `Vector3.zero`, `one`, `up`, `down`, `left`, `right`, `forward`, `back`; arithmetic, `dot`, `cross`, `length`, `normalized`, `clamped(max_length = 1.0)`, `lerp`, `flat`, `with(y: 0)`, `distance_to`, `approx?`, `to_a` |
 
 Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running.
+Every native takes finite numbers only: infinity or NaN (`0.0 / 0.0`) raises an `ArgumentError`
+instead of reaching the scene. A setting with a range raises outside it and says the range
+(`Camera.motion_blur must be from 0 to 1, not 3`); nothing is quietly clamped, except
+`Vehicle#drive`'s inputs, which an analog stick may push a little past full.
 Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing
 its rotation keeps its velocity. Vehicle wheel meshes must have their rotation applied (axle along X).
 
