@@ -166,6 +166,9 @@ bool needs_emissive_strength(const MaterialDesc& material);
 
 // Lists `extension` in the document's "extensionsUsed" once.
 void add_extension_used(nlohmann::json& json, const char* extension);
+// Takes `extension` out of the document's "extensionsUsed" and "extensionsRequired" (and each
+// list, once it is empty).
+void remove_extension_used(nlohmann::json& json, const char* extension);
 
 // Sets `key` to `value`, or removes the key when the value is an empty list or object.
 void set_unless_empty(nlohmann::json& object, const char* key, const nlohmann::json& value);

@@ -52,6 +52,18 @@ void keep_used(Json& doc, Kind kind, const std::vector<bool>& used) {
   set_unless_empty(*holder, kListNames[kind], kept);
 }
 
+// Whether the lights extension is there and adds no light any more (glTF wants at least one in it).
+bool emptied(const Json* lights) { return lights != nullptr && lights->empty(); }
+
+// Takes the lights extension out of a file left with no light: out of its extensions, and out of
+// the ones it says it uses.
+void drop_emptied_lights(Json& doc) {
+  if (!emptied(lights_extension(doc))) return;
+  doc[kExtensions].erase(kLightsExtension);
+  if (doc[kExtensions].empty()) doc.erase(kExtensions);
+  remove_extension_used(doc, kLightsExtension);
+}
+
 // A buffer view kept the plain way: no extension, in the file's only buffer.
 bool plain_view(const Json& view) {
   return !view.contains(kExtensions) && view.value(kBuffer, kOnlyBuffer) == kOnlyBuffer;
@@ -99,6 +111,7 @@ std::optional<GlbFile> lean_copy(const GlbFile& glb) {
   if (all_used(usage)) return std::nullopt;
   renumber(lean.json, usage);
   for (std::size_t kind = 0; kind < kKinds; ++kind) keep_used(lean.json, static_cast<Kind>(kind), usage[kind]);
+  drop_emptied_lights(lean.json);
   lean.bin = packed_bytes(lean.json, glb.bin);
   describe_buffer(lean.json, lean.bin.size());
   return lean;

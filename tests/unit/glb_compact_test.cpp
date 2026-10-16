@@ -136,6 +136,7 @@ TEST_CASE("the lights and cameras no object carries are left out, and the others
                                                              {{"name", "Kept"}, {"type", "point"}}};
   glb.json["nodes"][0]["camera"] = 1;
   glb.json["nodes"][0]["extensions"]["KHR_lights_punctual"] = {{"light", 2}};
+  glb.json["extensionsUsed"] = {"KHR_materials_clearcoat", "KHR_lights_punctual"};
   const std::optional<GlbFile> lean = without_unused(glb);
   REQUIRE(lean.has_value());
   const nlohmann::json& lights = lean->json["extensions"]["KHR_lights_punctual"]["lights"];
@@ -145,6 +146,7 @@ TEST_CASE("the lights and cameras no object carries are left out, and the others
   CHECK(lean->json["cameras"][0]["name"] == "Kept");
   CHECK(lean->json["nodes"][0]["camera"] == 0);
   CHECK(lean->json["nodes"][0]["extensions"]["KHR_lights_punctual"]["light"] == 0);
+  CHECK(lean->json["extensionsUsed"] == glb.json["extensionsUsed"]);
 
   // With no object carrying any, the lists go.
   glb.json["nodes"][0].erase("camera");
@@ -152,7 +154,16 @@ TEST_CASE("the lights and cameras no object carries are left out, and the others
   const std::optional<GlbFile> dark = without_unused(glb);
   REQUIRE(dark.has_value());
   CHECK_FALSE(dark->json.contains("cameras"));
-  CHECK_FALSE(dark->json["extensions"]["KHR_lights_punctual"].contains("lights"));
+  // And the lights extension goes with its last light (glTF wants one in it at least), from the
+  // extensions the file says it uses too.
+  CHECK_FALSE(dark->json.contains("extensions"));
+  CHECK(dark->json["extensionsUsed"] == nlohmann::json::array({"KHR_materials_clearcoat"}));
+  glb.json["extensionsUsed"] = {"KHR_lights_punctual"};
+  glb.json["extensionsRequired"] = {"KHR_lights_punctual"};
+  const std::optional<GlbFile> unlit = without_unused(glb);
+  REQUIRE(unlit.has_value());
+  CHECK_FALSE(unlit->json.contains("extensionsUsed"));
+  CHECK_FALSE(unlit->json.contains("extensionsRequired"));
 }
 
 TEST_CASE("a deleted light's and camera's entries leave the file, and come back with an undo") {
