@@ -295,7 +295,9 @@ if(NOT ANDROID)
     server/stop_signals.cpp
     server/server_program.cpp
     server/save_database.cpp
-    server/save_migration.cpp)
+    server/save_migration.cpp
+    server/room_slot.cpp
+    server/room_thread.cpp)
   target_link_libraries(redgem_game_server PUBLIC redgem_runtime sqlite3)
 
   redgem_add_library(redgem_editor

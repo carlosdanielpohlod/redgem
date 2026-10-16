@@ -25,6 +25,7 @@ below. The same goes for a [relay](scripting/multiplayer.md#over-the-internet-ro
 | `--port` | 7777 | The TCP port players connect to (0 picks a free one) |
 | `--max-players` | 8 | Players in one room, up to 15 |
 | `--rooms` | 8 | Rooms open at once, up to 64 |
+| `--threads` | The machine's cores | Threads the rooms run on, up to 64: each room has one of its own while there are no more rooms than threads |
 | `--per-address` | 24 | Machines one address may connect, up to 1024: raise it when many players share one address (a campus, some mobile networks) |
 | `--data` | `<game>-data` beside the game's folder | Where the game's `Save` is kept (`save.sqlite3`), for every room and every run |
 
@@ -32,7 +33,12 @@ It writes what happens to its output (rooms opened and closed, how many players)
 cleanly on Ctrl+C or `SIGTERM`: every room is closed and its players are told.
 
 A room is light (a platformer room takes 1 to 2 MB of memory and a few percent of one core), but
-every room runs the whole game, so `--rooms` is what sizes the machine.
+every room runs the whole game, so `--rooms` is what sizes the machine. Each room runs on a thread
+of its own, so the rooms use all the machine's cores, and a room loading a level (when its first
+player arrives, or when its game loads another) holds up no other room. Players connect and are
+placed in rooms on the server's main thread meanwhile. With more rooms open than `--threads`, the
+rooms share the threads there are: a level loading in one then holds up the others on its thread
+for that moment.
 
 ## Run it with Docker
 

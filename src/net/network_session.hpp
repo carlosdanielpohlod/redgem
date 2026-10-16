@@ -117,8 +117,8 @@ class NetworkSession {
   std::vector<int> players() const;
   // How many newcomers the game is deciding on (connection approval).
   std::size_t deciding() const;
-  // How many of the machines in the game connected from `address` (on the host).
-  int links_from(const std::string& address) const;
+  // Where the machines connected to this one connected from, one entry each (on the host).
+  std::vector<std::string> addresses() const;
   // The port being hosted on, or of the game joined.
   std::uint16_t port() const { return port_; }
 
@@ -150,10 +150,6 @@ class NetworkSession {
     bool is_another_than(int other) const { return let_in() && peer != other; }
     // A newcomer that may still say hello.
     bool waiting() const { return !let_in() && !connection.closed(); }
-    // Still there, and connected from `address`.
-    bool connected_from(const std::string& address) const {
-      return !connection.closed() && connection.address() == address;
-    }
   };
 
   bool connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello, std::string& error);

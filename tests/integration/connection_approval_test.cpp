@@ -181,10 +181,17 @@ struct Gathering {
     for (int i = 0; i < count; ++i) round();
   }
 
-  Engine& room_of(Engine& player) {
-    Engine* room = server->room(player.network().room());
-    REQUIRE(room != nullptr);
-    return *room;
+  // What `code` gives in the game of the server's room `player` is in, run on the room's thread.
+  std::string served(Engine& player, const std::string& code) {
+    RubyResult result;
+    std::string text;
+    const bool visited = server->visit(player.network().room(), [&](Engine& room) {
+      result = room.scripts().eval(code, "test.rb");
+      if (result.ok) text = RSTRING_PTR(mrb_obj_as_string(room.scripts().vm().state(), result.value));
+    });
+    REQUIRE(visited);
+    REQUIRE_MESSAGE(result.ok, result.error);
+    return text;
   }
 
   nlohmann::json saved_players() const {
@@ -369,9 +376,10 @@ TEST_CASE("a dedicated server's game decides who plays, and keeps each player's 
   REQUIRE(game.until([&] { return online(ana) && offline(eve); }));
   game.round();
   CHECK(ruby(eve, "$reasons.inspect") == "[\"not logged in\"]");
-  Engine& room = game.room_of(ana);
-  CHECK(ruby(room, "$joined.inspect") == "[[2, \"user-ana\", \"ana\"]]");
-  CHECK(ruby(room, "Network.identity(2)") == "user-ana");
+  // (The room hears of it at its next frame, on its own thread.)
+  REQUIRE(game.until([&] { return game.served(ana, "$joined.size") == "1"; }));
+  CHECK(game.served(ana, "$joined.inspect") == "[[2, \"user-ana\", \"ana\"]]");
+  CHECK(game.served(ana, "Network.identity(2)") == "user-ana");
 
   ruby(ana, "Network.leave");
   REQUIRE(game.until([&game] { return game.server->room_count() == 0; }));
@@ -385,7 +393,7 @@ TEST_CASE("a dedicated server's game decides who plays, and keeps each player's 
                         ", auth: { token: 'good', name: 'ana' })") == "true");
   REQUIRE(game.until([&ana] { return online(ana); }));
   game.round();
-  CHECK(ruby(game.room_of(ana), "Save['players']['user-ana']['visits']") == "1");
+  CHECK(game.served(ana, "Save['players']['user-ana']['visits']") == "1");
   ruby(ana, "Network.leave");
   REQUIRE(game.until([&game] { return game.server->room_count() == 0; }));
   CHECK(game.saved_players()["user-ana"]["visits"] == 2);

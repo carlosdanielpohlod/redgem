@@ -24,6 +24,16 @@ TEST_CASE("the server program plays the game it is given, as big as the usual se
   CHECK(plain.settings.port == kDefaultServerPort);
   CHECK(plain.settings.limits.max_players == kDefaultMaxPlayers);
   CHECK(plain.settings.limits.max_rooms == kDefaultMaxRooms);
+  CHECK(plain.settings.threads == processor_count());
+  CHECK(processor_count() >= 1);
+}
+
+TEST_CASE("the server program runs its rooms on as many threads as it is told, up to one a room") {
+  CHECK(parse_server_command({"game", "--threads", "2"}).settings.threads == 2);
+  CHECK(parse_server_command({"game", "--threads", "64"}).ok);
+  CHECK(parse_server_command({"game", "--threads", "0"}).error == "--threads needs a number from 1 to 64");
+  CHECK(parse_server_command({"game", "--threads", "65"}).error == "--threads needs a number from 1 to 64");
+  CHECK(server_usage().find("--threads <number>") != std::string::npos);
 }
 
 TEST_CASE("the server program takes its port and its size, in any order") {

@@ -30,9 +30,9 @@ the same pull request.
 
 ## Multiplayer
 
-- A dedicated server opens a room's game when its first player arrives, which holds up the
-  server's other rooms for a moment (the time a level takes to load). Its rooms share one
-  processor core.
+- A dedicated server runs each room on a thread of its own, up to `--threads` (the machine's
+  cores by default). With more rooms open than threads, rooms share them, and a level loading in
+  one holds up the others on its thread for that moment.
 - Messages are JSON over TCP: a packet lost on the way holds up the ones after it. What others
   move is shown a moment behind them (interpolated), and nothing rewinds time to judge a hit where
   its shooter saw the target (no lag compensation): fast competitive games will feel the delay.

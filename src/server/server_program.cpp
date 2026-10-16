@@ -15,11 +15,6 @@ namespace redgem::server {
 
 namespace {
 
-// Seconds on a clock that only goes forward.
-double seconds_now() {
-  return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
-}
-
 // How many rooms and players a server has, said in the log when it changes.
 struct Census {
   std::size_t rooms = 0;
@@ -56,11 +51,11 @@ int run_server(const ServerSettings& settings) {
 }  // namespace
 
 void serve_until(GameServer& server, const std::function<bool()>& stop) {
-  TickPacer pacer(config::kFixedDeltaSeconds, seconds_now());
+  TickPacer pacer(config::kFixedDeltaSeconds, steady_seconds());
   Census census;
   while (!stop()) {
-    std::this_thread::sleep_for(std::chrono::duration<double>(pacer.until_next(seconds_now())));
-    server.tick(pacer.take_turn(seconds_now()));
+    std::this_thread::sleep_for(std::chrono::duration<double>(pacer.until_next(steady_seconds())));
+    server.tick(pacer.take_turn(steady_seconds()));
     census.report(server);
   }
 }

@@ -6,6 +6,9 @@
 // Times are seconds on a clock that only goes forward.
 namespace redgem::server {
 
+// Seconds on a clock that only goes forward.
+double steady_seconds();
+
 class TickPacer {
  public:
   TickPacer(double tick_seconds, double now) : tick_seconds_(tick_seconds), last_turn_(now) {}

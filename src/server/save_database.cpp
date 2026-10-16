@@ -22,6 +22,10 @@ constexpr const char* kKeys = "SELECT key FROM saves ORDER BY key";
 constexpr const char* kBegin = "BEGIN";
 constexpr const char* kCommit = "COMMIT";
 constexpr const char* kRollBack = "ROLLBACK";
+// Where the statements above take their values (?1, ?2), and give them back.
+constexpr int kKeyPlace = 1;
+constexpr int kValuePlace = 2;
+constexpr int kFirstColumn = 0;
 
 bool executed(sqlite3* database, const char* sql) {
   return sqlite3_exec(database, sql, nullptr, nullptr, nullptr) == SQLITE_OK;
@@ -52,9 +56,9 @@ SaveDatabase::~SaveDatabase() { sqlite3_close(database_); }
 std::optional<nlohmann::json> SaveDatabase::get(const std::string& key) {
   const std::lock_guard<std::mutex> hold(lock_);
   SqliteStatement read(database_, kRead);
-  if (!read.bind(1, key).next_row()) return std::nullopt;
+  if (!read.bind(kKeyPlace, key).next_row()) return std::nullopt;
   // (A row that is not a value, written by something else than the server, counts as none.)
-  return saved::entry(nlohmann::json::parse(read.text(0), nullptr, false));
+  return saved::entry(nlohmann::json::parse(read.text(kFirstColumn), nullptr, false));
 }
 
 bool SaveDatabase::set(const std::string& key, const nlohmann::json& value) {
@@ -65,12 +69,12 @@ bool SaveDatabase::set(const std::string& key, const nlohmann::json& value) {
 
 bool SaveDatabase::write(const std::string& key, const nlohmann::json& value) {
   const std::string text = saved::written(saved::kept(value).value_or(nlohmann::json()));
-  return SqliteStatement(database_, kWrite).bind(1, key).bind(2, text).run();
+  return SqliteStatement(database_, kWrite).bind(kKeyPlace, key).bind(kValuePlace, text).run();
 }
 
 bool SaveDatabase::remove(const std::string& key) {
   const std::lock_guard<std::mutex> hold(lock_);
-  return SqliteStatement(database_, kRemove).bind(1, key).run();
+  return SqliteStatement(database_, kRemove).bind(kKeyPlace, key).run();
 }
 
 bool SaveDatabase::clear() {
@@ -82,7 +86,7 @@ std::vector<std::string> SaveDatabase::keys() {
   const std::lock_guard<std::mutex> hold(lock_);
   std::vector<std::string> names;
   SqliteStatement listing(database_, kKeys);
-  while (listing.next_row()) names.push_back(listing.text(0));
+  while (listing.next_row()) names.push_back(listing.text(kFirstColumn));
   return names;
 }
 

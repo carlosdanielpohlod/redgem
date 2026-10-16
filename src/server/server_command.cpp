@@ -21,23 +21,36 @@ constexpr NumberOption kOptions[] = {
     {"--rooms", 1, kMostRooms, [](ServerSettings& settings, int rooms) { settings.limits.max_rooms = rooms; }},
     {"--per-address", 1, net::kMostConnectionsPerAddress,
      [](ServerSettings& settings, int machines) { settings.connections_per_address = machines; }},
+    {"--threads", 1, kMostThreads, [](ServerSettings& settings, int threads) { settings.threads = threads; }},
 };
 
-std::string usage_text() {
-  const auto number = [](int value) { return std::to_string(value); };
-  return std::string("usage:\n") +
-         "  redgem-server <game_dir> [options]    run a game on a server, for players to join over the internet\n\n" +
-         "  --port <number>           the port to listen on (default: " + number(kDefaultServerPort) +
-         "; 0 picks a free one)\n" +
-         "  --max-players <number>    players in one room (default: " + number(kDefaultMaxPlayers) + ", at most " +
+std::string number(int value) { return std::to_string(value); }
+
+// How big the server is: its rooms and the threads they run on.
+std::string size_options() {
+  return "  --max-players <number>    players in one room (default: " + number(kDefaultMaxPlayers) + ", at most " +
          number(kMostPlayersPerRoom) + ")\n" +
          "  --rooms <number>          rooms open at once, each a match of its own (default: " +
          number(kDefaultMaxRooms) + ", at most " + number(kMostRooms) + ")\n" +
-         "  --per-address <number>    machines one address may connect (default: " +
+         "  --threads <number>        threads the rooms run on, one room each while they last (default: this\n" +
+         "                            machine's " + number(processor_count()) + " cores, at most " +
+         number(kMostThreads) + ")\n";
+}
+
+// Where it listens, whom it lets connect, and where it keeps what the game saves.
+std::string place_options() {
+  return "  --port <number>           the port to listen on (default: " + number(kDefaultServerPort) +
+         "; 0 picks a free one)\n" + "  --per-address <number>    machines one address may connect (default: " +
          number(net::kDefaultConnectionsPerAddress) + ", at most " + number(net::kMostConnectionsPerAddress) +
          "; players\n" + "                            behind one shared address, a campus, may need more)\n" +
          "  --data <dir>              where the game's Save is kept, for every room (default: a folder beside\n" +
          "                            the game's, named after it with " + kDataFolderSuffix + ")\n";
+}
+
+std::string usage_text() {
+  return std::string("usage:\n") +
+         "  redgem-server <game_dir> [options]    run a game on a server, for players to join over the internet\n\n" +
+         place_options() + size_options();
 }
 
 // Reads --data and the folder it is given.
