@@ -368,7 +368,8 @@ TEST_CASE("the platformer on a dedicated server plays no hero, keeps the coins, 
   Online online_game(kRoomy, REDGEM_PLATFORMER_DIR);
   Engine& player = online_game.join();
   CHECK(ruby(player, "CoOp.instance.ghosts.size") == "0");  // none for the server
-  CHECK(online_game.served(player, "CoOp.instance.ghosts.keys.inspect") == "[2]");
+  // (The room hears of the player at its next frame, on its own thread.)
+  CHECK(online_game.until([&] { return online_game.served(player, "CoOp.instance.ghosts.keys.inspect") == "[2]"; }));
   CHECK(online_game.served(player, "Scene.find('Player').get_component(Player).played?") == "false");
 
   ruby(player, "Network.emit(CoOp::COIN, 'Coin1')");
