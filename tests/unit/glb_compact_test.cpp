@@ -3,9 +3,9 @@
 #include <filesystem>
 #include <numeric>
 
-#include "editor/glb_compact.hpp"
-#include "editor/scene_document.hpp"
-#include "scene/gltf_loader.hpp"
+#include "editor/document/glb_compact.hpp"
+#include "editor/document/scene_document.hpp"
+#include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;

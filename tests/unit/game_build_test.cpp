@@ -6,7 +6,7 @@
 
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
-#include "project/android_package.hpp"
+#include "project/android/android_package.hpp"
 #include "project/game_build.hpp"
 
 using namespace redgem;

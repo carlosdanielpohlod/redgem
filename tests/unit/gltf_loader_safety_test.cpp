@@ -15,8 +15,8 @@
 
 #include <nlohmann/json.hpp>
 
-#include "scene/gltf_checks.hpp"
-#include "scene/gltf_loader.hpp"
+#include "scene/gltf/gltf_checks.hpp"
+#include "scene/gltf/gltf_loader.hpp"
 
 using namespace redgem;
 using nlohmann::json;

@@ -11,8 +11,10 @@ namespace {
 using CopyPair = std::pair<ObjectId, ObjectId>;
 
 // A copy before it gets its place in the scene: live, on its own, following no animation ahead.
+// It starts a life of its own: an original about to be destroyed hands that on to no copy.
 GameObject detached_copy(const GameObject& original) {
   GameObject copy = original;
+  copy.pending_destroy = false;
   copy.children.clear();
   copy.prefab = false;
   copy.props.erase(props::kPrefab);
@@ -31,20 +33,38 @@ ObjectId copy_or_original(const std::vector<CopyPair>& copies, ObjectId original
 
 }  // namespace
 
+ObjectId Scene::free_slot() {
+  if (free_slots_.empty()) {
+    objects_.emplace_back();
+    return static_cast<ObjectId>(objects_.size() - 1);
+  }
+  const ObjectId slot = free_slots_.back();
+  free_slots_.pop_back();
+  return slot;
+}
+
 ObjectId Scene::add_copy(ObjectId original, ObjectId parent, ObjectId root) {
   GameObject copy = detached_copy(at(original));
-  copy.id = static_cast<ObjectId>(objects_.size());
+  const ObjectId id = free_slot();
+  copy.id = id;
+  copy.serial = new_object_serial();
   copy.parent = parent;
-  copy.copy_root = root == kNoObject ? copy.id : root;
-  const ObjectId id = copy.id;
+  copy.copy_root = root == kNoObject ? id : root;
   copies_[copy.copy_of].push_back(id);
-  objects_.push_back(std::move(copy));
+  objects_[id] = std::move(copy);
   if (parent != kNoObject) objects_[parent].children.push_back(id);
   return id;
 }
 
 std::vector<ObjectId> Scene::clone(ObjectId source) {
+  if (!is_alive(source)) return {};
   const Transform world = world_transform(source);
+  const std::vector<CopyPair> copies = copy_subtree(source);
+  objects_[copies.front().second].local = world;  // the root keeps its world placement
+  return with_copied_joints(copies);
+}
+
+std::vector<CopyPair> Scene::copy_subtree(ObjectId source) {
   std::vector<CopyPair> copies;  // (original, its copy)
   // Breadth-first over the subtree; the new parent of each copy is known when it is created.
   std::vector<CopyPair> queue = {{source, kNoObject}};  // (original, copy's parent)
@@ -56,27 +76,28 @@ std::vector<ObjectId> Scene::clone(ObjectId source) {
       if (!objects_[child].destroyed) queue.push_back({child, id});
     }
   }
-  objects_[copies.front().second].local = world;  // the root keeps its world placement
-  return with_copied_joints(copies);
+  return copies;
 }
 
 std::vector<ObjectId> Scene::with_copied_joints(const std::vector<CopyPair>& copies) {
   std::vector<ObjectId> created;
   for (const auto& [original, id] : copies) {
-    for (ObjectId& joint : objects_[id].joints) joint = copy_or_original(copies, joint);
+    for (ObjectHandle& joint : objects_[id].joints) joint = copied_joint(joint, copies);
     created.push_back(id);
   }
   return created;
 }
 
+ObjectHandle Scene::copied_joint(ObjectHandle joint, const std::vector<CopyPair>& copies) const {
+  const ObjectId bone = resolve(joint);
+  // A bone that is gone stays gone: its slot may hold another object by now.
+  if (bone == kNoObject) return joint;
+  return handle(copy_or_original(copies, bone));
+}
+
 std::vector<ObjectId> Scene::copies_of(ObjectId original) const {
-  std::vector<ObjectId> alive;
   const auto found = copies_.find(original);
-  if (found == copies_.end()) return alive;
-  for (const ObjectId id : found->second) {
-    if (!objects_[id].destroyed) alive.push_back(id);
-  }
-  return alive;
+  return found == copies_.end() ? std::vector<ObjectId>{} : found->second;
 }
 
 }  // namespace redgem

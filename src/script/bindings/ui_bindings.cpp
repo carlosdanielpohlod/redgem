@@ -29,6 +29,7 @@ mrb_value ui_rect(mrb_state* mrb, mrb_value) {
   mrb_int r = 0, g = 0, b = 0, a = 0;
   mrb_float radius = 0.0;
   mrb_get_args(mrb, "iiiiiiiif", &box.x, &box.y, &box.width, &box.height, &r, &g, &b, &a, &radius);
+  radius = at_least(mrb, radius, 0.0, "a box's corner radius");
   HudItem item;
   item.kind = HudItem::Kind::Rect;
   place(item, box);

@@ -6,7 +6,7 @@
 #include "core/platform.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
-#include "editor/script_files.hpp"
+#include "editor/scripts/script_files.hpp"
 #include "editor/ui/panels.hpp"
 #include "editor/ui/project_folders.hpp"
 #include "editor/ui/style.hpp"

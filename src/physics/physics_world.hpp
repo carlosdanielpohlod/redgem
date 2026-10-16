@@ -14,8 +14,8 @@
 namespace redgem {
 
 struct WheelDesc {
-  ObjectId object = kNoObject;  // the child object that renders the wheel
-  Vec3 center;                  // wheel center in the chassis' (unscaled) local space
+  ObjectHandle object;  // the child object that renders the wheel (kept for the vehicle's life)
+  Vec3 center;          // wheel center in the chassis' (unscaled) local space
   float radius = 0.0f;
   float width = 0.0f;
 };
@@ -38,7 +38,7 @@ struct VehicleInput {
 };
 
 struct WheelPose {
-  ObjectId object = kNoObject;
+  ObjectHandle object;
   Transform world;  // scale is not tracked
 };
 

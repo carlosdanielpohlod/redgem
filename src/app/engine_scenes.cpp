@@ -72,9 +72,10 @@ void Engine::process_destroyed() {
     // whole batch is still alive, then the batch is torn down.
     for (const ObjectId id : pending) scripts_->on_destroyed(id);
     for (const ObjectId id : pending) scripts_->detach(id);
-    for (const ObjectId id : pending) {
-      physics_->remove_object(id);
-      scene_.finalize_destroy(id);
+    // Children first, so each parent is torn down with nothing left under it.
+    for (auto id = pending.rbegin(); id != pending.rend(); ++id) {
+      physics_->remove_object(*id);
+      scene_.finalize_destroy(*id);
     }
   }
 }

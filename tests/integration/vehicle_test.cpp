@@ -49,7 +49,12 @@ std::vector<WheelDesc> four_wheels() {
   std::vector<WheelDesc> wheels;
   ObjectId id = kFirstWheel;
   for (const float z : {-kAxleZ, kAxleZ}) {
-    for (const float x : {-kAxleX, kAxleX}) wheels.push_back({id++, {x, kWheelY, z}, kWheelRadius, kWheelWidth});
+    for (const float x : {-kAxleX, kAxleX}) {
+      // (No scene here: the world only carries the handles back, so any serial does.)
+      const ObjectHandle wheel{id, static_cast<ObjectSerial>(id)};
+      ++id;
+      wheels.push_back({wheel, {x, kWheelY, z}, kWheelRadius, kWheelWidth});
+    }
   }
   return wheels;
 }
@@ -116,7 +121,7 @@ TEST_CASE("a car settles on its wheels and drives forward") {
   CHECK(std::fabs(moved.position.x) < kMaxSideDrift);
 
   const std::vector<WheelPose> wheels = world->wheel_poses(kCar);
-  CHECK(wheels.front().object == kFirstWheel);
+  CHECK(wheels.front().object.id == kFirstWheel);
   CHECK(std::fabs(wheels.front().world.position.y - kWheelRadius) < kWheelHeightTolerance);
 }
 

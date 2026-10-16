@@ -1,8 +1,8 @@
 #include <doctest/doctest.h>
 
 #include "scene/scene_config.hpp"
-#include "scene/primitive_builder.hpp"
-#include "scene/primitives.hpp"
+#include "scene/shapes/primitive_builder.hpp"
+#include "scene/shapes/primitives.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;

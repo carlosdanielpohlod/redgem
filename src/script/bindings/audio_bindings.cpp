@@ -20,6 +20,8 @@ mrb_value audio_play(mrb_state* mrb, mrb_value) {
   mrb_value name;
   mrb_float volume = 0.0, pitch = 0.0;
   mrb_get_args(mrb, "off", &name, &volume, &pitch);
+  volume = at_least(mrb, volume, kSilent, "Audio.play's volume");
+  pitch = more_than(mrb, pitch, kSilent, "Audio.play's pitch");
   return mrb_bool_value(
       audio(mrb).play_sound(to_name(mrb, name), static_cast<float>(volume), static_cast<float>(pitch)));
 }
@@ -29,19 +31,19 @@ mrb_value audio_music(mrb_state* mrb, mrb_value) {
   mrb_bool loop = true;
   mrb_float volume = 0.0;
   mrb_get_args(mrb, "obf", &name, &loop, &volume);
+  volume = at_least(mrb, volume, kSilent, "Audio.play_music's volume");
   return mrb_bool_value(audio(mrb).play_music(to_name(mrb, name), loop, static_cast<float>(volume)));
 }
 
 mrb_value audio_set_music_pitch(mrb_state* mrb, mrb_value) {
-  const mrb_float pitch = float_arg(mrb);
-  if (pitch <= 0.0) mrb_raise(mrb, E_ARGUMENT_ERROR, "Audio.music_pitch must be positive");
+  const mrb_float pitch = more_than(mrb, float_arg(mrb), kSilent, "Audio.music_pitch");
   audio(mrb).set_music_pitch(static_cast<float>(pitch));
   return mrb_float_value(mrb, pitch);
 }
 
 mrb_value audio_set_music_volume(mrb_state* mrb, mrb_value) {
-  const mrb_float volume = float_arg(mrb);
-  audio(mrb).set_music_volume(static_cast<float>(volume < kSilent ? kSilent : volume));
+  const mrb_float volume = at_least(mrb, float_arg(mrb), kSilent, "Audio.music_volume");
+  audio(mrb).set_music_volume(static_cast<float>(volume));
   return mrb_float_value(mrb, volume);
 }
 
@@ -51,7 +53,7 @@ mrb_value audio_stop_music(mrb_state* mrb, mrb_value) {
 }
 
 mrb_value audio_set_volume(mrb_state* mrb, mrb_value) {
-  const mrb_float volume = float_arg(mrb);
+  const mrb_float volume = at_least(mrb, float_arg(mrb), kSilent, "Audio.volume");
   audio(mrb).set_master_volume(static_cast<float>(volume));
   return mrb_float_value(mrb, volume);
 }

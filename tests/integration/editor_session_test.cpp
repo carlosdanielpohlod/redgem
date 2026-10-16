@@ -7,7 +7,7 @@
 #include "scene/props.hpp"
 #include "editor/editor_session.hpp"
 #include "core/files.hpp"
-#include "editor/script_files.hpp"
+#include "editor/scripts/script_files.hpp"
 #include "testing/recording_audio.hpp"
 #include "test_support.hpp"
 
@@ -54,6 +54,33 @@ float y_of(const EditorSession& session, const std::string& name) {
 }
 
 }  // namespace
+
+TEST_CASE("refreshing one node gives the preview what rebuilding it all would, and keeps who it is") {
+  constexpr Vec3 kDragged{3.0f, 4.0f, 5.0f};
+  const auto dir = copy_sandbox("refresh_node");
+  auto session = open(dir);
+  const ObjectId crate = session->scene().find("Crate");
+  REQUIRE(crate != kNoObject);
+  const ObjectSerial serial = session->scene().at(crate).serial;
+  Transform local = session->document().node(crate).local;
+  local.position = kDragged;
+  session->document().set_local(crate, local, false);  // as a gizmo drag does, every frame
+  session->refresh_node(crate);
+  const GameObject one = session->scene().at(crate);
+  CHECK(one.serial == serial);
+  session->refresh_preview();
+  const GameObject& all = session->scene().at(crate);
+  CHECK(approx_equal(one.local.position, all.local.position, kPositionTolerance));
+  CHECK(approx_equal(one.local.position, kDragged, kPositionTolerance));
+  CHECK(one.name == all.name);
+  CHECK(one.parent == all.parent);
+  CHECK(one.children == all.children);
+  CHECK(one.props == all.props);
+  CHECK(one.mesh == all.mesh);
+  CHECK(one.prefab == all.prefab);
+  CHECK(one.light.has_value() == all.light.has_value());
+  std::filesystem::remove_all(dir);
+}
 
 TEST_CASE("a game's music ends with the game, whether Stop ends it or the game quits by itself") {
   test::LogCapture quiet;

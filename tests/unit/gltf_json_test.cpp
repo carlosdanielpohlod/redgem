@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "editor/gltf_json.hpp"
+#include "editor/document/gltf_json.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;

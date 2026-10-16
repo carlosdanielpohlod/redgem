@@ -3,6 +3,7 @@
 #include <mruby.h>
 #include <mruby/array.h>
 #include <mruby/class.h>
+#include <mruby/hash.h>
 #include <mruby/variable.h>
 
 #include <fstream>
@@ -61,27 +62,52 @@ RubyResult ScriptHost::load_file(const std::filesystem::path& path) {
 }
 
 mrb_value ScriptHost::object_value(ObjectId object) {
-  mrb_state* mrb = vm_.state();
   if (object < 0) return mrb_nil_value();
-  mrb_value cached = mrb_ary_entry(objects_cache_, object);
-  if (!mrb_nil_p(cached)) return cached;
+  mrb_state* mrb = vm_.state();
+  const mrb_value key = mrb_int_value(mrb, object);
+  mrb_value cached = mrb_hash_get(mrb, objects_cache_, key);
+  if (stands_for(cached, context_.scene->at(object))) return cached;
+  mrb_value wrapper = new_wrapper(context_.scene->at(object));
+  mrb_hash_set(mrb, objects_cache_, key, wrapper);
+  return wrapper;
+}
+
+// (Each Ruby GameObject is made once for its object and kept in the cache, which holds its
+// behaviours too: the cache is what keeps them alive until the object is destroyed.)
+mrb_value ScriptHost::new_wrapper(const GameObject& object) {
+  mrb_state* mrb = vm_.state();
   RClass* klass = mrb_class_get(mrb, binding::kGameObjectClass);
   mrb_value wrapper = mrb_obj_value(mrb_obj_alloc(mrb, MRB_TT_OBJECT, klass));
-  mrb_iv_set(mrb, wrapper, mrb_intern_cstr(mrb, binding::kIdVariable), mrb_int_value(mrb, object));
-  mrb_iv_set(mrb, wrapper, mrb_intern_cstr(mrb, kBehavioursVariable), mrb_ary_new(mrb));
-  mrb_ary_set(mrb, objects_cache_, object, wrapper);
+  set_variable(wrapper, binding::kIdVariable, mrb_int_value(mrb, object.id));
+  set_variable(wrapper, binding::kSerialVariable, mrb_int_value(mrb, static_cast<mrb_int>(object.serial)));
+  // Name and tag never change, so they stay readable once the object is gone.
+  set_variable(wrapper, binding::kNameVariable, binding::text_value(mrb, object.name));
+  set_variable(wrapper, binding::kTagVariable, binding::text_value(mrb, object.tag));
+  set_variable(wrapper, kBehavioursVariable, mrb_ary_new(mrb));
   return wrapper;
+}
+
+void ScriptHost::set_variable(mrb_value object, const char* name, mrb_value value) {
+  mrb_iv_set(vm_.state(), object, mrb_intern_cstr(vm_.state(), name), value);
+}
+
+bool ScriptHost::stands_for(mrb_value wrapper, const GameObject& object) {
+  if (mrb_nil_p(wrapper)) return false;
+  const mrb_value serial = mrb_iv_get(vm_.state(), wrapper, mrb_intern_cstr(vm_.state(), binding::kSerialVariable));
+  return mrb_integer(serial) == static_cast<mrb_int>(object.serial);
 }
 
 void ScriptHost::reset_scene() {
   behaviours_.clear();
-  vm_.release_kept();
+  behaviours_by_object_.clear();
   start_objects_cache();
 }
 
 void ScriptHost::start_objects_cache() {
   mrb_state* mrb = vm_.state();
-  objects_cache_ = mrb_ary_new(mrb);
+  // A Hash by id, not an Array: it holds only the objects scripts touched, whatever their ids,
+  // where an Array has a largest size a big scene's ids go past.
+  objects_cache_ = mrb_hash_new(mrb);
   mrb_gv_set(mrb, mrb_intern_cstr(mrb, kObjectsCacheGlobal), objects_cache_);
 }
 

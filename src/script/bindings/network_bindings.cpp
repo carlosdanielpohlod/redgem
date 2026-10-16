@@ -5,7 +5,7 @@
 #include <mruby.h>
 
 #include "core/log.hpp"
-#include "net/lan_discovery.hpp"
+#include "net/discovery/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"

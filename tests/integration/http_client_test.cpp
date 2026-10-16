@@ -6,7 +6,7 @@
 #include <thread>
 
 #include "http_test_server.hpp"
-#include "net/http_client.hpp"
+#include "net/http/http_client.hpp"
 
 using namespace redgem;
 using redgem::test::http_answer;

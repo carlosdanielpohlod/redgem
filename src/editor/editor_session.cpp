@@ -24,6 +24,11 @@ void EditorSession::refresh_preview() {
   if (selection_ >= document_.node_count()) selection_ = kNoObject;
 }
 
+void EditorSession::refresh_node(ObjectId node) {
+  if (!document_.has_node(node)) return refresh_preview();
+  preview_.refresh_from_desc(document_.desc(), node);
+}
+
 void EditorSession::select(ObjectId id) { selection_ = document_.has_node(id) ? id : kNoObject; }
 
 void EditorSession::select_by_name(const std::string& name) { select(document_.desc().find_node(name)); }
@@ -71,7 +76,8 @@ bool EditorSession::sculpt_terrain(ObjectId terrain, Vec3 world_point, float rad
   const TerrainBrush brush =
       editor_logic::local_brush(preview_.world_transform(terrain), world_point, radius, amount, mode);
   if (!document_.sculpt_terrain(terrain, brush)) return false;
-  refresh_preview();
+  // Its vertices reach the renderer as a changed mesh; of its object, nothing else changed.
+  refresh_node(terrain);
   return true;
 }
 

@@ -38,6 +38,8 @@ bool has_a_screen(const ScriptContext& ctx) { return ctx.screen_width > 0 && ctx
 mrb_value camera_screen_ray(mrb_state* mrb, mrb_value) {
   mrb_float x = 0.0, y = 0.0;
   mrb_get_args(mrb, "ff", &x, &y);
+  x = finite(mrb, x);
+  y = finite(mrb, y);
   const ScriptContext& ctx = context(mrb);
   const CameraDesc* camera = main_camera(mrb);
   const bool can_look = camera != nullptr && has_a_screen(ctx);
@@ -58,11 +60,8 @@ mrb_value camera_fov(mrb_state* mrb, mrb_value) {
   return mrb_float_value(mrb, fov > 0.0f ? radians_to_degrees(fov) : config::kDefaultFovYDegrees);
 }
 
-bool is_outside_fov_range(mrb_float degrees) { return degrees < kMinFovDegrees || degrees > kMaxFovDegrees; }
-
 mrb_value camera_set_fov(mrb_state* mrb, mrb_value) {
-  const mrb_float degrees = float_arg(mrb);
-  if (is_outside_fov_range(degrees)) mrb_raise(mrb, E_ARGUMENT_ERROR, "Camera.fov must be between 10 and 150 degrees");
+  const mrb_float degrees = from_to(mrb, float_arg(mrb), kMinFovDegrees, kMaxFovDegrees, "Camera.fov");
   CameraDesc* camera = main_camera(mrb);
   if (camera != nullptr) camera->fov_y_radians = degrees_to_radians(static_cast<float>(degrees));
   return mrb_float_value(mrb, degrees);
@@ -71,8 +70,8 @@ mrb_value camera_set_fov(mrb_state* mrb, mrb_value) {
 mrb_value camera_motion_blur(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, context(mrb).motion_blur); }
 
 mrb_value camera_set_motion_blur(mrb_state* mrb, mrb_value) {
-  const mrb_float amount = float_arg(mrb);
-  context(mrb).motion_blur = static_cast<float>(std::clamp(amount, kNoBlur, kFullBlur));
+  const mrb_float amount = from_to(mrb, float_arg(mrb), kNoBlur, kFullBlur, "Camera.motion_blur");
+  context(mrb).motion_blur = static_cast<float>(amount);
   return mrb_float_value(mrb, amount);
 }
 

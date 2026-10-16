@@ -9,7 +9,7 @@
 #include <nlohmann/json.hpp>
 
 #include "net/frame_buffer.hpp"
-#include "net/socket.hpp"
+#include "net/socket/socket.hpp"
 #include "net/wire.hpp"
 
 namespace redgem::net {

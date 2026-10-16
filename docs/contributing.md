@@ -81,17 +81,20 @@ src/core      what everything shares: math, logging, the fixed timestep clock, f
               layer (the only place, with the sockets of src/net, that asks which system this is),
               the words of a command line, embedding files in the binary, the game folder's layout
               (config.hpp)
-src/scene     glTF loader (meshes, skeletons, animations), Blender extras parser, scene graph,
-              animation playback, particles; the custom properties scenes carry (props.hpp)
+src/scene     scene graph (objects, transforms, copies), particles, the custom properties scenes
+              carry (props.hpp); in folders of their own: gltf/ (the loader: meshes, skeletons,
+              animations, Blender extras), animation/ (clips and their playback), shapes/
+              (primitives and terrain)
 src/physics   PhysicsWorld interface + Jolt implementation
 src/input     keys, axes/actions, keyboard, mouse, gamepad and scripted input sources; a touch
               screen's on-screen controls (touch_input_source.hpp), which only the program for
               a touch screen puts in front of the others
-src/net       sockets (socket*.cpp and datagrams.cpp: the only place with OS socket calls, what the
-              systems spell differently being in socket_native), message framing and wire format, the
-              host/guest session and its connection approval, discovery on the local network,
-              the relay and the entry point of its program (relay_main.cpp), and the games' web
-              requests (http_*: HTTP/1.1 over Mbed TLS, one thread per request)
+src/net       message framing and wire format, the host/guest session and its connection approval;
+              socket/ (the only place with OS socket calls, what the systems spell differently being
+              in socket_native), discovery/ (games on the local network), rooms/ (the relay and the
+              entry point of its program, relay_main.cpp, and what a dedicated server's rooms share
+              with it: codes, the lobby, guessers kept out), http/ (the games' web requests:
+              HTTP/1.1 over Mbed TLS, one thread per request)
 src/audio     sound effects and music (raylib, or silence when there is no audio device)
 src/storage   what a game keeps between runs (the save store)
 src/render    the window (window.hpp: the only place that opens one, with its graphics card, frame
@@ -104,12 +107,13 @@ src/app       what plays a game: the engine loop, which draws nothing and hands 
               (FrameView) to a presenter (presenter.hpp); the presenter that shows a game in a
               window of its own and the painter every drawing presenter shares; game.json, the
               game beside a built executable, where saves go, user settings, the entry points of
-              the player (player_main.cpp; on Android, android_main.cpp)
-src/editor    editor: scene document (undo, save, import), session (play mode), camera, picking,
-              script tabs, ImGui panels and theme (src/editor/ui)
-src/project   the tools around a game: new games from templates, builds (desktop and Android),
-              recent games and the project hub, the command line, the entry point of redgem
-              (main.cpp)
+              the player (player_main.cpp; on Android, android/android_main.cpp)
+src/editor    editor: session (play mode), camera, picking, the app and its panels; document/ (the
+              scene document: undo, save, the glb it edits, importing models), scripts/ (the script
+              tabs), ui/ (ImGui panels and theme)
+src/project   the tools around a game: new games from templates, builds (desktop, and Android in
+              android/), recent games and the project hub, the command line, the entry point of
+              redgem (main.cpp)
 src/testing   what runs tests, apart from the engine: TestInput, the pictures a test takes of the
               game (TestScreen), the system test and Ruby test runners, the audio tests listen
               with, redgem-test and its command line
@@ -134,6 +138,23 @@ it (`core`; then `scene`, `net`, `input`, `audio`, `physics`, `storage`; then `r
 sees it).
 Each layer keeps its own numbers in a `<layer>_config.hpp` next to its code.
 
+### Objects, and keeping hold of one
+
+A scene object's `ObjectId` is a slot. The loaded scene's objects keep their slots (an id below
+the node count is that node); the slot of an object made while the game runs (`Scene::clone`,
+`Scene.spawn`) holds a new object once it is destroyed. Every object also gets an `ObjectSerial`
+no other object ever had, in any scene.
+
+- What keeps an object past the step it was handed it (a skin's bones, a vehicle's wheels, a
+  character's own clip, a behaviour, a Ruby `GameObject` or `Transform`) keeps an `ObjectHandle`
+  and asks `Scene::resolve` for it each time: that finds the object while it is alive, and
+  nothing afterwards, whoever sits in its slot.
+- Only a registry the engine updates in the very step an object is destroyed may key by bare id:
+  the physics bodies (`Engine::process_destroyed` removes them) and the scene's own hierarchy and
+  copies.
+- Destruction is two steps: `request_destroy` marks an object and what is under it, its
+  `on_destroy` runs with everything still there, then the batch is torn down children first.
+
 ## Libraries and programs
 
 The folders are built into a few static libraries, one on top of the other, and each program
@@ -157,13 +178,13 @@ redgem-player   src/app/player_main.cpp    redgem_runtime   what players receive
                                                             the game/ folder beside it, nothing else
 redgem          src/project/main.cpp       redgem_project   the editor, the project hub, the command
                                                             line (new, build, --play)
-redgem-relay    src/net/relay_main.cpp     redgem_net       the meeting point for games over the
+redgem-relay    src/net/rooms/relay_main.cpp     redgem_net       the meeting point for games over the
                                                             internet: no window, for servers
 redgem-server   src/server/server_main.cpp redgem_game_server
                                                             a game run on a server for players to
                                                             join, in rooms: no window, no display
 redgem-test     src/testing/main.cpp       redgem_testing   runs a game's tests
-libredgem.so    src/app/android_main.cpp   redgem_runtime   the player on Android, loaded by the app
+libredgem.so    src/app/android/android_main.cpp   redgem_runtime   the player on Android, loaded by the app
 ```
 
 A built game is a copy of the player, never of the program that builds it: `redgem build` and

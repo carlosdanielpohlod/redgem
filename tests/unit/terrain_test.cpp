@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-#include "scene/terrain.hpp"
+#include "scene/shapes/terrain.hpp"
 
 using namespace redgem;
 

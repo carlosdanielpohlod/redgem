@@ -9,6 +9,15 @@ module Network
       @synced.delete(sync.key) if @synced[sync.key].equal?(sync)
     end
 
+    # Any destroyed object: if it was spawned on the network, it is no longer, whether or not its
+    # NetworkSync ever started (only a started one forgets it on its own).
+    def __object_gone(object)
+      return if @spawned.empty?
+
+      key, entry = @spawned.find { |_key, spawned| spawned[:object] == object }
+      forget_spawned(key, entry) if entry
+    end
+
     # The object is gone for good. (Its key may be one a spawned object goes by too: only what was
     # spawned as this very object is forgotten with it.)
     def __forget(sync)

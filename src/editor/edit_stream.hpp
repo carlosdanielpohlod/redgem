@@ -1,6 +1,6 @@
 #pragma once
 
-#include "editor/scene_document.hpp"
+#include "editor/document/scene_document.hpp"
 
 namespace redgem {
 

@@ -11,10 +11,10 @@
 
 #include <nlohmann/json.hpp>
 
-#include "editor/glb_file.hpp"
-#include "editor/scene_document.hpp"
-#include "scene/primitives.hpp"
-#include "scene/gltf_loader.hpp"
+#include "editor/document/glb_file.hpp"
+#include "editor/document/scene_document.hpp"
+#include "scene/shapes/primitives.hpp"
+#include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -738,6 +738,35 @@ TEST_CASE("a duplicated character has its own skeleton, also after the original 
   CHECK(joint_names(loaded.scene, "Arm") == std::vector<std::string>{"Lower", "Upper"});
   CHECK(joint_names(loaded.scene, "Arm.001") == std::vector<std::string>{"Lower.001", "Upper.001"});
   std::filesystem::remove(out);
+}
+
+TEST_CASE("a brush stroke on a saved document stays undoable and unsaved once released") {
+  // The editor's own order: grab (checkpoint), sculpt every held frame, release (drop the step if
+  // nothing changed). The release used to compare only nodes and materials and threw strokes away.
+  constexpr TerrainGrid kGrid{40.0f, 20};
+  constexpr Color kGrass{0.3f, 0.5f, 0.2f, 1.0f};
+  constexpr TerrainBrush kHill{0.0f, 0.0f, 6.0f, 3.0f, SculptMode::Raise};
+  const std::filesystem::path path = temp_copy_path("stroke");
+  SceneDocument doc = SceneDocument::create_empty(path);
+  const int terrain = doc.add_terrain("Terrain", kGrid, kGrass);
+  std::string error;
+  REQUIRE_MESSAGE(doc.save(error), error);
+  REQUIRE_FALSE(doc.dirty());
+
+  const int mesh = doc.node(terrain).mesh;
+  const auto height = [&doc, mesh, &kGrid] {
+    return terrain_height(doc.desc().meshes[static_cast<std::size_t>(mesh)].primitives.front(), kGrid, 0.0f, 0.0f);
+  };
+
+  doc.checkpoint();
+  REQUIRE(doc.sculpt_terrain(terrain, kHill));
+  doc.drop_checkpoint_if_unchanged();
+  CHECK(doc.dirty());
+  REQUIRE(doc.undo());  // the stroke, not the terrain's creation
+  CHECK(height() == doctest::Approx(0.0f));
+  CHECK(doc.terrain_grid(terrain).has_value());
+  CHECK_FALSE(doc.dirty());
+  std::filesystem::remove(path);
 }
 
 TEST_CASE("a terrain is sculpted, undone, saved and read back with its shape") {

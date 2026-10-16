@@ -2,6 +2,16 @@
 
 // Helpers for native methods. Errors are raised as Ruby exceptions (never C++ exceptions),
 // so they can only be used inside functions called from Ruby.
+//
+// What every native holds the scripts' arguments to:
+//   - a number is finite and fits a float, the engine's own numbers: infinity, NaN and a finite
+//     number too large for a float (1e300) are refused wherever they would go (float_arg, to_vec3,
+//     Vector3's own numbers, finite for the rest), so they never reach the scene, physics or the
+//     renderer;
+//   - a number with a range of its own is refused outside it, saying the range and what was given
+//     (at_least, more_than, from_to), never quietly clamped (a steering input is the exception:
+//     an analog stick may go a little past full, see Vehicle#drive);
+//   - an object is one that is still there (alive_object, alive_id).
 
 #include <mruby.h>
 
@@ -18,8 +28,12 @@ namespace redgem::binding {
 // Ruby classes of the prelude that natives look up by name.
 inline constexpr const char* kGameObjectClass = "GameObject";
 inline constexpr const char* kVector3Class = "Vector3";
-// Where a wrapper (GameObject, Transform, Rigidbody...) keeps the id of its object.
+// Where a wrapper (GameObject, Transform, Rigidbody...) keeps which object it stands for: the
+// object's slot and its serial (see ObjectSerial), and, on a GameObject, its name and tag.
 inline constexpr const char* kIdVariable = "@id";
+inline constexpr const char* kSerialVariable = "@serial";
+inline constexpr const char* kNameVariable = "@name";
+inline constexpr const char* kTagVariable = "@tag";
 
 ScriptContext& context(mrb_state* mrb);
 Scene& scene(mrb_state* mrb);
@@ -32,14 +46,23 @@ Part& required(mrb_state* mrb, Part* part, const char* unavailable) {
   return *part;
 }
 
-// Object id stored in @id of a wrapper (GameObject, Transform, Rigidbody...).
-ObjectId self_id(mrb_state* mrb, mrb_value self);
-// Any object that ever existed, destroyed or not. Raises for ids that never existed.
-GameObject& object_at(mrb_state* mrb, mrb_value self);
+// The handle a wrapper keeps (its @id and @serial); raises for a value that is no wrapper. Its
+// object is scene(mrb).resolve(handle): nothing once destroyed, or once the scene was switched.
+ObjectHandle wrapped_handle(mrb_state* mrb, mrb_value self);
 // Raises if the object behind `self` was destroyed.
 GameObject& alive_object(mrb_state* mrb, mrb_value self);
 // The id of the object behind `self`, which must not have been destroyed.
 ObjectId alive_id(mrb_state* mrb, mrb_value self);
+
+// What a Ruby Vector3 holds, inside the object itself (see vector3_bindings.cpp). vector3_of
+// must be given a Vector3.
+struct Vector3Value {
+  mrb_float x = 0.0;
+  mrb_float y = 0.0;
+  mrb_float z = 0.0;
+};
+Vector3Value& vector3_of(mrb_value vector);
+mrb_value new_vector3(mrb_state* mrb, const Vector3Value& v);
 
 // Accepts a Vector3 or a 3-element Array.
 Vec3 to_vec3(mrb_state* mrb, mrb_value value);
@@ -63,8 +86,19 @@ Found known(mrb_state* mrb, const std::optional<Found>& found, const char* unkno
   if (!found) mrb_raisef(mrb, E_ARGUMENT_ERROR, unknown, name.c_str());
   return *found;
 }
-// The single argument of a native method: any value, a number, true or false, or a name (a
-// Symbol or a String).
+// Whether a number is finite and small enough to become a float.
+bool fits_a_float(mrb_float value);
+// A number a script handed a native, when it fits a float (see fits_a_float): an ArgumentError
+// naming the native otherwise.
+mrb_float finite(mrb_state* mrb, mrb_float value);
+// A finite number within a range of its own: an ArgumentError saying "<what> must be ..., not
+// <value>" otherwise.
+mrb_float at_least(mrb_state* mrb, mrb_float value, mrb_float low, const char* what);
+mrb_float more_than(mrb_state* mrb, mrb_float value, mrb_float low, const char* what);
+mrb_float from_to(mrb_state* mrb, mrb_float value, mrb_float low, mrb_float high, const char* what);
+
+// The single argument of a native method: any value, a finite number, true or false, or a name
+// (a Symbol or a String).
 mrb_value single_arg(mrb_state* mrb);
 mrb_float float_arg(mrb_state* mrb);
 bool bool_arg(mrb_state* mrb);

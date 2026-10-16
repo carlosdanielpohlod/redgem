@@ -1,9 +1,10 @@
 # What an object may have besides its behaviours: where it is, and its body in the physics
 # world. Instances are made by GameObject, never with new; the engine defines what they do.
 class Transform
-  def self.__new(id)
+  def self.__new(id, serial)
     transform = allocate
     transform.instance_variable_set(:@id, id)
+    transform.instance_variable_set(:@serial, serial)
     transform
   end
 
@@ -15,26 +16,29 @@ class Transform
 end
 
 class CharacterController
-  def self.__new(id)
+  def self.__new(id, serial)
     controller = allocate
     controller.instance_variable_set(:@id, id)
+    controller.instance_variable_set(:@serial, serial)
     controller
   end
 end
 
 class Rigidbody
-  def self.__new(id)
+  def self.__new(id, serial)
     body = allocate
     body.instance_variable_set(:@id, id)
+    body.instance_variable_set(:@serial, serial)
     body
   end
 end
 
 # A car built in Blender: `body = "vehicle"` on the chassis, `wheel = true` on its wheel children.
 class Vehicle
-  def self.__new(id)
+  def self.__new(id, serial)
     vehicle = allocate
     vehicle.instance_variable_set(:@id, id)
+    vehicle.instance_variable_set(:@serial, serial)
     vehicle
   end
 

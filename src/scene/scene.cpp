@@ -1,5 +1,7 @@
 #include "scene/scene.hpp"
 
+#include <algorithm>
+#include <atomic>
 #include <stdexcept>
 
 namespace redgem {
@@ -19,9 +21,28 @@ bool is_live_camera(const GameObject& object) { return !object.destroyed && obje
 // Marked for destruction and not destroyed yet.
 bool awaits_destruction(const GameObject& object) { return object.pending_destroy && !object.destroyed; }
 
+void erase_id(std::vector<ObjectId>& ids, ObjectId id) {
+  ids.erase(std::remove(ids.begin(), ids.end(), id), ids.end());
+}
+
 }  // namespace
 
+ObjectSerial new_object_serial() {
+  // For the whole process, not one scene: a reference kept across a scene switch must not match.
+  static std::atomic<ObjectSerial> last{kNoSerial};
+  return ++last;
+}
+
 bool Scene::is_alive(ObjectId id) const { return valid(id) && !objects_[id].destroyed; }
+
+ObjectHandle Scene::handle(ObjectId id) const {
+  return is_alive(id) ? ObjectHandle{id, objects_[id].serial} : kNoHandle;
+}
+
+ObjectId Scene::resolve(ObjectHandle handle) const {
+  const bool same_object = is_alive(handle.id) && objects_[handle.id].serial == handle.serial;
+  return same_object ? handle.id : kNoObject;
+}
 
 GameObject& Scene::at(ObjectId id) {
   if (!valid(id)) throw std::out_of_range("invalid object id " + std::to_string(id));
@@ -94,17 +115,55 @@ void Scene::request_destroy(ObjectId id) {
 }
 
 std::vector<ObjectId> Scene::pending_destroy_ids() const {
+  // Walked from the top of each pending subtree: a copy's child may sit in a lower slot than it.
   std::vector<ObjectId> ids;
   for (const GameObject& object : objects_) {
-    if (awaits_destruction(object)) ids.push_back(object.id);
+    if (awaits_destruction(object) && !parent_is_pending(object)) append_pending(object.id, ids);
   }
   return ids;
+}
+
+void Scene::append_pending(ObjectId id, std::vector<ObjectId>& out) const {
+  out.push_back(id);
+  for (const ObjectId child : objects_[id].children) {
+    if (awaits_destruction(objects_[child])) append_pending(child, out);
+  }
+}
+
+bool Scene::parent_is_pending(const GameObject& object) const {
+  return object.parent != kNoObject && awaits_destruction(objects_[object.parent]);
 }
 
 void Scene::finalize_destroy(ObjectId id) {
   GameObject& object = at(id);
   object.destroyed = true;
   object.pending_destroy = false;
+  leave_parent(object);
+  leave_copies(object);
+  if (!reusable(object)) return;
+  objects_[id] = GameObject{};  // nothing of the old object lingers in the slot
+  objects_[id].id = id;
+  objects_[id].destroyed = true;
+  free_slots_.push_back(id);
+}
+
+void Scene::leave_parent(const GameObject& object) {
+  if (valid(object.parent)) erase_id(objects_[object.parent].children, object.id);
+}
+
+void Scene::leave_copies(const GameObject& object) {
+  const auto found = copies_.find(object.copy_of);
+  if (found == copies_.end()) return;
+  erase_id(found->second, object.id);
+  if (found->second.empty()) copies_.erase(found);
+}
+
+bool Scene::reusable(const GameObject& object) const {
+  // (Children leave first: a parent still listing some is destroyed before them, which the engine
+  // never does, and its slot is kept so they do not end up under a stranger. A skinned object
+  // using it as a bone holds a handle, which finds nothing once it is gone.)
+  const bool made_while_running = static_cast<std::size_t>(object.id) >= loaded_count_;
+  return made_while_running && object.children.empty();
 }
 
 }  // namespace redgem

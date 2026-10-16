@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <string>
 
-#include "app/android_settings.hpp"
+#include "app/android/android_settings.hpp"
 
 // game.json: what a game says about itself. This is the one place that reads the file.
 namespace redgem {

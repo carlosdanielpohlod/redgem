@@ -4,10 +4,11 @@
 
 #include <filesystem>
 #include <set>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
-#include "net/http_client.hpp"
+#include "net/http/http_client.hpp"
 #include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
 #include "script/ruby_vm.hpp"
@@ -56,7 +57,7 @@ class ScriptHost {
   void scene_was_reset();
   // Runs on_destroy on the object's behaviours (they stay attached until detach()).
   void on_destroyed(ObjectId object);
-  // Disables the object's behaviours and removes them from its GameObject.
+  // Forgets the object's behaviours and its Ruby GameObject, which from then on stands for nothing.
   void detach(ObjectId object);
 
   RubyResult eval(const std::string& code, const std::string& file_name);
@@ -74,18 +75,25 @@ class ScriptHost {
 
  private:
   struct BehaviourSlot {
-    ObjectId object = kNoObject;
+    ObjectHandle object;
     mrb_value instance = mrb_nil_value();
     std::string class_name;
     bool started = false;
     bool enabled = true;
+    // Whether its class has a fixed_update of its own: Behaviour's does nothing, and calling it on
+    // every behaviour every physics step would cost a protected Ruby call each for nothing.
+    bool fixed_updates = true;
 
     // Whether its callbacks are still called: it started, and no error of its own disabled it.
     bool active() const { return started && enabled; }
   };
 
   void load_prelude();
-  // Starts an empty cache of GameObject wrappers, which Ruby's garbage collector leaves alone.
+  // A new Ruby GameObject for an object; stands_for says whether one still stands for it.
+  mrb_value new_wrapper(const GameObject& object);
+  bool stands_for(mrb_value wrapper, const GameObject& object);
+  void set_variable(mrb_value object, const char* name, mrb_value value);
+  // Starts an empty cache of GameObject wrappers (by id), which Ruby's garbage collector leaves alone.
   void start_objects_cache();
 
   // Scripts and the behaviours made of their classes.
@@ -101,16 +109,22 @@ class ScriptHost {
   bool defines_its_class(const std::string& script, const std::string& class_name, const std::string& where);
   // Whether a Ruby class is Behaviour or inherits from it.
   bool is_behaviour_class(RClass* klass);
+  // Whether a behaviour class, or a module it includes, defines `method` rather than Behaviour.
+  bool overrides(RClass* klass, const char* method);
   // Reports why a behaviour could not be created; returns nil, which stands for it.
   mrb_value not_created(const std::string& where, const std::string& error);
 
   // Calling the behaviours.
   void invoke(std::size_t index, const char* method, std::initializer_list<mrb_value> args);
   void invoke_on_object(ObjectId object, const char* method, std::initializer_list<mrb_value> args);
-  // Calls `entry` with the frame's seconds on every behaviour that is running.
-  void update_running(const char* entry, float dt);
+  // Calls `entry` with the frame's seconds on every behaviour that is running (and, for
+  // fixed_update, has one of its own).
+  void update_running(const char* entry, float dt, bool fixed);
   // Enabled, on an object that is still there.
   bool runnable(const BehaviourSlot& slot) const;
+  // A copy of where the object's behaviours are: callbacks may attach more while it is walked.
+  std::vector<std::size_t> behaviours_of(ObjectId object) const;
+  void index_behaviours();
   // Runnable and started: its callbacks are called.
   bool running(const BehaviourSlot& slot) const;
   void disable_failed(std::size_t index, const char* method, const std::string& error);
@@ -120,6 +134,9 @@ class ScriptHost {
   RubyVm vm_;
   mrb_value objects_cache_ = mrb_nil_value();
   std::vector<BehaviourSlot> behaviours_;
+  // Where each object's behaviours are in behaviours_, in the order they were attached: what a
+  // contact, on_destroy and detach look up instead of walking every behaviour of the scene.
+  std::unordered_map<ObjectId, std::vector<std::size_t>> behaviours_by_object_;
   std::set<std::string> loaded_scripts_;
   std::set<std::string> loading_scripts_;
   int error_count_ = 0;

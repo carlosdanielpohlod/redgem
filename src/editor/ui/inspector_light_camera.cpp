@@ -75,7 +75,7 @@ void draw_light(PanelContext& context, int index) {
   light.intensity = std::max(light.intensity, kNoLowerLimit);
   light.range = std::max(light.range, kNoLowerLimit);
   context.session.document().set_light(index, light, false);
-  context.session.refresh_preview();
+  context.session.refresh_node(index);
 }
 
 void draw_camera(PanelContext& context, int index) {
@@ -91,7 +91,7 @@ void draw_camera(PanelContext& context, int index) {
   camera.fov_y_radians = std::clamp(fov, kMinFovDegrees, kMaxFovDegrees) / kRadiansToDegrees;
   camera.near_plane = std::max(camera.near_plane, kMinClipDistance);
   context.session.document().set_camera(index, camera, false);
-  context.session.refresh_preview();
+  context.session.refresh_node(index);
 }
 
 }  // namespace redgem::ui::inspector

@@ -185,6 +185,6 @@ TEST_CASE("scripts set the camera's field of view and the picture's speed streak
   CHECK(engine->script_context().motion_blur == doctest::Approx(0.0f));
   ruby(*engine, "Camera.motion_blur = 0.6");
   CHECK(engine->script_context().motion_blur == doctest::Approx(0.6f));
-  ruby(*engine, "Camera.motion_blur = 9");  // kept within 0..1
-  CHECK(engine->script_context().motion_blur == doctest::Approx(1.0f));
+  CHECK_FALSE(engine->scripts().eval("Camera.motion_blur = 9", "bad_blur.rb").ok);  // 0 to 1, refused past it
+  CHECK(engine->script_context().motion_blur == doctest::Approx(0.6f));
 }

@@ -8,8 +8,8 @@
 #include <variant>
 
 #include "app/engine.hpp"
-#include "editor/scene_document.hpp"
-#include "scene/terrain.hpp"
+#include "editor/document/scene_document.hpp"
+#include "scene/shapes/terrain.hpp"
 #include "input/input.hpp"
 #include "scene/scene.hpp"
 
@@ -38,8 +38,12 @@ class EditorSession {
   // The scene to draw: the live runtime while playing, otherwise the edited scene.
   const Scene& scene() const;
   const SceneDesc& scene_desc() const { return document_.desc(); }
-  // Call after every document edit so the preview reflects it.
+  // After every document edit, one of these so the preview reflects it: refresh_preview makes it
+  // all again (anything that adds, removes or moves nodes in the hierarchy, undo, redo, a changed
+  // prop); refresh_node makes one node's object again, for an edit to that node only (its
+  // placement, light or camera), which is what a drag repeats every frame.
   void refresh_preview();
+  void refresh_node(ObjectId node);
 
   ObjectId selection() const { return selection_; }
   void select(ObjectId id);

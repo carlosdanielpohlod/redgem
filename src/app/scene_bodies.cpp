@@ -32,7 +32,7 @@ WheelDesc describe_wheel(const Source& source, ObjectId child, const Transform& 
   // Wheels are modeled with their axle along X: width on X, radius in the Y/Z plane.
   const Vec3 half = hadamard(bounds_of(source, source.scene.at(child)).half_extents(), world.scale);
   WheelDesc wheel;
-  wheel.object = child;
+  wheel.object = source.scene.handle(child);
   wheel.center = rotate(conjugate(chassis.rotation), world.position - chassis.position);
   wheel.radius = std::max(half.y, half.z);
   wheel.width = half.x * kTwo;
@@ -89,7 +89,10 @@ void follow_body(Scene& scene, PhysicsWorld& physics, ObjectId id, const Transfo
   }
   if (type != BodyType::Vehicle) return;
   // After the chassis moved, so wheels are expressed relative to its new pose.
-  for (const WheelPose& wheel : physics.wheel_poses(id)) move_to(scene, wheel.object, wheel.world);
+  for (const WheelPose& wheel : physics.wheel_poses(id)) {
+    const ObjectId object = scene.resolve(wheel.object);  // a wheel destroyed on its own is gone
+    if (object != kNoObject) move_to(scene, object, wheel.world);
+  }
 }
 
 // Whether a body goes where its object is each step, instead of the other way round.

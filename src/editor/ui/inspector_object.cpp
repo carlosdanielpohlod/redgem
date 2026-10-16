@@ -97,7 +97,7 @@ void draw_transform(PanelContext& context, int index) {
   if (!changed) return;
   streamed_edit(context);
   doc.set_local(index, local, false);
-  context.session.refresh_preview();
+  context.session.refresh_node(index);
 }
 
 }  // namespace redgem::ui::inspector

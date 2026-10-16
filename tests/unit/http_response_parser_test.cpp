@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include "net/http_response_parser.hpp"
+#include "net/http/http_response_parser.hpp"
 
 using namespace redgem::net;
 

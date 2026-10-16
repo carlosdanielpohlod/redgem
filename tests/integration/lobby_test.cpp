@@ -6,7 +6,7 @@
 #include <thread>
 #include <vector>
 
-#include "net/lobby.hpp"
+#include "net/rooms/lobby.hpp"
 #include "net/network_session.hpp"
 
 using namespace redgem::net;

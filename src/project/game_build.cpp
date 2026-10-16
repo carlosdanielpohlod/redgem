@@ -7,7 +7,7 @@
 #include "core/config.hpp"
 #include "core/files.hpp"
 #include "core/platform.hpp"
-#include "project/android_package.hpp"
+#include "project/android/android_package.hpp"
 #include "project/notices.hpp"
 
 namespace redgem {

@@ -27,9 +27,15 @@ and [Gameplay recipes](gameplay.md).
 | `Audio` | `Audio.play(:jump, volume:, pitch:)`, `Audio.music(:theme, loop: true, volume: 0.7)`, `Audio.stop_music`, `Audio.music_pitch = 1.2`, `Audio.music_volume = 0.5` (change them every frame for an engine's drone), `Audio.volume = 0.8` (files in `sounds/`) |
 | `UI` / `Debug` / `Game` | `UI.text(str, x:, y:, size:, color:, alpha:, align:)`, `UI.rect(x:, y:, width:, height:, color:, alpha:, radius:)`, `UI.image(name, x:, y:, width:, height:)`, `UI.button(label, x:, y:, width:, height:)` → clicked?, `UI.text_field(value, x:, y:, width:, height:, max_length:, secret:)` → the new value (`secret: true` shows stars), `UI.width`, `UI.height`, `UI.text_width(str, size:)`, `Debug.log/warn/error`, `Game.quit`, `Game.load_scene("level2")` (`scenes/level2.glb`; `"main"` is `scene.glb`; Ruby globals survive), `Game.scene_name`, `Game.title` |
 | `GameMenu` | A behaviour: title screen, pause menu and end screen. `GameMenu.instance`, `show(:pause)`, `resume`, `restart`, `finish("You win!")`, `open?`, `screen`, `screens` (`:title`, `:pause`, `:over`, and the game's own), `button_box(index)`; `GameMenu::Screen.new(heading:, options:, back:)`, `add_option(label, index:) { }`; settings `title`, `start_open`; never opens on a dedicated server (see [Gameplay recipes](gameplay.md#pause-and-the-flow-between-screens)) |
-| `Vector3` | `Vector3.new(x, y, z)`, `Vector3.zero`, `one`, `up`, `down`, `left`, `right`, `forward`, `back`; arithmetic, `dot`, `cross`, `length`, `normalized`, `clamped(max_length = 1.0)`, `lerp`, `flat`, `with(y: 0)`, `distance_to`, `approx?`, `to_a` |
+| `Vector3` | `Vector3.new(x, y, z)`, `Vector3.zero`, `one`, `up`, `down`, `left`, `right`, `forward`, `back`; arithmetic, `dot`, `cross`, `length`, `normalized`, `clamped(max_length = 1.0)`, `lerp`, `flat`, `with(y: 0)`, `distance_to`, `approx?`, `to_a`; in place, for math done thousands of times a frame: `set(x, y, z)`, `add!(v)`, `sub!(v)`, `scale!(k)`, `normalize!` (they change the vector and hand it back: `dup` one you got from someone else first) |
 
 Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running.
+Every native takes finite numbers a float can hold: infinity, NaN (`0.0 / 0.0`) or a number too
+large (`1e300`) raises an `ArgumentError` instead of reaching the scene. So does `Vector3`
+arithmetic whose result would leave that range, and dividing a `Vector3` by zero; a vector changed
+in place (`add!`, `scale!`...) is left as it was when that happens. A setting with a range raises outside it and says the range
+(`Camera.motion_blur must be from 0 to 1, not 3`); nothing is quietly clamped, except
+`Vehicle#drive`'s inputs, which an analog stick may push a little past full.
 Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing
 its rotation keeps its velocity. Vehicle wheel meshes must have their rotation applied (axle along X).
 

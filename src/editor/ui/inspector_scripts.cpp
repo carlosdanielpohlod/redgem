@@ -5,7 +5,7 @@
 #include "core/log.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/inspector_logic.hpp"
-#include "editor/script_files.hpp"
+#include "editor/scripts/script_files.hpp"
 #include "editor/ui/inspector_cards.hpp"
 #include "editor/ui/style.hpp"
 #include "scene/props.hpp"

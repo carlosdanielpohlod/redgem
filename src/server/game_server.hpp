@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "app/engine.hpp"
-#include "net/lobby.hpp"
+#include "net/rooms/lobby.hpp"
 #include "net/wire.hpp"
 #include "scene/scene_desc.hpp"
 #include "server/room_choice.hpp"

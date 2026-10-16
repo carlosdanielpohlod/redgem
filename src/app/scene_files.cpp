@@ -6,7 +6,7 @@
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
 #include "render/gpu_profile.hpp"
-#include "scene/gltf_loader.hpp"
+#include "scene/gltf/gltf_loader.hpp"
 
 namespace redgem {
 namespace {

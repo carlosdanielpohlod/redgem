@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "net/relay_program.hpp"
+#include "net/rooms/relay_program.hpp"
 
 using namespace redgem::net;
 

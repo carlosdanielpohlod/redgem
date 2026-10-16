@@ -204,8 +204,10 @@ TEST_CASE("children destroyed with their parent still see it in on_destroy") {
 TEST_CASE("natives reject invalid objects with Ruby errors instead of crashing") {
   test::LogCapture capture;
   auto engine = sandbox();
-  const RubyResult result =
-      engine->scripts().eval("GameObject.allocate.tap { |o| o.instance_variable_set(:@id, 9999) }.name", "bad.rb");
+  const RubyResult result = engine->scripts().eval(
+      "GameObject.allocate.tap { |o| o.instance_variable_set(:@id, 9999); o.instance_variable_set(:@serial, 1) "
+      "}.visible",
+      "bad.rb");
   CHECK_FALSE(result.ok);
   CHECK(result.error.find("9999") != std::string::npos);
   const RubyResult destroyed =
@@ -316,6 +318,99 @@ TEST_CASE("objects spawned from inside update start on the next frame") {
   frames(*engine, 1);
   CHECK(ruby(*engine, "Scene.find_all(:bullet).size") == std::to_string(kSpawnFrames));
   CHECK(ruby(*engine, "$bullet_starts") == std::to_string(kSpawnFrames));
+  CHECK(engine->scripts().error_count() == kExpectedScriptErrors);
+}
+
+TEST_CASE("fixed_update is called only on behaviours that have one of their own") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, R"(
+    $base_calls = 0
+    class Behaviour
+      def fixed_update(_dt) = $base_calls += 1  # what a behaviour without one would get
+    end
+    module Steps
+      def fixed_update(_dt) = $mixed_in_calls = ($mixed_in_calls || 0) + 1
+    end
+    class Quiet < Behaviour; end
+    class Stepping < Behaviour
+      include Steps
+    end
+    Scene.spawn('Bullet', physics: false).add_component(Quiet)
+    Scene.spawn('Bullet', physics: false).add_component(Stepping)
+  )");
+  frames(*engine, kStartupFrames);
+  CHECK(ruby(*engine, "$base_calls") == "0");
+  CHECK(std::stoi(ruby(*engine, "$mixed_in_calls")) >= kStartupFrames - 1);
+}
+
+TEST_CASE("a contact reaches its objects' behaviours, in the order they came, after others were destroyed") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, R"(
+    $heard = []
+    class Ear < Behaviour
+      def on_trigger_enter(other) = $heard << [prop(:label), other.name]
+    end
+    $doomed = 3.times.map { Scene.spawn('Bullet', physics: false).tap { |o| o.add_component(Ear, label: :doomed) } }
+    $a = Scene.spawn('Bullet', physics: false)
+    $a.add_component(Ear, label: :first)
+    $a.add_component(Ear, label: :second)
+    $b = Scene.spawn('Bullet', physics: false)
+  )");
+  frames(*engine, 1);
+  ruby(*engine, "$doomed.each(&:destroy)");  // the behaviours before $a's go
+  frames(*engine, 1);
+  ContactEvent touch;
+  touch.self = std::stoi(ruby(*engine, "$a.id"));
+  touch.other = std::stoi(ruby(*engine, "$b.id"));
+  touch.trigger = true;
+  touch.phase = ContactPhase::Enter;
+  engine->scripts().dispatch(touch);
+  CHECK(ruby(*engine, "$heard.inspect") == R"([[:first, "Bullet"], [:second, "Bullet"]])");
+}
+
+TEST_CASE("a kept GameObject stands for its own object only, even once its slot holds a new one") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, "$old = Scene.spawn('Bullet', physics: false); $old_transform = $old.transform");
+  ruby(*engine, "$old.destroy");
+  frames(*engine, 1);
+  ruby(*engine, "$new = Scene.spawn('Bullet', physics: false)");
+  REQUIRE(ruby(*engine, "$new.id == $old.id") == "true");  // the slot was used again
+  CHECK(ruby(*engine, "$old.alive?") == "false");
+  CHECK(ruby(*engine, "$old == $new") == "false");
+  CHECK(ruby(*engine, "$old.name") == "Bullet");  // still readable
+  CHECK_FALSE(engine->scripts().eval("$old.transform.position", "stale.rb").ok);
+  CHECK_FALSE(engine->scripts().eval("$old_transform.position = Vector3.zero", "stale.rb").ok);
+  CHECK(ruby(*engine, "$old.destroy; $new.alive?") == "true");  // destroying it again leaves the new one be
+  const RubyResult moved = engine->scripts().eval("$old_transform.position", "stale.rb");
+  CHECK(moved.error.find("was destroyed") != std::string::npos);
+}
+
+TEST_CASE("a GameObject kept in a global across a scene switch stands for nothing in the new scene") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, "$hero = Scene.find('Hero'); Game.load_scene('level2')");
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "$hero.alive?") == "false");
+  CHECK(ruby(*engine, "$hero.name") == "Hero");
+  CHECK_FALSE(engine->scripts().eval("$hero.transform.position", "stale.rb").ok);
+}
+
+TEST_CASE("spawning and destroying for a long time does not grow the scene or the scripts") {
+  constexpr int kRounds = 300;
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, "def churn = 5.times { Scene.spawn('Bullet', physics: false).destroy }");
+  ruby(*engine, "churn");
+  frames(*engine, 1);
+  const std::size_t slots = engine->scene().size();
+  for (int i = 0; i < kRounds; ++i) {
+    ruby(*engine, "churn");
+    frames(*engine, 1);
+  }
+  CHECK(engine->scene().size() == slots);
   CHECK(engine->scripts().error_count() == kExpectedScriptErrors);
 }
 

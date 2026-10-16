@@ -59,16 +59,19 @@ constexpr float kMinAxisInput = -1.0f;
 constexpr float kMaxInput = 1.0f;
 constexpr float kMinPedalInput = 0.0f;
 
-float clamped(mrb_float value, float low, float high) { return std::clamp(static_cast<float>(value), low, high); }
+// Driving inputs are clamped, not refused: an analog stick may read a little past full.
+float clamped(mrb_state* mrb, mrb_float value, float low, float high) {
+  return std::clamp(static_cast<float>(finite(mrb, value)), low, high);
+}
 
 mrb_value vehicle_drive(mrb_state* mrb, mrb_value self) {
   mrb_float throttle = 0.0, steering = 0.0, brake = 0.0, handbrake = 0.0;
   mrb_get_args(mrb, "ffff", &throttle, &steering, &brake, &handbrake);
   VehicleInput input;
-  input.throttle = clamped(throttle, kMinAxisInput, kMaxInput);
-  input.steering = clamped(steering, kMinAxisInput, kMaxInput);
-  input.brake = clamped(brake, kMinPedalInput, kMaxInput);
-  input.handbrake = clamped(handbrake, kMinPedalInput, kMaxInput);
+  input.throttle = clamped(mrb, throttle, kMinAxisInput, kMaxInput);
+  input.steering = clamped(mrb, steering, kMinAxisInput, kMaxInput);
+  input.brake = clamped(mrb, brake, kMinPedalInput, kMaxInput);
+  input.handbrake = clamped(mrb, handbrake, kMinPedalInput, kMaxInput);
   physics(mrb).set_vehicle_input(alive_id(mrb, self), input);
   return mrb_nil_value();
 }
@@ -95,7 +98,8 @@ mrb_value physics_raycast(mrb_state* mrb, mrb_value) {
   mrb_float max_distance = kDefaultRaycastDistance;
   mrb_value ignore = mrb_nil_value();
   mrb_get_args(mrb, "oo|fo", &origin, &direction, &max_distance, &ignore);
-  const ObjectId ignored = mrb_nil_p(ignore) ? kNoObject : self_id(mrb, ignore);
+  max_distance = at_least(mrb, max_distance, 0.0, "Physics.raycast's distance");
+  const ObjectId ignored = mrb_nil_p(ignore) ? kNoObject : alive_id(mrb, ignore);
   const auto hit =
       physics(mrb).raycast(to_vec3(mrb, origin), to_vec3(mrb, direction), static_cast<float>(max_distance), ignored);
   return hit ? hit_value(mrb, *hit) : mrb_nil_value();

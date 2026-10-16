@@ -5,7 +5,7 @@
 #include <mruby/hash.h>
 #include <mruby/string.h>
 
-#include "net/lan_discovery.hpp"
+#include "net/discovery/lan_discovery.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/network_bindings.hpp"
 

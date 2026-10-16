@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "scene/extras_parser.hpp"
+#include "scene/gltf/extras_parser.hpp"
 
 using namespace redgem;
 

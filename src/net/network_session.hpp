@@ -9,7 +9,7 @@
 
 #include "net/byte_allowance.hpp"
 #include "net/connection.hpp"
-#include "net/socket.hpp"
+#include "net/socket/socket.hpp"
 #include "net/wire.hpp"
 
 namespace redgem::net {

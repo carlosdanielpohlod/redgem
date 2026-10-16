@@ -6,7 +6,7 @@
 
 #include <string>
 
-#include "scene/animation_player.hpp"
+#include "scene/animation/animation_player.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 
@@ -45,6 +45,7 @@ mrb_value animation_play(mrb_state* mrb, mrb_value) {
   mrb_bool loop = true, restart = false;
   mrb_float speed = 1.0;
   mrb_get_args(mrb, "obfb", &name, &loop, &speed, &restart);
+  speed = finite(mrb, speed);
   animations(mrb).play(clip_arg(mrb, name), loop, static_cast<float>(speed), restart);
   return mrb_nil_value();
 }
@@ -63,6 +64,7 @@ mrb_value animation_seek(mrb_state* mrb, mrb_value) {
   mrb_value name;
   mrb_float seconds = 0.0;
   mrb_get_args(mrb, "of", &name, &seconds);
+  seconds = finite(mrb, seconds);
   animations(mrb).seek(clip_arg(mrb, name), static_cast<float>(seconds));
   return mrb_nil_value();
 }
@@ -84,6 +86,8 @@ mrb_value game_object_animation_play(mrb_state* mrb, mrb_value self) {
   mrb_bool loop = true, restart = false;
   mrb_float speed = 1.0, fade = 0.0;
   mrb_get_args(mrb, "obffb", &name, &loop, &speed, &fade, &restart);
+  speed = finite(mrb, speed);
+  fade = at_least(mrb, fade, 0.0, "the fade");
   const std::string clip = to_name(mrb, name);
   const ClipStart how{loop, static_cast<float>(speed), static_cast<float>(fade), restart};
   if (!animations(mrb).play_on(scene(mrb), alive_id(mrb, self), clip, how)) raise_unknown_clip(mrb, clip);
@@ -95,6 +99,8 @@ mrb_value game_object_animation_mix(mrb_state* mrb, mrb_value self) {
   mrb_bool loop = true;
   mrb_float weight = 0.0, speed = 1.0;
   mrb_get_args(mrb, "ofbf", &name, &weight, &loop, &speed);
+  weight = finite(mrb, weight);
+  speed = finite(mrb, speed);
   const std::string clip = to_name(mrb, name);
   const bool mixed = animations(mrb).mix_on(scene(mrb), alive_id(mrb, self), clip, static_cast<float>(weight), loop,
                                             static_cast<float>(speed));
@@ -113,7 +119,7 @@ mrb_value game_object_animation_pause(mrb_state* mrb, mrb_value self) {
 }
 
 mrb_value game_object_animation_follow_scene(mrb_state* mrb, mrb_value self) {
-  const mrb_float fade = float_arg(mrb);
+  const mrb_float fade = at_least(mrb, float_arg(mrb), 0.0, "the fade");
   animations(mrb).follow_scene(scene(mrb), alive_id(mrb, self), static_cast<float>(fade));
   return mrb_nil_value();
 }

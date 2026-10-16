@@ -12,18 +12,19 @@
 namespace redgem {
 namespace {
 
-constexpr const char* kKeepAliveGlobal = "$__redgem_keep_alive";
-
 struct EvalRequest {
   const std::string* code = nullptr;
   const std::string* file_name = nullptr;
   bool compile_only = false;
 };
 
+// The arguments are borrowed from the caller for the length of the call: no copy is made, which
+// matters because every behaviour is called this way several times a frame.
 struct CallRequest {
   mrb_value receiver;
   const char* method = nullptr;
-  const std::vector<mrb_value>* args = nullptr;
+  const mrb_value* argv = nullptr;
+  mrb_int argc = 0;
 };
 
 mrb_value run_eval(mrb_state* mrb, void* userdata) {
@@ -41,8 +42,7 @@ mrb_value run_eval(mrb_state* mrb, void* userdata) {
 
 mrb_value run_call(mrb_state* mrb, void* userdata) {
   const auto* request = static_cast<const CallRequest*>(userdata);
-  return mrb_funcall_argv(mrb, request->receiver, mrb_intern_cstr(mrb, request->method),
-                          static_cast<mrb_int>(request->args->size()), request->args->data());
+  return mrb_funcall_argv(mrb, request->receiver, mrb_intern_cstr(mrb, request->method), request->argc, request->argv);
 }
 
 struct MadeCallRequest {
@@ -121,7 +121,6 @@ RubyResult run_protected(mrb_state* mrb, mrb_protect_error_func* body, void* req
 
 RubyVm::RubyVm() : mrb_(mrb_open()) {
   if (mrb_ == nullptr) throw std::runtime_error("cannot create the mruby interpreter");
-  mrb_gv_set(mrb_, mrb_intern_cstr(mrb_, kKeepAliveGlobal), mrb_ary_new(mrb_));
 }
 
 RubyVm::~RubyVm() { mrb_close(mrb_); }
@@ -144,23 +143,18 @@ RubyResult RubyVm::eval(const std::string& code, const std::string& file_name) {
 }
 
 RubyResult RubyVm::call(mrb_value receiver, const char* method, std::initializer_list<mrb_value> args) {
-  return call(receiver, method, std::vector<mrb_value>(args));
+  CallRequest request{receiver, method, args.begin(), static_cast<mrb_int>(args.size())};
+  return run_protected(mrb_, run_call, &request);
 }
 
 RubyResult RubyVm::call(mrb_value receiver, const char* method, const std::vector<mrb_value>& args) {
-  CallRequest request{receiver, method, &args};
+  CallRequest request{receiver, method, args.data(), static_cast<mrb_int>(args.size())};
   return run_protected(mrb_, run_call, &request);
 }
 
 RubyResult RubyVm::call_with(mrb_value receiver, const char* method, const ArgumentsMaker& make) {
   MadeCallRequest request{receiver, method, &make};
   return run_protected(mrb_, run_made_call, &request);
-}
-
-void RubyVm::release_kept() { mrb_gv_set(mrb_, mrb_intern_cstr(mrb_, kKeepAliveGlobal), mrb_ary_new(mrb_)); }
-
-void RubyVm::keep_alive(mrb_value value) {
-  mrb_ary_push(mrb_, mrb_gv_get(mrb_, mrb_intern_cstr(mrb_, kKeepAliveGlobal)), value);
 }
 
 }  // namespace redgem

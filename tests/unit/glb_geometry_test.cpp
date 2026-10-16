@@ -4,8 +4,8 @@
 #include <optional>
 #include <vector>
 
-#include "editor/glb_geometry.hpp"
-#include "editor/gltf_json.hpp"
+#include "editor/document/glb_geometry.hpp"
+#include "editor/document/gltf_json.hpp"
 
 using namespace redgem;
 using namespace redgem::gltf_json;

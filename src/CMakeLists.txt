@@ -111,10 +111,10 @@ endif()
 
 redgem_add_library(redgem_net
   net/frame_buffer.cpp
-  net/socket_native.cpp
-  net/socket.cpp
-  net/socket_io.cpp
-  net/datagrams.cpp
+  net/socket/socket_native.cpp
+  net/socket/socket.cpp
+  net/socket/socket_io.cpp
+  net/socket/datagrams.cpp
   net/wire.cpp
   net/connection.cpp
   net/network_session.cpp
@@ -122,27 +122,27 @@ redgem_add_library(redgem_net
   net/network_session_guest.cpp
   net/network_session_server.cpp
   net/network_session_approval.cpp
-  net/room_codes.cpp
-  net/code_guessers.cpp
-  net/lobby.cpp
-  net/nearby_games.cpp
-  net/lan_discovery.cpp
-  net/relay_server.cpp
-  net/relay_server_visitors.cpp
-  net/relay_server_rooms.cpp
-  net/relay_program.cpp
-  net/http_url.cpp
-  net/http_address.cpp
-  net/http_message.cpp
-  net/http_chunks.cpp
-  net/http_response_parser.cpp
-  net/http_response_head.cpp
-  net/http_trust.cpp
-  net/http_trust_system.cpp
-  net/http_stream.cpp
-  net/http_tls.cpp
-  net/http_exchange.cpp
-  net/http_client.cpp)
+  net/rooms/room_codes.cpp
+  net/rooms/code_guessers.cpp
+  net/rooms/lobby.cpp
+  net/discovery/nearby_games.cpp
+  net/discovery/lan_discovery.cpp
+  net/rooms/relay_server.cpp
+  net/rooms/relay_server_visitors.cpp
+  net/rooms/relay_server_rooms.cpp
+  net/rooms/relay_program.cpp
+  net/http/http_url.cpp
+  net/http/http_address.cpp
+  net/http/http_message.cpp
+  net/http/http_chunks.cpp
+  net/http/http_response_parser.cpp
+  net/http/http_response_head.cpp
+  net/http/http_trust.cpp
+  net/http/http_trust_system.cpp
+  net/http/http_stream.cpp
+  net/http/http_tls.cpp
+  net/http/http_exchange.cpp
+  net/http/http_client.cpp)
 target_link_libraries(redgem_net PUBLIC redgem_core nlohmann_json::nlohmann_json mbedtls)
 if(WIN32)
   # (crypt32: the Windows certificate store, which https:// answers are checked against.)
@@ -152,35 +152,35 @@ endif()
 redgem_add_library(redgem_runtime
   ${REDGEM_PRELUDE_HEADER}
   scene/property.cpp
-  scene/json_scanner.cpp
-  scene/json_scanner_strings.cpp
-  scene/extras_parser.cpp
+  scene/gltf/json_scanner.cpp
+  scene/gltf/json_scanner_strings.cpp
+  scene/gltf/extras_parser.cpp
   scene/transform.cpp
   scene/scene_desc.cpp
-  scene/gltf_checks.cpp
-  scene/gltf_accessors.cpp
-  scene/gltf_loader.cpp
-  scene/gltf_reader_materials.cpp
-  scene/gltf_reader_meshes.cpp
-  scene/gltf_reader_nodes.cpp
-  scene/gltf_reader_skins.cpp
-  scene/gltf_reader_animations.cpp
-  scene/cgltf_impl.cpp
+  scene/gltf/gltf_checks.cpp
+  scene/gltf/gltf_accessors.cpp
+  scene/gltf/gltf_loader.cpp
+  scene/gltf/gltf_reader_materials.cpp
+  scene/gltf/gltf_reader_meshes.cpp
+  scene/gltf/gltf_reader_nodes.cpp
+  scene/gltf/gltf_reader_skins.cpp
+  scene/gltf/gltf_reader_animations.cpp
+  scene/gltf/cgltf_impl.cpp
   scene/scene.cpp
   scene/scene_from_desc.cpp
   scene/scene_copies.cpp
-  scene/animation.cpp
-  scene/clip_clock.cpp
-  scene/animation_player.cpp
-  scene/animation_player_characters.cpp
-  scene/animation_player_posing.cpp
+  scene/animation/animation.cpp
+  scene/animation/clip_clock.cpp
+  scene/animation/animation_player.cpp
+  scene/animation/animation_player_characters.cpp
+  scene/animation/animation_player_posing.cpp
   scene/camera_ray.cpp
   scene/particles.cpp
-  scene/terrain.cpp
-  scene/terrain_sculpt.cpp
-  scene/terrain_raycast.cpp
-  scene/primitives.cpp
-  scene/primitive_round_shapes.cpp
+  scene/shapes/terrain.cpp
+  scene/shapes/terrain_sculpt.cpp
+  scene/shapes/terrain_raycast.cpp
+  scene/shapes/primitives.cpp
+  scene/shapes/primitive_round_shapes.cpp
   physics/body_config.cpp
   physics/contact_events.cpp
   physics/jolt/jolt_runtime.cpp
@@ -210,6 +210,7 @@ redgem_add_library(redgem_runtime
   script/bindings/bindings.cpp
   script/bindings/binding_helpers.cpp
   script/bindings/game_object_bindings.cpp
+  script/bindings/vector3_bindings.cpp
   script/bindings/transform_bindings.cpp
   script/bindings/scene_bindings.cpp
   script/bindings/camera_bindings.cpp
@@ -257,7 +258,7 @@ redgem_add_library(redgem_runtime
   render/ui_font.cpp
   render/culling.cpp
   app/json_file.cpp
-  app/android_settings.cpp
+  app/android/android_settings.cpp
   app/game_settings.cpp
   app/bundled_game.cpp
   app/save_location.cpp
@@ -291,24 +292,24 @@ if(NOT ANDROID)
   target_link_libraries(redgem_game_server PUBLIC redgem_runtime)
 
   redgem_add_library(redgem_editor
-    editor/glb_file.cpp
-    editor/glb_usage.cpp
-    editor/glb_compact.cpp
-    editor/gltf_json.cpp
-    editor/gltf_json_entries.cpp
-    editor/glb_geometry.cpp
-    editor/model_import.cpp
-    editor/model_merge.cpp
-    editor/model_import_desc.cpp
+    editor/document/glb_file.cpp
+    editor/document/glb_usage.cpp
+    editor/document/glb_compact.cpp
+    editor/document/gltf_json.cpp
+    editor/document/gltf_json_entries.cpp
+    editor/document/glb_geometry.cpp
+    editor/document/model_import.cpp
+    editor/document/model_merge.cpp
+    editor/document/model_import_desc.cpp
     editor/node_tree.cpp
-    editor/scene_document.cpp
-    editor/scene_document_history.cpp
-    editor/scene_document_terrain.cpp
-    editor/scene_document_edits.cpp
-    editor/scene_document_copies.cpp
-    editor/scene_document_create.cpp
-    editor/scene_document_skeletons.cpp
-    editor/scene_document_import.cpp
+    editor/document/scene_document.cpp
+    editor/document/scene_document_history.cpp
+    editor/document/scene_document_terrain.cpp
+    editor/document/scene_document_edits.cpp
+    editor/document/scene_document_copies.cpp
+    editor/document/scene_document_create.cpp
+    editor/document/scene_document_skeletons.cpp
+    editor/document/scene_document_import.cpp
     editor/editor_camera.cpp
     editor/editor_logic.cpp
     editor/edit_stream.cpp
@@ -330,9 +331,9 @@ if(NOT ANDROID)
     editor/editor_dialogs.cpp
     editor/editor_viewport.cpp
     editor/editor_scene_view.cpp
-    editor/script_files.cpp
-    editor/script_editor.cpp
-    editor/script_workspace.cpp
+    editor/scripts/script_files.cpp
+    editor/scripts/script_editor.cpp
+    editor/scripts/script_workspace.cpp
     editor/file_drop.cpp
     editor/project_files.cpp
     editor/ui/script_editor_panel.cpp
@@ -369,14 +370,14 @@ if(NOT ANDROID)
     project/game_build.cpp
     project/game_build_targets.cpp
     project/game_build_files.cpp
-    project/android_package.cpp
-    project/android_package_names.cpp
-    project/android_package_sdk.cpp
-    project/android_package_id.cpp
-    project/android_package_signing.cpp
-    project/android_package_manifest.cpp
-    project/android_package_stage.cpp
-    project/android_package_tools.cpp
+    project/android/android_package.cpp
+    project/android/android_package_names.cpp
+    project/android/android_package_sdk.cpp
+    project/android/android_package_id.cpp
+    project/android/android_package_signing.cpp
+    project/android/android_package_manifest.cpp
+    project/android/android_package_stage.cpp
+    project/android/android_package_tools.cpp
     project/recent_games.cpp
     project/project_hub.cpp
     project/project_hub_frame.cpp
@@ -401,9 +402,9 @@ set(REDGEM_INSTALL_COMPONENT redgem)
 
 if(ANDROID)
   # On Android the player is a library the system loads into a native activity; it plays the game
-  # packed in the same APK (see app/android_main.cpp). Its name is the one the packer writes into
-  # the app (app/android_bundle.hpp).
-  add_library(redgem SHARED app/android_main.cpp)
+  # packed in the same APK (see app/android/android_main.cpp). Its name is the one the packer writes into
+  # the app (app/android/android_bundle.hpp).
+  add_library(redgem SHARED app/android/android_main.cpp)
   target_link_libraries(redgem PRIVATE redgem_runtime android log GLESv3)
   target_include_directories(redgem SYSTEM PRIVATE ${ANDROID_NDK}/sources/android/native_app_glue)
   target_link_options(redgem PRIVATE -u ANativeActivity_onCreate)
@@ -419,7 +420,7 @@ else()
 
   # redgem-relay: where games played over the internet meet. It runs on servers: it has no window
   # and links nothing that opens one.
-  add_executable(redgem_relay net/relay_main.cpp)
+  add_executable(redgem_relay net/rooms/relay_main.cpp)
   target_link_libraries(redgem_relay PRIVATE redgem_net)
   set_target_properties(redgem_relay PROPERTIES OUTPUT_NAME redgem-relay)
   redgem_finish_program(redgem_relay)
@@ -457,7 +458,7 @@ endif()
 # it always agree.
 file(STRINGS ${CMAKE_SOURCE_DIR}/tools/android/min_api.txt REDGEM_ANDROID_MIN_API LIMIT_COUNT 1)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tools/android/min_api.txt)
-set_source_files_properties(project/android_package_manifest.cpp PROPERTIES
+set_source_files_properties(project/android/android_package_manifest.cpp PROPERTIES
   COMPILE_DEFINITIONS "REDGEM_ANDROID_MIN_API=${REDGEM_ANDROID_MIN_API}")
 
 # The fonts are assembled into the binary (core/embed.hpp): rebuild when they change. The one

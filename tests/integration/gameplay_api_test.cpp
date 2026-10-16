@@ -107,6 +107,19 @@ TEST_CASE("after runs a block once, later; every keeps running it; both can be c
   CHECK(ruby(*engine, "[$once, $ticks, $ticker.cancelled?]") == "[1, 7, true]");
 }
 
+TEST_CASE("scripts reach every object of a scene, however many it has") {
+  constexpr int kHugeScene = 140000;  // past the largest Ruby Array (131072): the wrapper cache once was one
+  const TempSave temp;
+  SceneDesc scene = small_scene();
+  NodeDesc stone;
+  stone.name = "Stone";
+  scene.nodes.resize(kHugeScene, stone);
+  scene.nodes.back().name = "LastStone";
+  auto engine = engine_for(scene, temp.file);
+  CHECK(ruby(*engine, "Scene.find('LastStone').transform.position.y") == "0.0");
+  CHECK(ruby(*engine, "Scene.find('LastStone').id") == std::to_string(kHugeScene - 1));
+}
+
 TEST_CASE("an object whose behaviours cannot be taken off it says so, and the game goes on") {
   const TempSave temp;
   const SceneDesc scene = small_scene();
@@ -115,7 +128,7 @@ TEST_CASE("an object whose behaviours cannot be taken off it says so, and the ga
   // A game's own code got in the way of the engine's bookkeeping.
   ruby(*engine, R"(
     class GameObject
-      def __remove_behaviours = raise("not letting go")
+      def __destroyed = raise("not letting go")
     end
     Scene.find('Door').destroy
   )");
@@ -123,7 +136,7 @@ TEST_CASE("an object whose behaviours cannot be taken off it says so, and the ga
   test::LogCapture log;
   frames(*engine, 1);
   CHECK(engine->scripts().error_count() == errors_before + 1);
-  CHECK(log.contains("taking the behaviours off 'Door'"));
+  CHECK(log.contains("forgetting the destroyed 'Door'"));
   CHECK(log.contains("not letting go"));
   CHECK(engine->scene().find("Door") == kNoObject);  // destroyed all the same
   frames(*engine, kHalfSecond);

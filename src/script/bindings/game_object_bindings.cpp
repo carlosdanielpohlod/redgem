@@ -20,22 +20,16 @@ mrb_value property_value(mrb_state* mrb, const PropertyValue& value) {
   return text_value(mrb, std::get<std::string>(value));
 }
 
-// Name and tag stay readable after destruction (scripts often log what they just destroyed).
-mrb_value game_object_name(mrb_state* mrb, mrb_value self) {
-  return mrb_str_new_cstr(mrb, object_at(mrb, self).name.c_str());
+// Still there, and not about to be destroyed.
+bool is_staying(const Scene& objects, ObjectId id) { return id != kNoObject && !objects.at(id).pending_destroy; }
+
+mrb_value game_object_alive(mrb_state* mrb, mrb_value self) {
+  return mrb_bool_value(is_staying(scene(mrb), scene(mrb).resolve(wrapped_handle(mrb, self))));
 }
 
-mrb_value game_object_tag(mrb_state* mrb, mrb_value self) {
-  return mrb_str_new_cstr(mrb, object_at(mrb, self).tag.c_str());
-}
-
-// Neither destroyed nor about to be.
-bool is_staying(const GameObject& object) { return !object.destroyed && !object.pending_destroy; }
-
-mrb_value game_object_alive(mrb_state* mrb, mrb_value self) { return mrb_bool_value(is_staying(object_at(mrb, self))); }
-
+// Destroying what is already gone does nothing (request_destroy ignores kNoObject).
 mrb_value game_object_destroy(mrb_state* mrb, mrb_value self) {
-  scene(mrb).request_destroy(object_at(mrb, self).id);
+  scene(mrb).request_destroy(scene(mrb).resolve(wrapped_handle(mrb, self)));
   return mrb_nil_value();
 }
 
@@ -118,8 +112,6 @@ mrb_value kernel_require_class(mrb_state* mrb, mrb_value) {
 }
 
 void install_identity_bindings(RClass* game_object, mrb_state* mrb) {
-  mrb_define_method(mrb, game_object, "name", game_object_name, MRB_ARGS_NONE());
-  mrb_define_method(mrb, game_object, "tag", game_object_tag, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "alive?", game_object_alive, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "destroy", game_object_destroy, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "props", game_object_props, MRB_ARGS_NONE());

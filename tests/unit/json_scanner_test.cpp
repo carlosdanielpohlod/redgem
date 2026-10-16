@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "scene/json_scanner.hpp"
+#include "scene/gltf/json_scanner.hpp"
 
 using namespace redgem;
 

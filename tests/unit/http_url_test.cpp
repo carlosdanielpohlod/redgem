@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include "net/http_url.hpp"
+#include "net/http/http_url.hpp"
 
 using namespace redgem::net;
 
