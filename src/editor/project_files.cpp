@@ -11,16 +11,29 @@ namespace {
 constexpr const char* kModelExtension = ".glb";
 constexpr const char* kAnySound = nullptr;  // for files_in: every kind of sound file the engine plays
 
-// Regular files of a folder with the extension (or any supported sound when `extension` is null).
+// A regular file of a folder, not a link (built games leave links out).
+bool plain_file(const std::filesystem::directory_entry& entry) {
+  std::error_code error;
+  return !entry.is_symlink(error) && entry.is_regular_file(error);
+}
+
+// Whether a file of `dir` is of the kind listed: with the extension, or any supported sound when
+// `extension` is null.
+bool of_kind(const std::filesystem::path& dir, const std::filesystem::path& file, const char* extension) {
+  if (extension == nullptr) return find_sound_file(dir, file.stem().string()).has_value();
+  return file.extension() == extension;
+}
+
+bool listed(const std::filesystem::path& dir, const std::filesystem::directory_entry& entry, const char* extension) {
+  return plain_file(entry) && of_kind(dir, entry.path(), extension);
+}
+
+// The plain files of a folder of one kind.
 std::vector<std::filesystem::path> files_in(const std::filesystem::path& dir, const char* extension) {
   std::vector<std::filesystem::path> found;
   std::error_code error;
   for (const auto& entry : std::filesystem::directory_iterator(dir, error)) {
-    if (!entry.is_regular_file(error)) continue;
-    if (extension == nullptr ? find_sound_file(dir, entry.path().stem().string()).has_value()
-                             : entry.path().extension() == extension) {
-      found.push_back(entry.path());
-    }
+    if (listed(dir, entry, extension)) found.push_back(entry.path());
   }
   return found;
 }

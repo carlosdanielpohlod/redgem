@@ -83,6 +83,20 @@ bool safe_asset_name(std::string_view name) {
   return !has_parent_step(name);
 }
 
+bool through_link(const std::filesystem::path& folder, const std::filesystem::path& relative) {
+  // (A path given whole is looked at below the folder only: the folder's own may hold links.)
+  const std::filesystem::path below = relative.is_absolute() ? relative.lexically_relative(folder) : relative;
+  std::filesystem::path step = folder;
+  for (const std::filesystem::path& part : below.lexically_normal()) {
+    step /= part;
+    std::error_code fs_error;
+    if (!std::filesystem::is_symlink(step, fs_error)) continue;
+    log::warning(printable(step.string()) + " is a symbolic link: built games do not carry links, so it is left out");
+    return true;
+  }
+  return false;
+}
+
 void warn_of_unsafe_asset_name(std::string_view name) {
   log::warning("the name '" + printable(name) + "' is refused: a game reaches only the files of its own folders");
 }
@@ -98,6 +112,7 @@ std::optional<std::filesystem::path> file_inside(const std::filesystem::path& fo
   if (fs_error) return std::nullopt;
   if (!stays_below(file.lexically_relative(root))) return std::nullopt;
   if (!std::filesystem::is_regular_file(file, fs_error)) return std::nullopt;
+  if (through_link(folder, relative)) return std::nullopt;
   return file;
 }
 

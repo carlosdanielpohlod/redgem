@@ -79,8 +79,6 @@ the same pull request.
 
 - A scene has limits per part (elements, nodes, depth, joints) but no limit on the memory it
   needs as a whole: a huge scene is not refused, it runs out of memory.
-- While a game is being developed, symbolic links inside its asset folders are followed. Built
-  games do not carry them.
 
 ## Tools
 
