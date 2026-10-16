@@ -32,6 +32,7 @@ constexpr server::RoomLimits kTwoRoomsOfOne{1, 2};
 constexpr int kTwoThreads = 2;
 constexpr double kSlowLoadSeconds = 1.5;  // what a slow room's level takes to load (see kSlowScene)
 constexpr double kFramesKeptShare = 0.5;  // of its frames, at least, another room plays meanwhile
+constexpr double kLongestJoinSeconds = 10.0;
 // The sandbox game's first level, which a server's room takes kSlowLoadSeconds to load once the
 // server's save says "slow".
 constexpr const char* kSlowScene = R"(
@@ -143,12 +144,14 @@ struct Online {
     return false;
   }
 
-  // Like until, for as long as `seconds` of the real clock: the rooms play on the real clock.
+  // Like until, with the players on the real clock as the rooms are (a frame of theirs a frame of
+  // real time, not as fast as they go), for `seconds` at most.
   bool until_for(double seconds, const std::function<bool()>& done) {
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<double>(seconds);
     while (std::chrono::steady_clock::now() < deadline) {
       round();
       if (done()) return true;
+      std::this_thread::sleep_for(std::chrono::duration<double>(config::kFixedDeltaSeconds));
     }
     return false;
   }
@@ -321,7 +324,10 @@ TEST_CASE("a room loading a slow level holds up no other room: each runs on a th
   online_game.served(first, "Save['slow'] = true");
   const int frames_before = std::stoi(online_game.served(first, "Time.frame"));
   const auto started = std::chrono::steady_clock::now();
-  Engine& second = online_game.join();  // into a room of its own, whose level loads slowly
+  // Into a room of its own, whose level loads slowly: on the real clock, the player waits for it
+  // as long as a player would.
+  Engine& second = online_game.knock();
+  REQUIRE(online_game.until_for(kLongestJoinSeconds, [&second] { return online(second); }));
   const double waited = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
   const int frames = std::stoi(online_game.served(first, "Time.frame")) - frames_before;
   CHECK(second.network().room() != first.network().room());
