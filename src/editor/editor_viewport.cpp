@@ -137,7 +137,7 @@ void EditorApp::apply_gizmo_drag(const Transform& world) {
   const Transform local =
       node.parent == kNoIndex ? world : relative_to(session_->scene().world_transform(node.parent), world);
   session_->document().set_local(selected, local, false);
-  session_->refresh_preview();
+  session_->refresh_node(selected);
 }
 
 }  // namespace redgem

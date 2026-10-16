@@ -4,6 +4,8 @@
 //   redgem_scripting_benchmark behaviours   thousands of objects, each with a behaviour that updates
 //   redgem_scripting_benchmark churn        objects spawned every frame that destroy themselves a
 //                                           second later, for minutes of game time
+//   redgem_scripting_benchmark rebuild FILE  how long making the scene of a glTF file's objects
+//                                           takes (what the editor's preview does after an edit)
 //
 // It prints the average time of a frame and, for churn, how it changes as the game goes on.
 
@@ -16,6 +18,7 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "scene/gltf_loader.hpp"
 
 namespace {
 
@@ -29,6 +32,7 @@ constexpr int kChurnMinutes = 2;
 constexpr int kFramesPerMinute = 60 * 60;  // at the fixed 60 Hz step
 constexpr int kChurnReports = 5;           // how many times the frame time is printed
 constexpr double kMicrosecondsPerSecond = 1e6;
+constexpr int kRebuilds = 200;
 
 // A behaviour that does a little work every frame, and one that leaves a second after it started.
 constexpr const char* kBehaviours = R"(
@@ -107,10 +111,25 @@ int churn(Engine& engine) {
   return 0;
 }
 
+int rebuild(const std::string& file) {
+  const redgem::LoadResult loaded = redgem::load_gltf_scene(file);
+  if (!loaded.ok) {
+    std::fprintf(stderr, "cannot read %s: %s\n", file.c_str(), loaded.error.c_str());
+    return 1;
+  }
+  std::size_t objects = 0;
+  const Clock::time_point start = Clock::now();
+  for (int i = 0; i < kRebuilds; ++i) objects = redgem::Scene::from_desc(loaded.scene).size();
+  const double seconds = std::chrono::duration<double>(Clock::now() - start).count() / kRebuilds;
+  std::printf("%zu objects: %.1f us a rebuild\n", objects, seconds * kMicrosecondsPerSecond);
+  return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   const std::string mode = argc > 1 ? argv[1] : "behaviours";
+  if (mode == "rebuild" && argc > 2) return rebuild(argv[2]);
   std::unique_ptr<Engine> engine = sandbox(argc > 2 ? argv[2] : REDGEM_BENCHMARK_GAME);
   if (!engine || !ruby(*engine, kBehaviours)) return 1;
   if (mode == "churn") return churn(*engine);

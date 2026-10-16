@@ -64,4 +64,11 @@ Scene Scene::from_desc(const SceneDesc& desc) {
   return scene;
 }
 
+void Scene::refresh_from_desc(const SceneDesc& desc, ObjectId id) {
+  GameObject object = object_of(desc.nodes.at(static_cast<std::size_t>(id)), desc, id);
+  object.serial = at(id).serial;
+  if (is_prefab(object.parent)) object.prefab = true;
+  objects_[id] = std::move(object);
+}
+
 }  // namespace redgem

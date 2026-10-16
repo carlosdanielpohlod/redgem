@@ -65,6 +65,10 @@ struct GameObject {
 class Scene {
  public:
   static Scene from_desc(const SceneDesc& desc);
+  // Makes one object of a from_desc scene again from its node, as from_desc would, keeping its
+  // serial: for an edit to the node itself (where it is, its light, its camera). The node's place
+  // in the hierarchy and its being a prefab must not have changed; for that, make the scene again.
+  void refresh_from_desc(const SceneDesc& desc, ObjectId id);
 
   std::size_t size() const { return objects_.size(); }
   bool is_alive(ObjectId id) const;
