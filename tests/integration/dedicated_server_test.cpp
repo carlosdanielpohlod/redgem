@@ -331,7 +331,7 @@ TEST_CASE("a room loading a slow level holds up no other room: each runs on a th
   const SlowGame slow;
   Online online_game(kTwoRoomsOfOne, slow.game, kTwoThreads);
   Engine& first = online_game.join();
-  online_game.served(first, "Save['slow'] = true; Scene.objects.first.add_component(PauseWatch)");
+  online_game.served(first, "Save['slow'] = true; $longest_pause = 0.0; Scene.objects.first.add_component(PauseWatch)");
   online_game.served(first, "$longest_pause = 0.0");
   const auto started = std::chrono::steady_clock::now();
   // Into a room of its own, whose level loads slowly: on the real clock, the player waits for it
