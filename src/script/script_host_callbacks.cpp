@@ -1,7 +1,7 @@
 // Calling the behaviours: what happens to their objects, frame after frame.
 
 #include <mruby.h>
-#include <mruby/array.h>
+#include <mruby/hash.h>
 
 #include <algorithm>
 
@@ -57,16 +57,17 @@ void ScriptHost::start_pending() {
   }
 }
 
-void ScriptHost::update_running(const char* entry, float dt) {
+void ScriptHost::update_running(const char* entry, float dt, bool fixed) {
   const mrb_value delta = mrb_float_value(vm_.state(), dt);
   for (std::size_t i = 0; i < behaviours_.size(); ++i) {
-    if (running(behaviours_[i])) invoke(i, entry, {delta});
+    const bool wanted = !fixed || behaviours_[i].fixed_updates;
+    if (wanted && running(behaviours_[i])) invoke(i, entry, {delta});
   }
 }
 
-void ScriptHost::fixed_update(float dt) { update_running("fixed_update", dt); }
+void ScriptHost::fixed_update(float dt) { update_running("fixed_update", dt, true); }
 
-void ScriptHost::update(float dt) { update_running(kUpdateEntry, dt); }
+void ScriptHost::update(float dt) { update_running(kUpdateEntry, dt, false); }
 
 void ScriptHost::dispatch(const ContactEvent& event) {
   const mrb_value self = object_value(event.self);
@@ -97,7 +98,7 @@ void ScriptHost::detach(ObjectId object) {
                     behaviours_.end());
   const RubyResult removed = vm_.call(object_value(object), kDestroyedEntry);
   if (!removed.ok) report_error("forgetting the destroyed '" + context_.scene->at(object).name + "'", removed.error);
-  mrb_ary_set(vm_.state(), objects_cache_, object, mrb_nil_value());
+  mrb_hash_delete_key(vm_.state(), objects_cache_, mrb_int_value(vm_.state(), object));
 }
 
 }  // namespace redgem

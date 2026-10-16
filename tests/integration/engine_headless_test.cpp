@@ -321,6 +321,29 @@ TEST_CASE("objects spawned from inside update start on the next frame") {
   CHECK(engine->scripts().error_count() == kExpectedScriptErrors);
 }
 
+TEST_CASE("fixed_update is called only on behaviours that have one of their own") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, R"(
+    $base_calls = 0
+    class Behaviour
+      def fixed_update(_dt) = $base_calls += 1  # what a behaviour without one would get
+    end
+    module Steps
+      def fixed_update(_dt) = $mixed_in_calls = ($mixed_in_calls || 0) + 1
+    end
+    class Quiet < Behaviour; end
+    class Stepping < Behaviour
+      include Steps
+    end
+    Scene.spawn('Bullet', physics: false).add_component(Quiet)
+    Scene.spawn('Bullet', physics: false).add_component(Stepping)
+  )");
+  frames(*engine, kStartupFrames);
+  CHECK(ruby(*engine, "$base_calls") == "0");
+  CHECK(std::stoi(ruby(*engine, "$mixed_in_calls")) >= kStartupFrames - 1);
+}
+
 TEST_CASE("a kept GameObject stands for its own object only, even once its slot holds a new one") {
   auto engine = sandbox();
   frames(*engine, 1);

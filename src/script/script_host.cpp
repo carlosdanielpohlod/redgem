@@ -3,6 +3,7 @@
 #include <mruby.h>
 #include <mruby/array.h>
 #include <mruby/class.h>
+#include <mruby/hash.h>
 #include <mruby/variable.h>
 
 #include <fstream>
@@ -62,10 +63,12 @@ RubyResult ScriptHost::load_file(const std::filesystem::path& path) {
 
 mrb_value ScriptHost::object_value(ObjectId object) {
   if (object < 0) return mrb_nil_value();
-  mrb_value cached = mrb_ary_entry(objects_cache_, object);
+  mrb_state* mrb = vm_.state();
+  const mrb_value key = mrb_int_value(mrb, object);
+  mrb_value cached = mrb_hash_get(mrb, objects_cache_, key);
   if (stands_for(cached, context_.scene->at(object))) return cached;
   mrb_value wrapper = new_wrapper(context_.scene->at(object));
-  mrb_ary_set(vm_.state(), objects_cache_, object, wrapper);
+  mrb_hash_set(mrb, objects_cache_, key, wrapper);
   return wrapper;
 }
 
@@ -101,7 +104,9 @@ void ScriptHost::reset_scene() {
 
 void ScriptHost::start_objects_cache() {
   mrb_state* mrb = vm_.state();
-  objects_cache_ = mrb_ary_new(mrb);
+  // A Hash by id, not an Array: it holds only the objects scripts touched, whatever their ids,
+  // where an Array has a largest size a big scene's ids go past.
+  objects_cache_ = mrb_hash_new(mrb);
   mrb_gv_set(mrb, mrb_intern_cstr(mrb, kObjectsCacheGlobal), objects_cache_);
 }
 

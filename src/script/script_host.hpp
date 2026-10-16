@@ -79,6 +79,9 @@ class ScriptHost {
     std::string class_name;
     bool started = false;
     bool enabled = true;
+    // Whether its class has a fixed_update of its own: Behaviour's does nothing, and calling it on
+    // every behaviour every physics step would cost a protected Ruby call each for nothing.
+    bool fixed_updates = true;
 
     // Whether its callbacks are still called: it started, and no error of its own disabled it.
     bool active() const { return started && enabled; }
@@ -89,7 +92,7 @@ class ScriptHost {
   mrb_value new_wrapper(const GameObject& object);
   bool stands_for(mrb_value wrapper, const GameObject& object);
   void set_variable(mrb_value object, const char* name, mrb_value value);
-  // Starts an empty cache of GameObject wrappers, which Ruby's garbage collector leaves alone.
+  // Starts an empty cache of GameObject wrappers (by id), which Ruby's garbage collector leaves alone.
   void start_objects_cache();
 
   // Scripts and the behaviours made of their classes.
@@ -105,14 +108,17 @@ class ScriptHost {
   bool defines_its_class(const std::string& script, const std::string& class_name, const std::string& where);
   // Whether a Ruby class is Behaviour or inherits from it.
   bool is_behaviour_class(RClass* klass);
+  // Whether a behaviour class, or a module it includes, defines `method` rather than Behaviour.
+  bool overrides(RClass* klass, const char* method);
   // Reports why a behaviour could not be created; returns nil, which stands for it.
   mrb_value not_created(const std::string& where, const std::string& error);
 
   // Calling the behaviours.
   void invoke(std::size_t index, const char* method, std::initializer_list<mrb_value> args);
   void invoke_on_object(ObjectId object, const char* method, std::initializer_list<mrb_value> args);
-  // Calls `entry` with the frame's seconds on every behaviour that is running.
-  void update_running(const char* entry, float dt);
+  // Calls `entry` with the frame's seconds on every behaviour that is running (and, for
+  // fixed_update, has one of its own).
+  void update_running(const char* entry, float dt, bool fixed);
   // Enabled, on an object that is still there.
   bool runnable(const BehaviourSlot& slot) const;
   // Runnable and started: its callbacks are called.

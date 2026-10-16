@@ -2,6 +2,7 @@
 
 #include <mruby.h>
 #include <mruby/class.h>
+#include <mruby/proc.h>
 
 #include "core/safe_path.hpp"
 #include "scene/props.hpp"
@@ -82,6 +83,13 @@ bool ScriptHost::is_behaviour_class(RClass* klass) {
   return mrb_test(vm_.call(mrb_obj_value(klass), "<=", {behaviour}).value);
 }
 
+bool ScriptHost::overrides(RClass* klass, const char* method) {
+  mrb_state* mrb = vm_.state();
+  RClass* owner = klass;  // becomes the class (or included module) the method is found in
+  const mrb_method_t found = mrb_method_search_vm(mrb, &owner, mrb_intern_cstr(mrb, method));
+  return !MRB_METHOD_UNDEF_P(found) && owner != mrb_class_get(mrb, kBehaviourClass);
+}
+
 mrb_value ScriptHost::not_created(const std::string& where, const std::string& error) {
   report_error(where, error);
   return mrb_nil_value();
@@ -96,7 +104,7 @@ mrb_value ScriptHost::instantiate(ObjectId object, RClass* klass, const std::str
   if (!instance.ok) return not_created(class_name + ".new on '" + object_name + "'", instance.error);
   const RubyResult attached = vm_.call(instance.value, "__attach", {object_value(object)});
   if (!attached.ok) return not_created(class_name + "#__attach", attached.error);
-  behaviours_.push_back({object, instance.value, class_name, false, true});
+  behaviours_.push_back({object, instance.value, class_name, false, true, overrides(klass, "fixed_update")});
   return instance.value;
 }
 

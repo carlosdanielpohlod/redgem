@@ -25,7 +25,7 @@ using Clock = std::chrono::steady_clock;
 constexpr int kBehaviourObjects = 4000;
 constexpr int kBehaviourFrames = 600;     // ten seconds of game
 constexpr int kChurnSpawnsPerFrame = 20;  // twelve hundred objects a second
-constexpr int kChurnMinutes = 5;
+constexpr int kChurnMinutes = 2;
 constexpr int kFramesPerMinute = 60 * 60;  // at the fixed 60 Hz step
 constexpr int kChurnReports = 5;           // how many times the frame time is printed
 constexpr double kMicrosecondsPerSecond = 1e6;
@@ -77,6 +77,14 @@ double seconds_per_frame(Engine& engine, int frames) {
   return std::chrono::duration<double>(Clock::now() - start).count() / frames;
 }
 
+// How many objects Ruby holds right after a full collection: what a leak would make grow.
+std::string ruby_objects(Engine& engine) {
+  const redgem::RubyResult counted = engine.scripts().eval(
+      "GC.start; ObjectSpace.count_objects[:TOTAL] - ObjectSpace.count_objects[:FREE]", "benchmark.rb");
+  if (!counted.ok) return "?";
+  return std::to_string(mrb_integer(counted.value));
+}
+
 int behaviours(Engine& engine) {
   if (!ruby(engine, spawn_code(kBehaviourObjects, "Ticker"))) return 1;
   engine.frame(redgem::config::kFixedDeltaSeconds);  // their starts run once, outside the measure
@@ -93,8 +101,8 @@ int churn(Engine& engine) {
   for (int report = 1; report <= kChurnReports; ++report) {
     const double seconds = seconds_per_frame(engine, frames_per_report);
     const double minutes = static_cast<double>(report * frames_per_report) / kFramesPerMinute;
-    std::printf("after %.0f min: %.1f us a frame, %zu object slots\n", minutes, seconds * kMicrosecondsPerSecond,
-                engine.scene().size());
+    std::printf("after %.1f min: %.1f us a frame, %zu object slots, %s live Ruby objects\n", minutes,
+                seconds * kMicrosecondsPerSecond, engine.scene().size(), ruby_objects(engine).c_str());
   }
   return 0;
 }
