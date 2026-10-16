@@ -1,8 +1,6 @@
 #include "server/server_command.hpp"
 
 #include <algorithm>
-#include <iterator>
-#include <optional>
 
 #include "core/command_line.hpp"
 
@@ -10,22 +8,13 @@ namespace redgem::server {
 
 namespace {
 
-constexpr int kLargestPort = 65535;
-constexpr std::size_t kMostDigits = 5;  // of any number the line takes
-constexpr const char* kDigits = "0123456789";
 constexpr const char* kNoGame = "which game? redgem-server <game_dir>";
 constexpr const char* kDataOption = "--data";
 
-// An option of the line that is given a whole number, from `least` to `most`.
-struct NumberOption {
-  const char* name;
-  int least;
-  int most;
-  void (*set)(ServerSettings&, int);
-};
+using NumberOption = command_line::NumberOption<ServerSettings>;
 
 constexpr NumberOption kOptions[] = {
-    {"--port", 0, kLargestPort,
+    {"--port", 0, command_line::kLargestPort,
      [](ServerSettings& settings, int port) { settings.port = static_cast<std::uint16_t>(port); }},
     {"--max-players", 1, kMostPlayersPerRoom,
      [](ServerSettings& settings, int players) { settings.limits.max_players = players; }},
@@ -51,37 +40,6 @@ std::string usage_text() {
          "                            the game's, named after it with " + kDataFolderSuffix + ")\n";
 }
 
-bool is_number(const std::string& text) {
-  return !text.empty() && text.size() <= kMostDigits && text.find_first_not_of(kDigits) == std::string::npos;
-}
-
-// The number a word says, when it is one from `least` to `most`.
-std::optional<int> number_between(const std::string& text, int least, int most) {
-  if (!is_number(text)) return std::nullopt;
-  const int number = std::stoi(text);
-  if (number < least || number > most) return std::nullopt;
-  return number;
-}
-
-const NumberOption* find_option(const std::string& word) {
-  const auto* found = std::find_if(std::begin(kOptions), std::end(kOptions),
-                                   [&word](const NumberOption& option) { return word == option.name; });
-  return found != std::end(kOptions) ? found : nullptr;
-}
-
-// Reads the option at `next` and its number; an error when it is no option, or not given a number it takes.
-std::string read_option(const std::vector<std::string>& args, std::size_t& next, ServerSettings& settings) {
-  const NumberOption* option = find_option(args[next++]);
-  if (option == nullptr) return "unexpected argument " + args[next - 1];
-  const auto number = number_between(command_line::option_value(args, next).value_or(""), option->least, option->most);
-  if (!number) {
-    return std::string(option->name) + " needs a number from " + std::to_string(option->least) + " to " +
-           std::to_string(option->most);
-  }
-  option->set(settings, *number);
-  return {};
-}
-
 // Reads --data and the folder it is given.
 std::string read_data_dir(const std::vector<std::string>& args, std::size_t& next, ServerSettings& settings) {
   ++next;
@@ -94,8 +52,8 @@ std::string read_data_dir(const std::vector<std::string>& args, std::size_t& nex
 // Reads the word at `next` (and an option's number); an error when it makes no sense.
 std::string read_word(const std::vector<std::string>& args, std::size_t& next, ServerSettings& settings) {
   if (args[next] == kDataOption) return read_data_dir(args, next, settings);
-  if (command_line::is_option(args[next])) return read_option(args, next, settings);
-  if (!settings.game_dir.empty()) return "unexpected argument " + args[next];
+  if (command_line::is_option(args[next])) return command_line::read_number_option(kOptions, args, next, settings);
+  if (!settings.game_dir.empty()) return command_line::unexpected(args[next]);
   settings.game_dir = args[next++];
   return {};
 }

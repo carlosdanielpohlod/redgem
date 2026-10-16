@@ -33,7 +33,7 @@ TEST_CASE("a relay's port is a number of at most five digits, up to the largest 
     CAPTURE(wrong);
     const RelayCommand refused = parse_relay_command({"--port", wrong});
     CHECK_FALSE(refused.ok);
-    CHECK(refused.error == "--port needs a number up to 65535");
+    CHECK(refused.error == "--port needs a number from 0 to 65535");  // as every program says it
   }
   CHECK_FALSE(parse_relay_command({"--port"}).ok);
   CHECK_FALSE(parse_relay_command({"--port", "9000", "9001"}).ok);

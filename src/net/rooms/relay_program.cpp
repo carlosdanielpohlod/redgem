@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <chrono>
 #include <iostream>
-#include <iterator>
-#include <optional>
 
 #include "core/command_line.hpp"
 #include "core/exit_codes.hpp"
@@ -14,21 +12,11 @@ namespace redgem::net {
 
 namespace {
 
-constexpr std::size_t kMostDigits = 5;  // of any number the line takes
-constexpr int kLargestPort = 65535;
-constexpr const char* kDigits = "0123456789";
-
-// An option of the line that is given a whole number, from `least` to `most`.
-struct NumberOption {
-  const char* name;
-  int least;
-  int most;
-  void (*set)(RelayCommand&, int);
-};
+using NumberOption = command_line::NumberOption<RelayCommand>;
 
 constexpr NumberOption kOptions[] = {
     // (Port 0 is no port to meet on: it stands for the usual one.)
-    {"--port", 0, kLargestPort,
+    {"--port", 0, command_line::kLargestPort,
      [](RelayCommand& command, int port) {
        if (port != 0) command.port = static_cast<std::uint16_t>(port);
      }},
@@ -51,47 +39,10 @@ std::string usage_text() {
          "Players behind one shared address (a campus, some mobile networks) may need more of both.\n";
 }
 
-bool is_number(const std::string& text) {
-  return !text.empty() && text.size() <= kMostDigits && text.find_first_not_of(kDigits) == std::string::npos;
-}
-
-// The number a word says, when it is one from `least` to `most`.
-std::optional<int> number_between(const std::string& text, int least, int most) {
-  if (!is_number(text)) return std::nullopt;
-  const int number = std::stoi(text);
-  if (number < least || number > most) return std::nullopt;
-  return number;
-}
-
-const NumberOption* find_option(const std::string& word) {
-  const auto* found = std::find_if(std::begin(kOptions), std::end(kOptions),
-                                   [&word](const NumberOption& option) { return word == option.name; });
-  return found != std::end(kOptions) ? found : nullptr;
-}
-
-// What an option says when it is not given a number it takes.
-std::string refusal(const NumberOption& option) {
-  const std::string range = option.least == 0
-                                ? "up to " + std::to_string(option.most)
-                                : "from " + std::to_string(option.least) + " to " + std::to_string(option.most);
-  return std::string(option.name) + " needs a number " + range;
-}
-
-// Reads the option at `next` and its number; an error when it is no option, or not given a number it takes.
-std::string read_option(const std::vector<std::string>& args, std::size_t& next, RelayCommand& command) {
-  const NumberOption* option = find_option(args[next]);
-  if (option == nullptr) return "unexpected argument " + args[next];
-  ++next;
-  const auto number = number_between(command_line::option_value(args, next).value_or(""), option->least, option->most);
-  if (!number) return refusal(*option);
-  option->set(command, *number);
-  return {};
-}
-
 // Reads the whole line into `command`; what makes no sense in it, if anything does.
 std::string read_line(const std::vector<std::string>& args, RelayCommand& command) {
   for (std::size_t next = 0; next < args.size();) {
-    std::string error = read_option(args, next, command);
+    std::string error = command_line::read_number_option(kOptions, args, next, command);
     if (!error.empty()) return error;
   }
   return {};
