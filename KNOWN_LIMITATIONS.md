@@ -72,7 +72,6 @@ the same pull request.
 - Lights and cameras of deleted objects keep their entries in the saved scene file.
 - Typing a value into an Inspector field (Ctrl+click) and then clicking another object may give
   the value to the newly selected object. Seen in the code, not confirmed by a test.
-- After Stop, the volume and music pitch a game set stay in the editor's audio.
 - In Docker the editor has no sound.
 
 ## Loading and files

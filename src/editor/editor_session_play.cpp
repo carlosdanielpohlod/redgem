@@ -28,6 +28,15 @@ EngineOptions runtime_options(const std::filesystem::path& game_dir, const Scene
   return options;
 }
 
+// The editor's audio after a game: its music ended, and back to what it was before the game
+// changed its volume and pitch.
+void end_game_audio(AudioSystem& audio) {
+  audio.stop_music();
+  audio.set_music_pitch(kAsRecorded);
+  audio.set_music_volume(kFullVolume);
+  audio.set_master_volume(kFullVolume);
+}
+
 }  // namespace
 
 std::variant<std::unique_ptr<EditorSession>, std::string> EditorSession::open(const std::filesystem::path& folder) {
@@ -71,8 +80,8 @@ void EditorSession::pause(bool paused) {
 void EditorSession::stop() {
   if (editing()) return;
   runtime_.reset();
-  // The game's music ends with the game, whoever ended it: Stop, or the game itself (Game.quit).
-  if (game_audio_ != nullptr) game_audio_->stop_music();
+  // The game's sound ends with the game, whoever ended it: Stop, or the game itself (Game.quit).
+  if (game_audio_ != nullptr) end_game_audio(*game_audio_);
   game_audio_ = nullptr;
   play_state_ = PlayState::Editing;
   refresh_preview();
