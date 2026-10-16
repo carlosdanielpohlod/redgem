@@ -262,6 +262,30 @@ TEST_CASE("an object with a NetworkSync is moved by its owner and follows on the
   CHECK(x_of(*host, "$platform") == doctest::Approx(80.0f));
 }
 
+TEST_CASE("a second NetworkSync under a key another object goes by is refused, and the first keeps it") {
+  Lan lan;
+  Engine& machine = lan.add_machine();
+  const std::string holder = "Network.instance_variable_get(:@synced)['shared'].equal?($first)";
+  ruby(machine, "$first = Scene.find('Platform').add_component(NetworkSync, key: 'shared')");
+  lan.round();
+  const int errors_before = machine.scripts().error_count();
+  ruby(machine, "$second = Scene.find('Ball').add_component(NetworkSync, key: 'shared')");
+  lan.round();
+  CHECK(machine.scripts().error_count() == errors_before + 1);  // its start raised: it is disabled
+  CHECK(ruby(machine, holder) == "true");
+  // Handing an object over to a key that is taken raises, and changes nothing.
+  ruby(machine, "$ball = Scene.find('Ball').add_component(NetworkSync, key: 'ball')");
+  lan.round();
+  CHECK(ruby(machine, "begin; $ball.assign(owner: 2, key: 'shared'); rescue ArgumentError => e; e.message; end")
+            .find("is \"Platform\"'s already") != std::string::npos);
+  CHECK(ruby(machine, "[$ball.key, $ball.owner].inspect") == "[\"ball\", 1]");
+  CHECK(ruby(machine, holder) == "true");
+  // Once the first object is gone, its key is free.
+  ruby(machine, "Scene.find('Platform').destroy");
+  lan.round();
+  CHECK(ruby(machine, "$ball.assign(owner: 1, key: 'shared'); $ball.key") == "shared");
+}
+
 TEST_CASE("Network.spawn creates an object on every machine, for late joiners too, until its owner leaves") {
   Lan lan;
   auto [host, guest] = lan.host_and_guest();

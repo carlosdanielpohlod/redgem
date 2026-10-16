@@ -14,7 +14,6 @@ the same pull request.
   tried on a real Mac. The app is not signed by a registered Apple developer nor notarized.
 - The editor on a Mac builds games for the Mac only: it carries no players for other systems.
   A built Mac game is a plain program beside its files, not an .app.
-- No iOS, web or console builds.
 - The Linux programs need a processor with AVX2 and glibc 2.39 or newer.
 - Android games have been run on an emulator only, not on phones. Characters are limited to 48
   bones there. The touch controls have one fixed layout (a stick and three buttons).
@@ -39,8 +38,6 @@ the same pull request.
 - A relay accepts 24 connections and 8 rooms per address, and a game hosted directly lets 4
   machines per address wait to join at the same time. Players behind one shared address (a
   campus, some mobile networks) can run into both.
-- Two `NetworkSync` components given the same key: the second silently takes the first one's
-  place.
 - A room on a relay lets everyone in: connection approval (`Network.authenticate`) works with a
   player hosting directly and on a dedicated server only.
 - A client of version 0.2.0 joining a game that decides who comes in gives up after 5 seconds

@@ -154,6 +154,9 @@ find!("Lift").add_component(NetworkSync)
 find!("Ball").add_component(NetworkSync, owner: 2, key: "ball")   # key: its name on the network
 ```
 
+A key is one object's: a second `NetworkSync` under a key another object goes by already raises
+an error (the behaviour is disabled, the first object keeps the key), and so does `assign` to it.
+
 For objects created while playing, `Network.spawn` makes the copy on every machine, including the
 ones that join later, and removes it when its owner leaves:
 
