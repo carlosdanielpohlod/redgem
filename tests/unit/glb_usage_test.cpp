@@ -69,3 +69,17 @@ TEST_CASE("a reference that points at nothing, or an unknown extension, is not f
   lights[kExtensions][kLightsExtension] = json::object();
   CHECK_NOTHROW(usage_of(lights));
 }
+
+TEST_CASE("the usage of a file follows the cameras and lights its nodes carry") {
+  json doc = two_meshes();
+  doc[kCameras] = json::array({json::object(), json::object()});
+  doc[kExtensions][kLightsExtension][kLights] = json::array({json::object(), json::object(), json::object()});
+  doc[kNodes][0][kCamera] = 1;
+  doc[kNodes][0][kExtensions][kLightsExtension][kLight] = 2;
+  const Usage usage = usage_of(doc);
+  CHECK(usage[kCameraKind] == std::vector<bool>{false, true});
+  CHECK(usage[kLightKind] == std::vector<bool>{false, false, true});
+  // A light the file does not have is not followed.
+  doc[kNodes][0][kExtensions][kLightsExtension][kLight] = 3;
+  CHECK_THROWS_AS(usage_of(doc), NotFollowed);
+}

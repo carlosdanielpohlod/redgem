@@ -42,13 +42,14 @@ void renumber(Json& doc, const Usage& usage) {
 
 // Takes the unused entries out of one of the file's lists (and the list, once it is empty).
 void keep_used(Json& doc, Kind kind, const std::vector<bool>& used) {
-  if (!doc.contains(kListNames[kind])) return;
+  Json* holder = holder_of(doc, kind);
+  if (holder == nullptr) return;
   Json kept = Json::array();
   std::size_t index = 0;
-  for (Json& entry : doc[kListNames[kind]]) {
+  each(*holder, kListNames[kind], [&](Json& entry) {
     if (used[index++]) kept.push_back(std::move(entry));
-  }
-  set_unless_empty(doc, kListNames[kind], kept);
+  });
+  set_unless_empty(*holder, kListNames[kind], kept);
 }
 
 // A buffer view kept the plain way: no extension, in the file's only buffer.

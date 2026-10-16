@@ -109,6 +109,7 @@ TEST_CASE("a file whose every part is used, or that is not understood, is left w
   CHECK_FALSE(without_unused(instanced).has_value());
   GlbFile lit = two_meshes_one_shown();
   lit.json["nodes"][0]["extensions"]["KHR_lights_punctual"] = {{"light", 0}};  // the editor's own: looked past
+  lit.json["extensions"]["KHR_lights_punctual"]["lights"] = {{{"type", "point"}}};
   CHECK(without_unused(lit).has_value());
 
   // Something else where glTF wants an index, or data outside the file's bytes.
@@ -125,6 +126,76 @@ TEST_CASE("a file whose every part is used, or that is not understood, is left w
   const GlbFile original = two_meshes_one_shown();
   without_unused(original);
   CHECK(original.json == two_meshes_one_shown().json);
+}
+
+TEST_CASE("the lights and cameras no object carries are left out, and the others are numbered anew") {
+  GlbFile glb = two_meshes_one_shown();
+  glb.json["cameras"] = {{{"name", "Gone"}, {"type", "perspective"}}, {{"name", "Kept"}, {"type", "perspective"}}};
+  glb.json["extensions"]["KHR_lights_punctual"]["lights"] = {{{"name", "Gone"}, {"type", "point"}},
+                                                             {{"name", "Also gone"}, {"type", "spot"}},
+                                                             {{"name", "Kept"}, {"type", "point"}}};
+  glb.json["nodes"][0]["camera"] = 1;
+  glb.json["nodes"][0]["extensions"]["KHR_lights_punctual"] = {{"light", 2}};
+  const std::optional<GlbFile> lean = without_unused(glb);
+  REQUIRE(lean.has_value());
+  const nlohmann::json& lights = lean->json["extensions"]["KHR_lights_punctual"]["lights"];
+  REQUIRE(lights.size() == 1);
+  CHECK(lights[0]["name"] == "Kept");
+  REQUIRE(lean->json["cameras"].size() == 1);
+  CHECK(lean->json["cameras"][0]["name"] == "Kept");
+  CHECK(lean->json["nodes"][0]["camera"] == 0);
+  CHECK(lean->json["nodes"][0]["extensions"]["KHR_lights_punctual"]["light"] == 0);
+
+  // With no object carrying any, the lists go.
+  glb.json["nodes"][0].erase("camera");
+  glb.json["nodes"][0].erase("extensions");
+  const std::optional<GlbFile> dark = without_unused(glb);
+  REQUIRE(dark.has_value());
+  CHECK_FALSE(dark->json.contains("cameras"));
+  CHECK_FALSE(dark->json["extensions"]["KHR_lights_punctual"].contains("lights"));
+}
+
+TEST_CASE("a deleted light's and camera's entries leave the file, and come back with an undo") {
+  const std::filesystem::path file = temp_scene("deleted_light");
+  SceneDocument doc = saved_floor(file);
+  std::string error;
+  const auto lights_in_file = [&file, &error] {
+    const std::optional<GlbFile> glb = read_glb(file, error);
+    REQUIRE_MESSAGE(glb.has_value(), error);
+    const nlohmann::json& extensions = glb->json.value("extensions", nlohmann::json::object());
+    return extensions.value("KHR_lights_punctual", nlohmann::json::object())
+        .value("lights", nlohmann::json::array())
+        .size();
+  };
+  const auto cameras_in_file = [&file, &error] {
+    return read_glb(file, error)->json.value("cameras", nlohmann::json::array()).size();
+  };
+  const std::size_t lights_before = lights_in_file();
+  const std::size_t cameras_before = cameras_in_file();
+  const int lamp = doc.add_light(LightType::Point, "Lamp", kGray, 1.0f);
+  doc.add_light(LightType::Spot, "Spot", kGray, 1.0f);
+  const int camera = doc.add_camera("Watcher", 1.0f);
+  REQUIRE_MESSAGE(doc.save(error), error);
+  REQUIRE(lights_in_file() == lights_before + 2);
+  REQUIRE(cameras_in_file() == cameras_before + 1);
+  doc.remove(camera);
+  doc.remove(lamp);
+  REQUIRE_MESSAGE(doc.save(error), error);
+  CHECK(lights_in_file() == lights_before + 1);
+  CHECK(cameras_in_file() == cameras_before);
+  // The light left is still the spot's, and the file loads with it.
+  const LoadResult loaded = load_gltf_scene(file.string());
+  REQUIRE_MESSAGE(loaded.ok, loaded.error);
+  const int spot = loaded.scene.find_node("Spot");
+  REQUIRE(spot != kNoIndex);
+  REQUIRE(loaded.scene.nodes[spot].light.has_value());
+  CHECK(loaded.scene.nodes[spot].light->type == LightType::Spot);
+  REQUIRE(doc.undo());
+  REQUIRE(doc.undo());
+  REQUIRE_MESSAGE(doc.save(error), error);
+  CHECK(lights_in_file() == lights_before + 2);
+  CHECK(cameras_in_file() == cameras_before + 1);
+  std::filesystem::remove(file);
 }
 
 TEST_CASE("skeletons and animations keep their data, whichever object they move") {

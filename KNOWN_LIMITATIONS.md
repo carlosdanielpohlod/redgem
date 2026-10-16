@@ -69,7 +69,6 @@ the same pull request.
 
 - A long session with many model imports uses more and more memory until the editor is closed:
   what was deleted is kept for undo.
-- Lights and cameras of deleted objects keep their entries in the saved scene file.
 - Typing a value into an Inspector field (Ctrl+click) and then clicking another object may give
   the value to the newly selected object. Seen in the code, not confirmed by a test.
 - In Docker the editor has no sound.
