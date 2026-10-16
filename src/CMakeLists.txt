@@ -158,6 +158,7 @@ redgem_add_library(redgem_runtime
   scene/transform.cpp
   scene/scene_desc.cpp
   scene/gltf/gltf_checks.cpp
+  scene/gltf/gltf_budget.cpp
   scene/gltf/gltf_accessors.cpp
   scene/gltf/gltf_loader.cpp
   scene/gltf/gltf_reader_materials.cpp

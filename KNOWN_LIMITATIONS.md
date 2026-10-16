@@ -75,11 +75,6 @@ the same pull request.
   the value to the newly selected object. Seen in the code, not confirmed by a test.
 - In Docker the editor has no sound.
 
-## Loading and files
-
-- A scene has limits per part (elements, nodes, depth, joints) but no limit on the memory it
-  needs as a whole: a huge scene is not refused, it runs out of memory.
-
 ## Tools
 
 - The Blender scene builders do not write the same bytes twice (vertex and UV order change

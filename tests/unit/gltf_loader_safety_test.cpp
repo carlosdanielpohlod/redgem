@@ -15,6 +15,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 
@@ -151,6 +152,36 @@ TEST_CASE("an accessor that claims more elements than the limit is refused, even
   const LoadResult result = load_gltf_scene(written(scratch, file));
   CHECK_FALSE(result.ok);
   CHECK(result.error.find("elements") != std::string::npos);
+}
+
+TEST_CASE("a scene whose parts are each within their limits but too big as a whole is refused before it is read") {
+  const Scratch scratch;
+  Gltf file = triangle();
+  // Accessors as big as one may be, each a quarter of a gigabyte once read: enough of them are
+  // more than a scene may need. (Their data is not there either: the size is what refuses them.)
+  const std::uint64_t accessor_bytes = gltf_checks::kMaxAccessorElements * 4 * sizeof(float);
+  const std::uint64_t accessors = gltf_budget::kMaxSceneBytes / accessor_bytes + 1;
+  for (std::uint64_t i = 0; i < accessors; ++i)
+    file.add_accessor(0, kFloatComponent, gltf_checks::kMaxAccessorElements, "VEC4");
+  const LoadResult result = load_gltf_scene(written(scratch, file));
+  CHECK_FALSE(result.ok);
+  CHECK(result.error.find("MB of memory, more than the 2048 MB a scene may") != std::string::npos);
+  // Two fewer of them, and the scene is within the limit (and refused for what it really is).
+  file.doc["accessors"].erase(file.doc["accessors"].size() - 1);
+  file.doc["accessors"].erase(file.doc["accessors"].size() - 1);
+  const LoadResult smaller = load_gltf_scene(written(scratch, file));
+  CHECK_FALSE(smaller.ok);
+  CHECK(smaller.error.find("reaches past its buffer view") != std::string::npos);
+}
+
+TEST_CASE("a file bigger than a scene may be is refused before it is read") {
+  const Scratch scratch;
+  const std::filesystem::path huge = scratch.game() / "huge.glb";
+  std::ofstream(huge, std::ios::binary) << "glTF";
+  std::filesystem::resize_file(huge, gltf_budget::kMaxSceneBytes + 1);  // (no disk is written: a sparse file)
+  const LoadResult result = load_gltf_scene(huge.string());
+  CHECK_FALSE(result.ok);
+  CHECK(result.error.find("the file alone takes 2048 MB of memory") != std::string::npos);
 }
 
 TEST_CASE("an accessor without a buffer view is not read: the part of the mesh that needs it is left out") {

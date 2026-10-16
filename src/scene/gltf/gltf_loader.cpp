@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <memory>
 
+#include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_reader.hpp"
 
@@ -59,9 +60,10 @@ bool sound(const std::string& problem, const std::string& path, std::string& err
 std::filesystem::path folder_of(const std::string& path) { return std::filesystem::path(path).parent_path(); }
 
 // The file parsed, with its buffers, and checked; null (and why, in `error`) when any of that
-// fails. The loader's own checks come before the library's: those do sums that a file can make
-// wrap around, and then read where the wrapped sum points.
+// fails (a file or a scene too big for memory is refused before it is read). The loader's own checks come before the
+// library's: those do sums that a file can make wrap around, and then read where the wrapped sum points.
 CgltfPtr open_gltf(const std::string& path, std::string& error) {
+  if (!sound(gltf_budget::file_problem(path), path, error)) return nullptr;
   cgltf_options options{};
   cgltf_data* raw = nullptr;
   const cgltf_result parsed = cgltf_parse_file(&options, path.c_str(), &raw);
@@ -69,6 +71,7 @@ CgltfPtr open_gltf(const std::string& path, std::string& error) {
   const bool opened =
       succeeded(parsed, "cannot parse", path, error) &&
       sound(gltf_checks::buffer_file_problem(*data, folder_of(path)), path, error) &&
+      sound(gltf_budget::scene_problem(*data, path), path, error) &&
       succeeded(cgltf_load_buffers(&options, data.get(), path.c_str()), "cannot load buffers of", path, error) &&
       sound(gltf_checks::data_problem(*data), path, error) &&
       succeeded(cgltf_validate(data.get()), "invalid glTF", path, error);
