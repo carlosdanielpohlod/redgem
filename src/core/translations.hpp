@@ -19,6 +19,9 @@ void add_file(std::string_view file_name, const EmbeddedFile& file);
 void use_language(std::string_view language);
 // The language the texts are shown in.
 const std::string& language();
+// The language the user asked for, whether or not the engine has texts in it: a game may have
+// some of its own (empty when the user and the system named none).
+const std::string& requested_language();
 // Every text added.
 const Texts& all();
 

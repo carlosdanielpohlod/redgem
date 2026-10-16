@@ -12,6 +12,11 @@ Texts& texts() {
   return all;
 }
 
+std::string& asked_language() {
+  static std::string language;
+  return language;
+}
+
 std::string& chosen_language() {
   static std::string language = kFallbackLanguage;
   return language;
@@ -29,10 +34,13 @@ void add_file(std::string_view file_name, const EmbeddedFile& file) {
 }
 
 void use_language(std::string_view language) {
+  asked_language() = language;
   chosen_language() = texts().has(language) ? std::string(language) : kFallbackLanguage;
 }
 
 const std::string& language() { return chosen_language(); }
+
+const std::string& requested_language() { return asked_language(); }
 
 const Texts& all() { return texts(); }
 

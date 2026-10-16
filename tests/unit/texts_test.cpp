@@ -91,6 +91,7 @@ TEST_CASE("a placeholder with no value stays, and so do braces that are no place
 TEST_CASE("the engine's texts are in English when no translation has the language asked for") {
   translations::use_language("xx");
   CHECK(translations::language() == "en");
+  CHECK(translations::requested_language() == "xx");
   translations::use_language("en");
   CHECK(translations::language() == "en");
 }
