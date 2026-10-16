@@ -25,6 +25,7 @@ void install_bindings(mrb_state* mrb) {
   install_animation_bindings(mrb);  // after GameObject's: it adds to that class
   install_particles_bindings(mrb);
   install_save_bindings(mrb);
+  install_i18n_bindings(mrb);
   install_network_bindings(mrb);
   install_http_bindings(mrb);
 }

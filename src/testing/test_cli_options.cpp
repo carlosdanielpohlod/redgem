@@ -6,6 +6,7 @@
 
 #include "core/command_line.hpp"
 #include "core/files.hpp"
+#include "core/translations.hpp"
 #include "render/gpu_select.hpp"
 #include "testing/test_cli_reading.hpp"
 
@@ -32,7 +33,7 @@ void read_help(Reading& reading) {
 void read_ruby(Reading& reading) {
   const auto file = value(reading);
   if (!file) {
-    fail(reading, "--ruby needs a file");
+    fail(reading, tr("testing.cli.ruby_needs_file"));
     return;
   }
   reading.result.options.mode = TestMode::RubyTests;
@@ -42,7 +43,7 @@ void read_ruby(Reading& reading) {
 void read_screenshots(Reading& reading) {
   const auto folder = value(reading);
   if (!folder) {
-    fail(reading, "--screenshots needs a directory");
+    fail(reading, tr("testing.cli.screenshots_need_directory"));
     return;
   }
   reading.result.options.screenshot_dir = *folder;
@@ -51,7 +52,7 @@ void read_screenshots(Reading& reading) {
 void read_work(Reading& reading) {
   const auto folder = value(reading);
   if (!folder) {
-    fail(reading, "--work needs a directory");
+    fail(reading, tr("testing.cli.work_needs_directory"));
     return;
   }
   reading.result.options.work_dir = *folder;
@@ -60,7 +61,7 @@ void read_work(Reading& reading) {
 void read_game(Reading& reading) {
   const auto folder = value(reading);
   if (!folder) {
-    fail(reading, "--game needs a game's folder");
+    fail(reading, tr("testing.cli.game_needs_folder"));
     return;
   }
   reading.result.options.scripts_game = normalized_folder(*folder);
@@ -72,7 +73,7 @@ void read_gpu(Reading& reading) {
   // (No name is no card's name either.)
   const std::string name = value(reading).value_or("");
   if (!gpu_choice_from_name(name)) {
-    fail(reading, "--gpu needs auto, dedicated or integrated");
+    fail(reading, tr("testing.cli.gpu_needs_card"));
     return;
   }
   reading.result.options.gpu = name;

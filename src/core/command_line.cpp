@@ -1,5 +1,7 @@
 #include "core/command_line.hpp"
 
+#include "core/translations.hpp"
+
 namespace redgem::command_line {
 
 namespace {
@@ -34,9 +36,10 @@ std::optional<int> number_between(const std::string& word, int least, int most) 
 }
 
 std::string number_refusal(const char* option, int least, int most) {
-  return std::string(option) + " needs a number from " + std::to_string(least) + " to " + std::to_string(most);
+  return tr("core.cli.needs_number",
+            {{"option", option}, {"least", std::to_string(least)}, {"most", std::to_string(most)}});
 }
 
-std::string unexpected(const std::string& word) { return "unexpected argument " + word; }
+std::string unexpected(const std::string& word) { return tr("core.cli.unexpected_argument", {{"argument", word}}); }
 
 }  // namespace redgem::command_line

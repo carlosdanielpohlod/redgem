@@ -6,7 +6,6 @@ module Accounts
   GUEST_KEY = :guest_id
   GUEST_ID_DIGITS = 16
   HEX = "0123456789abcdef".freeze
-  LOGIN_FAILED = "the login failed".freeze
 
   class << self
     attr_reader :name
@@ -37,7 +36,7 @@ module Accounts
       why_not(answer, response) unless logged_in?
     end
 
-    def why_not(answer, response) = answer[:error] || response.error || LOGIN_FAILED
+    def why_not(answer, response) = answer[:error] || response.error || I18n.t("login.failed")
 
     def new_guest_id
       random = Random.new(Time.now.usec)

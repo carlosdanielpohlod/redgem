@@ -28,7 +28,7 @@ void draw_node_actions(bool has_parent, int index, Pending& pending) {
   if (ImGui::MenuItem(duplicate_label(), kKeysDuplicate)) pending = {Pending::Kind::Duplicate, index, kNoIndex, {}};
   if (ImGui::MenuItem(delete_label(), kKeysDelete)) pending = {Pending::Kind::Delete, index, kNoIndex, {}};
   if (!has_parent) return;
-  if (ImGui::MenuItem(ICON_FA_ARROW_TURN_UP "  Move to top level")) {
+  if (ImGui::MenuItem(icon_label(ICON_FA_ARROW_TURN_UP, "editor.hierarchy.move_to_top"))) {
     pending = {Pending::Kind::Reparent, index, kNoIndex, {}};
   }
 }
@@ -38,7 +38,7 @@ void node_context_menu(PanelContext& context, int index, Pending& pending) {
   ImGui::BeginDisabled(!context.session.editing());
   draw_node_actions(context.session.document().node(index).parent != kNoIndex, index, pending);
   ImGui::Separator();
-  menu(ICON_FA_PLUS "  Create", [&context] { draw_create_menu(context); });
+  menu(icon_label(ICON_FA_PLUS, "editor.hierarchy.create"), [&context] { draw_create_menu(context); });
   ImGui::EndDisabled();
   ImGui::EndPopup();
 }

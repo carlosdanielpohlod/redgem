@@ -1,1 +1,19 @@
-{}
+{
+  "server.cli.data_needs_folder": "--data needs a folder",
+  "server.cli.no_game": "which game? redgem-server <game_dir>",
+  "server.cli.usage": [
+    "usage:",
+    "  redgem-server <game_dir> [options]    run a game on a server, for players to join over the internet",
+    "",
+    "  --port <number>           the port to listen on (default: {default_port}; 0 picks a free one)",
+    "  --per-address <number>    machines one address may connect (default: {default_per_address}, at most {most_per_address}; players",
+    "                            behind one shared address, a campus, may need more)",
+    "  --data <dir>              where the game's Save is kept, for every room (default: a folder beside",
+    "                            the game's, named after it with {data_suffix})",
+    "  --max-players <number>    players in one room (default: {default_players}, at most {most_players})",
+    "  --rooms <number>          rooms open at once, each a match of its own (default: {default_rooms}, at most {most_rooms})",
+    "  --threads <number>        threads the rooms run on, one room each while they last (default: this",
+    "                            machine's {cores} cores, at most {most_threads})",
+    ""
+  ]
+}

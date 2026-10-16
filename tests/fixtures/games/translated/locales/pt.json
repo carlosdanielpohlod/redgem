@@ -1,0 +1,8 @@
+{
+  "farewell": [
+    "Tchau,",
+    "{name}."
+  ],
+  "game.menu.resume": "Continuar",
+  "greeting": "Olá, {name}!"
+}

@@ -3,12 +3,12 @@
 #include <algorithm>
 
 #include "core/command_line.hpp"
+#include "core/translations.hpp"
 
 namespace redgem::server {
 
 namespace {
 
-constexpr const char* kNoGame = "which game? redgem-server <game_dir>";
 constexpr const char* kDataOption = "--data";
 
 using NumberOption = command_line::NumberOption<ServerSettings>;
@@ -26,38 +26,25 @@ constexpr NumberOption kOptions[] = {
 
 std::string number(int value) { return std::to_string(value); }
 
-// How big the server is: its rooms and the threads they run on.
-std::string size_options() {
-  return "  --max-players <number>    players in one room (default: " + number(kDefaultMaxPlayers) + ", at most " +
-         number(kMostPlayersPerRoom) + ")\n" +
-         "  --rooms <number>          rooms open at once, each a match of its own (default: " +
-         number(kDefaultMaxRooms) + ", at most " + number(kMostRooms) + ")\n" +
-         "  --threads <number>        threads the rooms run on, one room each while they last (default: this\n" +
-         "                            machine's " + number(processor_count()) + " cores, at most " +
-         number(kMostThreads) + ")\n";
-}
-
-// Where it listens, whom it lets connect, and where it keeps what the game saves.
-std::string place_options() {
-  return "  --port <number>           the port to listen on (default: " + number(kDefaultServerPort) +
-         "; 0 picks a free one)\n" + "  --per-address <number>    machines one address may connect (default: " +
-         number(net::kDefaultConnectionsPerAddress) + ", at most " + number(net::kMostConnectionsPerAddress) +
-         "; players\n" + "                            behind one shared address, a campus, may need more)\n" +
-         "  --data <dir>              where the game's Save is kept, for every room (default: a folder beside\n" +
-         "                            the game's, named after it with " + kDataFolderSuffix + ")\n";
-}
-
-std::string usage_text() {
-  return std::string("usage:\n") +
-         "  redgem-server <game_dir> [options]    run a game on a server, for players to join over the internet\n\n" +
-         place_options() + size_options();
+// The numbers and names the usage gives, by the names of its placeholders.
+TextValues usage_values() {
+  return {{"default_port", number(kDefaultServerPort)},
+          {"default_per_address", number(net::kDefaultConnectionsPerAddress)},
+          {"most_per_address", number(net::kMostConnectionsPerAddress)},
+          {"data_suffix", kDataFolderSuffix},
+          {"default_players", number(kDefaultMaxPlayers)},
+          {"most_players", number(kMostPlayersPerRoom)},
+          {"default_rooms", number(kDefaultMaxRooms)},
+          {"most_rooms", number(kMostRooms)},
+          {"cores", number(processor_count())},
+          {"most_threads", number(kMostThreads)}};
 }
 
 // Reads --data and the folder it is given.
 std::string read_data_dir(const std::vector<std::string>& args, std::size_t& next, ServerSettings& settings) {
   ++next;
   const auto folder = command_line::option_value(args, next);
-  if (!folder) return std::string(kDataOption) + " needs a folder";
+  if (!folder) return tr("server.cli.data_needs_folder");
   settings.data_dir = *folder;
   return {};
 }
@@ -77,12 +64,12 @@ std::string read_line(const std::vector<std::string>& args, ServerSettings& sett
     std::string error = read_word(args, next, settings);
     if (!error.empty()) return error;
   }
-  return settings.game_dir.empty() ? kNoGame : "";
+  return settings.game_dir.empty() ? tr("server.cli.no_game") : "";
 }
 
 }  // namespace
 
-std::string server_usage() { return usage_text(); }
+std::string server_usage() { return tr("server.cli.usage", usage_values()); }
 
 ServerCommand parse_server_command(const std::vector<std::string>& args) {
   ServerCommand command;

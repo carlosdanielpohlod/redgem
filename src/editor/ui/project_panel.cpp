@@ -4,9 +4,11 @@
 
 #include "core/log.hpp"
 #include "core/platform.hpp"
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/scripts/script_files.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/panels.hpp"
 #include "editor/ui/project_folders.hpp"
 #include "editor/ui/style.hpp"
@@ -90,10 +92,13 @@ void create_and_open_script(PanelContext& context, std::string& name) {
 void new_script_popup(PanelContext& context) {
   std::string& name = context.state.project.new_script_name;
   if (!ImGui::BeginPopup(kNewScriptPopup)) return;
-  ImGui::TextUnformatted("New Ruby behaviour");
+  ImGui::TextUnformatted(tr("editor.project.new_script_title"));
   ImGui::SetNextItemWidth(kNewScriptFieldWidth);
   if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
-  if (draw_new_script_form(kNewScriptNameId, "enemy_ai", "Create", name)) create_and_open_script(context, name);
+  if (draw_new_script_form(kNewScriptNameId, tr("editor.project.new_script_hint"), tr("editor.project.create_script"),
+                           name)) {
+    create_and_open_script(context, name);
+  }
   ImGui::EndPopup();
 }
 
@@ -101,8 +106,8 @@ void new_script_popup(PanelContext& context) {
 void draw_folders(const ProjectFiles& files, Folder& current) {
   ImGui::BeginChild(kFoldersId, ImVec2(kFolderColumnWidth, 0.0f), ImGuiChildFlags_ResizeX);
   for (const FolderInfo& info : folders()) {
-    const std::string label =
-        std::string(info.icon) + "  " + info.title + "  (" + std::to_string(files_of(files, info.folder).size()) + ")";
+    const std::string label = std::string(info.icon) + "  " + tr(info.title) + "  (" +
+                              std::to_string(files_of(files, info.folder).size()) + ")";
     if (ImGui::Selectable(label.c_str(), current == info.folder)) current = info.folder;
   }
   ImGui::EndChild();
@@ -115,11 +120,11 @@ void draw_folder_bar(PanelContext& context, const FolderInfo& info) {
   ImGui::TextColored(muted_color(), "%s / %s", game_dir.filename().string().c_str(), info.dir);
   ImGui::SameLine();
   if (info.folder == Folder::Scripts) {
-    if (ImGui::SmallButton(ICON_FA_PLUS "  New script")) ImGui::OpenPopup(kNewScriptPopup);
+    if (ImGui::SmallButton(icon_label(ICON_FA_PLUS, "editor.project.new_script"))) ImGui::OpenPopup(kNewScriptPopup);
     new_script_popup(context);
     ImGui::SameLine();
   }
-  if (!ImGui::SmallButton(ICON_FA_FOLDER_OPEN "  Open folder")) return;
+  if (!ImGui::SmallButton(icon_label(ICON_FA_FOLDER_OPEN, "editor.project.open_folder"))) return;
   std::error_code fs_error;
   std::filesystem::create_directories(game_dir / info.dir, fs_error);
   platform::open_in_system(game_dir / info.dir);
@@ -129,7 +134,7 @@ void draw_folder_bar(PanelContext& context, const FolderInfo& info) {
 void draw_tiles(PanelContext& context, const FolderInfo& info) {
   ImGui::BeginChild(kFilesId);
   const std::vector<std::string>& names = files_of(context.files, info.folder);
-  if (names.empty()) ImGui::TextColored(muted_color(), "%s", info.hint);
+  if (names.empty()) ImGui::TextColored(muted_color(), "%s", tr(info.hint));
   const float spacing = ImGui::GetStyle().ItemSpacing.x;
   const int columns = editor_logic::tile_columns(ImGui::GetContentRegionAvail().x, spacing, kTileWidth);
   int column = 0;

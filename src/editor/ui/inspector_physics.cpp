@@ -4,6 +4,7 @@
 #include <cfloat>
 #include <iterator>
 
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/inspector_logic.hpp"
@@ -17,10 +18,11 @@ namespace {
 using namespace editor_config;
 using namespace inspector_logic;
 
-// What each of props::kBodyTypes is for, in their order.
-constexpr const char* kBodyDescriptions[] = {"Never moves (floors, walls)", "Falls and gets pushed (crates, balls)",
-                                             "Moved by scripts, pushes others", "Walks and jumps (CharacterController)",
-                                             "Drives on its wheel children"};
+// The keys of what each of props::kBodyTypes is for, in their order.
+constexpr const char* kBodyDescriptions[] = {
+    "editor.inspector.physics.static_body", "editor.inspector.physics.dynamic_body",
+    "editor.inspector.physics.kinematic_body", "editor.inspector.physics.character_body",
+    "editor.inspector.physics.vehicle_body"};
 constexpr int kDefaultBody = 0;      // the first of props::kBodyTypes
 constexpr int kDefaultCollider = 0;  // the first of props::kColliders
 constexpr const char* kTriggerId = "##trigger";
@@ -43,12 +45,12 @@ void remove_physics(EditorSession& session, int index) {
 // Each of the rows below returns true when it changed the object: the card is then drawn again
 // from the new properties on the next frame.
 bool draw_trigger_row(EditorSession& session, int index, bool& trigger) {
-  property_label("Trigger");
+  property_label(tr("editor.inspector.physics.trigger"));
   if (ImGui::Checkbox(kTriggerId, &trigger)) {
     set_or_remove(session, index, props::kTrigger, flag_or_nothing(trigger, true));
     return true;
   }
-  tooltip("Detects overlaps (on_trigger_enter) instead of colliding.");
+  tooltip(tr("editor.inspector.physics.trigger_tooltip"));
   return false;
 }
 
@@ -56,12 +58,12 @@ bool draw_body_row(EditorSession& session, int index, const PropertyMap& props) 
   const int count = static_cast<int>(std::size(props::kBodyTypes));
   const std::string current = get_string(props, props::kBody).value_or(props::kBodyTypes[kDefaultBody]);
   int type = editor_logic::index_of(props::kBodyTypes, count, current, kDefaultBody);
-  property_label("Body");
+  property_label(tr("editor.inspector.physics.body"));
   if (ImGui::Combo(kBodyId, &type, props::kBodyTypes, count)) {
     set_or_remove(session, index, props::kBody, PropertyValue(std::string(props::kBodyTypes[type])));
     return true;
   }
-  tooltip(kBodyDescriptions[type]);
+  tooltip(tr(kBodyDescriptions[type]));
   return false;
 }
 
@@ -69,14 +71,14 @@ bool draw_collider_row(EditorSession& session, int index, const PropertyMap& pro
   const int count = static_cast<int>(std::size(props::kColliders));
   const std::string current = get_string(props, props::kCollider).value_or(props::kColliders[kDefaultCollider]);
   int collider = editor_logic::index_of(props::kColliders, count, current, kDefaultCollider);
-  property_label("Collider");
+  property_label(tr("editor.inspector.physics.collider"));
   if (!ImGui::Combo(kColliderId, &collider, props::kColliders, count)) return false;
   set_or_remove(session, index, props::kCollider, PropertyValue(std::string(props::kColliders[collider])));
   return true;
 }
 
 void draw_mass_row(PanelContext& context, int index, float mass) {
-  property_label("Mass");
+  property_label(tr("editor.inspector.physics.mass"));
   if (!ImGui::DragFloat(kMassId, &mass, kDragSpeedNumber, kMinMass, FLT_MAX, "%.2f kg")) return;
   streamed_edit(context);
   context.session.document().set_prop(index, props::kMass, static_cast<double>(std::max(mass, kMinMass)), false);
@@ -106,7 +108,7 @@ void draw_physics(PanelContext& context, int index) {
   if (!has_physics(props)) return;
   const BodyConfig body = body_config_from_props(props);
   bool removed = false;
-  const bool open = component_header(ICON_FA_WEIGHT_HANGING, "Physics", &removed);
+  const bool open = component_header(ICON_FA_WEIGHT_HANGING, tr("editor.inspector.physics.title"), &removed);
   if (removed) {
     remove_physics(context.session, index);
   } else if (open) {
@@ -120,9 +122,9 @@ void draw_wheel(EditorSession& session, int index) {
   const auto parent_body = get_string(session.document().node(node.parent).props, props::kBody);
   const bool is_wheel = get_bool(node.props, props::kWheel).value_or(false);
   if (!wheel_card_shown(parent_body, is_wheel)) return;
-  if (!component_header(ICON_FA_CAR, "Vehicle wheel")) return;
+  if (!component_header(ICON_FA_CAR, tr("editor.inspector.wheel.title"))) return;
   bool wheel = is_wheel;
-  property_label("Is a wheel");
+  property_label(tr("editor.inspector.wheel.is_wheel"));
   if (ImGui::Checkbox(kWheelId, &wheel)) set_or_remove(session, index, props::kWheel, flag_or_nothing(wheel, true));
 }
 
@@ -131,7 +133,7 @@ void add_body_menu(EditorSession& session, int index) {
     if (ImGui::MenuItem(props::kBodyTypes[i])) {
       set_or_remove(session, index, props::kBody, PropertyValue(std::string(props::kBodyTypes[i])));
     }
-    tooltip(kBodyDescriptions[i]);
+    tooltip(tr(kBodyDescriptions[i]));
   }
 }
 

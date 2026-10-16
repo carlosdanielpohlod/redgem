@@ -7,6 +7,7 @@
 #include "core/command_line.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
+#include "core/translations.hpp"
 
 namespace redgem::net {
 
@@ -26,17 +27,19 @@ constexpr NumberOption kOptions[] = {
      [](RelayCommand& command, int rooms) { command.limits.rooms_per_address = rooms; }},
 };
 
-std::string usage_text() {
-  const auto number = [](auto value) { return std::to_string(value); };
-  return std::string("usage:\n") +
-         "  redgem-relay [--port <number>] [--per-address <number>] [--rooms-per-address <number>]\n" +
-         "      run a meeting point for multiplayer games over the internet\n\n" +
-         "  --port <number>                the port to listen on (default: " + number(kDefaultRelayPort) + ")\n" +
-         "  --per-address <number>         machines one address may connect (default: " +
-         number(kDefaultConnectionsPerAddress) + ", at most " + number(kMostConnectionsPerAddress) + ")\n" +
-         "  --rooms-per-address <number>   rooms one address may have open (default: " +
-         number(kDefaultRoomsPerAddress) + ", at most " + number(kMaxRelayRooms) + ")\n" +
-         "Players behind one shared address (a campus, some mobile networks) may need more of both.\n";
+// A number as the usage writes it.
+template <typename Number>
+std::string number(Number value) {
+  return std::to_string(value);
+}
+
+// The numbers the usage gives, by the names of its placeholders.
+TextValues usage_values() {
+  return {{"default_port", number(kDefaultRelayPort)},
+          {"default_per_address", number(kDefaultConnectionsPerAddress)},
+          {"most_per_address", number(kMostConnectionsPerAddress)},
+          {"default_rooms", number(kDefaultRoomsPerAddress)},
+          {"most_rooms", number(kMaxRelayRooms)}};
 }
 
 // Reads the whole line into `command`; what makes no sense in it, if anything does.
@@ -78,7 +81,7 @@ int run_relay(const RelayCommand& command) {
 
 }  // namespace
 
-std::string relay_usage() { return usage_text(); }
+std::string relay_usage() { return tr("relay.cli.usage", usage_values()); }
 
 RelayCommand parse_relay_command(const std::vector<std::string>& args) {
   RelayCommand command;

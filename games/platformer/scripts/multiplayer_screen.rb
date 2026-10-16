@@ -4,8 +4,7 @@
 # With a dedicated server (see MainScene), Play online joins it: nobody has to host. It joins as
 # the player logged in (Log in, with a backend) or as a guest (see Accounts).
 class MultiplayerScreen < GameMenu::Screen
-  HEADING = "Multiplayer".freeze
-  NO_SERVER = "No server to play online on yet: set SERVER in scripts/main_scene.rb".freeze
+  NO_SERVER = I18n.t("multiplayer.no_server").freeze   # (in the language the game starts in)
   SERVER_KEY = :server              # the last address joined, kept between runs
   DEFAULT_SERVER = "127.0.0.1".freeze
   ROOM_CODE_LETTERS = 6
@@ -23,7 +22,7 @@ class MultiplayerScreen < GameMenu::Screen
 
   # `menu` is the GameMenu it is a screen of; `title` is what a hosted game is called.
   def initialize(menu, title:, relay:, server:)
-    super(heading: HEADING, back: -> { menu.show(:pause) })
+    super(heading: I18n.t("multiplayer.heading"), back: -> { menu.show(:pause) })
     @title = title
     @relay = relay.to_s
     @server = server.to_s
@@ -35,15 +34,15 @@ class MultiplayerScreen < GameMenu::Screen
 
   # What the screen offers: [label, what it does].
   def options
-    list = [["Host a game", -> { host_game }]]
-    list << ["Host online", -> { host_room }] if relay?
-    list << ["Log in", -> { GameMenu.instance.show(:login) }] if Accounts.backend?
+    list = [[I18n.t("multiplayer.host"), -> { host_game }]]
+    list << [I18n.t("multiplayer.host_online"), -> { host_room }] if relay?
+    list << [I18n.t("multiplayer.log_in"), -> { GameMenu.instance.show(:login) }] if Accounts.backend?
     list + joining_options
   end
 
   def joining_options
-    [["Join", -> { join_game }], ["Play online", -> { play_online }], ["Leave the game", -> { leave_game }],
-     ["Back", back]]
+    [[I18n.t("multiplayer.join"), -> { join_game }], [I18n.t("multiplayer.play_online"), -> { play_online }],
+     [I18n.t("multiplayer.leave"), -> { leave_game }], [I18n.t("menu.back"), back]]
   end
 
   def opened = Network.search
@@ -97,11 +96,13 @@ class MultiplayerScreen < GameMenu::Screen
 
   # What is going on with the network, in a line.
   def status
-    return "Joining #{@joining}..." if Network.connecting?
+    return I18n.t("multiplayer.joining", address: @joining) if Network.connecting?
     return offline_status unless Network.online?
 
     others = Network.players.size
-    "#{place}: #{others} other #{others == 1 ? "player" : "players"}"
+    return I18n.t("multiplayer.one_other", place: place) if others == 1
+
+    I18n.t("multiplayer.others", place: place, count: others)
   end
 
   private
@@ -133,24 +134,30 @@ class MultiplayerScreen < GameMenu::Screen
 
   def offline_status
     return @note if @note
-
-    return "Could not join #{@joining}#{": #{@reason}" if @reason}" if @failed
+    return failure if @failed
 
     hint
   end
 
-  def hint = relay? ? "Type a room's code or the host's address" : "Type the host's address to join a game"
+  # Why joining failed, when it was said.
+  def failure
+    return I18n.t("multiplayer.join_failed", address: @joining) unless @reason
+
+    I18n.t("multiplayer.join_failed_because", address: @joining, reason: @reason)
+  end
+
+  def hint = relay? ? I18n.t("multiplayer.hint_relay") : I18n.t("multiplayer.hint")
 
   def place
-    return "Room #{Network.room}" if Network.room
+    return I18n.t("multiplayer.room", room: Network.room) if Network.room
 
-    Network.host? ? "Hosting on port #{Network.port}" : "In the game at #{@joining}"
+    Network.host? ? I18n.t("multiplayer.hosting", port: Network.port) : I18n.t("multiplayer.in_game", address: @joining)
   end
 
   # The games hosted on this network, each a button that joins it.
   def draw_nearby(x, y, width, height)
     games = Network.games.first(MAX_NEARBY)
-    title = games.empty? ? "Looking for games nearby..." : "Games nearby"
+    title = games.empty? ? I18n.t("multiplayer.looking") : I18n.t("multiplayer.nearby")
     UI.text(title, x: x, y: y - STATUS_ABOVE_FIELD, size: NEARBY_TITLE_SIZE, color: :gray)
     games.each_with_index do |game, index|
       top = y + index * (height + GameMenu::BUTTON_GAP)

@@ -8,6 +8,7 @@
 
 #include <iterator>
 
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/scene_viewport.hpp"
 #include "editor/ui/style.hpp"
@@ -24,12 +25,12 @@ struct GizmoTool {
   GizmoMode mode;
   int key;
   const char* icon;
-  const char* tooltip;
+  const char* tooltip;  // the key of its text
 };
 constexpr GizmoTool kGizmoTools[] = {
-    {GizmoMode::Translate, KEY_W, ICON_FA_UP_DOWN_LEFT_RIGHT, "Move (W)"},
-    {GizmoMode::Rotate, KEY_E, ICON_FA_ROTATE, "Rotate (E)"},
-    {GizmoMode::Scale, KEY_R, ICON_FA_UP_RIGHT_AND_DOWN_LEFT_FROM_CENTER, "Scale (R)"},
+    {GizmoMode::Translate, KEY_W, ICON_FA_UP_DOWN_LEFT_RIGHT, "editor.toolbar.move"},
+    {GizmoMode::Rotate, KEY_E, ICON_FA_ROTATE, "editor.toolbar.rotate"},
+    {GizmoMode::Scale, KEY_R, ICON_FA_UP_RIGHT_AND_DOWN_LEFT_FROM_CENTER, "editor.toolbar.scale"},
 };
 
 ImGuizmo::OPERATION gizmo_operation(GizmoMode mode) {
@@ -53,15 +54,15 @@ void Gizmo::use_keys() {
 void Gizmo::draw_tools() {
   for (const GizmoTool& tool : kGizmoTools) {
     if (&tool != std::begin(kGizmoTools)) ImGui::SameLine();
-    if (ui::icon_button(tool.icon, tool.tooltip, mode_ == tool.mode)) mode_ = tool.mode;
+    if (ui::icon_button(tool.icon, tr(tool.tooltip), mode_ == tool.mode)) mode_ = tool.mode;
   }
   ImGui::SameLine(0.0f, kToolbarGroupGap);
   if (ui::icon_button(local_ ? ICON_FA_CUBE : ICON_FA_GLOBE,
-                      local_ ? "Local axes (click for world)" : "World axes (click for local)")) {
+                      tr(local_ ? "editor.toolbar.local_axes" : "editor.toolbar.world_axes"))) {
     local_ = !local_;
   }
   ImGui::SameLine();
-  ui::toggle_button(ICON_FA_MAGNET, "Snap to grid (or hold Ctrl while dragging)", snapping_);
+  ui::toggle_button(ICON_FA_MAGNET, tr("editor.toolbar.snap"), snapping_);
 }
 
 bool Gizmo::snaps() const { return snapping_ || ImGui::GetIO().KeyCtrl; }

@@ -1,0 +1,8 @@
+{
+  "farewell": [
+    "Bye,",
+    "{name}."
+  ],
+  "greeting": "Hello, {name}!",
+  "only.english": "Only in English"
+}

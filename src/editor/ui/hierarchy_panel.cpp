@@ -3,9 +3,11 @@
 
 #include <algorithm>
 
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/ui/hierarchy_rows.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/panels.hpp"
 #include "editor/ui/style.hpp"
 
@@ -75,12 +77,13 @@ void apply(PanelContext& context, const Pending& pending) {
 // The "+" button and the search field.
 void draw_search_bar(PanelContext& context) {
   ImGui::BeginDisabled(!context.session.editing());
-  if (icon_button(ICON_FA_PLUS, "Create an object")) ImGui::OpenPopup(kCreatePopup);
+  if (icon_button(ICON_FA_PLUS, tr("editor.hierarchy.create_tooltip"))) ImGui::OpenPopup(kCreatePopup);
   ImGui::EndDisabled();
   popup(kCreatePopup, [&context] { draw_create_menu(context); });
   ImGui::SameLine();
   ImGui::SetNextItemWidth(kFillWidth);
-  ImGui::InputTextWithHint(kSearchId, ICON_FA_MAGNIFYING_GLASS "  Search", &context.state.hierarchy.filter);
+  const char* hint = icon_label(ICON_FA_MAGNIFYING_GLASS, "editor.hierarchy.search");
+  ImGui::InputTextWithHint(kSearchId, hint, &context.state.hierarchy.filter);
 }
 
 // Every object, under its parent.

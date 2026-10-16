@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cmath>
 
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 
 namespace redgem::editor_logic {
@@ -13,7 +14,7 @@ using namespace editor_config;
 
 constexpr const char* kTitleSeparator = " - ";
 constexpr const char* kUnsavedMark = " *";
-constexpr const char* kPlayingMark = " [playing]";
+constexpr const char* kMarkGap = " ";  // before the play mark
 constexpr const char* kTargetSeparator = "-";
 constexpr const char* kHomeShorthand = "~";  // what a path under the home folder starts with
 constexpr const char* kHomePrefix = "~/";
@@ -33,7 +34,7 @@ bool starts_with(const std::string& text, const std::string& prefix) { return te
 std::string window_title(const std::string& game, bool unsaved, bool playing) {
   std::string title = std::string(kWindowTitle) + kTitleSeparator + game;
   if (unsaved) title += kUnsavedMark;
-  if (playing) title += kPlayingMark;
+  if (playing) title += std::string(kMarkGap) + tr("editor.title.playing");
   return title;
 }
 

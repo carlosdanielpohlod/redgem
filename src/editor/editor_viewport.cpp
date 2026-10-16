@@ -7,7 +7,10 @@
 #include <raylib.h>
 #include <ImGuizmo.h>
 
+#include <string>
+
 #include "core/log.hpp"
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/scene_viewport.hpp"
@@ -21,6 +24,12 @@ using namespace editor_config;
 using render_math::to_vec3;
 
 constexpr long long kStartupFrames = 2;  // the dock layout exists from the second frame on
+
+// The Scene window's name: its title, then its id (see editor_config), made once.
+const char* viewport_window_name() {
+  static const std::string name = std::string(tr(kViewportTitle)) + kViewportWindow;
+  return name.c_str();
+}
 
 // The right button is held over the view: flying takes the keyboard.
 bool flying_over(const SceneViewport& view) { return view.hovered && IsMouseButtonDown(MOUSE_BUTTON_RIGHT); }
@@ -39,7 +48,7 @@ void EditorApp::draw_viewport_window() {
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
   const bool playing = !editing();
   if (frame_count_ <= kStartupFrames) ImGui::SetNextWindowFocus();  // the Scene tab starts in front
-  ImGui::Begin(kViewportWindow, nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+  ImGui::Begin(viewport_window_name(), nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
   draw_viewport_image();
   if (!playing) draw_viewport_drop_target();
   track_viewport_focus();

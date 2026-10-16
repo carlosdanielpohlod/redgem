@@ -57,11 +57,11 @@ class GameManager < Behaviour
     CoOp.instance.won if mine
     record = record?
     Save[BEST_TIME_KEY] = @best_time = run_time if record
-    GameMenu.instance.finish(record ? format("New record: %<seconds>.1f s!", seconds: run_time) : "You win!")
+    GameMenu.instance.finish(record ? I18n.t("over.record", seconds: seconds(run_time)) : I18n.t("over.win"))
   end
 
   def update(_dt)
-    UI.text("Coins #{@coins}/#{@total_coins}", x: HUD_X, y: COINS_Y, size: HUD_SIZE, color: :gold)
+    draw_coins
     draw_best_time if @best_time
     draw_hint if run_time < HINT_SECONDS
     draw_banner
@@ -72,20 +72,26 @@ class GameManager < Behaviour
   # Whether the run that just ended is the fastest so far.
   def record? = @best_time.nil? || run_time < @best_time
 
+  # A time as the texts show it: 12.3.
+  def seconds(time) = format("%<seconds>.1f", seconds: time)
+
+  def draw_coins
+    UI.text(I18n.t("hud.coins", coins: @coins, total: @total_coins), x: HUD_X, y: COINS_Y, size: HUD_SIZE, color: :gold)
+  end
+
   def draw_best_time
-    text = format("Best %<seconds>.1f s", seconds: @best_time)
+    text = I18n.t("hud.best", seconds: seconds(@best_time))
     UI.text(text, x: UI.width - BEST_RIGHT_MARGIN, y: COINS_Y, size: HUD_SIZE, align: :right)
   end
 
   def draw_hint
-    UI.text("WASD / arrows or a gamepad to move, Space or A to jump. Grab every coin, then reach the flag!",
-            x: HUD_X, y: HINT_Y, size: HINT_SIZE)
+    UI.text(I18n.t("hud.hint"), x: HUD_X, y: HINT_Y, size: HINT_SIZE)
   end
 
   def draw_banner
-    return UI.text("YOU WIN!", x: BANNER_X, y: BANNER_Y, size: BANNER_SIZE, color: :yellow) if @won
+    return UI.text(I18n.t("banner.win"), x: BANNER_X, y: BANNER_Y, size: BANNER_SIZE, color: :yellow) if @won
     return unless Time.elapsed < @need_coins_until
 
-    UI.text("Collect all the coins first!", x: BANNER_X, y: BANNER_Y, size: HUD_SIZE, color: :orange)
+    UI.text(I18n.t("banner.need_coins"), x: BANNER_X, y: BANNER_Y, size: HUD_SIZE, color: :orange)
   end
 end

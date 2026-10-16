@@ -7,6 +7,7 @@
 
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
+#include "core/translations.hpp"
 #include "editor/editor_app.hpp"
 #include "project/editor_setup.hpp"
 #include "project/project_hub.hpp"
@@ -38,7 +39,7 @@ std::optional<int> edit_game(const std::filesystem::path& game, bool from_comman
   if (auto* error = std::get_if<std::string>(&created)) {
     log::error(*error);
     if (from_command_line) return kExitFailure;
-    hub_message = "Cannot open " + game.filename().string() + ": " + *error;
+    hub_message = tr("project.hub.cannot_open", {{"game", game.filename().string()}, {"error", *error}});
     return std::nullopt;
   }
   EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);

@@ -10,6 +10,7 @@
 #include "editor/editor_logic.hpp"
 #include "editor/scene_overlays.hpp"
 #include "editor/scene_viewport.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 #include "render/render_math.hpp"
 #include "render/renderer.hpp"
@@ -26,13 +27,15 @@ constexpr float kNoMotionBlur = 0.0f;  // strength of the blur while no game run
 constexpr ImVec2 kFlippedUvTopLeft{0.0f, 1.0f};
 constexpr ImVec2 kFlippedUvBottomRight{1.0f, 0.0f};
 
-// The Scene view's hints, in ViewportHint's order.
-constexpr const char* kViewportHints[] = {
-    ICON_FA_COMPUTER_MOUSE "  Right mouse + WASD to fly    F frames the selection",
-    ICON_FA_MOUNTAIN "  Terrain: turn Sculpt on in the Inspector to shape it",
-    ICON_FA_MOUNTAIN "  Sculpting: drag to shape the ground    Shift reverses    brush in the Inspector",
-    ICON_FA_GAMEPAD "  The game has the keyboard    Esc stops",
-    ICON_FA_GAMEPAD "  Click the game to give it the keyboard",
+// The Scene view's hints, in ViewportHint's order: an icon and the key of the text after it.
+struct Hint {
+  const char* icon;
+  const char* text;
+};
+constexpr Hint kViewportHints[] = {
+    {ICON_FA_COMPUTER_MOUSE, "editor.scene.hint.fly"},     {ICON_FA_MOUNTAIN, "editor.scene.hint.terrain"},
+    {ICON_FA_MOUNTAIN, "editor.scene.hint.sculpting"},     {ICON_FA_GAMEPAD, "editor.scene.hint.game_has_keyboard"},
+    {ICON_FA_GAMEPAD, "editor.scene.hint.click_the_game"},
 };
 
 }  // namespace
@@ -106,8 +109,9 @@ void EditorApp::draw_play_border() {
 void EditorApp::draw_viewport_hint(bool playing) {
   const SceneViewport& view = *viewport_;
   const bool terrain_selected = session_->is_terrain(session_->selection());
-  const char* hint = kViewportHints[static_cast<int>(
+  const Hint& shown = kViewportHints[static_cast<int>(
       editor_logic::viewport_hint({playing, view.focused, terrain_selected, terrain_tool_.sculpting}))];
+  const char* hint = ui::icon_label(shown.icon, shown.text);
   const ImVec2 hint_size = ImGui::CalcTextSize(hint);
   const editor_logic::Rect pill =
       editor_logic::hint_pill(view.screen_x, view.screen_y, viewport_height(), hint_size.x, hint_size.y);

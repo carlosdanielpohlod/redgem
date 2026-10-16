@@ -7,7 +7,8 @@
 #
 # Settings: title (shown on the title screen: the game's own title unless given), start_open
 # (false starts the game right away). On a dedicated server nobody is there to see a menu, and the
-# game must never freeze: none opens.
+# game must never freeze: none opens. Its labels are the engine's texts (see I18n), looked up in the
+# language in use as it is added; a game's own translation files may change them.
 #
 # The screens are :title, :pause and :over. A game changes them and adds its own:
 #
@@ -44,10 +45,10 @@ class GameMenu < Behaviour
   def initialize
     super
     @screen = nil
-    quit = ["Quit", -> { Game.quit }]
-    @screens = { title: Screen.new(options: [["Play", -> { resume }], quit]),
+    quit = [I18n.t("game.menu.quit"), -> { Game.quit }]
+    @screens = { title: Screen.new(options: [[I18n.t("game.menu.play"), -> { resume }], quit]),
                  pause: pause_screen(quit),
-                 over: Screen.new(options: [["Play again", -> { restart }], quit]) }
+                 over: Screen.new(options: [[I18n.t("game.menu.play_again"), -> { restart }], quit]) }
   end
 
   def start
@@ -101,8 +102,8 @@ class GameMenu < Behaviour
   private
 
   def pause_screen(quit)
-    options = [["Resume", -> { resume }], ["Restart", -> { restart }], quit]
-    Screen.new(heading: "Paused", options: options, back: -> { resume })
+    options = [[I18n.t("game.menu.resume"), -> { resume }], [I18n.t("game.menu.restart"), -> { restart }], quit]
+    Screen.new(heading: I18n.t("game.menu.paused"), options: options, back: -> { resume })
   end
 
   def open_screen = @screens[@screen]

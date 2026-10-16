@@ -157,6 +157,10 @@ UI.text("Coins #{@coins}/#{@total}", x: 20, y: 40, size: 28, color: :gold)
 Colors: `:white`, `:black`, `:red`, `:green`, `:blue`, `:yellow`, `:gold`, `:orange`, `:gray`, or
 `[r, g, b]`.
 
+To show it in the player's language, keep the text in the game's translation files and show it
+with `I18n.t("hud.coins", coins: @coins, total: @total)`: see
+[Texts in several languages](i18n.md).
+
 ## Menus, buttons and images
 
 Everything in `UI` is drawn the frame you call it, so a menu is just a behaviour that draws

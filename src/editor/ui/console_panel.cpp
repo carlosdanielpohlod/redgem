@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "editor/editor_config.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/panels.hpp"
 #include "editor/ui/style.hpp"
 
@@ -47,7 +48,7 @@ void filter_button(const char* icon, long long count, bool& shown, ImVec4 color)
 }
 
 void draw_filters(ConsoleLog& console, ConsoleFilters& filters) {
-  if (ImGui::SmallButton(ICON_FA_BAN "  Clear")) console.clear();
+  if (ImGui::SmallButton(icon_label(ICON_FA_BAN, "editor.console.clear"))) console.clear();
   const long long info = count_of(console, log::Level::Info) + count_of(console, log::Level::Debug);
   filter_button(ICON_FA_CIRCLE_INFO, info, filters.info, ImGui::GetStyleColorVec4(ImGuiCol_Text));
   filter_button(ICON_FA_TRIANGLE_EXCLAMATION, count_of(console, log::Level::Warning), filters.warnings,

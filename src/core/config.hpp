@@ -19,6 +19,7 @@ inline constexpr const char* kScriptsDirName = "scripts";
 inline constexpr const char* kSoundsDirName = "sounds";
 inline constexpr const char* kScenesDirName = "scenes";
 inline constexpr const char* kModelsDirName = "models";
+inline constexpr const char* kLocalesDirName = "locales";  // the game's translations: <language>.json (I18n)
 inline constexpr const char* kSceneExtension = ".glb";
 inline constexpr const char* kMainSceneName = "main";  // the game's scene.glb
 // scripts/<scene>_scene.rb sets a scene up from Ruby when it loads (see ruby/engine/scene_script.rb).

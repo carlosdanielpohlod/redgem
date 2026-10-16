@@ -45,8 +45,8 @@ int new_game(const redgem::CliOptions& options) {
     log::error(error);
     return kExitFailure;
   }
-  std::cout << "created " << options.game_dir.string() << " (" << options.template_name << "). Open it with: redgem "
-            << options.game_dir.string() << "\n";
+  std::cout << tr("project.cli.created", {{"game_dir", options.game_dir.string()}, {"template", options.template_name}})
+            << "\n";
   return kExitSuccess;
 }
 
@@ -67,9 +67,11 @@ int build(const redgem::CliOptions& options) {
     return kExitFailure;
   }
   // (An Android app is not run from here: it is installed on a phone.)
-  const char* next = target == BuildTarget::Android ? ": install it with adb install " : ": run ";
-  std::cout << "built " << options.build_dir.string() << " for " << build_target_name(target) << next
-            << executable->string() << "\n";
+  const char* said = target == BuildTarget::Android ? "project.cli.built_for_phone" : "project.cli.built";
+  std::cout << tr(said, {{"out_dir", options.build_dir.string()},
+                         {"target", build_target_name(target)},
+                         {"executable", executable->string()}})
+            << "\n";
   return kExitSuccess;
 }
 

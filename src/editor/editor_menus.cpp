@@ -17,17 +17,17 @@ namespace {
 
 using namespace editor_config;
 
-constexpr const char* kNoBuilds = "No way of building was given to this editor.";
+constexpr const char* kNoBuilds = "editor.menu.no_builds";
 
 // Saved for this user (not in the game): which card draws the editor and the games it starts.
 struct GpuOption {
   GpuChoice choice;
-  const char* label;
+  const char* label;  // the key of its text
 };
 constexpr GpuOption kGpuOptions[] = {
-    {GpuChoice::Auto, "Automatic (dedicated when there is one)"},
-    {GpuChoice::Dedicated, "Dedicated (faster)"},
-    {GpuChoice::Integrated, "Integrated (cooler and quieter, much slower)"},
+    {GpuChoice::Auto, "editor.gpu.automatic"},
+    {GpuChoice::Dedicated, "editor.gpu.dedicated"},
+    {GpuChoice::Integrated, "editor.gpu.integrated"},
 };
 
 void choose_gpu(UserSettings settings, GpuChoice choice) {
@@ -60,27 +60,30 @@ void EditorApp::draw_game_object_menu() {
 }
 
 void EditorApp::draw_help_menu() {
-  if (ImGui::MenuItem(ICON_FA_KEYBOARD "  Keyboard Shortcuts")) shortcuts_open_ = true;
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_KEYBOARD, "editor.menu.keyboard_shortcuts"))) shortcuts_open_ = true;
 }
 
 void EditorApp::draw_file_menu() {
-  if (ImGui::MenuItem(ICON_FA_FILE_CIRCLE_PLUS "  New Game...")) request_exit(EditorExit::OpenHub);
-  if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Open Game...")) request_exit(EditorExit::OpenHub);
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_FILE_CIRCLE_PLUS, "editor.menu.new_game")))
+    request_exit(EditorExit::OpenHub);
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_FOLDER_OPEN, "editor.menu.open_game"))) request_exit(EditorExit::OpenHub);
   ImGui::Separator();
   draw_game_file_items();
   ImGui::Separator();
-  if (ImGui::MenuItem(ICON_FA_RIGHT_FROM_BRACKET "  Quit")) request_exit(EditorExit::Quit);
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_RIGHT_FROM_BRACKET, "editor.menu.quit"))) request_exit(EditorExit::Quit);
 }
 
 // What the File menu offers for the game being edited.
 void EditorApp::draw_game_file_items() {
-  if (ImGui::MenuItem(ICON_FA_FLOPPY_DISK "  Save Scene", kKeysSave, false, editing())) save();
-  ui::menu(ICON_FA_BOX_ARCHIVE "  Build Game", [this] { draw_build_targets(); }, editing());
-  if (ImGui::MenuItem(ICON_FA_FOLDER "  Show Game Folder")) platform::open_in_system(session_->game_dir());
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_FLOPPY_DISK, "editor.menu.save_scene"), tr(kKeysSave), false, editing()))
+    save();
+  ui::menu(ui::icon_label(ICON_FA_BOX_ARCHIVE, "editor.menu.build_game"), [this] { draw_build_targets(); }, editing());
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_FOLDER, "editor.menu.show_game_folder")))
+    platform::open_in_system(session_->game_dir());
 }
 
 void EditorApp::draw_build_targets() {
-  if (builds_.empty()) ImGui::TextColored(ui::muted_color(), "%s", kNoBuilds);
+  if (builds_.empty()) ImGui::TextColored(ui::muted_color(), "%s", tr(kNoBuilds));
   for (const BuildChoice& choice : builds_) {
     if (ImGui::MenuItem(choice.label.c_str())) build(choice);
   }
@@ -91,12 +94,14 @@ void EditorApp::draw_edit_menu() {
   ImGui::Separator();
   draw_selection_items();
   ImGui::Separator();
-  ui::menu(ICON_FA_MICROCHIP "  Graphics Card", [this] { draw_graphics_card_menu(); });
+  ui::menu(ui::icon_label(ICON_FA_MICROCHIP, "editor.menu.graphics_card"), [this] { draw_graphics_card_menu(); });
 }
 
 void EditorApp::draw_undo_items() {
-  if (ImGui::MenuItem(ICON_FA_ROTATE_LEFT "  Undo", kKeysUndo, false, undo_offered())) session_->undo();
-  if (ImGui::MenuItem(ICON_FA_ROTATE_RIGHT "  Redo", kKeysRedo, false, redo_offered())) session_->redo();
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_ROTATE_LEFT, "editor.menu.undo"), tr(kKeysUndo), false, undo_offered()))
+    session_->undo();
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_ROTATE_RIGHT, "editor.menu.redo"), tr(kKeysRedo), false, redo_offered()))
+    session_->redo();
 }
 
 bool EditorApp::undo_offered() const { return editing() && session_->document().can_undo(); }
@@ -104,32 +109,35 @@ bool EditorApp::redo_offered() const { return editing() && session_->document().
 
 void EditorApp::draw_selection_items() {
   const bool has_selection = session_->selection() != kNoObject;
-  if (ImGui::MenuItem(ui::duplicate_label(), kKeysDuplicate, false, selection_editable())) {
+  if (ImGui::MenuItem(ui::duplicate_label(), tr(kKeysDuplicate), false, selection_editable())) {
     session_->duplicate_selection();
   }
-  if (ImGui::MenuItem(ui::delete_label(), kKeysDelete, false, selection_editable())) session_->delete_selection();
+  if (ImGui::MenuItem(ui::delete_label(), tr(kKeysDelete), false, selection_editable())) session_->delete_selection();
   ImGui::Separator();
-  if (ImGui::MenuItem(ICON_FA_EXPAND "  Frame Selection", kKeysFrame, false, has_selection)) frame_selection();
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_EXPAND, "editor.menu.frame_selection"), tr(kKeysFrame), false,
+                      has_selection))
+    frame_selection();
 }
 
 bool EditorApp::selection_editable() const { return editing() && session_->selection() != kNoObject; }
 
 void EditorApp::draw_view_menu() {
-  ImGui::MenuItem(ICON_FA_LIST "  Hierarchy (left)", kKeysHierarchy, &panels_.hierarchy);
-  ImGui::MenuItem(ICON_FA_SLIDERS "  Inspector (right)", kKeysInspector, &panels_.inspector);
-  ImGui::MenuItem(ICON_FA_TERMINAL "  Project and Console (bottom)", kKeysBottomPanel, &panels_.bottom);
+  ImGui::MenuItem(ui::icon_label(ICON_FA_LIST, "editor.menu.hierarchy_panel"), tr(kKeysHierarchy), &panels_.hierarchy);
+  ImGui::MenuItem(ui::icon_label(ICON_FA_SLIDERS, "editor.menu.inspector_panel"), tr(kKeysInspector),
+                  &panels_.inspector);
+  ImGui::MenuItem(ui::icon_label(ICON_FA_TERMINAL, "editor.menu.bottom_panels"), tr(kKeysBottomPanel), &panels_.bottom);
   ImGui::Separator();
-  if (ImGui::MenuItem(ICON_FA_CODE "  Focus on code and scene")) panels_ = {false, false, false};
-  if (ImGui::MenuItem(ICON_FA_TABLE_COLUMNS "  Show all panels")) panels_ = {};
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_CODE, "editor.menu.focus_on_code"))) panels_ = {false, false, false};
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_TABLE_COLUMNS, "editor.menu.show_all_panels"))) panels_ = {};
 }
 
 void EditorApp::draw_graphics_card_menu() {
   const UserSettings settings = read_user_settings(user_settings_file());
   for (const GpuOption& option : kGpuOptions) {
-    if (ImGui::MenuItem(option.label, nullptr, settings.gpu == option.choice)) choose_gpu(settings, option.choice);
+    if (ImGui::MenuItem(tr(option.label), nullptr, settings.gpu == option.choice)) choose_gpu(settings, option.choice);
   }
   ImGui::Separator();
-  ImGui::TextColored(ui::muted_color(), "Takes effect on the next start.");
+  ImGui::TextColored(ui::muted_color(), "%s", tr("editor.gpu.next_start"));
 }
 
 }  // namespace redgem

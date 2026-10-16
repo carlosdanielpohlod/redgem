@@ -3,51 +3,49 @@
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "core/platform.hpp"
+#include "core/translations.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/panels.hpp"
 #include "editor/ui/style.hpp"
 
 namespace redgem::ui {
 namespace {
 
-const char* shape_icon(PrimitiveShape shape) {
-  switch (shape) {
-    case PrimitiveShape::Sphere:
-      return ICON_FA_CIRCLE;
-    case PrimitiveShape::Plane:
-      return ICON_FA_SQUARE;
-    case PrimitiveShape::Cylinder:
-      return ICON_FA_DATABASE;
-    case PrimitiveShape::Capsule:
-      return ICON_FA_CAPSULES;
-    case PrimitiveShape::Cube:
-      break;
-  }
-  return ICON_FA_CUBE;
-}
+// The shapes the 3D Object menu offers, each with its icon and the key of its label.
+struct ShapeOption {
+  PrimitiveShape shape;
+  const char* icon;
+  const char* key;
+};
+constexpr ShapeOption kShapeOptions[] = {
+    {PrimitiveShape::Cube, ICON_FA_CUBE, "editor.create.shape.cube"},
+    {PrimitiveShape::Sphere, ICON_FA_CIRCLE, "editor.create.shape.sphere"},
+    {PrimitiveShape::Plane, ICON_FA_SQUARE, "editor.create.shape.plane"},
+    {PrimitiveShape::Cylinder, ICON_FA_DATABASE, "editor.create.shape.cylinder"},
+    {PrimitiveShape::Capsule, ICON_FA_CAPSULES, "editor.create.shape.capsule"},
+};
 
 // The kinds of light the Light menu offers.
 struct LightOption {
   LightType type;
-  const char* label;
+  const char* icon;
+  const char* key;
 };
-constexpr const char* kHowToAddModels = "Drop .glb files (exported from Blender) on this window";
-
 constexpr LightOption kLightOptions[] = {
-    {LightType::Directional, ICON_FA_SUN "  Directional (sun)"},
-    {LightType::Point, ICON_FA_LIGHTBULB "  Point"},
-    {LightType::Spot, ICON_FA_LIGHTBULB "  Spot"},
+    {LightType::Directional, ICON_FA_SUN, "editor.create.light.directional"},
+    {LightType::Point, ICON_FA_LIGHTBULB, "editor.create.light.point"},
+    {LightType::Spot, ICON_FA_LIGHTBULB, "editor.create.light.spot"},
 };
 
 void draw_shape_items(EditorSession& session, Vec3 at) {
-  for (const PrimitiveShape shape : all_primitives()) {
-    const std::string label = std::string(shape_icon(shape)) + "  " + primitive_name(shape);
-    if (ImGui::MenuItem(label.c_str())) session.create_primitive(shape, at);
+  for (const ShapeOption& option : kShapeOptions) {
+    if (ImGui::MenuItem(icon_label(option.icon, option.key))) session.create_primitive(option.shape, at);
   }
 }
 
 void draw_light_items(EditorSession& session, Vec3 at) {
   for (const LightOption& option : kLightOptions) {
-    if (ImGui::MenuItem(option.label)) session.create_light(option.type, at);
+    if (ImGui::MenuItem(icon_label(option.icon, option.key))) session.create_light(option.type, at);
   }
 }
 
@@ -55,11 +53,11 @@ void draw_light_items(EditorSession& session, Vec3 at) {
 void draw_scenery_items(PanelContext& context) {
   EditorSession& session = context.session;
   const Vec3 at = context.spawn_point;
-  if (ImGui::MenuItem(ICON_FA_VIDEO "  Camera")) session.create_camera(at);
-  if (ImGui::MenuItem(ICON_FA_MOUNTAIN "  Terrain")) create_terrain(context);
-  tooltip("Ground you shape with a brush: mountains, holes, plateaus.");
-  if (ImGui::MenuItem(ICON_FA_CLOUD_SUN "  Environment")) session.create_environment();
-  tooltip("Sky, fog, bloom and wind of the scene, as properties (colors are #rrggbb).");
+  if (ImGui::MenuItem(icon_label(ICON_FA_VIDEO, "editor.create.camera"))) session.create_camera(at);
+  if (ImGui::MenuItem(icon_label(ICON_FA_MOUNTAIN, "editor.create.terrain"))) create_terrain(context);
+  tooltip(tr("editor.create.terrain_tooltip"));
+  if (ImGui::MenuItem(icon_label(ICON_FA_CLOUD_SUN, "editor.create.environment"))) session.create_environment();
+  tooltip(tr("editor.create.environment_tooltip"));
 }
 
 void open_models_folder(const EditorSession& session) {
@@ -75,8 +73,10 @@ void draw_model_items(PanelContext& context) {
     if (ImGui::MenuItem(model.c_str())) import_model(context.session, model, context.spawn_point);
   }
   if (!context.files.models.empty()) ImGui::Separator();
-  ImGui::TextColored(muted_color(), "%s", kHowToAddModels);
-  if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN "  Open the models folder")) open_models_folder(context.session);
+  ImGui::TextColored(muted_color(), "%s", tr("editor.create.models_hint"));
+  if (ImGui::MenuItem(icon_label(ICON_FA_FOLDER_OPEN, "editor.create.open_models_folder"))) {
+    open_models_folder(context.session);
+  }
 }
 
 // A terrain was made, and the editor has a brush to turn on.
@@ -104,12 +104,12 @@ ObjectId import_model(EditorSession& session, const std::string& model_file, Vec
 void draw_create_menu(PanelContext& context) {
   EditorSession& session = context.session;
   const Vec3 at = context.spawn_point;
-  if (ImGui::MenuItem(ICON_FA_CIRCLE_DOT "  Empty")) session.create_empty(at);
-  menu(ICON_FA_CUBE "  3D Object", [&session, at] { draw_shape_items(session, at); });
-  menu(ICON_FA_LIGHTBULB "  Light", [&session, at] { draw_light_items(session, at); });
+  if (ImGui::MenuItem(icon_label(ICON_FA_CIRCLE_DOT, "editor.create.empty"))) session.create_empty(at);
+  menu(icon_label(ICON_FA_CUBE, "editor.create.shape_menu"), [&session, at] { draw_shape_items(session, at); });
+  menu(icon_label(ICON_FA_LIGHTBULB, "editor.create.light_menu"), [&session, at] { draw_light_items(session, at); });
   draw_scenery_items(context);
   ImGui::Separator();
-  menu(ICON_FA_FILE_IMPORT "  Model", [&context] { draw_model_items(context); });
+  menu(icon_label(ICON_FA_FILE_IMPORT, "editor.create.model_menu"), [&context] { draw_model_items(context); });
 }
 
 }  // namespace redgem::ui

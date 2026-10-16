@@ -9,6 +9,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/i18n.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_screen.rb
@@ -123,12 +124,14 @@ redgem_add_library(redgem_core
   core/texts.cpp
   core/text_placeholders.cpp
   core/translations.cpp
+  core/core_texts.cpp
   core/platform_language.cpp
   core/safe_path.cpp
   core/image_header.cpp
   core/math.cpp
   core/fixed_clock.cpp)
 target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
+redgem_embed_texts(redgem_core core)
 if(ANDROID)
   # Where a phone shows a program's messages (see core/platform.cpp).
   target_link_libraries(redgem_core PUBLIC log)
@@ -245,6 +248,7 @@ redgem_add_library(redgem_runtime
   script/script_host_callbacks.cpp
   script/script_host_network.cpp
   script/script_host_http.cpp
+  script/game_locales.cpp
   script/bindings/bindings.cpp
   script/bindings/binding_helpers.cpp
   script/bindings/game_object_bindings.cpp
@@ -260,6 +264,7 @@ redgem_add_library(redgem_runtime
   script/bindings/animation_bindings.cpp
   script/bindings/particles_bindings.cpp
   script/bindings/save_bindings.cpp
+  script/bindings/i18n_bindings.cpp
   script/bindings/message_values.cpp
   script/bindings/network_bindings.cpp
   script/bindings/network_search_bindings.cpp

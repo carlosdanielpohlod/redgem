@@ -2,6 +2,7 @@
 
 #include <cfloat>
 
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/inspector_logic.hpp"
@@ -44,8 +45,8 @@ void draw_name_field(PanelContext& context, int index) {
 
 void draw_tag_field(PanelContext& context, int index) {
   const std::string current = get_string(context.session.document().node(index).props, props::kTag).value_or("");
-  property_label("Tag");
-  const auto tag = text_field(context, kTagId, index, current, "untagged");
+  property_label(tr("editor.inspector.object.tag"));
+  const auto tag = text_field(context, kTagId, index, current, tr("editor.inspector.object.tag_hint"));
   if (tag) set_or_remove(context.session, tag->object, props::kTag, text_or_nothing(tag->text));
 }
 
@@ -53,20 +54,20 @@ void draw_tag_field(PanelContext& context, int index) {
 void draw_flags(EditorSession& session, int index) {
   const PropertyMap& props = session.document().node(index).props;
   bool visible = get_bool(props, props::kVisible).value_or(true);
-  if (ImGui::Checkbox("Visible", &visible)) {
+  if (ImGui::Checkbox(tr("editor.inspector.object.visible"), &visible)) {
     set_or_remove(session, index, props::kVisible, flag_or_nothing(!visible, false));
   }
   ImGui::SameLine();
   bool prefab = get_bool(props, props::kPrefab).value_or(false);
-  if (ImGui::Checkbox("Template", &prefab)) {
+  if (ImGui::Checkbox(tr("editor.inspector.object.template"), &prefab)) {
     set_or_remove(session, index, props::kPrefab, flag_or_nothing(prefab, true));
   }
-  tooltip("Templates are hidden in the game and copied with Scene.spawn(\"Name\", position: ...).");
+  tooltip(tr("editor.inspector.object.template_tooltip"));
 }
 
 bool drag_rotation(Quat& rotation) {
   Vec3 euler = quat_to_euler_degrees(rotation);
-  if (!drag_vec3("Rotation", kRotationId, euler, kDragSpeedRotation)) return false;
+  if (!drag_vec3(tr("editor.inspector.transform.rotation"), kRotationId, euler, kDragSpeedRotation)) return false;
   rotation = quat_from_euler_degrees(euler);
   return true;
 }
@@ -74,7 +75,8 @@ bool drag_rotation(Quat& rotation) {
 // Only touches the scale when it was itself edited: a mirrored object (negative scale) must survive a move.
 bool drag_scale(Vec3& scale) {
   Vec3 edited = scale;
-  if (!drag_vec3("Scale", kScaleId, edited, kDragSpeedScale, kMinScale, FLT_MAX)) return false;
+  const char* label = tr("editor.inspector.transform.scale");
+  if (!drag_vec3(label, kScaleId, edited, kDragSpeedScale, kMinScale, FLT_MAX)) return false;
   scale = editor_logic::at_least(edited, kMinScale);
   return true;
 }
@@ -88,10 +90,10 @@ void draw_header(PanelContext& context, int index) {
 }
 
 void draw_transform(PanelContext& context, int index) {
-  if (!component_header(ICON_FA_UP_DOWN_LEFT_RIGHT, "Transform")) return;
+  if (!component_header(ICON_FA_UP_DOWN_LEFT_RIGHT, tr("editor.inspector.transform.title"))) return;
   SceneDocument& doc = context.session.document();
   Transform local = doc.node(index).local;
-  bool changed = drag_vec3("Position", kPositionId, local.position, kDragSpeedPosition);
+  bool changed = drag_vec3(tr("editor.inspector.transform.position"), kPositionId, local.position, kDragSpeedPosition);
   changed |= drag_rotation(local.rotation);
   changed |= drag_scale(local.scale);
   if (!changed) return;

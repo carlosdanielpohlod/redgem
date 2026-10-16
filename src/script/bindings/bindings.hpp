@@ -21,6 +21,7 @@ void install_input_bindings(mrb_state* mrb);
 void install_animation_bindings(mrb_state* mrb);
 void install_particles_bindings(mrb_state* mrb);
 void install_save_bindings(mrb_state* mrb);
+void install_i18n_bindings(mrb_state* mrb);
 void install_network_bindings(mrb_state* mrb);
 void install_http_bindings(mrb_state* mrb);
 

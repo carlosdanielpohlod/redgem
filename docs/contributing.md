@@ -225,8 +225,8 @@ alone; a translation is another file beside it, with the same keys.
   reports and read next to the code; they stay in one language, as the code does.
 
 Each part is the texts of one library, built into it (`redgem_embed_texts` in
-`src/CMakeLists.txt`), so that a program carries only what it shows: `game` (the runtime: what
-players read), `editor`, `project` (the hub and `redgem`'s command line), `server`, `relay` and
+`src/CMakeLists.txt`), so that a program carries only what it shows: `core` (what a command
+line says of an option it cannot read), `game` (the runtime: what players read), `editor`, `project` (the hub and `redgem`'s command line), `server`, `relay` and
 `testing` (the command lines of the other programs). A program adds its parts and picks the
 language as it starts: the one in the user's settings (`"language"` in `settings.json`), else the
 system's; a key a translation lacks is shown in English.
@@ -237,6 +237,13 @@ the code fills them in: `tr("project.cli.created", {{"game", name}})`. A long te
 usage) may be a list of lines. `tests/unit/translation_keys_test.cpp` fails when the code shows a
 key English has no text for, when an English text is shown nowhere, or when a translation has a
 key English lacks; keys are written whole in the code, as string literals, for it to find them.
+
+A game's texts are not the engine's: they are in the game's own `locales/<language>.json`, and its
+scripts show them with `I18n.t("hud.coins")` (see [Texts in several languages](scripting/i18n.md)),
+behind which are the engine's `game` part (the prelude's `I18n.t` calls, in `ruby/engine/`), so a
+game's files may translate those too. The same test checks the games and templates of this
+repository: every key their scripts show has a text in their `locales/en.json` or the `game` part,
+and every text of theirs is shown.
 
 ## Not there yet
 

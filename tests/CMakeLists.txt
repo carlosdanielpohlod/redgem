@@ -103,6 +103,7 @@ add_executable(redgem_tests
   integration/ui_input_test.cpp
   integration/gameplay_api_test.cpp
   integration/native_arguments_test.cpp
+  integration/game_translations_test.cpp
   integration/message_values_test.cpp
   integration/connection_test.cpp
   integration/http_test_server.cpp

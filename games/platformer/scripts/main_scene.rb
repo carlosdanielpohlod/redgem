@@ -27,6 +27,6 @@ class MainScene < SceneScript
     menu = Camera.main.add_component(GameMenu, title: TITLE, start_open: false)
     menu.screens[:multiplayer] = MultiplayerScreen.new(menu, title: TITLE, relay: RELAY, server: SERVER)
     menu.screens[:login] = LoginScreen.new(menu)
-    menu.screens[:pause].add_option("Multiplayer", index: MULTIPLAYER_OPTION) { menu.show(:multiplayer) }
+    menu.screens[:pause].add_option(I18n.t("menu.multiplayer"), index: MULTIPLAYER_OPTION) { menu.show(:multiplayer) }
   end
 end

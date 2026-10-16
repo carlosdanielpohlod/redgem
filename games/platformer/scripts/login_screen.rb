@@ -2,7 +2,6 @@
 # password, then the backend's answer. (One field at a time: whatever is typed goes to every
 # field drawn.)
 class LoginScreen < GameMenu::Screen
-  HEADING = "Log in".freeze
   STATUS_SIZE = 22
   STATUS_ABOVE_FIELD = 34           # pixels from the status line's top to the field
   FIELD_ABOVE_BUTTONS = 74          # pixels from the field's top to the first button
@@ -11,13 +10,13 @@ class LoginScreen < GameMenu::Screen
   attr_accessor :name, :password
 
   def initialize(menu)
-    super(heading: HEADING, back: -> { menu.show(:multiplayer) })
+    super(heading: I18n.t("login.heading"), back: -> { menu.show(:multiplayer) })
     @name = ""
     @password = ""
     @asking_password = false
   end
 
-  def options = [[@asking_password ? "Log in" : "Next", -> { advance }], ["Back", back]]
+  def options = [[advance_label, -> { advance }], [I18n.t("menu.back"), back]]
   def space_above = HEIGHT_ABOVE_BUTTONS
   def typing? = true
 
@@ -36,17 +35,18 @@ class LoginScreen < GameMenu::Screen
     @note = nil
     return @asking_password = true unless @asking_password
 
-    @note = "Logging in..."
+    @note = I18n.t("login.logging_in")
     Accounts.log_in(@name, @password) { |failure| answered(failure) }
   end
 
   private
 
-  def prompt = @asking_password ? "Your password" : "Your name"
+  def advance_label = @asking_password ? I18n.t("login.log_in") : I18n.t("login.next")
+  def prompt = @asking_password ? I18n.t("login.password") : I18n.t("login.name")
 
   def answered(failure)
     @password = ""
     @asking_password = false
-    @note = failure || "Logged in as #{Accounts.name}: Play online joins with it"
+    @note = failure || I18n.t("login.logged_in", name: Accounts.name)
   end
 end

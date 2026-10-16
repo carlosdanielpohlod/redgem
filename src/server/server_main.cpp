@@ -8,6 +8,7 @@
 
 #include "app/game_texts.hpp"
 #include "app/user_settings.hpp"
+#include "core/core_texts.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "core/translations.hpp"
@@ -16,6 +17,7 @@
 
 int main(int argc, char** argv) {
   try {
+    redgem::add_core_texts();
     redgem::add_game_texts();
     redgem::server::add_server_texts();
     redgem::translations::use_language(redgem::language_for_run());
