@@ -14,6 +14,7 @@
 
 #include "core/texts.hpp"
 
+using namespace redgem;
 namespace fs = std::filesystem;
 
 namespace {
@@ -39,7 +40,7 @@ std::string read_file(const fs::path& file) {
 Keys keys_of(const fs::path& file) {
   Texts texts;
   std::string error;
-  REQUIRE_MESSAGE(texts.add("any", read_file(file), error), file.string() + ": " + error);
+  REQUIRE_MESSAGE(texts.add("any", read_file(file), error), (file.string() + ": " + error));
   const std::vector<std::string> keys = texts.keys("any");
   return Keys(keys.begin(), keys.end());
 }
@@ -87,7 +88,7 @@ void check_translations(const fs::path& locales) {
   const Keys english = keys_of(locales / kEnglishFile);
   for (const fs::directory_entry& entry : fs::directory_iterator(locales)) {
     for (const std::string& key : keys_of(entry.path())) {
-      CHECK_MESSAGE(english.count(key) == 1, entry.path().string() + " has a key English lacks: " + key);
+      CHECK_MESSAGE(english.count(key) == 1, (entry.path().string() + " has a key English lacks: " + key));
     }
   }
 }
@@ -110,7 +111,7 @@ TEST_CASE("every key the engine shows has a text in English, in the part its fir
   for (const std::string& key : engine_keys()) {
     const fs::path part = locales / part_of(key);
     if (!fs::is_directory(part)) continue;  // a text with dots in it that is no key (a host name)
-    CHECK_MESSAGE(in_english(part, key), "no text in " + (part / kEnglishFile).string() + " for " + key);
+    CHECK_MESSAGE(in_english(part, key), ("no text in " + (part / kEnglishFile).string() + " for " + key));
   }
 }
 
@@ -118,8 +119,8 @@ TEST_CASE("every text of the engine's English files is shown somewhere, and is i
   const Keys used = engine_keys();
   for (const std::string& part : parts()) {
     for (const std::string& key : keys_of(kSource / "locales" / part / kEnglishFile)) {
-      CHECK_MESSAGE(used.count(key) == 1, "nothing shows " + key + " (locales/" + part + ")");
-      CHECK_MESSAGE(part_of(key) == part, key + " is in locales/" + part + ", not in the part it names");
+      CHECK_MESSAGE(used.count(key) == 1, ("nothing shows " + key + " (locales/" + part + ")"));
+      CHECK_MESSAGE(part_of(key) == part, (key + " is in locales/" + part + ", not in the part it names"));
     }
   }
 }
@@ -135,9 +136,9 @@ TEST_CASE("every key a game or a template shows has a text in English, and every
     const Keys used = keys_in_code(game / "scripts", kRubyKey, ".rb");
     const Keys own = fs::is_directory(locales) ? keys_of(locales / kEnglishFile) : Keys();
     for (const std::string& key : used) {
-      CHECK_MESSAGE(own.count(key) + engine.count(key) > 0, game.string() + " shows " + key + " with no text");
+      CHECK_MESSAGE(own.count(key) + engine.count(key) > 0, (game.string() + " shows " + key + " with no text"));
     }
-    for (const std::string& key : own) CHECK_MESSAGE(used.count(key) == 1, game.string() + " never shows " + key);
+    for (const std::string& key : own) CHECK_MESSAGE(used.count(key) == 1, (game.string() + " never shows " + key));
     if (fs::is_directory(locales)) check_translations(locales);
   }
 }
