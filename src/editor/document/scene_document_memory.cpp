@@ -1,26 +1,75 @@
-// Part of SceneDocument: keeping the undo history within its limits, and letting go of what no
-// step of it can bring back (the meshes of deleted objects and undone imports, once their steps
-// are gone).
+// Part of SceneDocument: keeping the undo history within its limits (counting what its steps hold
+// as they come and go), and letting go of what no step of it can bring back (the meshes of deleted
+// objects and undone imports, once their steps are gone).
 
 #include "editor/document/scene_document.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <utility>
 
 #include "editor/document/glb_compact.hpp"
 
 namespace redgem {
 
-bool SceneDocument::history_too_long() {
+bool SceneDocument::history_too_long(std::size_t kept) const {
   if (undo_.size() > kMaxUndoSteps) return true;
   if (undo_.size() <= 1) return false;  // the latest step stays, however big
-  return history_bytes() > kMaxHistoryBytes;
+  return steps_bytes_ + kept > kMaxHistoryBytes;
 }
 
 void SceneDocument::trim_history() {
-  while (history_too_long()) undo_.erase(undo_.begin());
+  // (What only the steps use is worked out again only when a step that goes takes a mesh along.)
+  std::size_t kept = kept_bytes();
+  while (history_too_long(kept)) {
+    if (drop_oldest_step()) kept = kept_bytes();
+  }
   release_unreachable();
+}
+
+void SceneDocument::push_step(std::vector<Snapshot>& steps, Snapshot step) {
+  step.bytes = bytes_of(step);
+  steps_bytes_ += step.bytes;
+  for (const NodeDesc& node : step.nodes) {
+    if (node.mesh != kNoIndex) ++steps_showing_[node.mesh];
+  }
+  steps.push_back(std::move(step));
+}
+
+SceneDocument::Snapshot SceneDocument::pop_step(std::vector<Snapshot>& steps) {
+  Snapshot step = std::move(steps.back());
+  steps.pop_back();
+  uncount_step(step);
+  return step;
+}
+
+void SceneDocument::clear_redo() {
+  for (const Snapshot& step : redo_) uncount_step(step);
+  redo_.clear();
+}
+
+bool SceneDocument::drop_oldest_step() {
+  const bool mesh_left = uncount_step(undo_.front());
+  undo_.erase(undo_.begin());
+  return mesh_left;
+}
+
+bool SceneDocument::uncount_step(const Snapshot& step) {
+  steps_bytes_ -= step.bytes;
+  bool mesh_left = false;
+  for (const NodeDesc& node : step.nodes) {
+    if (node.mesh != kNoIndex) mesh_left = uncount_mesh(node.mesh) || mesh_left;
+  }
+  return mesh_left;
+}
+
+bool SceneDocument::uncount_mesh(int mesh) {
+  const auto counted = steps_showing_.find(mesh);
+  counted->second -= 1;
+  if (counted->second > 0) return false;
+  steps_showing_.erase(counted);
+  return true;
 }
 
 std::vector<int> SceneDocument::meshes_out_of_reach() const {

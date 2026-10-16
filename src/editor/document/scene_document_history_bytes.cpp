@@ -75,29 +75,30 @@ std::vector<bool> SceneDocument::meshes_in_use() const {
 
 std::vector<bool> SceneDocument::meshes_in_history() const {
   std::vector<bool> used(desc_.meshes.size(), false);
-  for (const Snapshot& step : undo_) mark_meshes(step.nodes, used);
-  for (const Snapshot& step : redo_) mark_meshes(step.nodes, used);
+  for (const auto& [mesh, steps] : steps_showing_) {
+    if (is_index_of(mesh, used.size())) used[static_cast<std::size_t>(mesh)] = true;
+  }
   return used;
 }
 
-std::size_t SceneDocument::bytes_of(const std::vector<Snapshot>& steps) {
+std::size_t SceneDocument::bytes_of(const Snapshot& step) {
   std::size_t bytes = 0;
-  for (const Snapshot& step : steps) {
-    for (const NodeDesc& node : step.nodes) bytes += node_bytes(node);
-    for (const MaterialDesc& material : step.materials) bytes += sizeof(MaterialDesc) + material.name.capacity();
-    for (const auto& [mesh, shape] : step.shapes) {
-      bytes += (shape.positions.capacity() + shape.normals.capacity()) * sizeof(float);
-    }
+  for (const NodeDesc& node : step.nodes) bytes += node_bytes(node);
+  for (const MaterialDesc& material : step.materials) bytes += sizeof(MaterialDesc) + material.name.capacity();
+  for (const auto& [mesh, shape] : step.shapes) {
+    bytes += (shape.positions.capacity() + shape.normals.capacity()) * sizeof(float);
   }
   return bytes;
 }
 
-std::size_t SceneDocument::history_bytes() {
+std::size_t SceneDocument::history_bytes() { return steps_bytes_ + kept_bytes(); }
+
+std::size_t SceneDocument::kept_bytes() {
   const std::vector<bool> in_use = meshes_in_use();
   std::vector<bool> only_in_history = meshes_in_history();
   std::transform(only_in_history.begin(), only_in_history.end(), in_use.begin(), only_in_history.begin(),
                  kept_for_undo);
-  return bytes_of(undo_) + bytes_of(redo_) + vertex_bytes(only_in_history) + file_bytes(only_in_history, in_use);
+  return vertex_bytes(only_in_history) + file_bytes(only_in_history, in_use);
 }
 
 std::size_t SceneDocument::vertex_bytes(const std::vector<bool>& meshes) const {

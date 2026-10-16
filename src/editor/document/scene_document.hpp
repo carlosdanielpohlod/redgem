@@ -129,6 +129,7 @@ class SceneDocument {
     std::vector<MaterialDesc> materials;
     long long version = 0;
     std::map<int, MeshShape> shapes;  // of every terrain, by mesh index
+    std::size_t bytes = 0;            // what all of that takes (see bytes_of), worked out as it is kept
   };
 
   SceneDocument() = default;
@@ -138,8 +139,21 @@ class SceneDocument {
   // Keeps the history within kMaxUndoSteps and kMaxHistoryBytes, then lets go of what no step
   // can bring back.
   void trim_history();
-  bool history_too_long();
-  static std::size_t bytes_of(const std::vector<Snapshot>& steps);
+  // Whether the history is past its limits, with `kept` bytes of what only its steps use (see kept_bytes).
+  bool history_too_long(std::size_t kept) const;
+  static std::size_t bytes_of(const Snapshot& step);
+  // The vertices, pictures and file bytes that only undo and redo steps use.
+  std::size_t kept_bytes();
+  // Every step goes on and off the undo and redo lists through these, which keep count of the
+  // steps' bytes and of the meshes they show as they come and go (so nothing walks every step).
+  void push_step(std::vector<Snapshot>& steps, Snapshot step);
+  Snapshot pop_step(std::vector<Snapshot>& steps);
+  void clear_redo();
+  // Drops the oldest undo step; true when a mesh no other step shows left the history with it.
+  bool drop_oldest_step();
+  // Takes a step out of the counts; true when a mesh no other step shows left the history with it.
+  bool uncount_step(const Snapshot& step);
+  bool uncount_mesh(int mesh);
   // Which meshes the nodes use now, and in some undo or redo step.
   std::vector<bool> meshes_in_use() const;
   std::vector<bool> meshes_in_history() const;
@@ -260,6 +274,8 @@ class SceneDocument {
   SceneDesc desc_;
   std::vector<Snapshot> undo_;
   std::vector<Snapshot> redo_;
+  std::size_t steps_bytes_ = 0;       // what the undo and redo steps hold, together
+  std::map<int, int> steps_showing_;  // by mesh: how many undo and redo steps show it (none: not listed)
   // Every distinct state of the nodes gets a version; the saved one is remembered.
   long long version_ = 0;
   long long next_version_ = 0;

@@ -115,6 +115,32 @@ TEST_CASE("undo keeps no more bytes than its limit, dropping its oldest steps") 
   CHECK(doc.node_count() == kBigTerrains + 1);  // the terrains were made by steps that went
 }
 
+TEST_CASE("what undo keeps is counted as its steps come and go, without walking them all") {
+  constexpr int kStepsBackToTheThing = 3;  // the rename, the deletion and the import
+  SceneDocument doc = empty_document("counted");
+  const int thing = doc.add_empty("Thing");
+  std::string error;
+  const int model = doc.import_model(fixture("hierarchy.glb"), error);
+  REQUIRE_MESSAGE(model != kNoIndex, error);
+  doc.remove(model);
+  doc.set_name(thing, "Renamed");
+  const std::size_t kept = doc.history_bytes();
+  // Undone and redone all the way, the steps hold what they held.
+  const std::size_t steps = undo_all(doc);
+  for (std::size_t step = 0; step < steps; ++step) REQUIRE(doc.redo());
+  CHECK(doc.history_bytes() == kept);
+  // A step that changes nothing goes again, and takes its bytes along.
+  doc.set_name(thing, "Renamed");
+  doc.drop_checkpoint_if_unchanged();
+  CHECK(doc.history_bytes() == kept);
+  // Back before the import, a new step lets go of the steps that showed the model, and of the model.
+  for (int step = 0; step < kStepsBackToTheThing; ++step) REQUIRE(doc.undo());
+  const std::size_t with_redo = doc.history_bytes();
+  doc.set_name(thing, "Again");
+  CHECK(doc.history_bytes() < with_redo);
+  CHECK_FALSE(doc.can_redo());
+}
+
 TEST_CASE("models imported and deleted over and over: what no step can bring back is let go of") {
   SceneDocument doc = empty_document("imports");
   std::string error;
