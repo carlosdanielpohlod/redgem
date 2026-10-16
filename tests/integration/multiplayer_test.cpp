@@ -267,12 +267,15 @@ TEST_CASE("a second NetworkSync under a key another object goes by is refused, a
   Lan lan;
   Engine& machine = lan.add_machine();
   const std::string holder = "Network.instance_variable_get(:@synced)['shared'].equal?($first)";
+  // (Hosting: the objects are this machine's to send, frame after frame.)
+  REQUIRE(ruby(machine, "Network.host(port: 0)") == "true");
   ruby(machine, "$first = Scene.find('Platform').add_component(NetworkSync, key: 'shared')");
   lan.round();
   const int errors_before = machine.scripts().error_count();
   ruby(machine, "$second = Scene.find('Ball').add_component(NetworkSync, key: 'shared')");
-  lan.round();
-  CHECK(machine.scripts().error_count() == errors_before + 1);  // its start raised: it is disabled
+  lan.rounds(kSettleRounds);
+  // Its start raised, and that is the only error: it is disabled, and never updated.
+  CHECK(machine.scripts().error_count() == errors_before + 1);
   CHECK(ruby(machine, holder) == "true");
   // Handing an object over to a key that is taken raises, and changes nothing.
   ruby(machine, "$ball = Scene.find('Ball').add_component(NetworkSync, key: 'ball')");
