@@ -59,6 +59,10 @@ bool would_block();
 IoStatus later_or_closed();
 std::string last_error();
 void close_native(NativeSocket socket);
+// Reads and drops what arrived on a connection and was never read. A connection closed with that
+// still in it ends with a reset instead of a goodbye, and on Windows a reset makes the other side
+// lose what it had not read yet of what this one said last.
+void discard_unread(NativeSocket socket);
 bool make_non_blocking(NativeSocket socket);
 // Whether a connection in the making has an answer yet: 1 yes, 0 not yet, negative on an error.
 int connection_answered(NativeSocket socket);

@@ -50,6 +50,9 @@ std::unique_ptr<Engine> play_headless(const std::filesystem::path& game) {
   return std::move(std::get<std::unique_ptr<Engine>>(created));
 }
 
+// A system whose player is made on another one: Windows, or Linux for a test run on Windows.
+BuildTarget another_system() { return platform::is_windows() ? BuildTarget::Linux : BuildTarget::Windows; }
+
 // The whole of a file, byte for byte.
 std::string bytes_of(const std::filesystem::path& file) {
   std::ifstream in(file, std::ios::binary);
@@ -256,22 +259,27 @@ TEST_CASE("building a game makes a standalone folder") {
 
 TEST_CASE("a build ships the player kept beside the program that builds, never that program") {
   const std::filesystem::path install = fresh("install") / "bin";
-  const std::filesystem::path editor = install / "redgem";
-  const std::filesystem::path windows_player = install / "runtimes" / "windows" / "redgem-player.exe";
-  std::filesystem::create_directories(windows_player.parent_path());
+  const std::filesystem::path editor = install / platform::executable_file_name("redgem", platform::is_windows());
+  const std::filesystem::path own_player =
+      install / platform::executable_file_name("redgem-player", platform::is_windows());
+  const BuildTarget other = another_system();
+  const std::filesystem::path other_player =
+      install / "runtimes" / build_target_name(other) /
+      platform::executable_file_name("redgem-player", other == BuildTarget::Windows);
+  std::filesystem::create_directories(other_player.parent_path());
   std::string error;
   REQUIRE(write_text_file(editor, "editor", error));
   // Where each is looked for: the same in a build folder and in an installation.
-  CHECK(runtime_location(host_build_target(), editor) == install / "redgem-player");
-  CHECK(runtime_location(BuildTarget::Windows, editor) == windows_player);
+  CHECK(runtime_location(host_build_target(), editor) == own_player);
+  CHECK(runtime_location(other, editor) == other_player);
   CHECK(runtime_location(BuildTarget::Android, editor) == install / "runtimes" / "android");
   // Nothing there yet: no build, and above all not one made of the editor itself.
   CHECK_FALSE(runtime_for(host_build_target(), editor).has_value());
-  CHECK_FALSE(runtime_for(BuildTarget::Windows, editor).has_value());
-  REQUIRE(write_text_file(install / "redgem-player", "player", error));
-  REQUIRE(write_text_file(windows_player, "windows player", error));
-  CHECK(runtime_for(host_build_target(), editor) == install / "redgem-player");
-  CHECK(runtime_for(BuildTarget::Windows, editor) == windows_player);
+  CHECK_FALSE(runtime_for(other, editor).has_value());
+  REQUIRE(write_text_file(own_player, "player", error));
+  REQUIRE(write_text_file(other_player, "other player", error));
+  CHECK(runtime_for(host_build_target(), editor) == own_player);
+  CHECK(runtime_for(other, editor) == other_player);
   CHECK_FALSE(runtime_for(BuildTarget::Android, editor).has_value());  // (packed another way)
   std::filesystem::remove_all(install.parent_path());
 }
@@ -282,7 +290,9 @@ TEST_CASE("a build with no player to ship says which file is missing and how it 
   CHECK(windows.find("cannot build for windows") != std::string::npos);
   CHECK(windows.find(missing.string()) != std::string::npos);
   CHECK(windows.find("comes with the editor") != std::string::npos);
-  CHECK(windows.find("tools/windows/build_runtime.sh") != std::string::npos);
+  // Made by a script on another system; on Windows itself, by the engine's own build.
+  const bool built_here = host_build_target() == BuildTarget::Windows;
+  CHECK((windows.find("tools/windows/build_runtime.sh") != std::string::npos) != built_here);
   const std::string own = missing_runtime_message(host_build_target(), "/opt/redgem/bin/redgem-player");
   CHECK(own.find("/opt/redgem/bin/redgem-player") != std::string::npos);
   CHECK(own.find("build_runtime.sh") == std::string::npos);  // nothing to cross-build
@@ -404,8 +414,7 @@ TEST_CASE("saving a game's settings keeps what else its game.json says") {
   settings.title = "New";
   std::string error;
   REQUIRE_MESSAGE(write_game_settings(dir, settings, error), error);
-  std::ifstream in(dir / "game.json");
-  const nlohmann::json saved = nlohmann::json::parse(in);
+  const nlohmann::json saved = nlohmann::json::parse(bytes_of(dir / "game.json"));
   CHECK(saved["title"] == "New");
   CHECK(saved["android"]["package"] == "com.mystudio.mine");
   CHECK(saved["notes"].size() == 2);

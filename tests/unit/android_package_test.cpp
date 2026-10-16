@@ -362,8 +362,10 @@ TEST_CASE("an app holds no file a link points at, and no file whose name would b
   CHECK_FALSE(std::filesystem::exists(stage / "assets/game/linked_folder"));
   CHECK(read(stage / "assets/game.files").find("linked") == std::string::npos);
 
+#ifndef _WIN32  // (Windows has no file names with line breaks in them.)
   std::ofstream(game / "scripts" / "two\nlines.rb") << "x";
   CHECK_FALSE(stage_android_game(game, runtimes, "stamp", stage, error));
   CHECK(error.find("line break") != std::string::npos);
   CHECK(error.find("scripts") != std::string::npos);
+#endif
 }

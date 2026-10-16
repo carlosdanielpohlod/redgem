@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
+
 #include "scene/gltf_loader.hpp"
 #include "test_support.hpp"
 

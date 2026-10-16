@@ -25,6 +25,7 @@ constexpr std::size_t kLengthBytes = 4;
 // The start of a message longer than any may be.
 constexpr std::uint8_t kTooLongAnnounced[kLengthBytes] = {0x7F, 0x00, 0x00, 0x00};
 constexpr const char* kTinyMessage = R"({"k":"m","n":"x"})";
+constexpr float kArrivalWaitSeconds = 3.0f;  // far longer than a message on this machine takes
 
 bool until(const std::function<bool()>& done) {
   for (int round = 0; round < kMaxRounds; ++round) {
@@ -66,6 +67,7 @@ struct BothEnds {
 struct WithStranger {
   Socket listener, stranger;
   Connection taker;
+  int pumps = 0;
 
   WithStranger() {
     std::string error;
@@ -80,6 +82,18 @@ struct WithStranger {
 
   void write(std::vector<std::uint8_t> bytes) {
     REQUIRE(until([&] { return stranger.write(bytes) == IoStatus::Ok; }));
+  }
+
+  // Takes messages until the stranger is seen to have hung up; how many there were.
+  int messages_until_gone() {
+    int taken = 0;
+    REQUIRE(until([&] {
+      taker.pump();
+      ++pumps;
+      while (taker.next_message()) ++taken;
+      return taker.closed();
+    }));
+    return taken;
   }
 
   // Pumps until `bytes` more have arrived (or the other side is seen to have hung up).
@@ -184,19 +198,22 @@ TEST_CASE("what a machine said before it hung up is still taken, however many po
   const std::vector<std::uint8_t> last_words = many_tiny_messages(kMoreThanAPoll);
   pair.write(last_words);
   pair.stranger.close();
-  int taken = 0;
-  int pumps = 0;
-  REQUIRE(until([&] {
-    pair.taker.pump();
-    ++pumps;
-    while (pair.taker.next_message()) ++taken;
-    return pair.taker.closed();
-  }));
-  CHECK(taken == kMoreThanAPoll);  // none was lost to the hanging up
-  CHECK(pumps > 1);                // and no poll took more than its share
+  CHECK(pair.messages_until_gone() == kMoreThanAPoll);  // none was lost to the hanging up
+  CHECK(pair.pumps > 1);                                // and no poll took more than its share
   // Nothing is said to a machine that is gone.
   pair.taker.send({{"k", "i"}});
   CHECK(pair.taker.held() == 0);
+}
+
+// A connection closed with unread bytes in it ends with a reset instead of a goodbye, and on
+// Windows a reset throws away what the other side had not read yet.
+TEST_CASE("a machine that hangs up without reading what it was sent still has all it said taken") {
+  WithStranger pair;
+  pair.taker.send({{"k", "i"}});
+  REQUIRE(Socket::wait({Watched{&pair.stranger}}, kArrivalWaitSeconds));  // there, and never read
+  pair.write(many_tiny_messages(kMoreThanAPoll));
+  pair.stranger.close();
+  CHECK(pair.messages_until_gone() == kMoreThanAPoll);
 }
 
 TEST_CASE("half a message from a machine that hung up is nothing to wait for") {

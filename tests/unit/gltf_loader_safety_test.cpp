@@ -333,13 +333,14 @@ TEST_CASE("names from a file are shown without their control characters") {
   file.doc["meshes"][0]["name"] = "Me@sh";
   const std::string path = written(scratch, file);
   // (The control characters go into the file as they are: a JSON library would write them escaped.)
+  // (Byte for byte: Windows would write each line break as two characters otherwise.)
   std::stringstream as_written;
-  as_written << std::ifstream(path).rdbuf();
+  as_written << std::ifstream(path, std::ios::binary).rdbuf();
   std::string text = as_written.str();
   const char controls[] = {'\x1b', '\n', '\r'};
   std::size_t next = 0;
   for (std::size_t at = text.find('@'); at != std::string::npos; at = text.find('@')) text[at] = controls[next++];
-  std::ofstream(path) << text;
+  std::ofstream(path, std::ios::binary) << text;
   const LoadResult result = load_gltf_scene(path);
   REQUIRE_MESSAGE(result.ok, result.error);
   CHECK(result.scene.nodes[0].name == "Tri?[2Jangle?error: fake");

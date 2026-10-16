@@ -1,15 +1,20 @@
-# The editor on real Macs: built, tested, opened on screen and packed into the Mac's download, once
-# on Apple Silicon and once on Intel. Each step that checks something fails the run when it fails;
-# the steps after it still run (when the build itself worked), so that one failure does not hide
-# the others. The pictures of the screen, the tests' pictures and the download are kept as the
-# run's artifacts.
+# The editor on real Macs: built, tested and opened on screen, once on Apple Silicon and once on
+# Intel. Each step that checks something fails the run when it fails; the steps after it still
+# run (when the build itself worked), so that one failure does not hide the others. The pictures
+# of the screen and the tests' pictures are kept as the run's artifacts. (Releases are packed by
+# hand: tools/release/package.sh.)
 name: macOS
 
 on:
+  pull_request:
   push:
-    branches: [main, macos-editor]
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
+
+# A newer push to the same branch makes the run of the older one pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -87,22 +92,6 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: tools/macos/capture_window.sh "${SHOTS}/editor-${{ matrix.arch }}.png" 30 build/src/redgem "${DEMO}"
 
-      - name: Pack the download
-        id: package
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: tools/release/package.sh
-
-      # As a double click does: through the system's launcher, with no game named (the project hub).
-      - name: Open the packed app and take a picture of the screen
-        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
-        run: |
-          unpacked="${RUNNER_TEMP}/unpacked"
-          mkdir -p "${unpacked}"
-          ditto -x -k "dist/release/redgem-macos-${{ matrix.arch }}.zip" "${unpacked}"
-          tools/macos/capture_window.sh "${SHOTS}/app-hub-${{ matrix.arch }}.png" 30 \
-            open -W -n "${unpacked}/redgem/RedGem.app"
-          pkill -x redgem || true
-
       - name: Keep the pictures of the screen
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
@@ -112,11 +101,3 @@ jobs:
             dist/screens
             build/screenshots/editor
           if-no-files-found: warn
-
-      - name: Keep the download
-        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: redgem-macos-${{ matrix.arch }}
-          path: dist/release/redgem-macos-${{ matrix.arch }}.zip
-          if-no-files-found: error
