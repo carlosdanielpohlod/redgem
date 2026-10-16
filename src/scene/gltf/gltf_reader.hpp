@@ -32,8 +32,9 @@ inline std::string text_or(const char* text, const std::string& fallback) { retu
 
 class GltfReader {
  public:
-  GltfReader(const cgltf_data& data, std::filesystem::path base_dir, LoadResult& result)
-      : data_(data), base_dir_(std::move(base_dir)), result_(result) {}
+  // `image_files`: the file each picture names, by its number (see gltf_checks::named_files).
+  GltfReader(const cgltf_data& data, std::vector<std::filesystem::path> image_files, LoadResult& result)
+      : data_(data), image_files_(std::move(image_files)), result_(result) {}
 
   // How many joints of a skeleton are kept (see load_gltf_scene).
   void set_max_skin_joints(int joints) { max_skin_joints_ = static_cast<cgltf_uint>(std::max(joints, 1)); }
@@ -67,7 +68,8 @@ class GltfReader {
   bool has_more_to_add(const std::vector<PendingNode>& pending) const { return !pending.empty() && problem_.empty(); }
 
   // Pictures and materials.
-  ImageData load_image(const cgltf_image& image) const;
+  // A picture, from the scene's data or from `file`, the one it names (empty for none it may read).
+  ImageData load_image(const cgltf_image& image, const std::filesystem::path& file) const;
   void load_images();
   int image_of(const cgltf_texture_view& view) const;
   void read_pbr(const cgltf_material& material, MaterialDesc& out) const;
@@ -116,7 +118,7 @@ class GltfReader {
   std::optional<AnimationPath> playable_path(const cgltf_animation_channel& channel, const std::string& clip_name);
 
   const cgltf_data& data_;
-  std::filesystem::path base_dir_;
+  std::vector<std::filesystem::path> image_files_;
   LoadResult& result_;
   std::vector<bool> added_;  // by glTF node index: already in the scene
   std::string problem_;      // what made the file unusable, when something did

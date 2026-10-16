@@ -36,12 +36,12 @@ Vec3 emissive_of(const cgltf_material& material) {
 
 }  // namespace
 
-ImageData GltfReader::load_image(const cgltf_image& image) const {
+ImageData GltfReader::load_image(const cgltf_image& image, const std::filesystem::path& file) const {
   ImageData out;
   out.file_extension = text_or(image.mime_type, "") == kJpegMimeType ? kJpegExtension : kPngExtension;
   if (image.buffer_view != nullptr) {
     out.encoded = embedded_bytes(*image.buffer_view);
-  } else if (const std::filesystem::path file = gltf_checks::file_of_uri(image.uri, base_dir_); !file.empty()) {
+  } else if (!file.empty()) {
     // (Only a picture file of the scene's own folder, and not one of any size.)
     out.encoded = read_file_up_to(file, gltf_checks::kMaxImageFileBytes).value_or(std::vector<std::uint8_t>());
     if (file.has_extension()) out.file_extension = file.extension().string();
@@ -51,7 +51,7 @@ ImageData GltfReader::load_image(const cgltf_image& image) const {
 
 void GltfReader::load_images() {
   for (cgltf_size i = 0; i < data_.images_count; ++i) {
-    ImageData image = load_image(data_.images[i]);
+    ImageData image = load_image(data_.images[i], image_files_[i]);
     if (image.encoded.empty()) warn("image " + std::to_string(i) + " has no readable data");
     result_.scene.images.push_back(std::move(image));
   }

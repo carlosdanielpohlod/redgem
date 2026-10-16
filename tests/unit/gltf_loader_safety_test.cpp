@@ -374,6 +374,24 @@ TEST_CASE("a picture is read from the scene's own folder and from nowhere else")
   CHECK(warned(result, "image 1 has no readable data"));
 }
 
+TEST_CASE("the files a scene names are found once for its load, and only in its own folder") {
+  const Scratch scratch;
+  std::ofstream(scratch.game() / "wood.png") << kPictureBytes;
+  std::ofstream(scratch.dir / "secret.png") << kPictureBytes;
+  Gltf file = triangle();
+  file.doc["images"] = json::array(
+      {{{"uri", "wood.png"}}, {{"uri", "../secret.png"}}, {{"uri", "data:image/png;base64,AAAA"}}, json::object()});
+  const std::string path = written(scratch, file);
+  cgltf_options options{};
+  cgltf_data* data = nullptr;
+  REQUIRE(cgltf_parse_file(&options, path.c_str(), &data) == cgltf_result_success);
+  const gltf_checks::NamedFiles files = gltf_checks::named_files(*data, scratch.game());
+  cgltf_free(data);
+  const auto found = [&scratch](const char* name) { return std::filesystem::weakly_canonical(scratch.game() / name); };
+  CHECK(files.buffers == std::vector<std::filesystem::path>{found("scene.bin")});
+  CHECK(files.images == std::vector<std::filesystem::path>{found("wood.png"), {}, {}, {}});
+}
+
 TEST_CASE("a data file outside the scene's folder fails the load") {
   const Scratch scratch;
   Gltf file = triangle();
