@@ -15,7 +15,8 @@ void info(const std::string& message);
 void warning(const std::string& message);
 void error(const std::string& message);
 
-// Replaces the output sink (tests capture messages). Returns the previous sink.
+// Replaces the output sink (tests capture messages). Returns the previous sink. Any thread may
+// write; the sink is called by one at a time, so it must not write to the log itself.
 Sink set_sink(Sink sink);
 void reset_sink();
 
