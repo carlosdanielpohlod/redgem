@@ -1,6 +1,8 @@
 #include "core/safe_path.hpp"
 
 #include <fstream>
+#include <mutex>
+#include <set>
 
 #include "core/log.hpp"
 
@@ -75,6 +77,20 @@ bool stays_below(const std::filesystem::path& below) {
   return !below.empty() && !below.is_absolute() && *below.begin() != kParentStep;
 }
 
+// Whether a link is not yet named in the log. Each is named once: a game asks for the same file
+// again and again (a sound each time it plays, a picture each time a scene loads).
+bool first_time_met(const std::filesystem::path& link) {
+  static std::mutex guard;  // (rooms of a server load their scenes at the same time)
+  static std::set<std::filesystem::path> met;
+  const std::lock_guard<std::mutex> lock(guard);
+  return met.insert(link).second;
+}
+
+void warn_of_link(const std::filesystem::path& link) {
+  if (!first_time_met(link)) return;
+  log::warning(printable(link.string()) + " is a symbolic link: built games do not carry links, so it is left out");
+}
+
 }  // namespace
 
 bool safe_asset_name(std::string_view name) {
@@ -87,11 +103,12 @@ bool through_link(const std::filesystem::path& folder, const std::filesystem::pa
   // (A path given whole is looked at below the folder only: the folder's own may hold links.)
   const std::filesystem::path below = relative.is_absolute() ? relative.lexically_relative(folder) : relative;
   std::filesystem::path step = folder;
-  for (const std::filesystem::path& part : below.lexically_normal()) {
+  // (Every step as written: in "linked/../file" the ".." leaves the folder the link leads to.)
+  for (const std::filesystem::path& part : below) {
     step /= part;
     std::error_code fs_error;
     if (!std::filesystem::is_symlink(step, fs_error)) continue;
-    log::warning(printable(step.string()) + " is a symbolic link: built games do not carry links, so it is left out");
+    warn_of_link(step);
     return true;
   }
   return false;

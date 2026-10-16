@@ -21,8 +21,8 @@ bool safe_asset_name(std::string_view name);
 void warn_of_unsafe_asset_name(std::string_view name);
 
 // Whether `relative` (a path inside `folder`) is reached through a symbolic link: the file itself
-// or a folder on the way below `folder`. A built game carries no links, so a game being developed
-// refuses them too: a warning names the file.
+// or a folder on the way below `folder`, each step taken as written. A built game carries no
+// links, so a game being developed refuses them too: a warning names each link, once.
 bool through_link(const std::filesystem::path& folder, const std::filesystem::path& relative);
 
 // The file a safe `name` means in `folder`: the first of `name` + each extension that is a regular

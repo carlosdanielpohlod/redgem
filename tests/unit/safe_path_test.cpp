@@ -104,13 +104,25 @@ TEST_CASE("an asset reached through a link inside its folder is refused, as buil
   CHECK_FALSE(find_asset_file(scratch.assets, "linked_ui/frame.png", kExtensions).has_value());
   CHECK_FALSE(file_inside(scratch.assets, "alias.png").has_value());
   CHECK_FALSE(file_inside(scratch.assets, scratch.assets / "linked_ui" / "frame.png").has_value());
-  // Each time, a warning names the link.
-  CHECK(log.count(log::Level::Warning) == 4);
+  // A warning names each link, once however often it is met (a sound is asked for at every play).
+  CHECK(log.count(log::Level::Warning) == 2);
   CHECK(log.contains("alias.png is a symbolic link"));
   CHECK(log.contains("linked_ui is a symbolic link"));
+  CHECK_FALSE(find_asset_file(scratch.assets, "alias", kExtensions).has_value());
+  CHECK(log.count(log::Level::Warning) == 2);
   // Links above the folder are the machine's own (a home folder elsewhere), not the game's.
   CHECK_FALSE(through_link(scratch.assets / "linked_ui", "frame.png"));
-  CHECK(log.count(log::Level::Warning) == 4);
+  CHECK(log.count(log::Level::Warning) == 2);
+}
+
+TEST_CASE("a link on the way to a file is one even when a '..' after it steps back out of it") {
+  const Scratch scratch;
+  std::filesystem::create_directory(scratch.assets / "ui" / "inner");
+  std::filesystem::create_directory_symlink(scratch.assets / "ui" / "inner", scratch.assets / "to_inner");
+  CHECK(file_inside(scratch.assets, "ui/inner/../frame.png").has_value());
+  // ("to_inner/.." is the folder above where the link leads, ui: not the assets folder.)
+  CHECK_FALSE(file_inside(scratch.assets, "to_inner/../frame.png").has_value());
+  CHECK(through_link(scratch.assets, "to_inner/../frame.png"));
 }
 
 TEST_CASE("a name whose first file is a link means the next file of that name that is none") {
