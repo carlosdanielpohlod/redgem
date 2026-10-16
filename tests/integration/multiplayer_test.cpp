@@ -11,6 +11,7 @@
 #include "app/engine.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "net/network_session.hpp"
 #include "net/rooms/relay_server.hpp"
 #include "test_support.hpp"
 
@@ -338,7 +339,11 @@ TEST_CASE("when the host leaves the game is over for everyone, and what the othe
 TEST_CASE("a game hosted directly lets as many machines from one address wait to join as it says") {
   Lan lan;
   Engine& machine = lan.add_machine();
+  // (What scripts are told is the engine's own numbers.)
+  CHECK(ruby(machine, "[Network::WAITING_PER_ADDRESS, Network::MOST_WAITING_PER_ADDRESS].inspect") ==
+        "[" + std::to_string(net::kDefaultWaitingPerAddress) + ", " + std::to_string(net::kMaxWaitingLinks) + "]");
   CHECK(ruby(machine, "Network.host(port: 0, waiting_per_address: 32)") == "true");
+  ruby(machine, "$ended = 0; Network.on_disconnect { $ended += 1 }");
   for (const char* wrong : {"0", "33"}) {
     CAPTURE(wrong);
     const std::string host = std::string("Network.host(port: 0, waiting_per_address: ") + wrong + ")";
@@ -346,6 +351,8 @@ TEST_CASE("a game hosted directly lets as many machines from one address wait to
     CHECK_FALSE(refused.ok);
     CHECK(refused.error.find("waiting_per_address") != std::string::npos);
   }
+  // A number it does not take is refused before anything else: the game hosted goes on.
+  CHECK(ruby(machine, "[Network.host?, $ended].inspect") == "[true, 0]");
 }
 
 TEST_CASE("joining where nobody hosts fails after a moment, and a taken port cannot be hosted on") {
