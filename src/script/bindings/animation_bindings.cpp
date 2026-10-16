@@ -6,7 +6,7 @@
 
 #include <string>
 
-#include "scene/animation_player.hpp"
+#include "scene/animation/animation_player.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 

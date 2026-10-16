@@ -9,10 +9,10 @@
 #include "editor/editor_config.hpp"
 #include "editor/editor_session.hpp"
 #include "editor/project_files.hpp"
-#include "editor/script_workspace.hpp"
+#include "editor/scripts/script_workspace.hpp"
 #include "editor/ui/panel_state.hpp"
 
-#include "scene/terrain.hpp"
+#include "scene/shapes/terrain.hpp"
 
 namespace redgem::ui {
 

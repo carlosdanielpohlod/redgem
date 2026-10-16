@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "editor/glb_file.hpp"
+#include "editor/document/glb_file.hpp"
 #include "editor/node_tree.hpp"
 #include "test_support.hpp"
 

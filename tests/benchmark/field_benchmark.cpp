@@ -16,7 +16,7 @@
 #include "benchmark/field_scene.hpp"
 #include "render/renderer.hpp"
 #include "render/window.hpp"
-#include "scene/gltf_loader.hpp"
+#include "scene/gltf/gltf_loader.hpp"
 
 namespace {
 

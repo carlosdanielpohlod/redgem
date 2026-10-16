@@ -8,8 +8,8 @@
 #include <variant>
 
 #include "app/engine.hpp"
-#include "editor/scene_document.hpp"
-#include "scene/terrain.hpp"
+#include "editor/document/scene_document.hpp"
+#include "scene/shapes/terrain.hpp"
 #include "input/input.hpp"
 #include "scene/scene.hpp"
 

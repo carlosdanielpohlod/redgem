@@ -3,10 +3,10 @@
 #include <chrono>
 #include <filesystem>
 
-#include "editor/script_editor.hpp"
-#include "editor/script_workspace.hpp"
+#include "editor/scripts/script_editor.hpp"
+#include "editor/scripts/script_workspace.hpp"
 #include "core/files.hpp"
-#include "editor/script_files.hpp"
+#include "editor/scripts/script_files.hpp"
 
 using namespace redgem;
 

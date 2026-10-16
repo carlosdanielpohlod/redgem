@@ -5,7 +5,7 @@
 #include <map>
 #include <sstream>
 
-#include "project/android_package.hpp"
+#include "project/android/android_package.hpp"
 #include "app/game_settings.hpp"
 #include "core/platform.hpp"
 #include "test_support.hpp"

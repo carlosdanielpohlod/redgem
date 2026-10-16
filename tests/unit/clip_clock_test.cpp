@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include "scene/clip_clock.hpp"
+#include "scene/animation/clip_clock.hpp"
 
 using namespace redgem;
 

@@ -21,9 +21,9 @@
 #include "editor/editor_app.hpp"
 #include "project/project_hub.hpp"
 #include "editor/editor_config.hpp"
-#include "editor/script_files.hpp"
+#include "editor/scripts/script_files.hpp"
 #include "editor/ui/panels.hpp"
-#include "scene/gltf_loader.hpp"
+#include "scene/gltf/gltf_loader.hpp"
 #include "window_picture.hpp"
 
 using namespace redgem;

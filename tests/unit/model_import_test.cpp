@@ -4,8 +4,8 @@
 #include <stdexcept>
 #include <string>
 
-#include "editor/gltf_json.hpp"
-#include "editor/model_import.hpp"
+#include "editor/document/gltf_json.hpp"
+#include "editor/document/model_import.hpp"
 
 using namespace redgem;
 using namespace redgem::gltf_json;

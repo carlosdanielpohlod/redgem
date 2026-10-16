@@ -20,7 +20,7 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
-#include "scene/gltf_loader.hpp"
+#include "scene/gltf/gltf_loader.hpp"
 
 namespace {
 

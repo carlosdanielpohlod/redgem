@@ -7,7 +7,7 @@
 
 #include <optional>
 
-#include "net/http_client.hpp"
+#include "net/http/http_client.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 #include "script/bindings/message_values.hpp"

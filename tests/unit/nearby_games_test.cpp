@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "net/nearby_games.hpp"
+#include "net/discovery/nearby_games.hpp"
 
 using namespace redgem::net;
 

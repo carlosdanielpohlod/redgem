@@ -2,7 +2,7 @@
 #include <imgui_stdlib.h>
 
 #include "editor/editor_config.hpp"
-#include "editor/script_files.hpp"
+#include "editor/scripts/script_files.hpp"
 #include "editor/ui/panels.hpp"
 #include "editor/ui/style.hpp"
 

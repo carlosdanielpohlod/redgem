@@ -7,7 +7,7 @@
 #include <string>
 #include <thread>
 
-#include "net/socket.hpp"
+#include "net/socket/socket.hpp"
 
 namespace redgem::test {
 

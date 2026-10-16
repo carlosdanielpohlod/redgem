@@ -22,7 +22,7 @@
 #include "editor/gated_input_source.hpp"
 #include "editor/gizmo.hpp"
 #include "editor/project_files.hpp"
-#include "editor/script_workspace.hpp"
+#include "editor/scripts/script_workspace.hpp"
 #include "editor/ui/panels.hpp"
 
 namespace redgem {

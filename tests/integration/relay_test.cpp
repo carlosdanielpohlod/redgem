@@ -12,10 +12,10 @@
 #endif
 
 #include "core/platform.hpp"
-#include "net/lan_discovery.hpp"
+#include "net/discovery/lan_discovery.hpp"
 #include "net/network_session.hpp"
-#include "net/relay_program.hpp"
-#include "net/relay_server.hpp"
+#include "net/rooms/relay_program.hpp"
+#include "net/rooms/relay_server.hpp"
 
 using namespace redgem::net;
 

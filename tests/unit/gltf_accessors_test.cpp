@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "scene/gltf_accessors.hpp"
+#include "scene/gltf/gltf_accessors.hpp"
 
 using namespace redgem;
 

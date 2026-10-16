@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include "scene/animation_player.hpp"
+#include "scene/animation/animation_player.hpp"
 
 using namespace redgem;
 

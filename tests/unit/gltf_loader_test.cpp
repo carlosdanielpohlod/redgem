@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "scene/gltf_loader.hpp"
+#include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;

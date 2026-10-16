@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "net/http_client.hpp"
+#include "net/http/http_client.hpp"
 #include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
 #include "script/ruby_vm.hpp"

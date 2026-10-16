@@ -3,7 +3,7 @@
 #include <filesystem>
 
 #include "editor/edit_stream.hpp"
-#include "editor/scene_document.hpp"
+#include "editor/document/scene_document.hpp"
 #include "editor/ui/panel_state.hpp"
 
 using namespace redgem;

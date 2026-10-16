@@ -11,7 +11,7 @@
 #include "app/engine.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
-#include "net/relay_server.hpp"
+#include "net/rooms/relay_server.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;

@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-#include "scene/animation.hpp"
+#include "scene/animation/animation.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;

@@ -7,7 +7,7 @@ namespace redgem {
 
 // The input of a touch screen: the devices it is given (a keyboard or a gamepad can be plugged
 // into a phone) and, while no gamepad is plugged in, on-screen controls that stand in for one
-// (see TouchControls). Chosen by the program that runs on a touch screen (app/android_main.cpp);
+// (see TouchControls). Chosen by the program that runs on a touch screen (app/android/android_main.cpp);
 // elsewhere nobody makes one. The fingers are read through raylib, which requires an open window.
 class TouchInputSource final : public InputSource {
  public:

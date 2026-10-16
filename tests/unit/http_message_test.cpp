@@ -1,6 +1,6 @@
 #include <doctest/doctest.h>
 
-#include "net/http_message.hpp"
+#include "net/http/http_message.hpp"
 
 using namespace redgem::net;
 

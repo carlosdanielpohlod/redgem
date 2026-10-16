@@ -10,7 +10,7 @@
 
 #include "core/math.hpp"
 #include "scene/scene_desc.hpp"
-#include "scene/terrain.hpp"
+#include "scene/shapes/terrain.hpp"
 #include "scene/transform.hpp"
 
 namespace redgem::editor_logic {

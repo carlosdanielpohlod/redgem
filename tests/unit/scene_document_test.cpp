@@ -11,10 +11,10 @@
 
 #include <nlohmann/json.hpp>
 
-#include "editor/glb_file.hpp"
-#include "editor/scene_document.hpp"
-#include "scene/primitives.hpp"
-#include "scene/gltf_loader.hpp"
+#include "editor/document/glb_file.hpp"
+#include "editor/document/scene_document.hpp"
+#include "scene/shapes/primitives.hpp"
+#include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;

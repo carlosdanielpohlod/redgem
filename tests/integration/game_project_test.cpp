@@ -23,8 +23,8 @@
 #include "app/app_config.hpp"
 #include "core/files.hpp"
 #include "core/platform.hpp"
-#include "editor/script_files.hpp"
-#include "scene/gltf_loader.hpp"
+#include "editor/scripts/script_files.hpp"
+#include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;

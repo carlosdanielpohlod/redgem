@@ -3,7 +3,7 @@
 #include <cmath>
 
 #include "benchmark/field_textures.hpp"
-#include "scene/primitives.hpp"
+#include "scene/shapes/primitives.hpp"
 
 namespace redgem::benchmark {
 namespace {

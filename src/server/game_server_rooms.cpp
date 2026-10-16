@@ -3,7 +3,7 @@
 #include <algorithm>
 
 #include "core/log.hpp"
-#include "net/room_codes.hpp"
+#include "net/rooms/room_codes.hpp"
 #include "server/game_server.hpp"
 
 namespace redgem::server {

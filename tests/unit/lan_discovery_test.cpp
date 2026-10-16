@@ -5,7 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
-#include "net/lan_discovery.hpp"
+#include "net/discovery/lan_discovery.hpp"
 
 using namespace redgem::net;
 using nlohmann::json;

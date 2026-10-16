@@ -7,7 +7,7 @@
 #include "scene/props.hpp"
 #include "editor/editor_session.hpp"
 #include "core/files.hpp"
-#include "editor/script_files.hpp"
+#include "editor/scripts/script_files.hpp"
 #include "testing/recording_audio.hpp"
 #include "test_support.hpp"
 
