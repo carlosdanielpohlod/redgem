@@ -62,8 +62,9 @@ std::string too_much(std::uint64_t bytes, const char* what) {
 
 }  // namespace
 
-std::string file_problem(const std::filesystem::path& file) {
-  const std::uint64_t bytes = size_of(file);
+std::string file_problem(const std::filesystem::path& file) { return file_size_problem(size_of(file)); }
+
+std::string file_size_problem(std::uint64_t bytes) {
   if (bytes <= kMaxSceneBytes) return {};
   return too_much(bytes, "the file alone takes ");
 }

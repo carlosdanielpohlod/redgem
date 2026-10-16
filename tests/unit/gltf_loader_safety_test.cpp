@@ -175,13 +175,13 @@ TEST_CASE("a scene whose parts are each within their limits but too big as a who
 }
 
 TEST_CASE("a file bigger than a scene may be is refused before it is read") {
+  CHECK(gltf_budget::file_size_problem(gltf_budget::kMaxSceneBytes).empty());
+  CHECK(gltf_budget::file_size_problem(gltf_budget::kMaxSceneBytes + 1) ==
+        "the file alone takes 2048 MB of memory, more than the 2048 MB a scene may");
+  // A file's own size is what is looked at (a scene's file of a few bytes is far from it).
   const Scratch scratch;
-  const std::filesystem::path huge = scratch.game() / "huge.glb";
-  std::ofstream(huge, std::ios::binary) << "glTF";
-  std::filesystem::resize_file(huge, gltf_budget::kMaxSceneBytes + 1);  // (no disk is written: a sparse file)
-  const LoadResult result = load_gltf_scene(huge.string());
-  CHECK_FALSE(result.ok);
-  CHECK(result.error.find("the file alone takes 2048 MB of memory") != std::string::npos);
+  CHECK(gltf_budget::file_problem(written(scratch, triangle())).empty());
+  CHECK(gltf_budget::file_problem(scratch.game() / "missing.glb").empty());  // (the loader says it is missing)
 }
 
 TEST_CASE("an accessor without a buffer view is not read: the part of the mesh that needs it is left out") {

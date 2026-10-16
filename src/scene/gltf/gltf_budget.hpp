@@ -17,8 +17,9 @@ namespace redgem::gltf_budget {
 inline constexpr std::uint64_t kMaxSceneBytes = std::uint64_t{2048} * 1024 * 1024;
 
 // Why a scene's file alone is more than a scene may need; empty when it is not. Run before the
-// file is read.
+// file is read. (The same for a file of `bytes` bytes.)
 std::string file_problem(const std::filesystem::path& file);
+std::string file_size_problem(std::uint64_t bytes);
 
 // What a parsed scene needs while it loads, in bytes: its file, the data files and the pictures
 // it names, the pictures copied out of its own data, and its numbers as the engine keeps them
