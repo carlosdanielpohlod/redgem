@@ -31,14 +31,25 @@ ObjectId copy_or_original(const std::vector<CopyPair>& copies, ObjectId original
 
 }  // namespace
 
+ObjectId Scene::free_slot() {
+  if (free_slots_.empty()) {
+    objects_.emplace_back();
+    return static_cast<ObjectId>(objects_.size() - 1);
+  }
+  const ObjectId slot = free_slots_.back();
+  free_slots_.pop_back();
+  return slot;
+}
+
 ObjectId Scene::add_copy(ObjectId original, ObjectId parent, ObjectId root) {
   GameObject copy = detached_copy(at(original));
-  copy.id = static_cast<ObjectId>(objects_.size());
+  const ObjectId id = free_slot();
+  copy.id = id;
+  copy.serial = new_object_serial();
   copy.parent = parent;
-  copy.copy_root = root == kNoObject ? copy.id : root;
-  const ObjectId id = copy.id;
+  copy.copy_root = root == kNoObject ? id : root;
   copies_[copy.copy_of].push_back(id);
-  objects_.push_back(std::move(copy));
+  objects_[id] = std::move(copy);
   if (parent != kNoObject) objects_[parent].children.push_back(id);
   return id;
 }
@@ -70,13 +81,8 @@ std::vector<ObjectId> Scene::with_copied_joints(const std::vector<CopyPair>& cop
 }
 
 std::vector<ObjectId> Scene::copies_of(ObjectId original) const {
-  std::vector<ObjectId> alive;
   const auto found = copies_.find(original);
-  if (found == copies_.end()) return alive;
-  for (const ObjectId id : found->second) {
-    if (!objects_[id].destroyed) alive.push_back(id);
-  }
-  return alive;
+  return found == copies_.end() ? std::vector<ObjectId>{} : found->second;
 }
 
 }  // namespace redgem

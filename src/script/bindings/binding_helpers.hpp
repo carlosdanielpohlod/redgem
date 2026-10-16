@@ -18,8 +18,12 @@ namespace redgem::binding {
 // Ruby classes of the prelude that natives look up by name.
 inline constexpr const char* kGameObjectClass = "GameObject";
 inline constexpr const char* kVector3Class = "Vector3";
-// Where a wrapper (GameObject, Transform, Rigidbody...) keeps the id of its object.
+// Where a wrapper (GameObject, Transform, Rigidbody...) keeps which object it stands for: the
+// object's slot and its serial (see ObjectSerial), and, on a GameObject, its name and tag.
 inline constexpr const char* kIdVariable = "@id";
+inline constexpr const char* kSerialVariable = "@serial";
+inline constexpr const char* kNameVariable = "@name";
+inline constexpr const char* kTagVariable = "@tag";
 
 ScriptContext& context(mrb_state* mrb);
 Scene& scene(mrb_state* mrb);
@@ -32,10 +36,9 @@ Part& required(mrb_state* mrb, Part* part, const char* unavailable) {
   return *part;
 }
 
-// Object id stored in @id of a wrapper (GameObject, Transform, Rigidbody...).
-ObjectId self_id(mrb_state* mrb, mrb_value self);
-// Any object that ever existed, destroyed or not. Raises for ids that never existed.
-GameObject& object_at(mrb_state* mrb, mrb_value self);
+// The object a wrapper stands for, destroyed or not, while its slot still holds it; nullptr once
+// the slot holds another object (or the scene was switched). Raises for a value that is no wrapper.
+GameObject* bound_object(mrb_state* mrb, mrb_value self);
 // Raises if the object behind `self` was destroyed.
 GameObject& alive_object(mrb_state* mrb, mrb_value self);
 // The id of the object behind `self`, which must not have been destroyed.

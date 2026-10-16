@@ -115,7 +115,7 @@ TEST_CASE("an object whose behaviours cannot be taken off it says so, and the ga
   // A game's own code got in the way of the engine's bookkeeping.
   ruby(*engine, R"(
     class GameObject
-      def __remove_behaviours = raise("not letting go")
+      def __destroyed = raise("not letting go")
     end
     Scene.find('Door').destroy
   )");
@@ -123,7 +123,7 @@ TEST_CASE("an object whose behaviours cannot be taken off it says so, and the ga
   test::LogCapture log;
   frames(*engine, 1);
   CHECK(engine->scripts().error_count() == errors_before + 1);
-  CHECK(log.contains("taking the behaviours off 'Door'"));
+  CHECK(log.contains("forgetting the destroyed 'Door'"));
   CHECK(log.contains("not letting go"));
   CHECK(engine->scene().find("Door") == kNoObject);  // destroyed all the same
   frames(*engine, kHalfSecond);

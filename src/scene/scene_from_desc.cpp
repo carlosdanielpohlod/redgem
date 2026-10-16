@@ -55,10 +55,12 @@ Scene Scene::from_desc(const SceneDesc& desc) {
   scene.objects_.reserve(desc.nodes.size());
   for (std::size_t i = 0; i < desc.nodes.size(); ++i) {
     GameObject object = object_of(desc.nodes[i], desc, static_cast<ObjectId>(i));
+    object.serial = new_object_serial();
     // Parents come first, so a prefab's descendants inherit the flag.
     if (scene.is_prefab(object.parent)) object.prefab = true;
     scene.objects_.push_back(std::move(object));
   }
+  scene.loaded_count_ = scene.objects_.size();
   return scene;
 }
 

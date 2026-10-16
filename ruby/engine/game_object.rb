@@ -1,29 +1,32 @@
-# Ruby side of scene objects. Native methods (name, tag, props, alive?, destroy, visible...)
-# are defined by the engine; this file adds the conveniences built on them.
+# Ruby side of scene objects. Native methods (props, alive?, destroy, visible...) are defined by
+# the engine; this file adds the conveniences built on them.
 class GameObject
-  # Instances are created by the engine (one per scene object), never with GameObject.new.
-  attr_reader :id
+  # Instances are created by the engine (one per scene object), never with GameObject.new. A
+  # GameObject keeps standing for its object only: once that is destroyed, every native method but
+  # alive? and destroy raises, even after its slot (the id) is given to a new object. The name and
+  # the tag stay readable.
+  attr_reader :id, :name, :tag
 
   def transform
-    @transform ||= Transform.__new(@id)
+    @transform ||= Transform.__new(@id, @serial)
   end
 
   def character
     return nil unless __has_character?
 
-    @character ||= CharacterController.__new(@id)
+    @character ||= CharacterController.__new(@id, @serial)
   end
 
   def rigidbody
     return nil unless __has_rigidbody?
 
-    @rigidbody ||= Rigidbody.__new(@id)
+    @rigidbody ||= Rigidbody.__new(@id, @serial)
   end
 
   def vehicle
     return nil unless __has_vehicle?
 
-    @vehicle ||= Vehicle.__new(@id)
+    @vehicle ||= Vehicle.__new(@id, @serial)
   end
 
   def tag?(value) = tag == value.to_s
@@ -43,7 +46,9 @@ class GameObject
     behaviour
   end
 
-  def ==(other) = other.is_a?(GameObject) && other.id == @id
+  def ==(other) = other.is_a?(GameObject) && other.id == @id && other.__serial == @serial
+
+  def __serial = @serial
 
   def inspect = "#<GameObject #{name.inspect} id=#{@id}>"
   alias to_s inspect
@@ -52,7 +57,9 @@ class GameObject
     @behaviours << behaviour
   end
 
-  def __remove_behaviours
+  # The object was destroyed: what the prelude kept about it goes too.
+  def __destroyed
     @behaviours.clear
+    Network.__object_gone(self)
   end
 end

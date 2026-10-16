@@ -43,24 +43,25 @@ bool is_triple(mrb_value value) { return mrb_array_p(value) && RARRAY_LEN(value)
 ScriptContext& context(mrb_state* mrb) { return script_host(mrb).context(); }
 Scene& scene(mrb_state* mrb) { return *context(mrb).scene; }
 
-ObjectId self_id(mrb_state* mrb, mrb_value self) {
+GameObject* bound_object(mrb_state* mrb, mrb_value self) {
   const mrb_value id = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kIdVariable));
-  const bool bound = mrb_integer_p(id);
+  const mrb_value serial = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kSerialVariable));
+  const bool bound = mrb_integer_p(id) && mrb_integer_p(serial);
   if (!bound) mrb_raise(mrb, E_TYPE_ERROR, "object is not bound to the scene");
-  const mrb_int raw = mrb_integer(id);
-  const bool exists = raw >= 0 && raw < static_cast<mrb_int>(scene(mrb).size());
-  if (!exists) mrb_raisef(mrb, E_RANGE_ERROR, "no game object with id %v", id);
-  return static_cast<ObjectId>(raw);
+  Scene& objects = scene(mrb);
+  if (!is_index_of(mrb_integer(id), objects.size())) return nullptr;
+  GameObject& object = objects.at(static_cast<ObjectId>(mrb_integer(id)));
+  return object.serial == static_cast<ObjectSerial>(mrb_integer(serial)) ? &object : nullptr;
 }
 
-GameObject& object_at(mrb_state* mrb, mrb_value self) { return scene(mrb).at(self_id(mrb, self)); }
-
 GameObject& alive_object(mrb_state* mrb, mrb_value self) {
-  GameObject& object = object_at(mrb, self);
-  if (object.destroyed) {
-    mrb_raisef(mrb, E_RUNTIME_ERROR, "game object %v was destroyed", mrb_int_value(mrb, object.id));
+  GameObject* object = bound_object(mrb, self);
+  if (object == nullptr || object->destroyed) {
+    const mrb_value name = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kNameVariable));
+    const mrb_value id = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kIdVariable));
+    mrb_raisef(mrb, E_RUNTIME_ERROR, "game object %v (id %v) was destroyed", name, id);
   }
-  return object;
+  return *object;
 }
 
 ObjectId alive_id(mrb_state* mrb, mrb_value self) { return alive_object(mrb, self).id; }

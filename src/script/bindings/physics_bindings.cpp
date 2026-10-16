@@ -95,7 +95,7 @@ mrb_value physics_raycast(mrb_state* mrb, mrb_value) {
   mrb_float max_distance = kDefaultRaycastDistance;
   mrb_value ignore = mrb_nil_value();
   mrb_get_args(mrb, "oo|fo", &origin, &direction, &max_distance, &ignore);
-  const ObjectId ignored = mrb_nil_p(ignore) ? kNoObject : self_id(mrb, ignore);
+  const ObjectId ignored = mrb_nil_p(ignore) ? kNoObject : alive_id(mrb, ignore);
   const auto hit =
       physics(mrb).raycast(to_vec3(mrb, origin), to_vec3(mrb, direction), static_cast<float>(max_distance), ignored);
   return hit ? hit_value(mrb, *hit) : mrb_nil_value();

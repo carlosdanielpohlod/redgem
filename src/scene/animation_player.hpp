@@ -39,6 +39,8 @@ class AnimationPlayer {
   void reset(const std::vector<AnimationDesc>& clips, const Scene& scene);
   // Moves the playing clips on by dt seconds and poses the scene's objects.
   void advance(float dt, Scene& scene);
+  // Lets go of a destroyed character's own clip before its slot can hold another object.
+  void forget(ObjectId object) { owned_.erase(object); }
 
   std::vector<std::string> names() const;
   bool has(const std::string& name) const { return find(name).has_value(); }

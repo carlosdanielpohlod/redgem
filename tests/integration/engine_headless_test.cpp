@@ -204,8 +204,10 @@ TEST_CASE("children destroyed with their parent still see it in on_destroy") {
 TEST_CASE("natives reject invalid objects with Ruby errors instead of crashing") {
   test::LogCapture capture;
   auto engine = sandbox();
-  const RubyResult result =
-      engine->scripts().eval("GameObject.allocate.tap { |o| o.instance_variable_set(:@id, 9999) }.name", "bad.rb");
+  const RubyResult result = engine->scripts().eval(
+      "GameObject.allocate.tap { |o| o.instance_variable_set(:@id, 9999); o.instance_variable_set(:@serial, 1) "
+      "}.visible",
+      "bad.rb");
   CHECK_FALSE(result.ok);
   CHECK(result.error.find("9999") != std::string::npos);
   const RubyResult destroyed =
@@ -316,6 +318,50 @@ TEST_CASE("objects spawned from inside update start on the next frame") {
   frames(*engine, 1);
   CHECK(ruby(*engine, "Scene.find_all(:bullet).size") == std::to_string(kSpawnFrames));
   CHECK(ruby(*engine, "$bullet_starts") == std::to_string(kSpawnFrames));
+  CHECK(engine->scripts().error_count() == kExpectedScriptErrors);
+}
+
+TEST_CASE("a kept GameObject stands for its own object only, even once its slot holds a new one") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, "$old = Scene.spawn('Bullet', physics: false); $old_transform = $old.transform");
+  ruby(*engine, "$old.destroy");
+  frames(*engine, 1);
+  ruby(*engine, "$new = Scene.spawn('Bullet', physics: false)");
+  REQUIRE(ruby(*engine, "$new.id == $old.id") == "true");  // the slot was used again
+  CHECK(ruby(*engine, "$old.alive?") == "false");
+  CHECK(ruby(*engine, "$old == $new") == "false");
+  CHECK(ruby(*engine, "$old.name") == "Bullet");  // still readable
+  CHECK_FALSE(engine->scripts().eval("$old.transform.position", "stale.rb").ok);
+  CHECK_FALSE(engine->scripts().eval("$old_transform.position = Vector3.zero", "stale.rb").ok);
+  CHECK(ruby(*engine, "$old.destroy; $new.alive?") == "true");  // destroying it again leaves the new one be
+  const RubyResult moved = engine->scripts().eval("$old_transform.position", "stale.rb");
+  CHECK(moved.error.find("was destroyed") != std::string::npos);
+}
+
+TEST_CASE("a GameObject kept in a global across a scene switch stands for nothing in the new scene") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, "$hero = Scene.find('Hero'); Game.load_scene('level2')");
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "$hero.alive?") == "false");
+  CHECK(ruby(*engine, "$hero.name") == "Hero");
+  CHECK_FALSE(engine->scripts().eval("$hero.transform.position", "stale.rb").ok);
+}
+
+TEST_CASE("spawning and destroying for a long time does not grow the scene or the scripts") {
+  constexpr int kRounds = 300;
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, "def churn = 5.times { Scene.spawn('Bullet', physics: false).destroy }");
+  ruby(*engine, "churn");
+  frames(*engine, 1);
+  const std::size_t slots = engine->scene().size();
+  for (int i = 0; i < kRounds; ++i) {
+    ruby(*engine, "churn");
+    frames(*engine, 1);
+  }
+  CHECK(engine->scene().size() == slots);
   CHECK(engine->scripts().error_count() == kExpectedScriptErrors);
 }
 

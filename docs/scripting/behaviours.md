@@ -62,6 +62,19 @@ Inside a behaviour:
 | `other.get_component(Player)` | a behaviour on another object |
 | `destroy` or `destroy(other)` | removes an object from the game |
 
+### Objects that are gone
+
+`destroy` takes an object out at the end of the step: its `on_destroy` still runs, and until then
+it can be used as usual. After that, a reference you kept (in a variable, a global, a timer's
+block) stands for that object only. `alive?` says `false`, `name` and `tag` still answer, and
+anything else raises `game object "Coin" (id 12) was destroyed`, even once a newly spawned object
+sits in the same place (its `id`) or the level was switched. A kept reference never starts acting
+on another object.
+
+```ruby
+@target = nil unless @target&.alive?   # forget an enemy someone else destroyed
+```
+
 ## Setting a level up in Ruby
 
 Instead of attaching scripts object by object, a level can have a **scene script**:

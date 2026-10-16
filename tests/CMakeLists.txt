@@ -14,6 +14,7 @@ add_executable(redgem_tests
   unit/extras_parser_test.cpp
   unit/transform_test.cpp
   unit/scene_test.cpp
+  unit/scene_identity_test.cpp
   unit/gltf_accessors_test.cpp
   unit/gltf_loader_test.cpp
   unit/gltf_loader_safety_test.cpp
@@ -357,3 +358,10 @@ add_executable(redgem_field_benchmark
   benchmark/field_textures.cpp)
 target_link_libraries(redgem_field_benchmark PRIVATE redgem_runtime)
 target_include_directories(redgem_field_benchmark PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+# How long the scripts and the scene take a frame, and whether that grows while a game spawns
+# and destroys objects (see benchmark/scripting_benchmark.cpp): built with the tests, never run by them.
+add_executable(redgem_scripting_benchmark benchmark/scripting_benchmark.cpp)
+target_link_libraries(redgem_scripting_benchmark PRIVATE redgem_runtime)
+target_compile_definitions(redgem_scripting_benchmark PRIVATE
+  REDGEM_BENCHMARK_GAME="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/games/sandbox")

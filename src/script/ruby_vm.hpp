@@ -38,11 +38,6 @@ class RubyVm {
   using ArgumentsMaker = std::function<std::vector<mrb_value>(mrb_state*)>;
   RubyResult call_with(mrb_value receiver, const char* method, const ArgumentsMaker& make);
 
-  // Keeps a value alive across garbage collections until the VM dies.
-  void keep_alive(mrb_value value);
-  // Lets go of everything keep_alive held.
-  void release_kept();
-
  private:
   mrb_state* mrb_;
 };

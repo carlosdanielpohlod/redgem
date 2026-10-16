@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <limits>
@@ -15,9 +16,16 @@ namespace redgem {
 
 using ObjectId = int;
 inline constexpr ObjectId kNoObject = kNoIndex;
+// Which object a slot holds: no two objects ever get the same serial, in any scene of the session,
+// so a reference that kept one can tell when its object is gone even if the slot holds another.
+using ObjectSerial = std::uint64_t;
+inline constexpr ObjectSerial kNoSerial = 0;
+// A serial no object had before.
+ObjectSerial new_object_serial();
 
 struct GameObject {
   ObjectId id = kNoObject;
+  ObjectSerial serial = kNoSerial;
   std::string name;
   std::string tag;
   ObjectId parent = kNoObject;
@@ -48,7 +56,10 @@ struct GameObject {
   bool pending_destroy = false;
 };
 
-// Runtime object hierarchy. Ids are stable for the whole session (destroyed slots stay reserved).
+// Runtime object hierarchy. An id is a slot. The slots of the loaded scene's objects are theirs for
+// good (id == node index); the slot of an object made while the game runs (a copy) is used again
+// once that object is destroyed, so a game that keeps spawning does not keep growing. What tells
+// two objects of one slot apart is their serial (see ObjectSerial).
 // Implemented in parts: scene.cpp (finding, placing and destroying objects), scene_from_desc.cpp
 // (the objects of a loaded file) and scene_copies.cpp (live copies).
 class Scene {
@@ -81,9 +92,11 @@ class Scene {
 
   // Marks the object and all its descendants for destruction at the end of the step.
   void request_destroy(ObjectId id);
-  // Objects marked for destruction but still alive (their on_destroy can still use them).
+  // Objects marked for destruction but still alive (their on_destroy can still use them), every
+  // parent ahead of its children.
   std::vector<ObjectId> pending_destroy_ids() const;
-  // Completes the destruction of a pending object (after its on_destroy ran).
+  // Completes the destruction of a pending object (after its on_destroy ran): it leaves its parent
+  // and the copies of its original, and its slot may then hold a new object.
   void finalize_destroy(ObjectId id);
 
  private:
@@ -94,9 +107,23 @@ class Scene {
   // Takes (original, its copy) pairs and returns the copies' ids, in that order.
   std::vector<ObjectId> with_copied_joints(const std::vector<std::pair<ObjectId, ObjectId>>& copies);
   bool valid(ObjectId id) const { return is_index_of(id, objects_.size()); }
+  // A slot for a new copy: one a destroyed copy left, else a new one at the end.
+  ObjectId free_slot();
+  // Puts the pending objects of `id`'s subtree in `out`, parents first.
+  void append_pending(ObjectId id, std::vector<ObjectId>& out) const;
+  // Whether a pending object's parent is pending too (so the parent lists it).
+  bool parent_is_pending(const GameObject& object) const;
+  void leave_parent(const GameObject& object);
+  void leave_copies(const GameObject& object);
+  // Whether a destroyed object's slot may hold a new object: it was made while the game ran, and
+  // no living object of its copy still uses it as a bone.
+  bool reusable(const GameObject& object) const;
+  bool is_bone_of_living_copy(const GameObject& object) const;
 
   std::vector<GameObject> objects_;
-  std::unordered_map<ObjectId, std::vector<ObjectId>> copies_;  // original -> every copy ever made
+  std::size_t loaded_count_ = 0;      // slots of the loaded scene's objects, never used again
+  std::vector<ObjectId> free_slots_;  // left by destroyed copies, used again last in first out
+  std::unordered_map<ObjectId, std::vector<ObjectId>> copies_;  // original -> its copies not finalized
 };
 
 }  // namespace redgem

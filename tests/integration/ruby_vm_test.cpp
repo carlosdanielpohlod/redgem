@@ -37,8 +37,7 @@ TEST_CASE("syntax errors are reported") {
 TEST_CASE("calls methods and catches their errors") {
   RubyVm vm;
   REQUIRE(vm.eval("class Calc; def add(a, b) = a + b; def fail! = raise('no'); end", "calc.rb").ok);
-  const mrb_value calc = vm.eval("Calc.new", "new.rb").value;
-  vm.keep_alive(calc);
+  const mrb_value calc = vm.eval("$calc = Calc.new", "new.rb").value;  // the global keeps it alive
   const RubyResult sum = vm.call(calc, "add", {mrb_fixnum_value(2), mrb_fixnum_value(5)});
   REQUIRE(sum.ok);
   CHECK(mrb_integer(sum.value) == 7);
@@ -49,8 +48,7 @@ TEST_CASE("calls methods and catches their errors") {
 TEST_CASE("arguments are made inside the protected call: failing to make them is an error like any other") {
   RubyVm vm;
   REQUIRE(vm.eval("class Calc; def add(a, b) = a + b; end", "calc.rb").ok);
-  const mrb_value calc = vm.eval("Calc.new", "new.rb").value;
-  vm.keep_alive(calc);
+  const mrb_value calc = vm.eval("$calc = Calc.new", "new.rb").value;  // the global keeps it alive
   const RubyResult sum = vm.call_with(
       calc, "add", [](mrb_state*) { return std::vector<mrb_value>{mrb_fixnum_value(2), mrb_fixnum_value(5)}; });
   REQUIRE(sum.ok);

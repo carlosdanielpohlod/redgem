@@ -56,7 +56,7 @@ class ScriptHost {
   void scene_was_reset();
   // Runs on_destroy on the object's behaviours (they stay attached until detach()).
   void on_destroyed(ObjectId object);
-  // Disables the object's behaviours and removes them from its GameObject.
+  // Forgets the object's behaviours and its Ruby GameObject, which from then on stands for nothing.
   void detach(ObjectId object);
 
   RubyResult eval(const std::string& code, const std::string& file_name);
@@ -85,6 +85,10 @@ class ScriptHost {
   };
 
   void load_prelude();
+  // A new Ruby GameObject for an object; stands_for says whether one still stands for it.
+  mrb_value new_wrapper(const GameObject& object);
+  bool stands_for(mrb_value wrapper, const GameObject& object);
+  void set_variable(mrb_value object, const char* name, mrb_value value);
   // Starts an empty cache of GameObject wrappers, which Ruby's garbage collector leaves alone.
   void start_objects_cache();
 

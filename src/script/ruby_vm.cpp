@@ -12,8 +12,6 @@
 namespace redgem {
 namespace {
 
-constexpr const char* kKeepAliveGlobal = "$__redgem_keep_alive";
-
 struct EvalRequest {
   const std::string* code = nullptr;
   const std::string* file_name = nullptr;
@@ -123,7 +121,6 @@ RubyResult run_protected(mrb_state* mrb, mrb_protect_error_func* body, void* req
 
 RubyVm::RubyVm() : mrb_(mrb_open()) {
   if (mrb_ == nullptr) throw std::runtime_error("cannot create the mruby interpreter");
-  mrb_gv_set(mrb_, mrb_intern_cstr(mrb_, kKeepAliveGlobal), mrb_ary_new(mrb_));
 }
 
 RubyVm::~RubyVm() { mrb_close(mrb_); }
@@ -158,12 +155,6 @@ RubyResult RubyVm::call(mrb_value receiver, const char* method, const std::vecto
 RubyResult RubyVm::call_with(mrb_value receiver, const char* method, const ArgumentsMaker& make) {
   MadeCallRequest request{receiver, method, &make};
   return run_protected(mrb_, run_made_call, &request);
-}
-
-void RubyVm::release_kept() { mrb_gv_set(mrb_, mrb_intern_cstr(mrb_, kKeepAliveGlobal), mrb_ary_new(mrb_)); }
-
-void RubyVm::keep_alive(mrb_value value) {
-  mrb_ary_push(mrb_, mrb_gv_get(mrb_, mrb_intern_cstr(mrb_, kKeepAliveGlobal)), value);
 }
 
 }  // namespace redgem

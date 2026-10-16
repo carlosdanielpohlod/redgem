@@ -472,6 +472,20 @@ TEST_CASE("a spawned object its owner destroys is gone on every machine, and its
   CHECK(ruby(*guest, "$mine.alive?") == "true");
 }
 
+TEST_CASE("a spawned object destroyed before its NetworkSync started is forgotten all the same") {
+  Lan lan;
+  Engine& solo = lan.add_machine();
+  // Spawned and destroyed inside one update: its NetworkSync would only have started on the next frame.
+  ruby(solo, R"(
+    class SpawnAndDrop < Behaviour
+      def update(_dt) = @done ||= Network.spawn('Ball').destroy.nil?
+    end
+    Scene.find('Platform').add_component(SpawnAndDrop)
+  )");
+  lan.rounds(2);
+  CHECK(ruby(solo, "Network.instance_variable_get(:@spawned).size") == "0");  // its place is free again
+}
+
 TEST_CASE("an object that goes by a spawned object's key does not take it along when it is destroyed") {
   Lan lan;
   Engine& host = lan.add_machine();

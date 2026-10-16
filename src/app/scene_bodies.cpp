@@ -72,6 +72,12 @@ BodyDesc describe_body(const Source& source, ObjectId id, BodyConfig config) {
   return desc;
 }
 
+// Whether a wheel the vehicle was built with is still there under it. (One destroyed on its own
+// left the chassis, and whatever took its slot since is not a wheel of this car.)
+bool is_wheel_of(const Scene& scene, ObjectId wheel, ObjectId chassis) {
+  return scene.is_alive(wheel) && scene.at(wheel).parent == chassis;
+}
+
 // Moves and turns an object to where physics has it, keeping its scale.
 void move_to(Scene& scene, ObjectId id, const Transform& pose) {
   Transform world = scene.world_transform(id);
@@ -89,7 +95,9 @@ void follow_body(Scene& scene, PhysicsWorld& physics, ObjectId id, const Transfo
   }
   if (type != BodyType::Vehicle) return;
   // After the chassis moved, so wheels are expressed relative to its new pose.
-  for (const WheelPose& wheel : physics.wheel_poses(id)) move_to(scene, wheel.object, wheel.world);
+  for (const WheelPose& wheel : physics.wheel_poses(id)) {
+    if (is_wheel_of(scene, wheel.object, id)) move_to(scene, wheel.object, wheel.world);
+  }
 }
 
 // Whether a body goes where its object is each step, instead of the other way round.

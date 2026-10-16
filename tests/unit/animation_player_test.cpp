@@ -270,6 +270,20 @@ TEST_CASE("a character's own clip can play once, pause and start over") {
   CHECK(crowd.x(crowd.first_arm) == doctest::Approx(kDistance / 4.0f));
 }
 
+TEST_CASE("a character spawned into a destroyed one's slot does not inherit its clip") {
+  Crowd crowd;
+  crowd.player.play_on(crowd.scene, crowd.first, "Run", ClipStart{true, 1.0f, 0.0f, false});
+  crowd.scene.request_destroy(crowd.first);
+  const std::vector<ObjectId> pending = crowd.scene.pending_destroy_ids();
+  for (auto gone = pending.rbegin(); gone != pending.rend(); ++gone) {  // as the engine does
+    crowd.player.forget(*gone);
+    crowd.scene.finalize_destroy(*gone);
+  }
+  const ObjectId newcomer = crowd.scene.clone(Crowd::kPerson).front();
+  REQUIRE(newcomer == crowd.first);
+  CHECK_FALSE(crowd.player.clip_on(crowd.scene, newcomer).has_value());  // it follows the scene's clips
+}
+
 TEST_CASE("a destroyed character is forgotten") {
   Crowd crowd;
   crowd.player.play_on(crowd.scene, crowd.first, "Run", ClipStart{true, 1.0f, 0.0f, false});
