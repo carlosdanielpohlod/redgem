@@ -128,6 +128,9 @@ class Scene {
   // Adds the copy of one object under `parent` (kNoObject for the root of a copy, whose root is
   // then itself). Returns its id.
   ObjectId add_copy(ObjectId original, ObjectId parent, ObjectId root);
+  // Copies `source` and what is under it, parents first: (original, its copy) pairs, the copy of
+  // `source` first.
+  std::vector<std::pair<ObjectId, ObjectId>> copy_subtree(ObjectId source);
   // A copied character is deformed by its own copied bones (bones outside the copy stay shared).
   // Takes (original, its copy) pairs and returns the copies' ids, in that order.
   std::vector<ObjectId> with_copied_joints(const std::vector<std::pair<ObjectId, ObjectId>>& copies);
