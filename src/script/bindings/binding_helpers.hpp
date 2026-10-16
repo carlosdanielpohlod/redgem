@@ -4,8 +4,10 @@
 // so they can only be used inside functions called from Ruby.
 //
 // What every native holds the scripts' arguments to:
-//   - a number is finite: infinity and NaN are refused wherever they would go (float_arg,
-//     to_vec3, finite for the rest), so they never reach the scene, physics or the renderer;
+//   - a number is finite and fits a float, the engine's own numbers: infinity, NaN and a finite
+//     number too large for a float (1e300) are refused wherever they would go (float_arg, to_vec3,
+//     Vector3's own numbers, finite for the rest), so they never reach the scene, physics or the
+//     renderer;
 //   - a number with a range of its own is refused outside it, saying the range and what was given
 //     (at_least, more_than, from_to), never quietly clamped (a steering input is the exception:
 //     an analog stick may go a little past full, see Vehicle#drive);
@@ -84,7 +86,10 @@ Found known(mrb_state* mrb, const std::optional<Found>& found, const char* unkno
   if (!found) mrb_raisef(mrb, E_ARGUMENT_ERROR, unknown, name.c_str());
   return *found;
 }
-// A number a script handed a native, when finite: an ArgumentError naming the native otherwise.
+// Whether a number is finite and small enough to become a float.
+bool fits_a_float(mrb_float value);
+// A number a script handed a native, when it fits a float (see fits_a_float): an ArgumentError
+// naming the native otherwise.
 mrb_float finite(mrb_state* mrb, mrb_float value);
 // A finite number within a range of its own: an ArgumentError saying "<what> must be ..., not
 // <value>" otherwise.

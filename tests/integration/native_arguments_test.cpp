@@ -6,8 +6,12 @@
 #include <mruby.h>
 #include <mruby/string.h>
 
+#include <cmath>
+#include <limits>
+
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "script/bindings/binding_helpers.hpp"
 #include "script/script_host.hpp"
 #include "test_support.hpp"
 
@@ -129,6 +133,30 @@ TEST_CASE("no native takes infinity or NaN for a number, whatever the number is 
     CHECK_MESSAGE(refuses(scripts, code, "expected a finite number"), code);
   }
   CHECK(ruby(scripts, "$host.transform.position.y") == "0.0");  // nothing refused got through
+}
+
+TEST_CASE("a number fits the engine when a float can hold it") {
+  constexpr double kLargest = std::numeric_limits<float>::max();
+  for (const double fits : {0.0, -0.0, 1.0, -2.5, 1e-40, kLargest, -kLargest}) CHECK(binding::fits_a_float(fits));
+  const double just_past = std::nextafter(kLargest, std::numeric_limits<double>::infinity());
+  for (const double too_much : {just_past, -just_past, 1e300, -1e300, std::numeric_limits<double>::infinity(),
+                                -std::numeric_limits<double>::infinity(), std::nan("")}) {
+    CHECK_FALSE(binding::fits_a_float(too_much));
+  }
+}
+
+TEST_CASE("no native takes a finite number too large for a float") {
+  const SceneDesc scene = small_scene();
+  const auto engine = engine_for(scene);
+  ScriptHost& scripts = engine->scripts();
+  ruby(scripts, "$host = Scene.find('Host')");
+  for (const char* code : {"Camera.fov = 1e300", "$host.transform.position = [0, 1e300, 0]",
+                           "$host.transform.scale = [-1e300, 1, 1]", "Physics.raycast([0, 0, 0], [0, -1, 0], 1e300)",
+                           "Vector3.new(1e300, 0, 0)", "Vector3.one.set(0, 0, -1e300)", "Vector3.one * 1e300"}) {
+    CHECK_MESSAGE(refuses(scripts, code, "expected a finite number"), code);
+  }
+  CHECK(ruby(scripts, "$host.transform.position.y") == "0.0");  // nothing refused got through
+  CHECK(ruby(scripts, "$host.transform.position = [0, -2.5, 0]; $host.transform.position.y") == "-2.5");
 }
 
 TEST_CASE("a place is a Vector3 or three numbers, and nothing else") {

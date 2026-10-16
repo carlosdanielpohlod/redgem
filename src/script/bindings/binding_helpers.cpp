@@ -10,6 +10,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <string>
 
 #include "script/script_host.hpp"
@@ -18,6 +19,8 @@ namespace redgem::binding {
 namespace {
 
 constexpr mrb_int kVectorComponents = 3;
+// The engine keeps its numbers as floats: a number from a script must fit one.
+constexpr mrb_float kLargestNumber = std::numeric_limits<float>::max();
 constexpr float kMaxColorChannel = 255.0f;
 
 constexpr std::size_t kNumberTextSize = 32;
@@ -126,10 +129,12 @@ mrb_value single_arg(mrb_state* mrb) {
   return value;
 }
 
+bool fits_a_float(mrb_float value) { return std::isfinite(value) && std::fabs(value) <= kLargestNumber; }
+
 mrb_float finite(mrb_state* mrb, mrb_float value) {
-  if (!std::isfinite(value)) {
-    mrb_raisef(mrb, E_ARGUMENT_ERROR, "%n: expected a finite number, not %v", mrb_get_mid(mrb),
-               mrb_float_value(mrb, value));
+  if (!fits_a_float(value)) {
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "%n: expected a finite number no larger than %v, not %v", mrb_get_mid(mrb),
+               mrb_float_value(mrb, kLargestNumber), mrb_float_value(mrb, value));
   }
   return value;
 }

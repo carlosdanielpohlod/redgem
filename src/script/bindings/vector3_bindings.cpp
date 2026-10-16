@@ -36,10 +36,16 @@ mrb_value made(mrb_state* mrb, mrb_float x, mrb_float y, mrb_float z) { return b
 
 mrb_float dot(const Vector3Value& a, const Vector3Value& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 
+// The numbers a Vector3 is made or set from, held to the rule every native holds numbers to
+// (binding::finite): the vector is not touched when one of them is refused.
+Vector3Value checked(mrb_state* mrb, const Vector3Value& given) {
+  return {binding::finite(mrb, given.x), binding::finite(mrb, given.y), binding::finite(mrb, given.z)};
+}
+
 mrb_value vector3_initialize(mrb_state* mrb, mrb_value self) {
-  Vector3Value& v = self_vector(self);
-  v = {};
-  mrb_get_args(mrb, "|fff", &v.x, &v.y, &v.z);
+  Vector3Value given;
+  mrb_get_args(mrb, "|fff", &given.x, &given.y, &given.z);
+  self_vector(self) = checked(mrb, given);
   return self;
 }
 
@@ -117,8 +123,9 @@ mrb_value vector3_equal(mrb_state* mrb, mrb_value self) {
 // The ones that change the vector they are called on, and hand it back.
 
 mrb_value vector3_set(mrb_state* mrb, mrb_value self) {
-  Vector3Value& v = self_vector(self);
-  mrb_get_args(mrb, "fff", &v.x, &v.y, &v.z);
+  Vector3Value given;
+  mrb_get_args(mrb, "fff", &given.x, &given.y, &given.z);
+  self_vector(self) = checked(mrb, given);
   return self;
 }
 

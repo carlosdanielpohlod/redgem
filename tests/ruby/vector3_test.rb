@@ -59,6 +59,27 @@ class Vector3Test < RedGemTest::Case
     assert_equal Vector3.new(2, 3, 4), copy
   end
 
+  def test_any_number_a_float_can_hold_makes_a_vector
+    assert_equal [1.0, -2.5, 0.0], Vector3.new(1, -2.5, 0).to_a
+    assert_equal [-3.0, 0.25, 7.0], Vector3.zero.set(-3, 0.25, 7).to_a
+  end
+
+  def test_no_vector_is_made_or_set_from_a_number_a_float_cannot_hold
+    [0.0 / 0.0, 1.0 / 0.0, -1.0 / 0.0, 1e300, -1e300].each do |bad|
+      assert_raises(ArgumentError) { Vector3.new(bad, 0, 0) }
+      assert_raises(ArgumentError) { Vector3.new(0, 0, bad) }
+      assert_raises(ArgumentError) { Vector3.one.set(0, bad, 0) }
+      assert_raises(ArgumentError) { Vector3.one.scale!(bad) }
+    end
+  end
+
+  def test_a_refused_set_leaves_the_vector_as_it_was
+    v = Vector3.new(1, 2, 3)
+    assert_raises(ArgumentError) { v.set(4, 0.0 / 0.0, 6) }
+    assert_equal Vector3.new(1, 2, 3), v
+    assert_equal Vector3.new(4, 5, 6), v.set(4, 5, 6)
+  end
+
   def test_numbers_keep_their_precision
     assert_equal 0.1, Vector3.new(0.1, 0, 0).x
     assert_equal 0.0, Vector3.new.z
