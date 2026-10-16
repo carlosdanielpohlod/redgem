@@ -31,7 +31,9 @@ add_library(redgem_testing STATIC
   test_stage.cpp
   system_test.cpp
   test_cli.cpp
-  test_cli_options.cpp)
+  test_cli_options.cpp
+  testing_texts.cpp)
+redgem_embed_texts(redgem_testing testing)
 target_include_directories(redgem_testing PRIVATE ${REDGEM_TESTING_GENERATED_DIR})
 # (It plays games as the player does: the runtime is all it stands on.)
 target_link_libraries(redgem_testing PUBLIC redgem_runtime)

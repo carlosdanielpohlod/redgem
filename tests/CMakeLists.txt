@@ -6,6 +6,8 @@ add_executable(redgem_tests
   unit/files_test.cpp
   unit/command_line_test.cpp
   unit/names_test.cpp
+  unit/texts_test.cpp
+  unit/translation_keys_test.cpp
   unit/embed_test.cpp
   unit/platform_test.cpp
   unit/property_test.cpp
@@ -120,6 +122,7 @@ target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 add_dependencies(redgem_tests redgem_player redgem)
 target_compile_definitions(redgem_tests PRIVATE
   REDGEM_FIXTURES_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
+  REDGEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
   REDGEM_TEMPLATES_DIR="${CMAKE_SOURCE_DIR}/templates"
   REDGEM_PLATFORMER_DIR="${CMAKE_SOURCE_DIR}/games/platformer"
   REDGEM_PLAYER_FILE="$<TARGET_FILE:redgem_player>"
@@ -131,7 +134,7 @@ add_test(NAME cpp.unit_and_integration COMMAND redgem_tests)
 # What tests are run with (src/testing, redgem-test) has tests of its own, in a program of their
 # own: redgem_tests above links the engine and its tools, and nothing of what tests are run with.
 add_executable(redgem_testing_tests
-  test_main.cpp
+  testing/testing_test_main.cpp
   testing/test_cli_test.cpp
   testing/test_saves_test.cpp
   testing/frame_pictures_test.cpp
@@ -334,7 +337,8 @@ set_tests_properties(system.harness_reports_failures PROPERTIES LABELS system RU
   PASS_REGULAR_EXPRESSION "system test failed: .*this must fail")
 
 # The editor window itself, driven by a doctest program.
-add_executable(redgem_editor_system_tests editor_system/editor_window_test.cpp editor_system/window_picture.cpp)
+add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp editor_system/editor_window_test.cpp
+               editor_system/window_picture.cpp)
 target_link_libraries(redgem_editor_system_tests PRIVATE redgem_project doctest::doctest)
 # It stands where the editor does, beside the player: its Build finds the player as redgem's does.
 add_dependencies(redgem_editor_system_tests redgem_player)

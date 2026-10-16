@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -17,9 +18,11 @@
 #include "app/android/android_bundle.hpp"
 #include "app/window_presenter.hpp"
 #include "app/bundled_game.hpp"
+#include "app/game_texts.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "core/platform.hpp"
+#include "core/translations.hpp"
 #include "input/raylib_input_source.hpp"
 #include "input/touch_input_source.hpp"
 
@@ -34,6 +37,7 @@ using namespace redgem;
 // moving them would lose the saves of the games already installed).
 constexpr const char* kUserDataFolder = ".config/redgem";
 constexpr std::size_t kCopyChunkBytes = 64 * 1024;
+constexpr std::size_t kLanguageLetters = 2;  // of the language the phone is set to ("pt")
 
 std::string read_asset(AAssetManager* assets, const std::string& name) {
   AAsset* asset = AAssetManager_open(assets, name.c_str(), AASSET_MODE_BUFFER);
@@ -113,6 +117,13 @@ float screen_aspect(const android_app* app) {
   return measured ? std::max(one_side, other_side) / std::min(one_side, other_side) : 0.0f;
 }
 
+// The language the phone is set to; empty when it says none.
+std::string phone_language(const android_app* app) {
+  char letters[kLanguageLetters] = {};
+  AConfiguration_getLanguage(app->config, letters);
+  return platform::language_of_locale(std::string(letters, strnlen(letters, kLanguageLetters)));
+}
+
 // Plays the game that was unpacked into the app's storage, on the whole screen, with on-screen
 // controls for whoever has no gamepad.
 int play_unpacked_game(const android_app* app) {
@@ -144,6 +155,8 @@ int main(int, char**) {
     return kExitFailure;
   }
   try {
+    add_game_texts();
+    translations::use_language(phone_language(app));
     return play_unpacked_game(app);
   } catch (const std::exception& error) {
     log::error(error.what());

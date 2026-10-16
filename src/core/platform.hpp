@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <string>
+#include <string_view>
 
 #include "core/log.hpp"
 
@@ -37,6 +38,13 @@ void set_user_data_dir(const std::filesystem::path& folder);
 std::string environment(const std::string& name);
 // Sets an environment variable of this process. With `overwrite` false an existing value stays.
 void set_environment(const std::string& name, const std::string& value, bool overwrite);
+
+// The language this user reads, as the system says ("pt" for Brazilian Portuguese): Windows' own
+// setting, elsewhere the locale's environment variables (LC_ALL, LC_MESSAGES, LANG). Empty when
+// the system names none.
+std::string system_language();
+// The language of a locale's name: "pt_BR.UTF-8" and "pt-BR" are "pt"; "C" and "POSIX" name none.
+std::string language_of_locale(std::string_view locale);
 
 // A text (a path, a name) as one word of a POSIX shell's command, whatever is in it.
 std::string posix_shell_word(const std::filesystem::path& text);

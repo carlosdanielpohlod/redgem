@@ -7,6 +7,7 @@
 #include "app/user_settings.hpp"
 #include "core/log.hpp"
 #include "core/platform.hpp"
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/ui/style.hpp"
 
@@ -44,11 +45,11 @@ void choose_gpu(UserSettings settings, GpuChoice choice) {
 void EditorApp::draw_menu_bar() {
   if (!ImGui::BeginMainMenuBar()) return;
   ImGui::TextColored(ui::accent_color(), ICON_FA_GEM);
-  ui::menu("File", [this] { draw_file_menu(); });
-  ui::menu("Edit", [this] { draw_edit_menu(); });
-  ui::menu("View", [this] { draw_view_menu(); });
-  ui::menu("GameObject", [this] { draw_game_object_menu(); }, editing());
-  ui::menu("Help", [this] { draw_help_menu(); });
+  ui::menu(tr("editor.menu.file"), [this] { draw_file_menu(); });
+  ui::menu(tr("editor.menu.edit"), [this] { draw_edit_menu(); });
+  ui::menu(tr("editor.menu.view"), [this] { draw_view_menu(); });
+  ui::menu(tr("editor.menu.game_object"), [this] { draw_game_object_menu(); }, editing());
+  ui::menu(tr("editor.menu.help"), [this] { draw_help_menu(); });
   ImGui::EndMainMenuBar();
 }
 
