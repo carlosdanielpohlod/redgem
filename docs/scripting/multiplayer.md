@@ -234,5 +234,5 @@ the way holds up the ones after it. Nothing rewinds time to judge a shot where i
 target (lag compensation), so the shooter's machine should decide its own hits, as in "Deciding
 things once": fine for co-op and casual games, not for competitive shooters. Messages are not
 encrypted. Players are not authenticated
-unless the game hosting asks for it ([Online services](online-services.md)); a room on a relay
-lets everyone in.
+unless the game hosting asks for it ([Online services](online-services.md)), in a room on a relay
+too.

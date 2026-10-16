@@ -107,6 +107,7 @@ void NetworkSession::go_offline() {
   links_.clear();
   listener_.close();
   peers_.clear();
+  room_asking_.clear();
   state_ = State::Offline;
   id_ = 0;
   port_ = 0;

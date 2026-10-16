@@ -41,8 +41,6 @@ the same pull request.
   game hosted directly lets 4 of them be joining at once. Whoever runs the relay, the server or
   the game has to raise these (`--per-address`, `--rooms-per-address`,
   `Network.host(waiting_per_address:)`).
-- A room on a relay lets everyone in: connection approval (`Network.authenticate`) works with a
-  player hosting directly and on a dedicated server only.
 - A dedicated server's `Save` is one file rewritten whole on every change, and its arrays and
   hashes hold at most 4096 entries each: fine for a few thousand players, not for more.
 

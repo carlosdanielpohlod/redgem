@@ -124,6 +124,7 @@ redgem_add_library(redgem_net
   net/network_session_guest.cpp
   net/network_session_server.cpp
   net/network_session_approval.cpp
+  net/network_session_room_approval.cpp
   net/rooms/room_codes.cpp
   net/rooms/code_guessers.cpp
   net/rooms/lobby.cpp
@@ -132,6 +133,7 @@ redgem_add_library(redgem_net
   net/rooms/relay_server.cpp
   net/rooms/relay_server_visitors.cpp
   net/rooms/relay_server_rooms.cpp
+  net/rooms/relay_server_approval.cpp
   net/rooms/relay_program.cpp
   net/http/http_url.cpp
   net/http/http_address.cpp

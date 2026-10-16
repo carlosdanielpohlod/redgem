@@ -141,7 +141,11 @@ No service is built into the engine and none is required.
   game is deciding", "refused, and why"); no version field was needed. A client of 0.2.0 joins as
   before (it carries nothing); against a host that decides, it ignores "deciding", so it gives up
   after its own 5 seconds if the game takes longer, and a refusal reaches it as a plain failure.
-  A room on a relay lets everyone in: the relay decides nothing.
+  In a room on a relay the game of whoever opened it decides, and the relay decides nothing: the
+  opener tells it whether its game decides (a new kind of message), the relay holds the newcomer
+  with the id it would have and hands the opener what its hello carried, and passes the decision
+  back (two more). A relay of 0.2.0 ignores the opener's word and lets everyone in; an opener of
+  0.2.0 never says it decides.
 - **Saving on a server**: the data folder defaults to `<game>-data` beside the game's folder. One
   `save.json` per server, shared by its rooms, written atomically on the server's one thread.
   `Save` now keeps arrays, hashes and `Vector3` as well (the example above needs a hash);

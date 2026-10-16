@@ -68,7 +68,9 @@ Network.on_join { |peer| greet(Network.identity(peer), Network.player_name(peer)
   it off. The handler stays when a level is loaded.
 - What a join carries is at most 4 KB once written as JSON. It is untrusted: check it with the
   service that issued it.
-- It works with a player hosting too. A room on a relay lets everyone in: the relay decides nothing.
+- It works with a player hosting too, and in a room on a relay, where the game of whoever opened the
+  room decides: the relay decides nothing, it passes each join on and the decision back (a relay
+  older than 0.3.0 lets everyone in).
 
 ## Saving on a server
 

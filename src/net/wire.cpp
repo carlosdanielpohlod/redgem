@@ -102,6 +102,10 @@ bool acceptable_auth(const nlohmann::json& auth) {
          auth.dump(kCompact, ' ', false, nlohmann::json::error_handler_t::replace).size() <= kMaxAuthBytes;
 }
 
+nlohmann::json refusal(const std::string& reason) {
+  return {{kKind, kRefused}, {kReason, reason.substr(0, kMaxReasonBytes)}};
+}
+
 bool is_game_message(const nlohmann::json& message) {
   return message[kKind] == kGameMessage && message.contains(kName);
 }

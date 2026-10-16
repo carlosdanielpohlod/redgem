@@ -33,6 +33,9 @@ inline constexpr int kDefaultRoomsPerAddress = 8;
 // How long a relay that could not take a newcomer (the system had no connection left to give)
 // leaves the ones waiting alone before it tries again.
 inline constexpr float kAcceptRestSeconds = 0.25f;
+// How long a newcomer may wait for the game of a room it asked into to decide on it: the game's
+// own time to decide, and a little more for its refusal to come through first.
+inline constexpr float kRelayApprovalSeconds = kApprovalSeconds + 2.0f;
 
 // What one address may hold on a relay: machines connected, and rooms open (redgem-relay's
 // --per-address and --rooms-per-address).
@@ -49,6 +52,9 @@ struct RelayLimits {
 // (net/rooms/relay_program.hpp).
 // It faces the internet, so it trusts nobody: what one address may open, try and pile up is
 // limited, silent machines are let go, and a room ends with whoever opened it.
+// When the game of a room decides who comes in (Network.authenticate), the relay decides
+// nothing: it passes what a newcomer's join carries to the room's opener, and the opener's
+// decision back (relay_server_approval.cpp).
 class RelayServer {
  public:
   RelayServer() = default;
@@ -78,8 +84,18 @@ class RelayServer {
     int peer = 0;
     ByteAllowance allowance{kRelayBytesPerSecond, kRelayBurstBytes};
     bool farewelled = false;  // the others in its room were told it is gone
+    bool guarded = false;     // it opened its room, whose game decides who comes in
+    int asking_as = 0;        // the id it would have, while the game of its room decides on it
+    float asking_for = 0.0f;
 
     bool in_room() const { return peer != 0; }
+    bool asking() const { return asking_as != 0; }
+    // The id it holds in its room: its own, or the one it would have.
+    int seat() const { return in_room() ? peer : asking_as; }
+    // Still there, holding a place in room `code` (in it, or waiting to be let in).
+    bool holds_seat_in(const std::string& code) const { return seat() != 0 && !connection.closed() && room == code; }
+    // Waiting in room `code` for its game to decide on it as `id`.
+    bool asks_as(const std::string& code, int id) const { return asking() && asking_as == id && holds_seat_in(code); }
     bool connected_from(const std::string& address) const {
       return !connection.closed() && connection.address() == address;
     }
@@ -96,6 +112,9 @@ class RelayServer {
   int rooms_opened_by(const std::string& address) const;
   // One member's turn in a poll: what arrived is read and handled, what waits is sent.
   void serve(Member& member, float seconds);
+  // What time passing does to a member not in a room yet: given up on when it keeps quiet, or
+  // when its room's game does not decide on it.
+  void wait_on(Member& member, float seconds);
   // Takes what arrived out of what the member may send; over it, the member is let go.
   void charge(Member& member, std::size_t bytes);
   // Lets go of the newest machines with much waiting, while the relay holds more than it may.
@@ -103,17 +122,34 @@ class RelayServer {
   void handle(Member& member, const nlohmann::json& message);
   void act_on(Member& member, const nlohmann::json& message);
   void hear_newcomer(Member& member, const nlohmann::json& message);
-  void enter_room(Member& member, const std::string& wanted);
+  void enter_room(Member& member, const std::string& wanted, const nlohmann::json& auth);
   void open_room(Member& member);
   void note_wrong_code(Member& member);
-  void join_room(Member& member, const std::string& room);
+  void join_room(Member& member, const std::string& room, const nlohmann::json& auth);
+  // Whether a room can take a newcomer: it has a place left (`free_id`), and is not ending (its
+  // opener just left: the room closes at the end of this poll).
+  static bool takes_newcomers(int free_id, const Member* opener);
+  void let_in(Member& member, int id);
+  // Connection approval (relay_server_approval.cpp).
+  void ask(Member& member, Member& opener, int id, const nlohmann::json& auth);
+  void hear_opener(Member& opener, const nlohmann::json& message);
+  void settle(const std::string& room, const nlohmann::json& verdict);
+  static void refuse(Member& member, const std::string& reason);
+  static void await_verdict(Member& member, float seconds);
+  Member* asking_member(const std::string& room, int id);
+  Member* opener_of(const std::string& room);
+  // The ids of a room's members and of the newcomers its game is deciding on.
+  std::vector<int> seats_taken(const std::string& room) const;
   void pass_on(Member& sender, const nlohmann::json& message);
   void drop_closed_members();
   void close_rooms_without_opener();
+  // Lets go of everyone holding a place in a room whose opener left.
+  void empty_room(const std::string& room);
   static bool has_opener(const std::vector<Member*>& inside);
   // Tells each room which of its members just went; true when some room was told.
   bool tell_rooms_who_left();
-  // Whether a member that left was a guest of a room that is still open: someone is there to tell.
+  // Whether a member that left held a guest's place in a room that is still open: someone is
+  // there to tell.
   bool missed_by_a_room(const Member& member) const;
   void tell_room(const std::string& room, int except, const nlohmann::json& message);
   std::vector<Member*> members_of(const std::string& room);
