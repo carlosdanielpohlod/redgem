@@ -15,9 +15,8 @@ std::size_t announced_length(const std::vector<std::uint8_t>& bytes, std::size_t
   return length;
 }
 
-}  // namespace
-
-std::vector<std::uint8_t> frame(const std::string& message) {
+template <typename Bytes>
+std::vector<std::uint8_t> framed(const Bytes& message) {
   std::vector<std::uint8_t> out;
   out.reserve(kLengthBytes + message.size());
   const auto length = static_cast<std::uint32_t>(message.size());
@@ -28,6 +27,11 @@ std::vector<std::uint8_t> frame(const std::string& message) {
   out.insert(out.end(), message.begin(), message.end());
   return out;
 }
+
+}  // namespace
+
+std::vector<std::uint8_t> frame(const std::string& message) { return framed(message); }
+std::vector<std::uint8_t> frame(const std::vector<std::uint8_t>& message) { return framed(message); }
 
 void FrameBuffer::compact() {
   bytes_.erase(bytes_.begin(), bytes_.begin() + static_cast<std::ptrdiff_t>(taken_));

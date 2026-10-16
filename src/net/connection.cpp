@@ -55,17 +55,20 @@ std::optional<nlohmann::json> Connection::next_message() {
     return std::nullopt;
   }
   ++taken_this_poll_;
-  nlohmann::json message = nlohmann::json::parse(*text, nullptr, false);
-  if (wire::well_formed(message)) return message;
+  auto message = wire::unpacked(*text);
+  if (message && wire::well_formed(*message)) return message;
   close();  // not one of ours
   return std::nullopt;
 }
 
 void Connection::send(const nlohmann::json& message) {
-  if (hung_up()) return;
   // (Text that is not valid UTF-8 travels with the broken parts replaced, instead of not at all.)
-  const std::vector<std::uint8_t> bytes = wire::packed(message);
-  outgoing_.insert(outgoing_.end(), bytes.begin(), bytes.end());
+  if (!hung_up()) send_packed(wire::packed(message));
+}
+
+void Connection::send_packed(const std::vector<std::uint8_t>& message) {
+  if (hung_up()) return;
+  outgoing_.insert(outgoing_.end(), message.begin(), message.end());
   since_said_ = 0.0f;
   if (outgoing_.size() > pending_limit_) {
     close();  // it stopped listening: messages are not piled up for it forever

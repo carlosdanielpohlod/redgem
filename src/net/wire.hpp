@@ -9,7 +9,8 @@
 
 #include "net/frame_buffer.hpp"
 
-// What machines in a game say to each other, and to a relay: JSON objects, one per frame.
+// What machines in a game say to each other, and to a relay or a dedicated server: maps, one per
+// frame, in MessagePack (see wire_codec.hpp).
 namespace redgem::net {
 
 // Who a message is for, besides one peer's id.
@@ -94,7 +95,11 @@ inline constexpr const char* kVerdict = "v";  // opener to relay: newcomer kTo i
 // handed out again once free, so they never outgrow what a message may carry.
 int free_peer_id(const std::vector<int>& taken);
 
+// A message a game sent (to kEveryone unless said).
 nlohmann::json game_message(const std::string& name, const nlohmann::json& data, int from, int to);
+// A message from a machine in the game as it is passed on to the others: from whom the host (or
+// relay) knows it is, whatever it claims, and to whom it says.
+nlohmann::json passed_on(const nlohmann::json& message, int from);
 // Whether what arrived is a message of ours, every field of the kind it should be (a list of
 // peers: ids there can be, each once, and fewer than a full game). Anything else comes from a
 // broken or hostile program, and nothing of it is used.
@@ -109,9 +114,6 @@ bool is_game_message(const nlohmann::json& message);
 // Whether the id a welcome hands this machine can be its own: only the host is 1 (as is whoever
 // opened a room on a relay, who can be nothing else), and nobody is 0.
 bool own_id_believable(int given, bool through_relay, bool opening_room);
-// A message as the bytes that travel: framed, with text that is not valid UTF-8 replaced instead
-// of refused.
-std::vector<std::uint8_t> packed(const nlohmann::json& message);
 
 }  // namespace wire
 

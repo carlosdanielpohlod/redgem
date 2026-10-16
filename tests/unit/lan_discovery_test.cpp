@@ -29,8 +29,14 @@ constexpr std::int64_t kWrapsToGamePort = kPastThirtyTwoBits + kGamePort;
 constexpr std::int64_t kWrapsToPlayers = kPastThirtyTwoBits + kPlayers;
 constexpr std::uint64_t kBeyondSigned = ~std::uint64_t{0};  // the largest number an answer can carry
 
+// What travels in a datagram: MessagePack.
+std::string as_bytes(const json& message) {
+  const std::vector<std::uint8_t> bytes = json::to_msgpack(message);
+  return {bytes.begin(), bytes.end()};
+}
+
 std::string answer(const json& name, const json& port, const json& players) {
-  return json{{"is", "redgem"}, {"name", name}, {"port", port}, {"players", players}}.dump();
+  return as_bytes({{"is", "redgem"}, {"name", name}, {"port", port}, {"players", players}});
 }
 
 NearbyGame game_at(const std::string& address, std::uint16_t port, const std::string& name = "Maze") {
@@ -65,7 +71,7 @@ TEST_CASE("what is not an address in numbers is not nearby") {
 }
 
 TEST_CASE("an answer to a search says a game's name, port and players") {
-  const auto game = game_from_answer(answer("Maze", kGamePort, kPlayers), kNeighbour);
+  const auto game = game_from_answer(search_answer("Maze", kGamePort, kPlayers), kNeighbour);
   REQUIRE(game.has_value());
   CHECK(game->address == kNeighbour);
   CHECK(game->port == kGamePort);
@@ -88,9 +94,15 @@ TEST_CASE("anything that is not a whole answer is no game") {
   CHECK_FALSE(game_from_answer("", kNeighbour).has_value());
   CHECK_FALSE(game_from_answer("redgem: who is hosting?", kNeighbour).has_value());
   CHECK_FALSE(game_from_answer("[1, 2]", kNeighbour).has_value());
-  CHECK_FALSE(game_from_answer(R"({"name": "Maze", "port": 7777, "players": 1})", kNeighbour).has_value());
+  CHECK_FALSE(game_from_answer(as_bytes(json::array({1, 2})), kNeighbour).has_value());
   CHECK_FALSE(
-      game_from_answer(R"({"is": "other", "name": "Maze", "port": 7777, "players": 1})", kNeighbour).has_value());
+      game_from_answer(as_bytes({{"name", "Maze"}, {"port", kGamePort}, {"players", 1}}), kNeighbour).has_value());
+  CHECK_FALSE(
+      game_from_answer(as_bytes({{"is", "other"}, {"name", "Maze"}, {"port", kGamePort}, {"players", 1}}), kNeighbour)
+          .has_value());
+  // An answer in JSON text, as versions before MessagePack sent it.
+  CHECK_FALSE(
+      game_from_answer(json::from_msgpack(search_answer("Maze", kGamePort, kPlayers)).dump(), kNeighbour).has_value());
   CHECK_FALSE(game_from_answer(answer(kPlayers, kGamePort, kPlayers), kNeighbour).has_value());
   CHECK_FALSE(game_from_answer(answer("Maze", "7777", kPlayers), kNeighbour).has_value());
   CHECK_FALSE(game_from_answer(answer("Maze", kGamePort, "many"), kNeighbour).has_value());

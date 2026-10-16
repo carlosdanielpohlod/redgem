@@ -118,6 +118,8 @@ redgem_add_library(redgem_net
   net/socket/socket_io.cpp
   net/socket/datagrams.cpp
   net/wire.cpp
+  net/wire_checks.cpp
+  net/wire_codec.cpp
   net/connection.cpp
   net/network_session.cpp
   net/network_session_host.cpp

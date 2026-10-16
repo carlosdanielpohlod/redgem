@@ -74,6 +74,7 @@ add_executable(redgem_tests
   unit/game_build_test.cpp
   unit/frame_buffer_test.cpp
   unit/wire_test.cpp
+  unit/wire_codec_test.cpp
   unit/http_url_test.cpp
   unit/http_message_test.cpp
   unit/http_response_parser_test.cpp

@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <cmath>
+#include <limits>
 #include <string>
 
 #include "net/wire.hpp"
@@ -26,13 +28,26 @@ json nested(int depth) {
 }  // namespace
 
 TEST_CASE("a game message carries its name, who sent it, who it is for and its data") {
-  const json message = wire::game_message("score", {{"points", kPoints}}, kGuest, kEveryone);
+  const json message = wire::game_message("score", {{"points", kPoints}}, kGuest, kOtherGuest);
   CHECK(message[wire::kKind] == wire::kGameMessage);
   CHECK(message[wire::kName] == "score");
   CHECK(message[wire::kFrom] == kGuest);
-  CHECK(message[wire::kTo] == kEveryone);
+  CHECK(message[wire::kTo] == kOtherGuest);
   CHECK(message[wire::kData]["points"] == kPoints);
   CHECK(wire::well_formed(message));
+  // One for everyone does not say so: that is what a message for nobody in particular is.
+  CHECK_FALSE(wire::game_message("score", nullptr, kGuest, kEveryone).contains(wire::kTo));
+}
+
+TEST_CASE("what is passed on is from whom the host knows it is, to whom it says, and nothing else") {
+  json message = wire::game_message("score", kPoints, kHostId, kOtherGuest);
+  message["extra"] = "ignored";
+  const json passed = wire::passed_on(message, kGuest);
+  CHECK(passed[wire::kFrom] == kGuest);
+  CHECK(passed[wire::kTo] == kOtherGuest);
+  CHECK(passed[wire::kName] == "score");
+  CHECK(passed[wire::kData] == kPoints);
+  CHECK_FALSE(passed.contains("extra"));
 }
 
 TEST_CASE("only an object that says its kind in a text is a message") {
@@ -117,6 +132,19 @@ TEST_CASE("a game's message is one of that kind with a name to hear it by") {
   CHECK_FALSE(wire::is_game_message({{wire::kKind, wire::kPing}, {wire::kName, "hit"}}));
 }
 
+TEST_CASE("a game's data is never bytes, nor a number that is not one") {
+  CHECK(acceptable_data(json{{"x", 1.5}, {"big", std::numeric_limits<std::uint64_t>::max()}}));
+  CHECK_FALSE(acceptable_data(json::binary({1, 2, 3})));
+  CHECK_FALSE(acceptable_data(json::array({json::binary({1})})));
+  for (const double odd : {std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
+                           std::numeric_limits<double>::quiet_NaN()}) {
+    CAPTURE(odd);
+    CHECK_FALSE(acceptable_data(json(odd)));
+    CHECK_FALSE(acceptable_data(json{{"deep", json::array({odd})}}));
+    CHECK_FALSE(wire::well_formed(wire::game_message("odd", odd, kGuest, kEveryone)));
+  }
+}
+
 TEST_CASE("a newcomer gets the lowest id nobody has, and none in a full game") {
   CHECK(wire::free_peer_id({}) == kFirstGuestId);
   CHECK(wire::free_peer_id({kFirstGuestId, kOtherGuest}) == kGuest);
@@ -141,17 +169,6 @@ TEST_CASE("a welcome cannot make a guest the host, or the opener of a room anyth
   CHECK(wire::own_id_believable(kHostId, through_relay, opening_room));
   CHECK_FALSE(wire::own_id_believable(kGuest, through_relay, opening_room));
   CHECK_FALSE(wire::own_id_believable(0, through_relay, opening_room));
-}
-
-TEST_CASE("a packed message is its JSON behind its length, with broken text replaced") {
-  const std::vector<std::uint8_t> bytes = wire::packed(json{{wire::kKind, wire::kPing}});
-  FrameBuffer buffer;
-  buffer.append(bytes.data(), bytes.size());
-  const auto text = buffer.next();
-  REQUIRE(text.has_value());
-  CHECK(json::parse(*text)[wire::kKind] == wire::kPing);
-  const std::string not_utf8 = "caf\xE9";
-  CHECK_NOTHROW(wire::packed(wire::game_message(not_utf8, json(), kGuest, kEveryone)));
 }
 
 TEST_CASE("what a hello carries for the game to decide on is nothing, or a small hash of message data") {

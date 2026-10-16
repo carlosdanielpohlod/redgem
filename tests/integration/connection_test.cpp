@@ -4,9 +4,11 @@
 #include <functional>
 #include <thread>
 
+#include "integration/wire_text.hpp"
 #include "net/connection.hpp"
 
 using namespace redgem::net;
+using redgem::test::wire_frame;
 
 namespace {
 
@@ -108,7 +110,7 @@ struct WithStranger {
 
 std::vector<std::uint8_t> many_tiny_messages(int count) {
   std::vector<std::uint8_t> bytes;
-  const std::vector<std::uint8_t> tiny = frame(kTinyMessage);
+  const std::vector<std::uint8_t> tiny = wire_frame(kTinyMessage);
   for (int i = 0; i < count; ++i) bytes.insert(bytes.end(), tiny.begin(), tiny.end());
   return bytes;
 }
@@ -137,7 +139,7 @@ TEST_CASE("a connection knows what it holds, and what a wait should watch it for
   CHECK(pair.taker.held() == 0);
   CHECK_FALSE(pair.taker.message_waiting());
   CHECK_FALSE(pair.taker.watched().sending);
-  const std::vector<std::uint8_t> tiny = frame(kTinyMessage);
+  const std::vector<std::uint8_t> tiny = wire_frame(kTinyMessage);
   pair.write(tiny);
   pair.take_in(tiny.size());
   CHECK(pair.taker.held() == tiny.size());
@@ -162,11 +164,11 @@ TEST_CASE("a call nobody answers is a closed connection") {
 }
 
 TEST_CASE("what is not a message of ours closes the connection") {
-  for (const std::string& bad : {std::string("this is not a message"), std::string(R"({"k":7})"),
-                                 std::string(R"({"k":"m","n":"x","t":"everyone"})")}) {
-    CAPTURE(bad);
+  // (A message as JSON text, as a version of the engine before MessagePack sent it, is not one either.)
+  for (const std::vector<std::uint8_t>& bytes :
+       {frame("this is not a message"), frame(kTinyMessage), wire_frame(R"({"k":7})"),
+        wire_frame(R"({"k":"m","n":"x","t":"everyone"})")}) {
     WithStranger pair;
-    const std::vector<std::uint8_t> bytes = frame(bad);
     pair.write(bytes);
     pair.take_in(bytes.size());
     CHECK_FALSE(pair.taker.next_message().has_value());
@@ -218,7 +220,7 @@ TEST_CASE("a machine that hangs up without reading what it was sent still has al
 
 TEST_CASE("half a message from a machine that hung up is nothing to wait for") {
   WithStranger pair;
-  std::vector<std::uint8_t> half = frame(kTinyMessage);
+  std::vector<std::uint8_t> half = wire_frame(kTinyMessage);
   half.pop_back();
   pair.write(half);
   pair.stranger.close();

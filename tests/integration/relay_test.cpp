@@ -12,12 +12,14 @@
 #endif
 
 #include "core/platform.hpp"
+#include "integration/wire_text.hpp"
 #include "net/discovery/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "net/rooms/relay_program.hpp"
 #include "net/rooms/relay_server.hpp"
 
 using namespace redgem::net;
+using redgem::test::wire_frame;
 
 namespace {
 
@@ -145,7 +147,7 @@ struct RawMachine {
     return bytes.empty();
   }
 
-  bool say(const std::string& text) { return send(frame(text)); }
+  bool say(const std::string& text) { return send(wire_frame(text)); }
 
   IoStatus listen() {
     std::vector<std::uint8_t> arrived;
@@ -162,7 +164,7 @@ struct RawMachine {
       text = heard.next();
       return text.has_value();
     }));
-    return nlohmann::json::parse(*text);
+    return redgem::test::message_in(*text);
   }
 
   // Opens a room and returns its code.
@@ -172,12 +174,21 @@ struct RawMachine {
   }
 };
 
-// What a stranger answers a search with: nonsense, half answers and answers from no game of
-// this engine, then one real answer.
-constexpr const char* kNotAnswers[] = {
-    "hello", R"({"is":"redgem"})", R"({"is":"redgem","name":7,"port":7777,"players":1})",
-    R"({"is":"redgem","name":"x","port":99999,"players":1})", R"({"is":"other","name":"x","port":7777,"players":1})"};
-constexpr const char* kRealAnswer = R"({"is":"redgem","name":"real","port":7777,"players":2})";
+// An answer to a search, written as JSON text, as the bytes that travel (MessagePack).
+std::string answer(const std::string& text) {
+  const std::vector<std::uint8_t> bytes = nlohmann::json::to_msgpack(nlohmann::json::parse(text));
+  return {bytes.begin(), bytes.end()};
+}
+
+// What a stranger answers a search with: nonsense, half answers, answers from no game of this
+// engine and an answer as JSON text (as versions before MessagePack sent it), then one real answer.
+const std::vector<std::string> kNotAnswers = {"hello",
+                                              answer(R"({"is":"redgem"})"),
+                                              answer(R"({"is":"redgem","name":7,"port":7777,"players":1})"),
+                                              answer(R"({"is":"redgem","name":"x","port":99999,"players":1})"),
+                                              answer(R"({"is":"other","name":"x","port":7777,"players":1})"),
+                                              R"({"is":"redgem","name":"x","port":7777,"players":1})"};
+const std::string kRealAnswer = answer(R"({"is":"redgem","name":"real","port":7777,"players":2})");
 
 // Answers every search that reached `listener` so far with all of the above. Every one, not just
 // the first: the first to arrive may be one a finder of the test before sent as it was closed (the
@@ -186,7 +197,7 @@ void answer_with_nonsense(Datagrams& listener) {
   std::string question, from;
   std::uint16_t from_port = 0;
   while (listener.receive(question, from, from_port)) {
-    for (const char* bad : kNotAnswers) listener.send_to(kLocalhost, from_port, bad);
+    for (const std::string& bad : kNotAnswers) listener.send_to(kLocalhost, from_port, bad);
     listener.send_to(kLocalhost, from_port, kRealAnswer);
   }
 }
@@ -227,7 +238,7 @@ TEST_CASE("a relay's wait ends when a machine it knows says something, or hangs 
   REQUIRE(meeting.until([&] { return meeting.relay.connection_count() == 1; }));
   // Connected and silent: only the time ends the wait.
   CHECK_FALSE(meeting.relay.wait(kShortWaitSeconds));
-  std::vector<std::uint8_t> words = frame(R"({"k":"h","r":"new"})");
+  std::vector<std::uint8_t> words = wire_frame(R"({"k":"h","r":"new"})");
   REQUIRE(machine.socket.write(words) == IoStatus::Ok);
   CHECK(meeting.relay.wait(kLongWaitSeconds));
   meeting.relay.poll(kRoundSeconds);
@@ -248,7 +259,7 @@ TEST_CASE("a relay with messages still to handle does not sleep on them") {
   CHECK(opener.next_message()["k"] == "j");
   // More messages at once than one poll handles: the rest wait inside the relay, not in a socket.
   std::vector<std::uint8_t> flood;
-  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x"})");
+  const std::vector<std::uint8_t> tiny = wire_frame(R"({"k":"m","n":"x"})");
   for (int i = 0; i < kFloodMessages; ++i) flood.insert(flood.end(), tiny.begin(), tiny.end());
   while (!flood.empty()) REQUIRE(flooder.socket.write(flood) != IoStatus::Closed);
   std::this_thread::sleep_for(kArrivalPause);
@@ -313,7 +324,7 @@ TEST_CASE("a flood of tiny messages through a relay is passed on a poll's worth 
   REQUIRE(flooder.say(R"({"k":"h","r":")" + code + R"("})"));
   CHECK(opener.next_message()["k"] == "j");
   std::vector<std::uint8_t> flood;
-  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x"})");
+  const std::vector<std::uint8_t> tiny = wire_frame(R"({"k":"m","n":"x"})");
   for (int i = 0; i < kFloodMessages; ++i) flood.insert(flood.end(), tiny.begin(), tiny.end());
   std::vector<std::uint8_t> unsent = flood;
   while (!unsent.empty()) REQUIRE(flooder.socket.write(unsent) != IoStatus::Closed);
@@ -441,7 +452,7 @@ TEST_CASE("a wrong code, a relay that is not there, and strangers get nowhere") 
   Socket silent = Socket::connect_to(kLocalhost, meeting.relay.port(), error);
   Socket rude = Socket::connect_to(kLocalhost, meeting.relay.port(), error);
   REQUIRE(meeting.until([&meeting] { return meeting.relay.connection_count() == 2; }));
-  std::vector<std::uint8_t> nonsense = frame(R"({"k":"m","n":"hit"})");  // a message before entering a room
+  std::vector<std::uint8_t> nonsense = wire_frame(R"({"k":"m","n":"hit"})");  // a message before entering a room
   REQUIRE(meeting.until([&] { return rude.write(nonsense) == IoStatus::Ok; }));
   REQUIRE(meeting.until([&meeting] { return meeting.relay.connection_count() == 1; }));
   meeting.relay.poll(kPastJoinTimeout);
@@ -454,8 +465,8 @@ TEST_CASE("a guest cannot pass for someone else in a room") {
   // What the session will not do, a raw connection can try: claim to be the host.
   std::string error;
   Socket liar = Socket::connect_to(kLocalhost, room.meeting.relay.port(), error);
-  std::vector<std::uint8_t> hello = frame(std::string(R"({"k":"h","r":")") + room.opener.room() + R"("})");
-  std::vector<std::uint8_t> lie = frame(R"({"k":"m","n":"order","f":1,"d":"obey"})");
+  std::vector<std::uint8_t> hello = wire_frame(std::string(R"({"k":"h","r":")") + room.opener.room() + R"("})");
+  std::vector<std::uint8_t> lie = wire_frame(R"({"k":"m","n":"order","f":1,"d":"obey"})");
   REQUIRE(room.meeting.until([&] { return liar.write(hello) == IoStatus::Ok; }));
   REQUIRE(room.meeting.until([&room] { return room.opener.peers().size() == 3; }));
   REQUIRE(room.meeting.until([&] { return liar.write(lie) == IoStatus::Ok; }));
@@ -602,14 +613,14 @@ TEST_CASE("a room whose opener goes silent is closed, and its guests are told th
   std::string error;
   // An opener that is not a real session: it opens the room and then freezes.
   Socket frozen = Socket::connect_to(kLocalhost, meeting.relay.port(), error);
-  std::vector<std::uint8_t> hello = frame(R"({"k":"h","r":"new"})");
+  std::vector<std::uint8_t> hello = wire_frame(R"({"k":"h","r":"new"})");
   REQUIRE(meeting.until([&] { return frozen.write(hello) == IoStatus::Ok; }));
   REQUIRE(meeting.until([&meeting] { return meeting.relay.room_count() == 1; }));
   std::vector<std::uint8_t> arrived;
   REQUIRE(meeting.until([&] { return frozen.read(arrived, kWelcomeBytes) == IoStatus::Ok; }));
   FrameBuffer reader;
   reader.append(arrived.data(), arrived.size());
-  const std::string code = nlohmann::json::parse(*reader.next())["r"];
+  const std::string code = redgem::test::message_in(*reader.next())["r"];
   REQUIRE(guest.join_room(kLocalhost, meeting.relay.port(), code, error));
   REQUIRE(meeting.until([&guest] { return guest.state() == NetworkSession::State::Online; }));
 
@@ -691,7 +702,7 @@ TEST_CASE("what a machine said before it hung up is passed on to its room, and t
   REQUIRE(talker.say(R"({"k":"h","r":")" + code + R"("})"));
   CHECK(opener.next_message()["k"] == "j");
   std::vector<std::uint8_t> last_words;
-  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x"})");
+  const std::vector<std::uint8_t> tiny = wire_frame(R"({"k":"m","n":"x"})");
   for (int i = 0; i < kFloodMessages; ++i) last_words.insert(last_words.end(), tiny.begin(), tiny.end());
   while (!last_words.empty()) REQUIRE(talker.socket.write(last_words) != IoStatus::Closed);
   talker.socket.close();

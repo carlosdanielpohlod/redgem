@@ -11,6 +11,7 @@
 #include "net/frame_buffer.hpp"
 #include "net/socket/socket.hpp"
 #include "net/wire.hpp"
+#include "net/wire_codec.hpp"
 
 namespace redgem::net {
 
@@ -45,6 +46,8 @@ class Connection {
   // Queues a message, sent right away when the connection takes it; what is left goes out with
   // the next pumps. With more than the limit waiting the other side stopped listening: closed.
   void send(const nlohmann::json& message);
+  // The same, for a message packed already (wire::packed): one that goes to many is packed once.
+  void send_packed(const std::vector<std::uint8_t>& message);
   // One try at sending what waits (pump does it too; this is for a last word before leaving).
   void flush();
 

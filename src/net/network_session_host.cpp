@@ -49,11 +49,10 @@ void NetworkSession::handle_as_host(Link& link, const nlohmann::json& message, s
   }
   if (!is_game_message(message)) return;
   link.idle_for = 0.0f;
-  const int to = message.value(kTo, kEveryone);
   // Who it is from is what the host knows, not what the message claims.
-  const nlohmann::json passed_on = game_message(message[kName], message.value(kData, nlohmann::json()), link.peer, to);
-  if (!pass_on(link.peer, to, passed_on)) return;
-  events.push_back(NetworkEvent::message(link.peer, passed_on[kName], passed_on[kData]));
+  const nlohmann::json passed = passed_on(message, link.peer);
+  if (!pass_on(link.peer, passed.value(kTo, kEveryone), passed)) return;
+  events.push_back(NetworkEvent::message(link.peer, passed[kName], passed[kData]));
 }
 
 void NetworkSession::hear_newcomer(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events) {
@@ -129,8 +128,9 @@ bool NetworkSession::send_as_host(const nlohmann::json& message, int to) {
 }
 
 void NetworkSession::queue_for_everyone_but(int peer, const nlohmann::json& message) {
+  const std::vector<std::uint8_t> bytes = packed(message);  // once, however many it goes to
   for (Link& link : links_) {
-    if (link.is_another_than(peer)) link.connection.send(message);
+    if (link.is_another_than(peer)) link.connection.send_packed(bytes);
   }
 }
 

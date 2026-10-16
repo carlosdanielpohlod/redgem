@@ -26,8 +26,8 @@ inline constexpr const char* kSearchQuestion = "redgem: who is hosting?";
 bool nearby_address(const std::string& address);
 // Whether what a host heard from the address `from` is a search it answers.
 bool search_to_answer(const std::string& message, const std::string& from);
-// What a host answers a search with: its game's name (as much of it as an answer holds), the
-// port to join it on and how many are playing.
+// What a host answers a search with (in MessagePack): its game's name (as much of it as an answer
+// holds), the port to join it on and how many are playing.
 std::string search_answer(const std::string& name, std::uint16_t game_port, int players);
 // The game an answer to a search describes, heard from the address `from`; nullopt for anything
 // that is not a whole answer (anything can arrive on a port) and for one from an address that is

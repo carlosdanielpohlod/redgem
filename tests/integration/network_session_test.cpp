@@ -4,9 +4,11 @@
 #include <functional>
 #include <thread>
 
+#include "integration/wire_text.hpp"
 #include "net/network_session.hpp"
 
 using namespace redgem::net;
+using redgem::test::wire_frame;
 
 namespace {
 
@@ -228,9 +230,24 @@ struct Stranger {
     REQUIRE(table.until([this] { return socket.connect_status() == IoStatus::Ok; }));
   }
 
-  void say(const std::string& text) {
-    std::vector<std::uint8_t> bytes = frame(text);
+  void say(const std::string& text) { say_bytes(wire_frame(text)); }
+
+  void say_bytes(std::vector<std::uint8_t> bytes) {
     REQUIRE(table.until([&] { return socket.write(bytes) == IoStatus::Ok; }));
+  }
+
+  // The next message the host sent it, waited for (null when none came).
+  nlohmann::json hear() {
+    FrameBuffer heard;
+    std::optional<std::string> bytes;
+    table.until([&] {
+      std::vector<std::uint8_t> arrived;
+      socket.read(arrived, kBigMessageBytes);
+      heard.append(arrived.data(), arrived.size());
+      bytes = heard.next();
+      return bytes.has_value();
+    });
+    return bytes ? redgem::test::message_in(*bytes) : nlohmann::json();
   }
 
   // Says hello as a real guest would, and waits to be let in.
@@ -263,7 +280,7 @@ struct LoneHost {
 TEST_CASE("whoever connects without saying hello is never in the game") {
   LoneHost lone;
   Stranger talker(lone.host, lone.table);
-  talker.say("this is not a message");
+  talker.say_bytes(frame("this is not a message"));
   CHECK(talker.hung_up_on());
   Stranger rude(lone.host, lone.table);
   rude.say(R"({"k":"m","n":"hit","d":1})");  // a message before the hello
@@ -310,7 +327,7 @@ TEST_CASE("a guest is not fooled by a host that hands out the host's own id") {
     if (!link.valid()) fake_host.accept(link);
     return link.valid();
   }));
-  std::vector<std::uint8_t> welcome = frame(R"({"k":"w","t":1,"p":[]})");
+  std::vector<std::uint8_t> welcome = wire_frame(R"({"k":"w","t":1,"p":[]})");
   REQUIRE(table.until([&] { return link.write(welcome) == IoStatus::Ok; }));
   REQUIRE(table.until([&table] { return table.count(0, NetworkEvent::Kind::Failed) == 1; }));
   CHECK(guest.state() == NetworkSession::State::Offline);
@@ -410,7 +427,7 @@ TEST_CASE("a flood of tiny messages from one machine is handled a poll's worth a
   Stranger flooder(lone.host, lone.table);
   flooder.get_in(lone.host);
   std::vector<std::uint8_t> flood;
-  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x"})");
+  const std::vector<std::uint8_t> tiny = wire_frame(R"({"k":"m","n":"x"})");
   for (int i = 0; i < kFloodMessages; ++i) flood.insert(flood.end(), tiny.begin(), tiny.end());
   REQUIRE(lone.table.until([&] { return flooder.socket.write(flood) == IoStatus::Ok && flood.empty(); }));
   std::this_thread::sleep_for(kArrivalPause);
@@ -430,7 +447,7 @@ TEST_CASE("what a guest said before it hung up is all heard, and only then is it
   Stranger talker(lone.host, lone.table);
   talker.get_in(lone.host);
   std::vector<std::uint8_t> last_words;
-  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x"})");
+  const std::vector<std::uint8_t> tiny = wire_frame(R"({"k":"m","n":"x"})");
   for (int i = 0; i < kFloodMessages; ++i) last_words.insert(last_words.end(), tiny.begin(), tiny.end());
   while (!last_words.empty()) REQUIRE(talker.socket.write(last_words) != IoStatus::Closed);
   talker.socket.close();
@@ -460,7 +477,7 @@ struct FakeHost {
   }
 
   void say(const std::string& text) {
-    std::vector<std::uint8_t> bytes = frame(text);
+    std::vector<std::uint8_t> bytes = wire_frame(text);
     REQUIRE(table.until([&] { return link.write(bytes) == IoStatus::Ok; }));
   }
 };
@@ -531,7 +548,7 @@ TEST_CASE("what a host said before it hung up is all heard, and only then is the
   FakeHost fake;
   fake.say(R"({"k":"w","t":2,"p":[1]})");
   std::vector<std::uint8_t> last_words;
-  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x","f":1})");
+  const std::vector<std::uint8_t> tiny = wire_frame(R"({"k":"m","n":"x","f":1})");
   for (int i = 0; i < kFloodMessages; ++i) last_words.insert(last_words.end(), tiny.begin(), tiny.end());
   while (!last_words.empty()) REQUIRE(fake.link.write(last_words) != IoStatus::Closed);
   fake.link.close();

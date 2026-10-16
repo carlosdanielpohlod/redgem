@@ -12,9 +12,10 @@ namespace redgem::net {
 inline constexpr std::size_t kMaxFrameBytes = 1024 * 1024;
 
 // Messages on a stream of bytes: each one travels as its length (4 bytes, big-endian) and then
-// its text. `frame` wraps a message for sending; a FrameBuffer cuts what arrives, in whatever
+// its bytes. `frame` wraps a message for sending; a FrameBuffer cuts what arrives, in whatever
 // pieces the network delivers it, back into messages.
 std::vector<std::uint8_t> frame(const std::string& message);
+std::vector<std::uint8_t> frame(const std::vector<std::uint8_t>& message);
 
 class FrameBuffer {
  public:
