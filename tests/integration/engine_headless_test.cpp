@@ -344,6 +344,32 @@ TEST_CASE("fixed_update is called only on behaviours that have one of their own"
   CHECK(std::stoi(ruby(*engine, "$mixed_in_calls")) >= kStartupFrames - 1);
 }
 
+TEST_CASE("a contact reaches its objects' behaviours, in the order they came, after others were destroyed") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, R"(
+    $heard = []
+    class Ear < Behaviour
+      def on_trigger_enter(other) = $heard << [prop(:label), other.name]
+    end
+    $doomed = 3.times.map { Scene.spawn('Bullet', physics: false).tap { |o| o.add_component(Ear, label: :doomed) } }
+    $a = Scene.spawn('Bullet', physics: false)
+    $a.add_component(Ear, label: :first)
+    $a.add_component(Ear, label: :second)
+    $b = Scene.spawn('Bullet', physics: false)
+  )");
+  frames(*engine, 1);
+  ruby(*engine, "$doomed.each(&:destroy)");  // the behaviours before $a's go
+  frames(*engine, 1);
+  ContactEvent touch;
+  touch.self = std::stoi(ruby(*engine, "$a.id"));
+  touch.other = std::stoi(ruby(*engine, "$b.id"));
+  touch.trigger = true;
+  touch.phase = ContactPhase::Enter;
+  engine->scripts().dispatch(touch);
+  CHECK(ruby(*engine, "$heard.inspect") == R"([[:first, "Bullet"], [:second, "Bullet"]])");
+}
+
 TEST_CASE("a kept GameObject stands for its own object only, even once its slot holds a new one") {
   auto engine = sandbox();
   frames(*engine, 1);

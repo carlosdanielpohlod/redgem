@@ -134,6 +134,23 @@ it (`core`; then `scene`, `net`, `input`, `audio`, `physics`, `storage`; then `r
 sees it).
 Each layer keeps its own numbers in a `<layer>_config.hpp` next to its code.
 
+### Objects, and keeping hold of one
+
+A scene object's `ObjectId` is a slot. The loaded scene's objects keep their slots (an id below
+the node count is that node); the slot of an object made while the game runs (`Scene::clone`,
+`Scene.spawn`) holds a new object once it is destroyed. Every object also gets an `ObjectSerial`
+no other object ever had, in any scene.
+
+- What keeps an object past the step it was handed it (a skin's bones, a vehicle's wheels, a
+  character's own clip, a behaviour, a Ruby `GameObject` or `Transform`) keeps an `ObjectHandle`
+  and asks `Scene::resolve` for it each time: that finds the object while it is alive, and
+  nothing afterwards, whoever sits in its slot.
+- Only a registry the engine updates in the very step an object is destroyed may key by bare id:
+  the physics bodies (`Engine::process_destroyed` removes them) and the scene's own hierarchy and
+  copies.
+- Destruction is two steps: `request_destroy` marks an object and what is under it, its
+  `on_destroy` runs with everything still there, then the batch is torn down children first.
+
 ## Libraries and programs
 
 The folders are built into a few static libraries, one on top of the other, and each program

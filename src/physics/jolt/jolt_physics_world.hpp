@@ -41,7 +41,7 @@ struct Record {
   JPH::BodyID body;
   JPH::Ref<JPH::CharacterVirtual> character;
   JPH::Ref<JPH::VehicleConstraint> vehicle;
-  std::vector<ObjectId> wheel_objects;  // same order as the vehicle's wheels
+  std::vector<ObjectHandle> wheel_objects;  // same order as the vehicle's wheels
   JPH::RefConst<JPH::Shape> shape;
   Transform pose;
   bool has_target = false;

@@ -13,20 +13,20 @@ ObjectId AnimationPlayer::character_of(const Scene& scene, ObjectId object) {
 
 ObjectId AnimationPlayer::owner_of(const Scene& scene, ObjectId object) const {
   const ObjectId root = scene.at(object).copy_root;
-  if (root != kNoObject) return owned_.count(root) != 0 ? root : kNoObject;
+  if (root != kNoObject) return owned_.count(scene.handle(root)) != 0 ? root : kNoObject;
   for (ObjectId walk = object; walk != kNoObject; walk = scene.at(walk).parent) {
-    if (owned_.count(walk) != 0) return walk;
+    if (owned_.count(scene.handle(walk)) != 0) return walk;
   }
   return kNoObject;
 }
 
 AnimationPlayer::Own* AnimationPlayer::own_of(const Scene& scene, ObjectId object) {
-  const auto found = owned_.find(character_of(scene, object));
+  const auto found = owned_.find(scene.handle(character_of(scene, object)));
   return found == owned_.end() ? nullptr : &found->second;
 }
 
 const AnimationPlayer::Own* AnimationPlayer::own_of(const Scene& scene, ObjectId object) const {
-  const auto found = owned_.find(character_of(scene, object));
+  const auto found = owned_.find(scene.handle(character_of(scene, object)));
   return found == owned_.end() ? nullptr : &found->second;
 }
 
@@ -39,7 +39,7 @@ const AnimationPlayer::Track* AnimationPlayer::track_on(const Scene& scene, Obje
 bool AnimationPlayer::play_on(const Scene& scene, ObjectId object, const std::string& name, const ClipStart& how) {
   const auto index = find(name);
   if (!index) return false;
-  Own& own = owned_[character_of(scene, object)];
+  Own& own = owned_[scene.handle(character_of(scene, object))];
   const bool already_on_it = own.to && own.to->clip == *index;
   if (already_on_it) {
     // Carry on (or start over), with no fade to itself.
@@ -71,7 +71,7 @@ bool AnimationPlayer::mix_on(const Scene& scene, ObjectId object, const std::str
                              float speed) {
   const auto index = find(name);
   if (!index) return false;
-  Own& own = owned_[character_of(scene, object)];
+  Own& own = owned_[scene.handle(character_of(scene, object))];
   // The same clip again only changes how it is mixed; another one starts from its beginning.
   const bool another = !own.layer || own.layer->clip != *index;
   Track layer = own.layer.value_or(Track{});

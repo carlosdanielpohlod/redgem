@@ -99,6 +99,7 @@ bool ScriptHost::stands_for(mrb_value wrapper, const GameObject& object) {
 
 void ScriptHost::reset_scene() {
   behaviours_.clear();
+  behaviours_by_object_.clear();
   start_objects_cache();
 }
 

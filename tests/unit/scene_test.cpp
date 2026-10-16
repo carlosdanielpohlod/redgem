@@ -13,6 +13,13 @@ namespace {
 
 constexpr int kMadeUpIndex = -7;  // what a broken file may hold
 
+// The objects a skin's bone handles stand for.
+std::vector<ObjectId> bone_ids(const Scene& scene, ObjectId skinned) {
+  std::vector<ObjectId> ids;
+  for (const ObjectHandle& bone : scene.at(skinned).joints) ids.push_back(scene.resolve(bone));
+  return ids;
+}
+
 SceneDesc family() {
   SceneDesc desc;
   NodeDesc parent;
@@ -108,14 +115,14 @@ TEST_CASE("a copied character is deformed by its own bones, not the template's")
   desc.skins = {skin};
 
   Scene scene = Scene::from_desc(desc);
-  CHECK(scene.at(2).joints == std::vector<ObjectId>{1, 3});
+  CHECK(bone_ids(scene, 2) == std::vector<ObjectId>{1, 3});
   const std::vector<ObjectId> copies = scene.clone(0);
   REQUIRE(copies.size() == 3);
   const ObjectId copied_bone = scene.at(copies[0]).children[0];
   const ObjectId copied_body = scene.at(copies[0]).children[1];
   CHECK(scene.at(copied_body).skin == 0);
-  CHECK(scene.at(copied_body).joints == std::vector<ObjectId>{copied_bone, 3});
-  CHECK(scene.at(2).joints == std::vector<ObjectId>{1, 3});  // the template is untouched
+  CHECK(bone_ids(scene, copied_body) == std::vector<ObjectId>{copied_bone, 3});
+  CHECK(bone_ids(scene, 2) == std::vector<ObjectId>{1, 3});  // the template is untouched
 }
 
 TEST_CASE("objects read their range of visible distances from props, and copies keep it") {

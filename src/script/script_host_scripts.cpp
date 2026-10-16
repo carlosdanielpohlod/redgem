@@ -104,7 +104,9 @@ mrb_value ScriptHost::instantiate(ObjectId object, RClass* klass, const std::str
   if (!instance.ok) return not_created(class_name + ".new on '" + object_name + "'", instance.error);
   const RubyResult attached = vm_.call(instance.value, "__attach", {object_value(object)});
   if (!attached.ok) return not_created(class_name + "#__attach", attached.error);
-  behaviours_.push_back({object, instance.value, class_name, false, true, overrides(klass, "fixed_update")});
+  behaviours_by_object_[object].push_back(behaviours_.size());
+  behaviours_.push_back(
+      {context_.scene->handle(object), instance.value, class_name, false, true, overrides(klass, "fixed_update")});
   return instance.value;
 }
 

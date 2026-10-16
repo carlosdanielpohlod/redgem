@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <set>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -74,7 +75,7 @@ class ScriptHost {
 
  private:
   struct BehaviourSlot {
-    ObjectId object = kNoObject;
+    ObjectHandle object;
     mrb_value instance = mrb_nil_value();
     std::string class_name;
     bool started = false;
@@ -121,6 +122,9 @@ class ScriptHost {
   void update_running(const char* entry, float dt, bool fixed);
   // Enabled, on an object that is still there.
   bool runnable(const BehaviourSlot& slot) const;
+  // A copy of where the object's behaviours are: callbacks may attach more while it is walked.
+  std::vector<std::size_t> behaviours_of(ObjectId object) const;
+  void index_behaviours();
   // Runnable and started: its callbacks are called.
   bool running(const BehaviourSlot& slot) const;
   void disable_failed(std::size_t index, const char* method, const std::string& error);
@@ -130,6 +134,9 @@ class ScriptHost {
   RubyVm vm_;
   mrb_value objects_cache_ = mrb_nil_value();
   std::vector<BehaviourSlot> behaviours_;
+  // Where each object's behaviours are in behaviours_, in the order they were attached: what a
+  // contact, on_destroy and detach look up instead of walking every behaviour of the scene.
+  std::unordered_map<ObjectId, std::vector<std::size_t>> behaviours_by_object_;
   std::set<std::string> loaded_scripts_;
   std::set<std::string> loading_scripts_;
   int error_count_ = 0;

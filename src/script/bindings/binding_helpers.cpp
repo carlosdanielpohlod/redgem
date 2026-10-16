@@ -59,25 +59,22 @@ bool is_triple(mrb_value value) { return mrb_array_p(value) && RARRAY_LEN(value)
 ScriptContext& context(mrb_state* mrb) { return script_host(mrb).context(); }
 Scene& scene(mrb_state* mrb) { return *context(mrb).scene; }
 
-GameObject* bound_object(mrb_state* mrb, mrb_value self) {
+ObjectHandle wrapped_handle(mrb_state* mrb, mrb_value self) {
   const mrb_value id = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kIdVariable));
   const mrb_value serial = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kSerialVariable));
   const bool bound = mrb_integer_p(id) && mrb_integer_p(serial);
   if (!bound) mrb_raise(mrb, E_TYPE_ERROR, "object is not bound to the scene");
-  Scene& objects = scene(mrb);
-  if (!is_index_of(mrb_integer(id), objects.size())) return nullptr;
-  GameObject& object = objects.at(static_cast<ObjectId>(mrb_integer(id)));
-  return object.serial == static_cast<ObjectSerial>(mrb_integer(serial)) ? &object : nullptr;
+  return {static_cast<ObjectId>(mrb_integer(id)), static_cast<ObjectSerial>(mrb_integer(serial))};
 }
 
 GameObject& alive_object(mrb_state* mrb, mrb_value self) {
-  GameObject* object = bound_object(mrb, self);
-  if (object == nullptr || object->destroyed) {
+  const ObjectId found = scene(mrb).resolve(wrapped_handle(mrb, self));
+  if (found == kNoObject) {
     const mrb_value name = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kNameVariable));
     const mrb_value id = mrb_iv_get(mrb, self, mrb_intern_cstr(mrb, kIdVariable));
     mrb_raisef(mrb, E_RUNTIME_ERROR, "game object %v (id %v) was destroyed", name, id);
   }
-  return *object;
+  return scene(mrb).at(found);
 }
 
 ObjectId alive_id(mrb_state* mrb, mrb_value self) { return alive_object(mrb, self).id; }

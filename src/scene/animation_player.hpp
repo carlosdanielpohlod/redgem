@@ -39,8 +39,6 @@ class AnimationPlayer {
   void reset(const std::vector<AnimationDesc>& clips, const Scene& scene);
   // Moves the playing clips on by dt seconds and poses the scene's objects.
   void advance(float dt, Scene& scene);
-  // Lets go of a destroyed character's own clip before its slot can hold another object.
-  void forget(ObjectId object) { owned_.erase(object); }
 
   std::vector<std::string> names() const;
   bool has(const std::string& name) const { return find(name).has_value(); }
@@ -126,8 +124,8 @@ class AnimationPlayer {
   void steady_base(const Scene& scene, ObjectId object, AnimationPath path, Transform& local);
 
   const std::vector<AnimationDesc>* clips_ = nullptr;
-  std::vector<ClipClock> clocks_;  // one for each of the scene's clips
-  std::map<ObjectId, Own> owned_;
+  std::vector<ClipClock> clocks_;            // one for each of the scene's clips
+  std::map<ObjectHandle, Own> owned_;        // by character: a new object in its slot is someone else
   std::vector<Transform> rest_;              // by object id, as the scene was loaded
   std::unordered_set<std::uint64_t> posed_;  // (object, path) pairs posed so far this frame
 };

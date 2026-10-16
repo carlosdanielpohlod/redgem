@@ -44,9 +44,9 @@ Part& required(mrb_state* mrb, Part* part, const char* unavailable) {
   return *part;
 }
 
-// The object a wrapper stands for, destroyed or not, while its slot still holds it; nullptr once
-// the slot holds another object (or the scene was switched). Raises for a value that is no wrapper.
-GameObject* bound_object(mrb_state* mrb, mrb_value self);
+// The handle a wrapper keeps (its @id and @serial); raises for a value that is no wrapper. Its
+// object is scene(mrb).resolve(handle): nothing once destroyed, or once the scene was switched.
+ObjectHandle wrapped_handle(mrb_state* mrb, mrb_value self);
 // Raises if the object behind `self` was destroyed.
 GameObject& alive_object(mrb_state* mrb, mrb_value self);
 // The id of the object behind `self`, which must not have been destroyed.

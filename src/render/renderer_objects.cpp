@@ -31,9 +31,10 @@ bool Renderer::Impl::pose_skeleton(const Scene& scene, const GameObject& object)
       std::min({object.joints.size(), skin.inverse_bind.size(), static_cast<std::size_t>(gpu_profile::kMaxSkinJoints)});
   bone_matrices.resize(count);
   for (std::size_t j = 0; j < count; ++j) {
-    if (!scene.is_alive(object.joints[j])) return false;
+    const ObjectId bone = scene.resolve(object.joints[j]);
+    if (bone == kNoObject) return false;
     bone_matrices[j] = MatrixMultiply(render_math::from_column_major(skin.inverse_bind[j]),
-                                      model_matrix(worlds[static_cast<std::size_t>(object.joints[j])]));
+                                      model_matrix(worlds[static_cast<std::size_t>(bone)]));
   }
   return count > 0;
 }

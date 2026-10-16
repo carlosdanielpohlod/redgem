@@ -75,7 +75,6 @@ void Engine::process_destroyed() {
     // Children first, so each parent is torn down with nothing left under it.
     for (auto id = pending.rbegin(); id != pending.rend(); ++id) {
       physics_->remove_object(*id);
-      animations_.forget(*id);
       scene_.finalize_destroy(*id);
     }
   }

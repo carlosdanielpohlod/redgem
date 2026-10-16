@@ -21,13 +21,6 @@ bool is_live_camera(const GameObject& object) { return !object.destroyed && obje
 // Marked for destruction and not destroyed yet.
 bool awaits_destruction(const GameObject& object) { return object.pending_destroy && !object.destroyed; }
 
-// Neither destroyed nor about to be.
-bool is_living(const GameObject& object) { return !object.destroyed && !object.pending_destroy; }
-
-bool uses_as_joint(const GameObject& object, ObjectId joint) {
-  return std::find(object.joints.begin(), object.joints.end(), joint) != object.joints.end();
-}
-
 void erase_id(std::vector<ObjectId>& ids, ObjectId id) {
   ids.erase(std::remove(ids.begin(), ids.end(), id), ids.end());
 }
@@ -41,6 +34,15 @@ ObjectSerial new_object_serial() {
 }
 
 bool Scene::is_alive(ObjectId id) const { return valid(id) && !objects_[id].destroyed; }
+
+ObjectHandle Scene::handle(ObjectId id) const {
+  return is_alive(id) ? ObjectHandle{id, objects_[id].serial} : kNoHandle;
+}
+
+ObjectId Scene::resolve(ObjectHandle handle) const {
+  const bool same_object = is_alive(handle.id) && objects_[handle.id].serial == handle.serial;
+  return same_object ? handle.id : kNoObject;
+}
 
 GameObject& Scene::at(ObjectId id) {
   if (!valid(id)) throw std::out_of_range("invalid object id " + std::to_string(id));
@@ -158,18 +160,10 @@ void Scene::leave_copies(const GameObject& object) {
 
 bool Scene::reusable(const GameObject& object) const {
   // (Children leave first: a parent still listing some is destroyed before them, which the engine
-  // never does, and its slot is kept so they do not end up under a stranger.)
+  // never does, and its slot is kept so they do not end up under a stranger. A skinned object
+  // using it as a bone holds a handle, which finds nothing once it is gone.)
   const bool made_while_running = static_cast<std::size_t>(object.id) >= loaded_count_;
-  return made_while_running && object.children.empty() && !is_bone_of_living_copy(object);
-}
-
-bool Scene::is_bone_of_living_copy(const GameObject& object) const {
-  const ObjectId root = object.copy_root;
-  const bool in_another_living_copy = valid(root) && root != object.id && is_living(objects_[root]);
-  if (!in_another_living_copy) return false;
-  return std::any_of(objects_.begin(), objects_.end(), [&object, root](const GameObject& other) {
-    return other.copy_root == root && is_living(other) && uses_as_joint(other, object.id);
-  });
+  return made_while_running && object.children.empty();
 }
 
 }  // namespace redgem

@@ -105,3 +105,46 @@ TEST_CASE("what is pending destruction comes parents first, whatever slots they 
   CHECK(pending.front() == reused.front());
   CHECK(pending.back() == reused.back());
 }
+
+TEST_CASE("a copy whose bone was destroyed no longer finds it, whatever takes its slot") {
+  SceneDesc desc;
+  NodeDesc walker;
+  walker.name = "Walker";
+  walker.children = {1, 2};
+  walker.props = {{"prefab", true}};
+  NodeDesc bone;
+  bone.name = "Bone";
+  bone.parent = 0;
+  NodeDesc body;
+  body.name = "Body";
+  body.parent = 0;
+  body.skin = 0;
+  desc.nodes = {walker, bone, body};
+  SkinDesc skin;
+  skin.joints = {1};
+  skin.inverse_bind.resize(1);
+  desc.skins = {skin};
+
+  Scene scene = Scene::from_desc(desc);
+  const std::vector<ObjectId> copy = scene.clone(0);  // walker, bone, body
+  REQUIRE(copy.size() == 3);
+  destroy_now(scene, copy[1]);                       // the bone alone
+  const ObjectId newcomer = scene.clone(0).front();  // in the bone's slot
+  REQUIRE(newcomer == copy[1]);
+  REQUIRE(scene.at(copy[2]).joints.size() == 1);
+  CHECK(scene.resolve(scene.at(copy[2]).joints.front()) == kNoObject);
+}
+
+TEST_CASE("a handle finds its object until it is destroyed, and never what takes its slot after") {
+  Scene scene = Scene::from_desc(spawnable());
+  const ObjectId copy = scene.clone(2).front();
+  const ObjectHandle kept = scene.handle(copy);
+  CHECK(scene.resolve(kept) == copy);
+  scene.request_destroy(copy);
+  CHECK(scene.resolve(kept) == copy);  // still there for its on_destroy
+  destroy_now(scene, copy);
+  CHECK(scene.resolve(kept) == kNoObject);
+  REQUIRE(scene.clone(2).front() == copy);
+  CHECK(scene.resolve(kept) == kNoObject);
+  CHECK(scene.handle(kNoObject) == kNoHandle);
+}

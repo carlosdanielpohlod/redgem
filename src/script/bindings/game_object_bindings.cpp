@@ -21,17 +21,15 @@ mrb_value property_value(mrb_state* mrb, const PropertyValue& value) {
 }
 
 // Still there, and not about to be destroyed.
-bool is_staying(const GameObject* object) {
-  return object != nullptr && !object->destroyed && !object->pending_destroy;
-}
+bool is_staying(const Scene& objects, ObjectId id) { return id != kNoObject && !objects.at(id).pending_destroy; }
 
 mrb_value game_object_alive(mrb_state* mrb, mrb_value self) {
-  return mrb_bool_value(is_staying(bound_object(mrb, self)));
+  return mrb_bool_value(is_staying(scene(mrb), scene(mrb).resolve(wrapped_handle(mrb, self))));
 }
 
-// Destroying what is already gone does nothing.
+// Destroying what is already gone does nothing (request_destroy ignores kNoObject).
 mrb_value game_object_destroy(mrb_state* mrb, mrb_value self) {
-  if (const GameObject* object = bound_object(mrb, self)) scene(mrb).request_destroy(object->id);
+  scene(mrb).request_destroy(scene(mrb).resolve(wrapped_handle(mrb, self)));
   return mrb_nil_value();
 }
 

@@ -32,7 +32,7 @@ WheelDesc describe_wheel(const Source& source, ObjectId child, const Transform& 
   // Wheels are modeled with their axle along X: width on X, radius in the Y/Z plane.
   const Vec3 half = hadamard(bounds_of(source, source.scene.at(child)).half_extents(), world.scale);
   WheelDesc wheel;
-  wheel.object = child;
+  wheel.object = source.scene.handle(child);
   wheel.center = rotate(conjugate(chassis.rotation), world.position - chassis.position);
   wheel.radius = std::max(half.y, half.z);
   wheel.width = half.x * kTwo;
@@ -72,12 +72,6 @@ BodyDesc describe_body(const Source& source, ObjectId id, BodyConfig config) {
   return desc;
 }
 
-// Whether a wheel the vehicle was built with is still there under it. (One destroyed on its own
-// left the chassis, and whatever took its slot since is not a wheel of this car.)
-bool is_wheel_of(const Scene& scene, ObjectId wheel, ObjectId chassis) {
-  return scene.is_alive(wheel) && scene.at(wheel).parent == chassis;
-}
-
 // Moves and turns an object to where physics has it, keeping its scale.
 void move_to(Scene& scene, ObjectId id, const Transform& pose) {
   Transform world = scene.world_transform(id);
@@ -96,7 +90,8 @@ void follow_body(Scene& scene, PhysicsWorld& physics, ObjectId id, const Transfo
   if (type != BodyType::Vehicle) return;
   // After the chassis moved, so wheels are expressed relative to its new pose.
   for (const WheelPose& wheel : physics.wheel_poses(id)) {
-    if (is_wheel_of(scene, wheel.object, id)) move_to(scene, wheel.object, wheel.world);
+    const ObjectId object = scene.resolve(wheel.object);  // a wheel destroyed on its own is gone
+    if (object != kNoObject) move_to(scene, object, wheel.world);
   }
 }
 

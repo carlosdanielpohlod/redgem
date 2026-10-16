@@ -30,7 +30,8 @@ void AnimationPlayer::advance(float dt, Scene& scene) {
   for (std::size_t i = 0; i < clocks_.size(); ++i) redgem::advance(clocks_[i], duration_of(i), dt);
   pose_followers(scene);
   for (auto entry = owned_.begin(); entry != owned_.end();) {
-    const bool done = !scene.is_alive(entry->first) || advance_own(entry->first, entry->second, dt, scene);
+    const ObjectId character = scene.resolve(entry->first);
+    const bool done = character == kNoObject || advance_own(character, entry->second, dt, scene);
     entry = done ? owned_.erase(entry) : std::next(entry);
   }
 }

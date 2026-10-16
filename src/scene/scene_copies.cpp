@@ -74,7 +74,7 @@ std::vector<ObjectId> Scene::clone(ObjectId source) {
 std::vector<ObjectId> Scene::with_copied_joints(const std::vector<CopyPair>& copies) {
   std::vector<ObjectId> created;
   for (const auto& [original, id] : copies) {
-    for (ObjectId& joint : objects_[id].joints) joint = copy_or_original(copies, joint);
+    for (ObjectHandle& joint : objects_[id].joints) joint = handle(copy_or_original(copies, joint.id));
     created.push_back(id);
   }
   return created;

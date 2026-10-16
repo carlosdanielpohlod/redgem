@@ -23,6 +23,22 @@ inline constexpr ObjectSerial kNoSerial = 0;
 // A serial no object had before.
 ObjectSerial new_object_serial();
 
+// How a part of the engine keeps an object it does not own, to find it again later (a bone, a
+// wheel, a character's own clip, a behaviour's object): Scene::resolve finds that object only,
+// and nothing once it is destroyed, even when its slot holds a new object by then.
+// The rule: what keeps an object past the step it was handed it keeps a handle. Only a registry
+// the engine itself updates in the step an object is destroyed may key by bare id (the physics
+// bodies, and the scene's own hierarchy and copies).
+struct ObjectHandle {
+  ObjectId id = kNoObject;
+  ObjectSerial serial = kNoSerial;
+
+  bool operator==(const ObjectHandle& other) const { return id == other.id && serial == other.serial; }
+  bool operator!=(const ObjectHandle& other) const { return !(*this == other); }
+  bool operator<(const ObjectHandle& other) const { return serial < other.serial; }  // serials never repeat
+};
+inline constexpr ObjectHandle kNoHandle{};
+
 struct GameObject {
   ObjectId id = kNoObject;
   ObjectSerial serial = kNoSerial;
@@ -35,7 +51,7 @@ struct GameObject {
   int skin = kNoIndex;  // skeleton deforming the mesh (index into the scene description's skins)
   // The objects acting as that skeleton's joints, in the skin's order. Copies made by clone()
   // point at their own copies of the bones.
-  std::vector<ObjectId> joints;
+  std::vector<ObjectHandle> joints;
   std::optional<CameraDesc> camera;
   std::optional<LightDesc> light;
   PropertyMap props;
@@ -72,6 +88,10 @@ class Scene {
 
   std::size_t size() const { return objects_.size(); }
   bool is_alive(ObjectId id) const;
+  // A handle to an alive object (kNoHandle for any other id), and the id of the object a handle
+  // was made for while it is still alive (kNoObject once it is destroyed).
+  ObjectHandle handle(ObjectId id) const;
+  ObjectId resolve(ObjectHandle handle) const;
   GameObject& at(ObjectId id);
   const GameObject& at(ObjectId id) const;
 
@@ -113,16 +133,16 @@ class Scene {
   bool valid(ObjectId id) const { return is_index_of(id, objects_.size()); }
   // A slot for a new copy: one a destroyed copy left, else a new one at the end.
   ObjectId free_slot();
+  // The handles of the bones of a node's skin, which must all be in the scene by then.
+  std::vector<ObjectHandle> joints_of(const NodeDesc& node, const SceneDesc& desc) const;
   // Puts the pending objects of `id`'s subtree in `out`, parents first.
   void append_pending(ObjectId id, std::vector<ObjectId>& out) const;
   // Whether a pending object's parent is pending too (so the parent lists it).
   bool parent_is_pending(const GameObject& object) const;
   void leave_parent(const GameObject& object);
   void leave_copies(const GameObject& object);
-  // Whether a destroyed object's slot may hold a new object: it was made while the game ran, and
-  // no living object of its copy still uses it as a bone.
+  // Whether a destroyed object's slot may hold a new object: one made while the game ran.
   bool reusable(const GameObject& object) const;
-  bool is_bone_of_living_copy(const GameObject& object) const;
 
   std::vector<GameObject> objects_;
   std::size_t loaded_count_ = 0;      // slots of the loaded scene's objects, never used again
