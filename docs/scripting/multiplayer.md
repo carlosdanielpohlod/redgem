@@ -184,6 +184,19 @@ add_component(NetworkSync, delay: 0.2)            # always this many seconds beh
 add_component(NetworkSync, interpolate: false)    # no delay: chases the newest place, less smoothly
 ```
 
+What the object's own animation does goes along with its place: play an attack on the owner's
+machine (`animation.play(:Attack, loop: false, fade: 0.1)`) and the others see the same clip,
+from the same moment of it, as far behind as they show the object, fading in as it does there.
+So do its speed, a pause, a clip mixed over it (`animation.mix`) and going back to the level's
+clips (`animation.follow_scene`). Only changes are sent, as part of the object's place, and the
+whole of it now and then, so a machine that joins in the middle of a fight sees it too. Clips are
+known by name: every machine needs the same ones, and a name is at most 64 bytes long. To leave a
+character's animation to each machine's own scripts:
+
+```ruby
+add_component(NetworkSync, animation: false)
+```
+
 For objects created while playing, `Network.spawn` makes the copy on every machine, including the
 ones that join later, and removes it when its owner leaves:
 
