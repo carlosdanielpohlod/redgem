@@ -5,6 +5,7 @@
 // redgem-server.
 
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -57,6 +58,17 @@ redgem::BuildTarget target_of(const redgem::CliOptions& options) {
   return named ? *named : redgem::host_build_target();
 }
 
+// What a build says it made, and what to do with it.
+void say_built(const redgem::CliOptions& options, redgem::BuildTarget target, const std::filesystem::path& executable) {
+  using namespace redgem;
+  // (An Android app is not run from here: it is installed on a phone.)
+  const char* said = target == BuildTarget::Android ? "project.cli.built_for_phone" : "project.cli.built";
+  std::cout << tr(said, {{"out_dir", options.build_dir.string()},
+                         {"target", build_target_name(target)},
+                         {"executable", executable.string()}})
+            << "\n";
+}
+
 int build(const redgem::CliOptions& options) {
   using namespace redgem;
   std::string error;
@@ -66,12 +78,7 @@ int build(const redgem::CliOptions& options) {
     log::error(error);
     return kExitFailure;
   }
-  // (An Android app is not run from here: it is installed on a phone.)
-  const char* said = target == BuildTarget::Android ? "project.cli.built_for_phone" : "project.cli.built";
-  std::cout << tr(said, {{"out_dir", options.build_dir.string()},
-                         {"target", build_target_name(target)},
-                         {"executable", executable->string()}})
-            << "\n";
+  say_built(options, target, *executable);
   return kExitSuccess;
 }
 

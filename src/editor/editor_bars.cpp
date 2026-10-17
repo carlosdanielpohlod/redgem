@@ -78,18 +78,23 @@ void EditorApp::draw_toolbar() {
   ImGui::End();
 }
 
+// Play while editing, Stop while the game runs.
+void EditorApp::draw_play_button(bool edit) {
+  if (edit) {
+    if (ui::icon_button(ICON_FA_PLAY, tr("editor.toolbar.play"))) play();
+    return;
+  }
+  ImGui::PushStyleColor(ImGuiCol_Text, ui::accent_color());
+  if (ui::icon_button(ICON_FA_STOP, tr("editor.toolbar.stop"), true)) stop();
+  ImGui::PopStyleColor();
+}
+
 // Center of the toolbar: Play / Stop and Pause.
 void EditorApp::draw_play_controls() {
   const bool edit = editing();
   const float group = icon_button_width() * kPlayControls + ImGui::GetStyle().ItemSpacing.x;
   ImGui::SameLine(editor_logic::centered_start(ImGui::GetWindowContentRegionMax().x, group));
-  if (edit) {
-    if (ui::icon_button(ICON_FA_PLAY, tr("editor.toolbar.play"))) play();
-  } else {
-    ImGui::PushStyleColor(ImGuiCol_Text, ui::accent_color());
-    if (ui::icon_button(ICON_FA_STOP, tr("editor.toolbar.stop"), true)) stop();
-    ImGui::PopStyleColor();
-  }
+  draw_play_button(edit);
   ImGui::SameLine();
   ImGui::BeginDisabled(edit);
   if (ui::icon_button(ICON_FA_PAUSE, tr("editor.toolbar.pause"), session_->play_state() == PlayState::Paused))
