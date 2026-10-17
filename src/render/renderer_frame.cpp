@@ -84,7 +84,7 @@ void Renderer::Impl::draw_lit_scene(const Camera3D& camera, const ParticleSystem
   EndMode3D();
   if (glow_gathered) add_gathered_glow();
   EndTextureMode();
-  if (sampled) resolve(scene_samples, hdr.id);
+  if (sampled) resolve_samples();
 }
 
 void Renderer::Impl::bind_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture) {

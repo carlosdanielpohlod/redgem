@@ -30,7 +30,7 @@ constexpr int kScreenFormat = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;   // what ends 
 // depth), attached to the framebuffer being set up.
 Texture2D load_depth_texture(unsigned int framebuffer, int width, int height) {
   Texture2D depth{};
-  depth.id = rlLoadTextureDepth(width, height, false);
+  depth.id = render_detail::depth_texture(width, height);  // (the format a picture of several samples has)
   depth.width = width;
   depth.height = height;
   depth.format = kDepthFormat24;
@@ -141,14 +141,22 @@ void Renderer::Impl::load_fixed_targets() {
   rlTextureParameters(panorama.texture.id, RL_TEXTURE_WRAP_T, RL_TEXTURE_WRAP_CLAMP);
 }
 
-void Renderer::Impl::ensure_targets(int width, int height, int samples) {
+void Renderer::Impl::ensure_targets(int width, int height, int asked) {
   if (!fits(hdr, width, height)) make_targets(width, height);
+  const int samples = samples_unusable ? 0 : asked;
   if (asked_before(scene_samples, width, height, samples)) return;
   render_detail::release(scene_samples);
   scene_samples = samples > 0 ? load_multisampled(width, height, samples) : Multisampled{0, 0, 0, width, height, 0};
   if (refused(scene_samples)) {
     log::warning("the graphics card cannot draw " + std::to_string(samples) + " samples a pixel: drawing one");
   }
+}
+
+void Renderer::Impl::resolve_samples() {
+  if (resolve(scene_samples, hdr.id)) return;
+  log::warning("the graphics card cannot copy the picture of several samples a pixel: drawing one");
+  samples_unusable = true;
+  render_detail::release(scene_samples);
 }
 
 void Renderer::Impl::make_targets(int width, int height) {

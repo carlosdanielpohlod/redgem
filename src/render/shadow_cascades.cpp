@@ -16,15 +16,39 @@ Cascade single_map(const CascadeCamera& camera, Vec3 to_sun) {
   return {fit_sun_view(camera.position, camera.target, to_sun), kShadowExtent, {0.0f, 0.0f}, 1.0f};
 }
 
-Cascade slice_cascade(const CascadeCamera& camera, Vec3 to_sun, int index, float from, float to, int count) {
-  const SliceSphere sphere = slice_sphere(camera, from, to);
+// One slice of the view: which cascade it is and how far along the view it goes, meters.
+struct Slice {
+  int index = 0;
+  float from = 0.0f;
+  float to = 0.0f;
+};
+
+Cascade slice_cascade(const CascadeCamera& camera, Vec3 to_sun, const Slice& slice, const Cascades& fitted) {
+  const SliceSphere sphere = slice_sphere(camera, slice.from, slice.to);
   const float extent = kTwo * sphere.radius;
   const Vector3 center = Vector3Add(camera.position, Vector3Scale(camera.forward, sphere.center));
-  const float texel = extent / static_cast<float>(cascade_texels(count));
-  const int column = index % kTilesAcross;
-  const int row = index / kTilesAcross;
+  const float texel = extent / static_cast<float>(cascade_texels(fitted.count));
+  const int column = slice.index % kTilesAcross;
+  const int row = slice.index / kTilesAcross;
   const Vector2 corner{static_cast<float>(column) * kTileSize, static_cast<float>(row) * kTileSize};
-  return {snapped_sun_view(center, to_sun, texel), extent, corner, kTileSize};
+  return {snapped_sun_view(center, to_sun, texel, fitted.sun_distance), extent, corner, kTileSize};
+}
+
+// Far enough back for the sun to see every caster over the whole shadowed view: its sphere holds
+// every slice's.
+float sun_distance_for(const CascadeCamera& camera, float distance) {
+  return std::max(kShadowSunDistance, slice_sphere(camera, camera.near, distance).radius + kCastersAbove);
+}
+
+// A cascade for each slice of the view, up to `distance` meters.
+void fit_slices(Cascades& fitted, const CascadeCamera& camera, Vec3 to_sun, float distance) {
+  const CascadeEnds ends = cascade_ends(fitted.count, camera.near, distance);
+  float from = camera.near;
+  for (int i = 0; i < fitted.count; ++i) {
+    const float to = ends[static_cast<std::size_t>(i)];
+    fitted.cascades[static_cast<std::size_t>(i)] = slice_cascade(camera, to_sun, {i, from, to}, fitted);
+    from = to;
+  }
 }
 
 }  // namespace
@@ -57,13 +81,8 @@ Cascades fit_cascades(const CascadeCamera& camera, Vec3 to_sun, int count, float
     fitted.cascades[0] = single_map(camera, to_sun);
     return fitted;
   }
-  const CascadeEnds ends = cascade_ends(fitted.count, camera.near, distance);
-  float from = camera.near;
-  for (int i = 0; i < fitted.count; ++i) {
-    const float to = ends[static_cast<std::size_t>(i)];
-    fitted.cascades[static_cast<std::size_t>(i)] = slice_cascade(camera, to_sun, i, from, to, fitted.count);
-    from = to;
-  }
+  fitted.sun_distance = sun_distance_for(camera, distance);
+  fit_slices(fitted, camera, to_sun, distance);
   return fitted;
 }
 

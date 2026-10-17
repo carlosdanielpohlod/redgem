@@ -53,7 +53,7 @@ void Renderer::Impl::load_pipeline() {
 }
 
 void Renderer::Impl::compile_shaders() {
-  depth_shader = compile_shader(shaders::kLitVertex, shaders::kDepthFragment, "shadow depth");
+  depth_shader = compile_shader(shaders::kLitVertex, shaders::depth_fragment().c_str(), "shadow depth");
   sky_shader = compile_shader(shaders::kSkyVertex, shaders::kSkyFragment, "sky");
   particle_shader = compile_shader(shaders::kParticleVertex, shaders::kParticleFragment, "particles");
   glow_limit_shader = compile_shader(nullptr, shaders::kGlowLimitFragment, "glow limit");

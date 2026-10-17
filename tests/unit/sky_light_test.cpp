@@ -96,6 +96,25 @@ TEST_CASE("a picture's sun is held down before it lights the scene, its color ke
   CHECK(held.y == doctest::Approx(kBrightestSkyLight * kHalf));
 }
 
+TEST_CASE("a picture far wider than tall keeps a row however much it is shrunk") {
+  constexpr std::uint32_t kLong = 4096;
+  constexpr std::uint32_t kShort = 7;
+  constexpr std::uint32_t kAsked = 8;  // would leave no row of seven
+  const FloatImage strip = shrunk(black_image(kLong, kShort), kAsked);
+  CHECK(strip.width == kLong / (kAsked / 2));
+  CHECK(strip.height == 1);
+  CHECK(shrunk(black_image(kLong, 1), kAsked).height == 1);
+}
+
+TEST_CASE("a sky picture of a single row, or of no pixels at all, still lights the scene") {
+  constexpr std::uint32_t kLong = 4096;
+  constexpr std::uint32_t kShort = 7;
+  for (const FloatImage& picture : {black_image(kLong, kShort), black_image(kLong, 1), FloatImage{}}) {
+    const SkyLight light = sky_light_of(picture);
+    CHECK_FALSE(light.reflections.empty());
+  }
+}
+
 TEST_CASE("the sky's cube map has every level of every face, the sharpest one the picture itself") {
   const FloatImage sky = two_halves(Vec3{2.0f, 2.0f, 2.0f}, Vec3::zero());
   const std::vector<FloatImage> pyramid = picture_pyramid(sky);

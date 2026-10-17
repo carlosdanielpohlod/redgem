@@ -11,6 +11,8 @@
 namespace redgem::render_detail {
 namespace {
 
+constexpr GLenum kDepthFormat = GL_DEPTH_COMPONENT24;  // of every depth the scene's pictures share
+
 unsigned int render_buffer(int width, int height, int samples, GLenum format) {
   unsigned int buffer = 0;
   glGenRenderbuffers(1, &buffer);
@@ -20,12 +22,18 @@ unsigned int render_buffer(int width, int height, int samples, GLenum format) {
   return buffer;
 }
 
+// Lets go of the errors earlier calls left, so that the next check is of a call's own.
+void forget_errors() {
+  while (glGetError() != GL_NO_ERROR) {
+  }
+}
+
 }  // namespace
 
 Multisampled load_multisampled(int width, int height, int samples) {
   Multisampled target{rlLoadFramebuffer(), 0, 0, width, height, samples};
   target.color = render_buffer(width, height, samples, GL_RGBA16F);
-  target.depth = render_buffer(width, height, samples, GL_DEPTH_COMPONENT24);
+  target.depth = render_buffer(width, height, samples, kDepthFormat);
   rlFramebufferAttach(target.framebuffer, target.color, RL_ATTACHMENT_COLOR_CHANNEL0, RL_ATTACHMENT_RENDERBUFFER, 0);
   rlFramebufferAttach(target.framebuffer, target.depth, RL_ATTACHMENT_DEPTH, RL_ATTACHMENT_RENDERBUFFER, 0);
   if (rlFramebufferComplete(target.framebuffer)) return target;
@@ -40,12 +48,27 @@ void release(Multisampled& target) {
   target = Multisampled{};
 }
 
-void resolve(const Multisampled& target, unsigned int framebuffer) {
+bool resolve(const Multisampled& target, unsigned int framebuffer) {
+  forget_errors();
   rlBindFramebuffer(RL_READ_FRAMEBUFFER, target.framebuffer);
   rlBindFramebuffer(RL_DRAW_FRAMEBUFFER, framebuffer);
   rlBlitFramebuffer(0, 0, target.width, target.height, 0, 0, target.width, target.height,
                     GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   rlDisableFramebuffer();
+  return glGetError() == GL_NO_ERROR;
+}
+
+unsigned int depth_texture(int width, int height) {
+  unsigned int texture = 0;
+  glGenTextures(1, &texture);
+  glBindTexture(GL_TEXTURE_2D, texture);
+  glTexImage2D(GL_TEXTURE_2D, 0, kDepthFormat, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  return texture;
 }
 
 void set_alpha_to_coverage(bool on) {

@@ -112,6 +112,15 @@ TEST_CASE("headers that are not of a Radiance picture this reads are refused") {
   CHECK(radiance_layout(good.data(), good.size()).has_value());
 }
 
+TEST_CASE("a header written with Windows line endings is read as any other") {
+  const Bytes crlf = text("#?RADIANCE\r\nFORMAT=32-bit_rle_rgbe\r\n\r\n-Y 2 +X 4\r\n");
+  const auto layout = radiance_layout(crlf.data(), crlf.size());
+  REQUIRE(layout.has_value());
+  CHECK(layout->width == kWide);
+  CHECK(layout->height == kHigh);
+  CHECK(layout->pixels_at == crlf.size());  // the pixels start after the size's whole line
+}
+
 TEST_CASE("pixels cut short or runs longer than their scanline are refused") {
   const Bytes pixel = {kFullMantissa, 0, 0, kOneExponent};
   Bytes cut = flat_picture(kWide, kHigh, pixel);

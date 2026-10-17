@@ -86,3 +86,14 @@ TEST_CASE("a cascade moves in whole texels: a camera moving less than one leaves
   const float across = Vector3DotProduct(Vector3Subtract(moved.view.target, still.view.target), right) / texel;
   CHECK(std::fabs(across - std::round(across)) < 0.01f);
 }
+
+TEST_CASE("shadows reaching far put the sun far enough back to see every caster of the farthest slice") {
+  constexpr float kFarthest = 2000.0f;  // meters: as far as an environment's shadows reach
+  const CascadeCamera camera = camera_at({0.0f, 2.0f, 0.0f}, {0.0f, 0.0f, -1.0f});
+  const Cascades near = fit_cascades(camera, kSlantedSun, kFour, kSliceTo);
+  CHECK(near.sun_distance == doctest::Approx(kShadowSunDistance));  // shadows close by keep it where it was
+  const Cascades far = fit_cascades(camera, kSlantedSun, kFour, kFarthest);
+  const Cascade& last = far.cascades[kFour - 1];
+  CHECK(far.sun_distance >= last.extent * kHalf + kCastersAbove);
+  CHECK(length(to_vec3(last.view.position) - to_vec3(last.view.target)) == doctest::Approx(far.sun_distance));
+}

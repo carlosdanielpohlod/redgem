@@ -27,7 +27,8 @@ float roughness_of(int level) {
 
 // The level of the pyramid as coarse as a sample that was this likely.
 const FloatImage& level_for(const std::vector<FloatImage>& pyramid, float likelihood) {
-  const float pixel = kSphere / static_cast<float>(pyramid[0].width * pyramid[0].height);
+  const std::size_t pixels = static_cast<std::size_t>(pyramid[0].width) * pyramid[0].height;
+  const float pixel = kSphere / static_cast<float>(std::max<std::size_t>(pixels, 1));
   const float sample = 1.0f / (static_cast<float>(kBlurSamples) * std::max(likelihood, kEpsilon));
   const float level = kHalf * std::log2(std::max(sample / pixel, 1.0f)) + kFinerLevel;
   const auto index = static_cast<std::size_t>(std::clamp(level, 0.0f, static_cast<float>(pyramid.size() - 1)));

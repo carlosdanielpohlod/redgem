@@ -34,8 +34,6 @@ std::uint32_t row(int y, std::uint32_t height) {
   return static_cast<std::uint32_t>(std::clamp(y, 0, static_cast<int>(height) - 1));
 }
 
-Vec3 mix(Vec3 a, Vec3 b, float t) { return a + (b - a) * t; }
-
 }  // namespace
 
 Vec3 picture_direction(PictureSpot spot) {

@@ -72,7 +72,7 @@ ChannelValue sample_channel(const AnimationChannel& channel, float time) {
 
 namespace {
 
-Vec3 mix(Vec3 from, Vec3 to, float weight) { return from + (to - from) * weight; }
+using redgem::mix;  // (points; rotations below)
 
 // The rotation `weight` of the way from one to the other, the short way round.
 Quat mix(Quat from, Quat to, float weight) {

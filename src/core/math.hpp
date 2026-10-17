@@ -48,6 +48,8 @@ inline Vec3 normalize(Vec3 v) {
   const float len = length(v);
   return len > kEpsilon ? v / len : Vec3::zero();
 }
+// The point `t` of the way from `a` to `b`: `a` at 0, `b` at 1.
+inline Vec3 mix(Vec3 a, Vec3 b, float t) { return a + (b - a) * t; }
 inline bool approx_equal(float a, float b, float tolerance) { return std::fabs(a - b) <= tolerance; }
 inline bool approx_equal(Vec3 a, Vec3 b, float tolerance) {
   return approx_equal(a.x, b.x, tolerance) && approx_equal(a.y, b.y, tolerance) && approx_equal(a.z, b.z, tolerance);

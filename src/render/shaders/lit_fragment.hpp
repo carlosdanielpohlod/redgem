@@ -3,10 +3,12 @@
 // The fragment shader every surface of a scene is lit by. It is one GLSL program, kept in parts
 // that share its uniforms and constants: this head (what it takes, how light meets a surface),
 // the sun's shadows (lit_shadows.hpp), the light from all around (lit_sky.hpp) and its main
-// (lit_main.hpp). lit_fragment() puts them together in that order.
+// (lit_main.hpp). lit_fragment() puts them together in that order, with copies fading by distance
+// (copy_fade.hpp) and which texels are drawn after the head.
 
 #include <string>
 
+#include "render/shaders/copy_fade.hpp"
 #include "render/shaders/lit_main.hpp"
 #include "render/shaders/lit_shadows.hpp"
 #include "render/shaders/lit_sky.hpp"
@@ -73,7 +75,6 @@ const float SWITCH_ON = 0.5;             // switches arrive as floats: on when a
 const float HALF = 0.5;                  // -1..1 becomes 0..1 when halved and moved up by a half
 const float NORMAL_MAP_RANGE = 2.0;      // a normal map stores -1..1 as 0..1
 const float SPECULAR_DIVISOR = 4.0;      // Cook-Torrance: D G F / (4 nv nl)
-const vec3 NOISE_WEIGHTS = vec3(0.06711056, 0.00583715, 52.9829189);  // interleaved gradient noise
 
 float distributionGGX(float nh, float a) {
   float a2 = a * a;
@@ -117,18 +118,10 @@ vec3 mappedNormal(vec3 n, vec3 position, vec2 uv) {
   return normalize(mat3(tangent * scale, bitangent * scale, n) * detail);
 }
 
-// A number 0..1 that changes from pixel to pixel without a pattern the eye picks up.
-float pixelNoise() { return fract(NOISE_WEIGHTS.z * fract(dot(gl_FragCoord.xy, NOISE_WEIGHTS.xy))); }
+)GLSL";
 
-// Whether a pixel of a copy that is fading out (or in) by distance is left out: a share of the
-// pixels that grows as it fades. A copy fading in leaves out exactly the pixels that one fading
-// out over the same distances keeps, so two levels of detail cross over without a gap.
-bool fadedAway(vec4 copy) {
-  if (min(copy.x, copy.y) >= 1.0) return false;  // (most copies: no noise worked out)
-  float noise = pixelNoise();
-  return noise >= copy.x || noise < 1.0 - copy.y;
-}
-
+// What of a surface's texels the lit shader draws (after copy_fade.hpp).
+inline constexpr const char* kLitAlpha = R"GLSL(
 // How opaque a cut-out pixel is when the picture's samples smooth its edge: the edge sharpened to
 // about a pixel wide.
 float coverage(float alpha) { return (alpha - alphaCutoff) / max(fwidth(alpha), EPSILON) + HALF; }
@@ -162,7 +155,7 @@ inline std::string lit_fragment(const LitFeatures& features = {}) {
   std::string switches;
   if (features.sky_picture) switches += kSkyPictureSwitch;
   if (features.soft_shadows) switches += kSoftShadowsSwitch;
-  std::string source = std::string(kLitHead) + kLitShadows + kLitSky + kLitMain;
+  std::string source = std::string(kLitHead) + kCopyFade + kLitAlpha + kLitShadows + kLitSky + kLitMain;
   const std::size_t version = source.find(kVersionLine);
   return source.insert(version + std::string(kVersionLine).size(), switches);
 }

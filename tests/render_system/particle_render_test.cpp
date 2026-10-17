@@ -100,6 +100,24 @@ TEST_CASE("a soft particle fades where it meets a wall; a hard one, and a soft o
   CHECK(redder_than_blue(middle_of(stage, desc, away, "particle_soft_away_from_wall")));
 }
 
+TEST_CASE("with several samples a pixel a soft particle fades where it meets a wall as with one") {
+  constexpr double kSamples = 4.0;
+  RenderStage stage;
+  SceneDesc desc = wall_scene(kBlue);
+  NodeDesc environment;
+  environment.name = "Environment";
+  environment.props["environment"] = true;
+  environment.props["msaa"] = kSamples;
+  desc.nodes.push_back(environment);
+  stage.upload(desc);
+  ParticleBurst fading = still_particle({0.0f, 0.0f, kWallFront + kJustInFront}, Vec3{1.0f, 0.0f, 0.0f});
+  fading.look.soft = kSoftOver;
+  ParticleSystem soft;
+  soft.burst(fading);
+  // (The wall's depth reaches the particles only when the samples' depth is copied out whole.)
+  CHECK_FALSE(redder_than_blue(middle_of(stage, desc, soft, "particle_soft_at_wall_msaa")));
+}
+
 TEST_CASE("a particle wearing a sprite sheet shows its cells one after the other over its life") {
   RenderStage stage;
   SceneDesc desc;

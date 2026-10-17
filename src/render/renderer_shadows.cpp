@@ -19,7 +19,6 @@ using render_math::Cascade;
 using render_math::Cascades;
 using render_math::kMaxShadowCascades;
 using render_math::kShadowMapSize;
-using render_math::kShadowSunDistance;
 using render_math::to_vec3;
 
 // The camera as the cascades see it.
@@ -31,9 +30,11 @@ render_math::CascadeCamera cascade_camera(const Camera3D& camera, float tan_half
 // The sun's view only needs the depth range that can hold casters and receivers; a tight range
 // keeps depth precise (and the shadow bias small).
 constexpr double kShadowNearPlane = 1.0;                                   // meters
-constexpr double kShadowFarPlane = kTwo * kShadowSunDistance;              // meters
 constexpr float kShadowTexel = 1.0f / static_cast<float>(kShadowMapSize);  // in texture coordinates
 constexpr int kFloatsPerTile = 4;                                          // its corner and its size, twice
+
+// Meters: as far past the cascades' middle as the sun is before it.
+double shadow_far_plane(const Cascades& cascades) { return kTwo * static_cast<double>(cascades.sun_distance); }
 
 // The sun's point of view: straight (no perspective) and wide enough for everything shadowed.
 Camera3D sun_camera(const Cascade& cascade) {
@@ -90,7 +91,7 @@ void Renderer::Impl::draw_sun_depth(const Camera3D& camera, Vec3 to_sun, const E
   send(depth_shader, depth_uniforms.view_position, camera.position);
   const double game_near = rlGetCullDistanceNear();
   const double game_far = rlGetCullDistanceFar();
-  rlSetClipPlanes(kShadowNearPlane, kShadowFarPlane);
+  rlSetClipPlanes(kShadowNearPlane, shadow_far_plane(cascades));
   draw_cascades(cascades, to_vec3(camera.position));
   rlSetClipPlanes(game_near, game_far);
   send_cascades(cascades, sun_size_of(env));
@@ -127,7 +128,7 @@ void Renderer::Impl::send_cascades(const Cascades& cascades, float sun_size) {
   SetShaderValueV(shader, lit_uniforms.shadow_scales, scales.data(), SHADER_UNIFORM_FLOAT, cascades.count);
   send(shader, lit_uniforms.shadow_cascades, cascades.count);
   send(shader, lit_uniforms.sun_size, sun_size);
-  send(shader, shaders::kShadowDepthRange, static_cast<float>(kShadowFarPlane - kShadowNearPlane));
+  send(shader, shaders::kShadowDepthRange, static_cast<float>(shadow_far_plane(cascades) - kShadowNearPlane));
 }
 
 }  // namespace redgem
