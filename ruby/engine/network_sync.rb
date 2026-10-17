@@ -96,13 +96,14 @@ class NetworkSync < Behaviour
   attr_writer :owner
 
   def owner = @owner ||= prop(:owner, Network::HOST).to_i
+  # Whether its own animation goes along: known from the first pose that arrives, started or not.
+  def animated? = prop(:animation, true)
   def key = @key ||= prop(:key, name).to_s
   # Offline, everything is this machine's to move.
   def mine? = !Network.online? || owner == Network.id
 
   def start
     Network.__track(self)
-    @animated = prop(:animation, true)
     @since_sent = 0.0
     watch_afresh
   end
@@ -138,7 +139,7 @@ class NetworkSync < Behaviour
     return if @since_sent < 1.0 / SENDS_PER_SECOND
 
     @since_sent = 0.0
-    Network.__pose(key, transform.position, transform.rotation, (game_object if @animated))
+    Network.__pose(key, transform.position, transform.rotation, (game_object if animated?))
   end
 
   # Where the owner says the object is, and what its animation does when that came along. Only the
@@ -148,7 +149,7 @@ class NetworkSync < Behaviour
 
     @position = Vector3[*position]
     @rotation = Vector3[*rotation]
-    animation = nil unless @animated
+    animation = nil unless animated?
     return take_animation(animation) unless @snapshots
 
     @snapshots.add(@position, @rotation, animation)

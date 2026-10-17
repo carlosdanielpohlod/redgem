@@ -822,3 +822,12 @@ TEST_CASE("a character whose owner never animated it keeps the clips a watcher's
   CHECK(clip_of(*guest) == "\"Guard\"");
   CHECK(clip_of(*host) == "nil");
 }
+
+TEST_CASE("an animation that arrives before its NetworkSync started is shown all the same") {
+  Lan lan;
+  Engine& machine = lan.add_machine();
+  // (Not interpolated, and not started yet: what arrives is done at once.)
+  ruby(machine, "$hero = Scene.find('Swordsman'); $sync = $hero.add_component(NetworkSync, interpolate: false)");
+  ruby(machine, "$sync.__receive([0, 0, 0], [0, 0, 0], 1, [0.0, 0.0, ['Attack', 0.25, 1.0, true, true], nil])");
+  CHECK(clip_of(machine) == "\"Attack\"");
+}
