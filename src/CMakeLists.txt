@@ -265,6 +265,7 @@ redgem_add_library(redgem_runtime
   script/bindings/scatter_bindings.cpp
   script/bindings/camera_bindings.cpp
   script/bindings/physics_bindings.cpp
+  script/bindings/light_bindings.cpp
   script/bindings/runtime_bindings.cpp
   script/bindings/ui_bindings.cpp
   script/bindings/audio_bindings.cpp

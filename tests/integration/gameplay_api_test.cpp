@@ -459,6 +459,34 @@ TEST_CASE("scripts let out bursts of particles, which fly for a while and are go
   CHECK(fails(*engine, "Particles.burst('here')"));
 }
 
+TEST_CASE("scripts change how bright a light shines and in what color, within what a light can be") {
+  constexpr float kWatts = 40.0f;
+  const TempSave temp;
+  SceneDesc scene = small_scene();
+  NodeDesc lamp;
+  lamp.name = "Lamp";
+  lamp.light = LightDesc{LightType::Point, Color{}, kWatts, 0.0f};
+  scene.nodes.push_back(lamp);
+  auto engine = engine_for(scene, temp.file);
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "Scene.find('Host').light.inspect") == "nil");
+  CHECK(ruby(*engine, "light = Scene.find('Lamp').light; [light.intensity, light.color].inspect") ==
+        "[40.0, [255, 255, 255]]");
+  ruby(*engine, "light = Scene.find('Lamp').light; light.intensity = 5; light.color = [255, 128, 0]");
+  const LightDesc& shining = *engine->scene().at(engine->scene().find("Lamp")).light;
+  CHECK(shining.intensity == doctest::Approx(5.0f));
+  CHECK(shining.color.g == doctest::Approx(0.2195f).epsilon(0.01));  // linear light: 128 shown is about a fifth
+  CHECK(shining.color.b == doctest::Approx(0.0f));
+  CHECK(ruby(*engine, "Scene.find('Lamp').light.color.inspect") == "[255, 128, 0]");
+  ruby(*engine, "Scene.find('Lamp').light.color = :orange");
+  CHECK(ruby(*engine, "Scene.find('Lamp').light.color.inspect") == "[255, 161, 0]");
+  for (const char* wrong : {"intensity = -1", "intensity = 0.0 / 0.0", "color = [256, 0, 0]", "color = :plaid"}) {
+    CAPTURE(wrong);
+    CHECK(fails(*engine, std::string("Scene.find('Lamp').light.") + wrong));
+  }
+  CHECK(shining.intensity == doctest::Approx(5.0f));
+}
+
 TEST_CASE("particles stay put while the game is paused") {
   const TempSave temp;
   const SceneDesc scene = small_scene();

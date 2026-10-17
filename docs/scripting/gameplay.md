@@ -298,6 +298,21 @@ end
 A white picture with see-through edges works best, since the color tints it:
 `Particles.burst(at, image: :smoke, color: :gray, alpha: 90, size: 1.2, life: 1.5, gravity: -0.05, spin: 40)`.
 
+## Light that flickers and fades
+
+An object with a light (a lamp, a fire's glow, made in Blender like any light) can change how
+bright it shines and in what color while the game runs:
+
+```ruby
+glow = Scene.spawn("FireLight", position: torch)
+every(0.05) { glow.light.intensity = 40 + rand * 25 }           # a flame's flicker
+tween(0.6) { |t| glow.light.intensity = 300 * (1 - t) }        # a blast that fades
+glow.light.color = [255, 120, 40]                               # or a name: :orange
+```
+
+`intensity` is in the units Blender gives the light (watts for a point or spot light, lux for the
+sun) and is at least 0; `color` is three channels from 0 to 255, as a color picker shows them.
+
 ## Control animations
 
 Every animation in a level plays in a loop from the start. `Animation` is for the ones that should

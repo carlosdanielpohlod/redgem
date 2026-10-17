@@ -15,6 +15,7 @@ void install_scene_bindings(mrb_state* mrb);
 void install_scatter_bindings(mrb_state* mrb);
 void install_camera_bindings(mrb_state* mrb);
 void install_physics_bindings(mrb_state* mrb);
+void install_light_bindings(mrb_state* mrb);
 void install_runtime_bindings(mrb_state* mrb);
 void install_ui_bindings(mrb_state* mrb);
 void install_audio_bindings(mrb_state* mrb);

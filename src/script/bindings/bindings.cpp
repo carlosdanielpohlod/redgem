@@ -15,6 +15,7 @@ void install_world_bindings(mrb_state* mrb) {
   install_scatter_bindings(mrb);
   install_camera_bindings(mrb);
   install_physics_bindings(mrb);
+  install_light_bindings(mrb);  // after GameObject's: it adds to that class
 }
 
 }  // namespace

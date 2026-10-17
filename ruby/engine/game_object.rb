@@ -29,6 +29,13 @@ class GameObject
     @vehicle ||= Vehicle.__new(@id, @serial)
   end
 
+  # The light it shines with (a lamp, a fire's glow), or nil when it has none.
+  def light
+    return nil unless __has_light?
+
+    @light ||= Light.__new(@id, @serial)
+  end
+
   def tag?(value) = tag == value.to_s
 
   def behaviours = @behaviours.dup
