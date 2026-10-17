@@ -65,6 +65,7 @@ bool Texts::add(std::string_view language, std::string_view json, std::string& e
 
 std::vector<std::string> Texts::languages() const {
   std::vector<std::string> names;
+  names.reserve(languages_.size());
   for (const auto& entry : languages_) names.push_back(entry.first);
   return names;
 }
