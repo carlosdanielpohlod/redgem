@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "core/log.hpp"
+#include "core/filled_texts.hpp"
 #include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/ui/panels.hpp"
@@ -16,8 +17,8 @@ namespace {
 constexpr const char* kCodeId = "##code";
 constexpr const char* kWindowIdPrefix = "###script:";  // ImGui: what follows ### is the window's identity
 
-// The dialog asking about a tab closed with unsaved changes: its title is also its id.
-const char* close_dialog_title() { return tr("editor.script.unsaved_title"); }
+// The dialog asking about a tab closed with unsaved changes: its title, then its id.
+const char* close_dialog_title() { return window_title("editor.script.unsaved_title", "###unsaved_script"); }
 
 void save(ScriptEditor& editor) {
   std::string error;
@@ -124,7 +125,8 @@ void draw_close_dialog(ScriptWorkspace& scripts, std::string& pending_close) {
   if (!ImGui::BeginPopupModal(close_dialog_title(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
   ImGui::TextColored(warning_color(), ICON_FA_TRIANGLE_EXCLAMATION);
   ImGui::SameLine();
-  ImGui::TextUnformatted(tr("editor.script.save_changes_question", {{"file", pending_close}}).c_str());
+  static FilledTexts question("editor.script.save_changes_question", "file");
+  ImGui::TextUnformatted(question.with(pending_close));
   ImGui::Spacing();
   if (draw_close_choices(scripts, pending_close)) {
     pending_close.clear();

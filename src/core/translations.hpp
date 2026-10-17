@@ -15,9 +15,16 @@ namespace redgem::translations {
 // Adds a translation file built into the program, named for its language ("en.json"). One that
 // is no translation file was built into the program broken: that is thrown.
 void add_file(std::string_view file_name, const EmbeddedFile& file);
-// Shows the texts in `language` ("pt") from now on, when there are some in it; else in English.
+// Adds every file of a folder of them built into the program (cmake/EmbedFolder.cmake's list of
+// {path, file}).
+template <typename Files>
+void add_files(const Files& files) {
+  for (const auto& file : files) add_file(file.path, file.file);
+}
+// Shows the texts in `language` ("pt_BR", "pt-BR", "PT") from now on: in that language, else in
+// that language without its region, else in another region of it, else in English.
 void use_language(std::string_view language);
-// The language the texts are shown in.
+// The language the texts are shown in, as a language_key (see core/language_names.hpp).
 const std::string& language();
 // The language the user asked for, whether or not the engine has texts in it: a game may have
 // some of its own (empty when the user and the system named none).

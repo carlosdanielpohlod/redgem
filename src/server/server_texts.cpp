@@ -5,8 +5,6 @@
 
 namespace redgem::server {
 
-void add_server_texts() {
-  for (const generated::FolderFile& file : generated::server_texts()) translations::add_file(file.path, file.file);
-}
+void add_server_texts() { translations::add_files(generated::server_texts()); }
 
 }  // namespace redgem::server

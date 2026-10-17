@@ -5,6 +5,7 @@
 #include <mruby/hash.h>
 #include <mruby/string.h>
 
+#include "core/language_names.hpp"
 #include "core/translations.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
@@ -16,12 +17,19 @@ namespace {
 
 using namespace binding;
 
-// The text of `key` in the scripts' language: the game's own (in that language, else in its
-// English), else the engine's (the labels of its menus, which a game's files may change), else the
-// key itself, so that a missing text shows.
+// The text of `key` in `language` (a language_key), the game's before the engine's (the labels of
+// its menus, which a game's files may change); nullptr when neither has it.
+const std::string* text_in(const ScriptHost& host, std::string_view language, const std::string& key) {
+  if (const std::string* text = host.locales().texts.find(language, key)) return text;
+  return translations::all().find(language, key);
+}
+
+// The text of `key` in the scripts' language, the game's or the engine's; else in English, the
+// game's or the engine's; else the key itself, so that a missing text shows. (A game's English
+// never hides the engine's translation into the player's language.)
 std::string text_of(const ScriptHost& host, const std::string& key) {
-  if (const std::string* text = host.locales().texts.find(host.locale(), key)) return *text;
-  if (const std::string* text = translations::all().find(host.locale(), key)) return *text;
+  if (const std::string* text = text_in(host, language_key(host.locale()), key)) return *text;
+  if (const std::string* text = text_in(host, kFallbackLanguage, key)) return *text;
   return key;
 }
 

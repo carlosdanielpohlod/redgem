@@ -8,6 +8,7 @@
 
 #include <string>
 
+#include "core/filled_texts.hpp"
 #include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
@@ -151,14 +152,14 @@ void EditorApp::draw_last_message() {
 
 // Right of the status bar: the selection, how big the scene is, the play state and the frame rate.
 void EditorApp::draw_scene_summary() {
+  static FilledTexts objects("editor.status.objects", "count");
+  static FilledTexts fps("editor.status.fps", "fps");
   const ObjectId selected = session_->selection();
-  const std::string objects =
-      tr("editor.status.objects", {{"count", std::to_string(session_->document().node_count())}});
-  const std::string fps = tr("editor.status.fps", {{"fps", std::to_string(GetFPS())}});
   char info[kTextBufferSize];
   ImFormatString(info, sizeof(info), "%s    %s %s    %s    %s",
                  selected != kNoObject ? session_->document().node(selected).name.c_str() : "", ICON_FA_CUBES,
-                 objects.c_str(), play_state_label(session_->play_state()), fps.c_str());
+                 objects.with(session_->document().node_count()), play_state_label(session_->play_state()),
+                 fps.with(GetFPS()));
   ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(info).x);
   ImGui::TextColored(ui::muted_color(), "%s", info);
 }

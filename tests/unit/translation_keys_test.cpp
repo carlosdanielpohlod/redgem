@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <regex>
 #include <set>
 #include <sstream>
@@ -36,13 +37,21 @@ std::string read_file(const fs::path& file) {
   return text.str();
 }
 
-// The keys of a translation file (it must be one).
-Keys keys_of(const fs::path& file) {
+// The keys of a translation file (it must be one), as it reads.
+Keys read_keys(const fs::path& file) {
   Texts texts;
   std::string error;
   REQUIRE_MESSAGE(texts.add("any", read_file(file), error), (file.string() + ": " + error));
   const std::vector<std::string> keys = texts.keys("any");
   return Keys(keys.begin(), keys.end());
+}
+
+// The same, each file read once however often it is asked about.
+const Keys& keys_of(const fs::path& file) {
+  static std::map<fs::path, Keys> read;
+  auto found = read.find(file);
+  if (found == read.end()) found = read.emplace(file, read_keys(file)).first;
+  return found->second;
 }
 
 // What `pattern` finds in the files of `folder` that end in `extension`.

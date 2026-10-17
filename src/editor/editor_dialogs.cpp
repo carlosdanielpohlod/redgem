@@ -7,6 +7,7 @@
 
 #include <string>
 
+#include "core/filled_texts.hpp"
 #include "core/log.hpp"
 #include "core/translations.hpp"
 #include "editor/editor_config.hpp"
@@ -21,10 +22,10 @@ using namespace editor_config;
 
 constexpr int kShortcutColumns = 2;  // keys, and what they do
 constexpr const char* kShortcutsTableId = "shortcuts";
-// The dialogs, by the keys of their titles (a title is its dialog's ImGui id too).
-constexpr const char* kUnsavedPopup = "editor.unsaved.title";
-constexpr const char* kExternalChangePopup = "editor.disk_change.title";
-constexpr const char* kShortcutsPopup = "editor.shortcuts.title";
+// The dialogs: their titles, then their ImGui ids (see ui::window_title), which no title shares.
+const char* unsaved_popup() { return ui::window_title("editor.unsaved.title", "###unsaved_changes"); }
+const char* external_change_popup() { return ui::window_title("editor.disk_change.title", "###scene_changed"); }
+const char* shortcuts_popup() { return ui::window_title("editor.shortcuts.title", "###shortcuts"); }
 
 // The keys of the texts of the shortcuts list.
 constexpr const char* kShortcuts[][kShortcutColumns] = {
@@ -65,17 +66,18 @@ void EditorApp::draw_dialogs() {
 }
 
 void EditorApp::draw_unsaved_dialog() {
-  if (unsaved_dialog_wanted()) ImGui::OpenPopup(tr(kUnsavedPopup));
-  if (!ImGui::BeginPopupModal(tr(kUnsavedPopup), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+  if (unsaved_dialog_wanted()) ImGui::OpenPopup(unsaved_popup());
+  if (!ImGui::BeginPopupModal(unsaved_popup(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
   ImGui::TextColored(ui::warning_color(), ICON_FA_TRIANGLE_EXCLAMATION);
   ImGui::SameLine();
-  ImGui::TextUnformatted(tr("editor.unsaved.question", {{"game", session_->game_dir().filename().string()}}).c_str());
+  static FilledTexts question("editor.unsaved.question", "game");
+  ImGui::TextUnformatted(question.with(session_->game_dir().filename().string()));
   ImGui::Spacing();
   draw_unsaved_choices();
   ImGui::EndPopup();
 }
 
-bool EditorApp::unsaved_dialog_wanted() const { return close_pending_ && !ImGui::IsPopupOpen(tr(kUnsavedPopup)); }
+bool EditorApp::unsaved_dialog_wanted() const { return close_pending_ && !ImGui::IsPopupOpen(unsaved_popup()); }
 
 void EditorApp::draw_unsaved_choices() {
   if (ImGui::Button(ui::save_label())) save_and_leave();
@@ -107,17 +109,17 @@ void EditorApp::cancel_leaving() {
 }
 
 void EditorApp::draw_external_change_dialog() {
-  if (external_change_dialog_wanted()) ImGui::OpenPopup(tr(kExternalChangePopup));
-  if (!ImGui::BeginPopupModal(tr(kExternalChangePopup), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
-  const std::string scene = session_->document().path().filename().string();
-  ImGui::TextUnformatted(tr("editor.disk_change.question", {{"scene", scene}}).c_str());
+  if (external_change_dialog_wanted()) ImGui::OpenPopup(external_change_popup());
+  if (!ImGui::BeginPopupModal(external_change_popup(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+  static FilledTexts question("editor.disk_change.question", "scene");
+  ImGui::TextUnformatted(question.with(session_->document().path().filename().string()));
   draw_external_change_choices();
   ImGui::EndPopup();
 }
 
 // The outside change is asked about once closing is not: one question at a time.
 bool EditorApp::external_change_dialog_wanted() const {
-  return session_->external_change_pending() && !close_pending_ && !ImGui::IsPopupOpen(tr(kExternalChangePopup));
+  return session_->external_change_pending() && !close_pending_ && !ImGui::IsPopupOpen(external_change_popup());
 }
 
 void EditorApp::draw_external_change_choices() {
@@ -134,10 +136,10 @@ void EditorApp::draw_external_change_choices() {
 
 void EditorApp::draw_shortcuts_dialog() {
   if (shortcuts_open_) {
-    ImGui::OpenPopup(tr(kShortcutsPopup));
+    ImGui::OpenPopup(shortcuts_popup());
     shortcuts_open_ = false;
   }
-  if (!ImGui::BeginPopupModal(tr(kShortcutsPopup), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+  if (!ImGui::BeginPopupModal(shortcuts_popup(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
   draw_shortcuts_table();
   if (ImGui::Button(tr("editor.shortcuts.close"))) ImGui::CloseCurrentPopup();
   ImGui::EndPopup();

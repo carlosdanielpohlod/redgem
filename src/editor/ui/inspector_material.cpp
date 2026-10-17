@@ -1,5 +1,6 @@
 // Inspector card of an object's mesh, with the materials it is drawn with.
 
+#include "core/filled_texts.hpp"
 #include "core/translations.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/inspector_logic.hpp"
@@ -20,14 +21,13 @@ constexpr const char* kEmissionId = "##emission";
 
 // The material's name (or its number) and how many objects show it.
 void draw_material_title(const SceneDocument& doc, int material) {
+  static FilledTexts numbered("editor.inspector.material.numbered", "number");
+  static FilledTexts shared("editor.inspector.material.shared", "count");
   const std::string& name = doc.material(material).name;
-  const std::string title =
-      name.empty() ? tr("editor.inspector.material.numbered", {{"number", std::to_string(material)}}) : name;
-  ImGui::SeparatorText(title.c_str());
+  ImGui::SeparatorText(name.empty() ? numbered.with(material) : name.c_str());
   const int users = doc.material_users(material);
   if (users <= 1) return;
-  const std::string shared = tr("editor.inspector.material.shared", {{"count", std::to_string(users)}});
-  ImGui::TextColored(muted_color(), ICON_FA_LINK "  %s", shared.c_str());
+  ImGui::TextColored(muted_color(), ICON_FA_LINK "  %s", shared.with(users));
 }
 
 bool draw_material_fields(MaterialDesc& edited) {

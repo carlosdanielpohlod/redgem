@@ -28,9 +28,13 @@ bool has_language_length(std::string_view name) {
   return !name.empty() && name.size() <= config::kMaxLanguageNameLength;
 }
 
+// A file's name without its extension, in UTF-8: a name the system's code page cannot spell
+// (Windows) is still a name, where path::string() would throw.
+std::string stem_of(const fs::path& file) { return file.stem().u8string(); }
+
 // Whether a file of the locales folder is named for a language: <language>.json.
 bool is_locale_file_name(const fs::path& file) {
-  return file.extension() == kLocaleExtension && is_language_name(file.stem().string());
+  return file.extension() == kLocaleExtension && is_language_name(stem_of(file));
 }
 
 // Whether a game has a locales folder of its own (not a link to one somewhere else, which
@@ -58,7 +62,7 @@ std::optional<std::string> add_file(const fs::directory_entry& entry, Texts& tex
   if (!bytes) return "it cannot be read, or is larger than " + std::to_string(config::kMaxLocaleFileBytes) + " bytes";
   std::string error;
   const std::string_view json(reinterpret_cast<const char*>(bytes->data()), bytes->size());
-  if (!texts.add(entry.path().stem().string(), json, error)) return error;
+  if (!texts.add(stem_of(entry.path()), json, error)) return error;
   return std::nullopt;
 }
 
@@ -74,9 +78,9 @@ GameLocales read_game_locales(const fs::path& game_dir) {
   std::error_code fs_error;
   for (const fs::directory_entry& entry : fs::directory_iterator(game_dir / config::kLocalesDirName, fs_error)) {
     if (const auto left_out = add_file(entry, locales.texts)) {
-      log::warning("left out " + printable(entry.path().string()) + ": " + printable(*left_out));
+      log::warning("left out " + printable(entry.path().u8string()) + ": " + printable(*left_out));
     } else {
-      locales.languages.push_back(entry.path().stem().string());
+      locales.languages.push_back(stem_of(entry.path()));
     }
   }
   std::sort(locales.languages.begin(), locales.languages.end());

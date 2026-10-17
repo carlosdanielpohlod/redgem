@@ -5,8 +5,6 @@
 
 namespace redgem {
 
-void add_project_texts() {
-  for (const generated::FolderFile& file : generated::project_texts()) translations::add_file(file.path, file.file);
-}
+void add_project_texts() { translations::add_files(generated::project_texts()); }
 
 }  // namespace redgem

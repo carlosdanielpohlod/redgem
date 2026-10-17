@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "core/filled_texts.hpp"
+#include "core/language_names.hpp"
 #include "core/platform.hpp"
 #include "core/texts.hpp"
 #include "core/translations.hpp"
@@ -41,15 +43,27 @@ TEST_CASE("a key is looked up in the language asked for") {
 
 TEST_CASE("a key a translation lacks is shown in English, and one nobody has is missing") {
   const Texts texts = two_languages();
-  CHECK(*texts.find("pt", "menu.quit") == "Quit");
-  CHECK(*texts.find("de", "menu.quit") == "Quit");
-  CHECK(texts.find("pt", "menu.nothing") == nullptr);
+  CHECK(texts.find("pt", "menu.quit") == nullptr);
+  CHECK(*texts.find_or_english("pt", "menu.quit") == "Quit");
+  CHECK(*texts.find_or_english("de", "menu.quit") == "Quit");
+  CHECK(texts.find_or_english("pt", "menu.nothing") == nullptr);
 }
 
-TEST_CASE("the languages and keys a set of texts has") {
-  const Texts texts = two_languages();
-  CHECK(texts.has("pt"));
-  CHECK_FALSE(texts.has("de"));
+TEST_CASE("a key a region lacks is looked up in its language without the region") {
+  Texts texts = two_languages();
+  std::string error;
+  REQUIRE(texts.add("pt-BR", R"({"menu.quit": "Sair"})", error));
+  CHECK(*texts.find("pt_br", "menu.quit") == "Sair");
+  CHECK(*texts.find("pt_br", "menu.save") == "Salvar");
+  CHECK(*texts.find("pt_pt", "menu.save") == "Salvar");
+  CHECK(texts.find("pt", "menu.quit") == nullptr);
+}
+
+TEST_CASE("the languages and keys a set of texts has, by their keys") {
+  Texts texts = two_languages();
+  std::string error;
+  REQUIRE(texts.add("PT_br", "{}", error));
+  CHECK(texts.languages() == std::vector<std::string>{"en", "pt", "pt_br"});
   CHECK(texts.keys("pt") == std::vector<std::string>{"menu.save"});
   CHECK(texts.keys("de").empty());
 }
@@ -92,6 +106,9 @@ TEST_CASE("the engine's texts are in English when no translation has the languag
   translations::use_language("xx");
   CHECK(translations::language() == "en");
   CHECK(translations::requested_language() == "xx");
+  translations::use_language("EN-us");  // the language alone, whatever its case and region
+  CHECK(translations::language() == "en");
+  CHECK(translations::requested_language() == "EN-us");
   translations::use_language("en");
   CHECK(translations::language() == "en");
 }
@@ -107,12 +124,39 @@ TEST_CASE("the engine's texts stay where they are from one lookup to the next") 
   CHECK(tr("editor.menu.file") == first);
 }
 
+TEST_CASE("a language's name is compared in small letters, with '_' between its parts") {
+  CHECK(language_key("pt-BR") == "pt_br");
+  CHECK(language_key("PT_br") == "pt_br");
+  CHECK(base_language("zh-Hant") == "zh");
+  CHECK(base_language("en") == "en");
+}
+
+TEST_CASE("the language that best serves one asked for: the same, then the language alone, then a region of it") {
+  const std::vector<std::string> available = {"en", "pt", "pt_BR", "es_MX"};
+  CHECK(best_language("pt-BR", available) == "pt_BR");
+  CHECK(best_language("PT", available) == "pt");
+  CHECK(best_language("pt_PT", available) == "pt");
+  CHECK(best_language("es", available) == "es_MX");
+  CHECK(best_language("es_ES", available) == "es_MX");
+  CHECK_FALSE(best_language("de", available));
+  CHECK_FALSE(best_language("", available));
+}
+
 TEST_CASE("a locale's name gives its language") {
-  CHECK(platform::language_of_locale("pt_BR.UTF-8") == "pt");
-  CHECK(platform::language_of_locale("pt-BR") == "pt");
+  CHECK(platform::language_of_locale("pt_BR.UTF-8") == "pt_br");
+  CHECK(platform::language_of_locale("pt-BR") == "pt_br");
   CHECK(platform::language_of_locale("de@euro") == "de");
   CHECK(platform::language_of_locale("EN") == "en");
   CHECK(platform::language_of_locale("C.UTF-8").empty());
   CHECK(platform::language_of_locale("POSIX").empty());
   CHECK(platform::language_of_locale("").empty());
+}
+
+TEST_CASE("a text with one value drawn every frame is filled once for each value, and kept") {
+  FilledTexts objects("editor.status.objects", "count");
+  const char* three = objects.with(3);
+  CHECK(std::string(three) == std::string(tr("editor.status.objects", {{"count", "3"}})));
+  CHECK(objects.with(3) == three);  // the same text, not made again
+  CHECK(std::string(objects.with(4)) == std::string(tr("editor.status.objects", {{"count", "4"}})));
+  CHECK(objects.with(std::string_view("3")) == three);
 }

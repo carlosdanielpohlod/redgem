@@ -5,8 +5,6 @@
 
 namespace redgem {
 
-void add_game_texts() {
-  for (const generated::FolderFile& file : generated::game_texts()) translations::add_file(file.path, file.file);
-}
+void add_game_texts() { translations::add_files(generated::game_texts()); }
 
 }  // namespace redgem

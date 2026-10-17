@@ -5,8 +5,6 @@
 
 namespace redgem::net {
 
-void add_relay_texts() {
-  for (const generated::FolderFile& file : generated::relay_texts()) translations::add_file(file.path, file.file);
-}
+void add_relay_texts() { translations::add_files(generated::relay_texts()); }
 
 }  // namespace redgem::net

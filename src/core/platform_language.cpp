@@ -3,7 +3,8 @@
 #include "core/platform.hpp"
 
 #include <algorithm>
-#include <cctype>
+
+#include "core/language_names.hpp"
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -15,8 +16,8 @@
 namespace redgem::platform {
 namespace {
 
-// Where the language of a locale's name ends: pt_BR.UTF-8, pt-BR, de@euro.
-constexpr const char* kAfterLanguage = "_-.@";
+// Where the language and region of a locale's name end: pt_BR.UTF-8, de@euro.
+constexpr const char* kAfterLanguage = ".@";
 // The locales that name no language, only the system's plain behaviour.
 constexpr const char* kPlainLocales[] = {"c", "posix"};
 
@@ -32,9 +33,7 @@ constexpr const char* kLocaleVariables[] = {"LC_ALL", "LC_MESSAGES", "LANG"};
 }  // namespace
 
 std::string language_of_locale(std::string_view locale) {
-  std::string language(locale.substr(0, locale.find_first_of(kAfterLanguage)));
-  std::transform(language.begin(), language.end(), language.begin(),
-                 [](unsigned char letter) { return static_cast<char>(std::tolower(letter)); });
+  const std::string language = language_key(locale.substr(0, locale.find_first_of(kAfterLanguage)));
   return names_no_language(language) ? std::string() : language;
 }
 

@@ -124,6 +124,8 @@ redgem_add_library(redgem_core
   core/texts.cpp
   core/text_placeholders.cpp
   core/translations.cpp
+  core/language_names.cpp
+  core/filled_texts.cpp
   core/core_texts.cpp
   core/platform_language.cpp
   core/safe_path.cpp

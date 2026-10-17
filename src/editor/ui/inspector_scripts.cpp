@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "core/log.hpp"
+#include "core/filled_texts.hpp"
 #include "core/translations.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/inspector_logic.hpp"
@@ -36,8 +37,8 @@ void write_scripts(EditorSession& session, int index, const std::vector<std::str
 void draw_script_card(PanelContext& context, const std::string& script) {
   property_label(tr("editor.inspector.script.label"));
   if (!listed(context.files.scripts, script)) {
-    const std::string missing = tr("editor.inspector.script.missing", {{"script", script}});
-    ImGui::TextColored(error_color(), ICON_FA_TRIANGLE_EXCLAMATION "  %s", missing.c_str());
+    static FilledTexts missing("editor.inspector.script.missing", "script");
+    ImGui::TextColored(error_color(), ICON_FA_TRIANGLE_EXCLAMATION "  %s", missing.with(script));
     return;
   }
   if (ImGui::Button((std::string(ICON_FA_PEN_TO_SQUARE "  ") + script).c_str())) open_script(context.scripts, script);

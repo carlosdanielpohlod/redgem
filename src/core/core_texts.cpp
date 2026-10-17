@@ -5,8 +5,6 @@
 
 namespace redgem {
 
-void add_core_texts() {
-  for (const generated::FolderFile& file : generated::core_texts()) translations::add_file(file.path, file.file);
-}
+void add_core_texts() { translations::add_files(generated::core_texts()); }
 
 }  // namespace redgem

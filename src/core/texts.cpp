@@ -5,10 +5,13 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/language_names.hpp"
+
 namespace redgem {
 namespace {
 
 constexpr char kLineBreak = '\n';  // between the lines of a text written as a list of them
+constexpr char kRegionMark = '_';  // where a language_key's region starts ("pt_br")
 
 // Whether a value of a translation file is a list of lines.
 bool is_lines(const nlohmann::json& value) {
@@ -52,18 +55,27 @@ std::optional<TextCatalog> read_catalog(std::string_view json, std::string& erro
 
 }  // namespace
 
-bool Texts::add(const std::string& language, std::string_view json, std::string& error) {
+bool Texts::add(std::string_view language, std::string_view json, std::string& error) {
   std::optional<TextCatalog> catalog = read_catalog(json, error);
   if (!catalog) return false;
-  TextCatalog& texts = languages_[language];
+  TextCatalog& texts = languages_[language_key(language)];
   for (auto& [key, text] : *catalog) texts.insert_or_assign(key, std::move(text));
   return true;
 }
 
-bool Texts::has(std::string_view language) const { return languages_.find(language) != languages_.end(); }
+std::vector<std::string> Texts::languages() const {
+  std::vector<std::string> names;
+  for (const auto& entry : languages_) names.push_back(entry.first);
+  return names;
+}
 
 const std::string* Texts::find(std::string_view language, std::string_view key) const {
   if (const std::string* text = find_in(language, key)) return text;
+  return find_in(language.substr(0, language.find(kRegionMark)), key);
+}
+
+const std::string* Texts::find_or_english(std::string_view language, std::string_view key) const {
+  if (const std::string* text = find(language, key)) return text;
   return find_in(kFallbackLanguage, key);
 }
 

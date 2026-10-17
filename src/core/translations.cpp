@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <stdexcept>
 
+#include "core/language_names.hpp"
+
 namespace redgem {
 namespace translations {
 namespace {
@@ -35,7 +37,8 @@ void add_file(std::string_view file_name, const EmbeddedFile& file) {
 
 void use_language(std::string_view language) {
   asked_language() = language;
-  chosen_language() = texts().has(language) ? std::string(language) : kFallbackLanguage;
+  const std::optional<std::string> best = best_language(language, texts().languages());
+  chosen_language() = best.value_or(kFallbackLanguage);
 }
 
 const std::string& language() { return chosen_language(); }
@@ -47,7 +50,7 @@ const Texts& all() { return texts(); }
 }  // namespace translations
 
 const char* tr(const char* key) {
-  const std::string* text = translations::all().find(translations::language(), key);
+  const std::string* text = translations::all().find_or_english(translations::language(), key);
   return text != nullptr ? text->c_str() : key;
 }
 

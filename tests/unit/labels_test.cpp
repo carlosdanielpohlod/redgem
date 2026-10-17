@@ -17,3 +17,9 @@ TEST_CASE("an editor label is made once, and stays where it is") {
   CHECK(ui::icon_label("@", "editor.menu.edit") == first);
   CHECK(ui::icon_label("#", "editor.menu.edit") != first);
 }
+
+TEST_CASE("a window's or a dialog's name is its title, then an id no title changes") {
+  CHECK(std::string(ui::window_title("editor.menu.file", "###first")) == "File###first");
+  CHECK(ui::window_title("editor.menu.file", "###second") != ui::window_title("editor.menu.file", "###first"));
+  CHECK(ui::window_title("editor.menu.file", "###first") == ui::window_title("editor.menu.file", "###first"));
+}
