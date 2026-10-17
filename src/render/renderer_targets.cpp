@@ -171,11 +171,14 @@ void Renderer::Impl::make_targets(int width, int height) {
   const int occlusion_height = downscaled(height, kOcclusionDownscale);
   occlusion_a = load_target(occlusion_width, occlusion_height, kScreenFormat, false);
   occlusion_b = load_target(occlusion_width, occlusion_height, kScreenFormat, false);
-  scene_depth = load_depth_target(width, height);
 }
 
 void Renderer::Impl::ensure_glow_target() {
   if (!loaded(glow)) glow = load_target_on(hdr.depth, kHdrFormat);
+}
+
+void Renderer::Impl::ensure_scene_depth_target() {
+  if (!loaded(scene_depth)) scene_depth = load_depth_target(hdr.texture.width, hdr.texture.height);
 }
 
 void Renderer::Impl::release_targets() {

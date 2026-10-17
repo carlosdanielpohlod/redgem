@@ -20,6 +20,17 @@ constexpr float kRightAngle = 90.0f;         // degrees: the field of view of on
 constexpr float kMinReflectedAngle = 0.03f;  // radians: only sizeable things are worth reflecting
 constexpr int kPanoramaMipsWanted = 1;       // rlGenTextureMipmaps answers how many levels it made
 
+// What `eye` sees in the direction of one cube face.
+Camera3D face_view(const render_math::CubeFace& face, Vector3 eye) {
+  Camera3D view{};
+  view.projection = CAMERA_PERSPECTIVE;
+  view.fovy = kRightAngle;
+  view.position = eye;
+  view.target = Vector3Add(eye, face.forward);
+  view.up = face.up;
+  return view;
+}
+
 }  // namespace
 
 void Renderer::Impl::capture_reflection_face(const Camera3D& camera) {
@@ -33,19 +44,16 @@ void Renderer::Impl::capture_reflection_face(const Camera3D& camera) {
   bind_for_the_frame(shader, lit_uniforms.reflection_map, kReflectionTextureSlot, panorama.texture.id);
 }
 
-// What is around `eye` in the direction of one cube face: the sky and the sizeable objects.
+// What is around `eye` in the direction of one cube face: the sky and the sizeable objects, their
+// see-through parts too.
 void Renderer::Impl::draw_surroundings(const render_math::CubeFace& face, Vector3 eye) {
-  Camera3D view{};
-  view.projection = CAMERA_PERSPECTIVE;
-  view.fovy = kRightAngle;
-  view.position = eye;
-  view.target = Vector3Add(eye, face.forward);
-  view.up = face.up;
+  const Camera3D view = face_view(face, eye);
   BeginTextureMode(reflection_face);
   ClearBackground(kBlack);
   BeginMode3D(view);
   draw_sky(view);
-  draw_objects(false, to_vec3(eye), kMinReflectedAngle);
+  const std::size_t first = draw_objects(false, to_vec3(eye), kMinReflectedAngle);
+  draw_see_through(first, to_vec3(eye));
   EndMode3D();
   EndTextureMode();
 }

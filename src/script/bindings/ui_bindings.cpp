@@ -2,6 +2,7 @@
 
 #include <mruby.h>
 
+#include "scene/scene_config.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 
@@ -10,7 +11,7 @@ namespace {
 
 using namespace binding;
 
-constexpr mrb_int kOpaque = 255;  // a color channel at its fullest
+constexpr mrb_int kOpaque = config::kMaxColorByte;  // a color channel at its fullest
 
 // Where something is drawn, as mruby hands it over.
 struct Box {

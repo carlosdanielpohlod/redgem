@@ -20,6 +20,15 @@ TEST_CASE("a stopwatch's laps are the time its reading moved on since the one be
   CHECK(watch.lap() == doctest::Approx(0.0));  // nothing went by
 }
 
+TEST_CASE("a stopwatch restarted counts its next lap from then on") {
+  double now = kStart;
+  Stopwatch watch([&now] { return now; });
+  now += kFirstLap;
+  watch.restart();  // what went by is not counted
+  now += kSecondLap;
+  CHECK(watch.lap() == doctest::Approx(kSecondLap));
+}
+
 TEST_CASE("a stopwatch given no reading of its own goes by the real clock") {
   Stopwatch watch;
   const double before = redgem::steady_seconds();

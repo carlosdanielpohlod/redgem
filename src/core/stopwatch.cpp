@@ -20,4 +20,6 @@ float Stopwatch::lap() {
   return static_cast<float>(elapsed);
 }
 
+void Stopwatch::restart() { last_ = reading_(); }
+
 }  // namespace redgem

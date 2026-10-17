@@ -40,6 +40,7 @@ void Engine::switch_to(const std::string& name, SceneDesc desc) {
   particles_.clear();
   scripts_->attach_scripts();
   scripts_->run_scene_script(name);
+  network_watch_.restart();  // the time the scene took to load is not the network's
 }
 
 void Engine::replace_world(SceneDesc desc) {

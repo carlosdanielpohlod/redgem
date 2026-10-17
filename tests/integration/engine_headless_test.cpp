@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <utility>
 
 #include "app/scene_files.hpp"
 #include "app/touch_circles.hpp"
@@ -73,6 +74,52 @@ Vec3 position_of(Engine& engine, const std::string& name) {
   REQUIRE(id != kNoObject);
   return engine.scene().world_transform(id).position;
 }
+
+// --- A join nobody answers, on a clock the test moves -------------------------------------------
+
+// Seconds of real time between two frames: a sixteenth, which floats hold exactly, so that polls
+// add up to a timeout exactly.
+constexpr double kNetworkPoll = 0.0625;
+// Polls that take a join past its timeout, and polls that stop one short of it: a capped poll
+// (config::kMaxFrameSeconds) in place of one of those would take it past.
+constexpr int kPastJoinTimeoutPolls = static_cast<int>((net::kJoinTimeoutSeconds + 1.0) / kNetworkPoll);
+constexpr int kShortOfJoinTimeoutPolls = static_cast<int>(net::kJoinTimeoutSeconds / kNetworkPoll) - 1;
+constexpr double kStartupSeconds = 60.0;  // a slow start or a slow load, longer than any timeout
+constexpr const char* kSecondScene = "level2";
+
+// Something that takes the connection and never answers: a listening socket nobody polls.
+net::Socket silent_listener() {
+  std::string error;
+  net::Socket silent = net::Socket::listen_on(0, error);
+  REQUIRE_MESSAGE(silent.valid(), error);
+  return silent;
+}
+
+// The sandbox, its network's real time read from `clock`, joining `silent`.
+std::unique_ptr<Engine> joining(const net::Socket& silent, Stopwatch::Reading clock) {
+  EngineOptions options;
+  options.game_dir = fixture("games/sandbox");
+  options.fixed_step = true;
+  options.network_time = std::move(clock);
+  auto created = Engine::create(options);
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  std::unique_ptr<Engine> engine = std::move(std::get<std::unique_ptr<Engine>>(created));
+  ruby(*engine, "$reasons = []; Network.on_fail { |reason| $reasons << reason }");
+  ruby(*engine, "Network.join('127.0.0.1', port: " + std::to_string(silent.local_port()) + ")");
+  return engine;
+}
+
+// `count` frames, each kNetworkPoll seconds of real time after the one before.
+void frames_apart(Engine& engine, double& now, int count) {
+  for (int i = 0; i < count; ++i) {
+    now += kNetworkPoll;
+    frames(engine, 1);
+  }
+}
+
+bool still_joining(Engine& engine) { return ruby(engine, "[Network.connecting?, $reasons].inspect") == "[true, []]"; }
+
+bool in_level2(const Engine* engine) { return engine != nullptr && engine->scene_name() == kSecondScene; }
 
 }  // namespace
 
@@ -281,27 +328,49 @@ TEST_CASE("only fixed_step selects fixed stepping: without it the game follows t
 
 TEST_CASE("a join waits for its answer on the real clock, however fast a game nobody shows plays its frames") {
   constexpr int kPastJoinTimeoutFrames = static_cast<int>(2.0f * net::kJoinTimeoutSeconds) * kOneSecondOfFrames;
-  constexpr double kPastJoinTimeout = net::kJoinTimeoutSeconds + 1.0;  // seconds
-  // Something that takes the connection and never answers: a listening socket nobody polls.
-  std::string error;
-  net::Socket silent = net::Socket::listen_on(0, error);
-  REQUIRE_MESSAGE(silent.valid(), error);
+  const net::Socket silent = silent_listener();
   double now = 0.0;  // the real time, as the engine reads it
-  EngineOptions options;
-  options.game_dir = fixture("games/sandbox");
-  options.fixed_step = true;
-  options.network_time = [&now] { return now; };
-  auto created = Engine::create(options);
-  REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
-  Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
-  ruby(engine, "$reasons = []; Network.on_fail { |reason| $reasons << reason }");
-  ruby(engine, "Network.join('127.0.0.1', port: " + std::to_string(silent.local_port()) + ")");
-  frames(engine, kPastJoinTimeoutFrames);  // ten seconds of frames in no time at all
-  CHECK(ruby(engine, "[Network.connecting?, $reasons].inspect") == "[true, []]");
-  now += kPastJoinTimeout;
-  frames(engine, 1);
-  CHECK(ruby(engine, "[Network.connecting?, $reasons].inspect") ==
+  auto engine = joining(silent, [&now] { return now; });
+  frames(*engine, kPastJoinTimeoutFrames);  // ten seconds of frames in no time at all
+  CHECK(still_joining(*engine));
+  frames_apart(*engine, now, kPastJoinTimeoutPolls);
+  CHECK(ruby(*engine, "[Network.connecting?, $reasons].inspect") ==
         "[false, [\"" + std::string(net::kNoAnswer) + "\"]]");
+}
+
+TEST_CASE("a long stall counts as one long frame for the network: it does not run a join's time out") {
+  const net::Socket silent = silent_listener();
+  double now = 0.0;
+  auto engine = joining(silent, [&now] { return now; });
+  now += net::kJoinTimeoutSeconds + kNetworkPoll;
+  frames(*engine, 1);
+  CHECK(still_joining(*engine));
+}
+
+TEST_CASE("the time a game takes to start is not the network's: a join asked for then waits as long as any") {
+  const net::Socket silent = silent_listener();
+  double now = 0.0;
+  bool started = false;  // the first reading is the engine's, as it is made; the game starts a while later
+  auto engine = joining(silent, [&now, &started] {
+    const double reading = started ? now + kStartupSeconds : now;
+    started = true;
+    return reading;
+  });
+  frames_apart(*engine, now, kShortOfJoinTimeoutPolls);
+  CHECK(still_joining(*engine));
+}
+
+TEST_CASE("the time a scene takes to load is not the network's: a join goes on waiting as long as any") {
+  const net::Socket silent = silent_listener();
+  double now = 0.0;
+  const Engine* seen = nullptr;  // the scene loads in no time; the clock says it took a while
+  auto engine = joining(silent, [&now, &seen] { return in_level2(seen) ? now + kStartupSeconds : now; });
+  seen = engine.get();
+  ruby(*engine, "Game.load_scene('level2')");
+  frames(*engine, 1);
+  REQUIRE(in_level2(seen));
+  frames_apart(*engine, now, kShortOfJoinTimeoutPolls);
+  CHECK(still_joining(*engine));
 }
 
 TEST_CASE("the input a program hands the engine is what the game reads") {

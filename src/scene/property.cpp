@@ -2,7 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cmath>
+
+#include "scene/color_space.hpp"
 
 namespace redgem {
 namespace {
@@ -47,8 +48,6 @@ constexpr std::size_t kHexDigitsPerChannel = 2;
 constexpr std::size_t kRedChannel = 0;
 constexpr std::size_t kGreenChannel = 1;
 constexpr std::size_t kBlueChannel = 2;
-constexpr float kMaxChannel = 255.0f;
-constexpr float kSrgbGamma = 2.2f;
 
 bool is_hex(const std::string& digits) {
   return std::all_of(digits.begin(), digits.end(), [](unsigned char c) { return std::isxdigit(c) != 0; });
@@ -58,8 +57,7 @@ bool is_hex(const std::string& digits) {
 std::optional<float> parse_hex_channel(const std::string& text, std::size_t channel) {
   const std::string digits = text.substr(kFirstHexDigit + channel * kHexDigitsPerChannel, kHexDigitsPerChannel);
   if (!is_hex(digits)) return std::nullopt;
-  const float srgb = static_cast<float>(std::stoi(digits, nullptr, kHexBase)) / kMaxChannel;
-  return std::pow(srgb, kSrgbGamma);
+  return linear_from_srgb(static_cast<float>(std::stoi(digits, nullptr, kHexBase)) / kMaxColorChannel);
 }
 
 bool is_written_as_a_hex_color(const std::string& text) {

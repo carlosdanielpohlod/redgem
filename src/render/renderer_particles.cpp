@@ -38,7 +38,6 @@ void Renderer::Impl::batch_particle_pictures(const ParticleSystem& system) {
 }
 
 void Renderer::Impl::draw_particles(const ParticleSystem& system, const Camera3D& camera) {
-  glow_gathered = false;
   if (system.particles().empty()) return;
   prepare_particles(system, camera);
   begin_particles();
@@ -103,8 +102,13 @@ void Renderer::Impl::share_scene_depth() {
   const int width = hdr.texture.width;
   const int height = hdr.texture.height;
   if (drawing_framebuffer() != hdr.id) copy_depth(drawing_framebuffer(), hdr.id, width, height);
-  if (particle_layout.any_soft) copy_depth(hdr.id, scene_depth.id, width, height);
+  if (particle_layout.any_soft) copy_soft_particle_depth();
   rlEnableFramebuffer(drawing_framebuffer());  // drawing goes on where it was
+}
+
+void Renderer::Impl::copy_soft_particle_depth() {
+  ensure_scene_depth_target();
+  copy_depth(hdr.id, scene_depth.id, hdr.texture.width, hdr.texture.height);
 }
 
 }  // namespace redgem

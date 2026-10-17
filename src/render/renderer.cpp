@@ -52,6 +52,7 @@ void Renderer::sync(const SceneDesc& desc) {
   impl_->upload_new_materials(desc);
   impl_->refresh_material_values(desc);
   impl_->upload_new_meshes(desc);
+  impl_->note_see_through_meshes();
 }
 
 void Renderer::refresh_mesh(const SceneDesc& desc, int mesh) {

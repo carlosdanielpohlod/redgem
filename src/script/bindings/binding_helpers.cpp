@@ -8,11 +8,13 @@
 #include <mruby/string.h>
 #include <mruby/variable.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <limits>
 #include <string>
 
+#include "scene/color_space.hpp"
 #include "script/script_host.hpp"
 
 namespace redgem::binding {
@@ -21,9 +23,11 @@ namespace {
 constexpr mrb_int kVectorComponents = 3;
 // The engine keeps its numbers as floats: a number from a script must fit one.
 constexpr mrb_float kLargestNumber = std::numeric_limits<float>::max();
-constexpr float kMaxColorChannel = 255.0f;
 
 constexpr std::size_t kNumberTextSize = 32;
+
+// A channel from 0 to kMaxColorChannel as a share from 0 to 1.
+float share_of_channel(mrb_float channel) { return static_cast<float>(channel / kMaxColorChannel); }
 
 float float_from(mrb_state* mrb, mrb_value value) { return static_cast<float>(finite(mrb, mrb_as_float(mrb, value))); }
 
@@ -175,8 +179,15 @@ double finite_number(mrb_state* mrb, mrb_value value, const char* refusal) {
 }
 
 Color color_from(mrb_int r, mrb_int g, mrb_int b, mrb_int a) {
-  return {static_cast<float>(r) / kMaxColorChannel, static_cast<float>(g) / kMaxColorChannel,
-          static_cast<float>(b) / kMaxColorChannel, static_cast<float>(a) / kMaxColorChannel};
+  return {share_of_channel(r), share_of_channel(g), share_of_channel(b), share_of_channel(a)};
+}
+
+float channel_from(mrb_state* mrb, mrb_float channel, const char* what) {
+  return share_of_channel(from_to(mrb, channel, 0.0, kMaxColorChannel, what));
+}
+
+mrb_value channel_shown(mrb_state* mrb, float share) {
+  return mrb_int_value(mrb, std::lround(std::clamp(share, 0.0f, 1.0f) * kMaxColorChannel));
 }
 
 }  // namespace redgem::binding

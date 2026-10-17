@@ -7,7 +7,6 @@
 namespace redgem::binding {
 namespace {
 
-constexpr mrb_float kMaxChannel = 255.0;       // of a color or an alpha, as scripts give them
 constexpr mrb_float kLargestSheetSide = 64.0;  // pictures across or down a sprite sheet
 constexpr mrb_int kColorChannels = 3;
 
@@ -23,8 +22,9 @@ OverLife<Value> keys_of(mrb_state* mrb, mrb_value list, const char* how_many, Re
   return over_life;
 }
 
+// A color's channel or an alpha, as scripts give them: 0 to 255.
 float channel_of(mrb_state* mrb, mrb_value value, const char* what) {
-  return static_cast<float>(from_to(mrb, mrb_as_float(mrb, value), 0.0, kMaxChannel, what) / kMaxChannel);
+  return channel_from(mrb, mrb_as_float(mrb, value), what);
 }
 
 // A color's channels as 0..1, from [r, g, b] with each 0 to 255.

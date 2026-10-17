@@ -71,20 +71,25 @@ void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, c
 }
 
 void Renderer::Impl::draw_lit_scene(const Camera3D& camera, const ParticleSystem* particles) {
+  glow_gathered = false;  // until this frame's particles gather some (a frame may have none)
   const bool sampled = scene_samples.framebuffer != 0;
   BeginTextureMode(sampled ? target_of(scene_samples) : hdr);
   ClearBackground(kBlack);
   BeginMode3D(camera);
   draw_sky(camera);
-  covering = sampled;
-  const std::size_t first = draw_objects(false, to_vec3(camera.position));
-  covering = false;
-  draw_see_through(first, to_vec3(camera.position));
+  draw_surfaces(camera, sampled);
   if (particles != nullptr) draw_particles(*particles, camera);
   EndMode3D();
   if (glow_gathered) add_gathered_glow();
   EndTextureMode();
   if (sampled) resolve_samples();
+}
+
+void Renderer::Impl::draw_surfaces(const Camera3D& camera, bool sampled) {
+  covering = sampled;
+  const std::size_t first = draw_objects(false, to_vec3(camera.position));
+  covering = false;
+  draw_see_through(first, to_vec3(camera.position));
 }
 
 void Renderer::Impl::bind_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture) {

@@ -513,6 +513,20 @@ TEST_CASE("scripts change how bright a light shines and in what color, within wh
   CHECK(shining.intensity == doctest::Approx(5.0f));
 }
 
+TEST_CASE("a light brighter than white shows its color as a script can give it back") {
+  constexpr Color kBrighterThanWhite{2.0f, 0.5f, -0.25f, 1.0f};  // linear light, past either end
+  const TempSave temp;
+  SceneDesc scene = small_scene();
+  NodeDesc lamp;
+  lamp.name = "Lamp";
+  lamp.light = LightDesc{LightType::Point, kBrighterThanWhite, 1.0f, 0.0f};
+  scene.nodes.push_back(lamp);
+  auto engine = engine_for(scene, temp.file);
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "Scene.find('Lamp').light.color.inspect") == "[255, 186, 0]");
+  CHECK_FALSE(fails(*engine, "light = Scene.find('Lamp').light; light.color = light.color"));
+}
+
 TEST_CASE("particles stay put while the game is paused") {
   const TempSave temp;
   const SceneDesc scene = small_scene();

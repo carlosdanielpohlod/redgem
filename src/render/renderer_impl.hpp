@@ -181,7 +181,8 @@ struct Renderer::Impl {
   render_detail::Multisampled scene_samples;  // the lit scene of several samples a pixel (msaa), resolved into hdr
   bool samples_unusable = false;              // the card could not copy them into hdr: one sample a pixel from then on
   bool covering = false;                      // the pass being drawn smooths cut-out edges with those samples
-  RenderTexture2D scene_depth{};              // the depth of the scene's surfaces, copied for soft particles (no color)
+  // The depth of the scene's surfaces, copied for soft particles (no color): made when first needed.
+  RenderTexture2D scene_depth{};
   // Glowing particles gathered apart, to be added within the environment's limit: made when first
   // needed, on the lit picture's own depth.
   RenderTexture2D glow{};
@@ -233,6 +234,8 @@ struct Renderer::Impl {
   render_math::ParticleLayout particle_layout;
   render_detail::ParticleBuffer particle_buffer;
   std::vector<render_math::SeeThroughDraw> see_through;  // the frame's, in the order they are drawn
+  std::vector<bool> see_through_meshes;                  // by mesh: whether a part of it is drawn see-through
+  bool any_see_through = false;                          // of any mesh: when none is, nothing is gathered
   int next_face = 0;                                     // the cube face captured this frame
   int faces_captured = 0;                                // reflections switch on once all six exist
 
@@ -261,6 +264,7 @@ struct Renderer::Impl {
   // draws one sample a pixel from then on.
   void resolve_samples();
   void ensure_glow_target();
+  void ensure_scene_depth_target();
   void release_targets();
   void release_fixed_targets();
 
@@ -294,6 +298,8 @@ struct Renderer::Impl {
   void prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect);
   // The scene as the camera sees it, into the HDR target.
   void draw_lit_scene(const Camera3D& camera, const ParticleSystem* particles);
+  // The objects, opaque then see-through; `sampled`: into the picture of several samples a pixel.
+  void draw_surfaces(const Camera3D& camera, bool sampled);
   // Binds a texture `program` reads all frame long to a slot of its own.
   void bind_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture);
   void bind_cube_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture);
@@ -370,6 +376,8 @@ struct Renderer::Impl {
   void gather_see_through(std::size_t first, Vec3 viewer);
   void add_see_through(const render_math::InstanceBatch& batch, std::size_t first, Vec3 viewer);
   bool has_see_through(int mesh) const;
+  // Which meshes have see-through parts, worked out whenever meshes or materials are uploaded.
+  void note_see_through_meshes();
   void draw_see_through_copies(const render_math::SeeThroughDraw& draw, ObjectPass& pass);
 
   // --- Scattered copies (renderer_scatter.cpp) -------------------------------------------------
@@ -406,6 +414,8 @@ struct Renderer::Impl {
   // The depth of what was drawn so far where particles read it: in the lit picture's own (which
   // glow gathered apart is hidden by), and copied for soft particles to fade into.
   void share_scene_depth();
+  // The depth soft particles fade into, copied from the lit picture's.
+  void copy_soft_particle_depth();
   // The light lit particles take: the sun, the sky and the nearest point lights.
   void send_particle_lights(Vector3 sun_color, const Environment& env, const render_math::PointLightUniforms& points);
 
