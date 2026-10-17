@@ -1,4 +1,5 @@
-// What the vertex shader reads of a frame besides its vertices (texel_rows.hpp): the bones of every
+// What the vertex shader reads of a frame besides its vertices (texel_rows.hpp): the record of every
+// object (instance_records.hpp: where it is, its tint, where its bones are) and the bones of every
 // skeleton, and how each pass judges every object, worked out once a frame for all its passes.
 
 #include "render/renderer_impl.hpp"
@@ -6,6 +7,8 @@
 #include <raymath.h>
 
 #include <algorithm>
+
+#include "render/instance_records.hpp"
 
 namespace redgem {
 namespace {
@@ -23,7 +26,7 @@ constexpr int kOneLevel = 1;  // no smaller copies: texels are fetched one by on
 void Renderer::Impl::write_frame_texels(const Scene& scene) {
   const std::size_t count = std::min(scene.size(), worlds.size());
   sights.assign(count, ObjectSight{});
-  std::size_t next_bone = 0;
+  std::size_t next_bone = render_math::record_texel(count);  // the bones come after the records
   for (std::size_t slot = 0; slot < count; ++slot) {
     const GameObject& object = scene.at(static_cast<ObjectId>(slot));
     if (!render_math::has_something_to_draw(object, show_prefabs, meshes.size())) continue;
@@ -35,14 +38,14 @@ std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& o
   const auto slot = static_cast<std::size_t>(object.id);
   const Bounds& bounds = mesh_bounds[static_cast<std::size_t>(object.mesh)];
   const std::optional<SkeletonPose> pose = pose_skeleton(scene, object, next_bone);
+  const render_math::InstanceLook look{object.tint, pose ? static_cast<float>(next_bone) : render_math::kNoBones};
   ObjectSight& sight = sights[slot];
-  sight.drawn = true;
+  sight.drawn = render_math::write_instance(texels, slot, model_matrix(worlds[slot]), look);
   if (!pose) {
     sight.sight = render_math::sight_of(bounds, worlds[slot]);
     return next_bone;
   }
   sight.sight = render_math::skinned_sight_of(bounds, worlds[slot], pose->first);
-  sight.first_bone = static_cast<float>(next_bone);
   return next_bone + pose->bones * kTexelsPerMatrix;
 }
 

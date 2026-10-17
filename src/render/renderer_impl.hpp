@@ -31,6 +31,7 @@
 
 #include "render/capture_views.hpp"
 #include "render/environment.hpp"
+#include "render/instance_batches.hpp"
 #include "render/mesh_pass.hpp"
 #include "render/render_math.hpp"
 #include "render/renderer.hpp"
@@ -65,12 +66,11 @@ struct GpuPrimitive {
   bool skinned = false;  // has joints: a skeleton deforms it
 };
 
-// What a frame knows of an object before any pass: whether it is drawn at all, what a pass judges
-// it by, and where its skeleton's bones are in the frame's texels.
+// What a frame knows of an object before any pass: whether it is drawn at all (its record is in
+// the frame's texels), and what a pass judges it by.
 struct ObjectSight {
   bool drawn = false;
   render_math::Sight sight;
-  float first_bone = render_math::kNoBones;
 };
 
 // Where a skeleton is this frame: its first bone (what a skinned mesh is judged by) and how many.
@@ -85,7 +85,6 @@ struct ObjectPass {
   // cppcheck-suppress uninitMemberVarNoCtor ; it holds a reference: whoever makes one has to give it
   MeshPass meshes;
   int skinned_location = kNoLocation;
-  int first_bone_location = kNoLocation;
   bool depth = false;  // the shadow map's pass: only depth is written
   render_math::View view;
   int last_material = kNoMaterialYet;
@@ -119,6 +118,8 @@ struct Renderer::Impl {
   render_detail::LitUniforms lit_uniforms;
   Shader depth_shader{};
   render_detail::DepthUniforms depth_uniforms;
+  int lit_instance_slot = render_detail::kNoLocation;  // the vertex attribute each copy's record number goes to
+  int depth_instance_slot = render_detail::kNoLocation;
   Shader sky_shader{};
   Shader particle_shader{};
   render_detail::ParticleUniforms particle_uniforms;
@@ -164,9 +165,11 @@ struct Renderer::Impl {
   render_math::TexelRows texels;    // what the vertex shader reads of the frame, and its texture
   std::vector<render_math::RowRun> changed_rows;
   unsigned int texel_texture = 0;
-  float wind = 0.0f;               // of the environment
-  Vector3 sun_travel{};            // direction the sun's light travels
-  float view_tan_half_fov = 0.0f;  // of the camera, for rebuilding positions from depth
+  render_math::InstanceBatches batches;  // what the pass being drawn sees, by mesh
+  render_detail::SlotBuffer slots;       // the record numbers of what the frame's passes see
+  float wind = 0.0f;                     // of the environment
+  Vector3 sun_travel{};                  // direction the sun's light travels
+  float view_tan_half_fov = 0.0f;        // of the camera, for rebuilding positions from depth
   float view_aspect = 0.0f;
   int next_face = 0;       // the cube face captured this frame
   int faces_captured = 0;  // reflections switch on once all six exist
@@ -224,10 +227,10 @@ struct Renderer::Impl {
 
   // --- What the vertex shader reads of a frame (renderer_frame_texels.cpp) ----------------------
 
-  // Every object's sight and every skeleton's bones, for all the passes of the frame.
+  // Every object's record, sight and bones, for all the passes of the frame.
   void write_frame_texels(const Scene& scene);
-  // One object's sight, and its bones from texel `next_bone` on. Returns where the next
-  // skeleton's bones go.
+  // One object's record and sight, and its bones from texel `next_bone` on. Returns where the
+  // next skeleton's bones go.
   std::size_t sight_object(const Scene& scene, const GameObject& object, std::size_t next_bone);
   // Writes an object's bones from texel `first` on: where each of its joints is now, times the
   // skin's inverse bind matrix. Nothing when the object has no (usable) skeleton.
@@ -258,13 +261,16 @@ struct Renderer::Impl {
   // when it must be drawn without backface culling.
   bool apply_material(int index, bool depth_pass);
   void send_surface(const MaterialDesc& factors);
-  // Draws what the current 3D view can see. `viewer` is the game camera in both passes: detail
-  // is judged by how big things look to the player, not to the sun.
+  // Draws what the current 3D view can see, every copy of a mesh in one call per part. `viewer`
+  // is the game camera in both passes: detail is judged by how big things look to the player, not
+  // to the sun.
   void draw_objects(const Scene& scene, bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
-  void draw_object(const GameObject& object, const Transform& world, const render_detail::ObjectSight& sight,
-                   ObjectPass& pass);
+  // Gathers into `batches` what the view sees.
+  void gather_copies(const Scene& scene, const render_math::View& view);
+  // `first`: where the pass's record numbers start in `slots`.
+  void draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass);
   void use_material(int material, ObjectPass& pass);
-  void draw_primitive(const GpuPrimitive& primitive, const Matrix& transform, float first_bone, ObjectPass& pass);
+  void draw_primitive(const GpuPrimitive& primitive, const render_detail::InstanceRun& run, ObjectPass& pass);
 
   // --- Particles (renderer_particles.cpp) -------------------------------------------------------
 

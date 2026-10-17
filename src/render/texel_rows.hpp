@@ -20,7 +20,6 @@ inline constexpr int kTexelsPerMatrix = 4;  // a 4x4 matrix, a column a texel
 inline constexpr std::size_t kMaxTexels = static_cast<std::size_t>(kTexelsPerRow) * kMaxTexelRows;
 // Where a skeleton's first bone is, for what has no skeleton (the shader takes texels as floats).
 inline constexpr float kNoBones = -1.0f;
-inline bool has_bones(float first_bone) { return first_bone >= 0.0f; }
 
 // Where a texel is in the texture.
 struct TexelPlace {

@@ -33,9 +33,9 @@ inline constexpr const char* kLightViewProjection = "lightViewProjection";
 inline constexpr const char* kShadowStrength = "shadowStrength";
 inline constexpr const char* kShadowTexel = "shadowTexel";
 inline constexpr const char* kShadowDepthRange = "shadowDepthRange";
-inline constexpr const char* kTint = "tint";
 inline constexpr const char* kFrameTexels = "frameTexels";
-inline constexpr const char* kFirstBone = "firstBone";
+// The vertex attribute a copy of a mesh finds its record by (see instance_records.hpp).
+inline constexpr const char* kInstanceSlot = "instanceSlot";
 inline constexpr const char* kSkinned = "skinned";
 inline constexpr const char* kReflectionMap = "reflectionMap";
 inline constexpr const char* kReflectionStrength = "reflectionStrength";
@@ -50,8 +50,6 @@ inline constexpr const char* kSkyTop = "skyTop";
 inline constexpr const char* kSkyHorizon = "skyHorizon";
 inline constexpr const char* kGroundColor = "groundColor";
 inline constexpr const char* kSunGlow = "sunGlow";
-inline constexpr const char* kModelMatrix = "matModel";
-inline constexpr const char* kNormalMatrix = "matNormal";
 // Post-processing.
 inline constexpr const char* kThreshold = "threshold";
 inline constexpr const char* kBlurStep = "blurStep";

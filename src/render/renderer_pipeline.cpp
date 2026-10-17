@@ -35,6 +35,8 @@ void Renderer::Impl::load_pipeline() {
   compile_shaders();
   lit_uniforms = find_lit_uniforms(shader);
   depth_uniforms = find_depth_uniforms(depth_shader);
+  lit_instance_slot = find_instance_slot(shader);
+  depth_instance_slot = find_instance_slot(depth_shader);
   particle_uniforms = find_particle_uniforms(particle_shader);
   load_fixed_targets();
   fallback_material = make_material(redgem::Color{});
@@ -63,6 +65,7 @@ void Renderer::Impl::load_sky() {
 void Renderer::Impl::release() {
   if (texel_texture != 0) rlUnloadTexture(texel_texture);
   texel_texture = 0;
+  release_slots(slots);
   release_assets();
   release_targets();
   free_maps(fallback_material);

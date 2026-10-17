@@ -1,5 +1,6 @@
-// Drawing the scene's objects: each one's materials, and the parts of its mesh that the view can
-// see. (Where each one is and its bones were worked out for the frame: see renderer_frame_texels.)
+// Drawing the scene's objects: what the view can see of them, every copy of a mesh in one call per
+// part, and their materials. (Where each one is, its look and its bones were worked out for the
+// frame: see renderer_frame_texels.)
 
 #include "render/renderer_impl.hpp"
 
@@ -15,11 +16,16 @@ namespace {
 using namespace render_detail;
 using render_math::kOff;
 using render_math::kOn;
-using render_math::model_matrix;
 using render_math::to_raylib;
 
 // A switch of the lit shader: on for a material that has that texture.
 float on_with(int image) { return image != kNoIndex ? kOn : kOff; }
+
+// Whether a view draws an object: one the frame has a record of, in the view, big enough in it,
+// and at the distance its level of detail is for.
+bool seen(const ObjectSight& sight, const GameObject& object, const render_math::View& view) {
+  return sight.drawn && render_math::sighted(view, sight.sight, object.visible_from, object.visible_to);
+}
 
 }  // namespace
 
@@ -67,43 +73,40 @@ void Renderer::Impl::draw_objects(const Scene& scene, bool depth_pass, Vec3 view
   const Matrix view_projection = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
   const render_math::View view{frustum_from_matrix(MatrixToFloatV(view_projection).v), viewer,
                                render_math::smallest_angle_drawn(detail_angle, depth_pass)};
-  const std::size_t count = std::min({scene.size(), worlds.size(), sights.size()});
-  ObjectPass objects{begin_mesh_pass(depth_pass ? depth_shader : shader),
-                     depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned,
-                     depth_pass ? depth_uniforms.first_bone : lit_uniforms.first_bone, depth_pass, view};
-  for (std::size_t slot = 0; slot < count; ++slot) {
-    if (!sights[slot].drawn) continue;
-    draw_object(scene.at(static_cast<ObjectId>(slot)), worlds[slot], sights[slot], objects);
-  }
+  gather_copies(scene, view);
+  const std::size_t first = append_slots(slots, batches.slots());
+  ObjectPass objects{
+      begin_mesh_pass(depth_pass ? depth_shader : shader, depth_pass ? depth_instance_slot : lit_instance_slot),
+      depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned, depth_pass, view};
+  for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
   end_mesh_pass();
 }
 
-// Not what the view cannot see, what looks too small in it, nor levels of detail meant for
-// another distance.
-void Renderer::Impl::draw_object(const GameObject& object, const Transform& world, const ObjectSight& sight,
-                                 ObjectPass& pass) {
-  if (!render_math::sighted(pass.view, sight.sight, object.visible_from, object.visible_to)) return;
-  const Matrix transform = model_matrix(world);
-  if (!pass.depth) {
-    const Vector3 tint = to_raylib(object.tint);
-    rlSetUniform(lit_uniforms.tint, &tint, SHADER_UNIFORM_VEC3, 1);
+void Renderer::Impl::gather_copies(const Scene& scene, const render_math::View& view) {
+  batches.start(meshes.size());
+  const std::size_t count = std::min(scene.size(), sights.size());
+  for (std::size_t slot = 0; slot < count; ++slot) {
+    const GameObject& object = scene.at(static_cast<ObjectId>(slot));
+    if (seen(sights[slot], object, view)) batches.add(object.mesh, slot);
   }
-  for (const GpuPrimitive& primitive : meshes[static_cast<std::size_t>(object.mesh)]) {
-    draw_primitive(primitive, transform, sight.first_bone, pass);
-  }
+  batches.lay_out();
 }
 
-void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const Matrix& transform, float first_bone,
-                                    ObjectPass& pass) {
+void Renderer::Impl::draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass) {
+  const InstanceRun run{slots.id, first + batch.first, batch.count};
+  for (const GpuPrimitive& primitive : meshes[static_cast<std::size_t>(batch.mesh)])
+    draw_primitive(primitive, run, pass);
+}
+
+void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const InstanceRun& run, ObjectPass& pass) {
   use_material(primitive.material, pass);
   const bool two_sided = pass.last_two_sided;
   if (two_sided) rlDisableBackfaceCulling();
-  // Per part: a skinned object may still have parts without bone weights, which stay rigid.
-  const bool deformed = render_math::has_bones(first_bone) && primitive.skinned;
-  const float skinning = deformed ? kOn : kOff;
+  // Per part: a skinned object may still have parts without bone weights, which stay rigid. (So
+  // does a copy whose skeleton could not be posed: it has no first bone.)
+  const float skinning = primitive.skinned ? kOn : kOff;
   rlSetUniform(pass.skinned_location, &skinning, SHADER_UNIFORM_FLOAT, 1);
-  if (deformed) rlSetUniform(pass.first_bone_location, &first_bone, SHADER_UNIFORM_FLOAT, 1);
-  draw_mesh(pass.meshes, primitive.mesh, transform);
+  draw_instances(pass.meshes, primitive.mesh, run);
   if (two_sided) rlEnableBackfaceCulling();
 }
 
