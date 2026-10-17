@@ -262,6 +262,7 @@ redgem_add_library(redgem_runtime
   render/shader_programs.cpp
   render/render_math.cpp
   render/visibility.cpp
+  render/texel_rows.cpp
   render/capture_views.cpp
   render/shader_source.cpp
   render/environment.cpp
