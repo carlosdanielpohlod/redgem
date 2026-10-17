@@ -90,15 +90,6 @@ struct RecordSource {
   float record = 0.0f;  // its number
 };
 
-// A set of scattered copies as it is drawn: its mesh, the distances it is drawn at, and its cells
-// (whose records come first in the frame's texels, before the objects').
-struct ScatterDraw {
-  int mesh = kNoIndex;
-  float visible_from = 0.0f;
-  float visible_to = 0.0f;
-  std::vector<render_math::ScatterChunk> chunks;
-};
-
 // Where a skeleton is this frame: its first bone (what a skinned mesh is judged by) and how many.
 struct SkeletonPose {
   Matrix first{};
@@ -192,10 +183,10 @@ struct Renderer::Impl {
   render_math::TexelRows texels;  // what the vertex shader reads of the frame, and its texture
   std::vector<render_math::RowRun> changed_rows;
   unsigned int texel_texture = 0;
-  render_math::InstanceBatches batches;  // what the pass being drawn sees, in runs of a mesh
-  render_detail::SlotBuffer slots;       // the record numbers of what the frame's passes see
-  std::uint64_t scatter_version = 0;     // of the scattered copies laid out (see Scattered)
-  std::vector<render_detail::ScatterDraw> scatter_draws;
+  render_math::InstanceBatches batches;                     // what the pass being drawn sees, in runs of a mesh
+  render_detail::SlotBuffer slots;                          // the record numbers of what the frame's passes see
+  std::uint64_t scatter_version = 0;                        // of the scattered copies laid out (see Scattered)
+  std::vector<render_math::ScatterLayout> scatter_layouts;  // whose records come first
   std::size_t scattered_records = 0;  // theirs come first in the frame's texels, the objects' after
   float wind = 0.0f;                  // of the environment
   Vector3 sun_travel{};               // direction the sun's light travels
@@ -316,7 +307,6 @@ struct Renderer::Impl {
   std::size_t lay_out_set(const ScatterSet& set, std::size_t first);
   // Adds to `batches` the cells the view sees.
   void gather_scattered(const render_math::View& view);
-  void gather_set(const render_detail::ScatterDraw& draw, const render_math::View& view);
 
   // --- Particles (renderer_particles.cpp) -------------------------------------------------------
 

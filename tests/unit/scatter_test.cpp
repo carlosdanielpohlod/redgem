@@ -40,6 +40,11 @@ constexpr float kSmallCopy = 0.25f;
 constexpr float kChunkRadius = 0.9f;
 constexpr float kNear = 1.0f;  // meters: a level of detail for what is at most this far
 const float kForever = std::numeric_limits<float>::infinity();
+constexpr float kLodBoundary = 3.0f;         // meters: where one level of detail hands over to the next
+constexpr Vec3 kNearCopy{0.0f, 0.0f, 0.4f};  // 2.6 m from the near viewer
+constexpr Vec3 kFarCopy{0.0f, 0.0f, -0.4f};  // 3.4 m from it
+constexpr int kNearMesh = 0;
+constexpr int kFarMesh = 1;
 
 ScatterRequest request(std::uint32_t seed = kSeed) {
   ScatterRequest asked;
@@ -180,12 +185,35 @@ TEST_CASE("scattered copies are cut into cells of the ground, each with a sphere
   }
 }
 
-TEST_CASE("a cell is drawn when in view, near enough for its biggest copy to show, and within its distances") {
+TEST_CASE("a cell is drawn when in view and near enough for its biggest copy to show") {
   const ScatterChunk chunk = small_chunk_in_the_middle();
-  CHECK(chunk_worth_drawing(identity_view(kNearViewer), chunk, 0.0f, kForever));
-  CHECK_FALSE(chunk_worth_drawing(identity_view(kFarViewer), chunk, 0.0f, kForever));  // too small from there
-  CHECK_FALSE(chunk_worth_drawing(identity_view(kNearViewer), chunk, 0.0f, kNear));    // all of it farther
+  CHECK(chunk_worth_drawing(identity_view(kNearViewer), chunk));
+  CHECK_FALSE(chunk_worth_drawing(identity_view(kFarViewer), chunk));  // too small from there
   ScatterChunk aside = chunk;
   aside.sphere.center = kNextCell;
-  CHECK_FALSE(chunk_worth_drawing(identity_view(kNearViewer), aside, 0.0f, kForever));  // out of the view
+  CHECK_FALSE(chunk_worth_drawing(identity_view(kNearViewer), aside));  // out of the view
+}
+
+TEST_CASE("a cell is within its distances, beyond them, or across them") {
+  const ScatterChunk chunk = small_chunk_in_the_middle();  // 3 m from the viewer, 0.9 m across
+  CHECK(reach_of(identity_view(kNearViewer), chunk, 0.0f, kForever) == Reach::All);
+  CHECK(reach_of(identity_view(kNearViewer), chunk, 0.0f, kNear) == Reach::None);  // all of it farther
+  CHECK(reach_of(identity_view(kNearViewer), chunk, 0.0f, kLodBoundary) == Reach::Some);
+}
+
+TEST_CASE("two levels of detail meeting across a cell draw each copy once, by where each copy is") {
+  ScatterLayout near_set{kNearMesh, 0.0f, kLodBoundary, 0, {small_chunk_in_the_middle()}, {kNearCopy, kFarCopy}};
+  near_set.chunks[0].count = 2;
+  ScatterLayout far_set = near_set;
+  far_set.mesh = kFarMesh;
+  far_set.visible_from = kLodBoundary;
+  far_set.visible_to = kForever;
+  InstanceBatches batches;
+  batches.start();
+  gather_set(batches, identity_view(kNearViewer), near_set);
+  gather_set(batches, identity_view(kNearViewer), far_set);
+  REQUIRE(batches.batches().size() == 2);
+  CHECK(batches.batches()[0].mesh == kNearMesh);
+  CHECK(batches.batches()[1].mesh == kFarMesh);
+  CHECK(batches.slots() == std::vector<float>{0.0f, 1.0f});  // the near copy by the near set, the far by the far
 }
