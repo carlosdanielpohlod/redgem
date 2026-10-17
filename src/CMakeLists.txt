@@ -288,6 +288,12 @@ redgem_add_library(redgem_runtime
   script/bindings/network_approval_bindings.cpp
   script/bindings/http_bindings.cpp
   render/mesh_builder.cpp
+  render/sky_directions.cpp
+  render/sky_harmonics.cpp
+  render/half_float.cpp
+  render/sky_sampling.cpp
+  render/sky_cube.cpp
+  render/sky_light.cpp
   render/mesh_pieces.cpp
   render/texture_loading.cpp
   render/renderer.cpp
