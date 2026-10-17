@@ -40,7 +40,7 @@ GameServer::Room* GameServer::open_room() {
 
 void GameServer::run(Room& room) {
   room.thread->add(room.slot);
-  log::info("room " + room.slot->code() + " opened (" + std::to_string(rooms_.size()) + " of " +
+  log::info("room " + room.slot->code() + " opened (" + std::to_string(seats().size()) + " of " +
             std::to_string(settings_.limits.max_rooms) + ")");
 }
 
@@ -60,7 +60,7 @@ RoomThread* GameServer::least_busy_thread() const {
 
 int GameServer::rooms_on(const RoomThread& thread) const {
   return static_cast<int>(
-      std::count_if(rooms_.begin(), rooms_.end(), [&thread](const Room& room) { return room.thread == &thread; }));
+      std::count_if(rooms_.begin(), rooms_.end(), [&thread](const Room& room) { return room.runs_on(thread); }));
 }
 
 bool GameServer::needs_new_thread(const RoomThread* least_busy) const {

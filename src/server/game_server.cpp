@@ -36,6 +36,8 @@ bool GameServer::open_saves(std::string& error) {
 
 void GameServer::tick(float seconds) {
   const auto in_rooms = [this](const std::string& address) { return players_from(address); };
+  // (Before placing anyone: a room that closed since the last turn holds no place any more.)
+  forget_closed_rooms();
   for (net::Arrival& arrival : lobby_.poll(seconds, in_rooms)) place(std::move(arrival));
   forget_closed_rooms();
 }

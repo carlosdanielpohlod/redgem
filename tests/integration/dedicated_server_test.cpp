@@ -30,6 +30,7 @@ constexpr server::RoomLimits kTwoRoomsOfTwo{2, 2};
 constexpr server::RoomLimits kRoomy{4, 2};
 constexpr server::RoomLimits kTwoRoomsOfOne{1, 2};
 constexpr int kTwoThreads = 2;
+constexpr int kFramesToSayHello = 30;     // of a joining player's, for its hello to be on its way
 constexpr int kVisitsPerRoom = 300;       // changes each room makes to one saved value
 constexpr double kSlowLoadSeconds = 1.5;  // what a slow room's level takes to load (see kSlowScene)
 // The longest a room may go without a frame while another loads: far less than the load.
@@ -274,6 +275,25 @@ TEST_CASE("a room whose players all left closes, and its place on the server is 
   Engine& next = online_game.join();
   CHECK(online(next));
   CHECK(online_game.server.room_count() == 1);
+}
+
+TEST_CASE("a room that closed between two turns of the lobby holds no place: its server never counts too many") {
+  test::LogCapture said;
+  Online online_game(kOneRoomOfTwo);
+  Engine& first = online_game.join();
+  ruby(first, "Network.leave");
+  // The next player's hello waits at the lobby while the old room closes, before the lobby's turn.
+  Engine& next = online_game.knock();
+  for (int frame = 0; frame < kFramesToSayHello; ++frame) {
+    next.frame(config::kFixedDeltaSeconds);
+    std::this_thread::sleep_for(kRoundPause);
+  }
+  std::this_thread::sleep_for(kHalfASecond);
+  online_game.server.tick(config::kFixedDeltaSeconds);
+  CHECK(online_game.server.room_count() == 1);
+  online_game.server.stop();  // (its rooms' threads write to the log no more)
+  CHECK(said.contains("opened (1 of 1)"));
+  CHECK_FALSE(said.contains("(2 of 1)"));
 }
 
 TEST_CASE("on a dedicated server the menu never opens, the game never freezes, and saves stay in memory") {

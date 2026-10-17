@@ -91,6 +91,9 @@ class GameServer {
   struct Room {
     std::shared_ptr<RoomSlot> slot;
     RoomThread* thread;
+
+    // Whether it is still open, on `other`. (One that closed is let go at the lobby's next turn.)
+    bool runs_on(const RoomThread& other) const { return thread == &other && !slot->closed(); }
   };
 
   bool open_saves(std::string& error);
