@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <functional>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -95,10 +96,15 @@ TEST_CASE("asking a server to open a room, or saying anything but hello first, i
   Socket rude = Socket::connect_to(kLocalhost, door.lobby.port(), error);
   Connection talker = Connection::calling(std::move(rude));
   talker.send(wire::game_message("hi", nullptr, kFirstGuestId, kEveryone));
-  REQUIRE(door.until([&talker] {
+  // (Words that say no version of the protocol get a refusal that says which one is spoken here.)
+  std::optional<nlohmann::json> told;
+  REQUIRE(door.until([&] {
     talker.pump();
+    if (const auto heard = talker.next_message()) told = heard;
     return talker.closed();
   }));
+  REQUIRE(told.has_value());
+  CHECK((*told)[wire::kReason] == wire::protocol_mismatch(0));
   CHECK(door.arrivals.empty());
 }
 
