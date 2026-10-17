@@ -11,8 +11,10 @@
 //   renderer_frame_texels.cpp what the vertex shader reads of a frame: its matrices, its bones
 //   renderer_environment.cpp  lights, atmosphere and the sky
 //   renderer_objects.cpp      the scene's objects
+//   renderer_see_through.cpp  their see-through parts, after the opaque ones
 //   renderer_scatter.cpp      copies scattered in great numbers
 //   renderer_particles.cpp    particles
+//   renderer_particle_glow.cpp glowing particles held to the environment's limit
 //   renderer_shadows.cpp      the sun's shadow map
 //   renderer_reflections.cpp  the surroundings, for reflections
 //   renderer_post.cpp         from the lit picture to the one on screen
