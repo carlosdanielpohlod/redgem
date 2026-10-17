@@ -44,6 +44,16 @@ class NetworkSnapshotsTest < RedGemTest::Case
     assert_in_delta went_on_to, shown_x
   end
 
+  def test_a_late_pose_takes_the_object_on_from_where_it_went_never_back
+    arrive_along_x(3)
+    @snapshots.advance(LATE)
+    went_on_to = shown_x
+    @snapshots.add(Vector3[3, 0, 0], STILL)
+    assert_in_delta went_on_to, shown_x
+    @snapshots.advance(@snapshots.delay)
+    assert_in_delta 3.0, shown_x
+  end
+
   def test_a_teleport_is_shown_at_once_never_slid_across
     arrive_along_x(3)
     @snapshots.advance(SEND)

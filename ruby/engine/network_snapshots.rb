@@ -39,6 +39,7 @@ class NetworkSync < Behaviour
     def add(position, rotation)
       newest = @poses.last
       make_way(newest, position) if newest
+      go_on_from_shown(@clock - delay)
       @poses << Pose.new(@clock, position, rotation)
       @poses.shift while @poses.size > KEPT
     end
@@ -48,12 +49,29 @@ class NetworkSync < Behaviour
       return if @poses.empty?
 
       moment = @clock - delay
-      @poses.shift while @poses.size > 2 && @poses[1].time <= moment
+      drop_older_than(moment)
       shown = pose_at(moment)
       [shown.position, shown.rotation]
     end
 
     private
+
+    # Keeps the two poses around `moment`, or the last two before it.
+    def drop_older_than(moment)
+      @poses.shift while @poses.size > 2 && @poses[1].time <= moment
+    end
+
+    # Past its newest pose, the object went on the way it was going: a pose that comes late takes
+    # it on from where it is shown, never back to where it was.
+    def go_on_from_shown(moment)
+      return unless gone_on?(moment)
+
+      drop_older_than(moment)
+      shown = pose_at(moment)
+      @poses = [Pose.new(moment, shown.position, shown.rotation)]
+    end
+
+    def gone_on?(moment) = @poses.size > 1 && moment > @poses.last.time
 
     def make_way(newest, position)
       learn(@clock - newest.time)

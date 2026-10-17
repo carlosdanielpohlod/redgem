@@ -91,7 +91,7 @@ class NetworkSync < Behaviour
   def start
     Network.__track(self)
     @since_sent = 0.0
-    @snapshots = Snapshots.new(1.0 / SENDS_PER_SECOND, prop(:delay)&.to_f) if prop(:interpolate, true)
+    watch_afresh
   end
 
   # Hands the object to another owner, under another name on the network if need be. Only on this
@@ -101,6 +101,13 @@ class NetworkSync < Behaviour
     Network.__track(self, key.to_s)
     @owner = owner
     @key = key.to_s
+    watch_afresh
+  end
+
+  # Nothing heard of the object yet: what came from an owner before says nothing of the next.
+  def watch_afresh
+    @position = @rotation = nil
+    @snapshots = Snapshots.new(1.0 / SENDS_PER_SECOND, prop(:delay)&.to_f) if prop(:interpolate, true)
   end
 
   def on_destroy = Network.__forget(self)
