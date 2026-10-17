@@ -40,7 +40,8 @@ Without one, scenes get a clear day. Other things worth knowing: the 16 point li
 camera are used each frame (so a street can have dozens of lamps); the sun casts soft shadows
 around the camera; materials use their glTF normal, roughness/metallic, occlusion and emission
 textures; and textured materials with transparency are cut out by their alpha and sway with the
-wind (leaves, fences).
+wind (leaves, fences), on objects that sway: unless an object says `sway = true` or `false`, those
+a skeleton moves do not (a character's hair follows its head, not the wind).
 
 Glossy surfaces reflect their surroundings: the engine keeps capturing the scene around the camera
 (one cube face per frame) and uses it for reflections and ambient light.
@@ -90,8 +91,8 @@ script runs on them. The same seed places them the same on every machine of a ga
 They are drawn by patches of ground 16 m across: a patch out of view, or too far for its biggest
 copy to show, is skipped whole. Like any object, they cast shadows, and small things (grass) only
 near the camera: a tuft half a meter high stops casting one about 50 m away, a tree hundreds of
-meters away. Textured cut-out materials sway in the wind (`wind` on the environment), each copy
-with its own phase, so a field does not move in step.
+meters away. Their foliage sways in the wind (`wind` on the environment), each copy with its own
+phase, so a field does not move in step, unless their template says `sway = false`.
 
 ## Terrain
 
@@ -142,6 +143,7 @@ regenerates a whole level from code; `tools/blender/scene_kit.py` has helpers to
 | `prefab`   | `true`                                         | A template: hidden and inert in the game, copied by `Scene.spawn` |
 | `visible_from`, `visible_to` | meters                          | The object is drawn only while that far from the camera: give a model a detailed version up close and a light one far away |
 | `tint`     | `"#rrggbb"`                                    | Multiplies the colors of this object's mesh (copies sharing a mesh can differ) |
+| `sway`     | `true` / `false`                               | Whether the wind sways its foliage: unless said, yes, except on objects a skeleton moves |
 | `environment` | `true`                                      | This object's properties set the sky, fog and effects (see "Look of a scene") |
 | anything   | number / string / bool                         | Available in Ruby as `props[:name]` / `prop(:name, default)` |
 

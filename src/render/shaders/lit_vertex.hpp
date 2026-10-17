@@ -8,9 +8,9 @@ namespace redgem::shaders {
 // instanceSlot, the number of its record (see instance_records.hpp), four floats a texel and
 // TEXELS_PER_ROW texels to a row (defined for every shader when it is compiled, see
 // shader_source.hpp). A record also gives the copy's tint and where its skeleton's bones are.
-// Foliage (windAmount > 0) sways: parts higher above the copy's own origin move more, each copy
-// with its own phase, from where it stands. Skinned meshes (skinned > 0.5) are placed by their
-// skeleton: each vertex follows up to four bones, whose matrices already lead to world space.
+// Foliage (windAmount > 0) of a copy that sways (its record says) sways: parts higher above the
+// copy's own origin move more, each copy with its own phase, from where it stands. Skinned meshes (skinned > 0.5) are
+// placed by their skeleton: each vertex follows up to four bones, whose matrices already lead to world space.
 inline constexpr const char* kLitVertex = R"GLSL(
 #version 330
 in vec3 vertexPosition;
@@ -77,10 +77,11 @@ void main() {
     normalToWorld = mat3(toWorld);  // good enough for normals: they are normalized, and rigs are not sheared
   }
   vec4 world = toWorld * vec4(vertexPosition, 1.0);
-  if (windAmount > 0.0) {
+  float wind = windAmount * frameTexel(record + NORMAL_TEXEL).w;  // (the record's own, not its skeleton's)
+  if (wind > 0.0) {
     float phase = time * WIND_SPEED + (world.x + world.z) * WIND_FREQUENCY;
     float sway = sin(phase) + WIND_GUST * sin(time * WIND_GUST_SPEED + world.x);
-    float reach = windAmount * WIND_REACH * clamp((world.y - ground) / WIND_HEIGHT_FULL, 0.0, 1.0);
+    float reach = wind * WIND_REACH * clamp((world.y - ground) / WIND_HEIGHT_FULL, 0.0, 1.0);
     world.x += sway * reach;
     world.z += cos(phase) * reach;
     world.y += sway * reach * WIND_LIFT;

@@ -28,7 +28,8 @@ bool same(const Transform& a, const Transform& b) {
 
 // Whether a record would be written from the very same as last time.
 bool same(const RecordSource& a, const RecordSource& b) {
-  return same(a.world, b.world) && same(a.tint, b.tint) && a.first_bone == b.first_bone && a.record == b.record;
+  return same(a.world, b.world) && same(a.tint, b.tint) && a.first_bone == b.first_bone && a.sway == b.sway &&
+         a.record == b.record;
 }
 
 }  // namespace
@@ -50,7 +51,8 @@ std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& o
   const auto slot = static_cast<std::size_t>(object.id);
   const Bounds& bounds = mesh_bounds[static_cast<std::size_t>(object.mesh)];
   const std::optional<SkeletonPose> pose = pose_skeleton(scene, object, next_bone);
-  const render_math::InstanceLook look{object.tint, pose ? static_cast<float>(next_bone) : render_math::kNoBones};
+  const render_math::InstanceLook look{object.tint, pose ? static_cast<float>(next_bone) : render_math::kNoBones,
+                                       object.sways ? render_math::kSways : render_math::kStill};
   const render_math::Sight seen = pose ? render_math::skinned_sight_of(bounds, worlds[slot], pose->first)
                                        : render_math::sight_of(bounds, worlds[slot]);
   sights[slot] = ObjectSight{write_record(slot, look), seen, object.mesh, object.visible_from, object.visible_to};
@@ -59,7 +61,7 @@ std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& o
 
 bool Renderer::Impl::write_record(std::size_t slot, const render_math::InstanceLook& look) {
   const std::size_t record = scattered_records + slot;
-  const RecordSource source{worlds[slot], look.tint, look.first_bone, static_cast<float>(record)};
+  const RecordSource source{worlds[slot], look.tint, look.first_bone, look.sway, static_cast<float>(record)};
   RecordSource& last = record_sources[slot];
   if (same(source, last)) return true;
   if (!render_math::write_instance(texels, record, model_matrix(worlds[slot]), look)) return false;

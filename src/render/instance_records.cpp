@@ -12,6 +12,8 @@ constexpr int kRecordFloats = kTexelsPerInstance * kFloatsPerTexel;
 constexpr int kMatrixFloats = kTexelsPerMatrix * kFloatsPerTexel;
 constexpr int kNormalColumnsFloats = 3 * kFloatsPerTexel;  // the normal matrix's first three columns
 constexpr int kLookAt = kLookTexel * kFloatsPerTexel;
+constexpr int kFourthFloat = 3;
+constexpr int kSwayAt = kNormalTexel * kFloatsPerTexel + kFourthFloat;  // the normal matrix's first column has room
 constexpr int kRed = 0;
 constexpr int kGreen = 1;
 constexpr int kBlue = 2;
@@ -30,6 +32,7 @@ bool write_instance(TexelRows& texels, std::size_t number, const Matrix& model, 
   record[kLookAt + kGreen] = look.tint.y;
   record[kLookAt + kBlue] = look.tint.z;
   record[kLookAt + kBone] = look.first_bone;
+  record[kSwayAt] = look.sway;
   return texels.write(record_texel(number), record.data(), kTexelsPerInstance);
 }
 

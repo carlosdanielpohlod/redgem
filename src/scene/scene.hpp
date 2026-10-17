@@ -62,6 +62,8 @@ struct GameObject {
   float visible_from = 0.0f;
   float visible_to = std::numeric_limits<float>::infinity();
   bool prefab = false;  // a template for Scene.spawn: not simulated, not drawn
+  // Whether wind sways its foliage (prop `sway`; unless said, it does when no skeleton moves it).
+  bool sways = true;
   // For objects made by clone(): the object of the loaded scene this one copies (animations of
   // the original also move its copies) and the root of the copy it belongs to.
   ObjectId copy_of = kNoObject;

@@ -90,6 +90,7 @@ struct RecordSource {
   Transform world;
   Vec3 tint;
   float first_bone = 0.0f;
+  float sway = 0.0f;
   float record = 0.0f;  // its number
 };
 

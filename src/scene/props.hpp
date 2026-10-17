@@ -26,6 +26,9 @@ inline constexpr const char* kTint = "tint";
 // range, make a detailed one up close and a light one far away.
 inline constexpr const char* kVisibleFrom = "visible_from";
 inline constexpr const char* kVisibleTo = "visible_to";
+// Whether wind sways an object's foliage (its textured see-through materials). Not said, it does
+// unless a skeleton moves the object (a character's hair follows its head, not the wind).
+inline constexpr const char* kSway = "sway";
 
 // --- Physics: what `body` and `collider` may be set to ----------------------------
 inline constexpr const char* kBodyStatic = "static";
