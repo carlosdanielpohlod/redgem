@@ -32,7 +32,7 @@ constexpr const char* kVersionWord = "#version";
 constexpr const char* kDefineWord = "#define ";
 // Every shader the engine compiles.
 const std::string kEngineShaders[] = {shaders::kLitVertex,         shaders::lit_fragment(),
-                                      shaders::kDepthFragment,     shaders::kSkyVertex,
+                                      shaders::depth_fragment(),   shaders::kSkyVertex,
                                       shaders::kSkyFragment,       shaders::kParticleFragment,
                                       shaders::kPanoramaFragment,  shaders::kAmbientOcclusionFragment,
                                       shaders::kBrightFragment,    shaders::kBlurFragment,
@@ -101,4 +101,12 @@ TEST_CASE("the lit vertex shader holds no array of bones: a skeleton's bones are
   CHECK_FALSE(contains(shaders::kLitVertex, "boneMatrices["));
   CHECK(contains(shaders::kLitVertex, std::string("uniform sampler2D ") + shaders::kFrameTexels));
   CHECK(contains(shaders::kLitVertex, "texelFetch"));
+}
+
+TEST_CASE("the lit pass and the shadow map's leave out the same pixels of a fading copy, written once") {
+  constexpr const char* kNoiseName = "NOISE_WEIGHTS =";
+  for (const std::string& source : {shaders::lit_fragment(), shaders::depth_fragment()}) {
+    CHECK(source.find(shaders::kCopyFade) != std::string::npos);
+    CHECK(source.find(kNoiseName) == source.rfind(kNoiseName));  // defined once
+  }
 }

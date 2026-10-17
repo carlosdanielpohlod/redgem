@@ -41,6 +41,7 @@ unsigned int reflectance_texture() {
   const int side = render_math::kReflectanceTableSize;
   const unsigned int id = rlLoadTexture(table.data(), side, side, kLightFormat, kOneLevel);
   rlTextureParameters(id, RL_TEXTURE_MIN_FILTER, RL_TEXTURE_FILTER_LINEAR);
+  rlTextureParameters(id, RL_TEXTURE_MAG_FILTER, RL_TEXTURE_FILTER_LINEAR);  // read between its entries
   rlTextureParameters(id, RL_TEXTURE_WRAP_S, RL_TEXTURE_WRAP_CLAMP);
   rlTextureParameters(id, RL_TEXTURE_WRAP_T, RL_TEXTURE_WRAP_CLAMP);
   return id;

@@ -117,6 +117,20 @@ TEST_CASE("a sky picture and the renderer's quality are read as the environment 
   CHECK(low.sky_intensity == doctest::Approx(0.0f));
 }
 
+TEST_CASE("numbers far past the renderer's quality limits are held to them") {
+  constexpr double kHuge = 1.0e30;  // far more than an int holds
+  PropertyMap props;
+  props["msaa"] = kHuge;
+  props["shadow_cascades"] = kHuge;
+  props["shadow_distance"] = 0.0;
+  const Environment high = environment_from_props(props);
+  CHECK(high.msaa == 8);
+  CHECK(high.shadow_cascades == 4);
+  CHECK(high.shadow_distance > 0.0f);  // a cascade of no size would divide by nothing
+  props["shadow_cascades"] = -kHuge;
+  CHECK(environment_from_props(props).shadow_cascades == 1);
+}
+
 TEST_CASE("glowing particles have no limit unless the environment sets one") {
   constexpr double kLimit = 3.0;
   CHECK(default_environment().glow_limit == doctest::Approx(0.0f));

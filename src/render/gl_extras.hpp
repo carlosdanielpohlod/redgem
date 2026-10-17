@@ -2,7 +2,8 @@
 
 // The few graphics calls raylib's rlgl does not offer, the same on desktop OpenGL 3.3 and on
 // OpenGL ES 3 (whose headers this part alone includes): a picture drawn with several samples per
-// pixel, alpha to coverage, and cube maps filtered across their faces' seams.
+// pixel, depth textures of the same format as its depth, alpha to coverage, and cube maps
+// filtered across their faces' seams.
 
 namespace redgem::render_detail {
 
@@ -19,8 +20,13 @@ struct Multisampled {
 };
 Multisampled load_multisampled(int width, int height, int samples);
 void release(Multisampled& target);
-// Averages its samples into the color and depth of `framebuffer` (of the same size).
-void resolve(const Multisampled& target, unsigned int framebuffer);
+// Averages its samples into the color and depth of `framebuffer` (of the same size, its depth a
+// depth_texture). False when the graphics card would not.
+bool resolve(const Multisampled& target, unsigned int framebuffer);
+
+// A depth texture of 24 bits, as a Multisampled's depth is: depth is only copied between the two
+// when their formats are the same.
+unsigned int depth_texture(int width, int height);
 
 // While on, a fragment's alpha says how many of its pixel's samples it covers.
 void set_alpha_to_coverage(bool on);

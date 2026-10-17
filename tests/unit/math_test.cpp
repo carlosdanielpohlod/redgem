@@ -82,3 +82,11 @@ TEST_CASE("vectors and quaternions are read from runs of floats") {
   CHECK(quat.z == doctest::Approx(4.0f));
   CHECK(quat.w == doctest::Approx(5.0f));
 }
+
+TEST_CASE("mix goes from one point to another along the share asked") {
+  const Vec3 from{0.0f, 2.0f, -4.0f};
+  const Vec3 to{4.0f, 2.0f, 4.0f};
+  CHECK(approx_equal(mix(from, to, 0.0f), from, kTolerance));
+  CHECK(approx_equal(mix(from, to, 1.0f), to, kTolerance));
+  CHECK(approx_equal(mix(from, to, 0.25f), Vec3{1.0f, 2.0f, -2.0f}, kTolerance));
+}

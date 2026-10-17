@@ -18,8 +18,18 @@ FloatImage held_to_sky_light(FloatImage picture) {
   return picture;
 }
 
+namespace {
+
+// The picture as it lights the scene: shrunk and held down; a picture with no pixels, a black sky.
+FloatImage lighting_picture(const FloatImage& picture) {
+  if (picture.empty()) return black_image(1, 1);
+  return held_to_sky_light(shrunk(picture, shrink_to_fit(picture.width, kSkyLightWidest)));
+}
+
+}  // namespace
+
 SkyLight sky_light_of(const FloatImage& picture) {
-  const FloatImage light = held_to_sky_light(shrunk(picture, shrink_to_fit(picture.width, kSkyLightWidest)));
+  const FloatImage light = lighting_picture(picture);
   return {sky_irradiance(light), sky_reflection_cube(picture_pyramid(light))};
 }
 

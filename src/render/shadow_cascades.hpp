@@ -18,6 +18,8 @@ namespace redgem::render_math {
 inline constexpr int kMaxShadowCascades = 4;  // MAX_CASCADES in the lit shader
 // How the slices are cut: 0 evenly, 1 each a constant factor deeper than the last.
 inline constexpr float kCascadeSplitBlend = 0.75f;
+// Meters above the sphere a cascade covers where what casts a shadow into it still counts.
+inline constexpr float kCastersAbove = 100.0f;
 
 // How far each slice reaches, meters from the camera: the last at `distance`.
 using CascadeEnds = std::array<float, kMaxShadowCascades>;
@@ -52,8 +54,12 @@ struct Cascade {
 struct Cascades {
   std::array<Cascade, kMaxShadowCascades> cascades{};
   int count = 0;
+  // Meters back each cascade's sun view sits: at least kCastersAbove beyond the largest cascade's
+  // sphere. The sun's view holds depth up to twice that.
+  float sun_distance = kShadowSunDistance;
 };
-// One cascade covers the map's single square (as without cascades); more share it, a quarter each.
+// One cascade covers the map's single square (as without cascades); more share it, a quarter each,
+// with the sun far enough back to hold the farthest slice (see Cascades::sun_distance).
 Cascades fit_cascades(const CascadeCamera& camera, Vec3 to_sun, int count, float distance);
 
 // The texels of one cascade's tile along a side.

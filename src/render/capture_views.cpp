@@ -25,7 +25,7 @@ SunView fit_sun_view(Vector3 camera_position, Vector3 camera_target, Vec3 to_sun
   return snapped_sun_view(ahead, to_sun, kShadowExtent / static_cast<float>(kShadowMapSize));
 }
 
-SunView snapped_sun_view(Vector3 ahead, Vec3 to_sun, float texel_size) {
+SunView snapped_sun_view(Vector3 ahead, Vec3 to_sun, float texel_size, float distance) {
   const Vector3 sun_axis = to_raylib(to_sun);
   const Vector3 map_vertical = shadow_map_vertical(sun_axis);
   const Vector3 map_right = Vector3Normalize(Vector3CrossProduct(map_vertical, sun_axis));
@@ -35,7 +35,7 @@ SunView snapped_sun_view(Vector3 ahead, Vec3 to_sun, float texel_size) {
   const Vector3 upward = Vector3Scale(map_up, snapped_down(Vector3DotProduct(ahead, map_up), texel_size));
   const Vector3 focus =
       Vector3Add(Vector3Add(across, upward), Vector3Scale(sun_axis, Vector3DotProduct(ahead, sun_axis)));
-  return {Vector3Add(focus, Vector3Scale(sun_axis, kShadowSunDistance)), focus, map_vertical};
+  return {Vector3Add(focus, Vector3Scale(sun_axis, distance)), focus, map_vertical};
 }
 
 // --- Reflections -----------------------------------------------------------------------------

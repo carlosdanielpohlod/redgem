@@ -17,17 +17,25 @@ constexpr std::string_view kRgbeFormat = "32-bit_rle_rgbe";
 constexpr std::string_view kRowsFromTop = "-Y ";
 constexpr std::string_view kColumnsFromLeft = " +X ";
 constexpr std::size_t kMaxHeaderBytes = 65536;  // real headers are a few lines
+constexpr char kCarriageReturn = '\r';          // what a line written on Windows ends with, before its newline
 
-// One line of text: what it says (without its newline) and where the next starts.
+// One line of text: what it says (without its newline, nor a carriage return before it) and where
+// the next starts.
 struct Line {
   std::string_view text;
   std::size_t next = 0;
 };
 
+std::string_view without_carriage_return(std::string_view text) {
+  if (!text.empty() && text.back() == kCarriageReturn) text.remove_suffix(1);
+  return text;
+}
+
 std::optional<Line> line_at(const std::uint8_t* data, std::size_t size, std::size_t at) {
   const std::size_t limit = std::min(size, kMaxHeaderBytes);
   for (std::size_t end = at; end < limit; ++end) {
-    if (data[end] == '\n') return Line{{reinterpret_cast<const char*>(data) + at, end - at}, end + 1};
+    if (data[end] != '\n') continue;
+    return Line{without_carriage_return({reinterpret_cast<const char*>(data) + at, end - at}), end + 1};
   }
   return std::nullopt;
 }

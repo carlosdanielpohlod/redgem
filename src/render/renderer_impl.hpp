@@ -179,6 +179,7 @@ struct Renderer::Impl {
   RenderTexture2D occlusion_a{};  // ambient occlusion (ping-pong with occlusion_b for the blur)
   RenderTexture2D occlusion_b{};
   render_detail::Multisampled scene_samples;  // the lit scene of several samples a pixel (msaa), resolved into hdr
+  bool samples_unusable = false;              // the card could not copy them into hdr: one sample a pixel from then on
   bool covering = false;                      // the pass being drawn smooths cut-out edges with those samples
   RenderTexture2D scene_depth{};              // the depth of the scene's surfaces, copied for soft particles (no color)
   // Glowing particles gathered apart, to be added within the environment's limit: made when first
@@ -256,6 +257,9 @@ struct Renderer::Impl {
   // of `samples` a pixel (none for 0).
   void ensure_targets(int width, int height, int samples);
   void make_targets(int width, int height);
+  // Copies the picture of several samples a pixel into hdr; when the card cannot, says so once and
+  // draws one sample a pixel from then on.
+  void resolve_samples();
   void ensure_glow_target();
   void release_targets();
   void release_fixed_targets();

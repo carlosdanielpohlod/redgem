@@ -36,7 +36,8 @@ std::uint32_t shrink_to_fit(std::uint32_t side, std::uint32_t widest);
 void add_share(FloatImage& image, std::uint32_t x, std::uint32_t y, Vec3 light, float share);
 
 // Every `shrink` x `shrink` block of pixels averaged into one (what is left over at the right and
-// bottom edges is dropped). `shrink` 1 returns the picture as it is.
+// bottom edges is dropped). `shrink` 1 returns the picture as it is. Never past a pixel along
+// either side: a picture far wider than tall is shrunk only as much as its height allows.
 FloatImage shrunk(const FloatImage& image, std::uint32_t shrink);
 
 }  // namespace redgem

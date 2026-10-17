@@ -11,8 +11,6 @@ namespace {
 // The looks' dice start apart from the places' (the same seed must not make them follow each other).
 constexpr std::uint64_t kLooksSeed = 0x6C6F6F6B00000000ULL;  // "look", above the 32 bits of a seed
 
-Vec3 mix(Vec3 a, Vec3 b, float t) { return a + (b - a) * t; }
-
 // The color at `along` (0..1) of the way through the list.
 Vec3 along_tints(const std::vector<Vec3>& tints, float along) {
   if (tints.size() == 1) return tints.front();
