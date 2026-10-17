@@ -102,6 +102,7 @@ add_executable(redgem_tests
   integration/scene_script_test.cpp
   integration/ui_input_test.cpp
   integration/gameplay_api_test.cpp
+  integration/scatter_test.cpp
   integration/native_arguments_test.cpp
   integration/message_values_test.cpp
   integration/connection_test.cpp

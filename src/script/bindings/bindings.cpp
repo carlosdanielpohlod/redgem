@@ -10,6 +10,7 @@ void install_world_bindings(mrb_state* mrb) {
   install_game_object_bindings(mrb);
   install_transform_bindings(mrb);
   install_scene_bindings(mrb);
+  install_scatter_bindings(mrb);
   install_camera_bindings(mrb);
   install_physics_bindings(mrb);
 }

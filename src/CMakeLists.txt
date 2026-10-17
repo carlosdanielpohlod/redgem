@@ -14,6 +14,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_screen.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/scatter.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_said.rb
@@ -227,6 +228,7 @@ redgem_add_library(redgem_runtime
   script/bindings/vector3_bindings.cpp
   script/bindings/transform_bindings.cpp
   script/bindings/scene_bindings.cpp
+  script/bindings/scatter_bindings.cpp
   script/bindings/camera_bindings.cpp
   script/bindings/physics_bindings.cpp
   script/bindings/runtime_bindings.cpp

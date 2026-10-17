@@ -59,9 +59,36 @@ variable (read by `redgem` and `redgem-test`), or `--gpu auto|dedicated|integrat
 environment, which wins over the saved setting.
 
 **Performance.** Objects outside the view, and parts too small to see from where the camera is, are
-not drawn. What costs most is the number of separate objects on screen, more than their triangles:
-join the parts of a model that share a material, and give heavy models lighter versions for far
-away with `visible_from` and `visible_to`.
+not drawn. Objects that share a mesh (linked duplicates in Blender, Alt+D, or copies of one model)
+are drawn together, every copy of a part in one call, however many there are: a street of the
+same building costs little more than one. What still costs is the number of different meshes on
+screen, and of separate parts in each: join the parts of a model that share a material, and give
+heavy models lighter versions for far away with `visible_from` and `visible_to`.
+
+## Grass, forests and cities
+
+Tens of thousands of copies (a meadow's grass, a forest) are too many to be objects: a script
+scatters them instead (`Scatter.place`, see the [API reference](scripting/api.md)). Model one tuft
+or one tree, give it `prefab = true` so the template itself is hidden in the game, and scatter it
+over the ground from a scene script's `setup`:
+
+```ruby
+Scatter.place("GrassTuft", count: 50_000, area: [Vector3[-80, 0, -80], Vector3[80, 0, 80]],
+              ground: find("Ground"), seed: 7, scale: 0.7..1.4, align: true)
+Scatter.place("Tree", count: 2_000, area: [Vector3[-140, 0, -140], Vector3[140, 0, -90]],
+              ground: find("Ground"), seed: 8, scale: 0.8..1.5)
+```
+
+The copies take the template's own mesh (a model whose parts are children: join them), its tint
+and its `visible_from` / `visible_to`. They are only drawn: nothing collides with them (give the
+trees a collider of their own, or invisible objects, where players must not walk through) and no
+script runs on them. The same seed places them the same on every machine of a game.
+
+They are drawn by patches of ground 16 m across: a patch out of view, or too far for its biggest
+copy to show, is skipped whole. Like any object, they cast shadows, and small things (grass) only
+near the camera: a tuft half a meter high stops casting one about 50 m away, a tree hundreds of
+meters away. Textured cut-out materials sway in the wind (`wind` on the environment), each copy
+with its own phase, so a field does not move in step.
 
 ## Terrain
 

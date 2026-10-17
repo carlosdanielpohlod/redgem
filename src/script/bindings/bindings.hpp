@@ -12,6 +12,7 @@ void install_vector3_bindings(mrb_state* mrb);
 void install_game_object_bindings(mrb_state* mrb);
 void install_transform_bindings(mrb_state* mrb);
 void install_scene_bindings(mrb_state* mrb);
+void install_scatter_bindings(mrb_state* mrb);
 void install_camera_bindings(mrb_state* mrb);
 void install_physics_bindings(mrb_state* mrb);
 void install_runtime_bindings(mrb_state* mrb);
