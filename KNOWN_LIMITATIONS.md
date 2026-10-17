@@ -26,7 +26,12 @@ the same pull request.
 
 - No blend trees or animation state machines: scripts choose and mix clips themselves.
 - Particles are not lit and cast no shadows.
-- Images must be PNG or JPEG, at most 8192 pixels a side.
+- Images must be PNG or JPEG, at most 8192 pixels a side (a sky picture may also be Radiance
+  `.hdr`). Blender's exporter can write WebP and KTX2 textures: neither is read (no decoder for
+  them is among the libraries the engine is built with).
+- A sky picture, shadow cascades and `msaa` have been seen on desktop OpenGL only, not on a phone.
+  On OpenGL ES 3 they rely on what the engine already needs there (half-float textures that can
+  be drawn into): a phone that cannot draw several samples a pixel draws one, and says so.
 
 ## Multiplayer
 
