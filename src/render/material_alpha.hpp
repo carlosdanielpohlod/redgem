@@ -44,8 +44,8 @@ AlphaTest alpha_test(const MaterialDesc& material, float wind, AlphaPass pass);
 // Whether a material is drawn again after the opaque surfaces, mixed with what is behind them.
 bool drawn_see_through(const MaterialDesc& material);
 
-// See-through surfaces to draw: an object's copy of a mesh (`count` 1), or a run of scattered
-// copies, which are not sorted among themselves. `first`: where its record numbers start among
+// See-through surfaces to draw: an object's copy of a mesh (`count` 1), or the scattered copies of
+// one cell, which are not sorted among themselves. `first`: where its record numbers start among
 // the pass's.
 struct SeeThroughDraw {
   float distance = 0.0f;  // from the viewer, in meters (squared: only the order matters)

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "render/instance_batches.hpp"
+#include "render/material_alpha.hpp"
 #include "render/visibility.hpp"
 #include "scene/scatter.hpp"
 #include "scene/scene_desc.hpp"
@@ -57,5 +58,20 @@ ScatterLayout lay_out_copies(const ScatterSet& set, const Bounds& bounds, std::s
 // Adds to `batches` the copies of a set the view draws: whole cells, and the copies of a cell
 // across the distances the set is drawn at that are within them.
 void gather_set(InstanceBatches& batches, const View& view, const ScatterLayout& layout);
+
+// Copies of one mesh a pass gathered: `count` record numbers from `first` on in what it gathered
+// (InstanceBatches::slots). The pass's record numbers start at `pass_first` among the frame's
+// (what SeeThroughDraw::first counts).
+struct GatheredRun {
+  int mesh = kNoIndex;
+  std::size_t first = 0;
+  std::size_t count = 0;
+  std::size_t pass_first = 0;
+};
+// Adds to `draws` the see-through parts of scattered copies, cell by cell, each cell at the
+// distance of its middle: sorted among the objects, at a draw call a cell rather than one a copy.
+// (The copies of a cell are not sorted among themselves.)
+void add_see_through_cells(std::vector<SeeThroughDraw>& draws, const std::vector<float>& records,
+                           const std::vector<ScatterLayout>& layouts, const GatheredRun& run, Vec3 viewer);
 
 }  // namespace redgem::render_math

@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <cmath>
+#include <limits>
 
 #include "scene/particles.hpp"
 
@@ -230,6 +231,14 @@ TEST_CASE("a flipbook shows its cells over the particle's life, or round and rou
   CHECK(flipbook_frame(looping, 0.35f, kLife) == 3);
   CHECK(flipbook_frame(looping, 0.85f, kLife) == 0);    // round again after the eighth
   CHECK(flipbook_frame(Flipbook{}, 1.0f, kLife) == 0);  // a single picture
+}
+
+TEST_CASE("a flipbook played very fast for very long still shows one of its cells") {
+  constexpr float kLongAge = 1.0e9f;  // seconds: more cells go by than an int can count
+  const Flipbook fastest{4, 2, std::numeric_limits<float>::max()};
+  const int frame = flipbook_frame(fastest, kLongAge, kLongAge);
+  CHECK(frame >= 0);
+  CHECK(frame < fastest.frames());
 }
 
 TEST_CASE("glowing particles shine with their own light, even when asked to be lit") {

@@ -4,8 +4,9 @@
 #include <mruby.h>
 #include <mruby/array.h>
 
-#include <cmath>
+#include <algorithm>
 
+#include "scene/color_space.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 
@@ -16,17 +17,16 @@ using namespace binding;
 
 // Scripts give colors as the interface does: red, green and blue from 0 to 255, as color pickers
 // show them (sRGB). Lights shine in linear light.
-constexpr mrb_float kMaxChannel = 255.0;
-constexpr double kSrgbGamma = 2.2;
 constexpr mrb_int kChannels = 3;
 
 float linear_from_channel(mrb_state* mrb, mrb_int channel) {
-  const mrb_float shown = from_to(mrb, static_cast<mrb_float>(channel), 0.0, kMaxChannel, "a light's color channel");
-  return static_cast<float>(std::pow(shown / kMaxChannel, kSrgbGamma));
+  return linear_from_srgb(channel_from(mrb, static_cast<mrb_float>(channel), "a light's color channel"));
 }
 
-mrb_value channel_shown(mrb_state* mrb, float linear) {
-  return mrb_int_value(mrb, static_cast<mrb_int>(std::lround(std::pow(linear, 1.0 / kSrgbGamma) * kMaxChannel)));
+// A channel of a light as scripts see it. A light may shine brighter than white (or, set from a
+// file, below black): it shows as the color closest to it that Light#color= takes.
+mrb_value shown_from_linear(mrb_state* mrb, float linear) {
+  return channel_shown(mrb, srgb_from_linear(std::clamp(linear, 0.0f, 1.0f)));
 }
 
 // The light of the object a Light stands for.
@@ -53,7 +53,7 @@ mrb_value light_set_intensity(mrb_state* mrb, mrb_value self) {
 mrb_value light_color(mrb_state* mrb, mrb_value self) {
   const Color& color = light_of(mrb, self).color;
   mrb_value channels = mrb_ary_new_capa(mrb, kChannels);
-  for (const float channel : {color.r, color.g, color.b}) mrb_ary_push(mrb, channels, channel_shown(mrb, channel));
+  for (const float channel : {color.r, color.g, color.b}) mrb_ary_push(mrb, channels, shown_from_linear(mrb, channel));
   return channels;
 }
 

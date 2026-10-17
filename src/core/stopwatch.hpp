@@ -19,6 +19,9 @@ class Stopwatch {
   explicit Stopwatch(Reading reading = {});
   // Seconds since the last lap, or since it was made for the first one.
   float lap();
+  // Starts the next lap now: what went by since the last one (a game starting, a scene loading)
+  // does not count.
+  void restart();
 
  private:
   Reading reading_;

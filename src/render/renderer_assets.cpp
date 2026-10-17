@@ -134,6 +134,8 @@ void Renderer::Impl::release_meshes() {
   }
   meshes.clear();
   mesh_bounds.clear();
+  see_through_meshes.clear();
+  any_see_through = false;
 }
 
 }  // namespace redgem

@@ -1,11 +1,13 @@
 // System test: see-through materials as the renderer draws them, read back as pixels: blended
-// cards mixed the farthest first whatever order the scene lists them in, a nearly opaque one
-// hiding what is behind it, and a dithered one leaving out a share of its pixels.
+// cards mixed the farthest first whatever order the scene lists them in, scattered ones among
+// them, a nearly opaque one hiding what is behind it, a dithered one leaving out a share of its
+// pixels, and a card seen in a mirror.
 #include <doctest/doctest.h>
 
 #include <string>
 
 #include "render_system/render_stage.hpp"
+#include "scene/scatter.hpp"
 
 using namespace redgem;
 using redgem::test::Picture;
@@ -20,11 +22,15 @@ constexpr float kHalfSeen = 0.5f;             // alpha of a card half see-throug
 constexpr Vec3 kCardSize{4.0f, 4.0f, 0.02f};  // meters: thin, facing the camera
 constexpr float kNear = 2.0f;                 // meters along z
 constexpr float kFar = 0.0f;
-constexpr float kRegion = 0.1f;       // of the picture, around its middle, where pixels are counted
-constexpr float kFewestShare = 0.2f;  // of the region: each color a dithered card shows at least this
+constexpr float kRegion = 0.1f;         // of the picture, around its middle, where pixels are counted
+constexpr float kFewestShare = 0.2f;    // of the region: each color a dithered card shows at least this
+constexpr int kNearCardNode = 1;        // of two_cards: after the camera
+constexpr float kBehindCamera = 14.0f;  // meters along z: what only a mirror shows
+constexpr int kFullTurn = 7;            // frames: reflections capture one cube face a frame, six in all
 
 bool greener_than_red(::Color c) { return c.g > c.r; }
 bool redder_than_green(::Color c) { return c.r > c.g; }
+bool greener_than_blue(::Color c) { return c.g > c.b; }
 
 MaterialDesc card_material(redgem::Color color, AlphaMode mode) {
   MaterialDesc material = test::glowing_material(color, kGlow);
@@ -54,6 +60,28 @@ SceneDesc two_cards(const MaterialDesc& near, const MaterialDesc& far) {
   RenderStage stage;
   stage.upload(desc);
   return stage.draw(Scene::from_desc(desc), name).at(kMiddle, kMiddle);
+}
+
+// A camera facing a mirror; behind the camera, a half see-through green card when `with_card`.
+SceneDesc mirror_room(bool with_card) {
+  MaterialDesc mirror;
+  mirror.metallic = 1.0f;
+  mirror.roughness = 0.0f;
+  SceneDesc desc;
+  desc.materials = {mirror, card_material({0.0f, 1.0f, 0.0f, kHalfSeen}, AlphaMode::Blend)};
+  desc.meshes = {test::cube_mesh(0), test::cube_mesh(1)};
+  desc.nodes = {test::camera_at(kCameraAt), card("Mirror", 0, kFar)};
+  if (with_card) desc.nodes.push_back(card("Behind", 1, kBehindCamera));
+  return desc;
+}
+
+// The middle of the mirror once its reflections have gone all the way round.
+::Color mirrored(const SceneDesc& desc, const std::string& name) {
+  RenderStage stage;
+  stage.upload(desc);
+  const Scene scene = Scene::from_desc(desc);
+  for (int frame = 1; frame < kFullTurn; ++frame) stage.draw(scene, name);
+  return stage.draw(scene, name).at(kMiddle, kMiddle);
 }
 
 // The share of the pixels around the middle of a picture that `wanted` picks.
@@ -96,4 +124,27 @@ TEST_CASE("a dithered card leaves out a share of its pixels instead of mixing th
   const Picture picture = stage.draw(Scene::from_desc(desc), "see_through_dithered");
   CHECK(share_around_middle(picture, greener_than_red) > kFewestShare);
   CHECK(share_around_middle(picture, redder_than_green) > kFewestShare);
+}
+
+TEST_CASE("a see-through card shows in a mirror's reflections") {
+  const ::Color without = mirrored(mirror_room(false), "see_through_mirror_empty");
+  const ::Color with = mirrored(mirror_room(true), "see_through_mirror_card");
+  CHECK_FALSE(greener_than_blue(without));  // the sky, as a mirror shows it
+  CHECK(greener_than_blue(with));
+}
+
+TEST_CASE("scattered see-through cards are mixed among the objects' the farthest first") {
+  SceneDesc desc = two_cards(card_material({0.0f, 1.0f, 0.0f, kHalfSeen}, AlphaMode::Blend),
+                             card_material({1.0f, 0.0f, 0.0f, kHalfSeen}, AlphaMode::Blend));
+  desc.nodes.erase(desc.nodes.begin() + kNearCardNode);  // the near green card is scattered instead
+  ScatterSet near_cards;
+  near_cards.mesh = 0;
+  near_cards.places = {card("Near", 0, kNear).local};
+  RenderStage stage;
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  scene.scattered().add(near_cards);
+  const ::Color seen = stage.draw(scene, "see_through_scattered_sorted").at(kMiddle, kMiddle);
+  CHECK(greener_than_red(seen));  // the near green copy was mixed over the far red object
+  CHECK(seen.r > 0);
 }

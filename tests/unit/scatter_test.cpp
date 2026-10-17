@@ -259,3 +259,29 @@ TEST_CASE("copies are scaled by their template's own scale, on top of their own"
   CHECK(places.front().scale.x == doctest::Approx(own * 2.0f));
   CHECK(places.front().scale.y == doctest::Approx(own * 3.0f));
 }
+
+TEST_CASE("scattered see-through copies are drawn cell by cell, sorted by the distance of their cell") {
+  constexpr Vec3 kNearCell{0.0f, 0.0f, 2.0f};
+  constexpr Vec3 kFarCell{0.0f, 0.0f, 40.0f};
+  constexpr std::size_t kObjectRecord = 7;  // after every scattered copy's
+  constexpr std::size_t kPassFirst = 10;    // where the pass's record numbers start among the frame's
+  const ScatterLayout layout{
+      kNearMesh,
+      0.0f,
+      kForever,
+      true,
+      0,
+      {{0, 1, {kNearCell, kChunkRadius}, kSmallCopy}, {1, 2, {kFarCell, kChunkRadius}, kSmallCopy}},
+      {kNearCell, kFarCell, kFarCell}};
+  const std::vector<float> records{static_cast<float>(kObjectRecord), 0.0f, 1.0f, 2.0f};  // an object, then the copies
+  std::vector<SeeThroughDraw> draws;
+  add_see_through_cells(draws, records, {layout}, GatheredRun{kNearMesh, 1, 3, kPassFirst}, Vec3::zero());
+  sort_back_to_front(draws);
+  REQUIRE(draws.size() == 2);
+  CHECK(draws[0].first == kPassFirst + 2);  // the far cell's two copies first
+  CHECK(draws[0].count == 2);
+  CHECK(draws[0].distance == doctest::Approx(dot(kFarCell, kFarCell)));
+  CHECK(draws[1].first == kPassFirst + 1);
+  CHECK(draws[1].count == 1);
+  CHECK(draws[1].mesh == kNearMesh);
+}

@@ -56,6 +56,7 @@ void Engine::initialize() {
   fill_context(manifest.settings.title);
   if (serves_a_room()) network_.serve_room(options_.server_room);  // before any script asks
   start_scripts();
+  network_watch_.restart();  // the network's time starts with the game, not with its loading
 }
 
 void Engine::build_world() {

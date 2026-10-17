@@ -110,6 +110,12 @@ double finite_number(mrb_state* mrb, mrb_value value, const char* refusal);
 
 // A color from its channels, each 0 to 255 as Ruby passes them.
 Color color_from(mrb_int r, mrb_int g, mrb_int b, mrb_int a);
+// One channel of a color as scripts give it, 0 to 255 as color pickers show it, as a share from 0
+// to 1: an ArgumentError saying "<what> must be ..." outside that range.
+float channel_from(mrb_state* mrb, mrb_float channel, const char* what);
+// A share from 0 to 1 as scripts see a channel: 0 to 255, rounded. A share past either end (a light
+// brighter than white) shows as that end, which channel_from takes back.
+mrb_value channel_shown(mrb_state* mrb, float share);
 
 mrb_value object_or_nil(mrb_state* mrb, ObjectId object);
 
