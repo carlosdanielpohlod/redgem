@@ -2,9 +2,11 @@
 
 #include <chrono>
 
+#include "integration/wire_text.hpp"
 #include "net/frame_buffer.hpp"
 
 using namespace redgem::net;
+using redgem::test::raw_frame;
 
 namespace {
 
@@ -17,7 +19,7 @@ constexpr std::chrono::seconds kFloodPatience{2};  // far more than cutting them
 }  // namespace
 
 TEST_CASE("a message is framed by its length and comes back whole") {
-  const std::vector<std::uint8_t> bytes = frame("hello");
+  const std::vector<std::uint8_t> bytes = raw_frame("hello");
   REQUIRE(bytes.size() == kLengthBytes + 5);
   CHECK(bytes[kLengthBytes - 1] == 5);
   FrameBuffer buffer;
@@ -27,9 +29,9 @@ TEST_CASE("a message is framed by its length and comes back whole") {
 }
 
 TEST_CASE("messages arriving in pieces, or several at once, are cut apart correctly") {
-  std::vector<std::uint8_t> stream = frame("first");
-  const std::vector<std::uint8_t> second = frame("");
-  const std::vector<std::uint8_t> third = frame("the third one");
+  std::vector<std::uint8_t> stream = raw_frame("first");
+  const std::vector<std::uint8_t> second = raw_frame("");
+  const std::vector<std::uint8_t> third = raw_frame("the third one");
   stream.insert(stream.end(), second.begin(), second.end());
   stream.insert(stream.end(), third.begin(), third.end());
   FrameBuffer buffer;
@@ -52,19 +54,19 @@ TEST_CASE("a message announced as longer than allowed breaks the buffer for good
   buffer.append(kHugeLength, sizeof(kHugeLength));
   CHECK_FALSE(buffer.next().has_value());
   CHECK(buffer.broken());
-  const std::vector<std::uint8_t> fine = frame("fine");
+  const std::vector<std::uint8_t> fine = raw_frame("fine");
   buffer.append(fine.data(), fine.size());
   CHECK_FALSE(buffer.next().has_value());
 }
 
 TEST_CASE("an empty message and the longest one allowed both come back whole") {
   FrameBuffer buffer;
-  const std::vector<std::uint8_t> empty = frame("");
+  const std::vector<std::uint8_t> empty = raw_frame("");
   CHECK(empty.size() == kLengthBytes);
   buffer.append(empty.data(), empty.size());
   CHECK(buffer.next() == std::string());
   const std::string longest(kMaxFrameBytes, 'x');
-  const std::vector<std::uint8_t> bytes = frame(longest);
+  const std::vector<std::uint8_t> bytes = raw_frame(longest);
   buffer.append(bytes.data(), bytes.size());
   CHECK(buffer.next() == longest);
   CHECK_FALSE(buffer.broken());
@@ -72,7 +74,7 @@ TEST_CASE("an empty message and the longest one allowed both come back whole") {
 
 TEST_CASE("one byte more than allowed breaks the buffer before any of the message is kept") {
   FrameBuffer buffer;
-  const std::vector<std::uint8_t> bytes = frame(std::string(kMaxFrameBytes + 1, 'x'));
+  const std::vector<std::uint8_t> bytes = raw_frame(std::string(kMaxFrameBytes + 1, 'x'));
   buffer.append(bytes.data(), kLengthBytes);
   CHECK_FALSE(buffer.next().has_value());
   CHECK(buffer.broken());
@@ -80,7 +82,7 @@ TEST_CASE("one byte more than allowed breaks the buffer before any of the messag
 
 TEST_CASE("a length still arriving is waited for") {
   FrameBuffer buffer;
-  const std::vector<std::uint8_t> bytes = frame("late");
+  const std::vector<std::uint8_t> bytes = raw_frame("late");
   buffer.append(bytes.data(), kLengthBytes - 1);
   CHECK_FALSE(buffer.next().has_value());
   CHECK_FALSE(buffer.broken());
@@ -89,7 +91,7 @@ TEST_CASE("a length still arriving is waited for") {
 }
 
 TEST_CASE("a flood of tiny messages is cut apart in the time it takes to read them once") {
-  const std::vector<std::uint8_t> tiny = frame("{\"k\":\"i\"}");
+  const std::vector<std::uint8_t> tiny = raw_frame("{\"k\":\"i\"}");
   std::vector<std::uint8_t> flood;
   while (flood.size() < kFloodBytes) flood.insert(flood.end(), tiny.begin(), tiny.end());
   FrameBuffer buffer;
@@ -105,8 +107,8 @@ TEST_CASE("a flood of tiny messages is cut apart in the time it takes to read th
 }
 
 TEST_CASE("what arrives after messages were taken continues where they ended") {
-  const std::vector<std::uint8_t> first = frame("first");
-  const std::vector<std::uint8_t> second = frame("second");
+  const std::vector<std::uint8_t> first = raw_frame("first");
+  const std::vector<std::uint8_t> second = raw_frame("second");
   FrameBuffer buffer;
   buffer.append(first.data(), first.size());
   buffer.append(second.data(), kLengthBytes + 1);

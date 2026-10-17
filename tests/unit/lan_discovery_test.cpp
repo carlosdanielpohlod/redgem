@@ -6,6 +6,7 @@
 #include <nlohmann/json.hpp>
 
 #include "net/discovery/lan_discovery.hpp"
+#include "net/wire.hpp"
 
 using namespace redgem::net;
 using nlohmann::json;
@@ -29,8 +30,15 @@ constexpr std::int64_t kWrapsToGamePort = kPastThirtyTwoBits + kGamePort;
 constexpr std::int64_t kWrapsToPlayers = kPastThirtyTwoBits + kPlayers;
 constexpr std::uint64_t kBeyondSigned = ~std::uint64_t{0};  // the largest number an answer can carry
 
-std::string answer(const json& name, const json& port, const json& players) {
-  return json{{"is", "redgem"}, {"name", name}, {"port", port}, {"players", players}}.dump();
+// What travels in a datagram: MessagePack.
+std::string as_bytes(const json& message) {
+  const std::vector<std::uint8_t> bytes = json::to_msgpack(message);
+  return {bytes.begin(), bytes.end()};
+}
+
+std::string answer(const json& name, const json& port, const json& players,
+                   const json& version = wire::kProtocolVersion) {
+  return as_bytes({{"is", "redgem"}, {"name", name}, {"port", port}, {"players", players}, {"v", version}});
 }
 
 NearbyGame game_at(const std::string& address, std::uint16_t port, const std::string& name = "Maze") {
@@ -64,14 +72,18 @@ TEST_CASE("what is not an address in numbers is not nearby") {
   }
 }
 
-TEST_CASE("an answer to a search says a game's name, port and players") {
-  const auto game = game_from_answer(answer("Maze", kGamePort, kPlayers), kNeighbour);
+TEST_CASE("an answer to a search says a game's name, port, players and version of the protocol") {
+  const auto game = game_from_answer(search_answer("Maze", kGamePort, kPlayers), kNeighbour);
   REQUIRE(game.has_value());
   CHECK(game->address == kNeighbour);
   CHECK(game->port == kGamePort);
   CHECK(game->name == "Maze");
   CHECK(game->players == kPlayers);
+  CHECK(game->protocol == wire::kProtocolVersion);
   CHECK(game->seen_ago == 0.0f);
+  // A game of another version is still described: the searcher says why it cannot be joined.
+  CHECK(game_from_answer(answer("Maze", kGamePort, kPlayers, wire::kProtocolVersion + 1), kNeighbour)->protocol ==
+        wire::kProtocolVersion + 1);
 }
 
 TEST_CASE("an answer's name is cut and its players kept within what a list shows") {
@@ -88,9 +100,16 @@ TEST_CASE("anything that is not a whole answer is no game") {
   CHECK_FALSE(game_from_answer("", kNeighbour).has_value());
   CHECK_FALSE(game_from_answer("redgem: who is hosting?", kNeighbour).has_value());
   CHECK_FALSE(game_from_answer("[1, 2]", kNeighbour).has_value());
-  CHECK_FALSE(game_from_answer(R"({"name": "Maze", "port": 7777, "players": 1})", kNeighbour).has_value());
+  CHECK_FALSE(game_from_answer(as_bytes(json::array({1, 2})), kNeighbour).has_value());
+  CHECK_FALSE(game_from_answer(as_bytes({{"name", "Maze"}, {"port", kGamePort}, {"players", 1}, {"v", 1}}), kNeighbour)
+                  .has_value());
   CHECK_FALSE(
-      game_from_answer(R"({"is": "other", "name": "Maze", "port": 7777, "players": 1})", kNeighbour).has_value());
+      game_from_answer(as_bytes({{"is", "other"}, {"name", "Maze"}, {"port", kGamePort}, {"players", 1}, {"v", 1}}),
+                       kNeighbour)
+          .has_value());
+  // An answer in JSON text, as versions before MessagePack sent it.
+  CHECK_FALSE(
+      game_from_answer(json::from_msgpack(search_answer("Maze", kGamePort, kPlayers)).dump(), kNeighbour).has_value());
   CHECK_FALSE(game_from_answer(answer(kPlayers, kGamePort, kPlayers), kNeighbour).has_value());
   CHECK_FALSE(game_from_answer(answer("Maze", "7777", kPlayers), kNeighbour).has_value());
   CHECK_FALSE(game_from_answer(answer("Maze", kGamePort, "many"), kNeighbour).has_value());
@@ -164,4 +183,20 @@ TEST_CASE("a game's name cannot carry what drives a terminal") {
   const auto game = game_from_answer(answer("Maze\x1b[2J\nfake line", kGamePort, kPlayers), kNeighbour);
   REQUIRE(game.has_value());
   CHECK(game->name == "Maze?[2J?fake line");
+}
+
+TEST_CASE("a game of another version is described whatever its answer holds, for the searcher to say why") {
+  // No version, one that is not a number, and a newer one whose answer has another shape altogether.
+  for (const std::string& other :
+       {as_bytes({{"is", "redgem"}, {"name", "Maze"}, {"port", kGamePort}, {"players", 1}}),
+        answer("Maze", kGamePort, kPlayers, "1"),
+        as_bytes(
+            {{"is", "redgem"}, {"name", "Maze"}, {"where", {{"port", "7777"}}}, {"v", wire::kProtocolVersion + 1}})}) {
+    const auto game = game_from_answer(other, kNeighbour);
+    REQUIRE(game.has_value());
+    CHECK(game->protocol != wire::kProtocolVersion);
+    CHECK(game->name == "Maze");
+    CHECK(game->address == kNeighbour);
+  }
+  CHECK(game_from_answer(as_bytes({{"is", "redgem"}, {"v", wire::kProtocolVersion + 1}}), kNeighbour)->name.empty());
 }

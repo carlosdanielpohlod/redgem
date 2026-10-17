@@ -49,11 +49,9 @@ void NetworkSession::handle_as_host(Link& link, const nlohmann::json& message, s
   }
   if (!is_game_message(message)) return;
   link.idle_for = 0.0f;
-  const int to = message.value(kTo, kEveryone);
   // Who it is from is what the host knows, not what the message claims.
-  const nlohmann::json passed_on = game_message(message[kName], message.value(kData, nlohmann::json()), link.peer, to);
-  if (!pass_on(link.peer, to, passed_on)) return;
-  events.push_back(NetworkEvent::message(link.peer, passed_on[kName], passed_on[kData]));
+  const nlohmann::json passed = passed_on(message, link.peer);
+  if (pass_on(link.peer, passed.value(kTo, kEveryone), passed)) hear_from_game(passed, events);
 }
 
 void NetworkSession::hear_newcomer(Link& link, const nlohmann::json& message, std::vector<NetworkEvent>& events) {
@@ -80,12 +78,13 @@ void NetworkSession::let_in(Link& link, int peer, std::vector<NetworkEvent>& eve
   already_here.insert(already_here.end(), peers_.begin(), peers_.end());
   link.connection.send(welcome_for(link.peer, already_here));
   queue_for_everyone_but(link.peer, {{kKind, kArrived}, {kFrom, link.peer}});
+  poses_.sent.start_over();  // the newcomer knows none of this machine's objects
   peers_.push_back(link.peer);
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerJoined, link.peer));
 }
 
 nlohmann::json NetworkSession::welcome_for(int peer, const std::vector<int>& already_here) const {
-  nlohmann::json welcome = {{kKind, kWelcome}, {kTo, peer}, {kPeers, already_here}};
+  nlohmann::json welcome = {{kKind, kWelcome}, {kTo, peer}, {kPeers, already_here}, {kVersion, kProtocolVersion}};
   if (!server_hosted_) return welcome;
   welcome[kRoom] = room_;
   welcome[kServer] = true;
@@ -129,8 +128,9 @@ bool NetworkSession::send_as_host(const nlohmann::json& message, int to) {
 }
 
 void NetworkSession::queue_for_everyone_but(int peer, const nlohmann::json& message) {
+  const std::vector<std::uint8_t> bytes = packed(message);  // once, however many it goes to
   for (Link& link : links_) {
-    if (link.is_another_than(peer)) link.connection.send(message);
+    if (link.is_another_than(peer)) link.connection.send_packed(bytes);
   }
 }
 

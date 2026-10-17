@@ -17,7 +17,7 @@ std::size_t announced_length(const std::vector<std::uint8_t>& bytes, std::size_t
 
 }  // namespace
 
-std::vector<std::uint8_t> frame(const std::string& message) {
+std::vector<std::uint8_t> frame(const std::vector<std::uint8_t>& message) {
   std::vector<std::uint8_t> out;
   out.reserve(kLengthBytes + message.size());
   const auto length = static_cast<std::uint32_t>(message.size());

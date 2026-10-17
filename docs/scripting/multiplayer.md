@@ -30,6 +30,10 @@ Network.on_disconnect { ... }          # the game is gone: the host left or the 
 `Network.online?`, `Network.host?`, `Network.id` and `Network.peers` (everyone else's ids) tell
 where things stand. `Network.leave` leaves the game; when the host leaves, it ends for everyone.
 
+Every machine in a game runs the same version of the engine's network protocol, and so do the relay
+and the dedicated server it meets on. A machine of another version is turned away: `on_fail` gets
+the reason (`"this game runs protocol 1, the other side 2"`), and both sides write it to the log.
+
 A host lets 4 machines from one address be joining at the same moment (more are hung up on, and
 try again). Players behind one shared address (a campus, some mobile networks) joining together
 may need more: `Network.host(waiting_per_address: 16)`, up to 32.
@@ -164,8 +168,10 @@ find!("Ball").add_component(NetworkSync, owner: 2, key: "ball")   # key: its nam
 
 A key is one object's: a second `NetworkSync` under a key another object goes by already raises
 an error (the behaviour is disabled, the first object keeps the key), and so does `assign` to it.
+A key is at most 128 bytes long.
 
-The owner sends where its object is 20 times a second. The other machines show it a moment behind,
+The owner sends where its object is 20 times a second, in a few bytes: only what changed since the
+last time (an object standing still sends little more than its key). The other machines show it a moment behind,
 blended between the last two places they heard of, so it moves smoothly however unevenly those
 arrive. The delay follows the network: about 75 milliseconds when places arrive steadily, longer
 (up to 350) when they come in bursts. When the next place is late, the object goes on the way it

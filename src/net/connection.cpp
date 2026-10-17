@@ -2,13 +2,16 @@
 
 #include <utility>
 
+#include "core/log.hpp"
+
 namespace redgem::net {
 
 Connection::Connection(Socket socket, std::size_t pending_limit, bool established)
     : socket_(std::move(socket)),
       address_(socket_.peer_address()),
       pending_limit_(pending_limit),
-      established_(established) {}
+      established_(established),
+      answering_(established) {}
 
 Connection Connection::accepted(Socket socket, std::size_t pending_limit) {
   return Connection(std::move(socket), pending_limit, true);
@@ -55,17 +58,39 @@ std::optional<nlohmann::json> Connection::next_message() {
     return std::nullopt;
   }
   ++taken_this_poll_;
-  nlohmann::json message = nlohmann::json::parse(*text, nullptr, false);
-  if (wire::well_formed(message)) return message;
-  close();  // not one of ours
+  return understood(wire::unpacked(*text));
+}
+
+std::optional<nlohmann::json> Connection::understood(const std::optional<nlohmann::json>& message) {
+  if (!message) return not_ours();
+  if (first_of_another_protocol(*message)) return another_protocol(wire::protocol_of(*message));
+  heard_ = true;
+  if (wire::well_formed(*message)) return message;
+  return not_ours();
+}
+
+std::optional<nlohmann::json> Connection::not_ours() {
+  close();
+  return std::nullopt;
+}
+
+std::optional<nlohmann::json> Connection::another_protocol(int theirs) {
+  heard_ = true;
+  if (!answering_) return wire::refusal_of_protocol(theirs);
+  const std::string why = wire::protocol_mismatch(theirs);
+  log::warning("turned away the machine at " + address_ + ": " + why);
+  refuse(why);
   return std::nullopt;
 }
 
 void Connection::send(const nlohmann::json& message) {
-  if (hung_up()) return;
   // (Text that is not valid UTF-8 travels with the broken parts replaced, instead of not at all.)
-  const std::vector<std::uint8_t> bytes = wire::packed(message);
-  outgoing_.insert(outgoing_.end(), bytes.begin(), bytes.end());
+  send_packed(wire::packed(message));
+}
+
+void Connection::send_packed(const std::vector<std::uint8_t>& message) {
+  if (hung_up()) return;
+  outgoing_.insert(outgoing_.end(), message.begin(), message.end());
   since_said_ = 0.0f;
   if (outgoing_.size() > pending_limit_) {
     close();  // it stopped listening: messages are not piled up for it forever

@@ -5,6 +5,8 @@
 
 #include <algorithm>
 
+#include "core/log.hpp"
+
 namespace redgem::net {
 
 using namespace wire;
@@ -31,23 +33,25 @@ void NetworkSession::hear_of_the_game(const nlohmann::json& message, std::vector
   if (kind == kArrived) peer_arrived(message.value(kFrom, 0), events);
   if (kind == kGone) peer_gone(message.value(kFrom, 0), events);
   if (kind == kAsking) hear_asking(message, events);
-  if (is_game_message(message)) hear_game_message(message, events);
-}
-
-void NetworkSession::hear_game_message(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
-  events.push_back(
-      NetworkEvent::message(message.value(kFrom, 0), message[kName], message.value(kData, nlohmann::json())));
+  if (is_game_message(message)) hear_from_game(message, events);
 }
 
 void NetworkSession::hear_while_joining(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
   const std::string kind = message[kKind];
   // The host's game takes its time to decide on this machine: this machine waits for it.
   if (kind == kConsidering) connecting_for_ = -kApprovalSeconds;
-  if (kind == kRefused) {
-    refusal_ = message.value(kReason, std::string());
-    links_.front().connection.close();  // the game ends with it, saying why (end_game_if_host_gone)
-  }
+  if (kind == kRefused) turned_away(message);
   accept_welcome(message, events);
+}
+
+void NetworkSession::turned_away(const nlohmann::json& refusal) {
+  if (speaks_our_protocol(refusal)) {
+    refusal_ = refusal.value(kReason, std::string());
+  } else {
+    refusal_ = protocol_mismatch(protocol_of(refusal));
+    log::warning("cannot join the game: " + refusal_);
+  }
+  links_.front().connection.close();  // the game ends with it, saying why (end_game_if_host_gone)
 }
 
 void NetworkSession::accept_welcome(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
@@ -79,6 +83,7 @@ bool NetworkSession::believable_welcome(int given, const std::vector<int>& other
 void NetworkSession::peer_arrived(int peer, std::vector<NetworkEvent>& events) {
   // What a host says is checked like anything else.
   if (!can_arrive(peer)) return;
+  poses_.sent.start_over();  // the newcomer knows none of this machine's objects
   peers_.push_back(peer);
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerJoined, peer));
 }

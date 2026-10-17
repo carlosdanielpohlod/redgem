@@ -153,3 +153,80 @@ No service is built into the engine and none is required.
 - **Guides**: the manual's Online services page; the platformer logs in when `ACCOUNTS` is set
   (`scripts/accounts.rb`, `scripts/server_gate.rb`) and joins as a guest otherwise. The backend's
   essential code is shown in the guide; no example app is kept in the repository.
+
+## On the wire
+
+What the machines of a game (and the relay and the dedicated server between them) say to each
+other, since protocol version 1. The code is in `src/net/wire*` and `src/net/pose_*`.
+
+- **Frames.** Every message travels as its length (4 bytes, big-endian) and then its bytes, at
+  most 1 MiB. A message is a MessagePack map whose keys are single letters (`k` its kind, `f` from,
+  `t` to, `n` a game message's name, `d` its data, and a few more for joining). A game's data is
+  MessagePack's nil, booleans, integers, floats, strings (UTF-8), arrays and maps; a `Vector3` is
+  `{"$v": [x, y, z]}`. A message to everyone does not say so (no `t`).
+- **Version.** Every connection starts with `v`, the protocol's version: in the newcomer's hello,
+  and in the first thing it gets back, a welcome, a refusal or "the game is deciding" (and in a
+  game's answer to a LAN search). The version of a connection's first message is read before
+  anything else of it, since another version's messages may hold what this one's may not. A host, a
+  relay or a server's lobby refuses a hello of another version with "this game runs protocol 1,
+  the other side 2" and logs it; the machine turned away says the same, from its side, in its
+  `on_fail` and its log. A game of another version found on the local network is not listed (the
+  log says why, once). Nothing is kept for older versions; what the first words look like (a frame
+  holding a map with `k`, `v` and a reason `y`) is the one thing every version keeps the same.
+- **Limits**, the same as with JSON: a message's data nests at most 16 deep, an array or a map
+  holds at most 4096 things, names and hash keys are at most 64 bytes, a join's `auth` at most 4096
+  bytes written out, a refusal's reason 256. What arrives is untrusted: depth and counts are
+  checked while it is read (arrays nested deeper than a message may be are stopped before they are
+  built), text must be UTF-8, and bytes, infinity and NaN are no game data. The allowances of a
+  relay and a server (bytes a second, messages a poll) are unchanged; since messages are smaller,
+  they now hold more of them.
+- **Poses** (NetworkSync) are a kind of message of their own, `o`, whose `d` is bytes:
+
+  | part | size | what |
+  |---|---|---|
+  | flags | 1 byte | which parts follow: where it is, how far it moved, its rotation |
+  | key size, key | 1 byte + up to 128 | the object's key (UTF-8) |
+  | where it is | 12 bytes | x, y, z as 32-bit floats |
+  | or how far it moved | 6 bytes | x, y, z as 16-bit steps of 1/1024 m since the last pose sent |
+  | rotation | 4 bytes | "smallest three": the largest part's index (2 bits), the others in 10 bits each |
+
+  A part that did not change since the last pose sent is left out; an object standing still sends
+  its key alone, which keeps the others' interpolation on time. Positions are floats, as the engine
+  keeps them, so a whole pose is exactly the sender's however far from the middle of the world,
+  and a move is counted from the last pose sent, so its precision (half a millimeter) does not
+  depend on where the object is either; a power of two times a whole number is exact in a float,
+  so the moves add up to the same place on every machine. A rotation comes back within 0.3
+  degrees. Every object's pose is sent whole first, again every 40 sends (two seconds), and as
+  soon as someone joins; a machine ignores moves of an object until it has its whole pose. The
+  receiving side hands whole poses to the scripts as the `$sync` message, as before.
+- **Debugging.** With `REDGEM_LOG_MESSAGES=1` in its environment, a game, relay or server writes
+  every message it sends and receives to its log as JSON text.
+
+A typical pose (a player running and turning, key `hero-2`) took about 110 to 140 bytes as JSON;
+it now takes 34 (30 when it only moves, 24 standing still, 40 when whole). The load test's game
+message (a shot: where, how hard, when) went from 143 bytes to 66, framing included.
+
+### Measured
+
+`tests/load` runs bots that join one room of the platformer on `redgem-server` and play as players
+do: each runs in circles, its pose sent 20 times a second, and fires a shot (a game message) twice
+a second; the server's game moves its copy of each player's hero. It measures the bytes each
+player sends and receives, the server's processor time per frame (its process, lobby included, at
+60 frames a second) and how long a shot takes from one player to the others (through the server,
+which passes messages on once a frame). The CI runs it for 5 seconds with 4, 8 and 15 players
+(`ctest -R load.short`, a step of its own in the Linux workflow); these are from GitHub's Linux
+runner, one run each, so the processor times are rough (the clock they are read from counts in
+10 ms steps).
+
+| players | | sent B/s per player | received B/s per player | bytes per pose | bytes per message | server CPU ms per frame | latency ms p50 / p95 / max |
+|---|---|---|---|---|---|---|---|
+| 4 | JSON | 3078 | 9234 | 141.0 | 143.2 | 0.30 | 8.6 / 16.2 / 17.2 |
+| 4 | MessagePack | 804 | 2423 | 34.1 | 66.0 | 0.47 | 9.7 / 17.2 / 17.3 |
+| 8 | JSON | 3065 | 21502 | 141.1 | 142.7 | 0.53 | 8.8 / 16.3 / 17.7 |
+| 8 | MessagePack | 802 | 5623 | 34.1 | 66.0 | 0.67 | 9.7 / 16.4 / 17.5 |
+| 15 | JSON | 3112 | 43726 | 142.8 | 143.1 | 1.23 | 9.0 / 16.7 / 18.0 |
+| 15 | MessagePack | 814 | 11402 | 34.6 | 66.0 | 1.23 | 9.8 / 16.7 / 18.0 |
+
+Each player sends and receives about a quarter of what it did. Latency is the server's frame (a
+message waits for the room's next one) and did not change; neither, within what these numbers can
+tell, did the server's processor time.

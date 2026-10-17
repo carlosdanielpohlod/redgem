@@ -9,6 +9,7 @@
 #include <string>
 #include <thread>
 
+#include "integration/wire_text.hpp"
 #include "net/frame_buffer.hpp"
 #include "net/network_session.hpp"
 #include "net/rooms/relay_server.hpp"
@@ -39,7 +40,7 @@ struct GuardedRoom {
     opener = Socket::connect_to(kLocalhost, relay.port(), error);
     REQUIRE(opener.valid());
     REQUIRE(until([this] { return opener.connect_status() == IoStatus::Ok; }));
-    std::vector<std::uint8_t> hello = frame(R"({"k":"h","r":"new","g":true})");
+    std::vector<std::uint8_t> hello = redgem::test::wire_frame(R"({"k":"h","r":"new","g":true})");
     REQUIRE(until([&] { return opener.write(hello) == IoStatus::Ok && hello.empty(); }));
     code = next_message()["r"];
   }
@@ -68,7 +69,7 @@ struct GuardedRoom {
       text = heard.next();
       return text.has_value();
     }));
-    return nlohmann::json::parse(*text);
+    return redgem::test::message_in(*text);
   }
 
   void join(NetworkSession& session) {

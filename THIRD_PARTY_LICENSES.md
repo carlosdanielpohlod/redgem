@@ -16,7 +16,7 @@ their own licenses and are not covered here.
 - **Jolt Physics**: Physics. https://github.com/jrouwe/JoltPhysics
 - **mruby**: The Ruby interpreter that runs game scripts. https://mruby.org
 - **cgltf**: Loading glTF scenes. https://github.com/jkuhlmann/cgltf
-- **nlohmann/json**: JSON. https://github.com/nlohmann/json
+- **nlohmann/json**: JSON, and MessagePack for multiplayer messages. https://github.com/nlohmann/json
 - **Mbed TLS**: HTTPS for the games' web requests (HTTP). https://www.trustedfirmware.org/projects/mbed-tls/
 - **SQLite**: Where a dedicated server keeps its game's saves. https://www.sqlite.org
 - **Dear ImGui**: The editor's interface. https://github.com/ocornut/imgui

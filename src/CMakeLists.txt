@@ -118,6 +118,12 @@ redgem_add_library(redgem_net
   net/socket/socket_io.cpp
   net/socket/datagrams.cpp
   net/wire.cpp
+  net/wire_checks.cpp
+  net/wire_codec.cpp
+  net/utf8_text.cpp
+  net/pose_quantization.cpp
+  net/pose_codec.cpp
+  net/pose_baselines.cpp
   net/connection.cpp
   net/network_session.cpp
   net/network_session_host.cpp
@@ -125,6 +131,7 @@ redgem_add_library(redgem_net
   net/network_session_server.cpp
   net/network_session_approval.cpp
   net/network_session_room_approval.cpp
+  net/network_session_poses.cpp
   net/rooms/room_codes.cpp
   net/rooms/code_guessers.cpp
   net/rooms/lobby.cpp
@@ -232,6 +239,7 @@ redgem_add_library(redgem_runtime
   script/bindings/network_bindings.cpp
   script/bindings/network_search_bindings.cpp
   script/bindings/network_state_bindings.cpp
+  script/bindings/network_pose_bindings.cpp
   script/bindings/network_approval_bindings.cpp
   script/bindings/http_bindings.cpp
   render/mesh_builder.cpp

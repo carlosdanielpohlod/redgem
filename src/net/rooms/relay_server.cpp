@@ -104,13 +104,13 @@ void RelayServer::act_on(Member& member, const nlohmann::json& message) {
 }
 
 void RelayServer::pass_on(Member& sender, const nlohmann::json& message) {
-  const int to = message.value(kTo, kEveryone);
   // Who it is from is what the relay knows, not what the message claims.
-  const nlohmann::json passed_on =
-      game_message(message[kName], message.value(kData, nlohmann::json()), sender.peer, to);
+  const nlohmann::json passed = passed_on(message, sender.peer);
+  const int to = passed.value(kTo, kEveryone);
+  const std::vector<std::uint8_t> bytes = packed(passed);  // once, however many it goes to
   for (Member* other : members_of(sender.room)) {
     if (other->peer == sender.peer) continue;
-    if (is_for(to, other->peer)) other->connection.send(passed_on);
+    if (is_for(to, other->peer)) other->connection.send_packed(bytes);
   }
 }
 

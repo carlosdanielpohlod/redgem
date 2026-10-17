@@ -53,5 +53,14 @@ Give the platform a *kinematic* body. A static body is not meant to move.
 RedGem asks for the dedicated card and logs which one it got when it starts. To choose:
 Edit > Graphics Card in the editor, or start with `--gpu dedicated`.
 
+**Joining fails with "this game runs protocol 1, the other side 2".**
+The two machines (or the game and the relay or server it meets on) run versions of RedGem whose
+network messages differ. Build every copy of the game, the relay and the server from the same
+version.
+
+**I want to see what the machines of a game say to each other.**
+Start the game, the relay or the server with `REDGEM_LOG_MESSAGES=1` in its environment: every
+message it sends and receives is written to its log, as JSON text.
+
 **I changed the level in Blender and the editor did not update.**
 It reloads `scene.glb` by itself when you have no unsaved edits. With unsaved edits it asks.

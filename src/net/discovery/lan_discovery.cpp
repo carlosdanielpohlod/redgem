@@ -2,6 +2,9 @@
 
 #include <algorithm>
 
+#include "core/log.hpp"
+#include "net/wire.hpp"
+
 namespace redgem::net {
 
 namespace {
@@ -9,6 +12,7 @@ namespace {
 constexpr float kAskEverySeconds = 1.0f;
 constexpr float kForgetAfterSeconds = 3.5f;  // a game that stopped answering is gone
 constexpr int kMaxAnswersPerUpdate = 8;      // a flood of questions gets a trickle of answers
+constexpr std::size_t kMostToldOf = 8;       // games of another version the log tells of in a search
 
 }  // namespace
 
@@ -29,6 +33,7 @@ bool LanDiscovery::search(std::uint16_t discovery_port) {
   finder_ = Datagrams::open_on(0, ignored);
   search_port_ = discovery_port;
   games_.clear();
+  other_protocols_.clear();
   since_asked_ = kAskEverySeconds;  // ask right away
   return finder_.valid();
 }
@@ -80,8 +85,21 @@ void LanDiscovery::collect_answers() {
   std::string from;
   std::uint16_t from_port = 0;
   while (finder_.receive(message, from, from_port)) {
-    if (const auto game = game_from_answer(message, from)) list_game(games_, *game);
+    if (const auto game = game_from_answer(message, from)) hear_of(*game);
   }
+}
+
+void LanDiscovery::hear_of(const NearbyGame& game) {
+  if (game.protocol == wire::kProtocolVersion) return list_game(games_, game);
+  const std::string where = game.address + " (\"" + game.name + "\")";  // (its port may be anything)
+  if (told_of(where)) return;
+  other_protocols_.push_back(where);
+  log::warning("the game at " + where + " cannot be joined: " + wire::protocol_mismatch(game.protocol));
+}
+
+bool LanDiscovery::told_of(const std::string& game) const {
+  const bool told = std::find(other_protocols_.begin(), other_protocols_.end(), game) != other_protocols_.end();
+  return told || other_protocols_.size() >= kMostToldOf;
 }
 
 }  // namespace redgem::net

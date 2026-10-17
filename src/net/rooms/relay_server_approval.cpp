@@ -23,7 +23,7 @@ bool says_yes(const nlohmann::json& message) {
 
 void RelayServer::ask(Member& member, Member& opener, int id, const nlohmann::json& auth) {
   member.asking_as = id;
-  member.connection.send({{kKind, kConsidering}});
+  member.connection.send(considering());
   nlohmann::json asked = {{kKind, kAsking}, {kFrom, id}};
   if (!auth.is_null()) asked[kAuth] = auth;
   opener.connection.send(asked);

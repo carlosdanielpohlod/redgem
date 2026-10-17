@@ -14,6 +14,11 @@ namespace {
 // A newcomer's first words say which room it wants.
 bool asks_for_a_room(const nlohmann::json& message) { return message[kKind] == kHello && message.contains(kRoom); }
 
+// What a newcomer let into a room as `id` is told: its id, who else is there, and the room's code.
+nlohmann::json welcome(int id, const std::vector<int>& others, const std::string& room) {
+  return {{kKind, kWelcome}, {kTo, id}, {kPeers, others}, {kRoom, room}, {kVersion, kProtocolVersion}};
+}
+
 }  // namespace
 
 std::string RelayServer::new_room_code() const {
@@ -58,7 +63,7 @@ void RelayServer::open_room(Member& member) {
   rooms_[code] = true;
   member.room = code;
   member.peer = kHostId;
-  member.connection.send({{kKind, kWelcome}, {kTo, member.peer}, {kPeers, std::vector<int>{}}, {kRoom, code}});
+  member.connection.send(welcome(member.peer, {}, code));
 }
 
 void RelayServer::join_room(Member& member, const std::string& room, const nlohmann::json& auth) {
@@ -83,7 +88,7 @@ void RelayServer::let_in(Member& member, int id) {
   for (const Member* other : members_of(member.room)) ids.push_back(other->peer);
   member.peer = id;
   member.asking_as = 0;
-  member.connection.send({{kKind, kWelcome}, {kTo, id}, {kPeers, ids}, {kRoom, member.room}});
+  member.connection.send(welcome(id, ids, member.room));
   tell_room(member.room, id, {{kKind, kArrived}, {kFrom, id}});
 }
 

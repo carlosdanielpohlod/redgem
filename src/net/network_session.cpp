@@ -14,8 +14,8 @@ namespace {
 bool names_a_room(const std::string& code) { return !code.empty() && code != kNewRoom; }
 
 // A newcomer's first words, with what the game joined decides on when there is any.
-nlohmann::json hello(const nlohmann::json& auth) {
-  nlohmann::json said = {{kKind, kHello}};
+nlohmann::json hello_with(const nlohmann::json& auth) {
+  nlohmann::json said = hello();
   if (!auth.is_null()) said[kAuth] = auth;
   return said;
 }
@@ -74,11 +74,14 @@ bool NetworkSession::connect_out(const std::string& address, std::uint16_t port,
 
 bool NetworkSession::join(const std::string& address, std::uint16_t port, std::string& error,
                           const nlohmann::json& auth) {
-  return connect_out(address, port, hello(auth), error);
+  return connect_out(address, port, hello_with(auth), error);
 }
 
 bool NetworkSession::host_room(const std::string& address, std::uint16_t port, std::string& error) {
-  if (!connect_out(address, port, {{kKind, kHello}, {kRoom, kNewRoom}, {kGuards, approving_}}, error)) return false;
+  nlohmann::json said = hello();
+  said[kRoom] = kNewRoom;
+  said[kGuards] = approving_;
+  if (!connect_out(address, port, said, error)) return false;
   through_relay_ = true;
   opening_room_ = true;
   return true;
@@ -90,7 +93,7 @@ bool NetworkSession::join_room(const std::string& address, std::uint16_t port, c
     error = "a room's code is needed to join it";
     return false;
   }
-  nlohmann::json said = hello(auth);
+  nlohmann::json said = hello_with(auth);
   said[kRoom] = code;
   if (!connect_out(address, port, said, error)) return false;
   through_relay_ = true;
@@ -117,6 +120,7 @@ void NetworkSession::go_offline() {
   room_.clear();
   refusal_.clear();
   pending_events_.clear();
+  poses_ = PoseBaselines();
 }
 
 std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
@@ -165,6 +169,7 @@ void NetworkSession::peer_left(int peer, std::vector<NetworkEvent>& events) {
   const auto gone = std::remove(peers_.begin(), peers_.end(), peer);
   if (gone == peers_.end()) return;  // nobody the game heard of
   peers_.erase(gone, peers_.end());
+  poses_.heard.forget(peer);
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::PeerLeft, peer));
 }
 
@@ -178,7 +183,10 @@ void NetworkSession::drop_closed_links(std::vector<NetworkEvent>& events) {
 
 bool NetworkSession::send(const std::string& name, const nlohmann::json& data, int to) {
   if (!can_send(name, data, to)) return false;
-  const nlohmann::json message = game_message(name, data, id_, to);
+  return deliver(game_message(name, data, id_, to), to);
+}
+
+bool NetworkSession::deliver(const nlohmann::json& message, int to) {
   return relaying() ? send_as_host(message, to) : send_through_host(message, to);
 }
 

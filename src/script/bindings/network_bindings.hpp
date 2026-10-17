@@ -30,6 +30,8 @@ nlohmann::json auth_arg(mrb_state* mrb, mrb_value auth);
 void install_network_approval_bindings(RClass* network_module, mrb_state* mrb);
 // Network.search and what it finds (network_search_bindings.cpp).
 void install_network_search_bindings(RClass* network_module, mrb_state* mrb);
+// Where the objects this machine moves are: Network.__pose (network_pose_bindings.cpp).
+void install_network_pose_bindings(RClass* network_module, mrb_state* mrb);
 // What the session is like right now: online?, host?, server?, id, peers... (network_state_bindings.cpp).
 void install_network_state_bindings(RClass* network_module, mrb_state* mrb);
 

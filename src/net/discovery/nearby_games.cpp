@@ -8,6 +8,8 @@
 
 #include "core/safe_path.hpp"
 #include "net/socket/socket.hpp"
+#include "net/wire.hpp"
+#include "net/wire_codec.hpp"
 
 namespace redgem::net {
 
@@ -20,7 +22,6 @@ constexpr const char* kPortKey = "port";
 constexpr const char* kPlayersKey = "players";
 constexpr std::size_t kMaxGames = 32;
 constexpr int kMaxGamesPerAddress = 4;  // one machine cannot fill the list by itself
-constexpr int kCompact = -1;            // nlohmann's "no indentation"
 // The first numbers of the addresses machines have on a local network (and of this machine itself).
 constexpr int kThisMachineNet = 127;
 constexpr int kPrivateNetA = 10;
@@ -32,7 +33,7 @@ constexpr int kPrivateNetCSecond = 168;
 constexpr int kLinkLocalNet = 169;
 constexpr int kLinkLocalSecond = 254;
 
-constexpr std::size_t kMaxNameBytes = 48;
+constexpr std::size_t kMaxGameNameBytes = 48;
 constexpr int kMaxPlayersShown = 99;
 constexpr int kLargestPort = 65535;
 constexpr char kAddressDot = '.';
@@ -56,10 +57,21 @@ bool has_whole_number(const nlohmann::json& answer, const char* key) {
   return answer.contains(key) && answer[key].is_number_integer();
 }
 
+// Whether an answer says it is a game of this engine's, of whatever version.
+bool from_redgem(const nlohmann::json& answer) {
+  return answer.is_object() && answer.value(kMark, nlohmann::json()) == kAnswerMark;
+}
+
 // Anything can arrive on a port: only a well-formed answer counts.
 bool is_answer(const nlohmann::json& answer) {
-  return answer.is_object() && answer.value(kMark, nlohmann::json()) == kAnswerMark && has_text(answer, kNameKey) &&
-         has_whole_number(answer, kPortKey) && has_whole_number(answer, kPlayersKey);
+  return has_text(answer, kNameKey) && has_whole_number(answer, kPortKey) && has_whole_number(answer, kPlayersKey);
+}
+
+// What a game's name is shown as: as much of it as a list holds (nothing in it drives a terminal:
+// it is shown on screens and in logs).
+std::string shown_name(const nlohmann::json& answer) {
+  return has_text(answer, kNameKey) ? printable(answer[kNameKey].get<std::string>().substr(0, kMaxGameNameBytes))
+                                    : std::string();
 }
 
 // A whole number of an answer in 64 bits, however large it was written (one past what those hold
@@ -73,6 +85,27 @@ std::int64_t wide_number(const nlohmann::json& number) {
 }
 
 bool is_port(std::int64_t number) { return number >= 1 && number <= kLargestPort; }
+
+// The game a well-formed answer from `from` describes, on `port`.
+NearbyGame game_of(const nlohmann::json& answer, std::uint16_t port, const std::string& from) {
+  NearbyGame game;
+  game.address = from;
+  game.port = port;
+  game.name = shown_name(answer);
+  game.players = static_cast<int>(std::clamp<std::int64_t>(wide_number(answer[kPlayersKey]), 1, kMaxPlayersShown));
+  game.protocol = wire::kProtocolVersion;
+  return game;
+}
+
+// A game of another version (or none): what it says may be shaped as that version's answers are,
+// so only who it is is read, for the searcher to say why it cannot be joined.
+NearbyGame game_of_another_protocol(const nlohmann::json& answer, const std::string& from) {
+  NearbyGame game;
+  game.address = from;
+  game.name = shown_name(answer);
+  game.protocol = wire::protocol_of(answer);
+  return game;
+}
 
 std::vector<NearbyGame>::iterator find_listed(std::vector<NearbyGame>& games, const NearbyGame& game) {
   return std::find_if(games.begin(), games.end(), [&game](const NearbyGame& other) {
@@ -111,24 +144,24 @@ bool search_to_answer(const std::string& message, const std::string& from) {
 }
 
 std::string search_answer(const std::string& name, std::uint16_t game_port, int players) {
-  const nlohmann::json answer = {
-      {kMark, kAnswerMark}, {kNameKey, name.substr(0, kMaxNameBytes)}, {kPortKey, game_port}, {kPlayersKey, players}};
-  return answer.dump(kCompact, ' ', false, nlohmann::json::error_handler_t::replace);
+  const nlohmann::json answer = {{kMark, kAnswerMark},
+                                 {kNameKey, name.substr(0, kMaxGameNameBytes)},
+                                 {kPortKey, game_port},
+                                 {kPlayersKey, players},
+                                 {wire::kVersion, wire::kProtocolVersion}};
+  const std::vector<std::uint8_t> bytes = wire::msgpack(answer);
+  return {bytes.begin(), bytes.end()};
 }
 
 std::optional<NearbyGame> game_from_answer(const std::string& message, const std::string& from) {
   if (!nearby_address(from)) return std::nullopt;  // a game on this network is not heard of from far away
-  const nlohmann::json answer = nlohmann::json::parse(message, nullptr, false);
-  if (!is_answer(answer)) return std::nullopt;
-  const std::int64_t port = wide_number(answer[kPortKey]);
+  const auto answer = wire::unpacked(message);
+  if (!answer || !from_redgem(*answer)) return std::nullopt;
+  if (!wire::speaks_our_protocol(*answer)) return game_of_another_protocol(*answer, from);
+  if (!is_answer(*answer)) return std::nullopt;
+  const std::int64_t port = wide_number((*answer)[kPortKey]);
   if (!is_port(port)) return std::nullopt;
-  NearbyGame game;
-  game.address = from;
-  game.port = static_cast<std::uint16_t>(port);
-  // (The name is shown on screens and in logs: nothing in it drives a terminal.)
-  game.name = printable(answer[kNameKey].get<std::string>().substr(0, kMaxNameBytes));
-  game.players = static_cast<int>(std::clamp<std::int64_t>(wide_number(answer[kPlayersKey]), 1, kMaxPlayersShown));
-  return game;
+  return game_of(*answer, static_cast<std::uint16_t>(port), from);
 }
 
 void list_game(std::vector<NearbyGame>& games, const NearbyGame& game) {

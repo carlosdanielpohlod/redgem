@@ -1,7 +1,10 @@
 #include <doctest/doctest.h>
 
+#include <cmath>
+#include <limits>
 #include <string>
 
+#include "net/pose_codec.hpp"
 #include "net/wire.hpp"
 
 using namespace redgem::net;
@@ -26,13 +29,33 @@ json nested(int depth) {
 }  // namespace
 
 TEST_CASE("a game message carries its name, who sent it, who it is for and its data") {
-  const json message = wire::game_message("score", {{"points", kPoints}}, kGuest, kEveryone);
+  const json message = wire::game_message("score", {{"points", kPoints}}, kGuest, kOtherGuest);
   CHECK(message[wire::kKind] == wire::kGameMessage);
   CHECK(message[wire::kName] == "score");
   CHECK(message[wire::kFrom] == kGuest);
-  CHECK(message[wire::kTo] == kEveryone);
+  CHECK(message[wire::kTo] == kOtherGuest);
   CHECK(message[wire::kData]["points"] == kPoints);
   CHECK(wire::well_formed(message));
+  // One for everyone does not say so: that is what a message for nobody in particular is.
+  CHECK_FALSE(wire::game_message("score", nullptr, kGuest, kEveryone).contains(wire::kTo));
+}
+
+TEST_CASE("what is passed on is from whom the host knows it is, to whom it says, and nothing else") {
+  json message = wire::game_message("score", kPoints, kHostId, kOtherGuest);
+  message["extra"] = "ignored";
+  const json passed = wire::passed_on(message, kGuest);
+  CHECK(passed[wire::kFrom] == kGuest);
+  CHECK(passed[wire::kTo] == kOtherGuest);
+  CHECK(passed[wire::kName] == "score");
+  CHECK(passed[wire::kData] == kPoints);
+  CHECK_FALSE(passed.contains("extra"));
+  const json pose = wire::passed_on(wire::pose_message({1, 2, 3}, kHostId), kGuest);
+  CHECK(pose[wire::kKind] == wire::kPose);
+  CHECK(pose[wire::kFrom] == kGuest);
+  const std::vector<std::uint8_t>& bytes = pose[wire::kData].get_binary();
+  CHECK(bytes == std::vector<std::uint8_t>{1, 2, 3});
+  CHECK_FALSE(pose.contains(wire::kTo));
+  CHECK_FALSE(pose.contains(wire::kName));
 }
 
 TEST_CASE("only an object that says its kind in a text is a message") {
@@ -111,10 +134,52 @@ TEST_CASE("data nests only so deep, under keys only so long") {
   CHECK_FALSE(wire::well_formed(json{{wire::kKind, wire::kGameMessage}, {wire::kData, nested(kMaxDataDepth + 1)}}));
 }
 
-TEST_CASE("a game's message is one of that kind with a name to hear it by") {
+TEST_CASE("a game's message is one of that kind with a name to hear it by, or a pose") {
   CHECK(wire::is_game_message(wire::game_message("hit", nullptr, kHostId, kEveryone)));
   CHECK_FALSE(wire::is_game_message({{wire::kKind, wire::kGameMessage}}));
   CHECK_FALSE(wire::is_game_message({{wire::kKind, wire::kPing}, {wire::kName, "hit"}}));
+  CHECK(wire::is_game_message(wire::pose_message({1}, kHostId)));
+  CHECK_FALSE(wire::is_game_message({{wire::kKind, wire::kPose}}));
+}
+
+TEST_CASE("a pose carries bytes, and no more than a pose may be") {
+  CHECK(wire::well_formed(wire::pose_message(std::vector<std::uint8_t>(kMaxPoseBytes, 0), kGuest)));
+  CHECK_FALSE(wire::well_formed(wire::pose_message(std::vector<std::uint8_t>(kMaxPoseBytes + 1, 0), kGuest)));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kPose}, {wire::kData, "not bytes"}}));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kPose}, {wire::kData, json::array({1, 2})}}));
+}
+
+TEST_CASE("a game's data is never bytes, nor a number that is not one") {
+  CHECK(acceptable_data(json{{"x", 1.5}, {"big", std::numeric_limits<std::uint64_t>::max()}}));
+  CHECK_FALSE(acceptable_data(json::binary({1, 2, 3})));
+  CHECK_FALSE(acceptable_data(json::array({json::binary({1})})));
+  for (const double odd : {std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
+                           std::numeric_limits<double>::quiet_NaN()}) {
+    CAPTURE(odd);
+    CHECK_FALSE(acceptable_data(json(odd)));
+    CHECK_FALSE(acceptable_data(json{{"deep", json::array({odd})}}));
+    CHECK_FALSE(wire::well_formed(wire::game_message("odd", odd, kGuest, kEveryone)));
+  }
+}
+
+TEST_CASE("the first words of a connection say the version of the protocol") {
+  const json hello = wire::hello();
+  CHECK(hello[wire::kKind] == wire::kHello);
+  CHECK(wire::speaks_our_protocol(hello));
+  CHECK(wire::refusal("full")[wire::kVersion] == wire::kProtocolVersion);
+  CHECK(wire::protocol_of(json{{wire::kKind, wire::kHello}}) == 0);  // a hello that says none
+  CHECK_FALSE(wire::speaks_our_protocol({{wire::kKind, wire::kHello}, {wire::kVersion, wire::kProtocolVersion + 1}}));
+  CHECK(wire::protocol_mismatch(wire::kProtocolVersion + 1) ==
+        "this game runs protocol " + std::to_string(wire::kProtocolVersion) + ", the other side " +
+            std::to_string(wire::kProtocolVersion + 1));
+}
+
+TEST_CASE("a version is a whole number a version can be") {
+  CHECK(wire::well_formed({{wire::kKind, wire::kHello}, {wire::kVersion, wire::kLargestProtocolVersion}}));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kHello}, {wire::kVersion, wire::kLargestProtocolVersion + 1}}));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kHello}, {wire::kVersion, -1}}));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kHello}, {wire::kVersion, "1"}}));
+  CHECK_FALSE(wire::well_formed({{wire::kKind, wire::kHello}, {wire::kVersion, kNotWhole}}));
 }
 
 TEST_CASE("a newcomer gets the lowest id nobody has, and none in a full game") {
@@ -141,17 +206,6 @@ TEST_CASE("a welcome cannot make a guest the host, or the opener of a room anyth
   CHECK(wire::own_id_believable(kHostId, through_relay, opening_room));
   CHECK_FALSE(wire::own_id_believable(kGuest, through_relay, opening_room));
   CHECK_FALSE(wire::own_id_believable(0, through_relay, opening_room));
-}
-
-TEST_CASE("a packed message is its JSON behind its length, with broken text replaced") {
-  const std::vector<std::uint8_t> bytes = wire::packed(json{{wire::kKind, wire::kPing}});
-  FrameBuffer buffer;
-  buffer.append(bytes.data(), bytes.size());
-  const auto text = buffer.next();
-  REQUIRE(text.has_value());
-  CHECK(json::parse(*text)[wire::kKind] == wire::kPing);
-  const std::string not_utf8 = "caf\xE9";
-  CHECK_NOTHROW(wire::packed(wire::game_message(not_utf8, json(), kGuest, kEveryone)));
 }
 
 TEST_CASE("what a hello carries for the game to decide on is nothing, or a small hash of message data") {

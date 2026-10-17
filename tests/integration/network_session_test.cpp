@@ -4,9 +4,12 @@
 #include <functional>
 #include <thread>
 
+#include "integration/wire_text.hpp"
 #include "net/network_session.hpp"
+#include "test_support.hpp"
 
 using namespace redgem::net;
+using redgem::test::wire_frame;
 
 namespace {
 
@@ -27,7 +30,8 @@ constexpr float kPastSilenceTimeout = kSilenceTimeoutSeconds + 3.0f * kQuietStep
 constexpr std::size_t kShownBytes = 60;          // of a bad message, when a check fails
 constexpr int kSilentStrangers = kMaxPeers - 1;  // as many as a game has places for guests
 constexpr int kFloodMessages = 3 * kMaxMessagesPerPoll / 2;
-constexpr std::chrono::milliseconds kArrivalPause{50};  // for what was written to be there to read
+constexpr std::chrono::milliseconds kArrivalPause{50};     // for what was written to be there to read
+constexpr int kNextProtocol = wire::kProtocolVersion + 1;  // what a newer version of the engine speaks
 
 // Sessions on this machine, and everything that happened to each.
 struct Table {
@@ -228,9 +232,24 @@ struct Stranger {
     REQUIRE(table.until([this] { return socket.connect_status() == IoStatus::Ok; }));
   }
 
-  void say(const std::string& text) {
-    std::vector<std::uint8_t> bytes = frame(text);
+  void say(const std::string& text) { say_bytes(wire_frame(text)); }
+
+  void say_bytes(std::vector<std::uint8_t> bytes) {
     REQUIRE(table.until([&] { return socket.write(bytes) == IoStatus::Ok; }));
+  }
+
+  // The next message the host sent it, waited for (null when none came).
+  nlohmann::json hear() {
+    FrameBuffer heard;
+    std::optional<std::string> bytes;
+    table.until([&] {
+      std::vector<std::uint8_t> arrived;
+      socket.read(arrived, kBigMessageBytes);
+      heard.append(arrived.data(), arrived.size());
+      bytes = heard.next();
+      return bytes.has_value();
+    });
+    return bytes ? redgem::test::message_in(*bytes) : nlohmann::json();
   }
 
   // Says hello as a real guest would, and waits to be let in.
@@ -263,7 +282,7 @@ struct LoneHost {
 TEST_CASE("whoever connects without saying hello is never in the game") {
   LoneHost lone;
   Stranger talker(lone.host, lone.table);
-  talker.say("this is not a message");
+  talker.say_bytes(redgem::test::raw_frame("this is not a message"));
   CHECK(talker.hung_up_on());
   Stranger rude(lone.host, lone.table);
   rude.say(R"({"k":"m","n":"hit","d":1})");  // a message before the hello
@@ -310,7 +329,7 @@ TEST_CASE("a guest is not fooled by a host that hands out the host's own id") {
     if (!link.valid()) fake_host.accept(link);
     return link.valid();
   }));
-  std::vector<std::uint8_t> welcome = frame(R"({"k":"w","t":1,"p":[]})");
+  std::vector<std::uint8_t> welcome = wire_frame(R"({"k":"w","t":1,"p":[]})");
   REQUIRE(table.until([&] { return link.write(welcome) == IoStatus::Ok; }));
   REQUIRE(table.until([&table] { return table.count(0, NetworkEvent::Kind::Failed) == 1; }));
   CHECK(guest.state() == NetworkSession::State::Offline);
@@ -410,7 +429,7 @@ TEST_CASE("a flood of tiny messages from one machine is handled a poll's worth a
   Stranger flooder(lone.host, lone.table);
   flooder.get_in(lone.host);
   std::vector<std::uint8_t> flood;
-  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x"})");
+  const std::vector<std::uint8_t> tiny = wire_frame(R"({"k":"m","n":"x"})");
   for (int i = 0; i < kFloodMessages; ++i) flood.insert(flood.end(), tiny.begin(), tiny.end());
   REQUIRE(lone.table.until([&] { return flooder.socket.write(flood) == IoStatus::Ok && flood.empty(); }));
   std::this_thread::sleep_for(kArrivalPause);
@@ -430,7 +449,7 @@ TEST_CASE("what a guest said before it hung up is all heard, and only then is it
   Stranger talker(lone.host, lone.table);
   talker.get_in(lone.host);
   std::vector<std::uint8_t> last_words;
-  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x"})");
+  const std::vector<std::uint8_t> tiny = wire_frame(R"({"k":"m","n":"x"})");
   for (int i = 0; i < kFloodMessages; ++i) last_words.insert(last_words.end(), tiny.begin(), tiny.end());
   while (!last_words.empty()) REQUIRE(talker.socket.write(last_words) != IoStatus::Closed);
   talker.socket.close();
@@ -460,7 +479,7 @@ struct FakeHost {
   }
 
   void say(const std::string& text) {
-    std::vector<std::uint8_t> bytes = frame(text);
+    std::vector<std::uint8_t> bytes = wire_frame(text);
     REQUIRE(table.until([&] { return link.write(bytes) == IoStatus::Ok; }));
   }
 };
@@ -479,7 +498,7 @@ TEST_CASE("a room's opener hears of each newcomer asking to come in once, howeve
   REQUIRE(opener.host_room(kLocalhost, listener.local_port(), error));
   REQUIRE(table.until([&] { return listener.accept(relay) == IoStatus::Ok || relay.valid(); }));
   const auto say = [&](const std::string& text) {
-    std::vector<std::uint8_t> bytes = frame(text);
+    std::vector<std::uint8_t> bytes = wire_frame(text);
     REQUIRE(table.until([&] { return relay.write(bytes) == IoStatus::Ok && bytes.empty(); }));
   };
   say(R"({"k":"w","t":1,"p":[],"r":"ABCDEF"})");
@@ -531,11 +550,110 @@ TEST_CASE("what a host said before it hung up is all heard, and only then is the
   FakeHost fake;
   fake.say(R"({"k":"w","t":2,"p":[1]})");
   std::vector<std::uint8_t> last_words;
-  const std::vector<std::uint8_t> tiny = frame(R"({"k":"m","n":"x","f":1})");
+  const std::vector<std::uint8_t> tiny = wire_frame(R"({"k":"m","n":"x","f":1})");
   for (int i = 0; i < kFloodMessages; ++i) last_words.insert(last_words.end(), tiny.begin(), tiny.end());
   while (!last_words.empty()) REQUIRE(fake.link.write(last_words) != IoStatus::Closed);
   fake.link.close();
   REQUIRE(fake.table.until([&fake] { return fake.table.count(0, NetworkEvent::Kind::Disconnected) == 1; }));
   CHECK(fake.table.count(0, NetworkEvent::Kind::Message) == kFloodMessages);
   CHECK(fake.table.events[0].back().kind == NetworkEvent::Kind::Disconnected);
+}
+
+TEST_CASE("a newcomer of another version of the protocol is turned away, told why, and the host logs it") {
+  redgem::test::LogCapture log;
+  LoneHost lone;
+  Stranger newer(lone.host, lone.table);
+  newer.say(R"({"k":"h","v":)" + std::to_string(kNextProtocol) + "}");
+  const nlohmann::json refusal = newer.hear();
+  CHECK(refusal[wire::kKind] == wire::kRefused);
+  CHECK(refusal[wire::kVersion] == wire::kProtocolVersion);
+  CHECK(refusal[wire::kReason] == wire::protocol_mismatch(kNextProtocol));
+  CHECK(newer.hung_up_on());
+  CHECK(lone.host.peers().empty());
+  CHECK(log.contains("this game runs protocol " + std::to_string(wire::kProtocolVersion) + ", the other side " +
+                     std::to_string(kNextProtocol)));
+  // A hello that says no version at all is of none this host speaks either.
+  Stranger unversioned(lone.host, lone.table);
+  unversioned.say(R"({"k":"h","v":0})");
+  CHECK(unversioned.hear()[wire::kReason] == wire::protocol_mismatch(0));
+}
+
+TEST_CASE("a guest turned away by a host of another version says why in its own words") {
+  for (const std::string& answer : {R"({"k":"x","y":"whatever its reason","v":)" + std::to_string(kNextProtocol) + "}",
+                                    R"({"k":"w","t":2,"p":[1],"v":)" + std::to_string(kNextProtocol) + "}",
+                                    // (a welcome this version could not read: its list of the others is no list)
+                                    R"({"k":"w","t":2,"p":"all","v":)" + std::to_string(kNextProtocol) + "}"}) {
+    CAPTURE(answer);
+    redgem::test::LogCapture log;
+    FakeHost fake;
+    fake.say(answer);
+    REQUIRE(fake.table.until([&fake] { return fake.table.count(0, NetworkEvent::Kind::Failed) == 1; }));
+    CHECK(fake.table.last(0, NetworkEvent::Kind::Failed)->name == wire::protocol_mismatch(kNextProtocol));
+    CHECK(fake.guest.state() == NetworkSession::State::Offline);
+    CHECK(log.contains(wire::protocol_mismatch(kNextProtocol)));
+  }
+}
+
+TEST_CASE("a refusal from a host of this version keeps the host's reason") {
+  FakeHost fake;
+  fake.say(R"({"k":"x","y":"the game is full of ghosts","v":)" + std::to_string(wire::kProtocolVersion) + "}");
+  REQUIRE(fake.table.until([&fake] { return fake.table.count(0, NetworkEvent::Kind::Failed) == 1; }));
+  CHECK(fake.table.last(0, NetworkEvent::Kind::Failed)->name == "the game is full of ghosts");
+}
+
+namespace {
+
+constexpr float kFacingDegrees = 45.0f;
+constexpr double kAngleTolerance = 0.01;  // of the angle: within half a degree of 45
+constexpr int kStillPoses = 3;
+
+// The poses a seat heard, as the game's scripts get them.
+std::vector<NetworkEvent> poses_heard(const Table& table, std::size_t seat) {
+  std::vector<NetworkEvent> poses;
+  for (const NetworkEvent& event : table.events[seat]) {
+    if (event.kind == NetworkEvent::Kind::Message && event.name == kPoseMessageName) poses.push_back(event);
+  }
+  return poses;
+}
+
+}  // namespace
+
+TEST_CASE("a pose goes to everyone else through the host, and arrives as the $sync message") {
+  Party party;
+  const redgem::Quat facing = redgem::quat_from_euler_degrees({0.0f, kFacingDegrees, 0.0f});
+  REQUIRE(party.first.send_pose("hero-2", {1.0f, 2.0f, 3.0f}, facing));
+  REQUIRE(party.table.until([&party] {
+    return poses_heard(party.table, Party::kHostSeat).size() == 1 &&
+           poses_heard(party.table, Party::kSecondSeat).size() == 1;
+  }));
+  for (const std::size_t seat : {Party::kHostSeat, Party::kSecondSeat}) {
+    const NetworkEvent pose = poses_heard(party.table, seat).back();
+    CHECK(pose.peer == kFirstGuest);
+    CHECK(pose.data[0] == "hero-2");
+    CHECK(pose.data[1][0].get<float>() == doctest::Approx(1.0f));
+    CHECK(pose.data[1][2].get<float>() == doctest::Approx(3.0f));
+    CHECK(pose.data[2][1].get<double>() == doctest::Approx(kFacingDegrees).epsilon(kAngleTolerance));
+  }
+  // Then only the move travels, and it comes out where the object is.
+  REQUIRE(party.first.send_pose("hero-2", {1.5f, 2.0f, 3.0f}, facing));
+  REQUIRE(party.table.until([&party] { return poses_heard(party.table, Party::kSecondSeat).size() == 2; }));
+  CHECK(poses_heard(party.table, Party::kSecondSeat).back().data[1][0].get<float>() == doctest::Approx(1.5f));
+  CHECK_FALSE(party.first.send_pose(std::string(kMaxPoseKeyBytes + 1, 'k'), {}, facing));
+}
+
+TEST_CASE("a machine that joins hears the others' objects whole, though they only send what changed") {
+  LoneHost lone;
+  NetworkSession mover, late;
+  lone.table.seat(mover);
+  lone.table.seat(late);
+  const std::size_t late_seat = 2;
+  std::string error;
+  REQUIRE(mover.join(kLocalhost, lone.host.port(), error));
+  REQUIRE(lone.table.until([&mover] { return mover.state() == NetworkSession::State::Online; }));
+  for (int i = 0; i < kStillPoses; ++i) mover.send_pose("crate", {5.0f, 0.0f, 0.0f}, redgem::Quat::identity());
+  REQUIRE(late.join(kLocalhost, lone.host.port(), error));
+  REQUIRE(lone.table.until([&mover] { return mover.peers().size() == 2; }));  // it heard of the newcomer
+  mover.send_pose("crate", {5.0f, 0.0f, 0.0f}, redgem::Quat::identity());
+  REQUIRE(lone.table.until([&] { return poses_heard(lone.table, late_seat).size() == 1; }));
+  CHECK(poses_heard(lone.table, late_seat).back().data[1][0].get<float>() == doctest::Approx(5.0f));
 }

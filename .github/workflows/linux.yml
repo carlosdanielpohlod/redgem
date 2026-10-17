@@ -111,7 +111,7 @@ jobs:
 
       # Everything else ctest has, the system tests (which open windows) included, on a virtual
       # display drawn by Mesa's software renderer (llvmpipe: OpenGL 3.3 core, as the engine asks).
-      # (Not the two programs of the steps above again.)
+      # (Not the two programs of the steps above again, nor the load test, which has its own step.)
       - name: All the other tests (ctest)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         env:
@@ -119,7 +119,13 @@ jobs:
           REDGEM_GPU: integrated
         run: >
           xvfb-run -a -s "-screen 0 1600x900x24"
-          ctest --test-dir build --output-on-failure -j 4 -E '^cpp\.'
+          ctest --test-dir build --output-on-failure -j 4 -E '^(cpp|load)\.'
+
+      # Bots playing on a dedicated server (tests/load): run alone, so that nothing else takes the
+      # processor it measures, and with its output, which is the table of what it measured.
+      - name: Load test
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ctest --test-dir build --verbose -R '^load\.'
 
       - name: Keep the tests' pictures
         if: ${{ failure() }}
