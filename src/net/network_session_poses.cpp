@@ -19,7 +19,7 @@ nlohmann::json placement(const std::string& key, const Pose& pose) {
 }  // namespace
 
 bool NetworkSession::send_pose(const std::string& key, Vec3 position, Quat rotation) {
-  if (!can_send_pose(key)) return false;
+  if (!can_send_pose(key, position, rotation)) return false;
   return deliver(pose_message(encoded(poses_.sent.update(key, position, rotation)), id_), kEveryone);
 }
 

@@ -95,6 +95,12 @@ Vec3 moved_by(Vec3 from, const PoseSteps& steps) {
           from.z + steps[kZOffset] * kPoseStep};
 }
 
+bool all_finite(Vec3 vector) { return std::isfinite(vector.x) && std::isfinite(vector.y) && std::isfinite(vector.z); }
+
+bool all_finite(Quat rotation) {
+  return all_finite(Vec3{rotation.x, rotation.y, rotation.z}) && std::isfinite(rotation.w);
+}
+
 bool moves(const PoseSteps& steps) { return steps != PoseSteps{}; }
 
 }  // namespace redgem::net

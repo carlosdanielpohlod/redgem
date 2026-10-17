@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
+#include "net/network_session.hpp"
 #include "net/pose_baselines.hpp"
 #include "net/pose_codec.hpp"
 #include "net/pose_quantization.hpp"
@@ -214,4 +216,54 @@ TEST_CASE("a receiver makes nothing of changes until a whole pose came from that
   receiver.forget(kSender);
   CHECK_FALSE(receiver.take(kSender, change).has_value());
   CHECK(receiver.take(kOtherSender, change).has_value());
+}
+
+namespace {
+
+std::string key_number(std::size_t number) { return "crate#" + std::to_string(number); }
+
+}  // namespace
+
+TEST_CASE("a sender that keeps all the poses it may forgets none for an object it knows") {
+  PoseSender sender;
+  for (std::size_t i = 0; i < kMaxRememberedPoses; ++i) sender.update(key_number(i), {}, Quat::identity());
+  // The first object's whole pose comes round again: the others stay known.
+  for (int i = 0; i < kSendsPerWholePose; ++i) sender.update(key_number(0), {}, Quat::identity());
+  CHECK_FALSE(sender.update(key_number(1), {}, Quat::identity()).whole());
+  // A new one is one too many: all start over.
+  CHECK(sender.update("one more", {}, Quat::identity()).whole());
+  CHECK(sender.update(key_number(1), {}, Quat::identity()).whole());
+}
+
+TEST_CASE("a receiver keeps so many poses of each machine, and one machine's never wipe another's") {
+  PoseReceiver receiver;
+  PoseSender sender;
+  const auto whole = [&sender](const std::string& key) {
+    sender.start_over();
+    return sent(sender.update(key, {}, Quat::identity()));
+  };
+  PoseUpdate still;
+  still.key = key_number(0);
+  REQUIRE(receiver.take(kOtherSender, whole(key_number(0))).has_value());
+  for (std::size_t i = 0; i < kMaxRememberedPoses; ++i)
+    REQUIRE(receiver.take(kSender, whole(key_number(i))).has_value());
+  // A whole pose of an object it knows already forgets nothing.
+  REQUIRE(receiver.take(kSender, whole(key_number(0))).has_value());
+  CHECK(receiver.take(kSender, still).has_value());
+  // One more of that machine's: its own start over, the other machine's are kept.
+  REQUIRE(receiver.take(kSender, whole("one more")).has_value());
+  CHECK_FALSE(receiver.take(kSender, still).has_value());
+  CHECK(receiver.take(kOtherSender, still).has_value());
+}
+
+TEST_CASE("a pose that is not numbers is not sent") {
+  // (Network.__pose cannot make one, but a session takes it from anywhere.)
+  NetworkSession session;
+  std::string error;
+  REQUIRE(session.host(0, error));
+  CHECK(session.send_pose("ok", {}, Quat::identity()));
+  CHECK_FALSE(session.send_pose("nan", {std::nanf(""), 0.0f, 0.0f}, Quat::identity()));
+  CHECK_FALSE(session.send_pose("inf", {}, Quat{0.0f, std::numeric_limits<float>::infinity(), 0.0f, 1.0f}));
+  CHECK_FALSE(all_finite(Quat{std::nanf(""), 0.0f, 0.0f, 1.0f}));
+  CHECK(all_finite(Vec3{1e30f, -1e30f, 0.0f}));
 }

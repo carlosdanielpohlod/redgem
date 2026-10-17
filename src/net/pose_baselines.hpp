@@ -22,8 +22,10 @@ namespace redgem::net {
 // How often an object's whole pose is sent again, at the least: in sends of it (NetworkSync sends
 // twenty a second).
 inline constexpr int kSendsPerWholePose = 40;
-// The objects each side keeps poses of. Past that it forgets them all and starts over from whole
-// poses (a game that spawns and destroys many objects would otherwise fill it up).
+// The objects each side keeps poses of: a sender of its own, a receiver of each machine's. Past
+// that it forgets them all (a receiver, all of that machine's) and starts over from whole poses (a
+// game that spawns and destroys many objects would otherwise fill it up). An object it already
+// keeps the pose of never makes it forget the others.
 inline constexpr std::size_t kMaxRememberedPoses = 4096;
 
 // The sender's side: what the others were last told of each of this machine's objects.
@@ -45,6 +47,10 @@ class PoseSender {
   static PoseUpdate change(const std::string& key, Sent& sent, const PoseSteps& steps, std::uint32_t rotation);
   // Whether the next pose of an object is to be whole: the others know nothing of it yet, or not lately.
   bool due_whole(std::unordered_map<std::string, Sent>::const_iterator sent) const;
+  // Whether a new object would be one more than the sender keeps.
+  bool full_without(const std::string& key) const {
+    return sent_.size() >= kMaxRememberedPoses && sent_.count(key) == 0;
+  }
 
   std::unordered_map<std::string, Sent> sent_;
 };
@@ -73,6 +79,11 @@ class PoseReceiver {
 
   // Starts over what is known of an object, from the whole pose that came.
   void start(const Source& source);
+  // Whether a new object of that machine would be one more than is kept of it.
+  bool full_without(const Source& source) const {
+    return known_.count(source) == 0 && poses_of(source.first) >= kMaxRememberedPoses;  // (counted for new ones only)
+  }
+  std::size_t poses_of(int peer) const;
   static void apply(const PoseUpdate& update, Known& known);
 
   std::map<Source, Known> known_;

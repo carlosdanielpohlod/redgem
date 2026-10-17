@@ -28,6 +28,9 @@ using PoseSteps = std::array<std::int16_t, kPoseAxes>;
 // axis (about 32 meters).
 std::optional<PoseSteps> steps_between(Vec3 from, Vec3 to);
 Vec3 moved_by(Vec3 from, const PoseSteps& steps);
+// Whether every number of a position or a rotation is one (not infinity, not NaN).
+bool all_finite(Vec3 vector);
+bool all_finite(Quat rotation);
 // Whether it moves at all.
 bool moves(const PoseSteps& steps);
 

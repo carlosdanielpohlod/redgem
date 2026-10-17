@@ -110,7 +110,8 @@ class NetworkSession {
   // is no such peer.
   bool send(const std::string& name, const nlohmann::json& data, int to = kEveryone);
   // Sends everyone else where an object of this machine is (NetworkSync), in as few bytes as it
-  // takes (see pose_codec.hpp). False when offline, or for a key longer than kMaxPoseKeyBytes.
+  // takes (see pose_codec.hpp). False when offline, for a key longer than kMaxPoseKeyBytes, or for a pose that is not
+  // numbers (infinity, NaN).
   bool send_pose(const std::string& key, Vec3 position, Quat rotation);
 
   State state() const { return state_; }
@@ -254,8 +255,11 @@ class NetworkSession {
   std::vector<int> take_closed_links();
   // Whether a message may go out: from a machine in a game, to someone else, within what a message may be.
   bool can_send(const std::string& name, const nlohmann::json& data, int to) const;
-  // Whether a pose may go out: from a machine in a game, of an object whose key a pose can carry.
-  bool can_send_pose(const std::string& key) const { return state_ == State::Online && key.size() <= kMaxPoseKeyBytes; }
+  // Whether a pose may go out: from a machine in a game, of an object whose key a pose can carry,
+  // made of numbers.
+  bool can_send_pose(const std::string& key, Vec3 position, Quat rotation) const {
+    return state_ == State::Online && key.size() <= kMaxPoseKeyBytes && all_finite(position) && all_finite(rotation);
+  }
   // Sends a message, to `to` or kEveryone: through the host, or as the host.
   bool deliver(const nlohmann::json& message, int to);
   // Whether a guest may address `to`: everyone, the host, or someone it knows of.

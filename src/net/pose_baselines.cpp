@@ -1,5 +1,7 @@
 #include "net/pose_baselines.hpp"
 
+#include <iterator>
+
 namespace redgem::net {
 
 PoseUpdate PoseSender::update(const std::string& key, Vec3 position, Quat rotation) {
@@ -16,7 +18,7 @@ bool PoseSender::due_whole(std::unordered_map<std::string, Sent>::const_iterator
 }
 
 PoseUpdate PoseSender::whole(const std::string& key, Vec3 position, std::uint32_t rotation) {
-  if (sent_.size() >= kMaxRememberedPoses) sent_.clear();
+  if (full_without(key)) sent_.clear();
   sent_[key] = Sent{position, rotation};
   PoseUpdate update;
   update.key = key;
@@ -56,8 +58,14 @@ void PoseReceiver::apply(const PoseUpdate& update, Known& known) {
 }
 
 void PoseReceiver::start(const Source& source) {
-  if (known_.size() >= kMaxRememberedPoses) known_.clear();
+  if (full_without(source)) forget(source.first);
   known_[source] = Known();  // (what the whole pose says is applied next)
+}
+
+std::size_t PoseReceiver::poses_of(int peer) const {
+  // (Sources are in the order of their machine's id, then key: a machine's are all together.)
+  return static_cast<std::size_t>(
+      std::distance(known_.lower_bound({peer, std::string()}), known_.lower_bound({peer + 1, std::string()})));
 }
 
 void PoseReceiver::forget(int peer) {
