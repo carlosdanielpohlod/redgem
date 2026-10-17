@@ -18,8 +18,6 @@ constexpr std::size_t kRotationBytes = 4;
 constexpr std::size_t kFlagsAt = 0;
 constexpr std::size_t kKeySizeAt = 1;
 
-bool has(std::uint8_t flags, std::uint8_t flag) { return (flags & flag) != 0; }
-
 std::uint8_t flags_of(const PoseUpdate& update) {
   std::uint8_t flags = 0;
   if (update.position) flags |= kAbsolutePosition;

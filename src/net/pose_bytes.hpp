@@ -22,6 +22,9 @@ inline constexpr std::size_t kStepBytes = 2;
 inline constexpr int kBitsPerByte = 8;
 inline constexpr std::uint32_t kByteMask = 0xFF;
 
+// Whether a byte of flags has `flag` set.
+inline bool has(std::uint32_t flags, std::uint32_t flag) { return (flags & flag) != 0; }
+
 class PoseWriter {
  public:
   void byte(std::uint8_t value) { bytes_.push_back(value); }
