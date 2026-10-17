@@ -132,7 +132,8 @@ redgem_add_library(redgem_core
   core/safe_path.cpp
   core/image_header.cpp
   core/math.cpp
-  core/fixed_clock.cpp)
+  core/fixed_clock.cpp
+  core/stopwatch.cpp)
 target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
 redgem_embed_texts(redgem_core core)
 if(ANDROID)

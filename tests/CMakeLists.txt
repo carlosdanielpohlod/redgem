@@ -2,6 +2,7 @@ add_executable(redgem_tests
   test_main.cpp
   unit/math_test.cpp
   unit/fixed_clock_test.cpp
+  unit/stopwatch_test.cpp
   unit/log_test.cpp
   unit/files_test.cpp
   unit/command_line_test.cpp

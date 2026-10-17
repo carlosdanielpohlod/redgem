@@ -21,14 +21,16 @@ Network.host                           # on one machine (port 7777; port: 9000 p
 Network.join("192.168.0.12")           # on the others: the host's address
 
 Network.on_connect { start_round }     # this machine is in the game
-Network.on_fail { |reason| show("Could not join: #{reason}") }  # reason: nil, or the host's
+Network.on_fail { |reason| show("Could not join: #{reason}") }  # reason: nil, the host's, or a timeout
 Network.on_join { |peer| ... }         # someone else arrived
 Network.on_leave { |peer| ... }        # someone else left
 Network.on_disconnect { ... }          # the game is gone: the host left or the connection dropped
 ```
 
 `Network.online?`, `Network.host?`, `Network.id` and `Network.peers` (everyone else's ids) tell
-where things stand. `Network.leave` leaves the game; when the host leaves, it ends for everyone.
+where things stand. A join that hears nothing back for 5 seconds gives up, and `on_fail` gets
+`"the game did not answer in time"`. That time, like every wait of the network, is real time: a game
+run with no window (a headless test) plays its frames faster than that, and they do not count. `Network.leave` leaves the game; when the host leaves, it ends for everyone.
 
 Every machine in a game runs the same version of the engine's network protocol, and so do the relay
 and the dedicated server it meets on. A machine of another version is turned away: `on_fail` gets

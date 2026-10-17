@@ -96,11 +96,15 @@ struct Gathering {
   std::unique_ptr<server::GameServer> server;
   std::unique_ptr<net::RelayServer> relay;
   std::vector<std::unique_ptr<Engine>> machines;
+  // The real time as the machines' networks read it: a frame's worth each round, so that a game's
+  // time to decide runs out in rounds, as the server's and the relay's do.
+  double clock = 0.0;
 
   Engine& add_machine() {
     EngineOptions options;
     options.game_dir = files.game;
     options.fixed_step = true;
+    options.network_time = [this] { return clock; };
     options.save_file = files.root / ("save" + std::to_string(machines.size()) + ".json");
     auto created = Engine::create(options);
     if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
@@ -163,6 +167,7 @@ struct Gathering {
   }
 
   void round() {
+    clock += config::kFixedDeltaSeconds;
     if (server) server->tick(config::kFixedDeltaSeconds);
     if (relay) relay->poll(config::kFixedDeltaSeconds);
     for (auto& machine : machines) machine->frame(config::kFixedDeltaSeconds);

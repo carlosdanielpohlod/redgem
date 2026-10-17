@@ -204,7 +204,7 @@ TEST_CASE("joining a game nobody hosts fails, and so does hosting on a port in u
   CHECK_FALSE(guest.join("no such machine.invalid", port, error));
 }
 
-TEST_CASE("a join that is never answered gives up") {
+TEST_CASE("a join that is never answered gives up, saying so") {
   // Something that accepts connections and then says nothing: a listening socket nobody polls.
   std::string error;
   Socket silent = Socket::listen_on(0, error);
@@ -215,6 +215,7 @@ TEST_CASE("a join that is never answered gives up") {
   const std::vector<NetworkEvent> events = guest.poll(kPastJoinTimeout);
   REQUIRE(events.size() == 1);
   CHECK(events.front().kind == NetworkEvent::Kind::Failed);
+  CHECK(events.front().name == kNoAnswer);
   CHECK(guest.state() == NetworkSession::State::Offline);
 }
 

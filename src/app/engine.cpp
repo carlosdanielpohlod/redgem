@@ -23,7 +23,8 @@ Engine::Engine(const EngineOptions& options)
     : options_(options),
       images_dir_(options.game_dir / config::kImagesDirName),
       presenter_(options.presenter),
-      clock_(config::kFixedDeltaSeconds, config::kMaxFrameSeconds, config::kMaxFixedStepsPerFrame) {}
+      clock_(config::kFixedDeltaSeconds, config::kMaxFrameSeconds, config::kMaxFixedStepsPerFrame),
+      network_watch_(options.network_time) {}
 
 Engine::~Engine() {
   // Scripts reference the scene and physics through the context: tear them down first.

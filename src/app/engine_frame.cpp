@@ -17,7 +17,7 @@ void Engine::frame(float frame_seconds) {
   read_input();
   context_.hud.clear();
   scripts_->start_pending();
-  poll_network(frame_seconds);
+  poll_network();
   answer_requests();
   follow_presenter();
   advance_game(frame_seconds);
@@ -39,13 +39,14 @@ InputSource& Engine::input_source() {
   return scripted_input_;
 }
 
-void Engine::poll_network(float frame_seconds) {
-  // On the real clock: the network does not pause with the game.
-  for (const net::NetworkEvent& event : network_.poll(frame_seconds)) scripts_->dispatch(event);
+void Engine::poll_network() {
+  // On the real clock: the network does not pause with the game, nor hurry with its frames.
+  const float seconds = network_watch_.lap();
+  for (const net::NetworkEvent& event : network_.poll(seconds)) scripts_->dispatch(event);
   // A game hosted on this machine's own port answers the neighbours looking for one.
   if (!found_by_neighbours()) discovery_.stop_announcing();
   discovery_.set_players(static_cast<int>(network_.peers().size()) + 1);
-  discovery_.update(frame_seconds);
+  discovery_.update(seconds);
 }
 
 void Engine::answer_requests() {
