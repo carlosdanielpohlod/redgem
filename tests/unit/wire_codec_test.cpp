@@ -141,3 +141,22 @@ TEST_CASE("what arrives in the wrong shape is read, and then is not well formed"
     CHECK_FALSE(wire::well_formed(*read));
   }
 }
+
+TEST_CASE("UTF-8 is read to the letter: every first byte, every range of the second, and every cut") {
+  for (const std::string& good :
+       {std::string(""), std::string("\x7F"), std::string("\xC2\x80"), std::string("\xDF\xBF"),
+        std::string("\xE0\xA0\x80"), std::string("\xED\x9F\xBF"), std::string("\xEE\x80\x80"),
+        std::string("\xEF\xBF\xBF"), std::string("\xF0\x90\x80\x80"), std::string("\xF4\x8F\xBF\xBF"),
+        std::string("a\0b", 3)}) {
+    CAPTURE(good);
+    CHECK(wire::valid_utf8(good));
+  }
+  for (const std::string& bad :
+       {std::string("\x80"), std::string("\xBF"), std::string("\xC0\xAF"), std::string("\xC1\xBF"), std::string("\xC2"),
+        std::string("\xC2\x7F"), std::string("\xC2\xC0"), std::string("\xE0\x9F\xBF"), std::string("\xE0\xA0"),
+        std::string("\xED\xA0\x80"), std::string("\xF0\x8F\xBF\xBF"), std::string("\xF4\x90\x80\x80"),
+        std::string("\xF5\x80\x80\x80"), std::string("\xFF"), std::string("\xF0\x90\x80"), std::string("ok\xE2\x98")}) {
+    CAPTURE(bad);
+    CHECK_FALSE(wire::valid_utf8(bad));
+  }
+}

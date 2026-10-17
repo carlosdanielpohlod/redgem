@@ -14,7 +14,6 @@ namespace {
 using nlohmann::json;
 
 constexpr int kCompact = -1;  // nlohmann's "no indentation"
-constexpr unsigned char kFirstNonAscii = 0x80;
 // How deep a message nests: the message itself, holding data that nests kMaxDataDepth deep.
 constexpr int kMaxMessageDepth = kMaxDataDepth + 1;
 constexpr const char* kLogVariable = "REDGEM_LOG_MESSAGES";
@@ -57,11 +56,6 @@ class BoundedBuilder {
   int depth_ = 0;
 };
 
-bool all_ascii(const std::string& text) {
-  return std::all_of(text.begin(), text.end(),
-                     [](char letter) { return static_cast<unsigned char>(letter) < kFirstNonAscii; });
-}
-
 bool texts_valid(const json& value);
 
 bool members_valid(const json& object) {
@@ -102,16 +96,6 @@ std::optional<json> unpacked(const std::string& bytes) {
   if (!json::sax_parse(bytes.begin(), bytes.end(), &builder, json::input_format_t::msgpack)) return std::nullopt;
   if (logging_messages()) log::info("received " + as_text(message));
   return message;
-}
-
-bool valid_utf8(const std::string& text) {
-  if (all_ascii(text)) return true;
-  try {
-    static_cast<void>(json(text).dump(kCompact, ' ', false, json::error_handler_t::strict));
-    return true;
-  } catch (const json::type_error&) {
-    return false;
-  }
 }
 
 }  // namespace redgem::net::wire

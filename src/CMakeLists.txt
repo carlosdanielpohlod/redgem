@@ -120,6 +120,7 @@ redgem_add_library(redgem_net
   net/wire.cpp
   net/wire_checks.cpp
   net/wire_codec.cpp
+  net/utf8_text.cpp
   net/pose_quantization.cpp
   net/pose_codec.cpp
   net/pose_baselines.cpp
