@@ -13,14 +13,15 @@ constexpr std::size_t kNoClip = 0;
 constexpr std::size_t kClipNumbersBytes = 2 * kFloatBytes + kByte;  // time, speed and flags
 constexpr std::size_t kHeadBytes = 2 * kFloatBytes;                 // fade and layer weight
 
-bool has(std::uint32_t flags, std::uint8_t flag) { return (flags & flag) != 0; }
-
 // Whether what was read is a clip: a name in UTF-8, and flags a clip has.
 bool sound_clip(const std::string& name, std::uint32_t flags) {
   return wire::valid_utf8(name) && (flags & ~kKnownClipFlags) == 0;
 }
 
-bool fits(const std::optional<ClipPart>& clip) { return !clip || clip->clip.size() <= kMaxClipNameBytes; }
+// Whether a clip, if any, has a name a clip carries: an empty one would read as no clip at all.
+bool fits(const std::optional<ClipPart>& clip) {
+  return !clip || (!clip->clip.empty() && clip->clip.size() <= kMaxClipNameBytes);
+}
 
 void write_clip(PoseWriter& writer, const std::optional<ClipPart>& clip) {
   if (!clip) {

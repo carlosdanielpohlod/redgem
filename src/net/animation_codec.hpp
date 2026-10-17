@@ -21,8 +21,8 @@
 
 namespace redgem::net {
 
-// The longest clip name an animation carries: a character playing a clip of a longer one is sent
-// without its animation.
+// The longest clip name an animation carries: a character playing a clip of a longer one (or of
+// an empty name, which a clip's size of 0 cannot tell from none) is sent without its animation.
 inline constexpr std::size_t kMaxClipNameBytes = 64;
 
 struct ClipPart {
@@ -44,7 +44,7 @@ struct AnimationPart {
 inline constexpr std::size_t kMaxAnimationBytes =
     2 * kFloatBytes + 2 * (kByte + kMaxClipNameBytes + 2 * kFloatBytes + kByte);
 
-// Whether every clip name of an animation fits what it carries.
+// Whether every clip name of an animation is one it carries: 1 to kMaxClipNameBytes bytes.
 bool carriable(const AnimationPart& part);
 void write_animation(PoseWriter& writer, const AnimationPart& part);
 // The animation in what is left of the bytes, which it must take up exactly; nothing otherwise.
