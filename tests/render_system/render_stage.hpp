@@ -1,0 +1,58 @@
+#pragma once
+
+// A window and a renderer for scenes made in code, and what they drew, as pixels a test can read.
+
+#include <raylib.h>
+
+#include <filesystem>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "render/renderer.hpp"
+#include "render/window.hpp"
+#include "scene/scene.hpp"
+#include "scene/scene_desc.hpp"
+
+namespace redgem::test {
+
+// A picture the renderer drew.
+struct Picture {
+  int width = 0;
+  int height = 0;
+  std::vector<::Color> pixels;  // row by row
+
+  // Where the pixels `wanted` picks are, on average, across the picture (0 at its left, 1 at its
+  // right), and how many there are.
+  struct Found {
+    float across = 0.0f;
+    std::size_t count = 0;
+  };
+  Found find(const std::function<bool(::Color)>& wanted) const;
+  ::Color at(float across, float down) const;
+};
+
+class RenderStage {
+ public:
+  RenderStage();
+  ~RenderStage();
+  RenderStage(const RenderStage&) = delete;
+  RenderStage& operator=(const RenderStage&) = delete;
+
+  // Uploads a scene's meshes and materials, replacing the last one's.
+  void upload(const SceneDesc& desc) { renderer_->upload(desc); }
+  // The scene as its camera sees it; also written to <screenshots>/render/<name>.png for whoever
+  // looks at the run afterwards.
+  Picture draw(const Scene& scene, const std::string& name);
+
+ private:
+  Window window_;
+  std::unique_ptr<Renderer> renderer_;
+  RenderTexture2D target_{};
+};
+
+// A camera node at `position`, looking at the origin.
+NodeDesc camera_at(Vec3 position);
+
+}  // namespace redgem::test
