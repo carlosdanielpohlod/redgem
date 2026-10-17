@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -32,7 +33,9 @@ inline constexpr float kServedIdleSeconds = 300.0f;
 inline constexpr int kDefaultWaitingPerAddress = 4;
 inline constexpr int kMaxWaitingLinks = 32;
 // What a pose that arrived (send_pose) is to the game's scripts: a Message event of this name
-// (Network::SYNC), whose data is [key, position, rotation in degrees], from the object's machine.
+// (Network::SYNC), whose data is [key, position, rotation in degrees], from the object's machine,
+// and [fade, layer weight, own clip, mixed clip] after them when it carries the object's
+// animation (a clip: [name, time, speed, loops, plays], or nil; see animation_codec.hpp).
 inline constexpr const char* kPoseMessageName = "$sync";
 
 struct NetworkEvent {
@@ -110,9 +113,11 @@ class NetworkSession {
   // is no such peer.
   bool send(const std::string& name, const nlohmann::json& data, int to = kEveryone);
   // Sends everyone else where an object of this machine is (NetworkSync), in as few bytes as it
-  // takes (see pose_codec.hpp). False when offline, for a key longer than kMaxPoseKeyBytes, or for a pose that is not
-  // numbers (infinity, NaN).
-  bool send_pose(const std::string& key, Vec3 position, Quat rotation);
+  // takes (see pose_codec.hpp), with what its animation does when `animated` (only when that is
+  // news: see PoseSender). False when offline, for a key longer than kMaxPoseKeyBytes, or for a
+  // pose that is not numbers (infinity, NaN).
+  bool send_pose(const std::string& key, Vec3 position, Quat rotation,
+                 const std::optional<Animated>& animated = std::nullopt);
 
   State state() const { return state_; }
   bool hosting() const { return state_ == State::Online && id_ == kHostId; }

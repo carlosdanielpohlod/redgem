@@ -124,6 +124,7 @@ redgem_add_library(redgem_net
   net/utf8_text.cpp
   net/pose_quantization.cpp
   net/pose_codec.cpp
+  net/animation_codec.cpp
   net/pose_baselines.cpp
   net/connection.cpp
   net/network_session.cpp
@@ -187,6 +188,7 @@ redgem_add_library(redgem_runtime
   scene/animation/clip_clock.cpp
   scene/animation/animation_player.cpp
   scene/animation/animation_player_characters.cpp
+  scene/animation/animation_player_sync.cpp
   scene/animation/animation_player_posing.cpp
   scene/camera_ray.cpp
   scene/particles.cpp
@@ -236,6 +238,7 @@ redgem_add_library(redgem_runtime
   script/bindings/audio_bindings.cpp
   script/bindings/input_bindings.cpp
   script/bindings/animation_bindings.cpp
+  script/bindings/animation_sync_bindings.cpp
   script/bindings/particles_bindings.cpp
   script/bindings/save_bindings.cpp
   script/bindings/message_values.cpp

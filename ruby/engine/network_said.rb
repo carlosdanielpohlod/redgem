@@ -6,6 +6,8 @@ module Network
     MAX_PEERS = 16            # machines in one game, the host included
     RECORD_SIZE = 5           # parts of a spawn record: key, template, owner, position, rotation
     SYNC_SIZE = 3             # parts of what says where an object is: key, position, rotation
+    ANIMATION_SIZE = 4        # parts of what says what its animation does: fade, weight, own clip, mixed clip
+    CLIP_SIZE = 5             # parts of a clip: name, time, speed, loops, plays
     VECTOR_SIZE = 3           # numbers a position or a rotation travels as: x, y, z
     MAX_KEY_SIZE = 128        # bytes in the key of an object on the network (a spawned one, any NetworkSync)
     MAX_COUNT_DIGITS = 9      # in the number such a key ends with
@@ -30,12 +32,25 @@ module Network
       # (Infinity and what is not a number compare as false, so they are out too.)
       def reachable?(number) = number.is_a?(Numeric) && number.abs <= MAX_DISTANCE
 
-      # Where an object is, as its owner sends it: [key, position, rotation].
+      # Where an object is, as its owner sends it: [key, position, rotation], and what its animation
+      # does after them when that came along.
       def placement?(data)
-        return false unless list?(data, SYNC_SIZE)
-
-        data.first.is_a?(String) && data.drop(1).all? { |part| vector?(part) }
+        key, position, rotation, animation = data
+        sync_size?(data) && key.is_a?(String) && vector?(position) && vector?(rotation) && no_or_animation?(animation)
       end
+
+      def sync_size?(data) = list?(data, SYNC_SIZE) || list?(data, SYNC_SIZE + 1)
+      def no_or_animation?(part) = part.nil? || animation?(part)
+
+      # [fade, weight, own clip, mixed clip]: numbers, and clips or nils.
+      def animation?(part)
+        list?(part, ANIMATION_SIZE) && numbers?(part.take(2)) && part.drop(2).all? { |clip| no_or_clip?(clip) }
+      end
+
+      def no_or_clip?(clip) = clip.nil? || clip?(clip)
+      # [name, time, speed, loops, plays].
+      def clip?(clip) = list?(clip, CLIP_SIZE) && clip[0].is_a?(String) && numbers?(clip[1, 2])
+      def numbers?(list) = list.all? { |number| reachable?(number) }
 
       # Whether `key` is one `maker` gives what it spawns from `template`: "Ball#2.7" is the
       # seventh thing machine 2 spawned. Nothing else is a spawned object's key, so no machine

@@ -13,6 +13,7 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "integration/swordsman.hpp"
 #include "server/game_server.hpp"
 #include "server/server_program.hpp"
 #include "server/stop_signals.hpp"
@@ -129,9 +130,11 @@ struct Online {
     return settings;
   }
 
-  Engine& add_player() {
+  // A player of the game; with `scene`, of that scene instead of the game's own level.
+  Engine& add_player(const SceneDesc* scene = nullptr) {
     EngineOptions options;
     options.game_dir = game;
+    options.scene = scene;
     options.fixed_step = true;
     options.save_file = dir / ("save" + std::to_string(players.size()) + ".json");
     auto created = Engine::create(options);
@@ -169,16 +172,16 @@ struct Online {
   }
 
   // Starts a new player joining: any room, or the one with `room` as its code.
-  Engine& knock(const std::string& room = {}) {
-    Engine& player = add_player();
+  Engine& knock(const std::string& room = {}, const SceneDesc* scene = nullptr) {
+    Engine& player = add_player(scene);
     const std::string asked = room.empty() ? "" : ", room: '" + room + "'";
     REQUIRE(ruby(player, "Network.join('127.0.0.1', port: " + std::to_string(server.port()) + asked + ")") == "true");
     return player;
   }
 
   // A new player in the game: any room, or the one with `room` as its code.
-  Engine& join(const std::string& room = {}) {
-    Engine& player = knock(room);
+  Engine& join(const std::string& room = {}, const SceneDesc* scene = nullptr) {
+    Engine& player = knock(room, scene);
     REQUIRE(until([&player] { return online(player); }));
     round();  // the others hear of it
     return player;
@@ -428,4 +431,19 @@ TEST_CASE("the platformer on a dedicated server plays no hero, keeps the coins, 
   CHECK(online_game.served(player, "[GameMenu.instance.open?, Time.scale].inspect") == "[false, 1.0]");
   CHECK(online_game.until_for(kPastMatchOverSeconds, [&] { return offline(player); }));
   REQUIRE(online_game.until([&] { return online_game.server.room_count() == 0; }));
+}
+
+TEST_CASE("a character's animation passes through a dedicated server's room to the other players") {
+  SceneDesc arena;
+  test::add_swordsman(arena);
+  Online online_game(kRoomy);
+  Engine& first = online_game.join({}, &arena);
+  Engine& second = online_game.join({}, &arena);
+  // The first player's swordsman (player 2), with the same key on both.
+  const std::string sync = "$hero = Scene.find('Swordsman'); $hero.add_component(NetworkSync, owner: 2)";
+  ruby(first, sync);
+  ruby(second, sync);
+  online_game.round();
+  ruby(first, "$hero.animation.play(:Attack)");
+  CHECK(online_game.until([&] { return ruby(second, "$hero.animation.clip.inspect") == "\"Attack\""; }));
 }

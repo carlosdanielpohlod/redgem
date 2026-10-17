@@ -79,6 +79,7 @@ add_executable(redgem_tests
   unit/wire_test.cpp
   unit/wire_codec_test.cpp
   unit/pose_codec_test.cpp
+  unit/animation_codec_test.cpp
   unit/http_url_test.cpp
   unit/http_message_test.cpp
   unit/http_response_parser_test.cpp
@@ -91,6 +92,7 @@ add_executable(redgem_tests
   unit/server_command_test.cpp
   unit/particles_test.cpp
   unit/animation_player_test.cpp
+  unit/animation_sync_test.cpp
   unit/clip_clock_test.cpp
   unit/camera_ray_test.cpp
   integration/physics_world_test.cpp
@@ -111,6 +113,7 @@ add_executable(redgem_tests
   integration/http_game_test.cpp
   integration/network_session_test.cpp
   integration/multiplayer_test.cpp
+  integration/swordsman.cpp
   integration/relay_test.cpp
   integration/relay_approval_test.cpp
   integration/lobby_test.cpp

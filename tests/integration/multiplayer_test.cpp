@@ -4,6 +4,8 @@
 #include <chrono>
 #include <filesystem>
 #include <functional>
+#include <initializer_list>
+#include <string>
 #include <thread>
 
 #include <mruby.h>
@@ -13,6 +15,7 @@
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "net/network_session.hpp"
+#include "integration/swordsman.hpp"
 #include "net/rooms/relay_server.hpp"
 #include "test_support.hpp"
 
@@ -33,8 +36,11 @@ constexpr int kRoundsForOneMoreAnswer = 150;  // frames: past the two seconds of
 constexpr float kWhereTheGuestLeftIt = 2.9f;  // meters along x, give or take
 constexpr int kQuarterSecondRounds = 15;      // frames
 constexpr float kMostOfTheWayToFive = 4.5f;   // from 3, where the ball starts
+constexpr float kShownBehind = 0.25f;         // seconds a watched swordsman is shown behind his owner
+constexpr float kFewFrames = 4.0f * config::kFixedDeltaSeconds;  // what a pose takes on its way, and more
+constexpr float kSomeMix = 0.05f;  // meters of the sword's move that only a mixed clip makes
 
-// A camera, a platform the host moves, and a ball to spawn copies of.
+// A camera, a platform the host moves, a ball to spawn copies of, and a swordsman (swordsman.hpp).
 SceneDesc small_scene() {
   SceneDesc desc;
   NodeDesc camera;
@@ -46,6 +52,7 @@ SceneDesc small_scene() {
   ball.name = "Ball";
   ball.local.position = {kBallStart, 0.0f, 0.0f};
   desc.nodes = {camera, platform, ball};
+  test::add_swordsman(desc);
   return desc;
 }
 
@@ -133,6 +140,18 @@ struct Lan {
 
 float x_of(Engine& engine, const std::string& ruby_object) {
   return std::stof(ruby(engine, ruby_object + ".transform.position.x"));
+}
+
+// Where a machine's swordsman is in his own clip, and where his sword is.
+float clip_time(Engine& engine) { return std::stof(ruby(engine, "$hero.animation.time")); }
+float sword_x(Engine& engine) { return std::stof(ruby(engine, "$hero.children.first.transform.local_position.x")); }
+std::string clip_of(Engine& engine) { return ruby(engine, "$hero.animation.clip.inspect"); }
+
+// Every one of `machines` gives its swordsman a NetworkSync with these settings.
+void sync_swordsman(std::initializer_list<Engine*> machines, const std::string& settings = "") {
+  for (Engine* machine : machines) {
+    ruby(*machine, "$hero = Scene.find('Swordsman'); $hero.add_component(NetworkSync" + settings + ")");
+  }
 }
 
 }  // namespace
@@ -748,4 +767,45 @@ TEST_CASE("a hosted game is found by the machines around it, by name, unless it 
   ruby(seeker, "Network.search");
   lan.rounds(kSettleRounds * 2);
   CHECK(ruby(seeker, "Network.games.inspect") == "[]");  // neither the hidden game nor the one hosted before it
+}
+
+TEST_CASE("a character's own animation is seen on the other machines from its moment, as far behind as its pose") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  sync_swordsman({host, guest}, ", delay: 0.25");
+  lan.rounds(kSettleRounds);
+  ruby(*host, "$hero.animation.play(:Attack, loop: false)");
+  REQUIRE(lan.until([&] { return clip_of(*guest) == "\"Attack\""; }));
+  const float behind = clip_time(*host) - clip_time(*guest);
+  CHECK(behind >= kShownBehind - kFewFrames);
+  CHECK(behind <= kShownBehind + kFewFrames);
+  lan.rounds(kSettleRounds);  // past the end of the attack
+  CHECK(ruby(*guest, "$hero.animation.playing?") == "false");
+  CHECK(sword_x(*guest) == doctest::Approx(test::kSwordReach));
+  CHECK(sword_x(*host) == doctest::Approx(test::kSwordReach));
+}
+
+TEST_CASE("a machine that joins late sees what a character is doing already, its mixed clip too") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  sync_swordsman({host, guest});
+  ruby(*host, "$hero.animation.play(:Guard); $hero.animation.mix(:Attack, weight: 0.5)");
+  lan.rounds(kSettleRounds);
+  Engine& late = lan.add_machine();
+  lan.join(late, *host);
+  sync_swordsman({&late});
+  REQUIRE(lan.until([&] { return clip_of(late) == "\"Guard\""; }));
+  // Guard alone leaves the sword at x = 0: what moves it along is the attack mixed over it.
+  CHECK(lan.until([&] { return sword_x(late) > kSomeMix; }));
+}
+
+TEST_CASE("an object whose NetworkSync leaves animation out keeps its own clips") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  sync_swordsman({host});
+  sync_swordsman({guest}, ", animation: false");
+  ruby(*host, "$hero.animation.play(:Attack)");
+  lan.rounds(kSettleRounds);
+  CHECK(clip_of(*host) == "\"Attack\"");
+  CHECK(clip_of(*guest) == "nil");
 }

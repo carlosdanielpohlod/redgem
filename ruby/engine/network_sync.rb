@@ -61,7 +61,7 @@ module Network
     def shared_by_me?(owner) = online? && owner == id
 
     def receive_sync(data, from)
-      @synced[data[0]]&.__receive(data[1], data[2], from) if Said.placement?(data)
+      @synced[data[0]]&.__receive(data[1], data[2], from, data[3]) if Said.placement?(data)
     end
 
     # A spawned object was destroyed here: when it was this machine's, the others lose it too.
@@ -73,13 +73,16 @@ module Network
 end
 
 # Keeps an object in the same place on every machine in the game: the machine that owns it moves
-# it as usual, the others see it follow. Both sides need the object, with the same key.
+# it as usual, the others see it follow. Both sides need the object, with the same key. What the
+# object's own animation does (game_object.animation: its clip, where it is in it, fades and mixes)
+# goes along, so the others see the attack that goes with the lunge, from the same moment of it.
 # Settings: owner (a peer's id; the host by default, right for the level's own moving things),
 # key (what the object is called on the network; its name by default: one object's only, a second
 # NetworkSync under a key taken already raises), interpolate (true by default: the others see it
 # a moment behind, moving smoothly, see Snapshots; false: it closes in on the newest pose that
 # arrived instead, sooner but jerkier), delay (seconds it is shown behind, always; unset: as short
-# as the network allows).
+# as the network allows), animation (true by default: its own animation is shown the same on the
+# others; false leaves each machine's to its own scripts).
 #
 #   player.add_component(NetworkSync, owner: Network.id, key: "hero-#{Network.id}")
 #   return unless get_component(NetworkSync).mine?   # only the owner reads the keyboard
@@ -99,6 +102,7 @@ class NetworkSync < Behaviour
 
   def start
     Network.__track(self)
+    @animated = prop(:animation, true)
     @since_sent = 0.0
     watch_afresh
   end
@@ -134,16 +138,20 @@ class NetworkSync < Behaviour
     return if @since_sent < 1.0 / SENDS_PER_SECOND
 
     @since_sent = 0.0
-    Network.__pose(key, transform.position, transform.rotation)
+    Network.__pose(key, transform.position, transform.rotation, (game_object if @animated))
   end
 
-  # Where the owner says the object is. Only the owner is believed.
-  def __receive(position, rotation, from)
+  # Where the owner says the object is, and what its animation does when that came along. Only the
+  # owner is believed.
+  def __receive(position, rotation, from, animation = nil)
     return unless from == owner
 
     @position = Vector3[*position]
     @rotation = Vector3[*rotation]
-    @snapshots&.add(@position, @rotation)
+    animation = nil unless @animated
+    return take_animation(animation) unless @snapshots
+
+    @snapshots.add(@position, @rotation, animation)
   end
 
   private
@@ -152,11 +160,20 @@ class NetworkSync < Behaviour
     return follow(dt) unless @snapshots
 
     @snapshots.advance(dt)
+    take_animation(*@snapshots.due_animation)
     position, rotation = @snapshots.pose
     return unless position
 
     transform.position = position
     transform.rotation = rotation
+  end
+
+  # Does what the owner said its animation did, `late` seconds ago (shown as far behind as its pose).
+  def take_animation(animation = nil, late = 0.0)
+    return unless animation
+
+    fade, weight, own, layer = animation
+    game_object.__animation_sync(fade, weight, own, layer, late)
   end
 
   def follow(dt)

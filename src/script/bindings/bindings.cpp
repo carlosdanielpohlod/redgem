@@ -1,5 +1,7 @@
 #include "script/bindings/bindings.hpp"
 
+#include "script/bindings/animation_sync.hpp"
+
 namespace redgem {
 
 namespace {
@@ -24,6 +26,7 @@ void install_bindings(mrb_state* mrb) {
   install_audio_bindings(mrb);
   install_input_bindings(mrb);
   install_animation_bindings(mrb);  // after GameObject's: it adds to that class
+  install_animation_sync_bindings(mrb);
   install_particles_bindings(mrb);
   install_save_bindings(mrb);
   install_network_bindings(mrb);
