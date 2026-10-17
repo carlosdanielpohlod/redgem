@@ -133,8 +133,8 @@ ScatterSet set_of(mrb_state* mrb, const GameObject& object, const PlaceArgs& arg
   set.tint = object.tint;
   set.visible_from = object.visible_from;
   set.visible_to = object.visible_to;
-  set.sways = object.sways;
   set.cast_shadow = object.cast_shadow;
+  set.sways = object.sways;
   scale_places(places, scene(mrb).world_transform(object.id).scale);
   set.tints = scatter_tints(args.looks, args.request.seed, places.size());
   set.places = std::move(places);

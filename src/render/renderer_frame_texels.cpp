@@ -51,11 +51,12 @@ std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& o
   const auto slot = static_cast<std::size_t>(object.id);
   const Bounds& bounds = mesh_bounds[static_cast<std::size_t>(object.mesh)];
   const std::optional<SkeletonPose> pose = pose_skeleton(scene, object, next_bone);
-  const render_math::InstanceLook look{object.tint, pose ? static_cast<float>(next_bone) : render_math::kNoBones,
-                                       object.sways ? render_math::kSways : render_math::kStill};
+  render_math::InstanceLook look{object.tint, pose ? static_cast<float>(next_bone) : render_math::kNoBones};
+  look.sway = object.sways ? render_math::kSways : render_math::kStill;
   const render_math::Sight seen = pose ? render_math::skinned_sight_of(bounds, worlds[slot], pose->first)
                                        : render_math::sight_of(bounds, worlds[slot]);
-  sights[slot] = ObjectSight{write_record(slot, look), seen, object.mesh, object.visible_from, object.visible_to};
+  sights[slot] = ObjectSight{write_record(slot, look), seen, object.mesh, object.visible_from, object.visible_to,
+                             object.cast_shadow};
   return pose ? next_bone + pose->bones * kTexelsPerMatrix : next_bone;
 }
 

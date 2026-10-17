@@ -53,6 +53,19 @@ inline constexpr const char* kSkyTop = "skyTop";
 inline constexpr const char* kSkyHorizon = "skyHorizon";
 inline constexpr const char* kGroundColor = "groundColor";
 inline constexpr const char* kSunGlow = "sunGlow";
+inline constexpr const char* kAlphaToCoverage = "alphaToCoverage";
+// The sky as a picture.
+inline constexpr const char* kSkyLight = "skyLight";
+inline constexpr const char* kSkyIrradiance = "skyIrradiance";
+inline constexpr const char* kSkyReflections = "skyReflections";
+inline constexpr const char* kSkyReflectance = "skyReflectance";
+inline constexpr const char* kSkyTurn = "skyTurn";
+inline constexpr const char* kSkyIntensity = "skyIntensity";
+// Shadow cascades.
+inline constexpr const char* kShadowTiles = "shadowTiles";
+inline constexpr const char* kShadowScales = "shadowScales";
+inline constexpr const char* kShadowCascades = "shadowCascades";
+inline constexpr const char* kSunSize = "sunSize";
 // Post-processing.
 inline constexpr const char* kThreshold = "threshold";
 inline constexpr const char* kBlurStep = "blurStep";

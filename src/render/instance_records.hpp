@@ -6,6 +6,8 @@
 //   texels 4-6  how its normals turn: the columns of its normal matrix; the first one's fourth float
 //               is how much the wind sways it (1, or 0 for one that does not sway)
 //   texel  7    its tint (red, green, blue), and where its skeleton's first bone is (kNoBones: none)
+//   texel  8    how a scattered copy fades: the distances it is drawn from and to, the meters it
+//               fades over at their ends (0: it does not), and how much it is lit as facing up
 // Every copy of a mesh drawn in one call finds its own record by its number. No window and no
 // graphics card needed, so it can be tested.
 
@@ -18,9 +20,10 @@
 
 namespace redgem::render_math {
 
-inline constexpr int kTexelsPerInstance = 8;
+inline constexpr int kTexelsPerInstance = 9;
 inline constexpr int kNormalTexel = 4;  // where a record's normal matrix starts
 inline constexpr int kLookTexel = 7;    // where its tint and first bone are
+inline constexpr int kCopyTexel = 8;    // where how it fades is
 
 inline constexpr float kSways = 1.0f;
 inline constexpr float kStill = 0.0f;
@@ -29,7 +32,12 @@ inline constexpr float kStill = 0.0f;
 struct InstanceLook {
   Vec3 tint = Vec3::one();
   float first_bone = kNoBones;
-  float sway = kSways;
+  // Scattered copies only (see ScatterSet).
+  float visible_from = 0.0f;
+  float visible_to = 0.0f;
+  float fade = 0.0f;
+  float upward = 0.0f;
+  float sway = kSways;  // how much the wind sways it (any copy)
 };
 
 // The first texel of instance `number`'s record.

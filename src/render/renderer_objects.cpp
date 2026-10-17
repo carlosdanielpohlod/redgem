@@ -21,10 +21,18 @@ using render_math::to_raylib;
 // A switch of the lit shader: on for a material that has that texture.
 float on_with(int image) { return image != kNoIndex ? kOn : kOff; }
 
-// Whether a view draws an object: one the frame has a record of, in the view, big enough in it,
-// and at the distance its level of detail is for.
-bool seen(const ObjectSight& sight, const render_math::View& view) {
-  return sight.drawn && render_math::sighted(view, sight.sight, sight.visible_from, sight.visible_to);
+// Whether a view draws an object: one the frame has a record of, that casts a shadow when the
+// pass is the shadow map's, in the view, big enough in it, and at the distance its level of
+// detail is for.
+bool seen(const ObjectSight& sight, const render_math::View& view, bool depth_pass) {
+  return sight.drawn && casts_into(sight.cast_shadow, depth_pass) &&
+         render_math::sighted(view, sight.sight, sight.visible_from, sight.visible_to);
+}
+
+// Whether the picture's samples smooth a material's cut-out edges (alpha to coverage): one cut out
+// by a cutoff, not a dithered one or one mixed with what is behind it.
+bool smooths_edges(const render_math::AlphaTest& test) {
+  return test.cutoff > render_math::kNoCutoff && !test.dithered && !test.mixed;
 }
 
 }  // namespace
@@ -44,6 +52,7 @@ bool Renderer::Impl::apply_material(int index, render_math::AlphaPass pass) {
     send(depth_shader, depth_uniforms.wind, test.sway);
   } else {
     send_surface(factors);
+    cover_edges(smooths_edges(test));
     send_alpha(test);
   }
   return test.two_sided;
@@ -71,6 +80,20 @@ void Renderer::Impl::send_surface(const MaterialDesc& factors) {
   send(shader, lit_uniforms.has_emissive_map, on_with(factors.emissive_image));
 }
 
+// With several samples a pixel, a cut-out material's edges are smoothed by them (alpha to
+// coverage): its alpha then says how much of a pixel it covers, and does not blend.
+void Renderer::Impl::cover_edges(bool cut_out) {
+  const bool on = covering && cut_out;
+  send(shader, lit_uniforms.alpha_to_coverage, on ? kOn : kOff);
+  if (!covering) return;
+  set_alpha_to_coverage(on);
+  if (on) {
+    rlDisableColorBlend();
+  } else {
+    rlEnableColorBlend();
+  }
+}
+
 // Consecutive parts often share a material: its textures and uniforms are then already set.
 void Renderer::Impl::use_material(int material, ObjectPass& pass) {
   if (material == pass.last_material) return;
@@ -85,23 +108,24 @@ std::size_t Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float det
   const Matrix view_projection = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
   const render_math::View view{frustum_from_matrix(MatrixToFloatV(view_projection).v), viewer,
                                render_math::smallest_angle_drawn(detail_angle, depth_pass)};
-  gather_copies(view);
+  gather_copies(view, depth_pass);
   const std::size_t first = append_slots(slots, batches.slots());
   ObjectPass objects{
       begin_mesh_pass(depth_pass ? depth_shader : shader, depth_pass ? depth_instance_slot : lit_instance_slot),
       depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned,
       depth_pass ? render_math::AlphaPass::Shadow : render_math::AlphaPass::Opaque, view};
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
+  if (covering) cover_edges(false);
   end_mesh_pass();
   return first;
 }
 
-void Renderer::Impl::gather_copies(const render_math::View& view) {
+void Renderer::Impl::gather_copies(const render_math::View& view, bool depth_pass) {
   batches.start();
   for (std::size_t slot = 0; slot < sights.size(); ++slot) {
-    if (seen(sights[slot], view)) batches.add(sights[slot].mesh, scattered_records + slot);
+    if (seen(sights[slot], view, depth_pass)) batches.add(sights[slot].mesh, scattered_records + slot);
   }
-  gather_scattered(view);
+  gather_scattered(view, depth_pass);
 }
 
 void Renderer::Impl::draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass) {

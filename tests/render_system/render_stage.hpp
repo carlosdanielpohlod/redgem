@@ -42,11 +42,11 @@ class RenderStage {
 
   // Uploads a scene's meshes and materials, replacing the last one's.
   void upload(const SceneDesc& desc) { renderer_->upload(desc); }
+  // Where the scene's pictures (a sky picture) and its particles' are looked for.
+  void set_images_dir(const std::filesystem::path& dir) { renderer_->set_images_dir(dir); }
   // The scene as its camera sees it, with `particles` when given; also written to
   // <screenshots>/render/<name>.png for whoever looks at the run afterwards.
   Picture draw(const Scene& scene, const std::string& name, const ParticleSystem* particles = nullptr);
-  // Where particles find their pictures by name.
-  void set_images_dir(const std::filesystem::path& dir) { renderer_->set_images_dir(dir); }
 
  private:
   Window window_;

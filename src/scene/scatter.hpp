@@ -29,8 +29,8 @@ struct ScatterSet {
   // Drawn only while this far from the camera, in meters (see GameObject).
   float visible_from = 0.0f;
   float visible_to = std::numeric_limits<float>::infinity();
-  bool sways = true;  // whether wind sways its foliage (see GameObject)
   bool cast_shadow = true;
+  bool sways = true;  // whether wind sways its foliage (see GameObject)
   std::vector<Transform> places;
   std::vector<Vec3> tints;  // one per place, multiplying `tint`; empty: all alike
   // Meters over which copies fade out before `visible_to` (and in after a `visible_from` above

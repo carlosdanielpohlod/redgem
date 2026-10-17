@@ -10,6 +10,7 @@
 //   renderer_frame.cpp        a frame: its camera, what is prepared, the lit picture
 //   renderer_frame_texels.cpp what the vertex shader reads of a frame: its matrices, its bones
 //   renderer_environment.cpp  lights, atmosphere and the sky
+//   renderer_sky.cpp          the sky as a picture, and its light
 //   renderer_objects.cpp      the scene's objects
 //   renderer_see_through.cpp  their see-through parts, after the opaque ones
 //   renderer_scatter.cpp      copies scattered in great numbers
@@ -35,6 +36,7 @@
 
 #include "render/capture_views.hpp"
 #include "render/environment.hpp"
+#include "render/gl_extras.hpp"
 #include "render/instance_batches.hpp"
 #include "render/instance_records.hpp"
 #include "render/material_alpha.hpp"
@@ -45,6 +47,8 @@
 #include "render/renderer.hpp"
 #include "render/scatter_chunks.hpp"
 #include "render/shader_programs.hpp"
+#include "render/shadow_cascades.hpp"
+#include "render/sky_harmonics.hpp"
 #include "render/texel_rows.hpp"
 #include "render/visibility.hpp"
 #include "scene/scene_config.hpp"
@@ -60,7 +64,9 @@ inline constexpr ::Color kBlack{0, 0, 0, config::kMaxColorByte};
 inline constexpr int kReflectionTextureSlot = 9;
 inline constexpr int kShadowTextureSlot = 10;
 inline constexpr int kFrameTexelSlot = 11;
-inline constexpr int kSceneDepthSlot = 12;  // what soft particles fade into
+inline constexpr int kSkyReflectionSlot = 12;
+inline constexpr int kSkyReflectanceSlot = 13;
+inline constexpr int kSceneDepthSlot = 14;  // what soft particles fade into
 
 // raylib numbers what is on the graphics card; zero is what was never loaded (or is released).
 inline bool loaded(const Texture2D& texture) { return texture.id != 0; }
@@ -85,7 +91,12 @@ struct ObjectSight {
   int mesh = kNoIndex;
   float visible_from = 0.0f;
   float visible_to = 0.0f;
+  bool cast_shadow = true;
 };
+
+// Whether what casts a shadow or not (`cast_shadow`) is drawn in a pass: the shadow map's pass
+// (`depth_pass`) leaves out what casts none.
+inline bool casts_into(bool cast_shadow, bool depth_pass) { return cast_shadow || !depth_pass; }
 
 // What an object's record was last written from: most of a scene stands still, and a record
 // written from the same is not worked out again.
@@ -115,8 +126,18 @@ struct ObjectPass {
   bool last_two_sided = false;
 };
 
-// Copies the depth of `from` into `to`, of the same size. The framebuffers stay bound.
-void copy_depth(const RenderTexture2D& from, const RenderTexture2D& to);
+// A sky picture on the graphics card, and its light (see sky_light.hpp).
+struct SkyTextures {
+  std::string name;  // what the environment asked for, looked for once ("": none)
+  Texture2D picture{};
+  unsigned int reflections = 0;  // a cube map, a roughness a level
+  unsigned int reflectance = 0;  // the split sum's table: made once, kept for the next picture
+  render_math::SkyHarmonics irradiance{};
+};
+
+// Copies the depth of framebuffer `from` into `to`, both `width` x `height` (several samples a
+// pixel are resolved). The framebuffers stay bound.
+void copy_depth(unsigned int from, unsigned int to, int width, int height);
 // Draws `source` over the whole current target (render textures are stored upside down).
 void draw_full(const RenderTexture2D& source, int width, int height);
 
@@ -155,7 +176,9 @@ struct Renderer::Impl {
   RenderTexture2D ldr{};          // tone mapped, luma in alpha, before anti-aliasing
   RenderTexture2D occlusion_a{};  // ambient occlusion (ping-pong with occlusion_b for the blur)
   RenderTexture2D occlusion_b{};
-  RenderTexture2D scene_depth{};  // the depth of the scene's surfaces, copied for soft particles (no color)
+  render_detail::Multisampled scene_samples;  // the lit scene of several samples a pixel (msaa), resolved into hdr
+  bool covering = false;                      // the pass being drawn smooths cut-out edges with those samples
+  RenderTexture2D scene_depth{};              // the depth of the scene's surfaces, copied for soft particles (no color)
   // Glowing particles gathered apart, to be added within the environment's limit: made when first
   // needed, on the lit picture's own depth.
   RenderTexture2D glow{};
@@ -170,6 +193,8 @@ struct Renderer::Impl {
   std::vector<SkinDesc> skins;                    // skeletons of the uploaded scene
   Mesh sky_mesh{};
   Material sky_material{};
+  Texture2D sky_default_texture{};  // what the sky material had: drawn with when there is no picture
+  render_detail::SkyTextures sky;
   // Texts and pictures.
   Font ui_font{};
   bool owns_ui_font = false;
@@ -194,7 +219,8 @@ struct Renderer::Impl {
   float glow_limit = 0.0f;            // of the environment (0: glowing particles are not gathered apart)
   bool glow_gathered = false;         // this frame's glowing particles wait in `glow`
   Vector3 sun_travel{};               // direction the sun's light travels
-  float view_tan_half_fov = 0.0f;     // of the camera, for rebuilding positions from depth
+  std::array<Matrix, render_math::kMaxShadowCascades> light_matrices{};  // into each cascade's view
+  float view_tan_half_fov = 0.0f;  // of the camera, for rebuilding positions from depth
   float view_aspect = 0.0f;
   // The frame's particles: their pictures (by Particle::look.image), the distinct ones among those
   // (a batch each) and each picture's batch, how they are laid out, and that on the graphics card.
@@ -220,8 +246,10 @@ struct Renderer::Impl {
   // --- Targets (renderer_targets.cpp) -----------------------------------------------------------
 
   void load_fixed_targets();
-  // The post-processing targets, made again when the output changes size.
-  void ensure_targets(int width, int height);
+  // The post-processing targets, made again when the output changes size, and the scene's picture
+  // of `samples` a pixel (none for 0).
+  void ensure_targets(int width, int height, int samples);
+  void make_targets(int width, int height);
   void ensure_glow_target();
   void release_targets();
   void release_fixed_targets();
@@ -258,6 +286,7 @@ struct Renderer::Impl {
   void draw_lit_scene(const Camera3D& camera, const ParticleSystem* particles);
   // Binds a texture `program` reads all frame long to a slot of its own.
   void bind_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture);
+  void bind_cube_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture);
 
   // --- What the vertex shader reads of a frame (renderer_frame_texels.cpp) ----------------------
 
@@ -293,6 +322,16 @@ struct Renderer::Impl {
   // A dome around the camera, behind everything (no depth written).
   void draw_sky(const Camera3D& camera);
 
+  // --- The sky as a picture (renderer_sky.cpp) --------------------------------------------------
+
+  // Loads the picture the environment names the first time it names it (and lets the last one go).
+  void use_sky_picture(const Environment& env);
+  void upload_sky_picture(const FloatImage& picture);
+  void release_sky_picture();
+  // Tells the lit and sky shaders whether the sky is a picture, how it is turned and its light.
+  void send_sky_light(const Environment& env);
+  void release_sky_light();
+
   // --- Objects (renderer_objects.cpp) -----------------------------------------------------------
 
   const MaterialDesc& factors_of(int material) const;
@@ -300,13 +339,14 @@ struct Renderer::Impl {
   // true when it must be drawn without backface culling.
   bool apply_material(int index, render_math::AlphaPass pass);
   void send_surface(const MaterialDesc& factors);
+  void cover_edges(bool cut_out);
   void send_alpha(const render_math::AlphaTest& test);
   // Draws what the current 3D view can see, copies of a mesh that come together in one call per
   // part. `viewer` is the game camera in both passes: detail is judged by how big things look to
   // the player, not to the sun. Returns where the pass's record numbers start in `slots`.
   std::size_t draw_objects(bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
-  // Gathers into `batches` what the view sees.
-  void gather_copies(const render_math::View& view);
+  // Gathers into `batches` what the view sees (in the shadow map's pass, what casts a shadow).
+  void gather_copies(const render_math::View& view, bool depth_pass);
   // `first`: where the pass's record numbers start in `slots`.
   void draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass);
   void use_material(int material, ObjectPass& pass);
@@ -329,7 +369,7 @@ struct Renderer::Impl {
   // One set's, from record `first` on. Returns the record after its last.
   std::size_t lay_out_set(const ScatterSet& set, std::size_t first);
   // Adds to `batches` the cells the view sees.
-  void gather_scattered(const render_math::View& view);
+  void gather_scattered(const render_math::View& view, bool depth_pass);
 
   // --- Particles (renderer_particles.cpp) -------------------------------------------------------
 
@@ -351,8 +391,11 @@ struct Renderer::Impl {
   bool gathers_glow() const { return glow_limit > 0.0f && particle_layout.any_glow; }
   void begin_gathering_glow();
   void add_gathered_glow();
-  // The depth of what was drawn so far, for soft particles to fade into.
-  void copy_scene_depth();
+  // The framebuffer the lit scene is being drawn into: of several samples a pixel, or the lit picture.
+  unsigned int drawing_framebuffer() const;
+  // The depth of what was drawn so far where particles read it: in the lit picture's own (which
+  // glow gathered apart is hidden by), and copied for soft particles to fade into.
+  void share_scene_depth();
   // The light lit particles take: the sun, the sky and the nearest point lights.
   void send_particle_lights(Vector3 sun_color, const Environment& env, const render_math::PointLightUniforms& points);
 
@@ -360,9 +403,13 @@ struct Renderer::Impl {
 
   // Renders the scene's depth from the sun and hands the result to the lit shader.
   void draw_shadow_map(const Camera3D& camera, const Environment& env);
-  void draw_sun_depth(const Camera3D& camera, Vec3 to_sun);
-  // Fills the shadow map from the sun's point of view. Returns the matrix that leads into that view.
+  void draw_sun_depth(const Camera3D& camera, Vec3 to_sun, const Environment& env);
+  // Each cascade into its tile of the map, its matrix into light_matrices.
+  void draw_cascades(const render_math::Cascades& cascades, Vec3 viewer);
+  // Draws the depth from the sun's point of view into the viewport set. Returns the matrix that
+  // leads into that view.
   Matrix draw_depth_from(const Camera3D& sun_view, Vec3 viewer);
+  void send_cascades(const render_math::Cascades& cascades, float sun_size);
 
   // --- Reflections (renderer_reflections.cpp) ---------------------------------------------------
 

@@ -35,6 +35,7 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::emissive, shaders::kEmissive},
     {&LitUniforms::has_emissive_map, shaders::kHasEmissiveMap},
     {&LitUniforms::alpha_cutoff, shaders::kAlphaCutoff},
+    {&LitUniforms::alpha_to_coverage, shaders::kAlphaToCoverage},
     {&LitUniforms::alpha_ceiling, shaders::kAlphaCeiling},
     {&LitUniforms::alpha_dithered, shaders::kAlphaDithered},
     {&LitUniforms::alpha_mixed, shaders::kAlphaMixed},
@@ -61,6 +62,13 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::sky_top, shaders::kSkyTop},
     {&LitUniforms::sky_horizon, shaders::kSkyHorizon},
     {&LitUniforms::ground, shaders::kGroundColor},
+    {&LitUniforms::sky_irradiance, shaders::kSkyIrradiance},
+    {&LitUniforms::sky_reflections, shaders::kSkyReflections},
+    {&LitUniforms::sky_reflectance, shaders::kSkyReflectance},
+    {&LitUniforms::shadow_tiles, shaders::kShadowTiles},
+    {&LitUniforms::shadow_scales, shaders::kShadowScales},
+    {&LitUniforms::shadow_cascades, shaders::kShadowCascades},
+    {&LitUniforms::sun_size, shaders::kSunSize},
 };
 
 // A uniform of the particle shader, and where its location is kept.
@@ -107,6 +115,7 @@ LitUniforms find_lit_uniforms(Shader& lit) {
 DepthUniforms find_depth_uniforms(const Shader& depth) {
   DepthUniforms found;
   found.alpha_cutoff = GetShaderLocation(depth, shaders::kAlphaCutoff);
+  found.view_position = GetShaderLocation(depth, shaders::kViewPosition);
   found.wind = GetShaderLocation(depth, shaders::kWindAmount);
   found.time = GetShaderLocation(depth, shaders::kTime);
   found.skinned = GetShaderLocation(depth, shaders::kSkinned);

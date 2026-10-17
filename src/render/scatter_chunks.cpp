@@ -97,7 +97,8 @@ Reach reach_of(const View& view, const ScatterChunk& chunk, float from, float to
 
 ScatterLayout lay_out_copies(const ScatterSet& set, const Bounds& bounds, std::size_t first,
                              std::vector<std::size_t>& order) {
-  ScatterLayout layout{set.mesh, set.visible_from, set.visible_to, first, chunk_copies(set.places, bounds, order), {}};
+  ScatterLayout layout{
+      set.mesh, set.visible_from, set.visible_to, set.cast_shadow, first, chunk_copies(set.places, bounds, order), {}};
   for (ScatterChunk& chunk : layout.chunks) chunk.first += first;
   for (const std::size_t copy : order) layout.centers.push_back(world_sphere(bounds, set.places[copy]).center);
   return layout;

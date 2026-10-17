@@ -55,7 +55,7 @@ void Renderer::Impl::prepare_particles(const ParticleSystem& system, const Camer
   batch_particle_pictures(system);
   render_math::lay_out_particles(system.particles(), particle_batch_of, particle_batches.size(), view, particle_layout);
   rlDrawRenderBatchActive();
-  if (particle_layout.any_soft) copy_scene_depth();
+  if (particle_layout.any_soft || gathers_glow()) share_scene_depth();
   send_particles(particle_buffer, particle_layout.vertices);
 }
 
@@ -87,7 +87,7 @@ void Renderer::Impl::draw_particle_run(const render_math::ParticleRun& run) {
 }
 
 void Renderer::Impl::end_particles() {
-  if (glow_gathered) rlEnableFramebuffer(hdr.id);
+  if (glow_gathered) rlEnableFramebuffer(drawing_framebuffer());
   rlSetBlendMode(BLEND_ALPHA);
   bind_texture(0, 0);
   rlDisableShader();
@@ -95,9 +95,16 @@ void Renderer::Impl::end_particles() {
   rlEnableDepthMask();
 }
 
-void Renderer::Impl::copy_scene_depth() {
-  copy_depth(hdr, scene_depth);
-  rlEnableFramebuffer(hdr.id);  // drawing goes on into the lit picture
+unsigned int Renderer::Impl::drawing_framebuffer() const {
+  return scene_samples.framebuffer != 0 ? scene_samples.framebuffer : hdr.id;
+}
+
+void Renderer::Impl::share_scene_depth() {
+  const int width = hdr.texture.width;
+  const int height = hdr.texture.height;
+  if (drawing_framebuffer() != hdr.id) copy_depth(drawing_framebuffer(), hdr.id, width, height);
+  if (particle_layout.any_soft) copy_depth(hdr.id, scene_depth.id, width, height);
+  rlEnableFramebuffer(drawing_framebuffer());  // drawing goes on where it was
 }
 
 }  // namespace redgem

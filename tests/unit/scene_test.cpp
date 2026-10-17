@@ -125,6 +125,20 @@ TEST_CASE("a copied character is deformed by its own bones, not the template's")
   CHECK(bone_ids(scene, 2) == std::vector<ObjectId>{1, 3});  // the template is untouched
 }
 
+TEST_CASE("objects cast shadows unless their props say not, and copies keep it") {
+  SceneDesc desc;
+  NodeDesc dome;
+  dome.name = "SkyDome";
+  dome.props = {{"cast_shadow", false}};
+  NodeDesc plain;
+  plain.name = "Plain";
+  desc.nodes = {dome, plain};
+  Scene scene = Scene::from_desc(desc);
+  CHECK_FALSE(scene.at(0).cast_shadow);
+  CHECK(scene.at(1).cast_shadow);
+  CHECK_FALSE(scene.at(scene.clone(0).front()).cast_shadow);
+}
+
 TEST_CASE("objects read their range of visible distances from props, and copies keep it") {
   constexpr double kFrom = 15.0;
   constexpr double kTo = 45.0;

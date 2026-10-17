@@ -4,6 +4,9 @@
 #include "render/renderer_impl.hpp"
 
 #include <stdexcept>
+#include <string>
+
+#include "core/log.hpp"
 
 namespace redgem {
 namespace {
@@ -119,6 +122,14 @@ bool fits(const RenderTexture2D& target, int width, int height) {
   return loaded(target) && target.texture.width == width && target.texture.height == height;
 }
 
+// Whether the picture of several samples was already asked for at this size (made or not).
+bool asked_before(const Multisampled& target, int width, int height, int samples) {
+  return target.samples == samples && target.width == width && target.height == height;
+}
+
+// Whether several samples a pixel were asked for and the graphics card could not make them.
+bool refused(const Multisampled& target) { return target.samples > 0 && target.framebuffer == 0; }
+
 }  // namespace
 
 void Renderer::Impl::load_fixed_targets() {
@@ -130,8 +141,17 @@ void Renderer::Impl::load_fixed_targets() {
   rlTextureParameters(panorama.texture.id, RL_TEXTURE_WRAP_T, RL_TEXTURE_WRAP_CLAMP);
 }
 
-void Renderer::Impl::ensure_targets(int width, int height) {
-  if (fits(hdr, width, height)) return;
+void Renderer::Impl::ensure_targets(int width, int height, int samples) {
+  if (!fits(hdr, width, height)) make_targets(width, height);
+  if (asked_before(scene_samples, width, height, samples)) return;
+  render_detail::release(scene_samples);
+  scene_samples = samples > 0 ? load_multisampled(width, height, samples) : Multisampled{0, 0, 0, width, height, 0};
+  if (refused(scene_samples)) {
+    log::warning("the graphics card cannot draw " + std::to_string(samples) + " samples a pixel: drawing one");
+  }
+}
+
+void Renderer::Impl::make_targets(int width, int height) {
   release_targets();
   const int bloom_width = downscaled(width, kBloomDownscale);
   const int bloom_height = downscaled(height, kBloomDownscale);
@@ -153,6 +173,7 @@ void Renderer::Impl::ensure_glow_target() {
 void Renderer::Impl::release_targets() {
   unload_target_on(glow);  // before the lit picture, whose depth it draws on
   for (RenderTexture2D* target : {&hdr, &bloom_a, &bloom_b, &ldr, &occlusion_a, &occlusion_b}) unload(*target);
+  render_detail::release(scene_samples);
   unload_depth_target(scene_depth);
 }
 

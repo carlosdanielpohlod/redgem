@@ -43,6 +43,7 @@ TEST_CASE("no two properties share a name") {
                                props::kTint,
                                props::kVisibleFrom,
                                props::kVisibleTo,
+                               props::kCastShadow,
                                props::kEnvironment,
                                props::environment::kSkyTop,
                                props::environment::kFogDensity};

@@ -31,12 +31,12 @@ constexpr const char* kNoVersion = "void main() {}";
 constexpr const char* kVersionWord = "#version";
 constexpr const char* kDefineWord = "#define ";
 // Every shader the engine compiles.
-constexpr const char* kEngineShaders[] = {shaders::kLitVertex,         shaders::kLitFragment,
-                                          shaders::kDepthFragment,     shaders::kSkyVertex,
-                                          shaders::kSkyFragment,       shaders::kParticleFragment,
-                                          shaders::kPanoramaFragment,  shaders::kAmbientOcclusionFragment,
-                                          shaders::kBrightFragment,    shaders::kBlurFragment,
-                                          shaders::kCompositeFragment, shaders::kAntialiasFragment};
+const std::string kEngineShaders[] = {shaders::kLitVertex,         shaders::lit_fragment(),
+                                      shaders::kDepthFragment,     shaders::kSkyVertex,
+                                      shaders::kSkyFragment,       shaders::kParticleFragment,
+                                      shaders::kPanoramaFragment,  shaders::kAmbientOcclusionFragment,
+                                      shaders::kBrightFragment,    shaders::kBlurFragment,
+                                      shaders::kCompositeFragment, shaders::kAntialiasFragment};
 
 std::string desktop_source() { return std::string(kNote) + shaders::kDesktopVersionLine + kBody; }
 
@@ -77,8 +77,8 @@ TEST_CASE("every engine shader is prepared with a version first and the engine's
       std::string(kDefineWord) + shaders::kTexelRowName + " " + std::to_string(render_math::kTexelsPerRow) + "\n";
   const std::string lights =
       std::string(kDefineWord) + shaders::kPointLightLimitName + " " + std::to_string(shaders::kMaxPointLights) + "\n";
-  for (const char* source : kEngineShaders) {
-    const std::string prepared = shaders::for_this_gpu(source);
+  for (const std::string& source : kEngineShaders) {
+    const std::string prepared = shaders::for_this_gpu(source.c_str());
     CHECK(starts_with(prepared, kVersionWord));
     CHECK(contains(prepared, rows));
     CHECK(contains(prepared, lights));
@@ -86,7 +86,7 @@ TEST_CASE("every engine shader is prepared with a version first and the engine's
 }
 
 TEST_CASE("no engine shader sets a limit of its own that could disagree with the engine's") {
-  for (const char* source : kEngineShaders) {
+  for (const std::string& source : kEngineShaders) {
     CHECK_FALSE(contains(source, std::string(kDefineWord) + shaders::kPointLightLimitName));
     CHECK_FALSE(contains(source, std::string(kDefineWord) + shaders::kTexelRowName));
   }

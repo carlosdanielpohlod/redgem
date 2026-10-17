@@ -32,6 +32,7 @@ void apply_props(const PropertyMap& props, GameObject& object) {
   object.tag = get_string(props, props::kTag).value_or("");
   object.visible = get_bool(props, props::kVisible).value_or(true);
   object.prefab = get_bool(props, props::kPrefab).value_or(false);
+  object.cast_shadow = get_bool(props, props::kCastShadow).value_or(true);
   object.sways = get_bool(props, props::kSway).value_or(object.skin == kNoIndex);
   if (const auto tint = get_string(props, props::kTint)) {
     object.tint = parse_hex_color(*tint).value_or(Vec3::one());

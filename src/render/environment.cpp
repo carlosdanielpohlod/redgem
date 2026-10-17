@@ -101,6 +101,7 @@ Environment environment_from_props(const PropertyMap& props) {
   read_color(props, props::environment::kFogColor, env.fog_color);
   for (const NumberProp& prop : kNumberProps) read_number(props, prop.key, env.*prop.value);
   for (const NumberProp& prop : kStrengthProps) read_strength(props, prop.key, env.*prop.value);
+  read_sky_and_quality(props, env);
   return env;
 }
 

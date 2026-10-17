@@ -26,6 +26,8 @@ inline constexpr const char* kTint = "tint";
 // range, make a detailed one up close and a light one far away.
 inline constexpr const char* kVisibleFrom = "visible_from";
 inline constexpr const char* kVisibleTo = "visible_to";
+// False keeps an object out of the sun's shadows (a sky dome, a glow): it is still drawn.
+inline constexpr const char* kCastShadow = "cast_shadow";
 // Whether wind sways an object's foliage (its textured see-through materials). Not said, it does
 // unless a skeleton moves the object (a character's hair follows its head, not the wind).
 inline constexpr const char* kSway = "sway";
@@ -74,6 +76,16 @@ inline constexpr const char* kContrast = "contrast";
 inline constexpr const char* kSaturation = "saturation";
 inline constexpr const char* kGrain = "grain";
 inline constexpr const char* kAberration = "aberration";
+// The sky as a picture of the game's images folder, which also lights the scene.
+inline constexpr const char* kSkyImage = "sky_image";        // its name
+inline constexpr const char* kSkyRotation = "sky_rotation";  // degrees it is turned around the vertical
+inline constexpr const char* kSkyIntensity = "sky_intensity";
+// Quality.
+inline constexpr const char* kMsaa = "msaa";  // samples per pixel of the scene's picture
+inline constexpr const char* kShadowCascades = "shadow_cascades";
+inline constexpr const char* kShadowDistance = "shadow_distance";  // meters
+inline constexpr const char* kShadowSoftness = "shadow_softness";  // degrees across the sun
+// The brightest glowing particles together make a pixel (see Environment::glow_limit).
 inline constexpr const char* kGlowLimit = "glow_limit";
 }  // namespace environment
 

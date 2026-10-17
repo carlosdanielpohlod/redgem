@@ -21,6 +21,7 @@ struct LitUniforms {
   int emissive = kNoLocation;
   int has_emissive_map = kNoLocation;
   int alpha_cutoff = kNoLocation;
+  int alpha_to_coverage = kNoLocation;
   int alpha_ceiling = kNoLocation;
   int alpha_dithered = kNoLocation;
   int alpha_mixed = kNoLocation;
@@ -47,11 +48,19 @@ struct LitUniforms {
   int sky_top = kNoLocation;
   int sky_horizon = kNoLocation;
   int ground = kNoLocation;
+  int sky_irradiance = kNoLocation;
+  int sky_reflections = kNoLocation;
+  int sky_reflectance = kNoLocation;
+  int shadow_tiles = kNoLocation;
+  int shadow_scales = kNoLocation;
+  int shadow_cascades = kNoLocation;
+  int sun_size = kNoLocation;
 };
 
 // Where the shadow map's depth shader takes its values.
 struct DepthUniforms {
   int alpha_cutoff = kNoLocation;
+  int view_position = kNoLocation;
   int wind = kNoLocation;
   int time = kNoLocation;
   int skinned = kNoLocation;
