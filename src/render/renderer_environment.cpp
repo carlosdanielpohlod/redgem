@@ -70,7 +70,7 @@ void Renderer::Impl::send_atmosphere(const Environment& env) {
   send(shader, lit_uniforms.ground, to_raylib(env.ground));
   send(shader, lit_uniforms.fog_color, to_raylib(env.fog_color));
   send(shader, lit_uniforms.fog_density, env.fog_density);
-  send(shader, lit_uniforms.time, static_cast<float>(GetTime()));
+  send(shader, lit_uniforms.time, now());
 }
 
 // The sky dome shows the same sky the surfaces are lit by.

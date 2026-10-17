@@ -117,6 +117,7 @@ GameWindowOptions developer_play_options(const CliOptions& options, GpuChoice gp
   window.game_dir = options.game_dir;
   window.show_fps = true;
   window.gpu = gpu;
+  if (!options.record.file.empty()) window.record = options.record;
   return window;
 }
 

@@ -2,10 +2,14 @@
 
 #include <filesystem>
 #include <functional>
+#include <memory>
+#include <optional>
 
 #include "app/frame_painter.hpp"
 #include "app/game_settings.hpp"
 #include "app/presenter.hpp"
+#include "app/recording.hpp"
+#include "app/video_recorder.hpp"
 #include "input/raylib_input_source.hpp"
 #include "render/gpu_select.hpp"
 #include "render/renderer.hpp"
@@ -30,6 +34,9 @@ struct GameWindowOptions {
   float screen_aspect = 0.0f;
   // Called once each frame is drawn and before it is shown, for whoever wants its picture.
   std::function<void()> on_frame_drawn;
+  // Records the game to a video (see recording.hpp): drawn off screen at the size asked for, each
+  // frame advancing the game by exactly 1/fps, the window showing what is recorded.
+  std::optional<RecordOptions> record;
 };
 
 // The window those options and a game's settings ask for. A screen that is not a window has its
@@ -42,13 +49,16 @@ class WindowPresenter final : public Presenter {
  public:
   // Throws std::runtime_error when no window can be opened.
   explicit WindowPresenter(GameWindowOptions options);
+  ~WindowPresenter() override;
+  WindowPresenter(const WindowPresenter&) = delete;
+  WindowPresenter& operator=(const WindowPresenter&) = delete;
 
-  SurfaceSize surface_size() const override { return window_.drawing_size(); }
+  SurfaceSize surface_size() const override;
   int text_width(const std::string& text, int size) const override { return renderer_.text_width(text, size); }
   void capture_cursor(bool wanted) override;
   void present(const FrameView& view) override;
-  bool open() const override { return !window_.close_requested(); }
-  float frame_seconds() const override { return window_.frame_seconds(); }
+  bool open() const override;
+  float frame_seconds() const override;
 
   // The keyboard, mouse and gamepad of the window.
   InputSource& devices() { return devices_; }
@@ -59,6 +69,17 @@ class WindowPresenter final : public Presenter {
   Renderer renderer_;  // (made after the window, released before it)
   FramePainter painter_;
   RaylibInputSource devices_;
+  // While recording: what the game is drawn into, and where its frames go.
+  RenderTexture2D recorded_{};
+  std::unique_ptr<VideoRecorder> recorder_;
+
+  bool recording() const { return recorder_ != nullptr; }
+  float recorded_frame_ = 0.0f;  // seconds each recorded frame advances the game by
+  void start_recording(const RecordOptions& record);
+  void stop_recording();
+  void present_recorded(const FrameView& view);
+  // The recorded picture, fitted into the window.
+  void show_recorded();
 };
 
 // Plays a game in a window of its own, with the machine's devices and sound, until the window

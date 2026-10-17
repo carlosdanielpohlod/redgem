@@ -55,7 +55,7 @@ void Renderer::Impl::begin_temporal(const Environment& env, const Camera3D& came
   temporal.history_valid = temporal.seen_before && render_math::keeps_history(temporal.view, view);
   temporal.view = view;
   temporal.seen_before = true;
-  temporal.time = static_cast<float>(GetTime());
+  temporal.time = now();
 }
 
 render_math::TemporalView Renderer::Impl::temporal_view(const Camera3D& camera) const {

@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -50,6 +51,9 @@ class Renderer {
   // Whether environments that ask for temporal anti-aliasing get it (on unless said): a view whose
   // overlays are drawn with the camera unjittered afterwards (the editor's) does without.
   void allow_temporal_antialias(bool allowed);
+  // The clock what moves with time (wind, film grain) follows, in seconds; nothing for the real
+  // one. A recording sets it to the game's, which advances a fixed step every frame.
+  void set_clock(std::optional<double> seconds);
   // Where UI.image looks for pictures (the game's images/ folder).
   void set_images_dir(const std::filesystem::path& dir);
   // Width in pixels of a text drawn by draw_hud at that size.

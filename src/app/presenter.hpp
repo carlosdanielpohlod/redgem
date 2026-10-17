@@ -35,6 +35,7 @@ struct FrameView {
   // Where UI.image finds its pictures.
   // cppcheck-suppress uninitMemberVarNoCtor ; a reference: whoever makes one has to give it
   const std::filesystem::path& images_dir;
+  bool stop_recording = false;  // a script ended the recording (Game.stop_recording)
 };
 
 // Who shows a game: a window of its own, a view inside another program, or nobody. The engine

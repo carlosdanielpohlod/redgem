@@ -301,6 +301,7 @@ redgem_add_library(redgem_runtime
   render/shadow_cascades.cpp
   render/temporal.cpp
   render/gl_extras.cpp
+  render/frame_readback.cpp
   render/mesh_pieces.cpp
   render/texture_loading.cpp
   render/renderer.cpp
@@ -349,6 +350,8 @@ redgem_add_library(redgem_runtime
   app/presenter.cpp
   app/frame_painter.cpp
   app/window_presenter.cpp
+  app/recording.cpp
+  app/video_recorder.cpp
   app/engine.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp
