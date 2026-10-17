@@ -28,6 +28,7 @@ add_library(redgem_testing STATIC
   test_library.cpp
   test_saves.cpp
   ruby_tests.cpp
+  opened_classes.cpp
   test_stage.cpp
   system_test.cpp
   test_cli.cpp

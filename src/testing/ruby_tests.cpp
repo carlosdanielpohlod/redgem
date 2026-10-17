@@ -9,6 +9,7 @@
 #include "physics/physics_config.hpp"
 #include "core/config.hpp"
 #include "core/exit_codes.hpp"
+#include "core/files.hpp"
 #include "core/log.hpp"
 #include "input/input.hpp"
 #include "net/http/http_client.hpp"
@@ -18,6 +19,7 @@
 #include "scene/scene.hpp"
 #include "script/script_context.hpp"
 #include "script/script_host.hpp"
+#include "testing/opened_classes.hpp"
 #include "testing/recording_audio.hpp"
 #include "testing/test_library.hpp"
 
@@ -63,9 +65,24 @@ bool every_test_passes(ScriptHost& host) {
   return mrb_integer_p(failures.value) && mrb_integer(failures.value) == 0 && host.error_count() == 0;
 }
 
-// Why the tests could not even start; nothing when they can.
-std::optional<std::string> load_tests(ScriptHost& host, BareWorld& world, const std::filesystem::path& test_file) {
+// The game's classes the file reopens are loaded first, so that it adds to them (see opened_classes).
+std::optional<std::string> load_reopened_classes(ScriptHost& host, const std::filesystem::path& test_file) {
+  std::string error;
+  const std::optional<std::string> source = read_text_file(test_file, error);
+  if (!source) return error;
+  for (const std::string& name : opened_classes(*source)) host.require_class(name);
+  return std::nullopt;
+}
+
+// Why the tests could not even start; nothing when they can. `of_a_game`: the classes they use
+// come from a game's scripts. (Without a game they come from the test file's own folder, which
+// holds the test file itself: nothing is loaded ahead then.)
+std::optional<std::string> load_tests(ScriptHost& host, BareWorld& world, const std::filesystem::path& test_file,
+                                      bool of_a_game) {
   if (auto error = load_test_library(host, world.driven_input)) return error;
+  if (of_a_game) {
+    if (auto error = load_reopened_classes(host, test_file)) return error;
+  }
   const RubyResult loaded = host.load_file(test_file);
   if (!loaded.ok) return loaded.error;
   return std::nullopt;
@@ -89,7 +106,7 @@ int run_ruby_tests(const std::filesystem::path& test_file, const std::filesystem
   if (!scripts) return kExitFailure;
   BareWorld world;
   ScriptHost host(world.context, *scripts);
-  if (const auto error = load_tests(host, world, test_file)) {
+  if (const auto error = load_tests(host, world, test_file, !game_dir.empty())) {
     log::error(*error);
     return kExitFailure;
   }

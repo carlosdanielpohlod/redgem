@@ -150,6 +150,7 @@ add_executable(redgem_testing_tests
   testing/test_saves_test.cpp
   testing/frame_pictures_test.cpp
   testing/test_library_test.cpp
+  testing/opened_classes_test.cpp
   testing/test_stage_test.cpp)
 target_link_libraries(redgem_testing_tests PRIVATE redgem_testing doctest::doctest)
 target_include_directories(redgem_testing_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
