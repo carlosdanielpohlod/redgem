@@ -35,6 +35,7 @@
 #include "render/environment.hpp"
 #include "render/instance_batches.hpp"
 #include "render/instance_records.hpp"
+#include "render/material_alpha.hpp"
 #include "render/mesh_pass.hpp"
 #include "render/particle_buffer.hpp"
 #include "render/particle_layout.hpp"
@@ -106,7 +107,7 @@ struct ObjectPass {
   // cppcheck-suppress uninitMemberVarNoCtor ; it holds a reference: whoever makes one has to give it
   MeshPass meshes;
   int skinned_location = kNoLocation;
-  bool depth = false;  // the shadow map's pass: only depth is written
+  render_math::AlphaPass alpha = render_math::AlphaPass::Opaque;  // Shadow: only depth is written
   render_math::View view;
   int last_material = kNoMaterialYet;
   bool last_two_sided = false;
@@ -200,8 +201,9 @@ struct Renderer::Impl {
   std::vector<std::size_t> particle_batch_of;
   render_math::ParticleLayout particle_layout;
   render_detail::ParticleBuffer particle_buffer;
-  int next_face = 0;       // the cube face captured this frame
-  int faces_captured = 0;  // reflections switch on once all six exist
+  std::vector<render_math::SeeThroughDraw> see_through;  // the frame's, in the order they are drawn
+  int next_face = 0;                                     // the cube face captured this frame
+  int faces_captured = 0;                                // reflections switch on once all six exist
 
   // --- What lives as long as the window (renderer_pipeline.cpp) ----------------------------------
 
@@ -292,21 +294,31 @@ struct Renderer::Impl {
   // --- Objects (renderer_objects.cpp) -----------------------------------------------------------
 
   const MaterialDesc& factors_of(int material) const;
-  // Sets a material's uniforms (only cut-out and wind for the shadow depth pass). Returns true
-  // when it must be drawn without backface culling.
-  bool apply_material(int index, bool depth_pass);
+  // Sets a material's uniforms for a pass (only cut-out and wind for the shadow map's). Returns
+  // true when it must be drawn without backface culling.
+  bool apply_material(int index, render_math::AlphaPass pass);
   void send_surface(const MaterialDesc& factors);
+  void send_alpha(const render_math::AlphaTest& test);
   // Draws what the current 3D view can see, copies of a mesh that come together in one call per
-  // part. `viewer`
-  // is the game camera in both passes: detail is judged by how big things look to the player, not
-  // to the sun.
-  void draw_objects(bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
+  // part. `viewer` is the game camera in both passes: detail is judged by how big things look to
+  // the player, not to the sun. Returns where the pass's record numbers start in `slots`.
+  std::size_t draw_objects(bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
   // Gathers into `batches` what the view sees.
   void gather_copies(const render_math::View& view);
   // `first`: where the pass's record numbers start in `slots`.
   void draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass);
   void use_material(int material, ObjectPass& pass);
   void draw_primitive(const GpuPrimitive& primitive, const render_detail::InstanceRun& run, ObjectPass& pass);
+
+  // --- See-through surfaces (renderer_see_through.cpp) -------------------------------------------
+
+  // After the opaque surfaces of the view whose records start at `first` in `slots`: the
+  // see-through parts of what it saw, the farthest first, mixed with what is behind them.
+  void draw_see_through(std::size_t first, Vec3 viewer);
+  void gather_see_through(std::size_t first, Vec3 viewer);
+  void add_see_through(const render_math::InstanceBatch& batch, std::size_t first, Vec3 viewer);
+  bool has_see_through(int mesh) const;
+  void draw_see_through_copies(const render_math::SeeThroughDraw& draw, ObjectPass& pass);
 
   // --- Scattered copies (renderer_scatter.cpp) -------------------------------------------------
 

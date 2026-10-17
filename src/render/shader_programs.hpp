@@ -21,6 +21,9 @@ struct LitUniforms {
   int emissive = kNoLocation;
   int has_emissive_map = kNoLocation;
   int alpha_cutoff = kNoLocation;
+  int alpha_ceiling = kNoLocation;
+  int alpha_dithered = kNoLocation;
+  int alpha_mixed = kNoLocation;
   int skinned = kNoLocation;
   int wind = kNoLocation;
   // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.

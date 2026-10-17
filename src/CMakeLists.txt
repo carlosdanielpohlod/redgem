@@ -296,6 +296,7 @@ redgem_add_library(redgem_runtime
   render/renderer_frame_texels.cpp
   render/renderer_environment.cpp
   render/renderer_objects.cpp
+  render/renderer_see_through.cpp
   render/renderer_scatter.cpp
   render/renderer_particles.cpp
   render/renderer_particle_glow.cpp
@@ -307,6 +308,7 @@ redgem_add_library(redgem_runtime
   render/particle_buffer.cpp
   render/shader_programs.cpp
   render/render_math.cpp
+  render/material_alpha.cpp
   render/particle_layout.cpp
   render/visibility.cpp
   render/texel_rows.cpp

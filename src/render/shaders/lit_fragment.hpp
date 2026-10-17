@@ -41,6 +41,9 @@ uniform float metallic;
 uniform float roughness;
 uniform vec3 emissive;
 uniform float alphaCutoff;
+uniform float alphaCeiling;        // at or above: not drawn (see material_alpha.hpp)
+uniform float alphaDithered;       // on: a fine pattern of the alpha leaves texels out instead of the cutoff
+uniform float alphaMixed;          // on: mixed with what is behind by its alpha
 uniform vec3 viewPos;
 uniform vec3 sunDirection;
 uniform vec3 sunColor;
@@ -85,6 +88,16 @@ const float HALF = 0.5;                  // -1..1 becomes 0..1 when halved and m
 const float NORMAL_MAP_RANGE = 2.0;      // a normal map stores -1..1 as 0..1
 const float SPECULAR_DIVISOR = 4.0;      // Cook-Torrance: D G F / (4 nv nl)
 const int SHADOW_TAPS_ACROSS = SHADOW_KERNEL + 1 + SHADOW_KERNEL;  // the texel itself and its neighbours on both sides
+const vec2 DITHER_STEP = vec2(0.06711056, 0.00583715);  // interleaved gradient noise: a pattern with no clumps
+const float DITHER_SCALE = 52.9829189;
+
+// A number from 0 to 1 for each pixel, spread so that any share of the pixels lies under any value.
+float ditherAt(vec2 pixel) { return fract(DITHER_SCALE * fract(dot(pixel, DITHER_STEP))); }
+
+bool leftOut(float alpha) {
+  if (alpha >= alphaCeiling) return true;
+  return alphaDithered > SWITCH_ON ? alpha <= ditherAt(gl_FragCoord.xy) : alpha < alphaCutoff;
+}
 
 float distributionGGX(float nh, float a) {
   float a2 = a * a;
@@ -170,7 +183,7 @@ vec3 sky(vec3 direction, float blur) {
 void main() {
   vec4 texel = texture(texture0, fragTexCoord);
   float alpha = colDiffuse.a * texel.a * fragColor.a;
-  if (alpha < alphaCutoff) discard;
+  if (leftOut(alpha)) discard;
   vec3 albedo = pow(texel.rgb, vec3(GAMMA)) * colDiffuse.rgb * fragColor.rgb * fragTint;
   float rough = roughness;
   float metal = metallic;
@@ -219,7 +232,7 @@ void main() {
 
   float fog = 1.0 - exp(-fogDensity * length(viewPos - fragPosition));
   color = mix(color, fogColor, clamp(fog, 0.0, 1.0));
-  finalColor = vec4(color, 1.0);
+  finalColor = vec4(color, alphaMixed > SWITCH_ON ? alpha : 1.0);
 }
 )GLSL";
 

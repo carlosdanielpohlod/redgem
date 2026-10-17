@@ -36,14 +36,26 @@ const MaterialDesc& Renderer::Impl::factors_of(int material) const {
   return known ? material_factors[static_cast<std::size_t>(material)] : fallback_factors;
 }
 
-bool Renderer::Impl::apply_material(int index, bool depth_pass) {
+bool Renderer::Impl::apply_material(int index, render_math::AlphaPass pass) {
   const MaterialDesc& factors = factors_of(index);
-  const render_math::AlphaTest test = render_math::alpha_test(factors, wind);
-  const Shader& pass_shader = depth_pass ? depth_shader : shader;
-  if (!depth_pass) send_surface(factors);
-  send(pass_shader, depth_pass ? depth_uniforms.alpha_cutoff : lit_uniforms.alpha_cutoff, test.cutoff);
-  send(pass_shader, depth_pass ? depth_uniforms.wind : lit_uniforms.wind, test.sway);
+  const render_math::AlphaTest test = render_math::alpha_test(factors, wind, pass);
+  if (pass == render_math::AlphaPass::Shadow) {
+    send(depth_shader, depth_uniforms.alpha_cutoff, test.cutoff);
+    send(depth_shader, depth_uniforms.wind, test.sway);
+  } else {
+    send_surface(factors);
+    send_alpha(test);
+  }
   return test.two_sided;
+}
+
+// What of a material is drawn in the lit pass, and how it sways.
+void Renderer::Impl::send_alpha(const render_math::AlphaTest& test) {
+  send(shader, lit_uniforms.alpha_cutoff, test.cutoff);
+  send(shader, lit_uniforms.alpha_ceiling, test.ceiling);
+  send(shader, lit_uniforms.alpha_dithered, test.dithered ? kOn : kOff);
+  send(shader, lit_uniforms.alpha_mixed, test.mixed ? kOn : kOff);
+  send(shader, lit_uniforms.wind, test.sway);
 }
 
 // How a material's surface answers light.
@@ -62,14 +74,14 @@ void Renderer::Impl::send_surface(const MaterialDesc& factors) {
 // Consecutive parts often share a material: its textures and uniforms are then already set.
 void Renderer::Impl::use_material(int material, ObjectPass& pass) {
   if (material == pass.last_material) return;
-  pass.last_two_sided = apply_material(material, pass.depth);
+  pass.last_two_sided = apply_material(material, pass.alpha);
   bind_material(pass.meshes, material == kNoIndex ? fallback_material : materials[static_cast<std::size_t>(material)]);
   pass.last_material = material;
 }
 
 // --- Objects ----------------------------------------------------------------------------------
 
-void Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float detail_angle) {
+std::size_t Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float detail_angle) {
   const Matrix view_projection = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
   const render_math::View view{frustum_from_matrix(MatrixToFloatV(view_projection).v), viewer,
                                render_math::smallest_angle_drawn(detail_angle, depth_pass)};
@@ -77,9 +89,11 @@ void Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float detail_ang
   const std::size_t first = append_slots(slots, batches.slots());
   ObjectPass objects{
       begin_mesh_pass(depth_pass ? depth_shader : shader, depth_pass ? depth_instance_slot : lit_instance_slot),
-      depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned, depth_pass, view};
+      depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned,
+      depth_pass ? render_math::AlphaPass::Shadow : render_math::AlphaPass::Opaque, view};
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
   end_mesh_pass();
+  return first;
 }
 
 void Renderer::Impl::gather_copies(const render_math::View& view) {

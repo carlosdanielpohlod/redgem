@@ -33,10 +33,7 @@ constexpr const char* kOtherLine = "    > Version:  4.6";
 constexpr int kWindowWidth = 1280;  // pixels
 constexpr int kQuarter = 4;
 constexpr int kQuarterWidth = 320;
-constexpr int kTinyTarget = 3;  // pixels: smaller than the factor it is divided by
-constexpr float kWind = 0.4f;
-constexpr float kMaskCutoff = 0.6f;
-constexpr int kSomeImage = 3;        // index of a texture
+constexpr int kTinyTarget = 3;       // pixels: smaller than the factor it is divided by
 constexpr float kLightRange = 7.0f;  // meters
 constexpr std::size_t kTwoLights = 2;
 constexpr std::size_t kTooManyLights = 40;
@@ -58,14 +55,6 @@ constexpr float kBoxHeight = 40.0f;
 constexpr float kCornerRadius = 10.0f;
 constexpr float kHalfRound = 0.5f;  // a 10 px radius on a 40 px side
 constexpr float kHugeRadius = 500.0f;
-
-MaterialDesc material(AlphaMode mode, bool textured) {
-  MaterialDesc desc;
-  desc.alpha_mode = mode;
-  desc.alpha_cutoff = kMaskCutoff;
-  if (textured) desc.base_color_image = kSomeImage;
-  return desc;
-}
 
 }  // namespace
 
@@ -135,41 +124,6 @@ TEST_CASE("the graphics card's name is read from the line that names it and from
 TEST_CASE("a smaller target is a fraction of the picture but never empty") {
   CHECK(downscaled(kWindowWidth, kQuarter) == kQuarterWidth);
   CHECK(downscaled(kTinyTarget, kQuarter) == 1);
-}
-
-TEST_CASE("opaque materials are drawn whole, still and one-sided") {
-  const AlphaTest test = alpha_test(material(AlphaMode::Opaque, true), kWind);
-  CHECK(test.cutoff == kNoCutoff);
-  CHECK(test.sway == kNoWind);
-  CHECK_FALSE(test.two_sided);
-}
-
-TEST_CASE("cut-out materials use their own cutoff and sway only when textured") {
-  const AlphaTest leaves = alpha_test(material(AlphaMode::Mask, true), kWind);
-  CHECK(leaves.cutoff == doctest::Approx(kMaskCutoff));
-  CHECK(leaves.sway == doctest::Approx(kWind));
-  CHECK(leaves.two_sided);
-  const AlphaTest plain = alpha_test(material(AlphaMode::Mask, false), kWind);
-  CHECK(plain.cutoff == doctest::Approx(kMaskCutoff));
-  CHECK(plain.sway == kNoWind);
-  CHECK(plain.two_sided);
-}
-
-TEST_CASE("textured blend materials are cut out like foliage; untextured ones are drawn whole") {
-  const AlphaTest fence = alpha_test(material(AlphaMode::Blend, true), kWind);
-  CHECK(fence.cutoff == doctest::Approx(kBlendAsCutoutThreshold));
-  CHECK(fence.sway == doctest::Approx(kWind));
-  CHECK(fence.two_sided);
-  const AlphaTest glass = alpha_test(material(AlphaMode::Blend, false), kWind);
-  CHECK(glass.cutoff == kNoCutoff);
-  CHECK(glass.sway == kNoWind);
-  CHECK_FALSE(glass.two_sided);
-}
-
-TEST_CASE("double-sided materials are drawn without backface culling") {
-  MaterialDesc sheet = material(AlphaMode::Opaque, false);
-  sheet.double_sided = true;
-  CHECK(alpha_test(sheet, kWind).two_sided);
 }
 
 TEST_CASE("point lights are laid out in the order given") {

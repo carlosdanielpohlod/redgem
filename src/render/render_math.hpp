@@ -1,7 +1,7 @@
 #pragma once
 
 // What the renderer works out before it draws, as the values the graphics card takes: colors and
-// matrices, a material's alpha test, the lights' arrays, the corners of a particle, the size of a
+// matrices, the lights' arrays, the corners of a particle, the size of a
 // picture. No window and no graphics card needed, so it can be tested. (Values handed to raylib
 // keep raylib's types.) What is worth drawing is in visibility.hpp; the views captured before the
 // picture are in capture_views.hpp.
@@ -28,12 +28,9 @@ inline constexpr int kColorChannels = 4;  // red, green, blue, alpha
 inline constexpr int kQuadCorners = 4;
 inline constexpr float kOn = 1.0f;  // shader switches passed as floats
 inline constexpr float kOff = 0.0f;
-inline constexpr float kNoCutoff = 0.0f;  // an alpha test that lets everything through
-inline constexpr float kNoWind = 0.0f;
 inline constexpr float kSquareCorners = 0.0f;  // roundness of a rectangle without rounded corners
 inline constexpr float kFullyRound = 1.0f;     // roundness whose corners meet: the short side is a half circle
 inline constexpr float kDiameterPerRadius = 2.0f;
-inline constexpr float kBlendAsCutoutThreshold = 0.35f;  // alpha below this is cut away on "blend" textures
 inline constexpr Vector3 kUpAxis{0.0f, 1.0f, 0.0f};
 inline constexpr Vector3 kForwardAxis{0.0f, 0.0f, 1.0f};
 
@@ -55,17 +52,6 @@ Matrix model_matrix(const Transform& t);
 std::optional<std::string> graphics_card_name(const std::string& trace_line);
 // A target `factor` times smaller than `size` pixels, never smaller than one pixel.
 int downscaled(int size, int factor);
-
-// --- Materials -------------------------------------------------------------------------------
-
-// How a material's see-through parts are drawn. There is no sorted transparency: cut-out
-// materials (and textured "blend" ones, i.e. leaves and fences) are drawn with an alpha test.
-struct AlphaTest {
-  float cutoff = kNoCutoff;  // alpha below this is not drawn
-  float sway = kNoWind;      // foliage sways in the wind; everything else stays still
-  bool two_sided = false;    // drawn without backface culling
-};
-AlphaTest alpha_test(const MaterialDesc& material, float wind);
 
 // --- Lights ----------------------------------------------------------------------------------
 

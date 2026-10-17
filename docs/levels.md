@@ -38,10 +38,35 @@ Environment in the editor, or a Blender empty) sets the mood through its propert
 
 Without one, scenes get a clear day. Other things worth knowing: the 16 point lights nearest to the
 camera are used each frame (so a street can have dozens of lamps); the sun casts soft shadows
-around the camera; materials use their glTF normal, roughness/metallic, occlusion and emission
-textures; and textured materials with transparency are cut out by their alpha and sway with the
-wind (leaves, fences), on objects that sway: unless an object says `sway = true` or `false`, those
-a skeleton moves do not (a character's hair follows its head, not the wind).
+around the camera; and materials use their glTF normal, roughness/metallic, occlusion and emission
+textures. A light's intensity and color can change while the game runs (see
+[Gameplay recipes](scripting/gameplay.md#light-that-flickers-and-fades)).
+
+### See-through materials and wind
+
+Blender's material settings decide how a material shows what is behind it (the glTF exporter
+writes them as the material's alpha mode):
+
+| Alpha mode | Drawn as | For |
+|------------|----------|-----|
+| Opaque | whole: its alpha is not looked at | almost everything |
+| Mask (alpha clip) | cut out where its alpha is below the material's cutoff | leaves, grass, fences |
+| Blend | see-through: mixed with what is behind it by its alpha | glass, hair cards, fur, smoke on a card |
+
+A blended material is drawn in two steps. What of it is nearly opaque (alpha 0.9 and above) is
+drawn with the opaque surfaces, so that a dozen hair cards over each other still sort themselves
+out; the rest is drawn after every opaque surface, mixed with what is behind it, one object at a
+time from the farthest to the nearest. Two see-through parts of the same object are not sorted
+between themselves, nor are copies scattered with `Scatter.place`. For many layers of fine cards
+(fur, a mane), give the material the custom property `transparency = "dithered"` (Material
+Properties → Custom Properties, exported when the exporter's *Custom Properties* is on): its texels
+are then left out in a fine pattern that thins with their alpha, which needs no sorting at all,
+at the price of a slight grain.
+
+**Wind.** Textured cut-out and blended materials are foliage: drawn on both sides, and swaying
+with the environment's `wind`. An object whose foliage must stay still gives itself `sway =
+false`; objects moved by a skeleton (characters, and so their hair) do not sway unless they say
+`sway = true`. Copies scattered from an object sway as it does.
 
 Glossy surfaces reflect their surroundings: the engine keeps capturing the scene around the camera
 (one cube face per frame) and uses it for reflections and ambient light.
@@ -92,7 +117,7 @@ They are drawn by patches of ground 16 m across: a patch out of view, or too far
 copy to show, is skipped whole. Like any object, they cast shadows, and small things (grass) only
 near the camera: a tuft half a meter high stops casting one about 50 m away, a tree hundreds of
 meters away. Their foliage sways in the wind (`wind` on the environment), each copy with its own
-phase, so a field does not move in step, unless their template says `sway = false`.
+phase, so a field does not move in step.
 
 ## Terrain
 
@@ -143,7 +168,7 @@ regenerates a whole level from code; `tools/blender/scene_kit.py` has helpers to
 | `prefab`   | `true`                                         | A template: hidden and inert in the game, copied by `Scene.spawn` |
 | `visible_from`, `visible_to` | meters                          | The object is drawn only while that far from the camera: give a model a detailed version up close and a light one far away |
 | `tint`     | `"#rrggbb"`                                    | Multiplies the colors of this object's mesh (copies sharing a mesh can differ) |
-| `sway`     | `true` / `false`                               | Whether the wind sways its foliage: unless said, yes, except on objects a skeleton moves |
+| `sway`     | `true` / `false`                               | Whether the wind sways its foliage: unless said, yes, except on objects a skeleton moves (see "See-through materials and wind") |
 | `environment` | `true`                                      | This object's properties set the sky, fog and effects (see "Look of a scene") |
 | anything   | number / string / bool                         | Available in Ruby as `props[:name]` / `prop(:name, default)` |
 

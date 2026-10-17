@@ -53,6 +53,10 @@ struct MaterialDesc {
   AlphaMode alpha_mode = AlphaMode::Opaque;
   float alpha_cutoff = kDefaultAlphaCutoff;
   bool double_sided = false;
+  // A blended material drawn as a fine pattern of its texels left out by how see-through they are,
+  // instead of mixed with what is behind: nothing to sort, for many layers of hair cards or fur
+  // (the material's custom property `transparency = "dithered"`).
+  bool dithered = false;
 };
 
 struct PrimitiveDesc {

@@ -35,6 +35,9 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::emissive, shaders::kEmissive},
     {&LitUniforms::has_emissive_map, shaders::kHasEmissiveMap},
     {&LitUniforms::alpha_cutoff, shaders::kAlphaCutoff},
+    {&LitUniforms::alpha_ceiling, shaders::kAlphaCeiling},
+    {&LitUniforms::alpha_dithered, shaders::kAlphaDithered},
+    {&LitUniforms::alpha_mixed, shaders::kAlphaMixed},
     {&LitUniforms::skinned, shaders::kSkinned},
     {&LitUniforms::wind, shaders::kWindAmount},
     // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.

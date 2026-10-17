@@ -30,6 +30,12 @@ inline constexpr const char* kVisibleTo = "visible_to";
 // unless a skeleton moves the object (a character's hair follows its head, not the wind).
 inline constexpr const char* kSway = "sway";
 
+// --- The properties of a material (glTF material extras) --------------------------
+// How a blended material shows what is behind it: mixed with it, sorted farthest first (the
+// default), or `kDithered` (see MaterialDesc::dithered).
+inline constexpr const char* kTransparency = "transparency";
+inline constexpr const char* kDithered = "dithered";
+
 // --- Physics: what `body` and `collider` may be set to ----------------------------
 inline constexpr const char* kBodyStatic = "static";
 inline constexpr const char* kBodyDynamic = "dynamic";

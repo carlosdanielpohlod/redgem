@@ -1,6 +1,8 @@
 // Pictures and materials of a glTF file.
 
 #include "core/safe_path.hpp"
+#include "scene/gltf/extras_parser.hpp"
+#include "scene/props.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_reader.hpp"
 
@@ -32,6 +34,13 @@ AlphaMode alpha_mode_of(cgltf_alpha_mode mode) {
 Vec3 emissive_of(const cgltf_material& material) {
   const float strength = material.has_emissive_strength ? material.emissive_strength.emissive_strength : 1.0f;
   return vec3_from(material.emissive_factor) * strength;
+}
+
+// What a material's custom properties say of how it is see-through.
+bool dithered(const cgltf_material& material) {
+  if (material.extras.data == nullptr) return false;
+  const ExtrasParseResult parsed = parse_extras(material.extras.data);
+  return get_string(parsed.properties, props::kTransparency).value_or("") == props::kDithered;
 }
 
 }  // namespace
@@ -91,6 +100,7 @@ MaterialDesc GltfReader::load_material(const cgltf_material& material) const {
   out.alpha_mode = alpha_mode_of(material.alpha_mode);
   out.alpha_cutoff = material.alpha_cutoff;
   out.double_sided = material.double_sided;
+  out.dithered = dithered(material);
   return out;
 }
 
