@@ -300,7 +300,8 @@ TEST_CASE("a join waits for its answer on the real clock, however fast a game no
   CHECK(ruby(engine, "[Network.connecting?, $reasons].inspect") == "[true, []]");
   now += kPastJoinTimeout;
   frames(engine, 1);
-  CHECK(ruby(engine, "[Network.connecting?, $reasons].inspect") == "[false, [\"" + std::string(net::kNoAnswer) + "\"]]");
+  CHECK(ruby(engine, "[Network.connecting?, $reasons].inspect") ==
+        "[false, [\"" + std::string(net::kNoAnswer) + "\"]]");
 }
 
 TEST_CASE("the input a program hands the engine is what the game reads") {

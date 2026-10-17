@@ -40,7 +40,9 @@ mrb_value game_object_has_light(mrb_state* mrb, mrb_value self) {
   return mrb_bool_value(alive_object(mrb, self).light.has_value());
 }
 
-mrb_value light_intensity(mrb_state* mrb, mrb_value self) { return mrb_float_value(mrb, light_of(mrb, self).intensity); }
+mrb_value light_intensity(mrb_state* mrb, mrb_value self) {
+  return mrb_float_value(mrb, light_of(mrb, self).intensity);
+}
 
 mrb_value light_set_intensity(mrb_state* mrb, mrb_value self) {
   const mrb_float intensity = at_least(mrb, float_arg(mrb), 0.0, "a light's intensity");
