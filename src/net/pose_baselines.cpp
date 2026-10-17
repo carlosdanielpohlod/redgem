@@ -21,6 +21,11 @@ PoseUpdate PoseSender::update(const std::string& key, Vec3 position, Quat rotati
   return update;
 }
 
+bool PoseSender::tells_animation(const std::string& key, std::uint32_t revision) const {
+  const auto sent = sent_.find(key);
+  return due_whole(sent) || sent->second.revision != revision;
+}
+
 void PoseSender::tell_animation(PoseUpdate& update, const Animated& animated) {
   Sent& sent = sent_[update.key];  // (placed has just made it, or found it)
   if (!tells(update, sent.revision, animated.revision)) return;

@@ -28,7 +28,7 @@ mrb_value network_pose(mrb_state* mrb, mrb_value) {
   const Quat turned = quat_from_euler_degrees(binding::to_vec3(mrb, rotation));
   const std::string name(key, static_cast<std::size_t>(key_size));
   return mrb_bool_value(
-      network(mrb).send_pose(name, binding::to_vec3(mrb, position), turned, animated_of(mrb, animated)));
+      network(mrb).send_pose(name, binding::to_vec3(mrb, position), turned, animated_of(mrb, animated, name)));
 }
 
 }  // namespace

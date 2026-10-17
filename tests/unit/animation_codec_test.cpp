@@ -98,6 +98,14 @@ TEST_CASE("a clip whose name is longer than an animation carries cannot be sent"
   CHECK_FALSE(carriable(part));
 }
 
+TEST_CASE("a clip without a name cannot be sent: it would read as no clip, and the pose would be no pose") {
+  AnimationPart part = attacking();
+  part.own->clip.clear();
+  CHECK_FALSE(carriable(part));
+  // (What its bytes would be: a size of 0, then numbers nothing reads.)
+  CHECK_FALSE(decoded(encoded(with_animation(part))).has_value());
+}
+
 TEST_CASE("the animation goes with a whole pose and when it changed, not with every pose") {
   PoseSender sender;
   const Animated first{kFirstRevision, attacking()};
@@ -113,6 +121,16 @@ TEST_CASE("the animation goes with a whole pose and when it changed, not with ev
   }
   CHECK(again);  // and every so often with the whole pose, in case it drifted
   CHECK_FALSE(sender.update(kKey, kHere, Quat::identity()).animation.has_value());  // an object that sends none
+}
+
+TEST_CASE("a sender says beforehand whether the next pose would tell an animation, so it is built only then") {
+  PoseSender sender;
+  CHECK(sender.tells_animation(kKey, kFirstRevision));  // the first pose is whole
+  sender.update(kKey, kHere, Quat::identity(), Animated{kFirstRevision, attacking()});
+  CHECK_FALSE(sender.tells_animation(kKey, kFirstRevision));  // heard already
+  CHECK(sender.tells_animation(kKey, kNextRevision));         // changed since
+  sender.start_over();
+  CHECK(sender.tells_animation(kKey, kFirstRevision));  // someone joined
 }
 
 TEST_CASE("a pose with an animation still fits what a pose may be") {

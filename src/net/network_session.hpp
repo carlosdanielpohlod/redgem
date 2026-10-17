@@ -119,6 +119,11 @@ class NetworkSession {
   bool send_pose(const std::string& key, Vec3 position, Quat rotation,
                  const std::optional<Animated>& animated = std::nullopt);
 
+  // Whether the next pose of `key` would carry an animation of that revision (see PoseSender).
+  bool tells_animation(const std::string& key, std::uint32_t revision) const {
+    return poses_.sent.tells_animation(key, revision);
+  }
+
   State state() const { return state_; }
   bool hosting() const { return state_ == State::Online && id_ == kHostId; }
   // This machine's id in the game; 0 while not in one.

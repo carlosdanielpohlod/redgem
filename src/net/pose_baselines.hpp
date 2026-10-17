@@ -42,6 +42,10 @@ class PoseSender {
   // object whose animation is sent, to this animation).
   PoseUpdate update(const std::string& key, Vec3 position, Quat rotation,
                     const std::optional<Animated>& animated = std::nullopt);
+  // Whether the next pose of `key` would tell an animation of that revision: a pose that is due
+  // whole, or a revision the others have not heard (a pose made whole by a move too far for a
+  // step, which this cannot know, tells none: what the others know of it has not changed).
+  bool tells_animation(const std::string& key, std::uint32_t revision) const;
   // The next pose of every object is whole (someone arrived who knows none of them).
   void start_over() { sent_.clear(); }
 

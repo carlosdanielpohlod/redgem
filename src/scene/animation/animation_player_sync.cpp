@@ -16,10 +16,14 @@ ClipState AnimationPlayer::state_of(const Track& track) const {
   return {(*clips_)[track.clip].name, clock.time, clock.speed, clock.loop, clock.playing};
 }
 
+std::uint32_t AnimationPlayer::revision_of(const Scene& scene, ObjectId object) const {
+  const auto revision = revisions_.find(scene.handle(character_of(scene, object)));
+  return revision != revisions_.end() ? revision->second : 0;
+}
+
 CharacterAnimation AnimationPlayer::animation_of(const Scene& scene, ObjectId object) const {
   CharacterAnimation state;
-  const auto revision = revisions_.find(scene.handle(character_of(scene, object)));
-  if (revision != revisions_.end()) state.revision = revision->second;
+  state.revision = revision_of(scene, object);
   const Own* own = own_of(scene, object);
   if (own == nullptr) return state;
   if (own->to) state.own = state_of(*own->to);

@@ -7,7 +7,9 @@
 
 #include <string>
 
+#include "net/network_session.hpp"
 #include "scene/animation/animation_player.hpp"
+#include "script/bindings/network_bindings.hpp"
 #include "script/bindings/binding_helpers.hpp"
 
 namespace redgem {
@@ -21,7 +23,8 @@ constexpr mrb_int kTimeAt = 1;
 constexpr mrb_int kSpeedAt = 2;
 constexpr mrb_int kLoopsAt = 3;
 constexpr mrb_int kPlaysAt = 4;
-constexpr int kSyncArgs = 5;  // fade, layer weight, own clip, mixed clip, how late
+constexpr std::uint32_t kNeverAnimated = 0;  // the revision of a character no script animated
+constexpr int kSyncArgs = 5;                 // fade, layer weight, own clip, mixed clip, how late
 constexpr const char* kNoClip = "a clip is [name, time, speed, loops, plays]";
 
 AnimationPlayer& animations(mrb_state* mrb) {
@@ -31,6 +34,14 @@ AnimationPlayer& animations(mrb_state* mrb) {
 std::optional<net::ClipPart> part_of(const std::optional<ClipState>& clip) {
   if (!clip) return std::nullopt;
   return net::ClipPart{clip->clip, clip->time, clip->speed, clip->loop, clip->playing};
+}
+
+// Whether the others are to hear what a character's animation does with the next pose of `key`.
+// Nothing while its scripts never set any (the others' scripts then keep the clips they gave it),
+// nor when they already heard what it does: then it is not even worked out.
+bool worth_telling(mrb_state* mrb, ObjectId id, const std::string& key) {
+  const std::uint32_t revision = animations(mrb).revision_of(scene(mrb), id);
+  return revision != kNeverAnimated && network(mrb).tells_animation(key, revision);
 }
 
 bool is_clip(mrb_value clip) { return mrb_array_p(clip) && RARRAY_LEN(clip) == kClipParts; }
@@ -66,9 +77,11 @@ mrb_value game_object_animation_sync(mrb_state* mrb, mrb_value self) {
 
 }  // namespace
 
-std::optional<net::Animated> animated_of(mrb_state* mrb, mrb_value object) {
+std::optional<net::Animated> animated_of(mrb_state* mrb, mrb_value object, const std::string& key) {
   if (mrb_nil_p(object)) return std::nullopt;
-  const CharacterAnimation state = animations(mrb).animation_of(scene(mrb), alive_id(mrb, object));
+  const ObjectId id = alive_id(mrb, object);
+  if (!worth_telling(mrb, id, key)) return std::nullopt;
+  const CharacterAnimation state = animations(mrb).animation_of(scene(mrb), id);
   const net::AnimationPart part{state.fade, state.layer_weight, part_of(state.own), part_of(state.layer)};
   if (!net::carriable(part)) return std::nullopt;
   return net::Animated{state.revision, part};

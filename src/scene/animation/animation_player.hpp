@@ -76,6 +76,8 @@ class AnimationPlayer {
   // --- What other machines see (NetworkSync) ------------------------------------------------
   // What the character `object` belongs to does of its own, for the others.
   CharacterAnimation animation_of(const Scene& scene, ObjectId object) const;
+  // Its revision alone (0 while no script ever changed what it does).
+  std::uint32_t revision_of(const Scene& scene, ObjectId object) const;
   // Makes the character do what `state` says another machine's does, `late_by` seconds on from
   // when it said so: the same clips, from the same moment in them. A clip this scene does not
   // have is left out.

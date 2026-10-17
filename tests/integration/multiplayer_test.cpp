@@ -38,7 +38,9 @@ constexpr int kQuarterSecondRounds = 15;      // frames
 constexpr float kMostOfTheWayToFive = 4.5f;   // from 3, where the ball starts
 constexpr float kShownBehind = 0.25f;         // seconds a watched swordsman is shown behind his owner
 constexpr float kFewFrames = 4.0f * config::kFixedDeltaSeconds;  // what a pose takes on its way, and more
-constexpr float kSomeMix = 0.05f;  // meters of the sword's move that only a mixed clip makes
+constexpr float kSomeMix = 0.05f;
+constexpr int kPastAWholePose = 180;  // frames: three seconds, past the two between whole poses  // meters of the
+                                      // sword's move that only a mixed clip makes
 
 // A camera, a platform the host moves, a ball to spawn copies of, and a swordsman (swordsman.hpp).
 SceneDesc small_scene() {
@@ -808,4 +810,15 @@ TEST_CASE("an object whose NetworkSync leaves animation out keeps its own clips"
   lan.rounds(kSettleRounds);
   CHECK(clip_of(*host) == "\"Attack\"");
   CHECK(clip_of(*guest) == "nil");
+}
+
+TEST_CASE("a character whose owner never animated it keeps the clips a watcher's scripts give it") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  sync_swordsman({host, guest});
+  lan.rounds(kSettleRounds);
+  ruby(*guest, "$hero.animation.play(:Guard)");  // say, a look of the guest's own
+  lan.rounds(kPastAWholePose);                   // the host's whole poses come and go
+  CHECK(clip_of(*guest) == "\"Guard\"");
+  CHECK(clip_of(*host) == "nil");
 }
