@@ -4,6 +4,7 @@
 
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_reader.hpp"
+#include "scene/scene_config.hpp"
 
 namespace redgem {
 namespace {
@@ -34,6 +35,11 @@ bool has_unusable_inverse_binds(const cgltf_skin& skin) {
   return skin.inverse_bind_matrices != nullptr && inverse_binds_of(skin, skin.joints_count) == nullptr;
 }
 
+// Whether a node is a mesh its scene has, deformed by a skeleton its scene has.
+bool skinned_mesh(const NodeDesc& node, const SceneDesc& scene) {
+  return is_index_of(node.mesh, scene.meshes.size()) && is_index_of(node.skin, scene.skins.size());
+}
+
 }  // namespace
 
 void GltfReader::load_skins() {
@@ -50,7 +56,7 @@ void GltfReader::load_skins() {
 
 SkinDesc GltfReader::load_skin(const cgltf_skin& skin, const std::vector<int>& nodes) const {
   SkinDesc out;
-  const cgltf_size joints = std::min<cgltf_size>(skin.joints_count, gltf_checks::kMaxJointsPerSkin);
+  const cgltf_size joints = std::min<cgltf_size>(skin.joints_count, config::kMaxSkinJoints);
   const cgltf_accessor* matrices = inverse_binds_of(skin, joints);
   for (cgltf_size j = 0; j < joints; ++j) {
     out.joints.push_back(nodes[static_cast<std::size_t>(index_of(skin.joints[j], data_.nodes))]);
@@ -63,9 +69,20 @@ void GltfReader::warn_of_unused_parts(const cgltf_skin& skin, cgltf_size index) 
   if (has_unusable_inverse_binds(skin)) {
     warn("skin " + std::to_string(index) + " has no usable inverse bind matrix for each of its joints: none is used");
   }
-  if (skin.joints_count <= max_skin_joints_) return;
-  warn("skin " + std::to_string(index) + " has more than " + std::to_string(max_skin_joints_) +
-       " joints: vertices of the extra ones follow the last supported joint");
+  if (skin.joints_count <= config::kMaxSkinJoints) return;
+  warn("skin " + std::to_string(index) + " has more than " + std::to_string(config::kMaxSkinJoints) +
+       " joints: vertices of the extra ones follow its first");
+}
+
+void GltfReader::keep_joints_within_skins() {
+  SceneDesc& scene = result_.scene;
+  for (const NodeDesc& node : scene.nodes) {
+    if (!skinned_mesh(node, scene)) continue;
+    const std::size_t joints = scene.skins[static_cast<std::size_t>(node.skin)].joints.size();
+    for (PrimitiveDesc& primitive : scene.meshes[static_cast<std::size_t>(node.mesh)].primitives) {
+      keep_joints_within(primitive, joints);
+    }
+  }
 }
 
 }  // namespace redgem

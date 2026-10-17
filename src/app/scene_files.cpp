@@ -5,7 +5,6 @@
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
-#include "render/gpu_profile.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 
 namespace redgem {
@@ -15,7 +14,7 @@ constexpr const char* kLinkedScene = "the scene is a symbolic link: built games 
 
 // The scene of a file, with the loader's warnings logged; the error when it cannot be read.
 std::variant<SceneDesc, std::string> read_scene_file(const std::filesystem::path& file) {
-  LoadResult loaded = load_gltf_scene(file.string(), gpu_profile::kMaxSkinJoints);
+  LoadResult loaded = load_gltf_scene(file.string());
   if (!loaded.ok) return loaded.error;
   for (const std::string& warning : loaded.warnings) log::warning(warning);
   return std::move(loaded.scene);

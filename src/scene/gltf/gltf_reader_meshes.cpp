@@ -47,7 +47,7 @@ void read_attribute(const cgltf_attribute& attribute, PrimitiveDesc& out) {
     *floats = gltf_accessors::unpack_floats(attribute.data);
   }
   if (attribute.type == cgltf_attribute_type_color) out.colors = gltf_accessors::rgba_bytes(attribute.data);
-  if (attribute.type == cgltf_attribute_type_joints) out.joints = gltf_accessors::joint_bytes(attribute.data);
+  if (attribute.type == cgltf_attribute_type_joints) out.joints = gltf_accessors::joint_indices(attribute.data);
 }
 
 // False when one of the attributes that are read is not of the kind glTF gives it.
@@ -117,15 +117,6 @@ void GltfReader::ensure_normals(PrimitiveDesc& primitive, const std::string& mes
   primitive.normals.assign(primitive.positions.size(), 0.0f);
   for (std::size_t v = 0; v < vertex_count_of(primitive); ++v) {
     primitive.normals[v * config::kFloatsPerNormal + kYOffset] = 1.0f;
-  }
-}
-
-void GltfReader::limit_joints() {
-  const auto last_kept = static_cast<std::uint8_t>(std::min(max_skin_joints_ - 1, gltf_accessors::kMaxJointByte));
-  for (MeshDesc& mesh : result_.scene.meshes) {
-    for (PrimitiveDesc& primitive : mesh.primitives) {
-      for (std::uint8_t& joint : primitive.joints) joint = std::min(joint, last_kept);
-    }
   }
 }
 

@@ -106,4 +106,25 @@ class NetworkSnapshotsTest < RedGemTest::Case
     @snapshots.advance(@snapshots.delay - SEND / 2)
     assert_in_delta 360.0, @snapshots.pose[1].y, NEAR
   end
+
+  def test_an_animation_that_came_with_a_pose_is_due_once_the_object_is_shown_at_that_moment
+    fixed = Snapshots.new(SEND, SEND * 2)
+    fixed.add(STILL, STILL, :attack)
+    assert_nil fixed.due_animation
+    fixed.advance(SEND * 2.5)
+    animation, late = fixed.due_animation
+    assert_equal :attack, animation
+    assert_in_delta SEND / 2, late
+    assert_nil fixed.due_animation # once
+  end
+
+  def test_of_animations_that_fell_due_together_the_newest_is_done
+    fixed = Snapshots.new(SEND, SEND)
+    fixed.add(STILL, STILL, :attack)
+    fixed.advance(SEND / 2)
+    fixed.add(STILL, STILL, :guard)
+    fixed.add(STILL, STILL)
+    fixed.advance(SEND * 2)
+    assert_equal :guard, fixed.due_animation[0]
+  end
 end

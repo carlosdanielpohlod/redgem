@@ -22,19 +22,19 @@ constexpr int kPanoramaMipsWanted = 1;       // rlGenTextureMipmaps answers how 
 
 }  // namespace
 
-void Renderer::Impl::capture_reflection_face(const Scene& scene, const Camera3D& camera) {
+void Renderer::Impl::capture_reflection_face(const Camera3D& camera) {
   const render_math::CubeFace& face = render_math::kCubeFaceViews[next_face];
-  draw_surroundings(scene, face, render_math::reflection_eye(camera.position));
+  draw_surroundings(face, render_math::reflection_eye(camera.position));
   copy_face_to_panorama(face);
   blur_panorama_levels();
   next_face = render_math::face_after(next_face);
   faces_captured = std::min(faces_captured + 1, kCubeFaces);
   send(shader, lit_uniforms.reflection_strength, render_math::reflection_strength(faces_captured));
-  bind_for_the_frame(lit_uniforms.reflection_map, kReflectionTextureSlot, panorama.texture.id);
+  bind_for_the_frame(shader, lit_uniforms.reflection_map, kReflectionTextureSlot, panorama.texture.id);
 }
 
 // What is around `eye` in the direction of one cube face: the sky and the sizeable objects.
-void Renderer::Impl::draw_surroundings(const Scene& scene, const render_math::CubeFace& face, Vector3 eye) {
+void Renderer::Impl::draw_surroundings(const render_math::CubeFace& face, Vector3 eye) {
   Camera3D view{};
   view.projection = CAMERA_PERSPECTIVE;
   view.fovy = kRightAngle;
@@ -45,7 +45,7 @@ void Renderer::Impl::draw_surroundings(const Scene& scene, const render_math::Cu
   ClearBackground(kBlack);
   BeginMode3D(view);
   draw_sky(view);
-  draw_objects(scene, false, to_vec3(eye), kMinReflectedAngle);
+  draw_objects(false, to_vec3(eye), kMinReflectedAngle);
   EndMode3D();
   EndTextureMode();
 }

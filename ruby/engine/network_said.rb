@@ -6,6 +6,9 @@ module Network
     MAX_PEERS = 16            # machines in one game, the host included
     RECORD_SIZE = 5           # parts of a spawn record: key, template, owner, position, rotation
     SYNC_SIZE = 3             # parts of what says where an object is: key, position, rotation
+    ANIMATION_SIZE = 4        # parts of what says what its animation does: fade, weight, own clip, mixed clip
+    CLIP_SIZE = 5             # parts of a clip: name, time, speed, loops, plays
+    MAX_CLIP_NAME_SIZE = 64   # bytes in a clip's name, as a pose carries it
     VECTOR_SIZE = 3           # numbers a position or a rotation travels as: x, y, z
     MAX_KEY_SIZE = 128        # bytes in the key of an object on the network (a spawned one, any NetworkSync)
     MAX_COUNT_DIGITS = 9      # in the number such a key ends with
@@ -30,12 +33,39 @@ module Network
       # (Infinity and what is not a number compare as false, so they are out too.)
       def reachable?(number) = number.is_a?(Numeric) && number.abs <= MAX_DISTANCE
 
-      # Where an object is, as its owner sends it: [key, position, rotation].
+      # Where an object is, as its owner sends it: [key, position, rotation], and what its animation
+      # does after them when that came along.
       def placement?(data)
-        return false unless list?(data, SYNC_SIZE)
-
-        data.first.is_a?(String) && data.drop(1).all? { |part| vector?(part) }
+        key, position, rotation, animation = data
+        sync_size?(data) && key.is_a?(String) && vector?(position) && vector?(rotation) && no_or_animation?(animation)
       end
+
+      def sync_size?(data) = list?(data, SYNC_SIZE) || list?(data, SYNC_SIZE + 1)
+      def no_or_animation?(part) = part.nil? || animation?(part)
+
+      # [fade, weight, own clip, mixed clip]: seconds of fade (none below 0), a weight from 0 to 1,
+      # and clips or nils. What is out of those would only be refused further on, every frame.
+      def animation?(part)
+        return false unless list?(part, ANIMATION_SIZE)
+
+        fade, weight, *clips = part
+        fade?(fade) && weight?(weight) && clips.all? { |clip| no_or_clip?(clip) }
+      end
+
+      def fade?(fade) = reachable?(fade) && fade >= 0
+      def weight?(weight) = reachable?(weight) && weight.between?(0, 1)
+      def no_or_clip?(clip) = clip.nil? || clip?(clip)
+
+      # [name, time, speed, loops, plays]: a name that is not empty, two numbers, two flags.
+      def clip?(clip)
+        return false unless list?(clip, CLIP_SIZE)
+
+        name, time, speed, *flags = clip
+        clip_name?(name) && numbers?([time, speed]) && flags.all? { |flag| [true, false].include?(flag) }
+      end
+
+      def clip_name?(name) = name.is_a?(String) && !name.empty? && name.bytesize <= MAX_CLIP_NAME_SIZE
+      def numbers?(list) = list.all? { |number| reachable?(number) }
 
       # Whether `key` is one `maker` gives what it spawns from `template`: "Ball#2.7" is the
       # seventh thing machine 2 spawned. Nothing else is a spawned object's key, so no machine

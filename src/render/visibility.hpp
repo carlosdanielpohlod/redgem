@@ -53,4 +53,17 @@ struct View {
 // True when the sphere is in the view, looks big enough and is within [from, to) meters.
 bool worth_drawing(const View& view, const BoundingSphere& sphere, float from, float to);
 
+// What a pass judges one object by, worked out once a frame: the sphere around its mesh where it
+// is now. A mesh without bounds is judged by distance alone, from where its object is (the
+// sphere's center then).
+struct Sight {
+  BoundingSphere sphere;
+  bool bounded = false;
+};
+Sight sight_of(const Bounds& bounds, const Transform& world);
+// The same for a skinned mesh, placed by its skeleton's first bone.
+Sight skinned_sight_of(const Bounds& bounds, const Transform& world, const Matrix& first_bone);
+// Whether a view draws what has that sight and is drawn within [from, to) meters.
+bool sighted(const View& view, const Sight& sight, float from, float to);
+
 }  // namespace redgem::render_math

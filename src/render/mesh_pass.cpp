@@ -1,7 +1,8 @@
 #include "render/mesh_pass.hpp"
 
-#include <raymath.h>
 #include <rlgl.h>
+
+#include <algorithm>
 
 #include "render/render_math.hpp"
 #include "render/shader_programs.hpp"
@@ -9,6 +10,9 @@
 
 namespace redgem::render_detail {
 namespace {
+
+constexpr std::size_t kGrowth = 2;  // how much bigger a buffer of numbers is made when one is too small
+constexpr int kOnePerCopy = 1;      // the vertex attribute divisor: the next number for every copy
 
 // Whether the pass's shader samples that kind of texture.
 bool samples(const MeshPass& pass, int map) { return takes(pass.shader, SHADER_LOC_MAP_DIFFUSE + map); }
@@ -29,26 +33,35 @@ void bind_texture(int slot, unsigned int texture) {
   }
 }
 
-// Where the mesh is, for the shader: its own matrix, the one for its normals, and the whole way to the screen.
-void send_matrices(const MeshPass& pass, const Matrix& model) {
-  const Shader& shader = pass.shader;
-  if (takes(shader, SHADER_LOC_MATRIX_MODEL)) rlSetUniformMatrix(shader.locs[SHADER_LOC_MATRIX_MODEL], model);
-  if (takes(shader, SHADER_LOC_MATRIX_NORMAL)) {
-    rlSetUniformMatrix(shader.locs[SHADER_LOC_MATRIX_NORMAL], MatrixTranspose(MatrixInvert(model)));
-  }
-  rlSetUniformMatrix(shader.locs[SHADER_LOC_MATRIX_MVP], MatrixMultiply(model, pass.view_projection));
-}
-
-// Whether the mesh is deformed by a skeleton the pass's shader can take.
-bool poses(const MeshPass& pass, const std::vector<Matrix>* bones) {
-  return bones != nullptr && takes(pass.shader, SHADER_LOC_BONE_MATRICES);
+// Room for at least `slots` numbers, in a new buffer when the old one is too small. What the
+// frame's earlier passes put in the old one was drawn already: a buffer lives on while draws use it.
+void make_room(SlotBuffer& buffer, std::size_t slots) {
+  if (slots <= buffer.capacity) return;
+  release_slots(buffer);
+  buffer.capacity = std::max(slots, buffer.capacity * kGrowth);
+  buffer.id = rlLoadVertexBuffer(nullptr, static_cast<int>(buffer.capacity * sizeof(float)), true);
 }
 
 }  // namespace
 
-MeshPass begin_mesh_pass(const Shader& shader) {
+std::size_t append_slots(SlotBuffer& buffer, const std::vector<float>& slots) {
+  const std::size_t first = buffer.used;
+  if (slots.empty()) return first;  // a pass that sees nothing
+  make_room(buffer, first + slots.size());
+  const auto bytes = static_cast<int>(slots.size() * sizeof(float));
+  rlUpdateVertexBuffer(buffer.id, slots.data(), bytes, static_cast<int>(first * sizeof(float)));
+  buffer.used = first + slots.size();
+  return first;
+}
+
+void release_slots(SlotBuffer& buffer) {
+  if (buffer.id != 0) rlUnloadVertexBuffer(buffer.id);
+  buffer.id = 0;
+}
+
+MeshPass begin_mesh_pass(const Shader& shader, int instance_slot) {
   rlDrawRenderBatchActive();  // whatever raylib still had queued goes first
-  const MeshPass pass{shader, MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection())};
+  const MeshPass pass{shader, instance_slot};
   rlEnableShader(shader.id);
   if (takes(shader, SHADER_LOC_MATRIX_VIEW)) {
     rlSetUniformMatrix(shader.locs[SHADER_LOC_MATRIX_VIEW], rlGetMatrixModelview());
@@ -69,17 +82,21 @@ void bind_material(const MeshPass& pass, const Material& material) {
   rlSetUniform(pass.shader.locs[SHADER_LOC_COLOR_DIFFUSE], color.data(), SHADER_UNIFORM_VEC4, 1);
 }
 
-void draw_mesh(const MeshPass& pass, const Mesh& mesh, const Matrix& model, const std::vector<Matrix>* bones) {
-  send_matrices(pass, model);
-  if (poses(pass, bones)) {
-    rlSetUniformMatrices(pass.shader.locs[SHADER_LOC_BONE_MATRICES], bones->data(), static_cast<int>(bones->size()));
-  }
+void draw_instances(const MeshPass& pass, const Mesh& mesh, const InstanceRun& run) {
+  const auto location = static_cast<unsigned int>(pass.instance_slot);
+  const auto copies = static_cast<int>(run.count);
   rlEnableVertexArray(mesh.vaoId);
+  rlEnableVertexBuffer(run.buffer);
+  rlSetVertexAttribute(location, 1, RL_FLOAT, false, 0, static_cast<int>(run.first * sizeof(float)));
+  rlSetVertexAttributeDivisor(location, kOnePerCopy);
+  rlEnableVertexAttribute(location);
   if (mesh.indices != nullptr) {
-    rlDrawVertexArrayElements(0, mesh.triangleCount * config::kVerticesPerTriangle, nullptr);
+    rlDrawVertexArrayElementsInstanced(0, mesh.triangleCount * config::kVerticesPerTriangle, nullptr, copies);
   } else {
-    rlDrawVertexArray(0, mesh.vertexCount);
+    rlDrawVertexArrayInstanced(0, mesh.vertexCount, copies);
   }
+  // Whatever else draws the mesh's vertex array (raylib's own calls) finds no copies in it.
+  rlDisableVertexAttribute(location);
 }
 
 void end_mesh_pass() {

@@ -13,10 +13,9 @@ namespace {
 
 // The uniforms raylib has a place for, under the lit shader's own names for them.
 constexpr std::pair<int, const char*> kKnownUniforms[] = {
-    {SHADER_LOC_MATRIX_MODEL, shaders::kModelMatrix},   {SHADER_LOC_MATRIX_NORMAL, shaders::kNormalMatrix},
     {SHADER_LOC_VECTOR_VIEW, shaders::kViewPosition},   {SHADER_LOC_MAP_EMISSION, shaders::kEmissiveMap},
     {SHADER_LOC_MAP_NORMAL, shaders::kNormalMap},       {SHADER_LOC_MAP_ROUGHNESS, shaders::kSurfaceMap},
-    {SHADER_LOC_MAP_OCCLUSION, shaders::kOcclusionMap}, {SHADER_LOC_BONE_MATRICES, shaders::kBoneMatrices},
+    {SHADER_LOC_MAP_OCCLUSION, shaders::kOcclusionMap},
 };
 
 // A uniform of the lit shader, and where its location is kept.
@@ -36,10 +35,10 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::emissive, shaders::kEmissive},
     {&LitUniforms::has_emissive_map, shaders::kHasEmissiveMap},
     {&LitUniforms::alpha_cutoff, shaders::kAlphaCutoff},
-    {&LitUniforms::tint, shaders::kTint},
     {&LitUniforms::skinned, shaders::kSkinned},
     {&LitUniforms::wind, shaders::kWindAmount},
-    // Once per frame: lights, shadows, reflections and the sky.
+    // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
+    {&LitUniforms::frame_texels, shaders::kFrameTexels},
     {&LitUniforms::shadow_map, shaders::kShadowMap},
     {&LitUniforms::light_matrix, shaders::kLightViewProjection},
     {&LitUniforms::shadow_strength, shaders::kShadowStrength},
@@ -79,16 +78,17 @@ LitUniforms find_lit_uniforms(Shader& lit) {
   return found;
 }
 
-DepthUniforms find_depth_uniforms(Shader& depth) {
-  depth.locs[SHADER_LOC_MATRIX_MODEL] = GetShaderLocation(depth, shaders::kModelMatrix);
-  depth.locs[SHADER_LOC_BONE_MATRICES] = GetShaderLocation(depth, shaders::kBoneMatrices);
+DepthUniforms find_depth_uniforms(const Shader& depth) {
   DepthUniforms found;
   found.alpha_cutoff = GetShaderLocation(depth, shaders::kAlphaCutoff);
   found.wind = GetShaderLocation(depth, shaders::kWindAmount);
   found.time = GetShaderLocation(depth, shaders::kTime);
   found.skinned = GetShaderLocation(depth, shaders::kSkinned);
+  found.frame_texels = GetShaderLocation(depth, shaders::kFrameTexels);
   return found;
 }
+
+int find_instance_slot(const Shader& program) { return GetShaderLocationAttrib(program, shaders::kInstanceSlot); }
 
 ParticleUniforms find_particle_uniforms(const Shader& particles) {
   return {GetShaderLocation(particles, shaders::kParticleBoost),

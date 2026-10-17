@@ -28,11 +28,24 @@ inline constexpr int kSendsPerWholePose = 40;
 // keeps the pose of never makes it forget the others.
 inline constexpr std::size_t kMaxRememberedPoses = 4096;
 
+// What an object's own animation does, and its revision (see CharacterAnimation): it is told the
+// others when the revision moved on, and with every whole pose.
+struct Animated {
+  std::uint32_t revision = 0;
+  AnimationPart part;
+};
+
 // The sender's side: what the others were last told of each of this machine's objects.
 class PoseSender {
  public:
-  // What takes the others from what they were last told of `key` to this pose.
-  PoseUpdate update(const std::string& key, Vec3 position, Quat rotation);
+  // What takes the others from what they were last told of `key` to this pose (and, for an
+  // object whose animation is sent, to this animation).
+  PoseUpdate update(const std::string& key, Vec3 position, Quat rotation,
+                    const std::optional<Animated>& animated = std::nullopt);
+  // Whether the next pose of `key` would tell an animation of that revision: a pose that is due
+  // whole, or a revision the others have not heard (a pose made whole by a move too far for a
+  // step, which this cannot know, tells none: what the others know of it has not changed).
+  bool tells_animation(const std::string& key, std::uint32_t revision) const;
   // The next pose of every object is whole (someone arrived who knows none of them).
   void start_over() { sent_.clear(); }
 
@@ -40,9 +53,12 @@ class PoseSender {
   struct Sent {
     Vec3 position;
     std::uint32_t rotation = 0;
-    int sends = 1;  // since the last whole pose, that one included
+    int sends = 1;                          // since the last whole pose, that one included
+    std::optional<std::uint32_t> revision;  // of the animation last told
   };
 
+  PoseUpdate placed(const std::string& key, Vec3 position, Quat rotation);
+  void tell_animation(PoseUpdate& update, const Animated& animated);
   PoseUpdate whole(const std::string& key, Vec3 position, std::uint32_t rotation);
   static PoseUpdate change(const std::string& key, Sent& sent, const PoseSteps& steps, std::uint32_t rotation);
   // Whether the next pose of an object is to be whole: the others know nothing of it yet, or not lately.

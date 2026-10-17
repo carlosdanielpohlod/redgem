@@ -46,29 +46,32 @@ Camera3D Renderer::Impl::camera_for(const Scene& scene) const {
 
 void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect) {
   // Where every object is, worked out once: each of the frame's passes (shadows, reflections, the
-  // view) would otherwise walk every object's chain of parents again.
+  // view) would otherwise walk every object's chain of parents again. So are its bones.
   render_math::world_transforms(scene, worlds);
+  slots.used = 0;  // the frame's passes start over in the buffer of what they see
+  write_frame_texels(scene);
+  send_frame_texels();
   apply_lights(scene, env, to_vec3(camera.position));
   view_tan_half_fov = std::tan(camera.fovy * DEG2RAD * kHalf);
   view_aspect = aspect;
-  draw_shadow_map(scene, camera, env);
-  capture_reflection_face(scene, camera);
+  draw_shadow_map(camera, env);
+  capture_reflection_face(camera);
   send(shader, shader.locs[SHADER_LOC_VECTOR_VIEW], camera.position);
 }
 
-void Renderer::Impl::draw_lit_scene(const Scene& scene, const Camera3D& camera, const ParticleSystem* particles) {
+void Renderer::Impl::draw_lit_scene(const Camera3D& camera, const ParticleSystem* particles) {
   BeginTextureMode(hdr);
   ClearBackground(kBlack);
   BeginMode3D(camera);
   draw_sky(camera);
-  draw_objects(scene, false, to_vec3(camera.position));
+  draw_objects(false, to_vec3(camera.position));
   if (particles != nullptr) draw_particles(*particles, camera);
   EndMode3D();
   EndTextureMode();
 }
 
-void Renderer::Impl::bind_for_the_frame(int sampler_location, int slot, unsigned int texture) {
-  rlEnableShader(shader.id);
+void Renderer::Impl::bind_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture) {
+  rlEnableShader(program.id);
   rlActiveTextureSlot(slot);
   rlEnableTexture(texture);
   rlSetUniform(sampler_location, &slot, SHADER_UNIFORM_INT, 1);

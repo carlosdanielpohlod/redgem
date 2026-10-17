@@ -8,8 +8,10 @@
 //   renderer_assets.cpp       a scene's meshes, materials and textures
 //   renderer_pictures.cpp     the font and the pictures games ask for by name
 //   renderer_frame.cpp        a frame: its camera, what is prepared, the lit picture
+//   renderer_frame_texels.cpp what the vertex shader reads of a frame: its matrices, its bones
 //   renderer_environment.cpp  lights, atmosphere and the sky
 //   renderer_objects.cpp      the scene's objects
+//   renderer_scatter.cpp      copies scattered in great numbers
 //   renderer_particles.cpp    particles
 //   renderer_shadows.cpp      the sun's shadow map
 //   renderer_reflections.cpp  the surroundings, for reflections
@@ -21,17 +23,24 @@
 #include <raylib.h>
 #include <rlgl.h>
 
+#include <array>
+#include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "render/capture_views.hpp"
 #include "render/environment.hpp"
+#include "render/instance_batches.hpp"
+#include "render/instance_records.hpp"
 #include "render/mesh_pass.hpp"
 #include "render/render_math.hpp"
 #include "render/renderer.hpp"
+#include "render/scatter_chunks.hpp"
 #include "render/shader_programs.hpp"
+#include "render/texel_rows.hpp"
 #include "render/visibility.hpp"
 #include "scene/scene_config.hpp"
 
@@ -45,6 +54,7 @@ inline constexpr ::Color kBlack{0, 0, 0, config::kMaxColorByte};
 // Texture slots no material uses: bound once per frame.
 inline constexpr int kReflectionTextureSlot = 9;
 inline constexpr int kShadowTextureSlot = 10;
+inline constexpr int kFrameTexelSlot = 11;
 
 // raylib numbers what is on the graphics card; zero is what was never loaded (or is released).
 inline bool loaded(const Texture2D& texture) { return texture.id != 0; }
@@ -57,6 +67,33 @@ struct GpuPrimitive {
   int material = kNoIndex;
   // Which of the mesh's pieces it is (see mesh_pieces): a piece that cannot be drawn has no part.
   std::size_t piece = 0;
+  bool skinned = false;  // has joints: a skeleton deforms it
+};
+
+// What a frame knows of an object before any pass: whether it is drawn at all (its record is in
+// the frame's texels), and what a pass judges it by (kept together, so that a pass over tens of
+// thousands of objects reads them one after the other).
+struct ObjectSight {
+  bool drawn = false;
+  render_math::Sight sight;
+  int mesh = kNoIndex;
+  float visible_from = 0.0f;
+  float visible_to = 0.0f;
+};
+
+// What an object's record was last written from: most of a scene stands still, and a record
+// written from the same is not worked out again.
+struct RecordSource {
+  Transform world;
+  Vec3 tint;
+  float first_bone = 0.0f;
+  float record = 0.0f;  // its number
+};
+
+// Where a skeleton is this frame: its first bone (what a skinned mesh is judged by) and how many.
+struct SkeletonPose {
+  Matrix first{};
+  std::size_t bones = 0;
 };
 
 // One pass over the scene's objects: what it is drawn with, what it can see, and the material
@@ -91,12 +128,15 @@ struct Renderer::Impl {
   using GpuPrimitive = render_detail::GpuPrimitive;
   using ObjectPass = render_detail::ObjectPass;
   using ParticleDraw = render_detail::ParticleDraw;
+  using ObjectSight = render_detail::ObjectSight;
 
   // Shaders, and where the ones drawn with all frame long take their values.
   Shader shader{};
   render_detail::LitUniforms lit_uniforms;
   Shader depth_shader{};
   render_detail::DepthUniforms depth_uniforms;
+  int lit_instance_slot = render_detail::kNoLocation;  // the vertex attribute each copy's record number goes to
+  int depth_instance_slot = render_detail::kNoLocation;
   Shader sky_shader{};
   Shader particle_shader{};
   render_detail::ParticleUniforms particle_uniforms;
@@ -137,8 +177,17 @@ struct Renderer::Impl {
   bool show_prefabs = false;
   float motion_blur = 0.0f;  // 0..1 (Camera.motion_blur)
   // The frame being drawn.
-  std::vector<Transform> worlds;      // every object's world transform (see prepare_frame)
-  std::vector<Matrix> bone_matrices;  // of the skinned object being drawn
+  std::vector<Transform> worlds;                            // every object's world transform (see prepare_frame)
+  std::vector<ObjectSight> sights;                          // by object, for every pass of the frame
+  std::vector<render_detail::RecordSource> record_sources;  // by object
+  render_math::TexelRows texels;  // what the vertex shader reads of the frame, and its texture
+  std::vector<render_math::RowRun> changed_rows;
+  unsigned int texel_texture = 0;
+  render_math::InstanceBatches batches;                     // what the pass being drawn sees, in runs of a mesh
+  render_detail::SlotBuffer slots;                          // the record numbers of what the frame's passes see
+  std::uint64_t scatter_version = 0;                        // of the scattered copies laid out (see Scattered)
+  std::vector<render_math::ScatterLayout> scatter_layouts;  // whose records come first
+  std::size_t scattered_records = 0;  // theirs come first in the frame's texels, the objects' after
   float wind = 0.0f;                  // of the environment
   Vector3 sun_travel{};               // direction the sun's light travels
   float view_tan_half_fov = 0.0f;     // of the camera, for rebuilding positions from depth
@@ -193,9 +242,32 @@ struct Renderer::Impl {
   // the sun's shadow map and one more face of the reflections. `aspect`: width over height.
   void prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect);
   // The scene as the camera sees it, into the HDR target.
-  void draw_lit_scene(const Scene& scene, const Camera3D& camera, const ParticleSystem* particles);
-  // Binds a texture the lit shader reads all frame long to a slot of its own.
-  void bind_for_the_frame(int sampler_location, int slot, unsigned int texture);
+  void draw_lit_scene(const Camera3D& camera, const ParticleSystem* particles);
+  // Binds a texture `program` reads all frame long to a slot of its own.
+  void bind_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture);
+
+  // --- What the vertex shader reads of a frame (renderer_frame_texels.cpp) ----------------------
+
+  // Every object's record, sight and bones, for all the passes of the frame.
+  void write_frame_texels(const Scene& scene);
+  // One object's record and sight, and its bones from texel `next_bone` on. Returns where the
+  // next skeleton's bones go.
+  std::size_t sight_object(const Scene& scene, const GameObject& object, std::size_t next_bone);
+  // Writes the record of the object in `slot`, unless it was written from the same last frame.
+  bool write_record(std::size_t slot, const render_math::InstanceLook& look);
+  // Writes an object's bones from texel `first` on: where each of its joints is now, times the
+  // skin's inverse bind matrix. Nothing when the object has no (usable) skeleton.
+  std::optional<render_detail::SkeletonPose> pose_skeleton(const Scene& scene, const GameObject& object,
+                                                           std::size_t first);
+  // The first `bones` bones of a skeleton, from texel `first` on; returns the first one's matrix.
+  std::optional<Matrix> write_bones(const Scene& scene, const GameObject& object, const SkinDesc& skin,
+                                    std::size_t first, std::size_t bones);
+  std::optional<Matrix> write_bone(const Scene& scene, ObjectHandle joint,
+                                   const std::array<float, kFloatsPerMatrix>& inverse_bind, std::size_t texel);
+  // Hands what changed to the graphics card, and the texture to the shaders that read it.
+  void send_frame_texels();
+  void remake_texel_texture();
+  void upload_changed_rows();
 
   // --- Lights, atmosphere and the sky (renderer_environment.cpp) --------------------------------
 
@@ -210,21 +282,31 @@ struct Renderer::Impl {
 
   // --- Objects (renderer_objects.cpp) -----------------------------------------------------------
 
-  // Fills bone_matrices for an object's skeleton: where each of its joints is now, times the
-  // skin's inverse bind matrix. False when the object has no (usable) skeleton.
-  bool pose_skeleton(const Scene& scene, const GameObject& object);
   const MaterialDesc& factors_of(int material) const;
   // Sets a material's uniforms (only cut-out and wind for the shadow depth pass). Returns true
   // when it must be drawn without backface culling.
   bool apply_material(int index, bool depth_pass);
   void send_surface(const MaterialDesc& factors);
-  // Draws what the current 3D view can see. `viewer` is the game camera in both passes: detail
-  // is judged by how big things look to the player, not to the sun.
-  void draw_objects(const Scene& scene, bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
-  void draw_object(const Scene& scene, const GameObject& object, const Transform& world, ObjectPass& pass);
-  bool in_view(const GameObject& object, const Transform& world, bool skinned, const render_math::View& view) const;
+  // Draws what the current 3D view can see, copies of a mesh that come together in one call per
+  // part. `viewer`
+  // is the game camera in both passes: detail is judged by how big things look to the player, not
+  // to the sun.
+  void draw_objects(bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
+  // Gathers into `batches` what the view sees.
+  void gather_copies(const render_math::View& view);
+  // `first`: where the pass's record numbers start in `slots`.
+  void draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass);
   void use_material(int material, ObjectPass& pass);
-  void draw_primitive(const GpuPrimitive& primitive, const Matrix& transform, bool skinned, ObjectPass& pass);
+  void draw_primitive(const GpuPrimitive& primitive, const render_detail::InstanceRun& run, ObjectPass& pass);
+
+  // --- Scattered copies (renderer_scatter.cpp) -------------------------------------------------
+
+  // Writes the records of the scene's scattered copies, cell by cell, when they changed.
+  void lay_out_scattered(const Scattered& scattered);
+  // One set's, from record `first` on. Returns the record after its last.
+  std::size_t lay_out_set(const ScatterSet& set, std::size_t first);
+  // Adds to `batches` the cells the view sees.
+  void gather_scattered(const render_math::View& view);
 
   // --- Particles (renderer_particles.cpp) -------------------------------------------------------
 
@@ -242,17 +324,17 @@ struct Renderer::Impl {
   // --- Sun shadows (renderer_shadows.cpp) -------------------------------------------------------
 
   // Renders the scene's depth from the sun and hands the result to the lit shader.
-  void draw_shadow_map(const Scene& scene, const Camera3D& camera, const Environment& env);
-  void draw_sun_depth(const Scene& scene, const Camera3D& camera, Vec3 to_sun);
+  void draw_shadow_map(const Camera3D& camera, const Environment& env);
+  void draw_sun_depth(const Camera3D& camera, Vec3 to_sun);
   // Fills the shadow map from the sun's point of view. Returns the matrix that leads into that view.
-  Matrix draw_depth_from(const Camera3D& sun_view, const Scene& scene, Vec3 viewer);
+  Matrix draw_depth_from(const Camera3D& sun_view, Vec3 viewer);
 
   // --- Reflections (renderer_reflections.cpp) ---------------------------------------------------
 
   // Captures one more face of the camera's surroundings into the panorama the lit shader reflects.
   // Six frames make a full turn, so reflections follow the camera with a short delay.
-  void capture_reflection_face(const Scene& scene, const Camera3D& camera);
-  void draw_surroundings(const Scene& scene, const render_math::CubeFace& face, Vector3 eye);
+  void capture_reflection_face(const Camera3D& camera);
+  void draw_surroundings(const render_math::CubeFace& face, Vector3 eye);
   void copy_face_to_panorama(const render_math::CubeFace& face);
   void blur_panorama_levels();
 

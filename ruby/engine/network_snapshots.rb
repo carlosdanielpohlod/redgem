@@ -22,6 +22,7 @@ class NetworkSync < Behaviour
     def initialize(interval, delay = nil)
       @clock = 0.0
       @poses = []
+      @animations = [] # [when it arrived, what the owner's animation did]
       @interval = interval
       @jitter = 0.0
       @fixed_delay = delay
@@ -36,12 +37,24 @@ class NetworkSync < Behaviour
 
     # Where the owner says the object is, as of now. Far from where it was, it was moved there at
     # once (a teleport): the poses before are forgotten, so it is never shown sliding across.
-    def add(position, rotation)
+    # An animation that came along is done when the object is shown at that moment.
+    def add(position, rotation, animation = nil)
       newest = @poses.last
       make_way(newest, position) if newest
       go_on_from_shown(@clock - delay)
       @poses << Pose.new(@clock, position, rotation)
       @poses.shift while @poses.size > KEPT
+      @animations << [@clock, animation] if animation
+      @animations.shift while @animations.size > KEPT
+    end
+
+    # [animation, seconds since its moment] for the newest animation whose moment the object is
+    # shown at by now (the older ones are passed over); nil when there is none.
+    def due_animation
+      moment = @clock - delay
+      due = nil
+      due = @animations.shift while @animations.first && @animations.first[0] <= moment
+      due && [due[1], moment - due[0]]
     end
 
     # [position, rotation] to show the object at now; nil before any pose arrived.

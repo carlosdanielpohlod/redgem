@@ -21,10 +21,10 @@ struct LitUniforms {
   int emissive = kNoLocation;
   int has_emissive_map = kNoLocation;
   int alpha_cutoff = kNoLocation;
-  int tint = kNoLocation;
   int skinned = kNoLocation;
   int wind = kNoLocation;
-  // Once per frame: lights, shadows, reflections and the sky.
+  // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
+  int frame_texels = kNoLocation;
   int shadow_map = kNoLocation;
   int light_matrix = kNoLocation;
   int shadow_strength = kNoLocation;
@@ -52,6 +52,7 @@ struct DepthUniforms {
   int wind = kNoLocation;
   int time = kNoLocation;
   int skinned = kNoLocation;
+  int frame_texels = kNoLocation;
 };
 
 struct ParticleUniforms {
@@ -64,10 +65,12 @@ struct ParticleUniforms {
 // `name`, when it does not compile.
 Shader compile_shader(const char* vertex, const char* fragment, const char* name);
 
-// Each also tells raylib where the uniforms it sets by itself are (matrices, texture maps, bones).
+// The lit one also tells raylib where the uniforms it sets by itself are (its texture maps).
 LitUniforms find_lit_uniforms(Shader& lit);
-DepthUniforms find_depth_uniforms(Shader& depth);
+DepthUniforms find_depth_uniforms(const Shader& depth);
 ParticleUniforms find_particle_uniforms(const Shader& particles);
+// Where a shader takes the number of each copy's record (see instance_records.hpp).
+int find_instance_slot(const Shader& program);
 
 // Whether a shader has the uniform raylib keeps at `place` (one of its SHADER_LOC_ names).
 inline bool takes(const Shader& shader, int place) { return shader.locs[place] != kNoLocation; }

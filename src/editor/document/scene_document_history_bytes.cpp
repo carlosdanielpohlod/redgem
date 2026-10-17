@@ -45,7 +45,8 @@ std::size_t node_bytes(const NodeDesc& node) {
 
 std::size_t primitive_bytes(const PrimitiveDesc& part) {
   const std::size_t floats = part.positions.size() + part.normals.size() + part.texcoords.size() + part.weights.size();
-  return floats * sizeof(float) + part.indices.size() * sizeof(std::uint32_t) + part.colors.size() + part.joints.size();
+  return floats * sizeof(float) + part.indices.size() * sizeof(std::uint32_t) + part.colors.size() +
+         part.joints.size() * sizeof(std::uint16_t);
 }
 
 std::size_t mesh_bytes(const MeshDesc& mesh) {

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "scene/property.hpp"
+#include "scene/scatter.hpp"
 #include "scene/scene_desc.hpp"
 #include "scene/transform.hpp"
 
@@ -124,6 +125,10 @@ class Scene {
   // and the copies of its original, and its slot may then hold a new object.
   void finalize_destroy(ObjectId id);
 
+  // Copies of meshes in great numbers that are not objects (Scatter: see scatter.hpp).
+  Scattered& scattered() { return scattered_; }
+  const Scattered& scattered() const { return scattered_; }
+
  private:
   // Adds the copy of one object under `parent` (kNoObject for the root of a copy, whose root is
   // then itself). Returns its id.
@@ -155,6 +160,7 @@ class Scene {
   std::size_t loaded_count_ = 0;      // slots of the loaded scene's objects, never used again
   std::vector<ObjectId> free_slots_;  // left by destroyed copies, used again last in first out
   std::unordered_map<ObjectId, std::vector<ObjectId>> copies_;  // original -> its copies not finalized
+  Scattered scattered_;
 };
 
 }  // namespace redgem

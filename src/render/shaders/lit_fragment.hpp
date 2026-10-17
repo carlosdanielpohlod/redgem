@@ -17,6 +17,7 @@ in vec3 fragPosition;
 in vec2 fragTexCoord;
 in vec4 fragColor;
 in vec3 fragNormal;
+flat in vec3 fragTint;             // per copy of the mesh, multiplies the base color
 
 uniform sampler2D texture0;
 uniform sampler2D emissiveMap;
@@ -40,7 +41,6 @@ uniform float metallic;
 uniform float roughness;
 uniform vec3 emissive;
 uniform float alphaCutoff;
-uniform vec3 tint;                 // per object, multiplies the base color
 uniform vec3 viewPos;
 uniform vec3 sunDirection;
 uniform vec3 sunColor;
@@ -171,7 +171,7 @@ void main() {
   vec4 texel = texture(texture0, fragTexCoord);
   float alpha = colDiffuse.a * texel.a * fragColor.a;
   if (alpha < alphaCutoff) discard;
-  vec3 albedo = pow(texel.rgb, vec3(GAMMA)) * colDiffuse.rgb * fragColor.rgb * tint;
+  vec3 albedo = pow(texel.rgb, vec3(GAMMA)) * colDiffuse.rgb * fragColor.rgb * fragTint;
   float rough = roughness;
   float metal = metallic;
   if (hasSurfaceMap > SWITCH_ON) {

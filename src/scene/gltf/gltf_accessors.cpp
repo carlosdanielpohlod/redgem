@@ -37,14 +37,14 @@ std::vector<float> unpack_floats(const cgltf_accessor* accessor) {
   return out;
 }
 
-std::vector<std::uint8_t> joint_bytes(const cgltf_accessor* accessor) {
+std::vector<std::uint16_t> joint_indices(const cgltf_accessor* accessor) {
   if (!gltf_checks::readable(accessor)) return {};
-  std::vector<std::uint8_t> out(accessor->count * kJointsPerVertex);
+  std::vector<std::uint16_t> out(accessor->count * kJointsPerVertex);
   for (cgltf_size v = 0; v < accessor->count; ++v) {
     cgltf_uint joints[kJointsPerVertex] = {};
     cgltf_accessor_read_uint(accessor, v, joints, kJointsPerVertex);
     for (int j = 0; j < kJointsPerVertex; ++j) {
-      out[v * kJointsPerVertex + j] = static_cast<std::uint8_t>(std::min<cgltf_uint>(joints[j], kMaxJointByte));
+      out[v * kJointsPerVertex + j] = static_cast<std::uint16_t>(std::min<cgltf_uint>(joints[j], kMaxJointIndex));
     }
   }
   return out;

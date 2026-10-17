@@ -10,7 +10,6 @@
 #include "core/log.hpp"
 #include "editor/document/glb_compact.hpp"
 #include "editor/document/gltf_json.hpp"
-#include "render/gpu_profile.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 
 namespace redgem {
@@ -26,7 +25,7 @@ std::variant<SceneDocument, std::string> SceneDocument::open(const std::filesyst
 }
 
 std::variant<SceneDocument, std::string> SceneDocument::open_file(const std::filesystem::path& path) {
-  LoadResult loaded = load_gltf_scene(path.string(), gpu_profile::kMaxSkinJoints);
+  LoadResult loaded = load_gltf_scene(path.string());
   if (!loaded.ok) return loaded.error;
   for (const std::string& warning : loaded.warnings) log::warning(warning);
   std::string error;

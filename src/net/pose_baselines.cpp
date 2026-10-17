@@ -4,7 +4,36 @@
 
 namespace redgem::net {
 
-PoseUpdate PoseSender::update(const std::string& key, Vec3 position, Quat rotation) {
+namespace {
+
+// Whether an animation is news to the others: with a whole pose (which may be the first they
+// hear of the object), or when it changed since they were last told.
+bool tells(const PoseUpdate& update, const std::optional<std::uint32_t>& told, std::uint32_t revision) {
+  return update.whole() || told != revision;
+}
+
+}  // namespace
+
+PoseUpdate PoseSender::update(const std::string& key, Vec3 position, Quat rotation,
+                              const std::optional<Animated>& animated) {
+  PoseUpdate update = placed(key, position, rotation);
+  if (animated) tell_animation(update, *animated);
+  return update;
+}
+
+bool PoseSender::tells_animation(const std::string& key, std::uint32_t revision) const {
+  const auto sent = sent_.find(key);
+  return due_whole(sent) || sent->second.revision != revision;
+}
+
+void PoseSender::tell_animation(PoseUpdate& update, const Animated& animated) {
+  Sent& sent = sent_[update.key];  // (placed has just made it, or found it)
+  if (!tells(update, sent.revision, animated.revision)) return;
+  update.animation = animated.part;
+  sent.revision = animated.revision;
+}
+
+PoseUpdate PoseSender::placed(const std::string& key, Vec3 position, Quat rotation) {
   const std::uint32_t turned = packed_rotation(rotation);
   const auto sent = sent_.find(key);
   if (due_whole(sent)) return whole(key, position, turned);

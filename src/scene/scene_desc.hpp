@@ -63,10 +63,14 @@ struct PrimitiveDesc {
   std::vector<std::uint32_t> indices;  // triangle list
   // Skinning (both empty on rigid meshes): for each vertex, up to 4 joints of the node's skin and
   // how much each one moves it.
-  std::vector<std::uint8_t> joints;  // 4 per vertex, indices into SkinDesc::joints
-  std::vector<float> weights;        // 4 per vertex
+  std::vector<std::uint16_t> joints;  // 4 per vertex, indices into SkinDesc::joints
+  std::vector<float> weights;         // 4 per vertex
   int material = kNoIndex;
 };
+
+// Makes every joint of a primitive's vertices one of a skeleton of `joints` joints: one past its
+// last becomes its first, whose bone is there (a file may name joints its skeleton does not have).
+void keep_joints_within(PrimitiveDesc& primitive, std::size_t joints);
 
 // What keeps a primitive from being drawn or collided with: no vertices, normals that are not one
 // per vertex, or indices that do not make whole triangles of the vertices it has. Empty when

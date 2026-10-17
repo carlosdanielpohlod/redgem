@@ -2,21 +2,40 @@
 
 #include "render/renderer_impl.hpp"
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "core/log.hpp"
 #include "render/mesh_builder.hpp"
 #include "render/mesh_pieces.hpp"
 #include "render/render_config.hpp"
 #include "render/texture_loading.hpp"
+#include "scene/scene_config.hpp"
 
 namespace redgem {
 namespace {
 
 using namespace render_detail;
 using render_math::to_raylib;
+
+constexpr int kShortNumbers = 0x1403;  // GL_UNSIGNED_SHORT, which rlgl has no name for
+// Where raylib binds every shader's vertexBoneIds (RL_DEFAULT_SHADER_ATTRIB_LOCATION_BONEIDS in
+// its config.h, which its headers do not show).
+constexpr int kJointsLocation = 7;
+
+// A skinned piece's joints, where the lit shader takes them (vertexBoneIds), 16 bits each. The
+// mesh keeps the buffer: releasing the mesh releases it.
+void upload_joints(Mesh& mesh, const std::vector<std::uint16_t>& joints) {
+  rlEnableVertexArray(mesh.vaoId);
+  const int bytes = static_cast<int>(joints.size() * sizeof(std::uint16_t));
+  mesh.vboId[kJointsLocation] = rlLoadVertexBuffer(joints.data(), bytes, false);
+  rlSetVertexAttribute(kJointsLocation, config::kJointsPerVertex, kShortNumbers, false, 0, 0);
+  rlEnableVertexAttribute(kJointsLocation);
+  rlDisableVertexArray();
+}
 
 // One piece of a mesh, on the graphics card. A piece that cannot be drawn is reported and left out.
 std::optional<GpuPrimitive> upload_piece(const PrimitiveDesc& piece, std::size_t number, const std::string& mesh_name) {
@@ -27,7 +46,9 @@ std::optional<GpuPrimitive> upload_piece(const PrimitiveDesc& piece, std::size_t
     return std::nullopt;
   }
   UploadMesh(&*mesh, false);
-  return GpuPrimitive{*mesh, piece.material, number};
+  const std::vector<std::uint16_t> joints = skin_joints(piece);
+  if (!joints.empty()) upload_joints(*mesh, joints);
+  return GpuPrimitive{*mesh, piece.material, number, !joints.empty()};
 }
 
 // The parts of a mesh, on the graphics card.

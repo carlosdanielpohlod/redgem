@@ -20,8 +20,6 @@ inline constexpr std::size_t kMaxAccessorElements = 16 * 1024 * 1024;
 inline constexpr int kMaxNodeDepth = 256;
 // The most nodes a file may hold.
 inline constexpr std::size_t kMaxSceneNodes = 100000;
-// The most joints of a skeleton that are read (far more than the renderer can use).
-inline constexpr std::size_t kMaxJointsPerSkin = 1024;
 // The biggest picture file, and the biggest data file beside a .gltf, that are read.
 inline constexpr std::uintmax_t kMaxImageFileBytes = 256ull * 1024 * 1024;
 inline constexpr std::uintmax_t kMaxBufferFileBytes = 1024ull * 1024 * 1024;

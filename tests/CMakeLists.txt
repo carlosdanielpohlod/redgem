@@ -58,6 +58,9 @@ add_executable(redgem_tests
   unit/culling_test.cpp
   unit/render_math_test.cpp
   unit/visibility_test.cpp
+  unit/texel_rows_test.cpp
+  unit/instance_records_test.cpp
+  unit/scatter_test.cpp
   unit/capture_views_test.cpp
   unit/shader_source_test.cpp
   unit/terrain_test.cpp
@@ -76,6 +79,7 @@ add_executable(redgem_tests
   unit/wire_test.cpp
   unit/wire_codec_test.cpp
   unit/pose_codec_test.cpp
+  unit/animation_codec_test.cpp
   unit/http_url_test.cpp
   unit/http_message_test.cpp
   unit/http_response_parser_test.cpp
@@ -88,6 +92,7 @@ add_executable(redgem_tests
   unit/server_command_test.cpp
   unit/particles_test.cpp
   unit/animation_player_test.cpp
+  unit/animation_sync_test.cpp
   unit/clip_clock_test.cpp
   unit/camera_ray_test.cpp
   integration/physics_world_test.cpp
@@ -99,6 +104,7 @@ add_executable(redgem_tests
   integration/scene_script_test.cpp
   integration/ui_input_test.cpp
   integration/gameplay_api_test.cpp
+  integration/scatter_test.cpp
   integration/native_arguments_test.cpp
   integration/message_values_test.cpp
   integration/connection_test.cpp
@@ -107,6 +113,7 @@ add_executable(redgem_tests
   integration/http_game_test.cpp
   integration/network_session_test.cpp
   integration/multiplayer_test.cpp
+  integration/swordsman.cpp
   integration/relay_test.cpp
   integration/relay_approval_test.cpp
   integration/lobby_test.cpp
@@ -347,6 +354,14 @@ target_compile_definitions(redgem_editor_system_tests PRIVATE
   REDGEM_PLAYER_FILE="$<TARGET_FILE:redgem_player>")
 add_test(NAME system.editor.window COMMAND redgem_editor_system_tests)
 set_tests_properties(system.editor.window PROPERTIES LABELS system RUN_SERIAL TRUE)
+
+# What the renderer draws, in a real window, read back as pixels: scenes made in code.
+add_executable(redgem_render_system_tests test_main.cpp render_system/render_system_test.cpp render_system/render_stage.cpp)
+target_link_libraries(redgem_render_system_tests PRIVATE redgem_runtime doctest::doctest)
+target_include_directories(redgem_render_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_definitions(redgem_render_system_tests PRIVATE REDGEM_SCREENSHOT_DIR="${REDGEM_SCREENSHOT_DIR}")
+add_test(NAME system.render.pictures COMMAND redgem_render_system_tests)
+set_tests_properties(system.render.pictures PROPERTIES LABELS system RUN_SERIAL TRUE)
 
 # Games whose scene is generated from downloaded assets (not committed) are tested when it is
 # there, and reported as skipped when it is not: a test that did not run never counts as passed.

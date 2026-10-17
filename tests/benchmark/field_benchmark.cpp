@@ -2,6 +2,7 @@
 // card goes (no vertical sync). A tool for whoever works on the renderer: not a test, not shipped.
 //
 //   redgem_field_benchmark objects              the field, every tuft and tree an object of its own
+//   redgem_field_benchmark scatter              the same field, every tuft and tree a scattered copy
 //   redgem_field_benchmark file games/city/scene.glb
 //
 // It prints the average and the median frame time over the frames it measures.
@@ -30,8 +31,11 @@ constexpr int kUnlimitedFps = 0;
 constexpr double kMillisecondsPerSecond = 1000.0;
 constexpr int kUsage = 2;
 
+constexpr const char* kScatterMode = "scatter";
+
 SceneDesc scene_for(const std::vector<std::string>& args) {
   if (args.size() > 1 && args[0] == "file") return load_gltf_scene(args[1]).scene;
+  if (args[0] == kScatterMode) return benchmark::field_templates();
   return benchmark::field_of_objects();
 }
 
@@ -64,7 +68,7 @@ void report(std::vector<double> times) {
 int main(int argc, char** argv) {
   const std::vector<std::string> args(argv + 1, argv + argc);
   if (args.empty()) {
-    std::puts("usage: redgem_field_benchmark objects | file <scene.glb>");
+    std::puts("usage: redgem_field_benchmark objects | scatter | file <scene.glb>");
     return kUsage;
   }
   WindowSettings settings{kWidth, kHeight, "RedGem field benchmark"};
@@ -74,7 +78,8 @@ int main(int argc, char** argv) {
   const SceneDesc desc = scene_for(args);
   Renderer renderer(window);
   renderer.upload(desc);
-  const Scene scene = Scene::from_desc(desc);
+  Scene scene = Scene::from_desc(desc);
+  if (args[0] == kScatterMode) benchmark::scatter_field(scene);
   report(frame_times(renderer, scene));
   return 0;
 }

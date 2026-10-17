@@ -10,6 +10,7 @@ void AnimationPlayer::reset(const std::vector<AnimationDesc>& clips, const Scene
   clips_ = &clips;
   clocks_.assign(clips.size(), ClipClock{});
   owned_.clear();
+  revisions_.clear();
   rest_.clear();
   for (std::size_t id = 0; id < scene.size(); ++id) rest_.push_back(scene.at(static_cast<ObjectId>(id)).local);
 }

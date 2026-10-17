@@ -17,8 +17,8 @@ the same pull request.
 - The editor on a Mac builds games for the Mac only: it carries no players for other systems.
   A built Mac game is a plain program beside its files, not an .app.
 - The Linux programs need a processor with AVX2 and glibc 2.39 or newer.
-- Android games have been run on an emulator only, not on phones. Characters are limited to 48
-  bones there. The touch controls have one fixed layout (a stick and three buttons).
+- Android games have been run on an emulator only, not on phones. The touch controls have one
+  fixed layout (a stick and three buttons).
 - Once, right after an emulator cold boot, an Android game stopped in its audio thread. It did
   not happen again in the runs that followed and has no fix.
 

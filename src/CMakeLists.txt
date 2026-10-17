@@ -14,6 +14,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_screen.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/scatter.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_said.rb
@@ -123,6 +124,7 @@ redgem_add_library(redgem_net
   net/utf8_text.cpp
   net/pose_quantization.cpp
   net/pose_codec.cpp
+  net/animation_codec.cpp
   net/pose_baselines.cpp
   net/connection.cpp
   net/network_session.cpp
@@ -181,10 +183,12 @@ redgem_add_library(redgem_runtime
   scene/scene.cpp
   scene/scene_from_desc.cpp
   scene/scene_copies.cpp
+  scene/scatter.cpp
   scene/animation/animation.cpp
   scene/animation/clip_clock.cpp
   scene/animation/animation_player.cpp
   scene/animation/animation_player_characters.cpp
+  scene/animation/animation_player_sync.cpp
   scene/animation/animation_player_posing.cpp
   scene/camera_ray.cpp
   scene/particles.cpp
@@ -226,6 +230,7 @@ redgem_add_library(redgem_runtime
   script/bindings/vector3_bindings.cpp
   script/bindings/transform_bindings.cpp
   script/bindings/scene_bindings.cpp
+  script/bindings/scatter_bindings.cpp
   script/bindings/camera_bindings.cpp
   script/bindings/physics_bindings.cpp
   script/bindings/runtime_bindings.cpp
@@ -233,6 +238,7 @@ redgem_add_library(redgem_runtime
   script/bindings/audio_bindings.cpp
   script/bindings/input_bindings.cpp
   script/bindings/animation_bindings.cpp
+  script/bindings/animation_sync_bindings.cpp
   script/bindings/particles_bindings.cpp
   script/bindings/save_bindings.cpp
   script/bindings/message_values.cpp
@@ -251,8 +257,10 @@ redgem_add_library(redgem_runtime
   render/renderer_assets.cpp
   render/renderer_pictures.cpp
   render/renderer_frame.cpp
+  render/renderer_frame_texels.cpp
   render/renderer_environment.cpp
   render/renderer_objects.cpp
+  render/renderer_scatter.cpp
   render/renderer_particles.cpp
   render/renderer_shadows.cpp
   render/renderer_reflections.cpp
@@ -262,6 +270,10 @@ redgem_add_library(redgem_runtime
   render/shader_programs.cpp
   render/render_math.cpp
   render/visibility.cpp
+  render/texel_rows.cpp
+  render/instance_records.cpp
+  render/instance_batches.cpp
+  render/scatter_chunks.cpp
   render/capture_views.cpp
   render/shader_source.cpp
   render/environment.cpp

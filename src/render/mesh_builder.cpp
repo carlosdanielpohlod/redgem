@@ -38,8 +38,8 @@ unsigned short* short_indices(const std::vector<std::uint32_t>& indices) {
 }
 
 // What a vertex has besides its place and normal: texture coordinates (zero when the primitive
-// has none), a color (white likewise) and, for skinned meshes, its joints and weights (raylib's
-// bone attributes).
+// has none), a color (white likewise) and, for skinned meshes, the weights of its joints (the
+// joints themselves go up on their own: see skin_joints).
 void copy_vertex_data(Mesh& mesh, const PrimitiveDesc& primitive) {
   const std::size_t texcoord_count = vertex_count_of(primitive) * config::kFloatsPerTexcoord;
   const std::size_t color_count = vertex_count_of(primitive) * config::kChannelsPerColor;
@@ -48,7 +48,6 @@ void copy_vertex_data(Mesh& mesh, const PrimitiveDesc& primitive) {
       has.texcoords ? copy_array(primitive.texcoords.data(), texcoord_count) : zeroed_array<float>(texcoord_count);
   mesh.colors = has.colors ? copy_array(primitive.colors.data(), color_count) : white_colors(color_count);
   if (!has.skin) return;
-  mesh.boneIds = copy_array(primitive.joints.data(), primitive.joints.size());
   mesh.boneWeights = copy_array(primitive.weights.data(), primitive.weights.size());
 }
 
@@ -79,13 +78,16 @@ std::optional<Mesh> build_mesh(const PrimitiveDesc& primitive, std::string& erro
   return mesh;
 }
 
+std::vector<std::uint16_t> skin_joints(const PrimitiveDesc& primitive) {
+  return vertex_data_of(primitive).skin ? primitive.joints : std::vector<std::uint16_t>{};
+}
+
 void free_cpu_mesh(Mesh& mesh) {
   MemFree(mesh.vertices);
   MemFree(mesh.normals);
   MemFree(mesh.texcoords);
   MemFree(mesh.colors);
   MemFree(mesh.indices);
-  if (mesh.boneIds != nullptr) MemFree(mesh.boneIds);
   if (mesh.boneWeights != nullptr) MemFree(mesh.boneWeights);
   mesh = Mesh{};
 }

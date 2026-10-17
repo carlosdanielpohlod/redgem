@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "scene/animation/character_animation.hpp"
 #include "scene/animation/clip_clock.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -30,8 +31,9 @@ struct ClipStart {
 // following the scene's clips and plays that one, fading over from what it was doing. A character
 // is an object and what is under it, or a spawned copy as a whole.
 // Implemented in parts: animation_player.cpp (the scene's clips, by name),
-// animation_player_characters.cpp (a character's own clip) and animation_player_posing.cpp (what
-// every frame does: moving the clips on and posing the objects).
+// animation_player_characters.cpp (a character's own clip), animation_player_posing.cpp (what
+// every frame does: moving the clips on and posing the objects) and animation_player_sync.cpp
+// (a character's clips as other machines see them).
 class AnimationPlayer {
  public:
   // Starts over with a scene's clips, which must outlive the player (or the next reset). The
@@ -71,6 +73,16 @@ class AnimationPlayer {
   bool playing_on(const Scene& scene, ObjectId object) const;
   float time_on(const Scene& scene, ObjectId object) const;
 
+  // --- What other machines see (NetworkSync) ------------------------------------------------
+  // What the character `object` belongs to does of its own, for the others.
+  CharacterAnimation animation_of(const Scene& scene, ObjectId object) const;
+  // Its revision alone (0 while no script ever changed what it does).
+  std::uint32_t revision_of(const Scene& scene, ObjectId object) const;
+  // Makes the character do what `state` says another machine's does, `late_by` seconds on from
+  // when it said so: the same clips, from the same moment in them. A clip this scene does not
+  // have is left out.
+  void take_animation(const Scene& scene, ObjectId object, const CharacterAnimation& state, float late_by);
+
  private:
   // A clip being played by one character.
   struct Track {
@@ -102,8 +114,22 @@ class AnimationPlayer {
   Own* own_of(const Scene& scene, ObjectId object);
   const Own* own_of(const Scene& scene, ObjectId object) const;
   const Track* track_on(const Scene& scene, ObjectId object) const;
+  // The character's own clip, and the clip mixed over it; null when it has none.
+  Track* own_track(const Scene& scene, ObjectId object);
+  Track* mixed_track(const Scene& scene, ObjectId object);
+  // The clock of `track` when it plays clip `clip`; null otherwise.
+  static ClipClock* clock_on(std::optional<Track>& track, std::size_t clip);
   // Sets a character on its way to `next` (the scene's clips when nullopt) over `fade` seconds.
   static void fade_to(Own& own, const std::optional<Track>& next, float fade);
+  // A script changed what the character does: its revision moves on (see CharacterAnimation).
+  void changed(const Scene& scene, ObjectId object);
+  ClipState state_of(const Track& track) const;
+  // Sets a track's clock to what another machine said of it, `late_by` seconds on.
+  void catch_up(Track& track, const ClipState& state, float late_by) const;
+  void take_own(const Scene& scene, ObjectId object, const CharacterAnimation& state, float late_by);
+  // Puts the character on `state`'s own clip; false for a clip this scene does not have.
+  bool onto(const Scene& scene, ObjectId object, const ClipState& own, float fade);
+  void take_layer(const Scene& scene, ObjectId object, const CharacterAnimation& state, float late_by);
 
   // Poses everything that follows the scene's clips.
   void pose_followers(Scene& scene);
@@ -124,10 +150,11 @@ class AnimationPlayer {
   void steady_base(const Scene& scene, ObjectId object, AnimationPath path, Transform& local);
 
   const std::vector<AnimationDesc>* clips_ = nullptr;
-  std::vector<ClipClock> clocks_;            // one for each of the scene's clips
-  std::map<ObjectHandle, Own> owned_;        // by character: a new object in its slot is someone else
-  std::vector<Transform> rest_;              // by object id, as the scene was loaded
-  std::unordered_set<std::uint64_t> posed_;  // (object, path) pairs posed so far this frame
+  std::vector<ClipClock> clocks_;                    // one for each of the scene's clips
+  std::map<ObjectHandle, Own> owned_;                // by character: a new object in its slot is someone else
+  std::map<ObjectHandle, std::uint32_t> revisions_;  // by character, from its first change on
+  std::vector<Transform> rest_;                      // by object id, as the scene was loaded
+  std::unordered_set<std::uint64_t> posed_;          // (object, path) pairs posed so far this frame
 };
 
 }  // namespace redgem

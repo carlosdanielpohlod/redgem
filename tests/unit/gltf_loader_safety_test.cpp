@@ -27,6 +27,8 @@ namespace {
 
 constexpr int kFloatComponent = 5126;
 constexpr int kUnsignedShortComponent = 5123;
+constexpr int kUnsignedByteComponent = 5121;
+constexpr std::uint8_t kPastTheSkeleton = 5;  // a joint of a skeleton of two
 constexpr std::size_t kTriangleCorners = 3;
 constexpr std::size_t kFloatsPerPosition = 3;
 constexpr float kNotIdentity = 2.0f;  // what the test's inverse bind matrix is filled with
@@ -263,6 +265,26 @@ TEST_CASE("a skin with fewer inverse bind matrices than joints uses none of them
   const LoadResult whole = load_gltf_scene(written(scratch, file));
   REQUIRE_MESSAGE(whole.ok, whole.error);
   CHECK(whole.scene.skins[0].inverse_bind[0][0] == doctest::Approx(kNotIdentity));
+}
+
+TEST_CASE("a vertex naming a joint its skeleton does not have follows the skeleton's first, not another's bones") {
+  const Scratch scratch;
+  Gltf file = triangle();
+  const std::vector<std::uint8_t> named = {1, 0, 0, 0, kPastTheSkeleton, 0, 0, 0, 0, 1, 0, 0};
+  const int joints = file.add_accessor(file.add_view(named), kUnsignedByteComponent, kTriangleCorners, "VEC4");
+  const int weights = file.add_accessor(file.add_view(std::vector<float>{1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0}),
+                                        kFloatComponent, kTriangleCorners, "VEC4");
+  file.primitive()["attributes"]["JOINTS_0"] = joints;
+  file.primitive()["attributes"]["WEIGHTS_0"] = weights;
+  file.doc["nodes"].push_back({{"name", "Lower"}});
+  file.doc["nodes"].push_back({{"name", "Upper"}});
+  file.doc["nodes"][0]["skin"] = 0;
+  file.doc["scenes"][0]["nodes"] = {0, 1, 2};
+  file.doc["skins"] = json::array({{{"joints", {1, 2}}}});  // two joints: 0 and 1
+  const LoadResult result = load_gltf_scene(written(scratch, file));
+  REQUIRE_MESSAGE(result.ok, result.error);
+  const std::vector<std::uint16_t>& loaded = result.scene.meshes[0].primitives[0].joints;
+  CHECK(loaded == std::vector<std::uint16_t>{1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0});
 }
 
 TEST_CASE("positions that are not three floats a vertex drop the part instead of miscounting its vertices") {
