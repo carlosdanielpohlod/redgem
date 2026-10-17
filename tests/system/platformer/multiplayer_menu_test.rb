@@ -46,7 +46,7 @@ SystemTest.define do |t|
   t.assert("Leave the game ends it") { !Network.online? }
   press.call(PLAY_ONLINE_BUTTON)
   t.assert("with no server set, Play online says where to set one, and joins nothing") do
-    menu.screens[:multiplayer].status == MultiplayerScreen::NO_SERVER && !Network.connecting? && !Network.online?
+    menu.screens[:multiplayer].status == I18n.t("multiplayer.no_server") && !Network.connecting? && !Network.online?
   end
 
   t.press(:escape)

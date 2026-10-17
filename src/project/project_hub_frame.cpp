@@ -5,6 +5,7 @@
 #include <imgui.h>
 #include <raylib.h>
 
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/ui/style.hpp"
 
@@ -63,7 +64,7 @@ void ProjectHub::draw_title() {
   ImGui::PopFont();
   ImGui::SameLine();
   ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ImGui::GetStyle().FramePadding.y);
-  ImGui::TextColored(ui::muted_color(), "Make 3D games in Ruby");
+  ImGui::TextColored(ui::muted_color(), "%s", tr("project.hub.tagline"));
   ImGui::Spacing();
   ImGui::Separator();
   ImGui::Spacing();

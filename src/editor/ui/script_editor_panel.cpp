@@ -4,16 +4,21 @@
 #include <vector>
 
 #include "core/log.hpp"
+#include "core/filled_texts.hpp"
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/ui/panels.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 
 namespace redgem::ui {
 namespace {
 
-constexpr const char* kCloseScriptPopup = "Unsaved script";
 constexpr const char* kCodeId = "##code";
 constexpr const char* kWindowIdPrefix = "###script:";  // ImGui: what follows ### is the window's identity
+
+// The dialog asking about a tab closed with unsaved changes: its title, then its id.
+const char* close_dialog_title() { return window_title("editor.script.unsaved_title", "###unsaved_script"); }
 
 void save(ScriptEditor& editor) {
   std::string error;
@@ -23,32 +28,36 @@ void save(ScriptEditor& editor) {
 // Where the script stands: changed outside, broken, saved and fine, or being edited.
 void draw_status(const ScriptEditor& editor) {
   if (editor.changed_on_disk()) {
-    ImGui::TextColored(warning_color(), ICON_FA_TRIANGLE_EXCLAMATION
-                       "  Changed outside the editor: Save keeps this, Revert loads the file");
+    ImGui::TextColored(warning_color(), "%s",
+                       icon_label(ICON_FA_TRIANGLE_EXCLAMATION, "editor.script.changed_on_disk"));
   } else if (!editor.syntax_error().empty()) {
     ImGui::TextColored(error_color(), ICON_FA_CIRCLE_XMARK "  %s", editor.syntax_error().c_str());
   } else if (!editor.modified()) {
-    ImGui::TextColored(success_color(), ICON_FA_CIRCLE_CHECK "  Syntax OK");
+    ImGui::TextColored(success_color(), "%s", icon_label(ICON_FA_CIRCLE_CHECK, "editor.script.syntax_ok"));
   } else {
-    ImGui::TextColored(muted_color(), "Unsaved changes");
+    ImGui::TextColored(muted_color(), "%s", tr("editor.script.unsaved_changes"));
   }
 }
 
 // Save, Revert, Split right, Open externally, and where the script stands.
 void draw_file_buttons(ScriptEditor& editor) {
-  if (ImGui::SmallButton(kSaveLabel)) save(editor);
-  tooltip("Ctrl+S. Play saves and reloads scripts too.");
+  if (ImGui::SmallButton(save_label())) save(editor);
+  tooltip(tr("editor.script.save_tooltip"));
   ImGui::SameLine();
   ImGui::BeginDisabled(!editor.modified());
-  if (ImGui::SmallButton(ICON_FA_ROTATE_LEFT "  Revert")) editor.revert();
+  if (ImGui::SmallButton(icon_label(ICON_FA_ROTATE_LEFT, "editor.script.revert"))) editor.revert();
   ImGui::EndDisabled();
 }
 
 void draw_view_buttons(const ScriptEditor& editor, const std::string& window_name, ScriptTabsResult& result) {
-  if (ImGui::SmallButton(ICON_FA_TABLE_COLUMNS "  Split right")) result.split_right = window_name;
-  tooltip("Show this script next to the others (or drag its tab anywhere)");
+  if (ImGui::SmallButton(icon_label(ICON_FA_TABLE_COLUMNS, "editor.script.split_right"))) {
+    result.split_right = window_name;
+  }
+  tooltip(tr("editor.script.split_right_tooltip"));
   ImGui::SameLine();
-  if (ImGui::SmallButton(ICON_FA_ARROW_UP_RIGHT_FROM_SQUARE "  Open externally")) editor.open_externally();
+  if (ImGui::SmallButton(icon_label(ICON_FA_ARROW_UP_RIGHT_FROM_SQUARE, "editor.script.open_externally"))) {
+    editor.open_externally();
+  }
 }
 
 // Save and Revert, Split right and Open externally, and where the script stands.
@@ -96,27 +105,28 @@ bool still_open(bool pressed, const ScriptEditor* editor) { return pressed && ed
 bool draw_close_choices(ScriptWorkspace& scripts, const std::string& file) {
   ScriptEditor* editor = scripts.find(file);
   bool done = editor == nullptr;
-  if (still_open(ImGui::Button(kSaveLabel), editor)) {
+  if (still_open(ImGui::Button(save_label()), editor)) {
     save_and_close(scripts, *editor, file);
     done = true;
   }
   ImGui::SameLine();
-  if (ImGui::Button(kDiscardLabel)) {
+  if (ImGui::Button(discard_label())) {
     scripts.close(file);
     done = true;
   }
   ImGui::SameLine();
-  return ImGui::Button(kCancelLabel) || done;
+  return ImGui::Button(cancel_label()) || done;
 }
 
 // Save / Discard / Cancel for a tab closed with unsaved changes.
 void draw_close_dialog(ScriptWorkspace& scripts, std::string& pending_close) {
   if (pending_close.empty()) return;
-  if (!ImGui::IsPopupOpen(kCloseScriptPopup)) ImGui::OpenPopup(kCloseScriptPopup);
-  if (!ImGui::BeginPopupModal(kCloseScriptPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+  if (!ImGui::IsPopupOpen(close_dialog_title())) ImGui::OpenPopup(close_dialog_title());
+  if (!ImGui::BeginPopupModal(close_dialog_title(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
   ImGui::TextColored(warning_color(), ICON_FA_TRIANGLE_EXCLAMATION);
   ImGui::SameLine();
-  ImGui::Text("Save changes to %s?", pending_close.c_str());
+  static FilledTexts question("editor.script.save_changes_question", "file");
+  ImGui::TextUnformatted(question.with(pending_close));
   ImGui::Spacing();
   if (draw_close_choices(scripts, pending_close)) {
     pending_close.clear();

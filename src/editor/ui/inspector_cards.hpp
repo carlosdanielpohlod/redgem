@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "core/translations.hpp"
 #include "editor/ui/panels.hpp"
 
 namespace redgem::ui::inspector {
@@ -62,9 +63,12 @@ bool edit_color(const char* id, Color& color, ImGuiColorEditFlags flags);
 // A color without transparency, as a vector or as a Color whose alpha stays as it is.
 bool edit_rgb(const char* id, Vec3& color, ImGuiColorEditFlags flags);
 bool edit_rgb(const char* id, Color& color, ImGuiColorEditFlags flags);
-// A drop-down over the values of an enum, listed by `names` in the enum's order.
+// A drop-down over the values of an enum, listed by the keys of their names (see
+// core/translations.hpp) in the enum's order.
 template <typename Enum, std::size_t Count>
-bool choose(const char* id, Enum& value, const char* const (&names)[Count]) {
+bool choose(const char* id, Enum& value, const char* const (&keys)[Count]) {
+  const char* names[Count];
+  for (std::size_t i = 0; i < Count; ++i) names[i] = tr(keys[i]);
   int chosen = static_cast<int>(value);
   if (!ImGui::Combo(id, &chosen, names, static_cast<int>(Count))) return false;
   value = static_cast<Enum>(chosen);

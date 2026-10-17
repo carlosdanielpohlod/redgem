@@ -1,5 +1,4 @@
 // System test: opens the real editor window on a copy of the platformer and drives it.
-#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
 
 #include <algorithm>

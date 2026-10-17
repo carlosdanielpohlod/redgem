@@ -11,6 +11,7 @@
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/scene_viewport.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 #include "render/render_math.hpp"
 
@@ -39,7 +40,8 @@ void EditorApp::draw_viewport_window() {
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
   const bool playing = !editing();
   if (frame_count_ <= kStartupFrames) ImGui::SetNextWindowFocus();  // the Scene tab starts in front
-  ImGui::Begin(kViewportWindow, nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+  ImGui::Begin(ui::window_title(kViewportTitle, kViewportWindow), nullptr,
+               ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
   draw_viewport_image();
   if (!playing) draw_viewport_drop_target();
   track_viewport_focus();

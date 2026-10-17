@@ -2,7 +2,9 @@
 
 #include <imgui.h>
 
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 #include "scene/props.hpp"
 
@@ -24,10 +26,10 @@ const char* icon_of(const NodeDesc& node) {
 
 // What can be done to the object itself.
 void draw_node_actions(bool has_parent, int index, Pending& pending) {
-  if (ImGui::MenuItem(kDuplicateLabel, kKeysDuplicate)) pending = {Pending::Kind::Duplicate, index, kNoIndex, {}};
-  if (ImGui::MenuItem(kDeleteLabel, kKeysDelete)) pending = {Pending::Kind::Delete, index, kNoIndex, {}};
+  if (ImGui::MenuItem(duplicate_label(), tr(kKeysDuplicate))) pending = {Pending::Kind::Duplicate, index, kNoIndex, {}};
+  if (ImGui::MenuItem(delete_label(), tr(kKeysDelete))) pending = {Pending::Kind::Delete, index, kNoIndex, {}};
   if (!has_parent) return;
-  if (ImGui::MenuItem(ICON_FA_ARROW_TURN_UP "  Move to top level")) {
+  if (ImGui::MenuItem(icon_label(ICON_FA_ARROW_TURN_UP, "editor.hierarchy.move_to_top"))) {
     pending = {Pending::Kind::Reparent, index, kNoIndex, {}};
   }
 }
@@ -37,7 +39,7 @@ void node_context_menu(PanelContext& context, int index, Pending& pending) {
   ImGui::BeginDisabled(!context.session.editing());
   draw_node_actions(context.session.document().node(index).parent != kNoIndex, index, pending);
   ImGui::Separator();
-  menu(ICON_FA_PLUS "  Create", [&context] { draw_create_menu(context); });
+  menu(icon_label(ICON_FA_PLUS, "editor.hierarchy.create"), [&context] { draw_create_menu(context); });
   ImGui::EndDisabled();
   ImGui::EndPopup();
 }

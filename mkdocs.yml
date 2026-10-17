@@ -36,6 +36,7 @@ nav:
       - Gameplay recipes: scripting/gameplay.md
       - Multiplayer: scripting/multiplayer.md
       - Online services: scripting/online-services.md
+      - Texts in several languages: scripting/i18n.md
       - API reference: scripting/api.md
   - Finishing a game:
       - Testing your game: testing.md

@@ -123,6 +123,7 @@ ruby/testing  the Ruby tests are written with (assertions, test cases, the syste
 templates     the new-game templates: each folder is a whole game (scene, scripts, sounds) and a
               template.json about it, embedded in redgem as it is; a new game is a copy of one.
               A template is edited like any game: redgem templates/platformer
+locales      the texts users read, one translation file per language (see Texts users read)
 assets/editor fonts of the editor (Inter, JetBrains Mono; SIL Open Font License, see the license files)
 games         demo games: scene.glb, scripts and the .blend each scene was built from
 showcase      renders of the showcase scene and the credits of its assets
@@ -206,6 +207,43 @@ never does: it is given a `Presenter`. `WindowPresenter` shows a game in its own
 and without one nobody shows the game (`NullPresenter`: tests, servers). What a game can show is
 a field of `FrameView`, drawn in `FramePainter`: added there, it reaches every presenter.
 `tests/include_directions.sh` holds the table and fails the test suite on an include that goes up.
+
+## Texts users read
+
+What a user of RedGem reads is not written in the code: it is in translation files, one per
+language, under `locales/<part>/<language>.json`, and the code names it by a key
+(`tr("editor.menu.file")`, see `src/core/translations.hpp`). Today there is English (`en.json`)
+alone; a translation is another file beside it, with the same keys.
+
+- **Into a translation file**: everything a user reads in a window or at a terminal. The
+  editor and the project hub (menus, buttons, panels, tooltips, dialogs, hints, the status bar,
+  the inspector's labels), the help, usage and errors of the command lines of `redgem`,
+  `redgem-server`, `redgem-relay` and `redgem-test` that are about what the user typed, and the
+  texts the engine shows players (the labels of `GameMenu`).
+- **In English in the code**: the log, and the messages of errors that are for whoever works on
+  the engine or a game (a broken file, a failed call). Those are searched for, quoted in bug
+  reports and read next to the code; they stay in one language, as the code does.
+
+Each part is the texts of one library, built into it (`redgem_embed_texts` in
+`src/CMakeLists.txt`), so that a program carries only what it shows: `core` (what a command
+line says of an option it cannot read), `game` (the runtime: what players read), `editor`, `project` (the hub and `redgem`'s command line), `server`, `relay` and
+`testing` (the command lines of the other programs). A program adds its parts and picks the
+language as it starts: the one in the user's settings (`"language"` in `settings.json`), else the
+system's; a key a translation lacks is shown in English.
+
+A key is the part's name, then where the text is, then what it is: `editor.menu.file`. The
+first word says which file it is in. A text with values in it names them, `Created {game}`, and
+the code fills them in: `tr("project.cli.created", {{"game", name}})`. A long text (a command's
+usage) may be a list of lines. `tests/unit/translation_keys_test.cpp` fails when the code shows a
+key English has no text for, when an English text is shown nowhere, or when a translation has a
+key English lacks; keys are written whole in the code, as string literals, for it to find them.
+
+A game's texts are not the engine's: they are in the game's own `locales/<language>.json`, and its
+scripts show them with `I18n.t("hud.coins")` (see [Texts in several languages](scripting/i18n.md)),
+behind which are the engine's `game` part (the prelude's `I18n.t` calls, in `ruby/engine/`), so a
+game's files may translate those too. The same test checks the games and templates of this
+repository: every key their scripts show has a text in their `locales/en.json` or the `game` part,
+and every text of theirs is shown.
 
 ## Not there yet
 

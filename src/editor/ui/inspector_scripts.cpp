@@ -3,6 +3,8 @@
 #include <algorithm>
 
 #include "core/log.hpp"
+#include "core/filled_texts.hpp"
+#include "core/translations.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/inspector_logic.hpp"
 #include "editor/scripts/script_files.hpp"
@@ -17,6 +19,12 @@ namespace {
 constexpr float kPopupFieldWidth = 160.0f;  // pixels: the name field inside the menu
 constexpr const char* kNewScriptId = "##new_script";
 
+// The button that makes a new script: its icon, then its text (made once: see editor/ui/labels.hpp).
+const char* new_script_label() {
+  static const std::string label = std::string(ICON_FA_PLUS " ") + tr("editor.inspector.script.new");
+  return label.c_str();
+}
+
 bool listed(const std::vector<std::string>& scripts, const std::string& script) {
   return std::find(scripts.begin(), scripts.end(), script) != scripts.end();
 }
@@ -27,13 +35,14 @@ void write_scripts(EditorSession& session, int index, const std::vector<std::str
 
 // The card of one attached script: a button that opens it, or a warning when its file is gone.
 void draw_script_card(PanelContext& context, const std::string& script) {
-  property_label("Script");
+  property_label(tr("editor.inspector.script.label"));
   if (!listed(context.files.scripts, script)) {
-    ImGui::TextColored(error_color(), ICON_FA_TRIANGLE_EXCLAMATION "  %s is missing", script.c_str());
+    static FilledTexts missing("editor.inspector.script.missing", "script");
+    ImGui::TextColored(error_color(), ICON_FA_TRIANGLE_EXCLAMATION "  %s", missing.with(script));
     return;
   }
   if (ImGui::Button((std::string(ICON_FA_PEN_TO_SQUARE "  ") + script).c_str())) open_script(context.scripts, script);
-  tooltip("Edit in a script tab");
+  tooltip(tr("editor.inspector.script.edit_tooltip"));
 }
 
 // One attached script as a card of its own. True when its close button was pressed.
@@ -88,7 +97,7 @@ void add_script_menu(PanelContext& context, int index) {
   const std::vector<std::string> attached = scripts_of(context.session, index);
   std::string& new_name = context.state.inspector.new_script_name;
   ImGui::SetNextItemWidth(kPopupFieldWidth);
-  if (draw_new_script_form(kNewScriptId, "new_script_name", ICON_FA_PLUS " New", new_name)) {
+  if (draw_new_script_form(kNewScriptId, tr("editor.inspector.script.name_hint"), new_script_label(), new_name)) {
     create_and_attach_script(context, index, new_name);
   }
   if (!context.files.scripts.empty()) ImGui::Separator();

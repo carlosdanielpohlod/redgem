@@ -160,6 +160,7 @@ class EditorApp {
   void draw_build_targets();
   void draw_toolbar();
   void draw_play_controls();
+  void draw_play_button(bool edit);
   void draw_game_tools();
   void draw_game_name();
   void draw_build_button();

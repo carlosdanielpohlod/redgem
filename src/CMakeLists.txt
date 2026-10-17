@@ -9,6 +9,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/i18n.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_screen.rb
@@ -67,6 +68,25 @@ add_custom_command(
   COMMENT "Embedding the licenses"
   VERBATIM)
 
+# The texts users read, in translation files: locales/<part>/<language>.json (see
+# core/translations.hpp). Each part is built into the library that shows it, which adds it with a
+# function of its own (add_<part>_texts), so that a program carries the texts of its parts and no
+# others': the player has none of the editor's.
+function(redgem_embed_texts target part)
+  file(GLOB files CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/locales/${part}/*.json)
+  set(folder ${CMAKE_BINARY_DIR}/generated_texts/${part})
+  set(header ${folder}/generated/${part}_texts.hpp)
+  add_custom_command(
+    OUTPUT ${header}
+    COMMAND ${CMAKE_COMMAND} -DOUTPUT=${header} -DROOT=${CMAKE_SOURCE_DIR}/locales/${part} -DNAME=${part}_texts
+            "-DSOURCES=${files}" -P ${CMAKE_SOURCE_DIR}/cmake/EmbedFolder.cmake
+    DEPENDS ${files} ${CMAKE_SOURCE_DIR}/cmake/EmbedFolder.cmake
+    COMMENT "Embedding the ${part} texts"
+    VERBATIM)
+  target_sources(${target} PRIVATE ${header})
+  target_include_directories(${target} PRIVATE ${folder})
+endfunction()
+
 # The engine is a few libraries, one on top of the other, and each program links only the ones it
 # is made of: what players receive (redgem-player) has none of the tools in it, and what runs on a
 # server (redgem-relay) has nothing that draws.
@@ -102,11 +122,19 @@ redgem_add_library(redgem_core
   core/files.cpp
   core/command_line.cpp
   core/names.cpp
+  core/texts.cpp
+  core/text_placeholders.cpp
+  core/translations.cpp
+  core/language_names.cpp
+  core/filled_texts.cpp
+  core/core_texts.cpp
+  core/platform_language.cpp
   core/safe_path.cpp
   core/image_header.cpp
   core/math.cpp
   core/fixed_clock.cpp)
-target_link_libraries(redgem_core PUBLIC m)
+target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
+redgem_embed_texts(redgem_core core)
 if(ANDROID)
   # Where a phone shows a program's messages (see core/platform.cpp).
   target_link_libraries(redgem_core PUBLIC log)
@@ -144,6 +172,7 @@ redgem_add_library(redgem_net
   net/rooms/relay_server_rooms.cpp
   net/rooms/relay_server_approval.cpp
   net/rooms/relay_program.cpp
+  net/rooms/relay_texts.cpp
   net/http/http_url.cpp
   net/http/http_address.cpp
   net/http/http_message.cpp
@@ -157,6 +186,7 @@ redgem_add_library(redgem_net
   net/http/http_exchange.cpp
   net/http/http_client.cpp)
 target_link_libraries(redgem_net PUBLIC redgem_core nlohmann_json::nlohmann_json mbedtls)
+redgem_embed_texts(redgem_net relay)
 if(WIN32)
   # (crypt32: the Windows certificate store, which https:// answers are checked against.)
   target_link_libraries(redgem_net PUBLIC ws2_32 crypt32)
@@ -224,6 +254,7 @@ redgem_add_library(redgem_runtime
   script/script_host_callbacks.cpp
   script/script_host_network.cpp
   script/script_host_http.cpp
+  script/game_locales.cpp
   script/bindings/bindings.cpp
   script/bindings/binding_helpers.cpp
   script/bindings/game_object_bindings.cpp
@@ -241,6 +272,7 @@ redgem_add_library(redgem_runtime
   script/bindings/animation_sync_bindings.cpp
   script/bindings/particles_bindings.cpp
   script/bindings/save_bindings.cpp
+  script/bindings/i18n_bindings.cpp
   script/bindings/message_values.cpp
   script/bindings/network_bindings.cpp
   script/bindings/network_search_bindings.cpp
@@ -296,7 +328,9 @@ redgem_add_library(redgem_runtime
   app/engine_scenes.cpp
   app/scene_bodies.cpp
   app/scene_files.cpp
-  app/touch_circles.cpp)
+  app/touch_circles.cpp
+  app/game_texts.cpp)
+redgem_embed_texts(redgem_runtime game)
 # (The prelude is the runtime's alone: no other library is given the folder it is generated in.)
 target_include_directories(redgem_runtime PRIVATE ${REDGEM_GENERATED_DIR})
 target_link_libraries(redgem_runtime PUBLIC redgem_net raylib Jolt mruby_lib cgltf_headers nlohmann_json::nlohmann_json m)
@@ -316,7 +350,9 @@ if(NOT ANDROID)
     server/server_program.cpp
     server/save_database.cpp
     server/room_slot.cpp
-    server/room_thread.cpp)
+    server/room_thread.cpp
+    server/server_texts.cpp)
+  redgem_embed_texts(redgem_game_server server)
   target_link_libraries(redgem_game_server PUBLIC redgem_runtime sqlite3)
 
   redgem_add_library(redgem_editor
@@ -385,10 +421,13 @@ if(NOT ANDROID)
     editor/ui/new_script_form.cpp
     editor/ui/create_menu.cpp
     editor/ui/style.cpp
+    editor/ui/labels.cpp
     editor/ui/theme.cpp
     editor/ui/fonts.cpp
     editor/ui/interface.cpp
-    editor/ui/embedded_fonts.cpp)
+    editor/ui/embedded_fonts.cpp
+    editor/editor_texts.cpp)
+  redgem_embed_texts(redgem_editor editor)
   target_link_libraries(redgem_editor PUBLIC redgem_runtime imgui_stack)
 
   redgem_add_library(redgem_project
@@ -416,7 +455,9 @@ if(NOT ANDROID)
     project/editor_setup.cpp
     project/editor_run.cpp
     project/cli.cpp
-    project/cli_options.cpp)
+    project/cli_options.cpp
+    project/project_texts.cpp)
+  redgem_embed_texts(redgem_project project)
   # (The templates and the licenses are the tools' alone, as the prelude is the runtime's.)
   target_include_directories(redgem_project PRIVATE ${REDGEM_PROJECT_GENERATED_DIR})
   target_link_libraries(redgem_project PUBLIC redgem_editor)

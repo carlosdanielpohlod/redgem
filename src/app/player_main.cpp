@@ -7,12 +7,14 @@
 #include <filesystem>
 
 #include "app/bundled_game.hpp"
+#include "app/game_texts.hpp"
 #include "app/user_settings.hpp"
 #include "app/window_presenter.hpp"
 #include "core/config.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "core/platform.hpp"
+#include "core/translations.hpp"
 
 namespace {
 
@@ -35,6 +37,8 @@ int play_game_beside(const std::filesystem::path& program) {
 
 int main(int, char**) {
   try {
+    redgem::add_game_texts();
+    redgem::translations::use_language(redgem::language_for_run());
     return play_game_beside(redgem::platform::executable_path());
   } catch (const std::exception& error) {
     // (Whatever goes wrong while playing is said, and fails the run.)

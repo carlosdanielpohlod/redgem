@@ -6,8 +6,13 @@
 #include <imgui_internal.h>
 #include <raylib.h>
 
+#include <string>
+
+#include "core/filled_texts.hpp"
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 
 namespace redgem {
@@ -54,15 +59,16 @@ ImVec4 level_color(log::Level level) {
 }
 
 const char* play_state_label(PlayState state) {
-  if (state == PlayState::Playing) return ICON_FA_PLAY "  Playing";
-  return state == PlayState::Paused ? ICON_FA_PAUSE "  Paused" : ICON_FA_PEN "  Editing";
+  if (state == PlayState::Playing) return ui::icon_label(ICON_FA_PLAY, "editor.status.playing");
+  return state == PlayState::Paused ? ui::icon_label(ICON_FA_PAUSE, "editor.status.paused")
+                                    : ui::icon_label(ICON_FA_PEN, "editor.status.editing");
 }
 
 }  // namespace
 
 void EditorApp::draw_toolbar() {
   if (begin_toolbar()) {
-    ui::toggle_button(ICON_FA_TABLE_LIST, "Show / hide the Hierarchy (Ctrl+B)", panels_.hierarchy);
+    ui::toggle_button(ICON_FA_TABLE_LIST, tr("editor.toolbar.hierarchy"), panels_.hierarchy);
     ImGui::SameLine(0.0f, kToolbarGroupGap);
     ImGui::BeginDisabled(!editing());
     gizmo_.draw_tools();
@@ -73,21 +79,27 @@ void EditorApp::draw_toolbar() {
   ImGui::End();
 }
 
+// Play while editing, Stop while the game runs.
+void EditorApp::draw_play_button(bool edit) {
+  if (edit) {
+    if (ui::icon_button(ICON_FA_PLAY, tr("editor.toolbar.play"))) play();
+    return;
+  }
+  ImGui::PushStyleColor(ImGuiCol_Text, ui::accent_color());
+  if (ui::icon_button(ICON_FA_STOP, tr("editor.toolbar.stop"), true)) stop();
+  ImGui::PopStyleColor();
+}
+
 // Center of the toolbar: Play / Stop and Pause.
 void EditorApp::draw_play_controls() {
   const bool edit = editing();
   const float group = icon_button_width() * kPlayControls + ImGui::GetStyle().ItemSpacing.x;
   ImGui::SameLine(editor_logic::centered_start(ImGui::GetWindowContentRegionMax().x, group));
-  if (edit) {
-    if (ui::icon_button(ICON_FA_PLAY, "Play (Ctrl+P)")) play();
-  } else {
-    ImGui::PushStyleColor(ImGuiCol_Text, ui::accent_color());
-    if (ui::icon_button(ICON_FA_STOP, "Stop (Ctrl+P / Esc)", true)) stop();
-    ImGui::PopStyleColor();
-  }
+  draw_play_button(edit);
   ImGui::SameLine();
   ImGui::BeginDisabled(edit);
-  if (ui::icon_button(ICON_FA_PAUSE, "Pause", session_->play_state() == PlayState::Paused)) toggle_pause();
+  if (ui::icon_button(ICON_FA_PAUSE, tr("editor.toolbar.pause"), session_->play_state() == PlayState::Paused))
+    toggle_pause();
   ImGui::EndDisabled();
 }
 
@@ -97,7 +109,7 @@ void EditorApp::draw_game_tools() {
   ImGui::SameLine();
   draw_build_button();
   ImGui::SameLine(0.0f, kToolbarGroupGap);
-  ui::toggle_button(ICON_FA_TABLE_LIST, "Show / hide the Inspector (Ctrl+Alt+B)", panels_.inspector);
+  ui::toggle_button(ICON_FA_TABLE_LIST, tr("editor.toolbar.inspector"), panels_.inspector);
 }
 
 // The game's name (with a dot while the scene has unsaved changes), placed so that the buttons
@@ -115,8 +127,7 @@ void EditorApp::draw_game_name() {
 
 void EditorApp::draw_build_button() {
   ImGui::BeginDisabled(!editing());
-  if (ui::icon_button(ICON_FA_BOX_ARCHIVE,
-                      "Build the game: an executable for Linux or Windows, or an app for Android")) {
+  if (ui::icon_button(ICON_FA_BOX_ARCHIVE, tr("editor.toolbar.build"))) {
     ImGui::OpenPopup(kBuildPopup);
   }
   ui::popup(kBuildPopup, [this] { draw_build_targets(); });
@@ -141,11 +152,14 @@ void EditorApp::draw_last_message() {
 
 // Right of the status bar: the selection, how big the scene is, the play state and the frame rate.
 void EditorApp::draw_scene_summary() {
+  static FilledTexts objects("editor.status.objects", "count");
+  static FilledTexts fps("editor.status.fps", "fps");
   const ObjectId selected = session_->selection();
   char info[kTextBufferSize];
-  ImFormatString(info, sizeof(info), "%s    %s %d objects    %s    %d FPS",
+  ImFormatString(info, sizeof(info), "%s    %s %s    %s    %s",
                  selected != kNoObject ? session_->document().node(selected).name.c_str() : "", ICON_FA_CUBES,
-                 session_->document().node_count(), play_state_label(session_->play_state()), GetFPS());
+                 objects.with(session_->document().node_count()), play_state_label(session_->play_state()),
+                 fps.with(GetFPS()));
   ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(info).x);
   ImGui::TextColored(ui::muted_color(), "%s", info);
 }

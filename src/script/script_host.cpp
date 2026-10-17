@@ -9,7 +9,10 @@
 #include <fstream>
 #include <sstream>
 
+#include "core/config.hpp"
 #include "core/log.hpp"
+#include "core/language_names.hpp"
+#include "core/translations.hpp"
 #include "generated/ruby_prelude.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
@@ -21,12 +24,29 @@ namespace {
 constexpr const char* kObjectsCacheGlobal = "$__redgem_objects";
 constexpr const char* kBehavioursVariable = "@behaviours";  // a GameObject's behaviours, kept by the prelude
 
+// The translations of the game whose scripts are in `scripts_dir`; none for scripts outside a
+// game's scripts folder (a file of tests run with no game around it).
+GameLocales locales_around(const std::filesystem::path& scripts_dir) {
+  if (scripts_dir.filename() != config::kScriptsDirName) return {};
+  return read_game_locales(scripts_dir.parent_path());
+}
+
+// The language a game's scripts start in: of the game's own, the one that best serves the user's
+// (even if the engine has no texts in it, see core/language_names.hpp); else the one the engine
+// shows its own texts in.
+std::string starting_locale(const GameLocales& locales) {
+  return best_language(translations::requested_language(), locales.languages).value_or(translations::language());
+}
+
 }  // namespace
 
 ScriptHost& script_host(mrb_state* mrb) { return *static_cast<ScriptHost*>(mrb->ud); }
 
 ScriptHost::ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir)
-    : context_(context), scripts_dir_(std::move(scripts_dir)) {
+    : context_(context),
+      scripts_dir_(std::move(scripts_dir)),
+      locales_(locales_around(scripts_dir_)),
+      locale_(starting_locale(locales_)) {
   mrb_state* mrb = vm_.state();
   mrb->ud = this;
   start_objects_cache();

@@ -8,6 +8,7 @@
 #include "core/files.hpp"
 #include "core/log.hpp"
 #include "core/platform.hpp"
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "project/game_templates.hpp"
@@ -19,7 +20,6 @@ namespace {
 using namespace editor_config;
 
 constexpr const char* kSuggestedTemplate = "platformer";  // the one chosen when the hub opens
-constexpr const char* kDefaultGameName = "My Game";
 
 // The hub's window: a form, drawn straight into it.
 WindowSettings hub_window(GpuChoice gpu) {
@@ -39,7 +39,7 @@ ProjectHub::ProjectHub(Options options)
     : options_(std::move(options)),
       window_(hub_window(options_.gpu)),
       interface_(window_, ui::Interface::Layout::Fixed),
-      new_name_(kDefaultGameName),
+      new_name_(tr("project.hub.default_game_name")),
       template_(kSuggestedTemplate) {
   refresh_games();
 }
@@ -70,7 +70,7 @@ std::optional<std::filesystem::path> ProjectHub::run() {
 
 bool ProjectHub::create_game(const std::string& name, const std::string& template_name) {
   if (!valid_game_name(name)) {
-    error_ = "Use letters, digits, spaces, - and _ for the name.";
+    error_ = tr("project.hub.bad_name");
     return false;
   }
   const std::filesystem::path dir = options_.games_folder / name;
@@ -86,7 +86,7 @@ bool ProjectHub::create_game(const std::string& name, const std::string& templat
 bool ProjectHub::open_game(const std::filesystem::path& typed) {
   const std::filesystem::path game_dir = normalized_folder(editor_logic::expand_home(typed, platform::home_dir()));
   if (!is_game_folder(game_dir)) {
-    error_ = shown_path(game_dir) + " is not a game (it has no " + config::kSceneFileName + ")";
+    error_ = tr("project.hub.not_a_game", {{"folder", shown_path(game_dir)}, {"scene_file", config::kSceneFileName}});
     return false;
   }
   remember_game(options_.recent_file, game_dir);

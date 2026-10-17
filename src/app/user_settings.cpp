@@ -12,11 +12,9 @@ namespace {
 
 constexpr const char* kSettingsFileName = "settings.json";
 constexpr const char* kGpuKey = "gpu";
+constexpr const char* kLanguageKey = "language";
 constexpr const char* kGpuVariable = "REDGEM_GPU";  // the user's choice of card for what is started from a shell
 constexpr int kJsonIndent = 2;
-
-// Whether the settings say which card to use, in a text.
-bool names_gpu(const nlohmann::json& settings) { return settings.is_object() && holds_text(settings, kGpuKey); }
 
 }  // namespace
 
@@ -25,15 +23,18 @@ std::filesystem::path user_settings_file() { return platform::user_data_dir() / 
 UserSettings read_user_settings(const std::filesystem::path& file) {
   UserSettings settings;
   const nlohmann::json json = read_json_file(file);
-  if (!names_gpu(json)) return settings;
-  settings.gpu = gpu_choice_from_name(json[kGpuKey].get<std::string>()).value_or(settings.gpu);
+  if (holds_text(json, kGpuKey)) {
+    settings.gpu = gpu_choice_from_name(json[kGpuKey].get<std::string>()).value_or(settings.gpu);
+  }
+  if (holds_text(json, kLanguageKey)) settings.language = json[kLanguageKey].get<std::string>();
   return settings;
 }
 
 bool write_user_settings(const std::filesystem::path& file, const UserSettings& settings, std::string& error) {
   std::error_code fs_error;
   std::filesystem::create_directories(file.parent_path(), fs_error);
-  const nlohmann::json json = {{kGpuKey, gpu_choice_name(settings.gpu)}};
+  nlohmann::json json = {{kGpuKey, gpu_choice_name(settings.gpu)}};
+  if (!settings.language.empty()) json[kLanguageKey] = settings.language;
   return write_text_file(file, json.dump(kJsonIndent) + "\n", error);
 }
 
@@ -50,6 +51,11 @@ GpuChoice gpu_choice_for_run(const std::optional<std::string>& command_line) {
   const std::string variable = platform::environment(kGpuVariable);
   const std::optional<std::string> environment = variable.empty() ? std::nullopt : std::optional(variable);
   return resolve_gpu_choice(command_line, environment, read_user_settings(user_settings_file()));
+}
+
+std::string language_for_run() {
+  const std::string chosen = read_user_settings(user_settings_file()).language;
+  return chosen.empty() ? platform::system_language() : chosen;
 }
 
 }  // namespace redgem

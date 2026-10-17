@@ -5,18 +5,23 @@
 // redgem-server.
 
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
 
+#include "app/game_texts.hpp"
 #include "app/user_settings.hpp"
 #include "app/window_presenter.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
+#include "core/translations.hpp"
+#include "editor/editor_texts.hpp"
 #include "project/cli.hpp"
 #include "project/editor_run.hpp"
 #include "project/game_build.hpp"
 #include "project/game_templates.hpp"
+#include "project/project_texts.hpp"
 
 namespace {
 
@@ -41,8 +46,8 @@ int new_game(const redgem::CliOptions& options) {
     log::error(error);
     return kExitFailure;
   }
-  std::cout << "created " << options.game_dir.string() << " (" << options.template_name << "). Open it with: redgem "
-            << options.game_dir.string() << "\n";
+  std::cout << tr("project.cli.created", {{"game_dir", options.game_dir.string()}, {"template", options.template_name}})
+            << "\n";
   return kExitSuccess;
 }
 
@@ -51,6 +56,17 @@ int new_game(const redgem::CliOptions& options) {
 redgem::BuildTarget target_of(const redgem::CliOptions& options) {
   const auto named = redgem::build_target_from_name(options.build_target);
   return named ? *named : redgem::host_build_target();
+}
+
+// What a build says it made, and what to do with it.
+void say_built(const redgem::CliOptions& options, redgem::BuildTarget target, const std::filesystem::path& executable) {
+  using namespace redgem;
+  // (An Android app is not run from here: it is installed on a phone.)
+  const char* said = target == BuildTarget::Android ? "project.cli.built_for_phone" : "project.cli.built";
+  std::cout << tr(said, {{"out_dir", options.build_dir.string()},
+                         {"target", build_target_name(target)},
+                         {"executable", executable.string()}})
+            << "\n";
 }
 
 int build(const redgem::CliOptions& options) {
@@ -62,10 +78,7 @@ int build(const redgem::CliOptions& options) {
     log::error(error);
     return kExitFailure;
   }
-  // (An Android app is not run from here: it is installed on a phone.)
-  const char* next = target == BuildTarget::Android ? ": install it with adb install " : ": run ";
-  std::cout << "built " << options.build_dir.string() << " for " << build_target_name(target) << next
-            << executable->string() << "\n";
+  say_built(options, target, *executable);
   return kExitSuccess;
 }
 
@@ -97,10 +110,20 @@ int reporting_errors(Run run) {
   }
 }
 
+// The texts redgem shows, its own and those of the games it plays, in its user's language.
+void set_up_texts() {
+  using namespace redgem;
+  add_game_texts();
+  add_editor_texts();
+  add_project_texts();
+  translations::use_language(language_for_run());
+}
+
 // What the command line asks for, done. (Reading the line is inside the same net as the running:
 // nothing a user types ends the program without a word.)
 int run_command_line(const std::vector<std::string>& args) {
   using namespace redgem;
+  set_up_texts();
   const CliResult cli = parse_cli(args);
   if (!cli.ok) {
     std::cerr << cli.error << "\n\n" << usage();

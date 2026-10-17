@@ -11,6 +11,7 @@ namespace redgem {
 // Preferences of this user on this machine (not of a game): ~/.config/redgem/settings.json.
 struct UserSettings {
   GpuChoice gpu = GpuChoice::Auto;
+  std::string language;  // what the engine's texts are shown in ("pt"); empty: the system's
 };
 
 std::filesystem::path user_settings_file();
@@ -27,5 +28,8 @@ GpuChoice resolve_gpu_choice(const std::optional<std::string>& command_line,
 // environment (REDGEM_GPU, read here and nowhere else) or saved settings say. Whoever opens a
 // window is handed the answer.
 GpuChoice gpu_choice_for_run(const std::optional<std::string>& command_line);
+
+// The language for this run of the program: the one the user chose, else the system's.
+std::string language_for_run();
 
 }  // namespace redgem

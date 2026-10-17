@@ -13,9 +13,9 @@ namespace redgem::ui::project {
 struct FolderInfo {
   ProjectFolder folder;
   const char* icon;
-  const char* title;
-  const char* dir;   // the folder's name inside the game
-  const char* hint;  // shown when the folder is empty
+  const char* title;  // the key of its name (see core/translations.hpp)
+  const char* dir;    // the folder's name inside the game
+  const char* hint;   // the key of what is shown when the folder is empty
   void (*open)(PanelContext&, const std::string& name);
 };
 

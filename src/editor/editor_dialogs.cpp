@@ -5,8 +5,13 @@
 
 #include <imgui.h>
 
+#include <string>
+
+#include "core/filled_texts.hpp"
 #include "core/log.hpp"
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
+#include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 #include "render/renderer.hpp"
 
@@ -17,24 +22,26 @@ using namespace editor_config;
 
 constexpr int kShortcutColumns = 2;  // keys, and what they do
 constexpr const char* kShortcutsTableId = "shortcuts";
-constexpr const char* kUnsavedPopup = "Unsaved changes";
-constexpr const char* kExternalChangePopup = "Scene changed on disk";
-constexpr const char* kShortcutsPopup = "Keyboard shortcuts";
+// The dialogs: their titles, then their ImGui ids (see ui::window_title), which no title shares.
+const char* unsaved_popup() { return ui::window_title("editor.unsaved.title", "###unsaved_changes"); }
+const char* external_change_popup() { return ui::window_title("editor.disk_change.title", "###scene_changed"); }
+const char* shortcuts_popup() { return ui::window_title("editor.shortcuts.title", "###shortcuts"); }
 
+// The keys of the texts of the shortcuts list.
 constexpr const char* kShortcuts[][kShortcutColumns] = {
-    {"Ctrl+P", "Play / Stop"},
-    {"Esc", "Stop playing"},
-    {kKeysSave, "Save scene"},
-    {"Ctrl+Z / Ctrl+Y", "Undo / Redo"},
-    {kKeysDuplicate, "Duplicate"},
-    {kKeysDelete, "Delete"},
-    {"W / E / R", "Move / Rotate / Scale"},
-    {"Hold Ctrl", "Snap while dragging"},
-    {kKeysFrame, "Frame selection"},
-    {"Right mouse + WASD/QE", "Fly the camera"},
-    {"Mouse wheel", "Zoom"},
-    {"Ctrl+B / Ctrl+Alt+B", "Hide / show the left / right panel"},
-    {kKeysBottomPanel, "Hide / show the bottom panel"},
+    {"editor.keys.play", "editor.shortcuts.play"},
+    {"editor.keys.stop", "editor.shortcuts.stop"},
+    {kKeysSave, "editor.shortcuts.save"},
+    {"editor.keys.undo_redo", "editor.shortcuts.undo_redo"},
+    {kKeysDuplicate, "editor.command.duplicate"},
+    {kKeysDelete, "editor.command.delete"},
+    {"editor.keys.gizmo_modes", "editor.shortcuts.gizmo_modes"},
+    {"editor.keys.snap", "editor.shortcuts.snap"},
+    {kKeysFrame, "editor.shortcuts.frame"},
+    {"editor.keys.fly", "editor.shortcuts.fly"},
+    {"editor.keys.zoom", "editor.shortcuts.zoom"},
+    {"editor.keys.side_panels", "editor.shortcuts.side_panels"},
+    {kKeysBottomPanel, "editor.shortcuts.bottom_panel"},
 };
 
 void draw_shortcuts_table() {
@@ -43,9 +50,9 @@ void draw_shortcuts_table() {
   for (const auto& [keys, action] : kShortcuts) {
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
-    ImGui::TextColored(ui::accent_color(), "%s", keys);
+    ImGui::TextColored(ui::accent_color(), "%s", tr(keys));
     ImGui::TableNextColumn();
-    ImGui::TextUnformatted(action);
+    ImGui::TextUnformatted(tr(action));
   }
   ImGui::EndTable();
 }
@@ -59,24 +66,25 @@ void EditorApp::draw_dialogs() {
 }
 
 void EditorApp::draw_unsaved_dialog() {
-  if (unsaved_dialog_wanted()) ImGui::OpenPopup(kUnsavedPopup);
-  if (!ImGui::BeginPopupModal(kUnsavedPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+  if (unsaved_dialog_wanted()) ImGui::OpenPopup(unsaved_popup());
+  if (!ImGui::BeginPopupModal(unsaved_popup(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
   ImGui::TextColored(ui::warning_color(), ICON_FA_TRIANGLE_EXCLAMATION);
   ImGui::SameLine();
-  ImGui::Text("Save changes to %s before closing?", session_->game_dir().filename().string().c_str());
+  static FilledTexts question("editor.unsaved.question", "game");
+  ImGui::TextUnformatted(question.with(session_->game_dir().filename().string()));
   ImGui::Spacing();
   draw_unsaved_choices();
   ImGui::EndPopup();
 }
 
-bool EditorApp::unsaved_dialog_wanted() const { return close_pending_ && !ImGui::IsPopupOpen(kUnsavedPopup); }
+bool EditorApp::unsaved_dialog_wanted() const { return close_pending_ && !ImGui::IsPopupOpen(unsaved_popup()); }
 
 void EditorApp::draw_unsaved_choices() {
-  if (ImGui::Button(ui::kSaveLabel)) save_and_leave();
+  if (ImGui::Button(ui::save_label())) save_and_leave();
   ImGui::SameLine();
-  if (ImGui::Button(ui::kDiscardLabel)) leave_without_saving();
+  if (ImGui::Button(ui::discard_label())) leave_without_saving();
   ImGui::SameLine();
-  if (ImGui::Button(ui::kCancelLabel)) cancel_leaving();
+  if (ImGui::Button(ui::cancel_label())) cancel_leaving();
 }
 
 void EditorApp::save_and_leave() {
@@ -101,26 +109,26 @@ void EditorApp::cancel_leaving() {
 }
 
 void EditorApp::draw_external_change_dialog() {
-  if (external_change_dialog_wanted()) ImGui::OpenPopup(kExternalChangePopup);
-  if (!ImGui::BeginPopupModal(kExternalChangePopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
-  ImGui::Text("%s changed on disk (Blender export?) while you have unsaved edits.",
-              session_->document().path().filename().string().c_str());
+  if (external_change_dialog_wanted()) ImGui::OpenPopup(external_change_popup());
+  if (!ImGui::BeginPopupModal(external_change_popup(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+  static FilledTexts question("editor.disk_change.question", "scene");
+  ImGui::TextUnformatted(question.with(session_->document().path().filename().string()));
   draw_external_change_choices();
   ImGui::EndPopup();
 }
 
 // The outside change is asked about once closing is not: one question at a time.
 bool EditorApp::external_change_dialog_wanted() const {
-  return session_->external_change_pending() && !close_pending_ && !ImGui::IsPopupOpen(kExternalChangePopup);
+  return session_->external_change_pending() && !close_pending_ && !ImGui::IsPopupOpen(external_change_popup());
 }
 
 void EditorApp::draw_external_change_choices() {
-  if (ImGui::Button("Reload from disk")) {
+  if (ImGui::Button(tr("editor.disk_change.reload"))) {
     if (session_->reload_from_disk()) renderer_->upload(session_->scene_desc());
     ImGui::CloseCurrentPopup();
   }
   ImGui::SameLine();
-  if (ImGui::Button("Keep my edits")) {
+  if (ImGui::Button(tr("editor.disk_change.keep"))) {
     session_->keep_my_edits();
     ImGui::CloseCurrentPopup();
   }
@@ -128,12 +136,12 @@ void EditorApp::draw_external_change_choices() {
 
 void EditorApp::draw_shortcuts_dialog() {
   if (shortcuts_open_) {
-    ImGui::OpenPopup(kShortcutsPopup);
+    ImGui::OpenPopup(shortcuts_popup());
     shortcuts_open_ = false;
   }
-  if (!ImGui::BeginPopupModal(kShortcutsPopup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+  if (!ImGui::BeginPopupModal(shortcuts_popup(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
   draw_shortcuts_table();
-  if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+  if (ImGui::Button(tr("editor.shortcuts.close"))) ImGui::CloseCurrentPopup();
   ImGui::EndPopup();
 }
 

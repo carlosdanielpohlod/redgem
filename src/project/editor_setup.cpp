@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 #include "project/game_build.hpp"
 
@@ -11,13 +12,14 @@ namespace {
 // The systems a game can be built for, as the Build menus offer them.
 struct BuildOption {
   BuildTarget target;
-  const char* label;
+  const char* icon;
+  const char* label;  // the key of its text
 };
 constexpr BuildOption kBuildOptions[] = {
-    {BuildTarget::Linux, ICON_FA_DESKTOP "  For Linux"},
-    {BuildTarget::Windows, ICON_FA_DESKTOP "  For Windows (.exe)"},
-    {BuildTarget::Android, ICON_FA_MOBILE_SCREEN "  For Android (.apk)"},
-    {BuildTarget::MacOS, ICON_FA_DESKTOP "  For macOS"},
+    {BuildTarget::Linux, ICON_FA_DESKTOP, "project.build.for_linux"},
+    {BuildTarget::Windows, ICON_FA_DESKTOP, "project.build.for_windows"},
+    {BuildTarget::Android, ICON_FA_MOBILE_SCREEN, "project.build.for_android"},
+    {BuildTarget::MacOS, ICON_FA_DESKTOP, "project.build.for_macos"},
 };
 
 // Whether the editor here offers a build for `target`: the Mac's player only comes with the
@@ -28,7 +30,7 @@ BuildChoice choice_for(const BuildOption& option) {
   const BuildTarget target = option.target;
   BuildChoice choice;
   choice.name = build_target_name(target);
-  choice.label = option.label;
+  choice.label = ui::icon_label(option.icon, option.label);
   choice.for_this_system = target == host_build_target();
   choice.build = [target](const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                           std::string& error) { return build_game_for(game_dir, out_dir, target, error); };

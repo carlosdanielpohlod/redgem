@@ -1,7 +1,7 @@
 #include <imgui.h>
 #include <imgui_stdlib.h>
 
-#include "editor/editor_config.hpp"
+#include "core/translations.hpp"
 #include "editor/scripts/script_files.hpp"
 #include "editor/ui/panels.hpp"
 #include "editor/ui/style.hpp"
@@ -24,7 +24,7 @@ bool draw_new_script_form(const char* id, const char* hint, const char* button_l
   ImGui::BeginDisabled(!valid);
   const bool asked = asked_for_script(ImGui::Button(button_label), entered, valid);
   ImGui::EndDisabled();
-  if (breaks_the_rule(name, valid)) ImGui::TextColored(muted_color(), "%s", editor_config::kScriptNameRule);
+  if (breaks_the_rule(name, valid)) ImGui::TextColored(muted_color(), "%s", tr("editor.script.name_rule"));
   return asked;
 }
 

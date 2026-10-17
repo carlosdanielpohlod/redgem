@@ -157,6 +157,10 @@ UI.text("Coins #{@coins}/#{@total}", x: 20, y: 40, size: 28, color: :gold)
 Colors: `:white`, `:black`, `:red`, `:green`, `:blue`, `:yellow`, `:gold`, `:orange`, `:gray`, or
 `[r, g, b]`.
 
+To show it in the player's language, keep the text in the game's translation files and show it
+with `I18n.t("hud.coins", coins: @coins, total: @total)`: see
+[Texts in several languages](i18n.md).
+
 ## Menus, buttons and images
 
 Everything in `UI` is drawn the frame you call it, so a menu is just a behaviour that draws
@@ -216,7 +220,8 @@ menu.screens[:credits] = GameMenu::Screen.new(heading: "Made by Ana", back: -> {
 menu.screens[:pause].add_option("Credits", index: 1) { menu.show(:credits) }
 ```
 
-`back` is what the pause keys do on that screen. A screen that draws more than buttons is a
+`back` is what the pause keys do on that screen. A label or a heading may also be a lookup,
+`-> { I18n.t("menu.credits") }`, made each time it is shown (see [Texts in several languages](i18n.md)). A screen that draws more than buttons is a
 subclass of `GameMenu::Screen` (`draw`, `space_above`, `opened`, `closed`, `typing?`): the
 platformer's multiplayer screen, `games/platformer/scripts/multiplayer_screen.rb`, is one.
 

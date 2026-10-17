@@ -7,7 +7,6 @@ class Online < Behaviour
   HERO = "Player".freeze
   KEY_PREFIX = "hero-".freeze   # a hero's name on the network, followed by its machine's id
   OPTION_INDEX = 1              # on the title and pause screens: after Play or Resume
-  NO_SERVER = "No server to play online on yet: set SERVER in scripts/online.rb".freeze
   NOTICE_SECONDS = 5.0
   NOTICE_X = 20
   NOTICE_Y = 60
@@ -26,11 +25,11 @@ class Online < Behaviour
   # Joins the server, in any room with a free place.
   def play
     GameMenu.instance.resume
-    return tell(NO_SERVER) if @server.empty?
+    return tell(I18n.t("online.no_server")) if @server.empty?
 
     address, port = @server.split(":")
     Network.join(address, port: (port || Network::DEFAULT_PORT).to_i)
-    tell("Joining #{@server}...")
+    tell(I18n.t("online.joining", server: @server))
   end
 
   def update(_dt)
@@ -40,12 +39,13 @@ class Online < Behaviour
   private
 
   def offer_in(menu)
-    %i[title pause].each { |screen| menu.screens[screen].add_option("Play online", index: OPTION_INDEX) { play } }
+    label = -> { I18n.t("online.play") }   # (looked up as it is shown, in the language in use then)
+    %i[title pause].each { |screen| menu.screens[screen].add_option(label, index: OPTION_INDEX) { play } }
   end
 
   def follow_the_players
     Network.on_connect { enter }
-    Network.on_fail { tell("Could not reach #{@server}") }
+    Network.on_fail { tell(I18n.t("online.unreachable", server: @server)) }
     Network.on_join { |peer| add_other(peer) }
     Network.on_leave { |peer| @others.delete(peer)&.destroy }
     Network.on_disconnect { leave }
@@ -55,7 +55,7 @@ class Online < Behaviour
   def enter
     show_my_hero unless Network.server?
     Network.players.each { |peer| add_other(peer) }
-    tell("Online, in room #{Network.room}")
+    tell(I18n.t("online.in_room", room: Network.room))
   end
 
   def show_my_hero
@@ -74,7 +74,7 @@ class Online < Behaviour
   def leave
     @others.each_value(&:destroy)
     @others = {}
-    tell("The online game is over")
+    tell(I18n.t("online.over"))
   end
 
   def tell(text)

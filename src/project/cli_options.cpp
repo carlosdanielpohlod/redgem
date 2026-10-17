@@ -5,6 +5,7 @@
 #include <optional>
 
 #include "core/command_line.hpp"
+#include "core/translations.hpp"
 #include "project/cli_reading.hpp"
 #include "project/game_build.hpp"
 #include "render/gpu_select.hpp"
@@ -32,7 +33,7 @@ void read_play(Reading& reading) { choose(reading, RunMode::Game); }
 void read_template(Reading& reading) {
   const auto name = value(reading);
   if (!name) {
-    fail(reading, "--template needs a name");
+    fail(reading, tr("project.cli.template_needs_name"));
     return;
   }
   reading.result.options.template_name = *name;
@@ -42,7 +43,7 @@ void read_target(Reading& reading) {
   // (No name is no target's name either.)
   const std::string name = value(reading).value_or("");
   if (!build_target_from_name(name)) {
-    fail(reading, "--target needs linux, windows, macos or android");
+    fail(reading, tr("project.cli.target_needs_system"));
     return;
   }
   reading.result.options.build_target = name;
@@ -51,7 +52,7 @@ void read_target(Reading& reading) {
 void read_gpu(Reading& reading) {
   const std::string name = value(reading).value_or("");
   if (!gpu_choice_from_name(name)) {
-    fail(reading, "--gpu needs auto, dedicated or integrated");
+    fail(reading, tr("project.cli.gpu_needs_card"));
     return;
   }
   reading.result.options.gpu = name;

@@ -1,0 +1,4 @@
+{
+  "core.cli.needs_number": "{option} needs a number from {least} to {most}",
+  "core.cli.unexpected_argument": "unexpected argument {argument}"
+}

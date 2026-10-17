@@ -1,0 +1,10 @@
+{
+  "hud.coins": "Coins: {coins}/{total}",
+  "online.in_room": "Online, in room {room}",
+  "online.joining": "Joining {server}...",
+  "online.no_server": "No server to play online on yet: set SERVER in scripts/online.rb",
+  "online.over": "The online game is over",
+  "online.play": "Play online",
+  "online.unreachable": "Could not reach {server}",
+  "over.every_coin": "You got every coin!"
+}

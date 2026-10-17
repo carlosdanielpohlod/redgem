@@ -5,12 +5,15 @@
 #include <string>
 #include <vector>
 
+#include "app/game_texts.hpp"
 #include "app/user_settings.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
+#include "core/translations.hpp"
 #include "testing/ruby_tests.hpp"
 #include "testing/system_test.hpp"
 #include "testing/test_cli.hpp"
+#include "testing/testing_texts.hpp"
 
 namespace {
 
@@ -31,6 +34,9 @@ int run_tests(const testing::TestCliOptions& options) {
 }
 
 int run_command_line(const std::vector<std::string>& args) {
+  add_game_texts();
+  testing::add_testing_texts();
+  translations::use_language(language_for_run());
   const testing::TestCliResult cli = testing::parse_test_cli(args);
   if (!cli.ok) {
     std::cerr << cli.error << "\n\n" << testing::test_usage();

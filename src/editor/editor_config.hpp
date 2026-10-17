@@ -1,6 +1,7 @@
 #pragma once
 
-// Every number of the editor UI, named.
+// Every number of the editor UI, named, and the keys of the texts named in several places
+// (see core/translations.hpp).
 
 namespace redgem::editor_config {
 
@@ -19,11 +20,20 @@ inline constexpr float kHierarchyWidth = 0.17f;
 inline constexpr float kInspectorWidth = 0.24f;
 inline constexpr float kBottomHeight = 0.27f;
 
-inline constexpr const char* kViewportWindow = "Scene";
-inline constexpr const char* kHierarchyWindow = "Hierarchy";
-inline constexpr const char* kInspectorWindow = "Inspector";
-inline constexpr const char* kConsoleWindow = "Console";
-inline constexpr const char* kProjectWindow = "Project";
+// The docked windows, by their ImGui ids: ImGui knows a window by what follows "###" in its name
+// alone, so a window begun as its title then its id ("Hierarchy###hierarchy") is found by the id
+// (the layout, focus, tests) whatever language its title is in.
+inline constexpr const char* kViewportWindow = "###scene";
+inline constexpr const char* kHierarchyWindow = "###hierarchy";
+inline constexpr const char* kInspectorWindow = "###inspector";
+inline constexpr const char* kConsoleWindow = "###console";
+inline constexpr const char* kProjectWindow = "###project";
+// The keys of their titles.
+inline constexpr const char* kViewportTitle = "editor.scene.title";
+inline constexpr const char* kHierarchyTitle = "editor.hierarchy.title";
+inline constexpr const char* kInspectorTitle = "editor.inspector.title";
+inline constexpr const char* kConsoleTitle = "editor.console.title";
+inline constexpr const char* kProjectTitle = "editor.project.title";
 
 // Bars around the dock space (pixels).
 inline constexpr float kToolbarHeight = 42.0f;
@@ -72,8 +82,6 @@ inline constexpr float kMinClipDistance = 0.001f;
 inline constexpr int kTextBufferSize = 256;
 inline constexpr float kLabelColumnWidth = 104.0f;
 inline constexpr float kFillWidth = -1.0f;  // ImGui: a widget this wide takes the rest of its row
-// What a script may be called, as shown under a name that is not one.
-inline constexpr const char* kScriptNameRule = "lowercase letters, digits and _ only";
 
 // The terrain brush as it starts.
 inline constexpr float kDefaultBrushRadius = 6.0f;    // meters
@@ -95,16 +103,17 @@ inline constexpr float kHubPadding = 24.0f;
 // Folder next to the game where Build puts the standalone game ("<game>-build").
 inline constexpr const char* kBuildSuffix = "-build";
 
-// Keys of the commands, as menus and the shortcuts list show them.
-inline constexpr const char* kKeysSave = "Ctrl+S";
-inline constexpr const char* kKeysUndo = "Ctrl+Z";
-inline constexpr const char* kKeysRedo = "Ctrl+Y";
-inline constexpr const char* kKeysDuplicate = "Ctrl+D";
-inline constexpr const char* kKeysDelete = "Del";
-inline constexpr const char* kKeysFrame = "F";
-inline constexpr const char* kKeysHierarchy = "Ctrl+B";
-inline constexpr const char* kKeysInspector = "Ctrl+Alt+B";
-inline constexpr const char* kKeysBottomPanel = "Ctrl+J";
+// Keys of the commands, as menus and the shortcuts list show them ("Ctrl+S"): the keys of those
+// texts.
+inline constexpr const char* kKeysSave = "editor.keys.save";
+inline constexpr const char* kKeysUndo = "editor.keys.undo";
+inline constexpr const char* kKeysRedo = "editor.keys.redo";
+inline constexpr const char* kKeysDuplicate = "editor.keys.duplicate";
+inline constexpr const char* kKeysDelete = "editor.keys.delete";
+inline constexpr const char* kKeysFrame = "editor.keys.frame";
+inline constexpr const char* kKeysHierarchy = "editor.keys.hierarchy";
+inline constexpr const char* kKeysInspector = "editor.keys.inspector";
+inline constexpr const char* kKeysBottomPanel = "editor.keys.bottom_panel";
 
 // Drag and drop payloads.
 inline constexpr const char* kPayloadNode = "REDGEM_NODE";

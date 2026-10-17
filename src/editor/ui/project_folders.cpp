@@ -34,14 +34,14 @@ void explain_scene(PanelContext& /*context*/, const std::string& name) {
 
 const std::vector<FolderInfo>& folders() {
   static const std::vector<FolderInfo> all = {
-      {Folder::Scripts, ICON_FA_GEM, "Scripts", config::kScriptsDirName,
-       "Ruby behaviours. Create one with New script, then drag it onto an object.", edit_script},
-      {Folder::Models, ICON_FA_CUBES, "Models", config::kModelsDirName,
-       "Drop .glb files (exported from Blender) on this window, then drag them into the scene.", add_model},
-      {Folder::Sounds, ICON_FA_VOLUME_HIGH, "Sounds", config::kSoundsDirName,
-       "Drop .wav / .ogg / .mp3 / .flac files on this window and play them with Audio.play(\"name\").", play_sound},
-      {Folder::Scenes, ICON_FA_MAP, "Scenes", config::kScenesDirName,
-       "Extra levels: scenes/<name>.glb, loaded with Game.load_scene(\"name\").", explain_scene},
+      {Folder::Scripts, ICON_FA_GEM, "editor.project.folder.scripts", config::kScriptsDirName,
+       "editor.project.folder.scripts_hint", edit_script},
+      {Folder::Models, ICON_FA_CUBES, "editor.project.folder.models", config::kModelsDirName,
+       "editor.project.folder.models_hint", add_model},
+      {Folder::Sounds, ICON_FA_VOLUME_HIGH, "editor.project.folder.sounds", config::kSoundsDirName,
+       "editor.project.folder.sounds_hint", play_sound},
+      {Folder::Scenes, ICON_FA_MAP, "editor.project.folder.scenes", config::kScenesDirName,
+       "editor.project.folder.scenes_hint", explain_scene},
   };
   return all;
 }

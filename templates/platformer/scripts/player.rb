@@ -20,7 +20,7 @@ class Player < Behaviour
   def collect_coin
     @coins += 1
     Audio.play(:coin)
-    GameMenu.instance.finish("You got every coin!") if @coins == @total
+    GameMenu.instance.finish(I18n.t("over.every_coin")) if @coins == @total
   end
 
   # Whether this machine plays the hero: not another player's (see Online), and none on a
@@ -39,7 +39,9 @@ class Player < Behaviour
     draw_hud
   end
 
-  def draw_hud = UI.text("Coins: #{@coins}/#{@total}", x: HUD_X, y: HUD_Y, size: HUD_SIZE, color: :gold)
+  def draw_hud
+    UI.text(I18n.t("hud.coins", coins: @coins, total: @total), x: HUD_X, y: HUD_Y, size: HUD_SIZE, color: :gold)
+  end
 
   private
 

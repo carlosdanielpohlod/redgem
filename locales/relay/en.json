@@ -1,0 +1,13 @@
+{
+  "relay.cli.usage": [
+    "usage:",
+    "  redgem-relay [--port <number>] [--per-address <number>] [--rooms-per-address <number>]",
+    "      run a meeting point for multiplayer games over the internet",
+    "",
+    "  --port <number>                the port to listen on (default: {default_port})",
+    "  --per-address <number>         machines one address may connect (default: {default_per_address}, at most {most_per_address})",
+    "  --rooms-per-address <number>   rooms one address may have open (default: {default_rooms}, at most {most_rooms})",
+    "Players behind one shared address (a campus, some mobile networks) may need more of both.",
+    ""
+  ]
+}
