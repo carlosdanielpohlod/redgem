@@ -82,3 +82,16 @@ To test the game's own classes, say which game they are from: they then load by 
 ```bash
 ./build/src/redgem-test --ruby tests/score_test.rb --game .
 ```
+
+A test may reopen one of the game's classes to add to it, a trace or a stand-in for a method:
+
+```ruby
+# tests/fighter_trace_test.rb
+class Fighter
+  alias untraced_strike strike
+  def strike(*args) = (Debug.log("strike #{args.inspect}"); untraced_strike(*args))
+end
+```
+
+A `class` or `module` line at the top of the file (not indented) loads that class from the game's
+scripts first, so the line reopens the game's `Fighter` instead of making a new, empty one.

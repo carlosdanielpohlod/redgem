@@ -461,3 +461,19 @@ TEST_CASE("elements fit a buffer only when no part of the sum wraps around") {
   CHECK_FALSE(gltf_checks::elements_fit(0, 4, kHuge, 4, kSize));
   CHECK_FALSE(gltf_checks::elements_fit(8, 4, 1, kHuge, kSize));
 }
+
+TEST_CASE("a material's custom property says whether it is dithered; any other is mixed, as glTF's blend says") {
+  const Scratch scratch;
+  Gltf file = triangle();
+  file.doc["materials"] =
+      json::array({{{"name", "Hair"}, {"alphaMode", "BLEND"}, {"extras", {{"transparency", "dithered"}}}},
+                   {{"name", "Glass"}, {"alphaMode", "BLEND"}, {"extras", {{"transparency", "glass"}}}},
+                   {{"name", "Plain"}}});
+  const LoadResult result = load_gltf_scene(written(scratch, file));
+  REQUIRE_MESSAGE(result.ok, result.error);
+  REQUIRE(result.scene.materials.size() == 3);
+  CHECK(result.scene.materials[0].dithered);
+  CHECK(result.scene.materials[0].alpha_mode == AlphaMode::Blend);
+  CHECK_FALSE(result.scene.materials[1].dithered);
+  CHECK_FALSE(result.scene.materials[2].dithered);
+}

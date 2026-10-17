@@ -293,10 +293,48 @@ end
 | `speed`, `life`, `size` | Meters per second, seconds, meters across (each particle varies a little) | 3.0, 0.8, 0.12 |
 | `gravity` | 1 falls like everything else, 0 floats, negative rises | 1.0 |
 | `image` | A picture from the game's `images/` folder drawn on each particle, tinted by `color` | a soft dot |
+| `frames`, `fps` | The image is a sprite sheet of `[columns, rows]` pictures, read like a page; `fps` of them a second, round and round, or all of them once over the particle's life without one | one picture |
 | `spin` | Degrees per second each picture turns | 0 |
+| `lit` | Takes the light of the sun, the sky and the lights near it, as smoke and dust do (glowing ones shine with their own light either way) | `false` |
+| `soft` | Meters over which it fades where it meets the ground or a wall, instead of cutting a hard line into it | 0 |
 
 A white picture with see-through edges works best, since the color tints it:
 `Particles.burst(at, image: :smoke, color: :gray, alpha: 90, size: 1.2, life: 1.5, gravity: -0.05, spin: 40)`.
+
+### Over their life
+
+`size`, `color` and `alpha` may each be a list of up to 4 values, which every particle goes
+through evenly over its life, from the first at its birth to the last at its end. A single size
+or alpha does what particles always did: it holds for half the life, then the size shrinks to
+0.3 of itself and the alpha fades out. A single color holds.
+
+```ruby
+# A flame that licks (an 8 x 4 sheet at 30 pictures a second), shrinking from yellow to a dark ember.
+Particles.burst(torch, count: 1, image: :flame_sheet, frames: [8, 4], fps: 30, glow: true, soft: 0.3,
+                size: [0.5, 0.6, 0.15], color: [[255, 230, 160], [255, 120, 30], [70, 25, 15]], life: 0.6)
+
+# Smoke that grows as it rises, fades in and out, and darkens in the shade.
+Particles.burst(chimney, count: 1, image: :smoke, lit: true, soft: 1.0, size: [0.5, 2.5],
+                alpha: [0, 120, 90, 0], gravity: -0.1, life: 3.0, spin: 20)
+```
+
+Lit particles are lit at their corners by the sun, the sky and the nearest lights, as a puff lit
+on about half of it; they take no shadows yet.
+
+## Light that flickers and fades
+
+An object with a light (a lamp, a fire's glow, made in Blender like any light) can change how
+bright it shines and in what color while the game runs:
+
+```ruby
+glow = Scene.spawn("FireLight", position: torch)
+every(0.05) { glow.light.intensity = 40 + rand * 25 }           # a flame's flicker
+tween(0.6) { |t| glow.light.intensity = 300 * (1 - t) }        # a blast that fades
+glow.light.color = [255, 120, 40]                               # or a name: :orange
+```
+
+`intensity` is in the units Blender gives the light (watts for a point or spot light, lux for the
+sun) and is at least 0; `color` is three channels from 0 to 255, as a color picker shows them.
 
 ## Control animations
 

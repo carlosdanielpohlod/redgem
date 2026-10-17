@@ -12,6 +12,8 @@
 #include "core/config.hpp"
 #include "core/exit_codes.hpp"
 #include "app/window_presenter.hpp"
+#include "net/socket/socket.hpp"
+#include "net/wire.hpp"
 #include "testing/recording_audio.hpp"
 #include "test_support.hpp"
 
@@ -275,6 +277,31 @@ TEST_CASE("only fixed_step selects fixed stepping: without it the game follows t
   Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
   for (int i = 0; i < kFrames; ++i) engine.frame(kHalfStep);
   CHECK(engine.script_context().time.elapsed == doctest::Approx(kFrames * kHalfStep).epsilon(0.1));
+}
+
+TEST_CASE("a join waits for its answer on the real clock, however fast a game nobody shows plays its frames") {
+  constexpr int kPastJoinTimeoutFrames = static_cast<int>(2.0f * net::kJoinTimeoutSeconds) * kOneSecondOfFrames;
+  constexpr double kPastJoinTimeout = net::kJoinTimeoutSeconds + 1.0;  // seconds
+  // Something that takes the connection and never answers: a listening socket nobody polls.
+  std::string error;
+  net::Socket silent = net::Socket::listen_on(0, error);
+  REQUIRE_MESSAGE(silent.valid(), error);
+  double now = 0.0;  // the real time, as the engine reads it
+  EngineOptions options;
+  options.game_dir = fixture("games/sandbox");
+  options.fixed_step = true;
+  options.network_time = [&now] { return now; };
+  auto created = Engine::create(options);
+  REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
+  Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
+  ruby(engine, "$reasons = []; Network.on_fail { |reason| $reasons << reason }");
+  ruby(engine, "Network.join('127.0.0.1', port: " + std::to_string(silent.local_port()) + ")");
+  frames(engine, kPastJoinTimeoutFrames);  // ten seconds of frames in no time at all
+  CHECK(ruby(engine, "[Network.connecting?, $reasons].inspect") == "[true, []]");
+  now += kPastJoinTimeout;
+  frames(engine, 1);
+  CHECK(ruby(engine, "[Network.connecting?, $reasons].inspect") ==
+        "[false, [\"" + std::string(net::kNoAnswer) + "\"]]");
 }
 
 TEST_CASE("the input a program hands the engine is what the game reads") {

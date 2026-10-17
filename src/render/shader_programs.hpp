@@ -21,6 +21,9 @@ struct LitUniforms {
   int emissive = kNoLocation;
   int has_emissive_map = kNoLocation;
   int alpha_cutoff = kNoLocation;
+  int alpha_ceiling = kNoLocation;
+  int alpha_dithered = kNoLocation;
+  int alpha_mixed = kNoLocation;
   int skinned = kNoLocation;
   int wind = kNoLocation;
   // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
@@ -55,9 +58,24 @@ struct DepthUniforms {
   int frame_texels = kNoLocation;
 };
 
+// Where the particle shader takes its values: per batch, and once per frame (what soft ones fade
+// into, and the light lit ones take).
 struct ParticleUniforms {
   int boost = kNoLocation;
   int textured = kNoLocation;
+  int scene_depth = kNoLocation;
+  int near_plane = kNoLocation;
+  int far_plane = kNoLocation;
+  int sun_color = kNoLocation;
+  int ambient = kNoLocation;
+  int sky_top = kNoLocation;
+  int sky_horizon = kNoLocation;
+  int ground = kNoLocation;
+  int point_count = kNoLocation;
+  int point_positions = kNoLocation;
+  int point_colors = kNoLocation;
+  int point_ranges = kNoLocation;
+  int look = kNoLocation;  // the vertex attribute of how soft and how lit a particle is
 };
 
 // A shader written for desktop OpenGL, compiled for this graphics card. `vertex` is null for a

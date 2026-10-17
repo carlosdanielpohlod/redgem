@@ -64,9 +64,11 @@ void Renderer::Impl::draw_lit_scene(const Camera3D& camera, const ParticleSystem
   ClearBackground(kBlack);
   BeginMode3D(camera);
   draw_sky(camera);
-  draw_objects(false, to_vec3(camera.position));
+  const std::size_t first = draw_objects(false, to_vec3(camera.position));
+  draw_see_through(first, to_vec3(camera.position));
   if (particles != nullptr) draw_particles(*particles, camera);
   EndMode3D();
+  if (glow_gathered) add_gathered_glow();
   EndTextureMode();
 }
 

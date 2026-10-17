@@ -9,6 +9,7 @@
 
 #include "audio/audio.hpp"
 #include "core/fixed_clock.hpp"
+#include "core/stopwatch.hpp"
 #include "input/input.hpp"
 #include "net/http/http_client.hpp"
 #include "net/discovery/lan_discovery.hpp"
@@ -52,6 +53,11 @@ struct EngineOptions {
   // the start as the game's host, with no player of its own (Network.server?), and, without a
   // `save` of the server's, what it saves kept for this match only. Empty: an ordinary game.
   std::string server_room;
+  // Where the network reads the real time its timeouts count (a join that gets no answer, a
+  // decision that never comes): the computer's steady clock when empty. Frames do not count: a
+  // game with nobody to show it plays them faster than real time. Tests that play frames to see
+  // a timeout give a reading that follows them.
+  Stopwatch::Reading network_time;
 };
 
 // Wires scene, physics, scripts and input together and runs the game loop. It opens no window and
@@ -126,7 +132,7 @@ class Engine {
   // The parts of a frame, in the order frame() runs them.
   void read_input();
   InputSource& input_source();
-  void poll_network(float frame_seconds);
+  void poll_network();
   // The answers of the game's web requests that came, each to the block waiting for it.
   void answer_requests();
   // Whether the game is one the neighbours looking for a game are told of: hosted on this
@@ -166,6 +172,7 @@ class Engine {
   net::LanDiscovery discovery_;
   net::HttpClient http_;  // (its requests still on their way are given up with the engine)
   FixedClock clock_;
+  Stopwatch network_watch_;  // the real time between the network's polls
 };
 
 }  // namespace redgem

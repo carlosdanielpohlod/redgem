@@ -86,3 +86,11 @@ TEST_CASE("strengths that go from none to full are held at full") {
   CHECK(env.ambient_occlusion == doctest::Approx(kFull));
   CHECK(env.bloom == doctest::Approx(kTooStrong));  // a plain amount: as much as asked
 }
+
+TEST_CASE("glowing particles have no limit unless the environment sets one") {
+  constexpr double kLimit = 3.0;
+  CHECK(default_environment().glow_limit == doctest::Approx(0.0f));
+  PropertyMap props;
+  props["glow_limit"] = kLimit;
+  CHECK(environment_from_props(props).glow_limit == doctest::Approx(kLimit));
+}

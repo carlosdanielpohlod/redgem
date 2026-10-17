@@ -132,7 +132,8 @@ redgem_add_library(redgem_core
   core/safe_path.cpp
   core/image_header.cpp
   core/math.cpp
-  core/fixed_clock.cpp)
+  core/fixed_clock.cpp
+  core/stopwatch.cpp)
 target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
 redgem_embed_texts(redgem_core core)
 if(ANDROID)
@@ -222,6 +223,7 @@ redgem_add_library(redgem_runtime
   scene/animation/animation_player_posing.cpp
   scene/camera_ray.cpp
   scene/particles.cpp
+  scene/particle_look.cpp
   scene/shapes/terrain.cpp
   scene/shapes/terrain_sculpt.cpp
   scene/shapes/terrain_raycast.cpp
@@ -264,6 +266,7 @@ redgem_add_library(redgem_runtime
   script/bindings/scatter_bindings.cpp
   script/bindings/camera_bindings.cpp
   script/bindings/physics_bindings.cpp
+  script/bindings/light_bindings.cpp
   script/bindings/runtime_bindings.cpp
   script/bindings/ui_bindings.cpp
   script/bindings/audio_bindings.cpp
@@ -271,6 +274,7 @@ redgem_add_library(redgem_runtime
   script/bindings/animation_bindings.cpp
   script/bindings/animation_sync_bindings.cpp
   script/bindings/particles_bindings.cpp
+  script/bindings/particle_look_args.cpp
   script/bindings/save_bindings.cpp
   script/bindings/i18n_bindings.cpp
   script/bindings/message_values.cpp
@@ -292,15 +296,20 @@ redgem_add_library(redgem_runtime
   render/renderer_frame_texels.cpp
   render/renderer_environment.cpp
   render/renderer_objects.cpp
+  render/renderer_see_through.cpp
   render/renderer_scatter.cpp
   render/renderer_particles.cpp
+  render/renderer_particle_glow.cpp
   render/renderer_shadows.cpp
   render/renderer_reflections.cpp
   render/renderer_post.cpp
   render/renderer_overlay.cpp
   render/mesh_pass.cpp
+  render/particle_buffer.cpp
   render/shader_programs.cpp
   render/render_math.cpp
+  render/material_alpha.cpp
+  render/particle_layout.cpp
   render/visibility.cpp
   render/texel_rows.cpp
   render/instance_records.cpp

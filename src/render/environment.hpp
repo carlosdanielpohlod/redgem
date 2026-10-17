@@ -27,6 +27,9 @@ struct Environment {
   float saturation = 0.0f;  // 1 leaves colors as they are; 0 is black and white
   float grain = 0.0f;       // film grain (0 = none)
   float aberration = 0.0f;  // color fringes toward the corners, as through a lens (0 = none)
+  // The brightest that glowing particles together make a pixel, in linear light: many of them over
+  // each other come near it instead of washing out to white (0 = no limit).
+  float glow_limit = 0.0f;
 };
 
 // A clear day: what scenes without an environment object get.
@@ -35,7 +38,7 @@ Environment default_environment();
 // The defaults with whatever the props override:
 //   sky_top, sky_horizon, ground_color, fog_color   "#rrggbb"
 //   fog_density, ambient, exposure, bloom, vignette, sun_glow, wind, shadows, ambient_occlusion,
-//   contrast, saturation, grain, aberration   numbers
+//   contrast, saturation, grain, aberration, glow_limit   numbers
 Environment environment_from_props(const PropertyMap& props);
 
 // The environment of the first live object with `environment = true`, or the default.

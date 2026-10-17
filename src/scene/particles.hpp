@@ -1,13 +1,17 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "core/math.hpp"
-#include "scene/scene_desc.hpp"
+#include "scene/particle_look.hpp"
 
 namespace redgem {
+
+// The most particles that fly at once: a burst past that lets out fewer.
+inline constexpr std::size_t kMaxParticles = 4096;
 
 // What a burst is like when nothing else is asked for.
 inline constexpr int kDefaultBurstCount = 12;
@@ -24,34 +28,32 @@ struct ParticleBurst {
   float spread_degrees = kDegreesPerHalfTurn;
   float speed = kDefaultBurstSpeed;  // meters per second (each particle gets a little more or less)
   float life = kDefaultBurstLife;    // seconds (also varied a little)
-  float size = kDefaultBurstSize;    // meters across
   float gravity = 1.0f;              // share of the world's gravity: 0 floats, negative rises (smoke)
-  Color color;
-  bool glow = false;  // lit from within: adds light instead of covering what is behind
-  // A picture from the game's images/ folder drawn on each particle (a puff of smoke, a star);
-  // empty for a soft round dot.
+  // How each one looks (its size also varies a little); its picture is the one named by `image`.
+  ParticleLook look = fading_look(kDefaultBurstSize);
+  // A picture from the game's images/ folder drawn on each particle (a puff of smoke, a star, a
+  // sprite sheet of flames); empty for a soft round dot.
   std::string image;
   float spin_degrees = 0.0f;  // how fast each one turns, per second (half of them the other way)
 };
-
-inline constexpr int kNoParticleImage = -1;
 
 struct Particle {
   Vec3 position;
   Vec3 velocity;
   float age = 0.0f;
   float life = 0.0f;
-  float size = 0.0f;
   float gravity = 0.0f;
-  Color color;
-  bool glow = false;
-  int image = kNoParticleImage;  // index into ParticleSystem::images()
-  float angle = 0.0f;            // radians it is turned by, around the line of sight
-  float spin = 0.0f;             // radians per second
+  ParticleLook look;
+  float angle = 0.0f;  // radians it is turned by, around the line of sight
+  float spin = 0.0f;   // radians per second
 
-  // What is drawn: particles shrink and fade out over the last part of their life.
-  float size_now() const;
-  float alpha_now() const;
+  // How much of its life is over: 0 at birth, 1 at the end.
+  float lived() const { return life > 0.0f ? age / life : 1.0f; }
+  // What is drawn now.
+  float size_now() const { return look.size.at(lived()); }
+  Vec3 color_now() const { return look.color.at(lived()); }
+  float alpha_now() const { return look.alpha.at(lived()); }
+  int frame_now() const { return flipbook_frame(look.flipbook, age, life); }
 };
 
 // The directions a burst's particles fly in: a cone around `axis`, which they lean away from

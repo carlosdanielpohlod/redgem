@@ -67,19 +67,6 @@ std::optional<std::string> graphics_card_name(const std::string& trace_line) {
 
 int downscaled(int size, int factor) { return std::max(size / factor, kSmallestTarget); }
 
-// --- Materials -------------------------------------------------------------------------------
-
-AlphaTest alpha_test(const MaterialDesc& material, float wind) {
-  const bool textured = material.base_color_image != kNoIndex;
-  const bool masked = material.alpha_mode == AlphaMode::Mask;
-  const bool cutout = masked || (material.alpha_mode == AlphaMode::Blend && textured);
-  AlphaTest test;
-  test.cutoff = masked ? material.alpha_cutoff : cutout ? kBlendAsCutoutThreshold : kNoCutoff;
-  test.sway = cutout && textured ? wind : kNoWind;
-  test.two_sided = material.double_sided || cutout;
-  return test;
-}
-
 // --- Lights ----------------------------------------------------------------------------------
 
 PointLightUniforms pack_point_lights(const std::vector<PointLight>& lights) {

@@ -9,7 +9,6 @@
 
 #include "render_system/render_stage.hpp"
 #include "scene/animation/animation_player.hpp"
-#include "scene/shapes/primitives.hpp"
 
 using namespace redgem;
 using redgem::test::Picture;
@@ -49,21 +48,8 @@ int brightest(::Color c) {
   return c.g > c.b ? kBrightGreen : kBrightBlue;
 }
 
-MaterialDesc glowing(redgem::Color color) {
-  MaterialDesc material;
-  material.base_color = color;
-  material.emissive = Vec3{color.r, color.g, color.b} * kGlow;
-  return material;
-}
-
-MeshDesc cube(int material) {
-  MeshDesc mesh{"Cube", {make_primitive(PrimitiveShape::Cube)}, {}};
-  mesh.primitives[0].material = material;
-  for (std::size_t i = 0; i < mesh.primitives[0].positions.size(); i += 3) {
-    mesh.bounds.include(vec3_from(&mesh.primitives[0].positions[i]));
-  }
-  return mesh;
-}
+MaterialDesc glowing(redgem::Color color) { return test::glowing_material(color, kGlow); }
+MeshDesc cube(int material) { return test::cube_mesh(material); }
 
 // A cube every vertex of which follows the skeleton's last bone, and nothing else.
 MeshDesc box_on_the_last_bone() {

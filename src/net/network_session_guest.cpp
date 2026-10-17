@@ -17,7 +17,9 @@ void NetworkSession::await_connection(float seconds, std::vector<NetworkEvent>& 
   connecting_for_ += seconds;
   if (connecting_for_ <= kJoinTimeoutSeconds) return;
   go_offline();
-  events.push_back(NetworkEvent::of(NetworkEvent::Kind::Failed));
+  NetworkEvent failed = NetworkEvent::of(NetworkEvent::Kind::Failed);
+  failed.name = kNoAnswer;
+  events.push_back(failed);
 }
 
 void NetworkSession::handle_as_guest(const nlohmann::json& message, std::vector<NetworkEvent>& events) {

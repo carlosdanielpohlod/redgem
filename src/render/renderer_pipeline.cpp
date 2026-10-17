@@ -9,6 +9,7 @@
 #include "render/shaders/lit_vertex.hpp"
 #include "render/shaders/panorama.hpp"
 #include "render/shaders/particle.hpp"
+#include "render/shaders/particle_glow.hpp"
 #include "render/shaders/shadow_depth.hpp"
 #include "render/shaders/sky.hpp"
 #include "render/shaders/tone_mapping.hpp"
@@ -38,6 +39,7 @@ void Renderer::Impl::load_pipeline() {
   lit_instance_slot = find_instance_slot(shader);
   depth_instance_slot = find_instance_slot(depth_shader);
   particle_uniforms = find_particle_uniforms(particle_shader);
+  particle_buffer = load_particle_buffer(particle_uniforms.look);
   load_fixed_targets();
   fallback_material = make_material(redgem::Color{});
   load_sky();
@@ -47,7 +49,8 @@ void Renderer::Impl::compile_shaders() {
   shader = compile_shader(shaders::kLitVertex, shaders::kLitFragment, "lit");
   depth_shader = compile_shader(shaders::kLitVertex, shaders::kDepthFragment, "shadow depth");
   sky_shader = compile_shader(shaders::kSkyVertex, shaders::kSkyFragment, "sky");
-  particle_shader = compile_shader(nullptr, shaders::kParticleFragment, "particles");
+  particle_shader = compile_shader(shaders::kParticleVertex, shaders::kParticleFragment, "particles");
+  glow_limit_shader = compile_shader(nullptr, shaders::kGlowLimitFragment, "glow limit");
   bright_shader = compile_shader(nullptr, shaders::kBrightFragment, "bloom threshold");
   blur_shader = compile_shader(nullptr, shaders::kBlurFragment, "blur");
   composite_shader = compile_shader(nullptr, shaders::kCompositeFragment, "tone mapping");
@@ -66,6 +69,7 @@ void Renderer::Impl::release() {
   if (texel_texture != 0) rlUnloadTexture(texel_texture);
   texel_texture = 0;
   release_slots(slots);
+  release_particle_buffer(particle_buffer);
   release_assets();
   release_targets();
   free_maps(fallback_material);
@@ -85,7 +89,7 @@ void Renderer::Impl::release_sky() {
 
 void Renderer::Impl::release_shaders() {
   for (Shader* program : {&shader, &depth_shader, &panorama_shader, &occlusion_shader, &sky_shader, &particle_shader,
-                          &bright_shader, &blur_shader, &composite_shader, &antialias_shader}) {
+                          &glow_limit_shader, &bright_shader, &blur_shader, &composite_shader, &antialias_shader}) {
     if (loaded(*program)) UnloadShader(*program);
     *program = Shader{};
   }

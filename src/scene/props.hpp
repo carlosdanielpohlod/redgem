@@ -26,6 +26,15 @@ inline constexpr const char* kTint = "tint";
 // range, make a detailed one up close and a light one far away.
 inline constexpr const char* kVisibleFrom = "visible_from";
 inline constexpr const char* kVisibleTo = "visible_to";
+// Whether wind sways an object's foliage (its textured see-through materials). Not said, it does
+// unless a skeleton moves the object (a character's hair follows its head, not the wind).
+inline constexpr const char* kSway = "sway";
+
+// --- The properties of a material (glTF material extras) --------------------------
+// How a blended material shows what is behind it: mixed with it, sorted farthest first (the
+// default), or `kDithered` (see MaterialDesc::dithered).
+inline constexpr const char* kTransparency = "transparency";
+inline constexpr const char* kDithered = "dithered";
 
 // --- Physics: what `body` and `collider` may be set to ----------------------------
 inline constexpr const char* kBodyStatic = "static";
@@ -65,6 +74,7 @@ inline constexpr const char* kContrast = "contrast";
 inline constexpr const char* kSaturation = "saturation";
 inline constexpr const char* kGrain = "grain";
 inline constexpr const char* kAberration = "aberration";
+inline constexpr const char* kGlowLimit = "glow_limit";
 }  // namespace environment
 
 }  // namespace redgem::props

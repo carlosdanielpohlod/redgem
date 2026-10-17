@@ -65,18 +65,48 @@ RenderTexture2D load_target(int width, int height, int format, bool with_depth) 
   return target;
 }
 
-// A framebuffer with only a depth texture, which the lit shader samples.
-RenderTexture2D load_shadow_target(int size) {
+// A framebuffer with only a depth texture, which shaders sample (the sun's shadow map, what soft
+// particles fade into).
+RenderTexture2D load_depth_target(int width, int height) {
   RenderTexture2D target{};
   target.id = rlLoadFramebuffer();
-  target.texture.width = size;
-  target.texture.height = size;
+  target.texture.width = width;
+  target.texture.height = height;
   rlEnableFramebuffer(target.id);
-  target.depth = load_depth_texture(target.id, size, size);
+  target.depth = load_depth_texture(target.id, width, height);
   const bool complete = rlFramebufferComplete(target.id);
   rlDisableFramebuffer();
-  if (!complete) throw std::runtime_error("cannot create the shadow map");
+  if (!complete) throw std::runtime_error("cannot create a depth target");
   return target;
+}
+
+void unload_depth_target(RenderTexture2D& target) {
+  if (!loaded(target)) return;
+  rlUnloadTexture(target.depth.id);
+  rlUnloadFramebuffer(target.id);
+  target = RenderTexture2D{};
+}
+
+// A target that draws on another's depth (which stays that other's when it is unloaded).
+RenderTexture2D load_target_on(const Texture2D& depth, int format) {
+  RenderTexture2D target{};
+  target.id = rlLoadFramebuffer();
+  rlEnableFramebuffer(target.id);
+  target.texture = load_color_texture(target.id, depth.width, depth.height, format);
+  rlFramebufferAttach(target.id, depth.id, RL_ATTACHMENT_DEPTH, RL_ATTACHMENT_TEXTURE2D, 0);
+  const bool complete = rlFramebufferComplete(target.id);
+  rlDisableFramebuffer();
+  if (!complete) throw std::runtime_error("cannot create a render target on another's depth");
+  return target;
+}
+
+// (raylib deletes whatever depth a framebuffer has when it unloads it: the other's is let go first.)
+void unload_target_on(RenderTexture2D& target) {
+  if (!loaded(target)) return;
+  rlFramebufferAttach(target.id, 0, RL_ATTACHMENT_DEPTH, RL_ATTACHMENT_TEXTURE2D, 0);
+  rlDisableFramebuffer();
+  UnloadRenderTexture(target);
+  target = RenderTexture2D{};
 }
 
 void unload(RenderTexture2D& target) {
@@ -92,7 +122,7 @@ bool fits(const RenderTexture2D& target, int width, int height) {
 }  // namespace
 
 void Renderer::Impl::load_fixed_targets() {
-  shadow = load_shadow_target(render_math::kShadowMapSize);
+  shadow = load_depth_target(render_math::kShadowMapSize, render_math::kShadowMapSize);
   reflection_face = load_target(kReflectionFaceSize, kReflectionFaceSize, kHdrFormat, true);
   panorama = load_target(kPanoramaWidth, kPanoramaHeight, kHdrFormat, false);
   // Around the horizon the panorama wraps; at the poles it must not (up would blend with down).
@@ -113,18 +143,21 @@ void Renderer::Impl::ensure_targets(int width, int height) {
   const int occlusion_height = downscaled(height, kOcclusionDownscale);
   occlusion_a = load_target(occlusion_width, occlusion_height, kScreenFormat, false);
   occlusion_b = load_target(occlusion_width, occlusion_height, kScreenFormat, false);
+  scene_depth = load_depth_target(width, height);
+}
+
+void Renderer::Impl::ensure_glow_target() {
+  if (!loaded(glow)) glow = load_target_on(hdr.depth, kHdrFormat);
 }
 
 void Renderer::Impl::release_targets() {
+  unload_target_on(glow);  // before the lit picture, whose depth it draws on
   for (RenderTexture2D* target : {&hdr, &bloom_a, &bloom_b, &ldr, &occlusion_a, &occlusion_b}) unload(*target);
+  unload_depth_target(scene_depth);
 }
 
 void Renderer::Impl::release_fixed_targets() {
-  if (loaded(shadow)) {
-    rlUnloadTexture(shadow.depth.id);
-    rlUnloadFramebuffer(shadow.id);
-    shadow = RenderTexture2D{};
-  }
+  unload_depth_target(shadow);
   for (RenderTexture2D* target : {&reflection_face, &panorama}) unload(*target);
 }
 

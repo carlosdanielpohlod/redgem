@@ -7,14 +7,11 @@ namespace redgem {
 
 namespace {
 
-constexpr std::size_t kMaxParticles = 4096;
 constexpr float kSpeedVariation = 0.4f;  // each particle's speed differs from the burst's by up to this share
 constexpr float kLifeVariation = 0.25f;
 constexpr float kSizeVariation = 0.3f;
 constexpr float kSpinVariation = 0.5f;
-constexpr float kFadeStart = 0.5f;  // share of its life after which a particle fades and shrinks
-constexpr float kEndSize = 0.3f;    // share of its size left at the end
-constexpr float kAirDrag = 0.6f;    // share of its speed a particle loses per second
+constexpr float kAirDrag = 0.6f;  // share of its speed a particle loses per second
 // A linear congruential generator (Numerical Recipes' constants), and how many of its bits are used.
 constexpr std::uint32_t kRandomMultiplier = 1664525u;
 constexpr std::uint32_t kRandomIncrement = 1013904223u;
@@ -23,9 +20,10 @@ constexpr float kRandomRange = 16777216.0f;  // 2^24
 
 float varied(float value, float variation, float unit) { return value * (1.0f + variation * (unit * kTwo - 1.0f)); }
 
-float fade(const Particle& particle) {
-  const float lived = particle.life > 0.0f ? particle.age / particle.life : 1.0f;
-  return std::clamp((lived - kFadeStart) / (1.0f - kFadeStart), 0.0f, 1.0f);
+// The same sizes over life, `scale` times as big.
+OverLife<float> scaled(OverLife<float> size, float scale) {
+  for (float& key : size.keys) key *= scale;
+  return size;
 }
 
 // Whether a burst that made `added` particles makes one more: it asks for more, and there is room.
@@ -34,9 +32,6 @@ bool makes_one_more(const ParticleBurst& burst, int added, std::size_t flying) {
 }
 
 }  // namespace
-
-float Particle::size_now() const { return size * (1.0f - (1.0f - kEndSize) * fade(*this)); }
-float Particle::alpha_now() const { return color.a * (1.0f - fade(*this)); }
 
 float ParticleSystem::random_unit() {
   seed_ = seed_ * kRandomMultiplier + kRandomIncrement;
@@ -83,11 +78,10 @@ Particle ParticleSystem::new_particle(const ParticleBurst& burst, const BurstCon
   particle.position = burst.position;
   particle.velocity = heading * varied(burst.speed, kSpeedVariation, random_unit());
   particle.life = varied(burst.life, kLifeVariation, random_unit());
-  particle.size = varied(burst.size, kSizeVariation, random_unit());
   particle.gravity = burst.gravity;
-  particle.color = burst.color;
-  particle.glow = burst.glow;
-  particle.image = image;
+  particle.look = burst.look;
+  particle.look.size = scaled(burst.look.size, varied(1.0f, kSizeVariation, random_unit()));
+  particle.look.image = image;
   if (image != kNoParticleImage) turn_at_random(particle, degrees_to_radians(burst.spin_degrees));
   return particle;
 }

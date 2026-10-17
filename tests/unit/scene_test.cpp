@@ -184,3 +184,26 @@ TEST_CASE("what is under a prefab is a prefab too, and prefabs are not found by 
   CHECK(scene.find_all_by_tag("enemy").empty());
   CHECK(scene.find("Child") != kNoObject);  // by name, a template is found
 }
+
+TEST_CASE("wind sways an object's foliage unless it says not to, or a skeleton moves it") {
+  SceneDesc desc;
+  NodeDesc tree;
+  tree.name = "Tree";
+  NodeDesc fence;
+  fence.name = "Fence";
+  fence.props = {{"sway", false}};
+  NodeDesc samurai;
+  samurai.name = "Samurai";
+  samurai.skin = 0;
+  NodeDesc flag;
+  flag.name = "Flag";
+  flag.skin = 0;
+  flag.props = {{"sway", true}};
+  desc.nodes = {tree, fence, samurai, flag};
+  desc.skins = {SkinDesc{}};
+  const Scene scene = Scene::from_desc(desc);
+  CHECK(scene.at(0).sways);
+  CHECK_FALSE(scene.at(1).sways);
+  CHECK_FALSE(scene.at(2).sways);  // a character's hair follows its head
+  CHECK(scene.at(3).sways);
+}

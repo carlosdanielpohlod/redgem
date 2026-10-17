@@ -29,6 +29,7 @@ struct ScatterSet {
   // Drawn only while this far from the camera, in meters (see GameObject).
   float visible_from = 0.0f;
   float visible_to = std::numeric_limits<float>::infinity();
+  bool sways = true;  // whether wind sways its foliage (see GameObject)
   std::vector<Transform> places;
 };
 

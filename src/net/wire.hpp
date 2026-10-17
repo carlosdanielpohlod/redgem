@@ -28,8 +28,10 @@ inline constexpr int kMaxDataDepth = 16;
 // ... and how many things one of its arrays or hashes may hold (every one of them becomes a value
 // in the game's memory on arrival).
 inline constexpr std::size_t kMaxDataMembers = 4096;
-// How long a machine that connected may keep quiet before saying what it wants.
+// How long a machine that connected may keep quiet before saying what it wants (and how long one
+// that joins waits for an answer, on the real clock), and why the one that joins gives up.
 inline constexpr float kJoinTimeoutSeconds = 5.0f;
+inline constexpr const char* kNoAnswer = "the game did not answer in time";
 // A machine that stopped listening is let go once this much is waiting to be sent to it.
 inline constexpr std::size_t kMaxPendingBytes = 8 * 1024 * 1024;
 // What one poll takes from one machine (at least a whole message, so there is always progress).

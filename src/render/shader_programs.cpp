@@ -35,6 +35,9 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::emissive, shaders::kEmissive},
     {&LitUniforms::has_emissive_map, shaders::kHasEmissiveMap},
     {&LitUniforms::alpha_cutoff, shaders::kAlphaCutoff},
+    {&LitUniforms::alpha_ceiling, shaders::kAlphaCeiling},
+    {&LitUniforms::alpha_dithered, shaders::kAlphaDithered},
+    {&LitUniforms::alpha_mixed, shaders::kAlphaMixed},
     {&LitUniforms::skinned, shaders::kSkinned},
     {&LitUniforms::wind, shaders::kWindAmount},
     // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
@@ -58,6 +61,29 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::sky_top, shaders::kSkyTop},
     {&LitUniforms::sky_horizon, shaders::kSkyHorizon},
     {&LitUniforms::ground, shaders::kGroundColor},
+};
+
+// A uniform of the particle shader, and where its location is kept.
+struct ParticleUniform {
+  int ParticleUniforms::* location;
+  const char* name;
+};
+
+constexpr ParticleUniform kParticleUniforms[] = {
+    {&ParticleUniforms::boost, shaders::kParticleBoost},
+    {&ParticleUniforms::textured, shaders::kParticleTextured},
+    {&ParticleUniforms::scene_depth, shaders::kSceneDepth},
+    {&ParticleUniforms::near_plane, shaders::kNearPlane},
+    {&ParticleUniforms::far_plane, shaders::kFarPlane},
+    {&ParticleUniforms::sun_color, shaders::kSunColor},
+    {&ParticleUniforms::ambient, shaders::kAmbientStrength},
+    {&ParticleUniforms::sky_top, shaders::kSkyTop},
+    {&ParticleUniforms::sky_horizon, shaders::kSkyHorizon},
+    {&ParticleUniforms::ground, shaders::kGroundColor},
+    {&ParticleUniforms::point_count, shaders::kPointLightCount},
+    {&ParticleUniforms::point_positions, shaders::kPointLightPositions},
+    {&ParticleUniforms::point_colors, shaders::kPointLightColors},
+    {&ParticleUniforms::point_ranges, shaders::kPointLightRanges},
 };
 
 }  // namespace
@@ -91,8 +117,12 @@ DepthUniforms find_depth_uniforms(const Shader& depth) {
 int find_instance_slot(const Shader& program) { return GetShaderLocationAttrib(program, shaders::kInstanceSlot); }
 
 ParticleUniforms find_particle_uniforms(const Shader& particles) {
-  return {GetShaderLocation(particles, shaders::kParticleBoost),
-          GetShaderLocation(particles, shaders::kParticleTextured)};
+  ParticleUniforms found;
+  for (const ParticleUniform& uniform : kParticleUniforms) {
+    found.*uniform.location = GetShaderLocation(particles, uniform.name);
+  }
+  found.look = GetShaderLocationAttrib(particles, shaders::kParticleLook);
+  return found;
 }
 
 }  // namespace redgem::render_detail

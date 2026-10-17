@@ -42,9 +42,11 @@ class RenderStage {
 
   // Uploads a scene's meshes and materials, replacing the last one's.
   void upload(const SceneDesc& desc) { renderer_->upload(desc); }
-  // The scene as its camera sees it; also written to <screenshots>/render/<name>.png for whoever
-  // looks at the run afterwards.
-  Picture draw(const Scene& scene, const std::string& name);
+  // The scene as its camera sees it, with `particles` when given; also written to
+  // <screenshots>/render/<name>.png for whoever looks at the run afterwards.
+  Picture draw(const Scene& scene, const std::string& name, const ParticleSystem* particles = nullptr);
+  // Where particles find their pictures by name.
+  void set_images_dir(const std::filesystem::path& dir) { renderer_->set_images_dir(dir); }
 
  private:
   Window window_;
@@ -54,5 +56,9 @@ class RenderStage {
 
 // A camera node at `position`, looking at the origin.
 NodeDesc camera_at(Vec3 position);
+// A cube a meter across, drawn with `material`.
+MeshDesc cube_mesh(int material);
+// A material that shines with its own color, `glow` times over: lit the same whatever the light.
+MaterialDesc glowing_material(Color color, float glow);
 
 }  // namespace redgem::test

@@ -97,7 +97,7 @@ mrb_value scatter_place(mrb_state* mrb, mrb_value) {
   std::vector<Transform> places = scatter_places(args.request, ground_of(mrb, args.ground));
   const auto placed = static_cast<mrb_int>(places.size());
   const int id = scene(mrb).scattered().add(
-      {0, object.mesh, object.tint, object.visible_from, object.visible_to, std::move(places)});
+      {0, object.mesh, object.tint, object.visible_from, object.visible_to, object.sways, std::move(places)});
   if (id == 0) mrb_raisef(mrb, E_ARGUMENT_ERROR, "a scene holds at most %d scattered copies", kMostCopies);
   const mrb_value answer[] = {mrb_int_value(mrb, id), mrb_int_value(mrb, placed)};
   return mrb_ary_new_from_values(mrb, kAnswerParts, answer);

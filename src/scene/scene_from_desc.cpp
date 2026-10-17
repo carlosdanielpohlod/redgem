@@ -26,12 +26,13 @@ void copy_parts(const NodeDesc& node, GameObject& object) {
   object.light = node.light;
 }
 
-// What a node's custom properties say about the object itself.
+// What a node's custom properties say about the object itself (its skeleton is known by then).
 void apply_props(const PropertyMap& props, GameObject& object) {
   object.props = props;
   object.tag = get_string(props, props::kTag).value_or("");
   object.visible = get_bool(props, props::kVisible).value_or(true);
   object.prefab = get_bool(props, props::kPrefab).value_or(false);
+  object.sways = get_bool(props, props::kSway).value_or(object.skin == kNoIndex);
   if (const auto tint = get_string(props, props::kTint)) {
     object.tint = parse_hex_color(*tint).value_or(Vec3::one());
   }
