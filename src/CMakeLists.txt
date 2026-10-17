@@ -294,6 +294,7 @@ redgem_add_library(redgem_runtime
   render/sky_sampling.cpp
   render/sky_cube.cpp
   render/sky_light.cpp
+  render/shadow_cascades.cpp
   render/mesh_pieces.cpp
   render/texture_loading.cpp
   render/renderer.cpp

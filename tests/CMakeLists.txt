@@ -68,6 +68,7 @@ add_executable(redgem_tests
   unit/instance_records_test.cpp
   unit/scatter_test.cpp
   unit/capture_views_test.cpp
+  unit/shadow_cascades_test.cpp
   unit/sky_light_test.cpp
   unit/shader_source_test.cpp
   unit/terrain_test.cpp
