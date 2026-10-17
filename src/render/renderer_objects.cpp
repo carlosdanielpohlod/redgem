@@ -127,7 +127,7 @@ void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const Matrix&
   const bool two_sided = pass.last_two_sided;
   if (two_sided) rlDisableBackfaceCulling();
   // Per part: a skinned object may still have parts without bone weights, which stay rigid.
-  const bool deformed = skinned && primitive.mesh.boneIds != nullptr;
+  const bool deformed = skinned && primitive.skinned;
   const float skinning = deformed ? kOn : kOff;
   rlSetUniform(pass.skinned_location, &skinning, SHADER_UNIFORM_FLOAT, 1);
   draw_mesh(pass.meshes, primitive.mesh, transform, deformed ? &bone_matrices : nullptr);

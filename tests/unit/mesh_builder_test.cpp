@@ -15,7 +15,8 @@ namespace {
 
 constexpr std::size_t kTriangleVertices = 3;
 constexpr std::uint8_t kRed[] = {200, 10, 10, 255};  // one vertex's color
-constexpr std::uint8_t kSecondJoint = 1;
+constexpr std::uint16_t kSecondJoint = 1;
+constexpr std::uint16_t kJointPastAByte = 300;  // a joint of a skeleton with fingers and more
 constexpr float kFullWeight = 1.0f;
 constexpr std::size_t kTooManyVertices = config::kMaxVerticesPerMesh + 1;
 
@@ -32,7 +33,7 @@ PrimitiveDesc skinned_triangle() {
   PrimitiveDesc primitive = triangle();
   for (std::size_t vertex = 0; vertex < kTriangleVertices; ++vertex) {
     primitive.colors.insert(primitive.colors.end(), std::begin(kRed), std::end(kRed));
-    primitive.joints.insert(primitive.joints.end(), {kSecondJoint, 0, 0, 0});
+    primitive.joints.insert(primitive.joints.end(), {kSecondJoint, kJointPastAByte, 0, 0});
     primitive.weights.insert(primitive.weights.end(), {kFullWeight, 0.0f, 0.0f, 0.0f});
   }
   return primitive;
@@ -88,10 +89,13 @@ TEST_CASE("vertex colors and skinning are carried into the mesh") {
   CHECK(error.empty());
   CHECK(mesh->colors[0] == kRed[0]);
   CHECK(mesh->colors[1] == kRed[1]);
-  REQUIRE(mesh->boneIds != nullptr);
   REQUIRE(mesh->boneWeights != nullptr);
-  CHECK(mesh->boneIds[0] == kSecondJoint);
   CHECK(mesh->boneWeights[0] == doctest::Approx(kFullWeight));
+  const std::vector<std::uint16_t> joints = skin_joints(skinned_triangle());
+  REQUIRE(joints.size() == kTriangleVertices * config::kJointsPerVertex);
+  CHECK(joints[0] == kSecondJoint);
+  CHECK(joints[1] == kJointPastAByte);  // more than a byte names: they go up 16 bits each
+  CHECK(mesh->boneIds == nullptr);      // (not raylib's, which hold a byte)
   free_cpu_mesh(*mesh);
 }
 
@@ -99,7 +103,7 @@ TEST_CASE("a mesh without skinning, or with skinning of the wrong length, is rig
   std::string error;
   std::optional<Mesh> rigid = build_mesh(triangle(), error);
   REQUIRE(rigid.has_value());
-  CHECK(rigid->boneIds == nullptr);
+  CHECK(skin_joints(triangle()).empty());
   CHECK(rigid->boneWeights == nullptr);
   free_cpu_mesh(*rigid);
 
@@ -107,6 +111,7 @@ TEST_CASE("a mesh without skinning, or with skinning of the wrong length, is rig
   broken.weights.pop_back();
   std::optional<Mesh> ignored = build_mesh(broken, error);
   REQUIRE(ignored.has_value());
-  CHECK(ignored->boneIds == nullptr);
+  CHECK(skin_joints(broken).empty());
+  CHECK(ignored->boneWeights == nullptr);
   free_cpu_mesh(*ignored);
 }

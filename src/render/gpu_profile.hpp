@@ -17,7 +17,7 @@ inline constexpr const char* kShaderHeader = shaders::kMobileHeader;
 inline constexpr int kMaxSkinJoints = 48;
 #else
 inline constexpr const char* kShaderHeader = shaders::kDesktopVersionLine;
-inline constexpr int kMaxSkinJoints = config::kMaxSkinJoints;  // every joint a scene's skeleton may have
+inline constexpr int kMaxSkinJoints = 64;
 #endif
 
 // A scene is never loaded with more joints than it may have, whatever the graphics card holds.

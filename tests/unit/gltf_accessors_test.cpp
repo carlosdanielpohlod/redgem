@@ -16,6 +16,8 @@ namespace {
 constexpr std::uint8_t kFullByte = 255;
 constexpr std::uint8_t kHalfByte = 127;  // half of a full channel, rounded down
 constexpr std::uint16_t kJointPastAByte = 300;
+constexpr std::uint16_t kJointPastASkeleton = 5000;  // more joints than a skeleton may have
+constexpr std::uint16_t kLastJoint = gltf_accessors::kMaxJointIndex;
 constexpr std::size_t kMoreThanStored = 100;  // elements an accessor claims without having them
 
 // An accessor over `values`, which it keeps: `per_element` of them make one element.
@@ -54,7 +56,7 @@ TEST_CASE("an accessor's floats are every component of every element") {
 
 TEST_CASE("an accessor that is missing, or claims more than its data holds, gives nothing") {
   CHECK(gltf_accessors::unpack_floats(nullptr).empty());
-  CHECK(gltf_accessors::joint_bytes(nullptr).empty());
+  CHECK(gltf_accessors::joint_indices(nullptr).empty());
   CHECK(gltf_accessors::rgba_bytes(nullptr).empty());
 
   Stored<float> lying = floats({1.0f, 2.0f, 3.0f}, cgltf_type_vec3);
@@ -64,10 +66,11 @@ TEST_CASE("an accessor that is missing, or claims more than its data holds, give
   CHECK(gltf_accessors::triangle_corners(&lying.accessor, 3).empty());
 }
 
-TEST_CASE("joints are four bytes a vertex, and an index past a byte becomes the highest a byte holds") {
-  const Stored<std::uint16_t> joints({0, 1, kJointPastAByte, 2, 3, 0, 0, 0}, cgltf_component_type_r_16u,
-                                     cgltf_type_vec4);
-  CHECK(gltf_accessors::joint_bytes(&joints.accessor) == std::vector<std::uint8_t>{0, 1, kFullByte, 2, 3, 0, 0, 0});
+TEST_CASE("joints are four indices a vertex, and one past the last a skeleton may have becomes that last one") {
+  const Stored<std::uint16_t> joints({0, 1, kJointPastAByte, 2, 3, kJointPastASkeleton, 0, 0},
+                                     cgltf_component_type_r_16u, cgltf_type_vec4);
+  CHECK(gltf_accessors::joint_indices(&joints.accessor) ==
+        std::vector<std::uint16_t>{0, 1, kJointPastAByte, 2, 3, kLastJoint, 0, 0});
 }
 
 TEST_CASE("colors without an alpha are opaque, and channels are brought into what a byte holds") {

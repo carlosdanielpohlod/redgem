@@ -57,6 +57,7 @@ struct GpuPrimitive {
   int material = kNoIndex;
   // Which of the mesh's pieces it is (see mesh_pieces): a piece that cannot be drawn has no part.
   std::size_t piece = 0;
+  bool skinned = false;  // has joints: a skeleton deforms it
 };
 
 // One pass over the scene's objects: what it is drawn with, what it can see, and the material

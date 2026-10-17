@@ -10,16 +10,19 @@
 #include <cstdint>
 #include <vector>
 
+#include "scene/scene_config.hpp"
+
 namespace redgem::gltf_accessors {
 
-inline constexpr cgltf_uint kMaxJointByte = 255;  // the highest joint index a vertex can name
+// The highest joint index a vertex can name: the last joint a skeleton may have.
+inline constexpr cgltf_uint kMaxJointIndex = config::kMaxSkinJoints - 1;
 
 // Every component of every element, as floats.
 std::vector<float> unpack_floats(const cgltf_accessor* accessor);
 
-// The joints each vertex follows, four to a vertex, one byte each: an index past what a byte
-// holds becomes the highest one it does.
-std::vector<std::uint8_t> joint_bytes(const cgltf_accessor* accessor);
+// The joints each vertex follows, four to a vertex: an index past the last joint a skeleton may
+// have becomes that one.
+std::vector<std::uint16_t> joint_indices(const cgltf_accessor* accessor);
 
 // Vertex colors as four bytes a vertex. Colors without an alpha are opaque; channels outside
 // 0..1 are brought into it.

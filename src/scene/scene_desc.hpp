@@ -63,8 +63,8 @@ struct PrimitiveDesc {
   std::vector<std::uint32_t> indices;  // triangle list
   // Skinning (both empty on rigid meshes): for each vertex, up to 4 joints of the node's skin and
   // how much each one moves it.
-  std::vector<std::uint8_t> joints;  // 4 per vertex, indices into SkinDesc::joints
-  std::vector<float> weights;        // 4 per vertex
+  std::vector<std::uint16_t> joints;  // 4 per vertex, indices into SkinDesc::joints
+  std::vector<float> weights;         // 4 per vertex
   int material = kNoIndex;
 };
 

@@ -116,7 +116,7 @@ TEST_CASE("a scene loaded for a drawer that moves fewer joints has the others fo
   REQUIRE(limited.warnings.size() == 1);
   CHECK(limited.warnings.front().find("more than 1 joints") != std::string::npos);
   bool beyond_the_first = false;
-  for (const std::uint8_t joint : whole.scene.meshes[0].primitives[0].joints) beyond_the_first |= joint > 0;
+  for (const std::uint16_t joint : whole.scene.meshes[0].primitives[0].joints) beyond_the_first |= joint > 0;
   CHECK(beyond_the_first);
-  for (const std::uint8_t joint : limited.scene.meshes[0].primitives[0].joints) CHECK(joint == 0);
+  for (const std::uint16_t joint : limited.scene.meshes[0].primitives[0].joints) CHECK(joint == 0);
 }
