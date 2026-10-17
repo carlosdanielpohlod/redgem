@@ -92,7 +92,7 @@ struct WithStranger {
 
   // A stranger that has said its first words already, as the tests below need.
   static WithStranger greeted() {
-    WithStranger pair = WithStranger::greeted();
+    WithStranger pair;
     pair.say_hello();
     return pair;
   }

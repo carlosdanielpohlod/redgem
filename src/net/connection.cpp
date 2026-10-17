@@ -62,10 +62,15 @@ std::optional<nlohmann::json> Connection::next_message() {
 }
 
 std::optional<nlohmann::json> Connection::understood(const std::optional<nlohmann::json>& message) {
-  if (first_of_another_protocol(message)) return another_protocol(wire::protocol_of(message.value()));
+  if (!message) return not_ours();
+  if (first_of_another_protocol(*message)) return another_protocol(wire::protocol_of(*message));
   heard_ = true;
-  if (message && wire::well_formed(*message)) return message;
-  close();  // not one of ours
+  if (wire::well_formed(*message)) return message;
+  return not_ours();
+}
+
+std::optional<nlohmann::json> Connection::not_ours() {
+  close();
   return std::nullopt;
 }
 

@@ -94,10 +94,12 @@ class Connection {
   // What a message that arrived is to this side (see next_message).
   std::optional<nlohmann::json> understood(const std::optional<nlohmann::json>& message);
   // Whether a message is the first words of another version of the protocol.
-  bool first_of_another_protocol(const std::optional<nlohmann::json>& message) const {
-    return !heard_ && message.has_value() && !wire::speaks_our_protocol(*message);
+  bool first_of_another_protocol(const nlohmann::json& message) const {
+    return !heard_ && !wire::speaks_our_protocol(message);
   }
   std::optional<nlohmann::json> another_protocol(int theirs);
+  // What is not a message of ours closes the connection: nothing of it is used.
+  std::optional<nlohmann::json> not_ours();
 
   Socket socket_;
   FrameBuffer incoming_;
