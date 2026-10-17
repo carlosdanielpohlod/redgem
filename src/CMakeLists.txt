@@ -131,6 +131,9 @@ redgem_add_library(redgem_core
   core/platform_language.cpp
   core/safe_path.cpp
   core/image_header.cpp
+  core/float_image.cpp
+  core/radiance_header.cpp
+  core/radiance_pixels.cpp
   core/math.cpp
   core/fixed_clock.cpp
   core/stopwatch.cpp)

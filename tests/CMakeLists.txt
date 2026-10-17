@@ -23,6 +23,7 @@ add_executable(redgem_tests
   unit/gltf_loader_safety_test.cpp
   unit/safe_path_test.cpp
   unit/image_header_test.cpp
+  unit/radiance_image_test.cpp
   unit/body_config_test.cpp
   unit/contact_events_test.cpp
   unit/input_test.cpp
