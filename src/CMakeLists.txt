@@ -218,6 +218,7 @@ redgem_add_library(redgem_runtime
   scene/scene_from_desc.cpp
   scene/scene_copies.cpp
   scene/scatter.cpp
+  scene/scatter_looks.cpp
   scene/animation/animation.cpp
   scene/animation/clip_clock.cpp
   scene/animation/animation_player.cpp

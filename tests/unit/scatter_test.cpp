@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <optional>
@@ -8,6 +9,7 @@
 #include "render/render_math.hpp"
 #include "render/scatter_chunks.hpp"
 #include "scene/scatter.hpp"
+#include "scene/scatter_looks.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -202,7 +204,7 @@ TEST_CASE("a cell is within its distances, beyond them, or across them") {
 }
 
 TEST_CASE("two levels of detail meeting across a cell draw each copy once, by where each copy is") {
-  ScatterLayout near_set{kNearMesh, 0.0f, kLodBoundary, 0, {small_chunk_in_the_middle()}, {kNearCopy, kFarCopy}};
+  ScatterLayout near_set{kNearMesh, 0.0f, kLodBoundary, true, 0, {small_chunk_in_the_middle()}, {kNearCopy, kFarCopy}};
   near_set.chunks[0].count = 2;
   ScatterLayout far_set = near_set;
   far_set.mesh = kFarMesh;
@@ -216,4 +218,44 @@ TEST_CASE("two levels of detail meeting across a cell draw each copy once, by wh
   CHECK(batches.batches()[0].mesh == kNearMesh);
   CHECK(batches.batches()[1].mesh == kFarMesh);
   CHECK(batches.slots() == std::vector<float>{0.0f, 1.0f});  // the near copy by the near set, the far by the far
+}
+
+TEST_CASE("copies take tints along the list asked for, the same for the same seed") {
+  ScatterLooks looks;
+  looks.tints = {Vec3{1.0f, 0.0f, 0.0f}, Vec3{0.0f, 0.0f, 1.0f}};
+  const std::vector<Vec3> tints = scatter_tints(looks, kSeed, kTries);
+  REQUIRE(tints.size() == kTries);
+  const std::vector<Vec3> again = scatter_tints(looks, kSeed, kTries);
+  const std::vector<Vec3> other = scatter_tints(looks, kOtherSeed, kTries);
+  CHECK(approx_equal(tints[kTries / 2], again[kTries / 2], 0.0f));
+  CHECK_FALSE(approx_equal(tints[kTries / 2], other[kTries / 2], kTolerance));
+  for (const Vec3 tint : tints) {
+    CHECK(tint.y == doctest::Approx(0.0f));
+    CHECK(tint.x + tint.z == doctest::Approx(1.0f));  // a blend of the two
+  }
+}
+
+TEST_CASE("copies vary in brightness only as much as asked, and not at all unless asked") {
+  ScatterLooks looks;
+  CHECK(scatter_tints(looks, kSeed, kTries).empty());
+  constexpr float kVariation = 0.2f;
+  looks.tint_variation = kVariation;
+  float darkest = 1.0f;
+  float brightest = 1.0f;
+  for (const Vec3 tint : scatter_tints(looks, kSeed, kTries)) {
+    CHECK(tint.x == doctest::Approx(tint.y));  // no hue: white made brighter or darker
+    darkest = std::min(darkest, tint.x);
+    brightest = std::max(brightest, tint.x);
+  }
+  CHECK(darkest >= 1.0f - kVariation);
+  CHECK(brightest <= 1.0f + kVariation);
+  CHECK(brightest - darkest > kVariation);  // they do vary
+}
+
+TEST_CASE("copies are scaled by their template's own scale, on top of their own") {
+  std::vector<redgem::Transform> places = scatter_places(request(), {});
+  const float own = places.front().scale.x;
+  scale_places(places, Vec3{2.0f, 3.0f, 2.0f});
+  CHECK(places.front().scale.x == doctest::Approx(own * 2.0f));
+  CHECK(places.front().scale.y == doctest::Approx(own * 3.0f));
 }

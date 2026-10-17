@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "scene/scatter.hpp"
+#include "scene/scatter_looks.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 
@@ -25,7 +26,13 @@ constexpr float kReach = 1000.0f;
 constexpr mrb_float kLargestSeed = 4294967295.0;  // seeds are 32-bit
 constexpr mrb_float kOneCopy = 1.0;
 constexpr mrb_float kNoScale = 0.0;
-constexpr int kPlaceArgs = 9;
+constexpr mrb_float kNoVariation = 0.0;
+constexpr mrb_float kFullVariation = 1.0;
+constexpr mrb_float kNoFade = 0.0;
+constexpr mrb_float kAsModelled = 0.0;  // normals as the mesh has them
+constexpr mrb_float kStraightUp = 1.0;
+constexpr int kPlaceArgs = 13;
+constexpr auto kMostTints = static_cast<int>(kMaxScatterTints);
 constexpr int kAnswerParts = 2;  // what Scatter.__place answers: an id and a count
 constexpr auto kMostCopies = static_cast<int>(kMaxScatteredCopies);
 
@@ -66,21 +73,50 @@ void set_box(mrb_state* mrb, ScatterRequest& request, mrb_value first, mrb_value
   request.high = {std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z)};
 }
 
-// What Scatter.__place is given: the template, what copies stand on, and how they are placed.
+// What Scatter.__place is given: the template, what copies stand on, how they are placed and how
+// they look.
 struct PlaceArgs {
   mrb_value source;
   mrb_value ground;
   ScatterRequest request;
+  ScatterLooks looks;
+  float fade = 0.0f;
+  float normals_up = 0.0f;
 };
 
-// Scatter.__place(template, count, corner, corner, ground, seed, smallest, largest, align)
+bool is_list(mrb_value value) { return mrb_array_p(value); }
+
+// A list of up to kMaxScatterTints colors (each [r, g, b] or a Vector3), or none for nil.
+std::vector<Vec3> tints_arg(mrb_state* mrb, mrb_value list) {
+  std::vector<Vec3> tints;
+  if (mrb_nil_p(list)) return tints;
+  if (!is_list(list)) mrb_raise(mrb, E_ARGUMENT_ERROR, "tints must be a list of colors");
+  const mrb_int count = RARRAY_LEN(list);
+  if (count > kMostTints) mrb_raisef(mrb, E_ARGUMENT_ERROR, "tints holds at most %d colors", kMostTints);
+  for (mrb_int i = 0; i < count; ++i) tints.push_back(to_vec3(mrb, mrb_ary_ref(mrb, list, i)));
+  return tints;
+}
+
+// tints, tint_variation, fade, normals_up: how the copies look.
+void set_looks(mrb_state* mrb, PlaceArgs& args, mrb_value tints, mrb_float variation, mrb_float fade,
+               mrb_float normals_up) {
+  args.looks.tints = tints_arg(mrb, tints);
+  args.looks.tint_variation =
+      static_cast<float>(from_to(mrb, variation, kNoVariation, kFullVariation, "tint_variation"));
+  args.fade = static_cast<float>(at_least(mrb, fade, kNoFade, "fade"));
+  args.normals_up = static_cast<float>(from_to(mrb, normals_up, kAsModelled, kStraightUp, "normals_up"));
+}
+
+// Scatter.__place(template, count, corner, corner, ground, seed, smallest, largest, align, tints,
+//                 tint_variation, fade, normals_up)
 PlaceArgs place_args(mrb_state* mrb) {
   PlaceArgs args{};
-  mrb_value first, second;
-  mrb_float count = 0.0, seed = 0.0, smallest = 1.0, largest = 1.0;
+  mrb_value first, second, tints;
+  mrb_float count = 0.0, seed = 0.0, smallest = 1.0, largest = 1.0, variation = 0.0, fade = 0.0, normals_up = 0.0;
   mrb_bool align = false;
-  mrb_get_args(mrb, "ofooofffb", &args.source, &count, &first, &second, &args.ground, &seed, &smallest, &largest,
-               &align);
+  mrb_get_args(mrb, "ofooofffbofff", &args.source, &count, &first, &second, &args.ground, &seed, &smallest, &largest,
+               &align, &tints, &variation, &fade, &normals_up);
+  set_looks(mrb, args, tints, variation, fade, normals_up);
   args.request.count = static_cast<std::size_t>(from_to(mrb, count, kOneCopy, kMaxScatteredCopies, "the count"));
   args.request.seed = static_cast<std::uint32_t>(from_to(mrb, seed, 0.0, kLargestSeed, "the seed"));
   args.request.smallest = static_cast<float>(more_than(mrb, smallest, kNoScale, "the smallest scale"));
@@ -90,14 +126,30 @@ PlaceArgs place_args(mrb_state* mrb) {
   return args;
 }
 
+// The set of copies of `object`: its mesh and look, at `places` scaled by its own scale.
+ScatterSet set_of(mrb_state* mrb, const GameObject& object, const PlaceArgs& args, std::vector<Transform> places) {
+  ScatterSet set;
+  set.mesh = object.mesh;
+  set.tint = object.tint;
+  set.visible_from = object.visible_from;
+  set.visible_to = object.visible_to;
+  set.sways = object.sways;
+  set.cast_shadow = object.cast_shadow;
+  scale_places(places, scene(mrb).world_transform(object.id).scale);
+  set.tints = scatter_tints(args.looks, args.request.seed, places.size());
+  set.places = std::move(places);
+  set.fade = args.fade;
+  set.normals_up = args.normals_up;
+  return set;
+}
+
 // -> [the set's id, how many copies were placed].
 mrb_value scatter_place(mrb_state* mrb, mrb_value) {
   const PlaceArgs args = place_args(mrb);
   const GameObject& object = template_arg(mrb, args.source);
   std::vector<Transform> places = scatter_places(args.request, ground_of(mrb, args.ground));
   const auto placed = static_cast<mrb_int>(places.size());
-  const int id = scene(mrb).scattered().add(
-      {0, object.mesh, object.tint, object.visible_from, object.visible_to, object.sways, std::move(places)});
+  const int id = scene(mrb).scattered().add(set_of(mrb, object, args, std::move(places)));
   if (id == 0) mrb_raisef(mrb, E_ARGUMENT_ERROR, "a scene holds at most %d scattered copies", kMostCopies);
   const mrb_value answer[] = {mrb_int_value(mrb, id), mrb_int_value(mrb, placed)};
   return mrb_ary_new_from_values(mrb, kAnswerParts, answer);

@@ -16,13 +16,25 @@ class Scatter
   # area: two opposite corners of a box. ground: an object with a collider: each copy stands where a
   # ray straight down meets it first, and a try that meets something else first, or nothing,
   # places none (the corners' heights then hardly matter); without it, copies stand on the box's
-  # bottom. scale: a number, or a range each copy is scaled within. align: true leans them with
-  # the slope they stand on (grass); false keeps them upright (trees, buildings).
-  def self.place(template, count:, area:, ground: nil, seed: 0, scale: 1.0, align: false)
+  # bottom. scale: a number, or a range each copy is scaled within (on top of the template's own
+  # scale). align: true leans them with the slope they stand on (grass); false keeps them upright
+  # (trees, buildings). How they look:
+  #   tints: [[r, g, b], ...]  each copy takes a color at random along the list (up to 16)
+  #   tint_variation: 0.1      each copy brighter or darker by up to this share
+  #   fade: 4.0                meters over which copies fade out before the template's visible_to
+  #                            (and in after its visible_from) instead of popping
+  #   normals_up: 0.8          0..1: grass cards lit as the ground they stand on, not as flat cards
+  def self.place(template, count:, area:, ground: nil, seed: 0, scale: 1.0, align: false, **looks)
     low, high = area
     smallest, largest = scale.is_a?(Range) ? [scale.begin, scale.end] : [scale, scale]
-    id, placed = __place(template, count, low, high, ground, seed, smallest.to_f, largest.to_f, align)
+    id, placed = __place(template, count, low, high, ground, seed, smallest.to_f, largest.to_f, align,
+                         *look_options(**looks))
     new(id, placed)
+  end
+
+  # The look options in the order Scatter.__place takes them.
+  def self.look_options(tints: nil, tint_variation: 0.0, fade: 0.0, normals_up: 0.0)
+    [tints, tint_variation.to_f, fade.to_f, normals_up.to_f]
   end
 
   def initialize(id, count)

@@ -30,7 +30,13 @@ struct ScatterSet {
   float visible_from = 0.0f;
   float visible_to = std::numeric_limits<float>::infinity();
   bool sways = true;  // whether wind sways its foliage (see GameObject)
+  bool cast_shadow = true;
   std::vector<Transform> places;
+  std::vector<Vec3> tints;  // one per place, multiplying `tint`; empty: all alike
+  // Meters over which copies fade out before `visible_to` (and in after a `visible_from` above
+  // zero) instead of popping; 0: they do not fade.
+  float fade = 0.0f;
+  float normals_up = 0.0f;  // 0..1: how far the copies' normals are bent toward their own up (grass lit as a meadow)
 };
 
 // What copies are asked for: `count` of them over a box (`low` its corner with the smallest x, y
@@ -57,6 +63,9 @@ using GroundProbe = std::function<std::optional<GroundHit>(Vec3 above, float dep
 // it, and is not placed where it does not; without one (an empty probe), on the bottom of the box.
 // Every try takes its random numbers whether or not it is placed: the others stay where they were.
 std::vector<Transform> scatter_places(const ScatterRequest& request, const GroundProbe& ground);
+
+// Every place scaled by the template's own scale, on top of its own.
+void scale_places(std::vector<Transform>& places, Vec3 scale);
 
 // Every set of copies of a scene.
 class Scattered {
