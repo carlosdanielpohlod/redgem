@@ -30,24 +30,17 @@ the same pull request.
 
 ## Multiplayer
 
-- Nobody runs a public relay or server: to play over the internet someone has to run
-  `redgem-relay` or `redgem-server` on a machine the players can reach.
-- A dedicated server opens a room's game when its first player arrives, which holds up the
-  server's other rooms for a moment (the time a level takes to load). Its rooms share one
-  processor core.
-- Messages are JSON over TCP. There is no prediction or lag compensation: fast action games
-  will feel the delay.
+- A dedicated server runs each room on a thread of its own, up to `--threads` (the machine's
+  cores by default). With more rooms open than threads, rooms share them, and a level loading in
+  one holds up the others on its thread for that moment.
+- Messages are JSON over TCP: a packet lost on the way holds up the ones after it. What others
+  move is shown a moment behind them (interpolated), and nothing rewinds time to judge a hit where
+  its shooter saw the target (no lag compensation): fast competitive games will feel the delay.
 - Players behind one shared address (a campus, some mobile networks) count as one address: by
   default a relay or a dedicated server lets it connect 24 machines (a relay, open 8 rooms), and a
   game hosted directly lets 4 of them be joining at once. Whoever runs the relay, the server or
   the game has to raise these (`--per-address`, `--rooms-per-address`,
   `Network.host(waiting_per_address:)`).
-- A room on a relay lets everyone in: connection approval (`Network.authenticate`) works with a
-  player hosting directly and on a dedicated server only.
-- A client of version 0.2.0 joining a game that decides who comes in gives up after 5 seconds
-  if the game takes longer to decide, and is told no reason when refused.
-- A dedicated server's `Save` is one file rewritten whole on every change, and its arrays and
-  hashes hold at most 4096 entries each: fine for a few thousand players, not for more.
 
 ## Web requests (HTTP)
 

@@ -67,14 +67,17 @@ end
 # it as usual, the others see it follow. Both sides need the object, with the same key.
 # Settings: owner (a peer's id; the host by default, right for the level's own moving things),
 # key (what the object is called on the network; its name by default: one object's only, a second
-# NetworkSync under a key taken already raises).
+# NetworkSync under a key taken already raises), interpolate (true by default: the others see it
+# a moment behind, moving smoothly, see Snapshots; false: it closes in on the newest pose that
+# arrived instead, sooner but jerkier), delay (seconds it is shown behind, always; unset: as short
+# as the network allows).
 #
 #   player.add_component(NetworkSync, owner: Network.id, key: "hero-#{Network.id}")
 #   return unless get_component(NetworkSync).mine?   # only the owner reads the keyboard
 class NetworkSync < Behaviour
   SENDS_PER_SECOND = 20.0
-  SMOOTHING = 14.0        # how fast a watched object closes in on where it should be (per second)
-  SNAP_DISTANCE = 6.0     # meters: further behind than this, it jumps there
+  SMOOTHING = 14.0        # how fast a watched object closes in on where it should be (per second), not interpolated
+  SNAP_DISTANCE = 6.0     # meters: further than this from where it was, it jumps there
   FULL_TURN = 360.0
   HALF_TURN = 180.0
 
@@ -88,6 +91,7 @@ class NetworkSync < Behaviour
   def start
     Network.__track(self)
     @since_sent = 0.0
+    watch_afresh
   end
 
   # Hands the object to another owner, under another name on the network if need be. Only on this
@@ -97,6 +101,13 @@ class NetworkSync < Behaviour
     Network.__track(self, key.to_s)
     @owner = owner
     @key = key.to_s
+    watch_afresh
+  end
+
+  # Nothing heard of the object yet: what came from an owner before says nothing of the next.
+  def watch_afresh
+    @position = @rotation = nil
+    @snapshots = Snapshots.new(1.0 / SENDS_PER_SECOND, prop(:delay)&.to_f) if prop(:interpolate, true)
   end
 
   def on_destroy = Network.__forget(self)
@@ -107,7 +118,7 @@ class NetworkSync < Behaviour
   end
 
   def update(dt)
-    return follow(dt) unless mine?
+    return watch(dt) unless mine?
     return unless Network.online?
 
     @since_sent += dt
@@ -123,9 +134,21 @@ class NetworkSync < Behaviour
 
     @position = Vector3[*position]
     @rotation = Vector3[*rotation]
+    @snapshots&.add(@position, @rotation)
   end
 
   private
+
+  def watch(dt)
+    return follow(dt) unless @snapshots
+
+    @snapshots.advance(dt)
+    position, rotation = @snapshots.pose
+    return unless position
+
+    transform.position = position
+    transform.rotation = rotation
+  end
 
   def follow(dt)
     return unless @position

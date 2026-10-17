@@ -1,7 +1,9 @@
-// GameServer: starting and stopping, and the turn every room gets.
+// GameServer: starting and stopping, and the lobby's turn.
 
 #include "server/game_server.hpp"
 
+#include <algorithm>
+#include <thread>
 #include <variant>
 
 #include "app/scene_files.hpp"
@@ -22,56 +24,56 @@ bool GameServer::start(std::string& error) {
     return false;
   }
   scene_ = std::move(std::get<SceneDesc>(scene));
-  if (!settings_.data_dir.empty()) saves_ = SaveStore(settings_.data_dir / kSaveFileName);
-  return lobby_.open(settings_.port, error, settings_.connections_per_address);
+  return open_saves(error) && lobby_.open(settings_.port, error, settings_.connections_per_address);
+}
+
+bool GameServer::open_saves(std::string& error) {
+  const std::filesystem::path& folder = settings_.data_dir;
+  saves_ = SaveDatabase::open(folder.empty() ? folder : folder / kSaveDatabaseName, error);
+  if (saves_ == nullptr) error = "cannot keep the game's saves: " + error;
+  return saves_ != nullptr;
 }
 
 void GameServer::tick(float seconds) {
   const auto in_rooms = [this](const std::string& address) { return players_from(address); };
+  // (Before placing anyone: a room that closed since the last turn holds no place any more.)
+  forget_closed_rooms();
   for (net::Arrival& arrival : lobby_.poll(seconds, in_rooms)) place(std::move(arrival));
-  for (Room& room : rooms_) room.engine->frame(seconds);
-  close_rooms_whose_match_is_over();
+  forget_closed_rooms();
 }
 
+GameServer::~GameServer() { stop(); }
+
 void GameServer::stop() {
-  for (Room& room : rooms_) close(room);
+  for (auto& thread : threads_) thread->stop();
+  threads_.clear();
   rooms_.clear();
   lobby_.close();
 }
 
 std::size_t GameServer::player_count() const {
   std::size_t players = 0;
-  for (const Room& room : rooms_) players += room.network().peers().size();
+  for (const Room& room : rooms_) players += room.slot->players();
   return players;
 }
 
-Engine* GameServer::room(const std::string& code) {
-  Room* found = find_room(code);
-  return found != nullptr ? found->engine.get() : nullptr;
+bool GameServer::visit(const std::string& code, const std::function<void(Engine&)>& visitor) {
+  Room* room = find_room(code);
+  return room != nullptr && room->slot->visit(visitor);
 }
 
 int GameServer::players_from(const std::string& address) const {
   int players = 0;
-  for (const Room& room : rooms_) players += room.network().links_from(address);
+  for (const Room& room : rooms_) players += room.slot->links_from(address);
   return players;
 }
 
-void GameServer::close_rooms_whose_match_is_over() {
-  for (auto room = rooms_.begin(); room != rooms_.end();) {
-    if (!room->match_over()) {
-      ++room;
-      continue;
-    }
-    const char* why = room->engine->finished() ? "the match ended" : "everyone left";
-    log::info("room " + room->code + " closed: " + why);
-    close(*room);
-    room = rooms_.erase(room);
-  }
+void GameServer::forget_closed_rooms() {
+  // (A room closes on its own thread, which lets go of its game: here only its place is freed.)
+  rooms_.erase(std::remove_if(rooms_.begin(), rooms_.end(), [](const Room& room) { return room.slot->closed(); }),
+               rooms_.end());
 }
 
-void GameServer::close(Room& room) {
-  // A last try to deliver what the game said; then its players hear that the game is gone.
-  room.network().leave();
-}
+int processor_count() { return std::max(1, static_cast<int>(std::thread::hardware_concurrency())); }
 
 }  // namespace redgem::server

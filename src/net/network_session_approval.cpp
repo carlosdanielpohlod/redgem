@@ -11,13 +11,6 @@ namespace redgem::net {
 
 using namespace wire;
 
-namespace {
-
-constexpr const char* kUnreadableAuth = "what the join carried for the game (auth:) is not a hash it can take";
-constexpr const char* kTooLate = "the game did not decide in time";
-
-}  // namespace
-
 void NetworkSession::consider(Link& link, const nlohmann::json& auth, std::vector<NetworkEvent>& events) {
   if (!acceptable_auth(auth)) return refuse(link, kUnreadableAuth);
   if (approving_) return ask(link, auth, events);
@@ -38,7 +31,7 @@ void NetworkSession::ask(Link& link, const nlohmann::json& auth, std::vector<Net
 
 bool NetworkSession::decide(int ticket, bool accepted, const std::string& reason) {
   Link* link = asking_link(ticket);
-  if (link == nullptr) return false;
+  if (link == nullptr) return decide_in_room(ticket, accepted, reason);
   if (accepted) {
     let_in(*link, link->asking_as, pending_events_);  // the game hears of it with the next poll
   } else {
@@ -49,14 +42,16 @@ bool NetworkSession::decide(int ticket, bool accepted, const std::string& reason
 
 void NetworkSession::refuse(Link& link, const std::string& reason) {
   link.asking_as = 0;
-  link.connection.send({{kKind, kRefused}, {kReason, reason.substr(0, kMaxReasonBytes)}});
-  link.connection.flush();  // its last word goes out before the connection is let go
-  link.connection.close();
+  link.connection.refuse(reason);
 }
 
 void NetworkSession::tend_newcomers(float seconds) {
   receive_newcomers(seconds);
-  if (relaying()) wait_for_decisions(seconds);
+  if (relaying()) {
+    wait_for_decisions(seconds);
+  } else {
+    wait_for_room_decisions(seconds);
+  }
 }
 
 void NetworkSession::wait_for_decisions(float seconds) {
@@ -74,8 +69,8 @@ NetworkSession::Link* NetworkSession::asking_link(int ticket) {
 }
 
 std::size_t NetworkSession::deciding() const {
-  return static_cast<std::size_t>(
-      std::count_if(links_.begin(), links_.end(), [](const Link& link) { return link.asking(); }));
+  return room_asking_.size() + static_cast<std::size_t>(std::count_if(links_.begin(), links_.end(),
+                                                                      [](const Link& link) { return link.asking(); }));
 }
 
 std::vector<int> NetworkSession::ids_taken() const {

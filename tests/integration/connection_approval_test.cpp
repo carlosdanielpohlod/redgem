@@ -1,5 +1,6 @@
-// Connection approval (Network.authenticate), with a player hosting and on a dedicated server:
-// who is let in, who is turned away and why, and what the server keeps for each player it knows.
+// Connection approval (Network.authenticate), with a player hosting, in a room on a relay and on
+// a dedicated server: who is let in, who is turned away and why, and what the server keeps for
+// each player it knows.
 
 #include <doctest/doctest.h>
 
@@ -14,6 +15,7 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "net/rooms/relay_server.hpp"
 #include "server/game_server.hpp"
 #include "test_support.hpp"
 
@@ -26,6 +28,7 @@ constexpr int kMaxRounds = 3000;  // of one frame on every machine, a millisecon
 constexpr std::chrono::milliseconds kRoundPause{1};
 constexpr int kWhileDeciding = 60;  // frames a newcomer is kept waiting on purpose
 constexpr server::RoomLimits kRoomOfFour{4, 1};
+constexpr int kPastJoinTimeoutRounds = 6 * 60;  // frames: longer than a join may keep quiet at a relay
 
 // What the game hosting decides, by the token a newcomer carries: "good" is let in as
 // "user-<name>", "bad" is turned away, and "later" waits for the test to decide ($later).
@@ -91,6 +94,7 @@ struct GuardedGame {
 struct Gathering {
   GuardedGame files;
   std::unique_ptr<server::GameServer> server;
+  std::unique_ptr<net::RelayServer> relay;
   std::vector<std::unique_ptr<Engine>> machines;
 
   Engine& add_machine() {
@@ -112,6 +116,27 @@ struct Gathering {
     REQUIRE(ruby(host, "Network.host(port: 0, visible: false)") == "true");
     ruby(host, kGatekeeper);
     return host;
+  }
+
+  // A player who opened a room on a relay, deciding who comes in as kGatekeeper says.
+  Engine& room_opener() {
+    relay = std::make_unique<net::RelayServer>();
+    std::string error;
+    REQUIRE_MESSAGE(relay->start(0, error), error);
+    Engine& opener = add_machine();
+    REQUIRE(ruby(opener, relay_setting() + "; Network.host(room: true)") == "true");
+    REQUIRE(until([&opener] { return online(opener); }));
+    ruby(opener, kGatekeeper);
+    return opener;
+  }
+
+  std::string relay_setting() const { return "Network.relay = '127.0.0.1:" + std::to_string(relay->port()) + "'"; }
+
+  // Starts a new machine joining the room `code` on the relay with `auth` (Ruby).
+  Engine& knock_room(const std::string& code, const std::string& auth) {
+    Engine& guest = add_machine();
+    REQUIRE(ruby(guest, relay_setting() + "; Network.join(room: '" + code + "', auth: " + auth + ")") == "true");
+    return guest;
   }
 
   void start_server() {
@@ -139,6 +164,7 @@ struct Gathering {
 
   void round() {
     if (server) server->tick(config::kFixedDeltaSeconds);
+    if (relay) relay->poll(config::kFixedDeltaSeconds);
     for (auto& machine : machines) machine->frame(config::kFixedDeltaSeconds);
     std::this_thread::sleep_for(kRoundPause);
   }
@@ -155,15 +181,24 @@ struct Gathering {
     for (int i = 0; i < count; ++i) round();
   }
 
-  Engine& room_of(Engine& player) {
-    Engine* room = server->room(player.network().room());
-    REQUIRE(room != nullptr);
-    return *room;
+  // What `code` gives in the game of the server's room `player` is in, run on the room's thread.
+  std::string served(Engine& player, const std::string& code) {
+    RubyResult result;
+    std::string text;
+    const bool visited = server->visit(player.network().room(), [&](Engine& room) {
+      result = room.scripts().eval(code, "test.rb");
+      if (result.ok) text = RSTRING_PTR(mrb_obj_as_string(room.scripts().vm().state(), result.value));
+    });
+    REQUIRE(visited);
+    REQUIRE_MESSAGE(result.ok, result.error);
+    return text;
   }
 
   nlohmann::json saved_players() const {
-    SaveStore saves(files.data / server::kSaveFileName);
-    return saves.get("players").value_or(nlohmann::json());
+    std::string error;
+    const auto saves = server::SaveDatabase::open(files.data / server::kSaveDatabaseName, error);
+    REQUIRE_MESSAGE(saves != nullptr, error);
+    return saves->get("players").value_or(nlohmann::json());
   }
 };
 
@@ -272,6 +307,66 @@ TEST_CASE("what a join carries is a small hash: anything else is refused before 
   CHECK(ruby(host, "$asked.inspect") == "[]");
 }
 
+TEST_CASE("in a room on a relay the game of whoever opened it decides who comes in, the relay nothing") {
+  test::LogCapture quiet;
+  Gathering game;
+  Engine& opener = game.room_opener();
+  const std::string code = opener.network().room();
+  Engine& ana = game.knock_room(code, "{ token: 'good', name: 'ana' }");
+  REQUIRE(game.until([&ana] { return online(ana); }));
+  Engine& eve = game.knock_room(code, "{ token: 'bad' }");
+  REQUIRE(game.until([&eve] { return offline(eve); }));
+  game.round();
+  CHECK(ruby(eve, "$reasons.inspect") == "[\"not logged in\"]");
+  CHECK(ruby(opener, "$asked.inspect") == "[[2, {name: \"ana\", token: \"good\"}], [3, {token: \"bad\"}]]");
+  CHECK(ruby(opener, "[$joined, Network.peers].inspect") == "[[[2, \"user-ana\", \"ana\"]], [2]]");
+  CHECK(ruby(ana, "[Network.id, Network.peers, Network.room].inspect") == "[2, [1], \"" + code + "\"]");
+}
+
+TEST_CASE("a newcomer waits at the relay for as long as the room's game takes to decide, and no longer") {
+  test::LogCapture quiet;
+  Gathering game;
+  Engine& opener = game.room_opener();
+  Engine& late = game.knock_room(opener.network().room(), "{ token: 'later' }");
+  REQUIRE(game.until([&opener] { return ruby(opener, "$asked.size") == "1"; }));
+  game.rounds(kPastJoinTimeoutRounds);
+  CHECK(ruby(late, "Network.connecting?") == "true");
+  CHECK(ruby(opener, "$later.accept(identity: 'late-1')") == "true");
+  REQUIRE(game.until([&late] { return online(late); }));
+  game.round();
+  CHECK(ruby(opener, "$joined.inspect") == "[[2, \"late-1\", nil]]");
+
+  // One the game never decides on is turned away when its time runs out.
+  Engine& forgotten = game.knock_room(opener.network().room(), "{ token: 'never' }");
+  REQUIRE(game.until([&forgotten] { return offline(forgotten); }));
+  CHECK(ruby(forgotten, "$reasons.inspect") == "[\"the game did not decide in time\"]");
+  CHECK(ruby(opener, "Network.peers.inspect") == "[2]");
+}
+
+TEST_CASE("a newcomer who leaves a relay while the room's game decides is not let in by a late yes") {
+  test::LogCapture quiet;
+  Gathering game;
+  Engine& opener = game.room_opener();
+  Engine& guest = game.knock_room(opener.network().room(), "{ token: 'later' }");
+  REQUIRE(game.until([&opener] { return ruby(opener, "$asked.size") == "1"; }));
+  ruby(guest, "Network.leave");
+  REQUIRE(game.until([&opener] { return opener.network().deciding() == 0; }));
+  CHECK(ruby(opener, "$later.accept(identity: 'gone')") == "false");
+  game.rounds(kWhileDeciding);
+  CHECK(ruby(opener, "[$joined, Network.peers].inspect") == "[[], []]");
+}
+
+TEST_CASE("a room whose game stops deciding lets everyone in again, whatever their join carries") {
+  test::LogCapture quiet;
+  Gathering game;
+  Engine& opener = game.room_opener();
+  ruby(opener, "Network.authenticate");
+  game.round();
+  Engine& guest = game.knock_room(opener.network().room(), "{ token: 'bad' }");
+  REQUIRE(game.until([&guest] { return online(guest); }));
+  CHECK(ruby(opener, "$asked.inspect") == "[]");
+}
+
 TEST_CASE("a dedicated server's game decides who plays, and keeps each player's save across restarts") {
   test::LogCapture quiet;
   Gathering game;
@@ -281,14 +376,15 @@ TEST_CASE("a dedicated server's game decides who plays, and keeps each player's 
   REQUIRE(game.until([&] { return online(ana) && offline(eve); }));
   game.round();
   CHECK(ruby(eve, "$reasons.inspect") == "[\"not logged in\"]");
-  Engine& room = game.room_of(ana);
-  CHECK(ruby(room, "$joined.inspect") == "[[2, \"user-ana\", \"ana\"]]");
-  CHECK(ruby(room, "Network.identity(2)") == "user-ana");
+  // (The room hears of it at its next frame, on its own thread.)
+  REQUIRE(game.until([&] { return game.served(ana, "$joined.size") == "1"; }));
+  CHECK(game.served(ana, "$joined.inspect") == "[[2, \"user-ana\", \"ana\"]]");
+  CHECK(game.served(ana, "Network.identity(2)") == "user-ana");
 
   ruby(ana, "Network.leave");
   REQUIRE(game.until([&game] { return game.server->room_count() == 0; }));
   CHECK(game.saved_players() == nlohmann::json{{"user-ana", {{"visits", 1}, {"name", "ana"}}}});
-  CHECK_FALSE(std::filesystem::exists(game.files.data / (std::string(server::kSaveFileName) + ".part")));
+  CHECK(std::filesystem::exists(game.files.data / server::kSaveDatabaseName));
 
   // The server stops and starts again: what it kept is there for the player's next visit.
   game.stop_server();
@@ -297,7 +393,7 @@ TEST_CASE("a dedicated server's game decides who plays, and keeps each player's 
                         ", auth: { token: 'good', name: 'ana' })") == "true");
   REQUIRE(game.until([&ana] { return online(ana); }));
   game.round();
-  CHECK(ruby(game.room_of(ana), "Save['players']['user-ana']['visits']") == "1");
+  CHECK(game.served(ana, "Save['players']['user-ana']['visits']") == "1");
   ruby(ana, "Network.leave");
   REQUIRE(game.until([&game] { return game.server->room_count() == 0; }));
   CHECK(game.saved_players()["user-ana"]["visits"] == 2);

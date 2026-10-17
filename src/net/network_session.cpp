@@ -78,7 +78,7 @@ bool NetworkSession::join(const std::string& address, std::uint16_t port, std::s
 }
 
 bool NetworkSession::host_room(const std::string& address, std::uint16_t port, std::string& error) {
-  if (!connect_out(address, port, {{kKind, kHello}, {kRoom, kNewRoom}}, error)) return false;
+  if (!connect_out(address, port, {{kKind, kHello}, {kRoom, kNewRoom}, {kGuards, approving_}}, error)) return false;
   through_relay_ = true;
   opening_room_ = true;
   return true;
@@ -107,6 +107,7 @@ void NetworkSession::go_offline() {
   links_.clear();
   listener_.close();
   peers_.clear();
+  room_asking_.clear();
   state_ = State::Offline;
   id_ = 0;
   port_ = 0;

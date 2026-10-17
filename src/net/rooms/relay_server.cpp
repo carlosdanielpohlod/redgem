@@ -49,12 +49,20 @@ bool RelayServer::wait(float seconds) const {
 
 void RelayServer::serve(Member& member, float seconds) {
   Connection& connection = member.connection;
-  if (!member.in_room()) connection.keep_waiting(seconds);  // for it to say which room
+  if (!member.in_room()) wait_on(member, seconds);
   member.allowance.refill(seconds);
   charge(member, connection.pump());
   if (member.in_room()) connection.keep_in_touch(seconds);
   // (Only so many a poll: the rest wait for the next one, see kMaxMessagesPerPoll.)
   while (const auto message = connection.next_message()) handle(member, *message);
+}
+
+void RelayServer::wait_on(Member& member, float seconds) {
+  if (member.asking()) {
+    await_verdict(member, seconds);
+  } else {
+    member.connection.keep_waiting(seconds);  // for it to say which room
+  }
 }
 
 void RelayServer::charge(Member& member, std::size_t bytes) {
@@ -85,10 +93,13 @@ void RelayServer::handle(Member& member, const nlohmann::json& message) {
 }
 
 void RelayServer::act_on(Member& member, const nlohmann::json& message) {
+  if (member.asking()) return;  // nothing it says counts while the game of its room decides on it
   if (!member.in_room()) {
     hear_newcomer(member, message);
   } else if (is_game_message(message)) {
     pass_on(member, message);
+  } else if (member.holds_room()) {
+    hear_opener(member, message);
   }
 }
 

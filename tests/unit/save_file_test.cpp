@@ -6,7 +6,7 @@
 
 #include "app/save_location.hpp"
 #include "core/platform.hpp"
-#include "storage/save_store.hpp"
+#include "storage/save_file.hpp"
 
 using namespace redgem;
 
@@ -35,14 +35,14 @@ Value got(const std::optional<nlohmann::json>& value) {
 TEST_CASE("what a game saves is there the next time it runs") {
   const TempSave temp;
   {
-    SaveStore store(temp.file);
+    SaveFile store(temp.file);
     CHECK_FALSE(store.get("best").has_value());
     CHECK(store.set("best", kBestScore));
     CHECK(store.set("name", std::string("Ana \"the fast\"")));
     CHECK(store.set("muted", true));
     CHECK(store.set("volume", kVolume));
   }
-  SaveStore again(temp.file);
+  SaveFile again(temp.file);
   CHECK(got<double>(again.get("best")) == doctest::Approx(kBestScore));
   CHECK(got<std::string>(again.get("name")) == "Ana \"the fast\"");
   CHECK(got<bool>(again.get("muted")));
@@ -52,24 +52,24 @@ TEST_CASE("what a game saves is there the next time it runs") {
 
 TEST_CASE("saved values can be removed one by one or all at once") {
   const TempSave temp;
-  SaveStore store(temp.file);
+  SaveFile store(temp.file);
   store.set("a", 1.0);
   store.set("b", 2.0);
   CHECK(store.remove("a"));
   CHECK_FALSE(store.get("a").has_value());
-  CHECK(SaveStore(temp.file).keys() == std::vector<std::string>{"b"});
+  CHECK(SaveFile(temp.file).keys() == std::vector<std::string>{"b"});
   CHECK(store.clear());
-  CHECK(SaveStore(temp.file).keys().empty());
+  CHECK(SaveFile(temp.file).keys().empty());
 }
 
 TEST_CASE("a damaged save file starts from nothing instead of stopping the game") {
   const TempSave temp;
   std::filesystem::create_directories(temp.file.parent_path());
   std::ofstream(temp.file) << "{ not json";
-  SaveStore store(temp.file);
+  SaveFile store(temp.file);
   CHECK(store.keys().empty());
   CHECK(store.set("best", kBestScore));
-  CHECK(got<double>(SaveStore(temp.file).get("best")) == doctest::Approx(kBestScore));
+  CHECK(got<double>(SaveFile(temp.file).get("best")) == doctest::Approx(kBestScore));
 }
 
 TEST_CASE("each game saves in a file named after its folder") {
@@ -137,7 +137,7 @@ TEST_CASE("a save keeps lists and hashes, and leaves out what stands for nothing
   std::ofstream(temp.file) << R"({"best": 1250.0, "name": "Ana", "muted": true, "list": [1, 2.5], "nothing": null,
                                   "players": {"user-1": {"level": 3}}, "deep": )"
                            << too_deep << "}";
-  SaveStore store(temp.file);
+  SaveFile store(temp.file);
   CHECK(store.keys() == std::vector<std::string>{"best", "list", "muted", "name", "players"});
   CHECK(store.get("best")->is_number_integer());  // whole numbers come back whole, however written
   CHECK(got<int>(store.get("best")) == static_cast<int>(kBestScore));
@@ -148,22 +148,22 @@ TEST_CASE("a save keeps lists and hashes, and leaves out what stands for nothing
 TEST_CASE("a hash saved for each player is there after a restart, and saving nothing removes it") {
   const TempSave temp;
   const nlohmann::json players = {{"user-1", {{"level", 3}, {"coins", 12.0}}}, {"user-2", {{"level", 1}}}};
-  REQUIRE(SaveStore(temp.file).set("players", players));
-  SaveStore again(temp.file);
+  REQUIRE(SaveFile(temp.file).set("players", players));
+  SaveFile again(temp.file);
   CHECK((*again.get("players"))["user-1"]["coins"].is_number_integer());
   CHECK((*again.get("players"))["user-2"]["level"] == 1);
   CHECK(again.set("players", nullptr));
-  CHECK(SaveStore(temp.file).keys().empty());
+  CHECK(SaveFile(temp.file).keys().empty());
 }
 
 TEST_CASE("a save is written whole: every kind of value, and no half-written file beside it") {
   const TempSave temp;
-  SaveStore store(temp.file);
+  SaveFile store(temp.file);
   REQUIRE(store.set("volume", kVolume));
   REQUIRE(store.set("name", std::string("Ana")));
   REQUIRE(store.set("muted", false));
   CHECK_FALSE(std::filesystem::exists(temp.file.string() + ".part"));
-  SaveStore again(temp.file);
+  SaveFile again(temp.file);
   CHECK(got<double>(again.get("volume")) == doctest::Approx(kVolume));
   CHECK(got<std::string>(again.get("name")) == "Ana");
   CHECK_FALSE(got<bool>(again.get("muted")));
@@ -174,13 +174,13 @@ TEST_CASE("a save that cannot be written says so and keeps the value for this ru
   // A file where the save's folder should be: nothing can be written under it.
   std::filesystem::create_directories(temp.dir);
   std::ofstream(temp.dir / "nested") << "in the way";
-  SaveStore store(temp.file);
+  SaveFile store(temp.file);
   CHECK_FALSE(store.set("best", kBestScore));
   CHECK(got<double>(store.get("best")) == doctest::Approx(kBestScore));
 }
 
 TEST_CASE("a store kept in memory holds what the game saves for as long as it lives, and writes nothing") {
-  SaveStore store;
+  SaveFile store;
   CHECK(store.set("best", kBestScore));
   CHECK(got<double>(store.get("best")) == doctest::Approx(kBestScore));
   CHECK(store.keys() == std::vector<std::string>{"best"});
@@ -188,5 +188,5 @@ TEST_CASE("a store kept in memory holds what the game saves for as long as it li
   CHECK(store.clear());
   CHECK(store.file().empty());
   CHECK_FALSE(std::filesystem::exists(".part"));  // (what writing to a file with no name would leave)
-  CHECK_FALSE(SaveStore().get("best").has_value());
+  CHECK_FALSE(SaveFile().get("best").has_value());
 }

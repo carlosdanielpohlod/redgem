@@ -68,7 +68,8 @@ Network.on_join { |peer| greet(Network.identity(peer), Network.player_name(peer)
   it off. The handler stays when a level is loaded.
 - What a join carries is at most 4 KB once written as JSON. It is untrusted: check it with the
   service that issued it.
-- It works with a player hosting too. A room on a relay lets everyone in: the relay decides nothing.
+- It works with a player hosting too, and in a room on a relay, where the game of whoever opened the
+  room decides: the relay decides nothing, it passes each join on and the decision back.
 
 ## Saving on a server
 
@@ -79,19 +80,35 @@ back with string keys), so each player's data can be kept under their identity:
 
 ```ruby
 Network.on_leave do |peer|
-  players = Save["players"] || {}
-  players[Network.identity(peer)] = { "level" => @level, "coins" => @coins }
-  Save["players"] = players
+  Save.update("players", {}) do |players|
+    players.merge(Network.identity(peer) => { "level" => @level, "coins" => @coins })
+  end
 end
 ```
 
-The file is rewritten whole on every change (never half-written): right for hundreds or a few
-thousand players. Past that, or for queries such as a ranking, send the data to a backend with
-`HTTP`.
+The server's rooms run at the same time, each on a thread of its own, and share its `Save`. Reading
+a value and writing it back (`players = Save["players"]; ...; Save["players"] = players`) can lose
+what another room wrote in between: change a value that more than one room may change with
+`Save.update`, whose block gets the value as it is and returns the new one, with no other room
+reading or writing the save meanwhile (keep the block short: the other rooms' saves wait for it).
+
+The server keeps its saves in a database, one row per key, each written as soon as it changes:
+a hash of every player is rewritten whole when one player changes, so with many players keep a
+key per player instead (`Save["player:#{Network.identity(peer)}"]`). For queries such as a
+ranking, send the data to a backend with `HTTP`.
 
 **Secrets of the server** (the key a backend lets only the server write with) go in the server's
-own save before it starts, in `<data folder>/save.json`: `{ "backend_key": "..." }`. The server's
-game reads them with `Save["backend_key"]`; players' machines never see a server's saves.
+own save, written with the `sqlite3` tool while the server is stopped (each value is stored as
+JSON, so a text is in double quotes):
+
+```bash
+sqlite3 /srv/platformer-data/save.sqlite3 \
+  "CREATE TABLE IF NOT EXISTS saves (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL) WITHOUT ROWID;
+   INSERT OR REPLACE INTO saves VALUES ('backend_key', '\"some-long-secret\"');"
+```
+
+The server's game reads them with `Save["backend_key"]`; players' machines never see a server's
+saves.
 
 ## With a hosted service: Supabase
 
@@ -214,8 +231,7 @@ which joins with the token. The server checks it with `GET /me`, lets the player
 key, in the backend too:
 
 ```bash
-mkdir -p /srv/platformer-data      # once: the backend's key, in the server's own save
-echo '{ "backend_key": "some-long-secret" }' > /srv/platformer-data/save.json
+mkdir -p /srv/platformer-data      # once: the backend's key, in the server's own save (see above)
 redgem-server games/platformer --data /srv/platformer-data
 ```
 

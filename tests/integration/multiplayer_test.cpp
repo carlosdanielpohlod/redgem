@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <functional>
@@ -29,6 +30,9 @@ constexpr std::size_t kManyTexts = 64;
 constexpr float kFarAlong = 40.0f;            // where a hero is moved to, along x
 constexpr int kAsksTooMany = 2;               // for what is spawned, beyond the answers a machine has saved up
 constexpr int kRoundsForOneMoreAnswer = 150;  // frames: past the two seconds of game time that earn one
+constexpr float kWhereTheGuestLeftIt = 2.9f;  // meters along x, give or take
+constexpr int kQuarterSecondRounds = 15;      // frames
+constexpr float kMostOfTheWayToFive = 4.5f;   // from 3, where the ball starts
 
 // A camera, a platform the host moves, and a ball to spawn copies of.
 SceneDesc small_scene() {
@@ -261,6 +265,46 @@ TEST_CASE("an object with a NetworkSync is moved by its owner and follows on the
   lan.rounds(kSettleRounds);
   CHECK(x_of(*guest, "$platform") == doctest::Approx(80.0f).epsilon(kNear));
   CHECK(x_of(*host, "$platform") == doctest::Approx(80.0f));
+}
+
+TEST_CASE("a watched object is shown the delay it asks for behind its owner, or closes in at once without one") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  ruby(*host, "$platform = Scene.find('Platform'); $platform.add_component(NetworkSync)");
+  ruby(*host, "$ball = Scene.find('Ball'); $ball.add_component(NetworkSync, key: 'ball')");
+  ruby(*guest, "$platform = Scene.find('Platform'); $platform.add_component(NetworkSync, delay: 0.5)");
+  ruby(*guest, "$ball = Scene.find('Ball'); $ball.add_component(NetworkSync, key: 'ball', interpolate: false)");
+  lan.rounds(kSettleRounds);
+
+  ruby(*host, "$platform.transform.position = Vector3.new(2, 0, 0); $ball.transform.position = Vector3.new(5, 0, 0)");
+  lan.rounds(kQuarterSecondRounds);
+  CHECK(x_of(*guest, "$platform") == doctest::Approx(0.0f).epsilon(kNear));  // half a second behind
+  CHECK(x_of(*guest, "$ball") > kMostOfTheWayToFive);                        // on its way already
+  lan.rounds(kSettleRounds);
+  CHECK(x_of(*guest, "$platform") == doctest::Approx(2.0f).epsilon(kNear));
+  CHECK(x_of(*guest, "$ball") == doctest::Approx(5.0f).epsilon(kNear));
+}
+
+TEST_CASE("an object handed back to a machine that watched it before is shown from what it hears now") {
+  Lan lan;
+  auto [host, guest] = lan.host_and_guest();
+  for (Engine* machine : {host, guest}) {
+    ruby(*machine, "$platform = Scene.find('Platform'); $sync = $platform.add_component(NetworkSync)");
+  }
+  lan.rounds(kSettleRounds);  // the guest watched the host's platform, at 0
+  for (Engine* machine : {host, guest}) ruby(*machine, "$sync.assign(owner: 2)");
+  ruby(*guest, "$platform.transform.position = Vector3.new(3, 0, 0)");
+  lan.rounds(kSettleRounds);
+  // The host takes it back, and moves it on from where the guest left it.
+  for (Engine* machine : {host, guest}) ruby(*machine, "$sync.assign(owner: 1)");
+  ruby(*host, "$platform.transform.position = Vector3.new(4, 0, 0)");
+  float lowest = kFarAlong;
+  for (int round = 0; round < kSettleRounds; ++round) {
+    lan.round();
+    lowest = std::min(lowest, x_of(*guest, "$platform"));
+  }
+  CHECK(lowest >= kWhereTheGuestLeftIt);  // never back where the host had it before
+  CHECK(x_of(*guest, "$platform") == doctest::Approx(4.0f).epsilon(kNear));
 }
 
 TEST_CASE("a second NetworkSync under a key another object goes by is refused, and the first keeps it") {

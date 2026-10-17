@@ -26,16 +26,18 @@ void RelayServer::hear_newcomer(Member& member, const nlohmann::json& message) {
     member.connection.close();
     return;
   }
-  enter_room(member, message[kRoom]);
+  // (Whether the game of a room it opens decides who comes in: from the start, before anyone joins.)
+  member.guarded = message.value(kGuards, false);
+  enter_room(member, message[kRoom], message.value(kAuth, nlohmann::json()));
 }
 
-void RelayServer::enter_room(Member& member, const std::string& wanted) {
+void RelayServer::enter_room(Member& member, const std::string& wanted, const nlohmann::json& auth) {
   if (wanted == kNewRoom) {
     open_room(member);
   } else if (rooms_.count(wanted) == 0) {
     note_wrong_code(member);
   } else {
-    join_room(member, wanted);
+    join_room(member, wanted, auth);
   }
 }
 
@@ -59,18 +61,30 @@ void RelayServer::open_room(Member& member) {
   member.connection.send({{kKind, kWelcome}, {kTo, member.peer}, {kPeers, std::vector<int>{}}, {kRoom, code}});
 }
 
-void RelayServer::join_room(Member& member, const std::string& room) {
-  std::vector<int> ids;
-  for (const Member* other : members_of(room)) ids.push_back(other->peer);
-  const int id = free_peer_id(ids);
-  if (id == 0) {
-    member.connection.close();  // a full room
+void RelayServer::join_room(Member& member, const std::string& room, const nlohmann::json& auth) {
+  const int id = free_peer_id(seats_taken(room));
+  Member* opener = opener_of(room);
+  if (!takes_newcomers(id, opener)) {
+    member.connection.close();
     return;
   }
   member.room = room;
+  if (opener->guarded) {
+    ask(member, *opener, id, auth);
+  } else {
+    let_in(member, id);
+  }
+}
+
+bool RelayServer::takes_newcomers(int free_id, const Member* opener) { return free_id != 0 && opener != nullptr; }
+
+void RelayServer::let_in(Member& member, int id) {
+  std::vector<int> ids;
+  for (const Member* other : members_of(member.room)) ids.push_back(other->peer);
   member.peer = id;
-  member.connection.send({{kKind, kWelcome}, {kTo, member.peer}, {kPeers, ids}, {kRoom, room}});
-  tell_room(room, member.peer, {{kKind, kArrived}, {kFrom, member.peer}});
+  member.asking_as = 0;
+  member.connection.send({{kKind, kWelcome}, {kTo, id}, {kPeers, ids}, {kRoom, member.room}});
+  tell_room(member.room, id, {{kKind, kArrived}, {kFrom, id}});
 }
 
 bool RelayServer::has_opener(const std::vector<Member*>& inside) {
@@ -85,13 +99,19 @@ void RelayServer::close_rooms_without_opener() {
       ++room;
       continue;
     }
-    for (Member* member : inside) member->connection.close();
+    empty_room(room->first);
     room = rooms_.erase(room);
   }
 }
 
+void RelayServer::empty_room(const std::string& room) {
+  for (const auto& member : members_) {
+    if (member->holds_seat_in(room)) member->connection.close();
+  }
+}
+
 bool RelayServer::missed_by_a_room(const Member& member) const {
-  return member.peer >= kFirstGuestId && rooms_.count(member.room) != 0;
+  return member.seat() >= kFirstGuestId && rooms_.count(member.room) != 0;
 }
 
 bool RelayServer::tell_rooms_who_left() {
@@ -100,7 +120,7 @@ bool RelayServer::tell_rooms_who_left() {
     if (!member->left_untold()) continue;
     member->farewelled = true;
     if (!missed_by_a_room(*member)) continue;
-    tell_room(member->room, member->peer, {{kKind, kGone}, {kFrom, member->peer}});
+    tell_room(member->room, member->seat(), {{kKind, kGone}, {kFrom, member->seat()}});
     told = true;
   }
   return told;

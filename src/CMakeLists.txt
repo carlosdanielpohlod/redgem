@@ -21,6 +21,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawn_requests.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_resends.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_sync.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/network_snapshots.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_approval.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/http.rb)
 set(REDGEM_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_include)
@@ -123,6 +124,7 @@ redgem_add_library(redgem_net
   net/network_session_guest.cpp
   net/network_session_server.cpp
   net/network_session_approval.cpp
+  net/network_session_room_approval.cpp
   net/rooms/room_codes.cpp
   net/rooms/code_guessers.cpp
   net/rooms/lobby.cpp
@@ -131,6 +133,7 @@ redgem_add_library(redgem_net
   net/rooms/relay_server.cpp
   net/rooms/relay_server_visitors.cpp
   net/rooms/relay_server_rooms.cpp
+  net/rooms/relay_server_approval.cpp
   net/rooms/relay_program.cpp
   net/http/http_url.cpp
   net/http/http_address.cpp
@@ -201,7 +204,8 @@ redgem_add_library(redgem_runtime
   input/raylib_input_source.cpp
   input/touch_controls.cpp
   input/touch_input_source.cpp
-  storage/save_store.cpp
+  storage/saved_values.cpp
+  storage/save_file.cpp
   script/script_naming.cpp
   script/ruby_vm.cpp
   script/script_host.cpp
@@ -289,8 +293,11 @@ if(NOT ANDROID)
     server/game_server_rooms.cpp
     server/server_command.cpp
     server/stop_signals.cpp
-    server/server_program.cpp)
-  target_link_libraries(redgem_game_server PUBLIC redgem_runtime)
+    server/server_program.cpp
+    server/save_database.cpp
+    server/room_slot.cpp
+    server/room_thread.cpp)
+  target_link_libraries(redgem_game_server PUBLIC redgem_runtime sqlite3)
 
   redgem_add_library(redgem_editor
     editor/document/glb_file.cpp

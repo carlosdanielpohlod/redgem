@@ -29,7 +29,8 @@ void NetworkSession::handle_as_guest(const nlohmann::json& message, std::vector<
 void NetworkSession::hear_of_the_game(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
   const std::string kind = message[kKind];
   if (kind == kArrived) peer_arrived(message.value(kFrom, 0), events);
-  if (kind == kGone) peer_left(message.value(kFrom, 0), events);
+  if (kind == kGone) peer_gone(message.value(kFrom, 0), events);
+  if (kind == kAsking) hear_asking(message, events);
   if (is_game_message(message)) hear_game_message(message, events);
 }
 
@@ -59,9 +60,13 @@ void NetworkSession::accept_welcome(const nlohmann::json& message, std::vector<N
     return;
   }
   id_ = given;
-  room_ = message.value(kRoom, std::string());
-  server_hosted_ = message.value(kServer, false);
   peers_ = others;
+  enter_game(message, events);
+}
+
+void NetworkSession::enter_game(const nlohmann::json& welcome, std::vector<NetworkEvent>& events) {
+  room_ = welcome.value(kRoom, std::string());
+  server_hosted_ = welcome.value(kServer, false);
   state_ = State::Online;
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::Connected, id_));
 }

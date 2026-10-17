@@ -93,14 +93,14 @@ kept under the player's identity:
 
 ```ruby
 Network.on_leave do |peer|
-  players = Save["players"] || {}
-  players[Network.identity(peer)] = { level: @level, coins: @coins }
-  Save["players"] = players
+  Save.update("players", {}) do |players|      # no other room's change gets lost in between
+    players.merge(Network.identity(peer) => { level: @level, coins: @coins })
+  end
 end
 ```
 
-One file, rewritten on change: right for hundreds or a few thousand players. Past that, or for
-queries such as a ranking, the game sends its data to a backend with `HTTP`.
+One row per key in a database (SQLite), each written as it changes. For queries such as a
+ranking, the game sends its data to a backend with `HTTP`.
 
 ### 4. Guides, not built-in services
 
@@ -117,7 +117,6 @@ No service is built into the engine and none is required.
 
 - **Encrypted game connections** (TLS over the same mbedTLS), optional, for games that carry
   anything sensitive over the game connection.
-- **A built-in database on the server** (SQLite), if file saves plus HTTP prove not enough.
 
 ## Security
 
@@ -141,9 +140,14 @@ No service is built into the engine and none is required.
   game is deciding", "refused, and why"); no version field was needed. A client of 0.2.0 joins as
   before (it carries nothing); against a host that decides, it ignores "deciding", so it gives up
   after its own 5 seconds if the game takes longer, and a refusal reaches it as a plain failure.
-  A room on a relay lets everyone in: the relay decides nothing.
-- **Saving on a server**: the data folder defaults to `<game>-data` beside the game's folder. One
-  `save.json` per server, shared by its rooms, written atomically on the server's one thread.
+  In a room on a relay the game of whoever opened it decides, and the relay decides nothing: the
+  opener tells it whether its game decides (a new kind of message), the relay holds the newcomer
+  with the id it would have and hands the opener what its hello carried, and passes the decision
+  back (two more).
+- **Saving on a server**: the data folder defaults to `<game>-data` beside the game's folder. It
+  holds a SQLite database (`save.sqlite3`, `src/server/save_database.*`): one row per key, each
+  change its own transaction, used by the rooms' threads one call at a time. Saved arrays and hashes are no longer limited to 4096
+  things (that limit is a message's); only their nesting is.
   `Save` now keeps arrays, hashes and `Vector3` as well (the example above needs a hash);
   hashes come back with string keys. A server's secrets (a backend's key) go in its own save.
 - **Guides**: the manual's Online services page; the platformer logs in when `ACCOUNTS` is set

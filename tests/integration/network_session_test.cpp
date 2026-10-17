@@ -20,6 +20,7 @@ constexpr int kSecondGuest = kHostId + 2;
 constexpr std::size_t kBigMessageBytes = 300 * 1024;  // more than one read or write takes
 constexpr int kTooDeep = kMaxDataDepth + 4;           // arrays inside arrays
 constexpr std::size_t kTooLongName = kMaxNameBytes + 1;
+constexpr int kSettleRounds = 50;
 constexpr int kManyVisits = 300;    // more than the largest id there is
 constexpr float kQuietStep = 4.0f;  // seconds
 constexpr float kPastSilenceTimeout = kSilenceTimeoutSeconds + 3.0f * kQuietStep;
@@ -465,6 +466,32 @@ struct FakeHost {
 };
 
 }  // namespace
+
+TEST_CASE("a room's opener hears of each newcomer asking to come in once, however often the relay says it") {
+  std::string error;
+  Socket listener = Socket::listen_on(0, error);
+  REQUIRE(listener.valid());
+  Socket relay;
+  NetworkSession opener;
+  Table table;
+  table.seat(opener);
+  opener.require_approval(true);
+  REQUIRE(opener.host_room(kLocalhost, listener.local_port(), error));
+  REQUIRE(table.until([&] { return listener.accept(relay) == IoStatus::Ok || relay.valid(); }));
+  const auto say = [&](const std::string& text) {
+    std::vector<std::uint8_t> bytes = frame(text);
+    REQUIRE(table.until([&] { return relay.write(bytes) == IoStatus::Ok && bytes.empty(); }));
+  };
+  say(R"({"k":"w","t":1,"p":[],"r":"ABCDEF"})");
+  REQUIRE(table.until([&] { return opener.state() == NetworkSession::State::Online; }));
+  for (int again = 0; again < kManyVisits; ++again) say(R"({"k":"q","f":2})");
+  say(R"({"k":"q","f":3})");
+  REQUIRE(table.until([&] { return table.count(0, NetworkEvent::Kind::Approval) == 2; }));
+  int rounds = 0;
+  table.until([&rounds] { return ++rounds == kSettleRounds; });  // for any more to arrive
+  CHECK(table.count(0, NetworkEvent::Kind::Approval) == 2);
+  CHECK(opener.deciding() == 2);
+}
 
 TEST_CASE("a guest does not believe a welcome whose list of the others cannot be true") {
   std::string crowd = "[1";

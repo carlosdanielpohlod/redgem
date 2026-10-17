@@ -56,6 +56,9 @@ class Connection {
 
   // Lets go of the other side now: nothing more of it is read, handled or sent.
   void close();
+  // Turns the other side away, telling it why first (see wire::refusal): its last word goes out
+  // before the connection is let go.
+  void refuse(const std::string& reason);
   // Whether nothing more comes of it: it was let go, or the other side hung up and everything it
   // had said before that was taken.
   bool closed() const { return dropped_ || (gone_ && !incoming_.message_waiting()); }

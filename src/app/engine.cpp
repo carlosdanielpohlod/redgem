@@ -9,6 +9,7 @@
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "storage/save_file.hpp"
 
 namespace redgem {
 namespace {
@@ -84,11 +85,11 @@ void Engine::open_saves() {
   if (options_.save != nullptr) return;  // its runner's
   // A server's room with no store of the server's: what it saves lasts for the match.
   if (serves_a_room()) {
-    save_ = std::make_unique<SaveStore>();
+    save_ = std::make_unique<SaveFile>();
     return;
   }
   save_ =
-      std::make_unique<SaveStore>(options_.save_file.empty() ? save_file_for(options_.game_dir) : options_.save_file);
+      std::make_unique<SaveFile>(options_.save_file.empty() ? save_file_for(options_.game_dir) : options_.save_file);
 }
 
 void Engine::fill_context(const std::string& game_title) {

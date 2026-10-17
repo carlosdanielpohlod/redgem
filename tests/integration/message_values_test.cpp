@@ -2,6 +2,8 @@
 
 #include <doctest/doctest.h>
 
+#include <filesystem>
+
 #include <mruby.h>
 #include <mruby/string.h>
 #include <mruby/variable.h>
@@ -81,6 +83,34 @@ TEST_CASE("what a message cannot carry is refused, saying why") {
   CHECK(refuses(*game, "Network.__emit('n', Array.new(5000, 0), 0)", "holds too many things"));
   const std::string nested = std::string(kTooDeep, '[') + std::string(kTooDeep, ']');
   CHECK(refuses(*game, "Network.__emit('n', " + nested + ", 0)", "a message's data is nested too deep"));
+}
+
+TEST_CASE("Save keeps arrays and hashes of any size, which a message could not carry, but no deeper") {
+  const std::filesystem::path save = std::filesystem::temp_directory_path() / "redgem-message-values-save.json";
+  std::filesystem::remove(save);
+  static const SceneDesc scene;
+  EngineOptions options;
+  options.game_dir = fixture("games/sandbox");
+  options.scene = &scene;
+  options.save_file = save;
+  auto created = Engine::create(options);
+  REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
+  Engine& game = *std::get<std::unique_ptr<Engine>>(created);
+  CHECK(ruby(game, "Save['many'] = Array.new(5000, 1); Save['many'].size") == "5000");
+  CHECK(ruby(game, "h = {}; 5000.times { |i| h[\"user-#{i}\"] = i }; Save['players'] = h; Save['players'].size") ==
+        "5000");
+  const std::string nested = std::string(kTooDeep, '[') + std::string(kTooDeep, ']');
+  CHECK(refuses(game, "Save['deep'] = " + nested, "a saved value's data is nested too deep"));
+
+  // Save.update: the block makes the new value of the one there (or of the default), which it returns.
+  CHECK(ruby(game, "Save.update('visits', 0) { |n| n + 1 }") == "1");
+  CHECK(ruby(game, "Save.update('visits', 0) { |n| n + 1 }; Save['visits']") == "2");
+  CHECK(ruby(game, "Save.update('seen') { |seen| seen.inspect }") == "nil");
+  CHECK(refuses(game, "Save.update('visits') { |n| raise 'no' }", "no"));
+  CHECK(ruby(game, "Save['visits']") == "2");  // a block that failed changed nothing
+  CHECK(ruby(game, "Save.update('visits') { nil }; Save.keys.include?(:visits)") == "false");
+  CHECK(refuses(game, "Save.update('visits')", "needs a block"));
+  std::filesystem::remove(save);
 }
 
 TEST_CASE("what arrives becomes Ruby values again, a vector as a Vector3") {

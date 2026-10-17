@@ -135,7 +135,7 @@ Network.emit(:score, 120, to: :host)
 A message carries `nil`, true/false, numbers, texts, `Vector3`, and arrays and hashes of those
 (hash keys arrive as symbols; a key no script of the receiving game uses anywhere arrives as a
 text instead, so `data[:damage]` works as written and only keys nobody asked for stay texts).
-An array or a hash holds at most 4096 things. Messages arrive whole and in the order they were sent. Handlers last
+An array or a hash holds at most 4096 things (in a message: `Save` keeps any number). Messages arrive whole and in the order they were sent. Handlers last
 until the next level is loaded, so register them in a behaviour's `start` or a scene script's
 `setup`. Names starting with `$` are the engine's own.
 
@@ -164,6 +164,19 @@ find!("Ball").add_component(NetworkSync, owner: 2, key: "ball")   # key: its nam
 
 A key is one object's: a second `NetworkSync` under a key another object goes by already raises
 an error (the behaviour is disabled, the first object keeps the key), and so does `assign` to it.
+
+The owner sends where its object is 20 times a second. The other machines show it a moment behind,
+blended between the last two places they heard of, so it moves smoothly however unevenly those
+arrive. The delay follows the network: about 75 milliseconds when places arrive steadily, longer
+(up to 350) when they come in bursts. When the next place is late, the object goes on the way it
+was going for a fifth of a second, then waits; moved far at once (more than 6 meters), it jumps
+there instead of sliding across. Your own objects are never delayed: they are moved on your
+machine. Each watcher can tune it per object:
+
+```ruby
+add_component(NetworkSync, delay: 0.2)            # always this many seconds behind
+add_component(NetworkSync, interpolate: false)    # no delay: chases the newest place, less smoothly
+```
 
 For objects created while playing, `Network.spawn` makes the copy on every machine, including the
 ones that join later, and removes it when its owner leaves:
@@ -215,8 +228,11 @@ and join `127.0.0.1` in the other.
 ## What it does not do
 
 There is no matchmaking or public list of games: players are on the same network, share a room
-code, or know the host's or the server's address. No relay or server is run for you. Every message passes through the host
-(or the relay), so there is no prediction or lag compensation: fine for co-op and casual
-games, not for competitive shooters. Messages are not encrypted. Players are not authenticated
-unless the game hosting asks for it ([Online services](online-services.md)); a room on a relay
-lets everyone in.
+code, or know the host's or the server's address. No relay or server is run for you: each game
+runs its own. Every message passes through the host (or the relay), over TCP: a packet lost on
+the way holds up the ones after it. Nothing rewinds time to judge a shot where its shooter saw the
+target (lag compensation), so the shooter's machine should decide its own hits, as in "Deciding
+things once": fine for co-op and casual games, not for competitive shooters. Messages are not
+encrypted. Players are not authenticated
+unless the game hosting asks for it ([Online services](online-services.md)), in a room on a relay
+too.

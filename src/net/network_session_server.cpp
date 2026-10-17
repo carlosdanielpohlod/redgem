@@ -27,9 +27,12 @@ std::vector<int> NetworkSession::players() const {
   return playing;
 }
 
-int NetworkSession::links_from(const std::string& address) const {
-  return static_cast<int>(std::count_if(links_.begin(), links_.end(),
-                                        [&address](const Link& link) { return link.connected_from(address); }));
+std::vector<std::string> NetworkSession::addresses() const {
+  std::vector<std::string> found;
+  for (const Link& link : links_) {
+    if (!link.connection.closed()) found.push_back(link.connection.address());
+  }
+  return found;
 }
 
 void NetworkSession::police(Link& link, std::size_t bytes, float seconds) {

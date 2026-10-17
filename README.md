@@ -73,6 +73,7 @@ RedGem stands on open source. Thank you to the people behind these projects.
 | [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) | Move, rotate and scale gizmos | MIT |
 | [nlohmann/json](https://github.com/nlohmann/json) 3.12.0 | Reading and writing glTF JSON and settings | MIT |
 | [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/) 3.6.7 | HTTPS for the games' web requests | Apache 2.0 |
+| [SQLite](https://www.sqlite.org) 3.50.4 | Where a dedicated server keeps its game's saves | Public domain |
 | [doctest](https://github.com/doctest/doctest) 2.4.11 | C++ tests | MIT |
 | [Inter](https://rsms.me/inter/), [JetBrains Mono](https://www.jetbrains.com/lp/mono/), [Font Awesome Free](https://fontawesome.com) | Editor fonts and icons | OFL |
 

@@ -25,6 +25,9 @@ PROJECTS = [
      os.path.join(DEPS, "nlohmann_json-src", "LICENSE.MIT")),
     ("Mbed TLS", "HTTPS for the games' web requests (HTTP)", "https://www.trustedfirmware.org/projects/mbed-tls/",
      os.path.join(DEPS, "mbedtls-src", "LICENSE")),
+    # (In the public domain: its "license" is the blessing its sources start with.)
+    ("SQLite", "Where a dedicated server keeps its game's saves", "https://www.sqlite.org",
+     os.path.join(DEPS, "sqlite-src", "sqlite3.h")),
     ("Dear ImGui", "The editor's interface", "https://github.com/ocornut/imgui",
      os.path.join(DEPS, "imgui-src", "LICENSE.txt")),
     ("rlImGui", "Dear ImGui on raylib", "https://github.com/raylib-extras/rlImGui",
@@ -77,6 +80,20 @@ their own licenses and are not covered here.
 """
 
 
+def license_text(path):
+    """A license file's text; for a C header, the comment it starts with, up to its first line of stars."""
+    with open(path, encoding="utf-8") as text:
+        content = text.read()
+    if not path.endswith(".h"):
+        return content.strip()
+    lines = []
+    for line in content.splitlines()[1:]:
+        if line.startswith("*****"):
+            break
+        lines.append(line.removeprefix("**").strip())
+    return "\n".join(lines).strip()
+
+
 def main():
     parts = [HEADER, "\n## Projects\n"]
     for name, purpose, url, _ in PROJECTS:
@@ -86,8 +103,7 @@ def main():
         parts.append(f"- **{name}**: {license_name}. {url}")
     parts.append("\n## License texts\n")
     for name, _, _, license_file in PROJECTS:
-        with open(license_file, encoding="utf-8") as text:
-            parts.append(f"### {name}\n\n```\n{text.read().strip()}\n```\n")
+        parts.append(f"### {name}\n\n```\n{license_text(license_file)}\n```\n")
     with open(OUTPUT, "w", encoding="utf-8") as out:
         out.write("\n".join(parts))
     print("wrote", os.path.relpath(OUTPUT, REPO_ROOT))
