@@ -82,7 +82,7 @@ struct ObjectSight {
 };
 
 // What an object's record was last written from: most of a scene stands still, and a record
-// written from the same is not worked out again. Only floats, so that two compare byte by byte.
+// written from the same is not worked out again.
 struct RecordSource {
   Transform world;
   Vec3 tint;
@@ -268,6 +268,9 @@ struct Renderer::Impl {
   // skin's inverse bind matrix. Nothing when the object has no (usable) skeleton.
   std::optional<render_detail::SkeletonPose> pose_skeleton(const Scene& scene, const GameObject& object,
                                                            std::size_t first);
+  // The first `bones` bones of a skeleton, from texel `first` on; returns the first one's matrix.
+  std::optional<Matrix> write_bones(const Scene& scene, const GameObject& object, const SkinDesc& skin,
+                                    std::size_t first, std::size_t bones);
   std::optional<Matrix> write_bone(const Scene& scene, ObjectHandle joint,
                                    const std::array<float, kFloatsPerMatrix>& inverse_bind, std::size_t texel);
   // Hands what changed to the graphics card, and the texture to the shaders that read it.
@@ -312,6 +315,7 @@ struct Renderer::Impl {
   std::size_t lay_out_set(const ScatterSet& set, std::size_t first);
   // Adds to `batches` the cells the view sees.
   void gather_scattered(const render_math::View& view);
+  void gather_set(const render_detail::ScatterDraw& draw, const render_math::View& view);
 
   // --- Particles (renderer_particles.cpp) -------------------------------------------------------
 

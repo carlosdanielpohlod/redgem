@@ -35,11 +35,13 @@ std::size_t Renderer::Impl::lay_out_set(const ScatterSet& set, std::size_t first
 }
 
 void Renderer::Impl::gather_scattered(const render_math::View& view) {
-  for (const ScatterDraw& draw : scatter_draws) {
-    for (const render_math::ScatterChunk& chunk : draw.chunks) {
-      if (render_math::chunk_worth_drawing(view, chunk, draw.visible_from, draw.visible_to)) {
-        batches.add_run(draw.mesh, chunk.first, chunk.count);
-      }
+  for (const ScatterDraw& draw : scatter_draws) gather_set(draw, view);
+}
+
+void Renderer::Impl::gather_set(const ScatterDraw& draw, const render_math::View& view) {
+  for (const render_math::ScatterChunk& chunk : draw.chunks) {
+    if (render_math::chunk_worth_drawing(view, chunk, draw.visible_from, draw.visible_to)) {
+      batches.add_run(draw.mesh, chunk.first, chunk.count);
     }
   }
 }
