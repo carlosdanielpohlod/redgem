@@ -221,9 +221,14 @@ TEST_CASE("particles are batched as plain dots first, then each picture once") {
   const int smoke = 0;
   const int star = 0;
   const std::vector<const int*> worn = {&smoke, nullptr, &star, &smoke};
-  const std::vector<const int*> batches = picture_batches(worn);
+  std::vector<const int*> batches;
+  std::vector<std::size_t> batch_of;
+  picture_batches(worn, batches, batch_of);
   CHECK(batches == std::vector<const int*>{nullptr, &smoke, &star});
-  CHECK(picture_batches(std::vector<const int*>{}) == std::vector<const int*>{nullptr});
+  CHECK(batch_of == std::vector<std::size_t>{1, 0, 2, 1});
+  picture_batches(std::vector<const int*>{}, batches, batch_of);
+  CHECK(batches == std::vector<const int*>{nullptr});
+  CHECK(batch_of.empty());
 }
 
 TEST_CASE("an image without a size is drawn as large as its picture") {

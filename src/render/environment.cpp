@@ -39,6 +39,7 @@ constexpr NumberProp kNumberProps[] = {
     {props::environment::kSaturation, &Environment::saturation},
     {props::environment::kGrain, &Environment::grain},
     {props::environment::kAberration, &Environment::aberration},
+    {props::environment::kGlowLimit, &Environment::glow_limit},
 };
 // The ones that are a 0..1 strength.
 constexpr NumberProp kStrengthProps[] = {

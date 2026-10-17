@@ -25,10 +25,13 @@ void Renderer::Impl::apply_lights(const Scene& scene, const Environment& env, Ve
       nearest_lights(std::move(lights.points), viewer, shaders::kMaxPointLights, kLightFadeDistance);
   const Vector3 sun_direction = to_raylib(lights.sun_direction);
   const Vector3 sun_color = to_raylib(lights.sun_color);
-  send_lights(sun_direction, sun_color, env.ambient, render_math::pack_point_lights(nearest));
+  const render_math::PointLightUniforms points = render_math::pack_point_lights(nearest);
+  send_lights(sun_direction, sun_color, env.ambient, points);
+  send_particle_lights(sun_color, env, points);
   send_atmosphere(env);
   send_sky_dome(env, sun_direction, sun_color);
   wind = env.wind;
+  glow_limit = env.glow_limit;
   sun_travel = sun_direction;
 }
 
@@ -42,6 +45,21 @@ void Renderer::Impl::send_lights(Vector3 sun_direction, Vector3 sun_color, float
   SetShaderValueV(shader, lit_uniforms.point_positions, points.positions, SHADER_UNIFORM_VEC3, points.count);
   SetShaderValueV(shader, lit_uniforms.point_colors, points.colors, SHADER_UNIFORM_VEC3, points.count);
   SetShaderValueV(shader, lit_uniforms.point_ranges, points.ranges, SHADER_UNIFORM_FLOAT, points.count);
+}
+
+void Renderer::Impl::send_particle_lights(Vector3 sun_color, const Environment& env,
+                                          const render_math::PointLightUniforms& points) {
+  const ParticleUniforms& at = particle_uniforms;
+  send(particle_shader, at.sun_color, sun_color);
+  send(particle_shader, at.ambient, env.ambient);
+  send(particle_shader, at.sky_top, to_raylib(env.sky_top));
+  send(particle_shader, at.sky_horizon, to_raylib(env.sky_horizon));
+  send(particle_shader, at.ground, to_raylib(env.ground));
+  send(particle_shader, at.point_count, points.count);
+  if (points.count == 0) return;
+  SetShaderValueV(particle_shader, at.point_positions, points.positions, SHADER_UNIFORM_VEC3, points.count);
+  SetShaderValueV(particle_shader, at.point_colors, points.colors, SHADER_UNIFORM_VEC3, points.count);
+  SetShaderValueV(particle_shader, at.point_ranges, points.ranges, SHADER_UNIFORM_FLOAT, points.count);
 }
 
 // What surfaces are lit by from all around, what hides them far away, and the time foliage sways by.

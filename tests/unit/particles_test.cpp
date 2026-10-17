@@ -85,7 +85,7 @@ TEST_CASE("particles fade and shrink at the end of their life") {
   system.burst(one);
   const Particle fresh = system.particles().front();
   CHECK(fresh.alpha_now() == doctest::Approx(1.0f));
-  CHECK(fresh.size_now() == doctest::Approx(fresh.size));
+  CHECK(fresh.size_now() == doctest::Approx(fresh.look.size.keys[0]));
   Particle old = fresh;
   old.age = old.life * 0.9f;
   CHECK(old.alpha_now() < fresh.alpha_now());
@@ -122,10 +122,10 @@ TEST_CASE("particles with a picture share it, start turned any which way and kee
   system.burst(sparks());  // plain dots
   CHECK(system.images() == std::vector<std::string>{"smoke", "spark"});
   const std::vector<Particle>& particles = system.particles();
-  CHECK(particles.front().image == 0);
-  CHECK(particles[kBurstCount].image == 1);
-  CHECK(particles[kBurstCount * 2].image == 0);
-  CHECK(particles.back().image == kNoParticleImage);
+  CHECK(particles.front().look.image == 0);
+  CHECK(particles[kBurstCount].look.image == 1);
+  CHECK(particles[kBurstCount * 2].look.image == 0);
+  CHECK(particles.back().look.image == kNoParticleImage);
   CHECK(particles.back().angle == doctest::Approx(0.0f));
   CHECK(particles[0].angle != doctest::Approx(particles[1].angle));
   bool clockwise = false, counterclockwise = false;
@@ -169,4 +169,73 @@ TEST_CASE("a heading goes from the cone's axis to its edge, all the way around")
   CHECK(length(edge) == doctest::Approx(1.0f));
   const Vec3 opposite = heading_in(cone, 1.0f, kHalfWayAround);
   CHECK(dot(edge, opposite) == doctest::Approx(-1.0f));
+}
+
+TEST_CASE("a value over life goes through its keys, evenly spread from birth to end") {
+  constexpr float kAQuarter = 0.25f;
+  const OverLife<float> one = steady(2.0f);
+  CHECK(one.at(0.0f) == doctest::Approx(2.0f));
+  CHECK(one.at(1.0f) == doctest::Approx(2.0f));
+  const OverLife<float> two{{1.0f, 3.0f}, 2};
+  CHECK(two.at(kHalf) == doctest::Approx(2.0f));
+  const OverLife<float> four{{0.0f, 3.0f, 3.0f, 0.0f}, 4};  // fades in, holds, fades out
+  CHECK(four.at(0.0f) == doctest::Approx(0.0f));
+  CHECK(four.at(1.0f / 6.0f) == doctest::Approx(1.5f));
+  CHECK(four.at(kHalf) == doctest::Approx(3.0f));
+  CHECK(four.at(1.0f) == doctest::Approx(0.0f));
+  CHECK(four.at(2.0f) == doctest::Approx(0.0f));  // past the end: the last key
+  const OverLife<Vec3> colors{{Vec3::one(), Vec3::zero()}, 2};
+  CHECK(approx_equal(colors.at(kAQuarter), Vec3::one() * (1.0f - kAQuarter), kEpsilon));
+}
+
+TEST_CASE("a single size and alpha hold for half the life, then shrink and fade as particles always did") {
+  ParticleSystem system;
+  ParticleBurst one = sparks();
+  one.count = 1;
+  system.burst(one);
+  Particle particle = system.particles().front();
+  const float size = particle.size_now();
+  particle.age = particle.life * 0.4f;
+  CHECK(particle.size_now() == doctest::Approx(size));
+  CHECK(particle.alpha_now() == doctest::Approx(1.0f));
+  particle.age = particle.life * 0.75f;
+  CHECK(particle.size_now() == doctest::Approx(size * (1.0f + kEndSizeShare) / 2.0f));
+  CHECK(particle.alpha_now() == doctest::Approx(kHalf));
+  particle.age = particle.life;
+  CHECK(particle.size_now() == doctest::Approx(size * kEndSizeShare));
+  CHECK(particle.alpha_now() == doctest::Approx(0.0f));
+}
+
+TEST_CASE("each particle of a burst is a little bigger or smaller, all through its life alike") {
+  ParticleSystem system;
+  ParticleBurst growing = sparks();
+  growing.look.size = OverLife<float>{{1.0f, 4.0f}, 2};
+  system.burst(growing);
+  for (const Particle& particle : system.particles()) {
+    CHECK(particle.look.size.keys[1] == doctest::Approx(particle.look.size.keys[0] * 4.0f));
+  }
+  CHECK(system.particles()[0].look.size.keys[0] != doctest::Approx(system.particles()[1].look.size.keys[0]));
+}
+
+TEST_CASE("a flipbook shows its cells over the particle's life, or round and round at its rate") {
+  constexpr float kLife = 2.0f;
+  const Flipbook once{4, 2, 0.0f};  // 8 cells
+  CHECK(flipbook_frame(once, 0.0f, kLife) == 0);
+  CHECK(flipbook_frame(once, kLife * kHalf, kLife) == 4);
+  CHECK(flipbook_frame(once, kLife * 0.99f, kLife) == 7);
+  CHECK(flipbook_frame(once, kLife, kLife) == 7);  // the end shows the last one
+  CHECK(flipbook_frame(once, 0.0f, 0.0f) == 7);    // a life of nothing is over
+  const Flipbook looping{4, 2, 10.0f};             // ten a second
+  CHECK(flipbook_frame(looping, 0.05f, kLife) == 0);
+  CHECK(flipbook_frame(looping, 0.35f, kLife) == 3);
+  CHECK(flipbook_frame(looping, 0.85f, kLife) == 0);    // round again after the eighth
+  CHECK(flipbook_frame(Flipbook{}, 1.0f, kLife) == 0);  // a single picture
+}
+
+TEST_CASE("glowing particles shine with their own light, even when asked to be lit") {
+  ParticleLook look;
+  look.lit = true;
+  CHECK(look.takes_light());
+  look.glow = true;
+  CHECK_FALSE(look.takes_light());
 }

@@ -1,5 +1,7 @@
 #include "render_system/render_stage.hpp"
 
+#include "scene/shapes/primitives.hpp"
+
 namespace redgem::test {
 namespace {
 
@@ -54,9 +56,9 @@ RenderStage::~RenderStage() {
   renderer_.reset();  // before the window it draws in
 }
 
-Picture RenderStage::draw(const Scene& scene, const std::string& name) {
+Picture RenderStage::draw(const Scene& scene, const std::string& name, const ParticleSystem* particles) {
   BeginDrawing();
-  renderer_->draw_world(scene, renderer_->scene_camera(scene), &target_);
+  renderer_->draw_world(scene, renderer_->scene_camera(scene), &target_, particles);
   EndDrawing();
   Image image = LoadImageFromTexture(target_.texture);
   ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
@@ -74,6 +76,22 @@ NodeDesc camera_at(Vec3 position) {
   camera.local.position = position;
   camera.local.rotation = quat_look_rotation(Vec3::zero() - position, Vec3::up());
   return camera;
+}
+
+MeshDesc cube_mesh(int material) {
+  MeshDesc mesh{"Cube", {make_primitive(PrimitiveShape::Cube)}, {}};
+  mesh.primitives[0].material = material;
+  for (std::size_t i = 0; i < mesh.primitives[0].positions.size(); i += 3) {
+    mesh.bounds.include(vec3_from(&mesh.primitives[0].positions[i]));
+  }
+  return mesh;
+}
+
+MaterialDesc glowing_material(Color color, float glow) {
+  MaterialDesc material;
+  material.base_color = color;
+  material.emissive = Vec3{color.r, color.g, color.b} * glow;
+  return material;
 }
 
 }  // namespace redgem::test

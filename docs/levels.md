@@ -34,6 +34,7 @@ Environment in the editor, or a Blender empty) sets the mood through its propert
 | `ambient_occlusion` | darkening of creases and contact areas (0 = none, 1 = full) |
 | `contrast`, `saturation` | the finished picture's grade: 1 leaves it as it is |
 | `grain`, `aberration` | film grain, and color fringes toward the corners as through a lens (0 turns each off) |
+| `glow_limit` | the brightest glowing particles together make a pixel, in linear light (2 to 4 suits fire): many flames or sparks over each other come near it and keep their color instead of washing out to white (0, the default, sets no limit) |
 
 Without one, scenes get a clear day. Other things worth knowing: the 16 point lights nearest to the
 camera are used each frame (so a street can have dozens of lamps); the sun casts soft shadows

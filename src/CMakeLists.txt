@@ -223,6 +223,7 @@ redgem_add_library(redgem_runtime
   scene/animation/animation_player_posing.cpp
   scene/camera_ray.cpp
   scene/particles.cpp
+  scene/particle_look.cpp
   scene/shapes/terrain.cpp
   scene/shapes/terrain_sculpt.cpp
   scene/shapes/terrain_raycast.cpp
@@ -273,6 +274,7 @@ redgem_add_library(redgem_runtime
   script/bindings/animation_bindings.cpp
   script/bindings/animation_sync_bindings.cpp
   script/bindings/particles_bindings.cpp
+  script/bindings/particle_look_args.cpp
   script/bindings/save_bindings.cpp
   script/bindings/i18n_bindings.cpp
   script/bindings/message_values.cpp
@@ -296,13 +298,16 @@ redgem_add_library(redgem_runtime
   render/renderer_objects.cpp
   render/renderer_scatter.cpp
   render/renderer_particles.cpp
+  render/renderer_particle_glow.cpp
   render/renderer_shadows.cpp
   render/renderer_reflections.cpp
   render/renderer_post.cpp
   render/renderer_overlay.cpp
   render/mesh_pass.cpp
+  render/particle_buffer.cpp
   render/shader_programs.cpp
   render/render_math.cpp
+  render/particle_layout.cpp
   render/visibility.cpp
   render/texel_rows.cpp
   render/instance_records.cpp

@@ -65,6 +65,7 @@ inline constexpr const char* kContrast = "contrast";
 inline constexpr const char* kSaturation = "saturation";
 inline constexpr const char* kGrain = "grain";
 inline constexpr const char* kAberration = "aberration";
+inline constexpr const char* kGlowLimit = "glow_limit";
 }  // namespace environment
 
 }  // namespace redgem::props

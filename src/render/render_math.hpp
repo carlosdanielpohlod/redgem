@@ -94,14 +94,17 @@ inline constexpr float kQuadV[kQuadCorners] = {1.0f, 1.0f, 0.0f, 0.0f};
 // around the line of sight.
 std::array<Vec3, kQuadCorners> particle_corners(Vec3 position, float size, float angle, const Facing& view);
 // What particles are drawn in batches of: the plain dots (a null picture) first, then each
-// picture once, in the order given.
+// picture once, in the order given; and the batch of each of `pictures`. Both are filled anew.
 template <typename Picture>
-std::vector<const Picture*> picture_batches(const std::vector<const Picture*>& pictures) {
-  std::vector<const Picture*> batches{nullptr};
+void picture_batches(const std::vector<const Picture*>& pictures, std::vector<const Picture*>& batches,
+                     std::vector<std::size_t>& batch_of) {
+  batches.assign(1, nullptr);
+  batch_of.clear();
   for (const Picture* picture : pictures) {
-    if (std::find(batches.begin(), batches.end(), picture) == batches.end()) batches.push_back(picture);
+    auto found = std::find(batches.begin(), batches.end(), picture);
+    if (found == batches.end()) found = batches.insert(batches.end(), picture);
+    batch_of.push_back(static_cast<std::size_t>(found - batches.begin()));
   }
-  return batches;
 }
 
 // --- What games draw over the picture --------------------------------------------------------

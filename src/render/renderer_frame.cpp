@@ -67,6 +67,7 @@ void Renderer::Impl::draw_lit_scene(const Camera3D& camera, const ParticleSystem
   draw_objects(false, to_vec3(camera.position));
   if (particles != nullptr) draw_particles(*particles, camera);
   EndMode3D();
+  if (glow_gathered) add_gathered_glow();
   EndTextureMode();
 }
 

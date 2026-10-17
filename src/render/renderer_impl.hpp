@@ -36,6 +36,8 @@
 #include "render/instance_batches.hpp"
 #include "render/instance_records.hpp"
 #include "render/mesh_pass.hpp"
+#include "render/particle_buffer.hpp"
+#include "render/particle_layout.hpp"
 #include "render/render_math.hpp"
 #include "render/renderer.hpp"
 #include "render/scatter_chunks.hpp"
@@ -55,6 +57,7 @@ inline constexpr ::Color kBlack{0, 0, 0, config::kMaxColorByte};
 inline constexpr int kReflectionTextureSlot = 9;
 inline constexpr int kShadowTextureSlot = 10;
 inline constexpr int kFrameTexelSlot = 11;
+inline constexpr int kSceneDepthSlot = 12;  // what soft particles fade into
 
 // raylib numbers what is on the graphics card; zero is what was never loaded (or is released).
 inline bool loaded(const Texture2D& texture) { return texture.id != 0; }
@@ -108,17 +111,8 @@ struct ObjectPass {
   bool last_two_sided = false;
 };
 
-// What every layer of particles is drawn with: their pictures by Particle::image, the distinct
-// ones among those (one batch each), and how the camera faces them.
-struct ParticleDraw {
-  const ParticleSystem& system;
-  // cppcheck-suppress uninitMemberVarNoCtor ; a reference: whoever makes one has to give it
-  const std::vector<const Texture2D*>& pictures;
-  // cppcheck-suppress uninitMemberVarNoCtor ; a reference: whoever makes one has to give it
-  const std::vector<const Texture2D*>& batches;
-  const render_math::Facing& view;
-};
-
+// Copies the depth of `from` into `to`, of the same size. The framebuffers stay bound.
+void copy_depth(const RenderTexture2D& from, const RenderTexture2D& to);
 // Draws `source` over the whole current target (render textures are stored upside down).
 void draw_full(const RenderTexture2D& source, int width, int height);
 
@@ -127,7 +121,6 @@ void draw_full(const RenderTexture2D& source, int width, int height);
 struct Renderer::Impl {
   using GpuPrimitive = render_detail::GpuPrimitive;
   using ObjectPass = render_detail::ObjectPass;
-  using ParticleDraw = render_detail::ParticleDraw;
   using ObjectSight = render_detail::ObjectSight;
 
   // Shaders, and where the ones drawn with all frame long take their values.
@@ -140,6 +133,7 @@ struct Renderer::Impl {
   Shader sky_shader{};
   Shader particle_shader{};
   render_detail::ParticleUniforms particle_uniforms;
+  Shader glow_limit_shader{};
   Shader panorama_shader{};
   Shader occlusion_shader{};
   Shader bright_shader{};
@@ -157,6 +151,10 @@ struct Renderer::Impl {
   RenderTexture2D ldr{};          // tone mapped, luma in alpha, before anti-aliasing
   RenderTexture2D occlusion_a{};  // ambient occlusion (ping-pong with occlusion_b for the blur)
   RenderTexture2D occlusion_b{};
+  RenderTexture2D scene_depth{};  // the depth of the scene's surfaces, copied for soft particles (no color)
+  // Glowing particles gathered apart, to be added within the environment's limit: made when first
+  // needed, on the lit picture's own depth.
+  RenderTexture2D glow{};
   // The scene's assets.
   std::vector<Texture2D> textures;
   std::vector<Material> materials;
@@ -189,9 +187,18 @@ struct Renderer::Impl {
   std::vector<render_math::ScatterLayout> scatter_layouts;  // whose records come first
   std::size_t scattered_records = 0;  // theirs come first in the frame's texels, the objects' after
   float wind = 0.0f;                  // of the environment
+  float glow_limit = 0.0f;            // of the environment (0: glowing particles are not gathered apart)
+  bool glow_gathered = false;         // this frame's glowing particles wait in `glow`
   Vector3 sun_travel{};               // direction the sun's light travels
   float view_tan_half_fov = 0.0f;     // of the camera, for rebuilding positions from depth
   float view_aspect = 0.0f;
+  // The frame's particles: their pictures (by Particle::look.image), the distinct ones among those
+  // (a batch each) and each picture's batch, how they are laid out, and that on the graphics card.
+  std::vector<const Texture2D*> particle_pictures;
+  std::vector<const Texture2D*> particle_batches;
+  std::vector<std::size_t> particle_batch_of;
+  render_math::ParticleLayout particle_layout;
+  render_detail::ParticleBuffer particle_buffer;
   int next_face = 0;       // the cube face captured this frame
   int faces_captured = 0;  // reflections switch on once all six exist
 
@@ -210,6 +217,7 @@ struct Renderer::Impl {
   void load_fixed_targets();
   // The post-processing targets, made again when the output changes size.
   void ensure_targets(int width, int height);
+  void ensure_glow_target();
   void release_targets();
   void release_fixed_targets();
 
@@ -313,13 +321,25 @@ struct Renderer::Impl {
   // Particles are hidden behind objects but do not hide each other (no depth written). Ordinary
   // ones cover what is behind them; glowing ones add their light to it.
   void draw_particles(const ParticleSystem& system, const Camera3D& camera);
-  // The particles that glow, or the ones that do not: each kind mixes with the picture in its own way.
-  void draw_particle_layer(const ParticleDraw& draw, bool glowing);
-  // The pictures a particle system uses, by Particle::image. Null for one the game's images
-  // folder does not have: those particles are drawn as dots.
-  std::vector<const Texture2D*> particle_pictures(const ParticleSystem& system);
-  // Draws the particles that glow (or the ones that do not) and wear `picture` (null: plain dots).
-  void draw_particle_batch(const ParticleDraw& draw, const Texture2D* picture, bool glowing);
+  // The pictures a particle system uses and their batches. A picture the game's images folder does
+  // not have is null: those particles are drawn as dots.
+  void batch_particle_pictures(const ParticleSystem& system);
+  // Lays the particles out, sends them to the graphics card, and copies what soft ones fade into.
+  void prepare_particles(const ParticleSystem& system, const Camera3D& camera);
+  // What every run of particles is drawn with: the shader, its view, and what soft ones fade into.
+  void begin_particles();
+  void draw_particle_runs(bool glowing);
+  void draw_particle_run(const render_math::ParticleRun& run);
+  void end_particles();
+  // Glowing particles, when the environment limits them, are gathered apart (into `glow`) and added
+  // to the picture within that limit once every particle is drawn.
+  bool gathers_glow() const { return glow_limit > 0.0f && particle_layout.any_glow; }
+  void begin_gathering_glow();
+  void add_gathered_glow();
+  // The depth of what was drawn so far, for soft particles to fade into.
+  void copy_scene_depth();
+  // The light lit particles take: the sun, the sky and the nearest point lights.
+  void send_particle_lights(Vector3 sun_color, const Environment& env, const render_math::PointLightUniforms& points);
 
   // --- Sun shadows (renderer_shadows.cpp) -------------------------------------------------------
 

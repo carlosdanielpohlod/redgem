@@ -88,7 +88,7 @@ A test may reopen one of the game's classes to add to it, a trace or a stand-in 
 ```ruby
 # tests/fighter_trace_test.rb
 class Fighter
-  alias_method :untraced_strike, :strike
+  alias untraced_strike strike
   def strike(*args) = (Debug.log("strike #{args.inspect}"); untraced_strike(*args))
 end
 ```

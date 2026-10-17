@@ -1,7 +1,7 @@
 # A test may reopen one of the game's classes to add to it: `class Mover` loads scripts/mover.rb
 # first, so it reopens the game's Mover instead of making a new, empty class.
 class Mover
-  alias_method :untraced_start, :start
+  alias untraced_start start
 
   def traced_start
     @started = true

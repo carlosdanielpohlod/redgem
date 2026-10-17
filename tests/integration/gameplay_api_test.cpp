@@ -433,12 +433,12 @@ TEST_CASE("scripts let out bursts of particles, which fly for a while and are go
   CHECK(ruby(*engine, "Particles.count") == "42");
   const std::vector<Particle>& particles = engine->script_context().particles->particles();
   REQUIRE(particles.size() == 42);
-  CHECK_FALSE(particles.front().glow);
+  CHECK_FALSE(particles.front().look.glow);
   CHECK(particles.front().position.y == doctest::Approx(2.0f));
   const Particle& spark = particles.back();
-  CHECK(spark.glow);
-  CHECK(spark.color.b == doctest::Approx(0.0f));  // gold has no blue
-  CHECK(spark.color.a == doctest::Approx(128.0f / 255.0f));
+  CHECK(spark.look.glow);
+  CHECK(spark.color_now().z == doctest::Approx(0.0f));  // gold has no blue
+  CHECK(spark.alpha_now() == doctest::Approx(128.0f / 255.0f));
   CHECK(spark.velocity.z < 0.0f);  // forward is -z
 
   frames(*engine, kHalfSecond);  // the short-lived sparks are over, the others still falling
@@ -450,13 +450,39 @@ TEST_CASE("scripts let out bursts of particles, which fly for a while and are go
   // With a picture from the game's images/ folder, each one turning.
   ruby(*engine, "Particles.burst(Vector3.zero, count: 3, image: :smoke, spin: 90)");
   CHECK(engine->script_context().particles->images() == std::vector<std::string>{"smoke"});
-  CHECK(engine->script_context().particles->particles().back().image == 0);
+  CHECK(engine->script_context().particles->particles().back().look.image == 0);
   CHECK(engine->script_context().particles->particles().back().spin != 0.0f);
 
   ruby(*engine, "Particles.burst(Vector3.zero); Particles.clear");
   CHECK(ruby(*engine, "Particles.count") == "0");
   CHECK(fails(*engine, "Particles.burst(Vector3.zero, color: :plaid)"));
   CHECK(fails(*engine, "Particles.burst('here')"));
+}
+
+TEST_CASE("a burst's particles go through the sizes, colors and alphas it lists, and the cells of its sheet") {
+  const TempSave temp;
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene, temp.file);
+  frames(*engine, 1);
+  ruby(*engine,
+       "Particles.burst(Vector3.zero, count: 1, size: [0.2, 1.0], color: [:white, [0, 0, 0]], alpha: [0, 255, 0], "
+       "image: :flames, frames: [4, 2], fps: 12, lit: true, soft: 0.5)");
+  const Particle& flame = engine->script_context().particles->particles().back();
+  CHECK(flame.look.size.count == 2);
+  CHECK(flame.look.size.keys[1] == doctest::Approx(flame.look.size.keys[0] * 5.0f));
+  CHECK(flame.look.color.count == 2);
+  CHECK(flame.look.color.keys[1].x == doctest::Approx(0.0f));
+  CHECK(flame.look.alpha.count == 3);
+  CHECK(flame.look.alpha.keys[1] == doctest::Approx(1.0f));
+  CHECK(flame.look.flipbook.frames() == 8);
+  CHECK(flame.look.flipbook.fps == doctest::Approx(12.0f));
+  CHECK(flame.look.lit);
+  CHECK(flame.look.soft == doctest::Approx(0.5f));
+  for (const char* wrong : {"size: [1, 2, 3, 4, 5]", "size: []", "size: -1", "alpha: [0, 300]", "color: [[0, 0]]",
+                            "frames: [0, 2]", "frames: [65, 1]", "fps: -1", "soft: -0.5", "soft: 0.0 / 0.0"}) {
+    CAPTURE(wrong);
+    CHECK(fails(*engine, std::string("Particles.burst(Vector3.zero, ") + wrong + ")"));
+  }
 }
 
 TEST_CASE("scripts change how bright a light shines and in what color, within what a light can be") {
