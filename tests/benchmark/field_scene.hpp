@@ -6,6 +6,7 @@
 
 #include <vector>
 
+#include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
 
 namespace redgem::benchmark {
@@ -15,6 +16,9 @@ inline constexpr int kTrees = 2000;
 // The names of the two templates in the scene: hidden objects that every copy is made from.
 inline constexpr const char* kGrassName = "GrassTuft";
 inline constexpr const char* kTreeName = "Tree";
+// Their meshes.
+inline constexpr int kGrassMesh = 1;
+inline constexpr int kTreeMesh = 2;
 
 // Where the copies go: grass over a square around the middle, trees in a ring around it.
 inline constexpr float kFieldSize = 160.0f;    // meters across
@@ -35,5 +39,7 @@ std::vector<Placement> tree_placements();
 SceneDesc field_templates();
 // The same scene with every tuft and tree as an object of its own.
 SceneDesc field_of_objects();
+// Puts every tuft and tree in a scene of the templates' as scattered copies (Scatter) instead.
+void scatter_field(Scene& scene);
 
 }  // namespace redgem::benchmark

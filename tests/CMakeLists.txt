@@ -60,6 +60,7 @@ add_executable(redgem_tests
   unit/visibility_test.cpp
   unit/texel_rows_test.cpp
   unit/instance_records_test.cpp
+  unit/scatter_test.cpp
   unit/capture_views_test.cpp
   unit/shader_source_test.cpp
   unit/terrain_test.cpp

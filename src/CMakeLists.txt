@@ -181,6 +181,7 @@ redgem_add_library(redgem_runtime
   scene/scene.cpp
   scene/scene_from_desc.cpp
   scene/scene_copies.cpp
+  scene/scatter.cpp
   scene/animation/animation.cpp
   scene/animation/clip_clock.cpp
   scene/animation/animation_player.cpp
@@ -254,6 +255,7 @@ redgem_add_library(redgem_runtime
   render/renderer_frame_texels.cpp
   render/renderer_environment.cpp
   render/renderer_objects.cpp
+  render/renderer_scatter.cpp
   render/renderer_particles.cpp
   render/renderer_shadows.cpp
   render/renderer_reflections.cpp
@@ -266,6 +268,7 @@ redgem_add_library(redgem_runtime
   render/texel_rows.cpp
   render/instance_records.cpp
   render/instance_batches.cpp
+  render/scatter_chunks.cpp
   render/capture_views.cpp
   render/shader_source.cpp
   render/environment.cpp

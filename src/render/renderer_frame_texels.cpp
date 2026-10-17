@@ -27,10 +27,11 @@ static_assert(sizeof(RecordSource) == kSourceFloats * sizeof(float), "a record's
 }  // namespace
 
 void Renderer::Impl::write_frame_texels(const Scene& scene) {
+  lay_out_scattered(scene.scattered());
   const std::size_t count = std::min(scene.size(), worlds.size());
   sights.assign(count, ObjectSight{});
   record_sources.resize(count);  // (a slot past the end that comes back is written anew)
-  std::size_t next_bone = render_math::record_texel(count);  // after every record
+  std::size_t next_bone = render_math::record_texel(scattered_records + count);  // after every record
   for (std::size_t slot = 0; slot < count; ++slot) {
     const GameObject& object = scene.at(static_cast<ObjectId>(slot));
     if (!render_math::has_something_to_draw(object, show_prefabs, meshes.size())) continue;
@@ -57,7 +58,7 @@ std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& o
 }
 
 bool Renderer::Impl::write_record(std::size_t slot, const render_math::InstanceLook& look) {
-  const std::size_t record = slot;
+  const std::size_t record = scattered_records + slot;
   const RecordSource source{worlds[slot], look.tint, look.first_bone, static_cast<float>(record)};
   RecordSource& last = record_sources[slot];
   if (std::memcmp(&source, &last, sizeof(RecordSource)) == 0) return true;

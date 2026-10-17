@@ -1,0 +1,82 @@
+#pragma once
+
+// Copies of a mesh placed in great numbers that are not objects of their own: a meadow's grass, a
+// forest's trees, the rubble of a city (Scatter in Ruby). They are only drawn: nothing simulates,
+// collides with or scripts them, so a scene can have tens of thousands. Where they go is worked
+// out here, and is the same for the same seed on every machine.
+
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <optional>
+#include <vector>
+
+#include "core/math.hpp"
+#include "scene/scene_desc.hpp"
+#include "scene/transform.hpp"
+
+namespace redgem {
+
+// The most copies a scene's sets may hold together.
+inline constexpr std::size_t kMaxScatteredCopies = 262144;
+
+// Copies of one mesh, as its object looked when they were placed.
+struct ScatterSet {
+  int id = 0;
+  int mesh = kNoIndex;
+  Vec3 tint = Vec3::one();
+  // Drawn only while this far from the camera, in meters (see GameObject).
+  float visible_from = 0.0f;
+  float visible_to = std::numeric_limits<float>::infinity();
+  std::vector<Transform> places;
+};
+
+// What copies are asked for: `count` of them over a box (`low` its corner with the smallest x, y
+// and z, `high` the opposite one), each turned at random around the vertical and scaled between
+// `smallest` and `largest`.
+struct ScatterRequest {
+  std::size_t count = 0;
+  Vec3 low;
+  Vec3 high;
+  std::uint32_t seed = 0;
+  float smallest = 1.0f;
+  float largest = 1.0f;
+  bool align = false;  // stands along the ground's slope instead of upright
+};
+
+// Where a ray straight down from `above` meets what copies stand on, within `depth` meters.
+struct GroundHit {
+  Vec3 point;
+  Vec3 normal = Vec3::up();
+};
+using GroundProbe = std::function<std::optional<GroundHit>(Vec3 above, float depth)>;
+
+// Where the copies go. With a ground, each stands where a ray from the top of the box down meets
+// it, and is not placed where it does not; without one (an empty probe), on the bottom of the box.
+// Every try takes its random numbers whether or not it is placed: the others stay where they were.
+std::vector<Transform> scatter_places(const ScatterRequest& request, const GroundProbe& ground);
+
+// Every set of copies of a scene.
+class Scattered {
+ public:
+  // Adds a set and returns its id, by which it is removed. Nothing (0) when there would be more
+  // than kMaxScatteredCopies.
+  int add(ScatterSet set);
+  bool remove(int id);
+  void clear();
+  std::size_t copies() const;
+  const std::vector<ScatterSet>& sets() const { return sets_; }
+  // Changes whenever the sets do, and is never the same for two scenes of a session (so whoever
+  // drew another scene's copies knows to start over).
+  std::uint64_t version() const { return version_; }
+
+ private:
+  void changed();
+
+  std::vector<ScatterSet> sets_;
+  int next_id_ = 1;
+  std::uint64_t version_ = 0;
+};
+
+}  // namespace redgem

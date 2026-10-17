@@ -95,11 +95,25 @@ NodeDesc environment() {
   return made;
 }
 
+Transform place_of(const Placement& placement) {
+  Transform place;
+  place.position = placement.position;
+  place.rotation = quat_from_axis_angle(Vec3::up(), degrees_to_radians(placement.yaw_degrees));
+  place.scale = Vec3::one() * placement.scale;
+  return place;
+}
+
 NodeDesc placed(const char* name, int mesh, const Placement& placement) {
   NodeDesc made = node(name, mesh, placement.position);
-  made.local.rotation = quat_from_axis_angle(Vec3::up(), degrees_to_radians(placement.yaw_degrees));
-  made.local.scale = Vec3::one() * placement.scale;
+  made.local = place_of(placement);
   return made;
+}
+
+ScatterSet scattered(int mesh, const std::vector<Placement>& placements) {
+  ScatterSet set;
+  set.mesh = mesh;
+  for (const Placement& placement : placements) set.places.push_back(place_of(placement));
+  return set;
 }
 
 }  // namespace
@@ -116,8 +130,8 @@ SceneDesc field_templates() {
                  mesh_of(kTreeName, {trunk(), crossed_quads(kCrownWidth, kCrownHeight, kCrownBase, kLeaves)})};
   NodeDesc ground_node = node("Ground", 0, Vec3::zero());
   ground_node.local.scale = Vec3::one() * kGroundScale;
-  NodeDesc grass = node(kGrassName, 1, Vec3::zero());
-  NodeDesc tree = node(kTreeName, 2, Vec3::zero());
+  NodeDesc grass = node(kGrassName, kGrassMesh, Vec3::zero());
+  NodeDesc tree = node(kTreeName, kTreeMesh, Vec3::zero());
   grass.props = tree.props = {{"prefab", true}};
   desc.nodes = {camera(), environment(), ground_node, grass, tree};
   return desc;
@@ -125,9 +139,14 @@ SceneDesc field_templates() {
 
 SceneDesc field_of_objects() {
   SceneDesc desc = field_templates();
-  for (const Placement& placement : grass_placements()) desc.nodes.push_back(placed(kGrassName, 1, placement));
-  for (const Placement& placement : tree_placements()) desc.nodes.push_back(placed(kTreeName, 2, placement));
+  for (const Placement& placement : grass_placements()) desc.nodes.push_back(placed(kGrassName, kGrassMesh, placement));
+  for (const Placement& placement : tree_placements()) desc.nodes.push_back(placed(kTreeName, kTreeMesh, placement));
   return desc;
+}
+
+void scatter_field(Scene& scene) {
+  scene.scattered().add(scattered(kGrassMesh, grass_placements()));
+  scene.scattered().add(scattered(kTreeMesh, tree_placements()));
 }
 
 }  // namespace redgem::benchmark

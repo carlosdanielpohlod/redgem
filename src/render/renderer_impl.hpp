@@ -11,6 +11,7 @@
 //   renderer_frame_texels.cpp what the vertex shader reads of a frame: its matrices, its bones
 //   renderer_environment.cpp  lights, atmosphere and the sky
 //   renderer_objects.cpp      the scene's objects
+//   renderer_scatter.cpp      copies scattered in great numbers
 //   renderer_particles.cpp    particles
 //   renderer_shadows.cpp      the sun's shadow map
 //   renderer_reflections.cpp  the surroundings, for reflections
@@ -23,6 +24,7 @@
 #include <rlgl.h>
 
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -36,6 +38,7 @@
 #include "render/mesh_pass.hpp"
 #include "render/render_math.hpp"
 #include "render/renderer.hpp"
+#include "render/scatter_chunks.hpp"
 #include "render/shader_programs.hpp"
 #include "render/texel_rows.hpp"
 #include "render/visibility.hpp"
@@ -85,6 +88,15 @@ struct RecordSource {
   Vec3 tint;
   float first_bone = 0.0f;
   float record = 0.0f;  // its number
+};
+
+// A set of scattered copies as it is drawn: its mesh, the distances it is drawn at, and its cells
+// (whose records come first in the frame's texels, before the objects').
+struct ScatterDraw {
+  int mesh = kNoIndex;
+  float visible_from = 0.0f;
+  float visible_to = 0.0f;
+  std::vector<render_math::ScatterChunk> chunks;
 };
 
 // Where a skeleton is this frame: its first bone (what a skinned mesh is judged by) and how many.
@@ -182,6 +194,9 @@ struct Renderer::Impl {
   unsigned int texel_texture = 0;
   render_math::InstanceBatches batches;  // what the pass being drawn sees, by mesh
   render_detail::SlotBuffer slots;       // the record numbers of what the frame's passes see
+  std::uint64_t scatter_version = 0;     // of the scattered copies laid out (see Scattered)
+  std::vector<render_detail::ScatterDraw> scatter_draws;
+  std::size_t scattered_records = 0;  // theirs come first in the frame's texels, the objects' after
   float wind = 0.0f;                  // of the environment
   Vector3 sun_travel{};               // direction the sun's light travels
   float view_tan_half_fov = 0.0f;     // of the camera, for rebuilding positions from depth
@@ -288,6 +303,15 @@ struct Renderer::Impl {
   void draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass);
   void use_material(int material, ObjectPass& pass);
   void draw_primitive(const GpuPrimitive& primitive, const render_detail::InstanceRun& run, ObjectPass& pass);
+
+  // --- Scattered copies (renderer_scatter.cpp) -------------------------------------------------
+
+  // Writes the records of the scene's scattered copies, cell by cell, when they changed.
+  void lay_out_scattered(const Scattered& scattered);
+  // One set's, from record `first` on. Returns the record after its last.
+  std::size_t lay_out_set(const ScatterSet& set, std::size_t first);
+  // Adds to `batches` the cells the view sees.
+  void gather_scattered(const render_math::View& view);
 
   // --- Particles (renderer_particles.cpp) -------------------------------------------------------
 
