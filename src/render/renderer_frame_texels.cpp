@@ -107,11 +107,14 @@ std::optional<Matrix> Renderer::Impl::write_bone(const Scene& scene, ObjectHandl
 
 void Renderer::Impl::send_frame_texels() {
   if (texels.rows() == 0) return;  // nothing was ever written: nothing reads it either
+  const bool kept_before = temporal.on && !texels.grew();
+  if (kept_before) keep_previous_texels();
   if (texels.grew()) {
     remake_texel_texture();
   } else {
     upload_changed_rows();
   }
+  if (temporal.on && !kept_before) keep_previous_texels();
   bind_for_the_frame(shader, lit_uniforms.frame_texels, kFrameTexelSlot, texel_texture);
   bind_for_the_frame(depth_shader, depth_uniforms.frame_texels, kFrameTexelSlot, texel_texture);
 }
@@ -119,6 +122,7 @@ void Renderer::Impl::send_frame_texels() {
 void Renderer::Impl::remake_texel_texture() {
   if (texel_texture != 0) rlUnloadTexture(texel_texture);
   texel_texture = rlLoadTexture(texels.row(0), kTexelsPerRow, texels.rows(), kTexelFormat, kOneLevel);
+  texel_texture_rows = texels.rows();
   texels.taken_whole();
   texels.take_changed(changed_rows);  // all of them went
 }

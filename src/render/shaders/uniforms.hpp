@@ -54,6 +54,8 @@ inline constexpr const char* kSkyHorizon = "skyHorizon";
 inline constexpr const char* kGroundColor = "groundColor";
 inline constexpr const char* kSunGlow = "sunGlow";
 inline constexpr const char* kAlphaToCoverage = "alphaToCoverage";
+// How the pixels' fine pattern (fading copies, dithered surfaces) is shifted this frame.
+inline constexpr const char* kNoiseShift = "noiseShift";
 // The sky as a picture.
 inline constexpr const char* kSkyLight = "skyLight";
 inline constexpr const char* kSkyIrradiance = "skyIrradiance";

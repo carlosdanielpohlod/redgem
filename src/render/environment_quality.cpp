@@ -50,6 +50,7 @@ void read_sky_and_quality(const PropertyMap& props, Environment& env) {
                                    kNearestShadows, kFarthestShadows);
   const float softness = std::clamp(number_or(props, props::environment::kShadowSoftness, 0.0f), 0.0f, kWidestSun);
   env.shadow_softness = degrees_to_radians(softness);
+  env.temporal_antialias = get_string(props, props::environment::kAntialias) == props::environment::kTemporalAntialias;
 }
 
 }  // namespace redgem

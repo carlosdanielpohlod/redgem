@@ -84,6 +84,20 @@ TEST_CASE("a dithered blended material is drawn once, with the opaque surfaces, 
   CHECK_FALSE(alpha_test(leaves, kWind, AlphaPass::Opaque).dithered);
 }
 
+TEST_CASE("the motion pass leaves out what the opaque pass leaves out, and sways as it does") {
+  MaterialDesc fur = material(AlphaMode::Blend, true);
+  fur.dithered = true;
+  for (const MaterialDesc& desc : {material(AlphaMode::Mask, true), material(AlphaMode::Blend, true), fur}) {
+    const AlphaTest opaque = alpha_test(desc, kWind, AlphaPass::Opaque);
+    const AlphaTest motion = alpha_test(desc, kWind, AlphaPass::Motion);
+    CHECK(motion.cutoff == doctest::Approx(opaque.cutoff));
+    CHECK(motion.dithered == opaque.dithered);
+    CHECK(motion.sway == doctest::Approx(opaque.sway));
+    CHECK(motion.two_sided == opaque.two_sided);
+    CHECK_FALSE(motion.mixed);
+  }
+}
+
 TEST_CASE("double-sided materials are drawn without backface culling") {
   MaterialDesc sheet = material(AlphaMode::Opaque, false);
   sheet.double_sided = true;

@@ -77,8 +77,12 @@ void Renderer::Impl::begin_particles() {
 }
 
 void Renderer::Impl::draw_particle_run(const render_math::ParticleRun& run) {
-  const Texture2D* picture = particle_batches[run.batch];
   blend_particles(run.glow);
+  draw_particle_picture(run);
+}
+
+void Renderer::Impl::draw_particle_picture(const render_math::ParticleRun& run) {
+  const Texture2D* picture = particle_batches[run.batch];
   send(particle_shader, particle_uniforms.boost, run.glow ? kParticleGlowBoost : kOn);
   send(particle_shader, particle_uniforms.textured, picture != nullptr ? kOn : kOff);
   bind_texture(0, picture != nullptr ? picture->id : rlGetTextureIdDefault());

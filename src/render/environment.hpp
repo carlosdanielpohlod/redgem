@@ -39,6 +39,8 @@ struct Environment {
   int shadow_cascades = 1;       // pictures of the sun's shadow map, farther and farther from the camera
   float shadow_distance = 0.0f;  // meters from the camera the cascades reach
   float shadow_softness = 0.0f;  // radians across the sun: wider shadow edges farther from their casters (0: fixed)
+  // Edges smoothed with the frames before (see temporal.hpp) instead of after the picture is drawn.
+  bool temporal_antialias = false;
   // The brightest that glowing particles together make a pixel, in linear light: many of them over
   // each other come near it instead of washing out to white (0 = no limit).
   float glow_limit = 0.0f;
@@ -53,7 +55,8 @@ Environment default_environment();
 //   contrast, saturation, grain, aberration, glow_limit   numbers
 //   sky_image (a name), sky_rotation (degrees), sky_intensity
 //   msaa (samples: 2, 4 or 8), shadow_cascades (1 to 4), shadow_distance (meters),
-//   shadow_softness (degrees across the sun: the real one is about half a degree)
+//   shadow_softness (degrees across the sun: the real one is about half a degree),
+//   antialias ("temporal": with the frames before)
 Environment environment_from_props(const PropertyMap& props);
 
 // The sky picture and quality properties of the list above.

@@ -117,6 +117,13 @@ void unload(RenderTexture2D& target) {
   target = RenderTexture2D{};
 }
 
+// What a new target holds is undefined: it is cleared before anything reads it.
+void clear(const RenderTexture2D& target) {
+  BeginTextureMode(target);
+  ClearBackground(::Color{0, 0, 0, 0});
+  EndTextureMode();
+}
+
 // Whether a target is there and `width` x `height` pixels.
 bool fits(const RenderTexture2D& target, int width, int height) {
   return loaded(target) && target.texture.width == width && target.texture.height == height;
@@ -181,9 +188,22 @@ void Renderer::Impl::ensure_scene_depth_target() {
   if (!loaded(scene_depth)) scene_depth = load_depth_target(hdr.texture.width, hdr.texture.height);
 }
 
+void Renderer::Impl::ensure_temporal_targets() {
+  const int width = hdr.texture.width;
+  const int height = hdr.texture.height;
+  if (fits(motion, width, height)) return;
+  motion = load_target(width, height, kHdrFormat, true);
+  SetTextureWrap(motion.depth, TEXTURE_WRAP_CLAMP);  // read around each pixel, at the edges too
+  for (RenderTexture2D& history : histories) history = load_target(width, height, kHdrFormat, false);
+  for (const RenderTexture2D* target : {&motion, &histories[0], &histories[1]}) clear(*target);
+}
+
 void Renderer::Impl::release_targets() {
   unload_target_on(glow);  // before the lit picture, whose depth it draws on
-  for (RenderTexture2D* target : {&hdr, &bloom_a, &bloom_b, &ldr, &occlusion_a, &occlusion_b}) unload(*target);
+  for (RenderTexture2D* target :
+       {&hdr, &bloom_a, &bloom_b, &ldr, &occlusion_a, &occlusion_b, &motion, &histories[0], &histories[1]}) {
+    unload(*target);
+  }
   render_detail::release(scene_samples);
   unload_depth_target(scene_depth);
 }

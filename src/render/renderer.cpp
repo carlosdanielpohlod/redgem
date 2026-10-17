@@ -44,6 +44,7 @@ Renderer::~Renderer() { impl_->release(); }
 void Renderer::upload(const SceneDesc& desc) {
   impl_->release_assets();
   impl_->faces_captured = 0;  // do not reflect the previous scene while the new one is captured
+  ++impl_->scene_uploads;     // nor mix its frames into the new one's
   sync(desc);
 }
 
@@ -80,6 +81,7 @@ void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const Rend
   impl_->prepare_frame(scene, camera, env, static_cast<float>(width) / static_cast<float>(height));
   impl_->draw_lit_scene(camera, particles);
   impl_->post_process(env, output);
+  impl_->end_temporal();
 }
 
 void Renderer::set_motion_blur(float amount) {

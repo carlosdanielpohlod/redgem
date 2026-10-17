@@ -131,6 +131,17 @@ TEST_CASE("numbers far past the renderer's quality limits are held to them") {
   CHECK(environment_from_props(props).shadow_cascades == 1);
 }
 
+TEST_CASE("edges are smoothed with the frames before only when the environment asks for it") {
+  CHECK_FALSE(default_environment().temporal_antialias);
+  PropertyMap props;
+  props["antialias"] = std::string("temporal");
+  CHECK(environment_from_props(props).temporal_antialias);
+  props["antialias"] = std::string("fxaa");  // anything else: after the picture is drawn
+  CHECK_FALSE(environment_from_props(props).temporal_antialias);
+  props["antialias"] = 1.0;  // not a name
+  CHECK_FALSE(environment_from_props(props).temporal_antialias);
+}
+
 TEST_CASE("glowing particles have no limit unless the environment sets one") {
   constexpr double kLimit = 3.0;
   CHECK(default_environment().glow_limit == doctest::Approx(0.0f));

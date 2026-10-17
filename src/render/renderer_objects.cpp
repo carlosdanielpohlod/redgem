@@ -50,6 +50,8 @@ bool Renderer::Impl::apply_material(int index, render_math::AlphaPass pass) {
   if (pass == render_math::AlphaPass::Shadow) {
     send(depth_shader, depth_uniforms.alpha_cutoff, test.cutoff);
     send(depth_shader, depth_uniforms.wind, test.sway);
+  } else if (pass == render_math::AlphaPass::Motion) {
+    send_motion_alpha(test);
   } else {
     send_surface(factors);
     cover_edges(smooths_edges(test));
@@ -65,6 +67,13 @@ void Renderer::Impl::send_alpha(const render_math::AlphaTest& test) {
   send(shader, lit_uniforms.alpha_dithered, test.dithered ? kOn : kOff);
   send(shader, lit_uniforms.alpha_mixed, test.mixed ? kOn : kOff);
   send(shader, lit_uniforms.wind, test.sway);
+}
+
+// What of a material the motion pass leaves out, and how it sways: as the lit pass.
+void Renderer::Impl::send_motion_alpha(const render_math::AlphaTest& test) {
+  send(motion_shader, motion_uniforms.alpha_cutoff, test.cutoff);
+  send(motion_shader, motion_uniforms.alpha_dithered, test.dithered ? kOn : kOff);
+  send(motion_shader, motion_uniforms.wind, test.sway);
 }
 
 // How a material's surface answers light.

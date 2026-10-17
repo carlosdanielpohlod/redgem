@@ -9,10 +9,12 @@
 #include "render/shaders/bloom.hpp"
 #include "render/shaders/lit_fragment.hpp"
 #include "render/shaders/lit_vertex.hpp"
+#include "render/shaders/motion.hpp"
 #include "render/shaders/panorama.hpp"
 #include "render/shaders/particle.hpp"
 #include "render/shaders/shadow_depth.hpp"
 #include "render/shaders/sky.hpp"
+#include "render/shaders/temporal.hpp"
 #include "render/shaders/tone_mapping.hpp"
 #include "render/shaders/uniforms.hpp"
 #include "render/texel_rows.hpp"
@@ -31,12 +33,14 @@ constexpr const char* kNoVersion = "void main() {}";
 constexpr const char* kVersionWord = "#version";
 constexpr const char* kDefineWord = "#define ";
 // Every shader the engine compiles.
-const std::string kEngineShaders[] = {shaders::kLitVertex,         shaders::lit_fragment(),
+const std::string kEngineShaders[] = {shaders::lit_vertex(),       shaders::lit_fragment(),
                                       shaders::depth_fragment(),   shaders::kSkyVertex,
                                       shaders::kSkyFragment,       shaders::kParticleFragment,
                                       shaders::kPanoramaFragment,  shaders::kAmbientOcclusionFragment,
                                       shaders::kBrightFragment,    shaders::kBlurFragment,
-                                      shaders::kCompositeFragment, shaders::kAntialiasFragment};
+                                      shaders::kCompositeFragment, shaders::kAntialiasFragment,
+                                      shaders::motion_vertex(),    shaders::motion_fragment(),
+                                      shaders::kTemporalFragment,  shaders::kSharpenFragment};
 
 std::string desktop_source() { return std::string(kNote) + shaders::kDesktopVersionLine + kBody; }
 
@@ -93,14 +97,21 @@ TEST_CASE("no engine shader sets a limit of its own that could disagree with the
 }
 
 TEST_CASE("the shaders start with what this build's graphics API wants") {
-  const std::string prepared = shaders::for_this_gpu(shaders::kLitVertex);
+  const std::string prepared = shaders::for_this_gpu(shaders::lit_vertex().c_str());
   CHECK(starts_with(prepared, gpu_profile::kShaderHeader));
 }
 
 TEST_CASE("the lit vertex shader holds no array of bones: a skeleton's bones are fetched from the frame's texels") {
-  CHECK_FALSE(contains(shaders::kLitVertex, "boneMatrices["));
-  CHECK(contains(shaders::kLitVertex, std::string("uniform sampler2D ") + shaders::kFrameTexels));
-  CHECK(contains(shaders::kLitVertex, "texelFetch"));
+  CHECK_FALSE(contains(shaders::lit_vertex(), "boneMatrices["));
+  CHECK(contains(shaders::lit_vertex(), std::string("uniform sampler2D ") + shaders::kFrameTexels));
+  CHECK(contains(shaders::lit_vertex(), "texelFetch"));
+}
+
+TEST_CASE("the motion pass places each vertex as the lit pass does, from this frame's texels and the last one's") {
+  const std::string motion = shaders::motion_vertex();
+  CHECK(contains(motion, shaders::kVertexPlacement));
+  CHECK(contains(shaders::lit_vertex(), shaders::kVertexPlacement));
+  CHECK(contains(motion, std::string("uniform sampler2D ") + shaders::kPreviousTexels));
 }
 
 TEST_CASE("the lit pass and the shadow map's leave out the same pixels of a fading copy, written once") {

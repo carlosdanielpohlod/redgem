@@ -25,6 +25,7 @@ struct LitUniforms {
   int alpha_ceiling = kNoLocation;
   int alpha_dithered = kNoLocation;
   int alpha_mixed = kNoLocation;
+  int noise_shift = kNoLocation;
   int skinned = kNoLocation;
   int wind = kNoLocation;
   // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
@@ -67,6 +68,33 @@ struct DepthUniforms {
   int frame_texels = kNoLocation;
 };
 
+// Where the motion pass's shader takes its values (see shaders/motion.hpp): per material, and
+// once per frame.
+struct MotionUniforms {
+  int alpha_cutoff = kNoLocation;
+  int alpha_dithered = kNoLocation;
+  int wind = kNoLocation;
+  int skinned = kNoLocation;
+  int noise_shift = kNoLocation;
+  int view_position = kNoLocation;
+  int time = kNoLocation;
+  int previous_time = kNoLocation;
+  int frame_texels = kNoLocation;
+  int previous_texels = kNoLocation;
+  int view_projection = kNoLocation;
+  int previous_view_projection = kNoLocation;
+};
+
+// Where the pass that mixes a frame with the ones before takes its values (see shaders/temporal.hpp).
+struct TemporalUniforms {
+  int history = kNoLocation;
+  int motion = kNoLocation;
+  int motion_depth = kNoLocation;
+  int reprojection = kNoLocation;
+  int texel_size = kNoLocation;
+  int history_valid = kNoLocation;
+};
+
 // Where the particle shader takes its values: per batch, and once per frame (what soft ones fade
 // into, and the light lit ones take).
 struct ParticleUniforms {
@@ -95,6 +123,8 @@ Shader compile_shader(const char* vertex, const char* fragment, const char* name
 // The lit one also tells raylib where the uniforms it sets by itself are (its texture maps).
 LitUniforms find_lit_uniforms(Shader& lit);
 DepthUniforms find_depth_uniforms(const Shader& depth);
+MotionUniforms find_motion_uniforms(const Shader& motion);
+TemporalUniforms find_temporal_uniforms(const Shader& temporal);
 ParticleUniforms find_particle_uniforms(const Shader& particles);
 // Where a shader takes the number of each copy's record (see instance_records.hpp).
 int find_instance_slot(const Shader& program);
