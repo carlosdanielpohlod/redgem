@@ -220,7 +220,8 @@ menu.screens[:credits] = GameMenu::Screen.new(heading: "Made by Ana", back: -> {
 menu.screens[:pause].add_option("Credits", index: 1) { menu.show(:credits) }
 ```
 
-`back` is what the pause keys do on that screen. A screen that draws more than buttons is a
+`back` is what the pause keys do on that screen. A label or a heading may also be a lookup,
+`-> { I18n.t("menu.credits") }`, made each time it is shown (see [Texts in several languages](i18n.md)). A screen that draws more than buttons is a
 subclass of `GameMenu::Screen` (`draw`, `space_above`, `opened`, `closed`, `typing?`): the
 platformer's multiplayer screen, `games/platformer/scripts/multiplayer_screen.rb`, is one.
 

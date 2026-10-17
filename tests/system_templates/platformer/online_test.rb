@@ -15,7 +15,7 @@ SystemTest.define do |t|
   t.click(x + width / 2, y + height / 2)
   t.wait
   t.assert("with no server set, it starts the game and says where to set one") do
-    !menu.open? && online.notice == Online::NO_SERVER && !Network.connecting? && !Network.online?
+    !menu.open? && online.notice == I18n.t("online.no_server") && !Network.connecting? && !Network.online?
   end
   t.screenshot("no_server_yet")
 end

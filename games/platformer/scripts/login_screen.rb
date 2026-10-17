@@ -10,7 +10,7 @@ class LoginScreen < GameMenu::Screen
   attr_accessor :name, :password
 
   def initialize(menu)
-    super(heading: I18n.t("login.heading"), back: -> { menu.show(:multiplayer) })
+    super(heading: -> { I18n.t("login.heading") }, back: -> { menu.show(:multiplayer) })
     @name = ""
     @password = ""
     @asking_password = false

@@ -4,7 +4,6 @@
 # With a dedicated server (see MainScene), Play online joins it: nobody has to host. It joins as
 # the player logged in (Log in, with a backend) or as a guest (see Accounts).
 class MultiplayerScreen < GameMenu::Screen
-  NO_SERVER = I18n.t("multiplayer.no_server").freeze   # (in the language the game starts in)
   SERVER_KEY = :server              # the last address joined, kept between runs
   DEFAULT_SERVER = "127.0.0.1".freeze
   ROOM_CODE_LETTERS = 6
@@ -22,7 +21,7 @@ class MultiplayerScreen < GameMenu::Screen
 
   # `menu` is the GameMenu it is a screen of; `title` is what a hosted game is called.
   def initialize(menu, title:, relay:, server:)
-    super(heading: I18n.t("multiplayer.heading"), back: -> { menu.show(:pause) })
+    super(heading: -> { I18n.t("multiplayer.heading") }, back: -> { menu.show(:pause) })
     @title = title
     @relay = relay.to_s
     @server = server.to_s
@@ -86,7 +85,7 @@ class MultiplayerScreen < GameMenu::Screen
   # Joins the dedicated server, in any room with a free place.
   def play_online
     starting(@server)
-    return @note = NO_SERVER if @server.empty?
+    return @note = I18n.t("multiplayer.no_server") if @server.empty?
 
     address, port = @server.split(":")
     Network.join(address, port: (port || Network::DEFAULT_PORT).to_i, auth: Accounts.auth)

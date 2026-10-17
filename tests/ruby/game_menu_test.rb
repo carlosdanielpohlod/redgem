@@ -91,6 +91,14 @@ class GameMenuTest < RedGemTest::Case
     assert_equal :pause, extended.screen
   end
 
+  def test_a_label_or_a_heading_given_as_a_lookup_is_looked_up_each_time_it_is_shown
+    word = "one"
+    screen = GameMenu::Screen.new(heading: -> { word }, options: [[-> { word }, nil]])
+    word = "two"
+    assert_equal "two", screen.heading
+    assert_equal ["two"], screen.options.map(&:first)
+  end
+
   def test_a_plain_screen_shows_nothing_more_than_its_buttons
     screen = GameMenu::Screen.new
     assert_equal "", screen.heading

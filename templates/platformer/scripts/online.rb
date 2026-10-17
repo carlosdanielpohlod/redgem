@@ -7,7 +7,6 @@ class Online < Behaviour
   HERO = "Player".freeze
   KEY_PREFIX = "hero-".freeze   # a hero's name on the network, followed by its machine's id
   OPTION_INDEX = 1              # on the title and pause screens: after Play or Resume
-  NO_SERVER = I18n.t("online.no_server").freeze   # (in the language the game starts in)
   NOTICE_SECONDS = 5.0
   NOTICE_X = 20
   NOTICE_Y = 60
@@ -26,7 +25,7 @@ class Online < Behaviour
   # Joins the server, in any room with a free place.
   def play
     GameMenu.instance.resume
-    return tell(NO_SERVER) if @server.empty?
+    return tell(I18n.t("online.no_server")) if @server.empty?
 
     address, port = @server.split(":")
     Network.join(address, port: (port || Network::DEFAULT_PORT).to_i)
@@ -40,7 +39,7 @@ class Online < Behaviour
   private
 
   def offer_in(menu)
-    label = I18n.t("online.play")
+    label = -> { I18n.t("online.play") }   # (looked up as it is shown, in the language in use then)
     %i[title pause].each { |screen| menu.screens[screen].add_option(label, index: OPTION_INDEX) { play } }
   end
 
