@@ -92,10 +92,14 @@ class RelayServer {
     bool asking() const { return asking_as != 0; }
     // The id it holds in its room: its own, or the one it would have.
     int seat() const { return in_room() ? peer : asking_as; }
-    // Still there, holding a place in room `code` (in it, or waiting to be let in).
-    bool holds_seat_in(const std::string& code) const { return seat() != 0 && !connection.closed() && room == code; }
-    // Waiting in room `code` for its game to decide on it as `id`.
-    bool asks_as(const std::string& code, int id) const { return asking() && asking_as == id && holds_seat_in(code); }
+    // Holding a place in room `code` (in it, or waiting to be let in). One that left holds it until
+    // the room was told: its id is nobody else's before then, or the room would hear of the
+    // newcomer and then that the id left.
+    bool holds_seat_in(const std::string& code) const { return seat() != 0 && !farewelled && room == code; }
+    // Still there, waiting in room `code` for its game to decide on it as `id`.
+    bool asks_as(const std::string& code, int id) const {
+      return asking() && asking_as == id && !connection.closed() && room == code;
+    }
     bool connected_from(const std::string& address) const {
       return !connection.closed() && connection.address() == address;
     }
@@ -134,7 +138,6 @@ class RelayServer {
   void ask(Member& member, Member& opener, int id, const nlohmann::json& auth);
   void hear_opener(Member& opener, const nlohmann::json& message);
   void settle(const std::string& room, const nlohmann::json& verdict);
-  static void refuse(Member& member, const std::string& reason);
   static void await_verdict(Member& member, float seconds);
   Member* asking_member(const std::string& room, int id);
   Member* opener_of(const std::string& room);

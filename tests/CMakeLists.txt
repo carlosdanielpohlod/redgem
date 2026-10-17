@@ -106,6 +106,7 @@ add_executable(redgem_tests
   integration/network_session_test.cpp
   integration/multiplayer_test.cpp
   integration/relay_test.cpp
+  integration/relay_approval_test.cpp
   integration/lobby_test.cpp
   integration/dedicated_server_test.cpp
   integration/connection_approval_test.cpp

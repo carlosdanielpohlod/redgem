@@ -68,8 +68,6 @@ void NetworkSession::enter_game(const nlohmann::json& welcome, std::vector<Netwo
   room_ = welcome.value(kRoom, std::string());
   server_hosted_ = welcome.value(kServer, false);
   state_ = State::Online;
-  // (The relay hears whether the game of the room it opened decides who comes in.)
-  if (opening_room_) tell_relay_who_decides();
   events.push_back(NetworkEvent::of(NetworkEvent::Kind::Connected, id_));
 }
 

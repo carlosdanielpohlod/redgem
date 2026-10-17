@@ -92,7 +92,7 @@ nlohmann::json game_message(const std::string& name, const nlohmann::json& data,
 bool well_formed(const nlohmann::json& message) {
   return has_kind(message) && is_id(message, kFrom) && is_id(message, kTo) && is_short_text(message, kName) &&
          is_list_of_peers(message, kPeers) && is_short_text(message, kRoom) && is_flag(message, kServer) &&
-         is_text_up_to(message, kReason, kMaxReasonBytes) &&
+         is_flag(message, kGuards) && is_text_up_to(message, kReason, kMaxReasonBytes) &&
          (!message.contains(kData) || acceptable_data(message[kData]));
 }
 

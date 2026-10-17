@@ -73,6 +73,9 @@ inline constexpr const char* kServer = "s";
 // that do not know of them never look for them: a host of version 0.2.0 lets everyone in.)
 inline constexpr const char* kAuth = "a";
 inline constexpr const char* kReason = "y";
+// In a hello that opens a room on a relay: whether the opener's game decides who comes in, so that
+// the room is guarded from the start (later changes come as kGuarded).
+inline constexpr const char* kGuards = "g";
 inline constexpr const char* kGameMessage = "m";
 inline constexpr const char* kHello = "h";        // a newcomer: let me in (to a relay: into this room)
 inline constexpr const char* kWelcome = "w";      // to a newcomer: your id, and who else is here

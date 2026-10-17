@@ -192,6 +192,9 @@ class NetworkSession {
   bool guards_a_room() const { return opening_room_ && state_ == State::Online; }
   void tell_relay_who_decides();
   void hear_asking(const nlohmann::json& message, std::vector<NetworkEvent>& events);
+  // Whether the relay's word that `peer` asks to come in can be believed: someone who can arrive,
+  // and is not asking already.
+  bool new_asker(int peer) const;
   bool decide_in_room(int ticket, bool accepted, const std::string& reason);
   void send_verdict(int peer, bool accepted, const std::string& reason = {});
   void wait_for_room_decisions(float seconds);

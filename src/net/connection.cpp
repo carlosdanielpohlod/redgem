@@ -100,6 +100,12 @@ void Connection::hang_up() {
   outgoing_.clear();
 }
 
+void Connection::refuse(const std::string& reason) {
+  send(wire::refusal(reason));
+  flush();
+  close();
+}
+
 void Connection::close() {
   hang_up();
   dropped_ = true;

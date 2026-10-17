@@ -41,19 +41,13 @@ void RelayServer::settle(const std::string& room, const nlohmann::json& verdict)
   if (says_yes(verdict)) {
     let_in(*newcomer, newcomer->asking_as);
   } else {
-    refuse(*newcomer, verdict.value(kReason, std::string()));
+    newcomer->connection.refuse(verdict.value(kReason, std::string()));  // (the opener hears it is gone)
   }
-}
-
-void RelayServer::refuse(Member& member, const std::string& reason) {
-  member.connection.send(refusal(reason));
-  member.connection.flush();  // its last word goes out before the connection is let go
-  member.connection.close();  // (the opener hears it is gone, see tell_rooms_who_left)
 }
 
 void RelayServer::await_verdict(Member& member, float seconds) {
   member.asking_for += seconds;
-  if (member.asking_for > kRelayApprovalSeconds) refuse(member, kTooLate);
+  if (member.asking_for > kRelayApprovalSeconds) member.connection.refuse(kTooLate);
 }
 
 RelayServer::Member* RelayServer::asking_member(const std::string& room, int id) {

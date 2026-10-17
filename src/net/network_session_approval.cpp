@@ -42,9 +42,7 @@ bool NetworkSession::decide(int ticket, bool accepted, const std::string& reason
 
 void NetworkSession::refuse(Link& link, const std::string& reason) {
   link.asking_as = 0;
-  link.connection.send(refusal(reason));
-  link.connection.flush();  // its last word goes out before the connection is let go
-  link.connection.close();
+  link.connection.refuse(reason);
 }
 
 void NetworkSession::tend_newcomers(float seconds) {

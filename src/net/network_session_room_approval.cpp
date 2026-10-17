@@ -22,12 +22,19 @@ void NetworkSession::tell_relay_who_decides() {
 void NetworkSession::hear_asking(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
   if (!opening_room_) return;  // only the machine that opened a room is asked
   const int peer = message.value(kFrom, 0);
-  if (!can_arrive(peer)) return;  // what the relay says is checked like anything else
+  if (!new_asker(peer)) return;  // what the relay says is checked like anything else
   const nlohmann::json auth = message.value(kAuth, nlohmann::json());
   if (!acceptable_auth(auth)) return send_verdict(peer, false, kUnreadableAuth);
   if (!approving_) return send_verdict(peer, true);
   room_asking_.push_back({peer, ++last_ticket_});
   events.push_back(NetworkEvent::approval(peer, last_ticket_, auth.is_null() ? nlohmann::json::object() : auth));
+}
+
+bool NetworkSession::new_asker(int peer) const {
+  // (Each id once: there are never more askers than places in a game.)
+  const bool asked_already = std::any_of(room_asking_.begin(), room_asking_.end(),
+                                         [peer](const RoomAsking& asking) { return asking.peer == peer; });
+  return can_arrive(peer) && !asked_already;
 }
 
 bool NetworkSession::decide_in_room(int ticket, bool accepted, const std::string& reason) {
