@@ -17,6 +17,15 @@ class NetworkTest < RedGemTest::Case
     ["Platform", POSITION, nil], ["Platform", [1.0, 2.0], POSITION], ["Platform", POSITION, POSITION, POSITION],
     ["Platform", [Float::INFINITY, 0, 0], POSITION]
   ].freeze
+  ATTACK = ["Attack", 0.2, 1.0, false, true].freeze
+  ANIMATED = ["Hero", POSITION, POSITION, [0.1, 0.5, ATTACK, nil]].freeze
+  # What a peer could put in a pose's animation that the binding would refuse, every frame.
+  WRONG_ANIMATIONS = [
+    [-0.1, 0.5, ATTACK, nil], [0.1, 1.5, ATTACK, nil], [0.1, -0.5, nil, nil],
+    [0.1, 0.5, ["", 0.2, 1.0, true, true], nil],
+    [0.1, 0.5, [:Attack, 0.2, 1.0, true, true], nil], [0.1, 0.5, ["Attack", 0.2, 1.0, 1, true], nil],
+    [0.1, 0.5, ["x" * (Network::Said::MAX_CLIP_NAME_SIZE + 1), 0.0, 1.0, true, true], nil], [0.1, 0.5, ATTACK]
+  ].freeze
 
   Said = Network::Said
   Resends = Network::Resends
@@ -114,5 +123,13 @@ class NetworkTest < RedGemTest::Case
     Resends::SAVED_UP.times { Resends.answer?(ASKER, NOON) }
     Resends.forget(ASKER)
     assert Resends.answer?(ASKER, NOON)
+  end
+
+  def test_a_pose_may_carry_an_animation_within_what_one_can_be
+    assert Network::Said.placement?(ANIMATED)
+    assert Network::Said.placement?(["Hero", POSITION, POSITION, [0.0, 0.0, nil, nil]])
+    WRONG_ANIMATIONS.each do |animation|
+      refute Network::Said.placement?(["Hero", POSITION, POSITION, animation]), animation.inspect
+    end
   end
 end

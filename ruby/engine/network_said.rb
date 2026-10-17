@@ -8,6 +8,7 @@ module Network
     SYNC_SIZE = 3             # parts of what says where an object is: key, position, rotation
     ANIMATION_SIZE = 4        # parts of what says what its animation does: fade, weight, own clip, mixed clip
     CLIP_SIZE = 5             # parts of a clip: name, time, speed, loops, plays
+    MAX_CLIP_NAME_SIZE = 64   # bytes in a clip's name, as a pose carries it
     VECTOR_SIZE = 3           # numbers a position or a rotation travels as: x, y, z
     MAX_KEY_SIZE = 128        # bytes in the key of an object on the network (a spawned one, any NetworkSync)
     MAX_COUNT_DIGITS = 9      # in the number such a key ends with
@@ -42,14 +43,28 @@ module Network
       def sync_size?(data) = list?(data, SYNC_SIZE) || list?(data, SYNC_SIZE + 1)
       def no_or_animation?(part) = part.nil? || animation?(part)
 
-      # [fade, weight, own clip, mixed clip]: numbers, and clips or nils.
+      # [fade, weight, own clip, mixed clip]: seconds of fade (none below 0), a weight from 0 to 1,
+      # and clips or nils. What is out of those would only be refused further on, every frame.
       def animation?(part)
-        list?(part, ANIMATION_SIZE) && numbers?(part.take(2)) && part.drop(2).all? { |clip| no_or_clip?(clip) }
+        return false unless list?(part, ANIMATION_SIZE)
+
+        fade, weight, *clips = part
+        fade?(fade) && weight?(weight) && clips.all? { |clip| no_or_clip?(clip) }
       end
 
+      def fade?(fade) = reachable?(fade) && fade >= 0
+      def weight?(weight) = reachable?(weight) && weight.between?(0, 1)
       def no_or_clip?(clip) = clip.nil? || clip?(clip)
-      # [name, time, speed, loops, plays].
-      def clip?(clip) = list?(clip, CLIP_SIZE) && clip[0].is_a?(String) && numbers?(clip[1, 2])
+
+      # [name, time, speed, loops, plays]: a name that is not empty, two numbers, two flags.
+      def clip?(clip)
+        return false unless list?(clip, CLIP_SIZE)
+
+        name, time, speed, *flags = clip
+        clip_name?(name) && numbers?([time, speed]) && flags.all? { |flag| [true, false].include?(flag) }
+      end
+
+      def clip_name?(name) = name.is_a?(String) && !name.empty? && name.bytesize <= MAX_CLIP_NAME_SIZE
       def numbers?(list) = list.all? { |number| reachable?(number) }
 
       # Whether `key` is one `maker` gives what it spawns from `template`: "Ball#2.7" is the
