@@ -91,11 +91,10 @@ void LanDiscovery::collect_answers() {
 
 void LanDiscovery::hear_of(const NearbyGame& game) {
   if (game.protocol == wire::kProtocolVersion) return list_game(games_, game);
-  const std::string where = game.address + ":" + std::to_string(game.port);
+  const std::string where = game.address + " (\"" + game.name + "\")";  // (its port may be anything)
   if (told_of(where)) return;
   other_protocols_.push_back(where);
-  log::warning("the game \"" + game.name + "\" at " + where +
-               " cannot be joined: " + wire::protocol_mismatch(game.protocol));
+  log::warning("the game at " + where + " cannot be joined: " + wire::protocol_mismatch(game.protocol));
 }
 
 bool LanDiscovery::told_of(const std::string& game) const {

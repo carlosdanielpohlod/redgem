@@ -165,7 +165,9 @@ other, since protocol version 1. The code is in `src/net/wire*` and `src/net/pos
   MessagePack's nil, booleans, integers, floats, strings (UTF-8), arrays and maps; a `Vector3` is
   `{"$v": [x, y, z]}`. A message to everyone does not say so (no `t`).
 - **Version.** Every connection starts with `v`, the protocol's version: in the newcomer's hello,
-  and in the welcome or refusal it gets back (and in a game's answer to a LAN search). A host, a
+  and in the first thing it gets back, a welcome, a refusal or "the game is deciding" (and in a
+  game's answer to a LAN search). The version of a connection's first message is read before
+  anything else of it, since another version's messages may hold what this one's may not. A host, a
   relay or a server's lobby refuses a hello of another version with "this game runs protocol 1,
   the other side 2" and logs it; the machine turned away says the same, from its side, in its
   `on_fail` and its log. A game of another version found on the local network is not listed (the

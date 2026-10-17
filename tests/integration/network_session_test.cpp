@@ -282,7 +282,7 @@ struct LoneHost {
 TEST_CASE("whoever connects without saying hello is never in the game") {
   LoneHost lone;
   Stranger talker(lone.host, lone.table);
-  talker.say_bytes(frame("this is not a message"));
+  talker.say_bytes(redgem::test::raw_frame("this is not a message"));
   CHECK(talker.hung_up_on());
   Stranger rude(lone.host, lone.table);
   rude.say(R"({"k":"m","n":"hit","d":1})");  // a message before the hello
@@ -498,7 +498,7 @@ TEST_CASE("a room's opener hears of each newcomer asking to come in once, howeve
   REQUIRE(opener.host_room(kLocalhost, listener.local_port(), error));
   REQUIRE(table.until([&] { return listener.accept(relay) == IoStatus::Ok || relay.valid(); }));
   const auto say = [&](const std::string& text) {
-    std::vector<std::uint8_t> bytes = frame(text);
+    std::vector<std::uint8_t> bytes = wire_frame(text);
     REQUIRE(table.until([&] { return relay.write(bytes) == IoStatus::Ok && bytes.empty(); }));
   };
   say(R"({"k":"w","t":1,"p":[],"r":"ABCDEF"})");
@@ -580,7 +580,9 @@ TEST_CASE("a newcomer of another version of the protocol is turned away, told wh
 
 TEST_CASE("a guest turned away by a host of another version says why in its own words") {
   for (const std::string& answer : {R"({"k":"x","y":"whatever its reason","v":)" + std::to_string(kNextProtocol) + "}",
-                                    R"({"k":"w","t":2,"p":[1],"v":)" + std::to_string(kNextProtocol) + "}"}) {
+                                    R"({"k":"w","t":2,"p":[1],"v":)" + std::to_string(kNextProtocol) + "}",
+                                    // (a welcome this version could not read: its list of the others is no list)
+                                    R"({"k":"w","t":2,"p":"all","v":)" + std::to_string(kNextProtocol) + "}"}) {
     CAPTURE(answer);
     redgem::test::LogCapture log;
     FakeHost fake;

@@ -41,16 +41,17 @@ class Connection {
   // A poll's first step: reads what arrived and sends what waits. How many bytes arrived.
   std::size_t pump();
   // The next message that arrived whole: at most kMaxMessagesPerPoll between two pumps, the rest
-  // wait for the next. What is not a message of ours closes the connection.
+  // wait for the next. What is not a message of ours closes the connection. The first words of
+  // another version of the protocol are looked at before anything else of them (that version's
+  // messages may hold what this one's may not): a machine that connected to this one is refused,
+  // told why and logged; to one that this one called, they come out as a refusal saying that
+  // version, and nothing more of them.
   std::optional<nlohmann::json> next_message();
   // Queues a message, sent right away when the connection takes it; what is left goes out with
   // the next pumps. With more than the limit waiting the other side stopped listening: closed.
   void send(const nlohmann::json& message);
   // The same, for a message packed already (wire::packed): one that goes to many is packed once.
   void send_packed(const std::vector<std::uint8_t>& message);
-  // Turns away a newcomer whose hello is of another version of the protocol, telling it why and
-  // saying so in the log. True when it did.
-  bool refused_for_protocol(const nlohmann::json& hello);
   // One try at sending what waits (pump does it too; this is for a last word before leaving).
   void flush();
 
@@ -90,6 +91,13 @@ class Connection {
   bool takes_more() const { return !dropped_ && taken_this_poll_ < kMaxMessagesPerPoll; }
   // The other side is gone: nothing more is sent or read, but what it said is still to be taken.
   void hang_up();
+  // What a message that arrived is to this side (see next_message).
+  std::optional<nlohmann::json> understood(const std::optional<nlohmann::json>& message);
+  // Whether a message is the first words of another version of the protocol.
+  bool first_of_another_protocol(const std::optional<nlohmann::json>& message) const {
+    return !heard_ && message.has_value() && !wire::speaks_our_protocol(*message);
+  }
+  std::optional<nlohmann::json> another_protocol(int theirs);
 
   Socket socket_;
   FrameBuffer incoming_;
@@ -101,6 +109,8 @@ class Connection {
   float quiet_for_ = 0.0f;    // seconds since anything arrived
   float since_said_ = 0.0f;   // seconds since anything was sent
   bool established_ = false;
+  bool answering_ = false;  // the other side connected to this one
+  bool heard_ = false;      // its first message was taken
   bool gone_ = false;
   bool dropped_ = false;
 };

@@ -107,12 +107,7 @@ TEST_CASE("anything that is not a whole answer is no game") {
       game_from_answer(as_bytes({{"is", "other"}, {"name", "Maze"}, {"port", kGamePort}, {"players", 1}, {"v", 1}}),
                        kNeighbour)
           .has_value());
-  // An answer with no version, or one that is not a number, and one in JSON text (as versions before
-  // MessagePack sent it).
-  CHECK_FALSE(
-      game_from_answer(as_bytes({{"is", "redgem"}, {"name", "Maze"}, {"port", kGamePort}, {"players", 1}}), kNeighbour)
-          .has_value());
-  CHECK_FALSE(game_from_answer(answer("Maze", kGamePort, kPlayers, "1"), kNeighbour).has_value());
+  // An answer in JSON text, as versions before MessagePack sent it.
   CHECK_FALSE(
       game_from_answer(json::from_msgpack(search_answer("Maze", kGamePort, kPlayers)).dump(), kNeighbour).has_value());
   CHECK_FALSE(game_from_answer(answer(kPlayers, kGamePort, kPlayers), kNeighbour).has_value());
@@ -188,4 +183,20 @@ TEST_CASE("a game's name cannot carry what drives a terminal") {
   const auto game = game_from_answer(answer("Maze\x1b[2J\nfake line", kGamePort, kPlayers), kNeighbour);
   REQUIRE(game.has_value());
   CHECK(game->name == "Maze?[2J?fake line");
+}
+
+TEST_CASE("a game of another version is described whatever its answer holds, for the searcher to say why") {
+  // No version, one that is not a number, and a newer one whose answer has another shape altogether.
+  for (const std::string& other :
+       {as_bytes({{"is", "redgem"}, {"name", "Maze"}, {"port", kGamePort}, {"players", 1}}),
+        answer("Maze", kGamePort, kPlayers, "1"),
+        as_bytes(
+            {{"is", "redgem"}, {"name", "Maze"}, {"where", {{"port", "7777"}}}, {"v", wire::kProtocolVersion + 1}})}) {
+    const auto game = game_from_answer(other, kNeighbour);
+    REQUIRE(game.has_value());
+    CHECK(game->protocol != wire::kProtocolVersion);
+    CHECK(game->name == "Maze");
+    CHECK(game->address == kNeighbour);
+  }
+  CHECK(game_from_answer(as_bytes({{"is", "redgem"}, {"v", wire::kProtocolVersion + 1}}), kNeighbour)->name.empty());
 }

@@ -31,7 +31,6 @@ void RelayServer::hear_newcomer(Member& member, const nlohmann::json& message) {
     member.connection.close();
     return;
   }
-  if (member.connection.refused_for_protocol(message)) return;
   // (Whether the game of a room it opens decides who comes in: from the start, before anyone joins.)
   member.guarded = message.value(kGuards, false);
   enter_room(member, message[kRoom], message.value(kAuth, nlohmann::json()));

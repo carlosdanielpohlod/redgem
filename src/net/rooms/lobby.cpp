@@ -68,7 +68,6 @@ void Lobby::hear(Newcomer& newcomer, float seconds) {
     connection.close();
     return;
   }
-  if (connection.refused_for_protocol(*message)) return;
   newcomer.wants = message->value(kRoom, std::string());
   newcomer.auth = message->value(kAuth, nlohmann::json());
 }

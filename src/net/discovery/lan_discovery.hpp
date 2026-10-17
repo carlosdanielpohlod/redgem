@@ -53,7 +53,7 @@ class LanDiscovery {
   int players_ = 1;
   float since_asked_ = 0.0f;
   std::vector<NearbyGame> games_;
-  std::vector<std::string> other_protocols_;  // games of another version the log told of: "address:port"
+  std::vector<std::string> other_protocols_;  // games of another version the log told of: "address (\"name\")"
 };
 
 }  // namespace redgem::net

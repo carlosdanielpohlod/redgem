@@ -60,7 +60,6 @@ void NetworkSession::hear_newcomer(Link& link, const nlohmann::json& message, st
     link.connection.close();
     return;
   }
-  if (link.connection.refused_for_protocol(message)) return;
   consider(link, message.value(kAuth, nlohmann::json()), events);
 }
 

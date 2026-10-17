@@ -125,6 +125,13 @@ bool acceptable_auth(const nlohmann::json& auth) {
          auth.dump(kCompact, ' ', false, nlohmann::json::error_handler_t::replace).size() <= kMaxAuthBytes;
 }
 
+int protocol_of(const nlohmann::json& message) {
+  const nlohmann::json said = message.is_object() ? message.value(kVersion, nlohmann::json()) : nlohmann::json();
+  return is_number_between(said, 0, kLargestProtocolVersion) ? said.get<int>() : 0;
+}
+
+bool speaks_our_protocol(const nlohmann::json& message) { return protocol_of(message) == kProtocolVersion; }
+
 bool is_game_message(const nlohmann::json& message) {
   const bool named_message = message[kKind] == kGameMessage && message.contains(kName);
   const bool pose = message[kKind] == kPose && message.contains(kData);

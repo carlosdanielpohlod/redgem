@@ -798,6 +798,10 @@ TEST_CASE("a relay turns away a machine of another version of the protocol, sayi
   CHECK(refusal[wire::kVersion] == wire::kProtocolVersion);
   CHECK(meeting.relay.room_count() == 0);
   CHECK(log.contains(wire::protocol_mismatch(next_protocol)));
+  // Nor is one whose hello this version could not even read.
+  RawMachine odd(meeting);
+  REQUIRE(odd.say(R"({"k":"h","r":["new"],"v":)" + std::to_string(next_protocol) + "}"));
+  CHECK(odd.next_message()[wire::kReason] == wire::protocol_mismatch(next_protocol));
   // A session of this version gets its room.
   NetworkSession opener;
   meeting.seat(opener);

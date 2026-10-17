@@ -10,7 +10,8 @@ Connection::Connection(Socket socket, std::size_t pending_limit, bool establishe
     : socket_(std::move(socket)),
       address_(socket_.peer_address()),
       pending_limit_(pending_limit),
-      established_(established) {}
+      established_(established),
+      answering_(established) {}
 
 Connection Connection::accepted(Socket socket, std::size_t pending_limit) {
   return Connection(std::move(socket), pending_limit, true);
@@ -57,15 +58,29 @@ std::optional<nlohmann::json> Connection::next_message() {
     return std::nullopt;
   }
   ++taken_this_poll_;
-  auto message = wire::unpacked(*text);
+  return understood(wire::unpacked(*text));
+}
+
+std::optional<nlohmann::json> Connection::understood(const std::optional<nlohmann::json>& message) {
+  if (first_of_another_protocol(message)) return another_protocol(wire::protocol_of(message.value()));
+  heard_ = true;
   if (message && wire::well_formed(*message)) return message;
   close();  // not one of ours
   return std::nullopt;
 }
 
+std::optional<nlohmann::json> Connection::another_protocol(int theirs) {
+  heard_ = true;
+  if (!answering_) return wire::refusal_of_protocol(theirs);
+  const std::string why = wire::protocol_mismatch(theirs);
+  log::warning("turned away the machine at " + address_ + ": " + why);
+  refuse(why);
+  return std::nullopt;
+}
+
 void Connection::send(const nlohmann::json& message) {
   // (Text that is not valid UTF-8 travels with the broken parts replaced, instead of not at all.)
-  if (!hung_up()) send_packed(wire::packed(message));
+  send_packed(wire::packed(message));
 }
 
 void Connection::send_packed(const std::vector<std::uint8_t>& message) {
@@ -82,14 +97,6 @@ void Connection::send_packed(const std::vector<std::uint8_t>& message) {
 void Connection::flush() {
   if (!can_write()) return;
   if (socket_.write(outgoing_) == IoStatus::Closed) hang_up();
-}
-
-bool Connection::refused_for_protocol(const nlohmann::json& hello) {
-  if (wire::speaks_our_protocol(hello)) return false;
-  const std::string why = wire::protocol_mismatch(wire::protocol_of(hello));
-  log::warning("turned away the machine at " + address_ + ": " + why);
-  refuse(why);
-  return true;
 }
 
 void Connection::keep_in_touch(float seconds) {

@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 
 #include "net/wire.hpp"
+#include "net/frame_buffer.hpp"
 #include "net/wire_codec.hpp"
 
 namespace redgem::test {
@@ -29,6 +30,11 @@ inline std::vector<std::uint8_t> wire_frame(const std::string& text) {
     message[net::wire::kVersion] = net::wire::kProtocolVersion;
   }
   return net::wire::packed(message);
+}
+
+// Any bytes, framed as a message is (for what is not one).
+inline std::vector<std::uint8_t> raw_frame(const std::string& bytes) {
+  return net::frame(std::vector<std::uint8_t>(bytes.begin(), bytes.end()));
 }
 
 // The message in the bytes of a frame (null when they are not one).

@@ -24,7 +24,7 @@ void NetworkSession::ask(Link& link, const nlohmann::json& auth, std::vector<Net
     return;
   }
   link.ticket = ++last_ticket_;
-  link.connection.send({{kKind, kConsidering}});
+  link.connection.send(considering());
   events.push_back(
       NetworkEvent::approval(link.asking_as, link.ticket, auth.is_null() ? nlohmann::json::object() : auth));
 }

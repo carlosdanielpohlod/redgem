@@ -56,8 +56,6 @@ void NetworkSession::turned_away(const nlohmann::json& refusal) {
 
 void NetworkSession::accept_welcome(const nlohmann::json& message, std::vector<NetworkEvent>& events) {
   if (message[kKind] != kWelcome) return;
-  // (A host of another version would have refused this machine: one that welcomes it is turned away.)
-  if (!speaks_our_protocol(message)) return turned_away(message);
   const int given = message.value(kTo, 0);
   // (well_formed saw to the list: ids there can be, each once. This machine is not one of the others.)
   const std::vector<int> others = message.value(kPeers, std::vector<int>{});

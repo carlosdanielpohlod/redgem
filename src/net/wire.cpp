@@ -30,9 +30,9 @@ nlohmann::json refusal(const std::string& reason) {
   return {{kKind, kRefused}, {kReason, reason.substr(0, kMaxReasonBytes)}, {kVersion, kProtocolVersion}};
 }
 
-int protocol_of(const nlohmann::json& message) { return message.value(kVersion, 0); }
+nlohmann::json refusal_of_protocol(int theirs) { return {{kKind, kRefused}, {kVersion, theirs}}; }
 
-bool speaks_our_protocol(const nlohmann::json& message) { return protocol_of(message) == kProtocolVersion; }
+nlohmann::json considering() { return {{kKind, kConsidering}, {kVersion, kProtocolVersion}}; }
 
 std::string protocol_mismatch(int theirs) {
   return "this game runs protocol " + std::to_string(kProtocolVersion) + ", the other side " + std::to_string(theirs);
