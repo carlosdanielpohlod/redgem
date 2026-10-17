@@ -15,6 +15,7 @@ constexpr float kQuarter = 0.5f;    // seconds
 constexpr float kLate = 0.25f;      // seconds a state is taken after it was told
 constexpr float kFade = 0.4f;
 constexpr float kHalfWeight = 0.5f;
+constexpr float kPastWhole = 1.2f;  // a weight the mix takes as 1
 constexpr ObjectId kHero = 0;
 constexpr const char* kSlide = "Slide";
 constexpr const char* kLift = "Lift";
@@ -73,6 +74,15 @@ TEST_CASE("a character's revision moves on when a script changes what it does, n
     change(owner);
     CHECK(owner.revision() != before);
   }
+}
+
+TEST_CASE("mixing a clip again with a weight past whole is no change: the weight was taken as whole") {
+  Machine owner;
+  owner.player.mix_on(owner.scene, kHero, kLift, kPastWhole, true, 1.0f);
+  const std::uint32_t mixed = owner.revision();
+  owner.player.mix_on(owner.scene, kHero, kLift, kPastWhole, true, 1.0f);  // as a script would, every frame
+  CHECK(owner.revision() == mixed);
+  CHECK(owner.state().layer_weight == doctest::Approx(1.0f));
 }
 
 TEST_CASE("what a character does of its own is its clip, where it is in it, the fade left and what is mixed") {

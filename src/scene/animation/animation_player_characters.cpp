@@ -108,16 +108,16 @@ bool AnimationPlayer::mix_on(const Scene& scene, ObjectId object, const std::str
   const auto index = find(name);
   if (!index) return false;
   Own& own = owned_[scene.handle(character_of(scene, object))];
-  // The same clip again only changes how it is mixed; another one starts from its beginning.
-  const ClipClock* mixed = clock_on(own.layer, *index);
+  const ClipClock* mixed = clock_on(own.layer, *index);  // the same clip again: only mixed otherwise
   const bool another = mixed == nullptr;
-  if (mixes_otherwise(mixed, weight, own.layer_weight, loop, speed)) changed(scene, object);
+  const float kept = std::clamp(weight, 0.0f, kWhole);  // what the mix takes it as
+  if (mixes_otherwise(mixed, kept, own.layer_weight, loop, speed)) changed(scene, object);
   Track layer = own.layer.value_or(Track{});
   if (another) layer = Track{};
   layer.clip = *index;
   start(layer.clock, duration_of(*index), loop, speed, another);
   own.layer = layer;
-  own.layer_weight = std::clamp(weight, 0.0f, kWhole);
+  own.layer_weight = kept;
   return true;
 }
 
