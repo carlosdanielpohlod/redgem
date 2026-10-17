@@ -36,6 +36,16 @@ void describe(unsigned int location, int floats, int type, bool normalized, std:
   rlEnableVertexAttribute(location);
 }
 
+// Where the shader finds each part of a corner in the buffer bound now.
+void describe_corners(int look_location) {
+  describe(RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION, kPositionFloats, RL_FLOAT, false,
+           offsetof(ParticleVertex, position));
+  describe(RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD, kUvFloats, RL_FLOAT, false, offsetof(ParticleVertex, u));
+  describe(RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR, render_math::kColorChannels, RL_UNSIGNED_BYTE, true,
+           offsetof(ParticleVertex, color));
+  describe(static_cast<unsigned int>(look_location), kLookFloats, RL_FLOAT, false, offsetof(ParticleVertex, soft));
+}
+
 }  // namespace
 
 ParticleBuffer load_particle_buffer(int look_location) {
@@ -43,12 +53,7 @@ ParticleBuffer load_particle_buffer(int look_location) {
   buffer.vertex_array = rlLoadVertexArray();
   rlEnableVertexArray(buffer.vertex_array);  // (made, not bound: what follows is kept in it)
   buffer.corners = rlLoadVertexBuffer(nullptr, static_cast<int>(kMaxCorners * sizeof(ParticleVertex)), true);
-  describe(RL_DEFAULT_SHADER_ATTRIB_LOCATION_POSITION, kPositionFloats, RL_FLOAT, false,
-           offsetof(ParticleVertex, position));
-  describe(RL_DEFAULT_SHADER_ATTRIB_LOCATION_TEXCOORD, kUvFloats, RL_FLOAT, false, offsetof(ParticleVertex, u));
-  describe(RL_DEFAULT_SHADER_ATTRIB_LOCATION_COLOR, render_math::kColorChannels, RL_UNSIGNED_BYTE, true,
-           offsetof(ParticleVertex, color));
-  describe(static_cast<unsigned int>(look_location), kLookFloats, RL_FLOAT, false, offsetof(ParticleVertex, soft));
+  describe_corners(look_location);
   const std::vector<std::uint16_t> indices = quad_triangles();
   buffer.triangles =
       rlLoadVertexBufferElement(indices.data(), static_cast<int>(indices.size() * sizeof(std::uint16_t)), false);
