@@ -25,6 +25,12 @@ std::string primitive_shape_problem(const PrimitiveDesc& primitive) {
   return {};
 }
 
+void keep_joints_within(PrimitiveDesc& primitive, std::size_t joints) {
+  for (std::uint16_t& joint : primitive.joints) {
+    if (joint >= joints) joint = 0;
+  }
+}
+
 void Bounds::include(Vec3 point) {
   if (!valid) {
     min = max = point;

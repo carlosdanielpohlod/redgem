@@ -15,10 +15,9 @@ struct LoadResult {
   SceneDesc scene;
 };
 
-// Loads a .glb/.gltf file with cgltf, including node extras (Blender custom properties).
-// `max_skin_joints` is how many joints of a skeleton whoever draws the scene can move (a
-// graphics card's shader holds so many): vertices of the joints past it follow the last one
-// kept, with a warning. Nobody can use more than a scene's skeleton may have.
-LoadResult load_gltf_scene(const std::string& path, int max_skin_joints = config::kMaxSkinJoints);
+// Loads a .glb/.gltf file with cgltf, including node extras (Blender custom properties). A
+// skeleton keeps its first config::kMaxSkinJoints joints, with a warning when it has more; a
+// vertex that names a joint its skeleton does not have follows the skeleton's first.
+LoadResult load_gltf_scene(const std::string& path);
 
 }  // namespace redgem

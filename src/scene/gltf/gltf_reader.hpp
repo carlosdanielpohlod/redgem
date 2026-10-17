@@ -36,17 +36,14 @@ class GltfReader {
   GltfReader(const cgltf_data& data, std::vector<std::filesystem::path> image_files, LoadResult& result)
       : data_(data), image_files_(std::move(image_files)), result_(result) {}
 
-  // How many joints of a skeleton are kept (see load_gltf_scene).
-  void set_max_skin_joints(int joints) { max_skin_joints_ = static_cast<cgltf_uint>(std::max(joints, 1)); }
-
   // Fills the result; returns what made the file unusable, or an empty text.
   std::string run() {
     load_images();
     load_materials();
     load_meshes();
-    limit_joints();
     load_nodes();
     load_skins();
+    keep_joints_within_skins();
     load_animations();
     return problem_;
   }
@@ -88,8 +85,6 @@ class GltfReader {
   std::nullopt_t dropped(const std::string& mesh_name, const std::string& why);
   // A mesh exported without normals is lit as if it faced up everywhere.
   void ensure_normals(PrimitiveDesc& primitive, const std::string& mesh_name);
-  // Vertices of the joints that are not kept follow the last one that is.
-  void limit_joints();
 
   // The tree of objects.
   void load_nodes();
@@ -107,6 +102,9 @@ class GltfReader {
   // Skeletons.
   void load_skins();
   SkinDesc load_skin(const cgltf_skin& skin, const std::vector<int>& nodes) const;
+  // A vertex naming a joint past its skeleton's last follows the skeleton's first (see
+  // keep_joints_within), for every skinned object's mesh.
+  void keep_joints_within_skins();
   void warn_of_unused_parts(const cgltf_skin& skin, cgltf_size index);
 
   // Animation clips.
@@ -122,7 +120,6 @@ class GltfReader {
   LoadResult& result_;
   std::vector<bool> added_;  // by glTF node index: already in the scene
   std::string problem_;      // what made the file unusable, when something did
-  cgltf_uint max_skin_joints_ = config::kMaxSkinJoints;
 };
 
 }  // namespace redgem

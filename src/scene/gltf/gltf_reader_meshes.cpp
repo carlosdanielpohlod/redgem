@@ -120,13 +120,4 @@ void GltfReader::ensure_normals(PrimitiveDesc& primitive, const std::string& mes
   }
 }
 
-void GltfReader::limit_joints() {
-  const auto last_kept = static_cast<std::uint16_t>(std::min(max_skin_joints_ - 1, gltf_accessors::kMaxJointIndex));
-  for (MeshDesc& mesh : result_.scene.meshes) {
-    for (PrimitiveDesc& primitive : mesh.primitives) {
-      for (std::uint16_t& joint : primitive.joints) joint = std::min(joint, last_kept);
-    }
-  }
-}
-
 }  // namespace redgem

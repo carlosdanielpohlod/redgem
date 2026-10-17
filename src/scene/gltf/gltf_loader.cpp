@@ -86,7 +86,7 @@ bool loaded_and_checked(cgltf_data& data, const gltf_checks::NamedFiles& files, 
 
 }  // namespace
 
-LoadResult load_gltf_scene(const std::string& path, int max_skin_joints) {
+LoadResult load_gltf_scene(const std::string& path) {
   LoadResult result;
   const CgltfPtr data = parsed_gltf(path, result.error);
   if (data == nullptr) return result;
@@ -94,7 +94,6 @@ LoadResult load_gltf_scene(const std::string& path, int max_skin_joints) {
   const gltf_checks::NamedFiles files = gltf_checks::named_files(*data, folder_of(path));
   if (!loaded_and_checked(*data, files, path, result.error)) return result;
   GltfReader reader(*data, files.images, result);
-  reader.set_max_skin_joints(std::min(max_skin_joints, config::kMaxSkinJoints));
   // (Its pictures are decoded later, once shown: what that will take is known from their headers.)
   result.ok = sound(reader.run(), path, result.error) &&
               sound(gltf_budget::pictures_problem(*data, path, files, result.scene.images), path, result.error);

@@ -68,6 +68,10 @@ struct PrimitiveDesc {
   int material = kNoIndex;
 };
 
+// Makes every joint of a primitive's vertices one of a skeleton of `joints` joints: one past its
+// last becomes its first, whose bone is there (a file may name joints its skeleton does not have).
+void keep_joints_within(PrimitiveDesc& primitive, std::size_t joints);
+
 // What keeps a primitive from being drawn or collided with: no vertices, normals that are not one
 // per vertex, or indices that do not make whole triangles of the vertices it has. Empty when
 // nothing does. Everything that walks a primitive's indices relies on this having been checked.
