@@ -54,17 +54,17 @@ void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, c
   apply_lights(scene, env, to_vec3(camera.position));
   view_tan_half_fov = std::tan(camera.fovy * DEG2RAD * kHalf);
   view_aspect = aspect;
-  draw_shadow_map(scene, camera, env);
-  capture_reflection_face(scene, camera);
+  draw_shadow_map(camera, env);
+  capture_reflection_face(camera);
   send(shader, shader.locs[SHADER_LOC_VECTOR_VIEW], camera.position);
 }
 
-void Renderer::Impl::draw_lit_scene(const Scene& scene, const Camera3D& camera, const ParticleSystem* particles) {
+void Renderer::Impl::draw_lit_scene(const Camera3D& camera, const ParticleSystem* particles) {
   BeginTextureMode(hdr);
   ClearBackground(kBlack);
   BeginMode3D(camera);
   draw_sky(camera);
-  draw_objects(scene, false, to_vec3(camera.position));
+  draw_objects(false, to_vec3(camera.position));
   if (particles != nullptr) draw_particles(*particles, camera);
   EndMode3D();
   EndTextureMode();

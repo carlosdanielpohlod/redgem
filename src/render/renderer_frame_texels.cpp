@@ -7,6 +7,7 @@
 #include <raymath.h>
 
 #include <algorithm>
+#include <cstring>
 
 #include "render/instance_records.hpp"
 
@@ -19,14 +20,17 @@ using render_math::kTexelsPerRow;
 using render_math::model_matrix;
 
 constexpr int kTexelFormat = RL_PIXELFORMAT_UNCOMPRESSED_R32G32B32A32;
-constexpr int kOneLevel = 1;  // no smaller copies: texels are fetched one by one, never filtered
+constexpr int kOneLevel = 1;                       // no smaller copies: texels are fetched one by one, never filtered
+constexpr std::size_t kSourceFloats = 10 + 3 + 2;  // a transform, a tint, a first bone and a number
+static_assert(sizeof(RecordSource) == kSourceFloats * sizeof(float), "a record's source compares byte by byte");
 
 }  // namespace
 
 void Renderer::Impl::write_frame_texels(const Scene& scene) {
   const std::size_t count = std::min(scene.size(), worlds.size());
   sights.assign(count, ObjectSight{});
-  std::size_t next_bone = render_math::record_texel(count);  // the bones come after the records
+  record_sources.resize(count);  // (a slot past the end that comes back is written anew)
+  std::size_t next_bone = render_math::record_texel(count);  // after every record
   for (std::size_t slot = 0; slot < count; ++slot) {
     const GameObject& object = scene.at(static_cast<ObjectId>(slot));
     if (!render_math::has_something_to_draw(object, show_prefabs, meshes.size())) continue;
@@ -40,13 +44,26 @@ std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& o
   const std::optional<SkeletonPose> pose = pose_skeleton(scene, object, next_bone);
   const render_math::InstanceLook look{object.tint, pose ? static_cast<float>(next_bone) : render_math::kNoBones};
   ObjectSight& sight = sights[slot];
-  sight.drawn = render_math::write_instance(texels, slot, model_matrix(worlds[slot]), look);
+  sight.drawn = write_record(slot, look);
+  sight.mesh = object.mesh;
+  sight.visible_from = object.visible_from;
+  sight.visible_to = object.visible_to;
   if (!pose) {
     sight.sight = render_math::sight_of(bounds, worlds[slot]);
     return next_bone;
   }
   sight.sight = render_math::skinned_sight_of(bounds, worlds[slot], pose->first);
   return next_bone + pose->bones * kTexelsPerMatrix;
+}
+
+bool Renderer::Impl::write_record(std::size_t slot, const render_math::InstanceLook& look) {
+  const std::size_t record = slot;
+  const RecordSource source{worlds[slot], look.tint, look.first_bone, static_cast<float>(record)};
+  RecordSource& last = record_sources[slot];
+  if (std::memcmp(&source, &last, sizeof(RecordSource)) == 0) return true;
+  if (!render_math::write_instance(texels, record, model_matrix(worlds[slot]), look)) return false;
+  last = source;
+  return true;
 }
 
 std::optional<SkeletonPose> Renderer::Impl::pose_skeleton(const Scene& scene, const GameObject& object,

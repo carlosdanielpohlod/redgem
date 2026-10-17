@@ -23,8 +23,8 @@ float on_with(int image) { return image != kNoIndex ? kOn : kOff; }
 
 // Whether a view draws an object: one the frame has a record of, in the view, big enough in it,
 // and at the distance its level of detail is for.
-bool seen(const ObjectSight& sight, const GameObject& object, const render_math::View& view) {
-  return sight.drawn && render_math::sighted(view, sight.sight, object.visible_from, object.visible_to);
+bool seen(const ObjectSight& sight, const render_math::View& view) {
+  return sight.drawn && render_math::sighted(view, sight.sight, sight.visible_from, sight.visible_to);
 }
 
 }  // namespace
@@ -69,11 +69,11 @@ void Renderer::Impl::use_material(int material, ObjectPass& pass) {
 
 // --- Objects ----------------------------------------------------------------------------------
 
-void Renderer::Impl::draw_objects(const Scene& scene, bool depth_pass, Vec3 viewer, float detail_angle) {
+void Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float detail_angle) {
   const Matrix view_projection = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
   const render_math::View view{frustum_from_matrix(MatrixToFloatV(view_projection).v), viewer,
                                render_math::smallest_angle_drawn(detail_angle, depth_pass)};
-  gather_copies(scene, view);
+  gather_copies(view);
   const std::size_t first = append_slots(slots, batches.slots());
   ObjectPass objects{
       begin_mesh_pass(depth_pass ? depth_shader : shader, depth_pass ? depth_instance_slot : lit_instance_slot),
@@ -82,12 +82,10 @@ void Renderer::Impl::draw_objects(const Scene& scene, bool depth_pass, Vec3 view
   end_mesh_pass();
 }
 
-void Renderer::Impl::gather_copies(const Scene& scene, const render_math::View& view) {
+void Renderer::Impl::gather_copies(const render_math::View& view) {
   batches.start(meshes.size());
-  const std::size_t count = std::min(scene.size(), sights.size());
-  for (std::size_t slot = 0; slot < count; ++slot) {
-    const GameObject& object = scene.at(static_cast<ObjectId>(slot));
-    if (seen(sights[slot], object, view)) batches.add(object.mesh, slot);
+  for (std::size_t slot = 0; slot < sights.size(); ++slot) {
+    if (seen(sights[slot], view)) batches.add(sights[slot].mesh, slot);
   }
   batches.lay_out();
 }

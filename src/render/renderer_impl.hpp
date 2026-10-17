@@ -32,6 +32,7 @@
 #include "render/capture_views.hpp"
 #include "render/environment.hpp"
 #include "render/instance_batches.hpp"
+#include "render/instance_records.hpp"
 #include "render/mesh_pass.hpp"
 #include "render/render_math.hpp"
 #include "render/renderer.hpp"
@@ -67,10 +68,23 @@ struct GpuPrimitive {
 };
 
 // What a frame knows of an object before any pass: whether it is drawn at all (its record is in
-// the frame's texels), and what a pass judges it by.
+// the frame's texels), and what a pass judges it by (kept together, so that a pass over tens of
+// thousands of objects reads them one after the other).
 struct ObjectSight {
   bool drawn = false;
   render_math::Sight sight;
+  int mesh = kNoIndex;
+  float visible_from = 0.0f;
+  float visible_to = 0.0f;
+};
+
+// What an object's record was last written from: most of a scene stands still, and a record
+// written from the same is not worked out again. Only floats, so that two compare byte by byte.
+struct RecordSource {
+  Transform world;
+  Vec3 tint;
+  float first_bone = 0.0f;
+  float record = 0.0f;  // its number
 };
 
 // Where a skeleton is this frame: its first bone (what a skinned mesh is judged by) and how many.
@@ -160,16 +174,17 @@ struct Renderer::Impl {
   bool show_prefabs = false;
   float motion_blur = 0.0f;  // 0..1 (Camera.motion_blur)
   // The frame being drawn.
-  std::vector<Transform> worlds;    // every object's world transform (see prepare_frame)
-  std::vector<ObjectSight> sights;  // by object, for every pass of the frame
-  render_math::TexelRows texels;    // what the vertex shader reads of the frame, and its texture
+  std::vector<Transform> worlds;                            // every object's world transform (see prepare_frame)
+  std::vector<ObjectSight> sights;                          // by object, for every pass of the frame
+  std::vector<render_detail::RecordSource> record_sources;  // by object
+  render_math::TexelRows texels;  // what the vertex shader reads of the frame, and its texture
   std::vector<render_math::RowRun> changed_rows;
   unsigned int texel_texture = 0;
   render_math::InstanceBatches batches;  // what the pass being drawn sees, by mesh
   render_detail::SlotBuffer slots;       // the record numbers of what the frame's passes see
-  float wind = 0.0f;                     // of the environment
-  Vector3 sun_travel{};                  // direction the sun's light travels
-  float view_tan_half_fov = 0.0f;        // of the camera, for rebuilding positions from depth
+  float wind = 0.0f;                  // of the environment
+  Vector3 sun_travel{};               // direction the sun's light travels
+  float view_tan_half_fov = 0.0f;     // of the camera, for rebuilding positions from depth
   float view_aspect = 0.0f;
   int next_face = 0;       // the cube face captured this frame
   int faces_captured = 0;  // reflections switch on once all six exist
@@ -221,7 +236,7 @@ struct Renderer::Impl {
   // the sun's shadow map and one more face of the reflections. `aspect`: width over height.
   void prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect);
   // The scene as the camera sees it, into the HDR target.
-  void draw_lit_scene(const Scene& scene, const Camera3D& camera, const ParticleSystem* particles);
+  void draw_lit_scene(const Camera3D& camera, const ParticleSystem* particles);
   // Binds a texture `program` reads all frame long to a slot of its own.
   void bind_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture);
 
@@ -232,6 +247,8 @@ struct Renderer::Impl {
   // One object's record and sight, and its bones from texel `next_bone` on. Returns where the
   // next skeleton's bones go.
   std::size_t sight_object(const Scene& scene, const GameObject& object, std::size_t next_bone);
+  // Writes the record of the object in `slot`, unless it was written from the same last frame.
+  bool write_record(std::size_t slot, const render_math::InstanceLook& look);
   // Writes an object's bones from texel `first` on: where each of its joints is now, times the
   // skin's inverse bind matrix. Nothing when the object has no (usable) skeleton.
   std::optional<render_detail::SkeletonPose> pose_skeleton(const Scene& scene, const GameObject& object,
@@ -264,9 +281,9 @@ struct Renderer::Impl {
   // Draws what the current 3D view can see, every copy of a mesh in one call per part. `viewer`
   // is the game camera in both passes: detail is judged by how big things look to the player, not
   // to the sun.
-  void draw_objects(const Scene& scene, bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
+  void draw_objects(bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
   // Gathers into `batches` what the view sees.
-  void gather_copies(const Scene& scene, const render_math::View& view);
+  void gather_copies(const render_math::View& view);
   // `first`: where the pass's record numbers start in `slots`.
   void draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass);
   void use_material(int material, ObjectPass& pass);
@@ -288,17 +305,17 @@ struct Renderer::Impl {
   // --- Sun shadows (renderer_shadows.cpp) -------------------------------------------------------
 
   // Renders the scene's depth from the sun and hands the result to the lit shader.
-  void draw_shadow_map(const Scene& scene, const Camera3D& camera, const Environment& env);
-  void draw_sun_depth(const Scene& scene, const Camera3D& camera, Vec3 to_sun);
+  void draw_shadow_map(const Camera3D& camera, const Environment& env);
+  void draw_sun_depth(const Camera3D& camera, Vec3 to_sun);
   // Fills the shadow map from the sun's point of view. Returns the matrix that leads into that view.
-  Matrix draw_depth_from(const Camera3D& sun_view, const Scene& scene, Vec3 viewer);
+  Matrix draw_depth_from(const Camera3D& sun_view, Vec3 viewer);
 
   // --- Reflections (renderer_reflections.cpp) ---------------------------------------------------
 
   // Captures one more face of the camera's surroundings into the panorama the lit shader reflects.
   // Six frames make a full turn, so reflections follow the camera with a short delay.
-  void capture_reflection_face(const Scene& scene, const Camera3D& camera);
-  void draw_surroundings(const Scene& scene, const render_math::CubeFace& face, Vector3 eye);
+  void capture_reflection_face(const Camera3D& camera);
+  void draw_surroundings(const render_math::CubeFace& face, Vector3 eye);
   void copy_face_to_panorama(const render_math::CubeFace& face);
   void blur_panorama_levels();
 
