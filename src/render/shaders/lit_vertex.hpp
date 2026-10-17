@@ -88,7 +88,7 @@ void main() {
   float ground = toWorld[3].y;
   vec4 copy = frameTexel(record + COPY_TEXEL);
   fragCopy = vec4(keptOf(copy, length(toWorld[3].xyz - viewPos)), copy.w, 0.0);
-  fragUp = normalize(mat3(toWorld) * UP);
+  fragUp = copy.w > 0.0 ? normalize(mat3(toWorld) * UP) : UP;  // (only grass asks for it)
   // (A copy whose skeleton could not be posed has no first bone: it stays as modeled.)
   if (skinned > SWITCH_ON && look.a >= 0.0) {
     toWorld = skeletonPose(int(look.a));

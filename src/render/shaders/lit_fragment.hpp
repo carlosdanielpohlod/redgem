@@ -124,6 +124,7 @@ float pixelNoise() { return fract(NOISE_WEIGHTS.z * fract(dot(gl_FragCoord.xy, N
 // pixels that grows as it fades. A copy fading in leaves out exactly the pixels that one fading
 // out over the same distances keeps, so two levels of detail cross over without a gap.
 bool fadedAway(vec4 copy) {
+  if (min(copy.x, copy.y) >= 1.0) return false;  // (most copies: no noise worked out)
   float noise = pixelNoise();
   return noise >= copy.x || noise < 1.0 - copy.y;
 }
@@ -140,7 +141,30 @@ bool leftOut(float alpha) {
 }
 )GLSL";
 
-// The whole fragment shader, its parts in order.
-inline std::string lit_fragment() { return std::string(kLitHead) + kLitShadows + kLitSky + kLitMain; }
+// What the lit shader is compiled with besides what every scene needs.
+struct LitFeatures {
+  bool sky_picture = false;   // the sky is a picture that lights the scene
+  bool soft_shadows = false;  // shadow edges as wide as the sun makes them
+
+  bool operator==(const LitFeatures& other) const {
+    return sky_picture == other.sky_picture && soft_shadows == other.soft_shadows;
+  }
+  bool operator!=(const LitFeatures& other) const { return !(*this == other); }
+};
+
+inline constexpr const char* kVersionLine = "#version 330\n";
+inline constexpr const char* kSkyPictureSwitch = "#define SKY_PICTURE\n";
+inline constexpr const char* kSoftShadowsSwitch = "#define SOFT_SHADOWS\n";
+
+// The whole fragment shader, its parts in order, with the features asked for switched on right
+// after its version line.
+inline std::string lit_fragment(const LitFeatures& features = {}) {
+  std::string switches;
+  if (features.sky_picture) switches += kSkyPictureSwitch;
+  if (features.soft_shadows) switches += kSoftShadowsSwitch;
+  std::string source = std::string(kLitHead) + kLitShadows + kLitSky + kLitMain;
+  const std::size_t version = source.find(kVersionLine);
+  return source.insert(version + std::string(kVersionLine).size(), switches);
+}
 
 }  // namespace redgem::shaders

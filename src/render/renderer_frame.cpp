@@ -54,6 +54,8 @@ Camera3D Renderer::Impl::camera_for(const Scene& scene) const {
 }
 
 void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect) {
+  use_sky_picture(env);
+  use_lit_features({loaded(sky.picture), env.shadow_softness > 0.0f});
   // Where every object is, worked out once: each of the frame's passes (shadows, reflections, the
   // view) would otherwise walk every object's chain of parents again. So are its bones.
   render_math::world_transforms(scene, worlds);

@@ -83,8 +83,8 @@ void Renderer::Impl::release_sky_picture() {
 void Renderer::Impl::send_sky_light(const Environment& env) {
   const float pictured = loaded(sky.picture) ? render_math::kOn : render_math::kOff;
   const Vector2 turn = turn_into_picture(env.sky_rotation);
+  send(sky_shader, shaders::kSkyLight, pictured);
   for (const Shader* program : {&shader, &sky_shader}) {
-    send(*program, shaders::kSkyLight, pictured);
     send(*program, shaders::kSkyTurn, turn);
     send(*program, shaders::kSkyIntensity, env.sky_intensity);
   }

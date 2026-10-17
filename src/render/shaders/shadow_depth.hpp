@@ -14,9 +14,13 @@ uniform vec4 colDiffuse;
 uniform float alphaCutoff;
 const vec3 NOISE_WEIGHTS = vec3(0.06711056, 0.00583715, 52.9829189);  // as the lit shader's
 float pixelNoise() { return fract(NOISE_WEIGHTS.z * fract(dot(gl_FragCoord.xy, NOISE_WEIGHTS.xy))); }
-void main() {
+bool fadedAway(vec4 copy) {
+  if (min(copy.x, copy.y) >= 1.0) return false;
   float noise = pixelNoise();
-  if (noise >= fragCopy.x || noise < 1.0 - fragCopy.y) discard;
+  return noise >= copy.x || noise < 1.0 - copy.y;
+}
+void main() {
+  if (fadedAway(fragCopy)) discard;
   if (colDiffuse.a * texture(texture0, fragTexCoord).a * fragColor.a < alphaCutoff) discard;
 }
 )GLSL";

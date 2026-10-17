@@ -41,14 +41,10 @@ void free_maps(Material& material) {
 
 void Renderer::Impl::load_pipeline() {
   compile_shaders();
-  lit_uniforms = find_lit_uniforms(shader);
+  compile_lit(shaders::LitFeatures{});
   depth_uniforms = find_depth_uniforms(depth_shader);
-  lit_instance_slot = find_instance_slot(shader);
   depth_instance_slot = find_instance_slot(depth_shader);
   particle_uniforms = find_particle_uniforms(particle_shader);
-  // A cube map's sampler must never share a slot with a picture's, even unused: given its own.
-  assign_slot(shader, lit_uniforms.sky_reflections, kSkyReflectionSlot);
-  assign_slot(shader, lit_uniforms.sky_reflectance, kSkyReflectanceSlot);
   filter_cube_maps_across_seams();
   particle_buffer = load_particle_buffer(particle_uniforms.look);
   load_fixed_targets();
@@ -57,7 +53,6 @@ void Renderer::Impl::load_pipeline() {
 }
 
 void Renderer::Impl::compile_shaders() {
-  shader = compile_shader(shaders::kLitVertex, shaders::lit_fragment().c_str(), "lit");
   depth_shader = compile_shader(shaders::kLitVertex, shaders::kDepthFragment, "shadow depth");
   sky_shader = compile_shader(shaders::kSkyVertex, shaders::kSkyFragment, "sky");
   particle_shader = compile_shader(shaders::kParticleVertex, shaders::kParticleFragment, "particles");
@@ -68,6 +63,23 @@ void Renderer::Impl::compile_shaders() {
   antialias_shader = compile_shader(nullptr, shaders::kAntialiasFragment, "anti-aliasing");
   panorama_shader = compile_shader(nullptr, shaders::kPanoramaFragment, "reflection panorama");
   occlusion_shader = compile_shader(nullptr, shaders::kAmbientOcclusionFragment, "ambient occlusion");
+}
+
+void Renderer::Impl::compile_lit(const shaders::LitFeatures& features) {
+  if (loaded(shader)) UnloadShader(shader);
+  shader = compile_shader(shaders::kLitVertex, shaders::lit_fragment(features).c_str(), "lit");
+  lit_uniforms = find_lit_uniforms(shader);
+  lit_instance_slot = find_instance_slot(shader);
+  // A cube map's sampler must never share a slot with a picture's, even unused: given its own.
+  assign_slot(shader, lit_uniforms.sky_reflections, kSkyReflectionSlot);
+  assign_slot(shader, lit_uniforms.sky_reflectance, kSkyReflectanceSlot);
+  for (Material& material : materials) material.shader = shader;
+  fallback_material.shader = shader;
+  lit_features = features;
+}
+
+void Renderer::Impl::use_lit_features(const shaders::LitFeatures& features) {
+  if (features != lit_features) compile_lit(features);
 }
 
 void Renderer::Impl::load_sky() {

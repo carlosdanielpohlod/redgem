@@ -47,6 +47,7 @@
 #include "render/renderer.hpp"
 #include "render/scatter_chunks.hpp"
 #include "render/shader_programs.hpp"
+#include "render/shaders/lit_fragment.hpp"
 #include "render/shadow_cascades.hpp"
 #include "render/sky_harmonics.hpp"
 #include "render/texel_rows.hpp"
@@ -151,6 +152,7 @@ struct Renderer::Impl {
   // Shaders, and where the ones drawn with all frame long take their values.
   Shader shader{};
   render_detail::LitUniforms lit_uniforms;
+  shaders::LitFeatures lit_features;  // what the lit shader was compiled with
   Shader depth_shader{};
   render_detail::DepthUniforms depth_uniforms;
   int lit_instance_slot = render_detail::kNoLocation;  // the vertex attribute each copy's record number goes to
@@ -238,6 +240,10 @@ struct Renderer::Impl {
   // Shaders, their uniforms, the shadow map, the reflection targets and the sky.
   void load_pipeline();
   void compile_shaders();
+  // The lit shader with these features (compiled again only when they change: the sky picture or
+  // soft shadows switched on or off).
+  void compile_lit(const shaders::LitFeatures& features);
+  void use_lit_features(const shaders::LitFeatures& features);
   void load_sky();
   void release();
   void release_sky();

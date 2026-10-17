@@ -20,23 +20,23 @@ namespace {
 
 constexpr int kSkyWide = 64;  // pixels of the test's sky picture
 constexpr int kSkyHigh = 32;
-constexpr std::uint8_t kBright = 128;     // a mantissa of 128 ...
+constexpr std::uint8_t kBright = 128;       // a mantissa of 128 ...
 constexpr std::uint8_t kOneExponent = 129;  // ... under this exponent is 1.0
 constexpr Vec3 kCameraAt{0.0f, 0.0f, 10.0f};
 constexpr float kTop = 0.05f;  // of the picture, down from its top: the sky behind everything
 constexpr float kMiddle = 0.5f;
 constexpr double kHalfTurn = 180.0;  // degrees
 constexpr int kFadeCopies = 40;
-constexpr float kFadeEnd = 12.0f;    // meters from the camera the copies are drawn to
-constexpr float kFade = 6.0f;        // meters they fade over before that
-constexpr float kRowDistance = 9.0f; // meters from the camera: half faded
+constexpr float kFadeEnd = 12.0f;     // meters from the camera the copies are drawn to
+constexpr float kFade = 6.0f;         // meters they fade over before that
+constexpr float kRowDistance = 9.0f;  // meters from the camera: half faded
 constexpr float kRowSpacing = 0.3f;
-constexpr float kFewest = 0.25f;     // share of the copies' pixels a half faded row keeps, at least ...
-constexpr float kMost = 0.75f;       // ... and at most
+constexpr float kFewest = 0.25f;  // share of the copies' pixels a half faded row keeps, at least ...
+constexpr float kMost = 0.75f;    // ... and at most
 constexpr Vec3 kAboveTheGround{0.0f, 12.0f, 1.0f};
 constexpr Vec3 kPole{2.0f, 0.0f, 0.0f};
 constexpr Vec3 kPoleSize{2.0f, 3.0f, 0.4f};  // a wall: wide enough to keep a dark middle under a wide sun
-constexpr double kSoftSun = 6.0;  // degrees across
+constexpr double kSoftSun = 6.0;             // degrees across
 constexpr double kCascades = 4.0;
 constexpr int kDark = 250;  // the sum of a pixel's channels in full shadow is below this ...
 constexpr int kLit = 550;   // ... and in full sun above this
@@ -190,9 +190,9 @@ TEST_CASE("scattered copies near the end of their distances fade out a share of 
 TEST_CASE("cascaded shadows of a sun as wide as asked have softer edges than a sharp sun's") {
   RenderStage stage;
   const Picture sharp = shadow_of(stage, {{"shadow_cascades", kCascades}}, "shadow_sharp");
-  const Picture soft =
-      shadow_of(stage, {{"shadow_cascades", kCascades}, {"shadow_softness", kSoftSun}}, "shadow_soft");
+  const Picture soft = shadow_of(stage, {{"shadow_cascades", kCascades}, {"shadow_softness", kSoftSun}}, "shadow_soft");
   REQUIRE(sharp.find(in_shadow).count > kSomeShadow);
   REQUIRE(soft.find(in_shadow).count > kSomeShadow);
-  CHECK(static_cast<float>(soft.find(on_an_edge).count) > static_cast<float>(sharp.find(on_an_edge).count) * kWiderEdges);
+  CHECK(static_cast<float>(soft.find(on_an_edge).count) >
+        static_cast<float>(sharp.find(on_an_edge).count) * kWiderEdges);
 }

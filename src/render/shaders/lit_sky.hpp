@@ -2,7 +2,8 @@
 
 // The lit fragment shader's part that knows the light from all around (see lit_fragment.hpp): the
 // sky, as a gradient or as a picture (its light worked out when it was loaded: render/sky_light.hpp),
-// mixed with the surroundings the engine keeps capturing around the camera.
+// mixed with the surroundings the engine keeps capturing around the camera. A picture's light is
+// compiled in only when there is one (SKY_PICTURE): scenes without one do not pay for it.
 
 namespace redgem::shaders {
 
@@ -31,7 +32,6 @@ uniform vec3 skyHorizon;
 uniform vec3 groundColor;
 uniform sampler2D reflectionMap;   // the surroundings as a panorama (longitude x latitude), HDR, with mips
 uniform float reflectionStrength;  // 0 until the panorama has been captured
-uniform float skyLight;            // 1: the sky is a picture, and lights the scene
 uniform vec3 skyIrradiance[SKY_HARMONICS];
 uniform samplerCube skyReflections; // the picture blurred for each roughness, a mip level each
 uniform sampler2D skyReflectance;   // how much of that a surface reflects (split sum)
@@ -75,18 +75,25 @@ vec3 pictureReflection(vec3 mirror, float rough) {
 vec3 ambientLight(vec3 n, vec3 v, vec3 albedo, vec3 f0, float rough, float metal) {
   vec3 f = fresnel(max(dot(n, v), 0.0), f0);
   vec3 mirror = reflect(-v, n);
-  bool pictured = skyLight > SWITCH_ON;
-  vec3 fromAround = pictured ? pictureIrradiance(n) : sky(n, ROUGH_SKY_BLUR);
-  vec3 reflected = pictured ? pictureReflection(mirror, rough) : sky(mirror, rough * ROUGH_SKY_BLUR);
+#ifdef SKY_PICTURE
+  vec3 fromAround = pictureIrradiance(n);
+  vec3 reflected = pictureReflection(mirror, rough);
+#else
+  vec3 fromAround = sky(n, ROUGH_SKY_BLUR);
+  vec3 reflected = sky(mirror, rough * ROUGH_SKY_BLUR);
+#endif
   if (reflectionStrength > 0.0) {
     fromAround = mix(fromAround, surroundings(n, REFLECTION_DIFFUSE_LOD), REFLECTION_DIFFUSE_MIX * reflectionStrength);
     reflected = mix(reflected, surroundings(mirror, rough * REFLECTION_MAX_LOD), reflectionStrength);
   }
   vec3 diffuseAmbient = (1.0 - f) * (1.0 - metal) * albedo * fromAround;
   // With a picture, the share reflected is the split sum's table; without, an estimate of it.
+#ifdef SKY_PICTURE
   vec2 table = texture(skyReflectance, vec2(max(dot(n, v), 0.0), rough)).rg;
-  vec3 specularAmbient = pictured ? reflected * (f0 * table.x + table.y) : f * reflected * (1.0 - rough * ROUGH_SPECULAR_DAMPING);
-  return diffuseAmbient + specularAmbient;
+  return diffuseAmbient + reflected * (f0 * table.x + table.y);
+#else
+  return diffuseAmbient + f * reflected * (1.0 - rough * ROUGH_SPECULAR_DAMPING);
+#endif
 }
 )GLSL";
 

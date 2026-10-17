@@ -3,7 +3,8 @@
 // The lit fragment shader's part that knows the sun's shadows (see lit_fragment.hpp). The shadow
 // map holds one picture of the scene's depth as the sun sees it, or several (cascades: tiles of
 // the map, each covering a larger stretch farther from the camera); a point is looked up in the
-// first one it lies well inside.
+// first one it lies well inside. Shadows as soft as the sun is wide are compiled in only when a
+// scene asks for them (SOFT_SHADOWS).
 
 namespace redgem::shaders {
 
@@ -17,6 +18,8 @@ const int SHADOW_TAPS_ACROSS = SHADOW_KERNEL + 1 + SHADOW_KERNEL;  // the texel 
 const float SHADOW_FADE = 0.08;          // fraction of the map's border where shadows fade out
 const float SHADOW_BASE_EXTENT = 90.0;   // meters across the whole map when it is one picture (render_math::kShadowExtent)
 const int SOFT_TAPS = 16;
+const int SEARCH_TAPS = 8;               // every other tap of the disc, for casters
+const int SOFT_CASCADES = 2;             // the nearest cascades, whose edges are worked out by the sun's size
 const float BLOCKER_REACH = 12.0;        // meters above a point casters are looked for, for soft shadows
 const float MIN_SOFT_TEXELS = 1.5;       // the narrowest soft edge, in texels
 const float MIN_FACING = 0.2;            // a surface more edge-on to the sun is taken as this steep
@@ -35,7 +38,7 @@ uniform int shadowCascades;
 uniform float shadowStrength;      // 0 = no shadows
 uniform float shadowTexel;         // size of one shadow map texel in UV
 uniform float shadowDepthRange;    // meters between the near and far planes of the sun's view
-uniform float sunSize;             // the tangent of the sun's apparent radius: 0 keeps every edge equally soft
+uniform float sunSize;             // the tangent of the sun's apparent radius (soft shadows)
 
 vec3 shadowCoords(int cascade, vec3 position) {
   vec4 clip = lightViewProjection[cascade] * vec4(position, 1.0);
@@ -94,19 +97,19 @@ float softShadow(vec2 uv, float depth, int cascade, float slope) {
   float searchDepth = depth - search * metersPerUv * slope / shadowDepthRange;
   float blockers = 0.0;
   float found = 0.0;
-  for (int i = 0; i < SOFT_TAPS; ++i) {
-    float nearest = texture(shadowMap, inTile(uv + discTap(i, turn) * search, tile)).r;
+  for (int i = 0; i < SEARCH_TAPS; ++i) {
+    float nearest = texture(shadowMap, inTile(uv + discTap(i * 2, turn) * search, tile)).r;
     if (nearest < searchDepth) { blockers += nearest; found += 1.0; }
   }
   if (found <= 0.0) return 1.0;
+  if (found >= float(SEARCH_TAPS)) return 0.0;  // well inside the shadow: no edge to filter
   float radius = max(sunSize * (depth - blockers / found) * shadowDepthRange / metersPerUv, shadowTexel * MIN_SOFT_TEXELS);
   float filterDepth = depth - radius * metersPerUv * slope / shadowDepthRange;
   float lit = 0.0;
   for (int i = 0; i < SOFT_TAPS; ++i) {
     lit += filterDepth > texture(shadowMap, inTile(uv + discTap(i, turn) * radius, tile)).r ? 0.0 : 1.0;
-    lit += filterDepth > texture(shadowMap, inTile(uv + discTap(i, turn.yx * vec2(-1.0, 1.0)) * radius * HALF, tile)).r ? 0.0 : 1.0;
   }
-  return lit / float(SOFT_TAPS * 2);
+  return lit / float(SOFT_TAPS);
 }
 
 // How much of the sun reaches a point: 1 = fully lit, 0 = in shadow. Outside the shadow map
@@ -122,7 +125,13 @@ float sunVisibility(vec3 position, vec3 n, vec3 toSun) {
   float bias = max(SHADOW_SLOPE_BIAS * (1.0 - max(dot(n, toSun), 0.0)), SHADOW_MIN_BIAS) * scale / shadowDepthRange;
   vec4 tile = shadowTiles[cascade];
   vec2 uv = tile.xy + coords.xy * tile.zw;
-  float lit = sunSize > 0.0 ? softShadow(uv, coords.z - bias, cascade, surfaceSlope(n, toSun)) : filteredShadow(uv, coords.z - bias);
+#ifdef SOFT_SHADOWS
+  // (Far cascades' texels are wider than the softest edge they would show: filtered as usual.)
+  float lit = cascade < SOFT_CASCADES ? softShadow(uv, coords.z - bias, cascade, surfaceSlope(n, toSun))
+                                      : filteredShadow(uv, coords.z - bias);
+#else
+  float lit = filteredShadow(uv, coords.z - bias);
+#endif
   return mix(1.0, lit, shadowStrength * inside);
 }
 )GLSL";
