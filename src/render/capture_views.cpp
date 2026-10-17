@@ -22,11 +22,14 @@ Vector3 shadow_map_vertical(Vector3 sun_axis) {
 SunView fit_sun_view(Vector3 camera_position, Vector3 camera_target, Vec3 to_sun) {
   const Vector3 forward = Vector3Normalize(Vector3Subtract(camera_target, camera_position));
   const Vector3 ahead = Vector3Add(camera_position, Vector3Scale(forward, kShadowExtent * kShadowFocusAhead));
+  return snapped_sun_view(ahead, to_sun, kShadowExtent / static_cast<float>(kShadowMapSize));
+}
+
+SunView snapped_sun_view(Vector3 ahead, Vec3 to_sun, float texel_size) {
   const Vector3 sun_axis = to_raylib(to_sun);
   const Vector3 map_vertical = shadow_map_vertical(sun_axis);
   const Vector3 map_right = Vector3Normalize(Vector3CrossProduct(map_vertical, sun_axis));
   const Vector3 map_up = Vector3CrossProduct(sun_axis, map_right);
-  const float texel_size = kShadowExtent / static_cast<float>(kShadowMapSize);
   // Snapped across the map; along the sun's own axis the place does not matter to the texels.
   const Vector3 across = Vector3Scale(map_right, snapped_down(Vector3DotProduct(ahead, map_right), texel_size));
   const Vector3 upward = Vector3Scale(map_up, snapped_down(Vector3DotProduct(ahead, map_up), texel_size));

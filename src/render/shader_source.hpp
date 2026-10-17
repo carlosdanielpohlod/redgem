@@ -9,9 +9,11 @@ namespace redgem::shaders {
 
 // The line every shader in render/shaders/ starts from: desktop OpenGL 3.3.
 inline constexpr const char* kDesktopVersionLine = "#version 330";
-// What phones (OpenGL ES 3) want instead: their own version, and how precise numbers are.
+// What phones (OpenGL ES 3) want instead: their own version, and how precise numbers are (a
+// picture's light is brighter than white: a sampler of low precision would clip it).
 inline constexpr const char* kMobileHeader =
-    "#version 300 es\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;";
+    "#version 300 es\nprecision highp float;\nprecision highp int;\nprecision highp sampler2D;\n"
+    "precision highp samplerCube;";
 // What the shaders and the engine agree on, defined for every shader from the engine's own
 // numbers: how wide the texture of the frame's matrices is, and the size of the lights' arrays.
 inline constexpr const char* kTexelRowName = "TEXELS_PER_ROW";

@@ -68,7 +68,9 @@ TEST_CASE("a copy says whether the wind sways it, in the room its normal matrix 
   TexelRows rows;
   REQUIRE(write_instance(rows, 0, MatrixIdentity(), InstanceLook{}));
   CHECK(texel(rows, kNormalTexel)[3] == kSways);
-  REQUIRE(write_instance(rows, 1, MatrixIdentity(), InstanceLook{Vec3::one(), kNoBones, kStill}));
+  InstanceLook still;
+  still.sway = kStill;
+  REQUIRE(write_instance(rows, 1, MatrixIdentity(), still));
   CHECK(texel(rows, record_texel(1) + kNormalTexel)[3] == kStill);
   CHECK(texel(rows, record_texel(1) + kNormalTexel)[0] == 1.0f);  // the normal matrix is still whole
 }

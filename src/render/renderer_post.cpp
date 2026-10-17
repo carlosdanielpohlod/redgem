@@ -35,11 +35,9 @@ void apply_effect(const RenderTexture2D& target, const Shader& effect, const Ren
 
 }  // namespace
 
-void render_detail::copy_depth(const RenderTexture2D& from, const RenderTexture2D& to) {
-  const int width = from.texture.width;
-  const int height = from.texture.height;
-  rlBindFramebuffer(RL_READ_FRAMEBUFFER, from.id);
-  rlBindFramebuffer(RL_DRAW_FRAMEBUFFER, to.id);
+void render_detail::copy_depth(unsigned int from, unsigned int to, int width, int height) {
+  rlBindFramebuffer(RL_READ_FRAMEBUFFER, from);
+  rlBindFramebuffer(RL_DRAW_FRAMEBUFFER, to);
   rlBlitFramebuffer(0, 0, width, height, 0, 0, width, height, kDepthBufferBit);
 }
 
@@ -134,7 +132,7 @@ void Renderer::Impl::antialias(const RenderTexture2D* output) {
 
 // The scene's depth goes along, so overlays drawn into `output` afterwards are occluded by it.
 void Renderer::Impl::copy_depth_to(const RenderTexture2D& output) {
-  copy_depth(hdr, output);
+  copy_depth(hdr.id, output.id, hdr.texture.width, hdr.texture.height);
   rlDisableFramebuffer();
 }
 

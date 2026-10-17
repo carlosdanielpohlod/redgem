@@ -30,6 +30,7 @@ void Renderer::Impl::apply_lights(const Scene& scene, const Environment& env, Ve
   send_particle_lights(sun_color, env, points);
   send_atmosphere(env);
   send_sky_dome(env, sun_direction, sun_color);
+  send_sky_light(env);
   wind = env.wind;
   glow_limit = env.glow_limit;
   sun_travel = sun_direction;

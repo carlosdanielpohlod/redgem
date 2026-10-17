@@ -23,6 +23,7 @@ add_executable(redgem_tests
   unit/gltf_loader_safety_test.cpp
   unit/safe_path_test.cpp
   unit/image_header_test.cpp
+  unit/radiance_image_test.cpp
   unit/body_config_test.cpp
   unit/contact_events_test.cpp
   unit/input_test.cpp
@@ -67,6 +68,8 @@ add_executable(redgem_tests
   unit/instance_records_test.cpp
   unit/scatter_test.cpp
   unit/capture_views_test.cpp
+  unit/shadow_cascades_test.cpp
+  unit/sky_light_test.cpp
   unit/shader_source_test.cpp
   unit/terrain_test.cpp
   unit/animation_test.cpp
@@ -368,7 +371,8 @@ set_tests_properties(system.editor.window PROPERTIES LABELS system RUN_SERIAL TR
 
 # What the renderer draws, in a real window, read back as pixels: scenes made in code.
 add_executable(redgem_render_system_tests render_system/render_test_main.cpp render_system/render_system_test.cpp
-  render_system/particle_render_test.cpp render_system/see_through_render_test.cpp render_system/render_stage.cpp)
+               render_system/render_look_test.cpp render_system/particle_render_test.cpp
+               render_system/see_through_render_test.cpp render_system/render_stage.cpp)
 target_link_libraries(redgem_render_system_tests PRIVATE redgem_runtime doctest::doctest)
 target_include_directories(redgem_render_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(redgem_render_system_tests PRIVATE REDGEM_SCREENSHOT_DIR="${REDGEM_SCREENSHOT_DIR}")

@@ -9,8 +9,10 @@ namespace redgem::shaders {
 // TEXELS_PER_ROW texels to a row (defined for every shader when it is compiled, see
 // shader_source.hpp). A record also gives the copy's tint and where its skeleton's bones are.
 // Foliage (windAmount > 0) of a copy that sways (its record says) sways: parts higher above the
-// copy's own origin move more, each copy with its own phase, from where it stands. Skinned meshes (skinned > 0.5) are
-// placed by their skeleton: each vertex follows up to four bones, whose matrices already lead to world space.
+// copy's own origin move more, each copy with its own phase, from where it stands. Skinned meshes
+// (skinned > 0.5) are placed by their skeleton: each vertex follows up to four bones, whose
+// matrices already lead to world space. A scattered copy may fade out (and in) at the ends of the
+// distances it is drawn at, and be lit as if it faced up (grass), as its record says.
 inline constexpr const char* kLitVertex = R"GLSL(
 #version 330
 in vec3 vertexPosition;
@@ -23,6 +25,7 @@ in float instanceSlot;
 uniform sampler2D frameTexels;
 uniform float skinned;
 
+uniform vec3 viewPos;               // the game camera's, in every pass: copies fade by their distance to it
 uniform mat4 matView;
 uniform mat4 matProjection;
 uniform float windAmount;
@@ -33,6 +36,8 @@ out vec2 fragTexCoord;
 out vec4 fragColor;
 out vec3 fragNormal;
 flat out vec3 fragTint;
+flat out vec4 fragCopy;                  // kept as it fades out (x) and in (y), lit as facing up (z)
+flat out vec3 fragUp;
 
 const float WIND_SPEED = 1.3;
 const float WIND_FREQUENCY = 0.35;      // phase change per meter, so neighbours are out of step
@@ -43,9 +48,11 @@ const float WIND_REACH = 0.12;          // meters of sway at full height and win
 const float WIND_LIFT = 0.3;            // vertical share of the motion
 const float SWITCH_ON = 0.5;            // switches arrive as floats: on when above this
 const int TEXELS_PER_MATRIX = 4;        // a column each
-const int TEXELS_PER_INSTANCE = 8;      // a record: where it is, how its normals turn, its look
+const int TEXELS_PER_INSTANCE = 9;      // a record: where it is, how its normals turn, its look, how it fades
 const int NORMAL_TEXEL = 4;
 const int LOOK_TEXEL = 7;
+const int COPY_TEXEL = 8;               // drawn from (x) and to (y) meters, faded over (z), lit as facing up (w)
+const vec3 UP = vec3(0.0, 1.0, 0.0);
 
 vec4 frameTexel(int index) {
   return texelFetch(frameTexels, ivec2(index % TEXELS_PER_ROW, index / TEXELS_PER_ROW), 0);
@@ -64,6 +71,14 @@ mat4 skeletonPose(int firstBone) {
          bone(firstBone, vertexBoneIds.z) * vertexBoneWeights.z + bone(firstBone, vertexBoneIds.w) * vertexBoneWeights.w;
 }
 
+// How much of a copy `distance` meters away is kept as it fades out at the far end of its
+// distances, and in at the near one (only when it has a near one).
+vec2 keptOf(vec4 copy, float distance) {
+  if (copy.z <= 0.0) return vec2(1.0);
+  float fadingIn = copy.x > 0.0 ? clamp((distance - copy.x) / copy.z, 0.0, 1.0) : 1.0;
+  return vec2(clamp((copy.y - distance) / copy.z, 0.0, 1.0), fadingIn);
+}
+
 void main() {
   int record = int(instanceSlot) * TEXELS_PER_INSTANCE;
   vec4 look = frameTexel(record + LOOK_TEXEL);
@@ -71,6 +86,9 @@ void main() {
   mat3 normalToWorld = mat3(frameTexel(record + NORMAL_TEXEL).xyz, frameTexel(record + NORMAL_TEXEL + 1).xyz,
                             frameTexel(record + NORMAL_TEXEL + 2).xyz);
   float ground = toWorld[3].y;
+  vec4 copy = frameTexel(record + COPY_TEXEL);
+  fragCopy = vec4(keptOf(copy, length(toWorld[3].xyz - viewPos)), copy.w, 0.0);
+  fragUp = copy.w > 0.0 ? normalize(mat3(toWorld) * UP) : UP;  // (only grass asks for it)
   // (A copy whose skeleton could not be posed has no first bone: it stays as modeled.)
   if (skinned > SWITCH_ON && look.a >= 0.0) {
     toWorld = skeletonPose(int(look.a));

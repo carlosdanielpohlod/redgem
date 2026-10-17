@@ -131,6 +131,9 @@ redgem_add_library(redgem_core
   core/platform_language.cpp
   core/safe_path.cpp
   core/image_header.cpp
+  core/float_image.cpp
+  core/radiance_header.cpp
+  core/radiance_pixels.cpp
   core/math.cpp
   core/fixed_clock.cpp
   core/stopwatch.cpp)
@@ -215,6 +218,7 @@ redgem_add_library(redgem_runtime
   scene/scene_from_desc.cpp
   scene/scene_copies.cpp
   scene/scatter.cpp
+  scene/scatter_looks.cpp
   scene/animation/animation.cpp
   scene/animation/clip_clock.cpp
   scene/animation/animation_player.cpp
@@ -285,6 +289,17 @@ redgem_add_library(redgem_runtime
   script/bindings/network_approval_bindings.cpp
   script/bindings/http_bindings.cpp
   render/mesh_builder.cpp
+  render/environment_quality.cpp
+  render/sky_directions.cpp
+  render/sky_harmonics.cpp
+  render/half_float.cpp
+  render/sky_sampling.cpp
+  render/sky_cube.cpp
+  render/sky_light.cpp
+  render/sky_picture.cpp
+  render/renderer_sky.cpp
+  render/shadow_cascades.cpp
+  render/gl_extras.cpp
   render/mesh_pieces.cpp
   render/texture_loading.cpp
   render/renderer.cpp

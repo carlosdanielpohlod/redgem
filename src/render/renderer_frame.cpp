@@ -27,6 +27,15 @@ Camera3D default_camera() {
   return camera;
 }
 
+// The picture of several samples a pixel as raylib draws into a target: its framebuffer and size.
+RenderTexture2D target_of(const Multisampled& samples) {
+  RenderTexture2D target{};
+  target.id = samples.framebuffer;
+  target.texture.width = samples.width;
+  target.texture.height = samples.height;
+  return target;
+}
+
 }  // namespace
 
 Camera3D Renderer::Impl::camera_for(const Scene& scene) const {
@@ -45,6 +54,8 @@ Camera3D Renderer::Impl::camera_for(const Scene& scene) const {
 }
 
 void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect) {
+  use_sky_picture(env);
+  use_lit_features({loaded(sky.picture), env.shadow_softness > 0.0f});
   // Where every object is, worked out once: each of the frame's passes (shadows, reflections, the
   // view) would otherwise walk every object's chain of parents again. So are its bones.
   render_math::world_transforms(scene, worlds);
@@ -60,22 +71,35 @@ void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, c
 }
 
 void Renderer::Impl::draw_lit_scene(const Camera3D& camera, const ParticleSystem* particles) {
-  BeginTextureMode(hdr);
+  const bool sampled = scene_samples.framebuffer != 0;
+  BeginTextureMode(sampled ? target_of(scene_samples) : hdr);
   ClearBackground(kBlack);
   BeginMode3D(camera);
   draw_sky(camera);
+  covering = sampled;
   const std::size_t first = draw_objects(false, to_vec3(camera.position));
+  covering = false;
   draw_see_through(first, to_vec3(camera.position));
   if (particles != nullptr) draw_particles(*particles, camera);
   EndMode3D();
   if (glow_gathered) add_gathered_glow();
   EndTextureMode();
+  if (sampled) resolve(scene_samples, hdr.id);
 }
 
 void Renderer::Impl::bind_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture) {
   rlEnableShader(program.id);
   rlActiveTextureSlot(slot);
   rlEnableTexture(texture);
+  rlSetUniform(sampler_location, &slot, SHADER_UNIFORM_INT, 1);
+  rlActiveTextureSlot(0);
+}
+
+void Renderer::Impl::bind_cube_for_the_frame(const Shader& program, int sampler_location, int slot,
+                                             unsigned int texture) {
+  rlEnableShader(program.id);
+  rlActiveTextureSlot(slot);
+  rlEnableTextureCubemap(texture);
   rlSetUniform(sampler_location, &slot, SHADER_UNIFORM_INT, 1);
   rlActiveTextureSlot(0);
 }

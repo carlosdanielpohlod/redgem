@@ -45,6 +45,8 @@ struct SunView {
 // Looks at a point ahead of the camera, moved in whole texels only: otherwise shadow edges
 // shimmer as the camera moves.
 SunView fit_sun_view(Vector3 camera_position, Vector3 camera_target, Vec3 to_sun);
+// The sun looking at `focus`, moved across its view to a whole number of `texel`s (meters).
+SunView snapped_sun_view(Vector3 focus, Vec3 to_sun, float texel);
 
 // --- Reflections -----------------------------------------------------------------------------
 

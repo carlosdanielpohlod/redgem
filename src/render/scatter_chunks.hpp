@@ -45,6 +45,7 @@ struct ScatterLayout {
   int mesh = kNoIndex;
   float visible_from = 0.0f;
   float visible_to = 0.0f;
+  bool cast_shadow = true;
   std::size_t first = 0;
   std::vector<ScatterChunk> chunks;
   std::vector<Vec3> centers;

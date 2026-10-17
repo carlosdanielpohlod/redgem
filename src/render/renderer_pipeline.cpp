@@ -24,6 +24,13 @@ constexpr float kSkyRadius = 50.0f;  // meters
 constexpr int kSkyRings = 16;
 constexpr int kSkySlices = 32;
 
+// Tells a shader's sampler which texture slot it reads.
+void assign_slot(const Shader& program, int sampler_location, int slot) {
+  rlEnableShader(program.id);
+  rlSetUniform(sampler_location, &slot, SHADER_UNIFORM_INT, 1);
+  rlDisableShader();
+}
+
 // A material made by LoadMaterialDefault owns only its array of maps.
 void free_maps(Material& material) {
   if (material.maps != nullptr) MemFree(material.maps);
@@ -34,11 +41,11 @@ void free_maps(Material& material) {
 
 void Renderer::Impl::load_pipeline() {
   compile_shaders();
-  lit_uniforms = find_lit_uniforms(shader);
+  compile_lit(shaders::LitFeatures{});
   depth_uniforms = find_depth_uniforms(depth_shader);
-  lit_instance_slot = find_instance_slot(shader);
   depth_instance_slot = find_instance_slot(depth_shader);
   particle_uniforms = find_particle_uniforms(particle_shader);
+  filter_cube_maps_across_seams();
   particle_buffer = load_particle_buffer(particle_uniforms.look);
   load_fixed_targets();
   fallback_material = make_material(redgem::Color{});
@@ -46,7 +53,6 @@ void Renderer::Impl::load_pipeline() {
 }
 
 void Renderer::Impl::compile_shaders() {
-  shader = compile_shader(shaders::kLitVertex, shaders::kLitFragment, "lit");
   depth_shader = compile_shader(shaders::kLitVertex, shaders::kDepthFragment, "shadow depth");
   sky_shader = compile_shader(shaders::kSkyVertex, shaders::kSkyFragment, "sky");
   particle_shader = compile_shader(shaders::kParticleVertex, shaders::kParticleFragment, "particles");
@@ -59,10 +65,28 @@ void Renderer::Impl::compile_shaders() {
   occlusion_shader = compile_shader(nullptr, shaders::kAmbientOcclusionFragment, "ambient occlusion");
 }
 
+void Renderer::Impl::compile_lit(const shaders::LitFeatures& features) {
+  if (loaded(shader)) UnloadShader(shader);
+  shader = compile_shader(shaders::kLitVertex, shaders::lit_fragment(features).c_str(), "lit");
+  lit_uniforms = find_lit_uniforms(shader);
+  lit_instance_slot = find_instance_slot(shader);
+  // A cube map's sampler must never share a slot with a picture's, even unused: given its own.
+  assign_slot(shader, lit_uniforms.sky_reflections, kSkyReflectionSlot);
+  assign_slot(shader, lit_uniforms.sky_reflectance, kSkyReflectanceSlot);
+  for (Material& material : materials) material.shader = shader;
+  fallback_material.shader = shader;
+  lit_features = features;
+}
+
+void Renderer::Impl::use_lit_features(const shaders::LitFeatures& features) {
+  if (features != lit_features) compile_lit(features);
+}
+
 void Renderer::Impl::load_sky() {
   sky_mesh = GenMeshSphere(kSkyRadius, kSkyRings, kSkySlices);
   sky_material = LoadMaterialDefault();
   sky_material.shader = sky_shader;
+  sky_default_texture = sky_material.maps[MATERIAL_MAP_ALBEDO].texture;
 }
 
 void Renderer::Impl::release() {
@@ -82,6 +106,7 @@ void Renderer::Impl::release() {
 }
 
 void Renderer::Impl::release_sky() {
+  release_sky_light();
   free_maps(sky_material);
   if (sky_mesh.vaoId != 0) UnloadMesh(sky_mesh);
   sky_mesh = Mesh{};

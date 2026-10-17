@@ -61,7 +61,8 @@ struct GameObject {
   // Drawn only while this far from the camera, in meters (props `visible_from`, `visible_to`).
   float visible_from = 0.0f;
   float visible_to = std::numeric_limits<float>::infinity();
-  bool prefab = false;  // a template for Scene.spawn: not simulated, not drawn
+  bool prefab = false;      // a template for Scene.spawn: not simulated, not drawn
+  bool cast_shadow = true;  // in the sun's shadows (prop `cast_shadow`)
   // Whether wind sways its foliage (prop `sway`; unless said, it does when no skeleton moves it).
   bool sways = true;
   // For objects made by clone(): the object of the loaded scene this one copies (animations of

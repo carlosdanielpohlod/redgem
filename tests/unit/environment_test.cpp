@@ -87,6 +87,36 @@ TEST_CASE("strengths that go from none to full are held at full") {
   CHECK(env.bloom == doctest::Approx(kTooStrong));  // a plain amount: as much as asked
 }
 
+TEST_CASE("a sky picture and the renderer's quality are read as the environment asks, within their limits") {
+  const Environment plain = default_environment();
+  CHECK(plain.sky_image.empty());
+  CHECK(plain.msaa == 0);
+  CHECK(plain.shadow_cascades == 1);
+  CHECK(plain.shadow_softness == doctest::Approx(0.0f));
+  PropertyMap props;
+  props["sky_image"] = std::string("meadow.hdr");
+  props["sky_rotation"] = -90.0;
+  props["sky_intensity"] = 2.5;
+  props["msaa"] = 6.0;  // not a power of two: the largest one below
+  props["shadow_cascades"] = 9.0;
+  props["shadow_softness"] = 0.5;
+  const Environment env = environment_from_props(props);
+  CHECK(env.sky_image == "meadow.hdr");
+  CHECK(env.sky_rotation == doctest::Approx(-kPi * 0.5f));
+  CHECK(env.sky_intensity == doctest::Approx(2.5f));
+  CHECK(env.msaa == 4);
+  CHECK(env.shadow_cascades == 4);
+  CHECK(env.shadow_distance > 0.0f);  // cascades reach somewhere unless told
+  CHECK(env.shadow_softness == doctest::Approx(degrees_to_radians(0.5f)));
+  props["msaa"] = 1.0;
+  props["shadow_cascades"] = 0.0;
+  props["sky_intensity"] = -1.0;
+  const Environment low = environment_from_props(props);
+  CHECK(low.msaa == 0);
+  CHECK(low.shadow_cascades == 1);
+  CHECK(low.sky_intensity == doctest::Approx(0.0f));
+}
+
 TEST_CASE("glowing particles have no limit unless the environment sets one") {
   constexpr double kLimit = 3.0;
   CHECK(default_environment().glow_limit == doctest::Approx(0.0f));
