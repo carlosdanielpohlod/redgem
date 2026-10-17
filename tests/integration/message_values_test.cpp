@@ -101,6 +101,15 @@ TEST_CASE("Save keeps arrays and hashes of any size, which a message could not c
         "5000");
   const std::string nested = std::string(kTooDeep, '[') + std::string(kTooDeep, ']');
   CHECK(refuses(game, "Save['deep'] = " + nested, "a saved value's data is nested too deep"));
+
+  // Save.update: the block makes the new value of the one there (or of the default), which it returns.
+  CHECK(ruby(game, "Save.update('visits', 0) { |n| n + 1 }") == "1");
+  CHECK(ruby(game, "Save.update('visits', 0) { |n| n + 1 }; Save['visits']") == "2");
+  CHECK(ruby(game, "Save.update('seen') { |seen| seen.inspect }") == "nil");
+  CHECK(refuses(game, "Save.update('visits') { |n| raise 'no' }", "no"));
+  CHECK(ruby(game, "Save['visits']") == "2");  // a block that failed changed nothing
+  CHECK(ruby(game, "Save.update('visits') { nil }; Save.keys.include?(:visits)") == "false");
+  CHECK(refuses(game, "Save.update('visits')", "needs a block"));
   std::filesystem::remove(save);
 }
 

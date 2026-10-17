@@ -94,7 +94,9 @@ players.
 `Save` on the server is the server's own: a SQLite database in its data folder (`--data`),
 shared by all its rooms and kept across restarts. Each key is a row of its own, written as soon as
 it changes, in a transaction (a crash keeps every change made before it, never half of one), and
-only what a script asks for is read into memory. Rooms write one at a time. Arrays and hashes
+only what a script asks for is read into memory. Rooms write one at a time, and change a value
+that several rooms may change with `Save.update`, which reads and writes it with no other room's
+save in between. Arrays and hashes
 saved there may hold any number of things (only their nesting is limited, to 16 levels). Keep
 each player's data under their identity, as
 [Online services](scripting/online-services.md#saving-on-a-server) shows; with many players,

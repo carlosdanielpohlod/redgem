@@ -2,9 +2,13 @@
 
 #include <filesystem>
 #include <fstream>
+#include <optional>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
+
+#include <sqlite3.h>
 
 #include "server/save_database.hpp"
 
@@ -87,6 +91,53 @@ TEST_CASE("rooms writing at once from their own threads lose nothing") {
   const std::vector<std::string> keys = opened(temp.database)->keys();
   CHECK(keys.size() == static_cast<std::size_t>(kRooms * kWritesPerRoom + 1));
   CHECK(*database->get("room-3-199") == 199);
+}
+
+TEST_CASE("an update reads and writes a key with no other room's in between: no change is lost") {
+  const TempData temp;
+  auto database = opened(temp.database);
+  std::vector<std::thread> rooms;
+  for (int room = 0; room < kRooms; ++room) {
+    rooms.emplace_back([&database] {
+      for (int write = 0; write < kWritesPerRoom; ++write) {
+        database->update("visits",
+                         [](const std::optional<nlohmann::json>& visits) { return visits.value_or(0).get<int>() + 1; });
+      }
+    });
+  }
+  for (std::thread& room : rooms) room.join();
+  CHECK(*database->get("visits") == kRooms * kWritesPerRoom);
+  // A change that fails leaves the key as it was; one that makes nothing removes it.
+  CHECK_THROWS(database->update("visits", [](const std::optional<nlohmann::json>&) -> nlohmann::json {
+    throw std::runtime_error("the game's block failed");
+  }));
+  CHECK(*database->get("visits") == kRooms * kWritesPerRoom);
+  CHECK(database->update("visits", [](const std::optional<nlohmann::json>&) { return nlohmann::json(); }));
+  CHECK_FALSE(database->get("visits").has_value());
+}
+
+TEST_CASE("a row that holds no value, written by something else than the server, is none") {
+  const TempData temp;
+  auto database = opened(temp.database);
+  database->set("good", 1);
+  sqlite3* other = nullptr;
+  REQUIRE(sqlite3_open(temp.database.string().c_str(), &other) == SQLITE_OK);
+  CHECK(sqlite3_exec(other, "INSERT INTO saves VALUES ('broken', '{ not json')", nullptr, nullptr, nullptr) ==
+        SQLITE_OK);
+  sqlite3_close(other);
+  CHECK_FALSE(database->get("broken").has_value());
+  CHECK(database->keys() == std::vector<std::string>{"good"});
+}
+
+TEST_CASE("each read sees the database as it is now, however often the store was read before") {
+  const TempData temp;
+  auto database = opened(temp.database);
+  auto other = opened(temp.database);
+  for (int value = 0; value < kWritesPerRoom; ++value) {
+    other->set("seen", value);
+    CHECK(*database->get("seen") == value);
+    CHECK(database->keys() == std::vector<std::string>{"seen"});
+  }
 }
 
 TEST_CASE("a database in memory keeps values for this run only, and one that cannot be opened says why") {

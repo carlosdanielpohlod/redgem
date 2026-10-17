@@ -38,7 +38,7 @@ std::optional<nlohmann::json> kept_at(const nlohmann::json& value, int depth) {
 std::optional<nlohmann::json> kept(const nlohmann::json& value) { return kept_at(value, 0); }
 
 std::optional<nlohmann::json> entry(const nlohmann::json& value) {
-  if (value.is_null()) return std::nullopt;
+  if (value.is_null() || value.is_discarded()) return std::nullopt;
   return kept(value);
 }
 

@@ -47,9 +47,10 @@ class ServerGate
     return if identity == ANONYMOUS
 
     coins = @coins.delete(peer) || 0
-    players = Save[PLAYERS_KEY] || {}
-    players[identity] = record(players[identity], coins, Network.player_name(peer))
-    Save[PLAYERS_KEY] = players
+    # (Other rooms keep their players too, at the same time: read and written with nothing in between.)
+    Save.update(PLAYERS_KEY, {}) do |players|
+      players.merge(identity => record(players[identity], coins, Network.player_name(peer)))
+    end
     report(identity, coins)
   end
 

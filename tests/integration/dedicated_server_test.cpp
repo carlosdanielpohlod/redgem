@@ -30,6 +30,7 @@ constexpr server::RoomLimits kTwoRoomsOfTwo{2, 2};
 constexpr server::RoomLimits kRoomy{4, 2};
 constexpr server::RoomLimits kTwoRoomsOfOne{1, 2};
 constexpr int kTwoThreads = 2;
+constexpr int kVisitsPerRoom = 300;       // changes each room makes to one saved value
 constexpr double kSlowLoadSeconds = 1.5;  // what a slow room's level takes to load (see kSlowScene)
 // The longest a room may go without a frame while another loads: far less than the load.
 constexpr double kLongestPause = kSlowLoadSeconds / 2;
@@ -345,6 +346,24 @@ TEST_CASE("a room loading a slow level holds up no other room: each runs on a th
   CHECK(waited >= kSlowLoadSeconds);  // it did load slowly ...
   // ... and the first room played on meanwhile.
   CHECK(longest_pause < kLongestPause);
+}
+
+TEST_CASE("rooms changing one saved value at the same time lose none of each other's changes") {
+  Online online_game(kTwoRoomsOfOne, fixture("games/sandbox"), kTwoThreads);
+  const std::string first = online_game.join().network().room();
+  const std::string second = online_game.join().network().room();
+  REQUIRE(first != second);
+  const std::string count_visits =
+      std::to_string(kVisitsPerRoom) + ".times { Save.update('visits', 0) { |visits| visits + 1 } }";
+  bool other_visited = false;
+  std::thread other([&] {
+    other_visited =
+        online_game.server.visit(second, [&](Engine& room) { room.scripts().eval(count_visits, "test.rb"); });
+  });
+  in_room(online_game.server, first, count_visits);
+  other.join();
+  CHECK(other_visited);
+  CHECK(in_room(online_game.server, first, "Save['visits']") == std::to_string(2 * kVisitsPerRoom));
 }
 
 TEST_CASE("SIGTERM stops a server whose rooms run on several threads: every match ends, every thread is joined") {

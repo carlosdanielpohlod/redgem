@@ -38,6 +38,24 @@ mrb_value save_set(mrb_state* mrb, mrb_value) {
   return value;
 }
 
+// Save.update(key, default = nil) { |value| new_value }: the block makes the key's new value of its
+// value (default when it has none), with no other room of a dedicated server reading or writing
+// the save meanwhile. Returns the new value.
+mrb_value save_update(mrb_state* mrb, mrb_value) {
+  mrb_value key;
+  mrb_value fallback = mrb_nil_value();
+  mrb_value block = mrb_nil_value();
+  mrb_get_args(mrb, "o|o&", &key, &fallback, &block);
+  if (mrb_nil_p(block)) mrb_raise(mrb, E_ARGUMENT_ERROR, "Save.update needs a block making the new value");
+  mrb_value made = mrb_nil_value();
+  const auto change = [&](const std::optional<nlohmann::json>& current) {
+    made = mrb_yield(mrb, block, current ? value_from(mrb, *current, HashKeys::Strings) : fallback);
+    return json_from(mrb, made, kSaveHolder);
+  };
+  if (!save(mrb).update(to_name(mrb, key), change)) log::warning("could not write " + save(mrb).where());
+  return made;
+}
+
 mrb_value save_delete(mrb_state* mrb, mrb_value) {
   save(mrb).remove(name_arg(mrb));
   return mrb_nil_value();
@@ -64,6 +82,7 @@ void install_save_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, save_module, "[]", save_get, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, save_module, "set", save_set, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, save_module, "[]=", save_set, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, save_module, "update", save_update, MRB_ARGS_ARG(1, 1) | MRB_ARGS_BLOCK());
   mrb_define_module_function(mrb, save_module, "delete", save_delete, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, save_module, "clear", save_clear, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, save_module, "keys", save_keys, MRB_ARGS_NONE());

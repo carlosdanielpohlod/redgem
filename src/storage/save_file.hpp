@@ -24,6 +24,8 @@ class SaveFile final : public SaveStore {
   bool remove(const std::string& key) override;
   bool clear() override;
   std::vector<std::string> keys() override;
+  // (A player's machine runs one game: nothing else reads or writes in between.)
+  bool update(const std::string& key, const Change& change) override { return set(key, change(get(key))); }
   std::string where() const override { return file_.string(); }
   const std::filesystem::path& file() const { return file_; }
 

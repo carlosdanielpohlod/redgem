@@ -93,9 +93,9 @@ kept under the player's identity:
 
 ```ruby
 Network.on_leave do |peer|
-  players = Save["players"] || {}
-  players[Network.identity(peer)] = { level: @level, coins: @coins }
-  Save["players"] = players
+  Save.update("players", {}) do |players|      # no other room's change gets lost in between
+    players.merge(Network.identity(peer) => { level: @level, coins: @coins })
+  end
 end
 ```
 
