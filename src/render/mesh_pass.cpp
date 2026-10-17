@@ -39,11 +39,6 @@ void send_matrices(const MeshPass& pass, const Matrix& model) {
   rlSetUniformMatrix(shader.locs[SHADER_LOC_MATRIX_MVP], MatrixMultiply(model, pass.view_projection));
 }
 
-// Whether the mesh is deformed by a skeleton the pass's shader can take.
-bool poses(const MeshPass& pass, const std::vector<Matrix>* bones) {
-  return bones != nullptr && takes(pass.shader, SHADER_LOC_BONE_MATRICES);
-}
-
 }  // namespace
 
 MeshPass begin_mesh_pass(const Shader& shader) {
@@ -69,11 +64,8 @@ void bind_material(const MeshPass& pass, const Material& material) {
   rlSetUniform(pass.shader.locs[SHADER_LOC_COLOR_DIFFUSE], color.data(), SHADER_UNIFORM_VEC4, 1);
 }
 
-void draw_mesh(const MeshPass& pass, const Mesh& mesh, const Matrix& model, const std::vector<Matrix>* bones) {
+void draw_mesh(const MeshPass& pass, const Mesh& mesh, const Matrix& model) {
   send_matrices(pass, model);
-  if (poses(pass, bones)) {
-    rlSetUniformMatrices(pass.shader.locs[SHADER_LOC_BONE_MATRICES], bones->data(), static_cast<int>(bones->size()));
-  }
   rlEnableVertexArray(mesh.vaoId);
   if (mesh.indices != nullptr) {
     rlDrawVertexArrayElements(0, mesh.triangleCount * config::kVerticesPerTriangle, nullptr);

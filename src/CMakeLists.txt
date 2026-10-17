@@ -251,6 +251,7 @@ redgem_add_library(redgem_runtime
   render/renderer_assets.cpp
   render/renderer_pictures.cpp
   render/renderer_frame.cpp
+  render/renderer_frame_texels.cpp
   render/renderer_environment.cpp
   render/renderer_objects.cpp
   render/renderer_particles.cpp

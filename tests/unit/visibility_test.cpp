@@ -160,3 +160,27 @@ TEST_CASE("a sphere is worth drawing when it is in view, big enough and at its d
   CHECK_FALSE(
       worth_drawing(identity_view(kNearViewer), middle, kLodFrom, kLodTo));  // a level of detail for farther away
 }
+
+TEST_CASE("an object is judged by the sphere around its mesh, or by where it is for a mesh without bounds") {
+  redgem::Transform world;
+  world.position = kOutsideView;
+  const Sight boxed = sight_of(box(kUnitBoxMin, kUnitBoxMax), world);
+  CHECK(boxed.bounded);
+  CHECK(approx_equal(boxed.sphere.center, kOutsideView, kTolerance));
+  CHECK_FALSE(sighted(identity_view(kNearViewer), boxed, 0.0f, kForever));  // out of the view
+  const Sight unbounded = sight_of(Bounds{}, world);
+  CHECK_FALSE(unbounded.bounded);
+  CHECK(sighted(identity_view(kNearViewer), unbounded, 0.0f, kForever));  // distance alone
+  CHECK_FALSE(sighted(identity_view(kNearViewer), unbounded, kLodFrom, kLodTo));
+}
+
+TEST_CASE("a skinned object is judged where its first bone is; without bounds, where it is itself") {
+  redgem::Transform world;
+  world.position = kPlace;
+  const Matrix bone = MatrixTranslate(kBoneShift, 0.0f, 0.0f);
+  const Sight posed = skinned_sight_of(box(kUnitBoxMin, kUnitBoxMax), world, bone);
+  CHECK(approx_equal(posed.sphere.center, Vec3{kBoneShift, 0.0f, 0.0f}, kTolerance));
+  const Sight unbounded = skinned_sight_of(Bounds{}, world, bone);
+  CHECK_FALSE(unbounded.bounded);
+  CHECK(approx_equal(unbounded.sphere.center, kPlace, kTolerance));
+}

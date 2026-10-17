@@ -30,7 +30,7 @@ void Renderer::Impl::capture_reflection_face(const Scene& scene, const Camera3D&
   next_face = render_math::face_after(next_face);
   faces_captured = std::min(faces_captured + 1, kCubeFaces);
   send(shader, lit_uniforms.reflection_strength, render_math::reflection_strength(faces_captured));
-  bind_for_the_frame(lit_uniforms.reflection_map, kReflectionTextureSlot, panorama.texture.id);
+  bind_for_the_frame(shader, lit_uniforms.reflection_map, kReflectionTextureSlot, panorama.texture.id);
 }
 
 // What is around `eye` in the direction of one cube face: the sky and the sizeable objects.

@@ -7,8 +7,6 @@
 
 #include <raylib.h>
 
-#include <vector>
-
 namespace redgem::render_detail {
 
 // The texture maps materials use (base color, emission, normal, metallic-roughness, occlusion).
@@ -26,8 +24,7 @@ struct MeshPass {
 // Sets what every mesh of the pass shares: the shader, the view and each texture's slot.
 MeshPass begin_mesh_pass(const Shader& shader);
 void bind_material(const MeshPass& pass, const Material& material);
-// `bones` is null for meshes that are not deformed by a skeleton.
-void draw_mesh(const MeshPass& pass, const Mesh& mesh, const Matrix& model, const std::vector<Matrix>* bones);
+void draw_mesh(const MeshPass& pass, const Mesh& mesh, const Matrix& model);
 // Leaves the state raylib expects: nothing bound.
 void end_mesh_pass();
 

@@ -8,6 +8,7 @@
 //   renderer_assets.cpp       a scene's meshes, materials and textures
 //   renderer_pictures.cpp     the font and the pictures games ask for by name
 //   renderer_frame.cpp        a frame: its camera, what is prepared, the lit picture
+//   renderer_frame_texels.cpp what the vertex shader reads of a frame: its matrices, its bones
 //   renderer_environment.cpp  lights, atmosphere and the sky
 //   renderer_objects.cpp      the scene's objects
 //   renderer_particles.cpp    particles
@@ -21,7 +22,9 @@
 #include <raylib.h>
 #include <rlgl.h>
 
+#include <array>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -32,6 +35,7 @@
 #include "render/render_math.hpp"
 #include "render/renderer.hpp"
 #include "render/shader_programs.hpp"
+#include "render/texel_rows.hpp"
 #include "render/visibility.hpp"
 #include "scene/scene_config.hpp"
 
@@ -45,6 +49,7 @@ inline constexpr ::Color kBlack{0, 0, 0, config::kMaxColorByte};
 // Texture slots no material uses: bound once per frame.
 inline constexpr int kReflectionTextureSlot = 9;
 inline constexpr int kShadowTextureSlot = 10;
+inline constexpr int kFrameTexelSlot = 11;
 
 // raylib numbers what is on the graphics card; zero is what was never loaded (or is released).
 inline bool loaded(const Texture2D& texture) { return texture.id != 0; }
@@ -60,12 +65,27 @@ struct GpuPrimitive {
   bool skinned = false;  // has joints: a skeleton deforms it
 };
 
+// What a frame knows of an object before any pass: whether it is drawn at all, what a pass judges
+// it by, and where its skeleton's bones are in the frame's texels.
+struct ObjectSight {
+  bool drawn = false;
+  render_math::Sight sight;
+  float first_bone = render_math::kNoBones;
+};
+
+// Where a skeleton is this frame: its first bone (what a skinned mesh is judged by) and how many.
+struct SkeletonPose {
+  Matrix first{};
+  std::size_t bones = 0;
+};
+
 // One pass over the scene's objects: what it is drawn with, what it can see, and the material
 // the previous part left set (consecutive parts often share one).
 struct ObjectPass {
   // cppcheck-suppress uninitMemberVarNoCtor ; it holds a reference: whoever makes one has to give it
   MeshPass meshes;
   int skinned_location = kNoLocation;
+  int first_bone_location = kNoLocation;
   bool depth = false;  // the shadow map's pass: only depth is written
   render_math::View view;
   int last_material = kNoMaterialYet;
@@ -92,6 +112,7 @@ struct Renderer::Impl {
   using GpuPrimitive = render_detail::GpuPrimitive;
   using ObjectPass = render_detail::ObjectPass;
   using ParticleDraw = render_detail::ParticleDraw;
+  using ObjectSight = render_detail::ObjectSight;
 
   // Shaders, and where the ones drawn with all frame long take their values.
   Shader shader{};
@@ -138,11 +159,14 @@ struct Renderer::Impl {
   bool show_prefabs = false;
   float motion_blur = 0.0f;  // 0..1 (Camera.motion_blur)
   // The frame being drawn.
-  std::vector<Transform> worlds;      // every object's world transform (see prepare_frame)
-  std::vector<Matrix> bone_matrices;  // of the skinned object being drawn
-  float wind = 0.0f;                  // of the environment
-  Vector3 sun_travel{};               // direction the sun's light travels
-  float view_tan_half_fov = 0.0f;     // of the camera, for rebuilding positions from depth
+  std::vector<Transform> worlds;    // every object's world transform (see prepare_frame)
+  std::vector<ObjectSight> sights;  // by object, for every pass of the frame
+  render_math::TexelRows texels;    // what the vertex shader reads of the frame, and its texture
+  std::vector<render_math::RowRun> changed_rows;
+  unsigned int texel_texture = 0;
+  float wind = 0.0f;               // of the environment
+  Vector3 sun_travel{};            // direction the sun's light travels
+  float view_tan_half_fov = 0.0f;  // of the camera, for rebuilding positions from depth
   float view_aspect = 0.0f;
   int next_face = 0;       // the cube face captured this frame
   int faces_captured = 0;  // reflections switch on once all six exist
@@ -195,8 +219,26 @@ struct Renderer::Impl {
   void prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect);
   // The scene as the camera sees it, into the HDR target.
   void draw_lit_scene(const Scene& scene, const Camera3D& camera, const ParticleSystem* particles);
-  // Binds a texture the lit shader reads all frame long to a slot of its own.
-  void bind_for_the_frame(int sampler_location, int slot, unsigned int texture);
+  // Binds a texture `program` reads all frame long to a slot of its own.
+  void bind_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture);
+
+  // --- What the vertex shader reads of a frame (renderer_frame_texels.cpp) ----------------------
+
+  // Every object's sight and every skeleton's bones, for all the passes of the frame.
+  void write_frame_texels(const Scene& scene);
+  // One object's sight, and its bones from texel `next_bone` on. Returns where the next
+  // skeleton's bones go.
+  std::size_t sight_object(const Scene& scene, const GameObject& object, std::size_t next_bone);
+  // Writes an object's bones from texel `first` on: where each of its joints is now, times the
+  // skin's inverse bind matrix. Nothing when the object has no (usable) skeleton.
+  std::optional<render_detail::SkeletonPose> pose_skeleton(const Scene& scene, const GameObject& object,
+                                                           std::size_t first);
+  std::optional<Matrix> write_bone(const Scene& scene, ObjectHandle joint,
+                                   const std::array<float, kFloatsPerMatrix>& inverse_bind, std::size_t texel);
+  // Hands what changed to the graphics card, and the texture to the shaders that read it.
+  void send_frame_texels();
+  void remake_texel_texture();
+  void upload_changed_rows();
 
   // --- Lights, atmosphere and the sky (renderer_environment.cpp) --------------------------------
 
@@ -211,9 +253,6 @@ struct Renderer::Impl {
 
   // --- Objects (renderer_objects.cpp) -----------------------------------------------------------
 
-  // Fills bone_matrices for an object's skeleton: where each of its joints is now, times the
-  // skin's inverse bind matrix. False when the object has no (usable) skeleton.
-  bool pose_skeleton(const Scene& scene, const GameObject& object);
   const MaterialDesc& factors_of(int material) const;
   // Sets a material's uniforms (only cut-out and wind for the shadow depth pass). Returns true
   // when it must be drawn without backface culling.
@@ -222,10 +261,10 @@ struct Renderer::Impl {
   // Draws what the current 3D view can see. `viewer` is the game camera in both passes: detail
   // is judged by how big things look to the player, not to the sun.
   void draw_objects(const Scene& scene, bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);
-  void draw_object(const Scene& scene, const GameObject& object, const Transform& world, ObjectPass& pass);
-  bool in_view(const GameObject& object, const Transform& world, bool skinned, const render_math::View& view) const;
+  void draw_object(const GameObject& object, const Transform& world, const render_detail::ObjectSight& sight,
+                   ObjectPass& pass);
   void use_material(int material, ObjectPass& pass);
-  void draw_primitive(const GpuPrimitive& primitive, const Matrix& transform, bool skinned, ObjectPass& pass);
+  void draw_primitive(const GpuPrimitive& primitive, const Matrix& transform, float first_bone, ObjectPass& pass);
 
   // --- Particles (renderer_particles.cpp) -------------------------------------------------------
 

@@ -9,7 +9,6 @@
 #include "editor/document/gltf_json.hpp"
 #include "editor/document/model_import.hpp"
 #include "editor/node_tree.hpp"
-#include "render/gpu_profile.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 
 namespace redgem {
@@ -58,7 +57,7 @@ int SceneDocument::import_model_file(const std::filesystem::path& path, std::str
     error = "invalid parent object";
     return kNoIndex;
   }
-  const LoadResult loaded = load_gltf_scene(path.string(), gpu_profile::kMaxSkinJoints);
+  const LoadResult loaded = load_gltf_scene(path.string());
   if (!loaded.ok) {
     error = loaded.error;
     return kNoIndex;

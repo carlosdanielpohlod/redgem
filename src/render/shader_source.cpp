@@ -2,6 +2,7 @@
 
 #include "render/gpu_profile.hpp"
 #include "render/shaders/uniforms.hpp"
+#include "render/texel_rows.hpp"
 
 namespace redgem::shaders {
 namespace {
@@ -15,15 +16,16 @@ std::string define(const char* name, int value) {
 
 }  // namespace
 
-std::string with_header(const std::string& source, const std::string& header, int max_bones, int max_point_lights) {
+std::string with_header(const std::string& source, const std::string& header, int texels_per_row,
+                        int max_point_lights) {
   const std::size_t version = source.find(kDesktopVersionLine);
   if (version == std::string::npos) return source;
-  const std::string limits = define(kBoneLimitName, max_bones) + define(kPointLightLimitName, max_point_lights);
+  const std::string limits = define(kTexelRowName, texels_per_row) + define(kPointLightLimitName, max_point_lights);
   return header + limits + source.substr(version + std::string(kDesktopVersionLine).size());
 }
 
 std::string for_this_gpu(const char* source) {
-  return with_header(source, gpu_profile::kShaderHeader, gpu_profile::kMaxSkinJoints, kMaxPointLights);
+  return with_header(source, gpu_profile::kShaderHeader, render_math::kTexelsPerRow, kMaxPointLights);
 }
 
 }  // namespace redgem::shaders

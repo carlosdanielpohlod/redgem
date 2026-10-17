@@ -6,8 +6,9 @@ namespace redgem::shaders {
 
 // Foliage (windAmount > 0) sways: higher parts move more, each tree with its own phase.
 // Skinned meshes (skinned > 0.5) are placed by their skeleton: each vertex follows up to four
-// bones, whose matrices already lead to world space. MAX_BONES is gpu_profile::kMaxSkinJoints, defined
-// for every shader when it is compiled (see shader_source.hpp).
+// bones, whose matrices already lead to world space. The bones of every skeleton of the frame are
+// in frameTexels, four texels a matrix (see texel_rows.hpp), TEXELS_PER_ROW to a row (defined for
+// every shader when it is compiled, see shader_source.hpp); firstBone is where this one's start.
 inline constexpr const char* kLitVertex = R"GLSL(
 #version 330
 in vec3 vertexPosition;
@@ -16,7 +17,8 @@ in vec3 vertexNormal;
 in vec4 vertexColor;
 in vec4 vertexBoneIds;
 in vec4 vertexBoneWeights;
-uniform mat4 boneMatrices[MAX_BONES];
+uniform sampler2D frameTexels;
+uniform float firstBone;
 uniform float skinned;
 
 uniform mat4 matModel;
@@ -39,13 +41,26 @@ const float WIND_HEIGHT_FULL = 6.0;     // meters above the ground where the swa
 const float WIND_REACH = 0.12;          // meters of sway at full height and wind 1
 const float WIND_LIFT = 0.3;            // vertical share of the motion
 const float SWITCH_ON = 0.5;            // switches arrive as floats: on when above this
+const int TEXELS_PER_MATRIX = 4;        // a column each
+
+vec4 frameTexel(int index) {
+  return texelFetch(frameTexels, ivec2(index % TEXELS_PER_ROW, index / TEXELS_PER_ROW), 0);
+}
+
+mat4 frameMatrix(int first) {
+  return mat4(frameTexel(first), frameTexel(first + 1), frameTexel(first + 2), frameTexel(first + 3));
+}
+
+mat4 bone(float joint) {
+  return frameMatrix(int(firstBone) + int(joint) * TEXELS_PER_MATRIX);
+}
 
 void main() {
   mat4 toWorld = matModel;
   mat3 normalToWorld = mat3(matNormal);
   if (skinned > SWITCH_ON) {
-    toWorld = boneMatrices[int(vertexBoneIds.x)] * vertexBoneWeights.x + boneMatrices[int(vertexBoneIds.y)] * vertexBoneWeights.y +
-              boneMatrices[int(vertexBoneIds.z)] * vertexBoneWeights.z + boneMatrices[int(vertexBoneIds.w)] * vertexBoneWeights.w;
+    toWorld = bone(vertexBoneIds.x) * vertexBoneWeights.x + bone(vertexBoneIds.y) * vertexBoneWeights.y +
+              bone(vertexBoneIds.z) * vertexBoneWeights.z + bone(vertexBoneIds.w) * vertexBoneWeights.w;
     normalToWorld = mat3(toWorld);  // good enough for normals: they are normalized, and rigs are not sheared
   }
   vec4 world = toWorld * vec4(vertexPosition, 1.0);

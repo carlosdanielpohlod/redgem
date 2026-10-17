@@ -23,8 +23,10 @@ struct LitUniforms {
   int alpha_cutoff = kNoLocation;
   int tint = kNoLocation;
   int skinned = kNoLocation;
+  int first_bone = kNoLocation;
   int wind = kNoLocation;
-  // Once per frame: lights, shadows, reflections and the sky.
+  // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
+  int frame_texels = kNoLocation;
   int shadow_map = kNoLocation;
   int light_matrix = kNoLocation;
   int shadow_strength = kNoLocation;
@@ -52,6 +54,8 @@ struct DepthUniforms {
   int wind = kNoLocation;
   int time = kNoLocation;
   int skinned = kNoLocation;
+  int first_bone = kNoLocation;
+  int frame_texels = kNoLocation;
 };
 
 struct ParticleUniforms {
@@ -64,7 +68,7 @@ struct ParticleUniforms {
 // `name`, when it does not compile.
 Shader compile_shader(const char* vertex, const char* fragment, const char* name);
 
-// Each also tells raylib where the uniforms it sets by itself are (matrices, texture maps, bones).
+// Each also tells raylib where the uniforms it sets by itself are (matrices, texture maps).
 LitUniforms find_lit_uniforms(Shader& lit);
 DepthUniforms find_depth_uniforms(Shader& depth);
 ParticleUniforms find_particle_uniforms(const Shader& particles);

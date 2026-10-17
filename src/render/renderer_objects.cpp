@@ -1,5 +1,5 @@
-// Drawing the scene's objects: each one's skeleton and materials, and the parts of its mesh that
-// the view can see.
+// Drawing the scene's objects: each one's materials, and the parts of its mesh that the view can
+// see. (Where each one is and its bones were worked out for the frame: see renderer_frame_texels.)
 
 #include "render/renderer_impl.hpp"
 
@@ -8,7 +8,6 @@
 #include <algorithm>
 
 #include "render/culling.hpp"
-#include "render/gpu_profile.hpp"
 
 namespace redgem {
 namespace {
@@ -23,21 +22,6 @@ using render_math::to_raylib;
 float on_with(int image) { return image != kNoIndex ? kOn : kOff; }
 
 }  // namespace
-
-bool Renderer::Impl::pose_skeleton(const Scene& scene, const GameObject& object) {
-  if (!is_index_of(object.skin, skins.size())) return false;
-  const SkinDesc& skin = skins[static_cast<std::size_t>(object.skin)];
-  const std::size_t count =
-      std::min({object.joints.size(), skin.inverse_bind.size(), static_cast<std::size_t>(gpu_profile::kMaxSkinJoints)});
-  bone_matrices.resize(count);
-  for (std::size_t j = 0; j < count; ++j) {
-    const ObjectId bone = scene.resolve(object.joints[j]);
-    if (bone == kNoObject) return false;
-    bone_matrices[j] = MatrixMultiply(render_math::from_column_major(skin.inverse_bind[j]),
-                                      model_matrix(worlds[static_cast<std::size_t>(bone)]));
-  }
-  return count > 0;
-}
 
 // --- Materials --------------------------------------------------------------------------------
 
@@ -83,54 +67,43 @@ void Renderer::Impl::draw_objects(const Scene& scene, bool depth_pass, Vec3 view
   const Matrix view_projection = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
   const render_math::View view{frustum_from_matrix(MatrixToFloatV(view_projection).v), viewer,
                                render_math::smallest_angle_drawn(detail_angle, depth_pass)};
-  const std::size_t count = std::min(scene.size(), worlds.size());
+  const std::size_t count = std::min({scene.size(), worlds.size(), sights.size()});
   ObjectPass objects{begin_mesh_pass(depth_pass ? depth_shader : shader),
-                     depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned, depth_pass, view};
+                     depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned,
+                     depth_pass ? depth_uniforms.first_bone : lit_uniforms.first_bone, depth_pass, view};
   for (std::size_t slot = 0; slot < count; ++slot) {
-    const GameObject& object = scene.at(static_cast<ObjectId>(slot));
-    if (!render_math::has_something_to_draw(object, show_prefabs, meshes.size())) continue;
-    draw_object(scene, object, worlds[slot], objects);
+    if (!sights[slot].drawn) continue;
+    draw_object(scene.at(static_cast<ObjectId>(slot)), worlds[slot], sights[slot], objects);
   }
   end_mesh_pass();
 }
 
-void Renderer::Impl::draw_object(const Scene& scene, const GameObject& object, const Transform& world,
+// Not what the view cannot see, what looks too small in it, nor levels of detail meant for
+// another distance.
+void Renderer::Impl::draw_object(const GameObject& object, const Transform& world, const ObjectSight& sight,
                                  ObjectPass& pass) {
-  const bool skinned = pose_skeleton(scene, object);
-  if (!in_view(object, world, skinned, pass.view)) return;
+  if (!render_math::sighted(pass.view, sight.sight, object.visible_from, object.visible_to)) return;
   const Matrix transform = model_matrix(world);
   if (!pass.depth) {
     const Vector3 tint = to_raylib(object.tint);
     rlSetUniform(lit_uniforms.tint, &tint, SHADER_UNIFORM_VEC3, 1);
   }
   for (const GpuPrimitive& primitive : meshes[static_cast<std::size_t>(object.mesh)]) {
-    draw_primitive(primitive, transform, skinned, pass);
+    draw_primitive(primitive, transform, sight.first_bone, pass);
   }
 }
 
-// False for what the view cannot see, what looks too small in it, and levels of detail meant for
-// another distance. (A mesh without bounds is judged by where its object is.)
-bool Renderer::Impl::in_view(const GameObject& object, const Transform& world, bool skinned,
-                             const render_math::View& view) const {
-  const Bounds& bounds = mesh_bounds[static_cast<std::size_t>(object.mesh)];
-  if (!bounds.valid) {
-    return !outside_distance_range(world.position, view.viewer, object.visible_from, object.visible_to);
-  }
-  const render_math::BoundingSphere sphere =
-      skinned ? render_math::skinned_sphere(bounds, bone_matrices.front()) : render_math::world_sphere(bounds, world);
-  return render_math::worth_drawing(view, sphere, object.visible_from, object.visible_to);
-}
-
-void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const Matrix& transform, bool skinned,
+void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const Matrix& transform, float first_bone,
                                     ObjectPass& pass) {
   use_material(primitive.material, pass);
   const bool two_sided = pass.last_two_sided;
   if (two_sided) rlDisableBackfaceCulling();
   // Per part: a skinned object may still have parts without bone weights, which stay rigid.
-  const bool deformed = skinned && primitive.skinned;
+  const bool deformed = render_math::has_bones(first_bone) && primitive.skinned;
   const float skinning = deformed ? kOn : kOff;
   rlSetUniform(pass.skinned_location, &skinning, SHADER_UNIFORM_FLOAT, 1);
-  draw_mesh(pass.meshes, primitive.mesh, transform, deformed ? &bone_matrices : nullptr);
+  if (deformed) rlSetUniform(pass.first_bone_location, &first_bone, SHADER_UNIFORM_FLOAT, 1);
+  draw_mesh(pass.meshes, primitive.mesh, transform);
   if (two_sided) rlEnableBackfaceCulling();
 }
 

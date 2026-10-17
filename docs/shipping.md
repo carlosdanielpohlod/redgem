@@ -61,7 +61,7 @@ What changes on a phone:
   A and B under the right, Start in the corner. A game that plays with a gamepad plays on a phone
   as it is; taps also work as mouse clicks, so `UI.button` menus work. A game with a touch
   interface of its own hides them with `Input.touch_controls = false`.
-- Characters may have up to 48 bones on a phone (64 on a computer).
+- Characters may have as many bones on a phone as on a computer (up to 1024 per skeleton).
 - There is no on-screen keyboard yet, so text fields cannot be typed in.
 - Phones are slower than computers: keep levels light (few lights, modest textures) and test on
   a real device. It needs Android 8 or later with OpenGL ES 3.

@@ -40,7 +40,7 @@ void Renderer::Impl::draw_shadow_map(const Scene& scene, const Camera3D& camera,
   if (strength > 0.0f) draw_sun_depth(scene, camera, to_sun);
   send(shader, lit_uniforms.shadow_strength, strength);
   send(shader, lit_uniforms.shadow_texel, kShadowTexel);
-  bind_for_the_frame(lit_uniforms.shadow_map, kShadowTextureSlot, shadow.depth.id);
+  bind_for_the_frame(shader, lit_uniforms.shadow_map, kShadowTextureSlot, shadow.depth.id);
 }
 
 // The scene's depth as the sun sees it, and the matrix that leads the lit shader into that view.

@@ -45,7 +45,7 @@ Glossy surfaces reflect their surroundings: the engine keeps capturing the scene
 (one cube face per frame) and uses it for reflections and ambient light.
 
 **Animated characters.** glTF skeletons and animations are supported: skinned meshes are deformed on
-the GPU (up to 64 bones per skeleton, 4 per vertex) and every animation in the scene plays in a
+the GPU (up to 1024 bones per skeleton, 4 per vertex: a character with fingers has about 65) and every animation in the scene plays in a
 loop until a script says otherwise (see [Control animations](scripting/gameplay.md#control-animations)). The editor keeps skeletons and animations when saving, reordering or importing models.
 `tools/blender/walk_rig.py` gives a scanned standing person leg bones and a walk cycle.
 

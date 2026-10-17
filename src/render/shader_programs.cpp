@@ -16,7 +16,7 @@ constexpr std::pair<int, const char*> kKnownUniforms[] = {
     {SHADER_LOC_MATRIX_MODEL, shaders::kModelMatrix},   {SHADER_LOC_MATRIX_NORMAL, shaders::kNormalMatrix},
     {SHADER_LOC_VECTOR_VIEW, shaders::kViewPosition},   {SHADER_LOC_MAP_EMISSION, shaders::kEmissiveMap},
     {SHADER_LOC_MAP_NORMAL, shaders::kNormalMap},       {SHADER_LOC_MAP_ROUGHNESS, shaders::kSurfaceMap},
-    {SHADER_LOC_MAP_OCCLUSION, shaders::kOcclusionMap}, {SHADER_LOC_BONE_MATRICES, shaders::kBoneMatrices},
+    {SHADER_LOC_MAP_OCCLUSION, shaders::kOcclusionMap},
 };
 
 // A uniform of the lit shader, and where its location is kept.
@@ -38,8 +38,10 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::alpha_cutoff, shaders::kAlphaCutoff},
     {&LitUniforms::tint, shaders::kTint},
     {&LitUniforms::skinned, shaders::kSkinned},
+    {&LitUniforms::first_bone, shaders::kFirstBone},
     {&LitUniforms::wind, shaders::kWindAmount},
-    // Once per frame: lights, shadows, reflections and the sky.
+    // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
+    {&LitUniforms::frame_texels, shaders::kFrameTexels},
     {&LitUniforms::shadow_map, shaders::kShadowMap},
     {&LitUniforms::light_matrix, shaders::kLightViewProjection},
     {&LitUniforms::shadow_strength, shaders::kShadowStrength},
@@ -81,12 +83,13 @@ LitUniforms find_lit_uniforms(Shader& lit) {
 
 DepthUniforms find_depth_uniforms(Shader& depth) {
   depth.locs[SHADER_LOC_MATRIX_MODEL] = GetShaderLocation(depth, shaders::kModelMatrix);
-  depth.locs[SHADER_LOC_BONE_MATRICES] = GetShaderLocation(depth, shaders::kBoneMatrices);
   DepthUniforms found;
   found.alpha_cutoff = GetShaderLocation(depth, shaders::kAlphaCutoff);
   found.wind = GetShaderLocation(depth, shaders::kWindAmount);
   found.time = GetShaderLocation(depth, shaders::kTime);
   found.skinned = GetShaderLocation(depth, shaders::kSkinned);
+  found.first_bone = GetShaderLocation(depth, shaders::kFirstBone);
+  found.frame_texels = GetShaderLocation(depth, shaders::kFrameTexels);
   return found;
 }
 

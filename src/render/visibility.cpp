@@ -73,4 +73,19 @@ bool worth_drawing(const View& view, const BoundingSphere& sphere, float from, f
   return !outside_distance_range(sphere.center, view.viewer, from, to);
 }
 
+Sight sight_of(const Bounds& bounds, const Transform& world) {
+  if (!bounds.valid) return {{world.position, 0.0f}, false};
+  return {world_sphere(bounds, world), true};
+}
+
+Sight skinned_sight_of(const Bounds& bounds, const Transform& world, const Matrix& first_bone) {
+  if (!bounds.valid) return sight_of(bounds, world);
+  return {skinned_sphere(bounds, first_bone), true};
+}
+
+bool sighted(const View& view, const Sight& sight, float from, float to) {
+  if (!sight.bounded) return !outside_distance_range(sight.sphere.center, view.viewer, from, to);
+  return worth_drawing(view, sight.sphere, from, to);
+}
+
 }  // namespace redgem::render_math

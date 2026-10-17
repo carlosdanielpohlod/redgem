@@ -46,8 +46,10 @@ Camera3D Renderer::Impl::camera_for(const Scene& scene) const {
 
 void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect) {
   // Where every object is, worked out once: each of the frame's passes (shadows, reflections, the
-  // view) would otherwise walk every object's chain of parents again.
+  // view) would otherwise walk every object's chain of parents again. So are its bones.
   render_math::world_transforms(scene, worlds);
+  write_frame_texels(scene);
+  send_frame_texels();
   apply_lights(scene, env, to_vec3(camera.position));
   view_tan_half_fov = std::tan(camera.fovy * DEG2RAD * kHalf);
   view_aspect = aspect;
@@ -67,8 +69,8 @@ void Renderer::Impl::draw_lit_scene(const Scene& scene, const Camera3D& camera, 
   EndTextureMode();
 }
 
-void Renderer::Impl::bind_for_the_frame(int sampler_location, int slot, unsigned int texture) {
-  rlEnableShader(shader.id);
+void Renderer::Impl::bind_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture) {
+  rlEnableShader(program.id);
   rlActiveTextureSlot(slot);
   rlEnableTexture(texture);
   rlSetUniform(sampler_location, &slot, SHADER_UNIFORM_INT, 1);
