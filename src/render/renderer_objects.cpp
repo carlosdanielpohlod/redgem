@@ -83,12 +83,11 @@ void Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float detail_ang
 }
 
 void Renderer::Impl::gather_copies(const render_math::View& view) {
-  batches.start(meshes.size());
+  batches.start();
   for (std::size_t slot = 0; slot < sights.size(); ++slot) {
     if (seen(sights[slot], view)) batches.add(sights[slot].mesh, scattered_records + slot);
   }
   gather_scattered(view);
-  batches.lay_out();
 }
 
 void Renderer::Impl::draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass) {

@@ -20,7 +20,6 @@ constexpr float kStretch = 2.0f;  // along x only: normals must not stretch with
 constexpr Vec3 kReddish{1.0f, 0.4f, 0.2f};
 constexpr float kFirstBone = 640.0f;
 constexpr int kTranslationColumn = 3;
-constexpr int kMeshes = 4;
 constexpr int kTree = 1;
 constexpr int kGrass = 3;
 constexpr std::size_t kGrassRunStart = 100;
@@ -65,34 +64,35 @@ TEST_CASE("a copy without a skeleton says so where its first bone would be") {
   CHECK(texel(rows, kLookTexel)[0] == 1.0f);  // untinted: white
 }
 
-TEST_CASE("copies are batched by mesh, each mesh in the order its first copy came in") {
+TEST_CASE("copies of a mesh that come one after the other are batched; another mesh between starts a new batch") {
   InstanceBatches batches;
-  batches.start(kMeshes);
+  batches.start();
   batches.add(kTree, 0);
-  batches.add(kGrass, 1);
-  batches.add(kTree, 2);
+  batches.add(kTree, 1);
+  batches.add(kGrass, 2);
   batches.add_run(kGrass, kGrassRunStart, kGrassRunLength);
-  batches.lay_out();
-  REQUIRE(batches.batches().size() == 2);
+  batches.add(kTree, 3);  // drawn after the grass, as it comes
+  REQUIRE(batches.batches().size() == 3);
   CHECK(batches.batches()[0].mesh == kTree);
   CHECK(batches.batches()[0].first == 0);
   CHECK(batches.batches()[0].count == 2);
   CHECK(batches.batches()[1].mesh == kGrass);
   CHECK(batches.batches()[1].first == 2);
   CHECK(batches.batches()[1].count == 1 + kGrassRunLength);
-  CHECK(same(batches.slots(), {0.0f, 2.0f, 1.0f, 100.0f, 101.0f, 102.0f}));
+  CHECK(batches.batches()[2].mesh == kTree);
+  CHECK(batches.batches()[2].first == 2 + 1 + kGrassRunLength);
+  CHECK(same(batches.slots(), {0.0f, 1.0f, 2.0f, 100.0f, 101.0f, 102.0f, 3.0f}));
 }
 
-TEST_CASE("a new pass starts with no copies, and an empty run adds no batch") {
+TEST_CASE("a new pass starts with no copies, and an empty run does not split a batch") {
   InstanceBatches batches;
-  batches.start(kMeshes);
-  batches.add(kTree, 0);
-  batches.lay_out();
-  batches.start(kMeshes);
-  batches.add_run(kGrass, kGrassRunStart, kNoCopies);
+  batches.start();
+  batches.add(kGrass, 0);
+  batches.start();
   batches.add(kTree, 1);
-  batches.lay_out();
+  batches.add_run(kGrass, kGrassRunStart, kNoCopies);
+  batches.add(kTree, 2);
   REQUIRE(batches.batches().size() == 1);
   CHECK(batches.batches()[0].mesh == kTree);
-  CHECK(same(batches.slots(), {1.0f}));
+  CHECK(same(batches.slots(), {1.0f, 2.0f}));
 }

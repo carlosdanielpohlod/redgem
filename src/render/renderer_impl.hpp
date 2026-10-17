@@ -192,7 +192,7 @@ struct Renderer::Impl {
   render_math::TexelRows texels;  // what the vertex shader reads of the frame, and its texture
   std::vector<render_math::RowRun> changed_rows;
   unsigned int texel_texture = 0;
-  render_math::InstanceBatches batches;  // what the pass being drawn sees, by mesh
+  render_math::InstanceBatches batches;  // what the pass being drawn sees, in runs of a mesh
   render_detail::SlotBuffer slots;       // the record numbers of what the frame's passes see
   std::uint64_t scatter_version = 0;     // of the scattered copies laid out (see Scattered)
   std::vector<render_detail::ScatterDraw> scatter_draws;
@@ -296,7 +296,8 @@ struct Renderer::Impl {
   // when it must be drawn without backface culling.
   bool apply_material(int index, bool depth_pass);
   void send_surface(const MaterialDesc& factors);
-  // Draws what the current 3D view can see, every copy of a mesh in one call per part. `viewer`
+  // Draws what the current 3D view can see, copies of a mesh that come together in one call per
+  // part. `viewer`
   // is the game camera in both passes: detail is judged by how big things look to the player, not
   // to the sun.
   void draw_objects(bool depth_pass, Vec3 viewer, float detail_angle = 0.0f);

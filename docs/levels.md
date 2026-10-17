@@ -60,8 +60,10 @@ environment, which wins over the saved setting.
 
 **Performance.** Objects outside the view, and parts too small to see from where the camera is, are
 not drawn. Objects that share a mesh (linked duplicates in Blender, Alt+D, or copies of one model)
-are drawn together, every copy of a part in one call, however many there are: a street of the
-same building costs little more than one. What still costs is the number of different meshes on
+and come one after the other in the level are drawn together, every copy of a part in one call,
+however many there are: a street of the same building costs little more than one. Blender keeps
+duplicates together by their names (Tree, Tree.001, Tree.002...); copies whose turn comes between
+other objects are drawn in that order, so that surfaces lying on each other look as they did. What still costs is the number of different meshes on
 screen, and of separate parts in each: join the parts of a model that share a material, and give
 heavy models lighter versions for far away with `visible_from` and `visible_to`.
 
