@@ -96,10 +96,10 @@ void LoadBot::shoot(double now) {
 }
 
 std::size_t LoadBot::send(const nlohmann::json& message) {
-  const std::size_t bytes = net::wire::packed(message).size();
-  connection_.send(message);
-  counts_.bytes_sent += bytes;
-  return bytes;
+  const std::vector<std::uint8_t> bytes = net::wire::packed(message);
+  connection_.send_packed(bytes);
+  counts_.bytes_sent += bytes.size();
+  return bytes.size();
 }
 
 }  // namespace redgem::load
