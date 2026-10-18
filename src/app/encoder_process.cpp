@@ -2,6 +2,22 @@
 
 #include "app/recording.hpp"
 
+// (A phone has no encoder program to start, and Android before API 28 has no posix_spawn: there
+// a recording cannot start.)
+#if defined(__ANDROID__)
+namespace redgem {
+
+EncoderProcess start_process(const std::vector<std::string>& /*arguments*/) { return {}; }
+
+bool finish_process(EncoderProcess& process) {
+  process.input = nullptr;
+  return false;
+}
+
+bool runs(const std::vector<std::string>& /*arguments*/) { return false; }
+
+}  // namespace redgem
+#else
 #ifdef _WIN32
 #include <cstdlib>
 #else
@@ -114,3 +130,4 @@ bool runs(const std::vector<std::string>& arguments) {
 #endif
 
 }  // namespace redgem
+#endif
