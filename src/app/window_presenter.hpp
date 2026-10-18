@@ -60,6 +60,9 @@ class WindowPresenter final : public Presenter {
   bool open() const override;
   float frame_seconds() const override;
 
+  // Whether a recording broke off: the encoder stopped before the game did.
+  bool recording_failed() const { return recording_failed_ || (recording() && recorder_->failed()); }
+
   // The keyboard, mouse and gamepad of the window.
   InputSource& devices() { return devices_; }
 
@@ -75,11 +78,14 @@ class WindowPresenter final : public Presenter {
 
   bool recording() const { return recorder_ != nullptr; }
   float recorded_frame_ = 0.0f;  // seconds each recorded frame advances the game by
+  bool recording_only_ = false;  // the run records for a set time: nothing else is played
+  bool recording_failed_ = false;
   void start_recording(const RecordOptions& record);
   void stop_recording();
   void present_recorded(const FrameView& view);
   // The recorded picture, fitted into the window.
   void show_recorded();
+  void point_into_recorded();
 };
 
 // Plays a game in a window of its own, with the machine's devices and sound, until the window

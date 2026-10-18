@@ -352,6 +352,7 @@ redgem_add_library(redgem_runtime
   app/window_presenter.cpp
   app/recording.cpp
   app/video_recorder.cpp
+  app/encoder_process.cpp
   app/engine.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp

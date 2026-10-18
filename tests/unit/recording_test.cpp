@@ -3,6 +3,7 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 
 #include "app/recording.hpp"
@@ -12,6 +13,7 @@ using namespace redgem;
 namespace {
 
 constexpr int kFps = 30;
+constexpr float kNoRoom = 0.001f;  // pixels: none left over at the sides
 constexpr double kSeconds = 2.0;
 constexpr std::int64_t kFramesInTwoSeconds = 60;
 
@@ -78,4 +80,34 @@ TEST_CASE("the encoder takes raw frames of the drawn size, flips them, and scale
 
 TEST_CASE("the encoder's command line quotes every argument, so that paths with spaces go through") {
   CHECK(shell_command({"ffmpeg", "-i", "my clip.mp4"}) == "\"ffmpeg\" \"-i\" \"my clip.mp4\"");
+}
+
+TEST_CASE("recorded sizes are rounded down to even sides, which the video's pixel format needs") {
+  CHECK(even(FrameSize{1921, 1081}) == FrameSize{1920, 1080});
+  CHECK(even(FrameSize{1920, 1080}) == FrameSize{1920, 1080});
+  CHECK(even(FrameSize{1, 1}) == FrameSize{2, 2});
+  RecordOptions options;
+  options.scale = FrameSize{641, 361};
+  CHECK(has(encoder_arguments(options, FrameSize{1280, 720}), "vflip,scale=640:360:flags=lanczos"));
+}
+
+TEST_CASE("a picture is fitted in the middle of a window of another shape, and the pointer follows it") {
+  const FrameSize window{1000, 1000};
+  const FrameSize picture{1920, 1080};
+  const Letterbox box = letterbox(window, picture);
+  CHECK(std::abs(box.x) < kNoRoom);
+  CHECK(box.width == doctest::Approx(1000.0f));
+  CHECK(box.height == doctest::Approx(562.5f));
+  CHECK(box.y == doctest::Approx(218.75f));
+  const PointMapping mapping = window_to_picture(window, picture);
+  // The window's middle is the picture's middle; the box's top left corner, the picture's.
+  CHECK((500.0f + mapping.offset_x) * mapping.scale_x == doctest::Approx(960.0f));
+  CHECK((500.0f + mapping.offset_y) * mapping.scale_y == doctest::Approx(540.0f));
+  CHECK((box.y + mapping.offset_y) * mapping.scale_y == doctest::Approx(0.0f));
+}
+
+TEST_CASE("the video's path goes to the encoder exactly as given, whatever it holds") {
+  RecordOptions options;
+  options.file = "clips/it's $HOME `now` \"quoted\" \\.mp4";
+  CHECK(encoder_arguments(options, FrameSize{640, 360}).back() == options.file.string());
 }

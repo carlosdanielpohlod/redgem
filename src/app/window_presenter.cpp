@@ -1,6 +1,8 @@
 #include "app/scene_files.hpp"
 #include "app/window_presenter.hpp"
 
+#include <rlgl.h>
+
 #include <algorithm>
 #include <cmath>
 #include <memory>
@@ -31,17 +33,6 @@ namespace {
 
 constexpr ::Color kBlackBars{0, 0, 0, 255};  // around a recorded picture of another shape than the window
 constexpr ::Color kUntinted{255, 255, 255, 255};
-constexpr float kHalfOf = 0.5f;  // of the room left: what goes on each side
-
-// The largest rectangle of `picture`'s shape that fits in `window`, in its middle.
-Rectangle fitted(SurfaceSize window, SurfaceSize picture) {
-  const float scale = std::min(static_cast<float>(window.width) / static_cast<float>(picture.width),
-                               static_cast<float>(window.height) / static_cast<float>(picture.height));
-  const float width = static_cast<float>(picture.width) * scale;
-  const float height = static_cast<float>(picture.height) * scale;
-  return {(static_cast<float>(window.width) - width) * kHalfOf, (static_cast<float>(window.height) - height) * kHalfOf,
-          width, height};
-}
 
 }  // namespace
 
@@ -60,16 +51,20 @@ WindowPresenter::~WindowPresenter() {
 
 void WindowPresenter::start_recording(const RecordOptions& record) {
   const SurfaceSize window = window_.drawing_size();
-  const FrameSize size = record.size.value_or(FrameSize{window.width, window.height});
+  const FrameSize size = even(record.size.value_or(FrameSize{window.width, window.height}));
   recorded_ = LoadRenderTexture(size.width, size.height);
   recorder_ = std::make_unique<VideoRecorder>(record, size);
   recorded_frame_ = recorded_frame_seconds(record.fps);
+  recording_only_ = record.seconds.has_value();
 }
 
 // What is recorded so far stays a video; the game goes on in the window, in real time.
 void WindowPresenter::stop_recording() {
+  recording_failed_ = recorder_->failed();
   recorder_.reset();
   renderer_.set_clock(std::nullopt);
+  SetMouseOffset(0, 0);
+  SetMouseScale(1.0f, 1.0f);
 }
 
 SurfaceSize WindowPresenter::surface_size() const {
@@ -79,7 +74,9 @@ SurfaceSize WindowPresenter::surface_size() const {
 
 bool WindowPresenter::open() const {
   const bool recorded_enough = recording() && recorder_->complete();
-  return !window_.close_requested() && !recorded_enough;
+  // A run that was only a recording ends when the recording breaks off, with an error.
+  const bool nothing_left_to_record = recording_failed_ && recording_only_;
+  return !window_.close_requested() && !recorded_enough && !nothing_left_to_record;
 }
 
 float WindowPresenter::frame_seconds() const { return recording() ? recorded_frame_ : window_.frame_seconds(); }
@@ -105,21 +102,35 @@ void WindowPresenter::present(const FrameView& view) {
 // in the video as in the game, however long a frame took to draw.
 void WindowPresenter::present_recorded(const FrameView& view) {
   renderer_.set_clock(static_cast<double>(recorder_->frames()) * recorded_frame_);
+  point_into_recorded();
   painter_.paint(view, &recorded_);
   recorder_->add_frame(recorded_.id);
+  if (recorder_->failed()) stop_recording();  // (the game goes on in the window)
   window_.begin_frame();
   show_recorded();
   if (options_.show_fps) window_.draw_frame_rate();
+  rlDrawRenderBatchActive();  // (whoever wants the frame's picture finds it drawn)
   if (options_.on_frame_drawn) options_.on_frame_drawn();
   window_.end_frame();
 }
 
 void WindowPresenter::show_recorded() {
   ClearBackground(kBlackBars);
-  const SurfaceSize picture{recorded_.texture.width, recorded_.texture.height};
+  const SurfaceSize window = window_.drawing_size();
+  const FrameSize picture{recorded_.texture.width, recorded_.texture.height};
+  const Letterbox box = letterbox(FrameSize{window.width, window.height}, picture);
   const Rectangle from{0.0f, 0.0f, static_cast<float>(picture.width), -static_cast<float>(picture.height)};
-  DrawTexturePro(recorded_.texture, from, fitted(window_.drawing_size(), picture), Vector2{0.0f, 0.0f}, 0.0f,
+  DrawTexturePro(recorded_.texture, from, Rectangle{box.x, box.y, box.width, box.height}, Vector2{0.0f, 0.0f}, 0.0f,
                  kUntinted);
+}
+
+// The pointer, over the window, points into the recorded picture.
+void WindowPresenter::point_into_recorded() {
+  const SurfaceSize window = window_.drawing_size();
+  const PointMapping mapping = window_to_picture(FrameSize{window.width, window.height},
+                                                 FrameSize{recorded_.texture.width, recorded_.texture.height});
+  SetMouseOffset(static_cast<int>(mapping.offset_x), static_cast<int>(mapping.offset_y));
+  SetMouseScale(mapping.scale_x, mapping.scale_y);
 }
 
 namespace {
@@ -140,7 +151,8 @@ int play(WindowPresenter& window, InputSource& input, const std::filesystem::pat
   game.presenter = &window;
   game.input = &input;
   game.audio = audio.get();
-  return Engine::create(game, std::move(scene))->run();
+  const int status = Engine::create(game, std::move(scene))->run();
+  return window.recording_failed() ? kExitFailure : status;
 }
 
 // The scene is read before the window is made: a game that cannot start says so with no window

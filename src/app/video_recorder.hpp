@@ -4,8 +4,8 @@
 // graphics card without waiting for it, and its pixels piped to the encoder, a program of its own.
 
 #include <cstdint>
-#include <cstdio>
 
+#include "app/encoder_process.hpp"
 #include "app/recording.hpp"
 #include "render/frame_readback.hpp"
 
@@ -24,17 +24,21 @@ class VideoRecorder {
   void add_frame(unsigned int framebuffer);
   // Hands the frames still being read to the encoder and waits for it to finish the video.
   void finish();
-  bool finished() const { return encoder_ == nullptr; }
+  bool finished() const { return encoder_.input == nullptr; }
+  // Whether the encoder stopped before it was asked to (the video is then incomplete, or none).
+  bool failed() const { return failed_; }
   // Whether the recording reached the length asked for.
   bool complete() const { return recording_complete(options_, frames_); }
   std::int64_t frames() const { return frames_; }
 
  private:
   void write(const std::uint8_t* pixels, std::size_t bytes);
+  void end_encoder();
 
   RecordOptions options_;
   FrameReadback readback_;
-  std::FILE* encoder_ = nullptr;
+  EncoderProcess encoder_;
+  bool failed_ = false;
   std::int64_t frames_ = 0;
 };
 

@@ -37,6 +37,28 @@ struct RecordOptions {
   std::optional<double> seconds;  // the recording stops after this long (else when the game quits)
 };
 
+// `size` with each side rounded down to an even number of pixels (at least two): the video's
+// pixel format keeps color for two by two pixels, and its encoder refuses odd sides.
+FrameSize even(FrameSize size);
+
+// Where a picture of `picture`'s size is shown in a window of `window`'s: as large as fits, in
+// its middle (bars fill the rest).
+struct Letterbox {
+  float x = 0.0f;
+  float y = 0.0f;
+  float width = 0.0f;
+  float height = 0.0f;
+};
+Letterbox letterbox(FrameSize window, FrameSize picture);
+// What takes a point of the window to the same point of the picture: picture = (window + offset) * scale.
+struct PointMapping {
+  float offset_x = 0.0f;
+  float offset_y = 0.0f;
+  float scale_x = 1.0f;
+  float scale_y = 1.0f;
+};
+PointMapping window_to_picture(FrameSize window, FrameSize picture);
+
 // "1920x1080" as a size; nothing for anything else (or a side that is not a positive number).
 std::optional<FrameSize> frame_size_from(const std::string& text);
 // A whole number of frames a second, 1 to kMostRecordFps.
@@ -54,7 +76,8 @@ bool recording_complete(const RecordOptions& options, std::int64_t frames);
 // The encoder's arguments: raw RGB frames of `source` size on its standard input, upside down (as
 // a framebuffer is read), into the video.
 std::vector<std::string> encoder_arguments(const RecordOptions& options, FrameSize source);
-// Those arguments as one command line for the system's shell, each quoted.
+// Those arguments as one command line for Windows' shell, each quoted. (Elsewhere the encoder is
+// started with them as they are, through no shell.)
 std::string shell_command(const std::vector<std::string>& arguments);
 
 }  // namespace redgem

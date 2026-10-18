@@ -1,5 +1,6 @@
 #include "app/recording.hpp"
 
+#include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <cstdlib>
@@ -8,6 +9,8 @@ namespace redgem {
 namespace {
 
 constexpr char kSizeSeparator = 'x';
+constexpr int kEvenPixels = 2;
+constexpr float kHalfOf = 0.5f;  // of the room left in a window: what goes on each side of a picture
 constexpr const char* kQuote = "\"";
 constexpr const char* kArgumentSeparator = " ";
 constexpr const char* kRawFormat = "rgb24";  // three bytes a pixel, as frames are read back
@@ -43,8 +46,9 @@ std::string replaced(std::string text, const std::string& name, const std::strin
 // The filters frames go through: flipped upright, then scaled when asked.
 std::string filters(const RecordOptions& options) {
   if (!options.scale) return kFlip;
-  const std::string scale = replaced(kScaleFilter, "{w}", std::to_string(options.scale->width));
-  return kFlip + replaced(scale, "{h}", std::to_string(options.scale->height));
+  const FrameSize size = even(*options.scale);
+  const std::string scale = replaced(kScaleFilter, "{w}", std::to_string(size.width));
+  return kFlip + replaced(scale, "{h}", std::to_string(size.height));
 }
 
 // Raw frames of `source` size, `options.fps` of them a second, on the standard input.
@@ -72,6 +76,26 @@ std::vector<std::string> output_arguments(const RecordOptions& options) {
 }
 
 }  // namespace
+
+FrameSize even(FrameSize size) {
+  const auto rounded = [](int side) { return std::max(side - side % kEvenPixels, kEvenPixels); };
+  return {rounded(size.width), rounded(size.height)};
+}
+
+Letterbox letterbox(FrameSize window, FrameSize picture) {
+  const float scale = std::min(static_cast<float>(window.width) / static_cast<float>(picture.width),
+                               static_cast<float>(window.height) / static_cast<float>(picture.height));
+  const float width = static_cast<float>(picture.width) * scale;
+  const float height = static_cast<float>(picture.height) * scale;
+  return {(static_cast<float>(window.width) - width) * kHalfOf, (static_cast<float>(window.height) - height) * kHalfOf,
+          width, height};
+}
+
+PointMapping window_to_picture(FrameSize window, FrameSize picture) {
+  const Letterbox box = letterbox(window, picture);
+  return {-box.x, -box.y, static_cast<float>(picture.width) / box.width,
+          static_cast<float>(picture.height) / box.height};
+}
 
 std::optional<FrameSize> frame_size_from(const std::string& text) {
   const std::size_t separator = text.find(kSizeSeparator);
