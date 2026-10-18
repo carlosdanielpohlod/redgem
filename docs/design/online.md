@@ -2,19 +2,19 @@
 
 Status: implemented (see [Online services](../scripting/online-services.md) for how a game uses it,
 and "As built" at the end for where the implementation differs). What RedGem needs so a game can
-be played online with accounts and saved data, built the way established engines do it, and
+be played online with accounts and saved data, built the way online games are commonly made, and
 generic: the engine provides the pieces, the game chooses its services.
 
-## What other engines do
+## Common practice
 
 | Need | Common practice |
 |------|-----------------|
-| Talking to web services | A generic, asynchronous HTTP client with HTTPS in the scripting API (Godot `HTTPRequest`, Unity `UnityWebRequest`, Unreal's HTTP module), available on every platform. |
-| Accounts and login | None ships its own account system. Games log in through a service (Unity Authentication, PlayFab, Nakama, Firebase, Supabase, Epic Online Services) or the developer's own backend, over HTTPS, and get a session token. |
-| Letting a player into a server | *Connection approval*: the client sends a payload when it connects (usually that token), the server decides whether to accept it (Unity Netcode `ConnectionApprovalCallback`, Godot `SceneMultiplayer.auth_callback`). |
-| Saved data on a server | The ordinary save API writes to the server's disk (Godot `user://`, Unity `persistentDataPath`). Anything bigger goes to a database behind a backend or service, reached over HTTP. |
+| Talking to web services | A generic, asynchronous HTTP client with HTTPS in the scripting API, available on every platform. |
+| Accounts and login | The engine ships no account system of its own. Games log in through an authentication service or the developer's own backend, over HTTPS, and get a session token. |
+| Letting a player into a server | *Connection approval*: the client sends a payload when it connects (usually that token), and the server decides whether to accept it. |
+| Saved data on a server | The ordinary save API writes to the server's disk. Anything bigger goes to a database behind a backend or service, reached over HTTP. |
 | Databases | Never opened by the game itself. A backend owns the database; the game server calls the backend. |
-| Encrypting the game connection | Offered by the transport (Godot ENet with DTLS, Unity Transport with TLS), usually optional. |
+| Encrypting the game connection | Offered by the transport, usually optional. |
 
 ## The design
 
