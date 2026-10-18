@@ -16,11 +16,7 @@ using namespace render_detail;
 // Bloom: what is brighter than the threshold (in linear light) glows.
 constexpr float kBloomThreshold = 1.0f;
 constexpr int kBloomBlurPasses = 3;
-constexpr int kDepthBufferBit = 0x00000100;  // GL_DEPTH_BUFFER_BIT
-constexpr float kSharpness = 0.25f;          // how much a picture smoothed with the frames before is sharpened
-
-// One texel of a texture `pixels` wide, in texture coordinates.
-float texel_of(int pixels) { return 1.0f / static_cast<float>(pixels); }
+constexpr float kSharpness = 0.25f;  // how much a picture smoothed with the frames before is sharpened
 
 Vector2 size_of(const RenderTexture2D& target) {
   return {static_cast<float>(target.texture.width), static_cast<float>(target.texture.height)};
@@ -36,12 +32,6 @@ void apply_effect(const RenderTexture2D& target, const Shader& effect, const Ren
 }
 
 }  // namespace
-
-void render_detail::copy_depth(unsigned int from, unsigned int to, int width, int height) {
-  rlBindFramebuffer(RL_READ_FRAMEBUFFER, from);
-  rlBindFramebuffer(RL_DRAW_FRAMEBUFFER, to);
-  rlBlitFramebuffer(0, 0, width, height, 0, 0, width, height, kDepthBufferBit);
-}
 
 void render_detail::draw_full(const RenderTexture2D& source, int width, int height) {
   const Rectangle from{0.0f, 0.0f, static_cast<float>(source.texture.width),
@@ -143,7 +133,7 @@ const Shader& Renderer::Impl::begin_finish(int width, int height) {
 
 // The scene's depth goes along, so overlays drawn into `output` afterwards are occluded by it.
 void Renderer::Impl::copy_depth_to(const RenderTexture2D& output) {
-  copy_depth(hdr.id, output.id, hdr.texture.width, hdr.texture.height);
+  copy_buffer(hdr.id, output.id, hdr.texture.width, hdr.texture.height, Buffer::Depth);
   rlDisableFramebuffer();
 }
 

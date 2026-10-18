@@ -72,6 +72,8 @@ struct DepthUniforms {
 // once per frame.
 struct MotionUniforms {
   int alpha_cutoff = kNoLocation;
+  int alpha_ceiling = kNoLocation;
+  int covering = kNoLocation;
   int alpha_dithered = kNoLocation;
   int wind = kNoLocation;
   int skinned = kNoLocation;

@@ -164,9 +164,8 @@ struct PreviousTexels {
   unsigned int to = 0;    // one of `texture`
 };
 
-// Copies the depth of framebuffer `from` into `to`, both `width` x `height` (several samples a
-// pixel are resolved). The framebuffers stay bound.
-void copy_depth(unsigned int from, unsigned int to, int width, int height);
+// One texel of a texture `pixels` wide, in texture coordinates.
+inline float texel_of(int pixels) { return 1.0f / static_cast<float>(pixels); }
 // Draws `source` over the whole current target (render textures are stored upside down).
 void draw_full(const RenderTexture2D& source, int width, int height);
 
@@ -256,6 +255,12 @@ struct Renderer::Impl {
   unsigned int texel_texture = 0;
   int texel_texture_rows = 0;
   render_detail::PreviousTexels previous_texels;
+  // Records and bones that were another object's (or nobody's) the frame before: the last frame's
+  // copy of them is this frame's, so that they show no motion they did not make. By texel ranges.
+  std::vector<std::pair<std::size_t, std::size_t>> fresh_texels;
+  std::vector<ObjectHandle> record_owners;  // by object slot: whose record it held last frame
+  bool temporal_allowed = true;             // Renderer::allow_temporal_antialias
+  bool temporal_unsupported = false;        // the card cannot copy the frame's float texels
   render_detail::TemporalState temporal;
   render_math::InstanceBatches batches;                     // what the pass being drawn sees, in runs of a mesh
   render_detail::SlotBuffer slots;                          // the record numbers of what the frame's passes see
@@ -406,7 +411,7 @@ struct Renderer::Impl {
   void send_surface(const MaterialDesc& factors);
   void cover_edges(bool cut_out);
   void send_alpha(const render_math::AlphaTest& test);
-  void send_motion_alpha(const render_math::AlphaTest& test);
+  void send_motion_alpha(const render_math::AlphaTest& test, bool covering);
   // Draws what the current 3D view can see, copies of a mesh that come together in one call per
   // part. `viewer` is the game camera in both passes: detail is judged by how big things look to
   // the player, not to the sun. Returns where the pass's record numbers start in `slots`.
@@ -485,10 +490,17 @@ struct Renderer::Impl {
   // from, into `motion`; drawing goes on where it was.
   void draw_motion(std::size_t first, Vec3 viewer);
   void send_motion_frame(Vec3 viewer);
-  // Where this frame's particles cover the picture, into the motion target's alpha.
+  // Where this frame's particles and see-through surfaces (which write no motion: what is behind
+  // them shows through) cover the picture, into the motion target's alpha.
   void mark_particle_cover();
+  void mark_see_through_cover(Vec3 viewer);
   // The frame's texels as they were, before this frame's go to the graphics card.
   void keep_previous_texels();
+  // Notes when an object's record (and bones) were not its own the frame before.
+  void note_fresh_record(const Scene& scene, const GameObject& object, float first_bone, std::size_t bones);
+  void carry_fresh_texels();
+  void give_up_temporal();
+  void release_temporal_targets();
   void remake_previous_texels();
   void release_previous_texels();
   // The lit picture mixed with the frames before, into the newer history.

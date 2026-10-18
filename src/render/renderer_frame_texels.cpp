@@ -18,8 +18,8 @@ using render_math::kTexelsPerMatrix;
 using render_math::kTexelsPerRow;
 using render_math::model_matrix;
 
-constexpr int kTexelFormat = RL_PIXELFORMAT_UNCOMPRESSED_R32G32B32A32;
-constexpr int kOneLevel = 1;  // no smaller copies: texels are fetched one by one, never filtered
+using render_math::kTexelFormat;
+using render_math::kTexelLevels;
 bool same(Vec3 a, Vec3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
 bool same(Quat a, Quat b) { return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w; }
 bool same(const Transform& a, const Transform& b) {
@@ -39,10 +39,14 @@ void Renderer::Impl::write_frame_texels(const Scene& scene) {
   const std::size_t count = std::min(scene.size(), worlds.size());
   sights.assign(count, ObjectSight{});
   record_sources.resize(count);  // (a slot past the end that comes back is written anew)
+  record_owners.resize(count);
   std::size_t next_bone = render_math::record_texel(scattered_records + count);  // after every record
   for (std::size_t slot = 0; slot < count; ++slot) {
     const GameObject& object = scene.at(static_cast<ObjectId>(slot));
-    if (!render_math::has_something_to_draw(object, show_prefabs, meshes.size())) continue;
+    if (!render_math::has_something_to_draw(object, show_prefabs, meshes.size())) {
+      record_owners[slot] = kNoHandle;
+      continue;
+    }
     next_bone = sight_object(scene, object, next_bone);
   }
 }
@@ -53,6 +57,7 @@ std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& o
   const std::optional<SkeletonPose> pose = pose_skeleton(scene, object, next_bone);
   render_math::InstanceLook look{object.tint, pose ? static_cast<float>(next_bone) : render_math::kNoBones};
   look.sway = object.sways ? render_math::kSways : render_math::kStill;
+  if (temporal.on) note_fresh_record(scene, object, look.first_bone, pose ? pose->bones : 0);
   const render_math::Sight seen = pose ? render_math::skinned_sight_of(bounds, worlds[slot], pose->first)
                                        : render_math::sight_of(bounds, worlds[slot]);
   sights[slot] = ObjectSight{write_record(slot, look), seen, object.mesh, object.visible_from, object.visible_to,
@@ -115,13 +120,14 @@ void Renderer::Impl::send_frame_texels() {
     upload_changed_rows();
   }
   if (temporal.on && !kept_before) keep_previous_texels();
+  if (temporal.on) carry_fresh_texels();
   bind_for_the_frame(shader, lit_uniforms.frame_texels, kFrameTexelSlot, texel_texture);
   bind_for_the_frame(depth_shader, depth_uniforms.frame_texels, kFrameTexelSlot, texel_texture);
 }
 
 void Renderer::Impl::remake_texel_texture() {
   if (texel_texture != 0) rlUnloadTexture(texel_texture);
-  texel_texture = rlLoadTexture(texels.row(0), kTexelsPerRow, texels.rows(), kTexelFormat, kOneLevel);
+  texel_texture = rlLoadTexture(texels.row(0), kTexelsPerRow, texels.rows(), kTexelFormat, kTexelLevels);
   texel_texture_rows = texels.rows();
   texels.taken_whole();
   texels.take_changed(changed_rows);  // all of them went

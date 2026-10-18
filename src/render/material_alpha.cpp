@@ -12,12 +12,15 @@ bool blended(const MaterialDesc& material) { return material.alpha_mode == Alpha
 // The opaque surfaces' passes: the lit one, and the one of where they moved.
 bool with_the_opaque(AlphaPass pass) { return pass == AlphaPass::Opaque || pass == AlphaPass::Motion; }
 
+// The see-through surfaces' passes: the lit one, and the one of how much they cover.
+bool mixed_in(AlphaPass pass) { return pass == AlphaPass::SeeThrough || pass == AlphaPass::Cover; }
+
 // Leaves, grass, fences: a texture's alpha cuts or blends their shape.
 bool foliage(const MaterialDesc& material) { return textured(material) && (masked(material) || blended(material)); }
 
 float blended_cutoff(const MaterialDesc& material, AlphaPass pass) {
   if (with_the_opaque(pass)) return kBlendCore;
-  if (pass == AlphaPass::SeeThrough) return kInvisibleAlpha;
+  if (mixed_in(pass)) return kInvisibleAlpha;
   return textured(material) ? kBlendShadowCutoff : kNoCutoff;
 }
 
@@ -36,11 +39,11 @@ bool farther(const SeeThroughDraw& a, const SeeThroughDraw& b) {
 AlphaTest alpha_test(const MaterialDesc& material, float wind, AlphaPass pass) {
   AlphaTest test;
   test.cutoff = cutoff_of(material, pass);
-  test.ceiling = pass == AlphaPass::SeeThrough ? kBlendCore : kNoCeiling;
+  test.ceiling = mixed_in(pass) ? kBlendCore : kNoCeiling;
   test.sway = foliage(material) ? wind : kNoWind;
   test.two_sided = material.double_sided || masked(material) || foliage(material);
   test.dithered = with_the_opaque(pass) && blended(material) && material.dithered;
-  test.mixed = pass == AlphaPass::SeeThrough;
+  test.mixed = mixed_in(pass);
   return test;
 }
 

@@ -101,6 +101,7 @@ void Renderer::Impl::draw_surfaces(Vec3 viewer, bool sampled) {
   covering = false;
   if (motion_needed()) draw_motion(first, viewer);
   draw_see_through(first, viewer);
+  if (motion_needed() && !see_through.empty()) mark_see_through_cover(viewer);
 }
 
 void Renderer::Impl::draw_scene_particles(const ParticleSystem* particles, const Camera3D& camera) {

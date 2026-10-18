@@ -29,9 +29,10 @@ inline constexpr float kInvisibleAlpha = 1.0f / 255.0f;  // a texel less opaque 
 inline constexpr float kBlendShadowCutoff = 0.35f;
 
 // The passes a material is drawn in: into the sun's shadow map, with the opaque surfaces, and
-// mixed with what is behind it after them. Motion: the opaque surfaces again, for where they moved
-// (temporal anti-aliasing): what the opaque pass leaves out, it leaves out.
-enum class AlphaPass { Shadow, Opaque, SeeThrough, Motion };
+// mixed with what is behind it after them. For temporal anti-aliasing, Motion: the opaque surfaces
+// again, for where they moved (what the opaque pass leaves out, it leaves out); Cover: the
+// see-through ones again, for how much of each pixel they cover (as the see-through pass draws them).
+enum class AlphaPass { Shadow, Opaque, SeeThrough, Motion, Cover };
 
 struct AlphaTest {
   float cutoff = kNoCutoff;    // alpha below this is not drawn

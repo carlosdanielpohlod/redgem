@@ -16,6 +16,7 @@ namespace redgem::shaders {
 inline constexpr const char* kPreviousTexels = "previousTexels";
 inline constexpr const char* kPreviousTime = "previousTime";
 inline constexpr const char* kViewProjection = "viewProjection";
+inline constexpr const char* kCovering = "covering";
 inline constexpr const char* kPreviousViewProjection = "previousViewProjection";
 
 inline constexpr const char* kMotionVertexMain = R"GLSL(
@@ -44,6 +45,7 @@ void main() {
 
 // What moved, in texture coordinates of the picture (rg), and that a surface was drawn there (b).
 // Cut-out and fading surfaces leave out what the lit pass leaves out (alpha tested, not covered).
+// Covering, a see-through surface writes how much of the pixel it covers instead, into alpha.
 inline constexpr const char* kMotionHead = R"GLSL(
 #version 330
 in vec2 fragTexCoord;
@@ -55,6 +57,8 @@ uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 uniform float alphaCutoff;
 uniform float alphaDithered;
+uniform float alphaCeiling;
+uniform float covering;  // on: how much a see-through surface covers the pixel, into alpha alone
 out vec4 finalColor;
 )GLSL";
 
@@ -63,10 +67,18 @@ const float SWITCH_ON = 0.5;
 const float NDC_TO_TEXTURE = 0.5;   // normalized device coordinates span 2 across, a texture 1
 const float NOWHERE = 0.0001;       // a w this small was behind the last frame's camera
 const float DRAWN = 1.0;
-bool leftOut(float alpha) { return alphaDithered > SWITCH_ON ? alpha <= pixelNoise() : alpha < alphaCutoff; }
+bool leftOut(float alpha) {
+  if (alpha >= alphaCeiling) return true;
+  return alphaDithered > SWITCH_ON ? alpha <= pixelNoise() : alpha < alphaCutoff;
+}
 void main() {
   if (fadedAway(fragCopy)) discard;
-  if (leftOut(colDiffuse.a * texture(texture0, fragTexCoord).a * fragColor.a)) discard;
+  float alpha = colDiffuse.a * texture(texture0, fragTexCoord).a * fragColor.a;
+  if (leftOut(alpha)) discard;
+  if (covering > SWITCH_ON) {
+    finalColor = vec4(0.0, 0.0, 0.0, alpha);
+    return;
+  }
   vec2 now = nowClip.xy / nowClip.w;
   vec2 before = beforeClip.w > NOWHERE ? beforeClip.xy / beforeClip.w : now;
   finalColor = vec4((now - before) * NDC_TO_TEXTURE, DRAWN, 0.0);

@@ -28,9 +28,12 @@ bool resolve(const Multisampled& target, unsigned int framebuffer);
 // when their formats are the same.
 unsigned int depth_texture(int width, int height);
 
-// Copies the color of framebuffer `from` into `to`, both `width` x `height`, texel for texel (no
-// filtering: float texels come out the same). Then neither is bound.
-void copy_color(unsigned int from, unsigned int to, int width, int height);
+// What of a framebuffer is copied.
+enum class Buffer { Color, Depth };
+// Copies `which` of framebuffer `from` into `to`, both `width` x `height`, texel for texel (no
+// filtering: float texels come out the same; several samples a pixel are resolved). The
+// framebuffers stay bound.
+void copy_buffer(unsigned int from, unsigned int to, int width, int height, Buffer which);
 
 // While on, a fragment's alpha says how many of its pixel's samples it covers.
 void set_alpha_to_coverage(bool on);

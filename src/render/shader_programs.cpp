@@ -100,6 +100,8 @@ constexpr ParticleUniform kParticleUniforms[] = {
 // The motion pass's uniforms, and where each one's location is kept.
 constexpr std::pair<int MotionUniforms::*, const char*> kMotionUniforms[] = {
     {&MotionUniforms::alpha_cutoff, shaders::kAlphaCutoff},
+    {&MotionUniforms::alpha_ceiling, shaders::kAlphaCeiling},
+    {&MotionUniforms::covering, shaders::kCovering},
     {&MotionUniforms::alpha_dithered, shaders::kAlphaDithered},
     {&MotionUniforms::wind, shaders::kWindAmount},
     {&MotionUniforms::skinned, shaders::kSkinned},

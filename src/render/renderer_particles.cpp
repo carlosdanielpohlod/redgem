@@ -105,14 +105,14 @@ unsigned int Renderer::Impl::drawing_framebuffer() const {
 void Renderer::Impl::share_scene_depth() {
   const int width = hdr.texture.width;
   const int height = hdr.texture.height;
-  if (drawing_framebuffer() != hdr.id) copy_depth(drawing_framebuffer(), hdr.id, width, height);
+  if (drawing_framebuffer() != hdr.id) copy_buffer(drawing_framebuffer(), hdr.id, width, height, Buffer::Depth);
   if (particle_layout.any_soft) copy_soft_particle_depth();
   rlEnableFramebuffer(drawing_framebuffer());  // drawing goes on where it was
 }
 
 void Renderer::Impl::copy_soft_particle_depth() {
   ensure_scene_depth_target();
-  copy_depth(hdr.id, scene_depth.id, hdr.texture.width, hdr.texture.height);
+  copy_buffer(hdr.id, scene_depth.id, hdr.texture.width, hdr.texture.height, Buffer::Depth);
 }
 
 }  // namespace redgem

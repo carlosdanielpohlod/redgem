@@ -47,6 +47,9 @@ class Renderer {
   void draw_hud(const std::vector<HudItem>& hud);
   // How much the picture streaks with speed, 0 (none) to 1 (see Camera.motion_blur in Ruby).
   void set_motion_blur(float amount);
+  // Whether environments that ask for temporal anti-aliasing get it (on unless said): a view whose
+  // overlays are drawn with the camera unjittered afterwards (the editor's) does without.
+  void allow_temporal_antialias(bool allowed);
   // Where UI.image looks for pictures (the game's images/ folder).
   void set_images_dir(const std::filesystem::path& dir);
   // Width in pixels of a text drawn by draw_hud at that size.

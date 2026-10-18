@@ -198,12 +198,14 @@ void Renderer::Impl::ensure_temporal_targets() {
   for (const RenderTexture2D* target : {&motion, &histories[0], &histories[1]}) clear(*target);
 }
 
+void Renderer::Impl::release_temporal_targets() {
+  for (RenderTexture2D* target : {&motion, &histories[0], &histories[1]}) unload(*target);
+}
+
 void Renderer::Impl::release_targets() {
   unload_target_on(glow);  // before the lit picture, whose depth it draws on
-  for (RenderTexture2D* target :
-       {&hdr, &bloom_a, &bloom_b, &ldr, &occlusion_a, &occlusion_b, &motion, &histories[0], &histories[1]}) {
-    unload(*target);
-  }
+  for (RenderTexture2D* target : {&hdr, &bloom_a, &bloom_b, &ldr, &occlusion_a, &occlusion_b}) unload(*target);
+  release_temporal_targets();
   render_detail::release(scene_samples);
   unload_depth_target(scene_depth);
 }

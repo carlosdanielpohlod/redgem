@@ -111,3 +111,12 @@ TEST_CASE("see-through surfaces are drawn the farthest first, and in the order t
   for (const SeeThroughDraw& draw : draws) meshes.push_back(draw.mesh);
   CHECK(meshes == std::vector<int>{1, 0, 2, 3});
 }
+
+TEST_CASE("the cover pass leaves out what the see-through pass leaves out") {
+  const MaterialDesc glass = material(AlphaMode::Blend, false);
+  const AlphaTest see_through = alpha_test(glass, kWind, AlphaPass::SeeThrough);
+  const AlphaTest cover = alpha_test(glass, kWind, AlphaPass::Cover);
+  CHECK(cover.cutoff == doctest::Approx(see_through.cutoff));
+  CHECK(cover.ceiling == doctest::Approx(see_through.ceiling));
+  CHECK(cover.mixed);
+}

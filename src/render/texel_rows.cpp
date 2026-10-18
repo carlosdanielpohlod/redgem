@@ -1,5 +1,7 @@
 #include "render/texel_rows.hpp"
 
+#include <algorithm>
+
 #include <raymath.h>
 
 #include <cstring>
@@ -28,6 +30,18 @@ bool extends(const std::vector<RowRun>& runs, int row) {
 
 TexelPlace texel_place(std::size_t texel) {
   return {static_cast<int>(texel % kTexelsPerRow), static_cast<int>(texel / kTexelsPerRow)};
+}
+
+std::vector<TexelSpan> texel_spans(std::size_t first, std::size_t count) {
+  std::vector<TexelSpan> spans;
+  for (std::size_t at = first, end = first + count; at < end;) {
+    const TexelPlace place = texel_place(at);
+    const std::size_t room = static_cast<std::size_t>(kTexelsPerRow - place.x);
+    const std::size_t taken = std::min(room, end - at);
+    spans.push_back({place, static_cast<int>(taken)});
+    at += taken;
+  }
+  return spans;
 }
 
 bool TexelRows::write(std::size_t first, const float* values, std::size_t count) {

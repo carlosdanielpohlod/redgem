@@ -88,6 +88,8 @@ void Renderer::set_motion_blur(float amount) {
   impl_->motion_blur = std::clamp(amount, kNoMotionBlur, kFullMotionBlur);
 }
 
+void Renderer::allow_temporal_antialias(bool allowed) { impl_->temporal_allowed = allowed; }
+
 void Renderer::set_images_dir(const std::filesystem::path& dir) {
   impl_->release_ui_images();
   impl_->images_dir = dir;

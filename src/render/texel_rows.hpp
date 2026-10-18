@@ -17,6 +17,8 @@ inline constexpr int kTexelsPerRow = 2048;  // the texture's width: what every O
 inline constexpr int kMaxTexelRows = 2048;  // and its height, at most
 inline constexpr int kFloatsPerTexel = 4;   // red, green, blue, alpha
 inline constexpr int kTexelsPerMatrix = 4;  // a 4x4 matrix, a column a texel
+inline constexpr int kTexelFormat = PIXELFORMAT_UNCOMPRESSED_R32G32B32A32;  // four floats a texel
+inline constexpr int kTexelLevels = 1;  // no smaller copies: texels are fetched one by one, never filtered
 inline constexpr std::size_t kMaxTexels = static_cast<std::size_t>(kTexelsPerRow) * kMaxTexelRows;
 // Where a skeleton's first bone is, for what has no skeleton (the shader takes texels as floats).
 inline constexpr float kNoBones = -1.0f;
@@ -27,6 +29,14 @@ struct TexelPlace {
   int y = 0;
 };
 TexelPlace texel_place(std::size_t texel);
+
+// Texels next to each other on one row: `count` of them from `first` on.
+struct TexelSpan {
+  TexelPlace first;
+  int count = 0;
+};
+// The texels from `first` on, `count` of them, as spans of a row each.
+std::vector<TexelSpan> texel_spans(std::size_t first, std::size_t count);
 
 // Rows next to each other.
 struct RowRun {

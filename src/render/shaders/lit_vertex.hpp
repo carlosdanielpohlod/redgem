@@ -92,15 +92,21 @@ vec4 swayed(vec4 world, float ground, float wind, float clock) {
   return world;
 }
 
+// The vertex placed by `toWorld` (its record's matrix, or its skeleton's pose), swayed as the
+// record says.
+vec4 placedBy(mat4 toWorld, float ground, sampler2D texels, int record, float clock) {
+  vec4 world = toWorld * vec4(vertexPosition, 1.0);
+  float wind = windAmount * texelOf(texels, record + NORMAL_TEXEL).w;  // (the record's own, not its skeleton's)
+  return wind > 0.0 ? swayed(world, ground, wind, clock) : world;
+}
+
 // Where the vertex of the copy whose record starts at texel `record` of `texels` is in the world.
 vec4 placed(sampler2D texels, int record, float clock) {
   vec4 look = texelOf(texels, record + LOOK_TEXEL);
   mat4 toWorld = matrixOf(texels, record);
   float ground = toWorld[3].y;
   if (posed(look)) toWorld = skeletonPose(texels, int(look.a));
-  vec4 world = toWorld * vec4(vertexPosition, 1.0);
-  float wind = windAmount * texelOf(texels, record + NORMAL_TEXEL).w;  // (the record's own, not its skeleton's)
-  return wind > 0.0 ? swayed(world, ground, wind, clock) : world;
+  return placedBy(toWorld, ground, texels, record, clock);
 }
 
 // How much of a copy `distance` meters away is kept as it fades out at the far end of its
@@ -130,9 +136,12 @@ void main() {
   vec4 copy = texelOf(frameTexels, record + COPY_TEXEL);
   fragCopy = vec4(keptOf(copy, length(toWorld[3].xyz - viewPos)), copy.w, 0.0);
   fragUp = copy.w > 0.0 ? normalize(mat3(toWorld) * UP) : UP;  // (only grass asks for it)
-  // good enough for normals: they are normalized, and rigs are not sheared
-  if (posed(look)) normalToWorld = mat3(skeletonPose(frameTexels, int(look.a)));
-  vec4 world = placed(frameTexels, record, time);
+  float ground = toWorld[3].y;
+  if (posed(look)) {
+    toWorld = skeletonPose(frameTexels, int(look.a));  // (worked out once, for the position and the normals)
+    normalToWorld = mat3(toWorld);  // good enough for normals: they are normalized, and rigs are not sheared
+  }
+  vec4 world = placedBy(toWorld, ground, frameTexels, record, time);
   fragPosition = world.xyz;
   fragTexCoord = vertexTexCoord;
   fragColor = vertexColor;

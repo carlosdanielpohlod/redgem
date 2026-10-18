@@ -6,6 +6,8 @@
 
 #include <raymath.h>
 
+#include "core/log.hpp"
+#include "render/instance_records.hpp"
 #include "render/shaders/uniforms.hpp"
 
 namespace redgem {
@@ -14,8 +16,8 @@ namespace {
 using namespace render_detail;
 using render_math::to_vec3;
 
-constexpr int kTexelFormat = RL_PIXELFORMAT_UNCOMPRESSED_R32G32B32A32;  // as the frame's texels
-constexpr int kOneLevel = 1;
+using render_math::kTexelFormat;
+using render_math::kTexelLevels;
 constexpr ::Color kNoMotion{0, 0, 0, 0};  // nothing drawn, nothing covered
 
 Matrix inverse_then(const Matrix& undone, const Matrix& then) { return MatrixMultiply(MatrixInvert(undone), then); }
@@ -31,13 +33,21 @@ void blend_cover() {
   rlSetBlendMode(RL_BLEND_CUSTOM_SEPARATE);
 }
 
+// Whether a frame is smoothed with the ones before: the environment asks, the view allows it (not
+// the editor's) and the graphics card can.
+bool temporal_wanted(const Environment& env, bool allowed, bool unsupported) {
+  return env.temporal_antialias && allowed && !unsupported;
+}
+
 }  // namespace
 
 void Renderer::Impl::begin_temporal(const Environment& env, const Camera3D& camera) {
-  temporal.on = env.temporal_antialias;
+  temporal.on = temporal_wanted(env, temporal_allowed, temporal_unsupported);
   send(shader, lit_uniforms.noise_shift, temporal.on ? render_math::noise_shift(temporal.frame) : 0.0f);
   if (!temporal.on) {
     temporal.seen_before = false;  // turned on again, it starts over
+    release_temporal_targets();
+    release_previous_texels();
     return;
   }
   ensure_temporal_targets();
@@ -99,26 +109,78 @@ void Renderer::Impl::mark_particle_cover() {
   rlEnableFramebuffer(drawing_framebuffer());
 }
 
+void Renderer::Impl::mark_see_through_cover(Vec3 viewer) {
+  rlEnableFramebuffer(motion.id);
+  ObjectPass pass{begin_mesh_pass(motion_shader, motion_instance_slot), motion_uniforms.skinned,
+                  render_math::AlphaPass::Cover, render_math::View{}};
+  blend_cover();
+  rlDisableDepthMask();
+  send_motion_frame(viewer);
+  for (const render_math::SeeThroughDraw& draw : see_through) draw_see_through_copies(draw, pass);
+  end_mesh_pass();
+  rlEnableDepthMask();
+  rlColorMask(true, true, true, true);
+  rlSetBlendMode(BLEND_ALPHA);
+  rlEnableFramebuffer(drawing_framebuffer());
+}
+
 // --- The last frame's records and bones ---------------------------------------------------------
 
 // The frame's texels are copied before they change (or, when their texture was made again
 // bigger, after: that frame's motion is then only the camera's).
 void Renderer::Impl::keep_previous_texels() {
   if (previous_texels.rows != texel_texture_rows) remake_previous_texels();
-  copy_color(previous_texels.from, previous_texels.to, render_math::kTexelsPerRow, texel_texture_rows);
+  if (temporal_unsupported) return;
+  copy_buffer(previous_texels.from, previous_texels.to, render_math::kTexelsPerRow, texel_texture_rows, Buffer::Color);
+  rlDisableFramebuffer();
 }
 
 void Renderer::Impl::remake_previous_texels() {
   release_previous_texels();
   previous_texels.texture =
-      rlLoadTexture(nullptr, render_math::kTexelsPerRow, texel_texture_rows, kTexelFormat, kOneLevel);
+      rlLoadTexture(nullptr, render_math::kTexelsPerRow, texel_texture_rows, kTexelFormat, kTexelLevels);
   previous_texels.rows = texel_texture_rows;
   previous_texels.from = rlLoadFramebuffer();
   rlFramebufferAttach(previous_texels.from, texel_texture, RL_ATTACHMENT_COLOR_CHANNEL0, RL_ATTACHMENT_TEXTURE2D, 0);
   previous_texels.to = rlLoadFramebuffer();
   rlFramebufferAttach(previous_texels.to, previous_texels.texture, RL_ATTACHMENT_COLOR_CHANNEL0,
                       RL_ATTACHMENT_TEXTURE2D, 0);
+  const bool copyable = rlFramebufferComplete(previous_texels.from) && rlFramebufferComplete(previous_texels.to);
   rlDisableFramebuffer();
+  if (!copyable) give_up_temporal();
+}
+
+// A card that cannot draw into float textures (OpenGL ES without EXT_color_buffer_float) cannot
+// copy the frame's texels: frames are drawn without the ones before from then on.
+void Renderer::Impl::give_up_temporal() {
+  log::warning("the graphics card cannot copy float textures: drawing without temporal anti-aliasing");
+  temporal_unsupported = true;
+  temporal.on = false;
+  temporal.history_valid = false;
+  release_previous_texels();
+}
+
+void Renderer::Impl::note_fresh_record(const Scene& scene, const GameObject& object, float first_bone,
+                                       std::size_t bones) {
+  const auto slot = static_cast<std::size_t>(object.id);
+  const ObjectHandle owner = scene.handle(object.id);
+  const bool fresh = record_owners[slot] != owner || record_sources[slot].first_bone != first_bone;
+  record_owners[slot] = owner;
+  if (!fresh) return;
+  fresh_texels.emplace_back(render_math::record_texel(scattered_records + slot), render_math::kTexelsPerInstance);
+  if (bones > 0) fresh_texels.emplace_back(static_cast<std::size_t>(first_bone), bones * render_math::kTexelsPerMatrix);
+}
+
+// Fresh records and bones go into the last frame's copy as they are now.
+void Renderer::Impl::carry_fresh_texels() {
+  if (previous_texels.texture == 0) fresh_texels.clear();  // (no copy to carry them into)
+  for (const auto& [first, count] : fresh_texels) {
+    for (const render_math::TexelSpan& span : render_math::texel_spans(first, count)) {
+      const float* values = texels.row(span.first.y) + span.first.x * render_math::kFloatsPerTexel;
+      rlUpdateTexture(previous_texels.texture, span.first.x, span.first.y, span.count, 1, kTexelFormat, values);
+    }
+  }
+  fresh_texels.clear();
 }
 
 // (A framebuffer is let go with its depth alone: their colors are the textures'.)
@@ -150,7 +212,7 @@ void Renderer::Impl::send_temporal_inputs(const RenderTexture2D& before) {
   SetShaderValueTexture(temporal_shader, temporal_uniforms.motion_depth, motion.depth);
   send_matrix(temporal_shader, temporal_uniforms.reprojection,
               inverse_then(temporal.view_projection, temporal.previous_view_projection));
-  const Vector2 texel{1.0f / static_cast<float>(hdr.texture.width), 1.0f / static_cast<float>(hdr.texture.height)};
+  const Vector2 texel{texel_of(hdr.texture.width), texel_of(hdr.texture.height)};
   send(temporal_shader, temporal_uniforms.texel_size, texel);
   send(temporal_shader, temporal_uniforms.history_valid, motion_needed() ? render_math::kOn : render_math::kOff);
 }
