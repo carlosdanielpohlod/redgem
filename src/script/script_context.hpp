@@ -69,6 +69,7 @@ struct ScriptContext {
   // What the game is called (game.json): how a hosted game shows up to others unless named.
   std::string game_title;
   bool quit_requested = false;
+  bool stop_recording_requested = false;  // Game.stop_recording: the video being recorded ends here
   // Called when a script writes a transform, so physics can follow.
   std::function<void(ObjectId, TransformWrite)> on_transform_written;
   // Creates a live copy of an object (Scene.spawn); null outside a running engine.

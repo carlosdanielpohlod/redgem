@@ -87,7 +87,7 @@ void Renderer::Impl::draw_shadow_map(const Camera3D& camera, const Environment& 
 void Renderer::Impl::draw_sun_depth(const Camera3D& camera, Vec3 to_sun, const Environment& env) {
   const Cascades cascades = render_math::fit_cascades(cascade_camera(camera, view_tan_half_fov, view_aspect), to_sun,
                                                       env.shadow_cascades, env.shadow_distance);
-  send(depth_shader, depth_uniforms.time, static_cast<float>(GetTime()));
+  send(depth_shader, depth_uniforms.time, now());
   send(depth_shader, depth_uniforms.view_position, camera.position);
   const double game_near = rlGetCullDistanceNear();
   const double game_far = rlGetCullDistanceFar();

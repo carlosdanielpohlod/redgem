@@ -52,6 +52,11 @@ mrb_value game_quit(mrb_state* mrb, mrb_value) {
   return mrb_nil_value();
 }
 
+mrb_value game_stop_recording(mrb_state* mrb, mrb_value) {
+  context(mrb).stop_recording_requested = true;
+  return mrb_nil_value();
+}
+
 bool has_scene(const ScriptContext& ctx, const std::string& name) { return ctx.scene_exists && ctx.scene_exists(name); }
 
 mrb_value game_load_scene(mrb_state* mrb, mrb_value) {
@@ -87,6 +92,7 @@ void install_debug_bindings(mrb_state* mrb) {
 void install_game_bindings(mrb_state* mrb) {
   RClass* game_module = mrb_define_module(mrb, "Game");
   mrb_define_module_function(mrb, game_module, "quit", game_quit, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, game_module, "stop_recording", game_stop_recording, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, game_module, "load_scene", game_load_scene, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, game_module, "scene_name", game_scene_name, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, game_module, "title", game_title, MRB_ARGS_NONE());

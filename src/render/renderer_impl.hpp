@@ -246,6 +246,8 @@ struct Renderer::Impl {
   bool show_prefabs = false;
   std::uint64_t scene_uploads = 0;  // scenes uploaded so far: what a frame was drawn of
   float motion_blur = 0.0f;         // 0..1 (Camera.motion_blur)
+  std::optional<double> clock;      // seconds (Renderer::set_clock); nothing: the real time
+  float now() const { return static_cast<float>(clock ? *clock : GetTime()); }
   // The frame being drawn.
   std::vector<Transform> worlds;                            // every object's world transform (see prepare_frame)
   std::vector<ObjectSight> sights;                          // by object, for every pass of the frame

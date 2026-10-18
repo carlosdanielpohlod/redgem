@@ -102,7 +102,7 @@ void Renderer::Impl::send_grade(const Environment& env) {
                                                  {shaders::kGrain, env.grain},
                                                  {shaders::kAberration, env.aberration},
                                                  {shaders::kMotionBlur, motion_blur},
-                                                 {shaders::kGradeTime, static_cast<float>(GetTime())}};
+                                                 {shaders::kGradeTime, now()}};
   for (const auto& [name, value] : grade) send(composite_shader, name, value);
 }
 

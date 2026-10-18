@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "app/recording.hpp"
 #include "app/window_presenter.hpp"
 #include "project/game_templates.hpp"
 
@@ -19,6 +20,9 @@ struct CliOptions {
   std::filesystem::path build_dir;               // RunMode::BuildGame
   std::string build_target;        // --target linux|windows|macos|android (empty: the system this runs on)
   std::optional<std::string> gpu;  // --gpu auto|dedicated|integrated (overrides the saved setting)
+  // --record <file> plays the game into a video (with --record-fps, --record-size, --record-scale
+  // and --record-seconds); no file: nothing is recorded.
+  RecordOptions record;
 };
 
 struct CliResult {

@@ -102,6 +102,27 @@ REDGEM_KEYSTORE_PASSWORD='...' ./build/src/redgem build my_game dist/android --t
 - Keep the keystore outside the game's folder. If one is left there anyway, builds leave it out:
   a signing key never travels with a game.
 
+## Recording a video
+
+`redgem <game_dir> --record out.mp4` plays the game into a video. You need
+[ffmpeg](https://ffmpeg.org) on the `PATH`; without it RedGem says so and does not start.
+
+```
+redgem games/arena --record trailer.mp4 --record-fps 30 --record-size 3840x2160 --record-scale 1920x1080 --record-seconds 20
+```
+
+- Each frame moves the game on by exactly 1/`--record-fps` seconds (30 unless given), however
+  long it takes to draw. A scene too heavy to play smoothly still comes out smooth in the video,
+  and so do the wind, film grain and everything else that moves with time.
+- `--record-size` is the size the game is drawn at, off screen (the window's own size unless
+  given). It is not limited by the window or the desktop, and the window shows a fitted copy.
+  `--record-scale` sets the video's size; frames are scaled down to it with lanczos, so drawing
+  at 4K and scaling to 1080p gives very clean edges.
+- Recording ends after `--record-seconds`, when a script calls `Game.stop_recording` (the game
+  keeps running in the window), or when the game quits.
+- Frames are read back from the graphics card a few frames late, so drawing never waits for it.
+  They are encoded as H.264 (`-crf 16`, preset `medium`, `yuv420p`), which plays everywhere.
+
 ## Notes
 
 - The executable needs the `game/` folder next to it.

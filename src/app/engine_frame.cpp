@@ -115,8 +115,8 @@ void Engine::fixed_step(float dt) {
 void Engine::present() {
   const TouchLayout* touch = input_source().touch_layout();
   controls_ = touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>();
-  presenter_->present(
-      {scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur, controls_, images_dir_});
+  presenter_->present({scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur,
+                       controls_, images_dir_, context_.stop_recording_requested});
 }
 
 int Engine::run() {

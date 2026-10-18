@@ -174,3 +174,30 @@ TEST_CASE("the usage text names the scene file and the scripts folder") {
   CHECK(text.find(config::kSceneFileName) != std::string::npos);
   CHECK(text.find(std::string(config::kScriptsDirName) + "/ folder") != std::string::npos);
 }
+
+TEST_CASE("a game recorded to a video from the command line, with what the recording asks for") {
+  const CliResult result = parse_cli({"games/demo", "--record", "out.mp4", "--record-fps", "60", "--record-size",
+                                      "3840x2160", "--record-scale", "1920x1080", "--record-seconds", "2.5"});
+  REQUIRE(result.ok);
+  CHECK(result.options.mode == RunMode::Game);  // recording plays the game
+  const RecordOptions& record = result.options.record;
+  CHECK(record.file == "out.mp4");
+  CHECK(record.fps == 60);
+  CHECK(record.size == FrameSize{3840, 2160});
+  CHECK(record.scale == FrameSize{1920, 1080});
+  REQUIRE(record.seconds);
+  CHECK(*record.seconds == doctest::Approx(2.5));
+  const GameWindowOptions window = developer_play_options(result.options);
+  REQUIRE(window.record);
+  CHECK(window.record->file == "out.mp4");
+  CHECK_FALSE(developer_play_options(parse_cli({"games/demo", "--play"}).options).record);
+}
+
+TEST_CASE("a recording asked for wrongly is refused, saying what it needs") {
+  CHECK_FALSE(parse_cli({"games/demo", "--record"}).ok);
+  CHECK_FALSE(parse_cli({"games/demo", "--record", "out.mp4", "--record-fps", "0"}).ok);
+  CHECK_FALSE(parse_cli({"games/demo", "--record", "out.mp4", "--record-size", "1920"}).ok);
+  CHECK_FALSE(parse_cli({"games/demo", "--record", "out.mp4", "--record-scale", "0x1080"}).ok);
+  CHECK_FALSE(parse_cli({"games/demo", "--record", "out.mp4", "--record-seconds", "-1"}).ok);
+  CHECK(usage().find("--record") != std::string::npos);
+}
