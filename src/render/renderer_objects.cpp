@@ -35,6 +35,11 @@ bool smooths_edges(const render_math::AlphaTest& test) {
   return test.cutoff > render_math::kNoCutoff && !test.dithered && !test.mixed;
 }
 
+// Whether a pass draws for temporal anti-aliasing: into the motion target, with the motion shader.
+bool for_temporal(render_math::AlphaPass pass) {
+  return pass == render_math::AlphaPass::Motion || pass == render_math::AlphaPass::Cover;
+}
+
 }  // namespace
 
 // --- Materials --------------------------------------------------------------------------------
@@ -50,6 +55,8 @@ bool Renderer::Impl::apply_material(int index, render_math::AlphaPass pass) {
   if (pass == render_math::AlphaPass::Shadow) {
     send(depth_shader, depth_uniforms.alpha_cutoff, test.cutoff);
     send(depth_shader, depth_uniforms.wind, test.sway);
+  } else if (for_temporal(pass)) {
+    send_motion_alpha(test, pass == render_math::AlphaPass::Cover);
   } else {
     send_surface(factors);
     cover_edges(smooths_edges(test));
@@ -65,6 +72,15 @@ void Renderer::Impl::send_alpha(const render_math::AlphaTest& test) {
   send(shader, lit_uniforms.alpha_dithered, test.dithered ? kOn : kOff);
   send(shader, lit_uniforms.alpha_mixed, test.mixed ? kOn : kOff);
   send(shader, lit_uniforms.wind, test.sway);
+}
+
+// What of a material the motion pass leaves out, and how it sways: as the lit pass.
+void Renderer::Impl::send_motion_alpha(const render_math::AlphaTest& test, bool covering) {
+  send(motion_shader, motion_uniforms.covering, covering ? kOn : kOff);
+  send(motion_shader, motion_uniforms.alpha_ceiling, test.ceiling);
+  send(motion_shader, motion_uniforms.alpha_cutoff, test.cutoff);
+  send(motion_shader, motion_uniforms.alpha_dithered, test.dithered ? kOn : kOff);
+  send(motion_shader, motion_uniforms.wind, test.sway);
 }
 
 // How a material's surface answers light.

@@ -77,8 +77,12 @@ void Renderer::Impl::begin_particles() {
 }
 
 void Renderer::Impl::draw_particle_run(const render_math::ParticleRun& run) {
-  const Texture2D* picture = particle_batches[run.batch];
   blend_particles(run.glow);
+  draw_particle_picture(run);
+}
+
+void Renderer::Impl::draw_particle_picture(const render_math::ParticleRun& run) {
+  const Texture2D* picture = particle_batches[run.batch];
   send(particle_shader, particle_uniforms.boost, run.glow ? kParticleGlowBoost : kOn);
   send(particle_shader, particle_uniforms.textured, picture != nullptr ? kOn : kOff);
   bind_texture(0, picture != nullptr ? picture->id : rlGetTextureIdDefault());
@@ -101,14 +105,14 @@ unsigned int Renderer::Impl::drawing_framebuffer() const {
 void Renderer::Impl::share_scene_depth() {
   const int width = hdr.texture.width;
   const int height = hdr.texture.height;
-  if (drawing_framebuffer() != hdr.id) copy_depth(drawing_framebuffer(), hdr.id, width, height);
+  if (drawing_framebuffer() != hdr.id) copy_buffer(drawing_framebuffer(), hdr.id, width, height, Buffer::Depth);
   if (particle_layout.any_soft) copy_soft_particle_depth();
   rlEnableFramebuffer(drawing_framebuffer());  // drawing goes on where it was
 }
 
 void Renderer::Impl::copy_soft_particle_depth() {
   ensure_scene_depth_target();
-  copy_depth(hdr.id, scene_depth.id, hdr.texture.width, hdr.texture.height);
+  copy_buffer(hdr.id, scene_depth.id, hdr.texture.width, hdr.texture.height, Buffer::Depth);
 }
 
 }  // namespace redgem

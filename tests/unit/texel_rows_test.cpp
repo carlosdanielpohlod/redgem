@@ -101,3 +101,15 @@ TEST_CASE("a matrix goes in as four texels, one column each, as GLSL builds a ma
   CHECK(translation[3] == 1.0f);
   CHECK(texel(rows, kSecondRowStart)[0] == 1.0f);  // the first column: the x axis
 }
+
+TEST_CASE("texels from anywhere are cut into spans of one row each") {
+  const auto spans = texel_spans(kTexelsPerRow - 2, 5);
+  REQUIRE(spans.size() == 2);
+  CHECK(spans[0].first.x == kTexelsPerRow - 2);
+  CHECK(spans[0].first.y == 0);
+  CHECK(spans[0].count == 2);
+  CHECK(spans[1].first.x == 0);
+  CHECK(spans[1].first.y == 1);
+  CHECK(spans[1].count == 3);
+  CHECK(texel_spans(7, 0).empty());
+}

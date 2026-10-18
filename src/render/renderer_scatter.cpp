@@ -18,6 +18,7 @@ Vec3 copy_tint(const ScatterSet& set, std::size_t copy) {
 void Renderer::Impl::lay_out_scattered(const Scattered& scattered) {
   if (scattered.version() == scatter_version) return;
   scatter_version = scattered.version();
+  temporal.history_valid = false;  // every object's record moves: none would find its last frame's
   scatter_layouts.clear();
   std::size_t next = 0;
   for (const ScatterSet& set : scattered.sets()) next = lay_out_set(set, next);

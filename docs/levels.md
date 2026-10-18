@@ -36,6 +36,7 @@ Environment in the editor, or a Blender empty) sets the mood through its propert
 | `grain`, `aberration` | film grain, and color fringes toward the corners as through a lens (0 turns each off) |
 | `sky_image`, `sky_rotation`, `sky_intensity` | a picture of the sky in the game's `images/` folder, drawn behind everything and lighting the scene (see "A sky picture"), the degrees it is turned around the vertical, and its brightness (1 = as the picture is) |
 | `msaa` | samples per pixel of the scene's picture (2, 4 or 8; 0, the default, is one): smoother edges, and grass and leaves whose cut-out edges are smoothed too |
+| `antialias` | `"temporal"` smooths edges with the frames before (see "Large outdoor scenes"); anything else, the default, smooths them after the picture is drawn |
 | `shadow_cascades`, `shadow_distance` | sun shadows over a large area: 1 to 4 maps, each farther from the camera, reaching `shadow_distance` meters (150 unless given) |
 | `shadow_softness` | how wide the sun is, in degrees: shadows grow softer the farther they fall from what casts them (the real sun is about 0.5; 0, the default, keeps every edge equally soft) |
 | `glow_limit` | the brightest glowing particles together make a pixel, in linear light (2 to 4 suits fire): many flames or sparks over each other come near it and keep their color instead of washing out to white (0, the default, sets no limit) |
@@ -96,6 +97,15 @@ with four than with one. `msaa = 4` smooths edges with four samples a pixel; cut
 (grass, leaves) then let those samples smooth their edges too, which keeps a meadow from
 shimmering as the camera moves. Without it, cut-out edges are smoothed afterwards with the rest of
 the picture.
+
+`antialias = "temporal"` goes further: each frame the view moves by less than a pixel, a different
+amount every frame, and the frames before, followed to where each pixel was then, are mixed into
+this one. Thin grass, leaves and the glints of shiny surfaces stop shimmering, and copies fading
+out by distance turn from a fine pattern into an even shade. What moves is followed, characters'
+bones and swaying foliage included; what is no longer there (a lightning flash, a character
+running past, the camera cutting to another place) is not smeared over the picture; particles
+take less of the frames before. A new scene, a new window size and a camera that jumps start over.
+It works with `msaa` on or off and costs one more pass over the scene's opaque surfaces.
 
 **Animated characters.** glTF skeletons and animations are supported: skinned meshes are deformed on
 the GPU (up to 1024 bones per skeleton, 4 per vertex: a character with fingers has about 65) and every animation in the scene plays in a

@@ -299,6 +299,7 @@ redgem_add_library(redgem_runtime
   render/sky_picture.cpp
   render/renderer_sky.cpp
   render/shadow_cascades.cpp
+  render/temporal.cpp
   render/gl_extras.cpp
   render/mesh_pieces.cpp
   render/texture_loading.cpp
@@ -313,6 +314,7 @@ redgem_add_library(redgem_runtime
   render/renderer_objects.cpp
   render/renderer_see_through.cpp
   render/renderer_scatter.cpp
+  render/renderer_temporal.cpp
   render/renderer_particles.cpp
   render/renderer_particle_glow.cpp
   render/renderer_shadows.cpp

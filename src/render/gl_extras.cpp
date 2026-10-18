@@ -71,6 +71,13 @@ unsigned int depth_texture(int width, int height) {
   return texture;
 }
 
+void copy_buffer(unsigned int from, unsigned int to, int width, int height, Buffer which) {
+  rlBindFramebuffer(RL_READ_FRAMEBUFFER, from);
+  rlBindFramebuffer(RL_DRAW_FRAMEBUFFER, to);
+  const int mask = which == Buffer::Color ? GL_COLOR_BUFFER_BIT : GL_DEPTH_BUFFER_BIT;
+  rlBlitFramebuffer(0, 0, width, height, 0, 0, width, height, mask);
+}
+
 void set_alpha_to_coverage(bool on) {
   if (on) {
     glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);

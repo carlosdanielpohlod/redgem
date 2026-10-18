@@ -1,10 +1,11 @@
-// From the lit picture to the one on screen: ambient occlusion, bloom, tone mapping and
-// anti-aliasing, each a full-screen pass.
+// From the lit picture to the one on screen: the frames before mixed in (temporal anti-aliasing),
+// ambient occlusion, bloom, tone mapping and anti-aliasing (or sharpening), each a full-screen pass.
 
 #include "render/renderer_impl.hpp"
 
 #include <utility>
 
+#include "render/shaders/temporal.hpp"
 #include "render/shaders/uniforms.hpp"
 
 namespace redgem {
@@ -15,10 +16,7 @@ using namespace render_detail;
 // Bloom: what is brighter than the threshold (in linear light) glows.
 constexpr float kBloomThreshold = 1.0f;
 constexpr int kBloomBlurPasses = 3;
-constexpr int kDepthBufferBit = 0x00000100;  // GL_DEPTH_BUFFER_BIT
-
-// One texel of a texture `pixels` wide, in texture coordinates.
-float texel_of(int pixels) { return 1.0f / static_cast<float>(pixels); }
+constexpr float kSharpness = 0.25f;  // how much a picture smoothed with the frames before is sharpened
 
 Vector2 size_of(const RenderTexture2D& target) {
   return {static_cast<float>(target.texture.width), static_cast<float>(target.texture.height)};
@@ -35,12 +33,6 @@ void apply_effect(const RenderTexture2D& target, const Shader& effect, const Ren
 
 }  // namespace
 
-void render_detail::copy_depth(unsigned int from, unsigned int to, int width, int height) {
-  rlBindFramebuffer(RL_READ_FRAMEBUFFER, from);
-  rlBindFramebuffer(RL_DRAW_FRAMEBUFFER, to);
-  rlBlitFramebuffer(0, 0, width, height, 0, 0, width, height, kDepthBufferBit);
-}
-
 void render_detail::draw_full(const RenderTexture2D& source, int width, int height) {
   const Rectangle from{0.0f, 0.0f, static_cast<float>(source.texture.width),
                        -static_cast<float>(source.texture.height)};
@@ -51,6 +43,7 @@ void render_detail::draw_full(const RenderTexture2D& source, int width, int heig
 void Renderer::Impl::post_process(const Environment& env, const RenderTexture2D* output) {
   rlDrawRenderBatchActive();
   rlDisableColorBlend();  // these passes replace pixels (alpha carries data, not transparency)
+  if (temporal.on) resolve_temporal();
   if (env.ambient_occlusion > 0.0f) draw_occlusion();
   draw_bloom();
   tone_map(env);
@@ -74,7 +67,7 @@ void Renderer::Impl::draw_occlusion() {
 // The bright parts of the picture, at a fraction of its size, blurred until they glow.
 void Renderer::Impl::draw_bloom() {
   send(bright_shader, shaders::kThreshold, kBloomThreshold);
-  apply_effect(bloom_a, bright_shader, hdr);
+  apply_effect(bloom_a, bright_shader, lit_picture());
   for (int i = 0; i < kBloomBlurPasses; ++i) blur(bloom_a, bloom_b);
 }
 
@@ -95,7 +88,7 @@ void Renderer::Impl::tone_map(const Environment& env) {
   send(composite_shader, shaders::kOcclusionAmount, env.ambient_occlusion);
   SetShaderValueTexture(composite_shader, GetShaderLocation(composite_shader, shaders::kOcclusionTexture),
                         occlusion_a.texture);
-  draw_full(hdr, hdr.texture.width, hdr.texture.height);
+  draw_full(lit_picture(), hdr.texture.width, hdr.texture.height);
   EndShaderMode();
   EndTextureMode();
 }
@@ -113,13 +106,13 @@ void Renderer::Impl::send_grade(const Environment& env) {
   for (const auto& [name, value] : grade) send(composite_shader, name, value);
 }
 
-// Smooths the edges of the tone mapped picture into `output` (the screen when null).
+// Smooths the edges of the tone mapped picture into `output` (the screen when null); smoothed with
+// the frames before, it is sharpened a little instead.
 void Renderer::Impl::antialias(const RenderTexture2D* output) {
   const int width = hdr.texture.width;
   const int height = hdr.texture.height;
   if (output != nullptr) BeginTextureMode(*output);
-  BeginShaderMode(antialias_shader);
-  send(antialias_shader, shaders::kTexelSize, Vector2{texel_of(width), texel_of(height)});
+  begin_finish(width, height);
   draw_full(ldr, width, height);
   EndShaderMode();
   if (output == nullptr) {
@@ -130,9 +123,17 @@ void Renderer::Impl::antialias(const RenderTexture2D* output) {
   copy_depth_to(*output);
 }
 
+const Shader& Renderer::Impl::begin_finish(int width, int height) {
+  const Shader& finish = temporal.on ? sharpen_shader : antialias_shader;
+  BeginShaderMode(finish);
+  send(finish, shaders::kTexelSize, Vector2{texel_of(width), texel_of(height)});
+  send(finish, shaders::kSharpness, kSharpness);
+  return finish;
+}
+
 // The scene's depth goes along, so overlays drawn into `output` afterwards are occluded by it.
 void Renderer::Impl::copy_depth_to(const RenderTexture2D& output) {
-  copy_depth(hdr.id, output.id, hdr.texture.width, hdr.texture.height);
+  copy_buffer(hdr.id, output.id, hdr.texture.width, hdr.texture.height, Buffer::Depth);
   rlDisableFramebuffer();
 }
 

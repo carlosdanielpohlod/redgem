@@ -7,11 +7,13 @@
 #include "render/shaders/bloom.hpp"
 #include "render/shaders/lit_fragment.hpp"
 #include "render/shaders/lit_vertex.hpp"
+#include "render/shaders/motion.hpp"
 #include "render/shaders/panorama.hpp"
 #include "render/shaders/particle.hpp"
 #include "render/shaders/particle_glow.hpp"
 #include "render/shaders/shadow_depth.hpp"
 #include "render/shaders/sky.hpp"
+#include "render/shaders/temporal.hpp"
 #include "render/shaders/tone_mapping.hpp"
 
 namespace redgem {
@@ -45,6 +47,9 @@ void Renderer::Impl::load_pipeline() {
   depth_uniforms = find_depth_uniforms(depth_shader);
   depth_instance_slot = find_instance_slot(depth_shader);
   particle_uniforms = find_particle_uniforms(particle_shader);
+  motion_uniforms = find_motion_uniforms(motion_shader);
+  motion_instance_slot = find_instance_slot(motion_shader);
+  temporal_uniforms = find_temporal_uniforms(temporal_shader);
   filter_cube_maps_across_seams();
   particle_buffer = load_particle_buffer(particle_uniforms.look);
   load_fixed_targets();
@@ -53,7 +58,10 @@ void Renderer::Impl::load_pipeline() {
 }
 
 void Renderer::Impl::compile_shaders() {
-  depth_shader = compile_shader(shaders::kLitVertex, shaders::depth_fragment().c_str(), "shadow depth");
+  depth_shader = compile_shader(shaders::lit_vertex().c_str(), shaders::depth_fragment().c_str(), "shadow depth");
+  motion_shader = compile_shader(shaders::motion_vertex().c_str(), shaders::motion_fragment().c_str(), "motion");
+  temporal_shader = compile_shader(nullptr, shaders::kTemporalFragment, "temporal anti-aliasing");
+  sharpen_shader = compile_shader(nullptr, shaders::kSharpenFragment, "sharpening");
   sky_shader = compile_shader(shaders::kSkyVertex, shaders::kSkyFragment, "sky");
   particle_shader = compile_shader(shaders::kParticleVertex, shaders::kParticleFragment, "particles");
   glow_limit_shader = compile_shader(nullptr, shaders::kGlowLimitFragment, "glow limit");
@@ -67,7 +75,7 @@ void Renderer::Impl::compile_shaders() {
 
 void Renderer::Impl::compile_lit(const shaders::LitFeatures& features) {
   if (loaded(shader)) UnloadShader(shader);
-  shader = compile_shader(shaders::kLitVertex, shaders::lit_fragment(features).c_str(), "lit");
+  shader = compile_shader(shaders::lit_vertex().c_str(), shaders::lit_fragment(features).c_str(), "lit");
   lit_uniforms = find_lit_uniforms(shader);
   lit_instance_slot = find_instance_slot(shader);
   // A cube map's sampler must never share a slot with a picture's, even unused: given its own.
@@ -93,6 +101,7 @@ void Renderer::Impl::release() {
   if (texel_texture != 0) rlUnloadTexture(texel_texture);
   texel_texture = 0;
   release_slots(slots);
+  release_previous_texels();
   release_particle_buffer(particle_buffer);
   release_assets();
   release_targets();
@@ -114,7 +123,8 @@ void Renderer::Impl::release_sky() {
 
 void Renderer::Impl::release_shaders() {
   for (Shader* program : {&shader, &depth_shader, &panorama_shader, &occlusion_shader, &sky_shader, &particle_shader,
-                          &glow_limit_shader, &bright_shader, &blur_shader, &composite_shader, &antialias_shader}) {
+                          &glow_limit_shader, &bright_shader, &blur_shader, &composite_shader, &antialias_shader,
+                          &motion_shader, &temporal_shader, &sharpen_shader}) {
     if (loaded(*program)) UnloadShader(*program);
     *program = Shader{};
   }

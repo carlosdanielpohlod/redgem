@@ -5,7 +5,9 @@
 #include <utility>
 
 #include "render/shader_source.hpp"
+#include "render/shaders/motion.hpp"
 #include "render/shaders/particle.hpp"
+#include "render/shaders/temporal.hpp"
 #include "render/shaders/uniforms.hpp"
 
 namespace redgem::render_detail {
@@ -38,6 +40,7 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::alpha_to_coverage, shaders::kAlphaToCoverage},
     {&LitUniforms::alpha_ceiling, shaders::kAlphaCeiling},
     {&LitUniforms::alpha_dithered, shaders::kAlphaDithered},
+    {&LitUniforms::noise_shift, shaders::kNoiseShift},
     {&LitUniforms::alpha_mixed, shaders::kAlphaMixed},
     {&LitUniforms::skinned, shaders::kSkinned},
     {&LitUniforms::wind, shaders::kWindAmount},
@@ -94,6 +97,24 @@ constexpr ParticleUniform kParticleUniforms[] = {
     {&ParticleUniforms::point_ranges, shaders::kPointLightRanges},
 };
 
+// The motion pass's uniforms, and where each one's location is kept.
+constexpr std::pair<int MotionUniforms::*, const char*> kMotionUniforms[] = {
+    {&MotionUniforms::alpha_cutoff, shaders::kAlphaCutoff},
+    {&MotionUniforms::alpha_ceiling, shaders::kAlphaCeiling},
+    {&MotionUniforms::covering, shaders::kCovering},
+    {&MotionUniforms::alpha_dithered, shaders::kAlphaDithered},
+    {&MotionUniforms::wind, shaders::kWindAmount},
+    {&MotionUniforms::skinned, shaders::kSkinned},
+    {&MotionUniforms::noise_shift, shaders::kNoiseShift},
+    {&MotionUniforms::view_position, shaders::kViewPosition},
+    {&MotionUniforms::time, shaders::kTime},
+    {&MotionUniforms::previous_time, shaders::kPreviousTime},
+    {&MotionUniforms::frame_texels, shaders::kFrameTexels},
+    {&MotionUniforms::previous_texels, shaders::kPreviousTexels},
+    {&MotionUniforms::view_projection, shaders::kViewProjection},
+    {&MotionUniforms::previous_view_projection, shaders::kPreviousViewProjection},
+};
+
 }  // namespace
 
 Shader compile_shader(const char* vertex, const char* fragment, const char* name) {
@@ -120,6 +141,23 @@ DepthUniforms find_depth_uniforms(const Shader& depth) {
   found.time = GetShaderLocation(depth, shaders::kTime);
   found.skinned = GetShaderLocation(depth, shaders::kSkinned);
   found.frame_texels = GetShaderLocation(depth, shaders::kFrameTexels);
+  return found;
+}
+
+MotionUniforms find_motion_uniforms(const Shader& motion) {
+  MotionUniforms found;
+  for (const auto& [location, name] : kMotionUniforms) found.*location = GetShaderLocation(motion, name);
+  return found;
+}
+
+TemporalUniforms find_temporal_uniforms(const Shader& temporal) {
+  TemporalUniforms found;
+  found.history = GetShaderLocation(temporal, shaders::kHistoryTexture);
+  found.motion = GetShaderLocation(temporal, shaders::kMotionTexture);
+  found.motion_depth = GetShaderLocation(temporal, shaders::kMotionDepth);
+  found.reprojection = GetShaderLocation(temporal, shaders::kReprojection);
+  found.texel_size = GetShaderLocation(temporal, shaders::kTexelSize);
+  found.history_valid = GetShaderLocation(temporal, shaders::kHistoryValid);
   return found;
 }
 

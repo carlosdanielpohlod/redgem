@@ -1,0 +1,284 @@
+// System test: edges smoothed with the frames before (antialias = "temporal"), drawn in a real
+// window: the fine pattern of copies fading out turns into an even shade, and what moves (or
+// jumps) leaves no trail behind.
+#include <doctest/doctest.h>
+
+#include <algorithm>
+#include <cstdlib>
+#include <string>
+
+#include "render_system/render_stage.hpp"
+#include "scene/shapes/primitives.hpp"
+
+using namespace redgem;
+using redgem::test::Picture;
+using redgem::test::RenderStage;
+
+namespace {
+
+constexpr Vec3 kCameraAt{0.0f, 0.0f, 10.0f};
+constexpr int kSettleFrames = 16;  // the frames before have settled by then
+constexpr int kFadeCopies = 40;
+constexpr float kFadeEnd = 12.0f;     // meters from the camera the copies are drawn to
+constexpr float kFade = 6.0f;         // meters they fade over before that
+constexpr float kRowDistance = 9.0f;  // meters from the camera: half faded
+constexpr float kRowSpacing = 0.3f;
+// The even shade's pixel to pixel change for its light, at most, of the pattern's.
+constexpr float kSmoother = 0.5f;
+// The light it keeps of the pattern's, at least. (It keeps more: the frames are mixed in linear
+// light, before the picture's tone is mapped, as the light of the pixels' parts would add up.)
+constexpr float kKeptLeast = 0.8f;
+constexpr float kLeft = -2.0f;    // meters across, where the cube starts
+constexpr float kRight = 2.0f;    // and where it jumps to
+constexpr float kStride = 0.25f;  // meters it moves a frame, moving on
+constexpr int kMovingFrames = 8;
+constexpr int kTrace = 24;        // a pixel this green still shows the cube
+constexpr int kLooseColumns = 2;  // columns a moving cube may cover beyond its own width
+constexpr double kSamples = 4.0;
+constexpr const char* kBlack = "#000000";
+constexpr float kGlow = 2.0f;  // how many times its color the cube shines
+
+// Grass: cards of thin cut-out blades swaying in the wind, a camera passing over them.
+constexpr int kBladesSide = 32;  // texels of the blades' picture
+constexpr int kBladeWidth = 3;   // texels: about a pixel and a half, seen from the camera
+constexpr int kBladeEvery = 8;   // a blade every this many texels across
+constexpr float kBladeCutoff = 0.5f;
+constexpr int kCardsAcross = 15;
+constexpr int kCardsDeep = 3;
+constexpr float kCardSpacing = 0.6f;  // meters
+constexpr float kCardSize = 0.4f;
+constexpr float kPlaneSide = 10.0f;     // meters across the plane a card is made from
+constexpr float kFieldDistance = 6.0f;  // meters from the camera to the field's middle
+constexpr Vec3 kFieldCamera{0.0f, 0.8f, 6.0f};
+constexpr float kPass = 0.6f;  // meters the camera moves across, over kPassFrames
+constexpr int kPassFrames = 12;
+constexpr double kWindy = 1.0;
+// Smoothed with the frames before while the camera moves, the grass is no farther from how it
+// settles with the camera still than this share of how far one sample a pixel is from that: it
+// smears no detail away.
+constexpr float kNoFartherThanAliased = 1.25f;
+
+// How green a pixel is over the others.
+int greenness(::Color c) { return std::max(static_cast<int>(c.g) - std::max(c.r, c.b), 0); }
+bool green(::Color c) { return greenness(c) > kTrace; }
+
+// The change from each pixel to the next across, summed.
+float roughness(const Picture& picture) {
+  float total = 0.0f;
+  for (std::size_t i = 0; i + 1 < picture.pixels.size(); ++i) {
+    total += static_cast<float>(std::abs(greenness(picture.pixels[i]) - greenness(picture.pixels[i + 1])));
+  }
+  return total;
+}
+
+float total_greenness(const Picture& picture) {
+  float total = 0.0f;
+  for (const ::Color c : picture.pixels) total += static_cast<float>(greenness(c));
+  return total;
+}
+
+// How many columns of the picture have a green pixel.
+int green_columns(const Picture& picture) {
+  int columns = 0;
+  for (int x = 0; x < picture.width; ++x) {
+    bool found = false;
+    for (int y = 0; y < picture.height && !found; ++y) {
+      found = green(picture.pixels[static_cast<std::size_t>(y * picture.width + x)]);
+    }
+    columns += found ? 1 : 0;
+  }
+  return columns;
+}
+
+// A night with nothing in it but what glows: no sky, fog, bloom or grade to tell apart from a trail.
+NodeDesc dark_environment(PropertyMap props) {
+  NodeDesc node;
+  node.name = "Environment";
+  node.props = std::move(props);
+  for (const char* color : {"sky_top", "sky_horizon", "ground_color", "fog_color"})
+    node.props[color] = std::string(kBlack);
+  for (const char* off : {"fog_density", "ambient", "bloom", "vignette", "sun_glow", "grain", "ambient_occlusion"}) {
+    node.props[off] = 0.0;
+  }
+  node.props["environment"] = true;
+  return node;
+}
+
+PropertyMap temporal(PropertyMap props = {}) {
+  props["antialias"] = std::string("temporal");
+  return props;
+}
+
+// A row of glowing cubes across the view, half faded: a fine pattern of their pixels is left out.
+Scene fading_row(RenderStage& stage, PropertyMap environment) {
+  SceneDesc desc;
+  desc.materials = {test::glowing_material(redgem::Color{0.0f, 1.0f, 0.0f, 1.0f}, kGlow)};
+  desc.meshes = {test::cube_mesh(0)};
+  desc.nodes = {test::camera_at(kCameraAt), dark_environment(std::move(environment))};
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  ScatterSet set;
+  set.mesh = 0;
+  set.visible_to = kFadeEnd;
+  set.fade = kFade;
+  for (int i = 0; i < kFadeCopies; ++i) {
+    const float x = (static_cast<float>(i) - static_cast<float>(kFadeCopies) * kHalf) * kRowSpacing;
+    set.places.push_back(redgem::Transform{{x, 0.0f, kCameraAt.z - kRowDistance}, {}, Vec3::one() * kRowSpacing});
+  }
+  scene.scattered().add(set);
+  return scene;
+}
+
+// One glowing cube, kLeft across.
+SceneDesc glowing_cube(PropertyMap environment) {
+  SceneDesc desc;
+  desc.materials = {test::glowing_material(redgem::Color{0.0f, 1.0f, 0.0f, 1.0f}, kGlow)};
+  desc.meshes = {test::cube_mesh(0)};
+  NodeDesc cube;
+  cube.name = "Cube";
+  cube.mesh = 0;
+  cube.local.position = {kLeft, 0.0f, 0.0f};
+  desc.nodes = {test::camera_at(kCameraAt), cube, dark_environment(std::move(environment))};
+  return desc;
+}
+
+Picture settle(RenderStage& stage, const Scene& scene, const std::string& name) {
+  for (int frame = 1; frame < kSettleFrames; ++frame) stage.draw(scene, name);
+  return stage.draw(scene, name);
+}
+
+// How many pixels of the left half of the picture are green.
+std::size_t green_on_the_left(const Picture& picture) {
+  std::size_t count = 0;
+  for (std::size_t i = 0; i < picture.pixels.size(); ++i) {
+    const bool left = static_cast<int>(i % static_cast<std::size_t>(picture.width)) < picture.width / 2;
+    if (left && green(picture.pixels[i])) ++count;
+  }
+  return count;
+}
+
+// A picture of thin green blades on nothing, as a PNG.
+ImageData blades_picture() {
+  Image image = GenImageColor(kBladesSide, kBladesSide, ::Color{0, 0, 0, 0});
+  for (int x = 0; x < kBladesSide; x += kBladeEvery) {
+    ImageDrawRectangle(&image, x, 0, kBladeWidth, kBladesSide, ::Color{60, 200, 40, 255});
+  }
+  int size = 0;
+  unsigned char* png = ExportImageToMemory(image, ".png", &size);
+  ImageData data{std::vector<std::uint8_t>(png, png + size), ".png"};
+  MemFree(png);
+  UnloadImage(image);
+  return data;
+}
+
+SceneDesc grass_field(PropertyMap environment) {
+  SceneDesc desc;
+  desc.images = {blades_picture()};
+  MaterialDesc blades;
+  blades.base_color_image = 0;
+  blades.alpha_mode = AlphaMode::Mask;
+  blades.alpha_cutoff = kBladeCutoff;
+  desc.materials = {blades};
+  desc.meshes = {test::cube_mesh(0)};
+  desc.meshes[0].primitives[0] = make_primitive(PrimitiveShape::Plane);
+  desc.meshes[0].primitives[0].material = 0;
+  environment["wind"] = kWindy;
+  environment["ambient"] = 1.0;
+  desc.nodes = {test::camera_at(kFieldCamera), dark_environment(std::move(environment))};
+  desc.nodes[1].props["ambient"] = 1.0;
+  return desc;
+}
+
+// The field's cards, standing up across the view.
+ScatterSet grass_cards() {
+  ScatterSet set;
+  set.mesh = 0;
+  const Quat standing = quat_from_axis_angle(Vec3{1.0f, 0.0f, 0.0f}, kPi * kHalf);
+  for (int row = 0; row < kCardsDeep; ++row) {
+    for (int column = 0; column < kCardsAcross; ++column) {
+      const float x = (static_cast<float>(column) - static_cast<float>(kCardsAcross) * kHalf) * kCardSpacing;
+      const float z = kFieldCamera.z - kFieldDistance + (static_cast<float>(row) - kCardsDeep * kHalf) * kCardSpacing;
+      set.places.push_back(redgem::Transform{{x, 0.0f, z}, standing, Vec3::one() * (kCardSize / kPlaneSide)});
+    }
+  }
+  return set;
+}
+
+// The field as the camera sees it at the end of its pass, with `environment`, after `pass_frames`
+// frames on its way there, `pass` meters across.
+Picture over_the_grass(RenderStage& stage, PropertyMap environment, float pass, int pass_frames,
+                       const std::string& name) {
+  const SceneDesc desc = grass_field(std::move(environment));
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  scene.scattered().add(grass_cards());
+  const ObjectId camera = scene.find("Camera");
+  Picture picture;
+  for (int frame = pass_frames; frame >= 0; --frame) {
+    const float step = pass * static_cast<float>(frame) / static_cast<float>(kPassFrames);
+    scene.set_world_position(camera, kFieldCamera - Vec3{step, 0.0f, 0.0f});
+    picture = stage.draw(scene, name);
+  }
+  return picture;
+}
+
+// How far one picture is from another: their channels' differences, summed.
+float distance_between(const Picture& a, const Picture& b) {
+  float total = 0.0f;
+  for (std::size_t i = 0; i < a.pixels.size(); ++i) {
+    total += static_cast<float>(std::abs(a.pixels[i].r - b.pixels[i].r) + std::abs(a.pixels[i].g - b.pixels[i].g) +
+                                std::abs(a.pixels[i].b - b.pixels[i].b));
+  }
+  return total;
+}
+
+}  // namespace
+
+TEST_CASE("smoothed with the frames before, the pattern of copies fading out turns into an even shade") {
+  RenderStage stage;
+  const Picture pattern = stage.draw(fading_row(stage, {}), "temporal_fade_pattern");
+  const Picture shade = settle(stage, fading_row(stage, temporal()), "temporal_fade_shade");
+  REQUIRE(total_greenness(pattern) > 0.0f);
+  REQUIRE(total_greenness(shade) > 0.0f);
+  const float pattern_light = total_greenness(pattern);
+  const float shade_light = total_greenness(shade);
+  CHECK(roughness(shade) / shade_light < roughness(pattern) / pattern_light * kSmoother);
+  CHECK(shade_light > pattern_light * kKeptLeast);
+}
+
+TEST_CASE("smoothed with the frames before, a cube that jumps or moves leaves no trail, with or without msaa") {
+  for (const double samples : {0.0, kSamples}) {
+    RenderStage stage;
+    const SceneDesc desc = glowing_cube(temporal({{"msaa", samples}}));
+    stage.upload(desc);
+    Scene scene = Scene::from_desc(desc);
+    const ObjectId cube = scene.find("Cube");
+    const int still_width = green_columns(settle(stage, scene, "temporal_cube_still"));
+    REQUIRE(still_width > 0);
+    scene.set_world_position(cube, {kRight, 0.0f, 0.0f});
+    const Picture jumped = stage.draw(scene, "temporal_cube_jumped");
+    CHECK(green_on_the_left(jumped) == 0);
+    CHECK(green_columns(jumped) <= still_width + kLooseColumns);
+    Picture moving = jumped;
+    for (int frame = 1; frame <= kMovingFrames; ++frame) {
+      scene.set_world_position(cube, {kRight - kStride * static_cast<float>(frame), 0.0f, 0.0f});
+      moving = stage.draw(scene, "temporal_cube_moving");
+    }
+    CHECK(green_columns(moving) <= still_width + kLooseColumns);
+  }
+}
+
+TEST_CASE("smoothed with the frames before, swaying grass passed over looks as it does with the camera still") {
+  RenderStage stage;
+  const Picture passing = over_the_grass(stage, temporal(), kPass, kPassFrames, "temporal_grass_passing");
+  // Right after (the wind has hardly moved): the same view, settled with the camera still, and
+  // with one sample a pixel.
+  const Picture still = over_the_grass(stage, temporal(), 0.0f, kPassFrames, "temporal_grass_still");
+  const Picture aliased = over_the_grass(stage, {}, 0.0f, 0, "temporal_grass_aliased");
+  const float passing_error = distance_between(passing, still);
+  const float aliased_error = distance_between(aliased, still);
+  MESSAGE("passing " << passing_error << ", aliased " << aliased_error);
+  REQUIRE(aliased_error > 0.0f);
+  CHECK(passing_error < aliased_error * kNoFartherThanAliased);
+  CHECK(total_greenness(passing) > total_greenness(aliased) * kKeptLeast);  // no blade fades away
+}

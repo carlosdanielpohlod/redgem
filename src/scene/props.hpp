@@ -85,6 +85,10 @@ inline constexpr const char* kMsaa = "msaa";  // samples per pixel of the scene'
 inline constexpr const char* kShadowCascades = "shadow_cascades";
 inline constexpr const char* kShadowDistance = "shadow_distance";  // meters
 inline constexpr const char* kShadowSoftness = "shadow_softness";  // degrees across the sun
+// How edges are smoothed: kTemporalAntialias, or after the picture is drawn (anything else).
+inline constexpr const char* kAntialias = "antialias";
+inline constexpr const char* kTemporalAntialias =
+    "temporal";  // with the frames before (Environment::temporal_antialias)
 // The brightest glowing particles together make a pixel (see Environment::glow_limit).
 inline constexpr const char* kGlowLimit = "glow_limit";
 }  // namespace environment

@@ -16,6 +16,7 @@
 //   renderer_scatter.cpp      copies scattered in great numbers
 //   renderer_particles.cpp    particles
 //   renderer_particle_glow.cpp glowing particles held to the environment's limit
+//   renderer_temporal.cpp     edges smoothed with the frames before (temporal anti-aliasing)
 //   renderer_shadows.cpp      the sun's shadow map
 //   renderer_reflections.cpp  the surroundings, for reflections
 //   renderer_post.cpp         from the lit picture to the one on screen
@@ -50,6 +51,7 @@
 #include "render/shaders/lit_fragment.hpp"
 #include "render/shadow_cascades.hpp"
 #include "render/sky_harmonics.hpp"
+#include "render/temporal.hpp"
 #include "render/texel_rows.hpp"
 #include "render/visibility.hpp"
 #include "scene/scene_config.hpp"
@@ -67,7 +69,8 @@ inline constexpr int kShadowTextureSlot = 10;
 inline constexpr int kFrameTexelSlot = 11;
 inline constexpr int kSkyReflectionSlot = 12;
 inline constexpr int kSkyReflectanceSlot = 13;
-inline constexpr int kSceneDepthSlot = 14;  // what soft particles fade into
+inline constexpr int kSceneDepthSlot = 14;     // what soft particles fade into
+inline constexpr int kPreviousTexelSlot = 15;  // the last frame's records and bones (temporal anti-aliasing)
 
 // raylib numbers what is on the graphics card; zero is what was never loaded (or is released).
 inline bool loaded(const Texture2D& texture) { return texture.id != 0; }
@@ -136,9 +139,33 @@ struct SkyTextures {
   render_math::SkyHarmonics irradiance{};
 };
 
-// Copies the depth of framebuffer `from` into `to`, both `width` x `height` (several samples a
-// pixel are resolved). The framebuffers stay bound.
-void copy_depth(unsigned int from, unsigned int to, int width, int height);
+inline constexpr std::size_t kHistories = 2;  // the mixed frames: this one's, and the last one's
+
+// Temporal anti-aliasing's state from frame to frame (see temporal.hpp).
+struct TemporalState {
+  bool on = false;             // this frame is mixed with the ones before
+  bool history_valid = false;  // ... and they can be used
+  bool seen_before = false;    // `view` is the last frame's: it was mixed too
+  std::uint64_t frame = 0;     // frames mixed so far: the jitter's phase
+  std::size_t latest = 0;      // which of the histories holds the newest mix
+  render_math::TemporalView view;
+  Matrix view_projection{};           // this frame's camera, without the jitter
+  Matrix previous_view_projection{};  // the last frame's
+  float time = 0.0f;                  // the wind's clock, this frame and the last
+  float previous_time = 0.0f;
+};
+
+// The last frame's records and bones, kept on the graphics card for the motion pass, and the
+// framebuffers they are copied through.
+struct PreviousTexels {
+  unsigned int texture = 0;
+  int rows = 0;
+  unsigned int from = 0;  // a framebuffer of the frame's texels
+  unsigned int to = 0;    // one of `texture`
+};
+
+// One texel of a texture `pixels` wide, in texture coordinates.
+inline float texel_of(int pixels) { return 1.0f / static_cast<float>(pixels); }
 // Draws `source` over the whole current target (render textures are stored upside down).
 void draw_full(const RenderTexture2D& source, int width, int height);
 
@@ -167,6 +194,12 @@ struct Renderer::Impl {
   Shader blur_shader{};
   Shader composite_shader{};
   Shader antialias_shader{};
+  Shader motion_shader{};  // temporal anti-aliasing: where things were, mixing the frames, sharpening
+  render_detail::MotionUniforms motion_uniforms;
+  int motion_instance_slot = render_detail::kNoLocation;
+  Shader temporal_shader{};
+  render_detail::TemporalUniforms temporal_uniforms;
+  Shader sharpen_shader{};
   // Targets whose size does not follow the window.
   RenderTexture2D shadow{};           // depth of the scene seen from the sun (no color)
   RenderTexture2D reflection_face{};  // one 90-degree view of the surroundings
@@ -186,6 +219,11 @@ struct Renderer::Impl {
   // Glowing particles gathered apart, to be added within the environment's limit: made when first
   // needed, on the lit picture's own depth.
   RenderTexture2D glow{};
+  // Temporal anti-aliasing's, made when a scene first asks for it: where each pixel was the frame
+  // before (with the depth of the surfaces it was drawn for), and the mixed frames, this one's and
+  // the last one's in turn.
+  RenderTexture2D motion{};
+  std::array<RenderTexture2D, render_detail::kHistories> histories{};
   // The scene's assets.
   std::vector<Texture2D> textures;
   std::vector<Material> materials;
@@ -206,7 +244,8 @@ struct Renderer::Impl {
   std::unordered_map<std::string, Texture2D> ui_images;  // by name; id 0 = looked for and not found
   // What the game asked for.
   bool show_prefabs = false;
-  float motion_blur = 0.0f;  // 0..1 (Camera.motion_blur)
+  std::uint64_t scene_uploads = 0;  // scenes uploaded so far: what a frame was drawn of
+  float motion_blur = 0.0f;         // 0..1 (Camera.motion_blur)
   // The frame being drawn.
   std::vector<Transform> worlds;                            // every object's world transform (see prepare_frame)
   std::vector<ObjectSight> sights;                          // by object, for every pass of the frame
@@ -214,6 +253,15 @@ struct Renderer::Impl {
   render_math::TexelRows texels;  // what the vertex shader reads of the frame, and its texture
   std::vector<render_math::RowRun> changed_rows;
   unsigned int texel_texture = 0;
+  int texel_texture_rows = 0;
+  render_detail::PreviousTexels previous_texels;
+  // Records and bones that were another object's (or nobody's) the frame before: the last frame's
+  // copy of them is this frame's, so that they show no motion they did not make. By texel ranges.
+  std::vector<std::pair<std::size_t, std::size_t>> fresh_texels;
+  std::vector<ObjectHandle> record_owners;  // by object slot: whose record it held last frame
+  bool temporal_allowed = true;             // Renderer::allow_temporal_antialias
+  bool temporal_unsupported = false;        // the card cannot copy the frame's float texels
+  render_detail::TemporalState temporal;
   render_math::InstanceBatches batches;                     // what the pass being drawn sees, in runs of a mesh
   render_detail::SlotBuffer slots;                          // the record numbers of what the frame's passes see
   std::uint64_t scatter_version = 0;                        // of the scattered copies laid out (see Scattered)
@@ -265,6 +313,7 @@ struct Renderer::Impl {
   void resolve_samples();
   void ensure_glow_target();
   void ensure_scene_depth_target();
+  void ensure_temporal_targets();
   void release_targets();
   void release_fixed_targets();
 
@@ -298,8 +347,13 @@ struct Renderer::Impl {
   void prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect);
   // The scene as the camera sees it, into the HDR target.
   void draw_lit_scene(const Camera3D& camera, const ParticleSystem* particles);
-  // The objects, opaque then see-through; `sampled`: into the picture of several samples a pixel.
-  void draw_surfaces(const Camera3D& camera, bool sampled);
+  // What the environment asks of the frame's shaders: the sky picture, the lit shader's features,
+  // smoothing with the frames before.
+  void use_environment(const Environment& env, const Camera3D& camera);
+  // The opaque surfaces (with several samples a pixel when `sampled`), where they moved from, and
+  // the see-through ones.
+  void draw_surfaces(Vec3 viewer, bool sampled);
+  void draw_scene_particles(const ParticleSystem* particles, const Camera3D& camera);
   // Binds a texture `program` reads all frame long to a slot of its own.
   void bind_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture);
   void bind_cube_for_the_frame(const Shader& program, int sampler_location, int slot, unsigned int texture);
@@ -357,6 +411,7 @@ struct Renderer::Impl {
   void send_surface(const MaterialDesc& factors);
   void cover_edges(bool cut_out);
   void send_alpha(const render_math::AlphaTest& test);
+  void send_motion_alpha(const render_math::AlphaTest& test, bool covering);
   // Draws what the current 3D view can see, copies of a mesh that come together in one call per
   // part. `viewer` is the game camera in both passes: detail is judged by how big things look to
   // the player, not to the sun. Returns where the pass's record numbers start in `slots`.
@@ -403,6 +458,8 @@ struct Renderer::Impl {
   void begin_particles();
   void draw_particle_runs(bool glowing);
   void draw_particle_run(const render_math::ParticleRun& run);
+  // A run's picture and look, drawn as the blending set says.
+  void draw_particle_picture(const render_math::ParticleRun& run);
   void end_particles();
   // Glowing particles, when the environment limits them, are gathered apart (into `glow`) and added
   // to the picture within that limit once every particle is drawn.
@@ -418,6 +475,40 @@ struct Renderer::Impl {
   void copy_soft_particle_depth();
   // The light lit particles take: the sun, the sky and the nearest point lights.
   void send_particle_lights(Vector3 sun_color, const Environment& env, const render_math::PointLightUniforms& points);
+
+  // --- Temporal anti-aliasing (renderer_temporal.cpp) -------------------------------------------
+
+  // Whether the environment asks for it, and whether the frames before can be used (see
+  // temporal.hpp); the shift of this frame's fine patterns.
+  void begin_temporal(const Environment& env, const Camera3D& camera);
+  render_math::TemporalView temporal_view(const Camera3D& camera) const;
+  // Moves the view of the lit pass (between BeginMode3D and EndMode3D) by this frame's jitter,
+  // keeping the view without it.
+  void jitter_view();
+  bool motion_needed() const { return temporal.on && temporal.history_valid; }
+  // Where the opaque surfaces of the lit pass (their record numbers from `first` in `slots`) moved
+  // from, into `motion`; drawing goes on where it was.
+  void draw_motion(std::size_t first, Vec3 viewer);
+  void send_motion_frame(Vec3 viewer);
+  // Where this frame's particles and see-through surfaces (which write no motion: what is behind
+  // them shows through) cover the picture, into the motion target's alpha.
+  void mark_particle_cover();
+  void mark_see_through_cover(Vec3 viewer);
+  // The frame's texels as they were, before this frame's go to the graphics card.
+  void keep_previous_texels();
+  // Notes when an object's record (and bones) were not its own the frame before.
+  void note_fresh_record(const Scene& scene, const GameObject& object, float first_bone, std::size_t bones);
+  void carry_fresh_texels();
+  void give_up_temporal();
+  void release_temporal_targets();
+  void remake_previous_texels();
+  void release_previous_texels();
+  // The lit picture mixed with the frames before, into the newer history.
+  void resolve_temporal();
+  void send_temporal_inputs(const RenderTexture2D& before);
+  void end_temporal();
+  // What post-processing starts from: the mixed picture, or the lit one.
+  const RenderTexture2D& lit_picture() const;
 
   // --- Sun shadows (renderer_shadows.cpp) -------------------------------------------------------
 
@@ -442,7 +533,8 @@ struct Renderer::Impl {
 
   // --- Post-processing (renderer_post.cpp) ------------------------------------------------------
 
-  // hdr -> bloom -> tone mapping -> anti-aliasing -> `output` (the screen when null).
+  // hdr -> the frames before mixed in -> bloom -> tone mapping -> anti-aliasing -> `output` (the
+  // screen when null).
   void post_process(const Environment& env, const RenderTexture2D* output);
   void draw_occlusion();
   void draw_bloom();
@@ -451,6 +543,8 @@ struct Renderer::Impl {
   void tone_map(const Environment& env);
   void send_grade(const Environment& env);
   void antialias(const RenderTexture2D* output);
+  // The last pass's shader, its values set: smoothing, or after the frames are mixed, sharpening.
+  const Shader& begin_finish(int width, int height);
   void copy_depth_to(const RenderTexture2D& output);
 
   // --- Over the picture (renderer_overlay.cpp) --------------------------------------------------

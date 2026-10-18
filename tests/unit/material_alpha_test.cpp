@@ -84,6 +84,20 @@ TEST_CASE("a dithered blended material is drawn once, with the opaque surfaces, 
   CHECK_FALSE(alpha_test(leaves, kWind, AlphaPass::Opaque).dithered);
 }
 
+TEST_CASE("the motion pass leaves out what the opaque pass leaves out, and sways as it does") {
+  MaterialDesc fur = material(AlphaMode::Blend, true);
+  fur.dithered = true;
+  for (const MaterialDesc& desc : {material(AlphaMode::Mask, true), material(AlphaMode::Blend, true), fur}) {
+    const AlphaTest opaque = alpha_test(desc, kWind, AlphaPass::Opaque);
+    const AlphaTest motion = alpha_test(desc, kWind, AlphaPass::Motion);
+    CHECK(motion.cutoff == doctest::Approx(opaque.cutoff));
+    CHECK(motion.dithered == opaque.dithered);
+    CHECK(motion.sway == doctest::Approx(opaque.sway));
+    CHECK(motion.two_sided == opaque.two_sided);
+    CHECK_FALSE(motion.mixed);
+  }
+}
+
 TEST_CASE("double-sided materials are drawn without backface culling") {
   MaterialDesc sheet = material(AlphaMode::Opaque, false);
   sheet.double_sided = true;
@@ -96,4 +110,13 @@ TEST_CASE("see-through surfaces are drawn the farthest first, and in the order t
   std::vector<int> meshes;
   for (const SeeThroughDraw& draw : draws) meshes.push_back(draw.mesh);
   CHECK(meshes == std::vector<int>{1, 0, 2, 3});
+}
+
+TEST_CASE("the cover pass leaves out what the see-through pass leaves out") {
+  const MaterialDesc glass = material(AlphaMode::Blend, false);
+  const AlphaTest see_through = alpha_test(glass, kWind, AlphaPass::SeeThrough);
+  const AlphaTest cover = alpha_test(glass, kWind, AlphaPass::Cover);
+  CHECK(cover.cutoff == doctest::Approx(see_through.cutoff));
+  CHECK(cover.ceiling == doctest::Approx(see_through.ceiling));
+  CHECK(cover.mixed);
 }
