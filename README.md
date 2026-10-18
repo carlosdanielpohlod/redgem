@@ -21,6 +21,31 @@ ship a standalone game.
   <a href="https://carlosdanielpohlod.github.io/redgem-site/manual/">Manual</a>
 </p>
 
+<details>
+<summary>Assets in the demo video</summary>
+
+Models from Sketchfab under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
+[Samurai](https://sketchfab.com/3d-models/150603038ee6476a9a4b173c682ff8d5) by fletcherkinnear ·
+[Viking](https://sketchfab.com/3d-models/79321179bafb4d558f0cd6a4a014ba9a) by Andy Woodhead ·
+[Leopard 2 A6](https://sketchfab.com/3d-models/7cb23d5322df4b409a880de635826067) by buh ·
+[Katana](https://sketchfab.com/3d-models/bee6931856084cd4886b2901226bca6a) by Joan LP ·
+[Viking battle axe](https://sketchfab.com/3d-models/b7123192adbf40f68043c57dd8ddcd15) by Mikhail Antonov ·
+[Coniferous Forest Assets Pack](https://sketchfab.com/3d-models/240ce9cf0ad3474f809a59f9446e63cd) by Dari ·
+[Grass claster](https://sketchfab.com/3d-models/832eb6c9c5b24790b1ca24ad7dfdcdba) by VRA ·
+[Residences of Rothenburg ob der Tauber](https://sketchfab.com/3d-models/af81933914b14dcbbb39bd8a0bbafaaf) by shotkey ·
+[BMW E30](https://sketchfab.com/3d-models/9dea494b447e442fafbddfc7eccbf158) and
+[Cadillac 75](https://sketchfab.com/3d-models/2935f8faa5f64ce4a3bd65af0f925c21) by ROH3D ·
+[Linden tree](https://sketchfab.com/3d-models/c0c3aa73cc9945d2a36c01a0d8d6d4bb) by Georgeous ·
+[Vintage lamp post](https://sketchfab.com/3d-models/56f6dcb3865144cd84e049ca6a736fae) by dasmodal ·
+[Street Bench](https://sketchfab.com/3d-models/1ddafec2fda5430697aaf403b3deba96) by donnichols.
+
+Characters' animations from [Mixamo](https://www.mixamo.com); sky, plants and textures from
+[Poly Haven](https://polyhaven.com) (CC0); particles from
+[Kenney](https://kenney.nl/assets/particle-pack) (CC0). City: [Poly Haven](https://polyhaven.com) and
+[ambientCG](https://ambientcg.com) (CC0), car and people from [BlenderKit](https://www.blenderkit.com).
+
+</details>
+
 ```ruby
 class Coin < Behaviour
   SPIN_DEGREES_PER_SECOND = 180.0
