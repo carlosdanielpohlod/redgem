@@ -1,8 +1,9 @@
 # The editor on real Macs: built, tested and opened on screen, once on Apple Silicon and once on
 # Intel. Each step that checks something fails the run when it fails; the steps after it still
 # run (when the build itself worked), so that one failure does not hide the others. The pictures
-# of the screen and the tests' pictures are kept as the run's artifacts. (Releases are packed by
-# hand: tools/release/package.sh.)
+# of the screen and the tests' pictures are kept as the run's artifacts. A run started by hand
+# with `package` set also packs the Mac's download (tools/release/package.sh) and keeps it as an
+# artifact, for a release; the other downloads are packed by hand.
 name: macOS
 
 on:
@@ -10,6 +11,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      package:
+        description: Pack the Mac's download for a release
+        type: boolean
+        default: false
 
 # A newer push to the same branch makes the run of the older one pointless.
 concurrency:
@@ -101,3 +107,29 @@ jobs:
             dist/screens
             build/screenshots/editor
           if-no-files-found: warn
+
+      - name: Pack the download
+        id: package
+        if: ${{ !cancelled() && inputs.package && steps.build.outcome == 'success' }}
+        run: tools/release/package.sh
+
+      # As a double click does: through the system's launcher, with no game named (the project hub).
+      - name: Open the packed app and take a picture of the screen
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        run: |
+          unpacked="${RUNNER_TEMP}/unpacked"
+          mkdir -p "${unpacked}"
+          ditto -x -k "dist/release/redgem-macos-${{ matrix.arch }}.zip" "${unpacked}"
+          tools/macos/capture_window.sh "dist/release/app-hub-${{ matrix.arch }}.png" 30 \
+            open -W -n "${unpacked}/redgem/RedGem.app"
+          pkill -x redgem || true
+
+      - name: Keep the download
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: redgem-macos-${{ matrix.arch }}
+          path: |
+            dist/release/redgem-macos-${{ matrix.arch }}.zip
+            dist/release/app-hub-${{ matrix.arch }}.png
+          if-no-files-found: error
