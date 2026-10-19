@@ -16,20 +16,29 @@ the same pull request.
   tried on a real Mac. The app is not signed by a registered Apple developer nor notarized.
 - The editor on a Mac builds games for the Mac only: it carries no players for other systems.
   A built Mac game is a plain program beside its files, not an .app.
-- The Linux programs need a processor with AVX2 and glibc 2.39 or newer.
+- The Linux programs need a processor with AVX2 and glibc 2.39 or newer (Ubuntu 24.04 and later).
 - Android games have been run on an emulator only, not on phones. The touch controls have one
-  fixed layout (a stick and three buttons).
+  fixed layout (a stick and three buttons). The continuous integration does not build for Android:
+  an Android-only break shows up when a release is packed.
 - Once, right after an emulator cold boot, an Android game stopped in its audio thread. It did
   not happen again in the runs that followed and has no fix.
 
 ## Rendering and animation
 
 - No blend trees or animation state machines: scripts choose and mix clips themselves.
-- Particles are not lit and cast no shadows.
+- Particles cast no shadows.
+- Grass and other `Scatter` copies are only drawn up to their `visible_to` distance; beyond it
+  the ground is its texture alone, with no simplified grass far away. Wide views over a meadow,
+  from a hill for example, show bare ground in the distance.
+- Temporal anti-aliasing (`antialias = "temporal"`) smears detail when the camera moves fast,
+  such as a chase camera behind a fast car. It is off in the editor's scene view, and turns itself
+  off, with a warning, on graphics cards that cannot draw into float textures.
+- There is no water: no reflecting, rippling surface besides an ordinary glossy material.
 - Images must be PNG or JPEG, at most 8192 pixels a side (a sky picture may also be Radiance
   `.hdr`). Blender's exporter can write WebP and KTX2 textures: neither is read (no decoder for
   them is among the libraries the engine is built with).
-- A sky picture, shadow cascades and `msaa` have been seen on desktop OpenGL only, not on a phone.
+- A sky picture, shadow cascades, `msaa` and temporal anti-aliasing have been seen on desktop
+  OpenGL only, not on a phone.
   On OpenGL ES 3 they rely on what the engine already needs there (half-float textures that can
   be drawn into): a phone that cannot draw several samples a pixel draws one, and says so.
 
@@ -76,6 +85,10 @@ the same pull request.
 - In Docker the editor has no sound.
 
 ## Tools
+
+- Recording a video (`redgem <game> --record out.mp4`) needs `ffmpeg` on the PATH, is only on the
+  development program `redgem` (not on a built game's `redgem-player`), and cannot start on
+  Android.
 
 - The Blender scene builders do not write the same bytes twice (vertex and UV order change
   between runs), so regenerating a demo scene shows up as a change.
