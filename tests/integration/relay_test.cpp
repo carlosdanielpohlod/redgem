@@ -26,6 +26,8 @@ namespace {
 
 constexpr float kShortWaitSeconds = 0.05f;
 constexpr std::chrono::milliseconds kShortWait{50};
+// Windows can end a timed wait up to one tick of its system timer (about 15.6 ms) early.
+constexpr std::chrono::milliseconds kClockTick{16};
 constexpr float kLongWaitSeconds = 5.0f;  // far longer than anything here takes to arrive
 constexpr std::chrono::milliseconds kLongWait{2500};
 constexpr std::chrono::milliseconds kPromptly{500};  // well under the second an idle relay sleeps
@@ -211,6 +213,9 @@ void answer_with_nonsense(Datagrams& listener) {
   }
 }
 
+// Whether a wait of kShortWait lasted it, give or take the tick the system's timer may cut off.
+bool slept_the_short_wait(std::chrono::steady_clock::duration slept) { return slept + kClockTick >= kShortWait; }
+
 }  // namespace
 
 TEST_CASE("an idle relay sleeps for as long as it is told when nothing arrives") {
@@ -218,7 +223,7 @@ TEST_CASE("an idle relay sleeps for as long as it is told when nothing arrives")
   const auto before = std::chrono::steady_clock::now();
   CHECK_FALSE(meeting.relay.wait(kShortWaitSeconds));
   const auto slept = std::chrono::steady_clock::now() - before;
-  CHECK(slept >= kShortWait);
+  CHECK(slept_the_short_wait(slept));
   CHECK(slept < kLongWait);
 }
 
@@ -281,7 +286,7 @@ TEST_CASE("a relay with messages still to handle does not sleep on them") {
 TEST_CASE("a wait on no socket at all is a plain sleep, and a wait of no time does not sleep") {
   const auto before = std::chrono::steady_clock::now();
   CHECK_FALSE(Socket::wait({}, kShortWaitSeconds));
-  CHECK(std::chrono::steady_clock::now() - before >= kShortWait);
+  CHECK(slept_the_short_wait(std::chrono::steady_clock::now() - before));
   const Socket closed;
   CHECK_FALSE(Socket::wait({{&closed, true}, {nullptr, false}}, 0.0f));
   Meeting meeting;
