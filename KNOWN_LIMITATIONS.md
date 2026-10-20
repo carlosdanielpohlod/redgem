@@ -27,9 +27,9 @@ the same pull request.
 
 - No blend trees or animation state machines: scripts choose and mix clips themselves.
 - Particles cast no shadows.
-- Grass and other `Scatter` copies are only drawn up to their `visible_to` distance; beyond it
-  the ground is its texture alone, with no simplified grass far away. Wide views over a meadow,
-  from a hill for example, show bare ground in the distance.
+- Grass and other `Scatter` copies stop at the base template's `visible_to`. Distance meshes
+  can be supplied with `lods`, but simplified models and impostor atlases are not generated
+  automatically. Beyond the final range the ground is still its texture alone.
 - Temporal anti-aliasing (`antialias = "temporal"`) smears detail when the camera moves fast,
   such as a chase camera behind a fast car. It is off in the editor's scene view, and turns itself
   off, with a warning, on graphics cards that cannot draw into float textures.

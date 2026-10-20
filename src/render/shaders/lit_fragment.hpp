@@ -9,6 +9,7 @@
 #include <string>
 
 #include "render/shaders/copy_fade.hpp"
+#include "render/shaders/lit_clearcoat.hpp"
 #include "render/shaders/lit_main.hpp"
 #include "render/shaders/lit_shadows.hpp"
 #include "render/shaders/lit_sky.hpp"
@@ -103,6 +104,27 @@ vec3 shade(vec3 n, vec3 v, vec3 l, vec3 radiance, vec3 albedo, vec3 f0, float ro
 
 // Bends the surface normal by a tangent-space normal map, building the tangent frame from the
 // screen-space derivatives of position and UV.
+#ifdef CLEARCOAT
+vec3 mappedNormal(vec3 n, vec3 position, vec2 uv, sampler2D normalTexture, float strength) {
+  vec3 detail = texture(normalTexture, uv).xyz * NORMAL_MAP_RANGE - 1.0;
+  detail.xy *= strength;
+  vec3 dp1 = dFdx(position);
+  vec3 dp2 = dFdy(position);
+  vec2 duv1 = dFdx(uv);
+  vec2 duv2 = dFdy(uv);
+  vec3 dp2perp = cross(dp2, n);
+  vec3 dp1perp = cross(n, dp1);
+  vec3 tangent = dp2perp * duv1.x + dp1perp * duv2.x;
+  vec3 bitangent = dp2perp * duv1.y + dp1perp * duv2.y;
+  float scale = inversesqrt(max(max(dot(tangent, tangent), dot(bitangent, bitangent)), EPSILON));
+  return normalize(mat3(tangent * scale, bitangent * scale, n) * detail);
+}
+
+vec3 mappedNormal(vec3 n, vec3 position, vec2 uv) {
+  return mappedNormal(n, position, uv, normalMap, normalScale);
+}
+
+#else
 vec3 mappedNormal(vec3 n, vec3 position, vec2 uv) {
   vec3 detail = texture(normalMap, uv).xyz * NORMAL_MAP_RANGE - 1.0;
   detail.xy *= normalScale;
@@ -117,6 +139,8 @@ vec3 mappedNormal(vec3 n, vec3 position, vec2 uv) {
   float scale = inversesqrt(max(max(dot(tangent, tangent), dot(bitangent, bitangent)), EPSILON));
   return normalize(mat3(tangent * scale, bitangent * scale, n) * detail);
 }
+
+#endif
 
 )GLSL";
 
@@ -138,15 +162,17 @@ bool leftOut(float alpha) {
 struct LitFeatures {
   bool sky_picture = false;   // the sky is a picture that lights the scene
   bool soft_shadows = false;  // shadow edges as wide as the sun makes them
+  bool clearcoat = false;     // only scenes with a coating need the layered BRDF
 
   bool operator==(const LitFeatures& other) const {
-    return sky_picture == other.sky_picture && soft_shadows == other.soft_shadows;
+    return sky_picture == other.sky_picture && soft_shadows == other.soft_shadows && clearcoat == other.clearcoat;
   }
   bool operator!=(const LitFeatures& other) const { return !(*this == other); }
 };
 
 inline constexpr const char* kVersionLine = "#version 330\n";
 inline constexpr const char* kSkyPictureSwitch = "#define SKY_PICTURE\n";
+inline constexpr const char* kClearcoatSwitch = "#define CLEARCOAT\n";
 inline constexpr const char* kSoftShadowsSwitch = "#define SOFT_SHADOWS\n";
 
 // The whole fragment shader, its parts in order, with the features asked for switched on right
@@ -155,7 +181,8 @@ inline std::string lit_fragment(const LitFeatures& features = {}) {
   std::string switches;
   if (features.sky_picture) switches += kSkyPictureSwitch;
   if (features.soft_shadows) switches += kSoftShadowsSwitch;
-  std::string source = std::string(kLitHead) + kCopyFade + kLitAlpha + kLitShadows + kLitSky + kLitMain;
+  if (features.clearcoat) switches += kClearcoatSwitch;
+  std::string source = std::string(kLitHead) + kCopyFade + kLitAlpha + kLitShadows + kLitSky + kLitClearcoat + kLitMain;
   const std::size_t version = source.find(kVersionLine);
   return source.insert(version + std::string(kVersionLine).size(), switches);
 }

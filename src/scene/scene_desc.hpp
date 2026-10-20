@@ -36,6 +36,16 @@ struct ImageData {
 
 enum class AlphaMode { Opaque, Mask, Blend };
 
+// A transparent dielectric coating above the base material (KHR_materials_clearcoat).
+struct ClearcoatDesc {
+  float factor = 0.0f;
+  float roughness = 0.0f;
+  int factor_image = kNoIndex;     // linear R channel
+  int roughness_image = kNoIndex;  // linear G channel
+  int normal_image = kNoIndex;
+  float normal_scale = 1.0f;
+};
+
 // glTF metallic-roughness material. Image fields index SceneDesc::images (kNoIndex when absent).
 struct MaterialDesc {
   std::string name;
@@ -57,6 +67,7 @@ struct MaterialDesc {
   // instead of mixed with what is behind: nothing to sort, for many layers of hair cards or fur
   // (the material's custom property `transparency = "dithered"`).
   bool dithered = false;
+  ClearcoatDesc clearcoat;
 };
 
 struct PrimitiveDesc {

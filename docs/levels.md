@@ -133,6 +133,18 @@ other objects are drawn in that order, so that surfaces lying on each other look
 screen, and of separate parts in each: join the parts of a model that share a material, and give
 heavy models lighter versions for far away with `visible_from` and `visible_to`.
 
+### Coated materials
+
+Blender's Principled BSDF coat is read through `KHR_materials_clearcoat`. A polished coating
+can sit above rough paint, wood or a textured base. Its weight and roughness have independent
+linear maps (red and green channels respectively), and its normal map does not change the base
+normal. The coating reflects the sun, point lights and the environment while attenuating the
+base layer and emission by Fresnel, rather than adding unlimited brightness.
+
+Export the coat with the material in glTF. A zero coat weight preserves the original shading.
+The editor keeps its factors, texture references and normal scale through import and saving.
+The layering follows the [glTF clearcoat extension](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_clearcoat).
+
 ## Grass, forests and cities
 
 Tens of thousands of copies (a meadow's grass, a forest) are too many to be objects: a script

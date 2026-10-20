@@ -391,3 +391,22 @@ TEST_CASE("an index is written as a number, and taken out when there is none") {
   set_or_erase_index(node, kSkin, kAnIndex);
   CHECK(node[kSkin] == kAnIndex);
 }
+
+TEST_CASE("saving a coating preserves texture references and writes its factors and normal scale") {
+  constexpr float kCoat = 0.8f;
+  constexpr float kCoatRoughness = 0.15f;
+  constexpr float kCoatNormalScale = 0.6f;
+  constexpr int kNormalTexture = 3;
+  MaterialDesc material;
+  material.clearcoat.factor = kCoat;
+  material.clearcoat.roughness = kCoatRoughness;
+  material.clearcoat.normal_scale = kCoatNormalScale;
+  const json original = {
+      {kExtensions, {{kClearcoatExtension, {{kClearcoatNormalTexture, {{kIndex, kNormalTexture}, {kScale, 1.0f}}}}}}}};
+  const auto saved = material_json(material, original);
+  const auto& coat = saved[kExtensions][kClearcoatExtension];
+  CHECK(coat[kClearcoatFactor] == kCoat);
+  CHECK(coat[kClearcoatRoughnessFactor] == kCoatRoughness);
+  CHECK(coat[kClearcoatNormalTexture][kIndex] == kNormalTexture);
+  CHECK(coat[kClearcoatNormalTexture][kScale] == kCoatNormalScale);
+}

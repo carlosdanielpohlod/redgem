@@ -16,6 +16,12 @@ struct LitUniforms {
   int normal_scale = kNoLocation;
   int has_surface_map = kNoLocation;
   int occlusion_strength = kNoLocation;
+  int coat_factor = kNoLocation;
+  int coat_roughness = kNoLocation;
+  int has_coat_factor_map = kNoLocation;
+  int has_coat_roughness_map = kNoLocation;
+  int has_coat_normal_map = kNoLocation;
+  int coat_normal_scale = kNoLocation;
   int metallic = kNoLocation;
   int roughness = kNoLocation;
   int emissive = kNoLocation;

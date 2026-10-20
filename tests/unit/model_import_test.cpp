@@ -200,9 +200,14 @@ TEST_CASE("the description's materials and meshes are shifted, and what is absen
   MaterialDesc material;
   material.base_color_image = kLocal;
   material.normal_image = kOtherLocal;
+  material.clearcoat.factor_image = kLocal;
+  material.clearcoat.normal_image = kOtherLocal;
   const MaterialDesc imported = imported_material(material, desc_offsets());
   CHECK(imported.base_color_image == kLocal + kImagesInScene);
   CHECK(imported.normal_image == kOtherLocal + kImagesInScene);
+  CHECK(imported.clearcoat.factor_image == kLocal + kImagesInScene);
+  CHECK(imported.clearcoat.normal_image == kOtherLocal + kImagesInScene);
+  CHECK(imported.clearcoat.roughness_image == kNoIndex);
   CHECK(imported.emissive_image == kNoIndex);
   CHECK(imported.occlusion_image == kNoIndex);
   CHECK(imported.metallic_roughness_image == kNoIndex);

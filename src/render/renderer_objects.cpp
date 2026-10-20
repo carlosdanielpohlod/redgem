@@ -85,6 +85,7 @@ void Renderer::Impl::send_motion_alpha(const render_math::AlphaTest& test, bool 
 
 // How a material's surface answers light.
 void Renderer::Impl::send_surface(const MaterialDesc& factors) {
+  send_clearcoat(factors.clearcoat);
   const bool has_occlusion_map = factors.occlusion_image != kNoIndex;
   send(shader, lit_uniforms.has_normal_map, on_with(factors.normal_image));
   send(shader, lit_uniforms.normal_scale, factors.normal_scale);
@@ -94,6 +95,15 @@ void Renderer::Impl::send_surface(const MaterialDesc& factors) {
   send(shader, lit_uniforms.roughness, factors.roughness);
   send(shader, lit_uniforms.emissive, to_raylib(factors.emissive));
   send(shader, lit_uniforms.has_emissive_map, on_with(factors.emissive_image));
+}
+
+void Renderer::Impl::send_clearcoat(const ClearcoatDesc& coat) {
+  send(shader, lit_uniforms.coat_factor, coat.factor);
+  send(shader, lit_uniforms.coat_roughness, coat.roughness);
+  send(shader, lit_uniforms.has_coat_factor_map, on_with(coat.factor_image));
+  send(shader, lit_uniforms.has_coat_roughness_map, on_with(coat.roughness_image));
+  send(shader, lit_uniforms.has_coat_normal_map, on_with(coat.normal_image));
+  send(shader, lit_uniforms.coat_normal_scale, coat.normal_scale);
 }
 
 // With several samples a pixel, a cut-out material's edges are smoothed by them (alpha to

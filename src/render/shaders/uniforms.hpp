@@ -68,6 +68,15 @@ inline constexpr const char* kShadowTiles = "shadowTiles";
 inline constexpr const char* kShadowScales = "shadowScales";
 inline constexpr const char* kShadowCascades = "shadowCascades";
 inline constexpr const char* kSunSize = "sunSize";
+inline constexpr const char* kCoatFactor = "coatFactor";
+inline constexpr const char* kCoatRoughness = "coatRoughness";
+inline constexpr const char* kHasCoatFactorMap = "hasCoatFactorMap";
+inline constexpr const char* kHasCoatRoughnessMap = "hasCoatRoughnessMap";
+inline constexpr const char* kHasCoatNormalMap = "hasCoatNormalMap";
+inline constexpr const char* kCoatNormalScale = "coatNormalScale";
+inline constexpr const char* kCoatFactorMap = "coatFactorMap";
+inline constexpr const char* kCoatRoughnessMap = "coatRoughnessMap";
+inline constexpr const char* kCoatNormalMap = "coatNormalMap";
 // Post-processing.
 inline constexpr const char* kThreshold = "threshold";
 inline constexpr const char* kBlurStep = "blurStep";

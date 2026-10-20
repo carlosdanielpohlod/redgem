@@ -12,7 +12,8 @@ int shifted(int index, int offset) { return index == kNoIndex ? kNoIndex : index
 MaterialDesc imported_material(const MaterialDesc& original, const DescOffsets& offsets) {
   MaterialDesc material = original;
   for (int* image : {&material.base_color_image, &material.metallic_roughness_image, &material.normal_image,
-                     &material.occlusion_image, &material.emissive_image}) {
+                     &material.occlusion_image, &material.emissive_image, &material.clearcoat.factor_image,
+                     &material.clearcoat.roughness_image, &material.clearcoat.normal_image}) {
     *image = shifted(*image, offsets.images);
   }
   return material;

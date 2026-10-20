@@ -103,6 +103,7 @@ void SceneDocument::sync_materials() {
   if (!materials.empty()) json[kMaterials] = materials;
   for (const MaterialDesc& material : desc_.materials) {
     if (needs_emissive_strength(material)) add_extension_used(json, kEmissiveStrengthExtension);
+    if (material.clearcoat.factor > 0.0f) add_extension_used(json, kClearcoatExtension);
   }
 }
 

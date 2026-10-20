@@ -69,6 +69,7 @@ class GltfReader {
   ImageData load_image(const cgltf_image& image, const std::filesystem::path& file) const;
   void load_images();
   int image_of(const cgltf_texture_view& view) const;
+  void read_clearcoat(const cgltf_material& material, MaterialDesc& out) const;
   void read_pbr(const cgltf_material& material, MaterialDesc& out) const;
   // The pictures laid over the base color, and how strongly the first two count.
   void read_detail_textures(const cgltf_material& material, MaterialDesc& out) const;

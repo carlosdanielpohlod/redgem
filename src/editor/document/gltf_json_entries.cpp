@@ -55,6 +55,20 @@ void write_emission(nlohmann::json& out, const MaterialDesc& material) {
   }
 }
 
+bool has_coat(const nlohmann::json& out) {
+  return has_object(out, kExtensions) && out[kExtensions].contains(kClearcoatExtension);
+}
+
+bool omits_coat(const nlohmann::json& out, const ClearcoatDesc& coat) { return coat.factor <= 0.0f && !has_coat(out); }
+
+void write_clearcoat(nlohmann::json& out, const ClearcoatDesc& coat) {
+  if (omits_coat(out, coat)) return;
+  auto& extension = out[kExtensions][kClearcoatExtension];
+  extension[kClearcoatFactor] = coat.factor;
+  extension[kClearcoatRoughnessFactor] = coat.roughness;
+  if (has_object(extension, kClearcoatNormalTexture)) extension[kClearcoatNormalTexture][kScale] = coat.normal_scale;
+}
+
 // A node gets a new entry when it came from none, or when another node took the one it came from.
 bool needs_new_entry(bool known, const std::set<int>& claimed, int source) {
   return !known || claimed.count(source) != 0;
@@ -94,6 +108,7 @@ nlohmann::json material_json(const MaterialDesc& material, const nlohmann::json&
   out[kPbr][kMetallicFactor] = material.metallic;
   out[kPbr][kRoughnessFactor] = material.roughness;
   write_emission(out, material);
+  write_clearcoat(out, material.clearcoat);
   return out;
 }
 

@@ -411,6 +411,7 @@ struct Renderer::Impl {
   // true when it must be drawn without backface culling.
   bool apply_material(int index, render_math::AlphaPass pass);
   void send_surface(const MaterialDesc& factors);
+  void send_clearcoat(const ClearcoatDesc& coat);
   void cover_edges(bool cut_out);
   void send_alpha(const render_math::AlphaTest& test);
   void send_motion_alpha(const render_math::AlphaTest& test, bool covering);

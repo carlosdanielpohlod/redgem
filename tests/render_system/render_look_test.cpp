@@ -196,3 +196,172 @@ TEST_CASE("cascaded shadows of a sun as wide as asked have softer edges than a s
   CHECK(static_cast<float>(soft.find(on_an_edge).count) >
         static_cast<float>(sharp.find(on_an_edge).count) * kWiderEdges);
 }
+
+namespace {
+
+constexpr float kCoatRoughness = 0.12f;  // a polished coating over a rough red base
+constexpr float kBaseRoughness = 0.8f;
+constexpr int kCoatHighlightGain = 20;  // visible green-channel increase in the white highlight
+constexpr float kCoatGlow = 0.4f;
+
+MaterialDesc coat_material(float weight, float roughness) {
+  constexpr redgem::Color kRedPaint{0.6f, 0.02f, 0.01f, 1.0f};
+  MaterialDesc material;
+  material.base_color = kRedPaint;
+  material.roughness = kBaseRoughness;
+  material.clearcoat.factor = weight;
+  material.clearcoat.roughness = roughness;
+  return material;
+}
+
+NodeDesc coat_sun() {
+  NodeDesc sun;
+  sun.name = "Sun";
+  sun.light = LightDesc{};
+  sun.light->intensity = 1.0f;
+  return sun;
+}
+
+SceneDesc coated_cube(float weight, float roughness = kCoatRoughness) {
+  SceneDesc desc;
+  desc.materials = {coat_material(weight, roughness)};
+  desc.meshes = {mesh_of(PrimitiveShape::Cube, 0)};
+  NodeDesc cube;
+  cube.name = "CoatedCube";
+  cube.mesh = 0;
+  desc.nodes = {test::camera_at(kCameraAt), cube, coat_sun(), environment_of({{"ambient", 0.0}, {"fog_density", 0.0}})};
+  return desc;
+}
+
+Picture coat_picture(RenderStage& stage, const SceneDesc& desc, const std::string& name) {
+  stage.upload(desc);
+  return stage.draw(Scene::from_desc(desc), name);
+}
+
+bool different_rgb(::Color a, ::Color b) { return a.r != b.r || a.g != b.g || a.b != b.b; }
+
+bool same_pixels(const Picture& a, const Picture& b) {
+  if (a.pixels.size() != b.pixels.size()) return false;
+  for (std::size_t i = 0; i < a.pixels.size(); ++i) {
+    const auto x = a.pixels[i];
+    const auto y = b.pixels[i];
+    if (different_rgb(x, y)) return false;
+  }
+  return true;
+}
+
+}  // namespace
+
+TEST_CASE("a polished clearcoat adds a white highlight above a rough colored base") {
+  RenderStage stage;
+  const auto plain = coat_picture(stage, coated_cube(0.0f), "coat_plain");
+  const auto coated = coat_picture(stage, coated_cube(1.0f), "coat_polished");
+  CHECK(coated.at(kMiddle, kMiddle).g > plain.at(kMiddle, kMiddle).g + kCoatHighlightGain);
+}
+
+TEST_CASE("a zero coat factor keeps the original pixels whatever the coating roughness") {
+  RenderStage stage;
+  const auto polished = coat_picture(stage, coated_cube(0.0f), "coat_disabled_polished");
+  const auto rough = coat_picture(stage, coated_cube(0.0f, 1.0f), "coat_disabled_rough");
+  CHECK(same_pixels(polished, rough));
+}
+
+TEST_CASE("clearcoat attenuates emission rather than adding energy over it") {
+  RenderStage stage;
+  SceneDesc desc = coated_cube(0.0f);
+  desc.nodes[2].light->intensity = 0.0f;
+  desc.materials[0].emissive = Vec3::one() * kCoatGlow;
+  const auto plain = coat_picture(stage, desc, "coat_emission_plain");
+  desc.materials[0].clearcoat.factor = 1.0f;
+  const auto coated = coat_picture(stage, desc, "coat_emission_attenuated");
+  CHECK(luma(coated.at(kMiddle, kMiddle)) < luma(plain.at(kMiddle, kMiddle)));
+}
+
+namespace {
+
+constexpr const char* kPng = ".png";
+constexpr unsigned char kFullChannel = 255;
+constexpr unsigned char kRoughnessChannel = 64;
+constexpr ::Color kNoRed{0, kFullChannel, kFullChannel, kFullChannel};
+constexpr ::Color kOnlyGreen{0, kRoughnessChannel, 0, kFullChannel};
+constexpr ::Color kSidewaysNormal{kFullChannel, 128, 128, kFullChannel};
+constexpr float kMapRoughness = static_cast<float>(kRoughnessChannel) / kFullChannel;
+
+ImageData solid_picture(::Color color) {
+  Image image = GenImageColor(1, 1, color);
+  int count = 0;
+  unsigned char* bytes = ExportImageToMemory(image, kPng, &count);
+  ImageData data{{bytes, bytes + count}, kPng};
+  MemFree(bytes);
+  UnloadImage(image);
+  return data;
+}
+
+}  // namespace
+
+TEST_CASE("the clearcoat factor uses the linear red channel and zero keeps every base pixel") {
+  RenderStage stage;
+  SceneDesc desc = coated_cube(0.0f);
+  const auto plain = coat_picture(stage, desc, "coat_factor_plain");
+  desc.materials[0].clearcoat.factor = 1.0f;
+  desc.materials[0].clearcoat.factor_image = 0;
+  desc.images = {solid_picture(kNoRed)};
+  const auto mapped = coat_picture(stage, desc, "coat_factor_red_zero");
+  CHECK(same_pixels(plain, mapped));
+}
+
+TEST_CASE("the clearcoat roughness uses its linear green channel") {
+  RenderStage stage;
+  SceneDesc desc = coated_cube(1.0f, kMapRoughness);
+  const auto factor = coat_picture(stage, desc, "coat_roughness_factor");
+  desc.materials[0].clearcoat.roughness = 1.0f;
+  desc.materials[0].clearcoat.roughness_image = 0;
+  desc.images = {solid_picture(kOnlyGreen)};
+  const auto mapped = coat_picture(stage, desc, "coat_roughness_green");
+  CHECK(same_pixels(factor, mapped));
+}
+
+TEST_CASE("the coating normal can turn its highlight without changing the base normal") {
+  RenderStage stage;
+  SceneDesc desc = coated_cube(1.0f);
+  const auto geometric = coat_picture(stage, desc, "coat_normal_geometric");
+  desc.materials[0].clearcoat.normal_image = 0;
+  desc.images = {solid_picture(kSidewaysNormal)};
+  const auto sideways = coat_picture(stage, desc, "coat_normal_sideways");
+  CHECK(sideways.at(kMiddle, kMiddle).g < geometric.at(kMiddle, kMiddle).g);
+  desc.materials[0].clearcoat.factor = 0.0f;
+  const auto disabled = coat_picture(stage, desc, "coat_normal_disabled");
+  desc.materials[0].clearcoat.normal_image = kNoIndex;
+  const auto absent = coat_picture(stage, desc, "coat_normal_absent");
+  CHECK(same_pixels(disabled, absent));
+}
+
+TEST_CASE("clearcoat reflects the ambient sky even without a direct light") {
+  RenderStage stage;
+  SceneDesc desc = coated_cube(0.0f);
+  desc.nodes[2].light->intensity = 0.0f;
+  desc.nodes[3].props["ambient"] = 1.0;
+  desc.materials[0].base_color = {0.0f, 0.0f, 0.0f, 1.0f};
+  desc.materials[0].roughness = 1.0f;
+  const auto plain = coat_picture(stage, desc, "coat_ambient_plain");
+  desc.materials[0].clearcoat.factor = 1.0f;
+  const auto coated = coat_picture(stage, desc, "coat_ambient_reflection");
+  CHECK(luma(coated.at(kMiddle, kMiddle)) > luma(plain.at(kMiddle, kMiddle)));
+}
+
+TEST_CASE("clearcoat also receives highlights from a point light") {
+  constexpr float kLampWatts = 100.0f;
+  RenderStage stage;
+  SceneDesc desc = coated_cube(0.0f);
+  constexpr float kLampRange = 20.0f;  // the cube is nine meters from the lamp
+  desc.nodes[2].light->intensity = 0.0f;
+  NodeDesc lamp;
+  lamp.name = "CoatLamp";
+  lamp.light = LightDesc{LightType::Point, {}, kLampWatts, kLampRange};
+  lamp.local.position = kCameraAt;
+  desc.nodes.push_back(lamp);
+  const auto plain = coat_picture(stage, desc, "coat_point_plain");
+  desc.materials[0].clearcoat.factor = 1.0f;
+  const auto coated = coat_picture(stage, desc, "coat_point_reflection");
+  CHECK(coated.at(kMiddle, kMiddle).g > plain.at(kMiddle, kMiddle).g);
+}

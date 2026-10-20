@@ -89,7 +89,10 @@ Material Renderer::Impl::load_material(const MaterialDesc& source) const {
                                       {MATERIAL_MAP_EMISSION, source.emissive_image},
                                       {MATERIAL_MAP_NORMAL, source.normal_image},
                                       {MATERIAL_MAP_ROUGHNESS, source.metallic_roughness_image},
-                                      {MATERIAL_MAP_OCCLUSION, source.occlusion_image}};
+                                      {MATERIAL_MAP_OCCLUSION, source.occlusion_image},
+                                      {render_detail::kCoatFactorMap, source.clearcoat.factor_image},
+                                      {render_detail::kCoatRoughnessMap, source.clearcoat.roughness_image},
+                                      {render_detail::kCoatNormalMap, source.clearcoat.normal_image}};
   for (const auto& [slot, image] : maps) {
     if (has_texture(textures, image)) material.maps[slot].texture = textures[static_cast<std::size_t>(image)];
   }

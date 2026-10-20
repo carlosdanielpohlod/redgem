@@ -30,25 +30,31 @@ void main() {
   if (fragCopy.z > 0.0) n = normalize(mix(n, fragUp, fragCopy.z));  // grass lit as the meadow it stands in
   vec3 flatNormal = n;
   if (hasNormalMap > SWITCH_ON) n = mappedNormal(n, fragPosition, fragTexCoord);
+#ifdef CLEARCOAT
+  prepareCoat(flatNormal);
+#endif
   vec3 v = normalize(viewPos - fragPosition);
   vec3 f0 = mix(vec3(DIELECTRIC_F0), albedo, metal);
 
   vec3 toSun = normalize(-sunDirection);
-  vec3 color = shade(n, v, toSun, sunColor * PI, albedo, f0, rough, metal) * sunVisibility(fragPosition, flatNormal, toSun);
+  vec3 color = shadeSurface(n, v, toSun, sunColor * PI, albedo, f0, rough, metal) * sunVisibility(fragPosition, flatNormal, toSun);
   for (int i = 0; i < pointLightCount; ++i) {
     vec3 toLight = pointLightPositions[i] - fragPosition;
     float distance = length(toLight);
     // Inverse-square falloff that reaches exactly zero at the light's range.
     float window = clamp(1.0 - distance / pointLightRanges[i], 0.0, 1.0);
     float falloff = window * window / (distance * distance + LIGHT_FALLOFF_BIAS);
-    color += shade(n, v, toLight / distance, pointLightColors[i] * falloff * PI, albedo, f0, rough, metal);
+    color += shadeSurface(n, v, toLight / distance, pointLightColors[i] * falloff * PI, albedo, f0, rough, metal);
   }
 
   float occlusion = mix(1.0, max(texture(occlusionMap, fragTexCoord).r, MIN_OCCLUSION), occlusionStrength);
-  color += ambientLight(n, v, albedo, f0, rough, metal) * ambientStrength * occlusion;
+  color += ambientSurface(n, v, albedo, f0, rough, metal) * ambientStrength * occlusion;
 
   vec3 glow = emissive;
   if (hasEmissiveMap > SWITCH_ON) glow *= pow(texture(emissiveMap, fragTexCoord).rgb, vec3(GAMMA));
+#ifdef CLEARCOAT
+  if (coatWeight > 0.0) glow *= 1.0 - coatBlend(v);
+#endif
   color += glow;
 
   float fog = 1.0 - exp(-fogDensity * length(viewPos - fragPosition));

@@ -83,6 +83,17 @@ void GltfReader::read_pbr(const cgltf_material& material, MaterialDesc& out) con
   out.metallic_roughness_image = image_of(pbr.metallic_roughness_texture);
 }
 
+void GltfReader::read_clearcoat(const cgltf_material& material, MaterialDesc& out) const {
+  if (!material.has_clearcoat) return;
+  const auto& coat = material.clearcoat;
+  out.clearcoat.factor = coat.clearcoat_factor;
+  out.clearcoat.roughness = coat.clearcoat_roughness_factor;
+  out.clearcoat.factor_image = image_of(coat.clearcoat_texture);
+  out.clearcoat.roughness_image = image_of(coat.clearcoat_roughness_texture);
+  out.clearcoat.normal_image = image_of(coat.clearcoat_normal_texture);
+  if (out.clearcoat.normal_image != kNoIndex) out.clearcoat.normal_scale = coat.clearcoat_normal_texture.scale;
+}
+
 void GltfReader::read_detail_textures(const cgltf_material& material, MaterialDesc& out) const {
   out.normal_image = image_of(material.normal_texture);
   if (out.normal_image != kNoIndex) out.normal_scale = material.normal_texture.scale;
@@ -96,6 +107,7 @@ MaterialDesc GltfReader::load_material(const cgltf_material& material) const {
   out.name = text_or(material.name, "");
   read_pbr(material, out);
   read_detail_textures(material, out);
+  read_clearcoat(material, out);
   out.emissive = emissive_of(material);
   out.alpha_mode = alpha_mode_of(material.alpha_mode);
   out.alpha_cutoff = material.alpha_cutoff;

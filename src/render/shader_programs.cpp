@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "render/shader_source.hpp"
+#include "render/mesh_pass.hpp"
 #include "render/shaders/motion.hpp"
 #include "render/shaders/particle.hpp"
 #include "render/shaders/temporal.hpp"
@@ -15,9 +16,14 @@ namespace {
 
 // The uniforms raylib has a place for, under the lit shader's own names for them.
 constexpr std::pair<int, const char*> kKnownUniforms[] = {
-    {SHADER_LOC_VECTOR_VIEW, shaders::kViewPosition},   {SHADER_LOC_MAP_EMISSION, shaders::kEmissiveMap},
-    {SHADER_LOC_MAP_NORMAL, shaders::kNormalMap},       {SHADER_LOC_MAP_ROUGHNESS, shaders::kSurfaceMap},
+    {SHADER_LOC_VECTOR_VIEW, shaders::kViewPosition},
+    {SHADER_LOC_MAP_EMISSION, shaders::kEmissiveMap},
+    {SHADER_LOC_MAP_NORMAL, shaders::kNormalMap},
+    {SHADER_LOC_MAP_ROUGHNESS, shaders::kSurfaceMap},
     {SHADER_LOC_MAP_OCCLUSION, shaders::kOcclusionMap},
+    {SHADER_LOC_MAP_DIFFUSE + kCoatFactorMap, shaders::kCoatFactorMap},
+    {SHADER_LOC_MAP_DIFFUSE + kCoatRoughnessMap, shaders::kCoatRoughnessMap},
+    {SHADER_LOC_MAP_DIFFUSE + kCoatNormalMap, shaders::kCoatNormalMap},
 };
 
 // A uniform of the lit shader, and where its location is kept.
@@ -28,6 +34,12 @@ struct LitUniform {
 
 constexpr LitUniform kLitUniforms[] = {
     // Per object and per material.
+    {&LitUniforms::coat_factor, shaders::kCoatFactor},
+    {&LitUniforms::coat_roughness, shaders::kCoatRoughness},
+    {&LitUniforms::has_coat_factor_map, shaders::kHasCoatFactorMap},
+    {&LitUniforms::has_coat_roughness_map, shaders::kHasCoatRoughnessMap},
+    {&LitUniforms::has_coat_normal_map, shaders::kHasCoatNormalMap},
+    {&LitUniforms::coat_normal_scale, shaders::kCoatNormalScale},
     {&LitUniforms::has_normal_map, shaders::kHasNormalMap},
     {&LitUniforms::normal_scale, shaders::kNormalScale},
     {&LitUniforms::has_surface_map, shaders::kHasSurfaceMap},
