@@ -443,6 +443,7 @@ struct Renderer::Impl {
   void lay_out_scattered(const Scattered& scattered);
   // One set's, from record `first` on. Returns the record after its last.
   std::size_t lay_out_set(const ScatterSet& set, std::size_t first);
+  std::size_t lay_out_level(const ScatterSet& set, const ScatterLevel& level, std::size_t first);
   // Adds to `batches` the cells the view sees.
   void gather_scattered(const render_math::View& view, bool depth_pass);
 

@@ -174,6 +174,28 @@ detail whose distances overlap by the fade cross over without a gap). `normals_u
 copies' normals toward their own up: grass cards are then lit as the ground they stand on, so a
 field does not show the cards' faces turning light and dark with the sun.
 
+### Scatter distance LODs
+
+Use lighter templates to keep vegetation visible far away without drawing the full mesh:
+
+```ruby
+forest = Scatter.place("Tree", count: 2_000, area: [corner_a, corner_b], seed: 7,
+                       fade: 8.0, lods: [["TreeMid", 40.0], ["TreeFar", 120.0]])
+```
+
+All levels share the base template's placement, scale, tint, wind and shadow settings. Each
+replacement contributes only its mesh and materials; model it with the same origin, orientation
+and dimensions. The base template's `visible_from` and `visible_to` bound the whole chain.
+
+At 40 meters the middle mesh begins appearing; over the next 8 meters it replaces the near
+mesh through complementary dithered pixels. The far mesh takes over from 120 to 128 meters.
+A zero `fade` switches immediately. Up to three replacements are supported. Distances must
+increase, leaving more than `fade` meters between transitions and before `visible_to`.
+
+`count` reports placed copies and `remove` removes the whole chain. Each representation uses
+one drawing record per copy: this example uses 6,000 of the scene's 262,144-record budget.
+An invalid chain or an exhausted budget adds nothing. Omitting `lods` keeps the original rendering.
+
 ## Terrain
 
 **GameObject > Terrain** adds a square of ground, 100 m across, that you shape with a brush. It
@@ -236,4 +258,3 @@ Wheels in front of the center (Blender `+Y`) steer, the rear ones get the hand b
 is driven. Wheel radius and width come from the wheel mesh. See `tools/blender/build_driving.py`.
 Blender is Z-up; the engine is Y-up like glTF: Blender `(x, y, z)` is engine `(x, z, -y)`
 (`Vector3.blender(x, y, z)` does the conversion). Forward is `-Z` (Blender `+Y`).
-

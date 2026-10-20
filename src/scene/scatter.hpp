@@ -18,12 +18,27 @@
 
 namespace redgem {
 
-// The most copies a scene's sets may hold together.
+// The most drawing records a scene's sets may hold together, counting every LOD.
 inline constexpr std::size_t kMaxScatteredCopies = 262144;
+
+// A lighter mesh taking over from this distance, in meters. It shares the base template's
+// transform and tint; models must use the same origin, size and orientation.
+struct ScatterLod {
+  int mesh = kNoIndex;
+  float from = 0.0f;
+};
+
+// A representation's drawing range, including overlap for dithered transitions.
+struct ScatterLevel {
+  int mesh = kNoIndex;
+  float from = 0.0f;
+  float to = std::numeric_limits<float>::infinity();
+};
 
 // Copies of one mesh, as its object looked when they were placed.
 struct ScatterSet {
   int id = 0;
+  std::vector<ScatterLod> lods;  // ordered by distance, after the base mesh
   int mesh = kNoIndex;
   Vec3 tint = Vec3::one();
   // Drawn only while this far from the camera, in meters (see GameObject).
@@ -38,6 +53,10 @@ struct ScatterSet {
   float fade = 0.0f;
   float normals_up = 0.0f;  // 0..1: how far the copies' normals are bent toward their own up (grass lit as a meadow)
 };
+
+// Drawing ranges for the base mesh and its lighter replacements. Adjacent levels overlap
+// for `fade` meters, keeping complementary pixels through the existing dither.
+std::vector<ScatterLevel> scatter_levels(const ScatterSet& set);
 
 // What copies are asked for: `count` of them over a box (`low` its corner with the smallest x, y
 // and z, `high` the opposite one), each turned at random around the vertical and scaled between
@@ -71,11 +90,13 @@ void scale_places(std::vector<Transform>& places, Vec3 scale);
 class Scattered {
  public:
   // Adds a set and returns its id, by which it is removed. Nothing (0) when there would be more
-  // than kMaxScatteredCopies.
+  // than kMaxScatteredCopies drawing records (including LODs).
   int add(ScatterSet set);
   bool remove(int id);
   void clear();
   std::size_t copies() const;
+  // Drawing records, counting each copy once for every representation.
+  std::size_t records() const;
   const std::vector<ScatterSet>& sets() const { return sets_; }
   // Changes whenever the sets do, and is never the same for two scenes of a session (so whoever
   // drew another scene's copies knows to start over).

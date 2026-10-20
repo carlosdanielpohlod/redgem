@@ -55,6 +55,9 @@ struct ScatterLayout {
 // chunk_copies does.
 ScatterLayout lay_out_copies(const ScatterSet& set, const Bounds& bounds, std::size_t first,
                              std::vector<std::size_t>& order);
+// Uses a replacement mesh and its range, sharing the original placement.
+ScatterLayout lay_out_level(const ScatterSet& set, const ScatterLevel& level, const Bounds& bounds, std::size_t first,
+                            std::vector<std::size_t>& order);
 // Adds to `batches` the copies of a set the view draws: whole cells, and the copies of a cell
 // across the distances the set is drawn at that are within them.
 void gather_set(InstanceBatches& batches, const View& view, const ScatterLayout& layout);

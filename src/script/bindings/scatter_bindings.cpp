@@ -31,7 +31,9 @@ constexpr mrb_float kFullVariation = 1.0;
 constexpr mrb_float kNoFade = 0.0;
 constexpr mrb_float kAsModelled = 0.0;  // normals as the mesh has them
 constexpr mrb_float kStraightUp = 1.0;
-constexpr int kPlaceArgs = 13;
+constexpr int kPlaceArgs = 14;
+constexpr int kLodParts = 2;  // a template and the distance where it starts taking over
+constexpr int kMostLods = 3;  // base plus three replacements keeps record memory bounded
 constexpr auto kMostTints = static_cast<int>(kMaxScatterTints);
 constexpr int kAnswerParts = 2;  // what Scatter.__place answers: an id and a count
 constexpr auto kMostCopies = static_cast<int>(kMaxScatteredCopies);
@@ -78,6 +80,7 @@ void set_box(mrb_state* mrb, ScatterRequest& request, mrb_value first, mrb_value
 struct PlaceArgs {
   mrb_value source;
   mrb_value ground;
+  mrb_value lods;
   ScatterRequest request;
   ScatterLooks looks;
   float fade = 0.0f;
@@ -108,14 +111,14 @@ void set_looks(mrb_state* mrb, PlaceArgs& args, mrb_value tints, mrb_float varia
 }
 
 // Scatter.__place(template, count, corner, corner, ground, seed, smallest, largest, align, tints,
-//                 tint_variation, fade, normals_up)
+//                 tint_variation, fade, normals_up, lods)
 PlaceArgs place_args(mrb_state* mrb) {
   PlaceArgs args{};
   mrb_value first, second, tints;
   mrb_float count = 0.0, seed = 0.0, smallest = 1.0, largest = 1.0, variation = 0.0, fade = 0.0, normals_up = 0.0;
   mrb_bool align = false;
-  mrb_get_args(mrb, "ofooofffbofff", &args.source, &count, &first, &second, &args.ground, &seed, &smallest, &largest,
-               &align, &tints, &variation, &fade, &normals_up);
+  mrb_get_args(mrb, "ofooofffbofffo", &args.source, &count, &first, &second, &args.ground, &seed, &smallest, &largest,
+               &align, &tints, &variation, &fade, &normals_up, &args.lods);
   set_looks(mrb, args, tints, variation, fade, normals_up);
   args.request.count = static_cast<std::size_t>(from_to(mrb, count, kOneCopy, kMaxScatteredCopies, "the count"));
   args.request.seed = static_cast<std::uint32_t>(from_to(mrb, seed, 0.0, kLargestSeed, "the seed"));
@@ -124,6 +127,30 @@ PlaceArgs place_args(mrb_state* mrb) {
   args.request.align = align;
   set_box(mrb, args.request, first, second);
   return args;
+}
+
+// One replacement, checked before any copies are placed.
+ScatterLod lod_arg(mrb_state* mrb, mrb_value pair, float previous, float end, float fade) {
+  if (!is_list(pair)) mrb_raise(mrb, E_ARGUMENT_ERROR, "each lod must be a [template, distance] pair");
+  if (RARRAY_LEN(pair) != kLodParts) mrb_raise(mrb, E_ARGUMENT_ERROR, "each lod must have two entries");
+  const auto distance = static_cast<float>(mrb_as_float(mrb, mrb_ary_ref(mrb, pair, 1)));
+  const auto from = static_cast<float>(more_than(mrb, distance, previous + fade, "lod distance"));
+  if (from + fade >= end) mrb_raise(mrb, E_ARGUMENT_ERROR, "lod transition exceeds visible_to");
+  return {template_arg(mrb, mrb_ary_ref(mrb, pair, 0)).mesh, from};
+}
+
+// Validates the whole chain before placing any copies, so errors change no scene.
+std::vector<ScatterLod> lods_arg(mrb_state* mrb, const PlaceArgs& args, const GameObject& object) {
+  std::vector<ScatterLod> lods;
+  if (mrb_nil_p(args.lods)) return lods;
+  if (!is_list(args.lods)) mrb_raise(mrb, E_ARGUMENT_ERROR, "lods must be a list of [template, distance] pairs");
+  if (RARRAY_LEN(args.lods) > kMostLods) mrb_raise(mrb, E_ARGUMENT_ERROR, "lods holds at most three replacements");
+  float previous = object.visible_from;
+  for (mrb_int i = 0; i < RARRAY_LEN(args.lods); ++i) {
+    lods.push_back(lod_arg(mrb, mrb_ary_ref(mrb, args.lods, i), previous, object.visible_to, args.fade));
+    previous = lods.back().from;
+  }
+  return lods;
 }
 
 // The set of copies of `object`: its mesh and look, at `places` scaled by its own scale.
@@ -147,10 +174,14 @@ ScatterSet set_of(mrb_state* mrb, const GameObject& object, const PlaceArgs& arg
 mrb_value scatter_place(mrb_state* mrb, mrb_value) {
   const PlaceArgs args = place_args(mrb);
   const GameObject& object = template_arg(mrb, args.source);
+  const auto lods = lods_arg(mrb, args, object);
   std::vector<Transform> places = scatter_places(args.request, ground_of(mrb, args.ground));
   const auto placed = static_cast<mrb_int>(places.size());
-  const int id = scene(mrb).scattered().add(set_of(mrb, object, args, std::move(places)));
-  if (id == 0) mrb_raisef(mrb, E_ARGUMENT_ERROR, "a scene holds at most %d scattered copies", kMostCopies);
+  ScatterSet set = set_of(mrb, object, args, std::move(places));
+  set.lods = lods;
+  const int id = scene(mrb).scattered().add(std::move(set));
+  if (id == 0)
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "a scene holds at most %d scatter drawing records, including LODs", kMostCopies);
   const mrb_value answer[] = {mrb_int_value(mrb, id), mrb_int_value(mrb, placed)};
   return mrb_ary_new_from_values(mrb, kAnswerParts, answer);
 }
