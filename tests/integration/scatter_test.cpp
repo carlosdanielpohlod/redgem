@@ -143,3 +143,46 @@ TEST_CASE("without a ground, copies stand on the bottom of their area") {
   ruby(*engine, "Scatter.place('Tuft', count: 10, area: [Vector3[-1, 5, -1], Vector3[1, 9, 1]])");
   for (const Transform& place : places(*engine, 0)) CHECK(place.position.y == 5.0f);
 }
+
+TEST_CASE("Scatter.place shares placements and appearance with its lighter distance meshes") {
+  constexpr float kReplacementDistance = 30.0f;  // meters before the ground mesh takes over
+  const SceneDesc scene = meadow();
+  auto engine = engine_for(scene);
+  CHECK(ruby(*engine,
+             "$lods = Scatter.place('Tuft', count: 10, area: [Vector3.zero, Vector3.one], "
+             "fade: 4.0, lods: [['Ground', 30.0]]); $lods.count") == "10");
+  const auto& sets = engine->scene().scattered().sets();
+  REQUIRE(sets.size() == 1);
+  REQUIRE(sets.front().lods.size() == 1);
+  CHECK(sets.front().lods.front().mesh == kGroundMesh);
+  CHECK(sets.front().lods.front().from == kReplacementDistance);
+  CHECK(sets.front().places.size() == 10);
+  CHECK(engine->scene().scattered().records() == 20);
+  CHECK(engine->scene().scattered().copies() == 10);
+  CHECK(ruby(*engine, "$lods.remove") == "true");
+  CHECK(engine->scene().scattered().sets().empty());
+}
+
+TEST_CASE("Scatter.place rejects invalid LOD chains without adding partial sets") {
+  const SceneDesc scene = meadow();
+  auto engine = engine_for(scene);
+  const std::string call = "Scatter.place('Tuft', count: 1, area: [Vector3.zero, Vector3.one], fade: 4.0, lods: ";
+  for (const std::string& lods :
+       {"false", "[false]", "[['Ground']]", "[['Nobody', 30.0]]", "[['Empty', 30.0]]", "[['Ground', -1.0]]",
+        "[['Ground', 1e100]]", "[['Ground', 3.0]]", "[['Ground', 30.0], ['Tuft', 32.0]]",
+        "[['Ground', 30.0], ['Tuft', 20.0]]", "[['Ground', 10.0], ['Tuft', 20.0], ['Ground', 30.0], ['Tuft', 40.0]]"}) {
+    CHECK_MESSAGE(fails(*engine, call + lods + ")"), lods);
+    CHECK(engine->scene().scattered().sets().empty());
+  }
+}
+
+TEST_CASE("Scatter.place keeps all LOD transitions inside the base drawing range") {
+  SceneDesc scene = meadow();
+  constexpr double kEndDistance = 32.0;  // the end must leave room for the whole transition
+  scene.nodes[kTuftNode].props["visible_to"] = kEndDistance;
+  auto engine = engine_for(scene);
+  CHECK(fails(*engine,
+              "Scatter.place('Tuft', count: 1, area: [Vector3.zero, Vector3.one], "
+              "fade: 4.0, lods: [['Ground', 30.0]])"));
+  CHECK(engine->scene().scattered().sets().empty());
+}

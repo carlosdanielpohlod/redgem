@@ -26,12 +26,16 @@ void Renderer::Impl::lay_out_scattered(const Scattered& scattered) {
 }
 
 std::size_t Renderer::Impl::lay_out_set(const ScatterSet& set, std::size_t first) {
-  if (!is_index_of(set.mesh, meshes.size())) return first;
+  for (const ScatterLevel& level : scatter_levels(set)) first = lay_out_level(set, level, first);
+  return first;
+}
+
+std::size_t Renderer::Impl::lay_out_level(const ScatterSet& set, const ScatterLevel& level, std::size_t first) {
+  if (!is_index_of(level.mesh, meshes.size())) return first;
   std::vector<std::size_t> order;
-  const Bounds& bounds = mesh_bounds[static_cast<std::size_t>(set.mesh)];
-  scatter_layouts.push_back(render_math::lay_out_copies(set, bounds, first, order));
-  render_math::InstanceLook look{set.tint, render_math::kNoBones, set.visible_from, set.visible_to,
-                                 set.fade, set.normals_up};
+  const Bounds& bounds = mesh_bounds[static_cast<std::size_t>(level.mesh)];
+  scatter_layouts.push_back(render_math::lay_out_level(set, level, bounds, first, order));
+  render_math::InstanceLook look{set.tint, render_math::kNoBones, level.from, level.to, set.fade, set.normals_up};
   look.sway = set.sways ? render_math::kSways : render_math::kStill;
   for (std::size_t at = 0; at < order.size(); ++at) {
     look.tint = copy_tint(set, order[at]);

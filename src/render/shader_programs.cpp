@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "render/shader_source.hpp"
+#include "render/mesh_pass.hpp"
 #include "render/shaders/motion.hpp"
 #include "render/shaders/particle.hpp"
 #include "render/shaders/temporal.hpp"
@@ -15,9 +16,14 @@ namespace {
 
 // The uniforms raylib has a place for, under the lit shader's own names for them.
 constexpr std::pair<int, const char*> kKnownUniforms[] = {
-    {SHADER_LOC_VECTOR_VIEW, shaders::kViewPosition},   {SHADER_LOC_MAP_EMISSION, shaders::kEmissiveMap},
-    {SHADER_LOC_MAP_NORMAL, shaders::kNormalMap},       {SHADER_LOC_MAP_ROUGHNESS, shaders::kSurfaceMap},
+    {SHADER_LOC_VECTOR_VIEW, shaders::kViewPosition},
+    {SHADER_LOC_MAP_EMISSION, shaders::kEmissiveMap},
+    {SHADER_LOC_MAP_NORMAL, shaders::kNormalMap},
+    {SHADER_LOC_MAP_ROUGHNESS, shaders::kSurfaceMap},
     {SHADER_LOC_MAP_OCCLUSION, shaders::kOcclusionMap},
+    {SHADER_LOC_MAP_DIFFUSE + kCoatFactorMap, shaders::kCoatFactorMap},
+    {SHADER_LOC_MAP_DIFFUSE + kCoatRoughnessMap, shaders::kCoatRoughnessMap},
+    {SHADER_LOC_MAP_DIFFUSE + kCoatNormalMap, shaders::kCoatNormalMap},
 };
 
 // A uniform of the lit shader, and where its location is kept.
@@ -28,6 +34,18 @@ struct LitUniform {
 
 constexpr LitUniform kLitUniforms[] = {
     // Per object and per material.
+    {&LitUniforms::water_ready, shaders::kWaterReady},
+    {&LitUniforms::water_absorption, shaders::kWaterAbsorption},
+    {&LitUniforms::water_surface, shaders::kWaterSurface},
+    {&LitUniforms::water_planes, shaders::kWaterPlanes},
+    {&LitUniforms::water_background, shaders::kWaterBackground},
+    {&LitUniforms::water_depth, shaders::kWaterDepth},
+    {&LitUniforms::coat_factor, shaders::kCoatFactor},
+    {&LitUniforms::coat_roughness, shaders::kCoatRoughness},
+    {&LitUniforms::has_coat_factor_map, shaders::kHasCoatFactorMap},
+    {&LitUniforms::has_coat_roughness_map, shaders::kHasCoatRoughnessMap},
+    {&LitUniforms::has_coat_normal_map, shaders::kHasCoatNormalMap},
+    {&LitUniforms::coat_normal_scale, shaders::kCoatNormalScale},
     {&LitUniforms::has_normal_map, shaders::kHasNormalMap},
     {&LitUniforms::normal_scale, shaders::kNormalScale},
     {&LitUniforms::has_surface_map, shaders::kHasSurfaceMap},
@@ -131,6 +149,11 @@ LitUniforms find_lit_uniforms(Shader& lit) {
   LitUniforms found;
   for (const LitUniform& uniform : kLitUniforms) found.*uniform.location = GetShaderLocation(lit, uniform.name);
   return found;
+}
+
+WaterUniforms find_water_uniforms(const Shader& program) {
+  return {GetShaderLocation(program, shaders::kWaterEnabled),
+          GetShaderLocation(program, shaders::kWaterWaveParameters)};
 }
 
 DepthUniforms find_depth_uniforms(const Shader& depth) {

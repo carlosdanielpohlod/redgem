@@ -285,3 +285,67 @@ TEST_CASE("scattered see-through copies are drawn cell by cell, sorted by the di
   CHECK(draws[1].count == 1);
   CHECK(draws[1].mesh == kNearMesh);
 }
+
+TEST_CASE("scatter LOD ranges overlap only over their dither transition") {
+  constexpr float kFirstLod = 30.0f;  // meters where the lighter mesh starts appearing
+  constexpr float kSecondLod = 90.0f;
+  constexpr float kTransition = 8.0f;  // meters shared by neighbouring representations
+  constexpr float kEnd = 300.0f;
+  ScatterSet set;
+  set.mesh = kNearMesh;
+  set.visible_to = kEnd;
+  set.fade = kTransition;
+  set.lods = {{kFarMesh, kFirstLod}, {kNearMesh, kSecondLod}};
+  const auto levels = scatter_levels(set);
+  REQUIRE(levels.size() == 3);
+  CHECK(levels[0].mesh == kNearMesh);
+  CHECK(levels[0].from == 0.0f);
+  CHECK(levels[0].to == kFirstLod + kTransition);
+  CHECK(levels[1].mesh == kFarMesh);
+  CHECK(levels[1].from == kFirstLod);
+  CHECK(levels[1].to == kSecondLod + kTransition);
+  CHECK(levels[2].from == kSecondLod);
+  CHECK(levels[2].to == kEnd);
+}
+
+TEST_CASE("a scatter without LODs keeps its original range") {
+  ScatterSet set;
+  set.mesh = kFarMesh;
+  set.visible_from = kNear;
+  const auto levels = scatter_levels(set);
+  REQUIRE(levels.size() == 1);
+  CHECK(levels.front().mesh == set.mesh);
+  CHECK(levels.front().from == set.visible_from);
+  CHECK(levels.front().to == set.visible_to);
+}
+
+TEST_CASE("scatter LODs count every representation against the drawing budget") {
+  Scattered scattered;
+  ScatterSet set;
+  set.places.resize(kMaxScatteredCopies / 2);
+  set.lods = {{kFarMesh, kLodBoundary}};
+  const int id = scattered.add(set);
+  REQUIRE(id != 0);
+  CHECK(scattered.records() == kMaxScatteredCopies);
+  CHECK(scattered.copies() == set.places.size());
+  CHECK(scattered.add(set) == 0);
+  CHECK(scattered.remove(id));
+  CHECK(scattered.copies() == 0);
+}
+
+TEST_CASE("LOD distance culling uses the placement origin even for an offset mesh") {
+  constexpr Vec3 kOffset{0.0f, 20.0f, 0.0f};  // tree geometry above the origin at its roots
+  constexpr float kEnd = 4.0f;
+  ScatterSet set;
+  set.mesh = kNearMesh;
+  set.places = {redgem::Transform{}};
+  set.lods = {{kFarMesh, kLodBoundary}};
+  Bounds bounds;
+  bounds.include(kOffset - Vec3::one());
+  bounds.include(kOffset + Vec3::one());
+  std::vector<std::size_t> order;
+  const auto layout = lay_out_level(set, {kNearMesh, 0.0f, kEnd}, bounds, 0, order);
+  REQUIRE(layout.centers.size() == 1);
+  CHECK(approx_equal(layout.centers.front(), Vec3::zero(), kTolerance));
+  CHECK(reach_of(identity_view(Vec3::zero()), layout.chunks.front(), 0.0f, kEnd) != Reach::None);
+}

@@ -180,6 +180,10 @@ struct Renderer::Impl {
   Shader shader{};
   render_detail::LitUniforms lit_uniforms;
   shaders::LitFeatures lit_features;  // what the lit shader was compiled with
+  render_detail::WaterUniforms lit_water;
+  render_detail::WaterUniforms motion_water;
+  render_detail::WaterUniforms depth_water;
+  RenderTexture2D water_background{};  // immutable opaque color and depth for the water pass
   Shader depth_shader{};
   render_detail::DepthUniforms depth_uniforms;
   int lit_instance_slot = render_detail::kNoLocation;  // the vertex attribute each copy's record number goes to
@@ -313,6 +317,10 @@ struct Renderer::Impl {
   // Copies the picture of several samples a pixel into hdr; when the card cannot, says so once and
   // draws one sample a pixel from then on.
   void resolve_samples();
+  void ensure_water_target();
+  void capture_water_background();
+  void send_water(const WaterDesc& water, render_math::AlphaPass pass);
+  float mesh_wave_height(int mesh) const;
   void ensure_glow_target();
   void ensure_scene_depth_target();
   void ensure_temporal_targets();
@@ -411,6 +419,7 @@ struct Renderer::Impl {
   // true when it must be drawn without backface culling.
   bool apply_material(int index, render_math::AlphaPass pass);
   void send_surface(const MaterialDesc& factors);
+  void send_clearcoat(const ClearcoatDesc& coat);
   void cover_edges(bool cut_out);
   void send_alpha(const render_math::AlphaTest& test);
   void send_motion_alpha(const render_math::AlphaTest& test, bool covering);
@@ -443,6 +452,7 @@ struct Renderer::Impl {
   void lay_out_scattered(const Scattered& scattered);
   // One set's, from record `first` on. Returns the record after its last.
   std::size_t lay_out_set(const ScatterSet& set, std::size_t first);
+  std::size_t lay_out_level(const ScatterSet& set, const ScatterLevel& level, std::size_t first);
   // Adds to `batches` the cells the view sees.
   void gather_scattered(const render_math::View& view, bool depth_pass);
 

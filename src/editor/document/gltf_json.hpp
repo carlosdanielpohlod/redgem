@@ -115,6 +115,10 @@ inline constexpr const char* kPerspectiveCamera = "perspective";
 
 // Extensions the editor writes.
 inline constexpr const char* kLightsExtension = "KHR_lights_punctual";
+inline constexpr const char* kClearcoatExtension = "KHR_materials_clearcoat";
+inline constexpr const char* kClearcoatNormalTexture = "clearcoatNormalTexture";
+inline constexpr const char* kClearcoatFactor = "clearcoatFactor";
+inline constexpr const char* kClearcoatRoughnessFactor = "clearcoatRoughnessFactor";
 inline constexpr const char* kEmissiveStrengthExtension = "KHR_materials_emissive_strength";
 
 // What a document made here says about itself.

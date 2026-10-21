@@ -180,6 +180,11 @@ void Renderer::Impl::make_targets(int width, int height) {
   occlusion_b = load_target(occlusion_width, occlusion_height, kScreenFormat, false);
 }
 
+void Renderer::Impl::ensure_water_target() {
+  if (!loaded(water_background))
+    water_background = load_target(hdr.texture.width, hdr.texture.height, kHdrFormat, true);
+}
+
 void Renderer::Impl::ensure_glow_target() {
   if (!loaded(glow)) glow = load_target_on(hdr.depth, kHdrFormat);
 }
@@ -204,7 +209,8 @@ void Renderer::Impl::release_temporal_targets() {
 
 void Renderer::Impl::release_targets() {
   unload_target_on(glow);  // before the lit picture, whose depth it draws on
-  for (RenderTexture2D* target : {&hdr, &bloom_a, &bloom_b, &ldr, &occlusion_a, &occlusion_b}) unload(*target);
+  for (RenderTexture2D* target : {&hdr, &bloom_a, &bloom_b, &ldr, &occlusion_a, &occlusion_b, &water_background})
+    unload(*target);
   release_temporal_targets();
   render_detail::release(scene_samples);
   unload_depth_target(scene_depth);

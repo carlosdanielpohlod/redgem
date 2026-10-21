@@ -13,9 +13,15 @@
 
 namespace redgem::render_detail {
 
+// Unused material map entries hold the coat's linear maps. All remain below the frame's slots.
+inline constexpr int kCoatFactorMap = MATERIAL_MAP_METALNESS;
+inline constexpr int kCoatRoughnessMap = MATERIAL_MAP_HEIGHT;
+inline constexpr int kCoatNormalMap = MATERIAL_MAP_CUBEMAP;
+
 // The texture maps materials use (base color, emission, normal, metallic-roughness, occlusion).
-inline constexpr int kMaterialMaps[] = {MATERIAL_MAP_ALBEDO, MATERIAL_MAP_EMISSION, MATERIAL_MAP_NORMAL,
-                                        MATERIAL_MAP_ROUGHNESS, MATERIAL_MAP_OCCLUSION};
+inline constexpr int kMaterialMaps[] = {MATERIAL_MAP_ALBEDO,    MATERIAL_MAP_EMISSION,  MATERIAL_MAP_NORMAL,
+                                        MATERIAL_MAP_ROUGHNESS, MATERIAL_MAP_OCCLUSION, kCoatFactorMap,
+                                        kCoatRoughnessMap,      kCoatNormalMap};
 
 // Meshes being drawn through one shader, from the view raylib is in (between BeginMode3D and
 // EndMode3D).

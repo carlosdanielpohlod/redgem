@@ -57,10 +57,22 @@ void scale_places(std::vector<Transform>& places, Vec3 scale) {
   for (Transform& place : places) place.scale = hadamard(place.scale, scale);
 }
 
+std::vector<ScatterLevel> scatter_levels(const ScatterSet& set) {
+  std::vector<ScatterLevel> levels;
+  ScatterLevel level{set.mesh, set.visible_from, set.visible_to};
+  for (const ScatterLod& lod : set.lods) {
+    level.to = lod.from + set.fade;
+    levels.push_back(level);
+    level = {lod.mesh, lod.from, set.visible_to};
+  }
+  levels.push_back(level);
+  return levels;
+}
+
 // --- A scene's sets -----------------------------------------------------------------------------
 
 int Scattered::add(ScatterSet set) {
-  if (copies() + set.places.size() > kMaxScatteredCopies) return 0;
+  if (records() + set.places.size() * (set.lods.size() + 1) > kMaxScatteredCopies) return 0;
   set.id = next_id_++;
   sets_.push_back(std::move(set));
   changed();
@@ -83,6 +95,12 @@ void Scattered::clear() {
 std::size_t Scattered::copies() const {
   std::size_t total = 0;
   for (const ScatterSet& set : sets_) total += set.places.size();
+  return total;
+}
+
+std::size_t Scattered::records() const {
+  std::size_t total = 0;
+  for (const ScatterSet& set : sets_) total += set.places.size() * (set.lods.size() + 1);
   return total;
 }
 

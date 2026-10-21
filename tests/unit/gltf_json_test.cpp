@@ -391,3 +391,36 @@ TEST_CASE("an index is written as a number, and taken out when there is none") {
   set_or_erase_index(node, kSkin, kAnIndex);
   CHECK(node[kSkin] == kAnIndex);
 }
+
+TEST_CASE("saving a coating preserves texture references and writes its factors and normal scale") {
+  constexpr float kCoat = 0.8f;
+  constexpr float kCoatRoughness = 0.15f;
+  constexpr float kCoatNormalScale = 0.6f;
+  constexpr int kNormalTexture = 3;
+  MaterialDesc material;
+  material.clearcoat.factor = kCoat;
+  material.clearcoat.roughness = kCoatRoughness;
+  material.clearcoat.normal_scale = kCoatNormalScale;
+  const json original = {
+      {kExtensions, {{kClearcoatExtension, {{kClearcoatNormalTexture, {{kIndex, kNormalTexture}, {kScale, 1.0f}}}}}}}};
+  const auto saved = material_json(material, original);
+  const auto& coat = saved[kExtensions][kClearcoatExtension];
+  CHECK(coat[kClearcoatFactor] == kCoat);
+  CHECK(coat[kClearcoatRoughnessFactor] == kCoatRoughness);
+  CHECK(coat[kClearcoatNormalTexture][kIndex] == kNormalTexture);
+  CHECK(coat[kClearcoatNormalTexture][kScale] == kCoatNormalScale);
+}
+
+TEST_CASE("saving water controls keeps unrelated material extras") {
+  MaterialDesc material;
+  material.water.enabled = true;
+  constexpr float kHeight = 0.2f;
+  material.water.wave_height = kHeight;
+  const auto saved = material_json(material, {{"extras", {{"artist_note", "pond"}}}});
+  CHECK(saved["extras"]["water"] == true);
+  CHECK(saved["extras"]["wave_height"].get<float>() == doctest::Approx(kHeight));
+  CHECK(saved["extras"]["absorption_red"].get<float>() == doctest::Approx(material.water.absorption.x));
+  CHECK(saved["extras"]["artist_note"] == "pond");
+  material.water.enabled = false;
+  CHECK(material_json(material, saved)["extras"]["water"] == false);
+}

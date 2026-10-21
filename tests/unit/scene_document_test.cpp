@@ -964,3 +964,48 @@ TEST_CASE("a .glb whose JSON is nested very deep is refused when read") {
   std::filesystem::remove(deep);
   std::filesystem::remove(shallow);
 }
+
+TEST_CASE("a clearcoat-only material edit survives undo, redo and saving") {
+  constexpr float kCoat = 0.75f;
+  constexpr float kRoughness = 0.12f;
+  SceneDocument doc = open_fixture();
+  const int box = doc.add_primitive(PrimitiveShape::Cube, "CoatedBox", Color{});
+  const int material = doc.material_of(box);
+  MaterialDesc edited = doc.material(material);
+  edited.clearcoat.factor = kCoat;
+  edited.clearcoat.roughness = kRoughness;
+  doc.set_material(material, edited);
+  REQUIRE(doc.undo());
+  CHECK(doc.material(material).clearcoat.factor == 0.0f);
+  REQUIRE(doc.redo());
+  const auto out = temp_copy_path("clearcoat");
+  std::string error;
+  REQUIRE(doc.save_as(out, error));
+  const auto loaded = load_gltf_scene(out.string());
+  REQUIRE_MESSAGE(loaded.ok, loaded.error);
+  CHECK(loaded.scene.materials[material].clearcoat.factor == doctest::Approx(kCoat));
+  CHECK(loaded.scene.materials[material].clearcoat.roughness == doctest::Approx(kRoughness));
+  std::filesystem::remove(out);
+}
+
+TEST_CASE("water-only edits retain their settings through undo, redo and saving") {
+  SceneDocument doc = open_fixture();
+  const int plane = doc.add_primitive(PrimitiveShape::Plane, "Pond", Color{});
+  const int material = doc.material_of(plane);
+  MaterialDesc edited = doc.material(material);
+  edited.water.enabled = true;
+  constexpr float kHeight = 0.14f;
+  edited.water.wave_height = kHeight;
+  doc.set_material(material, edited);
+  REQUIRE(doc.undo());
+  CHECK_FALSE(doc.material(material).water.enabled);
+  REQUIRE(doc.redo());
+  const auto out = temp_copy_path("water");
+  std::string error;
+  REQUIRE(doc.save_as(out, error));
+  const auto loaded = load_gltf_scene(out.string());
+  REQUIRE_MESSAGE(loaded.ok, loaded.error);
+  CHECK(loaded.scene.materials[material].water.enabled);
+  CHECK(loaded.scene.materials[material].water.wave_height == doctest::Approx(kHeight));
+  std::filesystem::remove(out);
+}

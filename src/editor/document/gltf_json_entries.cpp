@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <iterator>
 
+#include "scene/props.hpp"
+
 namespace redgem::gltf_json {
 namespace {
 
@@ -55,6 +57,39 @@ void write_emission(nlohmann::json& out, const MaterialDesc& material) {
   }
 }
 
+bool has_coat(const nlohmann::json& out) {
+  return has_object(out, kExtensions) && out[kExtensions].contains(kClearcoatExtension);
+}
+
+bool omits_coat(const nlohmann::json& out, const ClearcoatDesc& coat) { return coat.factor <= 0.0f && !has_coat(out); }
+
+void write_clearcoat(nlohmann::json& out, const ClearcoatDesc& coat) {
+  if (omits_coat(out, coat)) return;
+  auto& extension = out[kExtensions][kClearcoatExtension];
+  extension[kClearcoatFactor] = coat.factor;
+  extension[kClearcoatRoughnessFactor] = coat.roughness;
+  if (has_object(extension, kClearcoatNormalTexture)) extension[kClearcoatNormalTexture][kScale] = coat.normal_scale;
+}
+
+bool omits_water(const nlohmann::json& out, const WaterDesc& water) {
+  const bool had_water = has_object(out, kExtras) && out[kExtras].contains(props::kWater);
+  return !water.enabled && !had_water;
+}
+
+void write_water(nlohmann::json& out, const WaterDesc& water) {
+  if (omits_water(out, water)) return;
+  auto& extras = out[kExtras];
+  extras[props::kWater] = water.enabled;
+  extras[props::kWaveHeight] = water.wave_height;
+  extras[props::kWavelength] = water.wavelength;
+  extras[props::kWaveSpeed] = water.speed;
+  extras[props::kAbsorptionRed] = water.absorption.x;
+  extras[props::kAbsorptionGreen] = water.absorption.y;
+  extras[props::kAbsorptionBlue] = water.absorption.z;
+  extras[props::kFoamWidth] = water.foam_width;
+  extras[props::kRefraction] = water.refraction;
+}
+
 // A node gets a new entry when it came from none, or when another node took the one it came from.
 bool needs_new_entry(bool known, const std::set<int>& claimed, int source) {
   return !known || claimed.count(source) != 0;
@@ -94,6 +129,8 @@ nlohmann::json material_json(const MaterialDesc& material, const nlohmann::json&
   out[kPbr][kMetallicFactor] = material.metallic;
   out[kPbr][kRoughnessFactor] = material.roughness;
   write_emission(out, material);
+  write_clearcoat(out, material.clearcoat);
+  write_water(out, material.water);
   return out;
 }
 

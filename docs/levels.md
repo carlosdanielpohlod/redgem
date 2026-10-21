@@ -133,6 +133,18 @@ other objects are drawn in that order, so that surfaces lying on each other look
 screen, and of separate parts in each: join the parts of a model that share a material, and give
 heavy models lighter versions for far away with `visible_from` and `visible_to`.
 
+### Coated materials
+
+Blender's Principled BSDF coat is read through `KHR_materials_clearcoat`. A polished coating
+can sit above rough paint, wood or a textured base. Its weight and roughness have independent
+linear maps (red and green channels respectively), and its normal map does not change the base
+normal. The coating reflects the sun, point lights and the environment while attenuating the
+base layer and emission by Fresnel, rather than adding unlimited brightness.
+
+Export the coat with the material in glTF. A zero coat weight preserves the original shading.
+The editor keeps its factors, texture references and normal scale through import and saving.
+The layering follows the [glTF clearcoat extension](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_clearcoat).
+
 ## Grass, forests and cities
 
 Tens of thousands of copies (a meadow's grass, a forest) are too many to be objects: a script
@@ -173,6 +185,28 @@ instead of popping away (and fade in after its `visible_from`, when it has one: 
 detail whose distances overlap by the fade cross over without a gap). `normals_up` bends the
 copies' normals toward their own up: grass cards are then lit as the ground they stand on, so a
 field does not show the cards' faces turning light and dark with the sun.
+
+### Scatter distance LODs
+
+Use lighter templates to keep vegetation visible far away without drawing the full mesh:
+
+```ruby
+forest = Scatter.place("Tree", count: 2_000, area: [corner_a, corner_b], seed: 7,
+                       fade: 8.0, lods: [["TreeMid", 40.0], ["TreeFar", 120.0]])
+```
+
+All levels share the base template's placement, scale, tint, wind and shadow settings. Each
+replacement contributes only its mesh and materials; model it with the same origin, orientation
+and dimensions. The base template's `visible_from` and `visible_to` bound the whole chain.
+
+At 40 meters the middle mesh begins appearing; over the next 8 meters it replaces the near
+mesh through complementary dithered pixels. The far mesh takes over from 120 to 128 meters.
+A zero `fade` switches immediately. Up to three replacements are supported. Distances must
+increase, leaving more than `fade` meters between transitions and before `visible_to`.
+
+`count` reports placed copies and `remove` removes the whole chain. Each representation uses
+one drawing record per copy: this example uses 6,000 of the scene's 262,144-record budget.
+An invalid chain or an exhausted budget adds nothing. Omitting `lods` keeps the original rendering.
 
 ## Terrain
 
@@ -237,3 +271,46 @@ is driven. Wheel radius and width come from the wheel mesh. See `tools/blender/b
 Blender is Z-up; the engine is Y-up like glTF: Blender `(x, y, z)` is engine `(x, z, -y)`
 (`Vector3.blender(x, y, z)` does the conversion). Forward is `-Z` (Blender `+Y`).
 
+
+## Water surfaces
+
+A horizontal, upward-facing mesh becomes water when its material has the Blender custom
+property `water = true`. Enable custom properties in the glTF export. The surface is drawn
+after opaque geometry: it refracts that picture, absorbs light through the depth behind it,
+and reflects on-screen objects with a sky and surroundings fallback. The material's base color is its deep-water
+color and roughness controls its reflections. Its alpha is ignored; transparency comes from
+water depth and absorption instead.
+
+| Material custom property | Default | Meaning |
+| --- | --- | --- |
+| `water` | `false` | Use water shading. |
+| `wave_height` | `0.08` | Maximum vertical displacement in world meters, from 0 to 10. |
+| `wavelength` | `3` | Dominant wavelength in meters, from 0.05 to 1000. |
+| `wave_speed` | `1` | Wave clock multiplier, from 0 (still) to 10. |
+| `absorption_red` | `0.35` | Red light absorption per meter, from 0 to 10. |
+| `absorption_green` | `0.08` | Green light absorption per meter, from 0 to 10. |
+| `absorption_blue` | `0.035` | Blue light absorption per meter, from 0 to 10. |
+| `foam_width` | `0.12` | Shallow depth range for white shore foam, in meters; 0 disables it. |
+| `refraction` | `0.035` | Refraction strength, from 0 to 0.1; the default uses water's IOR of 1.333 and 0 keeps the bottom undistorted. |
+
+The Blender helper `scene_kit.water_material("Pond", wave_height=0.04, wavelength=2.0)`
+creates the material and its custom properties. Optional keyword arguments override the table
+above. The material preview has water's IOR and transmission; runtime waves and depth-based
+color are applied by the engine after export.
+
+Use a subdivided mesh: vertex spacing at most one tenth of the smallest visible geometric
+wavelength avoids angular silhouettes. Three traveling waves displace geometry; finer ripples
+change normals. Smooth spatial phase variation curves the crests without changing the maximum height.
+The pattern is in world coordinates, so adjacent patches share phase and mesh
+scale does not change the wavelength. Wave displacement follows the renderer's clock, including
+fixed-step recordings, and the temporal coverage pass uses the same displaced geometry.
+Water does not cast an opaque shadow. Objects keep their authored collision shapes.
+
+This first water material is for views above a lake or sea surface. Refraction samples only
+opaque geometry visible on screen; transparent objects and other water layers are absent from
+that snapshot. Screen-space reflections miss off-screen and hidden geometry and use the environment capture
+when a ray misses. There is no planar reflection pass. Shore foam follows shallow depth, without breaking-wave simulation.
+Absorption filters the transmitted picture, but does not yet attenuate lighting on its way to submerged
+objects; a lit bottom can therefore be brighter than in a full participating-medium render.
+There is no underwater camera mode, buoyancy, fluid simulation, or wave collision. Use ordinary
+scene meshes for water surfaces rather than Scatter copies.

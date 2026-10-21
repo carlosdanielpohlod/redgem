@@ -121,3 +121,11 @@ TEST_CASE("the lit pass and the shadow map's leave out the same pixels of a fadi
     CHECK(source.find(kNoiseName) == source.rfind(kNoiseName));  // defined once
   }
 }
+
+TEST_CASE("the coating shader is enabled only when a scene asks for layered materials") {
+  const shaders::LitFeatures plain;
+  const shaders::LitFeatures coated{false, false, true};
+  CHECK(plain != coated);
+  CHECK_FALSE(contains(shaders::lit_fragment(plain), shaders::kClearcoatSwitch));
+  CHECK(contains(shaders::lit_fragment(coated), shaders::kClearcoatSwitch));
+}

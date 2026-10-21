@@ -36,6 +36,10 @@ bool smooths_edges(const render_math::AlphaTest& test) {
 }
 
 // Whether a pass draws for temporal anti-aliasing: into the motion target, with the motion shader.
+bool omits_water(const MaterialDesc& material, render_math::AlphaPass pass) {
+  return material.water.enabled && pass != render_math::AlphaPass::SeeThrough && pass != render_math::AlphaPass::Cover;
+}
+
 bool for_temporal(render_math::AlphaPass pass) {
   return pass == render_math::AlphaPass::Motion || pass == render_math::AlphaPass::Cover;
 }
@@ -51,6 +55,7 @@ const MaterialDesc& Renderer::Impl::factors_of(int material) const {
 
 bool Renderer::Impl::apply_material(int index, render_math::AlphaPass pass) {
   const MaterialDesc& factors = factors_of(index);
+  send_water(factors.water, pass);
   const render_math::AlphaTest test = render_math::alpha_test(factors, wind, pass);
   if (pass == render_math::AlphaPass::Shadow) {
     send(depth_shader, depth_uniforms.alpha_cutoff, test.cutoff);
@@ -85,6 +90,7 @@ void Renderer::Impl::send_motion_alpha(const render_math::AlphaTest& test, bool 
 
 // How a material's surface answers light.
 void Renderer::Impl::send_surface(const MaterialDesc& factors) {
+  send_clearcoat(factors.clearcoat);
   const bool has_occlusion_map = factors.occlusion_image != kNoIndex;
   send(shader, lit_uniforms.has_normal_map, on_with(factors.normal_image));
   send(shader, lit_uniforms.normal_scale, factors.normal_scale);
@@ -94,6 +100,15 @@ void Renderer::Impl::send_surface(const MaterialDesc& factors) {
   send(shader, lit_uniforms.roughness, factors.roughness);
   send(shader, lit_uniforms.emissive, to_raylib(factors.emissive));
   send(shader, lit_uniforms.has_emissive_map, on_with(factors.emissive_image));
+}
+
+void Renderer::Impl::send_clearcoat(const ClearcoatDesc& coat) {
+  send(shader, lit_uniforms.coat_factor, coat.factor);
+  send(shader, lit_uniforms.coat_roughness, coat.roughness);
+  send(shader, lit_uniforms.has_coat_factor_map, on_with(coat.factor_image));
+  send(shader, lit_uniforms.has_coat_roughness_map, on_with(coat.roughness_image));
+  send(shader, lit_uniforms.has_coat_normal_map, on_with(coat.normal_image));
+  send(shader, lit_uniforms.coat_normal_scale, coat.normal_scale);
 }
 
 // With several samples a pixel, a cut-out material's edges are smoothed by them (alpha to
@@ -151,6 +166,7 @@ void Renderer::Impl::draw_batch(const render_math::InstanceBatch& batch, std::si
 }
 
 void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const InstanceRun& run, ObjectPass& pass) {
+  if (omits_water(factors_of(primitive.material), pass.alpha)) return;
   use_material(primitive.material, pass);
   const bool two_sided = pass.last_two_sided;
   if (two_sided) rlDisableBackfaceCulling();

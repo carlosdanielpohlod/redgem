@@ -58,6 +58,7 @@ uniform vec4 colDiffuse;
 uniform float alphaCutoff;
 uniform float alphaDithered;
 uniform float alphaCeiling;
+uniform float waterEnabled;
 uniform float covering;  // on: how much a see-through surface covers the pixel, into alpha alone
 out vec4 finalColor;
 )GLSL";
@@ -74,6 +75,7 @@ bool leftOut(float alpha) {
 void main() {
   if (fadedAway(fragCopy)) discard;
   float alpha = colDiffuse.a * texture(texture0, fragTexCoord).a * fragColor.a;
+  if (waterEnabled > SWITCH_ON) alpha = 1.0;
   if (leftOut(alpha)) discard;
   if (covering > SWITCH_ON) {
     finalColor = vec4(0.0, 0.0, 0.0, alpha);
@@ -89,6 +91,8 @@ void main() {
 inline std::string motion_fragment() { return std::string(kMotionHead) + kCopyFade + kMotionMain; }
 
 // The motion pass's vertex shader, whole: the lit pass's placement, done twice.
-inline std::string motion_vertex() { return std::string(kVertexHead) + kVertexPlacement + kMotionVertexMain; }
+inline std::string motion_vertex() {
+  return std::string(kVertexHead) + kWaterWaves + kVertexPlacement + kMotionVertexMain;
+}
 
 }  // namespace redgem::shaders

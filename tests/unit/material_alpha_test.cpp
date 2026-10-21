@@ -120,3 +120,16 @@ TEST_CASE("the cover pass leaves out what the see-through pass leaves out") {
   CHECK(cover.ceiling == doctest::Approx(see_through.ceiling));
   CHECK(cover.mixed);
 }
+
+TEST_CASE("water always uses the see-through pass without the nearly opaque alpha split") {
+  MaterialDesc material;
+  material.water.enabled = true;
+  CHECK(drawn_see_through(material));
+  const auto test = alpha_test(material, 1.0f, AlphaPass::SeeThrough);
+  CHECK(test.mixed);
+  CHECK(test.cutoff == kNoCutoff);
+  CHECK(test.ceiling == kNoCeiling);
+  CHECK(test.sway == kNoWind);
+  material.dithered = true;
+  CHECK(drawn_see_through(material));
+}

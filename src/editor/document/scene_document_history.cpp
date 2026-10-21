@@ -12,9 +12,21 @@ bool same_color(const Color& a, const Color& b) { return a.r == b.r && a.g == b.
 
 bool same_vec3(Vec3 a, Vec3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
 
+bool same_coat(const ClearcoatDesc& a, const ClearcoatDesc& b) {
+  return a.factor == b.factor && a.roughness == b.roughness && a.factor_image == b.factor_image &&
+         a.roughness_image == b.roughness_image && a.normal_image == b.normal_image && a.normal_scale == b.normal_scale;
+}
+
+bool same_water(const WaterDesc& a, const WaterDesc& b) {
+  return a.enabled == b.enabled && a.wave_height == b.wave_height && a.wavelength == b.wavelength &&
+         a.speed == b.speed && same_vec3(a.absorption, b.absorption) && a.foam_width == b.foam_width &&
+         a.refraction == b.refraction;
+}
+
 bool same_material(const MaterialDesc& x, const MaterialDesc& y) {
   return same_color(x.base_color, y.base_color) && x.metallic == y.metallic && x.roughness == y.roughness &&
-         same_vec3(x.emissive, y.emissive) && x.name == y.name;
+         same_vec3(x.emissive, y.emissive) && x.name == y.name && same_coat(x.clearcoat, y.clearcoat) &&
+         same_water(x.water, y.water);
 }
 
 bool same_materials(const std::vector<MaterialDesc>& a, const std::vector<MaterialDesc>& b) {

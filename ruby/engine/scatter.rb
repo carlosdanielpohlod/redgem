@@ -23,6 +23,7 @@ class Scatter
   #   tint_variation: 0.1      each copy brighter or darker by up to this share
   #   fade: 4.0                meters over which copies fade out before the template's visible_to
   #                            (and in after its visible_from) instead of popping
+  #   lods: [["TreeMid", 40.0]] lighter mesh starts taking over at 40 meters, over fade meters
   #   normals_up: 0.8          0..1: grass cards lit as the ground they stand on, not as flat cards
   def self.place(template, count:, area:, ground: nil, seed: 0, scale: 1.0, align: false, **looks)
     low, high = area
@@ -33,8 +34,8 @@ class Scatter
   end
 
   # The look options in the order Scatter.__place takes them.
-  def self.look_options(tints: nil, tint_variation: 0.0, fade: 0.0, normals_up: 0.0)
-    [tints, tint_variation.to_f, fade.to_f, normals_up.to_f]
+  def self.look_options(tints: nil, tint_variation: 0.0, fade: 0.0, normals_up: 0.0, lods: nil)
+    [tints, tint_variation.to_f, fade.to_f, normals_up.to_f, lods]
   end
 
   def initialize(id, count)
