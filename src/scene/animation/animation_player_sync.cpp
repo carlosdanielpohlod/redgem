@@ -26,6 +26,7 @@ CharacterAnimation AnimationPlayer::animation_of(const Scene& scene, ObjectId ob
   state.revision = revision_of(scene, object);
   const Own* own = own_of(scene, object);
   if (own == nullptr) return state;
+  if (has_graph(*own)) state.graph = graph_animation(*own);
   if (own->to) state.own = state_of(*own->to);
   state.fade = std::max(own->fade - own->faded, 0.0f);
   if (own->layer) state.layer = state_of(*own->layer);
@@ -40,7 +41,11 @@ void AnimationPlayer::catch_up(Track& track, const ClipState& state, float late_
 
 void AnimationPlayer::take_animation(const Scene& scene, ObjectId object, const CharacterAnimation& state,
                                      float late_by) {
-  take_own(scene, object, state, late_by);
+  if (state.graph) {
+    if (!take_graph(scene, object, *state.graph, late_by)) return;
+  } else {
+    take_own(scene, object, state, late_by);
+  }
   take_layer(scene, object, state, late_by);
 }
 

@@ -9,6 +9,10 @@ module Network
     ANIMATION_SIZE = 4        # parts of what says what its animation does: fade, weight, own clip, mixed clip
     CLIP_SIZE = 5             # parts of a clip: name, time, speed, loops, plays
     MAX_CLIP_NAME_SIZE = 64   # bytes in a clip's name, as a pose carries it
+    GRAPH_SIZE = 5           # blend, remaining fade, playing, source clips, destination clips
+    WEIGHTED_CLIP_SIZE = 2    # clip and normalized weight
+    MAX_BLEND_CLIPS = 2      # neighboring clips on each side of a fade
+    WEIGHT_TOLERANCE = 0.0001
     VECTOR_SIZE = 3           # numbers a position or a rotation travels as: x, y, z
     MAX_KEY_SIZE = 128        # bytes in the key of an object on the network (a spawned one, any NetworkSync)
     MAX_COUNT_DIGITS = 9      # in the number such a key ends with
@@ -46,10 +50,59 @@ module Network
       # [fade, weight, own clip, mixed clip]: seconds of fade (none below 0), a weight from 0 to 1,
       # and clips or nils. What is out of those would only be refused further on, every frame.
       def animation?(part)
-        return false unless list?(part, ANIMATION_SIZE)
+        return false unless animation_size?(part)
 
-        fade, weight, *clips = part
-        fade?(fade) && weight?(weight) && clips.all? { |clip| no_or_clip?(clip) }
+        fade, weight, own, layer, graph = part
+        animation_values?(fade, weight, own, layer) && compatible_graph?(graph, own)
+      end
+
+      def animation_size?(part) = list?(part, ANIMATION_SIZE) || list?(part, ANIMATION_SIZE + 1)
+
+      def animation_values?(fade, weight, own, layer)
+        fade?(fade) && weight?(weight) && no_or_clip?(own) && no_or_clip?(layer)
+      end
+
+      def compatible_graph?(graph, own) = graph.nil? || (own.nil? && graph?(graph))
+
+      def graph?(part)
+        return false unless list?(part, GRAPH_SIZE)
+
+        blend, remaining, playing, from, to = part
+        graph_values?(blend, remaining, playing) && graph_sides?(from, to) && graph_fade?(blend, remaining, from)
+      end
+
+      def graph_values?(blend, remaining, playing)
+        boolean?(playing) && weight?(blend) && fade?(remaining)
+      end
+
+      def boolean?(value) = [true, false].include?(value)
+
+      def graph_sides?(from, to)
+        weighted_side?(from) && weighted_side?(to) && !to.empty?
+      end
+
+      def graph_fade?(blend, remaining, from)
+        return blend == 1 && remaining.zero? if from.empty?
+
+        blend < 1.0 && remaining.positive?
+      end
+
+      def weighted_side?(side)
+        return false unless weighted_entries?(side)
+
+        side.empty? || normalized_weights?(side)
+      end
+
+      def weighted_entries?(side)
+        side.is_a?(Array) && side.size <= MAX_BLEND_CLIPS && side.all? { |entry| weighted_clip?(entry) }
+      end
+
+      def normalized_weights?(side)
+        (side.inject(0.0) { |sum, entry| sum + entry[1] } - 1.0).abs <= WEIGHT_TOLERANCE
+      end
+
+      def weighted_clip?(entry)
+        list?(entry, WEIGHTED_CLIP_SIZE) && clip?(entry[0]) && weight?(entry[1])
       end
 
       def fade?(fade) = reachable?(fade) && fade >= 0
@@ -61,7 +114,11 @@ module Network
         return false unless list?(clip, CLIP_SIZE)
 
         name, time, speed, *flags = clip
-        clip_name?(name) && numbers?([time, speed]) && flags.all? { |flag| [true, false].include?(flag) }
+        clip_name?(name) && clip_values?(time, speed, flags)
+      end
+
+      def clip_values?(time, speed, flags)
+        numbers?([time, speed]) && time >= 0 && flags.all? { |flag| boolean?(flag) }
       end
 
       def clip_name?(name) = name.is_a?(String) && !name.empty? && name.bytesize <= MAX_CLIP_NAME_SIZE

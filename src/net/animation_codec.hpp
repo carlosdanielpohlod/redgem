@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "net/pose_bytes.hpp"
 
@@ -33,16 +34,41 @@ struct ClipPart {
   bool playing = true;
 };
 
+inline constexpr std::size_t kMaxBlendClips = 2;  // neighbors per side of a one-dimensional blend
+
+struct WeightedClipPart {
+  ClipPart clip;
+  float weight = 1.0f;
+};
+
+struct GraphPart {
+  std::vector<WeightedClipPart> from;
+  std::vector<WeightedClipPart> to;
+  float blend = 1.0f;
+  float remaining = 0.0f;
+  bool playing = true;
+};
+
 struct AnimationPart {
   float fade = 0.0f;
   float layer_weight = 0.0f;
   std::optional<ClipPart> own;  // nothing: it follows the scene's clips
   std::optional<ClipPart> layer;
+  std::optional<GraphPart> graph;
 };
 
-// The most bytes an animation takes: two floats, and two clips of the longest names.
+// The largest mode has a layer, no manual base, and four graph clips with normalized weights.
+inline constexpr std::size_t kMaxClipBytes = kByte + kMaxClipNameBytes + 2 * kFloatBytes + kByte;
+inline constexpr std::size_t kGraphHeadBytes = 2 * kByte + 2 * kFloatBytes + kByte;
 inline constexpr std::size_t kMaxAnimationBytes =
-    2 * kFloatBytes + 2 * (kByte + kMaxClipNameBytes + 2 * kFloatBytes + kByte);
+    2 * kFloatBytes + kByte + kMaxClipBytes + kGraphHeadBytes + 2 * kMaxBlendClips * (kMaxClipBytes + kFloatBytes);
+
+bool valid_clip(const ClipPart& clip);
+void write_animation_clip(PoseWriter& writer, const std::optional<ClipPart>& clip);
+bool read_animation_clip(PoseReader& reader, std::optional<ClipPart>& clip);
+bool valid_graph(const GraphPart& graph);
+void write_graph(PoseWriter& writer, const GraphPart& graph);
+std::optional<GraphPart> read_graph(PoseReader& reader);
 
 // Whether every clip name of an animation is one it carries: 1 to kMaxClipNameBytes bytes.
 bool carriable(const AnimationPart& part);

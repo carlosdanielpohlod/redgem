@@ -58,6 +58,14 @@ void AnimationPlayer::advance_track(std::optional<Track>& track, float dt) const
 }
 
 bool AnimationPlayer::advance_own(ObjectId character, Own& own, float dt, Scene& scene) {
+  if (has_graph(own)) {
+    advance_graph(character, own, dt, scene);
+    return false;
+  }
+  return advance_manual_own(character, own, dt, scene);
+}
+
+bool AnimationPlayer::advance_manual_own(ObjectId character, Own& own, float dt, Scene& scene) {
   for (std::optional<Track>* track : {&own.from, &own.to, &own.layer}) advance_track(*track, dt);
   own.faded += dt;
   const bool arrived = own.fade <= 0.0f || own.faded >= own.fade;

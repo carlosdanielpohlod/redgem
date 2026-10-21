@@ -24,7 +24,7 @@ constexpr mrb_int kSpeedAt = 2;
 constexpr mrb_int kLoopsAt = 3;
 constexpr mrb_int kPlaysAt = 4;
 constexpr std::uint32_t kNeverAnimated = 0;  // the revision of a character no script animated
-constexpr int kSyncArgs = 5;                 // fade, layer weight, own clip, mixed clip, how late
+constexpr int kSyncArgs = 6;                 // fade, layer weight, own clip, mixed clip, graph, how late
 constexpr const char* kNoClip = "a clip is [name, time, speed, loops, plays]";
 
 AnimationPlayer& animations(mrb_state* mrb) {
@@ -63,13 +63,16 @@ std::optional<ClipState> clip_arg(mrb_state* mrb, mrb_value clip) {
 // object carried, `late_by` seconds ago.
 mrb_value game_object_animation_sync(mrb_state* mrb, mrb_value self) {
   mrb_float fade = 0.0, weight = 0.0, late = 0.0;
-  mrb_value own, layer;
-  mrb_get_args(mrb, "ffoof", &fade, &weight, &own, &layer, &late);
+  mrb_value own, layer, graph;
+  mrb_get_args(mrb, "ffooof", &fade, &weight, &own, &layer, &graph, &late);
   CharacterAnimation state;
   state.fade = static_cast<float>(at_least(mrb, fade, 0.0, "the fade"));
   state.layer_weight = static_cast<float>(from_to(mrb, weight, 0.0, 1.0, "the layer weight"));
   state.own = clip_arg(mrb, own);
   state.layer = clip_arg(mrb, layer);
+  state.graph = animation_graph_arg(mrb, graph);
+  if (state.graph && state.own)
+    mrb_raise(mrb, E_ARGUMENT_ERROR, "graph and manual clips cannot be synchronized together");
   const float late_by = static_cast<float>(at_least(mrb, late, 0.0, "how late it is"));
   animations(mrb).take_animation(scene(mrb), alive_id(mrb, self), state, late_by);
   return mrb_nil_value();
@@ -77,12 +80,15 @@ mrb_value game_object_animation_sync(mrb_state* mrb, mrb_value self) {
 
 }  // namespace
 
+std::optional<ClipState> animation_clip_arg(mrb_state* mrb, mrb_value value) { return clip_arg(mrb, value); }
+
 std::optional<net::Animated> animated_of(mrb_state* mrb, mrb_value object, const std::string& key) {
   if (mrb_nil_p(object)) return std::nullopt;
   const ObjectId id = alive_id(mrb, object);
   if (!worth_telling(mrb, id, key)) return std::nullopt;
   const CharacterAnimation state = animations(mrb).animation_of(scene(mrb), id);
-  const net::AnimationPart part{state.fade, state.layer_weight, part_of(state.own), part_of(state.layer)};
+  net::AnimationPart part{state.fade, state.layer_weight, part_of(state.own), part_of(state.layer), {}};
+  if (state.graph) part.graph = animation_graph_part(*state.graph);
   if (!net::carriable(part)) return std::nullopt;
   return net::Animated{state.revision, part};
 }

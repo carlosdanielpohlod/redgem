@@ -173,8 +173,8 @@ class NetworkSync < Behaviour
   def take_animation(animation = nil, late = 0.0)
     return unless animation
 
-    fade, weight, own, layer = animation
-    game_object.__animation_sync(fade, weight, own, layer, late)
+    fade, weight, own, layer, graph = animation
+    game_object.__animation_sync(fade, weight, own, layer, graph, late)
   end
 
   def follow(dt)

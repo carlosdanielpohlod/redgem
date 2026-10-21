@@ -17,6 +17,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scatter.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/animation_graph.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_said.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network_spawns.rb
@@ -157,6 +158,7 @@ redgem_add_library(redgem_net
   net/pose_quantization.cpp
   net/pose_codec.cpp
   net/animation_codec.cpp
+  net/graph_animation_codec.cpp
   net/pose_baselines.cpp
   net/connection.cpp
   net/network_session.cpp
@@ -220,11 +222,15 @@ redgem_add_library(redgem_runtime
   scene/scatter.cpp
   scene/scatter_looks.cpp
   scene/animation/animation.cpp
+  scene/animation/animation_blend.cpp
+  scene/animation/animation_graph.cpp
+  scene/animation/animation_graph_player.cpp
   scene/animation/clip_clock.cpp
   scene/animation/animation_player.cpp
   scene/animation/animation_player_characters.cpp
   scene/animation/animation_player_sync.cpp
   scene/animation/animation_player_posing.cpp
+  scene/animation/animation_player_graph.cpp
   scene/camera_ray.cpp
   scene/particles.cpp
   scene/particle_look.cpp
@@ -276,6 +282,8 @@ redgem_add_library(redgem_runtime
   script/bindings/audio_bindings.cpp
   script/bindings/input_bindings.cpp
   script/bindings/animation_bindings.cpp
+  script/bindings/animation_graph_bindings.cpp
+  script/bindings/animation_graph_sync.cpp
   script/bindings/animation_sync_bindings.cpp
   script/bindings/particles_bindings.cpp
   script/bindings/particle_look_args.cpp
