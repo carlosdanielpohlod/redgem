@@ -310,7 +310,12 @@ This first water material is for views above a lake or sea surface. Refraction s
 opaque geometry visible on screen; transparent objects and other water layers are absent from
 that snapshot. Screen-space reflections miss off-screen and hidden geometry and use the environment capture
 when a ray misses. There is no planar reflection pass. Shore foam follows shallow depth, without breaking-wave simulation.
+Refraction traces the visible depth field. When the refracted surface is hidden or outside the screen,
+it keeps the undistorted opaque sample instead; this fallback cannot reveal geometry absent from the snapshot.
 Absorption filters the transmitted picture, but does not yet attenuate lighting on its way to submerged
 objects; a lit bottom can therefore be brighter than in a full participating-medium render.
 There is no underwater camera mode, buoyancy, fluid simulation, or wave collision. Use ordinary
 scene meshes for water surfaces rather than Scatter copies.
+
+The [optical comparison](water-validation.md) records a fixed-camera Cycles reference and
+the remaining differences around refraction and incident lighting.
