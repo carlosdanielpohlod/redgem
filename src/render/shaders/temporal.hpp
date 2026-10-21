@@ -35,8 +35,10 @@ const float HISTORY_WEIGHT = 0.9;            // of the frames before, where noth
 const float COVERED_HISTORY_WEIGHT = 0.5;    // where particles cover the pixel
 const float MOVING_HISTORY_WEIGHT = 0.6;     // where the pixel moves FAST_PIXELS or more a frame
 const float FAST_PIXELS = 16.0;
+const float REJECT_MOTION_PIXELS = 32.0;     // faster motion uses this frame alone, per pixel
 const float SPLIT_PIXELS = 2.0;              // the pixel's motion and its nearest neighbour's this far apart: an edge opening
 const float SPLIT_HISTORY_WEIGHT = 0.5;      // where an edge opens (what was behind is newly seen)
+const float REJECT_SPLIT_PIXELS = 4.0;       // a large foreground/background motion disagreement rejects history
 // Standard deviations the frames before may stray from the colors around the pixel: far where it
 // stands still (a thin blade, missed by some of the jittered frames, still adds up), near once it
 // moves CLIP_PIXELS a frame (what moved away leaves no trail).
@@ -158,11 +160,22 @@ bool broken(vec3 color) { return any(isnan(color)) || any(isinf(color)); }
 // How much the frames before count: less where particles cover the pixel, where it moves fast
 // (the frames before are then blurrier, and fewer of them are worth anything at a low frame
 // rate), and where an edge opens.
+// Keep the existing still/slow weights. Repeated resampling at high velocity blurs detail even
+// with correct vectors; a large local motion split can reproject newly revealed background onto
+// the foreground. Neither history is worth accumulating. This needs no extra textures or pass.
+float historyRetention(vec2 motion, float split) {
+  float speed = length(motion / texelSize);
+  float moving = 1.0 - smoothstep(FAST_PIXELS, REJECT_MOTION_PIXELS, speed);
+  float opening = 1.0 - smoothstep(SPLIT_PIXELS, REJECT_SPLIT_PIXELS, split);
+  return min(moving, opening);
+}
+
 float historyWeight(vec2 motion, float split) {
   float covered = clamp(texture(motionTexture, fragTexCoord).a, 0.0, 1.0);
   float speed = clamp(length(motion / texelSize) / FAST_PIXELS, 0.0, 1.0);
   float weight = min(mix(HISTORY_WEIGHT, COVERED_HISTORY_WEIGHT, covered), mix(HISTORY_WEIGHT, MOVING_HISTORY_WEIGHT, speed));
-  return split > SPLIT_PIXELS ? min(weight, SPLIT_HISTORY_WEIGHT) : weight;
+  if (split > SPLIT_PIXELS) weight = min(weight, SPLIT_HISTORY_WEIGHT);
+  return weight * historyRetention(motion, split);
 }
 
 bool outside(vec2 uv) { return any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))); }
@@ -177,6 +190,10 @@ void main() {
     return;
   }
   float weight = historyWeight(motion, split);
+  if (weight <= 0.0) {
+    finalColor = current;
+    return;
+  }
   vec3 held = heldHistory(before, length(motion / texelSize));
   vec3 mixed = broken(held) ? toYCoCg(compress(current.rgb)) : mix(toYCoCg(compress(current.rgb)), held, weight);
   finalColor = vec4(expand(clamp(fromYCoCg(mixed), 0.0, MOST_COMPRESSED)), current.a);

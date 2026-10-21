@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <string>
 
+#include "render/temporal.hpp"
 #include "render_system/render_stage.hpp"
 #include "scene/shapes/primitives.hpp"
 
@@ -281,4 +282,126 @@ TEST_CASE("smoothed with the frames before, swaying grass passed over looks as i
   REQUIRE(aliased_error > 0.0f);
   CHECK(passing_error < aliased_error * kNoFartherThanAliased);
   CHECK(total_greenness(passing) > total_greenness(aliased) * kKeptLeast);  // no blade fades away
+}
+
+namespace {
+
+constexpr int kChaseFrames = render_math::kJitterPhases;  // final frame shares the first frame's jitter
+constexpr Vec3 kChaseStep{1.25f, 0.0f, -0.25f};           // over 32 pixels/frame on the wall, below camera-cut distance
+constexpr Vec3 kChaseWallSize{100.0f, 12.0f, 1.0f};
+constexpr Vec3 kChaseCarOffset{0.0f, -1.0f, -4.0f};  // a tracked subject with almost no screen motion
+constexpr Vec3 kChaseCarSize{1.4f, 0.7f, 2.0f};
+constexpr int kChaseTextureWidth = 4096;  // thin stripes at about one pixel, seen at the final view
+constexpr int kChaseTextureHeight = 8;
+constexpr int kChaseStripeWidth = 2;
+constexpr ::Color kChaseStripeColor{0, 255, 0, 255};
+constexpr ::Color kChaseStripeBackground{0, 0, 0, 255};  // dark gaps expose lost contrast
+constexpr float kChaseRegionLeft = 0.15f;                // wall detail only, above the tracked subject
+constexpr float kChaseRegionRight = 0.85f;
+constexpr float kChaseRegionTop = 0.15f;
+constexpr float kChaseRegionBottom = 0.40f;
+constexpr float kChaseMeanError = 0.5f;  // byte mean absolute error against a fresh, same-jitter frame
+
+ImageData chase_stripes() {
+  Image image = GenImageColor(kChaseTextureWidth, kChaseTextureHeight, kChaseStripeBackground);
+  for (int x = 0; x < kChaseTextureWidth; x += kChaseStripeWidth * 2)
+    ImageDrawRectangle(&image, x, 0, kChaseStripeWidth, kChaseTextureHeight, kChaseStripeColor);
+  int size = 0;
+  unsigned char* png = ExportImageToMemory(image, ".png", &size);
+  ImageData data{std::vector<std::uint8_t>(png, png + size), ".png"};
+  MemFree(png);
+  UnloadImage(image);
+  return data;
+}
+
+NodeDesc chase_wall() {
+  NodeDesc wall;
+  wall.name = "Wall";
+  wall.mesh = 0;
+  wall.local.scale = kChaseWallSize;
+  return wall;
+}
+
+NodeDesc chase_car() {
+  NodeDesc car;
+  car.name = "Car";
+  car.mesh = 1;
+  car.local.position = kCameraAt + kChaseCarOffset;
+  car.local.scale = kChaseCarSize;
+  return car;
+}
+
+SceneDesc chase_scene(PropertyMap environment) {
+  SceneDesc desc;
+  desc.images = {chase_stripes()};
+  MaterialDesc wall = test::glowing_material(redgem::Color{0.0f, 0.0f, 0.0f, 1.0f}, 0.0f);
+  wall.emissive = Vec3::one() * kGlow;
+  wall.emissive_image = 0;
+  desc.materials = {wall, test::glowing_material(redgem::Color{0.0f, 0.0f, 1.0f, 1.0f}, kGlow)};
+  desc.meshes = {test::cube_mesh(0), test::cube_mesh(1)};
+  desc.nodes = {test::camera_at(kCameraAt), chase_wall(), chase_car(), dark_environment(std::move(environment))};
+  return desc;
+}
+
+// Both camera and car travel together. The roadside wall moves quickly, the tracked car stays
+// in place on screen, and no frame crosses the global camera-cut threshold.
+Picture chase_picture(PropertyMap environment, bool moving, const std::string& name) {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  const SceneDesc desc = chase_scene(std::move(environment));
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  Picture picture;
+  for (int frame = moving ? kChaseFrames : 0; frame >= 0; --frame) {
+    const Vec3 camera = kCameraAt - kChaseStep * static_cast<float>(frame);
+    scene.set_world_position(scene.find("Camera"), camera);
+    scene.set_world_position(scene.find("Car"), camera + kChaseCarOffset);
+    picture = stage.draw(scene, name);
+  }
+  return picture;
+}
+
+bool in_chase_detail_region(int x, int y, const Picture& picture) {
+  const float across = static_cast<float>(x) / static_cast<float>(picture.width);
+  const float down = static_cast<float>(y) / static_cast<float>(picture.height);
+  return across > kChaseRegionLeft && across < kChaseRegionRight && down > kChaseRegionTop && down < kChaseRegionBottom;
+}
+
+float chase_pixel_error(::Color a, ::Color b) {
+  return static_cast<float>(std::abs(a.r - b.r) + std::abs(a.g - b.g) + std::abs(a.b - b.b));
+}
+
+float chase_detail_error(const Picture& moving, const Picture& fresh) {
+  float error = 0.0f;
+  std::size_t pixels = 0;
+  for (int y = 0; y < moving.height; ++y) {
+    for (int x = 0; x < moving.width; ++x) {
+      if (!in_chase_detail_region(x, y, moving)) continue;
+      const auto i = static_cast<std::size_t>(y * moving.width + x);
+      error += chase_pixel_error(moving.pixels[i], fresh.pixels[i]);
+      ++pixels;
+    }
+  }
+  return error / static_cast<float>(pixels);
+}
+
+}  // namespace
+
+TEST_CASE("a fast chase camera retains current roadside detail without discarding history for the whole scene") {
+  for (const double samples : {0.0, kSamples}) {
+    const PropertyMap environment = temporal({{"msaa", samples}});
+    const Picture moving = chase_picture(environment, true, "temporal_chase_fast");
+    const Picture fresh = chase_picture(environment, false, "temporal_chase_fresh");
+    REQUIRE(total_greenness(fresh) > 0.0f);
+    const float error = chase_detail_error(moving, fresh);
+    MESSAGE("fast chase detail error " << error << ", samples " << samples);
+    CHECK(error < kChaseMeanError);
+  }
+}
+
+TEST_CASE("a chase camera with temporal antialiasing off produces the same final pixels as a fresh view") {
+  const Picture moving = chase_picture({}, true, "temporal_chase_off_moving");
+  const Picture fresh = chase_picture({}, false, "temporal_chase_off_fresh");
+  REQUIRE(moving.pixels.size() == fresh.pixels.size());
+  CHECK(distance_between(moving, fresh) == 0.0f);
 }
