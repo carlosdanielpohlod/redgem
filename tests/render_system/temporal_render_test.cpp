@@ -405,3 +405,112 @@ TEST_CASE("a chase camera with temporal antialiasing off produces the same final
   REQUIRE(moving.pixels.size() == fresh.pixels.size());
   CHECK(distance_between(moving, fresh) == 0.0f);
 }
+
+namespace {
+
+// At 256 pixels and 45 degrees, this step moves the near card about 7.7 pixels and the wall
+// about 1.6 pixels. Their split exceeds four pixels; neither reaches the fast-motion ramp.
+constexpr float kOpeningCameraStep = 0.05f;
+constexpr Vec3 kOpeningCardAt{0.0f, 0.0f, 8.0f};
+constexpr Vec3 kOpeningCardSize{0.8f, 1.2f, 0.01f};
+constexpr Vec3 kOpeningWhitePatchAt{12.0f, 0.0f, 0.01f};  // its left edge is x=2, just beyond the card's projection
+constexpr Vec3 kOpeningWhitePatchSize{20.0f, 12.0f, 1.0f};
+constexpr redgem::Color kOpeningWhite{1.0f, 1.0f, 1.0f, 1.0f};
+constexpr redgem::Color kOpeningBlack{0.0f, 0.0f, 0.0f, 1.0f};
+constexpr int kOpeningBlackCeiling = 5;                // byte brightness of a freshly revealed black pixel
+constexpr int kOpeningWhiteFloor = 100;               // byte brightness of its opaque white neighbor
+constexpr float kOpeningRegionTop = 0.4f;             // central card rows, excluding its horizontal edges
+constexpr float kOpeningRegionBottom = 0.6f;
+constexpr std::size_t kOpeningMinimumPixels = 30;      // the edge assertion cannot pass with an empty selection
+constexpr float kOpeningMeanError = 0.5f;              // mean RGB byte error against the same-jitter fresh view
+
+NodeDesc opening_cube(const std::string& name, int mesh, Vec3 position, Vec3 scale) {
+  NodeDesc node;
+  node.name = name;
+  node.mesh = mesh;
+  node.local.position = position;
+  node.local.scale = scale;
+  return node;
+}
+
+NodeDesc opening_dark_sun() {
+  NodeDesc sun;
+  sun.name = "Sun";
+  sun.light = LightDesc{};
+  sun.light->intensity = 0.0f;  // emissive black and white alone define the test's signal
+  return sun;
+}
+
+SceneDesc opening_scene() {
+  SceneDesc desc;
+  desc.materials = {test::glowing_material(kOpeningBlack, 0.0f), test::glowing_material(kOpeningWhite, kGlow)};
+  desc.meshes = {test::cube_mesh(0), test::cube_mesh(1)};
+  desc.nodes = {test::camera_at(kCameraAt), opening_dark_sun(), dark_environment(temporal()),
+                opening_cube("Wall", 0, Vec3::zero(), kChaseWallSize),
+                opening_cube("Card", 1, kOpeningCardAt, kOpeningCardSize),
+                opening_cube("WhitePatch", 1, kOpeningWhitePatchAt, kOpeningWhitePatchSize)};
+  return desc;
+}
+
+// The warmed run moves only on its final frame. Eight warm-up frames put that last frame in
+// the same jitter phase as a freshly uploaded reference, without invalidating global history.
+Picture opening_picture(bool moving, const std::string& name) {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  const SceneDesc desc = opening_scene();
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  Picture picture;
+  for (int frame = 0; frame <= (moving ? render_math::kJitterPhases : 0); ++frame) {
+    const bool before_step = moving && frame < render_math::kJitterPhases;
+    const Vec3 camera = kCameraAt - Vec3{before_step ? kOpeningCameraStep : 0.0f, 0.0f, 0.0f};
+    scene.set_world_position(scene.find("Camera"), camera);
+    picture = stage.draw(scene, name);
+  }
+  return picture;
+}
+
+bool opening_edge_colors(::Color current, ::Color left) {
+  const bool black = std::max({current.r, current.g, current.b}) < kOpeningBlackCeiling;
+  const bool white = std::min({left.r, left.g, left.b}) > kOpeningWhiteFloor;
+  return black && white;
+}
+
+bool opening_edge_pixel(const Picture& fresh, int x, int y) {
+  const float down = static_cast<float>(y) / static_cast<float>(fresh.height);
+  const bool central_right = x > fresh.width / 2 && down > kOpeningRegionTop && down < kOpeningRegionBottom;
+  if (!central_right) return false;
+  const auto i = static_cast<std::size_t>(y * fresh.width + x);
+  return opening_edge_colors(fresh.pixels[i], fresh.pixels[i - 1]);
+}
+
+struct OpeningError {
+  std::size_t pixels = 0;
+  float total = 0.0f;
+};
+
+OpeningError opening_error(const Picture& moving, const Picture& fresh) {
+  OpeningError error;
+  for (int y = 0; y < fresh.height; ++y) {
+    for (int x = 1; x < fresh.width; ++x) {
+      if (!opening_edge_pixel(fresh, x, y)) continue;
+      const auto i = static_cast<std::size_t>(y * fresh.width + x);
+      error.total += chase_pixel_error(moving.pixels[i], fresh.pixels[i]);
+      ++error.pixels;
+    }
+  }
+  return error;
+}
+
+}  // namespace
+
+TEST_CASE("an opening edge rejects foreground history even below the fast-motion threshold") {
+  const Picture moving = opening_picture(true, "temporal_opening_moved");
+  const Picture fresh = opening_picture(false, "temporal_opening_fresh");
+  REQUIRE(moving.pixels.size() == fresh.pixels.size());
+  const OpeningError error = opening_error(moving, fresh);
+  REQUIRE(error.pixels >= kOpeningMinimumPixels);
+  const float mean = error.total / static_cast<float>(error.pixels);
+  MESSAGE("opening edge pixels " << error.pixels << ", mean error " << mean);
+  CHECK(mean < kOpeningMeanError);
+}

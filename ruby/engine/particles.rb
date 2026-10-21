@@ -24,8 +24,8 @@ module Particles
   # particle goes through over its life (see docs/scripting/gameplay.md).
   def self.burst(position, count: DEFAULT_COUNT, color: :white, alpha: UI::OPAQUE, speed: DEFAULT_SPEED,
                  spread: DEFAULT_SPREAD, direction: Vector3.up, life: DEFAULT_LIFE, size: DEFAULT_SIZE,
-                 gravity: WORLD_GRAVITY, glow: false, lit: false, cast_shadow: false, soft: HARD_EDGE, image: nil, frames: ONE_PICTURE,
-                 fps: OVER_LIFE, spin: NO_SPIN)
+                 gravity: WORLD_GRAVITY, glow: false, lit: false, cast_shadow: false, soft: HARD_EDGE, image: nil,
+                 frames: ONE_PICTURE, fps: OVER_LIFE, spin: NO_SPIN)
     columns, rows = frames
     __burst(position, direction, count.to_i, speed.to_f, spread.to_f, life.to_f, gravity.to_f, spin.to_f,
             numbers(size), colors(color), numbers(alpha), glow, lit, soft.to_f, image.to_s, columns.to_i, rows.to_i,

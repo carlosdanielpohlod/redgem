@@ -39,7 +39,7 @@ mrb_value parts(mrb_state* mrb, mrb_value value, mrb_int size) {
 
 mrb_value at(mrb_value value, mrb_int index) { return mrb_ary_entry(value, index); }
 
-float number(mrb_state* mrb, mrb_value value) { return static_cast<float>(finite(mrb, mrb_as_float(value))); }
+float number(mrb_state* mrb, mrb_value value) { return static_cast<float>(finite(mrb, mrb_as_float(mrb, value))); }
 
 bool flag(mrb_state* mrb, mrb_value value) {
   if (mrb_true_p(value)) return true;

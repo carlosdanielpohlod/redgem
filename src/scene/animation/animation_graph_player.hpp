@@ -41,6 +41,7 @@ class AnimationGraphPlayer {
     double phase = 0.0;
   };
 
+  const AnimationGraph& installed_graph() const;
   const CompiledAnimationState& state_of(const StateClock& clock) const;
   std::vector<AnimationGraphSample> samples(const StateClock& clock) const;
   double duration(const StateClock& clock) const;

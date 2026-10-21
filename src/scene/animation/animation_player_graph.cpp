@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 #include <utility>
 
 #include "scene/animation/animation.hpp"
@@ -156,7 +157,8 @@ std::optional<std::string> AnimationPlayer::graph_state(const Scene& scene, Obje
 
 GraphAnimation AnimationPlayer::graph_animation(const Own& own) const {
   if (own.received_graph) return *own.received_graph;
-  const auto& player = own.graph.value();
+  if (!own.graph) throw std::logic_error("character has no animation graph");
+  const auto& player = *own.graph;
   const auto frame = player.frame();
   GraphAnimation result;
   result.playing = player.playing();
@@ -183,7 +185,8 @@ void AnimationPlayer::advance_graph(ObjectId character, Own& own, float dt, Scen
     own.graph->advance(dt);
     if (state != own.graph->state()) changed(scene, character);
   } else {
-    tick_graph(own.received_graph.value(), dt);
+    if (!own.received_graph) throw std::logic_error("character has no received animation graph");
+    tick_graph(*own.received_graph, dt);
   }
   pose_graph(character, graph_animation(own), scene);
   advance_track(own.layer, dt);

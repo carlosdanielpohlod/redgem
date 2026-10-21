@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <stdexcept>
 #include <utility>
 
 namespace redgem {
@@ -110,12 +111,17 @@ std::optional<AnimationParameter> AnimationGraphPlayer::parameter(const std::str
   return found == parameters_.end() ? std::nullopt : std::optional<AnimationParameter>(found->second);
 }
 
+const AnimationGraph& AnimationGraphPlayer::installed_graph() const {
+  if (!graph_) throw std::logic_error("animation graph is not installed");
+  return *graph_;
+}
+
 const CompiledAnimationState& AnimationGraphPlayer::state_of(const StateClock& clock) const {
-  return graph_.value().states[clock.state];
+  return installed_graph().states[clock.state];
 }
 
 AnimationGraphPlayer::StateClock AnimationGraphPlayer::start(std::size_t state) const {
-  return {state, graph_.value().states[state].speed < 0.0f ? kFullPhase : 0.0};
+  return {state, installed_graph().states[state].speed < 0.0f ? kFullPhase : 0.0};
 }
 
 std::vector<AnimationGraphSample> AnimationGraphPlayer::samples(const StateClock& clock) const {
@@ -129,7 +135,7 @@ std::vector<AnimationGraphSample> AnimationGraphPlayer::samples(const StateClock
 
 bool AnimationGraphPlayer::representable_speeds() const {
   // Check every state so a later transition cannot produce an unsendable snapshot.
-  for (std::size_t state = 0; state < graph_.value().states.size(); ++state) {
+  for (std::size_t state = 0; state < installed_graph().states.size(); ++state) {
     const auto evaluated = samples({state, 0.0});
     if (!std::all_of(evaluated.begin(), evaluated.end(), representable_speed)) return false;
   }
@@ -156,7 +162,7 @@ void AnimationGraphPlayer::take_transition(const CompiledAnimationTransition& tr
 
 void AnimationGraphPlayer::choose_transition() {
   if (faded_ < fade_) return;
-  for (const auto& transition : graph_.value().transitions) {
+  for (const auto& transition : installed_graph().transitions) {
     if (transition.from != current_.state) continue;
     if (!matches(transition, parameters_)) continue;
     take_transition(transition);
