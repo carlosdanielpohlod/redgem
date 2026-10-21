@@ -36,7 +36,8 @@ the same pull request.
 - Water supports animated horizontal surfaces, depth absorption, screen-space refraction,
   screen-space reflections with an environment fallback and shore foam. It has no underwater camera mode, fluid simulation,
   buoyancy, breaking waves or planar reflections. Refraction sees opaque geometry on screen
-  only; overlapping water layers and transparent objects are not captured.
+  only; overlapping water layers and transparent objects are not captured. Absorption affects
+  the path from the bottom to the camera; incident lighting of submerged objects is not attenuated by water.
 - Images must be PNG or JPEG, at most 8192 pixels a side (a sky picture may also be Radiance
   `.hdr`). Blender's exporter can write WebP and KTX2 textures: neither is read (no decoder for
   them is among the libraries the engine is built with).
