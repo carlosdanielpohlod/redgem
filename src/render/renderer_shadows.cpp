@@ -74,17 +74,18 @@ CascadeUniforms cascade_uniforms(const Cascades& cascades) {
 
 }  // namespace
 
-void Renderer::Impl::draw_shadow_map(const Camera3D& camera, const Environment& env) {
+void Renderer::Impl::draw_shadow_map(const Camera3D& camera, const Environment& env, const ParticleSystem* particles) {
   const Vec3 to_sun = normalize(Vec3{-sun_travel.x, -sun_travel.y, -sun_travel.z});
   const float strength = render_math::sun_shadow_strength(to_sun, env.shadows);
-  if (strength > 0.0f) draw_sun_depth(camera, to_sun, env);
+  if (strength > 0.0f) draw_sun_depth(camera, to_sun, env, particles);
   send(shader, lit_uniforms.shadow_strength, strength);
   send(shader, lit_uniforms.shadow_texel, kShadowTexel);
   bind_for_the_frame(shader, lit_uniforms.shadow_map, kShadowTextureSlot, shadow.depth.id);
 }
 
 // The scene's depth as the sun sees it, and the matrices that lead the lit shader into that view.
-void Renderer::Impl::draw_sun_depth(const Camera3D& camera, Vec3 to_sun, const Environment& env) {
+void Renderer::Impl::draw_sun_depth(const Camera3D& camera, Vec3 to_sun, const Environment& env,
+                                    const ParticleSystem* particles) {
   const Cascades cascades = render_math::fit_cascades(cascade_camera(camera, view_tan_half_fov, view_aspect), to_sun,
                                                       env.shadow_cascades, env.shadow_distance);
   send(depth_shader, depth_uniforms.time, now());
@@ -92,6 +93,7 @@ void Renderer::Impl::draw_sun_depth(const Camera3D& camera, Vec3 to_sun, const E
   const double game_near = rlGetCullDistanceNear();
   const double game_far = rlGetCullDistanceFar();
   rlSetClipPlanes(kShadowNearPlane, shadow_far_plane(cascades));
+  prepare_particle_shadows(particles, sun_camera(cascades.cascades.front()));
   draw_cascades(cascades, to_vec3(camera.position));
   rlSetClipPlanes(game_near, game_far);
   send_cascades(cascades, sun_size_of(env));
@@ -113,6 +115,7 @@ Matrix Renderer::Impl::draw_depth_from(const Camera3D& sun_view, Vec3 viewer) {
   BeginMode3D(sun_view);
   const Matrix light_matrix = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
   draw_objects(true, viewer);
+  draw_particle_shadows(light_matrix);
   EndMode3D();
   return light_matrix;
 }

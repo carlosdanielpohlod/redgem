@@ -127,7 +127,7 @@ void Renderer::Impl::release_sky() {
 void Renderer::Impl::release_shaders() {
   for (Shader* program : {&shader, &depth_shader, &panorama_shader, &occlusion_shader, &sky_shader, &particle_shader,
                           &glow_limit_shader, &bright_shader, &blur_shader, &composite_shader, &antialias_shader,
-                          &motion_shader, &temporal_shader, &sharpen_shader}) {
+                          &motion_shader, &temporal_shader, &sharpen_shader, &particle_shadow_shader}) {
     if (loaded(*program)) UnloadShader(*program);
     *program = Shader{};
   }

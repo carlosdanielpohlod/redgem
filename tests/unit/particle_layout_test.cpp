@@ -93,3 +93,21 @@ TEST_CASE("the same layout is used again, frame after frame, whatever came befor
   lay_out_particles({}, {1}, kTwoBatches, kFacingForward, layout);
   CHECK(layout.runs.empty());
 }
+
+TEST_CASE("sun-facing particle layouts preserve lifetime alpha and flipbook without advancing simulation") {
+  Particle particle = particle_wearing(0, false);
+  particle.age = 0.75f;
+  particle.look.cast_shadow = true;
+  particle.look.size = OverLife<float>{{1.0f, 3.0f}, 2};
+  particle.look.alpha = OverLife<float>{{1.0f, 0.0f}, 2};
+  particle.look.flipbook = Flipbook{2, 2, 0.0f};
+  ParticleLayout layout;
+  const Facing sun{Vec3::up(), Vec3{0.0f, 0.0f, -1.0f}};
+  lay_out_particles({particle}, {1}, kTwoBatches, sun, layout);
+  REQUIRE(layout.vertices.size() == kQuadCorners);
+  CHECK(layout.vertices[0].color[3] == 63);
+  CHECK(layout.vertices[0].u == doctest::Approx(kHalf));
+  CHECK(layout.vertices[0].v == doctest::Approx(1.0f));
+  CHECK(length(layout.vertices[1].position - layout.vertices[0].position) == doctest::Approx(particle.size_now()));
+  CHECK(particle.age == doctest::Approx(0.75f));
+}

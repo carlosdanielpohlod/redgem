@@ -78,7 +78,7 @@ void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const Rend
   if (!has_area(width, height)) return;
   const Environment env = scene_environment(scene);
   impl_->ensure_targets(width, height, env.msaa);
-  impl_->prepare_frame(scene, camera, env, static_cast<float>(width) / static_cast<float>(height));
+  impl_->prepare_frame(scene, camera, env, static_cast<float>(width) / static_cast<float>(height), particles);
   impl_->draw_lit_scene(camera, particles);
   impl_->post_process(env, output);
   impl_->end_temporal();

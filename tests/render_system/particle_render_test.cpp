@@ -193,3 +193,151 @@ TEST_CASE("a frame drawn without particles adds none of the glow an earlier fram
   const ::Color after = stage.draw(scene, "particle_glow_then_none").at(kMiddle, kMiddle);
   CHECK(std::abs(after.r - plain.r) <= kSameShade);
 }
+
+namespace {
+
+constexpr Vec3 kShadowParticleAt{-2.5f, 2.5f, 3.0f};  // sun projects its center onto the wall's center
+constexpr float kShadowParticleSize = 1.6f;           // meters: the visible sprite stays outside the receiver region
+constexpr float kReceiverFrom = 0.35f;                // central wall, excluding the camera-visible particle
+constexpr float kReceiverTo = 0.65f;
+constexpr int kShadowDifference = 20;      // byte brightness lost to a full sun shadow
+constexpr std::size_t kShadowPixels = 30;  // a shadow must cover more than raster noise
+constexpr const char* kShadowSheet = "shadow_sheet";
+constexpr const char* kShadowRectangle = "shadow_rectangle";
+constexpr ::Color kShadowTransparent{0, 0, 0, 0};     // empty texels cast no shadow
+constexpr ::Color kShadowOpaque{255, 255, 255, 255};  // opaque white isolates silhouette from tint
+
+NodeDesc particle_shadow_environment() {
+  NodeDesc environment;
+  environment.name = "Environment";
+  environment.props = {{"environment", true},    {"shadows", 1.0}, {"shadow_cascades", 4.0},
+                       {"shadow_softness", 0.0}, {"ambient", 0.0}, {"ambient_occlusion", 0.0},
+                       {"fog_density", 0.0},     {"bloom", 0.0}};
+  return environment;
+}
+
+SceneDesc particle_shadow_scene() {
+  SceneDesc desc = wall_scene({1.0f, 1.0f, 1.0f, 1.0f});
+  desc.materials = {MaterialDesc{}};
+  NodeDesc sun;
+  sun.name = "Sun";
+  sun.light = LightDesc{};
+  sun.light->intensity = 1.0f;
+  sun.local.rotation = quat_look_rotation(normalize(Vec3{1.0f, -1.0f, -1.0f}), Vec3::up());
+  desc.nodes.push_back(sun);
+  desc.nodes.push_back(particle_shadow_environment());
+  return desc;
+}
+
+ParticleSystem shadow_particles(bool casts_shadow, const std::string& image = "") {
+  ParticleBurst burst = still_particle(kShadowParticleAt, Vec3::one());
+  burst.look.size = steady(kShadowParticleSize);
+  burst.look.cast_shadow = casts_shadow;
+  burst.image = image;
+  burst.look.flipbook = Flipbook{2, 1, 0.0f};
+  ParticleSystem particles;
+  particles.burst(burst);
+  return particles;
+}
+
+bool in_particle_shadow_receiver(int x, int y, const Picture& picture) {
+  const float across = static_cast<float>(x) / static_cast<float>(picture.width);
+  const float down = static_cast<float>(y) / static_cast<float>(picture.height);
+  return across > kReceiverFrom && across < kReceiverTo && down > kReceiverFrom && down < kReceiverTo;
+}
+
+bool darkened_receiver_pixel(const Picture& plain, const Picture& shadowed, int x, int y) {
+  if (!in_particle_shadow_receiver(x, y, plain)) return false;
+  const auto index = static_cast<std::size_t>(y * plain.width + x);
+  return plain.pixels[index].r - shadowed.pixels[index].r > kShadowDifference;
+}
+
+// Only darkening on the wall counts: the camera-visible sprite cannot satisfy this assertion.
+std::size_t receiver_shadow_pixels(const Picture& plain, const Picture& shadowed) {
+  std::size_t changed = 0;
+  for (int y = 0; y < plain.height; ++y) {
+    for (int x = 0; x < plain.width; ++x) {
+      if (darkened_receiver_pixel(plain, shadowed, x, y)) ++changed;
+    }
+  }
+  return changed;
+}
+
+std::filesystem::path write_shadow_sheet() {
+  const auto dir = std::filesystem::temp_directory_path() / "redgem-render-shadow-sheet";
+  std::filesystem::create_directories(dir);
+  Image sheet = GenImageColor(kCellPixels * 2, kCellPixels, kShadowTransparent);
+  ImageDrawCircle(&sheet, kCellPixels + kCellPixels / 2, kCellPixels / 2, kCellPixels / 3, kShadowOpaque);
+  ExportImage(sheet, (dir / (std::string(kShadowSheet) + ".png")).string().c_str());
+  UnloadImage(sheet);
+  Image rectangle = GenImageColor(kCellPixels, kCellPixels, kShadowOpaque);
+  ExportImage(rectangle, (dir / (std::string(kShadowRectangle) + ".png")).string().c_str());
+  UnloadImage(rectangle);
+  return dir;
+}
+
+}  // namespace
+
+TEST_CASE("particle sun shadows are opt-in, leave the circular silhouette, and clear after the caster is gone") {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  const SceneDesc desc = particle_shadow_scene();
+  const Scene scene = Scene::from_desc(desc);
+  stage.upload(desc);
+  const Picture plain = stage.draw(scene, "particle_shadow_plain");
+  const ParticleSystem disabled = shadow_particles(false);
+  CHECK(receiver_shadow_pixels(plain, stage.draw(scene, "particle_shadow_disabled", &disabled)) == 0);
+  ParticleSystem enabled = shadow_particles(true);
+  const Picture shadowed = stage.draw(scene, "particle_shadow_circle", &enabled);
+  const std::size_t circle_pixels = receiver_shadow_pixels(plain, shadowed);
+  CHECK(circle_pixels > kShadowPixels);
+  stage.set_images_dir(write_shadow_sheet());
+  const ParticleSystem rectangle = shadow_particles(true, kShadowRectangle);
+  const Picture square_shadow = stage.draw(scene, "particle_shadow_rectangle", &rectangle);
+  CHECK(receiver_shadow_pixels(plain, square_shadow) > circle_pixels + kShadowPixels);
+  enabled.clear();
+  CHECK(receiver_shadow_pixels(plain, stage.draw(scene, "particle_shadow_cleared", &enabled)) == 0);
+}
+
+TEST_CASE("particle shadow flipbooks discard transparent texels and lifetime alpha removes the shadow") {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  const SceneDesc desc = particle_shadow_scene();
+  const Scene scene = Scene::from_desc(desc);
+  stage.upload(desc);
+  stage.set_images_dir(write_shadow_sheet());
+  const Picture plain = stage.draw(scene, "particle_shadow_sheet_plain");
+  ParticleSystem particles = shadow_particles(true, kShadowSheet);
+  CHECK(receiver_shadow_pixels(plain, stage.draw(scene, "particle_shadow_transparent_cell", &particles)) == 0);
+  const float life = particles.particles().front().life;
+  particles.update(life * kLate);
+  CHECK(receiver_shadow_pixels(plain, stage.draw(scene, "particle_shadow_opaque_cell", &particles)) > kShadowPixels);
+  particles.clear();
+  ParticleBurst fading = still_particle(kShadowParticleAt, Vec3::one());
+  fading.look.cast_shadow = true;
+  fading.look.size = steady(kShadowParticleSize);
+  fading.look.alpha = OverLife<float>{{1.0f, 0.0f}, 2};
+  particles.burst(fading);
+  particles.update(particles.particles().front().life * kLate);
+  CHECK(receiver_shadow_pixels(plain, stage.draw(scene, "particle_shadow_faded", &particles)) == 0);
+}
+
+TEST_CASE("disabling particle shadows produces identical pixels before and after an enabled frame") {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  const SceneDesc desc = particle_shadow_scene();
+  const Scene scene = Scene::from_desc(desc);
+  stage.upload(desc);
+  const ParticleSystem disabled = shadow_particles(false);
+  const ParticleSystem enabled = shadow_particles(true);
+  const Picture before = stage.draw(scene, "particle_shadow_off_before", &disabled);
+  stage.draw(scene, "particle_shadow_on_between", &enabled);
+  const Picture after = stage.draw(scene, "particle_shadow_off_after", &disabled);
+  REQUIRE(before.pixels.size() == after.pixels.size());
+  for (std::size_t i = 0; i < before.pixels.size(); ++i) {
+    CHECK(before.pixels[i].r == after.pixels[i].r);
+    CHECK(before.pixels[i].g == after.pixels[i].g);
+    CHECK(before.pixels[i].b == after.pixels[i].b);
+    CHECK(before.pixels[i].a == after.pixels[i].a);
+  }
+}

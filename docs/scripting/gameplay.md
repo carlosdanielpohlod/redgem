@@ -318,6 +318,14 @@ Particles.burst(chimney, count: 1, image: :smoke, lit: true, soft: 1.0, size: [0
                 alpha: [0, 120, 90, 0], gravity: -0.1, life: 3.0, spin: 20)
 ```
 
+`cast_shadow: true` includes a particle in the directional sun's shadow cascades; it defaults to
+`false`. Its shadow is an alpha-cutout sprite facing the sun, using its current size, rotation,
+alpha and flipbook cell (or the circular dot mask without an image). Fragments whose combined
+texture and particle alpha is below 0.5 cast no shadow. Fading can therefore shrink or remove a
+shadow abruptly. This is a sprite approximation, not volumetric smoke: overlapping particles do
+not accumulate density, particles do not receive shadows, and `soft:` only fades the color pass
+against the camera's scene depth. Point lights do not cast particle shadows.
+
 Lit particles are lit at their corners by the sun, the sky and the nearest lights, as a puff lit
 on about half of it; they take no shadows yet.
 

@@ -26,7 +26,7 @@ the same pull request.
 ## Rendering and animation
 
 - No blend trees or animation state machines: scripts choose and mix clips themselves.
-- Particles cast no shadows.
+- Particle shadows are opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not volumetric density shadows. They do not receive shadows, and camera-depth soft fading does not affect their shadow silhouette.
 - Grass and other `Scatter` copies stop at the base template's `visible_to`. Distance meshes
   can be supplied with `lods`, but simplified models and impostor atlases are not generated
   automatically. Beyond the final range the ground is still its texture alone.

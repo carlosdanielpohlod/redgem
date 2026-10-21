@@ -27,7 +27,7 @@ struct BurstArgs {
   mrb_value sizes = mrb_nil_value();  // each kind of look: an Array of what it goes through
   mrb_value colors = mrb_nil_value();
   mrb_value alphas = mrb_nil_value();
-  mrb_bool glow = false, lit = false;
+  mrb_bool glow = false, lit = false, cast_shadow = false;
   mrb_float soft = 0.0;
   const char* image = nullptr;
   mrb_int columns = 1, rows = 1;  // of a sprite sheet
@@ -36,9 +36,9 @@ struct BurstArgs {
 
 BurstArgs burst_args(mrb_state* mrb) {
   BurstArgs args;
-  mrb_get_args(mrb, "ooifffffAAAbbfziif", &args.position, &args.direction, &args.count, &args.speed, &args.spread,
+  mrb_get_args(mrb, "ooifffffAAAbbfziifb", &args.position, &args.direction, &args.count, &args.speed, &args.spread,
                &args.life, &args.gravity, &args.spin, &args.sizes, &args.colors, &args.alphas, &args.glow, &args.lit,
-               &args.soft, &args.image, &args.columns, &args.rows, &args.fps);
+               &args.soft, &args.image, &args.columns, &args.rows, &args.fps, &args.cast_shadow);
   for (mrb_float* number : {&args.speed, &args.spread, &args.gravity, &args.spin}) *number = finite(mrb, *number);
   args.life = at_least(mrb, args.life, 0.0, "a burst's life");
   return args;
@@ -63,6 +63,7 @@ void set_look(mrb_state* mrb, const BurstArgs& args, ParticleBurst& burst) {
   burst.look.alpha = alphas_over_life(mrb, args.alphas);
   burst.look.glow = args.glow;
   burst.look.lit = args.lit;
+  burst.look.cast_shadow = args.cast_shadow;
   burst.look.soft = static_cast<float>(at_least(mrb, args.soft, 0.0, "a burst's soft edge"));
   burst.look.flipbook = flipbook_of(mrb, args.columns, args.rows, args.fps);
   burst.image = args.image;
@@ -89,7 +90,7 @@ mrb_value particles_clear(mrb_state* mrb, mrb_value) {
 
 void install_particles_bindings(mrb_state* mrb) {
   RClass* particles_module = mrb_define_module(mrb, "Particles");
-  mrb_define_module_function(mrb, particles_module, "__burst", particles_burst, MRB_ARGS_REQ(18));
+  mrb_define_module_function(mrb, particles_module, "__burst", particles_burst, MRB_ARGS_REQ(19));
   mrb_define_module_function(mrb, particles_module, "count", particles_count, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, particles_module, "clear", particles_clear, MRB_ARGS_NONE());
 }

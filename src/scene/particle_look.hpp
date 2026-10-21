@@ -65,6 +65,7 @@ struct ParticleLook {
   OverLife<Vec3> color = steady(Vec3::one());  // red, green, blue from 0 to 1, as color pickers show them
   OverLife<float> alpha = steady(1.0f);
   bool glow = false;             // lit from within: adds light instead of covering what is behind
+  bool cast_shadow = false;      // sun-facing alpha-cutout sprite in the sun shadow map
   bool lit = false;              // takes the light of the sun, the sky and the lights near it (smoke, dust)
   float soft = 0.0f;             // meters over which it fades where it meets what is behind it (0: a hard edge)
   int image = kNoParticleImage;  // index into ParticleSystem::images()
