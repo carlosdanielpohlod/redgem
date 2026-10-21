@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <iterator>
 
+#include "scene/props.hpp"
+
 namespace redgem::gltf_json {
 namespace {
 
@@ -69,6 +71,25 @@ void write_clearcoat(nlohmann::json& out, const ClearcoatDesc& coat) {
   if (has_object(extension, kClearcoatNormalTexture)) extension[kClearcoatNormalTexture][kScale] = coat.normal_scale;
 }
 
+bool omits_water(const nlohmann::json& out, const WaterDesc& water) {
+  const bool had_water = has_object(out, kExtras) && out[kExtras].contains(props::kWater);
+  return !water.enabled && !had_water;
+}
+
+void write_water(nlohmann::json& out, const WaterDesc& water) {
+  if (omits_water(out, water)) return;
+  auto& extras = out[kExtras];
+  extras[props::kWater] = water.enabled;
+  extras[props::kWaveHeight] = water.wave_height;
+  extras[props::kWavelength] = water.wavelength;
+  extras[props::kWaveSpeed] = water.speed;
+  extras[props::kAbsorptionRed] = water.absorption.x;
+  extras[props::kAbsorptionGreen] = water.absorption.y;
+  extras[props::kAbsorptionBlue] = water.absorption.z;
+  extras[props::kFoamWidth] = water.foam_width;
+  extras[props::kRefraction] = water.refraction;
+}
+
 // A node gets a new entry when it came from none, or when another node took the one it came from.
 bool needs_new_entry(bool known, const std::set<int>& claimed, int source) {
   return !known || claimed.count(source) != 0;
@@ -109,6 +130,7 @@ nlohmann::json material_json(const MaterialDesc& material, const nlohmann::json&
   out[kPbr][kRoughnessFactor] = material.roughness;
   write_emission(out, material);
   write_clearcoat(out, material.clearcoat);
+  write_water(out, material.water);
   return out;
 }
 

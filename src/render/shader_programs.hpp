@@ -9,6 +9,12 @@ namespace redgem::render_detail {
 
 inline constexpr int kNoLocation = -1;  // a uniform the shader does not have
 
+struct WaterUniforms {
+  int enabled = kNoLocation;
+  int waves = kNoLocation;
+};
+WaterUniforms find_water_uniforms(const Shader& program);
+
 // Where the lit shader takes its values.
 struct LitUniforms {
   // Per object and per material.
@@ -16,6 +22,12 @@ struct LitUniforms {
   int normal_scale = kNoLocation;
   int has_surface_map = kNoLocation;
   int occlusion_strength = kNoLocation;
+  int water_ready = kNoLocation;
+  int water_absorption = kNoLocation;
+  int water_surface = kNoLocation;
+  int water_planes = kNoLocation;
+  int water_background = kNoLocation;
+  int water_depth = kNoLocation;
   int coat_factor = kNoLocation;
   int coat_roughness = kNoLocation;
   int has_coat_factor_map = kNoLocation;

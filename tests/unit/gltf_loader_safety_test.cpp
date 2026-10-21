@@ -514,3 +514,50 @@ TEST_CASE("clearcoat imports its factors and three independent texture slots") {
   CHECK(plain.roughness_image == kNoIndex);
   CHECK(plain.normal_image == kNoIndex);
 }
+
+TEST_CASE("water material extras import bounded physical controls without changing plain materials") {
+  const Scratch scratch;
+  Gltf file = triangle();
+  constexpr float kHeight = 0.15f;
+  constexpr float kLength = 4.0f;
+  constexpr float kRedAbsorption = 0.7f;
+  file.doc["materials"] = json::array({{{"extras",
+                                         {{"water", true},
+                                          {"wave_height", kHeight},
+                                          {"wavelength", kLength},
+                                          {"absorption_red", kRedAbsorption},
+                                          {"foam_width", 0.0}}}},
+                                       json::object()});
+  const LoadResult result = load_gltf_scene(written(scratch, file));
+  REQUIRE_MESSAGE(result.ok, result.error);
+  const WaterDesc& water = result.scene.materials.front().water;
+  CHECK(water.enabled);
+  CHECK(water.wave_height == doctest::Approx(kHeight));
+  CHECK(water.wavelength == doctest::Approx(kLength));
+  CHECK(water.absorption.x == doctest::Approx(kRedAbsorption));
+  CHECK(water.foam_width == 0.0f);
+  CHECK_FALSE(result.scene.materials.back().water.enabled);
+}
+
+TEST_CASE("invalid water lengths and negative coefficients are kept in the supported range") {
+  constexpr double kEnormousRefraction = 1e300;
+  constexpr float kRefractionLimit = 0.1f;
+  const Scratch scratch;
+  Gltf file = triangle();
+  file.doc["materials"] = json::array({{{"extras",
+                                         {{"water", 1},
+                                          {"wave_height", -1.0},
+                                          {"wavelength", 0.0},
+                                          {"wave_speed", -1.0},
+                                          {"absorption_red", -1.0},
+                                          {"refraction", kEnormousRefraction}}}}});
+  const LoadResult result = load_gltf_scene(written(scratch, file));
+  REQUIRE_MESSAGE(result.ok, result.error);
+  const WaterDesc& water = result.scene.materials.front().water;
+  CHECK(water.enabled);
+  CHECK(water.wave_height == 0.0f);
+  CHECK(water.wavelength > 0.0f);
+  CHECK(water.speed == 0.0f);
+  CHECK(water.absorption.x == 0.0f);
+  CHECK(water.refraction <= kRefractionLimit);
+}

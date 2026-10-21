@@ -1,5 +1,8 @@
 // Pictures and materials of a glTF file.
 
+#include <algorithm>
+#include <cmath>
+
 #include "core/safe_path.hpp"
 #include "scene/gltf/extras_parser.hpp"
 #include "scene/props.hpp"
@@ -41,6 +44,36 @@ bool dithered(const cgltf_material& material) {
   if (material.extras.data == nullptr) return false;
   const ExtrasParseResult parsed = parse_extras(material.extras.data);
   return get_string(parsed.properties, props::kTransparency).value_or("") == props::kDithered;
+}
+
+// Limits also keep malformed custom properties from creating invalid shader arithmetic.
+constexpr double kMaxWaveHeight = 10.0;
+constexpr double kMinWavelength = 0.05;
+constexpr double kMaxWavelength = 1000.0;
+constexpr double kMaxWaveSpeed = 10.0;
+constexpr double kMaxAbsorption = 10.0;  // inverse meters
+constexpr double kMaxFoamWidth = 10.0;
+constexpr double kMaxRefraction = 0.1;
+
+float water_number(const PropertyMap& properties, const char* key, float fallback, double low, double high) {
+  const double value = get_number(properties, key).value_or(fallback);
+  return std::isfinite(value) ? static_cast<float>(std::clamp(value, low, high)) : fallback;
+}
+
+WaterDesc water_of(const cgltf_material& material) {
+  WaterDesc water;
+  if (material.extras.data == nullptr) return water;
+  const PropertyMap properties = parse_extras(material.extras.data).properties;
+  water.enabled = get_bool(properties, props::kWater).value_or(false);
+  water.wave_height = water_number(properties, props::kWaveHeight, water.wave_height, 0.0, kMaxWaveHeight);
+  water.wavelength = water_number(properties, props::kWavelength, water.wavelength, kMinWavelength, kMaxWavelength);
+  water.speed = water_number(properties, props::kWaveSpeed, water.speed, 0.0, kMaxWaveSpeed);
+  water.foam_width = water_number(properties, props::kFoamWidth, water.foam_width, 0.0, kMaxFoamWidth);
+  water.refraction = water_number(properties, props::kRefraction, water.refraction, 0.0, kMaxRefraction);
+  water.absorption.x = water_number(properties, props::kAbsorptionRed, water.absorption.x, 0.0, kMaxAbsorption);
+  water.absorption.y = water_number(properties, props::kAbsorptionGreen, water.absorption.y, 0.0, kMaxAbsorption);
+  water.absorption.z = water_number(properties, props::kAbsorptionBlue, water.absorption.z, 0.0, kMaxAbsorption);
+  return water;
 }
 
 }  // namespace
@@ -108,6 +141,7 @@ MaterialDesc GltfReader::load_material(const cgltf_material& material) const {
   read_pbr(material, out);
   read_detail_textures(material, out);
   read_clearcoat(material, out);
+  out.water = water_of(material);
   out.emissive = emissive_of(material);
   out.alpha_mode = alpha_mode_of(material.alpha_mode);
   out.alpha_cutoff = material.alpha_cutoff;

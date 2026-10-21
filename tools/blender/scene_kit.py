@@ -23,6 +23,14 @@ CAMERA_FOV_DEGREES = 50.0
 OPAQUE = 1.0
 DEFAULT_ROUGHNESS = 0.6
 DEFAULT_METALLIC = 0.0
+WATER_IOR = 1.333
+WATER_ROUGHNESS = 0.08
+WATER_COLOR = (0.015, 0.08, 0.1)
+WATER_PROPERTIES = {
+    "water": True, "wave_height": 0.08, "wavelength": 3.0, "wave_speed": 1.0,
+    "absorption_red": 0.35, "absorption_green": 0.08, "absorption_blue": 0.035,
+    "foam_width": 0.12, "refraction": 0.035,
+}
 NO_ROTATION = (0.0, 0.0, 0.0)   # Euler angles, radians
 # Cameras and lights look along their own -Z with +Y up (Blender's convention).
 LOOK_AXIS = "-Z"
@@ -53,6 +61,21 @@ def material(name, rgb, roughness=DEFAULT_ROUGHNESS, metallic=DEFAULT_METALLIC):
     bsdf.inputs["Base Color"].default_value = (*rgb, OPAQUE)
     bsdf.inputs["Roughness"].default_value = roughness
     bsdf.inputs["Metallic"].default_value = metallic
+    return mat
+
+
+def water_material(name, rgb=WATER_COLOR, **properties):
+    """Water shading in the runtime, with matching glass IOR in Blender's material preview.
+
+    Overrides are material custom properties, exported as glTF extras. Use a subdivided,
+    horizontal mesh; the runtime animates its vertices in world meters.
+    """
+    mat = material(name, rgb, roughness=WATER_ROUGHNESS)
+    bsdf = mat.node_tree.nodes[PRINCIPLED_BSDF]
+    bsdf.inputs["IOR"].default_value = WATER_IOR
+    bsdf.inputs["Transmission Weight"].default_value = OPAQUE
+    for key, value in (WATER_PROPERTIES | properties).items():
+        mat[key] = value
     return mat
 
 

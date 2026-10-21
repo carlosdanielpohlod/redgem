@@ -33,7 +33,10 @@ the same pull request.
 - Temporal anti-aliasing (`antialias = "temporal"`) smears detail when the camera moves fast,
   such as a chase camera behind a fast car. It is off in the editor's scene view, and turns itself
   off, with a warning, on graphics cards that cannot draw into float textures.
-- There is no water: no reflecting, rippling surface besides an ordinary glossy material.
+- Water supports animated horizontal surfaces, depth absorption, screen-space refraction,
+  screen-space reflections with an environment fallback and shore foam. It has no underwater camera mode, fluid simulation,
+  buoyancy, breaking waves or planar reflections. Refraction sees opaque geometry on screen
+  only; overlapping water layers and transparent objects are not captured.
 - Images must be PNG or JPEG, at most 8192 pixels a side (a sky picture may also be Radiance
   `.hdr`). Blender's exporter can write WebP and KTX2 textures: neither is read (no decoder for
   them is among the libraries the engine is built with).

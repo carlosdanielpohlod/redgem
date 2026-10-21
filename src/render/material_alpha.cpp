@@ -38,6 +38,11 @@ bool farther(const SeeThroughDraw& a, const SeeThroughDraw& b) {
 
 AlphaTest alpha_test(const MaterialDesc& material, float wind, AlphaPass pass) {
   AlphaTest test;
+  if (material.water.enabled) {
+    test.mixed = mixed_in(pass);
+    test.two_sided = material.double_sided;
+    return test;
+  }
   test.cutoff = cutoff_of(material, pass);
   test.ceiling = mixed_in(pass) ? kBlendCore : kNoCeiling;
   test.sway = foliage(material) ? wind : kNoWind;
@@ -47,7 +52,9 @@ AlphaTest alpha_test(const MaterialDesc& material, float wind, AlphaPass pass) {
   return test;
 }
 
-bool drawn_see_through(const MaterialDesc& material) { return blended(material) && !material.dithered; }
+bool drawn_see_through(const MaterialDesc& material) {
+  return material.water.enabled || (blended(material) && !material.dithered);
+}
 
 void sort_back_to_front(std::vector<SeeThroughDraw>& draws) { std::sort(draws.begin(), draws.end(), farther); }
 

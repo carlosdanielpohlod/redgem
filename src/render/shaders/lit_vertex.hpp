@@ -5,6 +5,8 @@
 
 #include <string>
 
+#include "render/shaders/water_waves.hpp"
+
 namespace redgem::shaders {
 
 // Every mesh is drawn instanced: each copy of it in one call finds where it is in frameTexels by
@@ -97,7 +99,9 @@ vec4 swayed(vec4 world, float ground, float wind, float clock) {
 vec4 placedBy(mat4 toWorld, float ground, sampler2D texels, int record, float clock) {
   vec4 world = toWorld * vec4(vertexPosition, 1.0);
   float wind = windAmount * texelOf(texels, record + NORMAL_TEXEL).w;  // (the record's own, not its skeleton's)
-  return wind > 0.0 ? swayed(world, ground, wind, clock) : world;
+  if (wind > 0.0) world = swayed(world, ground, wind, clock);
+  if (waterEnabled > SWITCH_ON) world.y += waterShape(world.xz, clock).x;
+  return world;
 }
 
 // Where the vertex of the copy whose record starts at texel `record` of `texels` is in the world.
@@ -152,6 +156,6 @@ void main() {
 )GLSL";
 
 // The lit (and depth) pass's vertex shader, whole.
-inline std::string lit_vertex() { return std::string(kVertexHead) + kVertexPlacement + kLitVertexMain; }
+inline std::string lit_vertex() { return std::string(kVertexHead) + kWaterWaves + kVertexPlacement + kLitVertexMain; }
 
 }  // namespace redgem::shaders

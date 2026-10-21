@@ -15,6 +15,8 @@ using namespace render_detail;
 using render_math::to_raylib;
 using render_math::to_vec3;
 
+bool water_surface(const MaterialDesc& material) { return material.water.enabled; }
+
 bool coated(const MaterialDesc& material) { return material.clearcoat.factor > 0.0f; }
 
 constexpr float kUnsetFov = 0.0f;  // radians: a camera that leaves its field of view to the engine
@@ -79,7 +81,10 @@ void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, c
 void Renderer::Impl::use_environment(const Environment& env, const Camera3D& camera) {
   use_sky_picture(env);
   const bool clearcoat = std::any_of(material_factors.begin(), material_factors.end(), coated);
-  use_lit_features({loaded(sky.picture), env.shadow_softness > 0.0f, clearcoat});
+  const bool water = std::any_of(material_factors.begin(), material_factors.end(), water_surface);
+  use_lit_features({loaded(sky.picture), env.shadow_softness > 0.0f, clearcoat, water});
+  if (water) ensure_water_target();
+  send(shader, lit_uniforms.water_ready, render_math::kOff);
   begin_temporal(env, camera);
 }
 
@@ -104,6 +109,7 @@ void Renderer::Impl::draw_surfaces(Vec3 viewer, bool sampled) {
   const std::size_t first = draw_objects(false, viewer);
   covering = false;
   if (motion_needed()) draw_motion(first, viewer);
+  if (lit_features.water) capture_water_background();
   draw_see_through(first, viewer);
   if (motion_needed() && !see_through.empty()) mark_see_through_cover(viewer);
 }

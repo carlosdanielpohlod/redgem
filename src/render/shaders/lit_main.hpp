@@ -10,6 +10,13 @@ const float MIN_OCCLUSION = 0.0;
 
 void main() {
   if (fadedAway(fragCopy)) discard;
+#ifdef WATER
+  if (waterEnabled > SWITCH_ON) {
+    if (alphaMixed < SWITCH_ON || waterReady < SWITCH_ON) discard;
+    finalColor = vec4(waterColor(), 1.0);
+    return;
+  }
+#endif
   vec4 texel = texture(texture0, fragTexCoord);
   float alpha = colDiffuse.a * texel.a * fragColor.a;
   bool covering = alphaToCoverage > SWITCH_ON;

@@ -270,3 +270,45 @@ Wheels in front of the center (Blender `+Y`) steer, the rear ones get the hand b
 is driven. Wheel radius and width come from the wheel mesh. See `tools/blender/build_driving.py`.
 Blender is Z-up; the engine is Y-up like glTF: Blender `(x, y, z)` is engine `(x, z, -y)`
 (`Vector3.blender(x, y, z)` does the conversion). Forward is `-Z` (Blender `+Y`).
+
+
+## Water surfaces
+
+A horizontal, upward-facing mesh becomes water when its material has the Blender custom
+property `water = true`. Enable custom properties in the glTF export. The surface is drawn
+after opaque geometry: it refracts that picture, absorbs light through the depth behind it,
+and reflects on-screen objects with a sky and surroundings fallback. The material's base color is its deep-water
+color and roughness controls its reflections. Its alpha is ignored; transparency comes from
+water depth and absorption instead.
+
+| Material custom property | Default | Meaning |
+| --- | --- | --- |
+| `water` | `false` | Use water shading. |
+| `wave_height` | `0.08` | Maximum vertical displacement in world meters, from 0 to 10. |
+| `wavelength` | `3` | Dominant wavelength in meters, from 0.05 to 1000. |
+| `wave_speed` | `1` | Wave clock multiplier, from 0 (still) to 10. |
+| `absorption_red` | `0.35` | Red light absorption per meter, from 0 to 10. |
+| `absorption_green` | `0.08` | Green light absorption per meter, from 0 to 10. |
+| `absorption_blue` | `0.035` | Blue light absorption per meter, from 0 to 10. |
+| `foam_width` | `0.12` | Shallow depth range for white shore foam, in meters; 0 disables it. |
+| `refraction` | `0.035` | Refraction strength, from 0 to 0.1; the default uses water's IOR of 1.333 and 0 keeps the bottom undistorted. |
+
+The Blender helper `scene_kit.water_material("Pond", wave_height=0.04, wavelength=2.0)`
+creates the material and its custom properties. Optional keyword arguments override the table
+above. The material preview has water's IOR and transmission; runtime waves and depth-based
+color are applied by the engine after export.
+
+Use a subdivided mesh: vertex spacing at most one tenth of the smallest visible geometric
+wavelength avoids angular silhouettes. Three traveling waves displace geometry; finer ripples
+change normals. Smooth spatial phase variation curves the crests without changing the maximum height.
+The pattern is in world coordinates, so adjacent patches share phase and mesh
+scale does not change the wavelength. Wave displacement follows the renderer's clock, including
+fixed-step recordings, and the temporal coverage pass uses the same displaced geometry.
+Water does not cast an opaque shadow. Objects keep their authored collision shapes.
+
+This first water material is for views above a lake or sea surface. Refraction samples only
+opaque geometry visible on screen; transparent objects and other water layers are absent from
+that snapshot. Screen-space reflections miss off-screen and hidden geometry and use the environment capture
+when a ray misses. There is no planar reflection pass. Shore foam follows shallow depth, without breaking-wave simulation.
+There is no underwater camera mode, buoyancy, fluid simulation, or wave collision. Use ordinary
+scene meshes for water surfaces rather than Scatter copies.

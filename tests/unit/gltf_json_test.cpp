@@ -410,3 +410,17 @@ TEST_CASE("saving a coating preserves texture references and writes its factors 
   CHECK(coat[kClearcoatNormalTexture][kIndex] == kNormalTexture);
   CHECK(coat[kClearcoatNormalTexture][kScale] == kCoatNormalScale);
 }
+
+TEST_CASE("saving water controls keeps unrelated material extras") {
+  MaterialDesc material;
+  material.water.enabled = true;
+  constexpr float kHeight = 0.2f;
+  material.water.wave_height = kHeight;
+  const auto saved = material_json(material, {{"extras", {{"artist_note", "pond"}}}});
+  CHECK(saved["extras"]["water"] == true);
+  CHECK(saved["extras"]["wave_height"].get<float>() == doctest::Approx(kHeight));
+  CHECK(saved["extras"]["absorption_red"].get<float>() == doctest::Approx(material.water.absorption.x));
+  CHECK(saved["extras"]["artist_note"] == "pond");
+  material.water.enabled = false;
+  CHECK(material_json(material, saved)["extras"]["water"] == false);
+}

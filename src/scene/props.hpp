@@ -37,6 +37,15 @@ inline constexpr const char* kSway = "sway";
 // default), or `kDithered` (see MaterialDesc::dithered).
 inline constexpr const char* kTransparency = "transparency";
 inline constexpr const char* kDithered = "dithered";
+inline constexpr const char* kWater = "water";
+inline constexpr const char* kWaveHeight = "wave_height";
+inline constexpr const char* kWavelength = "wavelength";
+inline constexpr const char* kWaveSpeed = "wave_speed";
+inline constexpr const char* kAbsorptionRed = "absorption_red";
+inline constexpr const char* kAbsorptionGreen = "absorption_green";
+inline constexpr const char* kAbsorptionBlue = "absorption_blue";
+inline constexpr const char* kFoamWidth = "foam_width";
+inline constexpr const char* kRefraction = "refraction";
 
 // --- Physics: what `body` and `collider` may be set to ----------------------------
 inline constexpr const char* kBodyStatic = "static";

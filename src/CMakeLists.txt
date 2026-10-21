@@ -314,6 +314,7 @@ redgem_add_library(redgem_runtime
   render/renderer_environment.cpp
   render/renderer_objects.cpp
   render/renderer_see_through.cpp
+  render/renderer_water.cpp
   render/renderer_scatter.cpp
   render/renderer_temporal.cpp
   render/renderer_particles.cpp

@@ -46,6 +46,24 @@ struct ClearcoatDesc {
   float normal_scale = 1.0f;
 };
 
+// Calm-water defaults, in world meters and inverse meters for absorption.
+inline constexpr float kWaterWaveHeight = 0.08f;
+inline constexpr float kWaterWavelength = 3.0f;
+inline constexpr Vec3 kWaterAbsorption{0.35f, 0.08f, 0.035f};
+inline constexpr float kWaterFoamWidth = 0.12f;
+inline constexpr float kWaterRefraction = 0.035f;  // scale giving the physical IOR-based refraction
+
+// A horizontal water surface. Distances are world meters, absorption is per meter.
+struct WaterDesc {
+  bool enabled = false;
+  float wave_height = kWaterWaveHeight;
+  float wavelength = kWaterWavelength;
+  float speed = 1.0f;
+  Vec3 absorption = kWaterAbsorption;
+  float foam_width = kWaterFoamWidth;
+  float refraction = kWaterRefraction;
+};
+
 // glTF metallic-roughness material. Image fields index SceneDesc::images (kNoIndex when absent).
 struct MaterialDesc {
   std::string name;
@@ -68,6 +86,7 @@ struct MaterialDesc {
   // (the material's custom property `transparency = "dithered"`).
   bool dithered = false;
   ClearcoatDesc clearcoat;
+  WaterDesc water;
 };
 
 struct PrimitiveDesc {

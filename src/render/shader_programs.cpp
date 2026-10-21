@@ -34,6 +34,12 @@ struct LitUniform {
 
 constexpr LitUniform kLitUniforms[] = {
     // Per object and per material.
+    {&LitUniforms::water_ready, shaders::kWaterReady},
+    {&LitUniforms::water_absorption, shaders::kWaterAbsorption},
+    {&LitUniforms::water_surface, shaders::kWaterSurface},
+    {&LitUniforms::water_planes, shaders::kWaterPlanes},
+    {&LitUniforms::water_background, shaders::kWaterBackground},
+    {&LitUniforms::water_depth, shaders::kWaterDepth},
     {&LitUniforms::coat_factor, shaders::kCoatFactor},
     {&LitUniforms::coat_roughness, shaders::kCoatRoughness},
     {&LitUniforms::has_coat_factor_map, shaders::kHasCoatFactorMap},
@@ -143,6 +149,11 @@ LitUniforms find_lit_uniforms(Shader& lit) {
   LitUniforms found;
   for (const LitUniform& uniform : kLitUniforms) found.*uniform.location = GetShaderLocation(lit, uniform.name);
   return found;
+}
+
+WaterUniforms find_water_uniforms(const Shader& program) {
+  return {GetShaderLocation(program, shaders::kWaterEnabled),
+          GetShaderLocation(program, shaders::kWaterWaveParameters)};
 }
 
 DepthUniforms find_depth_uniforms(const Shader& depth) {

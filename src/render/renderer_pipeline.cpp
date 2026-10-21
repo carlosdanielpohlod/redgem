@@ -77,6 +77,9 @@ void Renderer::Impl::compile_lit(const shaders::LitFeatures& features) {
   if (loaded(shader)) UnloadShader(shader);
   shader = compile_shader(shaders::lit_vertex().c_str(), shaders::lit_fragment(features).c_str(), "lit");
   lit_uniforms = find_lit_uniforms(shader);
+  lit_water = find_water_uniforms(shader);
+  depth_water = find_water_uniforms(depth_shader);
+  motion_water = find_water_uniforms(motion_shader);
   lit_instance_slot = find_instance_slot(shader);
   // A cube map's sampler must never share a slot with a picture's, even unused: given its own.
   assign_slot(shader, lit_uniforms.sky_reflections, kSkyReflectionSlot);

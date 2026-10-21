@@ -11,6 +11,8 @@
 #include "render/shaders/copy_fade.hpp"
 #include "render/shaders/lit_clearcoat.hpp"
 #include "render/shaders/lit_main.hpp"
+#include "render/shaders/lit_water.hpp"
+#include "render/shaders/water_waves.hpp"
 #include "render/shaders/lit_shadows.hpp"
 #include "render/shaders/lit_sky.hpp"
 
@@ -163,15 +165,18 @@ struct LitFeatures {
   bool sky_picture = false;   // the sky is a picture that lights the scene
   bool soft_shadows = false;  // shadow edges as wide as the sun makes them
   bool clearcoat = false;     // only scenes with a coating need the layered BRDF
+  bool water = false;         // refraction and procedural waves only when a scene needs them
 
   bool operator==(const LitFeatures& other) const {
-    return sky_picture == other.sky_picture && soft_shadows == other.soft_shadows && clearcoat == other.clearcoat;
+    return sky_picture == other.sky_picture && soft_shadows == other.soft_shadows && clearcoat == other.clearcoat &&
+           water == other.water;
   }
   bool operator!=(const LitFeatures& other) const { return !(*this == other); }
 };
 
 inline constexpr const char* kVersionLine = "#version 330\n";
 inline constexpr const char* kSkyPictureSwitch = "#define SKY_PICTURE\n";
+inline constexpr const char* kWaterSwitch = "#define WATER\n";
 inline constexpr const char* kClearcoatSwitch = "#define CLEARCOAT\n";
 inline constexpr const char* kSoftShadowsSwitch = "#define SOFT_SHADOWS\n";
 
@@ -182,7 +187,10 @@ inline std::string lit_fragment(const LitFeatures& features = {}) {
   if (features.sky_picture) switches += kSkyPictureSwitch;
   if (features.soft_shadows) switches += kSoftShadowsSwitch;
   if (features.clearcoat) switches += kClearcoatSwitch;
-  std::string source = std::string(kLitHead) + kCopyFade + kLitAlpha + kLitShadows + kLitSky + kLitClearcoat + kLitMain;
+  if (features.water) switches += kWaterSwitch;
+  std::string source = std::string(kLitHead) + kCopyFade + kLitAlpha + kLitShadows + kLitSky + kLitClearcoat;
+  if (features.water) source += std::string(kWaterWaves) + kLitWater;
+  source += kLitMain;
   const std::size_t version = source.find(kVersionLine);
   return source.insert(version + std::string(kVersionLine).size(), switches);
 }
