@@ -60,6 +60,31 @@ bool boundary_changed(const WaterSurface& surface, const Bounds& before, const B
   return !water_contact_point(surface, current);
 }
 
+Bounds contact_margin(Bounds bounds) {
+  bounds.min.y -= kWaterContactSkin;
+  bounds.max.y += kWaterContactSkin;
+  return bounds;
+}
+
+bool retains_contact(const WaterSurface& surface, const Bounds& before, const Bounds& current) {
+  return water_swept_contact(surface, contact_margin(before), contact_margin(current)).has_value();
+}
+
+bool exiting_boundary(const WaterSurface& surface, const Bounds& before, const Bounds& current, bool rising_exit) {
+  if (rising_exit) return true;
+  if (!touches_plane(surface, before)) return false;
+  if (!water_contact_point(surface, before)) return false;
+  return !water_contact_point(surface, current);
+}
+
+Vec3 boundary_origin(const WaterSurface& surface, const Bounds& before, const Bounds& current, const WaterSweep& sweep,
+                     bool rising_exit) {
+  if (!exiting_boundary(surface, before, current, rising_exit)) return sweep.point;
+  // Reversing the sweep finds the last point where this body touched the surface as it left.
+  const auto exit = water_swept_contact(surface, current, before);
+  return exit ? exit->point : sweep.point;
+}
+
 float ripple_radius(const Bounds& body) {
   const Vec3 half = body.half_extents();
   return std::clamp(std::max(half.x, half.z), kWaterRippleMinRadius, kWaterRippleMaxRadius);
@@ -170,10 +195,11 @@ void WaterInteractions::respond(Contact& contact, const WaterSurface& surface, c
                                 const WaterBodySample& body, const WaterSweep& sweep, float speed) {
   const bool wet = below_plane(contact.wet, body.bounds.min.y, surface.bounds.center().y);
   const bool changed = wet != contact.wet;
+  const bool rising_exit = contact.wet && !wet;
   contact.wet = wet;
   if (speed < kWaterMinimumSpeed) return;
   if (boundary_changed(surface, before.bounds, body.bounds, changed))
-    emit(contact, surface, body, sweep.point, speed);
+    emit(contact, surface, body, boundary_origin(surface, before.bounds, body.bounds, sweep, rising_exit), speed);
   else
     wake(contact, surface, body, speed);
 }
@@ -195,7 +221,7 @@ bool WaterInteractions::active_contact(const Contact& contact, const std::vector
   if (body == bodies.end()) return false;
   for (const auto& surface : surfaces) {
     if (same_contact(surface, contact.body, contact.surface, contact.primitive, body->object))
-      return water_swept_contact(surface, before->bounds, body->bounds).has_value();
+      return retains_contact(surface, before->bounds, body->bounds);
   }
   return false;
 }

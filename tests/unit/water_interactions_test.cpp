@@ -251,3 +251,49 @@ TEST_CASE("water cache keys and geometry apply the same bounded set of candidate
   scene.set_world_position(static_cast<ObjectId>(desc.nodes.size() - 1), kFarPond);
   CHECK(geometry.refresh(scene, desc).empty());
 }
+
+TEST_CASE("water surface jitter retains wet hysteresis and cooldown above the exact plane") {
+  constexpr float kFixedStep = 1.0f / 60.0f;
+  constexpr float kWetBottom = -0.03f;  // first entry crosses the lower hysteresis threshold
+  constexpr float kDryBottom = 0.03f;   // baseline starts genuinely outside the surface band
+  constexpr float kFirstJitterBottom = 0.005f;
+  constexpr float kSecondJitterBottom = 0.01f;  // both stay below the upper threshold, despite leaving the exact plane
+  constexpr int kJitterCycles = 4;              // include both intervals shorter and longer than the cooldown
+  Pond pond;
+  pond.at({0.0f, kBodyHalf + kDryBottom, 0.0f}, 0.0f);
+  pond.at({0.0f, kBodyHalf + kWetBottom, 0.0f}, kFixedStep);
+  REQUIRE(pond.water.snapshot().count == 1);
+  for (int cycle = 0; cycle < kJitterCycles; ++cycle) {
+    for (const float bottom : {kFirstJitterBottom, kSecondJitterBottom, kWetBottom}) {
+      pond.at({0.0f, kBodyHalf + bottom, 0.0f}, kFixedStep);
+      CHECK(pond.water.snapshot().count == 1);
+    }
+  }
+}
+
+TEST_CASE("water lateral exits emit at the shoreline instead of the previous body center") {
+  constexpr float kExitX = 6.0f;  // pond ends at x=5, well before this frame's destination
+  constexpr float kShoreX = 5.0f;
+  Pond pond;
+  pond.at(Vec3::zero(), 0.0f);
+  pond.at({kExitX, 0.0f, 0.0f});
+  REQUIRE(pond.water.snapshot().count == 1);
+  const auto& ripple = pond.water.snapshot().ripples[0];
+  CHECK(ripple.origin.x == doctest::Approx(kShoreX));
+  CHECK(ripple.origin.y == doctest::Approx(0.0f));
+  CHECK(ripple.origin.z == doctest::Approx(0.0f));
+}
+
+TEST_CASE("water rising exits follow the final contact along a diagonal path") {
+  // Travel along the two triangles' shared edge: both closest-point queries agree on the
+  // contact center. Other footprint contacts are conservative and may choose either triangle.
+  constexpr Vec3 kExit{1.0f, 2.0f, 1.0f};
+  const float contact_x = kExit.x * kBodyHalf / kExit.y;
+  const float contact_z = kExit.z * kBodyHalf / kExit.y;
+  Pond pond;
+  pond.at(Vec3::zero(), 0.0f);
+  pond.at(kExit);
+  REQUIRE(pond.water.snapshot().count == 1);
+  CHECK(pond.water.snapshot().ripples[0].origin.x == doctest::Approx(contact_x));
+  CHECK(pond.water.snapshot().ripples[0].origin.z == doctest::Approx(contact_z));
+}

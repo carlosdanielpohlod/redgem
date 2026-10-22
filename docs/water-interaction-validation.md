@@ -27,12 +27,17 @@ shared meshes/primitives, geometry caching, stationary jitter, destroyed handles
 kinematic movement from scripts, pause, expiry and world replacement. Living bodies can visit
 more than the retained-contact budget without permanently exhausting it.
 
+Contacts retain their wet-state hysteresis and cooldown through small oscillations inside the
+surface band. Exit impulses use the final contact at the shoreline or along an upward path,
+rather than the body's position before leaving. Dedicated regressions reproduce both failures
+against the preceding detector.
+
 Rendering tests check owner isolation, canonical simulation ages, repeated drawing, public
 snapshot validation, previous-frame packets, expiration, asset reload and temporal antialiasing
 with zero/four MSAA samples. Rendering never advances the simulation. The previous packet comes
 from the last frame actually drawn. Empty snapshots preserve the existing draw path.
 
-The complete build passed 1,209 C++ cases (41,997 assertions), 23 Ruby suites and 60 native render
+The complete build passed 1,212 C++ cases (42,022 assertions), 23 Ruby suites and 60 native render
 cases (655,534 assertions). All 1,509 checked include directions are allowed. A comparison with
 the preceding renderer found 106 shared screenshots pixel-identical; three grass images use a
 real-time wind clock and differ between runs. The lit, depth, motion, temporal and particle-shadow
