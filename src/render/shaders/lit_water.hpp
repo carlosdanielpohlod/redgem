@@ -54,17 +54,11 @@ float waterRoughness(vec3 n) {
   float variance = max(dot(dx, dx), dot(dy, dy)) * WATER_NORMAL_VARIANCE;
   return clamp(sqrt(roughness * roughness + variance), MIN_ROUGHNESS, 1.0);
 }
-vec2 waterUv(vec2 uv, vec3 ray, float surfaceDepth) {
-  vec3 surface = (matView * vec4(fragPosition, 1.0)).xyz;
-  float behind = waterLinearDepth(texture(waterDepth, uv).r);
-  float distance = max(behind - waterLinearDepth(surfaceDepth), 0.0) / max(-ray.z, EPSILON);
-  vec4 clip = matProjection * vec4(surface + ray * distance, 1.0);
-  vec2 projected = clip.xy / max(clip.w, EPSILON) * HALF + HALF;
-  vec2 refracted = mix(uv, projected, waterSurface.y / WATER_REFRACTION_SCALE);
-  if (any(lessThan(refracted, vec2(0.0))) || any(greaterThan(refracted, vec2(1.0)))) return uv;
-  // Reject foreground geometry; the offset vanishes naturally at shallow intersections.
-  return texture(waterDepth, refracted).r > surfaceDepth ? refracted : uv;
-}
+// Bounded secant iterations intersect the refracted ray with the visible depth field.
+// A miss keeps the undistorted opaque sample: hidden and off-screen surfaces are unavailable.
+const int WATER_REFRACTION_STEPS = 8;
+const float WATER_REFRACTION_THICKNESS = 0.02;  // view-space meters near the camera
+const float WATER_REFRACTION_RELATIVE_THICKNESS = 0.0005;
 // A short view-space ray against the opaque depth snapshot. A miss keeps the sky/probe fallback.
 const int WATER_REFLECTION_STEPS = 32;
 const int WATER_REFLECTION_REFINEMENT = 5;
@@ -94,6 +88,42 @@ float waterRayGap(vec3 origin, vec3 ray, float distance, out vec2 uv) {
   vec3 point = origin + ray * distance;
   if (!waterScreenPoint(point, uv)) return -WATER_DEPTH_LIMIT;
   return -point.z - waterLinearDepth(texture(waterDepth, uv).r);
+}
+bool waterRefractionSample(vec3 surface, vec3 ray, float distance, out vec2 uv, out float gap) {
+  vec3 point = surface + ray * distance;
+  if (!waterScreenPoint(point, uv)) return false;
+  float depth = texture(waterDepth, uv).r;
+  if (depth >= 1.0 - EPSILON) return false;
+  gap = -point.z - waterLinearDepth(depth);
+  return true;
+}
+vec3 waterUv(vec2 uv, vec3 snell, float surfaceDepth) {
+  vec3 surface = (matView * vec4(fragPosition, 1.0)).xyz;
+  float behind = waterLinearDepth(texture(waterDepth, uv).r);
+  float column = max(behind - waterLinearDepth(surfaceDepth), 0.0);
+  if (column <= EPSILON) return vec3(uv, 0.0);
+  vec3 fallback = vec3(uv, clamp(column / max(-snell.z, EPSILON), 0.0, WATER_DEPTH_LIMIT));
+  if (waterSurface.y <= 0.0) return fallback;
+  vec3 ray = normalize(mix(normalize(surface), snell, waterSurface.y / WATER_REFRACTION_SCALE));
+  if (ray.z >= -EPSILON) return fallback;
+  float before = 0.0;
+  float previousGap = -column;
+  float distance = column / -ray.z;
+  vec2 hit;
+  float gap;
+  for (int i = 0; i < WATER_REFRACTION_STEPS; ++i) {
+    if (distance <= 0.0 || distance > WATER_DEPTH_LIMIT) break;
+    if (!waterRefractionSample(surface, ray, distance, hit, gap)) break;
+    float thickness = max(WATER_REFRACTION_THICKNESS, behind * WATER_REFRACTION_RELATIVE_THICKNESS);
+    if (abs(gap) <= thickness) return vec3(hit, distance);
+    float difference = gap - previousGap;
+    if (abs(difference) <= EPSILON) break;
+    float next = distance - gap * (distance - before) / difference;
+    before = distance;
+    previousGap = gap;
+    distance = next;
+  }
+  return fallback;
 }
 vec4 waterScreenReflection(vec3 n, vec3 v) {
   vec3 origin = (matView * vec4(fragPosition + n * WATER_REFLECTION_BIAS, 1.0)).xyz;
@@ -168,15 +198,13 @@ vec3 waterColor() {
   vec3 n = waterNormal();
   vec3 v = normalize(viewPos - fragPosition);
   vec2 uv = gl_FragCoord.xy / vec2(textureSize(waterBackground, 0));
-  float surfaceDepth = waterLinearDepth(gl_FragCoord.z);
   vec3 ray = refract(normalize(mat3(matView) * -v), normalize(mat3(matView) * n), 1.0 / WATER_IOR);
-  vec2 bent = waterUv(uv, ray, gl_FragCoord.z);
-  float bottom = texture(waterDepth, bent).r;
-  float behind = waterLinearDepth(bottom);
-  float rayScale = 1.0 / max(-ray.z, EPSILON);
-  float thickness = clamp((behind - surfaceDepth) * rayScale, 0.0, WATER_DEPTH_LIMIT);
-  vec3 transmission = bottom < 1.0 - EPSILON ? exp(-max(waterAbsorption, vec3(0.0)) * thickness) : vec3(0.0);
-  vec3 background = texture(waterBackground, bent).rgb;
+  vec3 hit = waterUv(uv, ray, gl_FragCoord.z);
+  float bottom = texture(waterDepth, hit.xy).r;
+  float thickness = hit.z >= 0.0 ? hit.z : WATER_DEPTH_LIMIT;
+  bool transmittedHit = hit.z >= 0.0 && bottom < 1.0 - EPSILON;
+  vec3 transmission = transmittedHit ? exp(-max(waterAbsorption, vec3(0.0)) * thickness) : vec3(0.0);
+  vec3 background = texture(waterBackground, hit.xy).rgb;
   vec3 scattered = colDiffuse.rgb * waterIrradiance() * (1.0 - transmission);
   float fresnelWeight = fresnel(max(dot(n, v), 0.0), vec3(WATER_F0)).x;
   vec3 transmitted = transmission * (1.0 - fresnelWeight);

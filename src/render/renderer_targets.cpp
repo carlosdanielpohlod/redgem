@@ -181,8 +181,10 @@ void Renderer::Impl::make_targets(int width, int height) {
 }
 
 void Renderer::Impl::ensure_water_target() {
-  if (!loaded(water_background))
-    water_background = load_target(hdr.texture.width, hdr.texture.height, kHdrFormat, true);
+  if (loaded(water_background)) return;
+  water_background = load_target(hdr.texture.width, hdr.texture.height, kHdrFormat, true);
+  // Continuous floors need continuous depth between pixels for the refracted ray to converge.
+  SetTextureFilter(water_background.depth, TEXTURE_FILTER_BILINEAR);
 }
 
 void Renderer::Impl::ensure_glow_target() {

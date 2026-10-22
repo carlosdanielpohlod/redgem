@@ -32,6 +32,10 @@ constexpr float kReflectionFov = 50.0f;
 constexpr double kReflectionFog = 0.12;
 constexpr float kReflectionRegion = 0.57f;  // below the post's direct silhouette
 constexpr BoundingBox kReflectionPostBounds{{-0.5f, 0.5f, -1.5f}, {0.5f, 1.5f, -0.5f}};
+constexpr float kSlopedBottomDepth = 0.9f;
+constexpr float kBottomSlope = 0.5f;  // bottom height is slope * world Z minus depth
+constexpr float kBandNear = -0.9f;
+constexpr float kBandFar = -1.5f;
 
 struct ReflectionProbe {
   std::size_t pixel = 0;
@@ -254,6 +258,44 @@ Picture attenuated_reflection(RenderStage& stage, SceneDesc desc, float path) {
   desc.materials[kRockAsset].emissive = desc.materials[kRockAsset].emissive * transmission;
   return draw(stage, desc, "water_reflection_path_reference");
 }
+
+MeshDesc sloped_bottom(int material, float far, float near, float lift = 0.0f) {
+  MeshDesc mesh = plane_mesh(material);
+  mesh.bounds = Bounds{};
+  auto& positions = mesh.primitives.front().positions;
+  for (std::size_t i = 0; i < positions.size(); i += kCoordinates) {
+    const float z = positions[i + 2] > 0.0f ? near : far;
+    positions[i + 1] = kBottomSlope * z - kSlopedBottomDepth + lift;
+    positions[i + 2] = z;
+    mesh.bounds.include(vec3_from(&positions[i]));
+  }
+  return mesh;
+}
+
+SceneDesc tilted_refraction_pond() {
+  SceneDesc desc = clear_dark_pond();
+  desc.materials[1] = redgem::test::glowing_material({1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+  desc.materials.push_back(redgem::test::glowing_material({0.0f, 1.0f, 0.0f, 1.0f}, 1.0f));
+  constexpr float kFloorExtent = 12.0f;  // includes the much farther unrefracted intersection
+  constexpr float kBandLift = 0.003f;    // avoid coincident depth with the red floor
+  desc.meshes[1] = sloped_bottom(1, -kFloorExtent, kFloorExtent);
+  desc.meshes.push_back(sloped_bottom(kRockAsset, kBandFar, kBandNear, kBandLift));
+  desc.nodes[1].local = redgem::Transform{};
+  NodeDesc band;
+  band.name = "Snell intersection band";
+  band.mesh = kRockAsset;
+  desc.nodes.push_back(band);
+  return desc;
+}
+
+float central_snell_hit() {
+  constexpr float kWaterIor = 1.333f;
+  const Vec3 incident = normalize(Vec3::zero() - kViewer);
+  const float along_z = incident.z / kWaterIor;
+  const float down = -std::sqrt(1.0f - along_z * along_z);
+  const float distance = kSlopedBottomDepth / (kBottomSlope * along_z - down);
+  return along_z * distance;
+}
 }  // namespace
 
 TEST_CASE("water ripples change reflections with time while a still surface is stable") {
@@ -398,6 +440,34 @@ TEST_CASE("still water refracts a patterned bottom according to its depth") {
   desc.materials[0].water.refraction = kWaterRefraction;
   const auto bent = draw(stage, desc, "water_refracted_pattern");
   CHECK(changed(straight, bent) > kMinimumChangingPixels);
+}
+
+TEST_CASE("Snell refraction intersects an inclined floor instead of projecting its unrefracted depth once") {
+  RenderStage stage;
+  SceneDesc desc = tilted_refraction_pond();
+  REQUIRE(central_snell_hit() > kBandFar);
+  REQUIRE(central_snell_hit() < kBandNear);
+  const auto straight = draw(stage, desc, "water_sloped_unrefracted");
+  desc.materials[0].water.refraction = kWaterRefraction;
+  const auto bent = draw(stage, desc, "water_sloped_snell_hit");
+  constexpr int kBandContrast = 50;
+  REQUIRE(straight.at(kMiddle, kMiddle).r > straight.at(kMiddle, kMiddle).g + kBandContrast);
+  CHECK(bent.at(kMiddle, kMiddle).g > bent.at(kMiddle, kMiddle).r + kBandContrast);
+}
+
+TEST_CASE("off-screen water refraction keeps the available bottom instead of opening black holes") {
+  RenderStage stage;
+  SceneDesc desc = clear_dark_pond();
+  desc.materials[1] = redgem::test::glowing_material({1.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
+  constexpr float kDeepBottom = -3.0f;
+  constexpr float kBottomEdge = 0.98f;
+  constexpr int kVisibleBottom = 50;
+  desc.nodes[1].local.position.y = kDeepBottom;
+  const auto straight = draw(stage, desc, "water_screen_edge_straight");
+  desc.materials[0].water.refraction = kWaterRefraction;
+  const auto bent = draw(stage, desc, "water_screen_edge_fallback");
+  REQUIRE(straight.at(kMiddle, kBottomEdge).r > kVisibleBottom);
+  CHECK(bent.at(kMiddle, kBottomEdge).r > kVisibleBottom);
 }
 
 TEST_CASE("water reflects an on-screen red object below its direct silhouette") {
