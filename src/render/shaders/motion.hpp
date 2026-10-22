@@ -36,9 +36,9 @@ void main() {
   fragCopy = vec4(keptOf(texelOf(frameTexels, record + COPY_TEXEL), length(toWorld[3].xyz - viewPos)), 0.0, 0.0);
   fragTexCoord = vertexTexCoord;
   fragColor = vertexColor;
-  vec4 world = placed(frameTexels, record, time);
+  vec4 world = placed(frameTexels, record, time, false);
   nowClip = viewProjection * world;
-  beforeClip = previousViewProjection * placed(previousTexels, record, previousTime);
+  beforeClip = previousViewProjection * placed(previousTexels, record, previousTime, true);
   gl_Position = matProjection * matView * world;
 }
 )GLSL";
@@ -83,7 +83,7 @@ void main() {
   }
   vec2 now = nowClip.xy / nowClip.w;
   vec2 before = beforeClip.w > NOWHERE ? beforeClip.xy / beforeClip.w : now;
-  finalColor = vec4((now - before) * NDC_TO_TEXTURE, DRAWN, 0.0);
+  finalColor = vec4((now - before) * NDC_TO_TEXTURE, DRAWN, waterEnabled > SWITCH_ON ? 1.0 : 0.0);
 }
 )GLSL";
 

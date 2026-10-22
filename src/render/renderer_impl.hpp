@@ -39,6 +39,7 @@
 #include "render/environment.hpp"
 #include "render/gl_extras.hpp"
 #include "render/instance_batches.hpp"
+#include "render/water_ripple_packet.hpp"
 #include "render/instance_records.hpp"
 #include "render/material_alpha.hpp"
 #include "render/mesh_pass.hpp"
@@ -83,7 +84,8 @@ struct GpuPrimitive {
   int material = kNoIndex;
   // Which of the mesh's pieces it is (see mesh_pieces): a piece that cannot be drawn has no part.
   std::size_t piece = 0;
-  bool skinned = false;  // has joints: a skeleton deforms it
+  bool skinned = false;       // has joints: a skeleton deforms it
+  std::size_t primitive = 0;  // original MeshDesc primitive, shared by its GPU pieces
 };
 
 // What a frame knows of an object before any pass: whether it is drawn at all (its record is in
@@ -183,6 +185,11 @@ struct Renderer::Impl {
   render_detail::WaterUniforms lit_water;
   render_detail::WaterUniforms motion_water;
   render_detail::WaterUniforms depth_water;
+  WaterRippleSnapshot water_ripples;
+  WaterRippleSnapshot previous_water_ripples;
+  std::unordered_map<ObjectId, ObjectHandle> water_handles;
+  bool water_ripple_uniforms_dirty = false;
+  std::size_t see_through_slots_first = 0;
   RenderTexture2D water_background{};  // immutable opaque color and depth for the water pass
   Shader depth_shader{};
   render_detail::DepthUniforms depth_uniforms;
@@ -324,6 +331,16 @@ struct Renderer::Impl {
   void ensure_water_target();
   void capture_water_background();
   void send_water(const WaterDesc& water, render_math::AlphaPass pass);
+  void reset_water_ripples();
+  bool active_water_ripples() const;
+  void clear_water_ripple_uniforms();
+  void register_water_handles(const Scene& scene, const WaterRippleSnapshot& snapshot);
+  ObjectHandle water_owner(std::size_t record) const;
+  void prepare_water_ripples(const Scene& scene, const WaterRippleSnapshot* snapshot);
+  bool send_water_ripples(const GpuPrimitive& primitive, std::size_t record, render_math::AlphaPass pass);
+  void draw_water_copy(const GpuPrimitive& primitive, const render_detail::InstanceRun& run, std::size_t record,
+                       ObjectPass& pass);
+  void draw_water_copies(const GpuPrimitive& primitive, const render_detail::InstanceRun& run, ObjectPass& pass);
   float mesh_wave_height(int mesh) const;
   void ensure_glow_target();
   void ensure_scene_depth_target();

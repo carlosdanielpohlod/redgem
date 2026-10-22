@@ -43,6 +43,7 @@ Renderer::~Renderer() { impl_->release(); }
 
 void Renderer::upload(const SceneDesc& desc) {
   impl_->release_assets();
+  impl_->reset_water_ripples();
   impl_->faces_captured = 0;  // do not reflect the previous scene while the new one is captured
   ++impl_->scene_uploads;     // nor mix its frames into the new one's
   sync(desc);
@@ -72,16 +73,18 @@ void Renderer::refresh_mesh(const SceneDesc& desc, int mesh) {
 Camera3D Renderer::scene_camera(const Scene& scene) const { return impl_->camera_for(scene); }
 
 void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output,
-                          const ParticleSystem* particles) {
+                          const ParticleSystem* particles, const WaterRippleSnapshot* water_ripples) {
   const int width = output != nullptr ? output->texture.width : GetRenderWidth();
   const int height = output != nullptr ? output->texture.height : GetRenderHeight();
   if (!has_area(width, height)) return;
+  impl_->prepare_water_ripples(scene, water_ripples);
   const Environment env = scene_environment(scene);
   impl_->ensure_targets(width, height, env.msaa);
   impl_->prepare_frame(scene, camera, env, static_cast<float>(width) / static_cast<float>(height), particles);
   impl_->draw_lit_scene(camera, particles);
   impl_->post_process(env, output);
   impl_->end_temporal();
+  impl_->previous_water_ripples = impl_->water_ripples;
 }
 
 void Renderer::set_motion_blur(float amount) {

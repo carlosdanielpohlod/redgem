@@ -33,6 +33,7 @@ void Renderer::Impl::draw_see_through(std::size_t first, Vec3 viewer) {
 
 void Renderer::Impl::gather_see_through(std::size_t first, Vec3 viewer) {
   see_through.clear();
+  see_through_slots_first = first;
   if (!any_see_through) return;
   for (const render_math::InstanceBatch& batch : batches.batches()) {
     if (has_see_through(batch.mesh)) add_see_through(batch, first, viewer);
@@ -69,7 +70,11 @@ void Renderer::Impl::add_see_through(const render_math::InstanceBatch& batch, st
 void Renderer::Impl::draw_see_through_copies(const render_math::SeeThroughDraw& draw, ObjectPass& pass) {
   const InstanceRun run{slots.id, draw.first, draw.count};
   for (const GpuPrimitive& part : meshes[static_cast<std::size_t>(draw.mesh)]) {
-    if (render_math::drawn_see_through(factors_of(part.material))) draw_primitive(part, run, pass);
+    if (!render_math::drawn_see_through(factors_of(part.material))) continue;
+    if (factors_of(part.material).water.enabled)
+      draw_water_copies(part, run, pass);
+    else
+      draw_primitive(part, run, pass);
   }
 }
 

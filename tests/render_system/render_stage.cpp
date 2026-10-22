@@ -56,9 +56,10 @@ RenderStage::~RenderStage() {
   renderer_.reset();  // before the window it draws in
 }
 
-Picture RenderStage::draw(const Scene& scene, const std::string& name, const ParticleSystem* particles) {
+Picture RenderStage::draw(const Scene& scene, const std::string& name, const ParticleSystem* particles,
+                          const WaterRippleSnapshot* water_ripples) {
   BeginDrawing();
-  renderer_->draw_world(scene, renderer_->scene_camera(scene), &target_, particles);
+  renderer_->draw_world(scene, renderer_->scene_camera(scene), &target_, particles, water_ripples);
   EndDrawing();
   Image image = LoadImageFromTexture(target_.texture);
   ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);

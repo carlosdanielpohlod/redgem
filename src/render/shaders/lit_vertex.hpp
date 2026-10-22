@@ -96,21 +96,21 @@ vec4 swayed(vec4 world, float ground, float wind, float clock) {
 
 // The vertex placed by `toWorld` (its record's matrix, or its skeleton's pose), swayed as the
 // record says.
-vec4 placedBy(mat4 toWorld, float ground, sampler2D texels, int record, float clock) {
+vec4 placedBy(mat4 toWorld, float ground, sampler2D texels, int record, float clock, bool previous) {
   vec4 world = toWorld * vec4(vertexPosition, 1.0);
   float wind = windAmount * texelOf(texels, record + NORMAL_TEXEL).w;  // (the record's own, not its skeleton's)
   if (wind > 0.0) world = swayed(world, ground, wind, clock);
-  if (waterEnabled > SWITCH_ON) world.y += waterShape(world.xz, clock).x;
+  if (waterEnabled > SWITCH_ON) world.y += waterDeformation(world.xz, clock, previous).x;
   return world;
 }
 
 // Where the vertex of the copy whose record starts at texel `record` of `texels` is in the world.
-vec4 placed(sampler2D texels, int record, float clock) {
+vec4 placed(sampler2D texels, int record, float clock, bool previous) {
   vec4 look = texelOf(texels, record + LOOK_TEXEL);
   mat4 toWorld = matrixOf(texels, record);
   float ground = toWorld[3].y;
   if (posed(look)) toWorld = skeletonPose(texels, int(look.a));
-  return placedBy(toWorld, ground, texels, record, clock);
+  return placedBy(toWorld, ground, texels, record, clock, previous);
 }
 
 // How much of a copy `distance` meters away is kept as it fades out at the far end of its
@@ -145,7 +145,7 @@ void main() {
     toWorld = skeletonPose(frameTexels, int(look.a));  // (worked out once, for the position and the normals)
     normalToWorld = mat3(toWorld);  // good enough for normals: they are normalized, and rigs are not sheared
   }
-  vec4 world = placedBy(toWorld, ground, frameTexels, record, time);
+  vec4 world = placedBy(toWorld, ground, frameTexels, record, time, false);
   fragPosition = world.xyz;
   fragTexCoord = vertexTexCoord;
   fragColor = vertexColor;

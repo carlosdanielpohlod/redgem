@@ -38,7 +38,8 @@ the same pull request.
   It is off in the editor's scene view, and turns itself
   off, with a warning, on graphics cards that cannot draw into float textures.
 - Water supports animated horizontal surfaces, depth absorption, screen-space refraction,
-  screen-space reflections with an environment fallback and shore foam. It has no underwater camera mode, fluid simulation,
+  screen-space reflections with an environment fallback, shore foam and local impact/wake ripples
+  from physical bodies. It has no underwater camera mode, fluid simulation,
   buoyancy, breaking waves or planar reflections. Refraction sees opaque geometry on screen
   only; overlapping water layers and transparent objects are not captured. Absorption affects
   the path from the bottom to the camera; incident lighting of submerged objects is not attenuated by water.

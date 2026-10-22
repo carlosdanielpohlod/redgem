@@ -44,7 +44,7 @@ vec3 waterNormal() {
               + waterRipple(p, vec2(0.8, 0.6), 0.19, 0.3)
               + waterRipple(p, vec2(0.6, -0.8), 0.083, 0.2)
               + waterRipple(p, vec2(-0.28, 0.96), 0.041, 0.1);
-  vec2 slope = waterShape(p, time).yz + detail * wind;
+  vec2 slope = waterDeformation(p, time, false).yz + detail * wind;
   vec3 normal = normalize(vec3(-slope.x, 1.0, -slope.y));
   return gl_FrontFacing ? normal : -normal;
 }

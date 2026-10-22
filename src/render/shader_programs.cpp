@@ -152,8 +152,16 @@ LitUniforms find_lit_uniforms(Shader& lit) {
 }
 
 WaterUniforms find_water_uniforms(const Shader& program) {
-  return {GetShaderLocation(program, shaders::kWaterEnabled),
-          GetShaderLocation(program, shaders::kWaterWaveParameters)};
+  WaterUniforms found;
+  found.enabled = GetShaderLocation(program, shaders::kWaterEnabled);
+  found.waves = GetShaderLocation(program, shaders::kWaterWaveParameters);
+  found.ripples = {GetShaderLocation(program, shaders::kWaterRippleCount),
+                   GetShaderLocation(program, shaders::kWaterRipples),
+                   GetShaderLocation(program, shaders::kWaterRadii)};
+  found.previous_ripples = {GetShaderLocation(program, shaders::kPreviousWaterRippleCount),
+                            GetShaderLocation(program, shaders::kPreviousWaterRipples),
+                            GetShaderLocation(program, shaders::kPreviousWaterRadii)};
+  return found;
 }
 
 DepthUniforms find_depth_uniforms(const Shader& depth) {

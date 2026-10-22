@@ -12,6 +12,7 @@
 #include "scene/particles.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
+#include "scene/water_ripples.hpp"
 
 namespace redgem {
 
@@ -43,7 +44,7 @@ class Renderer {
   // so overlays drawn into it afterwards are hidden behind objects.
   // `particles`, when given, are drawn over the objects (and behind the ones in front of them).
   void draw_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output = nullptr,
-                  const ParticleSystem* particles = nullptr);
+                  const ParticleSystem* particles = nullptr, const WaterRippleSnapshot* water_ripples = nullptr);
   // Draws what scripts put on screen this frame: texts, rectangles and images.
   void draw_hud(const std::vector<HudItem>& hud);
   // How much the picture streaks with speed, 0 (none) to 1 (see Camera.motion_blur in Ruby).

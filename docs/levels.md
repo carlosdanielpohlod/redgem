@@ -311,6 +311,32 @@ scale does not change the wavelength. Wave displacement follows the renderer's c
 fixed-step recordings, and the temporal coverage pass uses the same displaced geometry.
 Water does not cast an opaque shadow. Objects keep their authored collision shapes.
 
+Dynamic and kinematic physics bodies automatically disturb horizontal water meshes when they
+cross the surface or travel through it. Each contact sends a short, outward-moving wave packet;
+its strength follows motion and its initial width follows the body's footprint. No script call
+is needed. The visual effect displaces vertices and bends the lighting normal with the same
+radial wave, so use a subdivided surface when the silhouette needs to move.
+
+Impulses belong to one object and one original mesh primitive. Copies that share a mesh or
+material, and other water primitives in that mesh, remain independent. The simulation keeps at
+most 16 impulses for three seconds; drawing never advances their ages. Pausing simulation freezes
+them, and recording uses the same simulation steps. They reset when the world changes. Temporal
+motion uses the last snapshot actually drawn; a newly observed impulse starts with its current
+age in both poses to avoid an invented first-frame velocity. These ripples are a visual response:
+they do not apply buoyancy or forces to physics bodies and are not network-synchronized.
+
+Contact detection uses the actual water triangles with a cached spatial tree. It supports rigid,
+horizontal planar mesh primitives; skinned or tilted surfaces and Scatter copies do not generate
+contacts. Body footprints use conservative world-aligned collider bounds, including spheres and
+capsules. A small surface margin, emission cooldown and travel spacing suppress resting jitter.
+Scripted position changes of dynamic bodies, characters and vehicles are treated as teleports;
+scripted kinematic movement can create entry waves and wakes.
+
+Work is bounded to the first 128 eligible water objects, 128 valid water primitives and
+262,144 triangles per world, 256 moving bodies and 1,024 active body/surface pairs. Tilted or
+oversized candidates still occupy a water-object slot. A primitive that exceeds the remaining
+triangle budget is ignored as a whole. These bounds keep interaction work predictable for large scenes.
+
 This first water material is for views above a lake or sea surface. Refraction samples only
 opaque geometry visible on screen; transparent objects and other water layers are absent from
 that snapshot. Screen-space reflections miss off-screen and hidden geometry and use the environment capture
