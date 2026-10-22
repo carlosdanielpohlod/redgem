@@ -106,6 +106,11 @@ bones and swaying foliage included; what is no longer there (a lightning flash, 
 running past, the camera cutting to another place) is not smeared over the picture; particles
 take less of the frames before. A new scene, a new window size and a camera that jumps start over.
 It works with `msaa` on or off and costs one more pass over the scene's opaque surfaces.
+History fades out locally between 16 and 32 pixels of motion per frame, and at large motion
+splits around opening edges. Fast scenery therefore favors current detail, while a tracked
+subject with little screen motion still accumulates samples. Newly revealed surfaces are
+estimated from neighboring motion; previous-frame depth is not checked. Very fast details can
+shimmer as fewer temporal samples are retained.
 
 **Animated characters.** glTF skeletons and animations are supported: skinned meshes are deformed on
 the GPU (up to 1024 bones per skeleton, 4 per vertex: a character with fingers has about 65) and every animation in the scene plays in a

@@ -248,3 +248,13 @@ TEST_CASE("glowing particles shine with their own light, even when asked to be l
   look.glow = true;
   CHECK_FALSE(look.takes_light());
 }
+
+TEST_CASE("particle shadow casting is opt-in and carried from the burst into every particle") {
+  ParticleSystem system;
+  ParticleBurst burst = sparks();
+  CHECK_FALSE(burst.look.cast_shadow);
+  burst.look.cast_shadow = true;
+  system.burst(burst);
+  REQUIRE_FALSE(system.particles().empty());
+  for (const auto& particle : system.particles()) CHECK(particle.look.cast_shadow);
+}

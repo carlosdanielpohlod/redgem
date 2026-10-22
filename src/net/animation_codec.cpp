@@ -1,5 +1,7 @@
 #include "net/animation_codec.hpp"
 
+#include <cmath>
+
 #include "net/wire_codec.hpp"
 
 namespace redgem::net {
@@ -19,11 +21,17 @@ bool sound_clip(const std::string& name, std::uint32_t flags) {
 }
 
 // Whether a clip, if any, has a name a clip carries: an empty one would read as no clip at all.
-bool fits(const std::optional<ClipPart>& clip) {
-  return !clip || (!clip->clip.empty() && clip->clip.size() <= kMaxClipNameBytes);
+bool fits(const std::optional<ClipPart>& clip) { return !clip || valid_clip(*clip); }
+
+}  // namespace
+
+bool valid_clip(const ClipPart& clip) {
+  const bool valid_name = !clip.clip.empty() && clip.clip.size() <= kMaxClipNameBytes && wire::valid_utf8(clip.clip);
+  const bool valid_time = std::isfinite(clip.time) && clip.time >= 0.0f;
+  return valid_name && valid_time && std::isfinite(clip.speed);
 }
 
-void write_clip(PoseWriter& writer, const std::optional<ClipPart>& clip) {
+void write_animation_clip(PoseWriter& writer, const std::optional<ClipPart>& clip) {
   if (!clip) {
     writer.byte(kNoClip);
     return;
@@ -34,6 +42,8 @@ void write_clip(PoseWriter& writer, const std::optional<ClipPart>& clip) {
   writer.number(clip->speed);
   writer.byte(static_cast<std::uint8_t>((clip->loop ? kLoops : 0) | (clip->playing ? kPlays : 0)));
 }
+
+namespace {
 
 // Whether what is left holds a clip of a name `size` bytes long, a name a clip may have.
 bool holds_clip(const PoseReader& reader, std::size_t size) {
@@ -48,31 +58,50 @@ std::optional<ClipPart> clip_of(PoseReader& reader, std::size_t size) {
   clip.time = reader.number();
   clip.speed = reader.number();
   const std::uint32_t flags = reader.word(kByte);
-  if (!sound_clip(clip.clip, flags)) return std::nullopt;
+  if (!sound_clip(clip.clip, flags) || !valid_clip(clip)) return std::nullopt;
   clip.loop = has(flags, kLoops);
   clip.playing = has(flags, kPlays);
   return clip;
 }
 
+}  // namespace
+
 // Reads a clip, or its absence, into `clip`: false when the bytes are not one.
-bool read_clip(PoseReader& reader, std::optional<ClipPart>& clip) {
+bool read_animation_clip(PoseReader& reader, std::optional<ClipPart>& clip) {
   if (reader.left() < kByte) return false;
   const std::size_t size = reader.word(kByte);
-  if (size == kNoClip) return true;
+  if (size == kNoClip) {
+    clip.reset();
+    return true;
+  }
   if (!holds_clip(reader, size)) return false;
   clip = clip_of(reader, size);
   return clip.has_value();
 }
 
+namespace {
+
+bool read_graph_tail(PoseReader& reader, AnimationPart& part) {
+  if (reader.left() == 0) return true;
+  part.graph = read_graph(reader);
+  return part.graph.has_value();
+}
+
 }  // namespace
 
-bool carriable(const AnimationPart& part) { return fits(part.own) && fits(part.layer); }
+bool carriable(const AnimationPart& part) {
+  const bool valid_weights = std::isfinite(part.layer_weight) && part.layer_weight >= 0.0f && part.layer_weight <= 1.0f;
+  const bool valid_fade = std::isfinite(part.fade) && part.fade >= 0.0f;
+  const bool valid_mode = !part.graph || (!part.own && valid_graph(*part.graph));
+  return valid_weights && valid_fade && valid_mode && fits(part.own) && fits(part.layer);
+}
 
 void write_animation(PoseWriter& writer, const AnimationPart& part) {
   writer.number(part.fade);
   writer.number(part.layer_weight);
-  write_clip(writer, part.own);
-  write_clip(writer, part.layer);
+  write_animation_clip(writer, part.own);
+  write_animation_clip(writer, part.layer);
+  if (part.graph) write_graph(writer, *part.graph);
 }
 
 std::optional<AnimationPart> read_animation(PoseReader& reader) {
@@ -80,9 +109,10 @@ std::optional<AnimationPart> read_animation(PoseReader& reader) {
   AnimationPart part;
   part.fade = reader.number();
   part.layer_weight = reader.number();
-  if (!read_clip(reader, part.own)) return std::nullopt;
-  if (!read_clip(reader, part.layer)) return std::nullopt;
-  if (reader.left() != 0) return std::nullopt;
+  if (!read_animation_clip(reader, part.own)) return std::nullopt;
+  if (!read_animation_clip(reader, part.layer)) return std::nullopt;
+  if (!read_graph_tail(reader, part)) return std::nullopt;
+  if (reader.left() != 0 || !carriable(part)) return std::nullopt;
   return part;
 }
 

@@ -8,6 +8,7 @@
 #include <string>
 
 #include "net/pose_baselines.hpp"
+#include "scene/animation/character_animation.hpp"
 
 namespace redgem {
 
@@ -17,5 +18,8 @@ namespace redgem {
 std::optional<net::Animated> animated_of(mrb_state* mrb, mrb_value object, const std::string& key);
 // GameObject#__animation_sync.
 void install_animation_sync_bindings(mrb_state* mrb);
+std::optional<ClipState> animation_clip_arg(mrb_state* mrb, mrb_value value);
+std::optional<GraphAnimation> animation_graph_arg(mrb_state* mrb, mrb_value value);
+net::GraphPart animation_graph_part(const GraphAnimation& graph);
 
 }  // namespace redgem

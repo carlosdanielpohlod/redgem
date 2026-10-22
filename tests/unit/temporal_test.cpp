@@ -117,3 +117,14 @@ TEST_CASE("the frames before are dropped when the camera cuts: jumps, turns arou
   CHECK(camera_cut(before, zoomed));
   for (const TemporalView& cut : {jumped, turned, zoomed}) CHECK_FALSE(keeps_history(before, cut));
 }
+
+TEST_CASE("fast chase camera translations keep global history for surfaces that stay in view") {
+  constexpr Vec3 kChaseStep{1.25f, 0.0f, -0.25f};  // meters per frame: fast screen motion without a camera cut
+  TemporalView before = looking_ahead();
+  for (int frame = 0; frame < kJitterPhases; ++frame) {
+    TemporalView now = before;
+    now.position = before.position + kChaseStep;
+    CHECK(keeps_history(before, now));
+    before = now;
+  }
+}

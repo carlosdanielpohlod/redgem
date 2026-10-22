@@ -5,6 +5,11 @@
 
 #include <raymath.h>
 
+#include <algorithm>
+#include <iterator>
+
+#include "render/shaders/particle.hpp"
+
 namespace redgem {
 namespace {
 
@@ -22,6 +27,8 @@ void blend_particles(bool glowing) {
                             RL_FUNC_ADD);
   rlSetBlendMode(RL_BLEND_CUSTOM_SEPARATE);
 }
+
+bool casts_particle_shadow(const Particle& particle) { return particle.look.cast_shadow; }
 
 void bind_texture(int slot, unsigned int texture) {
   rlActiveTextureSlot(slot);
@@ -56,6 +63,49 @@ void Renderer::Impl::prepare_particles(const ParticleSystem& system, const Camer
   rlDrawRenderBatchActive();
   if (particle_layout.any_soft || gathers_glow()) share_scene_depth();
   send_particles(particle_buffer, particle_layout.vertices);
+}
+
+void Renderer::Impl::prepare_particle_shadows(const ParticleSystem* system, const Camera3D& sun_view) {
+  particle_shadow_layout.runs.clear();
+  particle_casters.clear();
+  if (system == nullptr) return;
+  std::copy_if(system->particles().begin(), system->particles().end(), std::back_inserter(particle_casters),
+               casts_particle_shadow);
+  if (particle_casters.empty()) return;
+  load_particle_shadow_shader();
+  batch_particle_pictures(*system);
+  const auto view = render_math::facing(to_vec3(sun_view.position), to_vec3(sun_view.target), to_vec3(sun_view.up));
+  render_math::lay_out_particles(particle_casters, particle_batch_of, particle_batches.size(), view,
+                                 particle_shadow_layout);
+  send_particles(particle_buffer, particle_shadow_layout.vertices);
+}
+
+void Renderer::Impl::load_particle_shadow_shader() {
+  if (loaded(particle_shadow_shader)) return;
+  particle_shadow_shader =
+      compile_shader(shaders::kParticleShadowVertex, shaders::kParticleShadowFragment, "particle shadow depth");
+  particle_shadow_textured = GetShaderLocation(particle_shadow_shader, shaders::kParticleTextured);
+}
+
+void Renderer::Impl::draw_particle_shadows(const Matrix& light_matrix) {
+  if (particle_shadow_layout.runs.empty()) return;
+  rlDrawRenderBatchActive();
+  rlDisableBackfaceCulling();
+  rlDisableColorBlend();
+  rlEnableShader(particle_shadow_shader.id);
+  rlSetUniformMatrix(particle_shadow_shader.locs[SHADER_LOC_MATRIX_MVP], light_matrix);
+  for (const auto& run : particle_shadow_layout.runs) draw_particle_shadow_run(run);
+  bind_texture(0, 0);
+  rlDisableShader();
+  rlEnableColorBlend();
+  rlEnableBackfaceCulling();
+}
+
+void Renderer::Impl::draw_particle_shadow_run(const render_math::ParticleRun& run) {
+  const Texture2D* picture = particle_batches[run.batch];
+  send(particle_shadow_shader, particle_shadow_textured, picture != nullptr ? kOn : kOff);
+  bind_texture(0, picture != nullptr ? picture->id : rlGetTextureIdDefault());
+  render_detail::draw_particle_run(particle_buffer, run);
 }
 
 void Renderer::Impl::draw_particle_runs(bool glowing) {

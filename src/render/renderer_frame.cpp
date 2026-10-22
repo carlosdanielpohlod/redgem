@@ -62,7 +62,8 @@ Camera3D Renderer::Impl::camera_for(const Scene& scene) const {
   return camera;
 }
 
-void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect) {
+void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect,
+                                   const ParticleSystem* particles) {
   use_environment(env, camera);
   // Where every object is, worked out once: each of the frame's passes (shadows, reflections, the
   // view) would otherwise walk every object's chain of parents again. So are its bones.
@@ -73,7 +74,7 @@ void Renderer::Impl::prepare_frame(const Scene& scene, const Camera3D& camera, c
   apply_lights(scene, env, to_vec3(camera.position));
   view_tan_half_fov = std::tan(camera.fovy * DEG2RAD * kHalf);
   view_aspect = aspect;
-  draw_shadow_map(camera, env);
+  draw_shadow_map(camera, env, particles);
   capture_reflection_face(camera);
   send(shader, shader.locs[SHADER_LOC_VECTOR_VIEW], camera.position);
 }

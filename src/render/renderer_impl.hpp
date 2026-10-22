@@ -286,6 +286,10 @@ struct Renderer::Impl {
   std::vector<const Texture2D*> particle_batches;
   std::vector<std::size_t> particle_batch_of;
   render_math::ParticleLayout particle_layout;
+  render_math::ParticleLayout particle_shadow_layout;
+  std::vector<Particle> particle_casters;
+  Shader particle_shadow_shader{};
+  int particle_shadow_textured = -1;
   render_detail::ParticleBuffer particle_buffer;
   std::vector<render_math::SeeThroughDraw> see_through;  // the frame's, in the order they are drawn
   std::vector<bool> see_through_meshes;                  // by mesh: whether a part of it is drawn see-through
@@ -354,7 +358,8 @@ struct Renderer::Impl {
   Camera3D camera_for(const Scene& scene) const;
   // What every pass of a frame needs before the picture is drawn: where things are, the lights,
   // the sun's shadow map and one more face of the reflections. `aspect`: width over height.
-  void prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect);
+  void prepare_frame(const Scene& scene, const Camera3D& camera, const Environment& env, float aspect,
+                     const ParticleSystem* particles);
   // The scene as the camera sees it, into the HDR target.
   void draw_lit_scene(const Camera3D& camera, const ParticleSystem* particles);
   // What the environment asks of the frame's shaders: the sky picture, the lit shader's features,
@@ -468,6 +473,11 @@ struct Renderer::Impl {
   void prepare_particles(const ParticleSystem& system, const Camera3D& camera);
   // What every run of particles is drawn with: the shader, its view, and what soft ones fade into.
   void begin_particles();
+  // Sun-facing caster quads are uploaded once and reused by all cascades before color quads.
+  void prepare_particle_shadows(const ParticleSystem* system, const Camera3D& sun_view);
+  void draw_particle_shadows(const Matrix& light_matrix);
+  void load_particle_shadow_shader();
+  void draw_particle_shadow_run(const render_math::ParticleRun& run);
   void draw_particle_runs(bool glowing);
   void draw_particle_run(const render_math::ParticleRun& run);
   // A run's picture and look, drawn as the blending set says.
@@ -525,8 +535,8 @@ struct Renderer::Impl {
   // --- Sun shadows (renderer_shadows.cpp) -------------------------------------------------------
 
   // Renders the scene's depth from the sun and hands the result to the lit shader.
-  void draw_shadow_map(const Camera3D& camera, const Environment& env);
-  void draw_sun_depth(const Camera3D& camera, Vec3 to_sun, const Environment& env);
+  void draw_shadow_map(const Camera3D& camera, const Environment& env, const ParticleSystem* particles);
+  void draw_sun_depth(const Camera3D& camera, Vec3 to_sun, const Environment& env, const ParticleSystem* particles);
   // Each cascade into its tile of the map, its matrix into light_matrices.
   void draw_cascades(const render_math::Cascades& cascades, Vec3 viewer);
   // Draws the depth from the sun's point of view into the viewport set. Returns the matrix that

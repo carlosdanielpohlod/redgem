@@ -167,6 +167,7 @@ void install_object_animation_bindings(mrb_state* mrb) {
 void install_animation_bindings(mrb_state* mrb) {
   install_scene_clip_bindings(mrb);
   install_object_animation_bindings(mrb);
+  install_animation_graph_bindings(mrb);
 }
 
 }  // namespace redgem

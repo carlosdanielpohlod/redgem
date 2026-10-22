@@ -78,11 +78,14 @@ vec4 waterReflectedFog(vec3 sampleColor, vec3 point, float distance) {
   return vec4(reflected, smoothstep(WATER_FOG_REJECT, WATER_FOG_ACCEPT, cameraAir));
 }
 
+bool waterInsideScreen(vec2 uv) {
+  return all(greaterThan(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)));
+}
 bool waterScreenPoint(vec3 point, out vec2 uv) {
   if (point.z >= -waterPlanes.x) return false;
   vec4 clip = matProjection * vec4(point, 1.0);
   uv = clip.xy / clip.w * HALF + HALF;
-  return all(greaterThan(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)));
+  return waterInsideScreen(uv);
 }
 float waterRayGap(vec3 origin, vec3 ray, float distance, out vec2 uv) {
   vec3 point = origin + ray * distance;
@@ -97,6 +100,33 @@ bool waterRefractionSample(vec3 surface, vec3 ray, float distance, out vec2 uv, 
   gap = -point.z - waterLinearDepth(depth);
   return true;
 }
+bool waterRefractionDistanceOutside(float distance) {
+  return distance <= 0.0 || distance > WATER_DEPTH_LIMIT;
+}
+bool waterAdvanceRefraction(float gap, inout float before, inout float previousGap, inout float distance) {
+  float difference = gap - previousGap;
+  if (abs(difference) <= EPSILON) return false;
+  float next = distance - gap * (distance - before) / difference;
+  before = distance;
+  previousGap = gap;
+  distance = next;
+  return true;
+}
+vec3 waterTraceRefraction(vec3 surface, vec3 ray, float column, float behind, vec3 fallback) {
+  float before = 0.0;
+  float previousGap = -column;
+  float distance = column / -ray.z;
+  vec2 hit;
+  float gap;
+  for (int i = 0; i < WATER_REFRACTION_STEPS; ++i) {
+    if (waterRefractionDistanceOutside(distance)) break;
+    if (!waterRefractionSample(surface, ray, distance, hit, gap)) break;
+    float thickness = max(WATER_REFRACTION_THICKNESS, behind * WATER_REFRACTION_RELATIVE_THICKNESS);
+    if (abs(gap) <= thickness) return vec3(hit, distance);
+    if (!waterAdvanceRefraction(gap, before, previousGap, distance)) break;
+  }
+  return fallback;
+}
 vec3 waterUv(vec2 uv, vec3 snell, float surfaceDepth) {
   vec3 surface = (matView * vec4(fragPosition, 1.0)).xyz;
   float behind = waterLinearDepth(texture(waterDepth, uv).r);
@@ -106,24 +136,29 @@ vec3 waterUv(vec2 uv, vec3 snell, float surfaceDepth) {
   if (waterSurface.y <= 0.0) return fallback;
   vec3 ray = normalize(mix(normalize(surface), snell, waterSurface.y / WATER_REFRACTION_SCALE));
   if (ray.z >= -EPSILON) return fallback;
-  float before = 0.0;
-  float previousGap = -column;
-  float distance = column / -ray.z;
-  vec2 hit;
-  float gap;
-  for (int i = 0; i < WATER_REFRACTION_STEPS; ++i) {
-    if (distance <= 0.0 || distance > WATER_DEPTH_LIMIT) break;
-    if (!waterRefractionSample(surface, ray, distance, hit, gap)) break;
-    float thickness = max(WATER_REFRACTION_THICKNESS, behind * WATER_REFRACTION_RELATIVE_THICKNESS);
-    if (abs(gap) <= thickness) return vec3(hit, distance);
-    float difference = gap - previousGap;
-    if (abs(difference) <= EPSILON) break;
-    float next = distance - gap * (distance - before) / difference;
-    before = distance;
-    previousGap = gap;
-    distance = next;
+  return waterTraceRefraction(surface, ray, column, behind, fallback);
+}
+float waterRefineReflection(vec3 origin, vec3 ray, float before, float after) {
+  vec2 uv;
+  for (int refine = 0; refine < WATER_REFLECTION_REFINEMENT; ++refine) {
+    float middle = (before + after) * HALF;
+    if (waterRayGap(origin, ray, middle, uv) > 0.0) after = middle;
+    else before = middle;
   }
-  return fallback;
+  return after;
+}
+bool waterReflectionGapOutside(float gap) {
+  return gap < 0.0 || gap > WATER_REFLECTION_THICKNESS;
+}
+vec4 waterReflectionHit(vec3 origin, vec3 ray, float before, float distance) {
+  float after = waterRefineReflection(origin, ray, before, distance);
+  vec2 uv;
+  float gap = waterRayGap(origin, ray, after, uv);
+  if (waterReflectionGapOutside(gap)) return vec4(0.0);
+  vec2 edge = min(uv, 1.0 - uv);
+  float confidence = smoothstep(0.0, WATER_REFLECTION_EDGE, min(edge.x, edge.y));
+  vec4 reflected = waterReflectedFog(texture(waterBackground, uv).rgb, origin + ray * after, after);
+  return vec4(reflected.rgb, confidence * reflected.a);
 }
 vec4 waterScreenReflection(vec3 n, vec3 v) {
   vec3 origin = (matView * vec4(fragPosition + n * WATER_REFLECTION_BIAS, 1.0)).xyz;
@@ -135,20 +170,7 @@ vec4 waterScreenReflection(vec3 n, vec3 v) {
     distance += WATER_REFLECTION_STRIDE + float(i) * WATER_REFLECTION_GROWTH;
     if (!waterScreenPoint(origin + ray * distance, uv)) return vec4(0.0);
     float gap = waterRayGap(origin, ray, distance, uv);
-    if (gap >= 0.0) {
-      float after = distance;
-      for (int refine = 0; refine < WATER_REFLECTION_REFINEMENT; ++refine) {
-        float middle = (before + after) * HALF;
-        if (waterRayGap(origin, ray, middle, uv) > 0.0) after = middle;
-        else before = middle;
-      }
-      gap = waterRayGap(origin, ray, after, uv);
-      if (gap < 0.0 || gap > WATER_REFLECTION_THICKNESS) return vec4(0.0);
-      vec2 edge = min(uv, 1.0 - uv);
-      float confidence = smoothstep(0.0, WATER_REFLECTION_EDGE, min(edge.x, edge.y));
-      vec4 reflected = waterReflectedFog(texture(waterBackground, uv).rgb, origin + ray * after, after);
-      return vec4(reflected.rgb, confidence * reflected.a);
-    }
+    if (gap >= 0.0) return waterReflectionHit(origin, ray, before, distance);
     before = distance;
   }
   return vec4(0.0);
@@ -160,8 +182,7 @@ vec3 waterAmbientReflection(vec3 n, vec3 v, float rough) {
   float confidence = screen.a * pow(1.0 - rough, SPECULAR_DIVISOR);
   return mix(fallback, screen.rgb * fresnel(max(dot(n, v), 0.0), f0), confidence);
 }
-vec3 waterIrradiance() {
-  const vec3 up = vec3(0.0, 1.0, 0.0);
+vec3 waterAmbientIrradiance(vec3 up) {
 #ifdef SKY_PICTURE
   vec3 around = pictureIrradiance(up);
 #else
@@ -169,6 +190,11 @@ vec3 waterIrradiance() {
 #endif
   if (reflectionStrength > 0.0)
     around = mix(around, surroundings(up, REFLECTION_DIFFUSE_LOD), REFLECTION_DIFFUSE_MIX * reflectionStrength);
+  return around;
+}
+vec3 waterIrradiance() {
+  const vec3 up = vec3(0.0, 1.0, 0.0);
+  vec3 around = waterAmbientIrradiance(up);
   vec3 sun = normalize(-sunDirection);
   vec3 light = around * ambientStrength + sunColor * max(sun.y, 0.0) * sunVisibility(fragPosition, up, sun);
   for (int i = 0; i < pointLightCount; ++i) {
@@ -178,6 +204,14 @@ vec3 waterIrradiance() {
   }
   return light;
 }
+vec3 waterPointReflection(vec3 n, vec3 v, vec3 f0, float rough, int index) {
+  vec3 toLight = pointLightPositions[index] - fragPosition;
+  float distance = length(toLight);
+  float window = clamp(1.0 - distance / pointLightRanges[index], 0.0, 1.0);
+  float falloff = window * window / (distance * distance + LIGHT_FALLOFF_BIAS);
+  return shade(n, v, toLight / max(distance, EPSILON), pointLightColors[index] * falloff * PI,
+    vec3(0.0), f0, rough, 1.0);
+}
 vec3 waterReflection(vec3 n, vec3 v, float rough) {
   vec3 f0 = vec3(WATER_F0);
   vec3 reflected = waterAmbientReflection(n, v, rough);
@@ -185,40 +219,63 @@ vec3 waterReflection(vec3 n, vec3 v, float rough) {
   reflected += shade(n, v, sun, sunColor * PI, vec3(0.0), f0, rough, 1.0)
     * sunVisibility(fragPosition, vec3(0.0, 1.0, 0.0), sun);
   for (int i = 0; i < pointLightCount; ++i) {
-    vec3 toLight = pointLightPositions[i] - fragPosition;
-    float distance = length(toLight);
-    float window = clamp(1.0 - distance / pointLightRanges[i], 0.0, 1.0);
-    float falloff = window * window / (distance * distance + LIGHT_FALLOFF_BIAS);
-    reflected += shade(n, v, toLight / max(distance, EPSILON), pointLightColors[i] * falloff * PI,
-      vec3(0.0), f0, rough, 1.0);
+    reflected += waterPointReflection(n, v, f0, rough, i);
   }
   return reflected;
 }
-vec3 waterColor() {
-  vec3 n = waterNormal();
-  vec3 v = normalize(viewPos - fragPosition);
+struct WaterTransmission {
+  vec3 background;
+  vec3 transmission;
+  float thickness;
+};
+struct WaterSurfaceLight {
+  vec3 transmitted;
+  vec3 surface;
+};
+bool waterTransmittedHit(vec3 hit, float bottom) {
+  return hit.z >= 0.0 && bottom < 1.0 - EPSILON;
+}
+WaterTransmission waterSampleTransmission(vec3 n, vec3 v) {
   vec2 uv = gl_FragCoord.xy / vec2(textureSize(waterBackground, 0));
   vec3 ray = refract(normalize(mat3(matView) * -v), normalize(mat3(matView) * n), 1.0 / WATER_IOR);
   vec3 hit = waterUv(uv, ray, gl_FragCoord.z);
   float bottom = texture(waterDepth, hit.xy).r;
   float thickness = hit.z >= 0.0 ? hit.z : WATER_DEPTH_LIMIT;
-  bool transmittedHit = hit.z >= 0.0 && bottom < 1.0 - EPSILON;
+  bool transmittedHit = waterTransmittedHit(hit, bottom);
   vec3 transmission = transmittedHit ? exp(-max(waterAbsorption, vec3(0.0)) * thickness) : vec3(0.0);
   vec3 background = texture(waterBackground, hit.xy).rgb;
+  return WaterTransmission(background, transmission, thickness);
+}
+WaterSurfaceLight waterSurfaceLight(vec3 n, vec3 v, vec3 transmission) {
   vec3 scattered = colDiffuse.rgb * waterIrradiance() * (1.0 - transmission);
   float fresnelWeight = fresnel(max(dot(n, v), 0.0), vec3(WATER_F0)).x;
   vec3 transmitted = transmission * (1.0 - fresnelWeight);
   vec3 surface = scattered * (1.0 - fresnelWeight) + waterReflection(n, v, waterRoughness(n));
-  float foam = waterSurface.x > 0.0 ? 1.0 - smoothstep(0.0, waterSurface.x, thickness) : 0.0;
-  vec3 foamLight = ambientLight(n, v, vec3(1.0), vec3(DIELECTRIC_F0), WATER_FOAM_ROUGHNESS, 0.0) * ambientStrength;
+  return WaterSurfaceLight(transmitted, surface);
+}
+vec3 waterFoamLight(vec3 n, vec3 v) {
+  vec3 light = ambientLight(n, v, vec3(1.0), vec3(DIELECTRIC_F0), WATER_FOAM_ROUGHNESS, 0.0) * ambientStrength;
   vec3 toSun = normalize(-sunDirection);
-  foamLight += shade(n, v, toSun, sunColor * PI, vec3(1.0), vec3(DIELECTRIC_F0), WATER_FOAM_ROUGHNESS, 0.0)
+  light += shade(n, v, toSun, sunColor * PI, vec3(1.0), vec3(DIELECTRIC_F0), WATER_FOAM_ROUGHNESS, 0.0)
     * sunVisibility(fragPosition, vec3(0.0, 1.0, 0.0), toSun);
-  surface = mix(surface, foamLight, foam);
+  return light;
+}
+vec3 waterCompose(vec3 n, vec3 v, WaterTransmission optics, WaterSurfaceLight light) {
+  float foam = waterSurface.x > 0.0 ? 1.0 - smoothstep(0.0, waterSurface.x, optics.thickness) : 0.0;
+  vec3 foamLight = waterFoamLight(n, v);
+  vec3 surface = mix(light.surface, foamLight, foam);
+  vec3 transmitted = light.transmitted;
   transmitted *= 1.0 - foam;
   float air = exp(-fogDensity * length(viewPos - fragPosition));
   // The snapshot already contains atmospheric fog. Only the new surface contribution needs it.
-  return background * transmitted + surface * air + fogColor * (1.0 - transmitted) * (1.0 - air);
+  return optics.background * transmitted + surface * air + fogColor * (1.0 - transmitted) * (1.0 - air);
+}
+vec3 waterColor() {
+  vec3 n = waterNormal();
+  vec3 v = normalize(viewPos - fragPosition);
+  WaterTransmission optics = waterSampleTransmission(n, v);
+  WaterSurfaceLight light = waterSurfaceLight(n, v, optics.transmission);
+  return waterCompose(n, v, optics, light);
 }
 #endif
 )GLSL";

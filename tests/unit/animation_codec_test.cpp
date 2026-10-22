@@ -141,5 +141,5 @@ TEST_CASE("a pose with an animation still fits what a pose may be") {
   update.key = std::string(kMaxPoseKeyBytes, 'k');
   update.position = kHere;
   update.rotation = 0;
-  CHECK(encoded(update).size() == kMaxPoseBytes);
+  CHECK(encoded(update).size() <= kMaxPoseBytes);
 }

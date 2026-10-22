@@ -13,6 +13,7 @@ void AnimationPlayer::reset(const std::vector<AnimationDesc>& clips, const Scene
   revisions_.clear();
   rest_.clear();
   for (std::size_t id = 0; id < scene.size(); ++id) rest_.push_back(scene.at(static_cast<ObjectId>(id)).local);
+  blend_layout_ = animation_blend_layout(clips, rest_.size());
 }
 
 std::vector<std::string> AnimationPlayer::names() const {

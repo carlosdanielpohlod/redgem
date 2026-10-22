@@ -16,13 +16,29 @@ nlohmann::json clip_of(const std::optional<ClipPart>& clip) {
   return nlohmann::json::array({clip->clip, clip->time, clip->speed, clip->loop, clip->playing});
 }
 
+nlohmann::json graph_side(const std::vector<WeightedClipPart>& side) {
+  auto result = nlohmann::json::array();
+  for (const auto& entry : side) result.push_back(nlohmann::json::array({clip_of(entry.clip), entry.weight}));
+  return result;
+}
+
+nlohmann::json animation_of(const AnimationPart& part) {
+  auto result = nlohmann::json::array({part.fade, part.layer_weight, clip_of(part.own), clip_of(part.layer)});
+  if (part.graph) {
+    const auto& graph = *part.graph;
+    result.push_back(nlohmann::json::array(
+        {graph.blend, graph.remaining, graph.playing, graph_side(graph.from), graph_side(graph.to)}));
+  }
+  return result;
+}
+
 // A pose as the game's scripts hear it (kPoseMessageName).
 nlohmann::json placement(const PoseUpdate& update, const Pose& pose) {
   nlohmann::json heard =
       nlohmann::json::array({update.key, numbers_of(pose.position), numbers_of(quat_to_euler_degrees(pose.rotation))});
   if (!update.animation) return heard;
   const AnimationPart& part = *update.animation;
-  heard.push_back(nlohmann::json::array({part.fade, part.layer_weight, clip_of(part.own), clip_of(part.layer)}));
+  heard.push_back(animation_of(part));
   return heard;
 }
 

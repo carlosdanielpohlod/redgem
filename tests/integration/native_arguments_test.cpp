@@ -56,6 +56,28 @@ bool refuses(ScriptHost& scripts, const std::string& code, const std::string& me
 
 }  // namespace
 
+TEST_CASE("animation graph Ruby declarations are validated before replacing a character controller") {
+  SceneDesc scene = small_scene();
+  AnimationDesc idle;
+  idle.name = "Idle";
+  idle.duration = 1.0f;
+  scene.animations = {idle};
+  const auto engine = engine_for(scene);
+  auto& scripts = engine->scripts();
+  CHECK(ruby(scripts,
+             "@anim = Scene.find('Host').animation; @graph = Animation::Graph.new(initial: :idle, "
+             "parameters: {speed: 0.0}); @graph.clip(:idle, :Idle); @anim.use(@graph); @anim.state") == "idle");
+  CHECK(refuses(scripts, "@anim.set(:speed, true)", "parameter"));
+  CHECK(refuses(scripts, "@anim.set(:unknown, 1.0)", "parameter"));
+  CHECK(refuses(scripts, "@anim.set(:speed, 1e300)", "finite"));
+  CHECK(refuses(scripts, "@bad = Animation::Graph.new(initial: :idle); @bad.clip(:idle, :Missing); @anim.use(@bad)",
+                "invalid animation state"));
+  CHECK(ruby(scripts, "@anim.state") == "idle");
+  CHECK(refuses(scripts, "@anim.play(:Missing)", "no animation"));
+  CHECK(ruby(scripts, "@anim.state") == "idle");
+  CHECK(ruby(scripts, "@anim.play(:Idle); @anim.state.nil?") == "true");
+}
+
 TEST_CASE("what needs a running game says so to a script run without one") {
   Scene scene;
   ScriptContext context;

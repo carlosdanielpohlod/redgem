@@ -434,6 +434,7 @@ TEST_CASE("scripts let out bursts of particles, which fly for a while and are go
   const std::vector<Particle>& particles = engine->script_context().particles->particles();
   REQUIRE(particles.size() == 42);
   CHECK_FALSE(particles.front().look.glow);
+  CHECK_FALSE(particles.front().look.cast_shadow);
   CHECK(particles.front().position.y == doctest::Approx(2.0f));
   const Particle& spark = particles.back();
   CHECK(spark.look.glow);
@@ -466,7 +467,7 @@ TEST_CASE("a burst's particles go through the sizes, colors and alphas it lists,
   frames(*engine, 1);
   ruby(*engine,
        "Particles.burst(Vector3.zero, count: 1, size: [0.2, 1.0], color: [:white, [0, 0, 0]], alpha: [0, 255, 0], "
-       "image: :flames, frames: [4, 2], fps: 12, lit: true, soft: 0.5)");
+       "image: :flames, frames: [4, 2], fps: 12, lit: true, soft: 0.5, cast_shadow: true)");
   const Particle& flame = engine->script_context().particles->particles().back();
   CHECK(flame.look.size.count == 2);
   CHECK(flame.look.size.keys[1] == doctest::Approx(flame.look.size.keys[0] * 5.0f));
@@ -477,6 +478,7 @@ TEST_CASE("a burst's particles go through the sizes, colors and alphas it lists,
   CHECK(flame.look.flipbook.frames() == 8);
   CHECK(flame.look.flipbook.fps == doctest::Approx(12.0f));
   CHECK(flame.look.lit);
+  CHECK(flame.look.cast_shadow);
   CHECK(flame.look.soft == doctest::Approx(0.5f));
   for (const char* wrong : {"size: [1, 2, 3, 4, 5]", "size: []", "size: -1", "alpha: [0, 300]", "color: [[0, 0]]",
                             "frames: [0, 2]", "frames: [65, 1]", "fps: -1", "soft: -0.5", "soft: 0.0 / 0.0"}) {

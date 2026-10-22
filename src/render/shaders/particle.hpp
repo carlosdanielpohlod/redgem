@@ -104,4 +104,38 @@ void main() {
 }
 )GLSL";
 
+// The sun sees a sprite facing it. Alpha is cut out rather than accumulated as volume density.
+inline constexpr const char* kParticleShadowVertex = R"GLSL(
+#version 330
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+in vec4 vertexColor;
+uniform mat4 mvp;
+out vec2 fragTexCoord;
+out float fragAlpha;
+void main() {
+  fragTexCoord = vertexTexCoord;
+  fragAlpha = vertexColor.a;
+  gl_Position = mvp * vec4(vertexPosition, 1.0);
+}
+)GLSL";
+
+inline constexpr const char* kParticleShadowFragment = R"GLSL(
+#version 330
+in vec2 fragTexCoord;
+in float fragAlpha;
+uniform sampler2D texture0;
+uniform float textured;
+const float ALPHA_CUTOFF = 0.5;  // only the opaque half of a sprite writes sun depth
+const float SWITCH_ON = 0.5;
+const float SOFT_FROM = 0.55;    // same circular profile as the color pass
+const vec2 CENTER = vec2(0.5);
+const float RADIUS = 0.5;
+void main() {
+  float alpha = textured > SWITCH_ON ? texture(texture0, fragTexCoord).a
+      : 1.0 - smoothstep(SOFT_FROM, 1.0, length(fragTexCoord - CENTER) / RADIUS);
+  if (fragAlpha * alpha < ALPHA_CUTOFF) discard;
+}
+)GLSL";
+
 }  // namespace redgem::shaders

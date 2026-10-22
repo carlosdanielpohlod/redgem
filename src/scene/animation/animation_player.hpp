@@ -8,6 +8,8 @@
 #include <vector>
 
 #include "scene/animation/character_animation.hpp"
+#include "scene/animation/animation_graph_player.hpp"
+#include "scene/animation/animation_blend.hpp"
 #include "scene/animation/clip_clock.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -73,6 +75,10 @@ class AnimationPlayer {
   bool playing_on(const Scene& scene, ObjectId object) const;
   float time_on(const Scene& scene, ObjectId object) const;
 
+  bool use_graph(const Scene& scene, ObjectId object, const AnimationGraphDefinition& graph, std::string& error);
+  bool set_parameter(const Scene& scene, ObjectId object, const std::string& name, const AnimationParameter& value);
+  std::optional<std::string> graph_state(const Scene& scene, ObjectId object) const;
+
   // --- What other machines see (NetworkSync) ------------------------------------------------
   // What the character `object` belongs to does of its own, for the others.
   CharacterAnimation animation_of(const Scene& scene, ObjectId object) const;
@@ -99,6 +105,8 @@ class AnimationPlayer {
     // A clip laid over all that (see mix_on).
     std::optional<Track> layer;
     float layer_weight = 0.0f;
+    std::optional<AnimationGraphPlayer> graph;
+    std::optional<GraphAnimation> received_graph;
   };
 
   static constexpr float kWhole = 1.0f;  // a clip laid on with all its weight
@@ -130,6 +138,20 @@ class AnimationPlayer {
   // Puts the character on `state`'s own clip; false for a clip this scene does not have.
   bool onto(const Scene& scene, ObjectId object, const ClipState& own, float fade);
   void take_layer(const Scene& scene, ObjectId object, const CharacterAnimation& state, float late_by);
+  void advance_graph(ObjectId character, Own& own, float dt, Scene& scene);
+  GraphAnimation graph_animation(const Own& own) const;
+  bool take_graph(const Scene& scene, ObjectId object, const GraphAnimation& graph, float late_by);
+  void pose_graph(ObjectId character, const GraphAnimation& graph, Scene& scene);
+  void tick_graph(GraphAnimation& graph, float dt) const;
+  void tick_graph_side(std::vector<WeightedClipState>& clips, float dt) const;
+  static bool has_graph(const Own& own) { return own.graph.has_value() || own.received_graph.has_value(); }
+  static bool graph_paused(const Own& own);
+  static void detach_graph(Own& own);
+  bool leave_graph(const Scene& scene, ObjectId object);
+  bool pause_graph_on(const Scene& scene, ObjectId object);
+  std::optional<ClipState> dominant_graph_clip(const Scene& scene, ObjectId object) const;
+  bool known_graph_clip(const WeightedClipState& entry) const;
+  bool known_graph_side(const std::vector<WeightedClipState>& side) const;
 
   // Poses everything that follows the scene's clips.
   void pose_followers(Scene& scene);
@@ -137,6 +159,7 @@ class AnimationPlayer {
   void apply_scene_clips(Scene& scene, PoseOptions options) const;
   void advance_track(std::optional<Track>& track, float dt) const;
   // Moves one character's own clips on and poses it. True once nothing of its own is left.
+  bool advance_manual_own(ObjectId character, Own& own, float dt, Scene& scene);
   bool advance_own(ObjectId character, Own& own, float dt, Scene& scene);
   // Lays what a character is coming from or going to over its objects.
   void pose_character(ObjectId character, const std::optional<Track>& track, float weight, Scene& scene);
@@ -154,7 +177,8 @@ class AnimationPlayer {
   std::map<ObjectHandle, Own> owned_;                // by character: a new object in its slot is someone else
   std::map<ObjectHandle, std::uint32_t> revisions_;  // by character, from its first change on
   std::vector<Transform> rest_;                      // by object id, as the scene was loaded
-  std::unordered_set<std::uint64_t> posed_;          // (object, path) pairs posed so far this frame
+  AnimationBlendLayout blend_layout_;
+  std::unordered_set<std::uint64_t> posed_;  // (object, path) pairs posed so far this frame
 };
 
 }  // namespace redgem

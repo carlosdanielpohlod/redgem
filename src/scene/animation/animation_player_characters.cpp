@@ -75,6 +75,7 @@ bool AnimationPlayer::play_on(const Scene& scene, ObjectId object, const std::st
   const auto index = find(name);
   if (!index) return false;
   Own& own = owned_[scene.handle(character_of(scene, object))];
+  const bool detached = leave_graph(scene, object);
   ClipClock* current = clock_on(own.to, *index);
   if (changes_what_it_plays(current, how)) changed(scene, object);
   if (current != nullptr) {
@@ -83,7 +84,7 @@ bool AnimationPlayer::play_on(const Scene& scene, ObjectId object, const std::st
   }
   Track next{*index, ClipClock{}};
   start(next.clock, duration_of(*index), how.loop, how.speed, true);
-  fade_to(own, next, how.fade);
+  fade_to(own, next, detached ? 0.0f : how.fade);
   return true;
 }
 
@@ -96,6 +97,7 @@ void AnimationPlayer::fade_to(Own& own, const std::optional<Track>& next, float 
 }
 
 void AnimationPlayer::pause_on(const Scene& scene, ObjectId object) {
+  if (pause_graph_on(scene, object)) return;
   Track* track = own_track(scene, object);
   if (track == nullptr) return;
   if (!track->clock.playing) return;
@@ -130,22 +132,28 @@ void AnimationPlayer::unmix_on(const Scene& scene, ObjectId object) {
 }
 
 void AnimationPlayer::follow_scene(const Scene& scene, ObjectId object, float fade) {
+  if (leave_graph(scene, object)) return;
   if (track_on(scene, object) == nullptr) return;
   changed(scene, object);
   fade_to(*own_of(scene, object), std::nullopt, fade);
 }
 
 std::optional<std::string> AnimationPlayer::clip_on(const Scene& scene, ObjectId object) const {
+  if (const auto clip = dominant_graph_clip(scene, object)) return clip->clip;
   const Track* track = track_on(scene, object);
   return track != nullptr ? std::optional<std::string>((*clips_)[track->clip].name) : std::nullopt;
 }
 
 bool AnimationPlayer::playing_on(const Scene& scene, ObjectId object) const {
+  const Own* own = own_of(scene, object);
+  if (own != nullptr && own->graph) return own->graph->playing();
+  if (own != nullptr && own->received_graph) return own->received_graph->playing;
   const Track* track = track_on(scene, object);
   return track != nullptr && track->clock.playing;
 }
 
 float AnimationPlayer::time_on(const Scene& scene, ObjectId object) const {
+  if (const auto clip = dominant_graph_clip(scene, object)) return clip->time;
   const Track* track = track_on(scene, object);
   return track != nullptr ? track->clock.time : 0.0f;
 }

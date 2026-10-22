@@ -25,13 +25,17 @@ the same pull request.
 
 ## Rendering and animation
 
-- No blend trees or animation state machines: scripts choose and mix clips themselves.
-- Particles cast no shadows.
+- Animation graphs support clip states and one-dimensional blends only. State fades complete
+  before another transition is evaluated; there are no hierarchical or two-dimensional trees.
+- Particle shadows are opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not volumetric density shadows. They do not receive shadows, and camera-depth soft fading does not affect their shadow silhouette.
 - Grass and other `Scatter` copies stop at the base template's `visible_to`. Distance meshes
   can be supplied with `lods`, but simplified models and impostor atlases are not generated
   automatically. Beyond the final range the ground is still its texture alone.
 - Temporal anti-aliasing (`antialias = "temporal"`) smears detail when the camera moves fast,
-  such as a chase camera behind a fast car. It is off in the editor's scene view, and turns itself
+  such as a chase camera behind a fast car. Local high-motion and opening-edge rejection reduces
+  history accumulation, but disocclusion is estimated from current neighboring motion rather
+  than validated against previous-frame depth. Fast details can trade smear for shimmer.
+  It is off in the editor's scene view, and turns itself
   off, with a warning, on graphics cards that cannot draw into float textures.
 - Water supports animated horizontal surfaces, depth absorption, screen-space refraction,
   screen-space reflections with an environment fallback and shore foam. It has no underwater camera mode, fluid simulation,
