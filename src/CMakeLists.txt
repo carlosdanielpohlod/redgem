@@ -234,6 +234,8 @@ redgem_add_library(redgem_runtime
   scene/camera_ray.cpp
   scene/particles.cpp
   scene/particle_look.cpp
+  scene/water_geometry.cpp
+  scene/water_interactions.cpp
   scene/shapes/terrain.cpp
   scene/shapes/terrain_sculpt.cpp
   scene/shapes/terrain_raycast.cpp
@@ -323,6 +325,8 @@ redgem_add_library(redgem_runtime
   render/renderer_objects.cpp
   render/renderer_see_through.cpp
   render/renderer_water.cpp
+  render/water_ripple_packet.cpp
+  render/renderer_water_ripples.cpp
   render/renderer_scatter.cpp
   render/renderer_temporal.cpp
   render/renderer_particles.cpp
@@ -366,6 +370,7 @@ redgem_add_library(redgem_runtime
   app/engine_frame.cpp
   app/engine_scenes.cpp
   app/scene_bodies.cpp
+  app/scene_water.cpp
   app/scene_files.cpp
   app/touch_circles.cpp
   app/game_texts.cpp)

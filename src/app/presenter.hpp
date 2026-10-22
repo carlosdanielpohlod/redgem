@@ -7,6 +7,7 @@
 #include "render/hud.hpp"
 #include "render/window.hpp"
 #include "scene/particles.hpp"
+#include "scene/water_ripples.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
 
@@ -35,7 +36,8 @@ struct FrameView {
   // Where UI.image finds its pictures.
   // cppcheck-suppress uninitMemberVarNoCtor ; a reference: whoever makes one has to give it
   const std::filesystem::path& images_dir;
-  bool stop_recording = false;  // a script ended the recording (Game.stop_recording)
+  bool stop_recording = false;                         // a script ended the recording (Game.stop_recording)
+  const WaterRippleSnapshot* water_ripples = nullptr;  // transient simulation state; drawing never ages it
 };
 
 // Who shows a game: a window of its own, a view inside another program, or nobody. The engine

@@ -6,6 +6,7 @@
 #include <string>
 
 #include "app/scene_bodies.hpp"
+#include "app/scene_water.hpp"
 #include "app/scene_files.hpp"
 #include "core/log.hpp"
 #include "physics/physics_config.hpp"
@@ -17,6 +18,7 @@ Vec3 Engine::gravity() { return {0.0f, config::kGravityY, 0.0f}; }
 void Engine::make_bodies() {
   physics_ = create_jolt_physics_world(gravity());
   bodies::create_all({scene_, scene_desc_}, *physics_);
+  update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
 }
 
 void Engine::switch_scene_if_asked() {
@@ -46,21 +48,26 @@ void Engine::switch_to(const std::string& name, SceneDesc desc) {
 void Engine::replace_world(SceneDesc desc) {
   scene_desc_ = std::move(desc);
   scene_ = Scene::from_desc(scene_desc_);
+  water_.reset(scene_desc_);
   make_bodies();
   context_.physics = physics_.get();
+}
+
+void Engine::place_spawned(ObjectId id, const std::optional<Transform>& world) {
+  if (!world) return;
+  Transform placed = *world;
+  placed.scale = scene_.world_transform(id).scale;
+  scene_.set_world_transform(id, placed);
 }
 
 ObjectId Engine::spawn(ObjectId source, const std::optional<Transform>& world, bool physics) {
   if (!scene_.is_alive(source)) return kNoObject;
   const std::vector<ObjectId> created = scene_.clone(source);
-  if (world) {
-    Transform placed = *world;
-    placed.scale = scene_.world_transform(created.front()).scale;
-    scene_.set_world_transform(created.front(), placed);
-  }
+  place_spawned(created.front(), world);
   if (physics) {
     for (const ObjectId id : created) bodies::create({scene_, scene_desc_}, *physics_, id);
   }
+  update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);
   for (const ObjectId id : created) scripts_->attach_object(id);
   return created.front();
 }

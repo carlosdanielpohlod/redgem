@@ -9,9 +9,17 @@ namespace redgem::render_detail {
 
 inline constexpr int kNoLocation = -1;  // a uniform the shader does not have
 
+struct WaterRippleUniforms {
+  int count = kNoLocation;
+  int waves = kNoLocation;
+  int radii = kNoLocation;
+};
+
 struct WaterUniforms {
   int enabled = kNoLocation;
   int waves = kNoLocation;
+  WaterRippleUniforms ripples;
+  WaterRippleUniforms previous_ripples;
 };
 WaterUniforms find_water_uniforms(const Shader& program);
 

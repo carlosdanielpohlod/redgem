@@ -4,9 +4,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <limits>
 
 #include "render_system/render_stage.hpp"
 #include "scene/shapes/primitives.hpp"
+#include "render/water_ripple_packet.hpp"
 
 using namespace redgem;
 using redgem::test::Picture;
@@ -296,6 +299,104 @@ float central_snell_hit() {
   const float distance = kSlopedBottomDepth / (kBottomSlope * along_z - down);
   return along_z * distance;
 }
+constexpr float kPrimitivePlaneSide = 10.0f;  // built-in Plane spans ten meters before its node scale
+constexpr float kRippleTestAge = 0.25f;
+constexpr float kRippleTestWidth = 0.4f;
+constexpr float kRippleTestStrength = 0.12f;
+
+WaterRippleSnapshot ripple_snapshot(const Scene& scene, ObjectId water = 0) {
+  WaterRippleSnapshot snapshot;
+  snapshot.count = 1;
+  snapshot.time = kRippleTestAge;
+  snapshot.ripples[0] = {1,
+                         scene.handle(water),
+                         0,
+                         scene.world_transform(water).position,
+                         kRippleTestAge,
+                         kRippleTestStrength,
+                         kRippleTestWidth};
+  return snapshot;
+}
+
+void normalize_ripple_water(MeshDesc& mesh) {
+  mesh.bounds = Bounds{};
+  for (auto& primitive : mesh.primitives) {
+    for (float& coordinate : primitive.positions) coordinate /= kPrimitivePlaneSide;
+    for (std::size_t index = 0; index < primitive.positions.size(); index += kCoordinates) {
+      mesh.bounds.include(vec3_from(primitive.positions.data() + index));
+    }
+  }
+}
+
+SceneDesc ripple_pond() {
+  SceneDesc desc = pond();
+  normalize_ripple_water(desc.meshes[0]);
+  desc.materials[0].water.wave_height = 0.0f;
+  desc.nodes[kEnvironmentNode].props["grain"] = 0.0;
+  return desc;
+}
+
+std::size_t changed_right(const Picture& left, const Picture& right) {
+  constexpr float kOtherPondRegion = 0.65f;  // right of the contacted lake and its shoreline
+  const int first = static_cast<int>(left.width * kOtherPondRegion);
+  std::size_t count = 0;
+  for (int y = 0; y < left.height; ++y) {
+    for (int x = first; x < left.width; ++x) {
+      const auto index = static_cast<std::size_t>(y * left.width + x);
+      const auto a = left.pixels[index];
+      const auto b = right.pixels[index];
+      if (a.r != b.r || a.g != b.g || a.b != b.b) ++count;
+    }
+  }
+  return count;
+}
+
+constexpr int kRippleGridSide = 24;          // vertices resolve the moving ring in the motion pass
+constexpr double kRippleHistoryError = 2.0;  // RGB levels: subpixel jitter may differ at the shoreline
+
+void append_water_tile(PrimitiveDesc& grid, int across, int along) {
+  const auto tile = make_primitive(PrimitiveShape::Plane);
+  const auto first = static_cast<std::uint32_t>(grid.positions.size() / kCoordinates);
+  for (std::size_t index = 0; index < tile.positions.size(); index += kCoordinates) {
+    grid.positions.push_back((tile.positions[index] / kPrimitivePlaneSide + across + kMiddle) / kRippleGridSide -
+                             kMiddle);
+    grid.positions.push_back(0.0f);
+    grid.positions.push_back((tile.positions[index + 2] / kPrimitivePlaneSide + along + kMiddle) / kRippleGridSide -
+                             kMiddle);
+  }
+  grid.normals.insert(grid.normals.end(), tile.normals.begin(), tile.normals.end());
+  for (const auto index : tile.indices) grid.indices.push_back(first + index);
+}
+
+PrimitiveDesc ripple_grid() {
+  PrimitiveDesc grid;
+  grid.material = 0;
+  for (int along = 0; along < kRippleGridSide; ++along) {
+    for (int across = 0; across < kRippleGridSide; ++across) append_water_tile(grid, across, along);
+  }
+  return grid;
+}
+
+Picture settled_ripples(RenderStage& stage, const Scene& scene, const WaterRippleSnapshot* snapshot, const char* name,
+                        double render_clock) {
+  Picture picture;
+  for (int frame = 0; frame < kSettlingFrames; ++frame) {
+    stage.set_clock(render_clock + static_cast<double>(frame) * kFrameSeconds);
+    picture = stage.draw(scene, name, nullptr, snapshot);
+  }
+  return picture;
+}
+
+double ripple_picture_error(const Picture& a, const Picture& b) {
+  double error = 0.0;
+  for (std::size_t index = 0; index < a.pixels.size(); ++index) {
+    error += std::abs(static_cast<int>(a.pixels[index].r) - b.pixels[index].r);
+    error += std::abs(static_cast<int>(a.pixels[index].g) - b.pixels[index].g);
+    error += std::abs(static_cast<int>(a.pixels[index].b) - b.pixels[index].b);
+  }
+  return error / static_cast<double>(a.pixels.size() * kCoordinates);
+}
+
 }  // namespace
 
 TEST_CASE("water ripples change reflections with time while a still surface is stable") {
@@ -497,4 +598,171 @@ TEST_CASE("water reflects an on-screen red object below its direct silhouette") 
   }
   constexpr std::size_t kMinimumReflectionPixels = 10;
   CHECK(red > kMinimumReflectionPixels);
+}
+
+TEST_CASE("water impulses follow simulation age and repeated drawing does not advance them") {
+  RenderStage stage;
+  const SceneDesc desc = ripple_pond();
+  const Scene scene = Scene::from_desc(desc);
+  auto snapshot = ripple_snapshot(scene);
+  stage.upload(desc);
+  stage.set_clock(0.0);
+  const auto still = stage.draw(scene, "water_impulse_absent");
+  const auto first = stage.draw(scene, "water_impulse_first", nullptr, &snapshot);
+  stage.set_clock(1.0);  // rendering time advances while the simulation snapshot remains paused
+  const auto repeated = stage.draw(scene, "water_impulse_paused", nullptr, &snapshot);
+  CHECK(changed(still, first) > kMinimumChangingPixels);
+  CHECK(changed(first, repeated) == 0);
+  snapshot.ripples[0].age = 1.0f;
+  snapshot.time = 1.0;
+  const auto later = stage.draw(scene, "water_impulse_later", nullptr, &snapshot);
+  CHECK(changed(first, later) > kMinimumChangingPixels);
+}
+
+TEST_CASE("shared water mesh and material keep impulses on their owning object") {
+  RenderStage stage;
+  SceneDesc desc = ripple_pond();
+  constexpr float kPondOffset = 2.0f;
+  constexpr float kPondWidth = 4.0f;
+  desc.nodes[0].local.position.x = -kPondOffset;
+  desc.nodes[0].local.scale = {kPondWidth, 1.0f, kWaterSize};
+  NodeDesc other = desc.nodes[0];
+  other.name = "Other water";
+  other.local.position.x = kPondOffset;
+  desc.nodes.push_back(other);
+  const Scene scene = Scene::from_desc(desc);
+  const auto snapshot = ripple_snapshot(scene);
+  stage.upload(desc);
+  stage.set_clock(0.0);
+  const auto before = stage.draw(scene, "water_shared_lakes_still");
+  const auto after = stage.draw(scene, "water_shared_lakes_contact", nullptr, &snapshot);
+  CHECK(changed(before, after) > kMinimumChangingPixels);
+  CHECK(changed_right(before, after) == 0);
+}
+
+TEST_CASE("water ripple packets isolate primitive identity and retain the last drawn ages") {
+  using namespace render_detail;
+  const Scene scene = Scene::from_desc(ripple_pond());
+  const auto current = ripple_snapshot(scene);
+  auto previous = current;
+  previous.ripples[0].age = 0.0f;
+  const auto packet = previous_water_ripple_packet(previous, current, scene.handle(0), 0);
+  REQUIRE(packet.count == 1);
+  CHECK(packet.waves[0].z == 0.0f);
+  CHECK(water_ripple_packet(current, scene.handle(0), 1).count == 0);
+  CHECK(water_ripple_packet(current, scene.handle(1), 0).count == 0);
+  const auto newborn = previous_water_ripple_packet({}, current, scene.handle(0), 0);
+  REQUIRE(newborn.count == 1);
+  CHECK(newborn.waves[0].z == kRippleTestAge);
+  CHECK(water_ripple_bound(current, scene.handle(0)) == kRippleTestStrength);
+}
+
+TEST_CASE("shared water material keeps impulses on their original primitive") {
+  RenderStage stage;
+  SceneDesc desc = ripple_pond();
+  constexpr float kHalfWidth = 0.5f;
+  constexpr float kHalfOffset = 0.25f;
+  auto left = desc.meshes[0].primitives.front();
+  auto right = left;
+  for (std::size_t index = 0; index < left.positions.size(); index += kCoordinates) {
+    left.positions[index] = left.positions[index] * kHalfWidth - kHalfOffset;
+    right.positions[index] = right.positions[index] * kHalfWidth + kHalfOffset;
+  }
+  desc.meshes[0].primitives = {left, right};
+  const Scene scene = Scene::from_desc(desc);
+  auto snapshot = ripple_snapshot(scene);
+  constexpr float kContactX = -2.0f;
+  snapshot.ripples[0].origin.x = kContactX;
+  stage.upload(desc);
+  stage.set_clock(0.0);
+  const auto before = stage.draw(scene, "water_shared_primitives_still");
+  const auto after = stage.draw(scene, "water_shared_primitives_contact", nullptr, &snapshot);
+  CHECK(changed(before, after) > kMinimumChangingPixels);
+  CHECK(changed_right(before, after) == 0);
+}
+
+TEST_CASE("previous water ripple packets retain expired impulses and bound their union") {
+  using namespace render_detail;
+  const Scene scene = Scene::from_desc(ripple_pond());
+  auto previous = ripple_snapshot(scene);
+  auto current = previous;
+  previous.count = kMaxWaterRipples;
+  current.count = kMaxWaterRipples;
+  for (std::size_t index = 0; index < kMaxWaterRipples; ++index) {
+    previous.ripples[index] = previous.ripples[0];
+    current.ripples[index] = current.ripples[0];
+    previous.ripples[index].serial = index + 1;
+    current.ripples[index].serial = index + kMaxWaterRipples + 1;
+  }
+  const auto expired = previous_water_ripple_packet(previous, {}, scene.handle(0), 0);
+  CHECK(expired.count == static_cast<int>(kMaxWaterRipples));
+  const auto combined = previous_water_ripple_packet(previous, current, scene.handle(0), 0);
+  CHECK(combined.count == static_cast<int>(kMaxDrawnWaterRipples));
+  CHECK(water_ripple_packet(current, kNoHandle, 0).count == 0);
+}
+
+TEST_CASE("empty water snapshots and asset reload restore the unchanged water picture") {
+  RenderStage stage;
+  const SceneDesc desc = ripple_pond();
+  const Scene scene = Scene::from_desc(desc);
+  const auto snapshot = ripple_snapshot(scene);
+  stage.upload(desc);
+  stage.set_clock(0.0);
+  const auto baseline = stage.draw(scene, "water_empty_baseline");
+  stage.draw(scene, "water_empty_before_expiry", nullptr, &snapshot);
+  const WaterRippleSnapshot empty;
+  const auto expired = stage.draw(scene, "water_empty_after_expiry", nullptr, &empty);
+  CHECK(changed(baseline, expired) == 0);
+  stage.upload(desc);
+  const auto reloaded = stage.draw(scene, "water_empty_after_reload");
+  CHECK(changed(baseline, reloaded) == 0);
+}
+
+TEST_CASE("public water snapshots reject nonfinite values and out-of-range impulses before uniform upload") {
+  using namespace render_detail;
+  const Scene scene = Scene::from_desc(ripple_pond());
+  auto snapshot = ripple_snapshot(scene);
+  SUBCASE("nonfinite origin") { snapshot.ripples[0].origin.x = std::numeric_limits<float>::infinity(); }
+  SUBCASE("nonfinite age") { snapshot.ripples[0].age = std::numeric_limits<float>::quiet_NaN(); }
+  SUBCASE("expired age") { snapshot.ripples[0].age = kWaterRippleLifetime + 1.0f; }
+  SUBCASE("negative strength") { snapshot.ripples[0].strength = -1.0f; }
+  SUBCASE("unbounded strength") { snapshot.ripples[0].strength = kWaterRippleMaxStrength + 1.0f; }
+  SUBCASE("unbounded radius") { snapshot.ripples[0].radius = kWaterRippleMaxRadius + 1.0f; }
+  SUBCASE("missing owner") { snapshot.ripples[0].surface = kNoHandle; }
+  SUBCASE("missing serial") { snapshot.ripples[0].serial = 0; }
+  SUBCASE("nonfinite snapshot clock") { snapshot.time = std::numeric_limits<double>::infinity(); }
+  CHECK(validated_water_ripples(&snapshot).count == 0);
+}
+
+TEST_CASE("temporal water impulses settle without trails after age changes pauses expiry and reset") {
+  RenderStage stage;
+  SceneDesc desc = ripple_pond();
+  desc.nodes[kEnvironmentNode].props["antialias"] = std::string("temporal");
+  SUBCASE("single sample") { desc.nodes[kEnvironmentNode].props["msaa"] = 0.0; }
+  SUBCASE("four samples") { desc.nodes[kEnvironmentNode].props["msaa"] = 4.0; }
+  desc.meshes[0].primitives = {ripple_grid()};
+  const Scene scene = Scene::from_desc(desc);
+  auto snapshot = ripple_snapshot(scene);
+  stage.upload(desc);
+  const auto baseline = settled_ripples(stage, scene, nullptr, "water_impulse_taa_baseline", 0.0);
+  stage.draw(scene, "water_impulse_taa_contact", nullptr, &snapshot);
+  snapshot.ripples[0].age = 1.0f;
+  snapshot.time = 1.0;
+  const auto aged = settled_ripples(stage, scene, &snapshot, "water_impulse_taa_aged", 1.0);
+  constexpr double kPausedRenderClock = 100.0;
+  const auto paused = settled_ripples(stage, scene, &snapshot, "water_impulse_taa_paused", kPausedRenderClock);
+  CHECK(changed(baseline, aged) > kMinimumChangingPixels);
+  CHECK(ripple_picture_error(aged, paused) < kRippleHistoryError);
+  CHECK(snapshot.ripples[0].age == 1.0f);
+  CHECK(snapshot.time == 1.0);
+  stage.upload(desc);
+  const auto fresh = settled_ripples(stage, scene, &snapshot, "water_impulse_taa_fresh_pose", kPausedRenderClock);
+  CHECK(ripple_picture_error(paused, fresh) < kRippleHistoryError);
+  const auto expired = settled_ripples(stage, scene, nullptr, "water_impulse_taa_expired", kPausedRenderClock);
+  CHECK(ripple_picture_error(baseline, expired) < kRippleHistoryError);
+  stage.upload(desc);
+  const auto reset = settled_ripples(stage, scene, nullptr, "water_impulse_taa_reset", kPausedRenderClock);
+  CHECK(ripple_picture_error(baseline, reset) < kRippleHistoryError);
+  constexpr int kVisibleWater = 20;  // a broken or nonfinite shader must not black out the lit water
+  CHECK(reset.at(kMiddle, kMiddle).g > kVisibleWater);
 }

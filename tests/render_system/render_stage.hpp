@@ -47,7 +47,8 @@ class RenderStage {
   void set_images_dir(const std::filesystem::path& dir) { renderer_->set_images_dir(dir); }
   // The scene as its camera sees it, with `particles` when given; also written to
   // <screenshots>/render/<name>.png for whoever looks at the run afterwards.
-  Picture draw(const Scene& scene, const std::string& name, const ParticleSystem* particles = nullptr);
+  Picture draw(const Scene& scene, const std::string& name, const ParticleSystem* particles = nullptr,
+               const WaterRippleSnapshot* water_ripples = nullptr);
 
  private:
   Window window_;

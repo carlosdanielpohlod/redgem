@@ -18,6 +18,7 @@
 #include "render/hud.hpp"
 #include "scene/animation/animation_player.hpp"
 #include "scene/particles.hpp"
+#include "scene/water_interactions.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
 #include "app/game_settings.hpp"
@@ -128,6 +129,7 @@ class Engine {
   void switch_to(const std::string& name, SceneDesc desc);
   // Puts a newly loaded scene, with its bodies, in place of the running one.
   void replace_world(SceneDesc desc);
+  void place_spawned(ObjectId id, const std::optional<Transform>& world);
 
   // The parts of a frame, in the order frame() runs them.
   void read_input();
@@ -167,6 +169,7 @@ class Engine {
   int scene_generation_ = kFirstSceneGeneration;
   AnimationPlayer animations_;
   ParticleSystem particles_;
+  WaterInteractions water_;
   std::vector<ControlCircle> controls_;  // the touch controls of the frame being shown
   net::NetworkSession network_;
   net::LanDiscovery discovery_;

@@ -71,6 +71,7 @@ add_executable(redgem_tests
   unit/capture_views_test.cpp
   unit/shadow_cascades_test.cpp
   unit/temporal_test.cpp
+  unit/water_interactions_test.cpp
   unit/sky_light_test.cpp
   unit/shader_source_test.cpp
   unit/terrain_test.cpp
@@ -116,6 +117,7 @@ add_executable(redgem_tests
   integration/engine_headless_test.cpp
   integration/scene_parts_test.cpp
   integration/presenter_test.cpp
+  integration/water_interaction_test.cpp
   integration/scene_script_test.cpp
   integration/ui_input_test.cpp
   integration/gameplay_api_test.cpp

@@ -17,7 +17,7 @@ void FramePainter::follow_game(const FrameView& view) {
 
 void FramePainter::paint(const FrameView& view, const RenderTexture2D* output) {
   follow_game(view);
-  renderer_.draw_world(view.scene, renderer_.scene_camera(view.scene), output, &view.particles);
+  renderer_.draw_world(view.scene, renderer_.scene_camera(view.scene), output, &view.particles, view.water_ripples);
   // What is flat goes over the finished picture: the game's interface, then a touch screen's controls.
   if (output != nullptr) BeginTextureMode(*output);
   renderer_.draw_hud(view.hud);

@@ -6,6 +6,7 @@
 
 #include "app/save_location.hpp"
 #include "app/scene_bodies.hpp"
+#include "app/scene_water.hpp"
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
@@ -63,6 +64,7 @@ void Engine::build_world() {
   scene_ = Scene::from_desc(scene_desc_);
   animations_.reset(scene_desc_.animations, scene_);
   particles_.set_gravity(gravity());
+  water_.reset(scene_desc_);
   make_bodies();
 }
 
@@ -114,6 +116,7 @@ void Engine::fill_context(const std::string& game_title) {
 void Engine::connect_context() {
   context_.on_transform_written = [this](ObjectId id, TransformWrite write) {
     bodies::follow_write(scene_, *physics_, id, write);
+    if (water_teleport_write(*physics_, id, write)) water_.forget(scene_.handle(id));
   };
   context_.spawn = [this](ObjectId source, const std::optional<Transform>& world, bool physics) {
     return spawn(source, world, physics);

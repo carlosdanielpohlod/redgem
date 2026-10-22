@@ -51,12 +51,23 @@ std::optional<GpuPrimitive> upload_piece(const PrimitiveDesc& piece, std::size_t
   return GpuPrimitive{*mesh, piece.material, number, !joints.empty()};
 }
 
+// Keep the source primitive identity when a large primitive becomes several GPU pieces.
+void append_gpu_primitive(std::vector<GpuPrimitive>& parts, const PrimitiveDesc& source, std::size_t original,
+                          const std::string& name, std::size_t& number) {
+  for (const auto& piece : split_primitive(source, config::kMaxVerticesPerMesh)) {
+    auto uploaded = upload_piece(piece, number++, name);
+    if (!uploaded) continue;
+    uploaded->primitive = original;
+    parts.push_back(*uploaded);
+  }
+}
+
 // The parts of a mesh, on the graphics card.
 std::vector<GpuPrimitive> upload_mesh(const MeshDesc& mesh_desc) {
   std::vector<GpuPrimitive> primitives;
-  const std::vector<PrimitiveDesc> pieces = mesh_pieces(mesh_desc, config::kMaxVerticesPerMesh);
-  for (std::size_t number = 0; number < pieces.size(); ++number) {
-    if (const auto uploaded = upload_piece(pieces[number], number, mesh_desc.name)) primitives.push_back(*uploaded);
+  std::size_t number = 0;
+  for (std::size_t index = 0; index < mesh_desc.primitives.size(); ++index) {
+    append_gpu_primitive(primitives, mesh_desc.primitives[index], index, mesh_desc.name, number);
   }
   return primitives;
 }
