@@ -59,7 +59,7 @@ class WaterGeometryCache {
  private:
   struct Key {
     ObjectHandle object;
-    int mesh;
+    int mesh = kNoIndex;
     Transform world;
   };
   static std::vector<Key> collect_keys(const Scene& scene, const SceneDesc& desc);
