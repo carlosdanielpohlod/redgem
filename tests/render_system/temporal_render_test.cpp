@@ -417,12 +417,12 @@ constexpr Vec3 kOpeningWhitePatchAt{12.0f, 0.0f, 0.01f};  // its left edge is x=
 constexpr Vec3 kOpeningWhitePatchSize{20.0f, 12.0f, 1.0f};
 constexpr redgem::Color kOpeningWhite{1.0f, 1.0f, 1.0f, 1.0f};
 constexpr redgem::Color kOpeningBlack{0.0f, 0.0f, 0.0f, 1.0f};
-constexpr int kOpeningBlackCeiling = 5;                // byte brightness of a freshly revealed black pixel
-constexpr int kOpeningWhiteFloor = 100;               // byte brightness of its opaque white neighbor
-constexpr float kOpeningRegionTop = 0.4f;             // central card rows, excluding its horizontal edges
+constexpr int kOpeningBlackCeiling = 5;    // byte brightness of a freshly revealed black pixel
+constexpr int kOpeningWhiteFloor = 100;    // byte brightness of its opaque white neighbor
+constexpr float kOpeningRegionTop = 0.4f;  // central card rows, excluding its horizontal edges
 constexpr float kOpeningRegionBottom = 0.6f;
-constexpr std::size_t kOpeningMinimumPixels = 30;      // the edge assertion cannot pass with an empty selection
-constexpr float kOpeningMeanError = 0.5f;              // mean RGB byte error against the same-jitter fresh view
+constexpr std::size_t kOpeningMinimumPixels = 30;  // the edge assertion cannot pass with an empty selection
+constexpr float kOpeningMeanError = 0.5f;          // mean RGB byte error against the same-jitter fresh view
 
 NodeDesc opening_cube(const std::string& name, int mesh, Vec3 position, Vec3 scale) {
   NodeDesc node;
@@ -445,7 +445,9 @@ SceneDesc opening_scene() {
   SceneDesc desc;
   desc.materials = {test::glowing_material(kOpeningBlack, 0.0f), test::glowing_material(kOpeningWhite, kGlow)};
   desc.meshes = {test::cube_mesh(0), test::cube_mesh(1)};
-  desc.nodes = {test::camera_at(kCameraAt), opening_dark_sun(), dark_environment(temporal()),
+  desc.nodes = {test::camera_at(kCameraAt),
+                opening_dark_sun(),
+                dark_environment(temporal()),
                 opening_cube("Wall", 0, Vec3::zero(), kChaseWallSize),
                 opening_cube("Card", 1, kOpeningCardAt, kOpeningCardSize),
                 opening_cube("WhitePatch", 1, kOpeningWhitePatchAt, kOpeningWhitePatchSize)};
