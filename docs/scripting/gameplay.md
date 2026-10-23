@@ -407,6 +407,11 @@ when its folder is moved or renamed. A game with no `id` saves to
 `.config/redgem/saves/<folder>-<digits>.json`, with digits made from where its folder is. Tests
 get a save file of their own, empty at the start of each test.
 
+Each change is flushed to the disk before it replaces the file, and the save before it is kept
+beside it as `<name>.json.bak`. A save found damaged (cut short by a crash or a bad disk) is moved
+aside to `<name>.json.damaged`, never written over, and the game starts from the backup; the log
+says so, naming both files. When the backup is damaged too, the game starts from nothing.
+
 ## Keep score across objects
 
 Put a manager behaviour on one object and let the others find it:

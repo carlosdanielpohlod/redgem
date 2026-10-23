@@ -260,6 +260,7 @@ redgem_add_library(redgem_runtime
   input/touch_controls.cpp
   input/touch_input_source.cpp
   storage/saved_values.cpp
+  storage/durable_file.cpp
   storage/save_file.cpp
   script/script_naming.cpp
   script/ruby_vm.cpp
