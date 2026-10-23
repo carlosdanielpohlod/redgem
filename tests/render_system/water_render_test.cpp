@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 
 #include "render/shader_source.hpp"
@@ -1093,6 +1094,18 @@ std::vector<int> foam_band_profile(const Picture& foam, const Picture& plain, fl
   return profile;
 }
 
+std::vector<int> mean_foam_band_profile(const Picture& foam, const Picture& plain) {
+  std::vector<int> mean(kFoamNormalProbes, 0);
+  for (int i = 0; i < kFoamAlongProbes; ++i) {
+    const float z = static_cast<float>(i) * kFoamAlongStride - kFoamAlongMiddle;
+    const auto profile = foam_band_profile(foam, plain, z);
+    std::transform(mean.begin(), mean.end(), profile.begin(), mean.begin(), std::plus<int>());
+  }
+  // Measure the band's envelope across pores instead of depending on one noise slice.
+  for (auto& value : mean) value /= kFoamAlongProbes;
+  return mean;
+}
+
 bool partially_foamed(int value, int peak) {
   return static_cast<float>(value) > static_cast<float>(peak) * kFoamSoftLow &&
          static_cast<float>(value) < static_cast<float>(peak) * kFoamSoftHigh;
@@ -1120,7 +1133,7 @@ TEST_CASE("shore foam occupies a broad soft band and fades at the exact contact"
   const Picture plain = draw(stage, desc, "water_foam_band_off");
   desc.materials[0].water.foam_width = kFoamBandWidth;
   const Picture foam = draw(stage, desc, "water_foam_band_on");
-  const auto profile = foam_band_profile(foam, plain, 0.0f);
+  const auto profile = mean_foam_band_profile(foam, plain);
   const int peak = *std::max_element(profile.begin(), profile.end());
   REQUIRE(peak > kFoamVisible);
   const auto visible = std::count_if(profile.begin(), profile.end(), [](int value) { return value > kFoamVisible; });

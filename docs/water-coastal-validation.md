@@ -14,6 +14,10 @@ The reference uses Cycles with 32 samples, denoising, IOR 1.333, roughness 0.07 
 absorption coefficients. Its isotropic volume scattering is a physical approximation of the
 runtime body-light term; atmospheric fog and derivative filtering do not have identical models.
 The micro-height field is represented by bump shading in the reference.
+The reference's macro normals come from the displaced radial mesh, while the runtime uses
+analytic gradients. At a radius of 100 meters its radial and tangential edges are about
+1.58 and 1.64 meters, exceeding the shortest macro wavelength of 0.90 meters. Distant normal
+convergence must therefore be checked before attributing the image difference to shading alone.
 
 | Runtime | Cycles reference |
 | --- | --- |
@@ -57,6 +61,27 @@ Negative controls remove micro-normal variance or restore the continuous foam co
 they respectively lose energy at 4608 distant probe pixels and produce no open pockets in
 1089 shallow-shelf samples. Restoring nearest-depth bracketing makes the inclined-root probe
 return the wrong sample coordinate. The corrected versions pass those checks.
+
+## Smooth specular normalization
+
+The direct-light GGX distribution now preserves narrow specular lobes. Its previous additive
+denominator floor suppressed their energy: at roughness 0.07, the analytic peak is about
+13257, while the floored expression returned 0.24. The equivalent positive denominator is
+evaluated without that floor; callers already bound perceptual roughness to at least 0.045.
+This intentionally affects direct specular lighting on all materials, including water.
+It does not change the sky prefilter or establish agreement with the coastal reference.
+
+A GPU probe checks the production distribution against an independent double-precision
+reference at roughness 0.045, 0.07, 0.15 and 0.4, using 512 projected-distribution samples each.
+Both peak and projected mass checks pass on NVIDIA and software rendering. Restoring the
+old denominator fails all eight peak/mass checks. Foam envelope checks average 21 shoreline
+profiles so individual pores cannot determine band width; the existing width, softness and
+independent porosity requirements remain unchanged.
+The updated full render suite passes 77 cases and 655602 assertions; formatting and C++ lint
+also pass. The correction received a separate correctness review before publication.
+
+The pictures, optical metrics and frame times in this document precede this normalization
+correction. They remain historical evidence, rather than measurements of the new direct-light response.
 
 ## Cost
 
