@@ -1,9 +1,46 @@
 # Coastal water validation
 
-Photorealistic acceptance remains open. Geometric refraction controls pass and shore foam now
-follows a local horizontal band, but the coastal study still shows overly regular distant reflections.
-The current filtered-normal roughness approximation needs further validation against integrated
-shading. Passing geometric and temporal controls does not establish a photographic result.
+The current coastal result combines guarded refraction, a horizontal shore band and a broader
+micro-wave field. The practical target is stable, detailed real-time water. Distant reflections
+remain more regular than the reference, and filtered-normal roughness is an approximation;
+passing geometric and temporal controls does not establish photographic fidelity.
+
+## Broader micro detail
+
+Twelve wavelengths spanning approximately 3 to 51 centimeters replace four dominant carriers.
+Directions and phases vary deterministically, reducing parallel streaks near the camera.
+Equal slope weights preserve the previous sum of squared coefficients, 0.30. Macro displacement,
+physical impact ripples, foam, lighting and the roughness mapping remain unchanged.
+This is a finite artistic height field, not a fluid or ocean-spectrum simulation.
+
+Both pictures below use the same new field, frozen camera, 0.5-second clock, exposure 0.8 and
+foam disabled. The Cycles control uses analytic, ray-facing macro/micro gradients and 96 samples.
+The older four-carrier references below remain as historical controls; changing the wave field
+also changes the reference, so scores across those two targets do not prove a general fidelity gain.
+
+| Runtime, twelve micro waves | Matched analytic-normal Cycles control |
+| --- | --- |
+| ![Runtime broadband detail](images/water-coastal/engine-broadband.png) | ![Matched reference](images/water-coastal/reference-broadband96.png) |
+
+| Region | Rectangle | RGB MAE | RGB SSIM |
+| --- | --- | ---: | ---: |
+| Distant water | [40, 260, 1560, 325] | 10.256 | 0.5699 |
+| Foreground water | [200, 740, 1350, 880] | 28.602 | 0.6621 |
+
+Four near-origin positions and animation times check resolved slopes against independent
+height finite differences. Separate controls cover wavelength/direction participation and transfer
+of unresolved micro energy to variance. Their tolerance is unchanged from the earlier energy probe.
+Both focused micro cases also pass on llvmpipe. These controls do not establish gradient accuracy
+at arbitrary large world coordinates.
+
+A render-only ABBA run at 1600 by 900 measured medians of 15.998 and 16.150 ms for the previous
+four-carrier version, versus 16.068 and 16.316 ms for twelve carriers. The pair averages are
+16.074 and 16.192 ms. The 0.118 ms difference is smaller than the candidate repeat spread;
+it is not a precise overhead estimate. Do not combine this thermal session with the earlier costs below.
+
+An internal fixed-step recording was checked at frames 0, 90, 180 and 239: eight seconds,
+30 fps, 240 frames, rendered at 3840 by 2160 and downsampled to 1920 by 1080.
+The complete render suite passes 84 cases and 655741 assertions with this detail field.
 
 ## Horizontal shore band
 
@@ -13,7 +50,7 @@ the horizontal distance to the intersection of visible bottom and water tangent 
 Parallel shallow plateaus receive no foam. Centimeter pores fade to their expected mean
 coverage when unresolved; even dense coverage retains at least 28 percent of the transmitted light.
 
-![Current local shore band at the fixed coastal camera](images/water-coastal/shore-band.png)
+![Local shore band before the micro-detail update](images/water-coastal/shore-band.png)
 
 This is a local screen-space estimate, not a complete shoreline field. Discontinuous or
 missing depth suppresses coverage; curved terrain can produce gaps or differ from the nearest
@@ -25,7 +62,7 @@ sloping water surface over flat ground, a vertical wall and a shallow plateau wi
 Close-up pores retain the original minimum counts and transmission requirement. A separate
 frequency probe rejects decimeter clouds; minified coverage agrees with a resolved area quadrature.
 
-The complete updated render suite passes 83 cases and 655739 assertions. The ten initial foam
+Before the micro-detail update, the complete render suite passed 83 cases and 655739 assertions. The ten initial foam
 cases also pass on NVIDIA and llvmpipe. The two additional geometry controls pass on both renderers.
 The new helpers received an independent correctness review; this does not establish photographic acceptance.
 
@@ -42,7 +79,7 @@ therefore used wall time. Automated render tests, internal video recordings and 
 benchmarks set their clocks independently and are unaffected. Replacement previews must pass
 a repeated-capture check before being used for image comparisons.
 
-## Matched optical study
+## Historical four-carrier optical study
 
 Both views use the same scanned coast, camera, sun, sky, seven-component wave field and
 0.5-second clock at 1600 by 900 pixels. Foam is disabled in both optical views. Exposure is
@@ -108,7 +145,7 @@ further integration checks. Both the original reference and this control are ret
 - Require a soft, irregular foam band, open water pockets and partial bottom transmission.
 - Check displacement bounds, analytic gradients, stationary clocks and filtered normal energy.
 
-The current full render suite passed 83 cases and 655739 assertions. The previous full unit
+The current full render suite passed 84 cases and 655741 assertions. The previous full unit
 run passed 1215 cases; the current shader-generation checks pass 14 cases and 147 assertions.
 Local shader-validation binaries rebuild shader construction and changed tests while reusing
 unchanged CPU libraries. Clean builds remain a CI requirement.
@@ -137,7 +174,7 @@ profiles so individual pores cannot determine band width; the existing width, so
 independent porosity requirements remain unchanged.
 The correction received a separate correctness review before publication.
 
-The corrected runtime pictures include both this correction and the horizontal shore band.
+The historical four-carrier runtime pictures include both this correction and the horizontal shore band.
 Foam is disabled for the optical comparison and enabled for the separate shore-band picture.
 
 ## Shore-band cost

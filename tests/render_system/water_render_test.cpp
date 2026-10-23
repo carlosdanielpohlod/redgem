@@ -1291,22 +1291,26 @@ float referenceMicroEnergy(vec2 p, vec2 direction, float wavelength, float weigh
   }
   return energy / float(MICRO_PROBE_PHASE_SAMPLES);
 }
-vec2 referenceMicroSlope(vec2 p, vec2 direction, float wavelength, float weight) {
+vec2 referenceMicroSlope(vec2 p, vec2 direction, float wavelength, float weight, float offset) {
   float k = WATER_TAU / wavelength;
   vec3 phase = waterPhase(p, direction, k);
-  return phase.yz / k * (cos(phase.x) * weight);
+  return phase.yz / k * (cos(phase.x + offset) * weight);
 }
 vec2 referenceDetailSlope(vec2 p) {
-  return referenceMicroSlope(p, vec2(0.96, 0.28), 0.38, 0.4)
-       + referenceMicroSlope(p, vec2(0.8, 0.6), 0.19, 0.3)
-       + referenceMicroSlope(p, vec2(0.6, -0.8), 0.083, 0.2)
-       + referenceMicroSlope(p, vec2(-0.28, 0.96), 0.041, 0.1);
+  vec2 slope = vec2(0.0);
+  for (int index = 0; index < WATER_DETAIL_COUNT; ++index) {
+    vec4 component = WATER_DETAIL_COMPONENTS[index];
+    slope += referenceMicroSlope(p, component.xy, component.z, component.w, WATER_DETAIL_PHASES[index]);
+  }
+  return slope;
 }
 float referenceDetailEnergy(vec2 p) {
-  return referenceMicroEnergy(p, vec2(0.96, 0.28), 0.38, 0.4)
-       + referenceMicroEnergy(p, vec2(0.8, 0.6), 0.19, 0.3)
-       + referenceMicroEnergy(p, vec2(0.6, -0.8), 0.083, 0.2)
-       + referenceMicroEnergy(p, vec2(-0.28, 0.96), 0.041, 0.1);
+  float energy = 0.0;
+  for (int index = 0; index < WATER_DETAIL_COUNT; ++index) {
+    vec4 component = WATER_DETAIL_COMPONENTS[index];
+    energy += referenceMicroEnergy(p, component.xy, component.z, component.w);
+  }
+  return energy;
 }
 void main() {
   bool near = gl_FragCoord.x < MICRO_PROBE_MIDDLE;
@@ -2065,4 +2069,133 @@ TEST_CASE("water transmission covers the supported interior of a submerged objec
   INFO("Expected interior transmission pixels: ", coverage.expected, "; missing: ", coverage.missing);
   REQUIRE(coverage.expected > kOpticalMinimumReflection);
   CHECK(coverage.missing == 0);
+}
+
+namespace {
+
+constexpr const char* kDetailGradientProbeMain = R"GLSL(
+out vec4 finalColor;
+const vec4 DETAIL_PROBE_CLOCKS = vec4(0.7, 0.0, 1.1, 1.7);
+const vec2 DETAIL_PROBE_ORIGIN_A = vec2(0.12, -0.27);
+const vec2 DETAIL_PROBE_ORIGIN_B = vec2(-0.31, 0.18);
+const vec2 DETAIL_PROBE_ORIGIN_C = vec2(0.45, 0.22);
+const vec2 DETAIL_PROBE_ORIGIN_D = vec2(-0.22, -0.44);
+const float DETAIL_PROBE_MIDDLE = 48.0;
+const float DETAIL_REFERENCE_GRAVITY = 9.81;
+const float DETAIL_REFERENCE_BEND = 0.8;
+const float DETAIL_REFERENCE_BEND_FREQUENCY = 0.31;
+const float DETAIL_REFERENCE_CLOCK_SCALE = 0.4;
+const float DETAIL_PROBE_FOOTPRINT = 0.00001;
+const float DETAIL_PROBE_DIFFERENCE = 0.0002;
+// Central differences: float32 height subtraction plus O((k*h)^2) truncation at k<=210/m.
+const float DETAIL_PROBE_GRADIENT_ERROR = 0.0005;
+const float DETAIL_SLOPE_ENERGY_TARGET = 0.30;
+const float DETAIL_ENERGY_ERROR = 0.00001;
+const float DETAIL_MAX_ENERGY_SHARE = 0.125;
+const float DETAIL_MIN_EFFECTIVE_COMPONENTS = 8.0;
+const float DETAIL_MIN_BAND_SHARE = 0.12;
+const float DETAIL_MIN_WAVELENGTH_RATIO = 12.0;
+const float DETAIL_MIN_TRANSVERSE_SHARE = 0.15;
+const vec3 DETAIL_BAND_BOUNDARIES = vec3(0.24, 0.12, 0.06);
+float independentDetailHeight(vec2 p, float clock) {
+  float height = 0.0;
+  for (int index = 0; index < WATER_DETAIL_COUNT; ++index) {
+    vec4 c = WATER_DETAIL_COMPONENTS[index];
+    float k = WATER_TAU / c.z;
+    float bend = (-c.y * p.x + c.x * p.y) * k * DETAIL_REFERENCE_BEND_FREQUENCY;
+    float phase = (c.x * p.x + c.y * p.y) * k + DETAIL_REFERENCE_BEND * sin(bend) + WATER_DETAIL_PHASES[index];
+    phase -= sqrt(DETAIL_REFERENCE_GRAVITY * k) * clock * waterWaves.z * DETAIL_REFERENCE_CLOCK_SCALE;
+    height += c.w / k * sin(phase);
+  }
+  return height;
+}
+vec2 independentDetailGradient(vec2 p, float clock) {
+  vec2 dx = vec2(DETAIL_PROBE_DIFFERENCE, 0.0);
+  vec2 dy = dx.yx;
+  float x = independentDetailHeight(p + dx, clock) - independentDetailHeight(p - dx, clock);
+  float y = independentDetailHeight(p + dy, clock) - independentDetailHeight(p - dy, clock);
+  return vec2(x, y) / (2.0 * DETAIL_PROBE_DIFFERENCE);
+}
+int detailEnergyBand(float wavelength) {
+  if (wavelength >= DETAIL_BAND_BOUNDARIES.x) return 0;
+  if (wavelength >= DETAIL_BAND_BOUNDARIES.y) return 1;
+  return wavelength >= DETAIL_BAND_BOUNDARIES.z ? 2 : 3;
+}
+struct DetailSpectrum {
+  vec4 bands;
+  vec3 energy;  // sum of squares, sum of fourth powers, largest squared coefficient
+  vec2 wavelength;  // shortest, longest
+};
+DetailSpectrum detailSpectrum() {
+  DetailSpectrum spectrum = DetailSpectrum(vec4(0.0), vec3(0.0), vec2(1.0, 0.0));
+  for (int index = 0; index < WATER_DETAIL_COUNT; ++index) {
+    vec4 c = WATER_DETAIL_COMPONENTS[index];
+    float energy = c.w * c.w;
+    spectrum.energy.x += energy;
+    spectrum.energy.y += energy * energy;
+    spectrum.energy.z = max(spectrum.energy.z, energy);
+    spectrum.bands[detailEnergyBand(c.z)] += energy;
+    spectrum.wavelength = vec2(min(spectrum.wavelength.x, c.z), max(spectrum.wavelength.y, c.z));
+  }
+  return spectrum;
+}
+bool detailEnergyIsDistributed(vec3 energy) {
+  bool dominanceBounded = energy.z / energy.x <= DETAIL_MAX_ENERGY_SHARE;
+  bool participationBroad = energy.x * energy.x / energy.y >= DETAIL_MIN_EFFECTIVE_COMPONENTS;
+  return dominanceBounded && participationBroad;
+}
+bool detailSpectrumIsBroad() {
+  DetailSpectrum spectrum = detailSpectrum();
+  bool normalized = abs(spectrum.energy.x - DETAIL_SLOPE_ENERGY_TARGET) < DETAIL_ENERGY_ERROR;
+  bool distributed = detailEnergyIsDistributed(spectrum.energy);
+  bool bandsCovered = all(greaterThanEqual(spectrum.bands / spectrum.energy.x, vec4(DETAIL_MIN_BAND_SHARE)));
+  bool wavelengthsBroad = spectrum.wavelength.y / spectrum.wavelength.x >= DETAIL_MIN_WAVELENGTH_RATIO;
+  return all(bvec4(normalized, distributed, bandsCovered, wavelengthsBroad));
+}
+bool detailDirectionsAreBroad() {
+  vec3 moment = vec3(0.0);
+  for (int index = 0; index < WATER_DETAIL_COUNT; ++index) {
+    vec4 c = WATER_DETAIL_COMPONENTS[index];
+    moment += c.w * c.w * vec3(c.x * c.x, c.x * c.y, c.y * c.y);
+  }
+  float trace = moment.x + moment.z;
+  float discriminant = sqrt((moment.x - moment.z) * (moment.x - moment.z) + 4.0 * moment.y * moment.y);
+  return (trace - discriminant) * 0.5 / trace >= DETAIL_MIN_TRANSVERSE_SHARE;
+}
+bool detailGradientIntegratesAt(vec2 p, float clock) {
+  WaterWaveNormal detail = waterFilteredDetailShape(p, clock);
+  bool integrable = length(detail.slope - independentDetailGradient(p, clock)) < DETAIL_PROBE_GRADIENT_ERROR;
+  bool resolved = detail.variance == 0.0;
+  return integrable && resolved;
+}
+bool detailGradientsIntegrate(vec2 offset) {
+  bool first = detailGradientIntegratesAt(DETAIL_PROBE_ORIGIN_A + offset, DETAIL_PROBE_CLOCKS.x);
+  bool second = detailGradientIntegratesAt(DETAIL_PROBE_ORIGIN_B + offset, DETAIL_PROBE_CLOCKS.y);
+  bool third = detailGradientIntegratesAt(DETAIL_PROBE_ORIGIN_C + offset, DETAIL_PROBE_CLOCKS.z);
+  bool fourth = detailGradientIntegratesAt(DETAIL_PROBE_ORIGIN_D + offset, DETAIL_PROBE_CLOCKS.w);
+  return all(bvec4(first, second, third, fourth));
+}
+void main() {
+  vec2 offset = (gl_FragCoord.xy - vec2(DETAIL_PROBE_MIDDLE)) * DETAIL_PROBE_FOOTPRINT;
+  finalColor = vec4(detailGradientsIntegrate(offset) ? 1.0 : 0.0, detailSpectrumIsBroad() ? 1.0 : 0.0,
+    detailDirectionsAreBroad() ? 1.0 : 0.0, 1.0);
+}
+)GLSL";
+
+bool detail_probe_passed(const ::Color& pixel) {
+  const bool gradient = pixel.r == kWaveProbeWhite.r;
+  const bool spectrum = pixel.g == kWaveProbeWhite.g;
+  const bool direction = pixel.b == kWaveProbeWhite.b;
+  return gradient && spectrum && direction;
+}
+
+}  // namespace
+
+TEST_CASE("water micro slopes integrate a height field and distribute energy across wavelengths and directions") {
+  RenderStage stage;
+  const Picture probe = water_wave_probe(kDetailGradientProbeMain);
+  const auto bad_gradient = std::count_if(probe.pixels.begin(), probe.pixels.end(),
+                                          [](const ::Color& pixel) { return pixel.r != kWaveProbeWhite.r; });
+  INFO("Invalid finite-difference gradient pixels: ", bad_gradient);
+  CHECK(std::all_of(probe.pixels.begin(), probe.pixels.end(), detail_probe_passed));
 }
