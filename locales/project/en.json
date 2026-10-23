@@ -25,6 +25,7 @@
     "  redgem <game_dir> --play          play the game",
     "  redgem new <game_dir> [--template {templates}]   create a game",
     "  redgem build <game_dir> <out_dir> [--target linux|windows|macos|android]   make a standalone game (an executable, or an .apk)",
+    "  redgem --version                  say which version of RedGem this is",
     "",
     "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting,",
     "                                       else the dedicated card when there is one)",

@@ -81,6 +81,9 @@ minutes.
 *Platformer* under *New game*, give it a name, and the editor opens with a level you can play
 right away: press the Play button, move with WASD, jump with Space.
 
+`./build/src/redgem --version` says which version you have (`RedGem 0.3.0`, say): give it when
+you report a problem. (`redgem --help` lists everything else the command line does.)
+
 ## Blender (optional)
 
 You can make whole games without it. Install [Blender](https://www.blender.org) 4.x when you want

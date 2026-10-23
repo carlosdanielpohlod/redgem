@@ -137,6 +137,21 @@ TEST_CASE("-h asks for help too, and help forgets the rest of the line") {
   CHECK(help.error.empty());
 }
 
+TEST_CASE("--version says which RedGem this is, and forgets the rest of the line") {
+  const CliResult version = parse_cli({"games/demo", "--play", "--version"});
+  REQUIRE(version.ok);
+  CHECK(version.options.mode == RunMode::Version);
+  CHECK(version.options.game_dir.empty());
+  const std::string said = version_line();
+  const std::string prefix = "RedGem ";
+  REQUIRE(said.rfind(prefix, 0) == 0);
+  const std::string number = said.substr(prefix.size());
+  CHECK_FALSE(number.empty());
+  const std::string version_characters = "0123456789.";  // a version as project() gives it: 0.3.0
+  CHECK(number.find_first_not_of(version_characters) == std::string::npos);
+  CHECK(usage().find("--version") != std::string::npos);
+}
+
 TEST_CASE("what is wrong with a command line is said") {
   CHECK(parse_cli({"new", "games/demo", "--template"}).error == "--template needs a name");
   CHECK(parse_cli({"build", "a", "b", "--target", "amiga"}).error == "--target needs linux, windows, macos or android");

@@ -37,6 +37,9 @@ using cli::Reading;
 constexpr const char* kNewCommand = "new";
 constexpr const char* kBuildCommand = "build";
 
+// What --version says before the version.
+constexpr const char* kProgramName = "RedGem";
+
 // What goes between the names of the templates in the usage.
 constexpr const char* kTemplateSeparator = "|";
 
@@ -111,6 +114,8 @@ std::string usage() {
                                   {"scene_file", config::kSceneFileName},
                                   {"scripts_dir", config::kScriptsDirName}});
 }
+
+std::string version_line() { return std::string(kProgramName) + " " + REDGEM_VERSION; }
 
 GameWindowOptions developer_play_options(const CliOptions& options, GpuChoice gpu) {
   GameWindowOptions window;

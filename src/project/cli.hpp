@@ -11,7 +11,7 @@
 
 namespace redgem {
 
-enum class RunMode { Editor, Game, NewGame, BuildGame, Help };
+enum class RunMode { Editor, Game, NewGame, BuildGame, Help, Version };
 
 struct CliOptions {
   RunMode mode = RunMode::Editor;
@@ -36,5 +36,7 @@ CliResult parse_cli(const std::vector<std::string>& args);
 // so it comes with what a developer watches (the frames-per-second counter).
 GameWindowOptions developer_play_options(const CliOptions& options, GpuChoice gpu = GpuChoice::Auto);
 std::string usage();
+// What --version says: "RedGem" and the version the program was built as.
+std::string version_line();
 
 }  // namespace redgem
