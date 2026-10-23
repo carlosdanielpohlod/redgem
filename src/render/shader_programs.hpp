@@ -121,6 +121,9 @@ struct TemporalUniforms {
   int reprojection = kNoLocation;
   int texel_size = kNoLocation;
   int history_valid = kNoLocation;
+  int depth_projection = kNoLocation;
+  int current_jitter = kNoLocation;
+  int previous_jitter = kNoLocation;
 };
 
 // Where the particle shader takes its values: per batch, and once per frame (what soft ones fade

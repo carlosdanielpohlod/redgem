@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
+#include <utility>
 
 #include "render/temporal.hpp"
 #include "render_system/render_stage.hpp"
@@ -515,4 +516,177 @@ TEST_CASE("an opening edge rejects foreground history even below the fast-motion
   const float mean = error.total / static_cast<float>(error.pixels);
   MESSAGE("opening edge pixels " << error.pixels << ", mean error " << mean);
   CHECK(mean < kOpeningMeanError);
+}
+
+namespace {
+
+// A stopped foreground object disappears without leaving a velocity discontinuity. The dark
+// background edge still has a bright neighbor, so color clipping alone cannot reject its history.
+constexpr float kDepthBackgroundEdge = 0.1f;  // keep the exposed black edge just right of the picture center
+
+void add_depth_skin(SceneDesc& desc) {
+  SkinDesc skin;
+  skin.joints = {static_cast<int>(desc.nodes.size())};
+  NodeDesc joint;
+  joint.name = "DepthJoint";
+  joint.local = desc.nodes[4].local;  // a skinned vertex follows the joint, not the mesh node
+  desc.nodes.push_back(joint);
+  skin.inverse_bind = {{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}};
+  desc.skins.push_back(std::move(skin));
+  desc.nodes[4].skin = 0;
+}
+
+SceneDesc disappearing_scene(double samples, bool skinned) {
+  SceneDesc desc = opening_scene();
+  desc.nodes[5].local.position.x = kDepthBackgroundEdge - kOpeningWhitePatchSize.x * 0.5f;
+  desc.nodes[2].props["msaa"] = samples;
+  if (skinned) add_depth_skin(desc);
+  return desc;
+}
+
+void skin_disappearing_card(SceneDesc& desc) {
+  PrimitiveDesc& card = desc.meshes[1].primitives[0];
+  for (std::size_t vertex = 0; vertex < card.positions.size() / 3; ++vertex) {
+    card.joints.insert(card.joints.end(), {0, 0, 0, 0});
+    card.weights.insert(card.weights.end(), {1, 0, 0, 0});
+  }
+}
+
+Picture disappearing_picture(bool warmed, double samples, bool skinned, const std::string& name) {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  SceneDesc desc = disappearing_scene(samples, skinned);
+  if (skinned) skin_disappearing_card(desc);
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  for (int frame = 0; frame < (warmed ? render_math::kJitterPhases : 0); ++frame) {
+    stage.draw(scene, name + "_warm");
+  }
+  scene.at(scene.find("Card")).visible = false;
+  return stage.draw(scene, name);
+}
+
+}  // namespace
+
+TEST_CASE("temporal depth validation rejects stopped foreground history after an object disappears") {
+  for (const double samples : {0.0, kSamples}) {
+    for (const bool skinned : {false, true}) {
+      const Picture moved = disappearing_picture(true, samples, skinned, "temporal_depth_disappeared");
+      const Picture fresh = disappearing_picture(false, samples, skinned, "temporal_depth_disappeared_fresh");
+      const OpeningError error = opening_error(moved, fresh);
+      REQUIRE(error.pixels >= kOpeningMinimumPixels);
+      CHECK(error.total / static_cast<float>(error.pixels) < kOpeningMeanError);
+    }
+  }
+}
+
+namespace {
+
+constexpr float kDepthApproachStep = 0.25f;  // large relative depth change, small screen velocity
+constexpr float kDepthCoverage = 0.5f;
+constexpr float kDepthStableRoughness = 0.7f;  // accumulated dither must be visibly smoother than one sample
+constexpr int kDepthApproachFrames = 8;
+constexpr float kDepthInteriorLow = 0.47f;  // avoid the cube's moving silhouette
+constexpr float kDepthInteriorHigh = 0.53f;
+
+SceneDesc approaching_depth_scene(double samples, bool skinned) {
+  SceneDesc desc = disappearing_scene(samples, skinned);
+  desc.materials[1] = test::glowing_material({0, 1, 0, kDepthCoverage}, kGlow);
+  desc.materials[1].dithered = true;
+  desc.materials[1].alpha_mode = AlphaMode::Blend;
+  desc.nodes[5].mesh = kNoIndex;
+  desc.nodes[3].mesh = kNoIndex;  // sky behind the dither isolates coverage accumulation
+  desc.nodes[4].local.position = Vec3::zero();
+  desc.nodes[4].local.scale = Vec3::one();
+  if (skinned) {
+    skin_disappearing_card(desc);
+    desc.nodes.back().local = {};
+  }
+  return desc;
+}
+
+Picture approaching_depth_picture(bool warmed, double samples, bool skinned, const std::string& name) {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  const SceneDesc desc = approaching_depth_scene(samples, skinned);
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  const ObjectId moving = scene.find(skinned ? "DepthJoint" : "Card");
+  const int last = kSettleFrames + kDepthApproachFrames;
+  Picture picture;
+  for (int frame = warmed ? 0 : last; frame <= last; ++frame) {
+    const float advance = static_cast<float>(std::max(frame - kSettleFrames, 0)) * kDepthApproachStep;
+    scene.set_world_position(moving, Vec3{0, 0, advance});
+    picture = stage.draw(scene, name);
+  }
+  return picture;
+}
+
+float depth_interior_roughness(const Picture& picture) {
+  float total = 0;
+  const int low = static_cast<int>(kDepthInteriorLow * static_cast<float>(picture.width));
+  const int high = static_cast<int>(kDepthInteriorHigh * static_cast<float>(picture.width));
+  for (int y = low; y < high; ++y) {
+    for (int x = low; x < high; ++x) {
+      const auto pixel = static_cast<std::size_t>(y * picture.width + x);
+      total += static_cast<float>(std::abs(greenness(picture.pixels[pixel]) - greenness(picture.pixels[pixel + 1])));
+    }
+  }
+  return total;
+}
+
+}  // namespace
+
+TEST_CASE("temporal depth validation retains dither history while rigid and skinned surfaces approach the camera") {
+  for (const double samples : {0.0, kSamples}) {
+    for (const bool skinned : {false, true}) {
+      const Picture accumulated = approaching_depth_picture(true, samples, skinned, "temporal_depth_approach");
+      const Picture fresh = approaching_depth_picture(false, samples, skinned, "temporal_depth_approach_fresh");
+      const float aliased = depth_interior_roughness(fresh);
+      REQUIRE(aliased > 0.0f);
+      CHECK(depth_interior_roughness(accumulated) < aliased * kDepthStableRoughness);
+    }
+  }
+}
+
+namespace {
+
+// Keep the surviving near edge just right of the center ROI. Its subpixel placement leaves
+// an opaque motion texel beside the first black receiver texel with both one and four samples.
+constexpr float kAdjacentSurvivorEdge = 0.012f;  // world meters, about 1.86 pixels at this fixture's near depth
+
+SceneDesc adjacent_survivor_scene(double samples) {
+  SceneDesc desc = opening_scene();
+  desc.nodes[2].props["msaa"] = samples;
+  desc.nodes[5].mesh = kNoIndex;  // only the persistent near card supplies the bright neighbor
+  const float half_width = kOpeningCardSize.x * kHalf;
+  desc.nodes[4].local.position.x = kAdjacentSurvivorEdge + half_width;
+  const Vec3 survivor_at{kAdjacentSurvivorEdge - half_width, kOpeningCardAt.y, kOpeningCardAt.z};
+  desc.nodes.push_back(opening_cube("Survivor", 1, survivor_at, kOpeningCardSize));
+  return desc;
+}
+
+Picture adjacent_survivor_picture(bool warmed, double samples, const std::string& name) {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  const SceneDesc desc = adjacent_survivor_scene(samples);
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  for (int frame = 0; frame < (warmed ? render_math::kJitterPhases : 0); ++frame) stage.draw(scene, name + "_warm");
+  scene.at(scene.find("Card")).visible = false;
+  return stage.draw(scene, name);
+}
+
+}  // namespace
+
+TEST_CASE("temporal depth validation rejects a removed opaque card beside a surviving near neighbor") {
+  for (const double samples : {0.0, kSamples}) {
+    const Picture removed = adjacent_survivor_picture(true, samples, "temporal_depth_adjacent_removed");
+    const Picture fresh = adjacent_survivor_picture(false, samples, "temporal_depth_adjacent_fresh");
+    const OpeningError error = opening_error(removed, fresh);
+    REQUIRE(error.pixels >= kOpeningMinimumPixels);
+    const float mean = error.total / static_cast<float>(error.pixels);
+    MESSAGE("adjacent survivor pixels " << error.pixels << ", mean error " << mean << ", samples " << samples);
+    CHECK(mean < kOpeningMeanError);
+  }
 }

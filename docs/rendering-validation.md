@@ -28,9 +28,9 @@ next to the card. Their mean sum of absolute RGB byte errors falls from 588 to z
 | --- | --- |
 | ![Previous opening edge](images/temporal-validation/edge-before.png) | ![Updated opening edge](images/temporal-validation/edge-after.png) |
 
-The previous shader fails both new regressions. History rejection uses current motion and its
-neighbor disagreement; it still does not validate history against previous-frame depth. Fine
-moving detail can trade smear for shimmer.
+The previous shader fails both regressions. These original controls isolate current motion and
+neighbor disagreement; the additional depth validation below covers surfaces that disappear
+without leaving a motion discontinuity. Fine moving detail can still trade smear for shimmer.
 
 ## Particle shadows and water refactoring
 
@@ -54,3 +54,62 @@ With 60 warm-up frames and 600 measured frames at 1600 x 900, without vertical s
 the scatter field measured 3.107 ms average / 3.106 ms median and the local showcase scene
 5.091 ms average / 5.075 ms median. These are measurements of this run, not a controlled claim
 of speedup over another revision. Showcase assets are local and are not included here.
+
+## Previous-frame depth validation
+
+The temporal history stores logarithmic view distance in its existing alpha channel. The motion
+pass stores the expected previous view distance alongside its velocity, using the previous object
+and bone transforms. Depth comparisons use nearest texels, independently of the filtered RGB
+history, and account for the current and previous Halton shifts. An uninitialized frame cannot
+accumulate history; its output still initializes depth for the next frame. Sky and points behind
+the previous camera have distinct markers. Deliberately stochastic coverage (distance fades
+and dithered transparency) has signed depth metadata, allowing covered samples and sky holes
+to accumulate. An opaque center pixel still requires its own depth match; a neighboring
+stochastic surface cannot make unrelated opaque history valid.
+
+Logarithmic distance avoids overflowing half-float channels for distant geometry. A bounded
+comparison margin allows half-float rounding and the depth change across a subpixel footprint;
+it cannot grow without limit at a silhouette. The existing targets and render passes are reused.
+The first temporal frame now also draws the motion pass so its depth history starts initialized.
+
+Isolated resolve tests distinguish depth rejection from color clipping and velocity rejection.
+They cover zero-motion disocclusion, expected previous depth, invalid history, sky, jittered depth
+edges and distant values. Scene regressions additionally exercise a stopped foreground object
+that disappears and approaching rigid and skinned geometry, with zero and four MSAA samples.
+The approaching surfaces use dithered coverage so discarding all history cannot pass as a fix.
+
+
+The opaque-neighbor control selects 51 newly revealed black edge pixels beside a surviving
+white surface. With four MSAA samples, the previous renderer retains a mean sum of absolute RGB
+byte errors of 732; depth validation reduces that selected-edge error to zero. This does not
+claim that every pixel in an accumulated frame matches a fresh frame. Both renderers produce
+pixel-identical fresh reference pictures.
+
+| Previous history | Previous-depth validation |
+| --- | --- |
+| ![Previous edge crop](images/temporal-depth-validation/adjacent-before.png) | ![Validated edge crop](images/temporal-depth-validation/adjacent-after.png) |
+
+The crops cover [124, 100, 138, 156] in the original 256 by 256 picture and are enlarged eight
+times with nearest-neighbor sampling. The previous result retains a bright column from the
+removed opaque card. The corrected edge agrees with the freshly rendered background.
+
+The combined render suite passes 97 cases and 655778 assertions; the full unit suite passes
+1215 cases and 42068 assertions. The thirteen new depth/scene cases also pass on llvmpipe.
+The previous renderer fails eight of ten isolated depth cases
+and both disappearing-object scene cases (six failed assertions). The approaching rigid/skinned
+scene remains a positive history-preservation control. Five native GLES shader pairs compile
+and link; this does not replace Android packaging.
+
+A render-only ABBA comparison uses temporal anti-aliasing in both versions, a fixed 0.5-second
+animation clock, 1600 by 900 pixels, 60 warmup frames and 600 measured frames. The baseline uses
+the same twelve-wave water detail as the candidate. Physical interaction detection and game
+logic are excluded.
+
+| Scene | Previous medians (ms) | Depth-validation medians (ms) | Pair averages (ms) |
+| --- | --- | --- | --- |
+| Scatter field | 3.913, 3.846 | 3.876, 3.844 | 3.880 to 3.860 |
+| Coastal water | 12.573, 12.664 | 12.659, 12.675 | 12.619 to 12.667 |
+
+These small differences are comparable to repeat variation; they do not establish a speedup
+or a precise overhead. The added motion pass on the first temporal frame is outside the warmed
+measurement. No additional history texture or steady-state render pass is allocated.

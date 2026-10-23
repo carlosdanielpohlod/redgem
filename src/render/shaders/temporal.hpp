@@ -11,6 +11,9 @@ inline constexpr const char* kMotionDepth = "motionDepth";
 inline constexpr const char* kReprojection = "reprojection";
 inline constexpr const char* kHistoryValid = "historyValid";
 inline constexpr const char* kSharpness = "sharpness";
+inline constexpr const char* kDepthProjection = "depthProjection";
+inline constexpr const char* kCurrentJitter = "currentJitter";
+inline constexpr const char* kPreviousJitter = "previousJitter";
 
 // The lit picture (texture0, linear light, its view jittered) mixed with the frames before it
 // (historyTexture), read where each pixel was then: what the motion pass drew there, or for what
@@ -25,10 +28,13 @@ inline constexpr const char* kTemporalFragment = R"GLSL(
 in vec2 fragTexCoord;
 uniform sampler2D texture0;
 uniform sampler2D historyTexture;
-uniform sampler2D motionTexture;   // rg: motion in texture coordinates, b: a surface drew it, a: particles' cover
+uniform sampler2D motionTexture;   // rg: motion in texture coordinates, b: signed previous log view depth (negative: stochastic coverage), a: particles' cover
 uniform sampler2D motionDepth;
 uniform mat4 reprojection;         // this frame's normalized device coordinates to the last frame's clip ones
 uniform vec2 texelSize;
+uniform vec2 depthProjection;       // projection's z scale and translation, for linear view depth
+uniform vec2 currentJitter;         // this frame's shift in texture coordinates
+uniform vec2 previousJitter;
 uniform float historyValid;
 out vec4 finalColor;
 const float HISTORY_WEIGHT = 0.9;            // of the frames before, where nothing changed
@@ -51,6 +57,10 @@ const float NDC_TO_TEXTURE = 0.5;
 const float NOWHERE = 0.0001;
 const float NEIGHBOURS = 9.0;                // the pixel and the eight around it
 const float FARTHEST = 1.0;
+const float INVALID_DEPTH = -1024.0;       // outside the finite logarithmic depth range
+const float DEPTH_QUANTIZATION = 0.002;     // two half-float spacings in logarithmic view depth
+const float DEPTH_PIXEL_MARGIN = 0.75;      // neighboring texel centers differ by at most part of a pixel
+const float DEPTH_SLOPE_LIMIT = 0.01;       // discontinuities cannot turn the slope margin into a large depth gap
 const float MOST_COMPRESSED = 0.999;         // a compressed color this bright is about a thousand times white
 const vec3 LUMA = vec3(0.25, 0.5, 0.25);     // YCoCg's rows
 const vec3 ORANGE = vec3(0.5, 0.0, -0.5);
@@ -67,7 +77,7 @@ vec3 colorAt(vec2 uv) { return toYCoCg(compress(texture(texture0, inside(uv)).rg
 
 // How far what lies at `depth` at `uv` moved on the picture because the camera did.
 vec2 cameraMotion(vec2 uv, float depth) {
-  vec4 now = vec4(uv / NDC_TO_TEXTURE - 1.0, depth * DEPTH_RANGE - 1.0, 1.0);
+  vec4 now = vec4((uv - currentJitter) / NDC_TO_TEXTURE - 1.0, depth * DEPTH_RANGE - 1.0, 1.0);
   vec4 before = reprojection * now;
   return before.w > NOWHERE ? (now.xy - before.xy / before.w) * NDC_TO_TEXTURE : vec2(0.0);
 }
@@ -75,12 +85,12 @@ vec2 cameraMotion(vec2 uv, float depth) {
 // What the motion pass drew at `uv`, or where nothing was drawn (the sky) the camera's motion.
 vec2 drawnMotion(vec2 uv, float depth) {
   vec4 motion = texture(motionTexture, uv);
-  return motion.b > SWITCH_ON ? motion.rg : cameraMotion(uv, depth);
+  return motion.b != 0.0 ? motion.rg : cameraMotion(uv, depth);
 }
 
 // The motion of the nearest surface around the pixel (edges move with what is in front), and in
 // `split` how far, in pixels, the pixel's own motion is from it: an edge that opens.
-vec2 motionAt(vec2 uv, out float split) {
+vec2 nearestSurface(vec2 uv) {
   vec2 nearest = uv;
   float depth = FARTHEST + 1.0;
   for (int y = -1; y <= 1; ++y) {
@@ -90,9 +100,59 @@ vec2 motionAt(vec2 uv, out float split) {
       if (d < depth) { depth = d; nearest = at; }
     }
   }
-  vec2 motion = drawnMotion(nearest, depth);
+  return nearest;
+}
+
+vec3 motionAt(vec2 uv, out float split) {
+  vec2 nearest = nearestSurface(uv);
+  vec2 motion = drawnMotion(nearest, texture(motionDepth, nearest).r);
   split = length((drawnMotion(uv, texture(motionDepth, uv).r) - motion) / texelSize);
-  return motion;
+  return vec3(motion, texture(motionTexture, nearest).b);
+}
+
+// Logarithmic view distance stays finite in half-float history even for very distant surfaces.
+// Zero belongs to the sky; a negative depth identifies deliberately stochastic coverage.
+bool stochasticDepth(float depth) { return depth < 0.0 && depth > INVALID_DEPTH; }
+
+float currentDepth() {
+  float depth = texture(motionDepth, fragTexCoord).r;
+  if (depth >= FARTHEST) return 0.0;
+  float distance = depthProjection.y / (depth * DEPTH_RANGE - 1.0 + depthProjection.x);
+  float encoded = log2(1.0 + max(distance, 0.0));
+  float motion = texture(motionTexture, fragTexCoord).b;
+  return stochasticDepth(motion) ? -encoded : encoded;
+}
+
+float savedDepth(vec2 uv) {
+  ivec2 size = textureSize(historyTexture, 0);
+  ivec2 at = clamp(ivec2(uv * vec2(size)), ivec2(0), size - 1);
+  return texelFetch(historyTexture, at, 0).a;
+}
+
+bool invalidDepthPair(float expected, float held) { return expected <= INVALID_DEPTH || held <= INVALID_DEPTH; }
+bool hasSkyDepth(float expected, float held) { return expected == 0.0 || held == 0.0; }
+
+bool sameDepth(float expected, float held, float slope) {
+  if (invalidDepthPair(expected, held)) return false;
+  if (hasSkyDepth(expected, held)) return expected == held;
+  expected = abs(expected);
+  held = abs(held);
+  float scale = max(expected, 1.0);
+  float margin = DEPTH_QUANTIZATION * scale + min(slope * DEPTH_PIXEL_MARGIN, DEPTH_SLOPE_LIMIT * scale);
+  return abs(expected - held) <= margin;
+}
+
+// Stochastic holes intentionally mix a covered surface with the background over several frames.
+// Only that material's signed metadata permits the coverage mixture; opaque pixels stay strict.
+bool stochasticSky(float center, float held) { return stochasticDepth(center) && held == 0.0; }
+
+bool depthCompatible(float center, float nearest, float held, float slope) {
+  if (center <= INVALID_DEPTH) return false;
+  if (sameDepth(center, held, slope)) return true;
+  if (center > 0.0) return false;
+  if (!stochasticDepth(nearest)) return false;
+  if (stochasticSky(center, held)) return true;
+  return stochasticDepth(held) && sameDepth(nearest, held, slope);
 }
 
 // The frames before at `uv`, filtered by a Catmull-Rom spline in five reads (bilinear ones,
@@ -180,23 +240,28 @@ float historyWeight(vec2 motion, float split) {
 
 bool outside(vec2 uv) { return any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))); }
 
+// Every exit stores this frame's depth; rejected color history must not leave stale depth.
+bool missingHistory(vec2 before) { return historyValid < SWITCH_ON || outside(before); }
+
+vec3 resolveColor(vec3 current, vec3 motion, float split, float slope) {
+  vec2 before = fragTexCoord - motion.xy + previousJitter - currentJitter;
+  if (missingHistory(before)) return current;
+  float center = texture(motionTexture, fragTexCoord).b;
+  if (!depthCompatible(center, motion.z, savedDepth(before), slope)) return current;
+  float weight = historyWeight(motion.xy, split);
+  if (weight <= 0.0) return current;
+  vec3 held = heldHistory(before, length(motion.xy / texelSize));
+  vec3 mixed = broken(held) ? toYCoCg(compress(current)) : mix(toYCoCg(compress(current)), held, weight);
+  return expand(clamp(fromYCoCg(mixed), 0.0, MOST_COMPRESSED));
+}
+
 void main() {
-  vec4 current = texture(texture0, fragTexCoord);
   float split;
-  vec2 motion = motionAt(fragTexCoord, split);
-  vec2 before = fragTexCoord - motion;
-  if (historyValid < SWITCH_ON || outside(before)) {
-    finalColor = current;
-    return;
-  }
-  float weight = historyWeight(motion, split);
-  if (weight <= 0.0) {
-    finalColor = current;
-    return;
-  }
-  vec3 held = heldHistory(before, length(motion / texelSize));
-  vec3 mixed = broken(held) ? toYCoCg(compress(current.rgb)) : mix(toYCoCg(compress(current.rgb)), held, weight);
-  finalColor = vec4(expand(clamp(fromYCoCg(mixed), 0.0, MOST_COMPRESSED)), current.a);
+  vec3 motion = motionAt(fragTexCoord, split);
+  float center = texture(motionTexture, fragTexCoord).b;
+  float slope = abs(dFdx(abs(center))) + abs(dFdy(abs(center)));
+  vec3 current = texture(texture0, fragTexCoord).rgb;
+  finalColor = vec4(resolveColor(current, motion, split, slope), currentDepth());
 }
 )GLSL";
 

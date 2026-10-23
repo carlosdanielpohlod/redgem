@@ -189,6 +189,9 @@ TemporalUniforms find_temporal_uniforms(const Shader& temporal) {
   found.reprojection = GetShaderLocation(temporal, shaders::kReprojection);
   found.texel_size = GetShaderLocation(temporal, shaders::kTexelSize);
   found.history_valid = GetShaderLocation(temporal, shaders::kHistoryValid);
+  found.depth_projection = GetShaderLocation(temporal, shaders::kDepthProjection);
+  found.current_jitter = GetShaderLocation(temporal, shaders::kCurrentJitter);
+  found.previous_jitter = GetShaderLocation(temporal, shaders::kPreviousJitter);
   return found;
 }
 

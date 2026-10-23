@@ -43,7 +43,7 @@ void main() {
 }
 )GLSL";
 
-// What moved, in texture coordinates of the picture (rg), and that a surface was drawn there (b).
+// What moved, in texture coordinates of the picture (rg), and its previous logarithmic view depth (b).
 // Cut-out and fading surfaces leave out what the lit pass leaves out (alpha tested, not covered).
 // Covering, a see-through surface writes how much of the pixel it covers instead, into alpha.
 inline constexpr const char* kMotionHead = R"GLSL(
@@ -67,7 +67,15 @@ inline constexpr const char* kMotionMain = R"GLSL(
 const float SWITCH_ON = 0.5;
 const float NDC_TO_TEXTURE = 0.5;   // normalized device coordinates span 2 across, a texture 1
 const float NOWHERE = 0.0001;       // a w this small was behind the last frame's camera
-const float DRAWN = 1.0;
+const float INVALID_DEPTH = -1024.0;  // the surface was behind the previous camera
+bool stochasticCoverage() {
+  return alphaDithered > SWITCH_ON || min(fragCopy.x, fragCopy.y) < 1.0;
+}
+float previousDepth() {
+  if (beforeClip.w <= NOWHERE) return INVALID_DEPTH;
+  float depth = log2(1.0 + beforeClip.w);
+  return stochasticCoverage() ? -depth : depth;
+}
 bool leftOut(float alpha) {
   if (alpha >= alphaCeiling) return true;
   return alphaDithered > SWITCH_ON ? alpha <= pixelNoise() : alpha < alphaCutoff;
@@ -83,7 +91,7 @@ void main() {
   }
   vec2 now = nowClip.xy / nowClip.w;
   vec2 before = beforeClip.w > NOWHERE ? beforeClip.xy / beforeClip.w : now;
-  finalColor = vec4((now - before) * NDC_TO_TEXTURE, DRAWN, waterEnabled > SWITCH_ON ? 1.0 : 0.0);
+  finalColor = vec4((now - before) * NDC_TO_TEXTURE, previousDepth(), waterEnabled > SWITCH_ON ? 1.0 : 0.0);
 }
 )GLSL";
 
