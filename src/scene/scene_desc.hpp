@@ -60,7 +60,7 @@ struct WaterDesc {
   float wavelength = kWaterWavelength;
   float speed = 1.0f;
   Vec3 absorption = kWaterAbsorption;
-  float foam_width = kWaterFoamWidth;
+  float foam_width = kWaterFoamWidth;  // local horizontal shore width in world meters
   float refraction = kWaterRefraction;
 };
 

@@ -13,6 +13,7 @@
 #include "render/shaders/lit_main.hpp"
 #include "render/shaders/lit_water.hpp"
 #include "render/shaders/water_waves.hpp"
+#include "render/shaders/water_filter.hpp"
 #include "render/shaders/lit_shadows.hpp"
 #include "render/shaders/lit_sky.hpp"
 
@@ -81,8 +82,10 @@ const float SPECULAR_DIVISOR = 4.0;      // Cook-Torrance: D G F / (4 nv nl)
 
 float distributionGGX(float nh, float a) {
   float a2 = a * a;
-  float d = nh * nh * (a2 - 1.0) + 1.0;
-  return a2 / (PI * d * d + EPSILON);
+  float projected = nh * a;
+  // Roughness is bounded away from zero by callers; an additive floor removes narrow-lobe energy.
+  float d = projected * projected + max(1.0 - nh * nh, 0.0);
+  return a2 / (PI * d * d);
 }
 
 float geometrySmith(float nv, float nl, float rough) {
@@ -189,7 +192,7 @@ inline std::string lit_fragment(const LitFeatures& features = {}) {
   if (features.clearcoat) switches += kClearcoatSwitch;
   if (features.water) switches += kWaterSwitch;
   std::string source = std::string(kLitHead) + kCopyFade + kLitAlpha + kLitShadows + kLitSky + kLitClearcoat;
-  if (features.water) source += std::string(kWaterWaves) + kLitWater;
+  if (features.water) source += std::string(kWaterWaves) + kWaterFilter + kLitWater;
   source += kLitMain;
   const std::size_t version = source.find(kVersionLine);
   return source.insert(version + std::string(kVersionLine).size(), switches);

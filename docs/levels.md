@@ -295,7 +295,7 @@ water depth and absorption instead.
 | `absorption_red` | `0.35` | Red light absorption per meter, from 0 to 10. |
 | `absorption_green` | `0.08` | Green light absorption per meter, from 0 to 10. |
 | `absorption_blue` | `0.035` | Blue light absorption per meter, from 0 to 10. |
-| `foam_width` | `0.12` | Shallow depth range for white shore foam, in meters; 0 disables it. |
+| `foam_width` | `0.12` | Nominal local horizontal width of a shore foam band, in meters; 0 disables it. World-space patches vary its reach from 0.85 to 1.15 times this value. |
 | `refraction` | `0.035` | Refraction strength, from 0 to 0.1; the default uses water's IOR of 1.333 and 0 keeps the bottom undistorted. |
 
 The Blender helper `scene_kit.water_material("Pond", wave_height=0.04, wavelength=2.0)`
@@ -340,9 +340,33 @@ triangle budget is ignored as a whole. These bounds keep interaction work predic
 This first water material is for views above a lake or sea surface. Refraction samples only
 opaque geometry visible on screen; transparent objects and other water layers are absent from
 that snapshot. Screen-space reflections miss off-screen and hidden geometry and use the environment capture
-when a ray misses. There is no planar reflection pass. Shore foam follows shallow depth, without breaking-wave simulation.
+when a ray misses. There is no planar reflection pass. Shore foam approximates the horizontal distance
+to the intersection of the local water and visible-bottom tangent planes, without breaking-wave simulation.
+Its world-space patches and softer pockets form an irregular band
+rather than a uniform intersection line. Low-density pockets leave water uncovered; even dense
+patches preserve some transmission instead of replacing the whole shallow surface with white.
+Coverage fades in over a short contact distance and
+fades out across the authored horizontal width; larger `foam_width` values broaden the band. The
+pattern stays fixed in world space and does not drift with the render clock. Fine pores are filtered
+by their projected footprint and converge to expected mean coverage when unresolved. Flat shallow
+plateaus with no local shore intersection receive no foam. The local plane estimate uses the primary
+opaque depth, not the refracted optical path. Occluded or off-screen bottom geometry, depth discontinuities,
+and degenerate or almost parallel tangent planes produce no foam; they do not invent a hidden shore.
+Curved terrain is only locally approximated, and rejected curvature can leave gaps. Nearly vertical
+bottom walls are supported without dividing by the bottom normal's vertical component.
+
+Traveling waves combine seven non-harmonic scales with distinct phases around one prevailing
+direction. Slow spatial envelopes vary crest height; displacement and shading use the same
+analytic gradient. Positive amplitude weights sum to one, and the envelopes never exceed one,
+so `wave_height` remains the maximum displacement used by visibility bounds. Fragment normals
+fade each traveling component when its phase becomes too fine for a pixel; discarded slope
+variance adds bounded reflection roughness. Geometry and motion retain the full wave shape. This is a
+procedural surface approximation, without wave interactions or a fluid spectrum simulation.
 Refraction traces the visible depth field. When the refracted surface is hidden or outside the screen,
 it keeps the undistorted opaque sample instead; this fallback cannot reveal geometry absent from the snapshot.
+Depth discontinuities use a guarded, texel-matched color sample. When a ray misses, the visible
+bottom's local tangent plane may estimate its absorption distance; this remains an approximation
+for hidden or curved geometry.
 Absorption filters the transmitted picture, but does not yet attenuate lighting on its way to submerged
 objects; a lit bottom can therefore be brighter than in a full participating-medium render.
 There is no underwater camera mode, buoyancy, fluid simulation, or wave collision. Use ordinary

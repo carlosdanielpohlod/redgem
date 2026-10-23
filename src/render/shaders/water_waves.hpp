@@ -8,11 +8,26 @@ uniform vec3 waterWaves;  // maximum height, dominant wavelength, clock multipli
 const float WATER_TAU = 6.28318531;
 const float WATER_GRAVITY = 9.81;
 const float WATER_MIN_LENGTH = 0.05;
-const vec2 WATER_DIRECTION_A = vec2(0.8, 0.6);
-const vec2 WATER_DIRECTION_B = vec2(-0.6, 0.8);
-const vec2 WATER_DIRECTION_C = vec2(0.28, -0.96);
-const vec3 WATER_LENGTHS = vec3(1.0, 0.47, 0.21);
-const vec3 WATER_WEIGHTS = vec3(0.6, 0.28, 0.12);  // sum 1 bounds displacement by wave height
+// Direction XZ, relative wavelength, amplitude weight; positive weights sum to one.
+const vec4 WATER_COMPONENT_0 = vec4(0.96651104, 0.25662504, 1.000, 0.300);
+const vec2 WATER_PHASE_0 = vec2(0.35, 1.20);
+const vec4 WATER_COMPONENT_1 = vec4(0.91446668, 0.40466120, 0.790, 0.230);
+const vec2 WATER_PHASE_1 = vec2(1.90, 3.40);
+const vec4 WATER_COMPONENT_2 = vec4(0.84924920, 0.52799222, 0.610, 0.170);
+const vec2 WATER_PHASE_2 = vec2(4.10, 5.10);
+const vec4 WATER_COMPONENT_3 = vec4(0.76750205, 0.64104649, 0.430, 0.120);
+const vec2 WATER_PHASE_3 = vec2(5.35, 0.45);
+const vec4 WATER_COMPONENT_4 = vec4(0.67081635, 0.74162351, 0.310, 0.085);
+const vec2 WATER_PHASE_4 = vec2(2.75, 2.60);
+const vec4 WATER_COMPONENT_5 = vec4(0.56107397, 0.82776567, 0.227, 0.055);
+const vec2 WATER_PHASE_5 = vec2(0.95, 4.30);
+const vec4 WATER_COMPONENT_6 = vec4(0.47147527, 0.88187928, 0.163, 0.040);
+const vec2 WATER_PHASE_6 = vec2(4.85, 5.90);
+const float WATER_ENVELOPE_BASE = 0.825;
+const float WATER_ENVELOPE_VARIATION = 0.175;  // envelope stays in [0.65, 1], preserving displacement bounds
+const float WATER_ENVELOPE_FREQUENCY = 0.23;  // radians per dominant wavelength
+const vec2 WATER_ENVELOPE_DIRECTION_A = vec2(0.6, 0.8);
+const vec2 WATER_ENVELOPE_DIRECTION_B = vec2(-0.8, 0.6);
 const float WATER_PHASE_BEND = 0.8;  // radians: break the infinite parallel crests of a plane wave
 const float WATER_BEND_FREQUENCY = 0.31;
 
@@ -42,18 +57,34 @@ vec3 waterPhase(vec2 p, vec2 direction, float k) {
   return vec3(phase, gradient);
 }
 
-// Height and the two partial derivatives, used to recover the normal without finite differences.
-vec3 waterWave(vec2 p, float clock, vec2 direction, float lengthScale, float weight) {
-  float k = WATER_TAU / max(waterWaves.y * lengthScale, WATER_MIN_LENGTH);
-  vec3 shape = waterPhase(p, direction, k);
-  float phase = shape.x - sqrt(WATER_GRAVITY * k) * clock * waterWaves.z;
-  float height = waterWaves.x * weight;
-  return vec3(height * sin(phase), height * cos(phase) * shape.yz);
+// A slow spatial envelope breaks continuous equal-height crests without exceeding wave_height.
+vec3 waterEnvelope(vec2 p, float phase) {
+  float frequency = WATER_ENVELOPE_FREQUENCY / max(waterWaves.y, WATER_MIN_LENGTH);
+  float u = dot(p, WATER_ENVELOPE_DIRECTION_A) * frequency + phase;
+  float v = dot(p, WATER_ENVELOPE_DIRECTION_B) * frequency - phase;
+  float value = WATER_ENVELOPE_BASE + WATER_ENVELOPE_VARIATION * sin(u) * sin(v);
+  vec2 gradient = WATER_ENVELOPE_VARIATION * frequency *
+    (WATER_ENVELOPE_DIRECTION_A * cos(u) * sin(v) + WATER_ENVELOPE_DIRECTION_B * sin(u) * cos(v));
+  return vec3(value, gradient);
+}
+// Height and its analytic partial derivatives include both carrier and envelope gradients.
+vec3 waterWave(vec2 p, float clock, vec4 component, vec2 phases) {
+  float k = WATER_TAU / max(waterWaves.y * component.z, WATER_MIN_LENGTH);
+  vec3 shape = waterPhase(p, component.xy, k);
+  float phase = shape.x + phases.x - sqrt(WATER_GRAVITY * k) * clock * waterWaves.z;
+  vec3 envelope = waterEnvelope(p, phases.y);
+  float height = waterWaves.x * component.w;
+  vec2 gradient = envelope.x * cos(phase) * shape.yz + sin(phase) * envelope.yz;
+  return vec3(height * envelope.x * sin(phase), height * gradient);
 }
 vec3 waterShape(vec2 p, float clock) {
-  return waterWave(p, clock, WATER_DIRECTION_A, WATER_LENGTHS.x, WATER_WEIGHTS.x)
-       + waterWave(p, clock, WATER_DIRECTION_B, WATER_LENGTHS.y, WATER_WEIGHTS.y)
-       + waterWave(p, clock, WATER_DIRECTION_C, WATER_LENGTHS.z, WATER_WEIGHTS.z);
+  return waterWave(p, clock, WATER_COMPONENT_0, WATER_PHASE_0)
+       + waterWave(p, clock, WATER_COMPONENT_1, WATER_PHASE_1)
+       + waterWave(p, clock, WATER_COMPONENT_2, WATER_PHASE_2)
+       + waterWave(p, clock, WATER_COMPONENT_3, WATER_PHASE_3)
+       + waterWave(p, clock, WATER_COMPONENT_4, WATER_PHASE_4)
+       + waterWave(p, clock, WATER_COMPONENT_5, WATER_PHASE_5)
+       + waterWave(p, clock, WATER_COMPONENT_6, WATER_PHASE_6);
 }
 vec3 waterImpulse(vec2 p, vec4 wave, float radius) {
   vec2 offset = p - wave.xy;

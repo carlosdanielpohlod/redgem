@@ -380,6 +380,7 @@ set_tests_properties(system.editor.window PROPERTIES LABELS system RUN_SERIAL TR
 # What the renderer draws, in a real window, read back as pixels: scenes made in code.
 add_executable(redgem_render_system_tests render_system/render_test_main.cpp render_system/render_system_test.cpp
                render_system/animation_graph_render_test.cpp
+               render_system/specular_brdf_render_test.cpp
                render_system/render_look_test.cpp render_system/water_render_test.cpp render_system/scatter_lod_render_test.cpp render_system/particle_render_test.cpp
                render_system/see_through_render_test.cpp render_system/temporal_render_test.cpp
                render_system/recording_render_test.cpp
