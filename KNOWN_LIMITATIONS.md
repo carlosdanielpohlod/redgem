@@ -177,8 +177,6 @@ not a promise of how it will be closed.
   no time or instruction limit. (A script that raises is switched off and the game goes on.)
 - A crash in a built game closes it with a line in the log: no message to the player, no crash
   report, no backtrace. Running out of memory is not handled.
-- Saves are written to a new file and renamed over the old one, but not flushed to disk first, and
-  a damaged save is dropped silently with no backup kept.
 - A missing texture draws nothing, with a warning in the log, instead of a placeholder pattern.
 
 ### Shipping
@@ -219,7 +217,8 @@ not a promise of how it will be closed.
 
 ### Documentation
 
-- No changelog or migration notes between versions; the release notes on GitHub are the record.
+- No migration notes between versions: CHANGELOG.md says what changed, not how to move a game
+  across.
 - `docs/scripting/api.md` is a hand-written summary, not a full reference generated from the code,
   and there are no type signatures or stubs for code editors.
 - Templates are `empty` and `platformer` only; there is no example of running game tests in a
