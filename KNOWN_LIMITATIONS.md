@@ -40,7 +40,11 @@ the same pull request.
 - Water supports animated horizontal surfaces, depth absorption, screen-space refraction,
   screen-space reflections with an environment fallback, shore foam and local impact/wake ripples
   from physical bodies. It has no underwater camera mode, fluid simulation,
-  buoyancy, breaking waves or planar reflections. Refraction sees opaque geometry on screen
+  buoyancy, breaking waves or planar reflections. Shore foam is a static procedural band
+  driven by visible shallow depth, with open water pockets and partial transmission. It is not
+  a shoreline-distance field: broad shallow shelves may carry scattered foam across their area.
+  It does not accumulate, advect or follow breaking crests.
+  Refraction sees opaque geometry on screen
   only; overlapping water layers and transparent objects are not captured. Absorption affects
   the path from the bottom to the camera; incident lighting of submerged objects is not attenuated by water.
 - Images must be PNG or JPEG, at most 8192 pixels a side (a sky picture may also be Radiance

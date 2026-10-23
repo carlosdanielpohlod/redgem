@@ -1,6 +1,12 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <limits>
+#include <regex>
 #include <string>
+#include <vector>
 
 #include "render/gpu_profile.hpp"
 #include "render/shader_source.hpp"
@@ -17,6 +23,8 @@
 #include "render/shaders/temporal.hpp"
 #include "render/shaders/tone_mapping.hpp"
 #include "render/shaders/uniforms.hpp"
+#include "render/shaders/water_waves.hpp"
+#include "render/shaders/water_filter.hpp"
 #include "render/texel_rows.hpp"
 
 using namespace redgem;
@@ -128,4 +136,77 @@ TEST_CASE("the coating shader is enabled only when a scene asks for layered mate
   CHECK(plain != coated);
   CHECK_FALSE(contains(shaders::lit_fragment(plain), shaders::kClearcoatSwitch));
   CHECK(contains(shaders::lit_fragment(coated), shaders::kClearcoatSwitch));
+}
+
+namespace {
+
+constexpr std::size_t kMinimumWaterComponents = 6;
+constexpr std::size_t kMaximumWaterComponents = 8;
+constexpr std::size_t kWaveFields = 4;
+constexpr std::size_t kWaveLengthField = 2;
+constexpr std::size_t kWaveWeightField = 3;
+constexpr float kDominantWaterX = 0.8f;
+constexpr float kDominantWaterZ = 0.6f;
+constexpr float kMinimumDirectionAgreement = 0.9f;  // less than 26 degrees from the dominant direction
+constexpr float kMinimumWavelengthRatio = 1.15f;    // distinct scales, rather than almost duplicated carriers
+constexpr float kMinimumDirectionSpread = 0.5f;     // waves spread on both sides of the dominant direction
+using WaterComponent = std::array<float, kWaveFields>;
+
+std::vector<WaterComponent> water_components() {
+  const std::string source = shaders::kWaterWaves;
+  const std::regex declaration(R"(WATER_COMPONENT_[0-9]+ = vec4\(([^,]+), ([^,]+), ([^,]+), ([^)]+)\))");
+  std::vector<WaterComponent> components;
+  for (auto it = std::sregex_iterator(source.begin(), source.end(), declaration); it != std::sregex_iterator(); ++it) {
+    WaterComponent component{};
+    for (std::size_t field = 0; field < kWaveFields; ++field) component[field] = std::stof((*it)[field + 1].str());
+    components.push_back(component);
+  }
+  return components;
+}
+
+float water_direction_offset(const WaterComponent& component) {
+  return kDominantWaterX * component[1] - kDominantWaterZ * component[0];
+}
+
+}  // namespace
+
+TEST_CASE("water spectrum bounds displacement with normalized positive weights and distinct length scales") {
+  const auto components = water_components();
+  REQUIRE(components.size() >= kMinimumWaterComponents);
+  CHECK(components.size() <= kMaximumWaterComponents);
+  float weight = 0.0f;
+  float previous_length = std::numeric_limits<float>::infinity();
+  for (const auto& component : components) {
+    CHECK(component[kWaveWeightField] > 0.0f);
+    CHECK(component[kWaveLengthField] > 0.0f);
+    CHECK(previous_length / component[kWaveLengthField] > kMinimumWavelengthRatio);
+    weight += component[kWaveWeightField];
+    previous_length = component[kWaveLengthField];
+  }
+  CHECK(weight == doctest::Approx(1.0f));
+}
+
+TEST_CASE("water carriers share one prevailing direction without forming a perpendicular wave grid") {
+  const auto components = water_components();
+  REQUIRE(components.size() >= kMinimumWaterComponents);
+  float lowest = 1.0f;
+  float highest = -1.0f;
+  for (const auto& component : components) {
+    CHECK(component[0] * component[0] + component[1] * component[1] == doctest::Approx(1.0f));
+    CHECK(component[0] * kDominantWaterX + component[1] * kDominantWaterZ >= kMinimumDirectionAgreement);
+    lowest = std::min(lowest, water_direction_offset(component));
+    highest = std::max(highest, water_direction_offset(component));
+  }
+  CHECK(highest - lowest >= kMinimumDirectionSpread);
+}
+
+TEST_CASE("water normal filtering is fragment only and keeps vertex and motion geometry unfiltered") {
+  shaders::LitFeatures water;
+  water.water = true;
+  CHECK(contains(shaders::lit_fragment(water), shaders::kWaterFilter));
+  CHECK_FALSE(contains(shaders::lit_fragment(), shaders::kWaterFilter));
+  CHECK_FALSE(contains(shaders::lit_vertex(), shaders::kWaterFilter));
+  CHECK_FALSE(contains(shaders::motion_vertex(), shaders::kWaterFilter));
+  CHECK(contains(shaders::lit_vertex(), shaders::kWaterWaves));
+  CHECK(contains(shaders::motion_vertex(), shaders::kWaterWaves));
 }

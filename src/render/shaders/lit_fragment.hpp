@@ -13,6 +13,7 @@
 #include "render/shaders/lit_main.hpp"
 #include "render/shaders/lit_water.hpp"
 #include "render/shaders/water_waves.hpp"
+#include "render/shaders/water_filter.hpp"
 #include "render/shaders/lit_shadows.hpp"
 #include "render/shaders/lit_sky.hpp"
 
@@ -189,7 +190,7 @@ inline std::string lit_fragment(const LitFeatures& features = {}) {
   if (features.clearcoat) switches += kClearcoatSwitch;
   if (features.water) switches += kWaterSwitch;
   std::string source = std::string(kLitHead) + kCopyFade + kLitAlpha + kLitShadows + kLitSky + kLitClearcoat;
-  if (features.water) source += std::string(kWaterWaves) + kLitWater;
+  if (features.water) source += std::string(kWaterWaves) + kWaterFilter + kLitWater;
   source += kLitMain;
   const std::size_t version = source.find(kVersionLine);
   return source.insert(version + std::string(kVersionLine).size(), switches);

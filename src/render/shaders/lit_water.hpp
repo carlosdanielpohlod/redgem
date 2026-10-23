@@ -18,10 +18,8 @@ const float WATER_REFRACTION_SCALE = 0.035;  // default preserves the Snell-law 
 const float WATER_F0 = 0.02037;      // air/water interface, IOR 1.333
 const float WATER_WIND_SCALE = 10.0;
 const float WATER_MAX_RIPPLE_SLOPE = 0.35;
-const float WATER_RIPPLE_CLOCK = 0.4;
-const float WATER_FILTER_START = 0.5;  // phase change per pixel before unresolved detail fades
-const float WATER_FILTER_END = 2.0;
 const float WATER_NORMAL_VARIANCE = 0.25;
+const float WATER_UNRESOLVED_ROUGHNESS_LIMIT = 0.25;
 const float WATER_DEPTH_LIMIT = 100.0;  // meters: no unbounded absorption path on sky pixels
 const float WATER_FOAM_ROUGHNESS = 0.8;
 
@@ -30,33 +28,32 @@ float waterLinearDepth(float z) {
   return 2.0 * waterPlanes.x * waterPlanes.y /
     (waterPlanes.y + waterPlanes.x - ndc * (waterPlanes.y - waterPlanes.x));
 }
-vec2 waterRipple(vec2 p, vec2 direction, float wavelength, float weight) {
-  float k = WATER_TAU / wavelength;
-  vec3 shape = waterPhase(p, direction, k);
-  float phase = shape.x - sqrt(WATER_GRAVITY * k) * time * waterWaves.z * WATER_RIPPLE_CLOCK;
-  float resolved = 1.0 - smoothstep(WATER_FILTER_START, WATER_FILTER_END, fwidth(phase));
-  return shape.yz / k * (cos(phase) * weight * resolved);
-}
-vec3 waterNormal() {
+struct WaterNormal {
+  vec3 direction;
+  float variance;
+};
+WaterNormal waterNormal() {
   vec2 p = fragPosition.xz;
   float wind = clamp(waterWaves.x / max(waterWaves.y, WATER_MIN_LENGTH) * WATER_WIND_SCALE, 0.0, WATER_MAX_RIPPLE_SLOPE);
-  vec2 detail = waterRipple(p, vec2(0.96, 0.28), 0.38, 0.4)
-              + waterRipple(p, vec2(0.8, 0.6), 0.19, 0.3)
-              + waterRipple(p, vec2(0.6, -0.8), 0.083, 0.2)
-              + waterRipple(p, vec2(-0.28, 0.96), 0.041, 0.1);
-  vec2 slope = waterDeformation(p, time, false).yz + detail * wind;
+  WaterWaveNormal detail = waterFilteredDetailShape(p, time);
+  WaterWaveNormal macro = waterFilteredShape(p, time);
+  vec2 slope = macro.slope + waterCurrentRipples(p).yz + detail.slope * wind;
   vec3 normal = normalize(vec3(-slope.x, 1.0, -slope.y));
-  return gl_FrontFacing ? normal : -normal;
+  return WaterNormal(gl_FrontFacing ? normal : -normal, macro.variance + detail.variance * wind * wind);
 }
-float waterRoughness(vec3 n) {
-  vec3 dx = dFdx(n);
-  vec3 dy = dFdy(n);
+float waterRoughness(WaterNormal normal) {
+  vec3 dx = dFdx(normal.direction);
+  vec3 dy = dFdy(normal.direction);
   float variance = max(dot(dx, dx), dot(dy, dy)) * WATER_NORMAL_VARIANCE;
+  variance += min(normal.variance * WATER_NORMAL_VARIANCE, WATER_UNRESOLVED_ROUGHNESS_LIMIT);
   return clamp(sqrt(roughness * roughness + variance), MIN_ROUGHNESS, 1.0);
 }
 // Bounded secant iterations intersect the refracted ray with the visible depth field.
 // A miss keeps the undistorted opaque sample: hidden and off-screen surfaces are unavailable.
 const int WATER_REFRACTION_STEPS = 8;
+const int WATER_REFRACTION_SEARCH_STEPS = 32;  // recovery only: failed secants or nonplanar depth boundaries
+const int WATER_REFRACTION_REFINEMENT = 8;
+const float WATER_REFRACTION_DEPTH_CURVE = 0.00001;  // hardware-depth precision floor for curvature
 const float WATER_REFRACTION_THICKNESS = 0.02;  // view-space meters near the camera
 const float WATER_REFRACTION_RELATIVE_THICKNESS = 0.0005;
 // A short view-space ray against the opaque depth snapshot. A miss keeps the sky/probe fallback.
@@ -92,6 +89,39 @@ float waterRayGap(vec3 origin, vec3 ray, float distance, out vec2 uv) {
   if (!waterScreenPoint(point, uv)) return -WATER_DEPTH_LIMIT;
   return -point.z - waterLinearDepth(texture(waterDepth, uv).r);
 }
+// Hardware depth is affine across a projected plane, even when its view-space slope is steep.
+// Only curvature relative to the local slope triggers point sampling at an occlusion boundary.
+bool waterRefractionDepthCurve(float left, float middle, float right) {
+  float curvature = abs(left + right - 2.0 * middle);
+  float slope = max(abs(left - middle), abs(right - middle));
+  return curvature > max(WATER_REFRACTION_DEPTH_CURVE, slope * HALF);
+}
+float waterRefractionTexel(ivec2 pixel) {
+  ivec2 size = textureSize(waterDepth, 0);
+  return texelFetch(waterDepth, clamp(pixel, ivec2(0), size - 1), 0).r;
+}
+bool waterRefractionDiagonalCurve(ivec2 pixel, float middle) {
+  float upperLeft = waterRefractionTexel(pixel + ivec2(-1, -1));
+  float lowerRight = waterRefractionTexel(pixel + ivec2(1, 1));
+  float upperRight = waterRefractionTexel(pixel + ivec2(1, -1));
+  float lowerLeft = waterRefractionTexel(pixel + ivec2(-1, 1));
+  return waterRefractionDepthCurve(upperLeft, middle, lowerRight) ||
+    waterRefractionDepthCurve(upperRight, middle, lowerLeft);
+}
+bool waterRefractionDiscontinuous(vec2 uv) {
+  ivec2 pixel = ivec2(uv * vec2(textureSize(waterDepth, 0)));
+  float middle = waterRefractionTexel(pixel);
+  float left = waterRefractionTexel(pixel - ivec2(1, 0));
+  float right = waterRefractionTexel(pixel + ivec2(1, 0));
+  float above = waterRefractionTexel(pixel - ivec2(0, 1));
+  float below = waterRefractionTexel(pixel + ivec2(0, 1));
+  if (waterRefractionDepthCurve(left, middle, right) || waterRefractionDepthCurve(above, middle, below)) return true;
+  return waterRefractionDiagonalCurve(pixel, middle);
+}
+vec2 waterRefractionColorUv(vec2 uv) {
+  vec2 size = vec2(textureSize(waterDepth, 0));
+  return (floor(uv * size) + HALF) / size;
+}
 bool waterRefractionSample(vec3 surface, vec3 ray, float distance, out vec2 uv, out float gap) {
   vec3 point = surface + ray * distance;
   if (!waterScreenPoint(point, uv)) return false;
@@ -112,7 +142,14 @@ bool waterAdvanceRefraction(float gap, inout float before, inout float previousG
   distance = next;
   return true;
 }
-vec3 waterTraceRefraction(vec3 surface, vec3 ray, float column, float behind, vec3 fallback) {
+float waterRefractionTolerance(float depth) {
+  return max(WATER_REFRACTION_THICKNESS, depth * WATER_REFRACTION_RELATIVE_THICKNESS);
+}
+bool waterAcceptRefractionEstimate(vec2 hit, float distance, out vec3 result) {
+  result = vec3(hit, distance);
+  return !waterRefractionDiscontinuous(hit);
+}
+bool waterEstimateRefraction(vec3 surface, vec3 ray, float column, float behind, out vec3 result) {
   float before = 0.0;
   float previousGap = -column;
   float distance = column / -ray.z;
@@ -121,11 +158,118 @@ vec3 waterTraceRefraction(vec3 surface, vec3 ray, float column, float behind, ve
   for (int i = 0; i < WATER_REFRACTION_STEPS; ++i) {
     if (waterRefractionDistanceOutside(distance)) break;
     if (!waterRefractionSample(surface, ray, distance, hit, gap)) break;
-    float thickness = max(WATER_REFRACTION_THICKNESS, behind * WATER_REFRACTION_RELATIVE_THICKNESS);
-    if (abs(gap) <= thickness) return vec3(hit, distance);
+    float thickness = waterRefractionTolerance(behind);
+    if (abs(gap) <= thickness) return waterAcceptRefractionEstimate(hit, distance, result);
     if (!waterAdvanceRefraction(gap, before, previousGap, distance)) break;
   }
-  return fallback;
+  return false;
+}
+bool waterRefractionPointSample(vec3 surface, vec3 ray, float distance, out vec2 uv, out float gap) {
+  vec3 point = surface + ray * distance;
+  if (!waterScreenPoint(point, uv)) return false;
+  ivec2 size = textureSize(waterDepth, 0);
+  float depth = texelFetch(waterDepth, clamp(ivec2(uv * vec2(size)), ivec2(0), size - 1), 0).r;
+  if (depth >= 1.0 - EPSILON) return false;
+  gap = -point.z - waterLinearDepth(depth);
+  return true;
+}
+bool waterAcceptRefractionHit(vec3 surface, vec3 ray, float distance, out vec3 hit) {
+  vec2 uv;
+  float gap;
+  if (!waterRefractionSample(surface, ray, distance, uv, gap)) return false;
+  bool edge = waterRefractionDiscontinuous(uv);
+  if (edge && !waterRefractionPointSample(surface, ray, distance, uv, gap)) return false;
+  float tolerance = waterRefractionTolerance(-(surface + ray * distance).z);
+  if (abs(gap) > tolerance) return false;
+  hit = vec3(edge ? waterRefractionColorUv(uv) : uv, distance);
+  return true;
+}
+bool waterRefineRefraction(vec3 surface, vec3 ray, float before, float after, out vec3 hit) {
+  vec2 uv;
+  float gap;
+  for (int i = 0; i < WATER_REFRACTION_REFINEMENT; ++i) {
+    float middle = (before + after) * HALF;
+    if (!waterRefractionSample(surface, ray, middle, uv, gap)) return false;
+    if (gap >= 0.0) after = middle;
+    else before = middle;
+  }
+  return waterAcceptRefractionHit(surface, ray, after, hit);
+}
+bool waterRefractionCrossing(float previousGap, float gap) {
+  return previousGap < 0.0 && gap >= 0.0;
+}
+struct WaterRefractionInterval {
+  float distance;
+  float gap;
+};
+vec3 waterRefractionViewPoint(vec2 uv) {
+  float depth = waterLinearDepth(texture(waterDepth, uv).r);
+  vec2 projected = uv * 2.0 - 1.0 + matProjection[2].xy;
+  vec2 scale = vec2(matProjection[0].x, matProjection[1].y);
+  return vec3(projected * depth / scale, -depth);
+}
+vec3 waterRefractionBottomNormal(vec2 uv) {
+  vec2 pixel = 1.0 / vec2(textureSize(waterDepth, 0));
+  if (!waterInsideScreen(uv + pixel) || !waterInsideScreen(uv - pixel)) return vec3(0.0);
+  vec2 dx = vec2(pixel.x, 0.0);
+  vec2 dy = vec2(0.0, pixel.y);
+  vec3 across = (waterRefractionViewPoint(uv + dx) - waterRefractionViewPoint(uv - dx)) / pixel.x;
+  vec3 along = (waterRefractionViewPoint(uv + dy) - waterRefractionViewPoint(uv - dy)) / pixel.y;
+  vec3 normal = cross(across, along);
+  float magnitude = dot(normal, normal);
+  return magnitude > EPSILON * EPSILON ? normal * inversesqrt(magnitude) : vec3(0.0);
+}
+vec3 waterRefractionFallback(vec3 surface, vec3 ray, vec3 fallback) {
+  if (waterRefractionDiscontinuous(fallback.xy)) return fallback;
+  vec3 bottom = waterRefractionViewPoint(fallback.xy);
+  vec3 normal = waterRefractionBottomNormal(fallback.xy);
+  float direction = dot(normal, ray);
+  if (!(abs(direction) > EPSILON)) return fallback;
+  // Hidden geometry has no confirmed hit: use the visible bottom's local tangent plane as a proxy.
+  float distance = dot(normal, bottom - surface) / direction;
+  if (!(distance >= 0.0 && distance <= WATER_DEPTH_LIMIT)) return fallback;
+  return vec3(fallback.xy, distance);
+}
+struct WaterRefractionScreenRay {
+  vec4 origin;
+  vec4 direction;
+  vec2 from;
+  vec2 to;
+};
+WaterRefractionScreenRay waterRefractionScreenRay(vec3 surface, vec3 ray) {
+  vec4 origin = matProjection * vec4(surface, 1.0);
+  vec4 direction = matProjection * vec4(ray, 0.0);
+  vec4 end = origin + direction * WATER_DEPTH_LIMIT;
+  return WaterRefractionScreenRay(origin, direction, origin.xy / origin.w, end.xy / end.w);
+}
+float waterRefractionScreenDistance(WaterRefractionScreenRay ray, float fraction) {
+  vec2 extent = abs(ray.to - ray.from);
+  int axis = extent.x > extent.y ? 0 : 1;
+  float coordinate = mix(ray.from[axis], ray.to[axis], fraction);
+  float denominator = coordinate * ray.direction.w - ray.direction[axis];
+  if (abs(denominator) <= EPSILON) return WATER_DEPTH_LIMIT * fraction;
+  return (ray.origin[axis] - coordinate * ray.origin.w) / denominator;
+}
+vec3 waterSearchRefraction(vec3 surface, vec3 ray, float column, vec3 fallback) {
+  WaterRefractionScreenRay screenRay = waterRefractionScreenRay(surface, ray);
+  WaterRefractionInterval before = WaterRefractionInterval(0.0, -column);
+  vec2 uv;
+  float gap;
+  for (int i = 1; i <= WATER_REFRACTION_SEARCH_STEPS; ++i) {
+    float distance = waterRefractionScreenDistance(screenRay, float(i) / float(WATER_REFRACTION_SEARCH_STEPS));
+    // Bracket the same continuous depth field used by refinement; point sampling only validates edge hits.
+    if (!waterRefractionSample(surface, ray, distance, uv, gap)) return waterRefractionFallback(surface, ray, fallback);
+    vec3 hit;
+    if (waterRefractionCrossing(before.gap, gap) &&
+        waterRefineRefraction(surface, ray, before.distance, distance, hit)) return hit;
+    before = WaterRefractionInterval(distance, gap);
+  }
+  return waterRefractionFallback(surface, ray, fallback);
+}
+vec3 waterTraceRefraction(vec3 surface, vec3 ray, float column, float behind, vec3 fallback) {
+  vec3 estimate;
+  if (waterEstimateRefraction(surface, ray, column, behind, estimate)) return estimate;
+  return waterSearchRefraction(surface, ray, column, fallback);
 }
 vec3 waterUv(vec2 uv, vec3 snell, float surfaceDepth) {
   vec3 surface = (matView * vec4(fragPosition, 1.0)).xyz;
@@ -246,11 +390,11 @@ WaterTransmission waterSampleTransmission(vec3 n, vec3 v) {
   vec3 background = texture(waterBackground, hit.xy).rgb;
   return WaterTransmission(background, transmission, thickness);
 }
-WaterSurfaceLight waterSurfaceLight(vec3 n, vec3 v, vec3 transmission) {
+WaterSurfaceLight waterSurfaceLight(vec3 n, vec3 v, vec3 transmission, float rough) {
   vec3 scattered = colDiffuse.rgb * waterIrradiance() * (1.0 - transmission);
   float fresnelWeight = fresnel(max(dot(n, v), 0.0), vec3(WATER_F0)).x;
   vec3 transmitted = transmission * (1.0 - fresnelWeight);
-  vec3 surface = scattered * (1.0 - fresnelWeight) + waterReflection(n, v, waterRoughness(n));
+  vec3 surface = scattered * (1.0 - fresnelWeight) + waterReflection(n, v, rough);
   return WaterSurfaceLight(transmitted, surface);
 }
 vec3 waterFoamLight(vec3 n, vec3 v) {
@@ -260,8 +404,42 @@ vec3 waterFoamLight(vec3 n, vec3 v) {
     * sunVisibility(fragPosition, vec3(0.0, 1.0, 0.0), toSun);
   return light;
 }
+// Foam is a continuous world-space band, rather than a uniform white intersection line.
+const vec2 WATER_FOAM_HASH_DIRECTION = vec2(127.1, 311.7);
+const float WATER_FOAM_HASH_SCALE = 43758.5453;
+const float WATER_FOAM_PATCH_FREQUENCY = 0.7;  // inverse meters: broad shore patches
+const float WATER_FOAM_GRAIN_FREQUENCY = 3.2;  // inverse meters: softer pockets inside the band
+const vec2 WATER_FOAM_GRAIN_OFFSET = vec2(7.3, -2.8);
+const float WATER_FOAM_MIN_REACH = 0.6;        // shares of the authored nominal depth range
+const float WATER_FOAM_MAX_REACH = 1.4;
+const float WATER_FOAM_PORE_START = 0.35;  // low-density pockets leave the underlying water visible
+const float WATER_FOAM_PORE_END = 0.70;
+const float WATER_FOAM_MAX_COVERAGE = 0.72;  // foam preserves some transmission even in dense patches
+const float WATER_FOAM_CONTACT_FADE = 0.12;    // world meters: cap the proportional contact fade
+const float WATER_FOAM_CONTACT_SHARE = 0.15;   // narrow authored bands retain a proportionate fade
+
+float waterFoamHash(vec2 p) { return fract(sin(dot(p, WATER_FOAM_HASH_DIRECTION)) * WATER_FOAM_HASH_SCALE); }
+
+float waterFoamNoise(vec2 p) {
+  vec2 cell = floor(p);
+  vec2 blend = smoothstep(vec2(0.0), vec2(1.0), fract(p));
+  float lower = mix(waterFoamHash(cell), waterFoamHash(cell + vec2(1.0, 0.0)), blend.x);
+  float upper = mix(waterFoamHash(cell + vec2(0.0, 1.0)), waterFoamHash(cell + vec2(1.0)), blend.x);
+  return mix(lower, upper, blend.y);
+}
+
+float waterFoamCoverage(float thickness) {
+  if (waterSurface.x <= 0.0) return 0.0;
+  float shorePatch = waterFoamNoise(fragPosition.xz * WATER_FOAM_PATCH_FREQUENCY);
+  float grain = waterFoamNoise(fragPosition.xz * WATER_FOAM_GRAIN_FREQUENCY + WATER_FOAM_GRAIN_OFFSET);
+  float reach = waterSurface.x * mix(WATER_FOAM_MIN_REACH, WATER_FOAM_MAX_REACH, shorePatch);
+  float contact = min(WATER_FOAM_CONTACT_FADE, waterSurface.x * WATER_FOAM_CONTACT_SHARE);
+  float band = smoothstep(0.0, contact, thickness) * (1.0 - smoothstep(0.0, reach, thickness));
+  return band * WATER_FOAM_MAX_COVERAGE * smoothstep(WATER_FOAM_PORE_START, WATER_FOAM_PORE_END, grain);
+}
+
 vec3 waterCompose(vec3 n, vec3 v, WaterTransmission optics, WaterSurfaceLight light) {
-  float foam = waterSurface.x > 0.0 ? 1.0 - smoothstep(0.0, waterSurface.x, optics.thickness) : 0.0;
+  float foam = waterFoamCoverage(optics.thickness);
   vec3 foamLight = waterFoamLight(n, v);
   vec3 surface = mix(light.surface, foamLight, foam);
   vec3 transmitted = light.transmitted;
@@ -271,10 +449,11 @@ vec3 waterCompose(vec3 n, vec3 v, WaterTransmission optics, WaterSurfaceLight li
   return optics.background * transmitted + surface * air + fogColor * (1.0 - transmitted) * (1.0 - air);
 }
 vec3 waterColor() {
-  vec3 n = waterNormal();
+  WaterNormal normal = waterNormal();
+  vec3 n = normal.direction;
   vec3 v = normalize(viewPos - fragPosition);
   WaterTransmission optics = waterSampleTransmission(n, v);
-  WaterSurfaceLight light = waterSurfaceLight(n, v, optics.transmission);
+  WaterSurfaceLight light = waterSurfaceLight(n, v, optics.transmission, waterRoughness(normal));
   return waterCompose(n, v, optics, light);
 }
 #endif
