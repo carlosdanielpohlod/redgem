@@ -1,11 +1,13 @@
-// Part of EditorSession: Play mode, and the scene file on disk (saving it, and following what
-// others write to it).
+// Part of EditorSession: Play mode, and the scene files on disk (opening them, saving them, and
+// following what others write to the one edited).
 
 #include "editor/editor_session.hpp"
 
+#include "app/scene_files.hpp"
 #include "core/config.hpp"
 #include "core/files.hpp"
 #include "core/log.hpp"
+#include "editor/game_scenes.hpp"
 
 namespace redgem {
 namespace {
@@ -18,10 +20,11 @@ std::filesystem::file_time_type write_time(const std::filesystem::path& path) {
 
 // A game running inside the editor: the edited scene instead of the file, with the editor's devices.
 EngineOptions runtime_options(const std::filesystem::path& game_dir, const SceneDesc& scene,
-                              const PlayDevices& devices) {
+                              const std::string& scene_name, const PlayDevices& devices) {
   EngineOptions options;
   options.game_dir = game_dir;
   options.scene = &scene;
+  options.scene_name = scene_name;
   options.input = &devices.input;
   options.audio = devices.audio;
   options.presenter = devices.presenter;
@@ -45,22 +48,60 @@ std::variant<std::unique_ptr<EditorSession>, std::string> EditorSession::open(co
   auto opened = SceneDocument::open(scene_path);
   if (auto* error = std::get_if<std::string>(&opened)) return *error;
   std::unique_ptr<EditorSession> session(new EditorSession(game_dir, std::move(std::get<SceneDocument>(opened))));
-  session->loaded_write_time_ = write_time(scene_path);
-  session->refresh_preview();
+  session->begin_editing();
   return session;
+}
+
+std::string EditorSession::scene_name() const { return scene_name_of(game_dir_, document_.path()); }
+
+void EditorSession::begin_editing() {
+  selection_ = kNoObject;
+  loaded_write_time_ = write_time(document_.path());
+  external_change_pending_ = false;
+  refresh_preview();
+}
+
+bool EditorSession::open_scene(const std::string& name, std::string& error) {
+  if (!editing()) {
+    error = "stop the game to open another scene";
+    return false;
+  }
+  auto opened = SceneDocument::open(scene_file(game_dir_, name));
+  if (auto* message = std::get_if<std::string>(&opened)) {
+    error = *message;
+    return false;
+  }
+  document_ = std::move(std::get<SceneDocument>(opened));
+  begin_editing();
+  log::info("editing " + document_.path().string());
+  return true;
+}
+
+void EditorSession::note_saved() {
+  loaded_write_time_ = write_time(document_.path());
+  external_change_pending_ = false;
+  log::info("saved " + document_.path().string());
 }
 
 bool EditorSession::save(std::string& error) {
   if (!document_.save(error)) return false;
-  loaded_write_time_ = write_time(document_.path());
-  external_change_pending_ = false;
-  log::info("saved " + document_.path().string());
+  note_saved();
+  return true;
+}
+
+bool EditorSession::save_as(const std::string& name, std::string& error) {
+  const auto file = new_scene_file(game_dir_, name, error);
+  if (!file) return false;
+  std::error_code fs_error;
+  std::filesystem::create_directories(file->parent_path(), fs_error);
+  if (!document_.save_as(*file, error)) return false;
+  note_saved();
   return true;
 }
 
 bool EditorSession::play(const PlayDevices& devices, std::string& error) {
   if (!editing()) return true;
-  auto created = Engine::create(runtime_options(game_dir_, document_.desc(), devices));
+  auto created = Engine::create(runtime_options(game_dir_, document_.desc(), scene_name(), devices));
   if (auto* message = std::get_if<std::string>(&created)) {
     error = *message;
     return false;

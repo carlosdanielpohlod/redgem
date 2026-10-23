@@ -96,12 +96,13 @@ TEST_CASE("the Scene view's hint follows what the mouse would do there") {
   CHECK(editor_logic::viewport_hint({true, false, false, false}) == ViewportHint::ClickTheGame);
 }
 
-TEST_CASE("the window title names the game and marks unsaved changes and play mode") {
-  const std::string plain = window_title("demo", false, false);
-  CHECK(plain == std::string(editor_config::kWindowTitle) + " - demo");
-  CHECK(window_title("demo", true, false) == plain + " *");
-  CHECK(window_title("demo", false, true) == plain + " [playing]");
-  CHECK(window_title("demo", true, true) == plain + " * [playing]");
+TEST_CASE("the window title names the game and its open scene, and marks unsaved changes and play mode") {
+  const std::string plain = window_title("demo", "main", false, false);
+  CHECK(plain == std::string(editor_config::kWindowTitle) + " - demo - main");
+  CHECK(window_title("demo", "level2", false, false) == std::string(editor_config::kWindowTitle) + " - demo - level2");
+  CHECK(window_title("demo", "main", true, false) == plain + " *");
+  CHECK(window_title("demo", "main", false, true) == plain + " [playing]");
+  CHECK(window_title("demo", "main", true, true) == plain + " * [playing]");
 }
 
 TEST_CASE("a build goes next to the game, in a folder named after the system when it is another one") {

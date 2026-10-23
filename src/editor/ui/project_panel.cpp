@@ -113,17 +113,26 @@ void draw_folders(const ProjectFiles& files, Folder& current) {
   ImGui::EndChild();
 }
 
+// What the folders that hold files made here offer to make one: New script, New scene.
+void draw_new_file_button(PanelContext& context, Folder folder) {
+  if (folder == Folder::Scripts) {
+    if (ImGui::SmallButton(icon_label(ICON_FA_PLUS, "editor.project.new_script"))) ImGui::OpenPopup(kNewScriptPopup);
+    new_script_popup(context);
+    ImGui::SameLine();
+  }
+  if (folder == Folder::Scenes) {
+    context.new_scene_asked = ImGui::SmallButton(icon_label(ICON_FA_PLUS, "editor.project.new_scene"));
+    ImGui::SameLine();
+  }
+}
+
 // The current folder's path and its buttons.
 void draw_folder_bar(PanelContext& context, const FolderInfo& info) {
   const std::filesystem::path game_dir = context.session.game_dir();
   ImGui::AlignTextToFramePadding();
   ImGui::TextColored(muted_color(), "%s / %s", game_dir.filename().string().c_str(), info.dir);
   ImGui::SameLine();
-  if (info.folder == Folder::Scripts) {
-    if (ImGui::SmallButton(icon_label(ICON_FA_PLUS, "editor.project.new_script"))) ImGui::OpenPopup(kNewScriptPopup);
-    new_script_popup(context);
-    ImGui::SameLine();
-  }
+  draw_new_file_button(context, info.folder);
   if (!ImGui::SmallButton(icon_label(ICON_FA_FOLDER_OPEN, "editor.project.open_folder"))) return;
   std::error_code fs_error;
   std::filesystem::create_directories(game_dir / info.dir, fs_error);

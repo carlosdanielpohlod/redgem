@@ -18,7 +18,7 @@ ProjectFiles some_files() {
   files.scripts = {"enemy.rb"};
   files.models = {"crate.glb", "tree.glb"};
   files.sounds = {"jump.wav"};
-  files.scenes = {"level2"};
+  files.scenes = {"main", "level2"};
   return files;
 }
 

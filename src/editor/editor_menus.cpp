@@ -75,11 +75,31 @@ void EditorApp::draw_file_menu() {
 
 // What the File menu offers for the game being edited.
 void EditorApp::draw_game_file_items() {
-  if (ImGui::MenuItem(ui::icon_label(ICON_FA_FLOPPY_DISK, "editor.menu.save_scene"), tr(kKeysSave), false, editing()))
-    save();
+  draw_scene_items();
+  ImGui::Separator();
   ui::menu(ui::icon_label(ICON_FA_BOX_ARCHIVE, "editor.menu.build_game"), [this] { draw_build_targets(); }, editing());
   if (ImGui::MenuItem(ui::icon_label(ICON_FA_FOLDER, "editor.menu.show_game_folder")))
     platform::open_in_system(session_->game_dir());
+}
+
+// The File menu's scene commands: what the open scene is saved as, and which scene is open.
+void EditorApp::draw_scene_items() {
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_FLOPPY_DISK, "editor.menu.save_scene"), tr(kKeysSave), false, editing()))
+    save();
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_COPY, "editor.menu.save_scene_as"), nullptr, false, editing()))
+    ask_scene_name(SceneNameDialog::SaveAs);
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_MAP, "editor.menu.new_scene"), nullptr, false, editing()))
+    ask_scene_name(SceneNameDialog::NewScene);
+  ui::menu(
+      ui::icon_label(ICON_FA_FOLDER_OPEN, "editor.menu.open_scene"), [this] { draw_open_scene_items(); }, editing());
+}
+
+// Every scene of the game, the open one checked.
+void EditorApp::draw_open_scene_items() {
+  const std::string open = session_->scene_name();
+  for (const std::string& scene : files_.scenes) {
+    if (ImGui::MenuItem(scene.c_str(), nullptr, scene == open)) open_scene(scene);
+  }
 }
 
 void EditorApp::draw_build_targets() {

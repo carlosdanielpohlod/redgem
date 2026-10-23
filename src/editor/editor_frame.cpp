@@ -116,8 +116,8 @@ void EditorApp::retire_game_view() {
 }
 
 void EditorApp::update_title() {
-  const std::string title =
-      editor_logic::window_title(session_->game_dir().filename().string(), session_->document().dirty(), !editing());
+  const std::string title = editor_logic::window_title(session_->game_dir().filename().string(), session_->scene_name(),
+                                                       session_->document().dirty(), !editing());
   if (title == title_) return;
   title_ = title;
   window_->set_title(title_);

@@ -3,8 +3,8 @@
 // The editor window: toolbar, Hierarchy, Scene viewport (gizmos, Play mode), Inspector, Project,
 // Console and script tabs, status bar. One class, implemented part by part (editor_frame,
 // editor_commands, editor_input, editor_menus, editor_bars, editor_layout, editor_dialogs,
-// editor_viewport, editor_scene_view). This header stays long because it lists every step of
-// those parts: they all work on the one window's state, which is declared once, here.
+// editor_viewport, editor_scene_view, editor_scenes). This header stays long because it lists every
+// step of those parts: they all work on the one window's state, which is declared once, here.
 
 #include <filesystem>
 #include <memory>
@@ -34,6 +34,9 @@ class Window;
 namespace ui {
 class Interface;
 }
+
+// What the scene name dialog asks a name for: a new scene, or where to save the open one.
+enum class SceneNameDialog { None, NewScene, SaveAs };
 
 // Why the editor window closed: quit, or go back to the project hub (New / Open game).
 enum class EditorExit { Quit, OpenHub };
@@ -91,6 +94,16 @@ class EditorApp {
   void stop();
   void toggle_pause();
   void save();
+  // The game's scenes, by the names scripts load them with ("main" is scene.glb). Opens another
+  // one, after asking to save this one's edits when it has any.
+  void open_scene(const std::string& name);
+  // Makes scenes/<name>.glb with what a new scene starts with, then opens it like open_scene.
+  // False, with why in the console, when no scene can be made with that name.
+  bool new_scene(const std::string& name);
+  // Saves the open scene as scenes/<name>.glb, which is then the one edited.
+  bool save_scene_as(const std::string& name);
+  // A scene waits to be opened until the user says what becomes of the unsaved edits.
+  const std::optional<std::string>& scene_waiting() const { return pending_scene_; }
   void frame_selection();
   // Asks to leave (after the unsaved-changes dialog when needed).
   void request_exit(EditorExit action);
@@ -112,6 +125,12 @@ class EditorApp {
  private:
   EditorApp() = default;
   void open_window(GpuChoice gpu, FrameClock clock);
+  // Start looking through the scene's own camera, like the game would.
+  void look_through_main_camera();
+  // What the Project panel asked for: a scene to open, or a new one.
+  void take_scene_requests(const ui::PanelContext& context);
+  // Opens a scene now, whatever the edits of the open one (see open_scene).
+  void switch_scene(const std::string& name);
   bool editing() const { return session_->editing(); }
   bool unsaved_work() const;
   ui::PanelContext panel_context();
@@ -147,6 +166,8 @@ class EditorApp {
   void draw_menu_bar();
   void draw_file_menu();
   void draw_game_file_items();
+  void draw_scene_items();
+  void draw_open_scene_items();
   void draw_edit_menu();
   void draw_undo_items();
   bool undo_offered() const;
@@ -209,6 +230,16 @@ class EditorApp {
   void save_and_leave();
   void leave_without_saving();
   void cancel_leaving();
+  void draw_scene_switch_dialog();
+  bool scene_switch_dialog_wanted() const;
+  void draw_scene_switch_choices();
+  void save_and_switch();
+  void switch_without_saving();
+  void cancel_switch();
+  void ask_scene_name(SceneNameDialog dialog);
+  void draw_scene_name_dialog();
+  void draw_scene_name_form();
+  bool use_scene_name(const std::string& name);
   void draw_external_change_dialog();
   bool external_change_dialog_wanted() const;
   void draw_external_change_choices();
@@ -251,6 +282,10 @@ class EditorApp {
   bool quit_confirmed_ = false;  // the user chose Save or Discard
   bool gizmo_drawn_ = false;
   std::string title_;
+  std::optional<std::string> pending_scene_;  // a scene to open once the unsaved edits are dealt with
+  SceneNameDialog scene_name_dialog_ = SceneNameDialog::None;
+  bool scene_name_dialog_opening_ = false;  // the dialog opens on the next frame
+  std::string scene_name_field_;
 };
 
 }  // namespace redgem

@@ -31,14 +31,6 @@ WindowSettings window_settings(GpuChoice gpu) {
   return settings;
 }
 
-// Start looking through the scene's own camera, like the game would.
-void look_through_main_camera(EditorCamera& camera, const Scene& scene) {
-  const ObjectId main_camera = scene.main_camera();
-  if (main_camera == kNoObject) return;
-  const Transform world = scene.world_transform(main_camera);
-  camera.look_at(world.position, world.position + world.forward());
-}
-
 }  // namespace
 
 std::variant<std::unique_ptr<EditorApp>, std::string> EditorApp::create(const std::filesystem::path& game_dir,
@@ -65,8 +57,16 @@ void EditorApp::open_window(GpuChoice gpu, FrameClock clock) {
   viewport_ = std::make_unique<SceneViewport>();
   audio_ = create_raylib_audio();
   interface_ = std::make_unique<ui::Interface>(*window_, ui::Interface::Layout::Dockable);
-  look_through_main_camera(camera_, session_->scene());
+  look_through_main_camera();
   rescan_files();
+}
+
+void EditorApp::look_through_main_camera() {
+  const Scene& scene = session_->scene();
+  const ObjectId main_camera = scene.main_camera();
+  if (main_camera == kNoObject) return;
+  const Transform world = scene.world_transform(main_camera);
+  camera_.look_at(world.position, world.position + world.forward());
 }
 
 EditorApp::~EditorApp() {

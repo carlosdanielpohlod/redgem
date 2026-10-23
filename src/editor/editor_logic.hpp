@@ -27,8 +27,9 @@ struct Rect {
 
 // --- Names -----------------------------------------------------------------------------------
 
-// "RedGem Editor - <game>", with " *" for unsaved changes and " [playing]" while the game runs.
-std::string window_title(const std::string& game, bool unsaved, bool playing);
+// "RedGem Editor - <game> - <scene>", with " *" for unsaved changes and " [playing]" while the
+// game runs.
+std::string window_title(const std::string& game, const std::string& scene, bool unsaved, bool playing);
 // The folder Build fills: "<game>-build" for the system the editor runs on, or
 // "<game>-build-<target>" for another one.
 std::string build_folder_name(const std::string& game, const std::string& target, bool is_host_target);

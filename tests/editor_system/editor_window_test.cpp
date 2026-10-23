@@ -3,6 +3,9 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <optional>
+#include <string>
+#include <vector>
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -69,6 +72,10 @@ template <typename Window>
 void take_picture(Window& window, const std::filesystem::path& file) {
   for (int i = 0; i < kPictureFrames; ++i) window.frame();
   CHECK(save_window_picture(file));
+}
+
+bool has(const std::vector<std::string>& names, const std::string& name) {
+  return std::find(names.begin(), names.end(), name) != names.end();
 }
 
 float y_of(EditorSession& session, const std::string& name) {
@@ -477,5 +484,68 @@ TEST_CASE("a terrain is created, sculpted with the brush in the Scene view, and 
   REQUIRE(flat.has_value());
   CHECK(std::fabs(flat->y) < kTolerance);
   CHECK(app.console().error_count() == 0);
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("a second scene is made, edited, saved, reopened and played in the editor") {
+  constexpr const char* kSecondScene = "level_two";
+  constexpr const char* kAddedObject = "Sphere";  // what a new sphere is called
+  constexpr float kAbove = 3.0f;                  // meters over the new scene's ground
+  constexpr int kExpectedErrors = 1;              // the second New scene of the same name, refused
+  const std::filesystem::path game = copy_game();
+  auto created = EditorApp::create(game, even_pace());
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  EditorSession& session = app.session();
+  run(app, kWarmupFrames);
+
+  // File > New scene: scenes/level_two.glb, opened at once (nothing unsaved stood in the way).
+  REQUIRE(app.new_scene(kSecondScene));
+  CHECK(session.scene_name() == kSecondScene);
+  CHECK(has(app.files().scenes, kSecondScene));
+  CHECK_FALSE(app.new_scene(kSecondScene));  // it exists now
+  CHECK(session.scene().find("Ground") != kNoObject);
+
+  // Edit it and save: the edit goes to its own file, not to scene.glb.
+  REQUIRE(session.create_primitive(PrimitiveShape::Sphere, {0.0f, kAbove, 0.0f}) != kNoObject);
+  app.save();
+  CHECK_FALSE(session.document().dirty());
+  const std::filesystem::path second_file = game / config::kScenesDirName / "level_two.glb";
+  const LoadResult saved = load_gltf_scene(second_file.string());
+  REQUIRE(saved.ok);
+  CHECK(saved.scene.find_node(kAddedObject) != kNoIndex);
+  run(app, kFrameFrames);
+  take_picture(app, screenshot("editor_second_scene"));
+
+  // Back to the game's scene.glb, then the second scene again, as a double click opens them.
+  app.open_scene(config::kMainSceneName);
+  CHECK(session.document().path() == game / config::kSceneFileName);
+  run(app, kFrameFrames);
+  app.open_scene(kSecondScene);
+  CHECK(session.document().path() == second_file);
+  CHECK(session.scene().find(kAddedObject) != kNoObject);
+  CHECK_FALSE(session.document().can_undo());  // its own, fresh history
+
+  // Play starts from it, by its name. Stop comes back to it.
+  app.play();
+  REQUIRE(session.play_state() == PlayState::Playing);
+  CHECK(session.runtime()->scene_name() == kSecondScene);
+  run(app, kPlayFrames);
+  CHECK(session.scene().find(kAddedObject) != kNoObject);
+  take_picture(app, screenshot("editor_second_scene_playing"));
+  app.stop();
+  CHECK(session.scene_name() == kSecondScene);
+  CHECK(y_of(session, kAddedObject) == doctest::Approx(kAbove));
+
+  // With unsaved edits, opening another scene waits for the user's answer.
+  session.create_empty(app.spawn_point());
+  app.open_scene(config::kMainSceneName);
+  CHECK(app.scene_waiting() == std::optional<std::string>(config::kMainSceneName));
+  CHECK(session.scene_name() == kSecondScene);
+  run(app, kFrameFrames);
+  take_picture(app, screenshot("editor_unsaved_scene_dialog"));
+  CHECK(session.scene_name() == kSecondScene);  // until Save or Discard
+
+  CHECK(app.console().error_count() == kExpectedErrors);
   std::filesystem::remove_all(game);
 }

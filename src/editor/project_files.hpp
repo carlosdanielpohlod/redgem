@@ -10,7 +10,7 @@ namespace redgem {
 //   scripts  scripts/*.rb             file names  ("player.rb")
 //   models   models/*.glb             file names  ("tree.glb")
 //   sounds   sounds/*.wav|ogg|mp3|flac  sound names ("jump", what Audio.play takes)
-//   scenes   scenes/*.glb             scene names ("level2", what Game.load_scene takes)
+//   scenes   scene.glb, scenes/*.glb  scene names ("main" first, then "level2": what Game.load_scene takes)
 struct ProjectFiles {
   std::vector<std::string> scripts;
   std::vector<std::string> models;

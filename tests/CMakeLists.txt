@@ -57,6 +57,7 @@ add_executable(redgem_tests
   unit/primitives_test.cpp
   unit/file_drop_test.cpp
   unit/project_files_test.cpp
+  unit/game_scenes_test.cpp
   unit/environment_test.cpp
   unit/scene_lights_test.cpp
   unit/gpu_select_test.cpp

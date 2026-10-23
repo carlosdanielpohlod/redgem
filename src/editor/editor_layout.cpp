@@ -104,6 +104,7 @@ void EditorApp::draw_panels() {
   draw_viewport_window();  // before the script tabs: the Scene tab comes first
   draw_script_tabs();
   if (context.files_changed) rescan_files();
+  take_scene_requests(context);
 }
 
 void EditorApp::draw_side_panels(ui::PanelContext& context) {

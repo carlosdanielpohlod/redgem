@@ -30,10 +30,18 @@ struct PlayDevices {
 // is exactly as it was before Play.
 class EditorSession {
  public:
+  // The game's scene.glb, the scene it starts with, open for editing.
   static std::variant<std::unique_ptr<EditorSession>, std::string> open(const std::filesystem::path& game_dir);
 
   SceneDocument& document() { return document_; }
   const std::filesystem::path& game_dir() const { return game_dir_; }
+  // The scene being edited, by the name scripts load it with ("main" is scene.glb, see
+  // editor/game_scenes.hpp).
+  std::string scene_name() const;
+  // Opens another scene of the game in place of this one, with its own undo history; its unsaved
+  // edits are dropped, so ask first. False, and why in `error`, when it cannot be read, or while
+  // the game runs.
+  bool open_scene(const std::string& name, std::string& error);
 
   // The scene to draw: the live runtime while playing, otherwise the edited scene.
   const Scene& scene() const;
@@ -81,7 +89,10 @@ class EditorSession {
   void attach_script(ObjectId id, const std::string& file);
   void undo();
   void redo();
+  // Writes the scene being edited back to its file.
   bool save(std::string& error);
+  // Writes it as a new scene of the game (scenes/<name>.glb), which is then the one edited.
+  bool save_as(const std::string& name, std::string& error);
 
   PlayState play_state() const { return play_state_; }
   // No game runs: the scene can be edited.
@@ -94,7 +105,7 @@ class EditorSession {
   void tick(float frame_seconds);
   Engine* runtime() { return runtime_.get(); }
 
-  // Reloads scene.glb when it changed on disk (e.g. re-exported from Blender) and there are no
+  // Reloads the edited scene's file when it changed on disk (e.g. re-exported from Blender) and there are no
   // unsaved edits. With unsaved edits the change stays pending for the user to decide.
   // Returns true when it reloaded.
   bool reload_if_changed_on_disk();
@@ -106,6 +117,11 @@ class EditorSession {
 
  private:
   EditorSession(std::filesystem::path game_dir, SceneDocument document);
+  // The document just read from its file is edited from now on: nothing selected, and the file
+  // followed for changes others make to it.
+  void begin_editing();
+  // Whatever is saved last is what the file on disk holds.
+  void note_saved();
   // Whether an object can be edited now: the game is stopped, and there is one.
   bool can_edit(ObjectId id) const { return editing() && id != kNoObject; }
   bool can_sculpt(ObjectId terrain) const { return editing() && is_terrain(terrain); }

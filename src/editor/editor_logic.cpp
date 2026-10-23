@@ -31,8 +31,8 @@ bool starts_with(const std::string& text, const std::string& prefix) { return te
 
 }  // namespace
 
-std::string window_title(const std::string& game, bool unsaved, bool playing) {
-  std::string title = std::string(kWindowTitle) + kTitleSeparator + game;
+std::string window_title(const std::string& game, const std::string& scene, bool unsaved, bool playing) {
+  std::string title = std::string(kWindowTitle) + kTitleSeparator + game + kTitleSeparator + scene;
   if (unsaved) title += kUnsavedMark;
   if (playing) title += std::string(kMarkGap) + tr("editor.title.playing");
   return title;
