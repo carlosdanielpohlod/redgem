@@ -118,8 +118,6 @@ not a promise of how it will be closed.
 
 ### Editor
 
-- Only `scene.glb` can be opened and edited. Other scenes in `scenes/` can be loaded from a script
-  (`Game.load_scene`) but not edited, and Play always starts from `scene.glb`.
 - One object is selected at a time: no multi-select, box select or group transform, and no copy and
   paste (duplicate and delete only).
 - The material inspector edits color, metallic, roughness and emission, but cannot assign or swap a
