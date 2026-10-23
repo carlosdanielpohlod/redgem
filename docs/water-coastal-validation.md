@@ -1,11 +1,40 @@
 # Coastal water validation
 
-Photorealistic acceptance remains open. Geometric refraction controls pass, but the coastal
-study still shows overly regular distant reflections and large procedural foam patches.
+Photorealistic acceptance remains open. Geometric refraction controls pass and shore foam now
+follows a local horizontal band, but the coastal study still shows overly regular distant reflections.
 The current filtered-normal roughness approximation needs further validation against integrated
 shading. Passing geometric and temporal controls does not establish a photographic result.
 
-## Matched optical study
+## Horizontal shore band
+
+Optical path length previously placed foam across broad shallow terraces. The band now uses
+the horizontal distance to the intersection of visible bottom and water tangent planes.
+`foam_width` is a horizontal width in meters, with 15 percent spatial reach variation.
+Parallel shallow plateaus receive no foam. Centimeter pores fade to their expected mean
+coverage when unresolved; even dense coverage retains at least 28 percent of the transmitted light.
+
+![Current local shore band at the fixed coastal camera](images/water-coastal/shore-band.png)
+
+This is a local screen-space estimate, not a complete shoreline field. Discontinuous or
+missing depth suppresses coverage; curved terrain can produce gaps or differ from the nearest
+shore. The pattern is stationary and has no advection, accumulation or breaking-wave simulation.
+
+Physical controls require support inside 0.5 meters and none beyond 1.25 meters for a nominal
+one-meter band, across three bottom slopes and two camera angles. Separate controls cover a
+sloping water surface over flat ground, a vertical wall and a shallow plateau without a shore.
+Close-up pores retain the original minimum counts and transmission requirement. A separate
+frequency probe rejects decimeter clouds; minified coverage agrees with a resolved area quadrature.
+
+The complete updated render suite passes 83 cases and 655739 assertions. The ten initial foam
+cases also pass on NVIDIA and llvmpipe. The two additional geometry controls pass on both renderers.
+The new helpers received an independent correctness review; this does not establish photographic acceptance.
+
+Restoring optical-path coverage and decimeter pores makes all five selected negative controls fail:
+the flat plateau gains roughly 50000 changed pixels, the visible band edge moves by 0.5 to
+0.8 meters across slope/camera changes, and the fine-pore probe finds only 31 crossings instead
+of the required 100. These controls retain the same geometric and frequency thresholds.
+
+## Historical optical study
 
 Both views use the same scanned coast, camera, sun, sky, seven-component wave field and
 0.5-second clock at 1600 by 900 pixels. Foam is disabled in both optical views. Exposure is
@@ -80,10 +109,24 @@ independent porosity requirements remain unchanged.
 The updated full render suite passes 77 cases and 655602 assertions; formatting and C++ lint
 also pass. The correction received a separate correctness review before publication.
 
-The pictures, optical metrics and frame times in this document precede this normalization
-correction. They remain historical evidence, rather than measurements of the new direct-light response.
+The optical-study pictures, optical metrics and frame times below precede this normalization
+correction and the horizontal shore band. They remain historical evidence. The shore-band picture
+above uses both corrections.
 
-## Cost
+## Shore-band cost
+
+With the same RTX 4050 Laptop GPU, 1600 by 900 image, 0.5-second clock, 60 warmup frames and
+600 measured frames, a separate ABBA comparison isolates the horizontal shore band from
+the preceding normalized-specular version. Physical interaction detection and game logic are excluded.
+
+| Version | Run medians (ms) | Mean of medians (ms) |
+| --- | --- | ---: |
+| Optical-path foam | 11.489, 11.585 | 11.537 |
+| Horizontal shore band | 11.695, 11.735 | 11.715 |
+
+The new band adds about 0.18 ms, or 1.5 percent, in this coastal view.
+
+## Historical combined cost
 
 RTX 4050 Laptop GPU, 1600 by 900, clock 0.5, 60 warmup frames and 600 measured frames per run.
 One process runs at a time. Order is baseline, candidate, candidate, baseline.

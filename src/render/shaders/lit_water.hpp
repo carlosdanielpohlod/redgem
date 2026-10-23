@@ -8,7 +8,7 @@ uniform sampler2D waterBackground;
 uniform sampler2D waterDepth;
 uniform float waterReady;
 uniform vec3 waterAbsorption;
-uniform vec2 waterSurface;  // shore foam width in meters, refraction strength
+uniform vec2 waterSurface;  // local horizontal shore width in meters, refraction strength
 uniform vec2 waterPlanes;
 uniform float time;
 uniform mat4 matView;
@@ -404,19 +404,66 @@ vec3 waterFoamLight(vec3 n, vec3 v) {
     * sunVisibility(fragPosition, vec3(0.0, 1.0, 0.0), toSun);
   return light;
 }
+// Local horizontal distance to the intersection of the water and visible-bottom tangent planes.
+const float WATER_FOAM_MIN_SURFACE_UP = 0.02;  // reject surfaces that cannot be represented as height fields
+const float WATER_FOAM_MIN_SHORE_GRADIENT = 0.005;  // almost parallel planes do not establish a visible shore
+
+bool waterFoamSurfaceSlope(vec3 geometric, out vec2 slope) {
+  float magnitude = length(geometric);
+  bool degenerate = abs(geometric.y) <= magnitude * WATER_FOAM_MIN_SURFACE_UP;
+  if (degenerate) return false;
+  slope = -geometric.xz / geometric.y;
+  return true;
+}
+
+bool waterFoamNeighborsInside(vec2 uv, vec2 pixel) {
+  return waterInsideScreen(uv + pixel) && waterInsideScreen(uv - pixel);
+}
+
+bool waterFoamBottomKnown(vec2 uv) {
+  vec2 pixel = 1.0 / vec2(textureSize(waterDepth, 0));
+  if (!waterFoamNeighborsInside(uv, pixel)) return false;
+  if (texture(waterDepth, uv).r >= 1.0 - EPSILON) return false;
+  return !waterRefractionDiscontinuous(uv);
+}
+
+float waterFoamPlaneDistance(vec3 surface, vec3 bottom, vec3 normal, vec2 slope) {
+  vec3 worldNormal = transpose(mat3(matView)) * normal;
+  vec2 gradient = worldNormal.xz + worldNormal.y * slope;
+  float magnitude = length(gradient);
+  if (magnitude <= WATER_FOAM_MIN_SHORE_GRADIENT) return -1.0;
+  return abs(dot(normal, surface - bottom)) / magnitude;
+}
+
+float waterFoamShoreDistance(vec3 geometric) {
+  if (waterSurface.x <= 0.0) return -1.0;
+  vec2 slope;
+  if (!waterFoamSurfaceSlope(geometric, slope)) return -1.0;
+  vec2 uv = gl_FragCoord.xy / vec2(textureSize(waterBackground, 0));
+  if (!waterFoamBottomKnown(uv)) return -1.0;
+  vec3 surface = (matView * vec4(fragPosition, 1.0)).xyz;
+  vec3 bottom = waterRefractionViewPoint(uv);
+  vec3 normal = waterRefractionBottomNormal(uv);
+  return waterFoamPlaneDistance(surface, bottom, normal, slope);
+}
+
 // Foam is a continuous world-space band, rather than a uniform white intersection line.
 const vec2 WATER_FOAM_HASH_DIRECTION = vec2(127.1, 311.7);
 const float WATER_FOAM_HASH_SCALE = 43758.5453;
 const float WATER_FOAM_PATCH_FREQUENCY = 0.7;  // inverse meters: broad shore patches
-const float WATER_FOAM_GRAIN_FREQUENCY = 3.2;  // inverse meters: softer pockets inside the band
+const float WATER_FOAM_GRAIN_FREQUENCY = 32.0;  // inverse meters: centimeter-scale porous coverage
 const vec2 WATER_FOAM_GRAIN_OFFSET = vec2(7.3, -2.8);
-const float WATER_FOAM_MIN_REACH = 0.6;        // shares of the authored nominal depth range
-const float WATER_FOAM_MAX_REACH = 1.4;
+const float WATER_FOAM_MIN_REACH = 0.85;        // shares of the authored nominal horizontal width
+const float WATER_FOAM_MAX_REACH = 1.15;
 const float WATER_FOAM_PORE_START = 0.35;  // low-density pockets leave the underlying water visible
-const float WATER_FOAM_PORE_END = 0.70;
+const float WATER_FOAM_PORE_END = 0.65;
 const float WATER_FOAM_MAX_COVERAGE = 0.72;  // foam preserves some transmission even in dense patches
-const float WATER_FOAM_CONTACT_FADE = 0.12;    // world meters: cap the proportional contact fade
+const float WATER_FOAM_CONTACT_FADE = 0.12;    // horizontal meters: cap the proportional contact fade
 const float WATER_FOAM_CONTACT_SHARE = 0.15;   // narrow authored bands retain a proportionate fade
+// Symmetric thresholds and a symmetric noise ensemble give expected coverage exactly one half.
+const float WATER_FOAM_MEAN_POROSITY = 0.5;
+const float WATER_FOAM_FILTER_START = 0.25;  // cells per pixel: retain detail with at least four pixels per cell
+const float WATER_FOAM_FILTER_END = 1.0;     // unresolved cells converge to expected coverage, never to zero
 
 float waterFoamHash(vec2 p) { return fract(sin(dot(p, WATER_FOAM_HASH_DIRECTION)) * WATER_FOAM_HASH_SCALE); }
 
@@ -428,18 +475,31 @@ float waterFoamNoise(vec2 p) {
   return mix(lower, upper, blend.y);
 }
 
-float waterFoamCoverage(float thickness) {
-  if (waterSurface.x <= 0.0) return 0.0;
-  float shorePatch = waterFoamNoise(fragPosition.xz * WATER_FOAM_PATCH_FREQUENCY);
-  float grain = waterFoamNoise(fragPosition.xz * WATER_FOAM_GRAIN_FREQUENCY + WATER_FOAM_GRAIN_OFFSET);
-  float reach = waterSurface.x * mix(WATER_FOAM_MIN_REACH, WATER_FOAM_MAX_REACH, shorePatch);
-  float contact = min(WATER_FOAM_CONTACT_FADE, waterSurface.x * WATER_FOAM_CONTACT_SHARE);
-  float band = smoothstep(0.0, contact, thickness) * (1.0 - smoothstep(0.0, reach, thickness));
-  return band * WATER_FOAM_MAX_COVERAGE * smoothstep(WATER_FOAM_PORE_START, WATER_FOAM_PORE_END, grain);
+float waterFoamPores(vec2 p, float footprint) {
+  float grain = waterFoamNoise(p);
+  float coverage = smoothstep(WATER_FOAM_PORE_START, WATER_FOAM_PORE_END, grain);
+  float resolved = 1.0 - smoothstep(WATER_FOAM_FILTER_START, WATER_FOAM_FILTER_END, footprint);
+  return mix(WATER_FOAM_MEAN_POROSITY, coverage, resolved);
 }
 
-vec3 waterCompose(vec3 n, vec3 v, WaterTransmission optics, WaterSurfaceLight light) {
-  float foam = waterFoamCoverage(optics.thickness);
+bool waterFoamUnsupported(float distance) {
+  return waterSurface.x <= 0.0 || distance < 0.0;
+}
+
+float waterFoamCoverage(float distance, float footprint) {
+  if (waterFoamUnsupported(distance)) return 0.0;
+  float shorePatch = waterFoamNoise(fragPosition.xz * WATER_FOAM_PATCH_FREQUENCY);
+  float pores = waterFoamPores(fragPosition.xz * WATER_FOAM_GRAIN_FREQUENCY + WATER_FOAM_GRAIN_OFFSET,
+                               footprint * WATER_FOAM_GRAIN_FREQUENCY);
+  float reach = waterSurface.x * mix(WATER_FOAM_MIN_REACH, WATER_FOAM_MAX_REACH, shorePatch);
+  float contact = min(WATER_FOAM_CONTACT_FADE, waterSurface.x * WATER_FOAM_CONTACT_SHARE);
+  float band = smoothstep(0.0, contact, distance) * (1.0 - smoothstep(0.0, reach, distance));
+  return band * WATER_FOAM_MAX_COVERAGE * pores;
+}
+
+vec3 waterCompose(vec3 n, vec3 v, WaterTransmission optics, WaterSurfaceLight light,
+                  float shoreDistance, float foamFootprint) {
+  float foam = waterFoamCoverage(shoreDistance, foamFootprint);
   vec3 foamLight = waterFoamLight(n, v);
   vec3 surface = mix(light.surface, foamLight, foam);
   vec3 transmitted = light.transmitted;
@@ -449,12 +509,18 @@ vec3 waterCompose(vec3 n, vec3 v, WaterTransmission optics, WaterSurfaceLight li
   return optics.background * transmitted + surface * air + fogColor * (1.0 - transmitted) * (1.0 - air);
 }
 vec3 waterColor() {
+  // Evaluate derivatives for all water pixels before depth-dependent guards or traces diverge.
+  vec3 geometryDx = dFdx(fragPosition);
+  vec3 geometryDy = dFdy(fragPosition);
+  float foamFootprint = max(length(geometryDx.xz), length(geometryDy.xz));
   WaterNormal normal = waterNormal();
+  float rough = waterRoughness(normal);
+  float shoreDistance = waterFoamShoreDistance(cross(geometryDx, geometryDy));
   vec3 n = normal.direction;
   vec3 v = normalize(viewPos - fragPosition);
   WaterTransmission optics = waterSampleTransmission(n, v);
-  WaterSurfaceLight light = waterSurfaceLight(n, v, optics.transmission, waterRoughness(normal));
-  return waterCompose(n, v, optics, light);
+  WaterSurfaceLight light = waterSurfaceLight(n, v, optics.transmission, rough);
+  return waterCompose(n, v, optics, light, shoreDistance, foamFootprint);
 }
 #endif
 )GLSL";

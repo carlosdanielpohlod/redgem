@@ -9,12 +9,12 @@
 #include <limits>
 
 #include "render/shader_source.hpp"
-#include "render/shaders/water_waves.hpp"
-#include "render/shaders/water_filter.hpp"
 #include "render/shaders/lit_water.hpp"
+#include "render/shaders/water_filter.hpp"
+#include "render/shaders/water_waves.hpp"
+#include "render/water_ripple_packet.hpp"
 #include "render_system/render_stage.hpp"
 #include "scene/shapes/primitives.hpp"
-#include "render/water_ripple_packet.hpp"
 
 using namespace redgem;
 using redgem::test::Picture;
@@ -99,6 +99,17 @@ MeshDesc plane_mesh(int material) {
     mesh.bounds.include(vec3_from(&mesh.primitives.front().positions[i]));
   return mesh;
 }
+MeshDesc shore_bottom(float slope, float shore = 0.0f) {
+  MeshDesc mesh = plane_mesh(1);
+  mesh.bounds = Bounds{};
+  auto& positions = mesh.primitives.front().positions;
+  for (std::size_t i = 0; i < positions.size(); i += kCoordinates) {
+    positions[i + 1] = -slope * (positions[i] * kWaterSize - shore);
+    mesh.bounds.include(vec3_from(&positions[i]));
+  }
+  return mesh;
+}
+
 MaterialDesc pond_material() {
   MaterialDesc water;
   water.base_color = kWaterColor;
@@ -193,9 +204,11 @@ FoamShadowContrast foam_shadow_contrast(const Picture& shadow, const Picture& li
 SceneDesc foam_shadow_pond() {
   SceneDesc desc = pond();
   desc.materials[0].water.wave_height = 0.0f;
-  constexpr float kShallowBottom = -0.15f;  // interior of the band, beyond the contact fade
+  constexpr float kRoofShore = -0.3f;
+  constexpr float kRoofSlope = 0.5f;
   constexpr float kFoamReach = 10.0f;
-  desc.nodes[1].local.position.y = kShallowBottom;
+  desc.meshes[1] = shore_bottom(kRoofSlope, kRoofShore);
+  desc.nodes[1].local.position.y = 0.0f;
   desc.materials[0].water.foam_width = kFoamReach;
   desc.materials[1] = test::glowing_material(kBlackMaterial, 0.0f);  // isolate the foam's incident light
   desc.nodes[kEnvironmentNode].props["ambient"] = 0.0;
@@ -685,6 +698,10 @@ TEST_CASE("water shore foam brightens a shallow edge and remains optional") {
   RenderStage stage;
   SceneDesc desc = pond();
   desc.materials[0].water.wave_height = 0.0f;
+  constexpr float kNearShore = -0.3f;
+  constexpr float kNearSlope = 0.5f;
+  desc.meshes[1] = shore_bottom(kNearSlope, kNearShore);
+  desc.nodes[1].local.position.y = 0.0f;
   desc.materials[1] = redgem::test::glowing_material({0.0f, 0.0f, 0.0f, 1.0f}, 0.0f);
   const auto plain = draw(stage, desc, "water_without_foam");
   constexpr float kFoamReach = 2.0f;
@@ -1033,14 +1050,13 @@ namespace {
 constexpr Vec3 kFoamBandViewer{0.0f, 8.0f, 0.1f};  // nearly overhead: equal depth stays comparable along the shore
 constexpr Vec3 kFoamBandSun{0.8f, -0.6f, 0.0f};    // avoids a direct glint masking the foam's diffuse signal
 constexpr float kFoamBandFov = 45.0f;
-constexpr float kFoamBandWidth = 0.65f;  // nominal shallow depth range, in meters
-constexpr float kFoamBandSlope = 0.5f;   // bottom drops half a meter for every meter from shore
+constexpr float kFoamBandWidth = 1.0f;  // one horizontal meter leaves room for a broad half-meter band
+constexpr float kFoamBandSlope = 0.5f;  // bottom drops half a meter for every meter from shore
 constexpr float kFoamProbeStride = 0.05f;
 constexpr int kFoamNormalProbes = 40;  // two meters from exact contact to open water
 constexpr int kFoamAlongProbes = 21;
 constexpr float kFoamAlongStride = 0.125f;
 constexpr float kFoamAlongMiddle = 1.25f;
-constexpr float kFoamPatternDepthX = 0.6f;
 constexpr int kFoamVisible = 8;  // byte brightness above the identical scene without foam
 constexpr int kFoamIrregularVariation = 15;
 constexpr std::size_t kFoamBroadSamples = 10;  // about half a meter of visible coverage
@@ -1049,16 +1065,7 @@ constexpr float kFoamSoftLow = 0.15f;
 constexpr float kFoamSoftHigh = 0.75f;
 constexpr float kFoamContactMaximum = 0.8f;  // contact must fade instead of being the brightest line
 
-MeshDesc foam_band_bottom() {
-  MeshDesc mesh = plane_mesh(1);
-  mesh.bounds = Bounds{};
-  auto& positions = mesh.primitives[0].positions;
-  for (std::size_t i = 0; i < positions.size(); i += kCoordinates) {
-    positions[i + 1] = -kFoamBandSlope * positions[i] * kWaterSize;
-    mesh.bounds.include(vec3_from(&positions[i]));
-  }
-  return mesh;
-}
+MeshDesc foam_band_bottom() { return shore_bottom(kFoamBandSlope); }
 
 SceneDesc foam_band_scene() {
   SceneDesc desc = clear_dark_pond();
@@ -1116,15 +1123,6 @@ std::size_t soft_foam_samples(const std::vector<int>& profile, int peak) {
       std::count_if(profile.begin(), profile.end(), [peak](int value) { return partially_foamed(value, peak); }));
 }
 
-std::vector<int> foam_along_shore(const Picture& foam, const Picture& plain) {
-  std::vector<int> along;
-  for (int i = 0; i < kFoamAlongProbes; ++i) {
-    const float z = static_cast<float>(i) * kFoamAlongStride - kFoamAlongMiddle;
-    along.push_back(foam_band_signal(foam, plain, kFoamPatternDepthX, z));
-  }
-  return along;
-}
-
 }  // namespace
 
 TEST_CASE("shore foam occupies a broad soft band and fades at the exact contact") {
@@ -1141,22 +1139,6 @@ TEST_CASE("shore foam occupies a broad soft band and fades at the exact contact"
   CHECK(soft_foam_samples(profile, peak) >= kFoamSoftSamples);
   CHECK(static_cast<float>(profile.front()) < static_cast<float>(peak) * kFoamContactMaximum);
   CHECK(profile.back() <= kFoamVisible);
-}
-
-TEST_CASE("shore foam has world-space irregularity and remains deterministic with waves stopped") {
-  RenderStage stage;
-  SceneDesc desc = foam_band_scene();
-  const Picture plain = draw(stage, desc, "water_foam_pattern_off");
-  desc.materials[0].water.foam_width = kFoamBandWidth;
-  const Picture foam = draw(stage, desc, "water_foam_pattern_on");
-  const auto along = foam_along_shore(foam, plain);
-  const auto range = std::minmax_element(along.begin(), along.end());
-  CHECK(*range.second - *range.first >= kFoamIrregularVariation);
-  const Picture later = draw(stage, desc, "water_foam_pattern_later", kLater);
-  CHECK(changed(foam, later) == 0);
-  desc.materials[0].water.foam_width = 0.0f;
-  const Picture disabled = draw(stage, desc, "water_foam_pattern_disabled");
-  CHECK(changed(plain, disabled) == 0);
 }
 
 namespace {
@@ -1348,7 +1330,8 @@ std::string micro_energy_probe_source() {
   REQUIRE(end != std::string::npos);
   const char* inputs =
       "\n#define WATER\nconst float MIN_ROUGHNESS = 0.045;\n"
-      "const float EPSILON = 0.0001;\nvec3 fragPosition;\nfloat roughness = 0.07;\n";
+      "const float EPSILON = 0.0001;\nvec3 "
+      "fragPosition;\nfloat roughness = 0.07;\n";
   return std::string(shaders::kDesktopVersionLine) + "\n" + shaders::kWaterWaves + shaders::kWaterFilter + inputs +
          water.substr(0, end) + "\n#endif\n" + kMicroEnergyProbeMain;
 }
@@ -1370,39 +1353,69 @@ TEST_CASE("water micro normals preserve resolved detail and conserve the energy 
 namespace {
 
 constexpr int kFoamShelfProbes = 33;
-constexpr float kFoamShelfMiddle = 2.0f;
-constexpr float kFoamShelfDepth = -0.15f;       // beyond contact fade, within the shallow foam range
-constexpr int kFoamPoreTolerance = 2;           // byte difference from the identical scene without foam
-constexpr std::size_t kFoamMinimumPores = 100;  // about a tenth of the sampled shallow shelf must expose water
+constexpr float kFoamShelfMiddle = 0.6f;
+constexpr float kFoamShelfFirstX = 0.1f;
+constexpr float kFoamShelfAcrossStride = 0.0125f;
+constexpr Vec3 kFoamShelfTarget{0.3f, 0.0f, 0.0f};
+constexpr float kFoamShelfStride = 0.0375f;          // 1.2 meters sampled by 33 distinct, physically resolved probes
+constexpr Vec3 kFoamShelfViewer{0.3f, 1.6f, 0.02f};  // about six pixels per 3.125 cm cell at 256 pixels
+constexpr float kFoamShelfDepth = -0.15f;            // negative control: shallow water above a parallel bottom
+constexpr int kFoamPoreTolerance = 2;                // byte difference from the identical scene without foam
+constexpr std::size_t kFoamMinimumPores = 100;       // about a tenth of the sampled shallow shelf must expose water
 constexpr std::size_t kFoamMinimumPatches = 100;
 constexpr float kFoamMinimumTransmission = 0.4f;  // display-space share, conservatively below 28% linear throughput
 
 SceneDesc foam_shelf_scene() {
   SceneDesc desc = foam_band_scene();
-  desc.meshes[1] = plane_mesh(1);
-  desc.nodes[1].local.position.y = kFoamShelfDepth;
+  desc.nodes[2] = test::camera_at(kFoamShelfViewer);
+  desc.nodes[2].local.rotation = quat_look_rotation(kFoamShelfTarget - kFoamShelfViewer, Vec3::up());
+  desc.nodes[2].camera->fov_y_radians = degrees_to_radians(kFoamBandFov);
   return desc;
+}
+
+::Color foam_shelf_probe(const Picture& picture, Vec3 point) {
+  Camera3D camera{};
+  camera.position = {kFoamShelfViewer.x, kFoamShelfViewer.y, kFoamShelfViewer.z};
+  camera.target = {kFoamShelfTarget.x, kFoamShelfTarget.y, kFoamShelfTarget.z};
+  camera.up = {0.0f, 1.0f, 0.0f};
+  camera.fovy = kFoamBandFov;
+  camera.projection = CAMERA_PERSPECTIVE;
+  const auto pixel = GetWorldToScreenEx({point.x, point.y, point.z}, camera, picture.width, picture.height);
+  return picture.at(pixel.x / static_cast<float>(picture.width - 1), pixel.y / static_cast<float>(picture.height - 1));
+}
+
+int foam_shelf_signal(const Picture& foam, const Picture& plain, float x, float z) {
+  return static_cast<int>(foam_shelf_probe(foam, {x, 0.0f, z}).r) - foam_shelf_probe(plain, {x, 0.0f, z}).r;
 }
 
 std::vector<int> foam_shelf_signals(const Picture& foam, const Picture& plain) {
   std::vector<int> signals;
   for (int row = 0; row < kFoamShelfProbes; ++row) {
-    const float z = static_cast<float>(row) * kFoamAlongStride - kFoamShelfMiddle;
+    const float z = static_cast<float>(row) * kFoamShelfStride - kFoamShelfMiddle;
     for (int column = 0; column < kFoamShelfProbes; ++column) {
-      const float x = static_cast<float>(column) * kFoamAlongStride - kFoamShelfMiddle;
-      signals.push_back(foam_band_signal(foam, plain, x, z));
+      const float x = kFoamShelfFirstX + static_cast<float>(column) * kFoamShelfAcrossStride;
+      signals.push_back(foam_shelf_signal(foam, plain, x, z));
     }
   }
   return signals;
 }
 
+std::vector<int> foam_shelf_along_shore(const Picture& foam, const Picture& plain) {
+  std::vector<int> along;
+  for (int i = 0; i < kFoamShelfProbes; ++i) {
+    const float z = static_cast<float>(i) * kFoamShelfStride - kFoamShelfMiddle;
+    along.push_back(foam_shelf_signal(foam, plain, kFoamShelfTarget.x, z));
+  }
+  return along;
+}
+
 bool foam_shelf_retains_bottom(const Picture& foam, const Picture& plain) {
   for (int row = 0; row < kFoamShelfProbes; ++row) {
-    const float z = static_cast<float>(row) * kFoamAlongStride - kFoamShelfMiddle;
+    const float z = static_cast<float>(row) * kFoamShelfStride - kFoamShelfMiddle;
     for (int column = 0; column < kFoamShelfProbes; ++column) {
-      const float x = static_cast<float>(column) * kFoamAlongStride - kFoamShelfMiddle;
-      const int baseline = foam_band_probe(plain, {x, 0.0f, z}).r;
-      const int retained = foam_band_probe(foam, {x, 0.0f, z}).r;
+      const float x = kFoamShelfFirstX + static_cast<float>(column) * kFoamShelfAcrossStride;
+      const int baseline = foam_shelf_probe(plain, {x, 0.0f, z}).r;
+      const int retained = foam_shelf_probe(foam, {x, 0.0f, z}).r;
       if (static_cast<float>(retained) < static_cast<float>(baseline) * kFoamMinimumTransmission) return false;
     }
   }
@@ -1410,6 +1423,22 @@ bool foam_shelf_retains_bottom(const Picture& foam, const Picture& plain) {
 }
 
 }  // namespace
+
+TEST_CASE("shore foam has world-space irregularity and remains deterministic with waves stopped") {
+  RenderStage stage;
+  SceneDesc desc = foam_shelf_scene();
+  const Picture plain = draw(stage, desc, "water_foam_pattern_off");
+  desc.materials[0].water.foam_width = kFoamBandWidth;
+  const Picture foam = draw(stage, desc, "water_foam_pattern_on");
+  const auto along = foam_shelf_along_shore(foam, plain);
+  const auto range = std::minmax_element(along.begin(), along.end());
+  CHECK(*range.second - *range.first >= kFoamIrregularVariation);
+  const Picture later = draw(stage, desc, "water_foam_pattern_later", kLater);
+  CHECK(changed(foam, later) == 0);
+  desc.materials[0].water.foam_width = 0.0f;
+  const Picture disabled = draw(stage, desc, "water_foam_pattern_disabled");
+  CHECK(changed(plain, disabled) == 0);
+}
 
 TEST_CASE("shallow shore foam opens water pockets instead of coating an entire flat shelf") {
   RenderStage stage;
@@ -1435,6 +1464,288 @@ TEST_CASE("dense shore foam keeps the submerged surface partly visible") {
   const Picture foam = draw(stage, desc, "water_foam_shelf_transmission");
   REQUIRE(plain.at(kMiddle, kMiddle).r > kFoamVisible);
   CHECK(foam_shelf_retains_bottom(foam, plain));
+}
+
+namespace {
+
+constexpr int kFoamCoverageFineSide = 1024;  // two-meter patch: sixteen samples per fine cell
+constexpr int kFoamCoverageCoarseSide = 32;
+constexpr int kFoamCoverageMiddleSide = 64;
+constexpr float kFoamCoverageExtent = 2.0f;
+constexpr float kFoamCoverageByte = 255.0f;
+constexpr int kFoamFrequencyRows = 8;
+constexpr std::size_t kFoamMinimumCrossings = 100;  // old 31 cm cells cannot provide this many crossings over eight 2 m
+                                                    // rows
+constexpr double kFoamMeanTolerance = 0.025;  // finite 4096-cell quadrature error plus 8-bit readback quantization
+constexpr double kFoamVisibleMean = 0.1;
+constexpr const char* kFoamSourceStart = "const vec2 WATER_FOAM_HASH_DIRECTION";
+constexpr const char* kFoamSourceEnd = "vec3 waterCompose(";
+constexpr const char* kFoamCoverageHead = R"GLSL(#version 330
+uniform vec2 waterSurface;
+uniform float foamProbeSide;
+uniform float foamProbeExtent;
+out vec4 finalColor;
+vec3 foamProbePosition() {
+  vec2 p = (gl_FragCoord.xy / foamProbeSide - 0.5) * foamProbeExtent;
+  return vec3(p.x, 0.0, p.y);
+}
+#define fragPosition foamProbePosition()
+)GLSL";
+constexpr const char* kFoamCoverageMain = R"GLSL(
+void main() {
+  const float PROBE_SHORE_DISTANCE = 0.15;
+  vec2 p = foamProbePosition().xz;
+  float footprint = max(length(dFdx(p)), length(dFdy(p)));
+  float coverage = waterFoamCoverage(PROBE_SHORE_DISTANCE, footprint);
+  finalColor = vec4(vec3(coverage), 1.0);
+}
+)GLSL";
+
+std::string foam_coverage_source() {
+  const std::string water = shaders::kLitWater;
+  const auto begin = water.find(kFoamSourceStart);
+  const auto end = water.find(kFoamSourceEnd, begin);
+  REQUIRE(begin != std::string::npos);
+  REQUIRE(end != std::string::npos);
+  return std::string(kFoamCoverageHead) + water.substr(begin, end - begin) + kFoamCoverageMain;
+}
+
+void draw_foam_coverage(const Shader& shader, const RenderTexture2D& target) {
+  BeginDrawing();
+  BeginTextureMode(target);
+  ClearBackground(kWaveProbeBlack);
+  BeginShaderMode(shader);
+  DrawRectangle(0, 0, target.texture.width, target.texture.height, kWaveProbeWhite);
+  EndShaderMode();
+  EndTextureMode();
+  EndDrawing();
+}
+
+Picture foam_coverage_pixels(const RenderTexture2D& target) {
+  Image image = LoadImageFromTexture(target.texture);
+  ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+  const auto* pixels = static_cast<const ::Color*>(image.data);
+  const auto count = static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height);
+  Picture picture{image.width, image.height, {pixels, pixels + count}};
+  UnloadImage(image);
+  return picture;
+}
+
+Picture foam_coverage_probe(int side) {
+  const std::string source = foam_coverage_source();
+  const Shader shader = LoadShaderFromMemory(nullptr, shaders::for_this_gpu(source.c_str()).c_str());
+  REQUIRE(GetShaderLocation(shader, "foamProbeSide") >= 0);
+  const float resolution = static_cast<float>(side);
+  const float surface[] = {kFoamBandWidth, 0.0f};
+  SetShaderValue(shader, GetShaderLocation(shader, "foamProbeSide"), &resolution, SHADER_UNIFORM_FLOAT);
+  SetShaderValue(shader, GetShaderLocation(shader, "foamProbeExtent"), &kFoamCoverageExtent, SHADER_UNIFORM_FLOAT);
+  SetShaderValue(shader, GetShaderLocation(shader, "waterSurface"), surface, SHADER_UNIFORM_VEC2);
+  const RenderTexture2D target = LoadRenderTexture(side, side);
+  draw_foam_coverage(shader, target);
+  const Picture picture = foam_coverage_pixels(target);
+  UnloadRenderTexture(target);
+  UnloadShader(shader);
+  return picture;
+}
+
+double mean_foam_coverage(const Picture& picture) {
+  double total = 0.0;
+  for (const auto& pixel : picture.pixels) total += pixel.r;
+  return total / (static_cast<double>(picture.pixels.size()) * kFoamCoverageByte);
+}
+
+std::size_t foam_row_crossings(const Picture& picture, int row) {
+  const auto first = static_cast<std::size_t>(row * picture.width);
+  double threshold = 0.0;
+  for (int x = 0; x < picture.width; ++x) threshold += picture.pixels[first + static_cast<std::size_t>(x)].r;
+  threshold /= picture.width;
+  std::size_t count = 0;
+  for (int x = 1; x < picture.width; ++x) {
+    const auto pixel = first + static_cast<std::size_t>(x);
+    const bool before = picture.pixels[pixel - 1].r > threshold;
+    const bool after = picture.pixels[pixel].r > threshold;
+    if (before != after) ++count;
+  }
+  return count;
+}
+
+std::size_t fine_foam_crossings(const Picture& picture) {
+  std::size_t count = 0;
+  const int stride = picture.height / kFoamFrequencyRows;
+  for (int row = 0; row < kFoamFrequencyRows; ++row) count += foam_row_crossings(picture, row * stride + stride / 2);
+  return count;
+}
+
+}  // namespace
+
+TEST_CASE(
+    "nearby shore foam resolves centimeter pores instead of broad white "
+    "clouds") {
+  RenderStage stage;
+  const Picture picture = foam_coverage_probe(kFoamCoverageFineSide);
+  REQUIRE(mean_foam_coverage(picture) > kFoamVisibleMean);
+  const auto crossings = fine_foam_crossings(picture);
+  INFO("Resolved crossings over eight two-meter rows: ", crossings);
+  CHECK(crossings >= kFoamMinimumCrossings);
+}
+
+TEST_CASE("unresolved shore foam preserves the area mean of a resolved quadrature") {
+  RenderStage stage;
+  const double reference = mean_foam_coverage(foam_coverage_probe(kFoamCoverageFineSide));
+  REQUIRE(reference > kFoamVisibleMean);
+  for (const int side : {kFoamCoverageCoarseSide, kFoamCoverageMiddleSide}) {
+    const double distant = mean_foam_coverage(foam_coverage_probe(side));
+    INFO("Probe resolution: ", side, "; resolved mean: ", reference, "; filtered mean: ", distant);
+    CHECK(std::abs(distant - reference) <= kFoamMeanTolerance);
+  }
+}
+
+namespace {
+
+constexpr Vec3 kShoreTiltedViewer{3.0f, 6.0f, 0.1f};
+constexpr float kShoreShallowSlope = 0.15f;
+constexpr float kShoreSteepSlope = 1.2f;
+constexpr int kShoreInteriorProbe = 10;      // half a meter from shore, inside the one-meter band
+constexpr int kShoreExteriorProbe = 25;      // 1.25 meters is outside the maximum 1.15-meter reach
+constexpr float kShoreEdgeTolerance = 0.1f;  // two world-space probes, allowing projected depth/pixel quantization
+
+::Color shore_probe_from(const Picture& picture, Vec3 point, Vec3 viewer) {
+  Camera3D camera{};
+  camera.position = {viewer.x, viewer.y, viewer.z};
+  camera.target = {0.0f, 0.0f, 0.0f};
+  camera.up = {0.0f, 1.0f, 0.0f};
+  camera.fovy = kFoamBandFov;
+  camera.projection = CAMERA_PERSPECTIVE;
+  const auto pixel = GetWorldToScreenEx({point.x, point.y, point.z}, camera, picture.width, picture.height);
+  return picture.at(pixel.x / static_cast<float>(picture.width - 1), pixel.y / static_cast<float>(picture.height - 1));
+}
+
+std::vector<int> shore_distance_profile(const Picture& foam, const Picture& plain, Vec3 viewer,
+                                        float water_slope = 0.0f) {
+  std::vector<int> profile(kFoamNormalProbes, 0);
+  for (int x = 0; x < kFoamNormalProbes; ++x) {
+    for (int z = 0; z < kFoamAlongProbes; ++z) {
+      const Vec3 point{static_cast<float>(x) * kFoamProbeStride, static_cast<float>(x) * kFoamProbeStride * water_slope,
+                       static_cast<float>(z) * kFoamAlongStride - kFoamAlongMiddle};
+      profile[static_cast<std::size_t>(x)] +=
+          static_cast<int>(shore_probe_from(foam, point, viewer).r) - shore_probe_from(plain, point, viewer).r;
+    }
+    profile[static_cast<std::size_t>(x)] /= kFoamAlongProbes;
+  }
+  return profile;
+}
+
+std::vector<int> rendered_shore_profile(RenderStage& stage, float slope, Vec3 viewer) {
+  SceneDesc desc = foam_band_scene();
+  desc.meshes[1] = shore_bottom(slope);
+  desc.nodes[2] = test::camera_at(viewer);
+  desc.nodes[2].camera->fov_y_radians = degrees_to_radians(kFoamBandFov);
+  const Picture plain = draw(stage, desc, "water_horizontal_shore_off");
+  desc.materials[0].water.foam_width = kFoamBandWidth;
+  const Picture foam = draw(stage, desc, "water_horizontal_shore_on");
+  return shore_distance_profile(foam, plain, viewer);
+}
+
+void check_horizontal_shore_support(const std::vector<int>& profile) {
+  REQUIRE(profile[static_cast<std::size_t>(kShoreInteriorProbe)] > kFoamVisible);
+  for (int i = kShoreExteriorProbe; i < kFoamNormalProbes; ++i)
+    CHECK(profile[static_cast<std::size_t>(i)] <= kFoamVisible);
+}
+
+constexpr float kShoreWaterSlope = 0.5f;  // y = slope * x: CPU shore distance is exactly abs(x)
+constexpr Vec3 kShoreWallNormal{1.0f, 0.0f, 0.0f};
+
+MeshDesc inclined_shore_water() {
+  MeshDesc mesh = plane_mesh(0);
+  mesh.bounds = Bounds{};
+  auto& positions = mesh.primitives.front().positions;
+  for (std::size_t i = 0; i < positions.size(); i += kCoordinates) {
+    positions[i + 1] = positions[i] * kWaterSize * kShoreWaterSlope;
+    mesh.bounds.include(vec3_from(&positions[i]));
+  }
+  return mesh;
+}
+
+MeshDesc vertical_shore_wall() {
+  MeshDesc mesh = plane_mesh(1);
+  mesh.bounds = Bounds{};
+  auto& primitive = mesh.primitives.front();
+  for (std::size_t i = 0; i < primitive.positions.size(); i += kCoordinates) {
+    primitive.positions[i + 1] = -primitive.positions[i] * kWaterSize;
+    primitive.positions[i] = 0.0f;
+    primitive.normals[i] = kShoreWallNormal.x;
+    primitive.normals[i + 1] = kShoreWallNormal.y;
+    primitive.normals[i + 2] = kShoreWallNormal.z;
+    mesh.bounds.include(vec3_from(&primitive.positions[i]));
+  }
+  return mesh;
+}
+
+std::vector<int> geometry_shore_profile(RenderStage& stage, SceneDesc desc, float water_slope) {
+  desc.nodes[2] = test::camera_at(kShoreTiltedViewer);
+  desc.nodes[2].camera->fov_y_radians = degrees_to_radians(kFoamBandFov);
+  const Picture plain = draw(stage, desc, "water_geometry_shore_off");
+  desc.materials[0].water.foam_width = kFoamBandWidth;
+  const Picture foam = draw(stage, desc, "water_geometry_shore_on");
+  return shore_distance_profile(foam, plain, kShoreTiltedViewer, water_slope);
+}
+
+float visible_shore_edge(const std::vector<int>& profile) {
+  float edge = 0.0f;
+  for (std::size_t i = 0; i < profile.size(); ++i)
+    if (profile[i] > kFoamVisible) edge = static_cast<float>(i) * kFoamProbeStride;
+  return edge;
+}
+
+}  // namespace
+
+TEST_CASE("a flat shallow plateau without a local shore receives no shore foam") {
+  RenderStage stage;
+  for (const Vec3 viewer : {kFoamBandViewer, kShoreTiltedViewer}) {
+    SceneDesc desc = foam_band_scene();
+    desc.meshes[1] = plane_mesh(1);
+    desc.nodes[1].local.position.y = kFoamShelfDepth;
+    desc.nodes[2] = test::camera_at(viewer);
+    desc.nodes[2].camera->fov_y_radians = degrees_to_radians(kFoamBandFov);
+    const Picture plain = draw(stage, desc, "water_shallow_plateau_off");
+    desc.materials[0].water.foam_width = kFoamBandWidth;
+    const Picture foam = draw(stage, desc, "water_shallow_plateau_on");
+    CHECK(changed(plain, foam) == 0);
+  }
+}
+
+TEST_CASE("shore foam width is horizontal and stays stable with bottom slope and camera tilt") {
+  RenderStage stage;
+  const auto reference = rendered_shore_profile(stage, kFoamBandSlope, kFoamBandViewer);
+  check_horizontal_shore_support(reference);
+  const float reference_edge = visible_shore_edge(reference);
+  for (const float slope : {kShoreShallowSlope, kShoreSteepSlope}) {
+    for (const Vec3 viewer : {kFoamBandViewer, kShoreTiltedViewer}) {
+      const auto profile = rendered_shore_profile(stage, slope, viewer);
+      INFO("Bottom slope: ", slope, "; camera height: ", viewer.y);
+      check_horizontal_shore_support(profile);
+      CHECK(std::abs(visible_shore_edge(profile) - reference_edge) <= kShoreEdgeTolerance);
+    }
+  }
+}
+
+TEST_CASE("geometrically inclined water measures horizontal shore distance above a flat bottom") {
+  RenderStage stage;
+  SceneDesc desc = foam_band_scene();
+  desc.meshes[0] = inclined_shore_water();
+  desc.meshes[1] = plane_mesh(1);
+  REQUIRE(desc.materials[0].water.wave_height == 0.0f);
+  const auto profile = geometry_shore_profile(stage, desc, kShoreWaterSlope);
+  check_horizontal_shore_support(profile);
+}
+
+TEST_CASE("a visible vertical wall establishes a horizontal shore band without a vertical bottom normal") {
+  RenderStage stage;
+  SceneDesc desc = foam_band_scene();
+  desc.meshes[1] = vertical_shore_wall();
+  REQUIRE(desc.materials[0].water.wave_height == 0.0f);
+  const auto profile = geometry_shore_profile(stage, desc, 0.0f);
+  check_horizontal_shore_support(profile);
 }
 
 TEST_CASE("water SSR isolation excludes fully submerged emissive geometry") {
@@ -1493,7 +1804,10 @@ TEST_CASE("water transmission isolation follows a single Snell silhouette instea
   const auto transmitted = optical_pixels(refracted, config, kOpticalTransmissionDepth);
   REQUIRE(transmitted.red > kOpticalMinimumReflection);
   const auto unexpected = unexpected_transmitted_red(refracted, config, kOpticalTransmissionDepth);
-  INFO("Transmission-only red pixels outside the postprocess-supported Snell silhouette: ", unexpected);
+  INFO(
+      "Transmission-only red pixels outside the postprocess-supported Snell "
+      "silhouette: ",
+      unexpected);
   CHECK(unexpected == 0);
 }
 
@@ -1520,7 +1834,10 @@ TEST_CASE("water transmission preserves bottom attenuation outside a partially e
   const auto reference = draw(stage, desc, "water_transmission_attenuated_reference");
   REQUIRE(reference.at(kMiddle, kMiddle).g > kOpticalRedThreshold);
   const auto unexpected = unexpected_transmission_change(reference, obstructed, config);
-  INFO("Changed attenuation pixels outside the direct/Snell silhouette and postprocess support: ", unexpected);
+  INFO(
+      "Changed attenuation pixels outside the direct/Snell silhouette and "
+      "postprocess support: ",
+      unexpected);
   CHECK(unexpected == 0);
 }
 
