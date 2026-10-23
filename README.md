@@ -173,6 +173,7 @@ Small games and scenes that ship with the engine, each with its scripts and test
 
 Small pull requests are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) says how, and
 [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md) lists what is missing or wrong today.
+[CHANGELOG.md](CHANGELOG.md) says what changed in each release.
 
 ## License
 
