@@ -34,11 +34,22 @@ the flat plateau gains roughly 50000 changed pixels, the visible band edge moves
 0.8 meters across slope/camera changes, and the fine-pore probe finds only 31 crossings instead
 of the required 100. These controls retain the same geometric and frequency thresholds.
 
-## Historical optical study
+## Optical validation correction
+
+Earlier image metrics in this study are withdrawn: the preview helper changed the clock reset
+in recording shutdown instead of setting the clock before normal presentation. Those previews
+therefore used wall time. Automated render tests, internal video recordings and the frame-time
+benchmarks set their clocks independently and are unaffected. Replacement previews must pass
+a repeated-capture check before being used for image comparisons.
+
+## Matched optical study
 
 Both views use the same scanned coast, camera, sun, sky, seven-component wave field and
 0.5-second clock at 1600 by 900 pixels. Foam is disabled in both optical views. Exposure is
 0.8 with the same display transform; there is no alignment or exposure fitting.
+The corrected runtime capture is repeated in a separate process: the distant-water rectangle
+is pixel-identical, while five foreground pixels differ by one RGB byte. Its clock is set
+before normal frame presentation, independently of elapsed loading or rendering time.
 The reference uses Cycles with 32 samples, denoising, IOR 1.333, roughness 0.07 and the same
 absorption coefficients. Its isotropic volume scattering is a physical approximation of the
 runtime body-light term; atmospheric fog and derivative filtering do not have identical models.
@@ -62,12 +73,29 @@ removed from the result. Values below are computed from the lossless pictures ab
 
 | Region | Rectangle | RGB MAE | RGB SSIM |
 | --- | --- | ---: | ---: |
-| Distant water | [40, 260, 1560, 325] | 13.797 | 0.3061 |
-| Foreground water | [200, 740, 1350, 880] | 28.880 | 0.4300 |
+| Distant water | [40, 260, 1560, 325] | 10.213 | 0.5131 |
+| Foreground water | [200, 740, 1350, 880] | 29.062 | 0.6843 |
 
-A seven-wave preview without the new unresolved micro-normal variance measured 12.073 MAE /
-0.4081 SSIM in the distant rectangle. The current approximation regresses that comparison;
-its reflection filtering remains under investigation before visual acceptance.
+These values replace the withdrawn wall-clock comparisons. They do not establish photographic
+acceptance or a causal improvement over earlier shader variants, which need fresh timed captures.
+
+A separate normal-field control keeps the camera, displaced mesh, material, illumination and
+display transform, but replaces smooth mesh normals plus bump with the analytic total macro/micro
+height gradient. Its normal is oriented per incoming ray, matching
+[Cycles' geometry-normal convention](https://github.com/blender/blender/blob/v4.5.3/intern/cycles/kernel/geom/shader_data.h#L98-L104).
+Independent finite differences check that gradient. This control addresses mesh normal
+undersampling; it does not make the runtime's BSDF, screen-space visibility or fog identical.
+
+![Analytic-normal control, 96 samples](images/water-coastal/reference-analytic96.png)
+
+| Region | Runtime versus analytic-normal control: RGB MAE | RGB SSIM |
+| --- | ---: | ---: |
+| Distant water | 10.415 | 0.5643 |
+| Foreground water | 28.459 | 0.7075 |
+
+The control's 32-versus-96 sample difference is 3.371 MAE / 0.9280 SSIM at distance and
+2.580 / 0.9482 in the foreground. Sampling error is not zero; small candidate deltas need
+further integration checks. Both the original reference and this control are retained.
 
 ## Correctness controls
 
@@ -80,9 +108,10 @@ its reflection filtering remains under investigation before visual acceptance.
 - Require a soft, irregular foam band, open water pockets and partial bottom transmission.
 - Check displacement bounds, analytic gradients, stationary clocks and filtered normal energy.
 
-The full render suite passed 76 cases and 655593 assertions. Unit checks passed 1215 cases
-and 42068 assertions. Local shader-validation binaries rebuild shader construction and changed
-tests while reusing unchanged CPU libraries. Clean builds remain a CI requirement.
+The current full render suite passed 83 cases and 655739 assertions. The previous full unit
+run passed 1215 cases; the current shader-generation checks pass 14 cases and 147 assertions.
+Local shader-validation binaries rebuild shader construction and changed tests while reusing
+unchanged CPU libraries. Clean builds remain a CI requirement.
 The actual GLES shader pairs for lighting, motion, depth, particle shadows and temporal resolve
 all compiled and linked on a native GLES context. This does not replace an Android package build.
 
@@ -106,12 +135,10 @@ Both peak and projected mass checks pass on NVIDIA and software rendering. Resto
 old denominator fails all eight peak/mass checks. Foam envelope checks average 21 shoreline
 profiles so individual pores cannot determine band width; the existing width, softness and
 independent porosity requirements remain unchanged.
-The updated full render suite passes 77 cases and 655602 assertions; formatting and C++ lint
-also pass. The correction received a separate correctness review before publication.
+The correction received a separate correctness review before publication.
 
-The optical-study pictures, optical metrics and frame times below precede this normalization
-correction and the horizontal shore band. They remain historical evidence. The shore-band picture
-above uses both corrections.
+The corrected runtime pictures include both this correction and the horizontal shore band.
+Foam is disabled for the optical comparison and enabled for the separate shore-band picture.
 
 ## Shore-band cost
 
