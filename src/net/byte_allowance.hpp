@@ -9,9 +9,9 @@ namespace redgem::net {
 // bytes a second over time, and at once as much as a burst. A machine past it is flooding.
 //
 // Time the receiver stood still is forgiven apart (forgive): what the sender said meanwhile at its
-// own pace may arrive late and all at once. That credit is spent first, and only on what it was
-// given for: time keeps earning the ordinary allowance meanwhile, however long the backlog takes to
-// arrive, so a sender that goes on talking at its pace is never cut off for it.
+// own pace meanwhile may arrive late and all at once. That credit pays only for what goes past the
+// ordinary allowance, which time keeps earning meanwhile however long the backlog takes to arrive:
+// a sender that goes on talking at its pace is never cut off for it.
 class ByteAllowance {
  public:
   ByteAllowance(float bytes_per_second, float burst_bytes)
