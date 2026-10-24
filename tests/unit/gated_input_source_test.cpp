@@ -18,7 +18,7 @@ TEST_CASE("a game without the Scene view's focus gets no keys, buttons, wheel, g
   const MouseSample mouse = input.mouse();
   for (const bool held : mouse.buttons) CHECK_FALSE(held);
   CHECK(mouse.wheel == 0.0f);
-  CHECK_FALSE(input.gamepad().connected);
+  CHECK_FALSE(input.gamepad(kFirstGamepad).connected);
   CHECK(input.typed_text().empty());
 }
 

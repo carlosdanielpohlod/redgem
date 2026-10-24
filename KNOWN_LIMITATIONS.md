@@ -139,9 +139,11 @@ not a promise of how it will be closed.
   render scale choice, vsync always on, a fixed frame-rate cap.
 - No graphics quality presets a game can expose, and no general fallback for weaker graphics cards
   beyond TAA and `msaa` turning themselves off.
-- Input actions are fixed (`jump`, `fire`, `run` and two axes): games cannot declare their own, and
-  players cannot rebind keys. One gamepad, no rumble.
-- `UI` has no sliders, checkboxes, key capture, word wrap, anchors, scroll lists or gamepad focus
+- Players can rebind a game's actions (`Input.bind`, `Input.capture_next`), but the engine has no
+  ready-made controls screen: a game builds its own with `UI`. Gamepads cannot rumble (neither the
+  desktops' window library nor Android offers it), the mouse cannot be bound to an action, and a
+  capture catches keys and buttons, not sticks or triggers.
+- `UI` has no sliders, checkboxes, word wrap, anchors, scroll lists or gamepad focus
   navigation (a gamepad's A picks the first button), so settings screens have to be built by hand.
   Android has no on-screen keyboard.
 

@@ -67,6 +67,8 @@ enum class Key : int {
 
 // Ruby-facing name ("a", "space", "left_shift") to key.
 std::optional<Key> key_from_name(const std::string& name);
+// And back: the name a key goes by (empty for a key with none).
+std::string key_name(Key key);
 const std::vector<Key>& all_keys();
 
 }  // namespace redgem

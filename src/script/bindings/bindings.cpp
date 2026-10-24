@@ -26,6 +26,7 @@ void install_bindings(mrb_state* mrb) {
   install_ui_bindings(mrb);
   install_audio_bindings(mrb);
   install_input_bindings(mrb);
+  install_input_action_bindings(mrb);
   install_animation_bindings(mrb);  // after GameObject's: it adds to that class
   install_animation_sync_bindings(mrb);
   install_particles_bindings(mrb);

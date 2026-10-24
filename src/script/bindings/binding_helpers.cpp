@@ -159,6 +159,14 @@ mrb_float from_to(mrb_state* mrb, mrb_float value, mrb_float low, mrb_float high
   return value;
 }
 
+std::size_t pad_number(mrb_state* mrb, mrb_int pad) {
+  const bool known_pad = pad >= 0 && pad < static_cast<mrb_int>(kMaxGamepads);
+  if (!known_pad) {
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "pad must be from 0 to %i, not %i", static_cast<mrb_int>(kMaxGamepads) - 1, pad);
+  }
+  return static_cast<std::size_t>(pad);
+}
+
 mrb_float float_arg(mrb_state* mrb) {
   mrb_float number = 0.0;
   mrb_get_args(mrb, "f", &number);

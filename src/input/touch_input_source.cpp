@@ -24,8 +24,9 @@ void TouchInputSource::fit_surface(float width, float height) {
   height_ = height;
 }
 
-GamepadSample TouchInputSource::gamepad() const {
-  const GamepadSample plugged = devices_.gamepad();
+GamepadSample TouchInputSource::gamepad(std::size_t pad) const {
+  const GamepadSample plugged = devices_.gamepad(pad);
+  if (pad != kFirstGamepad) return plugged;
   shown_ = wanted_ && !plugged.connected;
   return shown_ ? touch_.update(read_touches(), width_, height_) : plugged;
 }

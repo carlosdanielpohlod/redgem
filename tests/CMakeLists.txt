@@ -27,6 +27,8 @@ add_executable(redgem_tests
   unit/body_config_test.cpp
   unit/contact_events_test.cpp
   unit/input_test.cpp
+  unit/input_bindings_test.cpp
+  unit/input_bindings_store_test.cpp
   unit/script_naming_test.cpp
   unit/cli_test.cpp
   unit/recording_test.cpp
@@ -122,6 +124,7 @@ add_executable(redgem_tests
   integration/water_interaction_test.cpp
   integration/scene_script_test.cpp
   integration/ui_input_test.cpp
+  integration/input_actions_test.cpp
   integration/gameplay_api_test.cpp
   integration/scatter_test.cpp
   integration/native_arguments_test.cpp
