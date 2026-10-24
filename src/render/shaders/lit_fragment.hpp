@@ -79,12 +79,15 @@ const float SWITCH_ON = 0.5;             // switches arrive as floats: on when a
 const float HALF = 0.5;                  // -1..1 becomes 0..1 when halved and moved up by a half
 const float NORMAL_MAP_RANGE = 2.0;      // a normal map stores -1..1 as 0..1
 const float SPECULAR_DIVISOR = 4.0;      // Cook-Torrance: D G F / (4 nv nl)
+// Below the smallest GGX denominator MIN_ROUGHNESS allows (about 4e-6, at the lobe's peak): it
+// changes no lobe callers can ask for and keeps a zero roughness from dividing zero by zero.
+const float GGX_DENOMINATOR_FLOOR = 1e-7;
 
 float distributionGGX(float nh, float a) {
   float a2 = a * a;
   float projected = nh * a;
-  // Roughness is bounded away from zero by callers; an additive floor removes narrow-lobe energy.
-  float d = projected * projected + max(1.0 - nh * nh, 0.0);
+  // An additive floor would remove narrow-lobe energy: the floor only stops a zero denominator.
+  float d = max(projected * projected + max(1.0 - nh * nh, 0.0), GGX_DENOMINATOR_FLOOR);
   return a2 / (PI * d * d);
 }
 

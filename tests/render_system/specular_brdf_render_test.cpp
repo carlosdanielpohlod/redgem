@@ -29,7 +29,9 @@ const int NDF_PROBE_SAMPLES = 512;
 const float NDF_PROBE_TOLERANCE = 0.015;  // float texture quantization near the narrowest supported lobe
 const int NDF_PROBE_ROUGHNESS_COUNT = 4;
 const float NDF_PROBE_ROUGHNESS[NDF_PROBE_ROUGHNESS_COUNT] = float[NDF_PROBE_ROUGHNESS_COUNT](0.045, 0.07, 0.15, 0.4);
+uniform float probeZero;  // never set: zero the compiler cannot fold away
 bool ndfProbeNormalized(float value) { return abs(value - 1.0) <= NDF_PROBE_TOLERANCE; }
+bool ndfProbeFinite(float value) { return !isnan(value) && !isinf(value); }
 void main() {
   int row = int(gl_FragCoord.x);
   float rough = NDF_PROBE_ROUGHNESS[row];
@@ -42,7 +44,8 @@ void main() {
   }
   bool correctPeak = ndfProbeNormalized(distributionGGX(1.0, alpha) / peak);
   bool correctMass = ndfProbeNormalized(mass / float(NDF_PROBE_SAMPLES));
-  finalColor = vec4(correctPeak ? 1.0 : 0.0, correctMass ? 1.0 : 0.0, 1.0, 1.0);
+  bool finiteAtZero = ndfProbeFinite(distributionGGX(1.0 - probeZero, probeZero));  // a zero roughness, at the peak
+  finalColor = vec4(correctPeak ? 1.0 : 0.0, correctMass ? 1.0 : 0.0, finiteAtZero ? 1.0 : 0.0, 1.0);
 }
 )GLSL";
 
@@ -128,4 +131,11 @@ TEST_CASE("GGX preserves the analytic peak and projected mass of smooth specular
     CHECK(pixels[index].r == kWhite.r);
     CHECK(pixels[index].g == kWhite.g);
   }
+}
+
+TEST_CASE("GGX stays finite at a zero roughness") {
+  redgem::test::RenderStage stage;
+  const Probe probe;
+  draw_probe(probe);
+  for (const ::Color pixel : probe_pixels(probe)) CHECK(pixel.b == kWhite.b);
 }
