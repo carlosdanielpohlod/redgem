@@ -10,17 +10,15 @@ struct WaterWaveNormal {
   vec2 slope;
   float variance;
 };
+// A wave's slope (the displacement's own gradient, see waterWaveGradient) where the pixel resolves
+// its phase; what it cannot resolve becomes slope variance.
 WaterWaveNormal waterFilteredWave(vec2 p, float clock, vec4 component, vec2 phases) {
-  float k = WATER_TAU / max(waterWaves.y * component.z, WATER_MIN_LENGTH);
-  vec3 shape = waterPhase(p, component.xy, k);
-  float phase = shape.x + phases.x - sqrt(WATER_GRAVITY * k) * clock * waterWaves.z;
-  vec3 envelope = waterEnvelope(p, phases.y);
-  float resolved = 1.0 - smoothstep(WATER_NORMAL_FILTER_START, WATER_NORMAL_FILTER_END, fwidth(phase));
-  float amplitude = waterWaves.x * component.w;
-  vec2 slope = amplitude * (envelope.x * cos(phase) * shape.yz + sin(phase) * envelope.yz);
-  float energy = WATER_SLOPE_MEAN_SQUARE * amplitude * amplitude *
-    (envelope.x * envelope.x * dot(shape.yz, shape.yz) + dot(envelope.yz, envelope.yz));
-  return WaterWaveNormal(slope * resolved, energy * (1.0 - resolved * resolved));
+  WaterWaveTerms wave = waterWaveTerms(p, clock, component, phases);
+  float resolved = 1.0 - smoothstep(WATER_NORMAL_FILTER_START, WATER_NORMAL_FILTER_END, fwidth(wave.phase));
+  vec3 envelope = wave.envelope;
+  float energy = WATER_SLOPE_MEAN_SQUARE * wave.height * wave.height *
+    (envelope.x * envelope.x * dot(wave.carrier, wave.carrier) + dot(envelope.yz, envelope.yz));
+  return WaterWaveNormal(waterWaveGradient(wave) * resolved, energy * (1.0 - resolved * resolved));
 }
 WaterWaveNormal waterAddNormals(WaterWaveNormal a, WaterWaveNormal b) {
   return WaterWaveNormal(a.slope + b.slope, a.variance + b.variance);
@@ -63,13 +61,10 @@ WaterWaveNormal waterFilteredDetailShape(vec2 p, float clock) {
   return detail;
 }
 WaterWaveNormal waterFilteredShape(vec2 p, float clock) {
-  WaterWaveNormal result = waterFilteredWave(p, clock, WATER_COMPONENT_0, WATER_PHASE_0);
-  result = waterAddNormals(result, waterFilteredWave(p, clock, WATER_COMPONENT_1, WATER_PHASE_1));
-  result = waterAddNormals(result, waterFilteredWave(p, clock, WATER_COMPONENT_2, WATER_PHASE_2));
-  result = waterAddNormals(result, waterFilteredWave(p, clock, WATER_COMPONENT_3, WATER_PHASE_3));
-  result = waterAddNormals(result, waterFilteredWave(p, clock, WATER_COMPONENT_4, WATER_PHASE_4));
-  result = waterAddNormals(result, waterFilteredWave(p, clock, WATER_COMPONENT_5, WATER_PHASE_5));
-  return waterAddNormals(result, waterFilteredWave(p, clock, WATER_COMPONENT_6, WATER_PHASE_6));
+  WaterWaveNormal result = WaterWaveNormal(vec2(0.0), 0.0);
+  for (int i = 0; i < WATER_WAVE_COUNT; ++i)
+    result = waterAddNormals(result, waterFilteredWave(p, clock, WATER_COMPONENTS[i], WATER_PHASES[i]));
+  return result;
 }
 )GLSL";
 }  // namespace redgem::shaders
