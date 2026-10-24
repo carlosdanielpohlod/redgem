@@ -93,13 +93,19 @@ While nobody talks to it the relay sleeps: it wakes when a machine connects or s
 and about once a second to let go of machines that went silent.
 
 The relay expects strangers: one address can only open a few rooms and hold a few connections,
-guessing room codes gets it kept out for a while, and a machine that goes silent is let go.
+guessing room codes gets it kept out for a while, and a machine that goes silent is let go, as is
+one that sends far more than a game does (each message counts for 64 bytes on top of its own, so
+floods of tiny messages count too).
 
 ## By the host's address
 
 Without a relay, players anywhere can still join the host's public address
 (`Network.join("203.0.113.7")`) if the host's router forwards the game's port (7777, TCP) to the
 host's machine.
+
+A host reached directly, whether it is a player or a dedicated server, lets go of a machine that
+sends far more than a game does: more than 256 KB a second over time (and a burst of 2 MB), or
+more than 8192 messages a second (and a burst of 16384), however short they are.
 
 ## On a dedicated server
 

@@ -181,6 +181,19 @@ not a promise of how it will be closed.
   a damaged save is dropped silently with no backup kept.
 - A missing texture draws nothing, with a warning in the log, instead of a placeholder pattern.
 
+### Security
+
+- On a dedicated server, a game's plain `http://` reaches anything on the server's own networks,
+  the cloud's instance metadata address (169.254.169.254) included: link-local and private
+  addresses are allowed alike.
+- A script that sets an engine class's name to something else (`Vector3 = 5`) breaks the
+  engine's calls that use that class with Ruby errors, instead of being stopped from doing so.
+- An Android build empties its staging folder (`.redgem-apk-stage` in the output folder) without
+  checking that a build made it.
+- No unit tests for the room-code guessers, room codes, `ByteAllowance`, saved values, the socket
+  layer or the TLS stream on its own (only through requests); no test of a TLS name that does not
+  match its certificate, nor of a server sending interim (1xx) answers for ever.
+
 ### Shipping
 
 - A built game has no icon (Windows, macOS, Linux or Android), no splash picture and no version
@@ -205,6 +218,17 @@ not a promise of how it will be closed.
   on none.
 - About forty unit and integration tests wait on the real clock, a source of rare timing failures.
 - One fetched dependency (`nlohmann_json`) is downloaded without a checksum.
+- Some constants are defined more than once (`kLargestPort` in four places, `kBitsPerByte` in
+  four, Ruby limits that repeat C++ ones), as are a few string helpers.
+- A connection's buffers never give memory back once grown, and copy what is left on every
+  partial send (`frame_buffer.cpp`, `socket_io.cpp`).
+- `Save.update`'s block runs under one lock for the whole database, which every room of a
+  dedicated server shares: a slow block holds up the saves of all rooms.
+- The threads of web requests are detached: one still running at exit may outlive the program's
+  static objects.
+- Water is expensive in coastal views: refraction can fall back to a 32-step screen search with
+  refinement near shorelines and rocks, and the shore foam's distance is computed for every water
+  pixel.
 
 ### Multiplayer
 

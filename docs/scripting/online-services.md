@@ -30,7 +30,10 @@ end
 - `response.json` gives hash keys as symbols when your scripts use that symbol, as strings
   otherwise (as messages do).
 - Addresses are `https://`, checked against the certificates the system trusts, or `http://` to
-  this machine or the local network only (a backend you run beside the game).
+  this machine or the local network only (a backend you run beside the game): 127.x, 10.x,
+  172.16.x to 172.31.x, 192.168.x, 169.254.x and 100.64.x to 100.127.x. Over `https://`, an answer
+  whose end only the connection's end marks must end with the server's TLS goodbye
+  (close_notify), or it is taken as cut short.
 - An answer is at most 8 MB; 16 requests may be on their way at once; each gives up after 15
   seconds unless `timeout:` says otherwise (at most 120). Redirects are not followed.
 - When a level is loaded, the blocks of requests still on their way are not called (the requests
