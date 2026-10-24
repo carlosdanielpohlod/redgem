@@ -25,8 +25,10 @@ inline constexpr int kDefaultScriptBudgetMs = 1000;
 // The most a game may give its scripts: a minute, past which "never returns" is what it means.
 inline constexpr int kMaxScriptBudgetMs = 60 * 1000;
 inline constexpr const char* kScriptBudgetKey = "script_budget_ms";
-// How often the watchdog looks at the scripts that run: a call is stopped at most two of these
-// past its budget.
-inline constexpr int kScriptWatchIntervalMs = 10;
+// What a call stopped past its budget has to unwind (its ensure clauses run) before it is stopped
+// at every instruction.
+inline constexpr int kScriptGraceMs = 50;
+// How often the watchdog asks again a call it asked to stop that is still in the engine's own work.
+inline constexpr int kScriptWatchRetryMs = 10;
 
 }  // namespace redgem::config

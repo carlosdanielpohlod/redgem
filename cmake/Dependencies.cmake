@@ -211,6 +211,10 @@ target_link_libraries(imgui_stack PUBLIC raylib)
 add_library(cgltf_headers INTERFACE)
 target_include_directories(cgltf_headers SYSTEM INTERFACE "${cgltf_SOURCE_DIR}")
 
+# The interpreter reads its code fetch hook atomically (see the script for why).
+set(MRUBY_SOURCE "${mruby_SOURCE_DIR}")
+include("${CMAKE_SOURCE_DIR}/cmake/patch_mruby.cmake")
+
 # (On Windows, rake is a batch file beside a script of the same name that only Ruby can start.)
 find_program(REDGEM_RAKE NAMES rake.bat rake REQUIRED)
 set(REDGEM_MRUBY_CONFIG "${CMAKE_SOURCE_DIR}/cmake/mruby_build_config.rb")
@@ -240,7 +244,7 @@ add_custom_command(
           ${REDGEM_MRUBY_ENV}
           ${REDGEM_RAKE} -j${REDGEM_CPU_COUNT} all
   WORKING_DIRECTORY "${mruby_SOURCE_DIR}"
-  DEPENDS "${REDGEM_MRUBY_CONFIG}"
+  DEPENDS "${REDGEM_MRUBY_CONFIG}" "${CMAKE_SOURCE_DIR}/cmake/patch_mruby.cmake"
   COMMENT "Building mruby ${REDGEM_MRUBY_TAG}"
   VERBATIM)
 add_custom_target(mruby_build DEPENDS "${REDGEM_MRUBY_LIB}")

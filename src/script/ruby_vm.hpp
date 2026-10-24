@@ -47,6 +47,8 @@ class RubyVm {
   // How long each call from C++ may run Ruby; zero (the default) for no limit.
   void set_budget(std::chrono::milliseconds budget);
   std::chrono::milliseconds budget() const { return budget_.limit(); }
+  // For the engine's work known to be long, which pauses it (BudgetPause).
+  ScriptBudget& budget_keeper() { return budget_; }
 
  private:
   RubyResult run_protected(mrb_protect_error_func* body, void* request);

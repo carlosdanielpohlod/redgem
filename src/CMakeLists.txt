@@ -133,6 +133,8 @@ endfunction()
 redgem_add_library(redgem_core
   core/log.cpp
   core/message_lines.cpp
+  core/coarse_clock.cpp
+  core/signal_stack.cpp
   core/xml_writer.cpp
   core/platform.cpp
   core/platform_desktop.cpp
@@ -395,7 +397,6 @@ redgem_add_library(redgem_runtime
   app/bundled_game.cpp
   app/save_location.cpp
   app/input_bindings_store.cpp
-  app/script_budget_setting.cpp
   app/user_settings.cpp
   app/game_display.cpp
   app/presenter.cpp

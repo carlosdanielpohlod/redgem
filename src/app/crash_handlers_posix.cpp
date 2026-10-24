@@ -9,6 +9,7 @@
 #include <execinfo.h>
 #endif
 #include <fcntl.h>
+#include <pthread.h>
 #if defined(__APPLE__)
 #include <sys/ucontext.h>
 #endif
@@ -16,6 +17,7 @@
 #include <unistd.h>
 
 #include <array>
+#include <atomic>
 #include <cerrno>
 #include <csignal>
 #include <cstdlib>
@@ -26,6 +28,7 @@
 #include "app/crash_handlers.hpp"
 #include "app/crash_report.hpp"
 #include "app/crash_text.hpp"
+#include "core/signal_stack.hpp"
 
 namespace redgem::crash {
 namespace {
@@ -34,8 +37,6 @@ namespace {
 constexpr std::array<int, 5> kFatalSignals = {SIGSEGV, SIGBUS, SIGABRT, SIGFPE, SIGILL};
 // How a shell tells a program the signal ended: what a crash during the report ends with.
 constexpr int kSignalExitBase = 128;
-// The stack the handler runs on: its own, as a crash may be the program's stack running out.
-constexpr std::size_t kHandlerStackBytes = 64 * 1024;
 constexpr int kMaxFrames = 64;
 constexpr std::size_t kMaxPathBytes = 4096;
 constexpr mode_t kFolderMode = 0755;
@@ -44,8 +45,10 @@ constexpr char kSeparator = '/';
 constexpr const char* kLineEnd = "\n";
 constexpr const char* kNoFrames = "  (none: the system gave no frames)\n";
 
-// Set while a crash is being reported: a second one (the handler crashing) ends the program at once.
-volatile std::sig_atomic_t reporting = 0;
+// Set once a crash is being reported, and by which thread. (A lock-free atomic may be used in a
+// signal handler.)
+std::atomic<bool> reporting{false};
+pthread_t reporter;
 
 void write_text(int fd, const char* text) {
   std::size_t left = std::strlen(text);
@@ -132,9 +135,20 @@ void write_signal_report(int signal, const void* context) {
   close(fd);
 }
 
+// Whether this thread is the one reporting a crash (pthread_self is not on POSIX's list of what a
+// handler may call, but it reads a register on every system the engine runs on).
+bool reporting_here() { return pthread_equal(reporter, pthread_self()) != 0; }
+
+// A crash while another thread reports one waits for that report, which ends the program; one in
+// the reporting thread itself (the handler crashing) ends it at once.
+void wait_for_the_report(int signal) {
+  if (reporting_here()) _exit(kSignalExitBase + signal);
+  for (;;) pause();
+}
+
 void on_fatal_signal(int signal, siginfo_t*, void* context) {
-  if (reporting != 0) _exit(kSignalExitBase + signal);
-  reporting = 1;
+  if (reporting.exchange(true)) wait_for_the_report(signal);
+  reporter = pthread_self();
   write_signal_report(signal, context);
   write_text(STDERR_FILENO, prepared_crash().closed_message.c_str());
   write_text(STDERR_FILENO, kLineEnd);
@@ -142,18 +156,10 @@ void on_fatal_signal(int signal, siginfo_t*, void* context) {
   raise(signal);
 }
 
-void use_handler_stack() {
-  static const std::unique_ptr<char[]> memory(new char[kHandlerStackBytes]);
-  stack_t stack = {};
-  stack.ss_sp = memory.get();
-  stack.ss_size = kHandlerStackBytes;
-  sigaltstack(&stack, nullptr);
-}
-
 }  // namespace
 
 void install_fatal_handlers() {
-  use_handler_stack();
+  give_this_thread_a_signal_stack();
   (void)current_backtrace();  // the first backtrace loads what it needs: not in a handler
   struct sigaction action = {};
   action.sa_sigaction = on_fatal_signal;

@@ -98,3 +98,12 @@ TEST_CASE("an exception that reaches the program's top is reported") {
 }
 
 TEST_CASE("running out of memory is reported as such") { check_reported("memory", "out of memory"); }
+
+TEST_CASE("running out of memory where nobody catches it is reported as such too") {
+#if defined(_WIN32)
+  // (Windows may hand it to the unhandled exception filter first, which cannot tell what it was.)
+  check_reported("terminate-memory", "uncaught exception");
+#else
+  check_reported("terminate-memory", "out of memory");
+#endif
+}

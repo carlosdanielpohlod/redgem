@@ -5,6 +5,7 @@
 #include <system_error>
 #include <thread>
 
+#include "core/signal_stack.hpp"
 #include "net/http/http_exchange.hpp"
 
 namespace redgem::net {
@@ -40,6 +41,7 @@ void HttpClient::launch(int id, HttpRequest request, Url url) {
   job->id = id;
   try {
     std::thread([job, request = std::move(request), url = std::move(url), trust = trust_] {
+      give_this_thread_a_signal_stack();  // (a crash on it is reported too)
       job->response = exchange(request, url, trust, job->cancelled);
       job->done.store(true);
     }).detach();

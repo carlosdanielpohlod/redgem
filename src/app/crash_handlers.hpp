@@ -40,8 +40,8 @@ void show_player(const std::string& message);
 // Writes the report of a crash happening now; where it went, or nothing when it could not be
 // written. Not for a signal handler (it allocates).
 std::filesystem::path write_report(const std::string& cause, const std::vector<std::string>& backtrace);
-// Writes the report, tells the player and ends the program (for std::terminate, and the handlers
-// of systems where a crash is not a signal).
-[[noreturn]] void report_and_end(const std::string& cause, const std::vector<std::string>& backtrace);
+// Writes the report, tells the player `message` and ends the program (for std::terminate).
+[[noreturn]] void report_and_end(const std::string& cause, const std::vector<std::string>& backtrace,
+                                 const std::string& message);
 
 }  // namespace redgem::crash

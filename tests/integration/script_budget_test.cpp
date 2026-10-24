@@ -24,7 +24,7 @@
 #endif
 
 #include "app/engine.hpp"
-#include "app/script_budget_setting.hpp"
+#include "app/game_settings.hpp"
 #include "core/config.hpp"
 #include "script/ruby_vm.hpp"
 #include "script/script_config.hpp"
@@ -92,6 +92,24 @@ const std::map<std::string, std::string> kScripts = {
     {"starter.rb",
      "class Starter < Behaviour\n  def start = loop {}\n  def update(_dt) = $starter_updated = true\nend\n"},
     {"counter.rb", "class Counter < Behaviour\n  def update(_dt) = $counted = ($counted || 0) + 1\nend\n"},
+    // A stopped call's ensure runs, on a short grace: it may put things back, even spawn.
+    {"resetter.rb",
+     "class Resetter < Behaviour\n  def update(_dt)\n    $state = :busy\n    loop {}\n  ensure\n"
+     "    $state = :idle\n  end\nend\n"},
+    {"endless_ensure.rb",
+     "class EndlessEnsure < Behaviour\n  def update(_dt)\n    loop {}\n  ensure\n    loop {}\n  end\nend\n"},
+    {"spawner.rb",
+     "class Spawner < Behaviour\n  def update(_dt)\n    loop {}\n  ensure\n    Scene.spawn('innocent.rb')\n  "
+     "end\nend\n"},
+    {"innocent.rb", "class Innocent < Behaviour\n  def start = $innocents = ($innocents || 0) + 1\nend\n"},
+    // Calls the engine makes from inside a call are not that call's time: two slow objects made
+    // from one update, each nearly a budget long, leave it well within its own.
+    {"slow.rb",
+     "class Slow < Behaviour\n  def initialize(*arguments)\n    super\n    started = Time.now\n"
+     "    nil while Time.now - started < 0.07\n  end\nend\n"},
+    {"patient.rb",
+     "class Patient < Behaviour\n  def update(_dt)\n    return if $patient_done\n"
+     "    2.times { Scene.spawn('slow.rb') }\n    $patient_done = true\n  end\nend\n"},
 };
 
 // A game of its own in a temporary folder, with the scripts above and a budget of kTestBudgetMs.
@@ -210,18 +228,61 @@ TEST_CASE("code the engine runs (a scene script, a console line) is stopped the 
 
 TEST_CASE("the budget is game.json's script_budget_ms, else the engine's own") {
   const std::filesystem::path given = budget_game("given", budget_settings());
-  CHECK(script_budget_for(given) == kTestBudget);
+  CHECK(read_game_manifest(given).settings.script_budget_ms == kTestBudgetMs);
   const std::filesystem::path none = budget_game("none", "{}");
-  CHECK(script_budget_for(none).count() == config::kDefaultScriptBudgetMs);
+  CHECK(read_game_manifest(none).settings.script_budget_ms == config::kDefaultScriptBudgetMs);
+  CHECK(read_game_manifest(none).script_budget_error.empty());
   for (const char* unusable : {"0", "-5", "1.5", "\"fast\"", "100000000"}) {
     const std::filesystem::path wrong = budget_game("wrong", std::string("{\"script_budget_ms\": ") + unusable + "}");
-    test::LogCapture capture;
-    CHECK(script_budget_for(wrong).count() == config::kDefaultScriptBudgetMs);
-    CHECK(capture.contains("script_budget_ms must be a whole number"));
+    const GameManifest manifest = read_game_manifest(wrong);
+    CHECK(manifest.settings.script_budget_ms == config::kDefaultScriptBudgetMs);
+    CHECK(manifest.script_budget_error.find("script_budget_ms must be a whole number") != std::string::npos);
     std::filesystem::remove_all(wrong);
   }
   std::filesystem::remove_all(given);
   std::filesystem::remove_all(none);
+}
+
+TEST_CASE("a stopped call's ensure runs and puts things back") {
+  const TestDeadline deadline("resetter");
+  const std::filesystem::path game = budget_game("ensure", budget_settings());
+  std::unique_ptr<Engine> engine = started(game, scene_of({"resetter.rb"}));
+  frames(*engine, 1);
+  CHECK(engine->scripts().error_count() == 1);
+  CHECK(ruby(*engine, "$state.inspect") == ":idle");
+  engine.reset();
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("an ensure that never returns is stopped all the same") {
+  check_stopped("endless_ensure.rb", "EndlessEnsure#update",
+                "it went on in a rescue or an ensure after it was stopped");
+}
+
+TEST_CASE("objects a stopped call spawns as it unwinds get their behaviours, and the error names the culprit") {
+  const TestDeadline deadline("spawner");
+  const std::filesystem::path game = budget_game("spawner", budget_settings());
+  test::LogCapture capture;
+  std::unique_ptr<Engine> engine = started(game, scene_of({"spawner.rb", "innocent.rb"}));
+  frames(*engine, kFramesAfter);
+  CHECK(engine->scripts().error_count() == 1);
+  CHECK(capture.contains("Spawner#update on 'spawner.rb' (behaviour disabled)"));
+  CHECK(capture.contains("ScriptTimeout"));
+  CHECK(ruby(*engine, "$innocents") == "2");  // the scene's, and the one spawned
+  engine.reset();
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("the calls the engine makes from inside a call are not that call's time") {
+  const TestDeadline deadline("patient");
+  const std::filesystem::path game = budget_game("patient", budget_settings());
+  test::LogCapture capture;
+  std::unique_ptr<Engine> engine = started(game, scene_of({"patient.rb", "slow.rb"}));
+  frames(*engine, kFramesAfter);
+  CHECK(engine->scripts().error_count() == 0);
+  CHECK(ruby(*engine, "$patient_done.inspect") == "true");
+  engine.reset();
+  std::filesystem::remove_all(game);
 }
 
 TEST_CASE("a running game's scripts are on the budget game.json gives them") {

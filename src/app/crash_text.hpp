@@ -37,6 +37,8 @@ class FixedText {
   }
   // A whole number, written with at least `width` digits (zeros in front).
   void append_number(std::int64_t value, int width = 1);
+  // A number in hexadecimal, small letters, no prefix ("1a2b").
+  void append_hex(std::uint64_t value);
   const char* c_str() const { return bytes_; }
   // (For a system call that takes a text it may change in place, as long as it puts it back.)
   char* data() { return bytes_; }
@@ -59,6 +61,20 @@ void FixedText<Size>::append_number(std::int64_t value, int width) {
   char digits[kMaxDigits];
   const int count = reversed_digits(value < 0 ? -value : value, digits);
   for (int pad = count; pad < width; ++pad) append('0');
+  for (int i = count - 1; i >= 0; --i) append(digits[i]);
+}
+
+template <std::size_t Size>
+void FixedText<Size>::append_hex(std::uint64_t value) {
+  constexpr const char* kHexDigits = "0123456789abcdef";
+  constexpr int kBitsPerDigit = 4;
+  constexpr std::uint64_t kDigitMask = 0xf;
+  char digits[kMaxDigits];
+  int count = 0;
+  do {
+    digits[count++] = kHexDigits[value & kDigitMask];
+    value >>= kBitsPerDigit;
+  } while (value > 0);
   for (int i = count - 1; i >= 0; --i) append(digits[i]);
 }
 

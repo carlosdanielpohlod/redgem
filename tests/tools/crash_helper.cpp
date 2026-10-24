@@ -1,6 +1,6 @@
 // Crashes on purpose, for tests/integration/crash_handling_test.cpp: it installs the crash
 // handling a shipped game has, for a game, then crashes the way it is asked to.
-//   redgem_crash_helper <user data folder> <game folder> segv|abort|terminate|exception|memory
+//   redgem_crash_helper <user data folder> <game folder> segv|abort|terminate|terminate-memory|exception|memory
 // (Built with the tests, never shipped.)
 
 #include <csignal>
@@ -32,6 +32,8 @@ int crash(const std::string& how) {
   if (how == "abort") std::abort();
   // An exception out of a thread: nobody can catch it, std::terminate is called.
   if (how == "terminate") std::thread([] { throw std::runtime_error("thrown where nobody catches it"); }).join();
+  // Memory running out where nobody catches it.
+  if (how == "terminate-memory") std::thread([] { throw std::bad_alloc(); }).join();
   if (how == "exception") throw std::runtime_error("thrown out of the game");
   if (how == "memory") throw std::bad_alloc();
   return redgem::kExitUsage;

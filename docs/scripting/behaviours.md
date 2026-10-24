@@ -123,10 +123,16 @@ a game you play, to Play in the editor and to every room of a dedicated server, 
 has its own scripts and its own budget. Raise it for a scene script that builds a large level in
 one go; a frame's update should never come near it.
 
-`ScriptTimeout` is not a `StandardError`, so `rescue => e` does not catch it, and a script that
-rescues `Exception` is stopped all the same: once a call is over its budget, it stops again at
-every step until it has returned. Time spent inside the engine's own methods counts, but they are
-never cut off halfway: the call stops at its next line of Ruby.
+`ScriptTimeout` is not a `StandardError`, so `rescue => e` does not catch it. A call over its
+budget is stopped once, where it stands, and has 50 ms more to unwind: its `ensure` clauses run,
+so it can put back what it changed. If it is still running after that (an `ensure` that loops, a
+`rescue Exception` that carries on), it is stopped again at every step until it has returned.
+
+What counts is the time spent in the call's own Ruby. Not counted: the work of the engine known
+to take long (spawning objects, placing scatter copies), and the calls the engine makes into the
+scripts from inside it, such as the `start` of a behaviour a spawned object brings, which each
+have a budget of their own. The engine's methods are never cut off halfway: the call stops at its
+next line of Ruby.
 
 A recursion that never ends stops on its own, with `SystemStackError`, long before the program's
 stack runs out, and is handled the same way: its behaviour is switched off. `redgem-test` runs a

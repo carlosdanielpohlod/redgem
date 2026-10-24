@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <csignal>
+#include <cstdint>
 #include <cstring>
 #include <string>
 
@@ -89,4 +90,13 @@ TEST_CASE("fatal signals are named in reports") {
 TEST_CASE("a report names the engine's version and the platform") {
   CHECK(std::strlen(engine_version()) > 0);
   CHECK(std::string(platform_name()).find(' ') != std::string::npos);  // the system, then the processor
+}
+
+TEST_CASE("a fixed text writes numbers in hexadecimal") {
+  constexpr std::uint64_t kOffset = 0x1a2b;
+  FixedText<kTinyText * 4> text;
+  text.append_hex(kOffset);
+  text.append(' ');
+  text.append_hex(0);
+  CHECK(std::string(text.c_str()) == "1a2b 0");
 }

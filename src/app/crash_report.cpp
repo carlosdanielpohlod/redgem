@@ -4,6 +4,7 @@
 #include <ctime>
 #include <exception>
 #include <fstream>
+#include <memory>
 #include <new>
 
 #include "app/crash_handlers.hpp"
@@ -24,6 +25,9 @@ constexpr const char* kFolderSuffix = "-crashes";
 constexpr const char* kNoBacktrace = "  (none: the stack had already unwound)\n";
 constexpr const char* kExceptionCause = "uncaught exception: ";
 constexpr const char* kOutOfMemoryCause = "out of memory (std::bad_alloc)";
+// Memory kept from the start and given back first when memory runs out: what the report and the
+// player's message are then made with.
+constexpr std::size_t kMemoryReserveBytes = 1024 * 1024;
 
 #if defined(_WIN32)
 constexpr const char* kSystem = "Windows";
@@ -52,6 +56,13 @@ PreparedCrash& prepared() {
   static PreparedCrash crash;
   return crash;
 }
+
+std::unique_ptr<char[]>& memory_reserve() {
+  static std::unique_ptr<char[]> reserve;
+  return reserve;
+}
+
+void release_memory_reserve() { memory_reserve().reset(); }
 
 bool& installed() {
   static bool done = false;
@@ -93,6 +104,18 @@ void prepare(const CrashSetup& setup) {
   crash.show_dialog = setup.show_dialog;
 }
 
+// Whether the exception nobody caught is memory running out.
+bool out_of_memory_uncaught() {
+  try {
+    if (const std::exception_ptr current = std::current_exception()) std::rethrow_exception(current);
+  } catch (const std::bad_alloc&) {
+    return true;
+  } catch (...) {
+    return false;
+  }
+  return false;
+}
+
 // What an exception nobody caught says of itself.
 std::string current_exception_text() {
   try {
@@ -105,7 +128,13 @@ std::string current_exception_text() {
   }
 }
 
-[[noreturn]] void on_terminate() { report_and_end(kExceptionCause + current_exception_text(), current_backtrace()); }
+[[noreturn]] void on_terminate() {
+  if (out_of_memory_uncaught()) {
+    release_memory_reserve();
+    report_and_end(kOutOfMemoryCause, current_backtrace(), prepared().out_of_memory_message);
+  }
+  report_and_end(kExceptionCause + current_exception_text(), current_backtrace(), prepared().closed_message);
+}
 
 // Writes the report and tells the player; the exit code a crash ends with.
 int report_and_tell(const std::string& cause, const std::string& message) {
@@ -147,6 +176,7 @@ const char* platform_name() {
 }
 
 void install_crash_handling(const CrashSetup& setup) {
+  memory_reserve().reset(new char[kMemoryReserveBytes]);
   prepare(setup);
   std::set_terminate(on_terminate);
   install_fatal_handlers();
@@ -165,9 +195,9 @@ std::filesystem::path write_report(const std::string& cause, const std::vector<s
   return out.good() ? file : std::filesystem::path();
 }
 
-void report_and_end(const std::string& cause, const std::vector<std::string>& backtrace) {
+void report_and_end(const std::string& cause, const std::vector<std::string>& backtrace, const std::string& message) {
   write_report(cause, backtrace);
-  show_player(prepared().closed_message);
+  show_player(message);
   std::_Exit(kExitFailure);
 }
 
@@ -176,6 +206,7 @@ int end_with_exception(const std::string& what) {
 }
 
 int end_out_of_memory() {
+  release_memory_reserve();
   try {
     return report_and_tell(kOutOfMemoryCause, prepared().out_of_memory_message);
   } catch (const std::bad_alloc&) {
