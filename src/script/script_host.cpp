@@ -37,6 +37,13 @@ std::string starting_locale(const GameLocales& locales) {
   return best_language(translations::requested_language(), locales.languages).value_or(translations::language());
 }
 
+// The value, which ObjectSpace.each_object no longer finds: what the host keeps for itself must be
+// out of scripts' reach, or one could empty it. (As mruby hides its own table of roots, gc.c.)
+mrb_value hidden(mrb_value value) {
+  mrb_obj_ptr(value)->c = nullptr;
+  return value;
+}
+
 // A script can set a wrapper's serial to anything; only the number the host wrote stands for the object.
 bool holds_serial(mrb_value serial, mrb_int wanted) { return mrb_integer_p(serial) && mrb_integer(serial) == wanted; }
 
@@ -87,7 +94,8 @@ mrb_value ScriptHost::object_value(ObjectId object) {
   if (object < 0) return mrb_nil_value();
   mrb_state* mrb = vm_.state();
   const mrb_value key = mrb_int_value(mrb, object);
-  mrb_value cached = mrb_hash_get(mrb, objects_cache_, key);
+  // (fetch, not get: a missing key asks nothing of the Hash class, which scripts can change.)
+  mrb_value cached = mrb_hash_fetch(mrb, objects_cache_, key, mrb_nil_value());
   if (stands_for(cached, context_.scene->at(object))) return cached;
   mrb_value wrapper = new_wrapper(context_.scene->at(object));
   mrb_hash_set(mrb, objects_cache_, key, wrapper);
@@ -124,24 +132,33 @@ void ScriptHost::reset_scene() {
   behaviours_.clear();
   behaviours_by_object_.clear();
   mrb_hash_clear(vm_.state(), objects_cache_);
-  root_behaviours();
+  mrb_hash_clear(vm_.state(), behaviour_roots_);
 }
 
 void ScriptHost::start_roots() {
   mrb_state* mrb = vm_.state();
   // A Hash by id, not an Array: it holds only the objects scripts touched, whatever their ids,
   // where an Array has a largest size a big scene's ids go past.
-  objects_cache_ = mrb_hash_new(mrb);
-  behaviour_roots_ = mrb_ary_new(mrb);
+  objects_cache_ = hidden(mrb_hash_new(mrb));
+  behaviour_roots_ = hidden(mrb_hash_new(mrb));
   // Not in a global: a script could set that to nil and have the collector free what C++ uses.
   mrb_gc_register(mrb, objects_cache_);
   mrb_gc_register(mrb, behaviour_roots_);
 }
 
-void ScriptHost::root_behaviours() {
+void ScriptHost::root_behaviour(ObjectId object, mrb_value instance) {
   mrb_state* mrb = vm_.state();
-  mrb_ary_clear(mrb, behaviour_roots_);
-  for (const BehaviourSlot& slot : behaviours_) mrb_ary_push(mrb, behaviour_roots_, slot.instance);
+  const mrb_value key = mrb_int_value(mrb, object);
+  mrb_value kept = mrb_hash_fetch(mrb, behaviour_roots_, key, mrb_nil_value());
+  if (mrb_nil_p(kept)) {
+    kept = hidden(mrb_ary_new(mrb));
+    mrb_hash_set(mrb, behaviour_roots_, key, kept);
+  }
+  mrb_ary_push(mrb, kept, instance);
+}
+
+void ScriptHost::unroot_behaviours(ObjectId object) {
+  mrb_hash_delete_key(vm_.state(), behaviour_roots_, mrb_int_value(vm_.state(), object));
 }
 
 }  // namespace redgem

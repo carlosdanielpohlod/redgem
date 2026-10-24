@@ -106,8 +106,9 @@ class ScriptHost {
   // Makes the Ruby values the host keeps for itself (the GameObject wrappers by id, the behaviour
   // instances) and roots them from C++, where no script can reach them to let them go.
   void start_roots();
-  // Makes the rooted behaviour instances the ones behaviours_ holds again (after some went).
-  void root_behaviours();
+  // Keeps a behaviour instance alive for as long as its object is there, and lets go of them.
+  void root_behaviour(ObjectId object, mrb_value instance);
+  void unroot_behaviours(ObjectId object);
 
   // Scripts and the behaviours made of their classes.
   void attach(ObjectId object, const std::string& script);
@@ -123,6 +124,9 @@ class ScriptHost {
   // The class a top-level constant names, or nullptr when there is none or the constant is not a
   // class (a script may set `Player = 5`): asking mruby for it then raises where nothing catches it.
   RClass* class_named(const std::string& name);
+  // The engine's module of that name (Network, HTTP), or nil when a script set the name to
+  // something else: calling a method on nil is then an error the call reports, not an abort.
+  mrb_value module_named(const char* name);
   // Whether a Ruby class is Behaviour or inherits from it.
   bool is_behaviour_class(RClass* klass);
   // Whether a behaviour class, or a module it includes, defines `method` rather than Behaviour.
@@ -153,8 +157,8 @@ class ScriptHost {
   std::string locale_;
   RubyVm vm_;
   mrb_value objects_cache_ = mrb_nil_value();
-  // Every instance in behaviours_: what keeps them alive while C++ still calls them, whatever a
-  // script does to the GameObject's own list of them.
+  // Every instance in behaviours_, in an Array by object id: what keeps them alive while C++
+  // still calls them, whatever a script does to the GameObject's own list of them.
   mrb_value behaviour_roots_ = mrb_nil_value();
   std::vector<BehaviourSlot> behaviours_;
   // Where each object's behaviours are in behaviours_, in the order they were attached: what a

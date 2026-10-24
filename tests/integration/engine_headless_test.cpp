@@ -309,6 +309,36 @@ TEST_CASE("a script letting go of what the engine keeps frees nothing the engine
   CHECK(ruby(*engine, "Scene.find('Hero').name") == "Hero");
 }
 
+// Nor can a script find what the engine keeps by walking every object there is and empty it.
+TEST_CASE("what the engine keeps cannot be found through ObjectSpace and emptied") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, "$spawner_on = true");
+  frames(*engine, 1);
+  ruby(*engine, "$spawner_on = false");
+  ruby(*engine,
+       "ObjectSpace.each_object(Hash) { |h| h.clear unless h.frozen? }; "
+       "ObjectSpace.each_object(Array) { |a| a.clear unless a.frozen? }; GC.start");
+  CHECK(ruby(*engine, "ObjectSpace.each_object(Bullet) {}") == "1");
+  frames(*engine, kOneSecondOfFrames);  // GcStress collects in every callback meanwhile
+  CHECK(ruby(*engine, "$bullet_starts") == "1");
+}
+
+// The engine's own modules looked up by name: one a script replaced is the script's error.
+TEST_CASE("a script that replaces the Network or HTTP module gets errors, not the end of the game") {
+  test::LogCapture capture;
+  auto engine = sandbox();
+  frames(*engine, 1);
+  const int errors = engine->scripts().error_count();
+  ruby(*engine, "Network = 5; HTTP = 5");
+  engine->scripts().dispatch(net::NetworkEvent::of(net::NetworkEvent::Kind::PeerJoined, 2));
+  engine->scripts().dispatch(net::HttpResult{});
+  ruby(*engine, "Game.load_scene('level2')");
+  frames(*engine, 1);
+  CHECK(engine->scene_name() == "level2");
+  CHECK(engine->scripts().error_count() > errors);
+}
+
 // The serial says which object a wrapper stands for; a script writing something else there gets
 // a new wrapper, not a number read out of whatever it wrote.
 TEST_CASE("a wrapper whose serial a script replaced stands for nothing") {

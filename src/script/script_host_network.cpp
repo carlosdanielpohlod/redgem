@@ -47,13 +47,11 @@ std::vector<mrb_value> event_arguments(mrb_state* mrb, const net::NetworkEvent& 
           binding::text_value(mrb, event.name), value_from(mrb, event.data), mrb_int_value(mrb, event.ticket)};
 }
 
-mrb_value network_module(mrb_state* mrb) { return mrb_obj_value(mrb_module_get(mrb, kNetworkModule)); }
-
 }  // namespace
 
 void ScriptHost::scene_was_reset() {
   for (const char* name : kResettingModules) {
-    const RubyResult result = vm_.call(mrb_obj_value(mrb_module_get(vm_.state(), name)), kSceneResetEntry);
+    const RubyResult result = vm_.call(module_named(name), kSceneResetEntry);
     if (!result.ok) report_error(std::string("resetting the handlers of ") + name, result.error);
   }
 }
@@ -63,7 +61,7 @@ void ScriptHost::dispatch(const net::NetworkEvent& event) {
   const int arena = mrb_gc_arena_save(mrb);
   // What another machine sent becomes Ruby values inside the protected call: should there be no
   // memory for them, that is one message lost, not the game.
-  const RubyResult result = vm_.call_with(network_module(mrb), kNetworkEventEntry,
+  const RubyResult result = vm_.call_with(module_named(kNetworkModule), kNetworkEventEntry,
                                           [&event](mrb_state* vm) { return event_arguments(vm, event); });
   mrb_gc_arena_restore(mrb, arena);
   if (result.ok) return;

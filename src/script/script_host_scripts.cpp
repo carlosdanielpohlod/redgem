@@ -72,6 +72,13 @@ RClass* ScriptHost::class_named(const std::string& name) {
   return mrb_class_p(constant) ? mrb_class_ptr(constant) : nullptr;
 }
 
+mrb_value ScriptHost::module_named(const char* name) {
+  mrb_state* mrb = vm_.state();
+  if (!mrb_class_defined(mrb, name)) return mrb_nil_value();
+  const mrb_value constant = mrb_const_get(mrb, mrb_obj_value(mrb->object_class), mrb_intern_cstr(mrb, name));
+  return mrb_type(constant) == MRB_TT_MODULE ? constant : mrb_nil_value();
+}
+
 bool ScriptHost::defines_its_class(const std::string& script, const std::string& class_name, const std::string& where) {
   if (class_named(class_name) != nullptr) return true;
   report_error(where, script + " does not define class " + class_name);
@@ -115,7 +122,7 @@ mrb_value ScriptHost::instantiate(ObjectId object, RClass* klass, const std::str
   if (!instance.ok) return not_created(class_name + ".new on '" + object_name + "'", instance.error);
   const RubyResult attached = vm_.call(instance.value, "__attach", {object_value(object)});
   if (!attached.ok) return not_created(class_name + "#__attach", attached.error);
-  mrb_ary_push(vm_.state(), behaviour_roots_, instance.value);
+  root_behaviour(object, instance.value);
   behaviours_by_object_[object].push_back(behaviours_.size());
   behaviours_.push_back(
       {context_.scene->handle(object), instance.value, class_name, false, true, overrides(klass, "fixed_update")});

@@ -114,7 +114,7 @@ void ScriptHost::detach(ObjectId object) {
                                      [object](const BehaviourSlot& slot) { return slot.object.id == object; }),
                       behaviours_.end());
     index_behaviours();  // the others moved down
-    root_behaviours();   // and those that went are no longer kept
+    unroot_behaviours(object);
   }
   const int arena = mrb_gc_arena_save(vm_.state());
   const RubyResult removed = vm_.call(object_value(object), kDestroyedEntry);
