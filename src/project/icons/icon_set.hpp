@@ -8,8 +8,9 @@
 
 #include "project/icons/bytes.hpp"
 
-// A game's icon (game.json "icon": a square PNG, 1024 pixels a side at best) made into the files
-// each system shows programs by: a Windows .ico, a Mac .icns, PNGs for Linux and Android.
+// A game's icon (game.json "icon": a square PNG, 1024 pixels a side at best) made into what each
+// system shows programs by: pictures inside a Windows program (see exe_icon.hpp), a Mac .icns,
+// PNGs for Linux and Android.
 namespace redgem {
 
 // The icon at several sizes: a side in pixels to a square PNG of that side.
@@ -32,8 +33,6 @@ std::optional<IconSet> icon_set_from(const std::filesystem::path& png, const Sid
   return scaled_icons(png, sides.data(), sides.size(), error);
 }
 
-// A Windows icon file holding every picture of `icons` as a PNG (Windows Vista and later read them).
-bytes::Bytes ico_file(const IconSet& icons);
 // A Mac icon file holding those of `icons` whose side is one of kMacIconSides, as PNGs.
 bytes::Bytes icns_file(const IconSet& icons);
 

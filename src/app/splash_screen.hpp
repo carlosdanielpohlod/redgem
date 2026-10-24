@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <vector>
 
 #include "app/presenter.hpp"
 
@@ -11,9 +13,9 @@
 // happen in between).
 namespace redgem {
 
-// The picture, when the game names one that is a PNG inside its folder that can be decoded;
-// nullopt otherwise (with a warning for one that is named and cannot be used).
-std::optional<std::filesystem::path> splash_picture(const std::filesystem::path& game_dir);
+// What the picture's file holds, when the game names one that is a PNG inside its folder that can
+// be decoded; nullopt otherwise (with a warning for one that is named and cannot be used).
+std::optional<std::vector<std::uint8_t>> splash_picture(const std::filesystem::path& game_dir);
 
 // Shows the game's splash picture, fitted to the window with black bars around it, when the game
 // is played in a window of its own (a built game, --play, a phone). Nothing for anyone else: the

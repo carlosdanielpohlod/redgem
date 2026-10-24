@@ -1,4 +1,5 @@
 {
+  "project.android.bundletool_jar_missing": "{variable} names {jar}, which is not a file: point it at bundletool's .jar (bundletool-all-<version>.jar)",
   "project.android.no_bundletool": "an App Bundle is made with Google's bundletool, which was not found: put bundletool on the PATH, or set {variable} to its .jar (https://github.com/google/bundletool/releases)",
   "project.build.bundle_is_for_android": "--bundle makes an Android App Bundle: use it with --target android",
   "project.build.cannot_empty": "cannot empty {folder} for the new build: {reason}",
@@ -12,6 +13,7 @@
   "project.cli.built": "built {out_dir} for {target}: run {executable}",
   "project.cli.built_bundle": "built {out_dir} for {target}: upload {executable} to Google Play",
   "project.cli.built_for_phone": "built {out_dir} for {target}: install it with adb install {executable}",
+  "project.cli.bundle_needs_build": "--bundle is for redgem build (with --target android)",
   "project.cli.choose_one_mode": "choose one of: new, build, --play",
   "project.cli.created": "created {game_dir} ({template}). Open it with: redgem {game_dir}",
   "project.cli.gpu_needs_card": "--gpu needs auto, dedicated or integrated",

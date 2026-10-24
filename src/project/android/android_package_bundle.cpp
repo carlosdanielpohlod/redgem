@@ -62,10 +62,18 @@ std::string sign_bundle_command(const std::filesystem::path& stage_dir, const Si
          posix_shell_word(stage_dir / kUnsignedBundle) + " " + posix_shell_word(key.alias);
 }
 
-// Whether a folder of the PATH (an empty one names none) holds the program.
-bool lies_in(const std::string& folder, const std::filesystem::path& program) {
+constexpr auto kRunnable =
+    std::filesystem::perms::owner_exec | std::filesystem::perms::group_exec | std::filesystem::perms::others_exec;
+
+bool runnable(const std::filesystem::path& program) {
   std::error_code fs_error;
-  return !folder.empty() && std::filesystem::is_regular_file(program, fs_error);
+  const bool file = std::filesystem::is_regular_file(program, fs_error);
+  return file && (std::filesystem::status(program, fs_error).permissions() & kRunnable) != std::filesystem::perms::none;
+}
+
+// Whether a folder of the PATH holds the program, which may run (an empty folder names none).
+bool lies_in(const std::string& folder, const std::filesystem::path& program) {
+  return !folder.empty() && runnable(program);
 }
 
 std::optional<std::filesystem::path> program_on_path(const std::string& name, const std::string& path_variable) {
@@ -77,14 +85,20 @@ std::optional<std::filesystem::path> program_on_path(const std::string& name, co
   return std::nullopt;
 }
 
+// The .jar the environment names, run with Java; a name that is no file is said, not passed over.
+std::optional<std::string> bundletool_jar(const std::string& jar, std::string& error) {
+  std::error_code fs_error;
+  if (std::filesystem::is_regular_file(jar, fs_error))
+    return std::string(kJavaTool) + kJarOption + posix_shell_word(jar);
+  error = tr("project.android.bundletool_jar_missing", {{"variable", kBundletoolVariable}, {"jar", jar}});
+  return std::nullopt;
+}
+
 }  // namespace
 
 std::optional<std::string> find_bundletool(const std::string& jar_variable_value, const std::string& path_variable,
                                            std::string& error) {
-  std::error_code fs_error;
-  if (std::filesystem::is_regular_file(jar_variable_value, fs_error)) {
-    return std::string(kJavaTool) + kJarOption + posix_shell_word(jar_variable_value);
-  }
+  if (!jar_variable_value.empty()) return bundletool_jar(jar_variable_value, error);
   if (const auto program = program_on_path(android_names::kBundletoolTool, path_variable)) {
     return posix_shell_word(*program);
   }

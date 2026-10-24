@@ -12,8 +12,8 @@ inline constexpr const char* kBundledGameFolder = "game";
 inline constexpr const char* kMacContentsFolder = "Contents";
 inline constexpr const char* kMacProgramFolder = "MacOS";
 inline constexpr const char* kMacResourcesFolder = "Resources";
-// The game a built executable ships with: the game folder next to it, or the one in the
-// resources of the app it is in, when there is one.
+// The game a built executable ships with, when there is one: the game folder next to it, or for
+// the program of a Mac app (in <name>.app/Contents/MacOS) the one in the app's resources.
 std::optional<std::filesystem::path> bundled_game(const std::filesystem::path& executable);
 
 }  // namespace redgem

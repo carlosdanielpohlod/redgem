@@ -501,7 +501,7 @@ if(NOT ANDROID)
     project/game_build_shipping.cpp
     project/game_build_mac.cpp
     project/icons/icon_set.cpp
-    project/icons/icon_files.cpp
+    project/icons/icns_file.cpp
     project/icons/exe_icon.cpp
     project/android/android_package.cpp
     project/android/android_package_names.cpp

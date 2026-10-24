@@ -113,8 +113,9 @@ bool pack_android_apk(const AndroidTools& tools, const std::filesystem::path& st
 // `bundletool` on the PATH, or its .jar where REDGEM_BUNDLETOOL says (run with Java). It is
 // signed with Java's jarsigner, and laid out with zip and unzip.
 inline constexpr const char* kBundletoolVariable = "REDGEM_BUNDLETOOL";
-// How bundletool is run here, as the start of a command line; nullopt, with `error` saying how to
-// get it, when it is nowhere.
+// How bundletool is run here, as the start of a command line: the .jar REDGEM_BUNDLETOOL names
+// (`jar_variable_value`), else a runnable `bundletool` in a folder of `path_variable`. nullopt,
+// with `error` saying how to get it, when it is nowhere or the variable names no file.
 std::optional<std::string> find_bundletool(const std::string& jar_variable_value, const std::string& path_variable,
                                            std::string& error);
 // The commands that make an App Bundle of a staged folder (each run from the stage folder): the

@@ -21,7 +21,6 @@
 using namespace redgem;
 using bytes::Bytes;
 using bytes::read_big;
-using bytes::read_little;
 
 namespace {
 
@@ -29,8 +28,6 @@ constexpr ::Color kRed{230, 41, 55, 255};
 constexpr ::Color kBlue{0, 121, 241, 255};  // (raylib's own colors are macros the engine's Color would clash with)
 
 constexpr int kIconSide = 64;  // the test's icon: small, so it is quick to scale
-constexpr std::size_t kIcoHeaderBytes = 6;
-constexpr std::size_t kIcoEntryBytes = 16;
 constexpr std::size_t kIcnsHeaderBytes = 8;
 
 // A folder of the test's own, removed when the test ends, with a game in it.
@@ -100,25 +97,6 @@ TEST_CASE("an icon must be a square PNG that can be read") {
   CHECK_FALSE(icon_set_from(scratch.game / "images" / "missing.png", kMacIconSides, error));
 }
 
-TEST_CASE("a Windows icon file holds every picture as a PNG, its entries saying where") {
-  const Scratch scratch;
-  const IconSet icons = test_icons(scratch);
-  const Bytes ico = ico_file(icons);
-  CHECK(read_little(ico, 0, 2) == 0);
-  CHECK(read_little(ico, 2, 2) == 1);  // an icon
-  REQUIRE(read_little(ico, 4, 2) == icons.size());
-  std::size_t index = 0;
-  for (const auto& [side, png] : icons) {
-    const std::size_t entry = kIcoHeaderBytes + index++ * kIcoEntryBytes;
-    CHECK(ico[entry] == (side == 256 ? 0 : side));  // 256 does not fit a byte: it is 0
-    CHECK(read_little(ico, entry + 6, 2) == 32);    // bits per pixel
-    const std::uint32_t size = read_little(ico, entry + 8, 4);
-    const std::uint32_t offset = read_little(ico, entry + 12, 4);
-    CHECK(size == png.size());
-    CHECK(Bytes(ico.begin() + offset, ico.begin() + offset + size) == png);
-  }
-}
-
 TEST_CASE("a Mac icon file holds the sizes Apple reads as PNGs, each after its type and length") {
   const Scratch scratch;
   write_png(scratch.game / "images" / "icon.png", kIconSide, kIconSide);
@@ -143,8 +121,8 @@ TEST_CASE("a Linux menu entry names the game, its program and its icon") {
   CHECK(desktop_entry("Coin Rush", "coin_rush", true) ==
         "[Desktop Entry]\nType=Application\nName=Coin Rush\nExec=coin_rush\nIcon=coin_rush\n"
         "Categories=Game;\nTerminal=false\n");
-  const std::string without_icon = desktop_entry(R"(Back\slash)", "game", false);
-  CHECK(without_icon.find("Name=Back\\\\slash\n") != std::string::npos);
+  const std::string without_icon = desktop_entry("Back\\slash\nTwo\tTabs", "game", false);
+  CHECK(without_icon.find("Name=Back\\\\slash\\nTwo\\tTabs\n") != std::string::npos);
   CHECK(without_icon.find("Icon=") == std::string::npos);
 }
 

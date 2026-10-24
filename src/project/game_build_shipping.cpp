@@ -3,8 +3,9 @@
 
 #include "project/game_shipping.hpp"
 
-#include <fstream>
-#include <iterator>
+#include <algorithm>
+#include <array>
+#include <utility>
 
 #include "app/game_settings.hpp"
 #include "core/files.hpp"
@@ -18,26 +19,31 @@ namespace redgem {
 namespace {
 
 constexpr const char* kDesktopExtension = ".desktop";
+// The most a player for Windows is read into memory to be given an icon (it is tens of megabytes).
+constexpr std::uintmax_t kMostPlayerBytes = 1024ull * 1024ull * 1024ull;
 constexpr const char* kPngExtension = ".png";
 constexpr char kEscape = '\\';  // what a .desktop file's values escape themselves with
+// What a .desktop value writes escaped, and how (the Desktop Entry Specification's).
+constexpr std::array<std::pair<char, char>, 4> kDesktopEscapes = {
+    {{'\\', '\\'}, {'\n', 'n'}, {'\t', 't'}, {'\r', 'r'}}};
 // A menu entry, by the freedesktop.org Desktop Entry Specification: a game, started without a terminal.
 constexpr const char* kDesktopHeader = "[Desktop Entry]\nType=Application\n";
 constexpr const char* kDesktopTail = "Categories=Game;\nTerminal=false\n";
 
-// A title as a .desktop value: a backslash is the one character there that says something else.
+// A title as a .desktop value: a backslash, a line break, a tab and a carriage return are written
+// as escapes, so the title stays one value on one line.
 std::string desktop_value(const std::string& text) {
   std::string value;
   for (const char letter : text) {
-    if (letter == kEscape) value.push_back(kEscape);
-    value.push_back(letter);
+    const auto* escape = std::find_if(kDesktopEscapes.begin(), kDesktopEscapes.end(),
+                                      [letter](const std::pair<char, char>& known) { return known.first == letter; });
+    if (escape == kDesktopEscapes.end()) {
+      value.push_back(letter);
+    } else {
+      value += {kEscape, escape->second};
+    }
   }
   return value;
-}
-
-std::optional<bytes::Bytes> read_bytes(const std::filesystem::path& file) {
-  std::ifstream in(file, std::ios::binary);
-  if (!in) return std::nullopt;
-  return bytes::Bytes(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
 }
 
 bool write_bytes(const std::filesystem::path& file, const bytes::Bytes& data, std::string& error) {
@@ -99,7 +105,7 @@ std::string desktop_entry_file(const std::string& executable) { return executabl
 std::string desktop_icon_file(const std::string& executable) { return executable + kPngExtension; }
 
 bool give_exe_icon(const std::filesystem::path& exe, const std::filesystem::path& icon, std::string& error) {
-  auto program = read_bytes(exe);
+  auto program = read_file_up_to(exe, kMostPlayerBytes);
   if (!program) {
     error = tr("project.icon.cannot_read_player", {{"player", exe.string()}});
     return false;

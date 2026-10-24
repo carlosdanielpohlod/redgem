@@ -135,6 +135,10 @@ TEST_CASE("--bundle asks an Android build for an App Bundle, and a build for a c
   CHECK(bundle.options.android_bundle);
   CHECK_FALSE(parse_cli({"build", "games/mine", "dist/apk", "--target", "android"}).options.android_bundle);
   CHECK(usage().find("--bundle") != std::string::npos);
+  // Nothing but a build makes an app.
+  const CliResult played = parse_cli({"games/mine", "--play", "--bundle"});
+  CHECK_FALSE(played.ok);
+  CHECK(played.error == tr("project.cli.bundle_needs_build"));
   std::string error;
   CHECK_FALSE(build_game_for("games/mine", "dist/mine", BuildTarget::Linux, error, AndroidFormat::Bundle));
   CHECK(error == tr("project.build.bundle_is_for_android"));

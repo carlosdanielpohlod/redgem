@@ -433,9 +433,14 @@ TEST_CASE("bundletool is found as a .jar named by the environment, or as a progr
   const std::filesystem::path jar = scratch.file("tools/bundletool-all.jar", "jar");
   CHECK(find_bundletool(jar.string(), "", error) == "java -jar '" + jar.string() + "'");
   const std::filesystem::path program = scratch.file("bin/bundletool", "#!/bin/sh");
+  CHECK_FALSE(find_bundletool("", program.parent_path().string(), error));  // a file that may not run is none
+  std::filesystem::permissions(program, std::filesystem::perms::owner_exec, std::filesystem::perm_options::add);
   CHECK(find_bundletool("", "/nowhere:" + program.parent_path().string(), error) == "'" + program.string() + "'");
   CHECK_FALSE(find_bundletool("", "/nowhere", error));
   CHECK(error.find(kBundletoolVariable) != std::string::npos);
+  // A variable naming no file is said, rather than passed over for what the PATH has.
+  CHECK_FALSE(find_bundletool("/nowhere/bundletool.jar", program.parent_path().string(), error));
+  CHECK(error.find("/nowhere/bundletool.jar") != std::string::npos);
 }
 
 TEST_CASE("an App Bundle is linked for a bundle, laid out as its one module, made and signed") {

@@ -40,24 +40,23 @@ std::string executable_file(const std::filesystem::path& game_dir, BuildTarget t
 // game's files go in beside it.
 bool names_an_executable(const std::string& name) { return !name.empty() && name != kBundledGameFolder; }
 
-// An App Bundle is Google Play's: a build for a computer makes none.
-bool bundle_asked_for_computer(AndroidFormat format, std::string& error) {
+// Whether a computer's build can make what is asked for: an App Bundle is Google Play's.
+bool fits_computer(AndroidFormat format, std::string& error) {
   if (format == AndroidFormat::Apk) return true;
   error = tr("project.build.bundle_is_for_android");
   return false;
 }
 
-// What a build made: the executable, or on the Mac the app (signed, when built on a Mac).
-std::optional<std::filesystem::path> made_by_build(const std::filesystem::path& game_dir,
-                                                   const std::filesystem::path& out_dir, BuildTarget target,
-                                                   std::string& error) {
-  if (target != BuildTarget::MacOS) return out_dir / executable_file(game_dir, target);
-  const auto identity = build_identity(game_dir, error);
-  if (!identity) return std::nullopt;
-  std::filesystem::path app = out_dir / mac_app_folder(identity->title, executable_name(game_dir));
-  if (platform::is_mac() && !sign_mac_app(app, error)) return std::nullopt;
-  return app;
+// A Mac app built on a Mac is signed (ad hoc) before it is said to be made.
+bool signed_if_mac_app(const std::filesystem::path& made, BuildTarget target, std::string& error) {
+  if (target != BuildTarget::MacOS || !platform::is_mac()) return true;
+  return sign_mac_app(made, error);
 }
+
+std::optional<std::filesystem::path> build_made(const std::filesystem::path& game_dir,
+                                                const std::filesystem::path& out_dir,
+                                                const std::filesystem::path& player, BuildTarget target,
+                                                std::string& error);
 
 }  // namespace
 
@@ -79,10 +78,33 @@ namespace {
 // The game folder a build replaces must not be the game itself, nor hold it.
 bool game_not_in_bundle(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                         std::string& error) {
-  const std::filesystem::path bundle = out_dir / kBundledGameFolder;
-  if (!folder_inside(game_dir, bundle)) return true;
-  error = tr("project.build.game_inside_its_build", {{"game", game_dir.string()}, {"folder", bundle.string()}});
+  return game_outside(game_dir, out_dir / kBundledGameFolder, error);
+}
+
+}  // namespace
+
+bool game_outside(const std::filesystem::path& game_dir, const std::filesystem::path& replaced, std::string& error) {
+  if (!folder_inside(game_dir, replaced)) return true;
+  error = tr("project.build.game_inside_its_build", {{"game", game_dir.string()}, {"folder", replaced.string()}});
   return false;
+}
+
+namespace {
+
+// A build for a computer, with the player for `target` found beside this program (`self`).
+std::optional<std::filesystem::path> build_for_computer(const std::filesystem::path& game_dir,
+                                                        const std::filesystem::path& out_dir, BuildTarget target,
+                                                        const std::filesystem::path& self, std::string& error) {
+  // (What is wrong with the game is said before what is missing here: it is the nearer mistake.)
+  if (!can_build(game_dir, out_dir, error)) return std::nullopt;
+  const auto runtime = runtime_for(target, self);
+  if (!runtime) {
+    error = missing_runtime_message(target, runtime_location(target, self));
+    return std::nullopt;
+  }
+  auto made = build_made(game_dir, out_dir, *runtime, target, error);
+  if (!made || !signed_if_mac_app(*made, target, error)) return std::nullopt;
+  return made;
 }
 
 }  // namespace
@@ -94,16 +116,8 @@ std::optional<std::filesystem::path> build_game_for(const std::filesystem::path&
   if (target == BuildTarget::Android) {
     return build_android_game(game_dir, out_dir, runtime_location(target, self), error, format);
   }
-  if (!bundle_asked_for_computer(format, error)) return std::nullopt;
-  // (What is wrong with the game is said before what is missing here: it is the nearer mistake.)
-  if (!can_build(normalized_folder(game_dir), normalized_folder(out_dir), error)) return std::nullopt;
-  const auto runtime = runtime_for(target, self);
-  if (!runtime) {
-    error = missing_runtime_message(target, runtime_location(target, self));
-    return std::nullopt;
-  }
-  if (!build_game(game_dir, out_dir, *runtime, target, error)) return std::nullopt;
-  return made_by_build(normalized_folder(game_dir), normalized_folder(out_dir), target, error);
+  if (!fits_computer(format, error)) return std::nullopt;
+  return build_for_computer(normalized_folder(game_dir), normalized_folder(out_dir), target, self, error);
 }
 
 bool copy_player(const std::filesystem::path& player, const std::filesystem::path& binary, std::string& error) {
@@ -164,15 +178,26 @@ bool build_folder(const std::filesystem::path& game_dir, const std::filesystem::
 
 }  // namespace
 
+namespace {
+
+// Builds, and says what was made: the executable, or for the Mac the app.
+std::optional<std::filesystem::path> build_made(const std::filesystem::path& game_dir,
+                                                const std::filesystem::path& out_dir,
+                                                const std::filesystem::path& player, BuildTarget target,
+                                                std::string& error) {
+  if (!can_build(game_dir, out_dir, error)) return std::nullopt;
+  const auto identity = build_identity(game_dir, error);
+  if (!identity) return std::nullopt;
+  if (target == BuildTarget::MacOS) return build_mac_app(game_dir, out_dir, player, *identity, error);
+  if (!build_folder(game_dir, out_dir, player, target, *identity, error)) return std::nullopt;
+  return out_dir / executable_file(game_dir, target);
+}
+
+}  // namespace
+
 bool build_game(const std::filesystem::path& game_folder, const std::filesystem::path& out_folder,
                 const std::filesystem::path& player, BuildTarget target, std::string& error) {
-  const std::filesystem::path game_dir = normalized_folder(game_folder);
-  const std::filesystem::path out_dir = normalized_folder(out_folder);
-  if (!can_build(game_dir, out_dir, error)) return false;
-  const auto identity = build_identity(game_dir, error);
-  if (!identity) return false;
-  if (target == BuildTarget::MacOS) return build_mac_app(game_dir, out_dir, player, *identity, error);
-  return build_folder(game_dir, out_dir, player, target, *identity, error);
+  return build_made(normalized_folder(game_folder), normalized_folder(out_folder), player, target, error).has_value();
 }
 
 bool folder_inside(const std::filesystem::path& folder, const std::filesystem::path& outer) {

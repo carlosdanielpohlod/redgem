@@ -11,6 +11,7 @@
 #include "app/game_settings.hpp"
 #include "app/splash_screen.hpp"
 #include "core/config.hpp"
+#include "core/image_header.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -100,7 +101,9 @@ TEST_CASE("the splash picture is a PNG inside the game that can be decoded") {
   std::ofstream(game / "images" / "splash.png") << "not a picture";
   CHECK_FALSE(splash_picture(game));
   write_png(game / "images" / "splash.png", kSplashSide, kSplashSide);
-  CHECK(splash_picture(game) == game / "images" / "splash.png");
+  const auto picture = splash_picture(game);
+  REQUIRE(picture);
+  CHECK(encoded_image_size(picture->data(), picture->size())->width == kSplashSide);
   CHECK_FALSE(splash_picture(game_saying("")));
 }
 
@@ -110,5 +113,6 @@ TEST_CASE("a Mac app plays the game kept in its resources") {
   std::filesystem::create_directories(game);
   std::ofstream(game / config::kSceneFileName) << "scene";
   CHECK(bundled_game(app / kMacProgramFolder / "game") == game);
-  CHECK_FALSE(bundled_game(app / "elsewhere" / "deeper" / "game"));
+  // A program elsewhere has no app around it: a Resources folder near it is nobody's game.
+  CHECK_FALSE(bundled_game(app / "elsewhere" / "game"));
 }

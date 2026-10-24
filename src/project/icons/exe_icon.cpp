@@ -82,6 +82,7 @@ struct Section {
 
 // What is known of a PE file once its headers are read: offsets are into the file.
 struct PeFile {
+  std::size_t file_size = 0;
   std::size_t coff = 0;
   std::size_t optional = 0;
   std::size_t sections_at = 0;
@@ -154,6 +155,7 @@ std::optional<PeFile> pe_file(const Bytes& exe) {
   const std::size_t signature = read_little(exe, kPeHeaderPointerAt, kWord);
   if (!has_pe_signature(exe, signature)) return std::nullopt;
   PeFile pe;
+  pe.file_size = exe.size();
   pe.coff = signature + kWord;
   pe.optional = pe.coff + kCoffHeaderBytes;
   pe.sections_at = pe.optional + read_little(exe, pe.coff + kOptionalHeaderSizeAt, kShort);
@@ -165,10 +167,13 @@ bool holds(const Section& section, std::uint32_t address, std::size_t count) {
   return address >= section.virtual_address && inside(section.raw_size, address - section.virtual_address, count);
 }
 
-// Where in the file `count` bytes at `address` (once loaded) are; nullopt when no section has them.
+// Where in the file `count` bytes at `address` (once loaded) are; nullopt when no section has
+// them, or the one that says it does reaches past the end of the file.
 std::optional<std::size_t> file_offset(const PeFile& pe, std::uint32_t address, std::size_t count) {
   for (const Section& section : pe.sections) {
-    if (holds(section, address, count)) return std::size_t{section.raw_offset} + (address - section.virtual_address);
+    if (!holds(section, address, count)) continue;
+    const std::size_t at = std::size_t{section.raw_offset} + (address - section.virtual_address);
+    if (inside(pe.file_size, at, count)) return at;
   }
   return std::nullopt;
 }

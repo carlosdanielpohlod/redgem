@@ -84,13 +84,6 @@ MacApp app_of(const BuildIdentity& identity, const std::string& executable) {
                 !identity.icon.empty()};
 }
 
-// The app's folder must not hold the game it is made of: it is emptied first.
-bool game_outside_app(const std::filesystem::path& game_dir, const std::filesystem::path& app, std::string& error) {
-  if (!folder_inside(game_dir, app)) return true;
-  error = tr("project.build.game_inside_its_build", {{"game", game_dir.string()}, {"folder", app.string()}});
-  return false;
-}
-
 bool fill_app(const std::filesystem::path& game_dir, const std::filesystem::path& app,
               const std::filesystem::path& player, const BuildIdentity& identity, std::string& error) {
   const std::string executable = executable_name(game_dir);
@@ -133,16 +126,20 @@ std::string mac_app_folder(const std::string& title, const std::string& executab
   return (name.empty() ? executable : name) + kAppExtension;
 }
 
-bool build_mac_app(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
-                   const std::filesystem::path& player, const BuildIdentity& identity, std::string& error) {
+std::optional<std::filesystem::path> build_mac_app(const std::filesystem::path& game_dir,
+                                                   const std::filesystem::path& out_dir,
+                                                   const std::filesystem::path& player, const BuildIdentity& identity,
+                                                   std::string& error) {
   const std::vector<std::string> outputs = {mac_app_folder(identity.title, executable_name(game_dir))};
-  const std::filesystem::path app = out_dir / outputs.front();
-  if (!game_outside_app(game_dir, app, error)) return false;
+  std::filesystem::path app = out_dir / outputs.front();
+  // (The app's folder is emptied first: it must not hold the game it is made of.)
+  if (!game_outside(game_dir, app, error)) return std::nullopt;
   std::error_code fs_error;
   std::filesystem::create_directories(out_dir, fs_error);
   BuildRecord record = BuildRecord::of(out_dir);
-  if (!record.may_write(outputs, error) || !record.keep(outputs, error)) return false;
-  return fresh_bundle(app, error) && fill_app(game_dir, app, player, identity, error);
+  if (!record.may_write(outputs, error) || !record.keep(outputs, error)) return std::nullopt;
+  if (!fresh_bundle(app, error) || !fill_app(game_dir, app, player, identity, error)) return std::nullopt;
+  return app;
 }
 
 bool sign_mac_app(const std::filesystem::path& app, std::string& error) {

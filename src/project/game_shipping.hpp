@@ -52,8 +52,11 @@ std::string mac_bundle_id(const std::string& game_id, const std::string& executa
 // The app's folder: the game's title, without what a file name cannot hold, then ".app"; the
 // executable's name when nothing of the title is left.
 std::string mac_app_folder(const std::string& title, const std::string& executable);
-bool build_mac_app(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
-                   const std::filesystem::path& player, const BuildIdentity& identity, std::string& error);
+// Builds the app in `out_dir`; the app, or nullopt with `error` set.
+std::optional<std::filesystem::path> build_mac_app(const std::filesystem::path& game_dir,
+                                                   const std::filesystem::path& out_dir,
+                                                   const std::filesystem::path& player, const BuildIdentity& identity,
+                                                   std::string& error);
 // Signs a built app with no identity (ad hoc), as every program on an Apple Silicon Mac must be,
 // with what it holds sealed into the signature. Only on a Mac (codesign is Apple's).
 bool sign_mac_app(const std::filesystem::path& app, std::string& error);
@@ -64,6 +67,8 @@ bool sign_mac_app(const std::filesystem::path& app, std::string& error);
 bool copy_player(const std::filesystem::path& player, const std::filesystem::path& binary, std::string& error);
 bool fresh_bundle(const std::filesystem::path& bundle, std::string& error);
 bool copy_game(const std::filesystem::path& game_dir, const std::filesystem::path& bundle, std::string& error);
+// Whether the game is outside a folder a build empties and replaces (it must not be emptied with it).
+bool game_outside(const std::filesystem::path& game_dir, const std::filesystem::path& replaced, std::string& error);
 
 // Windows: the game's icon inside its executable (see icons/exe_icon.hpp).
 bool give_exe_icon(const std::filesystem::path& exe, const std::filesystem::path& icon, std::string& error);

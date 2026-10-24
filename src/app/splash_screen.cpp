@@ -29,7 +29,7 @@ std::optional<std::vector<std::uint8_t>> picture_bytes(const std::filesystem::pa
 
 void draw_fitted(const Texture2D& picture) {
   const Letterbox box =
-      letterbox(FrameSize{GetScreenWidth(), GetScreenHeight()}, FrameSize{picture.width, picture.height});
+      letterbox(FrameSize{GetRenderWidth(), GetRenderHeight()}, FrameSize{picture.width, picture.height});
   const Rectangle whole{0.0f, 0.0f, static_cast<float>(picture.width), static_cast<float>(picture.height)};
   BeginDrawing();
   ClearBackground(kBars);
@@ -49,20 +49,18 @@ void show_picture(const std::vector<std::uint8_t>& bytes) {
 
 }  // namespace
 
-std::optional<std::filesystem::path> splash_picture(const std::filesystem::path& game_dir) {
+std::optional<std::vector<std::uint8_t>> splash_picture(const std::filesystem::path& game_dir) {
   const GameIdentity identity = read_game_identity(game_dir).identity;
   if (identity.splash.empty()) return std::nullopt;
-  auto file = file_inside(game_dir, identity.splash);
-  if (file && picture_bytes(*file)) return file;
-  log::warning(tr("game.splash.unusable", {{"picture", printable(identity.splash.generic_string())}}));
-  return std::nullopt;
+  const auto file = file_inside(game_dir, identity.splash);
+  auto bytes = file ? picture_bytes(*file) : std::nullopt;
+  if (!bytes) log::warning(tr("game.splash.unusable", {{"picture", printable(identity.splash.generic_string())}}));
+  return bytes;
 }
 
 void show_splash(Presenter* presenter, const std::filesystem::path& game_dir) {
   if (dynamic_cast<WindowPresenter*>(presenter) == nullptr) return;
-  const auto file = splash_picture(game_dir);
-  if (!file) return;
-  if (const auto bytes = picture_bytes(*file)) show_picture(*bytes);
+  if (const auto bytes = splash_picture(game_dir)) show_picture(*bytes);
 }
 
 }  // namespace redgem
