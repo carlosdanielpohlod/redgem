@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include "app/game_settings.hpp"
 #include "app/save_location.hpp"
 #include "core/platform.hpp"
 #include "storage/save_file.hpp"
@@ -70,6 +71,13 @@ TEST_CASE("each game saves in a file named after its folder") {
   // A built game's files sit in a folder called "game" next to its executable.
   CHECK(save_file_for("/somewhere/dist/MyGame/game").filename().string().rfind("MyGame-", 0) == 0);
   CHECK(save_file_for("/somewhere/dist/MyGame/game") == save_file_for("/somewhere/dist/MyGame"));
+}
+
+TEST_CASE("a game with no id keeps its settings by its folder, under a name no id can have") {
+  const std::string key = game_settings_key("/somewhere/games/platformer");
+  CHECK(key == "folder:" + save_file_for("/somewhere/games/platformer").stem().string());
+  CHECK(key != game_settings_key("/elsewhere/games/platformer"));
+  CHECK_FALSE(valid_game_id(key));
 }
 
 TEST_CASE("two games in folders of the same name do not share a save, and one game always finds its own") {

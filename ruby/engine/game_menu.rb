@@ -1,6 +1,7 @@
-# A game's menus: a title screen, a pause menu (Esc, P or a gamepad's Start) and an end screen.
-# While a menu is open the game is frozen (Time.scale = 0); its options are buttons, and a
-# gamepad's A picks the first one.
+# A game's menus: a title screen, a pause menu (Esc, P or a gamepad's Start), an end screen, and a
+# settings screen the first two lead to (see GameMenu::SettingsScreen). While a menu is open the
+# game is frozen (Time.scale = 0); its options are buttons. Up and down (arrows, a gamepad's D-pad)
+# move the focus between them, and Enter or a gamepad's A picks the focused one.
 #
 #   Camera.main.add_component(GameMenu)        # in a scene script's setup
 #   GameMenu.instance.finish("You win!")       # from any script: the end screen
@@ -27,10 +28,10 @@ class GameMenu < Behaviour
   PAUSE_KEYS = %i[escape p].freeze
   BACK_KEY = :escape
   PAUSE_BUTTON = :start
-  CONFIRM_BUTTON = :a
   RUNNING = 1.0
   FROZEN = 0.0
   LAST = -1                   # where an option is added unless said: after the others
+  REFERENCE_HEIGHT = 720      # the screen height the sizes above are for: a shorter one shrinks them
 
   # The name of the open screen; nil while the game goes on.
   attr_reader :screen
@@ -47,10 +48,12 @@ class GameMenu < Behaviour
   def initialize
     super
     @screen = nil
+    @focus = UI::Focus.new
     quit = [-> { I18n.t("game.menu.quit") }, -> { Game.quit }]
-    @screens = { title: Screen.new(options: [[-> { I18n.t("game.menu.play") }, -> { resume }], quit]),
-                 pause: pause_screen(quit),
-                 over: Screen.new(options: [[-> { I18n.t("game.menu.play_again") }, -> { restart }], quit]) }
+    title = [[-> { I18n.t("game.menu.play") }, -> { resume }], settings_option, quit]
+    @screens = { title: Screen.new(options: title), pause: pause_screen(quit),
+                 over: Screen.new(options: [[-> { I18n.t("game.menu.play_again") }, -> { restart }], quit]),
+                 settings: SettingsScreen.new(self) }
   end
 
   def start
@@ -67,7 +70,15 @@ class GameMenu < Behaviour
     open_screen&.closed
     @screen = name
     Time.scale = FROZEN
+    @focus.reset
+    open_screen.focus = @focus
     open_screen.opened
+  end
+
+  # Opens the settings screen, which goes back to the screen open now.
+  def show_settings
+    @screens[:settings].from = @screen
+    show(:settings)
   end
 
   # Closes the menu: the game goes on.
@@ -96,16 +107,28 @@ class GameMenu < Behaviour
 
   # Where the button at `index` of the open screen is: [x, y, width, height].
   def button_box(index)
-    x = (UI.width - BUTTON_WIDTH) / 2
-    y = (UI.height * FIRST_BUTTON_SHARE).to_i + index * (BUTTON_HEIGHT + BUTTON_GAP)
-    [x, y, BUTTON_WIDTH, BUTTON_HEIGHT]
+    width = scaled(BUTTON_WIDTH)
+    height = scaled(BUTTON_HEIGHT)
+    y = (UI.height * first_button_share).to_i + index * (height + scaled(BUTTON_GAP))
+    [(UI.width - width) / 2, y, width, height]
   end
+
+  # How much smaller than their sizes the menu's things are drawn: on a screen shorter than
+  # REFERENCE_HEIGHT, as much shorter (never larger; as they are where there is no screen).
+  def scale = UI.height.positive? ? [UI.height.to_f / REFERENCE_HEIGHT, 1.0].min : 1.0
+
+  # A size of the menu's, as it is drawn on this screen.
+  def scaled(size) = (size * scale).to_i
 
   private
 
+  def first_button_share = open_screen&.first_button_share || FIRST_BUTTON_SHARE
+
+  def settings_option = [-> { I18n.t("game.menu.settings") }, -> { show_settings }]
+
   def pause_screen(quit)
     options = [[-> { I18n.t("game.menu.resume") }, -> { resume }], [-> { I18n.t("game.menu.restart") }, -> { restart }],
-               quit]
+               settings_option, quit]
     Screen.new(heading: -> { I18n.t("game.menu.paused") }, options: options, back: -> { resume })
   end
 
@@ -127,27 +150,27 @@ class GameMenu < Behaviour
 
   def draw(screen)
     UI.rect(x: 0, y: 0, width: UI.width, height: UI.height, color: :black, alpha: SHADE_ALPHA)
-    heading_y = button_box(0)[1] - screen.space_above - TITLE_ABOVE_BUTTONS
-    UI.text(screen.heading, x: UI.width / 2, y: heading_y, size: TITLE_SIZE, align: :center)
+    draw_heading(screen)
+    @focus.update(screen.rows + screen.options.size)
     screen.draw(button_box(0))
-    chosen = clicked(screen.options) || confirmed(screen.options)
-    chosen&.call
+    clicked(screen.options, screen.rows)&.call
   end
 
-  # Draws the options as buttons; returns what the clicked one does, if one was.
-  def clicked(options)
+  def draw_heading(screen)
+    heading_y = button_box(0)[1] - screen.space_above - scaled(TITLE_ABOVE_BUTTONS)
+    UI.text(screen.heading, x: UI.width / 2, y: heading_y, size: scaled(TITLE_SIZE), align: :center)
+  end
+
+  # Draws the options as buttons, after the screen's `rows` in the focus; returns what the clicked
+  # (or picked) one does, if one was.
+  def clicked(options, rows)
     chosen = nil
-    options.each_with_index { |(label, action), index| chosen = action if button?(label, index) }
+    options.each_with_index { |(label, action), index| chosen = action if button?(label, index, rows + index) }
     chosen
   end
 
-  def button?(label, index)
+  def button?(label, index, place)
     x, y, width, height = button_box(index)
-    UI.button(label, x: x, y: y, width: width, height: height)
-  end
-
-  # A gamepad's A picks the first option.
-  def confirmed(options)
-    options.first.last if Input.gamepad_pressed?(CONFIRM_BUTTON)
+    UI.button(label, x: x, y: y, width: width, height: height, focused: @focus.at?(place))
   end
 end

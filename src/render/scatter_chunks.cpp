@@ -102,7 +102,34 @@ float distance_squared_to(const ScatterChunk* cell, Vec3 viewer) {
   return dot(apart, apart);
 }
 
+// Whether the copy at `index` is among the `density` kept: one more is kept each time the count
+// of those kept so far, as a share of the copies, passes a whole one.
+bool kept(std::size_t index, float density) {
+  const auto before = static_cast<double>(index) * density;
+  return std::floor(before + density) > std::floor(before);
+}
+
+void thin_places(ScatterSet& set, const ScatterSet& from, float density) {
+  set.places.clear();
+  set.tints.clear();
+  const bool tinted = from.tints.size() == from.places.size();
+  for (std::size_t at = 0; at < from.places.size(); ++at) {
+    if (!kept(at, density)) continue;
+    set.places.push_back(from.places[at]);
+    if (tinted) set.tints.push_back(from.tints[at]);
+  }
+}
+
 }  // namespace
+
+ScatterSet thinned_set(const ScatterSet& set, float density, float reach) {
+  ScatterSet thinned = set;
+  if (density < 1.0f) thin_places(thinned, set, std::max(density, 0.0f));
+  if (reach >= 1.0f) return thinned;
+  thinned.visible_to *= std::max(reach, 0.0f);
+  for (ScatterLod& lod : thinned.lods) lod.from *= std::max(reach, 0.0f);
+  return thinned;
+}
 
 std::vector<ScatterChunk> chunk_copies(const std::vector<Transform>& places, const Bounds& bounds,
                                        std::vector<std::size_t>& order) {

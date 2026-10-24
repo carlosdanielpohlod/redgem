@@ -4,6 +4,7 @@
 
 #include <string>
 
+#include "app/game_display.hpp"
 #include "app/save_location.hpp"
 #include "app/scene_bodies.hpp"
 #include "app/scene_water.hpp"
@@ -54,7 +55,9 @@ void Engine::initialize() {
   open_presenter(manifest.settings);
   open_audio();
   open_saves();
+  open_display();
   fill_context(manifest.settings.title);
+  connect_display();
   if (serves_a_room()) network_.serve_room(options_.server_room);  // before any script asks
   start_scripts();
   network_watch_.restart();  // the network's time starts with the game, not with its loading
@@ -83,6 +86,28 @@ void Engine::open_presenter(const GameSettings& settings) {
 void Engine::open_audio() {
   if (options_.audio == nullptr) owned_audio_ = std::make_unique<NullAudio>();
   audio().set_sounds_dir(options_.game_dir / config::kSoundsDirName);
+}
+
+void Engine::open_display() {
+  context_.display = game_display(options_.game_dir, player_settings_file(options_.settings_file));
+  follow_players_volume(context_.display.volume);
+}
+
+void Engine::follow_players_volume(float volume) {
+  if (volume == players_volume_) return;
+  players_volume_ = volume;
+  audio().set_master_volume(volume);
+}
+
+void Engine::connect_display() {
+  context_.apply_display = [this](const DisplaySettings& display) {
+    presenter_->apply_display(display);
+    follow_players_volume(display.volume);
+  };
+  context_.save_display = [this](const DisplaySettings& display, std::string& error) {
+    return save_game_display(options_.game_dir, player_settings_file(options_.settings_file), display, error);
+  };
+  context_.display_modes = [this] { return presenter_->display_modes(); };
 }
 
 void Engine::open_saves() {

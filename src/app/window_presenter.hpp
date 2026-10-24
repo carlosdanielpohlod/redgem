@@ -34,14 +34,19 @@ struct GameWindowOptions {
   float screen_aspect = 0.0f;
   // Called once each frame is drawn and before it is shown, for whoever wants its picture.
   std::function<void()> on_frame_drawn;
+  // Where the player's choices of how the game is shown are kept (see game_display.hpp): the
+  // user's settings file when empty.
+  std::filesystem::path settings_file;
   // Records the game to a video (see recording.hpp): drawn off screen at the size asked for, each
   // frame advancing the game by exactly 1/fps, the window showing what is recorded.
   std::optional<RecordOptions> record;
 };
 
-// The window those options and a game's settings ask for. A screen that is not a window has its
-// own shape: the game keeps its height and gets the width that fills it.
-WindowSettings game_window_settings(const GameSettings& settings, const GameWindowOptions& options);
+// The window those options, a game's settings and its player's display settings ask for. A screen
+// that is not a window has its own shape: the game keeps its height and gets the width that fills
+// it, in the one mode it has.
+WindowSettings game_window_settings(const GameSettings& settings, const DisplaySettings& display,
+                                    const GameWindowOptions& options);
 
 // Shows a game in a window of its own: opens the window, draws each frame in it, and reads the
 // keyboard, mouse and gamepad that come with it.
@@ -59,6 +64,11 @@ class WindowPresenter final : public Presenter {
   void present(const FrameView& view) override;
   bool open() const override;
   float frame_seconds() const override;
+  void apply_display(const DisplaySettings& display) override;
+  std::vector<SurfaceSize> display_modes() const override;
+
+  // The size the game's world was last drawn at: the window's, or as the render scale makes it.
+  SurfaceSize world_size() const;
 
   // Whether a recording broke off: the encoder stopped before the game did.
   bool recording_failed() const { return recording_failed_ || (recording() && recorder_->failed()); }
@@ -76,15 +86,26 @@ class WindowPresenter final : public Presenter {
   RenderTexture2D recorded_{};
   std::unique_ptr<VideoRecorder> recorder_;
 
+  // While the world is drawn at another size than the window's (DisplaySettings::render_scale):
+  // what it is drawn into, before it is stretched over the window.
+  RenderTexture2D scaled_{};
+  float render_scale_ = kFullRenderScale;
+
   bool recording() const { return recorder_ != nullptr; }
+  // A phone's screen: the window is the screen, in its one mode and at its one size.
+  bool fills_a_screen() const { return options_.screen_aspect > 0.0f; }
   float recorded_frame_ = 0.0f;  // seconds each recorded frame advances the game by
   bool recording_only_ = false;  // the run records for a set time: nothing else is played
   bool recording_failed_ = false;
   void start_recording(const RecordOptions& record);
   void stop_recording();
   void present_recorded(const FrameView& view);
-  // The recorded picture, fitted into the window.
-  void show_recorded();
+  void present_scaled(const FrameView& view);
+  void fit_scaled(SurfaceSize size);
+  // What the window shows once the frame is drawn, then shown: the frame rate, whoever wants its picture.
+  void finish_frame();
+  // A picture drawn off screen, fitted into the window.
+  void show_picture(const RenderTexture2D& picture);
   void point_into_recorded();
 };
 

@@ -4,15 +4,16 @@
 #include <cmath>
 
 #include "render/environment.hpp"
+#include "render/render_config.hpp"
 #include "scene/props.hpp"
 
 namespace redgem {
 namespace {
 
-constexpr int kFewestSamples = 2;            // fewer is no multisampling at all
-constexpr int kMostSamples = 8;              // what every desktop card holds (phones: 4, which they all hold)
-constexpr int kDoubling = 2;                 // samples come in powers of two
-constexpr int kMostCascades = 4;             // render_math::kMaxShadowCascades
+constexpr int kFewestSamples = 2;  // fewer is no multisampling at all
+constexpr int kMostSamples = config::kMostSamples;
+constexpr int kDoubling = 2;  // samples come in powers of two
+constexpr int kMostCascades = config::kMostCascades;
 constexpr float kCascadesReach = 150.0f;     // meters, unless the environment says
 constexpr float kFarthestShadows = 2000.0f;  // meters
 // Meters: the nearest shadows reach. More than any camera's near plane, so that a cascade has room.
@@ -38,6 +39,19 @@ int cascades_of(float asked) {
   return static_cast<int>(std::lround(std::clamp(asked, 1.0f, static_cast<float>(kMostCascades))));
 }
 
+// The share a quality allows of what a level asks for: within 0 (none of it) and 1 (all of it).
+float allowed_share(float share) { return std::isfinite(share) ? std::clamp(share, 0.0f, 1.0f) : 1.0f; }
+
+// Smoothed edges: as many samples as the level and the quality allow, and none when the card cannot.
+int allowed_samples(int asked, int allowed, const GpuAbilities& gpu) {
+  if (!gpu.multisampling) return 0;
+  return samples_of(static_cast<float>(std::min(asked, allowed)));
+}
+
+bool allowed_temporal(bool asked, const QualityCaps& caps, const GpuAbilities& gpu) {
+  return asked && caps.temporal_antialias && gpu.temporal;
+}
+
 }  // namespace
 
 void read_sky_and_quality(const PropertyMap& props, Environment& env) {
@@ -51,6 +65,18 @@ void read_sky_and_quality(const PropertyMap& props, Environment& env) {
   const float softness = std::clamp(number_or(props, props::environment::kShadowSoftness, 0.0f), 0.0f, kWidestSun);
   env.shadow_softness = degrees_to_radians(softness);
   env.temporal_antialias = get_string(props, props::environment::kAntialias) == props::environment::kTemporalAntialias;
+}
+
+Environment within_quality(Environment env, const QualityCaps& caps, const GpuAbilities& gpu) {
+  env.msaa = allowed_samples(env.msaa, caps.msaa, gpu);
+  env.temporal_antialias = allowed_temporal(env.temporal_antialias, caps, gpu);
+  env.shadow_cascades = std::clamp(caps.shadow_cascades, 1, env.shadow_cascades);
+  // (Never nearer than the nearest shadows reach: a cascade needs room.)
+  const float nearest = std::min(env.shadow_distance, kNearestShadows);
+  env.shadow_distance = std::max(env.shadow_distance * allowed_share(caps.shadow_distance), nearest);
+  env.ambient_occlusion *= allowed_share(caps.ambient_occlusion);
+  env.bloom *= allowed_share(caps.bloom);
+  return env;
 }
 
 }  // namespace redgem

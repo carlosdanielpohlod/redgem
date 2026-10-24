@@ -35,14 +35,16 @@ void blend_cover() {
 
 // Whether a frame is smoothed with the ones before: the environment asks, the view allows it (not
 // the editor's) and the graphics card can.
-bool temporal_wanted(const Environment& env, bool allowed, bool unsupported) {
-  return env.temporal_antialias && allowed && !unsupported;
+// (The environment is held to what the card can do; the card may have turned out not to during
+// this very frame.)
+bool temporal_wanted(const Environment& env, bool allowed, bool supported) {
+  return env.temporal_antialias && allowed && supported;
 }
 
 }  // namespace
 
 void Renderer::Impl::begin_temporal(const Environment& env, const Camera3D& camera) {
-  temporal.on = temporal_wanted(env, temporal_allowed, temporal_unsupported);
+  temporal.on = temporal_wanted(env, temporal_allowed, gpu.temporal);
   send(shader, lit_uniforms.noise_shift, temporal.on ? render_math::noise_shift(temporal.frame) : 0.0f);
   if (!temporal.on) {
     temporal.seen_before = false;  // turned on again, it starts over
@@ -138,7 +140,7 @@ void Renderer::Impl::mark_see_through_cover(Vec3 viewer) {
 // bigger, after: that frame's motion is then only the camera's).
 void Renderer::Impl::keep_previous_texels() {
   if (previous_texels.rows != texel_texture_rows) remake_previous_texels();
-  if (temporal_unsupported) return;
+  if (!gpu.temporal) return;
   copy_buffer(previous_texels.from, previous_texels.to, render_math::kTexelsPerRow, texel_texture_rows, Buffer::Color);
   rlDisableFramebuffer();
 }
@@ -162,7 +164,7 @@ void Renderer::Impl::remake_previous_texels() {
 // copy the frame's texels: frames are drawn without the ones before from then on.
 void Renderer::Impl::give_up_temporal() {
   log::warning("the graphics card cannot copy float textures: drawing without temporal anti-aliasing");
-  temporal_unsupported = true;
+  gpu.temporal = false;
   temporal.on = false;
   temporal.history_valid = false;
   release_previous_texels();

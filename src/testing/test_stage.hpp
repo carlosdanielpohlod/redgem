@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 
 #include "audio/audio.hpp"
@@ -27,10 +28,13 @@ class Stage {
 
   // Null when nobody shows the game.
   Presenter* presenter();
+  // Where the player's display settings are kept for this run: a file of the test's own.
+  const std::filesystem::path& settings_file() const { return settings_file_; }
   // Without a window there is no device either: the game still finds its sounds, and hears none.
   AudioSystem* audio() { return window_ ? speakers_.get() : &silent_; }
 
  private:
+  std::filesystem::path settings_file_;
   std::unique_ptr<WindowPresenter> window_;
   std::unique_ptr<AudioSystem> speakers_;
   RecordingAudio silent_;

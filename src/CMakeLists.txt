@@ -11,8 +11,11 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/i18n.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_widgets.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_screen.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_settings.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/settings.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scatter.rb
@@ -292,6 +295,7 @@ redgem_add_library(redgem_runtime
   script/bindings/particles_bindings.cpp
   script/bindings/particle_look_args.cpp
   script/bindings/save_bindings.cpp
+  script/bindings/settings_bindings.cpp
   script/bindings/i18n_bindings.cpp
   script/bindings/message_values.cpp
   script/bindings/network_bindings.cpp
@@ -354,6 +358,8 @@ redgem_add_library(redgem_runtime
   render/scene_lights.cpp
   render/gpu_select.cpp
   render/window.cpp
+  render/display_settings.cpp
+  render/quality.cpp
   render/ui_font.cpp
   render/culling.cpp
   app/json_file.cpp
@@ -362,6 +368,7 @@ redgem_add_library(redgem_runtime
   app/bundled_game.cpp
   app/save_location.cpp
   app/user_settings.cpp
+  app/game_display.cpp
   app/presenter.cpp
   app/frame_painter.cpp
   app/window_presenter.cpp

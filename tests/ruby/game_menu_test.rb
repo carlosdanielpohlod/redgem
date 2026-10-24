@@ -48,8 +48,8 @@ class GameMenuTest < RedGemTest::Case
 
   def test_the_screens_offer_what_a_game_expects
     labels = ->(screen) { menu.screens[screen].options.map(&:first) }
-    assert_equal %w[Play Quit], labels.call(:title)
-    assert_equal %w[Resume Restart Quit], labels.call(:pause)
+    assert_equal %w[Play Settings Quit], labels.call(:title)
+    assert_equal %w[Resume Restart Settings Quit], labels.call(:pause)
     assert_equal ["Play again", "Quit"], labels.call(:over)
   end
 
@@ -57,7 +57,7 @@ class GameMenuTest < RedGemTest::Case
     pause = menu.screens[:pause]
     pause.add_option("Credits", index: 1) { :credits }
     pause.add_option("Last") { :last }
-    assert_equal %w[Resume Credits Restart Quit Last], pause.options.map(&:first)
+    assert_equal %w[Resume Credits Restart Settings Quit Last], pause.options.map(&:first)
     assert_equal :credits, pause.options[1].last.call
   end
 
@@ -112,6 +112,45 @@ class GameMenuTest < RedGemTest::Case
     x, y, width, height = stacked.button_box(0)
     assert_equal [(UI.width - width) / 2, GameMenu::BUTTON_WIDTH, GameMenu::BUTTON_HEIGHT], [x, width, height]
     assert_equal y + height + GameMenu::BUTTON_GAP, stacked.button_box(1)[1]
+  end
+
+  def test_the_settings_screen_goes_back_to_where_it_was_opened_from
+    %i[title pause].each do |from|
+      opened = menu
+      opened.show(from)
+      opened.screens[from].options.find { |label, _| label == "Settings" }.last.call
+      assert_equal :settings, opened.screen
+      opened.screens[:settings].back.call
+      assert_equal from, opened.screen
+    end
+  end
+
+  def test_settings_opened_while_playing_go_back_to_the_game
+    playing = menu
+    playing.show_settings
+    assert_equal :settings, playing.screen
+    playing.screens[:settings].back.call
+    refute playing.open?
+    assert_in_delta GameMenu::RUNNING, Time.scale
+  end
+
+  def test_the_settings_screen_has_a_row_for_each_setting_and_a_back_button
+    settings = menu.screens[:settings]
+    assert_equal 7, settings.rows
+    assert_equal ["Back"], settings.options.map(&:first)
+    assert_equal "Settings", settings.heading
+    assert settings.space_above.positive?
+  end
+
+  def test_its_rows_come_first_in_the_focus_and_the_focus_starts_on_the_first
+    opened = menu
+    opened.show(:settings)
+    settings = opened.screens[:settings]
+    assert settings.focus.at?(0)
+    x, y, = opened.button_box(0)
+    assert_equal (UI.height * GameMenu::SettingsScreen::BUTTONS_SHARE).to_i, y, "the Back button sits under the rows"
+    settings.draw([x, y, GameMenu::BUTTON_WIDTH, GameMenu::BUTTON_HEIGHT]) # (draws every row, as Settings has them)
+    assert_equal :ultra, Settings.quality, "drawing them changes nothing"
   end
 
   def test_a_scene_with_no_menu_says_so

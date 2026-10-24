@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "render/display_settings.hpp"
 #include "render/gpu_select.hpp"
 #include "render/render_config.hpp"
 
@@ -16,15 +17,21 @@ struct WindowSettings {
   // Smooths the edges of what is drawn straight into the window (an interface). A game needs
   // none: its picture is drawn off screen and smoothed there.
   bool smooth_edges = false;
-  int frames_per_second = config::kTargetFps;  // the pace frames are held to
-  GpuChoice gpu = GpuChoice::Auto;             // the card asked for, before the window opens
+  int frames_per_second = config::kTargetFps;  // the pace frames are held to (kNoFrameCap: none)
+  bool vsync = true;                           // frames wait for the monitor's refresh
+  WindowMode mode = WindowMode::Windowed;
+  GpuChoice gpu = GpuChoice::Auto;  // the card asked for, before the window opens
 };
 
-// Width and height of something drawn on, in pixels.
-struct SurfaceSize {
-  int width = 0;
-  int height = 0;
+// What a window has to do to go from one mode and size to another. A window in fullscreen or
+// borderless leaves it before it changes size, and goes back into it afterwards; a borderless one
+// is always as big as the monitor, whatever size is asked.
+struct WindowChange {
+  bool leave_mode = false;  // back to a window first
+  bool resize = false;      // to the size asked
+  bool enter_mode = false;  // into the mode asked, last
 };
+WindowChange window_change(WindowMode mode, SurfaceSize size, WindowMode wanted_mode, SurfaceSize wanted_size);
 
 // The flags the window library is given before it opens a window with these settings.
 unsigned int window_flags(const WindowSettings& settings);
@@ -49,6 +56,14 @@ class Window {
   float frame_seconds() const;
   // Size of the area that is drawn in.
   SurfaceSize drawing_size() const;
+  // Puts the window in the mode, at the size and at the pace those settings say (only what
+  // changed is done again).
+  void show_as(const DisplaySettings& display);
+  // Only the pace of its frames (vsync, the frame cap): for a window that is a whole screen, whose
+  // mode and size are the screen's.
+  void pace(const DisplaySettings& display);
+  // Size of the monitor the window is on.
+  SurfaceSize monitor_size() const;
   void set_title(const std::string& title);
   // Hides the pointer and keeps it in the window (first-person cameras), or gives it back.
   void set_cursor_locked(bool locked);
@@ -57,6 +72,15 @@ class Window {
   void end_frame();
   // The frames-per-second counter, in its corner: for whoever makes the game.
   void draw_frame_rate();
+
+ private:
+  void change_shape(WindowMode mode, SurfaceSize size);
+  void set_vsync(bool on);
+  void toggle(WindowMode mode);
+
+  WindowMode mode_ = WindowMode::Windowed;
+  SurfaceSize size_;  // the size asked for last (a borderless window is the monitor's)
+  bool vsync_ = true;
 };
 
 }  // namespace redgem

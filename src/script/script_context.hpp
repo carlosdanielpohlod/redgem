@@ -8,6 +8,7 @@
 #include "audio/audio.hpp"
 #include "input/input.hpp"
 #include "physics/physics_world.hpp"
+#include "render/display_settings.hpp"
 #include "render/hud.hpp"
 #include "script/script_config.hpp"
 #include "scene/scene.hpp"
@@ -55,6 +56,14 @@ struct ScriptContext {
   bool touch_controls = true;
   // Camera.motion_blur: how much the picture streaks away from its center, 0 to 1.
   float motion_blur = 0.0f;
+  // How the player chose the game to be shown and heard (Settings): what is in use now.
+  DisplaySettings display;
+  // What puts a change of `display` into effect (the window, the renderer's quality, the volume),
+  // keeps it for the game's next runs (false, with what went wrong, when it cannot), and lists the
+  // window sizes the player may choose. Null outside a running engine: a change is only kept here.
+  std::function<void(const DisplaySettings&)> apply_display;
+  std::function<bool(const DisplaySettings&, std::string&)> save_display;
+  std::function<std::vector<SurfaceSize>()> display_modes;
   // What the game keeps between runs (Save); null when there is nowhere to keep it.
   SaveStore* save = nullptr;
   // The scene's animation clips (Animation) and the particles flying around (Particles).

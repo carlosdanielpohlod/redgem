@@ -8,6 +8,14 @@
 namespace redgem::config {
 
 inline constexpr int kTargetFps = 60;
+// What a side of a game's window may be, in pixels (game.json and the player's settings are not
+// trusted to be sane).
+inline constexpr int kMinWindowSide = 320;
+inline constexpr int kMaxWindowSide = 16384;
+
+// --- Quality an environment may ask for ------------------------------------------
+inline constexpr int kMostSamples = 8;   // samples a pixel: what every desktop card holds (phones: 4)
+inline constexpr int kMostCascades = 4;  // pictures of the sun's shadow map (render_math::kMaxShadowCascades)
 
 // --- Cameras and lights ----------------------------------------------------------
 inline constexpr float kDefaultCameraDistance = 10.0f;

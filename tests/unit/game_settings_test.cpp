@@ -127,3 +127,22 @@ TEST_CASE("saving the settings keeps the game's id, and writes one given to a ga
   CHECK(read_game_settings(plain).id == "coins-3fa2c1b0");
   std::filesystem::remove_all(plain.parent_path());
 }
+
+TEST_CASE("game.json says how the game is shown until its player chooses otherwise") {
+  const GameSettings plain = read_game_settings(game_saying(R"({"window_width": 800, "window_height": 450})"));
+  CHECK(plain.display.resolution == SurfaceSize{kWidth, kHeight});
+  CHECK(plain.display.mode == WindowMode::Windowed);
+  CHECK(plain.display.vsync);
+  CHECK(plain.display.fps_cap == config::kTargetFps);
+  const GameSettings shown = read_game_settings(
+      game_saying(R"({"fullscreen": true, "vsync": false, "fps_cap": 144, "render_scale": 0.75, "quality": "high"})"));
+  CHECK(shown.display.mode == WindowMode::Fullscreen);
+  CHECK_FALSE(shown.display.vsync);
+  CHECK(shown.display.fps_cap == 144);
+  CHECK(shown.display.render_scale == doctest::Approx(0.75f));
+  CHECK(shown.display.quality == QualityPreset::High);
+  CHECK(shown.display.resolution == SurfaceSize{config::kWindowWidth, config::kWindowHeight});
+  const GameSettings odd = read_game_settings(game_saying(R"({"fullscreen": "yes", "render_scale": 9})"));
+  CHECK(odd.display.mode == WindowMode::Windowed);
+  CHECK(odd.display.render_scale == kLargestRenderScale);
+}

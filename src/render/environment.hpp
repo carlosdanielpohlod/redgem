@@ -3,6 +3,7 @@
 #include <string>
 
 #include "core/math.hpp"
+#include "render/quality.hpp"
 #include "scene/property.hpp"
 #include "scene/scene.hpp"
 
@@ -61,6 +62,17 @@ Environment environment_from_props(const PropertyMap& props);
 
 // The sky picture and quality properties of the list above.
 void read_sky_and_quality(const PropertyMap& props, Environment& env);
+
+// What the graphics card turned out to be able to do. A feature it cannot do is dropped from every
+// environment quietly, as a quality that does not allow it would drop it.
+struct GpuAbilities {
+  bool multisampling = true;  // drawing several samples a pixel, and copying them into one
+  bool temporal = true;       // copying the frame's depth and colors for the frames after it
+};
+
+// What a level's environment gets of what it asks for under a quality and on a card: never more
+// than it asked for. Under QualityPreset::Ultra on a card that can do everything it is unchanged.
+Environment within_quality(Environment env, const QualityCaps& caps, const GpuAbilities& gpu);
 
 // The environment of the first live object with `environment = true`, or the default.
 Environment scene_environment(const Scene& scene);
