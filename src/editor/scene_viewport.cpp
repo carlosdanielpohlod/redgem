@@ -37,6 +37,11 @@ GameView::GameView(Window& window, Renderer& renderer, SceneViewport& view, cons
 
 int GameView::text_width(const std::string& text, int size) const { return renderer_.text_width(text, size); }
 
+int GameView::font_text_width(const std::string& text, int size, const std::string& font,
+                              const std::filesystem::path& folder) const {
+  return renderer_.font_text_width(text, size, font, folder);
+}
+
 void GameView::capture_cursor(bool wanted) { window_.set_cursor_locked(pointer_granted(wanted)); }
 
 void GameView::present(const FrameView& view) {

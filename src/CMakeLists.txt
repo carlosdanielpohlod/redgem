@@ -360,6 +360,8 @@ redgem_add_library(redgem_runtime
   render/window.cpp
   render/display_settings.cpp
   render/quality.cpp
+  render/font_rasterizer.cpp
+  render/game_fonts.cpp
   render/ui_font.cpp
   render/culling.cpp
   app/json_file.cpp
@@ -387,6 +389,7 @@ redgem_embed_texts(redgem_runtime game)
 # (The prelude is the runtime's alone: no other library is given the folder it is generated in.)
 target_include_directories(redgem_runtime PRIVATE ${REDGEM_GENERATED_DIR})
 target_link_libraries(redgem_runtime PUBLIC redgem_net raylib Jolt mruby_lib cgltf_headers nlohmann_json::nlohmann_json m)
+target_link_libraries(redgem_runtime PRIVATE freetype)
 if(WIN32)
   # mruby's socket and time gems use Windows' own libraries.
   target_link_libraries(redgem_runtime PUBLIC ws2_32)

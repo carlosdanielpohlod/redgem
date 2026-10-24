@@ -148,9 +148,10 @@ not a promise of how it will be closed.
 
 ### Text
 
-- The built-in font covers Latin-1 only (code points 32 to 255): no "€", no Polish or Turkish
-  letters, no Cyrillic, Greek or CJK. Games cannot load their own fonts, so most translations
-  cannot be shown.
+- Text uses individual Unicode glyphs without bidirectional layout, complex-script shaping or
+  automatic font fallback chains. The built-in font supports its own glyphs; other scripts, such as
+  CJK, need a game-provided font. Each face caches at most 2048 codepoints; four named game fonts
+  can be cached at once, with at most 32 MB per font file. Unsupported glyphs show a question mark.
 
 ### Gameplay API
 
