@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 
+#include "render/display_settings.hpp"
 #include "render/gpu_select.hpp"
 
 namespace redgem {
@@ -17,7 +18,16 @@ struct UserSettings {
 std::filesystem::path user_settings_file();
 // Missing or unreadable files give the defaults.
 UserSettings read_user_settings(const std::filesystem::path& file);
+// (What else the file holds, each game's display settings, stays as it is.)
 bool write_user_settings(const std::filesystem::path& file, const UserSettings& settings, std::string& error);
+
+// What the player chose for how a game is shown, kept in the same file under "games", by the
+// game's key (see game_settings_key): `defaults` (the game's game.json) with the player's choices
+// over them.
+DisplaySettings read_game_display(const std::filesystem::path& file, const std::string& game_key,
+                                  const DisplaySettings& defaults);
+bool write_game_display(const std::filesystem::path& file, const std::string& game_key, const DisplaySettings& display,
+                        std::string& error);
 
 // The card to use: what the command line asked for, else the REDGEM_GPU environment variable,
 // else the saved setting, else Auto. Unknown names are ignored.

@@ -3,7 +3,9 @@
 
 #include "render/renderer_impl.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 #include "render/half_float.hpp"
 #include "render/sky_light.hpp"
@@ -19,6 +21,19 @@ using render_math::kSkyHarmonics;
 
 constexpr int kLightFormat = PIXELFORMAT_UNCOMPRESSED_R16G16B16A16;  // half floats: filtered on phones too
 constexpr int kOneLevel = 1;
+// Pixels across the narrowest sky picture a quality loads: its light still has the cube's detail.
+constexpr std::uint32_t kNarrowestSky = 512;
+
+// Pixels across a sky picture is loaded at most at, under a quality's share of the widest.
+std::uint32_t sky_widest(float detail) {
+  const auto widest = static_cast<float>(render_math::kSkyPictureWidest) * std::clamp(detail, 0.0f, 1.0f);
+  return std::max(kNarrowestSky, static_cast<std::uint32_t>(widest));
+}
+
+// Whether the picture loaded is the one asked for, as wide as asked.
+bool sky_loaded_as(const SkyTextures& sky, const std::string& name, std::uint32_t widest) {
+  return sky.name == name && sky.widest == widest;
+}
 
 Texture2D picture_texture(const FloatImage& picture) {
   const std::vector<std::uint16_t> texels = render_math::picture_texels(picture);
@@ -54,11 +69,13 @@ Vector2 turn_into_picture(float rotation) { return {std::cos(-rotation), std::si
 }  // namespace
 
 void Renderer::Impl::use_sky_picture(const Environment& env) {
-  if (env.sky_image == sky.name) return;
+  const std::uint32_t widest = sky_widest(quality.sky_detail);
+  if (sky_loaded_as(sky, env.sky_image, widest)) return;
   release_sky_picture();
   sky.name = env.sky_image;
+  sky.widest = widest;
   if (sky.name.empty()) return;
-  const std::optional<FloatImage> picture = load_sky_picture(images_dir, sky.name, render_math::kSkyPictureWidest);
+  const std::optional<FloatImage> picture = load_sky_picture(images_dir, sky.name, widest);
   if (picture) upload_sky_picture(*picture);
 }
 

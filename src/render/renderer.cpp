@@ -78,7 +78,7 @@ void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const Rend
   const int height = output != nullptr ? output->texture.height : GetRenderHeight();
   if (!has_area(width, height)) return;
   impl_->prepare_water_ripples(scene, water_ripples);
-  const Environment env = scene_environment(scene);
+  const Environment env = within_quality(scene_environment(scene), impl_->quality, impl_->gpu);
   impl_->ensure_targets(width, height, env.msaa);
   impl_->prepare_frame(scene, camera, env, static_cast<float>(width) / static_cast<float>(height), particles);
   impl_->draw_lit_scene(camera, particles);
@@ -90,6 +90,8 @@ void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const Rend
 void Renderer::set_motion_blur(float amount) {
   impl_->motion_blur = std::clamp(amount, kNoMotionBlur, kFullMotionBlur);
 }
+
+void Renderer::set_quality(const QualityCaps& caps) { impl_->quality = caps; }
 
 void Renderer::allow_temporal_antialias(bool allowed) { impl_->temporal_allowed = allowed; }
 

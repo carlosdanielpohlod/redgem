@@ -135,15 +135,10 @@ not a promise of how it will be closed.
 
 ### What a shipped game offers its players
 
-- The window has a fixed size from `game.json`: no fullscreen or borderless mode, no resolution or
-  render scale choice, vsync always on, a fixed frame-rate cap.
-- No graphics quality presets a game can expose, and no general fallback for weaker graphics cards
-  beyond TAA and `msaa` turning themselves off.
 - Input actions are fixed (`jump`, `fire`, `run` and two axes): games cannot declare their own, and
   players cannot rebind keys. One gamepad, no rumble.
-- `UI` has no sliders, checkboxes, key capture, word wrap, anchors, scroll lists or gamepad focus
-  navigation (a gamepad's A picks the first button), so settings screens have to be built by hand.
-  Android has no on-screen keyboard.
+- `UI` has no key capture (for a rebinding screen), word wrap, anchors or scroll lists. Android has
+  no on-screen keyboard.
 
 ### Audio
 
