@@ -61,8 +61,7 @@ void Engine::initialize() {
   open_presenter(manifest.settings);
   open_audio();
   open_saves();
-  open_display(manifest.settings.display);
-  open_bindings();
+  open_player_choices(manifest.settings);
   fill_context(manifest.settings.title);
   connect_display();
   take_identity(identity);
@@ -131,6 +130,11 @@ void Engine::open_saves() {
   }
   save_ =
       std::make_unique<SaveFile>(options_.save_file.empty() ? save_file_for(options_.game_dir) : options_.save_file);
+}
+
+void Engine::open_player_choices(const GameSettings& settings) {
+  open_display(settings.display);
+  open_bindings();
 }
 
 void Engine::open_bindings() {

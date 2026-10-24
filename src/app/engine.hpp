@@ -133,6 +133,8 @@ class Engine {
   void open_display(const DisplaySettings& game_defaults);
   void connect_display();
   void follow_players_volume(float volume);
+  // What the player chose of the game: its display settings, and the keys of its actions.
+  void open_player_choices(const GameSettings& settings);
   // The game's actions and axes (game.json), and what its players bound them to.
   void open_bindings();
   std::filesystem::path chosen_bindings_file() const;

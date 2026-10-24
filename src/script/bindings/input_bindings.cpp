@@ -185,6 +185,7 @@ void install_input_bindings(mrb_state* mrb) {
   install_key_bindings(input_module, mrb);
   install_mouse_bindings(input_module, mrb);
   install_gamepad_bindings(input_module, mrb);
+  install_input_action_bindings(mrb);  // the game's own actions, and the players' bindings of them
 }
 
 }  // namespace redgem
