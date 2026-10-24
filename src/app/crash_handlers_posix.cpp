@@ -9,6 +9,9 @@
 #include <execinfo.h>
 #endif
 #include <fcntl.h>
+#if defined(__APPLE__)
+#include <sys/ucontext.h>
+#endif
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -39,6 +42,7 @@ constexpr mode_t kFolderMode = 0755;
 constexpr mode_t kFileMode = 0644;
 constexpr char kSeparator = '/';
 constexpr const char* kLineEnd = "\n";
+constexpr const char* kNoFrames = "  (none: the system gave no frames)\n";
 
 // Set while a crash is being reported: a second one (the handler crashing) ends the program at once.
 volatile std::sig_atomic_t reporting = 0;
@@ -77,12 +81,33 @@ ReportPath report_path(const Moment& moment) {
   return path;
 }
 
-void write_backtrace(int fd) {
-#if defined(__ANDROID__)
-  write_text(fd, "  (none on this system)\n");
+#if defined(__APPLE__)
+// Where the crashed function's frame is, as the signal's context says. (The Mac's backtrace()
+// stops at once on the handler's own stack, which is not the thread's.)
+void* crashed_frame(const void* context) {
+  const auto* machine = static_cast<const ucontext_t*>(context)->uc_mcontext;
+#if defined(__aarch64__)
+  return reinterpret_cast<void*>(__darwin_arm_thread_state64_get_fp(machine->__ss));
 #else
+  return reinterpret_cast<void*>(machine->__ss.__rbp);
+#endif
+}
+
+int crashed_frames(void** frames, const void* context) {
+  if (__builtin_available(macOS 12.0, *)) return backtrace_from_fp(crashed_frame(context), frames, kMaxFrames);
+  return 0;
+}
+#elif !defined(__ANDROID__)
+int crashed_frames(void** frames, const void*) { return backtrace(frames, kMaxFrames); }
+#else
+int crashed_frames(void**, const void*) { return 0; }  // (no backtrace() on the oldest Androids)
+#endif
+
+void write_backtrace(int fd, const void* context) {
   void* frames[kMaxFrames];
-  const int count = backtrace(frames, kMaxFrames);
+  const int count = crashed_frames(frames, context);
+  if (count <= 0) write_text(fd, kNoFrames);
+#if !defined(__ANDROID__)
   for (int i = 0; i < count; ++i) {
     write_text(fd, kFrameIndent);
     backtrace_symbols_fd(&frames[i], 1, fd);
@@ -90,7 +115,7 @@ void write_backtrace(int fd) {
 #endif
 }
 
-void write_signal_report(int signal) {
+void write_signal_report(int signal, const void* context) {
   const Moment moment = utc_moment(static_cast<std::int64_t>(time(nullptr)));
   ReportPath folder;
   folder.append(prepared_crash().folder_text.c_str());
@@ -103,14 +128,14 @@ void write_signal_report(int signal) {
   write_text(fd, kCauseLabel);
   write_text(fd, signal_description(signal));
   write_text(fd, kBacktraceLabel);
-  write_backtrace(fd);
+  write_backtrace(fd, context);
   close(fd);
 }
 
-void on_fatal_signal(int signal) {
+void on_fatal_signal(int signal, siginfo_t*, void* context) {
   if (reporting != 0) _exit(kSignalExitBase + signal);
   reporting = 1;
-  write_signal_report(signal);
+  write_signal_report(signal, context);
   write_text(STDERR_FILENO, prepared_crash().closed_message.c_str());
   write_text(STDERR_FILENO, kLineEnd);
   std::signal(signal, SIG_DFL);
@@ -131,8 +156,8 @@ void install_fatal_handlers() {
   use_handler_stack();
   (void)current_backtrace();  // the first backtrace loads what it needs: not in a handler
   struct sigaction action = {};
-  action.sa_handler = on_fatal_signal;
-  action.sa_flags = SA_ONSTACK;
+  action.sa_sigaction = on_fatal_signal;
+  action.sa_flags = SA_ONSTACK | SA_SIGINFO;
   sigemptyset(&action.sa_mask);
   for (const int signal : kFatalSignals) sigaction(signal, &action, nullptr);
 }
