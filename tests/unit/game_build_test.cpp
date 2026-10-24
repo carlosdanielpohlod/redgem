@@ -8,6 +8,7 @@
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
 #include "core/translations.hpp"
+#include "project/notices.hpp"
 #include "project/android/android_package.hpp"
 #include "project/game_build.hpp"
 
@@ -57,35 +58,61 @@ TEST_CASE("a build goes anywhere but into the game it copies") {
   CHECK_FALSE(builds_outside_game(scratch.game, scratch.game, error));
 }
 
-// The game folder of a build is emptied on each build: the game must not be in it.
-TEST_CASE("a build never goes where its game folder would be the game being built") {
+// The game folder of a build for a computer is emptied on each build: the game must not be in it.
+// An APK replaces no folder there, so it may go beside the game.
+TEST_CASE("a build for a computer never goes where its game folder would be the game being built") {
   const Scratch scratch;  // its game is <dir>/game, which a build into <dir> would replace
   std::string error;
-  CHECK_FALSE(builds_outside_game(scratch.game, scratch.dir, error));
-  CHECK(error == tr("project.build.game_inside_its_build",
-                    {{"game", scratch.game.string()}, {"folder", (scratch.dir / kBundledGameFolder).string()}}));
-  CHECK_FALSE(builds_outside_game(scratch.game / "inner", scratch.dir, error));
+  CHECK(builds_outside_game(scratch.game, scratch.dir, error));
   std::ofstream(scratch.dir / "player") << "player";
   CHECK_FALSE(build_game(scratch.game, scratch.dir, scratch.dir / "player", BuildTarget::Linux, error));
+  CHECK(error == tr("project.build.game_inside_its_build",
+                    {{"game", scratch.game.string()}, {"folder", (scratch.dir / kBundledGameFolder).string()}}));
   CHECK(std::filesystem::exists(scratch.game / config::kSceneFileName));
 }
 
-TEST_CASE("a build replaces only a game folder an earlier build made") {
+// A build writes the executable, the game folder and the licenses: over what an earlier build
+// wrote, never over a file or folder of one of those names that someone else put there.
+TEST_CASE("a build replaces only what an earlier build made") {
   const Scratch scratch;
-  const std::filesystem::path out = scratch.dir / "out";
   const std::filesystem::path player = scratch.dir / "player";
   std::ofstream(player) << "player";
   std::string error;
+  const std::filesystem::path out = scratch.dir / "out";
   REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error), error);
   REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error), error);  // its own: replaced
+  REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Windows, error), error);
 
-  const std::filesystem::path other_out = scratch.dir / "other_out";
-  std::filesystem::create_directories(other_out / kBundledGameFolder);
-  std::ofstream(other_out / kBundledGameFolder / "notes.txt") << "someone's own";
-  CHECK_FALSE(build_game(scratch.game, other_out, player, BuildTarget::Linux, error));
-  CHECK(error == tr("project.build.not_a_build", {{"folder", (other_out / kBundledGameFolder).string()}}));
-  CHECK(std::filesystem::exists(other_out / kBundledGameFolder / "notes.txt"));
+  const std::string executable = executable_name(scratch.game);  // for Linux
+  for (const std::string& name : {std::string(kBundledGameFolder), executable, std::string(kNoticesFolder)}) {
+    CAPTURE(name);
+    const std::filesystem::path other_out = scratch.dir / ("other_out_" + std::to_string(name.size()));
+    std::filesystem::remove_all(other_out);
+    std::filesystem::create_directories(other_out);
+    std::ofstream(other_out / name) << "someone's own";
+    CHECK_FALSE(build_game(scratch.game, other_out, player, BuildTarget::Linux, error));
+    CHECK(error == tr("project.build.not_a_build", {{"path", (other_out / name).string()}}));
+    CHECK(std::filesystem::is_regular_file(other_out / name));
+  }
 }
+
+#ifndef _WIN32  // (a folder that cannot be emptied, made by taking away the right to change it)
+TEST_CASE("a build whose earlier game folder cannot be emptied fails instead of shipping what is left") {
+  const Scratch scratch;
+  const std::filesystem::path player = scratch.dir / "player";
+  std::ofstream(player) << "player";
+  const std::filesystem::path out = scratch.dir / "out";
+  std::string error;
+  REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error), error);
+  const std::filesystem::path stuck = out / kBundledGameFolder / "stuck";
+  std::filesystem::create_directories(stuck);
+  std::ofstream(stuck / "stale.txt") << "from before";
+  std::filesystem::permissions(stuck, std::filesystem::perms::owner_read | std::filesystem::perms::owner_exec);
+  CHECK_FALSE(build_game(scratch.game, out, player, BuildTarget::Linux, error));
+  CHECK(error.find("cannot empty") != std::string::npos);
+  std::filesystem::permissions(stuck, std::filesystem::perms::owner_all);
+}
+#endif
 
 TEST_CASE("a player no script of the engine makes is said to come from building the engine on its system") {
   for (const BuildTarget target : {BuildTarget::Linux, BuildTarget::MacOS}) {

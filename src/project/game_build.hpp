@@ -34,9 +34,10 @@ std::string missing_runtime_message(BuildTarget target, const std::filesystem::p
 // Makes a standalone game in `out_dir`: an executable named after the game (a copy of `player`,
 // with .exe for Windows) next to a folder with the game's files. Started, that executable plays
 // the game beside it. Refuses an `out_dir` that is the game folder or inside it (the copy would
-// contain itself), and one whose game folder holds the game. That folder is replaced on each
-// build, and only when a build made it (it is marked so): a folder of that name with anything
-// else in it is left alone, and the build refused.
+// contain itself), and one whose game folder holds the game (that folder is emptied on each
+// build). What it writes in `out_dir` (the executable, the game folder, the licenses) replaces
+// only what an earlier build wrote there, as it recorded (build_record.hpp): a file or folder of
+// one of those names that no build made is left alone, and the build refused.
 bool build_game(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                 const std::filesystem::path& player, BuildTarget target, std::string& error);
 // Everything a build needs, for the editor and the command line: finds the player for `target`
@@ -46,8 +47,9 @@ std::optional<std::filesystem::path> build_game_for(const std::filesystem::path&
                                                     std::string& error);
 
 // What every build checks before it starts, each false with `error` saying why not: that what is
-// built is a game, and that the build does not go into the game it copies nor replace the folder
-// the game is in.
+// built is a game, and that the build does not go into the game it copies. (An APK replaces no
+// folder of the output's, so a game beside it is fine; see build_game for what else a build for
+// a computer checks.)
 bool is_game_to_build(const std::filesystem::path& game_dir, std::string& error);
 bool builds_outside_game(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                          std::string& error);

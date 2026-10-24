@@ -465,6 +465,30 @@ TEST_CASE("a built game carries no key in any case, nor the keystore its game.js
   std::filesystem::remove_all(dir);
 }
 
+// The keystore is told by being the same file: an absolute path, or one in another case where the
+// system ignores case (Windows, macOS), names it as well.
+TEST_CASE("a built game never carries the keystore its game.json names by an absolute path or in another case") {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-build-keystore-path-test";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  const std::filesystem::path game = dir / "game_src";
+  std::filesystem::copy(redgem::test::fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
+  std::ofstream(game / "upload.bin") << "secret";
+  std::ofstream(game / "release.bin") << "secret";
+  std::ofstream(dir / "engine") << "engine";
+  const nlohmann::json named = {{"android", {{"keystore", (game / "upload.bin").string()}}}};
+  std::ofstream(game / "game.json") << named.dump();
+  std::string error;
+  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", host_build_target(), error), error);
+  CHECK_FALSE(std::filesystem::exists(dir / "out" / "game" / "upload.bin"));
+
+  const bool case_ignored = std::filesystem::exists(game / "RELEASE.BIN");
+  std::ofstream(game / "game.json") << R"({"android": {"keystore": "RELEASE.BIN"}})";
+  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", host_build_target(), error), error);
+  CHECK(std::filesystem::exists(dir / "out" / "game" / "release.bin") == !case_ignored);
+  std::filesystem::remove_all(dir);
+}
+
 TEST_CASE("a game.json that holds the wrong kinds of things is read as far as it makes sense") {
   constexpr int kHuge = 2000000000;
   const auto dir = fresh("odd_settings");

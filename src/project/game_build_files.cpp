@@ -18,14 +18,21 @@ constexpr char kBackupSuffix = '~';  // of the copies editors leave behind
 // Whether a file or folder of a game goes into a build of it. A copy of a game goes to other
 // people: not what a link points at (that can be anything on the machine that builds), not hidden
 // files and folders, not editors' backups, not a signing key left in the folder.
-// The file the game's own settings sign its app with, whatever it is called. (A game.json with no
-// keystore names nothing, which no file is.)
+// The file the game's own settings sign its app with, however game.json writes it: relative to
+// the game or absolute, through "..", in another case where the system ignores case. Told by
+// being the same file, not by its name. (A game.json with no keystore names nothing.)
 struct Shipping {
   std::filesystem::path game_dir;
-  std::filesystem::path keystore = read_game_settings(game_dir).android.keystore.lexically_normal();
+  std::filesystem::path keystore = keystore_of(game_dir);
+
+  static std::filesystem::path keystore_of(const std::filesystem::path& game_dir) {
+    const std::filesystem::path named = read_game_settings(game_dir).android.keystore;
+    return named.empty() ? named : game_dir / named;  // (an absolute one stays as it is)
+  }
 
   bool is_the_keystore(const std::filesystem::path& file) const {
-    return !keystore.empty() && file.lexically_relative(game_dir).lexically_normal() == keystore;
+    std::error_code fs_error;
+    return !keystore.empty() && std::filesystem::equivalent(file, keystore, fs_error);
   }
 };
 
