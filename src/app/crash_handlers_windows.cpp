@@ -38,7 +38,11 @@ struct ExceptionName {
   DWORD code = 0;
   const char* text = nullptr;
 };
+// What a C++ exception is to Windows while it looks for a catch (this toolchain's, as GCC's: "GCC"
+// in its letters). One nobody catches can reach the filter as that, before std::terminate.
+constexpr DWORD kCxxExceptionCode = 0x20474343;
 constexpr ExceptionName kExceptionNames[] = {
+    {kCxxExceptionCode, "uncaught exception (a C++ exception nobody caught)"},
     {EXCEPTION_ACCESS_VIOLATION, "EXCEPTION_ACCESS_VIOLATION (invalid memory access)"},
     {EXCEPTION_STACK_OVERFLOW, "EXCEPTION_STACK_OVERFLOW (the stack ran out)"},
     {EXCEPTION_ILLEGAL_INSTRUCTION, "EXCEPTION_ILLEGAL_INSTRUCTION (illegal instruction)"},
