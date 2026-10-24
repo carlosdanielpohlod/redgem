@@ -136,6 +136,7 @@ development files.
 cmake -S . -B build -G Ninja
 cmake --build build
 ./build/src/redgem                      # project hub: open a demo or create a game
+./build/src/redgem --version            # which version this is
 ./build/src/redgem-test --help          # the tool that runs a game's tests
 ./build/src/redgem-relay                # the meeting point for multiplayer games over the internet
 ./build/src/redgem-server games/platformer   # a game on a dedicated server, for players to join
@@ -172,6 +173,7 @@ Small games and scenes that ship with the engine, each with its scripts and test
 
 Small pull requests are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) says how, and
 [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md) lists what is missing or wrong today.
+[CHANGELOG.md](CHANGELOG.md) says what changed in each release.
 
 ## License
 

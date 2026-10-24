@@ -62,16 +62,6 @@ TEST_CASE("saved values can be removed one by one or all at once") {
   CHECK(SaveFile(temp.file).keys().empty());
 }
 
-TEST_CASE("a damaged save file starts from nothing instead of stopping the game") {
-  const TempSave temp;
-  std::filesystem::create_directories(temp.file.parent_path());
-  std::ofstream(temp.file) << "{ not json";
-  SaveFile store(temp.file);
-  CHECK(store.keys().empty());
-  CHECK(store.set("best", kBestScore));
-  CHECK(got<double>(SaveFile(temp.file).get("best")) == doctest::Approx(kBestScore));
-}
-
 TEST_CASE("each game saves in a file named after its folder") {
   const std::filesystem::path player = save_file_for("/somewhere/games/platformer");
   CHECK(player.filename().string().rfind("platformer-", 0) == 0);

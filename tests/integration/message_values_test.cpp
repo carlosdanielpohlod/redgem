@@ -12,6 +12,7 @@
 
 #include "app/engine.hpp"
 #include "script/bindings/message_values.hpp"
+#include "storage/save_file.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -87,7 +88,7 @@ TEST_CASE("what a message cannot carry is refused, saying why") {
 
 TEST_CASE("Save keeps arrays and hashes of any size, which a message could not carry, but no deeper") {
   const std::filesystem::path save = std::filesystem::temp_directory_path() / "redgem-message-values-save.json";
-  std::filesystem::remove(save);
+  remove_save(save);
   static const SceneDesc scene;
   EngineOptions options;
   options.game_dir = fixture("games/sandbox");
@@ -110,7 +111,7 @@ TEST_CASE("Save keeps arrays and hashes of any size, which a message could not c
   CHECK(ruby(game, "Save['visits']") == "2");  // a block that failed changed nothing
   CHECK(ruby(game, "Save.update('visits') { nil }; Save.keys.include?(:visits)") == "false");
   CHECK(refuses(game, "Save.update('visits')", "needs a block"));
-  std::filesystem::remove(save);
+  remove_save(save);
 }
 
 TEST_CASE("what arrives becomes Ruby values again, a vector as a Vector3") {

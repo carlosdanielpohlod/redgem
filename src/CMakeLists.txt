@@ -260,6 +260,7 @@ redgem_add_library(redgem_runtime
   input/touch_controls.cpp
   input/touch_input_source.cpp
   storage/saved_values.cpp
+  storage/durable_file.cpp
   storage/save_file.cpp
   script/script_naming.cpp
   script/ruby_vm.cpp
@@ -504,6 +505,8 @@ if(NOT ANDROID)
   redgem_embed_texts(redgem_project project)
   # (The templates and the licenses are the tools' alone, as the prelude is the runtime's.)
   target_include_directories(redgem_project PRIVATE ${REDGEM_PROJECT_GENERATED_DIR})
+  # What `redgem --version` says: the version in project() at the top of the build.
+  target_compile_definitions(redgem_project PRIVATE REDGEM_VERSION="${redgem_VERSION}")
   target_link_libraries(redgem_project PUBLIC redgem_editor)
 endif()
 

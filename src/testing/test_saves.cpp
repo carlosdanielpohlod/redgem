@@ -1,9 +1,8 @@
 #include "testing/test_saves.hpp"
 
-#include <system_error>
-
 #include "app/save_location.hpp"
 #include "core/platform.hpp"
+#include "storage/save_file.hpp"
 
 namespace redgem::testing {
 namespace {
@@ -12,9 +11,9 @@ constexpr const char* kTestSavesFolder = "test-saves";  // beside the players' s
 constexpr const char* kWorkSavesFolder = "saves";       // in a run's own folder
 constexpr const char* kSaveExtension = ".json";
 
+// (Its backup too: a missing save is otherwise loaded from it.)
 std::filesystem::path emptied(const std::filesystem::path& file) {
-  std::error_code ignored;
-  std::filesystem::remove(file, ignored);
+  remove_save(file);
   return file;
 }
 

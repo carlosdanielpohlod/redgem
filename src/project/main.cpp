@@ -39,6 +39,11 @@ int show_help(const redgem::CliOptions&) {
   return redgem::kExitSuccess;
 }
 
+int show_version(const redgem::CliOptions&) {
+  std::cout << redgem::version_line() << "\n";
+  return redgem::kExitSuccess;
+}
+
 int new_game(const redgem::CliOptions& options) {
   using namespace redgem;
   std::string error;
@@ -88,8 +93,8 @@ struct Mode {
   int (*run)(const redgem::CliOptions&);
 };
 constexpr Mode kModes[] = {
-    {redgem::RunMode::Help, show_help},    {redgem::RunMode::NewGame, new_game}, {redgem::RunMode::BuildGame, build},
-    {redgem::RunMode::Editor, run_editor}, {redgem::RunMode::Game, play_game},
+    {redgem::RunMode::Help, show_help},  {redgem::RunMode::Version, show_version}, {redgem::RunMode::NewGame, new_game},
+    {redgem::RunMode::BuildGame, build}, {redgem::RunMode::Editor, run_editor},    {redgem::RunMode::Game, play_game},
 };
 
 int run_mode(const redgem::CliOptions& options) {

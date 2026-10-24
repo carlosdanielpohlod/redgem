@@ -15,6 +15,7 @@
 namespace redgem::cli {
 namespace {
 
+constexpr const char* kVersionOption = "--version";
 constexpr const char* kPlayOption = "--play";
 constexpr const char* kTemplateOption = "--template";
 constexpr const char* kTargetOption = "--target";
@@ -28,12 +29,17 @@ constexpr const char* kRecordSecondsOption = "--record-seconds";
 // What the option just read was given (see command_line::option_value).
 std::optional<std::string> value(Reading& reading) { return command_line::option_value(reading.args, reading.next); }
 
-void read_help(Reading& reading) {
+// Help and the version win over anything else on the line: the rest of it is not read.
+void answer_at_once(Reading& reading, RunMode mode) {
   reading.result.options = CliOptions{};
-  reading.result.options.mode = RunMode::Help;  // help wins over anything else on the line
+  reading.result.options.mode = mode;
   reading.result.ok = true;
   reading.done = true;
 }
+
+void read_help(Reading& reading) { answer_at_once(reading, RunMode::Help); }
+
+void read_version(Reading& reading) { answer_at_once(reading, RunMode::Version); }
 
 void read_play(Reading& reading) { choose(reading, RunMode::Game); }
 
@@ -113,6 +119,7 @@ void read_record_seconds(Reading& reading) {
 constexpr Option kOptions[] = {
     {command_line::kHelpOption, read_help},
     {command_line::kShortHelpOption, read_help},
+    {kVersionOption, read_version},
     {kPlayOption, read_play},
     {kTemplateOption, read_template},
     {kTargetOption, read_target},
