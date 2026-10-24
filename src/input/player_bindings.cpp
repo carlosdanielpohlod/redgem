@@ -13,6 +13,10 @@ std::vector<AxisSide> sides(std::optional<AxisSide> side) {
   return {AxisSide::Negative, AxisSide::Positive};
 }
 
+const ActionBinding& changed_side_of(const AxisBinding& axis, AxisSide side) {
+  return side == AxisSide::Negative ? axis.negative : axis.positive;
+}
+
 void change(ActionBinding& binding, const InputBinding& one, bool adding) {
   if (adding) return binding.add(one);
   binding.remove(one);
@@ -86,15 +90,18 @@ bool PlayerBindings::changed_action(std::size_t pad, const std::string& name, co
   if (now == nullptr) return false;
   ActionBinding changed = *now;
   change(changed, binding, adding);
-  changes_.at(pad).bind_action(name, std::move(changed));
+  // (A change that changes nothing is not one: the player keeps following the game's binding.)
+  if (changed.all() != now->all()) changes_.at(pad).bind_action(name, std::move(changed));
   return true;
 }
 
 void PlayerBindings::changed_axis(std::size_t pad, const std::string& name, const InputBinding& binding, AxisSide side,
                                   bool adding) {
-  AxisBinding changed = *axis(pad, name);
+  const AxisBinding& now = *axis(pad, name);
+  AxisBinding changed = now;
   change(changed.side(side), binding, adding);
-  changes_.at(pad).bind_axis(name, std::move(changed));
+  if (changed.side(side).all() != changed_side_of(now, side).all())
+    changes_.at(pad).bind_axis(name, std::move(changed));
 }
 
 bool PlayerBindings::cleared(std::size_t pad, const std::string& name, std::optional<AxisSide> side) {

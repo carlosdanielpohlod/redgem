@@ -57,6 +57,9 @@ module Input
     __cancel_capture
   end
 
+  # A capture asked for by a scene that is gone is called off with it.
+  def self.__scene_reset = cancel_capture
+
   # The engine's entry point when a capture caught something; pad is nil for a key.
   def self.__captured(binding, pad)
     block = @capture

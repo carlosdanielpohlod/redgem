@@ -156,7 +156,8 @@ TEST_CASE("a capture hands the next key or button pressed to its block, once") {
   frame(*engine);
   CHECK(ruby(*engine, "$caught.last.inspect") == R"(["key:k", nil])");
   CHECK(ruby(*engine, "$caught.size") == "2");
-  ruby(*engine, "Input.capture_next { $caught << :late }; Input.cancel_capture");
+  ruby(*engine, "Input.capture_next { $caught << :late }; Input.__scene_reset");
+  CHECK(ruby(*engine, "Input.capturing?") == "false");  // (a scene that is gone takes its capture with it)
   input.set_key(Key::M, true);
   frame(*engine);
   CHECK(ruby(*engine, "$caught.size") == "2");

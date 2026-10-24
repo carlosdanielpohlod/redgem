@@ -67,8 +67,22 @@ void InputState::update(const InputSource& source) {
 }
 
 void InputState::catch_capture() {
-  if (capturing_) captured_ = first_pressed();
-  if (captured_) capturing_ = false;
+  if (!capturing_) return;
+  captured_ = first_pressed();
+  if (!captured_) return;
+  capturing_ = false;
+  swallow(*captured_);
+}
+
+// What a capture caught is the capture's: it does not also read as pressed this frame (the action
+// just bound to it, a menu's confirm), as if it had been held already.
+void InputState::swallow(const CapturedBinding& caught) {
+  if (const Key* key = std::get_if<Key>(&caught.binding)) {
+    previous_.insert(*key);
+    return;
+  }
+  const auto button = static_cast<std::size_t>(std::get<GamepadButton>(caught.binding));
+  previous_gamepads_.at(caught.pad.value_or(kFirstGamepad)).buttons[button] = true;  // (a button always has its pad)
 }
 
 std::optional<CapturedBinding> InputState::first_pressed() const {

@@ -75,10 +75,21 @@ Json axis_json(const AxisBinding& axis) {
   return json;
 }
 
+bool absent_or_object(const Json& section) { return section.is_null() || section.is_object(); }
+
+// A part of the section that is there but is not an object is said, as everything else wrong.
+void check_part(const Json& section, const char* key, Problems& problems) {
+  const bool wrong = section.is_object() && section.contains(key) && !section[key].is_object();
+  if (wrong) problems.push_back(std::string("input: ") + key + " is not an object");
+}
+
 }  // namespace
 
 InputMap input_map_from_json(const Json& section, Problems& problems) {
   InputMap map;
+  if (!absent_or_object(section)) problems.emplace_back("input: the section is not an object");
+  check_part(section, kActionsKey, problems);
+  check_part(section, kAxesKey, problems);
   if (holds_object(section, kActionsKey)) {
     for (const auto& [name, list] : section[kActionsKey].items()) {
       map.bind_action(name, bindings_from(list, name, problems));

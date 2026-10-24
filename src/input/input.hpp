@@ -49,7 +49,8 @@ class InputState {
   const PlayerBindings& bindings() const { return bindings_; }
 
   // Waits for the next key or gamepad button to go down (one held already does not count): the
-  // first update that sees one keeps it for take_captured, and stops waiting.
+  // first update that sees one keeps it for take_captured, and stops waiting. That press is the
+  // capture's alone: nothing else reads it as pressed.
   void capture_next() { capturing_ = true, captured_.reset(); }
   void cancel_capture() { capturing_ = false; }
   bool capturing() const { return capturing_; }
@@ -97,6 +98,7 @@ class InputState {
   float stick_push(const AxisBinding& binding, std::size_t pad) const;
   // A capture waiting for a key or button catches the first that went down this frame.
   void catch_capture();
+  void swallow(const CapturedBinding& caught);
   std::optional<CapturedBinding> first_pressed() const;
   std::optional<CapturedBinding> first_pressed_button(std::size_t pad) const;
 

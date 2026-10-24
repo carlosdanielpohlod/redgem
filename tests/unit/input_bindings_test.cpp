@@ -90,8 +90,26 @@ TEST_CASE("what game.json's input section gets wrong is left out and said, the r
   CHECK(problems.size() == 5);  // two dash bindings, roll, steer's stick, lean
   std::vector<std::string> none;
   CHECK(input_map_from_json(nlohmann::json(), none).empty());
-  CHECK(input_map_from_json(nlohmann::json::parse(R"({"actions": []})"), none).empty());
+  CHECK(input_map_from_json(nlohmann::json::parse(R"({"title": "no input"})"), none).empty());
   CHECK(none.empty());
+}
+
+TEST_CASE("an input section, or a part of it, that is not an object is said") {
+  std::vector<std::string> problems;
+  CHECK(parsed(R"({"actions": ["dash"], "axes": 3})", problems).empty());
+  CHECK(problems.size() == 2);
+  CHECK(parsed(R"(["dash"])", problems).empty());
+  CHECK(problems.size() == 3);
+}
+
+TEST_CASE("a change that changes nothing keeps the player on the game's bindings") {
+  PlayerBindings bindings;
+  CHECK(bindings.unbind(0, "jump", InputBinding(Key::Z), std::nullopt));
+  CHECK(bindings.bind(0, "jump", Key::Space, std::nullopt));
+  CHECK(bindings.bind(0, "horizontal", Key::A, AxisSide::Negative));
+  CHECK(bindings.changes(0).empty());
+  bindings.declare_action("jump", {{Key::J}, {}});  // (a newer game binds it anew: the player follows)
+  CHECK(listed(bindings.action(0, "jump")) == std::vector<InputBinding>{Key::J});
 }
 
 TEST_CASE("an input map written as JSON reads back the same") {
@@ -268,6 +286,27 @@ TEST_CASE("a capture catches the next key or button that goes down, once") {
   REQUIRE(key.has_value());
   CHECK(key->binding == InputBinding(Key::K));
   CHECK_FALSE(key->pad.has_value());
+}
+
+TEST_CASE("what a capture caught does not also read as pressed") {
+  ScriptedInputSource source;
+  InputState input;
+  input.capture_next();
+  source.set_key(Key::Space, true);
+  source.set_gamepad_button(GamepadButton::A, true, kSecondPad);
+  input.update(source);
+  CHECK(input.take_captured()->binding == InputBinding(Key::Space));
+  CHECK_FALSE(input.pressed(Key::Space));
+  CHECK(input.action_pressed("jump") == false);
+  CHECK(input.action_pressed("jump", kSecondPad) == true);  // (only what was caught is swallowed)
+  input.capture_next();
+  source.set_gamepad_button(GamepadButton::Y, true);
+  input.update(source);
+  CHECK(input.take_captured()->binding == InputBinding(GamepadButton::Y));
+  CHECK_FALSE(input.gamepad_pressed(GamepadButton::Y));
+  source.set_gamepad_button(GamepadButton::Y, false);
+  input.update(source);
+  CHECK(input.gamepad_released(GamepadButton::Y));
 }
 
 TEST_CASE("a capture called off catches nothing") {
