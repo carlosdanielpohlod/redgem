@@ -15,7 +15,10 @@ the same pull request.
   half an hour instead of a minute), and the games' system tests are not run on the Mac. Never
   tried on a real Mac. The app is not signed by a registered Apple developer nor notarized.
 - The editor on a Mac builds games for the Mac only: it carries no players for other systems.
-  A built Mac game is a plain program beside its files, not an .app.
+  A built game's Mac app has been checked by unit tests on Linux and GitHub's Macs, never opened
+  on a real Mac.
+- A game's icon is put into a copy of the Windows player by the build; Windows' own loader of
+  icons has been seen reading it under Wine only.
 - The Linux programs need a processor with AVX2 and glibc 2.39 or newer (Ubuntu 24.04 and later).
 - Android games have been run on an emulator only, not on phones. The touch controls have one
   fixed layout (a stick and three buttons). The continuous integration does not build for Android:
@@ -191,14 +194,17 @@ not a promise of how it will be closed.
 
 ### Shipping
 
-- A built game has no icon (Windows, macOS, Linux or Android), no splash picture and no version
-  number outside Android.
+- The splash picture shows once the window is open: reading the first level's file, before
+  that, shows nothing. The Linux menu entry is for a package to install: the build does not add
+  it to a menu.
 - A built game is the player program beside a folder of loose files, scripts as plain `.rb`
   included: no packed or compressed archive.
-- No installers: no Windows installer or code signing, no Linux AppImage or Flatpak, no `.app`
-  bundle on macOS (and the editor's is not notarized).
-- Android builds are APKs; Google Play needs an App Bundle. The network permission is always asked
-  for, even by games that never go online.
+- No installers: no Windows installer or code signing, no Linux AppImage or Flatpak. A game's Mac
+  app (and the editor's) is signed ad hoc only, with no Developer ID nor notarization: a Mac that
+  downloads it warns that its developer cannot be verified.
+- An App Bundle (`--bundle`) needs Google's bundletool installed apart. Bundles have been checked
+  with bundletool, never uploaded to Google Play. A game that goes online without saying
+  `"network": true` in its `game.json` cannot reach the network on a phone.
 - Saves live under RedGem's own folder, not under the game's or its studio's name.
 - Except the Mac's, the downloads are packed by hand, not by the continuous integration.
 

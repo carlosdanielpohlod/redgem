@@ -32,7 +32,10 @@ std::optional<std::filesystem::path> runtime_for(BuildTarget target, const std::
 std::string missing_runtime_message(BuildTarget target, const std::filesystem::path& looked_for);
 
 // Makes a standalone game in `out_dir`: an executable named after the game (a copy of `player`,
-// with .exe for Windows) next to a folder with the game's files. Started, that executable plays
+// with .exe for Windows) next to a folder with the game's files, and what the system shows the
+// game by (see game_shipping.hpp): on Windows the game's icon inside the executable, on Linux a
+// menu entry and the icon beside it. For the Mac it is an app instead, <title>.app, with all of
+// that inside it. Started, that executable plays
 // the game beside it. Refuses an `out_dir` that is the game folder or inside it (the copy would
 // contain itself), and one whose game folder holds the game (that folder is emptied on each
 // build). What it writes in `out_dir` (the executable, the game folder, the licenses) replaces
@@ -40,11 +43,15 @@ std::string missing_runtime_message(BuildTarget target, const std::filesystem::p
 // one of those names that no build made is left alone, and the build refused.
 bool build_game(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                 const std::filesystem::path& player, BuildTarget target, std::string& error);
+// What a build for Android makes: an APK, to install on a phone, or an App Bundle (.aab), which
+// Google Play takes and makes the phones' APKs from.
+enum class AndroidFormat { Apk, Bundle };
 // Everything a build needs, for the editor and the command line: finds the player for `target`
-// and builds. Returns the game's executable (for Android, its .apk), or nullopt with `error` set.
+// and builds. Returns the game's executable (for the Mac, its .app; for Android, its .apk or
+// .aab), or nullopt with `error` set. An App Bundle is for Android only.
 std::optional<std::filesystem::path> build_game_for(const std::filesystem::path& game_dir,
                                                     const std::filesystem::path& out_dir, BuildTarget target,
-                                                    std::string& error);
+                                                    std::string& error, AndroidFormat format = AndroidFormat::Apk);
 
 // What every build checks before it starts, each false with `error` saying why not: that what is
 // built is a game, and that the build does not go into the game it copies. (An APK replaces no

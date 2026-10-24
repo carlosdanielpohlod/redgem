@@ -4,12 +4,15 @@
 
 #include <string>
 
+#include "app/game_identity.hpp"
 #include "app/save_location.hpp"
 #include "app/scene_bodies.hpp"
 #include "app/scene_water.hpp"
 #include "app/scene_files.hpp"
+#include "app/splash_screen.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "core/translations.hpp"
 #include "storage/save_file.hpp"
 
 namespace redgem {
@@ -48,6 +51,7 @@ std::unique_ptr<Engine> Engine::create(const EngineOptions& options, SceneDesc s
 }
 
 void Engine::initialize() {
+  show_splash(options_.presenter, options_.game_dir);  // (while the world is built and the scene uploaded)
   build_world();
   const GameManifest manifest = read_game_manifest(options_.game_dir);
   if (!manifest.id_error.empty()) log::warning(manifest.id_error + kSavedByFolderNote);
@@ -57,6 +61,7 @@ void Engine::initialize() {
   open_display(manifest.settings.display);
   fill_context(manifest.settings.title);
   connect_display();
+  take_identity();
   if (serves_a_room()) network_.serve_room(options_.server_room);  // before any script asks
   start_scripts();
   network_watch_.restart();  // the network's time starts with the game, not with its loading
@@ -137,6 +142,12 @@ void Engine::fill_context(const std::string& game_title) {
   context_.time.fixed_delta = config::kFixedDeltaSeconds;
   context_.scene_name = options_.scene_name;
   connect_context();
+}
+
+void Engine::take_identity() {
+  const GameIdentityReading identity = read_game_identity(options_.game_dir);
+  if (!identity.error.empty()) log::warning(tr("game.identity.unusable", {{"error", identity.error}}));
+  context_.game_version = identity.identity.version;
 }
 
 void Engine::connect_context() {

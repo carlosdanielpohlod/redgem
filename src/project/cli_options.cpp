@@ -19,6 +19,7 @@ constexpr const char* kVersionOption = "--version";
 constexpr const char* kPlayOption = "--play";
 constexpr const char* kTemplateOption = "--template";
 constexpr const char* kTargetOption = "--target";
+constexpr const char* kBundleOption = "--bundle";
 constexpr const char* kGpuOption = "--gpu";
 constexpr const char* kRecordOption = "--record";
 constexpr const char* kRecordFpsOption = "--record-fps";
@@ -61,6 +62,8 @@ void read_target(Reading& reading) {
   }
   reading.result.options.build_target = name;
 }
+
+void read_bundle(Reading& reading) { reading.result.options.android_bundle = true; }
 
 void read_gpu(Reading& reading) {
   const std::string name = value(reading).value_or("");
@@ -123,6 +126,7 @@ constexpr Option kOptions[] = {
     {kPlayOption, read_play},
     {kTemplateOption, read_template},
     {kTargetOption, read_target},
+    {kBundleOption, read_bundle},
     {kGpuOption, read_gpu},
     {kRecordOption, read_record},
     {kRecordFpsOption, read_record_fps},

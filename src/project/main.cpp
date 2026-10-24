@@ -63,14 +63,19 @@ redgem::BuildTarget target_of(const redgem::CliOptions& options) {
   return named ? *named : redgem::host_build_target();
 }
 
+// What a build made says to do with it: run it, install it on a phone, or upload it to the store.
+const char* built_text(const redgem::CliOptions& options, redgem::BuildTarget target) {
+  using redgem::BuildTarget;
+  if (target != BuildTarget::Android) return "project.cli.built";
+  return options.android_bundle ? "project.cli.built_bundle" : "project.cli.built_for_phone";
+}
+
 // What a build says it made, and what to do with it.
 void say_built(const redgem::CliOptions& options, redgem::BuildTarget target, const std::filesystem::path& executable) {
   using namespace redgem;
-  // (An Android app is not run from here: it is installed on a phone.)
-  const char* said = target == BuildTarget::Android ? "project.cli.built_for_phone" : "project.cli.built";
-  std::cout << tr(said, {{"out_dir", options.build_dir.string()},
-                         {"target", build_target_name(target)},
-                         {"executable", executable.string()}})
+  std::cout << tr(built_text(options, target), {{"out_dir", options.build_dir.string()},
+                                                {"target", build_target_name(target)},
+                                                {"executable", executable.string()}})
             << "\n";
 }
 
@@ -78,7 +83,8 @@ int build(const redgem::CliOptions& options) {
   using namespace redgem;
   std::string error;
   const BuildTarget target = target_of(options);
-  const auto executable = build_game_for(options.game_dir, options.build_dir, target, error);
+  const AndroidFormat format = options.android_bundle ? AndroidFormat::Bundle : AndroidFormat::Apk;
+  const auto executable = build_game_for(options.game_dir, options.build_dir, target, error, format);
   if (!executable) {
     log::error(error);
     return kExitFailure;

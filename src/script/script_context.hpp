@@ -77,6 +77,8 @@ struct ScriptContext {
   net::HttpClient* http = nullptr;
   // What the game is called (game.json): how a hosted game shows up to others unless named.
   std::string game_title;
+  // Its version (game.json), for Game.version; empty when it gives none.
+  std::string game_version;
   bool quit_requested = false;
   bool stop_recording_requested = false;  // Game.stop_recording: the video being recorded ends here
   // Called when a script writes a transform, so physics can follow.

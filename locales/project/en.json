@@ -1,5 +1,8 @@
 {
+  "project.android.no_bundletool": "an App Bundle is made with Google's bundletool, which was not found: put bundletool on the PATH, or set {variable} to its .jar (https://github.com/google/bundletool/releases)",
+  "project.build.bundle_is_for_android": "--bundle makes an Android App Bundle: use it with --target android",
   "project.build.cannot_empty": "cannot empty {folder} for the new build: {reason}",
+  "project.build.cannot_sign_app": "cannot sign {app}: codesign failed (it comes with Xcode's command line tools)",
   "project.build.for_android": "For Android (.apk)",
   "project.build.for_linux": "For Linux",
   "project.build.for_macos": "For macOS",
@@ -7,6 +10,7 @@
   "project.build.game_inside_its_build": "cannot build {game}: it is inside {folder}, which a build replaces",
   "project.build.not_a_build": "cannot build: {path} is there and no build made it; move it away or build into another folder",
   "project.cli.built": "built {out_dir} for {target}: run {executable}",
+  "project.cli.built_bundle": "built {out_dir} for {target}: upload {executable} to Google Play",
   "project.cli.built_for_phone": "built {out_dir} for {target}: install it with adb install {executable}",
   "project.cli.choose_one_mode": "choose one of: new, build, --play",
   "project.cli.created": "created {game_dir} ({template}). Open it with: redgem {game_dir}",
@@ -27,7 +31,9 @@
     "  redgem <game_dir>                 open the editor",
     "  redgem <game_dir> --play          play the game",
     "  redgem new <game_dir> [--template {templates}]   create a game",
-    "  redgem build <game_dir> <out_dir> [--target linux|windows|macos|android]   make a standalone game (an executable, or an .apk)",
+    "  redgem build <game_dir> <out_dir> [--target linux|windows|macos|android] [--bundle]",
+    "                                    make a standalone game: an executable (for the Mac, an .app),",
+    "                                    an .apk, or with --bundle an App Bundle (.aab) for Google Play",
     "  redgem --version                  say which version of RedGem this is",
     "",
     "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting,",
@@ -60,5 +66,11 @@
   "project.hub.open_hint": "Double click to open",
   "project.hub.path_hint": "/path/to/game",
   "project.hub.start_from": "Start from",
-  "project.hub.tagline": "Make 3D games in Ruby"
+  "project.hub.tagline": "Make 3D games in Ruby",
+  "project.icon.cannot_read_player": "cannot read the game's executable {player} to give it the game's icon",
+  "project.icon.missing": "the icon {picture} that game.json names is not a file in the game folder",
+  "project.icon.missing_side": "the game's icon was not made at every size the player for Windows has",
+  "project.icon.no_exe_icon": "the player for Windows carries no icon for the game's to replace: build it again with tools/windows/build_runtime.sh",
+  "project.icon.no_room": "the player for Windows has no room in its headers for the game's icon",
+  "project.icon.unusable": "the icon {picture} is not a square PNG that can be read"
 }

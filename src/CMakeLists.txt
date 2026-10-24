@@ -285,6 +285,7 @@ redgem_add_library(redgem_runtime
   script/bindings/physics_bindings.cpp
   script/bindings/light_bindings.cpp
   script/bindings/runtime_bindings.cpp
+  script/bindings/game_identity_bindings.cpp
   script/bindings/ui_bindings.cpp
   script/bindings/audio_bindings.cpp
   script/bindings/input_bindings.cpp
@@ -365,6 +366,8 @@ redgem_add_library(redgem_runtime
   app/json_file.cpp
   app/android/android_settings.cpp
   app/game_settings.cpp
+  app/game_identity.cpp
+  app/splash_screen.cpp
   app/bundled_game.cpp
   app/save_location.cpp
   app/user_settings.cpp
@@ -492,9 +495,14 @@ if(NOT ANDROID)
     project/game_templates.cpp
     project/game_names.cpp
     project/build_record.cpp
-  project/game_build.cpp
+    project/game_build.cpp
     project/game_build_targets.cpp
     project/game_build_files.cpp
+    project/game_build_shipping.cpp
+    project/game_build_mac.cpp
+    project/icons/icon_set.cpp
+    project/icons/icon_files.cpp
+    project/icons/exe_icon.cpp
     project/android/android_package.cpp
     project/android/android_package_names.cpp
     project/android/android_package_sdk.cpp
@@ -502,6 +510,8 @@ if(NOT ANDROID)
     project/android/android_package_signing.cpp
     project/android/android_package_manifest.cpp
     project/android/android_package_stage.cpp
+    project/android/android_package_icons.cpp
+    project/android/android_package_bundle.cpp
     project/android/android_package_tools.cpp
     project/recent_games.cpp
     project/project_hub.cpp
@@ -539,9 +549,21 @@ if(ANDROID)
   target_link_options(redgem PRIVATE -u ANativeActivity_onCreate)
   redgem_finish_program(redgem)
 else()
+  # On Windows the programs carry the engine's icon: assets/player/redgem.ico, drawn from
+  # branding/redgem-mark.svg at each size (rsvg-convert) and packed as PNGs. A build of a game with
+  # an icon of its own puts the game's in the player's place (project/icons/exe_icon.hpp).
+  set(REDGEM_ICON_SOURCES "")
+  if(WIN32)
+    enable_language(RC)
+    set(REDGEM_ICON_FILE ${CMAKE_SOURCE_DIR}/assets/player/redgem.ico)
+    set(REDGEM_ICON_SOURCES ${CMAKE_CURRENT_BINARY_DIR}/redgem_icon.rc)
+    configure_file(${CMAKE_SOURCE_DIR}/cmake/redgem_icon.rc.in ${REDGEM_ICON_SOURCES} @ONLY)
+    set_source_files_properties(${REDGEM_ICON_SOURCES} PROPERTIES OBJECT_DEPENDS ${REDGEM_ICON_FILE})
+  endif()
+
   # redgem-player: what players receive. It plays the game in the folder beside it, and is made
   # of the runtime alone (tests/ships_no_tools.sh looks into the program that came out).
-  add_executable(redgem_player app/player_main.cpp)
+  add_executable(redgem_player app/player_main.cpp ${REDGEM_ICON_SOURCES})
   target_link_libraries(redgem_player PRIVATE redgem_runtime)
   # On Windows a game is a windowed program, with no console window behind it.
   set_target_properties(redgem_player PROPERTIES OUTPUT_NAME redgem-player WIN32_EXECUTABLE ON)
@@ -562,7 +584,7 @@ else()
   redgem_finish_program(redgem_server)
 
   # redgem: the editor, the project hub and the command line that makes and builds games.
-  add_executable(redgem project/main.cpp)
+  add_executable(redgem project/main.cpp ${REDGEM_ICON_SOURCES})
   target_link_libraries(redgem PRIVATE redgem_project)
   # (On Windows the editor opens with no console window behind it.)
   set_target_properties(redgem PROPERTIES WIN32_EXECUTABLE ON)

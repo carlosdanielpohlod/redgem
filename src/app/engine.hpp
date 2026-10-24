@@ -132,6 +132,8 @@ class Engine {
   // Whether the game is a room of a dedicated server (see EngineOptions::server_room).
   bool serves_a_room() const { return !options_.server_room.empty(); }
   void fill_context(const std::string& game_title);
+  // What game.json says the game is (its version, for Game.version).
+  void take_identity();
   void connect_context();
   void start_scripts();
 

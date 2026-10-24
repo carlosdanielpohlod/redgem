@@ -1,4 +1,8 @@
 {
+  "game.identity.bad_network": "{place} must be true or false",
+  "game.identity.bad_picture": "{place} must name a .png file inside the game folder, like images/icon.png",
+  "game.identity.bad_version": "{place} must be a version like 1.2.0 (three numbers, then optionally -beta.1 or +build.5)",
+  "game.identity.unusable": "{error}. The game plays as if game.json did not say it",
   "game.menu.back": "Back",
   "game.menu.paused": "Paused",
   "game.menu.play": "Play",
@@ -28,5 +32,6 @@
   "game.settings.volume": "Master volume",
   "game.settings.vsync": "VSync",
   "game.settings.window_mode": "Window",
-  "game.settings.windowed": "Windowed"
+  "game.settings.windowed": "Windowed",
+  "game.splash.unusable": "the splash picture {picture} is not a PNG in the game's folder that can be read: the game starts without it"
 }

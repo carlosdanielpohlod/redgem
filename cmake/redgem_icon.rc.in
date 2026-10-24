@@ -1,0 +1,2 @@
+// The engine's icon, built into its programs for Windows (see src/CMakeLists.txt).
+1 ICON "@REDGEM_ICON_FILE@"

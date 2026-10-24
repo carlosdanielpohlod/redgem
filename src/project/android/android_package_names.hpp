@@ -12,10 +12,16 @@ extern const char kAapt2Tool[];
 extern const char kZipalignTool[];
 extern const char kApksignerTool[];
 extern const char kKeytoolTool[];
+// What an App Bundle is made with besides: Google's bundletool, Java's jarsigner, zip and unzip.
+extern const char kBundletoolTool[];
+extern const char kJarsignerTool[];
+extern const char kZipTool[];
+extern const char kUnzipTool[];
 // What a staged app is made of (see stage_android_game), which the tools are then pointed at.
 extern const char kAssetsFolder[];
 extern const char kLibrariesFolder[];
 extern const char kManifestFile[];
+extern const char kResourcesFolder[];  // res/: the launcher icons
 // The engine's own signing key, in the user's RedGem folder.
 extern const char kKeystoreFile[];
 

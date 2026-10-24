@@ -8,6 +8,7 @@
 #include "project/game_templates.hpp"
 #include "project/recent_games.hpp"
 #include "core/config.hpp"
+#include "core/translations.hpp"
 
 using namespace redgem;
 
@@ -126,6 +127,17 @@ TEST_CASE("macos is a build target") {
   CHECK(build_target_from_name("macos") == BuildTarget::MacOS);
   CHECK(std::string(build_target_name(BuildTarget::MacOS)) == "macos");
   CHECK(usage().find("--target linux|windows|macos|android") != std::string::npos);
+}
+
+TEST_CASE("--bundle asks an Android build for an App Bundle, and a build for a computer refuses it") {
+  const CliResult bundle = parse_cli({"build", "games/mine", "dist/aab", "--target", "android", "--bundle"});
+  REQUIRE(bundle.ok);
+  CHECK(bundle.options.android_bundle);
+  CHECK_FALSE(parse_cli({"build", "games/mine", "dist/apk", "--target", "android"}).options.android_bundle);
+  CHECK(usage().find("--bundle") != std::string::npos);
+  std::string error;
+  CHECK_FALSE(build_game_for("games/mine", "dist/mine", BuildTarget::Linux, error, AndroidFormat::Bundle));
+  CHECK(error == tr("project.build.bundle_is_for_android"));
 }
 
 TEST_CASE("-h asks for help too, and help forgets the rest of the line") {

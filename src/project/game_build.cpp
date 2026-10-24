@@ -12,6 +12,7 @@
 #include "core/translations.hpp"
 #include "project/android/android_package.hpp"
 #include "project/build_record.hpp"
+#include "project/game_shipping.hpp"
 #include "project/notices.hpp"
 
 namespace redgem {
@@ -38,6 +39,25 @@ std::string executable_file(const std::filesystem::path& game_dir, BuildTarget t
 // Whether a name can be the executable's: there is one, and it is not the name of the folder the
 // game's files go in beside it.
 bool names_an_executable(const std::string& name) { return !name.empty() && name != kBundledGameFolder; }
+
+// An App Bundle is Google Play's: a build for a computer makes none.
+bool bundle_asked_for_computer(AndroidFormat format, std::string& error) {
+  if (format == AndroidFormat::Apk) return true;
+  error = tr("project.build.bundle_is_for_android");
+  return false;
+}
+
+// What a build made: the executable, or on the Mac the app (signed, when built on a Mac).
+std::optional<std::filesystem::path> made_by_build(const std::filesystem::path& game_dir,
+                                                   const std::filesystem::path& out_dir, BuildTarget target,
+                                                   std::string& error) {
+  if (target != BuildTarget::MacOS) return out_dir / executable_file(game_dir, target);
+  const auto identity = build_identity(game_dir, error);
+  if (!identity) return std::nullopt;
+  std::filesystem::path app = out_dir / mac_app_folder(identity->title, executable_name(game_dir));
+  if (platform::is_mac() && !sign_mac_app(app, error)) return std::nullopt;
+  return app;
+}
 
 }  // namespace
 
@@ -69,11 +89,12 @@ bool game_not_in_bundle(const std::filesystem::path& game_dir, const std::filesy
 
 std::optional<std::filesystem::path> build_game_for(const std::filesystem::path& game_dir,
                                                     const std::filesystem::path& out_dir, BuildTarget target,
-                                                    std::string& error) {
+                                                    std::string& error, AndroidFormat format) {
   const std::filesystem::path self = platform::executable_path();
   if (target == BuildTarget::Android) {
-    return build_android_game(game_dir, out_dir, runtime_location(target, self), error);
+    return build_android_game(game_dir, out_dir, runtime_location(target, self), error, format);
   }
+  if (!bundle_asked_for_computer(format, error)) return std::nullopt;
   // (What is wrong with the game is said before what is missing here: it is the nearer mistake.)
   if (!can_build(normalized_folder(game_dir), normalized_folder(out_dir), error)) return std::nullopt;
   const auto runtime = runtime_for(target, self);
@@ -82,12 +103,9 @@ std::optional<std::filesystem::path> build_game_for(const std::filesystem::path&
     return std::nullopt;
   }
   if (!build_game(game_dir, out_dir, *runtime, target, error)) return std::nullopt;
-  return normalized_folder(out_dir) / executable_file(game_dir, target);
+  return made_by_build(normalized_folder(game_dir), normalized_folder(out_dir), target, error);
 }
 
-namespace {
-
-// The player as the game's executable, allowed to run.
 bool copy_player(const std::filesystem::path& player, const std::filesystem::path& binary, std::string& error) {
   std::error_code fs_error;
   std::filesystem::copy_file(player, binary, std::filesystem::copy_options::overwrite_existing, fs_error);
@@ -102,7 +120,7 @@ bool copy_player(const std::filesystem::path& player, const std::filesystem::pat
   return true;
 }
 
-// An empty `bundle` (an earlier build's is emptied first: none of its files may ship again).
+// (An earlier build's files are emptied first: none of them may ship again.)
 bool fresh_bundle(const std::filesystem::path& bundle, std::string& error) {
   std::error_code fs_error;
   std::filesystem::remove_all(bundle, fs_error);
@@ -112,7 +130,6 @@ bool fresh_bundle(const std::filesystem::path& bundle, std::string& error) {
   return false;
 }
 
-// A fresh copy in `bundle` of the files of the game that ship (see shipped_files).
 bool copy_game(const std::filesystem::path& game_dir, const std::filesystem::path& bundle, std::string& error) {
   if (!fresh_bundle(bundle, error)) return false;
   std::error_code fs_error;
@@ -126,6 +143,25 @@ bool copy_game(const std::filesystem::path& game_dir, const std::filesystem::pat
   return true;
 }
 
+namespace {
+
+// A build for a computer other than the Mac: the executable beside the game's folder.
+bool build_folder(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
+                  const std::filesystem::path& player, BuildTarget target, const BuildIdentity& identity,
+                  std::string& error) {
+  std::error_code fs_error;
+  std::filesystem::create_directories(out_dir, fs_error);
+  // (Only what a build made is written over: anything else of the same name is left as it is.)
+  std::vector<std::string> outputs = {executable_file(game_dir, target), kBundledGameFolder, kNoticesFolder};
+  const std::vector<std::string> shipping = shipping_outputs(game_dir, target);
+  outputs.insert(outputs.end(), shipping.begin(), shipping.end());
+  BuildRecord record = BuildRecord::of(out_dir);
+  if (!record.may_write(outputs, error) || !record.keep(outputs, error)) return false;
+  return copy_player(player, out_dir / outputs.front(), error) &&
+         copy_game(game_dir, out_dir / kBundledGameFolder, error) && write_notices(out_dir, error) &&
+         write_shipping_files(game_dir, out_dir, target, identity, error);
+}
+
 }  // namespace
 
 bool build_game(const std::filesystem::path& game_folder, const std::filesystem::path& out_folder,
@@ -133,14 +169,10 @@ bool build_game(const std::filesystem::path& game_folder, const std::filesystem:
   const std::filesystem::path game_dir = normalized_folder(game_folder);
   const std::filesystem::path out_dir = normalized_folder(out_folder);
   if (!can_build(game_dir, out_dir, error)) return false;
-  std::error_code fs_error;
-  std::filesystem::create_directories(out_dir, fs_error);
-  // (Only what a build made is written over: anything else of the same name is left as it is.)
-  const std::vector<std::string> outputs = {executable_file(game_dir, target), kBundledGameFolder, kNoticesFolder};
-  BuildRecord record = BuildRecord::of(out_dir);
-  if (!record.may_write(outputs, error) || !record.keep(outputs, error)) return false;
-  return copy_player(player, out_dir / outputs.front(), error) &&
-         copy_game(game_dir, out_dir / kBundledGameFolder, error) && write_notices(out_dir, error);
+  const auto identity = build_identity(game_dir, error);
+  if (!identity) return false;
+  if (target == BuildTarget::MacOS) return build_mac_app(game_dir, out_dir, player, *identity, error);
+  return build_folder(game_dir, out_dir, player, target, *identity, error);
 }
 
 bool folder_inside(const std::filesystem::path& folder, const std::filesystem::path& outer) {

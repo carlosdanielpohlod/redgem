@@ -83,6 +83,14 @@ TEST_CASE("the templates are the folders of templates/, each with a word about i
   CHECK(std::find(names.begin(), names.end(), kDefaultTemplate) != names.end());
 }
 
+// What a template's own game.json says (a game that goes online says so) stays in the new game's.
+void check_settings_kept(const std::filesystem::path& source, const std::filesystem::path& dir) {
+  if (!std::filesystem::exists(source / kGameSettingsFile)) return;
+  const nlohmann::json said = nlohmann::json::parse(bytes_of(source / kGameSettingsFile));
+  const nlohmann::json kept = nlohmann::json::parse(bytes_of(dir / kGameSettingsFile));
+  for (const auto& [key, value] : said.items()) CHECK(kept.at(key) == value);
+}
+
 TEST_CASE("a new game is its template's folder, file for file, and a game.json of its own") {
   for (const GameTemplate& known : game_templates()) {
     CAPTURE(known.name);
@@ -92,7 +100,8 @@ TEST_CASE("a new game is its template's folder, file for file, and a game.json o
     REQUIRE_MESSAGE(create_game(dir, known.name, error), error);
     std::size_t copied = 0;
     for (const auto& entry : std::filesystem::recursive_directory_iterator(source)) {
-      if (!entry.is_regular_file() || entry.path().filename() == "template.json") continue;
+      const std::filesystem::path name = entry.path().filename();
+      if (!entry.is_regular_file() || name == "template.json" || name == kGameSettingsFile) continue;
       const std::filesystem::path file = std::filesystem::relative(entry.path(), source);
       CAPTURE(file);
       CHECK(bytes_of(dir / file) == bytes_of(entry.path()));
@@ -102,6 +111,7 @@ TEST_CASE("a new game is its template's folder, file for file, and a game.json o
     // What a template says about itself is the template's, not the game's.
     CHECK_FALSE(std::filesystem::exists(dir / "template.json"));
     CHECK(std::filesystem::exists(dir / kGameSettingsFile));
+    check_settings_kept(source, dir);
     std::filesystem::remove_all(dir);
   }
 }
