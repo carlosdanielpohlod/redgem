@@ -41,7 +41,7 @@ struct Scratch {
 };
 
 std::string read(const std::filesystem::path& file) {
-  std::ifstream in(file);
+  std::ifstream in(file, std::ios::binary);  // (pictures too: no line endings changed on the way)
   std::stringstream text;
   text << in.rdbuf();
   return text.str();
@@ -432,14 +432,16 @@ TEST_CASE("bundletool is found as a .jar named by the environment, or as a progr
   std::string error;
   const std::filesystem::path jar = scratch.file("tools/bundletool-all.jar", "jar");
   CHECK(find_bundletool(jar.string(), "", error) == "java -jar '" + jar.string() + "'");
+#ifndef _WIN32  // (Android apps are packed with a POSIX shell: its PATH and its runnable files.)
   const std::filesystem::path program = scratch.file("bin/bundletool", "#!/bin/sh");
   CHECK_FALSE(find_bundletool("", program.parent_path().string(), error));  // a file that may not run is none
   std::filesystem::permissions(program, std::filesystem::perms::owner_exec, std::filesystem::perm_options::add);
   CHECK(find_bundletool("", "/nowhere:" + program.parent_path().string(), error) == "'" + program.string() + "'");
   CHECK_FALSE(find_bundletool("", "/nowhere", error));
   CHECK(error.find(kBundletoolVariable) != std::string::npos);
+#endif
   // A variable naming no file is said, rather than passed over for what the PATH has.
-  CHECK_FALSE(find_bundletool("/nowhere/bundletool.jar", program.parent_path().string(), error));
+  CHECK_FALSE(find_bundletool("/nowhere/bundletool.jar", (scratch.dir / "bin").string(), error));
   CHECK(error.find("/nowhere/bundletool.jar") != std::string::npos);
 }
 
