@@ -50,7 +50,11 @@ class RenderStage {
   Picture draw(const Scene& scene, const std::string& name, const ParticleSystem* particles = nullptr,
                const WaterRippleSnapshot* water_ripples = nullptr);
 
+  // Flat UI drawn into the same target, for testing images and text.
+  Picture draw_hud(const std::vector<HudItem>& hud, const std::string& name);
+
  private:
+  Picture capture(const std::string& name);
   Window window_;
   std::unique_ptr<Renderer> renderer_;
   RenderTexture2D target_{};

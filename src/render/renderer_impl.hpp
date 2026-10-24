@@ -255,7 +255,7 @@ struct Renderer::Impl {
   Font ui_font{};
   bool owns_ui_font = false;
   std::filesystem::path images_dir;
-  std::unordered_map<std::string, Texture2D> ui_images;  // by name; id 0 = looked for and not found
+  std::unordered_map<std::string, Texture2D> ui_images;  // by name; missing files keep a cached checkerboard
   // What the game asked for.
   bool show_prefabs = false;
   std::uint64_t scene_uploads = 0;  // scenes uploaded so far: what a frame was drawn of
@@ -368,8 +368,8 @@ struct Renderer::Impl {
 
   // The font of the game's texts: the interface font, rasterized large and scaled down smoothly.
   void load_ui_font();
-  // The picture UI.image or a particle asks for by name, loaded on first use. Null (reported
-  // once) when the game's images folder has no such file.
+  // The picture UI.image or a particle asks for, cached on first use. Missing files use a
+  // checkerboard and are reported once; null means the GPU could not allocate a texture.
   const Texture2D* ui_image(const std::string& name);
   void release_ui_images();
 

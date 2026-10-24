@@ -5,6 +5,8 @@
 #include <optional>
 #include <string>
 
+#include "audio/spatial_audio.hpp"
+
 namespace redgem {
 
 // What the audio is at before a game changes it: every sound and music at its full volume, the
@@ -19,6 +21,17 @@ class AudioSystem {
   virtual ~AudioSystem() = default;
   virtual bool play_sound(const std::string& name, float volume, float pitch) = 0;
   virtual bool play_music(const std::string& name, bool loop, float volume) = 0;
+  // Positional sources overlap independently, even when they use the same asset. Zero means no source.
+  // The game supplies world positions and listener orientation; update them when objects/cameras move.
+  // Backends without positional playback (including silent/test backends) report no source.
+  virtual SoundSourceId play_spatial_sound(const std::string&, const SpatialSound&) { return kNoSoundSource; }
+  virtual bool set_listener(const AudioListener&) { return false; }
+  virtual bool move_sound(SoundSourceId, Vec3) { return false; }
+  virtual bool sound_playing(SoundSourceId) const { return false; }
+  virtual bool stop_sound(SoundSourceId) { return false; }
+  // Releases positional sources only; music and flat sound effects keep playing.
+  virtual void stop_spatial_sounds() {}
+
   virtual void stop_music() = 0;
   // The playing music's pitch (1 = as recorded; it also plays faster or slower) and volume. They
   // can change every frame: an engine's drone following the car's speed.

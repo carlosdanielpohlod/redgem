@@ -26,7 +26,7 @@ and [Gameplay recipes](gameplay.md).
 | `NetworkSync` | A behaviour: `add_component(NetworkSync, owner: peer_id, key: "name", interpolate: true, delay: nil, animation: true)` (its own animation goes along: the others see the same clips, from the same moment) (see [Multiplayer](multiplayer.md#objects-in-the-same-place-everywhere)), `mine?`, `owner`, `key`, `assign(owner:, key:)` |
 | `Save` | `Save.get(key, default = nil)`, `Save[key]`, `Save[key] = value` (numbers, texts, true/false, `Vector3`, arrays and hashes of those; hashes come back with string keys; `nil` removes the key), `Save.update(key, default = nil) { \|value\| new_value }` (reads and writes the key with nothing in between: on a dedicated server, what changes a value another room may change too), `Save.delete(key)`, `Save.clear`, `Save.keys`; on a dedicated server, the server's own (see [Online services](online-services.md#saving-on-a-server)) |
 | `HTTP` | `HTTP.get/post/put/patch/delete(url, json:, body:, headers:, timeout: 15) { \|response\| }`; `response.ok?`, `status`, `headers`, `body`, `json`, `error` (see [Online services](online-services.md#http)) |
-| `Audio` | `Audio.play(:jump, volume:, pitch:)`, `Audio.music(:theme, loop: true, volume: 0.7)`, `Audio.stop_music`, `Audio.music_pitch = 1.2`, `Audio.music_volume = 0.5` (change them every frame for an engine's drone), `Audio.volume = 0.8` (files in `sounds/`) |
+| `Audio` | [Positional sources](#positional-audio): `Audio.play_at`, `listener`, `move`, `playing?`, `stop`, `stop_sources`; `Audio.play(:jump, volume:, pitch:)`, `Audio.music(:theme, loop: true, volume: 0.7)`, `Audio.stop_music`, `Audio.music_pitch = 1.2`, `Audio.music_volume = 0.5` (change them every frame for an engine's drone), `Audio.volume = 0.8` (files in `sounds/`) |
 | `UI` / `Debug` / `Game` | `UI.text(str, x:, y:, size:, color:, alpha:, align:)`, `UI.rect(x:, y:, width:, height:, color:, alpha:, radius:)`, `UI.image(name, x:, y:, width:, height:)`, `UI.button(label, x:, y:, width:, height:)` → clicked?, `UI.text_field(value, x:, y:, width:, height:, max_length:, secret:)` → the new value (`secret: true` shows stars), `UI.width`, `UI.height`, `UI.text_width(str, size:)`, `Debug.log/warn/error`, `Game.quit`, `Game.stop_recording` (ends a video being recorded with `--record`, see [Building and sharing](../shipping.md#recording-a-video); the game goes on), `Game.load_scene("level2")` (`scenes/level2.glb`; `"main"` is `scene.glb`; Ruby globals survive), `Game.scene_name`, `Game.title` |
 | `GameMenu` | A behaviour: title screen, pause menu and end screen. `GameMenu.instance`, `show(:pause)`, `resume`, `restart`, `finish("You win!")`, `open?`, `screen`, `screens` (`:title`, `:pause`, `:over`, and the game's own), `button_box(index)`; `GameMenu::Screen.new(heading:, options:, back:)`, `add_option(label, index:) { }`; settings `title`, `start_open`; its labels are the engine's texts `game.menu.*`, which a game's `locales/` files may change (see [Texts in several languages](i18n.md#the-engines-own-texts)); never opens on a dedicated server (see [Gameplay recipes](gameplay.md#pause-and-the-flow-between-screens)) |
 | `I18n` | `I18n.t("hud.coins", count: 3)` → the text of a key in the language in use, its `{count}` filled (see [Texts in several languages](i18n.md)), `I18n.locale` (`:en`), `I18n.locale = :pt`, `I18n.available_locales` (the languages of the game's `locales/` files) |
@@ -50,3 +50,38 @@ in place (`add!`, `scale!`...) is left as it was when that happens. A setting wi
 Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing
 its rotation keeps its velocity. Vehicle wheel meshes must have their rotation applied (axle along X).
 
+
+## Positional audio
+
+`Audio.play_at` plays an independent sound from `sounds/`, with world positions in meters.
+It returns a source id, or `nil` when the sound, device or one of the 64 voices is unavailable.
+Sources use stereo panning and inverse-distance volume, fading smoothly to silence at `max_distance`.
+Stereo files are downmixed before positioning. Nonlooping effects use buffered playback; loops stream.
+
+```ruby
+Audio.listener([0, 0, 0], [0, 0, -1], [0, 1, 0])
+source = Audio.play_at(:waterfall, [10, 0, -5], loop: true,
+                       volume: 0.8, pitch: 1.0,
+                       reference_distance: 2.0, max_distance: 60.0)
+Audio.move(source, [8, 0, -5]) if source
+Audio.stop(source) if source
+```
+
+Update `Audio.listener(position, forward, up)` when the camera moves, and `Audio.move(id, position)`
+when a source moves. The listener defaults to the origin, looking along negative Z, with Y up.
+Its forward and up directions must be nonzero and nonparallel. Vectors may be arrays or `Vector3`.
+These calls do not attach a source to an object or camera automatically.
+
+`volume` defaults to 1 and must be nonnegative; `pitch` defaults to 1 and must be from 0.01 to 8.
+The default full-volume `reference_distance` is 1 meter and the silent `max_distance` is 50 meters;
+both must be finite, with `0 < reference_distance < max_distance`. `loop` defaults to false.
+`Audio.playing?(id)` reports whether a source is playing. `Audio.stop(id)` stops that source;
+`Audio.stop_sources` releases all positional sources, leaving flat effects and music playing.
+Finished sources release their resources automatically; changing the sounds folder clears them too.
+Scene changes within the same game do not stop them automatically. Old ids are never reused.
+
+## Missing images
+
+Missing or unreadable images show an opaque magenta-and-black checkerboard, with a warning.
+This applies to declared scene textures, `UI.image` and particle images. A material that never
+specified a texture keeps its plain color. Refused paths still cannot read outside the game's folder.
