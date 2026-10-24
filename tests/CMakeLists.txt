@@ -152,7 +152,8 @@ add_executable(redgem_tests
   integration/dedicated_server_test.cpp
   integration/connection_approval_test.cpp
   integration/editor_session_test.cpp
-  integration/game_project_test.cpp)
+  integration/game_project_test.cpp
+  integration/scene_tools_test.cpp)
 target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest)
 target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # The tests of builds copy the real player, and look for it where a build does: beside redgem.

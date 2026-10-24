@@ -534,6 +534,13 @@ if(NOT ANDROID)
     project/editor_run.cpp
     project/cli.cpp
     project/cli_options.cpp
+    project/tool_line.cpp
+    project/tool_commands.cpp
+    project/closest_words.cpp
+    project/scene_text.cpp
+    project/scene_lookup.cpp
+    project/scene_assignments.cpp
+    project/scene_command.cpp
     project/project_texts.cpp)
   redgem_embed_texts(redgem_project project)
   # (The templates and the licenses are the tools' alone, as the prelude is the runtime's.)
