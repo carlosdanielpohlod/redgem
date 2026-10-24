@@ -187,3 +187,44 @@ TEST_CASE("an object's script is a file of the game's scripts folder, or it is n
   CHECK_FALSE(engine.scripts().eval("Game.load_scene('../../elsewhere')", "test.rb").ok);
   std::filesystem::remove_all(game);
 }
+
+// A constant of the class's name that is not a class is the script's mistake, reported like a
+// missing class: asking mruby for it as a class would raise where nothing catches it.
+TEST_CASE("a script's class name given to something that is not a class is reported, not fatal") {
+  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem-not-a-class-test";
+  std::filesystem::remove_all(game);
+  std::filesystem::create_directories(game / "scripts");
+  std::ofstream(game / "scripts" / "player.rb") << "Player = 5\n";
+  SceneDesc scene = bare_scene();
+  scene.nodes[0].props = {{"script", std::string("player.rb")}};
+  test::LogCapture capture;
+  EngineOptions options;
+  options.game_dir = game;
+  options.fixed_step = true;
+  options.scene = &scene;
+  auto created = Engine::create(options);
+  REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
+  Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
+  CHECK(engine.scripts().error_count() == 1);
+  CHECK(capture.contains("does not define class Player"));
+  frames(engine, 1);
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("a scene script's class replaced by something else is reported, not fatal") {
+  test::LogCapture capture;
+  EngineOptions options;
+  options.game_dir = fixture("games/sandbox");
+  options.fixed_step = true;
+  auto created = Engine::create(options);
+  REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
+  Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
+  for (const char* scene : {"level2", "main"}) {  // level2's script is loaded once and for all
+    ruby(engine, std::string("Game.load_scene('") + scene + "')");
+    frames(engine, 1);
+  }
+  ruby(engine, "Level2Scene = 5; Game.load_scene('level2')");
+  frames(engine, 1);
+  CHECK(engine.scene_name() == "level2");
+  CHECK(capture.contains("does not define class Level2Scene"));
+}

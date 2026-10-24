@@ -288,6 +288,48 @@ TEST_CASE("objects survive garbage collection every frame") {
   CHECK(ruby(*engine, "Scene.objects.map(&:name).include?('Crate')") == "true");
 }
 
+// What C++ calls (the behaviours) and looks objects up in (the wrappers) is rooted by the engine
+// itself: a script dropping its own references to them and collecting frees none of it.
+TEST_CASE("a script letting go of what the engine keeps frees nothing the engine still uses") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  // A bullet spawned from an update: its behaviour is made inside a callback, so nothing but what
+  // keeps behaviours alive holds it once the callback is over.
+  ruby(*engine, "$spawner_on = true");
+  frames(*engine, 1);
+  ruby(*engine, "$spawner_on = false");
+  ruby(*engine,
+       "$__redgem_objects = nil; Scene.objects.each { |o| o.instance_variable_get(:@behaviours).clear }; GC.start");
+  // (A freed object can go on answering until its slot is reused: what the collector kept says more.)
+  CHECK(ruby(*engine, "ObjectSpace.each_object(Bullet) {}") == "1");
+  const int updates_before = std::stoi(ruby(*engine, "$probe[:updates]"));
+  frames(*engine, kOneSecondOfFrames);  // GcStress collects in every callback meanwhile
+  CHECK(std::stoi(ruby(*engine, "$probe[:updates]")) == updates_before + kOneSecondOfFrames);
+  CHECK(ruby(*engine, "$bullet_starts") == "1");
+  CHECK(ruby(*engine, "Scene.find('Hero').name") == "Hero");
+}
+
+// The serial says which object a wrapper stands for; a script writing something else there gets
+// a new wrapper, not a number read out of whatever it wrote.
+TEST_CASE("a wrapper whose serial a script replaced stands for nothing") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, "$old_hero = Scene.find('Hero'); $old_hero.instance_variable_set(:@serial, 'not a number'); GC.start");
+  CHECK(ruby(*engine, "Scene.find('Hero').equal?($old_hero)") == "false");
+  CHECK(ruby(*engine, "Scene.find('Hero').name") == "Hero");
+}
+
+// Contacts come from C++, outside any Ruby call: the GameObjects made for them must not pile up
+// on the GC arena, which nothing else would empty while the game runs.
+TEST_CASE("contacts between objects leave the GC arena as they found it") {
+  auto engine = sandbox();
+  mrb_state* mrb = engine->scripts().vm().state();
+  const int arena = mrb_gc_arena_save(mrb);
+  const std::vector<ObjectId> ids = engine->scene().alive_ids();
+  for (const ObjectId id : ids) engine->scripts().dispatch(ContactEvent{id, ids.front(), ContactPhase::Enter, false});
+  CHECK(mrb_gc_arena_save(mrb) == arena);
+}
+
 TEST_CASE("a game's Ruby has nothing of what tests are written with") {
   // This program links the engine alone, as the one games ship as does: what tests use comes from
   // another library (src/testing), which a game never runs with.
