@@ -4,6 +4,12 @@
 
 #include <fstream>
 
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 #include "storage/saved_values.hpp"
 
 namespace redgem::server {
@@ -36,15 +42,40 @@ void make_folder_for(const std::filesystem::path& file) {
   if (!file.empty()) std::filesystem::create_directories(file.parent_path(), ignored);
 }
 
-// Saves are players' data: the file is its owner's alone, made so before sqlite opens it (the
-// files sqlite makes beside it, its journal, take its permissions).
-void keep_to_owner(const std::filesystem::path& file) {
-  if (file.empty()) return;
+// The files sqlite keeps beside a database in WAL mode: the log and its index.
+constexpr const char* kSideFileSuffixes[] = {"-wal", "-shm"};
+
+// The database, made empty and its owner's alone from its first moment (sqlite takes an empty
+// file as a new database). On Windows a file takes its folder's ACL instead: see
+// KNOWN_LIMITATIONS.md.
+void make_owners_only(const std::filesystem::path& file) {
+#ifdef _WIN32
+  std::ofstream(file, std::ios::binary);
+#else
+  const int made = ::open(file.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+  if (made >= 0) ::close(made);
+#endif
+}
+
+// What `file` is let be read by: its owner only, whatever it was let before.
+void restrict_to_owner(const std::filesystem::path& file) {
   std::error_code ignored;  // (opening the database says what went wrong)
-  if (!std::filesystem::exists(file, ignored)) std::ofstream(file, std::ios::binary);  // sqlite takes it as new
+  if (!std::filesystem::exists(file, ignored)) return;
   std::filesystem::permissions(file, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
                                std::filesystem::perm_options::replace, ignored);
 }
+
+// Saves are players' data: the database is its owner's alone, and so are the files beside it
+// that an earlier run left (sqlite makes new ones with the database's permissions).
+void keep_to_owner(const std::filesystem::path& file) {
+  if (file.empty()) return;
+  make_owners_only(file);
+  restrict_to_owner(file);
+  for (const char* suffix : kSideFileSuffixes) restrict_to_owner(file.string() + suffix);
+}
+
+// Whether sqlite opened the database and set it up as the server keeps it.
+bool set_up(int opened, sqlite3* database) { return opened == SQLITE_OK && executed(database, kSetUp); }
 
 }  // namespace
 
@@ -53,7 +84,7 @@ std::unique_ptr<SaveDatabase> SaveDatabase::open(const std::filesystem::path& fi
   keep_to_owner(file);
   sqlite3* database = nullptr;
   const int opened = sqlite3_open(file.empty() ? kInMemory : file.u8string().c_str(), &database);
-  if (opened != SQLITE_OK || !executed(database, kSetUp)) {
+  if (!set_up(opened, database)) {
     error = sqlite3_errmsg(database);
     sqlite3_close(database);
     return nullptr;

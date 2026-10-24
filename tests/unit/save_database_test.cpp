@@ -36,15 +36,13 @@ std::unique_ptr<SaveDatabase> opened(const std::filesystem::path& file) {
   return database;
 }
 
-// Whether only a file's owner may read or write it. (Windows keeps who may otherwise: always so there.)
+#ifndef _WIN32  // (on Windows a file takes its folder's ACL: see KNOWN_LIMITATIONS.md)
+// Whether only a file's owner may read or write it.
 bool owners_only(const std::filesystem::path& file) {
-#ifdef _WIN32
-  return std::filesystem::exists(file);
-#else
   const auto mine = std::filesystem::perms::owner_read | std::filesystem::perms::owner_write;
   return (std::filesystem::status(file).permissions() & std::filesystem::perms::all) == mine;
-#endif
 }
+#endif
 
 }  // namespace
 
@@ -165,15 +163,23 @@ TEST_CASE("a database in memory keeps values for this run only, and one that can
   CHECK_FALSE(error.empty());
 }
 
-// Players' saves are nobody else's on the machine: the database is its owner's alone.
+#ifndef _WIN32
+// Players' saves are nobody else's on the machine: the database is its owner's alone, and so are
+// the files sqlite keeps beside it.
 TEST_CASE("a server's save database is made readable by its owner only") {
   const TempData temp;
   opened(temp.database)->set("best", 1);
   CHECK(owners_only(temp.database));
   std::filesystem::permissions(temp.database, std::filesystem::perms::all, std::filesystem::perm_options::add);
-  opened(temp.database);  // one left open to everyone is closed again
+  const std::filesystem::path log = temp.database.string() + "-wal";
+  std::ofstream(log, std::ios::binary);  // an empty log, as a run that ended may leave
+  std::filesystem::permissions(log, std::filesystem::perms::all, std::filesystem::perm_options::add);
+  const auto again = opened(temp.database);  // ones left open to everyone are closed again
   CHECK(owners_only(temp.database));
+  REQUIRE(std::filesystem::exists(log));
+  CHECK(owners_only(log));
 }
+#endif
 
 TEST_CASE("a database whose saves table is not the server's does not open as if it could be used") {
   const TempData temp;

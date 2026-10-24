@@ -183,9 +183,10 @@ not a promise of how it will be closed.
 
 ### Security
 
-- On a dedicated server, a game's plain `http://` reaches anything on the server's own networks,
-  the cloud's instance metadata address (169.254.169.254) included: link-local and private
-  addresses are allowed alike.
+- On a dedicated server, a game's plain `http://` reaches anything on the server's own private
+  networks (only the clouds' known metadata addresses are refused).
+- On Windows a server's save database takes its folder's permissions: it is kept to its owner
+  only on Linux and macOS.
 - A script that sets an engine class's name to something else (`Vector3 = 5`) breaks the
   engine's calls that use that class with Ruby errors, instead of being stopped from doing so.
 - An Android build empties its staging folder (`.redgem-apk-stage` in the output folder) without
