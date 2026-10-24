@@ -59,10 +59,16 @@ of speedup over another revision. Showcase assets are local and are not included
 
 The temporal history stores logarithmic view distance in its existing alpha channel. The motion
 pass stores the expected previous view distance alongside its velocity, using the previous object
-and bone transforms. Depth comparisons use nearest texels, independently of the filtered RGB
-history, and account for the current and previous Halton shifts. An uninitialized frame cannot
-accumulate history; its output still initializes depth for the next frame. Sky and points behind
-the previous camera have distinct markers. Deliberately stochastic coverage (distance fades
+and bone transforms. Color history is read where the surface was, without either frame's
+Halton shift: the history is the average over every shift, so a still view holds still. Only
+the depth lookup accounts for the current and previous shifts, because each stored depth is the
+previous frame's jittered sample. Depth is checked over the reprojected texel and its eight
+neighbors: one match keeps the history (the previous sample may have landed one texel over at a
+silhouette, against the sky or another surface), none rejects it. Where only some match (a depth
+edge), the filtered color is kept within the four nearest texels' colors, so the spline's outer
+taps add no color from across the edge. An uninitialized frame cannot
+accumulate history; its output still initializes depth for the next frame. Sky (any depth below a
+small threshold) and points behind the previous camera have distinct markers. Deliberately stochastic coverage (distance fades
 and dithered transparency) has signed depth metadata, allowing covered samples and sky holes
 to accumulate. An opaque center pixel still requires its own depth match; a neighboring
 stochastic surface cannot make unrelated opaque history valid.
@@ -74,9 +80,13 @@ The first temporal frame now also draws the motion pass so its depth history sta
 
 Isolated resolve tests distinguish depth rejection from color clipping and velocity rejection.
 They cover zero-motion disocclusion, expected previous depth, invalid history, sky, jittered depth
-edges and distant values. Scene regressions additionally exercise a stopped foreground object
+edges, colors beside a depth edge and distant values. Scene regressions additionally exercise a stopped foreground object
 that disappears and approaching rigid and skinned geometry, with zero and four MSAA samples.
 The approaching surfaces use dithered coverage so discarding all history cannot pass as a fix.
+A still, turned cube in front of the sky and of a wall checks that the settled picture changes by
+less than 0.7 bytes per cube pixel from frame to frame (about 6 when the color lookup followed
+the jitter, about 1 when history was rejected at every silhouette) and that its silhouette
+gains partly covered pixels over a single sample.
 
 
 The opaque-neighbor control selects 51 newly revealed black edge pixels beside a surviving

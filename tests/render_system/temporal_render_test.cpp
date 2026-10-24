@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "render/temporal.hpp"
 #include "render_system/render_stage.hpp"
@@ -688,5 +689,104 @@ TEST_CASE("temporal depth validation rejects a removed opaque card beside a surv
     const float mean = error.total / static_cast<float>(error.pixels);
     MESSAGE("adjacent survivor pixels " << error.pixels << ", mean error " << mean << ", samples " << samples);
     CHECK(mean < kOpeningMeanError);
+  }
+}
+
+namespace {
+
+// A still glowing cube turned about the view axis: every edge it shows is a staircase of pixels.
+constexpr float kTurnedCubeAngle = 0.5f;          // radians about the view axis
+constexpr float kTurnedCubeSize = 3.0f;           // meters across: about ninety pixels from the camera
+constexpr Vec3 kTurnedWallAt{0.0f, 0.0f, -6.0f};  // a dark wall far enough behind to be another surface
+constexpr Vec3 kTurnedWallSize{40.0f, 40.0f, 1.0f};
+constexpr float kDimGlow = 0.3f;  // dim enough that the tone curve keeps partial coverage apart from full
+constexpr int kStillFrames = 4 * render_math::kJitterPhases;  // long enough to settle, then to compare
+constexpr float kInteriorShare = 0.9f;  // of the brightest green: the cube's inside, fully covered
+constexpr float kPartlyLow = 0.15f;     // of the inside's green: a pixel only partly covered, from here
+constexpr float kPartlyHigh = 0.85f;    // to here
+// Partly covered pixels a settled silhouette shows beyond a single sample's, at least: with the
+// frames before rejected wherever the previous sample hit the other surface, it shows about 110.
+constexpr int kSoftenedLeast = 130;
+// Byte change, per cube pixel, from one settled frame to the next and between two frames a jitter
+// cycle apart: a picture that holds still and has converged. (Read where the jitter moved it, the
+// history follows the jitter: about 6. Rejected at the silhouette: about 1.)
+constexpr float kStillFrameChange = 0.7f;
+constexpr float kConvergedChange = 0.25f;
+
+SceneDesc turned_cube(PropertyMap environment, bool wall) {
+  SceneDesc desc = glowing_cube(std::move(environment));
+  desc.materials[0] = test::glowing_material(redgem::Color{0.0f, 1.0f, 0.0f, 1.0f}, kDimGlow);
+  desc.materials.push_back(test::glowing_material(kOpeningBlack, 0.0f));
+  desc.meshes.push_back(test::cube_mesh(1));
+  NodeDesc& cube = desc.nodes[1];
+  cube.local.position = Vec3::zero();
+  cube.local.rotation = quat_from_axis_angle(Vec3{0.0f, 0.0f, 1.0f}, kTurnedCubeAngle);
+  cube.local.scale = Vec3::one() * kTurnedCubeSize;
+  if (wall) desc.nodes.push_back(opening_cube("Wall", 1, kTurnedWallAt, kTurnedWallSize));
+  return desc;
+}
+
+std::vector<Picture> still_frames(PropertyMap environment, bool wall, int frames, const std::string& name) {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  const SceneDesc desc = turned_cube(std::move(environment), wall);
+  stage.upload(desc);
+  const Scene scene = Scene::from_desc(desc);
+  std::vector<Picture> pictures;
+  for (int frame = 0; frame < frames; ++frame) pictures.push_back(stage.draw(scene, name));
+  return pictures;
+}
+
+int brightest_green(const Picture& picture) {
+  int brightest = 0;
+  for (const ::Color c : picture.pixels) brightest = std::max(brightest, greenness(c));
+  return brightest;
+}
+
+bool partly_covered(int green_of, int inside) {
+  const float share = static_cast<float>(green_of) / static_cast<float>(inside);
+  return share > kPartlyLow && share < kPartlyHigh;
+}
+
+// How many pixels show the cube only partly: its smoothed silhouette.
+int partly_covered_pixels(const Picture& picture) {
+  const auto inside = static_cast<int>(static_cast<float>(brightest_green(picture)) * kInteriorShare);
+  int count = 0;
+  for (const ::Color c : picture.pixels) count += partly_covered(greenness(c), inside) ? 1 : 0;
+  return count;
+}
+
+// How far `b` is from `a`, in byte change per pixel the cube covers.
+float change_per_cube_pixel(const Picture& a, const Picture& b) {
+  const auto covered = static_cast<float>(std::count_if(a.pixels.begin(), a.pixels.end(), green));
+  return distance_between(a, b) / std::max(covered, 1.0f);
+}
+
+}  // namespace
+
+TEST_CASE("smoothed with the frames before, a still view holds still and converges instead of following the jitter") {
+  for (const bool wall : {false, true}) {
+    const std::vector<Picture> frames = still_frames(temporal(), wall, kStillFrames, "temporal_still_cube");
+    const Picture& last = frames.back();
+    REQUIRE(total_greenness(last) > 0.0f);
+    float most = 0.0f;
+    for (std::size_t frame = frames.size() - render_math::kJitterPhases; frame < frames.size(); ++frame) {
+      most = std::max(most, change_per_cube_pixel(frames[frame - 1], frames[frame]));
+    }
+    const float cycle = change_per_cube_pixel(frames[frames.size() - 1 - render_math::kJitterPhases], last);
+    MESSAGE("wall " << wall << ": frame to frame " << most << ", a cycle apart " << cycle);
+    CHECK(most < kStillFrameChange);
+    CHECK(cycle < kConvergedChange);
+  }
+}
+
+// The first frame has no frames before: one jittered sample a pixel, with no other smoothing.
+TEST_CASE("smoothed with the frames before, a still cube's silhouette against the sky or a wall is softened") {
+  for (const bool wall : {false, true}) {
+    const std::vector<Picture> frames = still_frames(temporal(), wall, kStillFrames, "temporal_silhouette");
+    const int hard = partly_covered_pixels(frames.front());
+    const int soft = partly_covered_pixels(frames.back());
+    MESSAGE("wall " << wall << ": partly covered pixels " << hard << " one sample, " << soft << " smoothed");
+    CHECK(soft > hard + kSoftenedLeast);
   }
 }

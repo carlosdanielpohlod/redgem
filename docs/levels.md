@@ -109,8 +109,9 @@ It works with `msaa` on or off and costs one more pass over the scene's opaque s
 History fades out locally between 16 and 32 pixels of motion per frame, and at large motion
 splits around opening edges. Fast scenery therefore favors current detail, while a tracked
 subject with little screen motion still accumulates samples. Reprojected previous-frame depth
-rejects hidden or newly revealed surfaces, including moving and skinned objects. Depth samples
-account for both frames' subpixel camera shifts. Thin cut-outs and very fast details can still
+rejects hidden or newly revealed surfaces, including moving and skinned objects. A still view
+holds still and its edges, against the sky or other surfaces, settle smooth: depth is compared
+around where each pixel was, so a silhouette keeps its history. Thin cut-outs and very fast details can still
 shimmer as fewer temporal samples are retained.
 
 **Animated characters.** glTF skeletons and animations are supported: skinned meshes are deformed on

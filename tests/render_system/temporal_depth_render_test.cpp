@@ -28,7 +28,9 @@ constexpr int kDepthColorByte = 64;
 constexpr float kDepthEnabled = 1.0f;
 constexpr float kDepthDisabled = 0.0f;
 constexpr float kDepthHardware = 0.5f;
-constexpr float kDepthInvalid = -1024.0f;  // the surface was behind the previous camera
+constexpr float kDepthInvalid = -1024.0f;          // the surface was behind the previous camera
+constexpr int kStripeColumn = kDepthSide / 2 - 2;  // beyond the 3x3 previous depths the center pixel checks
+constexpr float kStripeShift = 2.0f / kDepthSide;  // a jitter difference that brings the stripe to the center
 
 using DepthPixels = std::array<Vector4, kDepthPixels>;
 
@@ -67,7 +69,9 @@ struct DepthInput {
   float valid = kDepthEnabled;
   Vector2 current_jitter{};
   Vector2 previous_jitter{};
-  bool stripe = false;
+  std::optional<float> stripe;  // the previous depth of one column of history, kStripeColumn
+  float stripe_color = kDepthHistory;
+  Vector2 motion{};
   std::optional<float> center;
 };
 
@@ -88,14 +92,15 @@ void depth_inputs(const Shader& shader, const std::array<Texture2D, 4>& textures
 DepthPixels history_depth_pixels(const DepthInput& input) {
   DepthPixels pixels = filled_depth({kDepthHistory, kDepthHistory, kDepthHistory, input.held});
   if (!input.stripe) return pixels;
+  const float c = input.stripe_color;
   for (int y = 0; y < kDepthSide; ++y) {
-    pixels[static_cast<std::size_t>(y * kDepthSide + kDepthSide / 2 - 1)].w = input.expected;
+    pixels[static_cast<std::size_t>(y * kDepthSide + kStripeColumn)] = {c, c, c, *input.stripe};
   }
   return pixels;
 }
 
 DepthPixels motion_depth_pixels(const DepthInput& input) {
-  DepthPixels pixels = filled_depth({0, 0, input.expected, 0});
+  DepthPixels pixels = filled_depth({input.motion.x, input.motion.y, input.expected, 0});
   if (input.center) {
     pixels[static_cast<std::size_t>((kDepthSide / 2) * kDepthSide + kDepthSide / 2)].z = *input.center;
   }
@@ -103,8 +108,11 @@ DepthPixels motion_depth_pixels(const DepthInput& input) {
 }
 
 std::array<Texture2D, 4> depth_textures(const DepthInput& input) {
-  return {depth_texture(current_depth_pixels()), depth_texture(history_depth_pixels(input)),
-          depth_texture(motion_depth_pixels(input)), depth_texture(filled_depth({input.hardware, 0, 0, 0}))};
+  const std::array<Texture2D, 4> textures{
+      depth_texture(current_depth_pixels()), depth_texture(history_depth_pixels(input)),
+      depth_texture(motion_depth_pixels(input)), depth_texture(filled_depth({input.hardware, 0, 0, 0}))};
+  SetTextureFilter(textures[1], TEXTURE_FILTER_BILINEAR);  // as the renderer's history targets are
+  return textures;
 }
 
 ::Color depth_output_pixel(const RenderTexture2D& output) {
@@ -153,7 +161,8 @@ struct DepthFixture {
 }
 
 ::Color resolved_depth_pixel(float expected, float held, float hardware, float valid) {
-  return resolved_depth_pixel(DepthInput{expected, held, hardware, valid, {}, {}, false, std::nullopt});
+  return resolved_depth_pixel(
+      DepthInput{expected, held, hardware, valid, {}, {}, std::nullopt, kDepthHistory, {}, std::nullopt});
 }
 
 void check_current_depth_pixel(::Color pixel) {
@@ -189,11 +198,11 @@ TEST_CASE("temporal depth validation distinguishes sky from a previously drawn s
 TEST_CASE("temporal depth validation samples the previous jitter phase without interpolating across depth edges") {
   DepthInput input;
   input.expected = encoded_depth(kDepthForeground);
-  input.stripe = true;
-  input.previous_jitter = {-1.0f / kDepthSide, 0};
+  input.stripe = input.expected;
+  input.previous_jitter = {-kStripeShift, 0};
   CHECK(resolved_depth_pixel(input).r > kDepthColorByte + kDepthPixelTolerance);
   input.previous_jitter = {};
-  input.current_jitter = {1.0f / kDepthSide, 0};
+  input.current_jitter = {kStripeShift, 0};
   CHECK(resolved_depth_pixel(input).r > kDepthColorByte + kDepthPixelTolerance);
   input.current_jitter = {};
   check_current_depth_pixel(resolved_depth_pixel(input));
@@ -243,4 +252,29 @@ TEST_CASE("temporal depth validation rejects an invalid center even beside stoch
   input.held = input.expected;
   input.center = kDepthInvalid;
   check_current_depth_pixel(resolved_depth_pixel(input));
+}
+
+namespace {
+
+// The center pixel's history read this far left, between texels: the spline's leftmost column
+// is the stripe, which also lies among the previous depths checked around the read.
+constexpr float kBetweenTexels = 0.75f / kDepthSide;
+constexpr float kDarkStripe = 0.0f;
+
+// The center pixel's history beside a column of another surface's previous depth, colored `stripe_color`.
+::Color beside_depth_edge(float stripe_color) {
+  DepthInput input;
+  input.stripe = encoded_depth(kDepthForeground);
+  input.stripe_color = stripe_color;
+  input.motion = {kBetweenTexels, 0};
+  return resolved_depth_pixel(input);
+}
+
+}  // namespace
+
+TEST_CASE("temporal history beside a depth edge takes no color from the other surface") {
+  const ::Color dark = beside_depth_edge(kDarkStripe);
+  const ::Color same = beside_depth_edge(kDepthHistory);
+  CHECK(same.r > kDepthColorByte + kDepthPixelTolerance);
+  CHECK(std::abs(static_cast<int>(dark.r) - static_cast<int>(same.r)) <= static_cast<int>(kDepthPixelTolerance));
 }
