@@ -156,6 +156,9 @@ class GameMenu < Behaviour
     clicked(screen.options, screen.rows)&.call
   end
 
+  # On a screen letters are typed into, Enter is the text's: only a gamepad's A picks.
+  def confirm_controls = typing? ? UI::GAMEPAD_CONFIRM : UI::CONFIRM
+
   def draw_heading(screen)
     heading_y = button_box(0)[1] - screen.space_above - scaled(TITLE_ABOVE_BUTTONS)
     UI.text(screen.heading, x: UI.width / 2, y: heading_y, size: scaled(TITLE_SIZE), align: :center)
@@ -171,6 +174,6 @@ class GameMenu < Behaviour
 
   def button?(label, index, place)
     x, y, width, height = button_box(index)
-    UI.button(label, x: x, y: y, width: width, height: height, focused: @focus.at?(place))
+    UI.button(label, x: x, y: y, width: width, height: height, focused: @focus.at?(place), confirm: confirm_controls)
   end
 end

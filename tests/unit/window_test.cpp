@@ -103,6 +103,17 @@ TEST_CASE("a window changes only what has to change to go from one mode and size
   CHECK(change(M::Borderless, small, M::Windowed, large) == std::array<bool, 3>{true, true, false});
 }
 
+TEST_CASE("a size asked for while borderless is not the window's yet: it is taken when it is a window again") {
+  const SurfaceSize small{800, 600};
+  const SurfaceSize large{1920, 1080};
+  CHECK(kept_size(WindowMode::Borderless, large, small) == small);
+  CHECK(kept_size(WindowMode::Windowed, large, small) == large);
+  CHECK(kept_size(WindowMode::Fullscreen, large, small) == large);
+  // Borderless at 800x600, 1920x1080 asked meanwhile, then a window: it is resized.
+  const SurfaceSize kept = kept_size(WindowMode::Borderless, large, small);
+  CHECK(window_change(WindowMode::Borderless, kept, WindowMode::Windowed, large).resize);
+}
+
 TEST_CASE("a game's window gives the game the pointer and shows no frame counter unless told") {
   const GameWindowOptions options;
   CHECK(options.capture_cursor);

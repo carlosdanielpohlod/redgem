@@ -19,6 +19,7 @@ module UI
   LEFT = [%i[left], %i[dpad_left]].freeze
   RIGHT = [%i[right], %i[dpad_right]].freeze
   CONFIRM = [%i[enter], %i[a]].freeze
+  GAMEPAD_CONFIRM = [[], %i[a]].freeze  # where Enter belongs to a text being typed
   FOCUS_COLOR = :gold
   FOCUS_RING = 3            # pixels the ring around a focused widget shows past it
   SLIDER_STEP = 0.05        # a slider's step unless said
@@ -61,10 +62,11 @@ module UI
   # -1 (left), 1 (right) or 0, as pressed this frame.
   def self.sideways = direction(LEFT, RIGHT)
 
-  def self.confirmed? = pressed_any?(CONFIRM)
+  def self.confirmed?(confirm = CONFIRM) = pressed_any?(confirm)
 
-  # Whether a widget is worked this frame as a click does: clicked, or confirmed while focused.
-  def self.worked?(box, focused) = clicked?(mouse_over?(**box)) || (focused && confirmed?)
+  # Whether a widget is worked this frame as a click does: clicked, or confirmed while focused
+  # (`confirm`: the controls that confirm, GAMEPAD_CONFIRM where Enter is someone else's).
+  def self.worked?(box, focused, confirm = CONFIRM) = clicked?(mouse_over?(**box)) || (focused && confirmed?(confirm))
 
   # Whether a toggle flips this frame: worked, or pushed left or right while focused.
   def self.flipped?(box, focused) = worked?(box, focused) || (focused && sideways != 0)

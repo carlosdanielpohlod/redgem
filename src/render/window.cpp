@@ -56,6 +56,10 @@ WindowChange window_change(WindowMode mode, SurfaceSize size, WindowMode wanted_
   return change;
 }
 
+SurfaceSize kept_size(WindowMode mode, SurfaceSize asked, SurfaceSize kept) {
+  return mode == WindowMode::Borderless ? kept : asked;
+}
+
 CursorChange cursor_change(bool captured, bool wanted) {
   if (captured == wanted) return CursorChange::None;
   return wanted ? CursorChange::Capture : CursorChange::Release;
@@ -87,18 +91,23 @@ void Window::pace(const DisplaySettings& display) {
   SetTargetFPS(held_fps_cap(display.fps_cap));
 }
 
-SurfaceSize Window::monitor_size() const {
+SurfaceSize Window::monitor_size() const { return monitor_; }
+
+// (Read while the window is a window: in fullscreen, the monitor says the size it was switched to.)
+void Window::follow_monitor() {
+  if (mode_ != WindowMode::Windowed) return;
   const int monitor = GetCurrentMonitor();
-  return {GetMonitorWidth(monitor), GetMonitorHeight(monitor)};
+  monitor_ = {GetMonitorWidth(monitor), GetMonitorHeight(monitor)};
 }
 
 void Window::change_shape(WindowMode mode, SurfaceSize size) {
+  follow_monitor();
   const WindowChange change = window_change(mode_, size_, mode, size);
   if (change.leave_mode) toggle(mode_);
   if (change.resize) SetWindowSize(size.width, size.height);
   if (change.enter_mode) toggle(mode);
   mode_ = mode;
-  size_ = size;
+  size_ = kept_size(mode, size, size_);
 }
 
 // Goes into a mode from a window, or back to a window from it: raylib toggles each one.

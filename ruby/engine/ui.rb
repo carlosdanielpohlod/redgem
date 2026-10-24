@@ -108,9 +108,10 @@ module UI
   end
 
   # Draws a button and returns true on the frame it is clicked (the left button is released over
-  # it). A focused one (see UI::Focus) is ringed, and the confirm key or a gamepad's A clicks it.
+  # it). A focused one (see UI::Focus) is ringed, and the confirm key or a gamepad's A clicks it
+  # (`confirm: UI::GAMEPAD_CONFIRM` leaves Enter to a text field).
   def self.button(label, x:, y:, width:, height:, color: BUTTON_COLOR, hover_color: BUTTON_HOVER_COLOR,
-                  text_color: :white, size: nil, focused: false)
+                  text_color: :white, size: nil, focused: false, confirm: CONFIRM)
     box = { x: x, y: y, width: width, height: height }
     over = mouse_over?(**box)
     focus_ring(box) if focused
@@ -118,7 +119,7 @@ module UI
     rect(**box, color: fill, alpha: BUTTON_ALPHA, radius: BUTTON_RADIUS)
     size ||= label_size(height)
     text(label, x: centered(x, width, 0), y: centered(y, height, size), size: size, color: text_color, align: :center)
-    worked?(box, focused)
+    worked?(box, focused, confirm)
   end
 
   # What the left button of the mouse does to a button the pointer may be `over`.

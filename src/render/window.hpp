@@ -32,6 +32,9 @@ struct WindowChange {
   bool enter_mode = false;  // into the mode asked, last
 };
 WindowChange window_change(WindowMode mode, SurfaceSize size, WindowMode wanted_mode, SurfaceSize wanted_size);
+// The size a window keeps for when it is a window again, once it went to `mode` asked for `asked`:
+// a borderless window is the monitor's size, and keeps the one it had (`kept`).
+SurfaceSize kept_size(WindowMode mode, SurfaceSize asked, SurfaceSize kept);
 
 // The flags the window library is given before it opens a window with these settings.
 unsigned int window_flags(const WindowSettings& settings);
@@ -62,7 +65,7 @@ class Window {
   // Only the pace of its frames (vsync, the frame cap): for a window that is a whole screen, whose
   // mode and size are the screen's.
   void pace(const DisplaySettings& display);
-  // Size of the monitor the window is on.
+  // Size of the monitor the window is on (its own, not the one fullscreen switched it to).
   SurfaceSize monitor_size() const;
   void set_title(const std::string& title);
   // Hides the pointer and keeps it in the window (first-person cameras), or gives it back.
@@ -75,11 +78,13 @@ class Window {
 
  private:
   void change_shape(WindowMode mode, SurfaceSize size);
+  void follow_monitor();
   void set_vsync(bool on);
   void toggle(WindowMode mode);
 
   WindowMode mode_ = WindowMode::Windowed;
-  SurfaceSize size_;  // the size asked for last (a borderless window is the monitor's)
+  SurfaceSize monitor_;  // the monitor's own size, as it was before the window switched it
+  SurfaceSize size_;     // the size asked for last (a borderless window is the monitor's)
   bool vsync_ = true;
 };
 
