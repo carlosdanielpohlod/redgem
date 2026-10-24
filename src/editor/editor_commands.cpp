@@ -58,7 +58,7 @@ void EditorApp::request_exit(EditorExit action) {
   exit_action_ = action;
   if (!editing()) stop();
   if (unsaved_work()) {
-    close_pending_ = true;
+    pending_ = PendingAction{PendingAction::Kind::Leave, {}};  // whatever else was waiting
   } else {
     quit_confirmed_ = true;
   }

@@ -3,7 +3,6 @@
 #include <algorithm>
 
 #include "core/config.hpp"
-#include "core/log.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/ui/style.hpp"
 
@@ -26,9 +25,7 @@ void play_sound(PanelContext& context, const std::string& name) {
   context.audio->play_sound(name, kFullVolume, kAsRecorded);  // sound previews play as recorded
 }
 
-void explain_scene(PanelContext& /*context*/, const std::string& name) {
-  log::info("load it from a script: Game.load_scene(\"" + name + "\")");
-}
+void open_scene(PanelContext& context, const std::string& name) { context.scene_to_open = name; }
 
 }  // namespace
 
@@ -41,7 +38,7 @@ const std::vector<FolderInfo>& folders() {
       {Folder::Sounds, ICON_FA_VOLUME_HIGH, "editor.project.folder.sounds", config::kSoundsDirName,
        "editor.project.folder.sounds_hint", play_sound},
       {Folder::Scenes, ICON_FA_MAP, "editor.project.folder.scenes", config::kScenesDirName,
-       "editor.project.folder.scenes_hint", explain_scene},
+       "editor.project.folder.scenes_hint", open_scene},
   };
   return all;
 }

@@ -57,6 +57,7 @@ add_executable(redgem_tests
   unit/primitives_test.cpp
   unit/file_drop_test.cpp
   unit/project_files_test.cpp
+  unit/game_scenes_test.cpp
   unit/environment_test.cpp
   unit/scene_lights_test.cpp
   unit/gpu_select_test.cpp
@@ -364,7 +365,8 @@ set_tests_properties(system.harness_reports_failures PROPERTIES LABELS system RU
 
 # The editor window itself, driven by a doctest program.
 add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp editor_system/editor_window_test.cpp
-               editor_system/window_picture.cpp)
+               editor_system/window_picture.cpp
+               editor_system/window_mouse.cpp)
 target_link_libraries(redgem_editor_system_tests PRIVATE redgem_project doctest::doctest)
 # It stands where the editor does, beside the player: its Build finds the player as redgem's does.
 add_dependencies(redgem_editor_system_tests redgem_player)

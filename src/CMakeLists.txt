@@ -442,11 +442,13 @@ if(NOT ANDROID)
     editor/editor_dialogs.cpp
     editor/editor_viewport.cpp
     editor/editor_scene_view.cpp
+    editor/editor_scenes.cpp
     editor/scripts/script_files.cpp
     editor/scripts/script_editor.cpp
     editor/scripts/script_workspace.cpp
     editor/file_drop.cpp
     editor/project_files.cpp
+    editor/game_scenes.cpp
     editor/ui/script_editor_panel.cpp
     editor/ui/hierarchy_panel.cpp
     editor/ui/hierarchy_rows.cpp

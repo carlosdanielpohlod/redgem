@@ -22,7 +22,7 @@ TEST_CASE("a game folder is listed by kind, with the names scripts use") {
   CHECK(has(files.scripts, "lift.rb"));
   CHECK(std::is_sorted(files.scripts.begin(), files.scripts.end()));
   CHECK(files.sounds == std::vector<std::string>{"beep"});
-  CHECK(files.scenes == std::vector<std::string>{"level2"});
+  CHECK(files.scenes == std::vector<std::string>{"main", "level2"});  // scene.glb first
   CHECK(files.models.empty());
   CHECK(files == ProjectFiles::scan(fixture("games/sandbox")));
   CHECK(ProjectFiles::scan(fixture("missing_game")).scripts.empty());

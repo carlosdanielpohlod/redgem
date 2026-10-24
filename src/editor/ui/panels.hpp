@@ -34,6 +34,9 @@ struct PanelContext {
   Vec3 spawn_point;              // where new objects appear (in front of the editor camera)
   AudioSystem* audio = nullptr;  // sound previews in the Project panel
   bool files_changed = false;    // set by panels that create files: the editor rescans the game
+  // Set by the Project panel: a scene to open (double clicked), and New scene asked for.
+  std::optional<std::string> scene_to_open;
+  bool new_scene_asked = false;
   TerrainTool* terrain = nullptr;
 };
 
@@ -49,7 +52,8 @@ HierarchyResult draw_hierarchy(PanelContext& context);
 void draw_inspector(PanelContext& context);
 
 // The game's files: scripts (double click edits, drag onto objects), models (double click or
-// drag to add to the scene), sounds (double click plays) and scenes.
+// drag to add to the scene), sounds (double click plays) and scenes (double click opens, New
+// scene makes one).
 void draw_project(PanelContext& context);
 
 void draw_console(ConsoleLog& console, ConsoleState& state);
@@ -75,9 +79,20 @@ ObjectId create_terrain(PanelContext& context);
 ObjectId import_model(EditorSession& session, const std::string& model_file, Vec3 position,
                       ObjectId parent = kNoObject);
 
-// A field for a new script's name with a button next to it, and under them the rule a name that
-// cannot be used breaks. True when the button (or Enter) asked for a script with a usable name.
+// What a name field takes: who says whether a name can be used, and the key of the text of the
+// rule a name that cannot breaks.
+struct NameRule {
+  bool (*usable)(const std::string& name);
+  const char* rule;
+};
+// A field for a new file's name with a button next to it, and under them the rule a name that
+// cannot be used breaks. True when the button (or Enter) asked for a usable name.
+bool draw_name_form(const char* id, const char* hint, const char* button_label, const NameRule& rule,
+                    std::string& name);
+// The same, for a new script's name (scripts/<name>.rb) ...
 bool draw_new_script_form(const char* id, const char* hint, const char* button_label, std::string& name);
+// ... and for a new scene's (scenes/<name>.glb).
+bool draw_new_scene_form(const char* id, const char* hint, const char* button_label, std::string& name);
 
 // Opens a script in its own tab (or brings the tab to the front).
 void open_script(ScriptWorkspace& scripts, const std::string& file_name);

@@ -150,16 +150,17 @@ void EditorApp::draw_last_message() {
   ImGui::TextColored(level_color(last.level), "%s", last.message.c_str());
 }
 
-// Right of the status bar: the selection, how big the scene is, the play state and the frame rate.
+// Right of the status bar: the selection, the open scene and how big it is, the play state and the
+// frame rate.
 void EditorApp::draw_scene_summary() {
   static FilledTexts objects("editor.status.objects", "count");
   static FilledTexts fps("editor.status.fps", "fps");
   const ObjectId selected = session_->selection();
   char info[kTextBufferSize];
-  ImFormatString(info, sizeof(info), "%s    %s %s    %s    %s",
-                 selected != kNoObject ? session_->document().node(selected).name.c_str() : "", ICON_FA_CUBES,
-                 objects.with(session_->document().node_count()), play_state_label(session_->play_state()),
-                 fps.with(GetFPS()));
+  ImFormatString(info, sizeof(info), "%s    %s %s    %s %s    %s    %s",
+                 selected != kNoObject ? session_->document().node(selected).name.c_str() : "", ICON_FA_MAP,
+                 session_->scene_name().c_str(), ICON_FA_CUBES, objects.with(session_->document().node_count()),
+                 play_state_label(session_->play_state()), fps.with(GetFPS()));
   ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(info).x);
   ImGui::TextColored(ui::muted_color(), "%s", info);
 }

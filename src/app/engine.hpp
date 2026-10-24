@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "audio/audio.hpp"
+#include "core/config.hpp"
 #include "core/fixed_clock.hpp"
 #include "core/stopwatch.hpp"
 #include "input/input.hpp"
@@ -36,6 +37,9 @@ struct EngineOptions {
   Presenter* presenter = nullptr;
   // Run this in-memory scene instead of loading game_dir/scene.glb (a scene being edited).
   const SceneDesc* scene = nullptr;
+  // What scripts call the scene the game starts on (Game.scene_name, its <name>_scene.rb): another
+  // than "main" when the editor plays one of the game's other scenes.
+  std::string scene_name = config::kMainSceneName;
   // Where the game's keys, mouse and gamepad come from, which has to outlive the engine: the
   // devices of the window it is shown in, a view that hands on what happens inside it, a program
   // that plays the game. Without one nothing is pressed until scripted_input() says so.

@@ -1,5 +1,5 @@
-// Part of EditorApp: the dialogs. Unsaved changes on leaving, the scene changed on disk, and the
-// list of keyboard shortcuts.
+// Part of EditorApp: the dialogs. Unsaved changes before leaving or opening another scene, the
+// scene changed on disk, and the list of keyboard shortcuts.
 
 #include "editor/editor_app.hpp"
 
@@ -61,6 +61,7 @@ void draw_shortcuts_table() {
 
 void EditorApp::draw_dialogs() {
   draw_unsaved_dialog();
+  draw_scene_name_dialog();
   draw_external_change_dialog();  // one question at a time: closing is asked first
   draw_shortcuts_dialog();
 }
@@ -70,42 +71,73 @@ void EditorApp::draw_unsaved_dialog() {
   if (!ImGui::BeginPopupModal(unsaved_popup(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
   ImGui::TextColored(ui::warning_color(), ICON_FA_TRIANGLE_EXCLAMATION);
   ImGui::SameLine();
-  static FilledTexts question("editor.unsaved.question", "game");
-  ImGui::TextUnformatted(question.with(session_->game_dir().filename().string()));
+  ImGui::TextUnformatted(unsaved_question());
   ImGui::Spacing();
   draw_unsaved_choices();
   ImGui::EndPopup();
 }
 
-bool EditorApp::unsaved_dialog_wanted() const { return close_pending_ && !ImGui::IsPopupOpen(unsaved_popup()); }
+bool EditorApp::unsaved_dialog_wanted() const { return pending_ && !ImGui::IsPopupOpen(unsaved_popup()); }
+
+// Leaving loses the game's unsaved work; opening another scene, the open scene's edits.
+const char* EditorApp::unsaved_question() const {
+  static FilledTexts leaving("editor.unsaved.question", "game");
+  static FilledTexts switching("editor.scenes.unsaved_question", "scene");
+  if (leaving_pending()) return leaving.with(session_->game_dir().filename().string());
+  return switching.with(session_->scene_name());
+}
 
 void EditorApp::draw_unsaved_choices() {
-  if (ImGui::Button(ui::save_label())) save_and_leave();
+  if (ImGui::Button(ui::save_label())) save_and_go_on();
   ImGui::SameLine();
-  if (ImGui::Button(ui::discard_label())) leave_without_saving();
+  if (ImGui::Button(ui::discard_label())) go_on_without_saving();
   ImGui::SameLine();
-  if (ImGui::Button(ui::cancel_label())) cancel_leaving();
+  if (ImGui::Button(ui::cancel_label())) cancel_pending();
 }
 
-void EditorApp::save_and_leave() {
+void EditorApp::save_and_go_on() {
   save();
-  save_scripts();
-  // Stay open if saving the scene or a script failed.
-  quit_confirmed_ = !unsaved_work();
-  close_pending_ = false;
-  ImGui::CloseCurrentPopup();
+  if (leaving_pending()) save_scripts();
+  const PendingAction action = take_pending();
+  if (still_unsaved(action)) return;  // saving failed: stay
+  carry_out(action);
 }
 
-void EditorApp::leave_without_saving() {
-  log::warning("closing without saving");
-  quit_confirmed_ = true;
-  ImGui::CloseCurrentPopup();
+void EditorApp::go_on_without_saving() {
+  const PendingAction action = take_pending();
+  log::warning(action.kind == PendingAction::Kind::Leave ? "closing without saving"
+                                                         : "opening " + action.scene + " without saving");
+  carry_out(action);
 }
 
-void EditorApp::cancel_leaving() {
-  close_pending_ = false;
+void EditorApp::cancel_pending() {
+  take_pending();
   exit_action_ = EditorExit::Quit;
+}
+
+PendingAction EditorApp::take_pending() {
+  const PendingAction action = pending_.value_or(PendingAction{});
+  pending_.reset();
   ImGui::CloseCurrentPopup();
+  return action;
+}
+
+bool EditorApp::still_unsaved(const PendingAction& action) const {
+  return action.kind == PendingAction::Kind::Leave ? unsaved_work() : session_->document().dirty();
+}
+
+void EditorApp::carry_out(const PendingAction& action) {
+  switch (action.kind) {
+    case PendingAction::Kind::Leave:
+      quit_confirmed_ = true;
+      break;
+    case PendingAction::Kind::OpenScene:
+      switch_scene(action.scene);
+      break;
+    case PendingAction::Kind::NewScene:
+      make_and_open_scene(action.scene);
+      break;
+  }
 }
 
 void EditorApp::draw_external_change_dialog() {
@@ -117,9 +149,9 @@ void EditorApp::draw_external_change_dialog() {
   ImGui::EndPopup();
 }
 
-// The outside change is asked about once closing is not: one question at a time.
+// The outside change is asked about once the unsaved edits are not: one question at a time.
 bool EditorApp::external_change_dialog_wanted() const {
-  return session_->external_change_pending() && !close_pending_ && !ImGui::IsPopupOpen(external_change_popup());
+  return session_->external_change_pending() && !pending_ && !ImGui::IsPopupOpen(external_change_popup());
 }
 
 void EditorApp::draw_external_change_choices() {

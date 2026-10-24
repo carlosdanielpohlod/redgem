@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <chrono>
 
+#include "app/scene_files.hpp"
+#include "editor/document/glb_file.hpp"
 #include "core/config.hpp"
 #include "scene/props.hpp"
 #include "editor/editor_session.hpp"
@@ -353,5 +355,89 @@ TEST_CASE("the environment object carries the scene's sky and effects, and there
   CHECK(session->document().node_count() == count + 1);
   session->undo();  // one step
   CHECK(session->document().node_count() == count);
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("another scene of the game opens with its own undo history, and plays as itself") {
+  constexpr const char* kSecondScene = "level2";
+  const auto dir = copy_sandbox("open_scene");
+  auto session = open(dir);
+  CHECK(session->scene_name() == config::kMainSceneName);
+  session->select_by_name("Crate");
+  session->create_empty(Vec3::zero());  // an undo step of scene.glb
+  std::string error;
+  REQUIRE_MESSAGE(session->open_scene(kSecondScene, error), error);
+  CHECK(session->scene_name() == kSecondScene);
+  CHECK(session->document().path() == dir / config::kScenesDirName / "level2.glb");
+  CHECK_FALSE(session->document().can_undo());  // nothing of the last scene's history
+  CHECK_FALSE(session->document().dirty());
+  CHECK(session->selection() == kNoObject);
+  CHECK(session->scene().find("Level2Marker") != kNoObject);
+
+  // Play starts from the open scene, by its name, and Stop comes back to it.
+  ScriptedInputSource input;
+  REQUIRE_MESSAGE(session->play({input}, error), error);
+  CHECK(session->runtime()->scene_name() == kSecondScene);
+  CHECK(session->scene().find("Level2Marker") != kNoObject);
+  CHECK_FALSE(session->open_scene(config::kMainSceneName, error));  // not while the game runs
+  session->stop();
+  CHECK(session->scene_name() == kSecondScene);
+  CHECK(session->scene().find("Level2Marker") != kNoObject);
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("save writes the open scene back to its own file, and save as makes another") {
+  const auto dir = copy_sandbox("save_scene");
+  auto session = open(dir);
+  std::string error;
+  REQUIRE(session->open_scene("level2", error));
+  session->create_empty(Vec3::zero());
+  REQUIRE(session->save(error));
+  CHECK(read_scene(dir, "level2")->find_node("GameObject") != kNoIndex);
+  CHECK(read_scene(dir, config::kMainSceneName)->find_node("GameObject") == kNoIndex);
+
+  session->create_camera(Vec3::zero());
+  REQUIRE_MESSAGE(session->save_as("level3", error), error);
+  CHECK(session->scene_name() == "level3");
+  CHECK_FALSE(session->document().dirty());
+  CHECK(read_scene(dir, "level3")->find_node("Camera.001") != kNoIndex);
+  CHECK(read_scene(dir, "level2")->find_node("Camera.001") == kNoIndex);
+  CHECK_FALSE(session->save_as("level2", error));  // a scene of the game already
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("the open scene's file is the one followed for outside changes") {
+  const auto dir = copy_sandbox("follow_scene");
+  auto session = open(dir);
+  std::string error;
+  REQUIRE(session->open_scene("level2", error));
+  touch_later(dir / config::kSceneFileName);
+  CHECK_FALSE(session->reload_if_changed_on_disk());  // not the scene being edited
+  touch_later(dir / config::kScenesDirName / "level2.glb");
+  CHECK(session->reload_if_changed_on_disk());
+  CHECK(session->scene_name() == "level2");
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("save as refuses to move a scene away from the files next to it that it uses") {
+  constexpr const char* kLinkedImage = "wood.png";
+  const auto dir = copy_sandbox("save_as_linked");
+  const std::filesystem::path scene = dir / config::kSceneFileName;
+  std::string error;
+  auto glb = read_glb(scene, error);
+  REQUIRE_MESSAGE(glb, error);
+  glb->json["images"] = nlohmann::json::array({{{"uri", kLinkedImage}}});  // a texture kept next to it
+  REQUIRE(write_glb(scene, *glb, error));
+  REQUIRE(write_text_file(dir / kLinkedImage, "not really a picture", error));
+  auto session = open(dir);
+  CHECK(session->document().linked_files() == std::vector<std::string>{kLinkedImage});
+
+  session->create_empty(Vec3::zero());
+  CHECK_FALSE(session->save_as("level3", error));  // scenes/ would not find scenes/wood.png
+  CHECK(error.find(kLinkedImage) != std::string::npos);
+  CHECK_FALSE(std::filesystem::exists(dir / config::kScenesDirName / "level3.glb"));
+  CHECK(session->scene_name() == config::kMainSceneName);
+  CHECK(session->document().dirty());
+  CHECK(session->save(error));  // in its own folder it still finds it
   std::filesystem::remove_all(dir);
 }

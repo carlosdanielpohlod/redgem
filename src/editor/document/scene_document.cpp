@@ -10,11 +10,25 @@
 #include "core/log.hpp"
 #include "editor/document/glb_compact.hpp"
 #include "editor/document/gltf_json.hpp"
+#include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 
 namespace redgem {
 
 using namespace gltf_json;
+
+namespace {
+
+// An image's or buffer's "uri" ("" without one).
+std::string uri_of(const nlohmann::json& entry) {
+  return entry.is_object() ? entry.value(kUri, std::string()) : std::string();
+}
+
+// A glTF "uri" names a file next to the scene: one is given (none at all is the .glb's own binary
+// chunk), and it is no data written into the JSON itself.
+bool names_a_linked_file(const std::string& uri) { return !uri.empty() && gltf_checks::names_a_file(uri.c_str()); }
+
+}  // namespace
 
 std::variant<SceneDocument, std::string> SceneDocument::open(const std::filesystem::path& path) {
   try {
@@ -131,6 +145,17 @@ bool SceneDocument::sync_glb(std::string& error) {
   keep_active_scene(json, roots);
   sync_skins_and_animations(json);
   return true;
+}
+
+std::vector<std::string> SceneDocument::linked_files() const {
+  std::vector<std::string> files;
+  for (const char* kind : {kImages, kBuffers}) {
+    for (const nlohmann::json& entry : list_of(glb_.json, kind)) {
+      const std::string uri = uri_of(entry);
+      if (names_a_linked_file(uri)) files.push_back(uri);
+    }
+  }
+  return files;
 }
 
 bool SceneDocument::save(std::string& error) { return save_as(path_, error); }

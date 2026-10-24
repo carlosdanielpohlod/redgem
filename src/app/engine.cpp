@@ -109,7 +109,7 @@ void Engine::fill_context(const std::string& game_title) {
   context_.physics = physics_.get();
   context_.input = &input_;
   context_.time.fixed_delta = config::kFixedDeltaSeconds;
-  context_.scene_name = config::kMainSceneName;
+  context_.scene_name = options_.scene_name;
   connect_context();
 }
 

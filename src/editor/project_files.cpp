@@ -58,6 +58,17 @@ std::vector<std::string> names_in(const std::filesystem::path& dir, const char* 
   return sorted_unique(std::move(names));
 }
 
+// The game's scenes by the names scripts load them with: "main" (its scene.glb) first, then those
+// of scenes/. A scenes/main.glb is left out: no script reaches it, "main" is scene.glb.
+std::vector<std::string> scene_names(const std::filesystem::path& game_dir) {
+  std::vector<std::string> names = names_in(game_dir / config::kScenesDirName, kModelExtension);
+  names.erase(std::remove(names.begin(), names.end(), config::kMainSceneName), names.end());
+  std::error_code error;
+  if (std::filesystem::exists(game_dir / config::kSceneFileName, error))
+    names.insert(names.begin(), config::kMainSceneName);
+  return names;
+}
+
 }  // namespace
 
 ProjectFiles ProjectFiles::scan(const std::filesystem::path& game_dir) {
@@ -65,7 +76,7 @@ ProjectFiles ProjectFiles::scan(const std::filesystem::path& game_dir) {
   files.scripts = file_names_in(game_dir / config::kScriptsDirName, config::kRubyFileExtension);
   files.models = file_names_in(game_dir / config::kModelsDirName, kModelExtension);
   files.sounds = names_in(game_dir / config::kSoundsDirName, kAnySound);
-  files.scenes = names_in(game_dir / config::kScenesDirName, kModelExtension);
+  files.scenes = scene_names(game_dir);
   return files;
 }
 

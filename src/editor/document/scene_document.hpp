@@ -38,6 +38,9 @@ class SceneDocument {
   // Whether `index` is one of the nodes.
   bool has_node(int index) const { return index >= 0 && index < node_count(); }
   const std::filesystem::path& path() const { return path_; }
+  // The files next to it the scene's images and buffers name (their "uri"s), which a copy saved
+  // in another folder would no longer find; empty when it carries everything in itself.
+  std::vector<std::string> linked_files() const;
   // True when the nodes or materials differ from what is on disk (undoing back to the saved
   // state clears it).
   bool dirty() const { return version_ != saved_version_; }
