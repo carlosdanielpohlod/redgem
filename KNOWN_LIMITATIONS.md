@@ -33,8 +33,11 @@ the same pull request.
   automatically. Beyond the final range the ground is still its texture alone.
 - Temporal anti-aliasing (`antialias = "temporal"`) smears detail when the camera moves fast,
   such as a chase camera behind a fast car. Local high-motion and opening-edge rejection reduces
-  history accumulation, but disocclusion is estimated from current neighboring motion rather
-  than validated against previous-frame depth. Fast details can trade smear for shimmer.
+  history accumulation. Previous-frame depth rejects history from hidden or newly revealed
+  surfaces, with previous skin and object poses included. The depth check accepts a match within a
+  texel, so history from a surface that disappeared can survive along its outline for a frame,
+  held back only by color clipping. Thin cut-outs and fast details can trade smear for shimmer
+  when too few valid temporal samples remain.
   It is off in the editor's scene view, and turns itself
   off, with a warning, on graphics cards that cannot draw into float textures.
 - Water supports animated horizontal surfaces, depth absorption, screen-space refraction,

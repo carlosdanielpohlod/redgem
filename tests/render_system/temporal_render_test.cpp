@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "render/temporal.hpp"
 #include "render_system/render_stage.hpp"
@@ -515,4 +517,330 @@ TEST_CASE("an opening edge rejects foreground history even below the fast-motion
   const float mean = error.total / static_cast<float>(error.pixels);
   MESSAGE("opening edge pixels " << error.pixels << ", mean error " << mean);
   CHECK(mean < kOpeningMeanError);
+}
+
+namespace {
+
+// A stopped foreground object disappears without leaving a velocity discontinuity. The dark
+// background edge still has a bright neighbor, so color clipping alone cannot reject its history.
+constexpr float kDepthBackgroundEdge = 0.1f;  // keep the exposed black edge just right of the picture center
+
+void add_depth_skin(SceneDesc& desc) {
+  SkinDesc skin;
+  skin.joints = {static_cast<int>(desc.nodes.size())};
+  NodeDesc joint;
+  joint.name = "DepthJoint";
+  joint.local = desc.nodes[4].local;  // a skinned vertex follows the joint, not the mesh node
+  desc.nodes.push_back(joint);
+  skin.inverse_bind = {{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}};
+  desc.skins.push_back(std::move(skin));
+  desc.nodes[4].skin = 0;
+}
+
+SceneDesc disappearing_scene(double samples, bool skinned) {
+  SceneDesc desc = opening_scene();
+  desc.nodes[5].local.position.x = kDepthBackgroundEdge - kOpeningWhitePatchSize.x * 0.5f;
+  desc.nodes[2].props["msaa"] = samples;
+  if (skinned) add_depth_skin(desc);
+  return desc;
+}
+
+void skin_disappearing_card(SceneDesc& desc) {
+  PrimitiveDesc& card = desc.meshes[1].primitives[0];
+  for (std::size_t vertex = 0; vertex < card.positions.size() / 3; ++vertex) {
+    card.joints.insert(card.joints.end(), {0, 0, 0, 0});
+    card.weights.insert(card.weights.end(), {1, 0, 0, 0});
+  }
+}
+
+Picture disappearing_picture(bool warmed, double samples, bool skinned, const std::string& name) {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  SceneDesc desc = disappearing_scene(samples, skinned);
+  if (skinned) skin_disappearing_card(desc);
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  for (int frame = 0; frame < (warmed ? render_math::kJitterPhases : 0); ++frame) {
+    stage.draw(scene, name + "_warm");
+  }
+  scene.at(scene.find("Card")).visible = false;
+  return stage.draw(scene, name);
+}
+
+}  // namespace
+
+TEST_CASE("temporal depth validation rejects stopped foreground history after an object disappears") {
+  for (const double samples : {0.0, kSamples}) {
+    for (const bool skinned : {false, true}) {
+      const Picture moved = disappearing_picture(true, samples, skinned, "temporal_depth_disappeared");
+      const Picture fresh = disappearing_picture(false, samples, skinned, "temporal_depth_disappeared_fresh");
+      const OpeningError error = opening_error(moved, fresh);
+      REQUIRE(error.pixels >= kOpeningMinimumPixels);
+      CHECK(error.total / static_cast<float>(error.pixels) < kOpeningMeanError);
+    }
+  }
+}
+
+namespace {
+
+constexpr float kDepthApproachStep = 0.25f;  // large relative depth change, small screen velocity
+constexpr float kDepthCoverage = 0.5f;
+constexpr float kDepthStableRoughness = 0.7f;  // accumulated dither must be visibly smoother than one sample
+constexpr int kDepthApproachFrames = 8;
+constexpr float kDepthInteriorLow = 0.47f;  // avoid the cube's moving silhouette
+constexpr float kDepthInteriorHigh = 0.53f;
+
+SceneDesc approaching_depth_scene(double samples, bool skinned) {
+  SceneDesc desc = disappearing_scene(samples, skinned);
+  desc.materials[1] = test::glowing_material({0, 1, 0, kDepthCoverage}, kGlow);
+  desc.materials[1].dithered = true;
+  desc.materials[1].alpha_mode = AlphaMode::Blend;
+  desc.nodes[5].mesh = kNoIndex;
+  desc.nodes[3].mesh = kNoIndex;  // sky behind the dither isolates coverage accumulation
+  desc.nodes[4].local.position = Vec3::zero();
+  desc.nodes[4].local.scale = Vec3::one();
+  if (skinned) {
+    skin_disappearing_card(desc);
+    desc.nodes.back().local = {};
+  }
+  return desc;
+}
+
+Picture approaching_depth_picture(bool warmed, double samples, bool skinned, const std::string& name) {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  const SceneDesc desc = approaching_depth_scene(samples, skinned);
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  const ObjectId moving = scene.find(skinned ? "DepthJoint" : "Card");
+  const int last = kSettleFrames + kDepthApproachFrames;
+  Picture picture;
+  for (int frame = warmed ? 0 : last; frame <= last; ++frame) {
+    const float advance = static_cast<float>(std::max(frame - kSettleFrames, 0)) * kDepthApproachStep;
+    scene.set_world_position(moving, Vec3{0, 0, advance});
+    picture = stage.draw(scene, name);
+  }
+  return picture;
+}
+
+float depth_interior_roughness(const Picture& picture) {
+  float total = 0;
+  const int low = static_cast<int>(kDepthInteriorLow * static_cast<float>(picture.width));
+  const int high = static_cast<int>(kDepthInteriorHigh * static_cast<float>(picture.width));
+  for (int y = low; y < high; ++y) {
+    for (int x = low; x < high; ++x) {
+      const auto pixel = static_cast<std::size_t>(y * picture.width + x);
+      total += static_cast<float>(std::abs(greenness(picture.pixels[pixel]) - greenness(picture.pixels[pixel + 1])));
+    }
+  }
+  return total;
+}
+
+}  // namespace
+
+TEST_CASE("temporal depth validation retains dither history while rigid and skinned surfaces approach the camera") {
+  for (const double samples : {0.0, kSamples}) {
+    for (const bool skinned : {false, true}) {
+      const Picture accumulated = approaching_depth_picture(true, samples, skinned, "temporal_depth_approach");
+      const Picture fresh = approaching_depth_picture(false, samples, skinned, "temporal_depth_approach_fresh");
+      const float aliased = depth_interior_roughness(fresh);
+      REQUIRE(aliased > 0.0f);
+      CHECK(depth_interior_roughness(accumulated) < aliased * kDepthStableRoughness);
+    }
+  }
+}
+
+namespace {
+
+// Keep the surviving near edge just right of the center ROI. Its subpixel placement leaves
+// an opaque motion texel beside the first black receiver texel with both one and four samples.
+constexpr float kAdjacentSurvivorEdge = 0.012f;  // world meters, about 1.86 pixels at this fixture's near depth
+
+SceneDesc adjacent_survivor_scene(double samples) {
+  SceneDesc desc = opening_scene();
+  desc.nodes[2].props["msaa"] = samples;
+  desc.nodes[5].mesh = kNoIndex;  // only the persistent near card supplies the bright neighbor
+  const float half_width = kOpeningCardSize.x * kHalf;
+  desc.nodes[4].local.position.x = kAdjacentSurvivorEdge + half_width;
+  const Vec3 survivor_at{kAdjacentSurvivorEdge - half_width, kOpeningCardAt.y, kOpeningCardAt.z};
+  desc.nodes.push_back(opening_cube("Survivor", 1, survivor_at, kOpeningCardSize));
+  return desc;
+}
+
+Picture adjacent_survivor_picture(bool warmed, double samples, const std::string& name) {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  const SceneDesc desc = adjacent_survivor_scene(samples);
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  for (int frame = 0; frame < (warmed ? render_math::kJitterPhases : 0); ++frame) stage.draw(scene, name + "_warm");
+  scene.at(scene.find("Card")).visible = false;
+  return stage.draw(scene, name);
+}
+
+}  // namespace
+
+TEST_CASE("temporal depth validation rejects a removed opaque card beside a surviving near neighbor") {
+  for (const double samples : {0.0, kSamples}) {
+    const Picture removed = adjacent_survivor_picture(true, samples, "temporal_depth_adjacent_removed");
+    const Picture fresh = adjacent_survivor_picture(false, samples, "temporal_depth_adjacent_fresh");
+    const OpeningError error = opening_error(removed, fresh);
+    REQUIRE(error.pixels >= kOpeningMinimumPixels);
+    const float mean = error.total / static_cast<float>(error.pixels);
+    MESSAGE("adjacent survivor pixels " << error.pixels << ", mean error " << mean << ", samples " << samples);
+    CHECK(mean < kOpeningMeanError);
+  }
+}
+
+namespace {
+
+// A still glowing cube turned about the view axis: every edge it shows is a staircase of pixels.
+constexpr float kTurnedCubeAngle = 0.5f;          // radians about the view axis
+constexpr float kTurnedCubeSize = 3.0f;           // meters across: about ninety pixels from the camera
+constexpr Vec3 kTurnedWallAt{0.0f, 0.0f, -6.0f};  // a dark wall far enough behind to be another surface
+constexpr Vec3 kTurnedWallSize{40.0f, 40.0f, 1.0f};
+constexpr float kDimGlow = 0.3f;  // dim enough that the tone curve keeps partial coverage apart from full
+constexpr int kStillFrames = 4 * render_math::kJitterPhases;  // long enough to settle, then to compare
+constexpr float kInteriorShare = 0.9f;  // of the brightest green: the cube's inside, fully covered
+constexpr float kPartlyLow = 0.15f;     // of the inside's green: a pixel only partly covered, from here
+constexpr float kPartlyHigh = 0.85f;    // to here
+// Partly covered pixels a settled silhouette shows beyond a single sample's, at least: with the
+// frames before rejected wherever the previous sample hit the other surface, it shows about 110.
+constexpr int kSoftenedLeast = 130;
+// Byte change, per cube pixel, from one settled frame to the next and between two frames a jitter
+// cycle apart: a picture that holds still and has converged. (Read where the jitter moved it, the
+// history follows the jitter: about 6. Rejected at the silhouette: about 1.)
+constexpr float kStillFrameChange = 0.7f;
+constexpr float kConvergedChange = 0.25f;
+
+SceneDesc turned_cube(PropertyMap environment, bool wall) {
+  SceneDesc desc = glowing_cube(std::move(environment));
+  desc.materials[0] = test::glowing_material(redgem::Color{0.0f, 1.0f, 0.0f, 1.0f}, kDimGlow);
+  desc.materials.push_back(test::glowing_material(kOpeningBlack, 0.0f));
+  desc.meshes.push_back(test::cube_mesh(1));
+  NodeDesc& cube = desc.nodes[1];
+  cube.local.position = Vec3::zero();
+  cube.local.rotation = quat_from_axis_angle(Vec3{0.0f, 0.0f, 1.0f}, kTurnedCubeAngle);
+  cube.local.scale = Vec3::one() * kTurnedCubeSize;
+  if (wall) desc.nodes.push_back(opening_cube("Wall", 1, kTurnedWallAt, kTurnedWallSize));
+  return desc;
+}
+
+std::vector<Picture> still_frames(PropertyMap environment, bool wall, int frames, const std::string& name) {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  const SceneDesc desc = turned_cube(std::move(environment), wall);
+  stage.upload(desc);
+  const Scene scene = Scene::from_desc(desc);
+  std::vector<Picture> pictures;
+  for (int frame = 0; frame < frames; ++frame) pictures.push_back(stage.draw(scene, name));
+  return pictures;
+}
+
+int brightest_green(const Picture& picture) {
+  int brightest = 0;
+  for (const ::Color c : picture.pixels) brightest = std::max(brightest, greenness(c));
+  return brightest;
+}
+
+bool partly_covered(int green_of, int inside) {
+  const float share = static_cast<float>(green_of) / static_cast<float>(inside);
+  return share > kPartlyLow && share < kPartlyHigh;
+}
+
+// How many pixels show the cube only partly: its smoothed silhouette.
+int partly_covered_pixels(const Picture& picture) {
+  const auto inside = static_cast<int>(static_cast<float>(brightest_green(picture)) * kInteriorShare);
+  int count = 0;
+  for (const ::Color c : picture.pixels) count += partly_covered(greenness(c), inside) ? 1 : 0;
+  return count;
+}
+
+// How far `b` is from `a`, in byte change per pixel the cube covers.
+float change_per_cube_pixel(const Picture& a, const Picture& b) {
+  const auto covered = static_cast<float>(std::count_if(a.pixels.begin(), a.pixels.end(), green));
+  return distance_between(a, b) / std::max(covered, 1.0f);
+}
+
+}  // namespace
+
+TEST_CASE("smoothed with the frames before, a still view holds still and converges instead of following the jitter") {
+  for (const bool wall : {false, true}) {
+    const std::vector<Picture> frames = still_frames(temporal(), wall, kStillFrames, "temporal_still_cube");
+    const Picture& last = frames.back();
+    REQUIRE(total_greenness(last) > 0.0f);
+    float most = 0.0f;
+    for (std::size_t frame = frames.size() - render_math::kJitterPhases; frame < frames.size(); ++frame) {
+      most = std::max(most, change_per_cube_pixel(frames[frame - 1], frames[frame]));
+    }
+    const float cycle = change_per_cube_pixel(frames[frames.size() - 1 - render_math::kJitterPhases], last);
+    MESSAGE("wall " << wall << ": frame to frame " << most << ", a cycle apart " << cycle);
+    CHECK(most < kStillFrameChange);
+    CHECK(cycle < kConvergedChange);
+  }
+}
+
+// The first frame has no frames before: one jittered sample a pixel, with no other smoothing.
+TEST_CASE("smoothed with the frames before, a still cube's silhouette against the sky or a wall is softened") {
+  for (const bool wall : {false, true}) {
+    const std::vector<Picture> frames = still_frames(temporal(), wall, kStillFrames, "temporal_silhouette");
+    const int hard = partly_covered_pixels(frames.front());
+    const int soft = partly_covered_pixels(frames.back());
+    MESSAGE("wall " << wall << ": partly covered pixels " << hard << " one sample, " << soft << " smoothed");
+    CHECK(soft > hard + kSoftenedLeast);
+  }
+}
+
+namespace {
+
+// A thin pole and the turned cube, each drifting slowly across the view: under a pixel a frame.
+constexpr Vec3 kPoleSize{0.05f, 4.0f, 0.05f};  // meters: about a pixel and a half wide from the camera
+constexpr float kSlowStride = 0.01f;           // meters a frame: about a third of a pixel
+constexpr int kDriftFrames = 4 * render_math::kJitterPhases;
+constexpr int kPoleLooseColumns = 2;  // columns the drifting pole may cover beyond the still one's
+// Partly covered pixels the drifting cube's silhouette keeps beyond a single sample's, at least
+// (it keeps over 200; with no history at its edges, none).
+constexpr int kDriftSoftenedLeast = 150;
+
+SceneDesc pole_scene() {
+  SceneDesc desc = glowing_cube(temporal());
+  desc.nodes[1].local.position = Vec3::zero();
+  desc.nodes[1].local.scale = kPoleSize;
+  return desc;
+}
+
+// The last of `frames` pictures of `desc`'s node 1 drifting right by `stride` meters a frame.
+Picture drifted(const SceneDesc& desc, float stride, int frames, const std::string& name) {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  const ObjectId moving = scene.find("Cube");
+  const Vec3 start = desc.nodes[1].local.position;
+  Picture picture;
+  for (int frame = 0; frame < frames; ++frame) {
+    scene.set_world_position(moving, start + Vec3{stride * static_cast<float>(frame), 0.0f, 0.0f});
+    picture = stage.draw(scene, name);
+  }
+  return picture;
+}
+
+}  // namespace
+
+TEST_CASE("smoothed with the frames before, a thin pole drifting slowly in front of the sky leaves no trail") {
+  const int still = green_columns(drifted(pole_scene(), 0.0f, kDriftFrames, "temporal_pole_still"));
+  REQUIRE(still > 0);
+  const int drifting = green_columns(drifted(pole_scene(), kSlowStride, kDriftFrames, "temporal_pole_drifting"));
+  MESSAGE("pole columns: still " << still << ", drifting " << drifting);
+  CHECK(drifting <= still + kPoleLooseColumns);
+}
+
+TEST_CASE("smoothed with the frames before, a slowly moving cube's silhouette keeps its history") {
+  for (const bool wall : {false, true}) {
+    const SceneDesc desc = turned_cube(temporal(), wall);
+    const int hard = partly_covered_pixels(drifted(desc, kSlowStride, 1, "temporal_drift_one_sample"));
+    const int soft = partly_covered_pixels(drifted(desc, kSlowStride, kDriftFrames, "temporal_drift_smoothed"));
+    MESSAGE("wall " << wall << ": partly covered pixels " << hard << " one sample, " << soft << " drifting");
+    CHECK(soft > hard + kDriftSoftenedLeast);
+  }
 }

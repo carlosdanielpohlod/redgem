@@ -151,6 +151,9 @@ struct TemporalState {
   std::uint64_t frame = 0;     // frames mixed so far: the jitter's phase
   std::size_t latest = 0;      // which of the histories holds the newest mix
   render_math::TemporalView view;
+  Vector2 depth_projection{};  // unjittered projection z coefficients
+  Vector2 current_jitter{};    // projection shift in texture coordinates
+  Vector2 previous_jitter{};
   Matrix view_projection{};           // this frame's camera, without the jitter
   Matrix previous_view_projection{};  // the last frame's
   float time = 0.0f;                  // the wind's clock, this frame and the last
@@ -545,6 +548,7 @@ struct Renderer::Impl {
   // The lit picture mixed with the frames before, into the newer history.
   void resolve_temporal();
   void send_temporal_inputs(const RenderTexture2D& before);
+  void send_temporal_view();
   void end_temporal();
   // What post-processing starts from: the mixed picture, or the lit one.
   const RenderTexture2D& lit_picture() const;

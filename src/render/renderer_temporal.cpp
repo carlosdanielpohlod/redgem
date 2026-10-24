@@ -67,7 +67,15 @@ render_math::TemporalView Renderer::Impl::temporal_view(const Camera3D& camera) 
 void Renderer::Impl::jitter_view() {
   const Matrix projection = rlGetMatrixProjection();
   temporal.view_projection = MatrixMultiply(rlGetMatrixModelview(), projection);
+  temporal.depth_projection = {projection.m10, projection.m14};
   const Vector2 offset = render_math::jitter_of(temporal.frame);
+  temporal.current_jitter = {offset.x / static_cast<float>(hdr.texture.width),
+                             offset.y / static_cast<float>(hdr.texture.height)};
+  if (!temporal.history_valid) {
+    temporal.previous_view_projection = temporal.view_projection;
+    temporal.previous_jitter = temporal.current_jitter;
+    temporal.previous_time = temporal.time;
+  }
   rlSetMatrixProjection(render_math::jittered(projection, offset, hdr.texture.width, hdr.texture.height));
 }
 
@@ -210,17 +218,25 @@ void Renderer::Impl::send_temporal_inputs(const RenderTexture2D& before) {
   SetShaderValueTexture(temporal_shader, temporal_uniforms.history, before.texture);
   SetShaderValueTexture(temporal_shader, temporal_uniforms.motion, motion.texture);
   SetShaderValueTexture(temporal_shader, temporal_uniforms.motion_depth, motion.depth);
-  send_matrix(temporal_shader, temporal_uniforms.reprojection,
-              inverse_then(temporal.view_projection, temporal.previous_view_projection));
+  send_temporal_view();
   const Vector2 texel{texel_of(hdr.texture.width), texel_of(hdr.texture.height)};
   send(temporal_shader, temporal_uniforms.texel_size, texel);
   send(temporal_shader, temporal_uniforms.history_valid, motion_needed() ? render_math::kOn : render_math::kOff);
+}
+
+void Renderer::Impl::send_temporal_view() {
+  send_matrix(temporal_shader, temporal_uniforms.reprojection,
+              inverse_then(temporal.view_projection, temporal.previous_view_projection));
+  send(temporal_shader, temporal_uniforms.depth_projection, temporal.depth_projection);
+  send(temporal_shader, temporal_uniforms.current_jitter, temporal.current_jitter);
+  send(temporal_shader, temporal_uniforms.previous_jitter, temporal.previous_jitter);
 }
 
 void Renderer::Impl::end_temporal() {
   if (!temporal.on) return;
   temporal.previous_view_projection = temporal.view_projection;
   temporal.previous_time = temporal.time;
+  temporal.previous_jitter = temporal.current_jitter;
   ++temporal.frame;
 }
 

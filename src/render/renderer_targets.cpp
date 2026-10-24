@@ -200,7 +200,8 @@ void Renderer::Impl::ensure_temporal_targets() {
   const int height = hdr.texture.height;
   if (fits(motion, width, height)) return;
   motion = load_target(width, height, kHdrFormat, true);
-  SetTextureWrap(motion.depth, TEXTURE_WRAP_CLAMP);  // read around each pixel, at the edges too
+  SetTextureFilter(motion.texture, TEXTURE_FILTER_POINT);  // depth and motion identify one surface
+  SetTextureWrap(motion.depth, TEXTURE_WRAP_CLAMP);        // read around each pixel, at the edges too
   for (RenderTexture2D& history : histories) history = load_target(width, height, kHdrFormat, false);
   for (const RenderTexture2D* target : {&motion, &histories[0], &histories[1]}) clear(*target);
 }
