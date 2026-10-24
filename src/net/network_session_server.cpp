@@ -53,10 +53,9 @@ bool NetworkSession::police_message(Link& link) {
 }
 
 void NetworkSession::forgive_stall(float seconds) {
-  const float forgiven = std::min(seconds, kMostForgivenStallSeconds);
   for (Link& link : links_) {
-    link.allowance.forgive(forgiven);
-    link.messages.forgive(forgiven);
+    link.allowance.forgive(seconds, kMostForgivenStallSeconds);
+    link.messages.forgive(seconds, kMostForgivenStallSeconds);
   }
 }
 
