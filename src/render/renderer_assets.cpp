@@ -93,7 +93,7 @@ Material Renderer::Impl::make_material(redgem::Color base_color) const {
   return material;
 }
 
-// A material with the textures it uses. (An image that could not be decoded leaves its map empty.)
+// A material with its textures; declared images that could not be decoded use a checkerboard.
 Material Renderer::Impl::load_material(const MaterialDesc& source) const {
   Material material = make_material(source.base_color);
   const std::pair<int, int> maps[] = {{MATERIAL_MAP_ALBEDO, source.base_color_image},

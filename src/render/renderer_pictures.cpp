@@ -27,7 +27,7 @@ std::vector<int> ui_letters() {
   return letters;
 }
 
-// A picture that was looked for, or null for one that was not found.
+// A cached picture (including a placeholder), or null when GPU allocation failed.
 const Texture2D* if_loaded(const Texture2D& picture) { return loaded(picture) ? &picture : nullptr; }
 
 }  // namespace

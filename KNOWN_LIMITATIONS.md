@@ -147,8 +147,9 @@ not a promise of how it will be closed.
 
 ### Audio
 
-- Sounds play once with a volume and a pitch: no positional (3D) sound or listener, no handle to
-  stop or loop one sound, one music track at a time with no crossfade, no mixing groups.
+- Positional sound provides stereo panning and distance falloff for at most 64 independent sources.
+  Games update source positions and the listener explicitly; there is no HRTF, occlusion or Doppler.
+  One music track at a time with no crossfade, no mixing groups.
 
 ### Text
 
@@ -178,7 +179,6 @@ not a promise of how it will be closed.
   no time or instruction limit. (A script that raises is switched off and the game goes on.)
 - A crash in a built game closes it with a line in the log: no message to the player, no crash
   report, no backtrace. Running out of memory is not handled.
-- A missing texture draws nothing, with a warning in the log, instead of a placeholder pattern.
 
 ### Security
 

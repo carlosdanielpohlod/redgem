@@ -13,12 +13,12 @@
 namespace redgem::render_detail {
 
 // A scene's image as a texture surfaces are drawn with, smaller copies of itself included. Its
-// id is 0 when the scene left the image empty or it cannot be decoded (said in a warning).
+// missing or undecodable data becomes an opaque checkerboard, with a warning.
 Texture2D load_scene_texture(const ImageData& image);
 
 // The first file of `folder` that `name` can mean (as it is, or with a picture's extension), as
-// a texture. Its id is 0 when none does, when the name reaches outside the folder, or when the
-// file is not a picture that is decoded.
+// a texture. Missing, refused and undecodable files become an opaque checkerboard, with a warning.
+// Every result is independently owned by the caller, including placeholders.
 Texture2D load_picture_file(const std::filesystem::path& folder, const std::string& name);
 
 }  // namespace redgem::render_detail

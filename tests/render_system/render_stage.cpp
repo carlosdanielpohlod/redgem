@@ -5,6 +5,7 @@
 namespace redgem::test {
 namespace {
 
+constexpr ::Color kHudBackground{255, 255, 255, 255};
 constexpr int kSide = 256;  // pixels across the picture, and down
 constexpr const char* kTitle = "RedGem render test";
 
@@ -61,6 +62,20 @@ Picture RenderStage::draw(const Scene& scene, const std::string& name, const Par
   BeginDrawing();
   renderer_->draw_world(scene, renderer_->scene_camera(scene), &target_, particles, water_ripples);
   EndDrawing();
+  return capture(name);
+}
+
+Picture RenderStage::draw_hud(const std::vector<HudItem>& hud, const std::string& name) {
+  BeginDrawing();
+  BeginTextureMode(target_);
+  ClearBackground(kHudBackground);
+  renderer_->draw_hud(hud);
+  EndTextureMode();
+  EndDrawing();
+  return capture(name);
+}
+
+Picture RenderStage::capture(const std::string& name) {
   Image image = LoadImageFromTexture(target_.texture);
   ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
   ImageFlipVertical(&image);  // render textures are stored upside down
