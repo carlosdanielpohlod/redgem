@@ -51,8 +51,11 @@ float waterRoughness(WaterNormal normal) {
 // Bounded secant iterations intersect the refracted ray with the visible depth field.
 // A miss keeps the undistorted opaque sample: hidden and off-screen surfaces are unavailable.
 const int WATER_REFRACTION_STEPS = 8;
-const int WATER_REFRACTION_SEARCH_STEPS = 32;  // recovery only: failed secants or nonplanar depth boundaries
-const int WATER_REFRACTION_REFINEMENT = 8;
+// Recovery quality, only where the secant estimate is rejected (nonplanar depth boundaries): screen
+// samples along the refracted ray, then halvings of each interval that brackets the bottom. Half
+// the samples of a 32-step search, with one more halving, end in a bracket as narrow as its.
+const int WATER_REFRACTION_SEARCH_STEPS = 16;
+const int WATER_REFRACTION_REFINEMENT = 9;
 const float WATER_REFRACTION_DEPTH_CURVE = 0.00001;  // hardware-depth precision floor for curvature
 const float WATER_REFRACTION_THICKNESS = 0.02;  // view-space meters near the camera
 const float WATER_REFRACTION_RELATIVE_THICKNESS = 0.0005;
@@ -77,6 +80,9 @@ vec4 waterReflectedFog(vec3 sampleColor, vec3 point, float distance) {
 
 bool waterInsideScreen(vec2 uv) {
   return all(greaterThan(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)));
+}
+bool waterFoamNeighborsInside(vec2 uv, vec2 pixel) {
+  return waterInsideScreen(uv + pixel) && waterInsideScreen(uv - pixel);
 }
 bool waterScreenPoint(vec3 point, out vec2 uv) {
   if (point.z >= -waterPlanes.x) return false;
@@ -108,14 +114,17 @@ bool waterRefractionDiagonalCurve(ivec2 pixel, float middle) {
   return waterRefractionDepthCurve(upperLeft, middle, lowerRight) ||
     waterRefractionDepthCurve(upperRight, middle, lowerLeft);
 }
-bool waterRefractionDiscontinuous(vec2 uv) {
-  ivec2 pixel = ivec2(uv * vec2(textureSize(waterDepth, 0)));
-  float middle = waterRefractionTexel(pixel);
+bool waterRefractionAxisCurve(ivec2 pixel, float middle) {
   float left = waterRefractionTexel(pixel - ivec2(1, 0));
   float right = waterRefractionTexel(pixel + ivec2(1, 0));
   float above = waterRefractionTexel(pixel - ivec2(0, 1));
   float below = waterRefractionTexel(pixel + ivec2(0, 1));
-  if (waterRefractionDepthCurve(left, middle, right) || waterRefractionDepthCurve(above, middle, below)) return true;
+  return waterRefractionDepthCurve(left, middle, right) || waterRefractionDepthCurve(above, middle, below);
+}
+bool waterRefractionDiscontinuous(vec2 uv) {
+  ivec2 pixel = ivec2(uv * vec2(textureSize(waterDepth, 0)));
+  float middle = waterRefractionTexel(pixel);
+  if (waterRefractionAxisCurve(pixel, middle)) return true;
   return waterRefractionDiagonalCurve(pixel, middle);
 }
 vec2 waterRefractionColorUv(vec2 uv) {
@@ -167,8 +176,7 @@ bool waterEstimateRefraction(vec3 surface, vec3 ray, float column, float behind,
 bool waterRefractionPointSample(vec3 surface, vec3 ray, float distance, out vec2 uv, out float gap) {
   vec3 point = surface + ray * distance;
   if (!waterScreenPoint(point, uv)) return false;
-  ivec2 size = textureSize(waterDepth, 0);
-  float depth = texelFetch(waterDepth, clamp(ivec2(uv * vec2(size)), ivec2(0), size - 1), 0).r;
+  float depth = waterRefractionTexel(ivec2(uv * vec2(textureSize(waterDepth, 0))));
   if (depth >= 1.0 - EPSILON) return false;
   gap = -point.z - waterLinearDepth(depth);
   return true;
@@ -210,7 +218,7 @@ vec3 waterRefractionViewPoint(vec2 uv) {
 }
 vec3 waterRefractionBottomNormal(vec2 uv) {
   vec2 pixel = 1.0 / vec2(textureSize(waterDepth, 0));
-  if (!waterInsideScreen(uv + pixel) || !waterInsideScreen(uv - pixel)) return vec3(0.0);
+  if (!waterFoamNeighborsInside(uv, pixel)) return vec3(0.0);
   vec2 dx = vec2(pixel.x, 0.0);
   vec2 dy = vec2(0.0, pixel.y);
   vec3 across = (waterRefractionViewPoint(uv + dx) - waterRefractionViewPoint(uv - dx)) / pixel.x;
@@ -219,15 +227,18 @@ vec3 waterRefractionBottomNormal(vec2 uv) {
   float magnitude = dot(normal, normal);
   return magnitude > EPSILON * EPSILON ? normal * inversesqrt(magnitude) : vec3(0.0);
 }
+// (Written so that a NaN, from a degenerate normal, also counts as no crossing.)
+bool waterRayCrossesPlane(float direction) { return abs(direction) > EPSILON; }
+bool waterPlaneDistanceInside(float distance) { return distance >= 0.0 && distance <= WATER_DEPTH_LIMIT; }
 vec3 waterRefractionFallback(vec3 surface, vec3 ray, vec3 fallback) {
   if (waterRefractionDiscontinuous(fallback.xy)) return fallback;
   vec3 bottom = waterRefractionViewPoint(fallback.xy);
   vec3 normal = waterRefractionBottomNormal(fallback.xy);
   float direction = dot(normal, ray);
-  if (!(abs(direction) > EPSILON)) return fallback;
+  if (!waterRayCrossesPlane(direction)) return fallback;
   // Hidden geometry has no confirmed hit: use the visible bottom's local tangent plane as a proxy.
   float distance = dot(normal, bottom - surface) / direction;
-  if (!(distance >= 0.0 && distance <= WATER_DEPTH_LIMIT)) return fallback;
+  if (!waterPlaneDistanceInside(distance)) return fallback;
   return vec3(fallback.xy, distance);
 }
 struct WaterRefractionScreenRay {
@@ -250,6 +261,8 @@ float waterRefractionScreenDistance(WaterRefractionScreenRay ray, float fraction
   if (abs(denominator) <= EPSILON) return WATER_DEPTH_LIMIT * fraction;
   return (ray.origin[axis] - coordinate * ray.origin.w) / denominator;
 }
+// A rejected bracket (the edge of a post or rock in front of the bottom) does not end the search:
+// later intervals may still reach the bottom behind it, within the same number of samples.
 vec3 waterSearchRefraction(vec3 surface, vec3 ray, float column, vec3 fallback) {
   WaterRefractionScreenRay screenRay = waterRefractionScreenRay(surface, ray);
   WaterRefractionInterval before = WaterRefractionInterval(0.0, -column);
@@ -258,7 +271,7 @@ vec3 waterSearchRefraction(vec3 surface, vec3 ray, float column, vec3 fallback) 
   for (int i = 1; i <= WATER_REFRACTION_SEARCH_STEPS; ++i) {
     float distance = waterRefractionScreenDistance(screenRay, float(i) / float(WATER_REFRACTION_SEARCH_STEPS));
     // Bracket the same continuous depth field used by refinement; point sampling only validates edge hits.
-    if (!waterRefractionSample(surface, ray, distance, uv, gap)) return waterRefractionFallback(surface, ray, fallback);
+    if (!waterRefractionSample(surface, ray, distance, uv, gap)) break;
     vec3 hit;
     if (waterRefractionCrossing(before.gap, gap) &&
         waterRefineRefraction(surface, ray, before.distance, distance, hit)) return hit;
@@ -416,37 +429,6 @@ bool waterFoamSurfaceSlope(vec3 geometric, out vec2 slope) {
   return true;
 }
 
-bool waterFoamNeighborsInside(vec2 uv, vec2 pixel) {
-  return waterInsideScreen(uv + pixel) && waterInsideScreen(uv - pixel);
-}
-
-bool waterFoamBottomKnown(vec2 uv) {
-  vec2 pixel = 1.0 / vec2(textureSize(waterDepth, 0));
-  if (!waterFoamNeighborsInside(uv, pixel)) return false;
-  if (texture(waterDepth, uv).r >= 1.0 - EPSILON) return false;
-  return !waterRefractionDiscontinuous(uv);
-}
-
-float waterFoamPlaneDistance(vec3 surface, vec3 bottom, vec3 normal, vec2 slope) {
-  vec3 worldNormal = transpose(mat3(matView)) * normal;
-  vec2 gradient = worldNormal.xz + worldNormal.y * slope;
-  float magnitude = length(gradient);
-  if (magnitude <= WATER_FOAM_MIN_SHORE_GRADIENT) return -1.0;
-  return abs(dot(normal, surface - bottom)) / magnitude;
-}
-
-float waterFoamShoreDistance(vec3 geometric) {
-  if (waterSurface.x <= 0.0) return -1.0;
-  vec2 slope;
-  if (!waterFoamSurfaceSlope(geometric, slope)) return -1.0;
-  vec2 uv = gl_FragCoord.xy / vec2(textureSize(waterBackground, 0));
-  if (!waterFoamBottomKnown(uv)) return -1.0;
-  vec3 surface = (matView * vec4(fragPosition, 1.0)).xyz;
-  vec3 bottom = waterRefractionViewPoint(uv);
-  vec3 normal = waterRefractionBottomNormal(uv);
-  return waterFoamPlaneDistance(surface, bottom, normal, slope);
-}
-
 // Foam is a continuous world-space band, rather than a uniform white intersection line.
 const vec2 WATER_FOAM_HASH_DIRECTION = vec2(127.1, 311.7);
 const float WATER_FOAM_HASH_SCALE = 43758.5453;
@@ -508,6 +490,53 @@ vec3 waterCompose(vec3 n, vec3 v, WaterTransmission optics, WaterSurfaceLight li
   // The snapshot already contains atmospheric fog. Only the new surface contribution needs it.
   return optics.background * transmitted + surface * air + fogColor * (1.0 - transmitted) * (1.0 - air);
 }
+// Meters of depth per horizontal meter from the shore: only a bottom steeper than this (about 76
+// degrees) can be deeper than this many reaches where foam still shows. Deeper water skips the
+// discontinuity test and the shore estimate.
+const float WATER_FOAM_STEEPEST_SHORE = 4.0;
+
+// The water column straight below `surface` (view space): down to the visible bottom's tangent
+// plane (through `bottom`, facing `normal`), not to `bottom` itself, which a grazing view sees far
+// out. A bottom plane too close to vertical gives no column.
+float waterFoamColumn(vec3 surface, vec3 bottom, vec3 normal) {
+  float facing = dot(normal, mat3(matView)[1]);
+  return abs(facing) > WATER_FOAM_MIN_SURFACE_UP ? dot(normal, surface - bottom) / facing : 0.0;
+}
+
+bool waterFoamOutOfReach(vec3 surface, vec3 bottom, vec3 normal) {
+  return waterFoamColumn(surface, bottom, normal) > waterSurface.x * WATER_FOAM_MAX_REACH * WATER_FOAM_STEEPEST_SHORE;
+}
+
+bool waterFoamBottomKnown(vec2 uv) {
+  vec2 pixel = 1.0 / vec2(textureSize(waterDepth, 0));
+  if (!waterFoamNeighborsInside(uv, pixel)) return false;
+  return texture(waterDepth, uv).r < 1.0 - EPSILON;
+}
+
+float waterFoamPlaneDistance(vec3 surface, vec3 bottom, vec3 normal, vec2 slope) {
+  vec3 worldNormal = transpose(mat3(matView)) * normal;
+  vec2 gradient = worldNormal.xz + worldNormal.y * slope;
+  float magnitude = length(gradient);
+  if (magnitude <= WATER_FOAM_MIN_SHORE_GRADIENT) return -1.0;
+  return abs(dot(normal, surface - bottom)) / magnitude;
+}
+
+float waterFoamShoreDistance(vec3 geometric) {
+  if (waterSurface.x <= 0.0) return -1.0;
+  vec2 slope;
+  if (!waterFoamSurfaceSlope(geometric, slope)) return -1.0;
+  vec2 uv = gl_FragCoord.xy / vec2(textureSize(waterBackground, 0));
+  if (!waterFoamBottomKnown(uv)) return -1.0;
+  vec3 surface = (matView * vec4(fragPosition, 1.0)).xyz;
+  vec3 bottom = waterRefractionViewPoint(uv);
+  vec3 normal = waterRefractionBottomNormal(uv);
+  // (Before the discontinuity test, the costliest part: a normal across an edge only ever sends
+  // the pixel on to that test, or skips foam where the edge would have rejected it anyway.)
+  if (waterFoamOutOfReach(surface, bottom, normal)) return -1.0;
+  if (waterRefractionDiscontinuous(uv)) return -1.0;
+  return waterFoamPlaneDistance(surface, bottom, normal, slope);
+}
+
 vec3 waterColor() {
   // Evaluate derivatives for all water pixels before depth-dependent guards or traces diverge.
   vec3 geometryDx = dFdx(fragPosition);

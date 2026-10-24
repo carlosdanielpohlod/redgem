@@ -111,6 +111,8 @@ jobs:
 
       # Everything else ctest has, the system tests (which open windows) included, on a virtual
       # display drawn by Mesa's software renderer (llvmpipe: OpenGL 3.3 core, as the engine asks).
+      # -noreset: by default the display resets whenever its last window closes, and a test opening
+      # its window during that reset cannot connect (GLFW fails, and raylib then crashes).
       # (Not the two programs of the steps above again, nor the load test, which has its own step.)
       - name: All the other tests (ctest)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
@@ -118,7 +120,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
           REDGEM_GPU: integrated
         run: >
-          xvfb-run -a -s "-screen 0 1600x900x24"
+          xvfb-run -a -s "-screen 0 1600x900x24 -noreset"
           ctest --test-dir build --output-on-failure -j 4 -E '^(cpp|load)\.'
 
       # Bots playing on a dedicated server (tests/load): run alone, so that nothing else takes the

@@ -1,5 +1,7 @@
 // Water must move, transmit the actual bottom, absorb by depth and respect opaque occlusion.
 #include <doctest/doctest.h>
+#include <raylib.h>
+#include <raymath.h>
 
 #include <algorithm>
 #include <cmath>
@@ -1885,7 +1887,7 @@ out vec4 finalColor;
 const float PROBE_RAY_X = 0.3;
 const float PROBE_ROOT_U = 0.58;
 const float PROBE_ROOT_U_TOLERANCE = 0.0005;
-const float PROBE_PREMATURE_STEP = 15.0;
+const float PROBE_PREMATURE_STEP = 8.0;  // of WATER_REFRACTION_SEARCH_STEPS: where nearest depth crosses early
 bool refractionProbePrematureCrossing(vec3 surface, vec3 ray) {
   WaterRefractionScreenRay screenRay = waterRefractionScreenRay(surface, ray);
   float endpoint = waterRefractionScreenDistance(screenRay, PROBE_PREMATURE_STEP / float(WATER_REFRACTION_SEARCH_STEPS));
@@ -1941,16 +1943,27 @@ float refraction_probe_hardware_depth(float depth) {
   return kRefractionProbeFar / extent - kRefractionProbeFar * kRefractionProbeNear / (extent * depth);
 }
 
-Texture2D refraction_probe_depth_texture() {
-  std::vector<float> pixels(kRefractionProbeTextureSide * kRefractionProbeTextureSide);
+// A post in front of the inclined floor, in the texture's columns across this range of u.
+constexpr float kRefractionPostFrom = 0.53f;
+constexpr float kRefractionPostTo = 0.56f;
+constexpr float kRefractionPostDepth = 1.05f;   // view meters: just below the water surface at 1
+constexpr int kRefractionPostTextureSide = 64;  // texels fine enough for a post between ray and floor root
+
+bool refraction_post_at(float u) { return u >= kRefractionPostFrom && u < kRefractionPostTo; }
+
+float refraction_probe_texel(float u, bool post) {
+  if (post && refraction_post_at(u)) return refraction_probe_hardware_depth(kRefractionPostDepth);
   const float root = refraction_probe_hardware_depth(refraction_probe_root_depth());
+  return std::min(root + kRefractionProbeDepthSlope * (u - kRefractionProbeRootU), kRefractionProbeDepthCeiling);
+}
+
+Texture2D refraction_probe_depth_texture(int side = kRefractionProbeTextureSide, bool post = false) {
+  std::vector<float> pixels(static_cast<std::size_t>(side * side));
   for (std::size_t index = 0; index < pixels.size(); ++index) {
-    const float u = (static_cast<float>(index % kRefractionProbeTextureSide) + kMiddle) / kRefractionProbeTextureSide;
-    pixels[index] =
-        std::min(root + kRefractionProbeDepthSlope * (u - kRefractionProbeRootU), kRefractionProbeDepthCeiling);
+    const float u = (static_cast<float>(index % static_cast<std::size_t>(side)) + kMiddle) / static_cast<float>(side);
+    pixels[index] = refraction_probe_texel(u, post);
   }
-  const Image image{pixels.data(), kRefractionProbeTextureSide, kRefractionProbeTextureSide, 1,
-                    PIXELFORMAT_UNCOMPRESSED_R32};
+  const Image image{pixels.data(), side, side, 1, PIXELFORMAT_UNCOMPRESSED_R32};
   Texture2D texture = LoadTextureFromImage(image);
   SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
   SetTextureWrap(texture, TEXTURE_WRAP_CLAMP);
@@ -2198,4 +2211,107 @@ TEST_CASE("water micro slopes integrate a height field and distribute energy acr
                                           [](const ::Color& pixel) { return pixel.r != kWaveProbeWhite.r; });
   INFO("Invalid finite-difference gradient pixels: ", bad_gradient);
   CHECK(std::all_of(probe.pixels.begin(), probe.pixels.end(), detail_probe_passed));
+}
+
+namespace {
+
+constexpr const char* kWaveSlopeProbeMain = R"GLSL(
+out vec4 finalColor;
+const float PROBE_SPACING = 0.37;  // meters between samples
+const float PROBE_QUAD = 0.5;      // a 2x2 block of pixels shares a sample: no phase change across it
+const float PROBE_CLOCK = 0.7;
+const float PROBE_TOLERANCE = 0.00001;
+void main() {
+  vec2 p = floor(gl_FragCoord.xy * PROBE_QUAD) * PROBE_SPACING;
+  WaterWaveNormal filtered = waterFilteredShape(p, PROBE_CLOCK);
+  bool same = length(filtered.slope - waterShape(p, PROBE_CLOCK).yz) <= PROBE_TOLERANCE;
+  finalColor = vec4(same ? 1.0 : 0.0, filtered.variance == 0.0 ? 1.0 : 0.0, 1.0, 1.0);
+}
+)GLSL";
+
+bool wave_slope_probe_passed(const ::Color& pixel) {
+  return pixel.r == kWaveProbeWhite.r && pixel.g == kWaveProbeWhite.g;
+}
+
+}  // namespace
+
+TEST_CASE("resolved water normals are the gradient of the displacement itself") {
+  RenderStage stage;
+  const Picture probe = water_wave_probe(kWaveSlopeProbeMain);
+  CHECK(std::all_of(probe.pixels.begin(), probe.pixels.end(), wave_slope_probe_passed));
+}
+
+namespace {
+
+constexpr int kFoamReachProbeSide = 1;
+constexpr float kFoamReachWidth = 0.6f;  // meters: the authored nominal shore width
+constexpr float kFoamReachPitch = 0.5f;  // radians the camera looks down: the column is not the view ray
+constexpr const char* kFoamReachHead = R"GLSL(#version 330
+// The rectangle batch owns matView; the probe needs a camera that looks down.
+#define matView probeView
+uniform vec2 waterSurface;
+uniform mat4 matView;
+)GLSL";
+constexpr const char* kFoamReachMain = R"GLSL(
+out vec4 finalColor;
+const float PROBE_MARGIN = 0.01;     // meters either side of the deepest column foam can show over
+const float PROBE_BEACH = 0.15;      // a gentle beach: its bottom drops this much a meter out
+const float PROBE_NEAR_SHORE = 0.5;  // meters from the waterline: well inside the foam band
+const float PROBE_FAR_SIGHT = 30.0;  // meters out along the beach a grazing view sees the bottom
+const vec3 PROBE_SURFACE = vec3(0.0, 0.0, -5.0);
+vec3 toView(vec3 world) { return mat3(matView) * world; }
+void main() {
+  float bound = waterSurface.x * WATER_FOAM_MAX_REACH * WATER_FOAM_STEEPEST_SHORE;
+  vec3 up = toView(vec3(0.0, 1.0, 0.0));
+  bool shallow = !waterFoamOutOfReach(PROBE_SURFACE, PROBE_SURFACE - up * (bound - PROBE_MARGIN), up);
+  bool deep = waterFoamOutOfReach(PROBE_SURFACE, PROBE_SURFACE - up * (bound + PROBE_MARGIN), up);
+  vec3 normal = normalize(toView(vec3(PROBE_BEACH, 1.0, 0.0)));
+  vec3 seaward = normalize(toView(vec3(1.0, -PROBE_BEACH, 0.0)));
+  vec3 below = PROBE_SURFACE - up * (PROBE_BEACH * PROBE_NEAR_SHORE);
+  bool grazing = !waterFoamOutOfReach(PROBE_SURFACE, below + seaward * PROBE_FAR_SIGHT, normal);
+  finalColor = vec4(shallow ? 1.0 : 0.0, deep ? 1.0 : 0.0, grazing ? 1.0 : 0.0, 1.0);
+}
+)GLSL";
+
+std::string foam_reach_source() {
+  return std::string(kFoamReachHead) +
+         refraction_source_section("const float WATER_FOAM_MIN_REACH", "const float WATER_FOAM_PORE_START") +
+         refraction_source_section("const float WATER_FOAM_MIN_SURFACE_UP", "bool waterFoamSurfaceSlope(") +
+         refraction_source_section("const float WATER_FOAM_STEEPEST_SHORE", "bool waterFoamBottomKnown(") +
+         kFoamReachMain;
+}
+
+::Color foam_reach_pixel() {
+  const Shader shader = LoadShaderFromMemory(nullptr, shaders::for_this_gpu(foam_reach_source().c_str()).c_str());
+  REQUIRE(GetShaderLocation(shader, "probeView") >= 0);
+  const float surface[] = {kFoamReachWidth, 1.0f};
+  SetShaderValue(shader, GetShaderLocation(shader, "waterSurface"), surface, SHADER_UNIFORM_VEC2);
+  SetShaderValueMatrix(shader, GetShaderLocation(shader, "probeView"), MatrixRotateX(kFoamReachPitch));
+  const RenderTexture2D target = LoadRenderTexture(kFoamReachProbeSide, kFoamReachProbeSide);
+  draw_foam_coverage(shader, target);
+  const ::Color pixel = refraction_probe_pixel(target);
+  UnloadRenderTexture(target);
+  UnloadShader(shader);
+  return pixel;
+}
+
+}  // namespace
+
+TEST_CASE("shore foam skips its estimate only where the water column is deeper than foam can show") {
+  RenderStage stage;
+  const ::Color pixel = foam_reach_pixel();
+  CHECK(pixel.r == kRefractionProbeWhite.r);  // just shallower than the bound: estimated
+  CHECK(pixel.g == kRefractionProbeWhite.g);  // just deeper: skipped
+  CHECK(pixel.b == kRefractionProbeWhite.b);  // near a gentle beach's waterline, seen far out: still estimated
+}
+
+TEST_CASE("refraction recovery looks past a post in front of the bottom instead of giving up at its edge") {
+  RenderStage stage;
+  RefractionProbe probe;
+  UnloadTexture(probe.depth);
+  probe.depth = refraction_probe_depth_texture(kRefractionPostTextureSide, true);
+  draw_refraction_probe(probe.shader, probe.target, probe.depth);
+  const auto pixel = refraction_probe_pixel(probe.target);
+  CHECK(pixel.g == kRefractionProbeWhite.g);  // the floor's root behind the post, not the undistorted fallback
+  CHECK(pixel.b == kRefractionProbeWhite.b);
 }
