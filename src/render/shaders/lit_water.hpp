@@ -52,10 +52,10 @@ float waterRoughness(WaterNormal normal) {
 // A miss keeps the undistorted opaque sample: hidden and off-screen surfaces are unavailable.
 const int WATER_REFRACTION_STEPS = 8;
 // Recovery quality, only where the secant estimate is rejected (nonplanar depth boundaries): screen
-// samples along the refracted ray, then halvings of the first interval that brackets the bottom
-// (fewer halvings miss inclined bottoms by more than the hit tolerance).
+// samples along the refracted ray, then halvings of each interval that brackets the bottom. Half
+// the samples of a 32-step search, with one more halving, end in a bracket as narrow as its.
 const int WATER_REFRACTION_SEARCH_STEPS = 16;
-const int WATER_REFRACTION_REFINEMENT = 8;
+const int WATER_REFRACTION_REFINEMENT = 9;
 const float WATER_REFRACTION_DEPTH_CURVE = 0.00001;  // hardware-depth precision floor for curvature
 const float WATER_REFRACTION_THICKNESS = 0.02;  // view-space meters near the camera
 const float WATER_REFRACTION_RELATIVE_THICKNESS = 0.0005;
@@ -261,13 +261,8 @@ float waterRefractionScreenDistance(WaterRefractionScreenRay ray, float fraction
   if (abs(denominator) <= EPSILON) return WATER_DEPTH_LIMIT * fraction;
   return (ray.origin[axis] - coordinate * ray.origin.w) / denominator;
 }
-// The first interval that brackets the bottom ends the search: refined to a hit, or, when the hit is
-// rejected, the tangent-plane fallback. No later interval is tried, which bounds the cost.
-vec3 waterBracketedRefraction(vec3 surface, vec3 ray, WaterRefractionInterval before, float distance, vec3 fallback) {
-  vec3 hit;
-  if (waterRefineRefraction(surface, ray, before.distance, distance, hit)) return hit;
-  return waterRefractionFallback(surface, ray, fallback);
-}
+// A rejected bracket (the edge of a post or rock in front of the bottom) does not end the search:
+// later intervals may still reach the bottom behind it, within the same number of samples.
 vec3 waterSearchRefraction(vec3 surface, vec3 ray, float column, vec3 fallback) {
   WaterRefractionScreenRay screenRay = waterRefractionScreenRay(surface, ray);
   WaterRefractionInterval before = WaterRefractionInterval(0.0, -column);
@@ -277,7 +272,9 @@ vec3 waterSearchRefraction(vec3 surface, vec3 ray, float column, vec3 fallback) 
     float distance = waterRefractionScreenDistance(screenRay, float(i) / float(WATER_REFRACTION_SEARCH_STEPS));
     // Bracket the same continuous depth field used by refinement; point sampling only validates edge hits.
     if (!waterRefractionSample(surface, ray, distance, uv, gap)) break;
-    if (waterRefractionCrossing(before.gap, gap)) return waterBracketedRefraction(surface, ray, before, distance, fallback);
+    vec3 hit;
+    if (waterRefractionCrossing(before.gap, gap) &&
+        waterRefineRefraction(surface, ray, before.distance, distance, hit)) return hit;
     before = WaterRefractionInterval(distance, gap);
   }
   return waterRefractionFallback(surface, ray, fallback);
@@ -495,22 +492,25 @@ vec3 waterCompose(vec3 n, vec3 v, WaterTransmission optics, WaterSurfaceLight li
 }
 // Meters of depth per horizontal meter from the shore: only a bottom steeper than this (about 76
 // degrees) can be deeper than this many reaches where foam still shows. Deeper water skips the
-// shore estimate, whose neighborhood reads are its cost.
+// discontinuity test and the shore estimate.
 const float WATER_FOAM_STEEPEST_SHORE = 4.0;
 
-// The water column below `surface` (view space), straight down to the visible bottom.
-float waterFoamColumn(vec3 surface, vec3 bottom) { return dot(surface - bottom, mat3(matView)[1]); }
-
-bool waterFoamOutOfReach(vec3 surface, vec3 bottom) {
-  return waterFoamColumn(surface, bottom) > waterSurface.x * WATER_FOAM_MAX_REACH * WATER_FOAM_STEEPEST_SHORE;
+// The water column straight below `surface` (view space): down to the visible bottom's tangent
+// plane (through `bottom`, facing `normal`), not to `bottom` itself, which a grazing view sees far
+// out. A bottom plane too close to vertical gives no column.
+float waterFoamColumn(vec3 surface, vec3 bottom, vec3 normal) {
+  float facing = dot(normal, mat3(matView)[1]);
+  return abs(facing) > WATER_FOAM_MIN_SURFACE_UP ? dot(normal, surface - bottom) / facing : 0.0;
 }
 
-bool waterFoamBottomKnown(vec2 uv, vec3 surface, vec3 bottom) {
+bool waterFoamOutOfReach(vec3 surface, vec3 bottom, vec3 normal) {
+  return waterFoamColumn(surface, bottom, normal) > waterSurface.x * WATER_FOAM_MAX_REACH * WATER_FOAM_STEEPEST_SHORE;
+}
+
+bool waterFoamBottomKnown(vec2 uv) {
   vec2 pixel = 1.0 / vec2(textureSize(waterDepth, 0));
   if (!waterFoamNeighborsInside(uv, pixel)) return false;
-  if (texture(waterDepth, uv).r >= 1.0 - EPSILON) return false;
-  if (waterFoamOutOfReach(surface, bottom)) return false;
-  return !waterRefractionDiscontinuous(uv);
+  return texture(waterDepth, uv).r < 1.0 - EPSILON;
 }
 
 float waterFoamPlaneDistance(vec3 surface, vec3 bottom, vec3 normal, vec2 slope) {
@@ -526,10 +526,14 @@ float waterFoamShoreDistance(vec3 geometric) {
   vec2 slope;
   if (!waterFoamSurfaceSlope(geometric, slope)) return -1.0;
   vec2 uv = gl_FragCoord.xy / vec2(textureSize(waterBackground, 0));
+  if (!waterFoamBottomKnown(uv)) return -1.0;
   vec3 surface = (matView * vec4(fragPosition, 1.0)).xyz;
   vec3 bottom = waterRefractionViewPoint(uv);
-  if (!waterFoamBottomKnown(uv, surface, bottom)) return -1.0;
   vec3 normal = waterRefractionBottomNormal(uv);
+  // (Before the discontinuity test, the costliest part: a normal across an edge only ever sends
+  // the pixel on to that test, or skips foam where the edge would have rejected it anyway.)
+  if (waterFoamOutOfReach(surface, bottom, normal)) return -1.0;
+  if (waterRefractionDiscontinuous(uv)) return -1.0;
   return waterFoamPlaneDistance(surface, bottom, normal, slope);
 }
 
