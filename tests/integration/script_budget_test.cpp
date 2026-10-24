@@ -7,11 +7,16 @@
 #include <mruby/string.h>
 
 #include <chrono>
+#include <condition_variable>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <variant>
 
 #if !defined(_WIN32)
@@ -30,6 +35,40 @@ using namespace redgem;
 namespace {
 
 using Clock = std::chrono::steady_clock;
+
+// The longest a test of the guard may take: one whose script the guard failed to stop ends the
+// test program here, failing, instead of spinning for as long as nobody stops it.
+constexpr std::chrono::seconds kTestDeadline{30};
+
+// Ends the program unless it is let go of before the deadline.
+class TestDeadline {
+ public:
+  explicit TestDeadline(const char* what) : what_(what), watch_([this] { watch(); }) {}
+  ~TestDeadline() {
+    {
+      const std::lock_guard<std::mutex> hold(lock_);
+      done_ = true;
+    }
+    wake_.notify_all();
+    watch_.join();
+  }
+  TestDeadline(const TestDeadline&) = delete;
+  TestDeadline& operator=(const TestDeadline&) = delete;
+
+ private:
+  void watch() {
+    std::unique_lock<std::mutex> hold(lock_);
+    if (wake_.wait_for(hold, kTestDeadline, [this] { return done_; })) return;
+    std::fprintf(stderr, "%s: the script was never stopped; ending the tests\n", what_);
+    std::_Exit(EXIT_FAILURE);
+  }
+
+  const char* what_;
+  std::mutex lock_;
+  std::condition_variable wake_;
+  bool done_ = false;
+  std::thread watch_;  // (last: it starts once the rest is ready)
+};
 
 constexpr std::chrono::milliseconds kTestBudget{100};
 constexpr int kTestBudgetMs = 100;  // what the test games' game.json says
@@ -104,6 +143,7 @@ Clock::duration frames(Engine& engine, int count) {
 // Whether a script stuck in `script` is stopped on its first frame, reported as such, and the game
 // goes on with its other behaviours.
 void check_stopped(const char* script, const char* reported_as, const char* error) {
+  const TestDeadline deadline(script);
   const std::filesystem::path game = budget_game(script, budget_settings());
   const SceneDesc scene = scene_of({script, "counter.rb"});
   test::LogCapture capture;
@@ -139,6 +179,7 @@ TEST_CASE("a recursion too deep ends with SystemStackError, not a crash") {
 }
 
 TEST_CASE("a start that never returns is stopped, and its behaviour never updated") {
+  const TestDeadline deadline("start");
   const std::filesystem::path game = budget_game("start", budget_settings());
   const SceneDesc scene = scene_of({"starter.rb", "counter.rb"});
   test::LogCapture capture;
@@ -152,6 +193,7 @@ TEST_CASE("a start that never returns is stopped, and its behaviour never update
 }
 
 TEST_CASE("code the engine runs (a scene script, a console line) is stopped the same way") {
+  const TestDeadline deadline("eval");
   const std::filesystem::path game = budget_game("eval", budget_settings());
   const SceneDesc scene = scene_of({"counter.rb"});
   std::unique_ptr<Engine> engine = started(game, scene);
@@ -192,6 +234,7 @@ TEST_CASE("a running game's scripts are on the budget game.json gives them") {
 }
 
 TEST_CASE("an interpreter has no budget until given one, and each call gets all of it") {
+  const TestDeadline deadline("interpreter");
   RubyVm vm;
   CHECK(vm.budget().count() == 0);
   vm.set_budget(kTestBudget);
@@ -227,6 +270,7 @@ void* dive_through_c(void* result) {
 }  // namespace
 
 TEST_CASE("a recursion through C stops with SystemStackError before a small thread's stack runs out") {
+  const TestDeadline deadline("recursion through C");
   pthread_attr_t attributes;
   pthread_attr_init(&attributes);
   pthread_attr_setstacksize(&attributes, kSmallThreadStack);
