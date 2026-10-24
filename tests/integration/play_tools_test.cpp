@@ -185,7 +185,12 @@ TEST_CASE("what redgem-test says of a game's tests is read a file a line") {
 #ifndef _WIN32
 TEST_CASE("a redgem-test that ends without a word about the tests fails the check") {
   // (A program that says nothing and fails, standing for one that crashed.)
-  const TestsRun run = run_game_tests(kPlatformer, "/bin/false", fs::temp_directory_path());
+  const fs::path tester = fs::temp_directory_path() / "redgem_silent_tester.sh";
+  std::string error;
+  REQUIRE(write_text_file(tester, "#!/bin/sh\nexit 3\n", error));
+  fs::permissions(tester, fs::perms::owner_all);
+  const TestsRun run = run_game_tests(kPlatformer, tester, fs::temp_directory_path());
+  fs::remove(tester);
   CHECK(run.passed == 0);
   CHECK(run.problem.find("redgem-test ended without saying how the tests went") != std::string::npos);
 }

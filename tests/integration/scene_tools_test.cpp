@@ -152,7 +152,8 @@ TEST_CASE("set changes an object and saves the scene as the editor does") {
 TEST_CASE("a text that reads as a number is listed in quotes, so that set takes it back as a text") {
   GameCopy game("quoted");
   REQUIRE(scene_tool({"set", game.dir(), "Coin1", "prop.code=\"12\"", "prop.count=12"}).exit_code == kExitSuccess);
-  const NodeDesc& coin = node_named(load(game.scene()), "Coin1");
+  const SceneDesc scene = load(game.scene());
+  const NodeDesc& coin = node_named(scene, "Coin1");
   CHECK(get_string(coin.props, "code") == "12");
   CHECK(get_number(coin.props, "count") == doctest::Approx(12.0));
   CHECK(has(scene_tool({"get", game.dir(), "Coin1"}).out, "code=\"12\"\n  count=12\n"));
