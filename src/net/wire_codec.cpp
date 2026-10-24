@@ -18,6 +18,7 @@ constexpr int kCompact = -1;  // nlohmann's "no indentation"
 constexpr int kMaxMessageDepth = kMaxDataDepth + 1;
 constexpr const char* kLogVariable = "REDGEM_LOG_MESSAGES";
 constexpr const char* kLogOn = "1";
+constexpr const char* kHidden = "(hidden)";  // what the log shows of a join's credentials
 
 // The reader of MessagePack hands what it finds to this, which builds the message, and stops it
 // at once when the message goes past what one may be: an array or a map nested deeper, or holding
@@ -74,6 +75,8 @@ bool texts_valid(const json& value) {
 
 std::string as_text(const json& message) { return message.dump(kCompact, ' ', false, json::error_handler_t::replace); }
 
+bool carries_credentials(const json& message) { return message.is_object() && message.contains(kAuth); }
+
 bool logging_messages() {
   static const bool logging = platform::environment(kLogVariable) == kLogOn;
   return logging;
@@ -82,10 +85,17 @@ bool logging_messages() {
 }  // namespace
 
 std::vector<std::uint8_t> msgpack(const json& message) {
-  if (logging_messages()) log::info("sent " + as_text(message));
+  if (logging_messages()) log::info("sent " + log_text(message));
   // (The rare message with broken text goes through JSON text, which replaces what is broken.)
   if (texts_valid(message)) return json::to_msgpack(message);
   return json::to_msgpack(json::parse(as_text(message)));
+}
+
+std::string log_text(const json& message) {
+  if (!carries_credentials(message)) return as_text(message);
+  json shown = message;
+  shown[kAuth] = kHidden;
+  return as_text(shown);
 }
 
 std::vector<std::uint8_t> packed(const json& message) { return frame(msgpack(message)); }
@@ -94,7 +104,7 @@ std::optional<json> unpacked(const std::string& bytes) {
   json message;
   BoundedBuilder builder(message);
   if (!json::sax_parse(bytes.begin(), bytes.end(), &builder, json::input_format_t::msgpack)) return std::nullopt;
-  if (logging_messages()) log::info("received " + as_text(message));
+  if (logging_messages()) log::info("received " + log_text(message));
   return message;
 }
 
