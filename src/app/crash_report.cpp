@@ -84,10 +84,12 @@ void prepare(const CrashSetup& setup) {
   facts.version = kVersion;
   facts.platform = platform_name();
   PreparedCrash& crash = prepared();
-  crash.folder = crash_folder_for(save_file_for(setup.game_dir)).string();
+  crash.folder = crash_folder_for(save_file_for(setup.game_dir));
+  // (In UTF-8: on Windows a folder's name may hold letters the system's code page has none for.)
+  crash.folder_text = crash.folder.u8string();
   crash.head = report_head(facts);
-  crash.closed_message = player_message("game.crash.closed", facts.game, crash.folder);
-  crash.out_of_memory_message = player_message("game.crash.out_of_memory", facts.game, crash.folder);
+  crash.closed_message = player_message("game.crash.closed", facts.game, crash.folder_text);
+  crash.out_of_memory_message = player_message("game.crash.out_of_memory", facts.game, crash.folder_text);
   crash.show_dialog = setup.show_dialog;
 }
 
@@ -128,7 +130,9 @@ std::string format_crash_report(const CrashFacts& facts) {
 }
 
 std::filesystem::path crash_folder_for(const std::filesystem::path& save_file) {
-  return save_file.parent_path() / (save_file.stem().string() + kFolderSuffix);
+  std::filesystem::path name = save_file.stem();
+  name += kFolderSuffix;
+  return save_file.parent_path() / name;
 }
 
 std::string crash_file_name(long long seconds_since_epoch) {
@@ -152,7 +156,7 @@ void install_crash_handling(const CrashSetup& setup) {
 bool crash_handling_installed() { return installed(); }
 
 std::filesystem::path write_report(const std::string& cause, const std::vector<std::string>& backtrace) {
-  const std::filesystem::path folder = prepared().folder;
+  const std::filesystem::path& folder = prepared().folder;
   std::error_code fs_error;
   std::filesystem::create_directories(folder, fs_error);
   const std::filesystem::path file = folder / crash_file_name(static_cast<long long>(std::time(nullptr)));

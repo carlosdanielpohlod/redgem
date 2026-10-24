@@ -69,7 +69,7 @@ void make_folders(ReportPath& folder) {
 
 ReportPath report_path(const Moment& moment) {
   ReportPath path;
-  path.append(prepared_crash().folder.c_str());
+  path.append(prepared_crash().folder_text.c_str());
   path.append(kSeparator);
   path.append(kReportPrefix);
   path.append(moment_stamp(moment).c_str());
@@ -93,7 +93,7 @@ void write_backtrace(int fd) {
 void write_signal_report(int signal) {
   const Moment moment = utc_moment(static_cast<std::int64_t>(time(nullptr)));
   ReportPath folder;
-  folder.append(prepared_crash().folder.c_str());
+  folder.append(prepared_crash().folder_text.c_str());
   make_folders(folder);
   const int fd = open(report_path(moment).c_str(), O_WRONLY | O_CREAT | O_TRUNC, kFileMode);
   if (fd < 0) return;

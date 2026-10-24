@@ -20,7 +20,8 @@ inline constexpr const char* kReportExtension = ".log";
 // What install_crash_handling prepared, for a crash to use as it is: a signal handler may not
 // allocate, so nothing it writes is made at that point.
 struct PreparedCrash {
-  std::string folder;                 // where reports go
+  std::filesystem::path folder;       // where reports go
+  std::string folder_text;            // the same in UTF-8: for a signal handler, and the player
   std::string head;                   // report_head of the game
   std::string closed_message;         // what the player is told after a crash
   std::string out_of_memory_message;  // ...after running out of memory
