@@ -54,7 +54,10 @@ void RelayServer::serve(Member& member, float seconds) {
   charge(member, connection.pump());
   if (member.in_room()) connection.keep_in_touch(seconds);
   // (Only so many a poll: the rest wait for the next one, see kMaxMessagesPerPoll.)
-  while (const auto message = connection.next_message()) handle(member, *message);
+  while (const auto message = connection.next_message()) {
+    charge(member, kRelayMessageCostBytes);
+    handle(member, *message);
+  }
 }
 
 void RelayServer::wait_on(Member& member, float seconds) {
@@ -120,6 +123,9 @@ void RelayServer::drop_closed_members() {
   for (bool changed = true; changed;) {
     close_rooms_without_opener();
     changed = tell_rooms_who_left();
+  }
+  for (const auto& member : members_) {
+    if (member->connection.closed()) take_out_of_room(*member);
   }
   members_.erase(std::remove_if(members_.begin(), members_.end(),
                                 [](const std::unique_ptr<Member>& member) { return member->connection.closed(); }),

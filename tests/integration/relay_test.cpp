@@ -368,6 +368,24 @@ TEST_CASE("a machine that sends more than any game would is let go by the relay"
   CHECK(meeting.relay.room_count() == 0);
 }
 
+// Each message is work for the relay whatever its size: tiny ones, far more than a game sends,
+// are a flood too, though their bytes alone are well within what a machine may send.
+TEST_CASE("a machine that sends far more tiny messages than any game would is let go by the relay") {
+  constexpr int kTinyFlood = 80000;  // ~1.7 MB of bytes; with what each message costs, past the burst
+  Meeting meeting;
+  RawMachine opener(meeting), flooder(meeting);
+  const std::string code = opener.open_room();
+  REQUIRE(flooder.say(R"({"k":"h","r":")" + code + R"("})"));
+  CHECK(opener.next_message()["k"] == "j");
+  std::vector<std::uint8_t> unsent;
+  const std::vector<std::uint8_t> tiny = wire_frame(R"({"k":"m","n":"x"})");
+  for (int i = 0; i < kTinyFlood; ++i) unsent.insert(unsent.end(), tiny.begin(), tiny.end());
+  const auto flooding = [&] { return !unsent.empty() && meeting.relay.connection_count() == 2; };
+  while (flooding() && flooder.socket.write(unsent) != IoStatus::Closed) meeting.relay.poll(kRoundSeconds);
+  REQUIRE(meeting.until([&meeting] { return meeting.relay.connection_count() == 1; }));
+  CHECK(meeting.relay.room_count() == 1);  // the opener plays on
+}
+
 TEST_CASE("a relay holding more than it may lets go of the newest machine with much waiting") {
   Meeting meeting(kSmallBudget);
   std::vector<std::uint8_t> half_sent(std::begin(kLongAnnounced), std::end(kLongAnnounced));

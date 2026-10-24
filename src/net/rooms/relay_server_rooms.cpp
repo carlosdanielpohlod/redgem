@@ -60,8 +60,7 @@ void RelayServer::open_room(Member& member) {
     member.connection.close();
     return;
   }
-  rooms_[code] = true;
-  member.room = code;
+  place_in(member, code);
   member.peer = kHostId;
   member.connection.send(welcome(member.peer, {}, code));
 }
@@ -73,7 +72,7 @@ void RelayServer::join_room(Member& member, const std::string& room, const nlohm
     member.connection.close();
     return;
   }
-  member.room = room;
+  place_in(member, room);
   if (opener->guarded) {
     ask(member, *opener, id, auth);
   } else {
@@ -137,12 +136,30 @@ void RelayServer::tell_room(const std::string& room, int except, const nlohmann:
   }
 }
 
+const std::vector<RelayServer::Member*>& RelayServer::entered(const std::string& room) const {
+  static const std::vector<Member*> kNobody;
+  const auto found = rooms_.find(room);
+  return found != rooms_.end() ? found->second : kNobody;
+}
+
 std::vector<RelayServer::Member*> RelayServer::members_of(const std::string& room) {
   std::vector<Member*> found;
-  for (const auto& member : members_) {
-    if (member->inside(room)) found.push_back(member.get());
+  for (Member* member : entered(room)) {
+    if (member->inside(room)) found.push_back(member);
   }
   return found;
+}
+
+void RelayServer::place_in(Member& member, const std::string& code) {
+  member.room = code;
+  rooms_[code].push_back(&member);
+}
+
+void RelayServer::take_out_of_room(const Member& member) {
+  const auto entered = rooms_.find(member.room);
+  if (entered == rooms_.end()) return;  // (its room closed first)
+  std::vector<Member*>& inside = entered->second;
+  inside.erase(std::remove(inside.begin(), inside.end(), &member), inside.end());
 }
 
 }  // namespace redgem::net
