@@ -75,6 +75,8 @@ TEST_CASE("the settings are kept as they are read back") {
   CHECK(read.fps_cap == kNoFrameCap);
   CHECK(read.quality == QualityPreset::Custom);
   CHECK(read.custom_quality == preset_caps(QualityPreset::Medium));
+  CHECK(display_from_json({{"custom_quality", {{"msaa", 2.0}, {"shadow_cascades", 2.4}}}}, read).custom_quality.msaa ==
+        2);
   CHECK(read.volume == doctest::Approx(0.25f));
 }
 

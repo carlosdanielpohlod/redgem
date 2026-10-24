@@ -18,6 +18,8 @@ namespace {
 
 using namespace binding;
 
+constexpr ValueHolder kSettingsHolder{"Settings", "a setting's", "take", kAnyNumber};
+
 mrb_value settings_read(mrb_state* mrb, mrb_value) {
   return value_from(mrb, display_json(context(mrb).display), HashKeys::Strings);
 }
@@ -27,7 +29,7 @@ mrb_value settings_write(mrb_state* mrb, mrb_value self) {
   mrb_value changes;
   mrb_get_args(mrb, "H", &changes);
   ScriptContext& game = context(mrb);
-  game.display = display_from_json(json_from(mrb, changes, kSaveHolder), game.display);
+  game.display = display_from_json(json_from(mrb, changes, kSettingsHolder), game.display);
   if (game.apply_display) game.apply_display(game.display);
   return settings_read(mrb, self);
 }

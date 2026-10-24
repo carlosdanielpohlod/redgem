@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
 #include <functional>
 #include <utility>
 
@@ -53,7 +52,6 @@ bool holds(const nlohmann::json& json, const char* key, const std::function<bool
 
 bool is_bool(const nlohmann::json& value) { return value.is_boolean(); }
 bool is_number(const nlohmann::json& value) { return value.is_number() && std::isfinite(value.get<double>()); }
-bool is_whole(const nlohmann::json& value) { return value.is_number_integer(); }
 bool is_text(const nlohmann::json& value) { return value.is_string(); }
 
 void read_bool(const nlohmann::json& json, const char* key, bool& into) {
@@ -64,10 +62,12 @@ void read_share(const nlohmann::json& json, const char* key, float& into) {
   if (holds(json, key, is_number)) into = std::clamp(json[key].get<float>(), 0.0f, 1.0f);
 }
 
-// A whole number held to `low`..`high` (a number past an int's range does not fit one).
+// A whole number held to `low`..`high` (one with a fraction, as a script's slider gives, rounded).
+// (Held to the range before it becomes an int: a number past an int's range does not fit one.)
 void read_whole(const nlohmann::json& json, const char* key, int low, int high, int& into) {
-  if (holds(json, key, is_whole)) {
-    into = static_cast<int>(std::clamp<std::int64_t>(json[key].get<std::int64_t>(), low, high));
+  if (holds(json, key, is_number)) {
+    into = static_cast<int>(
+        std::lround(std::clamp(json[key].get<double>(), static_cast<double>(low), static_cast<double>(high))));
   }
 }
 

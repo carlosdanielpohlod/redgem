@@ -51,6 +51,11 @@ class UiWidgetsTest < RedGemTest::Case
     refute UI.button("Go", **BOX, focused: true), "nothing pressed"
   end
 
+  def test_a_button_beside_a_text_field_leaves_enter_to_it
+    refute(pressing(UI::CONFIRM) { UI.button("Go", **BOX, focused: true, confirm: UI::GAMEPAD_CONFIRM) })
+    assert(pressing(UI::GAMEPAD_CONFIRM) { UI.button("Go", **BOX, focused: true, confirm: UI::GAMEPAD_CONFIRM) })
+  end
+
   def test_a_toggle_flips_when_confirmed_or_pushed_sideways_while_focused
     assert_equal true, pressing(UI::CONFIRM) { UI.toggle("VSync", false, **BOX, focused: true) }
     assert_equal false, pressing(UI::LEFT) { UI.toggle("VSync", true, **BOX, focused: true) }
