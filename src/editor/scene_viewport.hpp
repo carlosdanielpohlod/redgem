@@ -51,6 +51,8 @@ class GameView final : public Presenter {
 
   SurfaceSize surface_size() const override { return {view_.width, view_.height}; }
   int text_width(const std::string& text, int size) const override;
+  int font_text_width(const std::string& text, int size, const std::string& font,
+                      const std::filesystem::path& folder) const override;
   // A game that locks the pointer gets it while it has the focus; Esc (Stop) gives it back.
   void capture_cursor(bool wanted) override;
   void present(const FrameView& view) override;

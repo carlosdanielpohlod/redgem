@@ -54,7 +54,7 @@ bool is_empty_dir(const std::filesystem::path& dir) {
 
 void create_game_folders(const std::filesystem::path& game_dir) {
   for (const char* folder : {config::kScriptsDirName, config::kSoundsDirName, config::kScenesDirName,
-                             config::kModelsDirName, config::kImagesDirName}) {
+                             config::kModelsDirName, config::kImagesDirName, config::kFontsDirName}) {
     std::filesystem::create_directories(game_dir / folder);
   }
 }

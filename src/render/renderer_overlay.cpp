@@ -44,8 +44,9 @@ unsigned char control_alpha(ControlCircle::Look look) {
 
 void Renderer::Impl::draw_hud_text(const HudItem& item) {
   const float size = static_cast<float>(item.size);
-  DrawTextEx(ui_font, item.text.c_str(), {static_cast<float>(item.x), static_cast<float>(item.y)}, size,
-             size * kUiLetterSpacing, to_raylib(item.color));
+  DrawTextEx(ui_fonts.get(item.font, item.text), item.text.c_str(),
+             {static_cast<float>(item.x), static_cast<float>(item.y)}, size, size * kUiLetterSpacing,
+             to_raylib(item.color));
 }
 
 void Renderer::Impl::draw_hud_image(const HudItem& item) {
@@ -76,7 +77,15 @@ void Renderer::draw_hud(const std::vector<HudItem>& hud) {
 int Renderer::text_width(const std::string& text, int size) const {
   const float text_size = static_cast<float>(size);
   return static_cast<int>(
-      std::ceil(MeasureTextEx(impl_->ui_font, text.c_str(), text_size, text_size * kUiLetterSpacing).x));
+      std::ceil(MeasureTextEx(impl_->ui_fonts.get("", text), text.c_str(), text_size, text_size * kUiLetterSpacing).x));
+}
+
+int Renderer::font_text_width(const std::string& text, int size, const std::string& font,
+                              const std::filesystem::path& folder) const {
+  impl_->ui_fonts.set_directory(folder);
+  const float pixels = static_cast<float>(size);
+  return static_cast<int>(
+      std::ceil(MeasureTextEx(impl_->ui_fonts.get(font, text), text.c_str(), pixels, pixels * kUiLetterSpacing).x));
 }
 
 void Renderer::draw_controls(const std::vector<ControlCircle>& controls) {

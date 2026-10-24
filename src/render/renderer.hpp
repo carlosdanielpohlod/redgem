@@ -63,6 +63,8 @@ class Renderer {
   void set_images_dir(const std::filesystem::path& dir);
   // Width in pixels of a text drawn by draw_hud at that size.
   int text_width(const std::string& text, int size) const;
+  int font_text_width(const std::string& text, int size, const std::string& font,
+                      const std::filesystem::path& folder) const;
   // Prefabs (spawn templates) are hidden in games and shown in the editor.
   void set_show_prefabs(bool show);
   // Draws a touch screen's controls over everything: see-through, brighter where a finger is.

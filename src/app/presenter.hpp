@@ -49,6 +49,10 @@ class Presenter {
   virtual SurfaceSize surface_size() const = 0;
   // Width in pixels of a text drawn over the game at that size (UI.text_width, text alignment).
   virtual int text_width(const std::string& text, int size) const = 0;
+  virtual int font_text_width(const std::string& text, int size, const std::string&,
+                              const std::filesystem::path&) const {
+    return text_width(text, size);
+  }
   // The game asks for the pointer to be hidden and kept (Input.mouse_locked), every frame; the
   // presenter decides whether it gets it.
   virtual void capture_cursor(bool wanted) = 0;

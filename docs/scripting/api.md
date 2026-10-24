@@ -86,3 +86,29 @@ Scene changes within the same game do not stop them automatically. Old ids are n
 Missing or unreadable images show an opaque magenta-and-black checkerboard, with a warning.
 This applies to declared scene textures, `UI.image` and particle images. A material that never
 specified a texture keeps its plain color. Refused paths still cannot read outside the game's folder.
+
+## Game fonts and Unicode
+
+The built-in UI font adds glyphs on demand for text such as `€`, Polish and Turkish letters,
+Greek and Cyrillic. To use another face or a script it does not cover, put a TrueType `.ttf` or
+OpenType `.otf` file in the game's `fonts/` folder and select it:
+
+```ruby
+UI.font = :custom  # fonts/custom.ttf or fonts/custom.otf
+UI.text("€ Żółć ş Ω Ж", x: 20, y: 20, size: 28)
+width = UI.text_width("€ Żółć ş Ω Ж", size: 28)
+UI.font = nil      # return to the built-in face
+```
+
+A name may include a subfolder or extension. It must stay inside `fonts/`; links and paths outside
+the game are refused. Font files are included when the game is built. `UI.font` returns the selected
+name, or `nil` for the built-in face. Text captures the selected face when queued, so several faces
+can appear in one frame. Measurement and center/right alignment use the selected face too, in both
+the player and the editor's Play view. Widgets that draw through `UI.text` use the same selection.
+
+Missing, refused or unreadable faces fall back to the built-in font, with a warning. Unsupported
+glyphs use `?`; CJK needs a font containing those characters. Each face keeps at most 2048 requested
+codepoints; the cache holds four named game faces beside the built-in face, with at most 32 MB per
+font file. Changing games clears the named-face cache. New glyphs rebuild the face's atlas only
+when first requested. Text is drawn as individual glyphs: bidirectional layout, complex-script
+shaping and automatic fallback chains are not implemented.

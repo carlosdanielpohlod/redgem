@@ -63,6 +63,10 @@ class WindowPresenter final : public Presenter {
 
   SurfaceSize surface_size() const override;
   int text_width(const std::string& text, int size) const override { return renderer_.text_width(text, size); }
+  int font_text_width(const std::string& text, int size, const std::string& font,
+                      const std::filesystem::path& folder) const override {
+    return renderer_.font_text_width(text, size, font, folder);
+  }
   void capture_cursor(bool wanted) override;
   void present(const FrameView& view) override;
   bool open() const override;

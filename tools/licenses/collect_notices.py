@@ -21,7 +21,7 @@ PROJECTS = [
      os.path.join(DEPS, "mruby-src", "LICENSE")),
     ("cgltf", "Loading glTF scenes", "https://github.com/jkuhlmann/cgltf",
      os.path.join(DEPS, "cgltf-src", "LICENSE")),
-    ("nlohmann/json", "JSON", "https://github.com/nlohmann/json",
+    ("nlohmann/json", "JSON, and MessagePack for multiplayer messages", "https://github.com/nlohmann/json",
      os.path.join(DEPS, "nlohmann_json-src", "LICENSE.MIT")),
     ("Mbed TLS", "HTTPS for the games' web requests (HTTP)", "https://www.trustedfirmware.org/projects/mbed-tls/",
      os.path.join(DEPS, "mbedtls-src", "LICENSE")),
@@ -36,6 +36,9 @@ PROJECTS = [
      os.path.join(DEPS, "imguizmo-src", "LICENSE")),
     ("Font Awesome Free", "The editor's icons", "https://fontawesome.com",
      os.path.join(DEPS, "rlimgui-src", "extras", "FontAwsome_LICENSE.txt")),
+    ("FreeType", "Decoding game-provided fonts; copyright © 1996–2026 The FreeType Project, "
+     "all rights reserved (FreeType License)", "https://freetype.org",
+     os.path.join(DEPS, "freetype-src", "docs", "FTL.TXT")),
     ("Inter", "The editor's and the games' text font", "https://rsms.me/inter/",
      os.path.join(REPO_ROOT, "assets", "editor", "fonts", "Inter-LICENSE.txt")),
     ("JetBrains Mono", "The editor's code font", "https://www.jetbrains.com/lp/mono/",

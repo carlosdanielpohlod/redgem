@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <vector>
 
+#include "core/config.hpp"
 #include "render/mesh_pieces.hpp"
 #include "render/render_config.hpp"
 #include "render/renderer_impl.hpp"
@@ -100,6 +101,7 @@ void Renderer::set_clock(std::optional<double> seconds) { impl_->clock = seconds
 void Renderer::set_images_dir(const std::filesystem::path& dir) {
   impl_->release_ui_images();
   impl_->images_dir = dir;
+  impl_->ui_fonts.set_directory(dir.parent_path() / config::kFontsDirName);
 }
 
 void Renderer::set_show_prefabs(bool show) { impl_->show_prefabs = show; }

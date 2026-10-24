@@ -126,6 +126,19 @@ FetchContent_Declare(mbedtls
   URL https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${REDGEM_MBEDTLS_VERSION}/mbedtls-${REDGEM_MBEDTLS_VERSION}.tar.bz2
   URL_HASH SHA256=${REDGEM_MBEDTLS_SHA256})
 
+# --- FreeType (game-supplied TrueType/OpenType fonts) -----------------------------
+# The release commit and archive checksum are pinned together.
+set(REDGEM_FREETYPE_COMMIT "0a0221a1347e2f1e07c395263540026e9a0aa7c7") # 2.14.3
+set(REDGEM_FREETYPE_SHA256 "11cd478953fc1d382f20a233b8e2aed6c31b47cbf0568c4bdb3334bcc1550698")
+foreach(optional ZLIB BZIP2 PNG HARFBUZZ BROTLI)
+  set(FT_DISABLE_${optional} ON CACHE BOOL "" FORCE)
+endforeach()
+set(FT_ENABLE_ERROR_STRINGS OFF CACHE BOOL "" FORCE)
+set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
+FetchContent_Declare(freetype
+  URL https://codeload.github.com/freetype/freetype/tar.gz/${REDGEM_FREETYPE_COMMIT}
+  URL_HASH SHA256=${REDGEM_FREETYPE_SHA256})
+
 # --- SQLite (where a dedicated server keeps its game's saves; one C file, in the public domain) ----
 # Only where the server is built: a game on a phone keeps its saves in a file.
 if(NOT ANDROID)
@@ -143,7 +156,9 @@ if(NOT ANDROID)
   target_link_libraries(sqlite3 PUBLIC Threads::Threads)
 endif()
 
-FetchContent_MakeAvailable(raylib cgltf JoltPhysics doctest mruby nlohmann_json mbedtls)
+FetchContent_MakeAvailable(raylib cgltf JoltPhysics doctest mruby nlohmann_json mbedtls freetype)
+set_property(TARGET freetype PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
+  "${freetype_SOURCE_DIR}/include;${freetype_BINARY_DIR}/include")
 # Skinned meshes are deformed on the GPU: raylib then uploads bone ids / weights and bone matrices
 # (off in customized builds unless asked for).
 target_compile_definitions(raylib PRIVATE RL_SUPPORT_MESH_GPU_SKINNING)

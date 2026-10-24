@@ -35,6 +35,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "render/game_fonts.hpp"
 #include "render/capture_views.hpp"
 #include "render/environment.hpp"
 #include "render/gl_extras.hpp"
@@ -258,8 +259,7 @@ struct Renderer::Impl {
   Texture2D sky_default_texture{};  // what the sky material had: drawn with when there is no picture
   render_detail::SkyTextures sky;
   // Texts and pictures.
-  Font ui_font{};
-  bool owns_ui_font = false;
+  GameFonts ui_fonts;
   std::filesystem::path images_dir;
   std::unordered_map<std::string, Texture2D> ui_images;  // by name; missing files keep a cached checkerboard
   // What the game asked for.

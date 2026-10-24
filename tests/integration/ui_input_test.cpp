@@ -43,12 +43,12 @@ SceneDesc small_scene() {
   return desc;
 }
 
-std::unique_ptr<Engine> engine_for(const SceneDesc& scene) {
+std::unique_ptr<Engine> engine_for(const SceneDesc& scene, Presenter* presenter = &screen) {
   EngineOptions options;
   options.game_dir = fixture("games/directed");
   options.fixed_step = true;
   options.scene = &scene;
-  options.presenter = &screen;
+  options.presenter = presenter;
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   return std::move(std::get<std::unique_ptr<Engine>>(created));
@@ -187,4 +187,52 @@ TEST_CASE("scripts set the camera's field of view and the picture's speed streak
   CHECK(engine->script_context().motion_blur == doctest::Approx(0.6f));
   CHECK_FALSE(engine->scripts().eval("Camera.motion_blur = 9", "bad_blur.rb").ok);  // 0 to 1, refused past it
   CHECK(engine->script_context().motion_blur == doctest::Approx(0.6f));
+}
+
+TEST_CASE("UI font selection is captured per text and can return to the built-in face") {
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene);
+  CHECK(ruby(*engine, "UI.font.nil?") == "true");
+  CHECK(ruby(*engine, "UI.font = :custom; UI.font") == "custom");
+  ruby(*engine, "UI.text('Euro €', x: 10, y: 10)");
+  ruby(*engine, "UI.font = nil; UI.text('Default', x: 10, y: 40)");
+  const auto& hud = engine->script_context().hud;
+  REQUIRE(hud.size() == 2);
+  CHECK(hud[0].font == "custom");
+  CHECK(hud[1].font.empty());
+  CHECK_FALSE(engine->scripts().eval("UI.font = '../outside'", "invalid_font.rb").ok);
+  CHECK_FALSE(engine->scripts().eval("UI.font = '/outside'", "invalid_font.rb").ok);
+  CHECK(engine->script_context().ui_font.empty());
+}
+
+namespace {
+class FontMeasurePresenter final : public Presenter {
+ public:
+  mutable std::string selected;
+  mutable std::filesystem::path directory;
+  SurfaceSize surface_size() const override { return {kScreenWidth, kScreenHeight}; }
+  int text_width(const std::string&, int) const override { return 10; }
+  int font_text_width(const std::string&, int, const std::string& font,
+                      const std::filesystem::path& folder) const override {
+    selected = font;
+    directory = folder;
+    return 40;
+  }
+  void capture_cursor(bool) override {}
+  void present(const FrameView&) override {}
+  bool open() const override { return true; }
+  float frame_seconds() const override { return config::kFixedDeltaSeconds; }
+};
+}  // namespace
+
+TEST_CASE("text alignment measures the selected font from the game's own fonts folder") {
+  FontMeasurePresenter presenter;
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene, &presenter);
+  CHECK(ruby(*engine, "UI.font = :custom; UI.text_width('Wide')") == "40");
+  CHECK(presenter.selected == "custom");
+  CHECK(presenter.directory == std::filesystem::path(fixture("games/directed")) / "fonts");
+  ruby(*engine, "UI.text('Centered', x: 100, y: 10, align: :center)");
+  REQUIRE(engine->script_context().hud.size() == 1);
+  CHECK(engine->script_context().hud[0].x == 80);
 }

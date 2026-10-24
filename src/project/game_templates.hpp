@@ -30,7 +30,7 @@ bool valid_game_name(const std::string& name);
 std::string new_game_id(const std::string& name);
 
 // Creates a playable game folder: the template's files, the folders every game has (scripts/,
-// sounds/, scenes/, models/, images/) and a game.json with the game's title and id.
+// sounds/, scenes/, models/, images/, fonts/) and a game.json with the game's title and id.
 // Fails if the folder exists and is not empty.
 bool create_game(const std::filesystem::path& game_dir, const std::string& template_name, std::string& error);
 

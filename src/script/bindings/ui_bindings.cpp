@@ -1,6 +1,9 @@
 // UI natives: what scripts draw over the game.
 
 #include <mruby.h>
+#include <mruby/string.h>
+
+#include "core/safe_path.hpp"
 
 #include "scene/scene_config.hpp"
 #include "script/bindings/binding_helpers.hpp"
@@ -60,12 +63,27 @@ mrb_value ui_text(mrb_state* mrb, mrb_value) {
   mrb_get_args(mrb, "ziiiiiii", &text, &x, &y, &size, &r, &g, &b, &a);
   HudItem hud;
   hud.text = text;
+  hud.font = context(mrb).ui_font;
   hud.x = static_cast<int>(x);
   hud.y = static_cast<int>(y);
   hud.size = static_cast<int>(size);
   hud.color = color_from(r, g, b, a);
   context(mrb).hud.push_back(std::move(hud));
   return mrb_nil_value();
+}
+
+bool valid_font_name(const std::string& name) { return name.empty() || safe_asset_name(name); }
+
+mrb_value ui_font(mrb_state* mrb, mrb_value) {
+  const auto& name = context(mrb).ui_font;
+  return name.empty() ? mrb_nil_value() : mrb_str_new_cstr(mrb, name.c_str());
+}
+mrb_value ui_set_font(mrb_state* mrb, mrb_value) {
+  const auto value = single_arg(mrb);
+  const std::string name = mrb_nil_p(value) ? "" : to_name(mrb, value);
+  if (!valid_font_name(name)) mrb_raise(mrb, E_ARGUMENT_ERROR, "UI.font must name a file in fonts/");
+  context(mrb).ui_font = name;
+  return value;
 }
 
 mrb_value ui_width(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, context(mrb).screen_width); }
@@ -86,6 +104,8 @@ mrb_value ui_text_width(mrb_state* mrb, mrb_value) {
 
 void install_ui_bindings(mrb_state* mrb) {
   RClass* ui_module = mrb_define_module(mrb, "UI");
+  mrb_define_module_function(mrb, ui_module, "font", ui_font, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, ui_module, "font=", ui_set_font, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, ui_module, "__text", ui_text, MRB_ARGS_REQ(8));
   mrb_define_module_function(mrb, ui_module, "__rect", ui_rect, MRB_ARGS_REQ(9));
   mrb_define_module_function(mrb, ui_module, "__image", ui_image, MRB_ARGS_REQ(6));

@@ -79,7 +79,9 @@ void Engine::open_presenter(const GameSettings& settings) {
   const SurfaceSize size = presenter_->surface_size();
   context_.screen_width = size.width;
   context_.screen_height = size.height;
-  context_.measure_text = [this](const std::string& text, int size) { return presenter_->text_width(text, size); };
+  context_.measure_text = [this](const std::string& text, int size) {
+    return presenter_->font_text_width(text, size, context_.ui_font, options_.game_dir / config::kFontsDirName);
+  };
 }
 
 void Engine::open_audio() {

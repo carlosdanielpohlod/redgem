@@ -111,8 +111,7 @@ void Renderer::Impl::release() {
   free_maps(fallback_material);
   release_sky();
   release_ui_images();
-  if (owns_ui_font) UnloadFont(ui_font);
-  owns_ui_font = false;
+  ui_fonts.clear();
   release_fixed_targets();
   release_shaders();
 }
