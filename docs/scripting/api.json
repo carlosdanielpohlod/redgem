@@ -1,7 +1,7 @@
 {
   "description": "Every class and method of the scripting API, a line each (also: redgem api).",
   "about": "The scripting API of RedGem games: the classes and methods scripts use. Generated from docs/scripting/api.json, which tests keep in step with the engine.",
-  "notes": "Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.",
+  "notes": "Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp` last), at most 8192 pixels a side; animated WebP and KTX2/Basis are not read. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.",
   "classes": [
     {
       "name": "Behaviour",
@@ -1213,7 +1213,36 @@
           "name": "text_width",
           "static": true,
           "args": "str, size:",
-          "about": "how wide a text is, in pixels"
+          "about": "how wide a text is, in pixels (in the face selected)"
+        },
+        {
+          "name": "toggle",
+          "static": true,
+          "args": "label, on, x:, y:, width:, height:, focused: false",
+          "about": "an on/off row of a settings screen; returns whether it is on"
+        },
+        {
+          "name": "choice",
+          "static": true,
+          "args": "label, choices, index, x:, y:, width:, height:, focused: false",
+          "about": "a row that picks one of choices; returns the index chosen"
+        },
+        {
+          "name": "slider",
+          "static": true,
+          "args": "label, value, x:, y:, width:, height:, min: 0.0, max: 1.0, step: 0.05, focused: false",
+          "about": "a row with a slider; returns the value"
+        },
+        {
+          "name": "font",
+          "static": true,
+          "about": "the face texts are drawn with: a file name of fonts/, or nil for the built-in one"
+        },
+        {
+          "name": "font=",
+          "static": true,
+          "args": "name",
+          "about": "draws the next texts with fonts/<name>.ttf or .otf (nil: the built-in face)"
         }
       ],
       "internal": [
@@ -1221,14 +1250,56 @@
         "centered",
         "chop",
         "clicked?",
+        "confirmed?",
         "continuation?",
+        "direction",
+        "draw_slider",
+        "flipped?",
+        "focus_ring",
         "held?",
         "inside_letter?",
         "label_size",
         "letters",
         "mouse_over?",
+        "pressed_any?",
         "rgb",
-        "shade"
+        "row",
+        "shade",
+        "sideways",
+        "slider_at",
+        "slider_track",
+        "worked?"
+      ],
+      "guide": "gameplay.md",
+      "notes": "A focused widget (`focused: true`) is worked by Enter or a gamepad's A, and left and right change it. The built-in face adds glyphs as they are asked for (Greek, Cyrillic, accented letters, `€`); for another face or script, put a `.ttf` or `.otf` in `fonts/` and set `UI.font`. A missing or unreadable face falls back to the built-in one, with a warning; glyphs a face lacks show as `?`; there is no bidirectional layout or complex-script shaping."
+    },
+    {
+      "name": "UI::Focus",
+      "about": "Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping.",
+      "methods": [
+        {
+          "name": "new",
+          "static": true,
+          "about": "a focus on the first widget"
+        },
+        {
+          "name": "update",
+          "args": "count",
+          "about": "moves it among count widgets, as up or down was pressed this frame"
+        },
+        {
+          "name": "at?",
+          "args": "index",
+          "about": "whether the widget of that index has it: pass it as focused:"
+        },
+        {
+          "name": "index",
+          "about": "the widget that has it"
+        },
+        {
+          "name": "reset",
+          "about": "back to the first widget"
+        }
       ],
       "guide": "gameplay.md"
     },
@@ -1285,12 +1356,139 @@
           "name": "stop_recording",
           "static": true,
           "about": "ends a video recorded with --record; the game goes on"
+        },
+        {
+          "name": "version",
+          "static": true,
+          "about": "the version in game.json (\"1.2.0\"), or nil"
         }
       ]
     },
     {
+      "name": "Settings",
+      "about": "How the player chose the game to be shown and heard; a change takes effect at once.",
+      "methods": [
+        {
+          "name": "window_mode",
+          "static": true,
+          "about": ":windowed, :fullscreen or :borderless"
+        },
+        {
+          "name": "window_mode=",
+          "static": true,
+          "args": "mode",
+          "about": "changes it"
+        },
+        {
+          "name": "fullscreen?",
+          "static": true,
+          "about": "whether the game fills the screen"
+        },
+        {
+          "name": "fullscreen=",
+          "static": true,
+          "args": "on",
+          "about": "fullscreen, or back to a window"
+        },
+        {
+          "name": "resolution",
+          "static": true,
+          "about": "[width, height] of the window, in pixels"
+        },
+        {
+          "name": "resolution=",
+          "static": true,
+          "args": "size",
+          "about": "resizes the window: one of resolutions"
+        },
+        {
+          "name": "resolutions",
+          "static": true,
+          "about": "the sizes the monitor offers: [[w, h], ...]"
+        },
+        {
+          "name": "render_scale",
+          "static": true,
+          "about": "the share of the window's size the world is drawn at (0.5 to 2)"
+        },
+        {
+          "name": "render_scale=",
+          "static": true,
+          "args": "scale",
+          "about": "changes it"
+        },
+        {
+          "name": "vsync",
+          "static": true,
+          "about": "whether frames wait for the screen"
+        },
+        {
+          "name": "vsync=",
+          "static": true,
+          "args": "on",
+          "about": "changes it"
+        },
+        {
+          "name": "fps_cap",
+          "static": true,
+          "about": "frames a second at most; nil for none"
+        },
+        {
+          "name": "fps_cap=",
+          "static": true,
+          "args": "cap",
+          "about": "changes it"
+        },
+        {
+          "name": "quality",
+          "static": true,
+          "about": ":low, :medium, :high, :ultra or :custom"
+        },
+        {
+          "name": "quality=",
+          "static": true,
+          "args": "quality",
+          "about": "the most a level's environment gets of what it asks for"
+        },
+        {
+          "name": "quality_details",
+          "static": true,
+          "about": "what the custom quality allows: {msaa:, antialias:, shadow_cascades:, ...}"
+        },
+        {
+          "name": "quality_details=",
+          "static": true,
+          "args": "details",
+          "about": "changes some of them, and makes the quality :custom"
+        },
+        {
+          "name": "volume",
+          "static": true,
+          "about": "the player's volume, 0 to 1 (it multiplies Audio.volume)"
+        },
+        {
+          "name": "volume=",
+          "static": true,
+          "args": "volume",
+          "about": "changes it"
+        },
+        {
+          "name": "save",
+          "static": true,
+          "about": "keeps them for the next runs; false where they last for the run only"
+        }
+      ],
+      "internal": [
+        "known",
+        "read",
+        "write"
+      ],
+      "guide": "../shipping.md#notes",
+      "notes": "Until the player chooses, everything is what `game.json` says. `Settings.save` keeps them only in a built game a player plays: in the editor's Play, `redgem run`, a server's rooms and tests they last for the run, and `save` returns false."
+    },
+    {
       "name": "GameMenu",
-      "about": "A behaviour: title screen, pause menu and end screen.",
+      "about": "A behaviour: title screen, pause menu, end screen and settings screen; arrows or the D-pad move the focus, Enter or A picks.",
       "methods": [
         {
           "name": "instance",
@@ -1300,7 +1498,11 @@
         {
           "name": "show",
           "args": "screen",
-          "about": "opens a screen: :title, :pause, :over or one of the game's"
+          "about": "opens a screen: :title, :pause, :over, :settings or one of the game's"
+        },
+        {
+          "name": "show_settings",
+          "about": "opens the settings screen (window, resolution, quality, volume...)"
         },
         {
           "name": "resume",
@@ -1334,6 +1536,8 @@
         }
       ],
       "internal": [
+        "scale",
+        "scaled",
         "start",
         "update"
       ],
@@ -1391,6 +1595,23 @@
         {
           "name": "typing?",
           "about": "whether letters are typed into it"
+        },
+        {
+          "name": "rows",
+          "about": "how many widgets it draws above its buttons that take the focus"
+        },
+        {
+          "name": "first_button_share",
+          "about": "where its first button sits, a share of the height (nil: the menu's)"
+        },
+        {
+          "name": "focus",
+          "about": "its UI::Focus, which the menu gives it"
+        },
+        {
+          "name": "focus=",
+          "args": "focus",
+          "about": "sets it"
         }
       ],
       "guide": "gameplay.md#pause-and-the-flow-between-screens"

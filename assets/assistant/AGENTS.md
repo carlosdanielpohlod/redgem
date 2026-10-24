@@ -12,7 +12,7 @@ https://carlosdanielpohlod.github.io/redgem-site/manual/ (`llms.txt` there index
 | `scenes/<name>.glb` | more levels, loaded with `Game.load_scene("<name>")` |
 | `scripts/*.rb` | behaviours and scene scripts, one class per file |
 | `tests/*_test.rb` | the game's tests |
-| `sounds/`, `images/`, `models/` | sounds, pictures for the HUD and the sky, models to place |
+| `sounds/`, `images/`, `fonts/`, `models/` | sounds, pictures for the HUD and the sky, faces for UI.font, models to place |
 | `locales/<language>.json` | the texts players read (`I18n.t`) |
 | `game.json` | the game's id, title and window size |
 

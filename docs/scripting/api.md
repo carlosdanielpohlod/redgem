@@ -27,9 +27,11 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Animation::Graph`](#animationgraph) | Named states and transitions for one character (animation.use(graph)). |
 | [`Audio`](#audio) | Sounds and music from the game's sounds/ folder. |
 | [`UI`](#ui) | What a script draws over the game this frame: texts, rectangles, pictures, buttons. |
+| [`UI::Focus`](#uifocus) | Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. |
 | [`Debug`](#debug) | Messages to the console (and to redgem run). |
 | [`Game`](#game) | The game itself. |
-| [`GameMenu`](#gamemenu) | A behaviour: title screen, pause menu and end screen. |
+| [`Settings`](#settings) | How the player chose the game to be shown and heard; a change takes effect at once. |
+| [`GameMenu`](#gamemenu) | A behaviour: title screen, pause menu, end screen and settings screen; arrows or the D-pad move the focus, Enter or A picks. |
 | [`GameMenu::Screen`](#gamemenuscreen) | A screen of the GameMenu. |
 | [`Particles`](#particles) | Short-lived sparks, smoke and dust. |
 | [`Scatter`](#scatter) | Great numbers of copies of a mesh (grass, trees, rocks), drawn only. |
@@ -345,7 +347,24 @@ What a script draws over the game this frame: texts, rectangles, pictures, butto
 - `UI.text_field(value, x:, y:, width:, height:, max_length:, secret:)`: a field to type in; returns the new value
 - `UI.width`: the width of the screen, in pixels
 - `UI.height`: the height of the screen, in pixels
-- `UI.text_width(str, size:)`: how wide a text is, in pixels
+- `UI.text_width(str, size:)`: how wide a text is, in pixels (in the face selected)
+- `UI.toggle(label, on, x:, y:, width:, height:, focused: false)`: an on/off row of a settings screen; returns whether it is on
+- `UI.choice(label, choices, index, x:, y:, width:, height:, focused: false)`: a row that picks one of choices; returns the index chosen
+- `UI.slider(label, value, x:, y:, width:, height:, min: 0.0, max: 1.0, step: 0.05, focused: false)`: a row with a slider; returns the value
+- `UI.font`: the face texts are drawn with: a file name of fonts/, or nil for the built-in one
+- `UI.font = name`: draws the next texts with fonts/<name>.ttf or .otf (nil: the built-in face)
+
+A focused widget (`focused: true`) is worked by Enter or a gamepad's A, and left and right change it. The built-in face adds glyphs as they are asked for (Greek, Cyrillic, accented letters, `€`); for another face or script, put a `.ttf` or `.otf` in `fonts/` and set `UI.font`. A missing or unreadable face falls back to the built-in one, with a warning; glyphs a face lacks show as `?`; there is no bidirectional layout or complex-script shaping.
+
+## UI::Focus
+
+Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. See [gameplay.md](gameplay.md).
+
+- `UI::Focus.new`: a focus on the first widget
+- `update(count)`: moves it among count widgets, as up or down was pressed this frame
+- `at?(index)`: whether the widget of that index has it: pass it as focused:
+- `index`: the widget that has it
+- `reset`: back to the first widget
 
 ## Debug
 
@@ -364,13 +383,42 @@ The game itself.
 - `Game.title`: the game's title
 - `Game.quit`: ends the game
 - `Game.stop_recording`: ends a video recorded with --record; the game goes on
+- `Game.version`: the version in game.json ("1.2.0"), or nil
+
+## Settings
+
+How the player chose the game to be shown and heard; a change takes effect at once. See [../shipping.md#notes](../shipping.md#notes).
+
+- `Settings.window_mode`: :windowed, :fullscreen or :borderless
+- `Settings.window_mode = mode`: changes it
+- `Settings.fullscreen?`: whether the game fills the screen
+- `Settings.fullscreen = on`: fullscreen, or back to a window
+- `Settings.resolution`: [width, height] of the window, in pixels
+- `Settings.resolution = size`: resizes the window: one of resolutions
+- `Settings.resolutions`: the sizes the monitor offers: [[w, h], ...]
+- `Settings.render_scale`: the share of the window's size the world is drawn at (0.5 to 2)
+- `Settings.render_scale = scale`: changes it
+- `Settings.vsync`: whether frames wait for the screen
+- `Settings.vsync = on`: changes it
+- `Settings.fps_cap`: frames a second at most; nil for none
+- `Settings.fps_cap = cap`: changes it
+- `Settings.quality`: :low, :medium, :high, :ultra or :custom
+- `Settings.quality = quality`: the most a level's environment gets of what it asks for
+- `Settings.quality_details`: what the custom quality allows: {msaa:, antialias:, shadow_cascades:, ...}
+- `Settings.quality_details = details`: changes some of them, and makes the quality :custom
+- `Settings.volume`: the player's volume, 0 to 1 (it multiplies Audio.volume)
+- `Settings.volume = volume`: changes it
+- `Settings.save`: keeps them for the next runs; false where they last for the run only
+
+Until the player chooses, everything is what `game.json` says. `Settings.save` keeps them only in a built game a player plays: in the editor's Play, `redgem run`, a server's rooms and tests they last for the run, and `save` returns false.
 
 ## GameMenu
 
-A behaviour: title screen, pause menu and end screen. See [gameplay.md#pause-and-the-flow-between-screens](gameplay.md#pause-and-the-flow-between-screens).
+A behaviour: title screen, pause menu, end screen and settings screen; arrows or the D-pad move the focus, Enter or A picks. See [gameplay.md#pause-and-the-flow-between-screens](gameplay.md#pause-and-the-flow-between-screens).
 
 - `GameMenu.instance`: the menu of the scene, or nil
-- `show(screen)`: opens a screen: :title, :pause, :over or one of the game's
+- `show(screen)`: opens a screen: :title, :pause, :over, :settings or one of the game's
+- `show_settings`: opens the settings screen (window, resolution, quality, volume...)
 - `resume`: closes the menu and goes on
 - `restart`: starts the scene again
 - `finish(message)`: opens the end screen with a message
@@ -394,6 +442,10 @@ A screen of the GameMenu. See [gameplay.md#pause-and-the-flow-between-screens](g
 - `draw(first_button)`: draws what else it shows
 - `space_above`: pixels kept between its heading and its buttons
 - `typing?`: whether letters are typed into it
+- `rows`: how many widgets it draws above its buttons that take the focus
+- `first_button_share`: where its first button sits, a share of the height (nil: the menu's)
+- `focus`: its UI::Focus, which the menu gives it
+- `focus = focus`: sets it
 
 ## Particles
 
@@ -514,4 +566,4 @@ A behaviour: the same object in the same place on every machine. See [multiplaye
 
 ## Notes
 
-Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.
+Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp` last), at most 8192 pixels a side; animated WebP and KTX2/Basis are not read. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.
