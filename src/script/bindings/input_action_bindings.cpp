@@ -202,6 +202,8 @@ void install_declaring(RClass* input_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, input_module, "actions", input_actions, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, input_module, "axes", input_axes, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, input_module, "axis_stick", input_axis_stick, MRB_ARGS_REQ(1));
+  // How many players bind their own: one for each gamepad the engine reads.
+  mrb_define_const(mrb, input_module, "PLAYERS", mrb_int_value(mrb, static_cast<mrb_int>(kMaxGamepads)));
 }
 
 void install_rebinding(RClass* input_module, mrb_state* mrb) {

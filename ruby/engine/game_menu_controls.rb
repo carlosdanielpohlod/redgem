@@ -2,8 +2,8 @@
 # choice at the top), then a row for each action and each side of each axis (see
 # GameMenu::ControlsPage), the keys in one cell and the gamepad buttons in the other. Up and down
 # move between the rows, left and right between a row's two cells; Enter, a gamepad's A or a click
-# on a cell waits for the key or button that takes its place (Escape, or a gamepad's B or Back,
-# calls that off). Under the rows: "Reset to defaults" (the player's bindings, all back to the
+# on a cell waits for the key or button that takes its place (Escape or a gamepad's Back calls
+# that off, and B too for a keys' cell). Under the rows: "Reset to defaults" (the player's bindings, all back to the
 # game's) and Back. The players' bindings are kept for the game's next runs as they change.
 class GameMenu < Behaviour
   class ControlsScreen < Screen
@@ -20,6 +20,7 @@ class GameMenu < Behaviour
     CONFLICT_COLOR = :orange  # the text of a cell with a binding another row has too
     CONFLICT_MARK = " !".freeze
     WAITING_MARK = "...".freeze
+    CUT_MARK = "...".freeze   # ends a cell's text cut short to fit it
     VISIBLE_ROWS = 7          # rows shown at once; more scroll along with the focus
     PLAYER_ROWS = 1           # the player's choice, before the rows in the focus
     BUTTONS_SHARE = 0.8       # where its first button sits, as a share of the screen's height
@@ -60,17 +61,15 @@ class GameMenu < Behaviour
       captions(y)
       y += @menu.scaled(LINE_HEIGHT)
       player_choice(row_box(y, 0))
-      control_rows(y + row_step)
-      note(first_button[1] - @menu.scaled(LINE_HEIGHT))
+      shared = @page.shared
+      control_rows(y + row_step, shared)
+      note(first_button[1] - @menu.scaled(LINE_HEIGHT), shared)
     end
 
     private
 
-    # Back to the settings screen; a capture still waiting is called off.
-    def leave(menu)
-      @page.cancel
-      menu.show(:settings)
-    end
+    # Back to the settings screen (a capture still waiting is called off as the page closes).
+    def leave(menu) = menu.show(:settings)
 
     def shown_rows = PLAYER_ROWS + [@page.rows.size, VISIBLE_ROWS].min
     def row_step = @menu.scaled(ROW_HEIGHT + ROW_GAP)
@@ -97,12 +96,11 @@ class GameMenu < Behaviour
     end
 
     # The rows the focus is among, scrolled so the focused one shows; each frame's left or right
-    # first picks the focused row's cell.
-    def control_rows(y)
+    # first picks the focused row's cell. `shared`: the bindings on more than one row.
+    def control_rows(y, shared)
       all = @page.rows
       scroll_to(focus_index - PLAYER_ROWS, all.size)
       pick_column if focus_on_a_row?
-      shared = @page.shared
       @cells = {}
       all[@top, VISIBLE_ROWS].each_with_index do |row, at|
         control_row(row, row_box(y + at * row_step, PLAYER_ROWS + @top + at), shared)
@@ -144,10 +142,24 @@ class GameMenu < Behaviour
     def cell_text(row, column, box, conflict)
       size = UI.label_size(box[:height])
       text = waiting?(row, column) ? WAITING_MARK : @page.text(row, column)
-      text += CONFLICT_MARK if conflict
+      text = fitted(text, box[:width] - 2 * UI::FIELD_PADDING, size, conflict ? CONFLICT_MARK : "")
       UI.text(text, x: box[:x] + UI::FIELD_PADDING, y: UI.centered(box[:y], box[:height], size), size: size,
                     color: conflict ? CONFLICT_COLOR : :white)
     end
+
+    # A text with `mark` after it, cut short (and ending in CUT_MARK) where it would be wider than
+    # `width` at `size`: the mark always shows.
+    def fitted(text, width, size, mark)
+      return text + mark if fits?(text + mark, width, size)
+
+      text = UI.chop(text) until cut_enough?(text, width, size, mark)
+      text + CUT_MARK + mark
+    end
+
+    def fits?(text, width, size) = UI.text_width(text, size: size) <= width
+
+    # Whether a text being cut short fits with its marks (or has nothing more to cut).
+    def cut_enough?(text, width, size, mark) = text.empty? || fits?(text + CUT_MARK + mark, width, size)
 
     def waiting?(row, column) = @page.waiting == [row, column]
 
@@ -159,15 +171,15 @@ class GameMenu < Behaviour
     def cell_in(row_box, column) = { x: cell_x(column), y: row_box[:y], width: cell_width, height: row_box[:height] }
 
     # Under the rows: what to press while a capture waits, or what the marks mean when one shows.
-    def note(y)
-      text = note_text
+    def note(y, shared)
+      text = note_text(shared)
       UI.text(text, x: UI.width / 2, y: y, size: @menu.scaled(CAPTION_SIZE), align: :center) if text
     end
 
-    def note_text
+    def note_text(shared)
       return PROMPTS.fetch(@page.waiting.last).call if @page.capturing?
 
-      I18n.t("game.controls.conflict_note") if @page.shared.any?
+      I18n.t("game.controls.conflict_note") if shared.any?
     end
   end
 end

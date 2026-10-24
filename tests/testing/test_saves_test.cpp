@@ -106,6 +106,8 @@ TEST_CASE("a run that goes on from an earlier one plays with the files that run 
   CHECK(kept.settings == first.settings);
   CHECK(kept.bindings == first.bindings);
   CHECK(std::filesystem::exists(first.bindings));  // (not emptied)
+  CHECK(kept_anything(kept));
+  CHECK_FALSE(kept_anything(kept_run_files(game, work, "/tests/system/x/never_run_test.rb")));
   CHECK(fresh_run_files(game, "", earlier).save == test_save_file_for(game));
   std::filesystem::remove_all(work);
 }

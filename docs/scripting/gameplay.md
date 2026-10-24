@@ -159,13 +159,14 @@ right between a row's two cells.
 Enter, a gamepad's A or a click on a cell waits for the next key (the keys' cell) or button (the
 buttons' cell): that one takes the place of everything the cell had, and the row's other cell
 keeps its own. A button pressed for the keys' cell (or a key for the buttons') is not for it, and
-it waits on. Escape, or a gamepad's B or Back, calls the wait off, so those are never bound there.
+it waits on. Escape or a gamepad's Back calls the wait off (and B too, for a keys' cell), so those
+are never bound there.
 A key bound to two rows is allowed, as above, and both cells show it in orange with a `!`. "Reset to
 defaults" puts all of the shown player's bindings back to the game's; Back (or Esc) goes back to the
 settings. What players bind is kept for the next runs as it changes.
 
-A row is named by the game's translation files, as `game.controls.<name>` (an axis' sides as
-`game.controls.<name>_negative` and `_positive`); without one, its name is made readable (`:air_dash`
+A row is named by the game's translation files, as `game.controls.action_<name>` (an axis' sides
+as `game.controls.action_<name>_negative` and `_positive`); without one, its name is made readable (`:air_dash`
 is "Air dash", the sides of `:steer` "Steer -" and "Steer +"). The engine names its own (`:jump` is
 "Jump", the negative side of `:horizontal` "Move left") and the keys and buttons ("Space", "Left
 Shift", "A button", "Left stick X"), as `game.controls.*` texts a game may change too.

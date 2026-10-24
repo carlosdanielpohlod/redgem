@@ -82,6 +82,18 @@ class GameMenuControlsPageTest < RedGemTest::Case
     assert_equal ["key:j", "pad:a"], Input.bindings(:jump)
   end
 
+  def test_b_calls_a_wait_off_for_a_keys_cell_but_can_be_bound_in_a_buttons_cell
+    cancels = GameMenu::ControlsPage::CANCELS
+    assert_equal Input::CANCEL_CAPTURE, cancels.fetch(KEYS)
+    refute cancels.fetch(BUTTONS).include?("pad:b")
+    assert cancels.fetch(BUTTONS).include?("key:escape")
+  end
+
+  def test_a_game_names_its_own_rows_apart_from_the_pages_other_texts
+    Input.define_action(:reset, :r)
+    assert_equal "Reset", GameMenu::BindingNames.row(:reset, nil)
+  end
+
   def test_a_capture_called_off_leaves_the_cell_as_it_was
     rebinding = page
     rebinding.capture(JUMP, BUTTONS)

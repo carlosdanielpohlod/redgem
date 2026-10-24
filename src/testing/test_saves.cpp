@@ -92,4 +92,12 @@ RunFiles kept_run_files(const std::filesystem::path& game_dir, const std::filesy
           test_file_for(game_dir, work_dir, earlier_test, kBindingsEnding)};
 }
 
+bool kept_anything(const RunFiles& files) {
+  for (const std::filesystem::path* file : {&files.save, &files.settings, &files.bindings}) {
+    std::error_code error;
+    if (std::filesystem::exists(*file, error)) return true;
+  }
+  return false;
+}
+
 }  // namespace redgem::testing

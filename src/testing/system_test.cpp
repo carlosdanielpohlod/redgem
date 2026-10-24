@@ -12,6 +12,7 @@
 #include "app/engine.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
+#include "core/translations.hpp"
 #include "testing/frame_pictures.hpp"
 #include "testing/test_library.hpp"
 #include "testing/test_notes.hpp"
@@ -152,14 +153,18 @@ int play_test(Engine& engine, ScriptedInputSource& input, FramePictures& picture
   return run.play();
 }
 
-}  // namespace
+// Whether a run that goes on from another finds nothing that run left: a misspelt test, or one
+// never run in that folder (it would start from nothing, and fail far from the cause).
+bool goes_on_from_nothing(const SystemTestOptions& options, const RunFiles& files) {
+  return !options.after.empty() && !kept_anything(files);
+}
 
-int run_system_test(const SystemTestOptions& options) {
+// The test played on a game that starts with `files`.
+int play_with(const SystemTestOptions& options, const RunFiles& files) {
   // Made before the engine, so they outlive it: what TestInput sets and the game reads, the
   // pictures the test asks for, and where the game is shown.
   ScriptedInputSource input;
   FramePictures pictures(options.screenshot_dir);
-  const RunFiles files = run_files(options);
   Stage stage(options, files.settings, pictures);
   if (!options.work_dir.empty()) keep_notes_in(notes_folder_in(options.work_dir));
   auto created = Engine::create(engine_options(options, files, input, stage));
@@ -168,6 +173,18 @@ int run_system_test(const SystemTestOptions& options) {
     return kExitFailure;
   }
   return play_test(*std::get<std::unique_ptr<Engine>>(created), input, pictures, options.test_file);
+}
+
+}  // namespace
+
+int run_system_test(const SystemTestOptions& options) {
+  const RunFiles files = run_files(options);
+  if (goes_on_from_nothing(options, files)) {
+    log::error(
+        tr("testing.run.nothing_kept", {{"test", options.after.string()}, {"folder", options.work_dir.string()}}));
+    return kExitFailure;
+  }
+  return play_with(options, files);
 }
 
 }  // namespace redgem::testing

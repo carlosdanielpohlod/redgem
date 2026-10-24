@@ -20,6 +20,8 @@ Stage::Stage(const SystemTestOptions& options, const std::filesystem::path& sett
 
 Stage::~Stage() = default;
 
+const DisplaySettings& Stage::display() const { return window_ ? window_->shown() : player_.display; }
+
 Presenter* Stage::presenter() { return window_.get(); }
 
 }  // namespace redgem::testing

@@ -32,7 +32,8 @@ class Stage {
   Presenter* presenter();
   // The player's display settings the run starts with (what the settings file says over the
   // game's), and where they are kept for it.
-  const DisplaySettings& display() const { return player_.display; }
+  // (With a window, what the window came up with: a size the monitor lacks is not kept as asked.)
+  const DisplaySettings& display() const;
   const DisplayKeeping& display_kept_in() const { return player_.kept_in; }
   // Without a window there is no device either: the game still finds its sounds, and hears none.
   AudioSystem* audio() { return window_ ? speakers_.get() : &silent_; }

@@ -44,5 +44,7 @@ RunFiles fresh_run_files(const std::filesystem::path& game_dir, const std::files
 // goes on from there is the game started again (redgem-test --after).
 RunFiles kept_run_files(const std::filesystem::path& game_dir, const std::filesystem::path& work_dir,
                         const std::filesystem::path& earlier_test);
+// Whether any of a run's files is there: a run that kept nothing left none.
+bool kept_anything(const RunFiles& files);
 
 }  // namespace redgem::testing

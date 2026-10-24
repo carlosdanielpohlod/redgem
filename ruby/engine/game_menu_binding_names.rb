@@ -41,14 +41,15 @@ class GameMenu < Behaviour
                left_trigger: -> { I18n.t("game.controls.stick_left_trigger") },
                right_trigger: -> { I18n.t("game.controls.stick_right_trigger") } }.freeze
     # The rows of the engine's own actions and axes (a game's text of the same key wins).
-    ROWS = { jump: -> { I18n.t("game.controls.jump") },
-             fire: -> { I18n.t("game.controls.fire") },
-             run: -> { I18n.t("game.controls.run") },
-             horizontal_negative: -> { I18n.t("game.controls.horizontal_negative") },
-             horizontal_positive: -> { I18n.t("game.controls.horizontal_positive") },
-             vertical_negative: -> { I18n.t("game.controls.vertical_negative") },
-             vertical_positive: -> { I18n.t("game.controls.vertical_positive") } }.freeze
-    ROW_KEY_PREFIX = "game.controls.".freeze   # what a game's text for a row of its own is under
+    ROWS = { jump: -> { I18n.t("game.controls.action_jump") },
+             fire: -> { I18n.t("game.controls.action_fire") },
+             run: -> { I18n.t("game.controls.action_run") },
+             horizontal_negative: -> { I18n.t("game.controls.action_horizontal_negative") },
+             horizontal_positive: -> { I18n.t("game.controls.action_horizontal_positive") },
+             vertical_negative: -> { I18n.t("game.controls.action_vertical_negative") },
+             vertical_positive: -> { I18n.t("game.controls.action_vertical_positive") } }.freeze
+    # What a game's text for a row of its own is under (apart from the page's other texts).
+    ROW_KEY_PREFIX = "game.controls.action_".freeze
     SIDE_MARKS = { negative: " -", positive: " +" }.freeze  # after a readable axis name
     WORD_JOINER = "_".freeze                   # between the words of a name
 
@@ -63,7 +64,7 @@ class GameMenu < Behaviour
     def self.stick(axis) = STICKS[axis]&.call || readable(axis)
 
     # A row's name: an action's (side nil) or one side of an axis'. A game names its own in its
-    # translation files, as game.controls.<name> (game.controls.<name>_<side> for a side); without
+    # translation files, as game.controls.action_<name> (action_<name>_<side> for a side); without
     # one, the name is made readable (:steer's sides are "Steer -" and "Steer +").
     def self.row(name, side)
       key = side ? :"#{name}#{WORD_JOINER}#{side}" : name.to_sym

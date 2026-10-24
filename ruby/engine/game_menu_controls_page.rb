@@ -12,6 +12,9 @@ class GameMenu < Behaviour
     PREFIXES = [Input::KEY_PREFIX, Input::PAD_PREFIX].freeze
     SIDES = %i[negative positive].freeze
     SEPARATOR = ", ".freeze  # between the names of a cell's bindings
+    # What calls a wait off, for each cell: Escape, and a gamepad's B or Back for the keys' cell;
+    # only Escape and Back for the buttons' cell, so that B can be bound there.
+    CANCELS = [Input::CANCEL_CAPTURE, ["key:escape", "pad:back"]].freeze
 
     # An action (side nil), or one side of an axis.
     Row = Struct.new(:name, :side)
@@ -68,7 +71,7 @@ class GameMenu < Behaviour
     # Waits for the key or button that will fill a cell.
     def capture(row, column)
       @waiting = [row, column]
-      Input.capture_next { |binding, _pad| caught(binding) }
+      Input.capture_next(cancel: CANCELS.fetch(column)) { |binding, _pad| caught(binding) }
     end
 
     # Stops waiting: the cell keeps what it had.

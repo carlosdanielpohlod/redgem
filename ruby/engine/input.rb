@@ -1,10 +1,9 @@
 # A game's actions and axes, for each player. A player is a gamepad's number: 0 is the first (who
-# also has the keyboard), up to 3; pad: nil is the first too. Bindings are written as text
-# ("key:space" is a key, "pad:a" a gamepad button), as a Symbol (a key: :space), or as
-# {keys: [...], buttons: [...]}, mixed as one likes.
+# also has the keyboard), up to 3 (Input::PLAYERS players, as the engine counts them); pad: nil is
+# the first too. Bindings are written as text ("key:space" is a key, "pad:a" a gamepad button), as
+# a Symbol (a key: :space), or as {keys: [...], buttons: [...]}, mixed as one likes.
 module Input
   FIRST_PAD = 0
-  PLAYERS = 4   # players that bind their own: gamepads 0 to 3
   KEY_PREFIX = "key:".freeze
   PAD_PREFIX = "pad:".freeze
   # What calls a capture off unless it is told otherwise: Escape, and a gamepad's B or Back.

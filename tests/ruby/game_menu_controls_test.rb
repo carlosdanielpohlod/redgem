@@ -100,4 +100,13 @@ class GameMenuControlsTest < RedGemTest::Case
     assert_equal SECOND_PAD, controls.page.player
     assert_equal KEYS, controls.column, "on the players' choice, right is the choice's"
   end
+
+  def test_a_cells_text_too_wide_for_it_is_cut_short_and_keeps_its_mark
+    controls = menu.screens[:controls]
+    size = 15
+    fitted = controls.__send__(:fitted, "Left Ctrl, Enter, Left Shift", 120, size, " !")
+    assert fitted.end_with?("... !"), fitted
+    assert UI.text_width(fitted, size: size) <= 120
+    assert_equal "Space !", controls.__send__(:fitted, "Space", 120, size, " !")
+  end
 end
