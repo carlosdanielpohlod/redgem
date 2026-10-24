@@ -152,9 +152,8 @@ class ArcadeCar < Behaviour
 
   def move(dt)
     target = transform.position + flat_nose * (@speed * dt)
-    on_the_street = inside_the_street(target)
-    @speed *= BOUNCE unless on_the_street == target
-    clear = inside_the_street(clear_of_cars(on_the_street, dt))
+    @speed *= BOUNCE if off_the_street?(target)
+    clear = inside_the_street(clear_of_cars(inside_the_street(target), dt))
     @body.velocity = flat_nose * @speed if @body
     settle_at(clear)
   end
@@ -181,6 +180,12 @@ class ArcadeCar < Behaviour
 
   def inside_the_street(position)
     Vector3.new(position.x.clamp(@min_x, @max_x), position.y, position.z.clamp(@min_z, @max_z))
+  end
+
+  # Whether the street's edges would stop the car at `position`, asked of each number on its own
+  # rather than of whole vectors.
+  def off_the_street?(position)
+    position.x != position.x.clamp(@min_x, @max_x) || position.z != position.z.clamp(@min_z, @max_z)
   end
 
   # Moves the car out of any car it would overlap at `position`.

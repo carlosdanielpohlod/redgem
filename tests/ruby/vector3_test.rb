@@ -143,4 +143,20 @@ class Vector3Test < RedGemTest::Case
   def test_formatting
     assert_equal "(1.000, 2.000, 3.000)", Vector3.new(1, 2, 3).to_s
   end
+
+  def test_equal_vectors_are_one_key_of_a_hash
+    a = Vector3.new(1, 2, 3)
+    b = Vector3.new(1.0, 2.0, 3.0)
+    assert a.eql?(b)
+    assert_equal a.hash, b.hash
+    assert_equal :found, { a => :found }[b]
+    assert_equal 1, [a, b].uniq.size
+    refute a.eql?(Vector3.new(1, 2, 4))
+    refute a.eql?([1.0, 2.0, 3.0])
+  end
+
+  def test_a_negative_zero_is_the_same_key_as_zero
+    assert_equal Vector3.zero, -Vector3.zero
+    assert_equal Vector3.zero.hash, (-Vector3.zero).hash
+  end
 end
