@@ -1,10 +1,11 @@
-// Which addresses a request may reach over plain http://: this machine's and private networks'.
+// Which addresses are of a network of this machine's own rather than of the internet.
+
+#include "net/private_address.hpp"
 
 #include <sstream>
 #include <vector>
 
 #include "net/http/http_message.hpp"
-#include "net/http/http_url.hpp"
 
 namespace redgem::net {
 
@@ -14,17 +15,19 @@ namespace {
 constexpr std::size_t kOctets = 4;
 constexpr std::size_t kMostOctetDigits = 3;
 constexpr int kLargestOctet = 255;
-// The private ranges, by their first numbers: this machine (127.x), private networks (10.x,
-// 172.16.x to 172.31.x, 192.168.x) and addresses a network gives itself (169.254.x).
-constexpr int kLoopback = 127;
-constexpr int kPrivateA = 10;
-constexpr int kPrivateB = 172;
+// The private ranges, by their first numbers.
+constexpr int kLoopback = 127;  // 127.x: this machine
+constexpr int kPrivateA = 10;   // 10.x
+constexpr int kPrivateB = 172;  // 172.16.x to 172.31.x
 constexpr int kPrivateBFirst = 16;
 constexpr int kPrivateBLast = 31;
-constexpr int kPrivateC = 192;
+constexpr int kPrivateC = 192;  // 192.168.x
 constexpr int kPrivateCSecond = 168;
-constexpr int kLinkLocal = 169;
+constexpr int kLinkLocal = 169;  // 169.254.x: what a network with no server gives itself
 constexpr int kLinkLocalSecond = 254;
+constexpr int kSharedSpace = 100;  // 100.64.x to 100.127.x: carrier-grade NAT, and some VPNs
+constexpr int kSharedSpaceFirst = 64;
+constexpr int kSharedSpaceLast = 127;
 
 bool is_octet(const std::string& part) {
   return is_decimal(part, kMostOctetDigits) && std::stoi(part) <= kLargestOctet;
@@ -41,13 +44,24 @@ std::vector<int> octets(const std::string& numbers) {
   return read;
 }
 
+bool between(int number, int first, int last) { return number >= first && number <= last; }
+
+bool in_private_b(int first, int second) {
+  return first == kPrivateB && between(second, kPrivateBFirst, kPrivateBLast);
+}
+bool in_private_c(int first, int second) { return first == kPrivateC && second == kPrivateCSecond; }
+bool in_link_local(int first, int second) { return first == kLinkLocal && second == kLinkLocalSecond; }
+bool in_shared_space(int first, int second) {
+  return first == kSharedSpace && between(second, kSharedSpaceFirst, kSharedSpaceLast);
+}
+// The ranges known by their first number alone.
+bool in_whole_range(int first) { return first == kLoopback || first == kPrivateA; }
+
 bool in_private_range(const std::vector<int>& address) {
   const int first = address[0];
   const int second = address[1];
-  const bool private_b = first == kPrivateB && second >= kPrivateBFirst && second <= kPrivateBLast;
-  const bool private_c = first == kPrivateC && second == kPrivateCSecond;
-  const bool link_local = first == kLinkLocal && second == kLinkLocalSecond;
-  return first == kLoopback || first == kPrivateA || private_b || private_c || link_local;
+  if (in_whole_range(first) || in_private_b(first, second) || in_private_c(first, second)) return true;
+  return in_link_local(first, second) || in_shared_space(first, second);
 }
 
 }  // namespace

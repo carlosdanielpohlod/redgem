@@ -154,6 +154,7 @@ redgem_add_library(redgem_net
   net/wire.cpp
   net/wire_checks.cpp
   net/wire_codec.cpp
+  net/private_address.cpp
   net/utf8_text.cpp
   net/pose_quantization.cpp
   net/pose_codec.cpp
@@ -180,7 +181,6 @@ redgem_add_library(redgem_net
   net/rooms/relay_program.cpp
   net/rooms/relay_texts.cpp
   net/http/http_url.cpp
-  net/http/http_address.cpp
   net/http/http_message.cpp
   net/http/http_chunks.cpp
   net/http/http_response_parser.cpp
