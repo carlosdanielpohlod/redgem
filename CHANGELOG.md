@@ -29,7 +29,8 @@ until 1.0, a release may change what games rely on (see
 
 - **Saves are flushed to the disk** before they replace the previous one, and the previous save is
   kept beside it as `<name>.bak`. A damaged save is moved aside to `<name>.damaged` (never written
-  over), the backup is loaded in its place, and the log names both files.
+  over), the backup is loaded and put back in its place, and the log names both files. A save that
+  cannot be read is left alone, and the game runs without saving.
 - **KNOWN_LIMITATIONS.md** lists what stands between the engine and a 1.0.
 
 ### Fixed

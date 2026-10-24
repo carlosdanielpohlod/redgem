@@ -408,9 +408,11 @@ when its folder is moved or renamed. A game with no `id` saves to
 get a save file of their own, empty at the start of each test.
 
 Each change is flushed to the disk before it replaces the file, and the save before it is kept
-beside it as `<name>.json.bak`. A save found damaged (cut short by a crash or a bad disk) is moved
-aside to `<name>.json.damaged`, never written over, and the game starts from the backup; the log
-says so, naming both files. When the backup is damaged too, the game starts from nothing.
+beside it as `<name>.json.bak`, written the same way. A save found damaged (cut short by a crash
+or a bad disk) is moved aside to `<name>.json.damaged`, never written over, and the backup takes its
+place; the log says so, naming both files. When the backup is damaged too, it is moved aside as
+well and the game starts from nothing. A save that cannot be read at all (another program holds
+it, say) is left alone: the game runs without saving, and the log says why.
 
 ## Keep score across objects
 

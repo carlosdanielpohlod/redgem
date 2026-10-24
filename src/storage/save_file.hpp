@@ -11,10 +11,23 @@
 
 namespace redgem {
 
+// How many damaged saves of one game are kept apart (<name>.damaged, then .damaged.2 and on). With
+// all of those names taken, a damaged save is not moved, and nothing is written over it.
+inline constexpr int kMostDamagedSavesKept = 100;
+
+// Removes a save and its backup: a game finds nothing saved the next time it runs (a test's fresh
+// start). What was set aside as damaged stays.
+void remove_save(const std::filesystem::path& file);
+
+struct SaveReading;  // what reading a save file found (see save_file.cpp)
+
 // What a game keeps on a player's machine: one JSON file per game, read from disk on first use and
 // written back on every change, whole and at once and flushed to the disk: a crash or a power cut
-// never leaves half a file. The save it replaces is kept beside it as <name>.bak; a save found
-// damaged is moved aside to <name>.damaged (never written over) and the backup loaded instead.
+// never leaves half a file. The save it replaces is kept beside it as <name>.bak, written the same
+// way. A save found damaged is moved aside to <name>.damaged (never written over), and the backup
+// takes its place, on the disk too; a damaged backup is moved aside as well. A save that cannot be
+// read, or a damaged one that cannot be moved aside, is never written over: the game runs without
+// saving, and the log says why.
 class SaveFile final : public SaveStore {
  public:
   // Kept in memory only, for as long as the store lives: nothing is read or written (a test's).
@@ -39,10 +52,12 @@ class SaveFile final : public SaveStore {
 
  private:
   void load();
-  void keep(const nlohmann::json& contents);
-  void recover_from_damage();
+  void take(const SaveReading& reading);
+  void recover(const std::string& trouble, bool damaged);
+  void restore_from(const SaveReading& backup, const std::string& trouble, bool damaged);
+  std::optional<std::filesystem::path> set_aside(const std::filesystem::path& damaged);
+  void refuse_writes(const std::string& why);
   bool write();
-  bool holds_good_save() const;
   void back_up_previous() const;
   bool in_memory() const { return file_.empty(); }
 
@@ -50,9 +65,9 @@ class SaveFile final : public SaveStore {
   durable::Flush flush_;
   std::map<std::string, nlohmann::json> values_;
   bool loaded_ = false;
-  // False while the file holds a damaged save that could not be moved aside: it must not become
-  // the backup.
-  bool file_is_good_ = true;
+  std::string on_disk_;  // what the file holds, as written: what the next write keeps as the backup
+  // A save that cannot be read or moved aside is in the way: it is not written over.
+  bool writes_refused_ = false;
 };
 
 }  // namespace redgem

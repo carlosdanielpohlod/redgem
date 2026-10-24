@@ -20,4 +20,14 @@ bool flush_to_disk(std::FILE* file);
 // all of it reached the disk.
 bool write_flushed(const std::filesystem::path& file, const std::string& text, const Flush& flush = flush_to_disk);
 
+// Pushes a folder's list of files to the disk, so that a file just renamed into it stays renamed
+// after a power cut (fsync of the folder). Windows has no such flush: there it does nothing.
+// False when it could not.
+bool sync_folder(const std::filesystem::path& folder);
+
+// Replaces what `file` holds with `text`, whole: written beside it as <file>.part, flushed, moved
+// over it and the move pushed to the disk. False when `file` could not be replaced: it holds what
+// it held, and nothing is left beside it.
+bool replace_file(const std::filesystem::path& file, const std::string& text, const Flush& flush = flush_to_disk);
+
 }  // namespace redgem::durable

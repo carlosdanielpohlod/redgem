@@ -1,6 +1,7 @@
 #include "storage/save_file.hpp"
 
 #include <fstream>
+#include <iterator>
 #include <optional>
 #include <string>
 
@@ -8,14 +9,21 @@
 #include "storage/saved_values.hpp"
 
 namespace redgem {
+
+// What reading a save file found.
+struct SaveReading {
+  enum class Found { Nothing, Save, Damaged, Unreadable };
+  Found found = Found::Nothing;
+  std::string text;  // as it is on the disk (Save)
+  nlohmann::json json;
+};
+
 namespace {
 
-constexpr const char* kPartialSuffix = ".part";     // of a save still being written
+using Found = SaveReading::Found;
+
 constexpr const char* kBackupSuffix = ".bak";       // of the save before the last one
 constexpr const char* kDamagedSuffix = ".damaged";  // of a save found damaged, moved aside
-// How many damaged saves are kept apart (<name>.damaged, then .damaged.2 and on): past that, the
-// last name is written over.
-constexpr int kMostDamagedKept = 100;
 constexpr int kFirstNumberedDamaged = 2;
 constexpr int kIndent = 2;
 
@@ -30,109 +38,148 @@ bool is_there(const std::filesystem::path& file) {
   return std::filesystem::exists(file, fs_error);
 }
 
-// What a save file holds; nullopt when it cannot be read or is not a save (damaged).
-std::optional<nlohmann::json> read_save(const std::filesystem::path& file) {
-  std::ifstream in(file);
-  if (!in) return std::nullopt;
-  nlohmann::json json = nlohmann::json::parse(in, nullptr, false);
-  if (!json.is_object()) return std::nullopt;
-  return json;
+bool is_file(const std::filesystem::path& file) {
+  std::error_code fs_error;
+  return std::filesystem::is_regular_file(file, fs_error);
 }
 
-// A name beside `file` for it once damaged that no file has yet: a damaged save moved aside before
-// is never written over.
-std::filesystem::path damaged_name(const std::filesystem::path& file) {
+// The whole of a file; nullopt when it cannot be opened or read (locked by another program, not
+// allowed, a disk error, or no file at all but a folder).
+std::optional<std::string> text_of(const std::filesystem::path& file) {
+  if (!is_file(file)) return std::nullopt;
+  std::ifstream in(file, std::ios::binary);
+  if (!in) return std::nullopt;
+  try {
+    std::string text{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+    if (in.bad()) return std::nullopt;
+    return text;
+  } catch (const std::ios_base::failure&) {
+    return std::nullopt;  // (a read the disk failed)
+  }
+}
+
+// Only what is read and is no save is damaged: a file that cannot be read may be a good save.
+SaveReading read_save(const std::filesystem::path& file) {
+  if (!is_there(file)) return {};
+  const auto text = text_of(file);
+  if (!text) return {Found::Unreadable, {}, {}};
+  nlohmann::json json = nlohmann::json::parse(*text, nullptr, false);
+  if (!json.is_object()) return {Found::Damaged, {}, {}};
+  return {Found::Save, *text, std::move(json)};
+}
+
+// A name beside `file` for it once damaged that no file has yet; nullopt when all are taken.
+std::optional<std::filesystem::path> damaged_name(const std::filesystem::path& file) {
   const std::string first = file.string() + kDamagedSuffix;
   std::filesystem::path name = first;
-  for (int number = kFirstNumberedDamaged; number <= kMostDamagedKept; ++number) {
+  for (int number = kFirstNumberedDamaged; number <= kMostDamagedSavesKept + 1; ++number) {
     if (!is_there(name)) return name;
     name = first + "." + std::to_string(number);
   }
-  return name;
+  return std::nullopt;
 }
 
 // Moves a damaged save out of the way of the next one; nullopt when it could not be moved.
 std::optional<std::filesystem::path> move_aside(const std::filesystem::path& file) {
-  std::filesystem::path aside = damaged_name(file);
+  auto aside = damaged_name(file);
+  if (!aside) return std::nullopt;
   std::error_code fs_error;
-  std::filesystem::rename(file, aside, fs_error);
+  std::filesystem::rename(file, *aside, fs_error);
   if (fs_error) return std::nullopt;
   return aside;
 }
 
-// Where a damaged save went, for what is said about it.
-std::string said_where(const std::optional<std::filesystem::path>& aside) {
-  return aside ? "moved to " + aside->string() : "could not be moved aside";
-}
-
-// A save written beside the file and flushed to the disk; nothing is left of it when it cannot be.
-bool write_partial(const std::filesystem::path& partial, const std::string& text, const durable::Flush& flush) {
-  if (durable::write_flushed(partial, text, flush)) return true;
-  std::error_code fs_error;
-  std::filesystem::remove(partial, fs_error);
-  return false;
-}
+std::filesystem::path backup_of(const std::filesystem::path& file) { return file.string() + kBackupSuffix; }
 
 }  // namespace
 
-std::filesystem::path SaveFile::backup_file() const { return file_.string() + kBackupSuffix; }
+void remove_save(const std::filesystem::path& file) {
+  std::error_code fs_error;
+  std::filesystem::remove(file, fs_error);
+  std::filesystem::remove(backup_of(file), fs_error);
+}
+
+std::filesystem::path SaveFile::backup_file() const { return backup_of(file_); }
 
 void SaveFile::load() {
   if (loaded_ || in_memory()) return;
   loaded_ = true;
-  if (!is_there(file_)) return;
-  if (const auto contents = read_save(file_)) {
-    keep(*contents);
-    return;
-  }
-  recover_from_damage();
+  const SaveReading main = read_save(file_);
+  const std::string named = "the save file " + file_.string();
+  if (main.found == Found::Save) return take(main);
+  if (main.found == Found::Unreadable) return refuse_writes(named + " cannot be read");
+  if (main.found == Found::Nothing) return recover(named + " is missing", false);
+  const auto aside = set_aside(file_);
+  if (aside) recover(named + " is damaged (moved to " + aside->string() + ")", true);
 }
 
-void SaveFile::keep(const nlohmann::json& contents) {
-  for (const auto& [key, value] : contents.items()) {
+void SaveFile::take(const SaveReading& reading) {
+  for (const auto& [key, value] : reading.json.items()) {
     if (const auto keeping = saved::entry(value)) values_[key] = *keeping;
   }
+  on_disk_ = reading.text;
 }
 
-// The damaged save is moved aside, kept for whoever wants to look into it; the backup takes its
-// place, or nothing does when the backup is damaged too.
-void SaveFile::recover_from_damage() {
-  const auto aside = move_aside(file_);
-  file_is_good_ = aside.has_value();
-  const std::string damaged = "the save file " + file_.string() + " is damaged (" + said_where(aside) + ")";
-  if (const auto backup = read_save(backup_file())) {
-    keep(*backup);
-    log::error(damaged + ": its backup " + backup_file().string() + " was loaded instead");
+// The backup takes the place of a save that is damaged or missing (`trouble` says which; a missing
+// save with no backup either is a game's first run).
+void SaveFile::recover(const std::string& trouble, bool damaged) {
+  const SaveReading backup = read_save(backup_file());
+  const std::string named = "its backup " + backup_file().string();
+  if (backup.found == Found::Save) return restore_from(backup, trouble, damaged);
+  if (backup.found == Found::Unreadable) return refuse_writes(trouble + " and " + named + " cannot be read");
+  if (backup.found == Found::Nothing) {
+    if (damaged)
+      log::error(trouble + " and has no backup (" + backup_file().string() + "): the game starts from nothing");
     return;
   }
-  log::error(damaged + " and its backup " + backup_file().string() +
-             " cannot be read either: the game starts from nothing");
+  const auto aside = set_aside(backup_file());
+  if (aside)
+    log::error(trouble + " and " + named + " is damaged too (moved to " + aside->string() +
+               "): the game starts from nothing");
 }
 
-// The save about to be replaced becomes the backup. (Copied, not moved: there is a save in its
-// place at every moment.)
-bool SaveFile::holds_good_save() const { return file_is_good_ && is_there(file_); }
+// The backup is loaded and written back as the save: the next run finds it in its place.
+void SaveFile::restore_from(const SaveReading& backup, const std::string& trouble, bool damaged) {
+  take(backup);
+  on_disk_.clear();  // (the save's file holds nothing yet)
+  const std::string said = trouble + ": its backup " + backup_file().string() + " was loaded instead";
+  log::write(damaged ? log::Level::Error : log::Level::Warning, said);
+  if (durable::replace_file(file_, backup.text, flush_)) {
+    on_disk_ = backup.text;
+    return;
+  }
+  log::warning("the backup could not be written back as " + file_.string());
+}
 
+// Moves a damaged save aside; when it cannot be moved, nothing is written over it this run.
+std::optional<std::filesystem::path> SaveFile::set_aside(const std::filesystem::path& damaged) {
+  auto aside = move_aside(damaged);
+  if (!aside) refuse_writes("the damaged save " + damaged.string() + " could not be moved aside");
+  return aside;
+}
+
+void SaveFile::refuse_writes(const std::string& why) {
+  writes_refused_ = true;
+  log::error(why + ": the game is not saved this run, so that no save is lost");
+}
+
+// The save about to be replaced becomes the backup, written as a save is.
 void SaveFile::back_up_previous() const {
-  if (!holds_good_save()) return;  // a damaged save never takes the good backup's place
-  std::error_code fs_error;
-  std::filesystem::copy_file(file_, backup_file(), std::filesystem::copy_options::overwrite_existing, fs_error);
-  if (fs_error) log::warning("the save file " + file_.string() + " could not be backed up: " + fs_error.message());
+  if (on_disk_.empty()) return;
+  if (!durable::replace_file(backup_file(), on_disk_, flush_)) {
+    log::warning("the save file " + file_.string() + " could not be backed up to " + backup_file().string());
+  }
 }
 
 bool SaveFile::write() {
   if (in_memory()) return true;
+  if (writes_refused_) return false;  // (why was said when the save was read)
   std::error_code fs_error;
   std::filesystem::create_directories(file_.parent_path(), fs_error);
-  // Written beside the file, flushed to the disk and moved over it: a crash mid-write never leaves
-  // half a save.
-  const std::filesystem::path partial = file_.string() + kPartialSuffix;
   const std::string text = saved::written(as_json(values_), kIndent) + "\n";
-  if (!write_partial(partial, text, flush_)) return false;
   back_up_previous();
-  std::filesystem::rename(partial, file_, fs_error);
-  if (fs_error) return false;
-  file_is_good_ = true;
+  if (!durable::replace_file(file_, text, flush_)) return false;
+  on_disk_ = text;
   return true;
 }
 

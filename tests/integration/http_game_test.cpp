@@ -15,6 +15,7 @@
 #include "core/config.hpp"
 #include "editor/editor_session.hpp"
 #include "http_test_server.hpp"
+#include "storage/save_file.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -70,7 +71,7 @@ TEST_CASE("a script's request is answered in its block, on a frame of the game, 
   const std::string seen = server.last_request();
   CHECK(seen.find("\r\nContent-Type: application/json\r\n") != std::string::npos);
   CHECK(seen.substr(seen.find("\r\n\r\n") + 4) == "{\"player\":\"ana\",\"points\":120}");
-  std::filesystem::remove(save_file());
+  remove_save(save_file());
 }
 
 TEST_CASE("a game that ends gives its requests up: no block of it is ever called") {
@@ -83,7 +84,7 @@ TEST_CASE("a game that ends gives its requests up: no block of it is ever called
     REQUIRE(eventually([&server] { return server.requests() == 1; }));
   }
   CHECK(eventually([&server] { return server.saw_hang_up(); }));
-  std::filesystem::remove(save_file());
+  remove_save(save_file());
 }
 
 TEST_CASE("stopping a game played in the editor gives its requests up") {
