@@ -22,5 +22,10 @@ std::filesystem::path fresh_save_file_in(const std::filesystem::path& work_dir, 
 std::filesystem::path fresh_settings_file_for(const std::filesystem::path& game_dir,
                                               const std::filesystem::path& work_dir,
                                               const std::filesystem::path& test_file);
+// The same for the players' bindings of a tested game (Input.bind), ending in -bindings.json: a
+// test never plays with keys a person bound anew, nor changes them.
+std::filesystem::path fresh_bindings_file_for(const std::filesystem::path& game_dir,
+                                              const std::filesystem::path& work_dir,
+                                              const std::filesystem::path& test_file);
 
 }  // namespace redgem::testing

@@ -53,6 +53,8 @@ class ScriptHost {
   void dispatch(const net::NetworkEvent& event);
   // Hands the answer of a web request to the block waiting for it (HTTP).
   void dispatch(const net::HttpResult& result);
+  // Hands the key or button a capture caught to the block waiting for it (Input.capture_next).
+  void dispatch(const CapturedBinding& caught);
   // Tells Ruby's own bookkeeping (Network handlers, the blocks of HTTP requests) that the scene's
   // objects are gone.
   void scene_was_reset();

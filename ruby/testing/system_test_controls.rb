@@ -16,21 +16,21 @@ class SystemTest
     TestInput.type("")
   end
 
-  # A gamepad: pushes a stick (:left_x, :left_y, :right_x, :right_y; left and up are negative) or
-  # pulls a trigger for some frames, then lets go.
-  def tilt(axis, amount, frames:)
-    TestInput.set_gamepad_axis(axis, amount.to_f)
+  # A gamepad (the first, or pad: its number): pushes a stick (:left_x, :left_y, :right_x,
+  # :right_y; left and up are negative) or pulls a trigger for some frames, then lets go.
+  def tilt(axis, amount, frames:, pad: Input::FIRST_PAD)
+    TestInput.set_gamepad_axis(axis, amount.to_f, pad)
     wait(frames)
-    TestInput.set_gamepad_axis(axis, 0.0)
+    TestInput.set_gamepad_axis(axis, 0.0, pad)
   end
 
-  def hold_button(*buttons, frames:)
-    buttons.each { |button| TestInput.set_gamepad_button(button, true) }
+  def hold_button(*buttons, frames:, pad: Input::FIRST_PAD)
+    buttons.each { |button| TestInput.set_gamepad_button(button, true, pad) }
     wait(frames)
-    buttons.each { |button| TestInput.set_gamepad_button(button, false) }
+    buttons.each { |button| TestInput.set_gamepad_button(button, false, pad) }
   end
 
-  def press_button(button) = hold_button(button, frames: 1)
+  def press_button(button, pad: Input::FIRST_PAD) = hold_button(button, frames: 1, pad: pad)
 
   def move_mouse(x, y) = TestInput.move_mouse(x.to_f, y.to_f)
 

@@ -15,6 +15,7 @@
 
 #include <mruby.h>
 
+#include <cstddef>
 #include <optional>
 #include <string>
 
@@ -96,6 +97,9 @@ mrb_float finite(mrb_state* mrb, mrb_float value);
 mrb_float at_least(mrb_state* mrb, mrb_float value, mrb_float low, const char* what);
 mrb_float more_than(mrb_state* mrb, mrb_float value, mrb_float low, const char* what);
 mrb_float from_to(mrb_state* mrb, mrb_float value, mrb_float low, mrb_float high, const char* what);
+
+// A gamepad's number as a script gives it (pad: 1): an ArgumentError outside 0 to kMaxGamepads - 1.
+std::size_t pad_number(mrb_state* mrb, mrb_int pad);
 
 // The single argument of a native method: any value, a finite number, true or false, or a name
 // (a Symbol or a String).

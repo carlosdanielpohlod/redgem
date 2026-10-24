@@ -5,7 +5,6 @@
 namespace redgem {
 
 namespace {
-constexpr int kFirstGamepad = 0;
 constexpr float kHalf = 0.5f;
 constexpr float kTriggerReleased = -1.0f;  // what raylib reports for a trigger nobody touches
 // raylib's names for the axes and buttons, in GamepadAxis' and GamepadButton's order.
@@ -18,12 +17,12 @@ constexpr int kRaylibButtons[] = {
     GAMEPAD_BUTTON_LEFT_FACE_DOWN,  GAMEPAD_BUTTON_LEFT_FACE_LEFT,   GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
     GAMEPAD_BUTTON_LEFT_THUMB,      GAMEPAD_BUTTON_RIGHT_THUMB};
 
-// The first gamepad, which must be plugged in.
-GamepadSample read_gamepad() {
+// A gamepad, which must be plugged in.
+GamepadSample read_gamepad(int pad) {
   GamepadSample sample;
   sample.connected = true;
   for (std::size_t i = 0; i < kGamepadAxisCount; ++i) {
-    sample.axes[i] = GetGamepadAxisMovement(kFirstGamepad, kRaylibAxes[i]);
+    sample.axes[i] = GetGamepadAxisMovement(pad, kRaylibAxes[i]);
   }
   // raylib reports a trigger from -1 (released) to 1 (pulled): here 0 to 1.
   for (const GamepadAxis trigger : {GamepadAxis::LeftTrigger, GamepadAxis::RightTrigger}) {
@@ -31,7 +30,7 @@ GamepadSample read_gamepad() {
     value = (value - kTriggerReleased) * kHalf;
   }
   for (std::size_t i = 0; i < kGamepadButtonCount; ++i) {
-    sample.buttons[i] = IsGamepadButtonDown(kFirstGamepad, kRaylibButtons[i]);
+    sample.buttons[i] = IsGamepadButtonDown(pad, kRaylibButtons[i]);
   }
   return sample;
 }
@@ -62,8 +61,9 @@ std::string RaylibInputSource::typed_text() const {
   return text;
 }
 
-GamepadSample RaylibInputSource::gamepad() const {
-  return IsGamepadAvailable(kFirstGamepad) ? read_gamepad() : GamepadSample{};
+GamepadSample RaylibInputSource::gamepad(std::size_t pad) const {
+  const int number = static_cast<int>(pad);
+  return IsGamepadAvailable(number) ? read_gamepad(number) : GamepadSample{};
 }
 
 }  // namespace redgem

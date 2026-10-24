@@ -13,6 +13,9 @@ namespace redgem {
 // stay the same for as long as the game stays where it is.
 // (A save is only ever looked for in the one place: none is taken over from another.)
 std::filesystem::path save_file_for(const std::filesystem::path& game_dir);
+// A game's own file in `folder`, named as its save is named in the saves folder (by-id/<id>.json,
+// or <folder name>-<digits>.json): what else the engine keeps per game follows the same rules.
+std::filesystem::path game_file_in(const std::filesystem::path& folder, const std::filesystem::path& game_dir);
 // What a game's settings are kept by in the user's settings (its display settings): its id, or,
 // for a game with none, the name its save file is given after "folder:" ("folder:<name>-<digits>").
 std::string game_settings_key(const std::filesystem::path& game_dir);

@@ -44,10 +44,14 @@ std::string folder_name(const std::filesystem::path& game_dir) {
 
 }  // namespace
 
-std::filesystem::path save_file_for(const std::filesystem::path& game_dir) {
+std::filesystem::path game_file_in(const std::filesystem::path& folder, const std::filesystem::path& game_dir) {
   const std::string id = read_game_settings(game_dir).id;
-  if (!id.empty()) return saves_folder() / kSavesByIdFolder / (id + kSaveExtension);
-  return saves_folder() / (folder_name(game_dir) + kSaveExtension);
+  if (!id.empty()) return folder / kSavesByIdFolder / (id + kSaveExtension);
+  return folder / (folder_name(game_dir) + kSaveExtension);
+}
+
+std::filesystem::path save_file_for(const std::filesystem::path& game_dir) {
+  return game_file_in(saves_folder(), game_dir);
 }
 
 std::string game_settings_key(const std::filesystem::path& game_dir) {

@@ -16,6 +16,7 @@ bool Engine::finished() const { return context_.quit_requested || !presenter_->o
 
 void Engine::frame(float frame_seconds) {
   read_input();
+  hand_on_capture();
   context_.hud.clear();
   scripts_->start_pending();
   poll_network();
@@ -25,6 +26,7 @@ void Engine::frame(float frame_seconds) {
   present();
   audio().update();
   ++context_.time.frame;
+  keep_bindings();
   switch_scene_if_asked();
 }
 
@@ -33,6 +35,10 @@ void Engine::read_input() {
   const SurfaceSize surface = presenter_->surface_size();
   input_source().fit_surface(static_cast<float>(surface.width), static_cast<float>(surface.height));
   input_.update(input_source());
+}
+
+void Engine::hand_on_capture() {
+  if (const auto caught = input_.take_captured()) scripts_->dispatch(*caught);
 }
 
 InputSource& Engine::input_source() {

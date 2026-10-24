@@ -47,7 +47,19 @@ std::optional<Value> find_named(const Named<Value> (&table)[Count], const std::s
   return std::nullopt;
 }
 
+template <typename Value, std::size_t Count>
+std::string name_of(const Named<Value> (&table)[Count], Value value) {
+  for (const Named<Value>& known : table) {
+    if (value == known.value) return known.name;
+  }
+  return {};
+}
+
 }  // namespace
+
+std::string gamepad_axis_name(GamepadAxis axis) { return name_of(kGamepadAxisNames, axis); }
+
+std::string gamepad_button_name(GamepadButton button) { return name_of(kGamepadButtonNames, button); }
 
 std::optional<GamepadAxis> gamepad_axis_from_name(const std::string& name) {
   return find_named(kGamepadAxisNames, name);

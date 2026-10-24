@@ -51,6 +51,9 @@ struct ScriptContext {
   // Width of a text in pixels at a size (the font it is drawn with; estimated_text_width without one).
   std::function<int(const std::string&, int)> measure_text;
   std::string ui_font;  // selected game face; empty uses the built-in font
+  // Called when a player's bindings changed (Input.bind, unbind, reset_bindings), so that they are
+  // kept for the next run; null when nobody keeps them.
+  std::function<void()> on_bindings_changed;
   // Input.mouse_locked: the pointer is hidden and kept in the window (first-person cameras).
   bool mouse_locked = false;
   // Input.touch_controls: whether a touch screen shows its stick and buttons.

@@ -138,10 +138,11 @@ not a promise of how it will be closed.
 
 ### What a shipped game offers its players
 
-- Input actions are fixed (`jump`, `fire`, `run` and two axes): games cannot declare their own, and
-  players cannot rebind keys. One gamepad, no rumble.
-- `UI` has no key capture (for a rebinding screen), word wrap, anchors or scroll lists. Android has
-  no on-screen keyboard.
+- Players can rebind a game's actions (`Input.bind`, `Input.capture_next`), but the settings screen
+  has no controls page yet: a game builds its own with `UI`. Gamepads cannot rumble (neither the
+  desktops' window library nor Android offers it), the mouse cannot be bound to an action, and a
+  capture catches keys and buttons, not sticks or triggers.
+- `UI` has no word wrap, anchors or scroll lists. Android has no on-screen keyboard.
 
 ### Audio
 

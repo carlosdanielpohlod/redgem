@@ -16,7 +16,8 @@ class TouchInputSource final : public InputSource {
 
   bool is_key_down(Key key) const override { return devices_.is_key_down(key); }
   MouseSample mouse() const override { return devices_.mouse(); }
-  GamepadSample gamepad() const override;
+  // The on-screen controls stand in for the first gamepad only.
+  GamepadSample gamepad(std::size_t pad) const override;
   std::string typed_text() const override { return devices_.typed_text(); }
   const TouchLayout* touch_layout() const override { return shown_ ? &touch_.layout() : nullptr; }
   void show_touch_controls(bool show) override { wanted_ = show; }

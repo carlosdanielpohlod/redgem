@@ -11,7 +11,7 @@ class RaylibInputSource final : public InputSource {
  public:
   bool is_key_down(Key key) const override;
   MouseSample mouse() const override;
-  GamepadSample gamepad() const override;
+  GamepadSample gamepad(std::size_t pad) const override;
   std::string typed_text() const override;
 };
 
