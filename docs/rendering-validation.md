@@ -62,13 +62,17 @@ pass stores the expected previous view distance alongside its velocity, using th
 and bone transforms. Color history is read where the surface was, without either frame's
 Halton shift: the history is the average over every shift, so a still view holds still. Only
 the depth lookup accounts for the current and previous shifts, because each stored depth is the
-previous frame's jittered sample. Depth is checked over the reprojected texel and its eight
-neighbors: one match keeps the history (the previous sample may have landed one texel over at a
-silhouette, against the sky or another surface), none rejects it. Where only some match (a depth
-edge), the filtered color is kept within the four nearest texels' colors, so the spline's outer
-taps add no color from across the edge. An uninitialized frame cannot
-accumulate history; its output still initializes depth for the next frame. Sky (any depth below a
-small threshold) and points behind the previous camera have distinct markers. Deliberately stochastic coverage (distance fades
+previous frame's jittered sample. The pixel's own previous depth is looked for where its own
+motion takes it, even where its color follows the nearest surface's motion at an edge. Depth is
+checked over that texel and its eight neighbors, each with a slope margin for its own distance:
+one match keeps the history (the previous sample may have landed one texel over at a silhouette,
+against the sky or another surface), none rejects it. Where only some match (a depth edge), the
+filtered color is kept within the four nearest texels' colors, so the spline's outer taps add
+no color from across the edge. Where the pixel's own texel held another surface and the
+surfaces around it separate slowly (under two pixels a frame), the color is instead held to the
+colors of the matching texels: an object moving away leaves no ghost. An uninitialized frame cannot
+accumulate history; its output still initializes depth for the next frame. Sky (any depth below
+half the near plane's) and points behind the previous camera have distinct markers. Deliberately stochastic coverage (distance fades
 and dithered transparency) has signed depth metadata, allowing covered samples and sky holes
 to accumulate. An opaque center pixel still requires its own depth match; a neighboring
 stochastic surface cannot make unrelated opaque history valid.
@@ -80,7 +84,8 @@ The first temporal frame now also draws the motion pass so its depth history sta
 
 Isolated resolve tests distinguish depth rejection from color clipping and velocity rejection.
 They cover zero-motion disocclusion, expected previous depth, invalid history, sky, jittered depth
-edges, colors beside a depth edge and distant values. Scene regressions additionally exercise a stopped foreground object
+edges, colors beside a depth edge, a slow object moving away, a pixel whose neighbor moves
+differently, a sloped surface, a near plane of one millimeter and distant values. Scene regressions additionally exercise a stopped foreground object
 that disappears and approaching rigid and skinned geometry, with zero and four MSAA samples.
 The approaching surfaces use dithered coverage so discarding all history cannot pass as a fix.
 A still, turned cube in front of the sky and of a wall checks that the settled picture changes by

@@ -31,6 +31,7 @@ constexpr float kDepthHardware = 0.5f;
 constexpr float kDepthInvalid = -1024.0f;          // the surface was behind the previous camera
 constexpr int kStripeColumn = kDepthSide / 2 - 2;  // beyond the 3x3 previous depths the center pixel checks
 constexpr float kStripeShift = 2.0f / kDepthSide;  // a jitter difference that brings the stripe to the center
+constexpr float kHalfTexel = 0.5f;
 
 using DepthPixels = std::array<Vector4, kDepthPixels>;
 
@@ -71,9 +72,20 @@ struct DepthInput {
   Vector2 previous_jitter{};
   std::optional<float> stripe;  // the previous depth of one column of history, kStripeColumn
   float stripe_color = kDepthHistory;
-  Vector2 motion{};
+  Vector2 motion{};  // in texture coordinates
   std::optional<float> center;
+  float near = kDepthNear;
+  float slope = 0.0f;  // the previous depth's change for each texel across, the same surface's now and before
+  int stripe_column = kStripeColumn;
+  // The pixel right of the center: a nearer surface (`neighbour_depth`) moving this much, whose
+  // previous depth the history's `foreground_columns` leftmost columns hold.
+  std::optional<Vector2> neighbour_motion;
+  float neighbour_depth = encoded_depth(kDepthForeground);
+  int foreground_columns = 0;
 };
+
+constexpr float kDepthNearer = 0.3f;  // hardware depth of the neighbour, nearer than kDepthHardware
+constexpr std::size_t kNeighbourPixel = (kDepthSide / 2) * kDepthSide + kDepthSide / 2 + 1;
 
 void depth_inputs(const Shader& shader, const std::array<Texture2D, 4>& textures, const DepthInput& input) {
   SetShaderValueTexture(shader, GetShaderLocation(shader, "historyTexture"), textures[1]);
@@ -82,35 +94,57 @@ void depth_inputs(const Shader& shader, const std::array<Texture2D, 4>& textures
   SetShaderValueMatrix(shader, GetShaderLocation(shader, "reprojection"), MatrixIdentity());
   depth_vector(shader, "texelSize", {1.0f / kDepthSide, 1.0f / kDepthSide});
   depth_vector(shader, "depthProjection",
-               {-(kDepthFar + kDepthNear) / (kDepthFar - kDepthNear),
-                -2.0f * kDepthFar * kDepthNear / (kDepthFar - kDepthNear)});
+               {-(kDepthFar + input.near) / (kDepthFar - input.near),
+                -2.0f * kDepthFar * input.near / (kDepthFar - input.near)});
   depth_vector(shader, "currentJitter", input.current_jitter);
   depth_vector(shader, "previousJitter", input.previous_jitter);
   depth_uniform(shader, "historyValid", input.valid);
 }
 
-DepthPixels history_depth_pixels(const DepthInput& input) {
-  DepthPixels pixels = filled_depth({kDepthHistory, kDepthHistory, kDepthHistory, input.held});
-  if (!input.stripe) return pixels;
+// Where, in texels across, the center pixel's surface was in the frame before.
+float previous_center(const DepthInput& input) {
+  return static_cast<float>(kDepthSide / 2) + kHalfTexel - input.motion.x * kDepthSide;
+}
+
+Vector4 history_texel(const DepthInput& input, int x) {
+  float held = input.held + input.slope * (static_cast<float>(x) + kHalfTexel - previous_center(input));
+  if (x < input.foreground_columns) held = input.neighbour_depth;
+  if (x != input.stripe_column) return {kDepthHistory, kDepthHistory, kDepthHistory, held};
   const float c = input.stripe_color;
-  for (int y = 0; y < kDepthSide; ++y) {
-    pixels[static_cast<std::size_t>(y * kDepthSide + kStripeColumn)] = {c, c, c, *input.stripe};
-  }
+  return {c, c, c, input.stripe.value_or(held)};
+}
+
+DepthPixels history_depth_pixels(const DepthInput& input) {
+  DepthPixels pixels{};
+  for (std::size_t i = 0; i < pixels.size(); ++i) pixels[i] = history_texel(input, static_cast<int>(i % kDepthSide));
   return pixels;
 }
 
 DepthPixels motion_depth_pixels(const DepthInput& input) {
-  DepthPixels pixels = filled_depth({input.motion.x, input.motion.y, input.expected, 0});
+  DepthPixels pixels{};
+  for (std::size_t i = 0; i < pixels.size(); ++i) {
+    const auto across = static_cast<float>(static_cast<int>(i % kDepthSide) - kDepthSide / 2);
+    pixels[i] = {input.motion.x, input.motion.y, input.expected + input.slope * across, 0};
+  }
   if (input.center) {
     pixels[static_cast<std::size_t>((kDepthSide / 2) * kDepthSide + kDepthSide / 2)].z = *input.center;
   }
+  if (input.neighbour_motion) {
+    pixels[kNeighbourPixel] = {input.neighbour_motion->x, input.neighbour_motion->y, input.neighbour_depth, 0};
+  }
+  return pixels;
+}
+
+DepthPixels hardware_pixels(const DepthInput& input) {
+  DepthPixels pixels = filled_depth({input.hardware, 0, 0, 0});
+  if (input.neighbour_motion) pixels[kNeighbourPixel].x = kDepthNearer;
   return pixels;
 }
 
 std::array<Texture2D, 4> depth_textures(const DepthInput& input) {
   const std::array<Texture2D, 4> textures{
       depth_texture(current_depth_pixels()), depth_texture(history_depth_pixels(input)),
-      depth_texture(motion_depth_pixels(input)), depth_texture(filled_depth({input.hardware, 0, 0, 0}))};
+      depth_texture(motion_depth_pixels(input)), depth_texture(hardware_pixels(input))};
   SetTextureFilter(textures[1], TEXTURE_FILTER_BILINEAR);  // as the renderer's history targets are
   return textures;
 }
@@ -277,4 +311,65 @@ TEST_CASE("temporal history beside a depth edge takes no color from the other su
   const ::Color same = beside_depth_edge(kDepthHistory);
   CHECK(same.r > kDepthColorByte + kDepthPixelTolerance);
   CHECK(std::abs(static_cast<int>(dark.r) - static_cast<int>(same.r)) <= static_cast<int>(kDepthPixelTolerance));
+}
+
+namespace {
+
+constexpr float kTinyNear = 0.001f;     // meters: the nearest clip distance a camera may use
+constexpr float kNearSurface = 0.005f;  // meters: a surface between that near plane and the old sky limit
+constexpr float kSurfaceSlope = 0.02f;  // logarithmic depth per texel: a steep, but single, surface
+constexpr int kSplineOvershoot = 4;     // bytes the spline's outer tap moves the result, at least
+
+}  // namespace
+
+TEST_CASE("temporal depth validation tells a surface just past a tiny near plane from the sky") {
+  DepthInput input;
+  input.near = kTinyNear;
+  input.expected = encoded_depth(kNearSurface);
+  input.held = 0;
+  check_current_depth_pixel(resolved_depth_pixel(input));
+  input.held = input.expected;
+  CHECK(resolved_depth_pixel(input).r > kDepthColorByte + kDepthPixelTolerance);
+}
+
+TEST_CASE("temporal history on a sloped surface keeps the sharp spline: every neighbour's depth matches") {
+  DepthInput input;
+  input.slope = kSurfaceSlope;
+  input.motion = {kBetweenTexels, 0};
+  input.stripe_color = kDarkStripe;
+  const ::Color dark = resolved_depth_pixel(input);
+  input.stripe_color = kDepthHistory;
+  const ::Color same = resolved_depth_pixel(input);
+  CHECK(same.r > kDepthColorByte + kDepthPixelTolerance);
+  CHECK(std::abs(static_cast<int>(dark.r) - static_cast<int>(same.r)) >= kSplineOvershoot);
+}
+
+namespace {
+
+constexpr float kWideMotion =
+    3.0f / kDepthSide;  // the neighbour's motion: its 3x3 of history lies left of the center's
+constexpr float kSlowMotion = 0.5f / kDepthSide;  // a slow object moving away from the center pixel
+constexpr int kForegroundColumns = 3;
+
+}  // namespace
+
+TEST_CASE("temporal depth validation looks for the pixel's own previous depth where its own motion takes it") {
+  DepthInput input;  // the center shows the background; its right neighbour, a nearer surface that moved
+  input.neighbour_motion = Vector2{kWideMotion, 0};
+  input.foreground_columns = kForegroundColumns;
+  CHECK(resolved_depth_pixel(input).r > kDepthColorByte + kDepthPixelTolerance);
+}
+
+TEST_CASE("temporal history revealed behind an object that moved away keeps none of the object's color") {
+  DepthInput input;  // the center texel held the object, which now lies one pixel right and moves on
+  input.neighbour_motion = Vector2{kSlowMotion, 0};
+  input.stripe_column = kDepthSide / 2;
+  input.stripe = input.neighbour_depth;
+  input.stripe_color = kDarkStripe;
+  const ::Color object = resolved_depth_pixel(input);
+  input.stripe_color = kDepthHistory;
+  const ::Color background = resolved_depth_pixel(input);
+  CHECK(background.r > kDepthColorByte + kDepthPixelTolerance);
+  CHECK(std::abs(static_cast<int>(object.r) - static_cast<int>(background.r)) <=
+        static_cast<int>(kDepthPixelTolerance));
 }

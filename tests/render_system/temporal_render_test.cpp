@@ -790,3 +790,57 @@ TEST_CASE("smoothed with the frames before, a still cube's silhouette against th
     CHECK(soft > hard + kSoftenedLeast);
   }
 }
+
+namespace {
+
+// A thin pole and the turned cube, each drifting slowly across the view: under a pixel a frame.
+constexpr Vec3 kPoleSize{0.05f, 4.0f, 0.05f};  // meters: about a pixel and a half wide from the camera
+constexpr float kSlowStride = 0.01f;           // meters a frame: about a third of a pixel
+constexpr int kDriftFrames = 4 * render_math::kJitterPhases;
+constexpr int kPoleLooseColumns = 2;  // columns the drifting pole may cover beyond the still one's
+// Partly covered pixels the drifting cube's silhouette keeps beyond a single sample's, at least
+// (it keeps over 200; with no history at its edges, none).
+constexpr int kDriftSoftenedLeast = 150;
+
+SceneDesc pole_scene() {
+  SceneDesc desc = glowing_cube(temporal());
+  desc.nodes[1].local.position = Vec3::zero();
+  desc.nodes[1].local.scale = kPoleSize;
+  return desc;
+}
+
+// The last of `frames` pictures of `desc`'s node 1 drifting right by `stride` meters a frame.
+Picture drifted(const SceneDesc& desc, float stride, int frames, const std::string& name) {
+  RenderStage stage;
+  stage.set_clock(0.0);
+  stage.upload(desc);
+  Scene scene = Scene::from_desc(desc);
+  const ObjectId moving = scene.find("Cube");
+  const Vec3 start = desc.nodes[1].local.position;
+  Picture picture;
+  for (int frame = 0; frame < frames; ++frame) {
+    scene.set_world_position(moving, start + Vec3{stride * static_cast<float>(frame), 0.0f, 0.0f});
+    picture = stage.draw(scene, name);
+  }
+  return picture;
+}
+
+}  // namespace
+
+TEST_CASE("smoothed with the frames before, a thin pole drifting slowly in front of the sky leaves no trail") {
+  const int still = green_columns(drifted(pole_scene(), 0.0f, kDriftFrames, "temporal_pole_still"));
+  REQUIRE(still > 0);
+  const int drifting = green_columns(drifted(pole_scene(), kSlowStride, kDriftFrames, "temporal_pole_drifting"));
+  MESSAGE("pole columns: still " << still << ", drifting " << drifting);
+  CHECK(drifting <= still + kPoleLooseColumns);
+}
+
+TEST_CASE("smoothed with the frames before, a slowly moving cube's silhouette keeps its history") {
+  for (const bool wall : {false, true}) {
+    const SceneDesc desc = turned_cube(temporal(), wall);
+    const int hard = partly_covered_pixels(drifted(desc, kSlowStride, 1, "temporal_drift_one_sample"));
+    const int soft = partly_covered_pixels(drifted(desc, kSlowStride, kDriftFrames, "temporal_drift_smoothed"));
+    MESSAGE("wall " << wall << ": partly covered pixels " << hard << " one sample, " << soft << " drifting");
+    CHECK(soft > hard + kDriftSoftenedLeast);
+  }
+}
