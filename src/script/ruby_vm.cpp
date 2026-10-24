@@ -94,41 +94,74 @@ mrb_value run_describe(mrb_state* mrb, void* userdata) {
   return mrb_nil_value();
 }
 
+constexpr const char* kTimeoutClass = "ScriptTimeout";  // what a call that ran past its budget ends with
+
+// Counts a call from C++ against the budget for as long as it lasts.
+class BudgetedCall {
+ public:
+  explicit BudgetedCall(ScriptBudget& budget) : budget_(budget) { budget_.begin_call(); }
+  ~BudgetedCall() { budget_.end_call(); }
+  BudgetedCall(const BudgetedCall&) = delete;
+  BudgetedCall& operator=(const BudgetedCall&) = delete;
+
+ private:
+  ScriptBudget& budget_;
+};
+
+// The error a call that runs too long ends with. Not a StandardError: a bare `rescue` does not
+// take it for one of the script's own. (Rooted: a script removing the constant cannot free it.)
+RClass* define_timeout_class(mrb_state* mrb) {
+  RClass* timeout = mrb_define_class(mrb, kTimeoutClass, mrb->eException_class);
+  mrb_gc_register(mrb, mrb_obj_value(timeout));
+  return timeout;
+}
+
+}  // namespace
+
+// (The allocator's data is how the code fetch hook finds the budget: mruby has no other slot free.)
+RubyVm::RubyVm() : mrb_(mrb_open_allocf(mrb_default_allocf, &budget_)) {
+  if (mrb_ == nullptr) throw std::runtime_error("cannot create the mruby interpreter");
+  budget_.attach(mrb_, define_timeout_class(mrb_));
+}
+
+void RubyVm::set_budget(std::chrono::milliseconds budget) { budget_.set_limit(budget); }
+
 // What went wrong, as Ruby tells it: the exception inspected, then where it came from.
-std::string describe_exception(mrb_state* mrb, mrb_value exception) {
+std::string RubyVm::describe_exception(mrb_value exception) {
   mrb_bool failed = false;
   std::string text;
   DescribeRequest request{exception, &text};
-  // (Protected: an exception's own inspect may raise.)
-  mrb_protect_error(mrb, run_describe, &request, &failed);
+  // (Protected, and on a budget of its own: an exception's own inspect may raise, or never return.)
+  const BudgetedCall budgeted(budget_);
+  mrb_protect_error(mrb_, run_describe, &request, &failed);
   const bool described = !failed && !text.empty();
   return described ? text : "unknown Ruby error";
 }
 
 // Runs `body` with a Ruby error coming back as a result, instead of leaving through C++.
-RubyResult run_protected(mrb_state* mrb, mrb_protect_error_func* body, void* request) {
+RubyResult RubyVm::run_protected(mrb_protect_error_func* body, void* request) {
   mrb_bool failed = false;
   RubyResult result;
-  result.value = mrb_protect_error(mrb, body, request, &failed);
+  {
+    const BudgetedCall budgeted(budget_);
+    result.value = mrb_protect_error(mrb_, body, request, &failed);
+  }
   if (!failed) return result;
   result.ok = false;
-  result.error = describe_exception(mrb, result.value);
+  result.error = describe_exception(result.value);
   result.value = mrb_nil_value();
   return result;
 }
 
-}  // namespace
-
-RubyVm::RubyVm() : mrb_(mrb_open()) {
-  if (mrb_ == nullptr) throw std::runtime_error("cannot create the mruby interpreter");
+RubyVm::~RubyVm() {
+  budget_.set_limit(std::chrono::milliseconds(0));  // the watchdog lets go of the interpreter first
+  mrb_close(mrb_);
 }
-
-RubyVm::~RubyVm() { mrb_close(mrb_); }
 
 RubyResult RubyVm::check_syntax(const std::string& code, const std::string& file_name) {
   EvalRequest request{&code, &file_name, true};
   const int arena = mrb_gc_arena_save(mrb_);
-  RubyResult result = run_protected(mrb_, run_eval, &request);
+  RubyResult result = run_protected(run_eval, &request);
   result.value = mrb_nil_value();  // nothing ran: there is nothing to hand back
   mrb_gc_arena_restore(mrb_, arena);
   return result;
@@ -137,24 +170,24 @@ RubyResult RubyVm::check_syntax(const std::string& code, const std::string& file
 RubyResult RubyVm::eval(const std::string& code, const std::string& file_name) {
   EvalRequest request{&code, &file_name};
   const int arena = mrb_gc_arena_save(mrb_);
-  const RubyResult result = run_protected(mrb_, run_eval, &request);
+  const RubyResult result = run_protected(run_eval, &request);
   mrb_gc_arena_restore(mrb_, arena);
   return result;
 }
 
 RubyResult RubyVm::call(mrb_value receiver, const char* method, std::initializer_list<mrb_value> args) {
   CallRequest request{receiver, method, args.begin(), static_cast<mrb_int>(args.size())};
-  return run_protected(mrb_, run_call, &request);
+  return run_protected(run_call, &request);
 }
 
 RubyResult RubyVm::call(mrb_value receiver, const char* method, const std::vector<mrb_value>& args) {
   CallRequest request{receiver, method, args.data(), static_cast<mrb_int>(args.size())};
-  return run_protected(mrb_, run_call, &request);
+  return run_protected(run_call, &request);
 }
 
 RubyResult RubyVm::call_with(mrb_value receiver, const char* method, const ArgumentsMaker& make) {
   MadeCallRequest request{receiver, method, &make};
-  return run_protected(mrb_, run_made_call, &request);
+  return run_protected(run_made_call, &request);
 }
 
 }  // namespace redgem

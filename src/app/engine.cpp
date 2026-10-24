@@ -11,6 +11,7 @@
 #include "app/scene_bodies.hpp"
 #include "app/scene_water.hpp"
 #include "app/scene_files.hpp"
+#include "app/script_budget_setting.hpp"
 #include "app/splash_screen.hpp"
 #include "core/config.hpp"
 #include "core/log.hpp"
@@ -208,6 +209,7 @@ void Engine::connect_context() {
 
 void Engine::start_scripts() {
   scripts_ = std::make_unique<ScriptHost>(context_, options_.game_dir / config::kScriptsDirName);
+  scripts_->vm().set_budget(script_budget_for(options_.game_dir));
   scripts_->attach_scripts();
   scripts_->run_scene_script(context_.scene_name);
 }

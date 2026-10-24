@@ -246,8 +246,10 @@ add_custom_command(
 add_custom_target(mruby_build DEPENDS "${REDGEM_MRUBY_LIB}")
 
 add_library(mruby_lib STATIC IMPORTED GLOBAL)
+# (As mruby is built: see cmake/mruby_build_config.rb. Both change what mrb_state holds, so whatever
+# includes mruby's headers must be compiled with them too.)
 set_target_properties(mruby_lib PROPERTIES
   IMPORTED_LOCATION "${REDGEM_MRUBY_LIB}"
   INTERFACE_INCLUDE_DIRECTORIES "${mruby_SOURCE_DIR}/include"
-  INTERFACE_COMPILE_DEFINITIONS "MRB_USE_CXX_EXCEPTION")
+  INTERFACE_COMPILE_DEFINITIONS "MRB_USE_CXX_EXCEPTION;MRB_USE_DEBUG_HOOK")
 add_dependencies(mruby_lib mruby_build)

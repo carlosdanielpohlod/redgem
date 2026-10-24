@@ -46,6 +46,27 @@ Look at the Console: a script with an error is switched off and reported there. 
 class name matches the file name (`moving_door.rb` defines `MovingDoor`) and that it inherits
 from `Behaviour`.
 
+**The game freezes for a moment and a behaviour stops, with `ScriptTimeout` in the Console.**
+A call into that behaviour ran longer than the scripts' budget (1000 ms unless `game.json` says
+otherwise): it is stuck in a loop, or does far too much in one go. See
+[Behaviours](scripting/behaviours.md#a-script-that-never-returns).
+
+**A built game closed by itself.**
+A game that crashes writes a report and tells the player where it is (in a message box on
+Windows; on Linux and the Mac on its error stream, which a terminal shows). The report is a text
+file beside the game's save, in the player's home folder, in a folder named after the save:
+
+```
+.config/redgem/saves/by-id/<id>-crashes/crash-<date>-<time>.log                 Linux, Windows
+Library/Application Support/RedGem/saves/by-id/<id>-crashes/crash-<date>-<time>.log   macOS
+```
+
+(A game with no `id` uses `saves/<folder>-<digits>-crashes/`.) It says the game, the engine's
+version, the system, the time in UTC, what happened (the signal, such as `SIGSEGV`, or the
+exception and its message) and, where the system can say, the functions the program was in.
+Send it with a bug report. The save itself loses nothing: it is written to the disk on every
+change. A built game for Android writes no report yet: look in `adb logcat`.
+
 **`on_trigger_enter` never fires.**
 The object needs *Trigger* on, and the thing entering must be a character, a dynamic body or a
 kinematic body. Static scenery does not set triggers off.

@@ -5,8 +5,10 @@
 
 #include <exception>
 #include <filesystem>
+#include <new>
 
 #include "app/bundled_game.hpp"
+#include "app/crash_report.hpp"
 #include "app/game_texts.hpp"
 #include "app/user_settings.hpp"
 #include "app/window_presenter.hpp"
@@ -30,7 +32,8 @@ redgem::GameWindowOptions players_window(const std::filesystem::path& game) {
   return options;
 }
 
-// Plays the game beside `program`; an error when there is none.
+// Plays the game beside `program`; an error when there is none. From the moment the game is
+// found, a crash writes a report beside its save (see app/crash_report.hpp).
 int play_game_beside(const std::filesystem::path& program) {
   using namespace redgem;
   const auto game = bundled_game(program);
@@ -39,6 +42,7 @@ int play_game_beside(const std::filesystem::path& program) {
     log::error("no game to play: " + expected.string() + " is missing");
     return kExitFailure;
   }
+  crash::install_crash_handling({*game});
   return play_in_window(players_window(*game));
 }
 
@@ -49,9 +53,10 @@ int main(int, char**) {
     redgem::add_game_texts();
     redgem::translations::use_language(redgem::language_for_run());
     return play_game_beside(redgem::platform::executable_path());
+  } catch (const std::bad_alloc&) {
+    return redgem::crash::end_out_of_memory();
   } catch (const std::exception& error) {
     // (Whatever goes wrong while playing is said, and fails the run.)
-    redgem::log::error(error.what());
-    return redgem::kExitFailure;
+    return redgem::crash::end_with_exception(error.what());
   }
 }

@@ -287,6 +287,7 @@ redgem_add_library(redgem_runtime
   storage/save_file.cpp
   script/script_naming.cpp
   script/ruby_vm.cpp
+  script/script_budget.cpp
   script/script_host.cpp
   script/script_host_scripts.cpp
   script/script_host_callbacks.cpp
@@ -394,6 +395,7 @@ redgem_add_library(redgem_runtime
   app/bundled_game.cpp
   app/save_location.cpp
   app/input_bindings_store.cpp
+  app/script_budget_setting.cpp
   app/user_settings.cpp
   app/game_display.cpp
   app/presenter.cpp
@@ -409,16 +411,22 @@ redgem_add_library(redgem_runtime
   app/scene_water.cpp
   app/scene_files.cpp
   app/touch_circles.cpp
-  app/game_texts.cpp)
+  app/game_texts.cpp
+  app/crash_text.cpp
+  app/crash_report.cpp
+  app/crash_handlers_posix.cpp
+  app/crash_handlers_windows.cpp)
 redgem_embed_texts(redgem_runtime game)
 # (The prelude is the runtime's alone: no other library is given the folder it is generated in.)
 target_include_directories(redgem_runtime PRIVATE ${REDGEM_GENERATED_DIR})
 target_link_libraries(redgem_runtime PUBLIC redgem_net raylib Jolt mruby_lib cgltf_headers nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_runtime PRIVATE freetype)
 if(WIN32)
-  # mruby's socket and time gems use Windows' own libraries.
-  target_link_libraries(redgem_runtime PUBLIC ws2_32)
+  # mruby's socket and time gems use Windows' own libraries; a crash's message box is user32's.
+  target_link_libraries(redgem_runtime PUBLIC ws2_32 user32)
 endif()
+# What a crash report says the engine's version is: the version in project() at the top of the build.
+set_source_files_properties(app/crash_report.cpp PROPERTIES COMPILE_DEFINITIONS REDGEM_VERSION="${redgem_VERSION}")
 
 if(NOT ANDROID)
   redgem_add_library(redgem_game_server

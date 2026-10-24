@@ -1,0 +1,240 @@
+// Scripts that never return: each call into them has a budget of time (game.json's
+// script_budget_ms), past which it is stopped, its behaviour disabled, and the game goes on.
+
+#include <doctest/doctest.h>
+
+#include <mruby.h>
+#include <mruby/string.h>
+
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <map>
+#include <memory>
+#include <string>
+#include <variant>
+
+#if !defined(_WIN32)
+#include <pthread.h>
+#endif
+
+#include "app/engine.hpp"
+#include "app/script_budget_setting.hpp"
+#include "core/config.hpp"
+#include "script/ruby_vm.hpp"
+#include "script/script_config.hpp"
+#include "test_support.hpp"
+
+using namespace redgem;
+
+namespace {
+
+using Clock = std::chrono::steady_clock;
+
+constexpr std::chrono::milliseconds kTestBudget{100};
+constexpr int kTestBudgetMs = 100;  // what the test games' game.json says
+// Far more than a stopped call takes (its budget, and a few microseconds past it), far less than
+// a call that was never stopped would.
+constexpr std::chrono::seconds kStoppedWell{5};
+constexpr int kFramesAfter = 3;
+
+// Behaviours that never return from their update, and one that just counts its frames.
+const std::map<std::string, std::string> kScripts = {
+    {"looper.rb", "class Looper < Behaviour\n  def update(_dt) = loop {}\nend\n"},
+    {"spinner.rb", "class Spinner < Behaviour\n  def update(_dt)\n    while true; end\n  end\nend\n"},
+    {"diver.rb", "class Diver < Behaviour\n  def update(_dt) = dive(0)\n  def dive(depth) = dive(depth + 1)\nend\n"},
+    {"block_diver.rb",
+     "class BlockDiver < Behaviour\n  def update(_dt) = dive\n  def dive = [1].each { send(:dive) }\nend\n"},
+    // Rescuing every exception, even the budget's, still does not keep it running.
+    {"stubborn.rb",
+     "class Stubborn < Behaviour\n  def update(_dt)\n    loop do\n      begin\n        loop {}\n"
+     "      rescue Exception\n        $rescued = true\n      ensure\n        $ensured = true\n      end\n"
+     "    end\n  end\nend\n"},
+    {"starter.rb",
+     "class Starter < Behaviour\n  def start = loop {}\n  def update(_dt) = $starter_updated = true\nend\n"},
+    {"counter.rb", "class Counter < Behaviour\n  def update(_dt) = $counted = ($counted || 0) + 1\nend\n"},
+};
+
+// A game of its own in a temporary folder, with the scripts above and a budget of kTestBudgetMs.
+std::filesystem::path budget_game(const std::string& name, const std::string& settings) {
+  const std::filesystem::path game = std::filesystem::temp_directory_path() / ("redgem-budget-" + name);
+  std::filesystem::remove_all(game);
+  std::filesystem::create_directories(game / config::kScriptsDirName);
+  std::ofstream(game / "game.json") << settings;
+  for (const auto& [file, code] : kScripts) std::ofstream(game / config::kScriptsDirName / file) << code;
+  return game;
+}
+
+std::string budget_settings() { return "{\"script_budget_ms\": " + std::to_string(kTestBudgetMs) + "}"; }
+
+SceneDesc scene_of(std::initializer_list<const char*> scripts) {
+  SceneDesc desc;
+  for (const char* script : scripts) {
+    NodeDesc node;
+    node.name = script;
+    node.props = {{"script", std::string(script)}};
+    desc.nodes.push_back(node);
+  }
+  return desc;
+}
+
+std::unique_ptr<Engine> started(const std::filesystem::path& game, const SceneDesc& scene) {
+  EngineOptions options;
+  options.game_dir = game;
+  options.fixed_step = true;
+  options.scene = &scene;
+  auto created = Engine::create(options);
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  return std::move(std::get<std::unique_ptr<Engine>>(created));
+}
+
+std::string ruby(Engine& engine, const std::string& code) {
+  const RubyResult result = engine.scripts().eval(code, "test.rb");
+  REQUIRE_MESSAGE(result.ok, result.error);
+  return RSTRING_PTR(mrb_obj_as_string(engine.scripts().vm().state(), result.value));
+}
+
+// Runs frames; how long they took.
+Clock::duration frames(Engine& engine, int count) {
+  const Clock::time_point start = Clock::now();
+  for (int i = 0; i < count; ++i) engine.frame(config::kFixedDeltaSeconds);
+  return Clock::now() - start;
+}
+
+// Whether a script stuck in `script` is stopped on its first frame, reported as such, and the game
+// goes on with its other behaviours.
+void check_stopped(const char* script, const char* reported_as, const char* error) {
+  const std::filesystem::path game = budget_game(script, budget_settings());
+  const SceneDesc scene = scene_of({script, "counter.rb"});
+  test::LogCapture capture;
+  std::unique_ptr<Engine> engine = started(game, scene);
+  CHECK(frames(*engine, kFramesAfter) < kStoppedWell);
+  CHECK(engine->scripts().error_count() == 1);
+  CHECK(capture.contains(std::string(reported_as) + " on '" + script + "' (behaviour disabled)"));
+  CHECK(capture.contains(error));
+  CHECK(ruby(*engine, "$counted") == std::to_string(kFramesAfter));
+  engine.reset();
+  std::filesystem::remove_all(game);
+}
+
+}  // namespace
+
+TEST_CASE("a behaviour stuck in loop {} is stopped past its budget, disabled, and the game goes on") {
+  check_stopped("looper.rb", "Looper#update", "ScriptTimeout");
+  check_stopped("looper.rb", "Looper#update", "ms a call into the scripts may take (script_budget_ms in game.json)");
+}
+
+TEST_CASE("a behaviour stuck in while true is stopped the same way") {
+  check_stopped("spinner.rb", "Spinner#update", "ScriptTimeout");
+}
+
+TEST_CASE("a behaviour that rescues every exception is stopped all the same") {
+  check_stopped("stubborn.rb", "Stubborn#update", "ScriptTimeout");
+}
+
+TEST_CASE("a recursion too deep ends with SystemStackError, not a crash") {
+  check_stopped("diver.rb", "Diver#update", "SystemStackError");
+  // (Through a block and a method called by name: the engine's stack is never what runs out.)
+  check_stopped("block_diver.rb", "BlockDiver#update", "SystemStackError");
+}
+
+TEST_CASE("a start that never returns is stopped, and its behaviour never updated") {
+  const std::filesystem::path game = budget_game("start", budget_settings());
+  const SceneDesc scene = scene_of({"starter.rb", "counter.rb"});
+  test::LogCapture capture;
+  std::unique_ptr<Engine> engine = started(game, scene);
+  frames(*engine, kFramesAfter);
+  CHECK(capture.contains("Starter#start on 'starter.rb' (behaviour disabled)"));
+  CHECK(ruby(*engine, "$starter_updated.inspect") == "nil");
+  CHECK(ruby(*engine, "$counted") == std::to_string(kFramesAfter));
+  engine.reset();
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("code the engine runs (a scene script, a console line) is stopped the same way") {
+  const std::filesystem::path game = budget_game("eval", budget_settings());
+  const SceneDesc scene = scene_of({"counter.rb"});
+  std::unique_ptr<Engine> engine = started(game, scene);
+  const Clock::time_point start = Clock::now();
+  const RubyResult stuck = engine->scripts().eval("x = 0\nloop { x += 1 }", "stuck.rb");
+  CHECK(Clock::now() - start < kStoppedWell);
+  CHECK_FALSE(stuck.ok);
+  CHECK(stuck.error.find("ScriptTimeout") != std::string::npos);
+  // The next call has a budget of its own.
+  CHECK(ruby(*engine, "40 + 2") == "42");
+  engine.reset();
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("the budget is game.json's script_budget_ms, else the engine's own") {
+  const std::filesystem::path given = budget_game("given", budget_settings());
+  CHECK(script_budget_for(given) == kTestBudget);
+  const std::filesystem::path none = budget_game("none", "{}");
+  CHECK(script_budget_for(none).count() == config::kDefaultScriptBudgetMs);
+  for (const char* unusable : {"0", "-5", "1.5", "\"fast\"", "100000000"}) {
+    const std::filesystem::path wrong = budget_game("wrong", std::string("{\"script_budget_ms\": ") + unusable + "}");
+    test::LogCapture capture;
+    CHECK(script_budget_for(wrong).count() == config::kDefaultScriptBudgetMs);
+    CHECK(capture.contains("script_budget_ms must be a whole number"));
+    std::filesystem::remove_all(wrong);
+  }
+  std::filesystem::remove_all(given);
+  std::filesystem::remove_all(none);
+}
+
+TEST_CASE("a running game's scripts are on the budget game.json gives them") {
+  const std::filesystem::path game = budget_game("running", budget_settings());
+  const SceneDesc scene = scene_of({"counter.rb"});
+  std::unique_ptr<Engine> engine = started(game, scene);
+  CHECK(engine->scripts().vm().budget() == kTestBudget);
+  engine.reset();
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("an interpreter has no budget until given one, and each call gets all of it") {
+  RubyVm vm;
+  CHECK(vm.budget().count() == 0);
+  vm.set_budget(kTestBudget);
+  // Calls that each take most of the budget, longer than it together, all finish.
+  const std::string most_of_it =
+      "t = Time.now; while Time.now - t < " + std::to_string(kTestBudgetMs / 2 / 1000.0) + "; end; :done";
+  for (int i = 0; i < kFramesAfter; ++i) CHECK(vm.eval(most_of_it, "most.rb").ok);
+  const RubyResult stuck = vm.eval("loop {}", "stuck.rb");
+  CHECK_FALSE(stuck.ok);
+  CHECK(stuck.error.find("ScriptTimeout") != std::string::npos);
+  // An exception that never finishes saying what it is does not hang the engine either.
+  const RubyResult endless =
+      vm.eval("class Endless < StandardError; def inspect = loop {}; end; raise Endless", "e.rb");
+  CHECK_FALSE(endless.ok);
+  CHECK(vm.eval("1", "after.rb").ok);
+}
+
+#if !defined(_WIN32)
+namespace {
+
+// The stack a thread gets on the Mac (where a server's rooms run on threads of their own).
+constexpr std::size_t kSmallThreadStack = 512 * 1024;
+
+// Recursion through the engine's C side (a block called from Array#sort, which is C), each level
+// a call of the interpreter inside another: the C stack grows with it.
+void* dive_through_c(void* result) {
+  RubyVm vm;
+  const RubyResult dived = vm.eval("def dive = [2, 1].sort { dive; 0 }\ndive", "dive.rb");
+  *static_cast<std::string*>(result) = dived.ok ? "returned" : dived.error;
+  return nullptr;
+}
+
+}  // namespace
+
+TEST_CASE("a recursion through C stops with SystemStackError before a small thread's stack runs out") {
+  pthread_attr_t attributes;
+  pthread_attr_init(&attributes);
+  pthread_attr_setstacksize(&attributes, kSmallThreadStack);
+  std::string result;
+  pthread_t thread;
+  REQUIRE(pthread_create(&thread, &attributes, dive_through_c, &result) == 0);
+  pthread_join(thread, nullptr);
+  pthread_attr_destroy(&attributes);
+  CHECK(result.find("SystemStackError") != std::string::npos);
+}
+#endif

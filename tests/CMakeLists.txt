@@ -123,9 +123,12 @@ add_executable(redgem_tests
   unit/animation_sync_test.cpp
   unit/clip_clock_test.cpp
   unit/camera_ray_test.cpp
+  unit/crash_report_test.cpp
   integration/physics_world_test.cpp
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp
+  integration/script_budget_test.cpp
+  integration/crash_handling_test.cpp
   integration/engine_headless_test.cpp
   integration/scene_parts_test.cpp
   integration/presenter_test.cpp
@@ -159,14 +162,18 @@ add_executable(redgem_tests
   integration/error_hints_test.cpp)
 target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest)
 target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+# A program that crashes on purpose, for the tests of crash reports (tests/tools/crash_helper.cpp).
+add_executable(redgem_crash_helper tools/crash_helper.cpp)
+target_link_libraries(redgem_crash_helper PRIVATE redgem_runtime)
 # The tests of builds copy the real player, and look for it where a build does: beside redgem.
-add_dependencies(redgem_tests redgem_player redgem)
+add_dependencies(redgem_tests redgem_player redgem redgem_crash_helper)
 target_compile_definitions(redgem_tests PRIVATE
   REDGEM_FIXTURES_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
   REDGEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
   REDGEM_TEMPLATES_DIR="${CMAKE_SOURCE_DIR}/templates"
   REDGEM_PLATFORMER_DIR="${CMAKE_SOURCE_DIR}/games/platformer"
   REDGEM_PLAYER_FILE="$<TARGET_FILE:redgem_player>"
+  REDGEM_CRASH_HELPER_FILE="$<TARGET_FILE:redgem_crash_helper>"
   REDGEM_EDITOR_FILE="$<TARGET_FILE:redgem>")
 target_compile_options(redgem_tests PRIVATE -Wall -Wextra -Wno-unused-parameter)
 

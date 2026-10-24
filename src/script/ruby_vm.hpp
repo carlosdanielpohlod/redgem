@@ -1,11 +1,15 @@
 #pragma once
 
 #include <mruby.h>
+#include <mruby/error.h>
 
+#include <chrono>
 #include <functional>
 #include <initializer_list>
 #include <string>
 #include <vector>
+
+#include "script/script_budget.hpp"
 
 namespace redgem {
 
@@ -16,7 +20,9 @@ struct RubyResult {
 };
 
 // Owns an mruby interpreter. Every entry point from C++ is protected: Ruby exceptions
-// come back as RubyResult errors instead of aborting.
+// come back as RubyResult errors instead of aborting. With a budget set, a call that runs longer
+// than it is ended with a ScriptTimeout error (see script/script_budget.hpp); a recursion too deep
+// ends with mruby's own SystemStackError, long before the program's stack runs out.
 class RubyVm {
  public:
   RubyVm();
@@ -38,7 +44,16 @@ class RubyVm {
   using ArgumentsMaker = std::function<std::vector<mrb_value>(mrb_state*)>;
   RubyResult call_with(mrb_value receiver, const char* method, const ArgumentsMaker& make);
 
+  // How long each call from C++ may run Ruby; zero (the default) for no limit.
+  void set_budget(std::chrono::milliseconds budget);
+  std::chrono::milliseconds budget() const { return budget_.limit(); }
+
  private:
+  RubyResult run_protected(mrb_protect_error_func* body, void* request);
+  std::string describe_exception(mrb_value exception);
+
+  // (Before the interpreter, which keeps a pointer to it from its first instruction on.)
+  ScriptBudget budget_;
   mrb_state* mrb_;
 };
 
