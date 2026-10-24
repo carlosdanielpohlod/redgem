@@ -3,6 +3,8 @@
   "project.build.for_linux": "For Linux",
   "project.build.for_macos": "For macOS",
   "project.build.for_windows": "For Windows (.exe)",
+  "project.build.game_inside_its_build": "cannot build {game}: it is inside {folder}, which a build replaces",
+  "project.build.not_a_build": "cannot build: {folder} is there and no build made it; move it away or build into another folder",
   "project.cli.built": "built {out_dir} for {target}: run {executable}",
   "project.cli.built_for_phone": "built {out_dir} for {target}: install it with adb install {executable}",
   "project.cli.choose_one_mode": "choose one of: new, build, --play",

@@ -4,8 +4,10 @@
 #include <fstream>
 #include <string>
 
+#include "app/bundled_game.hpp"
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
+#include "core/translations.hpp"
 #include "project/android/android_package.hpp"
 #include "project/game_build.hpp"
 
@@ -53,6 +55,36 @@ TEST_CASE("a build goes anywhere but into the game it copies") {
   CHECK_FALSE(builds_outside_game(scratch.game, scratch.game / "out", error));
   CHECK(error == "cannot build into " + (scratch.game / "out").string() + ": it is inside the game folder");
   CHECK_FALSE(builds_outside_game(scratch.game, scratch.game, error));
+}
+
+// The game folder of a build is emptied on each build: the game must not be in it.
+TEST_CASE("a build never goes where its game folder would be the game being built") {
+  const Scratch scratch;  // its game is <dir>/game, which a build into <dir> would replace
+  std::string error;
+  CHECK_FALSE(builds_outside_game(scratch.game, scratch.dir, error));
+  CHECK(error == tr("project.build.game_inside_its_build",
+                    {{"game", scratch.game.string()}, {"folder", (scratch.dir / kBundledGameFolder).string()}}));
+  CHECK_FALSE(builds_outside_game(scratch.game / "inner", scratch.dir, error));
+  std::ofstream(scratch.dir / "player") << "player";
+  CHECK_FALSE(build_game(scratch.game, scratch.dir, scratch.dir / "player", BuildTarget::Linux, error));
+  CHECK(std::filesystem::exists(scratch.game / config::kSceneFileName));
+}
+
+TEST_CASE("a build replaces only a game folder an earlier build made") {
+  const Scratch scratch;
+  const std::filesystem::path out = scratch.dir / "out";
+  const std::filesystem::path player = scratch.dir / "player";
+  std::ofstream(player) << "player";
+  std::string error;
+  REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error), error);
+  REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error), error);  // its own: replaced
+
+  const std::filesystem::path other_out = scratch.dir / "other_out";
+  std::filesystem::create_directories(other_out / kBundledGameFolder);
+  std::ofstream(other_out / kBundledGameFolder / "notes.txt") << "someone's own";
+  CHECK_FALSE(build_game(scratch.game, other_out, player, BuildTarget::Linux, error));
+  CHECK(error == tr("project.build.not_a_build", {{"folder", (other_out / kBundledGameFolder).string()}}));
+  CHECK(std::filesystem::exists(other_out / kBundledGameFolder / "notes.txt"));
 }
 
 TEST_CASE("a player no script of the engine makes is said to come from building the engine on its system") {

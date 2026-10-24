@@ -7,6 +7,7 @@
 #include "core/config.hpp"
 #include "core/files.hpp"
 #include "core/platform.hpp"
+#include "core/translations.hpp"
 #include "project/android/android_package.hpp"
 #include "project/notices.hpp"
 
@@ -15,6 +16,10 @@ namespace {
 
 constexpr const char* kParentFolder = "..";          // how a path says "one folder up"
 constexpr const char* kFallbackExecutable = "play";  // for a game whose name gives no usable file name
+// Left in the game folder a build makes: what lets the next build replace that folder, which a
+// build never does to one it did not make.
+constexpr const char* kBuildMarker = ".redgem-build";
+constexpr const char* kBuildMarkerText = "Made by redgem build; the next build into this folder replaces it.\n";
 
 // What is built is a game, and not into itself.
 bool can_build(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir, std::string& error) {
@@ -38,11 +43,28 @@ bool is_game_to_build(const std::filesystem::path& game_dir, std::string& error)
   return false;
 }
 
-bool builds_outside_game(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
-                         std::string& error) {
+namespace {
+
+bool out_not_in_game(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir, std::string& error) {
   if (!folder_inside(out_dir, game_dir)) return true;
   error = "cannot build into " + out_dir.string() + ": it is inside the game folder";
   return false;
+}
+
+// The game folder a build replaces must not be the game itself, nor hold it.
+bool game_not_in_bundle(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
+                        std::string& error) {
+  const std::filesystem::path bundle = out_dir / kBundledGameFolder;
+  if (!folder_inside(game_dir, bundle)) return true;
+  error = tr("project.build.game_inside_its_build", {{"game", game_dir.string()}, {"folder", bundle.string()}});
+  return false;
+}
+
+}  // namespace
+
+bool builds_outside_game(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
+                         std::string& error) {
+  return out_not_in_game(game_dir, out_dir, error) && game_not_in_bundle(game_dir, out_dir, error);
 }
 
 std::optional<std::filesystem::path> build_game_for(const std::filesystem::path& game_dir,
@@ -80,11 +102,32 @@ bool copy_player(const std::filesystem::path& player, const std::filesystem::pat
   return true;
 }
 
-// A fresh copy in `bundle` of the files of the game that ship (see shipped_files).
-bool copy_game(const std::filesystem::path& game_dir, const std::filesystem::path& bundle, std::string& error) {
+// Whether the build may empty `bundle`: nothing is there yet, or an earlier build made it.
+bool may_replace(const std::filesystem::path& bundle) {
+  std::error_code fs_error;
+  const bool absent = !std::filesystem::exists(bundle, fs_error) && !fs_error;
+  return absent || std::filesystem::is_regular_file(bundle / kBuildMarker, fs_error);
+}
+
+bool replaceable(const std::filesystem::path& bundle, std::string& error) {
+  if (may_replace(bundle)) return true;
+  error = tr("project.build.not_a_build", {{"folder", bundle.string()}});
+  return false;
+}
+
+// An empty `bundle`, marked as a build's own.
+bool fresh_bundle(const std::filesystem::path& bundle, std::string& error) {
+  if (!replaceable(bundle, error)) return false;
   std::error_code fs_error;
   std::filesystem::remove_all(bundle, fs_error);
   std::filesystem::create_directories(bundle, fs_error);
+  return write_text_file(bundle / kBuildMarker, kBuildMarkerText, error);
+}
+
+// A fresh copy in `bundle` of the files of the game that ship (see shipped_files).
+bool copy_game(const std::filesystem::path& game_dir, const std::filesystem::path& bundle, std::string& error) {
+  if (!fresh_bundle(bundle, error)) return false;
+  std::error_code fs_error;
   for (const std::filesystem::path& file : shipped_files(game_dir)) {
     std::filesystem::create_directories((bundle / file).parent_path(), fs_error);
     std::filesystem::copy_file(game_dir / file, bundle / file, fs_error);
@@ -105,7 +148,8 @@ bool build_game(const std::filesystem::path& game_folder, const std::filesystem:
   std::error_code fs_error;
   std::filesystem::create_directories(out_dir, fs_error);
   const std::filesystem::path binary = out_dir / executable_file(game_dir, target);
-  return copy_player(player, binary, error) && copy_game(game_dir, out_dir / kBundledGameFolder, error) &&
+  const std::filesystem::path bundle = out_dir / kBundledGameFolder;
+  return replaceable(bundle, error) && copy_player(player, binary, error) && copy_game(game_dir, bundle, error) &&
          write_notices(out_dir, error);
 }
 

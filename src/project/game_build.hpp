@@ -34,7 +34,9 @@ std::string missing_runtime_message(BuildTarget target, const std::filesystem::p
 // Makes a standalone game in `out_dir`: an executable named after the game (a copy of `player`,
 // with .exe for Windows) next to a folder with the game's files. Started, that executable plays
 // the game beside it. Refuses an `out_dir` that is the game folder or inside it (the copy would
-// contain itself).
+// contain itself), and one whose game folder holds the game. That folder is replaced on each
+// build, and only when a build made it (it is marked so): a folder of that name with anything
+// else in it is left alone, and the build refused.
 bool build_game(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                 const std::filesystem::path& player, BuildTarget target, std::string& error);
 // Everything a build needs, for the editor and the command line: finds the player for `target`
@@ -44,7 +46,8 @@ std::optional<std::filesystem::path> build_game_for(const std::filesystem::path&
                                                     std::string& error);
 
 // What every build checks before it starts, each false with `error` saying why not: that what is
-// built is a game, and that the build does not go into the game it copies.
+// built is a game, and that the build does not go into the game it copies nor replace the folder
+// the game is in.
 bool is_game_to_build(const std::filesystem::path& game_dir, std::string& error);
 bool builds_outside_game(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                          std::string& error);
@@ -56,11 +59,11 @@ bool folder_inside(const std::filesystem::path& folder, const std::filesystem::p
 // The files of a game that go into a build of it, as paths inside its folder, sorted. Every build
 // (a folder for a computer, an app for a phone) ships these and nothing else: regular files only,
 // never what a link points at, nor hidden files and folders (.git, .env), editors' backups
-// (name~) or signing keys.
+// (name~), signing keys, or the keystore the game's game.json signs its app with.
 std::vector<std::filesystem::path> shipped_files(const std::filesystem::path& game_dir);
 
-// Whether a file is a key for signing apps (.keystore, .jks, .p12). A build never copies one:
-// whoever has it can pass their app off as the developer's.
+// Whether a file is a key for signing apps (.keystore, .jks, .p12, .pfx, .pem, .key, in any
+// case). A build never copies one: whoever has it can pass their app off as the developer's.
 bool signing_key_file(const std::filesystem::path& file);
 
 // The name of a game's executable: its folder name in lowercase, with anything that is not a
