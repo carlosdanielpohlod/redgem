@@ -6,6 +6,7 @@
 #include <nlohmann/json.hpp>
 
 #include "net/discovery/lan_discovery.hpp"
+#include "net/private_address.hpp"
 #include "net/wire.hpp"
 
 using namespace redgem::net;
@@ -54,21 +55,21 @@ NearbyGame game_at(const std::string& address, std::uint16_t port, const std::st
 
 TEST_CASE("only machines on the local network are nearby") {
   for (const char* local : {"127.0.0.1", "10.0.0.5", "10.255.3.1", "192.168.0.12", "192.168.255.255", "172.16.0.1",
-                            "172.31.9.9", "169.254.10.20", "100.64.0.1", "100.127.3.4"}) {
+                            "172.31.9.9", "169.254.10.20"}) {
     CAPTURE(local);
-    CHECK(nearby_address(local));
+    CHECK(is_private_address(local));
   }
   for (const char* elsewhere : {"8.8.8.8", "192.169.0.1", "192.167.1.1", "172.15.0.1", "172.32.0.1", "169.253.0.1",
-                                "11.0.0.1", "126.0.0.1", "128.0.0.1", "100.63.0.1", "100.128.0.1"}) {
+                                "11.0.0.1", "126.0.0.1", "128.0.0.1", "100.64.0.1", "100.100.100.200"}) {
     CAPTURE(elsewhere);
-    CHECK_FALSE(nearby_address(elsewhere));
+    CHECK_FALSE(is_private_address(elsewhere));
   }
 }
 
 TEST_CASE("what is not an address in numbers is not nearby") {
   for (const char* odd : {"", "localhost", "10", "10.", "192.x.0.1", ".168.0.1", "192,168.0.1"}) {
     CAPTURE(odd);
-    CHECK_FALSE(nearby_address(odd));
+    CHECK_FALSE(is_private_address(odd));
   }
 }
 

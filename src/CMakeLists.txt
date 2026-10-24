@@ -155,6 +155,7 @@ redgem_add_library(redgem_net
   net/wire_checks.cpp
   net/wire_codec.cpp
   net/private_address.cpp
+  net/decimal_text.cpp
   net/utf8_text.cpp
   net/pose_quantization.cpp
   net/pose_codec.cpp

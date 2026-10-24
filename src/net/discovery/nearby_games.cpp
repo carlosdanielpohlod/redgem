@@ -105,10 +105,8 @@ bool room_for(const std::vector<NearbyGame>& games, const NearbyGame& game) {
 
 }  // namespace
 
-bool nearby_address(const std::string& address) { return is_private_address(address); }
-
 bool search_to_answer(const std::string& message, const std::string& from) {
-  return message == kSearchQuestion && nearby_address(from);
+  return message == kSearchQuestion && is_private_address(from);
 }
 
 std::string search_answer(const std::string& name, std::uint16_t game_port, int players) {
@@ -122,7 +120,7 @@ std::string search_answer(const std::string& name, std::uint16_t game_port, int 
 }
 
 std::optional<NearbyGame> game_from_answer(const std::string& message, const std::string& from) {
-  if (!nearby_address(from)) return std::nullopt;  // a game on this network is not heard of from far away
+  if (!is_private_address(from)) return std::nullopt;  // a game on this network is not heard of from far away
   const auto answer = wire::unpacked(message);
   if (!answer || !from_redgem(*answer)) return std::nullopt;
   if (!wire::speaks_our_protocol(*answer)) return game_of_another_protocol(*answer, from);

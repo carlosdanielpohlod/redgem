@@ -64,12 +64,20 @@ TEST_CASE("nothing that could change what is sent gets into a request line") {
 }
 
 TEST_CASE("plain http goes to this machine and private networks only") {
-  for (const char* near : {"127.0.0.1", "127.8.9.10", "10.0.0.7", "172.16.0.1", "172.31.255.255", "192.168.1.20",
-                           "169.254.3.4", "100.64.0.1", "100.127.255.255"}) {
+  for (const char* near :
+       {"127.0.0.1", "127.8.9.10", "10.0.0.7", "172.16.0.1", "172.31.255.255", "192.168.1.20", "169.254.3.4"}) {
     CHECK_MESSAGE(is_private_address(near), near);
   }
   for (const char* far : {"8.8.8.8", "172.15.0.1", "172.32.0.1", "192.169.0.1", "11.0.0.1", "", "localhost", "127.0.0",
-                          "127.0.0.1.5", "127.0.0.256", "1..2.3", "100.63.255.255", "100.128.0.1"}) {
+                          "127.0.0.1.5", "127.0.0.256", "1..2.3", "100.64.0.1", "100.100.100.200"}) {
     CHECK_FALSE_MESSAGE(is_private_address(far), far);
   }
+}
+
+TEST_CASE("the clouds' metadata addresses are known, and only those") {
+  for (const char* metadata : {"169.254.169.254", "100.100.100.200", "fd00:ec2::254"}) {
+    CHECK_MESSAGE(is_cloud_metadata_address(metadata), metadata);
+  }
+  CHECK_FALSE(is_cloud_metadata_address("169.254.3.4"));
+  CHECK_FALSE(is_cloud_metadata_address("127.0.0.1"));
 }

@@ -22,9 +22,6 @@ struct NearbyGame {
 // What a machine looking for games asks everyone nearby.
 inline constexpr const char* kSearchQuestion = "redgem: who is hosting?";
 
-// Whether an address is one a machine on the local network has. Questions from anywhere else
-// are not answered: a game must not be made to send messages to strangers.
-bool nearby_address(const std::string& address);
 // Whether what a host heard from the address `from` is a search it answers.
 bool search_to_answer(const std::string& message, const std::string& from);
 // What a host answers a search with (in MessagePack): its game's name (as much of it as an answer

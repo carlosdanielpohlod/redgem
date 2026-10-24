@@ -2,10 +2,12 @@
 
 #include "net/private_address.hpp"
 
+#include <algorithm>
+#include <iterator>
 #include <sstream>
 #include <vector>
 
-#include "net/http/http_message.hpp"
+#include "net/decimal_text.hpp"
 
 namespace redgem::net {
 
@@ -25,9 +27,9 @@ constexpr int kPrivateC = 192;  // 192.168.x
 constexpr int kPrivateCSecond = 168;
 constexpr int kLinkLocal = 169;  // 169.254.x: what a network with no server gives itself
 constexpr int kLinkLocalSecond = 254;
-constexpr int kSharedSpace = 100;  // 100.64.x to 100.127.x: carrier-grade NAT, and some VPNs
-constexpr int kSharedSpaceFirst = 64;
-constexpr int kSharedSpaceLast = 127;
+// Where clouds tell a machine about itself, its keys among it, over plain HTTP: Amazon, Google,
+// Azure and others (169.254.169.254, and Amazon's over IPv6), Alibaba (100.100.100.200).
+constexpr const char* kCloudMetadataAddresses[] = {"169.254.169.254", "fd00:ec2::254", "100.100.100.200"};
 
 bool is_octet(const std::string& part) {
   return is_decimal(part, kMostOctetDigits) && std::stoi(part) <= kLargestOctet;
@@ -51,17 +53,14 @@ bool in_private_b(int first, int second) {
 }
 bool in_private_c(int first, int second) { return first == kPrivateC && second == kPrivateCSecond; }
 bool in_link_local(int first, int second) { return first == kLinkLocal && second == kLinkLocalSecond; }
-bool in_shared_space(int first, int second) {
-  return first == kSharedSpace && between(second, kSharedSpaceFirst, kSharedSpaceLast);
-}
 // The ranges known by their first number alone.
 bool in_whole_range(int first) { return first == kLoopback || first == kPrivateA; }
 
 bool in_private_range(const std::vector<int>& address) {
   const int first = address[0];
   const int second = address[1];
-  if (in_whole_range(first) || in_private_b(first, second) || in_private_c(first, second)) return true;
-  return in_link_local(first, second) || in_shared_space(first, second);
+  if (in_whole_range(first) || in_private_b(first, second)) return true;
+  return in_private_c(first, second) || in_link_local(first, second);
 }
 
 }  // namespace
@@ -69,6 +68,11 @@ bool in_private_range(const std::vector<int>& address) {
 bool is_private_address(const std::string& numbers) {
   const std::vector<int> address = octets(numbers);
   return address.size() == kOctets && in_private_range(address);
+}
+
+bool is_cloud_metadata_address(const std::string& numbers) {
+  return std::find(std::begin(kCloudMetadataAddresses), std::end(kCloudMetadataAddresses), numbers) !=
+         std::end(kCloudMetadataAddresses);
 }
 
 }  // namespace redgem::net
