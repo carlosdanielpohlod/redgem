@@ -103,7 +103,11 @@ jobs:
 
       - name: Unit and integration tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: ./build/tests/redgem_tests
+        run: |
+          ./build/tests/redgem_tests -tc="a guest that goes on at a game*" 2>&1 | grep -E "DBG|Status|ERROR|values" || true
+          ./build/tests/redgem_tests -sf="*multiplayer_test*" 2>&1 | grep -E "DBG|Status|ERROR|values|TEST CASE" || true
+          for i in 1 2 3; do ./build/tests/redgem_tests -tc="a guest that goes on at a game*" 2>&1 | grep -E "DBG|Status|ERROR" || true; done
+          ./build/tests/redgem_tests 2>&1 | grep -E "DBG|Status|ERROR|TEST CASE|values" | tail -60
 
       - name: Tests of the testing library
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}

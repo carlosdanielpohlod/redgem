@@ -5,6 +5,7 @@
 #include "net/network_session.hpp"
 
 #include <algorithm>
+#include <cstdio>
 
 namespace redgem::net {
 
@@ -39,20 +40,27 @@ void NetworkSession::police(Link& link, std::size_t bytes, float seconds) {
   if (!relaying()) return;
   link.allowance.refill(seconds);
   link.messages.refill(seconds);
-  if (!link.allowance.charge(bytes)) link.connection.close();  // no game talks this much: a flood
+  static float least_bytes = 1e30f, least_messages = 1e30f;
+  if (link.allowance.left() < least_bytes || link.messages.left() < least_messages) {
+    least_bytes = std::min(least_bytes, link.allowance.left()); least_messages = std::min(least_messages, link.messages.left());
+    std::fprintf(stderr, "DBG least bytes %.0f messages %.0f (read %zu)\n", least_bytes, least_messages, bytes);
+  }
+  if (!link.allowance.charge(bytes)) { std::fprintf(stderr, "DBG bytes flood bytes=%zu\n", bytes); link.connection.close(); }  // no game talks this much: a flood
   if (!serving()) return;
   link.idle_for += seconds;
-  if (link.idle_for > kServedIdleSeconds) link.connection.close();
+  if (link.idle_for > kServedIdleSeconds) { std::fprintf(stderr, "DBG idle\n"); link.connection.close(); }
 }
 
 bool NetworkSession::police_message(Link& link) {
   if (!relaying()) return true;
   if (link.messages.charge(1)) return true;
+  std::fprintf(stderr, "DBG message flood\n");
   link.connection.close();
   return false;
 }
 
 void NetworkSession::forgive_stall(float seconds) {
+  if (seconds > 0.0f) std::fprintf(stderr, "DBG forgive %.3f\n", seconds);
   const float forgiven = std::min(seconds, kMostForgivenStallSeconds);
   for (Link& link : links_) {
     link.allowance.forgive(forgiven);

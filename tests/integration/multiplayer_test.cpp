@@ -250,7 +250,9 @@ TEST_CASE("a guest that goes on at a game's pace while the host stands still is 
   // Both play on until the host heard all that was sent while it stood still (how fast that comes
   // is the machine's), and some more.
   const auto heard_the_stall = [&] { return std::stoi(ruby(*host, "$got")) >= kStallFrames * kMessagesPerFrame; };
-  for (int i = 0; i < kMaxRounds && !heard_the_stall(); ++i) frame(true);
+  int drain = 0;
+  for (int i = 0; i < kMaxRounds && !heard_the_stall(); ++i) frame(true), ++drain;
+  std::fprintf(stderr, "DBG drain frames %d online %d\n", drain, (int)(guest->network().state() == net::NetworkSession::State::Online));
   for (int i = 0; i < kAfterFrames; ++i) frame(true);
   CHECK(heard_the_stall());
   CHECK(guest->network().state() == net::NetworkSession::State::Online);
