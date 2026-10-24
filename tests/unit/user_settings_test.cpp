@@ -79,6 +79,16 @@ TEST_CASE("each game's display settings are kept by its key, apart from the othe
   std::filesystem::remove_all(dir);
 }
 
+namespace {
+
+// What a file holds, read and closed (Windows removes no file that is open).
+std::string text_of(const std::filesystem::path& file) {
+  std::ifstream in(file);
+  return std::string(std::istreambuf_iterator<char>(in), {});
+}
+
+}  // namespace
+
 TEST_CASE("a damaged settings file is moved aside, not written over, and the settings are written anew") {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_damaged_settings_test";
   std::filesystem::remove_all(dir);
@@ -91,8 +101,7 @@ TEST_CASE("a damaged settings file is moved aside, not written over, and the set
   REQUIRE_MESSAGE(write_game_display(file, "com.studio.one", chosen, error), error);
   const std::filesystem::path aside = dir / "settings.json.damaged";
   REQUIRE(std::filesystem::exists(aside));
-  std::ifstream kept(aside);
-  CHECK(std::string(std::istreambuf_iterator<char>(kept), {}) == R"({"gpu": "integrated", "games": {)");
+  CHECK(text_of(aside) == R"({"gpu": "integrated", "games": {)");
   CHECK(read_game_display(file, "com.studio.one", DisplaySettings{}).quality == QualityPreset::High);
   CHECK_FALSE(std::filesystem::exists(dir / "settings.json.part"));  // written whole, through a file beside it
   std::filesystem::remove_all(dir);
