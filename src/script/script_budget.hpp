@@ -55,7 +55,7 @@ class ScriptBudget {
   bool same_call_as_seen(bool calling, std::uint64_t serial) const;
   void stop_call(std::uint64_t serial, Clock::duration ran);
   void set_hook(bool on);
-  [[noreturn]] void raise_stopped(mrb_state* mrb, const mrb_code* pc);
+  void raise_stopped(mrb_state* mrb, const mrb_code* pc);
 
   mrb_state* mrb_ = nullptr;
   RClass* timeout_class_ = nullptr;

@@ -94,7 +94,7 @@ bool ScriptBudget::stopped_this_call() const {
 
 void ScriptBudget::on_instruction(mrb_state* mrb, const mrb_code* pc) {
   // (A hook set for a call that ended just before it was: nothing to stop.)
-  if (stopped_this_call()) raise_stopped(mrb, pc);
+  if (stopped_this_call()) return raise_stopped(mrb, pc);  // (raises: it does not return)
   set_hook(false);
 }
 

@@ -82,6 +82,18 @@ int reversed_digits(std::int64_t value, char (&digits)[kMaxDigits]) {
 namespace {
 
 constexpr int kYearDigits = 4;
+
+struct SignalName {
+  int signal = 0;
+  const char* text = nullptr;
+};
+constexpr SignalName kSignalNames[] = {
+    {SIGSEGV, "SIGSEGV (invalid memory access)"}, {SIGABRT, "SIGABRT (the program aborted)"},
+    {SIGFPE, "SIGFPE (arithmetic error)"},        {SIGILL, "SIGILL (illegal instruction)"},
+#ifdef SIGBUS
+    {SIGBUS, "SIGBUS (invalid memory access)"},
+#endif
+};
 constexpr int kPartDigits = 2;  // of a month, a day, an hour...
 
 }  // namespace
@@ -116,22 +128,10 @@ FixedText<kMomentTextSize> moment_stamp(const Moment& moment) {
 }
 
 const char* signal_description(int signal) {
-  switch (signal) {
-    case SIGSEGV:
-      return "SIGSEGV (invalid memory access)";
-    case SIGABRT:
-      return "SIGABRT (the program aborted)";
-    case SIGFPE:
-      return "SIGFPE (arithmetic error)";
-    case SIGILL:
-      return "SIGILL (illegal instruction)";
-#ifdef SIGBUS
-    case SIGBUS:
-      return "SIGBUS (invalid memory access)";
-#endif
-    default:
-      return "a fatal signal";
+  for (const SignalName& name : kSignalNames) {
+    if (name.signal == signal) return name.text;
   }
+  return "a fatal signal";
 }
 
 }  // namespace redgem::crash

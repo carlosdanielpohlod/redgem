@@ -26,11 +26,17 @@ constexpr int kMaxFrames = 62;  // the most CaptureStackBackTrace takes on older
 constexpr ULONG kHandlerStackBytes = 64 * 1024;
 constexpr int kAddressDigits = 16;
 constexpr const char* kDialogTitle = "RedGem";
+// Where the message box comes from: looked up as the crash happens, as user32 linked with the
+// engine would clash with raylib's functions of the same names (CloseWindow, ShowCursor...).
+constexpr const wchar_t* kUserLibrary = L"user32.dll";
+constexpr const char* kMessageBoxFunction = "MessageBoxW";
+constexpr UINT kDialogStyle = MB_OK | MB_ICONERROR | MB_TOPMOST;
+using MessageBoxFunction = int(WINAPI*)(HWND, LPCWSTR, LPCWSTR, UINT);
 constexpr const char* kPathSeparators = "\\/";
 
 struct ExceptionName {
-  DWORD code;
-  const char* text;
+  DWORD code = 0;
+  const char* text = nullptr;
 };
 constexpr ExceptionName kExceptionNames[] = {
     {EXCEPTION_ACCESS_VIOLATION, "EXCEPTION_ACCESS_VIOLATION (invalid memory access)"},
@@ -97,7 +103,10 @@ std::vector<std::string> current_backtrace() {
 void show_player(const std::string& message) {
   std::fprintf(stderr, "%s\n", message.c_str());
   if (!prepared_crash().show_dialog) return;
-  MessageBoxW(nullptr, wide(message).c_str(), wide(kDialogTitle).c_str(), MB_OK | MB_ICONERROR | MB_TOPMOST);
+  HMODULE library = LoadLibraryW(kUserLibrary);
+  if (library == nullptr) return;
+  const auto message_box = reinterpret_cast<MessageBoxFunction>(GetProcAddress(library, kMessageBoxFunction));
+  if (message_box != nullptr) message_box(nullptr, wide(message).c_str(), wide(kDialogTitle).c_str(), kDialogStyle);
 }
 
 }  // namespace redgem::crash

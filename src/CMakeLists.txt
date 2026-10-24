@@ -422,8 +422,8 @@ target_include_directories(redgem_runtime PRIVATE ${REDGEM_GENERATED_DIR})
 target_link_libraries(redgem_runtime PUBLIC redgem_net raylib Jolt mruby_lib cgltf_headers nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_runtime PRIVATE freetype)
 if(WIN32)
-  # mruby's socket and time gems use Windows' own libraries; a crash's message box is user32's.
-  target_link_libraries(redgem_runtime PUBLIC ws2_32 user32)
+  # mruby's socket and time gems use Windows' own libraries.
+  target_link_libraries(redgem_runtime PUBLIC ws2_32)
 endif()
 # What a crash report says the engine's version is: the version in project() at the top of the build.
 set_source_files_properties(app/crash_report.cpp PROPERTIES COMPILE_DEFINITIONS REDGEM_VERSION="${redgem_VERSION}")
