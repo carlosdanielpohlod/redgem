@@ -12,8 +12,11 @@ class ByteAllowance {
   ByteAllowance(float bytes_per_second, float burst_bytes)
       : per_second_(bytes_per_second), burst_(burst_bytes), left_(burst_bytes) {}
 
-  // Time passing earns bytes back, up to the burst.
-  void refill(float seconds) { left_ = std::min(burst_, left_ + seconds * per_second_); }
+  // Time passing earns bytes back, up to the burst (what was forgiven past it stays until used).
+  void refill(float seconds) { left_ = std::max(left_, std::min(burst_, left_ + seconds * per_second_)); }
+  // What `seconds` earn, past the burst too: for time the receiver stood still while the sender
+  // went on at its pace, whose bytes then arrive all at once.
+  void forgive(float seconds) { left_ = std::max(left_, 0.0f) + seconds * per_second_; }
   // Takes what arrived out of it; false when that was more than was left.
   bool charge(std::size_t bytes) {
     left_ -= static_cast<float>(bytes);

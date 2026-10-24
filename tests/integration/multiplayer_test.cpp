@@ -218,9 +218,38 @@ TEST_CASE("a machine that floods a game a player hosts with tiny messages is let
   lan.network_time = [] { return 0.0; };
   auto [host, guest] = lan.host_and_guest();
   // Few bytes, far more messages at once than poses of dozens of objects make.
+  ruby(*host, "$got = 0; Network.on(:t) { $got += 1 }");
   ruby(*guest, "20_000.times { Network.emit(:t) }");
   REQUIRE(lan.until([guest = guest] { return guest->network().state() == net::NetworkSession::State::Offline; }));
   CHECK(ruby(*host, "Network.peers.inspect") == "[]");
+  // Every message within the burst was heard (its hello took one); the one past it, which let the
+  // guest go, was not.
+  constexpr int kJoinMessages = 1;
+  CHECK(ruby(*host, "$got") == std::to_string(static_cast<int>(net::kServedBurstMessages) - kJoinMessages));
+}
+
+// A host loading a level stands still while its guests go on: what they sent meanwhile arrives at
+// once, and is no flood.
+TEST_CASE("a guest that goes on at a game's pace while the host stands still is not let go") {
+  constexpr int kStallFrames = 360;      // six seconds of the guest's frames while the host stands still
+  constexpr int kAfterFrames = 120;      // and two more with both playing
+  constexpr int kMessagesPerFrame = 60;  // 3600 a second: poses of dozens of objects
+  Lan lan;
+  double clock = 0.0;
+  lan.network_time = [&clock] { return clock; };
+  auto [host, guest] = lan.host_and_guest();
+  ruby(*host, "$got = 0; Network.on(:t) { $got += 1 }");
+  const std::string talk = std::to_string(kMessagesPerFrame) + ".times { Network.emit(:t) }";
+  const auto frame = [&](bool host_plays) {
+    clock += config::kFixedDeltaSeconds;
+    ruby(*guest, talk);
+    guest->frame(config::kFixedDeltaSeconds);
+    if (host_plays) host->frame(config::kFixedDeltaSeconds);
+  };
+  for (int i = 0; i < kStallFrames; ++i) frame(false);
+  for (int i = 0; i < kAfterFrames; ++i) frame(true);
+  CHECK(guest->network().state() == net::NetworkSession::State::Online);
+  CHECK(std::stoi(ruby(*host, "$got")) >= kStallFrames * kMessagesPerFrame);
 }
 
 TEST_CASE("a hash key no script here ever used arrives as a text, and makes no new symbol") {

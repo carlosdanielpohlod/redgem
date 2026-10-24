@@ -47,9 +47,13 @@ void RelayServer::enter_room(Member& member, const std::string& wanted, const nl
 }
 
 int RelayServer::rooms_opened_by(const std::string& address) const {
-  return static_cast<int>(std::count_if(members_.begin(), members_.end(), [&address](const auto& member) {
-    return member->holds_room() && member->connected_from(address);
-  }));
+  int opened = 0;
+  for (const auto& room : rooms_) {
+    opened += static_cast<int>(std::count_if(room.second.begin(), room.second.end(), [&address](const Member* member) {
+      return member->holds_room() && member->connected_from(address);
+    }));
+  }
+  return opened;
 }
 
 void RelayServer::open_room(Member& member) {
@@ -109,7 +113,7 @@ void RelayServer::close_rooms_without_opener() {
 }
 
 void RelayServer::empty_room(const std::string& room) {
-  for (const auto& member : members_) {
+  for (Member* member : entered(room)) {
     if (member->holds_seat_in(room)) member->connection.close();
   }
 }

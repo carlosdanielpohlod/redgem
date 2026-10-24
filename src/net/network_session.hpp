@@ -26,6 +26,9 @@ inline constexpr float kServedBurstBytes = 2.0f * kMaxFrameBytes;
 // for a burst of them, where a flood of tiny messages sends tens of thousands a second.
 inline constexpr float kServedMessagesPerSecond = 8192.0f;
 inline constexpr float kServedBurstMessages = 16384.0f;
+// The longest the host standing still (loading a level) is forgiven: what the others sent at their
+// own pace meanwhile, arriving at once, is not a flood.
+inline constexpr float kMostForgivenStallSeconds = 10.0f;
 // A machine in a dedicated server's room that says nothing to the game for this long (only "I am
 // here") is let go: a place in a room is for playing.
 inline constexpr float kServedIdleSeconds = 300.0f;
@@ -113,6 +116,10 @@ class NetworkSession {
 
   // Moves messages in and out. `seconds` since the last call, for giving up on a join.
   std::vector<NetworkEvent> poll(float seconds);
+  // This machine stood still for `seconds` past what its polls were told (a level loading): what
+  // the machines that joined it sent meanwhile is not held against them (up to
+  // kMostForgivenStallSeconds).
+  void forgive_stall(float seconds);
   // Sends a message to everyone else (kEveryone) or to one peer. False when offline or when there
   // is no such peer.
   bool send(const std::string& name, const nlohmann::json& data, int to = kEveryone);
@@ -196,8 +203,9 @@ class NetworkSession {
   // messages than it may is let go, and on a dedicated server, one that says nothing to the game
   // for too long. (A guest trusts its host; a room on a relay is held to it by the relay.)
   void police(Link& link, std::size_t bytes, float seconds);
-  // Counts one message that arrived on the link against what it may send.
-  void police_message(Link& link);
+  // Counts one message that arrived on the link against what it may send: false, with the link
+  // let go, for the one past it.
+  bool police_message(Link& link);
   // The newcomers' turn in a poll: those connecting are taken in, those the game is deciding on wait.
   void tend_newcomers(float seconds);
   void receive_newcomers(float seconds);

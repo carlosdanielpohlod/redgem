@@ -123,8 +123,8 @@ class RelayServer {
   // What time passing does to a member not in a room yet: given up on when it keeps quiet, or
   // when its room's game does not decide on it.
   void wait_on(Member& member, float seconds);
-  // Takes what arrived out of what the member may send; over it, the member is let go.
-  void charge(Member& member, std::size_t bytes);
+  // Takes what arrived out of what the member may send; over it, the member is let go (false).
+  bool charge(Member& member, std::size_t bytes);
   // Lets go of the newest machines with much waiting, while the relay holds more than it may.
   void shed_load();
   void handle(Member& member, const nlohmann::json& message);

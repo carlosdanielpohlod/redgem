@@ -45,9 +45,19 @@ void NetworkSession::police(Link& link, std::size_t bytes, float seconds) {
   if (link.idle_for > kServedIdleSeconds) link.connection.close();
 }
 
-void NetworkSession::police_message(Link& link) {
-  if (!relaying()) return;
-  if (!link.messages.charge(1)) link.connection.close();
+bool NetworkSession::police_message(Link& link) {
+  if (!relaying()) return true;
+  if (link.messages.charge(1)) return true;
+  link.connection.close();
+  return false;
+}
+
+void NetworkSession::forgive_stall(float seconds) {
+  const float forgiven = std::min(seconds, kMostForgivenStallSeconds);
+  for (Link& link : links_) {
+    link.allowance.forgive(forgiven);
+    link.messages.forgive(forgiven);
+  }
 }
 
 }  // namespace redgem::net

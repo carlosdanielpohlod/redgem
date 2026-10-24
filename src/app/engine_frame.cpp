@@ -44,7 +44,9 @@ void Engine::poll_network() {
   // On the real clock: the network does not pause with the game, nor hurry with its frames. A
   // long stall (a dragged window, a debugger) counts as one long frame, as it does for the game,
   // so that it does not run out the time the network gives its answers.
-  const float seconds = std::min(network_watch_.lap(), config::kMaxFrameSeconds);
+  const float lap = network_watch_.lap();
+  const float seconds = std::min(lap, config::kMaxFrameSeconds);
+  network_.forgive_stall(lap - seconds);  // (what the others sent while this one stood still)
   for (const net::NetworkEvent& event : network_.poll(seconds)) scripts_->dispatch(event);
   // A game hosted on this machine's own port answers the neighbours looking for one.
   if (!found_by_neighbours()) discovery_.stop_announcing();
