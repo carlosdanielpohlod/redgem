@@ -35,12 +35,16 @@ std::optional<ImageSize> webp_image_size(const std::uint8_t* data, std::size_t s
   if (!static_webp(features)) return std::nullopt;
   return ImageSize{static_cast<std::uint32_t>(features.width), static_cast<std::uint32_t>(features.height)};
 }
+bool decode_webp_rgba_into(const EncodedImage& image, std::uint8_t* output, std::size_t capacity, int stride) {
+  if (image.format() != EncodedImageFormat::Webp) return false;
+  if (!valid_output(output, capacity, stride)) return false;
+  return WebPDecodeRGBAInto(image.data(), image.byte_count(), output, capacity, stride) != nullptr;
+}
+
 bool decode_webp_rgba_into(const std::uint8_t* data, std::size_t size, std::uint8_t* output, std::size_t capacity,
                            int stride) {
-  if (!valid_output(output, capacity, stride)) return false;
-  if (!decodable_image(data, size)) return false;
-  if (!webp_image_size(data, size)) return false;
-  return WebPDecodeRGBAInto(data, size, output, capacity, stride) != nullptr;
+  const auto image = EncodedImage::read(data, size);
+  return image && decode_webp_rgba_into(*image, output, capacity, stride);
 }
 
 }  // namespace redgem

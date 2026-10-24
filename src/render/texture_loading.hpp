@@ -13,7 +13,7 @@
 namespace redgem::render_detail {
 
 // A bounded PNG, JPEG or static WebP decoded on the CPU. Caller releases the image.
-Image decode_picture(const std::string& extension, const std::vector<std::uint8_t>& encoded);
+Image decode_picture(const std::vector<std::uint8_t>& encoded);
 
 // A scene's image as a texture surfaces are drawn with, smaller copies of itself included. Its
 // missing or undecodable data becomes an opaque checkerboard, with a warning.

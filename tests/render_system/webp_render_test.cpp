@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "core/safe_path.hpp"
+#include "core/log.hpp"
 #include "core/image_header.hpp"
 #include "render/sky_picture.hpp"
 #include "render/texture_loading.hpp"
@@ -105,4 +106,56 @@ TEST_CASE("WebP sky pictures decode to linear light with the existing shrink lim
   CHECK(sky->at(0, 0).x == doctest::Approx(1));
   CHECK(sky->at(0, 0).y == doctest::Approx(0));
   CHECK(sky->at(kShrunkSide - 1, 0).y == doctest::Approx(1));
+}
+
+namespace {
+struct DisguisedImages {
+  const std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem-sniffed-images";
+  DisguisedImages() { std::filesystem::create_directories(folder); }
+  ~DisguisedImages() { std::filesystem::remove_all(folder); }
+};
+::Color first_texel(Texture2D texture) {
+  REQUIRE(texture.id != 0);
+  Image image = LoadImageFromTexture(texture);
+  ::Color* pixels = LoadImageColors(image);
+  REQUIRE(pixels != nullptr);
+  const auto first = pixels[0];
+  UnloadImageColors(pixels);
+  UnloadImage(image);
+  UnloadTexture(texture);
+  return first;
+}
+struct SkyWarnings {
+  int warnings = 0;
+  log::Sink previous = log::set_sink([this](log::Level level, const std::string&) {
+    if (level == log::Level::Warning) ++warnings;
+  });
+  ~SkyWarnings() { log::set_sink(std::move(previous)); }
+};
+}  // namespace
+
+TEST_CASE("PNG and JPEG bytes use their sniffed decoder despite WebP filenames and glTF hints") {
+  RenderStage stage;
+  DisguisedImages files;
+  for (const auto* extension : {"png", "jpg"}) {
+    const auto source = images_folder() / (std::string("sniff.") + extension);
+    const auto destination = files.folder / (std::string(extension) + ".webp");
+    std::filesystem::copy_file(source, destination, std::filesystem::copy_options::overwrite_existing);
+    CHECK(green(first_texel(render_detail::load_picture_file(files.folder, destination.filename().string()))));
+    const auto bytes = read_file_up_to(source, kMaxEncodedImageBytes);
+    REQUIRE(bytes.has_value());
+    CHECK(green(first_texel(render_detail::load_scene_texture(ImageData{*bytes, ".webp"}))));
+    const auto sky = render_detail::load_sky_picture(files.folder, destination.filename().string(), kSide);
+    REQUIRE(sky.has_value());
+    CHECK(sky->at(0, 0).y > kHalf);
+  }
+}
+
+TEST_CASE("an invalid or missing WebP sky reports one contextual warning") {
+  const char* name = "animated";
+  SUBCASE("animated") {}
+  SUBCASE("missing") { name = "not-present"; }
+  SkyWarnings captured;
+  CHECK_FALSE(render_detail::load_sky_picture(images_folder(), name, kSide).has_value());
+  CHECK(captured.warnings == 1);
 }

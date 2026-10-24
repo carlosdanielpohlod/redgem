@@ -19,6 +19,27 @@ struct ImageSize {
   std::uint32_t height = 0;
 };
 
+enum class EncodedImageFormat { Png, Jpeg, Webp };
+
+// A borrowed image whose encoded length, static format and dimensions were checked once.
+// Keep its source bytes alive and unchanged until decoding finishes.
+class EncodedImage {
+ public:
+  static std::optional<EncodedImage> read(const std::uint8_t* data, std::size_t bytes);
+  ImageSize dimensions() const { return size_; }
+  EncodedImageFormat format() const { return format_; }
+  const std::uint8_t* data() const { return data_; }
+  std::size_t byte_count() const { return bytes_; }
+
+ private:
+  EncodedImage(const std::uint8_t* data, std::size_t bytes, ImageSize size, EncodedImageFormat format)
+      : data_(data), bytes_(bytes), size_(size), format_(format) {}
+  const std::uint8_t* data_;
+  std::size_t bytes_;
+  ImageSize size_;
+  EncodedImageFormat format_;
+};
+
 // The size a PNG, JPEG or static WebP file says its picture has; nullopt for unsupported
 // formats, animation or a header that is cut short.
 std::optional<ImageSize> encoded_image_size(const std::uint8_t* data, std::size_t size);

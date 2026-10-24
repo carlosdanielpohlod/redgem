@@ -144,3 +144,38 @@ TEST_CASE("WebP headers cannot bypass the aggregate decoded scene memory budget"
   CHECK_FALSE(loaded.ok);
   CHECK_FALSE(loaded.error.empty());
 }
+
+TEST_CASE("a checked image carries the sniffed format and dimensions into WebP decoding") {
+  const auto bytes = webp_bytes("lossless");
+  const auto image = EncodedImage::read(bytes.data(), bytes.size());
+  REQUIRE(image.has_value());
+  CHECK(image->format() == EncodedImageFormat::Webp);
+  CHECK(image->dimensions().width == kSide);
+  CHECK(image->byte_count() == bytes.size());
+  std::array<std::uint8_t, kImageBytes> output;
+  CHECK(decode_webp_rgba_into(*image, output.data(), output.size(), kSide * kChannels));
+  for (const auto* extension : {"png", "jpg"}) {
+    const auto other = read_file_up_to(test::fixture(std::string("images/sniff.") + extension), kMaxEncodedImageBytes);
+    REQUIRE(other.has_value());
+    const auto header = EncodedImage::read(other->data(), other->size());
+    REQUIRE(header.has_value());
+    CHECK(header->format() != EncodedImageFormat::Webp);
+    CHECK_FALSE(decode_webp_rgba_into(*header, output.data(), output.size(), kSide * kChannels));
+  }
+}
+
+TEST_CASE("glTF images with a WebP MIME hint retain sniffable PNG or JPEG payloads") {
+  WebpScene scene;
+  for (const auto* extension : {"png", "jpg"}) {
+    std::filesystem::copy_file(test::fixture(std::string("images/sniff.") + extension), scene.folder / "picture.webp",
+                               std::filesystem::copy_options::overwrite_existing);
+    const auto loaded = scene.load(material_scene());
+    REQUIRE_MESSAGE(loaded.ok, loaded.error);
+    REQUIRE(loaded.scene.images.size() == 1);
+    const auto& picture = loaded.scene.images.front();
+    CHECK(picture.file_extension == ".webp");
+    const auto header = EncodedImage::read(picture.encoded.data(), picture.encoded.size());
+    REQUIRE(header.has_value());
+    CHECK(header->format() != EncodedImageFormat::Webp);
+  }
+}

@@ -1,6 +1,7 @@
 #include "render/texture_loading.hpp"
 
 #include <cstdint>
+#include <cstdlib>
 #include <optional>
 #include <vector>
 
@@ -31,13 +32,15 @@ Texture2D texture_or_placeholder(const Image& decoded) {
 }
 
 constexpr int kRgbaChannels = 4;
-Image decode_webp_picture(const std::vector<std::uint8_t>& encoded, const ImageSize& size) {
+Image decode_webp_picture(const EncodedImage& encoded) {
+  const ImageSize size = encoded.dimensions();
   const int width = static_cast<int>(size.width);
   const int height = static_cast<int>(size.height);
   const auto capacity = static_cast<std::size_t>(width) * height * kRgbaChannels;
-  auto* data = static_cast<std::uint8_t*>(MemAlloc(static_cast<unsigned int>(capacity)));
+  // The decoder writes every pixel; use raylib's uninitialized allocator, paired with MemFree.
+  auto* data = static_cast<std::uint8_t*>(RL_MALLOC(capacity));
   if (data == nullptr) return {};
-  if (decode_webp_rgba_into(encoded.data(), encoded.size(), data, capacity, width * kRgbaChannels))
+  if (decode_webp_rgba_into(encoded, data, capacity, width * kRgbaChannels))
     return {data, width, height, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
   MemFree(data);
   return {};
@@ -48,25 +51,23 @@ Image decode_picture_file(const std::filesystem::path& folder, const std::string
   if (!file) return {};
   const auto encoded = read_file_up_to(*file, kMaxEncodedImageBytes);
   if (!encoded) return {};
-  return decode_picture(file->extension().string(), *encoded);
+  return decode_picture(*encoded);
 }
 
 }  // namespace
 
-// An encoded picture, decoded. An empty image (and a warning) for one that is not a PNG, JPEG or static WebP
-// within the size limits: its header is read first, so that nothing oversized is ever decoded.
-Image decode_picture(const std::string& file_extension, const std::vector<std::uint8_t>& encoded) {
-  if (!decodable_image(encoded.data(), encoded.size())) {
-    log::warning("a picture cannot be decoded: expected a PNG, JPEG or static WebP of at most " +
-                 std::to_string(kMaxImageSide) + " x " + std::to_string(kMaxImageSide) + " pixels");
-    return Image{};
-  }
-  if (const auto webp = webp_image_size(encoded.data(), encoded.size())) return decode_webp_picture(encoded, *webp);
-  return LoadImageFromMemory(file_extension.c_str(), encoded.data(), static_cast<int>(encoded.size()));
+// Caller owns the contextual warning; failed decoding here is silent.
+Image decode_picture(const std::vector<std::uint8_t>& encoded) {
+  const auto image = EncodedImage::read(encoded.data(), encoded.size());
+  if (!image) return {};
+  if (image->format() == EncodedImageFormat::Webp) return decode_webp_picture(*image);
+  const char* hint = image->format() == EncodedImageFormat::Png ? ".png" : ".jpg";
+  return LoadImageFromMemory(hint, encoded.data(), static_cast<int>(encoded.size()));
 }
 
 Texture2D load_scene_texture(const ImageData& image) {
-  Image decoded = decode_picture(image.file_extension, image.encoded);
+  Image decoded = decode_picture(image.encoded);
+  if (!IsImageValid(decoded)) log::warning("scene picture is unreadable; using a checkerboard");
   Texture2D texture = texture_or_placeholder(decoded);
   UnloadImage(decoded);
   if (texture.id == 0) return texture;

@@ -49,9 +49,8 @@ bool fits_shrunk(const Image& decoded, std::uint32_t shrink) {
   return IsImageValid(decoded) && static_cast<std::uint32_t>(decoded.height) >= shrink;
 }
 
-std::optional<FloatImage> decode_ordinary(const std::string& extension, const std::vector<std::uint8_t>& encoded,
-                                          std::uint32_t widest) {
-  Image decoded = decode_picture(extension, encoded);
+std::optional<FloatImage> decode_ordinary(const std::vector<std::uint8_t>& encoded, std::uint32_t widest) {
+  Image decoded = decode_picture(encoded);
   const std::uint32_t shrink = shrink_to_fit(static_cast<std::uint32_t>(decoded.width), widest);
   std::optional<FloatImage> image;
   if (fits_shrunk(decoded, shrink)) image = linear_picture(decoded, shrink);
@@ -63,7 +62,7 @@ std::optional<FloatImage> decode_sky(const std::filesystem::path& file, std::uin
   const std::optional<std::vector<std::uint8_t>> encoded = read_file_up_to(file, kMaxEncodedImageBytes);
   if (!encoded) return std::nullopt;
   if (is_radiance(encoded->data(), encoded->size())) return decode_radiance(encoded->data(), encoded->size(), widest);
-  return decode_ordinary(file.extension().string(), *encoded, widest);
+  return decode_ordinary(*encoded, widest);
 }
 
 }  // namespace
