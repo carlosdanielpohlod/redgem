@@ -159,4 +159,15 @@ class Vector3Test < RedGemTest::Case
     assert_equal Vector3.zero, -Vector3.zero
     assert_equal Vector3.zero.hash, (-Vector3.zero).hash
   end
+
+  # As with an Array: a key changed in place is no longer found by the value it had; a dup as the
+  # key keeps its value whatever happens to the vector it was made from.
+  def test_a_key_changed_in_place_is_not_found_by_its_old_value
+    position = Vector3.new(1, 2, 3)
+    kept = { position => :here }
+    copied = { position.dup => :here }
+    position.add!(Vector3.up)
+    assert_nil kept[Vector3.new(1, 2, 3)]
+    assert_equal :here, copied[Vector3.new(1, 2, 3)]
+  end
 end
