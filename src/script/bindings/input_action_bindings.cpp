@@ -102,17 +102,18 @@ mrb_value input_define_axis(mrb_state* mrb, mrb_value) {
 mrb_value input_actions(mrb_state* mrb, mrb_value) { return names_value(mrb, bindings(mrb).declared().actions()); }
 mrb_value input_axes(mrb_state* mrb, mrb_value) { return names_value(mrb, bindings(mrb).declared().axes()); }
 
-// Whether a name the game declared is an axis that a stick moves.
-bool moved_by_a_stick(const AxisBinding* axis) { return axis != nullptr && axis->stick.has_value(); }
+// The stick that moves an axis, as a Symbol: nil when none does, or for an action (no axis).
+mrb_value stick_value(mrb_state* mrb, const AxisBinding* axis) {
+  if (axis == nullptr) return mrb_nil_value();
+  if (!axis->stick) return mrb_nil_value();
+  return mrb_symbol_value(mrb_intern_cstr(mrb, gamepad_axis_name(*axis->stick).c_str()));
+}
 
-// Input.axis_stick(:horizontal): the stick that moves an axis (:left_x), the game's for every
-// player; nil when no stick does, or for an action.
+// Input.axis_stick(:horizontal): the stick that moves an axis (:left_x), the game's for every player.
 mrb_value input_axis_stick(mrb_state* mrb, mrb_value) {
   mrb_value name;
   mrb_get_args(mrb, "o", &name);
-  const AxisBinding* axis = bindings(mrb).declared().axis(declared_name(mrb, name));
-  if (!moved_by_a_stick(axis)) return mrb_nil_value();
-  return mrb_symbol_value(mrb_intern_cstr(mrb, gamepad_axis_name(*axis->stick).c_str()));
+  return stick_value(mrb, bindings(mrb).declared().axis(declared_name(mrb, name)));
 }
 
 // --- Rebinding -------------------------------------------------------------------------------
