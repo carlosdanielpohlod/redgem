@@ -26,6 +26,8 @@
 #include "editor/scripts/script_files.hpp"
 #include "editor/ui/panels.hpp"
 #include "scene/gltf/gltf_loader.hpp"
+#include "editor/ui/labels.hpp"
+#include "window_mouse.hpp"
 #include "window_picture.hpp"
 
 using namespace redgem;
@@ -72,6 +74,46 @@ template <typename Window>
 void take_picture(Window& window, const std::filesystem::path& file) {
   for (int i = 0; i < kPictureFrames; ++i) window.frame();
   CHECK(save_window_picture(file));
+}
+
+// The unsaved-changes dialog: its id, and its buttons left to right.
+constexpr const char* kUnsavedDialog = "###unsaved_changes";
+enum class UnsavedChoice { Save, Discard, Cancel };
+constexpr int kClickFrames = 3;      // frames for the mouse to get somewhere, press and let go
+constexpr float kIntoButton = 4.0f;  // pixels past a button's left edge where it is clicked
+
+// Clicks the left mouse button at a point of the window, as ImGui hears the mouse.
+void click_at(EditorApp& app, ImVec2 point) {
+  redgem::test::move_window_mouse(point.x, point.y);  // what the interface's backend reads
+  ImGuiIO& io = ImGui::GetIO();
+  io.AddMousePosEvent(point.x, point.y);
+  run(app, kClickFrames);
+  io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+  run(app, kClickFrames);
+  io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+  run(app, kClickFrames);
+}
+
+// Where a button of the open unsaved-changes dialog is: its buttons are the dialog's last row.
+ImVec2 unsaved_choice_point(UnsavedChoice choice) {
+  const ImGuiWindow* dialog = ImGui::FindWindowByName(kUnsavedDialog);
+  REQUIRE(dialog != nullptr);
+  const ImGuiStyle& style = ImGui::GetStyle();
+  const char* labels[] = {ui::save_label(), ui::discard_label(), ui::cancel_label()};
+  float x = dialog->Pos.x + style.WindowPadding.x;
+  for (int i = 0; i < static_cast<int>(choice); ++i) {
+    x += ImGui::CalcTextSize(labels[i]).x + style.FramePadding.x * 2.0f + style.ItemSpacing.x;
+  }
+  const float y = dialog->Pos.y + dialog->Size.y - style.WindowPadding.y - ImGui::GetFrameHeight() * 0.5f;
+  return {x + kIntoButton, y};
+}
+
+void choose(EditorApp& app, UnsavedChoice choice) { click_at(app, unsaved_choice_point(choice)); }
+
+int node_count_of(const std::filesystem::path& file) {
+  const LoadResult loaded = load_gltf_scene(file.string());
+  REQUIRE(loaded.ok);
+  return static_cast<int>(loaded.scene.nodes.size());
 }
 
 bool has(const std::vector<std::string>& names, const std::string& name) {
@@ -489,6 +531,7 @@ TEST_CASE("a terrain is created, sculpted with the brush in the Scene view, and 
 
 TEST_CASE("a second scene is made, edited, saved, reopened and played in the editor") {
   constexpr const char* kSecondScene = "level_two";
+  constexpr const char* kThirdScene = "level_three";
   constexpr const char* kAddedObject = "Sphere";  // what a new sphere is called
   constexpr float kAbove = 3.0f;                  // meters over the new scene's ground
   constexpr int kExpectedErrors = 1;              // the second New scene of the same name, refused
@@ -540,11 +583,42 @@ TEST_CASE("a second scene is made, edited, saved, reopened and played in the edi
   // With unsaved edits, opening another scene waits for the user's answer.
   session.create_empty(app.spawn_point());
   app.open_scene(config::kMainSceneName);
-  CHECK(app.scene_waiting() == std::optional<std::string>(config::kMainSceneName));
+  REQUIRE(app.pending_action());
+  CHECK(app.pending_action()->scene == config::kMainSceneName);
   CHECK(session.scene_name() == kSecondScene);
   run(app, kFrameFrames);
   take_picture(app, screenshot("editor_unsaved_scene_dialog"));
   CHECK(session.scene_name() == kSecondScene);  // until Save or Discard
+
+  // Discard: main opens, and the second scene's file keeps what was saved.
+  const int second_saved = node_count_of(second_file);
+  choose(app, UnsavedChoice::Discard);
+  CHECK_FALSE(app.pending_action());
+  CHECK(session.scene_name() == config::kMainSceneName);
+  CHECK(node_count_of(second_file) == second_saved);
+
+  // New scene with unsaved edits: nothing is made before the answer, nor after Cancel.
+  const std::filesystem::path main_file = game / config::kSceneFileName;
+  const int main_saved = node_count_of(main_file);
+  const std::filesystem::path third_file = game / config::kScenesDirName / "level_three.glb";
+  session.create_empty(app.spawn_point());
+  REQUIRE(app.new_scene(kThirdScene));
+  CHECK_FALSE(std::filesystem::exists(third_file));
+  run(app, kFrameFrames);
+  choose(app, UnsavedChoice::Cancel);
+  CHECK_FALSE(app.pending_action());
+  CHECK_FALSE(std::filesystem::exists(third_file));
+  CHECK(session.scene_name() == config::kMainSceneName);
+  CHECK(session.document().dirty());
+
+  // Save: main keeps the edit, and the new scene is made and opened.
+  REQUIRE(app.new_scene(kThirdScene));
+  run(app, kFrameFrames);
+  choose(app, UnsavedChoice::Save);
+  CHECK_FALSE(app.pending_action());
+  CHECK(node_count_of(main_file) == main_saved + 1);
+  CHECK(std::filesystem::exists(third_file));
+  CHECK(session.scene_name() == kThirdScene);
 
   CHECK(app.console().error_count() == kExpectedErrors);
   std::filesystem::remove_all(game);

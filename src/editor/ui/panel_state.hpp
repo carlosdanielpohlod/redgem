@@ -67,4 +67,12 @@ struct PanelState {
   ScriptTabsState script_tabs;
 };
 
+// Another scene opens: what the panels held of the last one's objects goes (the search, half-typed
+// names, a streamed edit, which would land on the new scene's objects), without touching the new
+// scene. What is the game's (the Project panel, the Console, the script tabs) stays.
+inline void forget_scene(PanelState& state) {
+  state.hierarchy = HierarchyState{};
+  state.inspector = InspectorState{};
+}
+
 }  // namespace redgem::ui

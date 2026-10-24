@@ -5,22 +5,16 @@
 
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
+#include "editor/new_objects.hpp"
 
 namespace redgem {
 namespace {
 
-// What a new scene starts with: like the scene of a new game.
+// What a new scene starts with besides what the GameObject menu makes (see editor/new_objects.hpp).
 constexpr const char* kGroundName = "Ground";
-constexpr const char* kSunName = "Sun";
-constexpr const char* kCameraName = "Camera";
-constexpr Color kGroundColor{0.33f, 0.46f, 0.25f, 1.0f};  // grass
-constexpr Vec3 kGroundScale{2.0f, 1.0f, 2.0f};            // the built-in plane, 20 m across
-constexpr Color kSunColor{1.0f, 1.0f, 1.0f, 1.0f};        // white
-constexpr float kSunIntensity = 3.0f;                     // W/m2, like Blender's sun strength
-constexpr Vec3 kSunDirection{-0.4f, -1.0f, -0.6f};        // down at an angle
-constexpr float kCameraFov = 0.87f;                       // ~50 degrees
-constexpr Vec3 kCameraPosition{0.0f, 4.0f, 8.0f};         // meters: behind and above the middle
-constexpr Vec3 kCameraTarget{0.0f, 0.0f, 0.0f};           // the middle of the ground
+constexpr Vec3 kGroundScale{2.0f, 1.0f, 2.0f};     // the built-in plane, 20 m across
+constexpr Vec3 kCameraPosition{0.0f, 4.0f, 8.0f};  // meters: behind and above the middle
+constexpr Vec3 kCameraTarget{0.0f, 0.0f, 0.0f};    // the middle of the ground
 
 bool scene_name_character(char c) {
   const auto letter = static_cast<unsigned char>(c);
@@ -35,16 +29,16 @@ bool is_main_scene(const std::filesystem::path& game_dir, const std::filesystem:
   return file.lexically_normal() == (game_dir / config::kSceneFileName).lexically_normal();
 }
 
-// A node of the document moved to `position` and turned to look along `direction`.
-void place(SceneDocument& document, int node, Vec3 position, Vec3 direction) {
+// A node of the document moved to `position` and turned by `rotation`.
+void place(SceneDocument& document, int node, Vec3 position, Quat rotation) {
   Transform local = document.node(node).local;
   local.position = position;
-  local.rotation = quat_look_rotation(normalize(direction), Vec3::up());
+  local.rotation = rotation;
   document.set_local(node, local, false);
 }
 
 void add_ground(SceneDocument& document) {
-  const int ground = document.add_primitive(PrimitiveShape::Plane, kGroundName, kGroundColor);
+  const int ground = document.add_primitive(PrimitiveShape::Plane, kGroundName, new_objects::kGrassColor);
   Transform local = document.node(ground).local;
   local.scale = kGroundScale;
   document.set_local(ground, local, false);
@@ -78,19 +72,30 @@ std::optional<std::filesystem::path> new_scene_file(const std::filesystem::path&
 SceneDocument starting_scene(const std::filesystem::path& file) {
   SceneDocument document = SceneDocument::create_empty(file);
   add_ground(document);
-  const int sun = document.add_light(LightType::Directional, kSunName, kSunColor, kSunIntensity);
-  place(document, sun, Vec3::zero(), kSunDirection);
-  const int camera = document.add_camera(kCameraName, kCameraFov);
-  place(document, camera, kCameraPosition, kCameraTarget - kCameraPosition);
+  const int sun = document.add_light(LightType::Directional, new_objects::kSunName, new_objects::kLightColor,
+                                     new_objects::kSunIntensity);
+  place(document, sun, Vec3::zero(), new_objects::sun_rotation());
+  const int camera = document.add_camera(new_objects::kCameraName, new_objects::kCameraFov);
+  const Vec3 view = normalize(kCameraTarget - kCameraPosition);
+  place(document, camera, kCameraPosition, quat_look_rotation(view, Vec3::up()));
   return document;
 }
 
-std::optional<std::filesystem::path> create_scene(const std::filesystem::path& game_dir, const std::string& name,
-                                                  std::string& error) {
+std::optional<std::filesystem::path> ready_new_scene_file(const std::filesystem::path& game_dir,
+                                                          const std::string& name, std::string& error) {
   auto file = new_scene_file(game_dir, name, error);
   if (!file) return std::nullopt;
   std::error_code fs_error;
   std::filesystem::create_directories(file->parent_path(), fs_error);
+  if (!fs_error) return file;
+  error = "cannot make " + file->parent_path().string() + ": " + fs_error.message();
+  return std::nullopt;
+}
+
+std::optional<std::filesystem::path> create_scene(const std::filesystem::path& game_dir, const std::string& name,
+                                                  std::string& error) {
+  auto file = ready_new_scene_file(game_dir, name, error);
+  if (!file) return std::nullopt;
   SceneDocument document = starting_scene(*file);
   if (!document.save(error)) return std::nullopt;
   return file;

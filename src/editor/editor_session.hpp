@@ -37,7 +37,7 @@ class EditorSession {
   const std::filesystem::path& game_dir() const { return game_dir_; }
   // The scene being edited, by the name scripts load it with ("main" is scene.glb, see
   // editor/game_scenes.hpp).
-  std::string scene_name() const;
+  const std::string& scene_name() const { return scene_name_; }
   // Opens another scene of the game in place of this one, with its own undo history; its unsaved
   // edits are dropped, so ask first. False, and why in `error`, when it cannot be read, or while
   // the game runs.
@@ -92,6 +92,8 @@ class EditorSession {
   // Writes the scene being edited back to its file.
   bool save(std::string& error);
   // Writes it as a new scene of the game (scenes/<name>.glb), which is then the one edited.
+  // Refused when the scene uses files next to it (images, buffers) and would move to another
+  // folder, where it would not find them.
   bool save_as(const std::string& name, std::string& error);
 
   PlayState play_state() const { return play_state_; }
@@ -122,6 +124,8 @@ class EditorSession {
   void begin_editing();
   // Whatever is saved last is what the file on disk holds.
   void note_saved();
+  // Whether the scene can be saved as `file` and still find the files it uses (see save_as).
+  bool files_found_from(const std::filesystem::path& file, std::string& error) const;
   // Whether an object can be edited now: the game is stopped, and there is one.
   bool can_edit(ObjectId id) const { return editing() && id != kNoObject; }
   bool can_sculpt(ObjectId terrain) const { return editing() && is_terrain(terrain); }
@@ -146,6 +150,7 @@ class EditorSession {
 
   std::filesystem::path game_dir_;
   SceneDocument document_;
+  std::string scene_name_;  // of the document's file, kept as it opens or is saved as another
   Scene preview_;
   ObjectId selection_ = kNoObject;
   PlayState play_state_ = PlayState::Editing;

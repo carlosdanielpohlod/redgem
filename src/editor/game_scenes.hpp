@@ -22,6 +22,9 @@ std::string scene_name_of(const std::filesystem::path& game_dir, const std::file
 // scene can be called that or the game already has one called that.
 std::optional<std::filesystem::path> new_scene_file(const std::filesystem::path& game_dir, const std::string& name,
                                                     std::string& error);
+// The same, with the folder it goes in made: what saving a new scene needs.
+std::optional<std::filesystem::path> ready_new_scene_file(const std::filesystem::path& game_dir,
+                                                          const std::string& name, std::string& error);
 // What a new scene starts with, to be saved to `file`: the ground, a sun and a camera looking at
 // them, like the scene of a new game.
 SceneDocument starting_scene(const std::filesystem::path& file);

@@ -105,3 +105,30 @@ TEST_CASE("every editor starts with panels that remember nothing, and a console 
   // Another editor's is its own.
   CHECK(ui::PanelState().console.filters.shows(log::Level::Error));
 }
+
+TEST_CASE("opening another scene ends what the panels held of the last one, without touching the new one") {
+  constexpr unsigned int kNameField = 7;  // a widget id
+  TwoObjects old_scene;
+  TwoObjects new_scene;
+  ui::PanelState state;
+  old_scene.drag(state.inspector.edits, old_scene.first);
+  REQUIRE(state.inspector.edits.open());
+  ui::TextFieldState& typing = state.inspector.text_fields[kNameField];
+  typing.object = old_scene.second;
+  typing.editing = true;
+  typing.buffer = "Half typ";
+  state.hierarchy.filter = "Fir";
+  state.project.new_script_name = "enemy";
+
+  ui::forget_scene(state);
+  CHECK_FALSE(state.inspector.edits.open());
+  CHECK(state.inspector.text_fields.empty());
+  CHECK(state.hierarchy.filter.empty());
+  CHECK(state.project.new_script_name == "enemy");  // the game's, not the scene's
+
+  // A drag in the new scene is a step of its own, in its own history.
+  new_scene.drag(state.inspector.edits, new_scene.first);
+  state.inspector.edits.end_frame(false);
+  CHECK(new_scene.new_steps() == 1);
+  CHECK(old_scene.new_steps() == 1);  // the old scene's drag, left as it was
+}

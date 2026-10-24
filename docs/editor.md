@@ -74,7 +74,9 @@ The game always starts on `main` (`scene.glb`); scripts move to the others with
   `scenes/<name>.glb` with ground, a sun and a camera, and opens it. Names are lowercase letters,
   digits, `_` and `-`, starting with a letter (`level2`, `boss-fight`); `main` is taken.
 * **Save** (Ctrl+S) writes the open scene back to its own file. File > Save Scene As writes it as a
-  new scene of the game, which is then the one open.
+  new scene of the game, which is then the one open. A scene that uses files next to it (textures
+  exported outside the `.glb`) is not saved into another folder that way, where it would not find
+  them: export it from Blender as a `.glb` with its textures in it first.
 * **Play** starts the game on the open scene as it is edited, under its own name
   (`Game.scene_name`, and its `scripts/<name>_scene.rb` runs). Stop comes back to it.
 

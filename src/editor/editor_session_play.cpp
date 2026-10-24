@@ -40,6 +40,12 @@ void end_game_audio(AudioSystem& audio) {
   audio.set_master_volume(kFullVolume);
 }
 
+// Whether a copy of the document saved as `file` still finds the files next to it its images and
+// buffers name: it names none, or it stays in the same folder.
+bool finds_its_files(const SceneDocument& document, const std::filesystem::path& file) {
+  return document.linked_files().empty() || file.parent_path() == document.path().parent_path();
+}
+
 }  // namespace
 
 std::variant<std::unique_ptr<EditorSession>, std::string> EditorSession::open(const std::filesystem::path& folder) {
@@ -52,9 +58,8 @@ std::variant<std::unique_ptr<EditorSession>, std::string> EditorSession::open(co
   return session;
 }
 
-std::string EditorSession::scene_name() const { return scene_name_of(game_dir_, document_.path()); }
-
 void EditorSession::begin_editing() {
+  scene_name_ = scene_name_of(game_dir_, document_.path());
   selection_ = kNoObject;
   loaded_write_time_ = write_time(document_.path());
   external_change_pending_ = false;
@@ -90,13 +95,20 @@ bool EditorSession::save(std::string& error) {
 }
 
 bool EditorSession::save_as(const std::string& name, std::string& error) {
-  const auto file = new_scene_file(game_dir_, name, error);
+  const auto file = ready_new_scene_file(game_dir_, name, error);
   if (!file) return false;
-  std::error_code fs_error;
-  std::filesystem::create_directories(file->parent_path(), fs_error);
+  if (!files_found_from(*file, error)) return false;
   if (!document_.save_as(*file, error)) return false;
+  scene_name_ = name;
   note_saved();
   return true;
+}
+
+bool EditorSession::files_found_from(const std::filesystem::path& file, std::string& error) const {
+  if (finds_its_files(document_, file)) return true;
+  error = document_.path().filename().string() + " uses files next to it (" + document_.linked_files().front() +
+          "): to save it in another folder, export it from Blender as a .glb with its textures in it";
+  return false;
 }
 
 bool EditorSession::play(const PlayDevices& devices, std::string& error) {

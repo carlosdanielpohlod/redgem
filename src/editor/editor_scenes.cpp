@@ -1,11 +1,10 @@
-// Part of EditorApp: the game's scenes. Opening another one (asking first about unsaved edits),
-// making a new one, and saving the open one under a new name.
+// Part of EditorApp: the game's scenes. Opening another one or making a new one (asking first
+// about unsaved edits, see editor_dialogs), and saving the open one under a new name.
 
 #include "editor/editor_app.hpp"
 
 #include <imgui.h>
 
-#include "core/filled_texts.hpp"
 #include "core/log.hpp"
 #include "core/translations.hpp"
 #include "editor/game_scenes.hpp"
@@ -19,7 +18,6 @@ namespace {
 constexpr float kSceneNameFieldWidth = 180.0f;  // pixels
 constexpr const char* kSceneNameId = "##scene_name";
 // The dialogs: their titles, then their ImGui ids (see ui::window_title), which no title shares.
-const char* scene_switch_popup() { return ui::window_title("editor.unsaved.title", "###unsaved_scene"); }
 const char* new_scene_popup() { return ui::window_title("editor.scenes.new_title", "###new_scene"); }
 const char* save_as_popup() { return ui::window_title("editor.scenes.save_as_title", "###save_scene_as"); }
 
@@ -37,7 +35,7 @@ void EditorApp::open_scene(const std::string& name) {
   if (name == session_->scene_name()) return;  // already open
   if (!editing()) stop();
   if (session_->document().dirty()) {
-    pending_scene_ = name;
+    pending_ = PendingAction{PendingAction::Kind::OpenScene, name};
   } else {
     switch_scene(name);
   }
@@ -50,12 +48,25 @@ void EditorApp::switch_scene(const std::string& name) {
     return;
   }
   renderer_->upload(session_->scene_desc());  // the last scene's meshes and textures are let go
+  ui::forget_scene(panel_state_);
   look_through_main_camera();
   stroke_started_ = false;
   gizmo_dragging_ = false;
 }
 
 bool EditorApp::new_scene(const std::string& name) {
+  std::string error;
+  if (!new_scene_file(session_->game_dir(), name, error)) {
+    log::error("cannot make scene " + name + ": " + error);
+    return false;
+  }
+  if (!editing()) stop();
+  if (!session_->document().dirty()) return make_and_open_scene(name);
+  pending_ = PendingAction{PendingAction::Kind::NewScene, name};  // made once the user answers
+  return true;
+}
+
+bool EditorApp::make_and_open_scene(const std::string& name) {
   std::string error;
   const auto file = create_scene(session_->game_dir(), name, error);
   if (!file) {
@@ -64,7 +75,7 @@ bool EditorApp::new_scene(const std::string& name) {
   }
   log::info("created " + file->string());
   rescan_files();
-  open_scene(name);
+  switch_scene(name);
   return true;
 }
 
@@ -81,53 +92,6 @@ bool EditorApp::save_scene_as(const std::string& name) {
 void EditorApp::take_scene_requests(const ui::PanelContext& context) {
   if (context.scene_to_open) open_scene(*context.scene_to_open);
   if (context.new_scene_asked) ask_scene_name(SceneNameDialog::NewScene);
-}
-
-// --- Unsaved edits before another scene opens ---------------------------------------------------
-
-void EditorApp::draw_scene_switch_dialog() {
-  if (scene_switch_dialog_wanted()) ImGui::OpenPopup(scene_switch_popup());
-  if (!ImGui::BeginPopupModal(scene_switch_popup(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
-  ImGui::TextColored(ui::warning_color(), ICON_FA_TRIANGLE_EXCLAMATION);
-  ImGui::SameLine();
-  static FilledTexts question("editor.scenes.unsaved_question", "scene");
-  ImGui::TextUnformatted(question.with(session_->scene_name()));
-  ImGui::Spacing();
-  draw_scene_switch_choices();
-  ImGui::EndPopup();
-}
-
-// Closing the editor is asked about first: one question at a time.
-bool EditorApp::scene_switch_dialog_wanted() const {
-  return pending_scene_ && !close_pending_ && !ImGui::IsPopupOpen(scene_switch_popup());
-}
-
-void EditorApp::draw_scene_switch_choices() {
-  if (ImGui::Button(ui::save_label())) save_and_switch();
-  ImGui::SameLine();
-  if (ImGui::Button(ui::discard_label())) switch_without_saving();
-  ImGui::SameLine();
-  if (ImGui::Button(ui::cancel_label())) cancel_switch();
-}
-
-void EditorApp::save_and_switch() {
-  const std::string next = pending_scene_.value_or("");
-  save();
-  // Stay on this scene if saving it failed.
-  if (!session_->document().dirty()) switch_scene(next);
-  cancel_switch();
-}
-
-void EditorApp::switch_without_saving() {
-  const std::string next = pending_scene_.value_or("");
-  log::warning("opening " + next + " without saving " + session_->scene_name());
-  switch_scene(next);
-  cancel_switch();
-}
-
-void EditorApp::cancel_switch() {
-  pending_scene_.reset();
-  ImGui::CloseCurrentPopup();
 }
 
 // --- The name of a new scene, or of the open one saved as another -------------------------------

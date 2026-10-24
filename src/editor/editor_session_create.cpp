@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "core/log.hpp"
+#include "editor/new_objects.hpp"
 #include "scene/props.hpp"
 
 namespace redgem {
@@ -13,19 +14,12 @@ namespace {
 // Defaults of objects created from the editor's menus.
 constexpr const char* kNewEmptyName = "GameObject";
 constexpr const char* kNewTerrainName = "Terrain";
-constexpr const char* kNewCameraName = "Camera";
 constexpr const char* kNewEnvironmentName = "Environment";
-constexpr float kNewTerrainSize = 100.0f;                     // meters across
-constexpr int kNewTerrainCells = 64;                          // quads per side: about 1.5 m each
-constexpr Color kNewTerrainColor{0.33f, 0.46f, 0.25f, 1.0f};  // grass
-constexpr float kGroundLevel = 0.0f;                          // meters: new terrains lie at y = 0
-constexpr Color kNewShapeColor{0.8f, 0.8f, 0.8f, 1.0f};       // light gray
-constexpr Color kNewLightColor{1.0f, 1.0f, 1.0f, 1.0f};       // white
-constexpr float kNewSunIntensity = 3.0f;                      // W/m2, like Blender's sun strength
-constexpr float kNewLampIntensity = 500.0f;                   // watts, like Blender's default point light
-constexpr float kNewCameraFov = 0.87f;                        // ~50 degrees
-// New suns shine down at an angle instead of straight along -Z.
-constexpr Vec3 kNewSunDirection{-0.4f, -1.0f, -0.6f};
+constexpr float kNewTerrainSize = 100.0f;                // meters across
+constexpr int kNewTerrainCells = 64;                     // quads per side: about 1.5 m each
+constexpr float kGroundLevel = 0.0f;                     // meters: new terrains lie at y = 0
+constexpr Color kNewShapeColor{0.8f, 0.8f, 0.8f, 1.0f};  // light gray
+constexpr float kNewLampIntensity = 500.0f;              // watts, like Blender's default point light
 
 // What GameObject > Environment starts with: a sunset (colors as "#rrggbb").
 constexpr std::pair<const char*, const char*> kSunsetColors[] = {{props::environment::kSkyTop, "#33457f"},
@@ -39,7 +33,9 @@ constexpr std::pair<const char*, double> kSunsetNumbers[] = {
     {props::environment::kWind, 0.6}};
 
 const char* light_name(LightType type) {
-  return type == LightType::Directional ? "Sun" : type == LightType::Spot ? "Spot Light" : "Point Light";
+  return type == LightType::Directional ? new_objects::kSunName
+         : type == LightType::Spot      ? "Spot Light"
+                                        : "Point Light";
 }
 
 }  // namespace
@@ -72,18 +68,19 @@ ObjectId EditorSession::create_primitive(PrimitiveShape shape, Vec3 position) {
 ObjectId EditorSession::create_terrain(Vec3 position) {
   const auto add = [this] {
     return document_.add_terrain(document_.unique_name(kNewTerrainName), {kNewTerrainSize, kNewTerrainCells},
-                                 kNewTerrainColor);
+                                 new_objects::kGrassColor);
   };
   return place_created(add, {position.x, kGroundLevel, position.z});  // wherever the camera looks from
 }
 
 // A new light, aimed like a sun unless it shines all around.
 int EditorSession::add_light(LightType type) {
-  const float intensity = type == LightType::Directional ? kNewSunIntensity : kNewLampIntensity;
-  const int node = document_.add_light(type, document_.unique_name(light_name(type)), kNewLightColor, intensity);
+  const float intensity = type == LightType::Directional ? new_objects::kSunIntensity : kNewLampIntensity;
+  const int node =
+      document_.add_light(type, document_.unique_name(light_name(type)), new_objects::kLightColor, intensity);
   if (type != LightType::Point) {
     Transform local = document_.node(node).local;
-    local.rotation = quat_look_rotation(normalize(kNewSunDirection), Vec3::up());
+    local.rotation = new_objects::sun_rotation();
     document_.set_local(node, local, false);
   }
   return node;
@@ -94,7 +91,9 @@ ObjectId EditorSession::create_light(LightType type, Vec3 position) {
 }
 
 ObjectId EditorSession::create_camera(Vec3 position) {
-  const auto add = [this] { return document_.add_camera(document_.unique_name(kNewCameraName), kNewCameraFov); };
+  const auto add = [this] {
+    return document_.add_camera(document_.unique_name(new_objects::kCameraName), new_objects::kCameraFov);
+  };
   return place_created(add, position);
 }
 

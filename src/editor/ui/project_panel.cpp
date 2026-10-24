@@ -121,7 +121,9 @@ void draw_new_file_button(PanelContext& context, Folder folder) {
     ImGui::SameLine();
   }
   if (folder == Folder::Scenes) {
+    ImGui::BeginDisabled(!context.session.editing());  // like File > New Scene: not while the game runs
     context.new_scene_asked = ImGui::SmallButton(icon_label(ICON_FA_PLUS, "editor.project.new_scene"));
+    ImGui::EndDisabled();
     ImGui::SameLine();
   }
 }
