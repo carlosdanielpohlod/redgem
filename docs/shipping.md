@@ -138,6 +138,11 @@ redgem games/arena --record trailer.mp4 --record-fps 30 --record-size 3840x2160 
   `-` and `_`, starting and ending with a letter or a digit. Two games with the same `id` share
   a save: a game started as a copy of another needs a new one. A game with no `id` keeps its
   save by where its folder is, and starts a new save when it is given one.
+- `game.json` may also say how the game is shown until its player chooses otherwise:
+  `"fullscreen": true`, `"vsync": false`, `"fps_cap": 144` (`0` for no cap), `"render_scale": 0.75`
+  (the world drawn at 75% of the window's size) and `"quality": "medium"` (`low`, `medium`, `high`,
+  `ultra`). What the player chooses (see `Settings` in the [API reference](scripting/api.md)) is
+  kept in the user's settings file, by the game's `id`.
 
 - Everything in the game folder is copied, including the scripts as plain `.rb` files.
 - Check the licenses of the models and sounds you include. A license that allows using an asset

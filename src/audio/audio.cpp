@@ -301,7 +301,8 @@ class RaylibAudio final : public AudioSystem {
   }
 
   void set_master_volume(float volume) override {
-    if (ready_) SetMasterVolume(volume);
+    const float heard = heard_volume(volume);
+    if (ready_) SetMasterVolume(heard);
   }
 
   void update() override {

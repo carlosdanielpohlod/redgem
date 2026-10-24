@@ -5,6 +5,9 @@ class GameMenu < Behaviour
   class Screen
     attr_writer :heading
     attr_reader :back
+    # Which of its widgets the keyboard and a gamepad work (UI::Focus): its rows first, then its
+    # buttons. The menu gives it one when it shows it.
+    attr_accessor :focus
 
     # options: [[label, what it does (anything with `call`)], ...]. back: what the pause keys do
     # while the screen is open (nothing unless given). A heading or a label is a text, or a lookup
@@ -29,6 +32,8 @@ class GameMenu < Behaviour
     def draw(_first_button); end   # what else it shows; the first button is at [x, y, width, height]
     def space_above = 0            # pixels kept for that between its heading and its buttons
     def typing? = false            # letters are typed into it: of the pause keys, only Esc is one
+    def rows = 0                   # widgets it draws above its buttons that take the focus, first
+    def first_button_share = nil   # where its first button sits (a share of the height): the menu's unless said
 
     private
 

@@ -5,6 +5,7 @@
 #include <string>
 
 #include "app/android/android_settings.hpp"
+#include "render/display_settings.hpp"
 
 // game.json: what a game says about itself. This is the one place that reads the file.
 namespace redgem {
@@ -20,6 +21,10 @@ struct GameSettings {
   //   "id": "com.mystudio.mygame"   or   "id": "my-game-3fa2c1b0"
   std::string id;
   AndroidSettings android;
+  // How the game is shown until its player chooses otherwise: the window's size above, and
+  //   "fullscreen": true, "vsync": false, "fps_cap": 144 (0: none), "render_scale": 0.75,
+  //   "quality": "medium"
+  DisplaySettings display;
 };
 
 // Everything game.json says, read once.

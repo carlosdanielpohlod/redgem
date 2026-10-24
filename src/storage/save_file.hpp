@@ -19,6 +19,10 @@ inline constexpr int kMostDamagedSavesKept = 100;
 // start). What was set aside as damaged stays.
 void remove_save(const std::filesystem::path& file);
 
+// Moves a damaged file aside, to <name>.damaged (then .damaged.2 and on, as saves are): the name it
+// was moved to, or nullopt when it could not be moved (it is left where it is).
+std::optional<std::filesystem::path> move_damaged_aside(const std::filesystem::path& file);
+
 struct SaveReading;  // what reading a save file found (see save_file.cpp)
 
 // What a game keeps on a player's machine: one JSON file per game, read from disk on first use and

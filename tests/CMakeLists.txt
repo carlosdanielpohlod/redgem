@@ -63,6 +63,8 @@ add_executable(redgem_tests
   unit/scene_lights_test.cpp
   unit/gpu_select_test.cpp
   unit/window_test.cpp
+  unit/display_settings_test.cpp
+  unit/quality_test.cpp
   unit/culling_test.cpp
   unit/render_math_test.cpp
   unit/material_alpha_test.cpp
@@ -390,6 +392,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/temporal_depth_render_test.cpp
                render_system/missing_picture_render_test.cpp
                render_system/recording_render_test.cpp
+               render_system/display_render_test.cpp
                render_system/render_stage.cpp)
 target_link_libraries(redgem_render_system_tests PRIVATE redgem_runtime doctest::doctest)
 target_include_directories(redgem_render_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

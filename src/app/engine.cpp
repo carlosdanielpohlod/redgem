@@ -54,7 +54,9 @@ void Engine::initialize() {
   open_presenter(manifest.settings);
   open_audio();
   open_saves();
+  open_display(manifest.settings.display);
   fill_context(manifest.settings.title);
+  connect_display();
   if (serves_a_room()) network_.serve_room(options_.server_room);  // before any script asks
   start_scripts();
   network_watch_.restart();  // the network's time starts with the game, not with its loading
@@ -83,6 +85,30 @@ void Engine::open_presenter(const GameSettings& settings) {
 void Engine::open_audio() {
   if (options_.audio == nullptr) owned_audio_ = std::make_unique<NullAudio>();
   audio().set_sounds_dir(options_.game_dir / config::kSoundsDirName);
+}
+
+void Engine::open_display(const DisplaySettings& game_defaults) {
+  context_.display = options_.display.value_or(game_defaults);
+  follow_players_volume(context_.display.volume);
+}
+
+void Engine::follow_players_volume(float volume) {
+  if (volume == players_volume_) return;
+  players_volume_ = volume;
+  audio().set_player_volume(volume);
+}
+
+void Engine::connect_display() {
+  context_.apply_display = [this](const DisplaySettings& display) {
+    presenter_->apply_display(display);
+    follow_players_volume(display.volume);
+  };
+  if (keeps_display(options_.display_kept_in)) {
+    context_.save_display = [this](const DisplaySettings& display, std::string& error) {
+      return keep_display(*options_.display_kept_in, display, error);
+    };
+  }
+  context_.display_modes = [this] { return presenter_->display_modes(); };
 }
 
 void Engine::open_saves() {

@@ -132,9 +132,16 @@ struct ObjectPass {
   bool last_two_sided = false;
 };
 
+// What of the scattered copies a quality draws (see QualityCaps): a share of them, so far.
+struct ScatterQuality {
+  float density = 1.0f;
+  float reach = 1.0f;
+};
+
 // A sky picture on the graphics card, and its light (see sky_light.hpp).
 struct SkyTextures {
-  std::string name;  // what the environment asked for, looked for once ("": none)
+  std::string name;          // what the environment asked for, looked for once ("": none)
+  std::uint32_t widest = 0;  // pixels across it was loaded at most at (see QualityCaps::sky_detail)
   Texture2D picture{};
   unsigned int reflections = 0;  // a cube map, a roughness a level
   unsigned int reflectance = 0;  // the split sum's table: made once, kept for the next picture
@@ -226,7 +233,6 @@ struct Renderer::Impl {
   RenderTexture2D occlusion_a{};  // ambient occlusion (ping-pong with occlusion_b for the blur)
   RenderTexture2D occlusion_b{};
   render_detail::Multisampled scene_samples;  // the lit scene of several samples a pixel (msaa), resolved into hdr
-  bool samples_unusable = false;              // the card could not copy them into hdr: one sample a pixel from then on
   bool covering = false;                      // the pass being drawn smooths cut-out edges with those samples
   // The depth of the scene's surfaces, copied for soft particles (no color): made when first needed.
   RenderTexture2D scene_depth{};
@@ -276,11 +282,15 @@ struct Renderer::Impl {
   std::vector<std::pair<std::size_t, std::size_t>> fresh_texels;
   std::vector<ObjectHandle> record_owners;  // by object slot: whose record it held last frame
   bool temporal_allowed = true;             // Renderer::allow_temporal_antialias
-  bool temporal_unsupported = false;        // the card cannot copy the frame's float texels
+  // What the card turned out not to do (several samples a pixel copied into hdr, the frame's float
+  // texels copied): dropped from every environment from then on (see within_quality).
+  GpuAbilities gpu;
+  QualityCaps quality;  // Renderer::set_quality
   render_detail::TemporalState temporal;
   render_math::InstanceBatches batches;                     // what the pass being drawn sees, in runs of a mesh
   render_detail::SlotBuffer slots;                          // the record numbers of what the frame's passes see
   std::uint64_t scatter_version = 0;                        // of the scattered copies laid out (see Scattered)
+  render_detail::ScatterQuality scatter_quality;            // what of them they were laid out with
   std::vector<render_math::ScatterLayout> scatter_layouts;  // whose records come first
   std::size_t scattered_records = 0;  // theirs come first in the frame's texels, the objects' after
   float wind = 0.0f;                  // of the environment
@@ -476,7 +486,9 @@ struct Renderer::Impl {
   // Writes the records of the scene's scattered copies, cell by cell, when they changed.
   void lay_out_scattered(const Scattered& scattered);
   // One set's, from record `first` on. Returns the record after its last.
-  std::size_t lay_out_set(const ScatterSet& set, std::size_t first);
+  std::size_t lay_out_set(const ScatterSet& authored, std::size_t first);
+  // Whether the scattered copies are laid out already as they are now, with that quality.
+  bool laid_out_as(std::uint64_t version, const render_detail::ScatterQuality& wanted) const;
   std::size_t lay_out_level(const ScatterSet& set, const ScatterLevel& level, std::size_t first);
   // Adds to `batches` the cells the view sees.
   void gather_scattered(const render_math::View& view, bool depth_pass);

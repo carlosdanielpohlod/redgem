@@ -22,6 +22,7 @@
 #include "scene/water_interactions.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
+#include "app/game_display.hpp"
 #include "app/game_settings.hpp"
 #include "app/presenter.hpp"
 #include "storage/save_store.hpp"
@@ -47,6 +48,11 @@ struct EngineOptions {
   // Every frame advances the game by exactly one fixed step, however long it really took: the same
   // run gives the same game every time. Nothing else selects it.
   bool fixed_step = false;
+  // How the game is shown when it starts (Settings): what its game.json says when none.
+  std::optional<DisplaySettings> display;
+  // Where Settings.save keeps them for the next runs. None: they last for this run only, and
+  // nothing a player kept is read or written (see keeps_display).
+  std::optional<DisplayKeeping> display_kept_in;
   // Where Save keeps the game's data. Empty: the game's file in the user's RedGem folder.
   std::filesystem::path save_file;
   // What Save keeps the game's data in, kept by whoever runs the engine, which it has to outlive
@@ -119,6 +125,10 @@ class Engine {
   void open_presenter(const GameSettings& settings);
   void open_audio();
   void open_saves();
+  // The player's display settings, as they were kept; and what changes and keeps them (Settings).
+  void open_display(const DisplaySettings& game_defaults);
+  void connect_display();
+  void follow_players_volume(float volume);
   // Whether the game is a room of a dedicated server (see EngineOptions::server_room).
   bool serves_a_room() const { return !options_.server_room.empty(); }
   void fill_context(const std::string& game_title);
@@ -180,6 +190,9 @@ class Engine {
   net::HttpClient http_;  // (its requests still on their way are given up with the engine)
   FixedClock clock_;
   Stopwatch network_watch_;  // the real time between the network's polls
+  // The player's volume their settings last set (a multiplier of the game's own master volume):
+  // only a change of it is passed on.
+  float players_volume_ = kPlayersFullVolume;
 };
 
 }  // namespace redgem

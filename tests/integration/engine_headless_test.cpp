@@ -12,6 +12,7 @@
 #include "app/engine.hpp"
 #include "core/config.hpp"
 #include "core/exit_codes.hpp"
+#include "app/user_settings.hpp"
 #include "app/window_presenter.hpp"
 #include "net/socket/socket.hpp"
 #include "net/wire.hpp"
@@ -716,4 +717,66 @@ TEST_CASE("a touch screen's controls reach the renderer as plain circles, the st
   CHECK(circles[2].look == ControlCircle::Look::Resting);
   CHECK(circles[3].look == ControlCircle::Look::Pressed);
   CHECK(circles[4].y == doctest::Approx(layout.start.y));
+}
+
+namespace {
+
+// The sandbox game shown by nobody, keeping its player's settings in `settings`, as a player's run.
+std::unique_ptr<Engine> sandbox_keeping_settings(const std::filesystem::path& settings, AudioSystem& audio) {
+  EngineOptions options;
+  options.game_dir = fixture("games/sandbox");
+  options.fixed_step = true;
+  options.audio = &audio;
+  // (As a player's run does: what was kept read once, and where to keep it handed over.)
+  const PlayerDisplay kept = player_display(options.game_dir, settings);
+  options.display = kept.display;
+  options.display_kept_in = kept.kept_in;
+  auto created = Engine::create(options);
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  return std::move(std::get<std::unique_ptr<Engine>>(created));
+}
+
+}  // namespace
+
+TEST_CASE("what the player sets is kept for the game's next run, and the player's volume multiplies the game's") {
+  const std::filesystem::path settings = std::filesystem::temp_directory_path() / "redgem_engine_settings_test.json";
+  std::filesystem::remove(settings);
+  testing::RecordingAudio recording;
+  {
+    auto engine = sandbox_keeping_settings(settings, recording);
+    CHECK(ruby(*engine, "Settings.quality") == "ultra");
+    ruby(*engine, "Settings.quality = :low; Settings.render_scale = 0.75; Settings.volume = 0.5");
+    CHECK(recording.master_volume() == doctest::Approx(1.0f));  // the game's, as it was
+    CHECK(recording.heard_master_volume() == doctest::Approx(0.5f));
+    ruby(*engine, "Audio.volume = 0.4; Settings.vsync = false");  // each keeps its own
+    CHECK(recording.master_volume() == doctest::Approx(0.4f));
+    CHECK(recording.heard_master_volume() == doctest::Approx(0.2f));
+    CHECK(ruby(*engine, "Settings.volume") == "0.5");
+    CHECK(ruby(*engine, "Settings.save") == "true");
+    CHECK(ruby(*engine, "Settings.resolutions") == "[]");  // shown by nobody: no window to size
+  }
+  testing::RecordingAudio next_run;
+  auto again = sandbox_keeping_settings(settings, next_run);
+  CHECK(ruby(*again, "Settings.quality") == "low");
+  CHECK(ruby(*again, "Settings.render_scale") == "0.75");
+  CHECK(ruby(*again, "Settings.vsync") == "false");
+  CHECK(next_run.master_volume() == doctest::Approx(1.0f));
+  CHECK(next_run.heard_master_volume() == doctest::Approx(0.5f));
+  std::filesystem::remove(settings);
+}
+
+TEST_CASE("an engine not given where to keep its player's settings keeps nothing, and reads nothing kept") {
+  // (The editor's Play, a server's rooms, a developer's run and every test: only a player's run
+  // keeps what is chosen, and it says where.)
+  CHECK_FALSE(keeps_display(EngineOptions{}.display_kept_in));
+  const std::filesystem::path settings = user_settings_file();
+  const bool there = std::filesystem::exists(settings);
+  const auto written = there ? std::filesystem::last_write_time(settings) : std::filesystem::file_time_type{};
+  auto engine = sandbox();
+  CHECK(ruby(*engine, "Settings.quality") == "ultra");  // game.json's, whatever the player kept
+  ruby(*engine, "Settings.quality = :low");
+  CHECK(ruby(*engine, "Settings.save") == "false");
+  CHECK(ruby(*engine, "Settings.quality") == "low");  // (for this run)
+  CHECK(std::filesystem::exists(settings) == there);
+  if (there) CHECK(std::filesystem::last_write_time(settings) == written);
 }

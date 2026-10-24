@@ -2,6 +2,8 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <string>
 
 #include "app/user_settings.hpp"
 #include "core/platform.hpp"
@@ -45,5 +47,62 @@ TEST_CASE("settings are saved and read back; broken files give the defaults") {
   std::ofstream(file) << R"({"gpu": "warp"})";
   CHECK(read_user_settings(file).gpu == GpuChoice::Auto);
   CHECK(user_settings_file().filename() == "settings.json");
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("each game's display settings are kept by its key, apart from the others' and the user's own") {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_display_settings_test";
+  std::filesystem::remove_all(dir);
+  const std::filesystem::path file = dir / "settings.json";
+  DisplaySettings defaults;
+  defaults.resolution = {1280, 720};
+  CHECK(read_game_display(file, "com.studio.one", defaults).resolution == defaults.resolution);  // no file yet
+  DisplaySettings chosen = defaults;
+  chosen.mode = WindowMode::Borderless;
+  chosen.quality = QualityPreset::Low;
+  std::string error;
+  REQUIRE_MESSAGE(write_game_display(file, "com.studio.one", chosen, error), error);
+  UserSettings user;
+  user.gpu = GpuChoice::Integrated;
+  REQUIRE_MESSAGE(write_user_settings(file, user, error), error);  // (the games' settings stay)
+  REQUIRE_MESSAGE(write_game_display(file, "folder:two-1234", defaults, error), error);
+  const DisplaySettings one = read_game_display(file, "com.studio.one", defaults);
+  CHECK(one.mode == WindowMode::Borderless);
+  CHECK(one.quality == QualityPreset::Low);
+  CHECK(read_game_display(file, "folder:two-1234", defaults).mode == WindowMode::Windowed);
+  CHECK(read_game_display(file, "com.studio.three", defaults).quality == QualityPreset::Ultra);
+  CHECK(read_user_settings(file).gpu == GpuChoice::Integrated);
+  std::ofstream(file) << R"({"games": "broken"})";
+  CHECK(read_game_display(file, "com.studio.one", defaults).mode == WindowMode::Windowed);
+  REQUIRE_MESSAGE(write_game_display(file, "com.studio.one", chosen, error), error);
+  CHECK(read_game_display(file, "com.studio.one", defaults).mode == WindowMode::Borderless);
+  std::filesystem::remove_all(dir);
+}
+
+namespace {
+
+// What a file holds, read and closed (Windows removes no file that is open).
+std::string text_of(const std::filesystem::path& file) {
+  std::ifstream in(file);
+  return std::string(std::istreambuf_iterator<char>(in), {});
+}
+
+}  // namespace
+
+TEST_CASE("a damaged settings file is moved aside, not written over, and the settings are written anew") {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_damaged_settings_test";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  const std::filesystem::path file = dir / "settings.json";
+  std::ofstream(file) << R"({"gpu": "integrated", "games": {)";  // cut short
+  DisplaySettings chosen;
+  chosen.quality = QualityPreset::High;
+  std::string error;
+  REQUIRE_MESSAGE(write_game_display(file, "com.studio.one", chosen, error), error);
+  const std::filesystem::path aside = dir / "settings.json.damaged";
+  REQUIRE(std::filesystem::exists(aside));
+  CHECK(text_of(aside) == R"({"gpu": "integrated", "games": {)");
+  CHECK(read_game_display(file, "com.studio.one", DisplaySettings{}).quality == QualityPreset::High);
+  CHECK_FALSE(std::filesystem::exists(dir / "settings.json.part"));  // written whole, through a file beside it
   std::filesystem::remove_all(dir);
 }

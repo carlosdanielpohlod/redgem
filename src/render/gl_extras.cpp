@@ -2,6 +2,8 @@
 
 #include <rlgl.h>
 
+#include <algorithm>
+
 #if defined(GRAPHICS_API_OPENGL_ES3)
 #include <GLES3/gl3.h>
 #else
@@ -29,6 +31,14 @@ void forget_errors() {
 }
 
 }  // namespace
+
+int largest_target_side() {
+  GLint texture = 0;
+  GLint buffer = 0;
+  glGetIntegerv(GL_MAX_TEXTURE_SIZE, &texture);
+  glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE, &buffer);
+  return std::min(texture, buffer);
+}
 
 Multisampled load_multisampled(int width, int height, int samples) {
   Multisampled target{rlLoadFramebuffer(), 0, 0, width, height, samples};
