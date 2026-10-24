@@ -75,6 +75,8 @@ struct Lan {
   bool level_from_files = false;
   // A relay the machines may meet on, kept going with them.
   std::unique_ptr<net::RelayServer> relay;
+  // The real time as the machines' networks read it, when not the clock's (set before they start).
+  Stopwatch::Reading network_time;
 
   Lan() { std::filesystem::remove_all(dir); }
   ~Lan() {
@@ -87,6 +89,7 @@ struct Lan {
     options.game_dir = fixture("games/sandbox");
     options.fixed_step = true;
     if (!level_from_files) options.scene = &scene;
+    if (network_time) options.network_time = network_time;
     options.save_file = dir / ("save" + std::to_string(machines.size()) + ".json");
     auto created = Engine::create(options);
     if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
@@ -200,6 +203,7 @@ TEST_CASE("scripts send each other named messages carrying Ruby values") {
 // A player hosting is held to what a dedicated server holds its players to.
 TEST_CASE("a machine that floods a game a player hosts is let go") {
   Lan lan;
+  lan.network_time = [] { return 0.0; };  // (as below: only the burst counts)
   auto [host, guest] = lan.host_and_guest();
   ruby(*guest, "64.times { Network.emit(:big, 'x' * 65_536) }");  // more bytes at once than any game sends
   REQUIRE(lan.until([guest = guest] { return guest->network().state() == net::NetworkSession::State::Offline; }));
@@ -209,6 +213,9 @@ TEST_CASE("a machine that floods a game a player hosts is let go") {
 
 TEST_CASE("a machine that floods a game a player hosts with tiny messages is let go") {
   Lan lan;
+  // Time stands still for the networks: what a slow machine takes to pass the messages on earns
+  // the guest nothing back, so the burst alone is what it may send.
+  lan.network_time = [] { return 0.0; };
   auto [host, guest] = lan.host_and_guest();
   // Few bytes, far more messages at once than poses of dozens of objects make.
   ruby(*guest, "20_000.times { Network.emit(:t) }");
