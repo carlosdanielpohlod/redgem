@@ -63,6 +63,23 @@ class MainScene < SceneScript
 end
 )";
 
+// ... or with the same gatekeeper set up in a behaviour's start rather than in the scene's script.
+constexpr const char* kGateBehaviour = R"(
+class Gate < Behaviour
+  def start
+    eval_gatekeeper
+  end
+end
+)";
+constexpr const char* kSceneWithGate = R"(
+class MainScene < SceneScript
+  def setup
+    Scene.find('Hero').add_component(Gate) if Network.server?
+  end
+end
+)";
+constexpr bool kGateInStart = true;
+
 std::string ruby(Engine& engine, const std::string& code) {
   const RubyResult result = engine.scripts().eval(code, "test.rb");
   REQUIRE_MESSAGE(result.ok, result.error);
@@ -78,13 +95,21 @@ struct GuardedGame {
   std::filesystem::path game = root / "game";
   std::filesystem::path data = root / "data";
 
-  GuardedGame() {
+  explicit GuardedGame(bool gate_in_start = false) {
     std::filesystem::remove_all(root);
     std::filesystem::create_directories(root);
     std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
-    std::string scene = kServerScene;
-    scene.replace(scene.find("eval_gatekeeper"), std::string("eval_gatekeeper").size(), kGatekeeper);
-    std::ofstream(game / "scripts" / "main_scene.rb") << scene;
+    if (gate_in_start) {
+      std::ofstream(game / "scripts" / "gate.rb") << with_gatekeeper(kGateBehaviour);
+      std::ofstream(game / "scripts" / "main_scene.rb") << kSceneWithGate;
+    } else {
+      std::ofstream(game / "scripts" / "main_scene.rb") << with_gatekeeper(kServerScene);
+    }
+  }
+
+  static std::string with_gatekeeper(std::string script) {
+    const std::string placeholder = "eval_gatekeeper";
+    return script.replace(script.find(placeholder), placeholder.size(), kGatekeeper);
   }
   ~GuardedGame() { std::filesystem::remove_all(root); }
 };
@@ -92,6 +117,8 @@ struct GuardedGame {
 // Machines playing one game: a player hosting it, or a dedicated server's room; each machine
 // with an engine of its own.
 struct Gathering {
+  explicit Gathering(bool gate_in_start = false) : files(gate_in_start) {}
+
   GuardedGame files;
   std::unique_ptr<server::GameServer> server;
   std::unique_ptr<net::RelayServer> relay;
@@ -402,4 +429,16 @@ TEST_CASE("a dedicated server's game decides who plays, and keeps each player's 
   ruby(ana, "Network.leave");
   REQUIRE(game.until([&game] { return game.server->room_count() == 0; }));
   CHECK(game.saved_players()["user-ana"]["visits"] == 2);
+}
+
+// A room's game starts its behaviours before it lets its first player in: a gatekeeper set up in
+// a start is asked about that player too.
+TEST_CASE("a dedicated server's room asks a gatekeeper set in a behaviour's start about its first player") {
+  test::LogCapture quiet;
+  Gathering game(kGateInStart);
+  game.start_server();
+  Engine& eve = game.knock(game.server->port(), "{ token: 'bad', name: 'eve' }");
+  REQUIRE(game.until([&eve] { return offline(eve); }));
+  game.round();
+  CHECK(ruby(eve, "$reasons.inspect") == "[\"not logged in\"]");
 }
