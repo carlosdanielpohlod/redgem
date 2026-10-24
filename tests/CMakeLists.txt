@@ -21,6 +21,7 @@ add_executable(redgem_tests
   unit/gltf_accessors_test.cpp
   unit/gltf_loader_test.cpp
   unit/gltf_loader_safety_test.cpp
+  unit/spatial_audio_test.cpp
   unit/safe_path_test.cpp
   unit/image_header_test.cpp
   unit/radiance_image_test.cpp
