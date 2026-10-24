@@ -2,6 +2,8 @@
 
 #include <sqlite3.h>
 
+#include <fstream>
+
 #include "storage/saved_values.hpp"
 
 namespace redgem::server {
@@ -34,18 +36,39 @@ void make_folder_for(const std::filesystem::path& file) {
   if (!file.empty()) std::filesystem::create_directories(file.parent_path(), ignored);
 }
 
+// Saves are players' data: the file is its owner's alone, made so before sqlite opens it (the
+// files sqlite makes beside it, its journal, take its permissions).
+void keep_to_owner(const std::filesystem::path& file) {
+  if (file.empty()) return;
+  std::error_code ignored;  // (opening the database says what went wrong)
+  if (!std::filesystem::exists(file, ignored)) std::ofstream(file, std::ios::binary);  // sqlite takes it as new
+  std::filesystem::permissions(file, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+                               std::filesystem::perm_options::replace, ignored);
+}
+
 }  // namespace
 
 std::unique_ptr<SaveDatabase> SaveDatabase::open(const std::filesystem::path& file, std::string& error) {
   make_folder_for(file);
+  keep_to_owner(file);
   sqlite3* database = nullptr;
   const int opened = sqlite3_open(file.empty() ? kInMemory : file.u8string().c_str(), &database);
-  if (opened == SQLITE_OK && executed(database, kSetUp)) {
-    return std::unique_ptr<SaveDatabase>(new SaveDatabase(database, file));
+  if (opened != SQLITE_OK || !executed(database, kSetUp)) {
+    error = sqlite3_errmsg(database);
+    sqlite3_close(database);
+    return nullptr;
   }
-  error = sqlite3_errmsg(database);
-  sqlite3_close(database);
-  return nullptr;
+  std::unique_ptr<SaveDatabase> saves(new SaveDatabase(database, file));
+  error = saves->unprepared();
+  if (error.empty()) return saves;
+  return nullptr;  // (the database closes with `saves`)
+}
+
+std::string SaveDatabase::unprepared() const {
+  for (const SqliteStatement* statement : {&read_, &write_, &remove_, &keys_}) {
+    if (!statement->prepared()) return statement->error();
+  }
+  return {};
 }
 
 SaveDatabase::SaveDatabase(sqlite3* database, std::filesystem::path file)

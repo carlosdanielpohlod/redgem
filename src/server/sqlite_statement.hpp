@@ -42,15 +42,22 @@ class SqliteStatement {
     sqlite3_stmt* statement_;
   };
 
-  SqliteStatement(sqlite3* database, const char* sql) { sqlite3_prepare_v2(database, sql, -1, &statement_, nullptr); }
+  // (Whether it could be prepared is prepared(), and error() why not: one that could not does
+  // nothing, and says so as a step that fails.)
+  SqliteStatement(sqlite3* database, const char* sql) {
+    if (sqlite3_prepare_v2(database, sql, -1, &statement_, nullptr) != SQLITE_OK) error_ = sqlite3_errmsg(database);
+  }
   ~SqliteStatement() { sqlite3_finalize(statement_); }
   SqliteStatement(const SqliteStatement&) = delete;
   SqliteStatement& operator=(const SqliteStatement&) = delete;
 
   Use use() { return Use(statement_); }
+  bool prepared() const { return error_.empty(); }
+  const std::string& error() const { return error_; }
 
  private:
   sqlite3_stmt* statement_ = nullptr;
+  std::string error_;
 };
 
 }  // namespace redgem::server

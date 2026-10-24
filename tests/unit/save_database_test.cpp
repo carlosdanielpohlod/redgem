@@ -36,6 +36,16 @@ std::unique_ptr<SaveDatabase> opened(const std::filesystem::path& file) {
   return database;
 }
 
+// Whether only a file's owner may read or write it. (Windows keeps who may otherwise: always so there.)
+bool owners_only(const std::filesystem::path& file) {
+#ifdef _WIN32
+  return std::filesystem::exists(file);
+#else
+  const auto mine = std::filesystem::perms::owner_read | std::filesystem::perms::owner_write;
+  return (std::filesystem::status(file).permissions() & std::filesystem::perms::all) == mine;
+#endif
+}
+
 }  // namespace
 
 TEST_CASE("a server's saves are written one key at a time, and are there after a restart") {
@@ -153,4 +163,26 @@ TEST_CASE("a database in memory keeps values for this run only, and one that can
   std::string error;
   CHECK(SaveDatabase::open(temp.database, error) == nullptr);
   CHECK_FALSE(error.empty());
+}
+
+// Players' saves are nobody else's on the machine: the database is its owner's alone.
+TEST_CASE("a server's save database is made readable by its owner only") {
+  const TempData temp;
+  opened(temp.database)->set("best", 1);
+  CHECK(owners_only(temp.database));
+  std::filesystem::permissions(temp.database, std::filesystem::perms::all, std::filesystem::perm_options::add);
+  opened(temp.database);  // one left open to everyone is closed again
+  CHECK(owners_only(temp.database));
+}
+
+TEST_CASE("a database whose saves table is not the server's does not open as if it could be used") {
+  const TempData temp;
+  std::filesystem::create_directories(temp.database.parent_path());
+  sqlite3* other = nullptr;
+  REQUIRE(sqlite3_open(temp.database.string().c_str(), &other) == SQLITE_OK);
+  REQUIRE(sqlite3_exec(other, "CREATE TABLE saves (key TEXT)", nullptr, nullptr, nullptr) == SQLITE_OK);
+  sqlite3_close(other);
+  std::string error;
+  CHECK(SaveDatabase::open(temp.database, error) == nullptr);
+  CHECK(error.find("no such column") != std::string::npos);
 }
