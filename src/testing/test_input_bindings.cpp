@@ -81,21 +81,23 @@ mrb_value set_mouse_wheel(mrb_state* mrb, mrb_value) {
 mrb_value set_gamepad_axis(mrb_state* mrb, mrb_value) {
   mrb_value name;
   mrb_float value = 0.0;
-  mrb_get_args(mrb, "of", &name, &value);
+  mrb_int pad = 0;
+  mrb_get_args(mrb, "of|i", &name, &value, &pad);
   const std::string axis_name = to_name(mrb, name);
   const GamepadAxis axis = known(mrb, gamepad_axis_from_name(axis_name), "unknown gamepad axis :%s", axis_name);
-  driven_input(mrb).set_gamepad_axis(axis, static_cast<float>(value));
+  driven_input(mrb).set_gamepad_axis(axis, static_cast<float>(value), binding::pad_number(mrb, pad));
   return mrb_nil_value();
 }
 
 mrb_value set_gamepad_button(mrb_state* mrb, mrb_value) {
   mrb_value name;
   mrb_bool down = false;
-  mrb_get_args(mrb, "ob", &name, &down);
+  mrb_int pad = 0;
+  mrb_get_args(mrb, "ob|i", &name, &down, &pad);
   const std::string button_name = to_name(mrb, name);
   const GamepadButton button =
       known(mrb, gamepad_button_from_name(button_name), "unknown gamepad button :%s", button_name);
-  driven_input(mrb).set_gamepad_button(button, down);
+  driven_input(mrb).set_gamepad_button(button, down, binding::pad_number(mrb, pad));
   return mrb_nil_value();
 }
 
@@ -110,8 +112,9 @@ void define_mouse_and_gamepad(mrb_state* mrb, RClass* module) {
   mrb_define_module_function(mrb, module, "move_mouse", move_mouse, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, module, "set_mouse_button", set_mouse_button, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, module, "set_mouse_wheel", set_mouse_wheel, MRB_ARGS_REQ(1));
-  mrb_define_module_function(mrb, module, "set_gamepad_axis", set_gamepad_axis, MRB_ARGS_REQ(2));
-  mrb_define_module_function(mrb, module, "set_gamepad_button", set_gamepad_button, MRB_ARGS_REQ(2));
+  // (Both take the gamepad's number last: the first one when it is left out.)
+  mrb_define_module_function(mrb, module, "set_gamepad_axis", set_gamepad_axis, MRB_ARGS_ARG(2, 1));
+  mrb_define_module_function(mrb, module, "set_gamepad_button", set_gamepad_button, MRB_ARGS_ARG(2, 1));
 }
 
 }  // namespace

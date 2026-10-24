@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <set>
 #include <string>
 #include <utility>
@@ -16,7 +18,8 @@ class InputSource {
   virtual ~InputSource() = default;
   virtual bool is_key_down(Key key) const = 0;
   virtual MouseSample mouse() const { return {}; }
-  virtual GamepadSample gamepad() const { return {}; }
+  // A gamepad by its number, from 0 to kMaxGamepads - 1: unplugged when there is none.
+  virtual GamepadSample gamepad(std::size_t) const { return {}; }
   // What was typed since the last frame, as text (UTF-8): letters as the keyboard layout gives them.
   virtual std::string typed_text() const { return {}; }
   // The on-screen controls to draw, on a touch screen showing them; null otherwise.
@@ -34,18 +37,18 @@ class ScriptedInputSource final : public InputSource {
  public:
   bool is_key_down(Key key) const override { return held_.count(key) != 0; }
   MouseSample mouse() const override { return mouse_; }
-  GamepadSample gamepad() const override { return gamepad_; }
+  GamepadSample gamepad(std::size_t pad) const override { return gamepads_.at(pad); }
   std::string typed_text() const override { return typed_; }
   // What is "typed" every frame until told otherwise.
   void type_text(std::string text) { typed_ = std::move(text); }
   // Either of these plugs the gamepad in.
-  void set_gamepad_axis(GamepadAxis axis, float value) {
-    gamepad_.connected = true;
-    gamepad_.axes[static_cast<std::size_t>(axis)] = value;
+  void set_gamepad_axis(GamepadAxis axis, float value, std::size_t pad = 0) {
+    gamepads_.at(pad).connected = true;
+    gamepads_.at(pad).axes[static_cast<std::size_t>(axis)] = value;
   }
-  void set_gamepad_button(GamepadButton button, bool down) {
-    gamepad_.connected = true;
-    gamepad_.buttons[static_cast<std::size_t>(button)] = down;
+  void set_gamepad_button(GamepadButton button, bool down, std::size_t pad = 0) {
+    gamepads_.at(pad).connected = true;
+    gamepads_.at(pad).buttons[static_cast<std::size_t>(button)] = down;
   }
   void set_key(Key key, bool down) {
     held_.erase(key);
@@ -58,14 +61,14 @@ class ScriptedInputSource final : public InputSource {
     held_.clear();
     mouse_.buttons = {};
     mouse_.wheel = 0.0f;
-    gamepad_ = {};
+    gamepads_ = {};
     typed_.clear();
   }
 
  private:
   std::set<Key> held_;
   MouseSample mouse_;
-  GamepadSample gamepad_;
+  std::array<GamepadSample, kMaxGamepads> gamepads_{};
   std::string typed_;
 };
 

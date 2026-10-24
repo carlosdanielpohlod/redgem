@@ -64,6 +64,13 @@ std::optional<Key> key_from_name(const std::string& name) {
   return it->second;
 }
 
+std::string key_name(Key key) {
+  for (const auto& [name, named] : key_names()) {
+    if (named == key) return name;
+  }
+  return {};
+}
+
 const std::vector<Key>& all_keys() {
   static const std::vector<Key> keys = [] {
     std::vector<Key> out;

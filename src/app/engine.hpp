@@ -49,6 +49,9 @@ struct EngineOptions {
   bool fixed_step = false;
   // Where Save keeps the game's data. Empty: the game's file in the user's RedGem folder.
   std::filesystem::path save_file;
+  // Where the players' bindings of the game's actions are kept (Input.bind). Empty: the game's
+  // file in the user's RedGem folder, or nowhere for a game with no id or a server's room.
+  std::filesystem::path bindings_file;
   // What Save keeps the game's data in, kept by whoever runs the engine, which it has to outlive
   // (a dedicated server's, shared by its rooms). save_file is not looked at then.
   SaveStore* save = nullptr;
@@ -119,6 +122,10 @@ class Engine {
   void open_presenter(const GameSettings& settings);
   void open_audio();
   void open_saves();
+  // The game's actions and axes (game.json), and what its players bound them to.
+  void open_bindings();
+  std::filesystem::path chosen_bindings_file() const;
+  void keep_bindings();
   // Whether the game is a room of a dedicated server (see EngineOptions::server_room).
   bool serves_a_room() const { return !options_.server_room.empty(); }
   void fill_context(const std::string& game_title);
@@ -137,6 +144,8 @@ class Engine {
 
   // The parts of a frame, in the order frame() runs them.
   void read_input();
+  // The key or button a capture caught, to the block waiting for it (Input.capture_next).
+  void hand_on_capture();
   InputSource& input_source();
   void poll_network();
   // The answers of the game's web requests that came, each to the block waiting for it.
@@ -165,6 +174,7 @@ class Engine {
   std::unique_ptr<PhysicsWorld> physics_;
   InputState input_;
   ScriptedInputSource scripted_input_;
+  std::filesystem::path bindings_file_;  // empty: the players' bindings are kept nowhere
   ScriptContext context_;
   std::unique_ptr<ScriptHost> scripts_;
   std::unique_ptr<AudioSystem> owned_audio_;

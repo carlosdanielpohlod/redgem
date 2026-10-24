@@ -19,7 +19,7 @@ TEST_CASE("a touch screen with no gamepad plugged in shows controls that stand i
   const ScriptedInputSource devices;
   TouchInputSource screen(devices);
   screen.fit_surface(kViewWidth, kViewHeight);
-  const GamepadSample pad = screen.gamepad();
+  const GamepadSample pad = screen.gamepad(kFirstGamepad);
   CHECK(pad.connected);
   REQUIRE(screen.touch_layout() != nullptr);
 }
@@ -28,14 +28,14 @@ TEST_CASE("the touch controls are laid out on what the game is drawn on, not on 
   const ScriptedInputSource devices;
   TouchInputSource screen(devices);
   screen.fit_surface(kViewWidth, kViewHeight);
-  screen.gamepad();
+  screen.gamepad(kFirstGamepad);
   const TouchLayout large = *screen.touch_layout();
   CHECK(large.a.x > kViewWidth * kHalf);
   CHECK(large.a.x < kViewWidth);
   CHECK(large.a.y < kViewHeight);
   // The same game in a smaller view: every circle is inside it.
   screen.fit_surface(kSmallWidth, kSmallHeight);
-  screen.gamepad();
+  screen.gamepad(kFirstGamepad);
   const TouchLayout small = *screen.touch_layout();
   for (const TouchCircle& circle : {small.stick_base, small.a, small.b, small.start}) {
     CHECK(circle.x < kSmallWidth);
@@ -49,7 +49,7 @@ TEST_CASE("a plugged-in gamepad is read instead of the screen, and its controls 
   devices.set_gamepad_button(GamepadButton::B, true);
   TouchInputSource screen(devices);
   screen.fit_surface(kViewWidth, kViewHeight);
-  const GamepadSample pad = screen.gamepad();
+  const GamepadSample pad = screen.gamepad(kFirstGamepad);
   CHECK(pad.connected);
   CHECK(pad.buttons[static_cast<std::size_t>(GamepadButton::B)]);
   CHECK(screen.touch_layout() == nullptr);
@@ -60,10 +60,10 @@ TEST_CASE("a game with a touch interface of its own hides the controls, and no g
   TouchInputSource screen(devices);
   screen.fit_surface(kViewWidth, kViewHeight);
   screen.show_touch_controls(false);
-  CHECK_FALSE(screen.gamepad().connected);
+  CHECK_FALSE(screen.gamepad(kFirstGamepad).connected);
   CHECK(screen.touch_layout() == nullptr);
   screen.show_touch_controls(true);
-  CHECK(screen.gamepad().connected);
+  CHECK(screen.gamepad(kFirstGamepad).connected);
   CHECK(screen.touch_layout() != nullptr);
 }
 

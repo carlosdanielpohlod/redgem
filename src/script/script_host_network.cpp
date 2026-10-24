@@ -13,7 +13,7 @@ namespace {
 
 constexpr const char* kNetworkModule = "Network";
 // What forgets the handlers of a scene when another takes its place.
-constexpr const char* kResettingModules[] = {kNetworkModule, "HTTP"};
+constexpr const char* kResettingModules[] = {kNetworkModule, "HTTP", "Input"};  // (Input: a capture waiting)
 constexpr const char* kNetworkEventEntry = "__event";
 constexpr const char* kSceneResetEntry = "__scene_reset";
 

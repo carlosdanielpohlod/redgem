@@ -13,7 +13,8 @@ Input.down?(:e)                # any key: held
 Input.pressed?(:e)             # any key: went down this frame
 ```
 
-Built-in actions: `:jump` (Space), `:fire` (Left Ctrl or Enter), `:run` (Left Shift).
+Built-in actions: `:jump` (Space), `:fire` (Left Ctrl or Enter), `:run` (Left Shift). A game
+declares its own and lets players change them: see [Controls](#controls).
 
 ## Read a gamepad
 
@@ -35,6 +36,96 @@ Buttons are named as on an Xbox pad: `:a`, `:b`, `:x`, `:y`, `:left_bumper`, `:r
 ```ruby
 direction = Vector3.new(Input.axis(:horizontal), 0, -Input.axis(:vertical)).clamped
 ```
+
+Up to four gamepads are read at once, numbered from 0. Each is a player: `pad:` picks whose
+actions, axes or buttons to read, and leaving it out reads the first.
+
+```ruby
+Input.pads                              # [0, 1]: the gamepads plugged in
+Input.action_pressed?(:jump, pad: 1)    # the second player jumped
+Input.axis(:horizontal, pad: 1)         # the second player's stick
+Input.gamepad_down?(:start, pad: 1)
+```
+
+The keyboard belongs to the first player (pad 0). The other players start with the gamepad's
+bindings only, unless a player binds keys of their own (two players sharing one keyboard).
+
+Gamepads cannot rumble: the window library the engine uses on desktops has no vibration, and
+neither does Android's.
+
+## Controls
+
+A game names what its players do (actions, which are on or off, and axes, from -1 to 1) and says
+what triggers them. Scripts then read the names, never the keys, so players can change the keys.
+The built-in `:jump`, `:fire`, `:run`, `:horizontal` and `:vertical` are always there; a game adds
+its own, or binds one of those anew, in the `input` section of its `game.json`:
+
+```json
+{
+  "input": {
+    "actions": {
+      "dash": ["key:e", "pad:b"],
+      "jump": ["key:space", "key:w", "pad:a"]
+    },
+    "axes": {
+      "steer": {"negative": ["key:a", "pad:dpad_left"], "positive": ["key:d", "pad:dpad_right"], "pad_axis": "left_x"},
+      "climb": {"pad_axis": "right_y", "invert": true}
+    }
+  }
+}
+```
+
+A binding is `key:` with a key's name (`key:space`, `key:left_shift`, `key:7`) or `pad:` with a
+gamepad button's (`pad:a`, `pad:dpad_up`). An axis' `pad_axis` is a stick that moves it too, by as
+much as it is pushed; `invert` runs that stick the other way (up is negative on a stick). A
+binding the engine does not know is left out with a warning, and the game plays on. Scripts can
+declare names too, before using them:
+
+```ruby
+Input.define_action(:dash, keys: [:e], buttons: [:b])
+Input.define_axis(:steer, negative: ["key:a"], positive: ["key:d"], pad_axis: :left_x)
+Input.actions                   # [:dash, :fire, :jump, :run]
+Input.action_released?(:dash)   # true on the frame the last of its keys and buttons lets go
+```
+
+### Letting players rebind
+
+Each player (a gamepad's number, `pad:`, 0 when left out) has bindings of their own:
+
+```ruby
+Input.bindings(:jump)                         # ["key:space", "pad:a"]
+Input.bindings(:horizontal)                   # {negative: ["key:a", "key:left"], positive: [...]}
+Input.bind(:jump, key: :k)                    # Space and K both jump now
+Input.unbind(:jump, key: :space)              # only K
+Input.unbind(:jump)                           # nothing: every key and button taken away
+Input.bind(:fire, button: :y, pad: 1)         # the second player's Y fires
+Input.bind(:horizontal, key: :j, side: :negative)   # an axis says which way the key pushes it
+Input.reset_bindings(:jump)                   # back to the game's, for every player
+Input.reset_bindings(pad: 1)                  # all of the second player's, back to the game's
+```
+
+What players bind is kept between runs, in the user's RedGem folder (`bindings/<game id>.json`),
+for a game with an `id` in its `game.json`; a game without one forgets it when it closes. Taking
+every binding off an axis leaves its stick: the stick is the game's, not the player's.
+
+One key may be bound to several actions, and every action it is bound to sees it: Enter can both
+`:fire` in the game and `:confirm` in a menu. A settings screen that wants each key to do one
+thing checks `Input.bindings` of the other actions before binding it.
+
+A "press a key" screen asks for the next key or button pressed. The block gets the binding as
+text, and the gamepad's number (`nil` for a key); a key already held when it asks does not count:
+
+```ruby
+Input.capture_next do |binding, pad|
+  Input.unbind(:jump, pad: pad || 0)
+  Input.bind(:jump, binding, pad: pad || 0)
+end
+Input.capturing?       # still waiting
+Input.cancel_capture   # stop waiting (the block is never called)
+```
+
+Sticks and triggers are not caught, only keys and buttons. The engine has no ready-made controls
+screen yet: a game builds one with `UI` and these calls.
 
 ## Read the mouse
 

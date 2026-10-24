@@ -13,6 +13,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_screen.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/input.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scatter.rb
@@ -257,6 +258,9 @@ redgem_add_library(redgem_runtime
   input/keys.cpp
   input/devices.cpp
   input/input.cpp
+  input/input_map.cpp
+  input/input_config.cpp
+  input/player_bindings.cpp
   input/raylib_input_source.cpp
   input/touch_controls.cpp
   input/touch_input_source.cpp
@@ -270,6 +274,7 @@ redgem_add_library(redgem_runtime
   script/script_host_callbacks.cpp
   script/script_host_network.cpp
   script/script_host_http.cpp
+  script/script_host_input.cpp
   script/game_locales.cpp
   script/bindings/bindings.cpp
   script/bindings/binding_helpers.cpp
@@ -285,6 +290,7 @@ redgem_add_library(redgem_runtime
   script/bindings/ui_bindings.cpp
   script/bindings/audio_bindings.cpp
   script/bindings/input_bindings.cpp
+  script/bindings/input_action_bindings.cpp
   script/bindings/animation_bindings.cpp
   script/bindings/animation_graph_bindings.cpp
   script/bindings/animation_graph_sync.cpp
@@ -361,6 +367,7 @@ redgem_add_library(redgem_runtime
   app/game_settings.cpp
   app/bundled_game.cpp
   app/save_location.cpp
+  app/input_bindings_store.cpp
   app/user_settings.cpp
   app/presenter.cpp
   app/frame_painter.cpp
