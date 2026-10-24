@@ -86,6 +86,20 @@ std::unique_ptr<Engine> engine() {
   return std::move(std::get<std::unique_ptr<Engine>>(created));
 }
 
+// A text with its lines ended by '\n' alone (a Windows checkout ends them with "\r\n").
+std::string without_returns(std::string text) {
+  text.erase(std::remove(text.begin(), text.end(), '\r'), text.end());
+  return text;
+}
+
+// A file of the repository, as its lines read.
+std::string source_text(const char* file) {
+  std::string error;
+  const auto text = read_text_file(kSource / file, error);
+  REQUIRE_MESSAGE(text.has_value(), error);
+  return without_returns(*text);
+}
+
 // "Class.method" or "Class#method" split at its separator.
 struct Named {
   std::string owner;
@@ -149,14 +163,11 @@ TEST_CASE("everything the API reference lists is in the engine") {
 }
 
 TEST_CASE("the manual's API page is made from the reference") {
-  std::string error;
-  const auto json = read_text_file(kSource / "docs/scripting/api.json", error);
-  const auto page = read_text_file(kSource / "docs/scripting/api.md", error);
-  REQUIRE(json.has_value());
-  REQUIRE(page.has_value());
+  const std::string json = source_text("docs/scripting/api.json");
+  const std::string page = source_text("docs/scripting/api.md");
   // (Run `redgem api --markdown > docs/scripting/api.md` after changing the reference.)
-  CHECK(*page == api_markdown(read_api_reference(*json)));
-  CHECK(api_reference_json() == *json);  // what the program has built in is the file
+  CHECK(page == api_markdown(read_api_reference(json)));
+  CHECK(without_returns(api_reference_json()) == json);  // what the program has built in is the file
 }
 
 TEST_CASE("the guide of new games lists 25 calls that exist, with examples that compile") {
