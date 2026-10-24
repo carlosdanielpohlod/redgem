@@ -20,6 +20,7 @@
   "project.check.no_tester": "cannot run the tests: no redgem-test at {tester} (it is built beside redgem)",
   "project.check.scripts_there": "the scripts are: {names}",
   "project.check.summary": "check: {errors} errors, {warnings} warnings ({scripts} scripts, {scenes} scenes)",
+  "project.check.tester_failed": "redgem-test ended without saying how the tests went (status {status}): run redgem-test --all <game> to see why",
   "project.check.tests": "tests: {passed} passed, {failed} failed",
   "project.check.usage": [
     "usage: redgem check <game> [--run-tests] [--all]",

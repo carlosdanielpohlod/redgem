@@ -158,13 +158,16 @@ std::vector<std::string> script_files(const std::string& names) {
   return files;
 }
 
-// `script-=Door`: the script goes, and has to be there to go.
-std::string take_script(SceneEdit& edit, int index, std::vector<std::string> scripts, const std::string& script) {
-  const auto found = std::find(scripts.begin(), scripts.end(), script);
-  if (found == scripts.end()) {
-    return tr("project.scene.script_not_attached", {{"script", script}, {"scripts", joined(scripts)}});
+// `script-=Door,Sound`: the scripts go, and each has to be there to go.
+std::string take_scripts(SceneEdit& edit, int index, std::vector<std::string> scripts,
+                         const std::vector<std::string>& taken) {
+  for (const std::string& script : taken) {
+    const auto found = std::find(scripts.begin(), scripts.end(), script);
+    if (found == scripts.end()) {
+      return tr("project.scene.script_not_attached", {{"script", script}, {"scripts", joined(scripts)}});
+    }
+    scripts.erase(found);
   }
-  scripts.erase(found);
   write_scripts(edit, index, scripts);
   return {};
 }
@@ -179,7 +182,7 @@ std::vector<std::string> with_added(std::vector<std::string> scripts, const std:
 std::string set_scripts(SceneEdit& edit, int& index, const Assignment& assignment) {
   const std::vector<std::string> named = script_files(assignment.value);
   const std::vector<std::string> attached = scripts_of(edit.document, index);
-  if (assignment.op == kTake) return take_script(edit, index, attached, named.empty() ? "" : named.front());
+  if (assignment.op == kTake) return take_scripts(edit, index, attached, named);
   for (const std::string& script : named) note_missing(edit, script);
   write_scripts(edit, index, assignment.op == kAdd ? with_added(attached, named) : named);
   return {};

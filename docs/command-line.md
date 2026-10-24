@@ -59,7 +59,7 @@ What `set` (and `add`) take:
 | `scale=2` or `scale=1,2,1` | its size |
 | `name=Gate` | a new name |
 | `parent=Level` | moves it under another object, keeping where it is in the world; `parent=` moves it to the top |
-| `prop.speed=2.5` | a custom property: `true`/`false`, a number, or a text (`prop.label="Big coin"`); `prop.speed=` removes it |
+| `prop.speed=2.5` | a custom property: `true`/`false`, a number, or a text (`prop.label="Big coin"`); `prop.speed=` removes it. A text that reads as a number is given in quotes that reach redgem: `prop.code='"12"'` (a list shows it as `code="12"`) |
 | `script+=Door`, `script-=Door`, `script=Door,Sound` | attaches a behaviour, takes one off, or sets the list (`Door` is `scripts/door.rb`) |
 
 ```console

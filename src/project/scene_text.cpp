@@ -7,6 +7,8 @@
 #include <vector>
 
 #include "core/translations.hpp"
+#include "editor/node_tree.hpp"
+#include "project/scene_assignments.hpp"
 #include "scene/props.hpp"
 #include "script/script_naming.hpp"
 
@@ -48,6 +50,12 @@ bool is_identity(Quat rotation) { return approx_equal(rotation, Quat::identity()
 bool is_unit_scale(Vec3 scale) { return approx_equal(scale, Vec3::one(), kEpsilon); }
 bool is_uniform(Vec3 scale) {
   return approx_equal(scale.x, scale.y, kEpsilon) && approx_equal(scale.x, scale.z, kEpsilon);
+}
+
+// Whether a text, as `set` takes it back, would be read as something else without quotes: nothing,
+// a text with spaces, or one that reads as a number or true/false ("12").
+bool needs_quotes(const std::string& text) {
+  return text.empty() || text.find(' ') != std::string::npos || !std::holds_alternative<std::string>(typed_value(text));
 }
 
 // A scale as one number when it is the same on every side.
@@ -103,23 +111,50 @@ void add_properties(std::string& line, const PropertyMap& props) {
   }
 }
 
-// Walks the hierarchy into lines, as far as the limits let it.
+// Every node, top-level ones in their order, each followed by its children: the order the editor
+// saves them in. (Walked with a list of its own, not by calling itself: a file decides how deep its
+// nodes are nested, and must not decide how much stack is used.)
+std::vector<int> saved_order(const SceneDesc& scene) {
+  std::vector<int> order;
+  for (int top = 0; top < static_cast<int>(scene.nodes.size()); ++top) {
+    if (scene.nodes[top].parent != kNoIndex) continue;
+    const std::vector<int> family = node_tree::subtree(scene.nodes, top);
+    order.insert(order.end(), family.begin(), family.end());
+  }
+  return order;
+}
+
+// How deep each node is under the top of the scene, from nodes in saved order (parents first).
+std::vector<std::size_t> depths(const SceneDesc& scene, const std::vector<int>& order) {
+  std::vector<std::size_t> depth(scene.nodes.size(), 0);
+  for (const int index : order) {
+    const int parent = scene.nodes[index].parent;
+    if (parent != kNoIndex) depth[index] = depth[parent] + 1;
+  }
+  return depth;
+}
+
+// Writes the hierarchy into lines, as far as the limits let it.
 class ListWriter {
  public:
   ListWriter(const SceneDesc& scene, const ListLimits& limits) : scene_(scene), limits_(limits) {}
 
-  void write(int index, std::size_t depth) {
-    if (!room_left() || too_deep(depth)) return;
-    std::string indent;
-    for (std::size_t level = 0; level < depth; ++level) indent += kIndent;
-    text_ += indent + object_line(scene_, index) + "\n";
-    ++shown_;
-    for (const int child : scene_.nodes[index].children) write(child, depth + 1);
+  void write_all() {
+    const std::vector<int> order = saved_order(scene_);
+    const std::vector<std::size_t> depth = depths(scene_, order);
+    for (const int index : order) {
+      if (room_left() && !too_deep(depth[index])) write(index, depth[index]);
+    }
   }
   const std::string& text() const { return text_; }
   std::size_t shown() const { return shown_; }
 
  private:
+  void write(int index, std::size_t depth) {
+    for (std::size_t level = 0; level < depth; ++level) text_ += kIndent;
+    text_ += object_line(scene_, index) + "\n";
+    ++shown_;
+  }
   bool room_left() const { return limits_.most == 0 || shown_ < limits_.most; }
   bool too_deep(std::size_t depth) const { return depth > limits_.depth; }
 
@@ -184,18 +219,10 @@ std::string properties_detail(const PropertyMap& props) {
   return text.empty() ? text : "props:\n" + text;
 }
 
-void add_in_saved_order(const SceneDesc& scene, int index, std::vector<int>& order) {
-  order.push_back(index);
-  for (const int child : scene.nodes[index].children) add_in_saved_order(scene, child, order);
-}
-
 }  // namespace
 
 int saved_id(const SceneDesc& scene, int index) {
-  std::vector<int> order;
-  for (int top = 0; top < static_cast<int>(scene.nodes.size()); ++top) {
-    if (scene.nodes[top].parent == kNoIndex) add_in_saved_order(scene, top, order);
-  }
+  const std::vector<int> order = saved_order(scene);
   const auto found = std::find(order.begin(), order.end(), index);
   return found == order.end() ? kNoIndex : static_cast<int>(found - order.begin());
 }
@@ -220,8 +247,7 @@ std::string property_text(const PropertyValue& value) {
   if (const bool* flag = std::get_if<bool>(&value)) return *flag ? kTrue : kFalse;
   if (const double* number = std::get_if<double>(&value)) return number_text(*number, kDetailDecimals);
   const std::string& text = std::get<std::string>(value);
-  const bool needs_quotes = text.empty() || text.find(' ') != std::string::npos;
-  return needs_quotes ? kQuote + text + kQuote : text;
+  return needs_quotes(text) ? kQuote + text + kQuote : text;
 }
 
 std::string object_path(const SceneDesc& scene, int index) {
@@ -243,9 +269,7 @@ std::string object_line(const SceneDesc& scene, int index) {
 
 std::string scene_list(const SceneDesc& scene, const std::string& scene_name, const ListLimits& limits) {
   ListWriter writer(scene, limits);
-  for (std::size_t index = 0; index < scene.nodes.size(); ++index) {
-    if (scene.nodes[index].parent == kNoIndex) writer.write(static_cast<int>(index), 0);
-  }
+  writer.write_all();
   const std::size_t total = scene.nodes.size();
   std::string text = tr("project.scene.list_header", {{"scene", scene_name}, {"count", std::to_string(total)}}) + "\n";
   text += writer.text();

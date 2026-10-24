@@ -1,6 +1,7 @@
 #include "core/message_lines.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <sstream>
 #include <vector>
 
@@ -11,7 +12,8 @@ namespace {
 constexpr const char* kFrom = "from ";
 constexpr const char* kIn = ":in";
 constexpr char kSeparator = '/';
-constexpr char kBackslash = '\\';  // how Windows separates folders
+constexpr char kBackslash = '\\';              // how Windows separates folders
+constexpr const char* kBeforePaths = " '\"(";  // what a path in a message may follow
 
 std::vector<std::string> lines_of(const std::string& text) {
   std::vector<std::string> lines;
@@ -20,20 +22,36 @@ std::vector<std::string> lines_of(const std::string& text) {
   return lines;
 }
 
-void replace_all(std::string& text, const std::string& part, const std::string& by) {
-  if (part.empty()) return;
-  for (std::size_t at = text.find(part); at != std::string::npos; at = text.find(part, at + by.size())) {
-    text.replace(at, part.size(), by);
+// Whether a path starts at `at` in a text: there is nothing before it but a space, a quote or a
+// bracket (in "../x", "./" is no path's start).
+bool starts_a_path(const std::string& text, std::size_t at) {
+  return at == 0 || std::strchr(kBeforePaths, text[at - 1]) != nullptr;
+}
+
+// Takes `folder` out of every path of the text that starts with it.
+void remove_folder(std::string& text, const std::string& folder) {
+  for (std::size_t at = text.find(folder); at != std::string::npos; at = text.find(folder, at)) {
+    if (starts_a_path(text, at)) {
+      text.erase(at, folder.size());
+    } else {
+      ++at;
+    }
   }
+}
+
+// A folder as a path's start: with '/' between its parts and one after it, however it was typed
+// ("games/demo/" and "games/demo" are "games/demo/").
+std::string folder_start(const std::filesystem::path& folder) {
+  std::string text = folder.lexically_normal().generic_string();
+  if (text.empty() || text.back() != kSeparator) text += kSeparator;
+  return text;
 }
 
 // The ways the game's folder is written in what the engine says: as it was given, and in full.
 // (Paths are said with '/' whatever the system writes them with.)
 std::vector<std::string> folder_prefixes(const std::filesystem::path& game_dir) {
   std::error_code error;
-  const std::filesystem::path full = std::filesystem::absolute(game_dir, error).lexically_normal();
-  const std::filesystem::path given = game_dir.lexically_normal();
-  return {full.generic_string() + kSeparator, given.generic_string() + kSeparator};
+  return {folder_start(std::filesystem::absolute(game_dir, error)), folder_start(game_dir)};
 }
 
 std::string with_slashes(std::string text) {
@@ -44,7 +62,7 @@ std::string with_slashes(std::string text) {
 
 std::string without_folder(const std::string& said, const std::filesystem::path& game_dir) {
   std::string text = with_slashes(said);
-  for (const std::string& prefix : folder_prefixes(game_dir)) replace_all(text, prefix, "");
+  for (const std::string& prefix : folder_prefixes(game_dir)) remove_folder(text, prefix);
   return text;
 }
 

@@ -253,6 +253,12 @@ add_test(NAME system.tools.shot
          COMMAND redgem shot ${CMAKE_SOURCE_DIR}/games/platformer ${CMAKE_CURRENT_BINARY_DIR}/tools_shot.png --at 0.5)
 set_tests_properties(system.tools.shot PROPERTIES LABELS system RUN_SERIAL TRUE
   PASS_REGULAR_EXPRESSION "saved [^\n]*tools_shot.png \\(512x288, scene main at 0.5 s\\)")
+# (--at 0: the game as it starts, before its first step.)
+add_test(NAME system.tools.shot_at_the_start
+         COMMAND redgem shot ${CMAKE_SOURCE_DIR}/games/platformer ${CMAKE_CURRENT_BINARY_DIR}/tools_shot_start.png
+                 --at 0 --size 64x36)
+set_tests_properties(system.tools.shot_at_the_start PROPERTIES LABELS system RUN_SERIAL TRUE
+  PASS_REGULAR_EXPRESSION "saved [^\n]*tools_shot_start.png \\(64x36, scene main at 0 s\\)")
 add_test(NAME system.tools.shot_through_a_camera
          COMMAND redgem shot ${CMAKE_SOURCE_DIR}/games/platformer ${CMAKE_CURRENT_BINARY_DIR}/tools_shot_camera.png
                  --at 0 --size 64x36 --camera Nowhere)

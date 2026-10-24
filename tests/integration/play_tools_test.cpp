@@ -73,6 +73,14 @@ TEST_CASE("a run says each script error once, where it happened, and fails") {
   CHECK(has(ran.out, "ran main for 30 frames (0.5 s): 2 errors"));
 }
 
+TEST_CASE("a game's folder typed with a slash after it is left out of the paths all the same") {
+  const ToolResult ran = tool({"run", kSandbox.string() + "/", "--frames", "30"});
+  CHECK(has(ran.out, "error: scripts/broken.rb:5: Broken#update"));
+  CHECK(compact_message("loading ./scripts/x.rb: cannot read ./scripts/x.rb", ".") ==
+        "loading scripts/x.rb: cannot read scripts/x.rb");
+  CHECK(compact_message("cannot read ../other/x.rb", ".") == "cannot read ../other/x.rb");
+}
+
 TEST_CASE("a run plays the scene it is asked for, and refuses one the game lacks") {
   const ToolResult other = tool({"run", kSandbox.string(), "--scene", "level2", "--frames", "5"});
   CHECK(has(other.out, "ran level2 for 5 frames"));
@@ -135,6 +143,15 @@ TEST_CASE("a check finds what keeps a game from playing, and says what to do") {
   CHECK(has(checked.out, "check: 4 errors"));
 }
 
+TEST_CASE("a sky picture is found the way the engine finds it") {
+  GameCopy game("sky");
+  game.write("images/meadow.jpeg", "not really a picture: the check looks for the file");
+  for (const char* name : {"meadow", "meadow.jpeg"}) {
+    REQUIRE(tool({"scene", "set", game.dir(), "Sun", std::string("prop.sky_image=") + name}).exit_code == kExitSuccess);
+    CHECK_MESSAGE(tool({"check", game.dir()}).exit_code == kExitSuccess, name);
+  }
+}
+
 TEST_CASE("a check lists a screenful of problems unless asked for all") {
   GameCopy game("many");
   for (int file = 0; file < 40; ++file) game.write("scripts/broken" + std::to_string(file) + ".rb", "def x(");
@@ -149,6 +166,8 @@ TEST_CASE("a check of what is no game says so") {
 
 TEST_CASE("a script defines the class it is named for") {
   CHECK(defines_class("class Coin < Behaviour\nend", "Coin"));
+  CHECK(defines_class("class Coin(\nend", "Coin("));  // (whatever a file name makes of a class name)
+  CHECK_FALSE(defines_class("class Coinage\nend", "Coin"));
   CHECK(defines_class("# a coin\n  class Coin\nend", "Coin"));
   CHECK_FALSE(defines_class("class Coins\nend", "Coin"));
   CHECK_FALSE(defines_class("x = Coin.new", "Coin"));
@@ -162,3 +181,12 @@ TEST_CASE("what redgem-test says of a game's tests is read a file a line") {
   CHECK(run_game_tests(kPlatformer, "no/redgem-test", fs::temp_directory_path()).problem.find("no redgem-test") !=
         std::string::npos);
 }
+
+#ifndef _WIN32
+TEST_CASE("a redgem-test that ends without a word about the tests fails the check") {
+  // (A program that says nothing and fails, standing for one that crashed.)
+  const TestsRun run = run_game_tests(kPlatformer, "/bin/false", fs::temp_directory_path());
+  CHECK(run.passed == 0);
+  CHECK(run.problem.find("redgem-test ended without saying how the tests went") != std::string::npos);
+}
+#endif

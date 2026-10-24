@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <limits>
 #include <optional>
 #include <utility>
 #include <variant>
@@ -176,15 +177,26 @@ ToolResult remove(OpenScene& scene) {
   return saved(scene, tr("project.scene.removed", {{"object", line}, {"count", std::to_string(gone)}}) + "\n");
 }
 
+// A line that takes as many words as it wants after those it needs (what to set).
+constexpr std::size_t kAnyMore = std::numeric_limits<std::size_t>::max();
+
 struct Known {
   const char* word;
   Subcommand run;
-  std::size_t words;  // how many words it needs at least: the game, and the object it is about
+  std::size_t least;  // how many words it needs: the game, and the object it is about
+  std::size_t most;   // how many it takes (a word too many is refused, never left unread)
 };
 constexpr Known kSubcommands[] = {
-    {"list", list, kObjectWord},    {"get", get, kFirstAssignment},       {"set", set, kFirstAssignment},
-    {"add", add, kFirstAssignment}, {"remove", remove, kFirstAssignment},
+    {"list", list, kObjectWord, kObjectWord},
+    {"get", get, kFirstAssignment, kFirstAssignment},
+    {"set", set, kFirstAssignment, kAnyMore},
+    {"add", add, kFirstAssignment, kAnyMore},
+    {"remove", remove, kFirstAssignment, kFirstAssignment},
 };
+
+bool has_its_words(const Known& subcommand, const ToolLine& line) {
+  return line.words.size() >= subcommand.least && line.words.size() <= subcommand.most;
+}
 
 const Known* subcommand_named(const std::string& word) {
   const auto* found = std::find_if(std::begin(kSubcommands), std::end(kSubcommands),
@@ -205,7 +217,7 @@ std::variant<OpenScene, ToolResult> open_scene(ToolLine line) {
 
 ToolResult run_subcommand(const Known& subcommand, ToolLine line) {
   if (line.has(command_line::kHelpOption)) return answer(usage());
-  if (line.words.size() < subcommand.words) return failed(usage(), kExitUsage);
+  if (!has_its_words(subcommand, line)) return failed(usage(), kExitUsage);
   auto opened = open_scene(std::move(line));
   if (auto* problem = std::get_if<ToolResult>(&opened)) return *problem;
   return subcommand.run(std::get<OpenScene>(opened));
@@ -240,7 +252,12 @@ std::optional<std::filesystem::path> named_scene_file(const std::filesystem::pat
   return std::nullopt;
 }
 
+bool asks_for_help(const std::vector<std::string>& args) {
+  return !args.empty() && command_line::asks_for_help(args.front());
+}
+
 ToolResult run_scene_command(const std::vector<std::string>& args) {
+  if (asks_for_help(args)) return answer(usage());
   const Known* subcommand = args.empty() ? nullptr : subcommand_named(args.front());
   if (subcommand == nullptr) return failed(usage(), kExitUsage);
   std::string error;

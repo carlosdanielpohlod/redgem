@@ -2,12 +2,15 @@
 
 #include <algorithm>
 #include <optional>
-#include <regex>
+#include <cctype>
+#include <cstring>
+#include <sstream>
 #include <set>
 
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
 #include "core/files.hpp"
+#include "core/safe_path.hpp"
 #include "core/translations.hpp"
 #include "project/closest_words.hpp"
 #include "project/scene_command.hpp"
@@ -24,11 +27,14 @@ namespace fs = std::filesystem;
 
 // How many names a message that suggests some lists.
 constexpr std::size_t kMostSuggestions = 3;
-// What a sky picture may be (see docs/levels.md).
-constexpr const char* kSkyExtensions[] = {".hdr", ".png", ".jpg"};
+// What a sky picture may be named, after its name (as render/sky_picture.cpp looks for it).
+constexpr const char* kSkyExtensions[] = {"", ".hdr", ".png", ".jpg", ".jpeg"};
 // What a syntax error starts with, and what goes between a file and its line instead.
 constexpr const char* kLineWord = "line ";
 constexpr const char* kLineJoiner = ":";
+// How a class is defined: "class", at least one blank, its name.
+constexpr const char* kClassWord = "class ";
+constexpr const char* kBlanks = " \t";
 
 // The game's scripts, as paths inside its scripts folder ("enemies/slime.rb"), sorted.
 std::vector<std::string> script_files(const fs::path& scripts_dir) {
@@ -104,8 +110,7 @@ void check_script(SceneChecks& checks, const std::string& script, const std::str
 }
 
 bool has_sky_picture(const fs::path& images_dir, const std::string& name) {
-  return std::any_of(std::begin(kSkyExtensions), std::end(kSkyExtensions),
-                     [&](const char* extension) { return fs::exists(images_dir / (name + extension)); });
+  return find_asset_file(images_dir, name, kSkyExtensions).has_value();
 }
 
 void check_sky(SceneChecks& checks, const PropertyMap& props, const std::string& place) {
@@ -150,6 +155,24 @@ void check_scene(SceneChecks& checks, const std::string& name) {
   check_objects(checks, name, loaded.scene);
 }
 
+bool is_name_letter(char letter) { return std::isalnum(static_cast<unsigned char>(letter)) != 0 || letter == '_'; }
+
+// Whether `word` is in `line` at `at` (npos: nowhere).
+bool has_at(const std::string& line, std::size_t at, const std::string& word) {
+  return at != std::string::npos && line.compare(at, word.size(), word) == 0;
+}
+
+// Whether a name that ends at `at` ends there: the line does, or something no name holds follows.
+bool name_ends_at(const std::string& line, std::size_t at) { return at == line.size() || !is_name_letter(line[at]); }
+
+// Whether a line is `class <name>`, with nothing more to the name ("class Coin < Behaviour").
+bool defines_on(const std::string& line, const std::string& class_name) {
+  const std::size_t start = line.find_first_not_of(kBlanks);
+  if (!has_at(line, start, kClassWord)) return false;
+  const std::size_t name = line.find_first_not_of(kBlanks, start + std::strlen(kClassWord));
+  return has_at(line, name, class_name) && name_ends_at(line, name + class_name.size());
+}
+
 }  // namespace
 
 void check_scripts(const fs::path& game_dir, CheckReport& report) {
@@ -167,8 +190,11 @@ void check_scenes(const fs::path& game_dir, CheckReport& report) {
 }
 
 bool defines_class(const std::string& code, const std::string& class_name) {
-  const std::regex definition("(^|\\n)[ \\t]*class[ \\t]+" + class_name + "\\b");
-  return std::regex_search(code, definition);
+  std::stringstream lines(code);
+  for (std::string line; std::getline(lines, line);) {
+    if (defines_on(line, class_name)) return true;
+  }
+  return false;
 }
 
 }  // namespace redgem::tools

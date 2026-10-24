@@ -21,6 +21,7 @@ constexpr const char* kPassedMark = "PASS ";
 constexpr const char* kFailedMark = "FAIL ";
 constexpr const char* kOutputFile = "tests-said.txt";
 constexpr const char* kWorkFolder = "work";
+constexpr int kSucceeded = 0;  // what the shell says of a program that ended well
 
 bool starts_with(const std::string& text, const char* start) { return text.rfind(start, 0) == 0; }
 
@@ -33,6 +34,10 @@ std::string command_line(const std::vector<std::string>& words, const fs::path& 
   // (Windows' shell drops the first and last quotes of a line that starts with one.)
   return windows ? "\"" + command + "\"" : command;
 }
+
+// Whether redgem-test failed without saying which file did (it crashed, or did not understand
+// what it was asked): no test can then be taken as passed.
+bool ended_unsaid(int status, const TestsRun& run) { return status != kSucceeded && run.failures.empty(); }
 
 }  // namespace
 
@@ -56,9 +61,11 @@ TestsRun run_game_tests(const fs::path& game_dir, const fs::path& tester, const 
   const fs::path output = scratch / kOutputFile;
   const std::vector<std::string> words{tester.string(), kAllOption, game_dir.string(), kWorkOption,
                                        (scratch / kWorkFolder).string()};
-  std::system(command_line(words, output).c_str());  // NOLINT(bugprone-command-processor)
+  const int status = std::system(command_line(words, output).c_str());  // NOLINT(bugprone-command-processor)
   std::string error;
-  return read_tests_run(read_text_file(output, error).value_or(""));
+  TestsRun run = read_tests_run(read_text_file(output, error).value_or(""));
+  if (ended_unsaid(status, run)) run.problem = tr("project.check.tester_failed", {{"status", std::to_string(status)}});
+  return run;
 }
 
 }  // namespace redgem::tools

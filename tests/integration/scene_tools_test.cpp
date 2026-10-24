@@ -149,6 +149,29 @@ TEST_CASE("set changes an object and saves the scene as the editor does") {
   CHECK(std::holds_alternative<SceneDocument>(SceneDocument::open(game.scene())));
 }
 
+TEST_CASE("a text that reads as a number is listed in quotes, so that set takes it back as a text") {
+  GameCopy game("quoted");
+  REQUIRE(scene_tool({"set", game.dir(), "Coin1", "prop.code=\"12\"", "prop.count=12"}).exit_code == kExitSuccess);
+  const NodeDesc& coin = node_named(load(game.scene()), "Coin1");
+  CHECK(get_string(coin.props, "code") == "12");
+  CHECK(get_number(coin.props, "count") == doctest::Approx(12.0));
+  CHECK(has(scene_tool({"get", game.dir(), "Coin1"}).out, "code=\"12\"\n  count=12\n"));
+}
+
+TEST_CASE("a hierarchy as deep as a file makes it is listed without running out of stack") {
+  constexpr int kDepth = 100000;
+  SceneDesc scene;
+  for (int index = 0; index < kDepth; ++index) {
+    NodeDesc node;
+    node.name = "N" + std::to_string(index);
+    node.parent = index - 1;
+    if (index + 1 < kDepth) node.children = {index + 1};
+    scene.nodes.push_back(node);
+  }
+  CHECK(has(scene_list(scene, "deep", ListLimits{kEveryLevel, 2}), "#0 N0\n  #1 N1\n+99998 more"));
+  CHECK(saved_id(scene, kDepth - 1) == kDepth - 1);
+}
+
 TEST_CASE("scripts are taken off by name, and only those that are on") {
   GameCopy game("scripts");
   CHECK(scene_tool({"set", game.dir(), "Coin1", "script-=Coin"}).exit_code == kExitSuccess);
@@ -156,6 +179,9 @@ TEST_CASE("scripts are taken off by name, and only those that are on") {
   const ToolResult refused = scene_tool({"set", game.dir(), "Coin2", "script-=Door"});
   CHECK(refused.exit_code == kExitFailure);
   CHECK(has(refused.err, "door.rb is not attached; the object has: coin.rb"));
+  REQUIRE(scene_tool({"set", game.dir(), "Coin3", "script+=Spinner,Door"}).exit_code == kExitSuccess);
+  CHECK(scene_tool({"set", game.dir(), "Coin3", "script-=Coin,Door"}).exit_code == kExitSuccess);
+  CHECK(get_string(node_named(load(game.scene()), "Coin3").props, "script") == "spinner.rb");
 }
 
 TEST_CASE("what set cannot do is refused, with what it can, and nothing is saved") {
@@ -219,7 +245,12 @@ TEST_CASE("a scene the game does not have is answered with those it has") {
 
 TEST_CASE("the scene command explains itself") {
   CHECK(scene_tool({}).exit_code == kExitUsage);
+  CHECK(has(scene_tool({"--help"}).out, "redgem scene list"));
+  CHECK(scene_tool({"--help"}).exit_code == kExitSuccess);
   CHECK(has(scene_tool({"list", "--help"}).out, "redgem scene list"));
+  // A word too many is refused, never left unread: only one object is removed at a time.
+  CHECK(scene_tool({"remove", kPlatformer.string(), "Coin1", "Coin2"}).exit_code == kExitUsage);
+  CHECK(scene_tool({"get", kPlatformer.string(), "Coin1", "position=1,2,3"}).exit_code == kExitUsage);
   CHECK(scene_tool({"get", kPlatformer.string()}).exit_code == kExitUsage);
   CHECK(scene_tool({"list", kPlatformer.string(), "--bogus"}).exit_code == kExitUsage);
   CHECK_FALSE(run_tool_command({"games/demo", "--play"}).has_value());  // the editor's line

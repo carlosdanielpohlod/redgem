@@ -69,11 +69,13 @@ class ShotPresenter final : public Presenter {
 
   // Every frame is drawn, so that what builds up over frames (smoothed edges, trails) is there.
   void present(const FrameView& view) override {
-    renderer_.set_clock(static_cast<double>(drawn_) * config::kFixedDeltaSeconds);
+    renderer_.set_clock(static_cast<double>(steps_) * config::kFixedDeltaSeconds);
     painter_.paint(view, &picture_);
-    if (drawn_++ == frame_) take();
+    if (steps_ == frame_) take();
   }
 
+  // How many fixed steps the game has run, as the frame about to be presented shows it.
+  void at_step(long long steps) { steps_ = steps; }
   bool taken() const { return taken_; }
   bool saved() const { return saved_; }
 
@@ -92,7 +94,7 @@ class ShotPresenter final : public Presenter {
   RenderTexture2D picture_{};
   long long frame_;
   std::filesystem::path file_;
-  long long drawn_ = 0;
+  long long steps_ = 0;
   bool taken_ = false;
   bool saved_ = false;
 };
@@ -119,9 +121,16 @@ std::string said(const ShotRequest& request, const MessageCollector& messages) {
          "\n";
 }
 
-// Plays until the picture is taken, or the game ends first.
-void play_to_picture(Engine& engine, const ShotPresenter& shot) {
-  while (!shot.taken() && !engine.finished()) engine.frame(config::kFixedDeltaSeconds);
+// Shows the game as it starts, then plays until the picture is taken, or the game ends first.
+// (Each frame runs its step before it is shown: the frame of step N shows the game N steps in.)
+void play_to_picture(Engine& engine, ShotPresenter& shot) {
+  long long steps = 0;
+  shot.at_step(steps);
+  engine.present();
+  while (!shot.taken() && !engine.finished()) {
+    shot.at_step(++steps);
+    engine.frame(config::kFixedDeltaSeconds);
+  }
 }
 
 ToolResult shoot(const ShotRequest& request) {
