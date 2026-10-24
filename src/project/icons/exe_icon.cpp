@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <cstring>
+#include <map>
 #include <optional>
+#include <set>
 #include <utility>
 
 #include "core/translations.hpp"
@@ -38,7 +40,12 @@ constexpr std::size_t kChecksumAt = 64;
 constexpr std::size_t kPe32DirectoriesAt = 96;
 constexpr std::size_t kPe32PlusDirectoriesAt = 112;
 constexpr std::size_t kDirectoryBytes = 8;
-constexpr std::size_t kResourceDirectory = 2;  // which data directory says where the resources are
+constexpr std::size_t kDirectoryCountBytes = 4;  // NumberOfRvaAndSizes, just before the directories
+// The data directories read and written here, by their place in the list.
+constexpr std::size_t kResourceDirectory = 2;       // the resources: an address once loaded
+constexpr std::size_t kCertificateDirectory = 4;    // the signature: an offset in the file
+constexpr std::size_t kBoundImportDirectory = 11;   // bound imports: kept among the headers
+constexpr std::uint32_t kCertificateAlignment = 8;  // what the signature at the end is padded to
 // A section's header.
 constexpr std::size_t kSectionHeaderBytes = 40;
 constexpr std::size_t kSectionNameBytes = 8;
@@ -85,12 +92,19 @@ struct PeFile {
   std::size_t file_size = 0;
   std::size_t coff = 0;
   std::size_t optional = 0;
+  std::size_t directories = 0;  // where the data directories start
+  std::size_t directory_count = 0;
   std::size_t sections_at = 0;
   std::uint32_t section_alignment = 0;
   std::uint32_t file_alignment = 0;
   std::uint32_t headers_size = 0;
-  std::uint32_t resources = 0;  // the address of the resource tree; 0 for none
   std::vector<Section> sections;
+};
+
+// A data directory: where something is (an address or a file offset, by directory) and its size.
+struct Directory {
+  std::uint32_t at = 0;
+  std::uint32_t size = 0;
 };
 
 // One picture of an icon group: where its entry in the group is, its side and its id.
@@ -100,9 +114,17 @@ struct GroupPicture {
   std::uint32_t id = 0;
 };
 
-struct IconGroup {
-  std::size_t root = 0;  // where the resource tree starts in the file
+// One variant of a resource (one language of it): its id, and where its data entry is.
+struct Leaf {
+  std::uint32_t id = 0;
+  std::size_t entry = 0;
+};
+
+// The program's icon: the pictures of all its icon groups, and every variant of every picture
+// they name.
+struct ExeIcon {
   std::vector<GroupPicture> pictures;
+  std::vector<Leaf> leaves;
 };
 
 std::uint32_t aligned(std::size_t value, std::uint32_t alignment) {
@@ -119,23 +141,42 @@ std::size_t directories_at(std::uint32_t magic) {
   return magic == kPe32Magic ? kPe32DirectoriesAt : 0;
 }
 
-// Whether the optional header is of a known kind, with its resource directory inside the file.
-bool known_header(std::size_t directories, const Bytes& exe, std::size_t resource) {
-  return directories != 0 && inside(exe.size(), resource, kDirectoryBytes);
+// Whether data directory `index` is there: counted by the header, inside the optional header.
+bool has_directory(const PeFile& pe, std::size_t index, std::size_t optional_size) {
+  const std::size_t end = pe.directories - pe.optional + (index + 1) * kDirectoryBytes;
+  return index < pe.directory_count && end <= optional_size;
+}
+
+Directory directory(const Bytes& exe, const PeFile& pe, std::size_t index) {
+  const std::size_t at = pe.directories + index * kDirectoryBytes;
+  if (index >= pe.directory_count || !inside(exe.size(), at, kDirectoryBytes)) return {};
+  return {read_little(exe, at, kWord), read_little(exe, at + kWord, kWord)};
 }
 
 bool usable_alignments(const PeFile& pe) { return pe.section_alignment != 0 && pe.file_alignment != 0; }
 
+// Where the data directories start in an optional header of a known kind; 0 for any other.
+std::size_t directories_in(const Bytes& exe, std::size_t optional) {
+  if (!inside(exe.size(), optional, kShort)) return 0;
+  return directories_at(read_little(exe, optional, kShort));
+}
+
+// Whether the optional header is of a known kind and inside the file, with its directories.
+bool readable_optional_header(const Bytes& exe, const PeFile& pe, std::size_t directories, std::size_t size) {
+  return directories != 0 && directories <= size && inside(exe.size(), pe.optional, size);
+}
+
+// The headers of a known kind, whose optional header counts and holds the resource directory.
 bool read_optional_header(const Bytes& exe, PeFile& pe) {
-  if (!inside(exe.size(), pe.optional, kShort)) return false;
-  const std::size_t directories = directories_at(read_little(exe, pe.optional, kShort));
-  const std::size_t resource = pe.optional + directories + kResourceDirectory * kDirectoryBytes;
-  if (!known_header(directories, exe, resource)) return false;
+  const std::size_t optional_size = read_little(exe, pe.coff + kOptionalHeaderSizeAt, kShort);
+  const std::size_t directories = directories_in(exe, pe.optional);
+  if (!readable_optional_header(exe, pe, directories, optional_size)) return false;
+  pe.directories = pe.optional + directories;
+  pe.directory_count = read_little(exe, pe.directories - kDirectoryCountBytes, kDirectoryCountBytes);
   pe.section_alignment = read_little(exe, pe.optional + kSectionAlignmentAt, kWord);
   pe.file_alignment = read_little(exe, pe.optional + kFileAlignmentAt, kWord);
   pe.headers_size = read_little(exe, pe.optional + kHeadersSizeAt, kWord);
-  pe.resources = read_little(exe, resource, kWord);
-  return usable_alignments(pe);
+  return has_directory(pe, kResourceDirectory, optional_size) && usable_alignments(pe);
 }
 
 bool read_sections(const Bytes& exe, PeFile& pe) {
@@ -159,7 +200,8 @@ std::optional<PeFile> pe_file(const Bytes& exe) {
   pe.coff = signature + kWord;
   pe.optional = pe.coff + kCoffHeaderBytes;
   pe.sections_at = pe.optional + read_little(exe, pe.coff + kOptionalHeaderSizeAt, kShort);
-  if (!read_optional_header(exe, pe) || !read_sections(exe, pe)) return std::nullopt;
+  const bool readable = read_optional_header(exe, pe) && read_sections(exe, pe);
+  if (!readable) return std::nullopt;
   return pe;
 }
 
@@ -178,48 +220,59 @@ std::optional<std::size_t> file_offset(const PeFile& pe, std::uint32_t address, 
   return std::nullopt;
 }
 
-// What the entry of the resource directory at `dir` with `id` (the first one, with none) points
-// at, from the root of the tree, and whether that is another directory.
-struct Target {
+// An entry of a resource directory: its name (an id), what it points at (from the root of the
+// tree) and whether that is another directory.
+struct Entry {
+  std::uint32_t name = 0;
   std::size_t at = 0;
   bool directory = false;
 };
 
-bool names(std::uint32_t entry_name, const std::optional<std::uint32_t>& id) { return !id || entry_name == *id; }
+std::size_t entry_count(const Bytes& exe, std::size_t dir) {
+  return read_little(exe, dir + kNamedCountAt, kShort) + read_little(exe, dir + kIdCountAt, kShort);
+}
 
-std::optional<Target> entry_in(const Bytes& exe, std::size_t root, std::size_t dir, std::optional<std::uint32_t> id) {
-  if (!inside(exe.size(), dir, kResourceDirectoryBytes)) return std::nullopt;
-  const std::size_t count = read_little(exe, dir + kNamedCountAt, kShort) + read_little(exe, dir + kIdCountAt, kShort);
+// The entries of the resource directory at `dir`; none for one that is not inside the file.
+std::vector<Entry> entries_of(const Bytes& exe, std::size_t root, std::size_t dir) {
+  std::vector<Entry> entries;
+  const std::size_t count = inside(exe.size(), dir, kResourceDirectoryBytes) ? entry_count(exe, dir) : 0;
   for (std::size_t i = 0; i < count; ++i) {
     const std::size_t entry = dir + kResourceDirectoryBytes + i * kResourceEntryBytes;
-    if (!inside(exe.size(), entry, kResourceEntryBytes)) return std::nullopt;
-    if (!names(read_little(exe, entry, kWord), id)) continue;
+    if (!inside(exe.size(), entry, kResourceEntryBytes)) break;
     const std::uint32_t points_at = read_little(exe, entry + kWord, kWord);
-    return Target{root + (points_at & ~kSubdirectoryBit), (points_at & kSubdirectoryBit) != 0};
+    entries.push_back(
+        {read_little(exe, entry, kWord), root + (points_at & ~kSubdirectoryBit), (points_at & kSubdirectoryBit) != 0});
+  }
+  return entries;
+}
+
+bool is_data_entry(const Bytes& exe, const Entry& entry) {
+  return !entry.directory && inside(exe.size(), entry.at, kDataEntryBytes);
+}
+
+// The directory of `type` under the root; nullopt when the program has no resource of that type.
+std::optional<std::size_t> type_directory(const Bytes& exe, std::size_t root, std::uint32_t type) {
+  for (const Entry& entry : entries_of(exe, root, root)) {
+    if (entry.directory && entry.name == type) return entry.at;
   }
   return std::nullopt;
 }
 
-std::optional<std::size_t> subdirectory(const Bytes& exe, std::size_t root, std::size_t dir,
-                                        std::optional<std::uint32_t> id) {
-  const auto target = entry_in(exe, root, dir, id);
-  if (!target || !target->directory) return std::nullopt;
-  return target->at;
+// Every variant (every language) of every resource of `type`, with its id.
+void add_variants(const Bytes& exe, std::size_t root, const Entry& named, std::vector<Leaf>& leaves) {
+  if (!named.directory) return;
+  for (const Entry& language : entries_of(exe, root, named.at)) {
+    if (is_data_entry(exe, language)) leaves.push_back({named.name, language.at});
+  }
 }
 
-bool is_data_entry(const Bytes& exe, const Target& target) {
-  return !target.directory && inside(exe.size(), target.at, kDataEntryBytes);
-}
-
-// Where the data entry of the resource of `type` and `id` (the first, with none) is in the file:
-// its first language's.
-std::optional<std::size_t> data_entry(const Bytes& exe, std::size_t root, std::uint32_t type,
-                                      std::optional<std::uint32_t> id) {
-  const auto of_type = subdirectory(exe, root, root, type);
-  const auto named = of_type ? subdirectory(exe, root, *of_type, id) : std::nullopt;
-  const auto language = named ? entry_in(exe, root, *named, std::nullopt) : std::nullopt;
-  if (!language || !is_data_entry(exe, *language)) return std::nullopt;
-  return language->at;
+std::vector<Leaf> leaves_of(const Bytes& exe, std::size_t root, std::uint32_t type) {
+  std::vector<Leaf> leaves;
+  const auto of_type = type_directory(exe, root, type);
+  for (const Entry& named : of_type ? entries_of(exe, root, *of_type) : std::vector<Entry>()) {
+    add_variants(exe, root, named, leaves);
+  }
+  return leaves;
 }
 
 // Where the data a data entry points at is in the file.
@@ -227,61 +280,93 @@ std::optional<std::size_t> data_of(const Bytes& exe, const PeFile& pe, std::size
   return file_offset(pe, read_little(exe, entry, kWord), read_little(exe, entry + kWord, kWord));
 }
 
-std::vector<GroupPicture> group_pictures(const Bytes& exe, std::size_t group) {
-  std::vector<GroupPicture> pictures;
+int group_side(const Bytes& exe, std::size_t entry) { return exe[entry] == 0 ? kZeroSide : exe[entry]; }
+
+void add_group_pictures(const Bytes& exe, std::size_t group, std::vector<GroupPicture>& pictures) {
+  if (!inside(exe.size(), group, kGroupHeaderBytes)) return;
   const std::size_t count = read_little(exe, group + kGroupCountAt, kShort);
-  if (!inside(exe.size(), group, kGroupHeaderBytes + count * kGroupEntryBytes)) return pictures;
+  if (!inside(exe.size(), group, kGroupHeaderBytes + count * kGroupEntryBytes)) return;
   for (std::size_t i = 0; i < count; ++i) {
     const std::size_t entry = group + kGroupHeaderBytes + i * kGroupEntryBytes;
-    const int side = exe[entry] == 0 ? kZeroSide : exe[entry];
-    pictures.push_back({entry, side, read_little(exe, entry + kGroupIdAt, kShort)});
+    pictures.push_back({entry, group_side(exe, entry), read_little(exe, entry + kGroupIdAt, kShort)});
+  }
+}
+
+bool names_picture(const std::vector<GroupPicture>& pictures, std::uint32_t id) {
+  return std::any_of(pictures.begin(), pictures.end(), [id](const GroupPicture& picture) { return picture.id == id; });
+}
+
+bool has_variant(const std::vector<Leaf>& leaves, std::uint32_t id) {
+  return std::any_of(leaves.begin(), leaves.end(), [id](const Leaf& leaf) { return leaf.id == id; });
+}
+
+// Whether every picture the groups name has a variant to point at a new picture.
+bool every_picture_found(const ExeIcon& icon) {
+  return !icon.pictures.empty() &&
+         std::all_of(icon.pictures.begin(), icon.pictures.end(),
+                     [&icon](const GroupPicture& picture) { return has_variant(icon.leaves, picture.id); });
+}
+
+// The program's icon: every group, and every variant of the pictures they name; nullopt when it
+// has none, or a group names a picture it lacks.
+// The pictures of every icon group of the tree at `root`.
+std::vector<GroupPicture> pictures_of_groups(const Bytes& exe, const PeFile& pe, std::size_t root) {
+  std::vector<GroupPicture> pictures;
+  for (const Leaf& group : leaves_of(exe, root, kIconGroupType)) {
+    if (const auto data = data_of(exe, pe, group.entry)) add_group_pictures(exe, *data, pictures);
   }
   return pictures;
 }
 
-// The program's first icon group; nullopt when it has none.
-std::optional<IconGroup> icon_group(const Bytes& exe, const PeFile& pe) {
-  const auto root = file_offset(pe, pe.resources, kResourceDirectoryBytes);
-  const auto entry = root ? data_entry(exe, *root, kIconGroupType, std::nullopt) : std::nullopt;
-  const auto group = entry ? data_of(exe, pe, *entry) : std::nullopt;
-  if (!group || !inside(exe.size(), *group, kGroupHeaderBytes)) return std::nullopt;
-  IconGroup found{*root, group_pictures(exe, *group)};
-  if (found.pictures.empty()) return std::nullopt;
-  return found;
-}
-
-std::optional<IconGroup> icon_group_of(const Bytes& exe) {
-  const auto pe = pe_file(exe);
-  return pe ? icon_group(exe, *pe) : std::nullopt;
-}
-
-// The data entry of each picture of the group, in its order; nullopt when one has none.
-std::optional<std::vector<std::size_t>> picture_entries(const Bytes& exe, const IconGroup& group) {
-  std::vector<std::size_t> entries;
-  for (const GroupPicture& picture : group.pictures) {
-    const auto entry = data_entry(exe, group.root, kIconType, picture.id);
-    if (!entry) return std::nullopt;
-    entries.push_back(*entry);
+// Every variant of the pictures the groups name.
+std::vector<Leaf> variants_named(const Bytes& exe, std::size_t root, const std::vector<GroupPicture>& pictures) {
+  std::vector<Leaf> leaves;
+  for (const Leaf& leaf : leaves_of(exe, root, kIconType)) {
+    if (names_picture(pictures, leaf.id)) leaves.push_back(leaf);
   }
-  return entries;
+  return leaves;
 }
 
-bool has_every_side(const IconGroup& group, const IconSet& icons) {
-  return std::all_of(group.pictures.begin(), group.pictures.end(),
+std::optional<ExeIcon> exe_icon(const Bytes& exe, const PeFile& pe) {
+  const Directory resources = directory(exe, pe, kResourceDirectory);
+  const auto root = file_offset(pe, resources.at, kResourceDirectoryBytes);
+  if (!root) return std::nullopt;
+  ExeIcon icon;
+  icon.pictures = pictures_of_groups(exe, pe, *root);
+  icon.leaves = variants_named(exe, *root, icon.pictures);
+  if (!every_picture_found(icon)) return std::nullopt;
+  return icon;
+}
+
+std::optional<ExeIcon> exe_icon_of(const Bytes& exe) {
+  const auto pe = pe_file(exe);
+  return pe ? exe_icon(exe, *pe) : std::nullopt;
+}
+
+bool has_every_side(const ExeIcon& icon, const IconSet& icons) {
+  return std::all_of(icon.pictures.begin(), icon.pictures.end(),
                      [&icons](const GroupPicture& picture) { return icons.count(picture.side) != 0; });
 }
 
-// The pictures of `icons` the group asks for, one after the other, and where each starts.
+// The side of the picture `id` names (the first group naming it says).
+int side_of(const ExeIcon& icon, std::uint32_t id) {
+  const auto picture = std::find_if(icon.pictures.begin(), icon.pictures.end(),
+                                    [id](const GroupPicture& known) { return known.id == id; });
+  return picture->side;
+}
+
+// The new pictures, one of each side the groups ask for, one after the other, and where each starts.
 struct Pictures {
   Bytes data;
-  std::vector<std::size_t> starts;
+  std::map<int, std::size_t> starts;
 };
 
-Pictures pictures_for(const IconGroup& group, const IconSet& icons) {
+Pictures pictures_for(const ExeIcon& icon, const IconSet& icons) {
   Pictures pictures;
-  for (const GroupPicture& picture : group.pictures) {
+  for (const GroupPicture& picture : icon.pictures) {
+    if (pictures.starts.count(picture.side) != 0) continue;
     pictures.data.resize(aligned(pictures.data.size(), kPictureAlignment), 0);
-    pictures.starts.push_back(pictures.data.size());
+    pictures.starts[picture.side] = pictures.data.size();
     const Bytes& png = icons.at(picture.side);
     pictures.data.insert(pictures.data.end(), png.begin(), png.end());
   }
@@ -296,10 +381,37 @@ std::uint32_t first_raw_offset(const PeFile& pe) {
   return first;
 }
 
-// Whether one more section header fits between the last one and what follows the headers.
-bool room_for_section(const PeFile& pe, std::size_t header) {
-  return header + kSectionHeaderBytes <= first_raw_offset(pe);
+bool all_zero(const Bytes& exe, std::size_t at, std::size_t count) {
+  return std::all_of(exe.begin() + static_cast<std::ptrdiff_t>(at),
+                     exe.begin() + static_cast<std::ptrdiff_t>(at + count),
+                     [](std::uint8_t byte) { return byte == 0; });
 }
+
+// Whether what a directory says is in the file overlaps `count` bytes at `at`.
+bool overlaps(const Directory& directory, std::size_t at, std::size_t count) {
+  return directory.at < at + count && at < std::size_t{directory.at} + directory.size;
+}
+
+// Whether a header at `header` ends before the first section's data starts, inside the file.
+bool before_first_section(const Bytes& exe, const PeFile& pe, std::size_t header) {
+  return header + kSectionHeaderBytes <= first_raw_offset(pe) && inside(exe.size(), header, kSectionHeaderBytes);
+}
+
+// Whether the bound imports, which linkers may keep right after the section headers, are where a
+// new header would go.
+bool bound_imports_at(const Bytes& exe, const PeFile& pe, std::size_t header) {
+  const Directory bound = directory(exe, pe, kBoundImportDirectory);
+  return bound.size != 0 && overlaps(bound, header, kSectionHeaderBytes);
+}
+
+// Whether one more section header fits after the last one: before the first section's data,
+// on bytes nothing uses.
+bool room_for_section(const Bytes& exe, const PeFile& pe, std::size_t header) {
+  return before_first_section(exe, pe, header) && all_zero(exe, header, kSectionHeaderBytes) &&
+         !bound_imports_at(exe, pe, header);
+}
+
+std::size_t next_header(const PeFile& pe) { return pe.sections_at + pe.sections.size() * kSectionHeaderBytes; }
 
 // Where the program ends once loaded: the next section starts after it.
 std::uint32_t loaded_end(const PeFile& pe) {
@@ -311,8 +423,6 @@ std::uint32_t loaded_end(const PeFile& pe) {
 }
 
 void write_section_header(Bytes& exe, std::size_t header, const Section& section) {
-  std::fill(exe.begin() + static_cast<std::ptrdiff_t>(header),
-            exe.begin() + static_cast<std::ptrdiff_t>(header + kSectionHeaderBytes), 0);
   std::memcpy(&exe[header], kIconSectionName, std::min(std::strlen(kIconSectionName), kSectionNameBytes));
   write_little(exe, header + kVirtualSizeAt, section.virtual_size, kWord);
   write_little(exe, header + kVirtualAddressAt, section.virtual_address, kWord);
@@ -335,8 +445,8 @@ void count_section(Bytes& exe, const PeFile& pe, const Section& section) {
 // Adds a section holding `data` at the end of the program; its address once loaded, or nullopt
 // when the headers have no room for it.
 std::optional<std::uint32_t> add_section(Bytes& exe, const PeFile& pe, const Bytes& data) {
-  const std::size_t header = pe.sections_at + pe.sections.size() * kSectionHeaderBytes;
-  if (!room_for_section(pe, header)) return std::nullopt;
+  const std::size_t header = next_header(pe);
+  if (!room_for_section(exe, pe, header)) return std::nullopt;
   const Section section{static_cast<std::uint32_t>(data.size()), aligned(loaded_end(pe), pe.section_alignment),
                         aligned(data.size(), pe.file_alignment), aligned(exe.size(), pe.file_alignment)};
   write_section_header(exe, header, section);
@@ -345,6 +455,22 @@ std::optional<std::uint32_t> add_section(Bytes& exe, const PeFile& pe, const Byt
   exe.resize(std::size_t{section.raw_offset} + section.raw_size, 0);
   count_section(exe, pe, section);
   return section.virtual_address;
+}
+
+// Whether the signature is the last thing in the file (padded), as signing tools put it.
+bool signature_at_end(const Directory& certificate, std::size_t file_size) {
+  return certificate.at <= file_size &&
+         aligned(std::size_t{certificate.at} + certificate.size, kCertificateAlignment) >= file_size;
+}
+
+// The program without its signature (Authenticode), which would no longer match it once its icon
+// changes: the signature's directory emptied, and the signature cut off the end of the file.
+void drop_signature(Bytes& exe, const PeFile& pe) {
+  const Directory certificate = directory(exe, pe, kCertificateDirectory);
+  if (certificate.size == 0) return;
+  write_little(exe, pe.directories + kCertificateDirectory * kDirectoryBytes, 0, kWord);
+  write_little(exe, pe.directories + kCertificateDirectory * kDirectoryBytes + kWord, 0, kWord);
+  if (signature_at_end(certificate, exe.size())) exe.resize(certificate.at);
 }
 
 void describe_picture(Bytes& exe, const GroupPicture& picture, std::size_t size) {
@@ -357,15 +483,33 @@ void describe_picture(Bytes& exe, const GroupPicture& picture, std::size_t size)
   write_little(exe, picture.entry + kGroupBytesAt, static_cast<std::uint32_t>(size), kWord);
 }
 
-// Each picture's data entry points at its new picture, and the group says what that picture is.
-void point_at_pictures(Bytes& exe, const IconGroup& group, const std::vector<std::size_t>& entries,
-                       const Pictures& pictures, const IconSet& icons, std::uint32_t section) {
-  for (std::size_t i = 0; i < group.pictures.size(); ++i) {
-    const std::size_t size = icons.at(group.pictures[i].side).size();
-    write_little(exe, entries[i], section + static_cast<std::uint32_t>(pictures.starts[i]), kWord);
-    write_little(exe, entries[i] + kWord, static_cast<std::uint32_t>(size), kWord);
-    describe_picture(exe, group.pictures[i], size);
+// Every variant of every picture points at the new picture of its side, and every group says
+// what that picture is.
+void point_at_pictures(Bytes& exe, const ExeIcon& icon, const Pictures& pictures, const IconSet& icons,
+                       std::uint32_t section) {
+  for (const Leaf& leaf : icon.leaves) {
+    const int side = side_of(icon, leaf.id);
+    write_little(exe, leaf.entry, section + static_cast<std::uint32_t>(pictures.starts.at(side)), kWord);
+    write_little(exe, leaf.entry + kWord, static_cast<std::uint32_t>(icons.at(side).size()), kWord);
   }
+  for (const GroupPicture& picture : icon.pictures) describe_picture(exe, picture, icons.at(picture.side).size());
+}
+
+// A program about to be given an icon: a copy without its signature, read, and its icon.
+struct Patching {
+  Bytes exe;
+  PeFile pe;
+  ExeIcon icon;
+};
+
+std::optional<Patching> patching(const Bytes& exe) {
+  Bytes copy = exe;
+  if (const auto signed_pe = pe_file(copy)) drop_signature(copy, *signed_pe);
+  const auto pe = pe_file(copy);
+  if (!pe) return std::nullopt;
+  auto icon = exe_icon(copy, *pe);
+  if (!icon) return std::nullopt;
+  return Patching{std::move(copy), *pe, std::move(*icon)};
 }
 
 bool fail(std::string& error, const char* text) {
@@ -376,38 +520,40 @@ bool fail(std::string& error, const char* text) {
 }  // namespace
 
 std::vector<int> exe_icon_sides(const bytes::Bytes& exe) {
-  std::vector<int> sides;
-  if (const auto group = icon_group_of(exe)) {
-    for (const GroupPicture& picture : group->pictures) sides.push_back(picture.side);
+  std::set<int> sides;
+  if (const auto icon = exe_icon_of(exe)) {
+    for (const GroupPicture& picture : icon->pictures) sides.insert(picture.side);
   }
-  std::sort(sides.begin(), sides.end());
-  return sides;
+  return {sides.begin(), sides.end()};
+}
+
+bool exe_has_room_for_icon(const bytes::Bytes& exe) {
+  const auto pe = pe_file(exe);
+  return pe && room_for_section(exe, *pe, next_header(*pe));
 }
 
 bool replace_exe_icon(bytes::Bytes& exe, const IconSet& icons, std::string& error) {
-  const auto pe = pe_file(exe);
-  const auto group = pe ? icon_group(exe, *pe) : std::nullopt;
-  const auto entries = group ? picture_entries(exe, *group) : std::nullopt;
-  if (!entries) return fail(error, "project.icon.no_exe_icon");
-  if (!has_every_side(*group, icons)) return fail(error, "project.icon.missing_side");
-  const Pictures pictures = pictures_for(*group, icons);
-  Bytes patched = exe;
-  const auto section = add_section(patched, *pe, pictures.data);
+  auto patch = patching(exe);
+  if (!patch) return fail(error, "project.icon.no_exe_icon");
+  if (!has_every_side(patch->icon, icons)) return fail(error, "project.icon.missing_side");
+  const Pictures pictures = pictures_for(patch->icon, icons);
+  const auto section = add_section(patch->exe, patch->pe, pictures.data);
   if (!section) return fail(error, "project.icon.no_room");
-  point_at_pictures(patched, *group, *entries, pictures, icons, *section);
-  exe = std::move(patched);
+  point_at_pictures(patch->exe, patch->icon, pictures, icons, *section);
+  exe = std::move(patch->exe);
   return true;
 }
 
 IconSet exe_icons(const bytes::Bytes& exe) {
   IconSet icons;
   const auto pe = pe_file(exe);
-  const auto group = pe ? icon_group(exe, *pe) : std::nullopt;
-  const auto entries = group ? picture_entries(exe, *group) : std::nullopt;
-  for (std::size_t i = 0; entries && i < entries->size(); ++i) {
-    const auto data = data_of(exe, *pe, (*entries)[i]);
-    const std::size_t size = read_little(exe, (*entries)[i] + kWord, kWord);
-    if (data) icons[group->pictures[i].side] = Bytes(exe.begin() + *data, exe.begin() + *data + size);
+  if (!pe) return icons;
+  const auto icon = exe_icon(exe, *pe);
+  if (!icon) return icons;
+  for (const Leaf& leaf : icon->leaves) {
+    const auto data = data_of(exe, *pe, leaf.entry);
+    const std::size_t size = read_little(exe, leaf.entry + kWord, kWord);
+    if (data) icons.emplace(side_of(*icon, leaf.id), Bytes(exe.begin() + *data, exe.begin() + *data + size));
   }
   return icons;
 }

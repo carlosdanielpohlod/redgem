@@ -24,6 +24,7 @@
 #include "scene/scene_desc.hpp"
 #include "app/game_display.hpp"
 #include "app/game_settings.hpp"
+#include "app/game_identity.hpp"
 #include "app/presenter.hpp"
 #include "storage/save_store.hpp"
 #include "script/script_context.hpp"
@@ -133,7 +134,9 @@ class Engine {
   bool serves_a_room() const { return !options_.server_room.empty(); }
   void fill_context(const std::string& game_title);
   // What game.json says the game is (its version, for Game.version).
-  void take_identity();
+  // What game.json says the game is, read once; its splash picture shown while the rest loads.
+  GameIdentityReading begin_loading();
+  void take_identity(const GameIdentityReading& identity);
   void connect_context();
   void start_scripts();
 

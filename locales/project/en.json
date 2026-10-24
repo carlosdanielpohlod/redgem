@@ -1,5 +1,7 @@
 {
   "project.android.bundletool_jar_missing": "{variable} names {jar}, which is not a file: point it at bundletool's .jar (bundletool-all-<version>.jar)",
+  "project.android.network_refused": "game.json says \"network\": false, yet the game's scripts use the network (Network or HTTP): its app will not reach it on a phone",
+  "project.android.network_unsaid": "the game's scripts use the network (Network or HTTP), so its app asks for it: say \"network\": true in game.json",
   "project.android.no_bundletool": "an App Bundle is made with Google's bundletool, which was not found: put bundletool on the PATH, or set {variable} to its .jar (https://github.com/google/bundletool/releases)",
   "project.build.bundle_is_for_android": "--bundle makes an Android App Bundle: use it with --target android",
   "project.build.cannot_empty": "cannot empty {folder} for the new build: {reason}",
@@ -69,6 +71,7 @@
   "project.hub.path_hint": "/path/to/game",
   "project.hub.start_from": "Start from",
   "project.hub.tagline": "Make 3D games in Ruby",
+  "project.icon.beside_exe": "the game's icon cannot go inside {exe} ({reason}): it is shipped beside it as {ico}",
   "project.icon.cannot_read_player": "cannot read the game's executable {player} to give it the game's icon",
   "project.icon.missing": "the icon {picture} that game.json names is not a file in the game folder",
   "project.icon.missing_side": "the game's icon was not made at every size the player for Windows has",

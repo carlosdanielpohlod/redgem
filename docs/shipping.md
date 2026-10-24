@@ -45,9 +45,12 @@ A game says in its `game.json` what it is shown by; all of it is optional:
   world is built, the scripts start and the scene goes to the graphics card. (Reading the scene's
   file happens before the window opens: a big level still takes that long with no window.) It is
   shown by built games and `--play`, not by the editor.
-- `network` is `true` for a game that plays online (`Network`) or makes web requests (`HTTP`).
-  Only then does its Android app ask for the network: an app that asks for what it does not use
-  worries players and stores. On computers it changes nothing.
+- `network` says whether the game plays online (`Network`) or makes web requests (`HTTP`): its
+  Android app asks for the network only when it does, since an app that asks for what it does not
+  use worries players and stores. When `game.json` does not say, a build looks at the scripts:
+  one that calls `Network.` or `HTTP.` gets the network, and the build warns to say
+  `"network": true`. `"network": false` keeps the app offline even then (with a warning). On
+  computers it changes nothing.
 
 A build refuses a `game.json` that says one of these and cannot be used (a version that is not
 one, a picture that is not a PNG in the game's folder, an icon that is not square), saying which.
@@ -68,7 +71,11 @@ needed) and builds `redgem-player.exe` into `build/src/runtimes/windows/`; it ta
 and is only needed once, or again after updating RedGem. The build then makes `dist/my_game_win/my_game.exe` next to its `game/` folder.
 The game's icon goes inside the `.exe` (at 16 to 256 pixels): the file manager, the taskbar and
 shortcuts show it. Nothing has to run on Windows for that: the build puts the pictures into its
-copy of the player, in place of the engine's.
+copy of the player, in place of the engine's. The player RedGem makes is not signed; a player
+that was would lose its signature there (it would no longer match), so a game you release is
+signed afterwards, by you. A player that cannot take the icon (one made without an icon of its
+own, or with no room left in its headers) is left as it is, and the icon goes beside it as
+`my_game.ico`, with a warning.
 It needs 64-bit Windows 10 or later and a graphics card with OpenGL 3.3; nothing has to be
 installed with it.
 
@@ -136,8 +143,9 @@ What changes on a phone:
 
 - The app's launcher icon is made from the game's `icon`, at every screen density (48 to 192
   pixels). Its version is the game's `version` unless the `android` section gives another.
-- The app asks for the network (the `INTERNET` permission) only when `game.json` says
-  `"network": true`. Without it, `Network` and `HTTP` cannot reach anything on a phone.
+- The app asks for the network (the `INTERNET` permission) when `game.json` says
+  `"network": true`, or says nothing and the scripts call `Network.` or `HTTP.` (see above).
+  Without it, `Network` and `HTTP` cannot reach anything on a phone.
 
 ### For Google Play: an App Bundle
 

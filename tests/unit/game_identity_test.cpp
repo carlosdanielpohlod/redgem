@@ -60,13 +60,13 @@ TEST_CASE("the numbers of a version are what comes before its pre-release and bu
   CHECK(version_numbers("2.0.0-rc.1+build-7") == "2.0.0");
 }
 
-TEST_CASE("a game that says nothing of itself has no version, no pictures and stays offline") {
+TEST_CASE("a game that says nothing of itself has no version, no pictures and nothing about the network") {
   const GameIdentityReading reading = read_game_identity(game_saying(""));
   CHECK(reading.error.empty());
   CHECK(reading.identity.version.empty());
   CHECK(reading.identity.icon.empty());
   CHECK(reading.identity.splash.empty());
-  CHECK_FALSE(reading.identity.network);
+  CHECK_FALSE(reading.identity.network.has_value());
 }
 
 TEST_CASE("game.json gives a game its version, its icon, its splash picture and the network") {
@@ -76,7 +76,8 @@ TEST_CASE("game.json gives a game its version, its icon, its splash picture and 
   CHECK(reading.identity.version == "1.2.0");
   CHECK(reading.identity.icon == std::filesystem::path("images/icon.png"));
   CHECK(reading.identity.splash == std::filesystem::path("images/Splash.PNG"));
-  CHECK(reading.identity.network);
+  CHECK(reading.identity.network == true);
+  CHECK(read_game_identity(game_saying(R"({"network": false})")).identity.network == false);
 }
 
 TEST_CASE("what game.json says of the game and cannot be used is left out, and said") {
@@ -90,21 +91,21 @@ TEST_CASE("what game.json says of the game and cannot be used is left out, and s
   // The first thing wrong is said; the rest that can be used still is.
   const GameIdentityReading reading = read_game_identity(game_saying(R"({"version": "x", "network": true})"));
   CHECK(reading.identity.version.empty());
-  CHECK(reading.identity.network);
+  CHECK(reading.identity.network == true);
 }
 
 TEST_CASE("the splash picture is a PNG inside the game that can be decoded") {
   const std::filesystem::path game = game_saying(R"({"splash": "images/splash.png"})");
   test::LogCapture log;
-  CHECK_FALSE(splash_picture(game));  // not there yet
+  CHECK_FALSE(splash_picture(game, read_game_identity(game).identity));  // not there yet
   CHECK(log.contains("the splash picture images/splash.png is not a PNG"));
   std::ofstream(game / "images" / "splash.png") << "not a picture";
-  CHECK_FALSE(splash_picture(game));
+  CHECK_FALSE(splash_picture(game, read_game_identity(game).identity));
   write_png(game / "images" / "splash.png", kSplashSide, kSplashSide);
-  const auto picture = splash_picture(game);
+  const auto picture = splash_picture(game, read_game_identity(game).identity);
   REQUIRE(picture);
   CHECK(encoded_image_size(picture->data(), picture->size())->width == kSplashSide);
-  CHECK_FALSE(splash_picture(game_saying("")));
+  CHECK_FALSE(splash_picture(game_saying(""), {}));
 }
 
 TEST_CASE("a Mac app plays the game kept in its resources") {

@@ -27,6 +27,9 @@
 #include "core/platform.hpp"
 #include "editor/scripts/script_files.hpp"
 #include "scene/gltf/gltf_loader.hpp"
+#include "project/icons/exe_icon.hpp"
+#include "project/icons/icon_set.hpp"
+#include "core/safe_path.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -592,3 +595,12 @@ TEST_CASE("a built game carries the licenses of what it contains") {
   }
   std::filesystem::remove_all(dir);
 }
+
+#ifdef _WIN32  // (the player built here is the Windows one)
+TEST_CASE("the Windows player carries the engine's icon, with room in its headers for a game's") {
+  const auto player = read_file_up_to(REDGEM_PLAYER_FILE, std::uintmax_t{1} << 30);
+  REQUIRE(player.has_value());
+  CHECK(exe_icon_sides(*player) == std::vector<int>(kWindowsIconSides.begin(), kWindowsIconSides.end()));
+  CHECK(exe_has_room_for_icon(*player));
+}
+#endif

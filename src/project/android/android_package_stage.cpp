@@ -105,9 +105,10 @@ bool manifest_for(const std::filesystem::path& game_dir, const std::filesystem::
   // (An id that cannot be used is no id to name the app by: the build says so instead of guessing.)
   error = game.android_error.empty() ? game.id_error : game.android_error;
   if (!error.empty()) return false;
-  const auto identity = build_identity(game_dir, error);
+  const auto identity = build_identity(game_dir, game, error);
   if (!identity || !stage_icon_of(*identity, stage_dir, error)) return false;
-  const AndroidAppLook look{identity->identity.version, identity->identity.network, !identity->icon.empty()};
+  const AndroidAppLook look{identity->identity.version, app_goes_online(identity->identity, game_dir),
+                            !identity->icon.empty()};
   manifest =
       android_manifest(android_package_for(game.settings, game_dir), game.settings.title, game.settings.android, look);
   return true;

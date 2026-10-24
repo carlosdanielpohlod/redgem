@@ -23,7 +23,7 @@ std::vector<int> launcher_sides() {
 bool write_icon(const std::filesystem::path& file, const bytes::Bytes& png, std::string& error) {
   std::error_code fs_error;
   std::filesystem::create_directories(file.parent_path(), fs_error);
-  return write_text_file(file, std::string(png.begin(), png.end()), error);
+  return write_bytes_file(file, png, error);
 }
 
 }  // namespace

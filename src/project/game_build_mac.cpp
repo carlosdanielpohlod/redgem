@@ -1,6 +1,9 @@
 // Building a game for the Mac: an .app with the player, the game, its icon and its description.
 
+#include <algorithm>
 #include <cstdlib>
+#include <iterator>
+#include <string_view>
 #include <vector>
 
 #include "app/bundled_game.hpp"
@@ -25,7 +28,10 @@ constexpr char kBundleIdJoiner = '-';            // what a bundle id has instead
 constexpr const char* kNotInFileNames = "/\\:";  // what a folder's name cannot hold on a Mac or elsewhere
 constexpr const char* kTrimmed = " .";           // a name starting with a dot is hidden; spaces at its ends are lost
 constexpr const char* kMinimumMacOs = "11.0";    // the oldest macOS the player is built for
-constexpr const char* kAdHocIdentity = "-";      // codesign's name for "no identity"
+constexpr const char* kAdHocIdentity = "-";
+constexpr unsigned char kFirstPrintable = 0x20;  // the first character that is no control character
+constexpr const char* kAllowedControls =
+    "\t\n\r";  // the control characters XML 1.0 allows      // codesign's name for "no identity"
 // The start and the end of every Info.plist (Apple's "Information Property List").
 constexpr const char* kPlistHead =
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -48,8 +54,23 @@ constexpr const char* kApplicationType = "APPL";   // the bundle is an applicati
 constexpr const char* kDictionaryVersion = "6.0";  // the only version of the format there is
 constexpr const char* kPlistTail = "  <key>NSHighResolutionCapable</key>\n  <true/>\n</dict>\n</plist>\n";
 
+// Whether XML 1.0 lets a text hold a character: every control character but tab, line feed and
+// carriage return is forbidden.
+bool allowed_control(char letter) { return std::string_view(kAllowedControls).find(letter) != std::string_view::npos; }
+
+bool xml_character(char letter) {
+  return static_cast<unsigned char>(letter) >= kFirstPrintable || allowed_control(letter);
+}
+
+// A value as an Info.plist can hold it: without what XML forbids, escaped.
+std::string plist_text(const std::string& value) {
+  std::string text;
+  std::copy_if(value.begin(), value.end(), std::back_inserter(text), xml_character);
+  return xml_escaped(text);
+}
+
 std::string plist_entry(const char* key, const std::string& value) {
-  return std::string("  <key>") + key + "</key>\n  <string>" + xml_escaped(value) + "</string>\n";
+  return std::string("  <key>") + key + "</key>\n  <string>" + plist_text(value) + "</string>\n";
 }
 
 std::string version_entries(const std::string& version) {
@@ -76,7 +97,7 @@ bool write_resources(const std::filesystem::path& resources, const BuildIdentity
   const auto icons = icon_set_from(identity.icon, kMacIconSides, error);
   if (!icons) return false;
   const bytes::Bytes icns = icns_file(*icons);
-  return write_text_file(resources / (executable + kIcnsExtension), std::string(icns.begin(), icns.end()), error);
+  return write_bytes_file(resources / (executable + kIcnsExtension), icns, error);
 }
 
 MacApp app_of(const BuildIdentity& identity, const std::string& executable) {

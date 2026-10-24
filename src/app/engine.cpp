@@ -51,7 +51,7 @@ std::unique_ptr<Engine> Engine::create(const EngineOptions& options, SceneDesc s
 }
 
 void Engine::initialize() {
-  show_splash(options_.presenter, options_.game_dir);  // (while the world is built and the scene uploaded)
+  const GameIdentityReading identity = begin_loading();
   build_world();
   const GameManifest manifest = read_game_manifest(options_.game_dir);
   if (!manifest.id_error.empty()) log::warning(manifest.id_error + kSavedByFolderNote);
@@ -61,7 +61,7 @@ void Engine::initialize() {
   open_display(manifest.settings.display);
   fill_context(manifest.settings.title);
   connect_display();
-  take_identity();
+  take_identity(identity);
   if (serves_a_room()) network_.serve_room(options_.server_room);  // before any script asks
   start_scripts();
   network_watch_.restart();  // the network's time starts with the game, not with its loading
@@ -144,8 +144,13 @@ void Engine::fill_context(const std::string& game_title) {
   connect_context();
 }
 
-void Engine::take_identity() {
-  const GameIdentityReading identity = read_game_identity(options_.game_dir);
+GameIdentityReading Engine::begin_loading() {
+  GameIdentityReading identity = read_game_identity(options_.game_dir);
+  show_splash(options_.presenter, options_.game_dir, identity.identity);  // (while the world is built)
+  return identity;
+}
+
+void Engine::take_identity(const GameIdentityReading& identity) {
   if (!identity.error.empty()) log::warning(tr("game.identity.unusable", {{"error", identity.error}}));
   context_.game_version = identity.identity.version;
 }

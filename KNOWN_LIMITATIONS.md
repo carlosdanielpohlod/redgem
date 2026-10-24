@@ -203,8 +203,9 @@ not a promise of how it will be closed.
   app (and the editor's) is signed ad hoc only, with no Developer ID nor notarization: a Mac that
   downloads it warns that its developer cannot be verified.
 - An App Bundle (`--bundle`) needs Google's bundletool installed apart. Bundles have been checked
-  with bundletool, never uploaded to Google Play. A game that goes online without saying
-  `"network": true` in its `game.json` cannot reach the network on a phone.
+  with bundletool, never uploaded to Google Play. Whether an app asks for the network, when
+  `game.json` does not say, is guessed from its scripts' text (`Network.` or `HTTP.`): a script
+  that reaches them some other way is not seen.
 - Saves live under RedGem's own folder, not under the game's or its studio's name.
 - Except the Mac's, the downloads are packed by hand, not by the continuous integration.
 

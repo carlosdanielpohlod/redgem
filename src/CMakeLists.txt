@@ -501,7 +501,7 @@ if(NOT ANDROID)
     project/game_build_shipping.cpp
     project/game_build_mac.cpp
     project/icons/icon_set.cpp
-    project/icons/icns_file.cpp
+    project/icons/icon_files.cpp
     project/icons/exe_icon.cpp
     project/android/android_package.cpp
     project/android/android_package_names.cpp
@@ -567,6 +567,11 @@ else()
   target_link_libraries(redgem_player PRIVATE redgem_runtime)
   # On Windows a game is a windowed program, with no console window behind it.
   set_target_properties(redgem_player PROPERTIES OUTPUT_NAME redgem-player WIN32_EXECUTABLE ON)
+  if(WIN32)
+    # A build puts a game's icon in a section it adds to its copy of the player, whose headers have
+    # room for one more only when the debug sections the libraries bring are not there.
+    target_link_options(redgem_player PRIVATE -Wl,--strip-debug)
+  endif()
   redgem_finish_program(redgem_player)
 
   # redgem-relay: where games played over the internet meet. It runs on servers: it has no window

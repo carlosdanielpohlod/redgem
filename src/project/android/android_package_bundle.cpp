@@ -21,8 +21,6 @@ constexpr const char* kModuleZip = "base.zip";
 constexpr const char* kUnsignedBundle = "unsigned.aab";
 constexpr const char* kJarOption = " -jar ";
 constexpr const char* kJavaTool = "java";
-constexpr const char* kSignatureAlgorithm = "SHA256withRSA";
-constexpr const char* kDigestAlgorithm = "SHA-256";
 constexpr char kPathSeparator = ':';  // between the folders of the PATH
 constexpr bool kBundleLink = true;    // (the protocol-buffer form a bundle's module holds)
 
@@ -53,12 +51,12 @@ std::string build_bundle_command(const std::string& bundletool, const std::files
 }
 
 // Passwords never reach the command line: jarsigner reads them from the environment variables.
+// It picks the signature algorithm that fits the key (RSA, EC...) by itself.
 std::string sign_bundle_command(const std::filesystem::path& stage_dir, const SigningKey& key,
                                 const std::filesystem::path& aab) {
   return std::string(android_names::kJarsignerTool) + " -keystore " + posix_shell_word(key.keystore) +
          " -storepass:env " + posix_shell_word(key.store_password_variable) + " -keypass:env " +
-         posix_shell_word(key.key_password_variable) + " -sigalg " + kSignatureAlgorithm + " -digestalg " +
-         kDigestAlgorithm + " -signedjar " + posix_shell_word(aab) + " " +
+         posix_shell_word(key.key_password_variable) + " -signedjar " + posix_shell_word(aab) + " " +
          posix_shell_word(stage_dir / kUnsignedBundle) + " " + posix_shell_word(key.alias);
 }
 

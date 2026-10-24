@@ -17,6 +17,7 @@
 #include "project/icons/exe_icon.hpp"
 #include "project/icons/icon_set.hpp"
 #include "project/notices.hpp"
+#include "test_support.hpp"
 
 using namespace redgem;
 using bytes::Bytes;
@@ -29,6 +30,9 @@ constexpr ::Color kBlue{0, 121, 241, 255};  // (raylib's own colors are macros t
 
 constexpr int kIconSide = 64;  // the test's icon: small, so it is quick to scale
 constexpr std::size_t kIcnsHeaderBytes = 8;
+constexpr std::size_t kIcoHeaderBytes = 6;
+constexpr std::size_t kIcoEntryBytes = 16;
+constexpr int kLargestIcoSide = 256;  // written as 0 in an .ico
 
 // A folder of the test's own, removed when the test ends, with a game in it.
 struct Scratch {
@@ -97,6 +101,42 @@ TEST_CASE("an icon must be a square PNG that can be read") {
   CHECK_FALSE(icon_set_from(scratch.game / "images" / "missing.png", kMacIconSides, error));
 }
 
+TEST_CASE("a Windows icon file holds every picture as a PNG, its entries saying where") {
+  const Scratch scratch;
+  const IconSet icons = test_icons(scratch);
+  const Bytes ico = ico_file(icons);
+  CHECK(bytes::read_little(ico, 0, 2) == 0);
+  CHECK(bytes::read_little(ico, 2, 2) == 1);  // an icon
+  REQUIRE(bytes::read_little(ico, 4, 2) == icons.size());
+  std::size_t index = 0;
+  for (const auto& [side, png] : icons) {
+    const std::size_t entry = kIcoHeaderBytes + index++ * kIcoEntryBytes;
+    CHECK(ico[entry] == (side == kLargestIcoSide ? 0 : side));  // 256 does not fit a byte: it is 0
+    const std::uint32_t size = bytes::read_little(ico, entry + 8, 4);
+    const std::uint32_t offset = bytes::read_little(ico, entry + 12, 4);
+    CHECK(Bytes(ico.begin() + offset, ico.begin() + offset + size) == png);
+  }
+}
+
+TEST_CASE("a Windows executable that cannot carry the game's icon ships it beside itself, with a warning") {
+  const Scratch scratch;
+  std::ofstream(scratch.dir / "player") << "not a Windows program";
+  write_png(scratch.game / "images" / "icon.png", kIconSide, kIconSide);
+  scratch.say(R"({"icon": "images/icon.png"})");
+  std::string error;
+  test::LogCapture log;
+  REQUIRE_MESSAGE(build_game(scratch.game, scratch.out, scratch.dir / "player", BuildTarget::Windows, error), error);
+  CHECK(log.contains("is shipped beside it as"));
+  const Bytes ico = read_bytes(scratch.out / "my_game.ico");
+  REQUIRE(ico.size() > kIcoHeaderBytes);
+  CHECK(bytes::read_little(ico, 4, 2) == kWindowsIconSides.size());
+  CHECK(read_text(scratch.out / "my_game.exe") == "not a Windows program");  // left as it was
+  // Built again without an icon, the one beside it goes.
+  scratch.say("{}");
+  REQUIRE_MESSAGE(build_game(scratch.game, scratch.out, scratch.dir / "player", BuildTarget::Windows, error), error);
+  CHECK_FALSE(std::filesystem::exists(scratch.out / "my_game.ico"));
+}
+
 TEST_CASE("a Mac icon file holds the sizes Apple reads as PNGs, each after its type and length") {
   const Scratch scratch;
   write_png(scratch.game / "images" / "icon.png", kIconSide, kIconSide);
@@ -141,6 +181,14 @@ TEST_CASE("a Mac app's description says its name, id, program, version and icon"
   const std::string plain = mac_info_plist({"Game", "game", "com.redgem.game", "", false});
   CHECK(plain.find("<string>1.0</string>") != std::string::npos);
   CHECK(plain.find("CFBundleIconFile") == std::string::npos);
+}
+
+TEST_CASE("a Mac app's description holds no character XML forbids, keeping tabs and line breaks") {
+  const std::string plist =
+      mac_info_plist({std::string("Bell\aGame\x01\tOne\nTwo\r"), "game", "com.redgem.game", "", false});
+  CHECK(plist.find("<string>BellGame\tOne\nTwo\r</string>") != std::string::npos);
+  CHECK(plist.find('\a') == std::string::npos);
+  CHECK(plist.find('\x01') == std::string::npos);
 }
 
 TEST_CASE("a Mac app is named after the game, with an id a bundle may have") {

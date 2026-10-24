@@ -5,6 +5,7 @@
 #include <string>
 
 #include "app/game_identity.hpp"
+#include "app/game_settings.hpp"
 #include "project/game_build.hpp"
 
 // What a build gives a game besides its player and its files, so each system shows it as the
@@ -22,6 +23,15 @@ struct BuildIdentity {
 // network flag that cannot be used, or an icon that is not a file inside the game. (An id that
 // cannot be used is no id, as when the game plays: see GameManifest.)
 std::optional<BuildIdentity> build_identity(const std::filesystem::path& game_dir, std::string& error);
+// The same, with the game's settings already read.
+std::optional<BuildIdentity> build_identity(const std::filesystem::path& game_dir, const GameManifest& manifest,
+                                            std::string& error);
+
+// Whether a script of the game (scripts/**/*.rb) calls the network: Network. or HTTP.
+bool scripts_use_network(const std::filesystem::path& game_dir);
+// Whether a game's app asks for the network: as its game.json says ("network"), else when its
+// scripts use it. A warning says when they disagree, or when game.json says nothing and they do.
+bool app_goes_online(const GameIdentity& identity, const std::filesystem::path& game_dir);
 
 // The version systems are given for a game that has none.
 inline constexpr const char* kDefaultGameVersion = "1.0";
@@ -70,10 +80,14 @@ bool copy_game(const std::filesystem::path& game_dir, const std::filesystem::pat
 // Whether the game is outside a folder a build empties and replaces (it must not be emptied with it).
 bool game_outside(const std::filesystem::path& game_dir, const std::filesystem::path& replaced, std::string& error);
 
-// Windows: the game's icon inside its executable (see icons/exe_icon.hpp).
+// Windows: the game's icon inside its executable (see icons/exe_icon.hpp). When the executable
+// cannot take it (no icon of its own to replace, no room in its headers), the icon goes beside it
+// as <executable>.ico instead, with a warning saying why.
+std::string windows_icon_file(const std::string& executable);
 bool give_exe_icon(const std::filesystem::path& exe, const std::filesystem::path& icon, std::string& error);
 
-// What a build for a computer writes beside its executable for `target`: Linux's entry and icon.
+// What a build for a computer writes beside its executable for `target`: Linux's entry and icon,
+// the icon Windows' executable could not carry.
 std::vector<std::string> shipping_outputs(const std::filesystem::path& game_dir, BuildTarget target);
 bool write_shipping_files(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                           BuildTarget target, const BuildIdentity& identity, std::string& error);

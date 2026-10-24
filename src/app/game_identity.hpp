@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <optional>
 #include <string>
 
 // What game.json says a game is when it ships: its version, the pictures it is shown by (an icon
@@ -14,11 +15,14 @@ struct GameIdentity {
   std::string version;           // a semantic version ("1.2.0", "2.0.0-beta.1"); empty for none
   std::filesystem::path icon;    // a PNG inside the game folder, as game.json names it; empty for none
   std::filesystem::path splash;  // the same, for the picture shown while the game loads
-  bool network = false;          // the game plays online or makes web requests (an app asks for the network)
+  // Whether the game plays online or makes web requests (its Android app asks for the network);
+  // nullopt when game.json does not say, and a build looks at the scripts instead.
+  std::optional<bool> network;
 };
 
 struct GameIdentityReading {
-  // Always usable: whatever is missing or wrong is left out (no version, no pictures, offline).
+  // Always usable: whatever is missing or wrong is left out (no version, no pictures, nothing said
+  // about the network).
   GameIdentity identity;
   // What is wrong with the file's version, pictures or network flag; empty when nothing is. A game
   // plays all the same; a build refuses it, since what ships would not be what the file says.

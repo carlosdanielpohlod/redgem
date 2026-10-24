@@ -21,10 +21,12 @@ constexpr ::Color kBars{0, 0, 0, 255};        // around a picture of another sha
 constexpr ::Color kUntinted{255, 255, 255, 255};
 
 // What the picture's file holds, when it can be decoded as a picture.
+bool decodable(const std::vector<std::uint8_t>& bytes) { return decodable_image(bytes.data(), bytes.size()); }
+
 std::optional<std::vector<std::uint8_t>> picture_bytes(const std::filesystem::path& file) {
   auto bytes = read_file_up_to(file, kMaxEncodedImageBytes);
-  if (bytes && decodable_image(bytes->data(), bytes->size())) return bytes;
-  return std::nullopt;
+  if (!bytes || !decodable(*bytes)) return std::nullopt;
+  return bytes;
 }
 
 void draw_fitted(const Texture2D& picture) {
@@ -49,8 +51,8 @@ void show_picture(const std::vector<std::uint8_t>& bytes) {
 
 }  // namespace
 
-std::optional<std::vector<std::uint8_t>> splash_picture(const std::filesystem::path& game_dir) {
-  const GameIdentity identity = read_game_identity(game_dir).identity;
+std::optional<std::vector<std::uint8_t>> splash_picture(const std::filesystem::path& game_dir,
+                                                        const GameIdentity& identity) {
   if (identity.splash.empty()) return std::nullopt;
   const auto file = file_inside(game_dir, identity.splash);
   auto bytes = file ? picture_bytes(*file) : std::nullopt;
@@ -58,9 +60,9 @@ std::optional<std::vector<std::uint8_t>> splash_picture(const std::filesystem::p
   return bytes;
 }
 
-void show_splash(Presenter* presenter, const std::filesystem::path& game_dir) {
+void show_splash(Presenter* presenter, const std::filesystem::path& game_dir, const GameIdentity& identity) {
   if (dynamic_cast<WindowPresenter*>(presenter) == nullptr) return;
-  if (const auto bytes = splash_picture(game_dir)) show_picture(*bytes);
+  if (const auto bytes = splash_picture(game_dir, identity)) show_picture(*bytes);
 }
 
 }  // namespace redgem

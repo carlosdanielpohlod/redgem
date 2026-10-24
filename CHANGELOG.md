@@ -44,8 +44,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
-- **An Android app asks for the network only when its game says `"network": true`** in its
-  `game.json` (the platformer demo and template do).
+- **An Android app asks for the network only when its game goes online**: when its `game.json`
+  says `"network": true`, or says nothing and its scripts call `Network` or `HTTP` (the build then
+  warns to say so). The platformer demo and template say it.
 - **Saves are flushed to the disk** before they replace the previous one, and the previous save is
   kept beside it as `<name>.bak`. A damaged save is moved aside to `<name>.damaged` (never written
   over), the backup is loaded and put back in its place, and the log names both files. A save that

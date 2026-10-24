@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -11,6 +12,7 @@
 #include "app/game_settings.hpp"
 #include "core/image_header.hpp"
 #include "core/platform.hpp"
+#include "project/game_shipping.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -468,3 +470,68 @@ TEST_CASE("an App Bundle is linked for a bundle, laid out as its one module, mad
   CHECK(with_icon.front().command.find("aapt2' compile --dir") != std::string::npos);
   CHECK(with_icon[1].command.find("compiled-res.zip") != std::string::npos);
 }
+
+TEST_CASE("an app goes online when its game says so, or when its scripts call the network unasked") {
+  const Scratch scratch;
+  const std::map<std::string, std::filesystem::path> runtimes = {
+      {"x86_64", scratch.file("built/libredgem.so", "engine")}};
+  const std::filesystem::path game = scratch.dir / "game_src";
+  std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
+  const std::filesystem::path stage = scratch.dir / "stage";
+  const auto asks_for_network = [&]() {
+    std::string error;
+    REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", stage, error), error);
+    return read(stage / "AndroidManifest.xml").find("android.permission.INTERNET") != std::string::npos;
+  };
+  CHECK_FALSE(scripts_use_network(game));
+  CHECK_FALSE(asks_for_network());  // no network in its scripts, nothing said
+  std::filesystem::create_directories(game / "scripts" / "online");
+  std::ofstream(game / "scripts" / "online" / "lobby.rb")
+      << "class Lobby < Behaviour\n  def start = Network.host\nend\n";
+  CHECK(scripts_use_network(game));
+  {
+    test::LogCapture log;
+    CHECK(asks_for_network());  // an existing game keeps the network, and is told to say so
+    CHECK(log.contains("say \"network\": true in game.json"));
+  }
+  {
+    std::ofstream(game / "game.json") << R"({"network": false})";
+    test::LogCapture log;
+    CHECK_FALSE(asks_for_network());  // said: kept offline, with a warning
+    CHECK(log.contains("game.json says \"network\": false, yet the game's scripts use the network"));
+  }
+  {
+    std::ofstream(game / "game.json") << R"({"network": true})";
+    test::LogCapture log;
+    CHECK(asks_for_network());
+    CHECK(log.count(log::Level::Warning) == 0);
+  }
+  std::filesystem::remove_all(game / "scripts" / "online");
+  std::ofstream(game / "scripts" / "web.rb") << "HTTP.get(\"https://example.com\") { |r| r }\n";
+  CHECK(scripts_use_network(game));  // web requests too
+}
+
+#ifndef _WIN32  // (Android apps are packed with a POSIX shell.)
+TEST_CASE("an App Bundle is signed with whatever kind of key it is given, an EC one too") {
+  if (std::system("command -v keytool >/dev/null 2>&1 && command -v jarsigner >/dev/null 2>&1 && "
+                  "command -v jar >/dev/null 2>&1") != 0) {
+    MESSAGE("no Java tools here: skipped");
+    return;
+  }
+  const Scratch scratch;
+  setenv("REDGEM_TEST_STORE_PASSWORD", "secret-store", 1);
+  const SigningKey key{scratch.dir / "ec.keystore", "ec", "REDGEM_TEST_STORE_PASSWORD", "REDGEM_TEST_STORE_PASSWORD"};
+  const std::string make_key = "keytool -genkeypair -keystore '" + key.keystore.string() +
+                               "' -storepass:env REDGEM_TEST_STORE_PASSWORD -alias ec -keyalg EC -groupname secp256r1 "
+                               "-validity 1 -dname CN=Test >/dev/null 2>&1";
+  REQUIRE(std::system(make_key.c_str()) == 0);
+  scratch.file("content/BundleConfig.pb", "x");
+  const std::string make_bundle =
+      "cd '" + scratch.dir.string() + "' && jar cfM unsigned.aab -C content . >/dev/null 2>&1";
+  REQUIRE(std::system(make_bundle.c_str()) == 0);
+  const auto steps = bundle_commands(AndroidTools{}, "bundletool", scratch.dir, key, scratch.dir / "game.aab");
+  CHECK(steps.back().command.find("-sigalg") == std::string::npos);
+  REQUIRE(std::system((steps.back().command + " >/dev/null 2>&1").c_str()) == 0);
+  CHECK(std::system(("jarsigner -verify '" + (scratch.dir / "game.aab").string() + "' >/dev/null 2>&1").c_str()) == 0);
+}
+#endif
