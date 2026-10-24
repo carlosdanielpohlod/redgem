@@ -159,3 +159,92 @@ TEST_CASE("paused continuous emitters emit nothing and do not leave a trail acro
   REQUIRE(particles.particles().size() == static_cast<std::size_t>(kRate));
   for (const auto& particle : particles.particles()) CHECK(particle.position.x == doctest::Approx(kTravel));
 }
+
+TEST_CASE("continuous emitters share a saturated pool even when vacancies repeat on the same frame parity") {
+  Scene scene = emitter_scene();
+  ParticleSystem particles;
+  ParticleEmitters emitters;
+  auto first = still_births();
+  first.look.color = steady(Vec3::right());
+  auto second = first;
+  second.look.color = steady(Vec3::up());
+  emitters.create(scene, scene.handle(0), first, kMaxEmitterRate);
+  emitters.create(scene, scene.handle(0), second, kMaxEmitterRate);
+  emitters.advance(1, scene, particles);
+  REQUIRE(particles.particles().size() == kMaxParticles);
+  CHECK(particles.particles().front().color_now().x == 1);
+  emitters.advance(1, scene, particles);  // no vacancy: priority must not advance back to the first
+  particles.clear();
+  emitters.advance(1, scene, particles);
+  REQUIRE(particles.particles().size() == kMaxParticles);
+  for (const auto& particle : particles.particles()) CHECK(particle.color_now().y == 1);
+  emitters.advance(1, scene, particles);
+  particles.clear();
+  emitters.advance(1, scene, particles);
+  REQUIRE(particles.particles().size() == kMaxParticles);
+  CHECK(particles.particles().front().color_now().x == 1);
+}
+
+TEST_CASE("continuous emitters do not interpolate a trail across a teleport") {
+  constexpr float kAcrossTheMap = 1000;
+  Scene scene = emitter_scene();
+  ParticleSystem particles;
+  ParticleEmitters emitters;
+  emitters.create(scene, scene.handle(0), still_births(), kRate);
+  scene.at(0).local.position.x = kAcrossTheMap;
+  emitters.advance(1, scene, particles);
+  REQUIRE(particles.particles().size() == static_cast<std::size_t>(kRate));
+  for (const auto& particle : particles.particles()) CHECK(particle.position.x == doctest::Approx(kAcrossTheMap));
+}
+
+TEST_CASE("continuous emitter births age and move by the portion of the frame since birth") {
+  Scene scene = emitter_scene();
+  ParticleSystem particles;
+  ParticleEmitters emitters;
+  auto settings = still_births();
+  settings.speed = 1;
+  settings.spread_degrees = 0;
+  emitters.create(scene, scene.handle(0), settings, kRate);
+  emitters.advance(1, scene, particles);
+  REQUIRE(particles.particles().size() == static_cast<std::size_t>(kRate));
+  CHECK(particles.particles().front().age == doctest::Approx(1 - kQuarterSecond));
+  CHECK(particles.particles().front().position.y > 0);
+  CHECK(particles.particles().back().age == doctest::Approx(0));
+  CHECK(particles.particles().back().position.y == doctest::Approx(0));
+}
+
+TEST_CASE("continuous emitter births that already expired within a frame occupy no particle slots") {
+  constexpr float kShortLife = 0.01f;
+  Scene scene = emitter_scene();
+  ParticleSystem particles;
+  ParticleEmitters emitters;
+  auto settings = still_births();
+  settings.life = kShortLife;
+  emitters.create(scene, scene.handle(0), settings, kRate);
+  emitters.advance(1, scene, particles);
+  REQUIRE(particles.particles().size() == 1);
+  CHECK(particles.particles().front().age == 0);
+}
+
+TEST_CASE("continuous emission ages and birth positions agree when a frame is divided") {
+  Scene scene = emitter_scene();
+  ParticleSystem one_frame;
+  ParticleSystem divided;
+  ParticleEmitters first;
+  ParticleEmitters second;
+  first.create(scene, scene.handle(0), still_births(), kRate);
+  second.create(scene, scene.handle(0), still_births(), kRate);
+  scene.at(0).local.position.x = kTravel;
+  first.advance(1, scene, one_frame);
+  constexpr int kSteps = 4;
+  for (int i = 1; i <= kSteps; ++i) {
+    divided.update(kQuarterSecond);
+    scene.at(0).local.position.x = kTravel * static_cast<float>(i) / kSteps;
+    second.advance(kQuarterSecond, scene, divided);
+  }
+  REQUIRE(one_frame.particles().size() == divided.particles().size());
+  for (std::size_t i = 0; i < one_frame.particles().size(); ++i) {
+    CHECK(one_frame.particles()[i].age == doctest::Approx(divided.particles()[i].age));
+    CHECK(approx_equal(one_frame.particles()[i].position, divided.particles()[i].position, kEpsilon));
+  }
+}

@@ -83,6 +83,13 @@ class ParticleSystem {
   const std::vector<std::string>& images() const { return images_; }
 
  private:
+  friend class ParticleEmitters;
+  struct PreparedBurst {
+    BurstCone cone;
+    int image = kNoParticleImage;
+  };
+  PreparedBurst prepare(const ParticleBurst& burst);
+  bool emit_prepared(const ParticleBurst& burst, const PreparedBurst& prepared, Vec3 position, float age);
   float random_unit();  // 0 to 1
   int image_index(const std::string& name);
   Particle new_particle(const ParticleBurst& burst, const BurstCone& cone, int image);

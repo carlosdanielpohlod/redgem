@@ -18,9 +18,20 @@ int births_that_fit(double due, std::size_t flying) {
   const auto room = kMaxParticles - std::min(flying, kMaxParticles);
   return static_cast<int>(std::min(std::floor(due), static_cast<double>(room)));
 }
-float birth_fraction(int remaining, double fraction, float rate, float dt) {
+float birth_age(int remaining, double fraction, float rate, float dt) {
   const double age = (static_cast<double>(remaining) + fraction) / rate;
-  return static_cast<float>(std::clamp(1.0 - age / dt, 0.0, 1.0));
+  return static_cast<float>(std::clamp(age, 0.0, static_cast<double>(dt)));
+}
+Vec3 trail_start(Vec3 previous, Vec3 current) {
+  const bool continuous = length(current - previous) <= kMaxEmitterTrailDistance;
+  return continuous ? previous : current;
+}
+ParticleBurst world_burst(const ParticleBurst& settings, const Transform& world) {
+  ParticleBurst burst = settings;
+  burst.count = 1;
+  burst.position = world_position(world, settings.position);
+  burst.direction = rotate(world.rotation, settings.direction);
+  return burst;
 }
 
 }  // namespace
@@ -56,30 +67,44 @@ bool ParticleEmitters::active(const Scene& scene, int id) const {
   return scene.resolve(found->object) != kNoObject;
 }
 
-void ParticleEmitters::emit_between(Emitter& emitter, float dt, const Transform& world, ParticleSystem& particles) {
-  const double due = emitter.fraction + static_cast<double>(dt) * emitter.rate;
-  emitter.fraction = std::fmod(due, 1.0);
-  const Vec3 current = world_position(world, emitter.settings.position);
-  ParticleBurst burst = emitter.settings;
-  burst.count = 1;
-  burst.direction = rotate(world.rotation, burst.direction);
-  const int count = births_that_fit(due, particles.particles().size());
+int ParticleEmitters::emit_births(const Emitter& emitter, const ParticleBurst& burst,
+                                  const ParticleSystem::PreparedBurst& prepared, float dt, int count,
+                                  ParticleSystem& particles) {
+  const Vec3 from = trail_start(emitter.previous, burst.position);
+  int added = 0;
   for (int i = 0; i < count; ++i) {
-    const float along = birth_fraction(count - 1 - i, emitter.fraction, emitter.rate, dt);
-    burst.position = emitter.previous + (current - emitter.previous) * along;
-    particles.burst(burst);
+    const float age = birth_age(count - 1 - i, emitter.fraction, emitter.rate, dt);
+    const Vec3 position = from + (burst.position - from) * (1.0f - age / dt);
+    if (particles.emit_prepared(burst, prepared, position, age)) ++added;
   }
+  return added;
 }
 
-void ParticleEmitters::advance_one(Emitter& emitter, float dt, const Scene& scene, ParticleSystem& particles) {
+int ParticleEmitters::emit_between(Emitter& emitter, float dt, const Transform& world, ParticleSystem& particles) {
+  const double due = emitter.fraction + static_cast<double>(dt) * emitter.rate;
+  emitter.fraction = std::fmod(due, 1.0);
+  const int count = births_that_fit(due, particles.particles().size());
+  if (count == 0) return 0;
+  const ParticleBurst burst = world_burst(emitter.settings, world);
+  const auto prepared = particles.prepare(burst);
+  return emit_births(emitter, burst, prepared, dt, count, particles);
+}
+
+int ParticleEmitters::advance_one(Emitter& emitter, float dt, const Scene& scene, ParticleSystem& particles) {
   const Transform world = scene.world_transform(scene.resolve(emitter.object));
-  if (time_passed(dt)) emit_between(emitter, dt, world, particles);
+  const int added = time_passed(dt) ? emit_between(emitter, dt, world, particles) : 0;
   emitter.previous = world_position(world, emitter.settings.position);
+  return added;
 }
 
 void ParticleEmitters::advance(float dt, const Scene& scene, ParticleSystem& particles) {
   discard_destroyed(scene);
-  for (Emitter& emitter : emitters_) advance_one(emitter, dt, scene, particles);
+  if (emitters_.empty()) return;
+  const std::size_t start = next_emitter_ % emitters_.size();
+  for (std::size_t i = 0; i < emitters_.size(); ++i) {
+    const std::size_t index = (start + i) % emitters_.size();
+    if (advance_one(emitters_[index], dt, scene, particles) > 0) next_emitter_ = (index + 1) % emitters_.size();
+  }
 }
 
 }  // namespace redgem

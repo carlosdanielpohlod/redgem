@@ -100,12 +100,20 @@ mrb_value particles_burst(mrb_state* mrb, mrb_value) {
   return mrb_int_value(mrb, particles(mrb).burst(settings(mrb, burst_args(mrb))));
 }
 
+int create_emitter(mrb_state* mrb, const BurstArgs& args, float rate) {
+  auto& registry = emitters(mrb);
+  const ParticleBurst burst = settings(mrb, args);
+  if (!context(mrb).renders_particles) return kNoEmitter;
+  return registry.create(scene(mrb), wrapped_handle(mrb, args.object), burst, rate);
+}
+
 mrb_value particles_emitter(mrb_state* mrb, mrb_value) {
   const BurstArgs args = burst_args(mrb, true);
   const float rate = static_cast<float>(from_to(mrb, args.rate, 0.0, kMaxEmitterRate, "an emitter's rate"));
   more_than(mrb, rate, 0.0, "an emitter's rate");
   alive_id(mrb, args.object);
-  const int id = emitters(mrb).create(scene(mrb), wrapped_handle(mrb, args.object), settings(mrb, args), rate);
+  const int id = create_emitter(mrb, args, rate);
+  if (!context(mrb).renders_particles) return mrb_int_value(mrb, kNoEmitter);
   if (id == kNoEmitter) mrb_raise(mrb, E_RUNTIME_ERROR, "no room for another particle emitter");
   return mrb_int_value(mrb, id);
 }

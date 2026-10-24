@@ -75,6 +75,7 @@ struct ScriptContext {
   AnimationPlayer* animations = nullptr;
   ParticleSystem* particles = nullptr;
   ParticleEmitters* particle_emitters = nullptr;
+  bool renders_particles = false;  // emitters are local presentation, never simulated by a headless room
   // The multiplayer game this machine hosts or joined (Network).
   net::NetworkSession* network = nullptr;
   // Finding games on the local network, and being found (Network.search, Network.host).

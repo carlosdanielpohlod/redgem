@@ -174,6 +174,7 @@ void Engine::connect_effects() {
   context_.animations = &animations_;
   context_.particles = &particles_;
   context_.particle_emitters = &particle_emitters_;
+  context_.renders_particles = options_.presenter != nullptr;
 }
 
 void Engine::fill_context(const std::string& game_title) {
