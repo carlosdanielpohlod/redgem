@@ -78,3 +78,15 @@ TEST_CASE("each test of each game keeps its settings in a file of its own, empti
   const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-settings-work";
   CHECK(fresh_settings_file_for(one, work, test).parent_path() == work / "saves");
 }
+
+TEST_CASE("each test of each game keeps its players' bindings apart from its settings, emptied before it runs") {
+  const std::filesystem::path game = "/nowhere/redgem-testing-tests/one/game";
+  const std::filesystem::path test = "/tests/system/x/rebind_test.rb";
+  const std::filesystem::path bindings = fresh_bindings_file_for(game, "", test);
+  CHECK(bindings != fresh_settings_file_for(game, "", test));
+  CHECK(bindings.parent_path() == test_save_file_for(game).parent_path());
+  std::filesystem::create_directories(bindings.parent_path());
+  std::ofstream(bindings) << "{}";
+  CHECK(fresh_bindings_file_for(game, "", test) == bindings);
+  CHECK_FALSE(std::filesystem::exists(bindings));
+}
