@@ -1,4 +1,6 @@
 {
+  "testing.cli.all_alone": "--all runs every test of the game as it is: no test file, --game or --headless with it",
+  "testing.cli.all_needs_game": "--all needs a game's folder",
   "testing.cli.game_for_ruby_tests": "--game is for Ruby tests (a system test names its game first)",
   "testing.cli.game_needs_folder": "--game needs a game's folder",
   "testing.cli.gpu_needs_card": "--gpu needs auto, dedicated or integrated",
@@ -18,6 +20,9 @@
     "                                    play the game with a system test at the controls",
     "  redgem-test --ruby <test_file.rb> [--game <game_dir>]",
     "                                    run a file of Ruby unit tests",
+    "  redgem-test --all <game_dir> [--work <dir>]",
+    "                                    run every test of the game (tests/*_test.rb), system tests",
+    "                                    with no window; a line per file, PASS or FAIL",
     "",
     "  --screenshots <dir>   where the test's pictures go (default: {screenshot_dir})",
     "  --headless            no window: faster, and takes no pictures",
@@ -31,5 +36,7 @@
     ""
   ],
   "testing.cli.work_for_system_tests": "--work is for system tests (Ruby tests leave nothing behind)",
-  "testing.cli.work_needs_directory": "--work needs a directory"
+  "testing.cli.work_needs_directory": "--work needs a directory",
+  "testing.suite.failed": "failed",
+  "testing.suite.summary": "tests: {passed} passed, {failed} failed"
 }

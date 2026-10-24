@@ -26,6 +26,16 @@ The command exits with an error when an assertion fails or a script raises, so i
 automated check. Add `--headless` to run without opening a window (no screenshots then);
 `redgem-test --help` lists every option.
 
+To run every test of a game at once, each system test with no window, and get a line per file
+(`PASS` or `FAIL` with the first error it said):
+
+```bash
+./build/src/redgem-test --all my_game
+```
+
+`redgem check my_game --run-tests` does the same after looking the game over (see
+[The command line](command-line.md)).
+
 `redgem-test` is a development tool. It is not part of a built game: the program your players
 receive (what `redgem build` and the editor's Build make) contains no test code at all, and
 `SystemTest` and the rest of what tests are written with do not exist in the Ruby your game

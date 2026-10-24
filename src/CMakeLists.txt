@@ -120,6 +120,7 @@ endfunction()
 
 redgem_add_library(redgem_core
   core/log.cpp
+  core/message_lines.cpp
   core/xml_writer.cpp
   core/platform.cpp
   core/platform_desktop.cpp
@@ -541,6 +542,13 @@ if(NOT ANDROID)
     project/scene_lookup.cpp
     project/scene_assignments.cpp
     project/scene_command.cpp
+    project/script_messages.cpp
+    project/tool_play.cpp
+    project/run_command.cpp
+    project/shot_command.cpp
+    project/game_checks.cpp
+    project/game_tests.cpp
+    project/check_command.cpp
     project/project_texts.cpp)
   redgem_embed_texts(redgem_project project)
   # (The templates and the licenses are the tools' alone, as the prelude is the runtime's.)

@@ -31,6 +31,7 @@ nav:
   - Using the editor:
       - The editor: editor.md
       - Levels, lighting and Blender: levels.md
+      - The command line: command-line.md
   - Scripting in Ruby:
       - Behaviours: scripting/behaviours.md
       - Gameplay recipes: scripting/gameplay.md

@@ -23,6 +23,7 @@ constexpr char kAdd = '+';
 constexpr char kTake = '-';
 constexpr char kComma = ',';
 constexpr char kQuote = '"';
+constexpr std::size_t kQuotes = 2;  // one on each side
 constexpr const char* kPropPrefix = "prop.";
 constexpr const char* kTrue = "true";
 constexpr const char* kFalse = "false";
@@ -139,7 +140,8 @@ std::vector<std::string> scripts_of(const SceneDocument& document, int index) {
 // A script that is not in the game's scripts folder (yet) is attached all the same, and said.
 void note_missing(SceneEdit& edit, const std::string& script) {
   if (std::filesystem::exists(edit.scripts_dir / script)) return;
-  edit.notes.push_back(tr("project.scene.script_missing", {{"script", script}, {"class", class_name_for_script(script)}}));
+  edit.notes.push_back(
+      tr("project.scene.script_missing", {{"script", script}, {"class", class_name_for_script(script)}}));
 }
 
 void write_scripts(SceneEdit& edit, int index, const std::vector<std::string>& scripts) {
@@ -200,8 +202,8 @@ struct Key {
   bool adds_and_takes;  // whether it takes += and -=
 };
 constexpr Key kSetters[] = {
-    {"position", set_position, false}, {"pos", set_position, false}, {"rotation", set_rotation, false},
-    {"rot", set_rotation, false},      {"scale", set_scale, false},  {"name", set_name, false},
+    {"position", set_position, false}, {"pos", set_position, false},        {"rotation", set_rotation, false},
+    {"rot", set_rotation, false},      {"scale", set_scale, false},         {"name", set_name, false},
     {"parent", set_parent, false},     {props::kScript, set_scripts, true},
 };
 
@@ -223,7 +225,9 @@ std::string unknown_key(const std::string& key) {
   return tr("project.scene.unknown_key", {{"key", key}, {"keys", kKeys}}) + hint;
 }
 
-bool in_quotes(const std::string& text) { return text.size() >= 2 && text.front() == kQuote && text.back() == kQuote; }
+bool in_quotes(const std::string& text) {
+  return text.size() >= kQuotes && text.front() == kQuote && text.back() == kQuote;
+}
 
 bool ends_with(const std::string& text, const std::string& end) {
   return text.size() > end.size() && text.compare(text.size() - end.size(), end.size(), end) == 0;
@@ -249,7 +253,7 @@ PropertyValue typed_value(const std::string& text) {
   if (text == kTrue) return true;
   if (text == kFalse) return false;
   if (const auto number = number_from(text)) return *number;
-  return in_quotes(text) ? text.substr(1, text.size() - 2) : text;
+  return in_quotes(text) ? text.substr(1, text.size() - kQuotes) : text;
 }
 
 std::string script_file_for(const std::string& name) {

@@ -34,9 +34,9 @@ struct ToolGrammar {
 
 // The words after a tool's name, read.
 struct ToolLine {
-  std::vector<std::string> words;               // what is no option, in order
-  std::map<std::string, std::string> values;    // the options given a value
-  std::set<std::string> flags;                  // the options that are a word alone
+  std::vector<std::string> words;             // what is no option, in order
+  std::map<std::string, std::string> values;  // the options given a value
+  std::set<std::string> flags;                // the options that are a word alone
 
   bool has(const std::string& flag) const { return flags.count(flag) > 0; }
   std::optional<std::string> value(const std::string& option) const;

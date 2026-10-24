@@ -25,8 +25,10 @@ constexpr const char* kFromOption = "--from";
 constexpr const char* kParentOption = "--parent";
 constexpr const char* kDepthOption = "--depth";
 constexpr const char* kLimitOption = "--limit";
-const ToolGrammar kGrammar{{kSceneOption, kFromOption, kParentOption, kDepthOption, kLimitOption},
-                           {command_line::kHelpOption}};
+// What the command takes after its name.
+ToolGrammar grammar() {
+  return {{kSceneOption, kFromOption, kParentOption, kDepthOption, kLimitOption}, {command_line::kHelpOption}};
+}
 // A list stops after this many lines unless --limit says otherwise (0: never).
 constexpr std::size_t kDefaultListLimit = 200;
 // The words of the line: the game, then the object (or the name of a new one), then what to set.
@@ -114,9 +116,7 @@ std::string assign_all(OpenScene& scene, SceneEdit& edit, int& index) {
   return {};
 }
 
-SceneEdit edit_of(OpenScene& scene) {
-  return SceneEdit{scene.document, scene.game_dir / config::kScriptsDirName, {}};
-}
+SceneEdit edit_of(OpenScene& scene) { return SceneEdit{scene.document, scene.game_dir / config::kScriptsDirName, {}}; }
 
 // Sets what the line says on `index`, and saves.
 ToolResult assign_and_save(OpenScene& scene, int index) {
@@ -182,7 +182,7 @@ struct Known {
   std::size_t words;  // how many words it needs at least: the game, and the object it is about
 };
 constexpr Known kSubcommands[] = {
-    {"list", list, kObjectWord}, {"get", get, kFirstAssignment},       {"set", set, kFirstAssignment},
+    {"list", list, kObjectWord},    {"get", get, kFirstAssignment},       {"set", set, kFirstAssignment},
     {"add", add, kFirstAssignment}, {"remove", remove, kFirstAssignment},
 };
 
@@ -244,7 +244,7 @@ ToolResult run_scene_command(const std::vector<std::string>& args) {
   const Known* subcommand = args.empty() ? nullptr : subcommand_named(args.front());
   if (subcommand == nullptr) return failed(usage(), kExitUsage);
   std::string error;
-  auto line = read_tool_line(args, 1, kGrammar, error);
+  auto line = read_tool_line(args, 1, grammar(), error);
   if (!line) return failed(error + "\n\n" + usage(), kExitUsage);
   return run_subcommand(*subcommand, std::move(*line));
 }

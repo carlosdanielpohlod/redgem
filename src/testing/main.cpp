@@ -10,6 +10,7 @@
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "core/translations.hpp"
+#include "testing/game_test_suite.hpp"
 #include "testing/ruby_tests.hpp"
 #include "testing/system_test.hpp"
 #include "testing/test_cli.hpp"
@@ -25,6 +26,9 @@ int run_tests(const testing::TestCliOptions& options) {
   if (options.mode == testing::TestMode::Help) {
     std::cout << testing::test_usage();
     return kExitSuccess;
+  }
+  if (options.mode == testing::TestMode::GameTests) {
+    return testing::run_game_test_suite(options.game_dir, options.work_dir, gpu_choice_for_run(options.gpu));
   }
   if (options.mode == testing::TestMode::RubyTests) {
     return testing::run_ruby_tests(options.test_file, options.scripts_game);

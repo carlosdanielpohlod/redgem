@@ -46,7 +46,9 @@ std::string without_trailing_zeros(std::string text) {
 
 bool is_identity(Quat rotation) { return approx_equal(rotation, Quat::identity(), kEpsilon); }
 bool is_unit_scale(Vec3 scale) { return approx_equal(scale, Vec3::one(), kEpsilon); }
-bool is_uniform(Vec3 scale) { return approx_equal(scale.x, scale.y, kEpsilon) && approx_equal(scale.x, scale.z, kEpsilon); }
+bool is_uniform(Vec3 scale) {
+  return approx_equal(scale.x, scale.y, kEpsilon) && approx_equal(scale.x, scale.z, kEpsilon);
+}
 
 // A scale as one number when it is the same on every side.
 std::string scale_text(Vec3 scale, int decimals) {
@@ -72,7 +74,8 @@ void add(std::string& line, const std::string& key, const std::string& value) { 
 
 // Where it is, turned and sized, as far as it is not where an object starts.
 void add_placement(std::string& line, const Transform& local) {
-  if (!approx_equal(local.position, Vec3::zero(), kEpsilon)) add(line, kPositionKey, vector_text(local.position, kListDecimals));
+  if (!approx_equal(local.position, Vec3::zero(), kEpsilon))
+    add(line, kPositionKey, vector_text(local.position, kListDecimals));
   if (!is_identity(local.rotation)) {
     add(line, kRotationKey, vector_text(quat_to_euler_degrees(local.rotation), kListAngleDecimals));
   }
@@ -129,20 +132,23 @@ class ListWriter {
 std::string detail_line(const char* key, const std::string& value) { return std::string(key) + ": " + value + "\n"; }
 
 std::string light_detail(const LightDesc& light) {
-  return std::string(light_name(light.type)) + " color=" +
-         vector_text({light.color.r, light.color.g, light.color.b}, kDetailDecimals) +
-         " intensity=" + number_text(light.intensity, kDetailDecimals) + " range=" + number_text(light.range, kDetailDecimals);
+  return std::string(light_name(light.type)) +
+         " color=" + vector_text({light.color.r, light.color.g, light.color.b}, kDetailDecimals) +
+         " intensity=" + number_text(light.intensity, kDetailDecimals) +
+         " range=" + number_text(light.range, kDetailDecimals);
 }
 
 std::string camera_detail(const CameraDesc& camera) {
   return "fov=" + number_text(radians_to_degrees(camera.fov_y_radians), kListAngleDecimals) +
-         " near=" + number_text(camera.near_plane, kDetailDecimals) + " far=" + number_text(camera.far_plane, kDetailDecimals);
+         " near=" + number_text(camera.near_plane, kDetailDecimals) +
+         " far=" + number_text(camera.far_plane, kDetailDecimals);
 }
 
 std::string mesh_detail(const SceneDesc& scene, const MeshDesc& mesh) {
   std::string text = mesh.name;
   for (const PrimitiveDesc& part : mesh.primitives) {
-    if (is_index_of(part.material, scene.materials.size())) text += std::string(" ") + kMaterialKey + "=" + scene.materials[part.material].name;
+    if (is_index_of(part.material, scene.materials.size()))
+      text += std::string(" ") + kMaterialKey + "=" + scene.materials[part.material].name;
   }
   return text;
 }
@@ -163,7 +169,8 @@ std::string placement_detail(const Transform& local) {
 
 std::string parts_detail(const SceneDesc& scene, const NodeDesc& node) {
   std::string text;
-  if (is_index_of(node.mesh, scene.meshes.size())) text += detail_line("mesh", mesh_detail(scene, scene.meshes[node.mesh]));
+  if (is_index_of(node.mesh, scene.meshes.size()))
+    text += detail_line("mesh", mesh_detail(scene, scene.meshes[node.mesh]));
   if (node.light) text += detail_line("light", light_detail(*node.light));
   if (node.camera) text += detail_line("camera", camera_detail(*node.camera));
   return text;
@@ -220,7 +227,7 @@ std::string property_text(const PropertyValue& value) {
 std::string object_path(const SceneDesc& scene, int index) {
   std::string path = scene.nodes[index].name;
   for (int parent = scene.nodes[index].parent; parent != kNoIndex; parent = scene.nodes[parent].parent) {
-    path = scene.nodes[parent].name + kPathSeparator + path;
+    path.insert(0, scene.nodes[parent].name + kPathSeparator);
   }
   return path;
 }
@@ -251,7 +258,8 @@ std::string scene_list(const SceneDesc& scene, const std::string& scene_name, co
 std::string object_detail(const SceneDesc& scene, int index) {
   const NodeDesc& node = scene.nodes[index];
   std::string text = object_id(index) + " " + node.name + "\n" + detail_line("path", object_path(scene, index));
-  if (node.parent != kNoIndex) text += detail_line("parent", object_id(node.parent) + " " + scene.nodes[node.parent].name);
+  if (node.parent != kNoIndex)
+    text += detail_line("parent", object_id(node.parent) + " " + scene.nodes[node.parent].name);
   text += placement_detail(node.local) + parts_detail(scene, node);
   const auto scripts = get_string(node.props, props::kScript);
   if (scripts) text += detail_line("scripts", *scripts + " (" + script_classes(node.props) + ")");

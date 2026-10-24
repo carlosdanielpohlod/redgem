@@ -90,3 +90,14 @@ TEST_CASE("the flags the engine's own program once had mean nothing here either"
   CHECK(parse_test_cli({"games/demo", "--test", "t.rb"}).error == "unknown option --test");
   CHECK(parse_test_cli({"--ruby-test", "x_test.rb"}).error == "unknown option --ruby-test");
 }
+
+TEST_CASE("every test of a game, as they are") {
+  const TestCliResult result = parse_test_cli({"--all", "games/demo/", "--work", "w"});
+  REQUIRE(result.ok);
+  CHECK(result.options.mode == TestMode::GameTests);
+  CHECK(result.options.game_dir == "games/demo");
+  CHECK(result.options.work_dir == "w");
+  CHECK_FALSE(parse_test_cli({"--all"}).ok);
+  CHECK_FALSE(parse_test_cli({"--all", "games/demo", "t.rb"}).ok);
+  CHECK_FALSE(parse_test_cli({"--all", "games/demo", "--headless"}).ok);
+}

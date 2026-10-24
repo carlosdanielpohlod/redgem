@@ -34,7 +34,9 @@ bool holds_either(const std::string& a, const std::string& b) {
   return a.find(b) != std::string::npos || b.find(a) != std::string::npos;
 }
 
-std::size_t allowed_changes(const std::string& word) { return std::max(kLeastChanges, word.size() / kLettersPerChange); }
+std::size_t allowed_changes(const std::string& word) {
+  return std::max(kLeastChanges, word.size() / kLettersPerChange);
+}
 
 }  // namespace
 
