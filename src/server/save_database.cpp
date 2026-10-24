@@ -50,7 +50,8 @@ constexpr const char* kSideFileSuffixes[] = {"-wal", "-shm"};
 // KNOWN_LIMITATIONS.md.
 void make_owners_only(const std::filesystem::path& file) {
 #ifdef _WIN32
-  std::ofstream(file, std::ios::binary);
+  std::error_code ignored;
+  if (!std::filesystem::exists(file, ignored)) std::ofstream(file, std::ios::binary);  // (never over a database)
 #else
   const int made = ::open(file.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
   if (made >= 0) ::close(made);
