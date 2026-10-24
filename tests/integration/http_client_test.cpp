@@ -19,6 +19,7 @@ constexpr int kCreated = 201;
 constexpr std::chrono::milliseconds kPollPause{5};
 constexpr std::chrono::seconds kLongestWait{10};
 constexpr float kShortTimeout = 0.3f;
+constexpr std::chrono::seconds kHangUpNoticed{2};  // far less than a request's own timeout (15 s)
 
 net::HttpRequest request(const std::string& method, const std::string& url) {
   net::HttpRequest made;
@@ -114,6 +115,18 @@ TEST_CASE("an https answer that lasts until the connection ends is whole only wh
   const net::HttpResponse whole = answer(trusting, start(trusting, request("GET", polite.url("/"))));
   CHECK_MESSAGE(whole.error.empty(), whole.error);
   CHECK(whole.body == "all of it");
+}
+
+// The connection ending while the request goes (here in the TLS handshake) ends the request.
+TEST_CASE("an https server that hangs up before the request went fails it at once") {
+  HttpTestServer server(HttpTestServer::Kind::Secure, http_answer("200 OK", "never"));
+  server.hang_up_at_once();
+  net::HttpClient client(net::TrustStore::from_pem(server.certificate_pem()));
+  const auto before = std::chrono::steady_clock::now();
+  const net::HttpResponse refused = answer(client, start(client, request("GET", server.url("/"))));
+  CHECK(refused.status == 0);
+  CHECK_FALSE(refused.error.empty());
+  CHECK(std::chrono::steady_clock::now() - before < kHangUpNoticed);
 }
 
 TEST_CASE("a server that never answers is given up on at the request's timeout") {

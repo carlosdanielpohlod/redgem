@@ -90,12 +90,6 @@ std::string trimmed(const std::string& text) {
   return text.substr(first, text.find_last_not_of(kBlanks) - first + 1);
 }
 
-bool is_decimal(const std::string& text, std::size_t most_digits) {
-  const bool digits_only =
-      std::all_of(text.begin(), text.end(), [](char c) { return std::isdigit(static_cast<unsigned char>(c)) != 0; });
-  return digits_only && !text.empty() && text.size() <= most_digits;
-}
-
 std::string request_problem(const HttpRequest& request) {
   if (!listed(kMethods, request.method)) return "HTTP sends GET, POST, PUT, PATCH and DELETE";
   if (request.headers.size() > kMaxHttpRequestHeaders) {

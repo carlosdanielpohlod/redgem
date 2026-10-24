@@ -29,6 +29,8 @@ class HttpTestServer {
   // Set before any request: over TLS it ends each answer with close_notify, the goodbye that says
   // the connection's end is the server's own (without it, the end could be anyone cutting it).
   void say_goodbye() { goodbye_ = true; }
+  // Set before any request: it hangs up on every connection at once, before a word of TLS.
+  void hang_up_at_once() { hang_up_ = true; }
   // https://localhost:<port><path>, or http://127.0.0.1:<port><path>.
   std::string url(const std::string& path) const;
   const std::string& certificate_pem() const { return certificate_pem_; }
@@ -53,6 +55,7 @@ class HttpTestServer {
   std::uint16_t port_ = 0;
   std::atomic<bool> quiet_{false};
   std::atomic<bool> goodbye_{false};
+  std::atomic<bool> hang_up_{false};
   std::atomic<bool> stop_{false};
   std::atomic<int> requests_{0};
   std::atomic<int> hang_ups_{0};

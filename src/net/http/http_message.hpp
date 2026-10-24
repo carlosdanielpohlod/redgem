@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "net/decimal_text.hpp"
+
 #include "net/http/http_request.hpp"
 #include "net/http/http_url.hpp"
 
@@ -15,7 +17,5 @@ std::string request_text(const HttpRequest& request, const Url& url);
 std::string lower_case(std::string text);
 // A header's value as it is meant: without the spaces and tabs around it.
 std::string trimmed(const std::string& text);
-// Whether a text is a whole number of at most `most_digits` digits (no sign, nothing else).
-bool is_decimal(const std::string& text, std::size_t most_digits);
 
 }  // namespace redgem::net

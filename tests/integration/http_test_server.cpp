@@ -222,6 +222,7 @@ void HttpTestServer::serve() {
 }
 
 void HttpTestServer::serve_one(net::Socket socket) {
+  if (hang_up_.load()) return;  // (the socket closes as it goes)
   Channel channel(std::move(socket), tls_ ? &tls_->config : nullptr);
   std::string request;
   while (!stopping() && !whole(request)) {
