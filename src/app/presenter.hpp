@@ -58,6 +58,11 @@ class Presenter {
   virtual bool open() const = 0;
   // How long the frame before this one took: what Engine::run advances the game by.
   virtual float frame_seconds() const = 0;
+  // The player's display settings (Settings in Ruby): the presenter takes what it can of them. One
+  // that shows the game in no window of its own (nobody, the editor's view) takes none.
+  virtual void apply_display(const DisplaySettings& /*display*/) {}
+  // The sizes the player may choose for the window, smallest first; none without a window.
+  virtual std::vector<SurfaceSize> display_modes() const { return {}; }
 };
 
 // Nobody watches: a game played by a test or on a server. It has the size it was given, texts

@@ -22,6 +22,14 @@ until 1.0, a release may change what games rely on (see
   each character's graph its own, with the blended pose sent over the network.
 - **Particle sun shadows**: particles can cast the sun's shadow (opt-in), following their fading
   and flipbook cells.
+- **Display settings for players**: windowed, fullscreen and borderless modes, a resolution from
+  the monitor's sizes, a render scale (50% to 200%), vsync and a frame-rate cap, quality presets
+  (low to ultra, and custom) that cap what a level's environment asks for, and a master volume.
+  `game.json` gives the defaults; the `Settings` module reads and changes them, and keeps them per
+  game.
+- **Settings screen and widgets**: `GameMenu` has a settings screen reached from its title and
+  pause screens, built from the new `UI.toggle`, `UI.choice` and `UI.slider`. The keyboard and a
+  gamepad move a focus between widgets and buttons (`UI::Focus`).
 - **`redgem --version`** says which version of RedGem it is.
 - **CHANGELOG.md**: this file.
 
@@ -34,6 +42,9 @@ until 1.0, a release may change what games rely on (see
 - **Water looks closer to real water**: shore foam measured along the surface, broader fine
   detail on the waves, smoother highlights, and better refraction and wave filtering.
 - **KNOWN_LIMITATIONS.md** lists what stands between the engine and a 1.0.
+- **A gamepad's A picks the focused option** of a menu, not always the first one.
+- **What the graphics card cannot do** (several samples a pixel, temporal anti-aliasing) is dropped
+  in one place, as a quality that does not allow it would drop it.
 
 ### Fixed
 

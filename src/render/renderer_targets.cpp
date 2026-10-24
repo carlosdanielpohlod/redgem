@@ -150,7 +150,7 @@ void Renderer::Impl::load_fixed_targets() {
 
 void Renderer::Impl::ensure_targets(int width, int height, int asked) {
   if (!fits(hdr, width, height)) make_targets(width, height);
-  const int samples = samples_unusable ? 0 : asked;
+  const int samples = asked;  // (the environment's, which the card's abilities already held it to)
   if (asked_before(scene_samples, width, height, samples)) return;
   render_detail::release(scene_samples);
   scene_samples = samples > 0 ? load_multisampled(width, height, samples) : Multisampled{0, 0, 0, width, height, 0};
@@ -162,7 +162,7 @@ void Renderer::Impl::ensure_targets(int width, int height, int asked) {
 void Renderer::Impl::resolve_samples() {
   if (resolve(scene_samples, hdr.id)) return;
   log::warning("the graphics card cannot copy the picture of several samples a pixel: drawing one");
-  samples_unusable = true;
+  gpu.multisampling = false;
   render_detail::release(scene_samples);
 }
 

@@ -20,6 +20,11 @@ constexpr const char* kIdKey = "id";
 constexpr const char* kTitleKey = "title";
 constexpr const char* kWindowWidthKey = "window_width";
 constexpr const char* kWindowHeightKey = "window_height";
+constexpr const char* kFullscreenKey = "fullscreen";
+constexpr const char* kVsyncKey = "vsync";
+constexpr const char* kFpsCapKey = "fps_cap";
+constexpr const char* kRenderScaleKey = "render_scale";
+constexpr const char* kQualityKey = "quality";
 constexpr int kJsonIndent = 2;
 constexpr std::string_view kIdMarks = ".-_";  // what an id may hold besides small letters and digits
 constexpr std::string_view kTwoSeparators = "..";
@@ -58,6 +63,24 @@ void read_window(const nlohmann::json& json, GameSettings& settings) {
   settings.window_height = window_size(json, kWindowHeightKey, settings.window_height);
 }
 
+// Whether game.json asks for the game to start in fullscreen.
+bool asks_fullscreen(const nlohmann::json& json) {
+  return json.contains(kFullscreenKey) && json[kFullscreenKey].is_boolean() && json[kFullscreenKey].get<bool>();
+}
+
+// What the game shows itself as until its player says otherwise: game.json's keys are those of the
+// player's settings (display_json), under other names for some.
+void read_display(const nlohmann::json& json, GameSettings& settings) {
+  DisplaySettings& display = settings.display;
+  display.resolution = {settings.window_width, settings.window_height};
+  if (asks_fullscreen(json)) display.mode = WindowMode::Fullscreen;
+  nlohmann::json same_keys = nlohmann::json::object();
+  for (const char* key : {kVsyncKey, kFpsCapKey, kRenderScaleKey, kQualityKey}) {
+    if (json.contains(key)) same_keys[key] = json[key];
+  }
+  display = display_from_json(same_keys, display);
+}
+
 // Whether a text is as long as an id may be, with no two dots in a row.
 bool sized_as_id(const std::string& id) {
   return !id.empty() && id.size() <= kMaxGameIdLength && id.find(kTwoSeparators) == std::string::npos;
@@ -70,9 +93,11 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   manifest.settings.title = game_dir.filename().string();
   manifest.settings.window_width = config::kWindowWidth;
   manifest.settings.window_height = config::kWindowHeight;
+  manifest.settings.display.resolution = {config::kWindowWidth, config::kWindowHeight};
   const nlohmann::json json = read_json_file(game_dir / kGameSettingsFile);
   if (!json.is_object()) return manifest;
   read_window(json, manifest.settings);
+  read_display(json, manifest.settings);
   manifest.id_error = read_id(json, manifest.settings.id);
   manifest.android_error = read_android_section(json, manifest.settings.android);
   return manifest;

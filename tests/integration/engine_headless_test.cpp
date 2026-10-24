@@ -717,3 +717,42 @@ TEST_CASE("a touch screen's controls reach the renderer as plain circles, the st
   CHECK(circles[3].look == ControlCircle::Look::Pressed);
   CHECK(circles[4].y == doctest::Approx(layout.start.y));
 }
+
+namespace {
+
+// The sandbox game shown by nobody, keeping its player's settings in `settings`.
+std::unique_ptr<Engine> sandbox_keeping_settings(const std::filesystem::path& settings, AudioSystem& audio) {
+  EngineOptions options;
+  options.game_dir = fixture("games/sandbox");
+  options.fixed_step = true;
+  options.audio = &audio;
+  options.settings_file = settings;
+  auto created = Engine::create(options);
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  return std::move(std::get<std::unique_ptr<Engine>>(created));
+}
+
+}  // namespace
+
+TEST_CASE("what the player sets is kept for the game's next run, and its volume is the game's master volume") {
+  const std::filesystem::path settings = std::filesystem::temp_directory_path() / "redgem_engine_settings_test.json";
+  std::filesystem::remove(settings);
+  testing::RecordingAudio recording;
+  {
+    auto engine = sandbox_keeping_settings(settings, recording);
+    CHECK(ruby(*engine, "Settings.quality") == "ultra");
+    ruby(*engine, "Settings.quality = :low; Settings.render_scale = 0.75; Settings.volume = 0.5");
+    CHECK(recording.master_volume() == doctest::Approx(0.5f));
+    ruby(*engine, "Audio.volume = 0.2; Settings.vsync = false");  // the game's own volume stays
+    CHECK(recording.master_volume() == doctest::Approx(0.2f));
+    CHECK(ruby(*engine, "Settings.save") == "true");
+    CHECK(ruby(*engine, "Settings.resolutions") == "[]");  // shown by nobody: no window to size
+  }
+  testing::RecordingAudio next_run;
+  auto again = sandbox_keeping_settings(settings, next_run);
+  CHECK(ruby(*again, "Settings.quality") == "low");
+  CHECK(ruby(*again, "Settings.render_scale") == "0.75");
+  CHECK(ruby(*again, "Settings.vsync") == "false");
+  CHECK(next_run.master_volume() == doctest::Approx(0.5f));
+  std::filesystem::remove(settings);
+}

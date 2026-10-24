@@ -16,8 +16,10 @@ Vec3 copy_tint(const ScatterSet& set, std::size_t copy) {
 }  // namespace
 
 void Renderer::Impl::lay_out_scattered(const Scattered& scattered) {
-  if (scattered.version() == scatter_version) return;
+  const render_detail::ScatterQuality wanted{quality.scatter_density, quality.scatter_distance};
+  if (laid_out_as(scattered.version(), wanted)) return;
   scatter_version = scattered.version();
+  scatter_quality = wanted;
   temporal.history_valid = false;  // every object's record moves: none would find its last frame's
   scatter_layouts.clear();
   std::size_t next = 0;
@@ -25,9 +27,15 @@ void Renderer::Impl::lay_out_scattered(const Scattered& scattered) {
   scattered_records = next;
 }
 
-std::size_t Renderer::Impl::lay_out_set(const ScatterSet& set, std::size_t first) {
+std::size_t Renderer::Impl::lay_out_set(const ScatterSet& authored, std::size_t first) {
+  const ScatterSet set = render_math::thinned_set(authored, scatter_quality.density, scatter_quality.reach);
   for (const ScatterLevel& level : scatter_levels(set)) first = lay_out_level(set, level, first);
   return first;
+}
+
+bool Renderer::Impl::laid_out_as(std::uint64_t version, const render_detail::ScatterQuality& wanted) const {
+  return version == scatter_version && wanted.density == scatter_quality.density &&
+         wanted.reach == scatter_quality.reach;
 }
 
 std::size_t Renderer::Impl::lay_out_level(const ScatterSet& set, const ScatterLevel& level, std::size_t first) {

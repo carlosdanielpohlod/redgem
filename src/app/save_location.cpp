@@ -17,6 +17,8 @@ constexpr const char* kSavesFolder = "saves";
 constexpr const char* kSavesByIdFolder = "by-id";
 constexpr const char* kSaveExtension = ".json";
 constexpr char kNameJoiner = '-';
+// Before the settings key of a game with no id: no id has a ':', so no id is taken for it.
+constexpr const char* kFolderKeyMark = "folder:";
 
 // The folder a game is known by: a built game's files sit in a folder called "game", and it is
 // the folder around that one.
@@ -31,13 +33,26 @@ std::filesystem::path named_folder(const std::filesystem::path& game_dir) {
 
 std::filesystem::path saves_folder() { return platform::user_data_dir() / kSavesFolder; }
 
+namespace {
+
+// What a game with no id goes by: its folder's name, and a few digits made from where the folder
+// is (two games in folders of the same name do not share a save).
+std::string folder_name(const std::filesystem::path& game_dir) {
+  const std::filesystem::path named = named_folder(game_dir);
+  return named.filename().string() + kNameJoiner + name_digits(named.generic_string());
+}
+
+}  // namespace
+
 std::filesystem::path save_file_for(const std::filesystem::path& game_dir) {
   const std::string id = read_game_settings(game_dir).id;
   if (!id.empty()) return saves_folder() / kSavesByIdFolder / (id + kSaveExtension);
-  const std::filesystem::path named = named_folder(game_dir);
-  // (With a few digits made from where the game is: two games in folders of the same name do not share a save.)
-  const std::string place_digits = name_digits(named.generic_string());
-  return saves_folder() / (named.filename().string() + kNameJoiner + place_digits + kSaveExtension);
+  return saves_folder() / (folder_name(game_dir) + kSaveExtension);
+}
+
+std::string game_settings_key(const std::filesystem::path& game_dir) {
+  const std::string id = read_game_settings(game_dir).id;
+  return id.empty() ? kFolderKeyMark + folder_name(game_dir) : id;
 }
 
 }  // namespace redgem

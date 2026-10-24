@@ -199,7 +199,8 @@ The usual flow of a game is made of three things:
   `Game.load_scene(Game.scene_name)` to restart the current one.
 
 `GameMenu` is all of this, ready made: a title screen, a pause menu on Esc, P or a gamepad's
-Start, and an end screen. Put it on an object from the scene's script, and end the game from
+Start, an end screen, and a settings screen (see [A settings screen](#a-settings-screen)). Up and
+down move the focus between its buttons; Enter or a gamepad's A picks the focused one. Put it on an object from the scene's script, and end the game from
 anywhere:
 
 ```ruby
@@ -212,7 +213,7 @@ end
 GameMenu.instance.finish("You win!")
 ```
 
-Its screens are `:title`, `:pause` and `:over`. A game adds options and screens of its own:
+Its screens are `:title`, `:pause`, `:over` and `:settings`. A game adds options and screens of its own:
 
 ```ruby
 menu = GameMenu.instance
@@ -222,8 +223,37 @@ menu.screens[:pause].add_option("Credits", index: 1) { menu.show(:credits) }
 
 `back` is what the pause keys do on that screen. A label or a heading may also be a lookup,
 `-> { I18n.t("menu.credits") }`, made each time it is shown (see [Texts in several languages](i18n.md)). A screen that draws more than buttons is a
-subclass of `GameMenu::Screen` (`draw`, `space_above`, `opened`, `closed`, `typing?`): the
+subclass of `GameMenu::Screen` (`draw`, `space_above`, `opened`, `closed`, `typing?`, and `rows`
+for widgets of its own that take the focus before its buttons, with `focus`): the
 platformer's multiplayer screen, `games/platformer/scripts/multiplayer_screen.rb`, is one.
+
+## A settings screen
+
+`GameMenu` has one ready, reached from its title and pause screens: window mode, resolution,
+render scale, vsync, frame-rate cap, quality and master volume. A game builds its own with
+`Settings` and the widgets of `UI`, which the keyboard and a gamepad work through a focus:
+
+```ruby
+def update(_dt)
+  @focus ||= UI::Focus.new
+  @focus.update(3)   # up and down (arrows, D-pad) move it among three widgets
+  box = { x: 40, width: 480, height: 44 }
+  on = UI.toggle("VSync", Settings.vsync, y: 100, focused: @focus.at?(0), **box)
+  Settings.vsync = on unless on == Settings.vsync
+  names = %w[Low Medium High Ultra]
+  index = Settings::QUALITIES.index(Settings.quality) || 3
+  picked = UI.choice("Quality", names, index, y: 152, focused: @focus.at?(1), **box)
+  Settings.quality = Settings::QUALITIES[picked] unless picked == index
+  volume = UI.slider("Volume", Settings.volume, y: 204, focused: @focus.at?(2), **box)
+  Settings.volume = volume unless volume == Settings.volume
+end
+```
+
+Each change shows at once; `Settings.save` keeps them for the game's next runs. A quality caps
+what the level's environment asks for (samples a pixel, temporal anti-aliasing, shadow cascades
+and distance, scattered copies and how far they show, the sky picture's size, ambient occlusion,
+bloom): `:ultra` draws the level as it was made, and nothing ever gets more than it asked for.
+What the graphics card cannot do is left out whatever the quality.
 
 ## Play sounds and music
 

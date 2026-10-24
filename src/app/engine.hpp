@@ -47,6 +47,9 @@ struct EngineOptions {
   // Every frame advances the game by exactly one fixed step, however long it really took: the same
   // run gives the same game every time. Nothing else selects it.
   bool fixed_step = false;
+  // Where the player's choices of how the game is shown are kept (Settings, see game_display.hpp).
+  // Empty: the user's settings file.
+  std::filesystem::path settings_file;
   // Where Save keeps the game's data. Empty: the game's file in the user's RedGem folder.
   std::filesystem::path save_file;
   // What Save keeps the game's data in, kept by whoever runs the engine, which it has to outlive
@@ -119,6 +122,10 @@ class Engine {
   void open_presenter(const GameSettings& settings);
   void open_audio();
   void open_saves();
+  // The player's display settings, as they were kept; and what changes and keeps them (Settings).
+  void open_display();
+  void connect_display();
+  void follow_players_volume(float volume);
   // Whether the game is a room of a dedicated server (see EngineOptions::server_room).
   bool serves_a_room() const { return !options_.server_room.empty(); }
   void fill_context(const std::string& game_title);
@@ -180,6 +187,9 @@ class Engine {
   net::HttpClient http_;  // (its requests still on their way are given up with the engine)
   FixedClock clock_;
   Stopwatch network_watch_;  // the real time between the network's polls
+  // The master volume the player's settings last set: only a change of it is passed on (the
+  // volume a game sets by itself stays while the player changes something else).
+  float players_volume_ = kPlayersFullVolume;
 };
 
 }  // namespace redgem

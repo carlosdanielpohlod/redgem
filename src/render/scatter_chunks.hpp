@@ -51,6 +51,11 @@ struct ScatterLayout {
   std::vector<ScatterChunk> chunks;
   std::vector<Vec3> centers;
 };
+// A set as a quality draws it: `density` (0..1) of its copies, spread evenly over the order they
+// were placed in (which is at random), and drawn `reach` (0..1) times as far. At 1 and 1 it is the
+// set itself.
+ScatterSet thinned_set(const ScatterSet& set, float density, float reach);
+
 // Lays a set's copies out from record `first` on, a mesh with `bounds`. Fills `order` as
 // chunk_copies does.
 ScatterLayout lay_out_copies(const ScatterSet& set, const Bounds& bounds, std::size_t first,
