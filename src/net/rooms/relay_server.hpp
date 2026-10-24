@@ -25,6 +25,10 @@ inline constexpr std::size_t kMaxRelayBufferedBytes = 256 * 1024 * 1024;
 // a few of the longest messages. Far more than a game says; a machine past it is let go.
 inline constexpr float kRelayBytesPerSecond = 1024.0f * 1024.0f;
 inline constexpr float kRelayBurstBytes = 4.0f * kRelayBytesPerSecond;
+// What each message costs on top of its bytes: passing one on is work whatever its size, so a
+// machine sending floods of tiny ones runs out as one sending big ones does. (Poses of dozens of
+// objects at every frame stay far below it.)
+inline constexpr std::size_t kRelayMessageCostBytes = 64;
 // Machines a relay serves at once, and rooms it holds.
 inline constexpr std::size_t kMaxRelayConnections = 1024;
 inline constexpr std::size_t kMaxRelayRooms = 256;
@@ -119,8 +123,8 @@ class RelayServer {
   // What time passing does to a member not in a room yet: given up on when it keeps quiet, or
   // when its room's game does not decide on it.
   void wait_on(Member& member, float seconds);
-  // Takes what arrived out of what the member may send; over it, the member is let go.
-  void charge(Member& member, std::size_t bytes);
+  // Takes what arrived out of what the member may send; over it, the member is let go (false).
+  bool charge(Member& member, std::size_t bytes);
   // Lets go of the newest machines with much waiting, while the relay holds more than it may.
   void shed_load();
   void handle(Member& member, const nlohmann::json& message);
@@ -156,13 +160,21 @@ class RelayServer {
   bool missed_by_a_room(const Member& member) const;
   void tell_room(const std::string& room, int except, const nlohmann::json& message);
   std::vector<Member*> members_of(const std::string& room);
+  // Whoever entered a room and was not dropped yet (gone or not); nobody for a room not open.
+  const std::vector<Member*>& entered(const std::string& room) const;
+  // Puts a member in room `code`, and in its room's list.
+  void place_in(Member& member, const std::string& code);
+  // Takes a member that is being dropped out of its room's list.
+  void take_out_of_room(const Member& member);
   // A code no open room has; empty when none was found.
   std::string new_room_code() const;
 
   Socket listener_;
   std::uint16_t port_ = 0;
   std::vector<std::unique_ptr<Member>> members_;
-  std::map<std::string, bool> rooms_;  // the codes of the open rooms
+  // The open rooms by code, each with whoever entered it: what a message passed on looks through,
+  // instead of every machine on the relay. (Those who went are taken out as they are dropped.)
+  std::map<std::string, std::vector<Member*>> rooms_;
   CodeGuessers guessers_;
   std::size_t max_buffered_bytes_ = kMaxRelayBufferedBytes;
   RelayLimits limits_;

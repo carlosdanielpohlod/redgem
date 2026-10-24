@@ -160,3 +160,13 @@ TEST_CASE("UTF-8 is read to the letter: every first byte, every range of the sec
     CHECK_FALSE(wire::valid_utf8(bad));
   }
 }
+
+// REDGEM_LOG_MESSAGES=1 writes every message to the log: a join's token must not be among them.
+TEST_CASE("a message as the log shows it hides the credentials a join carries") {
+  const nlohmann::json hello = {{wire::kKind, wire::kHello}, {wire::kAuth, {{"token", "secret-token"}}}};
+  const std::string shown = wire::log_text(hello);
+  CHECK(shown.find("secret-token") == std::string::npos);
+  CHECK(shown.find("(hidden)") != std::string::npos);
+  const nlohmann::json plain = {{wire::kKind, wire::kHello}};
+  CHECK(wire::log_text(plain) == plain.dump());
+}

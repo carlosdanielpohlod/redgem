@@ -36,6 +36,14 @@ std::unique_ptr<SaveDatabase> opened(const std::filesystem::path& file) {
   return database;
 }
 
+#ifndef _WIN32  // (on Windows a file takes its folder's ACL: see KNOWN_LIMITATIONS.md)
+// Whether only a file's owner may read or write it.
+bool owners_only(const std::filesystem::path& file) {
+  const auto mine = std::filesystem::perms::owner_read | std::filesystem::perms::owner_write;
+  return (std::filesystem::status(file).permissions() & std::filesystem::perms::all) == mine;
+}
+#endif
+
 }  // namespace
 
 TEST_CASE("a server's saves are written one key at a time, and are there after a restart") {
@@ -153,4 +161,34 @@ TEST_CASE("a database in memory keeps values for this run only, and one that can
   std::string error;
   CHECK(SaveDatabase::open(temp.database, error) == nullptr);
   CHECK_FALSE(error.empty());
+}
+
+#ifndef _WIN32
+// Players' saves are nobody else's on the machine: the database is its owner's alone, and so are
+// the files sqlite keeps beside it.
+TEST_CASE("a server's save database is made readable by its owner only") {
+  const TempData temp;
+  opened(temp.database)->set("best", 1);
+  CHECK(owners_only(temp.database));
+  std::filesystem::permissions(temp.database, std::filesystem::perms::all, std::filesystem::perm_options::add);
+  const std::filesystem::path log = temp.database.string() + "-wal";
+  std::ofstream(log, std::ios::binary);  // an empty log, as a run that ended may leave
+  std::filesystem::permissions(log, std::filesystem::perms::all, std::filesystem::perm_options::add);
+  const auto again = opened(temp.database);  // ones left open to everyone are closed again
+  CHECK(owners_only(temp.database));
+  REQUIRE(std::filesystem::exists(log));
+  CHECK(owners_only(log));
+}
+#endif
+
+TEST_CASE("a database whose saves table is not the server's does not open as if it could be used") {
+  const TempData temp;
+  std::filesystem::create_directories(temp.database.parent_path());
+  sqlite3* other = nullptr;
+  REQUIRE(sqlite3_open(temp.database.string().c_str(), &other) == SQLITE_OK);
+  REQUIRE(sqlite3_exec(other, "CREATE TABLE saves (key TEXT)", nullptr, nullptr, nullptr) == SQLITE_OK);
+  sqlite3_close(other);
+  std::string error;
+  CHECK(SaveDatabase::open(temp.database, error) == nullptr);
+  CHECK(error.find("no such column") != std::string::npos);
 }

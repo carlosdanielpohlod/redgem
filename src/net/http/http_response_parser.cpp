@@ -40,6 +40,10 @@ void HttpResponseParser::end_of_stream() {
   fail("the connection ended before the whole answer came");
 }
 
+void HttpResponseParser::cut_off() {
+  if (state_ == State::Reading) fail("the connection was cut before the server said the answer was whole");
+}
+
 HttpResponse HttpResponseParser::take() { return std::move(response_); }
 
 void HttpResponseParser::choose_framing() {

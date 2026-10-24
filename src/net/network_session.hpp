@@ -17,11 +17,18 @@
 
 namespace redgem::net {
 
-// What a machine in a dedicated server's room may send: a game's talk many times over, far less
-// than a flood (on a server, every message it sends is work for the game's scripts); and at once,
-// one of the longest messages and more.
+// What a machine in a game hosted here (by a player or a dedicated server) may send: a game's talk
+// many times over, far less than a flood (every message it sends is work for the host's scripts);
+// and at once, one of the longest messages and more.
 inline constexpr float kServedBytesPerSecond = 256.0f * 1024.0f;
 inline constexpr float kServedBurstBytes = 2.0f * kMaxFrameBytes;
+// ... and how many messages, however short: poses of dozens of objects at every frame, and room
+// for a burst of them, where a flood of tiny messages sends tens of thousands a second.
+inline constexpr float kServedMessagesPerSecond = 8192.0f;
+inline constexpr float kServedBurstMessages = 16384.0f;
+// The longest the host standing still (loading a level) is forgiven: what the others sent at their
+// own pace meanwhile, arriving at once, is not a flood.
+inline constexpr float kMostForgivenStallSeconds = 10.0f;
 // A machine in a dedicated server's room that says nothing to the game for this long (only "I am
 // here") is let go: a place in a room is for playing.
 inline constexpr float kServedIdleSeconds = 300.0f;
@@ -109,6 +116,10 @@ class NetworkSession {
 
   // Moves messages in and out. `seconds` since the last call, for giving up on a join.
   std::vector<NetworkEvent> poll(float seconds);
+  // This machine stood still for `seconds` past what its polls were told (a level loading): what
+  // the machines that joined it sent meanwhile is not held against them (up to
+  // kMostForgivenStallSeconds).
+  void forgive_stall(float seconds);
   // Sends a message to everyone else (kEveryone) or to one peer. False when offline or when there
   // is no such peer.
   bool send(const std::string& name, const nlohmann::json& data, int to = kEveryone);
@@ -153,7 +164,8 @@ class NetworkSession {
   struct Link {
     Connection connection;
     int peer = 0;  // 0 on the host until the newcomer said hello and was let in
-    ByteAllowance allowance{kServedBytesPerSecond, kServedBurstBytes};  // on a dedicated server
+    ByteAllowance allowance{kServedBytesPerSecond, kServedBurstBytes};       // on the game's host
+    ByteAllowance messages{kServedMessagesPerSecond, kServedBurstMessages};  // ... counted in messages
     float idle_for = 0.0f;  // seconds since it last said something to the game, on a dedicated server
     int asking_as = 0;      // the id a newcomer would have, while the game decides on it
     int ticket = 0;         // ... and what the decision names
@@ -187,9 +199,13 @@ class NetworkSession {
   void start_hosting();
   // One link's turn in a poll: what arrived is read and handled, what waits is sent.
   void serve(Link& link, float seconds, std::vector<NetworkEvent>& events);
-  // What a dedicated server's room holds its machines to: one that sends more than it may, or
-  // says nothing to the game for too long, is let go.
+  // What the game's host holds the machines that joined it to: one that sends more bytes or
+  // messages than it may is let go, and on a dedicated server, one that says nothing to the game
+  // for too long. (A guest trusts its host; a room on a relay is held to it by the relay.)
   void police(Link& link, std::size_t bytes, float seconds);
+  // Counts one message that arrived on the link against what it may send: false, with the link
+  // let go, for the one past it.
+  bool police_message(Link& link);
   // The newcomers' turn in a poll: those connecting are taken in, those the game is deciding on wait.
   void tend_newcomers(float seconds);
   void receive_newcomers(float seconds);

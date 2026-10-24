@@ -71,6 +71,9 @@ void RoomThread::play_or_close(Room& room, float seconds) {
 
 void RoomThread::play(Room& room, float seconds) {
   if (!room.game) room.game = open_game(room.slot->code());
+  // Before anyone is let in: what a behaviour's start sets up (Network.authenticate) decides about
+  // the room's very first player too, not only about those who come after its first frame.
+  room.game->scripts().start_pending();
   room.slot->admit_arrivals(room.game->network());
   room.slot->run_visits(*room.game);
   room.game->frame(seconds);

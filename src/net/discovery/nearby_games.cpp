@@ -1,12 +1,12 @@
 #include "net/discovery/nearby_games.hpp"
 
 #include <algorithm>
-#include <cstdlib>
 #include <limits>
 
 #include <nlohmann/json.hpp>
 
 #include "core/safe_path.hpp"
+#include "net/private_address.hpp"
 #include "net/socket/socket.hpp"
 #include "net/wire.hpp"
 #include "net/wire_codec.hpp"
@@ -22,34 +22,9 @@ constexpr const char* kPortKey = "port";
 constexpr const char* kPlayersKey = "players";
 constexpr std::size_t kMaxGames = 32;
 constexpr int kMaxGamesPerAddress = 4;  // one machine cannot fill the list by itself
-// The first numbers of the addresses machines have on a local network (and of this machine itself).
-constexpr int kThisMachineNet = 127;
-constexpr int kPrivateNetA = 10;
-constexpr int kPrivateNetB = 172;
-constexpr int kPrivateNetBFrom = 16;
-constexpr int kPrivateNetBTo = 31;
-constexpr int kPrivateNetC = 192;
-constexpr int kPrivateNetCSecond = 168;
-constexpr int kLinkLocalNet = 169;
-constexpr int kLinkLocalSecond = 254;
-
 constexpr std::size_t kMaxGameNameBytes = 48;
 constexpr int kMaxPlayersShown = 99;
 constexpr int kLargestPort = 65535;
-constexpr char kAddressDot = '.';
-constexpr int kDecimal = 10;
-
-// The first two numbers of an address ("192.168.0.12" -> 192, 168); false when it does not start with two.
-bool leading_numbers(const std::string& address, long& first, long& second) {
-  char* after_first = nullptr;
-  first = std::strtol(address.c_str(), &after_first, kDecimal);
-  const bool number_then_dot = after_first != address.c_str() && *after_first == kAddressDot;
-  if (!number_then_dot) return false;
-  const char* second_text = after_first + 1;
-  char* after_second = nullptr;
-  second = std::strtol(second_text, &after_second, kDecimal);
-  return after_second != second_text;
-}
 
 bool has_text(const nlohmann::json& answer, const char* key) { return answer.contains(key) && answer[key].is_string(); }
 
@@ -130,17 +105,8 @@ bool room_for(const std::vector<NearbyGame>& games, const NearbyGame& game) {
 
 }  // namespace
 
-bool nearby_address(const std::string& address) {
-  long first = 0;
-  long second = 0;
-  if (!leading_numbers(address, first, second)) return false;
-  return first == kThisMachineNet || first == kPrivateNetA || (first == kPrivateNetC && second == kPrivateNetCSecond) ||
-         (first == kPrivateNetB && second >= kPrivateNetBFrom && second <= kPrivateNetBTo) ||
-         (first == kLinkLocalNet && second == kLinkLocalSecond);
-}
-
 bool search_to_answer(const std::string& message, const std::string& from) {
-  return message == kSearchQuestion && nearby_address(from);
+  return message == kSearchQuestion && is_private_address(from);
 }
 
 std::string search_answer(const std::string& name, std::uint16_t game_port, int players) {
@@ -154,7 +120,7 @@ std::string search_answer(const std::string& name, std::uint16_t game_port, int 
 }
 
 std::optional<NearbyGame> game_from_answer(const std::string& message, const std::string& from) {
-  if (!nearby_address(from)) return std::nullopt;  // a game on this network is not heard of from far away
+  if (!is_private_address(from)) return std::nullopt;  // a game on this network is not heard of from far away
   const auto answer = wire::unpacked(message);
   if (!answer || !from_redgem(*answer)) return std::nullopt;
   if (!wire::speaks_our_protocol(*answer)) return game_of_another_protocol(*answer, from);

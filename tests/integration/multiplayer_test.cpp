@@ -75,6 +75,8 @@ struct Lan {
   bool level_from_files = false;
   // A relay the machines may meet on, kept going with them.
   std::unique_ptr<net::RelayServer> relay;
+  // The real time as the machines' networks read it, when not the clock's (set before they start).
+  Stopwatch::Reading network_time;
 
   Lan() { std::filesystem::remove_all(dir); }
   ~Lan() {
@@ -87,6 +89,7 @@ struct Lan {
     options.game_dir = fixture("games/sandbox");
     options.fixed_step = true;
     if (!level_from_files) options.scene = &scene;
+    if (network_time) options.network_time = network_time;
     options.save_file = dir / ("save" + std::to_string(machines.size()) + ".json");
     auto created = Engine::create(options);
     if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
@@ -195,6 +198,62 @@ TEST_CASE("scripts send each other named messages carrying Ruby values") {
   CHECK_FALSE(host->scripts().eval("Network.emit(:hit, Scene.find('Ball'))", "bad.rb").ok);
   CHECK_FALSE(host->scripts().eval("Network.emit(:hit, Float::NAN)", "bad.rb").ok);
   CHECK(ruby(*host, "Network.emit(:hit, 1, to: 9)") == "false");
+}
+
+// A player hosting is held to what a dedicated server holds its players to.
+TEST_CASE("a machine that floods a game a player hosts is let go") {
+  Lan lan;
+  lan.network_time = [] { return 0.0; };  // (as below: only the burst counts)
+  auto [host, guest] = lan.host_and_guest();
+  ruby(*guest, "64.times { Network.emit(:big, 'x' * 65_536) }");  // more bytes at once than any game sends
+  REQUIRE(lan.until([guest = guest] { return guest->network().state() == net::NetworkSession::State::Offline; }));
+  CHECK(ruby(*guest, "$log.inspect") == "[:connected, :disconnected]");
+  REQUIRE(lan.until([host = host] { return ruby(*host, "Network.peers.inspect") == "[]"; }));
+}
+
+TEST_CASE("a machine that floods a game a player hosts with tiny messages is let go") {
+  Lan lan;
+  // Time stands still for the networks: what a slow machine takes to pass the messages on earns
+  // the guest nothing back, so the burst alone is what it may send.
+  lan.network_time = [] { return 0.0; };
+  auto [host, guest] = lan.host_and_guest();
+  // Few bytes, far more messages at once than poses of dozens of objects make.
+  ruby(*host, "$got = 0; Network.on(:t) { $got += 1 }");
+  ruby(*guest, "20_000.times { Network.emit(:t) }");
+  REQUIRE(lan.until([guest = guest] { return guest->network().state() == net::NetworkSession::State::Offline; }));
+  CHECK(ruby(*host, "Network.peers.inspect") == "[]");
+  // Every message within the burst was heard (its hello took one); the one past it, which let the
+  // guest go, was not.
+  constexpr int kJoinMessages = 1;
+  CHECK(ruby(*host, "$got") == std::to_string(static_cast<int>(net::kServedBurstMessages) - kJoinMessages));
+}
+
+// A host loading a level stands still while its guests go on: what they sent meanwhile arrives at
+// once, and is no flood.
+TEST_CASE("a guest that goes on at a game's pace while the host stands still is not let go") {
+  constexpr int kStallFrames = 360;      // six seconds of the guest's frames while the host stands still
+  constexpr int kAfterFrames = 120;      // and two more with both playing
+  constexpr int kMessagesPerFrame = 60;  // 3600 a second: poses of dozens of objects
+  Lan lan;
+  double clock = 0.0;
+  lan.network_time = [&clock] { return clock; };
+  auto [host, guest] = lan.host_and_guest();
+  ruby(*host, "$got = 0; Network.on(:t) { $got += 1 }");
+  const std::string talk = std::to_string(kMessagesPerFrame) + ".times { Network.emit(:t) }";
+  const auto frame = [&](bool host_plays) {
+    clock += config::kFixedDeltaSeconds;
+    ruby(*guest, talk);
+    guest->frame(config::kFixedDeltaSeconds);
+    if (host_plays) host->frame(config::kFixedDeltaSeconds);
+  };
+  for (int i = 0; i < kStallFrames; ++i) frame(false);
+  // Both play on until the host heard all that was sent while it stood still (how fast that comes
+  // is the machine's), and some more.
+  const auto heard_the_stall = [&] { return std::stoi(ruby(*host, "$got")) >= kStallFrames * kMessagesPerFrame; };
+  for (int i = 0; i < kMaxRounds && !heard_the_stall(); ++i) frame(true);
+  for (int i = 0; i < kAfterFrames; ++i) frame(true);
+  CHECK(heard_the_stall());
+  CHECK(guest->network().state() == net::NetworkSession::State::Online);
 }
 
 TEST_CASE("a hash key no script here ever used arrives as a text, and makes no new symbol") {

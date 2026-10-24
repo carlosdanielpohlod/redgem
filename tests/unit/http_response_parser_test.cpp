@@ -101,3 +101,16 @@ TEST_CASE("answers larger than a game may take are refused, early when they say 
   feed(endless_head, "HTTP/1.1 200 OK\r\n" + std::string(kMaxHttpHeadBytes + 1, 'a'));
   CHECK(endless_head.state() == State::Failed);
 }
+
+TEST_CASE("a connection cut without a goodbye leaves only an answer that said it was whole") {
+  HttpResponseParser until_the_end;
+  feed(until_the_end, "HTTP/1.1 200 OK\r\n\r\nall of it");
+  until_the_end.cut_off();
+  CHECK(until_the_end.state() == State::Failed);
+
+  HttpResponseParser measured;
+  feed(measured, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+  measured.cut_off();
+  CHECK(measured.state() == State::Done);
+  CHECK(measured.take().body == "ok");
+}

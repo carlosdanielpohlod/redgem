@@ -75,6 +75,11 @@ class Channel {
            result == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET;
   }
 
+  // TLS's goodbye, when the connection is through TLS.
+  void say_goodbye() {
+    if (secure_) mbedtls_ssl_close_notify(&ssl_);
+  }
+
   void write_all(const std::string& bytes, const std::atomic<bool>& stop) {
     std::vector<std::uint8_t> left(bytes.begin(), bytes.end());
     while (!left.empty() && !stop.load()) {
@@ -217,6 +222,7 @@ void HttpTestServer::serve() {
 }
 
 void HttpTestServer::serve_one(net::Socket socket) {
+  if (hang_up_.load()) return;  // (the socket closes as it goes)
   Channel channel(std::move(socket), tls_ ? &tls_->config : nullptr);
   std::string request;
   while (!stopping() && !whole(request)) {
@@ -236,6 +242,7 @@ void HttpTestServer::serve_one(net::Socket socket) {
     }
   }
   channel.write_all(answer_, stop_);
+  if (goodbye_.load()) channel.say_goodbye();
 }
 
 std::string http_answer(const std::string& status, const std::string& body, const std::string& extra_headers) {

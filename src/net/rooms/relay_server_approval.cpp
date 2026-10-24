@@ -51,9 +51,10 @@ void RelayServer::await_verdict(Member& member, float seconds) {
 }
 
 RelayServer::Member* RelayServer::asking_member(const std::string& room, int id) {
-  const auto found = std::find_if(members_.begin(), members_.end(),
-                                  [&room, id](const auto& member) { return member->asks_as(room, id); });
-  return found != members_.end() ? found->get() : nullptr;
+  const std::vector<Member*>& inside = entered(room);
+  const auto found = std::find_if(inside.begin(), inside.end(),
+                                  [&room, id](const Member* member) { return member->asks_as(room, id); });
+  return found != inside.end() ? *found : nullptr;
 }
 
 RelayServer::Member* RelayServer::opener_of(const std::string& room) {
@@ -65,7 +66,7 @@ RelayServer::Member* RelayServer::opener_of(const std::string& room) {
 
 std::vector<int> RelayServer::seats_taken(const std::string& room) const {
   std::vector<int> taken;
-  for (const auto& member : members_) {
+  for (const Member* member : entered(room)) {
     if (member->holds_seat_in(room)) taken.push_back(member->seat());
   }
   return taken;

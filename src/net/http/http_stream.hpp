@@ -18,6 +18,7 @@ enum class Flow {
   WantRead,   // nothing until more arrives
   WantWrite,  // nothing until the connection takes more
   Ended,      // the other side closed it
+  Cut,        // it ended without the other side saying so (TLS's close_notify): the end may be an attacker's
   Failed      // the connection broke, or the other side is not who it claims (see error())
 };
 

@@ -36,11 +36,28 @@ std::vector<std::string> NetworkSession::addresses() const {
 }
 
 void NetworkSession::police(Link& link, std::size_t bytes, float seconds) {
-  if (!serving()) return;
+  if (!relaying()) return;
   link.allowance.refill(seconds);
-  link.idle_for += seconds;
+  link.messages.refill(seconds);
   if (!link.allowance.charge(bytes)) link.connection.close();  // no game talks this much: a flood
+  if (!serving()) return;
+  link.idle_for += seconds;
   if (link.idle_for > kServedIdleSeconds) link.connection.close();
+}
+
+bool NetworkSession::police_message(Link& link) {
+  if (!relaying()) return true;
+  if (link.messages.charge(1)) return true;
+  link.connection.close();
+  return false;
+}
+
+void NetworkSession::forgive_stall(float seconds) {
+  const float forgiven = std::min(seconds, kMostForgivenStallSeconds);
+  for (Link& link : links_) {
+    link.allowance.forgive(forgiven);
+    link.messages.forgive(forgiven);
+  }
 }
 
 }  // namespace redgem::net

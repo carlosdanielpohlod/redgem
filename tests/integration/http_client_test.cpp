@@ -19,6 +19,7 @@ constexpr int kCreated = 201;
 constexpr std::chrono::milliseconds kPollPause{5};
 constexpr std::chrono::seconds kLongestWait{10};
 constexpr float kShortTimeout = 0.3f;
+constexpr std::chrono::seconds kHangUpNoticed{2};  // far less than a request's own timeout (15 s)
 
 net::HttpRequest request(const std::string& method, const std::string& url) {
   net::HttpRequest made;
@@ -96,6 +97,36 @@ TEST_CASE("https is spoken with a server whose certificate is trusted, and refus
   CHECK(refused.status == 0);
   CHECK(contains(refused.error, "certificate"));
   CHECK(server.requests() == requests_before);
+}
+
+// Over TLS only the server's close_notify says the connection's end is its own: an answer that
+// lasts until the end, cut without one, could be cut short by anyone on the way.
+TEST_CASE("an https answer that lasts until the connection ends is whole only when the server says goodbye") {
+  const std::string until_the_end = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nall of it";
+  HttpTestServer cut(HttpTestServer::Kind::Secure, until_the_end);
+  net::HttpClient client(net::TrustStore::from_pem(cut.certificate_pem()));
+  const net::HttpResponse refused = answer(client, start(client, request("GET", cut.url("/"))));
+  CHECK(refused.status == 0);
+  CHECK(contains(refused.error, "cut before the server said the answer was whole"));
+
+  HttpTestServer polite(HttpTestServer::Kind::Secure, until_the_end);
+  polite.say_goodbye();
+  net::HttpClient trusting(net::TrustStore::from_pem(polite.certificate_pem()));
+  const net::HttpResponse whole = answer(trusting, start(trusting, request("GET", polite.url("/"))));
+  CHECK_MESSAGE(whole.error.empty(), whole.error);
+  CHECK(whole.body == "all of it");
+}
+
+// The connection ending while the request goes (here in the TLS handshake) ends the request.
+TEST_CASE("an https server that hangs up before the request went fails it at once") {
+  HttpTestServer server(HttpTestServer::Kind::Secure, http_answer("200 OK", "never"));
+  server.hang_up_at_once();
+  net::HttpClient client(net::TrustStore::from_pem(server.certificate_pem()));
+  const auto before = std::chrono::steady_clock::now();
+  const net::HttpResponse refused = answer(client, start(client, request("GET", server.url("/"))));
+  CHECK(refused.status == 0);
+  CHECK_FALSE(refused.error.empty());
+  CHECK(std::chrono::steady_clock::now() - before < kHangUpNoticed);
 }
 
 TEST_CASE("a server that never answers is given up on at the request's timeout") {

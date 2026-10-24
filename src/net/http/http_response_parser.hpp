@@ -19,6 +19,9 @@ class HttpResponseParser {
   void feed(const char* bytes, std::size_t count);
   // The connection ended: an answer that lasts until then is whole, any other is cut short.
   void end_of_stream();
+  // The connection ended in a way that does not vouch for its end (TLS with no close_notify): only
+  // an answer whose length or chunks said it was whole is.
+  void cut_off();
   State state() const { return state_; }
   // The answer once Done; once Failed, one with the reason as its error.
   HttpResponse take();

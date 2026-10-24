@@ -145,6 +145,7 @@ void NetworkSession::serve(Link& link, float seconds, std::vector<NetworkEvent>&
   while (!offline()) {
     const auto message = link.connection.next_message();
     if (!message) break;
+    if (!police_message(link)) break;  // the message past what the machine may send goes nowhere
     handle(link, *message, events);
   }
 }
