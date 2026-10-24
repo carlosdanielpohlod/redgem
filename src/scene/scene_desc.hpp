@@ -30,8 +30,8 @@ struct Color {
 };
 
 struct ImageData {
-  std::vector<std::uint8_t> encoded;  // PNG/JPEG bytes as stored in the .glb
-  std::string file_extension;         // ".png" or ".jpg", what raylib's decoder expects
+  std::vector<std::uint8_t> encoded;  // PNG/JPEG/static WebP bytes as stored in the .glb
+  std::string file_extension;         // file-type hint for the image decoder
 };
 
 enum class AlphaMode { Opaque, Mask, Blend };

@@ -19,11 +19,11 @@ struct ImageSize {
   std::uint32_t height = 0;
 };
 
-// The size a PNG or JPEG file says its picture has; nullopt for anything that is neither, or
-// whose header is cut short. (glTF pictures are one or the other.)
+// The size a PNG, JPEG or static WebP file says its picture has; nullopt for unsupported
+// formats, animation or a header that is cut short.
 std::optional<ImageSize> encoded_image_size(const std::uint8_t* data, std::size_t size);
 
-// Whether an encoded picture may be decoded: a PNG or JPEG within the limits above, with at least
+// Whether an encoded picture may be decoded: PNG, JPEG or static WebP within the limits above, with at least
 // one pixel.
 bool decodable_image(const std::uint8_t* data, std::size_t size);
 

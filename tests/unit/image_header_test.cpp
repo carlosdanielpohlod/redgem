@@ -55,7 +55,7 @@ TEST_CASE("the size of a PNG and of a JPEG is read from its first bytes") {
   CHECK(jpeg_size->height == kHeight);
 }
 
-TEST_CASE("what is not a PNG or JPEG, or is cut short, has no size") {
+TEST_CASE("unsupported images and truncated PNG or JPEG headers have no size") {
   const std::vector<std::uint8_t> bitmap = {'B', 'M', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   CHECK_FALSE(encoded_image_size(bitmap.data(), bitmap.size()).has_value());
   CHECK_FALSE(encoded_image_size(nullptr, 0).has_value());

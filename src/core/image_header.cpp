@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <array>
 
+#include "core/webp_image.hpp"
+
 namespace redgem {
 namespace {
 
@@ -93,7 +95,8 @@ std::optional<ImageSize> jpeg_size(const std::uint8_t* data, std::size_t size) {
 std::optional<ImageSize> encoded_image_size(const std::uint8_t* data, std::size_t size) {
   if (data == nullptr) return std::nullopt;
   if (const std::optional<ImageSize> png = png_size(data, size)) return png;
-  return jpeg_size(data, size);
+  if (const auto jpeg = jpeg_size(data, size)) return jpeg;
+  return webp_image_size(data, size);
 }
 
 bool decodable_image(const std::uint8_t* data, std::size_t size) {

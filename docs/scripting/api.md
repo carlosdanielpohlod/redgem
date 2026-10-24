@@ -112,3 +112,17 @@ codepoints; the cache holds four named game faces beside the built-in face, with
 font file. Changing games clears the named-face cache. New glyphs rebuild the face's atlas only
 when first requested. Text is drawn as individual glyphs: bidirectional layout, complex-script
 shaping and automatic fallback chains are not implemented.
+
+## Static WebP images
+
+Images in PNG, JPEG and static WebP are accepted in scene materials, `UI.image`, particles and
+sky pictures. Names without an extension look for `.webp` after the existing PNG/JPEG choices.
+Lossless WebP retains its RGBA pixels, including transparency. Scene imports also support
+`EXT_texture_webp`, using its WebP image when supplied and retaining the plain image for
+unsupported Basis/KTX2 textures.
+
+The same limits apply before decoding: at most 8192 pixels per side and 256 MB of encoded data,
+with decoded scene-image sizes included in the aggregate scene budget. Invalid and animated WebP
+use the existing missing-image checkerboard (a missing sky keeps its normal fallback). Animated
+WebP and KTX2/Basis are not supported. WebP reduces file storage; it is decoded to regular pixels
+for rendering and does not reduce GPU texture memory through compression.
