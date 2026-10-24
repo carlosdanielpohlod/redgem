@@ -31,6 +31,8 @@ until 1.0, a release may change what games rely on (see
   kept beside it as `<name>.bak`. A damaged save is moved aside to `<name>.damaged` (never written
   over), the backup is loaded and put back in its place, and the log names both files. A save that
   cannot be read is left alone, and the game runs without saving.
+- **Water looks closer to real water**: shore foam measured along the surface, broader fine
+  detail on the waves, smoother highlights, and better refraction and wave filtering.
 - **KNOWN_LIMITATIONS.md** lists what stands between the engine and a 1.0.
 
 ### Fixed
