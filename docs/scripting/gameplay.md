@@ -448,12 +448,23 @@ with them.
 # A coin picked up: gold sparks in every direction.
 Particles.burst(transform.position, count: 24, color: :gold, glow: true)
 
-# Smoke from an exhaust: a few gray puffs a second, drifting up in a narrow cone.
-every(0.05) do
-  Particles.burst(exhaust, count: 1, color: :gray, direction: Vector3.up, spread: 20,
-                  speed: 1.0, life: 1.5, size: 0.4, gravity: -0.05)
-end
+# Smoke follows this object, from a local exhaust offset. Old puffs stay in the world.
+@smoke = Particles.emitter(game_object, rate: 20, offset: [0, 0.5, 1], color: :gray,
+                           direction: Vector3.up, spread: 20, speed: 1.0, life: 1.5,
+                           size: 0.4, gravity: -0.05)
 ```
+
+`Particles.emitter(object, rate: 24, offset: Vector3.zero, **settings)` returns a handle with
+`active?` and `stop`. It takes the burst settings below except `count`: `rate` is particles per
+game second, greater than zero and at most 4096. Offset uses the object's full world transform;
+direction follows its world rotation. Birth positions are spread along the object's movement
+between frames. Emitted particles move independently in world space, without inheriting the
+object's velocity. `Time.scale = 0` pauses emission.
+
+Destroying the object or changing scenes ends its emitters; stopping one leaves its existing
+particles to finish their lives. `Particles.clear` removes particles and emitters together. Up to
+256 emitters share the existing limit of 4096 live particles. When that limit is full, missed
+births are dropped rather than saved for a later burst. Emitter handles are never reused.
 
 | Setting | Meaning | Default |
 |---------|---------|---------|

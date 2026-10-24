@@ -166,7 +166,6 @@ not a promise of how it will be closed.
 - Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - No navigation mesh or pathfinding.
 - Cameras have no follow, orbit or shake helpers, and no `world_to_screen`.
-- Particles come in bursts only: no emitter that stays attached to an object.
 - `Save` is one key/value store per game: no slots, no saving of objects' state, no version number
   or migration hook.
 - `Game.load_scene` loads in the middle of a frame: there is no loading screen or loading in the

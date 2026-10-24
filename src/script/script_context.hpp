@@ -24,6 +24,7 @@ class HttpClient;
 }  // namespace net
 class AnimationPlayer;
 class ParticleSystem;
+class ParticleEmitters;
 
 // What a script changed on a transform; physics reacts differently to each.
 enum class TransformWrite { Position, Rotation };
@@ -73,6 +74,7 @@ struct ScriptContext {
   // The scene's animation clips (Animation) and the particles flying around (Particles).
   AnimationPlayer* animations = nullptr;
   ParticleSystem* particles = nullptr;
+  ParticleEmitters* particle_emitters = nullptr;
   // The multiplayer game this machine hosts or joined (Network).
   net::NetworkSession* network = nullptr;
   // Finding games on the local network, and being found (Network.search, Network.host).

@@ -113,6 +113,7 @@ add_executable(redgem_tests
   unit/room_choice_test.cpp
   unit/tick_pacer_test.cpp
   unit/server_command_test.cpp
+  unit/particle_emitters_test.cpp
   unit/particles_test.cpp
   unit/particle_layout_test.cpp
   unit/animation_player_test.cpp

@@ -258,6 +258,7 @@ redgem_add_library(redgem_runtime
   scene/animation/animation_player_posing.cpp
   scene/animation/animation_player_graph.cpp
   scene/camera_ray.cpp
+  scene/particle_emitters.cpp
   scene/particles.cpp
   scene/particle_look.cpp
   scene/water_geometry.cpp

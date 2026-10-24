@@ -8,6 +8,7 @@
 
 #include "render_system/render_stage.hpp"
 #include "scene/particles.hpp"
+#include "scene/particle_emitters.hpp"
 
 using namespace redgem;
 using redgem::test::Picture;
@@ -340,4 +341,38 @@ TEST_CASE("disabling particle shadows produces identical pixels before and after
     CHECK(before.pixels[i].b == after.pixels[i].b);
     CHECK(before.pixels[i].a == after.pixels[i].a);
   }
+}
+
+TEST_CASE("continuous emitter trail renders between its old and current object position") {
+  constexpr float kTravelAcross = 2.0f;
+  constexpr float kRate = 8.0f;
+  constexpr float kBirthStep = 0.125f;
+  constexpr float kTrailSize = 0.3f;
+  constexpr float kLeftOfCenter = 0.4f;
+  constexpr std::size_t kVisibleTrailPixels = 20;
+  auto desc = wall_scene(kBlack);
+  NodeDesc source;
+  source.name = "Source";
+  source.local.position = {-kTravelAcross, 0, kWellInFront};
+  desc.nodes.push_back(source);
+  Scene scene = Scene::from_desc(desc);
+  auto settings = still_particle(Vec3::zero(), {1, 0, 0});
+  settings.look.size = steady(kTrailSize);
+  ParticleSystem particles;
+  ParticleEmitters emitters;
+  const int id = emitters.create(scene, scene.handle(scene.find("Source")), settings, kRate);
+  emitters.advance(kBirthStep, scene, particles);
+  RenderStage stage;
+  stage.upload(desc);
+  const auto first = stage.draw(scene, "emitter_trail_start", &particles).find(redder_than_blue);
+  CHECK(first.count > kVisibleTrailPixels);
+  CHECK(first.across < kLeftOfCenter);
+  scene.at(scene.find("Source")).local.position.x = kTravelAcross;
+  emitters.advance(1.0f, scene, particles);
+  const auto trail = stage.draw(scene, "emitter_trail_moving", &particles).find(redder_than_blue);
+  CHECK(trail.count > first.count);
+  CHECK(trail.across > first.across);
+  CHECK(emitters.stop(id));
+  emitters.advance(1.0f, scene, particles);
+  CHECK(stage.draw(scene, "emitter_trail_stopped", &particles).find(redder_than_blue).count == trail.count);
 }

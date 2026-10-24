@@ -20,6 +20,7 @@
 #include "render/hud.hpp"
 #include "scene/animation/animation_player.hpp"
 #include "scene/particles.hpp"
+#include "scene/particle_emitters.hpp"
 #include "scene/water_interactions.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -145,6 +146,7 @@ class Engine {
   void keep_bindings();
   // Whether the game is a room of a dedicated server (see EngineOptions::server_room).
   bool serves_a_room() const { return !options_.server_room.empty(); }
+  void connect_effects();
   void fill_context(const std::string& game_title);
   // What game.json says the game is (its version, for Game.version).
   // What game.json says the game is, read once; its splash picture shown while the rest loads.
@@ -207,6 +209,7 @@ class Engine {
   int scene_generation_ = kFirstSceneGeneration;
   AnimationPlayer animations_;
   ParticleSystem particles_;
+  ParticleEmitters particle_emitters_;
   WaterInteractions water_;
   std::vector<ControlCircle> controls_;  // the touch controls of the frame being shown
   net::NetworkSession network_;
