@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "app/android/android_bundle.hpp"
+#include "app/user_settings.hpp"
 #include "app/window_presenter.hpp"
 #include "app/bundled_game.hpp"
 #include "app/game_texts.hpp"
@@ -138,6 +139,9 @@ int play_unpacked_game(const android_app* app) {
   GameWindowOptions options;
   options.game_dir = kBundledGameFolder;
   options.screen_aspect = screen_aspect(app);
+  const PlayerDisplay display = player_display(options.game_dir, user_settings_file());
+  options.display = display.display;
+  options.display_kept_in = display.kept_in;
   const RaylibInputSource devices;
   TouchInputSource touch_screen(devices);
   return play_in_window(options, touch_screen);

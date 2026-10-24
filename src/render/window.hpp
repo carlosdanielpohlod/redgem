@@ -59,12 +59,12 @@ class Window {
   float frame_seconds() const;
   // Size of the area that is drawn in.
   SurfaceSize drawing_size() const;
-  // Puts the window in the mode, at the size and at the pace those settings say (only what
-  // changed is done again).
-  void show_as(const DisplaySettings& display);
-  // Only the pace of its frames (vsync, the frame cap): for a window that is a whole screen, whose
-  // mode and size are the screen's.
+  // Puts the window in that mode, at that size (only what changes is done).
+  void reshape(WindowMode mode, SurfaceSize size);
+  // The pace of its frames: vsync and the frame cap.
   void pace(const DisplaySettings& display);
+  // The most pixels a side of a picture drawn off screen may have on its graphics card.
+  int largest_picture_side() const;
   // Size of the monitor the window is on (its own, not the one fullscreen switched it to).
   SurfaceSize monitor_size() const;
   void set_title(const std::string& title);
@@ -77,7 +77,6 @@ class Window {
   void draw_frame_rate();
 
  private:
-  void change_shape(WindowMode mode, SurfaceSize size);
   void follow_monitor();
   void set_vsync(bool on);
   void toggle(WindowMode mode);

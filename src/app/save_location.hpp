@@ -16,6 +16,9 @@ std::filesystem::path save_file_for(const std::filesystem::path& game_dir);
 // What a game's settings are kept by in the user's settings (its display settings): its id, or,
 // for a game with none, the name its save file is given after "folder:" ("folder:<name>-<digits>").
 std::string game_settings_key(const std::filesystem::path& game_dir);
+// The same, for a game whose settings were read already.
+struct GameSettings;
+std::string game_settings_key(const std::filesystem::path& game_dir, const GameSettings& settings);
 // The folder every game's save is under.
 std::filesystem::path saves_folder();
 

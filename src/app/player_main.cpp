@@ -18,6 +18,18 @@
 
 namespace {
 
+// The window of the player's own run: the one that keeps what the player chooses.
+redgem::GameWindowOptions players_window(const std::filesystem::path& game) {
+  using namespace redgem;
+  GameWindowOptions options;
+  options.game_dir = game;
+  options.gpu = gpu_choice_for_run(std::nullopt);
+  const PlayerDisplay display = player_display(game, user_settings_file());
+  options.display = display.display;
+  options.display_kept_in = display.kept_in;
+  return options;
+}
+
 // Plays the game beside `program`; an error when there is none.
 int play_game_beside(const std::filesystem::path& program) {
   using namespace redgem;
@@ -27,10 +39,7 @@ int play_game_beside(const std::filesystem::path& program) {
     log::error("no game to play: " + expected.string() + " is missing");
     return kExitFailure;
   }
-  GameWindowOptions options;
-  options.game_dir = *game;
-  options.gpu = gpu_choice_for_run(std::nullopt);
-  return play_in_window(options);
+  return play_in_window(players_window(*game));
 }
 
 }  // namespace

@@ -7,10 +7,11 @@
 namespace redgem::testing {
 
 Stage::Stage(const SystemTestOptions& options, FramePictures& pictures)
-    : settings_file_(fresh_settings_file_for(options.work_dir, options.test_file)) {
+    : display_kept_in_(player_display(options.game_dir,
+                                      fresh_settings_file_for(options.game_dir, options.work_dir, options.test_file))
+                           .kept_in) {
   if (options.headless) return;
   GameWindowOptions window;
-  window.settings_file = settings_file_;
   window.game_dir = options.game_dir;
   window.gpu = options.gpu;
   window.capture_cursor = false;  // the pointer stays with whoever sits at the machine

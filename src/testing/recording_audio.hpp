@@ -27,7 +27,10 @@ class RecordingAudio final : public AudioSystem {
   void stop_music() override { music_.reset(); }
   void set_music_pitch(float pitch) override { music_pitch_ = pitch; }
   void set_music_volume(float volume) override { music_volume_ = volume; }
-  void set_master_volume(float volume) override { master_volume_ = volume; }
+  void set_master_volume(float volume) override {
+    master_volume_ = volume;
+    heard_master_volume_ = heard_volume(volume);
+  }
   void update() override {}
   void set_sounds_dir(const std::filesystem::path& dir) override { sounds_dir_ = dir; }
 
@@ -35,13 +38,15 @@ class RecordingAudio final : public AudioSystem {
   const std::optional<std::string>& music() const { return music_; }
   float music_pitch() const { return music_pitch_; }
   float music_volume() const { return music_volume_; }
-  float master_volume() const { return master_volume_; }
+  float master_volume() const { return master_volume_; }              // the game's
+  float heard_master_volume() const { return heard_master_volume_; }  // the game's times the player's
 
  private:
   std::filesystem::path sounds_dir_;
   std::vector<std::string> played_;
   std::optional<std::string> music_;
   float master_volume_ = kFullVolume;
+  float heard_master_volume_ = kFullVolume;
   float music_pitch_ = kAsRecorded;
   float music_volume_ = kFullVolume;
 };

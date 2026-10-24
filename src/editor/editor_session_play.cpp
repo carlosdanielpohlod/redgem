@@ -38,6 +38,7 @@ void end_game_audio(AudioSystem& audio) {
   audio.set_music_pitch(kAsRecorded);
   audio.set_music_volume(kFullVolume);
   audio.set_master_volume(kFullVolume);
+  audio.set_player_volume(kFullVolume);
 }
 
 // Whether a copy of the document saved as `file` still finds the files next to it its images and

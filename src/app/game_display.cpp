@@ -6,18 +6,14 @@
 
 namespace redgem {
 
-std::filesystem::path player_settings_file(const std::filesystem::path& given) {
-  return given.empty() ? user_settings_file() : given;
+PlayerDisplay player_display(const std::filesystem::path& game_dir, const std::filesystem::path& settings_file) {
+  const GameSettings game = read_game_settings(game_dir);
+  const std::string key = game_settings_key(game_dir, game);
+  return {read_game_display(settings_file, key, game.display), {settings_file, key}};
 }
 
-DisplaySettings game_display(const std::filesystem::path& game_dir, const std::filesystem::path& settings_file) {
-  const DisplaySettings defaults = read_game_settings(game_dir).display;
-  return read_game_display(settings_file, game_settings_key(game_dir), defaults);
-}
-
-bool save_game_display(const std::filesystem::path& game_dir, const std::filesystem::path& settings_file,
-                       const DisplaySettings& display, std::string& error) {
-  return write_game_display(settings_file, game_settings_key(game_dir), display, error);
+bool keep_display(const DisplayKeeping& kept_in, const DisplaySettings& display, std::string& error) {
+  return write_game_display(kept_in.file, kept_in.game_key, display, error);
 }
 
 }  // namespace redgem

@@ -2,6 +2,8 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <string>
 
 #include "app/user_settings.hpp"
 #include "core/platform.hpp"
@@ -74,5 +76,24 @@ TEST_CASE("each game's display settings are kept by its key, apart from the othe
   CHECK(read_game_display(file, "com.studio.one", defaults).mode == WindowMode::Windowed);
   REQUIRE_MESSAGE(write_game_display(file, "com.studio.one", chosen, error), error);
   CHECK(read_game_display(file, "com.studio.one", defaults).mode == WindowMode::Borderless);
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("a damaged settings file is moved aside, not written over, and the settings are written anew") {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_damaged_settings_test";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  const std::filesystem::path file = dir / "settings.json";
+  std::ofstream(file) << R"({"gpu": "integrated", "games": {)";  // cut short
+  DisplaySettings chosen;
+  chosen.quality = QualityPreset::High;
+  std::string error;
+  REQUIRE_MESSAGE(write_game_display(file, "com.studio.one", chosen, error), error);
+  const std::filesystem::path aside = dir / "settings.json.damaged";
+  REQUIRE(std::filesystem::exists(aside));
+  std::ifstream kept(aside);
+  CHECK(std::string(std::istreambuf_iterator<char>(kept), {}) == R"({"gpu": "integrated", "games": {)");
+  CHECK(read_game_display(file, "com.studio.one", DisplaySettings{}).quality == QualityPreset::High);
+  CHECK_FALSE(std::filesystem::exists(dir / "settings.json.part"));  // written whole, through a file beside it
   std::filesystem::remove_all(dir);
 }

@@ -51,8 +51,11 @@ std::filesystem::path save_file_for(const std::filesystem::path& game_dir) {
 }
 
 std::string game_settings_key(const std::filesystem::path& game_dir) {
-  const std::string id = read_game_settings(game_dir).id;
-  return id.empty() ? kFolderKeyMark + folder_name(game_dir) : id;
+  return game_settings_key(game_dir, read_game_settings(game_dir));
+}
+
+std::string game_settings_key(const std::filesystem::path& game_dir, const GameSettings& settings) {
+  return settings.id.empty() ? kFolderKeyMark + folder_name(game_dir) : settings.id;
 }
 
 }  // namespace redgem

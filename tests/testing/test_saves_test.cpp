@@ -62,3 +62,19 @@ TEST_CASE("a game with an id is tested with a save of its id's, apart from the s
   CHECK(tested != save_file_for(game));
   std::filesystem::remove_all(game.parent_path());
 }
+
+TEST_CASE("each test of each game keeps its settings in a file of its own, emptied before it runs") {
+  const std::filesystem::path one = "/nowhere/redgem-testing-tests/one/game";
+  const std::filesystem::path two = "/nowhere/redgem-testing-tests/two/game";
+  const std::filesystem::path test = "/tests/system/x/menu_test.rb";
+  const std::filesystem::path first = fresh_settings_file_for(one, "", test);
+  CHECK(first != fresh_settings_file_for(two, "", test));  // the same test's name, another game
+  CHECK(first != fresh_settings_file_for(one, "", "/tests/system/x/other_test.rb"));
+  CHECK(first.parent_path() == test_save_file_for(one).parent_path());
+  std::filesystem::create_directories(first.parent_path());
+  std::ofstream(first) << "{}";
+  CHECK(fresh_settings_file_for(one, "", test) == first);
+  CHECK_FALSE(std::filesystem::exists(first));
+  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-settings-work";
+  CHECK(fresh_settings_file_for(one, work, test).parent_path() == work / "saves");
+}

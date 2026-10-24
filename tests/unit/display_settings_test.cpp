@@ -123,3 +123,27 @@ TEST_CASE("the window sizes offered are the usual ones that fit the monitor, and
   CHECK(window_sizes_for({1000, 700}).back() == SurfaceSize{1000, 700});
   CHECK(window_sizes_for({0, 0}).size() > 1);  // a monitor of no known size: every usual one
 }
+
+TEST_CASE("a picture too big for the card is held to its largest side, its shape kept") {
+  CHECK(held_to_side({2560, 1440}, 16384) == SurfaceSize{2560, 1440});
+  CHECK(held_to_side({8192, 4096}, 4096) == SurfaceSize{4096, 2048});
+  CHECK(held_to_side({3000, 6000}, 2000) == SurfaceSize{1000, 2000});
+  CHECK(held_to_side({10, 100000}, 1000) == SurfaceSize{1, 1000});
+}
+
+TEST_CASE("a change of settings tells what of the window it changes") {
+  DisplaySettings a;
+  a.resolution = {1280, 720};
+  DisplaySettings b = a;
+  b.volume = 0.5f;
+  b.quality = QualityPreset::Low;
+  CHECK(same_shape(a, b));
+  CHECK(same_pace(a, b));
+  b.fps_cap = kNoFrameCap;
+  CHECK_FALSE(same_pace(a, b));
+  b.mode = WindowMode::Borderless;
+  CHECK_FALSE(same_shape(a, b));
+  b = a;
+  b.resolution = {800, 600};
+  CHECK_FALSE(same_shape(a, b));
+}

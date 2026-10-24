@@ -37,6 +37,9 @@ void copy_buffer(unsigned int from, unsigned int to, int width, int height, Buff
 
 // While on, a fragment's alpha says how many of its pixel's samples it covers.
 void set_alpha_to_coverage(bool on);
+// The most pixels a side of a texture or a render buffer may have on the card: of a picture drawn
+// off screen.
+int largest_target_side();
 
 // Cube maps filtered across the seams between their faces (always so on OpenGL ES 3).
 void filter_cube_maps_across_seams();

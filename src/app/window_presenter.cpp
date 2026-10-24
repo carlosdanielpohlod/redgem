@@ -11,7 +11,6 @@
 #include <variant>
 
 #include "app/engine.hpp"
-#include "app/game_display.hpp"
 #include "audio/audio.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
@@ -41,49 +40,59 @@ namespace {
 constexpr ::Color kBlackBars{0, 0, 0, 255};  // around a recorded picture of another shape than the window
 constexpr ::Color kUntinted{255, 255, 255, 255};
 
+bool loaded(const RenderTexture2D& picture) { return picture.id != 0; }
+
 // Whether a picture drawn off screen is there, at that size.
 bool holds_size(const RenderTexture2D& picture, SurfaceSize size) {
-  return picture.id != 0 && SurfaceSize{picture.texture.width, picture.texture.height} == size;
+  return loaded(picture) && SurfaceSize{picture.texture.width, picture.texture.height} == size;
 }
 
-}  // namespace
+// Whether a picture to draw into was made whole: the card may refuse one (too big for it, no memory).
+bool drawable(const RenderTexture2D& picture) { return loaded(picture) && rlFramebufferComplete(picture.id); }
 
-namespace {
-
-// The window of a game, as its settings and its player's choices say.
-WindowSettings window_for(const GameWindowOptions& options) {
-  return game_window_settings(read_game_settings(options.game_dir),
-                              game_display(options.game_dir, player_settings_file(options.settings_file)), options);
+void release(RenderTexture2D& picture) {
+  if (loaded(picture)) UnloadRenderTexture(picture);
+  picture = RenderTexture2D{};
 }
 
 }  // namespace
 
 WindowPresenter::WindowPresenter(GameWindowOptions options)
-    : options_(std::move(options)), window_(window_for(options_)), renderer_(window_), painter_(renderer_) {
-  apply_display(game_display(options_.game_dir, player_settings_file(options_.settings_file)));
+    : options_(std::move(options)),
+      game_(read_game_settings(options_.game_dir)),
+      shown_(options_.display.value_or(game_.display)),
+      window_(game_window_settings(game_, shown_, options_)),
+      renderer_(window_),
+      painter_(renderer_) {
+  renderer_.set_quality(quality_caps(shown_));
+  render_scale_ = held_render_scale(shown_.render_scale);
   if (options_.record) start_recording(*options_.record);
 }
 
 WindowPresenter::~WindowPresenter() {
   recorder_.reset();  // (its last frames are read back before the picture they come from goes)
-  if (recorded_.id != 0) UnloadRenderTexture(recorded_);
-  if (scaled_.id != 0) UnloadRenderTexture(scaled_);
+  release(recorded_);
+  release(scaled_);
 }
 
+// Only what changed is done again: a script may write the settings every frame (a slider dragged).
 void WindowPresenter::apply_display(const DisplaySettings& display) {
-  if (fills_a_screen()) {
-    window_.pace(display);
-  } else {
-    window_.show_as(display);
-  }
-  renderer_.set_quality(quality_caps(display));
-  render_scale_ = held_render_scale(display.render_scale);
+  if (!same_shape(display, shown_)) reshape(display);
+  if (!same_pace(display, shown_)) window_.pace(display);
+  if (quality_caps(display) != quality_caps(shown_)) renderer_.set_quality(quality_caps(display));
+  if (display.render_scale != shown_.render_scale) follow_render_scale(display.render_scale);
+  shown_ = display;
 }
 
-SurfaceSize WindowPresenter::world_size() const {
-  if (recording()) return surface_size();
-  const bool scaled = scales_picture(render_scale_) && scaled_.id != 0;
-  return scaled ? SurfaceSize{scaled_.texture.width, scaled_.texture.height} : window_.drawing_size();
+void WindowPresenter::reshape(const DisplaySettings& display) {
+  if (!fills_a_screen()) window_.reshape(display.mode, display.resolution);
+}
+
+// A scale given up on (see fit_scaled) is tried again once another is asked for.
+void WindowPresenter::follow_render_scale(float scale) {
+  render_scale_ = held_render_scale(scale);
+  scaling_refused_ = false;
+  if (!scales_picture(render_scale_)) release(scaled_);
 }
 
 std::vector<SurfaceSize> WindowPresenter::display_modes() const {
@@ -133,7 +142,7 @@ void WindowPresenter::present(const FrameView& view) {
     present_recorded(view);
     return;
   }
-  if (scales_picture(render_scale_)) {
+  if (draws_scaled() && fit_scaled(scaled_size(window_.drawing_size(), render_scale_))) {
     present_scaled(view);
     return;
   }
@@ -151,7 +160,6 @@ void WindowPresenter::finish_frame() {
 
 // The world at its scale, stretched over the window; the interface over it at the window's size.
 void WindowPresenter::present_scaled(const FrameView& view) {
-  fit_scaled(scaled_size(window_.drawing_size(), render_scale_));
   painter_.paint_world(view, &scaled_);
   window_.begin_frame();
   show_picture(scaled_);
@@ -159,11 +167,23 @@ void WindowPresenter::present_scaled(const FrameView& view) {
   finish_frame();
 }
 
-void WindowPresenter::fit_scaled(SurfaceSize size) {
-  if (holds_size(scaled_, size)) return;
-  if (scaled_.id != 0) UnloadRenderTexture(scaled_);
+// Makes the picture the world is drawn into at that size, held to the most the card can draw
+// into. One the card refuses makes the world drawn at the window's size, with a warning, until
+// another scale is asked for. Whether there is one to draw into.
+bool WindowPresenter::fit_scaled(SurfaceSize asked) {
+  const SurfaceSize size = held_to_side(asked, window_.largest_picture_side());
+  if (holds_size(scaled_, size)) return true;
+  release(scaled_);
   scaled_ = LoadRenderTexture(size.width, size.height);
-  SetTextureFilter(scaled_.texture, TEXTURE_FILTER_BILINEAR);  // (smooth when it is stretched)
+  if (drawable(scaled_)) {
+    SetTextureFilter(scaled_.texture, TEXTURE_FILTER_BILINEAR);  // (smooth when it is stretched)
+    return true;
+  }
+  release(scaled_);
+  scaling_refused_ = true;
+  log::warning("the graphics card cannot draw the world at " + std::to_string(size.width) + "x" +
+               std::to_string(size.height) + ": it is drawn at the window's size");
+  return false;
 }
 
 // The game's clock is the recording's: what moves with time (the wind, film grain) moves as fast
@@ -216,7 +236,8 @@ int play(WindowPresenter& window, InputSource& input, const GameWindowOptions& o
   game.presenter = &window;
   game.input = &input;
   game.audio = audio.get();
-  game.settings_file = options.settings_file;
+  game.display = window.shown();
+  game.display_kept_in = options.display_kept_in;
   const int status = Engine::create(game, std::move(scene))->run();
   return window.recording_failed() ? kExitFailure : status;
 }

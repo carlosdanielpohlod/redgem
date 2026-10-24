@@ -37,7 +37,7 @@ enum class Status { Running, Passed, Failed };
 EngineOptions engine_options(const SystemTestOptions& options, ScriptedInputSource& input, Stage& stage) {
   EngineOptions engine;
   engine.game_dir = options.game_dir;
-  engine.settings_file = stage.settings_file();
+  engine.display_kept_in = stage.display_kept_in();
   engine.presenter = stage.presenter();
   engine.input = &input;  // the devices are not read: a key touched by accident changes nothing
   engine.save_file = options.work_dir.empty() ? fresh_test_save_file(options.game_dir)

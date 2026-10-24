@@ -25,8 +25,9 @@ until 1.0, a release may change what games rely on (see
 - **Display settings for players**: windowed, fullscreen and borderless modes, a resolution from
   the monitor's sizes, a render scale (50% to 200%), vsync and a frame-rate cap, quality presets
   (low to ultra, and custom) that cap what a level's environment asks for, and a master volume.
-  `game.json` gives the defaults; the `Settings` module reads and changes them, and keeps them per
-  game.
+  `game.json` gives the defaults; the `Settings` module reads and changes them, and the built
+  game keeps them per game (the editor's Play, servers and tests keep nothing). The player's
+  volume multiplies the game's own.
 - **Settings screen and widgets**: `GameMenu` has a settings screen reached from its title and
   pause screens, built from the new `UI.toggle`, `UI.choice` and `UI.slider`. The keyboard and a
   gamepad move a focus between widgets and buttons (`UI::Focus`).

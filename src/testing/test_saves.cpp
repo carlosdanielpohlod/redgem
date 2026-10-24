@@ -10,7 +10,8 @@ namespace {
 constexpr const char* kTestSavesFolder = "test-saves";  // beside the players' saves, in the user's own folder
 constexpr const char* kWorkSavesFolder = "saves";       // in a run's own folder
 constexpr const char* kSaveExtension = ".json";
-constexpr const char* kSettingsEnding = "-settings.json";  // after the test's name
+constexpr const char* kSettingsEnding = "-settings.json";  // after the game's and the test's names
+constexpr char kNameJoiner = '-';
 
 // (Its backup too: a missing save is otherwise loaded from it.)
 std::filesystem::path emptied(const std::filesystem::path& file) {
@@ -35,11 +36,13 @@ std::filesystem::path fresh_save_file_in(const std::filesystem::path& work_dir,
   return emptied(work_dir / kWorkSavesFolder / (test_file.stem().string() + kSaveExtension));
 }
 
-std::filesystem::path fresh_settings_file_for(const std::filesystem::path& work_dir,
+std::filesystem::path fresh_settings_file_for(const std::filesystem::path& game_dir,
+                                              const std::filesystem::path& work_dir,
                                               const std::filesystem::path& test_file) {
-  const std::filesystem::path folder =
-      work_dir.empty() ? platform::user_data_dir() / kTestSavesFolder : work_dir / kWorkSavesFolder;
-  const std::filesystem::path file = folder / (test_file.stem().string() + kSettingsEnding);
+  const std::filesystem::path game_save = test_save_file_for(game_dir);
+  const std::filesystem::path folder = work_dir.empty() ? game_save.parent_path() : work_dir / kWorkSavesFolder;
+  const std::string name = game_save.stem().string() + kNameJoiner + test_file.stem().string() + kSettingsEnding;
+  const std::filesystem::path file = folder / name;
   std::error_code error;
   std::filesystem::remove(file, error);
   return file;

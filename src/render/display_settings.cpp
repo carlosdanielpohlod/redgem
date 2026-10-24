@@ -32,6 +32,8 @@ constexpr const char* kSkyDetailKey = "sky_detail";
 constexpr const char* kOcclusionKey = "ambient_occlusion";
 constexpr const char* kBloomKey = "bloom";
 
+constexpr float kHalfPixel = 0.5f;  // (rounding to the nearest pixel)
+
 // The window sizes players usually pick, smallest first.
 constexpr SurfaceSize kUsualSizes[] = {{640, 360},  {800, 600},   {1024, 768},  {1280, 720}, {1366, 768},
                                        {1600, 900}, {1920, 1080}, {2560, 1440}, {3840, 2160}};
@@ -45,6 +47,14 @@ bool fits_in(SurfaceSize size, SurfaceSize monitor) {
 
 // Whether a usual size is offered besides the monitor's own: it fits, and it is not that one.
 bool offered_besides(SurfaceSize size, SurfaceSize monitor) { return fits_in(size, monitor) && size != monitor; }
+
+// A size times `scale`, rounded to whole pixels, never less than one a side.
+SurfaceSize scaled_size_by(SurfaceSize size, float scale) {
+  const auto side = [scale](int length) {
+    return std::max(1, static_cast<int>(std::floor(static_cast<float>(length) * scale + kHalfPixel)));
+  };
+  return {side(size.width), side(size.height)};
+}
 
 bool holds(const nlohmann::json& json, const char* key, const std::function<bool(const nlohmann::json&)>& kind) {
   return json.contains(key) && kind(json[key]);
@@ -139,11 +149,22 @@ float held_render_scale(float scale) {
 bool scales_picture(float render_scale) { return held_render_scale(render_scale) != kFullRenderScale; }
 
 SurfaceSize scaled_size(SurfaceSize window, float render_scale) {
-  const float scale = held_render_scale(render_scale);
-  const auto side = [scale](int length) {
-    return std::max(1, static_cast<int>(std::lround(static_cast<float>(length) * scale)));
-  };
-  return {side(window.width), side(window.height)};
+  return scaled_size_by(window, held_render_scale(render_scale));
+}
+
+SurfaceSize held_to_side(SurfaceSize size, int largest) {
+  const int longest = std::max(size.width, size.height);
+  if (longest <= largest) return size;
+  const float shrink = static_cast<float>(largest) / static_cast<float>(longest);
+  return scaled_size_by(size, shrink);
+}
+
+bool same_shape(const DisplaySettings& a, const DisplaySettings& b) {
+  return a.mode == b.mode && a.resolution == b.resolution;
+}
+
+bool same_pace(const DisplaySettings& a, const DisplaySettings& b) {
+  return a.vsync == b.vsync && a.fps_cap == b.fps_cap;
 }
 
 int held_fps_cap(int cap) { return std::clamp(cap, kNoFrameCap, kMostFramesPerSecond); }

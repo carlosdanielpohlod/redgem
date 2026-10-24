@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include "core/log.hpp"
+#include "render/gl_extras.hpp"
 #include "render/render_math.hpp"
 
 namespace redgem {
@@ -47,12 +48,25 @@ unsigned int window_flags(const WindowSettings& settings) {
   return flags;
 }
 
+namespace {
+
+// Whether a window going to `wanted_mode` is given another size: a borderless one is the monitor's.
+bool resized(WindowMode wanted_mode, SurfaceSize size, SurfaceSize wanted_size) {
+  return wanted_mode != WindowMode::Borderless && wanted_size != size;
+}
+
+// Whether a window that changes (`reshaped`) goes through the mode it is in, or to the one wanted:
+// a window is the one mode not gone into or out of.
+bool through_mode(bool reshaped, WindowMode mode) { return reshaped && mode != WindowMode::Windowed; }
+
+}  // namespace
+
 WindowChange window_change(WindowMode mode, SurfaceSize size, WindowMode wanted_mode, SurfaceSize wanted_size) {
   WindowChange change;
-  change.resize = wanted_mode != WindowMode::Borderless && wanted_size != size;
+  change.resize = resized(wanted_mode, size, wanted_size);
   const bool reshaped = change.resize || wanted_mode != mode;
-  change.leave_mode = reshaped && mode != WindowMode::Windowed;
-  change.enter_mode = reshaped && wanted_mode != WindowMode::Windowed;
+  change.leave_mode = through_mode(reshaped, mode);
+  change.enter_mode = through_mode(reshaped, wanted_mode);
   return change;
 }
 
@@ -70,7 +84,7 @@ Window::Window(const WindowSettings& settings) : size_{settings.width, settings.
   open_window(settings);
   SetExitKey(KEY_NULL);  // Esc belongs to what runs in the window: only its close button closes it
   SetTargetFPS(settings.frames_per_second);
-  change_shape(settings.mode, size_);
+  reshape(settings.mode, size_);
 }
 
 Window::~Window() { CloseWindow(); }
@@ -81,17 +95,14 @@ float Window::frame_seconds() const { return GetFrameTime(); }
 
 SurfaceSize Window::drawing_size() const { return {GetRenderWidth(), GetRenderHeight()}; }
 
-void Window::show_as(const DisplaySettings& display) {
-  change_shape(display.mode, display.resolution);
-  pace(display);
-}
-
 void Window::pace(const DisplaySettings& display) {
   set_vsync(display.vsync);
   SetTargetFPS(held_fps_cap(display.fps_cap));
 }
 
 SurfaceSize Window::monitor_size() const { return monitor_; }
+
+int Window::largest_picture_side() const { return render_detail::largest_target_side(); }
 
 // (Read while the window is a window: in fullscreen, the monitor says the size it was switched to.)
 void Window::follow_monitor() {
@@ -100,7 +111,7 @@ void Window::follow_monitor() {
   monitor_ = {GetMonitorWidth(monitor), GetMonitorHeight(monitor)};
 }
 
-void Window::change_shape(WindowMode mode, SurfaceSize size) {
+void Window::reshape(WindowMode mode, SurfaceSize size) {
   follow_monitor();
   const WindowChange change = window_change(mode_, size_, mode, size);
   if (change.leave_mode) toggle(mode_);

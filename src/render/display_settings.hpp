@@ -64,6 +64,11 @@ float held_render_scale(float scale);
 bool scales_picture(float render_scale);
 // The size the world is drawn at in a window of `window`'s size: never less than a pixel a side.
 SurfaceSize scaled_size(SurfaceSize window, float render_scale);
+// A size held to `largest` pixels a side, its shape kept (a picture the card can draw into).
+SurfaceSize held_to_side(SurfaceSize size, int largest);
+// Whether two settings ask for the same window (mode and size), and for the same pace of frames.
+bool same_shape(const DisplaySettings& a, const DisplaySettings& b);
+bool same_pace(const DisplaySettings& a, const DisplaySettings& b);
 // A frame cap held to what a cap can be: kNoFrameCap or 1..kMostFramesPerSecond.
 int held_fps_cap(int cap);
 
