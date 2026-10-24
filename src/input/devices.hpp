@@ -48,8 +48,14 @@ inline constexpr std::size_t kGamepadButtonCount = 14;
 // "left_x" -> GamepadAxis::LeftX, "a" -> GamepadButton::A; nullopt for an unknown name.
 std::optional<GamepadAxis> gamepad_axis_from_name(const std::string& name);
 std::optional<GamepadButton> gamepad_button_from_name(const std::string& name);
+// And back: "left_x", "a".
+std::string gamepad_axis_name(GamepadAxis axis);
+std::string gamepad_button_name(GamepadButton button);
 
-// The first gamepad at one instant. Sticks go from -1 to 1 (left and up are negative), triggers
+// How many gamepads the engine reads at once, numbered from 0 (one player each).
+inline constexpr std::size_t kMaxGamepads = 4;
+
+// A gamepad at one instant. Sticks go from -1 to 1 (left and up are negative), triggers
 // from 0 to 1.
 struct GamepadSample {
   bool connected = false;

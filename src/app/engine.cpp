@@ -3,8 +3,10 @@
 #include "app/engine.hpp"
 
 #include <string>
+#include <vector>
 
 #include "app/game_identity.hpp"
+#include "app/input_bindings_store.hpp"
 #include "app/save_location.hpp"
 #include "app/scene_bodies.hpp"
 #include "app/scene_water.hpp"
@@ -31,6 +33,7 @@ Engine::Engine(const EngineOptions& options)
       network_watch_(options.network_time) {}
 
 Engine::~Engine() {
+  keep_bindings();
   // Scripts reference the scene and physics through the context: tear them down first.
   scripts_.reset();
   physics_.reset();
@@ -58,7 +61,7 @@ void Engine::initialize() {
   open_presenter(manifest.settings);
   open_audio();
   open_saves();
-  open_display(manifest.settings.display);
+  open_player_choices(manifest.settings);
   fill_context(manifest.settings.title);
   connect_display();
   take_identity(identity);
@@ -129,6 +132,38 @@ void Engine::open_saves() {
       std::make_unique<SaveFile>(options_.save_file.empty() ? save_file_for(options_.game_dir) : options_.save_file);
 }
 
+void Engine::open_player_choices(const GameSettings& settings) {
+  open_display(settings.display);
+  open_bindings();
+}
+
+void Engine::open_bindings() {
+  std::vector<std::string> problems;
+  input_.bindings().declare(read_game_input(options_.game_dir, problems));
+  for (const std::string& problem : problems) log::warning(problem);
+  bindings_file_ = chosen_bindings_file();
+  if (!bindings_file_.empty()) read_player_bindings(bindings_file_, input_.bindings());
+  kept_bindings_ = player_bindings_text(input_.bindings());
+}
+
+std::filesystem::path Engine::chosen_bindings_file() const {
+  if (!options_.bindings_file.empty()) return options_.bindings_file;
+  if (serves_a_room()) return {};  // (a room has no players of its own)
+  return bindings_file_for(options_.game_dir);
+}
+
+void Engine::keep_bindings() {
+  if (!bindings_changed_) return;
+  bindings_changed_ = false;
+  std::string text = player_bindings_text(input_.bindings());
+  if (bindings_file_.empty() || text == kept_bindings_) return;
+  if (!write_player_bindings_text(bindings_file_, text)) {
+    log::warning("could not keep the players' bindings in " + bindings_file_.string());
+    return;
+  }
+  kept_bindings_ = std::move(text);
+}
+
 void Engine::fill_context(const std::string& game_title) {
   context_.save = options_.save != nullptr ? options_.save : save_.get();
   context_.animations = &animations_;
@@ -158,6 +193,7 @@ void Engine::take_identity(const GameIdentityReading& identity) {
 }
 
 void Engine::connect_context() {
+  context_.on_bindings_changed = [this] { bindings_changed_ = true; };
   context_.on_transform_written = [this](ObjectId id, TransformWrite write) {
     bodies::follow_write(scene_, *physics_, id, write);
     if (water_teleport_write(*physics_, id, write)) water_.forget(scene_.handle(id));

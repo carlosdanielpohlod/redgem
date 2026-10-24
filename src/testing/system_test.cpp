@@ -42,6 +42,7 @@ EngineOptions engine_options(const SystemTestOptions& options, ScriptedInputSour
   engine.input = &input;  // the devices are not read: a key touched by accident changes nothing
   engine.save_file = options.work_dir.empty() ? fresh_test_save_file(options.game_dir)
                                               : fresh_save_file_in(options.work_dir, options.test_file);
+  engine.bindings_file = fresh_bindings_file_for(options.game_dir, options.work_dir, options.test_file);
   engine.fixed_step = true;
   engine.audio = stage.audio();
   return engine;
