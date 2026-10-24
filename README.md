@@ -183,8 +183,9 @@ in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md); every built game carries 
 ## Documentation
 
 The manual is in [docs/](docs/index.md): [install](docs/install.md), [your first game](docs/first-game.md),
-[the editor](docs/editor.md), [scripting](docs/scripting/behaviours.md) and the
-[API reference](docs/scripting/api.md). To read it as a site:
+[the editor](docs/editor.md), [scripting](docs/scripting/behaviours.md), the
+[API reference](docs/scripting/api.md), [the command line](docs/command-line.md) and
+[making games with an AI assistant](docs/assistants.md). To read it as a site:
 
 ```bash
 pip install -r docs/requirements.txt

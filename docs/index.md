@@ -1,3 +1,7 @@
+---
+description: What RedGem is, where to start, and how a game's folder is organized.
+---
+
 # RedGem 3D Engine
 
 RedGem is a 3D game engine with its own editor. You build levels in the editor (or in Blender),
@@ -13,7 +17,8 @@ This manual is for people making games with it.
 3. Keep [Behaviours](scripting/behaviours.md) and the [API reference](scripting/api.md) open while
    you write scripts.
 4. [The command line](command-line.md) reads and changes scenes as text, plays a game with no
-   window, takes pictures of it and looks it over: handy in scripts and with coding assistants.
+   window, takes pictures of it and looks it over: handy in scripts and with coding assistants
+   (see [Making games with an AI assistant](assistants.md)).
 
 ## How a game is organized
 

@@ -1,3 +1,7 @@
+---
+description: The editor's panels, tools and shortcuts: placing objects, the Inspector, playing.
+---
+
 # The editor
 
 ```bash

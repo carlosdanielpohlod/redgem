@@ -2,7 +2,8 @@
 
 // What a game run by a tool (`redgem run`, `shot`) had to say, kept short: its warnings and
 // errors, one line each, starting with the place of the game's own files they point at
-// ("scripts/coin.rb:12: ..."), each said once with how many times it came.
+// ("scripts/coin.rb:12: ..."), each said once with how many times it came, and with what to do
+// about it when the error is a common one.
 
 #include <cstddef>
 #include <filesystem>
@@ -34,6 +35,8 @@ class MessageCollector {
     std::size_t times = 1;
   };
   void keep(log::Level level, const std::string& message);
+  // The message with what to do about it, when there is something to say (see error_hints.hpp).
+  std::string with_hint(const std::string& text) const;
 
   std::filesystem::path game_dir_;
   log::Sink previous_;

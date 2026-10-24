@@ -1,3 +1,7 @@
+---
+description: Multiplayer: hosting and joining, messages, synced objects, relays and rooms.
+---
+
 # Multiplayer
 
 Games can be played together over a local network or the internet. One machine **hosts** the game

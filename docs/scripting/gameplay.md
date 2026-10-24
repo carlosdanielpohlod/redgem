@@ -1,3 +1,7 @@
+---
+description: Gameplay recipes: movement, cameras, triggers, spawning, UI, sound, menus and more.
+---
+
 # Gameplay recipes
 
 Short answers to "how do I...". Each snippet goes inside a behaviour.

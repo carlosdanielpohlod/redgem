@@ -1,5 +1,6 @@
 site_name: RedGem 3D Engine
 site_description: The manual of RedGem, a 3D game engine where games are written in Ruby.
+site_url: https://carlosdanielpohlod.github.io/redgem-site/manual/
 docs_dir: docs
 theme:
   name: material
@@ -16,6 +17,9 @@ theme:
     - content.code.copy
 extra_css:
   - assets/manual.css
+# llms.txt and llms-full.txt, beside the built site: the manual for coding assistants.
+hooks:
+  - tools/docs/llms_txt.py
 markdown_extensions:
   - admonition
   - tables
@@ -32,6 +36,7 @@ nav:
       - The editor: editor.md
       - Levels, lighting and Blender: levels.md
       - The command line: command-line.md
+      - Making games with an AI assistant: assistants.md
   - Scripting in Ruby:
       - Behaviours: scripting/behaviours.md
       - Gameplay recipes: scripting/gameplay.md

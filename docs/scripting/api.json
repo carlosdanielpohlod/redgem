@@ -1,0 +1,1849 @@
+{
+  "description": "Every class and method of the scripting API, a line each (also: redgem api).",
+  "about": "The scripting API of RedGem games: the classes and methods scripts use. Generated from docs/scripting/api.json, which tests keep in step with the engine.",
+  "notes": "Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Missing or unreadable images show a magenta-and-black checkerboard, with a warning.",
+  "classes": [
+    {
+      "name": "Behaviour",
+      "about": "A Ruby class attached to an object: the engine calls its methods as the game runs.",
+      "methods": [
+        {
+          "name": "start",
+          "about": "called once, before the first update",
+          "top": 1,
+          "example": "def start = @speed = prop(:speed, 3.0)"
+        },
+        {
+          "name": "update",
+          "args": "dt",
+          "about": "called every frame; dt is the seconds since the last one",
+          "top": 2,
+          "example": "def update(dt) = transform.rotate(Vector3.new(0, 90 * dt, 0))"
+        },
+        {
+          "name": "fixed_update",
+          "args": "dt",
+          "about": "called 60 times a second, with the physics"
+        },
+        {
+          "name": "on_trigger_enter",
+          "args": "other",
+          "about": "something entered this object's trigger, or it entered one",
+          "top": 14,
+          "example": "def on_trigger_enter(other) = destroy if other.tag?(:player)"
+        },
+        {
+          "name": "on_trigger_exit",
+          "args": "other",
+          "about": "something left this object's trigger"
+        },
+        {
+          "name": "on_collision_enter",
+          "args": "other",
+          "about": "this object's body touched another"
+        },
+        {
+          "name": "on_collision_exit",
+          "args": "other",
+          "about": "this object's body stopped touching another"
+        },
+        {
+          "name": "on_destroy",
+          "about": "the object is being destroyed"
+        },
+        {
+          "name": "game_object",
+          "about": "the object this behaviour is attached to"
+        },
+        {
+          "name": "name",
+          "about": "the object's name"
+        },
+        {
+          "name": "transform",
+          "about": "the object's Transform",
+          "top": 3,
+          "example": "transform.position += transform.forward * 2.0 * dt"
+        },
+        {
+          "name": "character",
+          "about": "the object's CharacterController, or nil",
+          "top": 12,
+          "example": "character.move(Vector3.new(x, 0, z) * 5.0)"
+        },
+        {
+          "name": "rigidbody",
+          "about": "the object's Rigidbody, or nil"
+        },
+        {
+          "name": "vehicle",
+          "about": "the object's Vehicle, or nil"
+        },
+        {
+          "name": "animation",
+          "about": "the object's own Animator"
+        },
+        {
+          "name": "props",
+          "about": "the object's custom properties, as a Hash"
+        },
+        {
+          "name": "prop",
+          "args": "key, default = nil",
+          "about": "a setting: what add_component was given, else the object's property, else the default",
+          "top": 4,
+          "example": "@speed = prop(:speed, 3.0)"
+        },
+        {
+          "name": "find",
+          "args": "name",
+          "about": "the object called name, or nil",
+          "top": 5,
+          "example": "@player = find(\"Player\")"
+        },
+        {
+          "name": "find!",
+          "args": "name",
+          "about": "find that stops with a clear error when the object is missing"
+        },
+        {
+          "name": "find_all",
+          "args": "tag",
+          "about": "every object with that tag",
+          "top": 15,
+          "example": "find_all(:coin).size"
+        },
+        {
+          "name": "destroy",
+          "args": "target = game_object",
+          "about": "removes an object (this one unless said) at the end of the step",
+          "top": 13,
+          "example": "destroy(other)"
+        },
+        {
+          "name": "get_component",
+          "args": "klass",
+          "about": "another behaviour of this object, or nil",
+          "top": 16,
+          "example": "get_component(Health)&.damage(1)"
+        },
+        {
+          "name": "after",
+          "args": "seconds, &block",
+          "about": "runs the block once, that many seconds from now",
+          "top": 17,
+          "example": "after(2.0) { destroy }"
+        },
+        {
+          "name": "every",
+          "args": "seconds, &block",
+          "about": "runs the block every that many seconds"
+        },
+        {
+          "name": "tween",
+          "args": "seconds, ease: :smooth, &block",
+          "about": "calls the block with t from 0 to 1 over that many seconds"
+        },
+        {
+          "name": "cancel_timers",
+          "about": "stops every after, every and tween of this behaviour"
+        }
+      ],
+      "internal": [
+        "inspect"
+      ],
+      "guide": "behaviours.md"
+    },
+    {
+      "name": "GameObject",
+      "about": "An object of the scene, as scripts see it.",
+      "methods": [
+        {
+          "name": "name",
+          "about": "its name"
+        },
+        {
+          "name": "id",
+          "about": "its number in the running game"
+        },
+        {
+          "name": "tag",
+          "about": "its tag property"
+        },
+        {
+          "name": "tag?",
+          "args": "value",
+          "about": "whether its tag is value"
+        },
+        {
+          "name": "props",
+          "about": "its custom properties"
+        },
+        {
+          "name": "alive?",
+          "about": "false once it was destroyed"
+        },
+        {
+          "name": "destroy",
+          "about": "removes it at the end of the step"
+        },
+        {
+          "name": "visible",
+          "about": "whether it is drawn"
+        },
+        {
+          "name": "visible=",
+          "args": "value",
+          "about": "shows or hides it"
+        },
+        {
+          "name": "behaviours",
+          "about": "its behaviours"
+        },
+        {
+          "name": "parent",
+          "about": "the object it is under, or nil"
+        },
+        {
+          "name": "children",
+          "about": "the objects under it"
+        },
+        {
+          "name": "transform",
+          "about": "its Transform"
+        },
+        {
+          "name": "character",
+          "about": "its CharacterController, or nil"
+        },
+        {
+          "name": "rigidbody",
+          "about": "its Rigidbody, or nil"
+        },
+        {
+          "name": "vehicle",
+          "about": "its Vehicle, or nil"
+        },
+        {
+          "name": "light",
+          "about": "the Light it shines with, or nil"
+        },
+        {
+          "name": "animation",
+          "about": "its Animator"
+        },
+        {
+          "name": "animation_offset",
+          "about": "seconds its animations run ahead of the original's (a spawned copy)"
+        },
+        {
+          "name": "animation_offset=",
+          "args": "seconds",
+          "about": "sets that offset"
+        },
+        {
+          "name": "get_component",
+          "args": "klass",
+          "about": "one of its behaviours, or nil"
+        },
+        {
+          "name": "add_component",
+          "args": "klass, **settings",
+          "about": "attaches a behaviour; settings are what its prop reads",
+          "top": 18,
+          "example": "find(\"Door\").add_component(Door, speed: 2.0)"
+        },
+        {
+          "name": "tint",
+          "about": "the color its colors are multiplied by"
+        },
+        {
+          "name": "tint=",
+          "args": "color",
+          "about": "multiplies its colors: [1.0, 0.5, 0.5]"
+        }
+      ],
+      "internal": [
+        "==",
+        "inspect",
+        "to_s"
+      ],
+      "guide": "behaviours.md"
+    },
+    {
+      "name": "Transform",
+      "about": "Where an object is, how it is turned and how big it is.",
+      "methods": [
+        {
+          "name": "position",
+          "about": "its position in the world (Vector3)"
+        },
+        {
+          "name": "position=",
+          "args": "vector",
+          "about": "moves it; a physics object is teleported",
+          "top": 6,
+          "example": "transform.position = Vector3.new(0, 1, 0)"
+        },
+        {
+          "name": "local_position",
+          "about": "its position relative to its parent"
+        },
+        {
+          "name": "local_position=",
+          "args": "vector",
+          "about": "moves it relative to its parent"
+        },
+        {
+          "name": "rotation",
+          "about": "its rotation, Euler degrees (Vector3)"
+        },
+        {
+          "name": "rotation=",
+          "args": "degrees",
+          "about": "turns it to those Euler degrees"
+        },
+        {
+          "name": "rotate",
+          "args": "degrees",
+          "about": "turns it by those Euler degrees",
+          "top": 7,
+          "example": "transform.rotate(Vector3.new(0, 90 * dt, 0))"
+        },
+        {
+          "name": "look_at",
+          "args": "target, up = Vector3.up",
+          "about": "turns it to face a point"
+        },
+        {
+          "name": "translate",
+          "args": "offset",
+          "about": "moves it by an offset"
+        },
+        {
+          "name": "scale",
+          "about": "its scale (Vector3)"
+        },
+        {
+          "name": "scale=",
+          "args": "vector",
+          "about": "resizes it"
+        },
+        {
+          "name": "forward",
+          "about": "the direction it faces (-Z)",
+          "top": 8,
+          "example": "transform.position += transform.forward * speed * dt"
+        },
+        {
+          "name": "right",
+          "about": "its right (+X)"
+        },
+        {
+          "name": "up",
+          "about": "its up (+Y)"
+        }
+      ],
+      "internal": [
+        "inspect"
+      ]
+    },
+    {
+      "name": "Vector3",
+      "about": "A point or a direction in meters: x, y, z.",
+      "methods": [
+        {
+          "name": "new",
+          "static": true,
+          "args": "x, y, z",
+          "about": "a vector",
+          "top": 9,
+          "example": "Vector3.new(0, 1, 0)"
+        },
+        {
+          "name": "[]",
+          "static": true,
+          "args": "x, y, z",
+          "about": "the same as new"
+        },
+        {
+          "name": "zero",
+          "static": true,
+          "about": "(0, 0, 0)"
+        },
+        {
+          "name": "one",
+          "static": true,
+          "about": "(1, 1, 1)"
+        },
+        {
+          "name": "up",
+          "static": true,
+          "about": "(0, 1, 0)"
+        },
+        {
+          "name": "down",
+          "static": true,
+          "about": "(0, -1, 0)"
+        },
+        {
+          "name": "left",
+          "static": true,
+          "about": "(-1, 0, 0)"
+        },
+        {
+          "name": "right",
+          "static": true,
+          "about": "(1, 0, 0)"
+        },
+        {
+          "name": "forward",
+          "static": true,
+          "about": "(0, 0, -1)"
+        },
+        {
+          "name": "back",
+          "static": true,
+          "about": "(0, 0, 1)"
+        },
+        {
+          "name": "blender",
+          "static": true,
+          "args": "x, y, z",
+          "about": "a vector given in Blender's axes (Z up)"
+        },
+        {
+          "name": "x",
+          "about": "its x"
+        },
+        {
+          "name": "y",
+          "about": "its y"
+        },
+        {
+          "name": "z",
+          "about": "its z"
+        },
+        {
+          "name": "+",
+          "args": "other",
+          "about": "sum"
+        },
+        {
+          "name": "-",
+          "args": "other",
+          "about": "difference"
+        },
+        {
+          "name": "-@",
+          "about": "the opposite vector"
+        },
+        {
+          "name": "*",
+          "args": "number",
+          "about": "scaled"
+        },
+        {
+          "name": "/",
+          "args": "number",
+          "about": "divided"
+        },
+        {
+          "name": "==",
+          "args": "other",
+          "about": "whether the numbers are exactly the same"
+        },
+        {
+          "name": "dot",
+          "args": "other",
+          "about": "dot product"
+        },
+        {
+          "name": "cross",
+          "args": "other",
+          "about": "cross product"
+        },
+        {
+          "name": "length",
+          "about": "its length"
+        },
+        {
+          "name": "length_squared",
+          "about": "its length squared (faster)"
+        },
+        {
+          "name": "normalized",
+          "about": "the same direction, length 1"
+        },
+        {
+          "name": "clamped",
+          "args": "max_length = 1.0",
+          "about": "the same direction, no longer than max_length"
+        },
+        {
+          "name": "lerp",
+          "args": "other, t",
+          "about": "the point t of the way to other"
+        },
+        {
+          "name": "flat",
+          "about": "the same with y = 0"
+        },
+        {
+          "name": "with",
+          "args": "x:, y:, z:",
+          "about": "a copy with some parts changed: v.with(y: 0)"
+        },
+        {
+          "name": "distance_to",
+          "args": "other",
+          "about": "the distance to another point",
+          "top": 19,
+          "example": "near = transform.position.distance_to(@player.transform.position) < 2.0"
+        },
+        {
+          "name": "approx?",
+          "args": "other, tolerance = 0.0001",
+          "about": "whether two vectors are about the same"
+        },
+        {
+          "name": "to_a",
+          "about": "[x, y, z]"
+        },
+        {
+          "name": "set",
+          "args": "x, y, z",
+          "about": "changes it in place"
+        },
+        {
+          "name": "add!",
+          "args": "other",
+          "about": "adds in place"
+        },
+        {
+          "name": "sub!",
+          "args": "other",
+          "about": "subtracts in place"
+        },
+        {
+          "name": "scale!",
+          "args": "number",
+          "about": "scales in place"
+        },
+        {
+          "name": "normalize!",
+          "about": "normalizes in place"
+        }
+      ],
+      "internal": [
+        "eql?",
+        "hash",
+        "inspect",
+        "to_s"
+      ],
+      "notes": "`==` compares the numbers exactly, and equal vectors are one key of a `Hash`. A vector used as a key must not be changed in place (`set`, `add!`...) while the `Hash` holds it: use a `dup` as the key. The scene keeps positions, rotations and scales in 32-bit floats, so a vector that goes through it comes back rounded: compare what comes back from the scene with `approx?(other, tolerance)`. The in-place methods change the vector and hand it back: `dup` one you got from someone else first."
+    },
+    {
+      "name": "Scene",
+      "about": "The objects of the running scene.",
+      "methods": [
+        {
+          "name": "find",
+          "static": true,
+          "args": "name",
+          "about": "the object called name, or nil"
+        },
+        {
+          "name": "find!",
+          "static": true,
+          "args": "name",
+          "about": "find that stops with a clear error when the object is missing"
+        },
+        {
+          "name": "find_all",
+          "static": true,
+          "args": "tag",
+          "about": "every object with that tag"
+        },
+        {
+          "name": "objects",
+          "static": true,
+          "about": "every object"
+        },
+        {
+          "name": "spawn",
+          "static": true,
+          "args": "template, position: nil, rotation: nil, physics: true",
+          "about": "copies a prefab = true template, with its physics and scripts; returns the copy",
+          "top": 20,
+          "example": "Scene.spawn(\"Bullet\", position: transform.position, rotation: transform.rotation)"
+        }
+      ],
+      "guide": "gameplay.md"
+    },
+    {
+      "name": "SceneScript",
+      "about": "Sets a level up from Ruby when it loads: scripts/<scene>_scene.rb.",
+      "methods": [
+        {
+          "name": "setup",
+          "about": "runs when the level loads, before any behaviour starts",
+          "top": 21,
+          "example": "def setup = find!(\"Player\").add_component(Player, speed: 6.0)"
+        },
+        {
+          "name": "find",
+          "args": "name",
+          "about": "the object called name, or nil"
+        },
+        {
+          "name": "find!",
+          "args": "name",
+          "about": "find that stops with a clear error when the object is missing"
+        },
+        {
+          "name": "find_all",
+          "args": "tag",
+          "about": "every object with that tag"
+        }
+      ],
+      "guide": "behaviours.md#setting-a-level-up-in-ruby"
+    },
+    {
+      "name": "Input",
+      "about": "Keyboard, mouse, gamepad and touch, read every frame.",
+      "methods": [
+        {
+          "name": "axis",
+          "static": true,
+          "args": "name",
+          "about": ":horizontal or :vertical, from -1 to 1 (keys, stick)",
+          "top": 10,
+          "example": "x = Input.axis(:horizontal)"
+        },
+        {
+          "name": "down?",
+          "static": true,
+          "args": "key",
+          "about": "whether a key is held"
+        },
+        {
+          "name": "pressed?",
+          "static": true,
+          "args": "key",
+          "about": "whether a key went down this frame",
+          "top": 11,
+          "example": "character.jump(8.0) if Input.pressed?(:space) && character.grounded?"
+        },
+        {
+          "name": "released?",
+          "static": true,
+          "args": "key",
+          "about": "whether a key went up this frame"
+        },
+        {
+          "name": "action?",
+          "static": true,
+          "args": "name",
+          "about": "whether a named action (game settings) is held"
+        },
+        {
+          "name": "action_pressed?",
+          "static": true,
+          "args": "name",
+          "about": "whether a named action started this frame"
+        },
+        {
+          "name": "mouse_x",
+          "static": true,
+          "about": "the pointer's x, in pixels"
+        },
+        {
+          "name": "mouse_y",
+          "static": true,
+          "about": "the pointer's y, in pixels"
+        },
+        {
+          "name": "mouse_dx",
+          "static": true,
+          "about": "how far the mouse moved this frame, across"
+        },
+        {
+          "name": "mouse_dy",
+          "static": true,
+          "about": "how far the mouse moved this frame, up and down"
+        },
+        {
+          "name": "mouse_wheel",
+          "static": true,
+          "about": "how far the wheel turned this frame"
+        },
+        {
+          "name": "mouse_down?",
+          "static": true,
+          "args": "button",
+          "about": "whether a mouse button (:left, :right, :middle) is held"
+        },
+        {
+          "name": "mouse_pressed?",
+          "static": true,
+          "args": "button",
+          "about": "whether a mouse button went down this frame"
+        },
+        {
+          "name": "mouse_released?",
+          "static": true,
+          "args": "button",
+          "about": "whether a mouse button went up this frame"
+        },
+        {
+          "name": "mouse_locked=",
+          "static": true,
+          "args": "locked",
+          "about": "hides the pointer and keeps it in the window (first-person cameras)"
+        },
+        {
+          "name": "mouse_locked?",
+          "static": true,
+          "about": "whether the pointer is locked"
+        },
+        {
+          "name": "gamepad?",
+          "static": true,
+          "about": "whether a gamepad is connected"
+        },
+        {
+          "name": "gamepad_axis",
+          "static": true,
+          "args": "axis",
+          "about": ":left_x, :left_y, :right_x, :right_y, :left_trigger, :right_trigger"
+        },
+        {
+          "name": "gamepad_down?",
+          "static": true,
+          "args": "button",
+          "about": "whether a gamepad button (:a, :b, :x, :y...) is held"
+        },
+        {
+          "name": "gamepad_pressed?",
+          "static": true,
+          "args": "button",
+          "about": "whether a gamepad button went down this frame"
+        },
+        {
+          "name": "gamepad_released?",
+          "static": true,
+          "args": "button",
+          "about": "whether a gamepad button went up this frame"
+        },
+        {
+          "name": "text",
+          "static": true,
+          "about": "what was typed this frame"
+        },
+        {
+          "name": "touch_controls=",
+          "static": true,
+          "args": "on",
+          "about": "shows the on-screen stick and buttons of a phone"
+        },
+        {
+          "name": "touch_controls?",
+          "static": true,
+          "about": "whether they are shown"
+        }
+      ],
+      "guide": "gameplay.md"
+    },
+    {
+      "name": "Time",
+      "about": "The game's clock (added to Ruby's Time).",
+      "methods": [
+        {
+          "name": "delta",
+          "static": true,
+          "about": "seconds since the last frame"
+        },
+        {
+          "name": "fixed_delta",
+          "static": true,
+          "about": "seconds of a physics step (1/60)"
+        },
+        {
+          "name": "elapsed",
+          "static": true,
+          "about": "seconds since the game started"
+        },
+        {
+          "name": "frame",
+          "static": true,
+          "about": "how many frames have run"
+        },
+        {
+          "name": "scale",
+          "static": true,
+          "about": "how fast game time runs (1 is normal)"
+        },
+        {
+          "name": "scale=",
+          "static": true,
+          "args": "value",
+          "about": "slows or speeds the game; 0 pauses it"
+        }
+      ]
+    },
+    {
+      "name": "Physics",
+      "about": "Questions to the physics world.",
+      "methods": [
+        {
+          "name": "raycast",
+          "static": true,
+          "args": "origin, direction, max_distance = 1000, ignore = nil",
+          "about": "the first thing a ray hits: {object:, point:, normal:, distance:}, or nil",
+          "top": 22,
+          "example": "hit = Physics.raycast(transform.position, Vector3.down, 2.0, game_object)"
+        }
+      ],
+      "guide": "gameplay.md"
+    },
+    {
+      "name": "CharacterController",
+      "about": "The body of an object with body = \"character\": walks, jumps, climbs steps.",
+      "methods": [
+        {
+          "name": "move",
+          "args": "velocity",
+          "about": "walks with that velocity (m/s) this frame"
+        },
+        {
+          "name": "jump",
+          "args": "speed",
+          "about": "jumps up at that speed"
+        },
+        {
+          "name": "grounded?",
+          "about": "whether it stands on something"
+        },
+        {
+          "name": "velocity",
+          "about": "its velocity"
+        }
+      ],
+      "guide": "gameplay.md"
+    },
+    {
+      "name": "Rigidbody",
+      "about": "The body of an object with body = \"dynamic\" or \"kinematic\".",
+      "methods": [
+        {
+          "name": "velocity",
+          "about": "its velocity"
+        },
+        {
+          "name": "velocity=",
+          "args": "vector",
+          "about": "sets its velocity"
+        },
+        {
+          "name": "add_impulse",
+          "args": "vector",
+          "about": "pushes it"
+        }
+      ]
+    },
+    {
+      "name": "Vehicle",
+      "about": "The body of an object with body = \"vehicle\" and wheels.",
+      "methods": [
+        {
+          "name": "drive",
+          "args": "throttle: 0.0, steering: 0.0, brake: 0.0, handbrake: 0.0",
+          "about": "drives it this frame (each from -1 or 0 to 1)"
+        },
+        {
+          "name": "stop",
+          "about": "brakes fully"
+        },
+        {
+          "name": "speed",
+          "about": "its speed in m/s, signed"
+        },
+        {
+          "name": "velocity",
+          "about": "its velocity"
+        }
+      ],
+      "guide": "gameplay.md"
+    },
+    {
+      "name": "Camera",
+      "about": "The camera the game is seen through.",
+      "methods": [
+        {
+          "name": "main",
+          "static": true,
+          "about": "the object holding the camera"
+        },
+        {
+          "name": "screen_ray",
+          "static": true,
+          "args": "x, y",
+          "about": "[origin, direction] through a pixel of the screen"
+        },
+        {
+          "name": "fov",
+          "static": true,
+          "about": "its vertical field of view, in degrees"
+        },
+        {
+          "name": "fov=",
+          "static": true,
+          "args": "degrees",
+          "about": "sets the field of view"
+        },
+        {
+          "name": "motion_blur",
+          "static": true,
+          "about": "how much the picture streaks with speed, 0 to 1"
+        },
+        {
+          "name": "motion_blur=",
+          "static": true,
+          "args": "amount",
+          "about": "sets it"
+        }
+      ]
+    },
+    {
+      "name": "Light",
+      "about": "game_object.light: the light an object shines with.",
+      "methods": [
+        {
+          "name": "intensity",
+          "about": "watts for a point or spot light, lux for the sun"
+        },
+        {
+          "name": "intensity=",
+          "args": "value",
+          "about": "sets it; shows from the next frame"
+        },
+        {
+          "name": "color",
+          "about": "its color [r, g, b], 0 to 255"
+        },
+        {
+          "name": "color=",
+          "args": "color",
+          "about": ":orange or [r, g, b] from 0 to 255"
+        }
+      ],
+      "internal": [
+        "inspect"
+      ],
+      "guide": "gameplay.md#light-that-flickers-and-fades"
+    },
+    {
+      "name": "Animation",
+      "about": "The scene's own animations (exported from Blender), by name.",
+      "methods": [
+        {
+          "name": "names",
+          "static": true,
+          "about": "the names of the scene's animations"
+        },
+        {
+          "name": "play",
+          "static": true,
+          "args": "name, loop: true, speed: 1.0, restart: false",
+          "about": "plays one"
+        },
+        {
+          "name": "pause",
+          "static": true,
+          "args": "name",
+          "about": "pauses one"
+        },
+        {
+          "name": "stop",
+          "static": true,
+          "args": "name",
+          "about": "stops one"
+        },
+        {
+          "name": "playing?",
+          "static": true,
+          "args": "name",
+          "about": "whether it plays"
+        },
+        {
+          "name": "time",
+          "static": true,
+          "args": "name",
+          "about": "where it is, in seconds"
+        },
+        {
+          "name": "duration",
+          "static": true,
+          "args": "name",
+          "about": "how long it is, in seconds"
+        },
+        {
+          "name": "seek",
+          "static": true,
+          "args": "name, seconds",
+          "about": "jumps to a moment"
+        }
+      ],
+      "guide": "animation.md"
+    },
+    {
+      "name": "Animator",
+      "about": "game_object.animation (animation in a behaviour): an object's own clips.",
+      "methods": [
+        {
+          "name": "play",
+          "args": "name, loop: true, speed: 1.0, fade: 0.0, restart: false",
+          "about": "plays a clip, fading from the last one",
+          "top": 23,
+          "example": "animation.play(:Run, fade: 0.2)"
+        },
+        {
+          "name": "mix",
+          "args": "name, weight: 1.0, loop: true, speed: 1.0",
+          "about": "plays a clip over the one playing"
+        },
+        {
+          "name": "unmix",
+          "about": "stops the clip mixed over"
+        },
+        {
+          "name": "pause",
+          "about": "pauses its clips"
+        },
+        {
+          "name": "follow_scene",
+          "args": "fade: 0.0",
+          "about": "goes back to the scene's animations"
+        },
+        {
+          "name": "clip",
+          "about": "the clip playing"
+        },
+        {
+          "name": "playing?",
+          "about": "whether a clip plays"
+        },
+        {
+          "name": "time",
+          "about": "where the clip is, in seconds"
+        },
+        {
+          "name": "use",
+          "args": "graph",
+          "about": "installs an Animation::Graph"
+        },
+        {
+          "name": "set",
+          "args": "parameter, value",
+          "about": "sets a parameter of the graph"
+        },
+        {
+          "name": "state",
+          "about": "the graph's state, or nil"
+        }
+      ],
+      "guide": "animation.md"
+    },
+    {
+      "name": "Animation::Graph",
+      "about": "Named states and transitions for one character (animation.use(graph)).",
+      "methods": [
+        {
+          "name": "new",
+          "static": true,
+          "args": "initial:, parameters: {}",
+          "about": "a graph starting at a state, with its parameters and their defaults"
+        },
+        {
+          "name": "clip",
+          "args": "name, clip, loop: true, speed: 1.0",
+          "about": "a state that plays one clip"
+        },
+        {
+          "name": "blend_1d",
+          "args": "name, parameter:, clips:, loop: true, speed: 1.0",
+          "about": "a state that blends clips by a number: clips: [[0.0, :Idle], [5.0, :Run]]"
+        },
+        {
+          "name": "transition",
+          "args": "from, to, parameter:, equals: nil, above: nil, below: nil, fade: 0.0",
+          "about": "goes from one state to another when a parameter says so"
+        }
+      ],
+      "guide": "animation.md"
+    },
+    {
+      "name": "Audio",
+      "about": "Sounds and music from the game's sounds/ folder.",
+      "methods": [
+        {
+          "name": "play",
+          "static": true,
+          "args": "name, volume: 1.0, pitch: 1.0",
+          "about": "plays a sound once",
+          "top": 24,
+          "example": "Audio.play(:jump)"
+        },
+        {
+          "name": "music",
+          "static": true,
+          "args": "name, loop: true, volume: 0.7",
+          "about": "plays music"
+        },
+        {
+          "name": "stop_music",
+          "static": true,
+          "about": "stops the music"
+        },
+        {
+          "name": "music_pitch=",
+          "static": true,
+          "args": "pitch",
+          "about": "changes the music's pitch"
+        },
+        {
+          "name": "music_volume=",
+          "static": true,
+          "args": "volume",
+          "about": "changes the music's volume"
+        },
+        {
+          "name": "volume=",
+          "static": true,
+          "args": "volume",
+          "about": "the volume of everything"
+        },
+        {
+          "name": "play_at",
+          "static": true,
+          "args": "name, position, loop: false, volume: 1.0, pitch: 1.0, reference_distance: 1.0, max_distance: 50.0",
+          "about": "plays a sound at a place in the world; returns its id, or nil"
+        },
+        {
+          "name": "listener",
+          "static": true,
+          "args": "position, forward, up",
+          "about": "where the ears are (move it with the camera)"
+        },
+        {
+          "name": "move",
+          "static": true,
+          "args": "id, position",
+          "about": "moves a sound played with play_at"
+        },
+        {
+          "name": "playing?",
+          "static": true,
+          "args": "id",
+          "about": "whether that sound still plays"
+        },
+        {
+          "name": "stop",
+          "static": true,
+          "args": "id",
+          "about": "stops that sound"
+        },
+        {
+          "name": "stop_sources",
+          "static": true,
+          "about": "stops every sound played with play_at"
+        }
+      ],
+      "notes": "`play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 64 sources play at once; old ids are never reused."
+    },
+    {
+      "name": "UI",
+      "about": "What a script draws over the game this frame: texts, rectangles, pictures, buttons.",
+      "methods": [
+        {
+          "name": "text",
+          "static": true,
+          "args": "str, x:, y:, size:, color:, alpha:, align:",
+          "about": "draws a text",
+          "top": 25,
+          "example": "UI.text(\"Coins: #{@coins}\", x: 20, y: 20, size: 32, color: :yellow)"
+        },
+        {
+          "name": "rect",
+          "static": true,
+          "args": "x:, y:, width:, height:, color:, alpha:, radius:",
+          "about": "draws a rectangle"
+        },
+        {
+          "name": "image",
+          "static": true,
+          "args": "name, x:, y:, width:, height:",
+          "about": "draws a picture of images/"
+        },
+        {
+          "name": "button",
+          "static": true,
+          "args": "label, x:, y:, width:, height:",
+          "about": "draws a button; true the frame it is clicked"
+        },
+        {
+          "name": "text_field",
+          "static": true,
+          "args": "value, x:, y:, width:, height:, max_length:, secret:",
+          "about": "a field to type in; returns the new value"
+        },
+        {
+          "name": "width",
+          "static": true,
+          "about": "the width of the screen, in pixels"
+        },
+        {
+          "name": "height",
+          "static": true,
+          "about": "the height of the screen, in pixels"
+        },
+        {
+          "name": "text_width",
+          "static": true,
+          "args": "str, size:",
+          "about": "how wide a text is, in pixels"
+        }
+      ],
+      "internal": [
+        "button_fill",
+        "centered",
+        "chop",
+        "clicked?",
+        "continuation?",
+        "held?",
+        "inside_letter?",
+        "label_size",
+        "letters",
+        "mouse_over?",
+        "rgb",
+        "shade"
+      ],
+      "guide": "gameplay.md"
+    },
+    {
+      "name": "Debug",
+      "about": "Messages to the console (and to redgem run).",
+      "methods": [
+        {
+          "name": "log",
+          "static": true,
+          "args": "message",
+          "about": "says something"
+        },
+        {
+          "name": "warn",
+          "static": true,
+          "args": "message",
+          "about": "warns"
+        },
+        {
+          "name": "error",
+          "static": true,
+          "args": "message",
+          "about": "reports an error"
+        }
+      ]
+    },
+    {
+      "name": "Game",
+      "about": "The game itself.",
+      "methods": [
+        {
+          "name": "load_scene",
+          "static": true,
+          "args": "name",
+          "about": "switches to scenes/<name>.glb (\"main\" is scene.glb); Ruby globals survive"
+        },
+        {
+          "name": "scene_name",
+          "static": true,
+          "about": "the scene running"
+        },
+        {
+          "name": "title",
+          "static": true,
+          "about": "the game's title"
+        },
+        {
+          "name": "quit",
+          "static": true,
+          "about": "ends the game"
+        },
+        {
+          "name": "stop_recording",
+          "static": true,
+          "about": "ends a video recorded with --record; the game goes on"
+        }
+      ]
+    },
+    {
+      "name": "GameMenu",
+      "about": "A behaviour: title screen, pause menu and end screen.",
+      "methods": [
+        {
+          "name": "instance",
+          "static": true,
+          "about": "the menu of the scene, or nil"
+        },
+        {
+          "name": "show",
+          "args": "screen",
+          "about": "opens a screen: :title, :pause, :over or one of the game's"
+        },
+        {
+          "name": "resume",
+          "about": "closes the menu and goes on"
+        },
+        {
+          "name": "restart",
+          "about": "starts the scene again"
+        },
+        {
+          "name": "finish",
+          "args": "message",
+          "about": "opens the end screen with a message"
+        },
+        {
+          "name": "open?",
+          "about": "whether the menu is open"
+        },
+        {
+          "name": "screen",
+          "about": "the screen open"
+        },
+        {
+          "name": "screens",
+          "about": "the screens, by name"
+        },
+        {
+          "name": "button_box",
+          "args": "index",
+          "about": "where the menu's button of that index is: [x, y, width, height]"
+        }
+      ],
+      "internal": [
+        "start",
+        "update"
+      ],
+      "guide": "gameplay.md#pause-and-the-flow-between-screens"
+    },
+    {
+      "name": "GameMenu::Screen",
+      "about": "A screen of the GameMenu.",
+      "methods": [
+        {
+          "name": "new",
+          "static": true,
+          "args": "heading:, options:, back:",
+          "about": "a screen with a heading and options: [[label, action], ...]"
+        },
+        {
+          "name": "add_option",
+          "args": "label, index:, &action",
+          "about": "adds an option"
+        },
+        {
+          "name": "heading",
+          "about": "its heading"
+        },
+        {
+          "name": "heading=",
+          "args": "text",
+          "about": "changes its heading"
+        },
+        {
+          "name": "options",
+          "about": "its options"
+        },
+        {
+          "name": "back",
+          "about": "the screen Esc goes back to"
+        },
+        {
+          "name": "opened",
+          "about": "called when it is shown"
+        },
+        {
+          "name": "closed",
+          "about": "called when it is left"
+        },
+        {
+          "name": "draw",
+          "args": "first_button",
+          "about": "draws what else it shows"
+        },
+        {
+          "name": "space_above",
+          "about": "pixels kept between its heading and its buttons"
+        },
+        {
+          "name": "typing?",
+          "about": "whether letters are typed into it"
+        }
+      ],
+      "guide": "gameplay.md#pause-and-the-flow-between-screens"
+    },
+    {
+      "name": "Particles",
+      "about": "Short-lived sparks, smoke and dust.",
+      "methods": [
+        {
+          "name": "burst",
+          "static": true,
+          "args": "position, count:, color:, alpha:, glow:, lit:, cast_shadow:, soft:, direction:, spread:, speed:, life:, size:, gravity:, image:, frames:, fps:, spin:",
+          "about": "adds particles; returns how many (size, color and alpha may be lists over their life)"
+        },
+        {
+          "name": "count",
+          "static": true,
+          "about": "how many are alive"
+        },
+        {
+          "name": "clear",
+          "static": true,
+          "about": "removes them all"
+        }
+      ],
+      "internal": [
+        "colors",
+        "list_of_colors?",
+        "numbers"
+      ],
+      "guide": "gameplay.md#over-their-life"
+    },
+    {
+      "name": "Scatter",
+      "about": "Great numbers of copies of a mesh (grass, trees, rocks), drawn only.",
+      "methods": [
+        {
+          "name": "place",
+          "static": true,
+          "args": "template, count:, area:, ground: nil, seed: 0, scale: 1.0, align: false, tints:, tint_variation:, fade:, normals_up:, lods:",
+          "about": "places copies; returns a set (count, remove)"
+        },
+        {
+          "name": "clear",
+          "static": true,
+          "about": "removes every set"
+        },
+        {
+          "name": "count",
+          "about": "how many copies a set placed"
+        },
+        {
+          "name": "remove",
+          "about": "removes a set"
+        }
+      ],
+      "internal": [
+        "look_options"
+      ],
+      "guide": "../levels.md#grass-forests-and-cities"
+    },
+    {
+      "name": "Save",
+      "about": "What the game keeps between runs.",
+      "methods": [
+        {
+          "name": "get",
+          "static": true,
+          "args": "key, default = nil",
+          "about": "a value, or the default"
+        },
+        {
+          "name": "set",
+          "static": true,
+          "args": "key, value",
+          "about": "keeps a value (nil removes it)"
+        },
+        {
+          "name": "[]",
+          "static": true,
+          "args": "key",
+          "about": "the same as get"
+        },
+        {
+          "name": "[]=",
+          "static": true,
+          "args": "key, value",
+          "about": "the same as set"
+        },
+        {
+          "name": "update",
+          "static": true,
+          "args": "key, default = nil, &block",
+          "about": "reads and writes a key with nothing in between"
+        },
+        {
+          "name": "delete",
+          "static": true,
+          "args": "key",
+          "about": "removes a key"
+        },
+        {
+          "name": "clear",
+          "static": true,
+          "about": "removes everything"
+        },
+        {
+          "name": "keys",
+          "static": true,
+          "about": "every key"
+        }
+      ],
+      "guide": "online-services.md#saving-on-a-server",
+      "notes": "Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys."
+    },
+    {
+      "name": "HTTP",
+      "about": "Web requests; the answer comes to the block.",
+      "methods": [
+        {
+          "name": "get",
+          "static": true,
+          "args": "url, headers: {}, timeout: 15, &block",
+          "about": "GET"
+        },
+        {
+          "name": "post",
+          "static": true,
+          "args": "url, json: nil, body: nil, headers: {}, timeout: 15, &block",
+          "about": "POST"
+        },
+        {
+          "name": "put",
+          "static": true,
+          "args": "url, json: nil, body: nil, headers: {}, timeout: 15, &block",
+          "about": "PUT"
+        },
+        {
+          "name": "patch",
+          "static": true,
+          "args": "url, json: nil, body: nil, headers: {}, timeout: 15, &block",
+          "about": "PATCH"
+        },
+        {
+          "name": "delete",
+          "static": true,
+          "args": "url, headers: {}, timeout: 15, &block",
+          "about": "DELETE"
+        },
+        {
+          "name": "request",
+          "static": true,
+          "args": "verb, url, json: nil, body: nil, headers: {}, timeout: 15, &block",
+          "about": "any verb"
+        }
+      ],
+      "guide": "online-services.md#http"
+    },
+    {
+      "name": "HTTP::Response",
+      "about": "What a web request's block is given.",
+      "methods": [
+        {
+          "name": "ok?",
+          "about": "whether it came back with a 2xx status"
+        },
+        {
+          "name": "status",
+          "about": "its status"
+        },
+        {
+          "name": "headers",
+          "about": "its headers"
+        },
+        {
+          "name": "body",
+          "about": "its body"
+        },
+        {
+          "name": "json",
+          "about": "its body read as JSON"
+        },
+        {
+          "name": "error",
+          "about": "why there was no answer, or nil"
+        }
+      ],
+      "guide": "online-services.md#http"
+    },
+    {
+      "name": "I18n",
+      "about": "The game's texts in several languages (locales/*.json).",
+      "methods": [
+        {
+          "name": "t",
+          "static": true,
+          "args": "key, **values",
+          "about": "the text of a key in the language in use, its {placeholders} filled"
+        },
+        {
+          "name": "locale",
+          "static": true,
+          "about": "the language in use (:en)"
+        },
+        {
+          "name": "locale=",
+          "static": true,
+          "args": "language",
+          "about": "changes the language"
+        },
+        {
+          "name": "available_locales",
+          "static": true,
+          "about": "the languages of the game's locales/ files"
+        }
+      ],
+      "guide": "i18n.md"
+    },
+    {
+      "name": "Network",
+      "about": "Games played together: on a local network, through a relay or on a dedicated server.",
+      "methods": [
+        {
+          "name": "host",
+          "static": true,
+          "args": "port: 7777, name: nil, visible: true, room: false",
+          "about": "hosts a game"
+        },
+        {
+          "name": "join",
+          "static": true,
+          "args": "address = nil, port: 7777, room: nil, auth: nil",
+          "about": "joins a game (an address, or a room code)"
+        },
+        {
+          "name": "leave",
+          "static": true,
+          "about": "leaves the game"
+        },
+        {
+          "name": "online?",
+          "static": true,
+          "about": "whether this machine is in a game"
+        },
+        {
+          "name": "connecting?",
+          "static": true,
+          "about": "whether a join is on its way"
+        },
+        {
+          "name": "host?",
+          "static": true,
+          "about": "whether this machine hosts"
+        },
+        {
+          "name": "server?",
+          "static": true,
+          "about": "whether this machine is a dedicated server"
+        },
+        {
+          "name": "id",
+          "static": true,
+          "about": "this machine's peer id"
+        },
+        {
+          "name": "peers",
+          "static": true,
+          "about": "the peers of the game"
+        },
+        {
+          "name": "players",
+          "static": true,
+          "about": "the peers without a dedicated server"
+        },
+        {
+          "name": "port",
+          "static": true,
+          "about": "the port of the game"
+        },
+        {
+          "name": "room",
+          "static": true,
+          "about": "the room code, on a relay"
+        },
+        {
+          "name": "relay",
+          "static": true,
+          "about": "the relay's address"
+        },
+        {
+          "name": "relay=",
+          "static": true,
+          "args": "address",
+          "about": "sets the relay's address"
+        },
+        {
+          "name": "search",
+          "static": true,
+          "about": "looks for games on the local network"
+        },
+        {
+          "name": "searching?",
+          "static": true,
+          "about": "whether it is looking"
+        },
+        {
+          "name": "stop_search",
+          "static": true,
+          "about": "stops looking"
+        },
+        {
+          "name": "games",
+          "static": true,
+          "about": "the games found"
+        },
+        {
+          "name": "discovery_port",
+          "static": true,
+          "about": "the port games are looked for on"
+        },
+        {
+          "name": "discovery_port=",
+          "static": true,
+          "args": "port",
+          "about": "changes it"
+        },
+        {
+          "name": "emit",
+          "static": true,
+          "args": "name, data = nil, to: :all",
+          "about": "sends a message (:all, :host or a peer id)"
+        },
+        {
+          "name": "on",
+          "static": true,
+          "args": "name, &block",
+          "about": "receives a message: |data, from|"
+        },
+        {
+          "name": "on_connect",
+          "static": true,
+          "args": "&block",
+          "about": "this machine is in the game"
+        },
+        {
+          "name": "on_disconnect",
+          "static": true,
+          "args": "&block",
+          "about": "the game is gone"
+        },
+        {
+          "name": "on_join",
+          "static": true,
+          "args": "&block",
+          "about": "someone arrived: |peer|"
+        },
+        {
+          "name": "on_leave",
+          "static": true,
+          "args": "&block",
+          "about": "someone left: |peer|"
+        },
+        {
+          "name": "on_fail",
+          "static": true,
+          "args": "&block",
+          "about": "a join did not work out: |reason|"
+        },
+        {
+          "name": "authenticate",
+          "static": true,
+          "args": "&block",
+          "about": "decides who gets in: |peer, auth, decide|"
+        },
+        {
+          "name": "identity",
+          "static": true,
+          "args": "peer",
+          "about": "who a peer was accepted as"
+        },
+        {
+          "name": "player_name",
+          "static": true,
+          "args": "peer",
+          "about": "a peer's name"
+        },
+        {
+          "name": "spawn",
+          "static": true,
+          "args": "template, owner: Network.id, position:, rotation:",
+          "about": "spawns a copy on every machine"
+        },
+        {
+          "name": "allow_spawn",
+          "static": true,
+          "args": "*templates",
+          "about": "lets guests spawn those templates"
+        }
+      ],
+      "guide": "multiplayer.md"
+    },
+    {
+      "name": "Network::Decision",
+      "about": "What an authenticate block decides with.",
+      "methods": [
+        {
+          "name": "accept",
+          "args": "identity:, name: nil",
+          "about": "lets the peer in"
+        },
+        {
+          "name": "deny",
+          "args": "reason = \"not let in\"",
+          "about": "keeps the peer out"
+        }
+      ],
+      "guide": "online-services.md"
+    },
+    {
+      "name": "NetworkSync",
+      "about": "A behaviour: the same object in the same place on every machine.",
+      "methods": [
+        {
+          "name": "mine?",
+          "about": "whether this machine owns it"
+        },
+        {
+          "name": "owner",
+          "about": "the peer that owns it"
+        },
+        {
+          "name": "owner=",
+          "args": "peer",
+          "about": "gives it to a peer"
+        },
+        {
+          "name": "key",
+          "about": "the name it is known by on every machine"
+        },
+        {
+          "name": "assign",
+          "args": "owner:, key:",
+          "about": "sets its owner and key"
+        }
+      ],
+      "internal": [
+        "animated?",
+        "on_destroy",
+        "start",
+        "toward",
+        "update",
+        "watch_afresh"
+      ],
+      "guide": "multiplayer.md#objects-in-the-same-place-everywhere"
+    }
+  ]
+}

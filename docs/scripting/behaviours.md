@@ -1,3 +1,7 @@
+---
+description: Behaviours: Ruby classes attached to objects, their callbacks, settings and scene scripts.
+---
+
 # Behaviours
 
 A behaviour is a Ruby class that inherits from `Behaviour`. Attached to an object, it gets one

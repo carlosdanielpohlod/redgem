@@ -1,128 +1,515 @@
+---
+description: Every class and method of the scripting API, a line each (also: redgem api).
+---
+
 # API reference
 
-The classes and methods scripts use most. For how they fit together, see [Behaviours](behaviours.md)
-and [Gameplay recipes](gameplay.md).
+The scripting API of RedGem games: the classes and methods scripts use. Generated from docs/scripting/api.json, which tests keep in step with the engine.
 
-| Object | Highlights |
-|--------|-----------|
-| `Behaviour` | `start`, `update(dt)`, `fixed_update(dt)`, `on_trigger_enter/exit(other)`, `on_collision_enter/exit(other)`, `on_destroy`; helpers `game_object`, `name`, `transform`, `character`, `rigidbody`, `vehicle`, `props`, `prop`, `find`, `find_all`, `destroy`, `get_component`; timers `after(seconds) { }`, `every(seconds) { }`, `tween(seconds, ease: :smooth) { |t| }`, `cancel_timers` |
-| `GameObject` | `name`, `tag`, `tag?`, `props`, `alive?`, `destroy`, `visible` / `visible=`, `behaviours`, `parent`, `children`, `transform`, `character`, `rigidbody`, `vehicle`, `get_component(Klass)`, `add_component(Klass, speed: 2.0)`, `tint(=)` (multiplies its colors: `[1.0, 0.5, 0.5]`), `light` (the light it shines with, or `nil`), `animation` (its own clips, see `Animator`), `animation_offset(=)` (seconds a spawned copy's animations run ahead of the original's) |
-| `Transform` | `position(=)`, `local_position(=)`, `rotation(=)` (Euler degrees), `rotate`, `look_at`, `translate`, `scale(=)`, `forward`, `right`, `up` |
-| `CharacterController` | `move(velocity)`, `jump(speed)`, `grounded?`, `velocity` |
-| `Rigidbody` | `velocity(=)`, `add_impulse(vector)` |
-| `Light` | `game_object.light`: `intensity(=)` (watts for a point or spot light, lux for the sun, as in Blender), `color(=)` (`:orange` or `[r, g, b]` from 0 to 255); a change shows from the next frame (see [Gameplay recipes](gameplay.md#light-that-flickers-and-fades)) |
-| `Vehicle` | `drive(throttle:, steering:, brake:, handbrake:)`, `stop`, `speed` (m/s, signed), `velocity` |
-| `Physics` | `raycast(origin, direction, max_distance = 1000, ignore = nil)` → `{object:, point:, normal:, distance:}` or `nil` |
-| `Input` | `axis(:horizontal / :vertical)`, `down?(:space)`, `pressed?`, `released?`, `action?(:jump)`, `action_pressed?`, `action_released?`; actions and axes of the game's own (`game.json`'s `input` section, `define_action(:dash, keys: [:e], buttons: [:b])`, `define_axis(:steer, negative: ["key:a"], positive: ["key:d"], pad_axis: :left_x)`), `actions`, `axes`; a player's bindings: `bindings(:jump)`, `bind(:jump, key: :k)`, `unbind`, `reset_bindings`, kept between runs (named as the game's save is); `capture_next(cancel: ["key:escape", "pad:b", "pad:back"]) { \|binding, pad\| }` (binding `nil`: called off), `capturing?`, `cancel_capture` (see [Controls](gameplay.md#controls)); mouse: `mouse_x`, `mouse_y`, `mouse_dx`, `mouse_dy`, `mouse_wheel`, `mouse_down?(:left)`, `mouse_pressed?`, `mouse_released?`, `mouse_locked=`; gamepad: `pads` (the numbers of those plugged in), `gamepad?`, `gamepad_axis(:left_x)`, `gamepad_down?(:a)`, `gamepad_pressed?`, `gamepad_released?`; every action, axis, binding and gamepad call takes `pad:` (0 to 3: the player, 0 when left out); `text` (typed this frame); `touch_controls=` (the on-screen stick and buttons of a phone) |
-| `Time` | `delta`, `fixed_delta`, `elapsed`, `frame`, `scale(=)` (0 pauses the game) |
-| `Scene` / `Camera` | `Scene.find(name)`, `Scene.find_all(tag)`, `Scene.objects`, `Camera.main`, `Camera.screen_ray(x, y)` → `[origin, direction]`, `Camera.fov(=)` (degrees), `Camera.motion_blur(=)` (0..1: the picture streaks away from its center, as when moving fast) |
-| `SceneScript` | `setup`, `find`, `find_all`, `find!` (see [Setting a level up in Ruby](behaviours.md#setting-a-level-up-in-ruby)) |
-| `Scene.spawn` | `Scene.spawn("Bullet", position: v, rotation: euler, physics: true)` copies a `prefab = true` template (hidden and inert in the game) with its physics and scripts; copies of animated characters move like the original |
-| `Scatter` | `Scatter.place("GrassTuft", count: 50_000, area: [corner, corner], ground: Scene.find("Ground"), seed: 7, scale: 0.7..1.4, align: true)` puts copies of an object's mesh (its scale, tint, drawing distances and `cast_shadow` too) in great numbers: only drawn, never objects of their own, the same places for the same seed on every machine. Each stands where a ray straight down meets `ground` (none where it misses it); without `ground`, on the area's bottom. `align: true` leans them with the slope. How they look: `tints: [[r, g, b], ...]` (each copy a color along the list), `tint_variation: 0.1` (brighter or darker by up to that share), `fade: 8.0` (meters over which they fade out before the template's `visible_to` instead of popping), `normals_up: 0.7` (grass lit as the ground it stands on). `lods: [["TreeMid", 40.0], ["TreeFar", 120.0]]` replaces the mesh at increasing distances (see [distance LODs](../levels.md#scatter-distance-lods)). Returns a set: `count` (how many were placed), `remove`; `Scatter.clear` removes them all. A scene holds at most 262,144 (see [Levels](../levels.md#grass-forests-and-cities)) |
-| `Particles` | `Particles.burst(position, count:, color:, alpha:, glow:, lit:, cast_shadow:, soft:, direction:, spread:, speed:, life:, size:, gravity:, image:, frames: [columns, rows], fps:, spin:)` → how many were added (`size`, `color` and `alpha` may be lists of up to 4 values over the particles' life: see [Gameplay recipes](gameplay.md#over-their-life)), `Particles.count`, `Particles.clear` |
-| `Animation` | `Animation.names`, `play(name, loop: true, speed: 1.0, restart: false)`, `pause(name)`, `stop(name)`, `playing?(name)`, `time(name)`, `duration(name)`, `seek(name, seconds)` |
-| `Animator` | `game_object.animation` (or `animation` in a behaviour): `play(name, loop: true, speed: 1.0, fade: 0.0, restart: false)`, `mix(name, weight: 1.0, loop: true, speed: 1.0)`, `unmix`, `pause`, `follow_scene(fade: 0.0)`, `clip`, `playing?`, `time`; declarative [animation graphs](animation.md): `use(graph)`, `set(parameter, value)`, `state` |
-| `Network` | `host(port: 7777, name:, visible: true, room: false)`, `join(address, port: 7777)` / `join(room: "K7QM3P")` / `join(address, room: "K7QM3P")` (a room on a dedicated server), `relay=`, `room`, `search`, `searching?`, `stop_search`, `games`, `discovery_port=`, `leave`, `online?`, `connecting?`, `host?`, `server?` (this machine is a dedicated server: it plays nobody), `id`, `peers`, `players` (the peers without a dedicated server), `port`, `emit(name, data = nil, to: :all / :host / id)`, `on(name) { \|data, from\| }`, `on_connect`, `on_disconnect`, `on_join { \|peer\| }`, `on_leave { \|peer\| }`, `join(address, auth: { token: })`, `authenticate { \|peer, auth, decide\| }` (`decide.accept(identity:, name:)`, `decide.deny(reason)`), `identity(peer)`, `player_name(peer)`, `on_fail { \|reason\| }` (see [Online services](online-services.md)), `spawn(template, owner: Network.id, position:, rotation:)`, `allow_spawn(*templates)` (see [Multiplayer](multiplayer.md)) |
-| `NetworkSync` | A behaviour: `add_component(NetworkSync, owner: peer_id, key: "name", interpolate: true, delay: nil, animation: true)` (its own animation goes along: the others see the same clips, from the same moment) (see [Multiplayer](multiplayer.md#objects-in-the-same-place-everywhere)), `mine?`, `owner`, `key`, `assign(owner:, key:)` |
-| `Save` | `Save.get(key, default = nil)`, `Save[key]`, `Save[key] = value` (numbers, texts, true/false, `Vector3`, arrays and hashes of those; hashes come back with string keys; `nil` removes the key), `Save.update(key, default = nil) { \|value\| new_value }` (reads and writes the key with nothing in between: on a dedicated server, what changes a value another room may change too), `Save.delete(key)`, `Save.clear`, `Save.keys`; on a dedicated server, the server's own (see [Online services](online-services.md#saving-on-a-server)) |
-| `HTTP` | `HTTP.get/post/put/patch/delete(url, json:, body:, headers:, timeout: 15) { \|response\| }`; `response.ok?`, `status`, `headers`, `body`, `json`, `error` (see [Online services](online-services.md#http)) |
-| `Audio` | [Positional sources](#positional-audio): `Audio.play_at`, `listener`, `move`, `playing?`, `stop`, `stop_sources`; `Audio.play(:jump, volume:, pitch:)`, `Audio.music(:theme, loop: true, volume: 0.7)`, `Audio.stop_music`, `Audio.music_pitch = 1.2`, `Audio.music_volume = 0.5` (change them every frame for an engine's drone), `Audio.volume = 0.8` (files in `sounds/`) |
-| `UI` / `Debug` / `Game` | `UI.text(str, x:, y:, size:, color:, alpha:, align:)`, `UI.rect(x:, y:, width:, height:, color:, alpha:, radius:)`, `UI.image(name, x:, y:, width:, height:)`, `UI.button(label, x:, y:, width:, height:)` → clicked?, `UI.text_field(value, x:, y:, width:, height:, max_length:, secret:)` → the new value (`secret: true` shows stars); for settings screens `UI.toggle(label, on, x:, y:, width:, height:, focused:)` → on?, `UI.choice(label, choices, index, ...)` → the index chosen, `UI.slider(label, value, min:, max:, step:, ...)` → the value, and `UI::Focus.new` (`update(count)` moves it with the arrows or the D-pad, `at?(index)` is passed as `focused:`; a focused widget is worked by Enter or a gamepad's A, and left and right change it), `UI.width`, `UI.height`, `UI.text_width(str, size:)`, `Debug.log/warn/error`, `Game.quit`, `Game.stop_recording` (ends a video being recorded with `--record`, see [Building and sharing](../shipping.md#recording-a-video); the game goes on), `Game.load_scene("level2")` (`scenes/level2.glb`; `"main"` is `scene.glb`; Ruby globals survive), `Game.scene_name`, `Game.title`, `Game.version` (the `version` in `game.json`, such as `"1.2.0"`; `nil` when it gives none, see [Building and sharing](../shipping.md#icon-version-and-splash-picture)) |
-| `GameMenu` | A behaviour: title screen, pause menu, end screen and settings screen (window mode, resolution, render scale, vsync, frame cap, quality, master volume; it keeps them when it is left). Up and down (arrows, D-pad) move the focus, Enter or a gamepad's A picks. `GameMenu.instance`, `show(:pause)`, `show_settings`, `resume`, `restart`, `finish("You win!")`, `open?`, `screen`, `screens` (`:title`, `:pause`, `:over`, `:settings`, and the game's own), `button_box(index)`; `GameMenu::Screen.new(heading:, options:, back:)`, `add_option(label, index:) { }`; settings `title`, `start_open`; its labels are the engine's texts `game.menu.*`, which a game's `locales/` files may change (see [Texts in several languages](i18n.md#the-engines-own-texts)); never opens on a dedicated server (see [Gameplay recipes](gameplay.md#pause-and-the-flow-between-screens)) |
-| `Settings` | How the player chose the game to be shown and heard; each change takes effect at once, `Settings.save` keeps them for the next runs (only in the built game a player plays: in the editor's Play, `redgem run`, a server's rooms and tests they last for the run, and `save` returns false) (defaults: `game.json`, see [Building and sharing](../shipping.md#notes)). `window_mode(=)` (`:windowed`, `:fullscreen`, `:borderless`), `fullscreen?`, `fullscreen =`, `resolution(=)` (`[1920, 1080]`), `resolutions` (the monitor's: `[[w, h], ...]`), `render_scale(=)` (0.5 to 2: the world drawn at that share of the window's size, the interface at the window's own), `vsync(=)`, `fps_cap(=)` (`nil`: none), `quality(=)` (`:low`, `:medium`, `:high`, `:ultra`, `:custom`: the most a level's environment gets of what it asks for, never more), `quality_details(=)` (`{ msaa: 4, antialias: true, shadow_cascades: 2, shadow_distance: 0.5, scatter_density: 0.5, scatter_distance: 0.5, sky_detail: 0.5, ambient_occlusion: 1.0, bloom: 1.0 }`: setting some makes the quality `:custom`), `volume(=)` (the player's volume, 0 to 1: it multiplies the game's own `Audio.volume`, and each keeps its own) |
-| `I18n` | `I18n.t("hud.coins", count: 3)` → the text of a key in the language in use, its `{count}` filled (see [Texts in several languages](i18n.md)), `I18n.locale` (`:en`), `I18n.locale = :pt`, `I18n.available_locales` (the languages of the game's `locales/` files) |
-| `Vector3` | `Vector3.new(x, y, z)`, `Vector3.zero`, `one`, `up`, `down`, `left`, `right`, `forward`, `back`; arithmetic, `dot`, `cross`, `length`, `normalized`, `clamped(max_length = 1.0)`, `lerp`, `flat`, `with(y: 0)`, `distance_to`, `approx?`, `to_a`; in place, for math done thousands of times a frame: `set(x, y, z)`, `add!(v)`, `sub!(v)`, `scale!(k)`, `normalize!` (they change the vector and hand it back: `dup` one you got from someone else first) |
+| Class | What it is |
+|---|---|
+| [`Behaviour`](#behaviour) | A Ruby class attached to an object: the engine calls its methods as the game runs. |
+| [`GameObject`](#gameobject) | An object of the scene, as scripts see it. |
+| [`Transform`](#transform) | Where an object is, how it is turned and how big it is. |
+| [`Vector3`](#vector3) | A point or a direction in meters: x, y, z. |
+| [`Scene`](#scene) | The objects of the running scene. |
+| [`SceneScript`](#scenescript) | Sets a level up from Ruby when it loads: scripts/<scene>_scene.rb. |
+| [`Input`](#input) | Keyboard, mouse, gamepad and touch, read every frame. |
+| [`Time`](#time) | The game's clock (added to Ruby's Time). |
+| [`Physics`](#physics) | Questions to the physics world. |
+| [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
+| [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic". |
+| [`Vehicle`](#vehicle) | The body of an object with body = "vehicle" and wheels. |
+| [`Camera`](#camera) | The camera the game is seen through. |
+| [`Light`](#light) | game_object.light: the light an object shines with. |
+| [`Animation`](#animation) | The scene's own animations (exported from Blender), by name. |
+| [`Animator`](#animator) | game_object.animation (animation in a behaviour): an object's own clips. |
+| [`Animation::Graph`](#animationgraph) | Named states and transitions for one character (animation.use(graph)). |
+| [`Audio`](#audio) | Sounds and music from the game's sounds/ folder. |
+| [`UI`](#ui) | What a script draws over the game this frame: texts, rectangles, pictures, buttons. |
+| [`Debug`](#debug) | Messages to the console (and to redgem run). |
+| [`Game`](#game) | The game itself. |
+| [`GameMenu`](#gamemenu) | A behaviour: title screen, pause menu and end screen. |
+| [`GameMenu::Screen`](#gamemenuscreen) | A screen of the GameMenu. |
+| [`Particles`](#particles) | Short-lived sparks, smoke and dust. |
+| [`Scatter`](#scatter) | Great numbers of copies of a mesh (grass, trees, rocks), drawn only. |
+| [`Save`](#save) | What the game keeps between runs. |
+| [`HTTP`](#http) | Web requests; the answer comes to the block. |
+| [`HTTP::Response`](#httpresponse) | What a web request's block is given. |
+| [`I18n`](#i18n) | The game's texts in several languages (locales/*.json). |
+| [`Network`](#network) | Games played together: on a local network, through a relay or on a dedicated server. |
+| [`Network::Decision`](#networkdecision) | What an authenticate block decides with. |
+| [`NetworkSync`](#networksync) | A behaviour: the same object in the same place on every machine. |
 
-`==` compares the numbers exactly, and equal vectors are one key of a `Hash` (`eql?` and `hash`
-agree with it). As with an `Array`, a vector used as a key must not be changed in place
-(`set`, `add!`...) while the `Hash` holds it: it would no longer be found by its value. Use a
-`dup` as the key. The scene keeps positions, rotations and scales in 32-bit floats, so a vector
-that goes through it comes back rounded: `transform.position = v` and then
-`transform.position == v` can be false. Compare what came back from the scene with
-`approx?(other, tolerance)`.
+## Behaviour
 
-Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running.
-Every native takes finite numbers a float can hold: infinity, NaN (`0.0 / 0.0`) or a number too
-large (`1e300`) raises an `ArgumentError` instead of reaching the scene. So does `Vector3`
-arithmetic whose result would leave that range, and dividing a `Vector3` by zero; a vector changed
-in place (`add!`, `scale!`...) is left as it was when that happens. A setting with a range raises outside it and says the range
-(`Camera.motion_blur must be from 0 to 1, not 3`); nothing is quietly clamped, except
-`Vehicle#drive`'s inputs, which an analog stick may push a little past full.
-Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing
-its rotation keeps its velocity. Vehicle wheel meshes must have their rotation applied (axle along X).
+A Ruby class attached to an object: the engine calls its methods as the game runs. See [behaviours.md](behaviours.md).
 
+- `start`: called once, before the first update
+- `update(dt)`: called every frame; dt is the seconds since the last one
+- `fixed_update(dt)`: called 60 times a second, with the physics
+- `on_trigger_enter(other)`: something entered this object's trigger, or it entered one
+- `on_trigger_exit(other)`: something left this object's trigger
+- `on_collision_enter(other)`: this object's body touched another
+- `on_collision_exit(other)`: this object's body stopped touching another
+- `on_destroy`: the object is being destroyed
+- `game_object`: the object this behaviour is attached to
+- `name`: the object's name
+- `transform`: the object's Transform
+- `character`: the object's CharacterController, or nil
+- `rigidbody`: the object's Rigidbody, or nil
+- `vehicle`: the object's Vehicle, or nil
+- `animation`: the object's own Animator
+- `props`: the object's custom properties, as a Hash
+- `prop(key, default = nil)`: a setting: what add_component was given, else the object's property, else the default
+- `find(name)`: the object called name, or nil
+- `find!(name)`: find that stops with a clear error when the object is missing
+- `find_all(tag)`: every object with that tag
+- `destroy(target = game_object)`: removes an object (this one unless said) at the end of the step
+- `get_component(klass)`: another behaviour of this object, or nil
+- `after(seconds, &block)`: runs the block once, that many seconds from now
+- `every(seconds, &block)`: runs the block every that many seconds
+- `tween(seconds, ease: :smooth, &block)`: calls the block with t from 0 to 1 over that many seconds
+- `cancel_timers`: stops every after, every and tween of this behaviour
 
-## Positional audio
+## GameObject
 
-`Audio.play_at` plays an independent sound from `sounds/`, with world positions in meters.
-It returns a source id, or `nil` when the sound, device or one of the 64 voices is unavailable.
-Sources use stereo panning and inverse-distance volume, fading smoothly to silence at `max_distance`.
-Stereo files are downmixed before positioning. Nonlooping effects use buffered playback; loops stream.
+An object of the scene, as scripts see it. See [behaviours.md](behaviours.md).
 
-```ruby
-Audio.listener([0, 0, 0], [0, 0, -1], [0, 1, 0])
-source = Audio.play_at(:waterfall, [10, 0, -5], loop: true,
-                       volume: 0.8, pitch: 1.0,
-                       reference_distance: 2.0, max_distance: 60.0)
-Audio.move(source, [8, 0, -5]) if source
-Audio.stop(source) if source
-```
+- `name`: its name
+- `id`: its number in the running game
+- `tag`: its tag property
+- `tag?(value)`: whether its tag is value
+- `props`: its custom properties
+- `alive?`: false once it was destroyed
+- `destroy`: removes it at the end of the step
+- `visible`: whether it is drawn
+- `visible = value`: shows or hides it
+- `behaviours`: its behaviours
+- `parent`: the object it is under, or nil
+- `children`: the objects under it
+- `transform`: its Transform
+- `character`: its CharacterController, or nil
+- `rigidbody`: its Rigidbody, or nil
+- `vehicle`: its Vehicle, or nil
+- `light`: the Light it shines with, or nil
+- `animation`: its Animator
+- `animation_offset`: seconds its animations run ahead of the original's (a spawned copy)
+- `animation_offset = seconds`: sets that offset
+- `get_component(klass)`: one of its behaviours, or nil
+- `add_component(klass, **settings)`: attaches a behaviour; settings are what its prop reads
+- `tint`: the color its colors are multiplied by
+- `tint = color`: multiplies its colors: [1.0, 0.5, 0.5]
 
-Update `Audio.listener(position, forward, up)` when the camera moves, and `Audio.move(id, position)`
-when a source moves. The listener defaults to the origin, looking along negative Z, with Y up.
-Its forward and up directions must be nonzero and nonparallel. Vectors may be arrays or `Vector3`.
-These calls do not attach a source to an object or camera automatically.
+## Transform
 
-`volume` defaults to 1 and must be nonnegative; `pitch` defaults to 1 and must be from 0.01 to 8.
-The default full-volume `reference_distance` is 1 meter and the silent `max_distance` is 50 meters;
-both must be finite, with `0 < reference_distance < max_distance`. `loop` defaults to false.
-`Audio.playing?(id)` reports whether a source is playing. `Audio.stop(id)` stops that source;
-`Audio.stop_sources` releases all positional sources, leaving flat effects and music playing.
-Finished sources release their resources automatically; changing the sounds folder clears them too.
-Scene changes within the same game do not stop them automatically. Old ids are never reused.
+Where an object is, how it is turned and how big it is.
 
-## Missing images
+- `position`: its position in the world (Vector3)
+- `position = vector`: moves it; a physics object is teleported
+- `local_position`: its position relative to its parent
+- `local_position = vector`: moves it relative to its parent
+- `rotation`: its rotation, Euler degrees (Vector3)
+- `rotation = degrees`: turns it to those Euler degrees
+- `rotate(degrees)`: turns it by those Euler degrees
+- `look_at(target, up = Vector3.up)`: turns it to face a point
+- `translate(offset)`: moves it by an offset
+- `scale`: its scale (Vector3)
+- `scale = vector`: resizes it
+- `forward`: the direction it faces (-Z)
+- `right`: its right (+X)
+- `up`: its up (+Y)
 
-Missing or unreadable images show an opaque magenta-and-black checkerboard, with a warning.
-This applies to declared scene textures, `UI.image` and particle images. A material that never
-specified a texture keeps its plain color. Refused paths still cannot read outside the game's folder.
+## Vector3
 
-## Game fonts and Unicode
+A point or a direction in meters: x, y, z.
 
-The built-in UI font adds glyphs on demand for text such as `€`, Polish and Turkish letters,
-Greek and Cyrillic. To use another face or a script it does not cover, put a TrueType `.ttf` or
-OpenType `.otf` file in the game's `fonts/` folder and select it:
+- `Vector3.new(x, y, z)`: a vector
+- `Vector3[x, y, z]`: the same as new
+- `Vector3.zero`: (0, 0, 0)
+- `Vector3.one`: (1, 1, 1)
+- `Vector3.up`: (0, 1, 0)
+- `Vector3.down`: (0, -1, 0)
+- `Vector3.left`: (-1, 0, 0)
+- `Vector3.right`: (1, 0, 0)
+- `Vector3.forward`: (0, 0, -1)
+- `Vector3.back`: (0, 0, 1)
+- `Vector3.blender(x, y, z)`: a vector given in Blender's axes (Z up)
+- `x`: its x
+- `y`: its y
+- `z`: its z
+- `+ other`: sum
+- `- other`: difference
+- `-@`: the opposite vector
+- `* number`: scaled
+- `/ number`: divided
+- `== other`: whether the numbers are exactly the same
+- `dot(other)`: dot product
+- `cross(other)`: cross product
+- `length`: its length
+- `length_squared`: its length squared (faster)
+- `normalized`: the same direction, length 1
+- `clamped(max_length = 1.0)`: the same direction, no longer than max_length
+- `lerp(other, t)`: the point t of the way to other
+- `flat`: the same with y = 0
+- `with(x:, y:, z:)`: a copy with some parts changed: v.with(y: 0)
+- `distance_to(other)`: the distance to another point
+- `approx?(other, tolerance = 0.0001)`: whether two vectors are about the same
+- `to_a`: [x, y, z]
+- `set(x, y, z)`: changes it in place
+- `add!(other)`: adds in place
+- `sub!(other)`: subtracts in place
+- `scale!(number)`: scales in place
+- `normalize!`: normalizes in place
 
-```ruby
-UI.font = :custom  # fonts/custom.ttf or fonts/custom.otf
-UI.text("€ Żółć ş Ω Ж", x: 20, y: 20, size: 28)
-width = UI.text_width("€ Żółć ş Ω Ж", size: 28)
-UI.font = nil      # return to the built-in face
-```
+`==` compares the numbers exactly, and equal vectors are one key of a `Hash`. A vector used as a key must not be changed in place (`set`, `add!`...) while the `Hash` holds it: use a `dup` as the key. The scene keeps positions, rotations and scales in 32-bit floats, so a vector that goes through it comes back rounded: compare what comes back from the scene with `approx?(other, tolerance)`. The in-place methods change the vector and hand it back: `dup` one you got from someone else first.
 
-A name may include a subfolder or extension. It must stay inside `fonts/`; links and paths outside
-the game are refused. Font files are included when the game is built. `UI.font` returns the selected
-name, or `nil` for the built-in face. Text captures the selected face when queued, so several faces
-can appear in one frame. Measurement and center/right alignment use the selected face too, in both
-the player and the editor's Play view. Widgets that draw through `UI.text` use the same selection.
+## Scene
 
-Missing, refused or unreadable faces fall back to the built-in font, with a warning. Unsupported
-glyphs use `?`; CJK needs a font containing those characters. Each face keeps at most 2048 requested
-codepoints; the cache holds four named game faces beside the built-in face, with at most 32 MB per
-font file. Changing games clears the named-face cache. New glyphs rebuild the face's atlas only
-when first requested. Text is drawn as individual glyphs: bidirectional layout, complex-script
-shaping and automatic fallback chains are not implemented.
+The objects of the running scene. See [gameplay.md](gameplay.md).
 
-## Static WebP images
+- `Scene.find(name)`: the object called name, or nil
+- `Scene.find!(name)`: find that stops with a clear error when the object is missing
+- `Scene.find_all(tag)`: every object with that tag
+- `Scene.objects`: every object
+- `Scene.spawn(template, position: nil, rotation: nil, physics: true)`: copies a prefab = true template, with its physics and scripts; returns the copy
 
-Images in PNG, JPEG and static WebP are accepted in scene materials, `UI.image`, particles and
-sky pictures. Names without an extension look for `.webp` after the existing PNG/JPEG choices.
-Lossless WebP retains its RGBA pixels, including transparency. Scene imports also support
-`EXT_texture_webp`, using its WebP image when supplied and retaining the plain image for
-unsupported Basis/KTX2 textures.
+## SceneScript
 
-The same limits apply before decoding: at most 8192 pixels per side and 256 MB of encoded data,
-with decoded scene-image sizes included in the aggregate scene budget. Invalid and animated WebP
-use the existing missing-image checkerboard (a missing sky keeps its normal fallback). Animated
-WebP and KTX2/Basis are not supported. WebP reduces file storage; it is decoded to regular pixels
-for rendering and does not reduce GPU texture memory through compression.
+Sets a level up from Ruby when it loads: scripts/<scene>_scene.rb. See [behaviours.md#setting-a-level-up-in-ruby](behaviours.md#setting-a-level-up-in-ruby).
+
+- `setup`: runs when the level loads, before any behaviour starts
+- `find(name)`: the object called name, or nil
+- `find!(name)`: find that stops with a clear error when the object is missing
+- `find_all(tag)`: every object with that tag
+
+## Input
+
+Keyboard, mouse, gamepad and touch, read every frame. See [gameplay.md](gameplay.md).
+
+- `Input.axis(name)`: :horizontal or :vertical, from -1 to 1 (keys, stick)
+- `Input.down?(key)`: whether a key is held
+- `Input.pressed?(key)`: whether a key went down this frame
+- `Input.released?(key)`: whether a key went up this frame
+- `Input.action?(name)`: whether a named action (game settings) is held
+- `Input.action_pressed?(name)`: whether a named action started this frame
+- `Input.mouse_x`: the pointer's x, in pixels
+- `Input.mouse_y`: the pointer's y, in pixels
+- `Input.mouse_dx`: how far the mouse moved this frame, across
+- `Input.mouse_dy`: how far the mouse moved this frame, up and down
+- `Input.mouse_wheel`: how far the wheel turned this frame
+- `Input.mouse_down?(button)`: whether a mouse button (:left, :right, :middle) is held
+- `Input.mouse_pressed?(button)`: whether a mouse button went down this frame
+- `Input.mouse_released?(button)`: whether a mouse button went up this frame
+- `Input.mouse_locked = locked`: hides the pointer and keeps it in the window (first-person cameras)
+- `Input.mouse_locked?`: whether the pointer is locked
+- `Input.gamepad?`: whether a gamepad is connected
+- `Input.gamepad_axis(axis)`: :left_x, :left_y, :right_x, :right_y, :left_trigger, :right_trigger
+- `Input.gamepad_down?(button)`: whether a gamepad button (:a, :b, :x, :y...) is held
+- `Input.gamepad_pressed?(button)`: whether a gamepad button went down this frame
+- `Input.gamepad_released?(button)`: whether a gamepad button went up this frame
+- `Input.text`: what was typed this frame
+- `Input.touch_controls = on`: shows the on-screen stick and buttons of a phone
+- `Input.touch_controls?`: whether they are shown
+
+## Time
+
+The game's clock (added to Ruby's Time).
+
+- `Time.delta`: seconds since the last frame
+- `Time.fixed_delta`: seconds of a physics step (1/60)
+- `Time.elapsed`: seconds since the game started
+- `Time.frame`: how many frames have run
+- `Time.scale`: how fast game time runs (1 is normal)
+- `Time.scale = value`: slows or speeds the game; 0 pauses it
+
+## Physics
+
+Questions to the physics world. See [gameplay.md](gameplay.md).
+
+- `Physics.raycast(origin, direction, max_distance = 1000, ignore = nil)`: the first thing a ray hits: {object:, point:, normal:, distance:}, or nil
+
+## CharacterController
+
+The body of an object with body = "character": walks, jumps, climbs steps. See [gameplay.md](gameplay.md).
+
+- `move(velocity)`: walks with that velocity (m/s) this frame
+- `jump(speed)`: jumps up at that speed
+- `grounded?`: whether it stands on something
+- `velocity`: its velocity
+
+## Rigidbody
+
+The body of an object with body = "dynamic" or "kinematic".
+
+- `velocity`: its velocity
+- `velocity = vector`: sets its velocity
+- `add_impulse(vector)`: pushes it
+
+## Vehicle
+
+The body of an object with body = "vehicle" and wheels. See [gameplay.md](gameplay.md).
+
+- `drive(throttle: 0.0, steering: 0.0, brake: 0.0, handbrake: 0.0)`: drives it this frame (each from -1 or 0 to 1)
+- `stop`: brakes fully
+- `speed`: its speed in m/s, signed
+- `velocity`: its velocity
+
+## Camera
+
+The camera the game is seen through.
+
+- `Camera.main`: the object holding the camera
+- `Camera.screen_ray(x, y)`: [origin, direction] through a pixel of the screen
+- `Camera.fov`: its vertical field of view, in degrees
+- `Camera.fov = degrees`: sets the field of view
+- `Camera.motion_blur`: how much the picture streaks with speed, 0 to 1
+- `Camera.motion_blur = amount`: sets it
+
+## Light
+
+game_object.light: the light an object shines with. See [gameplay.md#light-that-flickers-and-fades](gameplay.md#light-that-flickers-and-fades).
+
+- `intensity`: watts for a point or spot light, lux for the sun
+- `intensity = value`: sets it; shows from the next frame
+- `color`: its color [r, g, b], 0 to 255
+- `color = color`: :orange or [r, g, b] from 0 to 255
+
+## Animation
+
+The scene's own animations (exported from Blender), by name. See [animation.md](animation.md).
+
+- `Animation.names`: the names of the scene's animations
+- `Animation.play(name, loop: true, speed: 1.0, restart: false)`: plays one
+- `Animation.pause(name)`: pauses one
+- `Animation.stop(name)`: stops one
+- `Animation.playing?(name)`: whether it plays
+- `Animation.time(name)`: where it is, in seconds
+- `Animation.duration(name)`: how long it is, in seconds
+- `Animation.seek(name, seconds)`: jumps to a moment
+
+## Animator
+
+game_object.animation (animation in a behaviour): an object's own clips. See [animation.md](animation.md).
+
+- `play(name, loop: true, speed: 1.0, fade: 0.0, restart: false)`: plays a clip, fading from the last one
+- `mix(name, weight: 1.0, loop: true, speed: 1.0)`: plays a clip over the one playing
+- `unmix`: stops the clip mixed over
+- `pause`: pauses its clips
+- `follow_scene(fade: 0.0)`: goes back to the scene's animations
+- `clip`: the clip playing
+- `playing?`: whether a clip plays
+- `time`: where the clip is, in seconds
+- `use(graph)`: installs an Animation::Graph
+- `set(parameter, value)`: sets a parameter of the graph
+- `state`: the graph's state, or nil
+
+## Animation::Graph
+
+Named states and transitions for one character (animation.use(graph)). See [animation.md](animation.md).
+
+- `Animation::Graph.new(initial:, parameters: {})`: a graph starting at a state, with its parameters and their defaults
+- `clip(name, clip, loop: true, speed: 1.0)`: a state that plays one clip
+- `blend_1d(name, parameter:, clips:, loop: true, speed: 1.0)`: a state that blends clips by a number: clips: [[0.0, :Idle], [5.0, :Run]]
+- `transition(from, to, parameter:, equals: nil, above: nil, below: nil, fade: 0.0)`: goes from one state to another when a parameter says so
+
+## Audio
+
+Sounds and music from the game's sounds/ folder.
+
+- `Audio.play(name, volume: 1.0, pitch: 1.0)`: plays a sound once
+- `Audio.music(name, loop: true, volume: 0.7)`: plays music
+- `Audio.stop_music`: stops the music
+- `Audio.music_pitch = pitch`: changes the music's pitch
+- `Audio.music_volume = volume`: changes the music's volume
+- `Audio.volume = volume`: the volume of everything
+- `Audio.play_at(name, position, loop: false, volume: 1.0, pitch: 1.0, reference_distance: 1.0, max_distance: 50.0)`: plays a sound at a place in the world; returns its id, or nil
+- `Audio.listener(position, forward, up)`: where the ears are (move it with the camera)
+- `Audio.move(id, position)`: moves a sound played with play_at
+- `Audio.playing?(id)`: whether that sound still plays
+- `Audio.stop(id)`: stops that sound
+- `Audio.stop_sources`: stops every sound played with play_at
+
+`play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 64 sources play at once; old ids are never reused.
+
+## UI
+
+What a script draws over the game this frame: texts, rectangles, pictures, buttons. See [gameplay.md](gameplay.md).
+
+- `UI.text(str, x:, y:, size:, color:, alpha:, align:)`: draws a text
+- `UI.rect(x:, y:, width:, height:, color:, alpha:, radius:)`: draws a rectangle
+- `UI.image(name, x:, y:, width:, height:)`: draws a picture of images/
+- `UI.button(label, x:, y:, width:, height:)`: draws a button; true the frame it is clicked
+- `UI.text_field(value, x:, y:, width:, height:, max_length:, secret:)`: a field to type in; returns the new value
+- `UI.width`: the width of the screen, in pixels
+- `UI.height`: the height of the screen, in pixels
+- `UI.text_width(str, size:)`: how wide a text is, in pixels
+
+## Debug
+
+Messages to the console (and to redgem run).
+
+- `Debug.log(message)`: says something
+- `Debug.warn(message)`: warns
+- `Debug.error(message)`: reports an error
+
+## Game
+
+The game itself.
+
+- `Game.load_scene(name)`: switches to scenes/<name>.glb ("main" is scene.glb); Ruby globals survive
+- `Game.scene_name`: the scene running
+- `Game.title`: the game's title
+- `Game.quit`: ends the game
+- `Game.stop_recording`: ends a video recorded with --record; the game goes on
+
+## GameMenu
+
+A behaviour: title screen, pause menu and end screen. See [gameplay.md#pause-and-the-flow-between-screens](gameplay.md#pause-and-the-flow-between-screens).
+
+- `GameMenu.instance`: the menu of the scene, or nil
+- `show(screen)`: opens a screen: :title, :pause, :over or one of the game's
+- `resume`: closes the menu and goes on
+- `restart`: starts the scene again
+- `finish(message)`: opens the end screen with a message
+- `open?`: whether the menu is open
+- `screen`: the screen open
+- `screens`: the screens, by name
+- `button_box(index)`: where the menu's button of that index is: [x, y, width, height]
+
+## GameMenu::Screen
+
+A screen of the GameMenu. See [gameplay.md#pause-and-the-flow-between-screens](gameplay.md#pause-and-the-flow-between-screens).
+
+- `GameMenu::Screen.new(heading:, options:, back:)`: a screen with a heading and options: [[label, action], ...]
+- `add_option(label, index:, &action)`: adds an option
+- `heading`: its heading
+- `heading = text`: changes its heading
+- `options`: its options
+- `back`: the screen Esc goes back to
+- `opened`: called when it is shown
+- `closed`: called when it is left
+- `draw(first_button)`: draws what else it shows
+- `space_above`: pixels kept between its heading and its buttons
+- `typing?`: whether letters are typed into it
+
+## Particles
+
+Short-lived sparks, smoke and dust. See [gameplay.md#over-their-life](gameplay.md#over-their-life).
+
+- `Particles.burst(position, count:, color:, alpha:, glow:, lit:, cast_shadow:, soft:, direction:, spread:, speed:, life:, size:, gravity:, image:, frames:, fps:, spin:)`: adds particles; returns how many (size, color and alpha may be lists over their life)
+- `Particles.count`: how many are alive
+- `Particles.clear`: removes them all
+
+## Scatter
+
+Great numbers of copies of a mesh (grass, trees, rocks), drawn only. See [../levels.md#grass-forests-and-cities](../levels.md#grass-forests-and-cities).
+
+- `Scatter.place(template, count:, area:, ground: nil, seed: 0, scale: 1.0, align: false, tints:, tint_variation:, fade:, normals_up:, lods:)`: places copies; returns a set (count, remove)
+- `Scatter.clear`: removes every set
+- `count`: how many copies a set placed
+- `remove`: removes a set
+
+## Save
+
+What the game keeps between runs. See [online-services.md#saving-on-a-server](online-services.md#saving-on-a-server).
+
+- `Save.get(key, default = nil)`: a value, or the default
+- `Save.set(key, value)`: keeps a value (nil removes it)
+- `Save[key]`: the same as get
+- `Save[key] = value`: the same as set
+- `Save.update(key, default = nil, &block)`: reads and writes a key with nothing in between
+- `Save.delete(key)`: removes a key
+- `Save.clear`: removes everything
+- `Save.keys`: every key
+
+Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys.
+
+## HTTP
+
+Web requests; the answer comes to the block. See [online-services.md#http](online-services.md#http).
+
+- `HTTP.get(url, headers: {}, timeout: 15, &block)`: GET
+- `HTTP.post(url, json: nil, body: nil, headers: {}, timeout: 15, &block)`: POST
+- `HTTP.put(url, json: nil, body: nil, headers: {}, timeout: 15, &block)`: PUT
+- `HTTP.patch(url, json: nil, body: nil, headers: {}, timeout: 15, &block)`: PATCH
+- `HTTP.delete(url, headers: {}, timeout: 15, &block)`: DELETE
+- `HTTP.request(verb, url, json: nil, body: nil, headers: {}, timeout: 15, &block)`: any verb
+
+## HTTP::Response
+
+What a web request's block is given. See [online-services.md#http](online-services.md#http).
+
+- `ok?`: whether it came back with a 2xx status
+- `status`: its status
+- `headers`: its headers
+- `body`: its body
+- `json`: its body read as JSON
+- `error`: why there was no answer, or nil
+
+## I18n
+
+The game's texts in several languages (locales/*.json). See [i18n.md](i18n.md).
+
+- `I18n.t(key, **values)`: the text of a key in the language in use, its {placeholders} filled
+- `I18n.locale`: the language in use (:en)
+- `I18n.locale = language`: changes the language
+- `I18n.available_locales`: the languages of the game's locales/ files
+
+## Network
+
+Games played together: on a local network, through a relay or on a dedicated server. See [multiplayer.md](multiplayer.md).
+
+- `Network.host(port: 7777, name: nil, visible: true, room: false)`: hosts a game
+- `Network.join(address = nil, port: 7777, room: nil, auth: nil)`: joins a game (an address, or a room code)
+- `Network.leave`: leaves the game
+- `Network.online?`: whether this machine is in a game
+- `Network.connecting?`: whether a join is on its way
+- `Network.host?`: whether this machine hosts
+- `Network.server?`: whether this machine is a dedicated server
+- `Network.id`: this machine's peer id
+- `Network.peers`: the peers of the game
+- `Network.players`: the peers without a dedicated server
+- `Network.port`: the port of the game
+- `Network.room`: the room code, on a relay
+- `Network.relay`: the relay's address
+- `Network.relay = address`: sets the relay's address
+- `Network.search`: looks for games on the local network
+- `Network.searching?`: whether it is looking
+- `Network.stop_search`: stops looking
+- `Network.games`: the games found
+- `Network.discovery_port`: the port games are looked for on
+- `Network.discovery_port = port`: changes it
+- `Network.emit(name, data = nil, to: :all)`: sends a message (:all, :host or a peer id)
+- `Network.on(name, &block)`: receives a message: |data, from|
+- `Network.on_connect(&block)`: this machine is in the game
+- `Network.on_disconnect(&block)`: the game is gone
+- `Network.on_join(&block)`: someone arrived: |peer|
+- `Network.on_leave(&block)`: someone left: |peer|
+- `Network.on_fail(&block)`: a join did not work out: |reason|
+- `Network.authenticate(&block)`: decides who gets in: |peer, auth, decide|
+- `Network.identity(peer)`: who a peer was accepted as
+- `Network.player_name(peer)`: a peer's name
+- `Network.spawn(template, owner: Network.id, position:, rotation:)`: spawns a copy on every machine
+- `Network.allow_spawn(*templates)`: lets guests spawn those templates
+
+## Network::Decision
+
+What an authenticate block decides with. See [online-services.md](online-services.md).
+
+- `accept(identity:, name: nil)`: lets the peer in
+- `deny(reason = "not let in")`: keeps the peer out
+
+## NetworkSync
+
+A behaviour: the same object in the same place on every machine. See [multiplayer.md#objects-in-the-same-place-everywhere](multiplayer.md#objects-in-the-same-place-everywhere).
+
+- `mine?`: whether this machine owns it
+- `owner`: the peer that owns it
+- `owner = peer`: gives it to a peer
+- `key`: the name it is known by on every machine
+- `assign(owner:, key:)`: sets its owner and key
+
+## Notes
+
+Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Missing or unreadable images show a magenta-and-black checkerboard, with a warning.
