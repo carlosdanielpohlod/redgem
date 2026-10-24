@@ -4,6 +4,8 @@
 
 #include <mruby.h>
 
+#include <limits>
+
 #include "core/log.hpp"
 #include "net/discovery/lan_discovery.hpp"
 #include "net/network_session.hpp"
@@ -20,6 +22,10 @@ constexpr mrb_int kLargestPort = 65535;
 constexpr const char* kUnavailable = "Network is only available while a game runs";
 
 bool is_a_port(mrb_int port) { return port >= 0 && port <= kLargestPort; }
+
+bool fits_an_int(mrb_int number) {
+  return number >= std::numeric_limits<int>::min() && number <= std::numeric_limits<int>::max();
+}
 
 // What a native answers when what it was asked to start did not: false, with the reason logged.
 mrb_value not_started(const std::string& failure, const std::string& error) {
@@ -105,13 +111,21 @@ mrb_value network_leave(mrb_state* mrb, mrb_value) {
   return mrb_nil_value();
 }
 
+// Whom a message goes to, as the int the session takes: a number past that is no machine's id,
+// and cut down to one it could be everyone's (kEveryone) or the host's.
+int recipient_arg(mrb_state* mrb, mrb_int to) {
+  if (!fits_an_int(to)) mrb_raise(mrb, E_ARGUMENT_ERROR, "no machine has that id");
+  return static_cast<int>(to);
+}
+
 mrb_value network_emit(mrb_state* mrb, mrb_value) {
   const char* name = nullptr;
   mrb_value data;
   mrb_int to = 0;
   mrb_get_args(mrb, "zoi", &name, &data, &to);
   if (std::string(name).size() > net::kMaxNameBytes) mrb_raise(mrb, E_ARGUMENT_ERROR, "a message's name is too long");
-  return mrb_bool_value(network(mrb).send(name, json_from(mrb, data), static_cast<int>(to)));
+  const int recipient = recipient_arg(mrb, to);
+  return mrb_bool_value(network(mrb).send(name, json_from(mrb, data), recipient));
 }
 
 void install_connection_bindings(RClass* network_module, mrb_state* mrb) {

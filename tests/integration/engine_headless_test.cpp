@@ -288,6 +288,78 @@ TEST_CASE("objects survive garbage collection every frame") {
   CHECK(ruby(*engine, "Scene.objects.map(&:name).include?('Crate')") == "true");
 }
 
+// What C++ calls (the behaviours) and looks objects up in (the wrappers) is rooted by the engine
+// itself: a script dropping its own references to them and collecting frees none of it.
+TEST_CASE("a script letting go of what the engine keeps frees nothing the engine still uses") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  // A bullet spawned from an update: its behaviour is made inside a callback, so nothing but what
+  // keeps behaviours alive holds it once the callback is over.
+  ruby(*engine, "$spawner_on = true");
+  frames(*engine, 1);
+  ruby(*engine, "$spawner_on = false");
+  ruby(*engine,
+       "$__redgem_objects = nil; Scene.objects.each { |o| o.instance_variable_get(:@behaviours).clear }; GC.start");
+  // (A freed object can go on answering until its slot is reused: what the collector kept says more.)
+  CHECK(ruby(*engine, "ObjectSpace.each_object(Bullet) {}") == "1");
+  const int updates_before = std::stoi(ruby(*engine, "$probe[:updates]"));
+  frames(*engine, kOneSecondOfFrames);  // GcStress collects in every callback meanwhile
+  CHECK(std::stoi(ruby(*engine, "$probe[:updates]")) == updates_before + kOneSecondOfFrames);
+  CHECK(ruby(*engine, "$bullet_starts") == "1");
+  CHECK(ruby(*engine, "Scene.find('Hero').name") == "Hero");
+}
+
+// Nor can a script find what the engine keeps by walking every object there is and empty it.
+TEST_CASE("what the engine keeps cannot be found through ObjectSpace and emptied") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, "$spawner_on = true");
+  frames(*engine, 1);
+  ruby(*engine, "$spawner_on = false");
+  ruby(*engine,
+       "ObjectSpace.each_object(Hash) { |h| h.clear unless h.frozen? }; "
+       "ObjectSpace.each_object(Array) { |a| a.clear unless a.frozen? }; GC.start");
+  CHECK(ruby(*engine, "ObjectSpace.each_object(Bullet) {}") == "1");
+  frames(*engine, kOneSecondOfFrames);  // GcStress collects in every callback meanwhile
+  CHECK(ruby(*engine, "$bullet_starts") == "1");
+}
+
+// The engine's own modules looked up by name: one a script replaced is the script's error.
+TEST_CASE("a script that replaces the Network or HTTP module gets errors, not the end of the game") {
+  test::LogCapture capture;
+  auto engine = sandbox();
+  frames(*engine, 1);
+  const int errors = engine->scripts().error_count();
+  ruby(*engine, "Network = 5; HTTP = 5");
+  engine->scripts().dispatch(net::NetworkEvent::of(net::NetworkEvent::Kind::PeerJoined, 2));
+  engine->scripts().dispatch(net::HttpResult{});
+  ruby(*engine, "Game.load_scene('level2')");
+  frames(*engine, 1);
+  CHECK(engine->scene_name() == "level2");
+  CHECK(engine->scripts().error_count() > errors);
+}
+
+// The serial says which object a wrapper stands for; a script writing something else there gets
+// a new wrapper, not a number read out of whatever it wrote.
+TEST_CASE("a wrapper whose serial a script replaced stands for nothing") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  ruby(*engine, "$old_hero = Scene.find('Hero'); $old_hero.instance_variable_set(:@serial, 'not a number'); GC.start");
+  CHECK(ruby(*engine, "Scene.find('Hero').equal?($old_hero)") == "false");
+  CHECK(ruby(*engine, "Scene.find('Hero').name") == "Hero");
+}
+
+// Contacts come from C++, outside any Ruby call: the GameObjects made for them must not pile up
+// on the GC arena, which nothing else would empty while the game runs.
+TEST_CASE("contacts between objects leave the GC arena as they found it") {
+  auto engine = sandbox();
+  mrb_state* mrb = engine->scripts().vm().state();
+  const int arena = mrb_gc_arena_save(mrb);
+  const std::vector<ObjectId> ids = engine->scene().alive_ids();
+  for (const ObjectId id : ids) engine->scripts().dispatch(ContactEvent{id, ids.front(), ContactPhase::Enter, false});
+  CHECK(mrb_gc_arena_save(mrb) == arena);
+}
+
 TEST_CASE("a game's Ruby has nothing of what tests are written with") {
   // This program links the engine alone, as the one games ship as does: what tests use comes from
   // another library (src/testing), which a game never runs with.

@@ -43,6 +43,10 @@ class Vector3
 
   def to_a = [x, y, z]
 
+  # Equal vectors are one key of a Hash, and one entry of uniq, as == says (-0.0 is 0.0 there).
+  def eql?(other) = self == other
+  def hash = to_a.map { |part| part.zero? ? part.abs : part }.hash
+
   def to_s = format("(%<x>.3f, %<y>.3f, %<z>.3f)", x: x, y: y, z: z)
   def inspect = "Vector3#{self}"
 end

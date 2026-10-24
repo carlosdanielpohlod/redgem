@@ -34,6 +34,8 @@ class NetworkTest < RedGemTest::Case
   NOON = 100.0          # seconds of game time
   ONE_MORE = Resends::SECONDS_FOR_ONE   # what earns a machine another answer
   LONG_AFTER = 3600.0
+  # An id past what the engine keeps one in: cut down to fit, it would be everyone's (0).
+  NO_MACHINES_ID = 2**32
 
   def setup
     [ASKER, OTHER_ASKER].each { |peer| Resends.forget(peer) }
@@ -131,5 +133,10 @@ class NetworkTest < RedGemTest::Case
     WRONG_ANIMATIONS.each do |animation|
       refute Network::Said.placement?(["Hero", POSITION, POSITION, animation]), animation.inspect
     end
+  end
+
+  def test_a_message_to_an_id_no_machine_can_have_is_refused
+    error = assert_raises(ArgumentError) { Network.emit(:hit, nil, to: NO_MACHINES_ID) }
+    assert_equal "no machine has that id", error.message
   end
 end

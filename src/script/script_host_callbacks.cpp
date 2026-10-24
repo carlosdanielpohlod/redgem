@@ -78,7 +78,15 @@ void ScriptHost::fixed_update(float dt) { update_running("fixed_update", dt, tru
 
 void ScriptHost::update(float dt) { update_running(kUpdateEntry, dt, false); }
 
+// The GameObjects made for a contact go on the GC arena; nothing else restores it here, so without
+// this every contact with a new object would grow it for as long as the game runs.
 void ScriptHost::dispatch(const ContactEvent& event) {
+  const int arena = mrb_gc_arena_save(vm_.state());
+  notify_contact(event);
+  mrb_gc_arena_restore(vm_.state(), arena);
+}
+
+void ScriptHost::notify_contact(const ContactEvent& event) {
   const mrb_value self = object_value(event.self);
   const mrb_value other = object_value(event.other);
   if (event.trigger) {
@@ -106,8 +114,11 @@ void ScriptHost::detach(ObjectId object) {
                                      [object](const BehaviourSlot& slot) { return slot.object.id == object; }),
                       behaviours_.end());
     index_behaviours();  // the others moved down
+    unroot_behaviours(object);
   }
+  const int arena = mrb_gc_arena_save(vm_.state());
   const RubyResult removed = vm_.call(object_value(object), kDestroyedEntry);
+  mrb_gc_arena_restore(vm_.state(), arena);
   if (!removed.ok) report_error("forgetting the destroyed '" + context_.scene->at(object).name + "'", removed.error);
   mrb_hash_delete_key(vm_.state(), objects_cache_, mrb_int_value(vm_.state(), object));
 }

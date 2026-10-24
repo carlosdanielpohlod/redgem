@@ -21,7 +21,6 @@ namespace redgem {
 
 namespace {
 
-constexpr const char* kObjectsCacheGlobal = "$__redgem_objects";
 constexpr const char* kBehavioursVariable = "@behaviours";  // a GameObject's behaviours, kept by the prelude
 
 // The translations of the game whose scripts are in `scripts_dir`; none for scripts outside a
@@ -38,6 +37,16 @@ std::string starting_locale(const GameLocales& locales) {
   return best_language(translations::requested_language(), locales.languages).value_or(translations::language());
 }
 
+// The value, which ObjectSpace.each_object no longer finds: what the host keeps for itself must be
+// out of scripts' reach, or one could empty it. (As mruby hides its own table of roots, gc.c.)
+mrb_value hidden(mrb_value value) {
+  mrb_obj_ptr(value)->c = nullptr;
+  return value;
+}
+
+// A script can set a wrapper's serial to anything; only the number the host wrote stands for the object.
+bool holds_serial(mrb_value serial, mrb_int wanted) { return mrb_integer_p(serial) && mrb_integer(serial) == wanted; }
+
 }  // namespace
 
 ScriptHost& script_host(mrb_state* mrb) { return *static_cast<ScriptHost*>(mrb->ud); }
@@ -49,7 +58,7 @@ ScriptHost::ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir
       locale_(starting_locale(locales_)) {
   mrb_state* mrb = vm_.state();
   mrb->ud = this;
-  start_objects_cache();
+  start_roots();
   install_bindings(mrb);
   load_prelude();
 }
@@ -85,18 +94,20 @@ mrb_value ScriptHost::object_value(ObjectId object) {
   if (object < 0) return mrb_nil_value();
   mrb_state* mrb = vm_.state();
   const mrb_value key = mrb_int_value(mrb, object);
-  mrb_value cached = mrb_hash_get(mrb, objects_cache_, key);
+  // (fetch, not get: a missing key asks nothing of the Hash class, which scripts can change.)
+  mrb_value cached = mrb_hash_fetch(mrb, objects_cache_, key, mrb_nil_value());
   if (stands_for(cached, context_.scene->at(object))) return cached;
   mrb_value wrapper = new_wrapper(context_.scene->at(object));
   mrb_hash_set(mrb, objects_cache_, key, wrapper);
   return wrapper;
 }
 
-// (Each Ruby GameObject is made once for its object and kept in the cache, which holds its
-// behaviours too: the cache is what keeps them alive until the object is destroyed.)
+// (Each Ruby GameObject is made once for its object and kept in the cache until the object is
+// destroyed; its behaviours are kept alive by behaviour_roots_.)
 mrb_value ScriptHost::new_wrapper(const GameObject& object) {
   mrb_state* mrb = vm_.state();
-  RClass* klass = mrb_class_get(mrb, binding::kGameObjectClass);
+  RClass* klass = class_named(binding::kGameObjectClass);
+  if (klass == nullptr) return mrb_nil_value();  // a script replaced the class: no object can be shown to it
   mrb_value wrapper = mrb_obj_value(mrb_obj_alloc(mrb, MRB_TT_OBJECT, klass));
   set_variable(wrapper, binding::kIdVariable, mrb_int_value(mrb, object.id));
   set_variable(wrapper, binding::kSerialVariable, mrb_int_value(mrb, static_cast<mrb_int>(object.serial)));
@@ -114,21 +125,40 @@ void ScriptHost::set_variable(mrb_value object, const char* name, mrb_value valu
 bool ScriptHost::stands_for(mrb_value wrapper, const GameObject& object) {
   if (mrb_nil_p(wrapper)) return false;
   const mrb_value serial = mrb_iv_get(vm_.state(), wrapper, mrb_intern_cstr(vm_.state(), binding::kSerialVariable));
-  return mrb_integer(serial) == static_cast<mrb_int>(object.serial);
+  return holds_serial(serial, static_cast<mrb_int>(object.serial));
 }
 
 void ScriptHost::reset_scene() {
   behaviours_.clear();
   behaviours_by_object_.clear();
-  start_objects_cache();
+  mrb_hash_clear(vm_.state(), objects_cache_);
+  mrb_hash_clear(vm_.state(), behaviour_roots_);
 }
 
-void ScriptHost::start_objects_cache() {
+void ScriptHost::start_roots() {
   mrb_state* mrb = vm_.state();
   // A Hash by id, not an Array: it holds only the objects scripts touched, whatever their ids,
   // where an Array has a largest size a big scene's ids go past.
-  objects_cache_ = mrb_hash_new(mrb);
-  mrb_gv_set(mrb, mrb_intern_cstr(mrb, kObjectsCacheGlobal), objects_cache_);
+  objects_cache_ = hidden(mrb_hash_new(mrb));
+  behaviour_roots_ = hidden(mrb_hash_new(mrb));
+  // Not in a global: a script could set that to nil and have the collector free what C++ uses.
+  mrb_gc_register(mrb, objects_cache_);
+  mrb_gc_register(mrb, behaviour_roots_);
+}
+
+void ScriptHost::root_behaviour(ObjectId object, mrb_value instance) {
+  mrb_state* mrb = vm_.state();
+  const mrb_value key = mrb_int_value(mrb, object);
+  mrb_value kept = mrb_hash_fetch(mrb, behaviour_roots_, key, mrb_nil_value());
+  if (mrb_nil_p(kept)) {
+    kept = hidden(mrb_ary_new(mrb));
+    mrb_hash_set(mrb, behaviour_roots_, key, kept);
+  }
+  mrb_ary_push(mrb, kept, instance);
+}
+
+void ScriptHost::unroot_behaviours(ObjectId object) {
+  mrb_hash_delete_key(vm_.state(), behaviour_roots_, mrb_int_value(vm_.state(), object));
 }
 
 }  // namespace redgem

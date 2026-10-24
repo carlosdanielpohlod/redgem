@@ -51,7 +51,7 @@ void ScriptHost::dispatch(const net::HttpResult& result) {
   mrb_state* mrb = vm_.state();
   const int arena = mrb_gc_arena_save(mrb);
   // (The answer becomes Ruby values inside the protected call: without memory for them, one answer is lost.)
-  const RubyResult called = vm_.call_with(mrb_obj_value(mrb_module_get(mrb, kHttpModule)), kAnswerEntry,
+  const RubyResult called = vm_.call_with(module_named(kHttpModule), kAnswerEntry,
                                           [&result](mrb_state* vm) { return answer_arguments(vm, result); });
   mrb_gc_arena_restore(mrb, arena);
   if (!called.ok) report_error("an HTTP block", called.error);

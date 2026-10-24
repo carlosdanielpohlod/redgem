@@ -135,6 +135,18 @@ TEST_CASE("what arrives becomes Ruby values again, a vector as a Vector3") {
   CHECK(ruby(*game, "$arrived.class") == "Hash");
 }
 
+// Another machine's numbers past what a float holds would be undefined as a Vector3's parts.
+TEST_CASE("a vector whose numbers a float cannot hold arrives as a plain hash") {
+  constexpr double kPastAFloat = 1e300;
+  const auto game = engine();
+  for (const double part : {kPastAFloat, -kPastAFloat}) {
+    arrive(*game, json{{"$v", {part, 0.0, 0.0}}});
+    CHECK(ruby(*game, "$arrived.class") == "Hash");
+  }
+  arrive(*game, json::parse(R"({"$v": [1e400, 0, 0]})", nullptr, false));
+  CHECK(ruby(*game, "$arrived.class") != "Vector3");
+}
+
 TEST_CASE("a key no script of the game uses arrives as a text, not as a new symbol") {
   const auto game = engine();
   arrive(*game, json{{"hp", 1}, {"a key nobody here ever wrote", 2}});

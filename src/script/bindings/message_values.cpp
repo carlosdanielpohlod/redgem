@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <limits>
 #include <optional>
 #include <string>
 
@@ -96,11 +98,17 @@ bool holds_only_a_vector(const nlohmann::json& json) {
   return json.is_object() && json.size() == 1 && json.contains(kVectorKey);
 }
 
+// A number a Vector3 can hold: converting one past a float's range to a float is undefined.
+bool fits_a_float(const nlohmann::json& part) {
+  if (!part.is_number()) return false;
+  const double number = part.get<double>();
+  return std::isfinite(number) && std::fabs(number) <= std::numeric_limits<float>::max();
+}
+
 bool is_vector(const nlohmann::json& json) {
   if (!holds_only_a_vector(json)) return false;
   const nlohmann::json& parts = json[kVectorKey];
-  return parts.is_array() && parts.size() == kVectorComponents &&
-         std::all_of(parts.begin(), parts.end(), [](const nlohmann::json& part) { return part.is_number(); });
+  return parts.is_array() && parts.size() == kVectorComponents && std::all_of(parts.begin(), parts.end(), fits_a_float);
 }
 
 mrb_value scalar_value(mrb_state* mrb, const nlohmann::json& json) {

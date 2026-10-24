@@ -32,6 +32,14 @@ and [Gameplay recipes](gameplay.md).
 | `I18n` | `I18n.t("hud.coins", count: 3)` → the text of a key in the language in use, its `{count}` filled (see [Texts in several languages](i18n.md)), `I18n.locale` (`:en`), `I18n.locale = :pt`, `I18n.available_locales` (the languages of the game's `locales/` files) |
 | `Vector3` | `Vector3.new(x, y, z)`, `Vector3.zero`, `one`, `up`, `down`, `left`, `right`, `forward`, `back`; arithmetic, `dot`, `cross`, `length`, `normalized`, `clamped(max_length = 1.0)`, `lerp`, `flat`, `with(y: 0)`, `distance_to`, `approx?`, `to_a`; in place, for math done thousands of times a frame: `set(x, y, z)`, `add!(v)`, `sub!(v)`, `scale!(k)`, `normalize!` (they change the vector and hand it back: `dup` one you got from someone else first) |
 
+`==` compares the numbers exactly, and equal vectors are one key of a `Hash` (`eql?` and `hash`
+agree with it). As with an `Array`, a vector used as a key must not be changed in place
+(`set`, `add!`...) while the `Hash` holds it: it would no longer be found by its value. Use a
+`dup` as the key. The scene keeps positions, rotations and scales in 32-bit floats, so a vector
+that goes through it comes back rounded: `transform.position = v` and then
+`transform.position == v` can be false. Compare what came back from the scene with
+`approx?(other, tolerance)`.
+
 Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running.
 Every native takes finite numbers a float can hold: infinity, NaN (`0.0 / 0.0`) or a number too
 large (`1e300`) raises an `ArgumentError` instead of reaching the scene. So does `Vector3`

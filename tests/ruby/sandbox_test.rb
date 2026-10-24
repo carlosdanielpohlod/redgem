@@ -5,6 +5,9 @@ class SandboxTest < RedGemTest::Case
   FORBIDDEN_METHODS = %i[eval system exec spawn fork open binding exit!].freeze
   CODE_AS_TEXT = "1 + 1".freeze
   HALF_MORE = 1.5
+  ENGINE_GLOBAL_PREFIX = "$__redgem".freeze
+  # The test tool's own, which a game never runs with.
+  TEST_TOOL_GLOBALS = %i[$__redgem_system_test].freeze
 
   def test_no_files_processes_or_sockets_exist
     FORBIDDEN_CONSTANTS.each do |name|
@@ -26,6 +29,14 @@ class SandboxTest < RedGemTest::Case
   def test_text_is_never_evaluated_as_code
     assert_raises(Exception) { instance_eval(CODE_AS_TEXT) }
     assert_raises(Exception) { Object.class_eval(CODE_AS_TEXT) }
+  end
+
+  # What the engine keeps for itself is rooted where scripts cannot reach: no global they could
+  # set to nil to have the collector free values the engine still uses.
+  def test_the_engine_keeps_nothing_in_globals
+    engine_globals = global_variables.select { |name| name.to_s.start_with?(ENGINE_GLOBAL_PREFIX) }
+    assert_equal [], engine_globals - TEST_TOOL_GLOBALS
+    GC.start
   end
 
   def test_what_scripts_do_need_is_there

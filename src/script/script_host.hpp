@@ -103,8 +103,12 @@ class ScriptHost {
   mrb_value new_wrapper(const GameObject& object);
   bool stands_for(mrb_value wrapper, const GameObject& object);
   void set_variable(mrb_value object, const char* name, mrb_value value);
-  // Starts an empty cache of GameObject wrappers (by id), which Ruby's garbage collector leaves alone.
-  void start_objects_cache();
+  // Makes the Ruby values the host keeps for itself (the GameObject wrappers by id, the behaviour
+  // instances) and roots them from C++, where no script can reach them to let them go.
+  void start_roots();
+  // Keeps a behaviour instance alive for as long as its object is there, and lets go of them.
+  void root_behaviour(ObjectId object, mrb_value instance);
+  void unroot_behaviours(ObjectId object);
 
   // Scripts and the behaviours made of their classes.
   void attach(ObjectId object, const std::string& script);
@@ -117,6 +121,12 @@ class ScriptHost {
   // Whether a loaded script defined the class named after it (an error is reported, as one of
   // `where`, when not).
   bool defines_its_class(const std::string& script, const std::string& class_name, const std::string& where);
+  // The class a top-level constant names, or nullptr when there is none or the constant is not a
+  // class (a script may set `Player = 5`): asking mruby for it then raises where nothing catches it.
+  RClass* class_named(const std::string& name);
+  // The engine's module of that name (Network, HTTP), or nil when a script set the name to
+  // something else: calling a method on nil is then an error the call reports, not an abort.
+  mrb_value module_named(const char* name);
   // Whether a Ruby class is Behaviour or inherits from it.
   bool is_behaviour_class(RClass* klass);
   // Whether a behaviour class, or a module it includes, defines `method` rather than Behaviour.
@@ -126,6 +136,8 @@ class ScriptHost {
 
   // Calling the behaviours.
   void invoke(std::size_t index, const char* method, std::initializer_list<mrb_value> args);
+  // Calls the contact's callbacks on the behaviours of both objects it concerns.
+  void notify_contact(const ContactEvent& event);
   void invoke_on_object(ObjectId object, const char* method, std::initializer_list<mrb_value> args);
   // Calls `entry` with the frame's seconds on every behaviour that is running (and, for
   // fixed_update, has one of its own).
@@ -145,6 +157,9 @@ class ScriptHost {
   std::string locale_;
   RubyVm vm_;
   mrb_value objects_cache_ = mrb_nil_value();
+  // Every instance in behaviours_, in an Array by object id: what keeps them alive while C++
+  // still calls them, whatever a script does to the GameObject's own list of them.
+  mrb_value behaviour_roots_ = mrb_nil_value();
   std::vector<BehaviourSlot> behaviours_;
   // Where each object's behaviours are in behaviours_, in the order they were attached: what a
   // contact, on_destroy and detach look up instead of walking every behaviour of the scene.

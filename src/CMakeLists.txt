@@ -483,7 +483,8 @@ if(NOT ANDROID)
     project/notices.cpp
     project/game_templates.cpp
     project/game_names.cpp
-    project/game_build.cpp
+    project/build_record.cpp
+  project/game_build.cpp
     project/game_build_targets.cpp
     project/game_build_files.cpp
     project/android/android_package.cpp

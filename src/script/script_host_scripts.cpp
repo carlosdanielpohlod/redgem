@@ -1,8 +1,10 @@
 // The game's scripts, and the behaviours made of the classes they define.
 
 #include <mruby.h>
+#include <mruby/array.h>
 #include <mruby/class.h>
 #include <mruby/proc.h>
+#include <mruby/variable.h>
 
 #include "core/safe_path.hpp"
 #include "scene/props.hpp"
@@ -63,34 +65,47 @@ bool ScriptHost::require_script(const std::string& script) {
   return true;
 }
 
+RClass* ScriptHost::class_named(const std::string& name) {
+  mrb_state* mrb = vm_.state();
+  if (!mrb_class_defined(mrb, name.c_str())) return nullptr;
+  const mrb_value constant = mrb_const_get(mrb, mrb_obj_value(mrb->object_class), mrb_intern_cstr(mrb, name.c_str()));
+  return mrb_class_p(constant) ? mrb_class_ptr(constant) : nullptr;
+}
+
+mrb_value ScriptHost::module_named(const char* name) {
+  mrb_state* mrb = vm_.state();
+  if (!mrb_class_defined(mrb, name)) return mrb_nil_value();
+  const mrb_value constant = mrb_const_get(mrb, mrb_obj_value(mrb->object_class), mrb_intern_cstr(mrb, name));
+  return mrb_type(constant) == MRB_TT_MODULE ? constant : mrb_nil_value();
+}
+
 bool ScriptHost::defines_its_class(const std::string& script, const std::string& class_name, const std::string& where) {
-  if (mrb_class_defined(vm_.state(), class_name.c_str())) return true;
+  if (class_named(class_name) != nullptr) return true;
   report_error(where, script + " does not define class " + class_name);
   return false;
 }
 
 void ScriptHost::attach(ObjectId object, const std::string& script) {
-  mrb_state* mrb = vm_.state();
   const std::string& object_name = context_.scene->at(object).name;
   if (!require_script(script)) return;
   const std::string class_name = class_name_for_script(script);
   if (!defines_its_class(script, class_name, object_called(object_name))) return;
-  instantiate(object, mrb_class_get(mrb, class_name.c_str()), class_name);
+  instantiate(object, class_named(class_name), class_name);
 }
 
 bool ScriptHost::is_behaviour_class(RClass* klass) {
   mrb_state* mrb = vm_.state();
   if (!mrb_obj_is_kind_of(mrb, mrb_obj_value(klass), mrb->class_class)) return false;
-  if (!mrb_class_defined(mrb, kBehaviourClass)) return false;
-  const mrb_value behaviour = mrb_obj_value(mrb_class_get(mrb, kBehaviourClass));
-  return mrb_test(vm_.call(mrb_obj_value(klass), "<=", {behaviour}).value);
+  RClass* behaviour = class_named(kBehaviourClass);
+  if (behaviour == nullptr) return false;
+  return mrb_test(vm_.call(mrb_obj_value(klass), "<=", {mrb_obj_value(behaviour)}).value);
 }
 
 bool ScriptHost::overrides(RClass* klass, const char* method) {
   mrb_state* mrb = vm_.state();
   RClass* owner = klass;  // becomes the class (or included module) the method is found in
   const mrb_method_t found = mrb_method_search_vm(mrb, &owner, mrb_intern_cstr(mrb, method));
-  return !MRB_METHOD_UNDEF_P(found) && owner != mrb_class_get(mrb, kBehaviourClass);
+  return !MRB_METHOD_UNDEF_P(found) && owner != class_named(kBehaviourClass);
 }
 
 mrb_value ScriptHost::not_created(const std::string& where, const std::string& error) {
@@ -107,6 +122,7 @@ mrb_value ScriptHost::instantiate(ObjectId object, RClass* klass, const std::str
   if (!instance.ok) return not_created(class_name + ".new on '" + object_name + "'", instance.error);
   const RubyResult attached = vm_.call(instance.value, "__attach", {object_value(object)});
   if (!attached.ok) return not_created(class_name + "#__attach", attached.error);
+  root_behaviour(object, instance.value);
   behaviours_by_object_[object].push_back(behaviours_.size());
   behaviours_.push_back(
       {context_.scene->handle(object), instance.value, class_name, false, true, overrides(klass, "fixed_update")});
@@ -135,9 +151,11 @@ void ScriptHost::run_scene_script(const std::string& scene_name) {
   if (!loaded) return;
   const std::string class_name = class_name_for_script(script);
   if (!defines_its_class(script, class_name, "scene '" + scene_name + "'")) return;
+  RClass* scene_script = class_named(kSceneScriptClass);
+  if (scene_script == nullptr) return;  // a script replaced the engine's own; there is nothing to run with
   const int arena = mrb_gc_arena_save(mrb);
-  const RubyResult ran = vm_.call(mrb_obj_value(mrb_class_get(mrb, kSceneScriptClass)), kRunSceneScriptEntry,
-                                  {mrb_obj_value(mrb_class_get(mrb, class_name.c_str()))});
+  const RubyResult ran =
+      vm_.call(mrb_obj_value(scene_script), kRunSceneScriptEntry, {mrb_obj_value(class_named(class_name))});
   mrb_gc_arena_restore(mrb, arena);
   if (!ran.ok) report_error(class_name + "#setup", ran.error);
 }
