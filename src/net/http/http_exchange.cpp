@@ -3,6 +3,7 @@
 #include "net/http/http_message.hpp"
 #include "net/http/http_response_parser.hpp"
 #include "net/http/http_stream.hpp"
+#include "net/private_address.hpp"
 
 namespace redgem::net {
 
@@ -42,6 +43,7 @@ Flow step(HttpStream& stream, std::vector<std::uint8_t>& outgoing, HttpResponseP
   const Flow flow = stream.receive(arrived);
   parser.feed(reinterpret_cast<const char*>(arrived.data()), arrived.size());
   if (flow == Flow::Ended) parser.end_of_stream();
+  if (flow == Flow::Cut) parser.cut_off();
   return flow;
 }
 

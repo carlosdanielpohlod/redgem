@@ -28,9 +28,10 @@ bool crypto_started() {
 
 bool wants_more(int result) { return result == MBEDTLS_ERR_SSL_WANT_READ || result == MBEDTLS_ERR_SSL_WANT_WRITE; }
 
-bool is_end(int result) {
-  return result == 0 || result == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY || result == MBEDTLS_ERR_SSL_CONN_EOF;
-}
+// Only the server's own goodbye ends a session cleanly; the connection ending without it (0, or
+// CONN_EOF) may be anyone between the two cutting it.
+bool is_end(int result) { return result == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY; }
+bool is_cut(int result) { return result == 0 || result == MBEDTLS_ERR_SSL_CONN_EOF; }
 
 class TlsStream : public HttpStream {
  public:
@@ -57,8 +58,9 @@ class TlsStream : public HttpStream {
     if (!crypto_started()) return false;
     last_ = seed();
     if (last_ != 0) return false;
-    mbedtls_ssl_config_defaults(&config_, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM,
-                                MBEDTLS_SSL_PRESET_DEFAULT);
+    last_ = mbedtls_ssl_config_defaults(&config_, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM,
+                                        MBEDTLS_SSL_PRESET_DEFAULT);
+    if (last_ != 0) return false;
     mbedtls_ssl_conf_authmode(&config_, MBEDTLS_SSL_VERIFY_REQUIRED);
     mbedtls_ssl_conf_ca_chain(&config_, trust_->chain(), nullptr);
     mbedtls_ssl_conf_rng(&config_, mbedtls_ctr_drbg_random, &random_);
@@ -100,6 +102,7 @@ class TlsStream : public HttpStream {
     if (result == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET) return Flow::Moved;  // nothing for us: go on
     if (wants_more(result)) return result == MBEDTLS_ERR_SSL_WANT_READ ? Flow::WantRead : Flow::WantWrite;
     if (is_end(result)) return Flow::Ended;
+    if (is_cut(result)) return Flow::Cut;
     last_ = result;
     return Flow::Failed;
   }

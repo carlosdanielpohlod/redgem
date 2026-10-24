@@ -25,8 +25,4 @@ struct Url {
 // as it is (spaces, line breaks). The part after # never travels and is dropped.
 std::optional<Url> parse_url(const std::string& text, std::string& error);
 
-// Whether an address in numbers is this machine's or one of a private network: where a request
-// may go over plain http:// (a backend on the same machine or network).
-bool is_private_address(const std::string& numbers);
-
 }  // namespace redgem::net
