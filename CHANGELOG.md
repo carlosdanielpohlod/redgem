@@ -31,11 +31,22 @@ until 1.0, a release may change what games rely on (see
 - **Settings screen and widgets**: `GameMenu` has a settings screen reached from its title and
   pause screens, built from the new `UI.toggle`, `UI.choice` and `UI.slider`. The keyboard and a
   gamepad move a focus between widgets and buttons (`UI::Focus`).
+- **Game icon, version and splash picture**: `game.json` can give a game an `icon`, a `version`
+  (read by scripts as `Game.version`) and a `splash` picture shown while it loads. Builds turn the
+  icon into each system's own: inside the Windows `.exe`, a menu entry and icon on Linux, an
+  `.icns` in the Mac app, launcher icons on Android.
+- **Mac apps**: a build for the Mac is an `.app` with the game, its icon and its description
+  inside, signed ad hoc.
+- **Android App Bundles**: `redgem build ... --target android --bundle` makes an `.aab` for Google
+  Play (with Google's bundletool).
 - **`redgem --version`** says which version of RedGem it is.
 - **CHANGELOG.md**: this file.
 
 ### Changed
 
+- **An Android app asks for the network only when its game goes online**: when its `game.json`
+  says `"network": true`, or says nothing and its scripts call `Network` or `HTTP` (the build then
+  warns to say so). The platformer demo and template say it.
 - **Saves are flushed to the disk** before they replace the previous one, and the previous save is
   kept beside it as `<name>.bak`. A damaged save is moved aside to `<name>.damaged` (never written
   over), the backup is loaded and put back in its place, and the log names both files. A save that

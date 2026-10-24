@@ -6,6 +6,10 @@ letting in only the players who logged in (connection approval) and keeping thei
 No service is built into the engine and none is required: below are two ways to do it, a hosted
 service (Supabase) and a backend of your own.
 
+A game that makes web requests says `"network": true` in its `game.json` (a build of one that
+says nothing guesses it from its scripts, and warns; `"network": false` keeps its Android app off
+the network; see [Building and sharing](../shipping.md#icon-version-and-splash-picture)).
+
 The player's password only ever goes from their device to the service, over HTTPS. The game
 connection carries the token the service gave, then gameplay.
 

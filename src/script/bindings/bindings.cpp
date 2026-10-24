@@ -23,6 +23,7 @@ void install_world_bindings(mrb_state* mrb) {
 void install_bindings(mrb_state* mrb) {
   install_world_bindings(mrb);
   install_runtime_bindings(mrb);
+  install_game_identity_bindings(mrb);  // after the runtime's: it adds to Game
   install_ui_bindings(mrb);
   install_audio_bindings(mrb);
   install_input_bindings(mrb);

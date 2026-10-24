@@ -18,9 +18,47 @@ program that builds: `redgem-player` in the same folder for the system you are o
 `runtimes/android/<abi>/libredgem.so`). When one is missing the build says which file it looked
 for.
 
+## Icon, version and splash picture
+
+A game says in its `game.json` what it is shown by; all of it is optional:
+
+```json
+{
+  "title": "My Game",
+  "version": "1.2.0",
+  "icon": "images/icon.png",
+  "splash": "images/splash.png",
+  "network": true
+}
+```
+
+- `version` is a [semantic version](https://semver.org): three numbers, then optionally a
+  pre-release (`2.0.0-beta.1`) or build part (`1.0.0+build.5`). Scripts read it with
+  `Game.version` (`nil` when there is none). Android shows it as the app's version, and a Mac app
+  carries its three numbers. A game without one is version 1.0 there.
+- `icon` is a square PNG in the game's folder, 1024×1024 at best (it is scaled down to every size
+  a system wants; a smaller one is scaled up, and looks it). Every build turns it into its
+  system's own icon (see each system below). A game without one keeps the engine's icon on
+  Windows and has the system's default icon elsewhere.
+- `splash` is a PNG in the game's folder shown over the whole window, fitted with black bars
+  around it, from when the window opens until the first frame of the game is drawn: while the
+  world is built, the scripts start and the scene goes to the graphics card. (Reading the scene's
+  file happens before the window opens: a big level still takes that long with no window.) It is
+  shown by built games and `--play`, not by the editor.
+- `network` says whether the game plays online (`Network`) or makes web requests (`HTTP`): its
+  Android app asks for the network only when it does, since an app that asks for what it does not
+  use worries players and stores. When `game.json` does not say, a build looks at the scripts:
+  one that calls `Network.` or `HTTP.` gets the network, and the build warns to say
+  `"network": true`. `"network": false` keeps the app offline even then (with a warning). On
+  computers it changes nothing.
+
+A build refuses a `game.json` that says one of these and cannot be used (a version that is not
+one, a picture that is not a PNG in the game's folder, an icon that is not square), saying which.
+A game played that way logs it as a warning and plays as if the line were not there.
+
 ## For Windows
 
-On Linux, RedGem builds games for Linux, Windows and Android (the experimental Windows download builds Windows games, the macOS one Mac games: `--target macos`). In the editor, **Build**
+On Linux, RedGem builds games for Linux, Windows and Android (the experimental Windows download builds Windows games, the macOS one Mac games: `--target macos`, see [For macOS](#for-macos)). In the editor, **Build**
 asks which one; from a terminal:
 
 ```bash
@@ -31,8 +69,42 @@ tools/windows/build_runtime.sh                                   # once: builds 
 The first command downloads a Windows compiler into the project (no administrator rights
 needed) and builds `redgem-player.exe` into `build/src/runtimes/windows/`; it takes a few minutes
 and is only needed once, or again after updating RedGem. The build then makes `dist/my_game_win/my_game.exe` next to its `game/` folder.
+The game's icon goes inside the `.exe` (at 16 to 256 pixels): the file manager, the taskbar and
+shortcuts show it. Nothing has to run on Windows for that: the build puts the pictures into its
+copy of the player, in place of the engine's. The player RedGem makes is not signed; a player
+that was would lose its signature there (it would no longer match), so a game you release is
+signed afterwards, by you. A player that cannot take the icon (one made without an icon of its
+own, or with no room left in its headers) is left as it is, and the icon goes beside it as
+`my_game.ico`, with a warning.
 It needs 64-bit Windows 10 or later and a graphics card with OpenGL 3.3; nothing has to be
 installed with it.
+
+## For Linux
+
+A build for Linux also writes `my_game.desktop`, a menu entry, and the icon as `my_game.png`
+(256 pixels) beside the executable. The entry names the program and its icon by name
+(`Exec=my_game`, `Icon=my_game`), the way a package installs them: an AppImage, a Flatpak or a
+distribution's package takes both files as they are. On its own, the folder runs from a file
+manager or a terminal; the entry needs installing to show up in a menu.
+
+## For macOS
+
+On a Mac, `--target macos` (the default there) makes an app: `dist/my_game/My Game.app`, named
+after the game's title. It holds everything, so it can be moved and opened like any Mac app:
+
+```
+My Game.app/Contents/Info.plist              its name, id, version and icon
+My Game.app/Contents/MacOS/my_game           the player
+My Game.app/Contents/Resources/game/         the game's files
+My Game.app/Contents/Resources/my_game.icns  the icon (16 to 1024 pixels)
+My Game.app/Contents/Resources/licenses/
+```
+
+The app's id is the game's `id` (with `_` written as `-`), or `com.redgem.` and its name. The
+build signs the app ad hoc (with no identity), which an Apple Silicon Mac requires to open it.
+That is not a developer's signature: a Mac that downloads the app warns that its developer cannot
+be verified until it is signed with a paid Apple Developer ID and notarized, which the build does
+not do.
 
 ## For Android
 
@@ -69,6 +141,27 @@ What changes on a phone:
   (`~/.config/redgem/android-debug.keystore`). It never leaves your machine and is different on
   everyone's; it is good for your own devices and for sharing the file.
 
+- The app's launcher icon is made from the game's `icon`, at every screen density (48 to 192
+  pixels). Its version is the game's `version` unless the `android` section gives another.
+- The app asks for the network (the `INTERNET` permission) when `game.json` says
+  `"network": true`, or says nothing and the scripts call `Network.` or `HTTP.` (see above).
+  Without it, `Network` and `HTTP` cannot reach anything on a phone.
+
+### For Google Play: an App Bundle
+
+Google Play takes App Bundles (`.aab`), not APKs. `--bundle` makes one:
+
+```bash
+./build/src/redgem build my_game dist/my_game_play --target android --bundle
+```
+
+It makes `dist/my_game_play/my_game.aab`, signed with the same key an APK would be (for Google
+Play, your own: see below). An App Bundle is made with Google's
+[bundletool](https://github.com/google/bundletool/releases), which is not part of the SDK: put a
+`bundletool` program on the `PATH`, or download `bundletool-all-<version>.jar` and point
+`REDGEM_BUNDLETOOL` at it (it runs with Java). `zip` and `unzip` must be installed too.
+A bundle is not installed on a phone by itself: `bundletool build-apks` makes the APKs Play would.
+
 ### Your own app id, version and key
 
 A game says these in the `android` section of its `game.json`; all are optional:
@@ -89,6 +182,8 @@ A game says these in the `android` section of its `game.json`; all are optional:
 - `package` is the app's id on the phone. Without it the app goes by the game's `id` (see below),
   and a game with no `id` by its folder name.
 - `version_code` goes up with every release: a phone only updates to a higher one.
+- `version_name` is the version players see; without it, the game's own `version` (1.0 when it
+  has none).
 - `keystore` and `key_alias` sign the app with a key of your own, which is what a release needs:
   players can only update a game signed with the same key as the one they have. Make it once with
   Java's `keytool` and keep it safe (and backed up): there is no getting it back.

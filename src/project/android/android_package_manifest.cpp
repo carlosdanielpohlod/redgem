@@ -3,6 +3,7 @@
 #include "project/android/android_package.hpp"
 
 #include "core/xml_writer.hpp"
+#include "project/game_shipping.hpp"
 
 namespace redgem {
 
@@ -41,6 +42,7 @@ constexpr const char* kHasCode = "android:hasCode";
 constexpr const char* kAllowBackup = "android:allowBackup";
 constexpr const char* kExtractNativeLibs = "android:extractNativeLibs";
 constexpr const char* kTheme = "android:theme";
+constexpr const char* kIcon = "android:icon";
 constexpr const char* kExported = "android:exported";
 constexpr const char* kOrientation = "android:screenOrientation";
 constexpr const char* kConfigChanges = "android:configChanges";
@@ -50,6 +52,7 @@ constexpr const char* kAndroidNamespace = "http://schemas.android.com/apk/res/an
 constexpr const char* kYes = "true";
 constexpr const char* kNo = "false";
 constexpr const char* kInternetPermission = "android.permission.INTERNET";
+constexpr const char* kLauncherIcon = "@mipmap/ic_launcher";  // see stage_android_icon
 constexpr const char* kFullScreenTheme = "@android:style/Theme.NoTitleBar.Fullscreen";
 constexpr const char* kNativeActivity = "android.app.NativeActivity";
 constexpr const char* kLibraryNameKey = "android.app.lib_name";
@@ -62,13 +65,14 @@ constexpr const char* kHandledChanges =
     "fontScale|locale|layoutDirection|touchscreen";
 constexpr const char* kOpenGlEs3 = "0x00030000";  // what the manifest calls OpenGL ES 3.0
 
-// What the app needs from the phone: a recent enough Android, OpenGL ES 3, and the network.
-void add_requirements(XmlElement& manifest) {
+// What the app needs from the phone: a recent enough Android, OpenGL ES 3, and the network for a
+// game that goes online (a game that does not, does not ask for it).
+void add_requirements(XmlElement& manifest, bool network) {
   manifest.child(tag::kUsesSdk)
       .attribute(attr::kMinSdk, std::to_string(kMinAndroidApi))
       .attribute(attr::kTargetSdk, std::to_string(kTargetAndroidApi));
   manifest.child(tag::kUsesFeature).attribute(attr::kGlEsVersion, kOpenGlEs3).attribute(attr::kRequired, kYes);
-  manifest.child(tag::kUsesPermission).attribute(attr::kName, kInternetPermission);  // multiplayer
+  if (network) manifest.child(tag::kUsesPermission).attribute(attr::kName, kInternetPermission);
 }
 
 // The one screen of the app: full, sideways, the system's native activity running the engine's
@@ -87,27 +91,34 @@ void add_activity(XmlElement& application) {
 
 // The app itself. No Java of its own: hasCode is off. Saves stay on the device: they do not leave
 // it through the system's backups unless a developer decides so.
-XmlElement& add_application(XmlElement& manifest, const std::string& label) {
+XmlElement& add_application(XmlElement& manifest, const std::string& label, bool icon) {
   XmlElement& application = manifest.child(tag::kApplication);
   application.attribute(attr::kLabel, label)
       .attribute(attr::kHasCode, kNo)
       .attribute(attr::kAllowBackup, kNo)
       .attribute(attr::kExtractNativeLibs, kYes)
       .attribute(attr::kTheme, kFullScreenTheme);
+  if (icon) application.attribute(attr::kIcon, kLauncherIcon);
   return application;
 }
 
 }  // namespace
 
-std::string android_manifest(const std::string& package, const std::string& label, const AndroidSettings& settings) {
+std::string android_manifest(const std::string& package, const std::string& label, const AndroidSettings& settings,
+                             const AndroidAppLook& look) {
   XmlElement manifest(tag::kManifest);
   manifest.attribute(attr::kAndroidNamespace, kAndroidNamespace)
       .attribute(attr::kPackage, package)
       .attribute(attr::kVersionCode, std::to_string(settings.version_code))
-      .attribute(attr::kVersionName, settings.version_name);
-  add_requirements(manifest);
-  add_activity(add_application(manifest, label));
+      .attribute(attr::kVersionName, android_version_name(settings, look));
+  add_requirements(manifest, look.network);
+  add_activity(add_application(manifest, label, look.icon));
   return manifest.document();
+}
+
+std::string android_version_name(const AndroidSettings& settings, const AndroidAppLook& look) {
+  if (!settings.version_name.empty()) return settings.version_name;
+  return look.version.empty() ? kDefaultGameVersion : look.version;
 }
 
 }  // namespace redgem

@@ -91,6 +91,9 @@ add_executable(redgem_tests
   unit/game_settings_test.cpp
   unit/json_file_test.cpp
   unit/game_build_test.cpp
+  unit/game_identity_test.cpp
+  unit/game_shipping_test.cpp
+  unit/exe_icon_test.cpp
   unit/frame_buffer_test.cpp
   unit/wire_test.cpp
   unit/wire_codec_test.cpp

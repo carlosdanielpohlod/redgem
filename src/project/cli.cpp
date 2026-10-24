@@ -98,12 +98,18 @@ void read_argument(Reading& reading) {
   }
 }
 
+// Whether --bundle was given to anything but a build (nothing else makes an app).
+bool bundle_outside_build(const CliOptions& options) {
+  return options.android_bundle && options.mode != RunMode::BuildGame;
+}
+
 // What is wrong with a line that was read to its end; empty when nothing is.
 std::string problem_with(const Reading& reading) {
   const CliOptions& options = reading.result.options;
   if (reading.conflict) return tr("project.cli.choose_one_mode");
   if (lacks_game(options)) return tr("project.cli.missing_game_dir");
   if (lacks_out_dir(options)) return tr("project.cli.missing_out_dir");
+  if (bundle_outside_build(options)) return tr("project.cli.bundle_needs_build");
   return {};
 }
 

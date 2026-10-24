@@ -33,6 +33,10 @@ bool write_text_file(const std::filesystem::path& path, const std::string& text,
   return false;
 }
 
+bool write_bytes_file(const std::filesystem::path& path, const std::vector<std::uint8_t>& bytes, std::string& error) {
+  return write_text_file(path, std::string(bytes.begin(), bytes.end()), error);
+}
+
 std::filesystem::path normalized_folder(const std::filesystem::path& folder) {
   const std::filesystem::path normal = folder.lexically_normal();
   return ends_with_separator(normal) ? normal.parent_path() : normal;

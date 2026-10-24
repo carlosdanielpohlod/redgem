@@ -16,6 +16,7 @@
 #include "core/platform.hpp"
 #include "project/editor_setup.hpp"
 #include "project/game_build.hpp"
+#include "project/game_shipping.hpp"
 #include "project/game_templates.hpp"
 #include "project/recent_games.hpp"
 #include "core/config.hpp"
@@ -236,6 +237,19 @@ TEST_CASE("a new Ruby script is written in the Script panel and runs on Play") {
   std::filesystem::remove_all(game);
 }
 
+namespace {
+
+// The program a build for this system made in `out`: beside the game's folder, or on a Mac
+// inside the game's app.
+std::filesystem::path built_program_in(const std::filesystem::path& out, const std::filesystem::path& game) {
+  const std::string program = executable_name(game);
+  if (!platform::is_mac()) return out / program;
+  return out / mac_app_folder(read_game_settings(game).title, program) / kMacContentsFolder / kMacProgramFolder /
+         program;
+}
+
+}  // namespace
+
 TEST_CASE("a game is built up in the editor: new objects, an imported model, materials, then a standalone build") {
   constexpr Vec3 kGlow{3.0f, 0.4f, 0.1f};
   constexpr float kMetal = 1.0f;
@@ -278,11 +292,16 @@ TEST_CASE("a game is built up in the editor: new objects, an imported model, mat
   REQUIRE(build.has_value());
   CHECK_FALSE(session.document().dirty());  // building saves first
   // What it built is the player under the game's name: not this program, which is the editor.
-  const std::filesystem::path built_program = *build / executable_name(game);
+  // (On a Mac it is inside the game's app, whose signing rewrites the program's own signature.)
+  const std::filesystem::path built_program = built_program_in(*build, game);
   REQUIRE(std::filesystem::exists(built_program));
-  CHECK(std::filesystem::file_size(built_program) == std::filesystem::file_size(REDGEM_PLAYER_FILE));
+  if (!platform::is_mac()) {
+    CHECK(std::filesystem::file_size(built_program) == std::filesystem::file_size(REDGEM_PLAYER_FILE));
+  }
   CHECK(std::filesystem::file_size(built_program) != std::filesystem::file_size(platform::executable_path()));
-  const LoadResult built = load_gltf_scene((*build / "game" / "scene.glb").string());
+  const auto built_game = bundled_game(built_program);
+  REQUIRE(built_game.has_value());
+  const LoadResult built = load_gltf_scene((*built_game / "scene.glb").string());
   REQUIRE(built.ok);
   CHECK(built.scene.find_node("Sphere") != kNoIndex);
   CHECK(built.scene.find_node("tower") != kNoIndex);

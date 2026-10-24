@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <vector>
 
 // Reading and writing whole files, and the paths of folders: what every part of the engine that
 // touches the disk shares.
@@ -12,6 +14,8 @@ namespace redgem {
 std::optional<std::string> read_text_file(const std::filesystem::path& path, std::string& error);
 // Replaces what a file holds. False, with `error` saying so, when it cannot be written.
 bool write_text_file(const std::filesystem::path& path, const std::string& text, std::string& error);
+// The same for bytes (a picture, a program).
+bool write_bytes_file(const std::filesystem::path& path, const std::vector<std::uint8_t>& bytes, std::string& error);
 
 // A folder path as the rest of the code expects it: no "." or "..", no trailing separator
 // ("games/foo/" -> "games/foo", whose filename is the game's name).

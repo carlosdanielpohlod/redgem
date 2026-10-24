@@ -27,6 +27,9 @@
 #include "core/platform.hpp"
 #include "editor/scripts/script_files.hpp"
 #include "scene/gltf/gltf_loader.hpp"
+#include "project/icons/exe_icon.hpp"
+#include "project/icons/icon_set.hpp"
+#include "core/safe_path.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -63,6 +66,12 @@ std::string bytes_of(const std::filesystem::path& file) {
   return bytes.str();
 }
 
+// A build for a computer that lays the game out beside its executable: this system's, except on
+// a Mac, where a build is an app (see game_shipping_test.cpp).
+BuildTarget folder_target() {
+  return host_build_target() == BuildTarget::MacOS ? BuildTarget::Linux : host_build_target();
+}
+
 }  // namespace
 
 TEST_CASE("the templates are the folders of templates/, each with a word about itself") {
@@ -83,6 +92,14 @@ TEST_CASE("the templates are the folders of templates/, each with a word about i
   CHECK(std::find(names.begin(), names.end(), kDefaultTemplate) != names.end());
 }
 
+// What a template's own game.json says (a game that goes online says so) stays in the new game's.
+void check_settings_kept(const std::filesystem::path& source, const std::filesystem::path& dir) {
+  if (!std::filesystem::exists(source / kGameSettingsFile)) return;
+  const nlohmann::json said = nlohmann::json::parse(bytes_of(source / kGameSettingsFile));
+  const nlohmann::json kept = nlohmann::json::parse(bytes_of(dir / kGameSettingsFile));
+  for (const auto& [key, value] : said.items()) CHECK(kept.at(key) == value);
+}
+
 TEST_CASE("a new game is its template's folder, file for file, and a game.json of its own") {
   for (const GameTemplate& known : game_templates()) {
     CAPTURE(known.name);
@@ -92,7 +109,8 @@ TEST_CASE("a new game is its template's folder, file for file, and a game.json o
     REQUIRE_MESSAGE(create_game(dir, known.name, error), error);
     std::size_t copied = 0;
     for (const auto& entry : std::filesystem::recursive_directory_iterator(source)) {
-      if (!entry.is_regular_file() || entry.path().filename() == "template.json") continue;
+      const std::filesystem::path name = entry.path().filename();
+      if (!entry.is_regular_file() || name == "template.json" || name == kGameSettingsFile) continue;
       const std::filesystem::path file = std::filesystem::relative(entry.path(), source);
       CAPTURE(file);
       CHECK(bytes_of(dir / file) == bytes_of(entry.path()));
@@ -102,6 +120,7 @@ TEST_CASE("a new game is its template's folder, file for file, and a game.json o
     // What a template says about itself is the template's, not the game's.
     CHECK_FALSE(std::filesystem::exists(dir / "template.json"));
     CHECK(std::filesystem::exists(dir / kGameSettingsFile));
+    check_settings_kept(source, dir);
     std::filesystem::remove_all(dir);
   }
 }
@@ -317,7 +336,7 @@ TEST_CASE("the game built from the sandbox is the real player under the game's n
   const std::filesystem::path out = fresh("built_sandbox");
   std::string error;
   const std::filesystem::path game = redgem::test::fixture("games/sandbox");
-  REQUIRE_MESSAGE(build_game(game, out, *runtime_for(host_build_target(), editor), host_build_target(), error), error);
+  REQUIRE_MESSAGE(build_game(game, out, *runtime_for(host_build_target(), editor), folder_target(), error), error);
   const std::filesystem::path executable =
       out / platform::executable_file_name(executable_name(game), platform::is_windows());
   REQUIRE(std::filesystem::is_regular_file(executable));
@@ -432,7 +451,7 @@ TEST_CASE("a built game never carries a signing key left in its folder") {
   std::ofstream(dir / "game_src" / "release.keystore") << "secret";
   std::ofstream(dir / "engine") << "engine";
   std::string error;
-  REQUIRE_MESSAGE(build_game(dir / "game_src", dir / "out", dir / "engine", host_build_target(), error), error);
+  REQUIRE_MESSAGE(build_game(dir / "game_src", dir / "out", dir / "engine", folder_target(), error), error);
   CHECK(std::filesystem::exists(dir / "out" / "game" / "scene.glb"));
   CHECK_FALSE(std::filesystem::exists(dir / "out" / "game" / "release.keystore"));
   CHECK(signing_key_file("keys/upload.jks"));
@@ -455,7 +474,7 @@ TEST_CASE("a built game carries no key in any case, nor the keystore its game.js
   std::ofstream(game / "game.json") << R"({"android": {"keystore": "secrets/../secrets/mine.bin"}})";
   std::ofstream(dir / "engine") << "engine";
   std::string error;
-  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", host_build_target(), error), error);
+  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", folder_target(), error), error);
   for (const std::string& key : keys) {
     CAPTURE(key);
     CHECK_FALSE(std::filesystem::exists(dir / "out" / "game" / key));
@@ -479,12 +498,12 @@ TEST_CASE("a built game never carries the keystore its game.json names by an abs
   const nlohmann::json named = {{"android", {{"keystore", (game / "upload.bin").string()}}}};
   std::ofstream(game / "game.json") << named.dump();
   std::string error;
-  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", host_build_target(), error), error);
+  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", folder_target(), error), error);
   CHECK_FALSE(std::filesystem::exists(dir / "out" / "game" / "upload.bin"));
 
   const bool case_ignored = std::filesystem::exists(game / "RELEASE.BIN");
   std::ofstream(game / "game.json") << R"({"android": {"keystore": "RELEASE.BIN"}})";
-  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", host_build_target(), error), error);
+  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", folder_target(), error), error);
   CHECK(std::filesystem::exists(dir / "out" / "game" / "release.bin") == !case_ignored);
   std::filesystem::remove_all(dir);
 }
@@ -536,7 +555,7 @@ TEST_CASE("a built game holds the game's own files: nothing hidden, no backups, 
   std::filesystem::create_directory_symlink(dir / "outside", game / "linked_folder");
   std::ofstream(dir / "engine") << "engine";
   std::string error;
-  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", host_build_target(), error), error);
+  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", folder_target(), error), error);
   const std::filesystem::path built = dir / "out" / "game";
   CHECK(std::filesystem::exists(built / "scene.glb"));
   CHECK(std::filesystem::exists(built / "scenes" / "level2.glb"));
@@ -559,8 +578,7 @@ TEST_CASE("a built game carries the licenses of what it contains") {
   std::ofstream(dir / "engine") << "engine";
   std::string error;
   REQUIRE_MESSAGE(
-      build_game(redgem::test::fixture("games/sandbox"), dir / "out", dir / "engine", host_build_target(), error),
-      error);
+      build_game(redgem::test::fixture("games/sandbox"), dir / "out", dir / "engine", folder_target(), error), error);
   const auto text_of = [&dir](const char* file) {
     std::ifstream in(dir / "out" / kNoticesFolder / file);
     std::stringstream text;
@@ -577,3 +595,12 @@ TEST_CASE("a built game carries the licenses of what it contains") {
   }
   std::filesystem::remove_all(dir);
 }
+
+#ifdef _WIN32  // (the player built here is the Windows one)
+TEST_CASE("the Windows player carries the engine's icon, with room in its headers for a game's") {
+  const auto player = read_file_up_to(REDGEM_PLAYER_FILE, std::uintmax_t{1} << 30);
+  REQUIRE(player.has_value());
+  CHECK(exe_icon_sides(*player) == std::vector<int>(kWindowsIconSides.begin(), kWindowsIconSides.end()));
+  CHECK(exe_has_room_for_icon(*player));
+}
+#endif

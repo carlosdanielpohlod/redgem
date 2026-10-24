@@ -9,6 +9,7 @@
 #include "core/files.hpp"
 #include "project/android/android_package_names.hpp"
 #include "project/game_build.hpp"
+#include "project/game_shipping.hpp"
 #include "project/notices.hpp"
 
 namespace redgem {
@@ -92,13 +93,24 @@ bool stage_runtimes(const std::map<std::string, std::filesystem::path>& runtimes
   return true;
 }
 
-// The app's manifest, from what the game says about its app (and about itself).
-bool manifest_for(const std::filesystem::path& game_dir, std::string& manifest, std::string& error) {
+// The launcher icon, for a game that has an icon.
+bool stage_icon_of(const BuildIdentity& identity, const std::filesystem::path& stage_dir, std::string& error) {
+  return identity.icon.empty() || stage_android_icon(identity.icon, stage_dir, error);
+}
+
+// The app's manifest, from what the game says about its app (and about itself), and its icon.
+bool manifest_for(const std::filesystem::path& game_dir, const std::filesystem::path& stage_dir, std::string& manifest,
+                  std::string& error) {
   const GameManifest game = read_game_manifest(game_dir);
   // (An id that cannot be used is no id to name the app by: the build says so instead of guessing.)
   error = game.android_error.empty() ? game.id_error : game.android_error;
   if (!error.empty()) return false;
-  manifest = android_manifest(android_package_for(game.settings, game_dir), game.settings.title, game.settings.android);
+  const auto identity = build_identity(game_dir, game, error);
+  if (!identity || !stage_icon_of(*identity, stage_dir, error)) return false;
+  const AndroidAppLook look{identity->identity.version, app_goes_online(identity->identity, game_dir),
+                            !identity->icon.empty()};
+  manifest =
+      android_manifest(android_package_for(game.settings, game_dir), game.settings.title, game.settings.android, look);
   return true;
 }
 
@@ -156,7 +168,7 @@ bool stage_android_game(const std::filesystem::path& game_folder,
   std::string manifest;
   // (The licenses of what the app contains go inside it, beside the game.)
   const bool staged = stage_files(game_dir, assets, files, error) && stage_runtimes(runtimes, stage_dir, error) &&
-                      manifest_for(game_dir, manifest, error) && write_notices(assets, error);
+                      manifest_for(game_dir, stage_dir, manifest, error) && write_notices(assets, error);
   return staged && write_listing(stage_dir, std::move(files), stamp, manifest, error);
 }
 

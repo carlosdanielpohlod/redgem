@@ -4,6 +4,11 @@ Games can be played together over a local network or the internet. One machine *
 and the others **join** it; every machine has an id (the host is 1, then 2, 3... as players arrive).
 Up to 16 machines play together.
 
+A game that plays online says so in its `game.json` with `"network": true`: its Android app
+then asks the phone for the network, which an app without it does not get (a build of a game
+that says nothing guesses it from its scripts, and warns; see
+[Building and sharing](../shipping.md#icon-version-and-splash-picture)).
+
 There are three ways for the others to get to the host, from the easiest, and a fourth where
 nobody hosts:
 

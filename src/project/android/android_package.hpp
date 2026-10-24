@@ -1,12 +1,16 @@
 #pragma once
 
 #include <filesystem>
+#include <array>
 #include <map>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "app/android/android_bundle.hpp"
 #include "app/game_settings.hpp"
+#include "project/game_build.hpp"
 
 namespace redgem {
 
@@ -62,9 +66,25 @@ std::string android_package_from(const std::string& name);
 // is when it reads as an app's id ("com.mystudio.mygame") and made into one when it does not
 // ("my-game" -> "com.redgem.mygame_3fa2c1"); else the one made from its folder's name.
 std::string android_package_for(const GameSettings& settings, const std::filesystem::path& game_dir);
+// What the game's own game.json says that its app shows (see app/game_identity.hpp).
+struct AndroidAppLook {
+  std::string version;   // the game's version: the app's, unless the "android" section names one
+  bool network = false;  // the app asks for the network (the INTERNET permission) only then
+  bool icon = false;     // the app has launcher icons (res/mipmap-*/, see stage_android_icon)
+};
 // The app's AndroidManifest.xml: a full-screen, landscape native activity running the engine.
-std::string android_manifest(const std::string& package, const std::string& label,
-                             const AndroidSettings& settings = {});
+std::string android_manifest(const std::string& package, const std::string& label, const AndroidSettings& settings = {},
+                             const AndroidAppLook& look = {});
+// The name the app's version goes by: the "android" section's, else the game's, else 1.0.
+std::string android_version_name(const AndroidSettings& settings, const AndroidAppLook& look);
+
+// The launcher icon of a game's app, made from its icon picture: res/mipmap-<density>/ic_launcher.png
+// in `stage_dir`, one for each screen density phones have. False, with `error` set, when the
+// picture cannot be used.
+bool stage_android_icon(const std::filesystem::path& icon, const std::filesystem::path& stage_dir, std::string& error);
+// The sides, in pixels, the launcher icon is made at, by density (Android's 48 dp at each).
+inline constexpr std::array<std::pair<const char*, int>, 5> kLauncherIconSides = {
+    {{"mdpi", 48}, {"hdpi", 72}, {"xhdpi", 96}, {"xxhdpi", 144}, {"xxxhdpi", 192}}};
 
 // The players built for Android (the runtime as a library the system loads, see
 // app/android/android_main.cpp), by kind of processor ("arm64-v8a" -> .../libredgem.so), found in
@@ -89,9 +109,34 @@ void keep_to_owner(const std::filesystem::path& file);
 bool pack_android_apk(const AndroidTools& tools, const std::filesystem::path& stage_dir, const SigningKey& key,
                       const std::filesystem::path& apk, std::string& error);
 
-// The whole thing: <out_dir>/<game>.apk from a game folder. Returns the APK, or nullopt with `error` set.
+// An App Bundle is made by Google's bundletool, which is not part of the SDK: the program
+// `bundletool` on the PATH, or its .jar where REDGEM_BUNDLETOOL says (run with Java). It is
+// signed with Java's jarsigner, and laid out with zip and unzip.
+inline constexpr const char* kBundletoolVariable = "REDGEM_BUNDLETOOL";
+// How bundletool is run here, as the start of a command line: the .jar REDGEM_BUNDLETOOL names
+// (`jar_variable_value`), else a runnable `bundletool` in a folder of `path_variable`. nullopt,
+// with `error` saying how to get it, when it is nowhere or the variable names no file.
+std::optional<std::string> find_bundletool(const std::string& jar_variable_value, const std::string& path_variable,
+                                           std::string& error);
+// The commands that make an App Bundle of a staged folder (each run from the stage folder): the
+// app's files linked in the protocol-buffer form bundles hold, laid out as the bundle's one module
+// (manifest/, res/, assets/, lib/, resources.pb), made into a bundle and signed.
+struct PackingStep {
+  std::string command;
+  std::string what;  // what it does, as a failure says it
+};
+std::vector<PackingStep> bundle_commands(const AndroidTools& tools, const std::string& bundletool,
+                                         const std::filesystem::path& stage_dir, const SigningKey& key,
+                                         const std::filesystem::path& aab);
+bool pack_android_bundle(const AndroidTools& tools, const std::string& bundletool,
+                         const std::filesystem::path& stage_dir, const SigningKey& key,
+                         const std::filesystem::path& aab, std::string& error);
+
+// The whole thing: <out_dir>/<game>.apk (or .aab) from a game folder. Returns the file, or nullopt
+// with `error` set.
 std::optional<std::filesystem::path> build_android_game(const std::filesystem::path& game_dir,
                                                         const std::filesystem::path& out_dir,
-                                                        const std::filesystem::path& runtimes_dir, std::string& error);
+                                                        const std::filesystem::path& runtimes_dir, std::string& error,
+                                                        AndroidFormat format = AndroidFormat::Apk);
 
 }  // namespace redgem

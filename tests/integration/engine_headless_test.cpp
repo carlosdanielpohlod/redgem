@@ -626,6 +626,39 @@ TEST_CASE("Game.title is what the game is called: its folder's name unless game.
   CHECK(ruby(*engine, "Game.title") == "sandbox");
 }
 
+// The sandbox game, copied with the game.json given, made by nobody's window.
+std::unique_ptr<Engine> sandbox_saying(const std::filesystem::path& game, const std::string& json) {
+  std::filesystem::remove_all(game);
+  std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
+  std::ofstream(game / kGameSettingsFile) << json;
+  EngineOptions options;
+  options.game_dir = game;
+  options.fixed_step = true;
+  auto created = Engine::create(options);
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  return std::move(std::get<std::unique_ptr<Engine>>(created));
+}
+
+TEST_CASE("Game.version is the version game.json gives the game, nil when it gives none") {
+  CHECK(ruby(*sandbox(), "Game.version.inspect") == "nil");
+  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_engine_version";
+  CHECK(ruby(*sandbox_saying(game, R"({"version": "1.4.0-beta.2"})"), "Game.version") == "1.4.0-beta.2");
+  test::LogCapture log;
+  // One that is not a version is none, and the log says why.
+  CHECK(ruby(*sandbox_saying(game, R"({"version": "1.4"})"), "Game.version.inspect") == "nil");
+  CHECK(log.contains("game.json: version must be a version like 1.2.0"));
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("a game played by nobody's window shows no splash picture, and plays all the same") {
+  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_engine_loading_picture";
+  test::LogCapture log;
+  auto engine = sandbox_saying(game, R"({"splash": "images/missing.png"})");
+  frames(*engine, 1);
+  CHECK_FALSE(log.contains("splash picture"));  // (not even looked for: there is nothing to show it on)
+  std::filesystem::remove_all(game);
+}
+
 TEST_CASE("Game.load_scene switches scenes at the end of the frame and keeps Ruby globals") {
   auto engine = sandbox();
   frames(*engine, 1);
