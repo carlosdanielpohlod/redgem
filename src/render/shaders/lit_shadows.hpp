@@ -127,7 +127,7 @@ float sunVisibility(vec3 position, vec3 n, vec3 toSun) {
   vec2 uv = tile.xy + coords.xy * tile.zw;
 #ifdef SOFT_SHADOWS
   // (Far cascades' texels are wider than the softest edge they would show: filtered as usual.)
-  float lit = cascade < SOFT_CASCADES ? softShadow(uv, coords.z - bias, cascade, surfaceSlope(n, toSun))
+  float lit = cascade < SOFT_CASCADES && sunSize > 0.0 ? softShadow(uv, coords.z - bias, cascade, surfaceSlope(n, toSun))
                                       : filteredShadow(uv, coords.z - bias);
 #else
   float lit = filteredShadow(uv, coords.z - bias);

@@ -72,15 +72,33 @@ CascadeUniforms cascade_uniforms(const Cascades& cascades) {
   return values;
 }
 
+void send_shadow_strength(const Shader& program, const ShadowUniforms& at, float strength) {
+  send(program, at.strength, strength);
+  send(program, at.texel, kShadowTexel);
+}
+
+void send_shadow_cascades(const Shader& program, const ShadowUniforms& at, const Cascades& cascades,
+                          const std::array<Matrix, kMaxShadowCascades>& matrices, float sun_size) {
+  const CascadeUniforms values = cascade_uniforms(cascades);
+  rlEnableShader(program.id);
+  rlSetUniformMatrices(at.matrices, matrices.data(), cascades.count);
+  rlDisableShader();
+  SetShaderValueV(program, at.tiles, values.tiles.data(), SHADER_UNIFORM_VEC4, cascades.count);
+  SetShaderValueV(program, at.scales, values.scales.data(), SHADER_UNIFORM_FLOAT, cascades.count);
+  send(program, at.cascades, cascades.count);
+  send(program, at.sun_size, sun_size);
+  send(program, at.depth_range, static_cast<float>(shadow_far_plane(cascades) - kShadowNearPlane));
+}
+
 }  // namespace
 
 void Renderer::Impl::draw_shadow_map(const Camera3D& camera, const Environment& env, const ParticleSystem* particles) {
   const Vec3 to_sun = normalize(Vec3{-sun_travel.x, -sun_travel.y, -sun_travel.z});
   const float strength = render_math::sun_shadow_strength(to_sun, env.shadows);
   if (strength > 0.0f) draw_sun_depth(camera, to_sun, env, particles);
-  send(shader, lit_uniforms.shadow_strength, strength);
-  send(shader, lit_uniforms.shadow_texel, kShadowTexel);
-  bind_for_the_frame(shader, lit_uniforms.shadow_map, kShadowTextureSlot, shadow.depth.id);
+  send_shadow_strength(shader, lit_uniforms.shadows, strength);
+  send_shadow_strength(particle_shader, particle_uniforms.shadows, strength);
+  bind_for_the_frame(shader, lit_uniforms.shadows.map, kShadowTextureSlot, shadow.depth.id);
 }
 
 // The scene's depth as the sun sees it, and the matrices that lead the lit shader into that view.
@@ -121,17 +139,8 @@ Matrix Renderer::Impl::draw_depth_from(const Camera3D& sun_view, Vec3 viewer) {
 }
 
 void Renderer::Impl::send_cascades(const Cascades& cascades, float sun_size) {
-  const CascadeUniforms values = cascade_uniforms(cascades);
-  const std::array<float, kMaxShadowCascades * kFloatsPerTile>& tiles = values.tiles;
-  const std::array<float, kMaxShadowCascades>& scales = values.scales;
-  rlEnableShader(shader.id);
-  rlSetUniformMatrices(lit_uniforms.light_matrix, light_matrices.data(), cascades.count);
-  rlDisableShader();
-  SetShaderValueV(shader, lit_uniforms.shadow_tiles, tiles.data(), SHADER_UNIFORM_VEC4, cascades.count);
-  SetShaderValueV(shader, lit_uniforms.shadow_scales, scales.data(), SHADER_UNIFORM_FLOAT, cascades.count);
-  send(shader, lit_uniforms.shadow_cascades, cascades.count);
-  send(shader, lit_uniforms.sun_size, sun_size);
-  send(shader, shaders::kShadowDepthRange, static_cast<float>(shadow_far_plane(cascades) - kShadowNearPlane));
+  send_shadow_cascades(shader, lit_uniforms.shadows, cascades, light_matrices, sun_size);
+  send_shadow_cascades(particle_shader, particle_uniforms.shadows, cascades, light_matrices, sun_size);
 }
 
 }  // namespace redgem

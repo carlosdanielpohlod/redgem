@@ -120,6 +120,7 @@ void Renderer::Impl::begin_particles() {
   rlEnableShader(particle_shader.id);
   const Matrix view_projection = MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection());
   rlSetUniformMatrix(particle_shader.locs[SHADER_LOC_MATRIX_MVP], view_projection);
+  bind_for_the_frame(particle_shader, particle_uniforms.shadows.map, kShadowTextureSlot, shadow.depth.id);
   if (!particle_layout.any_soft) return;
   bind_for_the_frame(particle_shader, particle_uniforms.scene_depth, kSceneDepthSlot, scene_depth.depth.id);
   send(particle_shader, particle_uniforms.near_plane, static_cast<float>(rlGetCullDistanceNear()));

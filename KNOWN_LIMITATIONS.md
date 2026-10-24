@@ -30,7 +30,9 @@ the same pull request.
 
 - Animation graphs support clip states and one-dimensional blends only. State fades complete
   before another transition is evaluated; there are no hierarchical or two-dimensional trees.
-- Particle shadows are opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not volumetric density shadows. They do not receive shadows, and camera-depth soft fading does not affect their shadow silhouette.
+- Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
+  volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
+  fading does not affect the cast shadow silhouette; point lights do not cast shadows.
 - Grass and other `Scatter` copies stop at the base template's `visible_to`. Distance meshes
   can be supplied with `lods`, but simplified models and impostor atlases are not generated
   automatically. Beyond the final range the ground is still its texture alone.

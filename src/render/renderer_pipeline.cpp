@@ -63,7 +63,7 @@ void Renderer::Impl::compile_shaders() {
   temporal_shader = compile_shader(nullptr, shaders::kTemporalFragment, "temporal anti-aliasing");
   sharpen_shader = compile_shader(nullptr, shaders::kSharpenFragment, "sharpening");
   sky_shader = compile_shader(shaders::kSkyVertex, shaders::kSkyFragment, "sky");
-  particle_shader = compile_shader(shaders::kParticleVertex, shaders::kParticleFragment, "particles");
+  particle_shader = compile_shader(shaders::kParticleVertex, shaders::particle_fragment().c_str(), "particles");
   glow_limit_shader = compile_shader(nullptr, shaders::kGlowLimitFragment, "glow limit");
   bright_shader = compile_shader(nullptr, shaders::kBrightFragment, "bloom threshold");
   blur_shader = compile_shader(nullptr, shaders::kBlurFragment, "blur");

@@ -23,8 +23,23 @@ struct WaterUniforms {
 };
 WaterUniforms find_water_uniforms(const Shader& program);
 
+// Shared sun-shadow lookups for surfaces and illuminated particles.
+struct ShadowUniforms {
+  int map = kNoLocation;
+  int matrices = kNoLocation;
+  int strength = kNoLocation;
+  int texel = kNoLocation;
+  int tiles = kNoLocation;
+  int scales = kNoLocation;
+  int cascades = kNoLocation;
+  int sun_size = kNoLocation;
+  int depth_range = kNoLocation;
+};
+ShadowUniforms find_shadow_uniforms(const Shader& program);
+
 // Where the lit shader takes its values.
 struct LitUniforms {
+  ShadowUniforms shadows;
   // Per object and per material.
   int has_normal_map = kNoLocation;
   int normal_scale = kNoLocation;
@@ -56,10 +71,6 @@ struct LitUniforms {
   int wind = kNoLocation;
   // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
   int frame_texels = kNoLocation;
-  int shadow_map = kNoLocation;
-  int light_matrix = kNoLocation;
-  int shadow_strength = kNoLocation;
-  int shadow_texel = kNoLocation;
   int reflection_map = kNoLocation;
   int reflection_strength = kNoLocation;
   int sun_direction = kNoLocation;
@@ -78,10 +89,6 @@ struct LitUniforms {
   int sky_irradiance = kNoLocation;
   int sky_reflections = kNoLocation;
   int sky_reflectance = kNoLocation;
-  int shadow_tiles = kNoLocation;
-  int shadow_scales = kNoLocation;
-  int shadow_cascades = kNoLocation;
-  int sun_size = kNoLocation;
 };
 
 // Where the shadow map's depth shader takes its values.
@@ -129,6 +136,8 @@ struct TemporalUniforms {
 // Where the particle shader takes its values: per batch, and once per frame (what soft ones fade
 // into, and the light lit ones take).
 struct ParticleUniforms {
+  ShadowUniforms shadows;
+  int sun_direction = kNoLocation;
   int boost = kNoLocation;
   int textured = kNoLocation;
   int scene_depth = kNoLocation;

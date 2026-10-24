@@ -27,7 +27,7 @@ void Renderer::Impl::apply_lights(const Scene& scene, const Environment& env, Ve
   const Vector3 sun_color = to_raylib(lights.sun_color);
   const render_math::PointLightUniforms points = render_math::pack_point_lights(nearest);
   send_lights(sun_direction, sun_color, env.ambient, points);
-  send_particle_lights(sun_color, env, points);
+  send_particle_lights(sun_direction, sun_color, env, points);
   send_atmosphere(env);
   send_sky_dome(env, sun_direction, sun_color);
   send_sky_light(env);
@@ -48,9 +48,10 @@ void Renderer::Impl::send_lights(Vector3 sun_direction, Vector3 sun_color, float
   SetShaderValueV(shader, lit_uniforms.point_ranges, points.ranges, SHADER_UNIFORM_FLOAT, points.count);
 }
 
-void Renderer::Impl::send_particle_lights(Vector3 sun_color, const Environment& env,
+void Renderer::Impl::send_particle_lights(Vector3 sun_direction, Vector3 sun_color, const Environment& env,
                                           const render_math::PointLightUniforms& points) {
   const ParticleUniforms& at = particle_uniforms;
+  send(particle_shader, at.sun_direction, sun_direction);
   send(particle_shader, at.sun_color, sun_color);
   send(particle_shader, at.ambient, env.ambient);
   send(particle_shader, at.sky_top, to_raylib(env.sky_top));

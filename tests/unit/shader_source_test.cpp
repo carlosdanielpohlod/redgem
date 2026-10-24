@@ -43,7 +43,7 @@ constexpr const char* kDefineWord = "#define ";
 // Every shader the engine compiles.
 const std::string kEngineShaders[] = {shaders::lit_vertex(),       shaders::lit_fragment(),
                                       shaders::depth_fragment(),   shaders::kSkyVertex,
-                                      shaders::kSkyFragment,       shaders::kParticleFragment,
+                                      shaders::kSkyFragment,       shaders::particle_fragment(),
                                       shaders::kPanoramaFragment,  shaders::kAmbientOcclusionFragment,
                                       shaders::kBrightFragment,    shaders::kBlurFragment,
                                       shaders::kCompositeFragment, shaders::kAntialiasFragment,

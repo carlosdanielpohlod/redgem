@@ -1,10 +1,15 @@
 #pragma once
 
+#include <string>
+
+#include "render/shaders/copy_fade.hpp"
+#include "render/shaders/lit_shadows.hpp"
+
 namespace redgem::shaders {
 
 // Particles: squares that face the camera, each corner given in the world (see particle_layout).
 // One that takes the light (lit) is lit at its corners by the sun, the sky and the point lights,
-// as a puff that is lit on about half of it whichever way the light comes from (no shadows);
+// as a puff that is lit on about half of it whichever way the light comes from;
 // the others shine with their own color, `boost` times brighter when they glow (so they bloom).
 inline constexpr const char* kParticleBoost = "boost";
 inline constexpr const char* kParticleTextured = "textured";
@@ -29,7 +34,9 @@ uniform vec3 pointLightColors[MAX_POINT_LIGHTS];
 uniform float pointLightRanges[MAX_POINT_LIGHTS];
 out vec2 fragTexCoord;
 out vec4 fragColor;
-out vec3 fragLight;
+out vec3 fragLocalLight;
+out vec3 fragSun;
+out vec3 fragPosition;
 out float fragSoft;
 const float SWITCH_ON = 0.5;           // switches arrive as floats: on when above this
 const float LIT_SHARE = 0.5;           // of a direct light, what a puff takes in on average
@@ -40,7 +47,7 @@ const float LIGHT_FALLOFF_BIAS = 1.0;  // as the lit shader's: meters added so l
 
 vec3 lightAround(vec3 position) {
   vec3 sky = skyTop * SKY_ABOVE + skyHorizon * SKY_AROUND + groundColor * SKY_BELOW;
-  vec3 light = sunColor * LIT_SHARE + sky * ambientStrength;
+  vec3 light = sky * ambientStrength;
   for (int i = 0; i < pointLightCount; ++i) {
     float distance = length(pointLightPositions[i] - position);
     float window = clamp(1.0 - distance / pointLightRanges[i], 0.0, 1.0);
@@ -52,7 +59,9 @@ vec3 lightAround(vec3 position) {
 void main() {
   fragTexCoord = vertexTexCoord;
   fragColor = vertexColor;
-  fragLight = particleLook.y > SWITCH_ON ? lightAround(vertexPosition) : vec3(boost);
+  fragLocalLight = particleLook.y > SWITCH_ON ? lightAround(vertexPosition) : vec3(boost);
+  fragSun = particleLook.y > SWITCH_ON ? sunColor * LIT_SHARE : vec3(0.0);
+  fragPosition = vertexPosition;
   fragSoft = particleLook.x;
   gl_Position = mvp * vec4(vertexPosition, 1.0);
 }
@@ -60,11 +69,14 @@ void main() {
 
 // A particle's picture, or a soft round dot without one. A soft one fades where it nears what is
 // behind it (the depth of the scene's surfaces, copied before particles are drawn).
-inline constexpr const char* kParticleFragment = R"GLSL(
+inline constexpr const char* kParticleFragmentHead = R"GLSL(
 #version 330
 in vec2 fragTexCoord;
 in vec4 fragColor;
-in vec3 fragLight;
+in vec3 fragLocalLight;
+in vec3 fragSun;
+in vec3 fragPosition;
+uniform vec3 sunDirection;
 in float fragSoft;
 uniform sampler2D texture0;  // the particle's picture, when it has one
 uniform float textured;      // 1 with a picture, 0 for the soft dot
@@ -73,6 +85,8 @@ uniform float nearPlane;
 uniform float farPlane;
 out vec4 finalColor;
 const float GAMMA = 2.2;
+const float HALF = 0.5;
+const float TWO_PI = 6.28318531;
 const float SOFT_FROM = 0.55;  // share of the radius where the dot starts fading out
 const vec2 CENTER = vec2(0.5);
 const float RADIUS = 0.5;      // of the square, in texture coordinates
@@ -92,6 +106,17 @@ float softness() {
   return clamp((behind - distanceAt(gl_FragCoord.z)) / fragSoft, 0.0, 1.0);
 }
 
+ )GLSL";
+
+inline constexpr const char* kParticleFragmentMain = R"GLSL(
+// Only direct sunlight is occluded: ambient and point lights keep their existing contribution.
+vec3 shadowedLight() {
+  if (dot(fragSun, fragSun) <= 0.0) return fragLocalLight;
+  vec3 toSun = normalize(-sunDirection);
+  float visible = sunVisibility(fragPosition, toSun, toSun);
+  return fragLocalLight + fragSun * visible;
+}
+
 void main() {
   vec4 shape;
   if (textured > SWITCH_ON) {
@@ -100,9 +125,14 @@ void main() {
     float fromCenter = length(fragTexCoord - CENTER) / RADIUS;
     shape = vec4(1.0, 1.0, 1.0, 1.0 - smoothstep(SOFT_FROM, 1.0, fromCenter));
   }
-  finalColor = vec4(pow(shape.rgb * fragColor.rgb, vec3(GAMMA)) * fragLight, fragColor.a * shape.a * softness());
+  finalColor = vec4(pow(shape.rgb * fragColor.rgb, vec3(GAMMA)) * shadowedLight(), fragColor.a * shape.a * softness());
 }
 )GLSL";
+
+inline std::string particle_fragment() {
+  return std::string(kParticleFragmentHead) + "\n#define SOFT_SHADOWS\n" + kCopyFade + kLitShadows +
+         kParticleFragmentMain;
+}
 
 // The sun sees a sprite facing it. Alpha is cut out rather than accumulated as volume density.
 inline constexpr const char* kParticleShadowVertex = R"GLSL(

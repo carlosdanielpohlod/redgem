@@ -528,7 +528,8 @@ struct Renderer::Impl {
   // The depth soft particles fade into, copied from the lit picture's.
   void copy_soft_particle_depth();
   // The light lit particles take: the sun, the sky and the nearest point lights.
-  void send_particle_lights(Vector3 sun_color, const Environment& env, const render_math::PointLightUniforms& points);
+  void send_particle_lights(Vector3 sun_direction, Vector3 sun_color, const Environment& env,
+                            const render_math::PointLightUniforms& points);
 
   // --- Temporal anti-aliasing (renderer_temporal.cpp) -------------------------------------------
 

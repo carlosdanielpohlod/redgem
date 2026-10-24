@@ -26,6 +26,18 @@ constexpr std::pair<int, const char*> kKnownUniforms[] = {
     {SHADER_LOC_MAP_DIFFUSE + kCoatNormalMap, shaders::kCoatNormalMap},
 };
 
+constexpr std::pair<int ShadowUniforms::*, const char*> kShadowUniforms[] = {
+    {&ShadowUniforms::map, shaders::kShadowMap},
+    {&ShadowUniforms::matrices, shaders::kLightViewProjection},
+    {&ShadowUniforms::strength, shaders::kShadowStrength},
+    {&ShadowUniforms::texel, shaders::kShadowTexel},
+    {&ShadowUniforms::tiles, shaders::kShadowTiles},
+    {&ShadowUniforms::scales, shaders::kShadowScales},
+    {&ShadowUniforms::cascades, shaders::kShadowCascades},
+    {&ShadowUniforms::sun_size, shaders::kSunSize},
+    {&ShadowUniforms::depth_range, shaders::kShadowDepthRange},
+};
+
 // A uniform of the lit shader, and where its location is kept.
 struct LitUniform {
   int LitUniforms::* location;
@@ -64,10 +76,6 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::wind, shaders::kWindAmount},
     // Once per frame: the frame's matrices, lights, shadows, reflections and the sky.
     {&LitUniforms::frame_texels, shaders::kFrameTexels},
-    {&LitUniforms::shadow_map, shaders::kShadowMap},
-    {&LitUniforms::light_matrix, shaders::kLightViewProjection},
-    {&LitUniforms::shadow_strength, shaders::kShadowStrength},
-    {&LitUniforms::shadow_texel, shaders::kShadowTexel},
     {&LitUniforms::reflection_map, shaders::kReflectionMap},
     {&LitUniforms::reflection_strength, shaders::kReflectionStrength},
     {&LitUniforms::sun_direction, shaders::kSunDirection},
@@ -86,10 +94,6 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::sky_irradiance, shaders::kSkyIrradiance},
     {&LitUniforms::sky_reflections, shaders::kSkyReflections},
     {&LitUniforms::sky_reflectance, shaders::kSkyReflectance},
-    {&LitUniforms::shadow_tiles, shaders::kShadowTiles},
-    {&LitUniforms::shadow_scales, shaders::kShadowScales},
-    {&LitUniforms::shadow_cascades, shaders::kShadowCascades},
-    {&LitUniforms::sun_size, shaders::kSunSize},
 };
 
 // A uniform of the particle shader, and where its location is kept.
@@ -99,6 +103,7 @@ struct ParticleUniform {
 };
 
 constexpr ParticleUniform kParticleUniforms[] = {
+    {&ParticleUniforms::sun_direction, shaders::kSunDirection},
     {&ParticleUniforms::boost, shaders::kParticleBoost},
     {&ParticleUniforms::textured, shaders::kParticleTextured},
     {&ParticleUniforms::scene_depth, shaders::kSceneDepth},
@@ -144,9 +149,16 @@ Shader compile_shader(const char* vertex, const char* fragment, const char* name
   return compiled;
 }
 
+ShadowUniforms find_shadow_uniforms(const Shader& program) {
+  ShadowUniforms found;
+  for (const auto& [member, name] : kShadowUniforms) found.*member = GetShaderLocation(program, name);
+  return found;
+}
+
 LitUniforms find_lit_uniforms(Shader& lit) {
   for (const auto& [place, name] : kKnownUniforms) lit.locs[place] = GetShaderLocation(lit, name);
   LitUniforms found;
+  found.shadows = find_shadow_uniforms(lit);
   for (const LitUniform& uniform : kLitUniforms) found.*uniform.location = GetShaderLocation(lit, uniform.name);
   return found;
 }
@@ -199,6 +211,7 @@ int find_instance_slot(const Shader& program) { return GetShaderLocationAttrib(p
 
 ParticleUniforms find_particle_uniforms(const Shader& particles) {
   ParticleUniforms found;
+  found.shadows = find_shadow_uniforms(particles);
   for (const ParticleUniform& uniform : kParticleUniforms) {
     found.*uniform.location = GetShaderLocation(particles, uniform.name);
   }
