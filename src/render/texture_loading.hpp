@@ -1,7 +1,7 @@
 #pragma once
 
 // Pictures onto the graphics card: the images a scene carries and the files of a game's images
-// folder. Nothing oversized or of another kind than PNG and JPEG is ever decoded.
+// folder. Nothing oversized or of another kind than PNG, JPEG and static WebP is ever decoded.
 
 #include <raylib.h>
 
@@ -11,6 +11,9 @@
 #include "scene/scene_desc.hpp"
 
 namespace redgem::render_detail {
+
+// A bounded PNG, JPEG or static WebP decoded on the CPU. Caller releases the image.
+Image decode_picture(const std::vector<std::uint8_t>& encoded);
 
 // A scene's image as a texture surfaces are drawn with, smaller copies of itself included. Its
 // missing or undecodable data becomes an opaque checkerboard, with a warning.

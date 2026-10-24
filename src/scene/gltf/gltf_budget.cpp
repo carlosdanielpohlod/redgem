@@ -83,11 +83,10 @@ namespace {
 
 // What a picture takes once decoded; nothing for one that will not be decoded.
 std::uint64_t decoded_size(const ImageData& image) {
-  const std::uint8_t* encoded = image.encoded.data();
-  const std::size_t length = image.encoded.size();
-  if (!decodable_image(encoded, length)) return 0;
-  const std::optional<ImageSize> size = encoded_image_size(encoded, length);
-  return size ? std::uint64_t{size->width} * size->height * kBytesPerPixel : 0;
+  const auto encoded = EncodedImage::read(image.encoded.data(), image.encoded.size());
+  if (!encoded) return 0;
+  const ImageSize size = encoded->dimensions();
+  return std::uint64_t{size.width} * size.height * kBytesPerPixel;
 }
 
 }  // namespace

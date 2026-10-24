@@ -55,9 +55,9 @@ the same pull request.
   Refraction sees opaque geometry on screen
   only; overlapping water layers and transparent objects are not captured. Absorption affects
   the path from the bottom to the camera; incident lighting of submerged objects is not attenuated by water.
-- Images must be PNG or JPEG, at most 8192 pixels a side (a sky picture may also be Radiance
-  `.hdr`). Blender's exporter can write WebP and KTX2 textures: neither is read (no decoder for
-  them is among the libraries the engine is built with).
+- Images support PNG, JPEG and static WebP, at most 8192 pixels a side (a sky picture may also
+  be Radiance `.hdr`). Animated WebP and KTX2/Basis textures are not read. WebP is decoded on the CPU and uploaded as
+  ordinary pixels; it does not provide GPU texture compression.
 - A sky picture, shadow cascades, `msaa` and temporal anti-aliasing have been seen on desktop
   OpenGL only, not on a phone.
   On OpenGL ES 3 they rely on what the engine already needs there (half-float textures that can

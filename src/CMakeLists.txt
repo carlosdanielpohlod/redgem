@@ -135,6 +135,7 @@ redgem_add_library(redgem_core
   core/platform_language.cpp
   core/safe_path.cpp
   core/image_header.cpp
+  core/webp_image.cpp
   core/float_image.cpp
   core/radiance_header.cpp
   core/radiance_pixels.cpp
@@ -142,6 +143,7 @@ redgem_add_library(redgem_core
   core/fixed_clock.cpp
   core/stopwatch.cpp)
 target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
+target_link_libraries(redgem_core PRIVATE webpdecoder)
 redgem_embed_texts(redgem_core core)
 if(ANDROID)
   # Where a phone shows a program's messages (see core/platform.cpp).

@@ -11,11 +11,12 @@
 #include "core/radiance_image.hpp"
 #include "core/safe_path.hpp"
 #include "scene/scene_config.hpp"
+#include "render/texture_loading.hpp"
 
 namespace redgem::render_detail {
 namespace {
 
-constexpr const char* kSkyExtensions[] = {"", ".hdr", ".png", ".jpg", ".jpeg"};
+constexpr const char* kSkyExtensions[] = {"", ".hdr", ".png", ".jpg", ".jpeg", ".webp"};
 constexpr float kGamma = 2.2f;  // the curve sRGB pictures are stored with, as the shaders take it
 
 float linear(unsigned char channel) {
@@ -48,10 +49,8 @@ bool fits_shrunk(const Image& decoded, std::uint32_t shrink) {
   return IsImageValid(decoded) && static_cast<std::uint32_t>(decoded.height) >= shrink;
 }
 
-std::optional<FloatImage> decode_ordinary(const std::string& extension, const std::vector<std::uint8_t>& encoded,
-                                          std::uint32_t widest) {
-  if (!decodable_image(encoded.data(), encoded.size())) return std::nullopt;
-  Image decoded = LoadImageFromMemory(extension.c_str(), encoded.data(), static_cast<int>(encoded.size()));
+std::optional<FloatImage> decode_ordinary(const std::vector<std::uint8_t>& encoded, std::uint32_t widest) {
+  Image decoded = decode_picture(encoded);
   const std::uint32_t shrink = shrink_to_fit(static_cast<std::uint32_t>(decoded.width), widest);
   std::optional<FloatImage> image;
   if (fits_shrunk(decoded, shrink)) image = linear_picture(decoded, shrink);
@@ -63,7 +62,7 @@ std::optional<FloatImage> decode_sky(const std::filesystem::path& file, std::uin
   const std::optional<std::vector<std::uint8_t>> encoded = read_file_up_to(file, kMaxEncodedImageBytes);
   if (!encoded) return std::nullopt;
   if (is_radiance(encoded->data(), encoded->size())) return decode_radiance(encoded->data(), encoded->size(), widest);
-  return decode_ordinary(file.extension().string(), *encoded, widest);
+  return decode_ordinary(*encoded, widest);
 }
 
 }  // namespace
@@ -74,7 +73,7 @@ std::optional<FloatImage> load_sky_picture(const std::filesystem::path& folder, 
   std::optional<FloatImage> picture = file ? decode_sky(*file, widest) : std::nullopt;
   if (!picture) {
     log::warning("no sky picture '" + printable(name) + "' that can be read in " + folder.string() +
-                 ": a Radiance (.hdr), PNG or JPEG picture of at most " + std::to_string(kMaxImageSide) +
+                 ": a Radiance (.hdr), PNG, JPEG or static WebP picture of at most " + std::to_string(kMaxImageSide) +
                  " pixels a side");
   }
   return picture;

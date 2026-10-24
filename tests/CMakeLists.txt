@@ -24,6 +24,7 @@ add_executable(redgem_tests
   unit/spatial_audio_test.cpp
   unit/safe_path_test.cpp
   unit/image_header_test.cpp
+  unit/webp_image_test.cpp
   unit/radiance_image_test.cpp
   unit/body_config_test.cpp
   unit/contact_events_test.cpp
@@ -394,6 +395,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/render_look_test.cpp render_system/water_render_test.cpp render_system/scatter_lod_render_test.cpp render_system/particle_render_test.cpp
                render_system/see_through_render_test.cpp render_system/temporal_render_test.cpp
                render_system/temporal_depth_render_test.cpp
+               render_system/webp_render_test.cpp
                render_system/game_font_render_test.cpp
                render_system/missing_picture_render_test.cpp
                render_system/recording_render_test.cpp
@@ -402,7 +404,8 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
 target_link_libraries(redgem_render_system_tests PRIVATE redgem_runtime doctest::doctest)
 target_include_directories(redgem_render_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(redgem_render_system_tests PRIVATE REDGEM_SCREENSHOT_DIR="${REDGEM_SCREENSHOT_DIR}"
-  REDGEM_TEMPLATES_DIR="${CMAKE_SOURCE_DIR}/templates")
+  REDGEM_TEMPLATES_DIR="${CMAKE_SOURCE_DIR}/templates"
+  REDGEM_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 add_test(NAME system.render.pictures COMMAND redgem_render_system_tests)
 set_tests_properties(system.render.pictures PROPERTIES LABELS system RUN_SERIAL TRUE)
 

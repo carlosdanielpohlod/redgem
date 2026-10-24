@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <array>
 
+#include "core/webp_image.hpp"
+
 namespace redgem {
 namespace {
 
@@ -88,20 +90,37 @@ std::optional<ImageSize> jpeg_size(const std::uint8_t* data, std::size_t size) {
   return std::nullopt;
 }
 
+struct ImageHeader {
+  ImageSize size;
+  EncodedImageFormat format;
+  ImageHeader(ImageSize dimensions, EncodedImageFormat kind) : size(dimensions), format(kind) {}
+};
+std::optional<ImageHeader> read_header(const std::uint8_t* data, std::size_t size) {
+  if (data == nullptr) return std::nullopt;
+  if (const auto png = png_size(data, size)) return ImageHeader{*png, EncodedImageFormat::Png};
+  if (const auto jpeg = jpeg_size(data, size)) return ImageHeader{*jpeg, EncodedImageFormat::Jpeg};
+  if (const auto webp = webp_image_size(data, size)) return ImageHeader{*webp, EncodedImageFormat::Webp};
+  return std::nullopt;
+}
+bool within_image_limits(ImageSize size) {
+  return std::min(size.width, size.height) > 0 && std::max(size.width, size.height) <= kMaxImageSide;
+}
+
 }  // namespace
 
 std::optional<ImageSize> encoded_image_size(const std::uint8_t* data, std::size_t size) {
-  if (data == nullptr) return std::nullopt;
-  if (const std::optional<ImageSize> png = png_size(data, size)) return png;
-  return jpeg_size(data, size);
+  const auto header = read_header(data, size);
+  return header ? std::optional<ImageSize>(header->size) : std::nullopt;
 }
 
-bool decodable_image(const std::uint8_t* data, std::size_t size) {
-  if (size > kMaxEncodedImageBytes) return false;
-  const std::optional<ImageSize> picture = encoded_image_size(data, size);
-  if (!picture) return false;
-  const std::uint32_t longest = std::max(picture->width, picture->height);
-  return std::min(picture->width, picture->height) > 0 && longest <= kMaxImageSide;
+std::optional<EncodedImage> EncodedImage::read(const std::uint8_t* data, std::size_t bytes) {
+  if (bytes > kMaxEncodedImageBytes) return std::nullopt;
+  const auto header = read_header(data, bytes);
+  if (!header) return std::nullopt;
+  if (!within_image_limits(header->size)) return std::nullopt;
+  return EncodedImage(data, bytes, header->size, header->format);
 }
+
+bool decodable_image(const std::uint8_t* data, std::size_t size) { return EncodedImage::read(data, size).has_value(); }
 
 }  // namespace redgem

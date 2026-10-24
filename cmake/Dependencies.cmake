@@ -139,6 +139,16 @@ FetchContent_Declare(freetype
   URL https://codeload.github.com/freetype/freetype/tar.gz/${REDGEM_FREETYPE_COMMIT}
   URL_HASH SHA256=${REDGEM_FREETYPE_SHA256})
 
+# --- WebP (static image decoding; no conversion tools or encoder linked) ----------
+set(REDGEM_WEBP_COMMIT "4fa21912338357f89e4fd51cf2368325b59e9bd9") # 1.6.0
+set(REDGEM_WEBP_SHA256 "923f3382a47a2af185c3240c954cf004428b237bd7317413a95146d01eb4b94b")
+foreach(tool ANIM_UTILS CWEBP DWEBP GIF2WEBP IMG2WEBP VWEBP WEBPINFO LIBWEBPMUX WEBPMUX EXTRAS WEBP_JS FUZZTEST)
+  set(WEBP_BUILD_${tool} OFF CACHE BOOL "" FORCE)
+endforeach()
+FetchContent_Declare(libwebp
+  URL https://codeload.github.com/webmproject/libwebp/tar.gz/${REDGEM_WEBP_COMMIT}
+  URL_HASH SHA256=${REDGEM_WEBP_SHA256})
+
 # --- SQLite (where a dedicated server keeps its game's saves; one C file, in the public domain) ----
 # Only where the server is built: a game on a phone keeps its saves in a file.
 if(NOT ANDROID)
@@ -156,7 +166,12 @@ if(NOT ANDROID)
   target_link_libraries(sqlite3 PUBLIC Threads::Threads)
 endif()
 
-FetchContent_MakeAvailable(raylib cgltf JoltPhysics doctest mruby nlohmann_json mbedtls freetype)
+FetchContent_MakeAvailable(raylib cgltf JoltPhysics doctest mruby nlohmann_json mbedtls freetype libwebp)
+# Only the decoder is pulled in by the engine; unreferenced encoder/demux targets stay out of all.
+set_property(DIRECTORY "${libwebp_SOURCE_DIR}" PROPERTY EXCLUDE_FROM_ALL TRUE)
+target_include_directories(webpdecoder SYSTEM INTERFACE "$<BUILD_INTERFACE:${libwebp_SOURCE_DIR}/src>")
+set_property(TARGET webpdecoder PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
+  "$<BUILD_INTERFACE:${libwebp_SOURCE_DIR}>;$<BUILD_INTERFACE:${libwebp_BINARY_DIR}>;$<BUILD_INTERFACE:${libwebp_SOURCE_DIR}/src>")
 set_property(TARGET freetype PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
   "${freetype_SOURCE_DIR}/include;${freetype_BINARY_DIR}/include")
 # Skinned meshes are deformed on the GPU: raylib then uploads bone ids / weights and bone matrices

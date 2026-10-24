@@ -36,6 +36,10 @@ PROJECTS = [
      os.path.join(DEPS, "imguizmo-src", "LICENSE")),
     ("Font Awesome Free", "The editor's icons", "https://fontawesome.com",
      os.path.join(DEPS, "rlimgui-src", "extras", "FontAwsome_LICENSE.txt")),
+    ("libwebp", "Decoding static WebP images", "https://developers.google.com/speed/webp",
+     os.path.join(DEPS, "libwebp-src", "COPYING")),
+    ("libwebp patent grant", "Additional rights for the WebP implementation",
+     "https://developers.google.com/speed/webp", os.path.join(DEPS, "libwebp-src", "PATENTS")),
     ("FreeType", "Decoding game-provided fonts; copyright © 1996–2026 The FreeType Project, "
      "all rights reserved (FreeType License)", "https://freetype.org",
      os.path.join(DEPS, "freetype-src", "docs", "FTL.TXT")),

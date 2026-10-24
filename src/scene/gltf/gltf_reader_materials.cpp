@@ -15,6 +15,18 @@ namespace {
 constexpr const char* kJpegMimeType = "image/jpeg";
 constexpr const char* kJpegExtension = ".jpg";
 constexpr const char* kPngExtension = ".png";
+constexpr const char* kWebpMimeType = "image/webp";
+constexpr const char* kWebpExtension = ".webp";
+const char* image_extension(const cgltf_image& image) {
+  const std::string mime = text_or(image.mime_type, "");
+  if (mime == kJpegMimeType) return kJpegExtension;
+  return mime == kWebpMimeType ? kWebpExtension : kPngExtension;
+}
+bool has_webp_image(const cgltf_texture& texture) { return texture.has_webp && texture.webp_image != nullptr; }
+const cgltf_image* supported_image(const cgltf_texture& texture) {
+  if (has_webp_image(texture)) return texture.webp_image;
+  return texture.image;  // Basis/KTX2 still needs a decoder; retain its plain fallback.
+}
 
 std::vector<std::uint8_t> embedded_bytes(const cgltf_buffer_view& view) {
   const auto* bytes = static_cast<const std::uint8_t*>(cgltf_buffer_view_data(&view));
@@ -80,7 +92,7 @@ WaterDesc water_of(const cgltf_material& material) {
 
 ImageData GltfReader::load_image(const cgltf_image& image, const std::filesystem::path& file) const {
   ImageData out;
-  out.file_extension = text_or(image.mime_type, "") == kJpegMimeType ? kJpegExtension : kPngExtension;
+  out.file_extension = image_extension(image);
   if (image.buffer_view != nullptr) {
     out.encoded = embedded_bytes(*image.buffer_view);
   } else if (!file.empty()) {
@@ -101,8 +113,7 @@ void GltfReader::load_images() {
 
 int GltfReader::image_of(const cgltf_texture_view& view) const {
   if (view.texture == nullptr) return kNoIndex;
-  // KHR_texture_basisu / webp images are not decodable here; fall back to the plain image.
-  return index_of(view.texture->image, data_.images);
+  return index_of(supported_image(*view.texture), data_.images);
 }
 
 void GltfReader::read_pbr(const cgltf_material& material, MaterialDesc& out) const {
