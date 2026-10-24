@@ -10,6 +10,7 @@
 #include <optional>
 #include <string>
 
+#include "input/devices.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 
@@ -101,6 +102,19 @@ mrb_value input_define_axis(mrb_state* mrb, mrb_value) {
 mrb_value input_actions(mrb_state* mrb, mrb_value) { return names_value(mrb, bindings(mrb).declared().actions()); }
 mrb_value input_axes(mrb_state* mrb, mrb_value) { return names_value(mrb, bindings(mrb).declared().axes()); }
 
+// Whether a name the game declared is an axis that a stick moves.
+bool moved_by_a_stick(const AxisBinding* axis) { return axis != nullptr && axis->stick.has_value(); }
+
+// Input.axis_stick(:horizontal): the stick that moves an axis (:left_x), the game's for every
+// player; nil when no stick does, or for an action.
+mrb_value input_axis_stick(mrb_state* mrb, mrb_value) {
+  mrb_value name;
+  mrb_get_args(mrb, "o", &name);
+  const AxisBinding* axis = bindings(mrb).declared().axis(declared_name(mrb, name));
+  if (!moved_by_a_stick(axis)) return mrb_nil_value();
+  return mrb_symbol_value(mrb_intern_cstr(mrb, gamepad_axis_name(*axis->stick).c_str()));
+}
+
 // --- Rebinding -------------------------------------------------------------------------------
 
 // What bind and unbind are given: a name, a binding (nil: all of them), a side and a player.
@@ -186,6 +200,7 @@ void install_declaring(RClass* input_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, input_module, "__define_axis", input_define_axis, MRB_ARGS_REQ(5));
   mrb_define_module_function(mrb, input_module, "actions", input_actions, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, input_module, "axes", input_axes, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, input_module, "axis_stick", input_axis_stick, MRB_ARGS_REQ(1));
 }
 
 void install_rebinding(RClass* input_module, mrb_state* mrb) {

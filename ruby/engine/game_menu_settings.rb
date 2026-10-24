@@ -1,7 +1,8 @@
 # The menu's settings screen (see GameMenu): how the game is shown (window mode, resolution,
 # render scale, vsync, frame cap, quality) and heard (master volume), as the Settings module has
 # them. Each change takes effect at once; leaving the screen (its Back button or Esc) keeps them
-# for the game's next runs and goes back to the screen it was opened from.
+# for the game's next runs and goes back to the screen it was opened from. Its Controls button
+# opens the controls page (see GameMenu::ControlsScreen), which comes back to it.
 class GameMenu < Behaviour
   class SettingsScreen < Screen
     ROW_WIDTH = 560
@@ -36,7 +37,7 @@ class GameMenu < Behaviour
       @from = :title
     end
 
-    def options = [[I18n.t("game.menu.back"), back]]
+    def options = [[I18n.t("game.settings.controls"), -> { @menu.show(:controls) }], [I18n.t("game.menu.back"), back]]
     def rows = VIDEO_ROWS.size + AUDIO_ROWS.size
     def space_above = rows * row_step + SECTIONS.size * @menu.scaled(CAPTION_HEIGHT)
     def first_button_share = BUTTONS_SHARE

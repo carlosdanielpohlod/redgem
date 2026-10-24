@@ -31,6 +31,10 @@ until 1.0, a release may change what games rely on (see
 - **Settings screen and widgets**: `GameMenu` has a settings screen reached from its title and
   pause screens, built from the new `UI.toggle`, `UI.choice` and `UI.slider`. The keyboard and a
   gamepad move a focus between widgets and buttons (`UI::Focus`).
+- **Controls page**: the settings screen leads to each player's keys and gamepad buttons for
+  every action and axis, rebound by pressing the new one, with keys bound twice marked and a
+  reset to the game's. `Input.axis_stick` says which stick moves an axis; `redgem-test --after`
+  starts a game again after an earlier test's run, with what that run kept.
 - **Game icon, version and splash picture**: `game.json` can give a game an `icon`, a `version`
   (read by scripts as `Game.version`) and a `splash` picture shown while it loads. Builds turn the
   icon into each system's own: inside the Windows `.exe`, a menu entry and icon on Linux, an

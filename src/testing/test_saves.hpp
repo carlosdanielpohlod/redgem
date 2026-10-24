@@ -28,4 +28,21 @@ std::filesystem::path fresh_bindings_file_for(const std::filesystem::path& game_
                                               const std::filesystem::path& work_dir,
                                               const std::filesystem::path& test_file);
 
+// What a test run keeps between runs of the game: its save, the player's display settings and the
+// players' bindings.
+struct RunFiles {
+  std::filesystem::path save;
+  std::filesystem::path settings;
+  std::filesystem::path bindings;
+};
+
+// The files a run of `test_file` plays with, emptied: it starts from nothing (see the fresh_
+// functions above).
+RunFiles fresh_run_files(const std::filesystem::path& game_dir, const std::filesystem::path& work_dir,
+                         const std::filesystem::path& test_file);
+// The files an earlier test's run in the same work folder played with, as it left them: a run that
+// goes on from there is the game started again (redgem-test --after).
+RunFiles kept_run_files(const std::filesystem::path& game_dir, const std::filesystem::path& work_dir,
+                        const std::filesystem::path& earlier_test);
+
 }  // namespace redgem::testing

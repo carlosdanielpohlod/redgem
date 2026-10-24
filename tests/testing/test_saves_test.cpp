@@ -90,3 +90,22 @@ TEST_CASE("each test of each game keeps its players' bindings apart from its set
   CHECK(fresh_bindings_file_for(game, "", test) == bindings);
   CHECK_FALSE(std::filesystem::exists(bindings));
 }
+
+TEST_CASE("a run that goes on from an earlier one plays with the files that run left, as it left them") {
+  const std::filesystem::path game = "/nowhere/redgem-testing-tests/one/game";
+  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-kept-work";
+  const std::filesystem::path earlier = "/tests/system/x/settings_test.rb";
+  const RunFiles first = fresh_run_files(game, work, earlier);
+  CHECK(first.save == fresh_save_file_in(work, earlier));
+  CHECK(first.settings == fresh_settings_file_for(game, work, earlier));
+  CHECK(first.bindings == fresh_bindings_file_for(game, work, earlier));
+  std::filesystem::create_directories(first.bindings.parent_path());
+  std::ofstream(first.bindings) << "{}";
+  const RunFiles kept = kept_run_files(game, work, earlier);
+  CHECK(kept.save == first.save);
+  CHECK(kept.settings == first.settings);
+  CHECK(kept.bindings == first.bindings);
+  CHECK(std::filesystem::exists(first.bindings));  // (not emptied)
+  CHECK(fresh_run_files(game, "", earlier).save == test_save_file_for(game));
+  std::filesystem::remove_all(work);
+}

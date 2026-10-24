@@ -34,27 +34,37 @@ std::filesystem::path fresh_test_save_file(const std::filesystem::path& game_dir
   return emptied(test_save_file_for(game_dir));
 }
 
-std::filesystem::path fresh_save_file_in(const std::filesystem::path& work_dir,
-                                         const std::filesystem::path& test_file) {
-  return emptied(work_dir / kWorkSavesFolder / (test_file.stem().string() + kSaveExtension));
-}
-
 namespace {
 
-// A file of one test of one game, named as the game's save is with the test's name and `ending`,
-// emptied (see fresh_settings_file_for).
-std::filesystem::path fresh_test_file(const std::filesystem::path& game_dir, const std::filesystem::path& work_dir,
-                                      const std::filesystem::path& test_file, const char* ending) {
+// The save file of one test run in a folder of its own (see fresh_save_file_in), as it is.
+std::filesystem::path save_file_in(const std::filesystem::path& work_dir, const std::filesystem::path& test_file) {
+  return work_dir / kWorkSavesFolder / (test_file.stem().string() + kSaveExtension);
+}
+
+// A file of one test of one game, named as the game's save is with the test's name and `ending`
+// (see fresh_settings_file_for), as it is.
+std::filesystem::path test_file_for(const std::filesystem::path& game_dir, const std::filesystem::path& work_dir,
+                                    const std::filesystem::path& test_file, const char* ending) {
   const std::filesystem::path game_save = test_save_file_for(game_dir);
   const std::filesystem::path folder = work_dir.empty() ? game_save.parent_path() : work_dir / kWorkSavesFolder;
-  const std::string name = game_save.stem().string() + kNameJoiner + test_file.stem().string() + ending;
-  const std::filesystem::path file = folder / name;
+  return folder / (game_save.stem().string() + kNameJoiner + test_file.stem().string() + ending);
+}
+
+// The same file, emptied.
+std::filesystem::path fresh_test_file(const std::filesystem::path& game_dir, const std::filesystem::path& work_dir,
+                                      const std::filesystem::path& test_file, const char* ending) {
+  const std::filesystem::path file = test_file_for(game_dir, work_dir, test_file, ending);
   std::error_code error;
   std::filesystem::remove(file, error);
   return file;
 }
 
 }  // namespace
+
+std::filesystem::path fresh_save_file_in(const std::filesystem::path& work_dir,
+                                         const std::filesystem::path& test_file) {
+  return emptied(save_file_in(work_dir, test_file));
+}
 
 std::filesystem::path fresh_settings_file_for(const std::filesystem::path& game_dir,
                                               const std::filesystem::path& work_dir,
@@ -66,6 +76,20 @@ std::filesystem::path fresh_bindings_file_for(const std::filesystem::path& game_
                                               const std::filesystem::path& work_dir,
                                               const std::filesystem::path& test_file) {
   return fresh_test_file(game_dir, work_dir, test_file, kBindingsEnding);
+}
+
+RunFiles fresh_run_files(const std::filesystem::path& game_dir, const std::filesystem::path& work_dir,
+                         const std::filesystem::path& test_file) {
+  const std::filesystem::path save =
+      work_dir.empty() ? fresh_test_save_file(game_dir) : fresh_save_file_in(work_dir, test_file);
+  return {save, fresh_settings_file_for(game_dir, work_dir, test_file),
+          fresh_bindings_file_for(game_dir, work_dir, test_file)};
+}
+
+RunFiles kept_run_files(const std::filesystem::path& game_dir, const std::filesystem::path& work_dir,
+                        const std::filesystem::path& earlier_test) {
+  return {save_file_in(work_dir, earlier_test), test_file_for(game_dir, work_dir, earlier_test, kSettingsEnding),
+          test_file_for(game_dir, work_dir, earlier_test, kBindingsEnding)};
 }
 
 }  // namespace redgem::testing

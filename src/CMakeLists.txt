@@ -17,6 +17,9 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_settings.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/settings.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/input.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_binding_names.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_controls_page.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_controls.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scatter.rb

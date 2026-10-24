@@ -138,8 +138,9 @@ not a promise of how it will be closed.
 
 ### What a shipped game offers its players
 
-- Players can rebind a game's actions (`Input.bind`, `Input.capture_next`), but the settings screen
-  has no controls page yet: a game builds its own with `UI`. Gamepads cannot rumble (neither the
+- The menu's controls page binds one key and one button to a row: rebinding a cell replaces all it
+  had, so a second key for one action comes only from a game's script (`Input.bind`). It lists
+  every action and axis the game declared. Gamepads cannot rumble (neither the
   desktops' window library nor Android offers it), the mouse cannot be bound to an action, and a
   capture catches keys and buttons, not sticks or triggers.
 - `UI` has no word wrap, anchors or scroll lists. Android has no on-screen keyboard.

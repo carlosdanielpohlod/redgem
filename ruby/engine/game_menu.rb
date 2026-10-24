@@ -1,5 +1,6 @@
 # A game's menus: a title screen, a pause menu (Esc, P or a gamepad's Start), an end screen, and a
-# settings screen the first two lead to (see GameMenu::SettingsScreen). While a menu is open the
+# settings screen the first two lead to (see GameMenu::SettingsScreen), with its controls page
+# (GameMenu::ControlsScreen). While a menu is open the
 # game is frozen (Time.scale = 0); its options are buttons. Up and down (arrows, a gamepad's D-pad)
 # move the focus between them, and Enter or a gamepad's A picks the focused one.
 #
@@ -13,7 +14,7 @@
 # files may change them. A game's own label or heading may be a text, or a lookup that is drawn the
 # same way: -> { I18n.t("menu.credits") }.
 #
-# The screens are :title, :pause and :over. A game changes them and adds its own:
+# The screens are :title, :pause, :over, :settings and :controls. A game changes them and adds its own:
 #
 #   menu.screens[:pause].add_option("Credits", index: 1) { menu.show(:credits) }
 #   menu.screens[:credits] = GameMenu::Screen.new(heading: "Credits", back: -> { menu.show(:pause) })
@@ -53,7 +54,7 @@ class GameMenu < Behaviour
     title = [[-> { I18n.t("game.menu.play") }, -> { resume }], settings_option, quit]
     @screens = { title: Screen.new(options: title), pause: pause_screen(quit),
                  over: Screen.new(options: [[-> { I18n.t("game.menu.play_again") }, -> { restart }], quit]),
-                 settings: SettingsScreen.new(self) }
+                 settings: SettingsScreen.new(self), controls: ControlsScreen.new(self) }
   end
 
   def start

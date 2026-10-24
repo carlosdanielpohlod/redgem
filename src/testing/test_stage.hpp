@@ -22,20 +22,23 @@ class FramePictures;
 // each frame is drawn.
 class Stage {
  public:
-  Stage(const SystemTestOptions& options, FramePictures& pictures);
+  // `settings_file`: where the player's display settings are kept for the run.
+  Stage(const SystemTestOptions& options, const std::filesystem::path& settings_file, FramePictures& pictures);
   ~Stage();
   Stage(const Stage&) = delete;
   Stage& operator=(const Stage&) = delete;
 
   // Null when nobody shows the game.
   Presenter* presenter();
-  // Where the player's display settings are kept for this run: a file of the test's own.
-  const DisplayKeeping& display_kept_in() const { return display_kept_in_; }
+  // The player's display settings the run starts with (what the settings file says over the
+  // game's), and where they are kept for it.
+  const DisplaySettings& display() const { return player_.display; }
+  const DisplayKeeping& display_kept_in() const { return player_.kept_in; }
   // Without a window there is no device either: the game still finds its sounds, and hears none.
   AudioSystem* audio() { return window_ ? speakers_.get() : &silent_; }
 
  private:
-  DisplayKeeping display_kept_in_;
+  PlayerDisplay player_;
   std::unique_ptr<WindowPresenter> window_;
   std::unique_ptr<AudioSystem> speakers_;
   RecordingAudio silent_;

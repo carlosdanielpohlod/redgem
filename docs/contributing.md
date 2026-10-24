@@ -39,9 +39,10 @@ ctest -L system                              # only the system tests
 Tests are run by a program of their own, `redgem-test`, built beside `redgem` (see
 [Libraries and programs](#libraries-and-programs)). A system test is
 a Ruby file run against a game:
-`redgem-test <game_dir> <file.rb> [--screenshots <dir>] [--headless] [--work <dir>]` (`--headless`
-runs without a window, `--work` gives the run a folder of its own for its save file and notes;
-`redgem-test --help` lists every option).
+`redgem-test <game_dir> <file.rb> [--screenshots <dir>] [--headless] [--work <dir>] [--after <test.rb>]`
+(`--headless` runs without a window, `--work` gives the run a folder of its own for its save file
+and notes, `--after` goes on from an earlier test's run in that folder as if the game were started
+again; `redgem-test --help` lists every option).
 
 The engine knows nothing of tests. Neither `redgem` nor `redgem-player`, which is what every
 built game ships as, has test code in it: what tests are written with (`TestInput`, `SystemTest`,
@@ -74,6 +75,10 @@ end
 
 A template is tested as the game it makes: `tests/system_templates/<template>/*_test.rb` run
 against a game created from it by `redgem new`. Every template needs at least one.
+
+What a game keeps between runs is tested by starting it again: `tests/system_restarts/<game>/<name>_test.rb`
+plays `games/<game>` after `tests/system/<game>/<name>_test.rb` did, with the save, display settings
+and bindings that run left (`tests/system_restarts/run_restart.sh`).
 
 Test fixtures are regenerated with
 `tools/blender/run.sh build_test_fixtures.py tests/fixtures`.

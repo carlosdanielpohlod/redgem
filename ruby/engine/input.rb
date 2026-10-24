@@ -4,6 +4,7 @@
 # {keys: [...], buttons: [...]}, mixed as one likes.
 module Input
   FIRST_PAD = 0
+  PLAYERS = 4   # players that bind their own: gamepads 0 to 3
   KEY_PREFIX = "key:".freeze
   PAD_PREFIX = "pad:".freeze
   # What calls a capture off unless it is told otherwise: Escape, and a gamepad's B or Back.
@@ -55,6 +56,7 @@ module Input
   end
 
   # An action's bindings (["key:space", "pad:a"]), or an axis' ({negative: [...], positive: [...]}).
+  # (The stick that moves an axis is the game's, the same for every player: Input.axis_stick.)
   def self.bindings(name, pad: FIRST_PAD) = __bindings(name, __pad(pad))
 
   # Back to the game's own bindings: one name or all, for one player or (pad: nil) all of them.

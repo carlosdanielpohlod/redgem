@@ -20,6 +20,7 @@ constexpr const char* kGpuOption = "--gpu";
 constexpr const char* kWorkOption = "--work";
 constexpr const char* kGameOption = "--game";
 constexpr const char* kAllOption = "--all";
+constexpr const char* kAfterOption = "--after";
 
 // What the option just read was given (see command_line::option_value).
 std::optional<std::string> value(Reading& reading) { return command_line::option_value(reading.args, reading.next); }
@@ -57,6 +58,15 @@ void read_work(Reading& reading) {
     return;
   }
   reading.result.options.work_dir = *folder;
+}
+
+void read_after(Reading& reading) {
+  const auto file = value(reading);
+  if (!file) {
+    fail(reading, tr("testing.cli.after_needs_test"));
+    return;
+  }
+  reading.result.options.after = *file;
 }
 
 void read_game(Reading& reading) {
@@ -101,6 +111,7 @@ constexpr Option kOptions[] = {
     {kWorkOption, read_work},
     {kGameOption, read_game},
     {kAllOption, read_all},
+    {kAfterOption, read_after},
 };
 
 }  // namespace

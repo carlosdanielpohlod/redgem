@@ -16,6 +16,10 @@ struct SystemTestOptions {
   // tests run with it leave each other. Empty: folders every run on this machine shares, which
   // two runs at the same time would get in each other's way in.
   std::filesystem::path work_dir;
+  // An earlier test run in the same work folder that this one goes on from, as if the game were
+  // started again: it plays with the save, settings and bindings that run left. Empty: none, and
+  // the game starts from nothing.
+  std::filesystem::path after;
 };
 
 // Plays a game with a system test at the controls: the real game, frame by frame, with the keys,

@@ -359,6 +359,20 @@ foreach(template_dir IN LISTS REDGEM_TEMPLATES)
   endforeach()
 endforeach()
 
+# Starting a game again: tests/system_restarts/<game>/<name>_test.rb plays games/<game> after
+# tests/system/<game>/<name>_test.rb did, with what that run kept (its save, settings and bindings).
+file(GLOB REDGEM_RESTART_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_restarts/*/*_test.rb)
+foreach(test_file IN LISTS REDGEM_RESTART_TESTS)
+  get_filename_component(test_name ${test_file} NAME_WE)
+  get_filename_component(game_dir ${test_file} DIRECTORY)
+  get_filename_component(game ${game_dir} NAME)
+  add_test(NAME system.${game}.${test_name}_after_a_restart
+           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/system_restarts/run_restart.sh $<TARGET_FILE:redgem_test_tool>
+                   ${CMAKE_SOURCE_DIR}/games/${game} ${CMAKE_CURRENT_SOURCE_DIR}/system/${game}/${test_name}.rb
+                   ${test_file} ${REDGEM_SCREENSHOT_DIR}/${game}_restart)
+  set_tests_properties(system.${game}.${test_name}_after_a_restart PROPERTIES LABELS system RUN_SERIAL TRUE)
+endforeach()
+
 # Multiplayer: two copies of the game run at once and play together, each driven by its own test.
 # tests/system_pairs/<game>/<name>_host_test.rb pairs up with <name>_guest_test.rb. A pair whose
 # name ends in _room also gets a relay to meet on (the relay is the engine's own program,

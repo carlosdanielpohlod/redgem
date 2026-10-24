@@ -2,18 +2,16 @@
 
 #include "app/window_presenter.hpp"
 #include "testing/frame_pictures.hpp"
-#include "testing/test_saves.hpp"
 
 namespace redgem::testing {
 
-Stage::Stage(const SystemTestOptions& options, FramePictures& pictures)
-    : display_kept_in_(player_display(options.game_dir,
-                                      fresh_settings_file_for(options.game_dir, options.work_dir, options.test_file))
-                           .kept_in) {
+Stage::Stage(const SystemTestOptions& options, const std::filesystem::path& settings_file, FramePictures& pictures)
+    : player_(player_display(options.game_dir, settings_file)) {
   if (options.headless) return;
   GameWindowOptions window;
   window.game_dir = options.game_dir;
   window.gpu = options.gpu;
+  window.display = player_.display;
   window.capture_cursor = false;  // the pointer stays with whoever sits at the machine
   window.on_frame_drawn = [&pictures] { pictures.save_pending(); };
   window_ = std::make_unique<WindowPresenter>(window);

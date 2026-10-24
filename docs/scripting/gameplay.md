@@ -144,8 +144,31 @@ Input.capturing?       # still waiting
 Input.cancel_capture   # stop waiting (the block is never called)
 ```
 
-Sticks and triggers are not caught, only keys and buttons. The engine has no ready-made controls
-screen yet: a game builds one with `UI` and these calls.
+Sticks and triggers are not caught, only keys and buttons. `Input.axis_stick(:horizontal)` says
+which stick moves an axis (`:left_x`, or `nil`): it is the game's, the same for every player.
+
+### The controls page
+
+`GameMenu`'s settings screen has a Controls button that opens a ready-made controls page (the
+`:controls` screen). At its top, a choice of the player whose bindings it shows (1 to 4: the first
+also has the keyboard). Under it, a row for each action and one for each side of each axis, every
+one the game declared, in two cells: the player's keys, and their gamepad buttons (an axis' stick
+shows among them, though no player rebinds it). Up and down move between the rows, left and
+right between a row's two cells.
+
+Enter, a gamepad's A or a click on a cell waits for the next key (the keys' cell) or button (the
+buttons' cell): that one takes the place of everything the cell had, and the row's other cell
+keeps its own. A button pressed for the keys' cell (or a key for the buttons') is not for it, and
+it waits on. Escape, or a gamepad's B or Back, calls the wait off, so those are never bound there.
+A key bound to two rows is allowed, as above, and both cells show it in orange with a `!`. "Reset to
+defaults" puts all of the shown player's bindings back to the game's; Back (or Esc) goes back to the
+settings. What players bind is kept for the next runs as it changes.
+
+A row is named by the game's translation files, as `game.controls.<name>` (an axis' sides as
+`game.controls.<name>_negative` and `_positive`); without one, its name is made readable (`:air_dash`
+is "Air dash", the sides of `:steer` "Steer -" and "Steer +"). The engine names its own (`:jump` is
+"Jump", the negative side of `:horizontal` "Move left") and the keys and buttons ("Space", "Left
+Shift", "A button", "Left stick X"), as `game.controls.*` texts a game may change too.
 
 ## Read the mouse
 
@@ -324,7 +347,7 @@ end
 GameMenu.instance.finish("You win!")
 ```
 
-Its screens are `:title`, `:pause`, `:over` and `:settings`. A game adds options and screens of its own:
+Its screens are `:title`, `:pause`, `:over`, `:settings` and `:controls`. A game adds options and screens of its own:
 
 ```ruby
 menu = GameMenu.instance
@@ -341,7 +364,8 @@ platformer's multiplayer screen, `games/platformer/scripts/multiplayer_screen.rb
 ## A settings screen
 
 `GameMenu` has one ready, reached from its title and pause screens: window mode, resolution,
-render scale, vsync, frame-rate cap, quality and master volume. A game builds its own with
+render scale, vsync, frame-rate cap, quality and master volume, with a button to its controls page
+(see [The controls page](#the-controls-page)). A game builds its own with
 `Settings` and the widgets of `UI`, which the keyboard and a gamepad work through a focus:
 
 ```ruby
