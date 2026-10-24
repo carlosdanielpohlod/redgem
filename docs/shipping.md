@@ -1,5 +1,5 @@
 ---
-description: Building a standalone game for Linux, Windows, macOS and Android, and recording videos.
+description: "Building a standalone game for Linux, Windows, macOS and Android, and recording videos."
 ---
 
 # Building and sharing

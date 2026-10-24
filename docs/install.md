@@ -1,5 +1,5 @@
 ---
-description: Installing RedGem on Linux, Windows and macOS, or building it from source.
+description: "Installing RedGem on Linux, Windows and macOS, or building it from source."
 ---
 
 # Install

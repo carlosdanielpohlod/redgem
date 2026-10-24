@@ -275,3 +275,5 @@ there yet:
 - Physics queries (raycasts and overlaps) through the same tools.
 - `redgem scene` ids are places in the scene file: adding or removing objects renumbers the ones
   after them.
+- A built game carries the `AGENTS.md` and `CLAUDE.md` of its folder to its players, with the rest
+  of its files.

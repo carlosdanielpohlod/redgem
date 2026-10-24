@@ -1,5 +1,5 @@
 ---
-description: Behaviours: Ruby classes attached to objects, their callbacks, settings and scene scripts.
+description: "Behaviours: Ruby classes attached to objects, their callbacks, settings and scene scripts."
 ---
 
 # Behaviours

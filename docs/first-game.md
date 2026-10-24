@@ -1,5 +1,5 @@
 ---
-description: From an empty folder to a playable game in about fifteen minutes.
+description: "From an empty folder to a playable game in about fifteen minutes."
 ---
 
 # Your first game

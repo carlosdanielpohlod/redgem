@@ -1,5 +1,5 @@
 ---
-description: System tests that play the game, Ruby unit tests, and redgem-test.
+description: "System tests that play the game, Ruby unit tests, and redgem-test."
 ---
 
 # Testing your game

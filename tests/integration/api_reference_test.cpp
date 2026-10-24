@@ -35,18 +35,29 @@ namespace {
 
 const fs::path kSource = REDGEM_SOURCE_DIR;
 constexpr std::size_t kMostGuideLines = 120;
-constexpr std::size_t kRankedCalls = 25;
+constexpr std::size_t kApiCalls = 25;
 constexpr const char* kInternalPrefix = "__";  // the engine's own plumbing, never a game's
 
-// Every public method of every top-level class and module, as "Class.method" (called on the
-// class) or "Class#method" (on an instance).
+// Every public method of every top-level class and module, and of the nested ones the reference
+// lists (the others are the engine's plumbing), as "Class.method" (called on the class) or
+// "Class#method" (on an instance). `NESTED` is the names of those nested ones.
 constexpr const char* kListMethods = R"ruby(
-  Object.constants.sort.map do |name|
-    owner = Object.const_get(name)
+  owners = Object.constants.map(&:to_s) + NESTED
+  owners.sort.map do |name|
+    owner = name.split("::").inject(Object) { |space, part| space.const_get(part) }
     next [] unless owner.is_a?(Module)
     owner.singleton_methods.map { |m| "#{name}.#{m}" } + owner.public_instance_methods(false).map { |m| "#{name}##{m}" }
   end.flatten.join("\n")
 )ruby";
+
+// The nested classes the reference lists, as Ruby: NESTED = ["Animation::Graph", ...].
+std::string nested_classes() {
+  std::string list;
+  for (const ApiClass& owner : api_reference().classes) {
+    if (owner.name.find("::") != std::string::npos) list += (list.empty() ? "\"" : ", \"") + owner.name + "\"";
+  }
+  return "NESTED = [" + list + "]\n";
+}
 
 std::string ruby_text(RubyVm& vm, const std::string& code) {
   const RubyResult result = vm.eval(code, "api_reference_test.rb");
@@ -107,10 +118,12 @@ bool exists(RubyVm& vm, const std::string& owner, const std::string& method, boo
 }  // namespace
 
 TEST_CASE("every public method the engine adds to Ruby is in the API reference") {
-  RubyVm bare;  // mruby with the engine's gems, and nothing of the engine
+  RubyVm bare;                     // mruby with the engine's gems, and nothing of the engine
+  ruby_text(bare, "NESTED = []");  // (none of them is mruby's own)
   const std::set<std::string> plain = lines_of(ruby_text(bare, kListMethods));
   const auto game = engine();
   std::vector<std::string> missing;
+  ruby_text(game->scripts().vm(), nested_classes());
   for (const std::string& entry : lines_of(ruby_text(game->scripts().vm(), kListMethods))) {
     const Named named = split(entry);
     const bool engine_own = plain.count(entry) == 0 && named.method.rfind(kInternalPrefix, 0) != 0;
@@ -147,8 +160,8 @@ TEST_CASE("the manual's API page is made from the reference") {
 }
 
 TEST_CASE("the guide of new games lists 25 calls that exist, with examples that compile") {
-  const std::vector<RankedCall> calls = most_used_calls(api_reference());
-  REQUIRE(calls.size() == kRankedCalls);
+  const std::vector<ApiCall> calls = most_used_calls(api_reference());
+  REQUIRE(calls.size() == kApiCalls);
   RubyVm vm;
   for (std::size_t rank = 0; rank < calls.size(); ++rank) {
     CHECK(calls[rank].method->top == static_cast<int>(rank + 1));

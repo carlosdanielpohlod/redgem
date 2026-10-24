@@ -1,5 +1,5 @@
 ---
-description: Running a game on a server with no window for players to join.
+description: "Running a game on a server with no window for players to join."
 ---
 
 # Dedicated server

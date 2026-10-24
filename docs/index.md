@@ -1,5 +1,5 @@
 ---
-description: What RedGem is, where to start, and how a game's folder is organized.
+description: "What RedGem is, where to start, and how a game's folder is organized."
 ---
 
 # RedGem 3D Engine

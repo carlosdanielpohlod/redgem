@@ -1,5 +1,5 @@
 ---
-description: Working on the engine itself: building, testing, the rules of the code.
+description: "Working on the engine itself: building, testing, the rules of the code."
 ---
 
 # Working on the engine

@@ -1,5 +1,5 @@
 ---
-description: Known limits and what to do when something goes wrong.
+description: "Known limits and what to do when something goes wrong."
 ---
 
 # Limits and troubleshooting

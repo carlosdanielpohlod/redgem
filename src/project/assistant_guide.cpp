@@ -27,14 +27,14 @@ std::string built_in_guide() {
 }
 
 // "- `Input.axis(name)`: what it does. `x = Input.axis(:horizontal)`".
-std::string call_line(const RankedCall& call) {
+std::string call_line(const ApiCall& call) {
   return "- `" + signature(*call.owner, *call.method) + "`: " + call.method->about + ". `" + call.method->example +
          "`\n";
 }
 
 std::string most_used_lines() {
   std::string lines;
-  for (const RankedCall& call : most_used_calls(api_reference())) lines += call_line(call);
+  for (const ApiCall& call : most_used_calls(api_reference())) lines += call_line(call);
   if (!lines.empty()) lines.pop_back();  // (the guide has the line's end)
   return lines;
 }

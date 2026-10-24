@@ -1,5 +1,5 @@
 ---
-description: Gameplay recipes: movement, cameras, triggers, spawning, UI, sound, menus and more.
+description: "Gameplay recipes: movement, cameras, triggers, spawning, UI, sound, menus and more."
 ---
 
 # Gameplay recipes

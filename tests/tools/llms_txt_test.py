@@ -23,6 +23,15 @@ class LlmsTxtTest(unittest.TestCase):
             self.assertIn(f"[{page.title}](", index)
             self.assertTrue(llms_txt.description_of(self.manual, page), page.path)
 
+    def test_pages_beside_the_sections_are_in_none_of_them(self):
+        index = llms_txt.index_text(self.manual)
+        sections = index.split("\n## ")
+        self.assertNotIn("troubleshooting/", next(part for part in sections if part.startswith("Finishing a game")))
+        self.assertIn("troubleshooting/", sections[-1])
+
+    def test_a_quoted_description_reads_without_its_quotes(self):
+        self.assertEqual(llms_txt.unquoted('"a: \\"b\\""'), 'a: "b"')
+
     def test_the_full_text_is_every_page_without_its_front_matter(self):
         full = llms_txt.full_text(self.manual)
         self.assertNotIn("\ndescription: ", full)

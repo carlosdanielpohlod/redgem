@@ -1,5 +1,5 @@
 ---
-description: Multiplayer: hosting and joining, messages, synced objects, relays and rooms.
+description: "Multiplayer: hosting and joining, messages, synced objects, relays and rooms."
 ---
 
 # Multiplayer

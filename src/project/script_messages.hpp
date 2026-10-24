@@ -35,7 +35,8 @@ class MessageCollector {
     std::size_t times = 1;
   };
   void keep(log::Level level, const std::string& message);
-  // The message with what to do about it, when there is something to say (see error_hints.hpp).
+  // The message with what to do about it, when there is something to say (see error_hints.hpp):
+  // worked out once per message said, when the lines are asked for.
   std::string with_hint(const std::string& text) const;
 
   std::filesystem::path game_dir_;

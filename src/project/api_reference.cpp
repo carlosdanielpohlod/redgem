@@ -29,6 +29,7 @@ constexpr const char* kArgs = "args";
 constexpr const char* kStatic = "static";
 constexpr const char* kTop = "top";
 constexpr const char* kExample = "example";
+constexpr const char* kClassKey = "class";  // what a found method says it is of
 // How texts lay a method out.
 constexpr std::size_t kSignatureColumn = 34;  // where a method's line starts after its signature
 constexpr const char* kIndent = "  ";
@@ -136,15 +137,31 @@ std::string anchor(const std::string& name) {
   return kept;
 }
 
-// A line per method that has to do with `word` (in small letters).
-std::vector<std::string> found_lines(const ApiReference& reference, const std::string& word) {
-  std::vector<std::string> lines;
-  for (const ApiClass& owner : reference.classes) {
-    for (const ApiMethod& method : owner.methods) {
-      if (matches(owner, method, word)) lines.push_back(method_line(signature(owner, method), method.about));
-    }
+nlohmann::json method_data(const ApiMethod& method) {
+  nlohmann::json data = {{kName, method.name}, {kAbout, method.about}};
+  if (!method.args.empty()) data[kArgs] = method.args;
+  if (method.on_class) data[kStatic] = true;
+  if (method.top > 0) data[kTop] = method.top;
+  if (!method.example.empty()) data[kExample] = method.example;
+  return data;
+}
+
+nlohmann::json class_data(const ApiClass& owner) {
+  nlohmann::json data = {{kName, owner.name}, {kAbout, owner.about}, {kMethods, nlohmann::json::array()}};
+  if (!owner.guide.empty()) data[kGuide] = owner.guide;
+  if (!owner.notes.empty()) data[kNotes] = owner.notes;
+  for (const ApiMethod& method : owner.methods) data[kMethods].push_back(method_data(method));
+  return data;
+}
+
+// A text as YAML writes it in double quotes (a front matter's value may hold ": ").
+std::string quoted(const std::string& text) {
+  std::string out = "\"";
+  for (const char letter : text) {
+    if (letter == '"' || letter == '\\') out += '\\';
+    out += letter;
   }
-  return lines;
+  return out + "\"";
 }
 
 }  // namespace
@@ -198,18 +215,52 @@ std::string api_class_text(const ApiClass& owner) {
 }
 
 std::string api_search(const ApiReference& reference, const std::string& word, std::size_t most) {
-  const std::vector<std::string> found = found_lines(reference, lowered(word));
+  const std::vector<ApiCall> found = methods_about(reference, word);
   if (found.empty()) return tr("project.api.nothing_found", {{"word", word}}) + "\n";
   std::string text;
-  for (std::size_t line = 0; line < found.size() && line < most; ++line) text += found[line];
+  for (std::size_t call = 0; call < found.size() && call < most; ++call) {
+    text += method_line(signature(*found[call].owner, *found[call].method), found[call].method->about);
+  }
   if (found.size() > most)
     text += tr("project.api.more_found", {{"count", std::to_string(found.size() - most)}}) + "\n";
   return text;
 }
 
+std::vector<ApiCall> methods_about(const ApiReference& reference, const std::string& word) {
+  std::vector<ApiCall> found;
+  for (const ApiClass& owner : reference.classes) {
+    for (const ApiMethod& method : owner.methods) {
+      if (matches(owner, method, lowered(word))) found.push_back({&owner, &method});
+    }
+  }
+  return found;
+}
+
+std::string api_json(const ApiReference& reference) {
+  nlohmann::json data = {{kDescription, reference.description},
+                         {kAbout, reference.about},
+                         {kNotes, reference.notes},
+                         {kClasses, nlohmann::json::array()}};
+  for (const ApiClass& owner : reference.classes) data[kClasses].push_back(class_data(owner));
+  return data.dump();
+}
+
+std::string class_json(const ApiClass& owner) { return class_data(owner).dump(); }
+
+std::string search_json(const ApiReference& reference, const std::string& word, std::size_t most) {
+  nlohmann::json found = nlohmann::json::array();
+  for (const ApiCall& call : methods_about(reference, word)) {
+    if (found.size() == most) break;
+    nlohmann::json data = method_data(*call.method);
+    data[kClassKey] = call.owner->name;
+    found.push_back(data);
+  }
+  return found.dump();
+}
+
 std::string api_markdown(const ApiReference& reference) {
-  std::string text = "---\ndescription: " + reference.description + "\n---\n\n# API reference\n\n" + reference.about +
-                     "\n\n| Class | What it is |\n|---|---|\n";
+  std::string text = "---\ndescription: " + quoted(reference.description) + "\n---\n\n# API reference\n\n" +
+                     reference.about + "\n\n| Class | What it is |\n|---|---|\n";
   for (const ApiClass& owner : reference.classes) {
     text += "| [`" + owner.name + "`](#" + anchor(owner.name) + ") | " + owner.about + " |\n";
   }
@@ -218,15 +269,15 @@ std::string api_markdown(const ApiReference& reference) {
   return text + "## Notes\n\n" + reference.notes + "\n";
 }
 
-std::vector<RankedCall> most_used_calls(const ApiReference& reference) {
-  std::vector<RankedCall> calls;
+std::vector<ApiCall> most_used_calls(const ApiReference& reference) {
+  std::vector<ApiCall> calls;
   for (const ApiClass& owner : reference.classes) {
     for (const ApiMethod& method : owner.methods) {
       if (method.top > 0) calls.push_back({&owner, &method});
     }
   }
   std::sort(calls.begin(), calls.end(),
-            [](const RankedCall& a, const RankedCall& b) { return a.method->top < b.method->top; });
+            [](const ApiCall& a, const ApiCall& b) { return a.method->top < b.method->top; });
   return calls;
 }
 

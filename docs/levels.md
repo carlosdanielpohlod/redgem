@@ -1,5 +1,5 @@
 ---
-description: Levels made in Blender or the editor: custom properties, physics, lighting, environment, scatter.
+description: "Levels made in Blender or the editor: custom properties, physics, lighting, environment, scatter."
 ---
 
 # Levels, lighting and Blender

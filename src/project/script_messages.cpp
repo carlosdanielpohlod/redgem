@@ -22,7 +22,7 @@ std::string MessageCollector::with_hint(const std::string& text) const {
 void MessageCollector::keep(log::Level level, const std::string& message) {
   if (level < log::Level::Warning) return;
   (level == log::Level::Error ? errors_ : warnings_) += 1;
-  const std::string text = with_hint(compact_message(message, game_dir_));
+  const std::string text = compact_message(message, game_dir_);
   const auto same = std::find_if(kept_.begin(), kept_.end(),
                                  [&](const Kept& kept) { return kept.level == level && kept.text == text; });
   if (same != kept_.end()) {
@@ -36,7 +36,7 @@ std::string MessageCollector::lines() const {
   std::string text;
   for (const Kept& kept : kept_) {
     const std::string times = kept.times > 1 ? " (x" + std::to_string(kept.times) + ")" : "";
-    text += std::string(log::level_name(kept.level)) + ": " + kept.text + times + "\n";
+    text += std::string(log::level_name(kept.level)) + ": " + with_hint(kept.text) + times + "\n";
   }
   return text;
 }

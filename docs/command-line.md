@@ -1,5 +1,5 @@
 ---
-description: redgem scene, run, shot and check: read and change scenes as text, play with no window, take pictures, check a game.
+description: "redgem scene, run, shot and check: read and change scenes as text, play with no window, take pictures, check a game."
 ---
 
 # The command line

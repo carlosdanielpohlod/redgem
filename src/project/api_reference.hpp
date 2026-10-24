@@ -62,11 +62,20 @@ std::string api_search(const ApiReference& reference, const std::string& word, s
 // docs/scripting/api.md.
 std::string api_markdown(const ApiReference& reference);
 
-// The calls games make most, in their rank's order.
-struct RankedCall {
+// A method, with the class it is of.
+struct ApiCall {
   const ApiClass* owner;
   const ApiMethod* method;
 };
-std::vector<RankedCall> most_used_calls(const ApiReference& reference);
+// The calls games make most, in their rank's order.
+std::vector<ApiCall> most_used_calls(const ApiReference& reference);
+// The methods whose call or line holds `word` (any case), in the reference's order.
+std::vector<ApiCall> methods_about(const ApiReference& reference, const std::string& word);
+
+// The same as data, for tools (compact JSON; the methods the engine keeps for itself left out):
+// the whole reference, one class, the methods a search finds (at most `most`, each with its class).
+std::string api_json(const ApiReference& reference);
+std::string class_json(const ApiClass& owner);
+std::string search_json(const ApiReference& reference, const std::string& word, std::size_t most);
 
 }  // namespace redgem::tools

@@ -106,6 +106,7 @@
   "project.hint.scenes": "the scenes are: {scenes}",
   "project.hint.scripts": "the scripts are: {scripts}",
   "project.hint.see_class": "redgem api {class} lists its methods",
+  "project.hint.see_index": "redgem api lists the engine's classes",
   "project.hub.bad_name": "Use letters, digits, spaces, - and _ for the name.",
   "project.hub.cannot_open": "Cannot open {game}: {error}",
   "project.hub.create_game": "Create game",

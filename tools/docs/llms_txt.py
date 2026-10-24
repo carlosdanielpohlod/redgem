@@ -27,6 +27,7 @@ SENTENCE_END = re.compile(r"(?<=[.!?])\s")
 MARKDOWN_LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 # A page's front matter (MkDocs takes it out of the page): "---", "description: ...", "---".
 FRONT_MATTER = re.compile(r"\A---\n(?P<settings>.*?)\n---\n+", re.DOTALL)
+QUOTE_ESCAPE = re.compile(r"\\(.)")
 DESCRIPTION_LINE = re.compile(r"^description:\s*(?P<text>.+)$", re.MULTILINE)
 PAGE_SUFFIX = ".md"
 INDEX_PAGE = "index.md"
@@ -71,17 +72,18 @@ def nav_lines(lines):
 
 
 def pages_of(lines):
-    """The pages of the navigation, in its order, each with the section it is in."""
+    """The pages of the navigation, in its order, each with the section it is in ("" for a page at
+    the top of the navigation, beside the sections)."""
+    entries = [match for match in map(NAV_LINE.match, nav_lines(lines)) if match]
+    top = min((len(entry["indent"]) for entry in entries), default=0)
     pages = []
     section = ""
-    for line in nav_lines(lines):
-        match = NAV_LINE.match(line)
-        if not match:
+    for entry in entries:
+        at_top = len(entry["indent"]) == top
+        if not entry["page"].endswith(PAGE_SUFFIX):
+            section = entry["title"].strip()
             continue
-        if match["page"].endswith(PAGE_SUFFIX):
-            pages.append(Page(match["title"].strip(), match["page"], section))
-        else:
-            section = match["title"].strip()
+        pages.append(Page(entry["title"].strip(), entry["page"], "" if at_top else section))
     return pages
 
 
@@ -120,20 +122,27 @@ def page_text(manual, page):
     return FRONT_MATTER.sub("", page_source(manual, page), count=1)
 
 
+def unquoted(value):
+    """A YAML value in double quotes, as it reads ("a: b" -> a: b)."""
+    if len(value) >= len('""') and value[0] == value[-1] == '"':
+        return QUOTE_ESCAPE.sub(r"\1", value[1:-1])
+    return value
+
+
 def description_of(manual, page):
     """What a page's front matter says it is about; else its first sentence."""
     front = FRONT_MATTER.match(page_source(manual, page))
     found = DESCRIPTION_LINE.search(front["settings"]) if front else None
-    return found["text"].strip() if found else first_sentence(page_text(manual, page))
+    return unquoted(found["text"].strip()) if found else first_sentence(page_text(manual, page))
 
 
 def index_text(manual):
-    lines = [f"# {manual.name}", "", f"> {manual.description}"]
-    section = None
+    lines = [f"# {manual.name}", "", f"> {manual.description}", ""]
+    section = ""
     for page in manual.pages:
         if page.section != section:
             section = page.section
-            lines += ["", f"## {section or 'Start'}", ""]
+            lines += ["", f"## {section or 'More'}", ""]
         lines.append(f"- [{page.title}]({page_url(manual, page)}): {description_of(manual, page)}")
     return "\n".join(lines) + "\n"
 
