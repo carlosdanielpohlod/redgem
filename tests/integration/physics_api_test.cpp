@@ -105,9 +105,9 @@ float number(Engine& engine, const std::string& code) { return std::stof(ruby(en
 
 TEST_CASE("a bullet on its layer flies through a pickup and stops at the wall behind it") {
   const TempGame game(kShooterGame);
-  const SceneDesc scene = scene_with({node("Bullet", {0, 1, 0}, {0.2f, 0.2f, 0.2f}, moving("dynamic", "bullet")),
-                                      node("Pickup", {4, 1, 0}, {1, 1, 1}, solid("pickup")),
-                                      node("Wall", {10, 1, 0}, {1, 4, 4}, solid())});
+  const SceneDesc scene =
+      scene_with({node("Bullet", {0, 1, 0}, {0.2f, 0.2f, 0.2f}, moving("dynamic", "bullet")),
+                  node("Pickup", {4, 1, 0}, {1, 1, 1}, solid("pickup")), node("Wall", {10, 1, 0}, {1, 4, 4}, solid())});
   auto engine = engine_for(game, scene);
   ruby(*engine, R"(
     $bullet = Scene.find('Bullet').rigidbody
@@ -171,8 +171,9 @@ TEST_CASE("Physics.raycast keeps its one ignored object, and takes layers and li
   CHECK(ruby(*engine, "Physics.raycast($from, Vector3.down)[:object].name") == "Pickup");
   CHECK(ruby(*engine, "Physics.raycast($from, Vector3.down, 20.0, Scene.find('Pickup'))[:object].name") == "Enemy");
   CHECK(ruby(*engine, "Physics.raycast($from, Vector3.down, layers: [:default])[:object].name") == "Ground");
-  CHECK(ruby(*engine, "Physics.raycast($from, Vector3.down, ignore: [Scene.find('Pickup'), Scene.find('Enemy')])"
-                      "[:object].name") == "Ground");
+  CHECK(ruby(*engine,
+             "Physics.raycast($from, Vector3.down, ignore: [Scene.find('Pickup'), Scene.find('Enemy')])"
+             "[:object].name") == "Ground");
 }
 
 TEST_CASE("raycast_all and casts answer nearest first") {
@@ -184,8 +185,7 @@ TEST_CASE("raycast_all and casts answer nearest first") {
         R"(["Pickup", "Enemy", "Ground"])");
   CHECK(number(*engine, "Physics.sphere_cast([0, 10, 0], [0, 0, 0], 0.5)[:distance]") ==
         doctest::Approx(5.0f).epsilon(0.05));
-  CHECK(ruby(*engine, "Physics.box_cast([0, 10, 0], [0, 0, 0], [1, 1, 1], layers: :enemy)[:object].name") ==
-        "Enemy");
+  CHECK(ruby(*engine, "Physics.box_cast([0, 10, 0], [0, 0, 0], [1, 1, 1], layers: :enemy)[:object].name") == "Enemy");
   CHECK(ruby(*engine, "Physics.capsule_cast([0, 10, 0], [0, 6, 0], 0.5, 2.0).inspect") == "nil");
   CHECK(error_of(*engine, "Physics.capsule_cast([0, 10, 0], [0, 0, 0], 1.0, 1.0)").find("a capsule's height") !=
         std::string::npos);

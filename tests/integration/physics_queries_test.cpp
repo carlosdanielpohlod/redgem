@@ -53,9 +53,7 @@ BodyDesc body(ObjectId id, PropertyMap props, Vec3 position, Vec3 half = kUnitHa
   return desc;
 }
 
-PropertyMap on_layer(const std::string& body, const std::string& layer) {
-  return {{"body", body}, {"layer", layer}};
-}
+PropertyMap on_layer(const std::string& body, const std::string& layer) { return {{"body", body}, {"layer", layer}}; }
 
 std::unique_ptr<PhysicsWorld> shooter_world() {
   auto world = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f}, shooter_layers());
@@ -204,8 +202,7 @@ TEST_CASE("boxes and capsules can be cast as well") {
   capsule.kind = QueryShapeKind::Capsule;
   capsule.radius = 0.25f;
   capsule.height = 1.5f;
-  CHECK(world->shape_cast(capsule, {0, 1, 0}, {10, 1, 0}, {})->distance ==
-        doctest::Approx(5.25f).epsilon(kTolerance));
+  CHECK(world->shape_cast(capsule, {0, 1, 0}, {10, 1, 0}, {})->distance == doctest::Approx(5.25f).epsilon(kTolerance));
 }
 
 TEST_CASE("an overlap finds what a shape in place touches, on the layers it is given") {

@@ -23,8 +23,8 @@ void add_layer(CollisionLayers& layers, const nlohmann::json& entry, std::vector
   const std::string name = entry.get<std::string>();
   if (layers.find(name)) return;  // "default" said again, or a layer twice: it is there already
   if (!layers.add(name)) {
-    warnings.push_back(std::string(kSection) + "at most " + std::to_string(kMaxCollisionLayers) +
-                       " layers; '" + name + "' is left out");
+    warnings.push_back(std::string(kSection) + "at most " + std::to_string(kMaxCollisionLayers) + " layers; '" + name +
+                       "' is left out");
   }
 }
 

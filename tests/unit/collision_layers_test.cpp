@@ -15,8 +15,8 @@ constexpr std::size_t kPlayer = 1;
 constexpr std::size_t kEnemy = 2;
 constexpr std::size_t kBullet = 3;
 constexpr std::size_t kPickup = 4;
-constexpr int kTooManyLayers = 20;         // past kMaxCollisionLayers
-constexpr std::size_t kOddEntries = 2;     // the number and the empty name; the repeated one is no harm
+constexpr int kTooManyLayers = 20;      // past kMaxCollisionLayers
+constexpr std::size_t kOddEntries = 2;  // the number and the empty name; the repeated one is no harm
 
 CollisionLayersReading read(const std::string& physics) {
   return collision_layers_from_json(nlohmann::json::parse(physics));
@@ -98,6 +98,5 @@ TEST_CASE("a physics section of the wrong shape is warned of and gives the defau
 
 TEST_CASE("an object's layer property names its collision layer") {
   CHECK(body_config_from_props({{"body", std::string("dynamic")}}).layer == kDefaultLayerName);
-  CHECK(body_config_from_props({{"body", std::string("dynamic")}, {"layer", std::string("enemy")}}).layer ==
-        "enemy");
+  CHECK(body_config_from_props({{"body", std::string("dynamic")}, {"layer", std::string("enemy")}}).layer == "enemy");
 }
