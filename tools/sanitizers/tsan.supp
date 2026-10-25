@@ -1,3 +1,7 @@
 # Data races ThreadSanitizer reports inside the libraries the engine is built from (suppressions=,
 # see run_tests.sh). One line per finding, with why: a race in the engine's own code is fixed,
 # never listed here.
+
+# Mbed TLS counts its elliptic curve multiplications in a global (mul_count) for its self-test,
+# from every thread doing TLS at once, with no lock; nothing reads it outside the self-test.
+race:mbedtls_mpi_mul_mod

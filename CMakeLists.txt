@@ -42,6 +42,12 @@ if(REDGEM_SANITIZERS)
   # passed over, so that a test run fails on it.)
   add_compile_options(-fsanitize=${REDGEM_SANITIZERS} -fno-omit-frame-pointer -fno-sanitize-recover=all)
   add_link_options(-fsanitize=${REDGEM_SANITIZERS})
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # GCC's flow analysis loses track of what the instrumented code initializes and warns of
+    # "maybe uninitialized" values inside the standard library (std::regex, std::function), which
+    # would fail a build with warnings as errors. Plain builds keep the warning.
+    add_compile_options(-Wno-maybe-uninitialized)
+  endif()
 endif()
 
 include(Dependencies)
