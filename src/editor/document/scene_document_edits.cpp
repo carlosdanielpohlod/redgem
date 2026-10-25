@@ -104,9 +104,9 @@ bool SceneDocument::can_reparent(int index, int new_parent) const {
   return !into_itself && desc_.nodes.at(index).parent != new_parent;
 }
 
-int SceneDocument::reparent(int index, int new_parent) {
+int SceneDocument::reparent(int index, int new_parent, bool record) {
   if (!can_reparent(index, new_parent)) return index;
-  checkpoint();
+  if (record) checkpoint();
   std::vector<NodeDesc>& nodes = desc_.nodes;
   const Transform local = local_under(nodes, index, new_parent);
   // Rebuild the list: everything else in order, then the moved subtree last (after its new parent).

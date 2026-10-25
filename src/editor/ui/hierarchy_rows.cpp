@@ -74,10 +74,17 @@ void draw_label(const RowLabel& label) {
 
 bool row_double_clicked() { return ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left); }
 
-// A left click selects the row's object as the keys held say (see click_mode).
+// A left click selects the row's object as the keys held say (see click_mode). On a row of a
+// selection of several, a plain one waits for the button to be let go (see GroupPress).
 void click_row(PanelContext& context, int index) {
   const ImGuiIO& io = ImGui::GetIO();
-  context.session.click_select(index, click_mode(io.KeyCtrl, io.KeyShift), context.state.hierarchy.rows);
+  const ClickMode mode = click_mode(io.KeyCtrl, io.KeyShift);
+  HierarchyState& state = context.state.hierarchy;
+  if (GroupPress::waits(context.session.selected(), index, mode)) {
+    state.press = GroupPress{index, false};
+  } else {
+    context.session.click_select(index, mode, state.rows);
+  }
 }
 
 // A right click keeps a selection the row is part of (its menu acts on all of it); otherwise it
@@ -93,10 +100,12 @@ void use_row_clicks(PanelContext& context, int index, HierarchyResult& result) {
   if (row_double_clicked()) result.frame_requested = true;
 }
 
-// The row just drawn can be dragged onto another object (or onto the empty space) while editing.
-void offer_row_drag(const EditorSession& session, int index, const RowLabel& label) {
-  if (!session.editing()) return;
+// The row just drawn can be dragged onto another object (or onto the empty space) while editing;
+// when it is part of the selection, the whole selection goes.
+void offer_row_drag(PanelContext& context, int index, const RowLabel& label) {
+  if (!context.session.editing()) return;
   if (!ImGui::BeginDragDropSource()) return;
+  context.state.hierarchy.press.dragged = true;
   ImGui::SetDragDropPayload(kPayloadNode, &index, sizeof(index));
   ImGui::Text("%s  %s", label.icon, label.name.c_str());
   ImGui::EndDragDropSource();
@@ -133,7 +142,7 @@ bool draw_row(PanelContext& context, int index, int flags, HierarchyResult& resu
   const bool open = ImGui::TreeNodeEx(kNodeId, flags);
   context.state.hierarchy.rows_drawn.push_back(index);
   use_row_clicks(context, index, result);
-  offer_row_drag(session, index, label);
+  offer_row_drag(context, index, label);
   accept_drops(index, pending);
   node_context_menu(context, index, result, pending);
   draw_label(label);

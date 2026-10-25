@@ -66,6 +66,20 @@ class Selection {
   ObjectId anchor_ = kNoObject;  // the last object clicked without Shift: where a run of rows starts
 };
 
+// A plain press on a row that is part of a selection of several waits for the button to be let
+// go: a drag of the row then moves them all, a click selects the row alone.
+struct GroupPress {
+  ObjectId row = kNoObject;  // the row pressed, while the button is held
+  bool dragged = false;      // the row was dragged since
+
+  // Whether a press on `id` with `mode` waits like this: a plain one, on a row of a selection of
+  // several.
+  static bool waits(const Selection& selection, ObjectId id, ClickMode mode);
+  // What the press does once the button is up, and forgets it: the row to select alone, or
+  // kNoObject (after a drag, or without a press).
+  ObjectId finish();
+};
+
 // The selected objects none of whose ancestors is selected too: what moves, is copied, duplicated
 // or deleted (a child goes along with its parent anyway), in the order they were picked.
 std::vector<int> top_level_of(const std::vector<int>& ids, const std::vector<NodeDesc>& nodes);

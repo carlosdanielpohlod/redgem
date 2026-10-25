@@ -18,7 +18,9 @@ enum class PivotMode { Center, First };
 // the gizmo scales it by is what the group is scaled by). The identity for no object.
 Transform pivot_of(const std::vector<Transform>& worlds, PivotMode mode);
 
-// Where an object placed at `start` goes when the pivot moves from `pivot_start` to `pivot_now`.
+// Where an object placed at `start` goes when the pivot moves from `pivot_start` (unscaled, see
+// pivot_of) to `pivot_now`. A scale is along the pivot's axes, whichever way the object is turned;
+// a turned object stretched unevenly takes the nearest placement without shear.
 Transform follow_pivot(const Transform& start, const Transform& pivot_start, const Transform& pivot_now);
 
 // A gizmo drag of a group, from where it began.

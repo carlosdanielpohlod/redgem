@@ -104,15 +104,15 @@ void describe_buffer(Json& doc, std::size_t bytes) {
   }
 }
 
-std::optional<GlbFile> lean_copy(const GlbFile& glb) {
+std::optional<GlbFile> lean_copy(const Json& json, const std::vector<std::uint8_t>& bin) {
   GlbFile lean;
-  lean.json = glb.json;
+  lean.json = json;
   const Usage usage = usage_of(lean.json);
   if (all_used(usage)) return std::nullopt;
   renumber(lean.json, usage);
   for (std::size_t kind = 0; kind < kKinds; ++kind) keep_used(lean.json, static_cast<Kind>(kind), usage[kind]);
   drop_emptied_lights(lean.json);
-  lean.bin = packed_bytes(lean.json, glb.bin);
+  lean.bin = packed_bytes(lean.json, bin);
   describe_buffer(lean.json, lean.bin.size());
   return lean;
 }
@@ -191,9 +191,17 @@ std::optional<std::vector<bool>> release_meshes(GlbFile& glb, const std::set<int
 
 std::optional<GlbFile> without_unused(const GlbFile& glb) {
   try {
-    return lean_copy(glb);
+    return lean_copy(glb.json, glb.bin);
   } catch (const std::exception&) {
     // (Also what the JSON library throws when the file holds something else than glTF says.)
+    return std::nullopt;
+  }
+}
+
+std::optional<GlbFile> without_unused(const nlohmann::json& json, const std::vector<std::uint8_t>& bin) {
+  try {
+    return lean_copy(json, bin);
+  } catch (const std::exception&) {
     return std::nullopt;
   }
 }

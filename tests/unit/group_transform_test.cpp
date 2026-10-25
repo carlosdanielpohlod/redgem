@@ -92,3 +92,24 @@ TEST_CASE("one object dragged alone goes exactly where its pivot goes") {
   CHECK(approx_equal(moved.rotation, crate.rotation, kTolerance));
   CHECK(approx_equal(moved.scale, crate.scale, kTolerance));
 }
+
+TEST_CASE("an uneven scale of the group stretches a turned object along the pivot's axes") {
+  Transform turned = at({1, 0, 0});
+  turned.rotation = quat_from_axis_angle(Vec3::up(), kQuarterTurn);             // its own z lies along the world's x
+  Drag drag = begin_drag({0, 1}, {at({-1, 0, 0}), turned}, PivotMode::Center);  // the pivot's axes are the world's
+  drag.pivot_now.scale = {kDouble, 1.0f, 1.0f};
+  const std::vector<Transform> stretched = placements(drag);
+  CHECK(approx_equal(stretched[0].position, Vec3{-2, 0, 0}, kTolerance));
+  CHECK(approx_equal(stretched[0].scale, Vec3{2, 1, 1}, kTolerance));
+  CHECK(approx_equal(stretched[1].position, Vec3{2, 0, 0}, kTolerance));
+  CHECK(approx_equal(stretched[1].scale, Vec3{1, 1, 2}, kTolerance));  // longer across the world's x
+  CHECK(approx_equal(stretched[1].rotation, turned.rotation, kTolerance));
+}
+
+TEST_CASE("an even scale of the group keeps a mirrored object mirrored") {
+  Transform mirrored = at({1, 0, 0});
+  mirrored.scale = {-1, 1, 1};
+  Drag drag = begin_drag({0}, {mirrored}, PivotMode::First);
+  drag.pivot_now.scale = {kDouble, kDouble, kDouble};
+  CHECK(approx_equal(placements(drag).front().scale, Vec3{-2, 2, 2}, kTolerance));
+}

@@ -82,7 +82,7 @@ bool well_formed(const std::string& text) {
 }
 
 // The text without spaces and line ends.
-std::string without_spaces(const std::string& text) {
+std::string without_spaces(std::string_view text) {
   std::string out;
   for (const char c : text) {
     if (kSpaces.find(c) == std::string_view::npos) out += c;
@@ -91,19 +91,24 @@ std::string without_spaces(const std::string& text) {
 }
 
 // The first line of the text, without what ends it.
-std::string first_line(const std::string& text) {
-  const std::string line = text.substr(0, text.find(kLineEnd));
+std::string_view first_line(std::string_view text) {
+  const std::string_view line = text.substr(0, text.find(kLineEnd));
   return line.substr(0, line.find_last_not_of(kSpaces) + 1);
 }
 
 // The text starts with the line that says it holds objects (and has a line after it).
-bool has_header(const std::string& text) {
-  return text.find(kLineEnd) != std::string::npos && first_line(text) == kHeader;
+bool has_header(std::string_view text) {
+  return text.find(kLineEnd) != std::string_view::npos && first_line(text) == kHeader;
+}
+
+// A text short enough to be read, which starts with the line that says it holds objects.
+bool may_hold_objects(std::string_view text, std::size_t max_text) {
+  return text.size() <= max_text && has_header(text);
 }
 
 }  // namespace
 
-bool fits_system_clipboard(std::size_t bytes) { return bytes <= kMaxClipboardBytes; }
+bool fits_system_clipboard(std::size_t bytes, std::size_t max_bytes) { return bytes <= max_bytes; }
 
 std::string base64_encode(const std::vector<std::uint8_t>& bytes) {
   std::string out;
@@ -128,8 +133,12 @@ std::optional<std::vector<std::uint8_t>> base64_decode(const std::string& text) 
 
 std::string to_text(const std::vector<std::uint8_t>& glb) { return kHeader + (kLineEnd + base64_encode(glb)); }
 
-std::optional<std::vector<std::uint8_t>> from_text(const std::string& text) {
-  if (!has_header(text)) return std::nullopt;
+std::string system_text(const std::vector<std::uint8_t>& glb, const std::string& too_big_note, std::size_t max_bytes) {
+  return fits_system_clipboard(glb.size(), max_bytes) ? to_text(glb) : too_big_note;
+}
+
+std::optional<std::vector<std::uint8_t>> from_text(std::string_view text, std::size_t max_text) {
+  if (!may_hold_objects(text, max_text)) return std::nullopt;
   return base64_decode(without_spaces(text.substr(text.find(kLineEnd) + 1)));
 }
 

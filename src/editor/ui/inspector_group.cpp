@@ -80,25 +80,27 @@ std::optional<AxisEdit> drag_mixed_vec3(const PartField& field, const std::vecto
 
 void apply_axis(PanelContext& context, TransformPart part, const AxisEdit& edit) {
   streamed_edit(context);  // one undo step for every object, for as long as the field is held
-  SceneDocument& doc = context.session.document();
-  for (const ObjectId id : selected(context)) {
-    doc.set_local(id, with_axis(doc.node(id).local, part, edit.axis, edit.value, kMinScale), false);
-    context.session.refresh_node(id);
-  }
+  context.session.set_roots_axis(part, edit.axis, edit.value, kMinScale);
 }
 
+// The placements shown are the ones edited: of the selection's top level (a child moves with its
+// selected parent, as with the gizmo).
 void draw_part(PanelContext& context, const PartField& field) {
   std::vector<Vec3> values;
-  for (const ObjectId id : selected(context))
+  for (const int id : context.session.selected_roots()) {
     values.push_back(part_of(context.session.document().node(id).local, field.part));
+  }
   if (const std::optional<AxisEdit> edit = drag_mixed_vec3(field, values)) apply_axis(context, field.part, *edit);
 }
 
-// Sets a property of every selected object, or removes it for nullopt: one undo step.
-void set_or_remove_all(PanelContext& context, const char* key, const std::optional<PropertyValue>& value) {
+// Sets a property of every one of `objects` (those still in the scene), or removes it for nullopt:
+// one undo step.
+void set_or_remove_all(PanelContext& context, const std::vector<ObjectId>& objects, const char* key,
+                       const std::optional<PropertyValue>& value) {
   SceneDocument& doc = context.session.document();
   doc.checkpoint();
-  for (const ObjectId id : selected(context)) {
+  for (const ObjectId id : objects) {
+    if (!doc.has_node(id)) continue;
     if (value) {
       doc.set_prop(id, key, *value, false);
     } else {
@@ -126,12 +128,12 @@ std::optional<bool> mixed_checkbox(PanelContext& context, const char* label_key,
 void draw_group_flags(PanelContext& context) {
   if (const std::optional<bool> visible =
           mixed_checkbox(context, "editor.inspector.object.visible", props::kVisible, true)) {
-    set_or_remove_all(context, props::kVisible, flag_or_nothing(!*visible, false));
+    set_or_remove_all(context, selected(context), props::kVisible, flag_or_nothing(!*visible, false));
   }
   ImGui::SameLine();
   if (const std::optional<bool> prefab =
           mixed_checkbox(context, "editor.inspector.object.template", props::kPrefab, false)) {
-    set_or_remove_all(context, props::kPrefab, flag_or_nothing(*prefab, true));
+    set_or_remove_all(context, selected(context), props::kPrefab, flag_or_nothing(*prefab, true));
   }
 }
 
@@ -143,8 +145,11 @@ void draw_group_tag(PanelContext& context) {
   const std::optional<std::string> shared = shared_value(tags);
   property_label(tr("editor.inspector.object.tag"));
   const char* hint = tr(shared ? "editor.inspector.object.tag_hint" : "editor.inspector.mixed");
+  // Typing goes to the objects selected when it began, whatever is selected when it is committed.
+  const bool typing = context.state.inspector.text_fields[ImGui::GetID(kTagId)].editing;
+  const std::vector<ObjectId> targets = context.state.inspector.group_tag.follow(typing, selected(context));
   const auto tag = text_field(context, kTagId, context.session.selection(), shared.value_or(""), hint);
-  if (tag) set_or_remove_all(context, props::kTag, text_or_nothing(tag->text));
+  if (tag) set_or_remove_all(context, targets, props::kTag, text_or_nothing(tag->text));
 }
 
 }  // namespace

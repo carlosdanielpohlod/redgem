@@ -99,6 +99,16 @@ void Selection::keep_below(int count) {
   if (anchor_ >= count) anchor_ = kNoObject;
 }
 
+bool GroupPress::waits(const Selection& selection, ObjectId id, ClickMode mode) {
+  return mode == ClickMode::Replace && selection.several() && selection.contains(id);
+}
+
+ObjectId GroupPress::finish() {
+  const ObjectId clicked = dragged ? kNoObject : row;
+  *this = GroupPress{};
+  return clicked;
+}
+
 std::vector<int> top_level_of(const std::vector<int>& ids, const std::vector<NodeDesc>& nodes) {
   std::vector<int> top;
   for (const int id : ids) {

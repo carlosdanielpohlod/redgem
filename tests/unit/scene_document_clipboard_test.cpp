@@ -3,6 +3,7 @@
 
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <variant>
@@ -39,7 +40,7 @@ std::filesystem::path temp_path(const std::string& name) {
   return std::filesystem::temp_directory_path() / ("redgem_clipboard_" + name + ".glb");
 }
 
-std::vector<std::uint8_t> copied(const SceneDocument& doc, const std::vector<std::string>& names) {
+std::vector<std::uint8_t> copied(SceneDocument& doc, const std::vector<std::string>& names) {
   std::vector<int> roots;
   for (const std::string& name : names) roots.push_back(doc.desc().find_node(name));
   std::string error;
@@ -235,4 +236,69 @@ TEST_CASE("a .glb goes through bytes in memory and back") {
   CHECK(*encoded == clip);
   CHECK_FALSE(decode_glb({1, 2, 3}, "the clipboard", error));
   CHECK(error.find("the clipboard") != std::string::npos);
+}
+
+TEST_CASE("a skinned mesh and its bones duplicated side by side keep moving together") {
+  SceneDocument doc = open_scene("skinned.glb");
+  REQUIRE(doc.desc().skins.size() == 1);
+  const std::vector<int> copies = doc.duplicate({doc.desc().find_node("Arm"), doc.desc().find_node("Lower")});
+  REQUIRE(copies.size() == 2);
+  const NodeDesc& arm = doc.node(copies[0]);
+  CHECK(arm.name == "Arm.001");
+  REQUIRE(doc.desc().skins.size() == 2);  // the copies have a skeleton of their own
+  REQUIRE(arm.skin == 1);
+  CHECK(doc.node(doc.desc().skins[1].joints[0]).name == "Lower.001");
+  CHECK(doc.node(doc.desc().skins[1].joints[1]).name == "Upper.001");
+  // Both copies stay under the rig, next to their originals.
+  const int rig = doc.desc().find_node("Rig");
+  CHECK(arm.parent == rig);
+  CHECK(doc.node(copies[1]).parent == rig);
+  const std::vector<int>& children = doc.node(rig).children;
+  CHECK(std::count(children.begin(), children.end(), copies[0]) == 1);
+  CHECK(std::count(children.begin(), children.end(), copies[1]) == 1);
+}
+
+TEST_CASE("a clip that holds nothing, or data in several buffers, pastes nothing and records nothing") {
+  SceneDocument doc = open_scene("hierarchy.glb");
+  std::string error;
+  GlbFile empty;
+  empty.json = nlohmann::json::parse(R"({"asset": {"version": "2.0"}, "scenes": [{"nodes": []}], "scene": 0})");
+  const auto nothing = encode_glb(empty, error);
+  REQUIRE(nothing);
+  CHECK(doc.paste_nodes(*nothing, kNoIndex, error).empty());
+  CHECK_FALSE(error.empty());
+
+  std::optional<GlbFile> two_buffers = decode_glb(copied(doc, {"Root"}), "the clipboard", error);
+  REQUIRE(two_buffers);
+  two_buffers->json[gltf_json::kBuffers].push_back({{gltf_json::kByteLength, 4}, {gltf_json::kUri, "more.bin"}});
+  error.clear();
+  CHECK(doc.paste_nodes(*encode_glb(*two_buffers, error), kNoIndex, error).empty());
+  CHECK_FALSE(error.empty());
+
+  CHECK_FALSE(doc.can_undo());
+  CHECK_FALSE(doc.dirty());
+  CHECK(doc.desc().find_node("Root.001") == kNoIndex);
+}
+
+TEST_CASE("a copy takes only the bytes of what it holds, and a sculpted terrain as it is now") {
+  constexpr TerrainGrid kBigGround{64.0f, 128};  // far more vertices than a cube
+  constexpr TerrainBrush kHill{0.0f, 0.0f, 8.0f, 2.0f, SculptMode::Raise};
+  constexpr float kRaised = 0.5f;  // meters: the hill is at least this high
+  SceneDocument doc = SceneDocument::create_empty(temp_path("lean_source"));
+  const int ground = doc.add_terrain("Ground", kBigGround, Color{0.2f, 0.6f, 0.2f, 1.0f});
+  doc.add_primitive(PrimitiveShape::Cube, "Box", Color{1, 1, 1, 1});
+  const std::vector<std::uint8_t> box = copied(doc, {"Box"});
+  const std::vector<std::uint8_t> terrain = copied(doc, {"Ground"});
+  CHECK(box.size() * 10 < terrain.size());
+
+  doc.checkpoint();
+  REQUIRE(doc.sculpt_terrain(ground, kHill));
+  SceneDocument into = open_scene("hierarchy.glb");
+  pasted(into, copied(doc, {"Ground"}));
+  const SceneDesc& saved = saved_and_loaded(into, "sculpted").scene;
+  const NodeDesc& pasted_ground = saved.nodes[saved.find_node("Ground")];
+  const std::vector<float>& positions = saved.meshes[pasted_ground.mesh].primitives.front().positions;
+  float highest = 0.0f;
+  for (std::size_t i = 1; i < positions.size(); i += 3) highest = std::max(highest, positions[i]);
+  CHECK(highest > kRaised);
 }

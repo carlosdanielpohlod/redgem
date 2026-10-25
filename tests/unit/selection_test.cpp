@@ -104,3 +104,19 @@ TEST_CASE("the top level of a selection leaves out what goes along with a select
   CHECK(top_level_of({3, 2}, nodes) == std::vector<int>{2});
   CHECK(top_level_of({}, nodes).empty());
 }
+
+TEST_CASE("a plain press on a row of several selected waits: a click selects it alone, a drag does not") {
+  Selection selection;
+  selection.set_all({2, 7});
+  CHECK(GroupPress::waits(selection, 7, ClickMode::Replace));
+  CHECK_FALSE(GroupPress::waits(selection, 7, ClickMode::Toggle));
+  CHECK_FALSE(GroupPress::waits(selection, 4, ClickMode::Replace));  // not selected: picked at once
+  selection.set(7);
+  CHECK_FALSE(GroupPress::waits(selection, 7, ClickMode::Replace));  // one alone: nothing to wait for
+
+  GroupPress click{7, false};
+  CHECK(click.finish() == 7);
+  CHECK(click.finish() == kNoObject);  // finished once
+  GroupPress drag{7, true};
+  CHECK(drag.finish() == kNoObject);
+}

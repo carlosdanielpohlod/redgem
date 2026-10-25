@@ -8,6 +8,7 @@
 #include <ImGuizmo.h>
 
 #include "core/log.hpp"
+#include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/keyboard.hpp"
 #include "editor/object_clipboard.hpp"
@@ -140,17 +141,18 @@ void EditorApp::cut_selection() {
   report("cut", error);
 }
 
-// On the system's clipboard too when it fits there, so that another editor window can paste it.
-// The editor keeps its own copy for when the system's clipboard holds something else.
+// On the system's clipboard too when it fits there, so that another editor window can paste it;
+// a copy too big for it puts a note there instead, so that the newest copy is the one pasted. The
+// editor keeps its own copy for when the system's clipboard holds something else.
 void EditorApp::keep_copied(const std::vector<std::uint8_t>& copied) {
   clipboard_ = copied;
-  if (object_clipboard::fits_system_clipboard(copied.size()))
-    SetClipboardText(object_clipboard::to_text(copied).c_str());
+  SetClipboardText(object_clipboard::system_text(copied, tr("editor.clipboard.kept_in_editor")).c_str());
 }
 
 std::optional<std::vector<std::uint8_t>> EditorApp::clipboard_objects() const {
   const char* text = GetClipboardText();
-  std::optional<std::vector<std::uint8_t>> copied = object_clipboard::from_text(text != nullptr ? text : "");
+  std::optional<std::vector<std::uint8_t>> copied =
+      object_clipboard::from_text(text != nullptr ? std::string_view(text) : std::string_view());
   if (copied) return copied;
   if (clipboard_.empty()) return std::nullopt;
   return clipboard_;

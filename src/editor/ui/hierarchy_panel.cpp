@@ -58,8 +58,24 @@ void apply_delete(PanelContext& context, const Pending& pending) {
   context.session.delete_selection();
 }
 
+// A row of the selection dragged takes the whole selection along.
 void apply_reparent(PanelContext& context, const Pending& pending) {
+  if (context.session.selected().contains(pending.target)) return context.session.reparent_selection(pending.parent);
   context.session.reparent(pending.target, pending.parent);
+}
+
+// A press waits, and the button was let go.
+bool press_ends(const GroupPress& press) {
+  return press.row != kNoObject && ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+}
+
+// A press that waited for the button (see GroupPress) is a click when the button is up and the
+// row was not dragged.
+void finish_press(PanelContext& context) {
+  GroupPress& press = context.state.hierarchy.press;
+  if (!press_ends(press)) return;
+  const ObjectId clicked = press.finish();
+  if (clicked != kNoObject) context.session.select(clicked);
 }
 
 void apply_attach_script(PanelContext& context, const Pending& pending) {
@@ -135,6 +151,12 @@ void draw_empty_space(PanelContext& context, HierarchyResult& result, Pending& p
   ImGui::EndPopup();
 }
 
+// What the rows asked for, once the tree is drawn (it changes indices).
+void apply_after_drawing(PanelContext& context, const Pending& pending) {
+  apply(context, pending);
+  finish_press(context);
+}
+
 }  // namespace
 
 HierarchyResult draw_hierarchy(PanelContext& context) {
@@ -150,7 +172,7 @@ HierarchyResult draw_hierarchy(PanelContext& context) {
   draw_empty_space(context, result, pending);
   ImGui::EndChild();
   ImGui::End();
-  apply(context, pending);
+  apply_after_drawing(context, pending);
   return result;
 }
 

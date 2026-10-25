@@ -71,7 +71,8 @@ class SceneDocument {
   // (the ones that are files next to the scene carried inside, so it can be pasted anywhere).
   // The roots (none under another one) are its top-level nodes, placed where they are in the
   // world. nullopt, with why in `error`, when it cannot be made.
-  std::optional<std::vector<std::uint8_t>> copy_nodes(const std::vector<int>& roots, std::string& error) const;
+  // (Not const: reshaped terrains are written into the scene's binary chunk first, as saving does.)
+  std::optional<std::vector<std::uint8_t>> copy_nodes(const std::vector<int>& roots, std::string& error);
   // Adds the nodes of such a .glb (from this scene or another one) under `parent` (kNoIndex = top
   // level), where they were in the world, with names no other node has. One undo step. Returns
   // the pasted top-level nodes; none, with why in `error`, when the bytes are not a scene.
@@ -95,7 +96,7 @@ class SceneDocument {
   // Moves a node (and its children) under `new_parent` (kNoIndex = scene root), keeping its world
   // placement. Returns the node's new index (nodes keep parents before children). Refuses cycles
   // and invalid indices (returns `index` unchanged).
-  int reparent(int index, int new_parent);
+  int reparent(int index, int new_parent, bool record = true);
   // Adds every object of another .glb (meshes, materials, textures) under a new empty named after
   // the file, itself under `parent`. Returns that node, or kNoIndex with `error` set. Skeletons
   // and animations come along. Models using several buffers are refused; morph targets and the
@@ -204,17 +205,26 @@ class SceneDocument {
   // Writes floats over the ones an accessor points at. False when they are not stored the way
   // the editor writes them (packed, and as many).
   bool store_stream(std::size_t accessor_index, const std::vector<float>& values);
-  // A copy of the scene as it is now, without its history: what copy_nodes cuts down.
-  SceneDocument without_history() const;
+  // The scene as it is now without its history, its vertices and its pictures (its binary chunk
+  // stays empty): what copy_nodes cuts down and writes the JSON of.
+  SceneDocument outline() const;
+  // How much of everything a paste may add to there was before it: what an unfinished one is cut
+  // back to.
+  struct PasteMark {
+    std::size_t bin, source_animations, meshes, materials, images, skins, animations, skin_joints, channels;
+  };
+  PasteMark paste_mark() const;
+  // Undoes a paste whose undo step was recorded but that stopped half way.
+  void take_back_paste(const PasteMark& mark, const model_import::JsonOffsets& offsets);
   // Keeps only the nodes `roots` and everything under them, the roots at the top level where they
   // are in the world.
   void keep_only(const std::vector<int>& roots);
-  // Copies `index` and everything under it next to it; returns the copy.
-  int copy_subtree(int index);
   // The glTF JSON and binary chunk brought up to date with the edits, as they are written.
   bool sync_for_writing(std::string& error);
-  std::optional<std::vector<std::uint8_t>> clipboard_glb(const std::vector<int>& roots, std::string& error) const;
+  std::optional<std::vector<std::uint8_t>> clipboard_glb(const std::vector<int>& roots, std::string& error);
   std::vector<int> paste_file(const std::filesystem::path& path, int parent, std::string& error);
+  std::vector<int> add_pasted(const SceneDesc& clip, const GlbFile& source, const std::filesystem::path& path,
+                              int parent);
   // The pasted nodes: a model's description added without an object of its own around it, its
   // lights and cameras kept, its top-level nodes under `parent` where they were in the world.
   std::vector<int> append_pasted(const SceneDesc& clip, const model_import::JsonOffsets& json_offsets, int parent);

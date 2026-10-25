@@ -54,10 +54,12 @@ void EditorSession::click_select(ObjectId id, ClickMode mode, const std::vector<
 
 void EditorSession::select_by_name(const std::string& name) { select(document_.desc().find_node(name)); }
 
-std::vector<std::string> EditorSession::selected_names() const {
+std::vector<std::string> EditorSession::selected_names() const { return names_of(selection_.ids()); }
+
+std::vector<std::string> EditorSession::names_of(const std::vector<ObjectId>& ids) const {
   std::vector<std::string> names;
-  names.reserve(selection_.size());
-  for (const ObjectId id : selection_.ids()) names.push_back(document_.node(id).name);
+  names.reserve(ids.size());
+  for (const ObjectId id : ids) names.push_back(document_.node(id).name);
   return names;
 }
 
@@ -87,7 +89,7 @@ void EditorSession::delete_selection() {
   refresh_preview();
 }
 
-std::optional<std::vector<std::uint8_t>> EditorSession::copy_selection(std::string& error) const {
+std::optional<std::vector<std::uint8_t>> EditorSession::copy_selection(std::string& error) {
   if (selection_.empty()) return std::nullopt;
   return document_.copy_nodes(selected_roots(), error);
 }
@@ -111,6 +113,14 @@ bool EditorSession::paste(const std::vector<std::uint8_t>& copied, ObjectId pare
 ObjectId EditorSession::paste_parent() const {
   const ObjectId selected = selection();
   return selected == kNoObject ? kNoObject : document_.node(selected).parent;
+}
+
+void EditorSession::set_roots_axis(inspector_logic::TransformPart part, int axis, float value, float min_scale) {
+  if (!can_edit_selection()) return;
+  for (const int id : selected_roots()) {
+    document_.set_local(id, inspector_logic::with_axis(document_.node(id).local, part, axis, value, min_scale), false);
+    refresh_node(id);
+  }
 }
 
 void EditorSession::place_in_world(ObjectId id, const Transform& world) {
@@ -152,6 +162,21 @@ void EditorSession::reparent(ObjectId child, ObjectId parent) {
   // (Indices of other objects may shift; names are unique, and the moved one keeps its own.)
   const std::vector<std::string> selected = selected_names();
   document_.reparent(child, parent);
+  refresh_and_reselect(selected);
+}
+
+void EditorSession::reparent_selection(ObjectId parent) {
+  if (!can_edit_selection()) return;
+  // (Each move renumbers the objects: they are found again by their names, which are unique.)
+  const std::vector<std::string> selected = selected_names();
+  const std::string parent_name = parent == kNoObject ? std::string() : document_.node(parent).name;
+  const std::vector<std::string> roots = names_of(selected_roots());
+  document_.checkpoint();
+  for (const std::string& root : roots) {
+    const int under = parent_name.empty() ? kNoIndex : document_.desc().find_node(parent_name);
+    document_.reparent(document_.desc().find_node(root), under, false);
+  }
+  document_.drop_checkpoint_if_unchanged();
   refresh_and_reselect(selected);
 }
 

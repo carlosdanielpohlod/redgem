@@ -543,3 +543,36 @@ TEST_CASE("pasting under an object puts the copies there, and nothing is pasted 
   session->stop();
   std::filesystem::remove_all(dir);
 }
+
+TEST_CASE("the Inspector of several objects moves a selected child once, with its parent") {
+  constexpr float kNewX = 7.0f;
+  constexpr float kMinScale = 0.001f;
+  const auto dir = copy_sandbox("group_inspector");
+  auto session = open(dir);
+  const ObjectId family = session->scene().find("Family");
+  const ObjectId kid = session->scene().find("Kid");
+  const Vec3 kid_local = session->document().node(kid).local.position;
+  session->select_all({family, kid, session->scene().find("Crate")});
+  session->document().checkpoint();
+  session->set_roots_axis(inspector_logic::TransformPart::Position, 0, kNewX, kMinScale);
+  CHECK(session->document().node(family).local.position.x == doctest::Approx(kNewX));
+  CHECK(session->document().node(session->scene().find("Crate")).local.position.x == doctest::Approx(kNewX));
+  CHECK(
+      approx_equal(session->document().node(kid).local.position, kid_local, kPositionTolerance));  // moved with Family
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("the whole selection is dragged under another object in one undo step") {
+  const auto dir = copy_sandbox("group_reparent");
+  auto session = open(dir);
+  session->select_all({session->scene().find("Crate"), session->scene().find("Coin")});
+  session->reparent_selection(session->scene().find("Family"));
+  const ObjectId family = session->scene().find("Family");
+  CHECK(session->document().node(session->scene().find("Crate")).parent == family);
+  CHECK(session->document().node(session->scene().find("Coin")).parent == family);
+  CHECK(session->selected().size() == 2);
+  session->undo();
+  CHECK(session->document().node(session->scene().find("Crate")).parent == kNoIndex);
+  CHECK(session->document().node(session->scene().find("Coin")).parent == kNoIndex);
+  std::filesystem::remove_all(dir);
+}

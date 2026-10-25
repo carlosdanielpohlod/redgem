@@ -38,6 +38,20 @@ bool wheel_card_shown(const std::optional<std::string>& parent_body, bool is_whe
 
 // --- Several objects at once ------------------------------------------------------------------
 
+// The objects a field shown for several of them edits: the ones selected when typing in it began,
+// so that typing committed after the selection changed goes where it was meant to. While no one
+// types, it follows the selection.
+class GroupTargets {
+ public:
+  const std::vector<int>& follow(bool typing, const std::vector<int>& selected) {
+    if (!typing) targets_ = selected;
+    return targets_;
+  }
+
+ private:
+  std::vector<int> targets_;
+};
+
 // The value every one of `values` has; nullopt when they differ (a field then shows them as
 // mixed) and when there is none.
 template <typename Value>

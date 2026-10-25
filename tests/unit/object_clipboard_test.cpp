@@ -76,3 +76,20 @@ TEST_CASE("only copies up to the limit go on the system's clipboard") {
   CHECK(fits_system_clipboard(kMaxClipboardBytes));
   CHECK_FALSE(fits_system_clipboard(kMaxClipboardBytes + 1));
 }
+
+TEST_CASE("a copy too big for the system's clipboard puts a note there, which pastes nothing") {
+  constexpr std::size_t kSmallLimit = 4;
+  const std::vector<std::uint8_t> small = bytes_of("tiny");
+  const std::vector<std::uint8_t> big = bytes_of("too big for it");
+  const std::string note = "kept in the editor";
+  CHECK(from_text(system_text(small, note, kSmallLimit)) == small);
+  CHECK(system_text(big, note, kSmallLimit) == note);
+  CHECK_FALSE(from_text(system_text(big, note, kSmallLimit)));  // an older copy is not pasted instead
+}
+
+TEST_CASE("clipboard text longer than any copy is refused without being read") {
+  const std::string text = to_text(bytes_of("some objects"));
+  CHECK(from_text(text, text.size()));
+  CHECK_FALSE(from_text(text, text.size() - 1));
+  CHECK(kMaxClipboardTextBytes > kMaxClipboardBytes / 3 * 4);
+}

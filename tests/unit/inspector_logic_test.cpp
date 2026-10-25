@@ -109,3 +109,11 @@ TEST_CASE("one number of a placement changes, the others stay") {
   CHECK(axis_of({4, 5, 6}, 2) == 6.0f);
   CHECK(approx_equal(with_axis(Vec3{4, 5, 6}, 0, 9.0f), Vec3{9, 5, 6}, kTolerance));
 }
+
+TEST_CASE("a field of several objects edits the ones selected when typing began") {
+  GroupTargets targets;
+  CHECK(targets.follow(false, {1, 2}) == std::vector<int>{1, 2});
+  CHECK(targets.follow(true, {1, 2}) == std::vector<int>{1, 2});
+  CHECK(targets.follow(true, {5}) == std::vector<int>{1, 2});  // the selection moved while typing
+  CHECK(targets.follow(false, {5}) == std::vector<int>{5});    // done typing: it follows again
+}

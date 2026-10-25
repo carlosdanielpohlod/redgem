@@ -1,4 +1,5 @@
 {
+  "editor.clipboard.kept_in_editor": "RedGem objects too big for the system clipboard: paste them in the editor window they were copied in.",
   "editor.command.cancel": "Cancel",
   "editor.command.copy": "Copy",
   "editor.command.cut": "Cut",

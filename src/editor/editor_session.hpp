@@ -10,6 +10,7 @@
 
 #include "app/engine.hpp"
 #include "editor/document/scene_document.hpp"
+#include "editor/inspector_logic.hpp"
 #include "editor/selection.hpp"
 #include "scene/shapes/terrain.hpp"
 #include "input/input.hpp"
@@ -77,7 +78,7 @@ class EditorSession {
   void delete_selection();
   // The selected objects with everything under them, as the clipboard holds them (see
   // SceneDocument::copy_nodes). nullopt without a selection, or with why in `error`.
-  std::optional<std::vector<std::uint8_t>> copy_selection(std::string& error) const;
+  std::optional<std::vector<std::uint8_t>> copy_selection(std::string& error);
   // The same, and then the objects are deleted.
   std::optional<std::vector<std::uint8_t>> cut_selection(std::string& error);
   // Adds objects copied from this scene or another one under `parent` (kNoObject = top level),
@@ -89,6 +90,9 @@ class EditorSession {
   // Places an object where it should be in the world, under its parent, as a drag does: not
   // recorded (call document().checkpoint() once when the drag begins).
   void place_in_world(ObjectId id, const Transform& world);
+  // One number of the placement of each of the selection's top-level objects (see selected_roots),
+  // as the Inspector of several objects edits it; not recorded, like place_in_world.
+  void set_roots_axis(inspector_logic::TransformPart part, int axis, float value, float min_scale);
 
   // Creating objects at a world position (usually in front of the editor camera). The new object
   // becomes the selection. Return kNoObject while playing.
@@ -114,6 +118,9 @@ class EditorSession {
                         ObjectId parent = kNoObject);
   // Moves `child` under `parent` (kNoObject = top level), keeping where it is in the world.
   void reparent(ObjectId child, ObjectId parent);
+  // The same for the selection's top level (see selected_roots), one undo step. What would go
+  // under itself stays where it is.
+  void reparent_selection(ObjectId parent);
   // Adds a script file (scripts/<file>) to the object's script list.
   void attach_script(ObjectId id, const std::string& file);
   void undo();
@@ -176,6 +183,7 @@ class EditorSession {
   // Names of the selected objects: how the selection is found again after an edit that renumbers
   // the objects.
   std::vector<std::string> selected_names() const;
+  std::vector<std::string> names_of(const std::vector<ObjectId>& ids) const;
   void select_by_names(const std::vector<std::string>& names);
   // The ones of `ids` that are objects of the scene.
   std::vector<ObjectId> known(const std::vector<ObjectId>& ids) const;
