@@ -1,0 +1,138 @@
+# The tests that open no window, run in builds that check memory and threads as they run: one with
+# AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer, one with ThreadSanitizer (the
+# rooms of a server, web requests, the scripts' watchdog and the relay run threads of their own).
+# A finding fails the run. What is reported inside the libraries the engine is built from is
+# listed in tools/sanitizers/*.supp; what is reported in the engine's own code is fixed. A third
+# build measures which lines of the engine those tests run (coverage), kept as the run's artifact.
+# The system tests are left to the Linux workflow: drawn by a software renderer they would take
+# hours with sanitizers on.
+name: Sanitizers
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push to the same branch makes the run of the older one pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ASan and UBSan
+            kind: address
+            configure: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREDGEM_SANITIZERS=address,undefined
+          - name: TSan
+            kind: thread
+            configure: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREDGEM_SANITIZERS=thread
+          - name: Coverage
+            kind: coverage
+            configure: >-
+              -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage
+              -DCMAKE_EXE_LINKER_FLAGS=--coverage -DCMAKE_SHARED_LINKER_FLAGS=--coverage
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1G
+      FETCH_DIR: ${{ github.workspace }}/.deps/fetch
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the build tools and libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build git ca-certificates xz-utils bison ccache \
+            libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libxext-dev libxfixes-dev libxrender-dev libasound2-dev
+
+      - name: Install gcovr
+        if: ${{ matrix.kind == 'coverage' }}
+        run: pipx install gcovr==8.3
+
+      # The sanitizers' runtimes need the program's memory where they expect it, which the
+      # runner's kernel scatters too widely by default (ThreadSanitizer then stops at once with
+      # "unexpected memory mapping").
+      - name: Narrow the address randomization for the sanitizers
+        if: ${{ matrix.kind != 'coverage' }}
+        run: sudo sysctl vm.mmap_rnd_bits=28
+
+      # rake builds mruby.
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+
+      - name: Restore the compiler cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-${{ matrix.kind }}-${{ github.run_id }}
+          restore-keys: ccache-${{ matrix.kind }}-
+
+      - name: Restore the libraries' sources
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .deps/fetch/*-src
+            .deps/fetch/*-subbuild
+          key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja ${{ matrix.configure }} -DREDGEM_WARNINGS_AS_ERRORS=ON
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+
+      # Only what the tests below run (the editor, the players and the tools they start included).
+      - name: Build
+        id: build
+        run: |
+          ccache --zero-stats
+          cmake --build build --target redgem_tests redgem_testing_tests redgem_test_tool redgem_relay redgem_server -- -k 0
+          ccache --show-stats
+
+      - name: Keep the compiler cache
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@v4
+        with:
+          path: .ccache
+          key: ccache-${{ matrix.kind }}-${{ github.run_id }}
+
+      - name: Tests with sanitizers
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.kind != 'coverage' }}
+        run: tools/sanitizers/run_tests.sh build ${{ matrix.kind }}
+
+      - name: Tests, measuring coverage
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.kind == 'coverage' }}
+        run: |
+          ./build/tests/redgem_tests
+          ./build/tests/redgem_testing_tests
+          ctest --test-dir build --output-on-failure -j 4 -R '^(ruby|relay|server)\.'
+
+      # (Of the engine's own code only: src/, not the libraries or the tests.)
+      - name: Coverage report
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.kind == 'coverage' }}
+        run: |
+          mkdir -p coverage
+          gcovr --root . --filter 'src/' --object-directory build --gcov-ignore-errors=no_working_dir_found \
+            --print-summary --txt coverage/summary.txt --html-details coverage/index.html | tee coverage/totals.txt
+          { echo '## Coverage of src/'; echo '```'; cat coverage/totals.txt; echo '```'; } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Keep the coverage report
+        if: ${{ !cancelled() && matrix.kind == 'coverage' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+          if-no-files-found: ignore

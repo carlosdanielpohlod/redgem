@@ -1,0 +1,3 @@
+# Undefined behaviour UBSan reports in the libraries the engine is built from (suppressions=, see
+# run_tests.sh). One line per finding, with why: one in the engine's own code is fixed, never
+# listed here.

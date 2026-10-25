@@ -33,6 +33,17 @@ int main() { return 0; }" REDGEM_POSITION_INDEPENDENT_BY_DEFAULT)
   endif()
 endif()
 
+# Sanitizers, for whole builds (the libraries too, so that what they do on the engine's threads
+# is seen): a comma-separated list for -fsanitize, such as "address,undefined" or "thread". The
+# continuous integration runs the tests in such builds (see tools/sanitizers/).
+set(REDGEM_SANITIZERS "" CACHE STRING "Sanitizers to build everything with (-fsanitize=<list>), or empty")
+if(REDGEM_SANITIZERS)
+  # (Frames kept, for whole backtraces; a finding stops the program instead of being reported and
+  # passed over, so that a test run fails on it.)
+  add_compile_options(-fsanitize=${REDGEM_SANITIZERS} -fno-omit-frame-pointer -fno-sanitize-recover=all)
+  add_link_options(-fsanitize=${REDGEM_SANITIZERS})
+endif()
+
 include(Dependencies)
 
 # (Set after the dependencies: only the targets made from here on, the engine's, take it.)

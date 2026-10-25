@@ -75,8 +75,9 @@ set(DEBUG_RENDERER_IN_DEBUG_AND_RELEASE OFF CACHE BOOL "" FORCE)
 set(PROFILER_IN_DEBUG_AND_RELEASE OFF CACHE BOOL "" FORCE)
 set(CPP_RTTI_ENABLED ON CACHE BOOL "" FORCE)
 set(CPP_EXCEPTIONS_ENABLED ON CACHE BOOL "" FORCE)
-if(WIN32 OR ANDROID OR APPLE)
-  # Its warnings-as-errors trips on a newer compiler's notes; a dependency's warnings are not ours to fix.
+if(WIN32 OR ANDROID OR APPLE OR REDGEM_SANITIZERS)
+  # Its warnings-as-errors trips on a newer compiler's notes (and on what a sanitized build makes
+  # the compiler see); a dependency's warnings are not ours to fix.
   set(ENABLE_ALL_WARNINGS OFF CACHE BOOL "" FORCE)
 endif()
 FetchContent_Declare(JoltPhysics

@@ -1,0 +1,2 @@
+# Leaks LeakSanitizer reports that are not the engine's (suppressions=, see run_tests.sh).
+# One line per library, with why: a leak in the engine's own code is fixed, never listed here.

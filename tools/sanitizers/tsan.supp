@@ -1,0 +1,3 @@
+# Data races ThreadSanitizer reports inside the libraries the engine is built from (suppressions=,
+# see run_tests.sh). One line per finding, with why: a race in the engine's own code is fixed,
+# never listed here.

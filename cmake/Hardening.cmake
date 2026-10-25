@@ -62,7 +62,8 @@ function(redgem_harden target)
     endif()
   endif()
   # Only in optimized builds: without optimization the checks cannot be made, and the C library says so.
-  if(REDGEM_FORTIFY_NOT_PRESET AND REDGEM_FORTIFY_WORKS)
+  # (Nor in a sanitized build, whose own checks of those functions it would get in the way of.)
+  if(REDGEM_FORTIFY_NOT_PRESET AND REDGEM_FORTIFY_WORKS AND NOT REDGEM_SANITIZERS)
     target_compile_definitions(${target} PRIVATE
       $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:_FORTIFY_SOURCE=2>)
   endif()
