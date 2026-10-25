@@ -12,7 +12,7 @@ struct AnimationGraphSample {
   double speed = 1.0;  // clip seconds per real second, including normalized phase synchronization
 };
 
-// Each side has at most two samples. Weights on each side sum to one; blend mixes the sides.
+// Each side has at most four samples. Weights on each side sum to one; blend mixes the sides.
 struct AnimationGraphFrame {
   std::vector<AnimationGraphSample> from;
   std::vector<AnimationGraphSample> to;

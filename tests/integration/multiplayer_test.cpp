@@ -8,6 +8,7 @@
 #include <string>
 #include <thread>
 #include <tuple>
+#include <utility>
 
 #include <mruby.h>
 #include <mruby/string.h>
@@ -963,4 +964,42 @@ TEST_CASE("an animation that arrives before its NetworkSync started is shown all
   ruby(machine, "$hero = Scene.find('Swordsman'); $sync = $hero.add_component(NetworkSync, interpolate: false)");
   ruby(machine, "$sync.__receive([0, 0, 0], [0, 0, 0], 1, [0.0, 0.0, ['Attack', 0.25, 1.0, true, true], nil])");
   CHECK(clip_of(machine) == "\"Attack\"");
+}
+
+TEST_CASE("four corner animation grids reach another machine through NetworkSync and keep their paused pose") {
+  Lan lan;
+  const auto original = lan.scene.animations;
+  for (auto clip : original) {
+    clip.name += "Side";
+    lan.scene.animations.push_back(std::move(clip));
+  }
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
+  sync_swordsman({host, guest});
+  ruby(*host,
+       "$grid = Animation::Graph.new(initial: :move, parameters: {x: 0.5, y: 0.5}); "
+       "$grid.blend_2d(:move, parameters: [:x, :y], clips: "
+       "[[[0,0], :Attack], [[1,0], :Guard], [[0,1], :GuardSide], [[1,1], :AttackSide]]); "
+       "$hero.animation.use($grid)");
+  lan.rounds(kQuarterSecondRounds);
+  ruby(*host, "$hero.animation.pause");
+  const auto state_of = [](Engine& engine) {
+    return engine.script_context().animations->animation_of(engine.scene(), engine.scene().find(test::kSwordsman));
+  };
+  REQUIRE(lan.until([&] {
+    const auto graph = state_of(*guest).graph;
+    return graph && graph->to.size() == 4 && !graph->playing;
+  }));
+  lan.round();  // received tracks are posed by the next animation update, before scripts run
+  const auto local = state_of(*host).graph;
+  const auto remote = state_of(*guest).graph;
+  REQUIRE(local.has_value());
+  REQUIRE(remote.has_value());
+  CHECK(sword_x(*guest) == doctest::Approx(sword_x(*host)));
+  for (std::size_t i = 0; i < local->to.size(); ++i) {
+    CHECK(remote->to[i].clip.clip == local->to[i].clip.clip);
+    CHECK(remote->to[i].weight == local->to[i].weight);
+    CHECK(remote->to[i].clip.time == doctest::Approx(local->to[i].clip.time));
+  }
 }

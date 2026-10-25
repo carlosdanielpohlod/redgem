@@ -386,6 +386,7 @@ Named states and transitions for one character (animation.use(graph)). See [anim
 - `Animation::Graph.new(initial:, parameters: {})`: a graph starting at a state, with its parameters and their defaults
 - `clip(name, clip, loop: true, speed: 1.0)`: a state that plays one clip
 - `blend_1d(name, parameter:, clips:, loop: true, speed: 1.0)`: a state that blends clips by a number: clips: [[0.0, :Idle], [5.0, :Run]]
+- `blend_2d(name, parameters:, clips:, loop: true, speed: 1.0)`: a rectangular two-dimensional grid: parameters: [:x, :y], clips: [[[x, y], :Clip], ...]
 - `transition(from, to, parameter:, equals: nil, above: nil, below: nil, fade: 0.0)`: goes from one state to another when a parameter says so
 
 ## Audio

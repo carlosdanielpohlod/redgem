@@ -28,8 +28,8 @@ the same pull request.
 
 ## Rendering and animation
 
-- Animation graphs support clip states and one-dimensional blends only. State fades complete
-  before another transition is evaluated; there are no hierarchical or two-dimensional trees.
+- Animation graphs support clip states, one-dimensional blends and rectangular two-dimensional grids. State fades complete
+  before another transition is evaluated; there are no hierarchical trees or irregular two-dimensional point clouds.
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; point lights do not cast shadows.

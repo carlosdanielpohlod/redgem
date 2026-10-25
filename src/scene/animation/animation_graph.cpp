@@ -1,4 +1,5 @@
 #include "scene/animation/animation_graph.hpp"
+#include "scene/animation/animation_blend_grid.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -39,28 +40,44 @@ std::optional<std::size_t> state_index(const AnimationGraph& graph, const std::s
 
 bool valid_duration(float duration) { return std::isfinite(duration) && duration >= 0.0f; }
 
+bool valid_secondary_parameter(const AnimationGraphState& state, const AnimationParameters& parameters) {
+  if (state.second_parameter.empty()) return true;
+  return state.parameter != state.second_parameter && numeric_parameter(parameters, state.second_parameter);
+}
+
+bool single_clip_state(const AnimationGraphState& state) {
+  return state.second_parameter.empty() && state.points.size() == 1;
+}
+
 bool valid_state_shape(const AnimationGraphState& state, const AnimationParameters& parameters) {
   if (state.name.empty() || !std::isfinite(state.speed)) return false;
-  if (state.parameter.empty()) return state.points.size() == 1;
-  return !state.points.empty() && numeric_parameter(parameters, state.parameter);
+  if (state.parameter.empty()) return single_clip_state(state);
+  if (state.points.empty() || !numeric_parameter(parameters, state.parameter)) return false;
+  return valid_secondary_parameter(state, parameters);
+}
+
+bool ordered_point(const CompiledAnimationState& state, const AnimationBlendPoint& point) {
+  if (!state.second_parameter.empty() || state.points.empty()) return true;
+  return point.threshold > state.points.back().threshold;
 }
 
 bool append_point(CompiledAnimationState& state, const AnimationBlendPoint& point,
                   const std::vector<AnimationDesc>& clips) {
   if (point.clip.empty() || !std::isfinite(point.threshold)) return false;
-  if (!state.points.empty() && point.threshold <= state.points.back().threshold) return false;
+  if (!ordered_point(state, point)) return false;
   const auto index = clip_index(clips, point.clip);
   if (!index || !valid_duration(clips[*index].duration)) return false;
-  state.points.push_back({point.threshold, *index, clips[*index].duration});
+  state.points.push_back({point.threshold, *index, clips[*index].duration, point.second_threshold});
   return true;
 }
 
 bool append_state(AnimationGraph& graph, const AnimationGraphState& state, const std::vector<AnimationDesc>& clips) {
   if (!valid_state_shape(state, graph.parameters) || state_index(graph, state.name)) return false;
-  CompiledAnimationState compiled{state.name, state.parameter, {}, state.loop, state.speed};
+  CompiledAnimationState compiled{state.name, state.parameter, {}, state.loop, state.speed, state.second_parameter};
   for (const AnimationBlendPoint& point : state.points) {
     if (!append_point(compiled, point, clips)) return false;
   }
+  if (!compile_blend_grid(compiled)) return false;
   graph.states.push_back(std::move(compiled));
   return true;
 }

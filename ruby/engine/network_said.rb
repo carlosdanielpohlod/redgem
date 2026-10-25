@@ -11,7 +11,7 @@ module Network
     MAX_CLIP_NAME_SIZE = 64   # bytes in a clip's name, as a pose carries it
     GRAPH_SIZE = 5           # blend, remaining fade, playing, source clips, destination clips
     WEIGHTED_CLIP_SIZE = 2    # clip and normalized weight
-    MAX_BLEND_CLIPS = 2      # neighboring clips on each side of a fade
+    MAX_BLEND_CLIPS = 4      # corners of a two-dimensional blend on each side of a fade
     WEIGHT_TOLERANCE = 0.0001
     VECTOR_SIZE = 3           # numbers a position or a rotation travels as: x, y, z
     MAX_KEY_SIZE = 128        # bytes in the key of an object on the network (a spawned one, any NetworkSync)

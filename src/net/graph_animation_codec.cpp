@@ -5,7 +5,7 @@
 namespace redgem::net {
 namespace {
 
-constexpr float kWeightTolerance = 0.0001f;  // rounding error of two normalized float weights
+constexpr float kWeightTolerance = 0.0001f;  // rounding error of normalized float weights
 
 bool unit_weight(float value) { return std::isfinite(value) && value >= 0.0f && value <= 1.0f; }
 

@@ -126,6 +126,7 @@ add_executable(redgem_tests
   unit/particles_test.cpp
   unit/particle_layout_test.cpp
   unit/animation_player_test.cpp
+  unit/animation_blend_grid_test.cpp
   unit/animation_graph_test.cpp
   unit/animation_graph_player_test.cpp
   unit/animation_graph_integration_test.cpp

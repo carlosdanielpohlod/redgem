@@ -251,6 +251,7 @@ redgem_add_library(redgem_runtime
   scene/scatter_looks.cpp
   scene/animation/animation.cpp
   scene/animation/animation_blend.cpp
+  scene/animation/animation_blend_grid.cpp
   scene/animation/animation_graph.cpp
   scene/animation/animation_graph_player.cpp
   scene/animation/clip_clock.cpp

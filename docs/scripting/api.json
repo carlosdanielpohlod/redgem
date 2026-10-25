@@ -1390,6 +1390,11 @@
           "about": "a state that blends clips by a number: clips: [[0.0, :Idle], [5.0, :Run]]"
         },
         {
+          "name": "blend_2d",
+          "args": "name, parameters:, clips:, loop: true, speed: 1.0",
+          "about": "a rectangular two-dimensional grid: parameters: [:x, :y], clips: [[[x, y], :Clip], ...]"
+        },
+        {
           "name": "transition",
           "args": "from, to, parameter:, equals: nil, above: nil, below: nil, fade: 0.0",
           "about": "goes from one state to another when a parameter says so"

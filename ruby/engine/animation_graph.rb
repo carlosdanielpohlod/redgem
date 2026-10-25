@@ -2,6 +2,7 @@ module Animation
   # A reusable description. Each Animator installs its own clocks and parameter values.
   class Graph
     UNSET = Object.new
+    GRID_AXES = 2  # independent numeric parameters of a rectangular blend
 
     def initialize(initial:, parameters: {})
       @initial = initial
@@ -17,6 +18,15 @@ module Animation
 
     def blend_1d(name, parameter:, clips:, loop: true, speed: Animation::NORMAL_SPEED)
       @states << [name, parameter, clips, loop, speed]
+      self
+    end
+
+    # A complete rectangular grid of [[x, y], clip] entries, in any order.
+    def blend_2d(name, parameters:, clips:, loop: true, speed: Animation::NORMAL_SPEED)
+      two_axes = parameters.is_a?(Array) && parameters.size == GRID_AXES
+      raise ArgumentError, "blend_2d needs two parameters" unless two_axes
+
+      @states << [name, parameters, clips, loop, speed]
       self
     end
 

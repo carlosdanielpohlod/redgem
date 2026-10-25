@@ -34,7 +34,7 @@ struct ClipPart {
   bool playing = true;
 };
 
-inline constexpr std::size_t kMaxBlendClips = 2;  // neighbors per side of a one-dimensional blend
+inline constexpr std::size_t kMaxBlendClips = 4;  // corners per side of a rectangular two-dimensional blend
 
 struct WeightedClipPart {
   ClipPart clip;
@@ -57,7 +57,7 @@ struct AnimationPart {
   std::optional<GraphPart> graph;
 };
 
-// The largest mode has a layer, no manual base, and four graph clips with normalized weights.
+// The largest mode has a layer, no manual base, and eight graph clips with normalized weights.
 inline constexpr std::size_t kMaxClipBytes = kByte + kMaxClipNameBytes + 2 * kFloatBytes + kByte;
 inline constexpr std::size_t kGraphHeadBytes = 2 * kByte + 2 * kFloatBytes + kByte;
 inline constexpr std::size_t kMaxAnimationBytes =
