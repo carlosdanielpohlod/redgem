@@ -176,6 +176,17 @@ set_property(TARGET webpdecoder PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
   "$<BUILD_INTERFACE:${libwebp_SOURCE_DIR}>;$<BUILD_INTERFACE:${libwebp_BINARY_DIR}>;$<BUILD_INTERFACE:${libwebp_SOURCE_DIR}/src>")
 set_property(TARGET freetype PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
   "${freetype_SOURCE_DIR}/include;${freetype_BINARY_DIR}/include")
+# Their headers are included by the engine's own code, which is built with warnings as errors in
+# the continuous integration (REDGEM_WARNINGS_AS_ERRORS): included as system headers, what the
+# compiler finds in them is theirs to fix, and is not reported against the engine.
+foreach(dep raylib Jolt doctest nlohmann_json mbedtls mbedx509 mbedcrypto)
+  if(TARGET ${dep})
+    get_target_property(dep_includes ${dep} INTERFACE_INCLUDE_DIRECTORIES)
+    if(dep_includes)
+      set_property(TARGET ${dep} APPEND PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES ${dep_includes})
+    endif()
+  endif()
+endforeach()
 # Skinned meshes are deformed on the GPU: raylib then uploads bone ids / weights and bone matrices
 # (off in customized builds unless asked for).
 target_compile_definitions(raylib PRIVATE RL_SUPPORT_MESH_GPU_SKINNING)
