@@ -100,4 +100,21 @@ TEST_CASE("every test of a game, as they are") {
   CHECK_FALSE(parse_test_cli({"--all"}).ok);
   CHECK_FALSE(parse_test_cli({"--all", "games/demo", "t.rb"}).ok);
   CHECK_FALSE(parse_test_cli({"--all", "games/demo", "--headless"}).ok);
+  CHECK_FALSE(parse_test_cli({"--all", "games/demo", "--work", "w", "--after", "t.rb"}).ok);
+}
+
+TEST_CASE("a system test can go on from an earlier one run in the same folder, and only then") {
+  const TestCliResult result =
+      parse_test_cli({"games/demo", "kept_test.rb", "--work", "/tmp/run", "--after", "settings_test.rb"});
+  REQUIRE(result.ok);
+  CHECK(result.options.after == "settings_test.rb");
+  CHECK(parse_test_cli({"games/demo", "t.rb"}).options.after.empty());
+  CHECK(parse_test_cli({"games/demo", "t.rb", "--after"}).error ==
+        "--after needs the system test this run goes on from");
+  CHECK(parse_test_cli({"games/demo", "t.rb", "--after", "s.rb"}).error ==
+        "--after needs --work: the folder the earlier run kept its files in");
+  CHECK(parse_test_cli({"--ruby", "x_test.rb", "--after", "s.rb"}).error ==
+        "--after is for system tests (Ruby tests leave nothing behind)");
+  CHECK(parse_test_cli({"games/demo", "a/t.rb", "--work", "/tmp/run", "--after", "b/t.rb"}).error ==
+        "--after names an earlier test, not this one (they would share their files)");
 }

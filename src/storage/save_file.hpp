@@ -18,6 +18,8 @@ inline constexpr int kMostDamagedSavesKept = 100;
 // Removes a save and its backup: a game finds nothing saved the next time it runs (a test's fresh
 // start). What was set aside as damaged stays.
 void remove_save(const std::filesystem::path& file);
+// Where a save's backup is kept (the save before the last write), beside it.
+std::filesystem::path save_backup_of(const std::filesystem::path& file);
 
 // Moves a damaged file aside, to <name>.damaged (then .damaged.2 and on, as saves are): the name it
 // was moved to, or nullopt when it could not be moved (it is left where it is).

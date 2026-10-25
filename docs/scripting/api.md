@@ -31,7 +31,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Debug`](#debug) | Messages to the console (and to redgem run). |
 | [`Game`](#game) | The game itself. |
 | [`Settings`](#settings) | How the player chose the game to be shown and heard; a change takes effect at once. |
-| [`GameMenu`](#gamemenu) | A behaviour: title screen, pause menu, end screen and settings screen; arrows or the D-pad move the focus, Enter or A picks. |
+| [`GameMenu`](#gamemenu) | A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks. |
 | [`GameMenu::Screen`](#gamemenuscreen) | A screen of the GameMenu. |
 | [`Particles`](#particles) | Short-lived sparks, smoke and dust. |
 | [`Scatter`](#scatter) | Great numbers of copies of a mesh (grass, trees, rocks), drawn only. |
@@ -200,12 +200,15 @@ Keyboard, mouse, gamepad and touch, read every frame. See [gameplay.md](gameplay
 - `Input.define_axis(name, negative: [], positive: [], pad_axis: nil, invert: false)`: adds an axis of the game's own: define_axis(:steer, negative: ["key:a"], positive: ["key:d"])
 - `Input.actions`: the names of the actions
 - `Input.axes`: the names of the axes
+- `Input.axis_stick(name)`: the stick that moves an axis (:left_x), the game's for every player; nil when none does
 - `Input.bindings(name, pad: 0)`: what a player bound to an action: ["key:space", "pad:a"]
+- `Input.bindings_changes`: a count that goes up whenever actions, axes or bindings may have changed
 - `Input.bind(name, binding = nil, key: nil, button: nil, side: nil, pad: 0)`: binds a key or a button to an action; kept between runs
 - `Input.unbind(name, binding = nil, key: nil, button: nil, side: nil, pad: 0)`: takes a binding off an action
 - `Input.reset_bindings(name = nil, pad: nil)`: back to the game's own bindings (of one action, or all; of one pad, or all)
 - `Input.capture_next(cancel: ["key:escape", "pad:b", "pad:back"], &block)`: the next key or button pressed, to the block: |binding, pad| (nil: called off)
 - `Input.capturing?`: whether a capture waits for a key
+- `Input.capturing_for?(block)`: whether a capture still waits to call that block (not once another took its place)
 - `Input.cancel_capture`: calls a capture off
 - `Input.mouse_x`: the pointer's x, in pixels
 - `Input.mouse_y`: the pointer's y, in pixels
@@ -378,6 +381,7 @@ Which widget of a screen the keyboard and a gamepad work: up and down move it, w
 - `UI::Focus.new`: a focus on the first widget
 - `update(count)`: moves it among count widgets, as up or down was pressed this frame
 - `at?(index)`: whether the widget of that index has it: pass it as focused:
+- `move_to(index)`: puts it on a widget (one clicked, or the one a screen comes back to)
 - `index`: the widget that has it
 - `reset`: back to the first widget
 
@@ -429,17 +433,17 @@ Until the player chooses, everything is what `game.json` says. `Settings.save` k
 
 ## GameMenu
 
-A behaviour: title screen, pause menu, end screen and settings screen; arrows or the D-pad move the focus, Enter or A picks. See [gameplay.md#pause-and-the-flow-between-screens](gameplay.md#pause-and-the-flow-between-screens).
+A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks. See [gameplay.md#pause-and-the-flow-between-screens](gameplay.md#pause-and-the-flow-between-screens).
 
 - `GameMenu.instance`: the menu of the scene, or nil
 - `show(screen)`: opens a screen: :title, :pause, :over, :settings or one of the game's
-- `show_settings`: opens the settings screen (window, resolution, quality, volume...)
+- `show_settings`: opens the settings screen (window, resolution, quality, volume...; its Controls button opens the controls page)
 - `resume`: closes the menu and goes on
 - `restart`: starts the scene again
 - `finish(message)`: opens the end screen with a message
 - `open?`: whether the menu is open
 - `screen`: the screen open
-- `screens`: the screens, by name
+- `screens`: the screens, by name (:title, :pause, :over, :settings, :controls and the game's own)
 - `button_box(index)`: where the menu's button of that index is: [x, y, width, height]
 
 ## GameMenu::Screen

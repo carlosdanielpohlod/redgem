@@ -1,7 +1,7 @@
 # A game's actions and axes, for each player. A player is a gamepad's number: 0 is the first (who
-# also has the keyboard), up to 3; pad: nil is the first too. Bindings are written as text
-# ("key:space" is a key, "pad:a" a gamepad button), as a Symbol (a key: :space), or as
-# {keys: [...], buttons: [...]}, mixed as one likes.
+# also has the keyboard), up to 3 (Input::PLAYERS players, as the engine counts them); pad: nil is
+# the first too. Bindings are written as text ("key:space" is a key, "pad:a" a gamepad button), as
+# a Symbol (a key: :space), or as {keys: [...], buttons: [...]}, mixed as one likes.
 module Input
   FIRST_PAD = 0
   KEY_PREFIX = "key:".freeze
@@ -23,12 +23,14 @@ module Input
   # Input.define_action(:dash, keys: [:left_shift], buttons: [:b]), or define_action(:dash, :e,
   # "pad:b"). Declaring a name again binds it anew.
   def self.define_action(name, *bindings, keys: [], buttons: [])
+    __changed
     __define_action(name, __texts(bindings) + __texts(keys: keys, buttons: buttons))
   end
 
   # Input.define_axis(:steer, negative: [:a], positive: {keys: [:d], buttons: [:dpad_right]},
   # pad_axis: :left_x). invert: true runs the stick the other way (a stick pushed up reads negative).
   def self.define_axis(name, negative: [], positive: [], pad_axis: nil, invert: false)
+    __changed
     __define_axis(name, __texts(negative), __texts(positive), pad_axis, invert)
   end
 
@@ -40,6 +42,7 @@ module Input
     texts = __given(binding, key, button)
     raise ArgumentError, "say what to bind: key:, button: or a binding" if texts.empty?
 
+    __changed
     texts.each { |text| __bind(name, text, side, __pad(pad)) }
     true
   end
@@ -48,6 +51,7 @@ module Input
   # none is said.
   def self.unbind(name, binding = nil, key: nil, button: nil, side: nil, pad: FIRST_PAD)
     texts = __given(binding, key, button)
+    __changed
     return __unbind(name, nil, side, __pad(pad)) if texts.empty?
 
     texts.each { |text| __unbind(name, text, side, __pad(pad)) }
@@ -55,10 +59,20 @@ module Input
   end
 
   # An action's bindings (["key:space", "pad:a"]), or an axis' ({negative: [...], positive: [...]}).
+  # (The stick that moves an axis is the game's, the same for every player: Input.axis_stick.)
   def self.bindings(name, pad: FIRST_PAD) = __bindings(name, __pad(pad))
 
   # Back to the game's own bindings: one name or all, for one player or (pad: nil) all of them.
-  def self.reset_bindings(name = nil, pad: nil) = __reset_bindings(name, pad)
+  def self.reset_bindings(name = nil, pad: nil)
+    __changed
+    __reset_bindings(name, pad)
+  end
+
+  # How many times the actions, the axes or what they are bound to may have changed: a screen that
+  # shows them works them out again when it is not the number it saw last.
+  def self.bindings_changes = @bindings_changes.to_i
+
+  def self.__changed = @bindings_changes = bindings_changes + 1
 
   # Calls the block with the next key or gamepad button pressed ("key:k", or "pad:a" with the
   # gamepad's number): what a "press a key" screen waits for. One of `cancel` calls the capture
@@ -72,6 +86,10 @@ module Input
     @capture = nil
     __cancel_capture
   end
+
+  # Whether a capture still waits to call this block (not once it was called, called off, or
+  # another capture took its place).
+  def self.capturing_for?(block) = capturing? && @capture.equal?(block)
 
   # A capture asked for by a scene that is gone is called off with it.
   def self.__scene_reset = cancel_capture

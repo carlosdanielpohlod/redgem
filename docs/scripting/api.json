@@ -5,6 +5,10 @@
   "internal_classes": [
     "Behaviour::Timer",
     "Behaviour::Tween",
+    "GameMenu::BindingNames",
+    "GameMenu::ControlsPage",
+    "GameMenu::ControlsPage::Row",
+    "GameMenu::ControlsScreen",
     "GameMenu::SettingsScreen",
     "Network::Resends",
     "Network::Said",
@@ -691,10 +695,21 @@
           "about": "the names of the axes"
         },
         {
+          "name": "axis_stick",
+          "static": true,
+          "args": "name",
+          "about": "the stick that moves an axis (:left_x), the game's for every player; nil when none does"
+        },
+        {
           "name": "bindings",
           "static": true,
           "args": "name, pad: 0",
           "about": "what a player bound to an action: [\"key:space\", \"pad:a\"]"
+        },
+        {
+          "name": "bindings_changes",
+          "static": true,
+          "about": "a count that goes up whenever actions, axes or bindings may have changed"
         },
         {
           "name": "bind",
@@ -724,6 +739,12 @@
           "name": "capturing?",
           "static": true,
           "about": "whether a capture waits for a key"
+        },
+        {
+          "name": "capturing_for?",
+          "static": true,
+          "args": "block",
+          "about": "whether a capture still waits to call that block (not once another took its place)"
         },
         {
           "name": "cancel_capture",
@@ -1376,6 +1397,11 @@
           "about": "whether the widget of that index has it: pass it as focused:"
         },
         {
+          "name": "move_to",
+          "args": "index",
+          "about": "puts it on a widget (one clicked, or the one a screen comes back to)"
+        },
+        {
           "name": "index",
           "about": "the widget that has it"
         },
@@ -1571,7 +1597,7 @@
     },
     {
       "name": "GameMenu",
-      "about": "A behaviour: title screen, pause menu, end screen and settings screen; arrows or the D-pad move the focus, Enter or A picks.",
+      "about": "A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks.",
       "methods": [
         {
           "name": "instance",
@@ -1585,7 +1611,7 @@
         },
         {
           "name": "show_settings",
-          "about": "opens the settings screen (window, resolution, quality, volume...)"
+          "about": "opens the settings screen (window, resolution, quality, volume...; its Controls button opens the controls page)"
         },
         {
           "name": "resume",
@@ -1610,7 +1636,7 @@
         },
         {
           "name": "screens",
-          "about": "the screens, by name"
+          "about": "the screens, by name (:title, :pause, :over, :settings, :controls and the game's own)"
         },
         {
           "name": "button_box",

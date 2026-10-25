@@ -50,12 +50,29 @@ std::string problem_with_ruby_tests(const TestCliOptions& options) {
   if (!options.game_dir.empty()) return tr("testing.cli.ruby_without_game");
   if (options.headless) return tr("testing.cli.headless_for_system_tests");
   if (!options.work_dir.empty()) return tr("testing.cli.work_for_system_tests");
+  if (!options.after.empty()) return tr("testing.cli.after_for_system_tests");
   return {};
 }
 
-// A suite of every test of a game runs them as they are: no test file, and no pictures.
+// A suite of every test of a game runs them as they are: no test file, no pictures, and from
+// nothing (no earlier run to go on from).
 bool has_more_than_a_suite(const TestCliOptions& options) {
-  return !options.test_file.empty() || !options.scripts_game.empty() || options.headless;
+  return !options.test_file.empty() || !options.scripts_game.empty() || options.headless || !options.after.empty();
+}
+
+// Whether a run would go on from an earlier one with no folder of their own to find its files in.
+bool going_on_alone(const TestCliOptions& options) { return !options.after.empty() && options.work_dir.empty(); }
+
+// Whether a run would go on from a test of its own name: their files would be the same ones.
+bool going_on_from_itself(const TestCliOptions& options) {
+  return !options.after.empty() && options.after.stem() == options.test_file.stem();
+}
+
+// What is wrong with what a system test is told to go on from (--after); empty when nothing is.
+std::string problem_with_going_on(const TestCliOptions& options) {
+  if (going_on_alone(options)) return tr("testing.cli.after_needs_work");
+  if (going_on_from_itself(options)) return tr("testing.cli.after_needs_another_test");
+  return {};
 }
 
 // What is wrong with a line that was read to its end; empty when nothing is.
@@ -65,7 +82,7 @@ std::string problem_with(const TestCliOptions& options) {
   if (!options.scripts_game.empty()) return tr("testing.cli.game_for_ruby_tests");
   if (options.game_dir.empty()) return tr("testing.cli.missing_game_dir");
   if (options.test_file.empty()) return tr("testing.cli.missing_system_test");
-  return {};
+  return problem_with_going_on(options);
 }
 
 }  // namespace

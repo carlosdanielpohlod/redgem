@@ -10,6 +10,7 @@
 #include <optional>
 #include <string>
 
+#include "input/devices.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 
@@ -101,6 +102,20 @@ mrb_value input_define_axis(mrb_state* mrb, mrb_value) {
 mrb_value input_actions(mrb_state* mrb, mrb_value) { return names_value(mrb, bindings(mrb).declared().actions()); }
 mrb_value input_axes(mrb_state* mrb, mrb_value) { return names_value(mrb, bindings(mrb).declared().axes()); }
 
+// The stick that moves an axis, as a Symbol: nil when none does, or for an action (no axis).
+mrb_value stick_value(mrb_state* mrb, const AxisBinding* axis) {
+  if (axis == nullptr) return mrb_nil_value();
+  if (!axis->stick) return mrb_nil_value();
+  return mrb_symbol_value(mrb_intern_cstr(mrb, gamepad_axis_name(*axis->stick).c_str()));
+}
+
+// Input.axis_stick(:horizontal): the stick that moves an axis (:left_x), the game's for every player.
+mrb_value input_axis_stick(mrb_state* mrb, mrb_value) {
+  mrb_value name;
+  mrb_get_args(mrb, "o", &name);
+  return stick_value(mrb, bindings(mrb).declared().axis(declared_name(mrb, name)));
+}
+
 // --- Rebinding -------------------------------------------------------------------------------
 
 // What bind and unbind are given: a name, a binding (nil: all of them), a side and a player.
@@ -186,6 +201,9 @@ void install_declaring(RClass* input_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, input_module, "__define_axis", input_define_axis, MRB_ARGS_REQ(5));
   mrb_define_module_function(mrb, input_module, "actions", input_actions, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, input_module, "axes", input_axes, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, input_module, "axis_stick", input_axis_stick, MRB_ARGS_REQ(1));
+  // How many players bind their own: one for each gamepad the engine reads.
+  mrb_define_const(mrb, input_module, "PLAYERS", mrb_int_value(mrb, static_cast<mrb_int>(kMaxGamepads)));
 }
 
 void install_rebinding(RClass* input_module, mrb_state* mrb) {

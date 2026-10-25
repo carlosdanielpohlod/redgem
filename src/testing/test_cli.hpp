@@ -18,6 +18,7 @@ struct TestCliOptions {
   std::filesystem::path screenshot_dir;  // where a system test's pictures go
   bool headless = false;                 // a system test without a window
   std::filesystem::path work_dir;        // --work: a folder of this run's own (see SystemTestOptions)
+  std::filesystem::path after;           // --after: the earlier test this run goes on from (the same)
   std::optional<std::string> gpu;        // --gpu auto|dedicated|integrated (overrides the saved setting)
 };
 

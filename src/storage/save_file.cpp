@@ -95,6 +95,8 @@ std::filesystem::path backup_of(const std::filesystem::path& file) { return file
 
 std::optional<std::filesystem::path> move_damaged_aside(const std::filesystem::path& file) { return move_aside(file); }
 
+std::filesystem::path save_backup_of(const std::filesystem::path& file) { return backup_of(file); }
+
 void remove_save(const std::filesystem::path& file) {
   std::error_code fs_error;
   std::filesystem::remove(file, fs_error);

@@ -48,6 +48,11 @@ module UI
     end
 
     def at?(index) = @index == index
+
+    # Puts it on a widget (one clicked, or the one a screen comes back to).
+    def move_to(index)
+      @index = index
+    end
   end
 
   # Whether one of the keys or gamepad buttons of `controls` ([keys, buttons]) was pressed this frame.

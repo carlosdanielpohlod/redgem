@@ -37,6 +37,13 @@ class InputBindingsTest < RedGemTest::Case
     assert_raises(ArgumentError) { Input.bind(:vertical, key: :i) }
   end
 
+  def test_an_axis_says_which_stick_moves_it_the_same_for_every_player
+    assert_equal :left_x, Input.axis_stick(:horizontal)
+    assert_equal :left_y, Input.axis_stick(:vertical)
+    assert_nil Input.axis_stick(:jump)
+    assert_raises(ArgumentError) { Input.axis_stick(:fly) }
+  end
+
   def test_each_player_binds_their_own
     Input.bind(:run, key: :right_shift, pad: SECOND_PAD)
     assert_equal ["key:right_shift", "pad:b"], Input.bindings(:run, pad: SECOND_PAD)

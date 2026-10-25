@@ -34,7 +34,7 @@ int run_tests(const testing::TestCliOptions& options) {
     return testing::run_ruby_tests(options.test_file, options.scripts_game);
   }
   return testing::run_system_test({options.game_dir, options.test_file, options.screenshot_dir, options.headless,
-                                   gpu_choice_for_run(options.gpu), options.work_dir});
+                                   gpu_choice_for_run(options.gpu), options.work_dir, options.after});
 }
 
 int run_command_line(const std::vector<std::string>& args) {

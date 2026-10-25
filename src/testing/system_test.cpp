@@ -12,6 +12,7 @@
 #include "app/engine.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
+#include "core/translations.hpp"
 #include "testing/frame_pictures.hpp"
 #include "testing/test_library.hpp"
 #include "testing/test_notes.hpp"
@@ -33,16 +34,23 @@ constexpr const char* kFailed = "failed";
 
 enum class Status { Running, Passed, Failed };
 
+// The files the run plays with: fresh ones, or copies of those of the run it goes on from.
+RunFiles run_files(const SystemTestOptions& options) {
+  if (options.after.empty()) return fresh_run_files(options.game_dir, options.work_dir, options.test_file);
+  return copied_run_files(options.game_dir, options.work_dir, options.test_file, options.after);
+}
+
 // An engine as a test needs it: the same run every time, with the test at the controls.
-EngineOptions engine_options(const SystemTestOptions& options, ScriptedInputSource& input, Stage& stage) {
+EngineOptions engine_options(const SystemTestOptions& options, const RunFiles& files, ScriptedInputSource& input,
+                             Stage& stage) {
   EngineOptions engine;
   engine.game_dir = options.game_dir;
+  engine.display = stage.display();
   engine.display_kept_in = stage.display_kept_in();
   engine.presenter = stage.presenter();
   engine.input = &input;  // the devices are not read: a key touched by accident changes nothing
-  engine.save_file = options.work_dir.empty() ? fresh_test_save_file(options.game_dir)
-                                              : fresh_save_file_in(options.work_dir, options.test_file);
-  engine.bindings_file = fresh_bindings_file_for(options.game_dir, options.work_dir, options.test_file);
+  engine.save_file = files.save;
+  engine.bindings_file = files.bindings;
   engine.fixed_step = true;
   engine.audio = stage.audio();
   return engine;
@@ -145,21 +153,38 @@ int play_test(Engine& engine, ScriptedInputSource& input, FramePictures& picture
   return run.play();
 }
 
-}  // namespace
+// Whether a run would go on from a test never run in its folder: a misspelt test, or a first run
+// made elsewhere (it would start from nothing, and fail far from the cause).
+bool goes_on_from_nothing(const SystemTestOptions& options) {
+  return !options.after.empty() && !ran_in(options.work_dir, options.after);
+}
 
-int run_system_test(const SystemTestOptions& options) {
+// The test played on a game that starts with `files`.
+int play_with(const SystemTestOptions& options, const RunFiles& files) {
   // Made before the engine, so they outlive it: what TestInput sets and the game reads, the
   // pictures the test asks for, and where the game is shown.
   ScriptedInputSource input;
   FramePictures pictures(options.screenshot_dir);
-  Stage stage(options, pictures);
+  Stage stage(options, files.settings, pictures);
   if (!options.work_dir.empty()) keep_notes_in(notes_folder_in(options.work_dir));
-  auto created = Engine::create(engine_options(options, input, stage));
+  auto created = Engine::create(engine_options(options, files, input, stage));
   if (auto* error = std::get_if<std::string>(&created)) {
     log::error(*error);
     return kExitFailure;
   }
   return play_test(*std::get<std::unique_ptr<Engine>>(created), input, pictures, options.test_file);
+}
+
+}  // namespace
+
+int run_system_test(const SystemTestOptions& options) {
+  if (goes_on_from_nothing(options)) {
+    log::error(tr("testing.run.never_ran", {{"test", options.after.string()}, {"folder", options.work_dir.string()}}));
+    return kExitFailure;
+  }
+  const RunFiles files = run_files(options);
+  if (!options.work_dir.empty()) mark_run(options.work_dir, options.test_file);
+  return play_with(options, files);
 }
 
 }  // namespace redgem::testing
