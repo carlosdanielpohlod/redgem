@@ -310,8 +310,8 @@ TEST_CASE("only the scene the engine loads is kept, with the new top-level nodes
 
   json sceneless = json::object();
   CHECK_FALSE(has_several_scenes(sceneless));
-  keep_active_scene(sceneless, json({0}));
-  CHECK(sceneless[kScenes][0][kNodes] == json({0}));
+  keep_active_scene(sceneless, json::array({0}));
+  CHECK(sceneless[kScenes][0][kNodes] == json::array({0}));
 }
 
 TEST_CASE("a file's 'scene' that names none of its scenes, or is no number, keeps a scene made here") {
@@ -319,14 +319,14 @@ TEST_CASE("a file's 'scene' that names none of its scenes, or is no number, keep
   for (const json& scene : {json(-1), json(kNoSuchScene), json("first"), json(nullptr), json(1.5)}) {
     CAPTURE(scene.dump());
     json document = {{kScene, scene}, {kScenes, {{{kName, "Level"}}}}};
-    keep_active_scene(document, json({0}));
+    keep_active_scene(document, json::array({0}));
     REQUIRE(document[kScenes].size() == 1);
-    CHECK(document[kScenes][0][kNodes] == json({0}));
+    CHECK(document[kScenes][0][kNodes] == json::array({0}));
     CHECK_FALSE(document[kScenes][0].contains(kName));
     CHECK(document[kScene] == 0);
   }
   json not_a_list = {{kScene, 0}, {kScenes, "none"}};
-  keep_active_scene(not_a_list, json({0}));
+  keep_active_scene(not_a_list, json::array({0}));
   CHECK(not_a_list[kScenes].size() == 1);
 }
 
