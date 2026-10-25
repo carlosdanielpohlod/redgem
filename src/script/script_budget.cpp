@@ -170,15 +170,17 @@ void ScriptBudget::pop() {
   resume(frames_.back(), coarse_milliseconds());
 }
 
-// Back in a call from what ran inside it, which does not count: a call stopped for good is
-// stopped again at its next instruction.
+// Back in a call from what ran inside it, which does not count (up to a point): a call that is
+// overdue now, or was stopped for good, is stopped at its next instruction.
 void ScriptBudget::resume(Frame& frame, std::int64_t now) {
   const std::int64_t away = forgivable(frame, now - frame.left_at);
   frame.forgiven += away;
   frame.started += away;
   frame.unwinding += away;
   publish(deadline_of(frame));
-  if (frame.phase == Phase::Stopped) request_stop();
+  // (Asked here, not left to the watchdog, which may only ever have looked while the engine
+  // worked: a loop that does nothing but spawn is overdue as it comes back from a spawn.)
+  if (overdue(frame, now)) request_stop();
 }
 
 std::int64_t ScriptBudget::deadline_of(const Frame& frame) const {
