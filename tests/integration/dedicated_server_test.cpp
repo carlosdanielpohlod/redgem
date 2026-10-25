@@ -31,9 +31,10 @@ constexpr server::RoomLimits kTwoRoomsOfTwo{2, 2};
 constexpr server::RoomLimits kRoomy{4, 2};
 constexpr server::RoomLimits kTwoRoomsOfOne{1, 2};
 constexpr int kTwoThreads = 2;
-constexpr int kFramesToSayHello = 30;     // of a joining player's, for its hello to be on its way
-constexpr int kVisitsPerRoom = 300;       // changes each room makes to one saved value
-constexpr double kSlowLoadSeconds = 1.5;  // what a slow room's level takes to load (see kSlowScene)
+constexpr int kFramesToSayHello = 30;          // of a joining player's, for its hello to be on its way
+constexpr int kVisitsPerRoom = 300;            // changes each room makes to one saved value
+constexpr double kSlowLoadSeconds = 1.5;       // what a slow room's level takes to load (see kSlowScene)
+constexpr int kSlowLevelBudgetMs = 10 * 1000;  // what its scripts may take, far more than that
 // The longest a room may go without a frame while another loads: far less than the load.
 constexpr double kLongestPause = kSlowLoadSeconds / 2;
 constexpr double kLongestJoinSeconds = 10.0;
@@ -84,7 +85,8 @@ std::string in_room(server::GameServer& server, const std::string& room, const s
   return text;
 }
 
-// The sandbox game in a folder of its own, with a level that may load slowly (kSlowScene).
+// The sandbox game in a folder of its own, with a level that may load slowly (kSlowScene), and
+// scripts given the time for it (past the engine's default budget).
 struct SlowGame {
   std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-slow-level-test";
   std::filesystem::path game = root / "game";
@@ -94,6 +96,7 @@ struct SlowGame {
     std::filesystem::create_directories(root);
     std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
     std::ofstream(game / "scripts" / "main_scene.rb") << kSlowScene;
+    std::ofstream(game / "game.json") << "{\"script_budget_ms\": " << kSlowLevelBudgetMs << "}";
   }
   ~SlowGame() { std::filesystem::remove_all(root); }
 };

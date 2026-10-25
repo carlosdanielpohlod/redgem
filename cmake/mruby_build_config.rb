@@ -15,6 +15,10 @@ def redgem_gems(conf)
   conf.gem core: 'mruby-compiler'   # the engine compiles the scripts itself
   conf.gem core: 'mruby-error'
   conf.enable_cxx_exception
+  # The hook the interpreter calls before each instruction: how a script that never returns is
+  # stopped (src/script/script_budget.hpp). The engine is compiled with the same definition
+  # (cmake/Dependencies.cmake), as it changes what mrb_state holds.
+  conf.compilers.each { |compiler| compiler.defines << 'MRB_USE_DEBUG_HOOK' }
 end
 
 # For the machine doing the build (a Windows build still needs it: it compiles mruby's own tools).

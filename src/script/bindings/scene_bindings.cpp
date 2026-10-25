@@ -7,6 +7,7 @@
 
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
+#include "script/script_host.hpp"
 
 namespace redgem {
 namespace {
@@ -49,6 +50,12 @@ std::optional<Transform> spawn_placement(mrb_state* mrb, ObjectId id, mrb_value 
   return world;
 }
 
+// Making the object, its bodies and its behaviours is the engine's time, not the script's.
+ObjectId spawned(mrb_state* mrb, ObjectId source, const std::optional<Transform>& placement, bool physics) {
+  const BudgetPause pause(script_host(mrb).vm().budget_keeper());
+  return context(mrb).spawn(source, placement, physics);
+}
+
 mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
   mrb_value source;
   mrb_value position = mrb_nil_value();
@@ -58,7 +65,7 @@ mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
   ScriptContext& ctx = context(mrb);
   if (!ctx.spawn) mrb_raise(mrb, E_RUNTIME_ERROR, "Scene.spawn only works while the game runs");
   const ObjectId id = spawn_source(mrb, source);
-  return object_or_nil(mrb, ctx.spawn(id, spawn_placement(mrb, id, position, rotation), physics));
+  return object_or_nil(mrb, spawned(mrb, id, spawn_placement(mrb, id, position, rotation), physics));
 }
 
 }  // namespace

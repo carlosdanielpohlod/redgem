@@ -104,3 +104,37 @@ the level file says what is there and where, and Ruby says what it does.
 
 An error in a behaviour does not stop the game. That behaviour is switched off, and the Console
 shows the error with the file and line. Fix it, press Play again.
+
+### A script that never returns
+
+Every call the engine makes into the scripts (a behaviour's `start` and `update`, a contact, a
+scene script, a network handler) has a budget of time: 1000 ms unless the game's `game.json` says
+otherwise. A call still running past it (a `loop {}` with no `break`, a `while true` waiting for
+something that never comes) is stopped with a `ScriptTimeout` error. The behaviour is switched
+off like one that raised, the Console says which behaviour and method it was and how long it ran,
+and the game goes on. The game freezes for the length of the budget, once.
+
+```json
+{ "id": "com.mystudio.mygame", "title": "My Game", "script_budget_ms": 2000 }
+```
+
+`script_budget_ms` is a whole number of milliseconds from 1 to 60000. It applies the same way to
+a game you play, to Play in the editor and to every room of a dedicated server, where each room
+has its own scripts and its own budget. Raise it for a scene script that builds a large level in
+one go; a frame's update should never come near it.
+
+`ScriptTimeout` is not a `StandardError`, so `rescue => e` does not catch it. A call over its
+budget is stopped once, where it stands, and has 50 ms more to unwind: its `ensure` clauses run,
+so it can put back what it changed. If it is still running after that (an `ensure` that loops, a
+`rescue Exception` that carries on), it is stopped again at every step until it has returned.
+
+What counts is the time spent in the call's own Ruby. Not counted: the work of the engine known
+to take long (spawning objects, placing scatter copies), and the calls the engine makes into the
+scripts from inside it, such as the `start` of a behaviour a spawned object brings, which each
+have a budget of their own. Up to four budgets of that are forgiven in one call: a loop that does
+nothing but spawn is stopped after about five. The engine's methods are never cut off halfway: the call stops at its
+next line of Ruby.
+
+A recursion that never ends stops on its own, with `SystemStackError`, long before the program's
+stack runs out, and is handled the same way: its behaviour is switched off. `redgem-test` runs a
+file of Ruby tests with no budget, as one call.

@@ -25,6 +25,7 @@ constexpr const char* kVsyncKey = "vsync";
 constexpr const char* kFpsCapKey = "fps_cap";
 constexpr const char* kRenderScaleKey = "render_scale";
 constexpr const char* kQualityKey = "quality";
+constexpr const char* kScriptBudgetKey = config::kScriptBudgetKey;
 constexpr int kJsonIndent = 2;
 constexpr std::string_view kIdMarks = ".-_";  // what an id may hold besides small letters and digits
 constexpr std::string_view kTwoSeparators = "..";
@@ -86,6 +87,24 @@ bool sized_as_id(const std::string& id) {
   return !id.empty() && id.size() <= kMaxGameIdLength && id.find(kTwoSeparators) == std::string::npos;
 }
 
+bool within_budget_range(std::int64_t asked) { return asked > 0 && asked <= config::kMaxScriptBudgetMs; }
+
+bool holds_usable_budget(const nlohmann::json& json) {
+  return holds_whole_number(json, kScriptBudgetKey) && within_budget_range(json[kScriptBudgetKey].get<std::int64_t>());
+}
+
+// The scripts' budget, when the file gives one that can be used; what is wrong with it otherwise.
+std::string read_script_budget(const nlohmann::json& json, GameSettings& settings) {
+  if (!json.contains(kScriptBudgetKey)) return {};
+  if (holds_usable_budget(json)) {
+    settings.script_budget_ms = json[kScriptBudgetKey].get<int>();
+    return {};
+  }
+  return std::string(kGameSettingsFile) + ": " + kScriptBudgetKey + " must be a whole number from 1 to " +
+         std::to_string(config::kMaxScriptBudgetMs) + "; the scripts get " +
+         std::to_string(config::kDefaultScriptBudgetMs) + " ms";
+}
+
 }  // namespace
 
 GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
@@ -100,6 +119,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   read_display(json, manifest.settings);
   manifest.id_error = read_id(json, manifest.settings.id);
   manifest.android_error = read_android_section(json, manifest.settings.android);
+  manifest.script_budget_error = read_script_budget(json, manifest.settings);
   return manifest;
 }
 

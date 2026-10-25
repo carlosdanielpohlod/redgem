@@ -6,6 +6,7 @@
 
 #include "core/config.hpp"
 #include "core/log.hpp"
+#include "core/engine_thread.hpp"
 #include "server/tick_pacer.hpp"
 
 namespace redgem::server {
@@ -17,7 +18,7 @@ constexpr const char* kServerStopped = "the server stopped";
 }  // namespace
 
 RoomThread::RoomThread(RoomStart start) : start_(std::move(start)) {
-  thread_ = std::thread([this] { run(); });
+  thread_ = std::thread([this] { run_engine_thread([this] { run(); }); });
 }
 
 RoomThread::~RoomThread() { stop(); }

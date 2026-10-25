@@ -17,4 +17,22 @@ inline constexpr std::uintmax_t kMaxLocaleFileBytes = 1024 * 1024;
 // The longest name a language goes by ("en", "pt_BR", "zh-Hant"): a file's or I18n.locale's.
 inline constexpr std::size_t kMaxLanguageNameLength = 16;
 
+// How long one call from the engine into a game's scripts may run (see script/script_budget.hpp),
+// unless game.json says otherwise under kScriptBudgetKey: long enough for a scene script that
+// builds a big level on a slow phone, short enough that a script stuck in a loop is a hitch
+// rather than a frozen game.
+inline constexpr int kDefaultScriptBudgetMs = 1000;
+// The most a game may give its scripts: a minute, past which "never returns" is what it means.
+inline constexpr int kMaxScriptBudgetMs = 60 * 1000;
+inline constexpr const char* kScriptBudgetKey = "script_budget_ms";
+// What a call stopped past its budget has to unwind (its ensure clauses run) before it is stopped
+// at every instruction.
+inline constexpr int kScriptGraceMs = 50;
+// The most of a call's time that work inside it may be forgiven (calls the engine makes from
+// inside it, its own work known to be long), in budgets: a loop that only ever spawns objects is
+// stopped after about this many and one.
+inline constexpr int kScriptForgivenBudgets = 4;
+// How often the watchdog asks again a call it asked to stop that is still in the engine's own work.
+inline constexpr int kScriptWatchRetryMs = 10;
+
 }  // namespace redgem::config

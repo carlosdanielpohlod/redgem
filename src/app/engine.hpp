@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -150,7 +151,8 @@ class Engine {
   GameIdentityReading begin_loading();
   void take_identity(const GameIdentityReading& identity);
   void connect_context();
-  void start_scripts();
+  // (With the time each call into them may take: game.json's script_budget_ms.)
+  void start_scripts(std::chrono::milliseconds script_budget);
 
   static Vec3 gravity();
   // A physics world of its own for the scene in place, with a body for every object that asks for one.

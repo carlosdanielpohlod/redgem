@@ -1,4 +1,6 @@
 {
+  "game.crash.closed": "{game} closed because of an error. A report of what happened was written in {folder}",
+  "game.crash.out_of_memory": "{game} ran out of memory and had to close. A report was written in {folder}",
   "game.identity.bad_network": "{place} must be true or false",
   "game.identity.bad_picture": "{place} must name a .png file inside the game folder, like images/icon.png",
   "game.identity.bad_version": "{place} must be a version like 1.2.0 (three numbers, then optionally -beta.1 or +build.5)",

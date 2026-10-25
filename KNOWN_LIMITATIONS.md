@@ -175,10 +175,15 @@ not a promise of how it will be closed.
 
 ### Safety
 
-- A script that never returns (`loop {}`) freezes the game, the editor or a server room: there is
-  no time or instruction limit. (A script that raises is switched off and the game goes on.)
-- A crash in a built game closes it with a line in the log: no message to the player, no crash
-  report, no backtrace. Running out of memory is not handled.
+- Running out of memory is handled only where it reaches the top of a built game (a clear message
+  and a report): memory running out inside a library that does not throw (the graphics driver,
+  the physics, the interpreter's own allocations, which a script sees as `NoMemoryError`) can
+  still end the game with only a crash report, or none.
+- A built game for Android writes no crash report and shows no message (only `adb logcat`). On
+  Windows the report's backtrace is module offsets (`redgem-player.exe+0x1a2b`), not function names.
+- The scripts' time budget stops Ruby code only: one call of the engine's own that takes long
+  (a huge `Array#sort`, a request to the engine for millions of things) is not cut off, and the
+  budget is wall time: a call paused in a debugger for longer than it is stopped when it resumes.
 
 ### Security
 

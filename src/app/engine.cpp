@@ -23,6 +23,12 @@ namespace {
 // What follows the word that a game's id cannot be used.
 constexpr const char* kSavedByFolderNote = ". Until it is put right, the game's save goes by where its folder is";
 
+// What game.json says that cannot be used, and what the game does instead.
+void warn_of_unusable(const GameManifest& manifest) {
+  if (!manifest.id_error.empty()) log::warning(manifest.id_error + kSavedByFolderNote);
+  if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
+}
+
 }  // namespace
 
 Engine::Engine(const EngineOptions& options)
@@ -57,7 +63,7 @@ void Engine::initialize() {
   const GameIdentityReading identity = begin_loading();
   build_world();
   const GameManifest manifest = read_game_manifest(options_.game_dir);
-  if (!manifest.id_error.empty()) log::warning(manifest.id_error + kSavedByFolderNote);
+  warn_of_unusable(manifest);
   open_presenter(manifest.settings);
   open_audio();
   open_saves();
@@ -66,7 +72,7 @@ void Engine::initialize() {
   connect_display();
   take_identity(identity);
   if (serves_a_room()) network_.serve_room(options_.server_room);  // before any script asks
-  start_scripts();
+  start_scripts(std::chrono::milliseconds(manifest.settings.script_budget_ms));
   network_watch_.restart();  // the network's time starts with the game, not with its loading
 }
 
@@ -206,8 +212,9 @@ void Engine::connect_context() {
   };
 }
 
-void Engine::start_scripts() {
+void Engine::start_scripts(std::chrono::milliseconds script_budget) {
   scripts_ = std::make_unique<ScriptHost>(context_, options_.game_dir / config::kScriptsDirName);
+  scripts_->vm().set_budget(script_budget);
   scripts_->attach_scripts();
   scripts_->run_scene_script(context_.scene_name);
 }

@@ -6,6 +6,7 @@
 
 #include "app/android/android_settings.hpp"
 #include "render/display_settings.hpp"
+#include "script/script_config.hpp"
 
 // game.json: what a game says about itself. This is the one place that reads the file.
 namespace redgem {
@@ -25,6 +26,10 @@ struct GameSettings {
   //   "fullscreen": true, "vsync": false, "fps_cap": 144 (0: none), "render_scale": 0.75,
   //   "quality": "medium"
   DisplaySettings display;
+  // How long one call into the game's scripts may run before it is stopped (see
+  // script/script_budget.hpp), in milliseconds, 1 to config::kMaxScriptBudgetMs:
+  //   "script_budget_ms": 2000
+  int script_budget_ms = config::kDefaultScriptBudgetMs;
 };
 
 // Everything game.json says, read once.
@@ -38,6 +43,9 @@ struct GameManifest {
   // What is wrong with the "id"; empty when it can be used or the game has none. (A game plays
   // all the same, as one with no id does.)
   std::string id_error;
+  // What is wrong with "script_budget_ms"; empty when it can be used or the file has none. (The
+  // scripts get the engine's default instead.)
+  std::string script_budget_error;
 };
 GameManifest read_game_manifest(const std::filesystem::path& game_dir);
 
