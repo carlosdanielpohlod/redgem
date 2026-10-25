@@ -35,7 +35,7 @@ struct PanelContext {
   AudioSystem* audio = nullptr;  // sound previews in the Project panel
   bool files_changed = false;    // set by panels that create files: the editor rescans the game
   // Set by the Project panel: a scene to open (double clicked), and New scene asked for.
-  std::optional<std::string> scene_to_open;
+  std::optional<std::string> scene_to_open{};
   bool new_scene_asked = false;
   TerrainTool* terrain = nullptr;
 };

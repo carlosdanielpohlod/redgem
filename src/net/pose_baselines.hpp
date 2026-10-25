@@ -54,7 +54,7 @@ class PoseSender {
     Vec3 position;
     std::uint32_t rotation = 0;
     int sends = 1;                          // since the last whole pose, that one included
-    std::optional<std::uint32_t> revision;  // of the animation last told
+    std::optional<std::uint32_t> revision{};  // of the animation last told
   };
 
   PoseUpdate placed(const std::string& key, Vec3 position, Quat rotation);

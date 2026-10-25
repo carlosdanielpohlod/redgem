@@ -42,7 +42,7 @@ void open_window(const WindowSettings& settings) {
 }  // namespace
 
 unsigned int window_flags(const WindowSettings& settings) {
-  unsigned int flags = settings.vsync ? FLAG_VSYNC_HINT : 0U;
+  unsigned int flags = settings.vsync ? static_cast<unsigned int>(FLAG_VSYNC_HINT) : 0U;
   if (settings.resizable) flags |= FLAG_WINDOW_RESIZABLE;
   if (settings.smooth_edges) flags |= FLAG_MSAA_4X_HINT;
   return flags;
