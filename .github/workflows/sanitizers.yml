@@ -37,10 +37,11 @@ jobs:
           - name: TSan
             kind: thread
             configure: -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREDGEM_SANITIZERS=thread
+          # (Optimized: the tests of a flooded server measure time, and fail in an unoptimized build.)
           - name: Coverage
             kind: coverage
             configure: >-
-              -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage
+              -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_FLAGS=--coverage -DCMAKE_CXX_FLAGS=--coverage
               -DCMAKE_EXE_LINKER_FLAGS=--coverage -DCMAKE_SHARED_LINKER_FLAGS=--coverage
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -125,6 +126,8 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.kind == 'coverage' }}
         run: |
           mkdir -p coverage
+          # (The programs CMake compiles to identify the compiler leave coverage notes of their own.)
+          rm -rf build/CMakeFiles/*/CompilerId*
           gcovr --root . --filter 'src/' --object-directory build --gcov-ignore-errors=no_working_dir_found \
             --print-summary --txt coverage/summary.txt --html-details coverage/index.html | tee coverage/totals.txt
           { echo '## Coverage of src/'; echo '```'; cat coverage/totals.txt; echo '```'; } >> "${GITHUB_STEP_SUMMARY}"
