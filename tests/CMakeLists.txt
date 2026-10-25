@@ -553,3 +553,6 @@ add_executable(redgem_scripting_benchmark benchmark/scripting_benchmark.cpp)
 target_link_libraries(redgem_scripting_benchmark PRIVATE redgem_runtime)
 target_compile_definitions(redgem_scripting_benchmark PRIVATE
   REDGEM_BENCHMARK_GAME="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/games/sandbox")
+
+# The parsers of untrusted input, fuzzed (tests/fuzz): their corpora replayed by every build.
+add_subdirectory(fuzz)

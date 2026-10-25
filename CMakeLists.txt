@@ -45,6 +45,17 @@ if(REDGEM_SANITIZERS)
   add_link_options(-fsanitize=${REDGEM_SANITIZERS})
 endif()
 
+# Fuzzing (tests/fuzz): with clang, every library is built for libFuzzer to follow which code an
+# input reaches, and the fuzz targets are built as fuzzers. Used with sanitizers, which catch what
+# an input does wrong (REDGEM_SANITIZERS=address,undefined).
+option(REDGEM_FUZZ "Build the fuzz targets with libFuzzer (clang)" OFF)
+if(REDGEM_FUZZ)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "REDGEM_FUZZ needs clang (libFuzzer): configure with -DCMAKE_CXX_COMPILER=clang++")
+  endif()
+  add_compile_options(-fsanitize=fuzzer-no-link)
+endif()
+
 include(Dependencies)
 
 # (Set after the dependencies: only the targets made from here on, the engine's, take it.)
