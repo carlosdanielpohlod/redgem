@@ -60,11 +60,8 @@ int SceneDocument::image_with(const std::vector<std::uint8_t>& bytes) const {
 std::string SceneDocument::image_name(int image) const {
   const nlohmann::json* entry = entry_at(glb_.json, kImages, image);
   if (entry == nullptr) return {};
-  for (const char* key : {kName, kUri}) {
-    const auto text = entry->find(key);
-    if (text != entry->end() && text->is_string()) return text->get<std::string>();
-  }
-  return {};
+  const std::string name = text_at(*entry, kName);
+  return name.empty() ? text_at(*entry, kUri) : name;
 }
 
 }  // namespace redgem

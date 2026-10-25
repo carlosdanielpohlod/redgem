@@ -46,13 +46,15 @@ SlotPlace place_of(Slot slot) {
 // material has no such object.
 const Json* holder_of(const Json& material, const SlotPlace& place) {
   if (!place.in_pbr) return &material;
-  const auto pbr = material.find(kPbr);
-  return pbr != material.end() && pbr->is_object() ? &*pbr : nullptr;
+  return has_object(material, kPbr) ? &material[kPbr] : nullptr;
 }
+
+// Whether a JSON value is an object with `key`.
+bool has_key(const Json& value, const char* key) { return value.is_object() && value.contains(key); }
 
 // What a texture or extension says its picture is ("source"), when it says it with an index.
 std::optional<int> source_of(const Json& holder) {
-  if (!holder.is_object() || !holder.contains(kSource)) return std::nullopt;
+  if (!has_key(holder, kSource)) return std::nullopt;
   return index_from(holder[kSource]);
 }
 
@@ -65,9 +67,7 @@ std::optional<int> webp_source(const Json& texture) {
 
 bool is_webp(const Json& doc, int image) {
   const Json* entry = entry_at(doc, kImages, image);
-  if (entry == nullptr) return false;
-  const auto mime = entry->find(kMimeType);
-  return mime != entry->end() && *mime == kWebpMime;
+  return entry != nullptr && text_at(*entry, kMimeType) == kWebpMime;
 }
 
 Json texture_for(const Json& doc, int image) {
@@ -100,6 +100,9 @@ ImageField field_of(Slot slot) {
   return &MaterialDesc::emissive_image;
 }
 
+// The holder of a material's slot has the slot.
+bool holds_slot(const Json* holder, const char* key) { return holder != nullptr && has_object(*holder, key); }
+
 }  // namespace
 
 int image_in(const MaterialDesc& material, Slot slot) { return material.*field_of(slot); }
@@ -124,7 +127,7 @@ int image_of_texture(const Json& doc, int texture) {
 int slot_image(const Json& doc, const Json& material, Slot slot) {
   const SlotPlace place = place_of(slot);
   const Json* holder = holder_of(material, place);
-  if (holder == nullptr || !has_object(*holder, place.key)) return kNoIndex;
+  if (!holds_slot(holder, place.key)) return kNoIndex;
   const auto texture = (*holder)[place.key].find(kIndex);
   if (texture == (*holder)[place.key].end()) return kNoIndex;
   return image_of_texture(doc, index_from(*texture).value_or(kNoIndex));

@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "editor/document/glb_compact.hpp"
+#include "editor/document/gltf_json.hpp"
 #include "editor/document/material_textures.hpp"
 
 namespace redgem {
@@ -19,7 +20,7 @@ namespace {
 void hold_images_of(const std::vector<MaterialDesc>& materials, std::vector<bool>& held) {
   for (const MaterialDesc& material : materials) {
     for (const int image : material_textures::images_of(material)) {
-      if (image >= 0 && image < static_cast<int>(held.size())) held[static_cast<std::size_t>(image)] = true;
+      if (gltf_json::in_range(image, held.size())) held[static_cast<std::size_t>(image)] = true;
     }
   }
 }
