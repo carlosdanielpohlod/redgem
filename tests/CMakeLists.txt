@@ -179,6 +179,11 @@ target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # A program that crashes on purpose, for the tests of crash reports (tests/tools/crash_helper.cpp).
 add_executable(redgem_crash_helper tools/crash_helper.cpp)
 target_link_libraries(redgem_crash_helper PRIVATE redgem_runtime)
+if(REDGEM_SANITIZERS)
+  # Its invalid access is meant to reach the engine's crash handler as a signal: UBSan would stop
+  # the program at the null pointer first.
+  target_compile_options(redgem_crash_helper PRIVATE -fno-sanitize=undefined)
+endif()
 # The tests of builds copy the real player, and look for it where a build does: beside redgem.
 add_dependencies(redgem_tests redgem_player redgem redgem_crash_helper)
 target_compile_definitions(redgem_tests PRIVATE

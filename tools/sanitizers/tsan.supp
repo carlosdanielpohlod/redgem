@@ -2,10 +2,6 @@
 # run_tests.sh). One line per finding, with why. A finding in the engine's own code is fixed; the
 # only ones listed here are known and waiting for their fix, each saying so.
 
-# Mbed TLS counts its elliptic curve multiplications in a global (mul_count) for its self-test,
-# from every thread doing TLS at once, with no lock; nothing reads it outside the self-test.
-race:mbedtls_mpi_mul_mod
-
 # KNOWN, TO FIX in src/physics (left to the work going on there): World::attach_vehicle holds a
 # body's write lock while it adds a step listener (Jolt's listener mutex), and PhysicsSystem::Update
 # takes them the other way round. Physics runs on one thread, so they never meet today; two

@@ -33,9 +33,10 @@ int main() { return 0; }" REDGEM_POSITION_INDEPENDENT_BY_DEFAULT)
   endif()
 endif()
 
-# Sanitizers, for whole builds (the libraries too, so that what they do on the engine's threads
-# is seen): a comma-separated list for -fsanitize, such as "address,undefined" or "thread". The
-# continuous integration runs the tests in such builds (see tools/sanitizers/).
+# Sanitizers, for whole builds (the libraries CMake builds too, so that what they do on the
+# engine's threads is seen; mruby, which rake builds, is not instrumented): a comma-separated list
+# for -fsanitize, such as "address,undefined" or "thread". The continuous integration runs the
+# tests in such builds (see tools/sanitizers/).
 set(REDGEM_SANITIZERS "" CACHE STRING "Sanitizers to build everything with (-fsanitize=<list>), or empty")
 if(REDGEM_SANITIZERS)
   # (Frames kept, for whole backtraces. What UBSan finds stays recoverable, so that its suppression

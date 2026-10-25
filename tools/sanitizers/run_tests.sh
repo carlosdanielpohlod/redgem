@@ -12,8 +12,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SUPPRESSIONS="${REPO_ROOT}/tools/sanitizers"
-BUILD_DIR="${1:?usage: run_tests.sh <build_dir> <address|thread>}"
-KIND="${2:?usage: run_tests.sh <build_dir> <address|thread>}"
+BUILD_DIR="${1:?usage: run_tests.sh <build_dir> <address|thread|coverage>}"
+KIND="${2:?usage: run_tests.sh <build_dir> <address|thread|coverage>}"
 # The ctest tests run as well: the Ruby tests, the command lines of the relay and the server, and
 # the checks of what the programs carry.
 CTEST_TESTS='^(ruby|relay|server|app|layering|tools)\.'
@@ -29,8 +29,10 @@ case "${KIND}" in
   thread)
     export TSAN_OPTIONS="${COMMON}:second_deadlock_stack=1:suppressions=${SUPPRESSIONS}/tsan.supp"
     ;;
+  # (No sanitizer: the same tests in a build that measures coverage.)
+  coverage) ;;
   *)
-    echo "unknown sanitizer ${KIND} (address, thread)" >&2
+    echo "unknown sanitizer ${KIND} (address, thread, coverage)" >&2
     exit 2
     ;;
 esac

@@ -115,16 +115,9 @@ jobs:
           path: .ccache
           key: ccache-${{ matrix.kind }}-${{ github.run_id }}
 
-      - name: Tests with sanitizers
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.kind != 'coverage' }}
+      - name: Tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: tools/sanitizers/run_tests.sh build ${{ matrix.kind }}
-
-      - name: Tests, measuring coverage
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.kind == 'coverage' }}
-        run: |
-          ./build/tests/redgem_tests
-          ./build/tests/redgem_testing_tests
-          ctest --test-dir build --output-on-failure -j 4 -R '^(ruby|relay|server)\.'
 
       # (Of the engine's own code only: src/, not the libraries or the tests.)
       - name: Coverage report
