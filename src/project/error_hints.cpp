@@ -1,6 +1,8 @@
 #include "project/error_hints.hpp"
 
 #include <algorithm>
+#include <cctype>
+#include <fstream>
 #include <regex>
 #include <vector>
 
@@ -8,6 +10,7 @@
 #include "core/translations.hpp"
 #include "project/api_reference.hpp"
 #include "project/closest_words.hpp"
+#include "project/game_checks.hpp"
 #include "project/scene_command.hpp"
 #include "script/script_naming.hpp"
 
@@ -18,10 +21,13 @@ namespace fs = std::filesystem;
 
 constexpr std::size_t kMostSuggestions = 3;
 // What mruby and the engine say, and what of it a hint needs (the first group, then the second).
-// (mruby says "for class X" or "for module X" of a call on the class itself, "for X" of one on an
-// instance: the third group.)
-const char* const kUnknownMethod = R"(undefined method '([^']+)' for (?:module |class )?([A-Z][A-Za-z0-9_:]*))";
-const char* const kClassReceiver = R"(' for (module|class) )";
+// Of a call on an instance mruby names the class ("for Transform"); of one on a class or a module
+// itself, only that it is one ("for Module", "for Class"): the place's line of code says which.
+const char* const kUnknownMethod = R"(undefined method '([^']+)' for ([A-Z][A-Za-z0-9_:]*))";
+const char* const kPlace = R"(^([^ :]+\.rb):([0-9]+):)";
+const char* const kClassName = R"(([A-Z][A-Za-z0-9_]*(?:::[A-Z][A-Za-z0-9_]*)*)\.)";
+const char* const kModuleReceiver = "Module";
+const char* const kClassReceiver = "Class";
 const char* const kUnknownConstant = R"(uninitialized constant ([A-Z][A-Za-z0-9_]*(?:::[A-Z][A-Za-z0-9_]*)*))";
 const char* const kUnknownScene = R"(no scene named ([^ ]+))";
 const char* const kUnreadableScript = R"(loading scripts/([^ :]+\.rb): cannot read)";
@@ -40,38 +46,86 @@ std::vector<std::string> method_names(const ApiClass& owner, bool on_class) {
   return names;
 }
 
-// The game's scripts, as their file names ("coin.rb").
-std::vector<std::string> script_files(const fs::path& game_dir) {
-  std::vector<std::string> files;
-  std::error_code error;
-  for (fs::recursive_directory_iterator entry(game_dir / config::kScriptsDirName, error), end; !error && entry != end;
-       entry.increment(error)) {
-    if (entry->path().extension() == config::kRubyFileExtension) files.push_back(entry->path().filename().string());
-  }
-  std::sort(files.begin(), files.end());
-  return files;
+// The game's scripts, as paths in its scripts folder ("enemies/slime.rb").
+std::vector<std::string> scripts_of(const fs::path& game_dir) {
+  return script_files(game_dir / config::kScriptsDirName);
 }
 
 // The classes the game's scripts are named for, and the engine's.
 std::vector<std::string> class_names(const fs::path& game_dir) {
   std::vector<std::string> names;
-  for (const std::string& file : script_files(game_dir)) names.push_back(class_name_for_script(file));
+  for (const std::string& file : scripts_of(game_dir)) names.push_back(class_name_for_script(file));
   for (const ApiClass& owner : api_reference().classes) names.push_back(owner.name);
   return names;
 }
 
-bool called_on_class(const std::string& message) {
-  static const std::regex receiver(kClassReceiver);
-  return std::regex_search(message, receiver);
+bool is_class_receiver(const std::string& receiver) {
+  return receiver == kModuleReceiver || receiver == kClassReceiver;
 }
 
-std::string method_hint(const Groups& groups, const fs::path&) {
+// The names near `method` of the methods of `owner` called on it or on its instances.
+std::string methods_hint(const ApiClass& owner, const std::string& method, bool on_class) {
+  const std::vector<std::string> near = closest_words(method, method_names(owner, on_class), kMostSuggestions);
+  if (near.empty()) return tr("project.hint.see_class", {{"class", owner.name}});
+  return tr("project.hint.method", {{"names", joined(near)}, {"class", owner.name}});
+}
+
+// Line `number` of a file; empty when there is none.
+std::string line_of(const fs::path& file, std::size_t number) {
+  std::ifstream in(file);
+  std::string line;
+  std::size_t read = 0;
+  while (read < number && std::getline(in, line)) ++read;
+  return read == number ? line : std::string();
+}
+
+// The text of a regular expression that finds `text` as it is.
+std::string escaped(const std::string& text) {
+  std::string out;
+  for (const char letter : text) {
+    if (std::isalnum(static_cast<unsigned char>(letter)) == 0) out += '\\';
+    out += letter;
+  }
+  return out;
+}
+
+// The class a failed call was made on, read from the line of code the message points at
+// ("Input.presed?(:space)" -> "Input"); empty when the line does not say.
+std::string receiver_in_code(const std::string& message, const std::string& method, const fs::path& game_dir) {
+  static const std::regex place(kPlace);
+  Groups found;
+  if (!std::regex_search(message, found, place)) return {};
+  const std::string code = line_of(game_dir / found[kFirst].str(), std::stoul(found[kSecond].str()));
+  Groups call;
+  if (!std::regex_search(code, call, std::regex(kClassName + escaped(method)))) return {};
+  return call[kFirst];
+}
+
+// The calls on classes near `method`, whatever the class: "Input.pressed?".
+std::string any_class_hint(const std::string& method) {
+  std::vector<std::string> near;
+  for (const ApiClass& owner : api_reference().classes) {
+    for (const std::string& name : closest_words(method, method_names(owner, true), kMostSuggestions)) {
+      near.push_back(owner.name + "." + name);
+    }
+  }
+  if (near.size() > kMostSuggestions) near.resize(kMostSuggestions);
+  return near.empty() ? std::string() : tr("project.hint.did_you_mean", {{"names", joined(near)}});
+}
+
+// A method called on a class or a module itself: that class's, when the code says which.
+std::string class_call_hint(const Groups& groups, const fs::path& game_dir) {
+  const std::string method = groups[kFirst];
+  const ApiClass* owner =
+      find_api_class(api_reference(), receiver_in_code(groups.prefix().str() + groups.str(), method, game_dir));
+  return owner != nullptr ? methods_hint(*owner, method, true) : any_class_hint(method);
+}
+
+std::string method_hint(const Groups& groups, const fs::path& game_dir) {
+  if (is_class_receiver(groups[kSecond])) return class_call_hint(groups, game_dir);
   const ApiClass* owner = find_api_class(api_reference(), groups[kSecond]);
   if (owner == nullptr) return {};
-  const std::vector<std::string> names = method_names(*owner, called_on_class(groups.str()));
-  const std::vector<std::string> near = closest_words(groups[kFirst], names, kMostSuggestions);
-  if (near.empty()) return tr("project.hint.see_class", {{"class", owner->name}});
-  return tr("project.hint.method", {{"names", joined(near)}, {"class", owner->name}});
+  return methods_hint(*owner, groups[kFirst], false);
 }
 
 // A class inside another that is not there: the engine's classes near it, or where they are listed.
@@ -103,7 +157,7 @@ std::string scene_hint(const Groups& groups, const fs::path& game_dir) {
 }
 
 std::string script_hint(const Groups& groups, const fs::path& game_dir) {
-  const std::vector<std::string> files = script_files(game_dir);
+  const std::vector<std::string> files = scripts_of(game_dir);
   const std::vector<std::string> near = closest_words(groups[kFirst], files, kMostSuggestions);
   if (!near.empty()) return tr("project.hint.did_you_mean", {{"names", joined(near)}});
   return tr("project.hint.scripts", {{"scripts", joined(files)}});

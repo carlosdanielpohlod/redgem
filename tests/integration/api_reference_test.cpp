@@ -38,26 +38,38 @@ constexpr std::size_t kMostGuideLines = 120;
 constexpr std::size_t kApiCalls = 25;
 constexpr const char* kInternalPrefix = "__";  // the engine's own plumbing, never a game's
 
-// Every public method of every top-level class and module, and of the nested ones the reference
-// lists (the others are the engine's plumbing), as "Class.method" (called on the class) or
-// "Class#method" (on an instance). `NESTED` is the names of those nested ones.
-constexpr const char* kListMethods = R"ruby(
-  owners = Object.constants.map(&:to_s) + NESTED
-  owners.sort.map do |name|
-    owner = name.split("::").inject(Object) { |space, part| space.const_get(part) }
-    next [] unless owner.is_a?(Module)
-    owner.singleton_methods.map { |m| "#{name}.#{m}" } + owner.public_instance_methods(false).map { |m| "#{name}##{m}" }
-  end.flatten.join("\n")
-)ruby";
+// What Ruby says of every class and module reachable from the top, nested ones included, each
+// under its path: "Class.method" for a method of its own called on it, "Class#method" for one of
+// its own called on its instances. And whether one of them has a method of its own or of a class
+// it comes from (Object and what is above it aside: those are Ruby's).
+constexpr const char* kReflection = R"ruby(
+  def __api_walk(space, name, seen, out)
+    return if seen[space.object_id]
+    seen[space.object_id] = true
+    out << [name, space] unless name.empty?
+    names = begin; space.constants; rescue NotImplementedError; []; end
+    names.sort.each do |constant|
+      value = space.const_get(constant)
+      __api_walk(value, name.empty? ? constant.to_s : "#{name}::#{constant}", seen, out) if value.is_a?(Module)
+    end
+  end
 
-// The nested classes the reference lists, as Ruby: NESTED = ["Animation::Graph", ...].
-std::string nested_classes() {
-  std::string list;
-  for (const ApiClass& owner : api_reference().classes) {
-    if (owner.name.find("::") != std::string::npos) list += (list.empty() ? "\"" : ", \"") + owner.name + "\"";
-  }
-  return "NESTED = [" + list + "]\n";
-}
+  def __api_methods
+    owners = []
+    __api_walk(Object, "", {}, owners)
+    owners.map do |name, owner|
+      owner.singleton_methods(false).map { |m| "#{name}.#{m}" } +
+        owner.public_instance_methods(false).map { |m| "#{name}##{m}" }
+    end.flatten.join("\n")
+  end
+
+  def __api_has?(path, method, on_class)
+    owner = path.split("::").inject(Object) { |space, part| space.const_get(part) }
+    chain = owner.is_a?(Class) ? owner.ancestors.take_while { |above| above != Object } : [owner]
+    return chain.any? { |each| each.public_instance_methods(false).include?(method) } unless on_class
+    (method == :new && owner.is_a?(Class)) || chain.any? { |each| each.singleton_methods(false).include?(method) }
+  end
+)ruby";
 
 std::string ruby_text(RubyVm& vm, const std::string& code) {
   const RubyResult result = vm.eval(code, "api_reference_test.rb");
@@ -111,7 +123,14 @@ Named split(const std::string& entry) {
   return {entry.substr(0, at), entry.substr(at + 1), entry[at] == '.'};
 }
 
+// Whether a class is one the engine keeps for itself (its timers, its network's plumbing).
+bool is_internal_class(const ApiReference& reference, const std::string& name) {
+  const std::vector<std::string>& internal = reference.internal_classes;
+  return std::find(internal.begin(), internal.end(), name) != internal.end();
+}
+
 bool is_listed(const ApiReference& reference, const Named& named) {
+  if (is_internal_class(reference, named.owner)) return true;
   const ApiClass* owner = find_api_class(reference, named.owner);
   if (owner == nullptr) return false;
   for (const ApiMethod& method : owner->methods) {
@@ -122,23 +141,21 @@ bool is_listed(const ApiReference& reference, const Named& named) {
 
 // Whether the engine has that method (and that class, by a path such as "Animation::Graph").
 bool exists(RubyVm& vm, const std::string& owner, const std::string& method, bool on_class) {
-  const std::string klass = "\"" + owner + "\".split(\"::\").inject(Object) { |space, part| space.const_get(part) }";
-  const std::string name = ":\"" + method + "\"";
-  const std::string question =
-      on_class ? ".respond_to?(" + name + ")" : ".public_instance_methods.include?(" + name + ")";
-  return ruby_text(vm, "(" + klass + ")" + question + ".to_s") == "true";
+  const std::string call = "__api_has?(\"" + owner + "\", :\"" + method + "\", " + (on_class ? "true" : "false") + ")";
+  return ruby_text(vm, call + ".to_s") == "true";
 }
 
 }  // namespace
 
 TEST_CASE("every public method the engine adds to Ruby is in the API reference") {
-  RubyVm bare;                     // mruby with the engine's gems, and nothing of the engine
-  ruby_text(bare, "NESTED = []");  // (none of them is mruby's own)
-  const std::set<std::string> plain = lines_of(ruby_text(bare, kListMethods));
+  RubyVm bare;  // mruby with the engine's gems, and nothing of the engine
+  ruby_text(bare, kReflection);
+  const std::set<std::string> plain = lines_of(ruby_text(bare, "__api_methods"));
   const auto game = engine();
+  RubyVm& vm = game->scripts().vm();
+  ruby_text(vm, kReflection);
   std::vector<std::string> missing;
-  ruby_text(game->scripts().vm(), nested_classes());
-  for (const std::string& entry : lines_of(ruby_text(game->scripts().vm(), kListMethods))) {
+  for (const std::string& entry : lines_of(ruby_text(vm, "__api_methods"))) {
     const Named named = split(entry);
     const bool engine_own = plain.count(entry) == 0 && named.method.rfind(kInternalPrefix, 0) != 0;
     if (engine_own && !is_listed(api_reference(), named)) missing.push_back(entry);
@@ -149,6 +166,7 @@ TEST_CASE("every public method the engine adds to Ruby is in the API reference")
 TEST_CASE("everything the API reference lists is in the engine") {
   const auto game = engine();
   RubyVm& vm = game->scripts().vm();
+  ruby_text(vm, kReflection);
   std::vector<std::string> gone;
   for (const ApiClass& owner : api_reference().classes) {
     for (const ApiMethod& method : owner.methods) {

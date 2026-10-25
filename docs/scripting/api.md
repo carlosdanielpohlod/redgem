@@ -195,6 +195,18 @@ Keyboard, mouse, gamepad and touch, read every frame. See [gameplay.md](gameplay
 - `Input.released?(key)`: whether a key went up this frame
 - `Input.action?(name)`: whether a named action (game settings) is held
 - `Input.action_pressed?(name)`: whether a named action started this frame
+- `Input.action_released?(name, pad: 0)`: whether a named action ended this frame
+- `Input.define_action(name, *bindings, keys: [], buttons: [])`: adds an action of the game's own (besides game.json's input section)
+- `Input.define_axis(name, negative: [], positive: [], pad_axis: nil, invert: false)`: adds an axis of the game's own: define_axis(:steer, negative: ["key:a"], positive: ["key:d"])
+- `Input.actions`: the names of the actions
+- `Input.axes`: the names of the axes
+- `Input.bindings(name, pad: 0)`: what a player bound to an action: ["key:space", "pad:a"]
+- `Input.bind(name, binding = nil, key: nil, button: nil, side: nil, pad: 0)`: binds a key or a button to an action; kept between runs
+- `Input.unbind(name, binding = nil, key: nil, button: nil, side: nil, pad: 0)`: takes a binding off an action
+- `Input.reset_bindings(name = nil, pad: nil)`: back to the game's own bindings (of one action, or all; of one pad, or all)
+- `Input.capture_next(cancel: ["key:escape", "pad:b", "pad:back"], &block)`: the next key or button pressed, to the block: |binding, pad| (nil: called off)
+- `Input.capturing?`: whether a capture waits for a key
+- `Input.cancel_capture`: calls a capture off
 - `Input.mouse_x`: the pointer's x, in pixels
 - `Input.mouse_y`: the pointer's y, in pixels
 - `Input.mouse_dx`: how far the mouse moved this frame, across
@@ -205,6 +217,7 @@ Keyboard, mouse, gamepad and touch, read every frame. See [gameplay.md](gameplay
 - `Input.mouse_released?(button)`: whether a mouse button went up this frame
 - `Input.mouse_locked = locked`: hides the pointer and keeps it in the window (first-person cameras)
 - `Input.mouse_locked?`: whether the pointer is locked
+- `Input.pads`: the numbers of the gamepads plugged in
 - `Input.gamepad?`: whether a gamepad is connected
 - `Input.gamepad_axis(axis)`: :left_x, :left_y, :right_x, :right_y, :left_trigger, :right_trigger
 - `Input.gamepad_down?(button)`: whether a gamepad button (:a, :b, :x, :y...) is held
@@ -213,6 +226,8 @@ Keyboard, mouse, gamepad and touch, read every frame. See [gameplay.md](gameplay
 - `Input.text`: what was typed this frame
 - `Input.touch_controls = on`: shows the on-screen stick and buttons of a phone
 - `Input.touch_controls?`: whether they are shown
+
+Every action, axis, binding and gamepad call takes `pad:` (0 to 3: the player; 0 when left out). Actions and axes come from `game.json`'s `input` section and `define_action`/`define_axis`; a player's bindings are kept between runs, beside the game's save. See [Controls](gameplay.md#controls).
 
 ## Time
 

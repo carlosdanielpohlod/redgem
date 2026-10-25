@@ -14,9 +14,7 @@ namespace {
 // Where the guide is in the repository, as it was built in, and what in it the calls replace.
 constexpr const char* kGuideFile = "assets/assistant/AGENTS.md";
 constexpr const char* kCallsMark = "{{most_used_calls}}";
-constexpr const char* kGuideName = "AGENTS.md";
-// The file one assistant reads instead, pointing at the other (its @ brings the guide in).
-constexpr const char* kPointerName = "CLAUDE.md";
+// What the file one assistant reads instead says: it points at the other (its @ brings it in).
 constexpr const char* kPointer = "See @AGENTS.md: the guide to this game, for every coding assistant.\n";
 
 std::string built_in_guide() {
@@ -49,8 +47,8 @@ std::string assistant_guide() {
 }
 
 bool write_assistant_guide(const std::filesystem::path& game_dir, std::string& error) {
-  return write_text_file(game_dir / kGuideName, assistant_guide(), error) &&
-         write_text_file(game_dir / kPointerName, kPointer, error);
+  return write_text_file(game_dir / kGuideFileName, assistant_guide(), error) &&
+         write_text_file(game_dir / kPointerFileName, kPointer, error);
 }
 
 }  // namespace redgem::tools

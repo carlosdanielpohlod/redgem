@@ -26,8 +26,8 @@ bool has(const std::string& text, const std::string& part) { return text.find(pa
 TEST_CASE("a method mistyped on one of the engine's classes is answered with the names near it") {
   CHECK(hint_for("undefined method 'positon=' for Transform (NoMethodError)", kPlatformer) ==
         "did you mean: position=, position (redgem api Transform)");
-  CHECK(hint_for("undefined method 'presed?' for module Input (NoMethodError)", kPlatformer) ==
-        "did you mean: pressed? (redgem api Input)");
+  CHECK(hint_for("undefined method 'zer' for Class (NoMethodError)", kPlatformer).find("Vector3.zero") !=
+        std::string::npos);
   CHECK(hint_for("undefined method 'zzzzzzzz' for Transform (NoMethodError)", kPlatformer) ==
         "redgem api Transform lists its methods");
   // (The game's own classes are the game's: the reference knows nothing of their methods.)
@@ -64,5 +64,33 @@ TEST_CASE("redgem run says the hint after the error") {
   CHECK(has(ran->out,
             "scripts/goal.rb:3: Goal#start on 'Goal' (behaviour disabled): undefined method 'positon=' for "
             "Transform (NoMethodError) -> did you mean: position=, position (redgem api Transform)"));
+  fs::remove_all(game);
+}
+
+TEST_CASE("a method mistyped on one of the engine's modules is answered from the line that called it") {
+  const fs::path game = fs::temp_directory_path() / "redgem_error_hints_module";
+  fs::remove_all(game);
+  fs::copy(kPlatformer, game, fs::copy_options::recursive);
+  std::string error;
+  REQUIRE(write_text_file(game / "scripts/goal.rb",
+                          "class Goal < Behaviour\n  def start\n    Input.presed?(:space)\n  end\nend\n", error));
+  const auto ran = run_tool_command({"run", game.string(), "--frames", "5"});
+  REQUIRE(ran.has_value());
+  CHECK(has(ran->out,
+            "undefined method 'presed?' for Module (NoMethodError) -> did you mean: pressed? (redgem api Input)"));
+  fs::remove_all(game);
+  // Without a line to read, the calls of every class near it.
+  CHECK(has(hint_for("undefined method 'presed?' for Module (NoMethodError)", kPlatformer), "Input.pressed?"));
+}
+
+TEST_CASE("a script looked for in a folder of scripts is answered with the paths there") {
+  const fs::path game = fs::temp_directory_path() / "redgem_error_hints_folders";
+  fs::remove_all(game);
+  fs::copy(kPlatformer, game, fs::copy_options::recursive);
+  std::string error;
+  fs::create_directories(game / "scripts/enemies");
+  REQUIRE(write_text_file(game / "scripts/enemies/slime.rb", "class Slime < Behaviour\nend\n", error));
+  CHECK(hint_for("loading scripts/enemies/slim.rb: cannot read scripts/enemies/slim.rb", game) ==
+        "did you mean: enemies/slime.rb");
   fs::remove_all(game);
 }

@@ -571,6 +571,23 @@ TEST_CASE("a built game holds the game's own files: nothing hidden, no backups, 
   std::filesystem::remove_all(dir);
 }
 
+TEST_CASE("a new game's guide for whoever makes it stays out of its builds") {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-build-guide-test";
+  std::filesystem::remove_all(dir);
+  std::string error;
+  REQUIRE_MESSAGE(create_game(dir / "game", "empty", error), error);
+  REQUIRE(std::filesystem::exists(dir / "game" / "AGENTS.md"));
+  // (A file of that name deeper in is the game's own, and ships.)
+  std::ofstream(dir / "game" / "scripts" / "AGENTS.md") << "the game's own text";
+  const std::vector<std::filesystem::path> shipped = shipped_files(dir / "game");
+  for (const char* left_behind : {"AGENTS.md", "CLAUDE.md"}) {
+    CHECK(std::find(shipped.begin(), shipped.end(), left_behind) == shipped.end());
+  }
+  CHECK(std::find(shipped.begin(), shipped.end(), std::filesystem::path("scripts") / "AGENTS.md") != shipped.end());
+  CHECK(std::find(shipped.begin(), shipped.end(), "scene.glb") != shipped.end());
+  std::filesystem::remove_all(dir);
+}
+
 TEST_CASE("a built game carries the licenses of what it contains") {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem-build-notices-test";
   std::filesystem::remove_all(dir);

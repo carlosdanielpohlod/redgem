@@ -33,6 +33,9 @@ struct ApiClass {
 };
 
 struct ApiReference {
+  // Classes the engine keeps for itself (public in Ruby, not for games), by path: listed so the
+  // tests know they are not forgotten, and shown nowhere.
+  std::vector<std::string> internal_classes;
   std::string about;
   std::string description;  // the manual page's, one line
   std::string notes;

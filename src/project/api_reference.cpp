@@ -25,6 +25,7 @@ constexpr const char* kName = "name";
 constexpr const char* kGuide = "guide";
 constexpr const char* kMethods = "methods";
 constexpr const char* kInternal = "internal";
+constexpr const char* kInternalClasses = "internal_classes";
 constexpr const char* kArgs = "args";
 constexpr const char* kStatic = "static";
 constexpr const char* kTop = "top";
@@ -171,6 +172,7 @@ ApiReference read_api_reference(const std::string& json_text) {
   ApiReference reference;
   reference.about = text_of(json, kAbout);
   reference.description = text_of(json, kDescription);
+  reference.internal_classes = json.value(kInternalClasses, std::vector<std::string>());
   reference.notes = text_of(json, kNotes);
   for (const nlohmann::json& owner : json.at(kClasses)) reference.classes.push_back(class_from(owner));
   return reference;

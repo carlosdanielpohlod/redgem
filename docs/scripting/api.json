@@ -2,6 +2,15 @@
   "description": "Every class and method of the scripting API, a line each (also: redgem api).",
   "about": "The scripting API of RedGem games: the classes and methods scripts use. Generated from docs/scripting/api.json, which tests keep in step with the engine.",
   "notes": "Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp` last), at most 8192 pixels a side; animated WebP and KTX2/Basis are not read. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.",
+  "internal_classes": [
+    "Behaviour::Timer",
+    "Behaviour::Tween",
+    "GameMenu::SettingsScreen",
+    "Network::Resends",
+    "Network::Said",
+    "NetworkSync::Snapshots",
+    "NetworkSync::Snapshots::Pose"
+  ],
   "classes": [
     {
       "name": "Behaviour",
@@ -654,6 +663,74 @@
           "about": "whether a named action started this frame"
         },
         {
+          "name": "action_released?",
+          "static": true,
+          "args": "name, pad: 0",
+          "about": "whether a named action ended this frame"
+        },
+        {
+          "name": "define_action",
+          "static": true,
+          "args": "name, *bindings, keys: [], buttons: []",
+          "about": "adds an action of the game's own (besides game.json's input section)"
+        },
+        {
+          "name": "define_axis",
+          "static": true,
+          "args": "name, negative: [], positive: [], pad_axis: nil, invert: false",
+          "about": "adds an axis of the game's own: define_axis(:steer, negative: [\"key:a\"], positive: [\"key:d\"])"
+        },
+        {
+          "name": "actions",
+          "static": true,
+          "about": "the names of the actions"
+        },
+        {
+          "name": "axes",
+          "static": true,
+          "about": "the names of the axes"
+        },
+        {
+          "name": "bindings",
+          "static": true,
+          "args": "name, pad: 0",
+          "about": "what a player bound to an action: [\"key:space\", \"pad:a\"]"
+        },
+        {
+          "name": "bind",
+          "static": true,
+          "args": "name, binding = nil, key: nil, button: nil, side: nil, pad: 0",
+          "about": "binds a key or a button to an action; kept between runs"
+        },
+        {
+          "name": "unbind",
+          "static": true,
+          "args": "name, binding = nil, key: nil, button: nil, side: nil, pad: 0",
+          "about": "takes a binding off an action"
+        },
+        {
+          "name": "reset_bindings",
+          "static": true,
+          "args": "name = nil, pad: nil",
+          "about": "back to the game's own bindings (of one action, or all; of one pad, or all)"
+        },
+        {
+          "name": "capture_next",
+          "static": true,
+          "args": "cancel: [\"key:escape\", \"pad:b\", \"pad:back\"], &block",
+          "about": "the next key or button pressed, to the block: |binding, pad| (nil: called off)"
+        },
+        {
+          "name": "capturing?",
+          "static": true,
+          "about": "whether a capture waits for a key"
+        },
+        {
+          "name": "cancel_capture",
+          "static": true,
+          "about": "calls a capture off"
+        },
+        {
           "name": "mouse_x",
           "static": true,
           "about": "the pointer's x, in pixels"
@@ -708,6 +785,11 @@
           "about": "whether the pointer is locked"
         },
         {
+          "name": "pads",
+          "static": true,
+          "about": "the numbers of the gamepads plugged in"
+        },
+        {
           "name": "gamepad?",
           "static": true,
           "about": "whether a gamepad is connected"
@@ -753,7 +835,8 @@
           "about": "whether they are shown"
         }
       ],
-      "guide": "gameplay.md"
+      "guide": "gameplay.md",
+      "notes": "Every action, axis, binding and gamepad call takes `pad:` (0 to 3: the player; 0 when left out). Actions and axes come from `game.json`'s `input` section and `define_action`/`define_axis`; a player's bindings are kept between runs, beside the game's save. See [Controls](gameplay.md#controls)."
     },
     {
       "name": "Time",
