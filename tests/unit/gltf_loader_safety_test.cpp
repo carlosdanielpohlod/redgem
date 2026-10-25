@@ -41,6 +41,7 @@ constexpr std::size_t kRepeatedRoots = 1000;
 constexpr std::size_t kRoomyFloats = 10;
 constexpr std::size_t kOddOffset = 2;
 constexpr std::size_t kOddStride = 14;
+constexpr std::size_t kOddByte = 1;  // where no 16-bit index may start
 constexpr const char* kPictureBytes = "not really a picture, but the bytes of a file";
 
 // A folder of the test's own, removed when the test ends.
@@ -263,7 +264,21 @@ TEST_CASE("data whose components do not lie at multiples of their size fails the
   stride.doc["bufferViews"][0]["byteStride"] = kOddStride;
   stride.doc["bufferViews"][0]["byteLength"] = kOddStride * kTriangleCorners;
   stride.bin.resize(kOddStride * kTriangleCorners + stride.bin.size());
-  CHECK_FALSE(load_gltf_scene(written(scratch, stride)).ok);
+  const LoadResult strided = load_gltf_scene(written(scratch, stride));
+  CHECK_FALSE(strided.ok);
+  CHECK(strided.error.find("not aligned") != std::string::npos);
+
+  // The list of a sparse accessor's replaced elements is read by the library's own checks.
+  Gltf sparse = triangle();
+  const int replaced = sparse.add_view(std::vector<std::uint16_t>{0, 0});
+  const int values = sparse.add_view(std::vector<float>(kFloatsPerPosition, 0.0f));
+  sparse.doc["accessors"][0]["sparse"] = {
+      {"count", 1},
+      {"indices", {{"bufferView", replaced}, {"byteOffset", kOddByte}, {"componentType", kUnsignedShortComponent}}},
+      {"values", {{"bufferView", values}}}};
+  const LoadResult sparsed = load_gltf_scene(written(scratch, sparse));
+  CHECK_FALSE(sparsed.ok);
+  CHECK(sparsed.error.find("not aligned") != std::string::npos);
 }
 
 TEST_CASE("a skin with fewer inverse bind matrices than joints uses none of them, instead of reading past them") {

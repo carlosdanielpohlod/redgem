@@ -25,6 +25,15 @@ export ASAN_OPTIONS="detect_leaks=1:halt_on_error=1"
 export UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1:suppressions=${REPO_ROOT}/tools/sanitizers/ubsan.supp"
 export LSAN_OPTIONS="suppressions=${REPO_ROOT}/tools/sanitizers/lsan.supp"
 
+# What the runs found, cut down to the fewest inputs that reach the same code: kept between runs,
+# the corpus would otherwise only grow.
+minimize() {
+  local target="$1" corpus="${WORK_DIR}/corpus/$1" smaller="${WORK_DIR}/corpus/$1.smaller"
+  rm -rf "${smaller}" && mkdir -p "${smaller}"
+  "${BUILD_DIR}/tests/fuzz/redgem_fuzz_${target}" -merge=1 -timeout="${INPUT_TIMEOUT}" -rss_limit_mb="${MEMORY_LIMIT_MB}" \
+    "${smaller}" "${corpus}" >/dev/null 2>&1 && rm -rf "${corpus}" && mv "${smaller}" "${corpus}"
+}
+
 mkdir -p "${WORK_DIR}/findings"
 failed=()
 for target in "${TARGETS[@]}"; do
@@ -34,6 +43,7 @@ for target in "${TARGETS[@]}"; do
     -rss_limit_mb="${MEMORY_LIMIT_MB}" -max_len="${MAX_INPUT_BYTES}" -print_final_stats=1 \
     -artifact_prefix="${WORK_DIR}/findings/${target}-" \
     "${WORK_DIR}/corpus/${target}" "${REPO_ROOT}/tests/fuzz/corpus/${target}" || failed+=("${target}")
+  minimize "${target}"
 done
 
 if [[ ${#failed[@]} -gt 0 ]]; then

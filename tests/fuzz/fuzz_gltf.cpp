@@ -4,6 +4,7 @@
 #include <fstream>
 #include <random>
 #include <string>
+#include <system_error>
 
 #include "fuzz/fuzz_target.hpp"
 #include "scene/gltf/gltf_loader.hpp"
@@ -12,13 +13,29 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// The loader reads a file: each input is written to the same one, in a folder of this run's own.
+// The loader reads a file: each input is written to the same one, in a folder of this run's own,
+// removed when the run ends.
+class SceneFolder {
+ public:
+  SceneFolder() : folder_(fs::temp_directory_path() / ("redgem_fuzz_gltf_" + std::to_string(std::random_device()()))) {
+    fs::create_directories(folder_);
+  }
+  ~SceneFolder() {
+    std::error_code ignored;
+    fs::remove_all(folder_, ignored);
+  }
+  SceneFolder(const SceneFolder&) = delete;
+  SceneFolder& operator=(const SceneFolder&) = delete;
+
+  fs::path file() const { return folder_ / "scene.glb"; }
+
+ private:
+  fs::path folder_;
+};
+
 const fs::path& scene_file() {
-  static const fs::path file = [] {
-    const fs::path folder = fs::temp_directory_path() / ("redgem_fuzz_gltf_" + std::to_string(std::random_device()()));
-    fs::create_directories(folder);
-    return folder / "scene.glb";
-  }();
+  static const SceneFolder folder;
+  static const fs::path file = folder.file();
   return file;
 }
 

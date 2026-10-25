@@ -113,7 +113,7 @@ first. A sanitized build is made and tested the same way as CI does:
 
 ```bash
 cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREDGEM_SANITIZERS=address,undefined
-cmake --build build-asan --target redgem_tests redgem_testing_tests redgem_test_tool redgem_relay redgem_server
+cmake --build build-asan
 tools/sanitizers/run_tests.sh build-asan address     # thread: -DREDGEM_SANITIZERS=thread
 ```
 
