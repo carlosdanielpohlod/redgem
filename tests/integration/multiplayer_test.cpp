@@ -1,4 +1,6 @@
+#include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <doctest/doctest.h>
 
 #include <algorithm>
@@ -253,7 +255,16 @@ TEST_CASE("a guest that goes on at a game's pace while the host stands still is 
   const auto heard_the_stall = [&] { return std::stoi(ruby(*host, "$got")) >= kStallFrames * kMessagesPerFrame; };
   int dbg_drain = 0;
   std::fprintf(stderr, "DBG stall over\n");
-  for (int i = 0; i < kMaxRounds && !heard_the_stall(); ++i) frame(true), ++dbg_drain;
+  const auto dbg_t0 = std::chrono::steady_clock::now();
+  const auto dbg_ms = [&] { return (int)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - dbg_t0).count(); };
+  int dbg_last_got = -1;
+  for (int i = 0; i < kMaxRounds && !heard_the_stall(); ++i) {
+    frame(true), ++dbg_drain;
+    const int got_now = std::stoi(ruby(*host, "$got"));
+    if (got_now != dbg_last_got) { std::fprintf(stderr, "DBG frame %d ms %d got %d\n", i, dbg_ms(), got_now); dbg_last_got = got_now; }
+    if (i == 100 || i == 400) { std::fprintf(stderr, "DBG ss at frame %d ms %d\n", i, dbg_ms()); std::fflush(stderr); (void)std::system("ss -tinm 'dst 127.0.0.1' 1>&2"); }
+  }
+  std::fprintf(stderr, "DBG drain ms %d\n", dbg_ms());
   std::fprintf(stderr, "DBG drain frames %d online %d got %s\n", dbg_drain, (int)(guest->network().state() == net::NetworkSession::State::Online), ruby(*host, "$got").c_str());
   for (int i = 0; i < kAfterFrames; ++i) frame(true);
   CHECK(heard_the_stall());
