@@ -53,7 +53,7 @@ class PoseSender {
   struct Sent {
     Vec3 position;
     std::uint32_t rotation = 0;
-    int sends = 1;                          // since the last whole pose, that one included
+    int sends = 1;                            // since the last whole pose, that one included
     std::optional<std::uint32_t> revision{};  // of the animation last told
   };
 
