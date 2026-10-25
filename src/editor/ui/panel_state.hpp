@@ -2,6 +2,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "core/log.hpp"
 #include "editor/edit_stream.hpp"
@@ -12,7 +13,9 @@
 namespace redgem::ui {
 
 struct HierarchyState {
-  std::string filter;  // the search field
+  std::string filter;           // the search field
+  std::vector<int> rows;        // the objects of the rows listed last frame, top to bottom (for Shift-click)
+  std::vector<int> rows_drawn;  // the same, as this frame lists them
 };
 
 // What a text field of the Inspector is doing.

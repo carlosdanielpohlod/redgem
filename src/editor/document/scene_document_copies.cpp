@@ -20,8 +20,18 @@ bool all_copied(const std::vector<int>& joints, const std::vector<int>& copy_of)
 
 }  // namespace
 
-int SceneDocument::duplicate(int index) {
+int SceneDocument::duplicate(int index) { return duplicate(std::vector<int>{index}).front(); }
+
+std::vector<int> SceneDocument::duplicate(const std::vector<int>& roots) {
   checkpoint();
+  std::vector<int> copies;
+  // (Copies go after every node there is: the numbers of the roots still to copy stay as they are.)
+  for (const int root : roots) copies.push_back(copy_subtree(root));
+  touch();
+  return copies;
+}
+
+int SceneDocument::copy_subtree(int index) {
   const std::vector<int> source = node_tree::subtree(desc_.nodes, index);
   const int first_copy = node_count();
   std::vector<int> copy_of(desc_.nodes.size(), kNoIndex);
@@ -31,7 +41,6 @@ int SceneDocument::duplicate(int index) {
   // its own skeleton (its animation is not copied: the copy keeps the pose it was copied in).
   give_copies_own_source_nodes(first_copy, source.size());
   give_copies_own_skins(first_copy, source.size(), copy_of);
-  touch();
   return first_copy;
 }
 

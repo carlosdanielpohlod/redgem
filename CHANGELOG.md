@@ -8,6 +8,17 @@ until 1.0, a release may change what games rely on (see
 
 ## [Unreleased]
 
+### Added
+
+- **Several objects at once in the editor**: Ctrl+click and Shift+click in the Hierarchy, Ctrl or
+  Shift + click and rectangle selection in the Scene view. The gizmo moves, turns and scales the
+  whole selection around its middle or its first object; the Inspector edits what they have in
+  common (a dash where they differ); Duplicate and Delete act on all of it, each one undo step.
+- **Cut, copy and paste** of objects with everything under them, their scripts, properties,
+  meshes, materials and pictures: in the same scene, into another scene, or into another editor
+  window through the system's clipboard. Paste puts them next to the selection, Paste as Child
+  under it.
+
 ## [0.4.0] - 2026-10-25
 
 ### Added

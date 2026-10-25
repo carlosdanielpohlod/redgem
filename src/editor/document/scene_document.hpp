@@ -58,8 +58,24 @@ class SceneDocument {
   // Copies the node and its children next to it. Returns the index of the copy. A skinned
   // character copied together with its bones gets its own skeleton, in the pose it had.
   int duplicate(int index);
+  // The same for several nodes at once, one undo step for all. Returns the copies, in the order
+  // of `roots` (none of which may be under another one: see top_level_of in editor/selection.hpp).
+  std::vector<int> duplicate(const std::vector<int>& roots);
   // Removes the node and its children. Indices of later nodes shift down.
   void remove(int index);
+  // The same for several nodes at once, one undo step for all.
+  void remove(const std::vector<int>& roots);
+
+  // The nodes `roots` with everything under them, as a .glb of their own: what is copied to the
+  // clipboard. It holds their meshes, materials, skeletons and animations, and their pictures
+  // (the ones that are files next to the scene carried inside, so it can be pasted anywhere).
+  // The roots (none under another one) are its top-level nodes, placed where they are in the
+  // world. nullopt, with why in `error`, when it cannot be made.
+  std::optional<std::vector<std::uint8_t>> copy_nodes(const std::vector<int>& roots, std::string& error) const;
+  // Adds the nodes of such a .glb (from this scene or another one) under `parent` (kNoIndex = top
+  // level), where they were in the world, with names no other node has. One undo step. Returns
+  // the pasted top-level nodes; none, with why in `error`, when the bytes are not a scene.
+  std::vector<int> paste_nodes(const std::vector<std::uint8_t>& glb, int parent, std::string& error);
 
   // Creating objects. Each returns the new node index and records one undo step.
   int add_empty(const std::string& name, int parent = kNoIndex);
@@ -188,6 +204,25 @@ class SceneDocument {
   // Writes floats over the ones an accessor points at. False when they are not stored the way
   // the editor writes them (packed, and as many).
   bool store_stream(std::size_t accessor_index, const std::vector<float>& values);
+  // A copy of the scene as it is now, without its history: what copy_nodes cuts down.
+  SceneDocument without_history() const;
+  // Keeps only the nodes `roots` and everything under them, the roots at the top level where they
+  // are in the world.
+  void keep_only(const std::vector<int>& roots);
+  // Copies `index` and everything under it next to it; returns the copy.
+  int copy_subtree(int index);
+  // The glTF JSON and binary chunk brought up to date with the edits, as they are written.
+  bool sync_for_writing(std::string& error);
+  std::optional<std::vector<std::uint8_t>> clipboard_glb(const std::vector<int>& roots, std::string& error) const;
+  std::vector<int> paste_file(const std::filesystem::path& path, int parent, std::string& error);
+  // The pasted nodes: a model's description added without an object of its own around it, its
+  // lights and cameras kept, its top-level nodes under `parent` where they were in the world.
+  std::vector<int> append_pasted(const SceneDesc& clip, const model_import::JsonOffsets& json_offsets, int parent);
+  void keep_lights_and_cameras(const SceneDesc& clip, int first);
+  // The pasted top-level nodes (from `first` on), each placed under `parent` where it was in the world.
+  std::vector<int> place_pasted_roots(int first, int parent);
+  // Adds a model's entries to the file (see import_model); returns where they start.
+  model_import::JsonOffsets merge_file(const GlbFile& source, const std::filesystem::path& path);
   // open, import_model and save_as themselves. Those three catch what these throw when a file
   // holds something else than glTF says it should, and report it like any other error.
   static std::variant<SceneDocument, std::string> open_file(const std::filesystem::path& path);

@@ -24,7 +24,18 @@ const char* icon_of(const NodeDesc& node) {
   return node.children.empty() ? ICON_FA_CIRCLE_DOT : ICON_FA_LAYER_GROUP;
 }
 
-// What can be done to the object itself.
+// What the clipboard can do with the object (and the rest of the selection).
+void draw_clipboard_actions(int index, HierarchyResult& result) {
+  if (ImGui::MenuItem(cut_label(), tr(kKeysCut))) result.clipboard = ClipboardCommand::Cut;
+  if (ImGui::MenuItem(copy_label(), tr(kKeysCopy))) result.clipboard = ClipboardCommand::Copy;
+  if (ImGui::MenuItem(paste_label(), tr(kKeysPaste))) result.clipboard = ClipboardCommand::Paste;
+  if (ImGui::MenuItem(paste_into_label(), tr(kKeysPasteInto))) {
+    result.clipboard = ClipboardCommand::PasteInto;
+    result.paste_parent = index;
+  }
+}
+
+// What can be done to the object itself (and the rest of the selection).
 void draw_node_actions(bool has_parent, int index, Pending& pending) {
   if (ImGui::MenuItem(duplicate_label(), tr(kKeysDuplicate))) pending = {Pending::Kind::Duplicate, index, kNoIndex, {}};
   if (ImGui::MenuItem(delete_label(), tr(kKeysDelete))) pending = {Pending::Kind::Delete, index, kNoIndex, {}};
@@ -34,9 +45,11 @@ void draw_node_actions(bool has_parent, int index, Pending& pending) {
   }
 }
 
-void node_context_menu(PanelContext& context, int index, Pending& pending) {
+void node_context_menu(PanelContext& context, int index, HierarchyResult& result, Pending& pending) {
   if (!ImGui::BeginPopupContextItem(kNodeMenu)) return;
   ImGui::BeginDisabled(!context.session.editing());
+  draw_clipboard_actions(index, result);
+  ImGui::Separator();
   draw_node_actions(context.session.document().node(index).parent != kNoIndex, index, pending);
   ImGui::Separator();
   menu(icon_label(ICON_FA_PLUS, "editor.hierarchy.create"), [&context] { draw_create_menu(context); });
@@ -59,15 +72,24 @@ void draw_label(const RowLabel& label) {
   ImGui::TextColored(accent_color(), ICON_FA_GEM);
 }
 
-bool row_clicked() {
-  return ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right);
-}
-
 bool row_double_clicked() { return ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left); }
 
+// A left click selects the row's object as the keys held say (see click_mode).
+void click_row(PanelContext& context, int index) {
+  const ImGuiIO& io = ImGui::GetIO();
+  context.session.click_select(index, click_mode(io.KeyCtrl, io.KeyShift), context.state.hierarchy.rows);
+}
+
+// A right click keeps a selection the row is part of (its menu acts on all of it); otherwise it
+// selects the row's object alone.
+void right_click_row(EditorSession& session, int index) {
+  if (!session.selected().contains(index)) session.select(index);
+}
+
 // A click on the row just drawn selects its object; a double click asks to frame it.
-void use_row_clicks(EditorSession& session, int index, HierarchyResult& result) {
-  if (row_clicked()) session.select(index);
+void use_row_clicks(PanelContext& context, int index, HierarchyResult& result) {
+  if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) click_row(context, index);
+  if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) right_click_row(context.session, index);
   if (row_double_clicked()) result.frame_requested = true;
 }
 
@@ -106,13 +128,14 @@ void accept_drops(int target, Pending& pending) {
 bool draw_row(PanelContext& context, int index, int flags, HierarchyResult& result, Pending& pending) {
   EditorSession& session = context.session;
   const RowLabel label = label_of(session.document().node(index));
-  if (session.selection() == index) flags |= ImGuiTreeNodeFlags_Selected;
+  if (session.selected().contains(index)) flags |= ImGuiTreeNodeFlags_Selected;
   flags |= ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanFullWidth;
   const bool open = ImGui::TreeNodeEx(kNodeId, flags);
-  use_row_clicks(session, index, result);
+  context.state.hierarchy.rows_drawn.push_back(index);
+  use_row_clicks(context, index, result);
   offer_row_drag(session, index, label);
   accept_drops(index, pending);
-  node_context_menu(context, index, pending);
+  node_context_menu(context, index, result, pending);
   draw_label(label);
   return open;
 }

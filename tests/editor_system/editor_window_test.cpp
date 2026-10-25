@@ -24,6 +24,7 @@
 #include "editor/editor_app.hpp"
 #include "project/project_hub.hpp"
 #include "editor/editor_config.hpp"
+#include "editor/object_clipboard.hpp"
 #include "editor/scripts/script_files.hpp"
 #include "editor/ui/panels.hpp"
 #include "scene/gltf/gltf_loader.hpp"
@@ -640,5 +641,63 @@ TEST_CASE("a second scene is made, edited, saved, reopened and played in the edi
   CHECK(session.scene_name() == kThirdScene);
 
   CHECK(app.console().error_count() == kExpectedErrors);
+  std::filesystem::remove_all(game);
+}
+
+TEST_CASE("objects are selected by clicks and a rectangle, duplicated, and copied into another scene") {
+  constexpr const char* kSecondScene = "level_two";
+  const std::filesystem::path game = copy_game();
+  auto created = EditorApp::create(game, even_pace());
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  EditorSession& session = app.session();
+  run(app, kWarmupFrames);
+  const int main_nodes = session.document().node_count();
+
+  // A rectangle over the whole Scene view selects the objects that show in it.
+  session.select_by_name("Coin1");
+  app.frame_selection();
+  run(app, kFrameFrames);
+  app.select_in_box({0.0f, 0.0f, app.viewport_width(), app.viewport_height()}, BoxMode::Replace);
+  CHECK(session.selected().several());
+  CHECK(session.selected().contains(session.scene().find("Coin1")));
+  run(app, kFrameFrames);
+  take_picture(app, screenshot("editor_box_selected"));
+
+  // Ctrl-click: the coin, then a crate is added to it. Both are duplicated in one undo step.
+  app.pick_at(app.viewport_width() * kViewportCenter, app.viewport_height() * kViewportCenter);
+  REQUIRE(session.selected().size() == 1);
+  session.click_select(session.scene().find("Crate1"), ClickMode::Toggle);
+  REQUIRE(session.selected().size() == 2);
+  session.duplicate_selection();
+  CHECK(session.scene().find("Coin1.001") != kNoObject);
+  CHECK(session.scene().find("Crate1.001") != kNoObject);
+  CHECK(session.document().node_count() == main_nodes + 2);
+  run(app, kFrameFrames);
+  take_picture(app, screenshot("editor_group_duplicated"));
+  session.undo();
+  CHECK(session.document().node_count() == main_nodes);
+
+  // Copy: the objects go on the system's clipboard as text. Pasted into a new scene, they stay.
+  session.select_all({session.scene().find("Coin1"), session.scene().find("Crate1")});
+  app.copy_selection();
+  const char* clipboard = ImGui::GetClipboardText();  // what the window's clipboard holds
+  REQUIRE(clipboard != nullptr);
+  CHECK(object_clipboard::from_text(clipboard));
+  REQUIRE(app.new_scene(kSecondScene));
+  const int second_nodes = session.document().node_count();
+  app.paste();
+  CHECK(session.document().node_count() == second_nodes + 2);
+  CHECK(session.selected().size() == 2);
+  CHECK(session.scene().find("Coin1") != kNoObject);
+  run(app, kFrameFrames);
+  take_picture(app, screenshot("editor_pasted_into_scene"));
+  app.save();
+  const LoadResult saved = load_gltf_scene((game / config::kScenesDirName / "level_two.glb").string());
+  REQUIRE(saved.ok);
+  CHECK(saved.scene.find_node("Crate1") != kNoIndex);
+  CHECK(saved.scene.find_node("Coin1") != kNoIndex);
+
+  CHECK(app.console().error_count() == 0);
   std::filesystem::remove_all(game);
 }

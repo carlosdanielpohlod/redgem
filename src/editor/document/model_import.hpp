@@ -74,6 +74,10 @@ void merge_model(nlohmann::json& scene, const nlohmann::json& model, const JsonO
 // Cuts those lists back to what the scene held before merge_model (an import that failed half way).
 void drop_model(nlohmann::json& scene, const JsonOffsets& offsets);
 
+// Where a model's entries start in the scene description: the same places as in the glTF JSON
+// (the loader keeps glTF order for these), and after the `skins` the description has.
+DescOffsets description_offsets(const JsonOffsets& json_offsets, std::size_t skins);
+
 // The same entries of the scene description.
 MaterialDesc imported_material(const MaterialDesc& original, const DescOffsets& offsets);
 MeshDesc imported_mesh(MeshDesc mesh, const DescOffsets& offsets);

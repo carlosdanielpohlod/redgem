@@ -40,10 +40,16 @@ struct PanelContext {
   TerrainTool* terrain = nullptr;
 };
 
-// Tree of scene objects with search. Click selects, double click asks to frame it, drag to
-// reparent, right click for actions; scripts and models can be dropped on it.
+// What an object's menu in the Hierarchy asks of the clipboard, which the editor holds.
+enum class ClipboardCommand { None, Cut, Copy, Paste, PasteInto };
+
+// Tree of scene objects with search. Click selects (Ctrl adds or takes away, Shift selects a run
+// of rows), double click asks to frame it, drag to reparent, right click for actions; scripts and
+// models can be dropped on it.
 struct HierarchyResult {
   bool frame_requested = false;
+  ClipboardCommand clipboard = ClipboardCommand::None;
+  ObjectId paste_parent = kNoObject;  // under which object PasteInto pastes (kNoObject = top level)
 };
 HierarchyResult draw_hierarchy(PanelContext& context);
 

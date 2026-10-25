@@ -129,6 +129,7 @@ bool EditorApp::redo_offered() const { return editing() && session_->document().
 
 void EditorApp::draw_selection_items() {
   const bool has_selection = session_->selection() != kNoObject;
+  draw_clipboard_items();
   if (ImGui::MenuItem(ui::duplicate_label(), tr(kKeysDuplicate), false, selection_editable())) {
     session_->duplicate_selection();
   }
@@ -137,6 +138,16 @@ void EditorApp::draw_selection_items() {
   if (ImGui::MenuItem(ui::icon_label(ICON_FA_EXPAND, "editor.menu.frame_selection"), tr(kKeysFrame), false,
                       has_selection))
     frame_selection();
+}
+
+void EditorApp::draw_clipboard_items() {
+  if (ImGui::MenuItem(ui::cut_label(), tr(kKeysCut), false, selection_editable())) cut_selection();
+  if (ImGui::MenuItem(ui::copy_label(), tr(kKeysCopy), false, selection_editable())) copy_selection();
+  if (ImGui::MenuItem(ui::paste_label(), tr(kKeysPaste), false, editing())) paste();
+  if (ImGui::MenuItem(ui::paste_into_label(), tr(kKeysPasteInto), false, selection_editable())) {
+    paste_into(session_->selection());
+  }
+  ImGui::Separator();
 }
 
 bool EditorApp::selection_editable() const { return editing() && session_->selection() != kNoObject; }

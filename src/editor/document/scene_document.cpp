@@ -169,11 +169,16 @@ bool SceneDocument::save_as(const std::filesystem::path& path, std::string& erro
   }
 }
 
-bool SceneDocument::save_file(const std::filesystem::path& path, std::string& error) {
+bool SceneDocument::sync_for_writing(std::string& error) {
   if (!sync_glb(error)) return false;
   for (const int mesh : unsaved_meshes_) {
     if (!store_mesh_vertices(mesh, error)) return false;
   }
+  return true;
+}
+
+bool SceneDocument::save_file(const std::filesystem::path& path, std::string& error) {
+  if (!sync_for_writing(error)) return false;
   // What nothing uses any more (a deleted object's mesh, an import that was undone) stays out of
   // the file. It stays in the document: undo and redo can bring back what used it.
   const std::optional<GlbFile> lean = without_unused(glb_);

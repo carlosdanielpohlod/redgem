@@ -16,6 +16,9 @@ namespace {
 
 using namespace gltf_json;
 
+// An imported node just added is one of the model's top-level nodes, and those go under an object.
+bool under_root(const NodeDesc& node, int root) { return root != kNoIndex && node.parent == root; }
+
 int count_of(const nlohmann::json& json, const char* key) {
   return json.contains(key) ? static_cast<int>(json[key].size()) : 0;
 }
@@ -27,18 +30,6 @@ std::optional<GlbFile> read_importable_glb(const std::filesystem::path& path, st
   if (!model_import::has_several_buffers(source->json)) return source;
   error = "models with several buffers are not supported (export a single .glb from Blender)";
   return std::nullopt;
-}
-
-// Where a model's entries start in the scene description: the same places as in the glTF JSON
-// (the loader keeps glTF order for these), and after the skins the description has.
-model_import::DescOffsets description_offsets(const model_import::JsonOffsets& json_offsets, std::size_t skins) {
-  model_import::DescOffsets offsets;
-  offsets.images = json_offsets.images;
-  offsets.materials = json_offsets.materials;
-  offsets.meshes = json_offsets.meshes;
-  offsets.source_nodes = json_offsets.nodes;
-  offsets.skins = static_cast<int>(skins);
-  return offsets;
 }
 
 }  // namespace
@@ -82,8 +73,7 @@ model_import::JsonOffsets SceneDocument::import_offsets() const {
   return offsets;
 }
 
-int SceneDocument::append_model(const SceneDesc& scene, const GlbFile& source, const std::filesystem::path& path,
-                                int parent) {
+model_import::JsonOffsets SceneDocument::merge_file(const GlbFile& source, const std::filesystem::path& path) {
   model_import::JsonOffsets offsets = import_offsets();
   const std::size_t bin_size = glb_.bin.size();
   const std::size_t animations = source_animations_.size();
@@ -95,6 +85,12 @@ int SceneDocument::append_model(const SceneDesc& scene, const GlbFile& source, c
     forget_model(offsets, bin_size, animations);
     throw;
   }
+  return offsets;
+}
+
+int SceneDocument::append_model(const SceneDesc& scene, const GlbFile& source, const std::filesystem::path& path,
+                                int parent) {
+  const model_import::JsonOffsets offsets = merge_file(source, path);
   checkpoint();
   return append_model_description(scene, offsets, path.stem().string(), parent);
 }
@@ -119,7 +115,7 @@ void SceneDocument::forget_model(const model_import::JsonOffsets& offsets, std::
 
 int SceneDocument::append_model_description(const SceneDesc& model, const model_import::JsonOffsets& json_offsets,
                                             const std::string& name, int parent) {
-  model_import::DescOffsets offsets = description_offsets(json_offsets, desc_.skins.size());
+  model_import::DescOffsets offsets = model_import::description_offsets(json_offsets, desc_.skins.size());
   append_model_assets(model, offsets);
   offsets.root = append_node(node_tree::named_node(name, parent));
   offsets.nodes = node_count();
@@ -141,7 +137,7 @@ void SceneDocument::append_model_nodes(const SceneDesc& model, const model_impor
     NodeDesc node = model_import::imported_node(imported, offsets);
     node.name = unique_name(node.name);
     desc_.nodes.push_back(std::move(node));
-    if (desc_.nodes.back().parent == offsets.root) desc_.nodes[offsets.root].children.push_back(node_count() - 1);
+    if (under_root(desc_.nodes.back(), offsets.root)) desc_.nodes[offsets.root].children.push_back(node_count() - 1);
   }
   // The imported skeletons and animations point at the imported nodes (now further on in the list).
   const std::size_t first_animation = desc_.animations.size();

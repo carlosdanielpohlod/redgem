@@ -451,6 +451,7 @@ if(NOT ANDROID)
 
   redgem_add_library(redgem_editor
     editor/document/glb_file.cpp
+    editor/document/glb_images.cpp
     editor/document/glb_usage.cpp
     editor/document/glb_compact.cpp
     editor/document/gltf_json.cpp
@@ -460,6 +461,10 @@ if(NOT ANDROID)
     editor/document/model_merge.cpp
     editor/document/model_import_desc.cpp
     editor/node_tree.cpp
+    editor/selection.cpp
+    editor/group_transform.cpp
+    editor/box_select.cpp
+    editor/object_clipboard.cpp
     editor/document/scene_document.cpp
     editor/document/scene_document_history.cpp
     editor/document/scene_document_memory.cpp
@@ -467,6 +472,7 @@ if(NOT ANDROID)
     editor/document/scene_document_terrain.cpp
     editor/document/scene_document_edits.cpp
     editor/document/scene_document_copies.cpp
+    editor/document/scene_document_clipboard.cpp
     editor/document/scene_document_create.cpp
     editor/document/scene_document_skeletons.cpp
     editor/document/scene_document_import.cpp
@@ -490,6 +496,7 @@ if(NOT ANDROID)
     editor/editor_layout.cpp
     editor/editor_dialogs.cpp
     editor/editor_viewport.cpp
+    editor/editor_selection.cpp
     editor/editor_scene_view.cpp
     editor/editor_scenes.cpp
     editor/scripts/script_files.cpp
@@ -505,6 +512,7 @@ if(NOT ANDROID)
     editor/ui/inspector_panel.cpp
     editor/ui/inspector_widgets.cpp
     editor/ui/inspector_object.cpp
+    editor/ui/inspector_group.cpp
     editor/ui/inspector_material.cpp
     editor/ui/inspector_light_camera.cpp
     editor/ui/inspector_terrain.cpp

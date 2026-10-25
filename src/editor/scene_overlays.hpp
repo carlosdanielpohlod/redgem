@@ -6,6 +6,7 @@
 #include <raylib.h>
 
 #include <optional>
+#include <vector>
 
 #include "scene/scene_config.hpp"
 #include "scene/scene.hpp"
@@ -25,8 +26,8 @@ struct BrushMark {
   float radius = 0.0f;
 };
 
-// Draws the overlays (inside a 3D mode) for the scene as it is, around `selected`.
-void draw_scene_overlays(const Scene& scene, const SceneDesc& desc, ObjectId selected,
+// Draws the overlays (inside a 3D mode) for the scene as it is, around each of `selected`.
+void draw_scene_overlays(const Scene& scene, const SceneDesc& desc, const std::vector<ObjectId>& selected,
                          const std::optional<BrushMark>& brush);
 
 }  // namespace redgem

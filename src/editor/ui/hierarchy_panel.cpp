@@ -43,13 +43,18 @@ void draw_tree(PanelContext& context, int index, HierarchyResult& result, Pendin
 // What each kind of pending edit does, in Pending::Kind's order.
 void apply_nothing(PanelContext& /*context*/, const Pending& /*pending*/) {}
 
+// The object whose menu was used, with the rest of the selection when it is part of it.
+void select_target(EditorSession& session, int target) {
+  if (!session.selected().contains(target)) session.select(target);
+}
+
 void apply_duplicate(PanelContext& context, const Pending& pending) {
-  context.session.select(pending.target);
+  select_target(context.session, pending.target);
   context.session.duplicate_selection();
 }
 
 void apply_delete(PanelContext& context, const Pending& pending) {
-  context.session.select(pending.target);
+  select_target(context.session, pending.target);
   context.session.delete_selection();
 }
 
@@ -116,13 +121,15 @@ void draw_objects(PanelContext& context, HierarchyResult& result, Pending& pendi
 }
 
 // The empty space below the tree: drop here to move objects to the top level, click to deselect.
-void draw_empty_space(PanelContext& context, Pending& pending) {
+void draw_empty_space(PanelContext& context, HierarchyResult& result, Pending& pending) {
   const ImVec2 free = ImGui::GetContentRegionAvail();
   const ImVec2 size(std::max(free.x, kRootDropMinWidth), std::max(free.y, kRootDropMinHeight));
   if (ImGui::InvisibleButton(kEmptySpaceId, size)) context.session.select(kNoObject);
   accept_drops(kNoIndex, pending);
   if (!ImGui::BeginPopupContextItem(kEmptySpaceMenu)) return;
   ImGui::BeginDisabled(!context.session.editing());
+  if (ImGui::MenuItem(paste_label())) result.clipboard = ClipboardCommand::PasteInto;  // at the top level
+  ImGui::Separator();
   draw_create_menu(context);
   ImGui::EndDisabled();
   ImGui::EndPopup();
@@ -137,8 +144,10 @@ HierarchyResult draw_hierarchy(PanelContext& context) {
   draw_search_bar(context);
   ImGui::Separator();
   ImGui::BeginChild(kTreeId);
+  context.state.hierarchy.rows_drawn.clear();
   draw_objects(context, result, pending);
-  draw_empty_space(context, pending);
+  context.state.hierarchy.rows.swap(context.state.hierarchy.rows_drawn);
+  draw_empty_space(context, result, pending);
   ImGui::EndChild();
   ImGui::End();
   apply(context, pending);

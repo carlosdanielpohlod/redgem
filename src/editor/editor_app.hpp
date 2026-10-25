@@ -9,11 +9,13 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <cstdint>
 #include <string>
 #include <variant>
 #include <vector>
 
 #include "audio/audio.hpp"
+#include "editor/box_select.hpp"
 #include "editor/console_log.hpp"
 #include "editor/editor_camera.hpp"
 #include "editor/editor_options.hpp"
@@ -21,6 +23,7 @@
 #include "editor/file_drop.hpp"
 #include "editor/gated_input_source.hpp"
 #include "editor/gizmo.hpp"
+#include "editor/group_transform.hpp"
 #include "editor/project_files.hpp"
 #include "editor/scripts/script_workspace.hpp"
 #include "editor/ui/panels.hpp"
@@ -128,6 +131,20 @@ class EditorApp {
   void rescan_files();
   // Selects what is under a point of the viewport (in viewport pixels, origin top-left).
   ObjectId pick_at(float x, float y);
+  // The same, with what the keys held do to a click (see view_click_mode): the object alone,
+  // or added to or taken from the selection.
+  ObjectId pick_at(float x, float y, ClickMode mode);
+  // Selects the objects whose middle shows inside a rectangle of the viewport (viewport pixels),
+  // in place of the selection or added to it.
+  void select_in_box(const editor_logic::Rect& rect, BoxMode mode);
+  // The clipboard: the selected objects with everything under them, as text on the system's
+  // clipboard (so they paste in another editor window too) or, when too big for it, in this
+  // editor's. Paste puts them next to the selected object, or at the top level; paste_into under
+  // `parent`.
+  void copy_selection();
+  void cut_selection();
+  void paste();
+  void paste_into(ObjectId parent);
   float viewport_width() const;
   float viewport_height() const;
 
@@ -184,6 +201,7 @@ class EditorApp {
   bool undo_offered() const;
   bool redo_offered() const;
   void draw_selection_items();
+  void draw_clipboard_items();
   bool selection_editable() const;
   void draw_view_menu();
   void draw_game_object_menu();
@@ -207,6 +225,8 @@ class EditorApp {
   void draw_panels();
   void draw_side_panels(ui::PanelContext& context);
   void draw_hierarchy_panel(ui::PanelContext& context);
+  // What an object's menu in the Hierarchy asked of the clipboard.
+  void run_clipboard_command(ui::ClipboardCommand command, ObjectId paste_parent);
   void draw_script_tabs();
   void draw_viewport_window();
   void draw_viewport_image();
@@ -225,6 +245,22 @@ class EditorApp {
   void draw_gizmo();
   // Something is selected, and the view has a size to draw it in.
   bool gizmo_drawable() const;
+  // Where the gizmo of the selection is (see group_transform::pivot_of).
+  Transform selection_pivot() const;
+  std::vector<Transform> worlds_of(const std::vector<int>& objects) const;
+  // Clicks and rectangles in the Scene view that select.
+  void use_selection_clicks();
+  void finish_selection_click(box_select::ViewPoint from, box_select::ViewPoint to);
+  void draw_selection_rect(box_select::ViewPoint from, box_select::ViewPoint to) const;
+  // What a rectangle can select: objects drawn with a mesh, lights and cameras, where their
+  // middle shows on the view.
+  std::vector<box_select::Candidate> box_candidates() const;
+  box_select::ViewCamera view_camera() const;
+  // The object under a point of the viewport, or kNoObject.
+  ObjectId object_at(float x, float y) const;
+  // Copied objects as the system's clipboard holds them, or else as this editor's does.
+  std::optional<std::vector<std::uint8_t>> clipboard_objects() const;
+  void keep_copied(const std::vector<std::uint8_t>& copied);
   // One undo step per drag, dropped when the drag ends where it started.
   void track_gizmo_drag(bool using_gizmo);
   bool drag_begins(bool using_gizmo) const { return using_gizmo && !gizmo_dragging_; }
@@ -232,7 +268,7 @@ class EditorApp {
   // A drag that ended without the gizmo being drawn (the selection was cleared, play started).
   void end_abandoned_gizmo_drag();
   bool gizmo_drag_abandoned() const { return gizmo_dragging_ && !gizmo_drawn_; }
-  void apply_gizmo_drag(const Transform& world);
+  void apply_gizmo_drag(const Transform& pivot);
   void update_title();
   void draw_dialogs();
   void draw_unsaved_dialog();
@@ -290,8 +326,11 @@ class EditorApp {
   long long frame_count_ = 0;
   bool layout_built_ = false;
   bool gizmo_dragging_ = false;
-  std::optional<PendingAction> pending_;  // what waits for Save / Discard / Cancel about unsaved work
-  bool quit_confirmed_ = false;           // the user chose Save or Discard
+  group_transform::Drag group_drag_;                // the gizmo drag in progress, from where it began
+  std::optional<box_select::ViewPoint> box_start_;  // where the left button went down in the view, while held
+  std::vector<std::uint8_t> clipboard_;             // copied objects too big for the system's clipboard
+  std::optional<PendingAction> pending_;            // what waits for Save / Discard / Cancel about unsaved work
+  bool quit_confirmed_ = false;                     // the user chose Save or Discard
   bool gizmo_drawn_ = false;
   std::string title_;
   SceneNameDialog scene_name_dialog_ = SceneNameDialog::None;

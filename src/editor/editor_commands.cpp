@@ -97,14 +97,6 @@ void EditorApp::frame_selection() {
   camera_.frame(center, radius);
 }
 
-ObjectId EditorApp::pick_at(float x, float y) {
-  const Ray ray = viewport_->ray_at(x, y);
-  const PickRay pick{to_vec3(ray.position), normalize(to_vec3(ray.direction))};
-  const ObjectId hit = pick_object(session_->scene(), session_->scene_desc(), pick);
-  session_->select(hit);
-  return hit;
-}
-
 std::optional<Vec3> EditorApp::sculpt_at(float x, float y, float seconds) {
   const ObjectId terrain = session_->selection();
   const Ray ray = viewport_->ray_at(x, y);

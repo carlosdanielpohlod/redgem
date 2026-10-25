@@ -86,9 +86,11 @@ std::string SceneDocument::unique_name(const std::string& base) const {
   }
 }
 
-void SceneDocument::remove(int index) {
+void SceneDocument::remove(int index) { remove(std::vector<int>{index}); }
+
+void SceneDocument::remove(const std::vector<int>& roots) {
   checkpoint();
-  const std::vector<int> kept = order_without(node_count(), subtree(desc_.nodes, index));
+  const std::vector<int> kept = order_without(node_count(), subtrees(desc_.nodes, roots));
   desc_.nodes = nodes_in_order(desc_.nodes, kept);
   refresh_node_references();
   touch();
