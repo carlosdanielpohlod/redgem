@@ -97,6 +97,25 @@ Every pull request runs these workflows (`.github/workflows/`), side by side:
 * **Android** (`android.yml`): the player built for arm64-v8a and x86_64 by
   `tools/android/build_runtime.sh`, with the NDK `tools/android/fetch_toolchain.sh` pins (kept
   between runs). Nothing runs on Android there: it catches code that only breaks that build.
+* **Sanitizers** (`sanitizers.yml`): the tests that open no window (unit and integration, the
+  testing library, Ruby, the command lines of the relay and the server) in a build with
+  AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer and in one with ThreadSanitizer,
+  stopping at the first finding; and a build with coverage, whose report of `src/` is the run's
+  `coverage` artifact. The system tests are not run there: drawn by a software renderer, they
+  would take hours with sanitizers on.
+
+Every workflow builds with `-DREDGEM_WARNINGS_AS_ERRORS=ON`: a compiler warning in `src/` or
+`tests/` fails it (the dependencies keep theirs). Build the same way before pushing to see them
+first. A sanitized build is made and tested the same way as CI does:
+
+```bash
+cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREDGEM_SANITIZERS=address,undefined
+cmake --build build-asan --target redgem_tests redgem_testing_tests redgem_test_tool redgem_relay redgem_server
+tools/sanitizers/run_tests.sh build-asan address     # thread: -DREDGEM_SANITIZERS=thread
+```
+
+A finding in the engine's code is fixed. One inside a library the engine is built from goes into
+the suppression file of its sanitizer (`tools/sanitizers/*.supp`), with a line saying why.
 
 Every archive `cmake/Dependencies.cmake` fetches is pinned by its SHA-256, as is the Android NDK
 (`tools/android/fetch_toolchain.sh`); a dependency fetched from git is pinned by its tag or commit. `THIRD_PARTY_LICENSES.md` is generated: after adding or

@@ -36,6 +36,13 @@ until 1.0, a release may change what games rely on (see
   a force, be disabled or removed, and goes with its objects.
 - **Android in the continuous integration**: every pull request builds the Android player for
   arm64-v8a and x86_64 with the pinned NDK, so an Android-only compile break fails it.
+- **Sanitizers in the continuous integration**: the unit, integration, Ruby and command line
+  tests run in a build with AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer and in
+  one with ThreadSanitizer (`REDGEM_SANITIZERS`, `tools/sanitizers/`), and a third build reports
+  the coverage of `src/` as an artifact.
+- **Warnings as errors**: every workflow builds with `REDGEM_WARNINGS_AS_ERRORS=ON`, so a compiler
+  warning in the engine's own code or tests fails it. The dependencies' headers are included as
+  system headers.
 - **License notices check**: `tools/licenses/collect_notices.py --check` (run by ctest as
   `tools.license_notices_are_up_to_date`) fails when `THIRD_PARTY_LICENSES.md` is not what the
   fetched dependencies make.
