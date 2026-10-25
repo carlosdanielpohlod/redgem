@@ -16,6 +16,12 @@ bool names_node(const nlohmann::json& channel) { return channel.contains(kTarget
 
 }  // namespace
 
+std::string text_at(const nlohmann::json& object, const char* key) {
+  if (!object.is_object()) return {};
+  const auto value = object.find(key);
+  return value != object.end() && value->is_string() ? value->get<std::string>() : std::string();
+}
+
 const nlohmann::json* entry_at(const nlohmann::json& json, const char* key, const nlohmann::json& index) {
   const std::optional<int> number = index_from(index);
   if (!number) return nullptr;

@@ -29,10 +29,8 @@ std::optional<std::vector<std::uint8_t>> linked_picture(const std::string& uri,
 
 // The file an image names by its "uri" (not a picture written into the JSON itself); "" for none.
 std::string linked_file(const nlohmann::json& image) {
-  const auto uri = image.find(kUri);
-  if (uri == image.end() || !uri->is_string()) return {};
-  const std::string name = uri->get<std::string>();
-  return gltf_checks::names_a_file(name.c_str()) ? name : std::string();
+  const std::string uri = text_at(image, kUri);
+  return gltf_checks::names_a_file(uri.c_str()) ? uri : std::string();
 }
 
 // The bytes added to the binary chunk, with a buffer view over them. Returns the view's number.
@@ -55,7 +53,8 @@ void embed_linked_image(GlbFile& glb, nlohmann::json& image, const std::filesyst
   const std::string file = image.is_object() ? linked_file(image) : std::string();
   if (file.empty()) return;
   const std::optional<std::vector<std::uint8_t>> bytes = linked_picture(file, scene_dir);
-  if (bytes && !mime_type_of(*bytes).empty()) carry_inside(glb, image, *bytes);
+  if (!bytes) return;
+  if (!mime_type_of(*bytes).empty()) carry_inside(glb, image, *bytes);  // (a picture glTF can name)
 }
 
 }  // namespace

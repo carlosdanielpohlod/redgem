@@ -57,6 +57,10 @@ class Selection {
 
  private:
   void add(ObjectId id);
+  // An object, not selected yet.
+  bool can_add(ObjectId id) const;
+  // A run of the rows `order` can go from the last one clicked to `id`: both are listed.
+  bool run_reaches(ObjectId id, const std::vector<ObjectId>& order) const;
 
   std::vector<ObjectId> ids_;
   ObjectId anchor_ = kNoObject;  // the last object clicked without Shift: where a run of rows starts

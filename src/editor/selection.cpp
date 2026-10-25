@@ -21,7 +21,8 @@ bool run_can_start(ObjectId anchor, const std::vector<ObjectId>& order) {
 // Whether one of the node's ancestors is among `ids`.
 bool has_selected_ancestor(int node, const std::vector<int>& ids, const std::vector<NodeDesc>& nodes) {
   std::size_t steps = 0;  // never more than there are nodes, whatever their links say
-  for (int up = nodes[node].parent; up != kNoIndex && steps < nodes.size(); up = nodes[up].parent, ++steps) {
+  const auto more_above = [&](int up) { return up != kNoIndex && steps < nodes.size(); };
+  for (int up = nodes[node].parent; more_above(up); up = nodes[up].parent, ++steps) {
     if (std::find(ids.begin(), ids.end(), up) != ids.end()) return true;
   }
   return false;
@@ -45,8 +46,14 @@ BoxMode box_mode(bool ctrl, bool shift) { return adds_to_selection(ctrl, shift) 
 
 bool Selection::contains(ObjectId id) const { return std::find(ids_.begin(), ids_.end(), id) != ids_.end(); }
 
+bool Selection::can_add(ObjectId id) const { return id != kNoObject && !contains(id); }
+
 void Selection::add(ObjectId id) {
-  if (id != kNoObject && !contains(id)) ids_.push_back(id);
+  if (can_add(id)) ids_.push_back(id);
+}
+
+bool Selection::run_reaches(ObjectId id, const std::vector<ObjectId>& order) const {
+  return run_can_start(anchor_, order) && listed(order, id);
 }
 
 void Selection::set(ObjectId id) {
@@ -72,7 +79,7 @@ void Selection::toggle(ObjectId id) {
 }
 
 void Selection::extend_to(ObjectId id, const std::vector<ObjectId>& order) {
-  if (!run_can_start(anchor_, order) || !listed(order, id)) return set(id);
+  if (!run_reaches(id, order)) return set(id);
   const std::ptrdiff_t from = position_of(order, anchor_);
   const std::ptrdiff_t to = position_of(order, id);
   const ObjectId anchor = anchor_;

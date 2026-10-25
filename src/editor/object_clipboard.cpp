@@ -66,10 +66,13 @@ struct Decoder {
   }
 };
 
+// Whether the text's first `length` characters end with padding.
+bool padding_before(const std::string& text, std::size_t length) { return length > 0 && text[length - 1] == kPadding; }
+
 // The text's characters without the padding at its end.
 std::size_t unpadded_length(const std::string& text) {
   std::size_t length = text.size();
-  while (length > 0 && text[length - 1] == kPadding) --length;
+  while (padding_before(text, length)) --length;
   return length;
 }
 

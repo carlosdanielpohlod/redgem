@@ -26,13 +26,22 @@ Axes axes_of(const ViewCamera& camera) {
 // The view has a size to put points on.
 bool has_area(const ViewCamera& camera) { return camera.width > 0.0f && camera.height > 0.0f; }
 
+// A point `depth` meters along where the camera looks shows on its view: it is in front of the
+// camera, and the view has a size.
+bool shows_at(float depth, const ViewCamera& camera) { return depth >= kNearestDepth && has_area(camera); }
+
+// The candidate shows on the view, inside the rectangle.
+bool held_by(const Candidate& candidate, const editor_logic::Rect& rect) {
+  return candidate.at.has_value() && contains(rect, *candidate.at);
+}
+
 }  // namespace
 
 std::optional<ViewPoint> to_view(const ViewCamera& camera, Vec3 point) {
   const Axes axes = axes_of(camera);
   const Vec3 offset = point - camera.position;
   const float depth = dot(offset, axes.forward);
-  if (depth < kNearestDepth || !has_area(camera)) return std::nullopt;
+  if (!shows_at(depth, camera)) return std::nullopt;
   const float half_height = depth * std::tan(camera.fov_y_degrees * kDegreesToRadians * kHalf);
   const float half_width = half_height * camera.width / camera.height;
   const float across = dot(offset, axes.right) / half_width;  // -1 at the left edge, 1 at the right
@@ -56,7 +65,7 @@ bool dragged_far_enough(ViewPoint from, ViewPoint to) {
 std::vector<int> inside(const std::vector<Candidate>& candidates, const editor_logic::Rect& rect) {
   std::vector<int> ids;
   for (const Candidate& candidate : candidates) {
-    if (candidate.at && contains(rect, *candidate.at)) ids.push_back(candidate.id);
+    if (held_by(candidate, rect)) ids.push_back(candidate.id);
   }
   return ids;
 }

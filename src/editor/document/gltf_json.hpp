@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <optional>
 #include <set>
+#include <string>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -138,6 +139,9 @@ std::optional<int> index_from(const nlohmann::json& value);
 std::optional<std::size_t> size_from(const nlohmann::json& value);
 // Whether `index` names one of `entries` entries.
 inline bool in_range(int index, std::size_t entries) { return index >= 0 && index < static_cast<int>(entries); }
+
+// object[key] when the object has it and it is a text; "" otherwise.
+std::string text_at(const nlohmann::json& object, const char* key);
 
 // The file's lists.
 // json[key][index], when the file has such an entry and it is an object; nullptr otherwise.
