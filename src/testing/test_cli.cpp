@@ -54,9 +54,10 @@ std::string problem_with_ruby_tests(const TestCliOptions& options) {
   return {};
 }
 
-// A suite of every test of a game runs them as they are: no test file, and no pictures.
+// A suite of every test of a game runs them as they are: no test file, no pictures, and from
+// nothing (no earlier run to go on from).
 bool has_more_than_a_suite(const TestCliOptions& options) {
-  return !options.test_file.empty() || !options.scripts_game.empty() || options.headless;
+  return !options.test_file.empty() || !options.scripts_game.empty() || options.headless || !options.after.empty();
 }
 
 // Whether a run would go on from an earlier one with no folder of their own to find its files in.

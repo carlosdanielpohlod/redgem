@@ -3,7 +3,7 @@
   "testing.cli.after_needs_another_test": "--after names an earlier test, not this one (they would share their files)",
   "testing.cli.after_needs_test": "--after needs the system test this run goes on from",
   "testing.cli.after_needs_work": "--after needs --work: the folder the earlier run kept its files in",
-  "testing.cli.all_alone": "--all runs every test of the game as it is: no test file, --game or --headless with it",
+  "testing.cli.all_alone": "--all runs every test of the game as it is: no test file, --game, --headless or --after with it",
   "testing.cli.all_needs_game": "--all needs a game's folder",
   "testing.cli.game_for_ruby_tests": "--game is for Ruby tests (a system test names its game first)",
   "testing.cli.game_needs_folder": "--game needs a game's folder",

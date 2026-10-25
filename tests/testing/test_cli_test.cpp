@@ -100,6 +100,7 @@ TEST_CASE("every test of a game, as they are") {
   CHECK_FALSE(parse_test_cli({"--all"}).ok);
   CHECK_FALSE(parse_test_cli({"--all", "games/demo", "t.rb"}).ok);
   CHECK_FALSE(parse_test_cli({"--all", "games/demo", "--headless"}).ok);
+  CHECK_FALSE(parse_test_cli({"--all", "games/demo", "--work", "w", "--after", "t.rb"}).ok);
 }
 
 TEST_CASE("a system test can go on from an earlier one run in the same folder, and only then") {
