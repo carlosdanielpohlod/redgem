@@ -28,6 +28,10 @@ namespace {
 constexpr int kMaxFrames = 62;  // the most CaptureStackBackTrace takes on older systems
 constexpr std::size_t kReportBytes = 64 * 1024;
 constexpr std::size_t kMaxPathCharacters = 32768;  // Windows' longest path
+// How long a crash waits for its report to be written, and then for the player to read the
+// message about it, before the program ends all the same.
+constexpr DWORD kReportWaitMs = 5 * 1000;
+constexpr DWORD kMessageWaitMs = 2 * 60 * 1000;
 constexpr const wchar_t* kDialogTitle = L"RedGem";
 // Where the message box comes from: looked up as the game starts, as user32 linked with the
 // engine would clash with raylib's functions of the same names (CloseWindow, ShowCursor...).
@@ -62,9 +66,11 @@ struct Reporter {
   std::wstring folder;   // where reports go
   std::wstring message;  // what the player is told
   MessageBoxFunction message_box = nullptr;
-  HANDLE asked = nullptr;     // set by the filter: a crash to report
-  HANDLE reported = nullptr;  // set by the reporter once it is written and told
-  LONG taken = 0;             // set by the first crash: a second one waits for its report
+  HANDLE asked = nullptr;    // set by the filter: a crash to report
+  HANDLE written = nullptr;  // set by the reporter once the report is written
+  HANDLE told = nullptr;     // ...and once the player closed the message about it
+  DWORD thread_id = 0;       // the reporter's
+  LONG taken = 0;            // set by the first crash: a second one waits for its report
   // The crash, as the filter saw it.
   const char* cause = nullptr;
   DWORD code = 0;
@@ -187,38 +193,51 @@ void tell(const Reporter& crash) {
 // The reporter's thread: asleep until a crash, on a stack of its own.
 DWORD WINAPI report_crashes(void*) {
   Reporter& crash = reporter();
-  WaitForSingleObject(crash.asked, INFINITE);
+  WaitForSingleObject(crash.asked, INFINITE);  // (until the game ends or crashes: nothing waits on it)
   const Moment moment = utc_moment(seconds_now());
   compose(crash, moment);
   write_file(crash, moment);
+  SetEvent(crash.written);
   tell(crash);
-  SetEvent(crash.reported);
+  SetEvent(crash.told);
   return 0;
 }
 
-// Notes where the crashed thread is, has the reporter write the report, and waits for it.
-void hand_over(const char* cause, DWORD code) {
+// Ends the program at once: what a crash ends with once its report is written, or could not be.
+[[noreturn]] void end_now() {
+  TerminateProcess(GetCurrentProcess(), kExitFailure);
+  std::_Exit(kExitFailure);
+}
+
+// Waits a while for the reporter, then ends the program. (Bounded: the reporter takes the
+// loader's lock and shows a message box, and a crash that held either would hang it.)
+[[noreturn]] void wait_for_the_reporter() {
+  const Reporter& crash = reporter();
+  WaitForSingleObject(crash.written, kReportWaitMs);
+  WaitForSingleObject(crash.told, kMessageWaitMs);
+  end_now();
+}
+
+bool on_the_reporter() { return GetCurrentThreadId() == reporter().thread_id; }
+
+// Notes where the crashed thread is, has the reporter write the report, and ends the program. A
+// crash of the reporter itself ends it at once; one while another is reported waits for that one.
+[[noreturn]] void hand_over(const char* cause, DWORD code) {
   Reporter& crash = reporter();
-  if (InterlockedExchange(&crash.taken, 1) != 0) {
-    WaitForSingleObject(crash.reported, INFINITE);
-    return;
-  }
+  if (on_the_reporter()) end_now();
+  if (InterlockedExchange(&crash.taken, 1) != 0) wait_for_the_reporter();
   crash.cause = cause;
   crash.code = code;
   crash.frame_count = CaptureStackBackTrace(0, kMaxFrames, crash.frames, nullptr);
   SetEvent(crash.asked);
-  WaitForSingleObject(crash.reported, INFINITE);
+  wait_for_the_reporter();
 }
 
 LONG WINAPI on_unhandled_exception(EXCEPTION_POINTERS* info) {
   hand_over(nullptr, info->ExceptionRecord->ExceptionCode);
-  return EXCEPTION_EXECUTE_HANDLER;  // (the program ends, with the exception's code)
 }
 
-void on_abort(int signal) {
-  hand_over(signal_description(signal), 0);
-  std::_Exit(kExitFailure);
-}
+void on_abort(int signal) { hand_over(signal_description(signal), 0); }
 
 void prepare_reporter() {
   Reporter& crash = reporter();
@@ -229,8 +248,9 @@ void prepare_reporter() {
     crash.message_box = reinterpret_cast<MessageBoxFunction>(GetProcAddress(user, kMessageBoxFunction));
   }
   crash.asked = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-  crash.reported = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-  CreateThread(nullptr, 0, report_crashes, nullptr, 0, nullptr);
+  crash.written = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+  crash.told = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+  CreateThread(nullptr, 0, report_crashes, nullptr, 0, &crash.thread_id);
 }
 
 }  // namespace

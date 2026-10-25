@@ -6,7 +6,7 @@
 
 #include "core/config.hpp"
 #include "core/log.hpp"
-#include "core/signal_stack.hpp"
+#include "core/engine_thread.hpp"
 #include "server/tick_pacer.hpp"
 
 namespace redgem::server {
@@ -18,7 +18,7 @@ constexpr const char* kServerStopped = "the server stopped";
 }  // namespace
 
 RoomThread::RoomThread(RoomStart start) : start_(std::move(start)) {
-  thread_ = std::thread([this] { run(); });
+  thread_ = std::thread([this] { run_engine_thread([this] { run(); }); });
 }
 
 RoomThread::~RoomThread() { stop(); }
@@ -38,7 +38,6 @@ void RoomThread::stop() {
 }
 
 void RoomThread::run() {
-  give_this_thread_a_signal_stack();  // (a crash on it is reported too)
   TickPacer pacer(config::kFixedDeltaSeconds, steady_seconds());
   while (wait_for_turn(pacer.until_next(steady_seconds()))) {
     take_new_rooms();

@@ -135,6 +135,7 @@ redgem_add_library(redgem_core
   core/message_lines.cpp
   core/coarse_clock.cpp
   core/signal_stack.cpp
+  core/engine_thread.cpp
   core/xml_writer.cpp
   core/platform.cpp
   core/platform_desktop.cpp

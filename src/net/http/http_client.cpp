@@ -5,7 +5,7 @@
 #include <system_error>
 #include <thread>
 
-#include "core/signal_stack.hpp"
+#include "core/engine_thread.hpp"
 #include "net/http/http_exchange.hpp"
 
 namespace redgem::net {
@@ -15,6 +15,20 @@ struct HttpClient::Job {
   std::atomic<bool> cancelled{false};
   std::atomic<bool> done{false};
   HttpResponse response;  // written by the thread before `done`, read by poll after it
+
+  // Carries the request out on a thread of its own, which holds the job (throws std::system_error
+  // when the system has no thread left).
+  static void start(const std::shared_ptr<Job>& job, HttpRequest request, Url url,
+                    std::shared_ptr<const TrustStore> trust) {
+    std::thread([job, request = std::move(request), url = std::move(url), trust = std::move(trust)] {
+      run_engine_thread([&] { job->carry_out(request, url, trust); });
+    }).detach();
+  }
+
+  void carry_out(const HttpRequest& request, const Url& url, const std::shared_ptr<const TrustStore>& trust) {
+    response = exchange(request, url, trust, cancelled);
+    done.store(true);
+  }
 };
 
 HttpClient::~HttpClient() {
@@ -40,11 +54,7 @@ void HttpClient::launch(int id, HttpRequest request, Url url) {
   auto job = std::make_shared<Job>();
   job->id = id;
   try {
-    std::thread([job, request = std::move(request), url = std::move(url), trust = trust_] {
-      give_this_thread_a_signal_stack();  // (a crash on it is reported too)
-      job->response = exchange(request, url, trust, job->cancelled);
-      job->done.store(true);
-    }).detach();
+    Job::start(job, std::move(request), std::move(url), trust_);
     jobs_.push_back(std::move(job));
   } catch (const std::system_error&) {
     refused_.push_back({id, HttpResponse::failure("the system has no thread left to send the request on")});

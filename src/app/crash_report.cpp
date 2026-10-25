@@ -11,6 +11,7 @@
 #include "app/crash_text.hpp"
 #include "app/game_settings.hpp"
 #include "app/save_location.hpp"
+#include "core/engine_thread.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "core/translations.hpp"
@@ -28,6 +29,8 @@ constexpr const char* kOutOfMemoryCause = "out of memory (std::bad_alloc)";
 // Memory kept from the start and given back first when memory runs out: what the report and the
 // player's message are then made with.
 constexpr std::size_t kMemoryReserveBytes = 1024 * 1024;
+constexpr std::size_t kPageBytes = 4096;  // the smallest page of the systems the engine runs on
+constexpr char kTouched = 1;
 
 #if defined(_WIN32)
 constexpr const char* kSystem = "Windows";
@@ -63,6 +66,13 @@ std::unique_ptr<char[]>& memory_reserve() {
 }
 
 void release_memory_reserve() { memory_reserve().reset(); }
+
+// Writes a byte of every page, so that the memory is the system's to give back when it is freed
+// (memory never written may never have been given: Linux and Android hand it out on first use).
+void touch_pages(char* memory, std::size_t bytes) {
+  volatile char* const pages = memory;  // (written through volatile: not a store to leave out)
+  for (std::size_t at = 0; at < bytes; at += kPageBytes) pages[at] = kTouched;
+}
 
 bool& installed() {
   static bool done = false;
@@ -104,10 +114,10 @@ void prepare(const CrashSetup& setup) {
   crash.show_dialog = setup.show_dialog;
 }
 
-// Whether the exception nobody caught is memory running out.
-bool out_of_memory_uncaught() {
+// Whether an exception nobody caught is memory running out.
+bool out_of_memory(const std::exception_ptr& uncaught) {
   try {
-    if (const std::exception_ptr current = std::current_exception()) std::rethrow_exception(current);
+    if (uncaught) std::rethrow_exception(uncaught);
   } catch (const std::bad_alloc&) {
     return true;
   } catch (...) {
@@ -117,9 +127,9 @@ bool out_of_memory_uncaught() {
 }
 
 // What an exception nobody caught says of itself.
-std::string current_exception_text() {
+std::string exception_text(const std::exception_ptr& uncaught) {
   try {
-    if (const std::exception_ptr current = std::current_exception()) std::rethrow_exception(current);
+    if (uncaught) std::rethrow_exception(uncaught);
     return "none (std::terminate was called directly)";
   } catch (const std::exception& error) {
     return error.what();
@@ -128,13 +138,19 @@ std::string current_exception_text() {
   }
 }
 
-[[noreturn]] void on_terminate() {
-  if (out_of_memory_uncaught()) {
+// Reports an exception nobody caught (memory running out as such) and ends the program.
+[[noreturn]] void report_uncaught(const std::exception_ptr& uncaught) {
+  if (out_of_memory(uncaught)) {
     release_memory_reserve();
     report_and_end(kOutOfMemoryCause, current_backtrace(), prepared().out_of_memory_message);
   }
-  report_and_end(kExceptionCause + current_exception_text(), current_backtrace(), prepared().closed_message);
+  report_and_end(kExceptionCause + exception_text(uncaught), current_backtrace(), prepared().closed_message);
 }
+
+[[noreturn]] void on_terminate() { report_uncaught(std::current_exception()); }
+
+// What leaves the work of a thread the engine started (core/engine_thread.hpp).
+[[noreturn]] void on_thread_exception(const std::exception_ptr& uncaught) { report_uncaught(uncaught); }
 
 // Writes the report and tells the player; the exit code a crash ends with.
 int report_and_tell(const std::string& cause, const std::string& message) {
@@ -177,8 +193,10 @@ const char* platform_name() {
 
 void install_crash_handling(const CrashSetup& setup) {
   memory_reserve().reset(new char[kMemoryReserveBytes]);
+  touch_pages(memory_reserve().get(), kMemoryReserveBytes);
   prepare(setup);
   std::set_terminate(on_terminate);
+  set_uncaught_handler(on_thread_exception);
   install_fatal_handlers();
   installed() = true;
 }

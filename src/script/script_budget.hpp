@@ -15,13 +15,12 @@ namespace redgem {
 // any other error (the behaviour it came from is disabled), and the game goes on.
 //
 // How a call is stopped:
-// - A watchdog thread (one for the whole program) sets the interpreter's code fetch hook (the
-//   function mruby calls before each instruction, here budget_hook) when the call running has
-//   passed its deadline. Until then there is none, and a call pays nothing for it. (The engine's
-//   mruby reads the hook atomically, cmake/patch_mruby.cmake, so setting it from another thread
-//   is safe; nothing else of the interpreter is touched from there.)
-// - The hook, on the interpreter's own thread, checks the clock itself and decides: a request
-//   for a call that has since ended, or that is not overdue, is dropped.
+// - While a limit is set, the interpreter's code fetch hook (the function mruby calls before each
+//   instruction) is budget_hook, set on the interpreter's own thread and never from another. All
+//   it does is read an atomic flag.
+// - A watchdog thread (one for the whole program) sets that flag when the call running has passed
+//   its deadline. It touches nothing else: the interpreter's thread, seeing the flag, checks the
+//   clock itself and decides (a request for a call that has since ended is dropped).
 // - The first time, the call is raised a ScriptTimeout once, where it stands, and has a short
 //   grace (kScriptGraceMs) to unwind: its `ensure` clauses run. If it still runs after that (an
 //   ensure that loops, a rescue that carries on), it is raised again at every instruction until
@@ -29,8 +28,9 @@ namespace redgem {
 //
 // What a call's time is: from when it begins, less the time spent in calls the engine makes from
 // inside it (each has a budget of its own: a stopped call does not stop them) and in the engine's
-// own work that is known to be long (Pause: spawning objects, placing scatter). A function of the
-// engine is never stopped halfway: the call ends at its next instruction of Ruby.
+// own work that is known to be long (Pause: spawning objects, placing scatter), up to
+// kScriptForgivenBudgets of its budgets in all: a loop that only ever spawns is stopped too. A
+// function of the engine is never stopped halfway: the call ends at its next instruction of Ruby.
 class ScriptBudget {
  public:
   using Milliseconds = std::chrono::milliseconds;
@@ -55,14 +55,16 @@ class ScriptBudget {
   void begin_pause() { push(false); }
   void end_pause() { pop(); }
 
-  // The interpreter's look at its clock when the watchdog asks (from the hook), which may raise.
+  // Whether the watchdog asks the interpreter to look at its clock; and the look (on the
+  // interpreter's thread, from the hook), which may raise.
+  bool stop_requested() const { return stop_.load(std::memory_order_relaxed); }
   void on_stop_request(mrb_state* mrb, const mrb_code* pc);
 
   // The watchdog's side: when the call running must be looked at (kNever when none runs, or it
   // runs the engine's work), and the request to look.
   static constexpr std::int64_t kNever = INT64_MAX;
   std::int64_t deadline() const { return deadline_.load(std::memory_order_seq_cst); }
-  void request_stop();
+  void request_stop() { stop_.store(true, std::memory_order_relaxed); }
 
  private:
   // What a call is to its budget: running on it, stopped once and unwinding on its grace, or
@@ -73,6 +75,7 @@ class ScriptBudget {
     std::int64_t started = 0;    // less the time of what ran inside it
     std::int64_t unwinding = 0;  // when it was stopped once, likewise
     std::int64_t left_at = 0;    // when what runs inside it began
+    std::int64_t forgiven = 0;   // of its time, how much was what ran inside it
     Phase phase = Phase::Running;
   };
 
@@ -87,16 +90,20 @@ class ScriptBudget {
   bool overdue(const Frame& frame, std::int64_t now) const;
   void step_up(Frame& frame, std::int64_t now);
   void raise(mrb_state* mrb, const mrb_code* pc, const Frame& frame, std::int64_t now);
-  using Hook = void (*)(mrb_state*, const mrb_irep*, const mrb_code*, mrb_value*);
-  void set_hook(Hook hook);
-  void silence();
+  void silence() { stop_.store(false, std::memory_order_relaxed); }
+  // How much of `away` is not the frame's time: what is left of what it may be forgiven.
+  std::int64_t forgivable(const Frame& frame, std::int64_t away) const;
 
   mrb_state* mrb_ = nullptr;
   RClass* timeout_class_ = nullptr;
   std::atomic<long long> limit_ms_{0};
   std::vector<Frame> frames_;  // the calls in calls, innermost last (the interpreter's thread)
   std::atomic<std::int64_t> deadline_{kNever};
+  std::atomic<bool> stop_{false};
 };
+
+// How many times the watchdog has woken since the program started (for the tests of its sleep).
+std::uint64_t script_watchdog_wakes();
 
 // Counts what runs inside it as engine work, not the call's (see ScriptBudget).
 class BudgetPause {

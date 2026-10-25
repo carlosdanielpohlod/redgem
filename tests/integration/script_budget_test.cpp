@@ -27,6 +27,7 @@
 #include "app/game_settings.hpp"
 #include "core/config.hpp"
 #include "script/ruby_vm.hpp"
+#include "script/script_budget.hpp"
 #include "script/script_config.hpp"
 #include "test_support.hpp"
 
@@ -107,6 +108,8 @@ const std::map<std::string, std::string> kScripts = {
     {"slow.rb",
      "class Slow < Behaviour\n  def initialize(*arguments)\n    super\n    started = Time.now\n"
      "    nil while Time.now - started < 0.07\n  end\nend\n"},
+    // A loop that only ever spawns: the engine's work it does is forgiven only up to a point.
+    {"breeder.rb", "class Breeder < Behaviour\n  def update(_dt) = loop { Scene.spawn('innocent.rb') }\nend\n"},
     {"patient.rb",
      "class Patient < Behaviour\n  def update(_dt)\n    return if $patient_done\n"
      "    2.times { Scene.spawn('slow.rb') }\n    $patient_done = true\n  end\nend\n"},
@@ -343,3 +346,36 @@ TEST_CASE("a recursion through C stops with SystemStackError before a small thre
   CHECK(result.find("SystemStackError") != std::string::npos);
 }
 #endif
+
+TEST_CASE("a loop that only ever spawns objects is stopped all the same, within a few budgets") {
+  const TestDeadline deadline("breeder");
+  const std::filesystem::path game = budget_game("breeder", budget_settings());
+  test::LogCapture capture;
+  std::unique_ptr<Engine> engine = started(game, scene_of({"breeder.rb", "innocent.rb"}));
+  CHECK(frames(*engine, 1) < kStoppedWell);
+  CHECK(capture.contains("Breeder#update on 'breeder.rb' (behaviour disabled)"));
+  CHECK(capture.contains("ScriptTimeout"));
+  engine.reset();
+  std::filesystem::remove_all(game);
+}
+
+namespace {
+
+constexpr std::chrono::milliseconds kIdleWatch{400};  // eight of the budget below, with no call running
+constexpr std::chrono::milliseconds kShortBudget{50};
+constexpr std::uint64_t kMostIdleWakes = 2;  // its last look at the call, and the one after it
+
+}  // namespace
+
+TEST_CASE("the watchdog sleeps while no script runs") {
+  const TestDeadline deadline("idle watchdog");
+  RubyVm vm;
+  vm.set_budget(kShortBudget);
+  REQUIRE(vm.eval("1 + 1", "one.rb").ok);
+  const std::uint64_t before = script_watchdog_wakes();
+  std::this_thread::sleep_for(kIdleWatch);
+  CHECK(script_watchdog_wakes() - before <= kMostIdleWakes);
+  // ... and wakes when a call needs it.
+  const RubyResult stuck = vm.eval("loop {}", "stuck.rb");
+  CHECK(stuck.error.find("ScriptTimeout") != std::string::npos);
+}

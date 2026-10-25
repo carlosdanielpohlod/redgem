@@ -1,6 +1,7 @@
 // Crashes on purpose, for tests/integration/crash_handling_test.cpp: it installs the crash
 // handling a shipped game has, for a game, then crashes the way it is asked to.
-//   redgem_crash_helper <user data folder> <game folder> segv|abort|terminate|terminate-memory|exception|memory
+//   redgem_crash_helper <user data folder> <game folder> segv|abort|terminate|terminate-memory|engine-thread|
+//                       engine-thread-memory|exception|memory
 // (Built with the tests, never shipped.)
 
 #include <csignal>
@@ -13,6 +14,7 @@
 
 #include "app/crash_report.hpp"
 #include "app/game_texts.hpp"
+#include "core/engine_thread.hpp"
 #include "core/exit_codes.hpp"
 #include "core/platform.hpp"
 
@@ -34,6 +36,13 @@ int crash(const std::string& how) {
   if (how == "terminate") std::thread([] { throw std::runtime_error("thrown where nobody catches it"); }).join();
   // Memory running out where nobody catches it.
   if (how == "terminate-memory") std::thread([] { throw std::bad_alloc(); }).join();
+  // The same from a thread the engine starts: reported as what it is, on every system.
+  if (how == "engine-thread")
+    std::thread([] {
+      redgem::run_engine_thread([] { throw std::runtime_error("thrown on an engine thread"); });
+    }).join();
+  if (how == "engine-thread-memory")
+    std::thread([] { redgem::run_engine_thread([] { throw std::bad_alloc(); }); }).join();
   if (how == "exception") throw std::runtime_error("thrown out of the game");
   if (how == "memory") throw std::bad_alloc();
   return redgem::kExitUsage;

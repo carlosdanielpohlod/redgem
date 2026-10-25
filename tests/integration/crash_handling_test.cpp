@@ -107,3 +107,8 @@ TEST_CASE("running out of memory where nobody catches it is reported as such too
   check_reported("terminate-memory", "out of memory");
 #endif
 }
+
+TEST_CASE("an exception that leaves the work of an engine thread is reported with what it said") {
+  check_reported("engine-thread", "uncaught exception: thrown on an engine thread");
+  check_reported("engine-thread-memory", "out of memory");
+}

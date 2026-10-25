@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "core/coarse_clock.hpp"
-#include "core/signal_stack.hpp"
+#include "core/engine_thread.hpp"
 #include "script/script_config.hpp"
 
 namespace redgem {
@@ -20,9 +20,14 @@ using std::chrono::milliseconds;
 
 constexpr std::size_t kUsualDepth = 16;  // calls in calls, room made for them at once
 
+std::atomic<std::uint64_t> watchdog_wakes{0};
+
 // The one thread that looks at every limited interpreter of the program. It sleeps until the
-// earliest deadline of the calls running; with none running, until one begins (begin_call rings
-// it then, which costs a call nothing while the watchdog is awake).
+// earliest deadline of the calls running, and with none running, until one begins: a deadline
+// earlier than the one it sleeps until wakes it (deadline_set), which costs a call nothing while
+// the watchdog already waits for an earlier one. After a look that finds no call running it waits
+// one more limit before it sleeps for good, so that a game calling its scripts every frame wakes
+// it about once a limit, not once a call.
 class Watchdog {
  public:
   static Watchdog& instance() {
@@ -34,8 +39,8 @@ class Watchdog {
   void add(ScriptBudget* budget) {
     const std::lock_guard<std::mutex> hold(lock_);
     if (std::find(budgets_.begin(), budgets_.end(), budget) == budgets_.end()) budgets_.push_back(budget);
-    if (!thread_.joinable()) thread_ = std::thread([this] { run(); });
-    wake_locked();
+    if (!thread_.joinable()) thread_ = std::thread([this] { run_engine_thread([this] { run(); }); });
+    wake_locked(ScriptBudget::kNever - 1);
   }
 
   // Once this returns, the watchdog does not touch the budget again.
@@ -44,31 +49,27 @@ class Watchdog {
     budgets_.erase(std::remove(budgets_.begin(), budgets_.end(), budget), budgets_.end());
   }
 
-  // A call began somewhere: wakes the watchdog if it sleeps for want of calls.
-  void call_began() {
-    if (!idle_.load(std::memory_order_seq_cst)) return;
+  // A call has a deadline: wakes the watchdog if it would look later than that.
+  void deadline_set(std::int64_t deadline) {
+    if (deadline >= planned_.load(std::memory_order_seq_cst)) return;
     const std::lock_guard<std::mutex> hold(lock_);
-    wake_locked();
+    wake_locked(deadline);
   }
 
  private:
   Watchdog() = default;
 
-  void wake_locked() {
-    idle_.store(false, std::memory_order_seq_cst);
+  void wake_locked(std::int64_t deadline) {
+    planned_.store(std::min(deadline, planned_.load(std::memory_order_seq_cst)), std::memory_order_seq_cst);
     wake_.notify_all();
   }
 
   [[noreturn]] void run() {
-    give_this_thread_a_signal_stack();
     std::unique_lock<std::mutex> hold(lock_);
     for (;;) {
-      const std::int64_t next = look(coarse_milliseconds());
-      if (next == ScriptBudget::kNever) {
-        sleep_until_a_call(hold);
-      } else {
-        wake_.wait_for(hold, milliseconds(next - coarse_milliseconds()));
-      }
+      watchdog_wakes.fetch_add(1, std::memory_order_relaxed);
+      const std::int64_t now = coarse_milliseconds();
+      sleep_until(hold, linger(look(now), now));
     }
   }
 
@@ -79,34 +80,51 @@ class Watchdog {
     return next;
   }
 
-  // (A call that began since this look has a deadline no earlier than a whole limit from now.)
   static std::int64_t look_at(ScriptBudget& budget, std::int64_t now) {
     const std::int64_t deadline = budget.deadline();
-    if (deadline > now) return std::min(deadline, now + budget.limit().count());
+    if (deadline > now) return deadline;  // (kNever for a budget with no call running)
     budget.request_stop();
     return now + config::kScriptWatchRetryMs;  // (until the interpreter is back in Ruby to see it)
   }
 
-  bool any_call_running() const {
-    return std::any_of(budgets_.begin(), budgets_.end(),
-                       [](const ScriptBudget* budget) { return budget->deadline() != ScriptBudget::kNever; });
+  // The first look that finds no call running waits one more limit; the next sleeps for good.
+  std::int64_t linger(std::int64_t next, std::int64_t now) {
+    const bool found_none = next == ScriptBudget::kNever;
+    const bool first_of_none = found_none && !found_none_before_;
+    found_none_before_ = found_none;
+    return first_of_none ? now + shortest_limit() : next;
   }
 
-  // Says it is idle before looking once more: a call beginning at the same moment either is seen
-  // here, or sees the watchdog idle and wakes it.
-  void sleep_until_a_call(std::unique_lock<std::mutex>& hold) {
-    idle_.store(true, std::memory_order_seq_cst);
-    if (any_call_running()) {
-      idle_.store(false, std::memory_order_seq_cst);
-      return;
+  std::int64_t shortest_limit() const {
+    std::int64_t shortest = ScriptBudget::kNever;
+    for (const ScriptBudget* budget : budgets_) shortest = std::min<std::int64_t>(shortest, budget->limit().count());
+    return shortest;
+  }
+
+  std::int64_t earliest_deadline() const {
+    std::int64_t earliest = ScriptBudget::kNever;
+    for (const ScriptBudget* budget : budgets_) earliest = std::min(earliest, budget->deadline());
+    return earliest;
+  }
+
+  // Says until when it sleeps before looking once more: a call beginning at the same moment either
+  // is seen here, or sees the plan and wakes it.
+  void sleep_until(std::unique_lock<std::mutex>& hold, std::int64_t next) {
+    planned_.store(next, std::memory_order_seq_cst);
+    if (earliest_deadline() < next) return;
+    const auto woken_early = [this, next] { return planned_.load(std::memory_order_seq_cst) < next; };
+    if (next == ScriptBudget::kNever) {
+      wake_.wait(hold, woken_early);
+    } else {
+      wake_.wait_for(hold, milliseconds(next - coarse_milliseconds()), woken_early);
     }
-    wake_.wait(hold, [this] { return !idle_.load(std::memory_order_seq_cst); });
   }
 
   std::mutex lock_;
   std::condition_variable wake_;
   std::vector<ScriptBudget*> budgets_;
-  std::atomic<bool> idle_{false};
+  std::atomic<std::int64_t> planned_{ScriptBudget::kNever};  // when it looks next
+  bool found_none_before_ = false;
   std::thread thread_;
 };
 
@@ -123,6 +141,8 @@ void ScriptBudget::attach(mrb_state* mrb, RClass* timeout_class) {
 void ScriptBudget::set_limit(Milliseconds limit) {
   limit_ms_.store(limit.count(), std::memory_order_relaxed);
   const bool limited = limit.count() > 0;
+  // (Set here, on the interpreter's own thread, and never from another.)
+  mrb_->code_fetch_hook = limited ? budget_hook : nullptr;
   if (limited) {
     Watchdog::instance().add(this);
   } else {
@@ -153,7 +173,8 @@ void ScriptBudget::pop() {
 // Back in a call from what ran inside it, which does not count: a call stopped for good is
 // stopped again at its next instruction.
 void ScriptBudget::resume(Frame& frame, std::int64_t now) {
-  const std::int64_t away = now - frame.left_at;
+  const std::int64_t away = forgivable(frame, now - frame.left_at);
+  frame.forgiven += away;
   frame.started += away;
   frame.unwinding += away;
   publish(deadline_of(frame));
@@ -173,12 +194,17 @@ std::int64_t ScriptBudget::deadline_of(const Frame& frame) const {
   return kNever;
 }
 
-// (A deadline to keep: the watchdog is woken if it sleeps for want of one.)
+std::int64_t ScriptBudget::forgivable(const Frame& frame, std::int64_t away) const {
+  const std::int64_t most = config::kScriptForgivenBudgets * limit().count();
+  return std::max<std::int64_t>(0, std::min(away, most - frame.forgiven));
+}
+
 bool ScriptBudget::counts(const Frame& frame) const { return frame.limited && limit().count() > 0; }
 
+// (A deadline to keep: the watchdog is woken if it would look later than that.)
 void ScriptBudget::publish(std::int64_t deadline) {
   deadline_.store(deadline, std::memory_order_seq_cst);
-  if (deadline != kNever) Watchdog::instance().call_began();
+  if (deadline != kNever) Watchdog::instance().deadline_set(deadline);
 }
 
 bool ScriptBudget::overdue(const Frame& frame, std::int64_t now) const {
@@ -220,15 +246,11 @@ void ScriptBudget::raise(mrb_state* mrb, const mrb_code* pc, const Frame& frame,
   mrb_raise(mrb, timeout_class_, message.c_str());
 }
 
-void ScriptBudget::request_stop() { set_hook(budget_hook); }
-
-void ScriptBudget::silence() { set_hook(nullptr); }
-
-// (mruby reads it atomically: see cmake/patch_mruby.cmake.)
-void ScriptBudget::set_hook(Hook hook) { __atomic_store_n(&mrb_->code_fetch_hook, hook, __ATOMIC_RELAXED); }
-
 void budget_hook(mrb_state* mrb, const mrb_irep*, const mrb_code* pc, mrb_value*) {
-  static_cast<ScriptBudget*>(mrb->allocf_ud)->on_stop_request(mrb, pc);
+  auto* budget = static_cast<ScriptBudget*>(mrb->allocf_ud);
+  if (budget->stop_requested()) budget->on_stop_request(mrb, pc);
 }
+
+std::uint64_t script_watchdog_wakes() { return watchdog_wakes.load(std::memory_order_relaxed); }
 
 }  // namespace redgem

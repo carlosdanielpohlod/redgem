@@ -131,7 +131,8 @@ so it can put back what it changed. If it is still running after that (an `ensur
 What counts is the time spent in the call's own Ruby. Not counted: the work of the engine known
 to take long (spawning objects, placing scatter copies), and the calls the engine makes into the
 scripts from inside it, such as the `start` of a behaviour a spawned object brings, which each
-have a budget of their own. The engine's methods are never cut off halfway: the call stops at its
+have a budget of their own. Up to four budgets of that are forgiven in one call: a loop that does
+nothing but spawn is stopped after about five. The engine's methods are never cut off halfway: the call stops at its
 next line of Ruby.
 
 A recursion that never ends stops on its own, with `SystemStackError`, long before the program's
