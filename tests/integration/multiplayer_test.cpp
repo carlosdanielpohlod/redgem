@@ -152,6 +152,22 @@ float clip_time(Engine& engine) { return std::stof(ruby(engine, "$hero.animation
 float sword_x(Engine& engine) { return std::stof(ruby(engine, "$hero.children.first.transform.local_position.x")); }
 std::string clip_of(Engine& engine) { return ruby(engine, "$hero.animation.clip.inspect"); }
 
+// Holds frames played on a clock of the test's own to the real clock, from where it reads
+// `network_start`: a frame waits until its time is real. (A connection's own timers run on the real
+// clock: one that lost some of what it carried sends it again a fifth of a real second later. Frames
+// that take far less than their time would make that wait look like many seconds of a game.)
+class RealPace {
+ public:
+  explicit RealPace(double network_start) : network_start_(network_start) {}
+  void wait_for(double network_time) const {
+    std::this_thread::sleep_until(real_start_ + std::chrono::duration<double>(network_time - network_start_));
+  }
+
+ private:
+  double network_start_;
+  std::chrono::steady_clock::time_point real_start_ = std::chrono::steady_clock::now();
+};
+
 // Every one of `machines` gives its swordsman a NetworkSync with these settings.
 void sync_swordsman(std::initializer_list<Engine*> machines, const std::string& settings = "") {
   for (Engine* machine : machines) {
@@ -240,18 +256,23 @@ TEST_CASE("a guest that goes on at a game's pace while the host stands still is 
   auto [host, guest] = lan.host_and_guest();
   ruby(*host, "$got = 0; Network.on(:t) { $got += 1 }");
   const std::string talk = std::to_string(kMessagesPerFrame) + ".times { Network.emit(:t) }";
-  const auto frame = [&](bool host_plays) {
+  const auto guest_frame = [&] {
     clock += config::kFixedDeltaSeconds;
     ruby(*guest, talk);
     guest->frame(config::kFixedDeltaSeconds);
-    if (host_plays) host->frame(config::kFixedDeltaSeconds);
   };
-  for (int i = 0; i < kStallFrames; ++i) frame(false);
+  for (int i = 0; i < kStallFrames; ++i) guest_frame();
   // Both play on until the host heard all that was sent while it stood still (how fast that comes
-  // is the machine's), and some more.
+  // is the machine's), and some more: at the game's real pace, as the connection between them has.
+  const RealPace pace(clock);
+  const auto both_frame = [&] {
+    guest_frame();
+    pace.wait_for(clock);
+    host->frame(config::kFixedDeltaSeconds);
+  };
   const auto heard_the_stall = [&] { return std::stoi(ruby(*host, "$got")) >= kStallFrames * kMessagesPerFrame; };
-  for (int i = 0; i < kMaxRounds && !heard_the_stall(); ++i) frame(true);
-  for (int i = 0; i < kAfterFrames; ++i) frame(true);
+  for (int i = 0; i < kMaxRounds && !heard_the_stall(); ++i) both_frame();
+  for (int i = 0; i < kAfterFrames; ++i) both_frame();
   CHECK(heard_the_stall());
   CHECK(guest->network().state() == net::NetworkSession::State::Online);
 }
