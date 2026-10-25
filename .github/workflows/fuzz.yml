@@ -98,8 +98,10 @@ jobs:
           cmake --build build --target redgem_fuzz_targets -- -k 0
           ccache --show-stats
 
+      # (Not from pull requests: the repository's caches are shared, and one per push would crowd
+      # out the rest.)
       - name: Keep the compiler cache
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name != 'pull_request' }}
         uses: actions/cache/save@v4
         with:
           path: .ccache

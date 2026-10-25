@@ -100,6 +100,14 @@ bool components_aligned(const cgltf_accessor& accessor) {
 
 bool misaligned(const cgltf_accessor& accessor) { return read_as_it_is(&accessor) && !components_aligned(accessor); }
 
+// What is wrong with an accessor of a file whose buffers are loaded: what it says about itself, or
+// where its data lies.
+std::string loaded_accessor_problem(const cgltf_accessor& accessor) {
+  std::string problem = accessor_problem(accessor);
+  if (problem.empty() && misaligned(accessor)) problem = "is not aligned to its components";
+  return problem;
+}
+
 std::string numbered(const char* what, std::size_t index) { return std::string(what) + " " + std::to_string(index); }
 
 }  // namespace
@@ -135,9 +143,8 @@ std::string data_problem(const cgltf_data& data) {
     if (!view_fits(&data.buffer_views[i])) return numbered("buffer view", i) + " reaches past its buffer";
   }
   for (cgltf_size i = 0; i < data.accessors_count; ++i) {
-    const std::string problem = accessor_problem(data.accessors[i]);
+    const std::string problem = loaded_accessor_problem(data.accessors[i]);
     if (!problem.empty()) return numbered("accessor", i) + " " + problem;
-    if (misaligned(data.accessors[i])) return numbered("accessor", i) + " is not aligned to its components";
   }
   return {};
 }
