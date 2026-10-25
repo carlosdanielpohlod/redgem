@@ -15,9 +15,6 @@ constexpr const char* kMetallicRoughnessTexture = "metallicRoughnessTexture";
 constexpr const char* kNormalTexture = "normalTexture";
 constexpr const char* kOcclusionTexture = "occlusionTexture";
 constexpr const char* kEmissiveTexture = "emissiveTexture";
-constexpr const char* kWebpExtension = "EXT_texture_webp";
-constexpr const char* kMimeType = "mimeType";
-constexpr const char* kWebpMime = "image/webp";
 constexpr std::size_t kCoatSlots = 3;  // a clearcoat's factor, roughness and normal pictures
 
 // Where a slot is in a material's JSON: under its "pbrMetallicRoughness" or at its top.
@@ -61,7 +58,7 @@ std::optional<int> source_of(const Json& holder) {
 // The WebP picture of a texture (EXT_texture_webp), when it has one.
 std::optional<int> webp_source(const Json& texture) {
   if (!has_object(texture, kExtensions)) return std::nullopt;
-  const auto webp = texture[kExtensions].find(kWebpExtension);
+  const auto webp = texture[kExtensions].find(kWebpTextureExtension);
   return webp == texture[kExtensions].end() ? std::nullopt : source_of(*webp);
 }
 
@@ -72,7 +69,26 @@ bool is_webp(const Json& doc, int image) {
 
 Json texture_for(const Json& doc, int image) {
   if (!is_webp(doc, image)) return {{kSource, image}};
-  return {{kExtensions, {{kWebpExtension, {{kSource, image}}}}}};
+  return {{kExtensions, {{kWebpTextureExtension, {{kSource, image}}}}}};
+}
+
+// A texture that samples its picture the default way: no sampler, or one that says nothing.
+// Another material's texture with a sampler of its own is not borrowed.
+bool plain_sampling(const Json& doc, int texture) {
+  const Json& entry = doc[kTextures][texture];
+  if (!entry.contains(kSampler)) return true;
+  const Json* sampler = entry_at(doc, kSamplers, entry[kSampler]);
+  return sampler != nullptr && sampler->empty();
+}
+
+// A texture of the document can show `image` for a material set in the editor.
+bool reusable(const Json& doc, int texture, int image) {
+  return image_of_texture(doc, texture) == image && plain_sampling(doc, texture);
+}
+
+// Whether a texture shows its picture through EXT_texture_webp.
+bool shows_webp(const Json& texture) {
+  return has_object(texture, kExtensions) && texture[kExtensions].contains(kWebpTextureExtension);
 }
 
 // The slot's JSON pointed at the texture: its other fields (scale, texture coordinates, extensions)
@@ -102,6 +118,14 @@ ImageField field_of(Slot slot) {
 
 // The holder of a material's slot has the slot.
 bool holds_slot(const Json* holder, const char* key) { return holder != nullptr && has_object(*holder, key); }
+
+// The object a slot is written into: the material, or its "pbrMetallicRoughness" (made one when
+// the file holds something else there).
+Json& writable_holder(Json& material, const SlotPlace& place) {
+  if (!place.in_pbr) return material;
+  if (!material[kPbr].is_object()) material[kPbr] = Json::object();
+  return material[kPbr];
+}
 
 }  // namespace
 
@@ -136,24 +160,36 @@ int slot_image(const Json& doc, const Json& material, Slot slot) {
 int texture_showing(Json& doc, int image) {
   const int textures = has_list(doc, kTextures) ? static_cast<int>(doc[kTextures].size()) : 0;
   for (int texture = 0; texture < textures; ++texture) {
-    if (image_of_texture(doc, texture) == image) return texture;
+    if (reusable(doc, texture, image)) return texture;
   }
-  if (is_webp(doc, image)) add_extension_used(doc, kWebpExtension);
+  // (Without a picture another reader can show, a WebP one is required to read the file.)
+  if (is_webp(doc, image)) add_extension_required(doc, kWebpTextureExtension);
   array_at(doc, kTextures).push_back(texture_for(doc, image));
   return textures;
+}
+
+void forget_unused_webp(Json& doc) {
+  for (const Json& texture : list_of(doc, kTextures)) {
+    if (shows_webp(texture)) return;
+  }
+  remove_extension_used(doc, kWebpTextureExtension);
+}
+
+// Points one slot of a material's JSON at `image`, or takes it out for kNoIndex.
+void write_slot(Json& doc, Json& material, Slot slot, int image) {
+  const SlotPlace place = place_of(slot);
+  Json& holder = writable_holder(material, place);
+  if (image == kNoIndex) {
+    holder.erase(place.key);
+  } else {
+    point_slot(holder, place.key, texture_showing(doc, image));
+  }
 }
 
 void write_slots(Json& doc, Json& material, const MaterialDesc& desc) {
   for (const Slot slot : kSlots) {
     const int image = image_in(desc, slot);
-    if (slot_image(doc, material, slot) == image) continue;
-    const SlotPlace place = place_of(slot);
-    Json& holder = place.in_pbr ? material[kPbr] : material;
-    if (image == kNoIndex) {
-      holder.erase(place.key);
-    } else {
-      point_slot(holder, place.key, texture_showing(doc, image));
-    }
+    if (slot_image(doc, material, slot) != image) write_slot(doc, material, slot, image);
   }
 }
 

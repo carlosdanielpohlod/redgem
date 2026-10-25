@@ -424,3 +424,10 @@ TEST_CASE("saving water controls keeps unrelated material extras") {
   material.water.enabled = false;
   CHECK(material_json(material, saved)["extras"]["water"] == false);
 }
+
+TEST_CASE("a material whose metallic-roughness part is not an object is written as one") {
+  MaterialDesc material;
+  material.roughness = 0.5f;
+  const nlohmann::json written = gltf_json::material_json(material, {{"pbrMetallicRoughness", 3}});
+  CHECK(written["pbrMetallicRoughness"]["roughnessFactor"] == 0.5);
+}

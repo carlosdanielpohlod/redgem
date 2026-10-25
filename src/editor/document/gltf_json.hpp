@@ -121,6 +121,13 @@ inline constexpr const char* kClearcoatNormalTexture = "clearcoatNormalTexture";
 inline constexpr const char* kClearcoatFactor = "clearcoatFactor";
 inline constexpr const char* kClearcoatRoughnessFactor = "clearcoatRoughnessFactor";
 inline constexpr const char* kEmissiveStrengthExtension = "KHR_materials_emissive_strength";
+inline constexpr const char* kWebpTextureExtension = "EXT_texture_webp";  // a texture showing a WebP picture
+
+// What an image says its picture is ("mimeType"), and the kinds of picture the editor writes.
+inline constexpr const char* kMimeType = "mimeType";
+inline constexpr const char* kPngMime = "image/png";
+inline constexpr const char* kJpegMime = "image/jpeg";
+inline constexpr const char* kWebpMime = "image/webp";
 
 // What a document made here says about itself.
 inline constexpr const char* kGltfVersion = "2.0";
@@ -174,6 +181,8 @@ bool needs_emissive_strength(const MaterialDesc& material);
 
 // Lists `extension` in the document's "extensionsUsed" once.
 void add_extension_used(nlohmann::json& json, const char* extension);
+// The same in "extensionsUsed" and "extensionsRequired": a reader without it cannot show the file.
+void add_extension_required(nlohmann::json& json, const char* extension);
 // Takes `extension` out of the document's "extensionsUsed" and "extensionsRequired" (and each
 // list, once it is empty).
 void remove_extension_used(nlohmann::json& json, const char* extension);

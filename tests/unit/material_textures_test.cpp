@@ -16,7 +16,7 @@ constexpr float kBumpy = 0.5f;  // the normal map's scale in the document below
 Json document() {
   return Json::parse(R"({
     "images": [{"bufferView": 0, "mimeType": "image/png"}, {"bufferView": 1, "mimeType": "image/webp"}],
-    "textures": [{"source": 0, "sampler": 0}],
+    "textures": [{"source": 0}],
     "materials": [{"pbrMetallicRoughness": {"baseColorTexture": {"index": 0, "texCoord": 1}},
                    "normalTexture": {"index": 0, "scale": 0.5}}]
   })");
@@ -78,4 +78,39 @@ TEST_CASE("writing a material's slots changes only the ones whose picture change
   write_slots(doc, material, desc);
   CHECK_FALSE(material.contains("normalTexture"));
   CHECK_FALSE(material.contains("occlusionTexture"));
+}
+
+TEST_CASE("a texture with a sampler of its own is not borrowed for another material") {
+  Json doc = document();
+  doc["samplers"] = Json::array({{{"magFilter", 9728}}});  // nearest: the first texture's own look
+  doc["textures"][0]["sampler"] = 0;
+  CHECK(texture_showing(doc, 0) == 1);
+  CHECK_FALSE(doc["textures"][1].contains("sampler"));
+  doc["samplers"][0] = Json::object();  // a sampler that says nothing samples the default way
+  CHECK(texture_showing(doc, 0) == 0);
+}
+
+TEST_CASE("a WebP texture is required to read the file, and forgotten once none is left") {
+  Json doc = document();
+  texture_showing(doc, 1);
+  CHECK(doc["extensionsRequired"] == Json::array({"EXT_texture_webp"}));
+  forget_unused_webp(doc);  // a texture still shows it
+  CHECK(doc.contains("extensionsUsed"));
+  doc["textures"].erase(1);
+  forget_unused_webp(doc);
+  CHECK_FALSE(doc.contains("extensionsUsed"));
+  CHECK_FALSE(doc.contains("extensionsRequired"));
+}
+
+TEST_CASE("slots are written into a material whose metallic-roughness part is not an object") {
+  Json doc = document();
+  Json material = {{"pbrMetallicRoughness", nullptr}};
+  MaterialDesc desc;
+  desc.base_color_image = 0;
+  write_slots(doc, material, desc);
+  CHECK(slot_image(doc, material, Slot::BaseColor) == 0);
+  material["pbrMetallicRoughness"] = 5;
+  desc.base_color_image = kNoIndex;
+  write_slots(doc, material, desc);  // nothing to take out, nothing thrown
+  CHECK(slot_image(doc, material, Slot::BaseColor) == kNoIndex);
 }

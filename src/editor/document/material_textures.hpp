@@ -36,5 +36,8 @@ int texture_showing(nlohmann::json& doc, int image);
 // image is left as it is (its texture coordinates, scale and extensions with it); a slot without
 // an image is taken out.
 void write_slots(nlohmann::json& doc, nlohmann::json& material, const MaterialDesc& desc);
+// Takes EXT_texture_webp out of what the document says it uses and requires when no texture of
+// it shows a WebP picture any more (for the file as written, without what nothing uses).
+void forget_unused_webp(nlohmann::json& doc);
 
 }  // namespace redgem::material_textures

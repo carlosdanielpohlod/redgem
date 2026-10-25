@@ -10,6 +10,9 @@ namespace redgem {
 // on the editor goes there), lowercase.
 inline constexpr const char* kImageFileExtensions[] = {".png", ".jpg", ".jpeg", ".webp"};
 
+// Whether a file is a picture a material can show, by its extension (whatever its case).
+bool is_picture_file(const std::filesystem::path& file);
+
 // What a game folder holds, as the editor lists it (each list sorted by name):
 //   scripts  scripts/*.rb             file names  ("player.rb")
 //   models   models/*.glb             file names  ("tree.glb")

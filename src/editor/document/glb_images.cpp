@@ -13,11 +13,6 @@ namespace {
 
 using namespace gltf_json;
 
-constexpr const char* kMimeType = "mimeType";
-constexpr const char* kPngMime = "image/png";
-constexpr const char* kJpegMime = "image/jpeg";
-constexpr const char* kWebpMime = "image/webp";
-
 // The picture file `uri` names, as the scene in `scene_dir` reads it; nullopt when it names none
 // the scene may read (only files inside its own folder, see core/safe_path.hpp).
 std::optional<std::vector<std::uint8_t>> linked_picture(const std::string& uri,

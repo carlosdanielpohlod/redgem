@@ -17,8 +17,6 @@ using namespace gltf_json;
 constexpr const char* kPngExtension = ".png";  // the file kinds the image decoder is told
 constexpr const char* kJpegExtension = ".jpg";
 constexpr const char* kWebpExtension = ".webp";
-constexpr const char* kJpegMime = "image/jpeg";
-constexpr const char* kWebpMime = "image/webp";
 
 const char* extension_for(const std::string& mime_type) {
   if (mime_type == kJpegMime) return kJpegExtension;
@@ -41,12 +39,18 @@ int SceneDocument::add_image(const std::filesystem::path& file, std::string& err
   if (!bytes) return refused(error, "cannot read " + name);
   if (!showable(*bytes)) return refused(error, name + " is not a PNG, JPEG or still WebP picture the engine can show");
   const int known = image_with(*bytes);
-  if (known != kNoIndex) return known;
+  if (known != kNoIndex) return hold_unshown(known);
   const std::string mime_type = glb_images::mime_type_of(*bytes);
   const int image = glb_images::append_image(glb_, *bytes, mime_type, file.filename().string());
   // (The description lists the file's images in the same order: one it lacks is an empty one.)
   if (desc_.images.size() < static_cast<std::size_t>(image)) desc_.images.resize(static_cast<std::size_t>(image));
   desc_.images.push_back(ImageData{*bytes, extension_for(mime_type)});
+  return hold_unshown(image);
+}
+
+int SceneDocument::hold_unshown(int image) {
+  // (Until a slot shows it, nothing the memory of undo looks at knows of it.)
+  unshown_images_.insert(image);
   return image;
 }
 

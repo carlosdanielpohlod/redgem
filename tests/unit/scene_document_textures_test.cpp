@@ -3,6 +3,7 @@
 
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <variant>
 
@@ -158,4 +159,52 @@ TEST_CASE("a textured object copied into another scene brings its picture along"
   const MaterialDesc& material = child_material(saved);
   REQUIRE(material.base_color_image != kNoIndex);
   CHECK(saved.images[material.base_color_image].encoded == bytes_of("images/sniff.png"));
+}
+
+TEST_CASE("a picture added at the limit of undo keeps its bytes while the history lets go of a mesh") {
+  SceneDocument doc = open_hierarchy();
+  // A mesh only the oldest steps show: once they go, what it was made of is let go of.
+  const int gone = doc.add_primitive(PrimitiveShape::Cube, "Gone", Color{1, 1, 1, 1});
+  doc.remove(gone);
+  const int root = doc.desc().find_node("Root");
+  // The step that shows it is the oldest of a full history: the next one recorded drops it.
+  for (std::size_t i = 0; i + 1 < SceneDocument::kMaxUndoSteps; ++i) doc.set_name(root, "Root" + std::to_string(i));
+  const int color = add(doc, "images/sniff.png");
+  edit_material(doc, [&](MaterialDesc& material) { material.base_color_image = color; });  // the history trims here
+  CHECK(doc.desc().images[color].encoded == bytes_of("images/sniff.png"));
+  const SceneDesc saved = saved_and_loaded(doc, "at_the_limit").scene;
+  const MaterialDesc& material = child_material(saved);
+  REQUIRE(material.base_color_image != kNoIndex);
+  CHECK(saved.images[material.base_color_image].encoded == bytes_of("images/sniff.png"));
+}
+
+TEST_CASE("a picture only undo can bring back counts toward what undo keeps") {
+  SceneDocument doc = open_hierarchy();
+  const int first = add(doc, "images/sniff.png");
+  const int second = add(doc, "images/sniff.jpg");
+  edit_material(doc, [&](MaterialDesc& material) { material.base_color_image = first; });
+  const std::size_t shown = doc.history_bytes();
+  edit_material(doc, [&](MaterialDesc& material) { material.base_color_image = second; });
+  // The first picture is only in an undo step now; the second is shown.
+  CHECK(doc.history_bytes() >= shown + bytes_of("images/sniff.png").size());
+}
+
+TEST_CASE("a WebP picture makes the file require its extension, until no texture shows one") {
+  SceneDocument doc = open_hierarchy();
+  const int webp = add(doc, "images/lossy.webp");
+  edit_material(doc, [&](MaterialDesc& material) { material.base_color_image = webp; });
+  const std::filesystem::path out = std::filesystem::temp_directory_path() / "redgem_textures_webp.glb";
+  std::string error;
+  REQUIRE_MESSAGE(doc.save_as(out, error), error);
+  const auto lists_webp = [&out, &error](const char* list) {
+    const nlohmann::json names = read_glb(out, error)->json.value(list, nlohmann::json::array());
+    return std::find(names.begin(), names.end(), "EXT_texture_webp") != names.end();
+  };
+  CHECK(lists_webp("extensionsUsed"));
+  CHECK(lists_webp("extensionsRequired"));
+  edit_material(doc, [](MaterialDesc& material) { material.base_color_image = kNoIndex; });
+  REQUIRE_MESSAGE(doc.save_as(out, error), error);
+  CHECK_FALSE(lists_webp("extensionsUsed"));
+  CHECK_FALSE(lists_webp("extensionsRequired"));
+  std::filesystem::remove(out);
 }

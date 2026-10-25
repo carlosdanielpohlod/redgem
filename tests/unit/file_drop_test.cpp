@@ -5,6 +5,7 @@
 
 #include "core/config.hpp"
 #include "editor/file_drop.hpp"
+#include "test_support.hpp"
 
 using namespace redgem;
 
@@ -59,13 +60,43 @@ TEST_CASE("dropped models and sounds are copied into the game's folders, which a
   CHECK(std::filesystem::exists(desk.root / "tree.glb"));  // copied, not moved
 }
 
-TEST_CASE("dropped pictures are copied into the game's images folder") {
+TEST_CASE("dropped pictures are copied into the game's images folder, what only looks like one is not") {
   Desk desk;
-  const DropReport report = add_dropped_files(desk.game, {desk.file("wood.png", "a picture"), desk.file("bark.webp")});
+  std::filesystem::copy_file(redgem::test::fixture("images/sniff.png"), desk.root / "wood.png");
+  std::filesystem::copy_file(redgem::test::fixture("images/lossy.webp"), desk.root / "bark.webp");
+  const DropReport report = add_dropped_files(
+      desk.game, {desk.root / "wood.png", desk.root / "bark.webp", desk.file("fake.png", "not a picture"),
+                  redgem::test::fixture("images/animated.webp")});
   CHECK(report.images == std::vector<std::string>{"wood.png", "bark.webp"});
-  CHECK(report.refused.empty());
-  CHECK(text_of(desk.game / config::kImagesDirName / "wood.png") == "a picture");
-  CHECK(std::filesystem::exists(desk.game / config::kImagesDirName / "bark.webp"));
+  REQUIRE(report.refused.size() == 2);
+  CHECK(report.refused[0].find("fake.png") == 0);
+  CHECK(report.refused[1].find("animated.webp") == 0);  // a moving picture is not shown either
+  CHECK(std::filesystem::exists(desk.game / config::kImagesDirName / "wood.png"));
+  CHECK_FALSE(std::filesystem::exists(desk.game / config::kImagesDirName / "fake.png"));
+}
+
+TEST_CASE("a link of the dropped file's name, even one pointing nowhere, is not written through") {
+  Desk desk;
+  const std::filesystem::path images = desk.game / config::kImagesDirName;
+  std::filesystem::create_directories(images);
+  const std::filesystem::path outside = desk.root / "outside.png";
+  std::filesystem::create_symlink(outside, images / "wood.png");  // dangling: outside.png is not there
+  std::filesystem::copy_file(redgem::test::fixture("images/sniff.png"), desk.root / "wood.png");
+  const DropReport report = add_dropped_files(desk.game, {desk.root / "wood.png"});
+  CHECK(report.images.empty());
+  REQUIRE(report.refused.size() == 1);
+  CHECK_FALSE(std::filesystem::exists(outside));
+}
+
+TEST_CASE("a game folder that is a link is not copied into") {
+  Desk desk;
+  const std::filesystem::path elsewhere = desk.root / "elsewhere";
+  std::filesystem::create_directories(elsewhere);
+  std::filesystem::create_symlink(elsewhere, desk.game / config::kImagesDirName);
+  std::filesystem::copy_file(redgem::test::fixture("images/sniff.png"), desk.root / "wood.png");
+  const DropReport report = add_dropped_files(desk.game, {desk.root / "wood.png"});
+  CHECK(report.images.empty());
+  CHECK_FALSE(std::filesystem::exists(elsewhere / "wood.png"));
 }
 
 TEST_CASE("a file the game already has under that name is left as it is") {

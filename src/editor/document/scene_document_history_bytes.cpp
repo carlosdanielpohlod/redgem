@@ -99,7 +99,7 @@ std::size_t SceneDocument::kept_bytes() {
   std::vector<bool> only_in_history = meshes_in_history();
   std::transform(only_in_history.begin(), only_in_history.end(), in_use.begin(), only_in_history.begin(),
                  kept_for_undo);
-  return vertex_bytes(only_in_history) + file_bytes(only_in_history, in_use);
+  return vertex_bytes(only_in_history) + file_bytes(only_in_history, in_use) + undo_picture_bytes();
 }
 
 std::size_t SceneDocument::vertex_bytes(const std::vector<bool>& meshes) const {

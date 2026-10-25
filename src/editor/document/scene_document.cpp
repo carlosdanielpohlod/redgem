@@ -186,7 +186,8 @@ bool SceneDocument::save_file(const std::filesystem::path& path, std::string& er
   if (!sync_for_writing(error)) return false;
   // What nothing uses any more (a deleted object's mesh, an import that was undone) stays out of
   // the file. It stays in the document: undo and redo can bring back what used it.
-  const std::optional<GlbFile> lean = without_unused(glb_);
+  std::optional<GlbFile> lean = without_unused(glb_);
+  material_textures::forget_unused_webp(lean ? lean->json : glb_.json);
   if (!write_glb(path, lean ? *lean : glb_, error)) return false;
   unsaved_meshes_.clear();
   path_ = path;
