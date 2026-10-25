@@ -232,7 +232,9 @@ not a promise of how it will be closed.
   lock while it takes Jolt's step-listener lock, which a physics step takes the other way round.
   Physics runs on one thread, so they never meet today; it is listed in
   `tools/sanitizers/tsan.supp` until it is fixed. UBSan finds a read before a table in raylib's
-  bundled `stb_image_resize2` (scaling icons), listed in `tools/sanitizers/ubsan.supp`.
+  bundled `stb_image_resize2` (scaling icons), listed in `tools/sanitizers/ubsan.supp`. LeakSanitizer
+  finds 161 bytes mruby allocated still held when the unit tests end; mruby is not built with the
+  sanitizers, so whose they are is unknown, and every leak of mruby's memory is listed as known.
 - About forty unit and integration tests wait on the real clock, a source of rare timing failures.
 - Some constants are defined more than once (`kLargestPort` in four places, `kBitsPerByte` in
   four, Ruby limits that repeat C++ ones), as are a few string helpers.
