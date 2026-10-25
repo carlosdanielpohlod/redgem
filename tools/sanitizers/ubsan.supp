@@ -5,3 +5,9 @@
 # Jolt keeps the shape filter of a step in raw storage it builds the wrapper in, and calls it
 # through a pointer whose dynamic type UBSan's vptr check cannot see there.
 vptr:*/Jolt/Physics/PhysicsSystem.cpp
+
+# raylib's stb_image_resize2 (ImageResize, which the builds' icons are scaled with) indexes its
+# table of vertical gather functions with a count that can be 0 for an edge scanline: a read
+# before the table (stbir__resample_vertical_gather), it seems. Not the engine's to fix: listed
+# until a raylib release brings a newer stb_image_resize2.
+object-size:*/stb_image_resize2.h
