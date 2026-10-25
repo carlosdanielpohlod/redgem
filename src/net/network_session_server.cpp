@@ -5,6 +5,7 @@
 #include "net/network_session.hpp"
 
 #include <algorithm>
+#include <cstdio>
 
 namespace redgem::net {
 
@@ -39,20 +40,22 @@ void NetworkSession::police(Link& link, std::size_t bytes, float seconds) {
   if (!relaying()) return;
   link.allowance.refill(seconds);
   link.messages.refill(seconds);
-  if (!link.allowance.charge(bytes)) link.connection.close();  // no game talks this much: a flood
+  if (!link.allowance.charge(bytes)) { std::fprintf(stderr, "DBG bytes flood %zu\n", bytes); link.connection.close(); }  // no game talks this much: a flood
   if (!serving()) return;
   link.idle_for += seconds;
-  if (link.idle_for > kServedIdleSeconds) link.connection.close();
+  if (link.idle_for > kServedIdleSeconds) { std::fprintf(stderr, "DBG idle\n"); link.connection.close(); }
 }
 
 bool NetworkSession::police_message(Link& link) {
   if (!relaying()) return true;
   if (link.messages.charge(1)) return true;
+  std::fprintf(stderr, "DBG message flood\n");
   link.connection.close();
   return false;
 }
 
 void NetworkSession::forgive_stall(float seconds) {
+  if (seconds > 0.0f) std::fprintf(stderr, "DBG forgive %.3f links %zu\n", seconds, links_.size());
   for (Link& link : links_) {
     link.allowance.forgive(seconds, kMostForgivenStallSeconds);
     link.messages.forgive(seconds, kMostForgivenStallSeconds);

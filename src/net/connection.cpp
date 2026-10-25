@@ -1,5 +1,6 @@
 #include "net/connection.hpp"
 
+#include <cstdio>
 #include <utility>
 
 #include "core/log.hpp"
@@ -54,7 +55,7 @@ std::optional<nlohmann::json> Connection::next_message() {
   if (!takes_more()) return std::nullopt;
   const auto text = incoming_.next();
   if (!text) {
-    if (incoming_.broken()) close();
+    if (incoming_.broken()) { std::fprintf(stderr, "DBG broken\n"); close(); }
     return std::nullopt;
   }
   ++taken_this_poll_;
@@ -62,7 +63,7 @@ std::optional<nlohmann::json> Connection::next_message() {
 }
 
 std::optional<nlohmann::json> Connection::understood(const std::optional<nlohmann::json>& message) {
-  if (!message) return not_ours();
+  if (!message) { std::fprintf(stderr, "DBG not ours\n"); return not_ours(); }
   if (first_of_another_protocol(*message)) return another_protocol(wire::protocol_of(*message));
   heard_ = true;
   if (wire::well_formed(*message)) return message;
@@ -92,7 +93,10 @@ void Connection::send_packed(const std::vector<std::uint8_t>& message) {
   if (hung_up()) return;
   outgoing_.insert(outgoing_.end(), message.begin(), message.end());
   since_said_ = 0.0f;
+  static std::size_t dbg_most = 65536;
+  if (outgoing_.size() > dbg_most) { dbg_most = outgoing_.size() * 2; std::fprintf(stderr, "DBG outgoing %zu limit %zu\n", outgoing_.size(), pending_limit_); }
   if (outgoing_.size() > pending_limit_) {
+    std::fprintf(stderr, "DBG pending %zu\n", outgoing_.size());
     close();  // it stopped listening: messages are not piled up for it forever
     return;
   }
@@ -108,6 +112,7 @@ void Connection::keep_in_touch(float seconds) {
   quiet_for_ += seconds;
   since_said_ += seconds;
   if (quiet_for_ > kSilenceTimeoutSeconds) {
+    std::fprintf(stderr, "DBG silence\n");
     close();  // gone without a goodbye
   } else if (since_said_ >= kPingEverySeconds) {
     send({{wire::kKind, wire::kPing}});
@@ -120,6 +125,7 @@ void Connection::keep_waiting(float seconds) {
 }
 
 void Connection::hang_up() {
+  std::fprintf(stderr, "DBG hang_up %s answering %d dropped %d\n", address_.c_str(), (int)answering_, (int)dropped_);
   gone_ = true;
   socket_.close();
   outgoing_.clear();

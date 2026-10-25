@@ -103,7 +103,11 @@ jobs:
 
       - name: Unit and integration tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: ./build/tests/redgem_tests
+        run: |
+          for i in $(seq 1 15); do echo "=== RUN $i"; ./build/tests/redgem_tests -tc="a guest that goes on at a game*" 2>&1 | grep -E "DBG|Status|ERROR|values" | grep -v "DBG poll" | tail -15 || true; done
+          for i in $(seq 1 3); do echo "=== FULL $i"; ./build/tests/redgem_tests -sf="*multiplayer_test*" > full$i.log 2>&1 || true; grep -nE "DBG (stall|drain|message|bytes|pending|silence|idle|broken|not)|ERROR|values" full$i.log | head -40; done
+          for f in full*.log; do if grep -q "online 0" $f; then echo "=== FAILED TRACE $f"; sed -n '/DBG stall over/,/DBG drain/p' $f | head -2000; fi; done
+          echo "=== ONE TRACE"; ./build/tests/redgem_tests -tc="a guest that goes on at a game*" 2>&1 | sed -n '/DBG stall over/,/DBG drain/p' | head -1200
 
       - name: Tests of the testing library
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}

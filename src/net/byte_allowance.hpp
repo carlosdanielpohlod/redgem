@@ -36,6 +36,9 @@ class ByteAllowance {
     return left_ >= 0.0f;
   }
 
+  float left() const { return left_; }
+  float forgiven() const { return forgiven_; }
+
  private:
   float per_second_;
   float burst_;

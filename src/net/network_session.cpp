@@ -1,6 +1,7 @@
 // NetworkSession: getting into a game and out of it, and the turn every poll gives each machine.
 
 #include "net/network_session.hpp"
+#include <cstdio>
 
 #include <algorithm>
 
@@ -139,14 +140,24 @@ std::vector<NetworkEvent> NetworkSession::poll(float seconds) {
 bool NetworkSession::still_serving(std::size_t link) const { return link < links_.size() && !offline(); }
 
 void NetworkSession::serve(Link& link, float seconds, std::vector<NetworkEvent>& events) {
-  police(link, link.connection.pump(), seconds);
+  const std::size_t dbg_bytes = link.connection.pump();
+  police(link, dbg_bytes, seconds);
+  int dbg_taken = 0;
   if (in_touch_with(link)) link.connection.keep_in_touch(seconds);
   // (Only so many a poll: the rest wait for the next one, see kMaxMessagesPerPoll.)
   while (!offline()) {
     const auto message = link.connection.next_message();
     if (!message) break;
     if (!police_message(link)) break;  // the message past what the machine may send goes nowhere
+    ++dbg_taken;
     handle(link, *message, events);
+  }
+  if (relaying()) {
+    static int dbg_empty = 0;
+    if (dbg_bytes == 0 && dbg_taken == 0) { ++dbg_empty; } else {
+      std::fprintf(stderr, "DBG poll e=%d s=%.4f b=%zu t=%d held=%zu l=%.0f f=%.0f ml=%.0f mf=%.0f\n", dbg_empty, seconds, dbg_bytes, dbg_taken, link.connection.held(), link.allowance.left(), link.allowance.forgiven(), link.messages.left(), link.messages.forgiven());
+      dbg_empty = 0;
+    }
   }
 }
 
