@@ -44,8 +44,8 @@ int SceneDocument::add_image(const std::filesystem::path& file, std::string& err
   if (known != kNoIndex) return known;
   const std::string mime_type = glb_images::mime_type_of(*bytes);
   const int image = glb_images::append_image(glb_, *bytes, mime_type, file.filename().string());
-  // (The description lists the file's images in the same order.)
-  desc_.images.resize(static_cast<std::size_t>(image));
+  // (The description lists the file's images in the same order: one it lacks is an empty one.)
+  if (desc_.images.size() < static_cast<std::size_t>(image)) desc_.images.resize(static_cast<std::size_t>(image));
   desc_.images.push_back(ImageData{*bytes, extension_for(mime_type)});
   return image;
 }
