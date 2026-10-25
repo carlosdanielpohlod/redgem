@@ -53,9 +53,15 @@ std::string problem_with_ruby_tests(const TestCliOptions& options) {
   return {};
 }
 
+// A suite of every test of a game runs them as they are: no test file, and no pictures.
+bool has_more_than_a_suite(const TestCliOptions& options) {
+  return !options.test_file.empty() || !options.scripts_game.empty() || options.headless;
+}
+
 // What is wrong with a line that was read to its end; empty when nothing is.
 std::string problem_with(const TestCliOptions& options) {
   if (options.mode == TestMode::RubyTests) return problem_with_ruby_tests(options);
+  if (options.mode == TestMode::GameTests) return has_more_than_a_suite(options) ? tr("testing.cli.all_alone") : "";
   if (!options.scripts_game.empty()) return tr("testing.cli.game_for_ruby_tests");
   if (options.game_dir.empty()) return tr("testing.cli.missing_game_dir");
   if (options.test_file.empty()) return tr("testing.cli.missing_system_test");

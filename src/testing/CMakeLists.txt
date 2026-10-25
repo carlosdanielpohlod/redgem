@@ -31,6 +31,7 @@ add_library(redgem_testing STATIC
   opened_classes.cpp
   test_stage.cpp
   system_test.cpp
+  game_test_suite.cpp
   test_cli.cpp
   test_cli_options.cpp
   testing_texts.cpp)

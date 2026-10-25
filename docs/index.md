@@ -12,6 +12,8 @@ This manual is for people making games with it.
    playable game.
 3. Keep [Behaviours](scripting/behaviours.md) and the [API reference](scripting/api.md) open while
    you write scripts.
+4. [The command line](command-line.md) reads and changes scenes as text, plays a game with no
+   window, takes pictures of it and looks it over: handy in scripts and with coding assistants.
 
 ## How a game is organized
 

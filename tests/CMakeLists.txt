@@ -152,7 +152,9 @@ add_executable(redgem_tests
   integration/dedicated_server_test.cpp
   integration/connection_approval_test.cpp
   integration/editor_session_test.cpp
-  integration/game_project_test.cpp)
+  integration/game_project_test.cpp
+  integration/scene_tools_test.cpp
+  integration/play_tools_test.cpp)
 target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest)
 target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # The tests of builds copy the real player, and look for it where a build does: beside redgem.
@@ -177,7 +179,8 @@ add_executable(redgem_testing_tests
   testing/frame_pictures_test.cpp
   testing/test_library_test.cpp
   testing/opened_classes_test.cpp
-  testing/test_stage_test.cpp)
+  testing/test_stage_test.cpp
+  testing/game_test_suite_test.cpp)
 target_link_libraries(redgem_testing_tests PRIVATE redgem_testing doctest::doctest)
 target_include_directories(redgem_testing_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(redgem_testing_tests PRIVATE
@@ -242,6 +245,30 @@ add_test(NAME app.check_catches_a_game_in_the_relay
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_tools.sh relay $<TARGET_FILE:redgem_player>)
 set_tests_properties(app.check_catches_a_game_in_the_relay PROPERTIES
   PASS_REGULAR_EXPRESSION "found in .*redgem-player: \"raylib\"")
+
+# The tools of redgem's command line that open a window or start another program (the others are
+# tested in integration/scene_tools_test.cpp and play_tools_test.cpp): a picture of a game at a
+# moment, and a game's own tests run by its check.
+add_test(NAME system.tools.shot
+         COMMAND redgem shot ${CMAKE_SOURCE_DIR}/games/platformer ${CMAKE_CURRENT_BINARY_DIR}/tools_shot.png --at 0.5)
+set_tests_properties(system.tools.shot PROPERTIES LABELS system RUN_SERIAL TRUE
+  PASS_REGULAR_EXPRESSION "saved [^\n]*tools_shot.png \\(512x288, scene main at 0.5 s\\)")
+# (--at 0: the game as it starts, before its first step.)
+add_test(NAME system.tools.shot_at_the_start
+         COMMAND redgem shot ${CMAKE_SOURCE_DIR}/games/platformer ${CMAKE_CURRENT_BINARY_DIR}/tools_shot_start.png
+                 --at 0 --size 64x36)
+set_tests_properties(system.tools.shot_at_the_start PROPERTIES LABELS system RUN_SERIAL TRUE
+  PASS_REGULAR_EXPRESSION "saved [^\n]*tools_shot_start.png \\(64x36, scene main at 0 s\\)")
+add_test(NAME system.tools.shot_through_a_camera
+         COMMAND redgem shot ${CMAKE_SOURCE_DIR}/games/platformer ${CMAKE_CURRENT_BINARY_DIR}/tools_shot_camera.png
+                 --at 0 --size 64x36 --camera Nowhere)
+set_tests_properties(system.tools.shot_through_a_camera PROPERTIES LABELS system RUN_SERIAL TRUE
+  PASS_REGULAR_EXPRESSION "no camera called Nowhere; the cameras are: Camera")
+# (The fixture's tests: a system test that passes and unit tests that fail.)
+add_test(NAME system.tools.check_runs_the_tests
+         COMMAND redgem check ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/games/checked --run-tests)
+set_tests_properties(system.tools.check_runs_the_tests PROPERTIES LABELS system RUN_SERIAL TRUE
+  PASS_REGULAR_EXPRESSION "FAIL tests/score_test.rb: FAIL ScoreTest#test_a_coin_is_worth_ten: [^\n]*expected 10, got 1.*tests: 1 passed, 1 failed")
 
 # The relay's command line, as the program itself answers it.
 add_test(NAME relay.help COMMAND redgem_relay --help)

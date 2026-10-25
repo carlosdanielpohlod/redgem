@@ -40,6 +40,14 @@ until 1.0, a release may change what games rely on (see
 - **Android App Bundles**: `redgem build ... --target android --bundle` makes an `.aab` for Google
   Play (with Google's bundletool).
 - **`redgem --version`** says which version of RedGem it is.
+- **`redgem scene list|get|set|add|remove`**: a scene read and changed from the command line as
+  short text, one line per object, objects named by a short id (`#12`), a path or a name; saved
+  as the editor saves it.
+- **`redgem run`** plays a game with no window for a while and says each script error once, with
+  its file and line; **`redgem shot`** saves a picture of a game at a moment.
+- **`redgem check`** looks a game over (scripts compile, scenes read, attached scripts are there
+  and define their class) and, with `--run-tests`, runs its tests: **`redgem-test --all`** runs
+  every test of a game, a line per file.
 - **CHANGELOG.md**: this file.
 
 ### Changed

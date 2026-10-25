@@ -1,5 +1,6 @@
 // redgem: the program games are made with. It opens the editor and the project hub and does what
-// the command line asks (new, build, --play). What players receive is another program,
+// the command line asks (new, build, --play, and the tools that read, change, play and check a
+// game from it: scene, run, shot, check). What players receive is another program,
 // redgem-player, which a build copies next to the game's files; where games meet over the
 // internet is a third, redgem-relay, and a game run on a server for players to join a fourth,
 // redgem-server.
@@ -22,6 +23,7 @@
 #include "project/game_build.hpp"
 #include "project/game_templates.hpp"
 #include "project/project_texts.hpp"
+#include "project/tool_commands.hpp"
 
 namespace {
 
@@ -93,6 +95,14 @@ int build(const redgem::CliOptions& options) {
   return kExitSuccess;
 }
 
+// What a developer tool answered, said where it belongs; its exit code.
+int said(const redgem::tools::ToolResult& result) {
+  std::cout << result.out;
+  std::cerr << result.err;
+  if (!result.err.empty() && result.err.back() != '\n') std::cerr << "\n";
+  return result.exit_code;
+}
+
 // What each way of running the program does.
 struct Mode {
   redgem::RunMode mode;
@@ -135,6 +145,7 @@ void set_up_texts() {
 int run_command_line(const std::vector<std::string>& args) {
   using namespace redgem;
   set_up_texts();
+  if (const auto tool = tools::run_tool_command(args)) return said(*tool);
   const CliResult cli = parse_cli(args);
   if (!cli.ok) {
     std::cerr << cli.error << "\n\n" << usage();

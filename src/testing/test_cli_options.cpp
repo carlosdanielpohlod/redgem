@@ -19,6 +19,7 @@ constexpr const char* kHeadlessOption = "--headless";
 constexpr const char* kGpuOption = "--gpu";
 constexpr const char* kWorkOption = "--work";
 constexpr const char* kGameOption = "--game";
+constexpr const char* kAllOption = "--all";
 
 // What the option just read was given (see command_line::option_value).
 std::optional<std::string> value(Reading& reading) { return command_line::option_value(reading.args, reading.next); }
@@ -67,6 +68,17 @@ void read_game(Reading& reading) {
   reading.result.options.scripts_game = normalized_folder(*folder);
 }
 
+// --all <game_dir>: every test of the game.
+void read_all(Reading& reading) {
+  const auto folder = value(reading);
+  if (!folder) {
+    fail(reading, tr("testing.cli.all_needs_game"));
+    return;
+  }
+  reading.result.options.mode = TestMode::GameTests;
+  reading.result.options.game_dir = normalized_folder(*folder);
+}
+
 void read_headless(Reading& reading) { reading.result.options.headless = true; }
 
 void read_gpu(Reading& reading) {
@@ -88,6 +100,7 @@ constexpr Option kOptions[] = {
     {kGpuOption, read_gpu},
     {kWorkOption, read_work},
     {kGameOption, read_game},
+    {kAllOption, read_all},
 };
 
 }  // namespace
