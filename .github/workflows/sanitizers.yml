@@ -106,8 +106,10 @@ jobs:
           cmake --build build --target redgem_tests redgem_testing_tests redgem_test_tool redgem_relay redgem_server -- -k 0
           ccache --show-stats
 
+      # (From main only: the repository's caches are shared, and one per pull request push of each
+      # build would crowd out the rest.)
       - name: Keep the compiler cache
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name != 'pull_request' }}
         uses: actions/cache/save@v4
         with:
           path: .ccache

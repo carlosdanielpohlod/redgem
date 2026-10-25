@@ -38,9 +38,9 @@ endif()
 # continuous integration runs the tests in such builds (see tools/sanitizers/).
 set(REDGEM_SANITIZERS "" CACHE STRING "Sanitizers to build everything with (-fsanitize=<list>), or empty")
 if(REDGEM_SANITIZERS)
-  # (Frames kept, for whole backtraces; a finding stops the program instead of being reported and
-  # passed over, so that a test run fails on it.)
-  add_compile_options(-fsanitize=${REDGEM_SANITIZERS} -fno-omit-frame-pointer -fno-sanitize-recover=all)
+  # (Frames kept, for whole backtraces. What UBSan finds stays recoverable, so that its suppression
+  # file can pass over a library's findings; halt_on_error stops the program at any other.)
+  add_compile_options(-fsanitize=${REDGEM_SANITIZERS} -fno-omit-frame-pointer)
   add_link_options(-fsanitize=${REDGEM_SANITIZERS})
 endif()
 

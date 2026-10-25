@@ -1,3 +1,7 @@
 # Undefined behaviour UBSan reports in the libraries the engine is built from (suppressions=, see
 # run_tests.sh). One line per finding, with why: one in the engine's own code is fixed, never
 # listed here.
+
+# Jolt keeps the shape filter of a step in raw storage it builds the wrapper in, and calls it
+# through a pointer whose dynamic type UBSan's vptr check cannot see there.
+vptr:*/Jolt/Physics/PhysicsSystem.cpp
