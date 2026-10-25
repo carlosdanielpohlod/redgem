@@ -89,9 +89,12 @@ jobs:
             .deps/fetch/*-subbuild
           key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
 
+      # (Without warnings as errors: GCC's flow analysis of instrumented code reports bounds and
+      # uninitialized values that are not there, inside the standard library. The Linux workflow
+      # builds the same code with warnings as errors.)
       - name: Configure
         run: >
-          cmake -S . -B build -G Ninja ${{ matrix.configure }} -DREDGEM_WARNINGS_AS_ERRORS=ON
+          cmake -S . -B build -G Ninja ${{ matrix.configure }}
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
 
