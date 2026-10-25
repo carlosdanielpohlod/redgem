@@ -131,8 +131,10 @@ TEST_CASE("a run that goes on from an earlier one plays on copies of its files, 
     CHECK_FALSE(std::filesystem::exists(own.settings));    // (the earlier run kept none)
     std::ofstream(own.bindings) << "{\"changed\": true}";  // what this run does is its own
   }
-  std::ifstream kept(first.bindings);
-  CHECK(std::string(std::istreambuf_iterator<char>(kept), {}) == "{}");
+  {
+    std::ifstream kept(first.bindings);  // (closed before the folder goes: Windows keeps open files)
+    CHECK(std::string(std::istreambuf_iterator<char>(kept), {}) == "{}");
+  }
   std::filesystem::remove_all(work);
 }
 
