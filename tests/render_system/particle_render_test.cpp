@@ -3,6 +3,7 @@
 #include <doctest/doctest.h>
 
 #include <cstdlib>
+#include <cmath>
 #include <filesystem>
 #include <string>
 
@@ -375,4 +376,98 @@ TEST_CASE("continuous emitter trail renders between its old and current object p
   CHECK(emitters.stop(id));
   emitters.advance(1.0f, scene, particles);
   CHECK(stage.draw(scene, "emitter_trail_stopped", &particles).find(redder_than_blue).count == trail.count);
+}
+
+namespace {
+constexpr Vec3 kReceivingPuffAt{0, 0, 3};
+constexpr Vec3 kPuffBlockerAt{-2, 2, 5};  // toward the sun from the puff, outside its camera silhouette
+constexpr float kPuffBlockerSide = 2.0f;
+constexpr int kPuffShadowLoss = 30;
+constexpr int kSamePuffShade = 2;
+constexpr float kPuffPointWatts = 1000.0f;  // exported point lights use Watts, not the sun's intensity units
+
+SceneDesc receiving_puff_scene() {
+  auto desc = particle_shadow_scene();
+  NodeDesc blocker;
+  blocker.name = "PuffBlocker";
+  blocker.mesh = 0;
+  blocker.local.position = kPuffBlockerAt;
+  blocker.local.scale = Vec3::one() * kPuffBlockerSide;
+  desc.nodes.push_back(blocker);
+  return desc;
+}
+ParticleSystem receiving_puff(bool lit, bool glow = false) {
+  auto birth = still_particle(kReceivingPuffAt, Vec3::one());
+  birth.look.size = steady(kShadowParticleSize);
+  birth.look.lit = lit;
+  birth.look.glow = glow;
+  ParticleSystem particles;
+  particles.burst(birth);
+  return particles;
+}
+::Color puff_center(RenderStage& stage, const Scene& scene, const ParticleSystem& particles, const std::string& name) {
+  return stage.draw(scene, name, &particles).at(kMiddle, kMiddle);
+}
+}  // namespace
+
+TEST_CASE("lit particles receive object sun shadows and recover when the caster is disabled") {
+  auto desc = receiving_puff_scene();
+  const auto environment = static_cast<std::size_t>(desc.find_node("Environment"));
+  SUBCASE("four cascades") {}
+  SUBCASE("one cascade") { desc.nodes[environment].props["shadow_cascades"] = 1.0; }
+  SUBCASE("soft sun") { desc.nodes[environment].props["shadow_softness"] = 0.5; }
+  Scene scene = Scene::from_desc(desc);
+  const auto particles = receiving_puff(true);
+  RenderStage stage;
+  stage.upload(desc);
+  const auto shadowed = puff_center(stage, scene, particles, "particle_receives_sun_shadow");
+  scene.at(scene.find("PuffBlocker")).cast_shadow = false;
+  const auto lit = puff_center(stage, scene, particles, "particle_receives_sun_clear");
+  CHECK(static_cast<int>(lit.r) - shadowed.r > kPuffShadowLoss);
+  CHECK(static_cast<int>(lit.g) - shadowed.g > kPuffShadowLoss);
+  CHECK(static_cast<int>(lit.b) - shadowed.b > kPuffShadowLoss);
+}
+
+TEST_CASE("unlit particles and their glow ignore object sun shadows") {
+  const auto desc = receiving_puff_scene();
+  Scene scene = Scene::from_desc(desc);
+  bool glow = false;
+  SUBCASE("unlit") {}
+  SUBCASE("unlit glow") { glow = true; }
+  const auto particles = receiving_puff(false, glow);
+  RenderStage stage;
+  stage.upload(desc);
+  const auto blocked = puff_center(stage, scene, particles, "particle_unlit_blocked");
+  scene.at(scene.find("PuffBlocker")).cast_shadow = false;
+  const auto plain = puff_center(stage, scene, particles, "particle_unlit_clear");
+  CHECK(std::abs(static_cast<int>(blocked.r) - plain.r) <= kSamePuffShade);
+  CHECK(std::abs(static_cast<int>(blocked.g) - plain.g) <= kSamePuffShade);
+  CHECK(std::abs(static_cast<int>(blocked.b) - plain.b) <= kSamePuffShade);
+}
+
+TEST_CASE("a particle in sun shadow retains ambient and point lighting") {
+  auto desc = receiving_puff_scene();
+  desc.nodes[static_cast<std::size_t>(desc.find_node("Environment"))].props["ambient"] = 0.2;
+  NodeDesc point;
+  point.name = "Point";
+  point.light = LightDesc{};
+  point.light->type = LightType::Point;
+  point.light->color = {0, 1, 0, 1};
+  point.light->intensity = kPuffPointWatts;
+  point.local.position = {0, 0, 5};
+  desc.nodes.push_back(point);
+  Scene scene = Scene::from_desc(desc);
+  const auto particles = receiving_puff(true);
+  RenderStage stage;
+  stage.upload(desc);
+  const auto shadowed = puff_center(stage, scene, particles, "particle_shadow_ambient_point");
+  scene.at(scene.find("Sun")).light->intensity = 0;
+  const auto without_sun = puff_center(stage, scene, particles, "particle_without_sun_ambient_point");
+  CHECK(shadowed.g > kPuffShadowLoss);
+  CHECK(std::abs(static_cast<int>(shadowed.r) - without_sun.r) <= kSamePuffShade);
+  CHECK(std::abs(static_cast<int>(shadowed.g) - without_sun.g) <= kSamePuffShade);
+  CHECK(std::abs(static_cast<int>(shadowed.b) - without_sun.b) <= kSamePuffShade);
+  scene.at(scene.find("Point")).light->intensity = 0;
+  const auto ambient_only = puff_center(stage, scene, particles, "particle_shadow_ambient_only");
+  CHECK(static_cast<int>(shadowed.g) - ambient_only.g > kSamePuffShade);
 }
