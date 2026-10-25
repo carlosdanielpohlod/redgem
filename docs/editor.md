@@ -17,8 +17,8 @@ icons):
   while dragging), Play / Pause / Stop, and Build.
 * **Hierarchy**: the object tree with search. Click to select, Ctrl+click to add an object to the
   selection or take it away, Shift+click to select every row from the last one clicked; double
-  click to frame, drag onto another object to parent it (or onto empty space to unparent), right
-  click for actions (on the whole selection) and to create objects. Scripts and models from the
+  click to frame, drag onto another object to parent it (or onto empty space to unparent; a row of
+  the selection takes the whole selection along), right click for actions (on the whole selection) and to create objects. Scripts and models from the
   Project panel can be dropped on it.
 * **Scene**: hold the right mouse button and use WASD/QE to fly, wheel to dolly, F to frame the
   selection, click to pick objects (Ctrl or Shift + click adds or takes away), drag a rectangle to
@@ -57,7 +57,9 @@ icons):
 ## Several objects at once
 
 Everything selected moves, turns and scales together with the gizmo (around the middle of the
-selection, or around the first object selected: the toolbar's pivot button), and Duplicate, Delete,
+selection, or around the first object selected: the toolbar's pivot button; a scale goes along the
+pivot's axes, and an object turned another way and stretched unevenly takes the nearest placement
+without shear), and Duplicate, Delete,
 Cut, Copy and Paste act on all of it. A child goes along with its selected parent. Each of these is
 one undo step, however many objects it touches.
 
