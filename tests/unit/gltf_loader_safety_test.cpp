@@ -57,8 +57,10 @@ struct Gltf {
   json doc;
   std::vector<std::uint8_t> bin;
 
+  // (Each view starts at a multiple of its values' size, as the glTF specification asks.)
   template <typename T>
   int add_view(const std::vector<T>& values) {
+    bin.resize((bin.size() + sizeof(T) - 1) / sizeof(T) * sizeof(T));
     const std::size_t offset = bin.size();
     const auto* bytes = reinterpret_cast<const std::uint8_t*>(values.data());
     bin.insert(bin.end(), bytes, bytes + values.size() * sizeof(T));
