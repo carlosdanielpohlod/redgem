@@ -13,6 +13,8 @@ inline constexpr const char* kCollider = "collider";
 inline constexpr const char* kTrigger = "trigger";
 inline constexpr const char* kTag = "tag";
 inline constexpr const char* kMass = "mass";
+// The collision layer of its body, one of game.json's physics layers (physics/collision_layers.hpp).
+inline constexpr const char* kLayer = "layer";
 inline constexpr const char* kVisible = "visible";
 inline constexpr const char* kWheel = "wheel";
 // A terrain: a square grid mesh made in the editor, whose ground can be sculpted there.

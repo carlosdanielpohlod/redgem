@@ -100,6 +100,14 @@ bool follows_its_object(PhysicsWorld& physics, ObjectId id) {
   return physics.body_type(id) == BodyType::Kinematic || physics.is_trigger(id);
 }
 
+// A layer the game does not have: the body goes on the default one, with a warning.
+void settle_layer(const PhysicsWorld& physics, const GameObject& object, BodyConfig& body) {
+  if (physics.layers().find(body.layer)) return;
+  log::warning("object '" + object.name + "': no physics layer '" + body.layer +
+               "' in game.json (layers: " + physics.layers().names_listed() + "), using " + kDefaultLayerName);
+  body.layer = kDefaultLayerName;
+}
+
 }  // namespace
 
 void create_all(const Source& source, PhysicsWorld& physics) {
@@ -112,6 +120,7 @@ void create(const Source& source, PhysicsWorld& physics, ObjectId id) {
   BodyConfig body = body_config_from_props(object.props);
   for (const std::string& warning : body.warnings) log::warning("object '" + object.name + "': " + warning);
   if (!body.wants_physics()) return;
+  settle_layer(physics, object, body);
   const BodyDesc desc = describe_body(source, id, std::move(body));
   if (auto error = physics.add_object(desc)) log::error("object '" + object.name + "': " + *error);
 }

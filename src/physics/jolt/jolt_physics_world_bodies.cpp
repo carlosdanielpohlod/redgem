@@ -23,14 +23,15 @@ JPH::RefConst<JPH::Shape> chassis_shape(const ShapeInfo& info) {
 }
 
 JPH::BodyCreationSettings body_settings(const BodyDesc& desc, const JPH::RefConst<JPH::Shape>& shape,
-                                        JPH::EMotionType motion) {
-  const JPH::ObjectLayer layer = motion == JPH::EMotionType::Static ? layers::kNonMoving : layers::kMoving;
+                                        JPH::EMotionType motion, JPH::ObjectLayer layer) {
   JPH::BodyCreationSettings settings(shape, JPH::RVec3(to_jolt(desc.world.position)), to_jolt(desc.world.rotation),
                                      motion, layer);
   settings.mUserData = static_cast<JPH::uint64>(desc.object);
-  // Contacts are tracked every step, so bodies must never fall asleep.
+  // Contacts are tracked every step, so bodies must never fall asleep by themselves (a script
+  // may still put one to sleep).
   settings.mAllowSleeping = false;
-  if (motion == JPH::EMotionType::Dynamic) {
+  // Kinematic bodies get their mass too: a script may turn them dynamic.
+  if (motion != JPH::EMotionType::Static) {
     settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
     settings.mMassPropertiesOverride.mMass = desc.config.mass;
   }
@@ -45,7 +46,8 @@ void World::create_body(const BodyDesc& desc, const ShapeInfo& info, Record& rec
   const JPH::RefConst<JPH::Shape> shape = vehicle ? chassis_shape(info) : info.shape;
   const JPH::EActivation activation =
       motion == JPH::EMotionType::Static ? JPH::EActivation::DontActivate : JPH::EActivation::Activate;
-  record.body = system_.GetBodyInterface().CreateAndAddBody(body_settings(desc, shape, motion), activation);
+  const JPH::ObjectLayer layer = layers::object_layer(record.layer, motion != JPH::EMotionType::Static);
+  record.body = system_.GetBodyInterface().CreateAndAddBody(body_settings(desc, shape, motion, layer), activation);
   body_owners_[record.body.GetIndexAndSequenceNumber()] = desc.object;
   if (vehicle) attach_vehicle(desc, record);
 }
@@ -55,6 +57,10 @@ void World::release_body(Record& record) {
   body_owners_.erase(record.body.GetIndexAndSequenceNumber());
   system_.GetBodyInterface().RemoveBody(record.body);
   system_.GetBodyInterface().DestroyBody(record.body);
+}
+
+JPH::ObjectLayer World::object_layer_of(const Record& record) const {
+  return layers::object_layer(record.layer, record.type != BodyType::Static);
 }
 
 void World::teleport_body(Record& record, const Transform& world) {

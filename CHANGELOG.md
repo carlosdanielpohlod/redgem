@@ -23,6 +23,14 @@ until 1.0, a release may change what games rely on (see
   meshes, materials and pictures: in the same scene, into another scene, or into another editor
   window through the system's clipboard. Paste puts them next to the selection, Paste as Child
   under it.
+- **Collision layers**: up to 16 named layers in `game.json`'s `physics` section, with what each
+  collides with; a body or trigger goes on one with the `layer` property or `rigidbody.layer =`.
+- **Physics queries**: `Physics.raycast_all`, `sphere_cast`, `box_cast`, `capsule_cast`,
+  `overlap_sphere`, `overlap_box` and `overlap_capsule`; every query, `raycast` included, takes
+  `layers:` and a list of objects to `ignore:`.
+- **Forces and body state**: `Rigidbody#add_force` (at a point too), `add_torque`,
+  `angular_velocity`, `mass`, `gravity_scale`, `sleep`/`wake`, and switching a body between
+  dynamic and kinematic while the game runs.
 
 ## [0.4.0] - 2026-10-25
 

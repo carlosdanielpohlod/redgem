@@ -30,9 +30,9 @@ bool holds(ObjectId trigger, ObjectId other) { return other != kNoObject && othe
 std::set<ObjectId> World::objects_inside(ObjectId id, const Record& trigger) const {
   JPH::AllHitCollisionCollector<JPH::CollideShapeCollector> collector;
   const JPH::RMat44 transform = matrix_of(trigger.pose);
-  // Only moving things (characters, dynamic and kinematic bodies) fire triggers.
+  // Only moving things (characters, dynamic and kinematic bodies) its layer meets fire a trigger.
   const JPH::SpecifiedBroadPhaseLayerFilter broad_filter(broad_phase_layers::kMoving);
-  const JPH::SpecifiedObjectLayerFilter layer_filter(layers::kMoving);
+  const MovingThatMeet layer_filter(layers_, trigger.layer);
   system_.GetNarrowPhaseQuery().CollideShape(trigger.shape, JPH::Vec3::sReplicate(kUnitScale), transform,
                                              JPH::CollideShapeSettings(), JPH::RVec3::sZero(), collector, broad_filter,
                                              layer_filter);
@@ -59,8 +59,15 @@ void World::collect_contact_events() {
     std::lock_guard<std::mutex> lock(contacts_mutex_);
     current.swap(current_contacts_);
   }
+  keep_resting_contacts(current);
   append_contact_changes(previous_contacts_, current, events_);
   previous_contacts_ = std::move(current);
+}
+
+void World::keep_resting_contacts(std::set<ContactPair>& current) const {
+  for (const ContactPair& pair : previous_contacts_) {
+    if (both_at_rest(pair)) current.insert(pair);
+  }
 }
 
 std::vector<ContactEvent> World::drain_events() { return std::exchange(events_, {}); }

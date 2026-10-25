@@ -7,13 +7,16 @@
 //   jolt_physics_world_characters.cpp  characters
 //   jolt_physics_world_vehicles.cpp    vehicles
 //   jolt_physics_world_contacts.cpp    who touches whom: contacts and triggers
-//   jolt_physics_world_queries.cpp     what a ray hits
+//   jolt_physics_world_forces.cpp      what pushes, turns, weighs and wakes rigid bodies
+//   jolt_physics_world_queries.cpp     what a ray, a moving shape or a shape in place finds
 
 #include <Jolt/Jolt.h>
 
 #include <Jolt/Core/JobSystemSingleThreaded.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Character/CharacterVirtual.h>
+#include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/ContactListener.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/Physics/Vehicle/VehicleConstraint.h>
@@ -38,6 +41,7 @@ namespace redgem::jolt {
 struct Record {
   BodyType type = BodyType::None;
   bool trigger = false;
+  std::size_t layer = kDefaultLayer;
   JPH::BodyID body;
   JPH::Ref<JPH::CharacterVirtual> character;
   JPH::Ref<JPH::VehicleConstraint> vehicle;
@@ -56,10 +60,12 @@ inline bool is_character(const Record* record) { return record != nullptr && rec
 inline bool is_vehicle(const Record* record) { return record != nullptr && record->vehicle != nullptr; }
 // A body forces move: the simulation decides where it is, and the scene follows.
 inline bool is_dynamic_body(const Record* record) { return has_body(record) && is_dynamic(record->type); }
+// A body that can move at all (dynamic, kinematic or a vehicle's): it has a mass and can sleep.
+inline bool is_movable_body(const Record* record) { return has_body(record) && record->type != BodyType::Static; }
 
 class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterContactListener {
  public:
-  explicit World(Vec3 gravity);
+  World(Vec3 gravity, const CollisionLayers& layers);
   ~World() override;
 
   std::optional<std::string> add_object(const BodyDesc& desc) override;
@@ -82,7 +88,29 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   void set_vehicle_input(ObjectId object, const VehicleInput& input) override;
   float vehicle_forward_speed(ObjectId object) const override;
   std::vector<WheelPose> wheel_poses(ObjectId object) const override;
-  std::optional<RaycastHit> raycast(Vec3 origin, Vec3 direction, float max_distance, ObjectId ignore) const override;
+  void add_force(ObjectId object, Vec3 force) override;
+  void add_force_at(ObjectId object, Vec3 force, Vec3 point) override;
+  void add_torque(ObjectId object, Vec3 torque) override;
+  Vec3 angular_velocity(ObjectId object) const override;
+  void set_angular_velocity(ObjectId object, Vec3 velocity) override;
+  float mass(ObjectId object) const override;
+  void set_mass(ObjectId object, float mass) override;
+  bool set_body_type(ObjectId object, BodyType type) override;
+  float gravity_scale(ObjectId object) const override;
+  void set_gravity_scale(ObjectId object, float scale) override;
+  void set_sleeping(ObjectId object, bool sleeping) override;
+  bool sleeping(ObjectId object) const override;
+  const CollisionLayers& layers() const override { return layers_; }
+  std::size_t layer(ObjectId object) const override;
+  void set_layer(ObjectId object, std::size_t layer) override;
+  using PhysicsWorld::raycast;
+  std::optional<RaycastHit> raycast(Vec3 origin, Vec3 direction, float max_distance,
+                                    const QueryFilter& filter) const override;
+  std::vector<RaycastHit> raycast_all(Vec3 origin, Vec3 direction, float max_distance,
+                                      const QueryFilter& filter) const override;
+  std::optional<RaycastHit> shape_cast(const QueryShape& shape, Vec3 from, Vec3 to,
+                                       const QueryFilter& filter) const override;
+  std::vector<RaycastHit> overlap(const QueryShape& shape, Vec3 center, const QueryFilter& filter) const override;
 
  private:
   Record* find(ObjectId object) {
@@ -98,8 +126,17 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
     return it == body_owners_.end() ? kNoObject : it->second;
   }
   JPH::BodyID body_of(ObjectId object) const;
+  // The bodies of the objects a query ignores.
+  std::vector<JPH::BodyID> bodies_of(const std::vector<ObjectId>& objects) const;
   // The normal of the surface a ray hit, or zero when the body is gone by now.
   Vec3 surface_normal(const JPH::RayCastResult& result, JPH::RVec3Arg point) const;
+  // What a ray hit, told as scripts see it.
+  RaycastHit ray_hit(const JPH::RRayCast& ray, const JPH::RayCastResult& result, float max_distance) const;
+  // The layer of an object's body in Jolt's terms.
+  JPH::ObjectLayer object_layer_of(const Record& record) const;
+  // A rigid body neither moving nor about to: static, or asleep. Characters never are.
+  bool at_rest(ObjectId object) const;
+  bool both_at_rest(const ContactPair& pair) const { return at_rest(pair.first) && at_rest(pair.second); }
   void create_simulated(const BodyDesc& desc, const ShapeInfo& info, Record& record);
   void move_kinematic_bodies(float dt);
 
@@ -114,7 +151,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   void update_characters(float dt);
   void update_character(Record& record, float dt);
   // Moves a character by its velocity, sliding along what it meets, climbing steps and keeping to the floor.
-  void move_character(JPH::CharacterVirtual& character, float dt);
+  void move_character(const Record& record, float dt);
 
   // Vehicles.
   void attach_vehicle(const BodyDesc& desc, Record& record);
@@ -124,6 +161,8 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   std::set<ObjectId> objects_inside(ObjectId id, const Record& trigger) const;
   void update_triggers();
   void collect_contact_events();
+  // Touching bodies that are both at rest are not reported by Jolt, yet they still touch.
+  void keep_resting_contacts(std::set<ContactPair>& current) const;
   void record_contact(ObjectId a, ObjectId b);
   void record_character_contact(const JPH::CharacterVirtual* character, const JPH::BodyID& body);
   // Removes every trace of an object from contact bookkeeping (no exit events for a destroyed object).
@@ -139,9 +178,10 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
 
   Runtime runtime_;
   Vec3 gravity_;
+  CollisionLayers layers_;
   BroadPhaseLayers broad_phase_layers_;
   ObjectVsBroadPhase object_vs_broad_phase_;
-  ObjectPairs object_pairs_;
+  ObjectPairs object_pairs_{layers_};
   JPH::TempAllocatorImpl temp_allocator_;
   JPH::JobSystemSingleThreaded job_system_;
   JPH::PhysicsSystem system_;

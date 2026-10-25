@@ -26,7 +26,7 @@ WheelPose wheel_pose(const Record& record, std::size_t wheel) {
 void World::attach_vehicle(const BodyDesc& desc, Record& record) {
   JPH::BodyLockWrite lock(system_.GetBodyLockInterface(), record.body);
   if (!lock.Succeeded()) return;
-  record.vehicle = build_vehicle(lock.GetBody(), desc.wheels, layers::kMoving);
+  record.vehicle = build_vehicle(lock.GetBody(), desc.wheels, object_layer_of(record));
   for (const WheelDesc& wheel : desc.wheels) record.wheel_objects.push_back(wheel.object);
   system_.AddConstraint(record.vehicle.GetPtr());
   system_.AddStepListener(record.vehicle.GetPtr());

@@ -16,9 +16,9 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`SceneScript`](#scenescript) | Sets a level up from Ruby when it loads: scripts/<scene>_scene.rb. |
 | [`Input`](#input) | Keyboard, mouse, gamepad and touch, read every frame. |
 | [`Time`](#time) | The game's clock (added to Ruby's Time). |
-| [`Physics`](#physics) | Questions to the physics world. |
+| [`Physics`](#physics) | Questions to the physics world: rays, moving shapes and shapes in place. |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
-| [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic". |
+| [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). |
 | [`Vehicle`](#vehicle) | The body of an object with body = "vehicle" and wheels. |
 | [`Camera`](#camera) | The camera the game is seen through. |
 | [`Light`](#light) | game_object.light: the light an object shines with. |
@@ -246,9 +246,19 @@ The game's clock (added to Ruby's Time).
 
 ## Physics
 
-Questions to the physics world. See [gameplay.md](gameplay.md).
+Questions to the physics world: rays, moving shapes and shapes in place. See [gameplay.md](gameplay.md).
 
-- `Physics.raycast(origin, direction, max_distance = 1000, ignore = nil)`: the first thing a ray hits: {object:, point:, normal:, distance:}, or nil
+- `Physics.raycast(origin, direction, max_distance = 1000, ignore = nil, layers: nil, ignore: nil)`: the first thing a ray hits: {object:, point:, normal:, distance:}, or nil
+- `Physics.raycast_all(origin, direction, max_distance = 1000, layers: nil, ignore: nil)`: everything a ray hits, nearest first
+- `Physics.sphere_cast(from, to, radius, layers: nil, ignore: nil)`: the first thing a ball moving from `from` to `to` touches, or nil
+- `Physics.box_cast(from, to, size, rotation: nil, layers: nil, ignore: nil)`: the same for a box (its whole size; rotation in degrees)
+- `Physics.capsule_cast(from, to, radius, height, rotation: nil, layers: nil, ignore: nil)`: the same for an upright capsule (height end to end)
+- `Physics.overlap_sphere(center, radius, layers: nil, ignore: nil)`: the hits of everything inside a ball, nearest first
+- `Physics.overlap_box(center, size, rotation: nil, layers: nil, ignore: nil)`: the same inside a box
+- `Physics.overlap_capsule(center, radius, height, rotation: nil, layers: nil, ignore: nil)`: the same inside a capsule
+- `Physics.layers`: the game's collision layers, as Symbols (game.json's physics layers)
+
+`layers:` is a layer's name or a list of them (every layer when nil); `ignore:` is an object or a list of objects to see through. Hits are `{object:, point:, normal:, distance:}`, each object once, nearest first, at most 64; triggers are never hit. A cast that starts inside something hits it at distance 0.
 
 ## CharacterController
 
@@ -258,14 +268,35 @@ The body of an object with body = "character": walks, jumps, climbs steps. See [
 - `jump(speed)`: jumps up at that speed
 - `grounded?`: whether it stands on something
 - `velocity`: its velocity
+- `layer`: its collision layer, a Symbol
+- `layer = name`: moves it to another collision layer
 
 ## Rigidbody
 
-The body of an object with body = "dynamic" or "kinematic".
+The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). See [gameplay.md](gameplay.md).
 
 - `velocity`: its velocity
 - `velocity = vector`: sets its velocity
 - `add_impulse(vector)`: pushes it
+- `add_force(force, at: nil)`: pushes it during the next step (newtons); at a point (world space), it also turns it
+- `add_torque(torque)`: turns it during the next step (newton meters)
+- `angular_velocity`: how fast it spins, degrees per second around each axis
+- `angular_velocity = vector`: sets how fast it spins
+- `mass`: its mass in kilograms
+- `mass = kilograms`: changes its mass (more than 0)
+- `kinematic?`: whether scripts move it (instead of forces)
+- `kinematic = flag`: turns a dynamic body kinematic, or back
+- `dynamic?`: whether forces move it
+- `dynamic = flag`: turns a kinematic body dynamic, or back
+- `gravity_scale`: how much gravity pulls it (1 is normal)
+- `gravity_scale = scale`: 0 floats, 2 falls twice as hard
+- `sleep`: stops simulating it until something touches it
+- `wake`: simulates it again
+- `sleeping?`: whether it sleeps
+- `layer`: its collision layer, a Symbol
+- `layer = name`: moves it to another collision layer
+
+Forces and torques act during the next physics step only: add them every `fixed_update` to keep pushing. A body made dynamic again starts at rest. `kinematic=` and `dynamic=` raise for a vehicle.
 
 ## Vehicle
 

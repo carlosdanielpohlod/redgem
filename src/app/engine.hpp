@@ -127,7 +127,8 @@ class Engine {
 
   // Starting up, in this order (the first scene is in place by then).
   void initialize();
-  void build_world();
+  // The scene, its animations and its bodies, which collide as game.json's layers say.
+  void build_world(const CollisionLayers& layers);
   void open_presenter(const GameSettings& settings);
   void open_audio();
   void open_saves();
@@ -196,6 +197,7 @@ class Engine {
   SceneDesc scene_desc_;
   Scene scene_;
   std::unique_ptr<PhysicsWorld> physics_;
+  CollisionLayers collision_layers_;  // game.json's: every scene's physics world has them
   InputState input_;
   ScriptedInputSource scripted_input_;
   std::filesystem::path bindings_file_;  // empty: the players' bindings are kept nowhere

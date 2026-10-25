@@ -65,9 +65,10 @@ Style/StringLiteralsInInterpolation:
   EnforcedStyle: double_quotes
 Layout/ExtraSpacing:
   AllowBeforeTrailingComments: true   # constants' comments are lined up
-# Coordinates, colors and time steps go by the letters everyone knows them by.
+# Coordinates, colors and time steps go by the letters everyone knows them by; a point a force
+# pushes at is `at:`.
 Naming/MethodParameterName:
-  AllowedNames: [x, y, z, r, g, b, a, t, dt, to, id]
+  AllowedNames: [x, y, z, r, g, b, a, t, dt, to, id, at]
 # Arithmetic is written as in a formula: * and / before + and -.
 Lint/AmbiguousOperatorPrecedence:
   Enabled: false

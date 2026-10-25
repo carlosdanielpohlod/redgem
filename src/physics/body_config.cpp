@@ -127,6 +127,11 @@ void read_mass(const PropertyMap& props, BodyConfig& config) {
   }
 }
 
+void read_layer(const PropertyMap& props, BodyConfig& config) {
+  const std::optional<std::string> layer = get_string(props, props::kLayer);
+  if (layer) config.layer = *layer;
+}
+
 }  // namespace
 
 bool is_dynamic(BodyType type) { return type == BodyType::Dynamic || type == BodyType::Vehicle; }
@@ -154,6 +159,7 @@ BodyConfig body_config_from_props(const PropertyMap& props) {
   apply_trigger(config);
   settle_collider(config);
   read_mass(props, config);
+  read_layer(props, config);
   return config;
 }
 

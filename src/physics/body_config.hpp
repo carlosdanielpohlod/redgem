@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "physics/collision_layers.hpp"
 #include "scene/scene_desc.hpp"
 #include "scene/property.hpp"
 
@@ -17,6 +18,7 @@ struct BodyConfig {
   ColliderShape collider = ColliderShape::Box;
   bool trigger = false;
   float mass = 0.0f;
+  std::string layer = kDefaultLayerName;  // a collision layer's name (physics/collision_layers.hpp)
   std::vector<std::string> warnings;
 
   bool wants_physics() const { return type != BodyType::None || trigger; }

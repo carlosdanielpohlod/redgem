@@ -164,9 +164,7 @@ not a promise of how it will be closed.
 
 ### Gameplay API
 
-- Physics has no collision layers or masks, joints, shape casts or overlap queries, forces or
-  torque, and mass or kinematic state cannot change while the game runs. `Physics.raycast` can only
-  ignore one object.
+- Physics has no joints.
 - Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - No navigation mesh or pathfinding.
 - Cameras have no follow, orbit or shake helpers, and no `world_to_screen`.
