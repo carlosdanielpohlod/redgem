@@ -24,9 +24,6 @@
 namespace redgem::jolt {
 namespace {
 
-// Query shapes are built at their final size.
-constexpr float kUnitScale = 1.0f;
-
 // A ray with no direction or no length: it cannot hit anything.
 bool goes_nowhere(Vec3 direction, float max_distance) { return length(direction) <= kEpsilon || max_distance <= 0.0f; }
 
@@ -93,10 +90,6 @@ JPH::RefConst<JPH::Shape> shape_of(const QueryShape& shape) {
   return new JPH::SphereShape(shape.radius);
 }
 
-JPH::RMat44 placed_at(Vec3 position, Quat rotation) {
-  return JPH::RMat44::sRotationTranslation(to_jolt(rotation), JPH::RVec3(to_jolt(position)));
-}
-
 }  // namespace
 
 JPH::BodyID World::body_of(ObjectId object) const {
@@ -160,7 +153,7 @@ std::optional<RaycastHit> World::shape_cast(const QueryShape& shape, Vec3 from, 
                                             const QueryFilter& filter) const {
   const JPH::RefConst<JPH::Shape> swept = shape_of(shape);
   const JPH::RShapeCast cast = JPH::RShapeCast::sFromWorldTransform(
-      swept.GetPtr(), JPH::Vec3::sReplicate(kUnitScale), placed_at(from, shape.rotation), to_jolt(to - from));
+      swept.GetPtr(), JPH::Vec3::sReplicate(kUnitScale), matrix_of(from, shape.rotation), to_jolt(to - from));
   JPH::ClosestHitCollisionCollector<JPH::CastShapeCollector> collector;
   const LayersInMask layer_filter(filter.layers);
   const IgnoredBodies body_filter(bodies_of(filter.ignore));
@@ -178,7 +171,7 @@ std::vector<RaycastHit> World::overlap(const QueryShape& shape, Vec3 center, con
   const LayersInMask layer_filter(filter.layers);
   const IgnoredBodies body_filter(bodies_of(filter.ignore));
   system_.GetNarrowPhaseQuery().CollideShape(tested.GetPtr(), JPH::Vec3::sReplicate(kUnitScale),
-                                             placed_at(center, shape.rotation), JPH::CollideShapeSettings(),
+                                             matrix_of(center, shape.rotation), JPH::CollideShapeSettings(),
                                              JPH::RVec3::sZero(), collector, {}, layer_filter, body_filter);
   std::vector<RaycastHit> hits;
   for (const JPH::CollideShapeResult& result : collector.mHits) {

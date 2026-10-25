@@ -903,8 +903,8 @@
         {
           "name": "raycast",
           "static": true,
-          "args": "origin, direction, max_distance = 1000, ignore = nil, layers: nil, ignore: nil",
-          "about": "the first thing a ray hits: {object:, point:, normal:, distance:}, or nil",
+          "args": "origin, direction, max_distance = 1000, skip = nil, layers: nil, ignore: nil",
+          "about": "the first thing a ray hits: {object:, point:, normal:, distance:}, or nil (skip: an object it sees through)",
           "top": 22,
           "example": "hit = Physics.raycast(transform.position, Vector3.down, 2.0, game_object)"
         },

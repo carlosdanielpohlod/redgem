@@ -50,12 +50,14 @@ std::optional<std::size_t> named_layer(const CollisionLayersReading& reading, co
   return layer;
 }
 
-LayerMask mask_of(CollisionLayersReading& reading, const nlohmann::json& names) {
-  LayerMask mask = 0;
+// The layers a "collides" list names; nothing (and a warning) when it is no list, so the entry is
+// left out rather than read as "nothing".
+std::optional<LayerMask> mask_of(CollisionLayersReading& reading, const nlohmann::json& names) {
   if (!names.is_array()) {
     reading.warnings.push_back(std::string(kSection) + "what a layer collides with must be a list of layers");
-    return mask;
+    return std::nullopt;
   }
+  LayerMask mask = 0;
   for (const nlohmann::json& name : names) {
     if (const auto layer = named_layer(reading, name, reading.warnings)) mask |= layer_bit(*layer);
   }
@@ -71,7 +73,8 @@ void read_collides(const nlohmann::json& physics, CollisionLayersReading& readin
   }
   for (const auto& [name, others] : rules.items()) {
     const std::optional<std::size_t> layer = named_layer(reading, name, reading.warnings);
-    if (layer) reading.layers.let_in(*layer, mask_of(reading, others));
+    const std::optional<LayerMask> mask = mask_of(reading, others);
+    if (layer && mask) reading.layers.let_in(*layer, *mask);
   }
 }
 

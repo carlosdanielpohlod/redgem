@@ -25,6 +25,9 @@ inline constexpr float kMinColliderHalfExtent = 0.01f;
 // Convex radius is clamped to this fraction of the smallest half extent.
 inline constexpr float kConvexRadiusFraction = 0.5f;
 
+// How far apart two resting bodies may be and still touch (Jolt keeps a sliver between them).
+inline constexpr float kRestingContactGap = 0.05f;
+
 // --- Queries (rays, casts and overlaps) --------------------------------------------
 // Most hits a query reports (the nearest ones): a query is not meant to list a crowd.
 inline constexpr std::size_t kMaxQueryHits = 64;

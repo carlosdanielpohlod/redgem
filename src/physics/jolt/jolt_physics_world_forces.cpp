@@ -69,6 +69,7 @@ void World::set_mass(ObjectId object, float mass) {
 bool World::set_body_type(ObjectId object, BodyType type) {
   Record* record = find(object);
   if (!can_switch(record, type)) return false;
+  if (record->type == type) return true;  // already that: a body keeps moving as it did
   JPH::BodyInterface& bodies = system_.GetBodyInterface();
   bodies.SetMotionType(record->body, motion_for(type), JPH::EActivation::Activate);
   // A kinematic body's speed is whatever its last move took (a jump across the level in one step):

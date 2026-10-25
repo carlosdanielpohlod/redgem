@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "physics/physics_config.hpp"
 #include "core/config.hpp"
@@ -101,12 +102,21 @@ std::optional<std::filesystem::path> scripts_for(const std::filesystem::path& te
   return std::nullopt;
 }
 
+// The collision layers of the game's game.json (warning of what is wrong with them, as the game
+// does); just the default layer without a game.
+CollisionLayers game_collision_layers(const std::filesystem::path& game_dir) {
+  if (game_dir.empty()) return {};
+  GameManifest manifest = read_game_manifest(game_dir);
+  for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
+  return std::move(manifest.settings.collision_layers);
+}
+
 }  // namespace
 
 int run_ruby_tests(const std::filesystem::path& test_file, const std::filesystem::path& game_dir) {
   const std::optional<std::filesystem::path> scripts = scripts_for(test_file, game_dir);
   if (!scripts) return kExitFailure;
-  BareWorld world(game_dir.empty() ? CollisionLayers() : read_game_settings(game_dir).collision_layers);
+  BareWorld world(game_collision_layers(game_dir));
   ScriptHost host(world.context, *scripts);
   if (const auto error = load_tests(host, world, test_file, !game_dir.empty())) {
     log::error(*error);

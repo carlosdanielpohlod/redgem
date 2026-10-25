@@ -221,3 +221,23 @@ TEST_CASE("an overlap finds what a shape in place touches, on the layers it is g
   box.half_extents = {0.5f, 0.5f, 0.5f};
   CHECK(world->overlap(box, {9, 3, 0}, {}).empty());
 }
+
+TEST_CASE("a sleeping body put on a layer that meets nothing leaves the ground it lay on") {
+  auto world = create_jolt_physics_world(
+      {0.0f, config::kGravityY, 0.0f},
+      collision_layers_from_json(nlohmann::json::parse(R"({"layers": ["ghost"], "collides": {"ghost": []}})")).layers);
+  REQUIRE_FALSE(world->add_object(body(kGround, {{"collider", std::string("box")}}, {0, -0.5f, 0}, {40, 0.5f, 40})));
+  REQUIRE_FALSE(world->add_object(body(kBullet, on_layer("dynamic", "default"), {0, 0.5f, 0})));
+  run(*world, kOneSecond);
+  world->drain_events();
+  world->set_sleeping(kBullet, true);
+  run(*world, kOneSecond);
+  CHECK(world->drain_events().empty());  // still lying there
+
+  world->set_layer(kBullet, *world->layers().find("ghost"));
+  run(*world, kOneSecond);
+  bool left = false;
+  for (const ContactEvent& event : world->drain_events()) left = left || event.phase == ContactPhase::Exit;
+  CHECK(left);
+  CHECK(world->simulated_pose(kBullet)->position.y < 0.0f);  // fell through
+}

@@ -134,6 +134,8 @@ void World::set_layer(ObjectId object, std::size_t layer) {
   record->layer = layer;
   const JPH::BodyID body = body_of(object);
   if (!body.IsInvalid()) system_.GetBodyInterface().SetObjectLayer(body, object_layer_of(*record));
+  // Woken, so that Jolt looks again at what it touches.
+  if (is_movable_body(record)) system_.GetBodyInterface().ActivateBody(body);
   if (is_vehicle(record)) set_wheels_layer(*record->vehicle, object_layer_of(*record));
 }
 

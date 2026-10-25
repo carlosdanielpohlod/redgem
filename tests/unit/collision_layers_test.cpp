@@ -94,6 +94,8 @@ TEST_CASE("a physics section of the wrong shape is warned of and gives the defau
   CHECK(mentions(read(R"({"collides": ["bullet"]})"), "must map layers"));
   CHECK(mentions(read(R"({"collides": {"default": "default"}})"), "must be a list of layers"));
   CHECK(read(R"({"layers": "bullet"})").layers.count() == 1);
+  // A list that is no list is left out: the layer still meets every other.
+  CHECK(read(R"({"collides": {"default": "default"}})").layers.collide(kDefaultLayer, kDefaultLayer));
 }
 
 TEST_CASE("an object's layer property names its collision layer") {

@@ -43,20 +43,33 @@ QueryFilter filter_of(mrb_state* mrb, mrb_value ignore, mrb_value layers) {
   return QueryFilter{layer_mask_arg(mrb, layers), objects_arg(mrb, ignore)};
 }
 
-// __raycast(origin, direction, max_distance, ignore, layers, all): every hit (all) or the first,
-// in a list.
-mrb_value physics_raycast(mrb_state* mrb, mrb_value) {
+// What a ray of a script is: where from, which way, how far, and what it looks at.
+struct RayArgs {
+  Vec3 origin;
+  Vec3 direction;
+  float max_distance = 0.0f;
+  QueryFilter filter;
+};
+
+// (origin, direction, max_distance, ignore, layers)
+RayArgs ray_args(mrb_state* mrb) {
   mrb_value origin, direction, ignore, layers;
   mrb_float max_distance = 0.0;
-  mrb_bool all = false;
-  mrb_get_args(mrb, "oofoob", &origin, &direction, &max_distance, &ignore, &layers, &all);
+  mrb_get_args(mrb, "oofoo", &origin, &direction, &max_distance, &ignore, &layers);
   const auto distance = static_cast<float>(at_least(mrb, max_distance, 0.0, "Physics.raycast's distance"));
-  const QueryFilter filter = filter_of(mrb, ignore, layers);
-  const Vec3 from = to_vec3(mrb, origin);
-  const Vec3 towards = to_vec3(mrb, direction);
-  if (all) return hits_value(mrb, physics(mrb).raycast_all(from, towards, distance, filter));
-  const std::optional<RaycastHit> hit = physics(mrb).raycast(from, towards, distance, filter);
-  return hits_value(mrb, hit ? std::vector<RaycastHit>{*hit} : std::vector<RaycastHit>{});
+  return {to_vec3(mrb, origin), to_vec3(mrb, direction), distance, filter_of(mrb, ignore, layers)};
+}
+
+// __raycast: the first hit, or nil.
+mrb_value physics_raycast(mrb_state* mrb, mrb_value) {
+  const RayArgs ray = ray_args(mrb);
+  return hit_or_nil(mrb, physics(mrb).raycast(ray.origin, ray.direction, ray.max_distance, ray.filter));
+}
+
+// __raycast_all: every hit.
+mrb_value physics_raycast_all(mrb_state* mrb, mrb_value) {
+  const RayArgs ray = ray_args(mrb);
+  return hits_value(mrb, physics(mrb).raycast_all(ray.origin, ray.direction, ray.max_distance, ray.filter));
 }
 
 // __cast(kind, size, rotation, from, to, ignore, layers): the first hit, or nil.
@@ -88,7 +101,8 @@ mrb_value physics_layers(mrb_state* mrb, mrb_value) {
 
 void install_physics_query_bindings(mrb_state* mrb) {
   RClass* physics_module = mrb_define_module(mrb, "Physics");
-  mrb_define_module_function(mrb, physics_module, "__raycast", physics_raycast, MRB_ARGS_REQ(6));
+  mrb_define_module_function(mrb, physics_module, "__raycast", physics_raycast, MRB_ARGS_REQ(5));
+  mrb_define_module_function(mrb, physics_module, "__raycast_all", physics_raycast_all, MRB_ARGS_REQ(5));
   mrb_define_module_function(mrb, physics_module, "__cast", physics_cast, MRB_ARGS_REQ(7));
   mrb_define_module_function(mrb, physics_module, "__overlap", physics_overlap, MRB_ARGS_REQ(6));
   mrb_define_module_function(mrb, physics_module, "layers", physics_layers, MRB_ARGS_NONE());

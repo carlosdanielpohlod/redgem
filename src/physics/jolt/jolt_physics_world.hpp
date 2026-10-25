@@ -137,6 +137,11 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   // A rigid body neither moving nor about to: static, or asleep. Characters never are.
   bool at_rest(ObjectId object) const;
   bool both_at_rest(const ContactPair& pair) const { return at_rest(pair.first) && at_rest(pair.second); }
+  // Whether two bodies still touch (or nearly: a resting contact keeps a sliver apart) on layers
+  // that meet.
+  bool still_touch(const ContactPair& pair) const;
+  // A contact Jolt no longer reports because both bodies rest, though they still touch.
+  bool rests_on(const ContactPair& pair) const { return both_at_rest(pair) && still_touch(pair); }
   void create_simulated(const BodyDesc& desc, const ShapeInfo& info, Record& record);
   void move_kinematic_bodies(float dt);
 

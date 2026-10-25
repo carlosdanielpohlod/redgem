@@ -248,7 +248,7 @@ The game's clock (added to Ruby's Time).
 
 Questions to the physics world: rays, moving shapes and shapes in place. See [gameplay.md](gameplay.md).
 
-- `Physics.raycast(origin, direction, max_distance = 1000, ignore = nil, layers: nil, ignore: nil)`: the first thing a ray hits: {object:, point:, normal:, distance:}, or nil
+- `Physics.raycast(origin, direction, max_distance = 1000, skip = nil, layers: nil, ignore: nil)`: the first thing a ray hits: {object:, point:, normal:, distance:}, or nil (skip: an object it sees through)
 - `Physics.raycast_all(origin, direction, max_distance = 1000, layers: nil, ignore: nil)`: everything a ray hits, nearest first
 - `Physics.sphere_cast(from, to, radius, layers: nil, ignore: nil)`: the first thing a ball moving from `from` to `to` touches, or nil
 - `Physics.box_cast(from, to, size, rotation: nil, layers: nil, ignore: nil)`: the same for a box (its whole size; rotation in degrees)

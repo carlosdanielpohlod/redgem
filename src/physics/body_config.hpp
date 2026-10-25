@@ -18,7 +18,9 @@ struct BodyConfig {
   ColliderShape collider = ColliderShape::Box;
   bool trigger = false;
   float mass = 0.0f;
-  std::string layer = kDefaultLayerName;  // a collision layer's name (physics/collision_layers.hpp)
+  // A collision layer's name (physics/collision_layers.hpp); one the game lacks means the default
+  // layer (bodies::create warns of it).
+  std::string layer = kDefaultLayerName;
   std::vector<std::string> warnings;
 
   bool wants_physics() const { return type != BodyType::None || trigger; }

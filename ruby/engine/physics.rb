@@ -9,13 +9,13 @@
 module Physics
   RAY_LENGTH = 1000.0 # meters: how far a ray given no length looks
 
-  # The fourth argument is an object the ray sees through, as `ignore:` is.
+  # `skip` is an object the ray sees through, as those of `ignore:` are.
   def self.raycast(origin, direction, max_distance = RAY_LENGTH, skip = nil, layers: nil, ignore: nil)
-    __raycast(origin, direction, max_distance, __objects([skip, ignore]), __layer_names(layers), false).first
+    __raycast(origin, direction, max_distance, __objects([skip, ignore]), __layer_names(layers))
   end
 
   def self.raycast_all(origin, direction, max_distance = RAY_LENGTH, layers: nil, ignore: nil)
-    __raycast(origin, direction, max_distance, __objects([ignore]), __layer_names(layers), true)
+    __raycast_all(origin, direction, max_distance, __objects([ignore]), __layer_names(layers))
   end
 
   def self.sphere_cast(from, to, radius, layers: nil, ignore: nil)

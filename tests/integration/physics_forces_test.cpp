@@ -3,6 +3,7 @@
 
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <memory>
 #include <vector>
 
@@ -174,4 +175,27 @@ TEST_CASE("static ground has no mass, no spin and never sleeps in a script's eye
   CHECK(length(world->angular_velocity(kGround)) == doctest::Approx(0.0f));
   CHECK_FALSE(world->sleeping(kGround));
   CHECK(world->gravity_scale(kGround) == doctest::Approx(1.0f));
+}
+
+TEST_CASE("switching a body to the type it has changes nothing") {
+  auto world = world_with_ground();
+  REQUIRE_FALSE(world->add_object(body(kCrate, {{"body", std::string("dynamic")}}, kAboveGround)));
+  run(*world, kOneSecond / 4);
+  const float falling = world->velocity(kCrate).y;
+  REQUIRE(falling < -1.0f);
+  CHECK(world->set_body_type(kCrate, BodyType::Dynamic));
+  CHECK(world->velocity(kCrate).y == doctest::Approx(falling));
+}
+
+TEST_CASE("a sleeping body stops touching the ground once the ground moves away") {
+  auto world = world_with_ground();
+  REQUIRE_FALSE(world->add_object(body(kCrate, {{"body", std::string("dynamic")}}, {0, 0.5f, 0})));
+  run(*world, kSettleSteps);
+  world->drain_events();
+  world->set_sleeping(kCrate, true);
+  world->teleport(kGround, Transform{{0, -50, 0}, Quat::identity(), Vec3::one()});
+  run(*world, 1);
+  const std::vector<ContactEvent> events = world->drain_events();
+  CHECK(std::any_of(events.begin(), events.end(), [](const ContactEvent& e) { return e.phase == ContactPhase::Exit; }));
+  CHECK(world->sleeping(kCrate));  // nothing woke it: it hangs where it slept
 }
