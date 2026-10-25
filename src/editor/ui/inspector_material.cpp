@@ -45,25 +45,18 @@ bool draw_material_fields(MaterialDesc& edited) {
   return changed;
 }
 
-void draw_texture_note(const MaterialDesc& material) {
-  if (!inspector_logic::textured(material)) return;
-  const char* key = material.normal_image != kNoIndex ? "editor.inspector.material.textured_with_normal_map"
-                                                      : "editor.inspector.material.textured";
-  ImGui::TextColored(muted_color(), "%s", icon_label(ICON_FA_IMAGE, key));
-}
-
 void draw_material(PanelContext& context, int material) {
   SceneDocument& doc = context.session.document();
   MaterialDesc edited = doc.material(material);
   ImGui::PushID(material);
   draw_material_title(doc, material);
   const bool changed = draw_material_fields(edited);
-  draw_texture_note(edited);
   if (changed) {
     streamed_edit(context);
     edited.emissive = editor_logic::at_least(edited.emissive, kNoGlow);
     doc.set_material(material, edited, false);
   }
+  draw_texture_slots(context, material);
   ImGui::PopID();
 }
 

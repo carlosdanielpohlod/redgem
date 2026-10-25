@@ -21,7 +21,12 @@ namespace {
 
 using namespace editor_config;
 
-bool only_sounds(const DropReport& report) { return report.models.empty() && !report.sounds.empty(); }
+// The Project panel shows the folder of what a drop added: models first, then pictures, then sounds.
+ui::ProjectFolder folder_to_show(const DropReport& report, ui::ProjectFolder shown) {
+  if (!report.models.empty()) return ui::ProjectFolder::Models;
+  if (!report.images.empty()) return ui::ProjectFolder::Images;
+  return report.sounds.empty() ? shown : ui::ProjectFolder::Sounds;
+}
 
 }  // namespace
 
@@ -83,9 +88,11 @@ void EditorApp::add_files(const std::vector<std::filesystem::path>& files) {
 void EditorApp::report_drop(const DropReport& report) {
   for (const std::string& model : report.models) log::info("added " + model + ": drag it from Models into the scene");
   for (const std::string& sound : report.sounds) log::info("added " + sound + " to the game's sounds");
+  for (const std::string& image : report.images) {
+    log::info("added " + image + " to the game's images: pick it in a material's texture slots");
+  }
   for (const std::string& refused : report.refused) log::warning("not added: " + refused);
-  if (!report.models.empty()) panel_state_.project.folder = ui::ProjectFolder::Models;
-  if (only_sounds(report)) panel_state_.project.folder = ui::ProjectFolder::Sounds;
+  panel_state_.project.folder = folder_to_show(report, panel_state_.project.folder);
 }
 
 void EditorApp::check_files_on_disk() {

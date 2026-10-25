@@ -25,7 +25,8 @@ icons):
   select what shows inside it (with Ctrl or Shift held, added to the selection), W / E / R switch
   the gizmo. Drop a model on the ground to place it there, or a script on an object to attach it.
 * **Inspector**: name, tag, visible, *Template* (hidden in the game, copied with `Scene.spawn`), then
-  one card per component: Transform, Mesh with its materials (color, metallic, roughness, emission),
+  one card per component: Transform, Mesh with its materials (color, metallic, roughness, emission
+  and their pictures, see [Material pictures](#material-pictures)),
   Light (type, color, intensity, range), Camera (field of view, clipping), one card per Ruby script,
   Physics (body, trigger, collider, mass), vehicle wheels and custom properties. **Add Component**
   adds scripts (existing or new), a physics body, a trigger or a property. With several objects
@@ -34,11 +35,13 @@ icons):
 * **GameObject menu**: terrain you sculpt with a brush (see [Levels](levels.md#terrain)), empty
   objects, cube / sphere / plane / cylinder / capsule (with colliders),
   directional / point / spot lights, cameras, and the game's models.
-* **Your own models and sounds**: drop `.glb` files (exported from Blender) and `.wav` / `.ogg` /
-  `.mp3` / `.flac` files from your file manager onto the editor window. They are copied into the
-  game's `models/` and `sounds/` folders and show up in the Project panel.
-* **Project**: the game's scripts, models, sounds and scenes. Double click a script to edit it, a
-  model to add it to the scene, a sound to hear it, a scene to open it (see [Scenes](#scenes)).
+* **Your own models, sounds and pictures**: drop `.glb` files (exported from Blender), `.wav` /
+  `.ogg` / `.mp3` / `.flac` files and `.png` / `.jpg` / `.jpeg` / `.webp` pictures from your file
+  manager onto the editor window. They are copied into the game's `models/`, `sounds/` and
+  `images/` folders and show up in the Project panel.
+* **Project**: the game's scripts, models, sounds, scenes and images. Double click a script to edit
+  it, a model to add it to the scene, a sound to hear it, a scene to open it (see [Scenes](#scenes)),
+  a picture to see it in your system's viewer.
   *New script* creates a `Behaviour` from a template, *New scene* a scene; *Open folder* shows the
   files.
 * **Console**: engine and Ruby output (filter by level), including script errors with backtraces.
@@ -53,6 +56,24 @@ icons):
 * **Ctrl+Z / Ctrl+Y** undo and redo, **Ctrl+D** duplicate, **Del** delete, **Ctrl+X / Ctrl+C /
   Ctrl+V** cut, copy and paste, **Ctrl+S** save. Help > Keyboard Shortcuts lists them all. File >
   New / Open Game goes back to the hub.
+
+## Material pictures
+
+Under a material's color, metallic, roughness and emission, the Inspector lists its five texture
+slots, each with the picture it shows or *None*:
+
+* **Color map**: the surface's colors, tinted by the material's color.
+* **Surface map**: roughness in the green channel and metalness in the blue one (glTF's
+  metallic-roughness map), scaled by the sliders.
+* **Normal map**: small bumps and grooves, as a tangent-space normal map.
+* **Occlusion map**: how much ambient light reaches each spot, in the red channel.
+* **Glow map**: where the surface glows, tinted by the emission color.
+
+Click a slot to pick one of the pictures of the game's `images/` folder (or *None*), or drag a
+picture from the Project panel's Images onto it. The picture goes inside the scene's `.glb` (the
+same picture used twice is stored once), so the scene still shows it in Blender and when copied to
+another scene; a picture no material shows any more is left out when the scene is saved. Each
+change is one undo step. PNG, JPEG and still WebP pictures can be used.
 
 ## Several objects at once
 

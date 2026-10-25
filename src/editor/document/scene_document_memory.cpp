@@ -10,8 +10,21 @@
 #include <utility>
 
 #include "editor/document/glb_compact.hpp"
+#include "editor/document/material_textures.hpp"
 
 namespace redgem {
+namespace {
+
+// Marks in `held` the images the materials show.
+void hold_images_of(const std::vector<MaterialDesc>& materials, std::vector<bool>& held) {
+  for (const MaterialDesc& material : materials) {
+    for (const int image : material_textures::images_of(material)) {
+      if (image >= 0 && image < static_cast<int>(held.size())) held[static_cast<std::size_t>(image)] = true;
+    }
+  }
+}
+
+}  // namespace
 
 bool SceneDocument::history_too_long(std::size_t kept) const {
   if (undo_.size() > kMaxUndoSteps) return true;
@@ -88,8 +101,9 @@ void SceneDocument::release_unreachable() {
   const std::vector<int> out_of_reach = meshes_out_of_reach();
   if (out_of_reach.empty()) return;
   for (const int mesh : out_of_reach) release_mesh(mesh);
+  const std::vector<bool> held = images_in_materials();
   const std::optional<std::vector<bool>> images_used =
-      release_meshes(glb_, released_meshes_, {source_nodes_, source_skins_, source_animations_});
+      release_meshes(glb_, released_meshes_, {source_nodes_, source_skins_, source_animations_}, held);
   if (images_used) release_images(*images_used);
 }
 
@@ -105,6 +119,14 @@ void SceneDocument::release_images(const std::vector<bool>& used) {
   for (std::size_t image = 0; image < images; ++image) {
     if (!used[image]) std::vector<std::uint8_t>().swap(desc_.images[image].encoded);
   }
+}
+
+std::vector<bool> SceneDocument::images_in_materials() const {
+  std::vector<bool> held(desc_.images.size(), false);
+  hold_images_of(desc_.materials, held);
+  for (const Snapshot& step : undo_) hold_images_of(step.materials, held);
+  for (const Snapshot& step : redo_) hold_images_of(step.materials, held);
+  return held;
 }
 
 }  // namespace redgem

@@ -10,6 +10,7 @@
 #include "core/log.hpp"
 #include "editor/document/glb_compact.hpp"
 #include "editor/document/gltf_json.hpp"
+#include "editor/document/material_textures.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 
@@ -115,6 +116,10 @@ void SceneDocument::sync_materials() {
   nlohmann::json& json = glb_.json;
   const nlohmann::json materials = materials_json(list_of(json, kMaterials), desc_.materials);
   if (!materials.empty()) json[kMaterials] = materials;
+  // The pictures each one is drawn with (texture slots set in the Inspector).
+  for (std::size_t i = 0; i < desc_.materials.size(); ++i) {
+    material_textures::write_slots(json, json[kMaterials][i], desc_.materials[i]);
+  }
   for (const MaterialDesc& material : desc_.materials) {
     if (needs_emissive_strength(material)) add_extension_used(json, kEmissiveStrengthExtension);
     if (material.clearcoat.factor > 0.0f) add_extension_used(json, kClearcoatExtension);

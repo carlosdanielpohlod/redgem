@@ -66,10 +66,11 @@ std::string mime_type_of(const std::vector<std::uint8_t>& bytes) {
   return image->format() == EncodedImageFormat::Jpeg ? kJpegMime : kWebpMime;
 }
 
-int append_image(GlbFile& glb, const std::vector<std::uint8_t>& bytes, const std::string& mime_type) {
+int append_image(GlbFile& glb, const std::vector<std::uint8_t>& bytes, const std::string& mime_type,
+                 const std::string& name) {
   const int view = append_view(glb, bytes);
   nlohmann::json& images = array_at(glb.json, kImages);
-  images.push_back({{kBufferView, view}, {kMimeType, mime_type}});
+  images.push_back({{kName, name}, {kBufferView, view}, {kMimeType, mime_type}});
   return last_index(images);
 }
 

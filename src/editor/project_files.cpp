@@ -1,6 +1,8 @@
 #include "editor/project_files.hpp"
 
 #include <algorithm>
+#include <cctype>
+#include <iterator>
 
 #include "audio/audio.hpp"
 #include "core/config.hpp"
@@ -10,6 +12,19 @@ namespace {
 
 constexpr const char* kModelExtension = ".glb";
 constexpr const char* kAnySound = nullptr;  // for files_in: every kind of sound file the engine plays
+constexpr const char* kAnyImage = "";       // for files_in: every kind of picture file a material shows
+
+std::string lowered(std::string text) {
+  std::transform(text.begin(), text.end(), text.begin(),
+                 [](unsigned char letter) { return static_cast<char>(std::tolower(letter)); });
+  return text;
+}
+
+bool picture_file(const std::filesystem::path& file) {
+  const std::string extension = lowered(file.extension().string());
+  return std::any_of(std::begin(kImageFileExtensions), std::end(kImageFileExtensions),
+                     [&extension](const char* known) { return extension == known; });
+}
 
 // A regular file of a folder, not a link (built games leave links out).
 bool plain_file(const std::filesystem::directory_entry& entry) {
@@ -17,10 +32,11 @@ bool plain_file(const std::filesystem::directory_entry& entry) {
   return !entry.is_symlink(error) && entry.is_regular_file(error);
 }
 
-// Whether a file of `dir` is of the kind listed: with the extension, or any supported sound when
-// `extension` is null.
+// Whether a file of `dir` is of the kind listed: with the extension, any supported sound when
+// `extension` is kAnySound, or any picture when it is kAnyImage.
 bool of_kind(const std::filesystem::path& dir, const std::filesystem::path& file, const char* extension) {
-  if (extension == nullptr) return find_sound_file(dir, file.stem().string()).has_value();
+  if (extension == kAnySound) return find_sound_file(dir, file.stem().string()).has_value();
+  if (extension == kAnyImage) return picture_file(file);
   return file.extension() == extension;
 }
 
@@ -77,11 +93,13 @@ ProjectFiles ProjectFiles::scan(const std::filesystem::path& game_dir) {
   files.models = file_names_in(game_dir / config::kModelsDirName, kModelExtension);
   files.sounds = names_in(game_dir / config::kSoundsDirName, kAnySound);
   files.scenes = scene_names(game_dir);
+  files.images = file_names_in(game_dir / config::kImagesDirName, kAnyImage);
   return files;
 }
 
 bool ProjectFiles::operator==(const ProjectFiles& other) const {
-  return scripts == other.scripts && models == other.models && sounds == other.sounds && scenes == other.scenes;
+  return scripts == other.scripts && models == other.models && sounds == other.sounds && scenes == other.scenes &&
+         images == other.images;
 }
 
 }  // namespace redgem

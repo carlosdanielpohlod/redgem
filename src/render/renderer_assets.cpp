@@ -78,6 +78,13 @@ bool has_texture(const std::vector<Texture2D>& textures, int image) {
   return is_index_of(image, textures.size()) && loaded(textures[static_cast<std::size_t>(image)]);
 }
 
+// What a map of a material without a picture there shows: raylib's white texel for the color (so
+// the color shows as it is), nothing for the others (the shader is told they have none).
+Texture2D blank_map(int slot) {
+  if (slot != MATERIAL_MAP_ALBEDO) return Texture2D{};
+  return Texture2D{rlGetTextureIdDefault(), 1, 1, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
+}
+
 }  // namespace
 
 void Renderer::Impl::upload_new_textures(const SceneDesc& desc) {
@@ -96,6 +103,13 @@ Material Renderer::Impl::make_material(redgem::Color base_color) const {
 // A material with its textures; declared images that could not be decoded use a checkerboard.
 Material Renderer::Impl::load_material(const MaterialDesc& source) const {
   Material material = make_material(source.base_color);
+  bind_textures(material, source);
+  return material;
+}
+
+// Each map shows the texture of its image, or what a material without one shows. (Done again as
+// the editor gives a slot another picture, or takes it away.)
+void Renderer::Impl::bind_textures(Material& material, const MaterialDesc& source) const {
   const std::pair<int, int> maps[] = {{MATERIAL_MAP_ALBEDO, source.base_color_image},
                                       {MATERIAL_MAP_EMISSION, source.emissive_image},
                                       {MATERIAL_MAP_NORMAL, source.normal_image},
@@ -105,9 +119,9 @@ Material Renderer::Impl::load_material(const MaterialDesc& source) const {
                                       {render_detail::kCoatRoughnessMap, source.clearcoat.roughness_image},
                                       {render_detail::kCoatNormalMap, source.clearcoat.normal_image}};
   for (const auto& [slot, image] : maps) {
-    if (has_texture(textures, image)) material.maps[slot].texture = textures[static_cast<std::size_t>(image)];
+    material.maps[slot].texture =
+        has_texture(textures, image) ? textures[static_cast<std::size_t>(image)] : blank_map(slot);
   }
-  return material;
 }
 
 void Renderer::Impl::upload_new_materials(const SceneDesc& desc) {
@@ -119,6 +133,7 @@ void Renderer::Impl::upload_new_materials(const SceneDesc& desc) {
 void Renderer::Impl::refresh_material_values(const SceneDesc& desc) {
   for (std::size_t i = 0; i < desc.materials.size(); ++i) {
     materials[i].maps[MATERIAL_MAP_ALBEDO].color = to_raylib(desc.materials[i].base_color);
+    bind_textures(materials[i], desc.materials[i]);
   }
   material_factors = desc.materials;
   skins = desc.skins;

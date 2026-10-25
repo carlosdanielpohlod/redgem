@@ -8,8 +8,9 @@
 namespace redgem {
 
 // Files dragged from the desktop onto the editor become the game's own: a model goes to its
-// models/ folder, a sound to sounds/. Anything else is not for a game.
-enum class DroppedKind { Model, Sound };
+// models/ folder, a sound to sounds/, a picture (for materials) to images/. Anything else is not
+// for a game.
+enum class DroppedKind { Model, Sound, Image };
 
 std::optional<DroppedKind> kind_of_dropped(const std::filesystem::path& file);
 
@@ -17,6 +18,7 @@ std::optional<DroppedKind> kind_of_dropped(const std::filesystem::path& file);
 struct DropReport {
   std::vector<std::string> models;   // file names now in models/
   std::vector<std::string> sounds;   // file names now in sounds/
+  std::vector<std::string> images;   // file names now in images/
   std::vector<std::string> refused;  // one line each: the file and why it was left out
 };
 

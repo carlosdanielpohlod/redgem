@@ -111,6 +111,13 @@ class SceneDocument {
   // How many nodes show this material.
   int material_users(int material) const;
   void set_material(int index, const MaterialDesc& material, bool record = true);
+  // Adds a picture file (PNG, JPEG or WebP, e.g. from the game's images/ folder) to the scene: its
+  // bytes go inside the scene's file, as an image a material's texture slot can show. The same
+  // picture added again is the image it already is. Returns the image's number, or kNoIndex with
+  // why in `error`. (Images are only ever added; saving leaves out the ones no material shows.)
+  int add_image(const std::filesystem::path& file, std::string& error);
+  // What an image is called in the file (the picture file it came from), "" when nothing.
+  std::string image_name(int image) const;
 
   // Drops the last checkpoint if nothing changed since (a click on a gizmo or field without moving it).
   void drop_checkpoint_if_unchanged();
@@ -189,6 +196,11 @@ class SceneDocument {
   void release_unreachable();
   void release_mesh(int mesh);
   void release_images(const std::vector<bool>& used);
+  // The images some material shows, now or in an undo or redo step: they stay, whatever the
+  // file's JSON (written on save) says.
+  std::vector<bool> images_in_materials() const;
+  // An image the scene holds with these bytes already, or kNoIndex.
+  int image_with(const std::vector<std::uint8_t>& bytes) const;
   // Whether two snapshots hold the same document, whatever their versions.
   static bool same_content(const Snapshot& a, const Snapshot& b);
   // Goes back to a snapshot (its nodes are moved out of it).

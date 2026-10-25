@@ -167,10 +167,23 @@ std::vector<std::uint8_t> bytes_in_use(Json& views, const std::vector<bool>& use
   return packed;
 }
 
+// The images `held` (and the bytes they are made of) count as used.
+void hold_images(const Json& doc, const std::vector<bool>& held, Usage& usage) {
+  const std::size_t images = std::min(held.size(), usage[kImageKind].size());
+  for (std::size_t image = 0; image < images; ++image) {
+    if (!held[image]) continue;
+    usage[kImageKind][image] = true;
+    const Json& entry = doc[kImages][image];
+    if (entry.contains(kBufferView))
+      usage[kBufferViewKind][entry_of(entry[kBufferView], usage[kBufferViewKind].size())] = true;
+  }
+}
+
 std::optional<std::vector<bool>> release_in_place(GlbFile& glb, const std::set<int>& released,
-                                                  const GlbSources& sources) {
+                                                  const GlbSources& sources, const std::vector<bool>& held_images) {
   Json probe = still_held(glb.json, released, sources);
-  const Usage usage = usage_of(probe);
+  Usage usage = usage_of(probe);
+  hold_images(glb.json, held_images, usage);
   Json views = list_of(glb.json, kBufferViews);
   std::vector<std::uint8_t> bin = bytes_in_use(views, usage[kBufferViewKind], glb.bin);
   set_unless_empty(glb.json, kBufferViews, views);
@@ -180,10 +193,10 @@ std::optional<std::vector<bool>> release_in_place(GlbFile& glb, const std::set<i
 
 }  // namespace
 
-std::optional<std::vector<bool>> release_meshes(GlbFile& glb, const std::set<int>& released,
-                                                const GlbSources& sources) {
+std::optional<std::vector<bool>> release_meshes(GlbFile& glb, const std::set<int>& released, const GlbSources& sources,
+                                                const std::vector<bool>& held_images) {
   try {
-    return release_in_place(glb, released, sources);
+    return release_in_place(glb, released, sources, held_images);
   } catch (const std::exception&) {
     return std::nullopt;
   }

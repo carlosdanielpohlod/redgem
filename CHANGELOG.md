@@ -14,6 +14,11 @@ until 1.0, a release may change what games rely on (see
   Shift + click and rectangle selection in the Scene view. The gizmo moves, turns and scales the
   whole selection around its middle or its first object; the Inspector edits what they have in
   common (a dash where they differ); Duplicate and Delete act on all of it, each one undo step.
+- **Material pictures in the Inspector**: the color, surface (metallic-roughness), normal,
+  occlusion and glow maps of a material are picked from the game's `images/` folder, swapped or
+  cleared, and saved inside the scene's `.glb`.
+- **Pictures dropped on the editor**: PNG, JPEG and WebP files are copied into the game's
+  `images/` folder, which the Project panel lists.
 - **Cut, copy and paste** of objects with everything under them, their scripts, properties,
   meshes, materials and pictures: in the same scene, into another scene, or into another editor
   window through the system's clipboard. Paste puts them next to the selection, Paste as Child

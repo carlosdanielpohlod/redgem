@@ -70,10 +70,6 @@ bool can_add_property(const PropertyMap& props, const std::string& key) {
   return !key.empty() && is_custom(key) && props.count(key) == 0;
 }
 
-bool textured(const MaterialDesc& material) {
-  return material.base_color_image != kNoIndex || material.normal_image != kNoIndex;
-}
-
 bool wheel_card_shown(const std::optional<std::string>& parent_body, bool is_wheel) {
   return is_wheel || parent_body == std::optional<std::string>(props::kBodyVehicle);
 }

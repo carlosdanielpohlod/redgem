@@ -127,8 +127,9 @@ not a promise of how it will be closed.
 
 ### Editor
 
-- The material inspector edits color, metallic, roughness and emission, but cannot assign or swap a
-  texture. Images cannot be dropped onto the editor, and the Project panel has no `images/` folder.
+- A picture put on a material from the editor goes inside the scene's `.glb`: changing the file in
+  `images/` afterwards does not change the scene (pick it again). The Inspector shows a slot's
+  picture by name, without a preview, and sets neither a texture's sampler nor its UV set.
 - Templates live inside one scene: there are no prefab files shared by several scenes, nor nesting
   or overrides.
 - Scripts reload when Play is pressed, not while the game runs. The script editor has no

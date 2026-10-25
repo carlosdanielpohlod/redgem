@@ -39,6 +39,9 @@ TEST_CASE("a dropped file is a model or a sound by its extension, whatever its c
   for (const char* sound : {"jump.wav", "theme.ogg", "hit.MP3", "wind.flac"}) {
     CHECK(kind_of_dropped(sound) == DroppedKind::Sound);
   }
+  for (const char* picture : {"wood.png", "bark.JPG", "leaf.jpeg", "moss.webp"}) {
+    CHECK(kind_of_dropped(picture) == DroppedKind::Image);
+  }
   CHECK_FALSE(kind_of_dropped("tree.fbx").has_value());
   CHECK_FALSE(kind_of_dropped("notes").has_value());
 }
@@ -54,6 +57,15 @@ TEST_CASE("dropped models and sounds are copied into the game's folders, which a
   CHECK(text_of(desk.game / config::kModelsDirName / "tree.glb") == "a tree");
   CHECK(std::filesystem::exists(desk.game / config::kSoundsDirName / "jump.wav"));
   CHECK(std::filesystem::exists(desk.root / "tree.glb"));  // copied, not moved
+}
+
+TEST_CASE("dropped pictures are copied into the game's images folder") {
+  Desk desk;
+  const DropReport report = add_dropped_files(desk.game, {desk.file("wood.png", "a picture"), desk.file("bark.webp")});
+  CHECK(report.images == std::vector<std::string>{"wood.png", "bark.webp"});
+  CHECK(report.refused.empty());
+  CHECK(text_of(desk.game / config::kImagesDirName / "wood.png") == "a picture");
+  CHECK(std::filesystem::exists(desk.game / config::kImagesDirName / "bark.webp"));
 }
 
 TEST_CASE("a file the game already has under that name is left as it is") {

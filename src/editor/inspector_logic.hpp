@@ -31,8 +31,6 @@ bool has_mass(const BodyConfig& body);
 bool is_custom(const std::string& key);
 // A name the object can take as a new property: not empty, not taken, not one with a widget of its own.
 bool can_add_property(const PropertyMap& props, const std::string& key);
-// Whether a material draws with pictures (a color or a normal map).
-bool textured(const MaterialDesc& material);
 // Whether an object shows the Vehicle wheel card: it is a wheel, or a child of a vehicle.
 bool wheel_card_shown(const std::optional<std::string>& parent_body, bool is_wheel);
 

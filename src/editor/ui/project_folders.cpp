@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "core/config.hpp"
+#include "core/platform.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/ui/style.hpp"
 
@@ -27,6 +28,11 @@ void play_sound(PanelContext& context, const std::string& name) {
 
 void open_scene(PanelContext& context, const std::string& name) { context.scene_to_open = name; }
 
+// A picture opens in the system's viewer (it is put on a material from the Inspector).
+void show_image(PanelContext& context, const std::string& name) {
+  platform::open_in_system(context.session.game_dir() / config::kImagesDirName / name);
+}
+
 }  // namespace
 
 const std::vector<FolderInfo>& folders() {
@@ -39,6 +45,8 @@ const std::vector<FolderInfo>& folders() {
        "editor.project.folder.sounds_hint", play_sound},
       {Folder::Scenes, ICON_FA_MAP, "editor.project.folder.scenes", config::kScenesDirName,
        "editor.project.folder.scenes_hint", open_scene},
+      {Folder::Images, ICON_FA_IMAGE, "editor.project.folder.images", config::kImagesDirName,
+       "editor.project.folder.images_hint", show_image},
   };
   return all;
 }
@@ -56,6 +64,8 @@ const std::vector<std::string>& files_of(const ProjectFiles& files, Folder folde
       return files.sounds;
     case Folder::Scenes:
       return files.scenes;
+    case Folder::Images:
+      return files.images;
     case Folder::Scripts:
       break;
   }
@@ -64,6 +74,7 @@ const std::vector<std::string>& files_of(const ProjectFiles& files, Folder folde
 
 const char* payload_of(Folder folder) {
   if (folder == Folder::Scripts) return kPayloadScript;
+  if (folder == Folder::Images) return kPayloadImage;
   return folder == Folder::Models ? kPayloadModel : nullptr;
 }
 

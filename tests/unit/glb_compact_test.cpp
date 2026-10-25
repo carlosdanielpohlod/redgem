@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <numeric>
 
@@ -239,6 +240,19 @@ TEST_CASE("the bytes of meshes let go of leave the file kept in memory, which ke
   CHECK_FALSE(release_meshes(instanced, {0}, {other_nodes, none, none}).has_value());
   CHECK(instanced.bin == two_meshes_one_shown().bin);
   CHECK(instanced.json == two_meshes_one_shown().json);
+}
+
+TEST_CASE("pictures the editor holds keep their bytes when the meshes that showed them are let go of") {
+  GlbFile glb = two_meshes_one_shown();
+  const nlohmann::json nodes = glb.json["nodes"];
+  const nlohmann::json none = nlohmann::json::array();
+  // The first picture is shown by the mesh let go of, but a material still names it (an undo
+  // step, or a texture slot set since the file was last written).
+  const std::optional<std::vector<bool>> images = release_meshes(glb, {0}, {nodes, none, none}, {true, false});
+  REQUIRE(images.has_value());
+  CHECK(*images == std::vector<bool>{true, true});
+  const std::vector<std::uint8_t> picture_bytes = {16, 17, 18};  // the first picture's three bytes
+  CHECK(std::search(glb.bin.begin(), glb.bin.end(), picture_bytes.begin(), picture_bytes.end()) != glb.bin.end());
 }
 
 TEST_CASE("skeletons and animations keep their data, whichever object they move") {

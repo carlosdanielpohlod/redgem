@@ -6,13 +6,15 @@
 
 #include "core/config.hpp"
 #include "core/safe_path.hpp"
+#include "editor/project_files.hpp"
 
 namespace redgem {
 namespace {
 
 constexpr const char* kModelExtension = ".glb";
 constexpr const char* kSoundExtensions[] = {".wav", ".ogg", ".mp3", ".flac"};
-constexpr const char* kNotForAGame = ": not a .glb model or a sound (.wav, .ogg, .mp3, .flac)";
+constexpr const char* kNotForAGame =
+    ": not a .glb model, a sound (.wav, .ogg, .mp3, .flac) or a picture (.png, .jpg, .jpeg, .webp)";
 constexpr const char* kAlreadyThere = ": the game already has a file of that name";
 constexpr const char* kNotCopied = ": could not be copied";
 
@@ -23,7 +25,18 @@ std::string lowered(std::string text) {
 }
 
 const char* folder_of(DroppedKind kind) {
+  if (kind == DroppedKind::Image) return config::kImagesDirName;
   return kind == DroppedKind::Model ? config::kModelsDirName : config::kSoundsDirName;
+}
+
+std::vector<std::string>& list_of(DroppedKind kind, DropReport& report) {
+  if (kind == DroppedKind::Image) return report.images;
+  return kind == DroppedKind::Model ? report.models : report.sounds;
+}
+
+template <std::size_t Count>
+bool one_of(const std::string& extension, const char* const (&known)[Count]) {
+  return std::any_of(std::begin(known), std::end(known), [&extension](const char* one) { return extension == one; });
 }
 
 // Copies the file into `folder`; why not, when it does not.
@@ -42,7 +55,7 @@ void add_one(const std::filesystem::path& game_dir, const std::filesystem::path&
   if (const char* problem = copy_into(game_dir / folder_of(*kind), file)) {
     return report.refused.push_back(name + problem);
   }
-  (*kind == DroppedKind::Model ? report.models : report.sounds).push_back(name);
+  list_of(*kind, report).push_back(name);
 }
 
 }  // namespace
@@ -50,9 +63,8 @@ void add_one(const std::filesystem::path& game_dir, const std::filesystem::path&
 std::optional<DroppedKind> kind_of_dropped(const std::filesystem::path& file) {
   const std::string extension = lowered(file.extension().string());
   if (extension == kModelExtension) return DroppedKind::Model;
-  const bool sound = std::any_of(std::begin(kSoundExtensions), std::end(kSoundExtensions),
-                                 [&extension](const char* known) { return extension == known; });
-  return sound ? std::optional<DroppedKind>(DroppedKind::Sound) : std::nullopt;
+  if (one_of(extension, kImageFileExtensions)) return DroppedKind::Image;
+  return one_of(extension, kSoundExtensions) ? std::optional<DroppedKind>(DroppedKind::Sound) : std::nullopt;
 }
 
 DropReport add_dropped_files(const std::filesystem::path& game_dir, const std::vector<std::filesystem::path>& files) {

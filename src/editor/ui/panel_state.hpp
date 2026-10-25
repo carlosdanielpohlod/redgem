@@ -39,7 +39,7 @@ struct InspectorState {
 };
 
 // The folders of a game the Project panel lists.
-enum class ProjectFolder { Scripts, Models, Sounds, Scenes };
+enum class ProjectFolder { Scripts, Models, Sounds, Scenes, Images };
 
 struct ProjectState {
   std::string new_script_name;
