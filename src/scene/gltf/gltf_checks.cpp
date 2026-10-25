@@ -87,6 +87,19 @@ bool read_as_it_is(const cgltf_accessor* accessor) {
   return accessor != nullptr && accessor->is_sparse == 0 && accessor->buffer_view != nullptr;
 }
 
+// Whether an accessor's components lie at addresses their type may be read from, as the glTF
+// specification asks: a float read from an address that is not a multiple of four is undefined
+// behaviour (and slow, or a crash, on some processors).
+bool components_aligned(const cgltf_accessor& accessor) {
+  const std::size_t component = cgltf_component_size(accessor.component_type);
+  const auto* data = static_cast<const std::uint8_t*>(cgltf_buffer_view_data(accessor.buffer_view));
+  if (component == 0 || data == nullptr) return true;
+  const std::uintptr_t start = reinterpret_cast<std::uintptr_t>(data) + accessor.offset;
+  return start % component == 0 && accessor.stride % component == 0;
+}
+
+bool misaligned(const cgltf_accessor& accessor) { return read_as_it_is(&accessor) && !components_aligned(accessor); }
+
 std::string numbered(const char* what, std::size_t index) { return std::string(what) + " " + std::to_string(index); }
 
 }  // namespace
@@ -124,6 +137,7 @@ std::string data_problem(const cgltf_data& data) {
   for (cgltf_size i = 0; i < data.accessors_count; ++i) {
     const std::string problem = accessor_problem(data.accessors[i]);
     if (!problem.empty()) return numbered("accessor", i) + " " + problem;
+    if (misaligned(data.accessors[i])) return numbered("accessor", i) + " is not aligned to its components";
   }
   return {};
 }
