@@ -85,6 +85,24 @@ run left. The first run is a ctest fixture of the second (`redgem-test --work <d
 Test fixtures are regenerated with
 `tools/blender/run.sh build_test_fixtures.py tests/fixtures`.
 
+## Continuous integration
+
+Every pull request runs these workflows (`.github/workflows/`), side by side:
+
+* **Linux** (`linux.yml`): the build, every test (the system tests in windows drawn by Mesa's
+  software renderer on a virtual display) and every linter.
+* **Windows** (`windows.yml`): the build with llvm-mingw and the tests that open no window.
+* **macOS** (`macos.yml`): the build and the tests that open no window on Apple Silicon and Intel,
+  and the editor system test.
+* **Android** (`android.yml`): the player built for arm64-v8a and x86_64 by
+  `tools/android/build_runtime.sh`, with the NDK `tools/android/fetch_toolchain.sh` pins (kept
+  between runs). Nothing runs on Android there: it catches code that only breaks that build.
+
+Every fetched archive is pinned by its SHA-256 (`cmake/Dependencies.cmake`); a dependency fetched
+from git is pinned by its tag or commit. `THIRD_PARTY_LICENSES.md` is generated: after adding or
+updating a dependency, run `python3 -I tools/licenses/collect_notices.py` (after a build) and
+commit what it writes. The test `tools.license_notices_are_up_to_date` fails when it is stale.
+
 ## Layout
 
 ```

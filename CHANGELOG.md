@@ -34,6 +34,16 @@ until 1.0, a release may change what games rely on (see
 - **Joints**: `Physics.joint` makes fixed, hinge (limits and a motor), slider, point and distance
   (a rope, or a spring) joints between two bodies or a body and the world; a joint can break past
   a force, be disabled or removed, and goes with its objects.
+- **Android in the continuous integration**: every pull request builds the Android player for
+  arm64-v8a and x86_64 with the pinned NDK, so an Android-only compile break fails it.
+- **License notices check**: `tools/licenses/collect_notices.py --check` (run by ctest as
+  `tools.license_notices_are_up_to_date`) fails when `THIRD_PARTY_LICENSES.md` is not what the
+  fetched dependencies make.
+
+### Changed
+
+- The JSON library (`nlohmann_json`) is downloaded with a pinned SHA-256 checksum, as every other
+  fetched archive is.
 
 ## [0.4.0] - 2026-10-25
 

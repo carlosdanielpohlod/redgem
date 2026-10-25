@@ -21,8 +21,8 @@ the same pull request.
   icons has been seen reading it under Wine only.
 - The Linux programs need a processor with AVX2 and glibc 2.39 or newer (Ubuntu 24.04 and later).
 - Android games have been run on an emulator only, not on phones. The touch controls have one
-  fixed layout (a stick and three buttons). The continuous integration does not build for Android:
-  an Android-only break shows up when a release is packed.
+  fixed layout (a stick and three buttons). The continuous integration builds the Android player
+  but runs nothing on Android.
 - Once, right after an emulator cold boot, an Android game stopped in its audio thread. It did
   not happen again in the runs that followed and has no fix.
 
@@ -229,7 +229,6 @@ not a promise of how it will be closed.
   Compiler warnings do not fail the build. The load test and the benchmarks print numbers but fail
   on none.
 - About forty unit and integration tests wait on the real clock, a source of rare timing failures.
-- One fetched dependency (`nlohmann_json`) is downloaded without a checksum.
 - Some constants are defined more than once (`kLargestPort` in four places, `kBitsPerByte` in
   four, Ruby limits that repeat C++ ones), as are a few string helpers.
 - A connection's buffers never give memory back once grown, and copy what is left on every
