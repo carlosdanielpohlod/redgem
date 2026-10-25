@@ -106,7 +106,8 @@ struct JointDesc {
   float max_distance = 0.0f;
   float spring_frequency = 0.0f;  // distance joints: hertz; 0: a stiff rope
   float spring_damping = 0.0f;    // 0 bounces on, 1 settles at once
-  float break_force = 0.0f;       // newtons pulling it apart; 0: it never breaks
+  // Newtons pulling it apart, or newton meters twisting it; 0: it never breaks.
+  float break_force = 0.0f;
 };
 
 // Physics backend as seen by the engine. Static, kinematic and trigger poses follow the scene;
@@ -195,8 +196,10 @@ class PhysicsWorld {
   // What a shape at `center` overlaps (distance from the center to each point).
   virtual std::vector<RaycastHit> overlap(const QueryShape& shape, Vec3 center, const QueryFilter& filter) const = 0;
 
-  // Joints, between rigid bodies (at least one of them dynamic). A joint goes when either of its
-  // objects does, and breaks (goes, and is told broken) when pulled harder than its break force.
+  // Joints, between rigid bodies (at least one of them dynamic: one between bodies that have all
+  // been made kinematic since holds nothing until one is dynamic again). A joint goes when either
+  // of its objects does, and breaks (goes, and is told broken) when pulled or twisted harder than
+  // its break force.
   // Ids are never given twice by a world.
   virtual std::variant<JointId, std::string> add_joint(const JointDesc& desc) = 0;
   virtual void remove_joint(JointId joint) = 0;

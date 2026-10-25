@@ -225,3 +225,30 @@ TEST_CASE("joints hold rigid bodies only, a dynamic one at least") {
   CHECK(refused(kCrate, kCrate));
   CHECK_FALSE(refused(kCrate, kGround));
 }
+
+TEST_CASE("a joint twisted harder than its break force breaks, even with its points together") {
+  auto world = world_with_ground();
+  const Vec3 at{0, 5, 0};
+  REQUIRE_FALSE(world->add_object(body(kCrate, dynamic(), at)));
+  JointDesc glue = joint(JointKind::Fixed, kCrate, kNoObject, at);
+  glue.break_force = 50.0f;
+  const JointId joint = joined(*world, glue);
+  world->set_gravity_scale(kCrate, 0.0f);
+  run(*world, kOneSecond);
+  CHECK(world->has_joint(joint));
+  world->add_torque(kCrate, {0, 1000, 0});
+  world->step(kDt);
+  CHECK(world->joint_broken(joint));
+}
+
+TEST_CASE("a disabled joint does not break, whatever it held before") {
+  auto world = world_with_ground();
+  REQUIRE_FALSE(world->add_object(body(kBall, dynamic(), rope().anchor)));
+  const JointId joint = joined(*world, rope());
+  run(*world, kOneSecond);  // it holds the ball's weight
+  world->set_joint_enabled(joint, false);
+  world->set_joint_break_force(joint, 1.0f);
+  run(*world, kOneSecond);
+  CHECK(world->has_joint(joint));
+  CHECK_FALSE(world->joint_broken(joint));
+}

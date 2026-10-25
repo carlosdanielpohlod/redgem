@@ -232,7 +232,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   std::set<ContactPair> previous_contacts_;
   std::vector<ContactEvent> events_;
   std::map<JointId, JointRecord> joints_;  // ordered: deterministic breaking
-  std::set<JointId> broken_joints_;
+  std::set<JointId> broken_joints_;        // a few bytes a broken joint, for as long as the scene runs
   JointId next_joint_ = kNoJoint + 1;
 };
 

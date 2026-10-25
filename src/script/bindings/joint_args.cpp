@@ -22,8 +22,7 @@ constexpr JointName kJointNames[] = {
     {JointKind::Point, "point"}, {JointKind::Distance, "distance"},
 };
 
-constexpr mrb_int kLimitEnds = 2;  // [low, high]
-constexpr mrb_float kHalfTurnDegrees = kDegreesPerHalfTurn;
+constexpr mrb_int kLimitEnds = 2;             // [low, high]
 constexpr mrb_float kLongestSlide = 10000.0;  // meters a slider's limits may reach either way
 
 std::optional<JointKind> joint_named(const std::string& name) {
@@ -71,10 +70,11 @@ bool takes_limits(JointKind kind) { return kind == JointKind::Hinge || kind == J
 
 // Hinges turn between limits in degrees (half a turn each way at most), sliders slide in meters.
 void read_limits(mrb_state* mrb, mrb_value options, JointDesc& desc) {
+  if (!takes_limits(desc.kind)) return;
   const mrb_value limits = option(mrb, options, "limits");
-  if (mrb_nil_p(limits) || !takes_limits(desc.kind)) return;
+  if (mrb_nil_p(limits)) return;
   if (desc.kind == JointKind::Hinge) {
-    const auto [low, high] = limits_of(mrb, limits, -kHalfTurnDegrees, kHalfTurnDegrees);
+    const auto [low, high] = limits_of(mrb, limits, -kDegreesPerHalfTurn, kDegreesPerHalfTurn);
     desc.limits = std::make_pair(degrees_to_radians(low), degrees_to_radians(high));
   } else {
     desc.limits = limits_of(mrb, limits, -kLongestSlide, kLongestSlide);
@@ -82,11 +82,18 @@ void read_limits(mrb_state* mrb, mrb_value options, JointDesc& desc) {
 }
 
 void read_axis(mrb_state* mrb, mrb_value options, JointDesc& desc) {
+  if (!takes_limits(desc.kind)) return;  // (the kinds with limits are the kinds with an axis)
   desc.axis = vector_or(mrb, options, "axis", Vec3::up());
   if (length(desc.axis) <= kEpsilon) mrb_raise(mrb, E_ARGUMENT_ERROR, "a joint's axis must not be zero");
 }
 
+bool gives_speed_alone(mrb_state* mrb, mrb_value options) {
+  return !mrb_nil_p(option(mrb, options, "motor_speed")) && mrb_nil_p(option(mrb, options, "motor_torque"));
+}
+
+// A motor turns with the torque it is given: none given, it would not turn at all.
 void read_motor(mrb_state* mrb, mrb_value options, JointDesc& desc) {
+  if (gives_speed_alone(mrb, options)) mrb_raise(mrb, E_ARGUMENT_ERROR, "a hinge's motor_speed needs a motor_torque");
   desc.motor_speed = degrees_to_radians(number_or(mrb, options, "motor_speed", 0.0f));
   desc.motor_torque = not_negative(mrb, options, "motor_torque", "a hinge's motor torque");
 }

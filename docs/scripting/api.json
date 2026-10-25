@@ -1007,7 +1007,7 @@
         },
         {
           "name": "break_force",
-          "about": "the pull (newtons) it breaks at; 0 never breaks"
+          "about": "the pull (newtons) or twist (newton meters) it breaks at; 0 never breaks"
         },
         {
           "name": "break_force=",
@@ -1017,7 +1017,7 @@
         {
           "name": "motor",
           "args": "speed, torque",
-          "about": "a hinge turns at that speed (degrees per second) with at most that torque; 0 torque stops it"
+          "about": "a hinge turns at that speed (degrees per second) with at most that torque; 0 torque lets it go"
         },
         {
           "name": "angle",
@@ -1029,7 +1029,7 @@
         "to_s"
       ],
       "guide": "gameplay.md",
-      "notes": "Points and axes are in world space; `anchor:` defaults to the object's position, `other_anchor:` (a distance joint's other end) to the other object's, `axis:` to up. A hinge's `limits:` are degrees [low, high] from where it starts (low -180 to 0, high 0 to 180), a slider's are meters along its axis. A distance joint keeps between `min:` (0) and `max:` (how far apart the ends are) apart, springy with `spring:` (hertz) and `damping:`. A joint needs a dynamic body at one end; it goes when either object is destroyed or the scene changes."
+      "notes": "Points and axes are in world space; `anchor:` defaults to the object's position, `other_anchor:` (a distance joint's other end) to the other object's, `axis:` to up. A hinge's `limits:` are degrees [low, high] from where it starts (low -180 to 0, high 0 to 180), a slider's are meters along its axis; a hinge's `motor_speed:` needs a `motor_torque:`. A distance joint keeps between `min:` (0) and `max:` (how far apart the ends are) apart, springy with `spring:` (hertz) and `damping:`. Each kind refuses options it has no use for, and `motor` and `angle` raise for anything but a hinge. A joint needs a dynamic body at one end (one whose bodies were all made kinematic since holds nothing until one is dynamic again); it goes when either object is destroyed or the scene changes."
     },
     {
       "name": "CharacterController",

@@ -6,6 +6,7 @@
 #include <Jolt/Physics/Constraints/PointConstraint.h>
 #include <Jolt/Physics/Constraints/SliderConstraint.h>
 
+#include <algorithm>
 #include <cmath>
 
 #include "physics/jolt/jolt_shapes.hpp"
@@ -35,7 +36,6 @@ JPH::Ref<JPH::TwoBodyConstraintSettings> hinge_settings(const JointDesc& desc) {
     settings->mLimitsMin = desc.limits->first;
     settings->mLimitsMax = desc.limits->second;
   }
-  settings->mMotorSettings.SetTorqueLimit(desc.motor_torque);
   return settings;
 }
 
@@ -71,23 +71,39 @@ JPH::Ref<JPH::TwoBodyConstraintSettings> distance_settings(const JointDesc& desc
   return settings;
 }
 
-// A slider's position impulse: across its axis, two ways.
-constexpr JPH::uint kSliderLambdaRows = 2;
-using SliderLambda = JPH::Vector<kSliderLambdaRows>;
+// A slider's and a hinge's impulses across their free direction: two rows.
+constexpr JPH::uint kTwoRows = 2;
+using TwoRowLambda = JPH::Vector<kTwoRows>;
 
-float length_of(const SliderLambda& lambda) { return std::sqrt(lambda[0] * lambda[0] + lambda[1] * lambda[1]); }
+float length_of(const TwoRowLambda& lambda) { return std::sqrt(lambda[0] * lambda[0] + lambda[1] * lambda[1]); }
 
-// The impulse (newton seconds) that held the joint together during the last step.
+// What held a joint together during the last step: the impulse keeping its points together
+// (newton seconds) and the one keeping it from twisting (newton meter seconds), the larger.
+template <typename Joint>
+float larger_held(const JPH::TwoBodyConstraint& constraint, float (*rotation)(const Joint&)) {
+  const auto& joint = static_cast<const Joint&>(constraint);
+  return std::max(joint.GetTotalLambdaPosition().Length(), rotation(joint));
+}
+
+float fixed_twist(const JPH::FixedConstraint& joint) { return joint.GetTotalLambdaRotation().Length(); }
+float hinge_twist(const JPH::HingeConstraint& joint) { return length_of(joint.GetTotalLambdaRotation()); }
+float no_twist(const JPH::PointConstraint&) { return 0.0f; }
+
+float slider_held(const JPH::TwoBodyConstraint& constraint) {
+  const auto& joint = static_cast<const JPH::SliderConstraint&>(constraint);
+  return std::max(length_of(joint.GetTotalLambdaPosition()), joint.GetTotalLambdaRotation().Length());
+}
+
 float held_impulse(const JPH::TwoBodyConstraint& constraint, JointKind kind) {
   switch (kind) {
     case JointKind::Fixed:
-      return static_cast<const JPH::FixedConstraint&>(constraint).GetTotalLambdaPosition().Length();
+      return larger_held<JPH::FixedConstraint>(constraint, fixed_twist);
     case JointKind::Hinge:
-      return static_cast<const JPH::HingeConstraint&>(constraint).GetTotalLambdaPosition().Length();
+      return larger_held<JPH::HingeConstraint>(constraint, hinge_twist);
     case JointKind::Slider:
-      return length_of(static_cast<const JPH::SliderConstraint&>(constraint).GetTotalLambdaPosition());
+      return slider_held(constraint);
     case JointKind::Point:
-      return static_cast<const JPH::PointConstraint&>(constraint).GetTotalLambdaPosition().Length();
+      return larger_held<JPH::PointConstraint>(constraint, no_twist);
     case JointKind::Distance:
       return std::fabs(static_cast<const JPH::DistanceConstraint&>(constraint).GetTotalLambdaPosition());
   }

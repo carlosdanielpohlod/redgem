@@ -91,7 +91,7 @@ mrb_value joint_motor(mrb_state* mrb, mrb_value self) {
 }
 
 mrb_value joint_angle(mrb_state* mrb, mrb_value self) {
-  return mrb_float_value(mrb, physics(mrb).hinge_angle(joint_of(mrb, self)) / degrees_to_radians(1.0f));
+  return mrb_float_value(mrb, radians_to_degrees(physics(mrb).hinge_angle(joint_of(mrb, self))));
 }
 
 }  // namespace
@@ -99,15 +99,15 @@ mrb_value joint_angle(mrb_state* mrb, mrb_value self) {
 void install_joint_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, mrb_module_get(mrb, "Physics"), "__joint", physics_joint, MRB_ARGS_REQ(4));
   RClass* joint = mrb_define_class(mrb, "Joint", mrb->object_class);
-  mrb_define_method(mrb, joint, "__alive?", joint_alive, MRB_ARGS_NONE());
+  mrb_define_method(mrb, joint, "alive?", joint_alive, MRB_ARGS_NONE());
   mrb_define_method(mrb, joint, "broken?", joint_broken, MRB_ARGS_NONE());
   mrb_define_method(mrb, joint, "remove", joint_remove, MRB_ARGS_NONE());
   mrb_define_method(mrb, joint, "enabled?", joint_enabled, MRB_ARGS_NONE());
   mrb_define_method(mrb, joint, "enabled=", joint_set_enabled, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, joint, "break_force", joint_break_force, MRB_ARGS_NONE());
   mrb_define_method(mrb, joint, "break_force=", joint_set_break_force, MRB_ARGS_REQ(1));
-  mrb_define_method(mrb, joint, "motor", joint_motor, MRB_ARGS_REQ(2));
-  mrb_define_method(mrb, joint, "angle", joint_angle, MRB_ARGS_NONE());
+  mrb_define_method(mrb, joint, "__motor", joint_motor, MRB_ARGS_REQ(2));
+  mrb_define_method(mrb, joint, "__angle", joint_angle, MRB_ARGS_NONE());
 }
 
 }  // namespace redgem

@@ -274,12 +274,12 @@ What holds two bodies together, or one to the world (made by Physics.joint). See
 - `remove`: lets go
 - `enabled?`: whether it holds right now
 - `enabled = flag`: lets go for a while, or holds again
-- `break_force`: the pull (newtons) it breaks at; 0 never breaks
+- `break_force`: the pull (newtons) or twist (newton meters) it breaks at; 0 never breaks
 - `break_force = newtons`: sets the pull it breaks at
-- `motor(speed, torque)`: a hinge turns at that speed (degrees per second) with at most that torque; 0 torque stops it
+- `motor(speed, torque)`: a hinge turns at that speed (degrees per second) with at most that torque; 0 torque lets it go
 - `angle`: how far a hinge turned from where it started, in degrees
 
-Points and axes are in world space; `anchor:` defaults to the object's position, `other_anchor:` (a distance joint's other end) to the other object's, `axis:` to up. A hinge's `limits:` are degrees [low, high] from where it starts (low -180 to 0, high 0 to 180), a slider's are meters along its axis. A distance joint keeps between `min:` (0) and `max:` (how far apart the ends are) apart, springy with `spring:` (hertz) and `damping:`. A joint needs a dynamic body at one end; it goes when either object is destroyed or the scene changes.
+Points and axes are in world space; `anchor:` defaults to the object's position, `other_anchor:` (a distance joint's other end) to the other object's, `axis:` to up. A hinge's `limits:` are degrees [low, high] from where it starts (low -180 to 0, high 0 to 180), a slider's are meters along its axis; a hinge's `motor_speed:` needs a `motor_torque:`. A distance joint keeps between `min:` (0) and `max:` (how far apart the ends are) apart, springy with `spring:` (hertz) and `damping:`. Each kind refuses options it has no use for, and `motor` and `angle` raise for anything but a hinge. A joint needs a dynamic body at one end (one whose bodies were all made kinematic since holds nothing until one is dynamic again); it goes when either object is destroyed or the scene changes.
 
 ## CharacterController
 

@@ -125,8 +125,12 @@ TEST_CASE("Physics.joint refuses what it cannot make, saying why") {
   ruby(*engine, "$door = Scene.find('Door')");
   const auto refusal = [&](const std::string& code) { return error_of(*engine, code); };
   CHECK(refusal("Physics.joint(:rope, $door)").find("unknown joint 'rope'") != std::string::npos);
-  CHECK(refusal("Physics.joint(:hinge, $door, nil, lenght: 2)").find("unknown joint option :lenght") !=
+  CHECK(refusal("Physics.joint(:hinge, $door, nil, lenght: 2)").find("a hinge joint takes no :lenght") !=
         std::string::npos);
+  CHECK(refusal("Physics.joint(:point, $door, nil, limits: [-30, 30])").find("takes no :limits") != std::string::npos);
+  CHECK(refusal("Physics.joint(:hinge, $door, nil, motor_speed: 90)").find("needs a motor_torque") !=
+        std::string::npos);
+  CHECK(refusal("Physics.joint(:fixed, $door).angle").find("only hinges have angle") != std::string::npos);
   CHECK(refusal("Physics.joint(:hinge, $door, nil, limits: [10, 90])").find("low limit") != std::string::npos);
   CHECK(refusal("Physics.joint(:hinge, $door, nil, limits: [0, 270])").find("high limit") != std::string::npos);
   CHECK(refusal("Physics.joint(:hinge, $door, nil, axis: Vector3.zero)").find("axis") != std::string::npos);

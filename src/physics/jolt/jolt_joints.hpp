@@ -21,7 +21,8 @@ JPH::Ref<JPH::TwoBodyConstraintSettings> joint_settings(const JointDesc& desc);
 void start_motor(JPH::TwoBodyConstraint& constraint, const JointDesc& desc);
 void set_motor(JPH::TwoBodyConstraint& hinge, float speed, float max_torque);
 
-// The force (newtons) that held the joint together during the last step of `dt` seconds.
+// What held the joint together during the last step of `dt` seconds: the force keeping its points
+// together (newtons) or the torque keeping it from twisting (newton meters), the larger.
 float joint_pull(const JPH::TwoBodyConstraint& constraint, JointKind kind, float dt);
 
 // Any axis at right angles to `axis` (which need not be of unit length).

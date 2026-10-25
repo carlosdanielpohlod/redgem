@@ -254,16 +254,18 @@ a body still until something bumps it or `wake` is called.
 A joint holds two bodies together, or one to the world (give `nil` as the other). Points and axes
 are in world space.
 
-A door on a hinge, swinging up to 110 degrees each way it is pushed, pulled shut by its motor:
+A door on a hinge that pushes open up to 110 degrees, and that its motor pulls shut (back to the
+0 degrees it started at, its other limit):
 
 ```ruby
 class Door < Behaviour
   def start
     pin = transform.position + Vector3.left * 0.5            # its left edge
-    @hinge = Physics.joint(:hinge, game_object, nil, anchor: pin, axis: Vector3.up, limits: [-110, 110])
+    @hinge = Physics.joint(:hinge, game_object, nil, anchor: pin, axis: Vector3.up, limits: [0, 110])
   end
 
   def close = @hinge.motor(-60, 50)                           # degrees per second, newton meters
+  def let_go = @hinge.motor(0, 0)
 end
 ```
 
@@ -280,8 +282,8 @@ end
 
 `spring: 2, damping: 0.3` makes it a bungee. Other kinds: `:fixed` glues two bodies as they are,
 `:slider` lets one slide along an axis (`limits:` in meters), `:point` lets it turn every way (a
-ball and socket). `break_force: 500` breaks a joint pulled harder than 500 newtons
-(`joint.broken?` then says so); `joint.remove` lets go; destroying either object removes it.
+ball and socket). `break_force: 500` breaks a joint pulled harder than 500 newtons, or twisted
+harder than 500 newton meters (`joint.broken?` then says so); `joint.remove` lets go; destroying either object removes it.
 
 ## Collision layers
 

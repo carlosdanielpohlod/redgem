@@ -15,8 +15,14 @@ namespace {
 // The world, as the other end of a joint: no body.
 bool is_world(ObjectId object) { return object == kNoObject; }
 
-// Whether a joint was pulled harder than it can take (one with no break force never breaks).
-bool overloaded(const JointRecord& joint, float pull) { return joint.break_force > 0.0f && pull > joint.break_force; }
+// Whether a joint can break: it has a break force, and it was solved in the last step (Jolt leaves
+// the impulses of a disabled joint, or of one between sleeping bodies, as they were).
+bool can_break(const JointRecord& joint) { return joint.break_force > 0.0f && joint.constraint->IsActive(); }
+
+// Whether a joint was pulled (or twisted) harder than it can take.
+bool overloaded(const JointRecord& joint, float dt) {
+  return can_break(joint) && joint_pull(*joint.constraint, joint.kind, dt) > joint.break_force;
+}
 
 // The second end of a joint is an object without a body (the world needs none).
 bool lacks_body(ObjectId object, const Record* record) { return !is_world(object) && !has_body(record); }
@@ -73,7 +79,7 @@ void World::break_overloaded_joints(float dt) {
     const JointId id = it->first;
     const JointRecord& joint = it->second;
     it = std::next(it);
-    if (!overloaded(joint, joint_pull(*joint.constraint, joint.kind, dt))) continue;
+    if (!overloaded(joint, dt)) continue;
     remove_joint(id);
     broken_joints_.insert(id);
   }
