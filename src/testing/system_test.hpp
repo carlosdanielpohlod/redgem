@@ -17,8 +17,8 @@ struct SystemTestOptions {
   // two runs at the same time would get in each other's way in.
   std::filesystem::path work_dir;
   // An earlier test run in the same work folder that this one goes on from, as if the game were
-  // started again: it plays with the save, settings and bindings that run left. Empty: none, and
-  // the game starts from nothing.
+  // started again: it plays on copies of the save, settings and bindings that run left. Empty:
+  // none, and the game starts from nothing.
   std::filesystem::path after;
 };
 

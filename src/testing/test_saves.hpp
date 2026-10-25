@@ -40,11 +40,19 @@ struct RunFiles {
 // functions above).
 RunFiles fresh_run_files(const std::filesystem::path& game_dir, const std::filesystem::path& work_dir,
                          const std::filesystem::path& test_file);
-// The files an earlier test's run in the same work folder played with, as it left them: a run that
-// goes on from there is the game started again (redgem-test --after).
+// The files an earlier test's run in the same work folder played with, as it left them.
 RunFiles kept_run_files(const std::filesystem::path& game_dir, const std::filesystem::path& work_dir,
                         const std::filesystem::path& earlier_test);
-// Whether any of a run's files is there: a run that kept nothing left none.
-bool kept_anything(const RunFiles& files);
+// The files a run of `test_file` plays with when it goes on from an earlier test's run in the same
+// work folder, as if the game were started again (redgem-test --after): its own, emptied, then
+// filled with copies of what that run left (the save's backup too). The earlier run's are never
+// changed, so the run starts the same way however often it is made.
+RunFiles copied_run_files(const std::filesystem::path& game_dir, const std::filesystem::path& work_dir,
+                          const std::filesystem::path& test_file, const std::filesystem::path& earlier_test);
+
+// Leaves word in a work folder that a test was run there (whatever it kept, maybe nothing).
+void mark_run(const std::filesystem::path& work_dir, const std::filesystem::path& test_file);
+// Whether a test was run in a work folder.
+bool ran_in(const std::filesystem::path& work_dir, const std::filesystem::path& test_file);
 
 }  // namespace redgem::testing

@@ -34,10 +34,10 @@ constexpr const char* kFailed = "failed";
 
 enum class Status { Running, Passed, Failed };
 
-// The files the run plays with: fresh ones, or those of the run it goes on from.
+// The files the run plays with: fresh ones, or copies of those of the run it goes on from.
 RunFiles run_files(const SystemTestOptions& options) {
   if (options.after.empty()) return fresh_run_files(options.game_dir, options.work_dir, options.test_file);
-  return kept_run_files(options.game_dir, options.work_dir, options.after);
+  return copied_run_files(options.game_dir, options.work_dir, options.test_file, options.after);
 }
 
 // An engine as a test needs it: the same run every time, with the test at the controls.
@@ -153,10 +153,10 @@ int play_test(Engine& engine, ScriptedInputSource& input, FramePictures& picture
   return run.play();
 }
 
-// Whether a run that goes on from another finds nothing that run left: a misspelt test, or one
-// never run in that folder (it would start from nothing, and fail far from the cause).
-bool goes_on_from_nothing(const SystemTestOptions& options, const RunFiles& files) {
-  return !options.after.empty() && !kept_anything(files);
+// Whether a run would go on from a test never run in its folder: a misspelt test, or a first run
+// made elsewhere (it would start from nothing, and fail far from the cause).
+bool goes_on_from_nothing(const SystemTestOptions& options) {
+  return !options.after.empty() && !ran_in(options.work_dir, options.after);
 }
 
 // The test played on a game that starts with `files`.
@@ -178,12 +178,12 @@ int play_with(const SystemTestOptions& options, const RunFiles& files) {
 }  // namespace
 
 int run_system_test(const SystemTestOptions& options) {
-  const RunFiles files = run_files(options);
-  if (goes_on_from_nothing(options, files)) {
-    log::error(
-        tr("testing.run.nothing_kept", {{"test", options.after.string()}, {"folder", options.work_dir.string()}}));
+  if (goes_on_from_nothing(options)) {
+    log::error(tr("testing.run.never_ran", {{"test", options.after.string()}, {"folder", options.work_dir.string()}}));
     return kExitFailure;
   }
+  const RunFiles files = run_files(options);
+  if (!options.work_dir.empty()) mark_run(options.work_dir, options.test_file);
   return play_with(options, files);
 }
 

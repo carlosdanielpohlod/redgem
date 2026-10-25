@@ -142,4 +142,51 @@ class GameMenuControlsPageTest < RedGemTest::Case
     refute marked.conflict?(JUMP, BUTTONS)
     refute marked.conflict?(LEFT, KEYS)
   end
+
+  def test_a_buttons_cell_takes_a_button_from_the_shown_players_own_gamepad_only
+    second = page
+    second.player = SECOND_PAD
+    second.capture(JUMP, BUTTONS)
+    Input.__captured("pad:y", Input::FIRST_PAD)
+    assert second.capturing?, "the first player's gamepad is not the second's"
+    assert_equal ["pad:a"], Input.bindings(:jump, pad: SECOND_PAD)
+    Input.__captured("pad:y", SECOND_PAD)
+    assert_equal ["pad:y"], Input.bindings(:jump, pad: SECOND_PAD)
+  end
+
+  def test_a_keys_cell_takes_a_key_for_any_player
+    second = page
+    second.player = SECOND_PAD
+    second.capture(JUMP, KEYS)
+    Input.__captured("key:k", nil)
+    assert_equal ["key:k", "pad:a"], Input.bindings(:jump, pad: SECOND_PAD)
+  end
+
+  def test_the_page_stops_waiting_when_something_else_ends_its_capture
+    waiting = page
+    waiting.capture(JUMP, KEYS)
+    Input.capture_next { |_binding, _pad| nil }
+    refute waiting.capturing?, "another capture took its place"
+    assert_nil waiting.waiting
+    waiting.capture(JUMP, KEYS)
+    Input.cancel_capture
+    refute waiting.capturing?, "called off from elsewhere"
+  end
+
+  def test_rows_and_cells_are_worked_out_again_only_after_the_bindings_change
+    cached = page
+    rows = cached.rows
+    keys = cached.bindings(JUMP, KEYS)
+    assert rows.equal?(cached.rows)
+    assert keys.equal?(cached.bindings(JUMP, KEYS))
+    Input.bind(:jump, key: :k)
+    assert_equal ["key:space", "key:k"], cached.bindings(JUMP, KEYS)
+  end
+
+  def test_another_player_shown_is_worked_out_anew
+    shown = page
+    assert_equal ["key:space"], shown.bindings(JUMP, KEYS)
+    shown.player = SECOND_PAD
+    assert_equal [], shown.bindings(JUMP, KEYS)
+  end
 end

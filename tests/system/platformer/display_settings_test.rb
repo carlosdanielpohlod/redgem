@@ -2,7 +2,7 @@
 # size asked for (and keeps it with the world drawn at half of it), the settings screen is reached
 # and worked with a gamepad alone, the focus moving with the D-pad, and its controls page rebinds
 # jump to K (a key, after the gamepad's A picked the cell) and to Y (a button, after a click on the
-# cell). Starting the game again keeps all of it: tests/system_restarts/platformer/.
+# cell). Starting the game again keeps all of it: tests/system_restarts/platformer/display_settings_restarted_test.rb.
 SETTLE_FRAMES = 30
 RESIZE_FRAMES = 60          # the most the window may take to come to its new size
 APEX_FRAMES = 20

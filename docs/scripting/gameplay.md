@@ -141,7 +141,9 @@ Input.capture_next do |binding, pad|
 end
 Input.capture_next(cancel: ["key:backspace"]) { |binding, pad| ... }   # Escape can be bound
 Input.capturing?       # still waiting
+Input.capturing_for?(block)   # still waiting to call that block (not once another capture took its place)
 Input.cancel_capture   # stop waiting (the block is never called)
+Input.bindings_changes # a count that goes up whenever actions, axes or bindings may have changed
 ```
 
 Sticks and triggers are not caught, only keys and buttons. `Input.axis_stick(:horizontal)` says
@@ -156,14 +158,17 @@ one the game declared, in two cells: the player's keys, and their gamepad button
 shows among them, though no player rebinds it). Up and down move between the rows, left and
 right between a row's two cells.
 
-Enter, a gamepad's A or a click on a cell waits for the next key (the keys' cell) or button (the
-buttons' cell): that one takes the place of everything the cell had, and the row's other cell
-keeps its own. A button pressed for the keys' cell (or a key for the buttons') is not for it, and
-it waits on. Escape or a gamepad's Back calls the wait off (and B too, for a keys' cell), so those
+Enter, a gamepad's A or a click on a cell (which also moves the focus there) waits for the next
+key (the keys' cell) or button (the buttons' cell): that one takes the place of everything the cell
+had, and the row's other cell keeps its own. A button pressed for the keys' cell (or a key for the
+buttons'), or a button of another player's gamepad, is not for it, and it waits on; any keyboard
+key is taken for any player. Escape or a gamepad's Back calls the wait off (and B too, for a keys' cell), so those
 are never bound there.
 A key bound to two rows is allowed, as above, and both cells show it in orange with a `!`. "Reset to
 defaults" puts all of the shown player's bindings back to the game's; Back (or Esc) goes back to the
-settings. What players bind is kept for the next runs as it changes.
+settings, on their Controls button (the settings were kept on the way in). What players bind is
+kept for the next runs as it changes. A game adds options to both screens as to any other
+(`add_option`): they come after the engine's buttons unless an `index:` says otherwise.
 
 A row is named by the game's translation files, as `game.controls.action_<name>` (an axis' sides
 as `game.controls.action_<name>_negative` and `_positive`); without one, its name is made readable (`:air_dash`

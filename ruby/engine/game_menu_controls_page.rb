@@ -3,7 +3,9 @@
 # axes, for one player at a time. Each row has two cells, the player's keys and their gamepad
 # buttons. Rebinding a cell waits for the next key (the keys' cell) or button (the buttons' cell)
 # pressed, and that one takes the place of what the cell had; the row's other cell keeps its own.
-# A key or button bound to two rows is allowed (both see it), and is marked.
+# A key or button bound to two rows is allowed (both see it), and is marked. A buttons' cell takes
+# a button from the shown player's own gamepad only. What it shows is worked out again only after
+# the bindings change (Input.bindings_changes) or another player is shown.
 class GameMenu < Behaviour
   class ControlsPage
     KEYS = 0       # the cell of a row's keys
@@ -21,18 +23,23 @@ class GameMenu < Behaviour
 
     # The player whose bindings are shown (a gamepad's number: 0 also has the keyboard).
     attr_reader :player
-    # The cell a capture is waiting to fill, [row, column]; nil while none is.
-    attr_reader :waiting
 
     def initialize
       @player = Input::FIRST_PAD
       @waiting = nil
+      @capture = ->(binding, pad) { caught(binding, pad) }
+      @seen = nil
     end
+
+    # The cell a capture is waiting to fill, [row, column]; nil while none is (also once something
+    # else called the capture off, or asked for one of its own).
+    def waiting = capturing? ? @waiting : nil
 
     # Every action of the game, then both sides of every axis.
     def rows
-      actions = Input.actions.map { |name| Row.new(name, nil) }
-      actions + Input.axes.flat_map { |name| SIDES.map { |side| Row.new(name, side) } }
+      refresh
+      @rows ||= Input.actions.map { |name| Row.new(name, nil) } +
+                Input.axes.flat_map { |name| SIDES.map { |side| Row.new(name, side) } }
     end
 
     # Shows another player's bindings (a capture waiting for the last one is called off).
@@ -43,9 +50,9 @@ class GameMenu < Behaviour
 
     # The player's bindings of a cell, as text ("key:space").
     def bindings(row, column)
-      all = Input.bindings(row.name, pad: @player)
-      all = all.fetch(row.side) if row.side
-      all.select { |binding| binding.start_with?(PREFIXES.fetch(column)) }
+      refresh
+      prefix = PREFIXES.fetch(column)
+      @cells[[row.name, row.side, column]] ||= of_row(row).select { |binding| binding.start_with?(prefix) }
     end
 
     # What a cell shows: its bindings by name, or "None". An axis' stick is among its buttons,
@@ -58,20 +65,19 @@ class GameMenu < Behaviour
 
     # The bindings the player has on more than one row.
     def shared
-      seen = Hash.new(0)
-      rows.each { |row| row_bindings(row).each { |binding| seen[binding] += 1 } }
-      seen.select { |_binding, rows| rows > 1 }.keys
+      refresh
+      @shared ||= counted.select { |_binding, rows| rows > 1 }.keys
     end
 
     # Whether a cell has a binding another row has too (`shared`, worked out once for many cells).
     def conflict?(row, column, shared = self.shared) = bindings(row, column).any? { |binding| shared.include?(binding) }
 
-    def capturing? = !@waiting.nil?
+    def capturing? = !@waiting.nil? && Input.capturing_for?(@capture)
 
     # Waits for the key or button that will fill a cell.
     def capture(row, column)
       @waiting = [row, column]
-      Input.capture_next(cancel: CANCELS.fetch(column)) { |binding, _pad| caught(binding) }
+      Input.capture_next(cancel: CANCELS.fetch(column), &@capture)
     end
 
     # Stops waiting: the cell keeps what it had.
@@ -86,11 +92,12 @@ class GameMenu < Behaviour
       Input.reset_bindings(pad: @player)
     end
 
-    # What a capture caught: nothing (it was called off) leaves the cell as it was, and a binding
-    # of the other kind (a button, for the keys' cell) is not for it: it waits on.
-    def caught(binding)
+    # What a capture caught (and on which gamepad: nil for a key): nothing (it was called off)
+    # leaves the cell as it was; a binding of the other kind (a button, for the keys' cell), or a
+    # button of another player's gamepad, is not for it: it waits on.
+    def caught(binding, pad = nil)
       return @waiting = nil if binding.nil?
-      return capture(*@waiting) unless fits?(binding, @waiting.last)
+      return capture(*@waiting) unless fits?(binding, pad, @waiting.last)
 
       replace(*@waiting, binding)
       @waiting = nil
@@ -98,7 +105,36 @@ class GameMenu < Behaviour
 
     private
 
-    def fits?(binding, column) = binding.start_with?(PREFIXES.fetch(column))
+    # Whether a binding caught is one the cell takes: of its kind, and a button from the shown
+    # player's own gamepad.
+    def fits?(binding, pad, column)
+      return false unless binding.start_with?(PREFIXES.fetch(column))
+
+      column == KEYS || pad == @player
+    end
+
+    # Forgets what it worked out when the bindings changed, or another player is shown.
+    def refresh
+      seen = [Input.bindings_changes, @player]
+      return if seen == @seen
+
+      @seen = seen
+      @rows = @shared = nil
+      @cells = {}
+    end
+
+    # All the player's bindings of a row (an action's, or one side of an axis').
+    def of_row(row)
+      all = Input.bindings(row.name, pad: @player)
+      row.side ? all.fetch(row.side) : all
+    end
+
+    # How many rows each of the player's bindings is on.
+    def counted
+      seen = Hash.new(0)
+      rows.each { |row| row_bindings(row).each { |binding| seen[binding] += 1 } }
+      seen
+    end
 
     # The cell's bindings give way to the one caught.
     def replace(row, column, binding)

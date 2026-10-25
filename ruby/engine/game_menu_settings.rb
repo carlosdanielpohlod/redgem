@@ -2,7 +2,8 @@
 # render scale, vsync, frame cap, quality) and heard (master volume), as the Settings module has
 # them. Each change takes effect at once; leaving the screen (its Back button or Esc) keeps them
 # for the game's next runs and goes back to the screen it was opened from. Its Controls button
-# opens the controls page (see GameMenu::ControlsScreen), which comes back to it.
+# keeps them too, and opens the controls page (see GameMenu::ControlsScreen), which comes back to
+# it. A game's own options (add_option) come with its buttons.
 class GameMenu < Behaviour
   class SettingsScreen < Screen
     ROW_WIDTH = 560
@@ -32,12 +33,16 @@ class GameMenu < Behaviour
     attr_accessor :from
 
     def initialize(menu)
-      super(heading: -> { I18n.t("game.settings.heading") }, back: -> { leave(menu) })
+      leave = -> { leave(menu) }
+      @controls_option = [-> { I18n.t("game.settings.controls") }, -> { open_controls(menu) }]
+      super(heading: -> { I18n.t("game.settings.heading") },
+            options: [@controls_option, [-> { I18n.t("game.menu.back") }, leave]], back: leave)
       @menu = menu
       @from = :title
     end
 
-    def options = [[I18n.t("game.settings.controls"), -> { @menu.show(:controls) }], [I18n.t("game.menu.back"), back]]
+    # Puts the focus on the Controls button (where it comes back to from the controls page).
+    def focus_controls = focus&.move_to(rows + @options.index(@controls_option))
     def rows = VIDEO_ROWS.size + AUDIO_ROWS.size
     def space_above = rows * row_step + SECTIONS.size * @menu.scaled(CAPTION_HEIGHT)
     def first_button_share = BUTTONS_SHARE
@@ -57,6 +62,12 @@ class GameMenu < Behaviour
     def leave(menu)
       Settings.save
       @from ? menu.show(@from) : menu.resume
+    end
+
+    # Keeps the settings (they are left for another screen), and opens the controls page.
+    def open_controls(menu)
+      Settings.save
+      menu.show(:controls)
     end
 
     # A caption, then its rows (`first` is the first one's place in the focus). Returns where the

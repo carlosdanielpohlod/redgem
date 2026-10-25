@@ -1,5 +1,6 @@
 {
   "testing.cli.after_for_system_tests": "--after is for system tests (Ruby tests leave nothing behind)",
+  "testing.cli.after_needs_another_test": "--after names an earlier test, not this one (they would share their files)",
   "testing.cli.after_needs_test": "--after needs the system test this run goes on from",
   "testing.cli.after_needs_work": "--after needs --work: the folder the earlier run kept its files in",
   "testing.cli.all_alone": "--all runs every test of the game as it is: no test file, --game or --headless with it",
@@ -32,7 +33,7 @@
     "  --work <dir>          a folder of this run's own for its save file and its notes to the tests",
     "                        run with it (default: folders every run on this machine shares)",
     "  --after <earlier_test.rb>  with --work: go on from that test's run in the same folder, as if",
-    "                        the game were started again (its save, settings and bindings)",
+    "                        the game were started again (copies of its save, settings and bindings)",
     "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting)",
     "  --game <game_dir>     the game whose classes the Ruby tests use, from its scripts folder",
     "                        (default: classes come from the test file's own folder)",
@@ -42,7 +43,7 @@
   ],
   "testing.cli.work_for_system_tests": "--work is for system tests (Ruby tests leave nothing behind)",
   "testing.cli.work_needs_directory": "--work needs a directory",
-  "testing.run.nothing_kept": "--after {test}: that test's run left nothing in {folder} to go on from (was it run there with --work?)",
+  "testing.run.never_ran": "--after {test}: that test was never run in {folder} (run it there with --work first)",
   "testing.suite.failed": "failed",
   "testing.suite.summary": "tests: {passed} passed, {failed} failed"
 }

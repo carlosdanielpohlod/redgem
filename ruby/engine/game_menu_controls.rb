@@ -3,8 +3,10 @@
 # GameMenu::ControlsPage), the keys in one cell and the gamepad buttons in the other. Up and down
 # move between the rows, left and right between a row's two cells; Enter, a gamepad's A or a click
 # on a cell waits for the key or button that takes its place (Escape or a gamepad's Back calls
-# that off, and B too for a keys' cell). Under the rows: "Reset to defaults" (the player's bindings, all back to the
-# game's) and Back. The players' bindings are kept for the game's next runs as they change.
+# that off, and B too for a keys' cell); a click also moves the focus there. Under the rows: "Reset
+# to defaults" (the player's bindings, all back to the game's), Back (to the settings, with the
+# focus on their Controls button) and any option a game adds. The players' bindings are kept for
+# the game's next runs as they change.
 class GameMenu < Behaviour
   class ControlsScreen < Screen
     ROW_WIDTH = 720
@@ -36,7 +38,9 @@ class GameMenu < Behaviour
     attr_reader :cells
 
     def initialize(menu)
-      super(heading: -> { I18n.t("game.controls.heading") }, back: -> { leave(menu) })
+      leave = -> { leave(menu) }
+      options = [[-> { I18n.t("game.controls.reset") }, -> { @page.reset }], [-> { I18n.t("game.menu.back") }, leave]]
+      super(heading: -> { I18n.t("game.controls.heading") }, options: options, back: leave)
       @menu = menu
       @page = ControlsPage.new
       @column = ControlsPage::KEYS
@@ -44,7 +48,6 @@ class GameMenu < Behaviour
       @cells = {}
     end
 
-    def options = [[I18n.t("game.controls.reset"), -> { @page.reset }], [I18n.t("game.menu.back"), back]]
     def rows = PLAYER_ROWS + @page.rows.size
     def space_above = shown_rows * row_step + 2 * @menu.scaled(LINE_HEIGHT)
     def first_button_share = BUTTONS_SHARE
@@ -68,8 +71,12 @@ class GameMenu < Behaviour
 
     private
 
-    # Back to the settings screen (a capture still waiting is called off as the page closes).
-    def leave(menu) = menu.show(:settings)
+    # Back to the settings screen, on its Controls button (a capture still waiting is called off as
+    # the page closes).
+    def leave(menu)
+      menu.show(:settings)
+      menu.screens[:settings].focus_controls
+    end
 
     def shown_rows = PLAYER_ROWS + [@page.rows.size, VISIBLE_ROWS].min
     def row_step = @menu.scaled(ROW_HEIGHT + ROW_GAP)
@@ -103,7 +110,8 @@ class GameMenu < Behaviour
       pick_column if focus_on_a_row?
       @cells = {}
       all[@top, VISIBLE_ROWS].each_with_index do |row, at|
-        control_row(row, row_box(y + at * row_step, PLAYER_ROWS + @top + at), shared)
+        place = PLAYER_ROWS + @top + at
+        control_row(row, row_box(y + at * row_step, place), place, shared)
       end
     end
 
@@ -114,26 +122,41 @@ class GameMenu < Behaviour
       @top = @top.clamp(0, [count - VISIBLE_ROWS, 0].max)
     end
 
-    def focus_on_a_row? = focus_index >= PLAYER_ROWS
+    # Whether the focus is on one of the rows (not on the player's choice, nor on a button).
+    def focus_on_a_row? = (focus_index - PLAYER_ROWS).between?(0, @page.rows.size - 1)
     def pick_column = @column = SIDEWAYS_COLUMNS.fetch(UI.sideways, @column)
 
-    def control_row(row, box, shared)
+    # A row at `place` in the focus.
+    def control_row(row, box, place, shared)
       focused = box.delete(:focused)
       UI.row(BindingNames.row(row.name, row.side), nil, box, false)
       [ControlsPage::KEYS, ControlsPage::BUTTONS].each do |column|
-        cell(row, column, cell_in(box, column), focused && column == @column, shared)
+        cell(row, [place, column], cell_in(box, column), focused && column == @column, shared)
       end
     end
 
-    # A cell: ringed and lit when it is the focused one; worked (clicked, or confirmed while
-    # focused), it waits for what takes its place, unless a capture already waits.
-    def cell(row, column, box, focused, shared)
+    # A cell (`spot`: its row's place in the focus, and its column): ringed and lit when it is the
+    # focused one; worked (clicked, or confirmed while focused), it waits for what takes its place,
+    # unless a capture already waits, and takes the focus.
+    def cell(row, spot, box, focused, shared)
+      column = spot.last
       @cells[[row.name, row.side, column]] = box
+      draw_cell(box, focused)
+      cell_text(row, column, box, @page.conflict?(row, column, shared))
+      rebind(row, spot) if rebinding?(box, focused)
+    end
+
+    def draw_cell(box, focused)
       UI.focus_ring(box) if focused
       fill, alpha = focused ? [UI::BUTTON_HOVER_COLOR, UI::BUTTON_ALPHA] : [CELL_COLOR, CELL_ALPHA]
       UI.rect(**box, color: fill, alpha: alpha, radius: UI::BUTTON_RADIUS)
-      cell_text(row, column, box, @page.conflict?(row, column, shared))
-      @page.capture(row, column) if rebinding?(box, focused)
+    end
+
+    # Waits for a cell's binding, with the focus moved to it (it was clicked, maybe).
+    def rebind(row, spot)
+      place, @column = spot
+      focus&.move_to(place)
+      @page.capture(row, @column)
     end
 
     # Whether a cell is worked this frame to wait for its binding (not while one is waited for).

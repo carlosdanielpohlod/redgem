@@ -62,6 +62,18 @@ bool has_more_than_a_suite(const TestCliOptions& options) {
 // Whether a run would go on from an earlier one with no folder of their own to find its files in.
 bool going_on_alone(const TestCliOptions& options) { return !options.after.empty() && options.work_dir.empty(); }
 
+// Whether a run would go on from a test of its own name: their files would be the same ones.
+bool going_on_from_itself(const TestCliOptions& options) {
+  return !options.after.empty() && options.after.stem() == options.test_file.stem();
+}
+
+// What is wrong with what a system test is told to go on from (--after); empty when nothing is.
+std::string problem_with_going_on(const TestCliOptions& options) {
+  if (going_on_alone(options)) return tr("testing.cli.after_needs_work");
+  if (going_on_from_itself(options)) return tr("testing.cli.after_needs_another_test");
+  return {};
+}
+
 // What is wrong with a line that was read to its end; empty when nothing is.
 std::string problem_with(const TestCliOptions& options) {
   if (options.mode == TestMode::RubyTests) return problem_with_ruby_tests(options);
@@ -69,8 +81,7 @@ std::string problem_with(const TestCliOptions& options) {
   if (!options.scripts_game.empty()) return tr("testing.cli.game_for_ruby_tests");
   if (options.game_dir.empty()) return tr("testing.cli.missing_game_dir");
   if (options.test_file.empty()) return tr("testing.cli.missing_system_test");
-  if (going_on_alone(options)) return tr("testing.cli.after_needs_work");
-  return {};
+  return problem_with_going_on(options);
 }
 
 }  // namespace

@@ -328,16 +328,35 @@ set_tests_properties(ruby.harness_reports_failures PROPERTIES
 
 # System tests open the real game window and drive it with simulated input.
 # tests/system/<game>/*_test.rb runs against games/<game>.
+#
+# Starting a game again: tests/system_restarts/<game>/<name>_restarted_test.rb plays games/<game>
+# after tests/system/<game>/<name>_test.rb did, with what that run kept (its save, settings and
+# bindings, copied). The first run is a ctest fixture of the second, in a work folder they share.
 set(REDGEM_SCREENSHOT_DIR ${CMAKE_BINARY_DIR}/screenshots)
+set(REDGEM_RESTART_WORK_DIR ${CMAKE_BINARY_DIR}/test-runs)
 file(GLOB REDGEM_SYSTEM_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system/*/*_test.rb)
 foreach(test_file IN LISTS REDGEM_SYSTEM_TESTS)
   get_filename_component(test_name ${test_file} NAME_WE)
   get_filename_component(game_dir ${test_file} DIRECTORY)
   get_filename_component(game ${game_dir} NAME)
+  string(REGEX REPLACE "_test$" "_restarted_test" restarted_name ${test_name})
+  set(restarted_test ${CMAKE_CURRENT_SOURCE_DIR}/system_restarts/${game}/${restarted_name}.rb)
+  set(work "")
+  if(EXISTS ${restarted_test})
+    set(work --work ${REDGEM_RESTART_WORK_DIR}/${game}/${test_name})
+  endif()
   add_test(NAME system.${game}.${test_name}
            COMMAND redgem_test_tool ${CMAKE_SOURCE_DIR}/games/${game} ${test_file}
-                   --screenshots ${REDGEM_SCREENSHOT_DIR}/${game})
+                   --screenshots ${REDGEM_SCREENSHOT_DIR}/${game} ${work})
   set_tests_properties(system.${game}.${test_name} PROPERTIES LABELS system RUN_SERIAL TRUE)
+  if(EXISTS ${restarted_test})
+    set_tests_properties(system.${game}.${test_name} PROPERTIES FIXTURES_SETUP restart.${game}.${test_name})
+    add_test(NAME system.${game}.${restarted_name}
+             COMMAND redgem_test_tool ${CMAKE_SOURCE_DIR}/games/${game} ${restarted_test}
+                     --screenshots ${REDGEM_SCREENSHOT_DIR}/${game} ${work} --after ${test_file})
+    set_tests_properties(system.${game}.${restarted_name} PROPERTIES LABELS system RUN_SERIAL TRUE
+                         FIXTURES_REQUIRED restart.${game}.${test_name})
+  endif()
 endforeach()
 
 # The templates: a game is made from each as `redgem new` makes it, and played by the tests of
@@ -357,20 +376,6 @@ foreach(template_dir IN LISTS REDGEM_TEMPLATES)
                      ${REDGEM_SCREENSHOT_DIR}/template_${template})
     set_tests_properties(system.template.${template}.${test_name} PROPERTIES LABELS system RUN_SERIAL TRUE)
   endforeach()
-endforeach()
-
-# Starting a game again: tests/system_restarts/<game>/<name>_test.rb plays games/<game> after
-# tests/system/<game>/<name>_test.rb did, with what that run kept (its save, settings and bindings).
-file(GLOB REDGEM_RESTART_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_restarts/*/*_test.rb)
-foreach(test_file IN LISTS REDGEM_RESTART_TESTS)
-  get_filename_component(test_name ${test_file} NAME_WE)
-  get_filename_component(game_dir ${test_file} DIRECTORY)
-  get_filename_component(game ${game_dir} NAME)
-  add_test(NAME system.${game}.${test_name}_after_a_restart
-           COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/system_restarts/run_restart.sh $<TARGET_FILE:redgem_test_tool>
-                   ${CMAKE_SOURCE_DIR}/games/${game} ${CMAKE_CURRENT_SOURCE_DIR}/system/${game}/${test_name}.rb
-                   ${test_file} ${REDGEM_SCREENSHOT_DIR}/${game}_restart)
-  set_tests_properties(system.${game}.${test_name}_after_a_restart PROPERTIES LABELS system RUN_SERIAL TRUE)
 endforeach()
 
 # Multiplayer: two copies of the game run at once and play together, each driven by its own test.

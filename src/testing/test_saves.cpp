@@ -1,5 +1,6 @@
 #include "testing/test_saves.hpp"
 
+#include <fstream>
 #include <system_error>
 
 #include "app/save_location.hpp"
@@ -15,6 +16,8 @@ constexpr const char* kSaveExtension = ".json";
 constexpr const char* kSettingsEnding = "-settings.json";  // after the game's and the test's names
 constexpr const char* kBindingsEnding = "-bindings.json";
 constexpr char kNameJoiner = '-';
+constexpr const char* kRunsFolder = "runs";  // in a run's own folder: a word from each test run there
+constexpr const char* kRunMarkEnding = ".ran";
 
 // (Its backup too: a missing save is otherwise loaded from it.)
 std::filesystem::path emptied(const std::filesystem::path& file) {
@@ -92,12 +95,42 @@ RunFiles kept_run_files(const std::filesystem::path& game_dir, const std::filesy
           test_file_for(game_dir, work_dir, earlier_test, kBindingsEnding)};
 }
 
-bool kept_anything(const RunFiles& files) {
-  for (const std::filesystem::path* file : {&files.save, &files.settings, &files.bindings}) {
-    std::error_code error;
-    if (std::filesystem::exists(*file, error)) return true;
-  }
-  return false;
+namespace {
+
+// A copy of a file, when there is one to copy (a run may have kept nothing in it).
+void copy_if_kept(const std::filesystem::path& from, const std::filesystem::path& to) {
+  std::error_code error;
+  if (!std::filesystem::exists(from, error)) return;
+  std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing, error);
+}
+
+std::filesystem::path run_mark(const std::filesystem::path& work_dir, const std::filesystem::path& test_file) {
+  return work_dir / kRunsFolder / (test_file.stem().string() + kRunMarkEnding);
+}
+
+}  // namespace
+
+RunFiles copied_run_files(const std::filesystem::path& game_dir, const std::filesystem::path& work_dir,
+                          const std::filesystem::path& test_file, const std::filesystem::path& earlier_test) {
+  const RunFiles own = fresh_run_files(game_dir, work_dir, test_file);
+  const RunFiles kept = kept_run_files(game_dir, work_dir, earlier_test);
+  copy_if_kept(kept.save, own.save);
+  copy_if_kept(save_backup_of(kept.save), save_backup_of(own.save));
+  copy_if_kept(kept.settings, own.settings);
+  copy_if_kept(kept.bindings, own.bindings);
+  return own;
+}
+
+void mark_run(const std::filesystem::path& work_dir, const std::filesystem::path& test_file) {
+  const std::filesystem::path mark = run_mark(work_dir, test_file);
+  std::error_code error;
+  std::filesystem::create_directories(mark.parent_path(), error);
+  std::ofstream(mark) << test_file.string() << '\n';
+}
+
+bool ran_in(const std::filesystem::path& work_dir, const std::filesystem::path& test_file) {
+  std::error_code error;
+  return std::filesystem::exists(run_mark(work_dir, test_file), error);
 }
 
 }  // namespace redgem::testing

@@ -76,9 +76,11 @@ end
 A template is tested as the game it makes: `tests/system_templates/<template>/*_test.rb` run
 against a game created from it by `redgem new`. Every template needs at least one.
 
-What a game keeps between runs is tested by starting it again: `tests/system_restarts/<game>/<name>_test.rb`
-plays `games/<game>` after `tests/system/<game>/<name>_test.rb` did, with the save, display settings
-and bindings that run left (`tests/system_restarts/run_restart.sh`).
+What a game keeps between runs is tested by starting it again:
+`tests/system_restarts/<game>/<name>_restarted_test.rb` plays `games/<game>` after
+`tests/system/<game>/<name>_test.rb` did, on copies of the save, display settings and bindings that
+run left. The first run is a ctest fixture of the second (`redgem-test --work <dir>`, then
+`--work <dir> --after <first_test.rb>`), so asking for the second runs the first once before it.
 
 Test fixtures are regenerated with
 `tools/blender/run.sh build_test_fixtures.py tests/fixtures`.

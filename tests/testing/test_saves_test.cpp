@@ -2,9 +2,11 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 
 #include "app/save_location.hpp"
+#include "storage/save_file.hpp"
 #include "testing/test_saves.hpp"
 
 using namespace redgem;
@@ -106,8 +108,40 @@ TEST_CASE("a run that goes on from an earlier one plays with the files that run 
   CHECK(kept.settings == first.settings);
   CHECK(kept.bindings == first.bindings);
   CHECK(std::filesystem::exists(first.bindings));  // (not emptied)
-  CHECK(kept_anything(kept));
-  CHECK_FALSE(kept_anything(kept_run_files(game, work, "/tests/system/x/never_run_test.rb")));
   CHECK(fresh_run_files(game, "", earlier).save == test_save_file_for(game));
+  std::filesystem::remove_all(work);
+}
+
+TEST_CASE("a run that goes on from an earlier one plays on copies of its files, the same each time") {
+  const std::filesystem::path game = "/nowhere/redgem-testing-tests/one/game";
+  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-copied-work";
+  const std::filesystem::path earlier = "/tests/system/x/settings_test.rb";
+  const std::filesystem::path later = "/tests/system_restarts/x/settings_restarted_test.rb";
+  const RunFiles first = fresh_run_files(game, work, earlier);
+  std::filesystem::create_directories(first.save.parent_path());
+  std::ofstream(first.save) << "{\"best\": 3}";
+  std::ofstream(save_backup_of(first.save)) << "{\"best\": 2}";
+  std::ofstream(first.bindings) << "{}";
+  for (int run = 0; run < 2; ++run) {
+    const RunFiles own = copied_run_files(game, work, later, earlier);
+    CHECK(own.save != first.save);
+    CHECK(std::filesystem::exists(own.save));
+    CHECK(std::filesystem::exists(save_backup_of(own.save)));
+    CHECK(std::filesystem::exists(own.bindings));
+    CHECK_FALSE(std::filesystem::exists(own.settings));    // (the earlier run kept none)
+    std::ofstream(own.bindings) << "{\"changed\": true}";  // what this run does is its own
+  }
+  std::ifstream kept(first.bindings);
+  CHECK(std::string(std::istreambuf_iterator<char>(kept), {}) == "{}");
+  std::filesystem::remove_all(work);
+}
+
+TEST_CASE("a run in a work folder leaves word that it was made there, even having kept nothing") {
+  const std::filesystem::path work = std::filesystem::temp_directory_path() / "redgem-testing-marked-work";
+  std::filesystem::remove_all(work);
+  CHECK_FALSE(ran_in(work, "/tests/system/x/settings_test.rb"));
+  mark_run(work, "/tests/system/x/settings_test.rb");
+  CHECK(ran_in(work, "settings_test.rb"));
+  CHECK_FALSE(ran_in(work, "other_test.rb"));
   std::filesystem::remove_all(work);
 }

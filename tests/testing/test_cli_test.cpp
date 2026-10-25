@@ -114,4 +114,6 @@ TEST_CASE("a system test can go on from an earlier one run in the same folder, a
         "--after needs --work: the folder the earlier run kept its files in");
   CHECK(parse_test_cli({"--ruby", "x_test.rb", "--after", "s.rb"}).error ==
         "--after is for system tests (Ruby tests leave nothing behind)");
+  CHECK(parse_test_cli({"games/demo", "a/t.rb", "--work", "/tmp/run", "--after", "b/t.rb"}).error ==
+        "--after names an earlier test, not this one (they would share their files)");
 }
