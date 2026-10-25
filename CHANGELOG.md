@@ -8,6 +8,8 @@ until 1.0, a release may change what games rely on (see
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-25
+
 ### Added
 
 - **Scatter distance LODs**: a scattered model can name simpler versions of itself for the
@@ -22,6 +24,23 @@ until 1.0, a release may change what games rely on (see
   each character's graph its own, with the blended pose sent over the network.
 - **Particle sun shadows**: particles can cast the sun's shadow (opt-in), following their fading
   and flipbook cells.
+- **Several scenes in the editor**: open a scene from the Scenes folder or File > Open Scene,
+  make one with File > New Scene, save it under another name with File > Save Scene As. Play
+  starts from the open scene.
+- **Input actions and rebinding**: a game declares its actions and axes in `game.json` or with
+  `Input.define_action` and `Input.define_axis`; players rebind them (`Input.bind`,
+  `Input.capture_next`), and their changes are kept per game. Up to four gamepads, each action
+  and axis read per pad.
+- **Positional audio**: `Audio.play_at` places a sound in the world, panned and fading with its
+  distance from the listener (`Audio.listener`), moved with `Audio.move`.
+- **Unicode text and game fonts**: UI text draws letters beyond Latin-1 (the euro sign, Polish,
+  Turkish, Greek, Cyrillic), and a game can use its own font from `fonts/` with `UI.font`.
+- **WebP images** in scene materials, the HUD, particles and sky pictures, including glTF's
+  `EXT_texture_webp`.
+- **Runaway scripts are stopped**: a script call that runs longer than `script_budget_ms` (from
+  `game.json`, 1 s by default) is stopped with a `ScriptTimeout`, and the game goes on.
+- **Crash reports**: when a built game crashes, it writes a report beside its save
+  (`<id>-crashes/`).
 - **Display settings for players**: windowed, fullscreen and borderless modes, a resolution from
   the monitor's sizes, a render scale (50% to 200%), vsync and a frame-rate cap, quality presets
   (low to ultra, and custom) that cap what a level's environment asks for, and a master volume.
@@ -71,6 +90,8 @@ until 1.0, a release may change what games rely on (see
   kept beside it as `<name>.bak`. A damaged save is moved aside to `<name>.damaged` (never written
   over), the backup is loaded and put back in its place, and the log names both files. A save that
   cannot be read is left alone, and the game runs without saving.
+- **A missing or unreadable image** shows as a magenta-and-black checkerboard, with one warning,
+  instead of disappearing.
 - **Water looks closer to real water**: shore foam measured along the surface, broader fine
   detail on the waves, smoother highlights, and better refraction and wave filtering.
 - **KNOWN_LIMITATIONS.md** lists what stands between the engine and a 1.0.
@@ -84,6 +105,17 @@ until 1.0, a release may change what games rely on (see
   refracted ray, so a slope or a nearby rock is no longer sampled in the wrong place.
 - **Temporal anti-aliasing under fast motion**: history that no longer matches is dropped when the
   camera moves fast or an edge opens up, instead of smearing.
+- **Temporal anti-aliasing when an object goes away**: history is checked against the previous
+  frame's depth, so a removed object no longer leaves a ghost behind.
+- **Security fixes from an audit**: scripts can no longer free objects the engine still uses; a
+  build refuses to replace a folder that holds the game, and never ships signing keys; vectors
+  out of range from the network arrive as plain hashes; `Network.authenticate` is asked about a
+  server room's first player too; every host limits floods of messages; the relay finds a room's
+  members without scanning every connection; a cut HTTPS answer is no longer taken as whole;
+  login tokens are hidden in message logs; the server's save database is readable only by its
+  owner.
+- **A guest that keeps playing while its host stalls** is no longer dropped as a flood when its
+  backlog arrives late.
 
 ## [0.3.0] - 2026-10-18
 
@@ -157,7 +189,8 @@ First experimental release.
   Wine so far. Builds games for Windows.
 - The platformer, driving and city demos.
 
-[Unreleased]: https://github.com/carlosdanielpohlod/redgem/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/carlosdanielpohlod/redgem/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/carlosdanielpohlod/redgem/releases/tag/v0.1.0
