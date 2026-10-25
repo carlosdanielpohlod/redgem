@@ -101,6 +101,7 @@ void Engine::update_frame(float delta) {
   particles_.update(delta);
   scripts_->update(delta);
   process_destroyed();
+  if (context_.renders_particles) particle_emitters_.advance(delta, scene_, particles_);
 }
 
 bool Engine::both_alive(const ContactEvent& event) const {

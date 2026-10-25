@@ -1736,6 +1736,12 @@
           "about": "adds particles; returns how many (size, color and alpha may be lists over their life)"
         },
         {
+          "name": "emitter",
+          "static": true,
+          "args": "object, rate: 24, offset: Vector3.zero, **settings",
+          "about": "starts a continuous local effect; returns a Particles::Emitter handle; uses burst settings except count"
+        },
+        {
           "name": "count",
           "static": true,
           "about": "how many are alive"
@@ -1743,15 +1749,32 @@
         {
           "name": "clear",
           "static": true,
-          "about": "removes them all"
+          "about": "removes all particles and stops every emitter"
         }
       ],
       "internal": [
         "colors",
         "list_of_colors?",
-        "numbers"
+        "numbers",
+        "parameters"
       ],
-      "guide": "gameplay.md#over-their-life"
+      "guide": "gameplay.md#sparks-dust-and-smoke",
+      "notes": "Emitters follow game time and stop on object destruction or scene changes. They are local visual effects, not replicated. Without a presenter, creation returns an inactive handle and no emitter is allocated or simulated. Births follow ordinary movement; movement over 10 meters per update starts them at the destination. Up to 256 emitters fairly share 4096 live particles; missed births are dropped."
+    },
+    {
+      "name": "Particles::Emitter",
+      "about": "A continuous particle effect attached to an object, returned by Particles.emitter.",
+      "methods": [
+        {
+          "name": "active?",
+          "about": "whether this emitter is still emitting from a live object"
+        },
+        {
+          "name": "stop",
+          "about": "stops new births; existing particles finish their lives"
+        }
+      ],
+      "guide": "gameplay.md#sparks-dust-and-smoke"
     },
     {
       "name": "Scatter",

@@ -31,6 +31,15 @@ bool makes_one_more(const ParticleBurst& burst, int added, std::size_t flying) {
   return added < burst.count && flying < kMaxParticles;
 }
 
+float speed_kept(float dt) { return std::max(0.0f, 1.0f - kAirDrag * dt); }
+
+void move_particle(Particle& particle, Vec3 gravity, float dt, float kept_speed) {
+  particle.age += dt;
+  particle.angle += particle.spin * dt;
+  particle.velocity = (particle.velocity + gravity * (particle.gravity * dt)) * kept_speed;
+  particle.position = particle.position + particle.velocity * dt;
+}
+
 }  // namespace
 
 float ParticleSystem::random_unit() {
@@ -86,25 +95,34 @@ Particle ParticleSystem::new_particle(const ParticleBurst& burst, const BurstCon
   return particle;
 }
 
+ParticleSystem::PreparedBurst ParticleSystem::prepare(const ParticleBurst& burst) {
+  return {burst_cone(burst.direction, burst.spread_degrees), image_index(burst.image)};
+}
+
+bool ParticleSystem::emit_prepared(const ParticleBurst& burst, const PreparedBurst& prepared, Vec3 position,
+                                   float age) {
+  if (particles_.size() >= kMaxParticles) return false;
+  Particle particle = new_particle(burst, prepared.cone, prepared.image);
+  if (age >= particle.life) return false;
+  particle.position = position;
+  move_particle(particle, gravity_, age, speed_kept(age));
+  particles_.push_back(particle);
+  return true;
+}
+
 int ParticleSystem::burst(const ParticleBurst& burst) {
-  const int image = image_index(burst.image);
-  const BurstCone cone = burst_cone(burst.direction, burst.spread_degrees);
+  const PreparedBurst prepared = prepare(burst);
   int added = 0;
   for (; makes_one_more(burst, added, particles_.size()); ++added) {
-    particles_.push_back(new_particle(burst, cone, image));
+    particles_.push_back(new_particle(burst, prepared.cone, prepared.image));
   }
   return added;
 }
 
 void ParticleSystem::update(float dt) {
   if (dt <= 0.0f) return;
-  const float kept_speed = std::max(0.0f, 1.0f - kAirDrag * dt);
-  for (Particle& particle : particles_) {
-    particle.age += dt;
-    particle.angle += particle.spin * dt;
-    particle.velocity = (particle.velocity + gravity_ * (particle.gravity * dt)) * kept_speed;
-    particle.position = particle.position + particle.velocity * dt;
-  }
+  const float kept_speed = speed_kept(dt);
+  for (Particle& particle : particles_) move_particle(particle, gravity_, dt, kept_speed);
   particles_.erase(std::remove_if(particles_.begin(), particles_.end(),
                                   [](const Particle& particle) { return particle.age >= particle.life; }),
                    particles_.end());

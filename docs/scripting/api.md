@@ -34,6 +34,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`GameMenu`](#gamemenu) | A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks. |
 | [`GameMenu::Screen`](#gamemenuscreen) | A screen of the GameMenu. |
 | [`Particles`](#particles) | Short-lived sparks, smoke and dust. |
+| [`Particles::Emitter`](#particlesemitter) | A continuous particle effect attached to an object, returned by Particles.emitter. |
 | [`Scatter`](#scatter) | Great numbers of copies of a mesh (grass, trees, rocks), drawn only. |
 | [`Save`](#save) | What the game keeps between runs. |
 | [`HTTP`](#http) | Web requests; the answer comes to the block. |
@@ -468,11 +469,21 @@ A screen of the GameMenu. See [gameplay.md#pause-and-the-flow-between-screens](g
 
 ## Particles
 
-Short-lived sparks, smoke and dust. See [gameplay.md#over-their-life](gameplay.md#over-their-life).
+Short-lived sparks, smoke and dust. See [gameplay.md#sparks-dust-and-smoke](gameplay.md#sparks-dust-and-smoke).
 
 - `Particles.burst(position, count:, color:, alpha:, glow:, lit:, cast_shadow:, soft:, direction:, spread:, speed:, life:, size:, gravity:, image:, frames:, fps:, spin:)`: adds particles; returns how many (size, color and alpha may be lists over their life)
+- `Particles.emitter(object, rate: 24, offset: Vector3.zero, **settings)`: starts a continuous local effect; returns a Particles::Emitter handle; uses burst settings except count
 - `Particles.count`: how many are alive
-- `Particles.clear`: removes them all
+- `Particles.clear`: removes all particles and stops every emitter
+
+Emitters follow game time and stop on object destruction or scene changes. They are local visual effects, not replicated. Without a presenter, creation returns an inactive handle and no emitter is allocated or simulated. Births follow ordinary movement; movement over 10 meters per update starts them at the destination. Up to 256 emitters fairly share 4096 live particles; missed births are dropped.
+
+## Particles::Emitter
+
+A continuous particle effect attached to an object, returned by Particles.emitter. See [gameplay.md#sparks-dust-and-smoke](gameplay.md#sparks-dust-and-smoke).
+
+- `active?`: whether this emitter is still emitting from a live object
+- `stop`: stops new births; existing particles finish their lives
 
 ## Scatter
 

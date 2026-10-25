@@ -55,8 +55,10 @@ struct TempSave {
   ~TempSave() { std::filesystem::remove_all(dir); }
 };
 
-std::unique_ptr<Engine> engine_for(const SceneDesc& scene, const std::filesystem::path& save_file) {
+std::unique_ptr<Engine> engine_for(const SceneDesc& scene, const std::filesystem::path& save_file,
+                                   Presenter* presenter = nullptr) {
   EngineOptions options;
+  options.presenter = presenter;
   options.game_dir = fixture("games/sandbox");
   options.fixed_step = true;
   options.scene = &scene;
@@ -563,4 +565,76 @@ TEST_CASE("scripts read what is typed, and a text field keeps it") {
   input.type_text("tonia");  // more than fits
   frames(*engine, 1);
   CHECK(ruby(*engine, field) == "Antoni");
+}
+
+TEST_CASE("scripts start continuous emitters that follow an object and stop independently") {
+  const TempSave temp;
+  const SceneDesc scene = small_scene();
+  NullPresenter presenter({320, 240});
+  auto engine = engine_for(scene, temp.file, &presenter);
+  frames(*engine, 1);
+  ruby(*engine,
+       "$jet = Particles.emitter(Scene.find('Host'), rate: 60, speed: 0, gravity: 0, life: 60, "
+       "offset: [1, 0, 0], color: :gold, cast_shadow: true)");
+  CHECK(ruby(*engine, "$jet.active?") == "true");
+  frames(*engine, 1);
+  REQUIRE(engine->script_context().particles->particles().size() == 1);
+  CHECK(engine->script_context().particles->particles().front().position.x == doctest::Approx(1));
+  CHECK(engine->script_context().particles->particles().front().look.cast_shadow);
+  ruby(*engine,
+       "class EmitterMover < Behaviour; def update(_dt); transform.position = [8, 0, 0]; end; end; "
+       "Scene.find('Host').add_component(EmitterMover)");
+  frames(*engine, 1);
+  REQUIRE(engine->script_context().particles->particles().size() == 2);
+  CHECK(engine->script_context().particles->particles().back().position.x == doctest::Approx(9));
+  ruby(*engine, "Time.scale = 0");
+  frames(*engine, kFramesPerSecond);
+  CHECK(ruby(*engine, "Particles.count") == "2");
+  ruby(*engine, "Time.scale = 1; $jet.stop");
+  CHECK(ruby(*engine, "$jet.active?") == "false");
+  CHECK(ruby(*engine, "$jet.stop") == "false");
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "Particles.count") == "2");
+}
+
+TEST_CASE("scripts clear continuous emitters and cannot stop a newer emitter using an old handle") {
+  const TempSave temp;
+  const SceneDesc scene = small_scene();
+  NullPresenter presenter({320, 240});
+  auto engine = engine_for(scene, temp.file, &presenter);
+  frames(*engine, 1);
+  ruby(*engine,
+       "$old = Particles.emitter(Scene.find('Host')); Particles.clear; "
+       "$new = Particles.emitter(Scene.find('Host'))");
+  CHECK(ruby(*engine, "$old.active?") == "false");
+  CHECK(ruby(*engine, "$old.stop") == "false");
+  CHECK(ruby(*engine, "$new.active?") == "true");
+  ruby(*engine, "Scene.find('Host').destroy");
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "$new.active?") == "false");
+}
+
+TEST_CASE("scripts refuse invalid continuous emitters through the same burst argument checks") {
+  const TempSave temp;
+  const SceneDesc scene = small_scene();
+  NullPresenter presenter({320, 240});
+  auto engine = engine_for(scene, temp.file, &presenter);
+  frames(*engine, 1);
+  for (const auto* options : {"rate: 0", "rate: -1", "rate: 4097", "rate: Float::INFINITY", "count: 2",
+                              "offset: 'here'", "color: :plaid", "life: -1", "frames: [0, 1]"})
+    CHECK(fails(*engine, std::string("Particles.emitter(Scene.find('Host'), ") + options + ")"));
+  CHECK(fails(*engine, "Particles.emitter(nil)"));
+  CHECK(fails(*engine, "Particles.emitter(7)"));
+  CHECK(ruby(*engine, "Particles.count") == "0");
+}
+
+TEST_CASE("continuous emitters are inactive local effects without a presenter") {
+  const TempSave temp;
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene, temp.file);
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "Particles.emitter(Scene.find('Host'), rate: 4096).active?") == "false");
+  frames(*engine, kFramesPerSecond);
+  CHECK(ruby(*engine, "Particles.count") == "0");
+  CHECK(ruby(*engine, "512.times { Particles.emitter(Scene.find('Host')) }; Particles.count") == "0");
 }

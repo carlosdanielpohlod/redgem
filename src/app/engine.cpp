@@ -170,10 +170,16 @@ void Engine::keep_bindings() {
   kept_bindings_ = std::move(text);
 }
 
-void Engine::fill_context(const std::string& game_title) {
-  context_.save = options_.save != nullptr ? options_.save : save_.get();
+void Engine::connect_effects() {
   context_.animations = &animations_;
   context_.particles = &particles_;
+  context_.particle_emitters = &particle_emitters_;
+  context_.renders_particles = options_.presenter != nullptr;
+}
+
+void Engine::fill_context(const std::string& game_title) {
+  context_.save = options_.save != nullptr ? options_.save : save_.get();
+  connect_effects();
   context_.network = &network_;
   context_.discovery = &discovery_;
   context_.http = &http_;

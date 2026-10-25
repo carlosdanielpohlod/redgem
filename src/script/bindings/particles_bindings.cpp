@@ -2,6 +2,11 @@
 
 #include <mruby.h>
 
+#include <array>
+#include <limits>
+
+#include "scene/particle_emitters.hpp"
+
 #include "scene/particles.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
@@ -18,8 +23,14 @@ ParticleSystem& particles(mrb_state* mrb) {
   return required(mrb, context(mrb).particles, "Particles are only available while a game runs");
 }
 
-// What Particles.__burst is called with, as mruby hands it over.
+ParticleEmitters& emitters(mrb_state* mrb) {
+  return required(mrb, context(mrb).particle_emitters, "Particle emitters are only available while a game runs");
+}
+
+// What Particles.__burst or __emitter is called with, as mruby hands it over.
 struct BurstArgs {
+  mrb_value object = mrb_nil_value();
+  mrb_float rate = 0.0;
   mrb_value position = mrb_nil_value();
   mrb_value direction = mrb_nil_value();
   mrb_int count = 0;
@@ -34,11 +45,20 @@ struct BurstArgs {
   mrb_float fps = 0.0;
 };
 
-BurstArgs burst_args(mrb_state* mrb) {
+constexpr std::size_t kEmitterPrefixArgs = 2;  // attached object and particles per second
+constexpr std::size_t kBurstArgs = 19;
+constexpr std::size_t kEmitterArgs = kBurstArgs + kEmitterPrefixArgs;
+constexpr const char* kBurstFormat = "ooifffffAAAbbfziifb";
+constexpr const char* kEmitterFormat = "ofooifffffAAAbbfziifb";
+
+BurstArgs burst_args(mrb_state* mrb, bool emitter = false) {
   BurstArgs args;
-  mrb_get_args(mrb, "ooifffffAAAbbfziifb", &args.position, &args.direction, &args.count, &args.speed, &args.spread,
-               &args.life, &args.gravity, &args.spin, &args.sizes, &args.colors, &args.alphas, &args.glow, &args.lit,
-               &args.soft, &args.image, &args.columns, &args.rows, &args.fps, &args.cast_shadow);
+  void* image_pointer = static_cast<void*>(&args.image);
+  std::array<void*, kEmitterArgs> pointers{
+      &args.object, &args.rate,    &args.position, &args.direction, &args.count,  &args.speed,  &args.spread,
+      &args.life,   &args.gravity, &args.spin,     &args.sizes,     &args.colors, &args.alphas, &args.glow,
+      &args.lit,    &args.soft,    image_pointer,  &args.columns,   &args.rows,   &args.fps,    &args.cast_shadow};
+  mrb_get_args_a(mrb, emitter ? kEmitterFormat : kBurstFormat, pointers.data() + (emitter ? 0 : kEmitterPrefixArgs));
   for (mrb_float* number : {&args.speed, &args.spread, &args.gravity, &args.spin}) *number = finite(mrb, *number);
   args.life = at_least(mrb, args.life, 0.0, "a burst's life");
   return args;
@@ -69,12 +89,47 @@ void set_look(mrb_state* mrb, const BurstArgs& args, ParticleBurst& burst) {
   burst.image = args.image;
 }
 
-mrb_value particles_burst(mrb_state* mrb, mrb_value) {
-  const BurstArgs args = burst_args(mrb);
+ParticleBurst settings(mrb_state* mrb, const BurstArgs& args) {
   ParticleBurst burst;
   set_motion(mrb, args, burst);
   set_look(mrb, args, burst);
-  return mrb_int_value(mrb, particles(mrb).burst(burst));
+  return burst;
+}
+
+mrb_value particles_burst(mrb_state* mrb, mrb_value) {
+  return mrb_int_value(mrb, particles(mrb).burst(settings(mrb, burst_args(mrb))));
+}
+
+int create_emitter(mrb_state* mrb, const BurstArgs& args, float rate) {
+  auto& registry = emitters(mrb);
+  const ParticleBurst burst = settings(mrb, args);
+  if (!context(mrb).renders_particles) return kNoEmitter;
+  return registry.create(scene(mrb), wrapped_handle(mrb, args.object), burst, rate);
+}
+
+mrb_value particles_emitter(mrb_state* mrb, mrb_value) {
+  const BurstArgs args = burst_args(mrb, true);
+  const float rate = static_cast<float>(from_to(mrb, args.rate, 0.0, kMaxEmitterRate, "an emitter's rate"));
+  more_than(mrb, rate, 0.0, "an emitter's rate");
+  alive_id(mrb, args.object);
+  const int id = create_emitter(mrb, args, rate);
+  if (!context(mrb).renders_particles) return mrb_int_value(mrb, kNoEmitter);
+  if (id == kNoEmitter) mrb_raise(mrb, E_RUNTIME_ERROR, "no room for another particle emitter");
+  return mrb_int_value(mrb, id);
+}
+
+int emitter_id_arg(mrb_state* mrb) {
+  mrb_int id = 0;
+  mrb_get_args(mrb, "i", &id);
+  if (id <= kNoEmitter) return kNoEmitter;
+  if (id > std::numeric_limits<int>::max()) return kNoEmitter;
+  return static_cast<int>(id);
+}
+
+mrb_value stop_emitter(mrb_state* mrb, mrb_value) { return mrb_bool_value(emitters(mrb).stop(emitter_id_arg(mrb))); }
+
+mrb_value emitter_active(mrb_state* mrb, mrb_value) {
+  return mrb_bool_value(emitters(mrb).active(scene(mrb), emitter_id_arg(mrb)));
 }
 
 mrb_value particles_count(mrb_state* mrb, mrb_value) {
@@ -83,6 +138,7 @@ mrb_value particles_count(mrb_state* mrb, mrb_value) {
 
 mrb_value particles_clear(mrb_state* mrb, mrb_value) {
   particles(mrb).clear();
+  if (context(mrb).particle_emitters != nullptr) context(mrb).particle_emitters->clear();
   return mrb_nil_value();
 }
 
@@ -90,7 +146,10 @@ mrb_value particles_clear(mrb_state* mrb, mrb_value) {
 
 void install_particles_bindings(mrb_state* mrb) {
   RClass* particles_module = mrb_define_module(mrb, "Particles");
-  mrb_define_module_function(mrb, particles_module, "__burst", particles_burst, MRB_ARGS_REQ(19));
+  mrb_define_module_function(mrb, particles_module, "__burst", particles_burst, MRB_ARGS_REQ(kBurstArgs));
+  mrb_define_module_function(mrb, particles_module, "__emitter", particles_emitter, MRB_ARGS_REQ(kEmitterArgs));
+  mrb_define_module_function(mrb, particles_module, "__stop_emitter", stop_emitter, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, particles_module, "__emitter_active", emitter_active, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, particles_module, "count", particles_count, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, particles_module, "clear", particles_clear, MRB_ARGS_NONE());
 }

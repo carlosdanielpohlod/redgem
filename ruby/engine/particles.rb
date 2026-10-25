@@ -2,10 +2,11 @@
 # nothing collides with them, and they are gone when their life is over.
 #
 #   Particles.burst(transform.position, count: 24, color: :gold, glow: true)
-#   every(0.05) { Particles.burst(exhaust, count: 1, image: :smoke, gravity: -0.1, spread: 20, spin: 40) }
+#   Particles.emitter(game_object, rate: 20, image: :smoke, gravity: -0.1, spread: 20, spin: 40)
 #   Particles.burst(torch, count: 1, image: :flames, frames: [8, 4], fps: 24, glow: true,
 #                   size: [0.4, 0.6, 0.2], color: [[255, 220, 150], [255, 120, 40], [90, 30, 20]])
 module Particles
+  DEFAULT_RATE = 24.0     # particles per game second of a continuous emitter
   DEFAULT_COUNT = 12
   DEFAULT_SPEED = 3.0     # meters per second
   DEFAULT_SPREAD = 180.0  # degrees away from the direction: 180 goes everywhere
@@ -22,14 +23,32 @@ module Particles
   # images/smoke.png), tinted by the color; without one they are soft round dots. spin: degrees
   # per second each picture turns. size, color and alpha may each be a list of up to 4 values the
   # particle goes through over its life (see docs/scripting/gameplay.md).
-  def self.burst(position, count: DEFAULT_COUNT, color: :white, alpha: UI::OPAQUE, speed: DEFAULT_SPEED,
-                 spread: DEFAULT_SPREAD, direction: Vector3.up, life: DEFAULT_LIFE, size: DEFAULT_SIZE,
-                 gravity: WORLD_GRAVITY, glow: false, lit: false, cast_shadow: false, soft: HARD_EDGE, image: nil,
-                 frames: ONE_PICTURE, fps: OVER_LIFE, spin: NO_SPIN)
+  def self.parameters(position, count: DEFAULT_COUNT, color: :white, alpha: UI::OPAQUE, speed: DEFAULT_SPEED,
+                      spread: DEFAULT_SPREAD, direction: Vector3.up, life: DEFAULT_LIFE, size: DEFAULT_SIZE,
+                      gravity: WORLD_GRAVITY, glow: false, lit: false, cast_shadow: false, soft: HARD_EDGE, image: nil,
+                      frames: ONE_PICTURE, fps: OVER_LIFE, spin: NO_SPIN)
     columns, rows = frames
-    __burst(position, direction, count.to_i, speed.to_f, spread.to_f, life.to_f, gravity.to_f, spin.to_f,
-            numbers(size), colors(color), numbers(alpha), glow, lit, soft.to_f, image.to_s, columns.to_i, rows.to_i,
-            fps.to_f, cast_shadow)
+    [position, direction, count.to_i, speed.to_f, spread.to_f, life.to_f, gravity.to_f, spin.to_f,
+     numbers(size), colors(color), numbers(alpha), glow, lit, soft.to_f, image.to_s, columns.to_i, rows.to_i,
+     fps.to_f, cast_shadow]
+  end
+
+  def self.burst(position, **)
+    arguments = parameters(position, **)
+    __burst(*arguments)
+  end
+
+  # Offset and direction are local to the object. New births follow it; old particles stay in the world.
+  def self.emitter(object, rate: DEFAULT_RATE, offset: Vector3.zero, **options)
+    raise ArgumentError, "use rate:, not count:, for a continuous emitter" if options.key?(:count)
+
+    Emitter.new(__emitter(object, rate.to_f, *parameters(offset, **options)))
+  end
+
+  class Emitter
+    def initialize(id) = @id = id
+    def stop = Particles.__stop_emitter(@id)
+    def active? = Particles.__emitter_active(@id)
   end
 
   def self.numbers(value) = value.is_a?(Array) ? value.map(&:to_f) : [value.to_f]
