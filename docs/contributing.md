@@ -98,8 +98,8 @@ Every pull request runs these workflows (`.github/workflows/`), side by side:
   `tools/android/build_runtime.sh`, with the NDK `tools/android/fetch_toolchain.sh` pins (kept
   between runs). Nothing runs on Android there: it catches code that only breaks that build.
 
-Every fetched archive is pinned by its SHA-256 (`cmake/Dependencies.cmake`); a dependency fetched
-from git is pinned by its tag or commit. `THIRD_PARTY_LICENSES.md` is generated: after adding or
+Every archive `cmake/Dependencies.cmake` fetches is pinned by its SHA-256, as is the Android NDK
+(`tools/android/fetch_toolchain.sh`); a dependency fetched from git is pinned by its tag or commit. `THIRD_PARTY_LICENSES.md` is generated: after adding or
 updating a dependency, run `python3 -I tools/licenses/collect_notices.py` (after a build) and
 commit what it writes. The test `tools.license_notices_are_up_to_date` fails when it is stale.
 

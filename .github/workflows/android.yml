@@ -26,8 +26,6 @@ jobs:
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 1G
-      # One copy of the dependencies' sources for both processors, kept between runs.
-      FETCH_DIR: ${{ github.workspace }}/.deps/fetch
     steps:
       - uses: actions/checkout@v4
 
@@ -67,20 +65,21 @@ jobs:
           key: ccache-android-${{ github.run_id }}
           restore-keys: ccache-android-
 
+      # (Each processor's build keeps its own: what CMake configures in them differs.)
       - name: Restore the libraries' sources
         id: fetch-cache
         uses: actions/cache/restore@v4
         with:
           path: |
-            .deps/fetch/*-src
-            .deps/fetch/*-subbuild
+            build-android/*/_deps/*-src
+            build-android/*/_deps/*-subbuild
           key: fetch-android-${{ hashFiles('cmake/Dependencies.cmake') }}
 
       - name: Build the player for both processors
         id: build
         env:
           REDGEM_ANDROID_CMAKE_ARGS: >-
-            -DFETCHCONTENT_BASE_DIR=${{ env.FETCH_DIR }} -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+            -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         run: |
           ccache --zero-stats
@@ -88,18 +87,20 @@ jobs:
           ccache --show-stats
           ls -l build/src/runtimes/android/*/libredgem.so
 
+      # (Only after a build that worked: one cut short may have half of them.)
       - name: Keep the libraries' sources
-        if: ${{ !cancelled() && steps.fetch-cache.outputs.cache-hit != 'true' }}
+        if: ${{ steps.build.outcome == 'success' && steps.fetch-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: |
-            .deps/fetch/*-src
-            .deps/fetch/*-subbuild
+            build-android/*/_deps/*-src
+            build-android/*/_deps/*-subbuild
           key: ${{ steps.fetch-cache.outputs.cache-primary-key }}
 
-      # (Even when the build failed: what it compiled is still good.)
+      # (Even when the build failed: what it compiled is still good. From main only: the
+      # repository's caches are shared, and one per pull request push would crowd out the rest.)
       - name: Keep the compiler cache
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name != 'pull_request' }}
         uses: actions/cache/save@v4
         with:
           path: .ccache

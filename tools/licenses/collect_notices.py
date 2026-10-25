@@ -20,8 +20,10 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DEPS = "{deps}"
 DEFAULT_DEPS = os.path.join(REPO_ROOT, "build", "_deps")
 OUTPUT = os.path.join(REPO_ROOT, "THIRD_PARTY_LICENSES.md")
-# What the check exits with when the file is stale (1 is any other failure of Python's own).
+# What the script exits with when the file is stale, and when a license file it reads is not there
+# (1 is any other failure of Python's own).
 EXIT_STALE = 2
+EXIT_MISSING = 3
 
 # (name, what it is used for, where it comes from, its license file).
 PROJECTS = [
@@ -143,7 +145,12 @@ def main():
     parser.add_argument("--deps", default=DEFAULT_DEPS, help="where the dependencies' sources are")
     parser.add_argument("--check", action="store_true", help="fail if the file is stale instead of writing it")
     args = parser.parse_args()
-    text = notices(os.path.abspath(args.deps))
+    try:
+        text = notices(os.path.abspath(args.deps))
+    except FileNotFoundError as missing:
+        print(f"no license file {missing.filename}: build first, or name the dependencies' folder with --deps",
+              file=sys.stderr)
+        sys.exit(EXIT_MISSING)
     if args.check:
         check(text)
         return

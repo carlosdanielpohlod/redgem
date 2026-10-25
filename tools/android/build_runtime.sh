@@ -5,8 +5,8 @@
 # `redgem build <game> <out> --target android` makes .apk games.
 #   tools/android/build_runtime.sh              # phones (arm64-v8a) and emulators (x86_64)
 #   tools/android/build_runtime.sh x86_64       # only one
-# REDGEM_ANDROID_CMAKE_ARGS adds arguments to the configure step (the continuous integration keeps
-# the dependencies' sources in one folder for both processors, and compiles through ccache).
+# REDGEM_ANDROID_CMAKE_ARGS adds arguments to the configure step, separated by spaces (none of them
+# may hold one): the continuous integration compiles through ccache.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -27,7 +27,7 @@ for abi in "${ABIS[@]}"; do
   cmake -S "${REPO_ROOT}" -B "${build_dir}" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="${NDK}/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI="${abi}" -DANDROID_PLATFORM="android-${MIN_ANDROID_API}" -DANDROID_STL=c++_static \
-    -DCMAKE_BUILD_TYPE=Release -DREDGEM_BUILD_TESTS=OFF "${EXTRA_CMAKE_ARGS[@]}"
+    -DCMAKE_BUILD_TYPE=Release -DREDGEM_BUILD_TESTS=OFF ${EXTRA_CMAKE_ARGS[@]+"${EXTRA_CMAKE_ARGS[@]}"}
   # (Half the processors: building for a phone while something else runs must not starve the machine.)
   cmake --build "${build_dir}" --target redgem --parallel "$(( ($(nproc) + 1) / 2 ))"
   mkdir -p "${ENGINE_DIR}/runtimes/android/${abi}"
