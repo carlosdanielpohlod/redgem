@@ -50,6 +50,14 @@ void carry_inside(GlbFile& glb, nlohmann::json& image, const std::vector<std::ui
   image[kMimeType] = mime_type_of(bytes);
 }
 
+// One image of the file carried in, when it names a picture file the scene reads.
+void embed_linked_image(GlbFile& glb, nlohmann::json& image, const std::filesystem::path& scene_dir) {
+  const std::string file = image.is_object() ? linked_file(image) : std::string();
+  if (file.empty()) return;
+  const std::optional<std::vector<std::uint8_t>> bytes = linked_picture(file, scene_dir);
+  if (bytes && !mime_type_of(*bytes).empty()) carry_inside(glb, image, *bytes);
+}
+
 }  // namespace
 
 std::string mime_type_of(const std::vector<std::uint8_t>& bytes) {
@@ -68,12 +76,8 @@ int append_image(GlbFile& glb, const std::vector<std::uint8_t>& bytes, const std
 
 void embed_linked_images(GlbFile& glb, const std::filesystem::path& scene_dir) {
   if (!has_list(glb.json, kImages)) return;
-  for (nlohmann::json& image : glb.json[kImages]) {
-    const std::string file = image.is_object() ? linked_file(image) : std::string();
-    if (file.empty()) continue;
-    const std::optional<std::vector<std::uint8_t>> bytes = linked_picture(file, scene_dir);
-    if (bytes && !mime_type_of(*bytes).empty()) carry_inside(glb, image, *bytes);
-  }
+  // (Carrying one in adds buffer views, not images: the list walked stays as it is.)
+  for (nlohmann::json& image : glb.json[kImages]) embed_linked_image(glb, image, scene_dir);
 }
 
 }  // namespace redgem::glb_images

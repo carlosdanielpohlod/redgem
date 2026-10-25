@@ -176,6 +176,7 @@ class EditorApp {
   void handle_window_shortcuts(bool was_editing);
   void handle_editing_shortcuts();
   void handle_document_shortcuts();
+  void handle_clipboard_shortcuts();
   void update_camera();
   // Editing, with the mouse over the Scene view.
   bool mouse_steers_camera() const;

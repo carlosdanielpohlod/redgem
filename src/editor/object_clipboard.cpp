@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <string_view>
+#include <utility>
 
 namespace redgem::object_clipboard {
 namespace {
@@ -49,6 +50,21 @@ void append_group(std::string& out, std::uint32_t group, std::size_t present) {
     out += digit <= present ? kAlphabet[(group >> shift) & kDigitMask] : kPadding;
   }
 }
+
+// Takes base64 digits one at a time and gives the bytes they make.
+struct Decoder {
+  std::vector<std::uint8_t> out;
+  std::uint32_t pending = 0;  // bits not made into a byte yet, the newest lowest
+  int pending_bits = 0;
+
+  void feed(std::uint32_t digit) {
+    pending = (pending << kBitsPerDigit) | digit;
+    pending_bits += kBitsPerDigit;
+    if (pending_bits < kBitsPerByte) return;
+    pending_bits -= kBitsPerByte;
+    out.push_back(static_cast<std::uint8_t>((pending >> pending_bits) & kByteMask));
+  }
+};
 
 // The text's characters without the padding at its end.
 std::size_t unpadded_length(const std::string& text) {
@@ -98,19 +114,13 @@ std::string base64_encode(const std::vector<std::uint8_t>& bytes) {
 std::optional<std::vector<std::uint8_t>> base64_decode(const std::string& text) {
   static const std::array<int, kCharacters> values = digit_values();
   if (!well_formed(text)) return std::nullopt;
-  std::vector<std::uint8_t> out;
-  std::uint32_t pending = 0;
-  int pending_bits = 0;
+  Decoder decoder;
   for (std::size_t i = 0; i < unpadded_length(text); ++i) {
     const int value = values[static_cast<unsigned char>(text[i])];
     if (value == kNotADigit) return std::nullopt;
-    pending = (pending << kBitsPerDigit) | static_cast<std::uint32_t>(value);
-    pending_bits += kBitsPerDigit;
-    if (pending_bits < kBitsPerByte) continue;
-    pending_bits -= kBitsPerByte;
-    out.push_back(static_cast<std::uint8_t>((pending >> pending_bits) & kByteMask));
+    decoder.feed(static_cast<std::uint32_t>(value));
   }
-  return out;
+  return std::move(decoder.out);
 }
 
 std::string to_text(const std::vector<std::uint8_t>& glb) { return kHeader + (kLineEnd + base64_encode(glb)); }

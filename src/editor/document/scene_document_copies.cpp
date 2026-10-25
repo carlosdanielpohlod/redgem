@@ -25,6 +25,7 @@ int SceneDocument::duplicate(int index) { return duplicate(std::vector<int>{inde
 std::vector<int> SceneDocument::duplicate(const std::vector<int>& roots) {
   checkpoint();
   std::vector<int> copies;
+  copies.reserve(roots.size());
   // (Copies go after every node there is: the numbers of the roots still to copy stay as they are.)
   for (const int root : roots) copies.push_back(copy_subtree(root));
   touch();

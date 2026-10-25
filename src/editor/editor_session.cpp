@@ -56,12 +56,14 @@ void EditorSession::select_by_name(const std::string& name) { select(document_.d
 
 std::vector<std::string> EditorSession::selected_names() const {
   std::vector<std::string> names;
+  names.reserve(selection_.size());
   for (const ObjectId id : selection_.ids()) names.push_back(document_.node(id).name);
   return names;
 }
 
 void EditorSession::select_by_names(const std::vector<std::string>& names) {
   std::vector<ObjectId> ids;
+  ids.reserve(names.size());
   for (const std::string& name : names) ids.push_back(document_.desc().find_node(name));
   select_all(ids);
 }

@@ -125,6 +125,7 @@ Transform EditorApp::selection_pivot() const {
 
 std::vector<Transform> EditorApp::worlds_of(const std::vector<int>& objects) const {
   std::vector<Transform> worlds;
+  worlds.reserve(objects.size());
   for (const int object : objects) worlds.push_back(session_->scene().world_transform(object));
   return worlds;
 }

@@ -7,6 +7,7 @@
 #include <exception>
 #include <fstream>
 #include <random>
+#include <utility>
 
 #include "editor/document/glb_compact.hpp"
 #include "editor/document/glb_images.hpp"
@@ -33,6 +34,12 @@ std::filesystem::path paste_file_path() {
 bool write_file(const std::filesystem::path& path, const std::vector<std::uint8_t>& bytes) {
   std::ofstream file(path, std::ios::binary | std::ios::trunc);
   return file && file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+}
+
+// What a paste that cannot be done returns, with why in `error`.
+std::vector<int> refused(std::string& error, std::string why) {
+  error = std::move(why);
+  return {};
 }
 
 // The temporary file is gone once the paste is done with it, however it ended.
@@ -82,6 +89,7 @@ SceneDocument SceneDocument::without_history() const {
 
 void SceneDocument::keep_only(const std::vector<int>& roots) {
   std::vector<Transform> worlds;
+  worlds.reserve(roots.size());
   for (const int root : roots) worlds.push_back(world_of(desc_.nodes, root));
   const std::vector<int> order = subtrees(desc_.nodes, roots);
   const std::vector<int> position = positions_in(order, desc_.nodes.size());
@@ -95,20 +103,14 @@ void SceneDocument::keep_only(const std::vector<int>& roots) {
 }
 
 std::vector<int> SceneDocument::paste_nodes(const std::vector<std::uint8_t>& glb, int parent, std::string& error) {
-  if (!can_be_parent(parent)) {
-    error = "invalid parent object";
-    return {};
-  }
+  if (!can_be_parent(parent)) return refused(error, "invalid parent object");
+  // (A model is read from a file: the loader checks a file before it reads any of it.)
   const RemovedAfter file{paste_file_path()};
-  if (!write_file(file.path, glb)) {
-    error = "cannot write " + file.path.string();
-    return {};
-  }
+  if (!write_file(file.path, glb)) return refused(error, "cannot write " + file.path.string());
   try {
     return paste_file(file.path, parent, error);
   } catch (const std::exception& problem) {
-    error = std::string(kClipboardName) + " cannot be pasted: " + problem.what();
-    return {};
+    return refused(error, std::string(kClipboardName) + " cannot be pasted: " + problem.what());
   }
 }
 

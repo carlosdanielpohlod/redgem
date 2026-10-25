@@ -47,6 +47,7 @@ const std::vector<ObjectId>& selected(PanelContext& context) { return context.se
 
 std::vector<float> axis_values(const std::vector<Vec3>& values, int axis) {
   std::vector<float> numbers;
+  numbers.reserve(values.size());
   for (const Vec3& value : values) numbers.push_back(axis_of(value, axis));
   return numbers;
 }
