@@ -1,3 +1,7 @@
+---
+description: "Web requests, connection approval and saving on a server."
+---
+
 # Online services
 
 What a game played online needs besides the game itself: talking to web services (`HTTP`),

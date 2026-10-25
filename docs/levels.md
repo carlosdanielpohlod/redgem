@@ -1,3 +1,7 @@
+---
+description: "Levels made in Blender or the editor: custom properties, physics, lighting, environment, scatter."
+---
+
 # Levels, lighting and Blender
 
 ## How a scene is made

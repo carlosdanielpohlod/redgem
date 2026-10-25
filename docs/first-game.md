@@ -1,3 +1,7 @@
+---
+description: "From an empty folder to a playable game in about fifteen minutes."
+---
+
 # Your first game
 
 You will create a game from a template, change it, write a behaviour in Ruby and export it.

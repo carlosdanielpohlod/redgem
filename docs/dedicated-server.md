@@ -1,3 +1,7 @@
+---
+description: "Running a game on a server with no window for players to join."
+---
+
 # Dedicated server
 
 With a dedicated server nobody has to host: the game runs on a machine on the internet, with no

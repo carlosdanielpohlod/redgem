@@ -1,3 +1,7 @@
+---
+description: "Building a standalone game for Linux, Windows, macOS and Android, and recording videos."
+---
+
 # Building and sharing
 
 **Build** in the editor's toolbar, or from a terminal:

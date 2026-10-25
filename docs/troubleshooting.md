@@ -1,3 +1,7 @@
+---
+description: "Known limits and what to do when something goes wrong."
+---
+
 # Limits and troubleshooting
 
 ## What RedGem does not do yet

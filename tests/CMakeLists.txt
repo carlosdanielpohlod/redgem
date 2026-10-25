@@ -154,7 +154,9 @@ add_executable(redgem_tests
   integration/editor_session_test.cpp
   integration/game_project_test.cpp
   integration/scene_tools_test.cpp
-  integration/play_tools_test.cpp)
+  integration/play_tools_test.cpp
+  integration/api_reference_test.cpp
+  integration/error_hints_test.cpp)
 target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest)
 target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # The tests of builds copy the real player, and look for it where a build does: beside redgem.
@@ -464,6 +466,8 @@ add_test(NAME system.optional_tests_without_their_scene_are_skipped
 # The tools that are scripts.
 add_test(NAME tools.blender_runs_in_a_home_of_its_own
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/blender_home.sh ${CMAKE_SOURCE_DIR}/tools/blender/run.sh)
+# The manual's index for coding assistants (llms.txt), which the docs build writes.
+add_test(NAME tools.llms_txt COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/llms_txt_test.py)
 
 # How a dedicated server holds up under players (see load/load_test.cpp): bots join a room of the
 # platformer on redgem-server and play, and what it costs is measured, a tool for whoever works on

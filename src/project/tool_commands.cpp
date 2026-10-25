@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iterator>
 
+#include "project/api_command.hpp"
 #include "project/check_command.hpp"
 #include "project/run_command.hpp"
 #include "project/scene_command.hpp"
@@ -18,10 +19,8 @@ struct NamedTool {
   Tool run;
 };
 constexpr NamedTool kTools[] = {
-    {kSceneCommand, run_scene_command},
-    {kRunCommand, run_run_command},
-    {kShotCommand, run_shot_command},
-    {kCheckCommand, run_check_command},
+    {kSceneCommand, run_scene_command}, {kRunCommand, run_run_command}, {kShotCommand, run_shot_command},
+    {kCheckCommand, run_check_command}, {kApiCommand, run_api_command},
 };
 
 }  // namespace

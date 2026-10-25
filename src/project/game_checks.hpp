@@ -19,6 +19,10 @@ struct CheckReport {
   std::set<std::string> broken_scripts;  // those that do not compile (their class is not looked for)
 };
 
+// The scripts of a scripts folder (and the folders in it), as paths inside it ("enemies/slime.rb"),
+// sorted.
+std::vector<std::string> script_files(const std::filesystem::path& scripts_dir);
+
 // Every script of the game's scripts folder (and the folders in it) compiles.
 void check_scripts(const std::filesystem::path& game_dir, CheckReport& report);
 

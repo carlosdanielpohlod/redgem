@@ -48,6 +48,14 @@ until 1.0, a release may change what games rely on (see
 - **`redgem check`** looks a game over (scripts compile, scenes read, attached scripts are there
   and define their class) and, with `--run-tests`, runs its tests: **`redgem-test --all`** runs
   every test of a game, a line per file.
+- **`redgem api`**: the scripting API as an index, a class or a search, and as JSON for tools,
+  from `docs/scripting/api.json`, which tests keep in step with the engine; the manual's API page
+  is made from it, a section per class.
+- **A guide in every new game**: `AGENTS.md` (layout, commands, conventions, the 25 calls used
+  most) and a `CLAUDE.md` that points at it; see "Making games with an AI assistant".
+- **Hints with common errors**: a mistyped method of an engine class, a class no script defines,
+  a scene the game lacks.
+- **`llms.txt` and `llms-full.txt`**: the manual for coding assistants, written by the docs build.
 - **CHANGELOG.md**: this file.
 
 ### Changed

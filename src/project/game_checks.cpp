@@ -38,20 +38,6 @@ constexpr const char* kSkyExtensions[] = {"", ".hdr", ".png", ".jpg", ".jpeg"};
 constexpr const char* kLineWord = "line ";
 constexpr const char* kLineJoiner = ":";
 
-// The game's scripts, as paths inside its scripts folder ("enemies/slime.rb"), sorted.
-std::vector<std::string> script_files(const fs::path& scripts_dir) {
-  std::vector<std::string> files;
-  std::error_code error;
-  for (fs::recursive_directory_iterator entry(scripts_dir, error), end; !error && entry != end;
-       entry.increment(error)) {
-    if (entry->path().extension() == config::kRubyFileExtension) {
-      files.push_back(entry->path().lexically_relative(scripts_dir).generic_string());
-    }
-  }
-  std::sort(files.begin(), files.end());
-  return files;
-}
-
 std::string in_scripts(const std::string& script) { return std::string(config::kScriptsDirName) + "/" + script; }
 
 // "line 3: unexpected end" -> "scripts/coin.rb:3: unexpected end".
@@ -179,6 +165,19 @@ void check_classes(const SceneChecks& checks) {
 }
 
 }  // namespace
+
+std::vector<std::string> script_files(const fs::path& scripts_dir) {
+  std::vector<std::string> files;
+  std::error_code error;
+  for (fs::recursive_directory_iterator entry(scripts_dir, error), end; !error && entry != end;
+       entry.increment(error)) {
+    if (entry->path().extension() == config::kRubyFileExtension) {
+      files.push_back(entry->path().lexically_relative(scripts_dir).generic_string());
+    }
+  }
+  std::sort(files.begin(), files.end());
+  return files;
+}
 
 void check_scripts(const fs::path& game_dir, CheckReport& report) {
   RubyVm vm;

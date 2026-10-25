@@ -1,3 +1,7 @@
+---
+description: "Working on the engine itself: building, testing, the rules of the code."
+---
+
 # Working on the engine
 
 For people changing RedGem itself. To make games with it, the rest of this manual is enough.

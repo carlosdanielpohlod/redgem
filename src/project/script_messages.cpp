@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "core/message_lines.hpp"
+#include "project/error_hints.hpp"
 
 namespace redgem::tools {
 
@@ -12,6 +13,11 @@ MessageCollector::MessageCollector(std::filesystem::path game_dir) : game_dir_(s
 }
 
 MessageCollector::~MessageCollector() { log::set_sink(std::move(previous_)); }
+
+std::string MessageCollector::with_hint(const std::string& text) const {
+  const std::string hint = hint_for(text, game_dir_);
+  return hint.empty() ? text : text + " -> " + hint;
+}
 
 void MessageCollector::keep(log::Level level, const std::string& message) {
   if (level < log::Level::Warning) return;
@@ -30,7 +36,7 @@ std::string MessageCollector::lines() const {
   std::string text;
   for (const Kept& kept : kept_) {
     const std::string times = kept.times > 1 ? " (x" + std::to_string(kept.times) + ")" : "";
-    text += std::string(log::level_name(kept.level)) + ": " + kept.text + times + "\n";
+    text += std::string(log::level_name(kept.level)) + ": " + with_hint(kept.text) + times + "\n";
   }
   return text;
 }

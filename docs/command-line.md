@@ -1,9 +1,13 @@
+---
+description: "redgem scene, run, shot and check: read and change scenes as text, play with no window, take pictures, check a game."
+---
+
 # The command line
 
 Besides opening the editor (`redgem my_game`), playing (`redgem my_game --play`), making a game
-(`redgem new`) and building one (`redgem build`), `redgem` has four tools that answer in a few
-lines of text and end: they read and change a scene, play the game with no window, take a picture
-of it, and look it over. They are made for scripts, terminals and coding assistants: what they say
+(`redgem new`) and building one (`redgem build`), `redgem` has tools that answer in a few lines
+of text and end: they read and change a scene, play the game with no window, take a picture of
+it, look it over, and say what the scripting API has. They are made for scripts, terminals and coding assistants: what they say
 is short, and every problem they report says where it is and what to do instead.
 
 Each one says more with `--help`. They end with exit code 0 when everything went well, 1 when
@@ -134,3 +138,23 @@ FAIL tests/score_test.rb: FAIL ScoreTest#test_a_coin_is_worth_ten: RedGemTest::F
 tests: 3 passed, 1 failed
 check: 0 errors, 0 warnings (12 scripts, 2 scenes)
 ```
+
+## `redgem api`: the scripting API
+
+```console
+$ redgem api Transform
+Transform: Where an object is, how it is turned and how big it is.
+  position                        its position in the world (Vector3)
+  position = vector               moves it; a physics object is teleported
+  rotate(degrees)                 turns it by those Euler degrees
+  ...
+```
+
+`redgem api` alone lists the classes, a line each; `redgem api <Class>` the methods of one;
+`redgem api --search <word>` the methods that have to do with a word (at most 20). `--json` says
+the same as data, for tools. It is the [API reference](scripting/api.md), which `--markdown`
+writes, and which is made from `docs/scripting/api.json`.
+
+Errors that `run` and `shot` report come with a hint when they are common ones: a mistyped method
+of one of the engine's classes gets the names near it, a class no script defines the file it is
+looked for in, a scene the game lacks the scenes it has.

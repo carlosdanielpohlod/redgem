@@ -1,3 +1,7 @@
+---
+description: "System tests that play the game, Ruby unit tests, and redgem-test."
+---
+
 # Testing your game
 
 The example below tests the game made in [Your first game](first-game.md).

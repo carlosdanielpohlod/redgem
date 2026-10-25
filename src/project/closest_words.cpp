@@ -13,12 +13,6 @@ constexpr std::size_t kLettersPerChange = 3;
 // ... and never fewer changes than this, so short words still find their typos.
 constexpr std::size_t kLeastChanges = 2;
 
-std::string lowered(const std::string& text) {
-  std::string low = text;
-  std::transform(low.begin(), low.end(), low.begin(), [](unsigned char c) { return std::tolower(c); });
-  return low;
-}
-
 // One more row of the table of distances: from `previous` (the row of the letters before `letter`).
 std::vector<std::size_t> next_row(const std::vector<std::size_t>& previous, char letter, const std::string& b) {
   std::vector<std::size_t> row(previous.size());
@@ -39,6 +33,12 @@ std::size_t allowed_changes(const std::string& word) {
 }
 
 }  // namespace
+
+std::string lowered(const std::string& text) {
+  std::string low = text;
+  std::transform(low.begin(), low.end(), low.begin(), [](unsigned char c) { return std::tolower(c); });
+  return low;
+}
 
 std::size_t edit_distance(const std::string& a, const std::string& b) {
   const std::string low_a = lowered(a);

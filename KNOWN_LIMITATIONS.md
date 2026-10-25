@@ -249,7 +249,29 @@ not a promise of how it will be closed.
 
 - No migration notes between versions: CHANGELOG.md says what changed, not how to move a game
   across.
-- `docs/scripting/api.md` is a hand-written summary, not a full reference generated from the code,
-  and there are no type signatures or stubs for code editors.
+- The API reference (`docs/scripting/api.json`, made into `docs/scripting/api.md` and `redgem api`)
+  is checked against the engine's classes and methods, but written by hand: arguments are written
+  as text, with no types, and there are no stubs for code editors.
 - Templates are `empty` and `platformer` only; there is no example of running game tests in a
   game's own continuous integration.
+
+### Working with AI assistants
+
+What is there today is the command line (`redgem scene`, `run`, `shot`, `check`, `api`), the
+`AGENTS.md` guide of new games and `llms.txt`; see [docs/assistants.md](docs/assistants.md). Not
+there yet:
+
+- Headless runs that reproduce a session: `--seed`, scripted input read from a file, and
+  assertions and stop conditions on the command line (`--assert`, `--until`, `--print`).
+- An event log read with a `since` cursor (only what is new), and `redgem scene diff` to show what
+  an edit changed.
+- A search of the game's assets and of the templates.
+- `redgem mcp`: an MCP server of about 8 to 10 tools wrapping the command line, and a live bridge
+  to an open editor (a localhost socket with a token) to list, select and move objects, set
+  properties, play, stop and step, read the console's errors and take small screenshots, with
+  read-only and allow-list flags.
+- Inspecting the objects of a game while it plays, and an opt-in Ruby eval in it (localhost and a
+  token, a timeout, compiled out of release builds).
+- Physics queries (raycasts and overlaps) through the same tools.
+- `redgem scene` ids are places in the scene file: adding or removing objects renumbers the ones
+  after them.

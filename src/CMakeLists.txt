@@ -62,6 +62,18 @@ add_custom_command(
   COMMENT "Embedding game templates"
   VERBATIM)
 
+# What the tools tell about the scripting API and new games: the API reference (one source of
+# truth, see project/api_reference.hpp) and the guide new games get (project/assistant_guide.hpp).
+set(REDGEM_ASSISTANT_SOURCES ${CMAKE_SOURCE_DIR}/docs/scripting/api.json ${CMAKE_SOURCE_DIR}/assets/assistant/AGENTS.md)
+set(REDGEM_ASSISTANT_HEADER ${REDGEM_PROJECT_GENERATED_DIR}/generated/assistant_files.hpp)
+add_custom_command(
+  OUTPUT ${REDGEM_ASSISTANT_HEADER}
+  COMMAND ${CMAKE_COMMAND} -DOUTPUT=${REDGEM_ASSISTANT_HEADER} -DROOT=${CMAKE_SOURCE_DIR}
+          -DNAME=kAssistantFiles "-DSOURCES=${REDGEM_ASSISTANT_SOURCES}" -P ${CMAKE_SOURCE_DIR}/cmake/EmbedFiles.cmake
+  DEPENDS ${REDGEM_ASSISTANT_SOURCES} ${CMAKE_SOURCE_DIR}/cmake/EmbedFiles.cmake
+  COMMENT "Embedding the API reference and the guide of new games"
+  VERBATIM)
+
 # The licenses that travel with every built game (see project/notices.hpp), embedded in the binary.
 set(REDGEM_LICENSE_SOURCES ${CMAKE_SOURCE_DIR}/LICENSE ${CMAKE_SOURCE_DIR}/THIRD_PARTY_LICENSES.md)
 set(REDGEM_LICENSES_HEADER ${REDGEM_PROJECT_GENERATED_DIR}/generated/licenses.hpp)
@@ -504,6 +516,7 @@ if(NOT ANDROID)
   redgem_add_library(redgem_project
     ${REDGEM_TEMPLATES_HEADER}
     ${REDGEM_LICENSES_HEADER}
+    ${REDGEM_ASSISTANT_HEADER}
     project/notices.cpp
     project/game_templates.cpp
     project/game_names.cpp
@@ -549,6 +562,10 @@ if(NOT ANDROID)
     project/game_checks.cpp
     project/game_tests.cpp
     project/check_command.cpp
+    project/api_reference.cpp
+    project/api_command.cpp
+    project/assistant_guide.cpp
+    project/error_hints.cpp
     project/project_texts.cpp)
   redgem_embed_texts(redgem_project project)
   # (The templates and the licenses are the tools' alone, as the prelude is the runtime's.)

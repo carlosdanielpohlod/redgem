@@ -1,3 +1,7 @@
+---
+description: "Installing RedGem on Linux, Windows and macOS, or building it from source."
+---
+
 # Install
 
 RedGem is experimental. The editor is developed on Linux; there are Windows and macOS downloads

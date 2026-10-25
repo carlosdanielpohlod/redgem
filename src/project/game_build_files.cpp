@@ -6,6 +6,7 @@
 #include <cctype>
 
 #include "app/game_settings.hpp"
+#include "project/assistant_guide.hpp"
 
 namespace redgem {
 namespace {
@@ -17,7 +18,8 @@ constexpr char kBackupSuffix = '~';  // of the copies editors leave behind
 
 // Whether a file or folder of a game goes into a build of it. A copy of a game goes to other
 // people: not what a link points at (that can be anything on the machine that builds), not hidden
-// files and folders, not editors' backups, not a signing key left in the folder.
+// files and folders, not editors' backups, not a signing key left in the folder, not the guide to
+// the game for whoever makes it (AGENTS.md and CLAUDE.md, see assistant_guide.hpp).
 // The file the game's own settings sign its app with, however game.json writes it: relative to
 // the game or absolute, through "..", in another case where the system ignores case. Told by
 // being the same file, not by its name. (A game.json with no keystore names nothing.)
@@ -40,9 +42,17 @@ bool is_leftover(const std::string& name) {
   return !name.empty() && (name.front() == kHiddenPrefix || name.back() == kBackupSuffix);
 }
 
+// Whether a file is the guide of the game for whoever makes it: one of its files at the top of
+// the game's folder (one of that name deeper in is the game's own).
+bool is_makers_guide(const std::filesystem::path& file, const Shipping& shipping) {
+  const std::filesystem::path inside = file.lexically_relative(shipping.game_dir);
+  return inside == tools::kGuideFileName || inside == tools::kPointerFileName;
+}
+
 bool ships(const std::filesystem::directory_entry& entry, const Shipping& shipping) {
   std::error_code fs_error;
   if (entry.is_symlink(fs_error) || is_leftover(entry.path().filename().string())) return false;
+  if (is_makers_guide(entry.path(), shipping)) return false;
   return !signing_key_file(entry.path()) && !shipping.is_the_keystore(entry.path());
 }
 
