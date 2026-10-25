@@ -3,6 +3,7 @@ add_executable(redgem_tests
   unit/math_test.cpp
   unit/collision_layers_test.cpp
   unit/fixed_clock_test.cpp
+  unit/coarse_clock_test.cpp
   unit/stopwatch_test.cpp
   unit/log_test.cpp
   unit/files_test.cpp

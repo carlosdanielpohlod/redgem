@@ -92,7 +92,8 @@ class Watchdog {
     const bool found_none = next == ScriptBudget::kNever;
     const bool first_of_none = found_none && !found_none_before_;
     found_none_before_ = found_none;
-    return first_of_none ? now + shortest_limit() : next;
+    // (With no interpreter limited any more, the shortest limit is "never".)
+    return first_of_none ? milliseconds_after(now, shortest_limit()) : next;
   }
 
   std::int64_t shortest_limit() const {

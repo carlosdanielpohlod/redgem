@@ -8,6 +8,8 @@
 #include <ctime>
 #endif
 
+#include <limits>
+
 namespace redgem {
 namespace {
 
@@ -18,7 +20,14 @@ constexpr std::int64_t kNanosecondsPerMillisecond = 1000 * 1000;
 constexpr std::int64_t kMillisecondsPerSecond = 1000;
 #endif
 
+constexpr std::int64_t kLatest = std::numeric_limits<std::int64_t>::max();
+
 }  // namespace
+
+std::int64_t milliseconds_after(std::int64_t now, std::int64_t span) {
+  if (span > kLatest - now) return kLatest;
+  return now + span;
+}
 
 #if defined(_WIN32)
 // (The system's tick count: no call into the kernel.)

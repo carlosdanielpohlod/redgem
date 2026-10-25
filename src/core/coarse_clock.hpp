@@ -10,4 +10,8 @@ namespace redgem {
 // call into the scripts has run.
 std::int64_t coarse_milliseconds();
 
+// The time `span` milliseconds after `now` on that clock; the latest time it can hold when that is
+// further than it can count (a span of "never", say).
+std::int64_t milliseconds_after(std::int64_t now, std::int64_t span);
+
 }  // namespace redgem
