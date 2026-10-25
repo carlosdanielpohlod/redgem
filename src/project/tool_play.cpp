@@ -38,15 +38,28 @@ std::variant<SceneDesc, std::string> scene_of(const PlayRequest& request) {
   return std::move(*scene);
 }
 
-// A length that is one: above nothing, and not endless.
-bool is_length(double value) { return value > 0 && std::isfinite(value); }
-
 constexpr double kStepsPerSecond = 1.0 / config::kFixedDeltaSeconds;
 
-// How many steps `length` is, at `steps_per_unit`: one at least.
-std::optional<long long> steps_from(std::optional<double> length, double steps_per_unit) {
-  if (!length || !is_length(*length)) return std::nullopt;
-  return std::max(1LL, static_cast<long long>(std::llround(*length * steps_per_unit)));
+// Whether a number of steps is one a tool plays: from `least` to kMostSteps.
+bool within_steps(double steps, long long least) {
+  return std::isfinite(steps) && steps >= static_cast<double>(least) && steps <= static_cast<double>(kMostSteps);
+}
+
+// How many steps `length` is, at `steps_per_unit`; nothing when that is fewer than `least` or
+// more than a tool plays (or no number at all).
+std::optional<long long> steps_from(std::optional<double> length, double steps_per_unit, long long least) {
+  if (!length) return std::nullopt;
+  const double steps = std::round(*length * steps_per_unit);
+  if (!within_steps(steps, least)) return std::nullopt;
+  return static_cast<long long>(steps);
+}
+
+// What `--frames`, else `seconds_option`, ask for; `otherwise` seconds when neither is given.
+std::optional<long long> steps_asked(const ToolLine& line, const char* seconds_option, double otherwise,
+                                     long long least) {
+  if (const auto frames = line.value(kFramesOption)) return steps_from(number_from(*frames), 1.0, least);
+  const auto seconds = line.value(seconds_option);
+  return steps_from(seconds ? number_from(*seconds) : otherwise, kStepsPerSecond, least);
 }
 
 // A name no other run picks, all but surely.
@@ -93,9 +106,11 @@ std::optional<std::string> keep_camera(SceneDesc& scene, const std::string& name
 }
 
 std::optional<long long> frames_asked(const ToolLine& line, double otherwise) {
-  if (const auto frames = line.value(kFramesOption)) return steps_from(number_from(*frames), 1.0);
-  const auto seconds = line.value(kSecondsOption);
-  return steps_from(seconds ? number_from(*seconds) : otherwise, kStepsPerSecond);
+  return steps_asked(line, kSecondsOption, otherwise, 1);
+}
+
+std::optional<long long> moment_asked(const ToolLine& line, const char* seconds_option, double otherwise) {
+  return steps_asked(line, seconds_option, otherwise, 0);
 }
 
 }  // namespace redgem::tools

@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -15,16 +16,15 @@ struct CheckReport {
   std::vector<std::string> warnings;
   std::size_t scripts = 0;
   std::size_t scenes = 0;
+  std::set<std::string> broken_scripts;  // those that do not compile (their class is not looked for)
 };
 
 // Every script of the game's scripts folder (and the folders in it) compiles.
 void check_scripts(const std::filesystem::path& game_dir, CheckReport& report);
 
 // Every scene of the game reads; every script its objects name is there and defines the class it
-// is named for; the sky picture it names is in the images folder.
+// is named for (as the engine finds out: it runs them, as playing does, in its sandbox); the sky
+// picture it names is in the images folder.
 void check_scenes(const std::filesystem::path& game_dir, CheckReport& report);
-
-// Whether a script defines a class of that name (a `class Name` line).
-bool defines_class(const std::string& code, const std::string& class_name);
 
 }  // namespace redgem::tools

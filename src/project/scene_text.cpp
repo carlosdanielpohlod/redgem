@@ -32,7 +32,6 @@ constexpr const char* kRotationKey = "rot";
 constexpr const char* kScaleKey = "scale";
 constexpr const char* kMeshKey = "mesh";
 constexpr const char* kLightKey = "light";
-constexpr const char* kCameraWord = "camera";
 constexpr const char* kScriptsKey = "scripts";
 constexpr const char* kMaterialKey = "material";
 constexpr const char* kTrue = "true";
@@ -63,19 +62,10 @@ std::string scale_text(Vec3 scale, int decimals) {
   return is_uniform(scale) ? number_text(scale.x, decimals) : vector_text(scale, decimals);
 }
 
-const char* light_name(LightType type) {
-  if (type == LightType::Directional) return kSunName;
-  return type == LightType::Point ? kPointName : kSpotName;
-}
-
-// The classes of the scripts an object has: "Coin,Spin".
-std::string script_classes(const PropertyMap& props) {
-  std::string classes;
-  const auto list = get_string(props, props::kScript);
-  for (const std::string& script : split_script_list(list.value_or(""))) {
-    classes += (classes.empty() ? "" : kListSeparator) + class_name_for_script(script);
-  }
-  return classes;
+// A script as a line names it: its class, when that names its file back.
+std::string script_word(const std::string& script) {
+  const std::string class_name = class_name_for_script(script);
+  return script_for_class_name(class_name) == script ? class_name : script;
 }
 
 void add(std::string& line, const std::string& key, const std::string& value) { line += " " + key + "=" + value; }
@@ -90,18 +80,13 @@ void add_placement(std::string& line, const Transform& local) {
   if (!is_unit_scale(local.scale)) add(line, kScaleKey, scale_text(local.scale, kListDecimals));
 }
 
-// Whether an object shows a mesh named otherwise than itself (most are named alike, and a list
-// does not say it twice).
-bool shows_other_mesh(const SceneDesc& scene, const NodeDesc& node) {
-  return is_index_of(node.mesh, scene.meshes.size()) && scene.meshes[node.mesh].name != node.name;
-}
-
 // What it shows or is: its mesh, its light, its camera, its scripts.
 void add_parts(std::string& line, const SceneDesc& scene, const NodeDesc& node) {
-  if (shows_other_mesh(scene, node)) add(line, kMeshKey, scene.meshes[node.mesh].name);
+  const std::string mesh = shown_mesh(scene, node);
+  if (!mesh.empty()) add(line, kMeshKey, mesh);
   if (node.light) add(line, kLightKey, light_name(node.light->type));
   if (node.camera) line += std::string(" ") + kCameraWord;
-  const std::string scripts = script_classes(node.props);
+  const std::string scripts = scripts_text(node.props);
   if (!scripts.empty()) add(line, kScriptsKey, scripts);
 }
 
@@ -258,9 +243,31 @@ std::string object_path(const SceneDesc& scene, int index) {
   return path;
 }
 
-std::string object_line(const SceneDesc& scene, int index) {
+const char* light_name(LightType type) {
+  if (type == LightType::Directional) return kSunName;
+  return type == LightType::Point ? kPointName : kSpotName;
+}
+
+// (Most meshes are named as their object, and a list does not say it twice.)
+std::string shown_mesh(const SceneDesc& scene, const NodeDesc& node) {
+  if (!is_index_of(node.mesh, scene.meshes.size())) return {};
+  const std::string& name = scene.meshes[node.mesh].name;
+  return name == node.name ? std::string() : name;
+}
+
+std::string scripts_text(const PropertyMap& props) {
+  std::string words;
+  for (const std::string& script : split_script_list(get_string(props, props::kScript).value_or(""))) {
+    words += (words.empty() ? "" : kListSeparator) + script_word(script);
+  }
+  return words;
+}
+
+std::string object_line(const SceneDesc& scene, int index) { return object_line(scene, index, index); }
+
+std::string object_line(const SceneDesc& scene, int index, int id) {
   const NodeDesc& node = scene.nodes[index];
-  std::string line = object_id(index) + " " + node.name;
+  std::string line = object_id(id) + " " + node.name;
   add_placement(line, node.local);
   add_parts(line, scene, node);
   add_properties(line, node.props);
@@ -286,7 +293,7 @@ std::string object_detail(const SceneDesc& scene, int index) {
     text += detail_line("parent", object_id(node.parent) + " " + scene.nodes[node.parent].name);
   text += placement_detail(node.local) + parts_detail(scene, node);
   const auto scripts = get_string(node.props, props::kScript);
-  if (scripts) text += detail_line("scripts", *scripts + " (" + script_classes(node.props) + ")");
+  if (scripts) text += detail_line("scripts", *scripts + " (" + scripts_text(node.props) + ")");
   text += properties_detail(node.props);
   if (!node.children.empty()) text += detail_line("children", children_detail(scene, node));
   return text;

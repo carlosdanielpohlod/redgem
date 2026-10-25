@@ -28,7 +28,9 @@ constexpr const char* kAtOption = "--at";
 constexpr const char* kSizeOption = "--size";
 constexpr const char* kCameraOption = "--camera";
 // What the command takes after its name.
-ToolGrammar grammar() { return {{kSceneOption, kAtOption, kSizeOption, kCameraOption}, {command_line::kHelpOption}}; }
+ToolGrammar grammar() {
+  return {{kSceneOption, kAtOption, kFramesOption, kSizeOption, kCameraOption}, {command_line::kHelpOption}};
+}
 constexpr double kDefaultAt = 1.0;  // seconds: what starts moving at once has moved
 constexpr FrameSize kDefaultSize{512, 288};
 constexpr const char* kPictureExtension = ".png";
@@ -150,10 +152,10 @@ ToolResult shoot(const ShotRequest& request) {
 bool read_timing(const ToolLine& line, ShotRequest& request) {
   const auto size_given = line.value(kSizeOption);
   const auto size = size_given ? frame_size_from(*size_given) : kDefaultSize;
-  const auto at = number_from(line.value(kAtOption).value_or(std::to_string(kDefaultAt)));
-  if (!size || !at || *at < 0) return false;
+  const auto frame = moment_asked(line, kAtOption, kDefaultAt);
+  if (!size || !frame) return false;
   request.size = *size;
-  request.frame = std::llround(*at / config::kFixedDeltaSeconds);
+  request.frame = *frame;
   return true;
 }
 

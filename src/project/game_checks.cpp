@@ -2,22 +2,27 @@
 
 #include <algorithm>
 #include <optional>
-#include <cctype>
-#include <cstring>
-#include <sstream>
-#include <set>
+
+#include <mruby.h>
+
+#include <map>
+#include <memory>
+#include <variant>
 
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
 #include "core/files.hpp"
 #include "core/safe_path.hpp"
 #include "core/translations.hpp"
+#include "project/script_messages.hpp"
+#include "project/tool_play.hpp"
 #include "project/closest_words.hpp"
 #include "project/scene_command.hpp"
 #include "project/scene_text.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "scene/props.hpp"
 #include "script/ruby_vm.hpp"
+#include "script/script_host.hpp"
 #include "script/script_naming.hpp"
 
 namespace redgem::tools {
@@ -32,9 +37,6 @@ constexpr const char* kSkyExtensions[] = {"", ".hdr", ".png", ".jpg", ".jpeg"};
 // What a syntax error starts with, and what goes between a file and its line instead.
 constexpr const char* kLineWord = "line ";
 constexpr const char* kLineJoiner = ":";
-// How a class is defined: "class", at least one blank, its name.
-constexpr const char* kClassWord = "class ";
-constexpr const char* kBlanks = " \t";
 
 // The game's scripts, as paths inside its scripts folder ("enemies/slime.rb"), sorted.
 std::vector<std::string> script_files(const fs::path& scripts_dir) {
@@ -77,7 +79,9 @@ std::string where(const std::string& scene_name, const SceneDesc& scene, int ind
 struct SceneChecks {
   fs::path game_dir;
   std::vector<std::string> scripts;  // the game's
-  std::set<std::string> classes_checked;
+  // The scripts the scenes attach that are there, each with where it was first seen attached: once
+  // every scene was read, the engine is asked whether each defines its class.
+  std::map<std::string, std::string> attached;
   CheckReport& report;
 };
 
@@ -88,20 +92,10 @@ std::string missing_script_hint(const SceneChecks& checks, const std::string& sc
   return tr("project.check.scripts_there", {{"names", checks.scripts.empty() ? "-" : joined(checks.scripts)}});
 }
 
-void check_class(SceneChecks& checks, const std::string& script, const std::string& place) {
-  if (!checks.classes_checked.insert(script).second) return;
-  std::string error;
-  const auto code = read_text_file(checks.game_dir / config::kScriptsDirName / script, error);
-  const std::string class_name = class_name_for_script(script);
-  if (code && defines_class(*code, class_name)) return;
-  checks.report.errors.push_back(
-      tr("project.check.no_class", {{"script", in_scripts(script)}, {"class", class_name}, {"where", place}}));
-}
-
 void check_script(SceneChecks& checks, const std::string& script, const std::string& place) {
   const bool there = std::find(checks.scripts.begin(), checks.scripts.end(), script) != checks.scripts.end();
   if (there) {
-    check_class(checks, script, place);
+    checks.attached.emplace(script, place);
     return;
   }
   checks.report.errors.push_back(
@@ -155,22 +149,33 @@ void check_scene(SceneChecks& checks, const std::string& name) {
   check_objects(checks, name, loaded.scene);
 }
 
-bool is_name_letter(char letter) { return std::isalnum(static_cast<unsigned char>(letter)) != 0 || letter == '_'; }
-
-// Whether `word` is in `line` at `at` (npos: nowhere).
-bool has_at(const std::string& line, std::size_t at, const std::string& word) {
-  return at != std::string::npos && line.compare(at, word.size(), word) == 0;
+// Whether the script defines the class it is named for, once the engine has run it (as playing
+// does: attaching it to an object) or, if it has not, once it is loaded now.
+bool defines_its_class(ScriptHost& host, const fs::path& scripts_dir, const std::string& script) {
+  const std::string class_name = class_name_for_script(script);
+  if (mrb_class_defined(host.vm().state(), class_name.c_str())) return true;
+  host.load_file(scripts_dir / script);
+  return mrb_class_defined(host.vm().state(), class_name.c_str());
 }
 
-// Whether a name that ends at `at` ends there: the line does, or something no name holds follows.
-bool name_ends_at(const std::string& line, std::size_t at) { return at == line.size() || !is_name_letter(line[at]); }
+void check_class(const SceneChecks& checks, ScriptHost& host, const std::string& script, const std::string& place) {
+  if (checks.report.broken_scripts.count(script) > 0) return;  // (said already)
+  if (defines_its_class(host, checks.game_dir / config::kScriptsDirName, script)) return;
+  checks.report.errors.push_back(
+      tr("project.check.no_class",
+         {{"script", in_scripts(script)}, {"class", class_name_for_script(script)}, {"where", place}}));
+}
 
-// Whether a line is `class <name>`, with nothing more to the name ("class Coin < Behaviour").
-bool defines_on(const std::string& line, const std::string& class_name) {
-  const std::size_t start = line.find_first_not_of(kBlanks);
-  if (!has_at(line, start, kClassWord)) return false;
-  const std::size_t name = line.find_first_not_of(kBlanks, start + std::strlen(kClassWord));
-  return has_at(line, name, class_name) && name_ends_at(line, name + class_name.size());
+// The engine of the game, playing nothing yet: the scripts of its first scene already run.
+// (What it logs is the check's own business: it says what it finds itself.)
+void check_classes(const SceneChecks& checks) {
+  if (checks.attached.empty()) return;
+  ScratchFolder scratch;
+  MessageCollector quiet(checks.game_dir);
+  auto created = engine_for({checks.game_dir, config::kMainSceneName, {}}, nullptr, scratch);
+  auto* engine = std::get_if<std::unique_ptr<Engine>>(&created);
+  if (engine == nullptr) return;  // (the scene's own problems are said already)
+  for (const auto& [script, place] : checks.attached) check_class(checks, (*engine)->scripts(), script, place);
 }
 
 }  // namespace
@@ -180,21 +185,17 @@ void check_scripts(const fs::path& game_dir, CheckReport& report) {
   const fs::path scripts_dir = game_dir / config::kScriptsDirName;
   for (const std::string& script : script_files(scripts_dir)) {
     ++report.scripts;
-    if (const auto problem = syntax_problem(vm, scripts_dir, script)) report.errors.push_back(*problem);
+    const auto problem = syntax_problem(vm, scripts_dir, script);
+    if (!problem) continue;
+    report.errors.push_back(*problem);
+    report.broken_scripts.insert(script);
   }
 }
 
 void check_scenes(const fs::path& game_dir, CheckReport& report) {
   SceneChecks checks{game_dir, script_files(game_dir / config::kScriptsDirName), {}, report};
   for (const std::string& name : scene_names(game_dir)) check_scene(checks, name);
-}
-
-bool defines_class(const std::string& code, const std::string& class_name) {
-  std::stringstream lines(code);
-  for (std::string line; std::getline(lines, line);) {
-    if (defines_on(line, class_name)) return true;
-  }
-  return false;
+  check_classes(checks);
 }
 
 }  // namespace redgem::tools

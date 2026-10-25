@@ -11,6 +11,8 @@
 #include "core/translations.hpp"
 #include "project/closest_words.hpp"
 #include "project/scene_lookup.hpp"
+#include "project/scene_text.hpp"
+#include "editor/node_tree.hpp"
 #include "project/tool_line.hpp"
 #include "scene/props.hpp"
 #include "script/script_naming.hpp"
@@ -29,7 +31,16 @@ constexpr const char* kTrue = "true";
 constexpr const char* kFalse = "false";
 constexpr std::size_t kVectorSides = 3;
 // Every key a word may set (the props are "prop.<key>").
-constexpr const char* kKeys = "position (pos), rotation (rot), scale, name, parent, script, prop.<key>";
+constexpr const char* kKeys =
+    "position (pos), rotation (rot), scale, name, parent, script (scripts), prop.<key> (or <key> alone)";
+// What a line calls the scripts, the mesh and the light (see scene_text.hpp).
+constexpr const char* kScriptsKey = "scripts";
+constexpr const char* kMeshKey = "mesh";
+constexpr const char* kLightKey = "light";
+constexpr char kPathSeparator = '/';
+// A key of up to this many letters is mistyped by one change at most; longer ones by two.
+constexpr std::size_t kShortKey = 5;
+constexpr std::size_t kTypoChanges = 2;
 
 // One word, read: `key` `op` `value`, op being '=', '+' (for +=) or '-' (for -=).
 struct Assignment {
@@ -113,8 +124,12 @@ std::string set_scale(SceneEdit& edit, int& index, const Assignment& assignment)
 }
 
 std::string set_name(SceneEdit& edit, int& index, const Assignment& assignment) {
-  if (assignment.value.empty()) return tr("project.scene.needs_name");
-  edit.document.set_name(index, assignment.value);
+  std::string problem = name_problem(assignment.value);
+  if (!problem.empty()) return problem;
+  // (A name another object has is made its own, as the editor makes it: "Wall.001".)
+  if (edit.document.node(index).name != assignment.value) {
+    edit.document.set_name(index, edit.document.unique_name(assignment.value));
+  }
   return {};
 }
 
@@ -124,12 +139,18 @@ FoundObject parent_named(const SceneDesc& scene, const std::string& reference) {
   return find_object(scene, reference);
 }
 
+// Whether `parent` is the object or one of its children: no object goes under itself.
+bool is_within(const SceneDesc& scene, int index, int parent) {
+  const std::vector<int> family = node_tree::subtree(scene.nodes, index);
+  return std::find(family.begin(), family.end(), parent) != family.end();
+}
+
 std::string set_parent(SceneEdit& edit, int& index, const Assignment& assignment) {
   const FoundObject parent = parent_named(edit.document.desc(), assignment.value);
   if (!parent.error.empty()) return parent.error;
-  const int moved = edit.document.reparent(index, parent.index);
-  if (edit.document.node(moved).parent != parent.index) return tr("project.scene.cannot_parent");
-  index = moved;
+  if (is_within(edit.document.desc(), index, parent.index)) return tr("project.scene.cannot_parent");
+  // (Moving renumbers the objects, the parent among them: the object is where reparent says.)
+  index = edit.document.reparent(index, parent.index);
   return {};
 }
 
@@ -198,6 +219,22 @@ std::string set_property(SceneEdit& edit, int index, const std::string& key, con
   return {};
 }
 
+// mesh= and light= say what an object is: a line's words are taken back as they are, and not changed.
+std::string shown_as(const std::string& key, const std::string& shown, const Assignment& assignment) {
+  if (assignment.value == shown) return {};
+  return tr("project.scene.read_only", {{"key", key}, {"value", shown.empty() ? "-" : shown}});
+}
+
+std::string check_mesh(SceneEdit& edit, int& index, const Assignment& assignment) {
+  const SceneDesc& scene = edit.document.desc();
+  return shown_as(assignment.key, shown_mesh(scene, scene.nodes[index]), assignment);
+}
+
+std::string check_light(SceneEdit& edit, int& index, const Assignment& assignment) {
+  const NodeDesc& node = edit.document.node(index);
+  return shown_as(assignment.key, node.light ? light_name(node.light->type) : "", assignment);
+}
+
 using Setter = std::string (*)(SceneEdit&, int&, const Assignment&);
 struct Key {
   const char* name;
@@ -207,7 +244,8 @@ struct Key {
 constexpr Key kSetters[] = {
     {"position", set_position, false}, {"pos", set_position, false},        {"rotation", set_rotation, false},
     {"rot", set_rotation, false},      {"scale", set_scale, false},         {"name", set_name, false},
-    {"parent", set_parent, false},     {props::kScript, set_scripts, true},
+    {"parent", set_parent, false},     {props::kScript, set_scripts, true}, {kScriptsKey, set_scripts, true},
+    {kMeshKey, check_mesh, false},     {kLightKey, check_light, false},
 };
 
 const Key* key_named(const std::string& name) {
@@ -220,9 +258,25 @@ bool is_property(const std::string& key) {
   return key.rfind(kPropPrefix, 0) == 0 && key.size() > std::string(kPropPrefix).size();
 }
 
-std::string unknown_key(const std::string& key) {
+std::vector<std::string> key_names() {
   std::vector<std::string> names;
   for (const Key& known : kSetters) names.emplace_back(known.name);
+  return names;
+}
+
+// How many letters a word may be off a key and still be taken for a mistyped key, not a property.
+std::size_t typo_changes(const std::string& key) { return key.size() > kShortKey ? kTypoChanges : 1; }
+
+// Whether a word that is no key is so near one that it is a typo of it (`positon`), rather than
+// a custom property (`speed`, `tag`).
+bool mistyped_key(const std::string& word) {
+  const std::vector<std::string> names = key_names();
+  return std::any_of(names.begin(), names.end(),
+                     [&word](const std::string& key) { return edit_distance(word, key) <= typo_changes(key); });
+}
+
+std::string unknown_key(const std::string& key) {
+  const std::vector<std::string> names = key_names();
   const std::vector<std::string> near = closest_words(key, names, 1);
   const std::string hint = near.empty() ? "" : tr("project.scene.did_you_mean", {{"name", near.front()}});
   return tr("project.scene.unknown_key", {{"key", key}, {"keys", kKeys}}) + hint;
@@ -240,16 +294,42 @@ bool takes(const Key& key, const Assignment& assignment) { return assignment.op 
 
 }  // namespace
 
+// Whether a name would be read as an id ("#3") or a path ("Level/Wall") when an object is named.
+bool reads_as_reference(const std::string& name) {
+  return name.front() == kIdMark || name.find(kPathSeparator) != std::string::npos;
+}
+
+// The word `camera` alone, as a line says an object has one: taken back only by one that has.
+std::string camera_word(const SceneEdit& edit, int index) {
+  if (edit.document.node(index).camera) return {};
+  return tr("project.scene.read_only", {{"key", kCameraWord}, {"value", "-"}});
+}
+
+// key=value whose key is no key of set's: a custom property (as a line lists them), unless the
+// object has no such property and the key is a typo of one of set's (then prop.<key>= says it is one).
+std::string property_or_typo(SceneEdit& edit, int index, const Assignment& assignment) {
+  const bool has_it = edit.document.node(index).props.count(assignment.key) > 0;
+  if (!has_it && mistyped_key(assignment.key)) return unknown_key(assignment.key);
+  return set_property(edit, index, assignment.key, assignment);
+}
+
 std::string apply_assignment(SceneEdit& edit, int& index, const std::string& word) {
+  if (word == kCameraWord) return camera_word(edit, index);
   const auto assignment = read_word(word);
   if (!assignment) return tr("project.scene.not_an_assignment", {{"word", word}, {"keys", kKeys}});
   if (is_property(assignment->key)) {
     return set_property(edit, index, assignment->key.substr(std::string(kPropPrefix).size()), *assignment);
   }
   const Key* key = key_named(assignment->key);
-  if (key == nullptr) return unknown_key(assignment->key);
+  if (key == nullptr) return property_or_typo(edit, index, *assignment);
   if (!takes(*key, *assignment)) return only_equals(*assignment);
   return key->set(edit, index, *assignment);
+}
+
+std::string name_problem(const std::string& name) {
+  if (name.empty()) return tr("project.scene.needs_name");
+  if (reads_as_reference(name)) return tr("project.scene.bad_name", {{"name", name}});
+  return {};
 }
 
 PropertyValue typed_value(const std::string& text) {

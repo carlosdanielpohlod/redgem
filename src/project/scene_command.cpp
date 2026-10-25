@@ -61,14 +61,11 @@ ToolResult saved(OpenScene& scene, std::string text) {
   return answer(std::move(text));
 }
 
-// Saves, and says what the object `index` is now, as the saved file has it.
+// Saves, and says what the object `index` is now, under the id the saved file gives it.
 ToolResult saved_object(OpenScene& scene, int index, const std::vector<std::string>& notes) {
-  const int id = saved_id(scene.document.desc(), index);
-  std::string error;
-  if (!scene.document.save(error)) return failed(error);
-  auto reread = SceneDocument::open(scene.document.path());
-  if (auto* problem = std::get_if<std::string>(&reread)) return failed(*problem);
-  ToolResult result = answer(object_line(std::get<SceneDocument>(reread).desc(), id) + "\n");
+  const SceneDesc& desc = scene.document.desc();
+  ToolResult result = saved(scene, object_line(desc, index, saved_id(desc, index)) + "\n");
+  if (result.exit_code != kExitSuccess) return result;
   for (const std::string& note : notes) result.err += note + "\n";
   return result;
 }
@@ -159,6 +156,8 @@ int added(OpenScene& scene, int source, int parent) {
 }
 
 ToolResult add(OpenScene& scene) {
+  const std::string problem = name_problem(object_word(scene));
+  if (!problem.empty()) return failed(problem);
   const auto source = optional_object(scene, kFromOption);
   if (const auto* problem = std::get_if<ToolResult>(&source)) return *problem;
   const auto parent = optional_object(scene, kParentOption);

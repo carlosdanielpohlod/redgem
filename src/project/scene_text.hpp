@@ -38,8 +38,21 @@ std::string object_path(const SceneDesc& scene, int index);
 // scene was read may have put them elsewhere).
 int saved_id(const SceneDesc& scene, int index);
 
-// One object's line, without its indentation: "#3 Coin pos=3,1,0 rot=0,45,0 mesh=Coin scripts=Coin tag=coin".
+// One object's line, without its indentation: "#3 Coin pos=3,1,0 rot=0,45,0 mesh=Rock scripts=Coin tag=coin".
+// Every word after the name is one `redgem scene set` takes back (see scene_assignments.hpp).
 std::string object_line(const SceneDesc& scene, int index);
+// The same, under another id (what the object will be once the scene is saved, see saved_id).
+std::string object_line(const SceneDesc& scene, int index, int id);
+
+// The words of a line that say what an object is rather than set it: they are taken back only as
+// they are. "sun", "point" or "spot", for a light of that type.
+const char* light_name(LightType type);
+// What a line says the mesh of an object is ("" when it says nothing: none, or one named as it).
+std::string shown_mesh(const SceneDesc& scene, const NodeDesc& node);
+inline constexpr const char* kCameraWord = "camera";  // an object with a camera
+// The scripts of an object as a line lists them: the class of each (Coin), or its file when the
+// class alone would not find it (enemies/slime.rb).
+std::string scripts_text(const PropertyMap& props);
 
 // A list that goes all the way down the hierarchy.
 inline constexpr std::size_t kEveryLevel = std::numeric_limits<std::size_t>::max();

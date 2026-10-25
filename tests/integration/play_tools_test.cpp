@@ -96,6 +96,11 @@ TEST_CASE("what a run cannot take is refused with its usage") {
   CHECK(has(tool({"run", "--help"}).out, "usage: redgem run"));
   CHECK(tool({"shot", kPlatformer.string(), "out.jpg"}).exit_code == kExitUsage);
   CHECK(tool({"shot", kPlatformer.string(), "out.png", "--size", "big"}).exit_code == kExitUsage);
+  // A moment past what a tool plays (an hour of the game) is refused, not played for ever.
+  CHECK(tool({"shot", kPlatformer.string(), "out.png", "--at", "1e300"}).exit_code == kExitUsage);
+  CHECK(tool({"shot", kPlatformer.string(), "out.png", "--frames", "999999999"}).exit_code == kExitUsage);
+  CHECK(tool({"shot", kPlatformer.string(), "out.png", "--at", "-1"}).exit_code == kExitUsage);
+  CHECK(tool({"run", kPlatformer.string(), "--seconds", "1e300"}).exit_code == kExitUsage);
 }
 
 TEST_CASE("a message is one line, led by the place in the game it points at") {
@@ -164,13 +169,18 @@ TEST_CASE("a check of what is no game says so") {
   CHECK(tool({"check"}).exit_code == kExitUsage);
 }
 
-TEST_CASE("a script defines the class it is named for") {
-  CHECK(defines_class("class Coin < Behaviour\nend", "Coin"));
-  CHECK(defines_class("class Coin(\nend", "Coin("));  // (whatever a file name makes of a class name)
-  CHECK_FALSE(defines_class("class Coinage\nend", "Coin"));
-  CHECK(defines_class("# a coin\n  class Coin\nend", "Coin"));
-  CHECK_FALSE(defines_class("class Coins\nend", "Coin"));
-  CHECK_FALSE(defines_class("x = Coin.new", "Coin"));
+TEST_CASE("whether a script defines its class is asked of the engine, not guessed from its text") {
+  GameCopy game("classes");
+  // A class made without the word `class`, and one named from the top: both are the class.
+  game.write("scripts/coin.rb", "Coin = Class.new(Behaviour) do\n  def update(dt); end\nend\n");
+  game.write("scripts/goal.rb", "class ::Goal < Behaviour\nend\n");
+  // ...and one only written in a text and a comment block, which defines nothing.
+  game.write("scripts/mover.rb", "NOTE = <<~TEXT\n  class Mover < Behaviour\nTEXT\n=begin\nclass Mover\n=end\n");
+  const ToolResult checked = tool({"check", game.dir()});
+  CHECK(has(checked.out, "error scripts/mover.rb does not define class Mover"));
+  CHECK_FALSE(has(checked.out, "coin.rb does not define"));
+  CHECK_FALSE(has(checked.out, "goal.rb does not define"));
+  CHECK(has(checked.out, "check: 1 errors"));
 }
 
 TEST_CASE("what redgem-test says of a game's tests is read a file a line") {

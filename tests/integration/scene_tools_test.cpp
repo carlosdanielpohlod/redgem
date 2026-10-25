@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <variant>
 #include <vector>
@@ -122,7 +123,13 @@ TEST_CASE("a name several objects share is refused with each of them") {
   GameCopy game("ambiguous");
   REQUIRE(scene_tool({"add", game.dir(), "Wall"}).exit_code == kExitSuccess);
   REQUIRE(scene_tool({"add", game.dir(), "Wall", "--parent", "Player"}).exit_code == kExitSuccess);
-  REQUIRE(scene_tool({"set", game.dir(), "Wall.001", "name=Wall"}).exit_code == kExitSuccess);
+  // (The tools never give two objects one name; a scene made elsewhere may.)
+  auto opened = SceneDocument::open(game.scene());
+  REQUIRE(std::holds_alternative<SceneDocument>(opened));
+  SceneDocument& document = std::get<SceneDocument>(opened);
+  document.set_name(document.desc().find_node("Wall.001"), "Wall");
+  std::string error;
+  REQUIRE_MESSAGE(document.save(error), error);
   const ToolResult refused = scene_tool({"get", game.dir(), "Wall"});
   CHECK(refused.exit_code == kExitFailure);
   CHECK(has(refused.err, "2 objects are called Wall"));
@@ -171,6 +178,50 @@ TEST_CASE("a hierarchy as deep as a file makes it is listed without running out 
   }
   CHECK(has(scene_list(scene, "deep", ListLimits{kEveryLevel, 2}), "#0 N0\n  #1 N1\n+99998 more"));
   CHECK(saved_id(scene, kDepth - 1) == kDepth - 1);
+}
+
+TEST_CASE("an object moves under one listed after it") {
+  GameCopy game("reparent");
+  // Ground is #0 and Step1 #1: Ground moves under an object after it.
+  const ToolResult moved = scene_tool({"set", game.dir(), "Ground", "parent=Step1"});
+  REQUIRE_MESSAGE(moved.exit_code == kExitSuccess, moved.err);
+  const SceneDesc scene = load(game.scene());
+  CHECK(scene.nodes[node_named(scene, "Ground").parent].name == "Step1");
+  CHECK(has(scene_tool({"get", game.dir(), "Ground"}).out, "path: Step1/Ground"));
+}
+
+TEST_CASE("a line of a list is what set takes back") {
+  GameCopy game("round_trip");
+  const std::string before = scene_tool({"get", game.dir(), "#4"}).out;
+  for (const char* object : {"MovingPlatform", "Player", "Camera", "Sun", "Coin1"}) {
+    std::string line = scene_tool({"list", game.dir()}).out;
+    const std::size_t at = line.find(std::string(" ") + object + " ");
+    REQUIRE(at != std::string::npos);
+    line = line.substr(at + 1, line.find('\n', at) - at - 1);
+    // The words after the name, fed back to set, change nothing.
+    std::vector<std::string> words{"set", game.dir(), object};
+    std::stringstream stream(line.substr(line.find(' ') + 1));
+    for (std::string word; stream >> word;) words.push_back(word);
+    const ToolResult set = scene_tool(words);
+    CHECK_MESSAGE(set.exit_code == kExitSuccess, object << ": " << set.err);
+    CHECK(has(set.out, line));
+  }
+  CHECK(scene_tool({"get", game.dir(), "#4"}).out == before);
+  // A key that is a typo of set's is refused; one that is not is a property.
+  CHECK(has(scene_tool({"set", game.dir(), "Coin1", "positon=1,2,3"}).err, "did you mean position?"));
+  CHECK(scene_tool({"set", game.dir(), "Coin1", "value=5"}).exit_code == kExitSuccess);
+  CHECK(has(scene_tool({"set", game.dir(), "Coin1", "mesh=Rock"}).err, "is not changed from the command line"));
+  CHECK(has(scene_tool({"set", game.dir(), "Coin1", "camera"}).err, "is not changed from the command line"));
+}
+
+TEST_CASE("a name an object could not be found by is refused, and names are made unique") {
+  GameCopy game("names");
+  CHECK(has(scene_tool({"add", game.dir(), "#3"}).err, "would read as an id"));
+  CHECK(has(scene_tool({"add", game.dir(), "Level/Wall"}).err, "or a path"));
+  CHECK(has(scene_tool({"set", game.dir(), "Coin1", "name=#9"}).err, "would read as an id"));
+  CHECK(has(scene_tool({"add", game.dir(), "Coin1"}).out, " Coin1.001"));
+  CHECK(has(scene_tool({"set", game.dir(), "Coin2", "name=Coin1"}).out, " Coin1.002"));
+  CHECK(has(scene_tool({"set", game.dir(), "Coin3", "name=Coin3"}).out, " Coin3 "));
 }
 
 TEST_CASE("scripts are taken off by name, and only those that are on") {

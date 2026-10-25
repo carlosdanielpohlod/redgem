@@ -71,7 +71,15 @@ $ redgem scene add games/my_game Coin6 --from Coin5 position=3,3,-31
 ```
 
 A copy made with `--from` of a `prefab = true` template is an object of the scene, not another
-template. A new object's name is made unique as the editor makes it (`Wall`, then `Wall.001`).
+template. Names are made unique as the editor makes them (`Wall`, then `Wall.001`), by `add` and
+by `name=` alike; a name that starts with `#` or holds a `/` is refused, since it would read as an
+id or a path.
+
+The words of a `list` line are what `set` takes back: `pos=`, `rot=`, `scripts=Coin,Spin` (the
+list of scripts), and a property as `speed=6` as well as `prop.speed=6`. A key that is a typo of
+one of `set`'s (`positon=`) is refused rather than made a property; `prop.` makes any key a
+property. `mesh=`, `light=` and `camera` say what an object is: they are taken back as they are,
+and not changed.
 
 ## `redgem run`: play with no window
 
@@ -95,7 +103,8 @@ $ redgem shot games/my_game shot.png --at 2
 saved shot.png (512x288, scene main at 2 s)
 ```
 
-It plays the game to that moment (1 second unless `--at` says otherwise) the way `run` does, draws
+It plays the game to that moment (1 second unless `--at` says otherwise; `--frames N` counts fixed
+steps instead; at most an hour of the game, as for `run`) the way `run` does, draws
 every frame off screen, and saves the picture of the one asked for. Small unless asked otherwise:
 `--size 1280x720` for more. `--camera Name` shows the game through the camera of that object
 instead of the scene's first camera; `--scene` starts on another scene. It needs a graphics card:

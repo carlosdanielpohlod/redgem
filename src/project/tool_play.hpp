@@ -51,8 +51,14 @@ std::variant<std::unique_ptr<Engine>, std::string> engine_for(const PlayRequest&
 // it. Why not, when no object of that name has a camera (the cameras there are, listed).
 std::optional<std::string> keep_camera(SceneDesc& scene, const std::string& name);
 
+// The most a tool plays a game for: an hour of it, in fixed steps.
+inline constexpr long long kMostSteps = 60LL * 60LL * 60LL;
+
 // How many fixed steps of play `--seconds` or `--frames` ask for; `otherwise` seconds when they
-// say nothing. Nothing when what they say is no length.
+// say nothing. Nothing when what they say is no length (one step at least, kMostSteps at most).
 std::optional<long long> frames_asked(const ToolLine& line, double otherwise);
+// The moment `--frames`, else `seconds_option`, ask for, in steps from the start (0 is the start);
+// `otherwise` seconds when they say nothing. Nothing when it is before the start or past kMostSteps.
+std::optional<long long> moment_asked(const ToolLine& line, const char* seconds_option, double otherwise);
 
 }  // namespace redgem::tools
