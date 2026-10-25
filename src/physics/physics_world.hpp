@@ -1,8 +1,11 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
+#include <variant>
 #include <vector>
 
 #include "core/math.hpp"
@@ -75,6 +78,35 @@ struct QueryShape {
   float height = 0.0f;  // capsules, from end to end along their own y
   Vec3 half_extents;    // boxes
   Quat rotation = Quat::identity();
+};
+
+// Joints hold two bodies together, or one body to the world.
+//   fixed     glued as they are
+//   hinge     turning around an axis through the anchor (a door), between limits, maybe by a motor
+//   slider    sliding along an axis (a drawer), between limits
+//   point     turning every way around the anchor (a ball and socket)
+//   distance  kept between `min_distance` and `max_distance` apart (a rope, or with a spring, a bungee)
+enum class JointKind { Fixed, Hinge, Slider, Point, Distance };
+using JointId = std::uint32_t;
+inline constexpr JointId kNoJoint = 0;
+
+struct JointDesc {
+  JointKind kind = JointKind::Fixed;
+  ObjectId a = kNoObject;
+  ObjectId b = kNoObject;  // kNoObject: the world
+  Vec3 anchor;             // world space; on `a` for a distance joint
+  Vec3 anchor_b;           // distance joints: the point on `b` (or in the world), world space
+  Vec3 axis = Vec3::up();  // hinges and sliders, world space
+  // Hinges: radians from where it starts, low in -pi..0, high in 0..pi; sliders: meters from where
+  // it starts, low <= 0 <= high. None: free.
+  std::optional<std::pair<float, float>> limits;
+  float motor_speed = 0.0f;   // hinges: radians per second
+  float motor_torque = 0.0f;  // hinges: newton meters at most; 0: no motor
+  float min_distance = 0.0f;  // distance joints
+  float max_distance = 0.0f;
+  float spring_frequency = 0.0f;  // distance joints: hertz; 0: a stiff rope
+  float spring_damping = 0.0f;    // 0 bounces on, 1 settles at once
+  float break_force = 0.0f;       // newtons pulling it apart; 0: it never breaks
 };
 
 // Physics backend as seen by the engine. Static, kinematic and trigger poses follow the scene;
@@ -162,6 +194,21 @@ class PhysicsWorld {
                                                const QueryFilter& filter) const = 0;
   // What a shape at `center` overlaps (distance from the center to each point).
   virtual std::vector<RaycastHit> overlap(const QueryShape& shape, Vec3 center, const QueryFilter& filter) const = 0;
+
+  // Joints, between rigid bodies (at least one of them dynamic). A joint goes when either of its
+  // objects does, and breaks (goes, and is told broken) when pulled harder than its break force.
+  // Ids are never given twice by a world.
+  virtual std::variant<JointId, std::string> add_joint(const JointDesc& desc) = 0;
+  virtual void remove_joint(JointId joint) = 0;
+  virtual bool has_joint(JointId joint) const = 0;
+  virtual bool joint_broken(JointId joint) const = 0;
+  virtual void set_joint_enabled(JointId joint, bool enabled) = 0;
+  virtual bool joint_enabled(JointId joint) const = 0;
+  virtual void set_joint_break_force(JointId joint, float force) = 0;
+  virtual float joint_break_force(JointId joint) const = 0;
+  // Hinges only: the motor (no motor at 0 torque), and how far it turned from where it started.
+  virtual void set_hinge_motor(JointId joint, float speed, float max_torque) = 0;
+  virtual float hinge_angle(JointId joint) const = 0;
 };
 
 std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers = {});

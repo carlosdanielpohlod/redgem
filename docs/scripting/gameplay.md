@@ -249,6 +249,40 @@ and changed while the game runs. `rigidbody.kinematic = true` hands a falling cr
 (a crane picks it up); `rigidbody.dynamic = true` drops it again, at rest. `rigidbody.sleep` keeps
 a body still until something bumps it or `wake` is called.
 
+## Doors, ropes and chains: joints
+
+A joint holds two bodies together, or one to the world (give `nil` as the other). Points and axes
+are in world space.
+
+A door on a hinge, swinging up to 110 degrees each way it is pushed, pulled shut by its motor:
+
+```ruby
+class Door < Behaviour
+  def start
+    pin = transform.position + Vector3.left * 0.5            # its left edge
+    @hinge = Physics.joint(:hinge, game_object, nil, anchor: pin, axis: Vector3.up, limits: [-110, 110])
+  end
+
+  def close = @hinge.motor(-60, 50)                           # degrees per second, newton meters
+end
+```
+
+A rope of distance joints: each link may come closer to the one above it, never farther.
+
+```ruby
+hook = Vector3.new(0, 8, 0)
+above = nil
+links.each do |link|                                          # dynamic spheres, top to bottom
+  Physics.joint(:distance, link, above, other_anchor: above ? nil : hook)
+  above = link
+end
+```
+
+`spring: 2, damping: 0.3` makes it a bungee. Other kinds: `:fixed` glues two bodies as they are,
+`:slider` lets one slide along an axis (`limits:` in meters), `:point` lets it turn every way (a
+ball and socket). `break_force: 500` breaks a joint pulled harder than 500 newtons
+(`joint.broken?` then says so); `joint.remove` lets go; destroying either object removes it.
+
 ## Collision layers
 
 Bullets that fly through pickups, ghosts that walk through walls: give each body a **layer** and

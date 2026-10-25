@@ -7,6 +7,7 @@
 //   jolt_physics_world_characters.cpp  characters
 //   jolt_physics_world_vehicles.cpp    vehicles
 //   jolt_physics_world_contacts.cpp    who touches whom: contacts and triggers
+//   jolt_physics_world_joints.cpp      what holds bodies together
 //   jolt_physics_world_forces.cpp      what pushes, turns, weighs and wakes rigid bodies
 //   jolt_physics_world_queries.cpp     what a ray, a moving shape or a shape in place finds
 
@@ -17,6 +18,7 @@
 #include <Jolt/Physics/Character/CharacterVirtual.h>
 #include <Jolt/Physics/Collision/CastResult.h>
 #include <Jolt/Physics/Collision/RayCast.h>
+#include <Jolt/Physics/Constraints/TwoBodyConstraint.h>
 #include <Jolt/Physics/Collision/ContactListener.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/Physics/Vehicle/VehicleConstraint.h>
@@ -52,6 +54,17 @@ struct Record {
   Vec3 desired_move;
   std::optional<float> pending_jump;
   std::set<ObjectId> overlaps;  // triggers only
+};
+
+// A joint, and what it was made between (`b` is kNoObject for the world).
+struct JointRecord {
+  JointKind kind = JointKind::Fixed;
+  ObjectId a = kNoObject;
+  ObjectId b = kNoObject;
+  JPH::Ref<JPH::TwoBodyConstraint> constraint;
+  float break_force = 0.0f;  // 0: it never breaks
+
+  bool holds(ObjectId object) const { return a == object || b == object; }
 };
 
 // What an object is in the world (`record` is null for one that is not in it).
@@ -111,6 +124,16 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   std::optional<RaycastHit> shape_cast(const QueryShape& shape, Vec3 from, Vec3 to,
                                        const QueryFilter& filter) const override;
   std::vector<RaycastHit> overlap(const QueryShape& shape, Vec3 center, const QueryFilter& filter) const override;
+  std::variant<JointId, std::string> add_joint(const JointDesc& desc) override;
+  void remove_joint(JointId joint) override;
+  bool has_joint(JointId joint) const override { return joints_.count(joint) != 0; }
+  bool joint_broken(JointId joint) const override { return broken_joints_.count(joint) != 0; }
+  void set_joint_enabled(JointId joint, bool enabled) override;
+  bool joint_enabled(JointId joint) const override;
+  void set_joint_break_force(JointId joint, float force) override;
+  float joint_break_force(JointId joint) const override;
+  void set_hinge_motor(JointId joint, float speed, float max_torque) override;
+  float hinge_angle(JointId joint) const override;
 
  private:
   Record* find(ObjectId object) {
@@ -162,6 +185,17 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   void attach_vehicle(const BodyDesc& desc, Record& record);
   void release_vehicle(Record& record);
 
+  // Joints.
+  const JointRecord* find_joint(JointId joint) const {
+    const auto it = joints_.find(joint);
+    return it == joints_.end() ? nullptr : &it->second;
+  }
+  // Why a joint cannot be made; nothing when it can.
+  std::optional<std::string> joint_problem(const JointDesc& desc) const;
+  void remove_joints_of(ObjectId object);
+  // Joints pulled harder than their break force during the last step of `dt` seconds go.
+  void break_overloaded_joints(float dt);
+
   // Contacts and triggers.
   std::set<ObjectId> objects_inside(ObjectId id, const Record& trigger) const;
   void update_triggers();
@@ -197,6 +231,9 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   std::set<ContactPair> current_contacts_;
   std::set<ContactPair> previous_contacts_;
   std::vector<ContactEvent> events_;
+  std::map<JointId, JointRecord> joints_;  // ordered: deterministic breaking
+  std::set<JointId> broken_joints_;
+  JointId next_joint_ = kNoJoint + 1;
 };
 
 }  // namespace redgem::jolt
