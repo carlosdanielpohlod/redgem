@@ -329,7 +329,7 @@ class EditorApp {
   bool gizmo_dragging_ = false;
   group_transform::Drag group_drag_;                // the gizmo drag in progress, from where it began
   std::optional<box_select::ViewPoint> box_start_;  // where the left button went down in the view, while held
-  std::vector<std::uint8_t> clipboard_;             // copied objects too big for the system's clipboard
+  std::vector<std::uint8_t> clipboard_;             // the last objects copied in this editor
   std::optional<PendingAction> pending_;            // what waits for Save / Discard / Cancel about unsaved work
   bool quit_confirmed_ = false;                     // the user chose Save or Discard
   bool gizmo_drawn_ = false;

@@ -140,14 +140,12 @@ void EditorApp::cut_selection() {
   report("cut", error);
 }
 
-// On the system's clipboard when it fits there, so that another editor window can paste it.
+// On the system's clipboard too when it fits there, so that another editor window can paste it.
+// The editor keeps its own copy for when the system's clipboard holds something else.
 void EditorApp::keep_copied(const std::vector<std::uint8_t>& copied) {
-  if (object_clipboard::fits_system_clipboard(copied.size())) {
+  clipboard_ = copied;
+  if (object_clipboard::fits_system_clipboard(copied.size()))
     SetClipboardText(object_clipboard::to_text(copied).c_str());
-    clipboard_.clear();
-  } else {
-    clipboard_ = copied;
-  }
 }
 
 std::optional<std::vector<std::uint8_t>> EditorApp::clipboard_objects() const {

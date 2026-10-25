@@ -133,6 +133,16 @@ Vec3 drop_point(Vec3 ray_origin, Vec3 ray_direction, Vec3 fallback) {
   return distance < kMaxDropDistance ? ray_origin + ray_direction * distance : fallback;
 }
 
+Sphere enclosing(const std::vector<Sphere>& spheres) {
+  if (spheres.empty()) return {};
+  Vec3 sum = Vec3::zero();
+  for (const Sphere& sphere : spheres) sum = sum + sphere.center;
+  Sphere all{sum * (1.0f / static_cast<float>(spheres.size())), 0.0f};
+  for (const Sphere& sphere : spheres)
+    all.radius = std::max(all.radius, length(sphere.center - all.center) + sphere.radius);
+  return all;
+}
+
 float fly_axis(bool negative_down, bool positive_down) {
   return (positive_down ? kFlyAxisFull : 0.0f) - (negative_down ? kFlyAxisFull : 0.0f);
 }

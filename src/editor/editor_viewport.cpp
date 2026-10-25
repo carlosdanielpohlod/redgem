@@ -42,6 +42,7 @@ void EditorApp::draw_viewport_window() {
   track_viewport_focus();
   draw_viewport_hint(playing);
   brush_point_.reset();
+  if (playing) box_start_.reset();  // the game has the mouse now
   playing ? draw_play_border() : use_viewport_tools();
   ImGui::End();
   ImGui::PopStyleVar();
@@ -84,6 +85,7 @@ void EditorApp::drop_script(const char* script_file, float x, float y) {
 void EditorApp::use_viewport_tools() {
   // Sculpting takes the left button over from the gizmo and from picking.
   if (sculpting()) {
+    box_start_.reset();  // a rectangle begun before the brush came on is not finished by it
     use_brush();
     return;
   }
