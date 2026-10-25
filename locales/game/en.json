@@ -49,8 +49,6 @@
   "game.controls.stick_right_trigger": "Right trigger",
   "game.controls.stick_right_x": "Right stick X",
   "game.controls.stick_right_y": "Right stick Y",
-  "game.controls.vertical_negative": "Move down",
-  "game.controls.vertical_positive": "Move up",
   "game.crash.closed": "{game} closed because of an error. A report of what happened was written in {folder}",
   "game.crash.out_of_memory": "{game} ran out of memory and had to close. A report was written in {folder}",
   "game.identity.bad_network": "{place} must be true or false",
