@@ -4,12 +4,24 @@ the engine and inside the games built with it. Run it after a build (the depende
 with their license files, are in build/_deps) whenever a dependency is added or updated.
 
     python3 -I tools/licenses/collect_notices.py
+    python3 -I tools/licenses/collect_notices.py --deps .deps/fetch --check
+
+--deps names where the build keeps the dependencies' sources (FETCHCONTENT_BASE_DIR) when that is
+not build/_deps. --check writes nothing: it fails when the file in the repository is not what the
+sources make, which is how the continuous integration catches a dependency updated without it.
 """
+import argparse
 import os
+import sys
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DEPS = os.path.join(REPO_ROOT, "build", "_deps")
+# Where the license files are looked for: the dependencies' sources, kept by the build. The
+# projects below name their files with this placeholder, replaced by --deps (or build/_deps).
+DEPS = "{deps}"
+DEFAULT_DEPS = os.path.join(REPO_ROOT, "build", "_deps")
 OUTPUT = os.path.join(REPO_ROOT, "THIRD_PARTY_LICENSES.md")
+# What the check exits with when the file is stale (1 is any other failure of Python's own).
+EXIT_STALE = 2
 
 # (name, what it is used for, where it comes from, its license file).
 PROJECTS = [
@@ -101,7 +113,8 @@ def license_text(path):
     return "\n".join(lines).strip()
 
 
-def main():
+def notices(deps):
+    """The whole text of THIRD_PARTY_LICENSES.md, from the license files under deps."""
     parts = [HEADER, "\n## Projects\n"]
     for name, purpose, url, _ in PROJECTS:
         parts.append(f"- **{name}**: {purpose}. {url}")
@@ -110,9 +123,32 @@ def main():
         parts.append(f"- **{name}**: {license_name}. {url}")
     parts.append("\n## License texts\n")
     for name, _, _, license_file in PROJECTS:
-        parts.append(f"### {name}\n\n```\n{license_text(license_file)}\n```\n")
+        parts.append(f"### {name}\n\n```\n{license_text(license_file.replace(DEPS, deps))}\n```\n")
+    return "\n".join(parts)
+
+
+def check(text, path=OUTPUT):
+    """Exits with EXIT_STALE when the committed file (path) differs from text."""
+    with open(path, encoding="utf-8") as committed:
+        if committed.read() == text:
+            print(os.path.basename(path), "is up to date")
+            return
+    print(os.path.basename(path), "is stale: run tools/licenses/collect_notices.py and commit it",
+          file=sys.stderr)
+    sys.exit(EXIT_STALE)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Writes (or checks) THIRD_PARTY_LICENSES.md.")
+    parser.add_argument("--deps", default=DEFAULT_DEPS, help="where the dependencies' sources are")
+    parser.add_argument("--check", action="store_true", help="fail if the file is stale instead of writing it")
+    args = parser.parse_args()
+    text = notices(os.path.abspath(args.deps))
+    if args.check:
+        check(text)
+        return
     with open(OUTPUT, "w", encoding="utf-8") as out:
-        out.write("\n".join(parts))
+        out.write(text)
     print("wrote", os.path.relpath(OUTPUT, REPO_ROOT))
 
 
