@@ -11,11 +11,11 @@ namespace {
 // Vertical speed (relative to the ground) below which a grounded character sticks to the ground.
 constexpr float kGroundedVerticalTolerance = 0.1f;
 
-JPH::Ref<JPH::CharacterVirtualSettings> character_settings(const ShapeInfo& info) {
+JPH::Ref<JPH::CharacterVirtualSettings> character_settings(const ShapeInfo& info, JPH::ObjectLayer layer) {
   JPH::Ref<JPH::CharacterVirtualSettings> settings = new JPH::CharacterVirtualSettings();
   settings->mShape = info.shape;
   settings->mInnerBodyShape = info.shape;
-  settings->mInnerBodyLayer = layers::kMoving;
+  settings->mInnerBodyLayer = layer;
   settings->mMaxSlopeAngle = degrees_to_radians(config::kCharacterMaxSlopeDegrees);
   settings->mMass = config::kCharacterMass;
   settings->mMaxStrength = config::kCharacterMaxStrength;
@@ -52,8 +52,9 @@ JPH::Vec3 carried_velocity(const Record& record) {
 
 void World::create_character(const BodyDesc& desc, const ShapeInfo& info, Record& record) {
   // Characters stay upright: physics only drives their position.
-  record.character = new JPH::CharacterVirtual(character_settings(info), JPH::RVec3(to_jolt(desc.world.position)),
-                                               JPH::Quat::sIdentity(), static_cast<JPH::uint64>(desc.object), &system_);
+  record.character = new JPH::CharacterVirtual(character_settings(info, object_layer_of(record)),
+                                               JPH::RVec3(to_jolt(desc.world.position)), JPH::Quat::sIdentity(),
+                                               static_cast<JPH::uint64>(desc.object), &system_);
   record.character->SetListener(this);
   body_owners_[record.character->GetInnerBodyID().GetIndexAndSequenceNumber()] = desc.object;
   character_owners_[record.character.GetPtr()] = desc.object;
@@ -79,15 +80,17 @@ void World::update_character(Record& record, float dt) {
   velocity += to_jolt(gravity_) * dt;
   velocity += to_jolt(record.desired_move);
   character.SetLinearVelocity(velocity);
-  move_character(character, dt);
+  move_character(record, dt);
 }
 
-void World::move_character(JPH::CharacterVirtual& character, float dt) {
+void World::move_character(const Record& record, float dt) {
+  JPH::CharacterVirtual& character = *record.character;
   JPH::CharacterVirtual::ExtendedUpdateSettings update_settings;
   update_settings.mStickToFloorStepDown = JPH::Vec3(0.0f, -config::kCharacterStickToFloorDistance, 0.0f);
   update_settings.mWalkStairsStepUp = JPH::Vec3(0.0f, config::kCharacterStairStepHeight, 0.0f);
-  const JPH::DefaultBroadPhaseLayerFilter broad_filter(object_vs_broad_phase_, layers::kMoving);
-  const JPH::DefaultObjectLayerFilter layer_filter(object_pairs_, layers::kMoving);
+  const JPH::ObjectLayer layer = object_layer_of(record);
+  const JPH::DefaultBroadPhaseLayerFilter broad_filter(object_vs_broad_phase_, layer);
+  const JPH::DefaultObjectLayerFilter layer_filter(object_pairs_, layer);
   const JPH::IgnoreSingleBodyFilter body_filter(character.GetInnerBodyID());
   const JPH::ShapeFilter shape_filter;
   character.ExtendedUpdate(dt, to_jolt(gravity_), update_settings, broad_filter, layer_filter, body_filter,

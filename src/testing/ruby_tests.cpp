@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "physics/physics_config.hpp"
 #include "core/config.hpp"
@@ -17,6 +18,7 @@
 #include "net/network_session.hpp"
 #include "physics/physics_world.hpp"
 #include "scene/scene.hpp"
+#include "app/game_settings.hpp"
 #include "script/script_context.hpp"
 #include "script/script_host.hpp"
 #include "testing/opened_classes.hpp"
@@ -30,11 +32,11 @@ namespace {
 constexpr const char* kRubyTestModule = "RedGemTest";
 constexpr const char* kRunAllMethod = "run_all";
 
-// What a file of Ruby unit tests runs against: a scene, physics, input, audio, a network and a web
-// client with nothing in them.
+// What a file of Ruby unit tests runs against: a scene, physics (with the game's collision layers),
+// input, audio, a network and a web client with nothing in them.
 struct BareWorld {
   Scene scene;
-  std::unique_ptr<PhysicsWorld> physics = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f});
+  std::unique_ptr<PhysicsWorld> physics;
   InputState input;
   ScriptedInputSource driven_input;  // what TestInput sets (the tests of the system test DSL use it)
   RecordingAudio audio;
@@ -43,7 +45,8 @@ struct BareWorld {
   net::HttpClient http;
   ScriptContext context;
 
-  BareWorld() {
+  explicit BareWorld(const CollisionLayers& layers)
+      : physics(create_jolt_physics_world({0.0f, config::kGravityY, 0.0f}, layers)) {
     context.scene = &scene;
     context.physics = physics.get();
     context.input = &input;
@@ -99,12 +102,21 @@ std::optional<std::filesystem::path> scripts_for(const std::filesystem::path& te
   return std::nullopt;
 }
 
+// The collision layers of the game's game.json (warning of what is wrong with them, as the game
+// does); just the default layer without a game.
+CollisionLayers game_collision_layers(const std::filesystem::path& game_dir) {
+  if (game_dir.empty()) return {};
+  GameManifest manifest = read_game_manifest(game_dir);
+  for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
+  return std::move(manifest.settings.collision_layers);
+}
+
 }  // namespace
 
 int run_ruby_tests(const std::filesystem::path& test_file, const std::filesystem::path& game_dir) {
   const std::optional<std::filesystem::path> scripts = scripts_for(test_file, game_dir);
   if (!scripts) return kExitFailure;
-  BareWorld world;
+  BareWorld world(game_collision_layers(game_dir));
   ScriptHost host(world.context, *scripts);
   if (const auto error = load_tests(host, world, test_file, !game_dir.empty())) {
     log::error(*error);

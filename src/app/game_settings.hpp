@@ -3,8 +3,10 @@
 #include <cstddef>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 #include "app/android/android_settings.hpp"
+#include "physics/collision_layers.hpp"
 #include "render/display_settings.hpp"
 #include "script/script_config.hpp"
 
@@ -30,6 +32,8 @@ struct GameSettings {
   // script/script_budget.hpp), in milliseconds, 1 to config::kMaxScriptBudgetMs:
   //   "script_budget_ms": 2000
   int script_budget_ms = config::kDefaultScriptBudgetMs;
+  // Which bodies collide with which: the "physics" section (see physics/collision_layers.hpp).
+  CollisionLayers collision_layers;
 };
 
 // Everything game.json says, read once.
@@ -46,6 +50,8 @@ struct GameManifest {
   // What is wrong with "script_budget_ms"; empty when it can be used or the file has none. (The
   // scripts get the engine's default instead.)
   std::string script_budget_error;
+  // What is wrong with the "physics" section; each problem is left out, the rest is used.
+  std::vector<std::string> physics_warnings;
 };
 GameManifest read_game_manifest(const std::filesystem::path& game_dir);
 

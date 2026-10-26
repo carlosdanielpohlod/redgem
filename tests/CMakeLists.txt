@@ -1,6 +1,7 @@
 add_executable(redgem_tests
   test_main.cpp
   unit/math_test.cpp
+  unit/collision_layers_test.cpp
   unit/fixed_clock_test.cpp
   unit/stopwatch_test.cpp
   unit/log_test.cpp
@@ -133,6 +134,9 @@ add_executable(redgem_tests
   unit/camera_ray_test.cpp
   unit/crash_report_test.cpp
   integration/physics_world_test.cpp
+  integration/physics_queries_test.cpp
+  integration/physics_forces_test.cpp
+  integration/physics_api_test.cpp
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp
   integration/script_budget_test.cpp

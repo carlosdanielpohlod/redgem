@@ -898,18 +898,68 @@
     },
     {
       "name": "Physics",
-      "about": "Questions to the physics world.",
+      "about": "Questions to the physics world: rays, moving shapes and shapes in place.",
       "methods": [
         {
           "name": "raycast",
           "static": true,
-          "args": "origin, direction, max_distance = 1000, ignore = nil",
-          "about": "the first thing a ray hits: {object:, point:, normal:, distance:}, or nil",
+          "args": "origin, direction, max_distance = 1000, skip = nil, layers: nil, ignore: nil",
+          "about": "the first thing a ray hits: {object:, point:, normal:, distance:}, or nil (skip: an object it sees through)",
           "top": 22,
           "example": "hit = Physics.raycast(transform.position, Vector3.down, 2.0, game_object)"
+        },
+        {
+          "name": "raycast_all",
+          "static": true,
+          "args": "origin, direction, max_distance = 1000, layers: nil, ignore: nil",
+          "about": "everything a ray hits, nearest first",
+          "example": "Physics.raycast_all(eye, forward, 50.0, layers: [:enemy]).each { |hit| hit[:object].destroy }"
+        },
+        {
+          "name": "sphere_cast",
+          "static": true,
+          "args": "from, to, radius, layers: nil, ignore: nil",
+          "about": "the first thing a ball moving from `from` to `to` touches, or nil"
+        },
+        {
+          "name": "box_cast",
+          "static": true,
+          "args": "from, to, size, rotation: nil, layers: nil, ignore: nil",
+          "about": "the same for a box (its whole size; rotation in degrees)"
+        },
+        {
+          "name": "capsule_cast",
+          "static": true,
+          "args": "from, to, radius, height, rotation: nil, layers: nil, ignore: nil",
+          "about": "the same for an upright capsule (height end to end)"
+        },
+        {
+          "name": "overlap_sphere",
+          "static": true,
+          "args": "center, radius, layers: nil, ignore: nil",
+          "about": "the hits of everything inside a ball, nearest first",
+          "example": "Physics.overlap_sphere(transform.position, 4.0, layers: :enemy).each { |hit| hit[:object].destroy }"
+        },
+        {
+          "name": "overlap_box",
+          "static": true,
+          "args": "center, size, rotation: nil, layers: nil, ignore: nil",
+          "about": "the same inside a box"
+        },
+        {
+          "name": "overlap_capsule",
+          "static": true,
+          "args": "center, radius, height, rotation: nil, layers: nil, ignore: nil",
+          "about": "the same inside a capsule"
+        },
+        {
+          "name": "layers",
+          "static": true,
+          "about": "the game's collision layers, as Symbols (game.json's physics layers)"
         }
       ],
-      "guide": "gameplay.md"
+      "guide": "gameplay.md",
+      "notes": "`layers:` is a layer's name or a list of them (every layer when nil); `ignore:` is an object or a list of objects to see through. Hits are `{object:, point:, normal:, distance:}`, each object once, nearest first, at most 64; triggers are never hit. A cast that starts inside something hits it at distance 0."
     },
     {
       "name": "CharacterController",
@@ -932,13 +982,22 @@
         {
           "name": "velocity",
           "about": "its velocity"
+        },
+        {
+          "name": "layer",
+          "about": "its collision layer, a Symbol"
+        },
+        {
+          "name": "layer=",
+          "args": "name",
+          "about": "moves it to another collision layer"
         }
       ],
       "guide": "gameplay.md"
     },
     {
       "name": "Rigidbody",
-      "about": "The body of an object with body = \"dynamic\" or \"kinematic\".",
+      "about": "The body of an object with body = \"dynamic\" or \"kinematic\" (or a vehicle's chassis).",
       "methods": [
         {
           "name": "velocity",
@@ -953,8 +1012,88 @@
           "name": "add_impulse",
           "args": "vector",
           "about": "pushes it"
+        },
+        {
+          "name": "add_force",
+          "args": "force, at: nil",
+          "about": "pushes it during the next step (newtons); at a point (world space), it also turns it",
+          "example": "def fixed_update(_dt) = rigidbody.add_force(Vector3.up * 30.0)"
+        },
+        {
+          "name": "add_torque",
+          "args": "torque",
+          "about": "turns it during the next step (newton meters)"
+        },
+        {
+          "name": "angular_velocity",
+          "about": "how fast it spins, degrees per second around each axis"
+        },
+        {
+          "name": "angular_velocity=",
+          "args": "vector",
+          "about": "sets how fast it spins"
+        },
+        {
+          "name": "mass",
+          "about": "its mass in kilograms"
+        },
+        {
+          "name": "mass=",
+          "args": "kilograms",
+          "about": "changes its mass (more than 0)"
+        },
+        {
+          "name": "kinematic?",
+          "about": "whether scripts move it (instead of forces)"
+        },
+        {
+          "name": "kinematic=",
+          "args": "flag",
+          "about": "turns a dynamic body kinematic, or back"
+        },
+        {
+          "name": "dynamic?",
+          "about": "whether forces move it"
+        },
+        {
+          "name": "dynamic=",
+          "args": "flag",
+          "about": "turns a kinematic body dynamic, or back"
+        },
+        {
+          "name": "gravity_scale",
+          "about": "how much gravity pulls it (1 is normal)"
+        },
+        {
+          "name": "gravity_scale=",
+          "args": "scale",
+          "about": "0 floats, 2 falls twice as hard"
+        },
+        {
+          "name": "sleep",
+          "about": "stops simulating it until something touches it"
+        },
+        {
+          "name": "wake",
+          "about": "simulates it again"
+        },
+        {
+          "name": "sleeping?",
+          "about": "whether it sleeps"
+        },
+        {
+          "name": "layer",
+          "about": "its collision layer, a Symbol"
+        },
+        {
+          "name": "layer=",
+          "args": "name",
+          "about": "moves it to another collision layer",
+          "example": "rigidbody.layer = :bullet"
         }
-      ]
+      ],
+      "guide": "gameplay.md",
+      "notes": "Forces and torques act during the next physics step only: add them every `fixed_update` to keep pushing. A body made dynamic again starts at rest. `kinematic=` and `dynamic=` raise for a vehicle."
     },
     {
       "name": "Vehicle",

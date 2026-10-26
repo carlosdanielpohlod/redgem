@@ -2,6 +2,7 @@
 
 #include <utility>
 
+#include "physics/jolt/jolt_vehicle.hpp"
 #include "physics/physics_config.hpp"
 
 namespace redgem {
@@ -11,10 +12,23 @@ namespace {
 // A kinematic body that was given somewhere to be by the end of the next step.
 bool has_move_pending(const Record& record) { return record.has_target && has_body(&record); }
 
+// The layer a body asked for; the default one when the game has no layer of that name.
+std::size_t layer_named(const CollisionLayers& layers, const std::string& name) {
+  return layers.find(name).value_or(kDefaultLayer);
+}
+
+// Whether an object can be put on a layer: it is in the world, and the layer is one of the game's.
+bool can_take_layer(const Record* record, const CollisionLayers& layers, std::size_t layer) {
+  return record != nullptr && layer < layers.count();
+}
+
 }  // namespace
 
-World::World(Vec3 gravity)
-    : gravity_(gravity), temp_allocator_(config::kPhysicsTempAllocatorBytes), job_system_(config::kMaxPhysicsJobs) {
+World::World(Vec3 gravity, const CollisionLayers& layers)
+    : gravity_(gravity),
+      layers_(layers),
+      temp_allocator_(config::kPhysicsTempAllocatorBytes),
+      job_system_(config::kMaxPhysicsJobs) {
   system_.Init(config::kMaxBodies, config::kNumBodyMutexes, config::kMaxBodyPairs, config::kMaxContactConstraints,
                broad_phase_layers_, object_vs_broad_phase_, object_pairs_);
   system_.SetGravity(to_jolt(gravity));
@@ -36,6 +50,7 @@ std::optional<std::string> World::add_object(const BodyDesc& desc) {
   Record record;
   record.type = desc.config.type;
   record.trigger = desc.config.trigger;
+  record.layer = layer_named(layers_, desc.config.layer);
   record.shape = info.shape;
   record.pose = desc.world;
   if (!record.trigger) create_simulated(desc, info, record);
@@ -108,6 +123,22 @@ void World::step(float dt) {
   collect_contact_events();
 }
 
+std::size_t World::layer(ObjectId object) const {
+  const Record* record = find(object);
+  return record != nullptr ? record->layer : kDefaultLayer;
+}
+
+void World::set_layer(ObjectId object, std::size_t layer) {
+  Record* record = find(object);
+  if (!can_take_layer(record, layers_, layer)) return;
+  record->layer = layer;
+  const JPH::BodyID body = body_of(object);
+  if (!body.IsInvalid()) system_.GetBodyInterface().SetObjectLayer(body, object_layer_of(*record));
+  // Woken, so that Jolt looks again at what it touches.
+  if (is_movable_body(record)) system_.GetBodyInterface().ActivateBody(body);
+  if (is_vehicle(record)) set_wheels_layer(*record->vehicle, object_layer_of(*record));
+}
+
 std::optional<Transform> World::simulated_pose(ObjectId object) const {
   const Record* record = find(object);
   if (record == nullptr) return std::nullopt;
@@ -125,6 +156,8 @@ std::optional<Transform> World::simulated_pose(ObjectId object) const {
 
 }  // namespace jolt
 
-std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity) { return std::make_unique<jolt::World>(gravity); }
+std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers) {
+  return std::make_unique<jolt::World>(gravity, layers);
+}
 
 }  // namespace redgem

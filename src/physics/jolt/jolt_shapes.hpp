@@ -25,5 +25,11 @@ inline JPH::Vec3 to_jolt(Vec3 v) { return JPH::Vec3(v.x, v.y, v.z); }
 inline JPH::Quat to_jolt(Quat q) { return JPH::Quat(q.x, q.y, q.z, q.w); }
 inline Vec3 from_jolt(JPH::Vec3Arg v) { return {v.GetX(), v.GetY(), v.GetZ()}; }
 inline Quat from_jolt(JPH::QuatArg q) { return {q.GetX(), q.GetY(), q.GetZ(), q.GetW()}; }
+inline JPH::RMat44 matrix_of(Vec3 position, Quat rotation) {
+  return JPH::RMat44::sRotationTranslation(to_jolt(rotation), JPH::RVec3(to_jolt(position)));
+}
+
+// Shapes the world builds for triggers and queries are made at their final size: unscaled.
+inline constexpr float kUnitScale = 1.0f;
 
 }  // namespace redgem::jolt

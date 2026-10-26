@@ -27,6 +27,8 @@ AxleLayout layout_axles(const std::vector<WheelDesc>& wheels);
 // Four-wheel-drive car: front wheels steer, rear wheels have the hand brake.
 JPH::Ref<JPH::VehicleConstraint> build_vehicle(JPH::Body& chassis, const std::vector<WheelDesc>& wheels,
                                                JPH::ObjectLayer layer);
+// What the wheels stand on: what bodies on `layer` collide with.
+void set_wheels_layer(JPH::VehicleConstraint& vehicle, JPH::ObjectLayer layer);
 
 // Stills a vehicle's wheels, engine and controls. They keep their own spin: a teleported car must
 // not drive off by itself.

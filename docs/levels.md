@@ -262,7 +262,8 @@ regenerates a whole level from code; `tools/blender/scene_kit.py` has helpers to
 | `wheel`    | `true`                                         | On a child of a `vehicle`: it becomes a wheel (model it with its axle along X) |
 | `collider` | `box`, `sphere`, `capsule`, `mesh`             | Shape, sized from the mesh bounds × object scale. `collider` alone = static body |
 | `trigger`  | `true`                                         | Trigger volume: fires `on_trigger_enter/exit`, does not collide |
-| `mass`     | number                                         | Mass of dynamic bodies |
+| `mass`     | number                                         | Mass of dynamic bodies (and of kinematic ones, should a script make them dynamic) |
+| `layer`    | a layer of `game.json`, e.g. `"enemy"`         | Collision layer of the body or trigger: what it meets (see "Collision layers" in the gameplay recipes). Without it, `default` |
 | `tag`      | string                                         | Used by `Scene.find_all(tag)` and `game_object.tag?` |
 | `visible`  | `false`                                        | Hide the mesh (the object still exists) |
 | `prefab`   | `true`                                         | A template: hidden and inert in the game, copied by `Scene.spawn` |

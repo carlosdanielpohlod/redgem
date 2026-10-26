@@ -5,6 +5,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/vector3.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_object.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/components.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/physics.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
@@ -269,6 +270,7 @@ redgem_add_library(redgem_runtime
   scene/shapes/primitives.cpp
   scene/shapes/primitive_round_shapes.cpp
   physics/body_config.cpp
+  physics/collision_layers.cpp
   physics/contact_events.cpp
   physics/jolt/jolt_runtime.cpp
   physics/jolt/jolt_shapes.cpp
@@ -278,6 +280,7 @@ redgem_add_library(redgem_runtime
   physics/jolt/jolt_physics_world_characters.cpp
   physics/jolt/jolt_physics_world_vehicles.cpp
   physics/jolt/jolt_physics_world_contacts.cpp
+  physics/jolt/jolt_physics_world_forces.cpp
   physics/jolt/jolt_physics_world_queries.cpp
   audio/audio.cpp
   input/keys.cpp
@@ -311,6 +314,9 @@ redgem_add_library(redgem_runtime
   script/bindings/scatter_bindings.cpp
   script/bindings/camera_bindings.cpp
   script/bindings/physics_bindings.cpp
+  script/bindings/physics_args.cpp
+  script/bindings/physics_query_bindings.cpp
+  script/bindings/rigidbody_bindings.cpp
   script/bindings/light_bindings.cpp
   script/bindings/runtime_bindings.cpp
   script/bindings/game_identity_bindings.cpp

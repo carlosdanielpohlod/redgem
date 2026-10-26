@@ -24,12 +24,27 @@ class CharacterController
   end
 end
 
+# The body of a dynamic or kinematic object (and of a vehicle's chassis). Forces act during the
+# next physics step only: push every fixed_update to keep pushing.
+#   rigidbody.add_force(Vector3.up * 30.0)                         # newtons, at the center of mass
+#   rigidbody.add_force(Vector3.right * 10.0, at: transform.position + Vector3.up)   # also turns it
+#   rigidbody.kinematic = true                                      # scripts move it from now on
 class Rigidbody
   def self.__new(id, serial)
     body = allocate
     body.instance_variable_set(:@id, id)
     body.instance_variable_set(:@serial, serial)
     body
+  end
+
+  def add_force(force, at: nil)
+    __add_force(force, at)
+  end
+
+  def dynamic? = !kinematic?
+
+  def dynamic=(dynamic)
+    self.kinematic = !dynamic
   end
 end
 

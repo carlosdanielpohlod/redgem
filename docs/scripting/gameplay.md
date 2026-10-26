@@ -234,6 +234,46 @@ rigidbody.velocity = Vector3.new(0, 0, -10)
 A **kinematic** body is moved by your script (set `transform.position`) and carries what stands
 on it: platforms, lifts, doors.
 
+Forces push for one physics step, so a steady push goes in `fixed_update`:
+
+```ruby
+def fixed_update(_dt)
+  rigidbody.add_force(Vector3.up * 30.0)                                  # newtons: a hovering crate
+  rigidbody.add_force(transform.forward * 5.0, at: transform.position + Vector3.up)   # also tips it
+  rigidbody.add_torque(Vector3.new(0, 2, 0))                              # spins it around y
+end
+```
+
+`rigidbody.mass`, `gravity_scale` (0 floats), `angular_velocity` (degrees per second) can be read
+and changed while the game runs. `rigidbody.kinematic = true` hands a falling crate to your script
+(a crane picks it up); `rigidbody.dynamic = true` drops it again, at rest. `rigidbody.sleep` keeps
+a body still until something bumps it or `wake` is called.
+
+## Collision layers
+
+Bullets that fly through pickups, ghosts that walk through walls: give each body a **layer** and
+say in `game.json` which layers meet. Up to 16 layers; `default` is always there.
+
+```json
+"physics": {
+  "layers": ["default", "player", "enemy", "bullet", "pickup"],
+  "collides": {"bullet": ["enemy", "default"], "pickup": ["player"]}
+}
+```
+
+A layer with no `collides` entry meets every layer; two layers meet only when each lets the other
+in, so above bullets hit enemies and walls but pass through players, pickups and other bullets,
+and pickups only notice players. Put an object on a layer with the `layer` custom property (in
+Blender or the Inspector), or from a script:
+
+```ruby
+bullet = Scene.spawn("Bullet", position: muzzle, rotation: transform.rotation)
+bullet.rigidbody.layer = :bullet
+bullet.rigidbody.velocity = transform.forward * 40.0
+```
+
+Triggers only notice bodies whose layer meets theirs, and queries look at the layers they are given.
+
 ## Drive a car
 
 Give the chassis a **vehicle** body and mark its wheel children with `wheel = true`.
@@ -284,7 +324,24 @@ hit = Physics.raycast(transform.position, transform.forward, 20.0, game_object)
 Debug.log("I see #{hit[:object].name} #{hit[:distance]} m away") if hit
 ```
 
-The last argument is an object the ray ignores (usually the one casting it).
+The last argument is an object the ray ignores (usually the one casting it). Every query also takes
+`layers:` (a layer or a list) and `ignore:` (an object or a list):
+
+```ruby
+# Everything a laser goes through, nearest first.
+Physics.raycast_all(eye, forward, 50.0, layers: [:enemy, :default], ignore: [game_object, gun])
+
+# Would a ball of radius 0.4 get from here to there? (nil: the way is clear)
+blocked = Physics.sphere_cast(transform.position, target, 0.4, ignore: game_object)
+
+# An explosion: everything on the enemy layer within 5 m.
+Physics.overlap_sphere(transform.position, 5.0, layers: :enemy).each do |hit|
+  hit[:object].rigidbody&.add_impulse((hit[:point] - transform.position).normalized * 20.0)
+end
+```
+
+`box_cast`, `capsule_cast`, `overlap_box` and `overlap_capsule` work the same way. Hits come
+nearest first, each object once, at most 64.
 
 ## Show text on screen
 

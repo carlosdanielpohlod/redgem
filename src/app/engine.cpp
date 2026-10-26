@@ -27,6 +27,7 @@ constexpr const char* kSavedByFolderNote = ". Until it is put right, the game's 
 void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.id_error.empty()) log::warning(manifest.id_error + kSavedByFolderNote);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
+  for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
 }
 
 }  // namespace
@@ -61,9 +62,9 @@ std::unique_ptr<Engine> Engine::create(const EngineOptions& options, SceneDesc s
 
 void Engine::initialize() {
   const GameIdentityReading identity = begin_loading();
-  build_world();
   const GameManifest manifest = read_game_manifest(options_.game_dir);
   warn_of_unusable(manifest);
+  build_world(manifest.settings.collision_layers);
   open_presenter(manifest.settings);
   open_audio();
   open_saves();
@@ -76,7 +77,8 @@ void Engine::initialize() {
   network_watch_.restart();  // the network's time starts with the game, not with its loading
 }
 
-void Engine::build_world() {
+void Engine::build_world(const CollisionLayers& layers) {
+  collision_layers_ = layers;
   scene_ = Scene::from_desc(scene_desc_);
   animations_.reset(scene_desc_.animations, scene_);
   particles_.set_gravity(gravity());

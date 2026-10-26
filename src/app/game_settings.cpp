@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <string_view>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
@@ -26,6 +27,7 @@ constexpr const char* kFpsCapKey = "fps_cap";
 constexpr const char* kRenderScaleKey = "render_scale";
 constexpr const char* kQualityKey = "quality";
 constexpr const char* kScriptBudgetKey = config::kScriptBudgetKey;
+constexpr const char* kPhysicsKey = "physics";
 constexpr int kJsonIndent = 2;
 constexpr std::string_view kIdMarks = ".-_";  // what an id may hold besides small letters and digits
 constexpr std::string_view kTwoSeparators = "..";
@@ -105,6 +107,13 @@ std::string read_script_budget(const nlohmann::json& json, GameSettings& setting
          std::to_string(config::kDefaultScriptBudgetMs) + " ms";
 }
 
+void read_physics(const nlohmann::json& json, GameManifest& manifest) {
+  if (!json.contains(kPhysicsKey)) return;
+  CollisionLayersReading reading = collision_layers_from_json(json[kPhysicsKey]);
+  manifest.settings.collision_layers = std::move(reading.layers);
+  manifest.physics_warnings = std::move(reading.warnings);
+}
+
 }  // namespace
 
 GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
@@ -120,6 +129,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   manifest.id_error = read_id(json, manifest.settings.id);
   manifest.android_error = read_android_section(json, manifest.settings.android);
   manifest.script_budget_error = read_script_budget(json, manifest.settings);
+  read_physics(json, manifest);
   return manifest;
 }
 

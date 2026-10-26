@@ -84,9 +84,13 @@ JPH::Ref<JPH::VehicleConstraint> build_vehicle(JPH::Body& chassis, const std::ve
   settings.mController = controller_settings(wheels);
 
   JPH::Ref<JPH::VehicleConstraint> vehicle = new JPH::VehicleConstraint(chassis, settings);
-  vehicle->SetVehicleCollisionTester(
-      new JPH::VehicleCollisionTesterCastCylinder(layer, config::kVehicleWheelConvexRadiusFraction));
+  set_wheels_layer(*vehicle, layer);
   return vehicle;
+}
+
+void set_wheels_layer(JPH::VehicleConstraint& vehicle, JPH::ObjectLayer layer) {
+  vehicle.SetVehicleCollisionTester(
+      new JPH::VehicleCollisionTesterCastCylinder(layer, config::kVehicleWheelConvexRadiusFraction));
 }
 
 void stop_vehicle(JPH::VehicleConstraint& vehicle) {
