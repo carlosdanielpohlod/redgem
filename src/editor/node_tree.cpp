@@ -19,6 +19,9 @@ std::vector<int> kept_children(const std::vector<int>& children, const std::vect
   return kept;
 }
 
+// Whether `index` is one of `count` nodes.
+bool one_of(int index, int count) { return index >= 0 && index < count; }
+
 void detach_from_parent(std::vector<NodeDesc>& nodes, int child) {
   const int parent = nodes[child].parent;
   if (parent == kNoIndex) return;
@@ -79,10 +82,23 @@ void move_under(std::vector<NodeDesc>& nodes, int child, int parent, const Trans
   nodes[child].local = local;
 }
 
+std::vector<int> subtrees(const std::vector<NodeDesc>& nodes, const std::vector<int>& roots) {
+  std::vector<int> out;
+  for (const int root : roots) {
+    const std::vector<int> nodes_under = subtree(nodes, root);
+    out.insert(out.end(), nodes_under.begin(), nodes_under.end());
+  }
+  return out;
+}
+
 std::vector<int> order_without(int count, const std::vector<int>& removed) {
+  std::vector<bool> gone(static_cast<std::size_t>(std::max(count, 0)), false);
+  for (const int index : removed) {
+    if (one_of(index, count)) gone[static_cast<std::size_t>(index)] = true;
+  }
   std::vector<int> order;
   for (int i = 0; i < count; ++i) {
-    if (std::find(removed.begin(), removed.end(), i) == removed.end()) order.push_back(i);
+    if (!gone[static_cast<std::size_t>(i)]) order.push_back(i);
   }
   return order;
 }

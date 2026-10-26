@@ -17,6 +17,8 @@ std::string numbered_name(const std::string& base, int number);
 NodeDesc named_node(const std::string& name, int parent);
 // Indices of `index` and all its descendants, parents first.
 std::vector<int> subtree(const std::vector<NodeDesc>& nodes, int index);
+// The same for several nodes, one subtree after the other (none of `roots` under another one).
+std::vector<int> subtrees(const std::vector<NodeDesc>& nodes, const std::vector<int>& roots);
 // Where a node is in the world, following its parents.
 Transform world_of(const std::vector<NodeDesc>& nodes, int index);
 // Where a node has to be placed under `parent` (kNoIndex = top level) to stay where it is in the world.

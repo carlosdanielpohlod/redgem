@@ -6,9 +6,12 @@
 #include <optional>
 #include <string>
 #include <variant>
+#include <vector>
 
 #include "app/engine.hpp"
 #include "editor/document/scene_document.hpp"
+#include "editor/inspector_logic.hpp"
+#include "editor/selection.hpp"
 #include "scene/shapes/terrain.hpp"
 #include "input/input.hpp"
 #include "scene/scene.hpp"
@@ -53,13 +56,43 @@ class EditorSession {
   void refresh_preview();
   void refresh_node(ObjectId node);
 
-  ObjectId selection() const { return selection_; }
+  // The first object selected (kNoObject without one): the one the Inspector shows alone, the
+  // terrain the brush shapes.
+  ObjectId selection() const { return selection_.primary(); }
+  // Every selected object.
+  const Selection& selected() const { return selection_; }
+  // The selected objects none of whose ancestors is selected (see top_level_of): what the group
+  // commands move, copy, duplicate and delete.
+  std::vector<int> selected_roots() const;
+  // Only `id` (nothing for kNoObject).
   void select(ObjectId id);
+  void select_all(const std::vector<ObjectId>& ids);
+  void add_to_selection(const std::vector<ObjectId>& ids);
+  // A click on an object (see Selection::click); `order` is the rows the Hierarchy lists.
+  void click_select(ObjectId id, ClickMode mode, const std::vector<ObjectId>& order = {});
   void select_by_name(const std::string& name);
 
-  // Editing commands (ignored while playing). They keep the selection meaningful.
+  // Editing commands (ignored while playing), on every selected object at once, each one undo
+  // step. They keep the selection meaningful: copies are selected, deleted objects are not.
   void duplicate_selection();
   void delete_selection();
+  // The selected objects with everything under them, as the clipboard holds them (see
+  // SceneDocument::copy_nodes). nullopt without a selection, or with why in `error`.
+  std::optional<std::vector<std::uint8_t>> copy_selection(std::string& error);
+  // The same, and then the objects are deleted.
+  std::optional<std::vector<std::uint8_t>> cut_selection(std::string& error);
+  // Adds objects copied from this scene or another one under `parent` (kNoObject = top level),
+  // where they were in the world. They become the selection. False, with why in `error`, when
+  // nothing could be pasted (or while playing).
+  bool paste(const std::vector<std::uint8_t>& copied, ObjectId parent, std::string& error);
+  // Where Paste puts objects: next to the selected object (under its parent), or at the top level.
+  ObjectId paste_parent() const;
+  // Places an object where it should be in the world, under its parent, as a drag does: not
+  // recorded (call document().checkpoint() once when the drag begins).
+  void place_in_world(ObjectId id, const Transform& world);
+  // One number of the placement of each of the selection's top-level objects (see selected_roots),
+  // as the Inspector of several objects edits it; not recorded, like place_in_world.
+  void set_roots_axis(inspector_logic::TransformPart part, int axis, float value, float min_scale);
 
   // Creating objects at a world position (usually in front of the editor camera). The new object
   // becomes the selection. Return kNoObject while playing.
@@ -85,6 +118,9 @@ class EditorSession {
                         ObjectId parent = kNoObject);
   // Moves `child` under `parent` (kNoObject = top level), keeping where it is in the world.
   void reparent(ObjectId child, ObjectId parent);
+  // The same for the selection's top level (see selected_roots), one undo step. What would go
+  // under itself stays where it is.
+  void reparent_selection(ObjectId parent);
   // Adds a script file (scripts/<file>) to the object's script list.
   void attach_script(ObjectId id, const std::string& file);
   void undo();
@@ -137,22 +173,28 @@ class EditorSession {
   }
   // The first object carrying the environment's properties, or kNoObject.
   ObjectId find_environment() const;
-  // The selection after an edit that renumbers the objects: the one called `name`.
-  void refresh_and_reselect(const std::string& name);
+  // The selection after an edit that renumbers the objects: the ones called `names`.
+  void refresh_and_reselect(const std::vector<std::string>& names);
   ObjectId place_new(int node, Vec3 position);
   // What every creation does: `add` makes the object (one undo step) and it is placed and
   // selected, while the game is stopped (kNoObject while it runs).
   ObjectId place_created(const std::function<int()>& add, Vec3 position);
   int add_light(LightType type);
-  // Name of the selected object ("" without one): how the selection is found again after an edit
-  // that renumbers the objects.
-  std::string selected_name() const;
+  // Names of the selected objects: how the selection is found again after an edit that renumbers
+  // the objects.
+  std::vector<std::string> selected_names() const;
+  std::vector<std::string> names_of(const std::vector<ObjectId>& ids) const;
+  void select_by_names(const std::vector<std::string>& names);
+  // The ones of `ids` that are objects of the scene.
+  std::vector<ObjectId> known(const std::vector<ObjectId>& ids) const;
+  // Whether the selection can be edited now: the game is stopped, and something is selected.
+  bool can_edit_selection() const { return editing() && !selection_.empty(); }
 
   std::filesystem::path game_dir_;
   SceneDocument document_;
   std::string scene_name_;  // of the document's file, kept as it opens or is saved as another
   Scene preview_;
-  ObjectId selection_ = kNoObject;
+  Selection selection_;
   PlayState play_state_ = PlayState::Editing;
   std::unique_ptr<Engine> runtime_;
   AudioSystem* game_audio_ = nullptr;  // what the running game sounds through, when it has something

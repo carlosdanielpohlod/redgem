@@ -2,9 +2,12 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "core/log.hpp"
 #include "editor/edit_stream.hpp"
+#include "editor/inspector_logic.hpp"
+#include "editor/selection.hpp"
 
 // What the panels remember between frames: the hierarchy's search, half-typed names, open
 // dialogs, which messages the console lists. One of these belongs to each editor, so nothing
@@ -12,7 +15,10 @@
 namespace redgem::ui {
 
 struct HierarchyState {
-  std::string filter;  // the search field
+  std::string filter;           // the search field
+  std::vector<int> rows;        // the objects of the rows listed last frame, top to bottom (for Shift-click)
+  std::vector<int> rows_drawn;  // the same, as this frame lists them
+  GroupPress press;             // a press on a row of a selection of several, until the button is up
 };
 
 // What a text field of the Inspector is doing.
@@ -29,6 +35,7 @@ struct InspectorState {
   std::string new_script_name;                         // Add Component > Script
   std::string new_property_key;                        // Add Component > Property
   int new_property_type = 0;                           // of the kinds the menu offers
+  inspector_logic::GroupTargets group_tag;             // whom the Tag of several objects is typed for
 };
 
 // The folders of a game the Project panel lists.

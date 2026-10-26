@@ -63,7 +63,7 @@ void EditorApp::draw_edited_scene() {
   if (brush_point_) brush = BrushMark{*brush_point_, terrain_tool_.radius};
   BeginTextureMode(view.target);
   BeginMode3D(view.camera);
-  draw_scene_overlays(session_->scene(), session_->scene_desc(), session_->selection(), brush);
+  draw_scene_overlays(session_->scene(), session_->scene_desc(), session_->selected().ids(), brush);
   EndMode3D();
   EndTextureMode();
 }

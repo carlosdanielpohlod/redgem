@@ -441,3 +441,138 @@ TEST_CASE("save as refuses to move a scene away from the files next to it that i
   CHECK(session->save(error));  // in its own folder it still finds it
   std::filesystem::remove_all(dir);
 }
+
+TEST_CASE("several selected objects are duplicated, moved and deleted together, one undo step each") {
+  constexpr Vec3 kLift{0.0f, 3.0f, 0.0f};
+  const auto dir = copy_sandbox("multi_select");
+  auto session = open(dir);
+  const ObjectId crate = session->scene().find("Crate");
+  const ObjectId coin = session->scene().find("Coin");
+  const ObjectId kid = session->scene().find("Kid");
+  const ObjectId family = session->scene().find("Family");
+  session->click_select(crate, ClickMode::Replace);
+  session->click_select(coin, ClickMode::Toggle);
+  session->click_select(kid, ClickMode::Toggle);
+  session->click_select(family, ClickMode::Toggle);
+  REQUIRE(session->selected().size() == 4);
+  CHECK(session->selected_roots().size() == 3);  // Kid goes along with Family
+
+  session->duplicate_selection();
+  CHECK(session->selected().size() == 3);  // the copies
+  CHECK(session->scene().find("Crate.001") != kNoObject);
+  CHECK(session->scene().find("Kid.001") != kNoObject);
+  session->undo();
+  CHECK(session->scene().find("Crate.001") == kNoObject);
+  CHECK(session->selected().empty());  // the copies were selected, and are gone
+
+  // Moved together as a drag does: one checkpoint, then every object placed.
+  session->select_all({crate, coin});
+  const float crate_y = y_of(*session, "Crate");
+  const float coin_y = y_of(*session, "Coin");
+  session->document().checkpoint();
+  for (const ObjectId id : session->selected_roots()) {
+    Transform world = session->scene().world_transform(id);
+    world.position = world.position + kLift;
+    session->place_in_world(id, world);
+  }
+  CHECK(y_of(*session, "Crate") == doctest::Approx(crate_y + kLift.y));
+  CHECK(y_of(*session, "Coin") == doctest::Approx(coin_y + kLift.y));
+  session->undo();
+  CHECK(y_of(*session, "Crate") == doctest::Approx(crate_y));
+  CHECK(y_of(*session, "Coin") == doctest::Approx(coin_y));
+  CHECK(session->selected().size() == 2);  // undo keeps both selected
+
+  session->delete_selection();
+  CHECK(session->scene().find("Crate") == kNoObject);
+  CHECK(session->scene().find("Coin") == kNoObject);
+  session->undo();
+  CHECK(session->scene().find("Crate") != kNoObject);
+  CHECK(session->scene().find("Coin") != kNoObject);
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("objects cut from one scene are pasted into another, and saved there") {
+  const auto dir = copy_sandbox("cut_paste");
+  auto session = open(dir);
+  session->select_all({session->scene().find("Crate"), session->scene().find("Family")});
+  std::string error;
+  const auto clip = session->cut_selection(error);
+  REQUIRE_MESSAGE(clip, error);
+  CHECK(session->scene().find("Crate") == kNoObject);
+  CHECK(session->scene().find("Kid") == kNoObject);
+  session->undo();  // the cut is one undo step
+  CHECK(session->scene().find("Kid") != kNoObject);
+
+  REQUIRE_MESSAGE(session->open_scene("level2", error), error);
+  session->select_by_name("Level2Marker");
+  REQUIRE_MESSAGE(session->paste(*clip, session->paste_parent(), error), error);
+  CHECK(session->selected().size() == 2);
+  const ObjectId kid = session->scene().find("Kid");
+  REQUIRE(kid != kNoObject);
+  CHECK(session->document().node(kid).parent == session->scene().find("Family"));
+  CHECK(session->scene().find("Crate") != kNoObject);
+  REQUIRE_MESSAGE(session->save(error), error);
+
+  auto reopened = open(dir);
+  REQUIRE_MESSAGE(reopened->open_scene("level2", error), error);
+  const ObjectId crate = reopened->scene().find("Crate");
+  REQUIRE(crate != kNoObject);
+  CHECK(get_string(reopened->document().node(crate).props, props::kTag) == std::optional<std::string>("crate"));
+  CHECK(reopened->document().node(crate).mesh != kNoIndex);
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("pasting under an object puts the copies there, and nothing is pasted while playing") {
+  const auto dir = copy_sandbox("paste_into");
+  auto session = open(dir);
+  session->select_by_name("Coin");
+  std::string error;
+  const auto clip = session->copy_selection(error);
+  REQUIRE_MESSAGE(clip, error);
+  const ObjectId family = session->scene().find("Family");
+  REQUIRE_MESSAGE(session->paste(*clip, family, error), error);
+  const ObjectId copy = session->scene().find("Coin.001");
+  REQUIRE(copy != kNoObject);
+  CHECK(session->document().node(copy).parent == family);
+  CHECK(session->selection() == copy);
+
+  ScriptedInputSource input;
+  REQUIRE_MESSAGE(session->play({input}, error), error);
+  error.clear();
+  CHECK_FALSE(session->paste(*clip, kNoObject, error));
+  session->stop();
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("the Inspector of several objects moves a selected child once, with its parent") {
+  constexpr float kNewX = 7.0f;
+  constexpr float kMinScale = 0.001f;
+  const auto dir = copy_sandbox("group_inspector");
+  auto session = open(dir);
+  const ObjectId family = session->scene().find("Family");
+  const ObjectId kid = session->scene().find("Kid");
+  const Vec3 kid_local = session->document().node(kid).local.position;
+  session->select_all({family, kid, session->scene().find("Crate")});
+  session->document().checkpoint();
+  session->set_roots_axis(inspector_logic::TransformPart::Position, 0, kNewX, kMinScale);
+  CHECK(session->document().node(family).local.position.x == doctest::Approx(kNewX));
+  CHECK(session->document().node(session->scene().find("Crate")).local.position.x == doctest::Approx(kNewX));
+  CHECK(
+      approx_equal(session->document().node(kid).local.position, kid_local, kPositionTolerance));  // moved with Family
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("the whole selection is dragged under another object in one undo step") {
+  const auto dir = copy_sandbox("group_reparent");
+  auto session = open(dir);
+  session->select_all({session->scene().find("Crate"), session->scene().find("Coin")});
+  session->reparent_selection(session->scene().find("Family"));
+  const ObjectId family = session->scene().find("Family");
+  CHECK(session->document().node(session->scene().find("Crate")).parent == family);
+  CHECK(session->document().node(session->scene().find("Coin")).parent == family);
+  CHECK(session->selected().size() == 2);
+  session->undo();
+  CHECK(session->document().node(session->scene().find("Crate")).parent == kNoIndex);
+  CHECK(session->document().node(session->scene().find("Coin")).parent == kNoIndex);
+  std::filesystem::remove_all(dir);
+}

@@ -45,7 +45,7 @@ ObjectId EditorSession::place_new(int node, Vec3 position) {
   local.position = position;
   document_.set_local(node, local, false);  // part of the creation's undo step
   refresh_preview();
-  selection_ = node;
+  selection_.set(node);
   return node;
 }
 
@@ -108,7 +108,7 @@ ObjectId EditorSession::create_environment() {
   if (!editing()) return kNoObject;
   const ObjectId existing = find_environment();
   if (existing != kNoObject) {
-    selection_ = existing;
+    selection_.set(existing);
     return existing;
   }
   const int node = document_.add_empty(document_.unique_name(kNewEnvironmentName));

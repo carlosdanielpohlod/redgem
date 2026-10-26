@@ -12,19 +12,25 @@ description: "The editor's panels, tools and shortcuts: placing objects, the Ins
 The editor is built with Dear ImGui (dark theme, Inter and JetBrains Mono fonts, Font Awesome
 icons):
 
-* **Toolbar**: move / rotate / scale gizmos, local or world axes, grid snapping (or hold Ctrl while
-  dragging), Play / Pause / Stop, and Build.
-* **Hierarchy**: the object tree with search. Click to select, double click to frame, drag onto
-  another object to parent it (or onto empty space to unparent), right click for actions and to
-  create objects. Scripts and models from the Project panel can be dropped on it.
+* **Toolbar**: move / rotate / scale gizmos, local or world axes, the pivot several selected objects
+  turn and scale around (their middle, or the first one selected), grid snapping (or hold Ctrl
+  while dragging), Play / Pause / Stop, and Build.
+* **Hierarchy**: the object tree with search. Click to select, Ctrl+click to add an object to the
+  selection or take it away, Shift+click to select every row from the last one clicked; double
+  click to frame, drag onto another object to parent it (or onto empty space to unparent; a row of
+  the selection takes the whole selection along), right click for actions (on the whole selection) and to create objects. Scripts and models from the
+  Project panel can be dropped on it.
 * **Scene**: hold the right mouse button and use WASD/QE to fly, wheel to dolly, F to frame the
-  selection, click to pick objects, W / E / R switch the gizmo. Drop a model on the ground to place
-  it there, or a script on an object to attach it.
+  selection, click to pick objects (Ctrl or Shift + click adds or takes away), drag a rectangle to
+  select what shows inside it (with Ctrl or Shift held, added to the selection), W / E / R switch
+  the gizmo. Drop a model on the ground to place it there, or a script on an object to attach it.
 * **Inspector**: name, tag, visible, *Template* (hidden in the game, copied with `Scene.spawn`), then
   one card per component: Transform, Mesh with its materials (color, metallic, roughness, emission),
   Light (type, color, intensity, range), Camera (field of view, clipping), one card per Ruby script,
   Physics (body, trigger, collider, mass), vehicle wheels and custom properties. **Add Component**
-  adds scripts (existing or new), a physics body, a trigger or a property.
+  adds scripts (existing or new), a physics body, a trigger or a property. With several objects
+  selected it shows what they have in common: tag, visible, *Template* and the Transform, a dash
+  where their values differ. An edit applies to all of them.
 * **GameObject menu**: terrain you sculpt with a brush (see [Levels](levels.md#terrain)), empty
   objects, cube / sphere / plane / cylinder / capsule (with colliders),
   directional / point / spot lights, cameras, and the game's models.
@@ -44,8 +50,30 @@ icons):
   (Ctrl+J) to give the scene or the code more room; the toolbar's outer buttons toggle the sides.
 * **Play / Pause / Stop** (Ctrl+P, Esc): runs the game inside the Scene view with the current edits
   and fresh scripts; Stop restores the scene exactly as it was.
-* **Ctrl+Z / Ctrl+Y** undo and redo, **Ctrl+D** duplicate, **Del** delete, **Ctrl+S** save. Help >
-  Keyboard Shortcuts lists them all. File > New / Open Game goes back to the hub.
+* **Ctrl+Z / Ctrl+Y** undo and redo, **Ctrl+D** duplicate, **Del** delete, **Ctrl+X / Ctrl+C /
+  Ctrl+V** cut, copy and paste, **Ctrl+S** save. Help > Keyboard Shortcuts lists them all. File >
+  New / Open Game goes back to the hub.
+
+## Several objects at once
+
+Everything selected moves, turns and scales together with the gizmo (around the middle of the
+selection, or around the first object selected: the toolbar's pivot button; a scale goes along the
+pivot's axes, and an object turned another way and stretched unevenly takes the nearest placement
+without shear), and Duplicate, Delete,
+Cut, Copy and Paste act on all of it. A child goes along with its selected parent. Each of these is
+one undo step, however many objects it touches.
+
+**Copy** takes the selected objects with everything under them: their meshes, materials, pictures,
+skeletons and animations, scripts and properties, lights and cameras. **Paste** (Ctrl+V) puts them
+next to the selected object, or at the top level when nothing is selected; **Paste as Child**
+(Ctrl+Shift+V, or the Hierarchy's menu) puts them under the selected object. They land where they
+were in the world, and a name that is already taken gets a number (`Crate.001`). Paste works in the
+scene they came from, in another scene of the game (open it and paste), and in another editor
+window: the copy goes on the system's clipboard as text. A copy bigger than 64 MB stays in the
+editor's own clipboard and pastes only in the window it was copied in.
+
+A pasted object has its own copy of its meshes and pictures, even in the scene it was copied from
+(Duplicate shares them instead).
 
 Undo goes back up to 200 steps, and keeps at most 256 MB for them (its copies of the objects and
 terrains, and what deleted objects and undone imports were made of: vertices, pictures and their

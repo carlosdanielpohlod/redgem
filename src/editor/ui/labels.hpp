@@ -22,5 +22,9 @@ const char* discard_label();
 const char* cancel_label();
 const char* duplicate_label();
 const char* delete_label();
+const char* cut_label();
+const char* copy_label();
+const char* paste_label();
+const char* paste_into_label();
 
 }  // namespace redgem::ui

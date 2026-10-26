@@ -61,7 +61,7 @@ std::variant<std::unique_ptr<EditorSession>, std::string> EditorSession::open(co
 
 void EditorSession::begin_editing() {
   scene_name_ = scene_name_of(game_dir_, document_.path());
-  selection_ = kNoObject;
+  selection_.clear();
   loaded_write_time_ = write_time(document_.path());
   external_change_pending_ = false;
   refresh_preview();
@@ -170,7 +170,7 @@ bool EditorSession::reload_from_disk() {
     log::error("cannot reload " + path.string() + ": " + *error);
     return false;
   }
-  const std::string selected = selected_name();
+  const std::vector<std::string> selected = selected_names();
   document_ = std::move(std::get<SceneDocument>(opened));
   loaded_write_time_ = write_time(path);
   external_change_pending_ = false;

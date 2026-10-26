@@ -73,5 +73,9 @@ const char* discard_label() { return tr("editor.command.discard"); }
 const char* cancel_label() { return tr("editor.command.cancel"); }
 const char* duplicate_label() { return icon_label(ICON_FA_CLONE, "editor.command.duplicate"); }
 const char* delete_label() { return icon_label(ICON_FA_TRASH, "editor.command.delete"); }
+const char* cut_label() { return icon_label(ICON_FA_SCISSORS, "editor.command.cut"); }
+const char* copy_label() { return icon_label(ICON_FA_COPY, "editor.command.copy"); }
+const char* paste_label() { return icon_label(ICON_FA_PASTE, "editor.command.paste"); }
+const char* paste_into_label() { return icon_label(ICON_FA_PASTE, "editor.command.paste_into"); }
 
 }  // namespace redgem::ui

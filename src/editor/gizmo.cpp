@@ -62,7 +62,18 @@ void Gizmo::draw_tools() {
     local_ = !local_;
   }
   ImGui::SameLine();
+  draw_pivot_button();
+  ImGui::SameLine();
   ui::toggle_button(ICON_FA_MAGNET, tr("editor.toolbar.snap"), snapping_);
+}
+
+void Gizmo::draw_pivot_button() {
+  using group_transform::PivotMode;
+  const bool center = pivot_ == PivotMode::Center;
+  const char* tooltip = tr(center ? "editor.toolbar.pivot_center" : "editor.toolbar.pivot_first");
+  if (ui::icon_button(center ? ICON_FA_BULLSEYE : ICON_FA_ARROW_POINTER, tooltip)) {
+    pivot_ = center ? PivotMode::First : PivotMode::Center;
+  }
 }
 
 bool Gizmo::snaps() const { return snapping_ || ImGui::GetIO().KeyCtrl; }

@@ -43,18 +43,39 @@ void draw_tree(PanelContext& context, int index, HierarchyResult& result, Pendin
 // What each kind of pending edit does, in Pending::Kind's order.
 void apply_nothing(PanelContext& /*context*/, const Pending& /*pending*/) {}
 
+// The object whose menu was used, with the rest of the selection when it is part of it.
+void select_target(EditorSession& session, int target) {
+  if (!session.selected().contains(target)) session.select(target);
+}
+
 void apply_duplicate(PanelContext& context, const Pending& pending) {
-  context.session.select(pending.target);
+  select_target(context.session, pending.target);
   context.session.duplicate_selection();
 }
 
 void apply_delete(PanelContext& context, const Pending& pending) {
-  context.session.select(pending.target);
+  select_target(context.session, pending.target);
   context.session.delete_selection();
 }
 
+// A row of the selection dragged takes the whole selection along.
 void apply_reparent(PanelContext& context, const Pending& pending) {
+  if (context.session.selected().contains(pending.target)) return context.session.reparent_selection(pending.parent);
   context.session.reparent(pending.target, pending.parent);
+}
+
+// A press waits, and the button was let go.
+bool press_ends(const GroupPress& press) {
+  return press.row != kNoObject && ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+}
+
+// A press that waited for the button (see GroupPress) is a click when the button is up and the
+// row was not dragged.
+void finish_press(PanelContext& context) {
+  GroupPress& press = context.state.hierarchy.press;
+  if (!press_ends(press)) return;
+  const ObjectId clicked = press.finish();
+  if (clicked != kNoObject) context.session.select(clicked);
 }
 
 void apply_attach_script(PanelContext& context, const Pending& pending) {
@@ -116,16 +137,24 @@ void draw_objects(PanelContext& context, HierarchyResult& result, Pending& pendi
 }
 
 // The empty space below the tree: drop here to move objects to the top level, click to deselect.
-void draw_empty_space(PanelContext& context, Pending& pending) {
+void draw_empty_space(PanelContext& context, HierarchyResult& result, Pending& pending) {
   const ImVec2 free = ImGui::GetContentRegionAvail();
   const ImVec2 size(std::max(free.x, kRootDropMinWidth), std::max(free.y, kRootDropMinHeight));
   if (ImGui::InvisibleButton(kEmptySpaceId, size)) context.session.select(kNoObject);
   accept_drops(kNoIndex, pending);
   if (!ImGui::BeginPopupContextItem(kEmptySpaceMenu)) return;
   ImGui::BeginDisabled(!context.session.editing());
+  if (ImGui::MenuItem(paste_label())) result.clipboard = ClipboardCommand::PasteInto;  // at the top level
+  ImGui::Separator();
   draw_create_menu(context);
   ImGui::EndDisabled();
   ImGui::EndPopup();
+}
+
+// What the rows asked for, once the tree is drawn (it changes indices).
+void apply_after_drawing(PanelContext& context, const Pending& pending) {
+  apply(context, pending);
+  finish_press(context);
 }
 
 }  // namespace
@@ -137,11 +166,13 @@ HierarchyResult draw_hierarchy(PanelContext& context) {
   draw_search_bar(context);
   ImGui::Separator();
   ImGui::BeginChild(kTreeId);
+  context.state.hierarchy.rows_drawn.clear();
   draw_objects(context, result, pending);
-  draw_empty_space(context, pending);
+  context.state.hierarchy.rows.swap(context.state.hierarchy.rows_drawn);
+  draw_empty_space(context, result, pending);
   ImGui::EndChild();
   ImGui::End();
-  apply(context, pending);
+  apply_after_drawing(context, pending);
   return result;
 }
 

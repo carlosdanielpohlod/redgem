@@ -88,6 +88,14 @@ std::array<Vec3, kBoxCorners> box_corners(const Transform& world, const Bounds& 
 // Where something dropped on the Scene view lands: on the ground (y = 0) under the mouse ray, or
 // at `fallback` when the ray aims at the sky or meets the ground too far away.
 Vec3 drop_point(Vec3 ray_origin, Vec3 ray_direction, Vec3 fallback);
+// A ball around something: what the camera frames.
+struct Sphere {
+  Vec3 center;
+  float radius = 0.0f;
+};
+// A ball around all of `spheres` (at their middle, wide enough for the farthest), for framing
+// several objects. The first one for one; an empty ball for none.
+Sphere enclosing(const std::vector<Sphere>& spheres);
 // One fly-camera axis from its two keys: -1, 0 or 1.
 float fly_axis(bool negative_down, bool positive_down);
 

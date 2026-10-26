@@ -86,11 +86,11 @@ Bounds bounds_of(const GameObject& object, const SceneDesc& desc) {
   return object.mesh != kNoIndex ? desc.meshes[object.mesh].bounds : default_collider_bounds();
 }
 
-void draw_scene_overlays(const Scene& scene, const SceneDesc& desc, ObjectId selected,
+void draw_scene_overlays(const Scene& scene, const SceneDesc& desc, const std::vector<ObjectId>& selected,
                          const std::optional<BrushMark>& brush) {
   DrawGrid(kGridSlices, kGridSpacing);
   draw_object_marks(scene, desc);
-  draw_selection_box(scene, desc, selected);
+  for (const ObjectId id : selected) draw_selection_box(scene, desc, id);
   if (brush) draw_brush(*brush);
 }
 

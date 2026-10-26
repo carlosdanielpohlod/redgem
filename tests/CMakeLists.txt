@@ -38,6 +38,11 @@ add_executable(redgem_tests
   unit/mesh_builder_test.cpp
   unit/mesh_pieces_test.cpp
   unit/scene_document_test.cpp
+  unit/scene_document_clipboard_test.cpp
+  unit/selection_test.cpp
+  unit/group_transform_test.cpp
+  unit/box_select_test.cpp
+  unit/object_clipboard_test.cpp
   unit/scene_tree_test.cpp
   unit/gltf_json_test.cpp
   unit/glb_geometry_test.cpp

@@ -9,6 +9,16 @@ int shifted(int index, int offset) { return index == kNoIndex ? kNoIndex : index
 
 }  // namespace
 
+DescOffsets description_offsets(const JsonOffsets& json_offsets, std::size_t skins) {
+  DescOffsets offsets;
+  offsets.images = json_offsets.images;
+  offsets.materials = json_offsets.materials;
+  offsets.meshes = json_offsets.meshes;
+  offsets.source_nodes = json_offsets.nodes;
+  offsets.skins = static_cast<int>(skins);
+  return offsets;
+}
+
 MaterialDesc imported_material(const MaterialDesc& original, const DescOffsets& offsets) {
   MaterialDesc material = original;
   for (int* image : {&material.base_color_image, &material.metallic_roughness_image, &material.normal_image,

@@ -16,6 +16,9 @@ namespace redgem {
 // nullopt when there is nothing to leave out, and when the file points at its data in a way that
 // is not followed here (an extension with indices of its own): such a file is saved whole.
 std::optional<GlbFile> without_unused(const GlbFile& glb);
+// The same for a file given as its JSON and its binary chunk apart (the chunk may be another
+// file's, as long as the JSON points into it): only the bytes kept are copied.
+std::optional<GlbFile> without_unused(const nlohmann::json& json, const std::vector<std::uint8_t>& bin);
 
 // What the editor keeps of a file's objects apart from its JSON (see SceneDocument): every node,
 // skeleton and animation as loaded or imported.

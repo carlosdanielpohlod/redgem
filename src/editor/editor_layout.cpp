@@ -119,7 +119,24 @@ void EditorApp::draw_side_panels(ui::PanelContext& context) {
 }
 
 void EditorApp::draw_hierarchy_panel(ui::PanelContext& context) {
-  if (ui::draw_hierarchy(context).frame_requested) frame_selection();
+  const ui::HierarchyResult result = ui::draw_hierarchy(context);
+  if (result.frame_requested) frame_selection();
+  run_clipboard_command(result.clipboard, result.paste_parent);
+}
+
+void EditorApp::run_clipboard_command(ui::ClipboardCommand command, ObjectId paste_parent) {
+  switch (command) {
+    case ui::ClipboardCommand::Cut:
+      return cut_selection();
+    case ui::ClipboardCommand::Copy:
+      return copy_selection();
+    case ui::ClipboardCommand::Paste:
+      return paste();
+    case ui::ClipboardCommand::PasteInto:
+      return paste_into(paste_parent);
+    case ui::ClipboardCommand::None:
+      return;
+  }
 }
 
 void EditorApp::draw_script_tabs() {

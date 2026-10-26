@@ -147,32 +147,44 @@ bool fits_in_glb(std::uint64_t json_bytes, std::uint64_t bin_bytes) {
   return kHeaderBytes + kChunkHeaderBytes + json_bytes + bin_chunk <= kMaxGlbBytes;
 }
 
+std::optional<GlbFile> decode_glb(const std::vector<std::uint8_t>& bytes, const std::string& name, std::string& error) {
+  GlbFile glb;
+  const std::string problem = is_glb(bytes) ? read_chunks(bytes, glb) : " is not a glTF 2.0 binary file";
+  if (problem.empty()) return glb;
+  error = name + problem;
+  return std::nullopt;
+}
+
 std::optional<GlbFile> read_glb(const std::filesystem::path& path, std::string& error) {
   const auto data = file_bytes(path);
   if (!data) {
     error = "cannot open " + path.string();
     return std::nullopt;
   }
-  GlbFile glb;
-  const std::string problem = is_glb(*data) ? read_chunks(*data, glb) : " is not a glTF 2.0 binary file";
-  if (!problem.empty()) {
-    error = path.string() + problem;
-    return std::nullopt;
-  }
-  return glb;
+  return decode_glb(*data, path.string(), error);
 }
 
-bool write_glb(const std::filesystem::path& path, const GlbFile& glb, std::string& error) {
+std::optional<std::vector<std::uint8_t>> encode_glb(const GlbFile& glb, std::string& error) {
   // Invalid UTF-8 (e.g. a truncated name) is replaced instead of throwing.
   std::string json = glb.json.dump(kCompactIndent, kJsonPadding, kAsciiOnly, nlohmann::json::error_handler_t::replace);
   json.append(glb_padded_size(json.size()) - json.size(), kJsonPadding);
   if (!fits_in_glb(json.size(), glb_padded_size(glb.bin.size()))) {
-    error = "cannot write " + path.string() + ": the scene is bigger than a .glb file can be (4 GB)";
-    return false;
+    error = "the scene is bigger than a .glb file can be (4 GB)";
+    return std::nullopt;
   }
   std::vector<std::uint8_t> bin = glb.bin;
   bin.resize(glb_padded_size(bin.size()), kBinPadding);
-  return write_atomically(path, glb_bytes(json, bin), error);
+  return glb_bytes(json, bin);
+}
+
+bool write_glb(const std::filesystem::path& path, const GlbFile& glb, std::string& error) {
+  std::string problem;
+  const std::optional<std::vector<std::uint8_t>> bytes = encode_glb(glb, problem);
+  if (!bytes) {
+    error = "cannot write " + path.string() + ": " + problem;
+    return false;
+  }
+  return write_atomically(path, *bytes, error);
 }
 
 }  // namespace redgem

@@ -53,6 +53,14 @@ void EditorApp::handle_document_shortcuts() {
   if (IsKeyPressed(KEY_Z)) shift_down() ? session_->redo() : session_->undo();
   if (IsKeyPressed(KEY_Y)) session_->redo();
   if (IsKeyPressed(KEY_D)) session_->duplicate_selection();
+  handle_clipboard_shortcuts();
+}
+
+// Ctrl + X, C or V; with Shift, V pastes under the selected object.
+void EditorApp::handle_clipboard_shortcuts() {
+  if (IsKeyPressed(KEY_C)) copy_selection();
+  if (IsKeyPressed(KEY_X)) cut_selection();
+  if (IsKeyPressed(KEY_V)) shift_down() ? paste_into(session_->selection()) : paste();
 }
 
 void EditorApp::update_camera() {

@@ -106,6 +106,9 @@ the same pull request.
   animations, and a few hundred bytes of description per object still stay until the editor is
   closed.
 - In Docker the editor has no sound.
+- A pasted object carries its own copy of its meshes and pictures, even in the scene it was copied
+  from (Duplicate shares them). A copy bigger than 64 MB pastes only in the editor window it was
+  copied in.
 
 ## Tools
 
@@ -126,8 +129,6 @@ not a promise of how it will be closed.
 
 ### Editor
 
-- One object is selected at a time: no multi-select, box select or group transform, and no copy and
-  paste (duplicate and delete only).
 - The material inspector edits color, metallic, roughness and emission, but cannot assign or swap a
   texture. Images cannot be dropped onto the editor, and the Project panel has no `images/` folder.
 - Templates live inside one scene: there are no prefab files shared by several scenes, nor nesting

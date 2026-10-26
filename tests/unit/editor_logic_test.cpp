@@ -245,3 +245,15 @@ TEST_CASE("a brush on a scaled terrain is measured in the terrain's own grid") {
   const TerrainBrush smooth = local_brush(terrain, kPointOnTerrain, kBrushRadius, kHeldSeconds, SculptMode::Smooth);
   CHECK(smooth.amount == doctest::Approx(kHeldSeconds));
 }
+
+TEST_CASE("framing several objects takes a ball around all of them") {
+  using editor_logic::Sphere;
+  constexpr float kTolerance = 1e-4f;
+  const Sphere one = editor_logic::enclosing({{Vec3{1, 2, 3}, 0.5f}});
+  CHECK(approx_equal(one.center, Vec3{1, 2, 3}, kTolerance));
+  CHECK(one.radius == doctest::Approx(0.5f));
+  const Sphere two = editor_logic::enclosing({{Vec3{-2, 0, 0}, 1.0f}, {Vec3{2, 0, 0}, 3.0f}});
+  CHECK(approx_equal(two.center, Vec3::zero(), kTolerance));
+  CHECK(two.radius == doctest::Approx(5.0f));  // the far edge of the bigger one
+  CHECK(editor_logic::enclosing({}).radius == 0.0f);
+}

@@ -86,9 +86,11 @@ std::string SceneDocument::unique_name(const std::string& base) const {
   }
 }
 
-void SceneDocument::remove(int index) {
+void SceneDocument::remove(int index) { remove(std::vector<int>{index}); }
+
+void SceneDocument::remove(const std::vector<int>& roots) {
   checkpoint();
-  const std::vector<int> kept = order_without(node_count(), subtree(desc_.nodes, index));
+  const std::vector<int> kept = order_without(node_count(), subtrees(desc_.nodes, roots));
   desc_.nodes = nodes_in_order(desc_.nodes, kept);
   refresh_node_references();
   touch();
@@ -102,9 +104,9 @@ bool SceneDocument::can_reparent(int index, int new_parent) const {
   return !into_itself && desc_.nodes.at(index).parent != new_parent;
 }
 
-int SceneDocument::reparent(int index, int new_parent) {
+int SceneDocument::reparent(int index, int new_parent, bool record) {
   if (!can_reparent(index, new_parent)) return index;
-  checkpoint();
+  if (record) checkpoint();
   std::vector<NodeDesc>& nodes = desc_.nodes;
   const Transform local = local_under(nodes, index, new_parent);
   // Rebuild the list: everything else in order, then the moved subtree last (after its new parent).

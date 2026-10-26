@@ -90,19 +90,15 @@ std::optional<std::filesystem::path> EditorApp::build() {
 Vec3 EditorApp::spawn_point() const { return camera_.position() + camera_.forward() * kSpawnDistance; }
 
 void EditorApp::frame_selection() {
-  if (session_->selection() == kNoObject) return;
-  Vec3 center;
-  float radius = 0.0f;
-  object_extent(session_->scene(), session_->scene_desc(), session_->selection(), center, radius);
-  camera_.frame(center, radius);
-}
-
-ObjectId EditorApp::pick_at(float x, float y) {
-  const Ray ray = viewport_->ray_at(x, y);
-  const PickRay pick{to_vec3(ray.position), normalize(to_vec3(ray.direction))};
-  const ObjectId hit = pick_object(session_->scene(), session_->scene_desc(), pick);
-  session_->select(hit);
-  return hit;
+  std::vector<editor_logic::Sphere> spheres;
+  for (const ObjectId id : session_->selected().ids()) {
+    editor_logic::Sphere sphere;
+    object_extent(session_->scene(), session_->scene_desc(), id, sphere.center, sphere.radius);
+    spheres.push_back(sphere);
+  }
+  if (spheres.empty()) return;
+  const editor_logic::Sphere all = editor_logic::enclosing(spheres);
+  camera_.frame(all.center, all.radius);
 }
 
 std::optional<Vec3> EditorApp::sculpt_at(float x, float y, float seconds) {

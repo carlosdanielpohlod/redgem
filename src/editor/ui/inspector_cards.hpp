@@ -14,6 +14,8 @@
 
 namespace redgem::ui::inspector {
 
+// What several selected objects have in common: their tag, flags and placement.
+void draw_group(PanelContext& context);
 // The object's icon, name, tag and flags, and where it is.
 void draw_header(PanelContext& context, int index);
 void draw_transform(PanelContext& context, int index);

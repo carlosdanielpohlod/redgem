@@ -13,40 +13,73 @@ namespace {
 
 using namespace gltf_json;
 
+// Whether `node` is one of the nodes copied.
+bool copied(int node, const std::vector<int>& copy_of) { return node != kNoIndex && copy_of[node] != kNoIndex; }
+
+// A copy whose original's parent is `parent` is a copied root under that same parent: it has
+// one, and it was not copied.
+bool copied_root_under_parent(int parent, const std::vector<int>& copy_of) {
+  return parent != kNoIndex && !copied(parent, copy_of);
+}
+
+// The number each of `source` gets as a copy (they are added from `first` on, in order), by node.
+std::vector<int> copy_numbers(const std::vector<int>& source, int first, std::size_t nodes) {
+  std::vector<int> copy_of(nodes, kNoIndex);
+  for (std::size_t i = 0; i < source.size(); ++i) copy_of[source[i]] = first + static_cast<int>(i);
+  return copy_of;
+}
+
+std::vector<int> copies_of(const std::vector<int>& originals, const std::vector<int>& copy_of) {
+  std::vector<int> copies;
+  copies.reserve(originals.size());
+  for (const int original : originals) copies.push_back(copy_of[original]);
+  return copies;
+}
+
+// The copied roots join the parents of their originals.
+void attach_copied_roots(std::vector<NodeDesc>& nodes, const std::vector<int>& source,
+                         const std::vector<int>& copy_of) {
+  for (const int original : source) {
+    const int copy = copy_of[original];
+    if (copied_root_under_parent(nodes[original].parent, copy_of)) nodes[nodes[copy].parent].children.push_back(copy);
+  }
+}
+
 bool all_copied(const std::vector<int>& joints, const std::vector<int>& copy_of) {
-  return std::all_of(joints.begin(), joints.end(),
-                     [&copy_of](int joint) { return joint != kNoIndex && copy_of[joint] != kNoIndex; });
+  return std::all_of(joints.begin(), joints.end(), [&copy_of](int joint) { return copied(joint, copy_of); });
 }
 
 }  // namespace
 
-int SceneDocument::duplicate(int index) {
+int SceneDocument::duplicate(int index) { return duplicate(std::vector<int>{index}).front(); }
+
+std::vector<int> SceneDocument::duplicate(const std::vector<int>& roots) {
   checkpoint();
-  const std::vector<int> source = node_tree::subtree(desc_.nodes, index);
+  // All the subtrees are copied as one, so that a skinned mesh and its bones copied side by side
+  // still find each other in the copy.
+  const std::vector<int> source = node_tree::subtrees(desc_.nodes, roots);
   const int first_copy = node_count();
-  std::vector<int> copy_of(desc_.nodes.size(), kNoIndex);
-  for (std::size_t i = 0; i < source.size(); ++i) copy_of[source[i]] = first_copy + static_cast<int>(i);
+  const std::vector<int> copy_of = copy_numbers(source, first_copy, desc_.nodes.size());
   append_copies(source, copy_of);
   // Each copy is a node of its own in the file too, and a character copied with its bones gets
   // its own skeleton (its animation is not copied: the copy keeps the pose it was copied in).
   give_copies_own_source_nodes(first_copy, source.size());
   give_copies_own_skins(first_copy, source.size(), copy_of);
   touch();
-  return first_copy;
+  return copies_of(roots, copy_of);
 }
 
 void SceneDocument::append_copies(const std::vector<int>& source, const std::vector<int>& copy_of) {
   std::vector<NodeDesc>& nodes = desc_.nodes;
-  const int root = source.front();
   for (const int original : source) {
     NodeDesc copy = nodes[original];
     copy.name = unique_name(copy.name);
-    copy.parent = original == root ? copy.parent : copy_of[copy.parent];
+    // (A copied root stays under the parent of its original; the others go under their parent's copy.)
+    if (copied(copy.parent, copy_of)) copy.parent = copy_of[copy.parent];
     for (int& child : copy.children) child = copy_of[child];
     nodes.push_back(std::move(copy));  // names stay unique because each copy is added before the next
   }
-  const int first_copy = copy_of[root];
-  if (nodes[first_copy].parent != kNoIndex) nodes[nodes[first_copy].parent].children.push_back(first_copy);
+  attach_copied_roots(nodes, source, copy_of);
 }
 
 void SceneDocument::give_copies_own_source_nodes(int first_copy, std::size_t count) {

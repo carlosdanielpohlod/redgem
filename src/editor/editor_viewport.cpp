@@ -26,11 +26,6 @@ constexpr long long kStartupFrames = 2;  // the dock layout exists from the seco
 // The right button is held over the view: flying takes the keyboard.
 bool flying_over(const SceneViewport& view) { return view.hovered && IsMouseButtonDown(MOUSE_BUTTON_RIGHT); }
 
-// A left click in the view, away from the gizmo.
-bool picking_click(const SceneViewport& view) {
-  return view.hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGuizmo::IsOver() && !ImGuizmo::IsUsing();
-}
-
 // The left button is held over the view.
 bool brushing(const SceneViewport& view) { return view.hovered && ImGui::IsMouseDown(ImGuiMouseButton_Left); }
 
@@ -47,6 +42,7 @@ void EditorApp::draw_viewport_window() {
   track_viewport_focus();
   draw_viewport_hint(playing);
   brush_point_.reset();
+  if (playing) box_start_.reset();  // the game has the mouse now
   playing ? draw_play_border() : use_viewport_tools();
   ImGui::End();
   ImGui::PopStyleVar();
@@ -89,15 +85,13 @@ void EditorApp::drop_script(const char* script_file, float x, float y) {
 void EditorApp::use_viewport_tools() {
   // Sculpting takes the left button over from the gizmo and from picking.
   if (sculpting()) {
+    box_start_.reset();  // a rectangle begun before the brush came on is not finished by it
     use_brush();
     return;
   }
   stroke_started_ = false;
-  if (session_->selection() != kNoObject) draw_gizmo();
-  if (picking_click(*viewport_)) {
-    const Vector2 mouse = viewport_->mouse();
-    pick_at(mouse.x, mouse.y);
-  }
+  if (!session_->selected().empty()) draw_gizmo();
+  use_selection_clicks();
 }
 
 bool EditorApp::sculpting() const { return terrain_tool_.sculpting && session_->is_terrain(session_->selection()); }
@@ -115,8 +109,9 @@ void EditorApp::use_brush() {
 
 void EditorApp::draw_gizmo() {
   if (!gizmo_drawable()) return;
-  const Transform world = session_->scene().world_transform(session_->selection());
-  const std::optional<Transform> dragged = gizmo_.manipulate(world, *viewport_);
+  // (While a drag goes on, the gizmo keeps the pivot it moves: the objects follow it.)
+  const Transform pivot = gizmo_dragging_ ? group_drag_.pivot_now : selection_pivot();
+  const std::optional<Transform> dragged = gizmo_.manipulate(pivot, *viewport_);
   gizmo_drawn_ = true;
   track_gizmo_drag(dragged.has_value());
   if (dragged) apply_gizmo_drag(*dragged);
@@ -126,20 +121,32 @@ bool EditorApp::gizmo_drawable() const {
   return session_->scene().is_alive(session_->selection()) && viewport_->width > 0 && viewport_->height > 0;
 }
 
+Transform EditorApp::selection_pivot() const {
+  return group_transform::pivot_of(worlds_of(session_->selected_roots()), gizmo_.pivot_mode());
+}
+
+std::vector<Transform> EditorApp::worlds_of(const std::vector<int>& objects) const {
+  std::vector<Transform> worlds;
+  worlds.reserve(objects.size());
+  for (const int object : objects) worlds.push_back(session_->scene().world_transform(object));
+  return worlds;
+}
+
 void EditorApp::track_gizmo_drag(bool using_gizmo) {
-  if (drag_begins(using_gizmo)) session_->document().checkpoint();
+  if (drag_begins(using_gizmo)) {
+    session_->document().checkpoint();  // one undo step for the whole group
+    const std::vector<int> objects = session_->selected_roots();
+    group_drag_ = group_transform::begin_drag(objects, worlds_of(objects), gizmo_.pivot_mode());
+  }
   if (drag_ends(using_gizmo)) session_->document().drop_checkpoint_if_unchanged();
   gizmo_dragging_ = using_gizmo;
 }
 
-// Moves the selection to where the gizmo was dragged (a world placement).
-void EditorApp::apply_gizmo_drag(const Transform& world) {
-  const ObjectId selected = session_->selection();
-  const NodeDesc& node = session_->document().node(selected);
-  const Transform local =
-      node.parent == kNoIndex ? world : relative_to(session_->scene().world_transform(node.parent), world);
-  session_->document().set_local(selected, local, false);
-  session_->refresh_node(selected);
+// Moves the selection with the pivot the gizmo was dragged to (a world placement).
+void EditorApp::apply_gizmo_drag(const Transform& pivot) {
+  group_drag_.pivot_now = pivot;
+  const std::vector<Transform> worlds = group_transform::placements(group_drag_);
+  for (std::size_t i = 0; i < worlds.size(); ++i) session_->place_in_world(group_drag_.objects[i], worlds[i]);
 }
 
 }  // namespace redgem

@@ -1,5 +1,6 @@
 #include "editor/inspector_logic.hpp"
 
+#include <algorithm>
 #include <set>
 
 #include "scene/props.hpp"
@@ -8,6 +9,8 @@ namespace redgem::inspector_logic {
 namespace {
 
 constexpr double kDefaultNumber = 0.0;  // what a new Number property starts as
+constexpr int kAxisX = 0;               // the numbers of a vector, in order
+constexpr int kAxisY = 1;
 
 // Properties edited by dedicated widgets instead of the generic list.
 const std::set<std::string>& reserved_props() {
@@ -18,6 +21,29 @@ const std::set<std::string>& reserved_props() {
 }
 
 }  // namespace
+
+Vec3 part_of(const Transform& local, TransformPart part) {
+  if (part == TransformPart::Position) return local.position;
+  return part == TransformPart::Rotation ? quat_to_euler_degrees(local.rotation) : local.scale;
+}
+
+float axis_of(Vec3 value, int axis) {
+  if (axis == kAxisX) return value.x;
+  return axis == kAxisY ? value.y : value.z;
+}
+
+Vec3 with_axis(Vec3 value, int axis, float number) {
+  (axis == kAxisX ? value.x : (axis == kAxisY ? value.y : value.z)) = number;
+  return value;
+}
+
+Transform with_axis(Transform local, TransformPart part, int axis, float value, float min_scale) {
+  const Vec3 changed = with_axis(part_of(local, part), axis, value);
+  if (part == TransformPart::Position) local.position = changed;
+  if (part == TransformPart::Rotation) local.rotation = quat_from_euler_degrees(changed);
+  if (part == TransformPart::Scale) local.scale = with_axis(local.scale, axis, std::max(value, min_scale));
+  return local;
+}
 
 std::optional<PropertyValue> flag_or_nothing(bool stored, bool value) {
   return stored ? std::optional<PropertyValue>(value) : std::nullopt;

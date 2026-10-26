@@ -63,6 +63,9 @@ inline constexpr float kOverlayMargin = 10.0f;
 inline constexpr float kOverlayPadding = 6.0f;
 inline constexpr float kOverlayRounding = 6.0f;
 inline constexpr float kOverlayAlpha = 0.8f;
+// The rectangle dragged over the Scene view to select: a thin frame over a faint fill.
+inline constexpr float kSelectionRectFillAlpha = 0.15f;
+inline constexpr float kSelectionRectBorder = 1.0f;
 
 // How often (in frames) the editor checks files changed outside (Blender exports, new assets).
 inline constexpr int kReloadCheckFrames = 30;
@@ -110,6 +113,10 @@ inline constexpr const char* kKeysUndo = "editor.keys.undo";
 inline constexpr const char* kKeysRedo = "editor.keys.redo";
 inline constexpr const char* kKeysDuplicate = "editor.keys.duplicate";
 inline constexpr const char* kKeysDelete = "editor.keys.delete";
+inline constexpr const char* kKeysCut = "editor.keys.cut";
+inline constexpr const char* kKeysCopy = "editor.keys.copy";
+inline constexpr const char* kKeysPaste = "editor.keys.paste";
+inline constexpr const char* kKeysPasteInto = "editor.keys.paste_into";
 inline constexpr const char* kKeysFrame = "editor.keys.frame";
 inline constexpr const char* kKeysHierarchy = "editor.keys.hierarchy";
 inline constexpr const char* kKeysInspector = "editor.keys.inspector";
