@@ -252,3 +252,43 @@ TEST_CASE("a disabled joint does not break, whatever it held before") {
   CHECK(world->has_joint(joint));
   CHECK_FALSE(world->joint_broken(joint));
 }
+
+TEST_CASE("a slider breaks when pushed against its travel limit") {
+  constexpr Vec3 kStart{0, 3, 0};
+  constexpr float kTravel = 0.25f;
+  constexpr float kBreakForce = 50.0f;
+  constexpr Vec3 kPush{200, 0, 0};
+  auto world = world_with_ground();
+  REQUIRE_FALSE(world->add_object(body(kCrate, dynamic(), kStart)));
+  world->set_gravity_scale(kCrate, 0.0f);
+  JointDesc desc = joint(JointKind::Slider, kCrate, kNoObject, kStart);
+  desc.axis = Vec3::right();
+  desc.limits = std::make_pair(0.0f, kTravel);
+  desc.break_force = kBreakForce;
+  const JointId slider = joined(*world, desc);
+  for (int i = 0; i < kOneSecond; ++i) {
+    world->add_force(kCrate, kPush);
+    world->step(kDt);
+  }
+  CHECK(world->joint_broken(slider));
+}
+
+TEST_CASE("a hinge breaks when twisted against its angular limit") {
+  constexpr Vec3 kStart{0, 3, 0};
+  constexpr float kLimit = 0.25f;
+  constexpr float kBreakForce = 50.0f;
+  constexpr Vec3 kTwist{0, 200, 0};
+  auto world = world_with_ground();
+  REQUIRE_FALSE(world->add_object(body(kCrate, dynamic(), kStart)));
+  world->set_gravity_scale(kCrate, 0.0f);
+  JointDesc desc = joint(JointKind::Hinge, kCrate, kNoObject, kStart);
+  desc.axis = Vec3::up();
+  desc.limits = std::make_pair(-kLimit, kLimit);
+  desc.break_force = kBreakForce;
+  const JointId hinge = joined(*world, desc);
+  for (int i = 0; i < kOneSecond; ++i) {
+    world->add_torque(kCrate, kTwist);
+    world->step(kDt);
+  }
+  CHECK(world->joint_broken(hinge));
+}

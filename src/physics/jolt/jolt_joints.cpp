@@ -86,12 +86,16 @@ float larger_held(const JPH::TwoBodyConstraint& constraint, float (*rotation)(co
 }
 
 float fixed_twist(const JPH::FixedConstraint& joint) { return joint.GetTotalLambdaRotation().Length(); }
-float hinge_twist(const JPH::HingeConstraint& joint) { return length_of(joint.GetTotalLambdaRotation()); }
+float hinge_twist(const JPH::HingeConstraint& joint) {
+  return std::max({length_of(joint.GetTotalLambdaRotation()), std::fabs(joint.GetTotalLambdaRotationLimits()),
+                   std::fabs(joint.GetTotalLambdaMotor())});
+}
 float no_twist(const JPH::PointConstraint&) { return 0.0f; }
 
 float slider_held(const JPH::TwoBodyConstraint& constraint) {
   const auto& joint = static_cast<const JPH::SliderConstraint&>(constraint);
-  return std::max(length_of(joint.GetTotalLambdaPosition()), joint.GetTotalLambdaRotation().Length());
+  return std::max({length_of(joint.GetTotalLambdaPosition()), joint.GetTotalLambdaRotation().Length(),
+                   std::fabs(joint.GetTotalLambdaPositionLimits()), std::fabs(joint.GetTotalLambdaMotor())});
 }
 
 float held_impulse(const JPH::TwoBodyConstraint& constraint, JointKind kind) {

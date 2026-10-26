@@ -3,6 +3,7 @@
 #include <mruby/array.h>
 #include <mruby/hash.h>
 
+#include <cmath>
 #include <optional>
 #include <string>
 #include <utility>
@@ -84,7 +85,11 @@ void read_limits(mrb_state* mrb, mrb_value options, JointDesc& desc) {
 void read_axis(mrb_state* mrb, mrb_value options, JointDesc& desc) {
   if (!takes_limits(desc.kind)) return;  // (the kinds with limits are the kinds with an axis)
   desc.axis = vector_or(mrb, options, "axis", Vec3::up());
-  if (length(desc.axis) <= kEpsilon) mrb_raise(mrb, E_ARGUMENT_ERROR, "a joint's axis must not be zero");
+  const double magnitude =
+      std::hypot(static_cast<double>(desc.axis.x), static_cast<double>(desc.axis.y), static_cast<double>(desc.axis.z));
+  if (magnitude <= kEpsilon) mrb_raise(mrb, E_ARGUMENT_ERROR, "a joint's axis must not be zero");
+  desc.axis = {static_cast<float>(desc.axis.x / magnitude), static_cast<float>(desc.axis.y / magnitude),
+               static_cast<float>(desc.axis.z / magnitude)};
 }
 
 bool gives_speed_alone(mrb_state* mrb, mrb_value options) {

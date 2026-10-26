@@ -139,3 +139,16 @@ TEST_CASE("Physics.joint refuses what it cannot make, saying why") {
   CHECK(refusal("Physics.joint(:distance, $door, nil, min: 3, max: 1)").find("max") != std::string::npos);
   CHECK(refusal("Physics.joint(:fixed, $door, nil, break_force: -1)").find("break force") != std::string::npos);
 }
+
+TEST_CASE("a hinge accepts a finite axis whose squared length exceeds a float") {
+  const TempGame game(kPlainGame);
+  const SceneDesc scene = yard();
+  auto engine = engine_for(game, scene);
+  ruby(*engine, R"(
+    $door = Physics.joint(:hinge, Scene.find('Door'), nil, anchor: [0, 1.5, 0], axis: [0, 1e30, 0],
+                          limits: [0, 90], motor_speed: 180, motor_torque: 100)
+  )");
+  frames(*engine, kTwoSeconds);
+  CHECK(ruby(*engine, "$door.alive?") == "true");
+  CHECK(number(*engine, "$door.angle") == doctest::Approx(90.0f).epsilon(kTolerance));
+}
