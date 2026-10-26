@@ -205,3 +205,112 @@ TEST_CASE("a redgem-test that ends without a word about the tests fails the chec
   CHECK(run.problem.find("redgem-test ended without saying how the tests went") != std::string::npos);
 }
 #endif
+
+TEST_CASE("a seeded run repeats random values from scene script loading onward") {
+  const GameCopy game("seeded");
+  game.write("scripts/main_scene.rb", "$loaded = rand(1_000_000)\nclass MainScene < SceneScript; end\n");
+  const std::vector<std::string> args{
+      "run", game.dir(), "--frames", "3", "--seed", "42", "--print", "[$loaded, rand(1_000_000)]", "--every", "1"};
+  const ToolResult first = tool(args);
+  const ToolResult second = tool(args);
+  CHECK(first.exit_code == kExitSuccess);
+  CHECK(first.out == second.out);
+  auto other = args;
+  other[5] = "43";
+  CHECK(tool(other).out != first.out);
+}
+
+TEST_CASE("a run replays held keys and releases them at the given frame") {
+  const GameCopy game("input_replay");
+  game.write("input.json", R"([{"frame":0,"keys":["w"]},{"frame":2,"keys":[]}])");
+  game.write("scripts/main_scene.rb", R"(
+    class ReplayCounter < Behaviour
+      def start = @count = 0
+      def update(_dt)
+        @count += 1 if Input.down?(:w)
+        $replayed = @count
+      end
+    end
+    Scene.find('Player').add_component(ReplayCounter)
+    class MainScene < SceneScript; end
+  )");
+  const ToolResult ran = tool({"run", game.dir(), "--frames", "4", "--input", game.dir() + "/input.json", "--print",
+                               "$replayed", "--every", "1"});
+  CHECK_MESSAGE(ran.exit_code == kExitSuccess, ran.out, ran.err);
+  CHECK(has(ran.out, "frame 1: 1\nframe 2: 2\nframe 3: 2\nframe 4: 2\n"));
+}
+
+TEST_CASE("run assertions and stop conditions are evaluated after each frame") {
+  const GameCopy game("run_conditions");
+  const ToolResult stopped = tool({"run", game.dir(), "--frames", "20", "--until", "($n ||= 0; $n += 1) == 3",
+                                   "--assert", "Scene.find('Player') != nil", "--print", "$n"});
+  CHECK_MESSAGE(stopped.exit_code == kExitSuccess, stopped.out, stopped.err);
+  CHECK(has(stopped.out, "ran main for 3 frames"));
+  CHECK(has(stopped.out, "frame 3: 3"));
+  const ToolResult failed = tool({"run", game.dir(), "--frames", "5", "--assert", "false"});
+  CHECK(failed.exit_code == kExitFailure);
+  CHECK(has(failed.err, "frame 1: --assert was false"));
+  CHECK(has(failed.out, "ran main for 1 frames"));
+  const ToolResult expired = tool({"run", game.dir(), "--frames", "2", "--until", "false"});
+  CHECK(expired.exit_code == kExitFailure);
+  CHECK(has(expired.err, "--until was not reached"));
+}
+
+TEST_CASE("run expression errors and runaway expressions end the run with a diagnostic") {
+  const GameCopy game("run_expression_error");
+  game.write("game.json", R"({"title":"Expression errors","script_budget_ms":20})");
+  for (const auto* option : {"--assert", "--until", "--print"}) {
+    const ToolResult failed = tool({"run", game.dir(), "--frames", "1", option, "raise 'bad expression'"});
+    CHECK(failed.exit_code == kExitFailure);
+    CHECK(has(failed.err, "bad expression"));
+  }
+  const ToolResult runaway = tool({"run", game.dir(), "--frames", "1", "--assert", "loop {}"});
+  CHECK(runaway.exit_code == kExitFailure);
+  CHECK(has(runaway.err, "ScriptTimeout"));
+}
+
+TEST_CASE("run plans reject invalid seeds and malformed input before playing") {
+  const GameCopy game("run_plan_errors");
+  for (const auto* seed : {"-1", "1.5", "1e30", "2147483648", "nan"}) {
+    CHECK(tool({"run", game.dir(), "--seed", seed}).exit_code == kExitUsage);
+  }
+  for (const auto* json :
+       {"bad", "{}", R"([{"frame":0,"keys":["missing"]}])", R"([{"frame":-1,"keys":[]}])", R"([{"frame":2,"keys":[]}])",
+        R"([{"frame":0,"keys":[]},{"frame":0,"keys":[]}])", R"([{"frame":0,"keys":[],"typo":true}])"}) {
+    game.write("bad-input.json", json);
+    CHECK(tool({"run", game.dir(), "--frames", "2", "--input", game.dir() + "/bad-input.json"}).exit_code ==
+          kExitUsage);
+  }
+  CHECK(tool({"run", game.dir(), "--every", "1"}).exit_code == kExitUsage);
+  CHECK(tool({"run", game.dir(), "--print", "1", "--every", "0"}).exit_code == kExitUsage);
+}
+
+TEST_CASE("run output is bounded and expressions can return ordinary Ruby values") {
+  const GameCopy game("run_print_limits");
+  const ToolResult ran = tool({"run", game.dir(), "--frames", "100", "--print", "'x' * 1000", "--every", "1"});
+  CHECK(ran.exit_code == kExitSuccess);
+  CHECK(ran.out.size() < 9000);
+  CHECK(has(ran.out, "output limit reached"));
+  CHECK(has(ran.out, "ran main for 100 frames"));
+  const ToolResult nil = tool({"run", game.dir(), "--frames", "1", "--print", "nil"});
+  CHECK(has(nil.out, "frame 1: nil"));
+}
+
+TEST_CASE("run input refuses deep JSON and non-regular files") {
+  const GameCopy game("run_input_bounds");
+  game.write("deep.json", std::string(1000, '[') + "0" + std::string(1000, ']'));
+  CHECK(tool({"run", game.dir(), "--input", game.dir() + "/deep.json"}).exit_code == kExitUsage);
+  CHECK(tool({"run", game.dir(), "--input", game.dir()}).exit_code == kExitUsage);
+}
+
+TEST_CASE("printed temporary values stay alive through their inspect and can reject an invalid inspect result") {
+  const GameCopy game("run_inspect");
+  const ToolResult collected = tool({"run", game.dir(), "--frames", "2", "--print",
+                                     "Class.new { def inspect; GC.start; 'still alive'; end }.new", "--every", "1"});
+  CHECK_MESSAGE(collected.exit_code == kExitSuccess, collected.err);
+  CHECK(has(collected.out, "frame 1: still alive"));
+  const ToolResult invalid =
+      tool({"run", game.dir(), "--frames", "1", "--print", "Class.new { def inspect = 42 }.new"});
+  CHECK(invalid.exit_code == kExitFailure);
+  CHECK(has(invalid.err, "inspect must return a string"));
+}

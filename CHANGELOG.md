@@ -59,6 +59,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Reproducible headless runs**: `redgem run` seeds Ruby and particle randomness before scripts
+  load, replays keyboard state from a JSON file, checks assertions and stop conditions every frame,
+  and prints selected state at a chosen frame interval.
+
 - **Scatter distance LODs**: a scattered model can name simpler versions of itself for the
   distance, drawn in its place farther away.
 - **Clearcoat materials**: the glTF clearcoat layer, with its coating maps, imported, edited and

@@ -24,8 +24,9 @@ inline constexpr const char* kFramesOption = "--frames";
 // What to play.
 struct PlayRequest {
   std::filesystem::path game_dir;
-  std::string scene;                  // "main" is scene.glb
-  std::optional<std::string> camera;  // the object whose camera shows the game (else the first camera)
+  std::string scene;                      // "main" is scene.glb
+  std::optional<std::string> camera;      // the object whose camera shows the game (else the first camera)
+  std::optional<std::uint32_t> seed = 0;  // tools repeat the same stream unless given another seed
 };
 
 // A folder of one run's own, empty as it starts and gone with it.

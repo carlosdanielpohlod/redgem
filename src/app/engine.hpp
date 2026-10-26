@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -51,6 +52,8 @@ struct EngineOptions {
   // Every frame advances the game by exactly one fixed step, however long it really took: the same
   // run gives the same game every time. Nothing else selects it.
   bool fixed_step = false;
+  // A reproducible random stream, seeded before any game scripts are loaded.
+  std::optional<std::uint32_t> random_seed{};
   // How the game is shown when it starts (Settings): what its game.json says when none.
   std::optional<DisplaySettings> display;
   // Where Settings.save keeps them for the next runs. None: they last for this run only, and
@@ -156,6 +159,7 @@ class Engine {
   void connect_context();
   // (With the time each call into them may take: game.json's script_budget_ms.)
   void start_scripts(std::chrono::milliseconds script_budget);
+  void seed_scripts();
 
   static Vec3 gravity();
   // A physics world of its own for the scene in place, with a body for every object that asks for one.

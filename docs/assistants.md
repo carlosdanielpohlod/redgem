@@ -81,3 +81,42 @@ The manual's site has `llms.txt`, an index of its pages with a line about each, 
 `llms-full.txt`, every page in one file to search. The docs build writes both
 (`tools/docs/llms_txt.py`). The API reference is also data: `redgem api --json`, and
 `docs/scripting/api.json` in the repository, which tests keep in step with the engine.
+
+## Repeating a headless session
+
+`redgem run` uses fixed steps of 1/60 s and a random seed of 0. Use `--seed N` to repeat another
+Ruby and particle random stream, including random values read while scripts first load. A seed
+is a whole number from 0 to 2147483647. Scatter requests keep their own explicit seeds. Network
+traffic, web responses and scripts that read external clocks or files are outside this replay.
+
+Keyboard input comes from a JSON file. Each event replaces the whole set of held keys before
+its zero-based frame; keys remain held until the next event. An empty list releases them:
+
+```json
+[
+  {"frame": 0, "keys": ["w"]},
+  {"frame": 30, "keys": ["w", "space"]},
+  {"frame": 31, "keys": ["w"]},
+  {"frame": 120, "keys": []}
+]
+```
+
+```sh
+redgem run my-game --seed 42 --frames 180 --input input.json \
+  --assert "Scene.find('Player').transform.position.y > -10" \
+  --print "Scene.find('Player').transform.position" --every 60
+```
+
+`--assert` evaluates a Ruby expression after every frame and fails the run at its first false or
+nil result. `--until` stops successfully when its expression becomes true; reaching the frame
+limit or quitting without satisfying it fails. Both expressions use ordinary Ruby truthiness
+(0 is true). `--print` evaluates an expression every `--every` frames (60 by default) and on the
+last frame, showing its Ruby `inspect` value with a one-based frame number. Values and total
+output are capped; increase `--every` to keep a longer run concise.
+
+Expressions run in the game's interpreter with its script timeout, and can call game APIs.
+Use them to read state: a mutation or a call to `rand` changes the session too. The order is
+input, game frame, assertion, periodic print, stop condition. On an early stop, a final print
+runs after the stop condition. A syntax error, exception or timeout in any expression fails the
+run with its frame and option. The command exits 0 on success, 1 for a failed run, and 2 for
+invalid options or an invalid input file. Input currently covers keyboard state only.
