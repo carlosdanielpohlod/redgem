@@ -7,6 +7,7 @@
 #include "editor/document/gltf_json.hpp"
 #include "editor/node_tree.hpp"
 #include "scene/props.hpp"
+#include "scene/scene_ids.hpp"
 
 namespace redgem {
 namespace {
@@ -23,8 +24,20 @@ constexpr const char* kTerrainCollider = props::kColliderMesh;  // things stand 
 
 }  // namespace
 
+void SceneDocument::remember_ids() {
+  for (const NodeDesc& node : desc_.nodes) issued_ids_.insert(node.stable_id);
+}
+
+std::string SceneDocument::fresh_id() {
+  for (;;) {
+    const std::string id = make_scene_id();
+    if (issued_ids_.insert(id).second) return id;
+  }
+}
+
 int SceneDocument::append_node(NodeDesc node) {
   node.name = unique_name(node.name);
+  node.stable_id = fresh_id();
   const int index = node_count();
   const int parent = node.parent;
   desc_.nodes.push_back(std::move(node));

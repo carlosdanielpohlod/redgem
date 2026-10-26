@@ -40,7 +40,8 @@ std::size_t property_bytes(const PropertyMap& props) {
 }
 
 std::size_t node_bytes(const NodeDesc& node) {
-  return sizeof(NodeDesc) + node.name.capacity() + node.children.capacity() * sizeof(int) + property_bytes(node.props);
+  return sizeof(NodeDesc) + node.stable_id.capacity() + node.name.capacity() + node.children.capacity() * sizeof(int) +
+         property_bytes(node.props);
 }
 
 std::size_t primitive_bytes(const PrimitiveDesc& part) {

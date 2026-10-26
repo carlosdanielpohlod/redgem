@@ -56,9 +56,9 @@ nlohmann::json* lights_extension(nlohmann::json& object);
 // (nullptr when the file has none).
 nlohmann::json* holder_of(nlohmann::json& doc, Kind kind);
 
-// Refuses (NotFollowed) an object with extensions other than `known`: they may point at the
-// file's lists in ways of their own.
-void refuse_other_extensions(const nlohmann::json& object, const char* known);
+// Refuses (NotFollowed) extensions other than the explicitly known ones: others may point at
+// the file's lists in ways of their own.
+void refuse_other_extensions(const nlohmann::json& object, const char* known, const char* also_known = nullptr);
 
 // The entry a reference points at; refused when it points at none.
 std::size_t entry_of(const nlohmann::json& reference, std::size_t entries);

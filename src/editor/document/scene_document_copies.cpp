@@ -73,6 +73,7 @@ void SceneDocument::append_copies(const std::vector<int>& source, const std::vec
   std::vector<NodeDesc>& nodes = desc_.nodes;
   for (const int original : source) {
     NodeDesc copy = nodes[original];
+    copy.stable_id = fresh_id();
     copy.name = unique_name(copy.name);
     // (A copied root stays under the parent of its original; the others go under their parent's copy.)
     if (copied(copy.parent, copy_of)) copy.parent = copy_of[copy.parent];

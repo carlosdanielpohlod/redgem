@@ -1,4 +1,5 @@
 #include "project/scene_text.hpp"
+#include "scene/scene_ids.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -176,7 +177,7 @@ std::string mesh_detail(const SceneDesc& scene, const MeshDesc& mesh) {
 std::string children_detail(const SceneDesc& scene, const NodeDesc& node) {
   std::string text;
   for (const int child : node.children) {
-    text += (text.empty() ? "" : ", ") + object_id(child) + " " + scene.nodes[child].name;
+    text += (text.empty() ? "" : ", ") + object_id(scene, child) + " " + scene.nodes[child].name;
   }
   return text;
 }
@@ -206,13 +207,7 @@ std::string properties_detail(const PropertyMap& props) {
 
 }  // namespace
 
-int saved_id(const SceneDesc& scene, int index) {
-  const std::vector<int> order = saved_order(scene);
-  const auto found = std::find(order.begin(), order.end(), index);
-  return found == order.end() ? kNoIndex : static_cast<int>(found - order.begin());
-}
-
-std::string object_id(int index) { return kIdMark + std::to_string(index); }
+std::string object_id(const SceneDesc& scene, int index) { return kIdMark + scene_node_id(scene, index); }
 
 std::string number_text(double value, int decimals) {
   const double scale = std::pow(kDecimalBase, decimals);
@@ -263,11 +258,9 @@ std::string scripts_text(const PropertyMap& props) {
   return words;
 }
 
-std::string object_line(const SceneDesc& scene, int index) { return object_line(scene, index, index); }
-
-std::string object_line(const SceneDesc& scene, int index, int id) {
+std::string object_line(const SceneDesc& scene, int index) {
   const NodeDesc& node = scene.nodes[index];
-  std::string line = object_id(id) + " " + node.name;
+  std::string line = object_id(scene, index) + " " + node.name;
   add_placement(line, node.local);
   add_parts(line, scene, node);
   add_properties(line, node.props);
@@ -288,9 +281,9 @@ std::string scene_list(const SceneDesc& scene, const std::string& scene_name, co
 
 std::string object_detail(const SceneDesc& scene, int index) {
   const NodeDesc& node = scene.nodes[index];
-  std::string text = object_id(index) + " " + node.name + "\n" + detail_line("path", object_path(scene, index));
+  std::string text = object_id(scene, index) + " " + node.name + "\n" + detail_line("path", object_path(scene, index));
   if (node.parent != kNoIndex)
-    text += detail_line("parent", object_id(node.parent) + " " + scene.nodes[node.parent].name);
+    text += detail_line("parent", object_id(scene, node.parent) + " " + scene.nodes[node.parent].name);
   text += placement_detail(node.local) + parts_detail(scene, node);
   const auto scripts = get_string(node.props, props::kScript);
   if (scripts) text += detail_line("scripts", *scripts + " (" + scripts_text(node.props) + ")");

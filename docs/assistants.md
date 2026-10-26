@@ -120,3 +120,20 @@ input, game frame, assertion, periodic print, stop condition. On an early stop, 
 runs after the stop condition. A syntax error, exception or timeout in any expression fails the
 run with its frame and option. The command exits 0 on success, 1 for a failed run, and 2 for
 invalid options or an invalid input file. Input currently covers keyboard state only.
+
+## Object identities
+
+An object's `#id` identifies that object across saves, renames and changes to its parent. Removing
+another object does not renumber it. Objects made, duplicated, pasted or imported in the editor
+get new identities; undo and redo restore the same identities with the objects.
+
+A scene that has never been saved by the editor starts with numeric identities (`#0`, `#1`, and
+so on). Its next save persists them in the scene. New objects use compact hexadecimal identities.
+Always take an identity from `redgem scene list` or the result of `scene add`, and pass it back
+unchanged; it is not an array index. Names and hierarchy paths remain valid selectors too.
+
+The file keeps identities in the private `REDGEM_object_id` glTF extension, with an `id` string
+on each node. It is listed in `extensionsUsed` so other glTF tools can ignore it. The engine
+repairs invalid or duplicate identities with a warning. An external exporter that drops this
+extension creates a scene without those persistent identities; list its objects again before
+editing it. Identical names in different scenes do not identify the same object.

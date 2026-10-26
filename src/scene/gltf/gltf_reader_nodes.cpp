@@ -1,6 +1,7 @@
 // The tree of objects of a glTF file.
 
 #include "core/safe_path.hpp"
+#include "scene/scene_ids.hpp"
 #include "scene/gltf/extras_parser.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_reader.hpp"
@@ -54,13 +55,29 @@ std::string skipped_property_warning(const std::string& node_name, const std::st
   return "node '" + node_name + "': property '" + key + "' is not a scalar, ignored";
 }
 
+std::string persisted_id(const cgltf_node& node) {
+  for (cgltf_size i = 0; i < node.extensions_count; ++i) {
+    const cgltf_extension& extension = node.extensions[i];
+    if (extension.name == nullptr || std::string(extension.name) != kSceneIdExtension || extension.data == nullptr)
+      continue;
+    const auto parsed = parse_extras(extension.data);
+    const std::string id = get_string(parsed.properties, kSceneIdMember).value_or("");
+    return parsed.ok && !id.empty() ? id : "?";
+  }
+  return {};
+}
+
 }  // namespace
 
 void GltfReader::load_nodes() {
   const cgltf_scene* scene = default_scene(data_);
   added_.assign(data_.nodes_count, false);
-  if (scene == nullptr) return add_parentless_nodes();
-  for (cgltf_size i = 0; i < scene->nodes_count; ++i) add_tree(*scene->nodes[i]);
+  if (scene == nullptr) {
+    add_parentless_nodes();
+  } else {
+    for (cgltf_size i = 0; i < scene->nodes_count; ++i) add_tree(*scene->nodes[i]);
+  }
+  for (const std::string& warning : assign_scene_ids(result_.scene)) warn(warning);
 }
 
 void GltfReader::add_parentless_nodes() {
@@ -109,6 +126,7 @@ NodeDesc GltfReader::read_node(const cgltf_node& node, int parent, int index) {
   out.source_camera = index_of(node.camera, data_.cameras);
   out.source_light = index_of(node.light, data_.lights);
   out.props = read_props(node, out.name);
+  out.stable_id = persisted_id(node);
   return out;
 }
 

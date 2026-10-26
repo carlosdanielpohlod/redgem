@@ -58,9 +58,9 @@ bool same_transform(const Transform& a, const Transform& b) {
 
 // What undo keeps of a node, compared.
 bool same_node(const NodeDesc& x, const NodeDesc& y) {
-  return same_transform(x.local, y.local) && x.name == y.name && x.props == y.props && x.parent == y.parent &&
-         x.children == y.children && x.mesh == y.mesh && x.skin == y.skin && same_light(x.light, y.light) &&
-         same_camera(x.camera, y.camera);
+  return x.stable_id == y.stable_id && same_transform(x.local, y.local) && x.name == y.name && x.props == y.props &&
+         x.parent == y.parent && x.children == y.children && x.mesh == y.mesh && x.skin == y.skin &&
+         same_light(x.light, y.light) && same_camera(x.camera, y.camera);
 }
 
 bool same_nodes(const std::vector<NodeDesc>& a, const std::vector<NodeDesc>& b) {

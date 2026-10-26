@@ -236,6 +236,7 @@ redgem_add_library(redgem_runtime
   scene/gltf/extras_parser.cpp
   scene/transform.cpp
   scene/scene_desc.cpp
+  scene/scene_ids.cpp
   scene/gltf/gltf_checks.cpp
   scene/gltf/gltf_budget.cpp
   scene/gltf/gltf_accessors.cpp

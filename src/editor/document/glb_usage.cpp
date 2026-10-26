@@ -1,4 +1,5 @@
 #include "editor/document/glb_usage.hpp"
+#include "scene/scene_ids.hpp"
 
 #include <algorithm>
 #include <string_view>
@@ -99,7 +100,7 @@ void walk_looks(Json& doc, const Usage& usage, const Use& use) {
 
 // What a node is drawn with, and the camera and light it carries.
 void walk_node(Json& node, const Use& use) {
-  refuse_other_extensions(node, kLightsExtension);
+  refuse_other_extensions(node, kLightsExtension, kSceneIdExtension);
   use_if_there(node, kMesh, kMeshKind, use);
   use_if_there(node, kCamera, kCameraKind, use);
   if (Json* lights = lights_extension(node)) use_if_there(*lights, kLight, kLightKind, use);
@@ -126,11 +127,12 @@ Use marking(Usage& usage) {
 
 }  // namespace
 
-void refuse_other_extensions(const Json& object, const char* known) {
+void refuse_other_extensions(const Json& object, const char* known, const char* also_known) {
   const auto extensions = object.find(kExtensions);
   if (extensions == object.end()) return;
   for (const auto& [name, extension] : extensions->items()) {
-    if (name != known) throw NotFollowed();
+    const bool supported = name == known || (also_known != nullptr && name == also_known);
+    if (!supported) throw NotFollowed();
   }
 }
 

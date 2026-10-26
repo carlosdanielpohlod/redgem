@@ -61,10 +61,10 @@ ToolResult saved(OpenScene& scene, std::string text) {
   return answer(std::move(text));
 }
 
-// Saves, and says what the object `index` is now, under the id the saved file gives it.
+// Saves, and says what the object `index` is now, under its persistent identity.
 ToolResult saved_object(OpenScene& scene, int index, const std::vector<std::string>& notes) {
   const SceneDesc& desc = scene.document.desc();
-  ToolResult result = saved(scene, object_line(desc, index, saved_id(desc, index)) + "\n");
+  ToolResult result = saved(scene, object_line(desc, index) + "\n");
   if (result.exit_code != kExitSuccess) return result;
   for (const std::string& note : notes) result.err += note + "\n";
   return result;
@@ -170,7 +170,7 @@ ToolResult remove(OpenScene& scene) {
   if (const auto* problem = std::get_if<ToolResult>(&object)) return *problem;
   const int index = std::get<int>(object);
   const std::size_t before = scene.document.desc().nodes.size();
-  const std::string line = object_id(index) + " " + scene.document.node(index).name;
+  const std::string line = object_id(scene.document.desc(), index) + " " + scene.document.node(index).name;
   scene.document.remove(index);
   const std::size_t gone = before - scene.document.desc().nodes.size();
   return saved(scene, tr("project.scene.removed", {{"object", line}, {"count", std::to_string(gone)}}) + "\n");

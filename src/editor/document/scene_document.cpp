@@ -13,6 +13,7 @@
 #include "editor/document/material_textures.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_loader.hpp"
+#include "scene/scene_ids.hpp"
 
 namespace redgem {
 
@@ -50,6 +51,7 @@ std::variant<SceneDocument, std::string> SceneDocument::open_file(const std::fil
   document.path_ = path;
   document.keep_file(std::move(*glb));
   document.desc_ = std::move(loaded.scene);
+  document.remember_ids();
   document.remember_node_references(0, 0);
   return document;
 }
@@ -99,6 +101,7 @@ void SceneDocument::sync_camera(NodeDesc& node, const CameraDesc& camera, std::s
 }
 
 nlohmann::json SceneDocument::sync_nodes() {
+  add_extension_used(glb_.json, kSceneIdExtension);
   nlohmann::json nodes = nlohmann::json::array();
   nlohmann::json roots = nlohmann::json::array();
   for (int i = 0; i < node_count(); ++i) {

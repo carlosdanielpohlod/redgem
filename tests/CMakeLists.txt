@@ -21,6 +21,7 @@ add_executable(redgem_tests
   unit/transform_test.cpp
   unit/scene_test.cpp
   unit/scene_identity_test.cpp
+  unit/scene_stable_ids_test.cpp
   unit/gltf_accessors_test.cpp
   unit/gltf_loader_test.cpp
   unit/gltf_loader_safety_test.cpp

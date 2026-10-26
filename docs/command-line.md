@@ -38,10 +38,11 @@ otherwise than the object, its light or camera, the classes of its scripts, and 
 properties. Children are indented under their parent. `--depth 0` lists the top objects alone;
 `--limit N` stops after N lines (200 unless said; `--limit 0` lists all).
 
-**Naming an object.** `#12` is the object's id: its place in the scene file. A path
-(`Player/Visor`) or a name works too when only one object has it; a name several objects share is
-refused, with each of them listed by id and path. Adding or removing objects renumbers the ones
-after them, so take ids from a fresh list.
+**Naming an object.** `#12` is a persistent object identity, independent of its place in the
+scene file. A path (`Player/Visor`) or a name works too when only one object has it; a name several
+objects share is refused, with each of them listed by id and path. Identities survive saves,
+renames and reparenting. New objects get hexadecimal identities: take them from `scene list` or
+`scene add` and pass them back unchanged.
 
 | Command | What it does |
 |---------|--------------|

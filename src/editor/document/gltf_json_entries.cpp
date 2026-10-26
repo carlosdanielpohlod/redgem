@@ -6,6 +6,7 @@
 #include <iterator>
 
 #include "scene/props.hpp"
+#include "scene/scene_ids.hpp"
 
 namespace redgem::gltf_json {
 namespace {
@@ -112,6 +113,7 @@ nlohmann::json node_json(const NodeDesc& node, const nlohmann::json& original) {
   write_light_reference(out, node.source_light);
   set_unless_empty(out, kChildren, node.children);
   write_extras(out, node.props);
+  if (!node.stable_id.empty()) out[kExtensions][kSceneIdExtension] = {{kSceneIdMember, node.stable_id}};
   return out;
 }
 

@@ -18,7 +18,4 @@ struct FoundObject {
 
 FoundObject find_object(const SceneDesc& scene, const std::string& reference);
 
-// "#12" as the 12 it names; kNoIndex for anything else.
-int id_number(const std::string& reference);
-
 }  // namespace redgem::tools

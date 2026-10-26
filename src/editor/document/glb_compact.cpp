@@ -7,6 +7,7 @@
 #include "editor/document/glb_usage.hpp"
 #include "editor/document/gltf_json.hpp"
 #include "scene/scene_desc.hpp"
+#include "scene/scene_ids.hpp"
 
 namespace redgem {
 namespace {
@@ -120,7 +121,7 @@ std::optional<GlbFile> lean_copy(const Json& json, const std::vector<std::uint8_
 // The file as if its objects were one for each mesh still held, with every node's extensions,
 // skeleton and animation the editor keeps: what is reached from those is still used.
 Json still_held(const Json& doc, const std::set<int>& released, const GlbSources& sources) {
-  for (const Json& node : sources.nodes) refuse_other_extensions(node, kLightsExtension);
+  for (const Json& node : sources.nodes) refuse_other_extensions(node, kLightsExtension, kSceneIdExtension);
   Json probe = doc;
   Json nodes = Json::array();
   const std::size_t meshes = probe.contains(kMeshes) ? probe[kMeshes].size() : 0;
