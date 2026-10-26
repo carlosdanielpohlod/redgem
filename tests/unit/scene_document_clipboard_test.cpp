@@ -220,9 +220,10 @@ TEST_CASE("a picture is added to a file as an image of its own") {
   CHECK(glb_images::mime_type_of(*read_file_bytes(fixture("images/sniff.jpg"))) == "image/jpeg");
   CHECK(glb_images::mime_type_of(*read_file_bytes(fixture("images/lossy.webp"))) == "image/webp");
   CHECK(glb_images::mime_type_of({1, 2, 3}).empty());
-  CHECK(glb_images::append_image(glb, png, "image/png") == 0);
-  CHECK(glb_images::append_image(glb, png, "image/png") == 1);
+  CHECK(glb_images::append_image(glb, png, "image/png", "first.png") == 0);
+  CHECK(glb_images::append_image(glb, png, "image/png", "second.png") == 1);
   CHECK(glb.json[gltf_json::kImages][1][gltf_json::kBufferView] == 1);
+  CHECK(glb.json[gltf_json::kImages][1][gltf_json::kName] == "second.png");
 }
 
 TEST_CASE("a .glb goes through bytes in memory and back") {

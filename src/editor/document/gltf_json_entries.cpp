@@ -124,6 +124,7 @@ bool needs_emissive_strength(const MaterialDesc& material) { return emissive_str
 nlohmann::json material_json(const MaterialDesc& material, const nlohmann::json& original) {
   nlohmann::json out = original.is_object() ? original : nlohmann::json::object();
   out[kName] = material.name;
+  if (!out[kPbr].is_object()) out[kPbr] = nlohmann::json::object();  // (a file may hold anything there)
   const Color& c = material.base_color;
   out[kPbr][kBaseColorFactor] = {c.r, c.g, c.b, c.a};
   out[kPbr][kMetallicFactor] = material.metallic;

@@ -5,6 +5,8 @@
 
 #include <algorithm>
 
+#include "editor/document/material_textures.hpp"
+
 namespace redgem {
 namespace {
 
@@ -23,10 +25,15 @@ bool same_water(const WaterDesc& a, const WaterDesc& b) {
          a.refraction == b.refraction;
 }
 
+// The pictures of its texture slots.
+bool same_pictures(const MaterialDesc& a, const MaterialDesc& b) {
+  return material_textures::images_of(a) == material_textures::images_of(b);
+}
+
 bool same_material(const MaterialDesc& x, const MaterialDesc& y) {
   return same_color(x.base_color, y.base_color) && x.metallic == y.metallic && x.roughness == y.roughness &&
          same_vec3(x.emissive, y.emissive) && x.name == y.name && same_coat(x.clearcoat, y.clearcoat) &&
-         same_water(x.water, y.water);
+         same_water(x.water, y.water) && same_pictures(x, y);
 }
 
 bool same_materials(const std::vector<MaterialDesc>& a, const std::vector<MaterialDesc>& b) {

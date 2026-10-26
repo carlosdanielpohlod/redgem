@@ -371,6 +371,7 @@ struct Renderer::Impl {
   void refresh_material_values(const SceneDesc& desc);
   Material make_material(redgem::Color base_color) const;
   Material load_material(const MaterialDesc& source) const;
+  void bind_textures(Material& material, const MaterialDesc& source) const;
   void release_assets();
   void release_meshes();
 

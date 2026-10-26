@@ -13,11 +13,6 @@ namespace {
 
 using namespace gltf_json;
 
-constexpr const char* kMimeType = "mimeType";
-constexpr const char* kPngMime = "image/png";
-constexpr const char* kJpegMime = "image/jpeg";
-constexpr const char* kWebpMime = "image/webp";
-
 // The picture file `uri` names, as the scene in `scene_dir` reads it; nullopt when it names none
 // the scene may read (only files inside its own folder, see core/safe_path.hpp).
 std::optional<std::vector<std::uint8_t>> linked_picture(const std::string& uri,
@@ -66,10 +61,11 @@ std::string mime_type_of(const std::vector<std::uint8_t>& bytes) {
   return image->format() == EncodedImageFormat::Jpeg ? kJpegMime : kWebpMime;
 }
 
-int append_image(GlbFile& glb, const std::vector<std::uint8_t>& bytes, const std::string& mime_type) {
+int append_image(GlbFile& glb, const std::vector<std::uint8_t>& bytes, const std::string& mime_type,
+                 const std::string& name) {
   const int view = append_view(glb, bytes);
   nlohmann::json& images = array_at(glb.json, kImages);
-  images.push_back({{kBufferView, view}, {kMimeType, mime_type}});
+  images.push_back({{kName, name}, {kBufferView, view}, {kMimeType, mime_type}});
   return last_index(images);
 }
 

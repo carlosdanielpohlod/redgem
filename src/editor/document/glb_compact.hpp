@@ -33,6 +33,9 @@ struct GlbSources {
 // that held them keep their length and point at the chunk's start (nothing reads them, and the
 // file stays whole however it is written). Returns which pictures something still uses, or
 // nullopt, with the file as it was, when it points at its data in a way not followed here.
-std::optional<std::vector<bool>> release_meshes(GlbFile& glb, const std::set<int>& released, const GlbSources& sources);
+// `held_images` (by number) stay with their bytes whatever reaches them: pictures the editor knows
+// to be used before the JSON says so.
+std::optional<std::vector<bool>> release_meshes(GlbFile& glb, const std::set<int>& released, const GlbSources& sources,
+                                                const std::vector<bool>& held_images = {});
 
 }  // namespace redgem

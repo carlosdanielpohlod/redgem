@@ -14,7 +14,6 @@ namespace {
 
 constexpr const char* kSpeed = "speed";
 constexpr double kFast = 4.0;
-constexpr int kSomeImage = 2;
 
 }  // namespace
 
@@ -63,16 +62,6 @@ TEST_CASE("properties with a widget of their own stay out of the list, and their
   CHECK(can_add_property({}, kSpeed));
   CHECK_FALSE(can_add_property({{kSpeed, kFast}}, kSpeed));
   CHECK_FALSE(can_add_property({}, ""));
-}
-
-TEST_CASE("a material is textured by a color picture or a normal map") {
-  MaterialDesc material;
-  CHECK_FALSE(textured(material));
-  material.normal_image = kSomeImage;
-  CHECK(textured(material));
-  material.normal_image = kNoIndex;
-  material.base_color_image = kSomeImage;
-  CHECK(textured(material));
 }
 
 TEST_CASE("the wheel card is for wheels and for the children of a vehicle") {

@@ -453,6 +453,7 @@ if(NOT ANDROID)
   redgem_add_library(redgem_editor
     editor/document/glb_file.cpp
     editor/document/glb_images.cpp
+    editor/document/material_textures.cpp
     editor/document/glb_usage.cpp
     editor/document/glb_compact.cpp
     editor/document/gltf_json.cpp
@@ -474,6 +475,7 @@ if(NOT ANDROID)
     editor/document/scene_document_edits.cpp
     editor/document/scene_document_copies.cpp
     editor/document/scene_document_clipboard.cpp
+    editor/document/scene_document_images.cpp
     editor/document/scene_document_create.cpp
     editor/document/scene_document_skeletons.cpp
     editor/document/scene_document_import.cpp
@@ -515,6 +517,7 @@ if(NOT ANDROID)
     editor/ui/inspector_object.cpp
     editor/ui/inspector_group.cpp
     editor/ui/inspector_material.cpp
+    editor/ui/inspector_textures.cpp
     editor/ui/inspector_light_camera.cpp
     editor/ui/inspector_terrain.cpp
     editor/ui/inspector_scripts.cpp

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 
+#include "editor/document/material_textures.hpp"
 #include "editor/node_tree.hpp"
 
 namespace redgem {
@@ -70,8 +71,9 @@ int SceneDocument::material_users(int material) const {
 }
 
 void SceneDocument::set_material(int index, const MaterialDesc& material, bool record) {
-  if (record) checkpoint();
+  if (record) checkpoint();  // (an image added for this edit is held through it: see unshown_images_)
   desc_.materials.at(index) = material;
+  for (const int image : material_textures::images_of(material)) unshown_images_.erase(image);
   touch();
 }
 

@@ -10,8 +10,30 @@
 #include <utility>
 
 #include "editor/document/glb_compact.hpp"
+#include "editor/document/gltf_json.hpp"
+#include "editor/document/material_textures.hpp"
 
 namespace redgem {
+namespace {
+
+// Marks in `held` the images the materials show.
+void hold_images_of(const std::vector<MaterialDesc>& materials, std::vector<bool>& held) {
+  for (const MaterialDesc& material : materials) {
+    for (const int image : material_textures::images_of(material)) {
+      if (gltf_json::in_range(image, held.size())) held[static_cast<std::size_t>(image)] = true;
+    }
+  }
+}
+
+// Whether some material of a step shows a picture: dropping the step may let go of one.
+bool shows_pictures(const std::vector<MaterialDesc>& materials) {
+  return std::any_of(materials.begin(), materials.end(), [](const MaterialDesc& material) {
+    const std::vector<int> images = material_textures::images_of(material);
+    return std::any_of(images.begin(), images.end(), [](int image) { return image != kNoIndex; });
+  });
+}
+
+}  // namespace
 
 bool SceneDocument::history_too_long(std::size_t kept) const {
   if (undo_.size() > kMaxUndoSteps) return true;
@@ -51,8 +73,9 @@ void SceneDocument::clear_redo() {
 
 bool SceneDocument::drop_oldest_step() {
   const bool mesh_left = uncount_step(undo_.front());
+  const bool pictures_left = shows_pictures(undo_.front().materials);
   undo_.erase(undo_.begin());
-  return mesh_left;
+  return mesh_left || pictures_left;
 }
 
 bool SceneDocument::uncount_step(const Snapshot& step) {
@@ -88,8 +111,9 @@ void SceneDocument::release_unreachable() {
   const std::vector<int> out_of_reach = meshes_out_of_reach();
   if (out_of_reach.empty()) return;
   for (const int mesh : out_of_reach) release_mesh(mesh);
+  const std::vector<bool> held = images_in_materials();
   const std::optional<std::vector<bool>> images_used =
-      release_meshes(glb_, released_meshes_, {source_nodes_, source_skins_, source_animations_});
+      release_meshes(glb_, released_meshes_, {source_nodes_, source_skins_, source_animations_}, held);
   if (images_used) release_images(*images_used);
 }
 
@@ -105,6 +129,30 @@ void SceneDocument::release_images(const std::vector<bool>& used) {
   for (std::size_t image = 0; image < images; ++image) {
     if (!used[image]) std::vector<std::uint8_t>().swap(desc_.images[image].encoded);
   }
+}
+
+std::vector<bool> SceneDocument::images_in_materials() const {
+  std::vector<bool> held(desc_.images.size(), false);
+  hold_images_of(desc_.materials, held);
+  for (const int image : unshown_images_) {
+    if (gltf_json::in_range(image, held.size())) held[static_cast<std::size_t>(image)] = true;
+  }
+  for (const Snapshot& step : undo_) hold_images_of(step.materials, held);
+  for (const Snapshot& step : redo_) hold_images_of(step.materials, held);
+  return held;
+}
+
+std::size_t SceneDocument::undo_picture_bytes() const {
+  std::vector<bool> now(desc_.images.size(), false);
+  hold_images_of(desc_.materials, now);
+  std::vector<bool> in_steps(desc_.images.size(), false);
+  for (const Snapshot& step : undo_) hold_images_of(step.materials, in_steps);
+  for (const Snapshot& step : redo_) hold_images_of(step.materials, in_steps);
+  std::size_t bytes = 0;
+  for (std::size_t image = 0; image < in_steps.size(); ++image) {
+    if (in_steps[image] && !now[image]) bytes += desc_.images[image].encoded.capacity();
+  }
+  return bytes;
 }
 
 }  // namespace redgem

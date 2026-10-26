@@ -71,6 +71,13 @@ void add_extension_used(nlohmann::json& json, const char* extension) {
   if (std::find(used.begin(), used.end(), extension) == used.end()) used.push_back(extension);
 }
 
+void add_extension_required(nlohmann::json& json, const char* extension) {
+  add_extension_used(json, extension);
+  nlohmann::json& required = json[kExtensionsRequired];
+  if (!required.is_array()) required = nlohmann::json::array();
+  if (std::find(required.begin(), required.end(), extension) == required.end()) required.push_back(extension);
+}
+
 void remove_extension_used(nlohmann::json& json, const char* extension) {
   for (const char* list : {kExtensionsUsed, kExtensionsRequired}) {
     nlohmann::json kept = nlohmann::json::array();

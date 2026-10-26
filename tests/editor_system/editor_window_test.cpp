@@ -701,3 +701,51 @@ TEST_CASE("objects are selected by clicks and a rectangle, duplicated, and copie
   CHECK(app.console().error_count() == 0);
   std::filesystem::remove_all(game);
 }
+
+TEST_CASE("a picture dropped on the editor goes to images/, and a material shows it once saved") {
+  const std::filesystem::path game = copy_game();
+  const std::filesystem::path desk = std::filesystem::temp_directory_path() / "redgem_editor_pictures";
+  std::filesystem::remove_all(desk);
+  std::filesystem::create_directories(desk);
+  std::filesystem::copy_file(std::filesystem::path(REDGEM_FIXTURES_DIR) / "images" / "sniff.png", desk / "wood.png");
+  auto created = EditorApp::create(game, even_pace());
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  EditorSession& session = app.session();
+  run(app, kWarmupFrames);
+
+  app.add_files({desk / "wood.png"});
+  CHECK(has(app.files().images, "wood.png"));
+  CHECK(std::filesystem::exists(game / config::kImagesDirName / "wood.png"));
+  CHECK(app.panel_state().project.folder == ui::ProjectFolder::Images);
+
+  // As the Inspector's Color map slot does when the picture is picked: one undo step.
+  session.select_by_name("Crate1");
+  app.frame_selection();
+  SceneDocument& doc = session.document();
+  const int material = doc.material_of(session.selection());
+  REQUIRE(material != kNoIndex);
+  std::string error;
+  const int image = doc.add_image(game / config::kImagesDirName / "wood.png", error);
+  REQUIRE_MESSAGE(image != kNoIndex, error);
+  MaterialDesc textured = doc.material(material);
+  textured.base_color_image = image;
+  doc.set_material(material, textured);
+  run(app, kFrameFrames);
+  take_picture(app, screenshot("editor_textured_crate"));
+
+  app.save();
+  const LoadResult saved = load_gltf_scene((game / config::kSceneFileName).string());
+  REQUIRE(saved.ok);
+  const NodeDesc& crate = saved.scene.nodes[saved.scene.find_node("Crate1")];
+  const int saved_material = saved.scene.meshes[crate.mesh].primitives.front().material;
+  CHECK(saved.scene.materials[saved_material].base_color_image != kNoIndex);
+
+  // Undo takes the picture off again; the scene still draws.
+  session.undo();
+  CHECK(doc.material(material).base_color_image != image);
+  run(app, kFrameFrames);
+  CHECK(app.console().error_count() == 0);
+  std::filesystem::remove_all(desk);
+  std::filesystem::remove_all(game);
+}

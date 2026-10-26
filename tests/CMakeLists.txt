@@ -39,6 +39,8 @@ add_executable(redgem_tests
   unit/mesh_pieces_test.cpp
   unit/scene_document_test.cpp
   unit/scene_document_clipboard_test.cpp
+  unit/scene_document_textures_test.cpp
+  unit/material_textures_test.cpp
   unit/selection_test.cpp
   unit/group_transform_test.cpp
   unit/box_select_test.cpp
@@ -460,6 +462,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/see_through_render_test.cpp render_system/temporal_render_test.cpp
                render_system/temporal_depth_render_test.cpp
                render_system/webp_render_test.cpp
+               render_system/material_pictures_render_test.cpp
                render_system/game_font_render_test.cpp
                render_system/missing_picture_render_test.cpp
                render_system/recording_render_test.cpp

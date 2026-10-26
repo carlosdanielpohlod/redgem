@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 
 #include "editor/project_files.hpp"
 #include "test_support.hpp"
@@ -26,6 +27,18 @@ TEST_CASE("a game folder is listed by kind, with the names scripts use") {
   CHECK(files.models.empty());
   CHECK(files == ProjectFiles::scan(fixture("games/sandbox")));
   CHECK(ProjectFiles::scan(fixture("missing_game")).scripts.empty());
+}
+
+TEST_CASE("the pictures of images/ are listed by file name, whatever the case of their extension") {
+  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem_project_files_images";
+  std::filesystem::remove_all(game);
+  std::filesystem::create_directories(game / "images");
+  for (const char* file : {"wood.png", "Bark.JPG", "moss.webp", "notes.txt"}) {
+    std::ofstream(game / "images" / file) << "data";
+  }
+  const ProjectFiles files = ProjectFiles::scan(game);
+  CHECK(files.images == std::vector<std::string>{"Bark.JPG", "moss.webp", "wood.png"});
+  std::filesystem::remove_all(game);
 }
 
 TEST_CASE("files reached through links are not listed: built games leave them out") {

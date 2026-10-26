@@ -13,6 +13,7 @@
 #include "editor/document/glb_compact.hpp"
 #include "editor/document/glb_images.hpp"
 #include "editor/document/gltf_json.hpp"
+#include "editor/document/material_textures.hpp"
 #include "editor/document/model_import.hpp"
 #include "editor/node_tree.hpp"
 #include "scene/gltf/gltf_loader.hpp"
@@ -108,6 +109,7 @@ std::optional<std::vector<std::uint8_t>> SceneDocument::clipboard_glb(const std:
   if (!glb_.bin.empty()) clip.glb_.json[kBuffers] = nlohmann::json::array({{{kByteLength, glb_.bin.size()}}});
   // (Only what the clip's nodes reach is taken from the scene's binary chunk.)
   GlbFile lean = without_unused(clip.glb_.json, glb_.bin).value_or(GlbFile{clip.glb_.json, glb_.bin});
+  material_textures::forget_unused_webp(lean.json);
   glb_images::embed_linked_images(lean, path_.parent_path());
   return encode_glb(lean, error);
 }
