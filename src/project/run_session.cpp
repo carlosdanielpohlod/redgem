@@ -2,7 +2,6 @@
 
 #include <mruby/string.h>
 
-#include <algorithm>
 #include <cstddef>
 #include <string_view>
 #include <utility>
@@ -10,6 +9,7 @@
 #include "core/config.hpp"
 #include "core/message_lines.hpp"
 #include "core/safe_path.hpp"
+#include "core/short_text.hpp"
 #include "core/translations.hpp"
 
 namespace redgem::tools {
@@ -22,13 +22,8 @@ constexpr const char* kExpressionFile = "<run expression>";
 std::string frame_label(long long frame) { return tr("project.run.frame_label", {{"frame", std::to_string(frame)}}); }
 
 std::string short_value(std::string_view text) {
-  constexpr unsigned char kContinuationMask = 0xC0;
-  constexpr unsigned char kContinuationByte = 0x80;
-  std::size_t end = std::min(text.size(), kMostValueBytes);
-  while (end > 0 && end < text.size() &&
-         (static_cast<unsigned char>(text[end]) & kContinuationMask) == kContinuationByte)
-    --end;
-  return printable(text.substr(0, end)) + (end < text.size() ? "..." : "");
+  const std::string_view prefix = utf8_prefix(text, kMostValueBytes);
+  return printable(prefix) + (prefix.size() < text.size() ? "..." : "");
 }
 
 class RunSession {

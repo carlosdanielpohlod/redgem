@@ -6,6 +6,7 @@ add_executable(redgem_tests
   unit/coarse_clock_test.cpp
   unit/stopwatch_test.cpp
   unit/log_test.cpp
+  unit/event_journal_test.cpp
   unit/files_test.cpp
   unit/command_line_test.cpp
   unit/names_test.cpp

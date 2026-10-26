@@ -59,6 +59,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Cursor event history for tools**: process logs can be read from an increasing cursor, with
+  bounded pages, level filters and explicit reports of overwritten messages. Custom console
+  sinks keep working alongside the history.
+
 - **Reproducible headless runs**: `redgem run` seeds Ruby and particle randomness before scripts
   load, replays keyboard state from a JSON file, checks assertions and stop conditions every frame,
   and prints selected state at a chosen frame interval.

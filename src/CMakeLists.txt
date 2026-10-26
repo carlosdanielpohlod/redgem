@@ -137,6 +137,8 @@ endfunction()
 
 redgem_add_library(redgem_core
   core/log.cpp
+  core/event_journal.cpp
+  core/short_text.cpp
   core/message_lines.cpp
   core/coarse_clock.cpp
   core/signal_stack.cpp

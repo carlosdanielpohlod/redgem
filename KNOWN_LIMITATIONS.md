@@ -275,8 +275,8 @@ What is there today is the command line (`redgem scene`, `run`, `shot`, `check`,
 there yet:
 
 - Headless input replay covers keyboard states only; mouse, gamepad and touch input are not yet replayed.
-- An event log read with a `since` cursor (only what is new), and `redgem scene diff` to show what
-  an edit changed.
+- A live tooling transport for the process event history (the native API already reads it with
+  a `since` cursor), and `redgem scene diff` to show what an edit changed.
 - A search of the game's assets and of the templates.
 - `redgem mcp`: an MCP server of about 8 to 10 tools wrapping the command line, and a live bridge
   to an open editor (a localhost socket with a token) to list, select and move objects, set

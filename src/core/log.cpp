@@ -4,9 +4,15 @@
 #include <utility>
 
 #include "core/platform.hpp"
+#include "core/event_journal.hpp"
 
 namespace redgem::log {
 namespace {
+
+EventJournal& journal() {
+  static EventJournal events;
+  return events;
+}
 
 // Where messages go until someone takes them (set_sink): wherever this system shows a program's
 // messages, which the platform layer knows.
@@ -42,6 +48,7 @@ const char* level_name(Level level) {
 
 void write(Level level, const std::string& message) {
   const std::lock_guard<std::mutex> hold(sink_lock());
+  journal().append(level, message);
   current_sink()(level, message);
 }
 void debug(const std::string& message) { write(Level::Debug, message); }
@@ -52,6 +59,12 @@ void error(const std::string& message) { write(Level::Error, message); }
 Sink set_sink(Sink sink) {
   const std::lock_guard<std::mutex> hold(sink_lock());
   return std::exchange(current_sink(), std::move(sink));
+}
+
+std::uint64_t event_cursor() { return journal().cursor(); }
+
+EventPage events_since(std::uint64_t cursor, std::size_t limit, Level minimum) {
+  return journal().since(cursor, limit, minimum);
 }
 
 void reset_sink() { set_sink(default_sink); }

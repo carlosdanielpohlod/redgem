@@ -327,3 +327,17 @@ and every text of theirs is shown.
 * Mirrored objects (negative scale) are drawn inside out.
 * More vehicle options from Blender properties (drive layout, engine torque); hot reload of
   scripts while playing.
+
+### Reading the process event history
+
+The native tooling API can read logs without replacing the console sink. Include
+`core/event_journal.hpp`, take `log::event_cursor()` before an operation, then read
+`log::events_since(cursor, limit, minimum_level)`. Pass the returned `cursor` to the next read,
+including when the level filter matched nothing. Read another page while `more` is true.
+
+The process retains 512 messages, each limited to 2 KiB plus a truncation marker, and returns
+at most 128 messages per page. Text keeps whole UTF-8 characters and removes terminal control
+characters while retaining line breaks. `dropped` counts messages overwritten since the supplied
+cursor. `cursor_ahead` reports a cursor beyond this process's latest event; reset the reader to
+the returned cursor. Cursors belong to the process that issued them and do not survive a restart.
+Writes and reads are synchronized; installing a custom log sink does not disable this history.
