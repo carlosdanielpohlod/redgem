@@ -127,7 +127,8 @@ TEST_CASE("every key the engine shows has a text in English, in the part its fir
 TEST_CASE("every text of the engine's English files is shown somewhere, and is in the right part") {
   const Keys used = engine_keys();
   for (const std::string& part : parts()) {
-    for (const std::string& key : keys_of(kSource / "locales" / part / kEnglishFile)) {
+    const fs::path english = kSource / "locales" / part / kEnglishFile;
+    for (const std::string& key : keys_of(english)) {
       CHECK_MESSAGE(used.count(key) == 1, ("nothing shows " + key + " (locales/" + part + ")"));
       CHECK_MESSAGE(part_of(key) == part, (key + " is in locales/" + part + ", not in the part it names"));
     }

@@ -167,7 +167,7 @@ TEST_CASE("Scatter.place rejects invalid LOD chains without adding partial sets"
   const SceneDesc scene = meadow();
   auto engine = engine_for(scene);
   const std::string call = "Scatter.place('Tuft', count: 1, area: [Vector3.zero, Vector3.one], fade: 4.0, lods: ";
-  for (const std::string& lods :
+  for (const char* lods :
        {"false", "[false]", "[['Ground']]", "[['Nobody', 30.0]]", "[['Empty', 30.0]]", "[['Ground', -1.0]]",
         "[['Ground', 1e100]]", "[['Ground', 3.0]]", "[['Ground', 30.0], ['Tuft', 32.0]]",
         "[['Ground', 30.0], ['Tuft', 20.0]]", "[['Ground', 10.0], ['Tuft', 20.0], ['Ground', 30.0], ['Tuft', 40.0]]"}) {

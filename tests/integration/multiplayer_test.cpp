@@ -7,6 +7,7 @@
 #include <initializer_list>
 #include <string>
 #include <thread>
+#include <tuple>
 
 #include <mruby.h>
 #include <mruby/string.h>
@@ -179,7 +180,9 @@ void sync_swordsman(std::initializer_list<Engine*> machines, const std::string& 
 
 TEST_CASE("one machine hosts, another joins, and both scripts are told") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   CHECK(ruby(*host, "[Network.online?, Network.host?, Network.id, Network.peers].inspect") == "[true, true, 1, [2]]");
   CHECK(ruby(*guest, "[Network.online?, Network.host?, Network.id, Network.peers].inspect") == "[true, false, 2, [1]]");
   CHECK(ruby(*host, "$log.inspect") == "[:connected, [:joined, 2]]");
@@ -189,7 +192,9 @@ TEST_CASE("one machine hosts, another joins, and both scripts are told") {
 
 TEST_CASE("scripts send each other named messages carrying Ruby values") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   ruby(*host, "$got = []; Network.on(:hit) { |data, from| $got << [data, from] }");
   ruby(*guest, "$got = []; Network.on(:hit) { |data, from| $got << [data, from] }");
   // (The host's scripts use these keys, which is what makes them symbols when they arrive.)
@@ -220,7 +225,9 @@ TEST_CASE("scripts send each other named messages carrying Ruby values") {
 TEST_CASE("a machine that floods a game a player hosts is let go") {
   Lan lan;
   lan.network_time = [] { return 0.0; };  // (as below: only the burst counts)
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   ruby(*guest, "64.times { Network.emit(:big, 'x' * 65_536) }");  // more bytes at once than any game sends
   REQUIRE(lan.until([guest = guest] { return guest->network().state() == net::NetworkSession::State::Offline; }));
   CHECK(ruby(*guest, "$log.inspect") == "[:connected, :disconnected]");
@@ -232,7 +239,9 @@ TEST_CASE("a machine that floods a game a player hosts with tiny messages is let
   // Time stands still for the networks: what a slow machine takes to pass the messages on earns
   // the guest nothing back, so the burst alone is what it may send.
   lan.network_time = [] { return 0.0; };
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   // Few bytes, far more messages at once than poses of dozens of objects make.
   ruby(*host, "$got = 0; Network.on(:t) { $got += 1 }");
   ruby(*guest, "20_000.times { Network.emit(:t) }");
@@ -253,7 +262,9 @@ TEST_CASE("a guest that goes on at a game's pace while the host stands still is 
   Lan lan;
   double clock = 0.0;
   lan.network_time = [&clock] { return clock; };
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   ruby(*host, "$got = 0; Network.on(:t) { $got += 1 }");
   const std::string talk = std::to_string(kMessagesPerFrame) + ".times { Network.emit(:t) }";
   const auto guest_frame = [&] {
@@ -279,7 +290,9 @@ TEST_CASE("a guest that goes on at a game's pace while the host stands still is 
 
 TEST_CASE("a hash key no script here ever used arrives as a text, and makes no new symbol") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   ruby(*host, "$got = nil; Network.on(:hit) { |data, _from| $got = data; $damage = data[:damage] }");
   CHECK(ruby(*guest, "Network.emit(:hit, { damage: 3, 'key_only_the_sender_made_up' => 4 })") == "true");
   REQUIRE(lan.until([&] { return ruby(*host, "$got.nil?") == "false"; }));
@@ -290,7 +303,9 @@ TEST_CASE("a hash key no script here ever used arrives as a text, and makes no n
 
 TEST_CASE("a message's name is shown in the log with nothing in it that fakes a line") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   ruby(*host, "Network.on(\"odd\\n[error] fake\") { raise 'broken handler' }");
   std::vector<std::string> lines;
   const log::Sink before = log::set_sink([&lines](log::Level, const std::string& line) { lines.push_back(line); });
@@ -333,7 +348,9 @@ TEST_CASE("no memory for what a message carries loses the message, not the game"
 
 TEST_CASE("a handler that fails is reported and the game goes on") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   ruby(*host, "$seen = 0; Network.on(:boom) { raise 'broken handler' }; Network.on(:fine) { $seen += 1 }");
   const int errors_before = host->scripts().error_count();
   ruby(*guest, "Network.emit(:boom); Network.emit(:fine)");
@@ -344,7 +361,9 @@ TEST_CASE("a handler that fails is reported and the game goes on") {
 
 TEST_CASE("an object with a NetworkSync is moved by its owner and follows on the other machines") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   // The level's own platform: the host's to move, by default.
   for (Engine* machine : {host, guest}) {
     ruby(*machine, "$platform = Scene.find('Platform'); $sync = $platform.add_component(NetworkSync)");
@@ -370,7 +389,9 @@ TEST_CASE("an object with a NetworkSync is moved by its owner and follows on the
 
 TEST_CASE("a watched object is shown the delay it asks for behind its owner, or closes in at once without one") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   ruby(*host, "$platform = Scene.find('Platform'); $platform.add_component(NetworkSync)");
   ruby(*host, "$ball = Scene.find('Ball'); $ball.add_component(NetworkSync, key: 'ball')");
   ruby(*guest, "$platform = Scene.find('Platform'); $platform.add_component(NetworkSync, delay: 0.5)");
@@ -388,7 +409,9 @@ TEST_CASE("a watched object is shown the delay it asks for behind its owner, or 
 
 TEST_CASE("an object handed back to a machine that watched it before is shown from what it hears now") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   for (Engine* machine : {host, guest}) {
     ruby(*machine, "$platform = Scene.find('Platform'); $sync = $platform.add_component(NetworkSync)");
   }
@@ -437,7 +460,9 @@ TEST_CASE("a second NetworkSync under a key another object goes by is refused, a
 
 TEST_CASE("Network.spawn creates an object on every machine, for late joiners too, until its owner leaves") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   ruby(*guest, "$mine = Network.spawn('Ball', position: Vector3.new(5, 0, 0))");
   REQUIRE(lan.until([&] { return ruby(*host, "Scene.objects.count { |o| o.name == 'Ball' }") == "2"; }));
   ruby(*host,
@@ -473,7 +498,9 @@ TEST_CASE("Network.spawn creates an object on every machine, for late joiners to
 
 TEST_CASE("when the host leaves the game is over for everyone, and what the others owned leaves them") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   ruby(*host, "$ball = Network.spawn('Ball')");
   REQUIRE(lan.until([&] { return ruby(*guest, "Scene.objects.count { |o| o.name == 'Ball' }") == "2"; }));
   ruby(*guest, "$theirs = Scene.objects.select { |o| o.name == 'Ball' }.last");
@@ -519,7 +546,9 @@ TEST_CASE("joining where nobody hosts fails after a moment, and a taken port can
 
 TEST_CASE("handlers end with the level; the connection does not") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   ruby(*host, "$got = 0; Network.on(:ping) { $got += 1 }; Game.load_scene('level2')");
   lan.round();
   ruby(*guest, "Network.emit(:ping)");
@@ -529,7 +558,9 @@ TEST_CASE("handlers end with the level; the connection does not") {
 
 TEST_CASE("a machine only spawns for others what this game spawns, and only for the one asking") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   const auto balls_on_host = [&] { return ruby(*host, "Scene.objects.count { |o| o.name == 'Ball' }"); };
   // The engine's own message names are not for games to send ...
   CHECK_FALSE(guest->scripts().eval("Network.emit('$spawn', [])", "bad.rb").ok);
@@ -568,7 +599,9 @@ void heard_out(Lan& lan, Engine& sender, Engine& receiver) {
 
 TEST_CASE("a spawned object's key is its maker's to give: nobody takes the key something else goes by") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   const auto balls_on_host = [&] { return ruby(*host, "Scene.objects.count { |o| o.name == 'Ball' }"); };
   // The guest's hero, kept in the same place everywhere under a key of the game's choosing.
   for (Engine* machine : {host, guest}) {
@@ -611,7 +644,9 @@ std::string balls_spawned_on(Engine& machine) {
 
 TEST_CASE("a machine has only so many spawned objects, by its own count as by everyone else's") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   const std::string most = ruby(*guest, "Network::MAX_SPAWNS_PER_PEER");
   ruby(*guest, "$made = Array.new(Network::MAX_SPAWNS_PER_PEER + 1) { Network.spawn('Ball') }");
   // One too many: nothing was made for it, here or on the host.
@@ -642,7 +677,9 @@ TEST_CASE("a game has only so many spawned objects, whoever they are for") {
 
 TEST_CASE("a spawned object its owner destroys is gone on every machine, and its place is free again") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   Engine& third = lan.add_machine();
   lan.join(third, *host);
   ruby(*guest, "$mine = Network.spawn('Ball')");
@@ -695,7 +732,9 @@ TEST_CASE("an object that goes by a spawned object's key does not take it along 
 
 TEST_CASE("a machine that keeps asking what is spawned is answered a few times, then only now and then") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   ruby(*host, "Network.spawn('Ball')");
   REQUIRE(lan.until([&] { return balls_spawned_on(*guest) == "1"; }));
   // The guest loses its copy and asks the host again: an answer brings the copy back.
@@ -718,7 +757,9 @@ TEST_CASE("a machine that keeps asking what is spawned is answered a few times, 
 
 TEST_CASE("a host spawns only for machines in the game, and what it says in the wrong shape is ignored") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   const auto balls_on_guest = [&] { return ruby(*guest, "Scene.objects.count { |o| o.name == 'Ball' }"); };
   ruby(*guest, "$platform = Scene.find('Platform'); $platform.add_component(NetworkSync)");
   lan.round();
@@ -766,7 +807,9 @@ TEST_CASE("offline, everything is this machine's; what it spawned then joins the
 
 TEST_CASE("hosting or joining again leaves the game this machine was in, and the others hear of it") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   REQUIRE(ruby(*host, "Network.host(port: 0)") == "true");
   CHECK(ruby(*host, "[$log.count(:disconnected), Network.peers].inspect") == "[1, []]");
   REQUIRE(lan.until([&] { return ruby(*guest, "Network.online?") == "false"; }));
@@ -776,7 +819,9 @@ TEST_CASE("hosting or joining again leaves the game this machine was in, and the
 TEST_CASE("after a level is loaded, the objects of the others are back and one's own are gone elsewhere") {
   Lan lan;
   lan.level_from_files = true;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   const auto crates = [](Engine& machine) { return ruby(machine, "Scene.objects.count { |o| o.name == 'Crate' }"); };
   REQUIRE(crates(*host) == "1");  // the level's own
   ruby(*host, "Network.spawn('Crate', position: Vector3.new(4, 9, 0))");
@@ -853,7 +898,9 @@ TEST_CASE("a hosted game is found by the machines around it, by name, unless it 
 
 TEST_CASE("a character's own animation is seen on the other machines from its moment, as far behind as its pose") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   sync_swordsman({host, guest}, ", delay: 0.25");
   lan.rounds(kSettleRounds);
   ruby(*host, "$hero.animation.play(:Attack, loop: false)");
@@ -869,7 +916,9 @@ TEST_CASE("a character's own animation is seen on the other machines from its mo
 
 TEST_CASE("a machine that joins late sees what a character is doing already, its mixed clip too") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   sync_swordsman({host, guest});
   ruby(*host, "$hero.animation.play(:Guard); $hero.animation.mix(:Attack, weight: 0.5)");
   lan.rounds(kSettleRounds);
@@ -883,7 +932,9 @@ TEST_CASE("a machine that joins late sees what a character is doing already, its
 
 TEST_CASE("an object whose NetworkSync leaves animation out keeps its own clips") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   sync_swordsman({host});
   sync_swordsman({guest}, ", animation: false");
   ruby(*host, "$hero.animation.play(:Attack)");
@@ -894,7 +945,9 @@ TEST_CASE("an object whose NetworkSync leaves animation out keeps its own clips"
 
 TEST_CASE("a character whose owner never animated it keeps the clips a watcher's scripts give it") {
   Lan lan;
-  auto [host, guest] = lan.host_and_guest();
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
   sync_swordsman({host, guest});
   lan.rounds(kSettleRounds);
   ruby(*guest, "$hero.animation.play(:Guard)");  // say, a look of the guest's own

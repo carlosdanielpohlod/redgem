@@ -1,0 +1,8 @@
+# Leaks LeakSanitizer reports that are not the engine's (suppressions=, see run_tests.sh).
+# One line per library, with why: a leak in the engine's own code is fixed, never listed here.
+
+# 161 bytes the interpreter allocated are still held when redgem_tests ends, after every test
+# passed. mruby is not instrumented (rake builds it), so the report stops at its allocator and
+# does not say whose they are; listed until that is found (see KNOWN_LIMITATIONS.md). It hides
+# any other leak of memory mruby allocates, too.
+leak:mrb_realloc_simple

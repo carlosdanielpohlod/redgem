@@ -66,8 +66,9 @@ jobs:
           sysctl -n machdep.cpu.brand_string
           system_profiler SPDisplaysDataType
 
+      # (A warning in the engine's own code fails the build: see REDGEM_WARNINGS_AS_ERRORS.)
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DREDGEM_WARNINGS_AS_ERRORS=ON
 
       # (Going on past the first error: every one of them is in the log.)
       - name: Build

@@ -85,9 +85,10 @@ jobs:
             .deps/fetch/*-subbuild
           key: fetch-windows-${{ hashFiles('cmake/Dependencies.cmake') }}
 
+      # (A warning in the engine's own code fails the build: see REDGEM_WARNINGS_AS_ERRORS.)
       - name: Configure
         run: >
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DREDGEM_WARNINGS_AS_ERRORS=ON
           -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/windows.cmake
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON

@@ -105,10 +105,12 @@ TEST_CASE("each collider name gives its shape") {
                                                              {props::kColliderSphere, ColliderShape::Sphere},
                                                              {props::kColliderCapsule, ColliderShape::Capsule},
                                                              {props::kColliderMesh, ColliderShape::Mesh}};
-  for (const auto& [name, shape] : colliders) {
+  for (const auto& collider : colliders) {
+    // (Not a structured binding: CAPTURE keeps it in a lambda, which C++17 does not allow.)
+    const char* name = collider.first;
     CAPTURE(name);
     const BodyConfig config = body_config_from_props({{"collider", std::string(name)}});
-    CHECK(config.collider == shape);
+    CHECK(config.collider == collider.second);
     CHECK(config.type == BodyType::Static);
     CHECK(config.warnings.empty());
   }

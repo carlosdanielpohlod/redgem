@@ -77,7 +77,10 @@ TEST_CASE("vertices are not written into data kept any other way than the editor
   const std::pair<const char*, json> changes[] = {
       {kComponentType, 5123}, {kType, kVec2Type}, {kType, 3},        {kCount, 4},
       {kCount, -3},           {kBufferView, 5},   {kBufferView, -1}, {kBufferView, "0"}};
-  for (const auto& [key, value] : changes) {
+  for (const auto& change : changes) {
+    // (Not a structured binding: CAPTURE keeps it in a lambda, which C++17 does not allow.)
+    const char* key = change.first;
+    const json& value = change.second;
     CAPTURE(key);
     CAPTURE(value.dump());
     json file = positions_file();
@@ -86,7 +89,10 @@ TEST_CASE("vertices are not written into data kept any other way than the editor
   }
   const std::pair<const char*, json> view_changes[] = {
       {kBuffer, 1}, {kByteStride, 16}, {kByteLength, kStreamBytes - 1}, {kByteLength, -1}, {kByteOffset, kChunkBytes}};
-  for (const auto& [key, value] : view_changes) {
+  for (const auto& change : view_changes) {
+    // (Not a structured binding: CAPTURE keeps it in a lambda, which C++17 does not allow.)
+    const char* key = change.first;
+    const json& value = change.second;
     CAPTURE(key);
     CAPTURE(value.dump());
     json file = positions_file();

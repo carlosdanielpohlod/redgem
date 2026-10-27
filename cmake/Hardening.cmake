@@ -53,6 +53,15 @@ if(WIN32)
   check_linker_flag(CXX "-Wl,--dynamicbase,--nxcompat,--high-entropy-va" REDGEM_LINKS_WINDOWS_MITIGATIONS)
 endif()
 
+# Whether the engine asks for the checked C functions itself: where the toolchain does not already,
+# where they work, and not in a sanitized build, whose own checks of those functions they would
+# get in the way of.
+if(REDGEM_FORTIFY_NOT_PRESET AND REDGEM_FORTIFY_WORKS AND NOT REDGEM_SANITIZERS)
+  set(REDGEM_ADDS_FORTIFY ON)
+else()
+  set(REDGEM_ADDS_FORTIFY OFF)
+endif()
+
 function(redgem_harden target)
   if(REDGEM_HAS_STACK_PROTECTOR)
     target_compile_options(${target} PRIVATE -fstack-protector-strong)
@@ -62,7 +71,7 @@ function(redgem_harden target)
     endif()
   endif()
   # Only in optimized builds: without optimization the checks cannot be made, and the C library says so.
-  if(REDGEM_FORTIFY_NOT_PRESET AND REDGEM_FORTIFY_WORKS)
+  if(REDGEM_ADDS_FORTIFY)
     target_compile_definitions(${target} PRIVATE
       $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>,$<CONFIG:MinSizeRel>>:_FORTIFY_SOURCE=2>)
   endif()

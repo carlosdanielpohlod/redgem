@@ -1,5 +1,8 @@
 #include "net/frame_buffer.hpp"
 
+#include <algorithm>
+#include <cstddef>
+
 namespace redgem::net {
 
 namespace {
@@ -18,14 +21,15 @@ std::size_t announced_length(const std::vector<std::uint8_t>& bytes, std::size_t
 }  // namespace
 
 std::vector<std::uint8_t> frame(const std::vector<std::uint8_t>& message) {
-  std::vector<std::uint8_t> out;
-  out.reserve(kLengthBytes + message.size());
+  // (Sized once and written in place: appending after the length bytes made GCC's optimizer see
+  // a copy into a buffer of no size, a false -Wstringop-overflow.)
+  std::vector<std::uint8_t> out(kLengthBytes + message.size());
   const auto length = static_cast<std::uint32_t>(message.size());
   for (std::size_t i = 0; i < kLengthBytes; ++i) {
     const int shift = static_cast<int>(kLengthBytes - 1 - i) * kBitsPerByte;
-    out.push_back(static_cast<std::uint8_t>((length >> shift) & kByteMask));
+    out[i] = static_cast<std::uint8_t>((length >> shift) & kByteMask);
   }
-  out.insert(out.end(), message.begin(), message.end());
+  std::copy(message.begin(), message.end(), out.begin() + static_cast<std::ptrdiff_t>(kLengthBytes));
   return out;
 }
 

@@ -71,9 +71,10 @@ jobs:
             .deps/fetch/*-subbuild
           key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
 
+      # (A warning in the engine's own code fails the build: see REDGEM_WARNINGS_AS_ERRORS.)
       - name: Configure
         run: >
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DREDGEM_WARNINGS_AS_ERRORS=ON
           -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
 
       - name: Keep the libraries' sources

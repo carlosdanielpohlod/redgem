@@ -3,6 +3,7 @@ add_executable(redgem_tests
   unit/math_test.cpp
   unit/collision_layers_test.cpp
   unit/fixed_clock_test.cpp
+  unit/coarse_clock_test.cpp
   unit/stopwatch_test.cpp
   unit/log_test.cpp
   unit/files_test.cpp
@@ -179,6 +180,11 @@ target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # A program that crashes on purpose, for the tests of crash reports (tests/tools/crash_helper.cpp).
 add_executable(redgem_crash_helper tools/crash_helper.cpp)
 target_link_libraries(redgem_crash_helper PRIVATE redgem_runtime)
+if(REDGEM_SANITIZERS)
+  # Its invalid access is meant to reach the engine's crash handler as a signal: UBSan would stop
+  # the program at the null pointer first.
+  target_compile_options(redgem_crash_helper PRIVATE -fno-sanitize=undefined)
+endif()
 # The tests of builds copy the real player, and look for it where a build does: beside redgem.
 add_dependencies(redgem_tests redgem_player redgem redgem_crash_helper)
 target_compile_definitions(redgem_tests PRIVATE
@@ -505,6 +511,8 @@ add_test(NAME system.optional_tests_without_their_scene_are_skipped
                  ${REDGEM_RUN_IF_BUILT} ${REDGEM_SKIPPED_EXIT_CODE})
 
 # The tools that are scripts.
+add_test(NAME tools.embedded_text
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_files_test.py ${CMAKE_CXX_COMPILER})
 add_test(NAME tools.blender_runs_in_a_home_of_its_own
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/blender_home.sh ${CMAKE_SOURCE_DIR}/tools/blender/run.sh)
 # The manual's index for coding assistants (llms.txt), which the docs build writes.

@@ -224,10 +224,17 @@ not a promise of how it will be closed.
 - Rendering, physics and scripts run on one thread; physics uses a single-threaded job system.
 - Textures are kept uncompressed on the graphics card (no KTX2/Basis, BCn or ASTC), which costs
   most on phones.
-- The continuous integration has no sanitizers (ASan, UBSan, TSan), no fuzzing of the file and
-  network parsers (they have hostile-input tests), no coverage report and no real graphics card.
-  Compiler warnings do not fail the build. The load test and the benchmarks print numbers but fail
-  on none.
+- The continuous integration has no fuzzing of the file and network parsers (they have
+  hostile-input tests) and no real graphics card. The sanitizers (ASan, UBSan, TSan) run the tests
+  that open no window, not the system tests; the coverage report is of those tests too, and no
+  share of it is required. The load test and the benchmarks print numbers but fail on none.
+- ThreadSanitizer finds a lock-order inversion in the physics: adding a vehicle holds a body's
+  lock while it takes Jolt's step-listener lock, which a physics step takes the other way round.
+  Physics runs on one thread, so they never meet today; it is listed in
+  `tools/sanitizers/tsan.supp` until it is fixed. UBSan finds a read before a table in raylib's
+  bundled `stb_image_resize2` (scaling icons), listed in `tools/sanitizers/ubsan.supp`. LeakSanitizer
+  finds 161 bytes mruby allocated still held when the unit tests end; mruby is not built with the
+  sanitizers, so whose they are is unknown, and every leak of mruby's memory is listed as known.
 - About forty unit and integration tests wait on the real clock, a source of rare timing failures.
 - Some constants are defined more than once (`kLargestPort` in four places, `kBitsPerByte` in
   four, Ruby limits that repeat C++ ones), as are a few string helpers.
