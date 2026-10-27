@@ -70,6 +70,7 @@ void World::create_simulated(const BodyDesc& desc, const ShapeInfo& info, Record
 void World::remove_object(ObjectId object) {
   const auto it = records_.find(object);
   if (it == records_.end()) return;
+  remove_joints_of(object);  // before its body: a joint must never hold a body that is gone
   release_vehicle(it->second);
   release_body(it->second);
   release_character(it->second);
@@ -118,6 +119,7 @@ void World::move_kinematic_bodies(float dt) {
 void World::step(float dt) {
   move_kinematic_bodies(dt);
   system_.Update(dt, config::kPhysicsCollisionSteps, &temp_allocator_, &job_system_);
+  break_overloaded_joints(dt);
   update_characters(dt);
   update_triggers();
   collect_contact_events();

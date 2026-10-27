@@ -31,6 +31,9 @@ until 1.0, a release may change what games rely on (see
 - **Forces and body state**: `Rigidbody#add_force` (at a point too), `add_torque`,
   `angular_velocity`, `mass`, `gravity_scale`, `sleep`/`wake`, and switching a body between
   dynamic and kinematic while the game runs.
+- **Joints**: `Physics.joint` makes fixed, hinge (limits and a motor), slider, point and distance
+  (a rope, or a spring) joints between two bodies or a body and the world; a joint can break past
+  a force, be disabled or removed, and goes with its objects.
 
 ## [0.4.0] - 2026-10-25
 

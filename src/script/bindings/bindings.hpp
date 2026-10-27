@@ -17,6 +17,7 @@ void install_camera_bindings(mrb_state* mrb);
 void install_physics_bindings(mrb_state* mrb);
 void install_rigidbody_bindings(mrb_state* mrb);
 void install_physics_query_bindings(mrb_state* mrb);
+void install_joint_bindings(mrb_state* mrb);
 void install_light_bindings(mrb_state* mrb);
 void install_runtime_bindings(mrb_state* mrb);
 void install_game_identity_bindings(mrb_state* mrb);

@@ -956,10 +956,80 @@
           "name": "layers",
           "static": true,
           "about": "the game's collision layers, as Symbols (game.json's physics layers)"
+        },
+        {
+          "name": "joint",
+          "static": true,
+          "args": "kind, object, other = nil, anchor: nil, other_anchor: nil, axis: nil, limits: nil, motor_speed: nil, motor_torque: nil, min: nil, max: nil, spring: nil, damping: nil, break_force: nil",
+          "about": "joins two objects, or one to the world (other nil): :fixed, :hinge, :slider, :point or :distance",
+          "example": "Physics.joint(:hinge, door, nil, anchor: pin, axis: Vector3.up, limits: [0, 110])"
         }
       ],
       "guide": "gameplay.md",
       "notes": "`layers:` is a layer's name or a list of them (every layer when nil); `ignore:` is an object or a list of objects to see through. Hits are `{object:, point:, normal:, distance:}`, each object once, nearest first, at most 64; triggers are never hit. A cast that starts inside something hits it at distance 0."
+    },
+    {
+      "name": "Joint",
+      "about": "What holds two bodies together, or one to the world (made by Physics.joint).",
+      "methods": [
+        {
+          "name": "kind",
+          "about": ":fixed, :hinge, :slider, :point or :distance"
+        },
+        {
+          "name": "object",
+          "about": "the object it holds"
+        },
+        {
+          "name": "other",
+          "about": "the other object it holds, or nil for the world"
+        },
+        {
+          "name": "alive?",
+          "about": "whether it still holds them"
+        },
+        {
+          "name": "broken?",
+          "about": "whether it was pulled past its break force"
+        },
+        {
+          "name": "remove",
+          "about": "lets go"
+        },
+        {
+          "name": "enabled?",
+          "about": "whether it holds right now"
+        },
+        {
+          "name": "enabled=",
+          "args": "flag",
+          "about": "lets go for a while, or holds again"
+        },
+        {
+          "name": "break_force",
+          "about": "the pull (newtons) or twist (newton meters) it breaks at; 0 never breaks"
+        },
+        {
+          "name": "break_force=",
+          "args": "newtons",
+          "about": "sets the pull it breaks at"
+        },
+        {
+          "name": "motor",
+          "args": "speed, torque",
+          "about": "a hinge turns at that speed (degrees per second) with at most that torque; 0 torque lets it go"
+        },
+        {
+          "name": "angle",
+          "about": "how far a hinge turned from where it started, in degrees"
+        }
+      ],
+      "internal": [
+        "inspect",
+        "to_s"
+      ],
+      "guide": "gameplay.md",
+      "notes": "Points and axes are in world space; `anchor:` defaults to the object's position, `other_anchor:` (a distance joint's other end) to the other object's, `axis:` to up. A hinge's `limits:` are degrees [low, high] from where it starts (low -180 to 0, high 0 to 180), a slider's are meters along its axis; a hinge's `motor_speed:` needs a `motor_torque:`. A distance joint keeps between `min:` (0) and `max:` (how far apart the ends are) apart, springy with `spring:` (hertz) and `damping:`. Each kind refuses options it has no use for, and `motor` and `angle` raise for anything but a hinge. A joint needs a dynamic body at one end (one whose bodies were all made kinematic since holds nothing until one is dynamic again); it goes when either object is destroyed or the scene changes."
     },
     {
       "name": "CharacterController",

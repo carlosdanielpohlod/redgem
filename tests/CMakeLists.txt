@@ -137,6 +137,8 @@ add_executable(redgem_tests
   integration/physics_queries_test.cpp
   integration/physics_forces_test.cpp
   integration/physics_api_test.cpp
+  integration/physics_joints_test.cpp
+  integration/physics_joint_api_test.cpp
   integration/vehicle_test.cpp
   integration/ruby_vm_test.cpp
   integration/script_budget_test.cpp
