@@ -137,3 +137,8 @@ on each node. It is listed in `extensionsUsed` so other glTF tools can ignore it
 repairs invalid or duplicate identities with a warning. An external exporter that drops this
 extension creates a scene without those persistent identities; list its objects again before
 editing it. Identical names in different scenes do not identify the same object.
+
+Before editing a scene, keep a copy of its `.glb`. Afterwards, use
+`redgem scene diff . --against /path/to/before.glb` to inspect the changes by persistent identity.
+It reports object additions, removals and changed fields without writing either file. `--scene`
+chooses another scene and `--limit` caps the details; see [the command line](command-line.md).

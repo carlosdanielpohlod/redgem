@@ -5,6 +5,7 @@
 // editor would save it).
 //
 //   redgem scene list   <game> [--scene name] [--depth N] [--limit N]
+//   redgem scene diff   <game> --against <before.glb> [--scene name] [--limit N]
 //   redgem scene get    <game> <object> [--scene name]
 //   redgem scene set    <game> <object> key=value... [--scene name]
 //   redgem scene add    <game> <name> [--from <object>] [--parent <object>] [key=value...] [--scene name]

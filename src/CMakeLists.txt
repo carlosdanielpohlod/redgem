@@ -592,6 +592,9 @@ if(NOT ANDROID)
     project/tool_commands.cpp
     project/closest_words.cpp
     project/scene_text.cpp
+    project/scene_diff.cpp
+    project/scene_snapshot.cpp
+    project/scene_fingerprint.cpp
     project/scene_lookup.cpp
     project/scene_assignments.cpp
     project/scene_command.cpp

@@ -276,7 +276,9 @@ there yet:
 
 - Headless input replay covers keyboard states only; mouse, gamepad and touch input are not yet replayed.
 - A live tooling transport for the process event history (the native API already reads it with
-  a `since` cursor), and `redgem scene diff` to show what an edit changed.
+  a `since` cursor).
+- `redgem scene diff` compares loaded object content against an earlier scene file, but does
+  not read a revision directly from Git or compare unused assets and unsupported glTF data.
 - A search of the game's assets and of the templates.
 - `redgem mcp`: an MCP server of about 8 to 10 tools wrapping the command line, and a live bridge
   to an open editor (a localhost socket with a token) to list, select and move objects, set

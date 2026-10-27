@@ -1,6 +1,7 @@
 #include "project/scene_command.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <iterator>
 #include <limits>
 #include <optional>
@@ -16,6 +17,7 @@
 #include "project/scene_assignments.hpp"
 #include "project/scene_lookup.hpp"
 #include "project/scene_text.hpp"
+#include "project/scene_diff.hpp"
 #include "scene/props.hpp"
 
 namespace redgem::tools {
@@ -26,9 +28,11 @@ constexpr const char* kFromOption = "--from";
 constexpr const char* kParentOption = "--parent";
 constexpr const char* kDepthOption = "--depth";
 constexpr const char* kLimitOption = "--limit";
+constexpr const char* kAgainstOption = "--against";
 // What the command takes after its name.
 ToolGrammar grammar() {
-  return {{kSceneOption, kFromOption, kParentOption, kDepthOption, kLimitOption}, {command_line::kHelpOption}};
+  return {{kSceneOption, kFromOption, kParentOption, kDepthOption, kLimitOption, kAgainstOption},
+          {command_line::kHelpOption}};
 }
 // A list stops after this many lines unless --limit says otherwise (0: never).
 constexpr std::size_t kDefaultListLimit = 200;
@@ -80,7 +84,10 @@ std::variant<int, ToolResult> named_object(const OpenScene& scene) {
 }
 
 // What a count must be: a whole number, not below zero.
-bool is_count(double number) { return number >= 0 && number == static_cast<double>(static_cast<std::size_t>(number)); }
+bool is_count(double number) {
+  const double end = std::ldexp(1.0, std::numeric_limits<std::size_t>::digits);
+  return number >= 0 && number < end && std::floor(number) == number;
+}
 
 // The count an option is given: `otherwise` without the option, nothing when it is no count.
 std::optional<std::size_t> count_option(const ToolLine& line, const char* option, std::size_t otherwise) {
@@ -176,6 +183,14 @@ ToolResult remove(OpenScene& scene) {
   return saved(scene, tr("project.scene.removed", {{"object", line}, {"count", std::to_string(gone)}}) + "\n");
 }
 
+ToolResult diff(OpenScene& scene) {
+  const auto baseline = scene.line.value(kAgainstOption);
+  if (!baseline) return failed(tr("project.scene.diff_needs_against"), kExitUsage);
+  const auto limit = count_option(scene.line, kLimitOption, kDefaultDiffLines);
+  if (!limit) return failed(tr("project.scene.needs_count"), kExitUsage);
+  return compare_scene_file(scene.document.desc(), scene.name, *baseline, *limit);
+}
+
 // A line that takes as many words as it wants after those it needs (what to set).
 constexpr std::size_t kAnyMore = std::numeric_limits<std::size_t>::max();
 
@@ -186,12 +201,20 @@ struct Known {
   std::size_t most;   // how many it takes (a word too many is refused, never left unread)
 };
 constexpr Known kSubcommands[] = {
-    {"list", list, kObjectWord, kObjectWord},
-    {"get", get, kFirstAssignment, kFirstAssignment},
-    {"set", set, kFirstAssignment, kAnyMore},
-    {"add", add, kFirstAssignment, kAnyMore},
-    {"remove", remove, kFirstAssignment, kFirstAssignment},
+    {"list", list, kObjectWord, kObjectWord},         {"diff", diff, kObjectWord, kObjectWord},
+    {"get", get, kFirstAssignment, kFirstAssignment}, {"set", set, kFirstAssignment, kAnyMore},
+    {"add", add, kFirstAssignment, kAnyMore},         {"remove", remove, kFirstAssignment, kFirstAssignment},
 };
+
+std::string unsupported_option(const Known& subcommand, const ToolLine& line) {
+  const bool diff_command = std::string(subcommand.word) == "diff";
+  if (!diff_command && line.value(kAgainstOption)) return tr("project.scene.diff_against_only");
+  if (!diff_command) return {};
+  for (const char* option : {kFromOption, kParentOption, kDepthOption}) {
+    if (line.value(option)) return tr("project.scene.diff_bad_option", {{"option", option}});
+  }
+  return {};
+}
 
 bool has_its_words(const Known& subcommand, const ToolLine& line) {
   return line.words.size() >= subcommand.least && line.words.size() <= subcommand.most;
@@ -217,6 +240,8 @@ std::variant<OpenScene, ToolResult> open_scene(ToolLine line) {
 ToolResult run_subcommand(const Known& subcommand, ToolLine line) {
   if (line.has(command_line::kHelpOption)) return answer(usage());
   if (!has_its_words(subcommand, line)) return failed(usage(), kExitUsage);
+  const std::string option_error = unsupported_option(subcommand, line);
+  if (!option_error.empty()) return failed(option_error, kExitUsage);
   auto opened = open_scene(std::move(line));
   if (auto* problem = std::get_if<ToolResult>(&opened)) return *problem;
   return subcommand.run(std::get<OpenScene>(opened));

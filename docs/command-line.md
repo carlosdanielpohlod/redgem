@@ -51,9 +51,24 @@ renames and reparenting. New objects get hexadecimal identities: take them from 
 | `redgem scene set <game> <object> key=value...` | changes the object and saves the scene |
 | `redgem scene add <game> <name> [--from <object>] [--parent <object>] [key=value...]` | adds an empty object, or a copy of another (with its children), and saves |
 | `redgem scene remove <game> <object>` | removes the object and its children, and saves |
+| `redgem scene diff <game> --against <before.glb>` | compares the current scene with an earlier save, without changing either file |
 
 Every command takes `--scene <name>` for another scene than `scene.glb`: `--scene level2` is
 `scenes/level2.glb`.
+
+For `diff`, save a copy of the scene before editing, then pass that file to `--against`. Objects
+are matched by their persistent identities: a rename or a reordered node array does not create
+a new object. The summary counts added, removed and changed objects; details show the fields
+that changed, including placement, hierarchy, properties, materials, image bytes, geometry,
+cameras, lights, skin bindings and animation keys. Geometry and binary assets show content
+fingerprints. Unused assets and glTF data the engine does not load are outside this comparison.
+Re-encoding an image changes its fingerprint even if it looks identical.
+
+`--limit N` bounds the detail lines (50 by default, `0` for all); the summary always counts every
+object. Numeric object and material fields tolerate float differences up to 0.00001; custom
+properties and fingerprinted asset values are compared exactly. Use an earlier save of the same
+scene: independently exported scenes without persistent
+identities cannot reliably identify the same objects.
 
 What `set` (and `add`) take:
 
