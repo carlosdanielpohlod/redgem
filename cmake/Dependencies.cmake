@@ -11,6 +11,7 @@ set(REDGEM_IMGUI_TAG   "v1.92.8-docking")
 set(REDGEM_RLIMGUI_COMMIT  "1550009359ad975927f7f0e4a3f47e3f27123ea9")
 set(REDGEM_IMGUIZMO_COMMIT "18cef5e031d8c6973d80284c67f60549fafd78c1")
 set(REDGEM_JSON_VERSION "v3.12.0")
+set(REDGEM_JSON_SHA256 "42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa")
 set(REDGEM_MBEDTLS_VERSION "3.6.7")
 set(REDGEM_MBEDTLS_SHA256 "a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6")
 # SQLite 3.50.4: the year it came out, and its version written in digits.
@@ -111,7 +112,8 @@ FetchContent_Declare(imguizmo
 
 # --- JSON (editor saves the glTF JSON chunk) --------------------------------------------
 FetchContent_Declare(nlohmann_json
-  URL https://github.com/nlohmann/json/releases/download/${REDGEM_JSON_VERSION}/json.tar.xz)
+  URL https://github.com/nlohmann/json/releases/download/${REDGEM_JSON_VERSION}/json.tar.xz
+  URL_HASH SHA256=${REDGEM_JSON_SHA256})
 
 # --- Mbed TLS (HTTPS for the games' HTTP; its release archive, which needs no code generation) ----
 set(ENABLE_PROGRAMS OFF CACHE BOOL "" FORCE)

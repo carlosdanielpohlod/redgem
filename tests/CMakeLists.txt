@@ -509,6 +509,11 @@ add_test(NAME tools.blender_runs_in_a_home_of_its_own
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/blender_home.sh ${CMAKE_SOURCE_DIR}/tools/blender/run.sh)
 # The manual's index for coding assistants (llms.txt), which the docs build writes.
 add_test(NAME tools.llms_txt COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/llms_txt_test.py)
+# THIRD_PARTY_LICENSES.md is what the dependencies this build fetched make: a dependency updated
+# without the file fails here (and the script that writes it is tested on its own).
+add_test(NAME tools.license_notices COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/collect_notices_test.py)
+add_test(NAME tools.license_notices_are_up_to_date
+         COMMAND python3 -I ${CMAKE_SOURCE_DIR}/tools/licenses/collect_notices.py --deps ${FETCHCONTENT_BASE_DIR} --check)
 
 # How a dedicated server holds up under players (see load/load_test.cpp): bots join a room of the
 # platformer on redgem-server and play, and what it costs is measured, a tool for whoever works on
