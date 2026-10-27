@@ -511,6 +511,8 @@ add_test(NAME system.optional_tests_without_their_scene_are_skipped
                  ${REDGEM_RUN_IF_BUILT} ${REDGEM_SKIPPED_EXIT_CODE})
 
 # The tools that are scripts.
+add_test(NAME tools.embedded_text
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_files_test.py ${CMAKE_CXX_COMPILER})
 add_test(NAME tools.blender_runs_in_a_home_of_its_own
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/blender_home.sh ${CMAKE_SOURCE_DIR}/tools/blender/run.sh)
 # The manual's index for coding assistants (llms.txt), which the docs build writes.
