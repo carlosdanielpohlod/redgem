@@ -2,8 +2,7 @@
 
 // A scene as short text (`redgem scene list` and `get`): one line per object, indented by the
 // hierarchy, saying only what differs from an object's defaults, so that reading a level costs
-// little. Every object is named by its id, `#<n>`: its place in the scene file, which the editor
-// saves parents first (adding or removing objects renumbers those after them).
+// little. Every object is named by its persisted identity (#id), independent of node order.
 
 #include <cstddef>
 #include <limits>
@@ -23,7 +22,7 @@ inline constexpr int kDetailDecimals = 4;
 inline constexpr char kIdMark = '#';
 
 // "#12".
-std::string object_id(int index);
+std::string object_id(const SceneDesc& scene, int index);
 // A number with at most `decimals` decimals and no trailing zeros: 1.50 -> "1.5", -0.001 -> "0".
 std::string number_text(double value, int decimals);
 // "x,y,z", each a number_text.
@@ -33,16 +32,9 @@ std::string property_text(const PropertyValue& value);
 // Where an object is in the hierarchy: "Level/Walls/Wall".
 std::string object_path(const SceneDesc& scene, int index);
 
-// The id `index` gets once the scene is saved and read again: files keep each object's children
-// right after it, in order, and the objects at the top in the order they are (edits made since the
-// scene was read may have put them elsewhere).
-int saved_id(const SceneDesc& scene, int index);
-
 // One object's line, without its indentation: "#3 Coin pos=3,1,0 rot=0,45,0 mesh=Rock scripts=Coin tag=coin".
 // Every word after the name is one `redgem scene set` takes back (see scene_assignments.hpp).
 std::string object_line(const SceneDesc& scene, int index);
-// The same, under another id (what the object will be once the scene is saved, see saved_id).
-std::string object_line(const SceneDesc& scene, int index, int id);
 
 // The words of a line that say what an object is rather than set it: they are taken back only as
 // they are. "sun", "point" or "spot", for a light of that type.

@@ -111,12 +111,12 @@ TEST_CASE("an object is found by id, by path or by a name only it has") {
   CHECK(find_object(scene, "Player/Visor").index == kVisorId);
   CHECK(find_object(scene, "Visor").index == kVisorId);
   CHECK(find_object(scene, "#999").index == kNoIndex);
-  CHECK(has(find_object(scene, "#999").error, "#0 to #27"));
+  CHECK(has(find_object(scene, "#999").error, "scene list"));
   // A mistyped name is answered with the names it is near.
   CHECK(has(find_object(scene, "Plyer").error, "did you mean: Player"));
-  CHECK(id_number("#12") == 12);
-  CHECK(id_number("#x") == kNoIndex);
-  CHECK(id_number("12") == kNoIndex);
+  CHECK(find_object(scene, "#12").index == 12);
+  CHECK(find_object(scene, "#x").index == kNoIndex);
+  CHECK(find_object(scene, "12").index == kNoIndex);
 }
 
 TEST_CASE("a name several objects share is refused with each of them") {
@@ -177,7 +177,7 @@ TEST_CASE("a hierarchy as deep as a file makes it is listed without running out 
     scene.nodes.push_back(node);
   }
   CHECK(has(scene_list(scene, "deep", ListLimits{kEveryLevel, 2}), "#0 N0\n  #1 N1\n+99998 more"));
-  CHECK(saved_id(scene, kDepth - 1) == kDepth - 1);
+  CHECK(object_id(scene, kDepth - 1) == "#" + std::to_string(kDepth - 1));
 }
 
 TEST_CASE("an object moves under one listed after it") {
@@ -252,10 +252,11 @@ TEST_CASE("add makes an empty object or a copy of another, where it is asked for
   GameCopy game("add");
   const ToolResult copy = scene_tool({"add", game.dir(), "Coin6", "--from", "Coin5", "position=3,3,-31"});
   REQUIRE_MESSAGE(copy.exit_code == kExitSuccess, copy.err);
-  CHECK(has(copy.out, "#27 Coin6 pos=3,3,-31 mesh=Coin5 scripts=Coin tag=coin trigger=true"));
+  CHECK(has(copy.out, " Coin6 pos=3,3,-31 mesh=Coin5 scripts=Coin tag=coin trigger=true"));
   const ToolResult child = scene_tool({"add", game.dir(), "Marker", "--parent", "Player"});
-  // The id is the one the saved file gives it: right after the Player's other child.
-  CHECK(has(child.out, "#7 Marker"));
+  // The returned identity still names that object after hierarchy order changes on save.
+  const std::string marker_id = child.out.substr(0, child.out.find(' '));
+  CHECK(has(scene_tool({"get", game.dir(), marker_id}).out, " Marker\n"));
   const SceneDesc scene = load(game.scene());
   CHECK(scene.nodes.size() == kPlatformerObjects + 2);
   CHECK(scene.nodes[node_named(scene, "Marker").parent].name == "Player");

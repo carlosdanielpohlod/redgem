@@ -58,7 +58,7 @@ std::optional<std::string> syntax_problem(RubyVm& vm, const fs::path& scripts_di
 // Where in a game an object is: "scene main #7 Coin1".
 std::string where(const std::string& scene_name, const SceneDesc& scene, int index) {
   return tr("project.check.where",
-            {{"scene", scene_name}, {"object", object_id(index) + " " + scene.nodes[index].name}});
+            {{"scene", scene_name}, {"object", object_id(scene, index) + " " + scene.nodes[index].name}});
 }
 
 // The scenes' look at one game: what was already looked at is not looked at again.

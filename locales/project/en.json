@@ -176,7 +176,7 @@
   "project.scene.needs_count": "--depth and --limit need a whole number, 0 or more",
   "project.scene.needs_name": "name needs a name: name=Gate",
   "project.scene.needs_vector": "{key} needs x,y,z (three numbers), not {value}",
-  "project.scene.no_id": "no object {id}: the ids of this scene go from #0 to #{count} (not included)",
+  "project.scene.no_id": "no object {id}; use redgem scene list to see this scene's ids",
   "project.scene.no_object": "no object called {object}",
   "project.scene.no_object_near": "no object called {object}; did you mean: {names}?",
   "project.scene.no_scene": "the game has no scene {scene}; its scenes are: {scenes}",

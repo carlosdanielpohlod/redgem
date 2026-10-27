@@ -314,6 +314,8 @@ class SceneDocument {
                                const std::string& name, int parent);
   void append_model_nodes(const SceneDesc& model, const model_import::DescOffsets& offsets);
   int append_node(NodeDesc node);
+  void remember_ids();
+  std::string fresh_id();
   void restore_materials(const std::vector<MaterialDesc>& snapshot);
   int append_material(const MaterialDesc& material);
   // A material with just a color and a roughness (what new shapes and terrains get).
@@ -337,6 +339,7 @@ class SceneDocument {
   std::vector<std::vector<int>> skin_joint_sources_;
   std::vector<std::vector<int>> channel_node_sources_;
   SceneDesc desc_;
+  std::set<std::string> issued_ids_;  // identities are never reused by this editing session
   std::vector<Snapshot> undo_;
   std::vector<Snapshot> redo_;
   std::size_t steps_bytes_ = 0;       // what the undo and redo steps hold, together

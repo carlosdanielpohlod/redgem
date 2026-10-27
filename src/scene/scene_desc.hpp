@@ -180,6 +180,7 @@ struct NodeDesc {
   int source_node = kNoIndex;
   int source_camera = kNoIndex;
   int source_light = kNoIndex;
+  std::string stable_id{};  // persisted scene identity, independent of hierarchy/file positions
 };
 
 struct SceneDesc {

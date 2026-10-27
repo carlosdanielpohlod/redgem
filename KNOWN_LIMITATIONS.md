@@ -285,5 +285,5 @@ there yet:
 - Inspecting the objects of a game while it plays, and an opt-in Ruby eval in it (localhost and a
   token, a timeout, compiled out of release builds).
 - Physics queries (raycasts and overlaps) through the same tools.
-- `redgem scene` ids are places in the scene file: adding or removing objects renumbers the ones
-  after them.
+- External exporters that drop the private `REDGEM_object_id` glTF extension also drop persistent
+  scene object identities.

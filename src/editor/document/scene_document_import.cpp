@@ -136,6 +136,7 @@ void SceneDocument::append_model_nodes(const SceneDesc& model, const model_impor
   for (const NodeDesc& imported : model.nodes) {
     NodeDesc node = model_import::imported_node(imported, offsets);
     node.name = unique_name(node.name);
+    node.stable_id = fresh_id();
     desc_.nodes.push_back(std::move(node));
     if (under_root(desc_.nodes.back(), offsets.root)) desc_.nodes[offsets.root].children.push_back(node_count() - 1);
   }
