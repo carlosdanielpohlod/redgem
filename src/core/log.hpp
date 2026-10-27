@@ -1,7 +1,13 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <string>
+
+namespace redgem {
+struct EventPage;
+}
 
 namespace redgem::log {
 
@@ -21,5 +27,12 @@ Sink set_sink(Sink sink);
 void reset_sink();
 
 const char* level_name(Level level);
+
+inline constexpr std::size_t kDefaultEventLimit = 128;
+
+// Every message reaches the process history, independently of the installed sink.
+// Include core/event_journal.hpp for the page's fields. Cursors last for this process only.
+std::uint64_t event_cursor();
+EventPage events_since(std::uint64_t cursor, std::size_t limit = kDefaultEventLimit, Level minimum = Level::Debug);
 
 }  // namespace redgem::log
