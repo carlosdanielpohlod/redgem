@@ -24,6 +24,7 @@
 #include "project/game_templates.hpp"
 #include "project/project_texts.hpp"
 #include "project/tool_commands.hpp"
+#include "project/mcp_command.hpp"
 
 namespace {
 
@@ -145,6 +146,8 @@ void set_up_texts() {
 int run_command_line(const std::vector<std::string>& args) {
   using namespace redgem;
   set_up_texts();
+  if (!args.empty() && args.front() == "mcp")
+    return tools::run_mcp_command(std::vector<std::string>(args.begin() + 1, args.end()));
   if (const auto tool = tools::run_tool_command(args)) return said(*tool);
   const CliResult cli = parse_cli(args);
   if (!cli.ok) {

@@ -275,15 +275,16 @@ What is there today is the command line (`redgem scene`, `run`, `shot`, `check`,
 there yet:
 
 - Headless input replay covers keyboard states only; mouse, gamepad and touch input are not yet replayed.
-- A live tooling transport for the process event history (the native API already reads it with
-  a `since` cursor).
+- Reading history from another running editor or game: MCP's `events` tool reads only its own
+  process history, using the native API's `since` cursor.
 - `redgem scene diff` compares loaded object content against an earlier scene file, but does
   not read a revision directly from Git or compare unused assets and unsupported glTF data.
 - A search of the game's assets and of the templates.
-- `redgem mcp`: an MCP server of about 8 to 10 tools wrapping the command line, and a live bridge
-  to an open editor (a localhost socket with a token) to list, select and move objects, set
-  properties, play, stop and step, read the console's errors and take small screenshots, with
-  read-only and allow-list flags.
+- `redgem mcp` exposes eight CLI/history tools over stdio with read-only and allow-list flags
+  ([docs/mcp.md](docs/mcp.md)), but has no live bridge to an open editor. File edits do not update
+  an editor's in-memory scene or undo stack. Selection, play/stop/step and screenshots through
+  a localhost socket with a token remain to be implemented. Native calls run serially and cannot
+  be interrupted by a cancellation notification.
 - Inspecting the objects of a game while it plays, and an opt-in Ruby eval in it (localhost and a
   token, a timeout, compiled out of release builds).
 - Physics queries (raycasts and overlaps) through the same tools.

@@ -23,6 +23,7 @@ add_executable(redgem_tests
   unit/scene_identity_test.cpp
   unit/scene_stable_ids_test.cpp
   unit/scene_diff_test.cpp
+  unit/mcp_test.cpp
   unit/gltf_accessors_test.cpp
   unit/gltf_loader_test.cpp
   unit/gltf_loader_safety_test.cpp
@@ -515,6 +516,10 @@ add_test(NAME system.optional_tests_without_their_scene_are_skipped
                  ${REDGEM_RUN_IF_BUILT} ${REDGEM_SKIPPED_EXIT_CODE})
 
 # The tools that are scripts.
+add_test(NAME system.mcp_stdio
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/mcp_stdio_test.py
+                 $<TARGET_FILE:redgem> ${CMAKE_SOURCE_DIR}/games/platformer)
+set_tests_properties(system.mcp_stdio PROPERTIES LABELS system RUN_SERIAL TRUE TIMEOUT 90 SKIP_RETURN_CODE 77)
 add_test(NAME tools.embedded_text
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/embed_files_test.py ${CMAKE_CXX_COMPILER})
 add_test(NAME tools.blender_runs_in_a_home_of_its_own

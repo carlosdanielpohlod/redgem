@@ -590,6 +590,10 @@ if(NOT ANDROID)
     project/cli_options.cpp
     project/tool_line.cpp
     project/tool_commands.cpp
+    project/mcp_protocol.cpp
+    project/mcp_catalog.cpp
+    project/mcp_tools.cpp
+    project/mcp_command.cpp
     project/closest_words.cpp
     project/scene_text.cpp
     project/scene_diff.cpp

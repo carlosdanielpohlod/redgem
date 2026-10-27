@@ -10,6 +10,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **MCP stdio tools**: `redgem mcp <game>` exposes scene inspection, editing and comparison,
+  headless runs, checks, API lookup and cursor-based process events. It supports read-only and
+  allow-list options, bounded messages and results, modern per-request metadata and legacy
+  initialization. It does not attach to an open editor yet.
 - **Scene comparison**: `redgem scene diff --against` reports added, removed and changed objects
   by persistent identity, including placement, hierarchy, properties, materials and asset content,
   without rewriting either scene file.

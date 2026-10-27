@@ -4,6 +4,9 @@ description: "Making games with a coding assistant: the guide every new game get
 
 # Making games with an AI assistant
 
+For an MCP client, [the stdio server](mcp.md) exposes the same developer commands through
+eight tools, with a read-only mode, an allow list and cursor-based process events.
+
 A coding assistant that works in a terminal (one that reads files and runs commands) can make a
 RedGem game with you: write behaviours, place objects in a level, play the game and read what went
 wrong. RedGem gives it what it needs in text, so it does not have to guess an API it has never
