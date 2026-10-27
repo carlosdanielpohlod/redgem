@@ -10,6 +10,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Scene comparison**: `redgem scene diff --against` reports added, removed and changed objects
+  by persistent identity, including placement, hierarchy, properties, materials and asset content,
+  without rewriting either scene file.
 - **Stable scene object identities**: command-line object IDs survive saves, renames, reparenting
   and deletion of other objects. New objects, duplicates, pasted objects and imported models get
   their own identities, persisted in the scene file and restored by undo and redo.

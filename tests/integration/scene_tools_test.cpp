@@ -317,3 +317,33 @@ TEST_CASE("names near a mistyped one") {
   CHECK(edit_distance("Kitten", "sitting") == 3);
   CHECK(joined({"a", "b"}) == "a, b");
 }
+
+TEST_CASE("scene diff compares an earlier save by identity and does not change either file") {
+  GameCopy game("diff");
+  const fs::path baseline = fs::path(game.dir()) / "before.glb";
+  fs::copy_file(game.scene(), baseline);
+  REQUIRE(scene_tool({"set", game.dir(), "Coin1", "position=1,2,3"}).exit_code == kExitSuccess);
+  const auto current_time = fs::last_write_time(game.scene());
+  const auto baseline_time = fs::last_write_time(baseline);
+  const ToolResult diff = scene_tool({"diff", game.dir(), "--against", baseline.string()});
+  CHECK_MESSAGE(diff.exit_code == kExitSuccess, diff.err);
+  CHECK(has(diff.out, "+0 -0 ~1 objects"));
+  CHECK(has(diff.out, "~ #7 Coin1"));
+  CHECK(has(diff.out, "position:"));
+  CHECK(fs::last_write_time(game.scene()) == current_time);
+  CHECK(fs::last_write_time(baseline) == baseline_time);
+  const ToolResult limited = scene_tool({"diff", game.dir(), "--against", baseline.string(), "--limit", "1"});
+  CHECK(has(limited.out, "detail lines not shown"));
+}
+
+TEST_CASE("scene diff refuses missing baselines, unrelated options and unsafe numeric limits") {
+  const auto game = kPlatformer.string();
+  CHECK(scene_tool({"diff", game}).exit_code == kExitUsage);
+  CHECK(scene_tool({"diff", game, "--against", "/no/such/scene.glb"}).exit_code == kExitFailure);
+  CHECK(scene_tool({"diff", game, "--against", (kPlatformer / "scene.glb").string(), "--limit", "1e300"}).exit_code ==
+        kExitUsage);
+  CHECK(scene_tool({"diff", game, "--against", (kPlatformer / "scene.glb").string(), "--depth", "1"}).exit_code ==
+        kExitUsage);
+  CHECK(scene_tool({"list", game, "--against", "other.glb"}).exit_code == kExitUsage);
+  CHECK(scene_tool({"list", game, "--limit", "1e300"}).exit_code != kExitSuccess);
+}
