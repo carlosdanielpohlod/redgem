@@ -17,15 +17,17 @@ using AnimationParameters = std::map<std::string, AnimationParameter>;
 struct AnimationBlendPoint {
   float threshold = 0.0f;
   std::string clip;
+  float second_threshold = 0.0f;
 };
 
-// An empty parameter denotes a single clip; otherwise points form a one-dimensional blend.
+// An empty parameter denotes a clip; a second parameter selects a rectangular two-dimensional grid.
 struct AnimationGraphState {
   std::string name;
   std::string parameter;
   std::vector<AnimationBlendPoint> points;
   bool loop = true;
   float speed = 1.0f;
+  std::string second_parameter{};
 };
 
 enum class AnimationComparison { Equal, Above, Below };
@@ -50,6 +52,7 @@ struct AnimationGraphPoint {
   float threshold = 0.0f;
   std::size_t clip = 0;
   float duration = 0.0f;
+  float second_threshold = 0.0f;
 };
 
 struct CompiledAnimationState {
@@ -58,6 +61,9 @@ struct CompiledAnimationState {
   std::vector<AnimationGraphPoint> points;
   bool loop = true;
   float speed = 1.0f;
+  std::string second_parameter{};
+  std::vector<float> first_axis{};
+  std::vector<float> second_axis{};
 };
 
 struct CompiledAnimationTransition {

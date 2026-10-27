@@ -33,6 +33,21 @@ class AnimationGraphTest < RedGemTest::Case
     clip = ["Run", -0.25, 1.0, true, true]
     assert !Network::Said.clip?(clip)
     clip[1] = 0.25
-    assert !Network::Said.graph?([1.0, 0.0, true, [], [[clip, 0.5], [clip, 0.5], [clip, 0.0]]])
+    assert !Network::Said.graph?([1.0, 0.0, true, [], Array.new(5) { [clip, 0.2] }])
+  end
+
+  def test_network_accepts_four_grid_corners_but_rejects_five_even_with_normalized_weights
+    clip = ["Run", 0.25, 1.0, true, true]
+    side = Array.new(4) { [clip, 0.25] }
+    assert Network::Said.graph?([1.0, 0.0, true, [], side])
+    side << [clip, 0.0]
+    assert !Network::Said.graph?([1.0, 0.0, true, [], side])
+  end
+
+  def test_two_dimensional_grid_keeps_its_parameter_pair_and_coordinates
+    grid = Animation::Graph.new(initial: :move, parameters: { x: 0.0, y: 0.0 })
+    points = [[[0, 0], :A], [[1, 0], :B], [[0, 1], :C], [[1, 1], :D]]
+    grid.blend_2d(:move, parameters: %i[x y], clips: points)
+    assert_equal [:move, %i[x y], points, true, 1.0], grid.__definition[2][0]
   end
 end

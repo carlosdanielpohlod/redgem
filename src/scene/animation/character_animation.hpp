@@ -20,7 +20,7 @@ struct ClipState {
   bool playing = true;
 };
 
-inline constexpr std::size_t kMaxGraphSideClips = 2;  // neighboring clips of a one-dimensional blend
+inline constexpr std::size_t kMaxGraphSideClips = 4;  // corners of a rectangular two-dimensional blend
 
 struct WeightedClipState {
   ClipState clip;

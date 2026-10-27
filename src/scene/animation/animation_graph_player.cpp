@@ -1,4 +1,5 @@
 #include "scene/animation/animation_graph_player.hpp"
+#include "scene/animation/animation_blend_grid.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -44,6 +45,14 @@ std::vector<AnimationGraphSample> between(const CompiledAnimationState& state, f
   const float weight = static_cast<float>((static_cast<double>(value) - lower.threshold) / span);
   if (weight == 0.0f) return {sample(lower, phase, 1.0f, state.loop)};
   return {sample(lower, phase, 1.0f - weight, state.loop), sample(*upper, phase, weight, state.loop)};
+}
+
+std::vector<AnimationGraphSample> state_samples(const CompiledAnimationState& state,
+                                                const AnimationParameters& parameters, double phase) {
+  if (state.parameter.empty()) return {sample(state.points.front(), phase, 1.0f, state.loop)};
+  const float first = std::get<float>(parameters.at(state.parameter));
+  if (state.second_parameter.empty()) return between(state, first, phase);
+  return grid_samples(state, first, std::get<float>(parameters.at(state.second_parameter)), phase);
 }
 
 double bounded_phase(double phase, bool loop) {
@@ -126,9 +135,7 @@ AnimationGraphPlayer::StateClock AnimationGraphPlayer::start(std::size_t state) 
 
 std::vector<AnimationGraphSample> AnimationGraphPlayer::samples(const StateClock& clock) const {
   const auto& state = state_of(clock);
-  auto result = state.parameter.empty()
-                    ? std::vector<AnimationGraphSample>{sample(state.points.front(), clock.phase, 1.0f, state.loop)}
-                    : between(state, std::get<float>(parameters_.at(state.parameter)), clock.phase);
+  auto result = state_samples(state, parameters_, clock.phase);
   synchronize_speeds(state, result);
   return result;
 }

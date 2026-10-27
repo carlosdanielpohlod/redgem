@@ -1,6 +1,7 @@
 #include <mruby.h>
 #include <mruby/array.h>
 #include <mruby/string.h>
+#include <utility>
 
 #include "scene/animation/animation_player.hpp"
 #include "script/bindings/binding_helpers.hpp"
@@ -66,21 +67,35 @@ AnimationParameters parameters(mrb_state* mrb, mrb_value value) {
   return result;
 }
 
+AnimationBlendPoint point(mrb_state* mrb, mrb_value value) {
+  parts(mrb, value, kPairParts);
+  const auto coordinates = at(value, kFirst);
+  const auto clip = to_name(mrb, at(value, kSecond));
+  if (mrb_type(coordinates) != MRB_TT_ARRAY) return {number(mrb, coordinates), clip};
+  parts(mrb, coordinates, kPairParts);
+  return {number(mrb, at(coordinates, kFirst)), clip, number(mrb, at(coordinates, kSecond))};
+}
+
 std::vector<AnimationBlendPoint> points(mrb_state* mrb, mrb_value value) {
   std::vector<AnimationBlendPoint> result;
   list(mrb, value);
-  for (mrb_int index = 0; index < RARRAY_LEN(value); ++index) {
-    const auto pair = parts(mrb, at(value, index), kPairParts);
-    result.push_back({number(mrb, at(pair, kFirst)), to_name(mrb, at(pair, kSecond))});
-  }
+  for (mrb_int index = 0; index < RARRAY_LEN(value); ++index) result.push_back(point(mrb, at(value, index)));
   return result;
+}
+
+std::pair<std::string, std::string> axes(mrb_state* mrb, mrb_value value) {
+  if (mrb_nil_p(value)) return {};
+  if (mrb_type(value) != MRB_TT_ARRAY) return {to_name(mrb, value), {}};
+  parts(mrb, value, kPairParts);
+  return {to_name(mrb, at(value, kFirst)), to_name(mrb, at(value, kSecond))};
 }
 
 AnimationGraphState state(mrb_state* mrb, mrb_value value) {
   parts(mrb, value, kStateParts);
-  const auto parameter = at(value, kSecond);
-  return {to_name(mrb, at(value, kFirst)), mrb_nil_p(parameter) ? "" : to_name(mrb, parameter),
-          points(mrb, at(value, kThird)), flag(mrb, at(value, kFourth)), number(mrb, at(value, kFifth))};
+  const auto parameters = axes(mrb, at(value, kSecond));
+  return {to_name(mrb, at(value, kFirst)), parameters.first,
+          points(mrb, at(value, kThird)),  flag(mrb, at(value, kFourth)),
+          number(mrb, at(value, kFifth)),  parameters.second};
 }
 
 AnimationComparison comparison(mrb_state* mrb, mrb_value value) {

@@ -44,7 +44,10 @@ TEST_CASE("evaluated animation graph tracks survive a pose wire round trip") {
 
 TEST_CASE("invalid graph weights clocks sizes and mixed modes are rejected on the wire") {
   auto part = graph_part();
-  SUBCASE("too many tracks") { part.graph->to.push_back(part.graph->to.front()); }
+  SUBCASE("too many tracks") {
+    part.graph->to.resize(kMaxBlendClips + 1, part.graph->to.front());
+    for (auto& entry : part.graph->to) entry.weight = 1.0f / static_cast<float>(part.graph->to.size());
+  }
   SUBCASE("no destination") { part.graph->to.clear(); }
   SUBCASE("weights do not sum to one") { part.graph->to[0].weight = 0.25f; }
   SUBCASE("negative weight") { part.graph->to[0].weight = -0.5f; }
@@ -73,7 +76,7 @@ TEST_CASE("the largest graph pose fits the declared wire limit exactly") {
   auto part = graph_part();
   const ClipPart clip{std::string(kMaxClipNameBytes, 'x'), 0.0f, 1.0f, true, true};
   part.layer = clip;
-  part.graph->from = {{clip, 0.5f}, {clip, 0.5f}};
+  part.graph->from.assign(kMaxBlendClips, {clip, 1.0f / kMaxBlendClips});
   part.graph->to = part.graph->from;
   auto update = graph_pose(part);
   update.key = std::string(kMaxPoseKeyBytes, 'x');

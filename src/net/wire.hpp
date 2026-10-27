@@ -67,7 +67,7 @@ namespace wire {
 // turned away, told why, and both sides log it: nothing of one version is understood by another.
 // What says so never changes, so that every version understands it: a frame (length, then
 // MessagePack) holding a map with kKind, kVersion and, in a refusal, kReason.
-inline constexpr int kProtocolVersion = 1;
+inline constexpr int kProtocolVersion = 2;
 // The largest a version that arrives can be (a number past it is not one).
 inline constexpr int kLargestProtocolVersion = 65535;
 

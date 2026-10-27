@@ -293,3 +293,26 @@ TEST_CASE("nearly complete graph fades remain valid network snapshots") {
   check_snapshot(owner);
   check_snapshot(watcher);
 }
+
+TEST_CASE("two dimensional graph poses survive snapshots and continue on a watching machine") {
+  GraphScene owner;
+  owner.desc.animations = {constant_clip("A", {}), constant_clip("B", {kDistance, 0, 0}),
+                           constant_clip("C", {0, kDistance, 0}), constant_clip("D", {kDistance, kDistance, 0})};
+  owner.player.reset(owner.desc.animations, owner.scene);
+  owner.graph.parameters = {{"x", 0.25f}, {"y", 0.75f}};
+  owner.graph.states = {{"Move", "x", {{0, "A", 0}, {1, "B", 0}, {0, "C", 1}, {1, "D", 1}}, true, 1, "y"}};
+  owner.graph.transitions.clear();
+  owner.use();
+  owner.advance(0.25f);
+  CHECK(owner.position().x == doctest::Approx(kDistance * 0.25f));
+  CHECK(owner.position().y == doctest::Approx(kDistance * 0.75f));
+  check_snapshot(owner);
+  GraphScene watcher;
+  watcher.player.reset(owner.desc.animations, watcher.scene);
+  watcher.player.take_animation(watcher.scene, kHero, owner.player.animation_of(owner.scene, kHero), 0.25f);
+  watcher.advance(0.25f);
+  owner.advance(0.5f);
+  CHECK(watcher.position().x == doctest::Approx(owner.position().x));
+  CHECK(watcher.position().y == doctest::Approx(owner.position().y));
+  CHECK(watcher.player.animation_of(watcher.scene, kHero).graph->to.size() == 4);
+}

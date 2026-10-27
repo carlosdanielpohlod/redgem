@@ -638,3 +638,27 @@ TEST_CASE("continuous emitters are inactive local effects without a presenter") 
   CHECK(ruby(*engine, "Particles.count") == "0");
   CHECK(ruby(*engine, "512.times { Particles.emitter(Scene.find('Host')) }; Particles.count") == "0");
 }
+
+TEST_CASE("Ruby two dimensional animation graphs install and reject incomplete grids") {
+  const TempSave temp;
+  const auto scene = small_scene();
+  auto engine = engine_for(scene, temp.file);
+  ruby(*engine,
+       "$grid = Animation::Graph.new(initial: :move, parameters: { x: 0.5, y: 0.5 }); "
+       "$grid.blend_2d(:move, parameters: [:x, :y], "
+       "clips: [[[0,0], 'Open'], [[1,0], 'Open'], [[0,1], 'Open'], [[1,1], 'Open']]); "
+       "Scene.find('Door').animation.use($grid)");
+  CHECK(ruby(*engine, "Scene.find('Door').animation.state") == "move");
+  CHECK(fails(*engine,
+              "$bad = Animation::Graph.new(initial: :move, parameters: {x: 0.0, y: 0.0}); "
+              "$bad.blend_2d(:move, parameters: [:x, :y], clips: [[[0,0], 'Open']]); "
+              "Scene.find('Door').animation.use($bad)"));
+}
+
+TEST_CASE("Ruby two dimensional animation graphs require a parameter pair") {
+  const TempSave temp;
+  const auto scene = small_scene();
+  auto engine = engine_for(scene, temp.file);
+  CHECK(fails(*engine, "Animation::Graph.new(initial: :move).blend_2d(:move, parameters: :x, clips: [])"));
+  CHECK(fails(*engine, "Animation::Graph.new(initial: :move).blend_2d(:move, parameters: [:x], clips: [])"));
+}
