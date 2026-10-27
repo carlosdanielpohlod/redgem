@@ -1,0 +1,128 @@
+# The parsers of what comes from outside, fuzzed with libFuzzer (tests/fuzz): the glTF loader,
+# picture headers (PNG, JPEG, WebP, Radiance), the MessagePack messages between machines, answers
+# of web servers and the JSON of a scene's custom properties. Built with clang, AddressSanitizer
+# and UndefinedBehaviorSanitizer. A minute per target on every pull request, ten every night; what
+# the runs find grows a corpus kept between them. An input that crashes a target is kept as the
+# run's artifact: once the code is fixed it goes into tests/fuzz/corpus/<target>, where every
+# build replays it.
+name: Fuzzing
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Seconds each target runs
+        type: number
+        default: 600
+
+# A newer push to the same branch makes the run of the older one pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: Fuzz the parsers
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1G
+      FETCH_DIR: ${{ github.workspace }}/.deps/fetch
+      WORK_DIR: ${{ github.workspace }}/.fuzz
+      # A minute each for a pull request or a push; longer at night or when asked.
+      SECONDS_EACH: ${{ inputs.seconds || (github.event_name == 'schedule' && 600) || 60 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the build tools and libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang libclang-rt-18-dev cmake ninja-build git ca-certificates xz-utils bison ccache \
+            libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libxext-dev libxfixes-dev libxrender-dev libasound2-dev
+
+      # (The sanitizers' runtimes need the program's memory where they expect it; see sanitizers.yml.)
+      - name: Narrow the address randomization for the sanitizers
+        run: sudo sysctl vm.mmap_rnd_bits=28
+
+      # rake builds mruby.
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+
+      - name: Restore the compiler cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-fuzz-${{ github.run_id }}
+          restore-keys: ccache-fuzz-
+
+      - name: Restore the libraries' sources
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .deps/fetch/*-src
+            .deps/fetch/*-subbuild
+          key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
+
+      # What earlier runs found (inputs reaching new code), from main's runs.
+      - name: Restore the corpus
+        uses: actions/cache/restore@v4
+        with:
+          path: .fuzz/corpus
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: fuzz-corpus-
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+          -DREDGEM_FUZZ=ON -DREDGEM_SANITIZERS=address,undefined -DREDGEM_WARNINGS_AS_ERRORS=ON
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+
+      - name: Build
+        id: build
+        run: |
+          ccache --zero-stats
+          cmake --build build --target redgem_fuzz_targets -- -k 0
+          ccache --show-stats
+
+      # (Not from pull requests: the repository's caches are shared, and one per push would crowd
+      # out the rest.)
+      - name: Keep the compiler cache
+        if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .ccache
+          key: ccache-fuzz-${{ github.run_id }}
+
+      - name: Fuzz
+        if: ${{ steps.build.outcome == 'success' }}
+        run: tests/fuzz/run_fuzzers.sh build "${SECONDS_EACH}" "${WORK_DIR}"
+
+      # (Only from main: a pull request's inputs are its own.)
+      - name: Keep the corpus
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && github.event_name != 'pull_request' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .fuzz/corpus
+          key: fuzz-corpus-${{ github.run_id }}
+
+      - name: Keep what was found
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-findings
+          path: .fuzz/findings
+          if-no-files-found: ignore

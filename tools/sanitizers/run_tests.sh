@@ -14,9 +14,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SUPPRESSIONS="${REPO_ROOT}/tools/sanitizers"
 BUILD_DIR="${1:?usage: run_tests.sh <build_dir> <address|thread|coverage>}"
 KIND="${2:?usage: run_tests.sh <build_dir> <address|thread|coverage>}"
-# The ctest tests run as well: the Ruby tests, the command lines of the relay and the server, and
-# the checks of what the programs carry.
-CTEST_TESTS='^(ruby|relay|server|app|layering|tools)\.'
+# The ctest tests run as well: the Ruby tests, the command lines of the relay and the server, the
+# checks of what the programs carry, and the fuzz targets' corpora (where an input that once
+# crashed a target, but not on every processor, is caught).
+CTEST_TESTS='^(ruby|relay|server|app|layering|tools|fuzz)\.'
 
 # (Each finding ends the program with an error, so that the test fails; symbols for the reports.)
 COMMON="halt_on_error=1:print_stacktrace=1:symbolize=1"

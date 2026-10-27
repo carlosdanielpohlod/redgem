@@ -87,6 +87,45 @@ bool read_as_it_is(const cgltf_accessor* accessor) {
   return accessor != nullptr && accessor->is_sparse == 0 && accessor->buffer_view != nullptr;
 }
 
+// Whether the data a view holds from `offset` on, read `stride` bytes apart as components of
+// `component` bytes, lies at addresses those components may be read from, as the glTF
+// specification asks: a float read from an address that is not a multiple of four is undefined
+// behaviour (and slow, or a crash, on some processors). Checked on the loaded data itself, so that
+// a buffer that starts out of line (a .glb whose chunks are not padded) is caught too.
+bool lies_aligned(const cgltf_buffer_view* view, std::size_t offset, std::size_t stride, std::size_t component) {
+  const auto* data = view == nullptr ? nullptr : static_cast<const std::uint8_t*>(cgltf_buffer_view_data(view));
+  if (component == 0 || data == nullptr) return true;
+  const std::uintptr_t start = reinterpret_cast<std::uintptr_t>(data) + offset;
+  return start % component == 0 && stride % component == 0;
+}
+
+bool base_aligned(const cgltf_accessor& accessor) {
+  return lies_aligned(accessor.buffer_view, accessor.offset, accessor.stride,
+                      cgltf_component_size(accessor.component_type));
+}
+
+// The list of which elements a sparse accessor replaces, and their replacement values (packed).
+bool sparse_aligned(const cgltf_accessor& accessor) {
+  const cgltf_accessor_sparse& sparse = accessor.sparse;
+  const std::size_t index = cgltf_component_size(sparse.indices_component_type);
+  return lies_aligned(sparse.indices_buffer_view, sparse.indices_byte_offset, index, index) &&
+         lies_aligned(sparse.values_buffer_view, sparse.values_byte_offset,
+                      cgltf_calc_size(accessor.type, accessor.component_type),
+                      cgltf_component_size(accessor.component_type));
+}
+
+bool sparse_misaligned(const cgltf_accessor& accessor) { return accessor.is_sparse != 0 && !sparse_aligned(accessor); }
+
+bool misaligned(const cgltf_accessor& accessor) { return !base_aligned(accessor) || sparse_misaligned(accessor); }
+
+// What is wrong with an accessor of a file whose buffers are loaded: what it says about itself, or
+// where its data lies.
+std::string loaded_accessor_problem(const cgltf_accessor& accessor) {
+  std::string problem = accessor_problem(accessor);
+  if (problem.empty() && misaligned(accessor)) problem = "is not aligned to its components";
+  return problem;
+}
+
 std::string numbered(const char* what, std::size_t index) { return std::string(what) + " " + std::to_string(index); }
 
 }  // namespace
@@ -122,7 +161,7 @@ std::string data_problem(const cgltf_data& data) {
     if (!view_fits(&data.buffer_views[i])) return numbered("buffer view", i) + " reaches past its buffer";
   }
   for (cgltf_size i = 0; i < data.accessors_count; ++i) {
-    const std::string problem = accessor_problem(data.accessors[i]);
+    const std::string problem = loaded_accessor_problem(data.accessors[i]);
     if (!problem.empty()) return numbered("accessor", i) + " " + problem;
   }
   return {};

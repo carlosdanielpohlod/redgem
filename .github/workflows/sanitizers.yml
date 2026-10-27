@@ -103,7 +103,9 @@ jobs:
         id: build
         run: |
           ccache --zero-stats
-          cmake --build build --target redgem_tests redgem_testing_tests redgem_test_tool redgem_relay redgem_server -- -k 0
+          cmake --build build --target redgem_tests redgem_testing_tests redgem_test_tool redgem_relay redgem_server \
+            redgem_fuzz_gltf_replay redgem_fuzz_image_header_replay redgem_fuzz_wire_replay \
+            redgem_fuzz_http_response_replay redgem_fuzz_json_scanner_replay -- -k 0
           ccache --show-stats
 
       # (From main only: the repository's caches are shared, and one per pull request push of each

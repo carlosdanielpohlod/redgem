@@ -40,6 +40,9 @@ until 1.0, a release may change what games rely on (see
   tests run in a build with AddressSanitizer, LeakSanitizer and UndefinedBehaviorSanitizer and in
   one with ThreadSanitizer (`REDGEM_SANITIZERS`, `tools/sanitizers/`), and a third build reports
   the coverage of `src/` as an artifact.
+- **Fuzzing**: libFuzzer targets for the glTF loader, picture headers, MessagePack messages, HTTP
+  answers and the JSON of glTF extras (`tests/fuzz/`, `REDGEM_FUZZ`), run for a minute each on
+  every pull request and longer every night; every build replays their corpora as tests.
 - **Warnings as errors**: every workflow builds with `REDGEM_WARNINGS_AS_ERRORS=ON`, so a compiler
   warning in the engine's own code or tests fails it. The dependencies' headers are included as
   system headers.

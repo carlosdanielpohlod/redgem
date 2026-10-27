@@ -37,8 +37,9 @@ std::string accessor_problem(const cgltf_accessor& accessor);
 // and it is not sparse or without a buffer view (those are treated as absent).
 bool readable(const cgltf_accessor* accessor);
 
-// The first thing wrong with the file's buffer views and accessors; empty when nothing is. Run
-// before anything walks them.
+// The first thing wrong with the file's buffer views and accessors (one whose data lies outside
+// its view, or at addresses its components cannot be read from); empty when nothing is. Run once
+// the buffers are loaded, before anything walks them.
 std::string data_problem(const cgltf_data& data);
 
 // The files a parsed scene's buffers and pictures name, by their numbers in the scene: each

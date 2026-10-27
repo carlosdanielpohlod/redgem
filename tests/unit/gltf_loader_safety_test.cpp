@@ -36,6 +36,12 @@ constexpr float kNotIdentity = 2.0f;  // what the test's inverse bind matrix is 
 constexpr std::uint64_t kWrappingCount = (std::uint64_t{1} << 62) + kTriangleCorners;
 constexpr std::uint64_t kFarOffset = std::uint64_t{1} << 62;
 constexpr std::size_t kRepeatedRoots = 1000;
+// Room for a triangle's positions starting a few bytes in, at an offset no float may start at,
+// and a distance between positions that is not a whole number of floats.
+constexpr std::size_t kRoomyFloats = 10;
+constexpr std::size_t kOddOffset = 2;
+constexpr std::size_t kOddStride = 14;
+constexpr std::size_t kOddByte = 1;  // where no 16-bit index may start
 constexpr const char* kPictureBytes = "not really a picture, but the bytes of a file";
 
 // A folder of the test's own, removed when the test ends.
@@ -240,6 +246,39 @@ TEST_CASE("data that ends after its buffer view fails the load") {
   Gltf far = triangle();
   far.doc["accessors"][0]["byteOffset"] = kFarOffset;
   CHECK_FALSE(load_gltf_scene(written(scratch, far)).ok);
+}
+
+TEST_CASE("data whose components do not lie at multiples of their size fails the load") {
+  // (Found by the glTF fuzz target: floats read from odd addresses, which is undefined behaviour.)
+  const Scratch scratch;
+  Gltf offset = triangle();
+  const int roomy = offset.add_view(std::vector<float>(kRoomyFloats, 0.0f));
+  const int shifted = offset.add_accessor(roomy, kFloatComponent, kTriangleCorners, "VEC3");
+  offset.doc["accessors"][shifted]["byteOffset"] = kOddOffset;
+  offset.primitive()["attributes"]["POSITION"] = shifted;
+  const LoadResult result = load_gltf_scene(written(scratch, offset));
+  CHECK_FALSE(result.ok);
+  CHECK(result.error.find("not aligned") != std::string::npos);
+
+  Gltf stride = triangle();
+  stride.doc["bufferViews"][0]["byteStride"] = kOddStride;
+  stride.doc["bufferViews"][0]["byteLength"] = kOddStride * kTriangleCorners;
+  stride.bin.resize(kOddStride * kTriangleCorners + stride.bin.size());
+  const LoadResult strided = load_gltf_scene(written(scratch, stride));
+  CHECK_FALSE(strided.ok);
+  CHECK(strided.error.find("not aligned") != std::string::npos);
+
+  // The list of a sparse accessor's replaced elements is read by the library's own checks.
+  Gltf sparse = triangle();
+  const int replaced = sparse.add_view(std::vector<std::uint16_t>{0, 0});
+  const int values = sparse.add_view(std::vector<float>(kFloatsPerPosition, 0.0f));
+  sparse.doc["accessors"][0]["sparse"] = {
+      {"count", 1},
+      {"indices", {{"bufferView", replaced}, {"byteOffset", kOddByte}, {"componentType", kUnsignedShortComponent}}},
+      {"values", {{"bufferView", values}}}};
+  const LoadResult sparsed = load_gltf_scene(written(scratch, sparse));
+  CHECK_FALSE(sparsed.ok);
+  CHECK(sparsed.error.find("not aligned") != std::string::npos);
 }
 
 TEST_CASE("a skin with fewer inverse bind matrices than joints uses none of them, instead of reading past them") {

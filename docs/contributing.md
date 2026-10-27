@@ -104,13 +104,16 @@ Every pull request runs these workflows (`.github/workflows/`), side by side:
   `coverage` artifact. The system tests are not run there: drawn by a software renderer, they
   would take hours with sanitizers on.
 
+* **Fuzzing** (`fuzz.yml`): the fuzz targets below, a minute each on a pull request, ten minutes
+  each every night.
+
 Every workflow builds with `-DREDGEM_WARNINGS_AS_ERRORS=ON`: a compiler warning in `src/` or
 `tests/` fails it (the dependencies keep theirs). Build the same way before pushing to see them
 first. A sanitized build is made and tested the same way as CI does:
 
 ```bash
 cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREDGEM_SANITIZERS=address,undefined
-cmake --build build-asan --target redgem_tests redgem_testing_tests redgem_test_tool redgem_relay redgem_server
+cmake --build build-asan
 tools/sanitizers/run_tests.sh build-asan address     # thread: -DREDGEM_SANITIZERS=thread
 ```
 
@@ -121,6 +124,27 @@ Every archive `cmake/Dependencies.cmake` fetches is pinned by its SHA-256, as is
 (`tools/android/fetch_toolchain.sh`); a dependency fetched from git is pinned by its tag or commit. `THIRD_PARTY_LICENSES.md` is generated: after adding or
 updating a dependency, run `python3 -I tools/licenses/collect_notices.py` (after a build) and
 commit what it writes. The test `tools.license_notices_are_up_to_date` fails when it is stale.
+
+### Fuzzing
+
+The parsers of what comes from outside have fuzz targets in `tests/fuzz/` (`fuzz_<target>.cpp`):
+`gltf` (the glTF loader), `image_header` (PNG, JPEG, WebP and Radiance headers, Radiance and small
+WebP pictures decoded), `wire` (MessagePack messages and the frames they travel in),
+`http_response` (answers of web servers, in pieces) and `json_scanner` (the custom properties of
+a scene's objects). With clang, libFuzzer makes up inputs for them:
+
+```bash
+cmake -S . -B build-fuzz -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo -DREDGEM_FUZZ=ON -DREDGEM_SANITIZERS=address,undefined
+cmake --build build-fuzz --target redgem_fuzz_targets
+tests/fuzz/run_fuzzers.sh build-fuzz 60 fuzz-work      # seconds each; what it finds is in fuzz-work/findings
+```
+
+Each target's seeds are in `tests/fuzz/corpus/<target>/`, and every build replays them
+(`redgem_fuzz_<target>_replay`, the ctest test `fuzz.<target>`). When a target finds an input that
+crashes it, fix the code and add the input to the target's corpus: its replay keeps it tested. A
+new parser of untrusted input gets a target of its own (`redgem_add_fuzz_target` in
+`tests/fuzz/CMakeLists.txt`).
 
 ## Layout
 
