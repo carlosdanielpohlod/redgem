@@ -24,15 +24,16 @@ class EmbedFilesTest(unittest.TestCase):
                 "-P", str(ROOT / "cmake/EmbedFiles.cmake"),
             ], check=True, capture_output=True)
             assertions = [
-                f"static_assert(sizeof(redgem::generated::kFiles_0) == {len(PAYLOAD) + 1});",
-                "static_assert(sizeof(redgem::generated::kFiles_1) == 1);",
+                "static_assert(std::char_traits<char>::length(redgem::generated::kFiles[0].contents)"
+                f" == {len(PAYLOAD)});",
+                "static_assert(redgem::generated::kFiles[1].contents[0] == '\\0');",
             ]
             for index in (0, 1, 2, 65535, len(PAYLOAD) - 1):
                 assertions.append(
-                    f"static_assert(static_cast<unsigned char>(redgem::generated::kFiles_0[{index}])"
+                    f"static_assert(static_cast<unsigned char>(redgem::generated::kFiles[0].contents[{index}])"
                     f" == {PAYLOAD[index]});")
             source = root / "test.cpp"
-            source.write_text('#include "embedded.hpp"\n' + "\n".join(assertions), encoding="utf-8")
+            source.write_text('#include <string>\n#include "embedded.hpp"\n' + "\n".join(assertions), encoding="utf-8")
             subprocess.run([
                 COMPILER, "-std=c++17", "-Werror", "-Woverlength-strings", "-c", str(source),
                 "-o", str(root / "test.o"),
