@@ -37,6 +37,7 @@ nav:
       - Levels, lighting and Blender: levels.md
       - The command line: command-line.md
       - Making games with an AI assistant: assistants.md
+      - MCP tools: mcp.md
   - Scripting in Ruby:
       - Behaviours: scripting/behaviours.md
       - Gameplay recipes: scripting/gameplay.md

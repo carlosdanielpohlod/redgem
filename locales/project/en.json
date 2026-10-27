@@ -85,6 +85,7 @@
     "  redgem shot <game_dir> <out.png> [--at seconds]       save a picture of the game at a moment",
     "  redgem check <game_dir> [--run-tests]                 look the game over (scripts, scenes, tests)",
     "  redgem api [Class] [--search word] [--json]           the scripting API, a class or a search",
+    "  redgem mcp <game_dir> [--read-only] [--allow tools]  serve developer tools over stdio",
     "",
     "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting,",
     "                                       else the dedicated card when there is one)",

@@ -4,6 +4,9 @@ description: "redgem scene, run, shot and check: read and change scenes as text,
 
 # The command line
 
+For an MCP client, `redgem mcp <game> --read-only` exposes scene and API inspection over stdio.
+See [MCP tools](mcp.md) for editing, headless runs, process events and permission options.
+
 Besides opening the editor (`redgem my_game`), playing (`redgem my_game --play`), making a game
 (`redgem new`) and building one (`redgem build`), `redgem` has tools that answer in a few lines
 of text and end: they read and change a scene, play the game with no window, take a picture of
