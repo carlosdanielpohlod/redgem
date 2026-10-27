@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <chrono>
 #include <filesystem>
 
 #include <mruby.h>
@@ -55,6 +56,13 @@ struct TempSave {
   ~TempSave() { std::filesystem::remove_all(dir); }
 };
 
+// These tests cover gameplay and durable writes, whose fsync can stall on instrumented CI.
+// Script deadlines are exercised separately in script_budget_test.cpp.
+std::unique_ptr<Engine> gameplay_engine(std::unique_ptr<Engine> engine) {
+  engine->scripts().vm().set_budget(std::chrono::milliseconds(0));
+  return engine;
+}
+
 std::unique_ptr<Engine> engine_for(const SceneDesc& scene, const std::filesystem::path& save_file,
                                    Presenter* presenter = nullptr) {
   EngineOptions options;
@@ -65,7 +73,7 @@ std::unique_ptr<Engine> engine_for(const SceneDesc& scene, const std::filesystem
   options.save_file = save_file;
   auto created = Engine::create(options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
-  return std::move(std::get<std::unique_ptr<Engine>>(created));
+  return gameplay_engine(std::move(std::get<std::unique_ptr<Engine>>(created)));
 }
 
 void frames(Engine& engine, int count) {
