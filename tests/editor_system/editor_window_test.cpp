@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <future>
+#include <chrono>
 #include <optional>
 #include <string>
 #include <vector>
@@ -31,6 +33,9 @@
 #include "editor/ui/labels.hpp"
 #include "window_mouse.hpp"
 #include "window_picture.hpp"
+#include "project/editor_bridge.hpp"
+#include "project/editor_live_tools.hpp"
+#include "project/editor_bridge_run.hpp"
 
 using namespace redgem;
 using redgem::test::save_window_picture;
@@ -748,4 +753,31 @@ TEST_CASE("a picture dropped on the editor goes to images/, and a material shows
   CHECK(app.console().error_count() == 0);
   std::filesystem::remove_all(desk);
   std::filesystem::remove_all(game);
+}
+
+TEST_CASE("the live editor bridge edits through the frame hook and undo updates the viewport") {
+  using namespace redgem::tools;
+  const auto game = copy_game();
+  auto created = EditorApp::create(game, even_pace());
+  REQUIRE(std::holds_alternative<std::unique_ptr<EditorApp>>(created));
+  auto& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  run(app, kWarmupFrames);
+  auto server = enable_editor_bridge(app);
+  REQUIRE(server != nullptr);
+  auto reply = std::async(std::launch::async, [&] {
+    return call_editor(game, server->connection_file(), "scene_edit",
+                       {{"action", "set"}, {"object", "Coin1"}, {"assignments", {"position=1,2,3"}}});
+  });
+  while (reply.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) app.frame();
+  const auto result = reply.get();
+  REQUIRE_MESSAGE(result["isError"] == false, result.dump());
+  CHECK(app.session().document().dirty());
+  const auto selected = app.session().selection();
+  REQUIRE(selected != kNoObject);
+  CHECK(app.session().scene().at(selected).local.position.y == doctest::Approx(2));
+  take_picture(app, screenshot("mcp_live_edit"));
+  app.session().undo();
+  run(app, kFrameFrames);
+  CHECK_FALSE(app.session().document().dirty());
+  app.set_frame_hook({});
 }

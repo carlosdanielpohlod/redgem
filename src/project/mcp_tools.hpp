@@ -11,6 +11,7 @@ struct Options {
   std::filesystem::path game;
   bool read_only = false;
   std::set<std::string> allow;
+  std::filesystem::path editor_connection{};
 };
 Json catalog(const Options& options);
 Json invoke(const Options& options, const std::string& name, const Json& args);

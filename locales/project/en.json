@@ -86,6 +86,7 @@
     "  redgem check <game_dir> [--run-tests]                 look the game over (scripts, scenes, tests)",
     "  redgem api [Class] [--search word] [--json]           the scripting API, a class or a search",
     "  redgem mcp <game_dir> [--read-only] [--allow tools]  serve developer tools over stdio",
+    "  redgem <game_dir> --editor-bridge                   enable authenticated local editor tools",
     "",
     "  --gpu auto|dedicated|integrated      graphics card for this run (default: the saved setting,",
     "                                       else the dedicated card when there is one)",

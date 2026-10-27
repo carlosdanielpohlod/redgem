@@ -13,7 +13,8 @@ redgem mcp /path/to/game --read-only
 Configure your MCP client to launch the `redgem` executable with those arguments. It reads
 newline-delimited JSON-RPC from standard input and writes only protocol responses to standard
 output. Native library output goes to standard error. Closing input stops the server.
-It opens no listening socket and does not attach to an editor.
+By default it opens no listening socket and works on files. Add `--editor` to connect to an
+editor that explicitly enabled its local bridge (see below).
 
 The server supports the MCP `2026-07-28` per-request metadata protocol and the `2025-11-25`
 initialization handshake. Modern clients can discover capabilities with `server/discover` and
@@ -47,9 +48,55 @@ disables execution entirely. The configured game directory stays fixed for the l
 process. Input replay and comparison files must be regular files inside it, without symbolic
 links. These restrictions protect tooling paths; they do not sandbox native game code.
 
-Edits go through the same scene commands as the CLI. Close the editor while editing through
-MCP: there is no live synchronization or editor undo entry yet. Keep an earlier save and inspect
-`scene_diff` after an edit. `from` and `parent` are available only when adding an object.
+Without `--editor`, edits go through the file-based scene commands. Close the editor while
+editing its files this way. Keep an earlier save and inspect `scene_diff` after an edit.
+`from` and `parent` are available only when adding an object in file mode.
+
+## Live editor
+
+Start the editor with its bridge explicitly enabled:
+
+```sh
+redgem /path/to/game --editor-bridge
+```
+
+The terminal prints the path of a private `connection.json` in the user's RedGem data folder.
+Pass that file to the MCP server for the same game:
+
+```sh
+redgem mcp /path/to/game --editor /path/to/connection.json
+```
+
+Scene listing, object details and scene comparison now read the editor's unsaved document.
+`scene_edit` accepts only `set` on an existing object with one or more assignments. The whole
+call is one undo step: invalid assignments or exceptions roll it back without losing earlier
+undo/redo. Successful changes update the viewport and select the object; they remain unsaved.
+Adding and removing objects through the live bridge are not implemented yet.
+
+The extra `editor` tool takes `action`: `status`, `select` (with `object`), `undo`, `redo`, or
+`save`. Status reports the open scene, edit/play state, dirty flag, selected identities and undo/
+redo availability and pending external file conflicts. With `--read-only`, its schema and
+validation permit only `status`. An `object` is accepted only by `select`.
+Edits and editor commands are refused while playing, during a gesture or dialog, or while an
+external file conflict is pending in the editor.
+Reading still describes the edited document, not the game's live runtime objects. An explicit
+`scene` must match the scene currently open; requests never switch scenes or discard edits.
+
+`events` reads the editor process's log history. `api`, `game_run` and `game_check` remain the
+ordinary CLI tools; runs and checks read saved files, not the unsaved editor scene. Play/stop/
+step controls, runtime inspection and viewport screenshots through this bridge are still pending.
+
+The bridge binds only to IPv4 loopback and requires a random credential on every request, with
+the game directory checked at both ends. Its connection file stays outside the repository and
+is removed on clean shutdown. On POSIX it is owner-only inside an owner-only directory; on
+Windows it inherits the user's profile access controls. Treat the file as a credential granting
+control of that editor. MCP read-only and allow-list options restrict that client's calls.
+
+At most four connections are handled at once, on the editor thread between frames. Requests
+are limited to 64 KiB and replies to 256 KiB. Transport waits expire after five seconds. If an
+edit times out, it may have completed: inspect status and the object before retrying. There is
+no automatic retry or fallback to editing the file when an editor connection fails. After a
+crash a stale connection file can remain; reconnect using the new editor instance's file.
 
 ## Bounded results
 
@@ -61,7 +108,8 @@ engine's diagnostic.
 Event results also contain `structuredContent`: `events`, `cursor`, `dropped`, `more` and
 `cursor_ahead`. Pass the returned cursor in the next `since`. Each event's text is capped at 256
 UTF-8 bytes, with `truncated` when shortened. The cursor belongs to this server process; it is
-not a cursor into another running editor or game. Events include engine log messages, not raw
+not a cursor into an unrelated editor or game (with `--editor`, it belongs to that editor).
+Events include engine log messages, not raw
 standard output. Process history is bounded, so `dropped` identifies overwritten messages.
 
 Requests run one at a time. A cancellation notification cannot interrupt a native command already

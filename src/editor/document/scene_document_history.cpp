@@ -70,6 +70,7 @@ bool same_nodes(const std::vector<NodeDesc>& a, const std::vector<NodeDesc>& b) 
 }  // namespace
 
 void SceneDocument::checkpoint() {
+  if (node_edit_active_) return;
   push_step(undo_, snapshot());
   clear_redo();
   changed_since_checkpoint_ = false;
@@ -124,6 +125,7 @@ void SceneDocument::restore_materials(const std::vector<MaterialDesc>& snapshot)
 }
 
 bool SceneDocument::undo() {
+  if (node_edit_active_) return false;
   if (undo_.empty()) return false;
   push_step(redo_, snapshot());
   Snapshot state = pop_step(undo_);
@@ -132,6 +134,7 @@ bool SceneDocument::undo() {
 }
 
 bool SceneDocument::redo() {
+  if (node_edit_active_) return false;
   if (redo_.empty()) return false;
   push_step(undo_, snapshot());
   Snapshot state = pop_step(redo_);

@@ -78,6 +78,7 @@ void no_signal_on_closed(NativeSocket socket);
 std::intptr_t open_non_blocking(int type, int protocol, std::string& error);
 // Takes a port of this machine, on every address it has.
 bool bind_to_port(NativeSocket socket, std::uint16_t port);
+bool bind_local_port(NativeSocket socket, std::uint16_t port);
 // The port a socket got; 0 when it has none.
 std::uint16_t bound_port(NativeSocket socket);
 std::string in_numbers(const sockaddr_in& address);

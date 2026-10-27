@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <exception>
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <optional>
 #include <set>
@@ -48,6 +49,10 @@ class SceneDocument {
   // Records an undo step. Edits below call it themselves unless `record` is false, so a gizmo
   // drag can call checkpoint() once and then stream unrecorded transform updates.
   void checkpoint();
+  // Groups placement/name/property/reparent edits of existing nodes into one undo step.
+  // The callback returns an error to roll back, preserving prior undo/redo. It must not save,
+  // import assets, create/delete nodes, or edit materials/terrain. Exceptions also roll back.
+  bool edit_existing_nodes(const std::function<std::string()>& edit, std::string& error);
   void set_name(int index, const std::string& name);
   void set_local(int index, const Transform& local, bool record = true);
   void set_prop(int index, const std::string& key, const PropertyValue& value, bool record = true);
@@ -145,6 +150,7 @@ class SceneDocument {
   std::string unique_name(const std::string& base) const;
 
  private:
+  class NodeEdit;
   // The vertices of a mesh that can be reshaped (a terrain).
   struct MeshShape {
     std::vector<float> positions;
@@ -349,6 +355,7 @@ class SceneDocument {
   long long next_version_ = 0;
   long long saved_version_ = 0;
   bool changed_since_checkpoint_ = false;
+  bool node_edit_active_ = false;
   std::set<int> changed_meshes_;   // reshaped since the renderer last asked
   std::set<int> unsaved_meshes_;   // reshaped since the last save
   std::set<int> released_meshes_;  // let go of: nothing can use them again

@@ -16,9 +16,12 @@ constexpr const char* kSchemas = R"JSON([
 {"name":"api","description":"Read the scripting API index, one class or a search. Example: {\"class\":\"Transform\"}.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"class":{"type":"string","maxLength":256},"search":{"type":"string","maxLength":256}}}},
 {"name":"events","description":"Read this server process's log history since a cursor. Pass the returned cursor next time. Event text is bounded; dropped and cursor_ahead report lost/foreign history.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"since":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":32},"level":{"type":"string","enum":["debug","info","warning","error"]}}}}
 ])JSON";
+constexpr const char* kEditorSchema =
+    R"JSON({"name":"editor","description":"Read live editor status, select an object, undo, redo or save. Mutations are refused during gestures or play. Live set edits stay unsaved until save.","inputSchema":{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["status","select","undo","redo","save"]},"object":{"type":"string","minLength":1,"maxLength":256}}}})JSON";
 
 bool read_only_tool(const std::string& name) {
-  return name != "scene_edit" && name != "game_run" && name != "game_check";
+  return name == "scene_list" || name == "scene_get" || name == "scene_diff" || name == "api" || name == "events" ||
+         name == "editor";
 }
 
 bool enabled(const Options& options, const std::string& name) {
@@ -61,19 +64,42 @@ void check_object(const Json& schema, const Json& args) {
 }
 
 void check_array(const Json& schema, const Json& args) {
+  if (args.size() < schema.value("minItems", std::size_t(0))) throw std::invalid_argument("too few array items");
   if (args.size() > schema.at("maxItems").get<std::size_t>()) throw std::invalid_argument("too many array items");
   for (const auto& item : args) validate_arguments(schema.at("items"), item);
 }
 }  // namespace
 
+namespace {
+Json available_tools(const Options& options) {
+  Json tools = Json::parse(kSchemas);
+  if (!options.editor_connection.empty()) tools.push_back(Json::parse(kEditorSchema));
+  return tools;
+}
+
+void live_schema(Json& tool, const Options& options) {
+  if (options.editor_connection.empty()) return;
+  if (tool["name"] == "editor" && options.read_only) tool["inputSchema"]["properties"]["action"]["enum"] = {"status"};
+  if (tool["name"] != "scene_edit") return;
+  auto& schema = tool["inputSchema"];
+  schema["properties"]["action"]["enum"] = {"set"};
+  schema["properties"]["assignments"]["minItems"] = 1;
+  schema["required"].push_back("assignments");
+  for (const char* field : {"from", "parent", "confirm"}) schema["properties"].erase(field);
+  tool["description"] =
+      "Set assignments on an existing object in the live editor, atomically as one undo step. Does not save.";
+}
+}  // namespace
+
 Json catalog(const Options& options) {
   Json tools = Json::array();
-  for (Json tool : Json::parse(kSchemas)) {
+  for (Json tool : available_tools(options)) {
     const std::string name = tool["name"];
     if (!enabled(options, name)) continue;
-    tool["annotations"] = {{"readOnlyHint", read_only_tool(name)},
+    live_schema(tool, options);
+    tool["annotations"] = {{"readOnlyHint", name == "editor" ? options.read_only : read_only_tool(name)},
                            {"openWorldHint", !read_only_tool(name)},
-                           {"destructiveHint", name == "scene_edit"}};
+                           {"destructiveHint", name == "scene_edit" || (name == "editor" && !options.read_only)}};
     tools.push_back(std::move(tool));
   }
   return tools;

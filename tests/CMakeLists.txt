@@ -175,6 +175,7 @@ add_executable(redgem_tests
   integration/dedicated_server_test.cpp
   integration/connection_approval_test.cpp
   integration/editor_session_test.cpp
+  integration/editor_bridge_test.cpp
   integration/game_project_test.cpp
   integration/scene_tools_test.cpp
   integration/play_tools_test.cpp
