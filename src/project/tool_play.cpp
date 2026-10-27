@@ -89,6 +89,7 @@ std::variant<std::unique_ptr<Engine>, std::string> engine_for(const PlayRequest&
   options.presenter = presenter;
   options.scene_name = request.scene;
   options.fixed_step = true;
+  options.random_seed = request.seed;
   options.save_file = scratch.path() / kSaveFile;
   return Engine::create(options, std::move(std::get<SceneDesc>(scene)));
 }

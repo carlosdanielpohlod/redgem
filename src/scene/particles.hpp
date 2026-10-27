@@ -77,6 +77,7 @@ class ParticleSystem {
   int burst(const ParticleBurst& burst);
   void update(float dt);
   void clear();
+  void set_seed(std::uint32_t seed) { seed_ = seed; }
   void set_gravity(Vec3 gravity) { gravity_ = gravity; }
   const std::vector<Particle>& particles() const { return particles_; }
   // The names of the pictures particles were given so far (Particle::image points here).

@@ -595,6 +595,8 @@ if(NOT ANDROID)
     project/script_messages.cpp
     project/tool_play.cpp
     project/run_command.cpp
+    project/run_plan.cpp
+    project/run_session.cpp
     project/shot_command.cpp
     project/game_checks.cpp
     project/game_tests.cpp

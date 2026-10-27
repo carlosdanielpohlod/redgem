@@ -274,8 +274,7 @@ What is there today is the command line (`redgem scene`, `run`, `shot`, `check`,
 `AGENTS.md` guide of new games and `llms.txt`; see [docs/assistants.md](docs/assistants.md). Not
 there yet:
 
-- Headless runs that reproduce a session: `--seed`, scripted input read from a file, and
-  assertions and stop conditions on the command line (`--assert`, `--until`, `--print`).
+- Headless input replay covers keyboard states only; mouse, gamepad and touch input are not yet replayed.
 - An event log read with a `since` cursor (only what is new), and `redgem scene diff` to show what
   an edit changed.
 - A search of the game's assets and of the templates.

@@ -82,6 +82,7 @@ void Engine::build_world(const CollisionLayers& layers) {
   scene_ = Scene::from_desc(scene_desc_);
   animations_.reset(scene_desc_.animations, scene_);
   particles_.set_gravity(gravity());
+  if (options_.random_seed) particles_.set_seed(*options_.random_seed);
   water_.reset(scene_desc_);
   make_bodies();
 }
@@ -223,8 +224,15 @@ void Engine::connect_context() {
 void Engine::start_scripts(std::chrono::milliseconds script_budget) {
   scripts_ = std::make_unique<ScriptHost>(context_, options_.game_dir / config::kScriptsDirName);
   scripts_->vm().set_budget(script_budget);
+  seed_scripts();
   scripts_->attach_scripts();
   scripts_->run_scene_script(context_.scene_name);
+}
+
+void Engine::seed_scripts() {
+  if (!options_.random_seed) return;
+  mrb_state* mrb = scripts_->vm().state();
+  scripts_->vm().call(mrb_top_self(mrb), "srand", {mrb_int_value(mrb, *options_.random_seed)});
 }
 
 AudioSystem& Engine::audio() { return options_.audio != nullptr ? *options_.audio : *owned_audio_; }
