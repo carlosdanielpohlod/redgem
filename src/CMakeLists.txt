@@ -509,6 +509,7 @@ if(NOT ANDROID)
     editor/editor_app.cpp
     editor/editor_frame.cpp
     editor/editor_commands.cpp
+    editor/editor_capture.cpp
     editor/editor_input.cpp
     editor/editor_menus.cpp
     editor/editor_bars.cpp
@@ -599,6 +600,7 @@ if(NOT ANDROID)
     project/editor_bridge_client.cpp
     project/editor_bridge_wire.cpp
     project/editor_live_tools.cpp
+    project/editor_window_tools.cpp
     project/editor_bridge_run.cpp
     project/closest_words.cpp
     project/scene_text.cpp

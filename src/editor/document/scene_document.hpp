@@ -49,10 +49,10 @@ class SceneDocument {
   // Records an undo step. Edits below call it themselves unless `record` is false, so a gizmo
   // drag can call checkpoint() once and then stream unrecorded transform updates.
   void checkpoint();
-  // Groups placement/name/property/reparent edits of existing nodes into one undo step.
+  // Groups node edits, empty-node creation and subtree deletion into one undo step.
   // The callback returns an error to roll back, preserving prior undo/redo. It must not save,
-  // import assets, create/delete nodes, or edit materials/terrain. Exceptions also roll back.
-  bool edit_existing_nodes(const std::function<std::string()>& edit, std::string& error);
+  // import/create assets, duplicate asset-backed nodes, or edit materials/terrain. Exceptions also roll back.
+  bool edit_nodes(const std::function<std::string()>& edit, std::string& error);
   void set_name(int index, const std::string& name);
   void set_local(int index, const Transform& local, bool record = true);
   void set_prop(int index, const std::string& key, const PropertyValue& value, bool record = true);

@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <imgui.h>
+#include <raylib.h>
 #include <imgui_internal.h>
 
 #include "app/bundled_game.hpp"
@@ -148,7 +149,7 @@ TEST_CASE("the editor opens, edits, plays, stops and saves a game") {
   session.select_by_name("Crate1");
   REQUIRE(session.selection() != kNoObject);
   const float original_y = y_of(session, "Crate1");
-  Transform lifted = session.document().node(session.selection()).local;
+  redgem::Transform lifted = session.document().node(session.selection()).local;
   lifted.position.y += kLift;
   session.document().set_local(session.selection(), lifted);
   session.refresh_preview();
@@ -779,5 +780,53 @@ TEST_CASE("the live editor bridge edits through the frame hook and undo updates 
   app.session().undo();
   run(app, kFrameFrames);
   CHECK_FALSE(app.session().document().dirty());
+  app.set_frame_hook({});
+}
+
+namespace {
+redgem::tools::mcp::Json editor_call(EditorApp& app, redgem::tools::EditorBridge& server,
+                                     const redgem::tools::mcp::Json& args) {
+  auto reply = std::async(std::launch::async, [&] {
+    return redgem::tools::call_editor(app.session().game_dir(), server.connection_file(), "editor", args);
+  });
+  while (reply.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) app.frame();
+  const auto result = reply.get();
+  REQUIRE_MESSAGE(result["isError"] == false, result.dump());
+  return result;
+}
+}  // namespace
+
+TEST_CASE("MCP controls real editor play and returns a bounded viewport image") {
+  const auto game = copy_game();
+  auto created = EditorApp::create(game, even_pace());
+  REQUIRE(std::holds_alternative<std::unique_ptr<EditorApp>>(created));
+  auto& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  run(app, kWarmupFrames);
+  auto server = enable_editor_bridge(app);
+  REQUIRE(server);
+  editor_call(app, *server, {{"action", "play"}});
+  CHECK(app.session().play_state() == PlayState::Playing);
+  editor_call(app, *server, {{"action", "pause"}});
+  CHECK(app.session().play_state() == PlayState::Paused);
+  editor_call(app, *server, {{"action", "step"}});
+  CHECK(app.session().play_state() == PlayState::Paused);
+  editor_call(app, *server, {{"action", "resume"}});
+  CHECK(app.session().play_state() == PlayState::Playing);
+  editor_call(app, *server, {{"action", "stop"}});
+  CHECK(app.session().editing());
+  CHECK_FALSE(app.session().document().dirty());
+  const auto result = editor_call(app, *server, {{"action", "capture"}, {"max_size", 256}});
+  const auto bytes = object_clipboard::base64_decode(result["content"][0]["data"]);
+  REQUIRE(bytes);
+  CHECK(bytes->size() <= 128 * 1024);
+  Image image = LoadImageFromMemory(".png", bytes->data(), static_cast<int>(bytes->size()));
+  REQUIRE(image.data != nullptr);
+  CHECK(std::max(image.width, image.height) <= 256);
+  UnloadImage(image);
+  auto file = screenshot("mcp_viewport");
+  file.replace_extension(".png");
+  std::string error;
+  std::filesystem::create_directories(file.parent_path());
+  CHECK(write_bytes_file(file, *bytes, error));
   app.set_frame_hook({});
 }

@@ -148,6 +148,13 @@ void EditorSession::tick(float frame_seconds) {
   if (runtime_->finished()) stop();  // a script called Game.quit
 }
 
+bool EditorSession::step() {
+  if (play_state_ != PlayState::Paused || !runtime_) return false;
+  runtime_->frame(config::kFixedDeltaSeconds);
+  if (runtime_->finished()) stop();
+  return true;
+}
+
 bool EditorSession::reload_if_changed_on_disk() {
   const auto time = write_time(document_.path());
   if (!reload_wanted(time)) return false;

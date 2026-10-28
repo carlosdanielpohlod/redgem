@@ -39,7 +39,7 @@ class SceneDocument::NodeEdit {
   bool committed_ = false;
 };
 
-bool SceneDocument::edit_existing_nodes(const std::function<std::string()>& edit, std::string& error) {
+bool SceneDocument::edit_nodes(const std::function<std::string()>& edit, std::string& error) {
   NodeEdit group(*this);
   error = edit();
   return group.finish(error);

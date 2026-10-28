@@ -5,5 +5,6 @@
 
 namespace redgem::tools {
 // Reads unsaved state; set is atomic and leaves the scene dirty rather than saving it.
-mcp::Json invoke_editor(EditorSession& session, const std::string& name, const mcp::Json& args, bool busy = false);
+mcp::Json invoke_editor(EditorSession& session, const std::string& name, const mcp::Json& args, bool busy = false,
+                        const mcp::Invoke& window = {});
 }  // namespace redgem::tools

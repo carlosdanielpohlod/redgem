@@ -8,8 +8,13 @@ until 1.0, a release may change what games rely on (see
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-28
+
 ### Added
 
+- **Complete editor MCP controls**: create empty objects and remove subtrees with atomic undo,
+  play/pause/resume/stop, advance paused games one fixed frame, and return bounded PNG viewport
+  images directly as MCP image content.
 - **Live editor tooling**: `--editor-bridge` enables an authenticated loopback endpoint; connect
   with `redgem mcp --editor`. Read unsaved scene state, set existing objects atomically as one
   undo step, select, undo, redo, save explicitly and read the editor's event history. File edits
@@ -17,7 +22,15 @@ until 1.0, a release may change what games rely on (see
 - **MCP stdio tools**: `redgem mcp <game>` exposes scene inspection, editing and comparison,
   headless runs, checks, API lookup and cursor-based process events. It supports read-only and
   allow-list options, bounded messages and results, modern per-request metadata and legacy
-  initialization. It does not attach to an open editor yet.
+  initialization. Add `--editor` to attach to the opt-in live bridge.
+- **Cursor event history for tools**: process logs can be read from an increasing cursor, with
+  bounded pages, level filters and explicit reports of overwritten messages. Custom console
+  sinks keep working alongside the history.
+
+- **Reproducible headless runs**: `redgem run` seeds Ruby and particle randomness before scripts
+  load, replays keyboard state from a JSON file, checks assertions and stop conditions every frame,
+  and prints selected state at a chosen frame interval.
+
 - **Scene comparison**: `redgem scene diff --against` reports added, removed and changed objects
   by persistent identity, including placement, hierarchy, properties, materials and asset content,
   without rewriting either scene file.
@@ -38,6 +51,11 @@ until 1.0, a release may change what games rely on (see
   meshes, materials and pictures: in the same scene, into another scene, or into another editor
   window through the system's clipboard. Paste puts them next to the selection, Paste as Child
   under it.
+- **Continuous particle emitters**: attach local emitters to scene objects, with fair shared
+  capacity, interpolated movement, teleport resets and correctly aged births. Lit particles can
+  receive the sun's shadows.
+- **Two-dimensional animation blending**: rectangular blend grids mix clips across two runtime
+  parameters, including synchronized normalized playback and networked blend poses.
 - **Collision layers**: up to 16 named layers in `game.json`'s `physics` section, with what each
   collides with; a body or trigger goes on one with the `layer` property or `rigidbody.layer =`.
 - **Physics queries**: `Physics.raycast_all`, `sphere_cast`, `box_cast`, `capsule_cast`,
@@ -73,14 +91,6 @@ until 1.0, a release may change what games rely on (see
 ## [0.4.0] - 2026-10-25
 
 ### Added
-
-- **Cursor event history for tools**: process logs can be read from an increasing cursor, with
-  bounded pages, level filters and explicit reports of overwritten messages. Custom console
-  sinks keep working alongside the history.
-
-- **Reproducible headless runs**: `redgem run` seeds Ruby and particle randomness before scripts
-  load, replays keyboard state from a JSON file, checks assertions and stop conditions every frame,
-  and prints selected state at a chosen frame interval.
 
 - **Scatter distance LODs**: a scattered model can name simpler versions of itself for the
   distance, drawn in its place farther away.

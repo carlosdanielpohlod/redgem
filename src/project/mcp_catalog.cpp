@@ -17,7 +17,7 @@ constexpr const char* kSchemas = R"JSON([
 {"name":"events","description":"Read this server process's log history since a cursor. Pass the returned cursor next time. Event text is bounded; dropped and cursor_ahead report lost/foreign history.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"since":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":32},"level":{"type":"string","enum":["debug","info","warning","error"]}}}}
 ])JSON";
 constexpr const char* kEditorSchema =
-    R"JSON({"name":"editor","description":"Read live editor status, select an object, undo, redo or save. Mutations are refused during gestures or play. Live set edits stay unsaved until save.","inputSchema":{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["status","select","undo","redo","save"]},"object":{"type":"string","minLength":1,"maxLength":256}}}})JSON";
+    R"JSON({"name":"editor","description":"Inspect the editor, capture its viewport, control play, select, undo, redo or save. Document changes require edit mode and stay unsaved until save.","inputSchema":{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["status","select","undo","redo","save","play","pause","resume","stop","step","capture"]},"object":{"type":"string","minLength":1,"maxLength":256},"max_size":{"type":"integer","minimum":128,"maximum":1024}}}})JSON";
 
 bool read_only_tool(const std::string& name) {
   return name == "scene_list" || name == "scene_get" || name == "scene_diff" || name == "api" || name == "events" ||
@@ -79,15 +79,15 @@ Json available_tools(const Options& options) {
 
 void live_schema(Json& tool, const Options& options) {
   if (options.editor_connection.empty()) return;
-  if (tool["name"] == "editor" && options.read_only) tool["inputSchema"]["properties"]["action"]["enum"] = {"status"};
+  if (tool["name"] == "editor" && options.read_only)
+    tool["inputSchema"]["properties"]["action"]["enum"] = {"status", "capture"};
   if (tool["name"] != "scene_edit") return;
   auto& schema = tool["inputSchema"];
-  schema["properties"]["action"]["enum"] = {"set"};
-  schema["properties"]["assignments"]["minItems"] = 1;
-  schema["required"].push_back("assignments");
-  for (const char* field : {"from", "parent", "confirm"}) schema["properties"].erase(field);
+  schema["properties"]["action"]["enum"] = {"set", "add", "remove"};
+  schema["properties"].erase("from");
   tool["description"] =
-      "Set assignments on an existing object in the live editor, atomically as one undo step. Does not save.";
+      "Set an object, add an empty object or remove a subtree in the live editor, atomically as one undo step. Remove "
+      "requires confirm=true. Does not save.";
 }
 }  // namespace
 
