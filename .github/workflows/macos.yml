@@ -89,10 +89,10 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: ctest --test-dir build --output-on-failure -LE system
 
-      # (About half an hour on these machines, against a minute with a graphics card.)
+      # Software rendering varies by runner: a successful Intel run has taken 45 minutes.
       - name: Editor system test (opens the editor window)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        timeout-minutes: 45
+        timeout-minutes: 60
         run: ctest --test-dir build -R '^system\.editor\.window$' --output-on-failure
 
       - name: Open the editor on a demo and take a picture of the screen
