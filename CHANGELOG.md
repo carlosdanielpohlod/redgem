@@ -10,6 +10,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Live editor tooling**: `--editor-bridge` enables an authenticated loopback endpoint; connect
+  with `redgem mcp --editor`. Read unsaved scene state, set existing objects atomically as one
+  undo step, select, undo, redo, save explicitly and read the editor's event history. File edits
+  remain the default when no editor connection is requested.
 - **MCP stdio tools**: `redgem mcp <game>` exposes scene inspection, editing and comparison,
   headless runs, checks, API lookup and cursor-based process events. It supports read-only and
   allow-list options, bounded messages and results, modern per-request metadata and legacy

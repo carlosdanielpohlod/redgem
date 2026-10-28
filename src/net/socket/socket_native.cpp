@@ -130,6 +130,14 @@ bool bind_to_port(NativeSocket socket, std::uint16_t port) {
   return bind(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0;
 }
 
+bool bind_local_port(NativeSocket socket, std::uint16_t port) {
+  sockaddr_in address{};
+  address.sin_family = AF_INET;
+  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  address.sin_port = htons(port);
+  return bind(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0;
+}
+
 std::uint16_t bound_port(NativeSocket socket) {
   sockaddr_in address{};
   Length size = sizeof(address);

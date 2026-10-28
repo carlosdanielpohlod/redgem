@@ -17,6 +17,7 @@ namespace {
 
 constexpr const char* kVersionOption = "--version";
 constexpr const char* kPlayOption = "--play";
+constexpr const char* kEditorBridgeOption = "--editor-bridge";
 constexpr const char* kTemplateOption = "--template";
 constexpr const char* kTargetOption = "--target";
 constexpr const char* kBundleOption = "--bundle";
@@ -43,6 +44,11 @@ void read_help(Reading& reading) { answer_at_once(reading, RunMode::Help); }
 void read_version(Reading& reading) { answer_at_once(reading, RunMode::Version); }
 
 void read_play(Reading& reading) { choose(reading, RunMode::Game); }
+
+void read_editor_bridge(Reading& reading) {
+  choose(reading, RunMode::Editor);
+  reading.result.options.editor_bridge = true;
+}
 
 void read_template(Reading& reading) {
   const auto name = value(reading);
@@ -124,6 +130,7 @@ constexpr Option kOptions[] = {
     {command_line::kShortHelpOption, read_help},
     {kVersionOption, read_version},
     {kPlayOption, read_play},
+    {kEditorBridgeOption, read_editor_bridge},
     {kTemplateOption, read_template},
     {kTargetOption, read_target},
     {kBundleOption, read_bundle},

@@ -66,6 +66,9 @@ class EditorApp {
   // One editor frame (input, simulation while playing, UI, rendering). What run() is a loop of,
   // for whoever drives the editor a frame at a time.
   void frame();
+  // Local tooling is polled on the editor thread before input and drawing. Empty by default.
+  void set_frame_hook(std::function<void(EditorApp&)> hook) { frame_hook_ = std::move(hook); }
+  bool interaction_active() const;
   // Whether the editor is done: leaving was asked for and nothing unsaved stands in the way (there
   // was nothing, or the user chose Save / Discard).
   bool finished() const { return quit_confirmed_; }
@@ -320,6 +323,7 @@ class EditorApp {
   EditorExit exit_action_ = EditorExit::Quit;
   bool shortcuts_open_ = false;
   FrameClock clock_;
+  std::function<void(EditorApp&)> frame_hook_{};
   std::vector<BuildChoice> builds_;
   float frame_seconds_ = 0.0f;  // what the clock said of the frame being drawn
   std::unique_ptr<SceneViewport> viewport_;

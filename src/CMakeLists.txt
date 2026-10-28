@@ -484,6 +484,7 @@ if(NOT ANDROID)
     editor/object_clipboard.cpp
     editor/document/scene_document.cpp
     editor/document/scene_document_history.cpp
+    editor/document/scene_document_node_edit.cpp
     editor/document/scene_document_memory.cpp
     editor/document/scene_document_history_bytes.cpp
     editor/document/scene_document_terrain.cpp
@@ -594,6 +595,11 @@ if(NOT ANDROID)
     project/mcp_catalog.cpp
     project/mcp_tools.cpp
     project/mcp_command.cpp
+    project/editor_bridge.cpp
+    project/editor_bridge_client.cpp
+    project/editor_bridge_wire.cpp
+    project/editor_live_tools.cpp
+    project/editor_bridge_run.cpp
     project/closest_words.cpp
     project/scene_text.cpp
     project/scene_diff.cpp

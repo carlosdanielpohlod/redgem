@@ -12,6 +12,7 @@
 #include "project/editor_setup.hpp"
 #include "project/project_hub.hpp"
 #include "project/recent_games.hpp"
+#include "project/editor_bridge_run.hpp"
 
 namespace redgem {
 namespace {
@@ -34,7 +35,7 @@ bool pick_game(std::filesystem::path& game, std::string& hub_message, GpuChoice 
 // One game in the editor, until the editor is left. The exit code, or nullopt to go (back) to the
 // hub: a broken game from the command line exits; from the hub it returns there.
 std::optional<int> edit_game(const std::filesystem::path& game, bool from_command_line, std::string& hub_message,
-                             GpuChoice gpu) {
+                             GpuChoice gpu, bool bridge_enabled) {
   auto created = EditorApp::create(game, editor_options(gpu));
   if (auto* error = std::get_if<std::string>(&created)) {
     log::error(*error);
@@ -43,6 +44,7 @@ std::optional<int> edit_game(const std::filesystem::path& game, bool from_comman
     return std::nullopt;
   }
   EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  const auto bridge = bridge_enabled ? enable_editor_bridge(app) : nullptr;
   const int code = app.run();
   if (app.exit_action() != EditorExit::OpenHub) return code;
   return std::nullopt;
@@ -50,12 +52,12 @@ std::optional<int> edit_game(const std::filesystem::path& game, bool from_comman
 
 }  // namespace
 
-int run_editor(const std::filesystem::path& given, GpuChoice gpu) {
+int run_editor(const std::filesystem::path& given, GpuChoice gpu, bool bridge) {
   std::filesystem::path game = given;
   bool from_command_line = !game.empty();
   std::string hub_message;  // why the last game did not open, shown in the hub
   while (pick_game(game, hub_message, gpu)) {
-    if (const auto code = edit_game(game, from_command_line, hub_message, gpu)) return *code;
+    if (const auto code = edit_game(game, from_command_line, hub_message, gpu, bridge)) return *code;
     from_command_line = false;
     game.clear();  // back to the hub
   }

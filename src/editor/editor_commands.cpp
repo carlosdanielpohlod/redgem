@@ -29,6 +29,11 @@ void EditorApp::save_scripts() {
   if (!scripts_->save_all(error)) log::error(error);
 }
 
+bool EditorApp::interaction_active() const {
+  return gizmo_dragging_ || stroke_started_ || ImGui::IsAnyItemActive() ||
+         ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+}
+
 void EditorApp::play() {
   save_scripts();  // like an IDE "save all": the game must run the code on screen
   rescan_files();

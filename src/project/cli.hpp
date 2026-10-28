@@ -24,6 +24,7 @@ struct CliOptions {
   // --record <file> plays the game into a video (with --record-fps, --record-size, --record-scale
   // and --record-seconds); no file: nothing is recorded.
   RecordOptions record;
+  bool editor_bridge = false;  // --editor-bridge: opt-in authenticated local tooling
 };
 
 struct CliResult {

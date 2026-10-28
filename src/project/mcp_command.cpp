@@ -19,7 +19,9 @@ namespace redgem::tools {
 namespace {
 constexpr const char* kReadOnly = "--read-only";
 constexpr const char* kAllow = "--allow";
-constexpr const char* kUsage = "usage: redgem mcp <game> [--read-only] [--allow tool,tool]\n";
+constexpr const char* kEditor = "--editor";
+constexpr const char* kUsage =
+    "usage: redgem mcp <game> [--editor connection.json] [--read-only] [--allow tool,tool]\n";
 
 #ifdef _WIN32
 int duplicate(int fd) { return _dup(fd); }
@@ -87,7 +89,9 @@ std::set<std::string> allow_list(const std::string& text) {
 
 void validate_allow(const std::set<std::string>& names) {
   std::set<std::string> known;
-  for (const auto& tool : mcp::catalog({})) known.insert(tool.at("name").get<std::string>());
+  mcp::Options options;
+  options.editor_connection = "live";
+  for (const auto& tool : mcp::catalog(options)) known.insert(tool.at("name").get<std::string>());
   for (const auto& name : names) {
     if (known.count(name) == 0) throw std::invalid_argument("unknown tool in --allow: " + name);
   }
@@ -99,6 +103,7 @@ mcp::Options options(const ToolLine& line) {
   result.game = std::filesystem::canonical(line.words.front());
   if (!std::filesystem::is_directory(result.game)) throw std::invalid_argument("game must be a directory");
   result.read_only = line.has(kReadOnly);
+  if (const auto editor = line.value(kEditor)) result.editor_connection = *editor;
   if (const auto allow = line.value(kAllow)) result.allow = allow_list(*allow);
   validate_allow(result.allow);
   return result;
@@ -129,7 +134,7 @@ int run_requested(const ToolLine& line) {
 
 int run_mcp_command(const std::vector<std::string>& args) {
   std::string problem;
-  const auto line = read_tool_line(args, 0, {{kAllow}, {kReadOnly, command_line::kHelpOption}}, problem);
+  const auto line = read_tool_line(args, 0, {{kAllow, kEditor}, {kReadOnly, command_line::kHelpOption}}, problem);
   if (!line) {
     std::cerr << problem << '\n' << kUsage;
     return kExitUsage;

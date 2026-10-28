@@ -118,6 +118,16 @@ Socket Socket::connect_to(const std::string& address, std::uint16_t port, std::s
   return stream;
 }
 
+Socket Socket::listen_local(std::uint16_t port, std::string& error) {
+  Socket listener(open_stream(error));
+  if (!listener.valid()) return listener;
+  const NativeSocket socket = native(listener.handle_);
+  if (bind_local_port(socket, port) && listen(socket, kWaitingConnections) == 0) return listener;
+  error = last_error();
+  listener.close();
+  return listener;
+}
+
 IoStatus Socket::accept(Socket& guest) {
   if (!valid()) return IoStatus::Closed;
   const NativeSocket taken = ::accept(native(handle_), nullptr, nullptr);

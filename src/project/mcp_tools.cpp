@@ -8,6 +8,7 @@
 #include "core/safe_path.hpp"
 #include "core/short_text.hpp"
 #include "project/tool_commands.hpp"
+#include "project/editor_bridge.hpp"
 
 namespace redgem::tools::mcp {
 namespace {
@@ -118,13 +119,8 @@ Json events(const Json& args) {
           {"more", page.more},
           {"cursor_ahead", page.cursor_ahead}};
 }
-}  // namespace
 
-Json invoke(const Options& options, const std::string& name, const Json& args) {
-  const Json tools = catalog(options);
-  const auto tool = std::find_if(tools.begin(), tools.end(), [&](const Json& item) { return item["name"] == name; });
-  if (tool == tools.end()) throw std::invalid_argument("unknown or disabled tool");
-  validate_arguments(tool->at("inputSchema"), args);
+Json native_result(const Options& options, const std::string& name, const Json& args) {
   if (name == "events") {
     const Json data = events(args);
     Json reply = tool_result(data.dump());
@@ -134,5 +130,17 @@ Json invoke(const Options& options, const std::string& name, const Json& args) {
   const auto result = run_tool_command(command(options, name, args));
   if (!result) throw std::logic_error("missing native command");
   return tool_result(result->out + result->err, result->exit_code != kExitSuccess);
+}
+}  // namespace
+
+Json invoke(const Options& options, const std::string& name, const Json& args) {
+  const Json tools = catalog(options);
+  const auto tool = std::find_if(tools.begin(), tools.end(), [&](const Json& item) { return item["name"] == name; });
+  if (tool == tools.end()) throw std::invalid_argument("unknown or disabled tool");
+  validate_arguments(tool->at("inputSchema"), args);
+  const bool live = name == "editor" || name == "events" || name.rfind("scene_", 0) == 0;
+  if (!options.editor_connection.empty() && live)
+    return call_editor(options.game, options.editor_connection, name, args);
+  return native_result(options, name, args);
 }
 }  // namespace redgem::tools::mcp
