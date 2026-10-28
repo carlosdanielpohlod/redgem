@@ -141,6 +141,8 @@ class EditorSession {
   void stop();
   // Advances the running game; does nothing while editing or paused.
   void tick(float frame_seconds);
+  // Exactly one fixed frame of a paused game, without resuming ordinary ticking.
+  bool step();
   Engine* runtime() { return runtime_.get(); }
 
   // Reloads the edited scene's file when it changed on disk (e.g. re-exported from Blender) and there are no

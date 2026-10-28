@@ -10,6 +10,23 @@ A 3D game engine and editor where games are written in **Ruby**, the most human-
 language. Build levels in the editor or in **Blender**, write the gameplay in Ruby, press Play,
 ship a standalone game.
 
+## New in 0.4.1: built-in MCP tools
+
+Connect an MCP client directly to RedGem: inspect and edit scenes, run reproducible headless
+checks, read errors since a cursor, control editor play and capture the scene viewport.
+Live edits appear immediately and each batch is one undo step; read-only and allow-list options
+keep access explicit. No editor plugin is needed.
+
+```sh
+redgem /path/to/game --editor-bridge
+# Use the connection.json path printed by the editor:
+redgem mcp /path/to/game --editor /path/to/connection.json
+# File inspection without an editor:
+redgem mcp /path/to/game --read-only
+```
+
+See [MCP tools and permissions](docs/mcp.md) for client setup, tool examples and limits.
+
 > **Experimental.** RedGem is a young engine: expect rough edges, and see the
 > [known limitations](KNOWN_LIMITATIONS.md). It is not written from zero: it puts together
 > open source projects such as Blender, Jolt Physics, raylib and mruby ([Built with](#built-with)).

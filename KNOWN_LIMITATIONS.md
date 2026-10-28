@@ -280,9 +280,10 @@ there yet:
 - `redgem scene diff` compares loaded object content against an earlier scene file, but does
   not read a revision directly from Git or compare unused assets and unsupported glTF data.
 - A search of the game's assets and of the templates.
-- The opt-in MCP editor bridge ([docs/mcp.md](docs/mcp.md)) supports live inspection, existing
-  node edits, selection, undo/redo, save and event history. Live object creation/removal,
-  play/stop/step and viewport screenshots remain pending. It must be explicitly connected to
+- The opt-in MCP editor bridge ([docs/mcp.md](docs/mcp.md)) supports live inspection, atomic node
+  set/add/remove, selection, undo/redo, save, play controls, single stepping, bounded viewport
+  images and event history. Live add creates empty objects only; asset-backed duplication and
+  model importing still use the editor UI or file tools. It must be explicitly connected to
   the current editor instance; it does not discover editors automatically. Native calls run
   serially and cannot be interrupted by a cancellation notification.
 - Inspecting the objects of a game while it plays, and an opt-in Ruby eval in it (localhost and a

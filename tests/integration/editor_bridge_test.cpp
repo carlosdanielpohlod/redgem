@@ -1,4 +1,5 @@
 #include <doctest/doctest.h>
+#include <mruby.h>
 
 #include <chrono>
 #include <filesystem>
@@ -105,7 +106,7 @@ TEST_CASE("node edit exceptions and no-ops preserve versions and undo history") 
   auto& doc = game.session->document();
   const auto index = coin(game);
   std::string error;
-  CHECK_THROWS_AS(doc.edit_existing_nodes(
+  CHECK_THROWS_AS(doc.edit_nodes(
                       [&]() -> std::string {
                         doc.set_prop(index, "temporary", true);
                         throw std::runtime_error("stopped");
@@ -115,7 +116,7 @@ TEST_CASE("node edit exceptions and no-ops preserve versions and undo history") 
   CHECK(doc.node(index).props.count("temporary") == 0);
   CHECK_FALSE(doc.can_undo());
   CHECK_FALSE(doc.dirty());
-  CHECK(doc.edit_existing_nodes(
+  CHECK(doc.edit_nodes(
       [&] {
         doc.set_prop(index, "temporary", true);
         doc.remove_prop(index, "temporary");
@@ -142,13 +143,13 @@ TEST_CASE("live editor inspection sees unsaved state and explicit save persists 
   CHECK(std::get<std::unique_ptr<EditorSession>>(reopened)->document().node(coin(game)).local.position.x == 1);
 }
 
-TEST_CASE("live editing rejects gestures, another scene, creation and playing") {
+TEST_CASE("live editing rejects gestures, another scene and playing") {
   Game game;
   CHECK_FALSE(ok(invoke_editor(*game.session, "scene_edit", set({"position=1,2,3"}), true)));
   auto other = set({"position=1,2,3"});
   other["scene"] = "another";
   CHECK_FALSE(ok(invoke_editor(*game.session, "scene_edit", other)));
-  CHECK_FALSE(ok(invoke_editor(*game.session, "scene_edit", {{"action", "add"}, {"object", "New"}})));
+  CHECK_FALSE(ok(invoke_editor(*game.session, "scene_edit", {{"action", "add"}, {"object", "../New"}})));
   ScriptedInputSource input;
   std::string error;
   REQUIRE(game.session->play({input}, error));
@@ -210,12 +211,13 @@ TEST_CASE("live MCP catalog exposes status only under read-only and narrows edit
   const auto read = mcp::catalog(options);
   CHECK(read.size() == 6);
   for (const auto& tool : read) {
-    if (tool["name"] == "editor") CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"status"}));
+    if (tool["name"] == "editor")
+      CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"status", "capture"}));
   }
   options.read_only = false;
   for (const auto& tool : mcp::catalog(options)) {
     if (tool["name"] == "scene_edit")
-      CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"set"}));
+      CHECK(tool["inputSchema"]["properties"]["action"]["enum"] == Json::array({"set", "add", "remove"}));
   }
 }
 
@@ -290,4 +292,62 @@ TEST_CASE("editor commands reject unrelated object arguments before touching und
   CHECK_FALSE(ok(invoke_editor(*game.session, "editor", {{"action", "select"}})));
   CHECK(game.session->document().dirty());
   CHECK(game.session->document().can_undo());
+}
+
+TEST_CASE("live creation and removal are atomic single undo steps with stable identities") {
+  Game game;
+  auto& session = *game.session;
+  const auto original = session.document().node_count();
+  REQUIRE(ok(invoke_editor(
+      session, "scene_edit",
+      {{"action", "add"}, {"object", "BridgeObject"}, {"parent", "Ground"}, {"assignments", {"position=1,2,3"}}})));
+  const auto found = find_object(session.scene_desc(), "BridgeObject");
+  REQUIRE(found.index != kNoIndex);
+  const std::string identity = session.document().node(found.index).stable_id;
+  CHECK(session.document().node_count() == original + 1);
+  session.undo();
+  CHECK(session.document().node_count() == original);
+  CHECK_FALSE(session.document().dirty());
+  session.redo();
+  CHECK(session.document().node(find_object(session.scene_desc(), "BridgeObject").index).stable_id == identity);
+  CHECK_FALSE(ok(invoke_editor(session, "scene_edit", {{"action", "remove"}, {"object", "BridgeObject"}})));
+  REQUIRE(
+      ok(invoke_editor(session, "scene_edit", {{"action", "remove"}, {"object", "BridgeObject"}, {"confirm", true}})));
+  CHECK(session.document().node_count() == original);
+  session.undo();
+  CHECK(session.document().node(find_object(session.scene_desc(), "BridgeObject").index).stable_id == identity);
+}
+
+TEST_CASE("failed live creation leaves neither an object nor an undo step") {
+  Game game;
+  const auto count = game.session->document().node_count();
+  CHECK_FALSE(ok(invoke_editor(*game.session, "scene_edit",
+                               {{"action", "add"}, {"object", "Bad"}, {"assignments", {"position=bad"}}})));
+  CHECK(game.session->document().node_count() == count);
+  CHECK_FALSE(game.session->document().can_undo());
+  CHECK_FALSE(game.session->document().dirty());
+}
+
+TEST_CASE("single stepping only advances paused games and leaves the editor document unchanged") {
+  Game game;
+  auto& session = *game.session;
+  CHECK_FALSE(session.step());
+  ScriptedInputSource input;
+  std::string error;
+  REQUIRE(session.play({input}, error));
+  CHECK_FALSE(session.step());
+  session.pause(true);
+  const auto installed = session.runtime()->scripts().eval(
+      "$mcp_steps = 0; class StepProbe < Behaviour; def update(_dt); $mcp_steps += 1; end; end; "
+      "Scene.find('Player').add_component(StepProbe)",
+      "step_test.rb");
+  REQUIRE_MESSAGE(installed.ok, installed.error);
+  REQUIRE(session.step());
+  const auto counted = session.runtime()->scripts().eval("$mcp_steps", "step_test.rb");
+  REQUIRE(counted.ok);
+  CHECK(mrb_fixnum(counted.value) == 1);
+  CHECK(session.play_state() == PlayState::Paused);
+  CHECK_FALSE(session.document().dirty());
+  session.stop();
+  CHECK_FALSE(session.step());
 }

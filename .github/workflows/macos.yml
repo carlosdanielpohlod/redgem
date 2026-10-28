@@ -2,8 +2,8 @@
 # Intel. Each step that checks something fails the run when it fails; the steps after it still
 # run (when the build itself worked), so that one failure does not hide the others. The pictures
 # of the screen and the tests' pictures are kept as the run's artifacts. A run started by hand
-# with `package` set also packs the Mac's download (tools/release/package.sh) and keeps it as an
-# artifact, for a release; the other downloads are packed by hand.
+# with `package` set, or a release-* pull request, also packs the Mac's download and keeps it
+# as an artifact for a release; the other downloads are packed by hand.
 name: macOS
 
 on:
@@ -89,10 +89,10 @@ jobs:
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: ctest --test-dir build --output-on-failure -LE system
 
-      # (About half an hour on these machines, against a minute with a graphics card.)
+      # Software rendering varies by runner: a successful Intel run has taken 45 minutes.
       - name: Editor system test (opens the editor window)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        timeout-minutes: 45
+        timeout-minutes: 60
         run: ctest --test-dir build -R '^system\.editor\.window$' --output-on-failure
 
       - name: Open the editor on a demo and take a picture of the screen
@@ -111,7 +111,7 @@ jobs:
 
       - name: Pack the download
         id: package
-        if: ${{ !cancelled() && inputs.package && steps.build.outcome == 'success' }}
+        if: ${{ !cancelled() && (inputs.package || startsWith(github.head_ref, 'release-')) && steps.build.outcome == 'success' }}
         run: tools/release/package.sh
 
       # As a double click does: through the system's launcher, with no game named (the project hub).

@@ -50,7 +50,7 @@ links. These restrictions protect tooling paths; they do not sandbox native game
 
 Without `--editor`, edits go through the file-based scene commands. Close the editor while
 editing its files this way. Keep an earlier save and inspect `scene_diff` after an edit.
-`from` and `parent` are available only when adding an object in file mode.
+`from` is available only in file mode; `parent` also works when adding a live empty object.
 
 ## Live editor
 
@@ -68,23 +68,37 @@ redgem mcp /path/to/game --editor /path/to/connection.json
 ```
 
 Scene listing, object details and scene comparison now read the editor's unsaved document.
-`scene_edit` accepts only `set` on an existing object with one or more assignments. The whole
-call is one undo step: invalid assignments or exceptions roll it back without losing earlier
-undo/redo. Successful changes update the viewport and select the object; they remain unsaved.
-Adding and removing objects through the live bridge are not implemented yet.
+`scene_edit` supports `set`, `add` and `remove`. `add` creates an empty object, optionally under
+`parent`, with initial `assignments`; attach scripts and properties as with the CLI. `from`
+(asset-backed duplication) remains file-only. `remove` deletes a subtree and requires
+`confirm: true`. Every call is one undo step: invalid assignments or exceptions roll it back
+without losing earlier undo/redo. Changes update the viewport and remain unsaved until `save`.
 
-The extra `editor` tool takes `action`: `status`, `select` (with `object`), `undo`, `redo`, or
-`save`. Status reports the open scene, edit/play state, dirty flag, selected identities and undo/
-redo availability and pending external file conflicts. With `--read-only`, its schema and
-validation permit only `status`. An `object` is accepted only by `select`.
-Edits and editor commands are refused while playing, during a gesture or dialog, or while an
-external file conflict is pending in the editor.
-Reading still describes the edited document, not the game's live runtime objects. An explicit
-`scene` must match the scene currently open; requests never switch scenes or discard edits.
+The `editor` tool takes these actions:
 
-`events` reads the editor process's log history. `api`, `game_run` and `game_check` remain the
-ordinary CLI tools; runs and checks read saved files, not the unsaved editor scene. Play/stop/
-step controls, runtime inspection and viewport screenshots through this bridge are still pending.
+| Action | Result |
+|--------|--------|
+| `status` | Scene, play state, dirty flag, selection, undo/redo and external-conflict state. |
+| `select` | Select the requested `object`. |
+| `undo`, `redo`, `save` | Apply the corresponding editor command. Saving is explicit. |
+| `play`, `pause`, `resume`, `stop` | Control the editor's game, using its normal input, audio and viewport. |
+| `step` | Advance a paused game by exactly one fixed frame, keeping it paused. |
+| `capture` | Return the last completed viewport as an MCP PNG image, without writing a file. |
+
+`capture` accepts `max_size` (default 512, range 128–1024), the longest output side. Images are
+reduced further when necessary to stay below 128 KiB before base64 encoding. Only the scene
+viewport is captured, never the desktop or other applications. `object` is accepted only by
+`select`; `max_size` only by `capture`. Read-only mode permits `status` and `capture` only.
+
+Edits and document commands are refused while playing, during gestures/dialogs, or with an
+external file conflict pending. Play starts a copy of the unsaved scene; Stop discards that
+runtime and restores the edited document. Pause/resume/stop/step control that runtime, not the
+file. Read operations still describe the edited document, not runtime-mutated objects. An
+explicit `scene` must match the open scene; requests never switch or discard scenes.
+
+`events` reads the editor's log history. `api`, `game_run` and `game_check` remain ordinary CLI
+tools: runs/checks read saved files rather than the unsaved editor scene. Runtime object
+inspection and arbitrary live eval are not exposed by this release.
 
 The bridge binds only to IPv4 loopback and requires a random credential on every request, with
 the game directory checked at both ends. Its connection file stays outside the repository and

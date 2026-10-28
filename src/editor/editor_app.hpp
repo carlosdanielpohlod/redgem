@@ -69,6 +69,13 @@ class EditorApp {
   // Local tooling is polled on the editor thread before input and drawing. Empty by default.
   void set_frame_hook(std::function<void(EditorApp&)> hook) { frame_hook_ = std::move(hook); }
   bool interaction_active() const;
+  struct ViewportPicture {
+    std::vector<std::uint8_t> bytes;
+    int width = 0;
+    int height = 0;
+  };
+  // A bounded JPEG of the last completed scene viewport (not the desktop or other windows).
+  std::optional<ViewportPicture> capture_viewport(int max_side, std::string& error) const;
   // Whether the editor is done: leaving was asked for and nothing unsaved stands in the way (there
   // was nothing, or the user chose Save / Discard).
   bool finished() const { return quit_confirmed_; }

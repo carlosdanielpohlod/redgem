@@ -56,19 +56,52 @@ void require_editable(const EditorSession& session, bool busy) {
     throw std::invalid_argument("resolve the editor's external file conflict first");
 }
 
+void validate_removal(const Json& args, const std::vector<std::string>& words) {
+  if (!args.value("confirm", false)) throw std::invalid_argument("remove needs confirm=true");
+  if (!words.empty()) throw std::invalid_argument("remove does not accept assignments");
+}
+
+void validate_edit(const Json& args) {
+  const std::string action = args.at("action");
+  if (args.contains("from")) throw std::invalid_argument("live add creates an empty object; from is not supported");
+  if (action != "add" && args.contains("parent")) throw std::invalid_argument("parent is only accepted by add");
+  const auto words = args.value("assignments", std::vector<std::string>{});
+  if (action == "set" && words.empty()) throw std::invalid_argument("set needs assignments");
+  if (action == "remove") validate_removal(args, words);
+}
+
+int add_empty(EditorSession& session, const Json& args) {
+  const std::string name = args.at("object");
+  const auto problem = name_problem(name);
+  if (!problem.empty()) throw std::invalid_argument(problem);
+  int parent = kNoIndex;
+  if (args.contains("parent")) parent = object(session, {{"object", args["parent"]}});
+  return session.document().add_empty(name, parent);
+}
+
+std::string apply_edit(EditorSession& session, SceneEdit& edit, int& index, const Json& args) {
+  const std::string action = args.at("action");
+  if (action == "add") index = add_empty(session, args);
+  if (action == "remove") {
+    session.document().remove(index);
+    index = kNoIndex;
+    return {};
+  }
+  return apply_words(edit, index, args);
+}
+
 Json edit(EditorSession& session, const Json& args, bool busy) {
   require_editable(session, busy);
-  if (args.at("action") != "set") throw std::invalid_argument("live edits currently support existing-object set only");
-  if (args.contains("from") || args.contains("parent"))
-    throw std::invalid_argument("from and parent are not set options");
-  int index = object(session, args);
+  validate_edit(args);
+  int index = args.at("action") == "add" ? kNoIndex : object(session, args);
+  const std::string removed = index == kNoIndex ? "" : object_line(session.scene_desc(), index);
   SceneEdit edit{session.document(), session.game_dir() / config::kScriptsDirName, {}};
   std::string error;
-  if (!session.document().edit_existing_nodes([&] { return apply_words(edit, index, args); }, error))
+  if (!session.document().edit_nodes([&] { return apply_edit(session, edit, index, args); }, error))
     throw std::invalid_argument(error);
   session.refresh_preview();
-  session.select(static_cast<ObjectId>(index));
-  return tool_result(object_line(session.scene_desc(), index) + "\n");
+  session.select(index == kNoIndex ? kNoObject : static_cast<ObjectId>(index));
+  return tool_result(index == kNoIndex ? "removed " + removed : object_line(session.scene_desc(), index));
 }
 
 void apply_control(EditorSession& session, const std::string& action, const Json& args) {
@@ -81,11 +114,30 @@ void apply_control(EditorSession& session, const std::string& action, const Json
   }
 }
 
-Json control(EditorSession& session, const Json& args, bool busy) {
-  const std::string action = args.at("action");
+bool window_action(const std::string& action) {
+  return action == "play" || action == "pause" || action == "resume" || action == "stop" || action == "step" ||
+         action == "capture";
+}
+
+void validate_control(const std::string& action, const Json& args) {
   if (action != "select" && args.contains("object")) throw std::invalid_argument("object is only accepted by select");
   if (action == "select" && !args.contains("object")) throw std::invalid_argument("select needs an object");
+  if (action != "capture" && args.contains("max_size"))
+    throw std::invalid_argument("max_size is only accepted by capture");
+}
+
+Json use_window(EditorSession& session, const std::string& action, const Json& args, bool busy, const Invoke& window) {
+  if (!window) throw std::invalid_argument("this action requires an editor window");
+  if (action != "capture" && busy) throw std::invalid_argument("finish the current editor gesture or dialog first");
+  if (action == "play") require_editable(session, false);
+  return window(action, args);
+}
+
+Json control(EditorSession& session, const Json& args, bool busy, const Invoke& window) {
+  const std::string action = args.at("action");
+  validate_control(action, args);
   if (action == "status") return tool_result(state(session).dump());
+  if (window_action(action)) return use_window(session, action, args, busy, window);
   require_editable(session, busy);
   apply_control(session, action, args);
   return tool_result(state(session).dump());
@@ -110,22 +162,22 @@ void validate(const EditorSession& session, const std::string& name, const Json&
   require_current_scene(session, args);
 }
 
-Json handle(EditorSession& session, const std::string& name, const Json& args, bool busy) {
+Json handle(EditorSession& session, const std::string& name, const Json& args, bool busy, const Invoke& window) {
   if (name == "scene_get") return tool_result(object_detail(session.scene_desc(), object(session, args)));
   if (name == "scene_edit") return edit(session, args, busy);
   if (name == "scene_diff") return compare(session, args);
-  if (name == "editor") return control(session, args, busy);
+  if (name == "editor") return control(session, args, busy, window);
   if (name != "scene_list") throw std::invalid_argument("tool is not available in the editor");
   return tool_result(scene_list(session.scene_desc(), session.scene_name(),
                                 {args.value("depth", kEveryLevel), args.value("limit", kLiveListLimit)}));
 }
 }  // namespace
 
-Json invoke_editor(EditorSession& session, const std::string& name, const Json& args, bool busy) {
+Json invoke_editor(EditorSession& session, const std::string& name, const Json& args, bool busy, const Invoke& window) {
   try {
     validate(session, name, args);
     if (name == "events") return mcp::invoke({}, name, args);
-    return handle(session, name, args, busy);
+    return handle(session, name, args, busy, window);
   } catch (const std::exception& error) {
     return tool_result(error.what(), true);
   }
