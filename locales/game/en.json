@@ -1,4 +1,5 @@
 {
+  "game.loading": "Loading…",
   "game.controls.action_fire": "Fire",
   "game.controls.action_horizontal_negative": "Move left",
   "game.controls.action_horizontal_positive": "Move right",

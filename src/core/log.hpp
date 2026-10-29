@@ -15,6 +15,19 @@ enum class Level { Debug, Info, Warning, Error };
 
 using Sink = std::function<void(Level, const std::string&)>;
 
+// Diverts only this thread's messages until destruction; nested captures restore their caller.
+// Background asset reads use it to deliver diagnostics on the owning thread, like their results.
+class Capture {
+ public:
+  explicit Capture(Sink sink);
+  ~Capture();
+  Capture(const Capture&) = delete;
+  Capture& operator=(const Capture&) = delete;
+
+ private:
+  Sink previous_;
+};
+
 void write(Level level, const std::string& message);
 void debug(const std::string& message);
 void info(const std::string& message);
@@ -30,7 +43,7 @@ const char* level_name(Level level);
 
 inline constexpr std::size_t kDefaultEventLimit = 128;
 
-// Every message reaches the process history, independently of the installed sink.
+// Messages outside a thread capture reach history independently of the installed process sink.
 // Include core/event_journal.hpp for the page's fields. Cursors last for this process only.
 std::uint64_t event_cursor();
 EventPage events_since(std::uint64_t cursor, std::size_t limit = kDefaultEventLimit, Level minimum = Level::Debug);

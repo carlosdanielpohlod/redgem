@@ -18,11 +18,11 @@ void Engine::frame(float frame_seconds) {
   read_input();
   hand_on_capture();
   context_.hud.clear();
-  scripts_->start_pending();
+  if (!is_loading_scene()) scripts_->start_pending();
   poll_network();
   answer_requests();
   follow_presenter();
-  advance_game(frame_seconds);
+  advance_or_loading(frame_seconds);
   present();
   audio().update();
   ++context_.time.frame;
@@ -66,11 +66,13 @@ void Engine::answer_requests() {
 
 bool Engine::found_by_neighbours() const { return network_.hosting() && network_.room().empty(); }
 
+bool Engine::captures_cursor() const { return context_.mouse_locked && !is_loading_scene(); }
+
 void Engine::follow_presenter() {
   const SurfaceSize size = presenter_->surface_size();
   context_.screen_width = size.width;
   context_.screen_height = size.height;
-  presenter_->capture_cursor(context_.mouse_locked);
+  presenter_->capture_cursor(captures_cursor());
 }
 
 void Engine::advance_game(float frame_seconds) {

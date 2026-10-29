@@ -95,9 +95,13 @@ struct ScriptContext {
   // on another machine must not push things around here).
   std::function<ObjectId(ObjectId, const std::optional<Transform>&, bool)> spawn;
   AudioSystem* audio = nullptr;
-  // Scene switching: Game.load_scene sets the request; the engine switches at the end of the frame.
+  // Scene requests are collected at frame end; asynchronous reads keep the old world until ready.
   std::string scene_name;
   std::optional<std::string> requested_scene;
+  bool scene_request_async = false;
+  bool cancel_scene_load = false;
+  std::string loading_scene;  // nonempty while the current world is frozen for a background read
+  std::string loading_error;  // last failed read, retained until the next request
   std::function<bool(const std::string&)> scene_exists;
 };
 

@@ -460,6 +460,22 @@ subclass of `GameMenu::Screen` (`draw`, `space_above`, `opened`, `closed`, `typi
 for widgets of its own that take the focus before its buttons, with `focus`): the
 platformer's multiplayer screen, `games/platformer/scripts/multiplayer_screen.rb`, is one.
 
+### A loading screen
+
+```ruby
+Game.on_loading do |delta|
+  UI.text("Loading #{Game.loading_scene}...", x: 24, y: 24, size: 28)
+  Game.cancel_scene_load if UI.button("Cancel", x: 24, y: 80, width: 160, height: 48)
+end
+Game.load_scene_async("level2")
+```
+
+Normal simulation pauses while the file is read; the loading screen, audio and network continue.
+Failure or cancellation preserves the current scene. Check `Game.loading_error` after the load
+ends to report a failure or retry. Successful activation removes the old loading callback.
+Physics, texture decoding and GPU upload can still cause an activation hitch; see
+[the API's loading limits](api.md#game). Use `Game.load_scene` for the existing synchronous switch.
+
 ## A settings screen
 
 `GameMenu` has one ready, reached from its title and pause screens: window mode, resolution,

@@ -1661,6 +1661,38 @@
           "about": "switches to scenes/<name>.glb (\"main\" is scene.glb); Ruby globals survive"
         },
         {
+          "name": "load_scene_async",
+          "static": true,
+          "args": "name",
+          "about": "queues a background scene read; the old world survives failed reads and cancellation"
+        },
+        {
+          "name": "loading?",
+          "static": true,
+          "about": "a scene request is queued or being read"
+        },
+        {
+          "name": "loading_scene",
+          "static": true,
+          "about": "the requested scene name, or nil"
+        },
+        {
+          "name": "loading_error",
+          "static": true,
+          "about": "the last asynchronous read error, or nil; cleared by the next load request"
+        },
+        {
+          "name": "cancel_scene_load",
+          "static": true,
+          "about": "cancels a pending asynchronous request; returns whether one was pending"
+        },
+        {
+          "name": "on_loading",
+          "static": true,
+          "args": "&block",
+          "about": "draws the loading screen each frame with unscaled delta; no block restores the default"
+        },
+        {
           "name": "scene_name",
           "static": true,
           "about": "the scene running"
@@ -1685,7 +1717,9 @@
           "static": true,
           "about": "the version in game.json (\"1.2.0\"), or nil"
         }
-      ]
+      ],
+      "notes": "While an asynchronous read is pending, physics, animations and normal behaviour callbacks pause.\nInput, networking, HTTP callbacks, audio and presentation continue. The loading callback can use\n`UI`, handle cancel buttons and animate using its unscaled delta; `Time.delta` is zero during\nloading. The pointer is released while the screen is shown. The default screen draws a translated\nloading label over the old world. A callback error is reported once and disables it for that load.\n\nUnsafe names are rejected immediately; missing or unreadable files are reported through\n`Game.loading_error` after the request runs. The old world stays intact if reading fails or is cancelled. The most recent request wins;\n`Game.load_scene` also supersedes an asynchronous request. Globals survive successful activation,\nbut the old scene's loading callback is removed before the next scene's setup runs. Errors are\nreported through `Game.loading_error` and the event log. At most eight background requests/results can be\noutstanding across the process, using one shared reader; a full queue fails without changing the\nworld. Cancelling an active read discards its result; it does not interrupt the file parser.\n\nOnly file reading and glTF parsing happen on the worker. Physics creation, script setup, texture\ndecoding and GPU upload still happen on the owning thread and may hitch during activation. The\nold and incoming scene coexist in memory during reading. Fixed-step offline runs (including\nrecordings and scripted replays) wait for the reader before advancing, then show exactly one\nloading frame before activation so completion does not depend on thread scheduling. Networked runs and dedicated-server rooms keep the\nbackground reader even in fixed-step mode; activation still runs on the server loop and can stall\nother rooms sharing that loop. Closing the process waits for an active parser to return.",
+      "guide": "gameplay.md#a-loading-screen"
     },
     {
       "name": "Settings",

@@ -40,6 +40,7 @@ Engine::Engine(const EngineOptions& options)
       network_watch_(options.network_time) {}
 
 Engine::~Engine() {
+  scene_load_.reset();
   keep_bindings();
   // Scripts reference the scene and physics through the context: tear them down first.
   scripts_.reset();

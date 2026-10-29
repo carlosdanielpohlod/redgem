@@ -8,6 +8,7 @@
 
 namespace redgem::log {
 namespace {
+thread_local Sink captured_sink;
 
 EventJournal& journal() {
   static EventJournal events;
@@ -46,7 +47,11 @@ const char* level_name(Level level) {
   return "unknown";
 }
 
+Capture::Capture(Sink sink) : previous_(std::exchange(captured_sink, std::move(sink))) {}
+Capture::~Capture() { captured_sink = std::move(previous_); }
+
 void write(Level level, const std::string& message) {
+  if (captured_sink) return captured_sink(level, message);
   const std::lock_guard<std::mutex> hold(sink_lock());
   journal().append(level, message);
   current_sink()(level, message);

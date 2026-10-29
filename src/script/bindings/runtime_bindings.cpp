@@ -63,7 +63,10 @@ mrb_value game_load_scene(mrb_state* mrb, mrb_value) {
   const std::string name = name_arg(mrb);
   ScriptContext& ctx = context(mrb);
   if (!has_scene(ctx, name)) mrb_raisef(mrb, E_ARGUMENT_ERROR, "no scene named %s", name.c_str());
+  ctx.loading_error.clear();
   ctx.requested_scene = name;
+  ctx.scene_request_async = false;
+  ctx.cancel_scene_load = false;
   return mrb_nil_value();
 }
 
@@ -104,6 +107,7 @@ void install_runtime_bindings(mrb_state* mrb) {
   install_time_bindings(mrb);
   install_debug_bindings(mrb);
   install_game_bindings(mrb);
+  install_loading_bindings(mrb);
 }
 
 }  // namespace redgem

@@ -37,3 +37,26 @@ TEST_CASE("level names") {
   CHECK(std::string(log::level_name(log::Level::Debug)) == "debug");
   CHECK(std::string(log::level_name(log::Level::Error)) == "error");
 }
+
+TEST_CASE("thread log captures are nested and do not redirect other threads") {
+  test::LogCapture process;
+  std::vector<std::string> outer;
+  std::vector<std::string> inner;
+  {
+    const log::Capture first([&](log::Level, const std::string& text) { outer.push_back(text); });
+    log::warning("outer first");
+    {
+      const log::Capture second([&](log::Level, const std::string& text) { inner.push_back(text); });
+      log::error("inner");
+    }
+    std::thread other([] { log::info("other thread"); });
+    other.join();
+    log::info("outer last");
+  }
+  log::info("after capture");
+  CHECK(outer == std::vector<std::string>{"outer first", "outer last"});
+  CHECK(inner == std::vector<std::string>{"inner"});
+  CHECK_FALSE(process.contains("outer"));
+  CHECK(process.contains("other thread"));
+  CHECK(process.contains("after capture"));
+}

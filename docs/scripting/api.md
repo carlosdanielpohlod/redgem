@@ -449,14 +449,42 @@ Messages to the console (and to redgem run).
 
 ## Game
 
-The game itself.
+The game itself. See [gameplay.md#a-loading-screen](gameplay.md#a-loading-screen).
 
 - `Game.load_scene(name)`: switches to scenes/<name>.glb ("main" is scene.glb); Ruby globals survive
+- `Game.load_scene_async(name)`: queues a background scene read; the old world survives failed reads and cancellation
+- `Game.loading?`: a scene request is queued or being read
+- `Game.loading_scene`: the requested scene name, or nil
+- `Game.loading_error`: the last asynchronous read error, or nil; cleared by the next load request
+- `Game.cancel_scene_load`: cancels a pending asynchronous request; returns whether one was pending
+- `Game.on_loading(&block)`: draws the loading screen each frame with unscaled delta; no block restores the default
 - `Game.scene_name`: the scene running
 - `Game.title`: the game's title
 - `Game.quit`: ends the game
 - `Game.stop_recording`: ends a video recorded with --record; the game goes on
 - `Game.version`: the version in game.json ("1.2.0"), or nil
+
+While an asynchronous read is pending, physics, animations and normal behaviour callbacks pause.
+Input, networking, HTTP callbacks, audio and presentation continue. The loading callback can use
+`UI`, handle cancel buttons and animate using its unscaled delta; `Time.delta` is zero during
+loading. The pointer is released while the screen is shown. The default screen draws a translated
+loading label over the old world. A callback error is reported once and disables it for that load.
+
+Unsafe names are rejected immediately; missing or unreadable files are reported through
+`Game.loading_error` after the request runs. The old world stays intact if reading fails or is cancelled. The most recent request wins;
+`Game.load_scene` also supersedes an asynchronous request. Globals survive successful activation,
+but the old scene's loading callback is removed before the next scene's setup runs. Errors are
+reported through `Game.loading_error` and the event log. At most eight background requests/results can be
+outstanding across the process, using one shared reader; a full queue fails without changing the
+world. Cancelling an active read discards its result; it does not interrupt the file parser.
+
+Only file reading and glTF parsing happen on the worker. Physics creation, script setup, texture
+decoding and GPU upload still happen on the owning thread and may hitch during activation. The
+old and incoming scene coexist in memory during reading. Fixed-step offline runs (including
+recordings and scripted replays) wait for the reader before advancing, then show exactly one
+loading frame before activation so completion does not depend on thread scheduling. Networked runs and dedicated-server rooms keep the
+background reader even in fixed-step mode; activation still runs on the server loop and can stall
+other rooms sharing that loop. Closing the process waits for an active parser to return.
 
 ## Settings
 

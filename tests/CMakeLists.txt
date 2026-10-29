@@ -154,6 +154,7 @@ add_executable(redgem_tests
   integration/presenter_test.cpp
   integration/water_interaction_test.cpp
   integration/scene_script_test.cpp
+  integration/async_scene_test.cpp
   integration/ui_input_test.cpp
   integration/input_actions_test.cpp
   integration/gameplay_api_test.cpp
@@ -191,8 +192,14 @@ if(REDGEM_SANITIZERS)
   # the program at the null pointer first.
   target_compile_options(redgem_crash_helper PRIVATE -fno-sanitize=undefined)
 endif()
+# A reader that finishes during static destruction must still be able to reject linked assets.
+add_executable(redgem_scene_shutdown_test tools/scene_shutdown_test.cpp)
+target_link_libraries(redgem_scene_shutdown_test PRIVATE redgem_runtime)
+add_test(NAME app.async_scene_shutdown COMMAND redgem_scene_shutdown_test
+         "${CMAKE_CURRENT_BINARY_DIR}/async-shutdown-files")
+set_tests_properties(app.async_scene_shutdown PROPERTIES TIMEOUT 30)
 # The tests of builds copy the real player, and look for it where a build does: beside redgem.
-add_dependencies(redgem_tests redgem_player redgem redgem_crash_helper)
+add_dependencies(redgem_tests redgem_player redgem redgem_crash_helper redgem_scene_shutdown_test)
 target_compile_definitions(redgem_tests PRIVATE
   REDGEM_FIXTURES_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
   REDGEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
@@ -475,6 +482,7 @@ set_tests_properties(system.editor.window PROPERTIES LABELS system RUN_SERIAL TR
 # What the renderer draws, in a real window, read back as pixels: scenes made in code.
 add_executable(redgem_render_system_tests render_system/render_test_main.cpp render_system/render_system_test.cpp
                render_system/animation_graph_render_test.cpp
+               render_system/async_scene_render_test.cpp
                render_system/specular_brdf_render_test.cpp
                render_system/render_look_test.cpp render_system/water_render_test.cpp render_system/scatter_lod_render_test.cpp render_system/particle_render_test.cpp
                render_system/see_through_render_test.cpp render_system/temporal_render_test.cpp
