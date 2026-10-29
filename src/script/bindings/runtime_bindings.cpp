@@ -106,6 +106,7 @@ void install_game_bindings(mrb_state* mrb) {
 void install_runtime_bindings(mrb_state* mrb) {
   install_time_bindings(mrb);
   install_debug_bindings(mrb);
+  install_profile_bindings(mrb);
   install_game_bindings(mrb);
   install_loading_bindings(mrb);
 }

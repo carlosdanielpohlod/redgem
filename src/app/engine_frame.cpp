@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "app/scene_bodies.hpp"
+#include "app/profile_overlay.hpp"
 #include "app/scene_water.hpp"
 #include "app/touch_circles.hpp"
 #include "core/config.hpp"
@@ -15,10 +16,8 @@ namespace redgem {
 bool Engine::finished() const { return context_.quit_requested || !presenter_->open(); }
 
 void Engine::frame(float frame_seconds) {
-  read_input();
-  hand_on_capture();
-  context_.hud.clear();
-  if (!is_loading_scene()) scripts_->start_pending();
+  profiler_.begin_frame();
+  prepare_frame();
   poll_network();
   answer_requests();
   follow_presenter();
@@ -28,6 +27,15 @@ void Engine::frame(float frame_seconds) {
   ++context_.time.frame;
   keep_bindings();
   switch_scene_if_asked();
+  profiler_.finish_frame();
+}
+
+void Engine::prepare_frame() {
+  const FrameProfileScope phase(profiler_, ProfilePhase::Input);
+  read_input();
+  hand_on_capture();
+  context_.hud.clear();
+  if (!is_loading_scene()) scripts_->start_pending();
 }
 
 void Engine::read_input() {
@@ -47,6 +55,7 @@ InputSource& Engine::input_source() {
 }
 
 void Engine::poll_network() {
+  const FrameProfileScope phase(profiler_, ProfilePhase::Network);
   // On the real clock: the network does not pause with the game, nor hurry with its frames. A
   // long stall (a dragged window, a debugger) counts as one long frame, as it does for the game,
   // so that it does not run out the time the network gives its answers.
@@ -61,6 +70,7 @@ void Engine::poll_network() {
 }
 
 void Engine::answer_requests() {
+  const FrameProfileScope phase(profiler_, ProfilePhase::Http);
   for (const net::HttpResult& result : http_.poll()) scripts_->dispatch(result);
 }
 
@@ -111,6 +121,7 @@ bool Engine::both_alive(const ContactEvent& event) const {
 }
 
 void Engine::fixed_step(float dt) {
+  const FrameProfileScope phase(profiler_, ProfilePhase::Physics);
   context_.time.delta = dt;
   scripts_->fixed_update(dt);
   process_destroyed();
@@ -127,10 +138,13 @@ void Engine::fixed_step(float dt) {
 }
 
 void Engine::present() {
+  const FrameProfileScope phase(profiler_, ProfilePhase::Presentation);
+  append_profile_overlay(context_);
   const TouchLayout* touch = input_source().touch_layout();
   controls_ = touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>();
   presenter_->present({scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur,
-                       controls_, images_dir_, context_.stop_recording_requested, &water_.snapshot()});
+                       controls_, images_dir_, context_.stop_recording_requested, &water_.snapshot(),
+                       shows_profile_stats(context_)});
 }
 
 int Engine::run() {

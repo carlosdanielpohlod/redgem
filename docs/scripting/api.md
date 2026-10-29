@@ -446,6 +446,14 @@ Messages to the console (and to redgem run).
 - `Debug.log(message)`: says something
 - `Debug.warn(message)`: warns
 - `Debug.error(message)`: reports an error
+- `Debug.profiling?`: whether foreground frame timings are being collected
+- `Debug.profiling = enabled`: starts a fresh profile window when enabled; disabling retains the last summary
+- `Debug.stats_visible?`: whether the developer statistics overlay was requested
+- `Debug.stats_visible = visible`: shows frame timings and FPS; showing also enables profiling, hiding leaves collection running
+- `Debug.frame_stats`: a snapshot with samples, fps and latest/mean/peak timings in milliseconds
+- `Debug.reset_frame_stats`: clears statistics and discards any unfinished measurement
+
+Profiling is off by default. The overlay uses the shared game HUD, including editor Play and recordings; it is hidden when profiling is off. Timings use the real steady clock, independently of Time.scale or fixed-step replay. The most recent 120 completed frames form the window; reads during a frame expose only completed frames. FPS uses completion-to-completion intervals, and is zero until an interval is available. `latest`, `mean` and `peak` contain `frame_ms`, `interval_ms`, `has_interval`, and `input_ms`, `network_ms`, `http_ms`, `update_ms`, `physics_ms`, `presentation_ms`, `scene_ms`. Input includes pending script startup; network and HTTP include their callbacks; update includes animations, scripts, particles, loading UI and physics. Physics includes fixed-update callbacks, body synchronization and contacts, so its time overlaps update. Presentation includes uploads, drawing and any frame-cap or synchronization waits. Scene includes request polling, synchronous reads and activation; the asynchronous worker is not instrumented, while offline fixed-step waits count as scene wall time. These are foreground wall times, not GPU timers or CPU utilization. Phase times are inclusive and must not be summed as a partition. Overlay timings and captures are nondeterministic; leave the overlay off for reproducible pictures.
 
 ## Game
 

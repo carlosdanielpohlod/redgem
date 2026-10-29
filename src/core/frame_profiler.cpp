@@ -7,7 +7,7 @@
 namespace redgem {
 namespace {
 constexpr double kMillisecondsPerSecond = 1000.0;
-constexpr std::array<std::string_view, kProfilePhaseCount> kPhaseNames{"input",   "network",      "http", "scripts",
+constexpr std::array<std::string_view, kProfilePhaseCount> kPhaseNames{"input",   "network",      "http", "update",
                                                                        "physics", "presentation", "scene"};
 
 double milliseconds_between(double start, double end) {

@@ -25,7 +25,7 @@ TEST_CASE("disabled profiling never reads the clock and empty summaries are fini
   FrameProfiler profiler([&] { return clock.read(); });
   profiler.begin_frame();
   {
-    const FrameProfileScope script(profiler, ProfilePhase::Scripts);
+    const FrameProfileScope script(profiler, ProfilePhase::Update);
   }
   profiler.finish_frame();
   CHECK(clock.reads == 0);
@@ -39,7 +39,7 @@ TEST_CASE("profile phases accumulate, nest inclusively and use real time") {
   profiler.set_enabled(true);
   profiler.begin_frame();
   {
-    const FrameProfileScope scripts(profiler, ProfilePhase::Scripts);
+    const FrameProfileScope scripts(profiler, ProfilePhase::Update);
     clock.now = 0.002;
     {
       const FrameProfileScope physics(profiler, ProfilePhase::Physics);
@@ -48,7 +48,7 @@ TEST_CASE("profile phases accumulate, nest inclusively and use real time") {
     clock.now = 0.008;
   }
   {
-    const FrameProfileScope scripts(profiler, ProfilePhase::Scripts);
+    const FrameProfileScope scripts(profiler, ProfilePhase::Update);
     clock.now = 0.010;
   }
   clock.now = 0.020;
@@ -56,7 +56,7 @@ TEST_CASE("profile phases accumulate, nest inclusively and use real time") {
   auto summary = profiler.summary();
   REQUIRE(summary.samples == 1);
   CHECK(summary.latest.frame_ms == doctest::Approx(20.0));
-  CHECK(summary.latest.phase_ms[column(ProfilePhase::Scripts)] == doctest::Approx(10.0));
+  CHECK(summary.latest.phase_ms[column(ProfilePhase::Update)] == doctest::Approx(10.0));
   CHECK(summary.latest.phase_ms[column(ProfilePhase::Physics)] == doctest::Approx(3.0));
   CHECK_FALSE(summary.latest.has_interval);
   CHECK(summary.frames_per_second == 0.0);
@@ -95,7 +95,7 @@ TEST_CASE("disabled and cleared frames discard outstanding scopes") {
   FrameProfiler profiler([&] { return clock.read(); });
   profiler.set_enabled(true);
   profiler.begin_frame();
-  auto stale = std::make_unique<FrameProfileScope>(profiler, ProfilePhase::Scripts);
+  auto stale = std::make_unique<FrameProfileScope>(profiler, ProfilePhase::Update);
   profiler.set_enabled(false);
   CHECK(profiler.enabled() == false);
   clock.now = 100.0;
@@ -108,7 +108,7 @@ TEST_CASE("disabled and cleared frames discard outstanding scopes") {
   profiler.finish_frame();
   CHECK(profiler.summary().samples == 1);
   CHECK_FALSE(profiler.summary().latest.has_interval);
-  CHECK(profiler.summary().latest.phase_ms[column(ProfilePhase::Scripts)] == 0.0);
+  CHECK(profiler.summary().latest.phase_ms[column(ProfilePhase::Update)] == 0.0);
 }
 
 TEST_CASE("disabling retains the last summary and re-enabling starts a new session") {
@@ -153,7 +153,7 @@ TEST_CASE("profile scopes unwind on errors and snapshots expose completed frames
   profiler.set_enabled(true);
   profiler.begin_frame();
   try {
-    const FrameProfileScope phase(profiler, ProfilePhase::Scripts);
+    const FrameProfileScope phase(profiler, ProfilePhase::Update);
     clock.now = 0.003;
     throw std::runtime_error("callback failed");
   } catch (const std::runtime_error&) {
@@ -161,7 +161,7 @@ TEST_CASE("profile scopes unwind on errors and snapshots expose completed frames
   CHECK(profiler.summary().samples == 0);
   clock.now = 0.005;
   profiler.finish_frame();
-  CHECK(profiler.summary().latest.phase_ms[column(ProfilePhase::Scripts)] == doctest::Approx(3.0));
+  CHECK(profiler.summary().latest.phase_ms[column(ProfilePhase::Update)] == doctest::Approx(3.0));
   profiler.begin_frame();
   profiler.set_enabled(true);  // repeated assignments do not reset an active session
   CHECK(profiler.summary().samples == 1);

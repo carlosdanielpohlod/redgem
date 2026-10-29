@@ -155,6 +155,7 @@ add_executable(redgem_tests
   integration/presenter_test.cpp
   integration/water_interaction_test.cpp
   integration/scene_script_test.cpp
+  integration/profile_api_test.cpp
   integration/async_scene_test.cpp
   integration/ui_input_test.cpp
   integration/input_actions_test.cpp
@@ -483,6 +484,7 @@ set_tests_properties(system.editor.window PROPERTIES LABELS system RUN_SERIAL TR
 # What the renderer draws, in a real window, read back as pixels: scenes made in code.
 add_executable(redgem_render_system_tests render_system/render_test_main.cpp render_system/render_system_test.cpp
                render_system/animation_graph_render_test.cpp
+               render_system/profile_overlay_render_test.cpp
                render_system/async_scene_render_test.cpp
                render_system/specular_brdf_render_test.cpp
                render_system/render_look_test.cpp render_system/water_render_test.cpp render_system/scatter_lod_render_test.cpp render_system/particle_render_test.cpp

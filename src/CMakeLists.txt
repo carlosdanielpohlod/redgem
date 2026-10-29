@@ -329,6 +329,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_args.cpp
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
+  script/bindings/profile_bindings.cpp
   script/bindings/runtime_bindings.cpp
   script/bindings/loading_bindings.cpp
   script/bindings/game_identity_bindings.cpp
@@ -429,6 +430,7 @@ redgem_add_library(redgem_runtime
   app/video_recorder.cpp
   app/encoder_process.cpp
   app/engine.cpp
+  app/profile_overlay.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp
   app/engine_loading.cpp

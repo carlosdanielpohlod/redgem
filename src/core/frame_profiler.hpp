@@ -10,7 +10,7 @@
 
 namespace redgem {
 
-enum class ProfilePhase { Input, Network, Http, Scripts, Physics, Presentation, Scene, Count };
+enum class ProfilePhase { Input, Network, Http, Update, Physics, Presentation, Scene, Count };
 inline constexpr std::size_t kProfilePhaseCount = static_cast<std::size_t>(ProfilePhase::Count);
 inline constexpr std::size_t kProfileHistoryFrames = 120;  // two seconds at sixty frames per second
 
