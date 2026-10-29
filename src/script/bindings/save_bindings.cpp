@@ -87,6 +87,7 @@ void install_save_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, save_module, "delete", save_delete, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, save_module, "clear", save_clear, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, save_module, "keys", save_keys, MRB_ARGS_NONE());
+  install_save_slot_bindings(mrb);
 }
 
 }  // namespace redgem

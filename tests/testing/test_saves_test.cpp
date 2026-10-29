@@ -158,11 +158,14 @@ TEST_CASE("copied game-test runs carry named slots and backups without sharing p
   first_slots.use_default(original);
   REQUIRE(first_slots.select("campaign").set("coins", 1));
   REQUIRE(first_slots.select("campaign").set("coins", 2));
+  REQUIRE(first_slots.select("once").set("coins", 41));
   const auto copied = copied_run_files("/games/slot-test", work, "later_test.rb", "first_test.rb");
   SaveFile second(copied.save);
   SaveSlots second_slots;
   second_slots.use_default(second);
   CHECK(second_slots.select("campaign").get("coins") == 2);
+  CHECK(second_slots.select("once").get("coins") == 41);
+  CHECK_FALSE(std::filesystem::exists(save_backup_of(save_slot_file(copied.save, "once"))));
   CHECK(std::filesystem::exists(save_backup_of(save_slot_file(copied.save, "campaign"))));
   REQUIRE(second_slots.select("campaign").set("coins", 99));
   CHECK(first_slots.select("campaign").get("coins") == 2);

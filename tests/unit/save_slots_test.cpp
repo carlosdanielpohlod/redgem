@@ -188,3 +188,24 @@ TEST_CASE("database slot views can close while another room updates its slot") {
   observer.join();
   CHECK(writing->get("coins") == kTurns);
 }
+
+TEST_CASE("opening slot-capable storage preserves rows from the legacy database schema") {
+  SlotFolder folder;
+  std::filesystem::create_directories(folder.root);
+  const auto path = folder.root / "legacy.sqlite";
+  sqlite3* legacy = nullptr;
+  REQUIRE(sqlite3_open(path.u8string().c_str(), &legacy) == SQLITE_OK);
+  const char* schema =
+      "CREATE TABLE saves(key TEXT PRIMARY KEY NOT NULL,value TEXT NOT NULL) WITHOUT ROWID;"
+      "INSERT INTO saves(key,value) VALUES('coins','7');";
+  REQUIRE(sqlite3_exec(legacy, schema, nullptr, nullptr, nullptr) == SQLITE_OK);
+  REQUIRE(sqlite3_close(legacy) == SQLITE_OK);
+  std::string error;
+  auto database = server::SaveDatabase::open(path, error);
+  REQUIRE_MESSAGE(database, error);
+  CHECK(database->get("coins") == 7);
+  auto campaign = database->open_slot("campaign");
+  REQUIRE(campaign->set("coins", 2));
+  CHECK(database->get("coins") == 7);
+  CHECK(campaign->get("coins") == 2);
+}
