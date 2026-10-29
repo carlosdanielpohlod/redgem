@@ -1,6 +1,7 @@
 #include "project/editor_bridge.hpp"
 
 #include <stdexcept>
+#include <utility>
 
 #include "project/editor_bridge_wire.hpp"
 
@@ -17,18 +18,20 @@ net::Socket connect(const Address& address) {
 
 class Exchange {
  public:
-  Exchange(const Address& address, const std::filesystem::path& game, const std::string& name, const Json& args)
+  Exchange(const Address& address, const std::filesystem::path& game, const std::string& name, const Json& args,
+           EditorBridgeClock clock)
       : socket_(connect(address)),
         output_(encode({{"token", address.token},
                         {"game", std::filesystem::canonical(game).generic_u8string()},
                         {"name", name},
-                        {"arguments", args}})) {
+                        {"arguments", args}})),
+        clock_(clock_or_steady(std::move(clock))) {
     if (output_.size() > kMaxRequest) throw std::runtime_error("editor request is too large");
   }
   Json run() {
-    const auto started = Clock::now();
+    const auto started = clock_();
     while (!step()) {
-      if (Clock::now() - started > kTimeout)
+      if (clock_() - started > kTimeout)
         throw std::runtime_error("editor request timed out; inspect the scene before retrying an edit");
       net::Socket::wait({{&socket_, !output_.empty()}}, kPollSeconds);
     }
@@ -63,14 +66,15 @@ class Exchange {
   }
   net::Socket socket_;
   Bytes input_, output_;
+  EditorBridgeClock clock_;
 };
 }  // namespace
 
 mcp::Json call_editor(const std::filesystem::path& game, const std::filesystem::path& connection,
-                      const std::string& name, const mcp::Json& args) {
+                      const std::string& name, const mcp::Json& args, EditorBridgeClock clock) {
   try {
     const auto address = bridge::read_address(game, connection);
-    return Exchange(address, game, name, args).run();
+    return Exchange(address, game, name, args, std::move(clock)).run();
   } catch (const std::exception& error) {
     return mcp::tool_result(error.what(), true);
   }

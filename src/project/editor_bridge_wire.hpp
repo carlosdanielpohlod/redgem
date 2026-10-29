@@ -7,6 +7,8 @@
 
 #include "net/socket/socket.hpp"
 #include "project/mcp_protocol.hpp"
+#include "project/editor_bridge.hpp"
+#include <utility>
 
 namespace redgem::tools::bridge {
 using mcp::Json;
@@ -14,6 +16,11 @@ using Bytes = std::vector<std::uint8_t>;
 using Clock = std::chrono::steady_clock;
 inline constexpr std::size_t kMaxRequest = mcp::kMaxRequestBytes;
 inline constexpr std::size_t kMaxReply = 256 * 1024;
+// A supplied clock isolates transport deadlines from slow graphics in system tests. Production
+// callers omit it and keep the same real steady clock and bounded request deadline.
+inline EditorBridgeClock clock_or_steady(EditorBridgeClock clock) {
+  return clock ? std::move(clock) : EditorBridgeClock(Clock::now);
+}
 inline constexpr auto kTimeout = std::chrono::seconds(5);
 inline constexpr float kPollSeconds = 0.005f;
 inline constexpr std::size_t kMaxClients = 4;

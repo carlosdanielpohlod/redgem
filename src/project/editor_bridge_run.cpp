@@ -1,6 +1,7 @@
 #include "project/editor_bridge_run.hpp"
 
 #include <iostream>
+#include <utility>
 
 #include "core/log.hpp"
 #include "editor/editor_app.hpp"
@@ -24,9 +25,10 @@ void hook(EditorApp& app, tools::EditorBridge* server) {
 }
 }  // namespace
 
-std::unique_ptr<tools::EditorBridge> enable_editor_bridge(EditorApp& app) {
+std::unique_ptr<tools::EditorBridge> enable_editor_bridge(EditorApp& app, tools::EditorBridgeClock clock) {
   try {
-    auto bridge = std::make_unique<tools::EditorBridge>(app.session().game_dir());
+    auto bridge =
+        std::make_unique<tools::EditorBridge>(app.session().game_dir(), std::filesystem::path{}, std::move(clock));
     std::cerr << "editor bridge connection: " << bridge->connection_file().string() << '\n';
     hook(app, bridge.get());
     return bridge;
