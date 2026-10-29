@@ -15,6 +15,7 @@ module Camera
     DISTANCE = 6.0
     PITCH = 20.0
     DISTANCES = 1.0..30.0
+    NEAREST = 0.1            # meters: nearer, the camera would sit on what it looks at (and never zoom out)
     PITCHES = -80.0..80.0
     STEEPEST = 89.0          # degrees: straight above or below, the camera would not know which way is up
     SMOOTHING = 0.08
@@ -69,7 +70,7 @@ module Camera
     private
 
     def limit(distances, pitches)
-      @distances = Camera.__range(distances, "Camera.orbit distances", 0.0, LARGEST)
+      @distances = Camera.__range(distances, "Camera.orbit distances", NEAREST, LARGEST)
       @pitches = Camera.__range(pitches, "Camera.orbit pitches", -STEEPEST, STEEPEST)
     end
 

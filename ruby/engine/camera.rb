@@ -90,12 +90,17 @@ module Camera
     raise ArgumentError, "#{what} must be a Vector3 no larger than #{LARGEST}, not #{value.inspect}"
   end
 
-  # A Range of numbers from low to high: an ArgumentError otherwise.
+  # A Range of numbers from low to high, both ends in it: an ArgumentError otherwise.
   def self.__range(value, what, low, high)
-    within = value.is_a?(Range) && __number_within?(value.first, low, high) && __number_within?(value.last, low, high)
-    return value.first.to_f..value.last.to_f if within && value.first <= value.last
+    return value.begin.to_f..value.end.to_f if __range_within?(value, low, high)
 
     raise ArgumentError, "#{what} must be a range within #{low}..#{high}, not #{value.inspect}"
+  end
+
+  def self.__range_within?(value, low, high)
+    return false unless value.is_a?(Range) && !value.exclude_end?
+
+    __number_within?(value.begin, low, high) && __number_within?(value.end, low, high) && value.begin <= value.end
   end
 
   # A number held within a range.

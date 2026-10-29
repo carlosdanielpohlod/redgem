@@ -134,7 +134,13 @@ class CameraTest < RedGemTest::Case
       assert_raises(ArgumentError) { Camera.__number(wrong, "smoothing", 0.0) }
     end
     assert_raises(ArgumentError) { Camera.__vector([0, 1e30, 0], "offset") }
-    assert_raises(ArgumentError) { Camera.__range(5..1, "distances", 0.0, 10.0) }
     assert_in_delta 2.5, Camera.__number(2.5, "smoothing", 0.0)
+  end
+
+  def test_ranges_must_hold_both_their_ends_in_order
+    [5..1, 1...5, (1..), (..5), 1..20].each do |wrong|
+      assert_raises(ArgumentError) { Camera.__range(wrong, "distances", 0.0, 10.0) }
+    end
+    assert_raises(ArgumentError) { Camera::Orbit.new(Vector3.zero, distance: 0, distances: 0..10) }
   end
 end

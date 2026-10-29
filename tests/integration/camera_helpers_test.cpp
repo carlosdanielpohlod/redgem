@@ -177,6 +177,14 @@ TEST_CASE("a shake fades out and puts a still camera back where it was; shakes s
   CHECK(says(*engine, "Camera.main.transform.position.approx?($place, 1e-5)"));
   CHECK(says(*engine, "Camera.main.transform.rotation.approx?($turn, 1e-3)"));
 
+  // A script that moves the camera but leaves its turn alone: the shake's turn is still taken back.
+  ruby(*engine, "Camera.shake(1.0, duration: 0.5)");
+  for (int frame = 0; frame < kOneSecond; ++frame) {
+    ruby(*engine, "Camera.main.transform.position = $place");
+    frames(*engine, 1);
+  }
+  CHECK(says(*engine, "Camera.main.transform.rotation.approx?($turn, 1e-3)"));
+
   ruby(*engine, "Camera.shake(1.0)");
   frames(*engine, 1);
   ruby(*engine, "Camera.stop_shaking");
