@@ -33,6 +33,7 @@
 #include "scene/gltf/gltf_loader.hpp"
 #include "editor/ui/labels.hpp"
 #include "window_mouse.hpp"
+#include "frame_wait_clock.hpp"
 #include "window_picture.hpp"
 #include "project/editor_bridge.hpp"
 #include "project/editor_live_tools.hpp"
@@ -763,13 +764,14 @@ TEST_CASE("the live editor bridge edits through the frame hook and undo updates 
   REQUIRE(std::holds_alternative<std::unique_ptr<EditorApp>>(created));
   auto& app = *std::get<std::unique_ptr<EditorApp>>(created);
   run(app, kWarmupFrames);
-  auto server = enable_editor_bridge(app);
+  test::FrameWaitClock clock;
+  auto server = enable_editor_bridge(app, clock.reading());
   REQUIRE(server != nullptr);
   auto reply = std::async(std::launch::async, [&] {
     return call_editor(game, server->connection_file(), "scene_edit",
-                       {{"action", "set"}, {"object", "Coin1"}, {"assignments", {"position=1,2,3"}}});
+                       {{"action", "set"}, {"object", "Coin1"}, {"assignments", {"position=1,2,3"}}}, clock.reading());
   });
-  while (reply.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) app.frame();
+  clock.pump(app, reply);
   const auto result = reply.get();
   REQUIRE_MESSAGE(result["isError"] == false, result.dump());
   CHECK(app.session().document().dirty());
@@ -784,12 +786,13 @@ TEST_CASE("the live editor bridge edits through the frame hook and undo updates 
 }
 
 namespace {
-redgem::tools::mcp::Json editor_call(EditorApp& app, redgem::tools::EditorBridge& server,
+redgem::tools::mcp::Json editor_call(EditorApp& app, redgem::tools::EditorBridge& server, test::FrameWaitClock& clock,
                                      const redgem::tools::mcp::Json& args) {
   auto reply = std::async(std::launch::async, [&] {
-    return redgem::tools::call_editor(app.session().game_dir(), server.connection_file(), "editor", args);
+    return redgem::tools::call_editor(app.session().game_dir(), server.connection_file(), "editor", args,
+                                      clock.reading());
   });
-  while (reply.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) app.frame();
+  clock.pump(app, reply);
   const auto result = reply.get();
   REQUIRE_MESSAGE(result["isError"] == false, result.dump());
   return result;
@@ -802,20 +805,21 @@ TEST_CASE("MCP controls real editor play and returns a bounded viewport image") 
   REQUIRE(std::holds_alternative<std::unique_ptr<EditorApp>>(created));
   auto& app = *std::get<std::unique_ptr<EditorApp>>(created);
   run(app, kWarmupFrames);
-  auto server = enable_editor_bridge(app);
+  test::FrameWaitClock clock;
+  auto server = enable_editor_bridge(app, clock.reading());
   REQUIRE(server);
-  editor_call(app, *server, {{"action", "play"}});
+  editor_call(app, *server, clock, {{"action", "play"}});
   CHECK(app.session().play_state() == PlayState::Playing);
-  editor_call(app, *server, {{"action", "pause"}});
+  editor_call(app, *server, clock, {{"action", "pause"}});
   CHECK(app.session().play_state() == PlayState::Paused);
-  editor_call(app, *server, {{"action", "step"}});
+  editor_call(app, *server, clock, {{"action", "step"}});
   CHECK(app.session().play_state() == PlayState::Paused);
-  editor_call(app, *server, {{"action", "resume"}});
+  editor_call(app, *server, clock, {{"action", "resume"}});
   CHECK(app.session().play_state() == PlayState::Playing);
-  editor_call(app, *server, {{"action", "stop"}});
+  editor_call(app, *server, clock, {{"action", "stop"}});
   CHECK(app.session().editing());
   CHECK_FALSE(app.session().document().dirty());
-  const auto result = editor_call(app, *server, {{"action", "capture"}, {"max_size", 256}});
+  const auto result = editor_call(app, *server, clock, {{"action", "capture"}, {"max_size", 256}});
   const auto bytes = object_clipboard::base64_decode(result["content"][0]["data"]);
   REQUIRE(bytes);
   CHECK(bytes->size() <= 128 * 1024);

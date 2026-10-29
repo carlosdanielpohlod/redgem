@@ -351,3 +351,38 @@ TEST_CASE("single stepping only advances paused games and leaves the editor docu
   session.stop();
   CHECK_FALSE(session.step());
 }
+
+TEST_CASE("editor bridge deadlines use the supplied clock without changing the production budget") {
+  Game game;
+  bridge::Clock::time_point now{};
+  EditorBridge server(game.path, game.root / "bridge", [&] { return now; });
+  SUBCASE("a client stops waiting even when the editor never pumps") {
+    std::size_t readings = 0;
+    const auto result = call_editor(game.path, server.connection_file(), "editor", {{"action", "status"}}, [&] {
+      ++readings;
+      now += std::chrono::seconds(1);
+      return now;
+    });
+    CHECK(result["isError"] == true);
+    CHECK(result["content"][0]["text"].get<std::string>().find("timed out") != std::string::npos);
+    CHECK(readings > 0);
+  }
+  SUBCASE("an idle server peer expires before it supplies a complete request") {
+    const auto address = bridge::read_address(game.path, server.connection_file());
+    std::string error;
+    auto socket = net::Socket::connect_to(net::kThisMachine, address.port, error);
+    REQUIRE(socket.valid());
+    constexpr int kConnectPolls = 100;
+    for (int attempt = 0; attempt < kConnectPolls && socket.connect_status() == net::IoStatus::WouldBlock; ++attempt)
+      net::Socket::wait({{&socket, true}}, bridge::kPollSeconds);
+    REQUIRE(socket.connect_status() == net::IoStatus::Ok);
+    const mcp::Invoke unused = [](const std::string&, const Json&) { return Json::object(); };
+    server.tick(unused);
+    now += bridge::kTimeout + std::chrono::seconds(1);
+    server.tick(unused);
+    bridge::Bytes received;
+    net::Socket::wait({{&socket, false}}, bridge::kPollSeconds);
+    CHECK(socket.read(received, bridge::kMaxReply) == net::IoStatus::Closed);
+    CHECK(received.empty());
+  }
+}

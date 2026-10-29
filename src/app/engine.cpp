@@ -37,6 +37,7 @@ Engine::Engine(const EngineOptions& options)
       images_dir_(options.game_dir / config::kImagesDirName),
       presenter_(options.presenter),
       clock_(config::kFixedDeltaSeconds, config::kMaxFrameSeconds, config::kMaxFixedStepsPerFrame),
+      profiler_(options.profile_time),
       network_watch_(options.network_time) {}
 
 Engine::~Engine() {
@@ -193,6 +194,7 @@ void Engine::fill_context(const std::string& game_title) {
   context_.physics = physics_.get();
   context_.input = &input_;
   context_.time.fixed_delta = config::kFixedDeltaSeconds;
+  context_.profiler = &profiler_;
   context_.scene_name = options_.scene_name;
   connect_context();
 }

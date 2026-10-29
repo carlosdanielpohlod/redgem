@@ -166,6 +166,7 @@ redgem_add_library(redgem_core
   core/radiance_pixels.cpp
   core/math.cpp
   core/fixed_clock.cpp
+  core/frame_profiler.cpp
   core/stopwatch.cpp)
 target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_core PRIVATE webpdecoder)
@@ -328,6 +329,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_args.cpp
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
+  script/bindings/profile_bindings.cpp
   script/bindings/runtime_bindings.cpp
   script/bindings/loading_bindings.cpp
   script/bindings/game_identity_bindings.cpp
@@ -428,6 +430,7 @@ redgem_add_library(redgem_runtime
   app/video_recorder.cpp
   app/encoder_process.cpp
   app/engine.cpp
+  app/profile_overlay.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp
   app/engine_loading.cpp

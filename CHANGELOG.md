@@ -10,6 +10,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Foreground frame profiler and statistics overlay**: opt-in real-clock phase timings, a bounded
+  rolling summary and FPS panel shared by player, editor Play and recorded frames.
+
 - **Asynchronous scene reads**: `Game.load_scene_async`, a shared bounded background parser,
   cancellation, last-error inspection and an immediate-mode loading-screen callback. The old
   world survives failed reads, while other rooms can keep ticking. Fixed-step offline runs have

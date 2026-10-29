@@ -148,11 +148,12 @@ void WindowPresenter::present(const FrameView& view) {
   }
   window_.begin_frame();
   painter_.paint(view);
-  finish_frame();
+  finish_frame(view.statistics_overlay);
 }
 
-void WindowPresenter::finish_frame() {
-  if (options_.show_fps) window_.draw_frame_rate();
+void WindowPresenter::finish_frame(bool statistics_overlay) {
+  const bool basic_counter = options_.show_fps && !statistics_overlay;
+  if (basic_counter) window_.draw_frame_rate();
   rlDrawRenderBatchActive();  // (whoever wants the frame's picture finds it drawn)
   if (options_.on_frame_drawn) options_.on_frame_drawn();
   window_.end_frame();
@@ -164,7 +165,7 @@ void WindowPresenter::present_scaled(const FrameView& view) {
   window_.begin_frame();
   show_picture(scaled_);
   painter_.paint_flat(view);
-  finish_frame();
+  finish_frame(view.statistics_overlay);
 }
 
 // Makes the picture the world is drawn into at that size, held to the most the card can draw
@@ -196,7 +197,7 @@ void WindowPresenter::present_recorded(const FrameView& view) {
   if (recorder_->failed()) stop_recording();  // (the game goes on in the window)
   window_.begin_frame();
   show_picture(recorded_);
-  finish_frame();
+  finish_frame(view.statistics_overlay);
 }
 
 void WindowPresenter::show_picture(const RenderTexture2D& shown) {

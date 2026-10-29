@@ -13,6 +13,7 @@
 #include "core/config.hpp"
 #include "core/fixed_clock.hpp"
 #include "core/stopwatch.hpp"
+#include "core/frame_profiler.hpp"
 #include "input/input.hpp"
 #include "net/http/http_client.hpp"
 #include "net/discovery/lan_discovery.hpp"
@@ -80,6 +81,7 @@ struct EngineOptions {
   // decision that never comes): the computer's steady clock when empty. Frames do not count: a
   // game with nobody to show it plays them faster than real time. Tests that play frames to see
   // a timeout give a reading that follows them.
+  Stopwatch::Reading profile_time;  // foreground profiling clock; empty uses the steady clock
   Stopwatch::Reading network_time;
   // A borrowed reader (must outlive the engine); otherwise one process-wide worker is shared.
   SceneLoader* scene_loader = nullptr;
@@ -177,6 +179,7 @@ class Engine {
   void place_spawned(ObjectId id, const std::optional<Transform>& world);
 
   // The parts of a frame, in the order frame() runs them.
+  void prepare_frame();
   void read_input();
   // The key or button a capture caught, to the block waiting for it (Input.capture_next).
   void hand_on_capture();
@@ -237,6 +240,7 @@ class Engine {
   net::LanDiscovery discovery_;
   net::HttpClient http_;  // (its requests still on their way are given up with the engine)
   FixedClock clock_;
+  FrameProfiler profiler_;
   Stopwatch network_watch_;  // the real time between the network's polls
   // The player's volume their settings last set (a multiplier of the game's own master volume):
   // only a change of it is passed on.

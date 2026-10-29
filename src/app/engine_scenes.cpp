@@ -22,6 +22,7 @@ void Engine::make_bodies() {
 }
 
 void Engine::switch_scene_if_asked() {
+  const FrameProfileScope phase(profiler_, ProfilePhase::Scene);
   if (context_.quit_requested) {
     context_.requested_scene.reset();
     return cancel_scene_load();

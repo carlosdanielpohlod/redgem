@@ -15,6 +15,7 @@ bool Engine::deterministic_scene_load() const {
 }
 
 void Engine::advance_or_loading(float frame_seconds) {
+  const FrameProfileScope phase(profiler_, ProfilePhase::Update);
   if (!is_loading_scene()) return advance_game(frame_seconds);
   context_.time.delta = 0.0f;
   const float delta =

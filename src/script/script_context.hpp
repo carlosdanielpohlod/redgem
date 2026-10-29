@@ -40,7 +40,11 @@ struct TimeInfo {
 };
 
 // Everything the Ruby bindings are allowed to touch. Owned by the engine.
+class FrameProfiler;
+
 struct ScriptContext {
+  FrameProfiler* profiler = nullptr;  // borrowed from the engine; absent in standalone interpreters
+  bool stats_visible = false;
   Scene* scene = nullptr;
   PhysicsWorld* physics = nullptr;
   InputState* input = nullptr;

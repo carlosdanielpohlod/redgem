@@ -117,7 +117,7 @@ class WindowPresenter final : public Presenter {
   void reshape(const DisplaySettings& display);
   void follow_render_scale(float scale);
   // What the window shows once the frame is drawn, then shown: the frame rate, whoever wants its picture.
-  void finish_frame();
+  void finish_frame(bool statistics_overlay);
   // A picture drawn off screen, fitted into the window.
   void show_picture(const RenderTexture2D& picture);
   void point_into_recorded();

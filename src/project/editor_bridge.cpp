@@ -26,9 +26,10 @@ bool matches_game(const Address& address, const Json& asked) {
 
 class Peer {
  public:
-  explicit Peer(net::Socket socket) : socket_(std::move(socket)) {}
+  explicit Peer(net::Socket socket, EditorBridgeClock clock)
+      : socket_(std::move(socket)), clock_(std::move(clock)), started_(clock_()) {}
   bool pump(const Address& address, const mcp::Invoke& invoke) {
-    if (Clock::now() - started_ > kTimeout) return false;
+    if (clock_() - started_ > kTimeout) return false;
     if (!answered_ && !receive(address, invoke)) return false;
     if (!answered_) return true;
     if (socket_.write(output_) == net::IoStatus::Closed) return false;
@@ -57,17 +58,19 @@ class Peer {
   }
   net::Socket socket_;
   Bytes input_, output_;
-  Clock::time_point started_ = Clock::now();
+  EditorBridgeClock clock_;
+  Clock::time_point started_;
   bool answered_ = false;
 };
 }  // namespace
 
 class EditorBridge::Impl {
  public:
-  Impl(const std::filesystem::path& game, const std::filesystem::path& root)
+  Impl(const std::filesystem::path& game, const std::filesystem::path& root, EditorBridgeClock clock)
       : listener_(listener()),
         address_{std::filesystem::canonical(game), listener_.local_port(), random_token()},
-        file_(address_, root) {}
+        file_(address_, root),
+        clock_(clock_or_steady(std::move(clock))) {}
   const std::filesystem::path& path() const { return file_.path(); }
   void tick(const mcp::Invoke& invoke) {
     accept();
@@ -79,16 +82,18 @@ class EditorBridge::Impl {
   void accept() {
     if (peers_.size() == kMaxClients) return;
     net::Socket socket;
-    if (listener_.accept(socket) == net::IoStatus::Ok) peers_.emplace_back(std::move(socket));
+    if (listener_.accept(socket) == net::IoStatus::Ok) peers_.emplace_back(std::move(socket), clock_);
   }
   net::Socket listener_;
   Address address_;
   ConnectionFile file_;
+  EditorBridgeClock clock_;
   std::vector<Peer> peers_;
 };
 
-EditorBridge::EditorBridge(const std::filesystem::path& game, const std::filesystem::path& root)
-    : impl_(std::make_unique<Impl>(game, root)) {}
+EditorBridge::EditorBridge(const std::filesystem::path& game, const std::filesystem::path& root,
+                           EditorBridgeClock clock)
+    : impl_(std::make_unique<Impl>(game, root, std::move(clock))) {}
 EditorBridge::~EditorBridge() = default;
 const std::filesystem::path& EditorBridge::connection_file() const { return impl_->path(); }
 void EditorBridge::tick(const mcp::Invoke& invoke) { impl_->tick(invoke); }

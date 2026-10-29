@@ -736,3 +736,20 @@ GameManager.instance.collect_coin
 ## Time
 
 `Time.elapsed` is seconds since the game started, `Time.delta` the length of the last frame.
+
+## Measure frame times
+
+```ruby
+Debug.stats_visible = true           # also starts profiling; shows the developer panel
+Debug.frame_stats[:mean][:update_ms] # average foreground update time, in milliseconds
+Debug.frame_stats[:peak][:scene_ms]  # largest foreground scene operation in the window
+Debug.stats_visible = false          # hides the panel while keeping collection active
+Debug.profiling = false              # stops collection; keeps the last summary
+Debug.reset_frame_stats              # clears the window and any unfinished measurement
+```
+
+The panel works in the player, editor Play and recordings. Collection is off by default and
+keeps at most 120 completed frames. Timings use the steady clock, so pausing or slowing the game
+does not change what is measured. Physics is included in update, and presentation includes any
+upload, frame cap or synchronization wait: these are inclusive foreground wall times, not GPU
+timers or a per-function sampling profiler. Leave the panel off for reproducible pictures.
