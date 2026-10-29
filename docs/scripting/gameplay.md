@@ -753,3 +753,27 @@ keeps at most 120 completed frames. Timings use the steady clock, so pausing or 
 does not change what is measured. Physics is included in update, and presentation includes any
 upload, frame cap or synchronization wait: these are inclusive foreground wall times, not GPU
 timers or a per-function sampling profiler. Leave the panel off for reproducible pictures.
+
+
+## Draw world diagnostics
+
+```ruby
+def update(_delta)
+  origin = transform.position
+  Debug.line(origin, origin + Vector3.up, color: :green)
+  Debug.box(origin, Vector3.new(1, 2, 1), color: :yellow, depth_test: false)
+end
+```
+
+Lines and axis-aligned wire boxes use world coordinates and are submitted every frame. Box size
+is its full nonnegative width, height and depth. They create no objects and are local to the
+presenter; a dedicated server validates arguments and returns `false` without collecting commands.
+Calls return `true` when accepted and `false` after the shared limit of 4096 commands per frame.
+The next frame starts with an empty buffer. Invalid vectors, box bounds or color channels are rejected before reaching the renderer. Use `UI.text` for a screen-space label.
+
+`depth_test: true` hides shapes behind opaque geometry; `false` draws through it. Transparent
+surfaces use the renderer's normal depth, so this is an opaque-scene diagnostic. Frames with shapes
+use an unjittered camera and restart temporal history; normal temporal sampling resumes when no
+shapes are submitted. Editor, scaled and recorded views reuse their color/depth target. Native
+windows allocate one cached target on demand; if allocation fails, the game still draws, reports
+a warning and omits the shapes. Changing the window size allows another allocation attempt.

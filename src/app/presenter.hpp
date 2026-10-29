@@ -12,6 +12,7 @@
 #include "scene/scene_desc.hpp"
 
 namespace redgem {
+class DebugDrawBuffer;
 
 // The number of the scene a game starts in; each scene it loads afterwards gets the next one.
 inline constexpr int kFirstSceneGeneration = 0;
@@ -39,6 +40,7 @@ struct FrameView {
   bool stop_recording = false;                         // a script ended the recording (Game.stop_recording)
   const WaterRippleSnapshot* water_ripples = nullptr;  // transient simulation state; drawing never ages it
   bool statistics_overlay = false;                     // replaces the developer window's basic FPS counter
+  const DebugDrawBuffer* debug_draw = nullptr;         // frame-local world primitives, never scene objects
 };
 
 // Who shows a game: a window of its own, a view inside another program, or nobody. The engine

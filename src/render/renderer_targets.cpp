@@ -221,7 +221,7 @@ void Renderer::Impl::release_targets() {
 
 void Renderer::Impl::release_fixed_targets() {
   unload_depth_target(shadow);
-  for (RenderTexture2D* target : {&reflection_face, &panorama}) unload(*target);
+  for (RenderTexture2D* target : {&reflection_face, &panorama, &debug_output}) unload(*target);
 }
 
 }  // namespace redgem

@@ -175,8 +175,9 @@ not a promise of how it will be closed.
   worker, with a loading-screen callback, but physics creation, scripts, texture decoding and GPU
   upload still block the owning thread at activation. Old and new scenes coexist in memory.
   Offline fixed-step runs intentionally wait for the reader for reproducible activation frames.
-- `Debug` has an opt-in foreground phase profiler and FPS/frame-time overlay, but no general debug
-  drawing (lines, boxes or labels), GPU timing or per-function sampling.
+- `Debug` supports an opt-in foreground phase profiler, FPS/frame-time overlay and immediate
+  world-space lines/wire boxes. World-space labels, GPU timing and per-function sampling remain
+  future work.
 
 ### Safety
 

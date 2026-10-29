@@ -18,6 +18,7 @@
 namespace redgem {
 
 class Window;
+class DebugDrawBuffer;
 
 // Owns every GPU resource a game is drawn with (shaders, targets, meshes, textures, fonts,
 // pictures) and draws with them. It draws in whatever window is open: that window is somebody
@@ -45,7 +46,12 @@ class Renderer {
   // so overlays drawn into it afterwards are hidden behind objects.
   // `particles`, when given, are drawn over the objects (and behind the ones in front of them).
   void draw_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output = nullptr,
-                  const ParticleSystem* particles = nullptr, const WaterRippleSnapshot* water_ripples = nullptr);
+                  const ParticleSystem* particles = nullptr, const WaterRippleSnapshot* water_ripples = nullptr,
+                  const DebugDrawBuffer* debug = nullptr);
+  // Overlays commands on a target whose color/depth draw_world just filled with this camera.
+  // Caller supplies an unjittered world frame and matching clip planes; no default-screen depth
+  // is assumed. Ends in the normal 2D state, ready for HUD, without writing scene depth.
+  void draw_debug(const DebugDrawBuffer& commands, const Camera3D& camera, const RenderTexture2D& output);
   // Draws what scripts put on screen this frame: texts, rectangles and images.
   void draw_hud(const std::vector<HudItem>& hud);
   // How much the picture streaks with speed, 0 (none) to 1 (see Camera.motion_blur in Ruby).
@@ -71,6 +77,11 @@ class Renderer {
   void draw_controls(const std::vector<ControlCircle>& controls);
 
  private:
+  void draw_plain(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output,
+                  const ParticleSystem* particles, const WaterRippleSnapshot* water_ripples);
+  void draw_debug_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output,
+                        const ParticleSystem* particles, const WaterRippleSnapshot* water_ripples,
+                        const DebugDrawBuffer& commands);
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };

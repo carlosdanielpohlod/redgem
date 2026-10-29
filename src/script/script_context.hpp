@@ -41,9 +41,11 @@ struct TimeInfo {
 
 // Everything the Ruby bindings are allowed to touch. Owned by the engine.
 class FrameProfiler;
+class DebugDrawBuffer;
 
 struct ScriptContext {
-  FrameProfiler* profiler = nullptr;  // borrowed from the engine; absent in standalone interpreters
+  DebugDrawBuffer* debug_draw = nullptr;  // absent without a presenter; local frame commands only
+  FrameProfiler* profiler = nullptr;      // borrowed from the engine; absent in standalone interpreters
   bool stats_visible = false;
   Scene* scene = nullptr;
   PhysicsWorld* physics = nullptr;

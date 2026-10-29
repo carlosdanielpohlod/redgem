@@ -14,6 +14,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/i18n.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_loading.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/debug.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui_widgets.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_screen.rb
@@ -330,6 +331,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
   script/bindings/profile_bindings.cpp
+  script/bindings/debug_draw_bindings.cpp
   script/bindings/runtime_bindings.cpp
   script/bindings/loading_bindings.cpp
   script/bindings/game_identity_bindings.cpp
@@ -369,6 +371,8 @@ redgem_add_library(redgem_runtime
   render/frame_readback.cpp
   render/mesh_pieces.cpp
   render/texture_loading.cpp
+  render/debug_draw.cpp
+  render/renderer_debug.cpp
   render/renderer.cpp
   render/renderer_pipeline.cpp
   render/renderer_targets.cpp

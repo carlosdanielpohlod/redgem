@@ -22,7 +22,8 @@ void FramePainter::paint(const FrameView& view, const RenderTexture2D* output) {
 
 void FramePainter::paint_world(const FrameView& view, const RenderTexture2D* output) {
   follow_game(view);
-  renderer_.draw_world(view.scene, renderer_.scene_camera(view.scene), output, &view.particles, view.water_ripples);
+  renderer_.draw_world(view.scene, renderer_.scene_camera(view.scene), output, &view.particles, view.water_ripples,
+                       view.debug_draw);
 }
 
 // What is flat goes over the finished picture: the game's interface, then a touch screen's controls.

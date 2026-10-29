@@ -29,7 +29,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Audio`](#audio) | Sounds and music from the game's sounds/ folder. |
 | [`UI`](#ui) | What a script draws over the game this frame: texts, rectangles, pictures, buttons. |
 | [`UI::Focus`](#uifocus) | Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. |
-| [`Debug`](#debug) | Messages to the console (and to redgem run). |
+| [`Debug`](#debug) | Developer diagnostics: console messages, frame timings and immediate world drawing. |
 | [`Game`](#game) | The game itself. |
 | [`Settings`](#settings) | How the player chose the game to be shown and heard; a change takes effect at once. |
 | [`GameMenu`](#gamemenu) | A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks. |
@@ -441,7 +441,7 @@ Which widget of a screen the keyboard and a gamepad work: up and down move it, w
 
 ## Debug
 
-Messages to the console (and to redgem run).
+Developer diagnostics: console messages, frame timings and immediate world drawing.
 
 - `Debug.log(message)`: says something
 - `Debug.warn(message)`: warns
@@ -452,8 +452,10 @@ Messages to the console (and to redgem run).
 - `Debug.stats_visible = visible`: shows frame timings and FPS; showing also enables profiling, hiding leaves collection running
 - `Debug.frame_stats`: a snapshot with samples, fps and latest/mean/peak timings in milliseconds
 - `Debug.reset_frame_stats`: clears statistics and discards any unfinished measurement
+- `Debug.line(from, to, color: :green, alpha: 255, depth_test: true)`: draws a world-space line for this frame; returns whether it was accepted
+- `Debug.box(center, size, color: :green, alpha: 255, depth_test: true)`: draws an axis-aligned wire box with full nonnegative size for this frame; returns whether it was accepted
 
-Profiling is off by default. The overlay uses the shared game HUD, including editor Play and recordings; it is hidden when profiling is off. Timings use the real steady clock, independently of Time.scale or fixed-step replay. The most recent 120 completed frames form the window; reads during a frame expose only completed frames. FPS uses completion-to-completion intervals, and is zero until an interval is available. `latest`, `mean` and `peak` contain `frame_ms`, `interval_ms`, `has_interval`, and `input_ms`, `network_ms`, `http_ms`, `update_ms`, `physics_ms`, `presentation_ms`, `scene_ms`. Input includes pending script startup; network and HTTP include their callbacks; update includes animations, scripts, particles, loading UI and physics. Physics includes fixed-update callbacks, body synchronization and contacts, so its time overlaps update. Presentation includes uploads, drawing and any frame-cap or synchronization waits. Scene includes request polling, synchronous reads and activation; the asynchronous worker is not instrumented, while offline fixed-step waits count as scene wall time. These are foreground wall times, not GPU timers or CPU utilization. Phase times are inclusive and must not be summed as a partition. Overlay timings and captures are nondeterministic; leave the overlay off for reproducible pictures.
+Profiling is off by default. The overlay uses the shared game HUD, including editor Play and recordings; it is hidden when profiling is off. Timings use the real steady clock, independently of Time.scale or fixed-step replay. The most recent 120 completed frames form the window; reads during a frame expose only completed frames. FPS uses completion-to-completion intervals, and is zero until an interval is available. `latest`, `mean` and `peak` contain `frame_ms`, `interval_ms`, `has_interval`, and `input_ms`, `network_ms`, `http_ms`, `update_ms`, `physics_ms`, `presentation_ms`, `scene_ms`. Input includes pending script startup; network and HTTP include their callbacks; update includes animations, scripts, particles, loading UI and physics. Physics includes fixed-update callbacks, body synchronization and contacts, so its time overlaps update. Presentation includes uploads, drawing and any frame-cap or synchronization waits. Scene includes request polling, synchronous reads and activation; the asynchronous worker is not instrumented, while offline fixed-step waits count as scene wall time. These are foreground wall times, not GPU timers or CPU utilization. Phase times are inclusive and must not be summed as a partition. Overlay timings and captures are nondeterministic; leave the overlay off for reproducible pictures. Debug.line and Debug.box use world coordinates and live for one frame: submit from ready/update/fixed_update. At most 4096 commands are accepted per frame; later calls return false. They are local-only and return false without a presenter, while still validating arguments. depth_test: false draws through objects. Shape frames use unjittered rendering and reset temporal history; normal temporal sampling resumes afterwards. Native windows allocate one cached color/depth target only when shapes are requested; editor, scaled and recorded views reuse their target. If that extra native target is unavailable, the game still draws with a warning and the shapes are omitted.
 
 ## Game
 

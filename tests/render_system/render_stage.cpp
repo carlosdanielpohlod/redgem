@@ -5,6 +5,7 @@
 namespace redgem::test {
 namespace {
 
+constexpr ::Color kNativeBackground{0, 0, 0, 255};
 constexpr ::Color kHudBackground{255, 255, 255, 255};
 constexpr int kSide = 256;  // pixels across the picture, and down
 constexpr const char* kTitle = "RedGem render test";
@@ -63,6 +64,27 @@ Picture RenderStage::draw(const Scene& scene, const std::string& name, const Par
   renderer_->draw_world(scene, renderer_->scene_camera(scene), &target_, particles, water_ripples);
   EndDrawing();
   return capture(name);
+}
+
+Picture RenderStage::draw_debug(const Scene& scene, const DebugDrawBuffer& commands, const std::string& name) {
+  BeginDrawing();
+  const auto camera = renderer_->scene_camera(scene);
+  renderer_->draw_world(scene, camera, &target_);
+  renderer_->draw_debug(commands, camera, target_);
+  EndDrawing();
+  return capture(name);
+}
+
+Picture RenderStage::draw_debug_native(const Scene& scene, const DebugDrawBuffer& commands, const std::string& name) {
+  BeginDrawing();
+  ClearBackground(kNativeBackground);
+  renderer_->draw_world(scene, renderer_->scene_camera(scene), nullptr, nullptr, nullptr, &commands);
+  Image image = LoadImageFromScreen();
+  const Picture picture = picture_of(image);
+  keep_picture(image, name);
+  UnloadImage(image);
+  EndDrawing();
+  return picture;
 }
 
 Picture RenderStage::draw_hud(const std::vector<HudItem>& hud, const std::string& name) {

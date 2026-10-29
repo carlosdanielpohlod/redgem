@@ -53,6 +53,10 @@ class RenderStage {
   Picture draw(const Scene& scene, const std::string& name, const ParticleSystem* particles = nullptr,
                const WaterRippleSnapshot* water_ripples = nullptr);
 
+  // Unjittered debug test scenes with depth and x-ray commands over their opaque objects.
+  Picture draw_debug(const Scene& scene, const DebugDrawBuffer& commands, const std::string& name);
+  // Default-screen readback before EndDrawing flushes: draw_world must finish its native quad.
+  Picture draw_debug_native(const Scene& scene, const DebugDrawBuffer& commands, const std::string& name);
   // Flat UI drawn into the same target, for testing images and text.
   Picture draw_hud(const std::vector<HudItem>& hud, const std::string& name);
 

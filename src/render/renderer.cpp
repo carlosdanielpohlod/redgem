@@ -8,6 +8,7 @@
 
 #include "core/config.hpp"
 #include "render/mesh_pieces.hpp"
+#include "render/debug_draw.hpp"
 #include "render/render_config.hpp"
 #include "render/renderer_impl.hpp"
 
@@ -73,7 +74,7 @@ void Renderer::refresh_mesh(const SceneDesc& desc, int mesh) {
 
 Camera3D Renderer::scene_camera(const Scene& scene) const { return impl_->camera_for(scene); }
 
-void Renderer::draw_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output,
+void Renderer::draw_plain(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output,
                           const ParticleSystem* particles, const WaterRippleSnapshot* water_ripples) {
   const int width = output != nullptr ? output->texture.width : GetRenderWidth();
   const int height = output != nullptr ? output->texture.height : GetRenderHeight();
