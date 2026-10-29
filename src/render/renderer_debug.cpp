@@ -95,6 +95,9 @@ void Renderer::draw_debug_world(const Scene& scene, const Camera3D& camera, cons
   const TemporalPause pause(impl_->temporal_allowed);
   draw_plain(scene, camera, target, particles, ripples);
   draw_debug(commands, camera, *target);
-  if (output == nullptr) render_detail::draw_full(*target, GetRenderWidth(), GetRenderHeight());
+  if (output == nullptr) {
+    render_detail::draw_full(*target, GetRenderWidth(), GetRenderHeight());
+    rlDrawRenderBatchActive();  // submit the native quad before its cached target can be resized
+  }
 }
 }  // namespace redgem

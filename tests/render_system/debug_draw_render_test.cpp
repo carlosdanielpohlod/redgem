@@ -174,3 +174,17 @@ TEST_CASE("frame views draw depth-tested and x-ray shapes in native and scaled w
   for (int frame = 0; frame < kResizeFrames; ++frame) engine.frame(config::kFixedDeltaSeconds);
   CHECK(latest.find(visible).count > 0);
 }
+
+TEST_CASE("native debug output is submitted before a caller reads the framebuffer") {
+  test::RenderStage stage;
+  const auto desc = wall_scene();
+  stage.upload(desc);
+  const auto scene = Scene::from_desc(desc);
+  DebugDrawBuffer commands;
+  DebugDrawItem line;
+  line.first = {-kHalfLine, 0.0f, 2.0f};
+  line.second = {kHalfLine, 0.0f, 2.0f};
+  line.color = kGreen;
+  REQUIRE(commands.append(line));
+  CHECK(stage.draw_debug_native(scene, commands, "debug_native_submitted").find(green).count > 0);
+}
