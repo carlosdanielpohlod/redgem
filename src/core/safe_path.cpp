@@ -77,13 +77,24 @@ bool stays_below(const std::filesystem::path& below) {
   return !below.empty() && !below.is_absolute() && *below.begin() != kParentStep;
 }
 
+struct LinkWarnings {
+  std::mutex guard;
+  std::set<std::filesystem::path> met;
+};
+
+LinkWarnings& link_warnings() {
+  // Process lifetime: a background reader can still warn while normal statics are being destroyed.
+  // The pointer remains reachable for leak checking; its cache must outlive every asset reader.
+  static auto* const warnings = new LinkWarnings;
+  return *warnings;
+}
+
 // Whether a link is not yet named in the log. Each is named once: a game asks for the same file
 // again and again (a sound each time it plays, a picture each time a scene loads).
 bool first_time_met(const std::filesystem::path& link) {
-  static std::mutex guard;  // (rooms of a server load their scenes at the same time)
-  static std::set<std::filesystem::path> met;
-  const std::lock_guard<std::mutex> lock(guard);
-  return met.insert(link).second;
+  auto& warnings = link_warnings();
+  const std::lock_guard<std::mutex> lock(warnings.guard);
+  return warnings.met.insert(link).second;
 }
 
 void warn_of_link(const std::filesystem::path& link) {

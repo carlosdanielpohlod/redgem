@@ -192,8 +192,14 @@ if(REDGEM_SANITIZERS)
   # the program at the null pointer first.
   target_compile_options(redgem_crash_helper PRIVATE -fno-sanitize=undefined)
 endif()
+# A reader that finishes during static destruction must still be able to reject linked assets.
+add_executable(redgem_scene_shutdown_test tools/scene_shutdown_test.cpp)
+target_link_libraries(redgem_scene_shutdown_test PRIVATE redgem_runtime)
+add_test(NAME app.async_scene_shutdown COMMAND redgem_scene_shutdown_test
+         "${CMAKE_CURRENT_BINARY_DIR}/async-shutdown-files")
+set_tests_properties(app.async_scene_shutdown PROPERTIES TIMEOUT 30)
 # The tests of builds copy the real player, and look for it where a build does: beside redgem.
-add_dependencies(redgem_tests redgem_player redgem redgem_crash_helper)
+add_dependencies(redgem_tests redgem_player redgem redgem_crash_helper redgem_scene_shutdown_test)
 target_compile_definitions(redgem_tests PRIVATE
   REDGEM_FIXTURES_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
   REDGEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
