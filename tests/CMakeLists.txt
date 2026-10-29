@@ -157,6 +157,7 @@ add_executable(redgem_tests
   integration/water_interaction_test.cpp
   integration/scene_script_test.cpp
   integration/profile_api_test.cpp
+  integration/debug_draw_api_test.cpp
   integration/async_scene_test.cpp
   integration/ui_input_test.cpp
   integration/input_actions_test.cpp

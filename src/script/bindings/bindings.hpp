@@ -21,6 +21,7 @@ void install_joint_bindings(mrb_state* mrb);
 void install_light_bindings(mrb_state* mrb);
 void install_runtime_bindings(mrb_state* mrb);
 void install_profile_bindings(mrb_state* mrb);
+void install_debug_draw_bindings(mrb_state* mrb);
 void install_loading_bindings(mrb_state* mrb);
 void install_game_identity_bindings(mrb_state* mrb);
 void install_ui_bindings(mrb_state* mrb);

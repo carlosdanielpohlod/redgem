@@ -29,6 +29,7 @@ bool valid(const DebugDrawItem& item) {
   return false;
 }
 }  // namespace
+bool valid_debug_draw(const DebugDrawItem& item) { return valid(item); }
 bool DebugDrawBuffer::append(const DebugDrawItem& item) {
   if (!valid(item)) return false;
   if (items_.size() == kMaxDebugDrawCommands) {

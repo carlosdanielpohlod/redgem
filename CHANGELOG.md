@@ -10,6 +10,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Immediate world diagnostics**: `Debug.line` and `Debug.box` draw bounded, frame-local wire
+  primitives with scene depth or explicit x-ray, across player, editor Play and recordings.
+
 - **Foreground frame profiler and statistics overlay**: opt-in real-clock phase timings, a bounded
   rolling summary and FPS panel shared by player, editor Play and recorded frames.
 

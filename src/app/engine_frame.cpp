@@ -35,6 +35,7 @@ void Engine::prepare_frame() {
   read_input();
   hand_on_capture();
   context_.hud.clear();
+  debug_draw_.clear();
   if (!is_loading_scene()) scripts_->start_pending();
 }
 
@@ -144,7 +145,7 @@ void Engine::present() {
   controls_ = touch != nullptr ? control_circles(*touch) : std::vector<ControlCircle>();
   presenter_->present({scene_, scene_desc_, scene_generation_, context_.hud, particles_, context_.motion_blur,
                        controls_, images_dir_, context_.stop_recording_requested, &water_.snapshot(),
-                       shows_profile_stats(context_)});
+                       shows_profile_stats(context_), &debug_draw_});
 }
 
 int Engine::run() {

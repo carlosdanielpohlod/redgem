@@ -14,6 +14,7 @@
 #include "core/fixed_clock.hpp"
 #include "core/stopwatch.hpp"
 #include "core/frame_profiler.hpp"
+#include "render/debug_draw.hpp"
 #include "input/input.hpp"
 #include "net/http/http_client.hpp"
 #include "net/discovery/lan_discovery.hpp"
@@ -240,6 +241,7 @@ class Engine {
   net::LanDiscovery discovery_;
   net::HttpClient http_;  // (its requests still on their way are given up with the engine)
   FixedClock clock_;
+  DebugDrawBuffer debug_draw_;
   FrameProfiler profiler_;
   Stopwatch network_watch_;  // the real time between the network's polls
   // The player's volume their settings last set (a multiplier of the game's own master volume):

@@ -46,7 +46,8 @@ class Renderer {
   // so overlays drawn into it afterwards are hidden behind objects.
   // `particles`, when given, are drawn over the objects (and behind the ones in front of them).
   void draw_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output = nullptr,
-                  const ParticleSystem* particles = nullptr, const WaterRippleSnapshot* water_ripples = nullptr);
+                  const ParticleSystem* particles = nullptr, const WaterRippleSnapshot* water_ripples = nullptr,
+                  const DebugDrawBuffer* debug = nullptr);
   // Overlays commands on a target whose color/depth draw_world just filled with this camera.
   // Caller supplies an unjittered world frame and matching clip planes; no default-screen depth
   // is assumed. Ends in the normal 2D state, ready for HUD, without writing scene depth.
@@ -76,6 +77,11 @@ class Renderer {
   void draw_controls(const std::vector<ControlCircle>& controls);
 
  private:
+  void draw_plain(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output,
+                  const ParticleSystem* particles, const WaterRippleSnapshot* water_ripples);
+  void draw_debug_world(const Scene& scene, const Camera3D& camera, const RenderTexture2D* output,
+                        const ParticleSystem* particles, const WaterRippleSnapshot* water_ripples,
+                        const DebugDrawBuffer& commands);
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };

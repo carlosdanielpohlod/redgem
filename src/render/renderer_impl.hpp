@@ -227,6 +227,9 @@ struct Renderer::Impl {
   RenderTexture2D reflection_face{};  // one 90-degree view of the surroundings
   RenderTexture2D panorama{};         // all of them, as longitude x latitude, with mips
   // Post-processing targets, sized like the output.
+  RenderTexture2D debug_output{};  // opt-in native-window overlay target; follows its own size
+  std::pair<int, int> refused_debug_size{};
+  RenderTexture2D* debug_surface(int width, int height);
   RenderTexture2D hdr{};      // the lit scene, linear HDR, with depth
   RenderTexture2D bloom_a{};  // bright parts, blurred (ping-pong with bloom_b)
   RenderTexture2D bloom_b{};

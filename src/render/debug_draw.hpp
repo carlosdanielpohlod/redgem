@@ -16,6 +16,8 @@ struct DebugDrawItem {
   bool depth_test = true;
 };
 
+bool valid_debug_draw(const DebugDrawItem& item);
+
 // One owning thread, one frame. Items never become scene objects or GPU resources. A full buffer
 // counts dropped commands without growing; clearing a frame retains capacity for the next one.
 class DebugDrawBuffer {
