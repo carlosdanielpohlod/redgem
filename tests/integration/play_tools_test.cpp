@@ -130,7 +130,7 @@ TEST_CASE("the same message twice is said once, with how many times") {
 TEST_CASE("a game in order passes its check") {
   const ToolResult checked = tool({"check", kPlatformer.string()});
   CHECK(checked.exit_code == kExitSuccess);
-  CHECK(checked.out == "check: 0 errors, 0 warnings (12 scripts, 1 scenes)\n");
+  CHECK(checked.out == "check: 0 errors, 0 warnings (13 scripts, 1 scenes)\n");
 }
 
 TEST_CASE("a check finds what keeps a game from playing, and says what to do") {
