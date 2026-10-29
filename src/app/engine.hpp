@@ -34,6 +34,9 @@
 #include "script/script_host.hpp"
 
 namespace redgem {
+class SceneLoader;
+class SceneLoad;
+struct LoadResult;
 
 struct EngineOptions {
   std::filesystem::path game_dir;
@@ -78,6 +81,8 @@ struct EngineOptions {
   // game with nobody to show it plays them faster than real time. Tests that play frames to see
   // a timeout give a reading that follows them.
   Stopwatch::Reading network_time;
+  // A borrowed reader (must outlive the engine); otherwise one process-wide worker is shared.
+  SceneLoader* scene_loader = nullptr;
 };
 
 // Wires scene, physics, scripts and input together and runs the game loop. It opens no window and
@@ -182,12 +187,21 @@ class Engine {
   // Whether the game is one the neighbours looking for a game are told of: hosted on this
   // machine's own port, and not as a room on a relay.
   bool found_by_neighbours() const;
+  bool captures_cursor() const;
   void follow_presenter();
   void advance_game(float frame_seconds);
   // Fixed steps to run this frame, with the game's time scaled by `scale`.
   int fixed_steps_due(float frame_seconds, float scale);
   void update_frame(float delta);
   void switch_scene_if_asked();
+  bool is_loading_scene() const;
+  bool deterministic_scene_load() const;
+  void advance_or_loading(float frame_seconds);
+  void request_scene(const std::string& name);
+  void begin_scene_load(const std::string& name);
+  void cancel_scene_load();
+  void poll_scene_load();
+  void finish_scene_load(LoadResult loaded);
 
   void fixed_step(float dt);
   // Whether a contact is between two objects that are both still there to hear of it.
@@ -198,6 +212,7 @@ class Engine {
   std::filesystem::path images_dir_;
   std::unique_ptr<Presenter> own_presenter_;  // the nobody that shows a game given no presenter
   Presenter* presenter_ = nullptr;
+  std::shared_ptr<SceneLoad> scene_load_;
   SceneDesc scene_desc_;
   Scene scene_;
   std::unique_ptr<PhysicsWorld> physics_;

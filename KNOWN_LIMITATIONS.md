@@ -171,8 +171,10 @@ not a promise of how it will be closed.
 - Cameras have no follow, orbit or shake helpers, and no `world_to_screen`.
 - `Save` is one key/value store per game: no slots, no saving of objects' state, no version number
   or migration hook.
-- `Game.load_scene` loads in the middle of a frame: there is no loading screen or loading in the
-  background. On a dedicated server, a room loading a level holds up the rooms sharing its thread.
+- `Game.load_scene` is synchronous. `Game.load_scene_async` reads and parses in a bounded shared
+  worker, with a loading-screen callback, but physics creation, scripts, texture decoding and GPU
+  upload still block the owning thread at activation. Old and new scenes coexist in memory.
+  Offline fixed-step runs intentionally wait for the reader for reproducible activation frames.
 - `Debug` writes to the log only: no on-screen lines, boxes or text, no frame-time overlay, no
   profiler.
 

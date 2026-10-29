@@ -78,6 +78,17 @@ void ScriptHost::fixed_update(float dt) { update_running("fixed_update", dt, tru
 
 void ScriptHost::update(float dt) { update_running(kUpdateEntry, dt, false); }
 
+void ScriptHost::draw_loading(float unscaled_delta) {
+  if (loading_screen_failed_) return;
+  const int arena = mrb_gc_arena_save(vm_.state());
+  const RubyResult result =
+      vm_.call(module_named("Game"), "__draw_loading", {mrb_float_value(vm_.state(), unscaled_delta)});
+  mrb_gc_arena_restore(vm_.state(), arena);
+  if (result.ok) return;
+  loading_screen_failed_ = true;
+  report_error("loading screen (disabled until the next load)", result.error);
+}
+
 // The GameObjects made for a contact go on the GC arena; nothing else restores it here, so without
 // this every contact with a new object would grow it for as long as the game runs.
 void ScriptHost::dispatch(const ContactEvent& event) {

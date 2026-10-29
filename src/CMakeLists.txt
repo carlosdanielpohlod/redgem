@@ -12,6 +12,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene_script.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/i18n.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/game_loading.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui_widgets.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu.rb
@@ -328,6 +329,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
   script/bindings/runtime_bindings.cpp
+  script/bindings/loading_bindings.cpp
   script/bindings/game_identity_bindings.cpp
   script/bindings/ui_bindings.cpp
   script/bindings/audio_bindings.cpp
@@ -428,6 +430,8 @@ redgem_add_library(redgem_runtime
   app/engine.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp
+  app/engine_loading.cpp
+  app/scene_loader.cpp
   app/scene_bodies.cpp
   app/scene_water.cpp
   app/scene_files.cpp

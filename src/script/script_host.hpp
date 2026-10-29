@@ -48,6 +48,8 @@ class ScriptHost {
   void start_pending();
   void fixed_update(float dt);
   void update(float dt);
+  void draw_loading(float unscaled_delta);
+  void begin_loading_screen() { loading_screen_failed_ = false; }
   void dispatch(const ContactEvent& event);
   // Hands something that happened on the network to the scripts listening for it (Network.on...).
   void dispatch(const net::NetworkEvent& event);
@@ -100,6 +102,7 @@ class ScriptHost {
     bool active() const { return started && enabled; }
   };
 
+  bool loading_screen_failed_ = false;
   void load_prelude();
   // A new Ruby GameObject for an object; stands_for says whether one still stands for it.
   mrb_value new_wrapper(const GameObject& object);

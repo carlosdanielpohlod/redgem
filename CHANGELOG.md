@@ -8,6 +8,14 @@ until 1.0, a release may change what games rely on (see
 
 ## [Unreleased]
 
+### Added
+
+- **Asynchronous scene reads**: `Game.load_scene_async`, a shared bounded background parser,
+  cancellation, last-error inspection and an immediate-mode loading-screen callback. The old
+  world survives failed reads, while other rooms can keep ticking. Fixed-step offline runs have
+  deterministic activation. Physics creation, script setup and GPU upload still happen on the
+  owning thread and may hitch at activation.
+
 ## [0.4.1] - 2026-10-28
 
 ### Added

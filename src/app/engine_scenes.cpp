@@ -22,13 +22,15 @@ void Engine::make_bodies() {
 }
 
 void Engine::switch_scene_if_asked() {
-  if (!context_.requested_scene) return;
+  if (context_.quit_requested) {
+    context_.requested_scene.reset();
+    return cancel_scene_load();
+  }
+  if (context_.cancel_scene_load) cancel_scene_load();
+  if (!context_.requested_scene) return poll_scene_load();
   const std::string name = *context_.requested_scene;
   context_.requested_scene.reset();
-  std::optional<SceneDesc> scene = read_scene(options_.game_dir, name);
-  if (!scene) return;
-  switch_to(name, std::move(*scene));
-  log::info("scene '" + name + "' loaded");
+  request_scene(name);
 }
 
 void Engine::switch_to(const std::string& name, SceneDesc desc) {
