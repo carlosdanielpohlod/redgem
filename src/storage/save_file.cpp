@@ -1,4 +1,5 @@
 #include "storage/save_file.hpp"
+#include "storage/save_slots.hpp"
 
 #include <fstream>
 #include <iterator>
@@ -101,6 +102,7 @@ void remove_save(const std::filesystem::path& file) {
   std::error_code fs_error;
   std::filesystem::remove(file, fs_error);
   std::filesystem::remove(backup_of(file), fs_error);
+  remove_named_save_files(file);
 }
 
 std::filesystem::path SaveFile::backup_file() const { return backup_of(file_); }

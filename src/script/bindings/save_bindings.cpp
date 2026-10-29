@@ -52,7 +52,8 @@ mrb_value save_update(mrb_state* mrb, mrb_value) {
     made = mrb_yield(mrb, block, current ? value_from(mrb, *current, HashKeys::Strings) : fallback);
     return json_from(mrb, made, kSaveHolder);
   };
-  if (!save(mrb).update(to_name(mrb, key), change)) log::warning("could not write " + save(mrb).where());
+  auto& store = save(mrb);
+  if (!store.update(to_name(mrb, key), change)) log::warning("could not write " + store.where());
   return made;
 }
 
@@ -86,6 +87,7 @@ void install_save_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, save_module, "delete", save_delete, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, save_module, "clear", save_clear, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, save_module, "keys", save_keys, MRB_ARGS_NONE());
+  install_save_slot_bindings(mrb);
 }
 
 }  // namespace redgem

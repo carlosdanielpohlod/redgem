@@ -305,6 +305,8 @@ redgem_add_library(redgem_runtime
   storage/saved_values.cpp
   storage/durable_file.cpp
   storage/save_file.cpp
+  storage/save_slots.cpp
+  storage/save_file_slots.cpp
   script/script_naming.cpp
   script/ruby_vm.cpp
   script/script_budget.cpp
@@ -346,6 +348,7 @@ redgem_add_library(redgem_runtime
   script/bindings/particles_bindings.cpp
   script/bindings/particle_look_args.cpp
   script/bindings/save_bindings.cpp
+  script/bindings/save_slot_bindings.cpp
   script/bindings/settings_bindings.cpp
   script/bindings/i18n_bindings.cpp
   script/bindings/message_values.cpp
@@ -434,6 +437,7 @@ redgem_add_library(redgem_runtime
   app/video_recorder.cpp
   app/encoder_process.cpp
   app/engine.cpp
+  app/engine_saves.cpp
   app/profile_overlay.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp
@@ -470,6 +474,7 @@ if(NOT ANDROID)
     server/stop_signals.cpp
     server/server_program.cpp
     server/save_database.cpp
+    server/save_database_slots.cpp
     server/room_slot.cpp
     server/room_thread.cpp
     server/server_texts.cpp)

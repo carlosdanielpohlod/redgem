@@ -777,3 +777,44 @@ use an unjittered camera and restart temporal history; normal temporal sampling 
 shapes are submitted. Editor, scaled and recorded views reuse their color/depth target. Native
 windows allocate one cached target on demand; if allocation fails, the game still draws, reports
 a warning and omits the shapes. Changing the window size allows another allocation attempt.
+
+
+## Keep separate progress in save slots
+
+```ruby
+Save.slot = 'profile-1'
+Save[:coins] = 12
+Save.slot = 'profile-2'
+Save[:coins]                         # nil: another slot
+Save.slot = 'profile-1'
+Save[:coins]                         # 12
+Save.slots                          # sorted String names, including 'default'
+Save.slot = 'default'                # the original save, with its existing data
+```
+
+Every engine starts on `default`. Selection lasts across scene changes and is independent for
+server rooms, even when their database is shared. `get`, `set`, `update`, `keys`, `delete` and
+`clear` use the selected slot; clearing one does not erase the others. An `update` block writes
+back to the store selected at entry, even if the block selects another slot. The block's other
+side effects are not rolled back when it raises.
+
+Names contain 1–48 lowercase ASCII letters/digits, hyphens or underscores and start with a letter
+or digit. Symbols are accepted on assignment; the getter and list return Strings. Invalid names
+raise `ArgumentError`; a failed selection leaves the previous slot and its data selected. At
+most 64 named slots can be opened per engine/run (and per shared local-file backend); listing is
+bounded to 4096 names. Unsupported custom backends or exceeded limits raise `RuntimeError`.
+
+The default file is neither renamed nor migrated. Named files live beside it in
+`<save-file>.slots/slot-<name>.json` and use the same atomic writes, backups and damaged-file
+recovery. Existing symbolic links at slot folders/files/backups are refused. Files are cached
+by the backend, so returning to an opened slot does not create stale copies of its values.
+Local-file stores retain their existing single-threaded, one-process contract; shared server
+rooms use SQLite. Named SQLite data has separate tables and the original default table remains
+unchanged. Storage operations still run synchronously.
+
+`Save.slots` includes persisted names plus slots opened during this run. A file slot is only
+persisted after a write; the database remembers named slots when they are opened. A supplied
+custom `SaveStore` keeps its original behavior and must implement the optional slot factory to
+support named selection. Game tests isolate slot files too: fresh runs clear live data/backups,
+restart runs copy them, and damaged evidence is retained rather than copied into another test.
+This API stores values; it does not automatically serialize scene objects or migrate game data.

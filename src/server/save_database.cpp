@@ -20,7 +20,10 @@ constexpr const char* kInMemory = ":memory:";
 // Written ahead of the database: a write never waits for the readers, nor a reader for a write.
 constexpr const char* kSetUp =
     "PRAGMA journal_mode = WAL;"
-    "CREATE TABLE IF NOT EXISTS saves (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL) WITHOUT ROWID;";
+    "CREATE TABLE IF NOT EXISTS saves (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL) WITHOUT ROWID;"
+    "CREATE TABLE IF NOT EXISTS save_slot_names (name TEXT PRIMARY KEY NOT NULL) WITHOUT ROWID;"
+    "CREATE TABLE IF NOT EXISTS save_slots (slot TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL,"
+    " PRIMARY KEY(slot,key)) WITHOUT ROWID;";
 constexpr const char* kRead = "SELECT value FROM saves WHERE key = ?1";
 constexpr const char* kWrite = "INSERT OR REPLACE INTO saves (key, value) VALUES (?1, ?2)";
 constexpr const char* kRemove = "DELETE FROM saves WHERE key = ?1";
@@ -100,7 +103,10 @@ std::string SaveDatabase::unprepared() const {
   for (const SqliteStatement* statement : {&read_, &write_, &remove_, &keys_}) {
     if (!statement->prepared()) return statement->error();
   }
-  return {};
+  const SqliteStatement slots(database_, "SELECT slot,key,value FROM save_slots LIMIT 0");
+  const SqliteStatement names(database_, "SELECT name FROM save_slot_names LIMIT 0");
+  if (!slots.prepared()) return slots.error();
+  return names.error();
 }
 
 SaveDatabase::SaveDatabase(sqlite3* database, std::filesystem::path file)

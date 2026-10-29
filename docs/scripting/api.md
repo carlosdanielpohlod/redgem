@@ -597,8 +597,11 @@ What the game keeps between runs. See [online-services.md#saving-on-a-server](on
 - `Save.delete(key)`: removes a key
 - `Save.clear`: removes everything
 - `Save.keys`: every key
+- `Save.slot`: the selected save slot name; default keeps the existing save file
+- `Save.slot = name`: selects a named slot for this engine; default restores the original store
+- `Save.slots`: sorted names of persisted slots and slots opened in this run, including default
 
-Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys.
+Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys. Named slots start on default for every engine and keep their selection across scenes. Selection is local to each engine, including shared-database server rooms. Names are 1–48 lowercase ASCII letters/digits, hyphens or underscores, starting with a letter/digit. At most 64 named stores may be opened per run/local backend and 4096 names listed; invalid names or unavailable backends leave selection unchanged and raise a Ruby error. The existing default file/table is preserved. Named files use their own atomic writes/backups; SQLite uses separate slot tables. Save.update writes to its entry store even if its block selects another slot. Slots keep values, not object-state snapshots or migration metadata.
 
 ## HTTP
 
