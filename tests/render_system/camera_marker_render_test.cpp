@@ -6,6 +6,7 @@
 #include <mruby.h>
 #include <mruby/array.h>
 
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <memory>
@@ -26,7 +27,8 @@ constexpr int kMarkerReach = 12;          // pixels around where the marker shou
 constexpr int kCoinReach = 5;             // and around where the coin should be
 constexpr float kMarkerTolerance = 1.5f;  // pixels the marker's middle may be off
 constexpr int kLeastMarkerPixels = 60;    // of the 14 pixels wide round marker
-constexpr int kGoldOverBlue = 60;         // how much redder than blue a pixel of the gold coin is
+constexpr int kGoldBright = 140;          // red and green above this in a lit gold pixel (the grass is less red)
+constexpr float kGoldBlue = 0.65f;        // and blue below this share of the lesser of them (the sky is bluer)
 constexpr float kHalfScale = 0.5f;
 constexpr float kOddScale = 0.63f;
 constexpr SurfaceSize kWide{720, 480};
@@ -35,8 +37,11 @@ constexpr SurfaceSize kSquare{500, 500};
 // The marker's pink (CoinMarker::COLOR: 255, 64, 160), as the window shows it.
 bool is_marker(::Color c) { return c.r > 230 && c.g < 100 && c.b > 130 && c.b < 190; }
 
-// The gold of a coin, lit: red over green over blue, far from the green grass and the blue sky.
-bool is_gold(::Color c) { return c.r > c.g && c.g > c.b && c.r - c.b > kGoldOverBlue; }
+// The gold of a coin, lit: as yellow as it is bright, unlike the green grass and the blue sky.
+bool is_gold(::Color c) {
+  const bool bright = c.r > kGoldBright && c.g > kGoldBright;
+  return bright && static_cast<float>(c.b) < kGoldBlue * static_cast<float>(std::min(c.r, c.g));
+}
 
 struct Spot {
   float x = 0.0f;
@@ -121,7 +126,7 @@ class MarkedGame {
     CHECK(std::abs(drawn.middle.y - marker.y) < kMarkerTolerance);
     CHECK(std::abs(marker.x - coin.x) < kMarkerTolerance);  // over it: straight above
     CHECK(marker.y < coin.y);
-    CHECK(find_near(shot_, coin, kCoinReach, is_gold).count > 0);  // and the picture has the coin there
+    CHECK(find_near(shot_, coin, kCoinReach, is_gold).count > 0);
   }
 
  private:
