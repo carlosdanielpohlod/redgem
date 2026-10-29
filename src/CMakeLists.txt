@@ -574,6 +574,18 @@ if(NOT ANDROID)
     editor/ui/fonts.cpp
     editor/ui/interface.cpp
     editor/ui/embedded_fonts.cpp
+    editor/agent/program_search.cpp
+    editor/agent/child_process_posix.cpp
+    editor/agent/child_process_windows.cpp
+    editor/agent/json_rpc.cpp
+    editor/agent/acp_messages.cpp
+    editor/agent/agent_transcript.cpp
+    editor/agent/workspace_files.cpp
+    editor/agent/agent_client.cpp
+    editor/agent/agent_connection.cpp
+    editor/agent/agent_profiles.cpp
+    editor/agent/markdown_blocks.cpp
+    editor/agent/text_diff.cpp
     editor/editor_texts.cpp)
   redgem_embed_texts(redgem_editor editor)
   target_link_libraries(redgem_editor PUBLIC redgem_runtime imgui_stack)
