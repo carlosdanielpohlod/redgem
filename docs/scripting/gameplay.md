@@ -379,6 +379,79 @@ end
 `box_cast`, `capsule_cast`, `overlap_box` and `overlap_capsule` work the same way. Hits come
 nearest first, each object once, at most 64.
 
+## Follow, orbit and shake the camera
+
+The camera follows, orbits and shakes on its own once told to: no script of its own has to move it
+every frame.
+
+**A third-person camera** follows an object at an offset, smoothed (`smoothing` is the seconds it
+takes to close half the way, the same at any frame rate), looking at it, and comes in front of any
+wall that would hide it (a `Physics.raycast` from the object to the camera):
+
+```ruby
+class Hero < Behaviour
+  def start
+    Camera.follow(game_object, offset: Vector3.new(0, 2.5, 5), smoothing: 0.12)
+  end
+end
+```
+
+`relative: true` takes the offset in the object's own axes (its +Z is behind it), so the camera
+swings round as it turns; `dead_zone: 0.5` lets it move half a meter before the camera goes after
+it; `look_at: false` leaves the camera's turn alone.
+
+**An orbit viewer** looks at an object or a point from around it: the player turns it by dragging
+with the right mouse button or with the right stick, and zooms with the wheel, within limits:
+
+```ruby
+class Viewer < Behaviour
+  def start
+    @orbit = Camera.orbit(Scene.find("Statue"), distance: 8, pitch: 25, distances: 3..15, pitches: -10..70)
+  end
+
+  def update(dt) = @orbit.turn(10 * dt, 0) # a script turns it too: a slow turntable
+end
+```
+
+`input: false` leaves it to the script alone. `Camera.stop_following` stops either; an object
+followed or orbited that is destroyed is let go, and the camera stays where it was.
+
+**A hit shakes the camera.** Each shake adds its strength to the camera's trauma (never past 1),
+which fades out over its duration; the camera moves and turns by the square of it, along smooth
+noise, on top of a follow or an orbit, and always comes back to where it should be:
+
+```ruby
+def on_collision_enter(other)
+  Camera.shake(0.4, duration: 0.3) if other.tag?(:enemy)
+end
+```
+
+A camera with a parent (on a vehicle, a dolly) works too: the helpers place it in the world.
+
+## Mark things on the screen
+
+`Camera.world_to_screen` says where a point of the world is on the screen, in the pixels `UI`
+draws in, at any window size and render scale: a health bar over an enemy, an arrow over a coin.
+It is nil when the point is behind the camera; a point beside the view comes back off the screen.
+
+```ruby
+class HealthBar < Behaviour
+  WIDTH = 60
+
+  def update(_dt)
+    x, y = Camera.world_to_screen(transform.position + Vector3.up * 2.2)
+    return unless x
+
+    UI.rect(x: x - WIDTH / 2, y: y, width: WIDTH, height: 8, color: :black)
+    UI.rect(x: x - WIDTH / 2, y: y, width: WIDTH * @health / 100.0, height: 8, color: :red)
+  end
+end
+```
+
+It is the camera as it is when called: a behaviour added after the first `Camera.follow` (or
+orbit, or shake) sees the camera where this frame draws it; one that was there before sees where
+it was a frame ago. `Camera.screen_ray` goes the other way.
+
 ## Show text on screen
 
 Call it every frame from `update`:

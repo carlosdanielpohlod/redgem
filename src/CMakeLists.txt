@@ -27,6 +27,11 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/audio.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/particles.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scatter.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/camera.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/camera_follow.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/camera_orbit.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/camera_shake.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/camera_rig.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/animation_graph.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/network.rb

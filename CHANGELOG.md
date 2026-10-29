@@ -57,6 +57,19 @@ until 1.0, a release may change what games rely on (see
   deterministic activation. Physics creation, script setup and GPU upload still happen on the
   owning thread and may hitch at activation.
 
+- **Camera helpers**: `Camera.follow` (an offset in the world's or the target's axes, smoothing
+  by half-life, look-at, a dead zone, and pulled in front of walls with a raycast),
+  `Camera.orbit` (yaw, pitch and distance turned by the right mouse button or the right stick and
+  zoomed by the wheel, within limits; `Camera::Orbit#turn` and `#zoom` for scripts) and
+  `Camera.shake` (trauma that stacks up to 1 and fades over its duration, along seeded noise, on
+  top of either without drifting the camera). The same at any frame rate; a destroyed target is
+  let go; a camera with a parent is placed in the world.
+- **`Camera.world_to_screen`**: where a point of the world is in the pixels the interface draws
+  in, at any window shape and render scale (nil behind the camera), the inverse of
+  `Camera.screen_ray`.
+- The platformer follows its hero with `Camera.follow`, shakes the camera when the hero falls off,
+  and marks the coin nearest the camera with `Camera.world_to_screen`.
+
 ### Changed
 
 - MCP argument errors are tool results naming the argument and its range, so models can
@@ -70,6 +83,7 @@ until 1.0, a release may change what games rely on (see
   connection files whose port refuses and skips unproven listeners for a minute.
 - MCP `events` answers in text alone, its cursor first.
 - A script calling `puts`, `print` or `p` is told to use `Debug.log`.
+- `Camera.screen_ray` follows the world's picture as the window shows it, render scale included.
 
 ### Fixed
 

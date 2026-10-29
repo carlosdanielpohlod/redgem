@@ -5,6 +5,7 @@ class Player < Behaviour
   SPEED = 6.0
   JUMP_SPEED = 9.0
   FALL_LIMIT = -10.0
+  FALL_SHAKE = 0.6        # how hard the camera shakes when the hero falls off and starts again (0 to 1)
   DEGREES_PER_RADIAN = 180.0 / Math::PI
 
   attr_reader :respawns
@@ -41,6 +42,7 @@ class Player < Behaviour
   def respawn
     transform.position = @spawn
     @respawns += 1
+    Camera.shake(FALL_SHAKE)
   end
 
   private
