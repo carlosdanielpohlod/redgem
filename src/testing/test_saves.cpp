@@ -6,6 +6,7 @@
 #include "app/save_location.hpp"
 #include "core/platform.hpp"
 #include "storage/save_file.hpp"
+#include "storage/save_slots.hpp"
 
 namespace redgem::testing {
 namespace {
@@ -104,6 +105,22 @@ void copy_if_kept(const std::filesystem::path& from, const std::filesystem::path
   std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing, error);
 }
 
+void copy_slot_file(const std::filesystem::path& from, const std::filesystem::path& to) {
+  if (!std::filesystem::is_symlink(from)) copy_if_kept(from, to);
+}
+void copy_slots(const std::filesystem::path& from, const std::filesystem::path& to) {
+  SaveFile source(from);
+  const auto names = source.slot_names();
+  if (names.empty()) return;
+  std::filesystem::create_directories(save_slots_folder(to));
+  for (const auto& name : names) {
+    const auto original = save_slot_file(from, name);
+    const auto copied = save_slot_file(to, name);
+    copy_slot_file(original, copied);
+    copy_slot_file(save_backup_of(original), save_backup_of(copied));
+  }
+}
+
 std::filesystem::path run_mark(const std::filesystem::path& work_dir, const std::filesystem::path& test_file) {
   return work_dir / kRunsFolder / (test_file.stem().string() + kRunMarkEnding);
 }
@@ -116,6 +133,7 @@ RunFiles copied_run_files(const std::filesystem::path& game_dir, const std::file
   const RunFiles kept = kept_run_files(game_dir, work_dir, earlier_test);
   copy_if_kept(kept.save, own.save);
   copy_if_kept(save_backup_of(kept.save), save_backup_of(own.save));
+  copy_slots(kept.save, own.save);
   copy_if_kept(kept.settings, own.settings);
   copy_if_kept(kept.bindings, own.bindings);
   return own;

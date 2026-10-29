@@ -10,6 +10,10 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Named save slots**: `Save.slot` selects isolated progress while the default keeps the existing
+  save; `Save.slots` lists known names. Local slots reuse durable files and backups, server rooms
+  select their own SQLite views, and game-test restarts copy/reset named slots too.
+
 - **Immediate world diagnostics**: `Debug.line` and `Debug.box` draw bounded, frame-local wire
   primitives with scene depth or explicit x-ray, across player, editor Play and recordings.
 

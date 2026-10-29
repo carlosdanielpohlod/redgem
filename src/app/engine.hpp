@@ -32,6 +32,7 @@
 #include "app/game_identity.hpp"
 #include "app/presenter.hpp"
 #include "storage/save_store.hpp"
+#include "storage/save_slots.hpp"
 #include "script/script_context.hpp"
 #include "script/script_host.hpp"
 
@@ -159,6 +160,8 @@ class Engine {
   // Whether the game is a room of a dedicated server (see EngineOptions::server_room).
   bool serves_a_room() const { return !options_.server_room.empty(); }
   void connect_effects();
+  void connect_saves();
+  void select_save_slot(const std::string& name);
   void fill_context(const std::string& game_title);
   // What game.json says the game is (its version, for Game.version).
   // What game.json says the game is, read once; its splash picture shown while the rest loads.
@@ -230,6 +233,7 @@ class Engine {
   std::unique_ptr<ScriptHost> scripts_;
   std::unique_ptr<AudioSystem> owned_audio_;
   std::unique_ptr<SaveStore> save_;
+  SaveSlots save_slots_;
   float pending_steps_ = 0.0f;  // fixed steps owed while Time.scale slows a fixed-step run
   int scene_generation_ = kFirstSceneGeneration;
   AnimationPlayer animations_;

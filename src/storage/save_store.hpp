@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -36,6 +37,10 @@ class SaveStore {
   virtual bool update(const std::string& key, const Change& change) = 0;
   // Where the values are kept, for what is said when they cannot be written.
   virtual std::string where() const = 0;
+  // Named views borrow this store's backend and must be destroyed before it. A custom backend
+  // may return nullptr to decline slots. The default namespace keeps its existing representation.
+  virtual std::unique_ptr<SaveStore> open_slot(const std::string&) { return nullptr; }
+  virtual std::vector<std::string> slot_names() { return {}; }
 };
 
 }  // namespace redgem

@@ -52,7 +52,8 @@ mrb_value save_update(mrb_state* mrb, mrb_value) {
     made = mrb_yield(mrb, block, current ? value_from(mrb, *current, HashKeys::Strings) : fallback);
     return json_from(mrb, made, kSaveHolder);
   };
-  if (!save(mrb).update(to_name(mrb, key), change)) log::warning("could not write " + save(mrb).where());
+  auto& store = save(mrb);
+  if (!store.update(to_name(mrb, key), change)) log::warning("could not write " + store.where());
   return made;
 }
 

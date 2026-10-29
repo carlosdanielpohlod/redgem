@@ -184,7 +184,7 @@ void Engine::connect_effects() {
 }
 
 void Engine::fill_context(const std::string& game_title) {
-  context_.save = options_.save != nullptr ? options_.save : save_.get();
+  connect_saves();
   connect_effects();
   context_.network = &network_;
   context_.discovery = &discovery_;

@@ -77,6 +77,9 @@ struct ScriptContext {
   std::function<std::vector<SurfaceSize>()> display_modes;
   // What the game keeps between runs (Save); null when there is nowhere to keep it.
   SaveStore* save = nullptr;
+  std::string save_slot;
+  std::function<void(const std::string&)> select_save_slot;
+  std::function<std::vector<std::string>()> list_save_slots;
   // The scene's animation clips (Animation) and the particles flying around (Particles).
   AnimationPlayer* animations = nullptr;
   ParticleSystem* particles = nullptr;

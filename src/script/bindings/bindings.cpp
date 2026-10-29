@@ -34,6 +34,7 @@ void install_bindings(mrb_state* mrb) {
   install_animation_sync_bindings(mrb);
   install_particles_bindings(mrb);
   install_save_bindings(mrb);
+  install_save_slot_bindings(mrb);
   install_i18n_bindings(mrb);
   install_network_bindings(mrb);
   install_http_bindings(mrb);

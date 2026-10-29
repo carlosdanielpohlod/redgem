@@ -11,6 +11,7 @@
 #include "storage/save_store.hpp"
 
 namespace redgem::server {
+class DatabaseSlot;
 
 // What a dedicated server's game saves (Save), in a SQLite database in its data folder: one row
 // per key, each change written on its own as it is made, in a transaction of its own (a crash
@@ -31,9 +32,12 @@ class SaveDatabase final : public SaveStore {
   bool clear() override;
   std::vector<std::string> keys() override;
   bool update(const std::string& key, const Change& change) override;
+  std::unique_ptr<SaveStore> open_slot(const std::string& name) override;
+  std::vector<std::string> slot_names() override;
   std::string where() const override { return file_.string(); }
 
  private:
+  friend class DatabaseSlot;
   SaveDatabase(sqlite3* database, std::filesystem::path file);
   // Why a statement could not be prepared; empty when every one was. A database whose table is
   // not the server's (made by something else) cannot be read or written, and must not open as if

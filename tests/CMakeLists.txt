@@ -100,6 +100,7 @@ add_executable(redgem_tests
   unit/animation_test.cpp
   unit/user_settings_test.cpp
   unit/save_file_test.cpp
+  unit/save_slots_test.cpp
   unit/save_safety_test.cpp
   unit/save_database_test.cpp
   unit/xml_writer_test.cpp
@@ -157,6 +158,7 @@ add_executable(redgem_tests
   integration/water_interaction_test.cpp
   integration/scene_script_test.cpp
   integration/profile_api_test.cpp
+  integration/save_slot_api_test.cpp
   integration/debug_draw_api_test.cpp
   integration/async_scene_test.cpp
   integration/ui_input_test.cpp

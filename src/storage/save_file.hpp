@@ -15,7 +15,7 @@ namespace redgem {
 // all of those names taken, a damaged save is not moved, and nothing is written over it.
 inline constexpr int kMostDamagedSavesKept = 100;
 
-// Removes a save and its backup: a game finds nothing saved the next time it runs (a test's fresh
+// Removes a save, its backup and its named slots: a game finds nothing saved the next time it runs (a test's fresh
 // start). What was set aside as damaged stays.
 void remove_save(const std::filesystem::path& file);
 // Where a save's backup is kept (the save before the last write), beside it.
@@ -52,11 +52,15 @@ class SaveFile final : public SaveStore {
   // (A player's machine runs one game: nothing else reads or writes in between.)
   bool update(const std::string& key, const Change& change) override { return set(key, change(get(key))); }
   std::string where() const override { return file_.string(); }
+  std::unique_ptr<SaveStore> open_slot(const std::string& name) override;
+  std::vector<std::string> slot_names() override;
   const std::filesystem::path& file() const { return file_; }
   // The save before the last one written, what a damaged save falls back to.
   std::filesystem::path backup_file() const;
 
  private:
+  SaveStore& slot_store(const std::string& name);
+  std::unique_ptr<SaveFile> make_slot_file(const std::string& name) const;
   void load();
   void take(const SaveReading& reading);
   void recover(const std::string& trouble, bool damaged);
@@ -70,6 +74,7 @@ class SaveFile final : public SaveStore {
   std::filesystem::path file_;
   durable::Flush flush_;
   std::map<std::string, nlohmann::json> values_;
+  std::map<std::string, std::unique_ptr<SaveFile>> named_slots_;
   bool loaded_ = false;
   std::string on_disk_;  // what the file holds, as written: what the next write keeps as the backup
   // A save that cannot be read or moved aside is in the way: it is not written over.
