@@ -370,6 +370,7 @@ redgem_add_library(redgem_runtime
   render/mesh_pieces.cpp
   render/texture_loading.cpp
   render/debug_draw.cpp
+  render/renderer_debug.cpp
   render/renderer.cpp
   render/renderer_pipeline.cpp
   render/renderer_targets.cpp

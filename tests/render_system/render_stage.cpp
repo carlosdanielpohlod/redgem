@@ -65,6 +65,15 @@ Picture RenderStage::draw(const Scene& scene, const std::string& name, const Par
   return capture(name);
 }
 
+Picture RenderStage::draw_debug(const Scene& scene, const DebugDrawBuffer& commands, const std::string& name) {
+  BeginDrawing();
+  const auto camera = renderer_->scene_camera(scene);
+  renderer_->draw_world(scene, camera, &target_);
+  renderer_->draw_debug(commands, camera, target_);
+  EndDrawing();
+  return capture(name);
+}
+
 Picture RenderStage::draw_hud(const std::vector<HudItem>& hud, const std::string& name) {
   BeginDrawing();
   BeginTextureMode(target_);
