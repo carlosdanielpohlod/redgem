@@ -281,23 +281,27 @@ there yet:
 
 - Headless input replay covers keyboard states only; mouse, gamepad and touch input are not yet replayed.
 - Reading history from an unrelated running game: MCP's `events` tool reads its own process or
-  its explicitly connected editor, using a process-local `since` cursor.
+  its connected editor, using a process-local `since` cursor.
 - `redgem scene diff` compares loaded object content against an earlier scene file, but does
   not read a revision directly from Git or compare unused assets and unsupported glTF data.
-- A search of the game's assets and of the templates.
+- A search of the game's assets and of the templates. `api` covers the engine's classes only, not
+  the game's own behaviours: read the game's scripts for those.
 - The opt-in MCP editor bridge ([docs/mcp.md](docs/mcp.md)) supports live inspection, atomic node
-  set/add/remove, selection, undo/redo, save, play controls, single stepping, bounded viewport
-  images and event history. Live add creates empty objects only; asset-backed duplication and
-  model importing still use the editor UI or file tools. It must be explicitly connected to
-  the current editor instance; it does not discover editors automatically. Native calls run
-  serially and cannot be interrupted by a cancellation notification.
+  set/add/remove, selection and framing, undo/redo, save, play controls, single stepping, bounded
+  viewport images, runtime queries and event history. Live add creates empty objects only;
+  asset-backed duplication (`from`) and model importing still use files or the editor UI. Native
+  calls run serially and cannot be interrupted by a cancellation notification.
 - The Agent panel ([docs/assistants.md](docs/assistants.md#the-agent-panel)) sends and shows text
   only: no pictures in the chat, and no terminal of the editor's for the agent (the adapters run
   commands themselves). Logging in to an agent happens in a terminal, with the agent's own CLI.
   Earlier sessions cannot be reopened, slash commands and session modes are not offered, and
   answers are not selectable as text (code blocks have a Copy button).
-- Inspecting the objects of a game while it plays, and an opt-in Ruby eval in it (localhost and a
-  token, a timeout, compiled out of release builds).
-- Physics queries (raycasts and overlaps) through the same tools.
+- An opt-in Ruby eval in a running game (localhost and a token, a timeout, compiled out of
+  release builds). `game_run` expressions cover headless runs; `game_query` covers inspection
+  and physics queries.
+- MCP adds one object per `scene_edit` call; a row of copies takes one call each.
+- Objects made since a scene was first saved get 16-character hexadecimal ids, longer to read
+  and pass back than the numeric ids of older objects.
+- `game_shot` needs a display (Xvfb works on a server).
 - External exporters that drop the private `REDGEM_object_id` glTF extension also drop persistent
   scene object identities.

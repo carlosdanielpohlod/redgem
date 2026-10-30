@@ -36,7 +36,12 @@ std::string shot_size(const Json& args) {
 }
 
 std::vector<std::string> shot_words(const Options& options, const Json& args, const std::filesystem::path& file) {
-  std::vector<std::string> words{"shot",  options.game.string(), file.string(), "--size", shot_size(args), "--at",
+  std::vector<std::string> words{"shot",
+                                 options.game.string(),
+                                 file.string(),
+                                 "--size",
+                                 shot_size(args),
+                                 "--at",
                                  number_text(args.value("at", kDefaultShotSeconds), kSecondsDecimals)};
   for (const char* key : {"scene", "camera"}) {
     if (!args.contains(key)) continue;
@@ -49,7 +54,8 @@ std::vector<std::string> shot_words(const Options& options, const Json& args, co
 // What the shot said, with the scratch file it wrote named only as "picture".
 std::string said_without_file(std::string text, const std::filesystem::path& file) {
   const std::string path = file.string();
-  for (auto at = text.find(path); at != std::string::npos; at = text.find(path, at)) text.replace(at, path.size(), kPictureWord);
+  for (auto at = text.find(path); at != std::string::npos; at = text.find(path, at))
+    text.replace(at, path.size(), kPictureWord);
   return text;
 }
 

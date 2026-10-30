@@ -140,7 +140,8 @@ std::string page_notes(const Json& data) {
 std::string events_text(const Json& data) {
   std::string text;
   for (const auto& row : data["events"])
-    text += "#" + row["id"].dump() + " " + row["level"].get<std::string>() + " " + row["text"].get<std::string>() + "\n";
+    text +=
+        "#" + row["id"].dump() + " " + row["level"].get<std::string>() + " " + row["text"].get<std::string>() + "\n";
   if (data["events"].empty()) text = "no new events\n";
   return text + "cursor=" + data["cursor"].dump() + page_notes(data);
 }

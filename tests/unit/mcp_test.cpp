@@ -173,7 +173,8 @@ TEST_CASE("MCP events read as one compact line each, with paths inside the game 
   CHECK(text.find("error scripts/coin.rb:12: Coin#update on 'Coin1': boom (RuntimeError)") != std::string::npos);
   CHECK(text.find(game) == std::string::npos);
   CHECK(text.find("cursor=" + reply["structuredContent"]["cursor"].dump()) != std::string::npos);
-  CHECK(text_of(invoke(options, "events", {{"since", reply["structuredContent"]["cursor"]}})).find("no new events") == 0);
+  CHECK(text_of(invoke(options, "events", {{"since", reply["structuredContent"]["cursor"]}})).find("no new events") ==
+        0);
 }
 
 TEST_CASE("MCP framing recovers after malformed, oversized and deeply nested messages") {

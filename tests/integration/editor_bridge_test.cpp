@@ -393,7 +393,8 @@ Json exchange_with(Game& game, EditorBridge& server, const mcp::Options& options
                    const Json& args) {
   auto future = std::async(std::launch::async, [&] { return mcp::invoke(options, name, args); });
   while (future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
-    server.tick([&](const std::string& tool, const Json& values) { return invoke_editor(*game.session, tool, values); });
+    server.tick(
+        [&](const std::string& tool, const Json& values) { return invoke_editor(*game.session, tool, values); });
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   return future.get();
@@ -443,8 +444,8 @@ TEST_CASE("live game_query asks the editor's running game, not the edited docume
   ScriptedInputSource input;
   std::string error;
   REQUIRE(session.play({input}, error));
-  session.runtime()->scene().set_world_position(static_cast<ObjectId>(find_object(session.scene_desc(), "Crate1").index),
-                                                Vec3{9, 9, 9});
+  session.runtime()->scene().set_world_position(
+      static_cast<ObjectId>(find_object(session.scene_desc(), "Crate1").index), Vec3{9, 9, 9});
   const auto crate = invoke_editor(session, "game_query", {{"action", "inspect"}, {"object", "Crate1"}});
   REQUIRE(ok(crate));
   CHECK(text(crate).find("#18 Crate1 pos=9,9,9 body=dynamic") == 0);

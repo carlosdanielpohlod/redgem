@@ -125,9 +125,11 @@ void add_connection(const std::filesystem::directory_entry& folder, std::vector<
 std::vector<std::filesystem::path> connection_files(const std::filesystem::path& root) {
   std::vector<Dated> found;
   std::error_code error;
-  for (const auto& folder : std::filesystem::directory_iterator(bridge_root(root), error)) add_connection(folder, found);
+  for (const auto& folder : std::filesystem::directory_iterator(bridge_root(root), error))
+    add_connection(folder, found);
   std::sort(found.begin(), found.end(), [](const Dated& a, const Dated& b) { return a.first > b.first; });
   std::vector<std::filesystem::path> files;
+  files.reserve(found.size());
   for (auto& dated : found) files.push_back(std::move(dated.second));
   return files;
 }

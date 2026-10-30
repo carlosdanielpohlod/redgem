@@ -42,15 +42,22 @@ bool moving_body(BodyType type) {
          type == BodyType::Vehicle;
 }
 
+// " vel=0,-0.2,0 grounded": how a body that moves is moving.
+std::string motion_text(const PhysicsWorld& physics, ObjectId id, BodyType type) {
+  if (!moving_body(type)) return {};
+  const Vec3 velocity = physics.velocity(id);
+  std::string text = shown_vector(velocity) ? " vel=" + vector_text(velocity, kListDecimals) : std::string();
+  if (type == BodyType::Character) text += physics.character_grounded(id) ? " grounded" : " airborne";
+  return text;
+}
+
 // " body=character vel=0,-0.2,0 grounded": what the physics world says about the object.
 std::string body_text(const PhysicsWorld& physics, ObjectId id) {
   if (!physics.has_object(id)) return {};
   const BodyType type = physics.body_type(id);
   std::string text = type == BodyType::None ? std::string() : std::string(" body=") + body_type_name(type);
   if (physics.is_trigger(id)) text += " trigger";
-  const Vec3 velocity = physics.velocity(id);
-  if (moving_body(type) && shown_vector(velocity)) text += " vel=" + vector_text(velocity, kListDecimals);
-  if (type == BodyType::Character) text += physics.character_grounded(id) ? " grounded" : " airborne";
+  text += motion_text(physics, id, type);
   if (physics.sleeping(id)) text += " sleeping";
   return text;
 }
@@ -61,7 +68,8 @@ std::string pose_text(const Scene& scene, ObjectId id) {
   std::string text = " pos=" + vector_text(world.position, kListDecimals);
   const Vec3 degrees = quat_to_euler_degrees(world.rotation);
   if (shown_vector(degrees)) text += " rot=" + vector_text(degrees, kListAngleDecimals);
-  if (!approx_equal(world.scale, Vec3::one(), kShownTolerance)) text += " scale=" + vector_text(world.scale, kListDecimals);
+  if (!approx_equal(world.scale, Vec3::one(), kShownTolerance))
+    text += " scale=" + vector_text(world.scale, kListDecimals);
   return text;
 }
 
@@ -145,7 +153,8 @@ Vec3 point_argument(const mcp::Json& args, const char* key) {
   std::istringstream in(args[key].get<std::string>());
   Vec3 point;
   const bool read = read_component(in, point.x) && read_component(in, point.y) && read_component(in, point.z);
-  if (!read || !in.eof()) throw std::invalid_argument(std::string(key) + ": needs x,y,z (three numbers), like 0,1.5,-4");
+  if (!read || !in.eof())
+    throw std::invalid_argument(std::string(key) + ": needs x,y,z (three numbers), like 0,1.5,-4");
   return point;
 }
 

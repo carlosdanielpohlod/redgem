@@ -58,7 +58,8 @@ std::string choices(const Json& schema) {
 }
 
 bool outside_choices(const Json& schema, const Json& value) {
-  return schema.contains("enum") && std::find(schema["enum"].begin(), schema["enum"].end(), value) == schema["enum"].end();
+  return schema.contains("enum") &&
+         std::find(schema["enum"].begin(), schema["enum"].end(), value) == schema["enum"].end();
 }
 
 void check_scalar(const Json& schema, const Json& value) {
@@ -74,7 +75,8 @@ void check_string(const Json& schema, const std::string& value) {
   if (value.size() < schema.value("minLength", std::size_t(0))) throw std::invalid_argument("cannot be empty");
   const auto longest = schema.value("maxLength", kMaxRequestBytes);
   if (value.size() > longest)
-    throw std::invalid_argument("is " + std::to_string(value.size()) + " bytes; the limit is " + std::to_string(longest));
+    throw std::invalid_argument("is " + std::to_string(value.size()) + " bytes; the limit is " +
+                                std::to_string(longest));
 }
 
 // "limit: must be at least 1, not 0": every problem names the argument it is about.
@@ -99,7 +101,8 @@ void check_object(const Json& schema, const Json& args) {
   }
   const Json& properties = schema.at("properties");
   for (const auto& [key, value] : args.items()) {
-    if (!properties.contains(key)) throw std::invalid_argument("unknown argument: " + key + " (accepted: " + names(properties) + ")");
+    if (!properties.contains(key))
+      throw std::invalid_argument("unknown argument: " + key + " (accepted: " + names(properties) + ")");
     check_named(key, properties[key], value);
   }
 }
@@ -108,7 +111,8 @@ void check_array(const Json& schema, const Json& args) {
   if (args.size() < schema.value("minItems", std::size_t(0))) throw std::invalid_argument("too few array items");
   const auto most = schema.at("maxItems").get<std::size_t>();
   if (args.size() > most) throw std::invalid_argument("has more than " + std::to_string(most) + " items");
-  for (std::size_t i = 0; i < args.size(); ++i) check_named("item " + std::to_string(i + 1), schema.at("items"), args[i]);
+  for (std::size_t i = 0; i < args.size(); ++i)
+    check_named("item " + std::to_string(i + 1), schema.at("items"), args[i]);
 }
 }  // namespace
 

@@ -190,15 +190,24 @@ Options events_options(const EditorSession& session) {
   return options;
 }
 
-Json handle(EditorSession& session, const std::string& name, const Json& args, bool busy, const Invoke& window) {
-  if (name == "scene_get") return tool_result(object_detail(session.scene_desc(), object(session, args)));
-  if (name == "scene_edit") return edit(session, args, busy);
-  if (name == "scene_diff") return compare(session, args);
-  if (name == "game_query") return query(session, args);
-  if (name == "editor") return control(session, args, busy, window);
-  if (name != "scene_list") throw std::invalid_argument("tool is not available in the editor");
+Json list(EditorSession& session, const Json& args) {
   return tool_result(scene_list(session.scene_desc(), session.scene_name(),
                                 {args.value("depth", kEveryLevel), args.value("limit", kDefaultListLimit)}));
+}
+
+// The tools that only read the document or the running game.
+Json read(EditorSession& session, const std::string& name, const Json& args) {
+  if (name == "scene_get") return tool_result(object_detail(session.scene_desc(), object(session, args)));
+  if (name == "scene_diff") return compare(session, args);
+  if (name == "game_query") return query(session, args);
+  if (name != "scene_list") throw std::invalid_argument("tool is not available in the editor");
+  return list(session, args);
+}
+
+Json handle(EditorSession& session, const std::string& name, const Json& args, bool busy, const Invoke& window) {
+  if (name == "scene_edit") return edit(session, args, busy);
+  if (name == "editor") return control(session, args, busy, window);
+  return read(session, name, args);
 }
 }  // namespace
 
