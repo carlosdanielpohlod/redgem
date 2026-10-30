@@ -44,6 +44,8 @@ struct GameObject {
   ObjectId id = kNoObject;
   ObjectSerial serial = kNoSerial;
   std::string name;
+  // Identity in the loaded scene file; live copies have none and must not alias their source.
+  std::string stable_id;
   std::string tag;
   ObjectId parent = kNoObject;
   std::vector<ObjectId> children;
@@ -100,6 +102,8 @@ class Scene {
   const GameObject& at(ObjectId id) const;
 
   ObjectId find(const std::string& name) const;
+  // Finds an original node by its file identity, independent of names and runtime slots.
+  ObjectId find_by_stable_id(const std::string& identity) const;
   std::vector<ObjectId> find_all_by_tag(const std::string& tag) const;
   std::vector<ObjectId> alive_ids() const;
   // First alive object holding a camera, or kNoObject.
