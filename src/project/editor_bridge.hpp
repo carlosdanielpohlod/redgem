@@ -4,6 +4,9 @@
 #include <functional>
 #include <chrono>
 #include <memory>
+#include <optional>
+#include <string>
+#include <vector>
 
 #include "project/mcp_protocol.hpp"
 
@@ -28,4 +31,12 @@ class EditorBridge {
 // One bounded request, with no automatic retry or fallback to file edits on failure.
 mcp::Json call_editor(const std::filesystem::path& game, const std::filesystem::path& connection,
                       const std::string& name, const mcp::Json& args, EditorBridgeClock clock = {});
+// The same, but nothing when no editor answers at that connection (it is not running, or the file
+// is gone or stale), so that the caller can try another editor or work on the files instead.
+std::optional<mcp::Json> try_editor(const std::filesystem::path& game, const std::filesystem::path& connection,
+                                    const std::string& name, const mcp::Json& args, EditorBridgeClock clock = {});
+// The connection files editors of `game` wrote under `private_root` (the user's RedGem data folder
+// when empty), newest first. Stale files of editors that crashed are among them.
+std::vector<std::filesystem::path> editor_connections(const std::filesystem::path& game,
+                                                      const std::filesystem::path& private_root = {});
 }  // namespace redgem::tools

@@ -1,6 +1,8 @@
 """Exercise the real stdio server, including native stdout isolation and saved scene edits."""
 
+import base64
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -24,10 +26,13 @@ def modern_call(number, name, args):
     return request(number, "tools/call", params)
 
 
-def exchange(game, messages, *flags):
+PNG_SIGNATURE = b"\x89PNG"
+
+
+def exchange(game, messages, *flags, env=None):
     result = subprocess.run([str(PROGRAM), "mcp", str(game), *flags],
                             input="".join(json.dumps(message) + "\n" for message in messages),
-                            text=True, capture_output=True, timeout=60)
+                            text=True, capture_output=True, timeout=60, env=env)
     if result.returncode:
         raise AssertionError(result.stderr)
     return [json.loads(line) for line in result.stdout.splitlines()], result.stderr
@@ -62,6 +67,28 @@ class McpStdioTest(unittest.TestCase):
             self.assertTrue(all(not reply["result"]["isError"] for reply in replies), replies)
             self.assertIn("position", replies[1]["result"]["content"][0]["text"])
             self.assertIn("+0 -0 ~1 objects", replies[2]["result"]["content"][0]["text"])
+
+    def test_shot_without_a_display_is_a_tool_error_and_the_server_keeps_answering(self):
+        env = {key: value for key, value in os.environ.items() if key not in ("DISPLAY", "WAYLAND_DISPLAY")}
+        replies, _ = exchange(GAME, [modern_call(1, "game_shot", {"width": 128}),
+                                     modern_call(2, "api", {"class": "Transform"})], env=env)
+        self.assertTrue(replies[0]["result"]["isError"], replies[0])
+        self.assertIn("no display", replies[0]["result"]["content"][0]["text"])
+        self.assertFalse(replies[1]["result"]["isError"])
+
+    @unittest.skipUnless(os.environ.get("DISPLAY"), "needs a display")
+    def test_shot_returns_a_small_png_image(self):
+        replies, _ = exchange(GAME, [modern_call(1, "game_shot", {"width": 128, "at": 0.5})])
+        content = replies[0]["result"]["content"]
+        self.assertFalse(replies[0]["result"]["isError"], replies[0])
+        self.assertEqual(content[0]["mimeType"], "image/png")
+        self.assertTrue(base64.b64decode(content[0]["data"]).startswith(PNG_SIGNATURE))
+        self.assertIn("128x72", content[1]["text"])
+
+    def test_bad_arguments_are_tool_errors_the_model_can_read(self):
+        replies, _ = exchange(GAME, [modern_call(1, "game_run", {"frames": 601})])
+        self.assertTrue(replies[0]["result"]["isError"])
+        self.assertEqual(replies[0]["result"]["content"][0]["text"], "frames: must be at most 600, not 601")
 
     def test_read_only_rejects_execution_even_when_it_is_on_the_allow_list(self):
         replies, _ = exchange(GAME, [modern_call(1, "game_run", {"frames": 1})],

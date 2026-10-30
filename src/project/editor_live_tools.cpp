@@ -9,12 +9,12 @@
 #include "project/scene_assignments.hpp"
 #include "project/scene_diff.hpp"
 #include "project/scene_lookup.hpp"
+#include "project/runtime_query.hpp"
 #include "project/scene_text.hpp"
 
 namespace redgem::tools {
 namespace {
 using namespace mcp;
-constexpr std::size_t kLiveListLimit = 50;
 
 Json state(EditorSession& session) {
   Json selected = Json::array();
@@ -116,11 +116,15 @@ void apply_control(EditorSession& session, const std::string& action, const Json
 
 bool window_action(const std::string& action) {
   return action == "play" || action == "pause" || action == "resume" || action == "stop" || action == "step" ||
-         action == "capture";
+         action == "capture" || action == "frame";
 }
 
+// The actions about an object: select needs one, frame takes one (else the selection).
+bool takes_object(const std::string& action) { return action == "select" || action == "frame"; }
+
 void validate_control(const std::string& action, const Json& args) {
-  if (action != "select" && args.contains("object")) throw std::invalid_argument("object is only accepted by select");
+  if (!takes_object(action) && args.contains("object"))
+    throw std::invalid_argument("object is only accepted by select and frame");
   if (action == "select" && !args.contains("object")) throw std::invalid_argument("select needs an object");
   if (action != "capture" && args.contains("max_size"))
     throw std::invalid_argument("max_size is only accepted by capture");
@@ -130,6 +134,7 @@ Json use_window(EditorSession& session, const std::string& action, const Json& a
   if (!window) throw std::invalid_argument("this action requires an editor window");
   if (action != "capture" && busy) throw std::invalid_argument("finish the current editor gesture or dialog first");
   if (action == "play") require_editable(session, false);
+  if (args.contains("object")) session.select(static_cast<ObjectId>(object(session, args)));
   return window(action, args);
 }
 
@@ -141,6 +146,22 @@ Json control(EditorSession& session, const Json& args, bool busy, const Invoke& 
   require_editable(session, busy);
   apply_control(session, action, args);
   return tool_result(state(session).dump());
+}
+
+// The objects of the scene the runtime plays, as its ids know them: the edited document's, unless a
+// script moved the game on to another scene (whose objects are then named by name alone).
+const SceneDesc& runtime_scene(EditorSession& session, Engine& runtime) {
+  static const SceneDesc kNoNodes;
+  return runtime.scene_name() == session.scene_name() ? session.scene_desc() : kNoNodes;
+}
+
+Json query(EditorSession& session, const Json& args) {
+  Engine* runtime = session.runtime();
+  if (session.editing() || runtime == nullptr)
+    throw std::invalid_argument("the editor is not playing; start the game with editor action=play first");
+  if (args.contains("frames"))
+    throw std::invalid_argument("frames is for headless queries; pause and use editor action=step to advance");
+  return tool_result(answer_query(*runtime, runtime_scene(session, *runtime), args));
 }
 
 Json compare(EditorSession& session, const Json& args) {
@@ -162,21 +183,29 @@ void validate(const EditorSession& session, const std::string& name, const Json&
   require_current_scene(session, args);
 }
 
+// Events of the editor's own process, with paths shown relative to its game.
+Options events_options(const EditorSession& session) {
+  Options options;
+  options.game = session.game_dir();
+  return options;
+}
+
 Json handle(EditorSession& session, const std::string& name, const Json& args, bool busy, const Invoke& window) {
   if (name == "scene_get") return tool_result(object_detail(session.scene_desc(), object(session, args)));
   if (name == "scene_edit") return edit(session, args, busy);
   if (name == "scene_diff") return compare(session, args);
+  if (name == "game_query") return query(session, args);
   if (name == "editor") return control(session, args, busy, window);
   if (name != "scene_list") throw std::invalid_argument("tool is not available in the editor");
   return tool_result(scene_list(session.scene_desc(), session.scene_name(),
-                                {args.value("depth", kEveryLevel), args.value("limit", kLiveListLimit)}));
+                                {args.value("depth", kEveryLevel), args.value("limit", kDefaultListLimit)}));
 }
 }  // namespace
 
 Json invoke_editor(EditorSession& session, const std::string& name, const Json& args, bool busy, const Invoke& window) {
   try {
     validate(session, name, args);
-    if (name == "events") return mcp::invoke({}, name, args);
+    if (name == "events") return mcp::invoke(events_options(session), name, args);
     return handle(session, name, args, busy, window);
   } catch (const std::exception& error) {
     return tool_result(error.what(), true);

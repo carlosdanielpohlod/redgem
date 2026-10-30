@@ -1,5 +1,6 @@
 #include "project/editor_bridge.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 #include <utility>
 
@@ -9,11 +10,27 @@ namespace redgem::tools {
 namespace {
 using namespace bridge;
 
+// No editor answers at the connection: what ends a try, and what a call says how to fix.
+struct Unreachable : std::runtime_error {
+  using std::runtime_error::runtime_error;
+};
+constexpr const char* kNotRunning =
+    "the editor is not running (its connection was refused). Start it with `redgem <game> --editor-bridge` and "
+    "restart this server with its new connection file, or use --editor auto to find it on every call";
+
 net::Socket connect(const Address& address) {
   std::string error;
   auto socket = net::Socket::connect_to(net::kThisMachine, address.port, error);
-  if (!socket.valid()) throw std::runtime_error("cannot connect to the editor");
+  if (!socket.valid()) throw Unreachable(kNotRunning);
   return socket;
+}
+
+Address address_of(const std::filesystem::path& game, const std::filesystem::path& connection) {
+  try {
+    return bridge::read_address(game, connection);
+  } catch (const std::exception& problem) {
+    throw Unreachable(std::string(problem.what()) + "; " + kNotRunning);
+  }
 }
 
 class Exchange {
@@ -41,7 +58,7 @@ class Exchange {
  private:
   bool connected() {
     const auto connected = socket_.connect_status();
-    if (connected == net::IoStatus::Closed) throw std::runtime_error("editor connection was refused");
+    if (connected == net::IoStatus::Closed) throw Unreachable(kNotRunning);
     if (connected == net::IoStatus::WouldBlock) return false;
     return true;
   }
@@ -70,13 +87,32 @@ class Exchange {
 };
 }  // namespace
 
-mcp::Json call_editor(const std::filesystem::path& game, const std::filesystem::path& connection,
-                      const std::string& name, const mcp::Json& args, EditorBridgeClock clock) {
+std::optional<mcp::Json> try_editor(const std::filesystem::path& game, const std::filesystem::path& connection,
+                                    const std::string& name, const mcp::Json& args, EditorBridgeClock clock) {
   try {
-    const auto address = bridge::read_address(game, connection);
-    return Exchange(address, game, name, args, std::move(clock)).run();
+    return Exchange(address_of(game, connection), game, name, args, std::move(clock)).run();
+  } catch (const Unreachable&) {
+    return std::nullopt;
   } catch (const std::exception& error) {
     return mcp::tool_result(error.what(), true);
   }
+}
+
+mcp::Json call_editor(const std::filesystem::path& game, const std::filesystem::path& connection,
+                      const std::string& name, const mcp::Json& args, EditorBridgeClock clock) {
+  try {
+    return Exchange(address_of(game, connection), game, name, args, std::move(clock)).run();
+  } catch (const std::exception& error) {
+    return mcp::tool_result(error.what(), true);
+  }
+}
+
+std::vector<std::filesystem::path> editor_connections(const std::filesystem::path& game,
+                                                      const std::filesystem::path& private_root) {
+  std::vector<std::filesystem::path> found = bridge::connection_files(private_root);
+  found.erase(std::remove_if(found.begin(), found.end(),
+                             [&](const std::filesystem::path& file) { return !bridge::belongs_to(game, file); }),
+              found.end());
+  return found;
 }
 }  // namespace redgem::tools

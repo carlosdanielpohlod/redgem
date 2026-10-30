@@ -47,6 +47,10 @@ class ConnectionFile {
 std::string random_token();
 bool same_token(const std::string& expected, const Json& given);
 Address read_address(const std::filesystem::path& game, const std::filesystem::path& path);
+// Every connection file under `root` (the user's bridge folder when empty), newest first.
+std::vector<std::filesystem::path> connection_files(const std::filesystem::path& root);
+// Whether a connection file is a valid one for `game`.
+bool belongs_to(const std::filesystem::path& game, const std::filesystem::path& file);
 Json parse(const std::string& text);
 Bytes encode(const Json& value);
 bool complete(const Bytes& bytes);

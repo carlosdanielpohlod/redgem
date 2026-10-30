@@ -20,8 +20,15 @@ constexpr int kMaxDepth = 16;
 constexpr std::uintmax_t kDescriptorBytes = 4096;
 constexpr int kLargestPort = 65535;
 
+constexpr const char* kBridgeFolder = "editor-bridge";
+constexpr const char* kConnectionName = "connection.json";
+
+std::filesystem::path bridge_root(const std::filesystem::path& root) {
+  return root.empty() ? platform::user_data_dir() / kBridgeFolder : root;
+}
+
 std::filesystem::path private_directory(const std::filesystem::path& root) {
-  const auto parent = root.empty() ? platform::user_data_dir() / "editor-bridge" : root;
+  const auto parent = bridge_root(root);
   std::filesystem::create_directories(parent);
   const auto folder = parent / random_token();
   if (!std::filesystem::create_directory(folder)) throw std::runtime_error("cannot create private bridge directory");
@@ -73,7 +80,7 @@ bool same_token(const std::string& expected, const Json& given) {
 }
 
 ConnectionFile::ConnectionFile(const Address& address, const std::filesystem::path& parent)
-    : directory_(private_directory(parent)), path_(directory_ / "connection.json") {
+    : directory_(private_directory(parent)), path_(directory_ / kConnectionName) {
   try {
     std::string error;
     if (!write_text_file(path_, descriptor(address).dump(), error))
@@ -102,6 +109,36 @@ Address read_address(const std::filesystem::path& game, const std::filesystem::p
   }
   if (!std::filesystem::equivalent(game, address.game)) throw std::runtime_error("bridge belongs to another game");
   return address;
+}
+
+namespace {
+using Dated = std::pair<std::filesystem::file_time_type, std::filesystem::path>;
+
+void add_connection(const std::filesystem::directory_entry& folder, std::vector<Dated>& found) {
+  std::error_code error;
+  const auto file = folder.path() / kConnectionName;
+  const auto written = std::filesystem::last_write_time(file, error);
+  if (!error) found.emplace_back(written, file);
+}
+}  // namespace
+
+std::vector<std::filesystem::path> connection_files(const std::filesystem::path& root) {
+  std::vector<Dated> found;
+  std::error_code error;
+  for (const auto& folder : std::filesystem::directory_iterator(bridge_root(root), error)) add_connection(folder, found);
+  std::sort(found.begin(), found.end(), [](const Dated& a, const Dated& b) { return a.first > b.first; });
+  std::vector<std::filesystem::path> files;
+  for (auto& dated : found) files.push_back(std::move(dated.second));
+  return files;
+}
+
+bool belongs_to(const std::filesystem::path& game, const std::filesystem::path& file) {
+  try {
+    read_address(game, file);
+    return true;
+  } catch (const std::exception&) {
+    return false;
+  }
 }
 
 Json parse(const std::string& text) {

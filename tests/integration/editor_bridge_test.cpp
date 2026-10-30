@@ -386,3 +386,78 @@ TEST_CASE("editor bridge deadlines use the supplied clock without changing the p
     CHECK(received.empty());
   }
 }
+
+namespace {
+// Calls through `options` while the editor polls `server`, as exchange does with a fixed file.
+Json exchange_with(Game& game, EditorBridge& server, const mcp::Options& options, const std::string& name,
+                   const Json& args) {
+  auto future = std::async(std::launch::async, [&] { return mcp::invoke(options, name, args); });
+  while (future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+    server.tick([&](const std::string& tool, const Json& values) { return invoke_editor(*game.session, tool, values); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  return future.get();
+}
+
+std::string text(const Json& result) { return result["content"][0]["text"]; }
+}  // namespace
+
+TEST_CASE("editor discovery finds this game's running editor and skips other games and stale files") {
+  Game game;
+  const auto root = game.root / "private";
+  EditorBridge server(game.path, root);
+  CHECK(editor_connections(game.path, root) == std::vector<fs::path>{server.connection_file()});
+  CHECK(editor_connections(REDGEM_PLATFORMER_DIR, root).empty());
+  std::string error;
+  Json stale = Json::parse(*read_text_file(server.connection_file(), error));
+  stale["port"] = 1;  // nothing listens there: an editor that crashed
+  fs::create_directories(root / "stale");
+  REQUIRE(write_text_file(root / "stale" / "connection.json", stale.dump(), error));
+  CHECK(editor_connections(game.path, root).size() == 2);
+  CHECK_FALSE(try_editor(game.path, root / "stale" / "connection.json", "editor", {{"action", "status"}}));
+  const auto refused = call_editor(game.path, root / "stale" / "connection.json", "editor", {{"action", "status"}});
+  CHECK(text(refused).find("--editor-bridge") != std::string::npos);
+}
+
+TEST_CASE("--editor auto edits the running editor live and falls back to files without one") {
+  Game game;
+  const auto root = game.root / "private";
+  const mcp::Options options{game.path, false, {}, mcp::kDiscoverEditor, root};
+  {
+    EditorBridge server(game.path, root);
+    CHECK(ok(exchange_with(game, server, options, "scene_edit", set({"position=1,2,3"}))));
+    CHECK(game.session->document().dirty());  // live: unsaved in the editor
+  }
+  const auto status = mcp::invoke(options, "editor", {{"action", "status"}});
+  CHECK_FALSE(ok(status));
+  CHECK(text(status).find("--editor-bridge") != std::string::npos);
+  CHECK(ok(mcp::invoke(options, "scene_edit", set({"position=4,5,6"}))));
+  CHECK(text(mcp::invoke(options, "scene_get", {{"object", "Coin1"}})).find("position: 4,5,6") != std::string::npos);
+}
+
+TEST_CASE("live game_query asks the editor's running game, not the edited document") {
+  Game game;
+  auto& session = *game.session;
+  const Json inspect{{"action", "inspect"}, {"object", "Player"}};
+  CHECK(text(invoke_editor(session, "game_query", inspect)).find("not playing") != std::string::npos);
+  ScriptedInputSource input;
+  std::string error;
+  REQUIRE(session.play({input}, error));
+  session.runtime()->scene().set_world_position(static_cast<ObjectId>(find_object(session.scene_desc(), "Crate1").index),
+                                                Vec3{9, 9, 9});
+  const auto crate = invoke_editor(session, "game_query", {{"action", "inspect"}, {"object", "Crate1"}});
+  REQUIRE(ok(crate));
+  CHECK(text(crate).find("#18 Crate1 pos=9,9,9 body=dynamic") == 0);
+  const auto ray = invoke_editor(session, "game_query", {{"action", "raycast"}, {"from", "0,5,-4"}, {"to", "0,-5,-4"}});
+  CHECK(text(ray).find("Ground") != std::string::npos);
+  CHECK_FALSE(ok(invoke_editor(session, "game_query", {{"action", "inspect"}, {"object", "Player"}, {"frames", 3}})));
+  session.stop();
+}
+
+TEST_CASE("frame takes an object, and needs the editor window like the other view actions") {
+  Game game;
+  CHECK_FALSE(ok(invoke_editor(*game.session, "editor", {{"action", "frame"}, {"object", "Nope"}})));
+  const auto windowless = invoke_editor(*game.session, "editor", {{"action", "frame"}, {"object", "Coin1"}});
+  CHECK(text(windowless).find("requires an editor window") != std::string::npos);
+  CHECK_FALSE(ok(invoke_editor(*game.session, "editor", {{"action", "undo"}, {"object", "Coin1"}})));
+}

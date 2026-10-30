@@ -45,6 +45,11 @@ void advance(EditorApp& app, const std::string& action) {
 
 mcp::Json editor_window_tool(EditorApp& app, const std::string& action, const mcp::Json& args) {
   if (action == "capture") return capture(app, args);
+  if (action == "frame") {
+    if (app.session().selected().ids().empty()) throw std::invalid_argument("frame needs an object, or a selection");
+    app.frame_selection();
+    return invoke_editor(app.session(), "editor", {{"action", "status"}});
+  }
   advance(app, action);
   return invoke_editor(app.session(), "editor", {{"action", "status"}});
 }
