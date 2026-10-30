@@ -66,9 +66,22 @@ Json picture_result(const std::vector<std::uint8_t>& png, const std::string& tex
           {"isError", false}};
 }
 
-// Plays the saved game `frames` fixed steps (fewer when it ends first).
-void play_frames(Engine& engine, int frames) {
-  for (int frame = 0; frame < frames && !engine.finished(); ++frame) engine.frame(config::kFixedDeltaSeconds);
+// Plays the saved game `frames` fixed steps, fewer when it ends first; returns how many it played.
+int play_frames(Engine& engine, int frames) {
+  int played = 0;
+  while (played < frames && !engine.finished()) {
+    engine.frame(config::kFixedDeltaSeconds);
+    ++played;
+  }
+  return played;
+}
+
+// The objects the runtime's ids name: the requested scene's, unless a script moved the game on
+// to another one (whose objects are then named by name alone, as spawned ones are).
+SceneDesc runtime_scene(const Engine& engine, const PlayRequest& request) {
+  if (engine.scene_name() != request.scene) return {};
+  auto scene = read_scene(request.game_dir, request.scene);
+  return scene ? std::move(*scene) : SceneDesc{};
 }
 
 std::string query_saved(const Options& options, const Json& args, const MessageCollector& messages) {
@@ -77,11 +90,9 @@ std::string query_saved(const Options& options, const Json& args, const MessageC
   auto created = engine_for(request, nullptr, scratch);
   if (auto* problem = std::get_if<std::string>(&created)) throw std::runtime_error(messages.lines() + *problem);
   Engine& engine = *std::get<std::unique_ptr<Engine>>(created);
-  const int frames = args.value("frames", kDefaultQueryFrames);
-  play_frames(engine, frames);
-  const auto scene = read_scene(options.game, request.scene);
-  const std::string answer = answer_query(engine, scene ? *scene : SceneDesc{}, args);
-  return "after " + std::to_string(frames) + " frames: " + answer + "\n" + messages.lines();
+  const int played = play_frames(engine, args.value("frames", kDefaultQueryFrames));
+  const std::string answer = answer_query(engine, runtime_scene(engine, request), args);
+  return "after " + std::to_string(played) + " frames: " + answer + "\n" + messages.lines();
 }
 
 }  // namespace

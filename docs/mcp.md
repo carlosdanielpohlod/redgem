@@ -112,7 +112,14 @@ connection files of editors that crashed are skipped. To pin one editor instance
 redgem mcp /path/to/game --editor /path/to/connection.json
 ```
 
-If that editor exits, calls fail with an error that says how to restart it.
+If that editor exits, calls fail with an error that says how to restart it. A pinned editor
+always answers scene edits live, so its `scene_edit` schema leaves out `from`.
+
+With `auto`, an `events` cursor belongs to whichever process answered: the editor, or this server
+when no editor is open. After an editor opens or closes, start again from `since: 0`. Discovery
+skips editors whose connection is refused; an editor that accepts the connection but fails the
+request (a timeout, or another program on a crashed editor's port) returns that error, since
+retrying elsewhere could apply an edit twice.
 
 Scene listing, object details and scene comparison now read the editor's unsaved document.
 `scene_edit` supports `set`, `add` and `remove`. `add` creates an empty object, optionally under
@@ -146,7 +153,8 @@ explicit `scene` must match the open scene; requests never switch or discard sce
 
 `events` reads the editor's log history. `game_query` asks the game the editor is playing (the
 runtime, not the edited document); it refuses `frames` there, so pause and `step` to advance.
-While editing, it reports that the editor is not playing. `api`, `game_run`, `game_check` and
+While editing, it reports that the editor is not playing; it does not fall back to the saved
+files, which may differ from the open document. `api`, `game_run`, `game_check` and
 `game_shot` remain ordinary CLI tools: they read saved files rather than the unsaved editor scene.
 Arbitrary live eval is not exposed.
 

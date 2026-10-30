@@ -23,7 +23,8 @@ constexpr const char* kNoDisplay =
 
 // Whether windows can be opened at all. raylib 5.5 carries on without graphics when GLFW cannot
 // start (no display to connect to) and then crashes, so GLFW is asked first; raylib's own start
-// finds it started and goes on.
+// finds it started and goes on. (The engine's GLFW is built for X11 alone, so no platform hint
+// raylib would give GLFW before starting it is lost; its allocator is the default one anyway.)
 bool windowing_started() {
 #if defined(__linux__) && !defined(__ANDROID__)
   return glfwInit() != 0;

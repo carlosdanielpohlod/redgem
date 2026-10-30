@@ -14,7 +14,7 @@ constexpr const char* kSchemas = R"JSON([
 {"name":"game_run","description":"Play the saved game headlessly (1/60 s steps, seed 0, at most 600 frames) and report each script error once with file:line. assert, until and print are Ruby expressions evaluated in the game after each frame, e.g. print=\"Scene.find('Player').transform.position\"; they can use anything scripts can (Scene, Physics, Input) and can change the run.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"scene":{"type":"string","maxLength":256},"frames":{"type":"integer","minimum":1,"maximum":600},"seed":{"type":"integer","minimum":0,"maximum":2147483647},"input":{"type":"string","maxLength":256},"assert":{"type":"string","maxLength":4096},"until":{"type":"string","maxLength":4096},"print":{"type":"string","maxLength":4096},"every":{"type":"integer","minimum":1,"maximum":600}}}},
 {"name":"game_check","description":"Check scripts, scenes and referenced assets without playing or running the game's tests.","inputSchema":{"type":"object","additionalProperties":false,"properties":{}}},
 {"name":"game_shot","description":"A picture of the saved game at a moment, through its camera: a PNG image, 512x288 unless width says otherwise. For whether things work use game_run; this shows how it looks.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"scene":{"type":"string","maxLength":256},"at":{"type":"number","minimum":0,"maximum":10},"width":{"type":"integer","minimum":128,"maximum":1024},"camera":{"type":"string","maxLength":256}}}},
-{"name":"game_query","description":"Ask the playing game: inspect an object's live state (world pos, rot, body, velocity, grounded, props), raycast between two points (from, to) or overlap a sphere (at, radius). Points are x,y,z. With a live editor in Play it asks that game; otherwise it plays the saved game for frames (default 60) first.","inputSchema":{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["inspect","raycast","overlap"]},"object":{"type":"string","minLength":1,"maxLength":256},"from":{"type":"string","maxLength":64},"to":{"type":"string","maxLength":64},"at":{"type":"string","maxLength":64},"radius":{"type":"number","minimum":0.01,"maximum":1000},"frames":{"type":"integer","minimum":0,"maximum":600},"scene":{"type":"string","maxLength":256}}}},
+{"name":"game_query","description":"Ask the playing game: inspect an object's live state (world pos, rot, body, velocity, grounded, props), raycast between two points (from, to) or overlap a sphere (at, radius). Points are x,y,z. Connected to an editor, it asks the game the editor is playing (start it with editor action=play); otherwise it plays the saved game for frames (default 60) first.","inputSchema":{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["inspect","raycast","overlap"]},"object":{"type":"string","minLength":1,"maxLength":256},"from":{"type":"string","maxLength":64},"to":{"type":"string","maxLength":64},"at":{"type":"string","maxLength":64},"radius":{"type":"number","minimum":0.01,"maximum":1000},"frames":{"type":"integer","minimum":0,"maximum":600},"scene":{"type":"string","maxLength":256}}}},
 {"name":"api","description":"Read the scripting API: the class index, one class, or a search. Example: {\"class\":\"Transform\"}.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"class":{"type":"string","maxLength":256},"search":{"type":"string","maxLength":256}}}},
 {"name":"events","description":"Read log messages (script errors, Debug.log) since a cursor, one line each. Pass the returned cursor as since next time to get only new ones.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"since":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":32},"level":{"type":"string","enum":["debug","info","warning","error"]}}}}
 ])JSON";
@@ -123,9 +123,14 @@ Json available_tools(const Options& options) {
   return tools;
 }
 
+// A pinned editor connection always answers scene edits live, where from is refused: the schema
+// leaves it out. With discovery the files may answer instead, so it stays.
+bool always_live(const Options& options) { return !options.editor_connection.empty() && !discovers_editor(options); }
+
 void live_schema(Json& tool, const Options& options) {
   if (tool["name"] == "editor" && options.read_only)
     tool["inputSchema"]["properties"]["action"]["enum"] = {"status", "capture"};
+  if (tool["name"] == "scene_edit" && always_live(options)) tool["inputSchema"]["properties"].erase("from");
 }
 }  // namespace
 

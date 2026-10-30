@@ -462,3 +462,22 @@ TEST_CASE("frame takes an object, and needs the editor window like the other vie
   CHECK(text(windowless).find("requires an editor window") != std::string::npos);
   CHECK_FALSE(ok(invoke_editor(*game.session, "editor", {{"action", "undo"}, {"object", "Coin1"}})));
 }
+
+TEST_CASE("a pinned editor connection leaves from out of scene_edit; discovery keeps it for the files") {
+  const auto from_offered = [](const mcp::Options& options) {
+    for (const auto& tool : mcp::catalog(options)) {
+      if (tool["name"] == "scene_edit") return tool["inputSchema"]["properties"].contains("from");
+    }
+    return false;
+  };
+  mcp::Options options;
+  CHECK(from_offered(options));
+  options.editor_connection = mcp::kDiscoverEditor;
+  CHECK(from_offered(options));
+  options.editor_connection = "connection.json";
+  CHECK_FALSE(from_offered(options));
+  Game game;
+  const auto refused =
+      invoke_editor(*game.session, "scene_edit", {{"action", "add"}, {"object", "Copy"}, {"from", "Coin1"}});
+  CHECK(text(refused) == "live add creates an empty object; from is not supported");
+}

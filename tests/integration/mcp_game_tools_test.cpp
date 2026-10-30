@@ -2,8 +2,11 @@
 
 #include <doctest/doctest.h>
 
+#include <filesystem>
 #include <stdexcept>
 #include <string>
+
+#include "core/files.hpp"
 
 #include "project/mcp_game_tools.hpp"
 #include "project/runtime_query.hpp"
@@ -23,6 +26,34 @@ std::string answer(const Json& args) {
 }
 
 bool has(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }
+
+// A copy of the platformer whose Player runs `update`, a Ruby method body, every frame.
+class ScriptedGame {
+ public:
+  explicit ScriptedGame(const std::string& update) {
+    std::filesystem::remove_all(root_);
+    std::filesystem::copy(REDGEM_PLATFORMER_DIR, root_, std::filesystem::copy_options::recursive);
+    std::string error;
+    const std::string script = "class Probe < Behaviour\n  def update(_dt)\n    " + update + "\n  end\nend\n";
+    REQUIRE(write_text_file(root_ / "scripts" / "probe.rb", script, error));
+    const Json attach{{"action", "set"}, {"object", "Player"}, {"assignments", {"script+=Probe"}}};
+    REQUIRE_FALSE(mcp::invoke(options(), "scene_edit", attach)["isError"].get<bool>());
+  }
+  ~ScriptedGame() { std::filesystem::remove_all(root_); }
+  ScriptedGame(const ScriptedGame&) = delete;
+  ScriptedGame& operator=(const ScriptedGame&) = delete;
+  mcp::Options options() const { return {root_, false, {}}; }
+  const std::filesystem::path& root() const { return root_; }
+
+ private:
+  std::filesystem::path root_ = std::filesystem::temp_directory_path() / "redgem-game-query-test";
+};
+
+std::string answer_in(const ScriptedGame& game, const Json& args) {
+  const Json result = mcp::game_query(game.options(), args);
+  REQUIRE_FALSE(result["isError"].get<bool>());
+  return result["content"][0]["text"];
+}
 
 }  // namespace
 
@@ -45,6 +76,20 @@ TEST_CASE("game_query lists what a ray between two points and a sphere meet, nea
   const std::string near_crates = answer({{"action", "overlap"}, {"at", "4,1,-3"}, {"radius", 1.5}});
   CHECK(has(near_crates, "Crate1"));
   CHECK(has(near_crates, "Crate2"));
+}
+
+TEST_CASE("game_query says how many frames were played when the game ended sooner") {
+  const ScriptedGame game("@frames = (@frames || 0) + 1; Game.quit if @frames == 5");
+  CHECK(has(answer_in(game, {{"action", "inspect"}, {"object", "Player"}, {"frames", 600}}), "after 5 frames: "));
+}
+
+TEST_CASE("after a script switched scenes, game_query names the new scene's objects by name, not by old ids") {
+  const ScriptedGame game("Game.load_scene('second') if Game.scene_name == 'main'");
+  std::filesystem::create_directories(game.root() / "scenes");
+  std::filesystem::copy_file(game.root() / "scene.glb", game.root() / "scenes" / "second.glb");
+  CHECK(has(answer_in(game, {{"action", "inspect"}, {"object", "Coin1"}, {"frames", 10}}), "Coin1"));
+  CHECK_THROWS_AS(mcp::game_query(game.options(), {{"action", "inspect"}, {"object", "#7"}, {"frames", 10}}),
+                  std::invalid_argument);
 }
 
 TEST_CASE("game_query refuses requests it cannot answer with what to change") {

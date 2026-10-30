@@ -175,7 +175,9 @@ Json compare(EditorSession& session, const Json& args) {
 void validate(const EditorSession& session, const std::string& name, const Json& args) {
   Options options;
   options.game = session.game_dir();
-  options.editor_connection = "live";  // exposes the editor schema without opening a connection
+  // Exposes the editor schema without opening a connection, keeping from so that a live add with
+  // it gets the reason it is refused (see validate_edit).
+  options.editor_connection = kDiscoverEditor;
   const Json tools = catalog(options);
   const auto tool = std::find_if(tools.begin(), tools.end(), [&](const Json& value) { return value["name"] == name; });
   if (tool == tools.end()) throw std::invalid_argument("unknown editor tool");

@@ -36,6 +36,7 @@ until 1.0, a release may change what games rely on (see
   velocity, grounded, props changed while playing), raycast between two points or overlap a
   sphere, in the editor's running game or after headless frames; and a small PNG picture of the
   saved game, returned as MCP image content.
+
 - **MCP editor discovery**: `redgem mcp <game> --editor auto` finds this game's running editor on
   every call, skipping stale connection files, and works on the files when none is open. The
   `editor` tool gains `frame`.
