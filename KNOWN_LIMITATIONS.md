@@ -132,8 +132,9 @@ not a promise of how it will be closed.
 - A picture put on a material from the editor goes inside the scene's `.glb`: changing the file in
   `images/` afterwards does not change the scene (pick it again). The Inspector shows a slot's
   picture by name, without a preview, and sets neither a texture's sampler nor its UV set.
-- Templates live inside one scene: there are no prefab files shared by several scenes, nor nesting
-  or overrides.
+- [Prefab file references](docs/prefabs.md) load at runtime and in editor Play, including nested
+  references and root property overrides. The editing viewport does not preview them yet, and
+  there are no editor commands to create or place prefab files or override inherited children.
 - Scripts reload when Play is pressed, not while the game runs. The script editor has no
   autocomplete, and a backtrace in the console does not jump to its line.
 - No autosave or crash recovery of the scene being edited; no animation preview or physics debug

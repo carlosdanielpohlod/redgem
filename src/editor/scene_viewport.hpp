@@ -47,7 +47,8 @@ struct SceneViewport {
 // game's screen, drawn with the editor's renderer into the view's picture.
 class GameView final : public Presenter {
  public:
-  GameView(Window& window, Renderer& renderer, SceneViewport& view, const GatedInputSource& input);
+  GameView(Window& window, Renderer& renderer, SceneViewport& view, const GatedInputSource& input,
+           bool scene_assets_uploaded = true);
 
   SurfaceSize surface_size() const override { return {view_.width, view_.height}; }
   int text_width(const std::string& text, int size) const override;
@@ -60,8 +61,10 @@ class GameView final : public Presenter {
   bool open() const override { return true; }
   float frame_seconds() const override;
 
-  // Whether the game loaded another scene, whose assets took the place of the edited scene's.
-  bool switched_scene() const { return painter_.uploaded_generation() != kFirstSceneGeneration; }
+  // Whether runtime loading replaced the edited scene's assets.
+  bool switched_scene() const {
+    return initial_assets_changed_ || painter_.uploaded_generation() != kFirstSceneGeneration;
+  }
 
  private:
   bool pointer_granted(bool wanted) const { return input_.enabled && wanted; }
@@ -71,6 +74,7 @@ class GameView final : public Presenter {
   SceneViewport& view_;
   const GatedInputSource& input_;
   FramePainter painter_;
+  bool initial_assets_changed_ = false;
 };
 
 }  // namespace redgem

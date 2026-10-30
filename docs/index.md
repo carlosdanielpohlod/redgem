@@ -30,6 +30,7 @@ A game is a folder:
 | `scenes/*.glb` | More levels |
 | `scripts/*.rb` | Ruby behaviours and scene scripts |
 | `models/*.glb` | Models you can drop into a level |
+| `prefabs/*.glb` | [Reusable object files](prefabs.md), loaded through scene references |
 | `sounds/` | `.wav`, `.ogg`, `.mp3` or `.flac` files |
 | `images/` | Pictures for menus and the HUD (`.png`, `.jpg`) |
 | `locales/` | The texts players read, one translation file per language: `en.json`, `pt.json`... (see [Texts in several languages](scripting/i18n.md)) |

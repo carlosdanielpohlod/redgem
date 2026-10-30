@@ -16,7 +16,9 @@ bool is_live_and_tagged(const GameObject& object, const std::string& tag) {
   return !object.destroyed && !object.prefab && object.tag == tag;
 }
 
-bool is_live_camera(const GameObject& object) { return !object.destroyed && object.camera.has_value(); }
+bool is_live_camera(const GameObject& object) {
+  return !object.destroyed && !object.prefab && object.camera.has_value();
+}
 
 // Marked for destruction and not destroyed yet.
 bool awaits_destruction(const GameObject& object) { return object.pending_destroy && !object.destroyed; }

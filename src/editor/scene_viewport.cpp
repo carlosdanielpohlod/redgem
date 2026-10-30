@@ -29,10 +29,16 @@ Vector2 SceneViewport::mouse() const {
 
 Ray SceneViewport::ray_at(float x, float y) const { return GetScreenToWorldRayEx({x, y}, camera, width, height); }
 
-GameView::GameView(Window& window, Renderer& renderer, SceneViewport& view, const GatedInputSource& input)
-    : window_(window), renderer_(renderer), view_(view), input_(input), painter_(renderer) {
-  // The game starts from the scene being edited, which the renderer already holds.
-  painter_.assume_uploaded(kFirstSceneGeneration);
+GameView::GameView(Window& window, Renderer& renderer, SceneViewport& view, const GatedInputSource& input,
+                   bool scene_assets_uploaded)
+    : window_(window),
+      renderer_(renderer),
+      view_(view),
+      input_(input),
+      painter_(renderer),
+      initial_assets_changed_(!scene_assets_uploaded) {
+  // Prefab expansion may replace the edited scene's assets before the first game frame.
+  if (scene_assets_uploaded) painter_.assume_uploaded(kFirstSceneGeneration);
 }
 
 int GameView::text_width(const std::string& text, int size) const { return renderer_.text_width(text, size); }

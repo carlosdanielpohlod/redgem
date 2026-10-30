@@ -267,6 +267,7 @@ regenerates a whole level from code; `tools/blender/scene_kit.py` has helpers to
 | `tag`      | string                                         | Used by `Scene.find_all(tag)` and `game_object.tag?` |
 | `visible`  | `false`                                        | Hide the mesh (the object still exists) |
 | `prefab`   | `true`                                         | A template: hidden and inert in the game, copied by `Scene.spawn` |
+| `prefab_file` | `prefabs/crate.glb` | An empty object loads a [reusable object file](prefabs.md) at its placement |
 | `visible_from`, `visible_to` | meters                          | The object is drawn only while that far from the camera: give a model a detailed version up close and a light one far away |
 | `tint`     | `"#rrggbb"`                                    | Multiplies the colors of this object's mesh (copies sharing a mesh can differ) |
 | `cast_shadow` | `false`                                     | Keeps the object out of the sun's shadows (a sky dome) |

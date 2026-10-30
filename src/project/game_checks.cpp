@@ -21,6 +21,8 @@
 #include "project/scene_text.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "scene/props.hpp"
+#include "scene/prefabs.hpp"
+#include <exception>
 #include "script/ruby_vm.hpp"
 #include "script/script_host.hpp"
 #include "script/script_naming.hpp"
@@ -123,16 +125,24 @@ std::string about(const std::string& file, const std::string& text) {
   return line;
 }
 
+void check_resolved_scene(SceneChecks& checks, const std::string& name, const std::string& file, SceneDesc scene) {
+  try {
+    check_objects(checks, name, prefabs::resolve(std::move(scene), checks.game_dir));
+  } catch (const std::exception& error) {
+    checks.report.errors.push_back(about(file, error.what()));
+  }
+}
+
 void check_scene(SceneChecks& checks, const std::string& name) {
   ++checks.report.scenes;
   const std::string file = scene_path(checks.game_dir, name);
-  const LoadResult loaded = load_gltf_scene((checks.game_dir / file).string());
+  LoadResult loaded = load_gltf_scene((checks.game_dir / file).string());
   for (const std::string& warning : loaded.warnings) checks.report.warnings.push_back(about(file, warning));
   if (!loaded.ok) {
     checks.report.errors.push_back(about(file, loaded.error));
     return;
   }
-  check_objects(checks, name, loaded.scene);
+  check_resolved_scene(checks, name, file, std::move(loaded.scene));
 }
 
 // Whether the script defines the class it is named for, once the engine has run it (as playing

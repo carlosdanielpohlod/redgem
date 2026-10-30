@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "core/log.hpp"
+#include "scene/prefabs.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/keyboard.hpp"
@@ -38,7 +39,8 @@ void EditorApp::play() {
   save_scripts();  // like an IDE "save all": the game must run the code on screen
   rescan_files();
   std::string error;
-  game_view_ = std::make_unique<GameView>(*window_, *renderer_, *viewport_, game_input_);
+  const bool unchanged_assets = !prefabs::has_references(session_->document().desc());
+  game_view_ = std::make_unique<GameView>(*window_, *renderer_, *viewport_, game_input_, unchanged_assets);
   if (!session_->play({game_input_, audio_.get(), game_view_.get()}, error)) {
     log::error("cannot play: " + error);
     game_view_.reset();

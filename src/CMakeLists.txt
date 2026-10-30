@@ -240,6 +240,10 @@ redgem_add_library(redgem_runtime
   scene/transform.cpp
   scene/scene_desc.cpp
   scene/scene_ids.cpp
+  scene/prefab_animations.cpp
+  scene/prefab_assets.cpp
+  scene/prefab_nodes.cpp
+  scene/prefab_loader.cpp
   scene/gltf/gltf_checks.cpp
   scene/gltf/gltf_budget.cpp
   scene/gltf/gltf_accessors.cpp

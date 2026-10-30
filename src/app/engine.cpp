@@ -2,6 +2,7 @@
 
 #include "app/engine.hpp"
 
+#include <exception>
 #include <string>
 #include <vector>
 
@@ -16,6 +17,7 @@
 #include "core/log.hpp"
 #include "core/translations.hpp"
 #include "storage/save_file.hpp"
+#include "scene/prefabs.hpp"
 
 namespace redgem {
 namespace {
@@ -49,15 +51,19 @@ Engine::~Engine() {
 }
 
 std::variant<std::unique_ptr<Engine>, std::string> Engine::create(const EngineOptions& options) {
-  if (options.scene != nullptr) return create(options, SceneDesc(*options.scene));
-  auto scene = read_game_scene(options.game_dir);
-  if (auto* error = std::get_if<std::string>(&scene)) return *error;
-  return create(options, std::move(std::get<SceneDesc>(scene)));
+  try {
+    if (options.scene != nullptr) return create(options, SceneDesc(*options.scene));
+    auto scene = read_game_scene(options.game_dir);
+    if (auto* error = std::get_if<std::string>(&scene)) return *error;
+    return create(options, std::move(std::get<SceneDesc>(scene)));
+  } catch (const std::exception& error) {
+    return std::string(error.what());
+  }
 }
 
 std::unique_ptr<Engine> Engine::create(const EngineOptions& options, SceneDesc scene) {
   std::unique_ptr<Engine> engine(new Engine(options));
-  engine->scene_desc_ = std::move(scene);
+  engine->scene_desc_ = prefabs::resolve(std::move(scene), options.game_dir);
   engine->initialize();
   return engine;
 }
