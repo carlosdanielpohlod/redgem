@@ -6,7 +6,6 @@
 
 #include <algorithm>
 
-#include "render/display_settings.hpp"
 #include "scene/camera_ray.hpp"
 #include "scene/scene_config.hpp"
 #include "script/bindings/binding_helpers.hpp"
@@ -18,8 +17,6 @@ namespace {
 using namespace binding;
 
 constexpr mrb_int kPairParts = 2;  // a ray is [origin, direction], a point of the screen [x, y]
-// What a pose is made of, in its order: a place, then a turn (a quaternion).
-enum PosePart : mrb_int { kPlaceX, kPlaceY, kPlaceZ, kTurnX, kTurnY, kTurnZ, kTurnW, kPoseParts };
 constexpr double kMinFovDegrees = 10.0;
 constexpr double kMaxFovDegrees = 150.0;
 constexpr double kNoBlur = 0.0;
@@ -35,17 +32,19 @@ CameraDesc* main_camera(mrb_state* mrb) {
 
 mrb_value camera_main(mrb_state* mrb, mrb_value) { return object_or_nil(mrb, scene(mrb).main_camera()); }
 
-// The screen scripts draw on, and the world's picture on it: drawn at the player's render scale,
-// then stretched over the screen (see WindowPresenter).
+// The screen scripts draw on, and the world's picture on it as the presenter draws it (at a render
+// scale, into a recording) and shows it stretched over the screen.
 ScreenFrame screen_frame(const ScriptContext& ctx) {
-  const SurfaceSize picture = scaled_size({ctx.screen_width, ctx.screen_height}, ctx.display.render_scale);
-  return {ctx.screen_width, ctx.screen_height, picture.width, picture.height};
+  return {ctx.screen_width, ctx.screen_height, ctx.picture_width, ctx.picture_height};
 }
 
 // (Game cameras are drawn in perspective.)
 Lens lens_of(const CameraDesc& camera) { return {camera.fov_y_radians, 0.0f}; }
 
-Transform main_camera_world(mrb_state* mrb) { return scene(mrb).world_transform(scene(mrb).main_camera()); }
+// Where the main camera sees from: its place, and its shake on it (as the renderer draws it).
+Transform main_camera_view(mrb_state* mrb, const CameraDesc& camera) {
+  return viewed_from(scene(mrb).world_transform(scene(mrb).main_camera()), camera.shake);
+}
 
 mrb_value pair(mrb_state* mrb, mrb_value first, mrb_value second) {
   mrb_value both = mrb_ary_new_capa(mrb, kPairParts);
@@ -63,7 +62,7 @@ mrb_value camera_screen_ray(mrb_state* mrb, mrb_value) {
   const ScreenFrame frame = screen_frame(context(mrb));
   const bool can_look = camera != nullptr && has_area(frame);
   if (!can_look) return mrb_nil_value();
-  const CameraRay ray = screen_ray(main_camera_world(mrb), lens_of(*camera), frame, point);
+  const CameraRay ray = screen_ray(main_camera_view(mrb, *camera), lens_of(*camera), frame, point);
   return pair(mrb, vec3_value(mrb, ray.origin), vec3_value(mrb, ray.direction));
 }
 
@@ -79,7 +78,8 @@ mrb_value camera_world_to_screen(mrb_state* mrb, mrb_value) {
   const Vec3 point = point_of(mrb, single_arg(mrb));
   const CameraDesc* camera = main_camera(mrb);
   if (camera == nullptr) return mrb_nil_value();
-  const auto shown = world_to_screen(main_camera_world(mrb), lens_of(*camera), screen_frame(context(mrb)), point);
+  const auto shown =
+      world_to_screen(main_camera_view(mrb, *camera), lens_of(*camera), screen_frame(context(mrb)), point);
   if (!shown) return mrb_nil_value();
   return pair(mrb, mrb_float_value(mrb, shown->x), mrb_float_value(mrb, shown->y));
 }
@@ -107,40 +107,16 @@ mrb_value camera_set_motion_blur(mrb_state* mrb, mrb_value) {
   return mrb_float_value(mrb, amount);
 }
 
-// An object's own place and turn, as kept relative to its parent: [x, y, z, qx, qy, qz, qw]. The
-// camera helpers keep the pose a shake started from, to put it back exactly: through world
-// positions and Euler angles it would come back a rounding off, and a moving parent would carry it.
-mrb_value camera_pose(mrb_state* mrb, mrb_value) {
-  const Transform& local = alive_object(mrb, single_arg(mrb)).local;
-  mrb_value pose = mrb_ary_new_capa(mrb, kPoseParts);
-  for (const float part : {local.position.x, local.position.y, local.position.z, local.rotation.x, local.rotation.y,
-                           local.rotation.z, local.rotation.w}) {
-    mrb_ary_push(mrb, pose, mrb_float_value(mrb, part));
-  }
-  return pose;
-}
-
-float pose_part(mrb_state* mrb, mrb_value pose, mrb_int index) {
-  return static_cast<float>(finite(mrb, mrb_as_float(mrb, mrb_ary_ref(mrb, pose, index))));
-}
-
-void notify_moved(mrb_state* mrb, ObjectId id) {
-  const ScriptContext& ctx = context(mrb);
-  if (!ctx.on_transform_written) return;
-  ctx.on_transform_written(id, TransformWrite::Position);
-  ctx.on_transform_written(id, TransformWrite::Rotation);
-}
-
-// Puts an object back in a pose camera_pose gave.
-mrb_value camera_set_pose(mrb_state* mrb, mrb_value) {
-  mrb_value object = mrb_nil_value(), pose = mrb_nil_value();
-  mrb_get_args(mrb, "oA", &object, &pose);
-  if (RARRAY_LEN(pose) != kPoseParts) mrb_raise(mrb, E_ARGUMENT_ERROR, "a pose is 7 numbers");
-  GameObject& moved = alive_object(mrb, object);
-  moved.local.position = {pose_part(mrb, pose, kPlaceX), pose_part(mrb, pose, kPlaceY), pose_part(mrb, pose, kPlaceZ)};
-  moved.local.rotation = normalize(Quat{pose_part(mrb, pose, kTurnX), pose_part(mrb, pose, kTurnY),
-                                        pose_part(mrb, pose, kTurnZ), pose_part(mrb, pose, kTurnW)});
-  notify_moved(mrb, moved.id);
+// Shakes a camera: what it shows moves by `move` meters (right, up, back) and turns by `turn`
+// degrees (pitch, yaw, roll) in its own axes, until the next shake; the object itself stays put
+// (see CameraDesc::shake). Camera::Rig gives the offsets.
+mrb_value camera_shake_by(mrb_state* mrb, mrb_value) {
+  mrb_value object = mrb_nil_value(), move = mrb_nil_value(), turn = mrb_nil_value();
+  mrb_get_args(mrb, "ooo", &object, &move, &turn);
+  std::optional<CameraDesc>& camera = alive_object(mrb, object).camera;
+  if (!camera) mrb_raise(mrb, E_ARGUMENT_ERROR, "only a camera shakes");
+  camera->shake.position = to_vec3(mrb, move);
+  camera->shake.rotation = quat_from_euler_degrees(to_vec3(mrb, turn));
   return object;
 }
 
@@ -155,8 +131,7 @@ void install_camera_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, camera_module, "fov=", camera_set_fov, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, camera_module, "motion_blur", camera_motion_blur, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, camera_module, "motion_blur=", camera_set_motion_blur, MRB_ARGS_REQ(1));
-  mrb_define_module_function(mrb, camera_module, "__pose", camera_pose, MRB_ARGS_REQ(1));
-  mrb_define_module_function(mrb, camera_module, "__set_pose", camera_set_pose, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, camera_module, "__shake_by", camera_shake_by, MRB_ARGS_REQ(3));
 }
 
 }  // namespace redgem

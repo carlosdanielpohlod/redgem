@@ -79,10 +79,17 @@ bool Engine::found_by_neighbours() const { return network_.hosting() && network_
 
 bool Engine::captures_cursor() const { return context_.mouse_locked && !is_loading_scene(); }
 
-void Engine::follow_presenter() {
+void Engine::read_surface_sizes() {
   const SurfaceSize size = presenter_->surface_size();
   context_.screen_width = size.width;
   context_.screen_height = size.height;
+  const SurfaceSize picture = presenter_->picture_size();
+  context_.picture_width = picture.width;
+  context_.picture_height = picture.height;
+}
+
+void Engine::follow_presenter() {
+  read_surface_sizes();
   presenter_->capture_cursor(captures_cursor());
 }
 
@@ -95,6 +102,7 @@ void Engine::advance_game(float frame_seconds) {
   // A long stall (a dragged window, a loading hitch) counts as one long frame, not as seconds of game.
   const float unscaled =
       options_.fixed_step ? config::kFixedDeltaSeconds : std::min(frame_seconds, config::kMaxFrameSeconds);
+  context_.time.unscaled_delta = unscaled;
   update_frame(unscaled * scale);
 }
 

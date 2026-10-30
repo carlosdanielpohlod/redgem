@@ -198,6 +198,8 @@ class Engine {
   // machine's own port, and not as a room on a relay.
   bool found_by_neighbours() const;
   bool captures_cursor() const;
+  // What the scripts know of the presenter's sizes: the screen (UI.width, UI.height), the world's picture.
+  void read_surface_sizes();
   void follow_presenter();
   void advance_game(float frame_seconds);
   // Fixed steps to run this frame, with the game's time scaled by `scale`.

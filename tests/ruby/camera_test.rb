@@ -9,12 +9,16 @@ class CameraTest < RedGemTest::Case
   # Stands in for a transform: a place the helpers move, along the world's axes.
   class Spot
     attr_accessor :position
+    attr_reader :looked_at
 
     def initialize(position)
       @position = position
     end
 
-    def look_at(_point); end
+    def look_at(point)
+      @looked_at = point
+    end
+
     def rotate(_turn); end
     def right = Vector3.right
     def up = Vector3.up
@@ -37,12 +41,33 @@ class CameraTest < RedGemTest::Case
     camera = Spot.new(Vector3.zero)
     (seconds / step).round.times do
       target.transform.position += velocity * step if target
-      motion.update(camera, step)
+      motion.update(camera, step, step)
     end
     camera.position
   end
 
-  def follow(target) = Camera::Follow.new(target, offset: [0, 3, 6], smoothing: 0.3, avoid_walls: false)
+  def follow(target, snap: false)
+    Camera::Follow.new(target, offset: [0, 3, 6], smoothing: 0.3, avoid_walls: false, snap: snap)
+  end
+
+  def test_a_follow_starts_in_its_place_unless_told_to_fly_there
+    assert_vector Vector3[2, 3, 7], camera_after(follow(Thing.new(Vector3[2, 0, 1]), snap: true), SLOW, SLOW)
+    refute camera_after(follow(Thing.new(Vector3[2, 0, 1])), SLOW, SLOW).approx?(Vector3[2, 3, 7], 0.1)
+  end
+
+  def test_the_camera_keeps_its_turn_when_what_it_looks_at_is_where_it_is
+    spot = Spot.new(Vector3[1, 2, 3])
+    Camera.__look(spot, Vector3[1, 2, 3])
+    assert_nil spot.looked_at
+    Camera.__look(spot, Vector3.zero)
+    assert_vector Vector3.zero, spot.looked_at
+  end
+
+  def test_a_wall_brings_the_camera_in_but_never_onto_what_it_looks_at
+    assert_in_delta 2.8, Camera.__seat_before(3.0, 6.0)
+    assert_in_delta Camera::NEAREST_SEAT, Camera.__seat_before(0.1, 6.0)
+    assert_in_delta 5.9, Camera.__seat_before(6.1, 6.0) # (a wall just behind it still keeps its margin)
+  end
 
   def test_smoothing_closes_half_the_way_every_half_life
     assert_in_delta 0.5, Camera.__share(0.2, 0.2)
@@ -86,9 +111,19 @@ class CameraTest < RedGemTest::Case
     orbit = Camera::Orbit.new(Vector3.zero, pitch: 10, distances: 2..8, pitches: -20..40)
     orbit.turn(400, 100)
     orbit.zoom(50)
-    assert_in_delta 400.0, orbit.yaw
+    assert_in_delta 40.0, orbit.yaw
     assert_in_delta 40.0, orbit.pitch
     assert_in_delta 8.0, orbit.distance
+  end
+
+  def test_an_orbit_keeps_its_yaw_within_a_turn_and_eases_the_short_way_round
+    assert_in_delta(-170.0, Camera::Orbit.wrap(190))
+    assert_in_delta 0.0, Camera::Orbit.wrap(720)
+    orbit = Camera::Orbit.new(Vector3.zero, yaw: 170, pitch: 0, smoothing: 1.0, input: false, avoid_walls: false)
+    camera_after(orbit, FAST, FAST)
+    orbit.turn(20, 0) # to -170: 20 degrees on, across the back, not 340 back
+    camera = camera_after(orbit, 1.0, FAST)
+    assert_vector Camera::Orbit.direction(180, 0) * Camera::Orbit::DISTANCE + Vector3.up, camera, 0.05
   end
 
   def shaken(step, seconds)

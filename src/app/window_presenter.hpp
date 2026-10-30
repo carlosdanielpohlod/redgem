@@ -62,6 +62,7 @@ class WindowPresenter final : public Presenter {
   WindowPresenter& operator=(const WindowPresenter&) = delete;
 
   SurfaceSize surface_size() const override;
+  SurfaceSize picture_size() const override;
   int text_width(const std::string& text, int size) const override { return renderer_.text_width(text, size); }
   int font_text_width(const std::string& text, int size, const std::string& font,
                       const std::filesystem::path& folder) const override {

@@ -131,6 +131,9 @@ struct CameraDesc {
   float fov_y_radians = 0.0f;
   float near_plane = 0.0f;
   float far_plane = 0.0f;
+  // How far a shake (Camera.shake) has it off its place, in its own axes, while the game runs: only
+  // what it shows moves, never the object, so a script moving the camera keeps its own pose.
+  Transform shake;
 };
 
 enum class LightType { Directional, Point, Spot };

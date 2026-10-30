@@ -15,6 +15,9 @@ using namespace binding;
 // --- Time ------------------------------------------------------------------------------------
 
 mrb_value time_delta(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, context(mrb).time.delta); }
+mrb_value time_unscaled_delta(mrb_state* mrb, mrb_value) {
+  return mrb_float_value(mrb, context(mrb).time.unscaled_delta);
+}
 mrb_value time_fixed_delta(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, context(mrb).time.fixed_delta); }
 mrb_value time_elapsed(mrb_state* mrb, mrb_value) { return mrb_float_value(mrb, context(mrb).time.elapsed); }
 mrb_value time_frame(mrb_state* mrb, mrb_value) { return mrb_int_value(mrb, context(mrb).time.frame); }
@@ -78,6 +81,7 @@ mrb_value game_title(mrb_state* mrb, mrb_value) { return text_value(mrb, context
 void install_time_bindings(mrb_state* mrb) {
   RClass* time_class = mrb_define_class(mrb, "Time", mrb->object_class);
   mrb_define_class_method(mrb, time_class, "delta", time_delta, MRB_ARGS_NONE());
+  mrb_define_class_method(mrb, time_class, "unscaled_delta", time_unscaled_delta, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, time_class, "fixed_delta", time_fixed_delta, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, time_class, "elapsed", time_elapsed, MRB_ARGS_NONE());
   mrb_define_class_method(mrb, time_class, "frame", time_frame, MRB_ARGS_NONE());

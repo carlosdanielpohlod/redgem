@@ -123,6 +123,14 @@ SurfaceSize WindowPresenter::surface_size() const {
   return {recorded_.texture.width, recorded_.texture.height};
 }
 
+// The world as present() draws it: into the recording's picture, at the render scale's share of the
+// window (held to what the card can draw into), or at the window's own size once the card refused.
+SurfaceSize WindowPresenter::picture_size() const {
+  if (recording()) return surface_size();
+  if (!draws_scaled()) return window_.drawing_size();
+  return held_to_side(scaled_size(window_.drawing_size(), render_scale_), window_.largest_picture_side());
+}
+
 bool WindowPresenter::open() const {
   const bool recorded_enough = recording() && recorder_->complete();
   // A run that was only a recording ends when the recording breaks off, with an error.

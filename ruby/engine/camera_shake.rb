@@ -61,13 +61,6 @@ module Camera
       [Vector3.new(*move), Vector3.new(*turn)]
     end
 
-    # Moves and turns the camera by the offset, in its own axes.
-    def apply(transform)
-      move, turn = offset
-      transform.position += transform.right * move.x + transform.up * move.y - transform.forward * move.z
-      transform.rotate(turn)
-    end
-
     def noise(axis) = Shake.noise(@seed, axis, @time * FREQUENCY)
 
     # Smooth noise from -1 to 1 along time: random values at whole times, eased between.

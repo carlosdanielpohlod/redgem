@@ -4,6 +4,7 @@
 #include <limits>
 #include <vector>
 
+#include "core/letterbox.hpp"
 #include "scene/camera_ray.hpp"
 #include "scene/scene_config.hpp"
 #include "test_support.hpp"
@@ -160,4 +161,25 @@ TEST_CASE("a screen of no size and points too far off to place are not on the sc
   const float nan = std::numeric_limits<float>::quiet_NaN();
   CHECK_FALSE(world_to_screen(camera, kPerspective, screen(), {0.0f, 0.0f, nan}).has_value());
   CHECK_FALSE(world_to_screen(camera, kPerspective, screen(), {nan, 0.0f, -1.0f}).has_value());
+}
+
+TEST_CASE("a shake moves where the camera sees from along the camera's own axes, not the world's") {
+  const Transform camera = turned_camera();
+  Transform shake;
+  shake.position = {1.0f, 0.0f, 0.0f};  // a meter to its right
+  shake.rotation = quat_from_euler_degrees({0.0f, kQuarterTurnDegrees, 0.0f});
+  const Transform seen = viewed_from(camera, shake);
+  CHECK(approx_equal(seen.position, camera.position + camera.right(), kTolerance));
+  CHECK(approx_equal(seen.forward(), -camera.right(), kTolerance));  // a quarter turn to its left
+  CHECK(approx_equal(viewed_from(camera, Transform{}).forward(), camera.forward(), kTolerance));
+}
+
+TEST_CASE("a picture is shown as large as fits, in the middle of the window") {
+  const Letterbox wide = fit_picture(800.0f, 400.0f, 400.0f, 400.0f);
+  CHECK(wide.x == doctest::Approx(200.0f));
+  CHECK(wide.y == doctest::Approx(0.0f));
+  CHECK(wide.width == doctest::Approx(400.0f));
+  const Letterbox tall = fit_picture(400.0f, 800.0f, 200.0f, 100.0f);
+  CHECK(tall.y == doctest::Approx(300.0f));
+  CHECK(tall.height == doctest::Approx(200.0f));
 }

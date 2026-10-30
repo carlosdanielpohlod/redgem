@@ -54,6 +54,44 @@ SceneDesc hero_scene(std::vector<NodeDesc> more = {}) {
   return scene_with(std::move(more));
 }
 
+// A hero carrying a shield (a collider of its own) between it and where the camera follows it.
+SceneDesc shielded_scene() {
+  NodeDesc hero;
+  hero.name = "Hero";
+  hero.children = {3};
+  NodeDesc shield = node("Shield", {0.0f, 1.0f, 1.0f}, {2.0f, 2.0f, 0.2f}, solid());
+  shield.parent = 2;  // (after the camera and the ground)
+  return scene_with({hero, shield});
+}
+
+// A camera, a hero and a crate. Slots of objects made while the game runs are taken again by the
+// next copy, and the first camera in the scene's order is the main one: so a copy of the camera
+// made where a copy of the crate was comes before a copy made after it, and takes over.
+SceneDesc copied_camera_scene() {
+  NodeDesc hero;
+  hero.name = "Hero";
+  NodeDesc camera;
+  camera.name = "Camera";
+  camera.camera = CameraDesc{};
+  NodeDesc crate;
+  crate.name = "Crate";
+  SceneDesc desc;
+  desc.nodes = {hero, camera, crate};
+  return desc;
+}
+
+// A screen 800 x 400 showing the world drawn square, between bars: from x = 200 to 600.
+class SquarePicture final : public Presenter {
+ public:
+  SurfaceSize surface_size() const override { return {800, 400}; }
+  SurfaceSize picture_size() const override { return {400, 400}; }
+  int text_width(const std::string& text, int) const override { return static_cast<int>(text.size()); }
+  void capture_cursor(bool) override {}
+  void present(const FrameView&) override {}
+  bool open() const override { return true; }
+  float frame_seconds() const override { return config::kFixedDeltaSeconds; }
+};
+
 std::unique_ptr<Engine> game_on(const TempGame& game, const SceneDesc& scene, Presenter& presenter) {
   EngineOptions options;
   options.game_dir = game.dir;
@@ -66,6 +104,11 @@ std::unique_ptr<Engine> game_on(const TempGame& game, const SceneDesc& scene, Pr
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   return std::move(std::get<std::unique_ptr<Engine>>(created));
 }
+
+// Whether the camera sees from its own place: no shake moves what it shows.
+constexpr const char* kSeesFromItsPlace =
+    "ray = Camera.screen_ray(400, 300); ray[0].approx?(Camera.main.transform.position, 1e-5) && "
+    "ray[1].approx?(Camera.main.transform.forward, 1e-5)";
 
 bool says(Engine& engine, const std::string& code) { return ruby(engine, code) == "true"; }
 
@@ -138,7 +181,7 @@ TEST_CASE("a target destroyed while followed or orbited is let go, and the camer
   CHECK(fails(*engine, "Camera.follow(Scene.find('Nobody'))"));
 }
 
-TEST_CASE("a camera with a parent follows in the world's space, and a shake leaves its own pose as it was") {
+TEST_CASE("a camera with a parent follows in the world's space, and is seen from its own place after a shake") {
   TempGame game(kGame);
   NullPresenter screen(kScreen);
   auto engine = game_on(game, parented_scene(), screen);
@@ -147,21 +190,20 @@ TEST_CASE("a camera with a parent follows in the world's space, and a shake leav
   CHECK(says(*engine, "Camera.main.transform.position.approx?(Vector3.new(0, 3, 6), 0.01)"));
   CHECK(says(*engine, "Camera.world_to_screen(Vector3.up).zip([400, 300]).all? { |a, b| (a - b).abs < 0.5 }"));
 
-  // The dolly carries the camera while it shakes; the shake over, the camera is where the dolly took it.
-  ruby(*engine, "Camera.stop_following; $before = Camera.__pose(Camera.main)");
+  // The dolly carries the camera while it shakes; the shake over, it sees from where the dolly took it.
+  ruby(*engine, "Camera.stop_following; $local = Camera.main.transform.local_position");
   ruby(*engine, "Camera.shake(1.0, duration: 0.5)");
-  frames(*engine, 1);
-  CHECK(says(*engine, "Camera.__pose(Camera.main) != $before"));
   for (int frame = 0; frame < kOneSecond; ++frame) {
     ruby(*engine, "Scene.find('Dolly').transform.position += Vector3.new(0.02, 0, 0)");
     frames(*engine, 1);
   }
   CHECK(says(*engine, "Camera.trauma.zero?"));
-  CHECK(says(*engine, "Camera.__pose(Camera.main).zip($before).all? { |a, b| (a - b).abs < 1e-6 }"));
+  CHECK(says(*engine, "Camera.main.transform.local_position == $local"));
+  CHECK(says(*engine, kSeesFromItsPlace));
   CHECK(engine->scripts().error_count() == 0);
 }
 
-TEST_CASE("a shake fades out and puts a still camera back where it was; shakes stack up to full trauma") {
+TEST_CASE("a shake moves what the camera shows, never the camera, and fades out; shakes stack up to full trauma") {
   TempGame game(kGame);
   NullPresenter screen(kScreen);
   auto engine = game_on(game, hero_scene(), screen);
@@ -170,28 +212,38 @@ TEST_CASE("a shake fades out and puts a still camera back where it was; shakes s
   CHECK(ruby(*engine, "Camera.shake(0.7, duration: 0.5)") == "0.7");
   CHECK(ruby(*engine, "Camera.shake(0.7, duration: 0.5)") == "1.0");
   frames(*engine, kFewFrames);
-  CHECK(says(*engine, "!Camera.main.transform.position.approx?($place, 0.001)"));
+  CHECK(says(*engine, "!(" + std::string(kSeesFromItsPlace) + ")"));
+  CHECK(says(*engine, "Camera.main.transform.position == $place && Camera.main.transform.rotation == $turn"));
   CHECK(says(*engine, "Camera.trauma.between?(0.01, 0.99)"));
   frames(*engine, kOneSecond);
   CHECK(says(*engine, "Camera.trauma.zero?"));
-  CHECK(says(*engine, "Camera.main.transform.position.approx?($place, 1e-5)"));
-  CHECK(says(*engine, "Camera.main.transform.rotation.approx?($turn, 1e-3)"));
-
-  // A script that moves the camera but leaves its turn alone: the shake's turn is still taken back.
-  ruby(*engine, "Camera.shake(1.0, duration: 0.5)");
-  for (int frame = 0; frame < kOneSecond; ++frame) {
-    ruby(*engine, "Camera.main.transform.position = $place");
-    frames(*engine, 1);
-  }
-  CHECK(says(*engine, "Camera.main.transform.rotation.approx?($turn, 1e-3)"));
+  CHECK(says(*engine, kSeesFromItsPlace));
 
   ruby(*engine, "Camera.shake(1.0)");
   frames(*engine, 1);
   ruby(*engine, "Camera.stop_shaking");
   frames(*engine, 1);
-  CHECK(says(*engine, "Camera.main.transform.position.approx?($place, 1e-5)"));
+  CHECK(says(*engine, kSeesFromItsPlace));
   CHECK(fails(*engine, "Camera.shake(1.5)"));
   CHECK(fails(*engine, "Camera.shake(0.5, duration: 0)"));
+}
+
+TEST_CASE("a script turning the camera a little every frame while it shakes keeps exactly its own turns") {
+  TempGame game(kGame);
+  NullPresenter screen(kScreen);
+  auto engine = game_on(game, hero_scene(), screen);
+  frames(*engine, 1);
+  ruby(*engine, "$place = Camera.main.transform.position");
+  ruby(*engine, "Camera.shake(1.0, duration: 0.5)");
+  for (int frame = 0; frame < kOneSecond; ++frame) {
+    ruby(*engine,
+         "Camera.main.transform.rotate(Vector3.new(0, 1, 0)); Camera.main.transform.translate(Vector3.right * 0.01)");
+    frames(*engine, 1);
+  }
+  CHECK(says(*engine, "Camera.trauma.zero?"));
+  CHECK(says(*engine, "Camera.main.transform.rotation.approx?(Vector3.new(0, 60, 0), 1e-3)"));  // no roll left
+  CHECK(says(*engine, "Camera.main.transform.position.approx?($place + Vector3.right * 0.6, 1e-4)"));
+  CHECK(says(*engine, kSeesFromItsPlace));
 }
 
 TEST_CASE("a shake on top of a follow leaves the camera where the follow puts it") {
@@ -202,9 +254,10 @@ TEST_CASE("a shake on top of a follow leaves the camera where the follow puts it
   frames(*engine, kOneSecond);
   ruby(*engine, "Camera.shake(1.0, duration: 1.0)");
   frames(*engine, kHalfSecond);
-  CHECK(says(*engine, "!Camera.main.transform.position.approx?(Vector3.new(0, 3, 6), 0.01)"));
-  frames(*engine, kOneSecond);
   CHECK(says(*engine, "Camera.main.transform.position.approx?(Vector3.new(0, 3, 6), 0.001)"));
+  CHECK(says(*engine, "!(" + std::string(kSeesFromItsPlace) + ")"));
+  frames(*engine, kOneSecond);
+  CHECK(says(*engine, kSeesFromItsPlace));
 }
 
 TEST_CASE("the same shake under a fixed step: every run sees the camera in the same places") {
@@ -215,7 +268,7 @@ TEST_CASE("the same shake under a fixed step: every run sees the camera in the s
     frames(*engine, 1);
     ruby(*engine, "Camera.shake(0.8, duration: 1.0)");
     frames(*engine, kFewFrames);
-    return ruby(*engine, "Camera.main.transform.position.to_a.map { |part| part.round(6) }");
+    return ruby(*engine, "Camera.screen_ray(400, 300).flat_map(&:to_a).map { |part| part.round(6) }");
   };
   CHECK(shaken_place() == shaken_place());
 }
@@ -311,6 +364,105 @@ TEST_CASE("Camera.world_to_screen on a screen of an odd shape, the world drawn a
              "Camera.world_to_screen(Vector3.new(0, 0, -10)).zip([166.5, 88.5]).all? { |a, b| (a - b).abs < 0.5 }"));
 }
 
+TEST_CASE("Camera.follow starts the camera in its place, unless it is told to fly there") {
+  TempGame game(kGame);
+  NullPresenter screen(kScreen);
+  auto engine = game_on(game, hero_scene(), screen);
+  ruby(*engine, "Camera.follow(Scene.find('Hero'), offset: Vector3.new(0, 3, 6), smoothing: 0.5)");
+  frames(*engine, 1);
+  CHECK(says(*engine, "Camera.main.transform.position.approx?(Vector3.new(0, 3, 6), 1e-4)"));
+  ruby(*engine, "Camera.main.transform.position = Vector3.zero");
+  ruby(*engine, "Camera.follow(Scene.find('Hero'), offset: Vector3.new(0, 3, 6), smoothing: 0.5, snap: false)");
+  frames(*engine, 1);
+  CHECK(says(*engine, "Camera.main.transform.position.length < 1.0"));
+}
+
+TEST_CASE("a wall right by the target keeps the camera off what it looks at, still looking at it") {
+  TempGame game(kGame);
+  NullPresenter screen(kScreen);
+  // A wall from x = 0.2 to 0.4, between the hero's head and where the camera wants to be.
+  auto engine = game_on(game, hero_scene({node("Wall", {0.3f, 1.0f, 0.0f}, {0.2f, 6.0f, 6.0f}, solid())}), screen);
+  ruby(*engine, "Camera.follow(Scene.find('Hero'), offset: Vector3.new(6, 1, 0), smoothing: 0)");
+  frames(*engine, 2);
+  CHECK(says(*engine, "Camera.main.transform.position.distance_to(Vector3.up).between?(0.29, 0.31)"));
+  CHECK(says(*engine, "Camera.main.transform.forward.x < -0.99"));  // at the hero, not snapped to -Z
+  ruby(*engine, "Camera.orbit(Scene.find('Hero'), distance: 6, yaw: 90, pitch: 0, smoothing: 0)");
+  frames(*engine, 1);
+  CHECK(says(*engine, "Camera.main.transform.forward.x < -0.99"));
+}
+
+TEST_CASE("what the target carries is no wall: the camera is not pulled in front of it") {
+  TempGame game(kGame);
+  NullPresenter screen(kScreen);
+  auto engine = game_on(game, shielded_scene(), screen);
+  ruby(*engine, "Camera.follow(Scene.find('Hero'), offset: Vector3.new(0, 1, 6), smoothing: 0)");
+  frames(*engine, 2);
+  CHECK(says(*engine, "Camera.main.transform.position.approx?(Vector3.new(0, 1, 6), 0.001)"));
+}
+
+TEST_CASE("a camera that is no longer the main one stops following and shaking") {
+  TempGame game(kGame);
+  NullPresenter screen(kScreen);
+  auto engine = game_on(game, copied_camera_scene(), screen);
+  frames(*engine, 1);
+  ruby(*engine, "$crate = Scene.spawn('Crate'); $first = Scene.spawn('Camera'); Scene.find('Camera').destroy");
+  frames(*engine, 1);
+  REQUIRE(says(*engine, "Camera.main == $first"));
+  ruby(*engine, "Camera.follow(Scene.find('Hero'), offset: Vector3.new(0, 3, 6)); Camera.shake(1.0, duration: 5)");
+  frames(*engine, 1);
+  ruby(*engine, "$crate.destroy");
+  frames(*engine, 1);
+  ruby(*engine, "$second = Scene.spawn($first)");  // where the crate was: before $first
+  frames(*engine, 1);
+  REQUIRE(says(*engine, "Camera.main == $second"));
+  ruby(*engine, "$place = $first.transform.position; Scene.find('Hero').transform.position = Vector3.new(5, 0, 0)");
+  frames(*engine, kFewFrames);
+  CHECK(says(*engine, "$first.transform.position == $place"));
+  CHECK(says(*engine, "$first.get_component(Camera::Rig).shake.trauma.zero?"));
+  CHECK(says(*engine, "!Camera.following? && Camera.trauma.zero?"));
+  CHECK(engine->scripts().error_count() == 0);
+}
+
+TEST_CASE("the player turns an orbit while the game is paused, and as fast in slow motion") {
+  TempGame game(kGame);
+  NullPresenter screen(kScreen);
+  auto engine = game_on(game, hero_scene(), screen);
+  ruby(*engine, "$orbit = Camera.orbit(Scene.find('Hero'), distance: 6, pitch: 0, smoothing: 0)");
+  frames(*engine, 1);
+  ruby(*engine, "Time.scale = 0");
+  ScriptedInputSource& input = engine->scripted_input();
+  input.move_mouse(kMouseStart, kMouseStart);
+  frames(*engine, 1);
+  input.set_mouse_button(MouseButton::Right, true);
+  input.move_mouse(kMouseStart - kDragged, kMouseStart);
+  frames(*engine, 1);
+  input.set_mouse_button(MouseButton::Right, false);
+  CHECK(ruby(*engine, "$orbit.yaw.round") == "30");
+  CHECK(
+      says(*engine, "Camera.main.transform.position.approx?(Vector3.up + Camera::Orbit.direction(30, 0) * 6, 0.001)"));
+  CHECK(says(*engine, "Time.delta.zero? && Time.unscaled_delta > 0"));
+
+  ruby(*engine, "Time.scale = 0.5");
+  input.set_gamepad_axis(GamepadAxis::RightX, 1.0f);
+  frames(*engine, kOneSecond);
+  input.set_gamepad_axis(GamepadAxis::RightX, 0.0f);
+  CHECK(ruby(*engine, "$orbit.yaw.round") == "-120");  // 150 degrees in a second of the player's
+}
+
+TEST_CASE("Camera.world_to_screen follows the picture as the presenter draws it, between its bars") {
+  TempGame game(kGame);
+  SquarePicture screen;
+  auto engine = game_on(game, hero_scene(), screen);
+  frames(*engine, 1);
+  // The right edge of the camera's view, ten meters away: the right edge of the square picture.
+  CHECK(says(*engine,
+             "Camera.world_to_screen(Vector3.new(Math.tan(22.5 * Math::PI / 180) * 10, 0, -10)).zip([600, 200]).all? "
+             "{ |a, b| (a - b).abs < 0.01 }"));
+  CHECK(says(*engine,
+             "Camera.screen_ray(600, 200)[1].approx?(Vector3.new(Math.tan(22.5 * Math::PI / 180), 0, "
+             "-1).normalized, 1e-5)"));
+}
+
 TEST_CASE("the camera helpers refuse what would break the picture") {
   TempGame game(kGame);
   NullPresenter screen(kScreen);
@@ -325,5 +477,5 @@ TEST_CASE("the camera helpers refuse what would break the picture") {
   CHECK(fails(*engine, "Camera.orbit(Scene.find('Hero'), distance: Float::INFINITY)"));
   CHECK(fails(*engine, "Camera.orbit(Scene.find('Hero')).turn(Float::NAN, 0)"));
   CHECK(fails(*engine, "Camera.shake(-0.1)"));
-  CHECK(fails(*engine, "Camera.__set_pose(Camera.main, [0, 0, 0])"));
+  CHECK(fails(*engine, "Camera.__shake_by(Scene.find('Hero'), Vector3.zero, Vector3.zero)"));  // not a camera
 }

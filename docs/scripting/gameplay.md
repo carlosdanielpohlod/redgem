@@ -398,7 +398,8 @@ end
 
 `relative: true` takes the offset in the object's own axes (its +Z is behind it), so the camera
 swings round as it turns; `dead_zone: 0.5` lets it move half a meter before the camera goes after
-it; `look_at: false` leaves the camera's turn alone.
+it; `look_at: false` leaves the camera's turn alone. It starts in its place; `snap: false` flies
+there from where the camera is. What the object carries (its children) is never taken for a wall.
 
 **An orbit viewer** looks at an object or a point from around it: the player turns it by dragging
 with the right mouse button or with the right stick, and zooms with the wheel, within limits:
@@ -413,12 +414,14 @@ class Viewer < Behaviour
 end
 ```
 
-`input: false` leaves it to the script alone. `Camera.stop_following` stops either; an object
+The player turns it also while the game is paused or slowed (`Time.unscaled_delta`); its yaw stays
+within -180..180 and eases the short way round. `input: false` leaves it to the script alone. `Camera.stop_following` stops either; an object
 followed or orbited that is destroyed is let go, and the camera stays where it was.
 
 **A hit shakes the camera.** Each shake adds its strength to the camera's trauma (never past 1),
-which fades out over its duration; the camera moves and turns by the square of it, along smooth
-noise, on top of a follow or an orbit, and always comes back to where it should be:
+which fades out over its duration; what the camera shows moves and turns by the square of it,
+along smooth noise, on top of a follow or an orbit. The camera object itself never moves, so a
+script of your own that moves or turns it keeps exactly its own pose:
 
 ```ruby
 def on_collision_enter(other)
@@ -448,9 +451,9 @@ class HealthBar < Behaviour
 end
 ```
 
-It is the camera as it is when called: a behaviour added after the first `Camera.follow` (or
-orbit, or shake) sees the camera where this frame draws it; one that was there before sees where
-it was a frame ago. `Camera.screen_ray` goes the other way.
+It sees from where the picture is drawn from, shake included. A behaviour added after the first
+`Camera.follow` (or orbit, or shake) sees the camera where this frame draws it; one that was there
+before sees where it was a frame ago. `Camera.screen_ray` goes the other way.
 
 ## Show text on screen
 

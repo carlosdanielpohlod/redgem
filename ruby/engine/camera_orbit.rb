@@ -1,13 +1,15 @@
 module Camera
   # The camera orbiting an object or a point (Camera.orbit), looking at it. Options:
   #   distance:    meters from it
-  #   yaw:         degrees around it: 0 is behind it (on its +Z side), 90 on its right
+  #   yaw:         degrees around it: 0 is behind it (on its +Z side), 90 on its right; kept within
+  #                -180..180, and eased the short way round (turn(720) ends where it started)
   #   pitch:       degrees above it (below it when negative)
   #   distances:   the range zooming keeps the distance in
   #   pitches:     the range turning keeps the pitch in (within -89..89)
   #   smoothing:   seconds the camera takes to close half the way to a new angle or distance
   #   input:       whether the player turns it (dragging with the right mouse button, or the
-  #                right stick) and zooms it (the mouse wheel)
+  #                right stick) and zooms it (the mouse wheel), also while the game is paused or
+  #                slowed (it goes by Time.unscaled_delta)
   #   height:      meters above the object's origin (or the point) it orbits
   #   avoid_walls: whether it comes in front of a wall between it and what it orbits
   # Scripts turn and zoom it too: Camera.orbit(...).turn(15, 0), .zoom(-2).
@@ -25,6 +27,8 @@ module Camera
     ZOOM_SHARE = 0.1         # of the distance, per notch of the wheel
     DRAG_BUTTON = :right
     RADIANS = Math::PI / 180.0
+    HALF_TURN = 180.0
+    FULL_TURN = 360.0
 
     attr_reader :target, :yaw, :pitch, :distance
 
@@ -40,11 +44,11 @@ module Camera
     end
 
     # Whether the object orbited is gone (a point never is).
-    def lost? = @target.is_a?(GameObject) && !@target.alive?
+    def lost? = orbits_object? && !@target.alive?
 
     # Turns the camera around by degrees, kept within its pitches.
     def turn(yaw, pitch)
-      @yaw += Camera.__number(yaw, "Orbit#turn yaw", -LARGEST)
+      @yaw = Orbit.wrap(@yaw + Camera.__number(yaw, "Orbit#turn yaw", -LARGEST))
       @pitch = Camera.__clamp(@pitch + Camera.__number(pitch, "Orbit#turn pitch", -LARGEST), @pitches)
     end
 
@@ -53,13 +57,17 @@ module Camera
       @distance = Camera.__clamp(@distance + Camera.__number(meters, "Orbit#zoom", -LARGEST), @distances)
     end
 
-    def update(transform, dt)
-      read_input(dt) if @input && dt.positive?
-      ease(Camera.__share(@smoothing, dt))
+    # The player turns it by the frame's real seconds, so it turns while the game is paused or slowed.
+    def update(transform, _dt, real_dt)
+      read_input(real_dt) if reads_input?(real_dt)
+      ease(Camera.__share(@smoothing, real_dt))
       seat = center + Orbit.direction(@shown[:yaw], @shown[:pitch]) * @shown[:distance]
       transform.position = @avoid_walls ? Camera.__clear_of_walls(center, seat, seen_through) : seat
-      transform.look_at(center)
+      Camera.__look(transform, center)
     end
+
+    # An angle in degrees as the same angle within -180..180.
+    def self.wrap(degrees) = (degrees + HALF_TURN) % FULL_TURN - HALF_TURN
 
     # The way from what is orbited to the camera, at those angles in degrees.
     def self.direction(yaw, pitch)
@@ -75,22 +83,26 @@ module Camera
     end
 
     def aim(yaw, pitch, distance)
-      @yaw = Camera.__number(yaw, "Camera.orbit yaw", -LARGEST)
+      @yaw = Orbit.wrap(Camera.__number(yaw, "Camera.orbit yaw", -LARGEST))
       @pitch = Camera.__clamp(Camera.__number(pitch, "Camera.orbit pitch", -STEEPEST, STEEPEST), @pitches)
       @distance = Camera.__clamp(Camera.__number(distance, "Camera.orbit distance", 0.0), @distances)
     end
 
+    def reads_input?(real_dt) = @input && real_dt.positive?
+
+    def orbits_object? = @target.is_a?(GameObject)
+
     def center
-      point = @target.is_a?(GameObject) ? @target.transform.position : @target
+      point = orbits_object? ? @target.transform.position : @target
       point + Vector3.up * @height
     end
 
-    def seen_through = @target.is_a?(GameObject) ? @target : nil
+    def seen_through = orbits_object? ? @target : nil
 
     # The angles and distance shown close in on those asked for (they start there).
     def ease(share)
       @shown ||= { yaw: @yaw, pitch: @pitch, distance: @distance }
-      @shown[:yaw] += (@yaw - @shown[:yaw]) * share
+      @shown[:yaw] = Orbit.wrap(@shown[:yaw] + Orbit.wrap(@yaw - @shown[:yaw]) * share)
       @shown[:pitch] += (@pitch - @shown[:pitch]) * share
       @shown[:distance] += (@distance - @shown[:distance]) * share
     end

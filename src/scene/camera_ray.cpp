@@ -1,8 +1,8 @@
 #include "scene/camera_ray.hpp"
 
-#include <algorithm>
 #include <cmath>
 
+#include "core/letterbox.hpp"
 #include "scene/scene_config.hpp"
 
 namespace redgem {
@@ -13,10 +13,7 @@ constexpr float kHalfSpan = 1.0f;
 
 // Where the world's picture lies on the screen, in pixels, and how wide it is for its height.
 struct PictureBox {
-  float x = 0.0f;
-  float y = 0.0f;
-  float width = 0.0f;
-  float height = 0.0f;
+  Letterbox shown;
   float aspect = 1.0f;
 };
 
@@ -47,12 +44,8 @@ PictureBox picture_box(const ScreenFrame& frame) {
   const bool sized = has_picture_size(frame);
   const float picture_width = sized ? static_cast<float>(frame.picture_width) : screen_width;
   const float picture_height = sized ? static_cast<float>(frame.picture_height) : screen_height;
-  // As large as fits, in the screen's middle (as the window shows a picture drawn at another size).
-  const float scale = std::min(screen_width / picture_width, screen_height / picture_height);
-  const float width = picture_width * scale;
-  const float height = picture_height * scale;
-  return {(screen_width - width) * kHalf, (screen_height - height) * kHalf, width, height,
-          picture_width / picture_height};
+  // (As the window shows a picture drawn at another size.)
+  return {fit_picture(screen_width, screen_height, picture_width, picture_height), picture_width / picture_height};
 }
 
 Spread spread_of(const Lens& lens, float aspect) {
@@ -60,12 +53,12 @@ Spread spread_of(const Lens& lens, float aspect) {
   return {half_height * aspect, half_height};
 }
 
-Centered centered(const PictureBox& box, ScreenPoint point) {
+Centered centered(const Letterbox& box, ScreenPoint point) {
   return {(point.x - box.x) / box.width * kFullSpan - kHalfSpan,
           kHalfSpan - (point.y - box.y) / box.height * kFullSpan};
 }
 
-ScreenPoint on_screen(const PictureBox& box, Centered point) {
+ScreenPoint on_screen(const Letterbox& box, Centered point) {
   return {box.x + (point.across + kHalfSpan) / kFullSpan * box.width,
           box.y + (kHalfSpan - point.upward) / kFullSpan * box.height};
 }
@@ -77,12 +70,19 @@ bool is_finite(ScreenPoint point) { return std::isfinite(point.x) && std::isfini
 
 }  // namespace
 
+Transform viewed_from(const Transform& camera_world, const Transform& offset) {
+  Transform viewed = camera_world;
+  viewed.position = camera_world.position + rotate(camera_world.rotation, offset.position);
+  viewed.rotation = normalize(camera_world.rotation * offset.rotation);
+  return viewed;
+}
+
 bool has_area(const ScreenFrame& frame) { return frame.screen_width > 0 && frame.screen_height > 0; }
 
 CameraRay screen_ray(const Transform& camera_world, const Lens& lens, const ScreenFrame& frame, ScreenPoint point) {
   const PictureBox box = picture_box(frame);
   const Spread spread = spread_of(lens, box.aspect);
-  const Centered at = centered(box, point);
+  const Centered at = centered(box.shown, point);
   const Vec3 aside =
       camera_world.right() * (at.across * spread.across) + camera_world.up() * (at.upward * spread.upward);
   // An orthographic lens sends parallel rays from across its picture; a perspective one fans them
@@ -102,7 +102,7 @@ std::optional<ScreenPoint> world_to_screen(const Transform& camera_world, const 
   const float spreading = is_orthographic(lens) ? 1.0f : depth;  // (a perspective picture widens with depth)
   const Centered at{dot(offset, camera_world.right()) / (spread.across * spreading),
                     dot(offset, camera_world.up()) / (spread.upward * spreading)};
-  const ScreenPoint shown = on_screen(box, at);
+  const ScreenPoint shown = on_screen(box.shown, at);
   if (!is_finite(shown)) return std::nullopt;
   return shown;
 }

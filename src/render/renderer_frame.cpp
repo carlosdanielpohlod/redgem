@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "render/render_config.hpp"
+#include "scene/camera_ray.hpp"
 
 namespace redgem {
 namespace {
@@ -50,13 +51,14 @@ RenderTexture2D target_of(const Multisampled& samples) {
 Camera3D Renderer::Impl::camera_for(const Scene& scene) const {
   const ObjectId id = scene.main_camera();
   if (id == kNoObject) return default_camera();
-  const Transform world = scene.world_transform(id);
+  const std::optional<CameraDesc>& lens = scene.at(id).camera;
+  // (A shake moves what the camera shows, never the camera.)
+  const Transform world = viewed_from(scene.world_transform(id), lens ? lens->shake : Transform{});
   Camera3D camera{};
   camera.projection = CAMERA_PERSPECTIVE;
   camera.position = to_raylib(world.position);
   camera.target = to_raylib(world.position + world.forward());
   camera.up = to_raylib(world.up());
-  const std::optional<CameraDesc>& lens = scene.at(id).camera;
   const float fov = lens ? lens->fov_y_radians : kUnsetFov;
   camera.fovy = fov > 0.0f ? radians_to_degrees(fov) : config::kDefaultFovYDegrees;
   return camera;

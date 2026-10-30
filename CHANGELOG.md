@@ -67,6 +67,8 @@ until 1.0, a release may change what games rely on (see
 - **`Camera.world_to_screen`**: where a point of the world is in the pixels the interface draws
   in, at any window shape and render scale (nil behind the camera), the inverse of
   `Camera.screen_ray`.
+- **`Time.unscaled_delta`**: the frame's seconds whatever `Time.scale`, for what moves while the
+  game is paused or slowed (an orbit the player turns goes by it).
 - The platformer follows its hero with `Camera.follow`, shakes the camera when the hero falls off,
   and marks the coin nearest the camera with `Camera.world_to_screen`.
 
@@ -83,7 +85,8 @@ until 1.0, a release may change what games rely on (see
   connection files whose port refuses and skips unproven listeners for a minute.
 - MCP `events` answers in text alone, its cursor first.
 - A script calling `puts`, `print` or `p` is told to use `Debug.log`.
-- `Camera.screen_ray` follows the world's picture as the window shows it, render scale included.
+- `Camera.screen_ray` follows the world's picture as the window shows it, render scale and
+  recording included (presenters say the size they draw the world at).
 
 ### Fixed
 
