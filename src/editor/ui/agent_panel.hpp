@@ -85,12 +85,14 @@ class AgentPanel {
   void follow_new_entries(bool at_bottom);
   void draw_entries(agent::AgentClient& client);
   void draw_entry(agent::AgentClient& client, std::size_t index);
+  static void draw_text_entry(const agent::Entry& entry);
   static void answer(agent::AgentClient& client, std::size_t index, const std::optional<std::string>& option);
   void draw_composer();
   void draw_attachments();
   void draw_input();
   void draw_actions();
   void draw_settings();
+  void draw_settings_buttons();
   void open_settings();
   void keep_settings();
   bool can_send() const;
@@ -108,7 +110,7 @@ class AgentPanel {
   std::string hint_;    // a word under the prompt box (nothing selected to attach)
   bool focus_input_ = false;
   std::vector<std::string> attached_;  // context for the next prompt
-  std::uint64_t seen_revision_ = 0;   // the transcript's, as last drawn
+  std::uint64_t seen_revision_ = 0;    // the transcript's, as last drawn
   std::map<std::size_t, ParsedText> parsed_;
   AgentSettings settings_;
   bool settings_open_ = false;

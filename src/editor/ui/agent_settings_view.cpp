@@ -16,11 +16,15 @@ namespace redgem::ui {
 namespace {
 
 constexpr const char* kSettingsPopup = "###agent_settings";
-constexpr float kListWidth = 140.0f;   // pixels of the list of agents
-constexpr float kFormWidth = 380.0f;   // pixels of the fields beside it
-constexpr int kFieldLines = 4;         // lines of the arguments' and the environment's boxes
+constexpr float kListWidth = 140.0f;  // pixels of the list of agents
+constexpr float kFormWidth = 380.0f;  // pixels of the fields beside it
+constexpr int kFieldLines = 4;        // lines of the arguments' and the environment's boxes
+constexpr float kBothSides = 2.0f;    // padding counted above and below
+constexpr float kListFields = 2.0f;   // the list is as tall as the two boxes beside it
 
-float field_height() { return ImGui::GetTextLineHeight() * kFieldLines + ImGui::GetStyle().FramePadding.y * 2.0f; }
+float field_height() {
+  return ImGui::GetTextLineHeight() * kFieldLines + ImGui::GetStyle().FramePadding.y * kBothSides;
+}
 
 // The text fields show the selected agent's arguments and variables a line each.
 void load_fields(AgentSettings& settings) {
@@ -44,7 +48,7 @@ void select(AgentSettings& settings, std::size_t index) {
 }
 
 void draw_list(AgentSettings& settings) {
-  ImGui::BeginChild("agents", ImVec2(kListWidth, field_height() * 2.0f), ImGuiChildFlags_Borders);
+  ImGui::BeginChild("agents", ImVec2(kListWidth, field_height() * kListFields), ImGuiChildFlags_Borders);
   for (std::size_t index = 0; index < settings.agents.size(); ++index) {
     ImGui::PushID(static_cast<int>(index));
     if (ImGui::Selectable(settings.agents[index].name.c_str(), index == settings.selected)) select(settings, index);
@@ -113,6 +117,14 @@ void AgentPanel::keep_settings() {
   end_session();
 }
 
+void AgentPanel::draw_settings_buttons() {
+  if (!settings_.error.empty()) ImGui::TextColored(palette::kError, "%s", settings_.error.c_str());
+  ImGui::TextColored(palette::kMuted, "%s", tr("editor.agent.settings_note"));
+  if (ImGui::Button(save_label())) keep_settings();
+  ImGui::SameLine();
+  if (ImGui::Button(cancel_label())) settings_open_ = false;
+}
+
 void AgentPanel::draw_settings() {
   if (settings_open_) ImGui::OpenPopup(kSettingsPopup);
   const char* title = window_title("editor.agent.settings_title", kSettingsPopup);
@@ -121,11 +133,7 @@ void AgentPanel::draw_settings() {
   ImGui::SameLine();
   draw_form(settings_);
   draw_list_buttons(settings_);
-  if (!settings_.error.empty()) ImGui::TextColored(palette::kError, "%s", settings_.error.c_str());
-  ImGui::TextColored(palette::kMuted, "%s", tr("editor.agent.settings_note"));
-  if (ImGui::Button(save_label())) keep_settings();
-  ImGui::SameLine();
-  if (ImGui::Button(cancel_label())) settings_open_ = false;
+  draw_settings_buttons();
   if (!settings_open_) ImGui::CloseCurrentPopup();
   ImGui::EndPopup();
 }

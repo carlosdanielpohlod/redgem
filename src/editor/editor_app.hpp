@@ -165,7 +165,7 @@ class EditorApp {
  private:
   EditorApp() = default;
   void open_window(GpuChoice gpu, FrameClock clock);
-  void make_agent_panel(AgentHooks hooks);
+  void make_agent_panel(const AgentHooks& hooks);
   // The selected objects as `describe` shows each.
   std::vector<std::string> selection_text(const std::function<std::string(const SceneDesc&, int)>& describe) const;
   // Start looking through the scene's own camera, like the game would.

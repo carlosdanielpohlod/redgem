@@ -18,13 +18,13 @@ using agent::Block;
 using agent::BlockKind;
 using agent::Span;
 
-constexpr float kListIndent = 18.0f;     // pixels per level of a list
-constexpr float kMarkBack = 13.0f;       // pixels a list item's mark stands before its text
-constexpr float kQuoteIndent = 12.0f;    // pixels a quote is set in, past its bar
-constexpr float kQuoteBarWidth = 3.0f;   // pixels
-constexpr float kCodePadding = 3.0f;     // pixels around inline code
-constexpr float kBoldOffset = 1.0f;      // bold is drawn twice, this far apart (the font has no bold face)
-constexpr float kHeadingGap = 4.0f;      // pixels above a heading
+constexpr float kListIndent = 18.0f;    // pixels per level of a list
+constexpr float kMarkBack = 13.0f;      // pixels a list item's mark stands before its text
+constexpr float kQuoteIndent = 12.0f;   // pixels a quote is set in, past its bar
+constexpr float kQuoteBarWidth = 3.0f;  // pixels
+constexpr float kCodePadding = 3.0f;    // pixels around inline code
+constexpr float kBoldOffset = 1.0f;     // bold is drawn twice, this far apart (the font has no bold face)
+constexpr float kHeadingGap = 4.0f;     // pixels above a heading
 constexpr float kCodeBlockPadding = 6.0f;
 constexpr const char* kBullet = "\xe2\x80\xa2";  // the bullet of a list item
 constexpr char kSpace = ' ';
@@ -52,9 +52,7 @@ Flow start_flow(float indent) {
 }
 
 // Reserves the room the flow took, so what comes next goes under it.
-void end_flow(const Flow& flow) {
-  ImGui::Dummy(ImVec2(flow.right - flow.left, flow.y + flow.line_height - flow.top));
-}
+void end_flow(const Flow& flow) { ImGui::Dummy(ImVec2(flow.right - flow.left, flow.y + flow.line_height - flow.top)); }
 
 ImVec4 span_color(const Span& span) {
   if (span.code) return palette::kAccentHover;
@@ -64,16 +62,21 @@ ImVec4 span_color(const Span& span) {
 // Whether a word fits on the line it would go on (a word wider than the band starts a line alone).
 bool wraps(const Flow& flow, float width) { return flow.x > flow.left && flow.x + width > flow.right; }
 
-void draw_word(Flow& flow, const std::string& word, const Span& span) {
-  ImFont* font = span.code ? code_font() : ImGui::GetFont();
-  const float size = ImGui::GetFontSize();
-  const float width = font->CalcTextSizeA(size, FLT_MAX, 0.0f, word.c_str()).x;
+// Where a word of `width` goes: on the line, or at the start of the next one.
+ImVec2 place(Flow& flow, float width) {
   if (wraps(flow, width)) {
     flow.x = flow.left;
     flow.y += flow.line_height;
   }
-  ImDrawList* draw = ImGui::GetWindowDrawList();
   const ImVec2 at(flow.x, flow.y);
+  flow.x += width;
+  return at;
+}
+
+void paint_word(const ImVec2& at, float width, const std::string& word, const Span& span) {
+  ImFont* font = span.code ? code_font() : ImGui::GetFont();
+  const float size = ImGui::GetFontSize();
+  ImDrawList* draw = ImGui::GetWindowDrawList();
   if (span.code) {
     draw->AddRectFilled(ImVec2(at.x - kCodePadding, at.y), ImVec2(at.x + width + kCodePadding, at.y + size),
                         ImGui::GetColorU32(palette::kFrame));
@@ -81,7 +84,12 @@ void draw_word(Flow& flow, const std::string& word, const Span& span) {
   const ImU32 color = ImGui::GetColorU32(span_color(span));
   draw->AddText(font, size, at, color, word.c_str());
   if (span.bold) draw->AddText(font, size, ImVec2(at.x + kBoldOffset, at.y), color, word.c_str());
-  flow.x += width;
+}
+
+void draw_word(Flow& flow, const std::string& word, const Span& span) {
+  ImFont* font = span.code ? code_font() : ImGui::GetFont();
+  const float width = font->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, word.c_str()).x;
+  paint_word(place(flow, width), width, word, span);
 }
 
 // Each word of a span with the spaces after it, so that a line breaks between words.
@@ -125,6 +133,14 @@ void draw_heading(const Block& block) {
   draw_spans(spans, 0.0f);
 }
 
+// Its language, and the button that copies it.
+void draw_code_header(const Block& block) {
+  ImGui::TextColored(palette::kMuted, "%s", block.language.c_str());
+  ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::GetFrameHeight());
+  if (ImGui::SmallButton(ICON_FA_COPY)) ImGui::SetClipboardText(block.code.c_str());
+  tooltip(tr("editor.agent.copy_code"));
+}
+
 // A fenced block: its text in the code font on a darker ground, with a button that copies it.
 void draw_code(const Block& block, int index) {
   ImGui::PushID(index);
@@ -132,10 +148,7 @@ void draw_code(const Block& block, int index) {
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kCodeBlockPadding, kCodeBlockPadding));
   ImGui::BeginChild("code", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding,
                     ImGuiWindowFlags_HorizontalScrollbar);
-  ImGui::TextColored(palette::kMuted, "%s", block.language.c_str());
-  ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::GetFrameHeight());
-  if (ImGui::SmallButton(ICON_FA_COPY)) ImGui::SetClipboardText(block.code.c_str());
-  tooltip(tr("editor.agent.copy_code"));
+  draw_code_header(block);
   ImGui::PushFont(code_font(), 0.0f);
   ImGui::TextUnformatted(block.code.c_str());
   ImGui::PopFont();
@@ -145,22 +158,24 @@ void draw_code(const Block& block, int index) {
   ImGui::PopID();
 }
 
+// List items and quotes: text set in from the margin, behind a mark.
+void draw_set_in(const Block& block) {
+  if (block.kind == BlockKind::Quote) return draw_quote(block);
+  draw_item(block, block.kind == BlockKind::Bullet ? kBullet : block.number + ".");
+}
+
 void draw_block(const Block& block, int index) {
   switch (block.kind) {
     case BlockKind::Code:
       return draw_code(block, index);
     case BlockKind::Heading:
       return draw_heading(block);
-    case BlockKind::Bullet:
-      return draw_item(block, kBullet);
-    case BlockKind::Numbered:
-      return draw_item(block, block.number + ".");
-    case BlockKind::Quote:
-      return draw_quote(block);
     case BlockKind::Rule:
       return ImGui::Separator();
     case BlockKind::Paragraph:
       return draw_spans(block.spans, 0.0f);
+    default:
+      return draw_set_in(block);
   }
 }
 

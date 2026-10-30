@@ -24,6 +24,8 @@ constexpr float kPickerWidth = 150.0f;   // pixels
 constexpr float kScrollToBottom = 1.0f;  // SetScrollHereY: the last line at the bottom
 constexpr float kEntryGap = 6.0f;        // pixels between entries
 constexpr const char* kWhitespace = " \t\r\n";
+constexpr float kBothSides = 2.0f;       // padding counted above and below
+constexpr float kRowsUnderInput = 2.0f;  // the attachments' row and the buttons' row
 
 bool blank(const std::string& text) { return text.find_first_not_of(kWhitespace) == std::string::npos; }
 
@@ -51,8 +53,8 @@ ImVec4 state_color(AgentState state) {
 // The room the prompt box and the buttons under it take.
 float composer_height() {
   const ImGuiStyle& style = ImGui::GetStyle();
-  const float input = ImGui::GetTextLineHeight() * kInputLines + style.FramePadding.y * 2.0f;
-  return input + ImGui::GetFrameHeightWithSpacing() * 2.0f + style.ItemSpacing.y;
+  const float input = ImGui::GetTextLineHeight() * kInputLines + style.FramePadding.y * kBothSides;
+  return input + ImGui::GetFrameHeightWithSpacing() * kRowsUnderInput + style.ItemSpacing.y;
 }
 
 // The hint a multiline box cannot show itself, over the empty box.
@@ -122,9 +124,7 @@ void AgentPanel::attach_selection() {
 bool AgentPanel::running() const { return connection_ != nullptr && connection_->client().busy(); }
 
 // A conversation that can take a prompt now or once it is ready: started, and not failed.
-bool AgentPanel::live() const {
-  return connection_ != nullptr && connection_->client().state() != AgentState::Failed;
-}
+bool AgentPanel::live() const { return connection_ != nullptr && connection_->client().state() != AgentState::Failed; }
 
 void AgentPanel::poll() {
   if (!connection_) return;
@@ -226,23 +226,25 @@ void AgentPanel::draw_entries(agent::AgentClient& client) {
 void AgentPanel::draw_entry(agent::AgentClient& client, std::size_t index) {
   const agent::Entry& entry = client.transcript().entries()[index];
   switch (entry.kind) {
-    case EntryKind::User:
-      return agent_view::draw_user(entry.text);
     case EntryKind::Agent:
       return agent_view::draw_markdown(markdown(index, entry.text));
-    case EntryKind::Thought:
-      return agent_view::draw_thought(entry.text);
     case EntryKind::Tool:
       return agent_view::draw_tool(entry.tool);
     case EntryKind::Plan:
       return agent_view::draw_plan(entry.plan);
     case EntryKind::Permission:
       return answer(client, index, agent_view::draw_permission(entry.permission));
-    case EntryKind::Notice:
-      return agent_view::draw_notice(entry.text);
-    case EntryKind::Error:
-      return agent_view::draw_error(entry.text);
+    default:
+      return draw_text_entry(entry);
   }
+}
+
+// What the user said, a thought, a notice or an error: text, each in its own look.
+void AgentPanel::draw_text_entry(const agent::Entry& entry) {
+  if (entry.kind == EntryKind::User) return agent_view::draw_user(entry.text);
+  if (entry.kind == EntryKind::Thought) return agent_view::draw_thought(entry.text);
+  if (entry.kind == EntryKind::Error) return agent_view::draw_error(entry.text);
+  agent_view::draw_notice(entry.text);
 }
 
 void AgentPanel::answer(agent::AgentClient& client, std::size_t index, const std::optional<std::string>& option) {
@@ -276,7 +278,7 @@ void AgentPanel::draw_attachments() {
 
 void AgentPanel::draw_input() {
   if (std::exchange(focus_input_, false)) ImGui::SetKeyboardFocusHere();
-  const float height = ImGui::GetTextLineHeight() * kInputLines + ImGui::GetStyle().FramePadding.y * 2.0f;
+  const float height = ImGui::GetTextLineHeight() * kInputLines + ImGui::GetStyle().FramePadding.y * kBothSides;
   const ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CtrlEnterForNewLine;
   const bool entered = ImGui::InputTextMultiline("##prompt", &input_, ImVec2(-1.0f, height), flags);
   if (input_.empty() && !ImGui::IsItemActive()) draw_hint(tr("editor.agent.input_hint"));

@@ -4,7 +4,7 @@
 
 namespace redgem {
 
-void EditorApp::make_agent_panel(AgentHooks hooks) {
+void EditorApp::make_agent_panel(const AgentHooks& hooks) {
   ui::AgentPanelSetup setup;
   setup.game = session_->game_dir();
   setup.agents_file = hooks.agents_file.empty() ? agent::agents_file() : hooks.agents_file;

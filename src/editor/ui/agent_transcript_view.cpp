@@ -22,13 +22,13 @@ using agent::PlanStatus;
 using agent::ToolCall;
 using agent::ToolStatus;
 
-constexpr float kBoxPadding = 6.0f;       // pixels inside the user's message box
+constexpr float kBoxPadding = 6.0f;  // pixels inside the user's message box
 constexpr float kBoxRounding = 4.0f;
-constexpr int kBoxStyles = 2;             // the style values the box pushes (rounding, padding)
-constexpr double kSpinnerPeriod = 0.8;    // seconds per turn of the working mark
+constexpr int kBoxStyles = 2;           // the style values the box pushes (rounding, padding)
+constexpr double kSpinnerPeriod = 0.8;  // seconds per turn of the working mark
 constexpr int kSpinnerFrames = 4;
 constexpr const char* kSpinner[kSpinnerFrames] = {"|", "/", "-", "\\"};
-constexpr float kDetailIndent = 8.0f;     // pixels a tool card's details are set in
+constexpr float kDetailIndent = 8.0f;  // pixels a tool card's details are set in
 constexpr const char* kRemovedMark = "- ";
 constexpr const char* kAddedMark = "+ ";
 constexpr const char* kKeptMark = "  ";
@@ -57,10 +57,14 @@ struct KindIcon {
   const char* kind;
   const char* icon;
 };
-constexpr KindIcon kKindIcons[] = {{"read", ICON_FA_FILE_LINES},       {"edit", ICON_FA_FILE_PEN},
-                                   {"delete", ICON_FA_TRASH},          {"move", ICON_FA_ARROW_RIGHT_ARROW_LEFT},
-                                   {"search", ICON_FA_MAGNIFYING_GLASS}, {"execute", ICON_FA_TERMINAL},
-                                   {"think", ICON_FA_LIGHTBULB},       {"fetch", ICON_FA_GLOBE}};
+constexpr KindIcon kKindIcons[] = {{"read", ICON_FA_FILE_LINES},
+                                   {"edit", ICON_FA_FILE_PEN},
+                                   {"delete", ICON_FA_TRASH},
+                                   {"move", ICON_FA_ARROW_RIGHT_ARROW_LEFT},
+                                   {"search", ICON_FA_MAGNIFYING_GLASS},
+                                   {"execute", ICON_FA_TERMINAL},
+                                   {"think", ICON_FA_LIGHTBULB},
+                                   {"fetch", ICON_FA_GLOBE}};
 
 const char* kind_icon(const std::string& kind) {
   for (const KindIcon& known : kKindIcons) {
@@ -139,6 +143,17 @@ void draw_answer(const PermissionRequest& request) {
   ImGui::TextColored(color, "%s", tr("editor.agent.question_answered", {{"option", chosen->name}}).c_str());
 }
 
+// A button per option, on one row; the id of the one clicked.
+std::optional<std::string> draw_options(const PermissionRequest& request) {
+  std::optional<std::string> chosen;
+  for (const agent::PermissionOption& option : request.options()) {
+    if (option_button(option)) chosen = option.id;
+    ImGui::SameLine();
+  }
+  ImGui::NewLine();
+  return chosen;
+}
+
 }  // namespace
 
 void draw_user(const std::string& text) {
@@ -195,13 +210,7 @@ std::optional<std::string> draw_permission(const PermissionRequest& request) {
     draw_answer(request);
     return std::nullopt;
   }
-  std::optional<std::string> chosen;
-  for (const agent::PermissionOption& option : request.options()) {
-    if (option_button(option)) chosen = option.id;
-    ImGui::SameLine();
-  }
-  ImGui::NewLine();
-  return chosen;
+  return draw_options(request);
 }
 
 void draw_notice(const std::string& text) { wrapped(palette::kMuted, text); }
