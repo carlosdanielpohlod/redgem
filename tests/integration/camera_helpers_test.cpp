@@ -420,6 +420,7 @@ TEST_CASE("a camera that is no longer the main one stops following and shaking")
   CHECK(says(*engine, "$first.transform.position == $place"));
   CHECK(says(*engine, "$first.get_component(Camera::Rig).shake.trauma.zero?"));
   CHECK(says(*engine, "!Camera.following? && Camera.trauma.zero?"));
+  CHECK(says(*engine, kSeesFromItsPlace));  // the copy of a shaking camera starts still
   CHECK(engine->scripts().error_count() == 0);
 }
 

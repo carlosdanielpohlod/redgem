@@ -9,9 +9,6 @@ module Camera
 
     def shake = @shake ||= Shake.new
 
-    # Whether this is the rig of that camera, still there.
-    def on?(camera) = game_object.alive? && game_object == camera
-
     def update(dt)
       return let_go unless main?
 

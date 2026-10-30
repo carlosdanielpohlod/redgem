@@ -55,16 +55,12 @@ module Camera
   def self.__rig(asker)
     camera = main
     raise ArgumentError, "#{asker}: the scene has no camera" if camera.nil?
-    return @rig if @rig&.on?(camera)
 
-    @rig = camera.get_component(Rig) || camera.add_component(Rig)
+    camera.get_component(Rig) || camera.add_component(Rig)
   end
 
   # The rig of the main camera, when it has one (a new scene's camera has none yet).
-  def self.__current_rig
-    camera = main
-    @rig if camera && @rig&.on?(camera)
-  end
+  def self.__current_rig = main&.get_component(Rig)
 
   def self.__object(target, asker)
     return target if __alive_object?(target)

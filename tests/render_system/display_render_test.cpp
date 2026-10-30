@@ -72,6 +72,8 @@ TEST_CASE("the window takes the size its player asks for, and the world is drawn
   window.apply_display(display);
   engine.frame(kFrame);
   CHECK(window.surface_size() == kWindow);  // the interface keeps the window's size
+  CHECK(window.picture_size() ==
+        SurfaceSize{kWindow.width / 2, kWindow.height / 2});  // and says what the world is drawn at
   CHECK(shown == kWindow);
 
   display.render_scale = 2.0f;
