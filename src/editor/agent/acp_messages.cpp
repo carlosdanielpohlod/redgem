@@ -33,6 +33,7 @@ FileChange change_of(const Json& diff) {
   change.path = field_text(diff, "path");
   change.new_text = field_text(diff, "newText");
   if (diff.contains("oldText") && diff["oldText"].is_string()) change.old_text = diff["oldText"].get<std::string>();
+  change.lines = diff_lines(change.old_text.value_or(""), change.new_text);
   return change;
 }
 

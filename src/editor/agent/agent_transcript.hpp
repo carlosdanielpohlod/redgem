@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "editor/agent/json_rpc.hpp"
+#include "editor/agent/text_diff.hpp"
 
 namespace redgem::agent {
 
@@ -22,6 +23,7 @@ struct FileChange {
   std::string path;
   std::optional<std::string> old_text;
   std::string new_text;
+  std::vector<DiffLine> lines;  // the change as lines, worked out once when it came
 };
 
 // One piece of what a tool call shows: text it produced, or a change to a file.

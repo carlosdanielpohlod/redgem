@@ -3,6 +3,7 @@
 
 #include <imgui.h>
 
+#include <algorithm>
 #include <cfloat>
 #include <string>
 
@@ -19,7 +20,7 @@ using agent::BlockKind;
 using agent::Span;
 
 constexpr float kListIndent = 18.0f;    // pixels per level of a list
-constexpr float kMarkBack = 13.0f;      // pixels a list item's mark stands before its text
+constexpr float kMarkGap = 5.0f;        // pixels between a list item's mark and its text
 constexpr float kQuoteIndent = 12.0f;   // pixels a quote is set in, past its bar
 constexpr float kQuoteBarWidth = 3.0f;  // pixels
 constexpr float kCodePadding = 3.0f;    // pixels around inline code
@@ -86,9 +87,30 @@ void paint_word(const ImVec2& at, float width, const std::string& word, const Sp
   if (span.bold) draw->AddText(font, size, ImVec2(at.x + kBoldOffset, at.y), color, word.c_str());
 }
 
-void draw_word(Flow& flow, const std::string& word, const Span& span) {
+float word_width(ImFont* font, const std::string& word) {
+  return font->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, word.c_str()).x;
+}
+
+// How much of a word too wide for a whole line fits on one (a character at least).
+std::size_t fitting(ImFont* font, const std::string& word, float band) {
+  const char* end = font->CalcWordWrapPosition(ImGui::GetFontSize(), word.c_str(), word.c_str() + word.size(), band);
+  return std::max<std::size_t>(1, static_cast<std::size_t>(end - word.c_str()));
+}
+
+bool too_wide(ImFont* font, const std::string& word, float band) {
+  return word.size() > 1 && word_width(font, word) > band;
+}
+
+// A word, broken over lines when it is wider than the band (a long path or address).
+void draw_word(Flow& flow, std::string word, const Span& span) {
   ImFont* font = span.code ? code_font() : ImGui::GetFont();
-  const float width = font->CalcTextSizeA(ImGui::GetFontSize(), FLT_MAX, 0.0f, word.c_str()).x;
+  const float band = flow.right - flow.left;
+  while (too_wide(font, word, band)) {
+    const std::string head = word.substr(0, fitting(font, word, band));
+    paint_word(place(flow, band + 1.0f), word_width(font, head), head, span);  // (a line of its own)
+    word.erase(0, head.size());
+  }
+  const float width = word_width(font, word);
   paint_word(place(flow, width), width, word, span);
 }
 
@@ -110,10 +132,12 @@ void draw_spans(const std::vector<Span>& spans, float indent) {
   end_flow(flow);
 }
 
+// The mark ("•", "12.") before the item's text, set in by the item's level and wide enough for it.
 void draw_item(const Block& block, const std::string& mark) {
-  const float indent = kListIndent * static_cast<float>(block.level + 1);
+  const float mark_width = ImGui::CalcTextSize(mark.c_str()).x + kMarkGap;
+  const float indent = kListIndent * static_cast<float>(block.level) + std::max(kListIndent, mark_width);
   const ImVec2 start = ImGui::GetCursorScreenPos();
-  ImGui::GetWindowDrawList()->AddText(ImVec2(start.x + indent - kMarkBack, start.y),
+  ImGui::GetWindowDrawList()->AddText(ImVec2(start.x + indent - mark_width, start.y),
                                       ImGui::GetColorU32(palette::kMuted), mark.c_str());
   draw_spans(block.spans, indent);
 }

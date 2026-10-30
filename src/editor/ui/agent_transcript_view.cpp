@@ -102,7 +102,7 @@ ImVec4 diff_color(DiffMark mark) {
 
 void draw_change(const agent::FileChange& change) {
   ImGui::TextColored(palette::kMuted, "%s %s", ICON_FA_FILE_PEN, change.path.c_str());
-  for (const agent::DiffLine& line : agent::diff_lines(change.old_text.value_or(""), change.new_text)) {
+  for (const agent::DiffLine& line : change.lines) {
     if (line.mark == DiffMark::Skipped) {
       ImGui::TextColored(palette::kMuted, "%s", tr("editor.agent.more_lines", {{"count", line.text}}).c_str());
       continue;

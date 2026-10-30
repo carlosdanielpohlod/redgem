@@ -136,6 +136,8 @@ TEST_CASE("a tool call starts, then its updates change only what they say") {
   REQUIRE(call.content[0].change);
   CHECK(call.content[0].change->old_text == std::optional<std::string>("a"));
   CHECK(call.content[0].change->new_text == "b");
+  REQUIRE(call.content[0].change->lines.size() == 2);  // (the change as lines, worked out once)
+  CHECK(call.content[0].change->lines[0].mark == DiffMark::Removed);
   CHECK(call.content[1].text == "done");
 }
 

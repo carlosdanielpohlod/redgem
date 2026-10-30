@@ -43,6 +43,7 @@ void EditorApp::frame() {
 void EditorApp::update_before_drawing() {
   check_files_on_disk();
   if (frame_hook_) frame_hook_(*this);
+  agent_panel_->poll();  // (an agent waits on its answers whether or not its panel is shown)
   take_dropped_files();
   handle_shortcuts();
   update_camera();

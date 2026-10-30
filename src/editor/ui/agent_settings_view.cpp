@@ -100,6 +100,25 @@ void draw_form(AgentSettings& settings) {
   ImGui::EndGroup();
 }
 
+// The same agent: the pick follows it through an edit of the list.
+bool same_agent(const agent::AgentProfile& one, const agent::AgentProfile& other) {
+  return one.name == other.name && one.command == other.command;
+}
+
+// Nothing about how the agent starts changed: its session can go on.
+bool same_launch(const agent::AgentProfile& one, const agent::AgentProfile& other) {
+  return same_agent(one, other) && one.arguments == other.arguments &&
+         agent::environment_text(one.environment) == agent::environment_text(other.environment);
+}
+
+// Where `agent` is in the list (the first agent when it is gone from it).
+std::size_t position_of(const std::vector<agent::AgentProfile>& agents, const agent::AgentProfile& agent) {
+  for (std::size_t index = 0; index < agents.size(); ++index) {
+    if (same_agent(agents[index], agent)) return index;
+  }
+  return 0;
+}
+
 }  // namespace
 
 void AgentPanel::open_settings() {
@@ -111,10 +130,11 @@ void AgentPanel::open_settings() {
 void AgentPanel::keep_settings() {
   store_fields(settings_);
   if (!agent::write_agents(setup_.agents_file, settings_.agents, settings_.error)) return;
+  const agent::AgentProfile before = agents_[picked_];
   agents_ = settings_.agents.empty() ? agent::preset_agents() : settings_.agents;
-  picked_ = std::min(picked_, agents_.size() - 1);
+  picked_ = position_of(agents_, before);
   settings_open_ = false;
-  end_session();
+  if (!same_launch(agents_[picked_], before)) end_session();
 }
 
 void AgentPanel::draw_settings_buttons() {

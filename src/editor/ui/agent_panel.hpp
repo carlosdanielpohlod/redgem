@@ -37,6 +37,7 @@ struct AgentPanelSetup {
 // when more of it came.
 struct ParsedText {
   std::size_t length = 0;
+  double when = -1.0;  // ImGui's time when it was read
   std::vector<agent::Block> blocks;
 };
 
@@ -56,7 +57,9 @@ class AgentPanel {
   AgentPanel(const AgentPanel&) = delete;
   AgentPanel& operator=(const AgentPanel&) = delete;
 
-  // The dockable window, once a frame; takes in what the agent sent first.
+  // Takes in what the agent sent; once a frame, whether the panel is shown or not.
+  void poll();
+  // The dockable window.
   void draw();
 
   // What its buttons do, for the editor's tests as much as for the buttons.
@@ -76,7 +79,11 @@ class AgentPanel {
   const std::vector<std::string>& attached() const { return attached_; }
 
  private:
-  void poll();
+  void give_back_queued();
+  bool pickable(std::size_t agent) const;
+  bool wants_login() const;
+  bool shows_hint() const;
+  void send_input();
   void draw_toolbar();
   void draw_agent_picker();
   void draw_status();

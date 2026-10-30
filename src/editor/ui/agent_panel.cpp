@@ -26,6 +26,9 @@ constexpr float kEntryGap = 6.0f;        // pixels between entries
 constexpr const char* kWhitespace = " \t\r\n";
 constexpr float kBothSides = 2.0f;       // padding counted above and below
 constexpr float kRowsUnderInput = 2.0f;  // the attachments' row and the buttons' row
+// While an answer streams in, its markdown is read again at most this often (seconds): reading a
+// long answer again for every piece would cost the frame more and more.
+constexpr double kReparseEvery = 0.1;
 
 bool blank(const std::string& text) { return text.find_first_not_of(kWhitespace) == std::string::npos; }
 
@@ -50,11 +53,18 @@ ImVec4 state_color(AgentState state) {
   return state == AgentState::Ready ? palette::kSuccess : palette::kWarning;
 }
 
+float input_height() {
+  return ImGui::GetTextLineHeight() * kInputLines + ImGui::GetStyle().FramePadding.y * kBothSides;
+}
+
 // The room the prompt box and the buttons under it take.
 float composer_height() {
-  const ImGuiStyle& style = ImGui::GetStyle();
-  const float input = ImGui::GetTextLineHeight() * kInputLines + style.FramePadding.y * kBothSides;
-  return input + ImGui::GetFrameHeightWithSpacing() * kRowsUnderInput + style.ItemSpacing.y;
+  return input_height() + ImGui::GetFrameHeightWithSpacing() * kRowsUnderInput + ImGui::GetStyle().ItemSpacing.y;
+}
+
+// Whether markdown read when the text was `parsed_length` long is to be read again now.
+bool stale(const ParsedText& parsed, const std::string& text, double now) {
+  return parsed.length != text.size() && now - parsed.when >= kReparseEvery;
 }
 
 // The hint a multiline box cannot show itself, over the empty box.
@@ -72,8 +82,10 @@ AgentPanel::AgentPanel(AgentPanelSetup setup)
 
 AgentPanel::~AgentPanel() = default;
 
+bool AgentPanel::pickable(std::size_t agent) const { return agent < agents_.size() && agent != picked_; }
+
 void AgentPanel::pick(std::size_t agent) {
-  if (agent >= agents_.size() || agent == picked_) return;
+  if (!pickable(agent)) return;
   picked_ = agent;
   end_session();
 }
@@ -129,13 +141,20 @@ bool AgentPanel::live() const { return connection_ != nullptr && connection_->cl
 void AgentPanel::poll() {
   if (!connection_) return;
   connection_->poll();
-  if (queued_.empty() || connection_->client().state() != AgentState::Ready) return;
+  if (queued_.empty()) return;
+  if (connection_->client().state() == AgentState::Failed) return give_back_queued();
+  if (connection_->client().state() != AgentState::Ready) return;
   if (connection_->client().prompt(queued_, attached_)) attached_.clear();
   queued_.clear();
 }
 
+// A prompt the session failed before taking goes back into the box, to send again.
+void AgentPanel::give_back_queued() {
+  if (input_.empty()) input_ = queued_;
+  queued_.clear();
+}
+
 void AgentPanel::draw() {
-  poll();
   const bool shown = ImGui::Begin(window_title(editor_config::kAgentTitle, editor_config::kAgentWindow));
   if (shown) {
     draw_toolbar();
@@ -180,13 +199,16 @@ void AgentPanel::draw_status() {
 
 void AgentPanel::draw_problem() {
   if (!start_error_.empty()) agent_view::draw_error(start_error_);
-  if (!connection_ || connection_->client().state() != AgentState::Failed) return;
-  const std::string login = agent::login_hint(agents_[picked_]);
-  if (connection_->client().needs_login() && !login.empty()) {
-    ImGui::TextColored(palette::kWarning, "%s", ICON_FA_TRIANGLE_EXCLAMATION);
-    ImGui::SameLine();
-    ImGui::TextWrapped("%s", login.c_str());
-  }
+  if (!wants_login()) return;
+  ImGui::TextColored(palette::kWarning, "%s", ICON_FA_TRIANGLE_EXCLAMATION);
+  ImGui::SameLine();
+  ImGui::TextWrapped("%s", agent::login_hint(agents_[picked_]).c_str());
+}
+
+// The session failed because the agent wants its user to log in, and the panel knows how.
+bool AgentPanel::wants_login() const {
+  if (connection_ == nullptr || !connection_->client().needs_login()) return false;
+  return !agent::login_hint(agents_[picked_]).empty();
 }
 
 void AgentPanel::draw_transcript() {
@@ -208,11 +230,16 @@ void AgentPanel::draw_transcript() {
 // The view stays at the bottom while it is there and more comes.
 void AgentPanel::follow_new_entries(bool at_bottom) {
   const std::uint64_t revision = connection_ ? connection_->client().transcript().revision() : 0;
-  if (revision != seen_revision_ && at_bottom) ImGui::SetScrollHereY(kScrollToBottom);
+  const bool more_came = revision != seen_revision_;
   seen_revision_ = revision;
+  if (!more_came) return;
+  if (at_bottom) ImGui::SetScrollHereY(kScrollToBottom);
 }
 
 void AgentPanel::draw_entries(agent::AgentClient& client) {
+  // (Widgets of one session's entries are told apart from another's: what was opened in the last
+  // session stays closed in this one.)
+  ImGui::PushID(connection_.get());
   const auto& entries = client.transcript().entries();
   for (std::size_t index = 0; index < entries.size(); ++index) {
     ImGui::PushID(static_cast<int>(index));
@@ -221,6 +248,7 @@ void AgentPanel::draw_entries(agent::AgentClient& client) {
     ImGui::Dummy(ImVec2(0.0f, kEntryGap));
   }
   if (client.busy()) agent_view::draw_working();
+  ImGui::PopID();
 }
 
 void AgentPanel::draw_entry(agent::AgentClient& client, std::size_t index) {
@@ -253,7 +281,8 @@ void AgentPanel::answer(agent::AgentClient& client, std::size_t index, const std
 
 const std::vector<agent::Block>& AgentPanel::markdown(std::size_t entry, const std::string& text) {
   ParsedText& parsed = parsed_[entry];
-  if (parsed.length != text.size()) parsed = {text.size(), agent::parse_markdown(text)};
+  const double now = ImGui::GetTime();
+  if (stale(parsed, text, now)) parsed = {text.size(), now, agent::parse_markdown(text)};
   return parsed.blocks;
 }
 
@@ -278,14 +307,21 @@ void AgentPanel::draw_attachments() {
 
 void AgentPanel::draw_input() {
   if (std::exchange(focus_input_, false)) ImGui::SetKeyboardFocusHere();
-  const float height = ImGui::GetTextLineHeight() * kInputLines + ImGui::GetStyle().FramePadding.y * kBothSides;
+  const float height = input_height();
   const ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CtrlEnterForNewLine;
   const bool entered = ImGui::InputTextMultiline("##prompt", &input_, ImVec2(-1.0f, height), flags);
-  if (input_.empty() && !ImGui::IsItemActive()) draw_hint(tr("editor.agent.input_hint"));
+  if (shows_hint()) draw_hint(tr("editor.agent.input_hint"));
   if (!entered) return;
-  if (send(input_)) input_.clear();
+  send_input();
   focus_input_ = true;
 }
+
+void AgentPanel::send_input() {
+  if (send(input_)) input_.clear();
+}
+
+// The box is empty and not being typed in: it shows what it is for.
+bool AgentPanel::shows_hint() const { return input_.empty() && !ImGui::IsItemActive(); }
 
 void AgentPanel::draw_actions() {
   if (icon_button(ICON_FA_PAPERCLIP, tr("editor.agent.attach"))) attach_selection();
@@ -295,7 +331,7 @@ void AgentPanel::draw_actions() {
     return;
   }
   ImGui::BeginDisabled(blank(input_));
-  if (icon_button(ICON_FA_PAPER_PLANE, tr("editor.agent.send")) && send(input_)) input_.clear();
+  if (icon_button(ICON_FA_PAPER_PLANE, tr("editor.agent.send"))) send_input();
   ImGui::EndDisabled();
 }
 
