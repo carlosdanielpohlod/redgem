@@ -34,7 +34,7 @@ constexpr const char* kAddedMark = "+ ";
 constexpr const char* kKeptMark = "  ";
 
 struct StatusLook {
-  const char* icon;
+  const char* icon = nullptr;
   ImVec4 color;
 };
 
