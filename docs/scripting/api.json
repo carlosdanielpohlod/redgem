@@ -184,6 +184,15 @@
           "about": "its persistent scene-file identity as a String; nil for runtime copies"
         },
         {
+          "name": "capture_state",
+          "about": "a versioned checkpoint of local pose, tint and visibility, suitable for Save"
+        },
+        {
+          "name": "restore_state",
+          "args": "state",
+          "about": "validates a checkpoint then restores pose and appearance; teleports physical descendants and returns self"
+        },
+        {
           "name": "tag",
           "about": "its tag property"
         },

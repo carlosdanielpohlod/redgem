@@ -83,6 +83,8 @@ An object of the scene, as scripts see it. See [behaviours.md](behaviours.md).
 - `name`: its name
 - `id`: its number in the running game
 - `stable_id`: its persistent scene-file identity as a String; nil for runtime copies
+- `capture_state`: a versioned checkpoint of local pose, tint and visibility, suitable for Save
+- `restore_state(state)`: validates a checkpoint then restores pose and appearance; teleports physical descendants and returns self
 - `tag`: its tag property
 - `tag?(value)`: whether its tag is value
 - `props`: its custom properties

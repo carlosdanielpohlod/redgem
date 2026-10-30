@@ -23,6 +23,7 @@ add_executable(redgem_tests
   unit/transform_test.cpp
   unit/scene_test.cpp
   unit/scene_runtime_identity_test.cpp
+  unit/object_state_test.cpp
   unit/scene_identity_test.cpp
   unit/scene_stable_ids_test.cpp
   unit/scene_diff_test.cpp
@@ -161,6 +162,7 @@ add_executable(redgem_tests
   integration/profile_api_test.cpp
   integration/save_slot_api_test.cpp
   integration/scene_identity_api_test.cpp
+  integration/object_state_api_test.cpp
   integration/debug_draw_api_test.cpp
   integration/async_scene_test.cpp
   integration/ui_input_test.cpp

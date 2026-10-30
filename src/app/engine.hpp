@@ -168,6 +168,9 @@ class Engine {
   GameIdentityReading begin_loading();
   void take_identity(const GameIdentityReading& identity);
   void connect_context();
+  void connect_object_checkpoints();
+  nlohmann::json capture_object_checkpoint(ObjectHandle object);
+  void restore_object_checkpoint(ObjectHandle object, const nlohmann::json& data);
   // (With the time each call into them may take: game.json's script_budget_ms.)
   void start_scripts(std::chrono::milliseconds script_budget);
   void seed_scripts();

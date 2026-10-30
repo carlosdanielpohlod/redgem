@@ -10,6 +10,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Object checkpoints**: capture and restore local pose, tint and visibility through Save,
+  with complete validation before writes and consistent physics teleports for moved hierarchies.
+
 - **Persistent object lookup**: `GameObject.stable_id` and `Scene.find_by_id` reconnect saved
   references to scene-file nodes after renames or reordering, without aliasing live copies.
 

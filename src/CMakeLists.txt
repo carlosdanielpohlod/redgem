@@ -251,6 +251,7 @@ redgem_add_library(redgem_runtime
   scene/gltf/gltf_reader_animations.cpp
   scene/gltf/cgltf_impl.cpp
   scene/scene.cpp
+  scene/object_state.cpp
   scene/scene_from_desc.cpp
   scene/scene_copies.cpp
   scene/scatter.cpp
@@ -320,6 +321,7 @@ redgem_add_library(redgem_runtime
   script/bindings/bindings.cpp
   script/bindings/binding_helpers.cpp
   script/bindings/game_object_bindings.cpp
+  script/bindings/object_state_bindings.cpp
   script/bindings/vector3_bindings.cpp
   script/bindings/transform_bindings.cpp
   script/bindings/scene_bindings.cpp
@@ -438,6 +440,7 @@ redgem_add_library(redgem_runtime
   app/encoder_process.cpp
   app/engine.cpp
   app/engine_saves.cpp
+  app/engine_object_state.cpp
   app/profile_overlay.cpp
   app/engine_frame.cpp
   app/engine_scenes.cpp

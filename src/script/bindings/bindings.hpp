@@ -10,6 +10,7 @@ void install_bindings(mrb_state* mrb);
 // One for each file of natives, named after what it defines.
 void install_vector3_bindings(mrb_state* mrb);
 void install_game_object_bindings(mrb_state* mrb);
+void install_object_state_bindings(mrb_state* mrb);
 void install_transform_bindings(mrb_state* mrb);
 void install_scene_bindings(mrb_state* mrb);
 void install_scatter_bindings(mrb_state* mrb);

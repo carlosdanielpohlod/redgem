@@ -169,8 +169,9 @@ not a promise of how it will be closed.
 - Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - No navigation mesh or pathfinding.
 - Cameras have no follow, orbit or shake helpers, and no `world_to_screen`.
-- `Save` supports named key/value slots, but object-state snapshots, version numbers and migration
-  hooks remain future work. Slot selection and storage calls are synchronous.
+- `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
+  automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
+  work. Slot selection and storage calls are synchronous.
 - `Game.load_scene` is synchronous. `Game.load_scene_async` reads and parses in a bounded shared
   worker, with a loading-screen callback, but physics creation, scripts, texture decoding and GPU
   upload still block the owning thread at activation. Old and new scenes coexist in memory.
