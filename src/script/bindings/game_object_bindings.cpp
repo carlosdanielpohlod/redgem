@@ -40,6 +40,11 @@ mrb_value game_object_props(mrb_state* mrb, mrb_value self) {
   return hash;
 }
 
+mrb_value game_object_stable_id(mrb_state* mrb, mrb_value self) {
+  const auto& identity = alive_object(mrb, self).stable_id;
+  return identity.empty() ? mrb_nil_value() : text_value(mrb, identity);
+}
+
 mrb_value game_object_visible(mrb_state* mrb, mrb_value self) {
   return mrb_bool_value(alive_object(mrb, self).visible);
 }
@@ -115,6 +120,7 @@ void install_identity_bindings(RClass* game_object, mrb_state* mrb) {
   mrb_define_method(mrb, game_object, "alive?", game_object_alive, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "destroy", game_object_destroy, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "props", game_object_props, MRB_ARGS_NONE());
+  mrb_define_method(mrb, game_object, "stable_id", game_object_stable_id, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "parent", game_object_parent, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "children", game_object_children, MRB_ARGS_NONE());
 }

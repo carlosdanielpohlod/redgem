@@ -180,6 +180,10 @@
           "about": "its number in the running game"
         },
         {
+          "name": "stable_id",
+          "about": "its persistent scene-file identity as a String; nil for runtime copies"
+        },
+        {
           "name": "tag",
           "about": "its tag property"
         },
@@ -565,6 +569,12 @@
           "static": true,
           "args": "name",
           "about": "the object called name, or nil"
+        },
+        {
+          "name": "find_by_id",
+          "static": true,
+          "args": "identity",
+          "about": "the current scene object with that persistent String/Symbol identity, or nil"
         },
         {
           "name": "find!",

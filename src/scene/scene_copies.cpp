@@ -16,6 +16,7 @@ GameObject detached_copy(const GameObject& original) {
   GameObject copy = original;
   copy.pending_destroy = false;
   copy.children.clear();
+  copy.stable_id.clear();
   copy.prefab = false;
   copy.props.erase(props::kPrefab);
   // A copy of a copy still follows the animations of the first original.

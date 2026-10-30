@@ -14,6 +14,10 @@ namespace {
 
 using namespace binding;
 
+mrb_value scene_find_by_id(mrb_state* mrb, mrb_value) {
+  return object_or_nil(mrb, scene(mrb).find_by_stable_id(name_arg(mrb)));
+}
+
 mrb_value scene_find(mrb_state* mrb, mrb_value) { return object_or_nil(mrb, scene(mrb).find(name_arg(mrb))); }
 
 // The objects as Ruby sees them, without those on their way out.
@@ -73,6 +77,7 @@ mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
 void install_scene_bindings(mrb_state* mrb) {
   RClass* scene_module = mrb_define_module(mrb, "Scene");
   mrb_define_module_function(mrb, scene_module, "find", scene_find, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, scene_module, "find_by_id", scene_find_by_id, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, scene_module, "find_all", scene_find_all, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, scene_module, "objects", scene_objects, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, scene_module, "__spawn", scene_spawn, MRB_ARGS_ARG(1, 3));

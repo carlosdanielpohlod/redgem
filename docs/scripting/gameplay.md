@@ -818,3 +818,31 @@ custom `SaveStore` keeps its original behavior and must implement the optional s
 support named selection. Game tests isolate slot files too: fresh runs clear live data/backups,
 restart runs copy them, and damaged evidence is retained rather than copied into another test.
 This API stores values; it does not automatically serialize scene objects or migrate game data.
+
+### Keeping references to scene objects
+
+A loaded object's `stable_id` is its identity in the scene file, independent of its name or
+runtime `id`. Use `Scene.find_by_id(identity)` to look it up in the current scene; it accepts a
+String or Symbol and returns `nil` when the original is gone or the identity is unknown.
+
+```ruby
+Save[:selected_object] = {
+  "scene" => Game.scene_name,
+  "id" => Scene.find!("Door").stable_id
+}
+selection = Save[:selected_object]
+if selection && selection["scene"] == Game.scene_name
+  door = Scene.find_by_id(selection["id"])
+end
+```
+
+Identities are scoped to one scene: save the scene name with the identity. The raw String has
+no `#` prefix (the command-line selector adds that prefix). Old files receive deterministic
+identities on read; a scene must be saved by the editor or command-line tools to persist them
+before an external tool reorders its nodes. See [scene editing](../command-line.md).
+
+Runtime copies have `nil` identities, including their descendants and copies of copies. A copy
+never resolves as its source, even after an object is destroyed or a runtime slot is reused.
+An old object reference remains stale after a scene switch; look up the saved identity again.
+An object whose in-memory source supplies no identity also returns `nil`. This lookup does not
+serialize transforms, behaviours or spawned instances; object checkpoints are a separate API.

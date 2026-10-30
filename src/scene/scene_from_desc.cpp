@@ -11,6 +11,7 @@ GameObject placed_object(const NodeDesc& node, ObjectId id) {
   GameObject object;
   object.id = id;
   object.name = node.name;
+  object.stable_id = node.stable_id;
   object.parent = node.parent;
   object.children = node.children;
   object.local = node.local;

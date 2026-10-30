@@ -61,6 +61,17 @@ ObjectId Scene::find(const std::string& name) const {
   return kNoObject;
 }
 
+ObjectId Scene::find_by_stable_id(const std::string& identity) const {
+  if (identity.empty()) return kNoObject;
+  const auto originals = std::min(loaded_count_, objects_.size());
+  for (std::size_t index = 0; index < originals; ++index) {
+    const GameObject& object = objects_[index];
+    const bool matches = !object.destroyed && object.stable_id == identity;
+    if (matches) return object.id;
+  }
+  return kNoObject;
+}
+
 std::vector<ObjectId> Scene::find_all_by_tag(const std::string& tag) const {
   std::vector<ObjectId> ids;
   for (const GameObject& object : objects_) {

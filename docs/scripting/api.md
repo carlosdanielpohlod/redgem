@@ -82,6 +82,7 @@ An object of the scene, as scripts see it. See [behaviours.md](behaviours.md).
 
 - `name`: its name
 - `id`: its number in the running game
+- `stable_id`: its persistent scene-file identity as a String; nil for runtime copies
 - `tag`: its tag property
 - `tag?(value)`: whether its tag is value
 - `props`: its custom properties
@@ -173,6 +174,7 @@ A point or a direction in meters: x, y, z.
 The objects of the running scene. See [gameplay.md](gameplay.md).
 
 - `Scene.find(name)`: the object called name, or nil
+- `Scene.find_by_id(identity)`: the current scene object with that persistent String/Symbol identity, or nil
 - `Scene.find!(name)`: find that stops with a clear error when the object is missing
 - `Scene.find_all(tag)`: every object with that tag
 - `Scene.objects`: every object

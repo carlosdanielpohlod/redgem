@@ -10,6 +10,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Persistent object lookup**: `GameObject.stable_id` and `Scene.find_by_id` reconnect saved
+  references to scene-file nodes after renames or reordering, without aliasing live copies.
+
 - **Named save slots**: `Save.slot` selects isolated progress while the default keeps the existing
   save; `Save.slots` lists known names. Local slots reuse durable files and backups, server rooms
   select their own SQLite views, and game-test restarts copy/reset named slots too.
