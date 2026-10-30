@@ -10,6 +10,15 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Agent panel**: a chat with a coding agent in the editor, through the Agent Client Protocol.
+  Claude Code and Codex come as presets, run by their open-source adapters
+  (`@agentclientprotocol/claude-agent-acp`, `@agentclientprotocol/codex-acp`), and you can add your
+  own agents. The panel streams the answer as markdown and shows tool calls with their diffs, the
+  agent's plan, permission questions (allow once, allow always, reject) and a Stop button. The
+  selected objects can be attached as context. The agent works in the game's folder: the editor
+  reads and writes files for it only there. It also gets the editor's live MCP tools, so it can
+  list and move objects, play, read errors and look at the viewport.
+
 - **Prefab file loading**: reusable GLB references with nested instances, root property overrides,
   persistent descendant identities and shared geometry, available at runtime and in editor Play.
 

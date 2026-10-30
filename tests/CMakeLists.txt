@@ -485,18 +485,20 @@ set_tests_properties(system.harness_reports_failures PROPERTIES LABELS system RU
 
 # The editor window itself, driven by a doctest program.
 add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp editor_system/editor_window_test.cpp
+               editor_system/agent_panel_test.cpp
                editor_system/window_picture.cpp
                editor_system/window_mouse.cpp)
 target_link_libraries(redgem_editor_system_tests PRIVATE redgem_project doctest::doctest)
 # It stands where the editor does, beside the player: its Build finds the player as redgem's does.
-add_dependencies(redgem_editor_system_tests redgem_player)
+add_dependencies(redgem_editor_system_tests redgem_player redgem_fake_acp_agent)
 set_target_properties(redgem_editor_system_tests PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:redgem_player>)
 target_compile_definitions(redgem_editor_system_tests PRIVATE
   REDGEM_PLATFORMER_DIR="${CMAKE_SOURCE_DIR}/games/platformer"
   REDGEM_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
   REDGEM_SCREENSHOT_DIR="${REDGEM_SCREENSHOT_DIR}"
-  REDGEM_PLAYER_FILE="$<TARGET_FILE:redgem_player>")
+  REDGEM_PLAYER_FILE="$<TARGET_FILE:redgem_player>"
+  REDGEM_FAKE_AGENT_FILE="$<TARGET_FILE:redgem_fake_acp_agent>")
 add_test(NAME system.editor.window COMMAND redgem_editor_system_tests)
 set_tests_properties(system.editor.window PROPERTIES LABELS system RUN_SERIAL TRUE)
 

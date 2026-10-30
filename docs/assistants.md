@@ -145,3 +145,55 @@ Before editing a scene, keep a copy of its `.glb`. Afterwards, use
 `redgem scene diff . --against /path/to/before.glb` to inspect the changes by persistent identity.
 It reports object additions, removals and changed fields without writing either file. `--scene`
 chooses another scene and `--limit` caps the details; see [the command line](command-line.md).
+
+## The Agent panel
+
+The editor has a chat with a coding agent: the **Agent** tab beside the Inspector (View > Agent
+shows or hides it). You talk to the agent there as you would in its own terminal chat. It works in
+the game's folder, and it gets the editor's MCP tools ([MCP tools](mcp.md#live-editor)), so it can
+list, select, move, add and remove objects in the open scene, play and stop the game, read the
+editor's events and errors, and look at the viewport.
+
+The editor speaks the [Agent Client Protocol](https://agentclientprotocol.com) (ACP) to agents. Each
+agent is its own program, an open-source adapter that the editor starts:
+
+| Agent | Adapter | Install |
+|-------|---------|---------|
+| Claude Code | `claude-agent-acp` | `npm i -g @agentclientprotocol/claude-agent-acp` |
+| Codex | `codex-acp` | `npm i -g @agentclientprotocol/codex-acp` |
+
+Both need [Node.js](https://nodejs.org). If the adapter is not installed but `npx` is, the editor
+runs it with `npx --yes <package>`, which downloads it the first time. If neither is there, the
+panel says what to install.
+
+The adapters log in the way their own command line tools do, and the editor never asks for a
+password. Log in once in a terminal (`claude`, then `/login`; or `codex login`, or an
+`OPENAI_API_KEY`), then start a new session in the panel. If an agent asks for a login, the panel
+shows its message and how to log in.
+
+### Using it
+
+1. Pick an agent at the top of the panel. Your first message starts a session (the **+** button
+   starts a new one).
+2. Write in the box at the bottom. **Enter** sends, **Shift+Enter** starts a new line.
+3. The answer streams in as markdown. Code blocks have a **Copy** button. Thinking is folded under
+   *Thinking*, and each tool call is a card with its status; open it to see its input, its output
+   and file changes as `-`/`+` lines. The agent's plan shows as a checklist.
+4. Before the agent acts, it may ask: the question shows its options (allow once, allow always,
+   reject). **Stop** ends the turn and answers any open question "cancelled".
+5. The paperclip attaches the selected objects to your next message, as `redgem scene get`
+   describes them, so you can ask about "these" without naming them.
+
+The agent reads and writes files through the editor only inside the game's folder. Paths that
+leave it are refused, and so are paths through symbolic links. Its first session turns on the
+editor's local bridge ([MCP tools](mcp.md#live-editor)) and hands the agent
+`redgem mcp <game> --editor <connection>` as its MCP server. Its edits to the scene are undo steps
+like yours, and they stay unsaved until you or the agent save.
+
+### Your own agents
+
+The gear button opens the list of agents. Each one has a name, a command, arguments (one per line)
+and environment variables (`NAME=value`). Any program that speaks ACP over its standard streams can
+be added. The list is kept in `agents.json` in your RedGem settings folder (`~/.config/redgem/` on
+Linux). Variables are stored there as plain text, so an API key there can be read by anyone who can
+read that file. **Restore** brings back the Claude Code and Codex presets.

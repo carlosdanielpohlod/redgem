@@ -49,6 +49,9 @@ icons):
   anywhere (or press *Split right*), like a code editor's editor groups. Ctrl+S saves and checks
   the syntax (errors show the line); *Open externally* uses your default editor. Play saves all
   open scripts and reloads them.
+* **Agent**: a chat with a coding agent (Claude Code, Codex or one of your own), in a tab beside
+  the Inspector. It works in the game's folder and sees and changes the open scene through the
+  editor's tools; see [The Agent panel](assistants.md#the-agent-panel).
 * **View menu**: hide the Hierarchy (Ctrl+B), the Inspector (Ctrl+Alt+B) or the bottom panels
   (Ctrl+J) to give the scene or the code more room; the toolbar's outer buttons toggle the sides.
 * **Play / Pause / Stop** (Ctrl+P, Esc): runs the game inside the Scene view with the current edits

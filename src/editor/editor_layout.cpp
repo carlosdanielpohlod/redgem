@@ -63,8 +63,8 @@ void EditorApp::build_default_layout(unsigned int dock) {
       ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, editor_logic::inspector_split_ratio(), nullptr, &center);
   const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, kBottomHeight, nullptr, &center);
   ImGui::DockBuilderDockWindow(kHierarchyWindow, left);
-  ImGui::DockBuilderDockWindow(kAgentWindow, right);
   ImGui::DockBuilderDockWindow(kInspectorWindow, right);
+  ImGui::DockBuilderDockWindow(kAgentWindow, right);  // (a tab behind the Inspector)
   ImGui::DockBuilderDockWindow(kProjectWindow, bottom);
   ImGui::DockBuilderDockWindow(kConsoleWindow, bottom);
   ImGui::DockBuilderDockWindow(kViewportWindow, center);
