@@ -846,3 +846,38 @@ never resolves as its source, even after an object is destroyed or a runtime slo
 An old object reference remains stale after a scene switch; look up the saved identity again.
 An object whose in-memory source supplies no identity also returns `nil`. This lookup does not
 serialize transforms, behaviours or spawned instances; object checkpoints are a separate API.
+
+### Object checkpoints
+
+`GameObject.capture_state` returns a versioned Hash of the object's local position, quaternion
+rotation, scale, tint and visibility. Keep that Hash unchanged in `Save`, beside the object's
+identity. On a fresh run or after loading the matching scene, resolve the identity and restore it:
+
+```ruby
+hero = Scene.find!("Hero")
+Save[:hero] = { "id" => hero.stable_id, "state" => hero.capture_state }
+# Later, in the same scene (for example its SceneScript#setup):
+saved = Save[:hero]
+hero = saved && Scene.find_by_id(saved["id"])
+hero.restore_state(saved["state"]) if hero
+```
+
+Restoration validates the complete payload and resulting hierarchy before changing anything.
+The scene name, source node, original/copy kind, parent source and current physics body must
+match. Malformed, incompatible or oversized data raises `ArgumentError`; a destroyed or pending
+object raises `RuntimeError`. A stale reference never restores a new object that reused its slot.
+A hierarchy pending destruction is refused. In-memory sources need explicit scene-file identities.
+
+The pose is local to the current parent. Physical bodies in the moved hierarchy are teleported
+immediately and stop moving; velocities are not saved. Existing colliders cannot change scale:
+a checkpoint that would rescale a physical hierarchy is refused. Render-only hierarchies can
+restore scale. Local components and resulting world components are bounded to one million in
+magnitude, and at most 4096 objects can move in one restoration.
+
+A checkpoint also works on an explicitly chosen runtime copy of the same source and parent;
+it cannot silently select a copy or overwrite its original. The game creates any needed copies
+first. This API neither spawns nor resurrects objects, changes parents, nor restores descendants'
+individual local poses or appearance. Save each object's checkpoint if those values matter.
+Animations, behaviours, joints, forces and game time remain active. Health, inventory and other
+script-owned values must be saved explicitly beside the checkpoint; this is not a whole-game
+snapshot. Checkpoints follow scene-file identity rules described above.

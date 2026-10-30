@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nlohmann/json_fwd.hpp>
+
 #include <functional>
 #include <optional>
 #include <string>
@@ -47,6 +49,8 @@ struct ScriptContext {
   DebugDrawBuffer* debug_draw = nullptr;  // absent without a presenter; local frame commands only
   FrameProfiler* profiler = nullptr;      // borrowed from the engine; absent in standalone interpreters
   bool stats_visible = false;
+  std::function<nlohmann::json(ObjectHandle)> capture_object_state;
+  std::function<void(ObjectHandle, const nlohmann::json&)> restore_object_state;
   Scene* scene = nullptr;
   PhysicsWorld* physics = nullptr;
   InputState* input = nullptr;

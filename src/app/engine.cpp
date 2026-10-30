@@ -212,6 +212,7 @@ void Engine::take_identity(const GameIdentityReading& identity) {
 }
 
 void Engine::connect_context() {
+  connect_object_checkpoints();
   context_.on_bindings_changed = [this] { bindings_changed_ = true; };
   context_.on_transform_written = [this](ObjectId id, TransformWrite write) {
     bodies::follow_write(scene_, *physics_, id, write);
