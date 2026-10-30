@@ -19,7 +19,7 @@ struct Conversation {
   Conversation() : folder(fs::temp_directory_path() / "redgem_agent_client_test") {
     fs::remove_all(folder);
     fs::create_directories(folder / "scripts");
-    std::ofstream(folder / "scripts" / "coin.rb") << "one\ntwo\nthree\n";
+    std::ofstream(folder / "scripts" / "coin.rb", std::ios::binary) << "one\ntwo\nthree\n";
     client = std::make_unique<AgentClient>(ClientSetup{folder, {{"redgem", "redgem", {"mcp"}, {}}}, "0.4.1"},
                                            [this](const Json& message) { sent.push_back(message); });
   }
