@@ -59,9 +59,17 @@ bool sound(const std::string& problem, const std::string& path, std::string& err
 
 std::filesystem::path folder_of(const std::string& path) { return std::filesystem::path(path).parent_path(); }
 
+bool file_exceeds_budget(const std::string& path, std::uint64_t max_bytes) {
+  std::error_code error;
+  const auto bytes = std::filesystem::file_size(path, error);
+  return !error && bytes > max_bytes;
+}
+
 // The file parsed; null (and why, in `error`) when it cannot be, or is too big for memory alone.
-CgltfPtr parsed_gltf(const std::string& path, std::string& error) {
+CgltfPtr parsed_gltf(const std::string& path, std::string& error, std::uint64_t max_bytes) {
   if (!sound(gltf_budget::file_problem(path), path, error)) return nullptr;
+  if (!sound(file_exceeds_budget(path, max_bytes) ? "scene exceeds its loading byte budget" : "", path, error))
+    return nullptr;
   cgltf_options options{};
   cgltf_data* raw = nullptr;
   const cgltf_result parsed = cgltf_parse_file(&options, path.c_str(), &raw);
@@ -75,30 +83,40 @@ CgltfPtr parsed_gltf(const std::string& path, std::string& error) {
 // own checks come before the library's: those do sums that a file can make wrap around, and then
 // read where the wrapped sum points.
 bool loaded_and_checked(cgltf_data& data, const gltf_checks::NamedFiles& files, const std::string& path,
-                        std::string& error) {
+                        std::string& error, std::uint64_t max_bytes) {
   cgltf_options options{};
   return sound(gltf_checks::buffer_file_problem(data, files), path, error) &&
          sound(gltf_budget::scene_problem(data, path, files), path, error) &&
+         sound(gltf_budget::scene_bytes(data, path, files) > max_bytes ? "scene exceeds its loading byte budget" : "",
+               path, error) &&
          succeeded(cgltf_load_buffers(&options, &data, path.c_str()), "cannot load buffers of", path, error) &&
          sound(gltf_checks::data_problem(data), path, error) &&
          succeeded(cgltf_validate(&data), "invalid glTF", path, error);
 }
 
+bool pictures_checked(const cgltf_data& data, const gltf_checks::NamedFiles& files, const std::string& path,
+                      LoadResult& result, std::uint64_t max_bytes) {
+  if (!sound(gltf_budget::pictures_problem(data, path, files, result.scene.images), path, result.error)) return false;
+  const auto bytes = gltf_budget::scene_bytes(data, path, files) + gltf_budget::decoded_bytes(result.scene.images);
+  return sound(bytes > max_bytes ? "scene exceeds its loading byte budget" : "", path, result.error);
+}
+
 }  // namespace
 
-LoadResult load_gltf_scene(const std::string& path) {
+LoadResult load_gltf_scene(const std::string& path, std::uint64_t max_bytes) {
   LoadResult result;
-  const CgltfPtr data = parsed_gltf(path, result.error);
+  const CgltfPtr data = parsed_gltf(path, result.error, max_bytes);
   if (data == nullptr) return result;
   // (Each file the scene names is found once, for every step below.)
   const gltf_checks::NamedFiles files = gltf_checks::named_files(*data, folder_of(path));
-  if (!loaded_and_checked(*data, files, path, result.error)) return result;
+  if (!loaded_and_checked(*data, files, path, result.error, max_bytes)) return result;
   GltfReader reader(*data, files.images, result);
   // (Its pictures are decoded later, once shown: what that will take is known from their headers.)
-  result.ok = sound(reader.run(), path, result.error) &&
-              sound(gltf_budget::pictures_problem(*data, path, files, result.scene.images), path, result.error);
+  result.ok = sound(reader.run(), path, result.error) && pictures_checked(*data, files, path, result, max_bytes);
   if (!result.ok) result.scene = SceneDesc{};
   return result;
 }
+
+LoadResult load_gltf_scene(const std::string& path) { return load_gltf_scene(path, gltf_budget::kMaxSceneBytes); }
 
 }  // namespace redgem

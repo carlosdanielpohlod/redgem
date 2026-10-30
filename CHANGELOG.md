@@ -10,6 +10,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Prefab file loading**: reusable GLB references with nested instances, root property overrides,
+  persistent descendant identities and shared geometry, available at runtime and in editor Play.
+
 - **Object checkpoints**: capture and restore local pose, tint and visibility through Save,
   with complete validation before writes and consistent physics teleports for moved hierarchies.
 

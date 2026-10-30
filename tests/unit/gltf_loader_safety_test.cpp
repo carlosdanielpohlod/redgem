@@ -602,3 +602,17 @@ TEST_CASE("invalid water lengths and negative coefficients are kept in the suppo
   CHECK(water.absorption.x == 0.0f);
   CHECK(water.refraction <= kRefractionLimit);
 }
+
+TEST_CASE("a caller's smaller glTF budget is enforced before accessor data is read") {
+  const Scratch scratch;
+  Gltf file = triangle();
+  constexpr std::size_t kAccessorCount = 2048;
+  constexpr std::uint64_t kExtraBytes = 128;
+  file.add_accessor(0, kFloatComponent, kAccessorCount, "VEC4");
+  const auto path = written(scratch, file);
+  const auto limit = std::filesystem::file_size(path) + kExtraBytes;
+  const auto loaded = load_gltf_scene(path, limit);
+  CHECK_FALSE(loaded.ok);
+  CHECK(loaded.error.find("loading byte budget") != std::string::npos);
+  CHECK(loaded.scene.meshes.empty());
+}

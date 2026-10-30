@@ -34,6 +34,7 @@ nav:
       - Your first game: first-game.md
   - Using the editor:
       - The editor: editor.md
+      - Prefab files: prefabs.md
       - Levels, lighting and Blender: levels.md
       - The command line: command-line.md
       - Making games with an AI assistant: assistants.md
