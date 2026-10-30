@@ -1,5 +1,6 @@
 #include "editor/agent/agent_profiles.hpp"
 
+#include <sstream>
 #include <system_error>
 
 #include "app/json_file.hpp"
@@ -14,6 +15,9 @@ constexpr const char* kAgentsFileName = "agents.json";
 constexpr const char* kAgentsKey = "agents";
 constexpr const char* kRunWithoutAsking = "--yes";  // npx: fetch the package without a question
 constexpr int kFileIndent = 2;
+constexpr char kLineEnd = '\n';
+constexpr char kCarriageReturn = '\r';
+constexpr char kEquals = '=';
 constexpr const char* kClaudeName = "Claude Code";  // the presets, as the picker names them
 constexpr const char* kCodexName = "Codex";
 
@@ -96,6 +100,11 @@ std::string install_hint(const AgentProfile& agent) {
   return tr("editor.agent.adapter_missing", {{"command", agent.command}, {"package", agent.package}});
 }
 
+// An '=' with a name before it.
+bool names_a_variable(std::size_t equals) { return equals != std::string::npos && equals > 0; }
+
+bool ends_with_return(const std::string& line) { return !line.empty() && line.back() == kCarriageReturn; }
+
 }  // namespace
 
 std::vector<AgentProfile> preset_agents() {
@@ -133,6 +142,38 @@ std::optional<ProgramCall> launch_call(const AgentProfile& agent, const ProgramF
   if (runs_through_npx(agent, find)) return through_npx(agent);
   error = install_hint(agent);
   return std::nullopt;
+}
+
+std::string lines_text(const std::vector<std::string>& lines) {
+  std::string text;
+  for (const std::string& line : lines) text += line + kLineEnd;
+  return text;
+}
+
+std::vector<std::string> text_lines(const std::string& text) {
+  std::vector<std::string> lines;
+  std::istringstream in(text);
+  std::string line;
+  while (std::getline(in, line)) {
+    if (ends_with_return(line)) line.pop_back();
+    if (!line.empty()) lines.push_back(line);
+  }
+  return lines;
+}
+
+std::string environment_text(const std::vector<EnvironmentVariable>& environment) {
+  std::string text;
+  for (const EnvironmentVariable& variable : environment) text += variable.name + kEquals + variable.value + kLineEnd;
+  return text;
+}
+
+std::vector<EnvironmentVariable> environment_of_text(const std::string& text) {
+  std::vector<EnvironmentVariable> environment;
+  for (const std::string& line : text_lines(text)) {
+    const std::size_t equals = line.find(kEquals);
+    if (names_a_variable(equals)) environment.push_back({line.substr(0, equals), line.substr(equals + 1)});
+  }
+  return environment;
 }
 
 }  // namespace redgem::agent

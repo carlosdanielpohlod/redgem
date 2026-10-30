@@ -51,4 +51,11 @@ std::string login_hint(const AgentProfile& agent);
 // with `error` saying what to install, when neither is there.
 std::optional<ProgramCall> launch_call(const AgentProfile& agent, const ProgramFinder& find, std::string& error);
 
+// The settings' text fields: arguments a line each, and environment variables as NAME=value lines.
+std::string lines_text(const std::vector<std::string>& lines);
+std::vector<std::string> text_lines(const std::string& text);
+std::string environment_text(const std::vector<EnvironmentVariable>& environment);
+// Lines without a name before their '=' are left out.
+std::vector<EnvironmentVariable> environment_of_text(const std::string& text);
+
 }  // namespace redgem::agent

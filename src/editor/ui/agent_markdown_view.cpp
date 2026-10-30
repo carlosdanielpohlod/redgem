@@ -1,0 +1,173 @@
+// Part of the Agent panel: an agent's markdown, drawn block by block. Text with inline styles is
+// laid out word by word, so that bold, italic and code sit inside wrapped lines.
+
+#include <imgui.h>
+
+#include <cfloat>
+#include <string>
+
+#include "core/translations.hpp"
+#include "editor/ui/agent_views.hpp"
+#include "editor/ui/palette.hpp"
+#include "editor/ui/style.hpp"
+
+namespace redgem::ui::agent_view {
+namespace {
+
+using agent::Block;
+using agent::BlockKind;
+using agent::Span;
+
+constexpr float kListIndent = 18.0f;     // pixels per level of a list
+constexpr float kMarkBack = 13.0f;       // pixels a list item's mark stands before its text
+constexpr float kQuoteIndent = 12.0f;    // pixels a quote is set in, past its bar
+constexpr float kQuoteBarWidth = 3.0f;   // pixels
+constexpr float kCodePadding = 3.0f;     // pixels around inline code
+constexpr float kBoldOffset = 1.0f;      // bold is drawn twice, this far apart (the font has no bold face)
+constexpr float kHeadingGap = 4.0f;      // pixels above a heading
+constexpr float kCodeBlockPadding = 6.0f;
+constexpr const char* kBullet = "\xe2\x80\xa2";  // the bullet of a list item
+constexpr char kSpace = ' ';
+
+// Where the next word goes, while text is laid out in a band of the window.
+struct Flow {
+  float left = 0.0f;
+  float right = 0.0f;
+  float x = 0.0f;
+  float y = 0.0f;
+  float top = 0.0f;
+  float line_height = 0.0f;
+};
+
+Flow start_flow(float indent) {
+  const ImVec2 start = ImGui::GetCursorScreenPos();
+  Flow flow;
+  flow.left = start.x + indent;
+  flow.right = start.x + ImGui::GetContentRegionAvail().x;
+  flow.x = flow.left;
+  flow.y = start.y;
+  flow.top = start.y;
+  flow.line_height = ImGui::GetTextLineHeightWithSpacing();
+  return flow;
+}
+
+// Reserves the room the flow took, so what comes next goes under it.
+void end_flow(const Flow& flow) {
+  ImGui::Dummy(ImVec2(flow.right - flow.left, flow.y + flow.line_height - flow.top));
+}
+
+ImVec4 span_color(const Span& span) {
+  if (span.code) return palette::kAccentHover;
+  return span.italic ? palette::kMuted : palette::kText;
+}
+
+// Whether a word fits on the line it would go on (a word wider than the band starts a line alone).
+bool wraps(const Flow& flow, float width) { return flow.x > flow.left && flow.x + width > flow.right; }
+
+void draw_word(Flow& flow, const std::string& word, const Span& span) {
+  ImFont* font = span.code ? code_font() : ImGui::GetFont();
+  const float size = ImGui::GetFontSize();
+  const float width = font->CalcTextSizeA(size, FLT_MAX, 0.0f, word.c_str()).x;
+  if (wraps(flow, width)) {
+    flow.x = flow.left;
+    flow.y += flow.line_height;
+  }
+  ImDrawList* draw = ImGui::GetWindowDrawList();
+  const ImVec2 at(flow.x, flow.y);
+  if (span.code) {
+    draw->AddRectFilled(ImVec2(at.x - kCodePadding, at.y), ImVec2(at.x + width + kCodePadding, at.y + size),
+                        ImGui::GetColorU32(palette::kFrame));
+  }
+  const ImU32 color = ImGui::GetColorU32(span_color(span));
+  draw->AddText(font, size, at, color, word.c_str());
+  if (span.bold) draw->AddText(font, size, ImVec2(at.x + kBoldOffset, at.y), color, word.c_str());
+  flow.x += width;
+}
+
+// Each word of a span with the spaces after it, so that a line breaks between words.
+void draw_span(Flow& flow, const Span& span) {
+  std::size_t start = 0;
+  while (start < span.text.size()) {
+    const std::size_t space = span.text.find(kSpace, start);
+    const std::size_t end = space == std::string::npos ? span.text.size() : span.text.find_first_not_of(kSpace, space);
+    const std::size_t stop = end == std::string::npos ? span.text.size() : end;
+    draw_word(flow, span.text.substr(start, stop - start), span);
+    start = stop;
+  }
+}
+
+void draw_spans(const std::vector<Span>& spans, float indent) {
+  Flow flow = start_flow(indent);
+  for (const Span& span : spans) draw_span(flow, span);
+  end_flow(flow);
+}
+
+void draw_item(const Block& block, const std::string& mark) {
+  const float indent = kListIndent * static_cast<float>(block.level + 1);
+  const ImVec2 start = ImGui::GetCursorScreenPos();
+  ImGui::GetWindowDrawList()->AddText(ImVec2(start.x + indent - kMarkBack, start.y),
+                                      ImGui::GetColorU32(palette::kMuted), mark.c_str());
+  draw_spans(block.spans, indent);
+}
+
+void draw_quote(const Block& block) {
+  const ImVec2 start = ImGui::GetCursorScreenPos();
+  draw_spans(block.spans, kQuoteIndent);
+  const float bottom = ImGui::GetCursorScreenPos().y;
+  ImGui::GetWindowDrawList()->AddRectFilled(start, ImVec2(start.x + kQuoteBarWidth, bottom),
+                                            ImGui::GetColorU32(palette::kBorder));
+}
+
+void draw_heading(const Block& block) {
+  ImGui::Dummy(ImVec2(0.0f, kHeadingGap));
+  std::vector<Span> spans = block.spans;
+  for (Span& span : spans) span.bold = true;
+  draw_spans(spans, 0.0f);
+}
+
+// A fenced block: its text in the code font on a darker ground, with a button that copies it.
+void draw_code(const Block& block, int index) {
+  ImGui::PushID(index);
+  ImGui::PushStyleColor(ImGuiCol_ChildBg, palette::kPanelDark);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kCodeBlockPadding, kCodeBlockPadding));
+  ImGui::BeginChild("code", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding,
+                    ImGuiWindowFlags_HorizontalScrollbar);
+  ImGui::TextColored(palette::kMuted, "%s", block.language.c_str());
+  ImGui::SameLine(ImGui::GetContentRegionAvail().x - ImGui::GetFrameHeight());
+  if (ImGui::SmallButton(ICON_FA_COPY)) ImGui::SetClipboardText(block.code.c_str());
+  tooltip(tr("editor.agent.copy_code"));
+  ImGui::PushFont(code_font(), 0.0f);
+  ImGui::TextUnformatted(block.code.c_str());
+  ImGui::PopFont();
+  ImGui::EndChild();
+  ImGui::PopStyleVar();
+  ImGui::PopStyleColor();
+  ImGui::PopID();
+}
+
+void draw_block(const Block& block, int index) {
+  switch (block.kind) {
+    case BlockKind::Code:
+      return draw_code(block, index);
+    case BlockKind::Heading:
+      return draw_heading(block);
+    case BlockKind::Bullet:
+      return draw_item(block, kBullet);
+    case BlockKind::Numbered:
+      return draw_item(block, block.number + ".");
+    case BlockKind::Quote:
+      return draw_quote(block);
+    case BlockKind::Rule:
+      return ImGui::Separator();
+    case BlockKind::Paragraph:
+      return draw_spans(block.spans, 0.0f);
+  }
+}
+
+}  // namespace
+
+void draw_markdown(const std::vector<Block>& blocks) {
+  for (std::size_t index = 0; index < blocks.size(); ++index) draw_block(blocks[index], static_cast<int>(index));
+}
+
+}  // namespace redgem::ui::agent_view
