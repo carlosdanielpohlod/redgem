@@ -63,6 +63,7 @@ void EditorApp::build_default_layout(unsigned int dock) {
       ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, editor_logic::inspector_split_ratio(), nullptr, &center);
   const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, kBottomHeight, nullptr, &center);
   ImGui::DockBuilderDockWindow(kHierarchyWindow, left);
+  ImGui::DockBuilderDockWindow(kAgentWindow, right);
   ImGui::DockBuilderDockWindow(kInspectorWindow, right);
   ImGui::DockBuilderDockWindow(kProjectWindow, bottom);
   ImGui::DockBuilderDockWindow(kConsoleWindow, bottom);
@@ -109,6 +110,7 @@ void EditorApp::draw_panels() {
 
 void EditorApp::draw_side_panels(ui::PanelContext& context) {
   if (panels_.hierarchy) draw_hierarchy_panel(context);
+  if (panels_.agent) agent_panel_->draw();
   if (panels_.inspector) ui::draw_inspector(context);
   // Whatever is selected, and whether or not the Inspector is shown: a drag is over once its
   // widget is let go.

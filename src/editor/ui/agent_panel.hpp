@@ -86,7 +86,6 @@ class AgentPanel {
   void draw_entries(agent::AgentClient& client);
   void draw_entry(agent::AgentClient& client, std::size_t index);
   static void answer(agent::AgentClient& client, std::size_t index, const std::optional<std::string>& option);
-  void draw_failure(const std::string& text);
   void draw_composer();
   void draw_attachments();
   void draw_input();

@@ -26,6 +26,7 @@
 #include "editor/group_transform.hpp"
 #include "editor/project_files.hpp"
 #include "editor/scripts/script_workspace.hpp"
+#include "editor/ui/agent_panel.hpp"
 #include "editor/ui/panels.hpp"
 
 namespace redgem {
@@ -89,6 +90,7 @@ class EditorApp {
     bool hierarchy = true;  // left (Ctrl+B)
     bool inspector = true;  // right (Ctrl+Alt+B)
     bool bottom = true;     // Project and Console (Ctrl+J)
+    bool agent = true;      // the Agent panel (right, beside the Inspector)
   };
   PanelVisibility& panels() { return panels_; }
   // What the panels remember between frames (searches, half-typed names, the console's filters):
@@ -109,6 +111,8 @@ class EditorApp {
   void add_files(const std::vector<std::filesystem::path>& files);
   bool close_requested() const;
   EditorExit exit_action() const { return exit_action_; }
+  // The conversation with a coding agent (the Agent panel).
+  ui::AgentPanel& agent_panel() { return *agent_panel_; }
 
   // Commands, the same ones the menus and shortcuts use.
   void play();
@@ -161,6 +165,9 @@ class EditorApp {
  private:
   EditorApp() = default;
   void open_window(GpuChoice gpu, FrameClock clock);
+  void make_agent_panel(AgentHooks hooks);
+  // The selected objects as `describe` shows each.
+  std::vector<std::string> selection_text(const std::function<std::string(const SceneDesc&, int)>& describe) const;
   // Start looking through the scene's own camera, like the game would.
   void look_through_main_camera();
   // What the Project panel asked for: a scene to open, or a new one.
@@ -315,6 +322,7 @@ class EditorApp {
   std::unique_ptr<AudioSystem> audio_;
   std::unique_ptr<EditorSession> session_;
   std::unique_ptr<ScriptWorkspace> scripts_;
+  std::unique_ptr<ui::AgentPanel> agent_panel_;  // (its agent stops before the session goes)
   PanelVisibility panels_;
   ui::PanelState panel_state_;
   ui::TerrainTool terrain_tool_;

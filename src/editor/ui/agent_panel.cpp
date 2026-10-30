@@ -241,17 +241,12 @@ void AgentPanel::draw_entry(agent::AgentClient& client, std::size_t index) {
     case EntryKind::Notice:
       return agent_view::draw_notice(entry.text);
     case EntryKind::Error:
-      return draw_failure(entry.text);
+      return agent_view::draw_error(entry.text);
   }
 }
 
 void AgentPanel::answer(agent::AgentClient& client, std::size_t index, const std::optional<std::string>& option) {
   if (option) client.choose(index, *option);
-}
-
-// The error, and under it what the agent's program wrote to its errors (folded).
-void AgentPanel::draw_failure(const std::string& text) {
-  agent_view::draw_error(text);
 }
 
 const std::vector<agent::Block>& AgentPanel::markdown(std::size_t entry, const std::string& text) {

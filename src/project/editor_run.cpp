@@ -12,6 +12,7 @@
 #include "project/editor_setup.hpp"
 #include "project/project_hub.hpp"
 #include "project/recent_games.hpp"
+#include "project/agent_tools.hpp"
 #include "project/editor_bridge_run.hpp"
 
 namespace redgem {
@@ -36,7 +37,10 @@ bool pick_game(std::filesystem::path& game, std::string& hub_message, GpuChoice 
 // hub: a broken game from the command line exits; from the hub it returns there.
 std::optional<int> edit_game(const std::filesystem::path& game, bool from_command_line, std::string& hub_message,
                              GpuChoice gpu, bool bridge_enabled) {
-  auto created = EditorApp::create(game, editor_options(gpu));
+  std::unique_ptr<tools::EditorBridge> bridge;  // (outlives the editor, whose agents' tools reach it)
+  EditorOptions options = editor_options(gpu);
+  options.agent = agent_hooks(bridge);
+  auto created = EditorApp::create(game, std::move(options));
   if (auto* error = std::get_if<std::string>(&created)) {
     log::error(*error);
     if (from_command_line) return kExitFailure;
@@ -44,7 +48,7 @@ std::optional<int> edit_game(const std::filesystem::path& game, bool from_comman
     return std::nullopt;
   }
   EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
-  const auto bridge = bridge_enabled ? enable_editor_bridge(app) : nullptr;
+  if (bridge_enabled) bridge = enable_editor_bridge(app);
   const int code = app.run();
   if (app.exit_action() != EditorExit::OpenHub) return code;
   return std::nullopt;
