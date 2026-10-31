@@ -10,6 +10,11 @@ A 3D game engine and editor where games are written in **Ruby**, the most human-
 language. Build levels in the editor or in **Blender**, write the gameplay in Ruby, press Play,
 ship a standalone game.
 
+<p align="center">
+  <img src="docs/images/editor.webp" alt="The RedGem editor: a treasure chest on a scanned coast in the Scene view, with the Hierarchy, the Inspector and the Project panel" width="900"><br>
+  <sub>The editor. Scene: <a href="https://polyhaven.com/a/treasure_chest">Treasure Chest</a> by Rico Cilliers, the coast scan and the sky from <a href="https://polyhaven.com">Poly Haven</a> (CC0).</sub>
+</p>
+
 ## New in 0.5.0: an AI agent inside the editor
 
 The **Agent panel** brings a coding agent into the editor: Claude Code and Codex come as presets
