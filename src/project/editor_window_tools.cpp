@@ -41,11 +41,19 @@ void advance(EditorApp& app, const std::string& action) {
   paused_action(app.session(), action);
 }
 
+void frame(EditorApp& app) {
+  if (app.session().selected().ids().empty()) throw std::invalid_argument("frame needs an object, or a selection");
+  app.frame_selection();
+}
 }  // namespace
 
 mcp::Json editor_window_tool(EditorApp& app, const std::string& action, const mcp::Json& args) {
   if (action == "capture") return capture(app, args);
-  advance(app, action);
+  if (action == "frame") {
+    frame(app);
+  } else {
+    advance(app, action);
+  }
   return invoke_editor(app.session(), "editor", {{"action", "status"}});
 }
 }  // namespace redgem::tools

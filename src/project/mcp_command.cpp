@@ -21,7 +21,7 @@ constexpr const char* kReadOnly = "--read-only";
 constexpr const char* kAllow = "--allow";
 constexpr const char* kEditor = "--editor";
 constexpr const char* kUsage =
-    "usage: redgem mcp <game> [--editor connection.json] [--read-only] [--allow tool,tool]\n";
+    "usage: redgem mcp <game> [--editor connection.json|auto] [--read-only] [--allow tool,tool]\n";
 
 #ifdef _WIN32
 int duplicate(int fd) { return _dup(fd); }
@@ -99,9 +99,11 @@ void validate_allow(const std::set<std::string>& names) {
 
 mcp::Options options(const ToolLine& line) {
   if (line.words.size() != 1) throw std::invalid_argument("mcp needs one game directory");
+  const std::filesystem::path asked = line.words.front();
+  if (!std::filesystem::is_directory(asked))
+    throw std::invalid_argument("no game folder at " + asked.string() + "; pass the folder that holds scene.glb");
   mcp::Options result;
-  result.game = std::filesystem::canonical(line.words.front());
-  if (!std::filesystem::is_directory(result.game)) throw std::invalid_argument("game must be a directory");
+  result.game = std::filesystem::canonical(asked);
   result.read_only = line.has(kReadOnly);
   if (const auto editor = line.value(kEditor)) result.editor_connection = *editor;
   if (const auto allow = line.value(kAllow)) result.allow = allow_list(*allow);

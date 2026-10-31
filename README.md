@@ -19,8 +19,8 @@ keep access explicit. No editor plugin is needed.
 
 ```sh
 redgem /path/to/game --editor-bridge
-# Use the connection.json path printed by the editor:
-redgem mcp /path/to/game --editor /path/to/connection.json
+# Uses the open editor when there is one, the files otherwise:
+redgem mcp /path/to/game --editor auto
 # File inspection without an editor:
 redgem mcp /path/to/game --read-only
 ```

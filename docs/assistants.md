@@ -4,8 +4,13 @@ description: "Making games with a coding assistant: the guide every new game get
 
 # Making games with an AI assistant
 
-For an MCP client, [the stdio server](mcp.md) exposes the same developer commands through
-eight tools, with a read-only mode, an allow list and cursor-based process events.
+For an MCP client, [the stdio server](mcp.md) exposes the same developer commands through ten
+tools (eleven with an editor), with a read-only mode, an allow list and cursor-based process
+events. Register it once per game; `--editor auto` makes it use the open editor when there is one:
+
+```sh
+claude mcp add redgem -- redgem mcp /path/to/game --editor auto
+```
 
 A coding assistant that works in a terminal (one that reads files and runs commands) can make a
 RedGem game with you: write behaviours, place objects in a level, play the game and read what went
@@ -66,6 +71,20 @@ ran main for 30 frames (0.5 s): 1 errors, 0 warnings
 4. A system test in `tests/` (see [Testing your game](testing.md)) keeps it working:
    `redgem check . --run-tests`.
 5. Open the editor (`redgem .`) to see and play it yourself.
+
+## The same loop over MCP
+
+| Need | Tool call |
+|------|-----------|
+| What is in a level | `scene_list` (50 lines unless `limit` says otherwise), then `scene_get` |
+| Move, tune, attach, copy | `scene_edit` with `assignments`, and `from` to copy an object with its mesh |
+| Does it play | `game_run`; `print` and `assert` read the game, e.g. `Scene.find('Coin6').transform.position` |
+| Why does it fall through the floor | `game_query` `raycast` or `inspect` (velocity, grounded) |
+| What it looks like | `game_shot` (512x288), or `editor` `capture` for the editor's view |
+| What went wrong since last time | `events` with the last `cursor` |
+
+A tool error says what to change (`frames: must be at most 600, not 601`), and a script that calls
+`puts` is told to use `Debug.log`: scripts have no standard output.
 
 ## Keeping it cheap
 

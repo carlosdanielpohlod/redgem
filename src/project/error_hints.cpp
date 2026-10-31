@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <iterator>
 #include <regex>
 #include <vector>
 
@@ -31,6 +32,8 @@ const char* const kClassReceiver = "Class";
 const char* const kUnknownConstant = R"(uninitialized constant ([A-Z][A-Za-z0-9_]*(?:::[A-Z][A-Za-z0-9_]*)*))";
 const char* const kUnknownScene = R"(no scene named ([^ ]+))";
 const char* const kUnreadableScript = R"(loading scripts/([^ :]+\.rb): cannot read)";
+// Kernel methods that print to standard output, which games do not have.
+const char* const kPrintingMethods[] = {"puts", "print", "p", "pp", "printf"};
 constexpr std::size_t kFirst = 1;
 constexpr std::size_t kSecond = 2;
 
@@ -121,7 +124,13 @@ std::string class_call_hint(const Groups& groups, const fs::path& game_dir) {
   return owner != nullptr ? methods_hint(*owner, method, true) : any_class_hint(method);
 }
 
+// Ruby's printing methods, which the game's interpreter leaves out: its messages go through Debug.
+bool is_printing(const std::string& method) {
+  return std::find(std::begin(kPrintingMethods), std::end(kPrintingMethods), method) != std::end(kPrintingMethods);
+}
+
 std::string method_hint(const Groups& groups, const fs::path& game_dir) {
+  if (is_printing(groups[kFirst])) return tr("project.hint.output");
   if (is_class_receiver(groups[kSecond])) return class_call_hint(groups, game_dir);
   const ApiClass* owner = find_api_class(api_reference(), groups[kSecond]);
   if (owner == nullptr) return {};

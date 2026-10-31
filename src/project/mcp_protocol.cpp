@@ -1,6 +1,7 @@
 #include "project/mcp_protocol.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <stdexcept>
 #include <utility>
 
@@ -16,7 +17,7 @@ constexpr int kInvalidParams = -32602;
 constexpr int kInternalError = -32603;
 constexpr int kUnsupportedVersion = -32022;
 constexpr int kMaxJsonDepth = 16;
-constexpr std::size_t kMaxResultBytes = 8192;
+constexpr std::size_t kMaxResultBytes = 8192;  // the "8 KiB" the cut notice names
 constexpr const char* kProtocolKey = "io.modelcontextprotocol/protocolVersion";
 constexpr const char* kCapabilitiesKey = "io.modelcontextprotocol/clientCapabilities";
 constexpr const char* kServerKey = "io.modelcontextprotocol/serverInfo";
@@ -32,6 +33,15 @@ Json error(const Json& id, int code, const std::string& message, const Json& dat
   Json body{{"code", code}, {"message", message}};
   if (!data.is_null()) body["data"] = data;
   return {{"jsonrpc", "2.0"}, {"id", id}, {"error", body}};
+}
+
+// Handshake versions whose tool messages this server answers unchanged. A client asking for one
+// gets it back; any other request is offered the newest, which the client may decline.
+constexpr const char* kHandshakeVersions[] = {kLegacyVersion, "2025-06-18", "2025-03-26"};
+
+std::string negotiated_version(const std::string& asked) {
+  const auto* found = std::find(std::begin(kHandshakeVersions), std::end(kHandshakeVersions), asked);
+  return found == std::end(kHandshakeVersions) ? kLegacyVersion : asked;
 }
 
 Json server_info() { return {{"name", "redgem"}, {"version", REDGEM_VERSION}}; }
@@ -112,7 +122,9 @@ Json Session::initialize(const Json& params) {
   if (!params.value("protocolVersion", Json()).is_string()) throw Failure(kInvalidParams, "protocolVersion required");
   if (!params.value("capabilities", Json()).is_object()) throw Failure(kInvalidParams, "capabilities required");
   initialized_ = true;
-  return {{"protocolVersion", kLegacyVersion}, {"capabilities", capabilities()}, {"serverInfo", server_info()}};
+  return {{"protocolVersion", negotiated_version(params["protocolVersion"])},
+          {"capabilities", capabilities()},
+          {"serverInfo", server_info()}};
 }
 
 Json Session::call(const Json& params) {
@@ -125,7 +137,8 @@ Json Session::call(const Json& params) {
   try {
     return invoke_(name, args);
   } catch (const std::invalid_argument& problem) {
-    throw Failure(kInvalidParams, problem.what());
+    // A tool error, not a protocol error: the model sees it and can correct the call.
+    return tool_result(problem.what(), true);
   }
 }
 
@@ -183,7 +196,7 @@ void serve(std::istream& input, const Send& send, Session& session) {
 
 Json tool_result(const std::string& text, bool failed) {
   std::string bounded(utf8_prefix(text, kMaxResultBytes));
-  if (bounded.size() < text.size()) bounded += "\n[output truncated; narrow the request]";
+  if (bounded.size() < text.size()) bounded += "\n[output cut at 8 KiB; narrow the request]";
   return {{"content", {{{"type", "text"}, {"text", bounded}}}}, {"isError", failed}};
 }
 }  // namespace redgem::tools::mcp

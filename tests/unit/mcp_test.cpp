@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <filesystem>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -40,8 +41,17 @@ TEST_CASE("MCP legacy initialization gates calls until the initialized notificat
   CHECK(session.receive(request("tools/list"))->contains("error"));
   CHECK_FALSE(session.receive({{"jsonrpc", "2.0"}, {"method", "notifications/initialized"}}));
   const auto listed = session.receive(request("tools/list"));
-  CHECK((*listed)["result"]["tools"].size() == 8);
+  CHECK((*listed)["result"]["tools"].size() == 10);
   CHECK_FALSE((*listed)["result"].contains("resultType"));
+}
+
+TEST_CASE("MCP legacy initialization answers an older supported version with that version") {
+  for (const char* version : {"2025-06-18", "2025-03-26", "2025-11-25"}) {
+    auto session = server();
+    const auto init =
+        session.receive(request("initialize", {{"protocolVersion", version}, {"capabilities", Json::object()}}));
+    CHECK((*init)["result"]["protocolVersion"] == version);
+  }
 }
 
 TEST_CASE("MCP modern discovery and calls carry metadata independently of prior requests") {
@@ -85,15 +95,41 @@ TEST_CASE("MCP read-only and allow lists restrict discovery and invocation toget
   CHECK_FALSE((*session.receive(call("api")))["result"]["isError"].get<bool>());
 }
 
-TEST_CASE("MCP schemas reject unknown, wrong-type and out-of-range tool arguments") {
+namespace {
+Json result_of(Session& session, const std::string& name, const Json& args) {
+  return (*session.receive(call(name, args)))["result"];
+}
+std::string text_of(const Json& result) { return result["content"][0]["text"].get<std::string>(); }
+}  // namespace
+
+TEST_CASE("MCP schemas reject unknown, wrong-type and out-of-range tool arguments as tool errors") {
   auto session = server();
   for (const Json& args : {Json{{"frames", -1}}, Json{{"frames", 601}}, Json{{"frames", 1.5}}, Json{{"frames", true}},
                            Json{{"game", "/elsewhere"}}, Json{{"seed", 2147483648ULL}}}) {
-    CHECK((*session.receive(call("game_run", args)))["error"]["code"] == -32602);
+    CHECK(result_of(session, "game_run", args)["isError"] == true);
   }
-  CHECK((*session.receive(call("scene_get")))["error"]["code"] == -32602);
-  CHECK((*session.receive(call("api", {{"class", std::string("nul\0name", 8)}})))["error"]["code"] == -32602);
-  CHECK((*session.receive(call("events", {{"since", -1}})))["error"]["code"] == -32602);
+  CHECK(result_of(session, "scene_get", Json::object())["isError"] == true);
+  CHECK(result_of(session, "api", {{"class", std::string("nul\0name", 8)}})["isError"] == true);
+  CHECK(result_of(session, "events", {{"since", -1}})["isError"] == true);
+}
+
+TEST_CASE("MCP argument errors name the argument and what it accepts") {
+  auto session = server();
+  CHECK(text_of(result_of(session, "game_run", {{"frames", 601}})) == "frames: must be at most 600, not 601");
+  CHECK(text_of(result_of(session, "scene_list", {{"limit", -1}})) == "limit: must be at least 0, not -1");
+  CHECK(text_of(result_of(session, "scene_list", {{"limit", "5"}})) == "limit: must be a whole number");
+  CHECK(text_of(result_of(session, "scene_edit", {{"action", "sett"}, {"object", "Coin1"}})) ==
+        "action: must be one of: set, add, remove");
+  CHECK(text_of(result_of(session, "scene_get", Json::object())) == "missing argument: object");
+  CHECK(contains(result_of(session, "game_run", {{"game", "/elsewhere"}}), "unknown argument: game (accepted: "));
+  const Json long_word{{"action", "set"}, {"object", "Coin1"}, {"assignments", {std::string(4097, 'x')}}};
+  CHECK(text_of(result_of(session, "scene_edit", long_word)) ==
+        "assignments: item 1: is 4097 bytes; the limit is 4096");
+}
+
+TEST_CASE("MCP unknown tools stay protocol errors") {
+  auto session = server();
+  CHECK((*session.receive(call("no_such_tool")))["error"]["code"] == -32602);
 }
 
 TEST_CASE("MCP confines input and comparison files and requires explicit deletion") {
@@ -108,21 +144,52 @@ TEST_CASE("MCP confines input and comparison files and requires explicit deletio
 TEST_CASE("MCP exposes native read-only scene and API commands") {
   const Options options{REDGEM_PLATFORMER_DIR, true, {}};
   CHECK(contains(invoke(options, "scene_list", {{"limit", 2}}), "27 objects"));
+  CHECK_FALSE(contains(invoke(options, "scene_list", {{"limit", 0}}), "more not shown"));
   CHECK(contains(invoke(options, "scene_get", {{"object", "Player"}}), "Player"));
   CHECK(contains(invoke(options, "scene_diff", {{"against", "scene.glb"}}), "no object changes"));
   CHECK(contains(invoke(options, "api", {{"class", "Transform"}}), "position"));
 }
 
-TEST_CASE("MCP event pages retain their cursor and bound individual text") {
+namespace {
+// The cursor a page of events says to pass next: its first line is "cursor=N ...".
+constexpr const char* kCursorPrefix = "cursor=";
+std::uint64_t page_cursor(const std::string& text) {
+  const std::size_t start = std::string(kCursorPrefix).size();
+  return std::stoull(text.substr(start, text.find_first_of(" \n") - start));
+}
+}  // namespace
+
+TEST_CASE("MCP event pages lead with their cursor and bound individual text") {
   const test::LogCapture capture;
   const auto cursor = log::event_cursor();
   log::warning(std::string(3000, 'x'));
-  const Json reply = invoke({}, "events", {{"since", cursor}, {"limit", 1}});
-  const Json data = reply["structuredContent"];
-  CHECK(data["cursor"].get<std::uint64_t>() > cursor);
-  CHECK(data["events"].size() == 1);
-  CHECK(data["events"][0]["text"].get<std::string>().size() == 256);
-  CHECK(data["events"][0]["truncated"] == true);
+  const std::string text = text_of(invoke({}, "events", {{"since", cursor}, {"limit", 1}}));
+  CHECK(text.rfind("cursor=", 0) == 0);
+  CHECK(page_cursor(text) > cursor);
+  CHECK(text.find("warning " + std::string(256, 'x') + "...\n") != std::string::npos);
+  CHECK(text.find(std::string(257, 'x')) == std::string::npos);
+}
+
+TEST_CASE("MCP event pages keep their cursor when the most events of the longest text fill a page") {
+  const test::LogCapture capture;
+  const auto cursor = log::event_cursor();
+  for (int i = 0; i < 32; ++i) log::warning(std::string(3000, 'y'));
+  const Json reply = invoke({}, "events", {{"since", cursor}, {"limit", 32}});
+  CHECK(page_cursor(text_of(reply)) > cursor);
+  CHECK_FALSE(reply.contains("structuredContent"));
+}
+
+TEST_CASE("MCP events read as one compact line each, with paths inside the game and the next cursor") {
+  const test::LogCapture capture;
+  const Options options{REDGEM_PLATFORMER_DIR, false, {}};
+  const auto cursor = log::event_cursor();
+  const std::string game = std::filesystem::path(REDGEM_PLATFORMER_DIR).generic_string();
+  log::error("Coin#update on 'Coin1': boom (RuntimeError)\n    from " + game + "/scripts/coin.rb:12:in update");
+  const std::string text = text_of(invoke(options, "events", {{"since", cursor}}));
+  CHECK(text.find("error scripts/coin.rb:12: Coin#update on 'Coin1': boom (RuntimeError)") != std::string::npos);
+  CHECK(text.find(game) == std::string::npos);
+  const auto next = page_cursor(text);
+  CHECK(text_of(invoke(options, "events", {{"since", next}})).find("no new events") != std::string::npos);
 }
 
 TEST_CASE("MCP framing recovers after malformed, oversized and deeply nested messages") {
@@ -144,7 +211,7 @@ TEST_CASE("MCP tool failures are results and long UTF-8 output is bounded") {
   CHECK(failed["isError"] == true);
   const std::string text = std::string(8191, 'x') + "é";
   const Json bounded = tool_result(text);
-  CHECK(contains(bounded, "output truncated"));
+  CHECK(contains(bounded, "output cut at 8 KiB"));
   CHECK_FALSE(contains(bounded, "é"));
   CHECK(bounded.dump().size() < 8400);
 }

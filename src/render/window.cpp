@@ -10,8 +10,28 @@
 #include "render/gl_extras.hpp"
 #include "render/render_math.hpp"
 
+// On desktop Linux raylib opens windows through the GLFW it is built with (see windowing_started).
+#if defined(__linux__) && !defined(__ANDROID__)
+extern "C" int glfwInit(void);
+#endif
+
 namespace redgem {
 namespace {
+
+constexpr const char* kNoDisplay =
+    "cannot open a window: there is no display (set DISPLAY, or run under a virtual display such as Xvfb)";
+
+// Whether windows can be opened at all. raylib 5.5 carries on without graphics when GLFW cannot
+// start (no display to connect to) and then crashes, so GLFW is asked first; raylib's own start
+// finds it started and goes on. (The engine's GLFW is built for X11 alone, so no platform hint
+// raylib would give GLFW before starting it is lost; its allocator is the default one anyway.)
+bool windowing_started() {
+#if defined(__linux__) && !defined(__ANDROID__)
+  return glfwInit() != 0;
+#else
+  return true;
+#endif
+}
 
 constexpr int kTraceLineLength = 512;  // characters of a raylib log line that are kept
 
@@ -30,6 +50,7 @@ void report_graphics_card(int level, const char* format, va_list args) {
 // Opens the window. raylib names the graphics card only at its most verbose level: listen while
 // it opens.
 void open_window(const WindowSettings& settings) {
+  if (!windowing_started()) throw std::runtime_error(kNoDisplay);
   SetTraceLogCallback(report_graphics_card);
   SetTraceLogLevel(LOG_INFO);
   SetConfigFlags(window_flags(settings));

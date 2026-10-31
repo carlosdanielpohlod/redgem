@@ -108,6 +108,7 @@
   "project.hint.constant": "a class {class} is looked for in {file} (class {class} < Behaviour)",
   "project.hint.did_you_mean": "did you mean: {names}",
   "project.hint.method": "did you mean: {names} (redgem api {class})",
+  "project.hint.output": "scripts have no standard output; use Debug.log(text), Debug.warn(text) or Debug.error(text)",
   "project.hint.scenes": "the scenes are: {scenes}",
   "project.hint.scripts": "the scripts are: {scripts}",
   "project.hint.see_class": "redgem api {class} lists its methods",

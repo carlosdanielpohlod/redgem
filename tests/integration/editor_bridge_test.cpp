@@ -6,6 +6,9 @@
 #include <future>
 #include <stdexcept>
 #include <thread>
+#include <atomic>
+#include <functional>
+#include <mutex>
 
 #include "core/files.hpp"
 #include "editor/editor_session.hpp"
@@ -385,4 +388,269 @@ TEST_CASE("editor bridge deadlines use the supplied clock without changing the p
     CHECK(socket.read(received, bridge::kMaxReply) == net::IoStatus::Closed);
     CHECK(received.empty());
   }
+}
+
+namespace {
+// Calls through `options` while the editor polls `server`, as exchange does with a fixed file.
+Json exchange_with(Game& game, EditorBridge& server, const mcp::Options& options, const std::string& name,
+                   const Json& args) {
+  auto future = std::async(std::launch::async, [&] { return mcp::invoke(options, name, args); });
+  while (future.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+    server.tick(
+        [&](const std::string& tool, const Json& values) { return invoke_editor(*game.session, tool, values); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  return future.get();
+}
+
+std::string text(const Json& result) { return result["content"][0]["text"]; }
+}  // namespace
+
+TEST_CASE("editor discovery finds this game's running editor and skips other games and stale files") {
+  Game game;
+  const auto root = game.root / "private";
+  EditorBridge server(game.path, root);
+  CHECK(editor_connections(game.path, root) == std::vector<fs::path>{server.connection_file()});
+  CHECK(editor_connections(REDGEM_PLATFORMER_DIR, root).empty());
+  std::string error;
+  Json stale = Json::parse(*read_text_file(server.connection_file(), error));
+  stale["port"] = 1;  // nothing listens there: an editor that crashed
+  fs::create_directories(root / "stale");
+  REQUIRE(write_text_file(root / "stale" / "connection.json", stale.dump(), error));
+  CHECK(editor_connections(game.path, root).size() == 2);
+  const auto missed = try_editor(game.path, root / "stale" / "connection.json", "editor", {{"action", "status"}});
+  CHECK_FALSE(missed.reply);
+  CHECK(missed.miss == EditorMiss::Refused);
+  const auto refused = call_editor(game.path, root / "stale" / "connection.json", "editor", {{"action", "status"}});
+  CHECK(text(refused).find("--editor-bridge") != std::string::npos);
+}
+
+TEST_CASE("--editor auto edits the running editor live and falls back to files without one") {
+  Game game;
+  const auto root = game.root / "private";
+  const mcp::Options options{game.path, false, {}, mcp::kDiscoverEditor, root};
+  {
+    EditorBridge server(game.path, root);
+    CHECK(ok(exchange_with(game, server, options, "scene_edit", set({"position=1,2,3"}))));
+    CHECK(game.session->document().dirty());  // live: unsaved in the editor
+  }
+  const auto status = mcp::invoke(options, "editor", {{"action", "status"}});
+  CHECK_FALSE(ok(status));
+  CHECK(text(status).find("--editor-bridge") != std::string::npos);
+  CHECK(ok(mcp::invoke(options, "scene_edit", set({"position=4,5,6"}))));
+  const std::string saved = text(mcp::invoke(options, "scene_get", {{"object", "Coin1"}}));
+  CHECK(saved.rfind("(no editor is running: answered from the saved files)\n", 0) == 0);
+  CHECK(saved.find("position: 4,5,6") != std::string::npos);
+}
+
+TEST_CASE("live game_query asks the editor's running game, not the edited document") {
+  Game game;
+  auto& session = *game.session;
+  const Json inspect{{"action", "inspect"}, {"object", "Player"}};
+  CHECK(text(invoke_editor(session, "game_query", inspect)).find("not playing") != std::string::npos);
+  ScriptedInputSource input;
+  std::string error;
+  REQUIRE(session.play({input}, error));
+  session.runtime()->scene().set_world_position(
+      static_cast<ObjectId>(find_object(session.scene_desc(), "Crate1").index), Vec3{9, 9, 9});
+  const auto crate = invoke_editor(session, "game_query", {{"action", "inspect"}, {"object", "Crate1"}});
+  REQUIRE(ok(crate));
+  CHECK(text(crate).find("#18 Crate1 pos=9,9,9 body=dynamic") == 0);
+  const auto ray = invoke_editor(session, "game_query", {{"action", "raycast"}, {"from", "0,5,-4"}, {"to", "0,-5,-4"}});
+  CHECK(text(ray).find("Ground") != std::string::npos);
+  CHECK_FALSE(ok(invoke_editor(session, "game_query", {{"action", "inspect"}, {"object", "Player"}, {"frames", 3}})));
+  session.stop();
+}
+
+TEST_CASE("frame takes an object, and needs the editor window like the other view actions") {
+  Game game;
+  CHECK_FALSE(ok(invoke_editor(*game.session, "editor", {{"action", "frame"}, {"object", "Nope"}})));
+  const auto windowless = invoke_editor(*game.session, "editor", {{"action", "frame"}, {"object", "Coin1"}});
+  CHECK(text(windowless).find("requires an editor window") != std::string::npos);
+  CHECK_FALSE(ok(invoke_editor(*game.session, "editor", {{"action", "undo"}, {"object", "Coin1"}})));
+}
+
+TEST_CASE("a pinned editor connection leaves from out of scene_edit; discovery keeps it for the files") {
+  const auto from_offered = [](const mcp::Options& options) {
+    for (const auto& tool : mcp::catalog(options)) {
+      if (tool["name"] == "scene_edit") return tool["inputSchema"]["properties"].contains("from");
+    }
+    return false;
+  };
+  mcp::Options options;
+  CHECK(from_offered(options));
+  options.editor_connection = mcp::kDiscoverEditor;
+  CHECK(from_offered(options));
+  options.editor_connection = "connection.json";
+  CHECK_FALSE(from_offered(options));
+  Game game;
+  const auto refused =
+      invoke_editor(*game.session, "scene_edit", {{"action", "add"}, {"object", "Copy"}, {"from", "Coin1"}});
+  CHECK(text(refused) == "live add creates an empty object; from is not supported");
+}
+
+TEST_CASE("live game_query refuses an ambiguous name instead of answering about the first match") {
+  Game game;
+  auto& session = *game.session;
+  session.document().set_name(find_object(session.scene_desc(), "Coin1").index, "Coin2");
+  ScriptedInputSource input;
+  std::string error;
+  REQUIRE(session.play({input}, error));
+  const auto reply = invoke_editor(session, "game_query", {{"action", "inspect"}, {"object", "Coin2"}});
+  CHECK_FALSE(ok(reply));
+  CHECK(text(reply).find("#7") != std::string::npos);
+  CHECK(text(reply).find("#8") != std::string::npos);
+  CHECK(ok(invoke_editor(session, "game_query", {{"action", "inspect"}, {"object", "#8"}})));
+  session.stop();
+}
+
+TEST_CASE("frame with an object is refused while playing, as select is; frame alone is not") {
+  Game game;
+  auto& session = *game.session;
+  int framed = 0;
+  const mcp::Invoke window = [&](const std::string&, const Json&) {
+    ++framed;
+    return mcp::tool_result("framed");
+  };
+  ScriptedInputSource input;
+  std::string error;
+  REQUIRE(session.play({input}, error));
+  CHECK_FALSE(ok(invoke_editor(session, "editor", {{"action", "frame"}, {"object", "Coin1"}}, false, window)));
+  CHECK(session.selected().ids().empty());
+  CHECK(ok(invoke_editor(session, "editor", {{"action", "frame"}}, false, window)));
+  CHECK(framed == 1);
+  session.stop();
+}
+
+namespace {
+// A program on a port that an editor's connection file names: it accepts, then does what
+// `behave` says with each connection, keeping a copy of every byte it received.
+class FakeListener {
+ public:
+  using Behaviour = std::function<void(net::Socket&, bridge::Bytes&)>;
+  explicit FakeListener(Behaviour behave) : behave_(std::move(behave)) {
+    std::string error;
+    listener_ = net::Socket::listen_local(0, error);
+    REQUIRE(listener_.valid());
+    thread_ = std::thread([this] { serve(); });
+  }
+  ~FakeListener() {
+    stop_ = true;
+    thread_.join();
+  }
+  FakeListener(const FakeListener&) = delete;
+  FakeListener& operator=(const FakeListener&) = delete;
+  std::uint16_t port() const { return listener_.local_port(); }
+  std::string received() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    return std::string(received_.begin(), received_.end());
+  }
+
+ private:
+  void serve() {
+    while (!stop_) {
+      net::Socket guest;
+      net::Socket::wait({{&listener_, false}}, bridge::kPollSeconds);
+      if (listener_.accept(guest) != net::IoStatus::Ok) continue;
+      bridge::Bytes bytes;
+      behave_(guest, bytes);
+      const std::lock_guard<std::mutex> lock(mutex_);
+      received_.insert(received_.end(), bytes.begin(), bytes.end());
+    }
+  }
+  net::Socket listener_;
+  Behaviour behave_;
+  std::thread thread_;
+  std::atomic<bool> stop_{false};
+  std::mutex mutex_;
+  bridge::Bytes received_;
+};
+
+constexpr int kFakePolls = 400;
+
+// Reads one line from `socket` into `bytes`; false when none came in time.
+bool read_line(net::Socket& socket, bridge::Bytes& bytes) {
+  for (int poll = 0; poll < kFakePolls && !bridge::complete(bytes); ++poll) {
+    net::Socket::wait({{&socket, false}}, bridge::kPollSeconds);
+    if (socket.read(bytes, bridge::kMaxRequest) == net::IoStatus::Closed) break;
+  }
+  return bridge::complete(bytes);
+}
+
+// A connection file like the editor's, naming `port` instead.
+fs::path descriptor_for(const fs::path& editor_file, std::uint16_t port, const fs::path& folder) {
+  std::string error;
+  Json descriptor = Json::parse(*read_text_file(editor_file, error));
+  descriptor["port"] = port;
+  fs::create_directories(folder);
+  const auto file = folder / "connection.json";
+  REQUIRE(write_text_file(file, descriptor.dump(), error));
+  return file;
+}
+
+std::string token_of(const fs::path& file) {
+  std::string error;
+  return Json::parse(*read_text_file(file, error))["token"];
+}
+}  // namespace
+
+TEST_CASE("a listener that does not prove itself gets only a nonce, and the try is a quick miss") {
+  Game game;
+  EditorBridge server(game.path, game.root / "private");
+  FakeListener silent([](net::Socket& guest, bridge::Bytes& bytes) { read_line(guest, bytes); });
+  const auto file = descriptor_for(server.connection_file(), silent.port(), game.root / "elsewhere" / "silent");
+  const auto attempt = try_editor(game.path, file, "scene_edit", set({"position=1,2,3"}));
+  CHECK_FALSE(attempt.reply);
+  CHECK(attempt.miss == EditorMiss::Unproven);
+  const std::string sent = silent.received();
+  CHECK(sent.find("hello") != std::string::npos);
+  CHECK(sent.find(token_of(file)) == std::string::npos);
+  CHECK(sent.find("scene_edit") == std::string::npos);
+}
+
+TEST_CASE("a connection lost after the editor proved itself fails the call instead of trying elsewhere") {
+  Game game;
+  EditorBridge server(game.path, game.root / "private");
+  const std::string token = token_of(server.connection_file());
+  FakeListener dropping([&](net::Socket& guest, bridge::Bytes& bytes) {
+    if (!read_line(guest, bytes)) return;
+    bridge::Bytes hello = bytes;
+    const Json asked = bridge::parse(bridge::take_line(hello));
+    auto proof = bridge::encode({{"proof", bridge::server_proof(token, asked["hello"].get<std::string>())}});
+    while (!proof.empty() && guest.write(proof) != net::IoStatus::Closed) {
+    }
+    bridge::Bytes request;
+    read_line(guest, request);
+    bytes.insert(bytes.end(), request.begin(), request.end());
+    guest.close();  // the request was delivered, then the connection reset
+  });
+  const auto file = descriptor_for(server.connection_file(), dropping.port(), game.root / "elsewhere" / "dropping");
+  const auto attempt = try_editor(game.path, file, "scene_edit", set({"position=1,2,3"}));
+  REQUIRE(attempt.reply);
+  CHECK(attempt.miss == EditorMiss::None);
+  CHECK((*attempt.reply)["isError"] == true);
+  CHECK(dropping.received().find("scene_edit") != std::string::npos);
+}
+
+TEST_CASE("discovery forgets refused connection files and backs off from unproven listeners") {
+  Game game;
+  const auto root = game.root / "private";
+  fs::path editor_file;
+  {
+    EditorBridge server(game.path, game.root / "template");
+    editor_file = fs::path(server.connection_file());
+    fs::copy_file(editor_file, game.root / "template.json");
+  }
+  editor_file = game.root / "template.json";
+  FakeListener silent([](net::Socket& guest, bridge::Bytes& bytes) { read_line(guest, bytes); });
+  const auto unproven = descriptor_for(editor_file, silent.port(), root / "silent");
+  const auto refused = descriptor_for(editor_file, 1, root / "refused");
+  const mcp::Options options{game.path, false, {}, mcp::kDiscoverEditor, root};
+  const auto first = mcp::invoke(options, "scene_list", {{"limit", 1}});
+  CHECK(text(first).rfind("(no editor is running: answered from the saved files)", 0) == 0);
+  CHECK_FALSE(fs::exists(refused.parent_path()));
+  CHECK(fs::exists(unproven));
+  const auto started = std::chrono::steady_clock::now();
+  CHECK(ok(mcp::invoke(options, "scene_list", {{"limit", 1}})));
+  CHECK(std::chrono::steady_clock::now() - started < bridge::kHandshakeTimeout);
 }

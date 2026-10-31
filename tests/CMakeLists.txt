@@ -193,6 +193,7 @@ add_executable(redgem_tests
   integration/connection_approval_test.cpp
   integration/editor_session_test.cpp
   integration/editor_bridge_test.cpp
+  integration/mcp_game_tools_test.cpp
   integration/game_project_test.cpp
   integration/scene_tools_test.cpp
   integration/play_tools_test.cpp

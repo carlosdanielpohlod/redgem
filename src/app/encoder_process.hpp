@@ -4,6 +4,7 @@
 // shell, except on Windows, where each is quoted) and fed through a pipe on its standard input.
 
 #include <cstdio>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -20,5 +21,15 @@ EncoderProcess start_process(const std::vector<std::string>& arguments);
 bool finish_process(EncoderProcess& process);
 // Whether `arguments` start and end well (what they print is thrown away).
 bool runs(const std::vector<std::string>& arguments);
+
+// How a program run to its end ended.
+struct ProcessEnd {
+  bool started = false;
+  bool exited = false;  // it ended by itself (false: a signal, such as a crash, ended it)
+  int code = 0;         // its exit code when it exited; the signal's number otherwise
+};
+// Runs `arguments` to their end with nothing on standard input and what they print, output and
+// errors alike, written to `output`. A crash of the program is its own, not its caller's.
+ProcessEnd run_to_end(const std::vector<std::string>& arguments, const std::filesystem::path& output);
 
 }  // namespace redgem

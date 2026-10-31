@@ -34,6 +34,14 @@ TEST_CASE("a method mistyped on one of the engine's classes is answered with the
   CHECK(hint_for("undefined method 'jump' for Coin (NoMethodError)", kPlatformer).empty());
 }
 
+TEST_CASE("printing to standard output, which scripts lack, is answered with Debug's messages") {
+  for (const char* method : {"puts", "print", "p"}) {
+    const std::string message = std::string("undefined method '") + method + "' for Coin (NoMethodError)";
+    CHECK(has(hint_for(message, kPlatformer), "use Debug.log(text)"));
+  }
+  CHECK_FALSE(has(hint_for("undefined method 'putz' for Coin (NoMethodError)", kPlatformer), "Debug.log"));
+}
+
 TEST_CASE("a class no script defines is answered with the file it is looked for in") {
   CHECK(hint_for("uninitialized constant Spiner (NameError)", kPlatformer) ==
         "a class Spiner is looked for in scripts/spiner.rb (class Spiner < Behaviour)");

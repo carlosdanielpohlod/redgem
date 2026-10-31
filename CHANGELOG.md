@@ -36,6 +36,15 @@ until 1.0, a release may change what games rely on (see
   save; `Save.slots` lists known names. Local slots reuse durable files and backups, server rooms
   select their own SQLite views, and game-test restarts copy/reset named slots too.
 
+- **MCP `game_query` and `game_shot`**: inspect an object's live state (world pose, body,
+  velocity, grounded, props changed while playing), raycast between two points or overlap a
+  sphere, in the editor's running game or after headless frames; and a small PNG picture of the
+  saved game, returned as MCP image content.
+
+- **MCP editor discovery**: `redgem mcp <game> --editor auto` finds this game's running editor on
+  every call, skipping stale connection files, and works on the files when none is open. The
+  `editor` tool gains `frame`.
+
 - **Immediate world diagnostics**: `Debug.line` and `Debug.box` draw bounded, frame-local wire
   primitives with scene depth or explicit x-ray, across player, editor Play and recordings.
 
@@ -47,6 +56,27 @@ until 1.0, a release may change what games rely on (see
   world survives failed reads, while other rooms can keep ticking. Fixed-step offline runs have
   deterministic activation. Physics creation, script setup and GPU upload still happen on the
   owning thread and may hitch at activation.
+
+### Changed
+
+- MCP argument errors are tool results naming the argument and its range, so models can
+  correct them; unknown tools stay protocol errors. Tool descriptions say what expressions and
+  assignments look like.
+- MCP events read as one line each, `#id level scripts/file.rb:line: message`, after the next
+  cursor, instead of a JSON dump with absolute backtraces.
+- MCP `scene_list` shows 50 objects by default in file mode too, and `limit: 0` shows all.
+- The editor bridge's wire version is 2: before a client sends the credential or a request, the
+  editor proves with an HMAC of a client nonce that it holds the credential. Discovery deletes
+  connection files whose port refuses and skips unproven listeners for a minute.
+- MCP `events` answers in text alone, its cursor first.
+- A script calling `puts`, `print` or `p` is told to use `Debug.log`.
+
+### Fixed
+
+- `redgem shot` and MCP `game_shot` crashed when no display was available; they now report it.
+  `game_shot` draws in a child process, so a renderer crash cannot stop the MCP server.
+- MCP initialization answered `2025-06-18` and `2025-03-26` clients with an unrequested version.
+- A missing game folder for `redgem mcp` is reported plainly instead of as a filesystem error.
 
 ## [0.4.1] - 2026-10-28
 
