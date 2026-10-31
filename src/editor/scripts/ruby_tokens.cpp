@@ -42,19 +42,19 @@ constexpr std::size_t kQuotedSymbolOpening = 2;      // :"
 constexpr std::size_t kClassVariableSigils = 2;      // @@
 
 constexpr std::string_view kKeywords[] = {
-    "BEGIN",  "END",   "alias", "and",    "begin", "break",    "case",     "class",     "def",    "defined?", "do",
-    "else",   "elsif", "end",   "ensure", "false", "for",      "if",       "in",        "module", "next",     "nil",
-    "not",    "or",    "redo",  "rescue", "retry", "return",   "self",     "super",     "then",   "true",     "undef",
-    "unless", "until", "when",  "while",  "yield", "__FILE__", "__LINE__", "__method__"};
+    "BEGIN",  "END",   "alias", "and",    "begin", "break",    "case",     "class",       "def",    "defined?", "do",
+    "else",   "elsif", "end",   "ensure", "false", "for",      "if",       "in",          "module", "next",     "nil",
+    "not",    "or",    "redo",  "rescue", "retry", "return",   "self",     "super",       "then",   "true",     "undef",
+    "unless", "until", "when",  "while",  "yield", "__FILE__", "__LINE__", "__ENCODING__"};
 // The keywords that are values: what follows them is an operator ("self / 2"), not an operand.
-constexpr std::string_view kValueKeywords[] = {"end",  "false",    "nil",      "self",
-                                               "true", "__FILE__", "__LINE__", "__method__"};
+constexpr std::string_view kValueKeywords[] = {"end",  "false", "nil",      "self",     "super",
+                                               "true", "yield", "__FILE__", "__LINE__", "__ENCODING__"};
 
 // %-literals: the letter after "%", what it makes and whether "#{}" works inside.
 struct PercentLiteral {
-  char letter;
-  Kind kind;
-  bool interpolates;
+  char letter = '\0';
+  Kind kind = Kind::String;
+  bool interpolates = false;
 };
 constexpr PercentLiteral kPercentLiterals[] = {
     {'q', Kind::String, false}, {'Q', Kind::String, true},  {'w', Kind::String, false},
@@ -98,32 +98,42 @@ const PercentLiteral* percent_literal(char letter, char opener) {
 
 // What closes a string-like literal, and what it is.
 struct Literal {
-  char open;   // nests inside it, as in %w(a (b) c); the same as `close` for quotes
-  char close;  // '\n' for a line of a heredoc
-  bool interpolates;
-  Kind kind;
+  char open = '\0';   // nests inside it, as in %w(a (b) c); the same as `close` for quotes
+  char close = '\0';  // '\n' for a line of a heredoc
+  bool interpolates = false;
+  Kind kind = Kind::String;
+  bool one_line = false;  // ends at the end of its line if not closed before
 };
 
 // A heredoc begun on the current line: its body starts on the next one.
 struct Heredoc {
   std::string terminator;
-  bool indented_end;
-  bool interpolates;
+  bool indented_end = false;
+  bool interpolates = false;
 };
 
 // A heredoc's opening (<<~NAME, <<-'NAME', <<NAME), and the offset just past it.
 struct HeredocOpening {
   Heredoc heredoc;
-  std::size_t end;
+  std::size_t end = 0;
+  bool unmistakable = false;  // see named_clearly
 };
 
 // A %-literal's opening: its type, and how far past the "%" its opening delimiter is.
 struct PercentOpening {
   PercentLiteral type;
-  std::size_t opener_ahead;
+  std::size_t opener_ahead = 0;
 };
 
 bool closes_quote(char quote, char c) { return quote == '\0' || c == quote; }
+bool is_heredoc_name(char first, char quote, char after) { return is_name_start(first) && closes_quote(quote, after); }
+// <<~eos, <<-eos, <<'eos' and <<EOS can only be heredocs; a bare lowercase name, as in
+// "class <<self", is not one.
+bool named_clearly(bool indented, char quote, char first) { return indented || quote != '\0' || !is_lower(first); }
+std::string_view without_carriage_return(std::string_view line) {
+  if (line.empty()) return line;
+  return line.back() == '\r' ? line.substr(0, line.size() - 1) : line;
+}
 
 class Scanner {
  public:
@@ -179,17 +189,33 @@ class Scanner {
   }
   // `c` is here, where a value may go.
   bool opens_value(char c) const { return peek() == c && operand_next_; }
+  bool blank_before() const { return pos_ > 0 && is_in(kBlanks, code_[pos_ - 1]); }
+  bool value_follows(std::size_t ahead) const { return is_visible(peek(ahead)) && peek(ahead) != '='; }
+  // A method name, a space, then an operator of `length` stuck to what follows: the first argument
+  // of a call without parentheses, as in "puts <<EOS", "p %w[a]" or "split /,/" ("a / b" divides).
+  bool starts_spaced_argument(std::size_t length) const {
+    return after_name_ && blank_before() && value_follows(length);
+  }
+  bool value_may_start(std::size_t length) const { return operand_next_ || starts_spaced_argument(length); }
+  // `c` is here and opens a literal: where a value goes, or as a call's first argument.
+  bool opens_argument(char c) const { return peek() == c && value_may_start(1); }
   // A value was read: what follows is an operator or the end of the expression.
   void ended_operand() {
     operand_next_ = false;
     after_dot_ = false;
+    after_name_ = false;
+  }
+  // Something that is not a value was read (an operator, a newline): a value may come next.
+  void expect_operand() {
+    operand_next_ = true;
+    after_dot_ = false;
+    after_name_ = false;
   }
 
   bool scan_newline() {
     if (peek() != '\n') return false;
     ++pos_;
-    operand_next_ = true;
-    after_dot_ = false;
+    expect_operand();
     scan_heredoc_bodies();
     return true;
   }
@@ -247,12 +273,20 @@ class Scanner {
     return literal.interpolates && starts_with(kInterpolationOpen) && nesting_ < kMaxNesting;
   }
   bool closes(const Literal& literal, char c, int depth) const { return c == literal.close && depth == 0; }
+  bool ends_at_line_end(const Literal& literal) const { return literal.one_line || literal.close == '\n'; }
+  bool stops_before(const Literal& literal) const { return literal.one_line && peek() == '\n'; }
+  // The character after a backslash, whatever it is; but a heredoc line or a regex still ends at
+  // its newline.
+  void skip_escaped(const Literal& literal) {
+    if (peek() == '\n' && ends_at_line_end(literal)) return;
+    pos_ = std::min(pos_ + 1, code_.size());
+  }
   // One step through a literal's inside: true once its closing character was taken.
   bool step_body(const Literal& literal, int& depth) {
     const char c = peek();
     ++pos_;
     if (c == '\\') {
-      pos_ = std::min(pos_ + 1, code_.size());  // the escaped character, whatever it is
+      skip_escaped(literal);
       return false;
     }
     if (closes(literal, c, depth)) return true;
@@ -264,7 +298,7 @@ class Scanner {
   // it never closes. Its code starts at `begin` (its opening).
   void scan_body(const Literal& literal, std::size_t begin) {
     int depth = 0;
-    while (!at_end()) {
+    while (!at_end() && !stops_before(literal)) {
       if (opens_interpolation(literal)) {
         add(begin, literal.kind);
         scan_interpolation();
@@ -282,8 +316,7 @@ class Scanner {
     pos_ += kInterpolationOpen.size();
     add(open, Kind::Interpolation);
     ++nesting_;
-    operand_next_ = true;
-    after_dot_ = false;
+    expect_operand();
     scan_code_to_closing_brace();
     --nesting_;
     if (peek() != '}') return;
@@ -308,20 +341,25 @@ class Scanner {
     const std::size_t name_at = quote_at + (quote == '\0' ? 0 : 1);
     std::size_t name_end = name_at;
     while (is_name_char(peek(name_end))) ++name_end;
-    if (!is_name_start(peek(name_at)) || !closes_quote(quote, peek(name_end))) return std::nullopt;
+    if (!is_heredoc_name(peek(name_at), quote, peek(name_end))) return std::nullopt;
     const std::string name(code_.substr(pos_ + name_at, name_end - name_at));
     const std::size_t end = pos_ + name_end + (quote == '\0' ? 0 : 1);
-    return HeredocOpening{{name, indented, quote != '\''}, end};
+    return HeredocOpening{{name, indented, quote != '\''}, end, named_clearly(indented, quote, name.front())};
   }
-  // "x << y" is a shift or an append; "<<~NAME" anywhere, and "<<NAME" where a value goes, open
-  // heredocs.
-  bool is_heredoc(const std::optional<HeredocOpening>& opening) const {
-    return opening && (opening->heredoc.indented_end || operand_next_);
+  // "x << y" is a shift or an append; "<<NAME" opens a heredoc where a value goes.
+  bool opens_heredoc(const HeredocOpening& opening) const {
+    return opening.unmistakable && value_may_start(kHeredocStart.size());
+  }
+  std::optional<HeredocOpening> heredoc_here() const {
+    if (!starts_with(kHeredocStart)) return std::nullopt;
+    std::optional<HeredocOpening> opening = heredoc_opening();
+    if (!opening) return std::nullopt;
+    if (!opens_heredoc(*opening)) return std::nullopt;
+    return opening;
   }
   bool scan_heredoc_opening() {
-    if (!starts_with(kHeredocStart)) return false;
-    const std::optional<HeredocOpening> opening = heredoc_opening();
-    if (!is_heredoc(opening)) return false;
+    const std::optional<HeredocOpening> opening = heredoc_here();
+    if (!opening) return false;
     const std::size_t begin = pos_;
     pos_ = opening->end;
     add(begin, Kind::String);
@@ -334,8 +372,7 @@ class Scanner {
     const std::size_t line_end = std::min(code_.find('\n', pos_), code_.size());
     std::string_view line = code_.substr(pos_, line_end - pos_);
     if (heredoc.indented_end) line.remove_prefix(std::min(line.find_first_not_of(kBlanks), line.size()));
-    if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
-    return line == heredoc.terminator;
+    return without_carriage_return(line) == heredoc.terminator;
   }
   // The heredocs opened on the line just ended: their lines, then each one's closing word.
   void scan_heredoc_bodies() {
@@ -350,7 +387,7 @@ class Scanner {
   }
 
   std::optional<PercentOpening> percent_opening() const {
-    if (!opens_value('%')) return std::nullopt;
+    if (!opens_argument('%')) return std::nullopt;
     if (is_delimiter(peek(1))) return PercentOpening{kBarePercent, 1};
     const PercentLiteral* type = percent_literal(peek(1), peek(kTypedPercentOpener));
     if (type == nullptr) return std::nullopt;
@@ -376,11 +413,12 @@ class Scanner {
     skip_while(is_lower);
     add(begin, Kind::Regex);
   }
-  // /.../ where a value goes ("a / b" is a division).
+  // /.../ where a value goes ("a / b" is a division). It ends with its line when not closed
+  // before: a slash taken for a regex by mistake colors no more than that.
   bool scan_regex() {
-    if (!opens_value('/')) return false;
+    if (!opens_argument('/')) return false;
     const std::size_t begin = pos_++;
-    scan_body({'/', '/', true, Kind::Regex}, begin);
+    scan_body({'/', '/', true, Kind::Regex, true}, begin);
     scan_regex_flags();
     ended_operand();
     return true;
@@ -406,7 +444,7 @@ class Scanner {
   bool scan_scope() {
     if (!starts_with(kScope)) return false;
     pos_ += kScope.size();
-    operand_next_ = true;
+    expect_operand();
     after_dot_ = true;
     return true;
   }
@@ -441,14 +479,21 @@ class Scanner {
   // @name, @@name, $name and the one-character globals ($0, $!).
   bool scan_variable() {
     if (!starts_variable()) return false;
-    const bool global = starts_global_variable();
     const std::size_t begin = pos_++;
-    if (global && !is_name_char(peek())) ++pos_;  // $!
-    if (peek() == '@') ++pos_;                    // @@name
+    if (code_[begin] == '$') {
+      take_global_punctuation();
+    } else if (peek() == '@') {
+      ++pos_;  // @@name
+    }
     skip_while(is_name_char);
     add(begin, Kind::Variable);
     ended_operand();
     return true;
+  }
+
+  // $! and the other globals named by one punctuation character.
+  void take_global_punctuation() {
+    if (!is_name_char(peek())) ++pos_;
   }
 
   bool has_radix_prefix(std::size_t begin) const {
@@ -459,12 +504,13 @@ class Scanner {
     return is_in(kExponentSigns, peek()) && is_digit(peek(1)) && is_in(kExponents, code_[pos_ - 1]) &&
            !has_radix_prefix(begin);
   }
+  bool at_fraction() const { return peek() == '.' && is_digit(peek(1)); }
   // 42, 1_000, 0x1F, 3.14, 1.5e-3, 2r, 3i: digits and letters, then a fraction and an exponent.
   bool scan_number() {
     if (!is_digit(peek())) return false;
     const std::size_t begin = pos_;
     skip_while(is_name_char);
-    if (peek() == '.' && is_digit(peek(1))) {
+    if (at_fraction()) {
       ++pos_;
       skip_while(is_name_char);
     }
@@ -478,21 +524,24 @@ class Scanner {
   }
 
   // The ? or ! that ends a method name (empty?, save!), but not "!=": x!=y compares.
+  bool at_method_suffix() const { return is_in(kMethodSuffixes, peek()) && peek(1) != '='; }
   void take_method_suffix() {
-    if (is_in(kMethodSuffixes, peek()) && peek(1) != '=') ++pos_;
+    if (at_method_suffix()) ++pos_;
   }
   // "name:" is a hash key or a keyword argument; "A::B" is not.
   bool at_label() const { return peek() == ':' && peek(1) != ':'; }
   void add_word(std::size_t begin) {
     const std::string_view word = code_.substr(begin, pos_ - begin);
     const bool keyword = !after_dot_ && is_one_of(kKeywords, word);
+    ended_operand();
     if (keyword) {
       add(begin, Kind::Keyword);
+      operand_next_ = !is_one_of(kValueKeywords, word);
     } else if (is_upper(word.front())) {
       add(begin, Kind::Constant);
+    } else {
+      after_name_ = true;  // a method or a local variable
     }
-    ended_operand();
-    if (keyword) operand_next_ = !is_one_of(kValueKeywords, word);
   }
   bool scan_word() {
     if (!is_name_start(peek())) return false;
@@ -505,8 +554,7 @@ class Scanner {
     }
     ++pos_;
     add(begin, Kind::Symbol);
-    operand_next_ = true;
-    after_dot_ = false;
+    expect_operand();
     return true;
   }
 
@@ -518,6 +566,7 @@ class Scanner {
     const bool dot = is_method_dot();
     const bool closing = is_in(kClosingBrackets, peek());
     ++pos_;
+    expect_operand();
     operand_next_ = !closing;
     after_dot_ = dot;
     return true;
@@ -530,6 +579,7 @@ class Scanner {
   std::size_t nesting_ = 0;        // interpolations the scanner is inside
   bool operand_next_ = true;       // a value may come next: "/" opens a regex, "%" a literal, "?" a character
   bool after_dot_ = false;         // a "." was just read: what follows is a method name, never a keyword
+  bool after_name_ = false;        // a method or variable name was just read (see starts_spaced_argument)
 };
 
 std::vector<std::size_t> line_starts_of(const std::string& code) {
@@ -544,8 +594,10 @@ std::vector<std::size_t> line_starts_of(const std::string& code) {
 
 std::vector<RubyToken> ruby_tokens(std::string_view code) { return Scanner(code).run(); }
 
+bool RubyHighlightCache::holds(const std::string& code) const { return filled_ && code == code_; }
+
 const RubyHighlight& RubyHighlightCache::of(const std::string& code) {
-  if (filled_ && code == code_) return highlight_;
+  if (holds(code)) return highlight_;
   code_ = code;
   highlight_.tokens = ruby_tokens(code_);
   highlight_.line_starts = line_starts_of(code_);

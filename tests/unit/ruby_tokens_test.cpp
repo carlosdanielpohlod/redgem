@@ -108,6 +108,28 @@ TEST_CASE("heredoc bodies are strings up to their closing word") {
   CHECK(colored("list << item") == Colored{});  // an append, not a heredoc
 }
 
+TEST_CASE("a backslash ending a heredoc line does not hide the closing word") {
+  CHECK(colored("path = <<~'EOS'\n  C:\\\nEOS\nputs path\n") ==
+        Colored{{"<<~'EOS'", Kind::String}, {"  C:\\\nEOS", Kind::String}});
+}
+
+TEST_CASE("a call without parentheses may start with a literal") {
+  CHECK(colored("raise <<MSG\nCan't load\nMSG\n") ==
+        Colored{{"<<MSG", Kind::String}, {"Can't load\nMSG", Kind::String}});
+  CHECK(colored("p %w[a b]") == Colored{{"%w[a b]", Kind::String}});
+  CHECK(colored("line.split /,/") == Colored{{"/,/", Kind::Regex}});
+  CHECK(colored("class <<self\nend") ==
+        Colored{{"class", Kind::Keyword}, {"self", Kind::Keyword}, {"end", Kind::Keyword}});
+  // A slash taken for a regex by mistake colors no more than the rest of its line.
+  CHECK(colored("half = width /2\nend") == Colored{{"/2", Kind::Regex}, {"end", Kind::Keyword}});
+}
+
+TEST_CASE("yield, super and __ENCODING__ are values") {
+  CHECK(colored("total = yield / 2 + super % 3") ==
+        Colored{{"yield", Kind::Keyword}, {"2", Kind::Number}, {"super", Kind::Keyword}, {"3", Kind::Number}});
+  CHECK(colored("__ENCODING__") == Colored{{"__ENCODING__", Kind::Keyword}});
+}
+
 TEST_CASE("method names may end in ? and !") {
   const Colored tokens = colored("return if empty? || defined?(x)\nsave!\nx != y");
   CHECK(has(tokens, "defined?", Kind::Keyword));

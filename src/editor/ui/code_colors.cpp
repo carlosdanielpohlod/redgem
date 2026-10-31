@@ -16,7 +16,7 @@ namespace redgem::ui {
 namespace {
 
 struct KindColor {
-  RubyTokenKind kind;
+  RubyTokenKind kind = RubyTokenKind::String;
   ImVec4 color;
 };
 constexpr KindColor kKindColors[] = {{RubyTokenKind::Keyword, palette::kCodeKeyword},
@@ -33,17 +33,17 @@ using TokenIt = std::vector<RubyToken>::const_iterator;
 
 // Where and how the box draws its text.
 struct CodeView {
-  ImDrawList* draw_list;
-  ImFont* font;
-  float font_size;  // also the height of a line
-  ImVec2 origin;    // where the first line's first character goes
-  ImVec4 clip;      // the part of the box text shows in (not its scrollbar)
+  ImDrawList* draw_list = nullptr;
+  ImFont* font = nullptr;
+  float font_size = 0.0f;  // also the height of a line
+  ImVec2 origin;           // where the first line's first character goes
+  ImVec4 clip;             // the part of the box text shows in (not its scrollbar)
 };
 
 // Part of a line drawn in one color: from where the last one ended to `end`.
 struct Piece {
-  std::size_t end;
-  ImU32 color;
+  std::size_t end = 0;
+  ImU32 color = 0;
 };
 
 // The window the multi-line box with this id draws in, a child of the current window.

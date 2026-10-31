@@ -120,15 +120,26 @@ ImVec2 unsaved_choice_point(UnsavedChoice choice) {
 
 void choose(EditorApp& app, UnsavedChoice choice) { click_at(app, unsaved_choice_point(choice)); }
 
-// Whether the script tab of a file drew some of its code in a color.
-bool code_drawn_in(const std::string& file, const ImVec4& color) {
+// A regex, which the script had none of (in a block never called: the game Ruby has no Regexp).
+constexpr const char* kTypedCode = "MATCHER = -> { /spin/i }";
+constexpr const char* kCodeBoxId = "##code";  // the script tab's text box (its child window's name has it)
+
+// The text box of a file's script tab: the child window it draws its code in.
+const ImGuiWindow* code_box_of(const std::string& file) {
   const ImGuiWindow* tab = ImGui::FindWindowByName(ui::script_window_name(file).c_str());
   REQUIRE(tab != nullptr);
-  const ImU32 wanted = ImGui::ColorConvertFloat4ToU32(color);
   for (const ImGuiWindow* child : tab->DC.ChildWindows) {
-    for (const ImDrawVert& vertex : child->DrawList->VtxBuffer) {
-      if (vertex.col == wanted) return true;
-    }
+    if (std::string(child->Name).find(kCodeBoxId) != std::string::npos) return child;
+  }
+  FAIL("the script tab has no text box");
+  return nullptr;
+}
+
+// Whether the script tab of a file drew some of its code in a color.
+bool code_drawn_in(const std::string& file, const ImVec4& color) {
+  const ImU32 wanted = ImGui::GetColorU32(color);
+  for (const ImDrawVert& vertex : code_box_of(file)->DrawList->VtxBuffer) {
+    if (vertex.col == wanted) return true;
   }
   return false;
 }
@@ -249,10 +260,21 @@ TEST_CASE("a new Ruby script is written in the Script panel and runs on Play") {
   session.refresh_preview();
   run(app, kFrameFrames);
   take_picture(app, screenshot("editor_script_panel"));
-  for (const RubyTokenKind kind : {RubyTokenKind::Keyword, RubyTokenKind::String, RubyTokenKind::Comment,
-                                   RubyTokenKind::Symbol, RubyTokenKind::Constant, RubyTokenKind::Variable}) {
+  for (const RubyTokenKind kind :
+       {RubyTokenKind::Keyword, RubyTokenKind::String, RubyTokenKind::Interpolation, RubyTokenKind::Comment,
+        RubyTokenKind::Symbol, RubyTokenKind::Number, RubyTokenKind::Constant, RubyTokenKind::Variable}) {
+    INFO("token kind ", static_cast<int>(kind));
     CHECK(code_drawn_in(*file, ui::code_color(kind)));
   }
+
+  // Typed into the tab (a click in it puts the cursor after the last line), new code is colored too.
+  const ImGuiWindow* box = code_box_of(*file);
+  click_at(app, ImVec2(box->Pos.x + box->Size.x * kHalf, box->Pos.y + box->Size.y * kHalf));
+  ImGui::GetIO().AddInputCharactersUTF8(kTypedCode);
+  run(app, kFrameFrames);
+  CHECK(editor->text().find(kTypedCode) != std::string::npos);
+  take_picture(app, screenshot("editor_script_typed"));
+  CHECK(code_drawn_in(*file, ui::code_color(RubyTokenKind::Regex)));
 
   app.play();  // saves the open script first
   CHECK_FALSE(editor->modified());

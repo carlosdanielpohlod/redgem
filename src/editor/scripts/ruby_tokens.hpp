@@ -45,6 +45,8 @@ class RubyHighlightCache {
   const RubyHighlight& of(const std::string& code);
 
  private:
+  bool holds(const std::string& code) const;  // the highlight of this code is worked out
+
   std::string code_;
   RubyHighlight highlight_;
   bool filled_ = false;
