@@ -7,6 +7,8 @@
 #include "core/filled_texts.hpp"
 #include "core/translations.hpp"
 #include "editor/editor_config.hpp"
+#include "editor/ui/code_colors.hpp"
+#include "editor/ui/palette.hpp"
 #include "editor/ui/panels.hpp"
 #include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
@@ -74,13 +76,19 @@ bool save_pressed_in_code() {
   return ImGui::IsItemActive() && ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false);
 }
 
-// The code itself, filling the rest of the tab. Ctrl+S in it saves.
+// The code itself, filling the rest of the tab, in the colors of its Ruby (the text box's own text
+// is invisible: the colored copy shows instead). Ctrl+S in it saves.
 void draw_code(ScriptEditor& editor) {
   ImGui::PushFont(code_font(), 0.0f);
+  const ImGuiID id = ImGui::GetID(kCodeId);
+  ImGui::PushStyleColor(ImGuiCol_Text, palette::kTransparent);
   ImGui::InputTextMultiline(kCodeId, &editor.text(), ImVec2(editor_config::kFillWidth, editor_config::kFillWidth),
                             ImGuiInputTextFlags_AllowTabInput);
+  ImGui::PopStyleColor();
+  const bool save_pressed = save_pressed_in_code();
+  draw_code_colors(id, editor.text(), editor.highlight());
   ImGui::PopFont();
-  if (save_pressed_in_code()) save(editor);
+  if (save_pressed) save(editor);
 }
 
 void draw_body(ScriptEditor& editor, const std::string& window_name, ScriptTabsResult& result) {

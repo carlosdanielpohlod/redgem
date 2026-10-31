@@ -29,6 +29,7 @@
 #include "editor/editor_config.hpp"
 #include "editor/object_clipboard.hpp"
 #include "editor/scripts/script_files.hpp"
+#include "editor/ui/code_colors.hpp"
 #include "editor/ui/panels.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "editor/ui/labels.hpp"
@@ -118,6 +119,19 @@ ImVec2 unsaved_choice_point(UnsavedChoice choice) {
 }
 
 void choose(EditorApp& app, UnsavedChoice choice) { click_at(app, unsaved_choice_point(choice)); }
+
+// Whether the script tab of a file drew some of its code in a color.
+bool code_drawn_in(const std::string& file, const ImVec4& color) {
+  const ImGuiWindow* tab = ImGui::FindWindowByName(ui::script_window_name(file).c_str());
+  REQUIRE(tab != nullptr);
+  const ImU32 wanted = ImGui::ColorConvertFloat4ToU32(color);
+  for (const ImGuiWindow* child : tab->DC.ChildWindows) {
+    for (const ImDrawVert& vertex : child->DrawList->VtxBuffer) {
+      if (vertex.col == wanted) return true;
+    }
+  }
+  return false;
+}
 
 int node_count_of(const std::filesystem::path& file) {
   const LoadResult loaded = load_gltf_scene(file.string());
@@ -221,9 +235,12 @@ TEST_CASE("a new Ruby script is written in the Script panel and runs on Play") {
   ScriptEditor* editor = app.scripts().open(*file, error);
   REQUIRE(editor != nullptr);
   editor->text() =
+      "# Turns the tree it is attached to.\n"
       "class SpinTree < Behaviour\n"
       "  DEGREES_PER_SECOND = 90.0\n"
       "  def update(dt)\n"
+      "    @label = \"#{DEGREES_PER_SECOND} degrees a second\"\n"
+      "    @axis = :y\n"
       "    transform.rotate(Vector3.new(0, DEGREES_PER_SECOND * dt, 0))\n"
       "  end\n"
       "end\n";
@@ -232,6 +249,10 @@ TEST_CASE("a new Ruby script is written in the Script panel and runs on Play") {
   session.refresh_preview();
   run(app, kFrameFrames);
   take_picture(app, screenshot("editor_script_panel"));
+  for (const RubyTokenKind kind : {RubyTokenKind::Keyword, RubyTokenKind::String, RubyTokenKind::Comment,
+                                   RubyTokenKind::Symbol, RubyTokenKind::Constant, RubyTokenKind::Variable}) {
+    CHECK(code_drawn_in(*file, ui::code_color(kind)));
+  }
 
   app.play();  // saves the open script first
   CHECK_FALSE(editor->modified());

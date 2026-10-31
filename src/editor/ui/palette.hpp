@@ -27,5 +27,20 @@ inline constexpr ImVec4 kMuted{0.58f, 0.60f, 0.66f, 1.0f};
 inline constexpr ImVec4 kError{1.0f, 0.42f, 0.42f, 1.0f};
 inline constexpr ImVec4 kWarning{1.0f, 0.78f, 0.32f, 1.0f};
 inline constexpr ImVec4 kSuccess{0.40f, 0.85f, 0.55f, 1.0f};
+inline constexpr ImVec4 kSky{0.45f, 0.75f, 0.98f, 1.0f};
+inline constexpr ImVec4 kLavender{0.73f, 0.62f, 0.98f, 1.0f};
+inline constexpr ImVec4 kTeal{0.38f, 0.84f, 0.80f, 1.0f};
+inline constexpr ImVec4 kOrange{0.98f, 0.62f, 0.38f, 1.0f};
+
+// Ruby code in the script tabs, by what each word is.
+inline constexpr ImVec4 kCodeKeyword = kAccentHover;
+inline constexpr ImVec4 kCodeString = kSuccess;
+inline constexpr ImVec4 kCodeInterpolation = kAccent;
+inline constexpr ImVec4 kCodeSymbol = kSky;
+inline constexpr ImVec4 kCodeRegex = kTeal;
+inline constexpr ImVec4 kCodeComment = kTextDisabled;
+inline constexpr ImVec4 kCodeNumber = kOrange;
+inline constexpr ImVec4 kCodeConstant = kWarning;
+inline constexpr ImVec4 kCodeVariable = kLavender;
 
 }  // namespace redgem::ui::palette

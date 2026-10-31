@@ -546,10 +546,12 @@ if(NOT ANDROID)
     editor/scripts/script_files.cpp
     editor/scripts/script_editor.cpp
     editor/scripts/script_workspace.cpp
+    editor/scripts/ruby_tokens.cpp
     editor/file_drop.cpp
     editor/project_files.cpp
     editor/game_scenes.cpp
     editor/ui/script_editor_panel.cpp
+    editor/ui/code_colors.cpp
     editor/ui/hierarchy_panel.cpp
     editor/ui/hierarchy_rows.cpp
     editor/inspector_logic.cpp

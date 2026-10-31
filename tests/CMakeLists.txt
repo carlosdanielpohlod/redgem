@@ -76,6 +76,7 @@ add_executable(redgem_tests
   unit/gizmo_test.cpp
   unit/scene_overlays_test.cpp
   unit/script_files_test.cpp
+  unit/ruby_tokens_test.cpp
   unit/primitives_test.cpp
   unit/file_drop_test.cpp
   unit/project_files_test.cpp

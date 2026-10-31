@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <string>
 
+#include "editor/scripts/ruby_tokens.hpp"
 #include "script/ruby_vm.hpp"
 
 namespace redgem {
@@ -20,6 +21,8 @@ class ScriptEditor {
 
   std::string& text() { return text_; }
   bool modified() const { return text_ != saved_text_; }
+  // The text's Ruby tokens, for coloring it (worked out again only after the text changed).
+  const RubyHighlight& highlight() { return highlight_.of(text_); }
 
   // Writes the file (even with mistakes, so no work is lost) and checks its syntax.
   // Returns false only when the file could not be written.
@@ -46,6 +49,7 @@ class ScriptEditor {
   std::string syntax_error_;
   std::filesystem::file_time_type disk_time_{};  // of the file when it was last read or written here
   bool changed_on_disk_ = false;
+  RubyHighlightCache highlight_;
   RubyVm vm_;
 };
 
