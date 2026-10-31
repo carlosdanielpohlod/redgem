@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "core/log.hpp"
 #include "core/translations.hpp"
 #include "editor/editor_config.hpp"
 #include "editor/ui/agent_views.hpp"
@@ -31,6 +32,7 @@ constexpr float kRowsUnderInput = 2.0f;  // the attachments' row and the buttons
 constexpr double kReparseEvery = 0.1;
 constexpr float kNotMeasured = 0.0f;
 constexpr const char* kPromptId = "##prompt";
+constexpr const char* kHistoryPopup = "agent_history";
 constexpr char kLineEnd = '\n';  // the height of an entry never drawn yet
 
 bool blank(const std::string& text) { return text.find_first_not_of(kWhitespace) == std::string::npos; }
@@ -99,7 +101,11 @@ bool scrolled_to_bottom() { return ImGui::GetScrollY() >= ImGui::GetScrollMaxY()
 }  // namespace
 
 AgentPanel::AgentPanel(AgentPanelSetup setup)
-    : setup_(std::move(setup)), agents_(agent::read_agents(setup_.agents_file)) {}
+    : setup_(std::move(setup)), agents_(agent::read_agents(setup_.agents_file)) {
+  if (!setup_.sessions_file.empty()) past_ = agent::read_sessions(setup_.sessions_file, setup_.game);
+  // (The conversation the game was left with comes back: it is never lost by closing the editor.)
+  if (setup_.reopen_last && !past_.empty()) open_past(past_.front());
+}
 
 AgentPanel::~AgentPanel() = default;
 
@@ -111,7 +117,7 @@ void AgentPanel::pick(std::size_t agent) {
   end_session();
 }
 
-void AgentPanel::start_session() {
+void AgentPanel::start_session(const std::string& past_session) {
   end_session();
   if (agents_.empty()) return;
   const auto call = agent::launch_call(agents_[picked_], setup_.find, start_error_);
@@ -120,14 +126,28 @@ void AgentPanel::start_session() {
   std::vector<agent::McpServer> servers;
   if (setup_.tool_servers) servers = setup_.tool_servers(tools_error);
   connection_ = std::make_unique<agent::AgentConnection>(
-      *call, agent::ClientSetup{setup_.game, std::move(servers), setup_.client_version});
+      *call, agent::ClientSetup{setup_.game, std::move(servers), setup_.client_version, past_session});
   if (!tools_error.empty()) {
     connection_->client().transcript().add(EntryKind::Notice, tr("editor.agent.no_tools", {{"error", tools_error}}));
   }
 }
 
+void AgentPanel::open_past(const agent::PastSession& session) {
+  const auto found = std::find_if(agents_.begin(), agents_.end(),
+                                  [&](const agent::AgentProfile& agent) { return agent.name == session.agent; });
+  if (found == agents_.end()) {
+    end_session();
+    start_error_ = tr("editor.agent.agent_gone", {{"agent", session.agent}});
+    return;
+  }
+  picked_ = static_cast<std::size_t>(found - agents_.begin());
+  start_session(session.id);
+  title_ = session.title;
+}
+
 void AgentPanel::end_session() {
   connection_.reset();  // (stops the agent's program)
+  title_.clear();
   start_error_.clear();
   queued_.clear();
   parsed_.clear();
@@ -141,9 +161,25 @@ bool AgentPanel::send(const std::string& text) {
     queued_ = text;
     return connection_ != nullptr;
   }
+  return prompt_now(text);
+}
+
+// Sends a prompt to a conversation that is ready, and remembers the conversation for the game.
+bool AgentPanel::prompt_now(const std::string& text) {
   if (!connection_->client().prompt(text, attached_)) return false;
   attached_.clear();
+  note_prompt(text);
   return true;
+}
+
+void AgentPanel::note_prompt(const std::string& text) {
+  if (setup_.sessions_file.empty()) return;
+  if (title_.empty()) title_ = agent::session_title(text);
+  const agent::PastSession session{connection_->client().session_id(), agents_[picked_].name, title_,
+                                   agent::seconds_now()};
+  std::string error;
+  if (!agent::remember_session(setup_.sessions_file, setup_.game, session, error)) log::warning(error);
+  past_ = agent::read_sessions(setup_.sessions_file, setup_.game);
 }
 
 void AgentPanel::stop() {
@@ -166,7 +202,7 @@ void AgentPanel::poll() {
   if (queued_.empty()) return;
   if (connection_->client().state() == AgentState::Failed) return give_back_queued();
   if (connection_->client().state() != AgentState::Ready) return;
-  if (connection_->client().prompt(queued_, attached_)) attached_.clear();
+  prompt_now(queued_);
   queued_.clear();
 }
 
@@ -203,10 +239,38 @@ void AgentPanel::draw_toolbar() {
   ImGui::SameLine();
   if (icon_button(ICON_FA_PLUS, tr("editor.agent.new_session"))) start_session();
   ImGui::SameLine();
+  draw_history();
+  ImGui::SameLine();
   if (icon_button(ICON_FA_GEAR, tr("editor.agent.settings"))) open_settings();
   ImGui::SameLine();
   draw_status();
   ImGui::Separator();
+}
+
+// The game's past conversations: picking one reopens it.
+void AgentPanel::draw_history() {
+  if (setup_.sessions_file.empty()) return;
+  if (icon_button(ICON_FA_CLOCK_ROTATE_LEFT, tr("editor.agent.history"))) ImGui::OpenPopup(kHistoryPopup);
+  popup(kHistoryPopup, [this] { draw_history_list(); });
+}
+
+void AgentPanel::draw_history_list() {
+  if (past_.empty()) return ImGui::TextColored(palette::kMuted, "%s", tr("editor.agent.history_empty"));
+  const std::int64_t now = agent::seconds_now();
+  for (std::size_t index = 0; index < past_.size(); ++index) {
+    const agent::PastSession& session = past_[index];
+    ImGui::PushID(static_cast<int>(index));
+    if (ImGui::Selectable(session.title.c_str(), is_current(session))) open_past(agent::PastSession(session));
+    ImGui::SameLine();
+    ImGui::TextColored(palette::kMuted, "%s, %s", session.agent.c_str(),
+                       agent::time_ago(session.last_used, now).c_str());
+    ImGui::PopID();
+  }
+}
+
+// The conversation the panel shows now.
+bool AgentPanel::is_current(const agent::PastSession& session) const {
+  return connection_ != nullptr && connection_->client().session_id() == session.id;
 }
 
 void AgentPanel::draw_agent_picker() {

@@ -190,6 +190,19 @@ editor's local bridge ([MCP tools](mcp.md#live-editor)) and hands the agent
 `redgem mcp <game> --editor <connection>` as its MCP server. Its edits to the scene are undo steps
 like yours, and they stay unsaved until you or the agent save.
 
+### Past conversations
+
+A conversation is not lost when the editor closes. The editor remembers each game's last 20
+conversations: which agent each was had with, its first message as a title, and when it was last
+used. When the editor opens the game again, the last conversation comes back as it was left. The
+clock button beside **+** lists the others, and picking one reopens it with its agent.
+
+The agent keeps the conversation itself. Reopening one asks the agent to replay it (ACP's
+`session/load`, which both Claude Code's and Codex's adapters support), and the transcript is
+rebuilt from that replay. An agent that cannot replay conversations starts a new one, and the panel
+says so; the list stays. The list is kept in `agent-sessions.json` in your RedGem settings folder,
+not in the game's folder, so it is not shared with the game.
+
 ### Your own agents
 
 The gear button opens the list of agents. Each one has a name, a command, arguments (one per line)

@@ -4,7 +4,11 @@
 // the session's folder through the editor, and reads it back. What it is told changes that:
 //   FAKE_AGENT_LOGIN=1     session/new answers "authentication required"
 //   prompt "crash"         it writes a line to its standard error and ends
+//   FAKE_AGENT_NO_LOAD=1   it says it cannot reopen past conversations (no loadSession)
+// Each prompt is kept in fake-agent-history.txt in the session's folder: session/load of its one
+// session replays them, each with the answer it got.
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -25,6 +29,11 @@ constexpr const char* kSession = "fake-session";
 constexpr const char* kNotesFile = "notes.txt";
 constexpr const char* kLoginVariable = "FAKE_AGENT_LOGIN";
 constexpr const char* kCrashPrompt = "crash";
+constexpr const char* kNoLoadVariable = "FAKE_AGENT_NO_LOAD";
+constexpr const char* kHistoryFile = "/fake-agent-history.txt";
+constexpr const char* kAnswerStart = "Hello ";
+constexpr const char* kAnswerEnd = "from the **fake** agent.";
+constexpr int kNoSuchSession = -32002;
 
 void send(const Json& message) { std::cout << message.dump() << '\n' << std::flush; }
 
@@ -102,15 +111,36 @@ const char* acted_on(const Session& session, const Json& outcome, const std::str
   return "end_turn";
 }
 
+void keep_prompt(const Session& session, const std::string& text) {
+  std::ofstream(session.folder + kHistoryFile, std::ios::app) << text << '\n';
+}
+
+// session/load: every prompt kept, as the user's message and the answer, then the answer to the call.
+void load_session(const Json& id, const Json& params, Session& session) {
+  if (params.value("sessionId", std::string()) != kSession) {
+    send({{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", kNoSuchSession}, {"message", "fake: no such session"}}}});
+    return;
+  }
+  session.folder = params.value("cwd", std::string());
+  std::ifstream history(session.folder + kHistoryFile);
+  std::string line;
+  while (std::getline(history, line)) {
+    update({{"sessionUpdate", "user_message_chunk"}, {"content", {{"type", "text"}, {"text", line}}}});
+    say("agent_message_chunk", std::string(kAnswerStart) + kAnswerEnd);
+  }
+  answer(id, Json::object());
+}
+
 void prompt(const Json& id, const Json& params, const Session& session) {
   const std::string text = params["prompt"].back().value("text", std::string());
+  keep_prompt(session, text);
   if (text == kCrashPrompt) {
     std::cerr << "fake agent: crashed on purpose" << std::endl;
     std::exit(kCrashExitCode);
   }
   say("agent_thought_chunk", "Thinking about it.");
-  say("agent_message_chunk", "Hello ");
-  say("agent_message_chunk", "from the **fake** agent.");
+  say("agent_message_chunk", kAnswerStart);
+  say("agent_message_chunk", kAnswerEnd);
   update({{"sessionUpdate", "plan"},
           {"entries", {{{"content", "Write the notes"}, {"priority", "high"}, {"status", "in_progress"}}}}});
   update({{"sessionUpdate", "tool_call"},
@@ -143,10 +173,13 @@ int main() {
     const Json id = message->value("id", Json());
     const Json params = message->value("params", Json::object());
     if (method == "initialize") {
-      answer(id,
-             {{"protocolVersion", kProtocolVersion}, {"agentInfo", {{"name", "fake-agent"}, {"title", "Fake agent"}}}});
+      answer(id, {{"protocolVersion", kProtocolVersion},
+                  {"agentInfo", {{"name", "fake-agent"}, {"title", "Fake agent"}}},
+                  {"agentCapabilities", {{"loadSession", std::getenv(kNoLoadVariable) == nullptr}}}});
     } else if (method == "session/new") {
       open_session(id, params, session);
+    } else if (method == "session/load") {
+      load_session(id, params, session);
     } else if (method == "session/prompt") {
       prompt(id, params, session);
     }
