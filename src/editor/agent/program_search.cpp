@@ -47,10 +47,10 @@ fs::path with_an_extension(const fs::path& base, const std::vector<std::string>&
 #ifdef _WIN32
 std::vector<std::string> this_systems_extensions() {
   const std::string listed = platform::environment(kExtensionsVariable);
-  std::vector<std::string> extensions{""};
-  for (const std::string& extension : split(listed.empty() ? kDefaultExtensions : listed, kPathSeparator)) {
-    extensions.push_back(extension);
-  }
+  // (The name as given comes last: npm puts a shell script without an extension beside its .cmd,
+  // which Windows cannot start.)
+  std::vector<std::string> extensions = split(listed.empty() ? kDefaultExtensions : listed, kPathSeparator);
+  extensions.emplace_back("");
   return extensions;
 }
 

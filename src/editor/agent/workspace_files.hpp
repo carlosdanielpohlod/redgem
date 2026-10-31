@@ -35,6 +35,8 @@ class Workspace {
   bool write(const std::string& requested, const std::string& text, std::string& error) const;
 
  private:
+  std::string refusal(const std::string& requested, const std::filesystem::path& relative) const;
+
   std::filesystem::path folder_;
 };
 

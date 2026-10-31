@@ -12,10 +12,18 @@
 #include "editor/agent/workspace_files.hpp"
 #include "test_support.hpp"
 
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
+
 using namespace redgem::agent;
 namespace fs = std::filesystem;
 
 namespace {
+
+#ifndef _WIN32
+constexpr mode_t kOwnerReadWrite = 0600;
+#endif
 
 fs::path fresh_folder(const std::string& name) {
   const fs::path folder = fs::temp_directory_path() / name;
@@ -140,3 +148,39 @@ TEST_CASE("a program is found on the search path, with the system's extensions")
   CHECK(find_program_in("/c/agent", "", ':', {""}, exists) == fs::path("/c/agent"));
   CHECK(find_program_in("", "/c", ':', {""}, exists).empty());
 }
+
+TEST_CASE("a workspace refuses device names, alternate streams and what is no regular file") {
+  const fs::path folder = fresh_folder("redgem_workspace_devices");
+  const Workspace workspace(folder);
+  std::string error;
+  CHECK_FALSE(workspace.resolve("scripts/CON", error));
+  CHECK_FALSE(workspace.resolve("nul.txt", error));
+  CHECK_FALSE(workspace.resolve("game.json:stream", error));
+  CHECK(workspace.resolve("console.rb", error));
+  fs::create_directories(folder / "a_folder");
+  CHECK_FALSE(workspace.write("a_folder", "x", error));
+  CHECK(fs::is_directory(folder / "a_folder"));
+  REQUIRE(workspace.write("kept.txt", "one", error));
+  REQUIRE(workspace.write("kept.txt", "two", error));
+  CHECK(workspace.read("kept.txt", {}, error) == std::optional<std::string>("two"));
+  CHECK(std::distance(fs::directory_iterator(folder), fs::directory_iterator()) == 2);  // (no temporary left)
+  fs::remove_all(folder);
+}
+
+TEST_CASE("on Windows the system's extensions come before a name without one") {
+  const std::set<fs::path> files = {fs::path("/n") / "agent", fs::path("/n") / "agent.cmd"};
+  const ProgramTest exists = [&](const fs::path& file) { return files.count(file) > 0; };
+  CHECK(find_program_in("agent", "/n", ';', {".exe", ".cmd", ""}, exists) == fs::path("/n") / "agent.cmd");
+}
+
+#ifndef _WIN32
+TEST_CASE("a workspace does not write into a pipe, which would wait for a reader forever") {
+  const fs::path folder = fresh_folder("redgem_workspace_fifo");
+  REQUIRE(mkfifo((folder / "pipe").c_str(), kOwnerReadWrite) == 0);
+  const Workspace workspace(folder);
+  std::string error;
+  CHECK_FALSE(workspace.write("pipe", "x", error));
+  CHECK_FALSE(workspace.read("pipe", {}, error));
+  fs::remove_all(folder);
+}
+#endif

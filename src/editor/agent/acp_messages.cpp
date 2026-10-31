@@ -18,25 +18,20 @@ constexpr const char* kCancelledOutcome = "cancelled";
 constexpr const char* kImagePlaceholder = "[image]";  // what the transcript shows for a picture
 constexpr const char* kTerminalPlaceholder = "[terminal output]";
 
-std::string text_or_empty(const Json& value, const char* key) {
-  const auto found = value.find(key);
-  return found != value.end() && found->is_string() ? found->get<std::string>() : std::string();
-}
-
-bool is_type(const Json& block, const char* type) { return block.is_object() && text_or_empty(block, "type") == type; }
+bool is_type(const Json& block, const char* type) { return block.is_object() && field_text(block, "type") == type; }
 
 // A content block as text: text itself, the address of a link, the text of an embedded resource.
 std::string block_text(const Json& block) {
-  if (is_type(block, kTextType)) return text_or_empty(block, "text");
-  if (is_type(block, kResourceLinkType)) return text_or_empty(block, "uri");
-  if (is_type(block, kResourceType)) return text_or_empty(block.value("resource", Json::object()), "text");
+  if (is_type(block, kTextType)) return field_text(block, "text");
+  if (is_type(block, kResourceLinkType)) return field_text(block, "uri");
+  if (is_type(block, kResourceType)) return field_text(field_object(block, "resource"), "text");
   return block.is_object() && block.contains("type") ? kImagePlaceholder : "";
 }
 
 FileChange change_of(const Json& diff) {
   FileChange change;
-  change.path = text_or_empty(diff, "path");
-  change.new_text = text_or_empty(diff, "newText");
+  change.path = field_text(diff, "path");
+  change.new_text = field_text(diff, "newText");
   if (diff.contains("oldText") && diff["oldText"].is_string()) change.old_text = diff["oldText"].get<std::string>();
   return change;
 }
@@ -46,7 +41,7 @@ ToolContent tool_content(const Json& item) {
   if (is_type(item, kDiffType)) {
     content.change = change_of(item);
   } else if (is_type(item, kContentType)) {
-    content.text = block_text(item.value(kContentType, Json::object()));
+    content.text = block_text(field_object(item, kContentType));
   } else {
     content.text = kTerminalPlaceholder;
   }
@@ -62,7 +57,7 @@ std::vector<ToolContent> tool_contents(const Json& items) {
 std::vector<std::string> locations_of(const Json& items) {
   std::vector<std::string> locations;
   for (const Json& item : items) {
-    if (item.is_object()) locations.push_back(text_or_empty(item, "path"));
+    if (item.is_object()) locations.push_back(field_text(item, "path"));
   }
   return locations;
 }
@@ -84,9 +79,8 @@ PlanStatus plan_status_of(const std::string& value) {
 
 std::vector<PlanItem> plan_of(const Json& update) {
   std::vector<PlanItem> plan;
-  for (const Json& entry : update.value("entries", Json::array())) {
-    if (entry.is_object())
-      plan.push_back({text_or_empty(entry, "content"), plan_status_of(text_or_empty(entry, "status"))});
+  for (const Json& entry : field_list(update, "entries")) {
+    if (entry.is_object()) plan.push_back({field_text(entry, "content"), plan_status_of(field_text(entry, "status"))});
   }
   return plan;
 }
@@ -100,12 +94,12 @@ bool has_list(const Json& update, const char* key) { return update.contains(key)
 
 ToolCall started_call(const Json& update) {
   ToolCall call;
-  call.id = text_or_empty(update, "toolCallId");
-  call.title = text_or_empty(update, "title");
-  call.kind = text_or_empty(update, "kind");
-  call.status = status_of(update.value("status", Json())).value_or(ToolStatus::Pending);
-  call.content = tool_contents(update.value("content", Json::array()));
-  call.locations = locations_of(update.value("locations", Json::array()));
+  call.id = field_text(update, "toolCallId");
+  call.title = field_text(update, "title");
+  call.kind = field_text(update, "kind");
+  call.status = status_of(field(update, "status")).value_or(ToolStatus::Pending);
+  call.content = tool_contents(field_list(update, "content"));
+  call.locations = locations_of(field_list(update, "locations"));
   if (update.contains("rawInput")) call.input = compact(update["rawInput"]);
   return call;
 }
@@ -120,12 +114,12 @@ PermissionKind permission_kind_of(const std::string& value) {
 using UpdateHandler = bool (*)(Transcript&, const Json&);
 
 bool message_chunk(Transcript& transcript, const Json& update) {
-  transcript.append(EntryKind::Agent, block_text(update.value("content", Json::object())));
+  transcript.append(EntryKind::Agent, block_text(field_object(update, "content")));
   return true;
 }
 
 bool thought_chunk(Transcript& transcript, const Json& update) {
-  transcript.append(EntryKind::Thought, block_text(update.value("content", Json::object())));
+  transcript.append(EntryKind::Thought, block_text(field_object(update, "content")));
   return true;
 }
 
@@ -155,6 +149,27 @@ UpdateHandler handler_for(const std::string& kind) {
 }
 
 }  // namespace
+
+Json field(const Json& value, const char* key) {
+  if (!value.is_object()) return Json();
+  const auto found = value.find(key);
+  return found == value.end() ? Json() : *found;
+}
+
+Json field_object(const Json& value, const char* key) {
+  Json found = field(value, key);
+  return found.is_object() ? found : Json::object();
+}
+
+Json field_list(const Json& value, const char* key) {
+  Json found = field(value, key);
+  return found.is_array() ? found : Json::array();
+}
+
+std::string field_text(const Json& value, const char* key) {
+  const Json found = field(value, key);
+  return found.is_string() ? found.get<std::string>() : std::string();
+}
 
 Json initialize_params(const std::string& client_version) {
   return {{"protocolVersion", kProtocolVersion},
@@ -186,29 +201,30 @@ Json cancel_params(const std::string& session) { return {{"sessionId", session}}
 
 AgentInfo agent_info(const Json& result) {
   AgentInfo info;
-  info.protocol_version = result.value("protocolVersion", 0);
-  const Json about = result.value("agentInfo", Json::object());
-  info.name = text_or_empty(about, "title");
-  if (info.name.empty()) info.name = text_or_empty(about, "name");
-  for (const Json& login : result.value("authMethods", Json::array())) {
-    if (login.is_object()) info.login_methods.push_back(text_or_empty(login, "name"));
+  const Json version = field(result, "protocolVersion");
+  info.protocol_version = version.is_number_integer() ? version.get<int>() : 0;
+  const Json about = field_object(result, "agentInfo");
+  info.name = field_text(about, "title");
+  if (info.name.empty()) info.name = field_text(about, "name");
+  for (const Json& login : field_list(result, "authMethods")) {
+    if (login.is_object()) info.login_methods.push_back(field_text(login, "name"));
   }
   return info;
 }
 
 bool apply_update(Transcript& transcript, const Json& params) {
-  const Json update = params.value("update", Json::object());
+  const Json update = field_object(params, "update");
   if (!update.is_object()) return false;
-  const UpdateHandler handler = handler_for(text_or_empty(update, "sessionUpdate"));
+  const UpdateHandler handler = handler_for(field_text(update, "sessionUpdate"));
   return handler != nullptr && handler(transcript, update);
 }
 
 ToolCallPatch tool_patch(const Json& update) {
   ToolCallPatch patch;
-  patch.id = text_or_empty(update, "toolCallId");
+  patch.id = field_text(update, "toolCallId");
   patch.title = optional_text(update, "title");
   patch.kind = optional_text(update, "kind");
-  patch.status = status_of(update.value("status", Json()));
+  patch.status = status_of(field(update, "status"));
   if (has_list(update, "content")) patch.content = tool_contents(update["content"]);
   if (has_list(update, "locations")) patch.locations = locations_of(update["locations"]);
   if (update.contains("rawInput")) patch.input = compact(update["rawInput"]);
@@ -217,12 +233,12 @@ ToolCallPatch tool_patch(const Json& update) {
 
 PermissionRequest permission_request(const Json& id, const Json& params) {
   std::vector<PermissionOption> options;
-  for (const Json& option : params.value("options", Json::array())) {
+  for (const Json& option : field_list(params, "options")) {
     if (!option.is_object()) continue;
-    options.push_back({text_or_empty(option, "optionId"), text_or_empty(option, "name"),
-                       permission_kind_of(text_or_empty(option, "kind"))});
+    options.push_back(
+        {field_text(option, "optionId"), field_text(option, "name"), permission_kind_of(field_text(option, "kind"))});
   }
-  return {id, tool_patch(params.value("toolCall", Json::object())), std::move(options)};
+  return {id, tool_patch(field_object(params, "toolCall")), std::move(options)};
 }
 
 Json permission_outcome(const PermissionRequest& request) {
@@ -231,6 +247,6 @@ Json permission_outcome(const PermissionRequest& request) {
   return {{"outcome", {{"outcome", kSelectedOutcome}, {"optionId", chosen->id}}}};
 }
 
-std::string stop_reason(const Json& result) { return text_or_empty(result, "stopReason"); }
+std::string stop_reason(const Json& result) { return field_text(result, "stopReason"); }
 
 }  // namespace redgem::agent

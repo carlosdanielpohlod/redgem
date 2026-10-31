@@ -136,3 +136,19 @@ TEST_CASE("a program that is not there fails at once, saying so") {
   CHECK(connection.client().error().find("redgem-no-such-agent") != std::string::npos);
   fs::remove_all(folder);
 }
+
+#ifndef _WIN32
+TEST_CASE("ending a session does not wait for what the agent started and let go of") {
+  if (find_program("python3").empty()) return;  // (what makes the stray process here)
+  // A program whose child leaves its process group and holds its streams open for half a minute.
+  const std::string stray = "import os, time\nif os.fork() == 0:\n    os.setpgid(0, 0)\ntime.sleep(30)\n";
+  const fs::path folder = game_folder();
+  const auto started = std::chrono::steady_clock::now();
+  {
+    AgentConnection connection({"python3", {"-c", stray}, {}}, setup_in(folder));
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));  // (time for the child to go its way)
+  }
+  CHECK(std::chrono::steady_clock::now() - started < std::chrono::seconds(10));
+  fs::remove_all(folder);
+}
+#endif

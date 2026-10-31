@@ -12,6 +12,7 @@
 #include <utility>
 
 #include <fcntl.h>
+#include <poll.h>
 #include <spawn.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -22,11 +23,16 @@ extern char** environ;  // NOLINT(readability-redundant-declaration): what the a
 
 namespace redgem::agent {
 
+constexpr std::size_t kWakeEnds = 2;  // the wake pipe's: read, write
+
 struct ChildProcess::Handles {
   pid_t process = 0;
   int input = -1;   // its standard input, written here
   int output = -1;  // its standard output, read here
   int errors = -1;  // its standard error, read here
+  // Written once by stop(): every read and write waiting on the agent comes back at once, even when
+  // something that left its process group (a daemon it started) still holds its pipes open.
+  std::array<int, kWakeEnds> wake{-1, -1};
   std::mutex stopping;
   bool stopped = false;
 };
@@ -34,6 +40,9 @@ struct ChildProcess::Handles {
 namespace {
 
 constexpr int kSucceeded = 0;
+constexpr int kWaitForever = -1;           // poll(): no time limit
+constexpr std::size_t kWaitedStreams = 2;  // the stream, and the wake pipe
+constexpr char kWakeByte = 0;
 constexpr int kReadEnd = 0;
 constexpr int kWriteEnd = 1;
 constexpr std::size_t kPipeEnds = 2;
@@ -138,13 +147,23 @@ pid_t spawn(const std::filesystem::path& program, const ProgramCall& call, const
 }
 
 // The editor's ends of the pipes of a started program, taken out of `pipes`.
-std::unique_ptr<ChildProcess::Handles> keep_ends(pid_t process, Pipes& pipes) {
+// A pipe whose read end tells waits to give up, once something is written to it.
+bool open_wake(Pipe& wake) {
+  if (pipe(wake.data()) != kSucceeded) return false;
+  for (const int end : wake) fcntl(end, F_SETFD, FD_CLOEXEC);
+  return true;
+}
+
+bool open_all(Pipes& pipes, Pipe& wake) { return open_pipes(pipes) && open_wake(wake); }
+
+std::unique_ptr<ChildProcess::Handles> keep_ends(pid_t process, Pipes& pipes, const Pipe& wake) {
   auto handles = std::make_unique<ChildProcess::Handles>();
   handles->process = process;
   handles->input = std::exchange(pipes[kInput][kWriteEnd], -1);
   handles->output = std::exchange(pipes[kOutput][kReadEnd], -1);
   handles->errors = std::exchange(pipes[kErrors][kReadEnd], -1);
   close_all(pipes);  // (the child's ends: it holds its own copies now)
+  handles->wake = wake;
   return handles;
 }
 
@@ -153,14 +172,30 @@ std::unique_ptr<ChildProcess::Handles> launch(const std::filesystem::path& progr
                                               std::string& error) {
   Pipes pipes{};
   for (Pipe& ends : pipes) ends = {-1, -1};
-  const pid_t process = open_pipes(pipes) ? spawn(program, call, pipes) : 0;
-  if (process != 0) return keep_ends(process, pipes);
+  Pipe wake{-1, -1};
+  const pid_t process = open_all(pipes, wake) ? spawn(program, call, pipes) : 0;
+  if (process != 0) return keep_ends(process, pipes, wake);
   error = "could not start " + program.string() + ": " + std::strerror(errno);
   close_all(pipes);
+  for (int& end : wake) close_end(end);
   return nullptr;
 }
 
-std::size_t read_some(int stream, char* buffer, std::size_t size) {
+// Waits until `stream` is ready for `events`; false when stop() woke the wait instead (or it failed).
+// A call that failed only because a signal came first: tried again.
+bool interrupted(long result) { return result < 0 && errno == EINTR; }
+
+bool wait_for(int stream, short events, int wake) {
+  std::array<pollfd, kWaitedStreams> waited{pollfd{stream, events, 0}, pollfd{wake, POLLIN, 0}};
+  for (;;) {
+    const int ready = poll(waited.data(), waited.size(), kWaitForever);
+    if (interrupted(ready)) continue;
+    return ready > 0 && waited[1].revents == 0;
+  }
+}
+
+std::size_t read_some(int stream, int wake, char* buffer, std::size_t size) {
+  if (!wait_for(stream, POLLIN, wake)) return 0;
   for (;;) {
     const ssize_t got = read(stream, buffer, size);
     if (got >= 0) return static_cast<std::size_t>(got);
@@ -176,6 +211,7 @@ ChildProcess::~ChildProcess() {
   stop();
   close_end(handles_->output);
   close_end(handles_->errors);
+  for (int& end : handles_->wake) close_end(end);
 }
 
 std::unique_ptr<ChildProcess> ChildProcess::start(const ProgramCall& call, std::string& error) {
@@ -194,8 +230,9 @@ std::unique_ptr<ChildProcess> ChildProcess::start(const ProgramCall& call, std::
 bool ChildProcess::write(const std::string& bytes) {
   std::size_t written = 0;
   while (written < bytes.size()) {
+    if (!wait_for(handles_->input, POLLOUT, handles_->wake[kReadEnd])) return false;
     const ssize_t put = ::write(handles_->input, bytes.data() + written, bytes.size() - written);
-    if (put < 0 && errno == EINTR) continue;
+    if (interrupted(put)) continue;
     if (put <= 0) return false;
     written += static_cast<std::size_t>(put);
   }
@@ -203,17 +240,19 @@ bool ChildProcess::write(const std::string& bytes) {
 }
 
 std::size_t ChildProcess::read_output(char* buffer, std::size_t size) {
-  return read_some(handles_->output, buffer, size);
+  return read_some(handles_->output, handles_->wake[kReadEnd], buffer, size);
 }
 
 std::size_t ChildProcess::read_errors(char* buffer, std::size_t size) {
-  return read_some(handles_->errors, buffer, size);
+  return read_some(handles_->errors, handles_->wake[kReadEnd], buffer, size);
 }
 
 void ChildProcess::stop() {
   const std::lock_guard<std::mutex> lock(handles_->stopping);
   if (handles_->stopped) return;
   handles_->stopped = true;
+  const ssize_t woken = ::write(handles_->wake[kWriteEnd], &kWakeByte, sizeof(kWakeByte));
+  static_cast<void>(woken);    // (a full wake pipe is already awake)
   close_end(handles_->input);  // (an agent that reads to the end of its input may leave by itself)
   kill(-handles_->process, SIGTERM);
   kill(-handles_->process, SIGKILL);

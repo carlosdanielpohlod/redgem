@@ -44,6 +44,26 @@ bool carries_text(const Json& params) {
   return names_a_file(params) && params.contains("content") && params["content"].is_string();
 }
 
+Json read_answer(const Workspace& workspace, const RpcMessage& message) {
+  if (!names_a_file(message.params)) return rpc_error(message.id, kInvalidParams, "a path is needed");
+  std::string error;
+  const auto text = workspace.read(message.params["path"].get<std::string>(), range_of(message.params), error);
+  if (!text) return rpc_error(message.id, kResourceNotFound, error);
+  return rpc_result(message.id, {{"content", *text}});
+}
+
+Json write_answer(const Workspace& workspace, const RpcMessage& message) {
+  if (!carries_text(message.params)) {
+    return rpc_error(message.id, kInvalidParams, "a path and its content are needed");
+  }
+  std::string error;
+  const std::string path = message.params["path"].get<std::string>();
+  if (!workspace.write(path, message.params["content"].get<std::string>(), error)) {
+    return rpc_error(message.id, kInternalError, error);
+  }
+  return rpc_result(message.id, Json::object());
+}
+
 }  // namespace
 
 AgentClient::AgentClient(ClientSetup setup, Send send)
@@ -55,6 +75,16 @@ void AgentClient::begin() {
 }
 
 void AgentClient::receive(const Json& message) {
+  // (What an agent sends is checked field by field; a field of an unexpected type that slips past a
+  // check is the agent's fault, and ends its conversation rather than the editor.)
+  try {
+    take(message);
+  } catch (const std::exception& error) {
+    fail(tr("editor.agent.malformed", {{"error", error.what()}}));
+  }
+}
+
+void AgentClient::take(const Json& message) {
   const RpcMessage parsed = classify(message);
   switch (parsed.kind) {
     case RpcKind::Response:
@@ -78,7 +108,13 @@ bool AgentClient::prompt(const std::string& text, const std::vector<std::string>
 
 void AgentClient::cancel() {
   if (!busy()) return;
+  cancelling_ = true;
   send_(rpc_notification(method::kCancel, cancel_params(session_)));
+  cancel_questions();
+}
+
+// Every question still waiting is given up, and the agent told so (ACP wants an answer to each).
+void AgentClient::cancel_questions() {
   for (const std::size_t entry : transcript_.waiting_permissions()) {
     PermissionRequest* request = transcript_.permission(entry);
     request->cancel();
@@ -133,12 +169,14 @@ void AgentClient::on_session(const RpcMessage& message) {
     needs_login_ = message.error->code == kAuthRequired;
     return fail(message.error->message);
   }
-  session_ = message.result.value("sessionId", std::string());
+  session_ = field_text(message.result, "sessionId");
+  if (session_.empty()) return fail(tr("editor.agent.malformed", {{"error", "session/new gave no sessionId"}}));
   state_ = AgentState::Ready;
 }
 
 void AgentClient::on_turn_end(const RpcMessage& message) {
-  for (const std::size_t entry : transcript_.waiting_permissions()) transcript_.permission(entry)->cancel();
+  cancel_questions();
+  cancelling_ = false;
   state_ = AgentState::Ready;
   if (message.error) return transcript_.add(EntryKind::Error, message.error->message);
   say_why_the_turn_ended(stop_reason(message.result));
@@ -163,30 +201,38 @@ void AgentClient::on_notification(const RpcMessage& message) {
   if (message.method == method::kUpdate) apply_update(transcript_, message.params);
 }
 
-void AgentClient::read_file(const RpcMessage& message) {
-  if (!names_a_file(message.params)) return refuse(message.id, kInvalidParams, "a path is needed");
-  std::string error;
-  const auto text = workspace_.read(message.params["path"].get<std::string>(), range_of(message.params), error);
-  if (!text) return refuse(message.id, kResourceNotFound, error);
-  answer(message.id, {{"content", *text}});
-}
+void AgentClient::read_file(const RpcMessage& message) { answer_file(message); }
 
-void AgentClient::write_file(const RpcMessage& message) {
-  if (!carries_text(message.params)) return refuse(message.id, kInvalidParams, "a path and its content are needed");
-  std::string error;
-  const std::string path = message.params["path"].get<std::string>();
-  if (!workspace_.write(path, message.params["content"].get<std::string>(), error)) {
-    return refuse(message.id, kInternalError, error);
-  }
-  answer(message.id, Json::object());
+void AgentClient::write_file(const RpcMessage& message) { answer_file(message); }
+
+void AgentClient::answer_file(const RpcMessage& message) {
+  if (const auto answer = answer_file_request(workspace_, message)) send_(*answer);
 }
 
 void AgentClient::ask_permission(const RpcMessage& message) {
-  transcript_.ask(permission_request(message.id, message.params));
+  PermissionRequest request = permission_request(message.id, message.params);
+  // (A question that crossed Stop on its way is not shown: the turn it belongs to is ending.)
+  if (cancelling_) {
+    request.cancel();
+    return answer_permission(request);
+  }
+  transcript_.ask(request);
 }
 
 void AgentClient::answer_permission(PermissionRequest& request) {
   answer(request.request_id(), permission_outcome(request));
+}
+
+bool is_file_method(const std::string& name) { return name == method::kReadTextFile || name == method::kWriteTextFile; }
+
+bool is_file_request(const RpcMessage& message) {
+  return message.kind == RpcKind::Request && is_file_method(message.method);
+}
+
+std::optional<Json> answer_file_request(const Workspace& workspace, const RpcMessage& message) {
+  if (!is_file_request(message)) return std::nullopt;
+  if (message.method == method::kReadTextFile) return read_answer(workspace, message);
+  return write_answer(workspace, message);
 }
 
 }  // namespace redgem::agent

@@ -180,3 +180,59 @@ TEST_CASE("an agent that went away fails the conversation once, giving up its qu
   CHECK(talk.client->error() == "it ended");
   CHECK(talk.client->transcript().waiting_permissions().empty());
 }
+
+TEST_CASE("answers of the wrong shape fail the conversation instead of the editor") {
+  const std::vector<Json> broken = {Json(),                // a null result
+                                    {{"sessionId", 7}},    // a numeric session id
+                                    Json::array({1, 2})};  // an array
+  for (const Json& result : broken) {
+    Conversation talk;
+    talk.client->begin();
+    talk.client->receive(rpc_result(talk.last_id(), {{"protocolVersion", 1}}));
+    CHECK_NOTHROW(talk.client->receive(rpc_result(talk.last_id(), result)));
+    CHECK(talk.client->state() == AgentState::Failed);
+  }
+  Conversation talk;
+  talk.client->begin();
+  const Json odd_error = {{"jsonrpc", "2.0"}, {"id", talk.last_id()}, {"error", {{"code", "x"}, {"message", 3}}}};
+  CHECK_NOTHROW(talk.client->receive(odd_error));
+  CHECK(talk.client->state() == AgentState::Failed);
+}
+
+TEST_CASE("requests and updates of the wrong shape do not reach past the client") {
+  Conversation talk;
+  talk.open();
+  CHECK_NOTHROW(talk.client->receive(rpc_request(kAgentsRequest, "session/request_permission", Json::array())));
+  CHECK_NOTHROW(talk.client->receive(
+      rpc_request(kAgentsRequest, "session/request_permission", {{"toolCall", 5}, {"options", 3}})));
+  CHECK_NOTHROW(talk.client->receive(rpc_notification("session/update", Json::array())));
+  CHECK_NOTHROW(talk.client->receive(
+      rpc_notification("session/update", {{"update", {{"sessionUpdate", "plan"}, {"entries", 4}}}})));
+  CHECK_NOTHROW(talk.client->receive(rpc_notification(
+      "session/update", {{"update", {{"sessionUpdate", "tool_call"}, {"content", 1}, {"locations", "x"}}}})));
+}
+
+TEST_CASE("a question that comes after Stop is answered cancelled at once") {
+  Conversation talk;
+  talk.open();
+  talk.client->prompt("go");
+  const int turn = talk.last_id();
+  talk.client->cancel();
+  talk.client->receive(rpc_request(kAgentsRequest, "session/request_permission", permission_params()));
+  CHECK(talk.last() == rpc_result(kAgentsRequest, {{"outcome", {{"outcome", "cancelled"}}}}));
+  CHECK(talk.client->transcript().waiting_permissions().empty());
+  talk.client->receive(rpc_result(turn, {{"stopReason", "cancelled"}}));
+  CHECK(talk.client->prompt("again"));
+  talk.client->receive(rpc_request(kAgentsRequest + 1, "session/request_permission", permission_params()));
+  CHECK_FALSE(talk.client->transcript().waiting_permissions().empty());  // (a new turn asks again)
+}
+
+TEST_CASE("a turn that ends with a question still open answers it cancelled") {
+  Conversation talk;
+  talk.open();
+  talk.client->prompt("go");
+  const int turn = talk.last_id();
+  talk.client->receive(rpc_request(kAgentsRequest, "session/request_permission", permission_params()));
+  talk.client->receive(rpc_result(turn, {{"stopReason", "end_turn"}}));
+  CHECK(talk.last() == rpc_result(kAgentsRequest, {{"outcome", {{"outcome", "cancelled"}}}}));
+}

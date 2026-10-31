@@ -19,8 +19,10 @@ bool ends_with_return(const std::string& line) { return !line.empty() && line.ba
 RpcError error_of(const Json& error) {
   RpcError parsed;
   if (!error.is_object()) return parsed;
-  parsed.code = error.value("code", kInternalError);
-  parsed.message = error.value("message", std::string());
+  const Json code = error.value("code", Json());
+  const Json message = error.value("message", Json());
+  if (code.is_number_integer()) parsed.code = code.get<int>();
+  if (message.is_string()) parsed.message = message.get<std::string>();
   return parsed;
 }
 
@@ -42,7 +44,24 @@ RpcMessage response_of(const Json& message) {
   return parsed;
 }
 
+// Thrown by the parser's callback at a value nested too deep.
+struct TooDeep {};
+
 }  // namespace
+
+std::optional<Json> parse_message(const std::string& line) {
+  const auto depth_guard = [](int depth, Json::parse_event_t, Json&) {
+    if (depth >= kMaxMessageDepth) throw TooDeep{};  // (depth counts from 0)
+    return true;
+  };
+  try {
+    Json message = Json::parse(line, depth_guard, false);
+    if (message.is_discarded()) return std::nullopt;
+    return message;
+  } catch (const TooDeep&) {
+    return std::nullopt;
+  }
+}
 
 void LineReader::feed(const char* bytes, std::size_t size) {
   if (overflowed_) return;

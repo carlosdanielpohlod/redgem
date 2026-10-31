@@ -22,6 +22,10 @@ inline constexpr int kInternalError = -32603;
 inline constexpr int kAuthRequired = -32000;
 inline constexpr int kResourceNotFound = -32002;
 
+// How deeply a message read from an agent may nest: far past what the protocol's messages need, and
+// far short of what copying and freeing a value (which recurse) can take.
+inline constexpr int kMaxMessageDepth = 64;
+
 // The longest line read from an agent: a message holding a whole file's text and its change fits.
 inline constexpr std::size_t kMaxLineBytes = std::size_t{16} * 1024 * 1024;
 
@@ -47,6 +51,9 @@ class LineReader {
 std::string compact(const Json& value);
 // A message as one line to write (every line break inside strings is escaped).
 std::string to_line(const Json& message);
+
+// A line read from an agent as JSON; nullopt for one that is none, or nests deeper than kMaxMessageDepth.
+std::optional<Json> parse_message(const std::string& line);
 
 // What a message is.
 enum class RpcKind { Request, Notification, Response, Invalid };

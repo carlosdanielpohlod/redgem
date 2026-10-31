@@ -64,6 +64,13 @@ Json permission_outcome(const PermissionRequest& request);
 // What a tool call says (from a tool_call update, or the tool of a permission request).
 ToolCallPatch tool_patch(const Json& update);
 
+// What an agent sent is read field by field, each of the type it should be: a field that is missing,
+// or of another type, reads as nothing (null, {}, [] or "").
+Json field(const Json& value, const char* key);
+Json field_object(const Json& value, const char* key);
+Json field_list(const Json& value, const char* key);
+std::string field_text(const Json& value, const char* key);
+
 // Why a prompt turn ended, as the protocol says it ("end_turn", "cancelled", "refusal" ...).
 std::string stop_reason(const Json& result);
 

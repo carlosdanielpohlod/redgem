@@ -181,3 +181,15 @@ TEST_CASE("a cancelled question answers cancelled") {
 }
 
 TEST_CASE("why a turn ended") { CHECK(stop_reason({{"stopReason", "end_turn"}}) == "end_turn"); }
+
+TEST_CASE("a line nested deeper than a message can be is refused") {
+  std::string deep;
+  for (int level = 0; level < kMaxMessageDepth + 1; ++level) deep += "[";
+  for (int level = 0; level < kMaxMessageDepth + 1; ++level) deep += "]";
+  CHECK_FALSE(parse_message(deep));
+  CHECK_FALSE(parse_message(std::string(100000, '[')));
+  CHECK_FALSE(parse_message("not json"));
+  const auto fine = parse_message(R"({"jsonrpc":"2.0","method":"x","params":{"a":[[1]]}})");
+  REQUIRE(fine);
+  CHECK((*fine)["params"]["a"][0][0] == 1);
+}

@@ -39,7 +39,11 @@ constexpr std::size_t kErrors = 2;
 constexpr std::size_t kStreams = 3;
 constexpr UINT kStoppedCode = 1;  // what a stopped agent's exit code says
 constexpr const wchar_t* kSpecialInArgument = L" \t\n\v\"";
-constexpr const wchar_t* kShell = L"cmd.exe /d /s /c \"";  // what starts a batch file (closed by a quote)
+constexpr const wchar_t* kShellOptions = L" /d /s /c \"";  // cmd.exe's, before a batch file (closed by a quote)
+constexpr const wchar_t* kShellName = L"\\cmd.exe";        // in the system's folder
+// What cmd.exe reads as its own even inside quotes (or as quotes): a batch file's arguments are
+// refused with any of them rather than run as something else.
+constexpr const char* kShellCharacters = "%!^&|<>\"\r\n";
 constexpr const wchar_t* kBatchExtensions[] = {L".cmd", L".bat"};
 constexpr wchar_t kQuote = L'"';
 constexpr wchar_t kBackslash = L'\\';
@@ -83,10 +87,28 @@ bool is_batch_file(const std::filesystem::path& program) {
                      [&](const wchar_t* batch) { return extension == batch; });
 }
 
+// cmd.exe from the system's folder, not one the current folder or PATH could put first.
+std::wstring system_shell() {
+  std::wstring folder(MAX_PATH, L'\0');
+  folder.resize(GetSystemDirectoryW(folder.data(), static_cast<UINT>(folder.size())));
+  return folder + kShellName;
+}
+
 std::wstring command_line(const std::filesystem::path& program, const ProgramCall& call) {
   std::wstring line = quoted(program.wstring());
   for (const std::string& argument : call.arguments) line += L" " + quoted(wide(argument));
-  return is_batch_file(program) ? kShell + line + kQuote : line;
+  return is_batch_file(program) ? quoted(system_shell()) + kShellOptions + line + kQuote : line;
+}
+
+bool shell_reads(const std::string& text) { return text.find_first_of(kShellCharacters) != std::string::npos; }
+
+// Why a batch file cannot be started with these arguments (cmd.exe would read them as its own); empty
+// when it can.
+std::string batch_refusal(const std::filesystem::path& program, const ProgramCall& call) {
+  if (!is_batch_file(program)) return "";
+  const auto unsafe = std::find_if(call.arguments.begin(), call.arguments.end(), shell_reads);
+  if (unsafe == call.arguments.end()) return "";
+  return "cannot pass '" + *unsafe + "' to " + program.u8string() + ": cmd.exe reads % ! ^ & | < > \" itself";
 }
 
 bool same_name(const std::wstring& entry, const std::wstring& name) {
@@ -153,7 +175,9 @@ bool create(const std::filesystem::path& program, const ProgramCall& call, std::
   std::wstring line = command_line(program, call);
   std::wstring environment = environment_block(call);
   const DWORD flags = CREATE_SUSPENDED | CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT;
-  return CreateProcessW(nullptr, line.data(), nullptr, nullptr, TRUE, flags, environment.data(), nullptr, &startup,
+  const std::wstring shell = system_shell();
+  const wchar_t* application = is_batch_file(program) ? shell.c_str() : nullptr;
+  return CreateProcessW(application, line.data(), nullptr, nullptr, TRUE, flags, environment.data(), nullptr, &startup,
                         &started) != FALSE;
 }
 
@@ -214,6 +238,8 @@ std::unique_ptr<ChildProcess> ChildProcess::start(const ProgramCall& call, std::
     error = "'" + call.program + "' was not found";
     return nullptr;
   }
+  error = batch_refusal(program, call);
+  if (!error.empty()) return nullptr;
   auto handles = launch(program, call, error);
   if (!handles) return nullptr;
   return std::unique_ptr<ChildProcess>(new ChildProcess(std::move(handles)));

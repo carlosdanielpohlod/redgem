@@ -25,6 +25,7 @@ std::thread engine_thread(Work work) {
 
 AgentConnection::AgentConnection(const ProgramCall& program, ClientSetup setup)
     : client_(std::move(setup), [this](const Json& message) { send(message); }),
+      files_(client_.workspace()),
       process_(ChildProcess::start(program, start_error_)) {
   if (!process_) {
     client_.fail(start_error_);
@@ -53,7 +54,8 @@ void AgentConnection::poll() {
   bool ended = false;
   if (!take_inbox(messages, ended)) return;
   for (const Json& message : messages) client_.receive(message);
-  if (ended) client_.fail(why_it_ended());
+  if (!ended || std::exchange(end_reported_, true)) return;
+  client_.fail(why_it_ended());
 }
 
 bool AgentConnection::take_inbox(std::deque<Json>& messages, bool& ended) {
@@ -104,18 +106,35 @@ void AgentConnection::read_messages() {
     while (const auto line = lines.next()) take_line(*line);
     if (lines.overflowed()) break;
   }
+  finish_reading(lines.overflowed());
+}
+
+void AgentConnection::finish_reading(bool overflowed) {
+  if (overflowed) process_->stop();  // (it cannot be read on: it is no use running)
   std::unique_lock<std::mutex> guard(lock_);
   errors_ended_signal_.wait_for(guard, kErrorsGrace, [this] { return errors_ended_; });
   output_ended_ = true;
-  unreadable_ = lines.overflowed();
+  unreadable_ = overflowed;
 }
 
 void AgentConnection::take_line(const std::string& line) {
-  Json message = Json::parse(line, nullptr, false);
+  auto message = parse_message(line);
   // (A line that is no message is the agent talking to itself: kept with its errors.)
-  if (message.is_discarded()) return keep_error_line(line);
+  if (!message) return keep_error_line(line);
+  // (Files are read and written here, off the editor's thread: a big one does not hold up a frame.)
+  if (answer_files(*message)) return;
   const std::lock_guard<std::mutex> guard(lock_);
-  inbox_.push_back(std::move(message));
+  inbox_.push_back(std::move(*message));
+}
+
+bool AgentConnection::answer_files(const Json& message) {
+  try {
+    const auto answer = answer_file_request(files_, classify(message));
+    if (answer) send(*answer);
+    return answer.has_value();
+  } catch (const std::exception&) {
+    return false;  // (left to the client, which says what is wrong with it)
+  }
 }
 
 void AgentConnection::read_errors() {

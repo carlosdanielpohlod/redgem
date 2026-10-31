@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <functional>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -64,6 +65,7 @@ class AgentClient {
  private:
   // What a request sent waits for.
   enum class Call { Initialize, NewSession, Prompt };
+  void take(const Json& message);
   int request(Call call, const char* method, const Json& params);
   void on_response(const RpcMessage& message);
   void on_request(const RpcMessage& message);
@@ -75,8 +77,10 @@ class AgentClient {
   void refuse(const Json& id, int code, const std::string& why) { send_(rpc_error(id, code, why)); }
   void read_file(const RpcMessage& message);
   void write_file(const RpcMessage& message);
+  void answer_file(const RpcMessage& message);
   void ask_permission(const RpcMessage& message);
   void answer_permission(PermissionRequest& request);
+  void cancel_questions();
   void say_why_the_turn_ended(const std::string& reason);
 
   ClientSetup setup_;
@@ -86,10 +90,17 @@ class AgentClient {
   AgentState state_ = AgentState::Starting;
   std::string error_;
   bool needs_login_ = false;
+  bool cancelling_ = false;  // Stop was asked for, and the turn has not ended yet
   AgentInfo info_;
   std::string session_;
   int next_id_ = 0;
   std::map<int, Call> waiting_;  // requests sent, by id, until answered
 };
+
+// Whether a message is a request for a file (fs/read_text_file, fs/write_text_file).
+bool is_file_request(const RpcMessage& message);
+// The answer to a request for a file, done in `workspace` (on whichever thread asks: it touches the
+// workspace's files alone); nullopt for any other message.
+std::optional<Json> answer_file_request(const Workspace& workspace, const RpcMessage& message);
 
 }  // namespace redgem::agent

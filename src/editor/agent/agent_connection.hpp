@@ -41,6 +41,8 @@ class AgentConnection {
   void send(const Json& message);
   void read_messages();
   void take_line(const std::string& line);
+  void finish_reading(bool overflowed);
+  bool answer_files(const Json& message);
   void read_errors();
   void write_messages();
   void keep_error_line(const std::string& line);
@@ -48,7 +50,9 @@ class AgentConnection {
   std::string why_it_ended() const;
 
   AgentClient client_;
-  std::string start_error_;  // why the program did not start (set before process_ is)
+  Workspace files_;            // the client's, for the file requests answered on the reader's thread
+  bool end_reported_ = false;  // the client was told the agent ended (on the editor's thread)
+  std::string start_error_;    // why the program did not start (set before process_ is)
   std::unique_ptr<ChildProcess> process_;
 
   mutable std::mutex lock_;  // guards everything below, which the threads share
