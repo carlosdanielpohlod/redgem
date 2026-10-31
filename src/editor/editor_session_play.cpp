@@ -50,7 +50,8 @@ bool finds_its_files(const SceneDocument& document, const std::filesystem::path&
 }  // namespace
 
 std::variant<std::unique_ptr<EditorSession>, std::string> EditorSession::open(const std::filesystem::path& folder) {
-  const std::filesystem::path game_dir = normalized_folder(folder);
+  // Absolute, so programs started in another folder (an agent's MCP server) find the game too.
+  const std::filesystem::path game_dir = normalized_folder(std::filesystem::absolute(folder));
   const std::filesystem::path scene_path = game_dir / config::kSceneFileName;
   auto opened = SceneDocument::open(scene_path);
   if (auto* error = std::get_if<std::string>(&opened)) return *error;

@@ -42,7 +42,9 @@ bool icon_button(const char* icon, const char* tip, bool active) {
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kAccentSoft);
   }
   const float side = ImGui::GetFrameHeight();
+  ImGui::PushID(tip);  // buttons sharing an icon (the panel toggles) stay apart by what they do
   const bool pressed = ImGui::Button(icon, ImVec2(side * kIconButtonWidth, side));
+  ImGui::PopID();
   if (active) ImGui::PopStyleColor(kActiveButtonColors);
   tooltip(tip);
   return pressed;
