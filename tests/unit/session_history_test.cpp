@@ -6,6 +6,8 @@
 #include <iterator>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
 #include "editor/agent/session_history.hpp"
 #include "test_support.hpp"
 
@@ -77,8 +79,10 @@ TEST_CASE("a file that cannot be read is kept aside, not written over") {
   std::ifstream aside(file.string() + ".unreadable");
   std::string kept((std::istreambuf_iterator<char>(aside)), std::istreambuf_iterator<char>());
   CHECK(kept == broken);
-  std::ofstream(file) << R"({"games": {")" << fs::weakly_canonical(game).u8string()
-                      << R"(": [{"id": 3}, {"id": "ok", "agent": "Codex"}]}})";
+  // Built as JSON, so a Windows path's backslashes are escaped.
+  const nlohmann::json kept_games = {
+      {"games", {{fs::weakly_canonical(game).u8string(), {{{"id", 3}}, {{"id", "ok"}, {"agent", "Codex"}}}}}}};
+  std::ofstream(file) << kept_games.dump();
   REQUIRE(read_sessions(file, game).size() == 1);
   CHECK(read_sessions(file, game)[0].id == "ok");
   fs::remove_all(file.parent_path());
