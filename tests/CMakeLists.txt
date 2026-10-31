@@ -173,6 +173,7 @@ add_executable(redgem_tests
   integration/debug_draw_api_test.cpp
   integration/async_scene_test.cpp
   integration/ui_input_test.cpp
+  integration/camera_helpers_test.cpp
   integration/input_actions_test.cpp
   integration/gameplay_api_test.cpp
   integration/scatter_test.cpp
@@ -521,11 +522,13 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/missing_picture_render_test.cpp
                render_system/recording_render_test.cpp
                render_system/display_render_test.cpp
+               render_system/camera_marker_render_test.cpp
                render_system/render_stage.cpp)
 target_link_libraries(redgem_render_system_tests PRIVATE redgem_runtime doctest::doctest)
 target_include_directories(redgem_render_system_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(redgem_render_system_tests PRIVATE REDGEM_SCREENSHOT_DIR="${REDGEM_SCREENSHOT_DIR}"
   REDGEM_TEMPLATES_DIR="${CMAKE_SOURCE_DIR}/templates"
+  REDGEM_GAMES_DIR="${CMAKE_SOURCE_DIR}/games"
   REDGEM_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
 add_test(NAME system.render.pictures COMMAND redgem_render_system_tests)
 set_tests_properties(system.render.pictures PROPERTIES LABELS system RUN_SERIAL TRUE)

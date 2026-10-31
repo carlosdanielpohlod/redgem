@@ -21,7 +21,8 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). |
 | [`Vehicle`](#vehicle) | The body of an object with body = "vehicle" and wheels. |
-| [`Camera`](#camera) | The camera the game is seen through. |
+| [`Camera`](#camera) | The camera the game is seen through, and what it does on its own: follow, orbit, shake. |
+| [`Camera::Orbit`](#cameraorbit) | What Camera.orbit returns: the camera's angles and distance around what it orbits, for scripts to read and change. |
 | [`Light`](#light) | game_object.light: the light an object shines with. |
 | [`Animation`](#animation) | The scene's own animations (exported from Blender), by name. |
 | [`Animator`](#animator) | game_object.animation (animation in a behaviour): an object's own clips. |
@@ -243,6 +244,7 @@ Every action, axis, binding and gamepad call takes `pad:` (0 to 3: the player; 0
 The game's clock (added to Ruby's Time).
 
 - `Time.delta`: seconds since the last frame
+- `Time.unscaled_delta`: seconds since the last frame, whatever Time.scale (also while paused)
 - `Time.fixed_delta`: seconds of a physics step (1/60)
 - `Time.elapsed`: seconds since the game started
 - `Time.frame`: how many frames have run
@@ -336,14 +338,33 @@ Wheel meshes must have their rotation applied (the axle along X). `drive`'s inpu
 
 ## Camera
 
-The camera the game is seen through.
+The camera the game is seen through, and what it does on its own: follow, orbit, shake. See [gameplay.md#follow-orbit-and-shake-the-camera](gameplay.md#follow-orbit-and-shake-the-camera).
 
 - `Camera.main`: the object holding the camera
 - `Camera.screen_ray(x, y)`: [origin, direction] through a pixel of the screen
+- `Camera.world_to_screen(point)`: [x, y]: where a Vector3 (or an object) is on the screen, in the pixels UI draws in; nil behind the camera
 - `Camera.fov`: its vertical field of view, in degrees
 - `Camera.fov = degrees`: sets the field of view
 - `Camera.motion_blur`: how much the picture streaks with speed, 0 to 1
 - `Camera.motion_blur = amount`: sets it
+- `Camera.follow(target, offset: [0, 3, 6], relative: false, smoothing: 0.15, look_at: true, look_height: 1.0, avoid_walls: true, dead_zone: 0, snap: true)`: follows an object from now on: offset in meters (relative: in its own axes), smoothing in seconds to close half the way, in front of walls between; snap: false flies there
+- `Camera.orbit(target, distance: 6, yaw: 0, pitch: 20, distances: 1..30, pitches: -80..80, smoothing: 0.08, input: true, height: 1.0, avoid_walls: true)`: orbits an object or a point, looking at it, turned by dragging with the right mouse button or the right stick and zoomed by the wheel, also while paused; returns a Camera::Orbit
+- `Camera.stop_following`: stops following or orbiting; the camera stays where it is
+- `Camera.following?`: whether it follows or orbits something (an object destroyed is let go)
+- `Camera.shake(strength, duration: 0.5)`: shakes what it shows (never the camera object): strength (0 to 1) adds to its trauma, held at 1, fading over duration seconds
+- `Camera.trauma`: how much it shakes now, 0 to 1
+- `Camera.stop_shaking`: stops the shake at once
+
+## Camera::Orbit
+
+What Camera.orbit returns: the camera's angles and distance around what it orbits, for scripts to read and change. See [gameplay.md#follow-orbit-and-shake-the-camera](gameplay.md#follow-orbit-and-shake-the-camera).
+
+- `yaw`: degrees around it, -180 to 180: 0 behind it (its +Z side), 90 on its right
+- `pitch`: degrees above it
+- `distance`: meters from it
+- `target`: the object or point it orbits
+- `turn(yaw, pitch)`: turns by degrees (the yaw wraps round, eased the short way), the pitch kept within its range
+- `zoom(meters)`: comes nearer (negative) or goes further, within its range
 
 ## Light
 

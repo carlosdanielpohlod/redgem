@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include "core/letterbox.hpp"
+
 namespace redgem {
 
 inline constexpr int kDefaultRecordFps = 30;
@@ -41,14 +43,7 @@ struct RecordOptions {
 // pixel format keeps color for two by two pixels, and its encoder refuses odd sides.
 FrameSize even(FrameSize size);
 
-// Where a picture of `picture`'s size is shown in a window of `window`'s: as large as fits, in
-// its middle (bars fill the rest).
-struct Letterbox {
-  float x = 0.0f;
-  float y = 0.0f;
-  float width = 0.0f;
-  float height = 0.0f;
-};
+// Where a picture of `picture`'s size is shown in a window of `window`'s (see fit_picture).
 Letterbox letterbox(FrameSize window, FrameSize picture);
 // What takes a point of the window to the same point of the picture: picture = (window + offset) * scale.
 struct PointMapping {

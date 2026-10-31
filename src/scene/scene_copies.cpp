@@ -22,6 +22,8 @@ GameObject detached_copy(const GameObject& original) {
   // A copy of a copy still follows the animations of the first original.
   copy.copy_of = original.copy_of == kNoObject ? original.id : original.copy_of;
   copy.animation_offset = 0.0f;
+  // A copy of a shaking camera has no rig to end the shake: it starts still.
+  copy.camera_shake = Transform{};
   return copy;
 }
 
