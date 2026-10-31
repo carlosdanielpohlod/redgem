@@ -9,13 +9,21 @@ namespace {
 constexpr const char* kSchemas = R"JSON([
 {"name":"scene_list","description":"List objects in the configured game. Use returned #ids for subsequent calls.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"scene":{"type":"string","maxLength":256},"limit":{"type":"integer","minimum":1,"maximum":200},"depth":{"type":"integer","minimum":0,"maximum":64}}}},
 {"name":"scene_get","description":"Read one object by #id, unique name or hierarchy path.","inputSchema":{"type":"object","additionalProperties":false,"required":["object"],"properties":{"object":{"type":"string","minLength":1,"maxLength":256},"scene":{"type":"string","maxLength":256}}}},
-{"name":"scene_edit","description":"Set, add or remove a scene object. Assignments use CLI key=value syntax. Remove requires confirm=true. Edits save the file.","inputSchema":{"type":"object","additionalProperties":false,"required":["action","object"],"properties":{"action":{"type":"string","enum":["set","add","remove"]},"object":{"type":"string","minLength":1,"maxLength":256},"scene":{"type":"string","maxLength":256},"assignments":{"type":"array","maxItems":64,"items":{"type":"string","maxLength":4096}},"from":{"type":"string","maxLength":256},"parent":{"type":"string","maxLength":256},"confirm":{"type":"boolean"}}}},
+{"name":"scene_edit","description":"Set, add or remove a scene object. Remove requires confirm=true. Edits save the file.","inputSchema":{"type":"object","additionalProperties":false,"required":["action","object"],"properties":{"action":{"type":"string","enum":["set","add","remove"]},"object":{"type":"string","minLength":1,"maxLength":256},"scene":{"type":"string","maxLength":256},"assignments":{"type":"array","maxItems":64,"items":{"type":"string","maxLength":4096}},"from":{"type":"string","maxLength":256},"parent":{"type":"string","maxLength":256},"confirm":{"type":"boolean"}}}},
 {"name":"scene_diff","description":"Compare the scene with an earlier .glb inside the configured game, by persistent identity.","inputSchema":{"type":"object","additionalProperties":false,"required":["against"],"properties":{"against":{"type":"string","minLength":1,"maxLength":256},"scene":{"type":"string","maxLength":256},"limit":{"type":"integer","minimum":1,"maximum":200}}}},
 {"name":"game_run","description":"Run headlessly with a fixed step and seed. Assertions, stop conditions and prints are Ruby expressions and can mutate the game. At most 600 frames.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"scene":{"type":"string","maxLength":256},"frames":{"type":"integer","minimum":1,"maximum":600},"seed":{"type":"integer","minimum":0,"maximum":2147483647},"input":{"type":"string","maxLength":256},"assert":{"type":"string","maxLength":4096},"until":{"type":"string","maxLength":4096},"print":{"type":"string","maxLength":4096},"every":{"type":"integer","minimum":1,"maximum":600}}}},
 {"name":"game_check","description":"Check scripts, scenes and referenced assets without running the game's test scripts.","inputSchema":{"type":"object","additionalProperties":false,"properties":{}}},
 {"name":"api","description":"Read the scripting API index, one class or a search. Example: {\"class\":\"Transform\"}.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"class":{"type":"string","maxLength":256},"search":{"type":"string","maxLength":256}}}},
 {"name":"events","description":"Read this server process's log history since a cursor. Pass the returned cursor next time. Event text is bounded; dropped and cursor_ahead report lost/foreign history.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"since":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":32},"level":{"type":"string","enum":["debug","info","warning","error"]}}}}
 ])JSON";
+// What scene_edit's assignments take, told to the agent: without it, an agent guesses words (color=)
+// that only become custom properties nothing reads.
+constexpr const char* kAssignmentWords =
+    "Assignments are key=value words: position=x,y,z, rotation=x,y,z (degrees), scale=s or x,y,z, name=N, "
+    "parent=P, tint=#rrggbb (multiplies the colors of this object's mesh: the way to color one object), "
+    "script+=Class, script-=Class, scripts=A,B, prop.key=value (a custom property scripts read; prop.key= removes "
+    "it). Other bare keys also become custom properties.";
+
 constexpr const char* kEditorSchema =
     R"JSON({"name":"editor","description":"Inspect the editor, capture its viewport, control play, select, undo, redo or save. Document changes require edit mode and stay unsaved until save.","inputSchema":{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["status","select","undo","redo","save","play","pause","resume","stop","step","capture"]},"object":{"type":"string","minLength":1,"maxLength":256},"max_size":{"type":"integer","minimum":128,"maximum":1024}}}})JSON";
 
@@ -89,6 +97,12 @@ void live_schema(Json& tool, const Options& options) {
       "Set an object, add an empty object or remove a subtree in the live editor, atomically as one undo step. Remove "
       "requires confirm=true. Does not save.";
 }
+
+// scene_edit says what its assignments take, in either mode.
+void describe_assignments(Json& tool) {
+  if (tool["name"] == "scene_edit")
+    tool["description"] = tool["description"].get<std::string>() + " " + kAssignmentWords;
+}
 }  // namespace
 
 Json catalog(const Options& options) {
@@ -97,6 +111,7 @@ Json catalog(const Options& options) {
     const std::string name = tool["name"];
     if (!enabled(options, name)) continue;
     live_schema(tool, options);
+    describe_assignments(tool);
     tool["annotations"] = {{"readOnlyHint", name == "editor" ? options.read_only : read_only_tool(name)},
                            {"openWorldHint", !read_only_tool(name)},
                            {"destructiveHint", name == "scene_edit" || (name == "editor" && !options.read_only)}};

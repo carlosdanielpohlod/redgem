@@ -84,6 +84,10 @@ bool out_of_sight(float height) {
   return height > kNotMeasured && !ImGui::IsRectVisible(ImVec2(ImGui::GetContentRegionAvail().x, height));
 }
 
+// The transcript shows its end (give or take a line): it stays there while more comes, and stays
+// where the user scrolled to otherwise.
+bool scrolled_to_bottom() { return ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - ImGui::GetTextLineHeight(); }
+
 }  // namespace
 
 AgentPanel::AgentPanel(AgentPanelSetup setup)
@@ -233,7 +237,7 @@ bool AgentPanel::wants_login() const {
 
 void AgentPanel::draw_transcript() {
   ImGui::BeginChild("transcript", ImVec2(0.0f, -composer_height()));
-  const bool at_bottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY();
+  const bool at_bottom = scrolled_to_bottom();
   if (connection_) {
     draw_entries(connection_->client());
   } else if (start_error_.empty()) {
@@ -243,17 +247,10 @@ void AgentPanel::draw_transcript() {
     ImGui::TextWrapped("%s", tr("editor.agent.no_session"));
     ImGui::PopStyleColor();
   }
-  follow_new_entries(at_bottom);
-  ImGui::EndChild();
-}
-
-// The view stays at the bottom while it is there and more comes.
-void AgentPanel::follow_new_entries(bool at_bottom) {
-  const std::uint64_t revision = connection_ ? connection_->client().transcript().revision() : 0;
-  const bool more_came = revision != seen_revision_;
-  seen_revision_ = revision;
-  if (!more_came) return;
+  // (Every frame, not only when an entry came: an answer keeps growing after it came, as its markdown
+  // is read again and the heights of entries out of sight are measured.)
   if (at_bottom) ImGui::SetScrollHereY(kScrollToBottom);
+  ImGui::EndChild();
 }
 
 void AgentPanel::draw_entries(agent::AgentClient& client) {

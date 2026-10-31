@@ -85,8 +85,12 @@ Json profile_json(const AgentProfile& agent) {
           {"package", agent.package}};
 }
 
+// A command with a folder in it ("/opt/agent/bin/agent") is looked for there alone, not on PATH.
+bool names_a_file(const std::string& command) { return std::filesystem::path(command).has_parent_path(); }
+
 bool runs_through_npx(const AgentProfile& agent, const ProgramFinder& find) {
-  return !agent.package.empty() && !find(kPackageRunner).empty();
+  // (A command given as a file is the user's choice of program: npx does not stand in for it.)
+  return !agent.package.empty() && !names_a_file(agent.command) && !find(kPackageRunner).empty();
 }
 
 ProgramCall through_npx(const AgentProfile& agent) {
@@ -96,6 +100,7 @@ ProgramCall through_npx(const AgentProfile& agent) {
 }
 
 std::string install_hint(const AgentProfile& agent) {
+  if (names_a_file(agent.command)) return tr("editor.agent.file_missing", {{"command", agent.command}});
   if (agent.package.empty()) return tr("editor.agent.command_missing", {{"command", agent.command}});
   return tr("editor.agent.adapter_missing", {{"command", agent.command}, {"package", agent.package}});
 }
