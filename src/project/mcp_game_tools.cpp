@@ -7,20 +7,23 @@
 #include <variant>
 #include <vector>
 
+#include "app/encoder_process.hpp"
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
+#include "core/files.hpp"
+#include "core/platform.hpp"
 #include "core/safe_path.hpp"
 #include "editor/object_clipboard.hpp"
 #include "project/runtime_query.hpp"
 #include "project/scene_text.hpp"
 #include "project/script_messages.hpp"
-#include "project/tool_commands.hpp"
 #include "project/tool_play.hpp"
 
 namespace redgem::tools::mcp {
 namespace {
 
 constexpr const char* kShotFile = "shot.png";
+constexpr const char* kShotLog = "shot.txt";  // what the picture's process printed
 // The largest picture read back: a 1024-wide PNG of a busy scene stays well below it.
 constexpr std::uintmax_t kMostPictureBytes = 4 * 1024 * 1024;
 constexpr const char* kPictureWord = "picture";
@@ -35,8 +38,11 @@ std::string shot_size(const Json& args) {
   return std::to_string(width) + "x" + std::to_string(height);
 }
 
+// `redgem shot ...` as a program of its own: a graphics driver that crashes while it opens a
+// window or draws (raylib goes on even when it cannot make one) takes only that process down.
 std::vector<std::string> shot_words(const Options& options, const Json& args, const std::filesystem::path& file) {
-  std::vector<std::string> words{"shot",
+  std::vector<std::string> words{platform::executable_path().string(),
+                                 "shot",
                                  options.game.string(),
                                  file.string(),
                                  "--size",
@@ -57,6 +63,18 @@ std::string said_without_file(std::string text, const std::filesystem::path& fil
   for (auto at = text.find(path); at != std::string::npos; at = text.find(path, at))
     text.replace(at, path.size(), kPictureWord);
   return text;
+}
+
+// What the picture's process printed (nothing when it wrote nothing).
+std::string printed(const std::filesystem::path& log) {
+  std::string error;
+  return read_text_file(log, error).value_or("");
+}
+
+// What a picture's process said before the graphics driver or the renderer crashed.
+std::string crash_report(const ProcessEnd& end, const std::string& said) {
+  return "the renderer crashed while taking the picture (signal " + std::to_string(end.code) +
+         "); the graphics driver may not support this display. What it said:\n" + said;
 }
 
 Json picture_result(const std::vector<std::uint8_t>& png, const std::string& text) {
@@ -100,10 +118,12 @@ std::string query_saved(const Options& options, const Json& args, const MessageC
 Json game_shot(const Options& options, const Json& args) {
   ScratchFolder scratch;
   const auto file = scratch.path() / kShotFile;
-  const auto result = run_tool_command(shot_words(options, args, file));
-  if (!result) throw std::logic_error("missing shot command");
-  const std::string said = said_without_file(result->out + result->err, file);
-  if (result->exit_code != kExitSuccess) return tool_result(said, true);
+  const auto log = scratch.path() / kShotLog;
+  const ProcessEnd end = run_to_end(shot_words(options, args, file), log);
+  if (!end.started) return tool_result("cannot start the program that takes pictures", true);
+  const std::string said = said_without_file(printed(log), file);
+  if (!end.exited) return tool_result(crash_report(end, said), true);
+  if (end.code != kExitSuccess) return tool_result(said, true);
   const auto png = read_file_up_to(file, kMostPictureBytes);
   if (!png) return tool_result("the picture could not be read back; ask for a smaller width", true);
   return picture_result(*png, said);

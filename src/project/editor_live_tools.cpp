@@ -134,7 +134,10 @@ Json use_window(EditorSession& session, const std::string& action, const Json& a
   if (!window) throw std::invalid_argument("this action requires an editor window");
   if (action != "capture" && busy) throw std::invalid_argument("finish the current editor gesture or dialog first");
   if (action == "play") require_editable(session, false);
-  if (args.contains("object")) session.select(static_cast<ObjectId>(object(session, args)));
+  if (args.contains("object")) {
+    require_editable(session, busy);  // selecting it is a change, refused as select's is
+    session.select(static_cast<ObjectId>(object(session, args)));
+  }
   return window(action, args);
 }
 

@@ -1,6 +1,8 @@
 #include "project/mcp_tools.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <map>
 #include <stdexcept>
 #include <vector>
 
@@ -127,7 +129,7 @@ Json events(const Options& options, const Json& args) {
           {"cursor_ahead", page.cursor_ahead}};
 }
 
-// What a page says about itself after its events, only when there is something to say.
+// What a page says about itself after its cursor, only when there is something to say.
 std::string page_notes(const Json& data) {
   std::string notes;
   if (data["more"].get<bool>()) notes += " more=true (call again with this since)";
@@ -136,23 +138,19 @@ std::string page_notes(const Json& data) {
   return notes;
 }
 
-// "#2 error scripts/coin.rb:4: ..." lines, then the cursor to pass as since next time.
+// The cursor to pass as since next time first, so that no cut of a long page can lose it, then
+// "#2 error scripts/coin.rb:4: ..." lines.
 std::string events_text(const Json& data) {
-  std::string text;
+  std::string text = "cursor=" + data["cursor"].dump() + page_notes(data) + "\n";
   for (const auto& row : data["events"])
-    text +=
-        "#" + row["id"].dump() + " " + row["level"].get<std::string>() + " " + row["text"].get<std::string>() + "\n";
-  if (data["events"].empty()) text = "no new events\n";
-  return text + "cursor=" + data["cursor"].dump() + page_notes(data);
+    text += "#" + row["id"].dump() + " " + row["level"].get<std::string>() + " " + row["text"].get<std::string>() +
+            (row["truncated"].get<bool>() ? "..." : "") + "\n";
+  if (data["events"].empty()) text += "no new events\n";
+  return text;
 }
 
 Json native_result(const Options& options, const std::string& name, const Json& args) {
-  if (name == "events") {
-    const Json data = events(options, args);
-    Json reply = tool_result(events_text(data));
-    reply["structuredContent"] = data;
-    return reply;
-  }
+  if (name == "events") return tool_result(events_text(events(options, args)));
   if (name == "game_shot") return game_shot(options, args);
   if (name == "game_query") return game_query(options, args);
   const auto result = run_tool_command(command(options, name, args));
@@ -166,15 +164,54 @@ bool answered_live(const std::string& name) {
 
 constexpr const char* kNoEditor =
     "no editor of this game is running with its bridge; start one with `redgem <game> --editor-bridge`";
+// The first line of an answer the saved files gave because no editor took the call.
+constexpr const char* kFromFiles = "(no editor is running: answered from the saved files)\n";
+// How long discovery leaves alone a connection whose listener did not prove itself: a program
+// that took a crashed editor's port then costs one handshake wait a minute, not one a call.
+constexpr auto kUnprovenBackoff = std::chrono::seconds(60);
+
+using Clock = std::chrono::steady_clock;
+
+// Connection files that did not prove themselves lately, with when (this process's memory).
+std::map<std::filesystem::path, Clock::time_point>& unproven() {
+  static std::map<std::filesystem::path, Clock::time_point> files;
+  return files;
+}
+
+bool backing_off(const std::filesystem::path& file) {
+  const auto found = unproven().find(file);
+  return found != unproven().end() && Clock::now() - found->second < kUnprovenBackoff;
+}
+
+// What a miss teaches about a connection file: a refused one is gone for good, an unproven one
+// is left alone for a while.
+void remember(const std::filesystem::path& file, EditorMiss miss) {
+  if (miss == EditorMiss::Refused) forget_connection(file);
+  if (miss == EditorMiss::Unproven) unproven()[file] = Clock::now();
+}
+
+// The answer of the files, said to be theirs, so that nobody takes it for the open editor's.
+Json from_files(Json reply) {
+  for (auto& part : reply["content"]) {
+    if (part.value("type", "") != "text") continue;
+    part["text"] = kFromFiles + part["text"].get<std::string>();
+    return reply;
+  }
+  reply["content"].insert(reply["content"].begin(), Json{{"type", "text"}, {"text", kFromFiles}});
+  return reply;
+}
 
 // The first running editor of the game answers; without one, the files do (the editor's own
 // actions cannot be done without it).
 Json discovered(const Options& options, const std::string& name, const Json& args) {
   for (const auto& file : editor_connections(options.game, options.bridge_root)) {
-    if (auto reply = try_editor(options.game, file, name, args)) return *reply;
+    if (backing_off(file)) continue;
+    auto attempt = try_editor(options.game, file, name, args);
+    if (attempt.reply) return *attempt.reply;
+    remember(file, attempt.miss);
   }
   if (name == "editor") return tool_result(kNoEditor, true);
-  return native_result(options, name, args);
+  return from_files(native_result(options, name, args));
 }
 }  // namespace
 

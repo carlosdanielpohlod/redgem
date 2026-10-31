@@ -58,7 +58,8 @@ after 60 frames: 2 hits, nearest first:
 #0 Ground at 0,0,0 normal=0,1,0 dist=5
 ```
 
-`game_shot` opens a hidden window, so it needs a display. Without one (no `DISPLAY` on Linux)
+`game_shot` draws in a separate `redgem shot` process with a hidden window. A graphics driver
+that crashes takes only that process down, and the call reports it. It needs a display. Without one (no `DISPLAY` on Linux)
 it returns a tool error that says so, and the server keeps answering. Some MCP clients start
 servers with only a few environment variables; pass `DISPLAY` in the server's configuration
 if pictures are wanted. Prefer `game_run` to find out whether something works and use pictures
@@ -105,8 +106,11 @@ redgem mcp /path/to/game --editor auto
 
 With `auto`, each call uses the newest running editor of that game. When none answers, the
 scene tools, `game_query` and `events` work on the saved files and this server instead, and
-the `editor` tool returns an error saying how to start an editor with its bridge. Stale
-connection files of editors that crashed are skipped. To pin one editor instance, pass its file:
+their answer starts with `(no editor is running: answered from the saved files)`; the `editor`
+tool returns an error saying how to start an editor with its bridge. A connection file whose
+port refuses connections belongs to an editor that is gone and is deleted. A listener that does
+not prove itself (below) is skipped for a minute, so it delays at most one call a minute by about
+a second. To pin one editor instance, pass its file:
 
 ```sh
 redgem mcp /path/to/game --editor /path/to/connection.json
@@ -116,10 +120,7 @@ If that editor exits, calls fail with an error that says how to restart it. A pi
 always answers scene edits live, so its `scene_edit` schema leaves out `from`.
 
 With `auto`, an `events` cursor belongs to whichever process answered: the editor, or this server
-when no editor is open. After an editor opens or closes, start again from `since: 0`. Discovery
-skips editors whose connection is refused; an editor that accepts the connection but fails the
-request (a timeout, or another program on a crashed editor's port) returns that error, since
-retrying elsewhere could apply an edit twice.
+when no editor is open. After an editor opens or closes, start again from `since: 0`.
 
 Scene listing, object details and scene comparison now read the editor's unsaved document.
 `scene_edit` supports `set`, `add` and `remove`. `add` creates an empty object, optionally under
@@ -166,29 +167,36 @@ control of that editor. MCP read-only and allow-list options restrict that clien
 
 At most four connections are handled at once, on the editor thread between frames. Requests
 are limited to 64 KiB and replies to 256 KiB. Transport waits expire after five seconds. If an
-edit times out, it may have completed: inspect status and the object before retrying. There is
-no automatic retry or fallback to editing the file when an editor connection fails. After a
-crash a stale connection file can remain; reconnect using the new editor instance's file.
+edit times out, it may have completed: inspect status and the object before retrying. A pinned
+connection (`--editor connection.json`) never falls back to the files.
+
+Before it sends the credential or a request, the client sends a random nonce, and the editor must
+answer within one second with an HMAC-SHA256 of it keyed by the credential. A program that took a
+crashed editor's port therefore receives only that nonce. Until that proof, a failure means no
+editor took the call; after it, any failure (a timeout, or a reset after the request went out)
+fails the call. It is never retried elsewhere or applied to the files, because the edit may
+already have happened.
 
 ## Bounded results
 
 Each request is at most 64 KiB with at most 16 JSON nesting levels. Ordinary tool text is limited
-to 8 KiB with a truncation notice; narrow the scene list or API query for more detail. Invalid
-arguments return JSON-RPC errors. A valid command that fails returns `isError: true` with the
-engine's diagnostic.
+to 8 KiB with a notice saying it was cut; narrow the scene list (`depth`, `limit`, then
+`scene_get`) or the API query for more detail. Invalid arguments and a valid command that fails
+both return `isError: true`, with what to change or the engine's diagnostic. Unknown or disabled
+tools are JSON-RPC errors.
 
-Event text is one line per event, `#id level text`, then `cursor=N` to pass as the next `since`:
+Event text starts with `cursor=N`, the value to pass as the next `since` (followed by `more`,
+`dropped` or `cursor_ahead` when they apply), then one line per event, `#id level text`:
 
 ```text
-#2 error scripts/coin.rb:12: Coin#update on 'Coin1': undefined method 'positon=' for Transform (NoMethodError)
 cursor=2
+#2 error scripts/coin.rb:12: Coin#update on 'Coin1': undefined method 'positon=' for Transform (NoMethodError)
 ```
 
 Each event is its message's first line, led by the place in the game's files its backtrace names,
-with the game's folder left out of paths. Results also contain `structuredContent`: `events`,
-`cursor`, `dropped`, `more` and `cursor_ahead`. Each event's text is capped at 256 UTF-8 bytes,
-with `truncated` when shortened. The cursor belongs to this server process; it is
-not a cursor into an unrelated editor or game (with `--editor`, it belongs to that editor).
+with the game's folder left out of paths. Each event's text is capped at 256 UTF-8 bytes and ends
+with `...` when shortened. The cursor belongs to this server process; it is not a cursor into an
+unrelated editor or game (with `--editor`, it belongs to that editor).
 Events include engine log messages, not raw
 standard output. Process history is bounded, so `dropped` identifies overwritten messages.
 

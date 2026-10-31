@@ -47,7 +47,7 @@ FoundObject ambiguous(const SceneDesc& scene, const std::string& reference, cons
   std::string list;
   for (const int index : found) list += "\n  " + object_id(scene, index) + " " + object_path(scene, index);
   return {kNoIndex,
-          tr("project.scene.ambiguous", {{"object", reference}, {"count", std::to_string(found.size())}}) + list};
+          tr("project.scene.ambiguous", {{"object", reference}, {"count", std::to_string(found.size())}}) + list, true};
 }
 
 FoundObject by_id(const SceneDesc& scene, const std::string& reference) {

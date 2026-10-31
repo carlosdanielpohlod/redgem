@@ -51,8 +51,9 @@ class McpStdioTest(unittest.TestCase):
         self.assertEqual([reply["id"] for reply in replies], [1, 2, 3])
         self.assertFalse(replies[1]["result"]["isError"], replies[1])
         self.assertIn("123", replies[1]["result"]["content"][0]["text"])
-        self.assertIn("cursor", replies[2]["result"]["structuredContent"])
-        self.assertIn("protocol-noise", json.dumps(replies[2]["result"]["structuredContent"]))
+        events = replies[2]["result"]["content"][0]["text"]
+        self.assertTrue(events.startswith("cursor="), events)
+        self.assertIn("protocol-noise", events)
 
     def test_modern_calls_edit_and_compare_only_the_configured_game(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -2,10 +2,13 @@
 
 #include <doctest/doctest.h>
 
+#include <csignal>
 #include <filesystem>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
+#include "app/encoder_process.hpp"
 #include "core/files.hpp"
 
 #include "project/mcp_game_tools.hpp"
@@ -96,7 +99,7 @@ TEST_CASE("game_query refuses requests it cannot answer with what to change") {
   CHECK_THROWS_WITH_AS(mcp::game_query(kPlatformer, {{"action", "inspect"}}),
                        "inspect needs object (a #id, path or name)", std::invalid_argument);
   CHECK_THROWS_WITH_AS(mcp::game_query(kPlatformer, {{"action", "raycast"}, {"from", "0,5"}, {"to", "0,0,0"}}),
-                       "from: needs x,y,z (three numbers), like 0,1.5,-4", std::invalid_argument);
+                       "from: needs x,y,z (three numbers of at most 1000000 meters), like 0,1.5,-4", std::invalid_argument);
   CHECK_THROWS_WITH_AS(mcp::game_query(kPlatformer, {{"action", "raycast"}, {"from", "1,1,1"}, {"to", "1,1,1"}}),
                        "from and to must be different points", std::invalid_argument);
   CHECK_THROWS_AS(mcp::game_query(kPlatformer, {{"action", "inspect"}, {"object", "Nope"}}), std::invalid_argument);
@@ -112,4 +115,27 @@ TEST_CASE("query points are three finite numbers") {
   }
   CHECK_THROWS_WITH_AS(point_argument(Json::object(), "at"), "missing argument: at (x,y,z in meters)",
                        std::invalid_argument);
+  // Beyond any level: rays between such points would overflow to a miss or reach physics as NaN.
+  for (const char* far : {"1e30,0,0", "0,3e38,0", "0,0,-1000001"}) {
+    CHECK_THROWS_AS(point_argument({{"at", far}}, "at"), std::invalid_argument);
+  }
+  CHECK(point_argument({{"at", "1000000,0,-1000000"}}, "at").x == doctest::Approx(1.0e6));
 }
+
+#ifndef _WIN32
+TEST_CASE("a program run to its end reports its output, its exit code and a crash as its own") {
+  const auto output = std::filesystem::temp_directory_path() / "redgem-run-to-end.txt";
+  const ProcessEnd exited = run_to_end({"/bin/sh", "-c", "echo said; echo warned >&2; exit 3"}, output);
+  CHECK(exited.started);
+  CHECK(exited.exited);
+  CHECK(exited.code == 3);
+  std::string error;
+  CHECK(read_text_file(output, error) == std::optional<std::string>("said\nwarned\n"));
+  const ProcessEnd crashed = run_to_end({"/bin/sh", "-c", "kill -SEGV $$"}, output);
+  CHECK(crashed.started);
+  CHECK_FALSE(crashed.exited);
+  CHECK(crashed.code == SIGSEGV);
+  CHECK_FALSE(run_to_end({"/no/such/program"}, output).started);
+  std::filesystem::remove(output);
+}
+#endif

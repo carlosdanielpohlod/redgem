@@ -24,43 +24,56 @@ bool matches_game(const Address& address, const Json& asked) {
   return std::filesystem::equivalent(address.game, std::filesystem::u8path(game));
 }
 
+// One client: its hello, answered with the proof, then its request, answered with the result.
 class Peer {
  public:
   explicit Peer(net::Socket socket, EditorBridgeClock clock)
       : socket_(std::move(socket)), clock_(std::move(clock)), started_(clock_()) {}
   bool pump(const Address& address, const mcp::Invoke& invoke) {
     if (clock_() - started_ > kTimeout) return false;
-    if (!answered_ && !receive(address, invoke)) return false;
-    if (!answered_) return true;
-    if (socket_.write(output_) == net::IoStatus::Closed) return false;
-    return !output_.empty();
+    if (!output_.empty()) return send();
+    if (stage_ == Stage::Done) return false;
+    return receive(address, invoke);
   }
 
  private:
+  enum class Stage { Hello, Request, Done };
+
+  // Writes what is waiting; false when the client went or everything of the last answer is out.
+  bool send() {
+    if (socket_.write(output_) == net::IoStatus::Closed) return false;
+    return !output_.empty() || stage_ != Stage::Done;
+  }
   bool receive(const Address& address, const mcp::Invoke& invoke) {
     if (socket_.read(input_, kMaxRequest) == net::IoStatus::Closed) return false;
     if (input_.size() > kMaxRequest) return false;
     if (!complete(input_)) return true;
     try {
-      return answer(address, invoke);
+      const Json asked = parse(take_line(input_));
+      return stage_ == Stage::Hello ? greet(address, asked) : answer(address, invoke, asked);
     } catch (const std::exception&) {
       return false;  // malformed or unauthenticated peers get no protocol or credential detail
     }
   }
-  bool answer(const Address& address, const mcp::Invoke& invoke) {
-    const Json asked = parse(std::string(input_.begin(), input_.end()));
+  bool greet(const Address& address, const Json& asked) {
+    if (!asked.is_object() || !valid_nonce(asked.value("hello", Json()))) return false;
+    output_ = encode({{"proof", server_proof(address.token, asked["hello"].get<std::string>())}});
+    stage_ = Stage::Request;
+    return true;
+  }
+  bool answer(const Address& address, const mcp::Invoke& invoke, const Json& asked) {
     if (!asked.is_object() || !same_token(address.token, asked.value("token", Json()))) return false;
     if (!matches_game(address, asked)) return false;
     if (!asked.value("name", Json()).is_string() || !asked.value("arguments", Json()).is_object()) return false;
     output_ = encode(invoke(asked["name"], asked["arguments"]));
-    answered_ = true;
+    stage_ = Stage::Done;
     return output_.size() <= kMaxReply;
   }
   net::Socket socket_;
   Bytes input_, output_;
   EditorBridgeClock clock_;
   Clock::time_point started_;
-  bool answered_ = false;
+  Stage stage_ = Stage::Hello;
 };
 }  // namespace
 

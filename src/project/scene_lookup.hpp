@@ -14,6 +14,7 @@ namespace redgem::tools {
 struct FoundObject {
   int index = kNoIndex;
   std::string error;
+  bool ambiguous = false;  // several objects answer to the reference (`error` lists them)
 };
 
 FoundObject find_object(const SceneDesc& scene, const std::string& reference);

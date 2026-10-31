@@ -18,6 +18,9 @@ constexpr float kShownTolerance = 0.005f;
 // Shortest ray between two points: closer points are one point, with no direction to cast in.
 constexpr float kShortestRay = 1e-4f;
 constexpr char kComponentSeparator = ',';
+// Farthest a query point may be from the origin on any axis, in meters: well past any level, and
+// near enough that a ray between two such points stays finite in single precision.
+constexpr float kLargestCoordinate = 1.0e6f;
 
 // "#7 Coin1" for an object of the loaded scene; "Coin1 (spawned)" for one made while playing.
 std::string object_label(Engine& engine, const SceneDesc& scene, ObjectId id) {
@@ -30,6 +33,7 @@ std::string object_label(Engine& engine, const SceneDesc& scene, ObjectId id) {
 ObjectId requested_object(Engine& engine, const SceneDesc& scene, const std::string& reference) {
   const FoundObject found = find_object(scene, reference);
   if (found.index != kNoIndex) return static_cast<ObjectId>(found.index);
+  if (found.ambiguous) throw std::invalid_argument(found.error);  // the request must name one of them
   const ObjectId spawned = engine.scene().find(reference);
   if (spawned == kNoObject) throw std::invalid_argument(found.error);
   return spawned;
@@ -138,12 +142,14 @@ std::string overlap(Engine& engine, const SceneDesc& scene, const mcp::Json& arg
   return std::to_string(hits.size()) + " objects, nearest first:\n" + hits_text(engine, scene, hits);
 }
 
-// Reads the next component of "x,y,z" into `value`; false when it is no finite number.
+bool within_world(float value) { return std::isfinite(value) && std::fabs(value) <= kLargestCoordinate; }
+
+// Reads the next component of "x,y,z" into `value`; false when it is no number within the world.
 bool read_component(std::istringstream& in, float& value) {
   std::string part;
   if (!std::getline(in, part, kComponentSeparator)) return false;
   std::istringstream number(part);
-  return static_cast<bool>(number >> value) && number.eof() && std::isfinite(value);
+  return static_cast<bool>(number >> value) && number.eof() && within_world(value);
 }
 
 }  // namespace
@@ -154,7 +160,8 @@ Vec3 point_argument(const mcp::Json& args, const char* key) {
   Vec3 point;
   const bool read = read_component(in, point.x) && read_component(in, point.y) && read_component(in, point.z);
   if (!read || !in.eof())
-    throw std::invalid_argument(std::string(key) + ": needs x,y,z (three numbers), like 0,1.5,-4");
+    throw std::invalid_argument(std::string(key) + ": needs x,y,z (three numbers of at most " +
+                                number_text(kLargestCoordinate, 0) + " meters), like 0,1.5,-4");
   return point;
 }
 

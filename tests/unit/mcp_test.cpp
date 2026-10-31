@@ -150,16 +150,33 @@ TEST_CASE("MCP exposes native read-only scene and API commands") {
   CHECK(contains(invoke(options, "api", {{"class", "Transform"}}), "position"));
 }
 
-TEST_CASE("MCP event pages retain their cursor and bound individual text") {
+namespace {
+// The cursor a page of events says to pass next: its first line is "cursor=N ...".
+constexpr const char* kCursorPrefix = "cursor=";
+std::uint64_t page_cursor(const std::string& text) {
+  const std::size_t start = std::string(kCursorPrefix).size();
+  return std::stoull(text.substr(start, text.find_first_of(" \n") - start));
+}
+}  // namespace
+
+TEST_CASE("MCP event pages lead with their cursor and bound individual text") {
   const test::LogCapture capture;
   const auto cursor = log::event_cursor();
   log::warning(std::string(3000, 'x'));
-  const Json reply = invoke({}, "events", {{"since", cursor}, {"limit", 1}});
-  const Json data = reply["structuredContent"];
-  CHECK(data["cursor"].get<std::uint64_t>() > cursor);
-  CHECK(data["events"].size() == 1);
-  CHECK(data["events"][0]["text"].get<std::string>().size() == 256);
-  CHECK(data["events"][0]["truncated"] == true);
+  const std::string text = text_of(invoke({}, "events", {{"since", cursor}, {"limit", 1}}));
+  CHECK(text.rfind("cursor=", 0) == 0);
+  CHECK(page_cursor(text) > cursor);
+  CHECK(text.find("warning " + std::string(256, 'x') + "...\n") != std::string::npos);
+  CHECK(text.find(std::string(257, 'x')) == std::string::npos);
+}
+
+TEST_CASE("MCP event pages keep their cursor when the most events of the longest text fill a page") {
+  const test::LogCapture capture;
+  const auto cursor = log::event_cursor();
+  for (int i = 0; i < 32; ++i) log::warning(std::string(3000, 'y'));
+  const Json reply = invoke({}, "events", {{"since", cursor}, {"limit", 32}});
+  CHECK(page_cursor(text_of(reply)) > cursor);
+  CHECK_FALSE(reply.contains("structuredContent"));
 }
 
 TEST_CASE("MCP events read as one compact line each, with paths inside the game and the next cursor") {
@@ -168,13 +185,11 @@ TEST_CASE("MCP events read as one compact line each, with paths inside the game 
   const auto cursor = log::event_cursor();
   const std::string game = std::filesystem::path(REDGEM_PLATFORMER_DIR).generic_string();
   log::error("Coin#update on 'Coin1': boom (RuntimeError)\n    from " + game + "/scripts/coin.rb:12:in update");
-  const Json reply = invoke(options, "events", {{"since", cursor}});
-  const std::string text = reply["content"][0]["text"];
+  const std::string text = text_of(invoke(options, "events", {{"since", cursor}}));
   CHECK(text.find("error scripts/coin.rb:12: Coin#update on 'Coin1': boom (RuntimeError)") != std::string::npos);
   CHECK(text.find(game) == std::string::npos);
-  CHECK(text.find("cursor=" + reply["structuredContent"]["cursor"].dump()) != std::string::npos);
-  CHECK(text_of(invoke(options, "events", {{"since", reply["structuredContent"]["cursor"]}})).find("no new events") ==
-        0);
+  const auto next = page_cursor(text);
+  CHECK(text_of(invoke(options, "events", {{"since", next}})).find("no new events") != std::string::npos);
 }
 
 TEST_CASE("MCP framing recovers after malformed, oversized and deeply nested messages") {
@@ -196,7 +211,7 @@ TEST_CASE("MCP tool failures are results and long UTF-8 output is bounded") {
   CHECK(failed["isError"] == true);
   const std::string text = std::string(8191, 'x') + "é";
   const Json bounded = tool_result(text);
-  CHECK(contains(bounded, "output truncated"));
+  CHECK(contains(bounded, "output cut at 8 KiB"));
   CHECK_FALSE(contains(bounded, "é"));
   CHECK(bounded.dump().size() < 8400);
 }

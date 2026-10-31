@@ -1,11 +1,14 @@
 #include "project/editor_bridge_wire.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <array>
 #include <iomanip>
 #include <random>
 #include <sstream>
 #include <stdexcept>
+
+#include <mbedtls/md.h>
 
 #include "core/files.hpp"
 #include "core/platform.hpp"
@@ -19,6 +22,19 @@ constexpr int kHexWidth = 2;
 constexpr int kMaxDepth = 16;
 constexpr std::uintmax_t kDescriptorBytes = 4096;
 constexpr int kLargestPort = 65535;
+// What the editor's proof is a keyed hash of, besides the client's nonce: no other use of the
+// token can produce the same bytes.
+constexpr const char* kProofContext = "redgem editor bridge proof v2\n";
+constexpr std::size_t kSha256Bytes = 32;
+
+std::string hex(const unsigned char* bytes, std::size_t count) {
+  std::ostringstream text;
+  text << std::hex << std::setfill('0');
+  for (std::size_t i = 0; i < count; ++i) text << std::setw(kHexWidth) << static_cast<int>(bytes[i]);
+  return text.str();
+}
+
+bool hex_digit(char letter) { return std::isxdigit(static_cast<unsigned char>(letter)) != 0; }
 
 constexpr const char* kBridgeFolder = "editor-bridge";
 constexpr const char* kConnectionName = "connection.json";
@@ -141,6 +157,30 @@ bool belongs_to(const std::filesystem::path& game, const std::filesystem::path& 
   } catch (const std::exception&) {
     return false;
   }
+}
+
+std::string take_line(Bytes& bytes) {
+  const auto end = std::find(bytes.begin(), bytes.end(), '\n');
+  std::string line(bytes.begin(), end);
+  bytes.erase(bytes.begin(), end == bytes.end() ? end : end + 1);
+  return line;
+}
+
+std::string server_proof(const std::string& token, const std::string& nonce) {
+  const std::string message = kProofContext + nonce;
+  std::array<unsigned char, kSha256Bytes> digest{};
+  const auto* sha256 = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+  const int failed =
+      mbedtls_md_hmac(sha256, reinterpret_cast<const unsigned char*>(token.data()), token.size(),
+                      reinterpret_cast<const unsigned char*>(message.data()), message.size(), digest.data());
+  if (failed != 0) throw std::runtime_error("cannot compute the bridge proof");
+  return hex(digest.data(), digest.size());
+}
+
+bool valid_nonce(const Json& nonce) {
+  if (!nonce.is_string()) return false;
+  const auto& text = nonce.get_ref<const std::string&>();
+  return text.size() == kTokenBytes * kHexWidth && std::all_of(text.begin(), text.end(), hex_digit);
 }
 
 Json parse(const std::string& text) {

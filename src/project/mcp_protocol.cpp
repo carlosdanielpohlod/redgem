@@ -17,7 +17,7 @@ constexpr int kInvalidParams = -32602;
 constexpr int kInternalError = -32603;
 constexpr int kUnsupportedVersion = -32022;
 constexpr int kMaxJsonDepth = 16;
-constexpr std::size_t kMaxResultBytes = 8192;
+constexpr std::size_t kMaxResultBytes = 8192;  // the "8 KiB" the cut notice names
 constexpr const char* kProtocolKey = "io.modelcontextprotocol/protocolVersion";
 constexpr const char* kCapabilitiesKey = "io.modelcontextprotocol/clientCapabilities";
 constexpr const char* kServerKey = "io.modelcontextprotocol/serverInfo";
@@ -196,7 +196,7 @@ void serve(std::istream& input, const Send& send, Session& session) {
 
 Json tool_result(const std::string& text, bool failed) {
   std::string bounded(utf8_prefix(text, kMaxResultBytes));
-  if (bounded.size() < text.size()) bounded += "\n[output truncated; narrow the request]";
+  if (bounded.size() < text.size()) bounded += "\n[output cut at 8 KiB; narrow the request]";
   return {{"content", {{{"type", "text"}, {"text", bounded}}}}, {"isError", failed}};
 }
 }  // namespace redgem::tools::mcp
