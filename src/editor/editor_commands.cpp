@@ -13,6 +13,7 @@
 #include "editor/keyboard.hpp"
 #include "editor/picking.hpp"
 #include "editor/scene_viewport.hpp"
+#include "editor/ui/style.hpp"
 #include "render/render_math.hpp"
 #include "render/renderer.hpp"
 #include "render/window.hpp"
@@ -30,8 +31,9 @@ void EditorApp::save_scripts() {
   if (!scripts_->save_all(error)) log::error(error);
 }
 
+// Typing to the agent leaves the scene free: that is where its edits are asked for.
 bool EditorApp::interaction_active() const {
-  return gizmo_dragging_ || stroke_started_ || ImGui::IsAnyItemActive() ||
+  return gizmo_dragging_ || stroke_started_ || ui::item_active_outside(kAgentWindow) ||
          ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
 }
 

@@ -57,6 +57,18 @@ float y_of(const EditorSession& session, const std::string& name) {
 
 }  // namespace
 
+TEST_CASE("a game opened by a relative path keeps its folder as an absolute one") {
+  const std::filesystem::path dir = copy_sandbox("relative");
+  const std::filesystem::path before = std::filesystem::current_path();
+  std::filesystem::current_path(dir.parent_path());
+  auto opened = EditorSession::open(dir.filename());
+  std::filesystem::current_path(before);
+  REQUIRE(std::holds_alternative<std::unique_ptr<EditorSession>>(opened));
+  const std::filesystem::path game_dir = std::get<std::unique_ptr<EditorSession>>(opened)->game_dir();
+  CHECK(game_dir.is_absolute());
+  CHECK(std::filesystem::equivalent(game_dir, dir));
+}
+
 TEST_CASE("refreshing one node gives the preview what rebuilding it all would, and keeps who it is") {
   constexpr Vec3 kDragged{3.0f, 4.0f, 5.0f};
   const auto dir = copy_sandbox("refresh_node");
