@@ -75,8 +75,9 @@ class EditorApp {
     int width = 0;
     int height = 0;
   };
-  // A bounded JPEG of the last completed scene viewport (not the desktop or other windows).
-  std::optional<ViewportPicture> capture_viewport(int max_side, std::string& error) const;
+  // A PNG of the last completed scene viewport (not the desktop or other windows), its longest side
+  // at most `max_side`, made smaller when needed for its bytes to fit `max_bytes`.
+  std::optional<ViewportPicture> capture_viewport(int max_side, std::size_t max_bytes, std::string& error) const;
   // Whether the editor is done: leaving was asked for and nothing unsaved stands in the way (there
   // was nothing, or the user chose Save / Discard).
   bool finished() const { return quit_confirmed_; }

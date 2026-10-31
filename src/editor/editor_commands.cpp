@@ -48,7 +48,9 @@ void EditorApp::play() {
     game_view_.reset();
     return;
   }
-  ImGui::SetWindowFocus(kViewportWindow);  // the game gets the keyboard right away
+  // The game gets the keyboard right away, unless the user is typing somewhere: Play an agent pressed
+  // must not take its message box from under the user's fingers.
+  if (!ImGui::GetIO().WantTextInput) ImGui::SetWindowFocus(kViewportWindow);
 }
 
 void EditorApp::stop() {

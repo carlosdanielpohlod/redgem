@@ -20,10 +20,9 @@ namespace {
 using agent::AgentState;
 using agent::EntryKind;
 
-constexpr int kInputLines = 3;           // how tall the prompt box is, in lines of text
-constexpr float kPickerWidth = 150.0f;   // pixels
-constexpr float kScrollToBottom = 1.0f;  // SetScrollHereY: the last line at the bottom
-constexpr float kEntryGap = 6.0f;        // pixels between entries
+constexpr int kInputLines = 3;          // how tall the prompt box is, in lines of text
+constexpr float kPickerWidth = 150.0f;  // pixels
+constexpr float kEntryGap = 6.0f;       // pixels between entries
 constexpr const char* kWhitespace = " \t\r\n";
 constexpr float kBothSides = 2.0f;       // padding counted above and below
 constexpr float kRowsUnderInput = 2.0f;  // the attachments' row and the buttons' row
@@ -83,6 +82,19 @@ void draw_hint(const char* hint) {
 bool out_of_sight(float height) {
   return height > kNotMeasured && !ImGui::IsRectVisible(ImVec2(ImGui::GetContentRegionAvail().x, height));
 }
+
+// What the panel is for, before any conversation.
+void draw_no_session() {
+  ImGui::TextColored(palette::kMuted, "%s", ICON_FA_ROBOT);
+  ImGui::SameLine();
+  ImGui::PushStyleColor(ImGuiCol_Text, palette::kMuted);
+  ImGui::TextWrapped("%s", tr("editor.agent.no_session"));
+  ImGui::PopStyleColor();
+}
+
+// The transcript showed its end when this frame began (before anything new is drawn): it stays there
+// while more comes, and stays where the user scrolled to otherwise, however close to the end.
+bool scrolled_to_bottom() { return ImGui::GetScrollY() >= ImGui::GetScrollMaxY(); }
 
 }  // namespace
 
@@ -233,27 +245,18 @@ bool AgentPanel::wants_login() const {
 
 void AgentPanel::draw_transcript() {
   ImGui::BeginChild("transcript", ImVec2(0.0f, -composer_height()));
-  const bool at_bottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY();
+  const bool at_bottom = scrolled_to_bottom();
   if (connection_) {
     draw_entries(connection_->client());
   } else if (start_error_.empty()) {
-    ImGui::TextColored(palette::kMuted, "%s", ICON_FA_ROBOT);
-    ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Text, palette::kMuted);
-    ImGui::TextWrapped("%s", tr("editor.agent.no_session"));
-    ImGui::PopStyleColor();
+    draw_no_session();
   }
-  follow_new_entries(at_bottom);
+  // (Every frame, not only when an entry came: an answer keeps growing after it came, as its markdown
+  // is read again and the heights of entries out of sight are measured.)
+  // (Scrolled to where the content ends now, which ImGui keeps within the end once it knows how tall
+  // the transcript is: the next frame begins at the very end.)
+  if (at_bottom) ImGui::SetScrollY(ImGui::GetCursorPosY());
   ImGui::EndChild();
-}
-
-// The view stays at the bottom while it is there and more comes.
-void AgentPanel::follow_new_entries(bool at_bottom) {
-  const std::uint64_t revision = connection_ ? connection_->client().transcript().revision() : 0;
-  const bool more_came = revision != seen_revision_;
-  seen_revision_ = revision;
-  if (!more_came) return;
-  if (at_bottom) ImGui::SetScrollHereY(kScrollToBottom);
 }
 
 void AgentPanel::draw_entries(agent::AgentClient& client) {

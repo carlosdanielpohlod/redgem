@@ -90,7 +90,6 @@ class AgentPanel {
   void draw_status();
   void draw_problem();
   void draw_transcript();
-  void follow_new_entries(bool at_bottom);
   void draw_entries(agent::AgentClient& client);
   void draw_entry(agent::AgentClient& client, std::size_t index);
   void draw_or_pass(agent::AgentClient& client, std::size_t index);
@@ -122,7 +121,6 @@ class AgentPanel {
   std::string hint_;      // a word under the prompt box (nothing selected to attach)
   bool focus_input_ = false;
   std::vector<std::string> attached_;         // context for the next prompt
-  std::uint64_t seen_revision_ = 0;           // the transcript's, as last drawn
   std::map<std::size_t, ParsedText> parsed_;  // by entry number
   std::map<std::size_t, float> heights_;      // how tall each entry was last drawn, by number
   float measured_width_ = 0.0f;               // the width those heights were measured at

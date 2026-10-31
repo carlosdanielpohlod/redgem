@@ -18,6 +18,14 @@ constexpr const char* kSchemas = R"JSON([
 {"name":"api","description":"Read the scripting API: the class index, one class, or a search. Example: {\"class\":\"Transform\"}.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"class":{"type":"string","maxLength":256},"search":{"type":"string","maxLength":256}}}},
 {"name":"events","description":"Read log messages (script errors, Debug.log) since a cursor, one line each. Pass the returned cursor as since next time to get only new ones.","inputSchema":{"type":"object","additionalProperties":false,"properties":{"since":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":32},"level":{"type":"string","enum":["debug","info","warning","error"]}}}}
 ])JSON";
+// What scene_edit's assignments take, told to the agent: without it, an agent guesses words (color=)
+// that only become custom properties nothing reads.
+// What scene_edit's list of words leaves out and agents guess wrong (color=), which only makes a custom
+// property nothing reads.
+constexpr const char* kColorWords =
+    "tint=#rrggbb multiplies the colors of this object's mesh: the way to color one object. Other bare keys "
+    "become custom properties.";
+
 constexpr const char* kEditorSchema =
     R"JSON({"name":"editor","description":"The open editor: status, select or frame an object, capture the viewport (PNG, max_size default 512), play/pause/resume/stop/step its game, undo, redo or save. Document changes need edit mode and stay unsaved until save.","inputSchema":{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["status","select","frame","undo","redo","save","play","pause","resume","stop","step","capture"]},"object":{"type":"string","minLength":1,"maxLength":256},"max_size":{"type":"integer","minimum":128,"maximum":1024}}}})JSON";
 
@@ -132,6 +140,11 @@ void live_schema(Json& tool, const Options& options) {
     tool["inputSchema"]["properties"]["action"]["enum"] = {"status", "capture"};
   if (tool["name"] == "scene_edit" && always_live(options)) tool["inputSchema"]["properties"].erase("from");
 }
+
+// scene_edit says how to color an object, in either mode.
+void describe_assignments(Json& tool) {
+  if (tool["name"] == "scene_edit") tool["description"] = tool["description"].get<std::string>() + " " + kColorWords;
+}
 }  // namespace
 
 Json catalog(const Options& options) {
@@ -140,6 +153,7 @@ Json catalog(const Options& options) {
     const std::string name = tool["name"];
     if (!enabled(options, name)) continue;
     live_schema(tool, options);
+    describe_assignments(tool);
     tool["annotations"] = {{"readOnlyHint", name == "editor" ? options.read_only : read_only_tool(name)},
                            {"openWorldHint", !read_only_tool(name)},
                            {"destructiveHint", name == "scene_edit" || (name == "editor" && !options.read_only)}};

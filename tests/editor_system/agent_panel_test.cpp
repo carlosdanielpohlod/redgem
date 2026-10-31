@@ -4,6 +4,8 @@
 #include <doctest/doctest.h>
 
 #include <chrono>
+#include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -19,6 +21,7 @@
 #include "editor/editor_config.hpp"
 #include "project/agent_tools.hpp"
 #include "project/editor_setup.hpp"
+#include "window_mouse.hpp"
 #include "window_picture.hpp"
 
 using namespace redgem;
@@ -73,7 +76,83 @@ std::string file_text(const std::filesystem::path& file) {
   return text.str();
 }
 
+constexpr float kPartOfALine = 0.5f;
+constexpr int kStreamedPieces = 120;  // pieces of an answer, a frame each: far more than the panel shows
+constexpr int kClickFrames = 3;
+constexpr const char* kPromptId = "##prompt";
+
+ImGuiWindow* agent_window() { return ImGui::FindWindowByName(editor_config::kAgentWindow); }
+
+// The Agent panel's transcript: its child window.
+ImGuiWindow* transcript_window() {
+  for (ImGuiWindow* window : ImGui::GetCurrentContext()->Windows) {
+    if (window->ParentWindow == agent_window() && std::strstr(window->Name, "transcript") != nullptr) return window;
+  }
+  return nullptr;
+}
+
+ImGuiID prompt_box() { return ImGui::GetIDWithSeed(kPromptId, nullptr, agent_window()->ID); }
+
+void click_at(EditorApp& app, ImVec2 point) {
+  test::move_window_mouse(point.x, point.y);
+  ImGuiIO& io = ImGui::GetIO();
+  io.AddMousePosEvent(point.x, point.y);
+  run(app, kClickFrames);
+  io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+  run(app, kClickFrames);
+  io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+  run(app, kClickFrames);
+}
+
+// Clicks into the message box, as a user would before typing: it is under the transcript.
+void click_into_prompt(EditorApp& app) {
+  const ImGuiWindow* transcript = transcript_window();
+  REQUIRE(transcript != nullptr);
+  const float below = ImGui::GetFrameHeightWithSpacing() * 2.0f;
+  click_at(app, ImVec2(transcript->Pos.x + below, transcript->Pos.y + transcript->Size.y + below));
+}
+
 }  // namespace
+
+TEST_CASE("the transcript follows an answer as it grows, and Play an agent presses leaves the message box alone") {
+  const std::filesystem::path game = copy_game();
+  EditorOptions options = editor_options(GpuChoice::Auto);
+  options.clock = [] { return config::kFixedDeltaSeconds; };
+  options.agent.agents_file = fake_agents_file();
+  auto created = EditorApp::create(game, std::move(options));
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  run(app, kWarmupFrames);
+  ui::AgentPanel& panel = app.agent_panel();
+  panel.start_session();
+  REQUIRE(panel.connection() != nullptr);
+  agent::AgentClient& client = panel.connection()->client();
+  REQUIRE(run_until(app, [&] { return client.state() == agent::AgentState::Ready; }));
+  ImGui::SetWindowFocus(editor_config::kAgentWindow);
+  for (int piece = 0; piece < kStreamedPieces; ++piece) {
+    client.transcript().append(agent::EntryKind::Agent, "A line of a long answer, as it streams in.\n\n");
+    app.frame();
+  }
+  run(app, kPictureFrames);
+  const ImGuiWindow* transcript = transcript_window();
+  REQUIRE(transcript != nullptr);
+  CHECK(transcript->ScrollMax.y > 0.0f);
+  CHECK(transcript->Scroll.y >= transcript->ScrollMax.y);
+  // Scrolled up by less than a line, the view stays there: it follows only from the very end.
+  // (ImGui keeps scroll positions in whole pixels.)
+  const float a_little_up = std::floor(transcript->ScrollMax.y - ImGui::GetTextLineHeight() * kPartOfALine);
+  ImGui::SetScrollY(transcript_window(), a_little_up);
+  run(app, kPictureFrames);
+  CHECK(transcript_window()->Scroll.y == doctest::Approx(a_little_up));
+
+  click_into_prompt(app);
+  REQUIRE(ImGui::GetActiveID() == prompt_box());
+  app.play();  // (as the editor's MCP tools press it)
+  run(app, kPictureFrames);
+  CHECK(ImGui::GetActiveID() == prompt_box());
+  app.stop();
+  std::filesystem::remove_all(game);
+}
 
 TEST_CASE("the Agent panel talks to an agent, which writes a file in the game after asking") {
   const std::filesystem::path game = copy_game();
