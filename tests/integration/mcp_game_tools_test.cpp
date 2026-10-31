@@ -99,7 +99,8 @@ TEST_CASE("game_query refuses requests it cannot answer with what to change") {
   CHECK_THROWS_WITH_AS(mcp::game_query(kPlatformer, {{"action", "inspect"}}),
                        "inspect needs object (a #id, path or name)", std::invalid_argument);
   CHECK_THROWS_WITH_AS(mcp::game_query(kPlatformer, {{"action", "raycast"}, {"from", "0,5"}, {"to", "0,0,0"}}),
-                       "from: needs x,y,z (three numbers of at most 1000000 meters), like 0,1.5,-4", std::invalid_argument);
+                       "from: needs x,y,z (three numbers of at most 1000000 meters), like 0,1.5,-4",
+                       std::invalid_argument);
   CHECK_THROWS_WITH_AS(mcp::game_query(kPlatformer, {{"action", "raycast"}, {"from", "1,1,1"}, {"to", "1,1,1"}}),
                        "from and to must be different points", std::invalid_argument);
   CHECK_THROWS_AS(mcp::game_query(kPlatformer, {{"action", "inspect"}, {"object", "Nope"}}), std::invalid_argument);

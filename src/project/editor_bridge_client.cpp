@@ -55,19 +55,25 @@ class Exchange {
     if (request_.size() > kMaxRequest) throw std::runtime_error("editor request is too large");
   }
   Json run() {
-    const auto started = clock_();
+    started_ = clock_();
     while (!step()) {
-      check_deadline(clock_() - started);
+      check_deadline(clock_());
       net::Socket::wait({{&socket_, !output_.empty()}}, kPollSeconds);
     }
     return response();
   }
 
  private:
-  void check_deadline(Clock::duration waited) const {
-    if (!proven_ && waited > kHandshakeTimeout) throw Missed(EditorMiss::Unproven, kUnproven);
-    if (waited > kTimeout)
-      throw std::runtime_error("editor request timed out; inspect the scene before retrying an edit");
+  bool proof_overdue(Clock::time_point now) const {
+    return connected_ && !proven_ && now - connected_at_ > kHandshakeTimeout;
+  }
+  // The proof is due a short while after the connection was made, not after it was asked for:
+  // Windows takes seconds to say that a port refuses, which must still read as a refusal.
+  void check_deadline(Clock::time_point now) const {
+    if (proof_overdue(now)) throw Missed(EditorMiss::Unproven, kUnproven);
+    if (now - started_ <= kTimeout) return;
+    if (!proven_) throw Missed(EditorMiss::Unproven, kUnproven);
+    throw std::runtime_error("editor request timed out; inspect the scene before retrying an edit");
   }
   // A failure: a miss before the proof, the request's own after it.
   [[noreturn]] void fail(const char* after_proof) const {
@@ -81,6 +87,7 @@ class Exchange {
     const auto status = socket_.connect_status();
     if (status == net::IoStatus::Closed) throw Missed(EditorMiss::Refused, kNotRunning);
     connected_ = status == net::IoStatus::Ok;
+    if (connected_) connected_at_ = clock_();
     return connected_;
   }
   bool step() {
@@ -120,6 +127,7 @@ class Exchange {
   std::string token_, nonce_;
   Bytes request_, input_, output_;
   EditorBridgeClock clock_;
+  Clock::time_point started_{}, connected_at_{};
   bool connected_ = false;
   bool proven_ = false;
 };
