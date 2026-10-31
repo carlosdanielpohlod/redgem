@@ -32,6 +32,13 @@ std::vector<PastSession> remember(const fs::path& file, const fs::path& game, co
   return *kept;
 }
 
+// A file's whole text, closed again before the test removes its folder (Windows will not remove
+// an open file).
+std::string text_of(const fs::path& path) {
+  std::ifstream in(path);
+  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
 }  // namespace
 
 TEST_CASE("a game's past conversations are kept per game, newest first") {
@@ -76,9 +83,7 @@ TEST_CASE("a file that cannot be read is kept aside, not written over") {
   redgem::test::LogCapture quiet;
   remember(file, game, {"a", "Claude Code", "t", kSomeTime});
   CHECK(read_sessions(file, game).size() == 1);
-  std::ifstream aside(file.string() + ".unreadable");
-  std::string kept((std::istreambuf_iterator<char>(aside)), std::istreambuf_iterator<char>());
-  CHECK(kept == broken);
+  CHECK(text_of(file.string() + ".unreadable") == broken);
   // Built as JSON, so a Windows path's backslashes are escaped.
   const nlohmann::json kept_games = {
       {"games", {{fs::weakly_canonical(game).u8string(), {{{"id", 3}}, {{"id", "ok"}, {"agent", "Codex"}}}}}}};
