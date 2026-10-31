@@ -11,6 +11,7 @@
   "editor.agent.field_command": "Command",
   "editor.agent.field_environment": "Environment (NAME=value, one per line)",
   "editor.agent.field_name": "Name",
+  "editor.agent.file_missing": "'{command}' does not exist, or cannot be run. Check the agent's command in the Agent panel's settings.",
   "editor.agent.input_hint": "Ask the agent... (Enter sends, Shift+Enter for a new line)",
   "editor.agent.login_claude": "Log in first: run `claude` in a terminal and type /login, then start a new session here.",
   "editor.agent.login_codex": "Log in first: run `codex login` in a terminal (or set OPENAI_API_KEY in the agent's settings), then start a new session here.",

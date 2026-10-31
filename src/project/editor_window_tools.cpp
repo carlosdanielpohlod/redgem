@@ -4,15 +4,22 @@
 
 #include "editor/editor_app.hpp"
 #include "editor/object_clipboard.hpp"
+#include "project/editor_bridge_wire.hpp"
 #include "project/editor_live_tools.hpp"
 
 namespace redgem::tools {
 namespace {
 constexpr int kDefaultCaptureSide = 512;
+// What a capture's PNG may weigh: the whole reply crosses the bridge, which takes bridge::kMaxReply,
+// with the PNG as base64 text (4 characters for every 3 bytes) inside a little JSON around it.
+constexpr std::size_t kReplyEnvelope = 4 * 1024;  // bytes kept for the JSON around the picture
+constexpr std::size_t kBase64Bytes = 3;
+constexpr std::size_t kBase64Characters = 4;
+constexpr std::size_t kMaxPictureBytes = (bridge::kMaxReply - kReplyEnvelope) / kBase64Characters * kBase64Bytes;
 
 mcp::Json capture(EditorApp& app, const mcp::Json& args) {
   std::string error;
-  const auto picture = app.capture_viewport(args.value("max_size", kDefaultCaptureSide), error);
+  const auto picture = app.capture_viewport(args.value("max_size", kDefaultCaptureSide), kMaxPictureBytes, error);
   if (!picture) return mcp::tool_result(error, true);
   const auto encoded = object_clipboard::base64_encode(picture->bytes);
   return {{"content",

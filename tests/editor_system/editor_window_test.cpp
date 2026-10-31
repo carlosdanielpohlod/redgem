@@ -36,6 +36,7 @@
 #include "frame_wait_clock.hpp"
 #include "window_picture.hpp"
 #include "project/editor_bridge.hpp"
+#include "project/editor_bridge_wire.hpp"
 #include "project/editor_live_tools.hpp"
 #include "project/editor_bridge_run.hpp"
 
@@ -819,10 +820,14 @@ TEST_CASE("MCP controls real editor play and returns a bounded viewport image") 
   editor_call(app, *server, clock, {{"action", "stop"}});
   CHECK(app.session().editing());
   CHECK_FALSE(app.session().document().dirty());
+  // (The largest capture still crosses the bridge, base64 and all.)
+  const auto largest = editor_call(app, *server, clock, {{"action", "capture"}, {"max_size", 1024}});
+  CHECK(largest["content"][0]["type"] == "image");
+  CHECK(largest.dump().size() <= tools::bridge::kMaxReply);
   const auto result = editor_call(app, *server, clock, {{"action", "capture"}, {"max_size", 256}});
   const auto bytes = object_clipboard::base64_decode(result["content"][0]["data"]);
   REQUIRE(bytes);
-  CHECK(bytes->size() <= 128 * 1024);
+  CHECK(result.dump().size() <= tools::bridge::kMaxReply);
   Image image = LoadImageFromMemory(".png", bytes->data(), static_cast<int>(bytes->size()));
   REQUIRE(image.data != nullptr);
   CHECK(std::max(image.width, image.height) <= 256);
