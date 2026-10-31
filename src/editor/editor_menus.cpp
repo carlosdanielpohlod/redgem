@@ -157,8 +157,10 @@ void EditorApp::draw_view_menu() {
   ImGui::MenuItem(ui::icon_label(ICON_FA_SLIDERS, "editor.menu.inspector_panel"), tr(kKeysInspector),
                   &panels_.inspector);
   ImGui::MenuItem(ui::icon_label(ICON_FA_TERMINAL, "editor.menu.bottom_panels"), tr(kKeysBottomPanel), &panels_.bottom);
+  ImGui::MenuItem(ui::icon_label(ICON_FA_ROBOT, "editor.menu.agent_panel"), nullptr, &panels_.agent);
   ImGui::Separator();
-  if (ImGui::MenuItem(ui::icon_label(ICON_FA_CODE, "editor.menu.focus_on_code"))) panels_ = {false, false, false};
+  if (ImGui::MenuItem(ui::icon_label(ICON_FA_CODE, "editor.menu.focus_on_code")))
+    panels_ = {false, false, false, false};
   if (ImGui::MenuItem(ui::icon_label(ICON_FA_TABLE_COLUMNS, "editor.menu.show_all_panels"))) panels_ = {};
 }
 

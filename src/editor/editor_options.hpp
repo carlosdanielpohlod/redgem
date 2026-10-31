@@ -8,9 +8,13 @@
 #include <string>
 #include <vector>
 
+#include "editor/agent/acp_messages.hpp"
 #include "render/gpu_select.hpp"
+#include "scene/scene_desc.hpp"
 
 namespace redgem {
+
+class EditorApp;
 
 // How long the frame about to be drawn counts for, in seconds; asked once a frame.
 using FrameClock = std::function<float()>;
@@ -29,6 +33,19 @@ struct BuildChoice {
       build;
 };
 
+// What the Agent panel is given by whoever opens the editor (see ui/agent_panel.hpp): the editor
+// knows the tools it hands an agent only through these.
+struct AgentHooks {
+  std::string client_version;  // what the editor tells an agent it is
+  // The MCP servers a new session gets for this editor (its live tools); empty, with `error`, when
+  // there are none. Empty function: none.
+  std::function<std::vector<agent::McpServer>(EditorApp& editor, std::string& error)> tool_servers;
+  // An object of the scene as `redgem scene get` shows it, for the context a prompt carries.
+  std::function<std::string(const SceneDesc& scene, int object)> describe_object;
+  // Where the list of agents is kept; empty: agents.json in the user's data folder.
+  std::filesystem::path agents_file;
+};
+
 struct EditorOptions {
   // How long each frame counts for, for whoever drives the editor at a pace of its own. Empty:
   // the time the window measured between its last two frames.
@@ -37,6 +54,7 @@ struct EditorOptions {
   GpuChoice gpu = GpuChoice::Auto;
   // The ways of building a game, in the order Build Game lists them. None: the editor builds nothing.
   std::vector<BuildChoice> builds;
+  AgentHooks agent;
 };
 
 }  // namespace redgem

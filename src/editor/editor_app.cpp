@@ -43,6 +43,7 @@ std::variant<std::unique_ptr<EditorApp>, std::string> EditorApp::create(const st
   app->session_ = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
   app->scripts_ = std::make_unique<ScriptWorkspace>(game_dir / config::kScriptsDirName);
   app->open_window(options.gpu, std::move(options.clock));
+  app->make_agent_panel(options.agent);
   log::info("editing " + app->session_->document().path().string());
   return app;
 }
@@ -70,7 +71,8 @@ void EditorApp::look_through_main_camera() {
 }
 
 EditorApp::~EditorApp() {
-  session_.reset();  // the running game, if any, goes before who shows it
+  agent_panel_.reset();  // its agent's tools talk to this editor
+  session_.reset();      // the running game, if any, goes before who shows it
   game_view_.reset();
   viewport_.reset();  // GPU resources go before the window
   interface_.reset();

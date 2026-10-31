@@ -291,6 +291,11 @@ there yet:
   model importing still use the editor UI or file tools. It must be explicitly connected to
   the current editor instance; it does not discover editors automatically. Native calls run
   serially and cannot be interrupted by a cancellation notification.
+- The Agent panel ([docs/assistants.md](docs/assistants.md#the-agent-panel)) sends and shows text
+  only: no pictures in the chat, and no terminal of the editor's for the agent (the adapters run
+  commands themselves). Logging in to an agent happens in a terminal, with the agent's own CLI.
+  Earlier sessions cannot be reopened, slash commands and session modes are not offered, and
+  answers are not selectable as text (code blocks have a Copy button).
 - Inspecting the objects of a game while it plays, and an opt-in Ruby eval in it (localhost and a
   token, a timeout, compiled out of release builds).
 - Physics queries (raycasts and overlaps) through the same tools.

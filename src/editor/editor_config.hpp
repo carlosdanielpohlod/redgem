@@ -28,12 +28,14 @@ inline constexpr const char* kHierarchyWindow = "###hierarchy";
 inline constexpr const char* kInspectorWindow = "###inspector";
 inline constexpr const char* kConsoleWindow = "###console";
 inline constexpr const char* kProjectWindow = "###project";
+inline constexpr const char* kAgentWindow = "###agent";
 // The keys of their titles.
 inline constexpr const char* kViewportTitle = "editor.scene.title";
 inline constexpr const char* kHierarchyTitle = "editor.hierarchy.title";
 inline constexpr const char* kInspectorTitle = "editor.inspector.title";
 inline constexpr const char* kConsoleTitle = "editor.console.title";
 inline constexpr const char* kProjectTitle = "editor.project.title";
+inline constexpr const char* kAgentTitle = "editor.agent.title";
 
 // Bars around the dock space (pixels).
 inline constexpr float kToolbarHeight = 42.0f;

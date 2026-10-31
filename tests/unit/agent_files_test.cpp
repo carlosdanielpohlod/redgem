@@ -184,3 +184,12 @@ TEST_CASE("a workspace does not write into a pipe, which would wait for a reader
   fs::remove_all(folder);
 }
 #endif
+TEST_CASE("the settings' fields: arguments a line each, variables as NAME=value") {
+  CHECK(lines_text({"--acp", "--verbose"}) == "--acp\n--verbose\n");
+  CHECK(text_lines("--acp\r\n\n--verbose") == std::vector<std::string>{"--acp", "--verbose"});
+  CHECK(environment_text({{"A", "1"}, {"B", "x=y"}}) == "A=1\nB=x=y\n");
+  const auto environment = environment_of_text("A=1\n=nameless\nnot a variable\nB=x=y\n");
+  REQUIRE(environment.size() == 2);
+  CHECK(environment[1].name == "B");
+  CHECK(environment[1].value == "x=y");
+}

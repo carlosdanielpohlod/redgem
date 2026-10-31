@@ -134,8 +134,8 @@ TEST_CASE("a tool call starts, then its updates change only what they say") {
   CHECK(call.locations == std::vector<std::string>{"/g/scripts/coin.rb"});
   REQUIRE(call.content.size() == 2);
   REQUIRE(call.content[0].change);
-  CHECK(call.content[0].change->old_text == std::optional<std::string>("a"));
-  CHECK(call.content[0].change->new_text == "b");
+  REQUIRE(call.content[0].change->lines.size() == 2);  // (the change as lines, worked out once)
+  CHECK(call.content[0].change->lines[0].mark == DiffMark::Removed);
   CHECK(call.content[1].text == "done");
 }
 
@@ -192,4 +192,29 @@ TEST_CASE("a line nested deeper than a message can be is refused") {
   const auto fine = parse_message(R"({"jsonrpc":"2.0","method":"x","params":{"a":[[1]]}})");
   REQUIRE(fine);
   CHECK((*fine)["params"]["a"][0][0] == 1);
+}
+
+TEST_CASE("a long conversation lets its oldest entries go, but not a question still waiting") {
+  Transcript transcript;
+  const std::size_t question = transcript.ask(PermissionRequest(1, {}, {{"yes", "Allow", PermissionKind::AllowOnce}}));
+  for (std::size_t entry = 0; entry < kMaxEntries * 2; ++entry) transcript.add(EntryKind::Notice, "note");
+  CHECK(transcript.entries().size() <= kMaxEntries + 1);
+  REQUIRE(transcript.permission(question) != nullptr);
+  CHECK(transcript.permission(question)->choose("yes"));
+  transcript.add(EntryKind::Notice, "one more");
+  CHECK(transcript.entries().size() == kMaxEntries);
+  CHECK(transcript.permission(question) == nullptr);  // (let go once answered)
+  CHECK(transcript.entries().front().number > question);
+  CHECK(transcript.end_number() == kMaxEntries * 2 + 2);
+}
+
+TEST_CASE("an option of a kind the editor does not know allows nothing it can tell") {
+  const PermissionRequest request = permission_request(
+      2, {{"toolCall",
+           {{"toolCallId", "t"}, {"rawInput", {{"command", "rm -rf build"}}}, {"locations", {{{"path", "/g/a"}}}}}},
+          {"options", {{{"optionId", "x"}, {"name", "Something new"}, {"kind", "allow_for_a_while"}}}}});
+  REQUIRE(request.options().size() == 1);
+  CHECK(request.options()[0].kind == PermissionKind::Other);
+  CHECK(request.tool().input == std::optional<std::string>(R"({"command":"rm -rf build"})"));
+  CHECK(request.tool().locations == std::optional<std::vector<std::string>>({"/g/a"}));
 }

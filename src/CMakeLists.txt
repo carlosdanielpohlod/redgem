@@ -542,6 +542,7 @@ if(NOT ANDROID)
     editor/editor_selection.cpp
     editor/editor_scene_view.cpp
     editor/editor_scenes.cpp
+    editor/editor_agent.cpp
     editor/scripts/script_files.cpp
     editor/scripts/script_editor.cpp
     editor/scripts/script_workspace.cpp
@@ -564,6 +565,10 @@ if(NOT ANDROID)
     editor/ui/inspector_physics.cpp
     editor/ui/inspector_properties.cpp
     editor/ui/console_panel.cpp
+    editor/ui/agent_panel.cpp
+    editor/ui/agent_settings_view.cpp
+    editor/ui/agent_transcript_view.cpp
+    editor/ui/agent_markdown_view.cpp
     editor/ui/project_panel.cpp
     editor/ui/project_folders.cpp
     editor/ui/new_script_form.cpp
@@ -623,6 +628,7 @@ if(NOT ANDROID)
     project/project_hub_panels.cpp
     project/editor_setup.cpp
     project/editor_run.cpp
+    project/agent_tools.cpp
     project/cli.cpp
     project/cli_options.cpp
     project/tool_line.cpp

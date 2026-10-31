@@ -16,6 +16,11 @@ bool is_tool_call(const Entry& entry, const std::string& id) {
   return entry.kind == EntryKind::Tool && entry.tool.id == id;
 }
 
+// Whether a search for entry `number` found it.
+bool is_entry(std::vector<Entry>::iterator found, const std::vector<Entry>& entries, std::size_t number) {
+  return found != entries.end() && found->number == number;
+}
+
 template <typename Value>
 void take(std::optional<Value> const& given, Value& field) {
   if (given) field = *given;
@@ -56,7 +61,7 @@ void Transcript::add(EntryKind kind, const std::string& text) {
   Entry entry;
   entry.kind = kind;
   entry.text = text;
-  entries_.push_back(std::move(entry));
+  push(std::move(entry));
   changed();
 }
 
@@ -73,7 +78,7 @@ void Transcript::start_tool(const ToolCall& call) {
     Entry entry;
     entry.kind = EntryKind::Tool;
     entry.tool = call;
-    entries_.push_back(std::move(entry));
+    push(std::move(entry));
   }
   changed();
 }
@@ -99,7 +104,7 @@ void Transcript::set_plan(const std::vector<PlanItem>& plan) {
     Entry entry;
     entry.kind = EntryKind::Plan;
     entry.plan = plan;
-    entries_.push_back(std::move(entry));
+    push(std::move(entry));
   }
   changed();
 }
@@ -108,21 +113,41 @@ std::size_t Transcript::ask(const PermissionRequest& request) {
   Entry entry;
   entry.kind = EntryKind::Permission;
   entry.permission = request;
-  entries_.push_back(std::move(entry));
+  push(std::move(entry));
   changed();
-  return entries_.size() - 1;
+  return next_ - 1;
 }
 
-PermissionRequest* Transcript::permission(std::size_t index) {
-  if (index >= entries_.size() || entries_[index].kind != EntryKind::Permission) return nullptr;
+PermissionRequest* Transcript::permission(std::size_t number) {
+  Entry* entry = numbered(number);
+  if (entry == nullptr || entry->kind != EntryKind::Permission) return nullptr;
   changed();  // (asked for to be answered)
-  return &entries_[index].permission;
+  return &entry->permission;
+}
+
+Entry* Transcript::numbered(std::size_t number) {
+  const auto found = std::lower_bound(entries_.begin(), entries_.end(), number,
+                                      [](const Entry& entry, std::size_t wanted) { return entry.number < wanted; });
+  return is_entry(found, entries_, number) ? &*found : nullptr;
+}
+
+void Transcript::push(Entry entry) {
+  entry.number = next_++;
+  entries_.push_back(std::move(entry));
+  if (entries_.size() > kMaxEntries) let_go_of_one();
+}
+
+// The oldest entry that is not a question still waiting.
+void Transcript::let_go_of_one() {
+  const auto oldest =
+      std::find_if(entries_.begin(), entries_.end(), [](const Entry& entry) { return !waiting_question(entry); });
+  if (oldest != entries_.end()) entries_.erase(oldest);
 }
 
 std::vector<std::size_t> Transcript::waiting_permissions() const {
   std::vector<std::size_t> waiting;
-  for (std::size_t index = 0; index < entries_.size(); ++index) {
-    if (waiting_question(entries_[index])) waiting.push_back(index);
+  for (const Entry& entry : entries_) {
+    if (waiting_question(entry)) waiting.push_back(entry.number);
   }
   return waiting;
 }
