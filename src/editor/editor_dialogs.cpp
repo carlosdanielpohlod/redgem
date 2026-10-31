@@ -66,6 +66,7 @@ void draw_shortcuts_table() {
 
 void EditorApp::draw_dialogs() {
   draw_unsaved_dialog();
+  draw_build_wait_dialog();
   draw_scene_name_dialog();
   draw_external_change_dialog();  // one question at a time: closing is asked first
   draw_shortcuts_dialog();
@@ -154,9 +155,11 @@ void EditorApp::draw_external_change_dialog() {
   ImGui::EndPopup();
 }
 
-// The outside change is asked about once the unsaved edits are not: one question at a time.
+// The outside change is asked about once the unsaved edits are not, and not while leaving waits
+// for a build (it is asked after): one question at a time.
 bool EditorApp::external_change_dialog_wanted() const {
-  return session_->external_change_pending() && !pending_ && !ImGui::IsPopupOpen(external_change_popup());
+  return session_->external_change_pending() && !pending_ && !waiting_for_build() &&
+         !ImGui::IsPopupOpen(external_change_popup());
 }
 
 void EditorApp::draw_external_change_choices() {

@@ -12,6 +12,7 @@
 #include "core/translations.hpp"
 #include "project/android/android_package.hpp"
 #include "project/build_record.hpp"
+#include "project/build_steps.hpp"
 #include "project/game_shipping.hpp"
 #include "project/notices.hpp"
 
@@ -121,6 +122,7 @@ std::optional<std::filesystem::path> build_game_for(const std::filesystem::path&
 }
 
 bool copy_player(const std::filesystem::path& player, const std::filesystem::path& binary, std::string& error) {
+  build_steps::begin(build_steps::kCopyingPlayer);
   std::error_code fs_error;
   std::filesystem::copy_file(player, binary, std::filesystem::copy_options::overwrite_existing, fs_error);
   if (fs_error) {
@@ -145,6 +147,7 @@ bool fresh_bundle(const std::filesystem::path& bundle, std::string& error) {
 }
 
 bool copy_game(const std::filesystem::path& game_dir, const std::filesystem::path& bundle, std::string& error) {
+  build_steps::begin(build_steps::kCopyingFiles);
   if (!fresh_bundle(bundle, error)) return false;
   std::error_code fs_error;
   for (const std::filesystem::path& file : shipped_files(game_dir)) {

@@ -2,8 +2,8 @@
 
 // The editor window: toolbar, Hierarchy, Scene viewport (gizmos, Play mode), Inspector, Project,
 // Console and script tabs, status bar. One class, implemented part by part (editor_frame,
-// editor_commands, editor_input, editor_menus, editor_bars, editor_layout, editor_dialogs,
-// editor_viewport, editor_scene_view, editor_scenes). This header stays long because it lists every
+// editor_commands, editor_builds, editor_input, editor_menus, editor_bars, editor_layout,
+// editor_dialogs, editor_viewport, editor_scene_view, editor_scenes). This header stays long because it lists every
 // step of those parts: they all work on the one window's state, which is declared once, here.
 
 #include <filesystem>
@@ -16,6 +16,7 @@
 
 #include "audio/audio.hpp"
 #include "editor/box_select.hpp"
+#include "editor/build_job.hpp"
 #include "editor/console_log.hpp"
 #include "editor/editor_camera.hpp"
 #include "editor/editor_options.hpp"
@@ -77,9 +78,10 @@ class EditorApp {
   };
   // A bounded JPEG of the last completed scene viewport (not the desktop or other windows).
   std::optional<ViewportPicture> capture_viewport(int max_side, std::string& error) const;
-  // Whether the editor is done: leaving was asked for and nothing unsaved stands in the way (there
-  // was nothing, or the user chose Save / Discard).
-  bool finished() const { return quit_confirmed_; }
+  // Whether the editor is done: leaving was asked for, and nothing unsaved stands in the way (there
+  // was nothing, or the user chose Save / Discard). Leaving waits for a build that runs, saying
+  // so, and only then asks about unsaved work; no build is ever left running.
+  bool finished() const { return quit_confirmed_ && !building(); }
 
   EditorSession& session() { return *session_; }
   EditorCamera& camera() { return camera_; }
@@ -131,14 +133,23 @@ class EditorApp {
   // What waits for the user's answer about the unsaved edits, if anything.
   const std::optional<PendingAction>& pending_action() const { return pending_; }
   void frame_selection();
-  // Asks to leave (after the unsaved-changes dialog when needed).
+  // Asks to leave (after the unsaved-changes dialog when needed, and once a running build ended).
   void request_exit(EditorExit action);
-  // Makes a standalone game in a folder next to the game ("<game>-build", or "<game>-build-windows"
-  // for another system), in one of the ways the editor was opened with. Returns that folder.
+  // Starts making a standalone game in a folder next to the game ("<game>-build", or
+  // "<game>-build-windows" for another system), in one of the ways the editor was opened with, on a
+  // thread of its own: the editor keeps drawing, shows how the build goes and then how it ended.
+  // The scene and the scripts are saved first, and the build works from the files on disk. False,
+  // with why in the console, while another build runs or when the game cannot be saved.
+  bool start_build(const BuildChoice& choice);
+  // The same, waiting for the build to end (for tools and tests). Returns the folder it filled.
   std::optional<std::filesystem::path> build(const BuildChoice& choice);
   // The same, for the system the editor runs on.
   std::optional<std::filesystem::path> build();
   const std::vector<BuildChoice>& builds() const { return builds_; }
+  // A build runs, or ended and was not taken in yet (it is at the next frame).
+  bool building() const { return build_job_.busy(); }
+  // How the last build ended, while the editor shows it (until closed, or another build starts).
+  const std::optional<BuildOutcome>& last_build() const { return last_build_; }
   // Where objects created from the menus appear: in front of the editor camera.
   Vec3 spawn_point() const;
   // Re-reads the game folder (scripts, models, sounds, scenes).
@@ -226,6 +237,27 @@ class EditorApp {
   void draw_help_menu();
   void draw_graphics_card_menu();
   void draw_build_targets();
+  // Where a build in `choice`'s way goes.
+  std::filesystem::path build_folder(const BuildChoice& choice) const;
+  // Takes in how the build ended, once it has: its messages and result go to the console, and the
+  // result is shown. Returns the folder it filled, when it succeeded.
+  std::optional<std::filesystem::path> take_build_outcome();
+  // Builds can start: the game is being edited and no other build runs.
+  bool build_offered() const { return editing() && !building(); }
+  // The window in a corner of the Scene view that shows how a build goes and how it ended.
+  void draw_build_status();
+  void draw_build_progress();
+  void draw_build_result(const BuildOutcome& outcome);
+  void draw_build_result_actions(const BuildOutcome& outcome);
+  // Like an IDE's "save all" before a build. False, with why in the console, when something stays
+  // unsaved.
+  bool saved_for_build();
+  // Leaving was asked for while a build ran: it is asked again once the build ended.
+  void leave_if_asked();
+  // Leaving was asked for, and waits for the build to end.
+  bool waiting_for_build() const { return leave_after_build_ && building(); }
+  void draw_build_wait_dialog();
+  bool build_wait_dialog_wanted() const;
   void draw_toolbar();
   void draw_play_controls();
   void draw_play_button(bool edit);
@@ -340,7 +372,12 @@ class EditorApp {
   FrameClock clock_;
   std::function<void(EditorApp&)> frame_hook_{};
   std::vector<BuildChoice> builds_;
-  float frame_seconds_ = 0.0f;  // what the clock said of the frame being drawn
+  // The build in the background. (Its destructor waits for it: its thread only works on what the
+  // job holds, and the files on disk, so it may go at any point.)
+  BuildJob build_job_;
+  std::optional<BuildOutcome> last_build_;  // shown until closed
+  bool leave_after_build_ = false;          // leaving was asked for while a build ran
+  float frame_seconds_ = 0.0f;              // what the clock said of the frame being drawn
   std::unique_ptr<SceneViewport> viewport_;
   std::unique_ptr<GameView> game_view_;  // who shows the running game, while one runs
   long long frame_count_ = 0;

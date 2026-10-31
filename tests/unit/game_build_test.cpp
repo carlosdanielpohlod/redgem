@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <vector>
 
 #include "app/bundled_game.hpp"
 #include "app/scene_files.hpp"
@@ -37,6 +38,15 @@ TEST_CASE("a folder is a game when it holds the scene a game starts with") {
   CHECK(is_game_folder(scratch.game));
   CHECK_FALSE(is_game_folder(scratch.empty));
   CHECK_FALSE(is_game_folder(scratch.dir / "nowhere"));
+}
+
+// A build may read the game while the editor saves it: what the editor is still writing, under a
+// name it takes off when done, is not part of the game.
+TEST_CASE("a build ships no file the editor is still writing") {
+  const Scratch scratch;
+  std::ofstream(scratch.game / (std::string(config::kSceneFileName) + config::kSceneWritingSuffix)) << "half";
+  std::ofstream(scratch.game / (std::string("player.rb") + config::kAgentWritingSuffix)) << "half";
+  CHECK(shipped_files(scratch.game) == std::vector<std::filesystem::path>{config::kSceneFileName});
 }
 
 TEST_CASE("only a game is built, and what is not one is named") {

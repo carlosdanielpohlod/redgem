@@ -4,8 +4,6 @@
 
 #include <imgui.h>
 
-#include <algorithm>
-
 #include "core/log.hpp"
 #include "scene/prefabs.hpp"
 #include "editor/editor_config.hpp"
@@ -63,35 +61,16 @@ void EditorApp::save() {
 
 void EditorApp::request_exit(EditorExit action) {
   exit_action_ = action;
+  if (building()) {
+    leave_after_build_ = true;  // (asked again when it ends: what is unsaved then is what counts)
+    return;
+  }
   if (!editing()) stop();
   if (unsaved_work()) {
     pending_ = PendingAction{PendingAction::Kind::Leave, {}};  // whatever else was waiting
   } else {
     quit_confirmed_ = true;
   }
-}
-
-std::optional<std::filesystem::path> EditorApp::build(const BuildChoice& choice) {
-  if (session_->document().dirty()) save();
-  const std::filesystem::path game = session_->game_dir();
-  std::filesystem::path out = game.parent_path() / editor_logic::build_folder_name(game.filename().string(),
-                                                                                   choice.name, choice.for_this_system);
-  std::string error;
-  const auto executable = choice.build(game, out, error);
-  if (!executable) {
-    log::error("build failed: " + error);
-    return std::nullopt;
-  }
-  log::info("built for " + choice.name + ": " + executable->string());
-  return out;
-}
-
-std::optional<std::filesystem::path> EditorApp::build() {
-  const auto own =
-      std::find_if(builds_.begin(), builds_.end(), [](const BuildChoice& choice) { return choice.for_this_system; });
-  if (own != builds_.end()) return build(*own);
-  log::error("build failed: this editor was not given a way to build for this system");
-  return std::nullopt;
 }
 
 Vec3 EditorApp::spawn_point() const { return camera_.position() + camera_.forward() * kSpawnDistance; }

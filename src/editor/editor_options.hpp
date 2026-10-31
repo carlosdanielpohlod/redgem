@@ -19,6 +19,10 @@ class EditorApp;
 // How long the frame about to be drawn counts for, in seconds; asked once a frame.
 using FrameClock = std::function<float()>;
 
+// Hears each step a build begins ("copying the game's files", "signing the APK"), on the thread
+// that builds.
+using BuildProgress = std::function<void(const std::string& step)>;
+
 // One way of making a standalone game, as Build Game offers it. The editor only knows that such
 // ways exist: whoever opens it says which, and does the building.
 struct BuildChoice {
@@ -26,10 +30,12 @@ struct BuildChoice {
   std::string label;  // what the menu shows
   // Whether it is for the system the editor runs on (the build then needs no system in its folder's name).
   bool for_this_system = false;
-  // Builds the game in `game_dir` into `out_dir`. The game's executable (or app), or nullopt
-  // with `error` saying why not.
+  // Builds the game in `game_dir` into `out_dir`, telling `progress` (which may be empty) each step
+  // it begins. The game's executable (or app), or nullopt with `error` saying why not. The editor
+  // calls it on a thread of its own: it works only on the files it is given.
   std::function<std::optional<std::filesystem::path>(const std::filesystem::path& game_dir,
-                                                     const std::filesystem::path& out_dir, std::string& error)>
+                                                     const std::filesystem::path& out_dir,
+                                                     const BuildProgress& progress, std::string& error)>
       build;
 };
 
