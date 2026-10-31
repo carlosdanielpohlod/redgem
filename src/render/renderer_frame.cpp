@@ -53,7 +53,7 @@ Camera3D Renderer::Impl::camera_for(const Scene& scene) const {
   if (id == kNoObject) return default_camera();
   const std::optional<CameraDesc>& lens = scene.at(id).camera;
   // (A shake moves what the camera shows, never the camera.)
-  const Transform world = viewed_from(scene.world_transform(id), lens ? lens->shake : Transform{});
+  const Transform world = viewed_from(scene.world_transform(id), scene.at(id).camera_shake);
   Camera3D camera{};
   camera.projection = CAMERA_PERSPECTIVE;
   camera.position = to_raylib(world.position);

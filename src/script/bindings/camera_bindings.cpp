@@ -42,8 +42,9 @@ ScreenFrame screen_frame(const ScriptContext& ctx) {
 Lens lens_of(const CameraDesc& camera) { return {camera.fov_y_radians, 0.0f}; }
 
 // Where the main camera sees from: its place, and its shake on it (as the renderer draws it).
-Transform main_camera_view(mrb_state* mrb, const CameraDesc& camera) {
-  return viewed_from(scene(mrb).world_transform(scene(mrb).main_camera()), camera.shake);
+Transform main_camera_view(mrb_state* mrb) {
+  const ObjectId id = scene(mrb).main_camera();
+  return viewed_from(scene(mrb).world_transform(id), scene(mrb).at(id).camera_shake);
 }
 
 mrb_value pair(mrb_state* mrb, mrb_value first, mrb_value second) {
@@ -62,7 +63,7 @@ mrb_value camera_screen_ray(mrb_state* mrb, mrb_value) {
   const ScreenFrame frame = screen_frame(context(mrb));
   const bool can_look = camera != nullptr && has_area(frame);
   if (!can_look) return mrb_nil_value();
-  const CameraRay ray = screen_ray(main_camera_view(mrb, *camera), lens_of(*camera), frame, point);
+  const CameraRay ray = screen_ray(main_camera_view(mrb), lens_of(*camera), frame, point);
   return pair(mrb, vec3_value(mrb, ray.origin), vec3_value(mrb, ray.direction));
 }
 
@@ -78,8 +79,7 @@ mrb_value camera_world_to_screen(mrb_state* mrb, mrb_value) {
   const Vec3 point = point_of(mrb, single_arg(mrb));
   const CameraDesc* camera = main_camera(mrb);
   if (camera == nullptr) return mrb_nil_value();
-  const auto shown =
-      world_to_screen(main_camera_view(mrb, *camera), lens_of(*camera), screen_frame(context(mrb)), point);
+  const auto shown = world_to_screen(main_camera_view(mrb), lens_of(*camera), screen_frame(context(mrb)), point);
   if (!shown) return mrb_nil_value();
   return pair(mrb, mrb_float_value(mrb, shown->x), mrb_float_value(mrb, shown->y));
 }
@@ -109,14 +109,14 @@ mrb_value camera_set_motion_blur(mrb_state* mrb, mrb_value) {
 
 // Shakes a camera: what it shows moves by `move` meters (right, up, back) and turns by `turn`
 // degrees (pitch, yaw, roll) in its own axes, until the next shake; the object itself stays put
-// (see CameraDesc::shake). Camera::Rig gives the offsets.
+// (see GameObject::camera_shake). Camera::Rig gives the offsets.
 mrb_value camera_shake_by(mrb_state* mrb, mrb_value) {
   mrb_value object = mrb_nil_value(), move = mrb_nil_value(), turn = mrb_nil_value();
   mrb_get_args(mrb, "ooo", &object, &move, &turn);
-  std::optional<CameraDesc>& camera = alive_object(mrb, object).camera;
-  if (!camera) mrb_raise(mrb, E_ARGUMENT_ERROR, "only a camera shakes");
-  camera->shake.position = to_vec3(mrb, move);
-  camera->shake.rotation = quat_from_euler_degrees(to_vec3(mrb, turn));
+  GameObject& camera = alive_object(mrb, object);
+  if (!camera.camera) mrb_raise(mrb, E_ARGUMENT_ERROR, "only a camera shakes");
+  camera.camera_shake.position = to_vec3(mrb, move);
+  camera.camera_shake.rotation = quat_from_euler_degrees(to_vec3(mrb, turn));
   return object;
 }
 

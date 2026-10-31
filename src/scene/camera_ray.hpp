@@ -41,7 +41,7 @@ struct CameraRay {
 };
 
 // Where a camera sees from: its place in the world, moved and turned by `offset` in its own axes
-// (its shake, see CameraDesc).
+// (its shake, see GameObject::camera_shake).
 Transform viewed_from(const Transform& camera_world, const Transform& offset);
 
 // Whether the screen has a size: there is nothing to see through otherwise.
