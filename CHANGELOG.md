@@ -10,6 +10,12 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Builds in the background**: Build in the editor no longer freezes the window while it works
+  (a build for Android takes minutes). A box in the Scene view shows what is being built, for how
+  long, and the step it is at (copying the game's files, packing the app, signing it), then how
+  it ended: the folder it filled, with an Open folder button, or the error. One build runs at a
+  time, and closing the editor during one waits for it to end, saying so.
+
 - **Agent panel**: a chat with a coding agent in the editor, through the Agent Client Protocol.
   Claude Code and Codex come as presets, run by their open-source adapters
   (`@agentclientprotocol/claude-agent-acp`, `@agentclientprotocol/codex-acp`), and you can add your

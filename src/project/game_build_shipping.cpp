@@ -14,6 +14,7 @@
 #include "core/platform.hpp"
 #include "core/safe_path.hpp"
 #include "core/translations.hpp"
+#include "project/build_steps.hpp"
 #include "project/icons/exe_icon.hpp"
 #include "project/icons/icon_set.hpp"
 
@@ -193,6 +194,7 @@ std::vector<std::string> shipping_outputs(const std::filesystem::path& game_dir,
 
 bool write_shipping_files(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                           BuildTarget target, const BuildIdentity& identity, std::string& error) {
+  build_steps::begin(build_steps::kShippingFiles);
   if (target == BuildTarget::Linux) return write_linux_files(game_dir, out_dir, identity, error);
   return target != BuildTarget::Windows || write_windows_files(game_dir, out_dir, identity, error);
 }

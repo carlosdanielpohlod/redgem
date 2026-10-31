@@ -44,6 +44,7 @@ void EditorApp::update_before_drawing() {
   check_files_on_disk();
   if (frame_hook_) frame_hook_(*this);
   agent_panel_->poll();  // (an agent waits on its answers whether or not its panel is shown)
+  take_build_outcome();
   take_dropped_files();
   handle_shortcuts();
   update_camera();
@@ -63,6 +64,7 @@ void EditorApp::draw_interface() {
   draw_status_bar();
   draw_dockspace();
   draw_panels();
+  draw_build_status();
   end_abandoned_gizmo_drag();
   draw_dialogs();
   interface_->end_frame();

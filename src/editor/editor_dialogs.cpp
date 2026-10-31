@@ -66,6 +66,7 @@ void draw_shortcuts_table() {
 
 void EditorApp::draw_dialogs() {
   draw_unsaved_dialog();
+  draw_build_wait_dialog();
   draw_scene_name_dialog();
   draw_external_change_dialog();  // one question at a time: closing is asked first
   draw_shortcuts_dialog();

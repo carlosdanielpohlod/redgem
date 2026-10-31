@@ -141,3 +141,19 @@ The game always starts on `main` (`scene.glb`); scripts move to the others with
 The window title and the status bar name the open scene, and the editor follows that scene's file
 for changes made outside. Built games carry every scene: Build copies the whole game folder,
 `scenes/` included.
+
+## Building
+
+**Build** (in the toolbar, or File > Build Game) asks which system to build for, saves the open
+scene, and builds the game into a folder beside it: `<game>-build` for the system the editor runs
+on, `<game>-build-<system>` for another one (see [Building and sharing](shipping.md)). The build
+runs in the background, so the editor keeps working while it does: a box in the Scene view's
+bottom-right corner shows what is being built, for how long it has been, and the step it is at
+(copying the game's files, packing the app, signing it). When it ends, the box says how it went:
+the folder it filled, with **Open folder**, or what went wrong. The Console keeps the same lines.
+
+One build runs at a time: Build is greyed out until the running one ends. The build reads the
+game's files from disk, never the scene open in the editor, so you can keep editing while it runs;
+what you save meanwhile is only sure to be in the next build. Closing the editor while a build
+runs waits for it, saying so, and closes when it is done (**Keep the editor open** stays instead).
+A build is not stopped halfway: the tools it runs would leave half-written files behind.

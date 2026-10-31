@@ -53,7 +53,7 @@ TEST_CASE("a build the editor offers says why it could not be made") {
   const auto own = std::find_if(choices.begin(), choices.end(), [](const BuildChoice& c) { return c.for_this_system; });
   REQUIRE(own != choices.end());
   std::string error;
-  CHECK_FALSE(own->build("/nowhere/no-such-game", "/nowhere/out", error).has_value());
+  CHECK_FALSE(own->build("/nowhere/no-such-game", "/nowhere/out", {}, error).has_value());
   CHECK(error.find("is not a game") != std::string::npos);
 }
 
