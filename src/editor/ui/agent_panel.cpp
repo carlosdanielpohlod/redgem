@@ -84,6 +84,15 @@ bool out_of_sight(float height) {
   return height > kNotMeasured && !ImGui::IsRectVisible(ImVec2(ImGui::GetContentRegionAvail().x, height));
 }
 
+// What the panel is for, before any conversation.
+void draw_no_session() {
+  ImGui::TextColored(palette::kMuted, "%s", ICON_FA_ROBOT);
+  ImGui::SameLine();
+  ImGui::PushStyleColor(ImGuiCol_Text, palette::kMuted);
+  ImGui::TextWrapped("%s", tr("editor.agent.no_session"));
+  ImGui::PopStyleColor();
+}
+
 // The transcript shows its end (give or take a line): it stays there while more comes, and stays
 // where the user scrolled to otherwise.
 bool scrolled_to_bottom() { return ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - ImGui::GetTextLineHeight(); }
@@ -241,11 +250,7 @@ void AgentPanel::draw_transcript() {
   if (connection_) {
     draw_entries(connection_->client());
   } else if (start_error_.empty()) {
-    ImGui::TextColored(palette::kMuted, "%s", ICON_FA_ROBOT);
-    ImGui::SameLine();
-    ImGui::PushStyleColor(ImGuiCol_Text, palette::kMuted);
-    ImGui::TextWrapped("%s", tr("editor.agent.no_session"));
-    ImGui::PopStyleColor();
+    draw_no_session();
   }
   // (Every frame, not only when an entry came: an answer keeps growing after it came, as its markdown
   // is read again and the heights of entries out of sight are measured.)
