@@ -5,6 +5,9 @@
   "internal_classes": [
     "Behaviour::Timer",
     "Behaviour::Tween",
+    "Camera::Follow",
+    "Camera::Rig",
+    "Camera::Shake",
     "GameMenu::BindingNames",
     "GameMenu::ControlsPage",
     "GameMenu::ControlsPage::Row",
@@ -888,6 +891,11 @@
           "about": "seconds since the last frame"
         },
         {
+          "name": "unscaled_delta",
+          "static": true,
+          "about": "seconds since the last frame, whatever Time.scale (also while paused)"
+        },
+        {
           "name": "fixed_delta",
           "static": true,
           "about": "seconds of a physics step (1/60)"
@@ -1211,7 +1219,7 @@
     },
     {
       "name": "Camera",
-      "about": "The camera the game is seen through.",
+      "about": "The camera the game is seen through, and what it does on its own: follow, orbit, shake.",
       "methods": [
         {
           "name": "main",
@@ -1223,6 +1231,13 @@
           "static": true,
           "args": "x, y",
           "about": "[origin, direction] through a pixel of the screen"
+        },
+        {
+          "name": "world_to_screen",
+          "static": true,
+          "args": "point",
+          "about": "[x, y]: where a Vector3 (or an object) is on the screen, in the pixels UI draws in; nil behind the camera",
+          "example": "x, y = Camera.world_to_screen(enemy.transform.position + Vector3.up * 2)"
         },
         {
           "name": "fov",
@@ -1245,8 +1260,88 @@
           "static": true,
           "args": "amount",
           "about": "sets it"
+        },
+        {
+          "name": "follow",
+          "static": true,
+          "args": "target, offset: [0, 3, 6], relative: false, smoothing: 0.15, look_at: true, look_height: 1.0, avoid_walls: true, dead_zone: 0, snap: true",
+          "about": "follows an object from now on: offset in meters (relative: in its own axes), smoothing in seconds to close half the way, in front of walls between; snap: false flies there",
+          "example": "Camera.follow(Scene.find(\"Player\"), offset: Vector3.new(0, 3, 6), smoothing: 0.15)"
+        },
+        {
+          "name": "orbit",
+          "static": true,
+          "args": "target, distance: 6, yaw: 0, pitch: 20, distances: 1..30, pitches: -80..80, smoothing: 0.08, input: true, height: 1.0, avoid_walls: true",
+          "about": "orbits an object or a point, looking at it, turned by dragging with the right mouse button or the right stick and zoomed by the wheel, also while paused; returns a Camera::Orbit"
+        },
+        {
+          "name": "stop_following",
+          "static": true,
+          "about": "stops following or orbiting; the camera stays where it is"
+        },
+        {
+          "name": "following?",
+          "static": true,
+          "about": "whether it follows or orbits something (an object destroyed is let go)"
+        },
+        {
+          "name": "shake",
+          "static": true,
+          "args": "strength, duration: 0.5",
+          "about": "shakes what it shows (never the camera object): strength (0 to 1) adds to its trauma, held at 1, fading over duration seconds",
+          "example": "Camera.shake(0.5, duration: 0.4)"
+        },
+        {
+          "name": "trauma",
+          "static": true,
+          "about": "how much it shakes now, 0 to 1"
+        },
+        {
+          "name": "stop_shaking",
+          "static": true,
+          "about": "stops the shake at once"
         }
-      ]
+      ],
+      "guide": "gameplay.md#follow-orbit-and-shake-the-camera"
+    },
+    {
+      "name": "Camera::Orbit",
+      "about": "What Camera.orbit returns: the camera's angles and distance around what it orbits, for scripts to read and change.",
+      "methods": [
+        {
+          "name": "yaw",
+          "about": "degrees around it, -180 to 180: 0 behind it (its +Z side), 90 on its right"
+        },
+        {
+          "name": "pitch",
+          "about": "degrees above it"
+        },
+        {
+          "name": "distance",
+          "about": "meters from it"
+        },
+        {
+          "name": "target",
+          "about": "the object or point it orbits"
+        },
+        {
+          "name": "turn",
+          "args": "yaw, pitch",
+          "about": "turns by degrees (the yaw wraps round, eased the short way), the pitch kept within its range"
+        },
+        {
+          "name": "zoom",
+          "args": "meters",
+          "about": "comes nearer (negative) or goes further, within its range"
+        }
+      ],
+      "internal": [
+        "direction",
+        "lost?",
+        "update",
+        "wrap"
+      ],
+      "guide": "gameplay.md#follow-orbit-and-shake-the-camera"
     },
     {
       "name": "Light",

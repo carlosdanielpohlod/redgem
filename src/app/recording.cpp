@@ -10,7 +10,6 @@ namespace {
 
 constexpr char kSizeSeparator = 'x';
 constexpr int kEvenPixels = 2;
-constexpr float kHalfOf = 0.5f;  // of the room left in a window: what goes on each side of a picture
 constexpr const char* kQuote = "\"";
 constexpr const char* kArgumentSeparator = " ";
 constexpr const char* kRawFormat = "rgb24";  // three bytes a pixel, as frames are read back
@@ -83,12 +82,8 @@ FrameSize even(FrameSize size) {
 }
 
 Letterbox letterbox(FrameSize window, FrameSize picture) {
-  const float scale = std::min(static_cast<float>(window.width) / static_cast<float>(picture.width),
-                               static_cast<float>(window.height) / static_cast<float>(picture.height));
-  const float width = static_cast<float>(picture.width) * scale;
-  const float height = static_cast<float>(picture.height) * scale;
-  return {(static_cast<float>(window.width) - width) * kHalfOf, (static_cast<float>(window.height) - height) * kHalfOf,
-          width, height};
+  return fit_picture(static_cast<float>(window.width), static_cast<float>(window.height),
+                     static_cast<float>(picture.width), static_cast<float>(picture.height));
 }
 
 PointMapping window_to_picture(FrameSize window, FrameSize picture) {

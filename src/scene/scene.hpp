@@ -56,6 +56,9 @@ struct GameObject {
   // point at their own copies of the bones.
   std::vector<ObjectHandle> joints;
   std::optional<CameraDesc> camera;
+  // How far a shake (Camera.shake) has a camera off its place, in its own axes, while the game
+  // runs: only what it shows moves, never the object, so a script moving it keeps its own pose.
+  Transform camera_shake;
   std::optional<LightDesc> light;
   PropertyMap props;
   bool visible = true;

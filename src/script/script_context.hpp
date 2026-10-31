@@ -39,6 +39,9 @@ struct TimeInfo {
   // How fast game time runs (Time.scale): 0 pauses the game, 1 is normal. Menus keep working
   // while paused: behaviours are still updated, with a delta of 0.
   float scale = 1.0f;
+  // The frame's seconds whatever the scale (Time.unscaled_delta): what moves while the game is
+  // paused or slowed, such as an orbit the player turns, goes by it.
+  float unscaled_delta = 0.0f;
 };
 
 // Everything the Ruby bindings are allowed to touch. Owned by the engine.
@@ -59,6 +62,10 @@ struct ScriptContext {
   // The size of what the game is drawn in: the window, or the editor's Scene view while playing.
   int screen_width = 0;
   int screen_height = 0;
+  // The size the world's picture is drawn at, shown stretched over the screen as large as fits
+  // (see Presenter::picture_size); 0 when it is the screen's own.
+  int picture_width = 0;
+  int picture_height = 0;
   // Width of a text in pixels at a size (the font it is drawn with; estimated_text_width without one).
   std::function<int(const std::string&, int)> measure_text;
   std::string ui_font;  // selected game face; empty uses the built-in font

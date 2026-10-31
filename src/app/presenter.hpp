@@ -50,6 +50,10 @@ class Presenter {
   virtual ~Presenter() = default;
   // The size of what the game is drawn on, in pixels (what UI.width and UI.height say).
   virtual SurfaceSize surface_size() const = 0;
+  // The size the world's picture is drawn at: the surface's, unless it is drawn at another size and
+  // shown stretched over the surface (a render scale). Where the world's points are on the surface
+  // follows from it (Camera.world_to_screen).
+  virtual SurfaceSize picture_size() const { return surface_size(); }
   // Width in pixels of a text drawn over the game at that size (UI.text_width, text alignment).
   virtual int text_width(const std::string& text, int size) const = 0;
   virtual int font_text_width(const std::string& text, int size, const std::string&,
