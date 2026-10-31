@@ -7,9 +7,10 @@
 #include <nlohmann/json.hpp>
 
 #include "app/json_file.hpp"
-#include "core/files.hpp"
+#include "core/log.hpp"
 #include "core/platform.hpp"
 #include "core/translations.hpp"
+#include "storage/durable_file.hpp"
 
 namespace redgem::agent {
 namespace {
@@ -19,6 +20,7 @@ using Json = nlohmann::json;
 constexpr const char* kSessionsFileName = "agent-sessions.json";
 constexpr const char* kGamesKey = "games";
 constexpr int kFileIndent = 2;
+constexpr const char* kUnreadableSuffix = ".unreadable";
 constexpr const char* kLineEnds = "\r\n";
 constexpr const char* kCutMark = "...";
 constexpr std::int64_t kMinute = 60;  // seconds
@@ -83,10 +85,41 @@ std::vector<PastSession> with(std::vector<PastSession> sessions, const PastSessi
   sessions.erase(
       std::remove_if(sessions.begin(), sessions.end(), [&](const PastSession& kept) { return kept.id == session.id; }),
       sessions.end());
-  sessions.push_back(session);
+  sessions.insert(sessions.begin(), session);  // (first among those of the same second)
   std::stable_sort(sessions.begin(), sessions.end(), newer);
   if (sessions.size() > kKeptSessions) sessions.resize(kKeptSessions);
   return sessions;
+}
+
+// A game's conversations in what the file holds, newest first.
+std::vector<PastSession> sessions_of(const Json& games, const std::filesystem::path& game) {
+  const auto found = games.find(game_key(game));
+  std::vector<PastSession> sessions = found == games.end() ? std::vector<PastSession>{} : sessions_in(*found);
+  std::stable_sort(sessions.begin(), sessions.end(), newer);
+  return sessions;
+}
+
+// A file that is there but cannot be read as the list: what it holds is not thrown away with it.
+bool unreadable(const std::filesystem::path& file, const Json& read) {
+  std::error_code error;
+  return std::filesystem::exists(file, error) && !read.is_object();
+}
+
+void keep_aside(const std::filesystem::path& file) {
+  std::filesystem::path aside = file;
+  aside += kUnreadableSuffix;
+  std::error_code error;
+  std::filesystem::rename(file, aside, error);
+  log::warning(file.u8string() + " could not be read: kept as " + aside.u8string() + ", and a new one started");
+}
+
+// The whole file replaced at once, flushed to the disk: a crash leaves the old one or the new one.
+bool write(const std::filesystem::path& file, const Json& content, std::string& error) {
+  std::error_code fs_error;
+  std::filesystem::create_directories(file.parent_path(), fs_error);
+  if (durable::replace_file(file, content.dump(kFileIndent) + "\n")) return true;
+  error = "cannot write " + file.u8string();
+  return false;
 }
 
 }  // namespace
@@ -94,22 +127,22 @@ std::vector<PastSession> with(std::vector<PastSession> sessions, const PastSessi
 std::filesystem::path sessions_file() { return platform::user_data_dir() / kSessionsFileName; }
 
 std::vector<PastSession> read_sessions(const std::filesystem::path& file, const std::filesystem::path& game) {
-  const Json games = games_in(read_json_file(file));
-  const auto found = games.find(game_key(game));
-  std::vector<PastSession> sessions = found == games.end() ? std::vector<PastSession>{} : sessions_in(*found);
-  std::stable_sort(sessions.begin(), sessions.end(), newer);
-  return sessions;
+  return sessions_of(games_in(read_json_file(file)), game);
 }
 
-bool remember_session(const std::filesystem::path& file, const std::filesystem::path& game, const PastSession& session,
-                      std::string& error) {
-  Json games = games_in(read_json_file(file));
+std::optional<std::vector<PastSession>> remember_session(const std::filesystem::path& file,
+                                                         const std::filesystem::path& game, const PastSession& session,
+                                                         std::string& error) {
+  // (Read and written back at once, so that what another editor kept meanwhile is kept too.)
+  const Json read = read_json_file(file);
+  if (unreadable(file, read)) keep_aside(file);
+  Json games = games_in(read);
+  std::vector<PastSession> sessions = with(sessions_of(games, game), session);
   Json listed = Json::array();
-  for (const PastSession& kept : with(read_sessions(file, game), session)) listed.push_back(session_json(kept));
+  for (const PastSession& kept : sessions) listed.push_back(session_json(kept));
   games[game_key(game)] = listed;
-  std::error_code fs_error;
-  std::filesystem::create_directories(file.parent_path(), fs_error);
-  return write_text_file(file, Json{{kGamesKey, games}}.dump(kFileIndent) + "\n", error);
+  if (!write(file, Json{{kGamesKey, games}}, error)) return std::nullopt;
+  return sessions;
 }
 
 std::string session_title(const std::string& first_message) {

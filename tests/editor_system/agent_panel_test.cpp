@@ -42,10 +42,10 @@ std::filesystem::path copy_game() {
 }
 
 // A list of agents with the fake one alone in it.
-std::filesystem::path fake_agents_file() {
+std::filesystem::path fake_agents_file(std::vector<agent::EnvironmentVariable> environment = {}) {
   const std::filesystem::path file = std::filesystem::temp_directory_path() / "redgem_editor_agents.json";
   std::string error;
-  REQUIRE(agent::write_agents(file, {{"Fake agent", REDGEM_FAKE_AGENT_FILE, {}, {}, ""}}, error));
+  REQUIRE(agent::write_agents(file, {{"Fake agent", REDGEM_FAKE_AGENT_FILE, {}, std::move(environment), ""}}, error));
   return file;
 }
 
@@ -121,10 +121,11 @@ std::filesystem::path fresh_sessions_file() {
 }
 
 // An editor whose Agent panel keeps the game's conversations in `sessions`, and reopens the last.
-std::unique_ptr<EditorApp> editor_keeping(const std::filesystem::path& game, const std::filesystem::path& sessions) {
+std::unique_ptr<EditorApp> editor_keeping(const std::filesystem::path& game, const std::filesystem::path& sessions,
+                                          std::vector<agent::EnvironmentVariable> agent_environment = {}) {
   EditorOptions options = editor_options(GpuChoice::Auto);
   options.clock = [] { return config::kFixedDeltaSeconds; };
-  options.agent.agents_file = fake_agents_file();
+  options.agent.agents_file = fake_agents_file(std::move(agent_environment));
   options.agent.sessions_file = sessions;
   options.agent.reopen_last_session = true;
   auto created = EditorApp::create(game, std::move(options));
@@ -153,6 +154,12 @@ TEST_CASE("the editor reopens a game's last conversation with its agent") {
   }
   auto app = editor_keeping(game, sessions);  // (the game opened again)
   ui::AgentPanel& panel = app->agent_panel();
+  run(*app, kWarmupFrames);
+  const bool agent_tab_shown = ImGui::FindWindowByName(editor_config::kAgentWindow)->DockTabIsVisible;
+  CHECK_FALSE(agent_tab_shown);          // (behind the Inspector)
+  CHECK(panel.connection() == nullptr);  // (unseen: no agent started yet)
+  ImGui::SetWindowFocus(editor_config::kAgentWindow);
+  run(*app, kPictureFrames);
   REQUIRE(panel.connection() != nullptr);
   agent::AgentClient& client = panel.connection()->client();
   REQUIRE(run_until(*app, [&] { return client.state() == agent::AgentState::Ready; }));
@@ -162,6 +169,36 @@ TEST_CASE("the editor reopens a game's last conversation with its agent") {
   REQUIRE(said != entries.end());
   CHECK(said->text == "keep notes");
   take_picture(*app, "agent_reopened");
+  std::filesystem::remove_all(game);
+}
+
+// A conversation the editor keeps with the fake agent: one prompt, its question rejected.
+void talk_once(EditorApp& app, const std::string& text) {
+  ui::AgentPanel& panel = app.agent_panel();
+  ImGui::SetWindowFocus(editor_config::kAgentWindow);
+  run(app, kPictureFrames);
+  REQUIRE(panel.send(text));
+  agent::AgentClient& client = panel.connection()->client();
+  REQUIRE(run_until(app, [&] { return !client.transcript().waiting_permissions().empty(); }));
+  client.choose(client.transcript().waiting_permissions().front(), "reject");
+  REQUIRE(run_until(app, [&] { return client.state() == agent::AgentState::Ready; }));
+}
+
+TEST_CASE("a conversation started in place of one that could not be reopened has a title of its own") {
+  const std::filesystem::path game = copy_game();
+  const std::filesystem::path sessions = fresh_sessions_file();
+  {
+    auto app = editor_keeping(game, sessions);
+    run(*app, kWarmupFrames);
+    talk_once(*app, "first thing");
+  }
+  auto app = editor_keeping(game, sessions, {{"FAKE_AGENT_NO_LOAD", "1"}});  // (it cannot load now)
+  run(*app, kWarmupFrames);
+  talk_once(*app, "second thing");
+  const auto& past = app->agent_panel().past_sessions();
+  REQUIRE(past.size() == 2);
+  CHECK(past[0].title == "second thing");
+  CHECK(past[1].title == "first thing");
   std::filesystem::remove_all(game);
 }
 

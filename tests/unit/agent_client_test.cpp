@@ -295,3 +295,31 @@ TEST_CASE("a past conversation the agent cannot find gives way to a new one") {
   talk.client->receive(rpc_result(talk.last_id(), {{"sessionId", "s11"}}));
   CHECK(talk.client->state() == AgentState::Ready);
 }
+
+TEST_CASE("a load that fails midway leaves nothing of the replay under the new conversation") {
+  Conversation talk("s9");
+  talk.client->begin();
+  talk.client->receive(rpc_result(talk.last_id(), can_load(true)));
+  talk.client->receive(replayed("user_message_chunk", "half of an old turn"));
+  talk.client->receive(rpc_error(talk.last_id(), kInternalError, "replay broke"));
+  const auto& entries = talk.client->transcript().entries();
+  REQUIRE(entries.size() == 1);
+  CHECK(entries[0].kind == EntryKind::Notice);
+}
+
+TEST_CASE("replayed user turns stay apart, and the blocks of one turn are kept apart within it") {
+  Transcript transcript;
+  const auto block = [&](const std::string& text, const std::string& id) {
+    apply_update(transcript, {{"update",
+                               {{"sessionUpdate", "user_message_chunk"},
+                                {"messageId", id},
+                                {"content", {{"type", "text"}, {"text", text}}}}}});
+  };
+  block("context", "m1");
+  block("make it spin", "m1");
+  block("and faster", "m2");
+  const auto& entries = transcript.entries();
+  REQUIRE(entries.size() == 2);
+  CHECK(entries[0].text == "context\n\nmake it spin");
+  CHECK(entries[1].text == "and faster");
+}
