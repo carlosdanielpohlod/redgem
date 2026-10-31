@@ -100,6 +100,7 @@ enum class EntryKind { User, Agent, Thought, Tool, Plan, Permission, Notice, Err
 // One entry of the conversation: the fields its kind uses are set.
 struct Entry {
   std::size_t number = 0;  // its place in the conversation (see Transcript)
+  std::string message_id;  // the agent's id of the message it shows, when the agent gave one
   EntryKind kind = EntryKind::Notice;
   std::string text;              // User, Agent, Thought, Notice, Error
   ToolCall tool;                 // Tool
@@ -124,6 +125,10 @@ class Transcript {
   // A piece of the agent's answer or thought: it continues the last entry when that is of the same
   // kind, else starts a new one.
   void append(EntryKind kind, const std::string& piece);
+  // A block of what the user said, as an agent replays a past conversation: it goes on the user's
+  // entry before it when that is the same message (blocks apart by a blank line), else starts one.
+  // Without ids, a block right after the user's last one is taken as part of it.
+  void add_user_block(const std::string& block, const std::string& message_id);
   void start_tool(const ToolCall& call);
   // Changes the tool call `patch` names; a call never announced starts with what the patch says.
   void update_tool(const ToolCallPatch& patch);

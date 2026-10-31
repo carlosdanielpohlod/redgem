@@ -52,7 +52,8 @@ std::optional<int> edit_game(const std::filesystem::path& game, bool from_comman
     return std::nullopt;
   }
   EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);
-  if (bridge_enabled) bridge = enable_editor_bridge(app);
+  // (One bridge for the editor: an agent's session may have enabled it already.)
+  if (bridge_enabled && !bridge) bridge = enable_editor_bridge(app);
   const int code = app.run();
   if (app.exit_action() != EditorExit::OpenHub) return code;
   return std::nullopt;

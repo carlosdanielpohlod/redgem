@@ -121,7 +121,7 @@ bool message_chunk(Transcript& transcript, const Json& update) {
 
 // What the user said, as an agent replays a past conversation (session/load).
 bool user_chunk(Transcript& transcript, const Json& update) {
-  transcript.append(EntryKind::User, block_text(field_object(update, "content")));
+  transcript.add_user_block(block_text(field_object(update, "content")), field_text(update, "messageId"));
   return true;
 }
 

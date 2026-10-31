@@ -98,6 +98,9 @@ class AgentPanel {
   void draw_history();
   void draw_history_list();
   bool is_current(const agent::PastSession& session) const;
+  std::vector<agent::AgentProfile>::const_iterator agent_named(const std::string& name) const;
+  void reopen_if_pending();
+  bool can_reopen_last() const;
   void note_prompt(const std::string& text);
   bool prompt_now(const std::string& text);
   void draw_agent_picker();
@@ -139,7 +142,13 @@ class AgentPanel {
   std::map<std::size_t, float> heights_;      // how tall each entry was last drawn, by number
   float measured_width_ = 0.0f;               // the width those heights were measured at
   std::vector<agent::PastSession> past_;      // the game's past conversations, newest first
-  std::string title_;                         // the conversation's, from its first message (empty before)
+  // The conversation's title (from its first message), and the session it belongs to.
+  struct Title {
+    std::string session;
+    std::string text;
+  };
+  Title title_;
+  bool reopen_pending_ = false;  // the game's last conversation comes back when the panel is first shown or used
   AgentSettings settings_;
   bool settings_open_ = false;
 };

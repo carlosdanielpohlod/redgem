@@ -5,8 +5,9 @@
 //   FAKE_AGENT_LOGIN=1     session/new answers "authentication required"
 //   prompt "crash"         it writes a line to its standard error and ends
 //   FAKE_AGENT_NO_LOAD=1   it says it cannot reopen past conversations (no loadSession)
-// Each prompt is kept in fake-agent-history.txt in the session's folder: session/load of its one
+// Each prompt is kept in fake-agent-history-<session>.txt in the session's folder: session/load of a
 // session replays them, each with the answer it got.
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -25,12 +26,15 @@ constexpr int kCrashExitCode = 3;
 constexpr int kPermissionRequest = 100;  // the ids of the agent's own requests
 constexpr int kWriteRequest = 101;
 constexpr int kReadRequest = 102;
-constexpr const char* kSession = "fake-session";
+constexpr const char* kSessionPrefix = "fake-session-";
+// The id of the session open now: a new one each session/new, so that a test tells them apart.
+std::string current_session = "fake-session";
 constexpr const char* kNotesFile = "notes.txt";
 constexpr const char* kLoginVariable = "FAKE_AGENT_LOGIN";
 constexpr const char* kCrashPrompt = "crash";
 constexpr const char* kNoLoadVariable = "FAKE_AGENT_NO_LOAD";
-constexpr const char* kHistoryFile = "/fake-agent-history.txt";
+constexpr const char* kHistoryFile = "/fake-agent-history-";  // + the session's id + ".txt"
+constexpr const char* kHistoryExtension = ".txt";
 constexpr const char* kAnswerStart = "Hello ";
 constexpr const char* kAnswerEnd = "from the **fake** agent.";
 constexpr int kNoSuchSession = -32002;
@@ -44,7 +48,9 @@ void ask(int id, const std::string& method, const Json& params) {
 }
 
 void update(const Json& body) {
-  send({{"jsonrpc", "2.0"}, {"method", "session/update"}, {"params", {{"sessionId", kSession}, {"update", body}}}});
+  send({{"jsonrpc", "2.0"},
+        {"method", "session/update"},
+        {"params", {{"sessionId", current_session}, {"update", body}}}});
 }
 
 void say(const char* kind, const std::string& text) {
@@ -80,7 +86,7 @@ void tool_status(const char* status, const Json& content = Json::array()) {
 }
 
 Json permission_params() {
-  return {{"sessionId", kSession},
+  return {{"sessionId", current_session},
           {"toolCall", {{"toolCallId", "t1"}, {"title", "Write notes.txt"}}},
           {"options",
            {{{"optionId", "allow"}, {"name", "Allow"}, {"kind", "allow_once"}},
@@ -91,9 +97,9 @@ Json permission_params() {
 // Writes notes.txt through the editor and reads it back; true when it reads what was written.
 bool write_notes(const Session& session, const std::string& text) {
   const std::string path = session.folder + "/" + kNotesFile;
-  ask(kWriteRequest, "fs/write_text_file", {{"sessionId", kSession}, {"path", path}, {"content", text}});
+  ask(kWriteRequest, "fs/write_text_file", {{"sessionId", current_session}, {"path", path}, {"content", text}});
   if (!wait_for_answer(kWriteRequest).contains("result")) return false;
-  ask(kReadRequest, "fs/read_text_file", {{"sessionId", kSession}, {"path", path}});
+  ask(kReadRequest, "fs/read_text_file", {{"sessionId", current_session}, {"path", path}});
   const Json read = wait_for_answer(kReadRequest);
   return read.contains("result") && read["result"].value("content", std::string()) == text;
 }
@@ -111,18 +117,23 @@ const char* acted_on(const Session& session, const Json& outcome, const std::str
   return "end_turn";
 }
 
+std::string history_file(const Session& session, const std::string& id) {
+  return session.folder + kHistoryFile + id + kHistoryExtension;
+}
+
 void keep_prompt(const Session& session, const std::string& text) {
-  std::ofstream(session.folder + kHistoryFile, std::ios::app) << text << '\n';
+  std::ofstream(history_file(session, current_session), std::ios::app) << text << '\n';
 }
 
 // session/load: every prompt kept, as the user's message and the answer, then the answer to the call.
 void load_session(const Json& id, const Json& params, Session& session) {
-  if (params.value("sessionId", std::string()) != kSession) {
+  session.folder = params.value("cwd", std::string());
+  current_session = params.value("sessionId", std::string());
+  std::ifstream history(history_file(session, current_session));
+  if (!history) {
     send({{"jsonrpc", "2.0"}, {"id", id}, {"error", {{"code", kNoSuchSession}, {"message", "fake: no such session"}}}});
     return;
   }
-  session.folder = params.value("cwd", std::string());
-  std::ifstream history(session.folder + kHistoryFile);
   std::string line;
   while (std::getline(history, line)) {
     update({{"sessionUpdate", "user_message_chunk"}, {"content", {{"type", "text"}, {"text", line}}}});
@@ -161,7 +172,8 @@ void open_session(const Json& id, const Json& params, Session& session) {
   session.folder = params.value("cwd", std::string());
   const Json servers = params.value("mcpServers", Json::array());
   session.tools = servers.empty() ? "none" : servers[0].value("name", std::string());
-  answer(id, {{"sessionId", kSession}});
+  current_session = kSessionPrefix + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+  answer(id, {{"sessionId", current_session}});
 }
 
 }  // namespace

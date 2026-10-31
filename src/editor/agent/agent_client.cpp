@@ -178,6 +178,7 @@ void AgentClient::open_session() {
 
 // A new conversation in place of the past one asked for, with why in the transcript.
 void AgentClient::start_anew(const std::string& why) {
+  transcript_.clear();  // (what was replayed of the past conversation is not this one's)
   transcript_.add(EntryKind::Notice, why);
   setup_.load_session.clear();
   open_session();

@@ -3,9 +3,11 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 
 #include "editor/agent/session_history.hpp"
+#include "test_support.hpp"
 
 using namespace redgem::agent;
 namespace fs = std::filesystem;
@@ -21,9 +23,11 @@ fs::path fresh_file(const std::string& name) {
   return folder / "agent-sessions.json";
 }
 
-void remember(const fs::path& file, const fs::path& game, const PastSession& session) {
+std::vector<PastSession> remember(const fs::path& file, const fs::path& game, const PastSession& session) {
   std::string error;
-  REQUIRE_MESSAGE(remember_session(file, game, session, error), error);
+  const auto kept = remember_session(file, game, session, error);
+  REQUIRE_MESSAGE(kept.has_value(), error);
+  return *kept;
 }
 
 }  // namespace
@@ -61,17 +65,35 @@ TEST_CASE("using a conversation again moves it first, and only so many are kept"
   fs::remove_all(file.parent_path());
 }
 
-TEST_CASE("a broken file reads as no conversations, and is written anew") {
+TEST_CASE("a file that cannot be read is kept aside, not written over") {
   const fs::path file = fresh_file("redgem_sessions_broken");
   const fs::path game = file.parent_path() / "game";
-  std::ofstream(file) << "{\"games\": [1, 2";
+  const std::string broken = "{\"games\": [1, 2";
+  std::ofstream(file) << broken;
   CHECK(read_sessions(file, game).empty());
+  redgem::test::LogCapture quiet;
   remember(file, game, {"a", "Claude Code", "t", kSomeTime});
   CHECK(read_sessions(file, game).size() == 1);
+  std::ifstream aside(file.string() + ".unreadable");
+  std::string kept((std::istreambuf_iterator<char>(aside)), std::istreambuf_iterator<char>());
+  CHECK(kept == broken);
   std::ofstream(file) << R"({"games": {")" << fs::weakly_canonical(game).u8string()
                       << R"(": [{"id": 3}, {"id": "ok", "agent": "Codex"}]}})";
   REQUIRE(read_sessions(file, game).size() == 1);
   CHECK(read_sessions(file, game)[0].id == "ok");
+  fs::remove_all(file.parent_path());
+}
+
+TEST_CASE("what another editor kept meanwhile stays, and what is kept comes back from one write") {
+  const fs::path file = fresh_file("redgem_sessions_two_editors");
+  const fs::path game = file.parent_path() / "game";
+  remember(file, game, {"mine", "Claude Code", "t", kSomeTime});
+  remember(file, game, {"theirs", "Codex", "t", kSomeTime + 1});  // (the other editor, between two of mine)
+  const auto kept = remember(file, game, {"mine", "Claude Code", "t", kSomeTime + 2});
+  REQUIRE(kept.size() == 2);
+  CHECK(kept[0].id == "mine");
+  CHECK(kept[1].id == "theirs");
+  CHECK(read_sessions(file, game).size() == 2);
   fs::remove_all(file.parent_path());
 }
 

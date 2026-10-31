@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -30,9 +31,12 @@ std::filesystem::path sessions_file();
 
 // The game's past conversations, newest first; none when the file is missing or unreadable.
 std::vector<PastSession> read_sessions(const std::filesystem::path& file, const std::filesystem::path& game);
-// Remembers a conversation (in place of one with its id), keeping the kKeptSessions newest.
-bool remember_session(const std::filesystem::path& file, const std::filesystem::path& game, const PastSession& session,
-                      std::string& error);
+// Remembers a conversation (in place of one with its id), keeping the kKeptSessions newest; what is
+// kept for the game then, or nullopt with `error`. The file is read and written back at once, so what
+// another editor kept meanwhile stays. A file that cannot be read is kept aside, never overwritten.
+std::optional<std::vector<PastSession>> remember_session(const std::filesystem::path& file,
+                                                         const std::filesystem::path& game, const PastSession& session,
+                                                         std::string& error);
 
 // A conversation's title: the first line of its first message, cut to kTitleLength bytes (never
 // inside a character).

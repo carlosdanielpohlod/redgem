@@ -103,8 +103,31 @@ bool scrolled_to_bottom() { return ImGui::GetScrollY() >= ImGui::GetScrollMaxY()
 AgentPanel::AgentPanel(AgentPanelSetup setup)
     : setup_(std::move(setup)), agents_(agent::read_agents(setup_.agents_file)) {
   if (!setup_.sessions_file.empty()) past_ = agent::read_sessions(setup_.sessions_file, setup_.game);
-  // (The conversation the game was left with comes back: it is never lost by closing the editor.)
-  if (setup_.reopen_last && !past_.empty()) open_past(past_.front());
+  // (The conversation the game was left with comes back, so that closing the editor never loses it;
+  // but only once the panel is shown or used: an agent is not started for a panel nobody looks at.)
+  reopen_pending_ = can_reopen_last();
+}
+
+// The panel can be seen: not a docked tab behind another (a docked window is begun before its tab
+// is shown, the first frame).
+bool tab_in_sight() {
+  const ImGuiWindow* window = ImGui::GetCurrentWindow();
+  return !window->DockIsActive || window->DockTabIsVisible;
+}
+
+// There is a last conversation to reopen, with an agent still in the list.
+bool AgentPanel::can_reopen_last() const {
+  return setup_.reopen_last && !past_.empty() && agent_named(past_.front().agent) != agents_.end();
+}
+
+std::vector<agent::AgentProfile>::const_iterator AgentPanel::agent_named(const std::string& name) const {
+  return std::find_if(agents_.begin(), agents_.end(),
+                      [&](const agent::AgentProfile& agent) { return agent.name == name; });
+}
+
+void AgentPanel::reopen_if_pending() {
+  if (!std::exchange(reopen_pending_, false)) return;
+  open_past(agent::PastSession(past_.front()));
 }
 
 AgentPanel::~AgentPanel() = default;
@@ -113,6 +136,7 @@ bool AgentPanel::pickable(std::size_t agent) const { return agent < agents_.size
 
 void AgentPanel::pick(std::size_t agent) {
   if (!pickable(agent)) return;
+  reopen_pending_ = false;
   picked_ = agent;
   end_session();
 }
@@ -133,8 +157,8 @@ void AgentPanel::start_session(const std::string& past_session) {
 }
 
 void AgentPanel::open_past(const agent::PastSession& session) {
-  const auto found = std::find_if(agents_.begin(), agents_.end(),
-                                  [&](const agent::AgentProfile& agent) { return agent.name == session.agent; });
+  reopen_pending_ = false;
+  const auto found = agent_named(session.agent);
   if (found == agents_.end()) {
     end_session();
     start_error_ = tr("editor.agent.agent_gone", {{"agent", session.agent}});
@@ -142,12 +166,12 @@ void AgentPanel::open_past(const agent::PastSession& session) {
   }
   picked_ = static_cast<std::size_t>(found - agents_.begin());
   start_session(session.id);
-  title_ = session.title;
+  title_ = {session.id, session.title};
 }
 
 void AgentPanel::end_session() {
   connection_.reset();  // (stops the agent's program)
-  title_.clear();
+  title_ = {};
   start_error_.clear();
   queued_.clear();
   parsed_.clear();
@@ -156,6 +180,7 @@ void AgentPanel::end_session() {
 
 bool AgentPanel::send(const std::string& text) {
   if (blank(text)) return false;
+  reopen_if_pending();  // (the user goes on with the conversation they left)
   if (!live()) {
     start_session();
     queued_ = text;
@@ -174,12 +199,15 @@ bool AgentPanel::prompt_now(const std::string& text) {
 
 void AgentPanel::note_prompt(const std::string& text) {
   if (setup_.sessions_file.empty()) return;
-  if (title_.empty()) title_ = agent::session_title(text);
-  const agent::PastSession session{connection_->client().session_id(), agents_[picked_].name, title_,
-                                   agent::seconds_now()};
+  const std::string& id = connection_->client().session_id();
+  // (A conversation is titled by its own first message: one started in place of a past one that
+  // could not be reopened gets a title of its own.)
+  if (title_.session != id) title_ = {id, agent::session_title(text)};
   std::string error;
-  if (!agent::remember_session(setup_.sessions_file, setup_.game, session, error)) log::warning(error);
-  past_ = agent::read_sessions(setup_.sessions_file, setup_.game);
+  const auto kept = agent::remember_session(setup_.sessions_file, setup_.game,
+                                            {id, agents_[picked_].name, title_.text, agent::seconds_now()}, error);
+  if (!kept) return log::warning(error);
+  past_ = *kept;
 }
 
 void AgentPanel::stop() {
@@ -224,6 +252,7 @@ void AgentPanel::take_back_returned() {
 
 void AgentPanel::draw() {
   const bool shown = ImGui::Begin(window_title(editor_config::kAgentTitle, editor_config::kAgentWindow));
+  if (shown && tab_in_sight()) reopen_if_pending();
   if (shown) {
     draw_toolbar();
     draw_problem();
