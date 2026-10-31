@@ -10,6 +10,13 @@ bool continues(const std::vector<Entry>& entries, EntryKind kind) {
   return !entries.empty() && entries.back().kind == kind;
 }
 
+constexpr const char* kBlockGap = "\n\n";  // between blocks of one message
+
+// The user's entry last in the transcript is the message a block with `message_id` belongs to.
+bool same_user_message(const std::vector<Entry>& entries, const std::string& message_id) {
+  return continues(entries, EntryKind::User) && entries.back().message_id == message_id;
+}
+
 bool waiting_question(const Entry& entry) { return entry.kind == EntryKind::Permission && entry.permission.waiting(); }
 
 bool is_tool_call(const Entry& entry, const std::string& id) {
@@ -68,6 +75,16 @@ void Transcript::add(EntryKind kind, const std::string& text) {
 void Transcript::append(EntryKind kind, const std::string& piece) {
   if (!continues(entries_, kind)) return add(kind, piece);
   entries_.back().text += piece;
+  changed();
+}
+
+void Transcript::add_user_block(const std::string& block, const std::string& message_id) {
+  if (!same_user_message(entries_, message_id)) {
+    add(EntryKind::User, block);
+    entries_.back().message_id = message_id;
+    return;
+  }
+  entries_.back().text += kBlockGap + block;
   changed();
 }
 

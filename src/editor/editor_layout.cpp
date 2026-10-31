@@ -35,6 +35,22 @@ ImGuiID split_to_the_right(const ImGuiDockNode& group, const std::string& window
   return right;
 }
 
+constexpr const char* kTabIdName = "#TAB";  // what ImGui names a docked window's tab, below the window
+
+// The tab a group shows when the layout is made (else it shows the window docked into it last).
+void show_first(ImGuiID group, const char* window_name) {
+  ImGuiDockNode* node = ImGui::DockBuilderGetNode(group);
+  if (node == nullptr) return;
+  node->SelectedTabId = ImGui::GetIDWithSeed(kTabIdName, nullptr, ImHashStr(window_name));
+}
+
+// The Inspector, and the Agent panel as a tab behind it.
+void dock_right_tabs(ImGuiID right) {
+  ImGui::DockBuilderDockWindow(kInspectorWindow, right);
+  ImGui::DockBuilderDockWindow(kAgentWindow, right);
+  show_first(right, kInspectorWindow);
+}
+
 // A window that exists and sits in a dock group.
 bool in_dock_group(const ImGuiWindow* window) { return window != nullptr && window->DockNode != nullptr; }
 
@@ -63,8 +79,7 @@ void EditorApp::build_default_layout(unsigned int dock) {
       ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, editor_logic::inspector_split_ratio(), nullptr, &center);
   const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, kBottomHeight, nullptr, &center);
   ImGui::DockBuilderDockWindow(kHierarchyWindow, left);
-  ImGui::DockBuilderDockWindow(kInspectorWindow, right);
-  ImGui::DockBuilderDockWindow(kAgentWindow, right);  // (a tab behind the Inspector)
+  dock_right_tabs(right);
   ImGui::DockBuilderDockWindow(kProjectWindow, bottom);
   ImGui::DockBuilderDockWindow(kConsoleWindow, bottom);
   ImGui::DockBuilderDockWindow(kViewportWindow, center);

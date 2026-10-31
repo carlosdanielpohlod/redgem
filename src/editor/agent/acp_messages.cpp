@@ -119,6 +119,12 @@ bool message_chunk(Transcript& transcript, const Json& update) {
   return true;
 }
 
+// What the user said, as an agent replays a past conversation (session/load).
+bool user_chunk(Transcript& transcript, const Json& update) {
+  transcript.add_user_block(block_text(field_object(update, "content")), field_text(update, "messageId"));
+  return true;
+}
+
 bool thought_chunk(Transcript& transcript, const Json& update) {
   transcript.append(EntryKind::Thought, block_text(field_object(update, "content")));
   return true;
@@ -140,11 +146,10 @@ bool plan(Transcript& transcript, const Json& update) {
 }
 
 UpdateHandler handler_for(const std::string& kind) {
-  static const std::map<std::string, UpdateHandler> kHandlers = {{"agent_message_chunk", message_chunk},
-                                                                 {"agent_thought_chunk", thought_chunk},
-                                                                 {"tool_call", tool_call},
-                                                                 {"tool_call_update", tool_call_update},
-                                                                 {"plan", plan}};
+  static const std::map<std::string, UpdateHandler> kHandlers = {
+      {"user_message_chunk", user_chunk},     {"agent_message_chunk", message_chunk},
+      {"agent_thought_chunk", thought_chunk}, {"tool_call", tool_call},
+      {"tool_call_update", tool_call_update}, {"plan", plan}};
   const auto found = kHandlers.find(kind);
   return found == kHandlers.end() ? nullptr : found->second;
 }
@@ -191,6 +196,13 @@ Json new_session_params(const std::filesystem::path& folder, const std::vector<M
   return {{"cwd", folder.u8string()}, {"mcpServers", listed}};
 }
 
+Json load_session_params(const std::string& session, const std::filesystem::path& folder,
+                         const std::vector<McpServer>& servers) {
+  Json params = new_session_params(folder, servers);
+  params["sessionId"] = session;
+  return params;
+}
+
 Json prompt_params(const std::string& session, const std::string& text, const std::vector<std::string>& context) {
   Json blocks = Json::array();
   for (const std::string& part : context) blocks.push_back({{"type", kTextType}, {"text", part}});
@@ -207,6 +219,7 @@ AgentInfo agent_info(const Json& result) {
   const Json about = field_object(result, "agentInfo");
   info.name = field_text(about, "title");
   if (info.name.empty()) info.name = field_text(about, "name");
+  info.loads_sessions = field(field_object(result, "agentCapabilities"), "loadSession") == true;
   for (const Json& login : field_list(result, "authMethods")) {
     if (login.is_object()) info.login_methods.push_back(field_text(login, "name"));
   }

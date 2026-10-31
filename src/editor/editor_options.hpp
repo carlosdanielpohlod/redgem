@@ -50,6 +50,10 @@ struct AgentHooks {
   std::function<std::string(const SceneDesc& scene, int object)> describe_object;
   // Where the list of agents is kept; empty: agents.json in the user's data folder.
   std::filesystem::path agents_file;
+  // Where each game's past conversations are kept (empty: none are), and whether the last one comes
+  // back as the editor opens the game.
+  std::filesystem::path sessions_file;
+  bool reopen_last_session = false;
 };
 
 struct EditorOptions {

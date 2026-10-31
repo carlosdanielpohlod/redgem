@@ -23,7 +23,8 @@ until 1.0, a release may change what games rely on (see
   agent's plan, permission questions (allow once, allow always, reject) and a Stop button. The
   selected objects can be attached as context. The agent works in the game's folder: the editor
   reads and writes files for it only there. It also gets the editor's live MCP tools, so it can
-  list and move objects, play, read errors and look at the viewport.
+  list and move objects, play, read errors and look at the viewport. Each game's past conversations
+  are listed, and the last one comes back when the editor opens the game again.
 
 - **Ruby colors in the script tabs**: keywords, strings and their `#{}` interpolations, symbols,
   comments, numbers, constants and instance variables are colored while typing, heredocs,

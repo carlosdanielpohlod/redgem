@@ -9,6 +9,8 @@ void EditorApp::make_agent_panel(const AgentHooks& hooks) {
   setup.game = session_->game_dir();
   setup.agents_file = hooks.agents_file.empty() ? agent::agents_file() : hooks.agents_file;
   setup.client_version = hooks.client_version;
+  setup.sessions_file = hooks.sessions_file;
+  setup.reopen_last = hooks.reopen_last_session;
   if (hooks.tool_servers) {
     setup.tool_servers = [this, servers = hooks.tool_servers](std::string& error) { return servers(*this, error); };
   }

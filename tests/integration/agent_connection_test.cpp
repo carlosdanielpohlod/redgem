@@ -27,7 +27,7 @@ fs::path game_folder() {
   return folder;
 }
 
-ClientSetup setup_in(const fs::path& folder) { return {folder, {{"redgem", "redgem", {"mcp"}, {}}}, "test"}; }
+ClientSetup setup_in(const fs::path& folder) { return {folder, {{"redgem", "redgem", {"mcp"}, {}}}, "test", {}}; }
 
 ProgramCall fake_agent(std::vector<EnvironmentVariable> environment = {}) {
   return {REDGEM_FAKE_AGENT_FILE, {}, std::move(environment)};
@@ -152,3 +152,41 @@ TEST_CASE("ending a session does not wait for what the agent started and let go 
   fs::remove_all(folder);
 }
 #endif
+
+TEST_CASE("a conversation with an agent program is loaded again by a new program") {
+  const fs::path folder = game_folder();
+  std::string session;
+  {
+    AgentConnection connection(fake_agent(), setup_in(folder));
+    AgentClient& client = connection.client();
+    REQUIRE(poll_until(connection, [&] { return client.state() == AgentState::Ready; }));
+    client.prompt("remember the coin");
+    REQUIRE(poll_until(connection, [&] { return asked(client); }));
+    client.choose(client.transcript().waiting_permissions().front(), "reject");
+    REQUIRE(poll_until(connection, [&] { return client.state() == AgentState::Ready; }));
+    session = client.session_id();
+  }
+  ClientSetup again = setup_in(folder);
+  again.load_session = session;
+  AgentConnection connection(fake_agent(), again);
+  AgentClient& client = connection.client();
+  REQUIRE(poll_until(connection, [&] { return client.state() == AgentState::Ready; }));
+  const Entry* user = last_of(client.transcript(), EntryKind::User);
+  REQUIRE(user != nullptr);
+  CHECK(user->text == "remember the coin");
+  CHECK(last_of(client.transcript(), EntryKind::Agent)->text == "Hello from the **fake** agent.");
+  CHECK(client.session_id() == session);
+  fs::remove_all(folder);
+}
+
+TEST_CASE("an agent program that cannot load conversations starts a new one") {
+  const fs::path folder = game_folder();
+  ClientSetup setup = setup_in(folder);
+  setup.load_session = "fake-session";
+  AgentConnection connection(fake_agent({{"FAKE_AGENT_NO_LOAD", "1"}}), setup);
+  AgentClient& client = connection.client();
+  REQUIRE(poll_until(connection, [&] { return client.state() == AgentState::Ready; }));
+  CHECK(last_of(client.transcript(), EntryKind::Notice) != nullptr);
+  CHECK(last_of(client.transcript(), EntryKind::User) == nullptr);
+  fs::remove_all(folder);
+}
