@@ -10,12 +10,16 @@ A 3D game engine and editor where games are written in **Ruby**, the most human-
 language. Build levels in the editor or in **Blender**, write the gameplay in Ruby, press Play,
 ship a standalone game.
 
-## New in 0.4.1: built-in MCP tools
+## New in 0.5.0: an AI agent inside the editor
 
-Connect an MCP client directly to RedGem: inspect and edit scenes, run reproducible headless
-checks, read errors since a cursor, control editor play and capture the scene viewport.
-Live edits appear immediately and each batch is one undo step; read-only and allow-list options
-keep access explicit. No editor plugin is needed.
+The **Agent panel** brings a coding agent into the editor: Claude Code and Codex come as presets
+(over the Agent Client Protocol), or add your own. Ask it to change the game, and watch the
+answer stream in with its tool calls, diffs, plan and permission questions. The agent works in
+the game's folder and gets the editor's live MCP tools: it lists and moves objects, presses Play,
+reads errors and looks at the viewport. Each game keeps its past conversations. See
+[the Agent panel](docs/assistants.md#the-agent-panel).
+
+The same MCP tools work from any MCP client, with or without an open editor:
 
 ```sh
 redgem /path/to/game --editor-bridge
@@ -25,7 +29,9 @@ redgem mcp /path/to/game --editor auto
 redgem mcp /path/to/game --read-only
 ```
 
-See [MCP tools and permissions](docs/mcp.md) for client setup, tool examples and limits.
+Also new: Ruby colors in the code tabs, builds in the background with their progress, and camera
+helpers (`Camera.follow`, `orbit`, `shake`, `world_to_screen`). See [MCP tools and
+permissions](docs/mcp.md) and the [changelog](CHANGELOG.md).
 
 > **Experimental.** RedGem is a young engine: expect rough edges, and see the
 > [known limitations](KNOWN_LIMITATIONS.md). It is not written from zero: it puts together
@@ -88,9 +94,11 @@ end
   per-character animation with blending, saved progress.
 - **Multiplayer**: games found by themselves on the local network, rooms by code over the
   internet through a relay that ships with the engine, named messages, objects kept in sync.
-- **Editor**: scene view with gizmos, hierarchy, inspector, Ruby code tabs, play mode, undo,
-  sculptable terrain, and one-click builds of the game for Linux, Windows and Android (and, on a
-  Mac, for the Mac).
+- **Editor**: scene view with gizmos, hierarchy, inspector, Ruby code tabs with syntax colors,
+  play mode, undo, sculptable terrain, and one-click builds of the game for Linux, Windows and
+  Android (and, on a Mac, for the Mac), made in the background.
+- **AI agents**: the Agent panel chats with Claude Code or Codex inside the editor, and
+  `redgem mcp` gives any MCP client the scene, headless runs, errors and the live editor.
 - **Blender as the modeling tool**: scenes are glTF files; custom properties carry gameplay data.
 - **Rendering**: PBR materials, sun shadows, reflections, ambient occlusion, bloom, fog,
   skeletal animation.

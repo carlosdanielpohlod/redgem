@@ -1,5 +1,5 @@
 ---
-description: "Making games with a coding assistant: the guide every new game gets, the commands to use, and how to keep it cheap."
+description: "Making games with a coding assistant: the Agent panel in the editor (Claude Code, Codex), the guide every new game gets, the commands to use, and how to keep it cheap."
 ---
 
 # Making games with an AI assistant
