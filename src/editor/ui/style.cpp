@@ -15,6 +15,12 @@ using namespace palette;
 
 constexpr int kActiveButtonColors = 2;                     // style colors icon_button pushes for a pressed button
 constexpr const char* kHeaderLabelFormat = "%s  %s###%s";  // icon, title, and the title again as the id
+constexpr float kHalf = 0.5f;
+constexpr float kSpinnerRadius = 0.4f;     // of a line's height
+constexpr float kSpinnerSpeed = 6.0f;      // radians a second
+constexpr float kSpinnerArc = 4.2f;        // radians of the circle drawn (about two thirds of it)
+constexpr int kSpinnerSegments = 24;       // straight pieces the arc is drawn with
+constexpr float kSpinnerThickness = 2.0f;  // pixels
 
 }  // namespace
 
@@ -52,6 +58,17 @@ void tooltip(const char* text) {
   if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled)) {
     ImGui::SetTooltip("%s", text);
   }
+}
+
+void spinner() {
+  const float size = ImGui::GetTextLineHeight();
+  const ImVec2 corner = ImGui::GetCursorScreenPos();
+  ImGui::Dummy(ImVec2(size, size));
+  const ImVec2 center(corner.x + size * kHalf, corner.y + size * kHalf);
+  const float start = static_cast<float>(ImGui::GetTime()) * kSpinnerSpeed;
+  ImDrawList* draw = ImGui::GetWindowDrawList();
+  draw->PathArcTo(center, size * kSpinnerRadius, start, start + kSpinnerArc, kSpinnerSegments);
+  draw->PathStroke(ImGui::GetColorU32(kAccent), ImDrawFlags_None, kSpinnerThickness);
 }
 
 void toggle_button(const char* icon, const char* tip, bool& on) {

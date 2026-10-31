@@ -532,6 +532,8 @@ if(NOT ANDROID)
     editor/editor_app.cpp
     editor/editor_frame.cpp
     editor/editor_commands.cpp
+    editor/editor_builds.cpp
+    editor/build_job.cpp
     editor/editor_capture.cpp
     editor/editor_input.cpp
     editor/editor_menus.cpp
@@ -603,6 +605,7 @@ if(NOT ANDROID)
     project/game_templates.cpp
     project/game_names.cpp
     project/build_record.cpp
+    project/build_steps.cpp
     project/game_build.cpp
     project/game_build_targets.cpp
     project/game_build_files.cpp

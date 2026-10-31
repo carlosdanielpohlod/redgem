@@ -77,7 +77,8 @@ void EditorApp::draw_file_menu() {
 void EditorApp::draw_game_file_items() {
   draw_scene_items();
   ImGui::Separator();
-  ui::menu(ui::icon_label(ICON_FA_BOX_ARCHIVE, "editor.menu.build_game"), [this] { draw_build_targets(); }, editing());
+  ui::menu(
+      ui::icon_label(ICON_FA_BOX_ARCHIVE, "editor.menu.build_game"), [this] { draw_build_targets(); }, build_offered());
   if (ImGui::MenuItem(ui::icon_label(ICON_FA_FOLDER, "editor.menu.show_game_folder")))
     platform::open_in_system(session_->game_dir());
 }
@@ -105,7 +106,7 @@ void EditorApp::draw_open_scene_items() {
 void EditorApp::draw_build_targets() {
   if (builds_.empty()) ImGui::TextColored(ui::muted_color(), "%s", tr(kNoBuilds));
   for (const BuildChoice& choice : builds_) {
-    if (ImGui::MenuItem(choice.label.c_str())) build(choice);
+    if (ImGui::MenuItem(choice.label.c_str())) start_build(choice);
   }
 }
 

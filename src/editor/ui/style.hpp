@@ -28,6 +28,8 @@ bool component_header(const char* icon, const char* title, bool* removed = nullp
 // A square icon button with a tooltip; `active` shows it pressed (toggle buttons).
 bool icon_button(const char* icon, const char* tooltip, bool active = false);
 void tooltip(const char* text);
+// A circle that keeps turning, the size of a line of text: something is being worked on.
+void spinner();
 // A toggle button: clicking it flips `on`, and it shows pressed while `on`.
 void toggle_button(const char* icon, const char* tooltip, bool& on);
 // The text dropped on the last item, of a kind of payload (see editor_config's kPayload...);

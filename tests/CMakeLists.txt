@@ -46,6 +46,7 @@ add_executable(redgem_tests
   unit/cli_test.cpp
   unit/recording_test.cpp
   unit/editor_setup_test.cpp
+  unit/build_job_test.cpp
   unit/mesh_builder_test.cpp
   unit/mesh_pieces_test.cpp
   unit/scene_document_test.cpp
@@ -113,6 +114,7 @@ add_executable(redgem_tests
   unit/game_settings_test.cpp
   unit/json_file_test.cpp
   unit/game_build_test.cpp
+  unit/build_steps_test.cpp
   unit/game_identity_test.cpp
   unit/game_shipping_test.cpp
   unit/exe_icon_test.cpp
@@ -486,6 +488,7 @@ set_tests_properties(system.harness_reports_failures PROPERTIES LABELS system RU
 # The editor window itself, driven by a doctest program.
 add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp editor_system/editor_window_test.cpp
                editor_system/agent_panel_test.cpp
+               editor_system/build_progress_test.cpp
                editor_system/window_picture.cpp
                editor_system/window_mouse.cpp)
 target_link_libraries(redgem_editor_system_tests PRIVATE redgem_project doctest::doctest)

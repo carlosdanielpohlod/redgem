@@ -9,6 +9,7 @@
 #include "core/platform.hpp"
 #include "project/android/android_package_commands.hpp"
 #include "project/android/android_package_names.hpp"
+#include "project/build_steps.hpp"
 
 namespace redgem {
 
@@ -88,6 +89,7 @@ bool compile_resources(const AndroidTools& tools, const std::filesystem::path& s
 namespace android_commands {
 
 bool run(const std::string& command, const std::filesystem::path& log, const std::string& what, std::string& error) {
+  build_steps::begin(what);
   const std::string logged = command + " >" + posix_shell_word(log) + " 2>&1";
   // The SDK's tools are programs to run: every word of `command` that is not fixed is quoted.
   if (std::system(logged.c_str()) == 0) return true;  // NOLINT(bugprone-command-processor)

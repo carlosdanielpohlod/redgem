@@ -5,6 +5,7 @@
 #include "core/files.hpp"
 #include "core/platform.hpp"
 #include "project/android/android_package_names.hpp"
+#include "project/build_steps.hpp"
 #include "project/game_build.hpp"
 
 namespace redgem {
@@ -35,6 +36,7 @@ bool pack(const Packer& packer, const std::filesystem::path& stage, const std::f
 bool build_app(const std::filesystem::path& game_dir, const std::map<std::string, std::filesystem::path>& runtimes,
                const Packer& packer, const std::filesystem::path& out, std::string& error) {
   const std::filesystem::path stage = out.parent_path() / kStageFolder;
+  build_steps::begin(build_steps::kCopyingFiles);
   // (The stamp only has to differ from the last build's.)
   const std::string stamp = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
   const bool built = stage_android_game(game_dir, runtimes, stamp, stage, error) && pack(packer, stage, out, error);
