@@ -5,6 +5,8 @@
 #include <fstream>
 #include <iterator>
 
+#include "core/config.hpp"
+
 namespace redgem {
 namespace {
 
@@ -19,7 +21,6 @@ constexpr std::size_t kChunkAlignment = 4;
 constexpr std::uint64_t kMaxGlbBytes = 0xFFFFFFFFull;  // what the 32 bits of a length can say: 4 GB less a byte
 constexpr char kJsonPadding = ' ';
 constexpr std::uint8_t kBinPadding = 0;
-constexpr const char* kTempSuffix = ".tmp";
 constexpr int kCompactIndent = -1;
 constexpr bool kAsciiOnly = false;
 // How deep a file's JSON may be nested. glTF itself goes a handful of levels down; walking,
@@ -68,7 +69,7 @@ void remove_if_there(const std::filesystem::path& path) {
 
 // Writes to a temporary file first, so a failed save never leaves half a scene behind.
 bool write_atomically(const std::filesystem::path& path, const std::vector<std::uint8_t>& bytes, std::string& error) {
-  const std::filesystem::path temp = path.string() + kTempSuffix;
+  const std::filesystem::path temp = path.string() + config::kSceneWritingSuffix;
   if (!write_bytes(temp, bytes)) {
     error = "cannot write " + temp.string();
     remove_if_there(temp);

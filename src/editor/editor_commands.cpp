@@ -61,6 +61,10 @@ void EditorApp::save() {
 
 void EditorApp::request_exit(EditorExit action) {
   exit_action_ = action;
+  if (building()) {
+    leave_after_build_ = true;  // (asked again when it ends: what is unsaved then is what counts)
+    return;
+  }
   if (!editing()) stop();
   if (unsaved_work()) {
     pending_ = PendingAction{PendingAction::Kind::Leave, {}};  // whatever else was waiting

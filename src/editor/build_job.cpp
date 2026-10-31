@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <exception>
+#include <system_error>
 #include <utility>
 
 #include "core/engine_thread.hpp"
@@ -19,12 +20,20 @@ BuildJob::~BuildJob() { wait(); }
 
 bool BuildJob::start(BuildRequest request) {
   if (busy_) return false;
-  busy_ = true;
   target_ = request.choice.name;
   started_ = Clock::now();
   step_.clear();
-  worker_ = std::thread([this, request = std::move(request)] { run_engine_thread([&] { work(request); }); });
+  try {
+    launch(std::move(request));
+  } catch (const std::system_error&) {
+    return false;  // no thread to build on: nothing started
+  }
+  busy_ = true;
   return true;
+}
+
+void BuildJob::launch(BuildRequest request) {
+  worker_ = std::thread([this, request = std::move(request)] { run_engine_thread([&] { work(request); }); });
 }
 
 std::string BuildJob::step() const {

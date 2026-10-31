@@ -69,6 +69,12 @@ void report(const BuildOutcome& outcome) {
   log::error("build failed: " + outcome.error);
 }
 
+// The folder a build filled; nullopt when it failed.
+std::optional<std::filesystem::path> filled_folder(const BuildOutcome& outcome) {
+  if (!outcome.succeeded()) return std::nullopt;
+  return outcome.out_dir;
+}
+
 }  // namespace
 
 bool EditorApp::start_build(const BuildChoice& choice) {
@@ -76,11 +82,23 @@ bool EditorApp::start_build(const BuildChoice& choice) {
     log::error("cannot build for " + choice.name + ": the build for " + build_job_.target() + " is still running");
     return false;
   }
-  // (The build reads the game from disk: what is saved when it starts is what it ships.)
-  if (session_->document().dirty()) save();
+  if (!saved_for_build()) return false;
   last_build_.reset();
+  if (!build_job_.start({choice, session_->game_dir(), build_folder(choice)})) {
+    log::error("cannot build for " + choice.name + ": no thread could be started for it");
+    return false;
+  }
   log::info("building for " + choice.name + "...");
-  return build_job_.start({choice, session_->game_dir(), build_folder(choice)});
+  return true;
+}
+
+// (The build reads the game from disk: what is saved when it starts is what it ships.)
+bool EditorApp::saved_for_build() {
+  if (session_->document().dirty()) save();
+  save_scripts();
+  if (!unsaved_work()) return true;
+  log::error("cannot build: the game's edits could not be saved");
+  return false;
 }
 
 std::optional<std::filesystem::path> EditorApp::build(const BuildChoice& choice) {
@@ -107,8 +125,16 @@ std::optional<std::filesystem::path> EditorApp::take_build_outcome() {
   std::optional<BuildOutcome> outcome = build_job_.take_outcome();
   if (!outcome) return std::nullopt;
   report(*outcome);
+  std::optional<std::filesystem::path> filled = filled_folder(*outcome);
   last_build_ = std::move(outcome);
-  return last_build_->succeeded() ? std::optional(last_build_->out_dir) : std::nullopt;
+  leave_if_asked();
+  return filled;
+}
+
+void EditorApp::leave_if_asked() {
+  if (!leave_after_build_) return;
+  leave_after_build_ = false;
+  request_exit(exit_action_);
 }
 
 void EditorApp::draw_build_status() {
@@ -170,15 +196,16 @@ void EditorApp::draw_build_wait_dialog() {
   ImGui::TextUnformatted(waiting.with(build_job_.target()));
   ImGui::TextColored(ui::muted_color(), "%s", step_text(build_job_.step()).c_str());
   if (ImGui::Button(tr("editor.build.keep_open"))) {
-    quit_confirmed_ = false;
+    leave_after_build_ = false;
     exit_action_ = EditorExit::Quit;
     ImGui::CloseCurrentPopup();
   }
   ImGui::EndPopup();
 }
 
+// (The scene changed on disk is asked about first: one question at a time.)
 bool EditorApp::build_wait_dialog_wanted() const {
-  return waiting_for_build() && !ImGui::IsPopupOpen(build_wait_popup());
+  return waiting_for_build() && !session_->external_change_pending() && !ImGui::IsPopupOpen(build_wait_popup());
 }
 
 }  // namespace redgem

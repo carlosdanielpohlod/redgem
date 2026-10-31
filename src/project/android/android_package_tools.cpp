@@ -18,6 +18,7 @@ namespace {
 constexpr const char* kKeyOwner = "CN=RedGem";            // who the engine's own key says it belongs to
 constexpr const char* kPasswordFromEnvironment = "env:";  // apksigner: the password is in this variable
 constexpr const char* kUnsignedApk = "unsigned.apk";
+constexpr const char* kHintStart = " (";  // where a step's hint for when it fails begins ("(is Java installed?)")
 constexpr const char* kAlignedApk = "aligned.apk";
 constexpr const char* kCompiledResources = "compiled-res.zip";  // the launcher icon, compiled by aapt2
 constexpr bool kApkLink = false;                                // (not the protocol-buffer form of a bundle)
@@ -89,7 +90,7 @@ bool compile_resources(const AndroidTools& tools, const std::filesystem::path& s
 namespace android_commands {
 
 bool run(const std::string& command, const std::filesystem::path& log, const std::string& what, std::string& error) {
-  build_steps::begin(what);
+  build_steps::begin(what.substr(0, what.find(kHintStart)));
   const std::string logged = command + " >" + posix_shell_word(log) + " 2>&1";
   // The SDK's tools are programs to run: every word of `command` that is not fixed is quoted.
   if (std::system(logged.c_str()) == 0) return true;  // NOLINT(bugprone-command-processor)

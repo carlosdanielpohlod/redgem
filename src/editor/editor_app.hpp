@@ -78,9 +78,9 @@ class EditorApp {
   };
   // A bounded JPEG of the last completed scene viewport (not the desktop or other windows).
   std::optional<ViewportPicture> capture_viewport(int max_side, std::string& error) const;
-  // Whether the editor is done: leaving was asked for, nothing unsaved stands in the way (there
-  // was nothing, or the user chose Save / Discard), and no build is still running (the editor
-  // waits for it, saying so).
+  // Whether the editor is done: leaving was asked for, and nothing unsaved stands in the way (there
+  // was nothing, or the user chose Save / Discard). Leaving waits for a build that runs, saying
+  // so, and only then asks about unsaved work; no build is ever left running.
   bool finished() const { return quit_confirmed_ && !building(); }
 
   EditorSession& session() { return *session_; }
@@ -133,13 +133,13 @@ class EditorApp {
   // What waits for the user's answer about the unsaved edits, if anything.
   const std::optional<PendingAction>& pending_action() const { return pending_; }
   void frame_selection();
-  // Asks to leave (after the unsaved-changes dialog when needed).
+  // Asks to leave (after the unsaved-changes dialog when needed, and once a running build ended).
   void request_exit(EditorExit action);
   // Starts making a standalone game in a folder next to the game ("<game>-build", or
   // "<game>-build-windows" for another system), in one of the ways the editor was opened with, on a
   // thread of its own: the editor keeps drawing, shows how the build goes and then how it ended.
-  // The scene is saved first, and the build works from the files on disk. False, with why in the
-  // console, while another build runs.
+  // The scene and the scripts are saved first, and the build works from the files on disk. False,
+  // with why in the console, while another build runs or when the game cannot be saved.
   bool start_build(const BuildChoice& choice);
   // The same, waiting for the build to end (for tools and tests). Returns the folder it filled.
   std::optional<std::filesystem::path> build(const BuildChoice& choice);
@@ -249,8 +249,13 @@ class EditorApp {
   void draw_build_progress();
   void draw_build_result(const BuildOutcome& outcome);
   void draw_build_result_actions(const BuildOutcome& outcome);
-  // Leaving was confirmed, and waits for the build to end.
-  bool waiting_for_build() const { return quit_confirmed_ && building(); }
+  // Like an IDE's "save all" before a build. False, with why in the console, when something stays
+  // unsaved.
+  bool saved_for_build();
+  // Leaving was asked for while a build ran: it is asked again once the build ended.
+  void leave_if_asked();
+  // Leaving was asked for, and waits for the build to end.
+  bool waiting_for_build() const { return leave_after_build_ && building(); }
   void draw_build_wait_dialog();
   bool build_wait_dialog_wanted() const;
   void draw_toolbar();
@@ -371,6 +376,7 @@ class EditorApp {
   // job holds, and the files on disk, so it may go at any point.)
   BuildJob build_job_;
   std::optional<BuildOutcome> last_build_;  // shown until closed
+  bool leave_after_build_ = false;          // leaving was asked for while a build ran
   float frame_seconds_ = 0.0f;              // what the clock said of the frame being drawn
   std::unique_ptr<SceneViewport> viewport_;
   std::unique_ptr<GameView> game_view_;  // who shows the running game, while one runs

@@ -26,5 +26,9 @@ inline constexpr const char* kMainSceneName = "main";  // the game's scene.glb
 // scripts/<scene>_scene.rb sets a scene up from Ruby when it loads (see ruby/engine/scene_script.rb).
 inline constexpr const char* kSceneScriptSuffix = "_scene";
 inline constexpr const char* kRubyFileExtension = ".rb";
+// What the editor names a file while it writes it, before the file takes its own name: a scene it
+// saves, and a file it writes for a coding agent. A file named so is never part of a game.
+inline constexpr const char* kSceneWritingSuffix = ".tmp";
+inline constexpr const char* kAgentWritingSuffix = ".redgem-writing";
 
 }  // namespace redgem::config
