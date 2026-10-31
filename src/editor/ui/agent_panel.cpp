@@ -20,10 +20,9 @@ namespace {
 using agent::AgentState;
 using agent::EntryKind;
 
-constexpr int kInputLines = 3;           // how tall the prompt box is, in lines of text
-constexpr float kPickerWidth = 150.0f;   // pixels
-constexpr float kScrollToBottom = 1.0f;  // SetScrollHereY: the last line at the bottom
-constexpr float kEntryGap = 6.0f;        // pixels between entries
+constexpr int kInputLines = 3;          // how tall the prompt box is, in lines of text
+constexpr float kPickerWidth = 150.0f;  // pixels
+constexpr float kEntryGap = 6.0f;       // pixels between entries
 constexpr const char* kWhitespace = " \t\r\n";
 constexpr float kBothSides = 2.0f;       // padding counted above and below
 constexpr float kRowsUnderInput = 2.0f;  // the attachments' row and the buttons' row
@@ -93,9 +92,9 @@ void draw_no_session() {
   ImGui::PopStyleColor();
 }
 
-// The transcript shows its end (give or take a line): it stays there while more comes, and stays
-// where the user scrolled to otherwise.
-bool scrolled_to_bottom() { return ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - ImGui::GetTextLineHeight(); }
+// The transcript showed its end when this frame began (before anything new is drawn): it stays there
+// while more comes, and stays where the user scrolled to otherwise, however close to the end.
+bool scrolled_to_bottom() { return ImGui::GetScrollY() >= ImGui::GetScrollMaxY(); }
 
 }  // namespace
 
@@ -254,7 +253,9 @@ void AgentPanel::draw_transcript() {
   }
   // (Every frame, not only when an entry came: an answer keeps growing after it came, as its markdown
   // is read again and the heights of entries out of sight are measured.)
-  if (at_bottom) ImGui::SetScrollHereY(kScrollToBottom);
+  // (Scrolled to where the content ends now, which ImGui keeps within the end once it knows how tall
+  // the transcript is: the next frame begins at the very end.)
+  if (at_bottom) ImGui::SetScrollY(ImGui::GetCursorPosY());
   ImGui::EndChild();
 }
 

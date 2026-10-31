@@ -4,6 +4,7 @@
 #include <doctest/doctest.h>
 
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -75,6 +76,7 @@ std::string file_text(const std::filesystem::path& file) {
   return text.str();
 }
 
+constexpr float kPartOfALine = 0.5f;
 constexpr int kStreamedPieces = 120;  // pieces of an answer, a frame each: far more than the panel shows
 constexpr int kClickFrames = 3;
 constexpr const char* kPromptId = "##prompt";
@@ -135,7 +137,13 @@ TEST_CASE("the transcript follows an answer as it grows, and Play an agent press
   const ImGuiWindow* transcript = transcript_window();
   REQUIRE(transcript != nullptr);
   CHECK(transcript->ScrollMax.y > 0.0f);
-  CHECK(transcript->Scroll.y >= transcript->ScrollMax.y - ImGui::GetTextLineHeight());
+  CHECK(transcript->Scroll.y >= transcript->ScrollMax.y);
+  // Scrolled up by less than a line, the view stays there: it follows only from the very end.
+  // (ImGui keeps scroll positions in whole pixels.)
+  const float a_little_up = std::floor(transcript->ScrollMax.y - ImGui::GetTextLineHeight() * kPartOfALine);
+  ImGui::SetScrollY(transcript_window(), a_little_up);
+  run(app, kPictureFrames);
+  CHECK(transcript_window()->Scroll.y == doctest::Approx(a_little_up));
 
   click_into_prompt(app);
   REQUIRE(ImGui::GetActiveID() == prompt_box());

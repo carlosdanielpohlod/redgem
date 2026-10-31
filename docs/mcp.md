@@ -142,7 +142,8 @@ The `editor` tool takes these actions:
 | `capture` | Return the last completed viewport as an MCP PNG image, without writing a file. |
 
 `capture` accepts `max_size` (default 512, range 128–1024), the longest output side. Images are
-reduced further when necessary to stay below 128 KiB before base64 encoding. Only the scene
+reduced further when necessary for the reply, with the PNG as base64 text, to stay within the
+bridge's 256 KiB limit (about 188 KiB of PNG). Only the scene
 viewport is captured, never the desktop or other applications. `object` is accepted only by
 `select` and `frame`; `max_size` only by `capture`. Read-only mode permits `status` and `capture` only.
 
