@@ -27,7 +27,7 @@ fs::path game_folder() {
   return folder;
 }
 
-ClientSetup setup_in(const fs::path& folder) { return {folder, {{"redgem", "redgem", {"mcp"}, {}}}, "test"}; }
+ClientSetup setup_in(const fs::path& folder) { return {folder, {{"redgem", "redgem", {"mcp"}, {}}}, "test", {}}; }
 
 ProgramCall fake_agent(std::vector<EnvironmentVariable> environment = {}) {
   return {REDGEM_FAKE_AGENT_FILE, {}, std::move(environment)};
