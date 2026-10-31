@@ -19,6 +19,10 @@ until 1.0, a release may change what games rely on (see
   reads and writes files for it only there. It also gets the editor's live MCP tools, so it can
   list and move objects, play, read errors and look at the viewport.
 
+- **Ruby colors in the script tabs**: keywords, strings and their `#{}` interpolations, symbols,
+  comments, numbers, constants and instance variables are colored while typing, heredocs,
+  `%w[]`, regexes and `=begin` blocks included.
+
 - **Prefab file loading**: reusable GLB references with nested instances, root property overrides,
   persistent descendant identities and shared geometry, available at runtime and in editor Play.
 

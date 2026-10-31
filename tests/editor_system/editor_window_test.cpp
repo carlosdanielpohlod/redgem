@@ -29,6 +29,7 @@
 #include "editor/editor_config.hpp"
 #include "editor/object_clipboard.hpp"
 #include "editor/scripts/script_files.hpp"
+#include "editor/ui/code_colors.hpp"
 #include "editor/ui/panels.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "editor/ui/labels.hpp"
@@ -118,6 +119,30 @@ ImVec2 unsaved_choice_point(UnsavedChoice choice) {
 }
 
 void choose(EditorApp& app, UnsavedChoice choice) { click_at(app, unsaved_choice_point(choice)); }
+
+// A regex, which the script had none of (in a block never called: the game Ruby has no Regexp).
+constexpr const char* kTypedCode = "MATCHER = -> { /spin/i }";
+constexpr const char* kCodeBoxId = "##code";  // the script tab's text box (its child window's name has it)
+
+// The text box of a file's script tab: the child window it draws its code in.
+const ImGuiWindow* code_box_of(const std::string& file) {
+  const ImGuiWindow* tab = ImGui::FindWindowByName(ui::script_window_name(file).c_str());
+  REQUIRE(tab != nullptr);
+  for (const ImGuiWindow* child : tab->DC.ChildWindows) {
+    if (std::string(child->Name).find(kCodeBoxId) != std::string::npos) return child;
+  }
+  FAIL("the script tab has no text box");
+  return nullptr;
+}
+
+// Whether the script tab of a file drew some of its code in a color.
+bool code_drawn_in(const std::string& file, const ImVec4& color) {
+  const ImU32 wanted = ImGui::GetColorU32(color);
+  for (const ImDrawVert& vertex : code_box_of(file)->DrawList->VtxBuffer) {
+    if (vertex.col == wanted) return true;
+  }
+  return false;
+}
 
 int node_count_of(const std::filesystem::path& file) {
   const LoadResult loaded = load_gltf_scene(file.string());
@@ -221,9 +246,12 @@ TEST_CASE("a new Ruby script is written in the Script panel and runs on Play") {
   ScriptEditor* editor = app.scripts().open(*file, error);
   REQUIRE(editor != nullptr);
   editor->text() =
+      "# Turns the tree it is attached to.\n"
       "class SpinTree < Behaviour\n"
       "  DEGREES_PER_SECOND = 90.0\n"
       "  def update(dt)\n"
+      "    @label = \"#{DEGREES_PER_SECOND} degrees a second\"\n"
+      "    @axis = :y\n"
       "    transform.rotate(Vector3.new(0, DEGREES_PER_SECOND * dt, 0))\n"
       "  end\n"
       "end\n";
@@ -232,6 +260,21 @@ TEST_CASE("a new Ruby script is written in the Script panel and runs on Play") {
   session.refresh_preview();
   run(app, kFrameFrames);
   take_picture(app, screenshot("editor_script_panel"));
+  for (const RubyTokenKind kind :
+       {RubyTokenKind::Keyword, RubyTokenKind::String, RubyTokenKind::Interpolation, RubyTokenKind::Comment,
+        RubyTokenKind::Symbol, RubyTokenKind::Number, RubyTokenKind::Constant, RubyTokenKind::Variable}) {
+    INFO("token kind ", static_cast<int>(kind));
+    CHECK(code_drawn_in(*file, ui::code_color(kind)));
+  }
+
+  // Typed into the tab (a click in it puts the cursor after the last line), new code is colored too.
+  const ImGuiWindow* box = code_box_of(*file);
+  click_at(app, ImVec2(box->Pos.x + box->Size.x * kHalf, box->Pos.y + box->Size.y * kHalf));
+  ImGui::GetIO().AddInputCharactersUTF8(kTypedCode);
+  run(app, kFrameFrames);
+  CHECK(editor->text().find(kTypedCode) != std::string::npos);
+  take_picture(app, screenshot("editor_script_typed"));
+  CHECK(code_drawn_in(*file, ui::code_color(RubyTokenKind::Regex)));
 
   app.play();  // saves the open script first
   CHECK_FALSE(editor->modified());

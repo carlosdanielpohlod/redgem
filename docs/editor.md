@@ -46,7 +46,9 @@ icons):
   files.
 * **Console**: engine and Ruby output (filter by level), including script errors with backtraces.
 * **Scripts**: each open Ruby file gets its own tab next to the Scene. Drag tabs to split the view
-  anywhere (or press *Split right*), like a code editor's editor groups. Ctrl+S saves and checks
+  anywhere (or press *Split right*), like a code editor's editor groups. The code is colored as
+  you type: keywords, strings, symbols, comments, numbers, constants and `@variables` each have a
+  color of the editor's theme. Ctrl+S saves and checks
   the syntax (errors show the line); *Open externally* uses your default editor. Play saves all
   open scripts and reloads them.
 * **Agent**: a chat with a coding agent (Claude Code, Codex or one of your own), in a tab beside
