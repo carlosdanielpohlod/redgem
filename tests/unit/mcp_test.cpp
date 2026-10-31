@@ -215,3 +215,17 @@ TEST_CASE("MCP tool failures are results and long UTF-8 output is bounded") {
   CHECK_FALSE(contains(bounded, "é"));
   CHECK(bounded.dump().size() < 8400);
 }
+
+TEST_CASE("scene_edit tells an agent the words its assignments take, the color of one object among them") {
+  for (const std::string connection : {"", "live"}) {
+    Options options;
+    options.editor_connection = connection;
+    for (const Json& tool : catalog(options)) {
+      if (tool["name"] != "scene_edit") continue;
+      const std::string description = tool["description"];
+      CHECK(description.find("tint=#rrggbb") != std::string::npos);
+      CHECK(description.find("position=") != std::string::npos);
+      CHECK(description.find("script+=") != std::string::npos);
+    }
+  }
+}

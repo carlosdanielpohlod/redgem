@@ -193,3 +193,11 @@ TEST_CASE("the settings' fields: arguments a line each, variables as NAME=value"
   CHECK(environment[1].name == "B");
   CHECK(environment[1].value == "x=y");
 }
+
+TEST_CASE("an agent whose command names a file that is not there is told so, not sent to PATH") {
+  std::string error;
+  CHECK_FALSE(
+      launch_call(AgentProfile{"Mine", "/opt/nowhere/agent", {}, {}, kClaudePackage}, installed({"npx"}), error));
+  CHECK(error.find("/opt/nowhere/agent") != std::string::npos);
+  CHECK(error.find("PATH") == std::string::npos);
+}

@@ -12,7 +12,9 @@ namespace {
 constexpr std::size_t kMaxImageBytes = 128 * 1024;
 constexpr int kSmallestCapture = 128;
 constexpr int kLargestCapture = 1024;
-constexpr int kShrinkFactor = 2;
+// A picture too big is made smaller by a quarter at a time: as large as fits, not half of it.
+constexpr int kShrinkNumerator = 3;
+constexpr int kShrinkDenominator = 4;
 constexpr const char* kCaptureFormat = ".png";
 
 struct HeldImage {
@@ -36,7 +38,7 @@ std::vector<std::uint8_t> png(const Image& image) {
 EditorApp::ViewportPicture encode(Image& image) {
   auto bytes = png(image);
   while (bytes.size() > kMaxImageBytes && std::max(image.width, image.height) > kSmallestCapture) {
-    fit(image, std::max(kSmallestCapture, std::max(image.width, image.height) / kShrinkFactor));
+    fit(image, std::max(kSmallestCapture, std::max(image.width, image.height) * kShrinkNumerator / kShrinkDenominator));
     bytes = png(image);
   }
   if (bytes.size() > kMaxImageBytes) return {};
@@ -54,6 +56,7 @@ std::optional<EditorApp::ViewportPicture> EditorApp::capture_viewport(int max_si
   HeldImage picture{LoadImageFromTexture(viewport_->target.texture)};
   if (!picture.image.data) return failed_picture(error, "viewport is not ready");
   ImageFlipVertical(&picture.image);
+  ImageFormat(&picture.image, PIXELFORMAT_UNCOMPRESSED_R8G8B8);  // (the viewport has no transparency to keep)
   fit(picture.image, max_side);
   auto result = encode(picture.image);
   if (result.bytes.empty()) return failed_picture(error, "could not encode the viewport");
