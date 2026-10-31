@@ -15,35 +15,12 @@ ship a standalone game.
   <sub>The editor. Scene: <a href="https://polyhaven.com/a/treasure_chest">Treasure Chest</a> by Rico Cilliers, the coast scan and the sky from <a href="https://polyhaven.com">Poly Haven</a> (CC0).</sub>
 </p>
 
-## New in 0.5.0: an AI agent inside the editor
-
-The **Agent panel** brings a coding agent into the editor: Claude Code and Codex come as presets
-(over the Agent Client Protocol), or add your own. Ask it to change the game, and watch the
-answer stream in with its tool calls, diffs, plan and permission questions. The agent works in
-the game's folder and gets the editor's live MCP tools: it lists and moves objects, presses Play,
-reads errors and looks at the viewport. Each game keeps its past conversations. See
-[the Agent panel](docs/assistants.md#the-agent-panel).
-
-The same MCP tools work from any MCP client, with or without an open editor:
-
-```sh
-redgem /path/to/game --editor-bridge
-# Uses the open editor when there is one, the files otherwise:
-redgem mcp /path/to/game --editor auto
-# File inspection without an editor:
-redgem mcp /path/to/game --read-only
-```
-
-Also new: Ruby colors in the code tabs, builds in the background with their progress, and camera
-helpers (`Camera.follow`, `orbit`, `shake`, `world_to_screen`). See [MCP tools and
-permissions](docs/mcp.md) and the [changelog](CHANGELOG.md).
-
 > **Experimental.** RedGem is a young engine: expect rough edges, and see the
 > [known limitations](KNOWN_LIMITATIONS.md). It is not written from zero: it puts together
 > open source projects such as Blender, Jolt Physics, raylib and mruby ([Built with](#built-with)).
 
 <p align="center">
-  <a href="https://carlosdanielpohlod.github.io/redgem-site/#demo"><img src="https://carlosdanielpohlod.github.io/redgem-site/assets/poster-0.3.jpg" alt="Watch the RedGem demo video" width="720"></a><br>
+  <a href="https://carlosdanielpohlod.github.io/redgem-site/#demo"><img src="https://carlosdanielpohlod.github.io/redgem-site/assets/poster-0.5.jpg" alt="Watch the RedGem demo video" width="720"></a><br>
   <a href="https://carlosdanielpohlod.github.io/redgem-site/#demo">Watch the demo</a> ·
   <a href="https://carlosdanielpohlod.github.io/redgem-site/">Site</a> ·
   <a href="https://carlosdanielpohlod.github.io/redgem-site/manual/">Manual</a>
@@ -52,25 +29,10 @@ permissions](docs/mcp.md) and the [changelog](CHANGELOG.md).
 <details>
 <summary>Assets in the demo video</summary>
 
-Models from Sketchfab under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/):
-[Samurai](https://sketchfab.com/3d-models/150603038ee6476a9a4b173c682ff8d5) by fletcherkinnear ·
-[Viking](https://sketchfab.com/3d-models/79321179bafb4d558f0cd6a4a014ba9a) by Andy Woodhead ·
-[Leopard 2 A6](https://sketchfab.com/3d-models/7cb23d5322df4b409a880de635826067) by buh ·
-[Katana](https://sketchfab.com/3d-models/bee6931856084cd4886b2901226bca6a) by Joan LP ·
-[Viking battle axe](https://sketchfab.com/3d-models/b7123192adbf40f68043c57dd8ddcd15) by Mikhail Antonov ·
-[Coniferous Forest Assets Pack](https://sketchfab.com/3d-models/240ce9cf0ad3474f809a59f9446e63cd) by Dari ·
-[Grass claster](https://sketchfab.com/3d-models/832eb6c9c5b24790b1ca24ad7dfdcdba) by VRA ·
-[Residences of Rothenburg ob der Tauber](https://sketchfab.com/3d-models/af81933914b14dcbbb39bd8a0bbafaaf) by shotkey ·
-[BMW E30](https://sketchfab.com/3d-models/9dea494b447e442fafbddfc7eccbf158) and
-[Cadillac 75](https://sketchfab.com/3d-models/2935f8faa5f64ce4a3bd65af0f925c21) by ROH3D ·
-[Linden tree](https://sketchfab.com/3d-models/c0c3aa73cc9945d2a36c01a0d8d6d4bb) by Georgeous ·
-[Vintage lamp post](https://sketchfab.com/3d-models/56f6dcb3865144cd84e049ca6a736fae) by dasmodal ·
-[Street Bench](https://sketchfab.com/3d-models/1ddafec2fda5430697aaf403b3deba96) by donnichols.
-
-Characters' animations from [Mixamo](https://www.mixamo.com); sky, plants and textures from
-[Poly Haven](https://polyhaven.com) (CC0); particles from
-[Kenney](https://kenney.nl/assets/particle-pack) (CC0). City: [Poly Haven](https://polyhaven.com) and
-[ambientCG](https://ambientcg.com) (CC0), car and people from [BlenderKit](https://www.blenderkit.com).
+[Treasure Chest](https://polyhaven.com/a/treasure_chest) by Rico Cilliers,
+[Coast Rocks 01](https://polyhaven.com/a/coast_rocks_01) by Rico Cilliers and Rob Tuytel and the
+[Ballito Rocky Beach](https://polyhaven.com/a/ballito_rocky_beach) sky, all from
+[Poly Haven](https://polyhaven.com) (CC0).
 
 </details>
 
@@ -95,18 +57,23 @@ end
 
 - **Ruby scripting**: behaviours with `start`, `update`, triggers, collisions, timers and tweens;
   scenes set up in Ruby; classes load on first use, no `require`.
-- **Gameplay kit**: keyboard, mouse and gamepad input, menus and HUD, sounds and music, particles,
-  per-character animation with blending, saved progress.
+- **Gameplay kit**: keyboard, mouse and gamepad input, menus and HUD, particles, camera follow,
+  orbit and shake, per-character animation with blending, saved progress.
 - **Multiplayer**: games found by themselves on the local network, rooms by code over the
   internet through a relay that ships with the engine, named messages, objects kept in sync.
 - **Editor**: scene view with gizmos, hierarchy, inspector, Ruby code tabs with syntax colors,
   play mode, undo, sculptable terrain, and one-click builds of the game for Linux, Windows and
   Android (and, on a Mac, for the Mac), made in the background.
-- **AI agents**: the Agent panel chats with Claude Code or Codex inside the editor, and
-  `redgem mcp` gives any MCP client the scene, headless runs, errors and the live editor.
+- **LLM support through MCP**: an Agent panel in the editor chats with Claude Code, Codex or your
+  own agent, which edits the open scene, writes scripts, presses Play and reads errors through
+  the editor's MCP tools. `redgem mcp` gives any MCP client the same tools, with or without an
+  open editor ([the Agent panel](docs/assistants.md#the-agent-panel), [MCP tools](docs/mcp.md)).
 - **Blender as the modeling tool**: scenes are glTF files; custom properties carry gameplay data.
-- **Rendering**: PBR materials, sun shadows, reflections, ambient occlusion, bloom, fog,
-  skeletal animation.
+- **Advanced graphics**: physically based materials, HDR with filmic tone mapping, sun shadows,
+  reflections, ambient occlusion, bloom, fog, temporal anti-aliasing, water with refraction and
+  shore foam, scattered vegetation, particles that cast shadows, skeletal animation.
+- **Advanced audio**: sounds and music with volume and pitch, 3D positional sound panned and
+  fading with distance from the listener, music pitch for engine notes and speed.
 - **Physics**: rigid bodies, character controllers, vehicles, triggers, raycasts.
 - **Tests**: games are tested by scripts that play them frame by frame, run by a tool of their
   own (`redgem-test`): the game your players get has no test code in it, and no editor either.
