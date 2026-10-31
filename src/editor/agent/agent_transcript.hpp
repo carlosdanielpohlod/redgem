@@ -18,12 +18,11 @@ namespace redgem::agent {
 enum class ToolStatus { Pending, InProgress, Completed, Failed };
 enum class PlanStatus { Pending, InProgress, Completed };
 
-// A change a tool made (or wants to make) to a file: its text before (none for a new file) and after.
+// A change a tool made (or wants to make) to a file, as the lines it shows: worked out once when
+// it came, and kept without the file's whole text before and after.
 struct FileChange {
   std::string path;
-  std::optional<std::string> old_text;
-  std::string new_text;
-  std::vector<DiffLine> lines;  // the change as lines, worked out once when it came
+  std::vector<DiffLine> lines;
 };
 
 // One piece of what a tool call shows: text it produced, or a change to a file.
@@ -58,7 +57,8 @@ struct PlanItem {
   PlanStatus status = PlanStatus::Pending;
 };
 
-enum class PermissionKind { AllowOnce, AllowAlways, RejectOnce, RejectAlways };
+// Other: a kind this editor does not know, shown as neither allowing nor rejecting.
+enum class PermissionKind { AllowOnce, AllowAlways, RejectOnce, RejectAlways, Other };
 struct PermissionOption {
   std::string id;
   std::string name;
@@ -99,6 +99,7 @@ enum class EntryKind { User, Agent, Thought, Tool, Plan, Permission, Notice, Err
 
 // One entry of the conversation: the fields its kind uses are set.
 struct Entry {
+  std::size_t number = 0;  // its place in the conversation (see Transcript)
   EntryKind kind = EntryKind::Notice;
   std::string text;              // User, Agent, Thought, Notice, Error
   ToolCall tool;                 // Tool
@@ -106,9 +107,16 @@ struct Entry {
   PermissionRequest permission;  // Permission
 };
 
+// The most entries a conversation keeps: the oldest go first (a question still waiting stays).
+inline constexpr std::size_t kMaxEntries = 400;
+
+// Entries are numbered as they come (Entry::number): a number stays its entry's own when older
+// entries are let go, and is never given twice.
 class Transcript {
  public:
   const std::vector<Entry>& entries() const { return entries_; }
+  // The number the next entry gets.
+  std::size_t end_number() const { return next_; }
   // Goes up with every change: whoever shows it knows when to look again.
   std::uint64_t revision() const { return revision_; }
 
@@ -121,19 +129,23 @@ class Transcript {
   void update_tool(const ToolCallPatch& patch);
   // The agent's whole plan as it is now: it replaces the one shown last.
   void set_plan(const std::vector<PlanItem>& plan);
-  // A question of the agent's; its index in entries().
+  // A question of the agent's; its entry's number.
   std::size_t ask(const PermissionRequest& request);
-  // The question at `index` (nullptr when that entry is none).
-  PermissionRequest* permission(std::size_t index);
+  // The question numbered `number` (nullptr when that entry is none, or was let go).
+  PermissionRequest* permission(std::size_t number);
   // Every question still waiting, to give up when the turn stops.
   std::vector<std::size_t> waiting_permissions() const;
   void clear();
 
  private:
   Entry* find_tool(const std::string& id);
+  Entry* numbered(std::size_t number);
+  void push(Entry entry);
+  void let_go_of_one();
   void changed() { ++revision_; }
 
   std::vector<Entry> entries_;
+  std::size_t next_ = 0;
   std::uint64_t revision_ = 0;
 };
 

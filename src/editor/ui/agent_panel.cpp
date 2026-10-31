@@ -1,6 +1,7 @@
 #include "editor/ui/agent_panel.hpp"
 
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <misc/cpp/imgui_stdlib.h>
 
 #include <algorithm>
@@ -29,6 +30,9 @@ constexpr float kRowsUnderInput = 2.0f;  // the attachments' row and the buttons
 // While an answer streams in, its markdown is read again at most this often (seconds): reading a
 // long answer again for every piece would cost the frame more and more.
 constexpr double kReparseEvery = 0.1;
+constexpr float kNotMeasured = 0.0f;
+constexpr const char* kPromptId = "##prompt";
+constexpr char kLineEnd = '\n';  // the height of an entry never drawn yet
 
 bool blank(const std::string& text) { return text.find_first_not_of(kWhitespace) == std::string::npos; }
 
@@ -75,6 +79,11 @@ void draw_hint(const char* hint) {
                                       ImGui::GetColorU32(palette::kTextDisabled), hint);
 }
 
+// An entry drawn before, `height` tall, that would not show where it stands.
+bool out_of_sight(float height) {
+  return height > kNotMeasured && !ImGui::IsRectVisible(ImVec2(ImGui::GetContentRegionAvail().x, height));
+}
+
 }  // namespace
 
 AgentPanel::AgentPanel(AgentPanelSetup setup)
@@ -110,6 +119,7 @@ void AgentPanel::end_session() {
   start_error_.clear();
   queued_.clear();
   parsed_.clear();
+  heights_.clear();
 }
 
 bool AgentPanel::send(const std::string& text) {
@@ -148,10 +158,20 @@ void AgentPanel::poll() {
   queued_.clear();
 }
 
-// A prompt the session failed before taking goes back into the box, to send again.
+// A prompt the session failed before taking goes back into the box, to send again (once the box is
+// drawn: see take_back_returned).
 void AgentPanel::give_back_queued() {
-  if (input_.empty()) input_ = queued_;
+  returned_ = std::move(queued_);
   queued_.clear();
+}
+
+// The box is let go of first when it is being typed in: ImGui would put back what it holds over
+// what is written into input_ meanwhile.
+void AgentPanel::take_back_returned() {
+  if (returned_.empty()) return;
+  if (ImGui::GetActiveID() == ImGui::GetID(kPromptId)) ImGui::ClearActiveID();
+  input_ = input_.empty() ? returned_ : returned_ + kLineEnd + input_;
+  returned_.clear();
 }
 
 void AgentPanel::draw() {
@@ -241,27 +261,57 @@ void AgentPanel::draw_entries(agent::AgentClient& client) {
   // session stays closed in this one.)
   ImGui::PushID(connection_.get());
   const auto& entries = client.transcript().entries();
+  if (!entries.empty()) forget_before(entries.front().number);
+  forget_heights_if_resized();
   for (std::size_t index = 0; index < entries.size(); ++index) {
-    ImGui::PushID(static_cast<int>(index));
-    draw_entry(client, index);
+    ImGui::PushID(static_cast<int>(entries[index].number));
+    draw_or_pass(client, index);
     ImGui::PopID();
-    ImGui::Dummy(ImVec2(0.0f, kEntryGap));
   }
   if (client.busy()) agent_view::draw_working();
   ImGui::PopID();
+}
+
+// An entry out of sight takes its room alone (as tall as it was last drawn), so that a long
+// conversation costs a frame what shows of it.
+void AgentPanel::draw_or_pass(agent::AgentClient& client, std::size_t index) {
+  const std::size_t number = client.transcript().entries()[index].number;
+  const auto known = heights_.find(number);
+  const float height = known == heights_.end() ? kNotMeasured : known->second;
+  if (out_of_sight(height)) {
+    ImGui::Dummy(ImVec2(0.0f, height - ImGui::GetStyle().ItemSpacing.y));
+    return;
+  }
+  const float top = ImGui::GetCursorPosY();
+  draw_entry(client, index);
+  ImGui::Dummy(ImVec2(0.0f, kEntryGap));
+  heights_[number] = ImGui::GetCursorPosY() - top;
+}
+
+// What was kept of entries the conversation let go.
+void AgentPanel::forget_before(std::size_t first) {
+  parsed_.erase(parsed_.begin(), parsed_.lower_bound(first));
+  heights_.erase(heights_.begin(), heights_.lower_bound(first));
+}
+
+// Text wraps anew at another width: the heights measured at the last one are no use.
+void AgentPanel::forget_heights_if_resized() {
+  const float width = ImGui::GetContentRegionAvail().x;
+  if (width != measured_width_) heights_.clear();
+  measured_width_ = width;
 }
 
 void AgentPanel::draw_entry(agent::AgentClient& client, std::size_t index) {
   const agent::Entry& entry = client.transcript().entries()[index];
   switch (entry.kind) {
     case EntryKind::Agent:
-      return agent_view::draw_markdown(markdown(index, entry.text));
+      return agent_view::draw_markdown(markdown(entry.number, entry.text));
     case EntryKind::Tool:
       return agent_view::draw_tool(entry.tool);
     case EntryKind::Plan:
       return agent_view::draw_plan(entry.plan);
     case EntryKind::Permission:
-      return answer(client, index, agent_view::draw_permission(entry.permission));
+      return answer(client, entry.number, agent_view::draw_permission(entry.permission));
     default:
       return draw_text_entry(entry);
   }
@@ -306,10 +356,11 @@ void AgentPanel::draw_attachments() {
 }
 
 void AgentPanel::draw_input() {
+  take_back_returned();
   if (std::exchange(focus_input_, false)) ImGui::SetKeyboardFocusHere();
   const float height = input_height();
   const ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CtrlEnterForNewLine;
-  const bool entered = ImGui::InputTextMultiline("##prompt", &input_, ImVec2(-1.0f, height), flags);
+  const bool entered = ImGui::InputTextMultiline(kPromptId, &input_, ImVec2(-1.0f, height), flags);
   if (shows_hint()) draw_hint(tr("editor.agent.input_hint"));
   if (!entered) return;
   send_input();

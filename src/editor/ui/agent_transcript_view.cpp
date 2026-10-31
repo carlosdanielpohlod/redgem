@@ -126,7 +126,17 @@ void draw_tool_details(const ToolCall& call) {
 
 bool allows(PermissionKind kind) { return kind == PermissionKind::AllowOnce || kind == PermissionKind::AllowAlways; }
 
-const char* option_icon(PermissionKind kind) { return allows(kind) ? ICON_FA_CHECK : ICON_FA_XMARK; }
+bool rejects(PermissionKind kind) { return kind == PermissionKind::RejectOnce || kind == PermissionKind::RejectAlways; }
+
+ImVec4 answer_color(PermissionKind kind) {
+  if (allows(kind)) return palette::kSuccess;
+  return rejects(kind) ? palette::kError : palette::kMuted;
+}
+
+const char* option_icon(PermissionKind kind) {
+  if (allows(kind)) return ICON_FA_CHECK;
+  return rejects(kind) ? ICON_FA_XMARK : ICON_FA_CIRCLE_QUESTION;
+}
 
 bool option_button(const agent::PermissionOption& option) {
   const std::string label = std::string(option_icon(option.kind)) + " " + option.name + "##" + option.id;
@@ -139,8 +149,19 @@ bool option_button(const agent::PermissionOption& option) {
 void draw_answer(const PermissionRequest& request) {
   const agent::PermissionOption* chosen = request.chosen();
   if (chosen == nullptr) return ImGui::TextColored(palette::kMuted, "%s", tr("editor.agent.question_cancelled"));
-  const ImVec4 color = allows(chosen->kind) ? palette::kSuccess : palette::kError;
+  const ImVec4 color = answer_color(chosen->kind);
   ImGui::TextColored(color, "%s", tr("editor.agent.question_answered", {{"option", chosen->name}}).c_str());
+}
+
+// What the tool would be run with and the files it would touch, under the question: what is allowed
+// is seen, not only the title the agent gave it.
+void draw_what_it_runs(const agent::ToolCallPatch& tool) {
+  ImGui::Indent(kDetailIndent);
+  if (tool.input) code_text(palette::kMuted, *tool.input);
+  for (const std::string& location : tool.locations.value_or(std::vector<std::string>{})) {
+    ImGui::TextColored(palette::kMuted, "%s %s", ICON_FA_FILE_LINES, location.c_str());
+  }
+  ImGui::Unindent(kDetailIndent);
 }
 
 // A button per option, on one row; the id of the one clicked.
@@ -206,6 +227,7 @@ std::optional<std::string> draw_permission(const PermissionRequest& request) {
   ImGui::TextColored(palette::kWarning, "%s", ICON_FA_SHIELD_HALVED);
   ImGui::SameLine();
   wrapped(palette::kText, tr("editor.agent.question", {{"tool", title}}));
+  draw_what_it_runs(request.tool());
   if (!request.waiting()) {
     draw_answer(request);
     return std::nullopt;

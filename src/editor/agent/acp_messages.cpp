@@ -31,9 +31,7 @@ std::string block_text(const Json& block) {
 FileChange change_of(const Json& diff) {
   FileChange change;
   change.path = field_text(diff, "path");
-  change.new_text = field_text(diff, "newText");
-  if (diff.contains("oldText") && diff["oldText"].is_string()) change.old_text = diff["oldText"].get<std::string>();
-  change.lines = diff_lines(change.old_text.value_or(""), change.new_text);
+  change.lines = diff_lines(field_text(diff, "oldText"), field_text(diff, "newText"));
   return change;
 }
 
@@ -106,10 +104,12 @@ ToolCall started_call(const Json& update) {
 }
 
 PermissionKind permission_kind_of(const std::string& value) {
-  if (value == "allow_always") return PermissionKind::AllowAlways;
-  if (value == "reject_once") return PermissionKind::RejectOnce;
-  if (value == "reject_always") return PermissionKind::RejectAlways;
-  return PermissionKind::AllowOnce;
+  static const std::map<std::string, PermissionKind> kKinds = {{"allow_once", PermissionKind::AllowOnce},
+                                                               {"allow_always", PermissionKind::AllowAlways},
+                                                               {"reject_once", PermissionKind::RejectOnce},
+                                                               {"reject_always", PermissionKind::RejectAlways}};
+  const auto found = kKinds.find(value);
+  return found == kKinds.end() ? PermissionKind::Other : found->second;
 }
 
 using UpdateHandler = bool (*)(Transcript&, const Json&);

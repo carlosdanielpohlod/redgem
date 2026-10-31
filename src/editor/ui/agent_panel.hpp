@@ -80,6 +80,7 @@ class AgentPanel {
 
  private:
   void give_back_queued();
+  void take_back_returned();
   bool pickable(std::size_t agent) const;
   bool wants_login() const;
   bool shows_hint() const;
@@ -92,6 +93,9 @@ class AgentPanel {
   void follow_new_entries(bool at_bottom);
   void draw_entries(agent::AgentClient& client);
   void draw_entry(agent::AgentClient& client, std::size_t index);
+  void draw_or_pass(agent::AgentClient& client, std::size_t index);
+  void forget_before(std::size_t first);
+  void forget_heights_if_resized();
   static void draw_text_entry(const agent::Entry& entry);
   static void answer(agent::AgentClient& client, std::size_t index, const std::optional<std::string>& option);
   void draw_composer();
@@ -113,12 +117,15 @@ class AgentPanel {
   std::unique_ptr<agent::AgentConnection> connection_;
   std::string start_error_;
   std::string input_;
-  std::string queued_;  // a prompt sent before the session was ready, sent once it is
-  std::string hint_;    // a word under the prompt box (nothing selected to attach)
+  std::string returned_;  // a queued prompt given back, put into the box when it is next drawn
+  std::string queued_;    // a prompt sent before the session was ready, sent once it is
+  std::string hint_;      // a word under the prompt box (nothing selected to attach)
   bool focus_input_ = false;
-  std::vector<std::string> attached_;  // context for the next prompt
-  std::uint64_t seen_revision_ = 0;    // the transcript's, as last drawn
-  std::map<std::size_t, ParsedText> parsed_;
+  std::vector<std::string> attached_;         // context for the next prompt
+  std::uint64_t seen_revision_ = 0;           // the transcript's, as last drawn
+  std::map<std::size_t, ParsedText> parsed_;  // by entry number
+  std::map<std::size_t, float> heights_;      // how tall each entry was last drawn, by number
+  float measured_width_ = 0.0f;               // the width those heights were measured at
   AgentSettings settings_;
   bool settings_open_ = false;
 };
