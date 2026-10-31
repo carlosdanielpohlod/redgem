@@ -150,6 +150,7 @@ add_executable(redgem_tests
   unit/agent_client_test.cpp
   unit/agent_files_test.cpp
   unit/markdown_blocks_test.cpp
+  unit/session_history_test.cpp
   integration/physics_world_test.cpp
   integration/physics_queries_test.cpp
   integration/physics_forces_test.cpp

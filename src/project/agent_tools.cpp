@@ -2,6 +2,7 @@
 
 #include "core/platform.hpp"
 #include "core/translations.hpp"
+#include "editor/agent/session_history.hpp"
 #include "editor/editor_app.hpp"
 #include "project/editor_bridge_run.hpp"
 #include "project/scene_text.hpp"
@@ -26,6 +27,8 @@ agent::McpServer live_server(EditorApp& editor, const tools::EditorBridge& bridg
 AgentHooks agent_hooks(std::unique_ptr<tools::EditorBridge>& bridge) {
   AgentHooks hooks;
   hooks.client_version = REDGEM_VERSION;
+  hooks.sessions_file = agent::sessions_file();
+  hooks.reopen_last_session = true;
   hooks.tool_servers = [&bridge](EditorApp& editor, std::string& error) -> std::vector<agent::McpServer> {
     if (!bridge) bridge = enable_editor_bridge(editor);
     if (bridge) return {live_server(editor, *bridge)};

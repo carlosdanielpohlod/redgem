@@ -32,6 +32,8 @@ struct ClientSetup {
   std::filesystem::path folder;  // the game's: the session's working folder, and the only files it reaches
   std::vector<McpServer> servers;
   std::string client_version;
+  // A past conversation to replay (session/load) instead of starting a new one; empty for a new one.
+  std::string load_session;
 };
 
 class AgentClient {
@@ -58,13 +60,18 @@ class AgentClient {
   // Whether the agent asked its user to log in (session/new answered "authentication required").
   bool needs_login() const { return needs_login_; }
   const AgentInfo& info() const { return info_; }
+  // The agent's id of the conversation (empty until it is open).
+  const std::string& session_id() const { return session_; }
   const Transcript& transcript() const { return transcript_; }
   Transcript& transcript() { return transcript_; }
   const Workspace& workspace() const { return workspace_; }
 
  private:
   // What a request sent waits for.
-  enum class Call { Initialize, NewSession, Prompt };
+  enum class Call { Initialize, NewSession, LoadSession, Prompt };
+  void open_session();
+  void start_anew(const std::string& why);
+  void on_loaded(const RpcMessage& message);
   void take(const Json& message);
   int request(Call call, const char* method, const Json& params);
   void on_response(const RpcMessage& message);

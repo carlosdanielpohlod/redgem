@@ -16,12 +16,14 @@ namespace {
 
 // A client whose messages are kept, in a game folder of its own.
 struct Conversation {
-  Conversation() : folder(fs::temp_directory_path() / "redgem_agent_client_test") {
+  explicit Conversation(const std::string& past_session = "")
+      : folder(fs::temp_directory_path() / "redgem_agent_client_test") {
     fs::remove_all(folder);
     fs::create_directories(folder / "scripts");
     std::ofstream(folder / "scripts" / "coin.rb", std::ios::binary) << "one\ntwo\nthree\n";
-    client = std::make_unique<AgentClient>(ClientSetup{folder, {{"redgem", "redgem", {"mcp"}, {}}}, "0.4.1"},
-                                           [this](const Json& message) { sent.push_back(message); });
+    client =
+        std::make_unique<AgentClient>(ClientSetup{folder, {{"redgem", "redgem", {"mcp"}, {}}}, "0.4.1", past_session},
+                                      [this](const Json& message) { sent.push_back(message); });
   }
   ~Conversation() { fs::remove_all(folder); }
   Conversation(const Conversation&) = delete;
@@ -235,4 +237,89 @@ TEST_CASE("a turn that ends with a question still open answers it cancelled") {
   talk.client->receive(rpc_request(kAgentsRequest, "session/request_permission", permission_params()));
   talk.client->receive(rpc_result(turn, {{"stopReason", "end_turn"}}));
   CHECK(talk.last() == rpc_result(kAgentsRequest, {{"outcome", {{"outcome", "cancelled"}}}}));
+}
+
+namespace {
+
+Json can_load(bool loads) { return {{"protocolVersion", 1}, {"agentCapabilities", {{"loadSession", loads}}}}; }
+
+Json replayed(const char* kind, const std::string& text) {
+  return rpc_notification(
+      "session/update",
+      {{"sessionId", "s9"}, {"update", {{"sessionUpdate", kind}, {"content", {{"type", "text"}, {"text", text}}}}}});
+}
+
+}  // namespace
+
+TEST_CASE("a past conversation is loaded, and the agent's replay of it rebuilds the transcript") {
+  Conversation talk("s9");
+  talk.client->begin();
+  talk.client->receive(rpc_result(talk.last_id(), can_load(true)));
+  CHECK(talk.client->info().loads_sessions);
+  REQUIRE(talk.last()["method"] == "session/load");
+  CHECK(talk.last()["params"]["sessionId"] == "s9");
+  CHECK(talk.last()["params"]["mcpServers"][0]["name"] == "redgem");
+  const int load = talk.last_id();
+  talk.client->receive(replayed("user_message_chunk", "make the coins spin"));
+  talk.client->receive(replayed("agent_message_chunk", "Done: they spin."));
+  talk.client->receive(rpc_result(load, Json::object()));
+  CHECK(talk.client->state() == AgentState::Ready);
+  CHECK(talk.client->session_id() == "s9");
+  const auto& entries = talk.client->transcript().entries();
+  REQUIRE(entries.size() == 2);
+  CHECK(entries[0].kind == EntryKind::User);
+  CHECK(entries[0].text == "make the coins spin");
+  CHECK(entries[1].text == "Done: they spin.");
+  CHECK(talk.client->prompt("and faster"));  // (the conversation goes on from there)
+  CHECK(talk.last()["params"]["sessionId"] == "s9");
+}
+
+TEST_CASE("an agent that cannot load past conversations starts a new one, saying so") {
+  Conversation talk("s9");
+  talk.client->begin();
+  talk.client->receive(rpc_result(talk.last_id(), can_load(false)));
+  CHECK(talk.last()["method"] == "session/new");
+  REQUIRE_FALSE(talk.client->transcript().entries().empty());
+  CHECK(talk.client->transcript().entries().front().kind == EntryKind::Notice);
+  talk.client->receive(rpc_result(talk.last_id(), {{"sessionId", "s10"}}));
+  CHECK(talk.client->session_id() == "s10");
+}
+
+TEST_CASE("a past conversation the agent cannot find gives way to a new one") {
+  Conversation talk("gone");
+  talk.client->begin();
+  talk.client->receive(rpc_result(talk.last_id(), can_load(true)));
+  talk.client->receive(rpc_error(talk.last_id(), kResourceNotFound, "no such session"));
+  CHECK(talk.last()["method"] == "session/new");
+  CHECK(talk.client->transcript().entries().back().text.find("no such session") != std::string::npos);
+  talk.client->receive(rpc_result(talk.last_id(), {{"sessionId", "s11"}}));
+  CHECK(talk.client->state() == AgentState::Ready);
+}
+
+TEST_CASE("a load that fails midway leaves nothing of the replay under the new conversation") {
+  Conversation talk("s9");
+  talk.client->begin();
+  talk.client->receive(rpc_result(talk.last_id(), can_load(true)));
+  talk.client->receive(replayed("user_message_chunk", "half of an old turn"));
+  talk.client->receive(rpc_error(talk.last_id(), kInternalError, "replay broke"));
+  const auto& entries = talk.client->transcript().entries();
+  REQUIRE(entries.size() == 1);
+  CHECK(entries[0].kind == EntryKind::Notice);
+}
+
+TEST_CASE("replayed user turns stay apart, and the blocks of one turn are kept apart within it") {
+  Transcript transcript;
+  const auto block = [&](const std::string& text, const std::string& id) {
+    apply_update(transcript, {{"update",
+                               {{"sessionUpdate", "user_message_chunk"},
+                                {"messageId", id},
+                                {"content", {{"type", "text"}, {"text", text}}}}}});
+  };
+  block("context", "m1");
+  block("make it spin", "m1");
+  block("and faster", "m2");
+  const auto& entries = transcript.entries();
+  REQUIRE(entries.size() == 2);
+  CHECK(entries[0].text == "context\n\nmake it spin");
+  CHECK(entries[1].text == "and faster");
 }

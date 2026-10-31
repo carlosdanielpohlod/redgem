@@ -3,6 +3,7 @@
 // given to it and the selection attached to the prompt.
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -41,10 +42,10 @@ std::filesystem::path copy_game() {
 }
 
 // A list of agents with the fake one alone in it.
-std::filesystem::path fake_agents_file() {
+std::filesystem::path fake_agents_file(std::vector<agent::EnvironmentVariable> environment = {}) {
   const std::filesystem::path file = std::filesystem::temp_directory_path() / "redgem_editor_agents.json";
   std::string error;
-  REQUIRE(agent::write_agents(file, {{"Fake agent", REDGEM_FAKE_AGENT_FILE, {}, {}, ""}}, error));
+  REQUIRE(agent::write_agents(file, {{"Fake agent", REDGEM_FAKE_AGENT_FILE, {}, std::move(environment), ""}}, error));
   return file;
 }
 
@@ -112,7 +113,94 @@ void click_into_prompt(EditorApp& app) {
   click_at(app, ImVec2(transcript->Pos.x + below, transcript->Pos.y + transcript->Size.y + below));
 }
 
+// A file of past conversations of the test's own, empty.
+std::filesystem::path fresh_sessions_file() {
+  const std::filesystem::path file = std::filesystem::temp_directory_path() / "redgem_editor_agent_sessions.json";
+  std::filesystem::remove(file);
+  return file;
+}
+
+// An editor whose Agent panel keeps the game's conversations in `sessions`, and reopens the last.
+std::unique_ptr<EditorApp> editor_keeping(const std::filesystem::path& game, const std::filesystem::path& sessions,
+                                          std::vector<agent::EnvironmentVariable> agent_environment = {}) {
+  EditorOptions options = editor_options(GpuChoice::Auto);
+  options.clock = [] { return config::kFixedDeltaSeconds; };
+  options.agent.agents_file = fake_agents_file(std::move(agent_environment));
+  options.agent.sessions_file = sessions;
+  options.agent.reopen_last_session = true;
+  auto created = EditorApp::create(game, std::move(options));
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  return std::move(std::get<std::unique_ptr<EditorApp>>(created));
+}
+
 }  // namespace
+
+TEST_CASE("the editor reopens a game's last conversation with its agent") {
+  const std::filesystem::path game = copy_game();
+  const std::filesystem::path sessions = fresh_sessions_file();
+  {
+    auto app = editor_keeping(game, sessions);
+    run(*app, kWarmupFrames);
+    ui::AgentPanel& panel = app->agent_panel();
+    CHECK(panel.connection() == nullptr);  // (nothing to reopen yet)
+    REQUIRE(panel.send("keep notes"));
+    agent::AgentClient& client = panel.connection()->client();
+    REQUIRE(run_until(*app, [&] { return !client.transcript().waiting_permissions().empty(); }));
+    client.choose(client.transcript().waiting_permissions().front(), "reject");
+    REQUIRE(run_until(*app, [&] { return client.state() == agent::AgentState::Ready; }));
+    REQUIRE(panel.past_sessions().size() == 1);
+    CHECK(panel.past_sessions()[0].title == "keep notes");
+    CHECK(panel.past_sessions()[0].agent == "Fake agent");
+  }
+  auto app = editor_keeping(game, sessions);  // (the game opened again)
+  ui::AgentPanel& panel = app->agent_panel();
+  run(*app, kWarmupFrames);
+  const bool agent_tab_shown = ImGui::FindWindowByName(editor_config::kAgentWindow)->DockTabIsVisible;
+  CHECK_FALSE(agent_tab_shown);          // (behind the Inspector)
+  CHECK(panel.connection() == nullptr);  // (unseen: no agent started yet)
+  ImGui::SetWindowFocus(editor_config::kAgentWindow);
+  run(*app, kPictureFrames);
+  REQUIRE(panel.connection() != nullptr);
+  agent::AgentClient& client = panel.connection()->client();
+  REQUIRE(run_until(*app, [&] { return client.state() == agent::AgentState::Ready; }));
+  const auto& entries = client.transcript().entries();
+  const auto said = std::find_if(entries.begin(), entries.end(),
+                                 [](const agent::Entry& entry) { return entry.kind == agent::EntryKind::User; });
+  REQUIRE(said != entries.end());
+  CHECK(said->text == "keep notes");
+  take_picture(*app, "agent_reopened");
+  std::filesystem::remove_all(game);
+}
+
+// A conversation the editor keeps with the fake agent: one prompt, its question rejected.
+void talk_once(EditorApp& app, const std::string& text) {
+  ui::AgentPanel& panel = app.agent_panel();
+  ImGui::SetWindowFocus(editor_config::kAgentWindow);
+  run(app, kPictureFrames);
+  REQUIRE(panel.send(text));
+  agent::AgentClient& client = panel.connection()->client();
+  REQUIRE(run_until(app, [&] { return !client.transcript().waiting_permissions().empty(); }));
+  client.choose(client.transcript().waiting_permissions().front(), "reject");
+  REQUIRE(run_until(app, [&] { return client.state() == agent::AgentState::Ready; }));
+}
+
+TEST_CASE("a conversation started in place of one that could not be reopened has a title of its own") {
+  const std::filesystem::path game = copy_game();
+  const std::filesystem::path sessions = fresh_sessions_file();
+  {
+    auto app = editor_keeping(game, sessions);
+    run(*app, kWarmupFrames);
+    talk_once(*app, "first thing");
+  }
+  auto app = editor_keeping(game, sessions, {{"FAKE_AGENT_NO_LOAD", "1"}});  // (it cannot load now)
+  run(*app, kWarmupFrames);
+  talk_once(*app, "second thing");
+  const auto& past = app->agent_panel().past_sessions();
+  REQUIRE(past.size() == 2);
+  CHECK(past[0].title == "second thing");
+  CHECK(past[1].title == "first thing");
+  std::filesystem::remove_all(game);
+}
 
 TEST_CASE("the transcript follows an answer as it grows, and Play an agent presses leaves the message box alone") {
   const std::filesystem::path game = copy_game();
@@ -161,6 +249,7 @@ TEST_CASE("the Agent panel talks to an agent, which writes a file in the game af
   options.clock = [] { return config::kFixedDeltaSeconds; };
   options.agent = agent_hooks(bridge);
   options.agent.agents_file = fake_agents_file();
+  options.agent.sessions_file = fresh_sessions_file();  // (never the user's own)
   auto created = EditorApp::create(game, std::move(options));
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   EditorApp& app = *std::get<std::unique_ptr<EditorApp>>(created);

@@ -20,6 +20,7 @@ inline constexpr int kProtocolVersion = 1;
 namespace method {
 inline constexpr const char* kInitialize = "initialize";
 inline constexpr const char* kNewSession = "session/new";
+inline constexpr const char* kLoadSession = "session/load";
 inline constexpr const char* kPrompt = "session/prompt";
 inline constexpr const char* kCancel = "session/cancel";
 inline constexpr const char* kUpdate = "session/update";
@@ -40,6 +41,9 @@ struct McpServer {
 // for the agent (it runs no terminals for it).
 Json initialize_params(const std::string& client_version);
 Json new_session_params(const std::filesystem::path& folder, const std::vector<McpServer>& servers);
+// session/load: the same, for a past conversation the agent replays.
+Json load_session_params(const std::string& session, const std::filesystem::path& folder,
+                         const std::vector<McpServer>& servers);
 // What the user typed, after the context they attached (each its own block of text).
 Json prompt_params(const std::string& session, const std::string& text, const std::vector<std::string>& context);
 Json cancel_params(const std::string& session);
@@ -49,6 +53,7 @@ struct AgentInfo {
   int protocol_version = 0;
   std::string name;                        // its title or name, when it said
   std::vector<std::string> login_methods;  // the names of its authentication methods
+  bool loads_sessions = false;             // it can replay a past conversation (session/load)
 };
 AgentInfo agent_info(const Json& result);
 

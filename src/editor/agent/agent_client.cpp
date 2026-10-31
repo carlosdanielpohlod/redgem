@@ -151,6 +151,7 @@ void AgentClient::on_response(const RpcMessage& message) {
   waiting_.erase(found);
   if (call == Call::Initialize) return on_initialized(message);
   if (call == Call::NewSession) return on_session(message);
+  if (call == Call::LoadSession) return on_loaded(message);
   on_turn_end(message);
 }
 
@@ -161,7 +162,34 @@ void AgentClient::on_initialized(const RpcMessage& message) {
     return fail(tr("editor.agent.protocol_mismatch", {{"version", std::to_string(info_.protocol_version)}}));
   }
   state_ = AgentState::OpeningSession;
-  request(Call::NewSession, method::kNewSession, new_session_params(workspace_.folder(), setup_.servers));
+  open_session();
+}
+
+// A past conversation when one was asked for and the agent can replay it; else a new one, saying why.
+void AgentClient::open_session() {
+  if (setup_.load_session.empty()) {
+    request(Call::NewSession, method::kNewSession, new_session_params(workspace_.folder(), setup_.servers));
+    return;
+  }
+  if (!info_.loads_sessions) return start_anew(tr("editor.agent.cannot_load"));
+  request(Call::LoadSession, method::kLoadSession,
+          load_session_params(setup_.load_session, workspace_.folder(), setup_.servers));
+}
+
+// A new conversation in place of the past one asked for, with why in the transcript.
+void AgentClient::start_anew(const std::string& why) {
+  transcript_.clear();  // (what was replayed of the past conversation is not this one's)
+  transcript_.add(EntryKind::Notice, why);
+  setup_.load_session.clear();
+  open_session();
+}
+
+// The agent replayed the conversation (its updates came before this answer): it goes on from there.
+// One it could not find starts anew.
+void AgentClient::on_loaded(const RpcMessage& message) {
+  if (message.error) return start_anew(tr("editor.agent.load_failed", {{"error", message.error->message}}));
+  session_ = setup_.load_session;
+  state_ = AgentState::Ready;
 }
 
 void AgentClient::on_session(const RpcMessage& message) {
