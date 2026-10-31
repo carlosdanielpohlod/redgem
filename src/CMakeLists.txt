@@ -593,6 +593,7 @@ if(NOT ANDROID)
     editor/agent/agent_profiles.cpp
     editor/agent/markdown_blocks.cpp
     editor/agent/text_diff.cpp
+    editor/agent/session_history.cpp
     editor/editor_texts.cpp)
   redgem_embed_texts(redgem_editor editor)
   target_link_libraries(redgem_editor PUBLIC redgem_runtime imgui_stack)

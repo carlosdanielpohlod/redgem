@@ -18,6 +18,7 @@
 #include "editor/agent/agent_connection.hpp"
 #include "editor/agent/agent_profiles.hpp"
 #include "editor/agent/markdown_blocks.hpp"
+#include "editor/agent/session_history.hpp"
 
 namespace redgem::ui {
 
@@ -31,6 +32,10 @@ struct AgentPanelSetup {
   // The selected objects as `redgem scene get` describes them, one text each.
   std::function<std::vector<std::string>()> selection_text;
   agent::ProgramFinder find = agent::find_program;
+  // Where the game's past conversations are kept (empty: none are, and there is no history).
+  std::filesystem::path sessions_file;
+  // Whether the game's last conversation comes back as the panel opens.
+  bool reopen_last = false;
 };
 
 // What the panel remembers of an agent's answer already read as markdown: it is read again only
@@ -64,7 +69,11 @@ class AgentPanel {
 
   // What its buttons do, for the editor's tests as much as for the buttons.
   void pick(std::size_t agent);
-  void start_session();
+  // A new conversation, or the past one `past_session` names (session/load).
+  void start_session(const std::string& past_session = "");
+  // A past conversation of the game, with the agent it was had with.
+  void open_past(const agent::PastSession& session);
+  const std::vector<agent::PastSession>& past_sessions() const { return past_; }
   bool send(const std::string& text);
   void stop();
   void attach_selection();
@@ -86,6 +95,11 @@ class AgentPanel {
   bool shows_hint() const;
   void send_input();
   void draw_toolbar();
+  void draw_history();
+  void draw_history_list();
+  bool is_current(const agent::PastSession& session) const;
+  void note_prompt(const std::string& text);
+  bool prompt_now(const std::string& text);
   void draw_agent_picker();
   void draw_status();
   void draw_problem();
@@ -124,6 +138,8 @@ class AgentPanel {
   std::map<std::size_t, ParsedText> parsed_;  // by entry number
   std::map<std::size_t, float> heights_;      // how tall each entry was last drawn, by number
   float measured_width_ = 0.0f;               // the width those heights were measured at
+  std::vector<agent::PastSession> past_;      // the game's past conversations, newest first
+  std::string title_;                         // the conversation's, from its first message (empty before)
   AgentSettings settings_;
   bool settings_open_ = false;
 };

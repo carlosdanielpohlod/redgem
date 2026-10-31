@@ -294,8 +294,9 @@ there yet:
 - The Agent panel ([docs/assistants.md](docs/assistants.md#the-agent-panel)) sends and shows text
   only: no pictures in the chat, and no terminal of the editor's for the agent (the adapters run
   commands themselves). Logging in to an agent happens in a terminal, with the agent's own CLI.
-  Earlier sessions cannot be reopened, slash commands and session modes are not offered, and
-  answers are not selectable as text (code blocks have a Copy button).
+  Slash commands and session modes are not offered, and answers are not selectable as text (code
+  blocks have a Copy button). Past conversations are reopened through the agent (`session/load`): an
+  agent that cannot do that starts anew, and a conversation the agent no longer keeps is gone.
 - An opt-in Ruby eval in a running game (localhost and a token, a timeout, compiled out of
   release builds). `game_run` expressions cover headless runs; `game_query` covers inspection
   and physics queries.
