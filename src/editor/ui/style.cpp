@@ -16,6 +16,13 @@ using namespace palette;
 constexpr int kActiveButtonColors = 2;                     // style colors icon_button pushes for a pressed button
 constexpr const char* kHeaderLabelFormat = "%s  %s###%s";  // icon, title, and the title again as the id
 
+// Whether a window is the named one or one of its own children (a text box's scrolling area).
+// With no window to place the active item, it counts as outside.
+bool inside(const ImGuiWindow* window, const ImGuiWindow* named) {
+  if (window == nullptr || named == nullptr) return false;
+  return window->RootWindow == named->RootWindow;
+}
+
 }  // namespace
 
 void property_label(const char* text) {
@@ -54,6 +61,11 @@ void tooltip(const char* text) {
   if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled)) {
     ImGui::SetTooltip("%s", text);
   }
+}
+
+bool item_active_outside(const char* window_name) {
+  if (!ImGui::IsAnyItemActive()) return false;
+  return !inside(GImGui->ActiveIdWindow, ImGui::FindWindowByName(window_name));
 }
 
 void toggle_button(const char* icon, const char* tip, bool& on) {

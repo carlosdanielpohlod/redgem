@@ -219,6 +219,8 @@ until 1.0, a release may change what games rely on (see
 
 - **The Agent panel's tools with a game opened by a relative path**: the editor keeps the game's
   folder absolute, so the agent's MCP server, started in the game's folder, finds it.
+- **The agent's scene edits refused as "editor is busy"** while the cursor sat in the Agent
+  panel's message box: typing to the agent no longer counts as using the editor.
 - **"Conflicting ID" warning on the toolbar**: the Hierarchy and Inspector toggles share an icon
   and no longer share an ImGui ID.
 - **Water refraction on sloped floors**: the bottom seen through water is traced along the
