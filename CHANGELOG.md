@@ -8,13 +8,9 @@ until 1.0, a release may change what games rely on (see
 
 ## [Unreleased]
 
-### Added
+## [0.5.0] - 2026-10-31
 
-- **Builds in the background**: Build in the editor no longer freezes the window while it works
-  (a build for Android takes minutes). A box in the Scene view shows what is being built, for how
-  long, and the step it is at (copying the game's files, packing the app, signing it), then how
-  it ended: the folder it filled, with an Open folder button, or the error. One build runs at a
-  time, and closing the editor during one waits for it to end, saying so.
+### Added
 
 - **Agent panel**: a chat with a coding agent in the editor, through the Agent Client Protocol.
   Claude Code and Codex come as presets, run by their open-source adapters
@@ -25,45 +21,21 @@ until 1.0, a release may change what games rely on (see
   reads and writes files for it only there. It also gets the editor's live MCP tools, so it can
   list and move objects, play, read errors and look at the viewport. Each game's past conversations
   are listed, and the last one comes back when the editor opens the game again.
-
-- **Ruby colors in the script tabs**: keywords, strings and their `#{}` interpolations, symbols,
-  comments, numbers, constants and instance variables are colored while typing, heredocs,
-  `%w[]`, regexes and `=begin` blocks included.
-
-- **Prefab file loading**: reusable GLB references with nested instances, root property overrides,
-  persistent descendant identities and shared geometry, available at runtime and in editor Play.
-
-- **Object checkpoints**: capture and restore local pose, tint and visibility through Save,
-  with complete validation before writes and consistent physics teleports for moved hierarchies.
-
-- **Persistent object lookup**: `GameObject.stable_id` and `Scene.find_by_id` reconnect saved
-  references to scene-file nodes after renames or reordering, without aliasing live copies.
-
-- **Named save slots**: `Save.slot` selects isolated progress while the default keeps the existing
-  save; `Save.slots` lists known names. Local slots reuse durable files and backups, server rooms
-  select their own SQLite views, and game-test restarts copy/reset named slots too.
-
 - **MCP `game_query` and `game_shot`**: inspect an object's live state (world pose, body,
   velocity, grounded, props changed while playing), raycast between two points or overlap a
   sphere, in the editor's running game or after headless frames; and a small PNG picture of the
   saved game, returned as MCP image content.
-
 - **MCP editor discovery**: `redgem mcp <game> --editor auto` finds this game's running editor on
   every call, skipping stale connection files, and works on the files when none is open. The
   `editor` tool gains `frame`.
-
-- **Immediate world diagnostics**: `Debug.line` and `Debug.box` draw bounded, frame-local wire
-  primitives with scene depth or explicit x-ray, across player, editor Play and recordings.
-
-- **Foreground frame profiler and statistics overlay**: opt-in real-clock phase timings, a bounded
-  rolling summary and FPS panel shared by player, editor Play and recorded frames.
-
-- **Asynchronous scene reads**: `Game.load_scene_async`, a shared bounded background parser,
-  cancellation, last-error inspection and an immediate-mode loading-screen callback. The old
-  world survives failed reads, while other rooms can keep ticking. Fixed-step offline runs have
-  deterministic activation. Physics creation, script setup and GPU upload still happen on the
-  owning thread and may hitch at activation.
-
+- **Ruby colors in the script tabs**: keywords, strings and their `#{}` interpolations, symbols,
+  comments, numbers, constants and instance variables are colored while typing, heredocs,
+  `%w[]`, regexes and `=begin` blocks included.
+- **Builds in the background**: Build in the editor no longer freezes the window while it works
+  (a build for Android takes minutes). A box in the Scene view shows what is being built, for how
+  long, and the step it is at (copying the game's files, packing the app, signing it), then how
+  it ended: the folder it filled, with an Open folder button, or the error. One build runs at a
+  time, and closing the editor during one waits for it to end, saying so.
 - **Camera helpers**: `Camera.follow` (an offset in the world's or the target's axes, smoothing
   by half-life, look-at, a dead zone, and pulled in front of walls with a raycast),
   `Camera.orbit` (yaw, pitch and distance turned by the right mouse button or the right stick and
@@ -78,25 +50,59 @@ until 1.0, a release may change what games rely on (see
   game is paused or slowed (an orbit the player turns goes by it).
 - The platformer follows its hero with `Camera.follow`, shakes the camera when the hero falls off,
   and marks the coin nearest the camera with `Camera.world_to_screen`.
+- **Named save slots**: `Save.slot` selects isolated progress while the default keeps the existing
+  save; `Save.slots` lists known names. Local slots reuse durable files and backups, server rooms
+  select their own SQLite views, and game-test restarts copy/reset named slots too.
+- **Object checkpoints**: capture and restore local pose, tint and visibility through Save,
+  with complete validation before writes and consistent physics teleports for moved hierarchies.
+- **Persistent object lookup**: `GameObject.stable_id` and `Scene.find_by_id` reconnect saved
+  references to scene-file nodes after renames or reordering, without aliasing live copies.
+- **Immediate world diagnostics**: `Debug.line` and `Debug.box` draw bounded, frame-local wire
+  primitives with scene depth or explicit x-ray, across player, editor Play and recordings.
+- **Foreground frame profiler and statistics overlay**: opt-in real-clock phase timings, a bounded
+  rolling summary and FPS panel shared by player, editor Play and recorded frames.
+- **Prefab file loading**: reusable GLB references with nested instances, root property overrides,
+  persistent descendant identities and shared geometry, available at runtime and in editor Play.
+- **Asynchronous scene reads**: `Game.load_scene_async`, a shared bounded background parser,
+  cancellation, last-error inspection and an immediate-mode loading-screen callback. The old
+  world survives failed reads, while other rooms can keep ticking. Fixed-step offline runs have
+  deterministic activation. Physics creation, script setup and GPU upload still happen on the
+  owning thread and may hitch at activation.
 
 ### Changed
 
 - MCP argument errors are tool results naming the argument and its range, so models can
   correct them; unknown tools stay protocol errors. Tool descriptions say what expressions and
-  assignments look like.
+  assignments look like, and `scene_edit`'s lists the words its assignments take (`tint=#rrggbb`
+  among them).
 - MCP events read as one line each, `#id level scripts/file.rb:line: message`, after the next
   cursor, instead of a JSON dump with absolute backtraces.
+- MCP `events` answers in text alone, its cursor first.
 - MCP `scene_list` shows 50 objects by default in file mode too, and `limit: 0` shows all.
 - The editor bridge's wire version is 2: before a client sends the credential or a request, the
   editor proves with an HMAC of a client nonce that it holds the credential. Discovery deletes
   connection files whose port refuses and skips unproven listeners for a minute.
-- MCP `events` answers in text alone, its cursor first.
+- A viewport capture is sized against what the bridge carries (the whole reply, the PNG as base64
+  text included), drops the alpha channel the viewport does not use, and shrinks a quarter at a
+  time from the original picture, so a 512-pixel request no longer comes back 256 wide.
 - A script calling `puts`, `print` or `p` is told to use `Debug.log`.
 - `Camera.screen_ray` follows the world's picture as the window shows it, render scale and
   recording included (presenters say the size they draw the world at).
 
 ### Fixed
 
+- **The Agent panel's tools with a game opened by a relative path**: the editor keeps the game's
+  folder absolute, so the agent's MCP server, started in the game's folder, finds it.
+- **The agent's scene edits refused as "editor is busy"** while the cursor sat in the Agent
+  panel's message box: typing to the agent no longer counts as using the editor.
+- **Play pressed by an agent took the keyboard** from the message box the user was typing in:
+  the Scene view gets the keyboard only when nobody is typing in a text field.
+- **The Agent panel's transcript stopped following** an answer that kept growing after its first
+  turn; it now follows while its very end is in view, and a view scrolled up stays where it is.
+- **An agent command that is a missing file** was reported as "not found on PATH" (and run through
+  `npx` when it named a package); it is now reported as a file that does not exist.
+- **"Conflicting ID" warning on the toolbar**: the Hierarchy and Inspector toggles share an icon
+  and no longer share an ImGui ID.
 - `redgem shot` and MCP `game_shot` crashed when no display was available; they now report it.
   `game_shot` draws in a child process, so a renderer crash cannot stop the MCP server.
 - MCP initialization answered `2025-06-18` and `2025-03-26` clients with an unrequested version.
@@ -275,12 +281,6 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
-- **The Agent panel's tools with a game opened by a relative path**: the editor keeps the game's
-  folder absolute, so the agent's MCP server, started in the game's folder, finds it.
-- **The agent's scene edits refused as "editor is busy"** while the cursor sat in the Agent
-  panel's message box: typing to the agent no longer counts as using the editor.
-- **"Conflicting ID" warning on the toolbar**: the Hierarchy and Inspector toggles share an icon
-  and no longer share an ImGui ID.
 - **Water refraction on sloped floors**: the bottom seen through water is traced along the
   refracted ray, so a slope or a nearby rock is no longer sampled in the wrong place.
 - **Temporal anti-aliasing under fast motion**: history that no longer matches is dropped when the
@@ -369,7 +369,9 @@ First experimental release.
   Wine so far. Builds games for Windows.
 - The platformer, driving and city demos.
 
-[Unreleased]: https://github.com/carlosdanielpohlod/redgem/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/carlosdanielpohlod/redgem/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.4.1...v0.5.0
+[0.4.1]: https://github.com/carlosdanielpohlod/redgem/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/carlosdanielpohlod/redgem/compare/v0.1.0...v0.2.0

@@ -274,9 +274,9 @@ not a promise of how it will be closed.
 
 ### Working with AI assistants
 
-What is there today is the command line (`redgem scene`, `run`, `shot`, `check`, `api`), the
-`AGENTS.md` guide of new games and `llms.txt`; see [docs/assistants.md](docs/assistants.md). Not
-there yet:
+What is there today is the command line (`redgem scene`, `run`, `shot`, `check`, `api`), the MCP
+tools (`redgem mcp`), the editor's Agent panel, the `AGENTS.md` guide of new games and `llms.txt`;
+see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not there yet:
 
 - Headless input replay covers keyboard states only; mouse, gamepad and touch input are not yet replayed.
 - Reading history from an unrelated running game: MCP's `events` tool reads its own process or

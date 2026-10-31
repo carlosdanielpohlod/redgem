@@ -22,7 +22,7 @@ struct Conversation {
     fs::create_directories(folder / "scripts");
     std::ofstream(folder / "scripts" / "coin.rb", std::ios::binary) << "one\ntwo\nthree\n";
     client =
-        std::make_unique<AgentClient>(ClientSetup{folder, {{"redgem", "redgem", {"mcp"}, {}}}, "0.4.1", past_session},
+        std::make_unique<AgentClient>(ClientSetup{folder, {{"redgem", "redgem", {"mcp"}, {}}}, "0.5.0", past_session},
                                       [this](const Json& message) { sent.push_back(message); });
   }
   ~Conversation() { fs::remove_all(folder); }

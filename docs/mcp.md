@@ -1,5 +1,5 @@
 ---
-description: "MCP over stdio: scene tools, headless runs, bounded events and explicit permissions for one game."
+description: "redgem mcp: MCP over stdio for one game, with scene tools, headless runs, game_query and game_shot, the live editor, bounded events and explicit permissions."
 ---
 
 # MCP tools

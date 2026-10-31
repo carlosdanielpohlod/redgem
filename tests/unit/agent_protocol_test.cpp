@@ -62,12 +62,12 @@ TEST_CASE("messages are told apart: requests, notifications, responses and error
 }
 
 TEST_CASE("initialize says what the editor offers: text files, no terminal") {
-  const Json params = initialize_params("0.4.1");
+  const Json params = initialize_params("0.5.0");
   CHECK(params["protocolVersion"] == kProtocolVersion);
   CHECK(params["clientCapabilities"]["fs"]["readTextFile"] == true);
   CHECK(params["clientCapabilities"]["fs"]["writeTextFile"] == true);
   CHECK(params["clientCapabilities"]["terminal"] == false);
-  CHECK(params["clientInfo"]["version"] == "0.4.1");
+  CHECK(params["clientInfo"]["version"] == "0.5.0");
 }
 
 TEST_CASE("a new session works in the game's folder with the editor's MCP server") {
