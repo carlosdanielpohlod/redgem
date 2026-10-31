@@ -145,6 +145,10 @@ add_executable(redgem_tests
   unit/clip_clock_test.cpp
   unit/camera_ray_test.cpp
   unit/crash_report_test.cpp
+  unit/agent_protocol_test.cpp
+  unit/agent_client_test.cpp
+  unit/agent_files_test.cpp
+  unit/markdown_blocks_test.cpp
   integration/physics_world_test.cpp
   integration/physics_queries_test.cpp
   integration/physics_forces_test.cpp
@@ -192,7 +196,8 @@ add_executable(redgem_tests
   integration/scene_tools_test.cpp
   integration/play_tools_test.cpp
   integration/api_reference_test.cpp
-  integration/error_hints_test.cpp)
+  integration/error_hints_test.cpp
+  integration/agent_connection_test.cpp)
 target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest)
 target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # A program that crashes on purpose, for the tests of crash reports (tests/tools/crash_helper.cpp).
@@ -203,6 +208,10 @@ if(REDGEM_SANITIZERS)
   # the program at the null pointer first.
   target_compile_options(redgem_crash_helper PRIVATE -fno-sanitize=undefined)
 endif()
+# A coding agent for the tests of the Agent panel: it speaks the Agent Client Protocol on its
+# standard streams (tests/tools/fake_acp_agent.cpp).
+add_executable(redgem_fake_acp_agent tools/fake_acp_agent.cpp)
+target_link_libraries(redgem_fake_acp_agent PRIVATE nlohmann_json::nlohmann_json)
 # A reader that finishes during static destruction must still be able to reject linked assets.
 add_executable(redgem_scene_shutdown_test tools/scene_shutdown_test.cpp)
 target_link_libraries(redgem_scene_shutdown_test PRIVATE redgem_runtime)
@@ -210,7 +219,7 @@ add_test(NAME app.async_scene_shutdown COMMAND redgem_scene_shutdown_test
          "${CMAKE_CURRENT_BINARY_DIR}/async-shutdown-files")
 set_tests_properties(app.async_scene_shutdown PROPERTIES TIMEOUT 30)
 # The tests of builds copy the real player, and look for it where a build does: beside redgem.
-add_dependencies(redgem_tests redgem_player redgem redgem_crash_helper redgem_scene_shutdown_test)
+add_dependencies(redgem_tests redgem_player redgem redgem_crash_helper redgem_scene_shutdown_test redgem_fake_acp_agent)
 target_compile_definitions(redgem_tests PRIVATE
   REDGEM_FIXTURES_DIR="${CMAKE_SOURCE_DIR}/tests/fixtures"
   REDGEM_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
@@ -218,6 +227,7 @@ target_compile_definitions(redgem_tests PRIVATE
   REDGEM_PLATFORMER_DIR="${CMAKE_SOURCE_DIR}/games/platformer"
   REDGEM_PLAYER_FILE="$<TARGET_FILE:redgem_player>"
   REDGEM_CRASH_HELPER_FILE="$<TARGET_FILE:redgem_crash_helper>"
+  REDGEM_FAKE_AGENT_FILE="$<TARGET_FILE:redgem_fake_acp_agent>"
   REDGEM_EDITOR_FILE="$<TARGET_FILE:redgem>")
 target_compile_options(redgem_tests PRIVATE -Wall -Wextra -Wno-unused-parameter)
 
