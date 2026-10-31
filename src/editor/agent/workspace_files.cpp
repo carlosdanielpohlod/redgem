@@ -7,6 +7,7 @@
 #include <sstream>
 #include <system_error>
 
+#include "core/config.hpp"
 #include "core/safe_path.hpp"
 
 namespace redgem::agent {
@@ -49,7 +50,6 @@ constexpr const char* kDeviceNames[] = {"CON",  "PRN",  "AUX",  "NUL",  "COM1", 
                                         "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3",
                                         "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"};
 constexpr char kStreamMark = ':';  // an alternate data stream, after a file's name
-constexpr const char* kTemporarySuffix = ".redgem-writing";
 
 bool is_device_name(const fs::path& part) {
   std::string stem = part.stem().u8string();
@@ -83,7 +83,7 @@ bool fits_a_file(const fs::path& file) {
 // Writes the text beside the file, then puts it in the file's place: a reader never sees half of it.
 bool replace_file(const fs::path& file, const std::string& text, std::string& error) {
   fs::path written = file;
-  written += kTemporarySuffix;
+  written += config::kAgentWritingSuffix;
   {
     std::ofstream out(written, std::ios::binary | std::ios::trunc);
     out << text;

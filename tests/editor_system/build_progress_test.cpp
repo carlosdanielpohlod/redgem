@@ -143,3 +143,53 @@ TEST_CASE("leaving while a build runs waits for it, saying so, and leaves once i
   CHECK(app.finished());
   CHECK(app.last_build().has_value());
 }
+
+TEST_CASE("what was edited while a build ran is asked about once it ends, before the editor closes") {
+  const auto game = copy_game();
+  auto created = EditorApp::create(game, even_pace());
+  REQUIRE(std::holds_alternative<std::unique_ptr<EditorApp>>(created));
+  auto& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  run(app, kWarmupFrames);
+
+  HeldBuild held;
+  REQUIRE(app.start_build(held.choice()));
+  app.session().create_light(LightType::Point, app.spawn_point());  // edited while it builds
+  REQUIRE(app.session().document().dirty());
+  app.request_exit(EditorExit::Quit);
+  run(app, kBusyFrames);
+  CHECK_FALSE(app.pending_action().has_value());  // the build first
+  CHECK(shown(kWaitDialog));
+
+  held.let_go();
+  run_until_built(app);
+  run(app, kBusyFrames);
+  CHECK(app.pending_action().has_value());  // then the edits
+  CHECK_FALSE(app.finished());
+}
+
+TEST_CASE("Build saves the scene and the scripts first, and refuses to start when they cannot be saved") {
+  const auto game = copy_game();
+  auto created = EditorApp::create(game, even_pace());
+  REQUIRE(std::holds_alternative<std::unique_ptr<EditorApp>>(created));
+  auto& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  run(app, kWarmupFrames);
+
+  app.session().create_light(LightType::Point, app.spawn_point());
+  HeldBuild held;
+  REQUIRE(app.start_build(held.choice()));
+  CHECK_FALSE(app.session().document().dirty());
+  held.let_go();
+  run_until_built(app);
+  CHECK(app.last_build().has_value());
+
+#ifndef _WIN32  // (a folder nothing can be saved in, made by taking away the right to change it)
+  app.session().create_light(LightType::Point, app.spawn_point());
+  const auto writable = std::filesystem::status(game).permissions();
+  std::filesystem::permissions(game, std::filesystem::perms::owner_write, std::filesystem::perm_options::remove);
+  const HeldBuild refused;
+  CHECK_FALSE(app.start_build(refused.choice()));
+  std::filesystem::permissions(game, writable);
+  CHECK_FALSE(app.building());
+  CHECK(app.session().document().dirty());
+#endif
+}

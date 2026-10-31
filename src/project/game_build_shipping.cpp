@@ -75,6 +75,7 @@ bool write_linux_icon(const std::filesystem::path& icon, const std::filesystem::
 
 bool write_linux_files(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                        const BuildIdentity& identity, std::string& error) {
+  build_steps::begin(build_steps::kShippingFiles);
   const std::string executable = executable_name(game_dir);
   const std::string entry = desktop_entry(identity.title, executable, !identity.icon.empty());
   return write_text_file(out_dir / desktop_entry_file(executable), entry, error) &&
@@ -96,6 +97,7 @@ bool icon_beside_exe(const std::filesystem::path& exe, const IconSet& icons, con
 
 bool write_windows_files(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                          const BuildIdentity& identity, std::string& error) {
+  build_steps::begin(build_steps::kShippingFiles);
   const std::string executable = platform::executable_file_name(executable_name(game_dir), true);
   remove_leftover(out_dir / windows_icon_file(executable_name(game_dir)));
   return identity.icon.empty() || give_exe_icon(out_dir / executable, identity.icon, error);
@@ -194,7 +196,6 @@ std::vector<std::string> shipping_outputs(const std::filesystem::path& game_dir,
 
 bool write_shipping_files(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                           BuildTarget target, const BuildIdentity& identity, std::string& error) {
-  build_steps::begin(build_steps::kShippingFiles);
   if (target == BuildTarget::Linux) return write_linux_files(game_dir, out_dir, identity, error);
   return target != BuildTarget::Windows || write_windows_files(game_dir, out_dir, identity, error);
 }

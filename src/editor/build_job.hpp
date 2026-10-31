@@ -52,7 +52,7 @@ class BuildJob {
   BuildJob& operator=(const BuildJob&) = delete;
 
   // Starts the build on a thread of its own. False, and nothing started, while another one is
-  // busy: one build at a time.
+  // busy (one build at a time), or when the system gives no thread to build on.
   bool start(BuildRequest request);
   // A build was started, and how it ended was not taken yet.
   bool busy() const { return busy_; }
@@ -71,6 +71,8 @@ class BuildJob {
  private:
   using Clock = std::chrono::steady_clock;
 
+  // Starts the build's thread; throws std::system_error when the system gives none.
+  void launch(BuildRequest request);
   // On the build's thread.
   void work(const BuildRequest& request);
   std::optional<std::filesystem::path> made_by(const BuildRequest& request, std::string& error);
