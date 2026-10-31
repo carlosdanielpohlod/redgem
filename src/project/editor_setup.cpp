@@ -4,6 +4,7 @@
 
 #include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
+#include "project/build_steps.hpp"
 #include "project/game_build.hpp"
 
 namespace redgem {
@@ -33,7 +34,10 @@ BuildChoice choice_for(const BuildOption& option) {
   choice.label = ui::icon_label(option.icon, option.label);
   choice.for_this_system = target == host_build_target();
   choice.build = [target](const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
-                          std::string& error) { return build_game_for(game_dir, out_dir, target, error); };
+                          const BuildProgress& progress, std::string& error) {
+    const build_steps::Listen listen(progress);
+    return build_game_for(game_dir, out_dir, target, error);
+  };
   return choice;
 }
 

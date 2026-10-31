@@ -12,6 +12,7 @@
 #include "core/translations.hpp"
 #include "core/xml_writer.hpp"
 #include "project/build_record.hpp"
+#include "project/build_steps.hpp"
 #include "project/game_shipping.hpp"
 #include "project/icons/icon_set.hpp"
 #include "project/notices.hpp"
@@ -164,6 +165,7 @@ std::optional<std::filesystem::path> build_mac_app(const std::filesystem::path& 
 }
 
 bool sign_mac_app(const std::filesystem::path& app, std::string& error) {
+  build_steps::begin(build_steps::kSigningApp);
   const std::string command = "codesign --force --deep --sign " + platform::posix_shell_word(kAdHocIdentity) + " " +
                               platform::posix_shell_word(app) + " >/dev/null 2>&1";
   // (The app's path reaches the shell as one quoted word.)

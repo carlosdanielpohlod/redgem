@@ -126,8 +126,8 @@ void EditorApp::draw_game_name() {
 }
 
 void EditorApp::draw_build_button() {
-  ImGui::BeginDisabled(!editing());
-  if (ui::icon_button(ICON_FA_BOX_ARCHIVE, tr("editor.toolbar.build"))) {
+  ImGui::BeginDisabled(!build_offered());
+  if (ui::icon_button(ICON_FA_BOX_ARCHIVE, tr(building() ? "editor.toolbar.building" : "editor.toolbar.build"))) {
     ImGui::OpenPopup(kBuildPopup);
   }
   ui::popup(kBuildPopup, [this] { draw_build_targets(); });

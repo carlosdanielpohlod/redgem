@@ -30,6 +30,8 @@ bool icon_button(const char* icon, const char* tooltip, bool active = false);
 void tooltip(const char* text);
 // Whether an item is being used (typed in, dragged) in any window but the one named.
 bool item_active_outside(const char* window_name);
+// A circle that keeps turning, the size of a line of text: something is being worked on.
+void spinner();
 // A toggle button: clicking it flips `on`, and it shows pressed while `on`.
 void toggle_button(const char* icon, const char* tooltip, bool& on);
 // The text dropped on the last item, of a kind of payload (see editor_config's kPayload...);
