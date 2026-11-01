@@ -25,6 +25,9 @@ constexpr int kBusyFrames = 30;                       // frames drawn while the 
 constexpr int kPictureFrames = 3;                     // more than the buffers a window swaps between
 constexpr int kMostFrames = 600;                      // frames a build that was let go may take to be taken in
 constexpr auto kPatience = std::chrono::seconds(10);  // far longer than the fake build takes to begin
+// How long a held build waits to be let go at most. Machines that draw without a graphics card
+// (the CI's Macs) take seconds a frame, so this must outlast every frame a test draws meanwhile.
+constexpr auto kMostHeld = std::chrono::minutes(5);
 constexpr const char* kTarget = "android";
 constexpr const char* kStep = "packing the game's files";
 constexpr const char* kStatusWindow = "##build_status";
@@ -39,7 +42,8 @@ std::filesystem::path copy_game() {
 }
 
 // A build that says a step, then waits to be let go: as long as a build for a phone takes. (What
-// it waits on is shared with its thread, which may outlast the test's own variables.)
+// it waits on is shared with its thread, which may outlast the test's own variables.) It is let go
+// when the test's variable ends, so a test that fails before letting it go does not wait it out.
 struct HeldBuild {
   struct Signals {
     std::promise<void> release;
@@ -48,8 +52,18 @@ struct HeldBuild {
   };
   std::shared_ptr<Signals> signals = std::make_shared<Signals>();
   std::future<void> has_begun = signals->began.get_future();
+  bool let_gone = false;
 
-  void let_go() { signals->release.set_value(); }
+  HeldBuild() = default;
+  HeldBuild(const HeldBuild&) = delete;
+  HeldBuild& operator=(const HeldBuild&) = delete;
+  ~HeldBuild() { let_go(); }
+
+  void let_go() {
+    if (let_gone) return;
+    let_gone = true;
+    signals->release.set_value();
+  }
 
   BuildChoice choice() const {
     BuildChoice choice;
@@ -60,7 +74,7 @@ struct HeldBuild {
                                        std::string&) -> std::optional<std::filesystem::path> {
       progress(kStep);
       signals->began.set_value();
-      signals->released.wait_for(kPatience);  // (a test that fails before letting it go does not hang)
+      signals->released.wait_for(kMostHeld);
       return out_dir / kTarget;
     };
     return choice;
