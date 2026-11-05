@@ -10,6 +10,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Prefab placement**: double-click or drag files from the Project panel into the scene or
+  hierarchy to create linked instances, with dependency validation and undo/redo.
+
 - **Prefab previews in the editor**: inherited geometry and components appear while editing,
   with reference selection, cached placement edits and preserved links on save.
 

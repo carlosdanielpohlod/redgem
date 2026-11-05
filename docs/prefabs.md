@@ -41,6 +41,12 @@ Reopening or reloading the scene rereads its prefab sources. Placement drags use
 data. Missing or invalid references report an error and leave the authored scene editable so
 the link can be repaired. Playing still validates every dependency.
 
-Creating prefab files, placing them through dedicated editor commands and overriding inherited
-children remain future work; use your modeling tool and the `prefab_file` property for now.
+The Project panel's **Prefabs** folder lists `prefabs/*.glb`. Double-click a file to place a
+linked instance in front of the editor camera, drag it onto the Scene view to place it at the
+ground under the pointer, or onto a Hierarchy object to parent it there. Placement validates
+the complete scene's prefab dependencies first. A failed placement leaves the scene, selection
+and undo history unchanged. Repeated instances share source assets and have independent identities.
+
+Creating prefab files and overriding inherited children remain future work; create source
+files in your modeling tool for now.
 Built games include regular files in `prefabs/` along with the other game assets.

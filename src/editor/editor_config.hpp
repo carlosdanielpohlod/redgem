@@ -128,6 +128,7 @@ inline constexpr const char* kKeysBottomPanel = "editor.keys.bottom_panel";
 inline constexpr const char* kPayloadNode = "REDGEM_NODE";
 inline constexpr const char* kPayloadScript = "REDGEM_SCRIPT";
 inline constexpr const char* kPayloadModel = "REDGEM_MODEL";
+inline constexpr const char* kPayloadPrefab = "REDGEM_PREFAB";
 inline constexpr const char* kPayloadImage = "REDGEM_IMAGE";
 
 // Viewport colors (RGBA 0-255).

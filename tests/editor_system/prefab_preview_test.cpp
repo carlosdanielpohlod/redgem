@@ -8,6 +8,7 @@
 #include "core/config.hpp"
 #include "editor/document/scene_document.hpp"
 #include "editor/editor_app.hpp"
+#include "editor/ui/project_folders.hpp"
 #include "project/editor_setup.hpp"
 #include "scene/props.hpp"
 #include "window_picture.hpp"
@@ -47,10 +48,6 @@ std::filesystem::path game_files() {
   redgem::Transform pose;
   pose.position = kPlacement + kSourceOffset + Vec3{0, 0, 6};
   scene.set_local(camera, pose);
-  const int placed = scene.add_empty("Placed");
-  pose.position = kPlacement;
-  scene.set_local(placed, pose);
-  scene.set_prop(placed, props::kPrefabFile, std::string("prefabs/shape.glb"));
   std::string error;
   REQUIRE_MESSAGE(scene.save(error), error);
   return game;
@@ -107,7 +104,13 @@ TEST_CASE("prefabs render in the editor through selection play stop and same-cou
   auto& app = *std::get<std::unique_ptr<EditorApp>>(created);
   auto& session = app.session();
   frames(app);
-  const int placed = session.scene_desc().find_node("Placed");
+  app.panel_state().project.folder = ui::ProjectFolder::Prefabs;
+  ui::PanelContext context{session, app.scripts(), app.files(), app.panel_state(), kPlacement};
+  ui::project::info_of(ui::ProjectFolder::Prefabs).open(context, "shape.glb");
+  const int placed = session.selection();
+  REQUIRE(placed != kNoObject);
+  CHECK(session.preview_generation() > 0);
+  frames(app);
   session.select(placed);
   app.frame_selection();
   CHECK(app.camera().target().x == doctest::Approx(kSourceOffset.x));

@@ -87,9 +87,13 @@ void apply_import_model(PanelContext& context, const Pending& pending) {
   import_model(context.session, pending.file, context.spawn_point, pending.parent);
 }
 
+void apply_place_prefab(PanelContext& context, const Pending& pending) {
+  place_prefab(context.session, pending.file, context.spawn_point, pending.parent);
+}
+
 using ApplyPending = void (*)(PanelContext&, const Pending&);
-constexpr ApplyPending kApplyPending[] = {apply_nothing,  apply_duplicate,     apply_delete,
-                                          apply_reparent, apply_attach_script, apply_import_model};
+constexpr ApplyPending kApplyPending[] = {apply_nothing,       apply_duplicate,    apply_delete,      apply_reparent,
+                                          apply_attach_script, apply_import_model, apply_place_prefab};
 
 void apply(PanelContext& context, const Pending& pending) {
   kApplyPending[static_cast<std::size_t>(pending.kind)](context, pending);

@@ -10,7 +10,7 @@ namespace redgem::ui::hierarchy {
 
 // Edits are collected while the tree is drawn and applied after it (they change indices).
 struct Pending {
-  enum class Kind { None, Duplicate, Delete, Reparent, AttachScript, ImportModel };
+  enum class Kind { None, Duplicate, Delete, Reparent, AttachScript, ImportModel, PlacePrefab };
   Kind kind = Kind::None;
   int target = kNoIndex;
   int parent = kNoIndex;

@@ -284,6 +284,7 @@ class EditorApp {
   void draw_viewport_image();
   void draw_viewport_drop_target();
   // What was dropped on a point of the Scene view (viewport pixels).
+  void drop_prefab(const char* file, float x, float y);
   void drop_model(const char* model_file, float x, float y);
   void drop_script(const char* script_file, float x, float y);
   void track_viewport_focus();

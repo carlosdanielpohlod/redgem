@@ -1,5 +1,10 @@
 #include "editor/editor_session.hpp"
 
+#include <exception>
+#include <stdexcept>
+#include <utility>
+#include "scene/prefab_import.hpp"
+
 namespace redgem {
 const SceneDesc& EditorSession::preview_desc() const {
   const auto* resolved = prefab_preview_.resolved();
@@ -47,5 +52,60 @@ void EditorSession::place_pasted(const std::vector<int>& objects, const std::str
   for (const auto id : objects) locals.push_back(relative_to(parent_world, document_.node(id).local));
   move_roots(names, parent, locals);
   refresh_and_reselect(names);
+}
+namespace {
+bool invertible(const Transform& parent) { return parent.scale.x != 0 && parent.scale.y != 0 && parent.scale.z != 0; }
+Transform reference_local(const Scene& preview, int parent, const Transform& world) {
+  if (parent == kNoIndex) return prefabs::checked_placement(world);
+  const auto under = preview.world_transform(parent);
+  if (!invertible(under)) throw std::runtime_error("cannot place a prefab under a parent with zero scale");
+  return prefabs::checked_placement(relative_to(under, world));
+}
+int add_reference(SceneDocument& document, const std::string& file, const Transform& local, int parent) {
+  const int id = document.add_empty(std::filesystem::u8path(file).stem().u8string(), parent);
+  document.set_local(id, local, false);
+  document.set_prop(id, props::kPrefabFile, file, false);
+  return id;
+}
+struct PrefabPlacement {
+  int object = kNoIndex;
+  PrefabPreview preview;
+  Scene scene;
+
+  std::string prepare(SceneDocument& document, const std::filesystem::path& game, const std::string& file,
+                      const Transform& local, int parent) {
+    object = add_reference(document, file, local, parent);
+    preview.rebuild(document.desc(), game);
+    if (!preview.error().empty()) return preview.error();
+    scene = Scene::from_desc(*preview.resolved());
+    return {};
+  }
+};
+}  // namespace
+ObjectId EditorSession::place_prefab(const std::string& file, Vec3 position, std::string& error, ObjectId parent) {
+  error.clear();
+  if (!can_place_under(parent)) {
+    error = "stop the game and choose a valid parent to place a prefab";
+    return kNoObject;
+  }
+  Transform world;
+  world.position = position;
+  try {
+    return place_linked(file, world, parent, error);
+  } catch (const std::exception& problem) {
+    error = problem.what();
+    return kNoObject;
+  }
+}
+ObjectId EditorSession::place_linked(const std::string& file, const Transform& world, ObjectId parent,
+                                     std::string& error) {
+  const auto local = reference_local(preview_, parent, world);
+  PrefabPlacement ready;
+  const auto edit = [&] { return ready.prepare(document_, game_dir_, file, local, parent); };
+  if (!document_.edit_nodes(edit, error)) return kNoObject;
+  prefab_preview_.adopt(std::move(ready.preview));
+  preview_ = std::move(ready.scene);
+  select(ready.object);
+  return ready.object;
 }
 }  // namespace redgem

@@ -85,6 +85,9 @@ ObjectId create_terrain(PanelContext& context);
 ObjectId import_model(EditorSession& session, const std::string& model_file, Vec3 position,
                       ObjectId parent = kNoObject);
 
+// Places a prefab from the game's prefabs/ folder and reports errors in the console.
+ObjectId place_prefab(EditorSession& session, const std::string& file, Vec3 position, ObjectId parent = kNoObject);
+
 // What a name field takes: who says whether a name can be used, and the key of the text of the
 // rule a name that cannot breaks.
 struct NameRule {

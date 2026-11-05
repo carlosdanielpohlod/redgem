@@ -20,6 +20,7 @@ inline constexpr const char* kSoundsDirName = "sounds";
 inline constexpr const char* kFontsDirName = "fonts";  // game-provided TrueType/OpenType faces
 inline constexpr const char* kScenesDirName = "scenes";
 inline constexpr const char* kModelsDirName = "models";
+inline constexpr const char* kPrefabsDirName = "prefabs";  // reusable linked GLB hierarchies
 inline constexpr const char* kLocalesDirName = "locales";  // the game's translations: <language>.json (I18n)
 inline constexpr const char* kSceneExtension = ".glb";
 inline constexpr const char* kMainSceneName = "main";  // the game's scene.glb

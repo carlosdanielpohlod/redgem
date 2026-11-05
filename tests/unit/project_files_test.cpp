@@ -56,3 +56,21 @@ TEST_CASE("files reached through links are not listed: built games leave them ou
   CHECK(files.sounds == std::vector<std::string>{"beep", "jump"});
   std::filesystem::remove_all(game);
 }
+
+TEST_CASE("prefab files are listed separately from imported models and affect project rescans") {
+  const auto game = std::filesystem::temp_directory_path() / "redgem_project_files_prefabs";
+  std::filesystem::remove_all(game);
+  std::filesystem::create_directories(game / "prefabs");
+  const auto before = ProjectFiles::scan(game);
+  for (const char* file : {"zebra.glb", "arch.glb", "notes.txt"}) std::ofstream(game / "prefabs" / file) << "data";
+  const auto after = ProjectFiles::scan(game);
+  CHECK(after.prefabs == std::vector<std::string>{"arch.glb", "zebra.glb"});
+  CHECK(after.models.empty());
+  CHECK_FALSE(before == after);
+  std::filesystem::create_symlink(game / "prefabs/arch.glb", game / "prefabs/link.glb");
+  CHECK(ProjectFiles::scan(game) == after);
+  std::filesystem::rename(game / "prefabs", game / "elsewhere");
+  std::filesystem::create_directory_symlink(game / "elsewhere", game / "prefabs");
+  CHECK(ProjectFiles::scan(game).prefabs.empty());
+  std::filesystem::remove_all(game);
+}

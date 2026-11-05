@@ -25,6 +25,7 @@ struct ProjectFiles {
   std::vector<std::string> sounds;
   std::vector<std::string> scenes;
   std::vector<std::string> images;
+  std::vector<std::string> prefabs;  // prefabs/*.glb, file names (linked when placed)
 
   static ProjectFiles scan(const std::filesystem::path& game_dir);
   bool operator==(const ProjectFiles& other) const;
