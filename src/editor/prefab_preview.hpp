@@ -4,12 +4,16 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <string>
 #include "scene/prefabs.hpp"
 
 namespace redgem {
 // The document stays authored; this disposable snapshot supplies inherited rendering data.
 class PrefabPreview {
  public:
+  // Publish a validated snapshot while keeping renderer generations monotonic.
+  void adopt(PrefabPreview&& ready);
+  const std::string& error() const { return error_; }
   void rebuild(const SceneDesc& document, const std::filesystem::path& game_dir, const prefabs::Limits& limits = {});
   const SceneDesc* resolved() const { return resolved_.get(); }
   bool refresh(const SceneDesc& document, int node);

@@ -59,6 +59,7 @@ void EditorApp::track_viewport_focus() {
 void EditorApp::draw_viewport_drop_target() {
   if (!ImGui::BeginDragDropTarget()) return;
   const Vector2 mouse = viewport_->mouse();
+  if (const char* prefab = ui::dropped_text(kPayloadPrefab)) drop_prefab(prefab, mouse.x, mouse.y);
   if (const char* model = ui::dropped_text(kPayloadModel)) drop_model(model, mouse.x, mouse.y);
   if (const char* script = ui::dropped_text(kPayloadScript)) drop_script(script, mouse.x, mouse.y);
   ImGui::EndDragDropTarget();
@@ -69,6 +70,12 @@ void EditorApp::drop_model(const char* model_file, float x, float y) {
   const Ray ray = viewport_->ray_at(x, y);
   const Vec3 at = editor_logic::drop_point(to_vec3(ray.position), to_vec3(ray.direction), spawn_point());
   ui::import_model(*session_, model_file, at);
+}
+
+void EditorApp::drop_prefab(const char* file, float x, float y) {
+  const Ray ray = viewport_->ray_at(x, y);
+  const Vec3 at = editor_logic::drop_point(to_vec3(ray.position), to_vec3(ray.direction), spawn_point());
+  ui::place_prefab(*session_, file, at);
 }
 
 // A script goes to the object under the mouse.

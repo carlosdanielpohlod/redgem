@@ -123,6 +123,9 @@ class EditorSession {
   // another object. One undo step.
   ObjectId import_model(const std::filesystem::path& path, Vec3 position, std::string& error,
                         ObjectId parent = kNoObject);
+  // Places a game-relative prefab GLB as an empty linked reference, one undo step.
+  // Invalid dependencies or placements leave the document and selection unchanged.
+  ObjectId place_prefab(const std::string& file, Vec3 position, std::string& error, ObjectId parent = kNoObject);
   // Moves `child` under `parent` (kNoObject = top level), keeping where it is in the world.
   void reparent(ObjectId child, ObjectId parent);
   // The same for the selection's top level (see selected_roots), one undo step. What would go
@@ -184,6 +187,7 @@ class EditorSession {
   ObjectId find_environment() const;
   // The selection after an edit that renumbers the objects: the ones called `names`.
   void refresh_and_reselect(const std::vector<std::string>& names);
+  ObjectId place_linked(const std::string& file, const Transform& world, ObjectId parent, std::string& error);
   ObjectId place_new(int node, Vec3 position);
   // What every creation does: `add` makes the object (one undo step) and it is placed and
   // selected, while the game is stopped (kNoObject while it runs).
@@ -199,6 +203,7 @@ class EditorSession {
   // Whether the selection can be edited now: the game is stopped, and something is selected.
   bool can_edit_selection() const { return editing() && !selection_.empty(); }
 
+  bool can_place_under(ObjectId parent) const { return editing() && valid_parent(parent); }
   bool valid_parent(ObjectId parent) const { return parent == kNoObject || document_.has_node(parent); }
   std::vector<Transform> placement_worlds(const std::vector<int>& objects) const;
   std::vector<Transform> locals_under(const std::vector<int>& objects, const Transform& parent) const;

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <exception>
 #include <stdexcept>
+#include <utility>
 #include "scene/prefab_import.hpp"
 #include "scene/gltf/gltf_budget.hpp"
 #include "core/log.hpp"
@@ -27,6 +28,11 @@ void refresh_root(NodeDesc& target, const NodeDesc& authored, const prefabs::Ori
   target.parent = authored.parent;
 }
 }  // namespace
+void PrefabPreview::adopt(PrefabPreview&& ready) {
+  const auto next = generation_ + 1;
+  *this = std::move(ready);
+  generation_ = next;
+}
 PrefabPreview::Counts PrefabPreview::counts(const SceneDesc& scene) {
   return {scene.meshes.size(), scene.materials.size(), scene.images.size()};
 }

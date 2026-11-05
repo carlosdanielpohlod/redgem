@@ -131,6 +131,7 @@ void accept_drops(int target, Pending& pending) {
   const char* script = target != kNoIndex ? dropped_text(kPayloadScript) : nullptr;
   if (script != nullptr) pending = {Pending::Kind::AttachScript, target, kNoIndex, script};
   if (const char* model = dropped_text(kPayloadModel)) pending = {Pending::Kind::ImportModel, kNoIndex, target, model};
+  if (const char* file = dropped_text(kPayloadPrefab)) pending = {Pending::Kind::PlacePrefab, kNoIndex, target, file};
   ImGui::EndDragDropTarget();
 }
 

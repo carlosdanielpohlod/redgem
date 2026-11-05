@@ -6,6 +6,7 @@
 
 #include "audio/audio.hpp"
 #include "core/config.hpp"
+#include "core/safe_path.hpp"
 
 namespace redgem {
 namespace {
@@ -80,6 +81,11 @@ std::vector<std::string> names_in(const std::filesystem::path& dir, const FileKi
 
 // The game's scenes by the names scripts load them with: "main" (its scene.glb) first, then those
 // of scenes/. A scenes/main.glb is left out: no script reaches it, "main" is scene.glb.
+std::vector<std::string> prefab_names(const std::filesystem::path& game_dir) {
+  if (through_link(game_dir, config::kPrefabsDirName)) return {};
+  return file_names_in(game_dir / config::kPrefabsDirName, kModels);
+}
+
 std::vector<std::string> scene_names(const std::filesystem::path& game_dir) {
   std::vector<std::string> names = names_in(game_dir / config::kScenesDirName, kModels);
   names.erase(std::remove(names.begin(), names.end(), config::kMainSceneName), names.end());
@@ -100,6 +106,7 @@ bool is_picture_file(const std::filesystem::path& file) {
 ProjectFiles ProjectFiles::scan(const std::filesystem::path& game_dir) {
   ProjectFiles files;
   files.scripts = file_names_in(game_dir / config::kScriptsDirName, kScripts);
+  files.prefabs = prefab_names(game_dir);
   files.models = file_names_in(game_dir / config::kModelsDirName, kModels);
   files.sounds = names_in(game_dir / config::kSoundsDirName, kSounds);
   files.scenes = scene_names(game_dir);
@@ -109,7 +116,7 @@ ProjectFiles ProjectFiles::scan(const std::filesystem::path& game_dir) {
 
 bool ProjectFiles::operator==(const ProjectFiles& other) const {
   return scripts == other.scripts && models == other.models && sounds == other.sounds && scenes == other.scenes &&
-         images == other.images;
+         images == other.images && prefabs == other.prefabs;
 }
 
 }  // namespace redgem

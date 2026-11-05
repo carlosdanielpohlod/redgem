@@ -86,6 +86,14 @@ bool brush_ready(const PanelContext& context, ObjectId terrain) {
 
 }  // namespace
 
+ObjectId place_prefab(EditorSession& session, const std::string& file, Vec3 position, ObjectId parent) {
+  std::string error;
+  const auto uri = (std::filesystem::path(config::kPrefabsDirName) / file).generic_u8string();
+  const ObjectId placed = session.place_prefab(uri, position, error, parent);
+  if (placed == kNoObject) log::error("cannot place " + file + ": " + error);
+  return placed;
+}
+
 ObjectId create_terrain(PanelContext& context) {
   const ObjectId terrain = context.session.create_terrain(context.spawn_point);
   // Dragging over the new ground shapes it right away.

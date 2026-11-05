@@ -472,3 +472,114 @@ TEST_CASE("editor node refresh detects newly added prefab links and edits to bro
   REQUIRE(preview.resolved() != nullptr);
   CHECK(preview.resolved()->nodes[0].local.position.x == doctest::Approx(6));
 }
+
+TEST_CASE("placing a prefab keeps a linked document through undo redo save reopen and Play") {
+  PrefabFiles files;
+  cube_prefab(files);
+  files.write("scene.glb", nlohmann::json::array({{{"name", "Existing"}}}));
+  auto session = prefab_session(files);
+  std::string error;
+  const Vec3 at{5, 4, 3};
+  const int placed = session->place_prefab("prefabs/cube.glb", at, error);
+  REQUIRE_MESSAGE(placed != kNoObject, error);
+  CHECK(session->selection() == placed);
+  CHECK(session->scene_desc().nodes.size() == 2);
+  CHECK(session->scene_desc().meshes.empty());
+  CHECK(session->document().node(placed).mesh == kNoIndex);
+  CHECK(get_string(session->document().node(placed).props, props::kPrefabFile) == "prefabs/cube.glb");
+  const auto id = session->document().node(placed).stable_id;
+  CHECK(approx_equal(session->placement_world(placed).position, at, test::kTolerance));
+  CHECK(approx_equal(session->scene().world_transform(placed).position, at + Vec3{2, 0, 0}, test::kTolerance));
+  CHECK(session->preview_desc().meshes.size() == 2);
+  session->undo();
+  CHECK(session->scene_desc().nodes.size() == 1);
+  CHECK_FALSE(session->document().dirty());
+  session->redo();
+  CHECK(session->document().node(placed).stable_id == id);
+  REQUIRE_MESSAGE(session->save(error), error);
+  session = prefab_session(files);
+  CHECK(session->document().node(placed).stable_id == id);
+  CHECK(session->scene_desc().meshes.empty());
+  ScriptedInputSource input;
+  REQUIRE_MESSAGE(session->play({input}, error), error);
+  CHECK(session->scene().size() == 3);
+  CHECK(session->place_prefab("prefabs/cube.glb", at, error) == kNoObject);
+  CHECK_FALSE(error.empty());
+  session->stop();
+  CHECK(session->scene_desc().nodes.size() == 2);
+}
+TEST_CASE("prefab placement uses inherited parent offsets and distinct stable identities") {
+  PrefabFiles files;
+  cube_prefab(files);
+  files.write("scene.glb", nlohmann::json::array({{{"name", "Existing"}}}));
+  auto session = prefab_session(files);
+  std::string error;
+  const int parent = session->place_prefab("prefabs/cube.glb", {3, 0, 0}, error);
+  REQUIRE(parent != kNoObject);
+  Transform pose = session->document().node(parent).local;
+  pose.rotation = quat_from_axis_angle(Vec3::up(), kPi / 3);
+  pose.scale = {2, 3, 4};
+  session->document().set_local(parent, pose);
+  session->refresh_node(parent);
+  const Vec3 at{12, 5, -4};
+  const int child = session->place_prefab("prefabs/cube.glb", at, error, parent);
+  REQUIRE_MESSAGE(child != kNoObject, error);
+  CHECK(session->document().node(child).parent == parent);
+  CHECK(approx_equal(session->placement_world(child).position, at, test::kTolerance));
+  CHECK(session->document().node(child).stable_id != session->document().node(parent).stable_id);
+  CHECK(session->document().node(child).name != session->document().node(parent).name);
+  CHECK(session->preview_desc().meshes.size() == 2);
+  CHECK(session->authored_object(static_cast<int>(session->preview_desc().nodes.size()) - 1) == child);
+  pose.scale.y = 0;
+  session->document().set_local(parent, pose);
+  session->refresh_node(parent);
+  const auto count = session->document().node_count();
+  CHECK(session->place_prefab("prefabs/cube.glb", at, error, parent) == kNoObject);
+  CHECK(error.find("zero scale") != std::string::npos);
+  CHECK(session->document().node_count() == count);
+  CHECK(session->selection() == child);
+}
+TEST_CASE("rejected prefab placements preserve document selection and redo history") {
+  test::LogCapture quiet;
+  PrefabFiles files;
+  cube_prefab(files);
+  files.write("scene.glb", nlohmann::json::array({{{"name", "Existing"}}}));
+  files.write("prefabs/cycle.glb", nlohmann::json::array({{{"extras", {{"prefab_file", "prefabs/cycle.glb"}}}}}));
+  auto session = prefab_session(files);
+  std::string error;
+  REQUIRE(session->place_prefab("prefabs/cube.glb", {}, error) != kNoObject);
+  session->undo();
+  session->select(0);
+  for (const auto* file : {"prefabs/missing.glb", "../cube.glb", "prefabs/cycle.glb", ""}) {
+    CAPTURE(file);
+    CHECK(session->place_prefab(file, {}, error) == kNoObject);
+    CHECK_FALSE(error.empty());
+    CHECK(session->document().node_count() == 1);
+    CHECK(session->selection() == 0);
+    CHECK_FALSE(session->document().dirty());
+    CHECK(session->document().can_redo());
+  }
+  CHECK(session->place_prefab("prefabs/cube.glb", {}, error, 500) == kNoObject);
+  CHECK(session->place_prefab("prefabs/cube.glb", {std::numeric_limits<float>::infinity(), 0, 0}, error) == kNoObject);
+  CHECK(session->document().can_redo());
+  session->redo();
+  CHECK(session->document().node_count() == 2);
+}
+
+TEST_CASE("nested prefab placement resolves dependencies without flattening or stale asset generations") {
+  PrefabFiles files;
+  cube_prefab(files);
+  files.write("scene.glb", nlohmann::json::array({{{"name", "Existing"}}}));
+  files.write("prefabs/nested.glb", nlohmann::json::array({{{"extras", {{"prefab_file", "prefabs/cube.glb"}}}}}));
+  auto session = prefab_session(files);
+  std::string error;
+  for (int i = 0; i < 3; ++i) {
+    const auto before = session->preview_generation();
+    REQUIRE_MESSAGE(session->place_prefab("prefabs/nested.glb", {static_cast<float>(i), 0, 0}, error) != kNoObject,
+                    error);
+    CHECK(session->preview_generation() > before);
+    CHECK(session->scene_desc().meshes.empty());
+    CHECK(session->preview_desc().meshes.size() == 2);
+    CHECK(session->scene().size() == 1 + (i + 1) * 2);
+  }
+}
