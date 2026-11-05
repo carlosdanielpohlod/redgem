@@ -5,6 +5,9 @@
 #include "app/scene_files.hpp"
 #include "editor/document/glb_file.hpp"
 #include "scene/prefabs.hpp"
+#include "editor/editor_session.hpp"
+#include "editor/picking.hpp"
+#include "test_support.hpp"
 #include "scene/prefab_import.hpp"
 #include "scene/scene.hpp"
 #include "scene/gltf/gltf_loader.hpp"
@@ -28,6 +31,24 @@ struct PrefabFiles {
     REQUIRE_MESSAGE(write_glb(dir / name, file, error), error);
   }
 };
+void cube_prefab(const PrefabFiles& files) {
+  auto doc = SceneDocument::create_empty(files.dir / "prefabs/cube.glb");
+  const int root = doc.add_primitive(PrimitiveShape::Cube, "Source", Color{1, 1, 1, 1});
+  const int child = doc.add_primitive(PrimitiveShape::Cube, "Part", Color{1, 1, 1, 1}, root);
+  Transform local;
+  local.position = {2, 0, 0};
+  doc.set_local(root, local, false);
+  local.position = {0, 2, 0};
+  doc.set_local(child, local, false);
+  doc.set_prop(root, props::kPrefab, true, false);
+  std::string error;
+  REQUIRE_MESSAGE(doc.save(error), error);
+}
+std::unique_ptr<EditorSession> prefab_session(const PrefabFiles& files) {
+  auto opened = EditorSession::open(files.dir);
+  if (const auto* error = std::get_if<std::string>(&opened)) FAIL(*error);
+  return std::move(std::get<std::unique_ptr<EditorSession>>(opened));
+}
 SceneDesc placements(const std::string& file, std::size_t count = 1) {
   SceneDesc scene;
   for (std::size_t i = 0; i < count; ++i) {
@@ -259,4 +280,195 @@ TEST_CASE("prefab identities normalize harmless path aliases but reject parent t
   const auto alias = prefabs::resolve(placements("prefabs/./item.glb"), files.dir);
   CHECK(direct.nodes[1].stable_id == alias.nodes[1].stable_id);
   CHECK_THROWS(prefabs::resolve(placements("prefabs/../prefabs/item.glb"), files.dir));
+}
+TEST_CASE("prefab origin metadata caches nested defaults and exact ordered root offsets") {
+  PrefabFiles files;
+  files.write("prefabs/item.glb", kHierarchy);
+  files.write("prefabs/outer.glb", nlohmann::json::parse(R"([
+    {"name":"Outer", "translation":[0,0,4],
+     "extras":{"prefab_file":"prefabs/item.glb","health":30,"tag":"source"}}
+  ])"));
+  auto authored = placements("prefabs/outer.glb");
+  authored.nodes[0].local.position.x = 5;
+  authored.nodes[0].props["health"] = 40.0;
+  prefabs::Origins origins;
+  const auto resolved = prefabs::resolve(authored, files.dir, {}, &origins);
+  REQUIRE(origins.size() == 1);
+  const auto& origin = origins.at(0);
+  CHECK(origin.reference == "prefabs/outer.glb");
+  CHECK(origin.name == "Outer");
+  CHECK(origin.roots.size() == 2);
+  CHECK(origin.defaults.at("health") == PropertyValue(30.0));
+  CHECK(origin.defaults.count(props::kPrefab) == 0);
+  CHECK(origin.defaults.count(prefabs::kFileProperty) == 0);
+  CHECK(prefabs::inherited_props(origin, authored.nodes[0].props) == resolved.nodes[0].props);
+  CHECK(prefabs::inherited_local(origin, authored.nodes[0].local).position.x == doctest::Approx(7));
+  authored.nodes[0].props.erase("health");
+  CHECK(prefabs::inherited_props(origin, authored.nodes[0].props).at("health") == PropertyValue(30.0));
+}
+TEST_CASE("failed prefab expansion leaves previously collected origins untouched") {
+  PrefabFiles files;
+  files.write("prefabs/item.glb", kHierarchy);
+  prefabs::Origins origins;
+  prefabs::resolve(placements("prefabs/item.glb"), files.dir, {}, &origins);
+  CHECK_THROWS(prefabs::resolve(placements("prefabs/missing.glb"), files.dir, {}, &origins));
+  CHECK(origins.at(0).reference == "prefabs/item.glb");
+}
+TEST_CASE("editor prefab preview preserves inherited parts while dragging without rereading files") {
+  PrefabFiles files;
+  cube_prefab(files);
+  auto raw = placements("prefabs/cube.glb");
+  PrefabPreview preview;
+  preview.rebuild(raw, files.dir);
+  REQUIRE(preview.resolved() != nullptr);
+  REQUIRE(preview.resolved()->nodes.size() == 2);
+  const auto generation = preview.generation();
+  const auto mesh = preview.resolved()->nodes[0].mesh;
+  REQUIRE(mesh != kNoIndex);
+  std::filesystem::remove(files.dir / "prefabs/cube.glb");
+  raw.nodes[0].local.position.x = 5;
+  REQUIRE(preview.refresh(raw, 0));
+  CHECK(preview.resolved()->nodes[0].local.position.x == doctest::Approx(7));
+  CHECK(preview.resolved()->nodes[0].mesh == mesh);
+  CHECK(preview.resolved()->nodes[0].children == std::vector<int>{1});
+  CHECK(preview.generation() == generation);
+}
+TEST_CASE("editor prefab preview selects inherited geometry through its authored reference and saves links") {
+  PrefabFiles files;
+  cube_prefab(files);
+  files.write("scene.glb", nlohmann::json::parse(R"([
+    {"name":"Placed", "extras":{"prefab_file":"prefabs/cube.glb"}}
+  ])"));
+  auto session = prefab_session(files);
+  CHECK(session->scene_desc().nodes.size() == 1);
+  REQUIRE(session->preview_desc().nodes.size() == 2);
+  const PickRay ray{{2, 2, 5}, {0, 0, -1}};
+  const auto hit = pick_object(session->scene(), session->preview_desc(), ray);
+  REQUIRE(hit == 1);
+  session->select(hit);
+  CHECK(session->selection() == 0);
+  CHECK(session->selected().ids() == std::vector<int>{0});
+  Transform world;
+  world.position = {5, 0, 0};
+  session->document().checkpoint();
+  session->place_in_world(0, world);
+  CHECK(session->placement_world(0).position.x == doctest::Approx(5));
+  CHECK(session->scene().world_transform(0).position.x == doctest::Approx(7));
+  std::string error;
+  REQUIRE_MESSAGE(session->save(error), error);
+  const auto saved = load_gltf_scene((files.dir / "scene.glb").string());
+  REQUIRE(saved.ok);
+  REQUIRE(saved.scene.nodes.size() == 1);
+  CHECK(saved.scene.meshes.empty());
+  CHECK(get_string(saved.scene.nodes[0].props, prefabs::kFileProperty) == "prefabs/cube.glb");
+  session->undo();
+  CHECK(session->scene().world_transform(0).position.x == doctest::Approx(2));
+  session->redo();
+  CHECK(session->scene().world_transform(0).position.x == doctest::Approx(7));
+  ScriptedInputSource input;
+  REQUIRE_MESSAGE(session->play({input}, error), error);
+  CHECK(session->scene().world_transform(0).position.x == doctest::Approx(7));
+  session->stop();
+  CHECK(session->scene().world_transform(0).position.x == doctest::Approx(7));
+}
+TEST_CASE("editor prefab failures leave references editable and coalesce repeated diagnostics") {
+  PrefabFiles files;
+  test::LogCapture logs;
+  auto raw = placements("prefabs/missing.glb");
+  PrefabPreview preview;
+  preview.rebuild(raw, files.dir);
+  preview.rebuild(raw, files.dir);
+  CHECK(preview.resolved() == nullptr);
+  CHECK(logs.count(log::Level::Error) == 1);
+  cube_prefab(files);
+  raw.nodes[0].props[prefabs::kFileProperty] = std::string("prefabs/cube.glb");
+  preview.rebuild(raw, files.dir);
+  REQUIRE(preview.resolved() != nullptr);
+  CHECK(preview.resolved()->nodes.size() == 2);
+}
+TEST_CASE("editor prefab assets synchronize base edits and detect changed import offsets") {
+  PrefabFiles files;
+  cube_prefab(files);
+  auto raw = placements("prefabs/cube.glb");
+  raw.meshes.resize(1);
+  raw.materials.resize(1);
+  PrefabPreview preview;
+  preview.rebuild(raw, files.dir);
+  raw.materials[0].roughness = 0.25f;
+  raw.meshes[0].name = "Edited terrain";
+  REQUIRE(preview.resolved() != nullptr);
+  REQUIRE(preview.sync_assets(raw, {0}));
+  CHECK(preview.resolved()->materials[0].roughness == doctest::Approx(0.25f));
+  CHECK(preview.resolved()->meshes[0].name == "Edited terrain");
+  raw.images.emplace_back();
+  CHECK_FALSE(preview.sync_assets(raw, {}));
+}
+TEST_CASE("editor copying and reparenting children of prefab references preserves their world placement") {
+  PrefabFiles files;
+  cube_prefab(files);
+  files.write("scene.glb", nlohmann::json::parse(R"([
+    {"name":"Placed", "children":[1], "extras":{"prefab_file":"prefabs/cube.glb"}},
+    {"name":"Authored child", "translation":[0,3,0]}
+  ])"));
+  auto session = prefab_session(files);
+  const int child = session->scene_desc().find_node("Authored child");
+  REQUIRE(child != kNoIndex);
+  CHECK(session->scene().world_transform(child).position.x == doctest::Approx(2));
+  session->select(child);
+  std::string error;
+  const auto copied = session->copy_selection(error);
+  REQUIRE_MESSAGE(copied.has_value(), error);
+  REQUIRE_MESSAGE(session->paste(*copied, kNoObject, error), error);
+  CHECK(session->scene().world_transform(session->selection()).position.x == doctest::Approx(2));
+  session->undo();
+  session->select_by_name("Authored child");
+  session->reparent_selection(kNoObject);
+  CHECK(session->scene().world_transform(session->selection()).position.x == doctest::Approx(2));
+  session->undo();
+  session->select_by_name("Authored child");
+  const int placed = session->scene_desc().find_node("Placed");
+  REQUIRE_MESSAGE(session->paste(*copied, placed, error), error);
+  CHECK(session->scene().world_transform(session->selection()).position.x == doctest::Approx(2));
+  CHECK(session->document().node(session->selection()).local.position.x == doctest::Approx(0));
+}
+TEST_CASE("editor prefab dragging refuses a composed transform overflow") {
+  PrefabFiles files;
+  files.write("prefabs/item.glb", kHierarchy);
+  auto raw = placements("prefabs/item.glb");
+  PrefabPreview preview;
+  preview.rebuild(raw, files.dir);
+  raw.nodes[0].local.scale.x = std::numeric_limits<float>::max();
+  CHECK_FALSE(preview.refresh(raw, 0));
+}
+TEST_CASE("editor prefab copy budgets are checked before copying the authored scene") {
+  PrefabFiles files;
+  cube_prefab(files);
+  const auto raw = placements("prefabs/cube.glb");
+  prefabs::Limits limits;
+  limits.expanded_bytes = 1;
+  test::LogCapture logs;
+  PrefabPreview preview;
+  preview.rebuild(raw, files.dir, limits);
+  CHECK(preview.resolved() == nullptr);
+  CHECK(logs.contains("prefab preview copy budget"));
+}
+TEST_CASE("editor node refresh detects newly added prefab links and edits to broken links") {
+  PrefabFiles files;
+  cube_prefab(files);
+  SceneDesc raw;
+  raw.nodes.emplace_back();
+  PrefabPreview preview;
+  preview.rebuild(raw, files.dir);
+  raw.nodes[0].props[prefabs::kFileProperty] = std::string("prefabs/missing.glb");
+  CHECK_FALSE(preview.refresh(raw, 0));
+  preview.rebuild(raw, files.dir);
+  const auto generation = preview.generation();
+  raw.nodes[0].local.position.x = 4;
+  CHECK(preview.refresh(raw, 0));
+  CHECK(preview.generation() == generation);
+  raw.nodes[0].props[prefabs::kFileProperty] = std::string("prefabs/cube.glb");
+  CHECK_FALSE(preview.refresh(raw, 0));
+  preview.rebuild(raw, files.dir);
+  REQUIRE(preview.resolved() != nullptr);
+  CHECK(preview.resolved()->nodes[0].local.position.x == doctest::Approx(6));
 }

@@ -20,25 +20,28 @@ EditorSession::EditorSession(std::filesystem::path game_dir, SceneDocument docum
 const Scene& EditorSession::scene() const { return runtime_ ? runtime_->scene() : preview_; }
 
 void EditorSession::refresh_preview() {
-  preview_ = Scene::from_desc(document_.desc());
+  prefab_preview_.rebuild(document_.desc(), game_dir_);
+  preview_ = Scene::from_desc(preview_desc());
   selection_.keep_below(document_.node_count());
 }
 
 void EditorSession::refresh_node(ObjectId node) {
   if (!document_.has_node(node)) return refresh_preview();
-  preview_.refresh_from_desc(document_.desc(), node);
+  if (!prefab_preview_.refresh(document_.desc(), node)) return refresh_preview();
+  preview_.refresh_from_desc(preview_desc(), node);
 }
 
 std::vector<int> EditorSession::selected_roots() const {
   return top_level_of(selection_.ids(), document_.desc().nodes);
 }
 
-void EditorSession::select(ObjectId id) { selection_.set(document_.has_node(id) ? id : kNoObject); }
+void EditorSession::select(ObjectId id) { selection_.set(authored_object(id)); }
 
 std::vector<ObjectId> EditorSession::known(const std::vector<ObjectId>& ids) const {
   std::vector<ObjectId> objects;
   for (const ObjectId id : ids) {
-    if (document_.has_node(id)) objects.push_back(id);
+    const auto authored = authored_object(id);
+    if (authored != kNoObject) objects.push_back(authored);
   }
   return objects;
 }
@@ -48,6 +51,7 @@ void EditorSession::select_all(const std::vector<ObjectId>& ids) { selection_.se
 void EditorSession::add_to_selection(const std::vector<ObjectId>& ids) { selection_.add_all(known(ids)); }
 
 void EditorSession::click_select(ObjectId id, ClickMode mode, const std::vector<ObjectId>& order) {
+  id = authored_object(id);
   if (!document_.has_node(id)) return select(kNoObject);
   selection_.click(id, mode, order);
 }
@@ -91,7 +95,8 @@ void EditorSession::delete_selection() {
 
 std::optional<std::vector<std::uint8_t>> EditorSession::copy_selection(std::string& error) {
   if (selection_.empty()) return std::nullopt;
-  return document_.copy_nodes(selected_roots(), error);
+  const auto roots = selected_roots();
+  return document_.copy_nodes(roots, error, placement_worlds(roots));
 }
 
 std::optional<std::vector<std::uint8_t>> EditorSession::cut_selection(std::string& error) {
@@ -102,11 +107,12 @@ std::optional<std::vector<std::uint8_t>> EditorSession::cut_selection(std::strin
 }
 
 bool EditorSession::paste(const std::vector<std::uint8_t>& copied, ObjectId parent, std::string& error) {
-  if (!editing()) return false;
-  const std::vector<int> pasted = document_.paste_nodes(copied, parent, error);
+  if (!editing() || !valid_parent(parent)) return false;
+  const std::string parent_name = parent == kNoObject ? "" : document_.node(parent).name;
+  const Transform parent_world = parent == kNoObject ? Transform{} : preview_.world_transform(parent);
+  const std::vector<int> pasted = document_.paste_nodes(copied, kNoIndex, error);
   if (pasted.empty()) return false;
-  refresh_preview();
-  select_all(pasted);
+  place_pasted(pasted, parent_name, parent_world);
   return true;
 }
 
@@ -158,24 +164,23 @@ bool EditorSession::sculpt_terrain(ObjectId terrain, Vec3 world_point, float rad
 }
 
 void EditorSession::reparent(ObjectId child, ObjectId parent) {
-  if (!can_edit(child)) return;
-  // (Indices of other objects may shift; names are unique, and the moved one keeps its own.)
-  const std::vector<std::string> selected = selected_names();
-  document_.reparent(child, parent);
+  if (!can_edit(child) || !valid_parent(parent)) return;
+  const auto selected = selected_names();
+  const Transform world = placement_world(child);
+  const Transform local = parent == kNoObject ? world : relative_to(preview_.world_transform(parent), world);
+  document_.reparent(child, parent, true, &local);
   refresh_and_reselect(selected);
 }
 
 void EditorSession::reparent_selection(ObjectId parent) {
-  if (!can_edit_selection()) return;
-  // (Each move renumbers the objects: they are found again by their names, which are unique.)
-  const std::vector<std::string> selected = selected_names();
-  const std::string parent_name = parent == kNoObject ? std::string() : document_.node(parent).name;
-  const std::vector<std::string> roots = names_of(selected_roots());
+  if (!can_edit_selection() || !valid_parent(parent)) return;
+  const auto selected = selected_names();
+  const std::string parent_name = parent == kNoObject ? "" : document_.node(parent).name;
+  const Transform parent_world = parent == kNoObject ? Transform{} : preview_.world_transform(parent);
+  const auto roots = selected_roots();
+  const auto locals = locals_under(roots, parent_world);
   document_.checkpoint();
-  for (const std::string& root : roots) {
-    const int under = parent_name.empty() ? kNoIndex : document_.desc().find_node(parent_name);
-    document_.reparent(document_.desc().find_node(root), under, false);
-  }
+  move_roots(names_of(roots), parent_name, locals);
   document_.drop_checkpoint_if_unchanged();
   refresh_and_reselect(selected);
 }

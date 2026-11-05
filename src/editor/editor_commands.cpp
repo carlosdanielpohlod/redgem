@@ -9,6 +9,7 @@
 #include "editor/editor_config.hpp"
 #include "editor/editor_logic.hpp"
 #include "editor/keyboard.hpp"
+#include "editor/node_tree.hpp"
 #include "editor/picking.hpp"
 #include "editor/scene_viewport.hpp"
 #include "editor/ui/style.hpp"
@@ -21,6 +22,15 @@ namespace {
 
 using namespace editor_config;
 using render_math::to_vec3;
+
+// A linked object may be an empty root with geometry well away from its placement pivot.
+std::vector<int> framed_parts(EditorSession& session, ObjectId id) {
+  if (!session.editing() || session.document().node(id).props.count(props::kPrefabFile) == 0) return {id};
+  auto parts = node_tree::subtree(session.preview_desc().nodes, id);
+  const auto empty = [&session](int part) { return session.scene().at(part).mesh == kNoIndex; };
+  parts.erase(std::remove_if(parts.begin(), parts.end(), empty), parts.end());
+  return parts.empty() ? std::vector<int>{id} : parts;
+}
 
 }  // namespace
 
@@ -82,9 +92,11 @@ Vec3 EditorApp::spawn_point() const { return camera_.position() + camera_.forwar
 void EditorApp::frame_selection() {
   std::vector<editor_logic::Sphere> spheres;
   for (const ObjectId id : session_->selected().ids()) {
-    editor_logic::Sphere sphere;
-    object_extent(session_->scene(), session_->scene_desc(), id, sphere.center, sphere.radius);
-    spheres.push_back(sphere);
+    for (const int part : framed_parts(*session_, id)) {
+      editor_logic::Sphere sphere;
+      object_extent(session_->scene(), session_->preview_desc(), part, sphere.center, sphere.radius);
+      spheres.push_back(sphere);
+    }
   }
   if (spheres.empty()) return;
   const editor_logic::Sphere all = editor_logic::enclosing(spheres);

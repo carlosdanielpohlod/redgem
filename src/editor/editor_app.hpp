@@ -7,9 +7,9 @@
 // step of those parts: they all work on the one window's state, which is declared once, here.
 
 #include <filesystem>
+#include <cstdint>
 #include <memory>
 #include <optional>
-#include <cstdint>
 #include <string>
 #include <variant>
 #include <vector>
@@ -219,6 +219,7 @@ class EditorApp {
   void draw_edited_scene();
   void aim_viewport_camera();
   void sync_renderer_assets();
+  void upload_preview_assets();
   // The interface, top to bottom.
   void draw_interface();
   void draw_menu_bar();
@@ -351,6 +352,7 @@ class EditorApp {
   // The window, then what draws in it: made in this order, released in the opposite one.
   std::unique_ptr<Window> window_;
   std::unique_ptr<Renderer> renderer_;
+  std::uint64_t preview_generation_ = 0;
   std::unique_ptr<ui::Interface> interface_;
   std::unique_ptr<AudioSystem> audio_;
   std::unique_ptr<EditorSession> session_;

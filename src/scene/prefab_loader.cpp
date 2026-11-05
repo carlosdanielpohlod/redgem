@@ -55,8 +55,12 @@ void check_hierarchy(const SceneDesc& scene) {
 }
 class Resolver {
  public:
-  Resolver(SceneDesc source, fs::path folder, const Limits& limits)
-      : scene_(std::move(source)), folder_(std::move(folder)), limits_(limits) {}
+  Resolver(SceneDesc source, fs::path folder, const Limits& limits, Origins* origins)
+      : scene_(std::move(source)),
+        folder_(std::move(folder)),
+        limits_(limits),
+        origins_(origins),
+        authored_(scene_.nodes.size()) {}
   SceneDesc run() {
     const auto authored = scene_.nodes.size();
     require(authored <= limits_.nodes, "prefab scene has too many nodes");
@@ -128,10 +132,16 @@ class Resolver {
     for (const auto& animation : source.scene.animations)
       for (const auto& channel : animation.channels) animated_.insert(instance_node(channel.node, instance));
   }
+  void remember_origin(int id, const Source& source) {
+    if (!origins_ || static_cast<std::size_t>(id) >= authored_) return;
+    reserve_bytes(expanded_bytes_, source.instance_bytes, limits_.expanded_bytes);
+    record_origin(*origins_, id, scene_.nodes[id], source.scene.nodes.front());
+  }
   Instance import(Source& prefab, int id, const std::string& uri) {
     require(animated_.count(id) == 0 || identity_transform(prefab.scene.nodes.front().local),
             "animated prefab placements require an identity source root transform");
     reserve(prefab);
+    remember_origin(id, prefab);
     transfer_assets(scene_, prefab);
     const auto instance = append_instance(scene_, prefab, id, uri);
     remember_imported_animation_targets(prefab, instance);
@@ -153,6 +163,8 @@ class Resolver {
   SceneDesc scene_;
   fs::path folder_;
   Limits limits_;
+  Origins* origins_ = nullptr;
+  std::size_t authored_ = 0;
   std::map<std::string, Source> sources_;
   std::vector<fs::path> stack_;
   std::set<std::string> identities_;
@@ -163,8 +175,11 @@ class Resolver {
 };
 }  // namespace
 bool has_references(const SceneDesc& scene) { return std::any_of(scene.nodes.begin(), scene.nodes.end(), has_file); }
-SceneDesc resolve(SceneDesc scene, const std::filesystem::path& game_dir, const Limits& limits) {
-  if (!has_references(scene)) return scene;
-  return Resolver(std::move(scene), fs::canonical(game_dir), limits).run();
+SceneDesc resolve(SceneDesc scene, const std::filesystem::path& game_dir, const Limits& limits, Origins* origins) {
+  Origins collected;
+  if (has_references(scene))
+    scene = Resolver(std::move(scene), fs::canonical(game_dir), limits, origins ? &collected : nullptr).run();
+  if (origins) *origins = std::move(collected);
+  return scene;
 }
 }  // namespace redgem::prefabs

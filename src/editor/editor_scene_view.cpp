@@ -63,7 +63,7 @@ void EditorApp::draw_edited_scene() {
   if (brush_point_) brush = BrushMark{*brush_point_, terrain_tool_.radius};
   BeginTextureMode(view.target);
   BeginMode3D(view.camera);
-  draw_scene_overlays(session_->scene(), session_->scene_desc(), session_->selected().ids(), brush);
+  draw_scene_overlays(session_->scene(), session_->preview_desc(), session_->selected().ids(), brush);
   EndMode3D();
   EndTextureMode();
 }
@@ -77,12 +77,21 @@ void EditorApp::aim_viewport_camera() {
   camera.projection = CAMERA_PERSPECTIVE;
 }
 
+void EditorApp::upload_preview_assets() {
+  renderer_->upload(session_->preview_desc());
+  preview_generation_ = session_->preview_generation();
+}
+
 // Objects and materials created in the editor, and terrain that was sculpted.
 void EditorApp::sync_renderer_assets() {
-  renderer_->sync(session_->scene_desc());
-  for (const int mesh : session_->document().take_changed_meshes()) {
-    renderer_->refresh_mesh(session_->scene_desc(), mesh);
+  const auto changed = session_->document().take_changed_meshes();
+  session_->sync_preview_assets(changed);
+  if (preview_generation_ != session_->preview_generation()) {
+    upload_preview_assets();
+  } else {
+    renderer_->sync(session_->preview_desc());
   }
+  for (const int mesh : changed) renderer_->refresh_mesh(session_->preview_desc(), mesh);
 }
 
 // The rendered scene, filling the window. Remembers where it is on screen.

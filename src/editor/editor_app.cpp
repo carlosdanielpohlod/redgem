@@ -53,7 +53,7 @@ void EditorApp::open_window(GpuChoice gpu, FrameClock clock) {
   window_ = std::make_unique<Window>(window_settings(gpu));
   clock_ = clock ? std::move(clock) : [this] { return window_->frame_seconds(); };
   renderer_ = std::make_unique<Renderer>(*window_);
-  renderer_->upload(session_->scene_desc());
+  upload_preview_assets();
   renderer_->set_images_dir(session_->game_dir() / config::kImagesDirName);
   viewport_ = std::make_unique<SceneViewport>();
   audio_ = create_raylib_audio();

@@ -48,8 +48,7 @@ NodeDesc instance_root(const NodeDesc& source, NodeDesc authored, const Assets& 
   auto root = instance_node_desc(source, assets, instance);
   root.name = std::move(authored.name);
   if (root.name.empty()) root.name = source.name;
-  root.local = combine(authored.local, source.local);
-  if (!finite(root.local)) throw std::runtime_error("prefab placement transform is not finite");
+  root.local = checked_placement(combine(authored.local, source.local));
   root.parent = authored.parent;
   root.stable_id = std::move(authored.stable_id);
   root.source_node = authored.source_node;
@@ -65,6 +64,10 @@ void append_skins(SceneDesc& target, const SceneDesc& source, const Instance& in
   }
 }
 }  // namespace
+Transform checked_placement(const Transform& placement) {
+  if (!finite(placement)) throw std::runtime_error("prefab placement transform is not finite");
+  return placement;
+}
 int instance_node(int node, const Instance& instance) {
   if (node == kNoIndex) return kNoIndex;
   return node == 0 ? instance.root : instance.nodes + node - 1;

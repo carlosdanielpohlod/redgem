@@ -133,8 +133,8 @@ not a promise of how it will be closed.
   `images/` afterwards does not change the scene (pick it again). The Inspector shows a slot's
   picture by name, without a preview, and sets neither a texture's sampler nor its UV set.
 - [Prefab file references](docs/prefabs.md) load at runtime and in editor Play, including nested
-  references and root property overrides. The editing viewport does not preview them yet, and
-  there are no editor commands to create or place prefab files or override inherited children.
+  references, root property overrides and editing-viewport previews. There are no dedicated
+  editor commands to create or place prefab files or override inherited children.
 - Scripts reload when Play is pressed, not while the game runs. The script editor has no
   autocomplete, and a backtrace in the console does not jump to its line.
 - No autosave or crash recovery of the scene being edited; no animation preview or physics debug

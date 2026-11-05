@@ -89,7 +89,7 @@ void EditorApp::draw_selection_rect(ViewPoint from, ViewPoint to) const {
 ObjectId EditorApp::object_at(float x, float y) const {
   const Ray ray = viewport_->ray_at(x, y);
   const PickRay pick{to_vec3(ray.position), normalize(to_vec3(ray.direction))};
-  return pick_object(session_->scene(), session_->scene_desc(), pick);
+  return session_->authored_object(pick_object(session_->scene(), session_->preview_desc(), pick));
 }
 
 ObjectId EditorApp::pick_at(float x, float y) { return pick_at(x, y, ClickMode::Replace); }
@@ -111,12 +111,12 @@ void EditorApp::select_in_box(const editor_logic::Rect& rect, BoxMode mode) {
 
 std::vector<box_select::Candidate> EditorApp::box_candidates() const {
   const Scene& scene = session_->scene();
-  const SceneDesc& desc = session_->scene_desc();
+  const SceneDesc& desc = session_->preview_desc();
   const box_select::ViewCamera camera = view_camera();
   std::vector<box_select::Candidate> candidates;
   for (const ObjectId id : scene.alive_ids()) {
     if (!box_selectable(scene.at(id), desc.nodes[id])) continue;
-    candidates.push_back({id, box_select::to_view(camera, middle_of(scene, desc, id))});
+    candidates.push_back({session_->authored_object(id), box_select::to_view(camera, middle_of(scene, desc, id))});
   }
   return candidates;
 }

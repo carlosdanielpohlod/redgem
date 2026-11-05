@@ -12,6 +12,7 @@
 #include "editor/document/scene_document.hpp"
 #include "editor/inspector_logic.hpp"
 #include "editor/selection.hpp"
+#include "editor/prefab_preview.hpp"
 #include "scene/shapes/terrain.hpp"
 #include "input/input.hpp"
 #include "scene/scene.hpp"
@@ -49,6 +50,12 @@ class EditorSession {
   // The scene to draw: the live runtime while playing, otherwise the edited scene.
   const Scene& scene() const;
   const SceneDesc& scene_desc() const { return document_.desc(); }
+  // Rendering sees inherited assets; document commands keep authored node indices and content.
+  const SceneDesc& preview_desc() const;
+  ObjectId authored_object(ObjectId id) const;
+  Transform placement_world(ObjectId id) const;
+  void sync_preview_assets(const std::vector<int>& changed_meshes);
+  std::uint64_t preview_generation() const { return prefab_preview_.generation(); }
   // After every document edit, one of these so the preview reflects it: refresh_preview makes it
   // all again (anything that adds, removes or moves nodes in the hierarchy, undo, redo, a changed
   // prop); refresh_node makes one node's object again, for an edit to that node only (its
@@ -165,7 +172,7 @@ class EditorSession {
   // Whether the scene can be saved as `file` and still find the files it uses (see save_as).
   bool files_found_from(const std::filesystem::path& file, std::string& error) const;
   // Whether an object can be edited now: the game is stopped, and there is one.
-  bool can_edit(ObjectId id) const { return editing() && id != kNoObject; }
+  bool can_edit(ObjectId id) const { return editing() && document_.has_node(id); }
   bool can_sculpt(ObjectId terrain) const { return editing() && is_terrain(terrain); }
   // A game runs and is not paused.
   bool playing() const { return play_state_ == PlayState::Playing && runtime_ != nullptr; }
@@ -192,10 +199,17 @@ class EditorSession {
   // Whether the selection can be edited now: the game is stopped, and something is selected.
   bool can_edit_selection() const { return editing() && !selection_.empty(); }
 
+  bool valid_parent(ObjectId parent) const { return parent == kNoObject || document_.has_node(parent); }
+  std::vector<Transform> placement_worlds(const std::vector<int>& objects) const;
+  std::vector<Transform> locals_under(const std::vector<int>& objects, const Transform& parent) const;
+  void move_roots(const std::vector<std::string>& names, const std::string& parent,
+                  const std::vector<Transform>& locals);
+  void place_pasted(const std::vector<int>& objects, const std::string& parent, const Transform& parent_world);
   std::filesystem::path game_dir_;
   SceneDocument document_;
   std::string scene_name_;  // of the document's file, kept as it opens or is saved as another
   Scene preview_;
+  PrefabPreview prefab_preview_;
   Selection selection_;
   PlayState play_state_ = PlayState::Editing;
   std::unique_ptr<Engine> runtime_;
