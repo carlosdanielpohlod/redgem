@@ -248,6 +248,7 @@ redgem_add_library(redgem_runtime
   scene/prefab_animations.cpp
   scene/prefab_assets.cpp
   scene/prefab_nodes.cpp
+  scene/prefab_origins.cpp
   scene/prefab_loader.cpp
   scene/gltf/gltf_checks.cpp
   scene/gltf/gltf_budget.cpp
@@ -527,7 +528,9 @@ if(NOT ANDROID)
     editor/editor_logic.cpp
     editor/edit_stream.cpp
     editor/picking.cpp
-    editor/editor_session.cpp
+    editor/editor_session_prefabs.cpp
+    editor/prefab_preview.cpp
+  editor/editor_session.cpp
     editor/editor_session_create.cpp
     editor/editor_session_play.cpp
     editor/console_log.cpp

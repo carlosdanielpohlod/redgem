@@ -492,6 +492,7 @@ set_tests_properties(system.harness_reports_failures PROPERTIES LABELS system RU
 
 # The editor window itself, driven by a doctest program.
 add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp editor_system/editor_window_test.cpp
+               editor_system/prefab_preview_test.cpp
                editor_system/agent_panel_test.cpp
                editor_system/build_progress_test.cpp
                editor_system/window_picture.cpp

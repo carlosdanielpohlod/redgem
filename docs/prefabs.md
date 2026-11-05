@@ -29,10 +29,18 @@ placements require an identity transform on the source root.
 Cycles and oversized expansions fail the load before replacing the running scene.
 Defaults allow 64 source files, eight nested references, 4,096 instances and 100,000
 expanded nodes, with 256 MiB of source GLB files and 512 MiB of estimated expanded
-content. The GLB reader also checks a tighter memory budget before reading buffers.
+content. The GLB reader also checks a tighter memory budget before reading buffers. Editor
+previews count copied scene data against their budget before allocating the snapshot.
 
-This first implementation supports runtime loading, editor Play and project checks.
-The editing viewport still shows the authored reference node. Creating prefab files,
-placing them through the editor and previewing inherited children are separate editor
-work; save the source file through your modeling tool for now. Built games include
-regular files in `prefabs/` along with the other game assets.
+The editing viewport previews inherited geometry, lights and cameras. Clicking inherited parts
+selects the authored reference; its placement pivot stays independent of source-root offsets.
+Moving references, copying, reparenting and undo preserve their world placement. Saving keeps
+references in the scene file, with inherited assets in their original prefab files.
+
+Reopening or reloading the scene rereads its prefab sources. Placement drags use cached source
+data. Missing or invalid references report an error and leave the authored scene editable so
+the link can be repaired. Playing still validates every dependency.
+
+Creating prefab files, placing them through dedicated editor commands and overriding inherited
+children remain future work; use your modeling tool and the `prefab_file` property for now.
+Built games include regular files in `prefabs/` along with the other game assets.

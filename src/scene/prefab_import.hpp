@@ -5,6 +5,8 @@
 
 namespace redgem::prefabs {
 inline constexpr std::size_t kIdentityBytes = 64;
+Transform checked_placement(const Transform& placement);
+void record_origin(Origins& origins, int id, const NodeDesc& authored, const NodeDesc& source);
 struct Assets {
   int images = 0;
   int materials = 0;

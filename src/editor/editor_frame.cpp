@@ -100,7 +100,7 @@ void EditorApp::report_drop(const DropReport& report) {
 }
 
 void EditorApp::check_files_on_disk() {
-  if (reloaded_from_disk()) renderer_->upload(session_->scene_desc());
+  if (reloaded_from_disk()) upload_preview_assets();
   if (time_to(kAssetScanFrames)) {
     rescan_files();
     scripts_->sync_with_disk();
@@ -122,7 +122,7 @@ bool EditorApp::game_has_input() const { return viewport_->focused && session_->
 
 void EditorApp::retire_game_view() {
   if (!game_view_) return;
-  if (game_view_->switched_scene()) renderer_->upload(session_->scene_desc());  // back to the edited scene's assets
+  if (game_view_->switched_scene()) upload_preview_assets();  // back to the edited scene's assets
   game_view_.reset();
 }
 

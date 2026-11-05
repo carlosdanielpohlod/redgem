@@ -8,6 +8,11 @@ until 1.0, a release may change what games rely on (see
 
 ## [Unreleased]
 
+### Added
+
+- **Prefab previews in the editor**: inherited geometry and components appear while editing,
+  with reference selection, cached placement edits and preserved links on save.
+
 ## [0.5.0] - 2026-10-31
 
 ### Added

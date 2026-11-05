@@ -47,7 +47,7 @@ void EditorApp::switch_scene(const std::string& name) {
     log::error("cannot open scene " + name + ": " + error);
     return;
   }
-  renderer_->upload(session_->scene_desc());  // the last scene's meshes and textures are let go
+  upload_preview_assets();  // the last scene's meshes and textures are let go
   ui::forget_scene(panel_state_);
   look_through_main_camera();
   stroke_started_ = false;

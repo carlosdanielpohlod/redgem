@@ -164,7 +164,7 @@ bool EditorApp::external_change_dialog_wanted() const {
 
 void EditorApp::draw_external_change_choices() {
   if (ImGui::Button(tr("editor.disk_change.reload"))) {
-    if (session_->reload_from_disk()) renderer_->upload(session_->scene_desc());
+    if (session_->reload_from_disk()) upload_preview_assets();
     ImGui::CloseCurrentPopup();
   }
   ImGui::SameLine();

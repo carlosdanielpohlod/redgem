@@ -61,6 +61,18 @@ struct PasteFolder {
   PasteFolder& operator=(const PasteFolder&) = delete;
 };
 
+std::vector<Transform> copied_worlds(const std::vector<NodeDesc>& nodes, const std::vector<int>& roots,
+                                     const std::vector<Transform>& provided) {
+  if (!provided.empty()) {
+    if (provided.size() != roots.size()) throw std::invalid_argument("copied placements must match the roots");
+    return provided;
+  }
+  std::vector<Transform> worlds;
+  worlds.reserve(roots.size());
+  for (const int root : roots) worlds.push_back(world_of(nodes, root));
+  return worlds;
+}
+
 // A copied mesh without its vertices: what writing the clip's JSON needs of it.
 MeshDesc without_vertices(const MeshDesc& mesh) {
   MeshDesc outline;
@@ -87,23 +99,24 @@ std::optional<GlbFile> pasteable_clip(const std::filesystem::path& path, const S
 
 }  // namespace
 
-std::optional<std::vector<std::uint8_t>> SceneDocument::copy_nodes(const std::vector<int>& roots, std::string& error) {
+std::optional<std::vector<std::uint8_t>> SceneDocument::copy_nodes(const std::vector<int>& roots, std::string& error,
+                                                                   const std::vector<Transform>& worlds) {
   try {
-    return clipboard_glb(roots, error);
+    return clipboard_glb(roots, error, worlds);
   } catch (const std::exception& problem) {
     error = unusable(path_, problem);
     return std::nullopt;
   }
 }
 
-std::optional<std::vector<std::uint8_t>> SceneDocument::clipboard_glb(const std::vector<int>& roots,
-                                                                      std::string& error) {
+std::optional<std::vector<std::uint8_t>> SceneDocument::clipboard_glb(const std::vector<int>& roots, std::string& error,
+                                                                      const std::vector<Transform>& worlds) {
   // Reshaped terrains are written into the binary chunk first, which the clip takes its bytes from.
   for (const int mesh : unsaved_meshes_) {
     if (!store_mesh_vertices(mesh, error)) return std::nullopt;
   }
   SceneDocument clip = outline();
-  clip.keep_only(roots);
+  clip.keep_only(roots, worlds);
   if (!clip.sync_glb(error)) return std::nullopt;
   // The outline keeps no bytes of its own: its JSON points into the scene's binary chunk.
   if (!glb_.bin.empty()) clip.glb_.json[kBuffers] = nlohmann::json::array({{{kByteLength, glb_.bin.size()}}});
@@ -131,10 +144,8 @@ SceneDocument SceneDocument::outline() const {
   return copy;
 }
 
-void SceneDocument::keep_only(const std::vector<int>& roots) {
-  std::vector<Transform> worlds;
-  worlds.reserve(roots.size());
-  for (const int root : roots) worlds.push_back(world_of(desc_.nodes, root));
+void SceneDocument::keep_only(const std::vector<int>& roots, const std::vector<Transform>& provided) {
+  const auto worlds = copied_worlds(desc_.nodes, roots, provided);
   const std::vector<int> order = subtrees(desc_.nodes, roots);
   const std::vector<int> position = positions_in(order, desc_.nodes.size());
   desc_.nodes = nodes_in_order(desc_.nodes, order);
