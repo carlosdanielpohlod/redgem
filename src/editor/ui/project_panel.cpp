@@ -135,6 +135,7 @@ void draw_folder_bar(PanelContext& context, const FolderInfo& info) {
   ImGui::TextColored(muted_color(), "%s / %s", game_dir.filename().string().c_str(), info.dir);
   ImGui::SameLine();
   draw_new_file_button(context, info.folder);
+  draw_prefab_tools(context);
   if (!ImGui::SmallButton(icon_label(ICON_FA_FOLDER_OPEN, "editor.project.open_folder"))) return;
   std::error_code fs_error;
   std::filesystem::create_directories(game_dir / info.dir, fs_error);

@@ -126,6 +126,9 @@ class EditorSession {
   // Places a game-relative prefab GLB as an empty linked reference, one undo step.
   // Invalid dependencies or placements leave the document and selection unchanged.
   ObjectId place_prefab(const std::string& file, Vec3 position, std::string& error, ObjectId parent = kNoObject);
+  bool can_export_prefab() const { return editing() && selected_roots().size() == 1; }
+  // Saves the selected hierarchy as a reusable file, leaving this scene unchanged.
+  bool export_prefab(const std::string& name, std::string& error);
   // Moves `child` under `parent` (kNoObject = top level), keeping where it is in the world.
   void reparent(ObjectId child, ObjectId parent);
   // The same for the selection's top level (see selected_roots), one undo step. What would go

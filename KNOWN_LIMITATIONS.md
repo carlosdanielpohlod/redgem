@@ -134,7 +134,9 @@ not a promise of how it will be closed.
   picture by name, without a preview, and sets neither a texture's sampler nor its UV set.
 - [Prefab file references](docs/prefabs.md) load at runtime and in editor Play, including nested
   references, root property overrides, editing-viewport previews and placement from the Project
-  panel. There are no dedicated editor commands to create prefab files or override inherited children.
+  panel and exporting one selected hierarchy as a source file. Inherited children cannot be
+  overridden separately. Export needs complete skeletons and descendant-only animation; it does
+  not replace the original selection with a reference or overwrite an existing source file.
 - Scripts reload when Play is pressed, not while the game runs. The script editor has no
   autocomplete, and a backtrace in the console does not jump to its line.
 - No autosave or crash recovery of the scene being edited; no animation preview or physics debug

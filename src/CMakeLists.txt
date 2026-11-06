@@ -530,6 +530,8 @@ if(NOT ANDROID)
     editor/picking.cpp
     editor/editor_session_prefabs.cpp
     editor/prefab_preview.cpp
+    editor/prefab_files.cpp
+    editor/ui/prefab_tools.cpp
   editor/editor_session.cpp
     editor/editor_session_create.cpp
     editor/editor_session_play.cpp

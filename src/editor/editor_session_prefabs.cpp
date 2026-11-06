@@ -1,4 +1,5 @@
 #include "editor/editor_session.hpp"
+#include "editor/prefab_files.hpp"
 
 #include <exception>
 #include <stdexcept>
@@ -107,5 +108,13 @@ ObjectId EditorSession::place_linked(const std::string& file, const Transform& w
   preview_ = std::move(ready.scene);
   select(ready.object);
   return ready.object;
+}
+bool EditorSession::export_prefab(const std::string& name, std::string& error) {
+  if (!can_export_prefab()) {
+    error = "stop the game and select one hierarchy to export as a prefab";
+    return false;
+  }
+  const int root = selected_roots().front();
+  return prefab_files::save(document_, root, placement_world(root), game_dir_, name, error);
 }
 }  // namespace redgem

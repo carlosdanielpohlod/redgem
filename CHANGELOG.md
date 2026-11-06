@@ -10,6 +10,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Prefab creation**: save a selected hierarchy as a reusable GLB from the Project panel,
+  preserving complete skeletons and nested references while validating dependencies before publication.
+
 - **Prefab placement**: double-click or drag files from the Project panel into the scene or
   hierarchy to create linked instances, with dependency validation and undo/redo.
 

@@ -47,6 +47,17 @@ ground under the pointer, or onto a Hierarchy object to parent it there. Placeme
 the complete scene's prefab dependencies first. A failed placement leaves the scene, selection
 and undo history unchanged. Repeated instances share source assets and have independent identities.
 
-Creating prefab files and overriding inherited children remain future work; create source
-files in your modeling tool for now.
+To create a source file, select one hierarchy, open **Project > Prefabs**, and choose
+**Save selection as prefab**. Enter a new lowercase name; the editor creates
+`prefabs/<name>.glb`. Existing files are refused. The original scene and its undo history stay
+unchanged; place the new file separately. Its root keeps the selected object's world
+orientation and size, with its position reset to the origin. Meshes, materials, embedded images,
+child identities, complete skeletons and descendant animations are retained. Linked selections
+remain nested references rather than flattened geometry.
+
+Include every joint of a used skeleton in the selected hierarchy and animate descendants rather
+than the selected root. The editor validates dependencies and runtime budgets before publishing
+a complete file; it never exposes an incomplete source. Export checks a conservative 512 MiB
+estimate of the edited scene's data before copying and caps the source GLB at 256 MiB.
+Overriding inherited children remains future work.
 Built games include regular files in `prefabs/` along with the other game assets.
