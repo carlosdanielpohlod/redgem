@@ -76,6 +76,7 @@ void EditorApp::draw_file_menu() {
 // What the File menu offers for the game being edited.
 void EditorApp::draw_game_file_items() {
   draw_scene_items();
+  if (ImGui::MenuItem(tr("editor.menu.reload_scripts"), nullptr, false, !editing())) reload_scripts();
   ImGui::Separator();
   ui::menu(
       ui::icon_label(ICON_FA_BOX_ARCHIVE, "editor.menu.build_game"), [this] { draw_build_targets(); }, build_offered());

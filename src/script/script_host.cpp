@@ -51,8 +51,9 @@ bool holds_serial(mrb_value serial, mrb_int wanted) { return mrb_integer_p(seria
 
 ScriptHost& script_host(mrb_state* mrb) { return *static_cast<ScriptHost*>(mrb->ud); }
 
-ScriptHost::ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir)
-    : context_(context),
+ScriptHost::ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir, bool live_reload)
+    : live_reload_(live_reload),
+      context_(context),
       scripts_dir_(std::move(scripts_dir)),
       locales_(locales_around(scripts_dir_)),
       locale_(starting_locale(locales_)) {
@@ -87,7 +88,10 @@ RubyResult ScriptHost::load_file(const std::filesystem::path& path) {
   }
   std::stringstream buffer;
   buffer << in.rdbuf();
-  return vm_.eval(buffer.str(), path.string());
+  const auto code = buffer.str();
+  const auto result = vm_.eval(code, path.string());
+  if (result.ok) remember_source(path, code);
+  return result;
 }
 
 mrb_value ScriptHost::object_value(ObjectId object) {

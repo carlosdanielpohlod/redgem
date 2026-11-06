@@ -58,6 +58,8 @@ struct EngineOptions {
   // Every frame advances the game by exactly one fixed step, however long it really took: the same
   // run gives the same game every time. Nothing else selects it.
   bool fixed_step = false;
+  // Only the editor enables live behaviour reload; shipped games do not poll their scripts.
+  bool live_script_reload = false;
   // A reproducible random stream, seeded before any game scripts are loaded.
   std::optional<std::uint32_t> random_seed{};
   // How the game is shown when it starts (Settings): what its game.json says when none.

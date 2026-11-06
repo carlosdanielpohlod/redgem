@@ -34,9 +34,21 @@ std::vector<int> framed_parts(EditorSession& session, ObjectId id) {
 
 }  // namespace
 
-void EditorApp::save_scripts() {
+bool EditorApp::can_reload_scripts() const {
+  const bool manipulating = gizmo_dragging_ || stroke_started_;
+  const bool popup = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
+  return session_->runtime() && !manipulating && !popup;
+}
+void EditorApp::reload_scripts() {
+  if (!session_->runtime()) return;
+  if (!save_scripts()) return;
+  session_->runtime()->scripts().reload_scripts(true);
+}
+bool EditorApp::save_scripts() {
   std::string error;
-  if (!scripts_->save_all(error)) log::error(error);
+  if (scripts_->save_all(error)) return true;
+  log::error(error);
+  return false;
 }
 
 // Typing to the agent leaves the scene free: that is where its edits are asked for.

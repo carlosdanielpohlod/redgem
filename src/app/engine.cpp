@@ -238,7 +238,8 @@ void Engine::connect_context() {
 }
 
 void Engine::start_scripts(std::chrono::milliseconds script_budget) {
-  scripts_ = std::make_unique<ScriptHost>(context_, options_.game_dir / config::kScriptsDirName);
+  scripts_ =
+      std::make_unique<ScriptHost>(context_, options_.game_dir / config::kScriptsDirName, options_.live_script_reload);
   scripts_->vm().set_budget(script_budget);
   seed_scripts();
   scripts_->attach_scripts();
