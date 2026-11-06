@@ -26,6 +26,7 @@ add_executable(redgem_tests
   unit/object_state_test.cpp
   unit/scene_identity_test.cpp
   unit/prefabs_test.cpp
+  unit/prefab_export_test.cpp
   unit/scene_stable_ids_test.cpp
   unit/scene_diff_test.cpp
   unit/mcp_test.cpp

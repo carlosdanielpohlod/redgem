@@ -42,6 +42,7 @@ struct InspectorState {
 enum class ProjectFolder { Scripts, Models, Sounds, Scenes, Images, Prefabs };
 
 struct ProjectState {
+  std::string new_prefab_name;
   std::string new_script_name;
   ProjectFolder folder = ProjectFolder::Scripts;  // the one whose files are shown
 };

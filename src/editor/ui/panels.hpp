@@ -61,6 +61,9 @@ void draw_inspector(PanelContext& context);
 // drag to add to the scene), sounds (double click plays) and scenes (double click opens, New
 // scene makes one).
 void draw_project(PanelContext& context);
+void draw_prefab_tools(PanelContext& context);
+// Saves the selection and requests a file rescan, reporting errors to the console.
+bool save_prefab(PanelContext& context, const std::string& name);
 
 void draw_console(ConsoleLog& console, ConsoleState& state);
 
