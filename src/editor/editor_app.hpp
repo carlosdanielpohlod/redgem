@@ -346,7 +346,9 @@ class EditorApp {
   void draw_external_change_choices();
   void draw_shortcuts_dialog();
   bool editing_blocked() const;
-  void save_scripts();
+  bool save_scripts();
+  void reload_scripts();
+  bool can_reload_scripts() const;
   float frame_seconds() const { return frame_seconds_; }
 
   std::unique_ptr<ConsoleLog> console_;

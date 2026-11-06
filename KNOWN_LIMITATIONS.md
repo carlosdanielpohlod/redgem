@@ -137,8 +137,11 @@ not a promise of how it will be closed.
   panel and exporting one selected hierarchy as a source file. Inherited children cannot be
   overridden separately. Export needs complete skeletons and descendant-only animation; it does
   not replace the original selection with a reference or overwrite an existing source file.
-- Scripts reload when Play is pressed, not while the game runs. The script editor has no
-  autocomplete, and a backtrace in the console does not jump to its line.
+- [Live script reload](docs/scripting/live_reload.md) updates plain behaviour methods and literal
+  constants during editor Play, preserving instance fields. Executable setup, computed constants,
+  class methods/mixins, changed inheritance and initially failed scripts still require a restart;
+  existing blocks keep their old code. The script editor has no autocomplete, and console
+  backtraces do not jump to their lines.
 - No autosave or crash recovery of the scene being edited; no animation preview or physics debug
   view; no preferences beyond the graphics card (key bindings, camera speed, snap sizes); no HiDPI
   scaling; dark theme only.

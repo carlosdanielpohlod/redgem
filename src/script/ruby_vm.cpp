@@ -122,6 +122,7 @@ RClass* define_timeout_class(mrb_state* mrb) {
 RubyVm::RubyVm() : mrb_(mrb_open_allocf(mrb_default_allocf, &budget_)) {
   if (mrb_ == nullptr) throw std::runtime_error("cannot create the mruby interpreter");
   budget_.attach(mrb_, define_timeout_class(mrb_));
+  reload_hooks_ = class_reload_hooks(mrb_, mrb_->class_class);
 }
 
 void RubyVm::set_budget(std::chrono::milliseconds budget) { budget_.set_limit(budget); }

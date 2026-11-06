@@ -320,9 +320,12 @@ redgem_add_library(redgem_runtime
   storage/save_file_slots.cpp
   script/script_naming.cpp
   script/ruby_vm.cpp
+  script/reload_shape.cpp
+  script/ruby_reload.cpp
   script/script_budget.cpp
   script/script_host.cpp
   script/script_host_scripts.cpp
+  script/script_host_reload.cpp
   script/script_host_callbacks.cpp
   script/script_host_network.cpp
   script/script_host_http.cpp
@@ -467,7 +470,8 @@ redgem_add_library(redgem_runtime
   app/crash_handlers_windows.cpp)
 redgem_embed_texts(redgem_runtime game)
 # (The prelude is the runtime's alone: no other library is given the folder it is generated in.)
-target_include_directories(redgem_runtime PRIVATE ${REDGEM_GENERATED_DIR})
+target_include_directories(redgem_runtime PRIVATE ${REDGEM_GENERATED_DIR}
+  "${mruby_SOURCE_DIR}/mrbgems/mruby-compiler/core")
 target_link_libraries(redgem_runtime PUBLIC redgem_net raylib Jolt mruby_lib cgltf_headers nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_runtime PRIVATE freetype)
 if(WIN32)

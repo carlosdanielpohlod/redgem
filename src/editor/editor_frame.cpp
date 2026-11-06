@@ -104,6 +104,7 @@ void EditorApp::check_files_on_disk() {
   if (time_to(kAssetScanFrames)) {
     rescan_files();
     scripts_->sync_with_disk();
+    if (can_reload_scripts()) session_->runtime()->scripts().reload_scripts();
   }
 }
 

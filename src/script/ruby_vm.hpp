@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "script/script_budget.hpp"
+#include "script/ruby_reload.hpp"
 
 namespace redgem {
 
@@ -33,6 +34,8 @@ class RubyVm {
   mrb_state* state() { return mrb_; }
 
   RubyResult eval(const std::string& code, const std::string& file_name);
+  // Replaces one plain behaviour class while retaining its identity and instance fields.
+  RubyResult reload_class(RClass* klass, const std::string& code, const std::string& file_name);
   // Compiles without running. On a syntax error, `error` says where ("line N: ...").
   RubyResult check_syntax(const std::string& code, const std::string& file_name);
   RubyResult call(mrb_value receiver, const char* method, std::initializer_list<mrb_value> args = {});
@@ -57,6 +60,7 @@ class RubyVm {
   // (Before the interpreter, which keeps a pointer to it from its first instruction on.)
   ScriptBudget budget_;
   mrb_state* mrb_;
+  ReloadHooks reload_hooks_{};
 };
 
 }  // namespace redgem
