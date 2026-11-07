@@ -166,6 +166,8 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   // A contact Jolt no longer reports because both bodies rest, though they still touch.
   bool rests_on(const ContactPair& pair) const { return both_at_rest(pair) && still_touch(pair); }
   void create_simulated(const BodyDesc& desc, const ShapeInfo& info, Record& record);
+  // Holds an object's record, counting it among the triggers when it is one.
+  void keep(ObjectId object, Record record);
   void move_kinematic_bodies(float dt);
 
   // Rigid bodies.

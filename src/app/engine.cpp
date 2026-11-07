@@ -3,7 +3,9 @@
 #include "app/engine.hpp"
 
 #include <exception>
+#include <filesystem>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include "app/game_identity.hpp"
@@ -30,6 +32,13 @@ void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.id_error.empty()) log::warning(manifest.id_error + kSavedByFolderNote);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
   for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
+}
+
+// Whether the game has a scene of that name. (A script names it: a name the system refuses, too long
+// for instance, is a scene that is not there, never an exception thrown through the interpreter.)
+bool has_scene_file(const std::filesystem::path& game_dir, const std::string& name) {
+  std::error_code fs_error;
+  return safe_scene_name(name) && std::filesystem::exists(scene_file(game_dir, name), fs_error);
 }
 
 }  // namespace
@@ -225,12 +234,7 @@ void Engine::connect_context() {
   context_.spawn = [this](ObjectId source, const std::optional<Transform>& world, bool physics) {
     return spawn(source, world, physics);
   };
-  context_.scene_exists = [this](const std::string& name) {
-    // (A script names it: a name the system refuses, too long for instance, is a scene that is not
-    // there, never an exception thrown through the interpreter.)
-    std::error_code fs_error;
-    return safe_scene_name(name) && std::filesystem::exists(scene_file(options_.game_dir, name), fs_error);
-  };
+  context_.scene_exists = [this](const std::string& name) { return has_scene_file(options_.game_dir, name); };
 }
 
 void Engine::start_scripts(std::chrono::milliseconds script_budget) {
