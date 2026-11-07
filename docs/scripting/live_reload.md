@@ -42,8 +42,8 @@ The declaration restrictions apply to code executed while the file itself is eva
 
 Syntax errors and unsupported declarations keep the previous code running and report the
 problem once per observed file version. Fix and save the file, or use **Reload scripts** to
-retry. A successfully reloaded class re-enables its own instances disabled by later callbacks;
-failed instances of subclasses remain disabled until their own class is reloaded or Play restarts. A failed
+retry. A successfully reloaded class re-enables its instances and subclasses disabled by later
+callbacks. A still-broken subclass reports its error once more and is disabled again. A failed
 `start` leaves its instance disabled until Play is restarted, avoiding half-initialized updates.
 An error in a subsequently called method follows the usual rule: that behaviour is disabled.
 

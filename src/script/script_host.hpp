@@ -109,6 +109,8 @@ class ScriptHost {
   };
 
   void remember_source(const std::filesystem::path& path, const std::string& code);
+  void record_source(const std::filesystem::path& path, const std::string& source, std::string& name);
+  void disable_reload_source(const std::string& name, const char* error);
   bool reload_script(const std::string& script, bool retry);
   bool apply_reload(const std::string& script, RClass* klass, const std::string& source);
   bool reload_unreadable(const std::string& script);

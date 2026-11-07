@@ -41,7 +41,8 @@ std::optional<std::string> source_in(const std::filesystem::path& folder, const 
 }
 bool awaiting_stable_source(ReloadSource& state, const std::optional<ScriptStamp>& stamp, bool retry) {
   const bool stable = state.settling && state.candidate == stamp;
-  if (retry || stable) return false;
+  const bool ready = retry || stable;
+  if (ready) return false;
   state.candidate = stamp;
   state.settling = true;
   return true;
@@ -70,9 +71,26 @@ ScriptStamp script_stamp(const std::string& source) {
   return stamp;
 }
 void ScriptHost::remember_source(const std::filesystem::path& path, const std::string& source) {
+  std::string name;
+  try {
+    record_source(path, source, name);
+  } catch (const std::exception& error) {
+    disable_reload_source(name, error.what());
+  }
+}
+void ScriptHost::disable_reload_source(const std::string& name, const char* error) {
+  if (name.empty()) {
+    live_reload_ = false;
+    reload_sources_.clear();
+  } else {
+    reload_sources_.erase(name);
+  }
+  log::warning("live reload disabled for " + name + ": " + error);
+}
+void ScriptHost::record_source(const std::filesystem::path& path, const std::string& source, std::string& name) {
   if (!live_reload_) return;
   if (source.size() > kReloadSourceBytes) return;
-  const auto name = path.lexically_relative(scripts_dir_).generic_u8string();
+  name = path.lexically_relative(scripts_dir_).generic_u8string();
   if (!safe_asset_name(name)) return;
   auto& state = reload_sources_[name];
   state.observed = script_stamp(source);
@@ -82,7 +100,7 @@ void ScriptHost::refresh_reloaded(RClass* klass) {
   for (auto& slot : behaviours_) {
     auto* actual = mrb_obj_class(vm_.state(), slot.instance);
     slot.fixed_updates = overrides(actual, "fixed_update");
-    const bool resumes_here = actual == klass && !slot.start_failed;
+    const bool resumes_here = inherits_class(actual, klass) && !slot.start_failed;
     if (resumes_here) slot.enabled = true;
   }
 }
