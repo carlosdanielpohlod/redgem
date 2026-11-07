@@ -123,6 +123,8 @@ class InputState {
   void swallow_mouse();
   // The mouse buttons held now read as up until they are let go; the wheel as still until it stops.
   void swallow_held_mouse();
+  // The mouse of this frame, with what a capture swallowed hidden.
+  void read_mouse(const InputSource& source);
   // Forgets the swallowed mouse buttons the device's sample says were let go, and the wheel once
   // it stopped.
   void forget_let_go(const MouseSample& raw);

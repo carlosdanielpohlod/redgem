@@ -90,15 +90,19 @@ void InputState::update(const InputSource& source) {
   for (const Key key : all_keys()) {
     if (source.is_key_down(key)) current_.insert(key);
   }
+  read_mouse(source);
+  previous_gamepads_ = gamepads_;
+  for (std::size_t pad = 0; pad < kMaxGamepads; ++pad) gamepads_[pad] = source.gamepad(pad);
+  typed_ = source.typed_text();
+  catch_capture();
+}
+
+void InputState::read_mouse(const InputSource& source) {
   previous_mouse_ = mouse_;
   mouse_ = source.mouse();
   touch_pointer_ = source.touch_pointer();
   forget_let_go(mouse_);
   hide_swallowed_mouse();
-  previous_gamepads_ = gamepads_;
-  for (std::size_t pad = 0; pad < kMaxGamepads; ++pad) gamepads_[pad] = source.gamepad(pad);
-  typed_ = source.typed_text();
-  catch_capture();
 }
 
 void InputState::capture_next(std::vector<InputBinding> cancels, MouseCapture mouse) {
