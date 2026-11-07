@@ -166,10 +166,14 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   // A contact Jolt no longer reports because both bodies rest, though they still touch.
   bool rests_on(const ContactPair& pair) const { return both_at_rest(pair) && still_touch(pair); }
   void create_simulated(const BodyDesc& desc, const ShapeInfo& info, Record& record);
+  // Holds an object's record, counting it among the triggers when it is one.
+  void keep(ObjectId object, Record record);
   void move_kinematic_bodies(float dt);
 
   // Rigid bodies.
   void create_body(const BodyDesc& desc, const ShapeInfo& info, Record& record);
+  // The world holds config::kMaxBodies bodies already: the object is left without one, said once.
+  void tell_bodies_full();
   void release_body(Record& record);
   void teleport_body(Record& record, const Transform& world);
 
@@ -225,6 +229,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   JPH::JobSystemSingleThreaded job_system_;
   JPH::PhysicsSystem system_;
   std::map<ObjectId, Record> records_;  // ordered: deterministic iteration
+  std::set<ObjectId> triggers_;         // of the records, those that are triggers
   std::map<JPH::uint32, ObjectId> body_owners_;
   std::map<const JPH::CharacterVirtual*, ObjectId> character_owners_;
   std::mutex contacts_mutex_;
@@ -234,6 +239,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   std::map<JointId, JointRecord> joints_;  // ordered: deterministic breaking
   std::set<JointId> broken_joints_;        // a few bytes a broken joint, for as long as the scene runs
   JointId next_joint_ = kNoJoint + 1;
+  bool told_bodies_full_ = false;  // the error that the world holds all the bodies it can was logged
 };
 
 }  // namespace redgem::jolt

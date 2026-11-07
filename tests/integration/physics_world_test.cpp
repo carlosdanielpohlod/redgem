@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -8,6 +9,7 @@
 #include "core/config.hpp"
 #include "physics/physics_config.hpp"
 #include "physics/physics_world.hpp"
+#include "test_support.hpp"
 
 using namespace redgem;
 
@@ -198,4 +200,41 @@ TEST_CASE("a mesh collider is made only of triangles that name the mesh's own ve
   REQUIRE_FALSE(world->add_object(body(kCrate, {{"body", std::string("dynamic")}}, kDropHeight, kCrateHalfExtents)));
   run(*world, kSettleSteps);
   CHECK(world->simulated_pose(kCrate)->position.y == doctest::Approx(kCrateHalfExtents.y).epsilon(kPositionTolerance));
+}
+
+TEST_CASE("past the bodies the world can hold, an object gets none, and that is said once, naming the limit") {
+  constexpr ObjectId kFirstBox = 100;
+  constexpr float kBoxSpacing = 2.0f;  // apart: no two boxes touch
+  constexpr int kBeyondTheLimit = 2;   // boxes added once the world is full
+  auto world = world_with_ground();    // (the ground is one of the bodies)
+  const redgem::test::LogCapture log;
+  const auto box_at = [](std::uint32_t index) {
+    return body(kFirstBox + index, {{"collider", std::string("box")}}, {kBoxSpacing * index, 0, kBoxSpacing},
+                kCrateHalfExtents);
+  };
+  const std::uint32_t boxes = config::kMaxBodies - 1 + kBeyondTheLimit;
+  for (std::uint32_t i = 0; i < boxes; ++i) REQUIRE_FALSE(world->add_object(box_at(i)));
+  CHECK(log.count(log::Level::Error) == 1);
+  CHECK(log.contains(std::to_string(config::kMaxBodies)));
+  const auto above = [](std::uint32_t index) { return Vec3{kBoxSpacing * index, kRayLength / 2, kBoxSpacing}; };
+  // (The ground is ignored: under the first box, it would be hit whether the box has a body or not.)
+  CHECK(world->raycast(above(0), kDown, kRayLength, kGround));
+  CHECK_FALSE(world->raycast(above(boxes - 1), kDown, kRayLength, kGround));
+}
+
+TEST_CASE("a world of many thousand objects is taken apart in a moment, not in time for every pair of them") {
+  // (A script that spawns until its budget stops it leaves tens of thousands: forgetting each one
+  // used to look at every other, and closing the game took minutes.)
+  constexpr std::uint32_t kManyObjects = 100000;  // (taking them apart pair by pair: about a minute)
+  constexpr ObjectId kFirstObject = 100;
+  constexpr auto kInAMoment = std::chrono::seconds(5);
+  auto world = world_with_ground();
+  const redgem::test::LogCapture quiet;  // (past the bodies it holds, the world says so)
+  REQUIRE_FALSE(world->add_object(body(kZone, {{"trigger", true}}, kAboveGround, kZoneHalfExtents)));
+  for (std::uint32_t i = 0; i < kManyObjects; ++i) {
+    REQUIRE_FALSE(world->add_object(body(kFirstObject + i, {{"collider", std::string("box")}}, {}, kCrateHalfExtents)));
+  }
+  const auto start = std::chrono::steady_clock::now();
+  world.reset();
+  CHECK(std::chrono::steady_clock::now() - start < kInAMoment);
 }

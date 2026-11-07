@@ -51,8 +51,8 @@ std::set<ObjectId> World::objects_inside(ObjectId id, const Record& trigger) con
 }
 
 void World::update_triggers() {
-  for (auto& [id, record] : records_) {
-    if (!record.trigger) continue;
+  for (const ObjectId id : triggers_) {
+    Record& record = *find(id);  // (triggers_ holds the records that are triggers, and only those)
     std::set<ObjectId> now = objects_inside(id, record);
     append_trigger_changes(id, record.overlaps, now, events_);
     record.overlaps = std::move(now);
@@ -109,7 +109,10 @@ void World::forget(ObjectId object) {
     std::lock_guard<std::mutex> lock(contacts_mutex_);
     erase_pairs_with(object, current_contacts_);
   }
-  for (auto& [id, record] : records_) record.overlaps.erase(object);
+  // (The triggers alone, not every object: destroying each of many thousands, or the whole world
+  // at once, would otherwise take time for every other one.)
+  triggers_.erase(object);
+  for (const ObjectId trigger : triggers_) find(trigger)->overlaps.erase(object);
   for (auto it = character_owners_.begin(); it != character_owners_.end();) {
     it = it->second == object ? character_owners_.erase(it) : std::next(it);
   }

@@ -171,6 +171,10 @@ not a promise of how it will be closed.
   editor's Physics card has no collision layer picker (`layer` is set as a custom property).
 - Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - No navigation mesh or pathfinding.
+- A scene holds at most 4096 physics bodies at once (a fixed size, not set per game). An object
+  spawned past that gets no body: no collisions, and raycasts miss it. The engine logs one error
+  when that first happens. A game that keeps spawning (bullets, debris) has to destroy what it no
+  longer needs.
 - `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
   automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
   work. Slot selection and storage calls are synchronous.
