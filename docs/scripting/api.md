@@ -203,17 +203,17 @@ Keyboard, mouse, gamepad and touch, read every frame. See [gameplay.md](gameplay
 - `Input.action?(name)`: whether a named action (game settings) is held
 - `Input.action_pressed?(name)`: whether a named action started this frame
 - `Input.action_released?(name, pad: 0)`: whether a named action ended this frame
-- `Input.define_action(name, *bindings, keys: [], buttons: [])`: adds an action of the game's own (besides game.json's input section)
+- `Input.define_action(name, *bindings, keys: [], buttons: [], mouse: [])`: adds an action of the game's own (besides game.json's input section)
 - `Input.define_axis(name, negative: [], positive: [], pad_axis: nil, invert: false)`: adds an axis of the game's own: define_axis(:steer, negative: ["key:a"], positive: ["key:d"])
 - `Input.actions`: the names of the actions
 - `Input.axes`: the names of the axes
 - `Input.axis_stick(name)`: the stick that moves an axis (:left_x), the game's for every player; nil when none does
-- `Input.bindings(name, pad: 0)`: what a player bound to an action: ["key:space", "pad:a"]
+- `Input.bindings(name, pad: 0)`: what a player bound to an action: ["key:space", "mouse:left", "pad:a"]
 - `Input.bindings_changes`: a count that goes up whenever actions, axes or bindings may have changed
-- `Input.bind(name, binding = nil, key: nil, button: nil, side: nil, pad: 0)`: binds a key or a button to an action; kept between runs
-- `Input.unbind(name, binding = nil, key: nil, button: nil, side: nil, pad: 0)`: takes a binding off an action
+- `Input.bind(name, binding = nil, key: nil, button: nil, mouse: nil, side: nil, pad: 0)`: binds a key, a mouse button (mouse: :left, :wheel_up) or a gamepad button to an action; kept between runs
+- `Input.unbind(name, binding = nil, key: nil, button: nil, mouse: nil, side: nil, pad: 0)`: takes a binding off an action
 - `Input.reset_bindings(name = nil, pad: nil)`: back to the game's own bindings (of one action, or all; of one pad, or all)
-- `Input.capture_next(cancel: ["key:escape", "pad:b", "pad:back"], &block)`: the next key or button pressed, to the block: |binding, pad| (nil: called off)
+- `Input.capture_next(cancel: ["key:escape", "pad:b", "pad:back"], mouse: true, &block)`: the next key, mouse button, wheel turn or gamepad button pressed, to the block: |binding, pad| (nil: called off); mouse: false leaves the mouse out
 - `Input.capturing?`: whether a capture waits for a key
 - `Input.capturing_for?(block)`: whether a capture still waits to call that block (not once another took its place)
 - `Input.cancel_capture`: calls a capture off
@@ -222,7 +222,7 @@ Keyboard, mouse, gamepad and touch, read every frame. See [gameplay.md](gameplay
 - `Input.mouse_dx`: how far the mouse moved this frame, across
 - `Input.mouse_dy`: how far the mouse moved this frame, up and down
 - `Input.mouse_wheel`: how far the wheel turned this frame
-- `Input.mouse_down?(button)`: whether a mouse button (:left, :right, :middle) is held
+- `Input.mouse_down?(button)`: whether a mouse button (:left, :right, :middle, :side, :extra) is held
 - `Input.mouse_pressed?(button)`: whether a mouse button went down this frame
 - `Input.mouse_released?(button)`: whether a mouse button went up this frame
 - `Input.mouse_locked = locked`: hides the pointer and keeps it in the window (first-person cameras)

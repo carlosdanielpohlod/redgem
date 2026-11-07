@@ -20,6 +20,23 @@ Input.pressed?(:e)             # any key: went down this frame
 Built-in actions: `:jump` (Space), `:fire` (Left Ctrl or Enter), `:run` (Left Shift). A game
 declares its own and lets players change them: see [Controls](#controls).
 
+Keys go by these names:
+
+| Keys | Names |
+|---|---|
+| Letters and digits | `:a` to `:z`, `:"0"` to `:"9"` (written `"key:7"` as text) |
+| Function keys | `:f1` to `:f12` |
+| Editing | `:escape`, `:enter`, `:tab`, `:backspace`, `:insert`, `:delete`, `:home`, `:end`, `:page_up`, `:page_down` |
+| Arrows | `:up`, `:down`, `:left`, `:right` |
+| Punctuation | `:space`, `:apostrophe`, `:comma`, `:minus`, `:period`, `:slash`, `:semicolon`, `:equals`, `:left_bracket`, `:right_bracket`, `:backslash`, `:grave` |
+| Modifiers | `:left_shift`, `:right_shift`, `:left_control`, `:right_control`, `:left_alt`, `:right_alt`, `:left_super`, `:right_super` |
+| Locks and system | `:caps_lock`, `:scroll_lock`, `:num_lock`, `:print_screen`, `:pause`, `:menu` |
+| Keypad | `:kp_0` to `:kp_9`, `:kp_decimal`, `:kp_divide`, `:kp_multiply`, `:kp_subtract`, `:kp_add`, `:kp_enter`, `:kp_equals` |
+
+A key is named for where it is on a US keyboard: on another layout, `:semicolon` is the key in that
+place, whatever it types. Some systems keep a key for themselves (Print Screen, the Super keys),
+and a game never sees it go down there.
+
 ## Read a gamepad
 
 A game written with axes and actions already works with a gamepad: the left stick moves
@@ -51,8 +68,8 @@ Input.axis(:horizontal, pad: 1)         # the second player's stick
 Input.gamepad_down?(:start, pad: 1)
 ```
 
-The keyboard belongs to the first player (pad 0). The other players start with the gamepad's
-bindings only, unless a player binds keys of their own (two players sharing one keyboard).
+The keyboard and the mouse belong to the first player (pad 0). The other players start with the
+gamepad's bindings only, unless a player binds keys of their own (two players sharing one keyboard).
 
 Gamepads cannot rumble: the window library the engine uses on desktops has no vibration, and
 neither does Android's.
@@ -79,15 +96,21 @@ its own, or binds one of those anew, in the `input` section of its `game.json`:
 }
 ```
 
-A binding is `key:` with a key's name (`key:space`, `key:left_shift`, `key:7`) or `pad:` with a
-gamepad button's (`pad:a`, `pad:dpad_up`). An axis' `pad_axis` is a stick that moves it too, by as
+A binding is `key:` with a key's name (`key:space`, `key:left_shift`, `key:f5`, `key:kp_1`),
+`mouse:` with a mouse button's (`mouse:left`, `mouse:right`, `mouse:middle`, and the side buttons
+`mouse:side` and `mouse:extra`) or the wheel's direction (`mouse:wheel_up`, `mouse:wheel_down`), or
+`pad:` with a gamepad button's (`pad:a`, `pad:dpad_up`). The wheel is pressed on every frame it
+turns that way, and let go on the first it does not: `action_pressed?` sees each turn, which suits
+picking the next weapon. An axis' `pad_axis` is a stick that moves it too, by as
 much as it is pushed; `invert` runs that stick the other way (up is negative on a stick). A
 binding the engine does not know is left out with a warning, and the game plays on. Scripts can
 declare names too, before using them. There, a binding may also be a Symbol (a key) or
-`{keys: [...], buttons: [...]}`, mixed as one likes:
+`{keys: [...], mouse: [...], buttons: [...]}`, mixed as one likes:
 
 ```ruby
 Input.define_action(:dash, keys: [:e], buttons: [:b])     # or define_action(:dash, :e, "pad:b")
+Input.define_action(:shoot, :f, mouse: [:left], buttons: [:right_bumper])
+Input.define_action(:next_weapon, "mouse:wheel_up", "pad:y")
 Input.define_axis(:steer, negative: [:a, "pad:dpad_left"], positive: {keys: [:d], buttons: [:dpad_right]},
                   pad_axis: :left_x)
 Input.actions                   # [:dash, :fire, :jump, :run]
@@ -106,6 +129,7 @@ Input.bindings(:jump)                         # ["key:space", "pad:a"]
 Input.bindings(:horizontal)                   # {negative: ["key:a", "key:left"], positive: [...]}
 Input.bind(:jump, key: :k)                    # Space and K both jump now
 Input.bind(:jump, key: :j, button: :y)        # both given: both bound (unbind takes both away too)
+Input.bind(:fire, mouse: :left)               # a click fires (or Input.bind(:fire, "mouse:left"))
 Input.unbind(:jump, key: :space)              # only K
 Input.unbind(:jump)                           # nothing: every key and button taken away
 Input.bind(:fire, button: :y, pad: 1)         # the second player's Y fires
@@ -125,8 +149,15 @@ One key may be bound to several actions, and every action it is bound to sees it
 `:fire` in the game and `:confirm` in a menu. A settings screen that wants each key to do one
 thing checks `Input.bindings` of the other actions before binding it.
 
-A "press a key" screen asks for the next key or button pressed. The block gets the binding as
-text, and the gamepad's number (`nil` for a key); a key already held when it asks does not count.
+A "press a key" screen asks for the next key, mouse button or gamepad button pressed, or the
+wheel turned. The block gets the binding as text, and the gamepad's number (`nil` for a key or the
+mouse); a key or button already held when it asks does not count, so the click on a "Rebind" button
+that asked is never taken for the binding (nor does its release click anything, and a scroll under
+way when it asks is not caught either). A mouse button caught is the capture's until it is let
+go: its release clicks nothing under the pointer. `mouse: false` leaves the mouse out of a capture,
+for a screen that waits for a gamepad button while its own buttons still take clicks. On a touch
+screen a tap is the mouse's left button, and a capture never catches it: taps keep working the
+screen.
 Escape, or a gamepad's B or Back, calls the capture off instead: the block gets `nil` for the
 binding, so the player can back out (`cancel:` lists other bindings for that, `cancel: []` none).
 Whatever went down on the frame a capture ends is the capture's: no action fires and no menu opens
@@ -140,6 +171,7 @@ Input.capture_next do |binding, pad|
   Input.bind(:jump, binding, pad: pad)
 end
 Input.capture_next(cancel: ["key:backspace"]) { |binding, pad| ... }   # Escape can be bound
+Input.capture_next(mouse: false) { |binding, pad| ... }   # keys and gamepad buttons only
 Input.capturing?       # still waiting
 Input.capturing_for?(block)   # still waiting to call that block (not once another capture took its place)
 Input.cancel_capture   # stop waiting (the block is never called)
@@ -154,16 +186,19 @@ which stick moves an axis (`:left_x`, or `nil`): it is the game's, the same for 
 `GameMenu`'s settings screen has a Controls button that opens a ready-made controls page (the
 `:controls` screen). At its top, a choice of the player whose bindings it shows (1 to 4: the first
 also has the keyboard). Under it, a row for each action and one for each side of each axis, every
-one the game declared, in two cells: the player's keys, and their gamepad buttons (an axis' stick
+one the game declared, in two cells: the player's keys and mouse buttons, and their gamepad buttons (an axis' stick
 shows among them, though no player rebinds it). Up and down move between the rows, left and
 right between a row's two cells.
 
 Enter, a gamepad's A or a click on a cell (which also moves the focus there) waits for the next
-key (the keys' cell) or button (the buttons' cell): that one takes the place of everything the cell
+key, mouse button or wheel turn (the keys' cell) or gamepad button (the buttons' cell): that one
+takes the place of everything the cell
 had, and the row's other cell keeps its own. A button pressed for the keys' cell (or a key for the
 buttons'), or a button of another player's gamepad, is not for it, and it waits on; any keyboard
-key is taken for any player. Escape or a gamepad's Back calls the wait off (and B too, for a keys' cell), so those
-are never bound there.
+key or mouse button is taken for any player. The click on a cell that starts a wait is not taken for
+its binding; the next click is, and it clicks nothing else on the page. While a buttons' cell waits,
+the mouse works the page as usual. Escape or a gamepad's Back calls the wait off (and B too, for a
+keys' cell), so those are never bound there.
 A key bound to two rows is allowed, as above, and both cells show it in orange with a `!`. "Reset to
 defaults" puts all of the shown player's bindings back to the game's; Back (or Esc) goes back to the
 settings, on their Controls button (the settings were kept on the way in). What players bind is
@@ -181,7 +216,7 @@ Shift", "A button", "Left stick X"), as `game.controls.*` texts a game may chang
 ```ruby
 Input.mouse_x, Input.mouse_y        # pixels from the top-left corner
 Input.mouse_dx, Input.mouse_dy      # how far it moved since the last frame
-Input.mouse_down?(:left)            # :left, :right or :middle, held
+Input.mouse_down?(:left)            # :left, :right, :middle, :side or :extra, held
 Input.mouse_pressed?(:left)         # went down this frame
 Input.mouse_released?(:left)        # went up this frame
 Input.mouse_wheel                   # notches turned this frame

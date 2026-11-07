@@ -1,17 +1,20 @@
 # What the menu's controls page holds and does, apart from how it is drawn (see
 # GameMenu::ControlsScreen): a row for each of the game's actions and for each side of each of its
-# axes, for one player at a time. Each row has two cells, the player's keys and their gamepad
-# buttons. Rebinding a cell waits for the next key (the keys' cell) or button (the buttons' cell)
-# pressed, and that one takes the place of what the cell had; the row's other cell keeps its own.
+# axes, for one player at a time. Each row has two cells, the player's keys and mouse buttons, and
+# their gamepad buttons. Rebinding a cell waits for the next key, mouse button or wheel turn (the
+# keys' cell) or gamepad button (the buttons' cell) pressed, and that one takes the place of what
+# the cell had; the row's other cell keeps its own. The click that asked for the wait is not taken
+# for the binding, and the one caught clicks nothing on the page; a click while the buttons' cell
+# waits works the page as usual.
 # A key or button bound to two rows is allowed (both see it), and is marked. A buttons' cell takes
 # a button from the shown player's own gamepad only. What it shows is worked out again only after
 # the bindings change (Input.bindings_changes) or another player is shown.
 class GameMenu < Behaviour
   class ControlsPage
-    KEYS = 0       # the cell of a row's keys
+    KEYS = 0       # the cell of a row's keys and mouse buttons
     BUTTONS = 1    # the cell of its gamepad buttons
     # What the bindings of each cell start with.
-    PREFIXES = [Input::KEY_PREFIX, Input::PAD_PREFIX].freeze
+    PREFIXES = [[Input::KEY_PREFIX, Input::MOUSE_PREFIX].freeze, [Input::PAD_PREFIX].freeze].freeze
     SIDES = %i[negative positive].freeze
     SEPARATOR = ", ".freeze  # between the names of a cell's bindings
     # What calls a wait off, for each cell: Escape, and a gamepad's B or Back for the keys' cell;
@@ -48,11 +51,10 @@ class GameMenu < Behaviour
       @player = pad
     end
 
-    # The player's bindings of a cell, as text ("key:space").
+    # The player's bindings of a cell, as text ("key:space", "mouse:left").
     def bindings(row, column)
       refresh
-      prefix = PREFIXES.fetch(column)
-      @cells[[row.name, row.side, column]] ||= of_row(row).select { |binding| binding.start_with?(prefix) }
+      @cells[[row.name, row.side, column]] ||= of_row(row).select { |binding| of_column?(binding, column) }
     end
 
     # What a cell shows: its bindings by name, or "None". An axis' stick is among its buttons,
@@ -74,10 +76,10 @@ class GameMenu < Behaviour
 
     def capturing? = !@waiting.nil? && Input.capturing_for?(@capture)
 
-    # Waits for the key or button that will fill a cell.
+    # Waits for the key or button that will fill a cell (the mouse only for the keys' cell).
     def capture(row, column)
       @waiting = [row, column]
-      Input.capture_next(cancel: CANCELS.fetch(column), &@capture)
+      Input.capture_next(cancel: CANCELS.fetch(column), mouse: column == KEYS, &@capture)
     end
 
     # Stops waiting: the cell keeps what it had.
@@ -108,10 +110,12 @@ class GameMenu < Behaviour
     # Whether a binding caught is one the cell takes: of its kind, and a button from the shown
     # player's own gamepad.
     def fits?(binding, pad, column)
-      return false unless binding.start_with?(PREFIXES.fetch(column))
+      return false unless of_column?(binding, column)
 
       column == KEYS || pad == @player
     end
+
+    def of_column?(binding, column) = binding.start_with?(*PREFIXES.fetch(column))
 
     # Forgets what it worked out when the bindings changed, or another player is shown.
     def refresh

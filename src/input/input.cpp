@@ -13,6 +13,24 @@ constexpr float kAxisPositive = 1.0f;
 
 bool is_trigger(GamepadAxis axis) { return axis == GamepadAxis::LeftTrigger || axis == GamepadAxis::RightTrigger; }
 
+bool is_wheel(MouseInput input) { return input == MouseInput::WheelUp || input == MouseInput::WheelDown; }
+
+// Whether a mouse binding is held in a sample: its button down, or the wheel turning its way.
+bool mouse_holds(const MouseSample& mouse, MouseInput input) {
+  if (input == MouseInput::WheelUp) return mouse.wheel > 0.0f;
+  if (input == MouseInput::WheelDown) return mouse.wheel < 0.0f;
+  return mouse.buttons[static_cast<std::size_t>(input)];
+}
+
+// A mouse binding of a button reads that button: the first of MouseInput are MouseButton's.
+static_assert(static_cast<std::size_t>(MouseInput::Extra) + 1 == kMouseButtonCount,
+              "MouseInput starts with the buttons");
+static_assert(static_cast<int>(MouseInput::Side) == static_cast<int>(MouseButton::Side), "in MouseButton's order");
+
+// Every mouse binding, in the order a capture looks for them: the buttons, then the wheel.
+constexpr MouseInput kMouseInputs[] = {MouseInput::Left,  MouseInput::Right,   MouseInput::Middle,   MouseInput::Side,
+                                       MouseInput::Extra, MouseInput::WheelUp, MouseInput::WheelDown};
+
 // Where the keys held put an axis: -1, 0 (none, or both ways at once) or 1.
 float push_of(bool negative, bool positive) {
   float value = 0.0f;
@@ -25,24 +43,36 @@ float push_of(bool negative, bool positive) {
 
 std::vector<InputBinding> default_capture_cancels() { return {Key::Escape, GamepadButton::B, GamepadButton::Back}; }
 
-bool InputState::held(const std::set<Key>& keys, const GamepadSample& pad, const ActionBinding& binding) {
+bool InputState::held(const std::set<Key>& keys, const GamepadSample& pad, const MouseSample& mouse,
+                      const ActionBinding& binding) {
   const bool key_held =
       std::any_of(binding.keys.begin(), binding.keys.end(), [&keys](Key key) { return keys.count(key) != 0; });
-  return key_held || std::any_of(binding.buttons.begin(), binding.buttons.end(), [&pad](GamepadButton button) {
-           return pad.buttons[static_cast<std::size_t>(button)];
-         });
+  const bool mouse_held = std::any_of(binding.mouse.begin(), binding.mouse.end(),
+                                      [&mouse](MouseInput input) { return mouse_holds(mouse, input); });
+  return key_held || mouse_held ||
+         std::any_of(binding.buttons.begin(), binding.buttons.end(),
+                     [&pad](GamepadButton button) { return pad.buttons[static_cast<std::size_t>(button)]; });
+}
+
+bool InputState::mouse_input_pressed(MouseInput input) const {
+  // (The wheel has no "held before": each frame it turns is a press of its own.)
+  if (is_wheel(input)) return mouse_holds(mouse_, input);
+  return mouse_holds(mouse_, input) && !mouse_holds(previous_mouse_, input);
 }
 
 bool InputState::just_pressed(const ActionBinding& binding, std::size_t pad) const {
   const bool key_pressed =
       std::any_of(binding.keys.begin(), binding.keys.end(), [this](Key key) { return pressed(key); });
-  return key_pressed || std::any_of(binding.buttons.begin(), binding.buttons.end(),
-                                    [this, pad](GamepadButton button) { return gamepad_pressed(button, pad); });
+  const bool mouse_pressed = std::any_of(binding.mouse.begin(), binding.mouse.end(),
+                                         [this](MouseInput input) { return mouse_input_pressed(input); });
+  return key_pressed || mouse_pressed ||
+         std::any_of(binding.buttons.begin(), binding.buttons.end(),
+                     [this, pad](GamepadButton button) { return gamepad_pressed(button, pad); });
 }
 
 float InputState::key_push(const AxisBinding& binding, std::size_t pad) const {
   const GamepadSample& gamepad = gamepads_.at(pad);
-  return push_of(held(current_, gamepad, binding.negative), held(current_, gamepad, binding.positive));
+  return push_of(held(current_, gamepad, mouse_, binding.negative), held(current_, gamepad, mouse_, binding.positive));
 }
 
 // Where the binding's stick puts an axis (and by how much: it is not just on or off).
@@ -60,12 +90,35 @@ void InputState::update(const InputSource& source) {
   for (const Key key : all_keys()) {
     if (source.is_key_down(key)) current_.insert(key);
   }
-  previous_mouse_ = mouse_;
-  mouse_ = source.mouse();
+  read_mouse(source);
   previous_gamepads_ = gamepads_;
   for (std::size_t pad = 0; pad < kMaxGamepads; ++pad) gamepads_[pad] = source.gamepad(pad);
   typed_ = source.typed_text();
   catch_capture();
+}
+
+void InputState::read_mouse(const InputSource& source) {
+  previous_mouse_ = mouse_;
+  mouse_ = source.mouse();
+  touch_pointer_ = source.touch_pointer();
+  forget_let_go(mouse_);
+  hide_swallowed_mouse();
+}
+
+void InputState::capture_next(std::vector<InputBinding> cancels, MouseCapture mouse) {
+  capturing_ = true;
+  captured_.reset();
+  capture_cancels_ = std::move(cancels);
+  capture_mouse_ = mouse;
+  if (catches_mouse()) swallow_held_mouse();
+}
+
+void InputState::swallow_held_mouse() {
+  for (std::size_t button = 0; button < kMouseButtonCount; ++button) {
+    if (mouse_.buttons[button]) swallowed_buttons_[button] = true;
+  }
+  if (mouse_.wheel != 0.0f) swallowed_wheel_ = true;
+  hide_swallowed_mouse();
 }
 
 void InputState::catch_capture() {
@@ -88,14 +141,57 @@ void InputState::swallow_this_frame() {
       previous_gamepads_[pad].buttons[button] |= gamepads_[pad].buttons[button];
     }
   }
+  if (catches_mouse()) swallow_mouse();
+}
+
+void InputState::swallow_mouse() {
+  for (std::size_t button = 0; button < kMouseButtonCount; ++button) {
+    if (mouse_pressed(static_cast<MouseButton>(button))) swallowed_buttons_[button] = true;
+  }
+  if (mouse_.wheel != 0.0f) swallowed_wheel_ = true;
+  hide_swallowed_mouse();
+}
+
+// (A button swallowed reads as up from the frame it was pressed to the one it is let go in: it is
+// neither pressed nor released, so a menu under the pointer sees no click. The wheel swallowed
+// reads as still until a frame it does not turn: a scroll lasts several frames.) Read from the
+// device's own sample, once a frame: the sample hidden says nothing of what was let go.
+void InputState::forget_let_go(const MouseSample& raw) {
+  for (std::size_t button = 0; button < kMouseButtonCount; ++button) {
+    if (!raw.buttons[button]) swallowed_buttons_[button] = false;
+  }
+  if (raw.wheel == 0.0f) swallowed_wheel_ = false;
+}
+
+// (Hiding what is hidden already changes nothing: it may run more than once a frame.)
+void InputState::hide_swallowed_mouse() {
+  for (std::size_t button = 0; button < kMouseButtonCount; ++button) {
+    if (swallowed_buttons_[button]) mouse_.buttons[button] = false;
+  }
+  if (swallowed_wheel_) mouse_.wheel = 0.0f;
 }
 
 std::optional<CapturedBinding> InputState::first_pressed() const {
-  for (const Key key : all_keys()) {
-    if (pressed(key)) return CapturedBinding{key, std::nullopt};
+  if (auto key = first_pressed_key()) return key;
+  if (catches_mouse()) {
+    if (auto mouse = first_pressed_mouse()) return mouse;
   }
   for (std::size_t pad = 0; pad < kMaxGamepads; ++pad) {
     if (auto caught = first_pressed_button(pad)) return caught;
+  }
+  return std::nullopt;
+}
+
+std::optional<CapturedBinding> InputState::first_pressed_key() const {
+  for (const Key key : all_keys()) {
+    if (pressed(key)) return CapturedBinding{key, std::nullopt};
+  }
+  return std::nullopt;
+}
+
+std::optional<CapturedBinding> InputState::first_pressed_mouse() const {
+  for (const MouseInput input : kMouseInputs) {
+    if (mouse_input_pressed(input)) return CapturedBinding{input, std::nullopt};
   }
   return std::nullopt;
 }
@@ -140,7 +236,7 @@ std::optional<float> InputState::axis(const std::string& name, std::size_t pad) 
 std::optional<bool> InputState::action_down(const std::string& name, std::size_t pad) const {
   const ActionBinding* binding = bindings_.action(pad, name);
   if (binding == nullptr) return std::nullopt;
-  return held(current_, gamepads_.at(pad), *binding);
+  return held(current_, gamepads_.at(pad), mouse_, *binding);
 }
 
 std::optional<bool> InputState::action_pressed(const std::string& name, std::size_t pad) const {
@@ -152,8 +248,8 @@ std::optional<bool> InputState::action_pressed(const std::string& name, std::siz
 std::optional<bool> InputState::action_released(const std::string& name, std::size_t pad) const {
   const ActionBinding* binding = bindings_.action(pad, name);
   if (binding == nullptr) return std::nullopt;
-  const bool held_before = held(previous_, previous_gamepads_.at(pad), *binding);
-  return held_before && !held(current_, gamepads_.at(pad), *binding);
+  const bool held_before = held(previous_, previous_gamepads_.at(pad), previous_mouse_, *binding);
+  return held_before && !held(current_, gamepads_.at(pad), mouse_, *binding);
 }
 
 }  // namespace redgem

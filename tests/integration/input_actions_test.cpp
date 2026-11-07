@@ -100,7 +100,7 @@ TEST_CASE("scripts bind a player's actions anew, and the players' bindings are k
     CHECK(fails(*engine, "Input.bind(:jump, key: :j, side: :up)"));  // no such side
     CHECK(fails(*engine, "Input.bind(:fly, key: :j)"));
     CHECK(fails(*engine, "Input.bind(:jump)"));
-    CHECK(fails(*engine, "Input.bind(:jump, 'mouse:left')"));
+    CHECK(fails(*engine, "Input.bind(:jump, 'mouse:thumb')"));
     CHECK(fails(*engine, "Input.bind(:jump, key: :k, pad: 4)"));
   }
   REQUIRE(std::filesystem::exists(files.bindings));
@@ -162,6 +162,49 @@ TEST_CASE("a capture hands the next key or button pressed to its block, once") {
   input.set_key(Key::M, true);
   frame(*engine);
   CHECK(ruby(*engine, "$caught.size") == "2");
+}
+
+TEST_CASE("a capture asked for by a click catches the next click, which clicks nothing else") {
+  const TempFiles files;
+  const SceneDesc scene = one_camera();
+  auto engine = engine_for(scene, files);
+  ScriptedInputSource& input = engine->scripted_input();
+  input.set_mouse_button(MouseButton::Left, true);
+  frame(*engine);
+  input.set_mouse_button(MouseButton::Left, false);
+  frame(*engine);
+  // (A menu's cell is clicked when the left button is let go over it: it asks for the capture then.)
+  ruby(*engine,
+       "$caught = []; Input.capture_next { |binding, pad| $caught << [binding, pad] } if "
+       "Input.mouse_released?(:left)");
+  frame(*engine);
+  CHECK(ruby(*engine, "$caught.inspect") == "[]");
+  input.set_mouse_button(MouseButton::Left, true);
+  frame(*engine);
+  CHECK(ruby(*engine, "$caught.inspect") == R"([["mouse:left", nil]])");
+  CHECK(ruby(*engine, "Input.mouse_pressed?(:left)") == "false");
+  input.set_mouse_button(MouseButton::Left, false);
+  frame(*engine);
+  CHECK(ruby(*engine, "Input.mouse_released?(:left)") == "false");
+  ruby(*engine, "Input.bind(:fire, $caught.first.first)");
+  input.set_mouse_button(MouseButton::Left, true);
+  frame(*engine);
+  CHECK(ruby(*engine, "[Input.action_pressed?(:fire), Input.bindings(:fire)].inspect") ==
+        R"([true, ["key:left_control", "key:enter", "mouse:left", "pad:x"]])");
+}
+
+TEST_CASE("a capture that leaves the mouse out catches a key while clicks work as usual") {
+  const TempFiles files;
+  const SceneDesc scene = one_camera();
+  auto engine = engine_for(scene, files);
+  ScriptedInputSource& input = engine->scripted_input();
+  ruby(*engine, "$caught = []; Input.capture_next(mouse: false) { |binding, _pad| $caught << binding }");
+  input.set_mouse_button(MouseButton::Left, true);
+  frame(*engine);
+  CHECK(ruby(*engine, "[$caught, Input.mouse_pressed?(:left), Input.capturing?].inspect") == "[[], true, true]");
+  input.set_key(Key::F5, true);
+  frame(*engine);
+  CHECK(ruby(*engine, "$caught.inspect") == R"(["key:f5"])");
 }
 
 TEST_CASE("the players' bindings are written once, at the frame's end, and only when they changed") {

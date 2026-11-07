@@ -1,5 +1,8 @@
 #include <doctest/doctest.h>
 
+#include <set>
+#include <string>
+
 #include "input/input.hpp"
 
 using namespace redgem;
@@ -127,7 +130,14 @@ TEST_CASE("mouse buttons have names") {
   CHECK(mouse_button_from_name("left") == MouseButton::Left);
   CHECK(mouse_button_from_name("right") == MouseButton::Right);
   CHECK(mouse_button_from_name("middle") == MouseButton::Middle);
+  CHECK(mouse_button_from_name("side") == MouseButton::Side);
+  CHECK(mouse_button_from_name("extra") == MouseButton::Extra);
   CHECK_FALSE(mouse_button_from_name("thumb").has_value());
+  CHECK_FALSE(mouse_button_from_name("wheel_up").has_value());  // (the wheel is no button)
+  CHECK(mouse_input_from_name("wheel_up") == MouseInput::WheelUp);
+  CHECK(mouse_input_from_name("extra") == MouseInput::Extra);
+  CHECK(mouse_input_name(MouseInput::WheelDown) == "wheel_down");
+  CHECK_FALSE(mouse_input_from_name("wheel_left").has_value());
 }
 
 TEST_CASE("every letter, digit and named key is known, and nothing else") {
@@ -140,9 +150,64 @@ TEST_CASE("every letter, digit and named key is known, and nothing else") {
   CHECK(key_from_name("up") == Key::Up);
   CHECK(key_from_name("right_control") == Key::RightControl);
   CHECK_FALSE(key_from_name("A").has_value());
-  CHECK_FALSE(key_from_name("f1").has_value());
+  CHECK_FALSE(key_from_name("f0").has_value());
+  CHECK_FALSE(key_from_name("f13").has_value());
+  CHECK_FALSE(key_from_name("kp_10").has_value());
   constexpr std::size_t kLetters = 26;
   constexpr std::size_t kDigits = 10;
-  constexpr std::size_t kNamedKeys = 19;  // space and punctuation, editing keys, arrows, modifiers
-  CHECK(all_keys().size() == kLetters + kDigits + kNamedKeys);
+  constexpr std::size_t kFunctionKeys = 12;
+  constexpr std::size_t kKeypadDigits = 10;
+  // Space and punctuation (12), editing keys (10), arrows (4), locks and system keys (6),
+  // modifiers (8), the keypad's other keys (7).
+  constexpr std::size_t kNamedKeys = 47;
+  CHECK(all_keys().size() == kLetters + kDigits + kFunctionKeys + kKeypadDigits + kNamedKeys);
+}
+
+TEST_CASE("the function keys, the editing block, the keypad and the rest of a full keyboard have names") {
+  CHECK(key_from_name("f1") == Key::F1);
+  CHECK(key_from_name("f5") == Key::F5);
+  CHECK(key_from_name("f12") == Key::F12);
+  CHECK(key_from_name("insert") == Key::Insert);
+  CHECK(key_from_name("delete") == Key::Delete);
+  CHECK(key_from_name("home") == Key::Home);
+  CHECK(key_from_name("end") == Key::End);
+  CHECK(key_from_name("page_up") == Key::PageUp);
+  CHECK(key_from_name("page_down") == Key::PageDown);
+  CHECK(key_from_name("kp_0") == Key::Keypad0);
+  CHECK(key_from_name("kp_9") == Key::Keypad9);
+  CHECK(key_from_name("kp_enter") == Key::KeypadEnter);
+  CHECK(key_from_name("kp_add") == Key::KeypadAdd);
+  CHECK(key_from_name("right_alt") == Key::RightAlt);
+  CHECK(key_from_name("caps_lock") == Key::CapsLock);
+  CHECK(key_from_name("left_bracket") == Key::LeftBracket);
+  CHECK(key_from_name("right_bracket") == Key::RightBracket);
+  CHECK(key_from_name("semicolon") == Key::Semicolon);
+  CHECK(key_from_name("equals") == Key::Equals);
+  CHECK(key_from_name("backslash") == Key::Backslash);
+  CHECK(key_from_name("grave") == Key::Grave);
+}
+
+TEST_CASE("every key goes by one name, which reads back as that key") {
+  std::set<std::string> names;
+  for (const Key key : all_keys()) {
+    const std::string name = key_name(key);
+    CHECK(key_from_name(name) == key);
+    names.insert(name);
+  }
+  CHECK(names.size() == all_keys().size());
+  CHECK(key_name(Key::F10) == "f10");
+  CHECK(key_name(Key::Keypad3) == "kp_3");
+}
+
+TEST_CASE("a new key is read as any other") {
+  ScriptedInputSource source;
+  InputState input;
+  source.set_key(Key::F5, true);
+  source.set_key(Key::Keypad1, true);
+  input.update(source);
+  CHECK(input.pressed(Key::F5));
+  CHECK(input.down(Key::Keypad1));
+  source.set_key(Key::F5, false);
+  input.update(source);
+  CHECK(input.released(Key::F5));
 }

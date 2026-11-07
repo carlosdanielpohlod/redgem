@@ -18,6 +18,9 @@ class InputSource {
   virtual ~InputSource() = default;
   virtual bool is_key_down(Key key) const = 0;
   virtual MouseSample mouse() const { return {}; }
+  // Whether the mouse is a finger on a touch screen (a tap is its left button): a capture then
+  // leaves it out, so that a tap still works the screen it is on.
+  virtual bool touch_pointer() const { return false; }
   // A gamepad by its number, from 0 to kMaxGamepads - 1: unplugged when there is none.
   virtual GamepadSample gamepad(std::size_t) const { return {}; }
   // What was typed since the last frame, as text (UTF-8): letters as the keyboard layout gives them.
@@ -37,6 +40,9 @@ class ScriptedInputSource final : public InputSource {
  public:
   bool is_key_down(Key key) const override { return held_.count(key) != 0; }
   MouseSample mouse() const override { return mouse_; }
+  bool touch_pointer() const override { return touch_pointer_; }
+  // Plays a touch screen, whose taps are the mouse's left button.
+  void set_touch_pointer(bool touch) { touch_pointer_ = touch; }
   GamepadSample gamepad(std::size_t pad) const override { return gamepads_.at(pad); }
   std::string typed_text() const override { return typed_; }
   // What is "typed" every frame until told otherwise.
@@ -68,6 +74,7 @@ class ScriptedInputSource final : public InputSource {
  private:
   std::set<Key> held_;
   MouseSample mouse_;
+  bool touch_pointer_ = false;
   std::array<GamepadSample, kMaxGamepads> gamepads_{};
   std::string typed_;
 };

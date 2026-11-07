@@ -15,7 +15,7 @@ constexpr const char* kInputModule = "Input";
 constexpr const char* kCapturedEntry = "__captured";
 
 // What Input.__captured takes: the binding as text (nil when the capture was called off), and the
-// gamepad's number (nil for a key).
+// gamepad's number (nil for a key or the mouse).
 std::vector<mrb_value> captured_arguments(mrb_state* mrb, const CapturedBinding& caught) {
   const mrb_value pad = caught.pad ? mrb_int_value(mrb, static_cast<mrb_int>(*caught.pad)) : mrb_nil_value();
   const mrb_value binding = caught.cancelled ? mrb_nil_value() : binding::text_value(mrb, binding_text(caught.binding));
