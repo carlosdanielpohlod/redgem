@@ -12,6 +12,9 @@
 using namespace redgem;
 namespace {
 constexpr int kFrames = 5;
+// This checks file polling rather than render quality; keep software-rendered CI inexpensive.
+constexpr int kWindowWidth = 800;
+constexpr int kWindowHeight = 600;
 constexpr int kCaptureSide = 400;
 constexpr std::size_t kPictureBytes = 1024 * 1024;
 constexpr int kColorMargin = 64;
@@ -77,6 +80,7 @@ TEST_CASE("saved behaviour changes reach a running editor game without replacing
   auto created = EditorApp::create(game, options);
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   auto& app = *std::get<std::unique_ptr<EditorApp>>(created);
+  SetWindowSize(kWindowWidth, kWindowHeight);
   frames(app);
   app.session().select_by_name("Actor");
   app.frame_selection();
@@ -87,7 +91,7 @@ TEST_CASE("saved behaviour changes reach a running editor game without replacing
   CHECK(colored_pixels(app, false) > kVisiblePixels);
   checked(engine->scripts(), "$id = $actor.object_id; $steps_before = $actor.steps");
   write_mover(game, true);
-  frames(app, editor_config::kAssetScanFrames + kFrames);
+  frames(app, 2 * editor_config::kAssetScanFrames + kFrames);
   CHECK(app.session().runtime() == engine);
   checked(engine->scripts(), "raise unless $actor.object_id == $id && $starts == 1 && $actor.steps > $steps_before");
   CHECK(colored_pixels(app, true) > kVisiblePixels);

@@ -7,12 +7,14 @@
 #include <functional>
 #include <initializer_list>
 #include <string>
+#include <memory>
 #include <vector>
 
 #include "script/script_budget.hpp"
 #include "script/ruby_reload.hpp"
 
 namespace redgem {
+class ReloadOwnership;
 
 struct RubyResult {
   bool ok = true;
@@ -33,6 +35,7 @@ class RubyVm {
 
   mrb_state* state() { return mrb_; }
 
+  void enable_reload_tracking();
   RubyResult eval(const std::string& code, const std::string& file_name);
   // Replaces one plain behaviour class while retaining its identity and instance fields.
   RubyResult reload_class(RClass* klass, const std::string& code, const std::string& file_name);
@@ -61,6 +64,7 @@ class RubyVm {
   ScriptBudget budget_;
   mrb_state* mrb_;
   ReloadHooks reload_hooks_{};
+  std::unique_ptr<ReloadOwnership> reload_ownership_;
 };
 
 }  // namespace redgem

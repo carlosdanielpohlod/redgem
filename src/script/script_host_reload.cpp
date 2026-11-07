@@ -9,12 +9,24 @@
 
 namespace redgem {
 namespace {
-constexpr std::size_t kPollFiles = 8;  // at most two MiB read per automatic editor poll
-constexpr const char* kBaseClass = "Behaviour";
-bool inherits(RClass* klass, RClass* base) {
-  for (; klass; klass = klass->super)
-    if (klass == base) return true;
-  return false;
+constexpr std::size_t kPollFiles = 8;          // at most two MiB read per automatic editor poll
+constexpr std::size_t kContentCheckPolls = 8;  // periodically catch same-size, same-timestamp edits
+std::optional<ReloadFileInfo> file_info(const std::filesystem::path& folder, const std::string& name) {
+  const auto path = file_inside(folder.parent_path(), folder.filename() / std::filesystem::u8path(name));
+  if (!path) return {};
+  std::error_code error;
+  const auto bytes = std::filesystem::file_size(*path, error);
+  if (error) return {};
+  const auto modified = std::filesystem::last_write_time(*path, error);
+  if (error) return {};
+  return ReloadFileInfo{bytes, modified};
+}
+bool needs_read(ReloadSource& state, const std::optional<ReloadFileInfo>& info, bool retry) {
+  const bool due = ++state.polls >= kContentCheckPolls;
+  const bool wanted = retry || state.settling || info != state.info || due;
+  state.info = info;
+  if (wanted) state.polls = 0;
+  return wanted;
 }
 std::optional<std::string> source_in(const std::filesystem::path& folder, const std::string& name) {
   const auto path = file_inside(folder.parent_path(), folder.filename() / std::filesystem::u8path(name));
@@ -23,9 +35,23 @@ std::optional<std::string> source_in(const std::filesystem::path& folder, const 
   if (!bytes) return {};
   return std::string(bytes->begin(), bytes->end());
 }
-bool observe_change(std::optional<ScriptStamp>& observed, const std::optional<ScriptStamp>& stamp, bool retry) {
-  if (!retry && observed == stamp) return false;
-  observed = stamp;  // one attempt per version, including a missing file
+bool awaiting_stable_source(ReloadSource& state, const std::optional<ScriptStamp>& stamp, bool retry) {
+  const bool stable = state.settling && state.candidate == stamp;
+  if (retry || stable) return false;
+  state.candidate = stamp;
+  state.settling = true;
+  return true;
+}
+bool settled_change(ReloadSource& state, const std::optional<ScriptStamp>& stamp, bool retry) {
+  const bool same_success = state.observed == stamp && !(retry && state.failed);
+  if (same_success) {
+    state.settling = false;
+    return false;
+  }
+  if (awaiting_stable_source(state, stamp, retry)) return false;
+  state.settling = false;
+  state.observed = stamp;
+  state.failed = true;
   return true;
 }
 std::optional<ScriptStamp> stamp_of(const std::optional<std::string>& source) {
@@ -42,24 +68,33 @@ ScriptStamp script_stamp(const std::string& source) {
 void ScriptHost::remember_source(const std::filesystem::path& path, const std::string& source) {
   if (!live_reload_) return;
   const auto name = path.lexically_relative(scripts_dir_).generic_u8string();
-  if (safe_asset_name(name)) observed_sources_[name] = script_stamp(source);
+  if (!safe_asset_name(name)) return;
+  auto& state = reload_sources_[name];
+  state.observed = script_stamp(source);
+  state.info = file_info(scripts_dir_, name);
 }
 void ScriptHost::refresh_reloaded(RClass* klass) {
   for (auto& slot : behaviours_) {
     auto* actual = mrb_obj_class(vm_.state(), slot.instance);
     slot.fixed_updates = overrides(actual, "fixed_update");
-    if (inherits(actual, klass)) slot.enabled = true;
+    if (inherits_class(actual, klass) && !slot.start_failed) slot.enabled = true;
   }
 }
 bool ScriptHost::reload_script(const std::string& script, bool retry) {
   auto* klass = class_named(class_name_for_script(script));
-  if (!klass || !inherits(klass, class_named(kBaseClass))) return false;
+  if (!is_behaviour_class(klass)) return false;
+  auto& state = reload_sources_[script];
+  if (!needs_read(state, file_info(scripts_dir_, script), retry)) return false;
   const auto source = source_in(scripts_dir_, script);
   const auto stamp = stamp_of(source);
-  if (!observe_change(observed_sources_[script], stamp, retry)) return false;
+  if (!settled_change(state, stamp, retry)) return false;
   if (!source) return reload_unreadable(script);
-  const auto result = vm_.reload_class(klass, *source, (scripts_dir_ / script).u8string());
+  return apply_reload(script, klass, *source);
+}
+bool ScriptHost::apply_reload(const std::string& script, RClass* klass, const std::string& source) {
+  const auto result = vm_.reload_class(klass, source, (scripts_dir_ / script).u8string());
   if (!result.ok) return reload_failed(script, result.error);
+  reload_sources_.at(script).failed = false;
   refresh_reloaded(klass);
   log::info("reloaded " + printable(script));
   return true;

@@ -15,7 +15,6 @@ namespace redgem {
 
 namespace {
 
-constexpr const char* kBehaviourClass = "Behaviour";
 constexpr const char* kSceneScriptClass = "SceneScript";  // what a scene's setup script inherits from
 constexpr const char* kRunSceneScriptEntry = "__run";
 
@@ -93,13 +92,7 @@ void ScriptHost::attach(ObjectId object, const std::string& script) {
   instantiate(object, class_named(class_name), class_name);
 }
 
-bool ScriptHost::is_behaviour_class(RClass* klass) {
-  mrb_state* mrb = vm_.state();
-  if (!mrb_obj_is_kind_of(mrb, mrb_obj_value(klass), mrb->class_class)) return false;
-  RClass* behaviour = class_named(kBehaviourClass);
-  if (behaviour == nullptr) return false;
-  return mrb_test(vm_.call(mrb_obj_value(klass), "<=", {mrb_obj_value(behaviour)}).value);
-}
+bool ScriptHost::is_behaviour_class(RClass* klass) { return inherits_class(klass, class_named(kBehaviourClass)); }
 
 bool ScriptHost::overrides(RClass* klass, const char* method) {
   mrb_state* mrb = vm_.state();
