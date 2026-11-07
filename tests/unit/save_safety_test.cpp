@@ -59,7 +59,8 @@ std::set<std::string> names_in(const std::filesystem::path& folder) {
   return names;
 }
 
-// The partial files being written for `file`: <file>.<random>.part, beside it.
+// What is being written for `file` beside it: <file>.<random>.part (a folder of the write's own on
+// Linux, the Mac and Android, the file itself on Windows).
 std::vector<std::filesystem::path> partials_of(const std::filesystem::path& file) {
   const std::string start = file.filename().string() + ".";
   std::vector<std::filesystem::path> partials;
@@ -323,28 +324,27 @@ TEST_CASE("a file replaced quickly is replaced whole, or says why it was not") {
   CHECK_FALSE(why.empty());
 }
 
-TEST_CASE("a partial file swapped for a link while it is written is never moved into place") {
+TEST_CASE("a partial file swapped for a link while it is written is not what is moved into place") {
   const TempSave temp;
   const std::filesystem::path file = temp.dir / "game" / "settings.json";
   const std::filesystem::path victim = temp.dir / "elsewhere" / "victim.txt";
+  const std::filesystem::path aside = temp.dir / "aside";
   write_text(file, kDamaged);
   write_text(victim, kUserText);
-  bool swapped = false;
+  // While the write flushes, another program moves what it writes away and puts a link to the
+  // user's file under that name. (On Windows the file being written is shared with nobody: the move
+  // is refused, and nothing is swapped.)
   const durable::Flush swap_for_a_link = [&](std::FILE* out) {
-    const bool flushed = durable::flush_to_disk(out);
     for (const std::filesystem::path& partial : partials_of(file)) {
-      std::filesystem::remove(partial);
-      std::error_code link_error;
-      std::filesystem::create_symlink(victim, partial, link_error);
-      swapped = !link_error;
+      std::error_code swap_error;
+      std::filesystem::rename(partial, aside, swap_error);
+      if (!swap_error) std::filesystem::create_symlink(victim, partial, swap_error);
     }
-    return flushed;
+    return durable::flush_to_disk(out);
   };
-  const bool replaced = durable::replace_file(file, kAlsoDamaged, swap_for_a_link);
-  if (!swapped) return;  // (Windows without developer mode makes no links)
-  CHECK_FALSE(replaced);
+  REQUIRE(durable::replace_file(file, kAlsoDamaged, swap_for_a_link));
   CHECK_FALSE(std::filesystem::is_symlink(file));
-  CHECK(contents_of(file) == kDamaged);
+  CHECK(contents_of(file) == kAlsoDamaged);  // the file written, whatever had its name
   CHECK(contents_of(victim) == kUserText);
 }
 

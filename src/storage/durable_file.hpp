@@ -32,11 +32,10 @@ bool sync_folder(const std::filesystem::path& folder);
 // it holds what it held, and nothing this write made is left beside it.
 bool replace_file(const std::filesystem::path& file, std::string_view text, const Flush& flush = flush_to_disk);
 
-// replace_file, its partial file named <file>.<random><partial_suffix>. That file is made new under
-// a name no other write has (two writes of one file never share one) and never opened through a
-// link; nothing already in the folder is removed or written. It is moved over `file` only while
-// its name still leads to the very file written: replaced by a link or another file meanwhile, the
-// write fails and leaves what is there alone.
+// replace_file, its partial file named <file>.<random><partial_suffix>. That file is this write's
+// own: made new under a name no other write has (two writes of one file never share one), never
+// opened through a link, and the one moved over `file` whatever has its name by then (see
+// staged_write.hpp). Nothing already in the folder is opened, written or removed.
 bool replace_file_via(const std::filesystem::path& file, const char* partial_suffix, std::string_view text,
                       const Flush& flush = flush_to_disk);
 
