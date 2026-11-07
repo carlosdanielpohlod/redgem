@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <Jolt/Physics/Collision/TransformedShape.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
 
 namespace redgem::jolt {
 namespace {
@@ -43,9 +44,8 @@ bool append_after_skip(PhysicsDebugGeometry& geometry, const PhysicsDebugTriangl
   const auto remaining = count - static_cast<int>(skipped);
   return append_batch(geometry, metadata, vertices.data() + skipped * kDebugTriangleCorners, remaining, limit);
 }
-}  // namespace
-bool append_debug_shape(const JPH::TransformedShape& shape, const PhysicsDebugTriangle& metadata, std::size_t skip,
-                        std::size_t limit, PhysicsDebugGeometry& geometry) {
+bool append_leaf(const JPH::TransformedShape& shape, const PhysicsDebugTriangle& metadata, std::size_t& skip,
+                 std::size_t limit, PhysicsDebugGeometry& geometry) {
   JPH::TransformedShape::GetTrianglesContext context;
   shape.GetTrianglesStart(context, JPH::AABox::sBiggest(), JPH::RVec3::sZero());
   std::array<JPH::Float3, kBatchVertices> vertices{};
@@ -54,6 +54,31 @@ bool append_debug_shape(const JPH::TransformedShape& shape, const PhysicsDebugTr
     if (count == 0) return true;
     if (!append_after_skip(geometry, metadata, vertices, count, skip, limit)) return false;
   }
+}
+class LeafCollector final : public JPH::TransformedShapeCollector {
+ public:
+  LeafCollector(const PhysicsDebugTriangle& metadata, std::size_t skip, std::size_t limit,
+                PhysicsDebugGeometry& geometry)
+      : metadata_(metadata), skip_(skip), limit_(limit), geometry_(geometry) {}
+  void AddHit(const JPH::TransformedShape& shape) override {
+    complete_ = append_leaf(shape, metadata_, skip_, limit_, geometry_);
+    if (!complete_) ForceEarlyOut();
+  }
+  bool complete() const { return complete_; }
+
+ private:
+  const PhysicsDebugTriangle& metadata_;
+  std::size_t skip_;
+  std::size_t limit_;
+  PhysicsDebugGeometry& geometry_;
+  bool complete_ = true;
+};
+}  // namespace
+bool append_debug_shape(const JPH::TransformedShape& shape, const PhysicsDebugTriangle& metadata, std::size_t skip,
+                        std::size_t limit, PhysicsDebugGeometry& geometry) {
+  LeafCollector collector(metadata, skip, limit, geometry);
+  shape.CollectTransformedShapes(JPH::AABox::sBiggest(), collector);
+  return collector.complete();
 }
 namespace {
 struct Candidate {

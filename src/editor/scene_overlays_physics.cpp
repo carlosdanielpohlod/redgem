@@ -1,7 +1,8 @@
 #include "editor/scene_overlays.hpp"
 
 #include <array>
-#include <set>
+#include <algorithm>
+#include <vector>
 #include <tuple>
 
 #include "render/debug_draw.hpp"
@@ -15,7 +16,8 @@ constexpr Color kCharacter{0.31f, 0.9f, 1, 1};
 constexpr Color kTrigger{1, 0.71f, 0.24f, 1};
 using Point = std::array<float, config::kFloatsPerPosition>;
 using Edge = std::tuple<ObjectId, Point, Point>;
-using Edges = std::set<Edge>;
+using ColoredEdge = std::pair<Edge, Color>;
+using Edges = std::vector<ColoredEdge>;
 Color collider_color(const PhysicsDebugTriangle& triangle) {
   if (triangle.trigger) return kTrigger;
   switch (triangle.type) {
@@ -35,22 +37,35 @@ Edge edge_key(ObjectId object, Vec3 first, Vec3 second) {
   Point b{second.x, second.y, second.z};
   return a < b ? Edge{object, a, b} : Edge{object, b, a};
 }
-bool append_edge(DebugDrawBuffer& commands, const PhysicsDebugTriangle& triangle, std::size_t corner, Edges& edges) {
-  const auto first = triangle.corners[corner];
-  const auto second = triangle.corners[(corner + 1) % kDebugTriangleCorners];
-  if (!edges.insert(edge_key(triangle.object, first, second)).second) return true;
-  return commands.append({DebugDrawItem::Kind::Line, first, second, collider_color(triangle), false});
+void collect_triangle(Edges& edges, const PhysicsDebugTriangle& triangle) {
+  for (std::size_t corner = 0; corner < kDebugTriangleCorners; ++corner) {
+    const auto first = triangle.corners[corner];
+    const auto second = triangle.corners[(corner + 1) % kDebugTriangleCorners];
+    edges.emplace_back(edge_key(triangle.object, first, second), collider_color(triangle));
+  }
 }
-bool append_triangle(DebugDrawBuffer& commands, const PhysicsDebugTriangle& triangle, Edges& edges) {
-  for (std::size_t corner = 0; corner < kDebugTriangleCorners; ++corner)
-    if (!append_edge(commands, triangle, corner, edges)) return false;
-  return true;
+bool edge_before(const ColoredEdge& a, const ColoredEdge& b) { return a.first < b.first; }
+bool same_edge(const ColoredEdge& a, const ColoredEdge& b) { return a.first == b.first; }
+Edges unique_edges(const PhysicsDebugGeometry& geometry) {
+  Edges edges;
+  edges.reserve(geometry.triangles.size() * kDebugTriangleCorners);
+  for (const auto& triangle : geometry.triangles) collect_triangle(edges, triangle);
+  std::sort(edges.begin(), edges.end(), edge_before);
+  edges.erase(std::unique(edges.begin(), edges.end(), same_edge), edges.end());
+  return edges;
+}
+Vec3 vector_of(const Point& point) {
+  const auto& [x, y, z] = point;
+  return {x, y, z};
+}
+bool append_edge(DebugDrawBuffer& commands, const ColoredEdge& edge) {
+  const auto& [object, first, second] = edge.first;
+  return commands.append({DebugDrawItem::Kind::Line, vector_of(first), vector_of(second), edge.second, false});
 }
 }  // namespace
 bool append_physics_colliders(DebugDrawBuffer& commands, const PhysicsDebugGeometry& geometry) {
-  Edges edges;
-  for (const auto& triangle : geometry.triangles)
-    if (!append_triangle(commands, triangle, edges)) return false;
+  for (const auto& edge : unique_edges(geometry))
+    if (!append_edge(commands, edge)) return false;
   return !geometry.truncated;
 }
 }  // namespace redgem
