@@ -22,6 +22,11 @@ bool mouse_holds(const MouseSample& mouse, MouseInput input) {
   return mouse.buttons[static_cast<std::size_t>(input)];
 }
 
+// A mouse binding of a button reads that button: the first of MouseInput are MouseButton's.
+static_assert(static_cast<std::size_t>(MouseInput::Extra) + 1 == kMouseButtonCount,
+              "MouseInput starts with the buttons");
+static_assert(static_cast<int>(MouseInput::Side) == static_cast<int>(MouseButton::Side), "in MouseButton's order");
+
 // Every mouse binding, in the order a capture looks for them: the buttons, then the wheel.
 constexpr MouseInput kMouseInputs[] = {MouseInput::Left,  MouseInput::Right,   MouseInput::Middle,   MouseInput::Side,
                                        MouseInput::Extra, MouseInput::WheelUp, MouseInput::WheelDown};
@@ -87,7 +92,8 @@ void InputState::update(const InputSource& source) {
   }
   previous_mouse_ = mouse_;
   mouse_ = source.mouse();
-  hide_swallowed_buttons();
+  touch_pointer_ = source.touch_pointer();
+  hide_swallowed_mouse();
   previous_gamepads_ = gamepads_;
   for (std::size_t pad = 0; pad < kMaxGamepads; ++pad) gamepads_[pad] = source.gamepad(pad);
   typed_ = source.typed_text();
@@ -114,29 +120,32 @@ void InputState::swallow_this_frame() {
       previous_gamepads_[pad].buttons[button] |= gamepads_[pad].buttons[button];
     }
   }
-  swallow_mouse();
+  if (catches_mouse()) swallow_mouse();
 }
 
 void InputState::swallow_mouse() {
   for (std::size_t button = 0; button < kMouseButtonCount; ++button) {
     if (mouse_pressed(static_cast<MouseButton>(button))) swallowed_buttons_[button] = true;
   }
-  hide_swallowed_buttons();
-  mouse_.wheel = 0.0f;
+  if (mouse_.wheel != 0.0f) swallowed_wheel_ = true;
+  hide_swallowed_mouse();
 }
 
 // (A button swallowed reads as up from the frame it was pressed to the one it is let go in: it is
-// neither pressed nor released, so a menu under the pointer sees no click.)
-void InputState::hide_swallowed_buttons() {
+// neither pressed nor released, so a menu under the pointer sees no click. The wheel swallowed
+// reads as still until a frame it does not turn: a scroll lasts several frames.)
+void InputState::hide_swallowed_mouse() {
   for (std::size_t button = 0; button < kMouseButtonCount; ++button) {
     if (!mouse_.buttons[button]) swallowed_buttons_[button] = false;
     if (swallowed_buttons_[button]) mouse_.buttons[button] = false;
   }
+  if (mouse_.wheel == 0.0f) swallowed_wheel_ = false;
+  if (swallowed_wheel_) mouse_.wheel = 0.0f;
 }
 
 std::optional<CapturedBinding> InputState::first_pressed() const {
   if (auto key = first_pressed_key()) return key;
-  if (capture_mouse_ == MouseCapture::Caught) {
+  if (catches_mouse()) {
     if (auto mouse = first_pressed_mouse()) return mouse;
   }
   for (std::size_t pad = 0; pad < kMaxGamepads; ++pad) {

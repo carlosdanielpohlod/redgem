@@ -100,7 +100,7 @@ TEST_CASE("scripts bind a player's actions anew, and the players' bindings are k
     CHECK(fails(*engine, "Input.bind(:jump, key: :j, side: :up)"));  // no such side
     CHECK(fails(*engine, "Input.bind(:fly, key: :j)"));
     CHECK(fails(*engine, "Input.bind(:jump)"));
-    CHECK(fails(*engine, "Input.bind(:jump, 'mouse:left')"));
+    CHECK(fails(*engine, "Input.bind(:jump, 'mouse:thumb')"));
     CHECK(fails(*engine, "Input.bind(:jump, key: :k, pad: 4)"));
   }
   REQUIRE(std::filesystem::exists(files.bindings));
@@ -189,8 +189,8 @@ TEST_CASE("a capture asked for by a click catches the next click, which clicks n
   ruby(*engine, "Input.bind(:fire, $caught.first.first)");
   input.set_mouse_button(MouseButton::Left, true);
   frame(*engine);
-  CHECK(ruby(*engine, "[Input.action_pressed?(:fire), Input.bindings(:fire).last].inspect") ==
-        R"([true, "mouse:left"])");
+  CHECK(ruby(*engine, "[Input.action_pressed?(:fire), Input.bindings(:fire)].inspect") ==
+        R"([true, ["key:left_control", "key:enter", "mouse:left", "pad:x"]])");
 }
 
 TEST_CASE("a capture that leaves the mouse out catches a key while clicks work as usual") {

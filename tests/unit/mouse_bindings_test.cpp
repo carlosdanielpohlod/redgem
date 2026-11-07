@@ -123,6 +123,40 @@ TEST_CASE("a capture catches the wheel's direction, and the turn is the capture'
   input.update(source);
   CHECK(input.take_captured()->binding == InputBinding(MouseInput::WheelDown));
   CHECK(input.mouse_wheel() == doctest::Approx(0.0f));
+  input.update(source);  // the same scroll, still going
+  CHECK(input.mouse_wheel() == doctest::Approx(0.0f));
+  source.set_mouse_wheel(0.0f);
+  input.update(source);
+  source.set_mouse_wheel(kWheelDown);
+  input.update(source);
+  CHECK(input.mouse_wheel() == doctest::Approx(kWheelDown));  // a new scroll is anybody's again
+}
+
+TEST_CASE("a capture that leaves the mouse out does not swallow a click that came with what it caught") {
+  ScriptedInputSource source;
+  InputState input;
+  input.capture_next(default_capture_cancels(), MouseCapture::Ignored);
+  source.set_mouse_button(MouseButton::Left, true);
+  source.set_gamepad_button(GamepadButton::Y, true);
+  input.update(source);
+  CHECK(input.take_captured()->binding == InputBinding(GamepadButton::Y));
+  CHECK(input.mouse_pressed(MouseButton::Left));
+}
+
+TEST_CASE("on a touch screen a capture leaves taps alone: they work the screen") {
+  ScriptedInputSource source;
+  source.set_touch_pointer(true);
+  InputState input;
+  input.capture_next();
+  source.set_mouse_button(MouseButton::Left, true);  // a tap
+  input.update(source);
+  CHECK_FALSE(input.take_captured().has_value());
+  source.set_mouse_button(MouseButton::Left, false);
+  input.update(source);
+  CHECK(input.mouse_released(MouseButton::Left));
+  source.set_key(Key::F5, true);  // a keyboard plugged into the phone
+  input.update(source);
+  CHECK(input.take_captured()->binding == InputBinding(Key::F5));
 }
 
 TEST_CASE("a capture told to leave the mouse out lets its clicks through") {

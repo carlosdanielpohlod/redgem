@@ -118,10 +118,14 @@ class InputState {
   void catch_capture();
   // Makes everything held now read as held before too, so that none of it reads as pressed.
   void swallow_this_frame();
-  // The mouse buttons pressed this frame read as up until they are let go; the wheel as still.
+  // The mouse buttons pressed this frame read as up until they are let go; the wheel as still
+  // until it stops.
   void swallow_mouse();
-  // Hides the mouse buttons swallowed that are still held (and forgets those let go).
-  void hide_swallowed_buttons();
+  // Hides the mouse buttons swallowed that are still held, and the wheel still turning (and
+  // forgets what was let go).
+  void hide_swallowed_mouse();
+  // Whether the capture waiting catches the mouse: asked to, and the mouse is no finger.
+  bool catches_mouse() const { return capture_mouse_ == MouseCapture::Caught && !touch_pointer_; }
   bool cancels_capture(const InputBinding& binding) const;
   std::optional<CapturedBinding> first_pressed() const;
   std::optional<CapturedBinding> first_pressed_key() const;
@@ -142,6 +146,8 @@ class InputState {
   MouseCapture capture_mouse_ = MouseCapture::Caught;
   // The mouse buttons a capture caught, which read as up until they are let go.
   std::array<bool, kMouseButtonCount> swallowed_buttons_{};
+  bool swallowed_wheel_ = false;
+  bool touch_pointer_ = false;  // the source's mouse is a finger on a touch screen
 };
 
 }  // namespace redgem

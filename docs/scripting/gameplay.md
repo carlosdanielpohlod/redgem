@@ -154,7 +154,9 @@ wheel turned. The block gets the binding as text, and the gamepad's number (`nil
 mouse); a key or button already held when it asks does not count, so the click on a "Rebind" button
 that asked is never taken for the binding. A mouse button caught is the capture's until it is let
 go: its release clicks nothing under the pointer. `mouse: false` leaves the mouse out of a capture,
-for a screen that waits for a gamepad button while its own buttons still take clicks.
+for a screen that waits for a gamepad button while its own buttons still take clicks. On a touch
+screen a tap is the mouse's left button, and a capture never catches it: taps keep working the
+screen.
 Escape, or a gamepad's B or Back, calls the capture off instead: the block gets `nil` for the
 binding, so the player can back out (`cancel:` lists other bindings for that, `cancel: []` none).
 Whatever went down on the frame a capture ends is the capture's: no action fires and no menu opens
