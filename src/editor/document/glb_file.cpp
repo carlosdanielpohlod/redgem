@@ -64,8 +64,9 @@ bool write_atomically(const std::filesystem::path& path, const std::vector<std::
   std::filesystem::path temp = path;
   temp += config::kSceneWritingSuffix;
   const std::string_view text(reinterpret_cast<const char*>(bytes.data()), bytes.size());
-  if (durable::replace_file_via(path, temp, text)) return true;
-  error = "cannot write " + path.string();
+  std::string why;
+  if (durable::replace_file_quickly(path, temp, text, why)) return true;
+  error = "cannot write " + path.string() + ": " + why;
   return false;
 }
 

@@ -284,3 +284,16 @@ TEST_CASE("a partial file a crash left behind is replaced, not refused") {
   CHECK(contents_of(file) == kAlsoDamaged);
   CHECK_FALSE(std::filesystem::exists(beside(file, kPartial)));
 }
+
+TEST_CASE("a file replaced quickly is replaced whole, or says why it was not") {
+  const TempSave temp;
+  const std::filesystem::path file = temp.dir / "scene.glb";
+  write_text(file, kDamaged);
+  std::string why;
+  REQUIRE_MESSAGE(durable::replace_file_quickly(file, beside(file, kPartial), kAlsoDamaged, why), why);
+  CHECK(contents_of(file) == kAlsoDamaged);
+  CHECK_FALSE(std::filesystem::exists(beside(file, kPartial)));
+  const std::filesystem::path nowhere = temp.dir / "missing" / "scene.glb";
+  CHECK_FALSE(durable::replace_file_quickly(nowhere, beside(nowhere, kPartial), kAlsoDamaged, why));
+  CHECK_FALSE(why.empty());
+}

@@ -97,10 +97,31 @@ int sync_to_disk(std::FILE* file) {
 #endif
 }
 
+// Pushes what was written out of the program's buffers to the system only: a write that may be lost
+// to a power cut, though never left half done.
+bool flush_to_system(std::FILE* file) { return std::fflush(file) == 0; }
+
+#ifdef _WIN32
+// Why a file could not be made new (CreateFileW says it in the thread's last error).
+std::error_code creation_error() { return {static_cast<int>(GetLastError()), std::system_category()}; }
+#else
+std::error_code creation_error() { return {errno, std::generic_category()}; }
+#endif
+
+// Why a write failed: what the system said, else that not all of it was written.
+std::error_code write_error() {
+  const int said = errno;
+  return said != 0 ? std::error_code(said, std::generic_category()) : std::make_error_code(std::errc::io_error);
+}
+
+bool wrote_all(std::FILE* out, std::string_view text) {
+  return std::fwrite(text.data(), 1, text.size(), out) == text.size();
+}
+
 // Writes all of `text` into the open file, flushes it and closes it. False when not all of it
-// reached the disk.
+// reached where `flush` pushes it.
 bool write_and_close(std::FILE* out, std::string_view text, const Flush& flush) {
-  const bool flushed = std::fwrite(text.data(), 1, text.size(), out) == text.size() && flush(out);
+  const bool flushed = wrote_all(out, text) ? flush(out) : false;
   // A full disk can show only here: the file being replaced must not be lost to half a one.
   if (std::fclose(out) != 0) return false;
   return flushed;
@@ -116,20 +137,23 @@ void remove_entry(const std::filesystem::path& file) {
   std::filesystem::remove(file, ignored);
 }
 
-// Writes `text` flushed into a file made new at `partial`.
-bool write_new_flushed(const std::filesystem::path& partial, std::string_view text, const Flush& flush) {
+// Writes `text` flushed into a file made new at `partial`; why it could not.
+std::error_code write_new(const std::filesystem::path& partial, std::string_view text, const Flush& flush) {
   remove_entry(partial);
+  errno = 0;
   std::FILE* out = create_new(partial);
-  return out != nullptr && write_and_close(out, text, flush);
+  if (out == nullptr) return creation_error();
+  errno = 0;
+  return write_and_close(out, text, flush) ? std::error_code() : write_error();
 }
 
-// Writes `partial` flushed, then moves it over `file`.
-bool write_and_move(const std::filesystem::path& partial, const std::filesystem::path& file, std::string_view text,
-                    const Flush& flush) {
-  if (!write_new_flushed(partial, text, flush)) return false;
-  std::error_code fs_error;
-  std::filesystem::rename(partial, file, fs_error);
-  return !fs_error;
+// Writes `partial` flushed and moves it over `file`; else removes it. Why it could not.
+std::error_code put_in_place(const std::filesystem::path& file, const std::filesystem::path& partial,
+                             std::string_view text, const Flush& flush) {
+  std::error_code error = write_new(partial, text, flush);
+  if (!error) std::filesystem::rename(partial, file, error);
+  if (error) remove_entry(partial);
+  return error;
 }
 
 }  // namespace
@@ -141,7 +165,8 @@ bool flush_to_disk(std::FILE* file) {
 
 bool write_flushed(const std::filesystem::path& file, const std::string& text, const Flush& flush) {
   std::FILE* out = open_for_writing(file);
-  return out != nullptr && write_and_close(out, text, flush);
+  if (out == nullptr) return false;
+  return write_and_close(out, text, flush);
 }
 
 bool sync_folder(const std::filesystem::path& folder) {
@@ -165,13 +190,17 @@ bool replace_file(const std::filesystem::path& file, std::string_view text, cons
 
 bool replace_file_via(const std::filesystem::path& file, const std::filesystem::path& partial, std::string_view text,
                       const Flush& flush) {
-  if (!write_and_move(partial, file, text, flush)) {
-    remove_entry(partial);
-    return false;
-  }
+  if (put_in_place(file, partial, text, flush)) return false;
   // (The file is replaced either way: only a power cut in the next moments could undo it.)
   if (!sync_folder(folder_of(file))) log::warning("the folder of " + file.string() + " could not be flushed to disk");
   return true;
+}
+
+bool replace_file_quickly(const std::filesystem::path& file, const std::filesystem::path& partial,
+                          std::string_view text, std::string& error) {
+  const std::error_code failure = put_in_place(file, partial, text, flush_to_system);
+  if (failure) error = failure.message();
+  return !failure;
 }
 
 }  // namespace redgem::durable

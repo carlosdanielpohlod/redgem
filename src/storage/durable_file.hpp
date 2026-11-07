@@ -18,7 +18,8 @@ using Flush = std::function<bool(std::FILE* file)>;
 bool flush_to_disk(std::FILE* file);
 
 // Writes `text` into `file` (replacing what it held) and flushes it with `flush`. False when not
-// all of it reached the disk.
+// all of it reached the disk. It opens `file` as it is, through a link too: only for a name nothing
+// else can have chosen (a file in a folder just made for it). replace_file_via is for any other.
 bool write_flushed(const std::filesystem::path& file, const std::string& text, const Flush& flush = flush_to_disk);
 
 // Pushes a folder's list of files to the disk, so that a file just renamed into it stays renamed
@@ -37,5 +38,11 @@ bool replace_file(const std::filesystem::path& file, std::string_view text, cons
 // the writing is refused when something takes the name again before the file is made.
 bool replace_file_via(const std::filesystem::path& file, const std::filesystem::path& partial, std::string_view text,
                       const Flush& flush = flush_to_disk);
+
+// replace_file_via without the trips to the disk: the file is never left half written, but a power
+// cut right after may lose it (a scene save, an agent's edit: the editor's work, not a player's).
+// False, with why in `error`, when `file` could not be replaced.
+bool replace_file_quickly(const std::filesystem::path& file, const std::filesystem::path& partial,
+                          std::string_view text, std::string& error);
 
 }  // namespace redgem::durable

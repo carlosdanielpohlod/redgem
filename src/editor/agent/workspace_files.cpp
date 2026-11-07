@@ -85,8 +85,9 @@ bool fits_a_file(const fs::path& file) {
 bool replace_file(const fs::path& file, const std::string& text, std::string& error) {
   fs::path written = file;
   written += config::kAgentWritingSuffix;
-  if (durable::replace_file_via(file, written, text)) return true;
-  error = "cannot write " + file.u8string();
+  std::string why;
+  if (durable::replace_file_quickly(file, written, text, why)) return true;
+  error = "cannot write " + file.u8string() + ": " + why;
   return false;
 }
 
