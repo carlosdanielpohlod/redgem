@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "scene/scene_config.hpp"
+#include "physics/debug_geometry.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
 
@@ -29,5 +30,8 @@ struct BrushMark {
 // Draws the overlays (inside a 3D mode) for the scene as it is, around each of `selected`.
 void draw_scene_overlays(const Scene& scene, const SceneDesc& desc, const std::vector<ObjectId>& selected,
                          const std::optional<BrushMark>& brush);
+
+// Backend collider triangles drawn as colored wires; call inside a 3D mode.
+void draw_physics_colliders(const PhysicsDebugGeometry& geometry);
 
 }  // namespace redgem

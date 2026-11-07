@@ -142,8 +142,9 @@ not a promise of how it will be closed.
   class methods/mixins, changed inheritance and initially failed scripts still require a restart;
   existing blocks keep their old code. The script editor has no autocomplete, and console
   backtraces do not jump to their lines.
-- No autosave or crash recovery of the scene being edited; no animation preview or physics debug
-  view; no preferences beyond the graphics card (key bindings, camera speed, snap sizes); no HiDPI
+- The editor can show actual collider wireframes during Play/Pause; it does not yet draw
+  contacts, joints or velocities, or preview colliders before Play.
+- No autosave or crash recovery of the scene being edited; no animation preview; no preferences beyond the graphics card (key bindings, camera speed, snap sizes); no HiDPI
   scaling; dark theme only.
 
 ### What a shipped game offers its players

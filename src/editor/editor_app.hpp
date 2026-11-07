@@ -96,6 +96,9 @@ class EditorApp {
     bool agent = true;      // the Agent panel (right, beside the Inspector)
   };
   PanelVisibility& panels() { return panels_; }
+  // Optional actual-collider overlay during Play/Pause; editor-only and off by default.
+  void set_physics_debug(bool enabled) { physics_debug_ = enabled; }
+  bool physics_debug_enabled() const { return physics_debug_; }
   // What the panels remember between frames (searches, half-typed names, the console's filters):
   // this editor's own, new with every game opened.
   ui::PanelState& panel_state() { return panel_state_; }
@@ -235,6 +238,8 @@ class EditorApp {
   void draw_clipboard_items();
   bool selection_editable() const;
   void draw_view_menu();
+  void draw_physics_debug_menu();
+  void draw_physics_debug();
   void draw_game_object_menu();
   void draw_help_menu();
   void draw_graphics_card_menu();
@@ -388,6 +393,8 @@ class EditorApp {
   std::unique_ptr<GameView> game_view_;  // who shows the running game, while one runs
   long long frame_count_ = 0;
   bool layout_built_ = false;
+  bool physics_debug_ = false;
+  bool physics_debug_truncated_ = false;
   bool gizmo_dragging_ = false;
   group_transform::Drag group_drag_;                // the gizmo drag in progress, from where it began
   std::optional<box_select::ViewPoint> box_start_;  // where the left button went down in the view, while held
