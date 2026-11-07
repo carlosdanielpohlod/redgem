@@ -122,9 +122,16 @@ bool opens_named_folder(const CliOptions& options) {
 
 }  // namespace
 
+// Whether the folder is surely not there. (One that cannot be looked at is left to the editor or
+// the game, which say why they cannot open it.)
+bool surely_missing(const std::filesystem::path& folder) {
+  std::error_code fs_error;
+  return !std::filesystem::exists(folder, fs_error) && !fs_error;
+}
+
 std::string missing_game_folder(const CliOptions& options) {
-  std::error_code unreadable;
-  if (!opens_named_folder(options) || std::filesystem::is_directory(options.game_dir, unreadable)) return {};
+  if (!opens_named_folder(options)) return {};
+  if (!surely_missing(options.game_dir)) return {};
   return tr("project.cli.no_game_folder", {{"game_dir", options.game_dir.string()}});
 }
 

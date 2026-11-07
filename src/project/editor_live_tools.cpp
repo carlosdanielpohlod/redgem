@@ -139,10 +139,15 @@ void validate_control(const std::string& action, const Json& args) {
     throw std::invalid_argument("max_size is only accepted by capture");
 }
 
+// A capture is taken whatever the editor is doing; the other window actions wait until it is free.
+bool refuses_when_busy(const std::string& action, bool busy) { return busy && action != "capture"; }
+
 Json use_window(EditorSession& session, const std::string& action, const Json& args, bool busy, const Invoke& window) {
   if (!window) throw std::invalid_argument("this action requires an editor window");
-  if (action != "capture") require_no_external_change(session);
-  if (action != "capture" && busy) throw std::invalid_argument("finish the current editor gesture or dialog first");
+  if (refuses_when_busy(action, busy)) {
+    require_no_external_change(session);  // (the reason the editor is busy, when it is that)
+    throw std::invalid_argument("finish the current editor gesture or dialog first");
+  }
   if (action == "play") require_editable(session, false);
   if (args.contains("object")) {
     require_editable(session, busy);  // selecting it is a change, refused as select's is

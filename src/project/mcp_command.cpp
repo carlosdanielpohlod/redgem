@@ -1,9 +1,11 @@
 #include "project/mcp_command.hpp"
 
 #include <cstdio>
+#include <filesystem>
 #include <iostream>
 #include <optional>
 #include <sstream>
+#include <system_error>
 #include <stdexcept>
 
 #ifdef _WIN32
@@ -98,13 +100,25 @@ void validate_allow(const std::set<std::string>& names) {
   }
 }
 
+// Whether a path names a folder that can be opened; `folder` is then where it is, whole.
+bool opens_as_folder(const std::filesystem::path& asked, std::filesystem::path& folder) {
+  std::error_code fs_error;
+  folder = std::filesystem::canonical(asked, fs_error);
+  return !fs_error && std::filesystem::is_directory(folder, fs_error);
+}
+
+// The game folder a line names, whole; a usage error when it is no folder that can be opened.
+std::filesystem::path game_folder(const std::filesystem::path& asked) {
+  std::filesystem::path folder;
+  if (!opens_as_folder(asked, folder))
+    throw std::invalid_argument("no game folder at " + asked.string() + "; pass the folder that holds scene.glb");
+  return folder;
+}
+
 mcp::Options options(const ToolLine& line) {
   if (line.words.size() != 1) throw std::invalid_argument("mcp needs one game directory");
-  const std::filesystem::path asked = line.words.front();
-  if (!std::filesystem::is_directory(asked))
-    throw std::invalid_argument("no game folder at " + asked.string() + "; pass the folder that holds scene.glb");
   mcp::Options result;
-  result.game = std::filesystem::canonical(asked);
+  result.game = game_folder(line.words.front());
   result.read_only = line.has(kReadOnly);
   if (const auto editor = line.value(kEditor)) result.editor_connection = *editor;
   if (const auto allow = line.value(kAllow)) result.allow = allow_list(*allow);

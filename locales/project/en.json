@@ -199,7 +199,7 @@
   "project.scene.out_of_reach": "{key} takes numbers from -{largest} to {largest}, not {value}",
   "project.scene.read_only": "{key} says what the object is ({value}): it is not changed from the command line",
   "project.scene.removed": "removed {object} ({count} objects with its children)",
-  "project.scene.scale_too_small": "scale must be at least {least} on every side (zero flattens the object, a negative scale turns it inside out), not {value}",
+  "project.scene.scale_out_of_range": "scale takes numbers from {least} to {largest} on every side (zero flattens the object, a negative scale turns it inside out), not {value}",
   "project.scene.script_missing": "note: scripts/{script} does not exist yet; it must define class {class}",
   "project.scene.script_not_attached": "{script} is not attached; the object has: {scripts}",
   "project.scene.unknown_key": "unknown key {key} (prop.{key}= sets a property of that name); the keys are: {keys}",

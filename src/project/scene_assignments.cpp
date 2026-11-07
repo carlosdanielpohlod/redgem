@@ -33,7 +33,8 @@ constexpr const char* kPropPrefix = "prop.";
 constexpr const char* kTrue = "true";
 constexpr const char* kFalse = "false";
 constexpr std::size_t kVectorSides = 3;
-constexpr int kScaleDecimals = 3;  // enough to show the smallest scale (0.001)
+constexpr int kScaleDecimals = 3;    // enough to show the smallest scale (0.001)
+constexpr double kNarrowable = 1.0;  // a number a float takes for sure, past any smallest scale
 // Every key a word may set (the props are "prop.<key>").
 constexpr const char* kKeys =
     "position (pos), rotation (rot), scale, name, parent, script (scripts), prop.<key> (or <key> alone)";
@@ -106,12 +107,15 @@ bool within_reach(const Sides& sides) {
                      [](double side) { return std::fabs(side) <= config::kLargestCoordinate; });
 }
 
-// Whether every side of a scale is at least the smallest the Inspector takes: zero flattens the
-// object to nothing (its transform has no inverse) and a negative one turns it inside out.
-bool keeps_shape(const Sides& sides) {
-  return std::all_of(sides.begin(), sides.end(),
-                     [](double side) { return static_cast<float>(side) >= editor_config::kMinScale; });
+// Whether a side of a scale is at least the smallest the Inspector takes: zero flattens the object
+// to nothing (its transform has no inverse) and a negative one turns it inside out. (Compared as the
+// float it is saved as, so that 0.001 itself is taken; a side past kNarrowable is no small one.)
+bool keeps_shape(double side) {
+  return static_cast<float>(std::clamp(side, -kNarrowable, kNarrowable)) >= editor_config::kMinScale;
 }
+
+// Whether a side of a scale is one the Inspector could set, and is within reach.
+bool fits_a_scale(double side) { return keeps_shape(side) && std::fabs(side) <= config::kLargestCoordinate; }
 
 std::string needs_vector(const Assignment& assignment) {
   return tr("project.scene.needs_vector", {{"key", assignment.key}, {"value", assignment.value}});
@@ -130,16 +134,18 @@ std::variant<Vec3, std::string> placement_vector(const Assignment& assignment, c
   return vector_of(*sides);
 }
 
-std::string too_small(const Assignment& assignment) {
-  return tr("project.scene.scale_too_small",
-            {{"value", assignment.value}, {"least", number_text(editor_config::kMinScale, kScaleDecimals)}});
+std::string scale_out_of_range(const Assignment& assignment) {
+  return tr("project.scene.scale_out_of_range", {{"value", assignment.value},
+                                                 {"least", number_text(editor_config::kMinScale, kScaleDecimals)},
+                                                 {"largest", number_text(config::kLargestCoordinate, 0)}});
 }
 
+// The scale a word gives, or what is wrong with it: one number or three, each one a scale may be.
 std::variant<Vec3, std::string> scale_vector(const Assignment& assignment) {
   const std::optional<Sides> sides = scale_sides_from(assignment.value);
-  std::variant<Vec3, std::string> scale = placement_vector(assignment, sides);
-  if (std::holds_alternative<Vec3>(scale) && !keeps_shape(*sides)) return too_small(assignment);
-  return scale;
+  if (!sides) return needs_vector(assignment);
+  if (!std::all_of(sides->begin(), sides->end(), fits_a_scale)) return scale_out_of_range(assignment);
+  return vector_of(*sides);
 }
 
 std::string only_equals(const Assignment& assignment) {

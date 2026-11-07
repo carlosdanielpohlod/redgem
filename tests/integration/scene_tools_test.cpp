@@ -252,7 +252,7 @@ TEST_CASE("a placement no float holds, or past the tools' reach, is refused befo
   GameCopy game("out_of_reach");
   const auto before = fs::last_write_time(game.scene());
   // (A float cannot hold 1e40: the file would have held null, no glTF, and the object moved to 0.)
-  for (const char* word : {"position=1e40,-1e40,1", "rotation=1e40,0,0", "scale=1e39", "position=2000000,0,0"}) {
+  for (const char* word : {"position=1e40,-1e40,1", "rotation=1e40,0,0", "position=2000000,0,0"}) {
     CAPTURE(word);
     const ToolResult refused = scene_tool({"set", game.dir(), "Player", word});
     CHECK(refused.exit_code != kExitSuccess);
@@ -262,14 +262,15 @@ TEST_CASE("a placement no float holds, or past the tools' reach, is refused befo
   CHECK(scene_tool({"set", game.dir(), "Player", "position=1000000,-1000000,1"}).exit_code == kExitSuccess);
 }
 
-TEST_CASE("a scale of zero, below the smallest the Inspector takes, or negative is refused") {
+TEST_CASE("a scale of zero, below the smallest the Inspector takes, negative or past reach is refused") {
   GameCopy game("flat_scale");
   const auto before = fs::last_write_time(game.scene());
-  for (const char* word : {"scale=0", "scale=-1", "scale=1,0,1", "scale=1,1,-2", "scale=0.0001"}) {
+  for (const char* word :
+       {"scale=0", "scale=-1", "scale=1,0,1", "scale=1,1,-2", "scale=0.0001", "scale=1e39", "scale=1,-1e40,1"}) {
     CAPTURE(word);
     const ToolResult refused = scene_tool({"set", game.dir(), "Player", word});
     CHECK(refused.exit_code != kExitSuccess);
-    CHECK(has(refused.err, "scale must be at least 0.001"));
+    CHECK(has(refused.err, "scale takes numbers from 0.001 to 1000000 on every side"));
   }
   CHECK(fs::last_write_time(game.scene()) == before);
   CHECK(scene_tool({"set", game.dir(), "Player", "scale=0.001"}).exit_code == kExitSuccess);
