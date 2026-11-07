@@ -19,8 +19,8 @@ namespace {
 
 constexpr double kBestScore = 1250.0;
 constexpr double kOlderScore = 900.0;
-constexpr const char* kDamaged = "{ not json";  // what a save cut short by a crash may hold
-constexpr const char* kAlsoDamaged = "[1, 2";   // another one, told apart from the first
+constexpr const char* kDamaged = "{ not json";            // what a save cut short by a crash may hold
+constexpr const char* kAlsoDamaged = "[1, 2";             // another one, told apart from the first
 constexpr const char* kUserText = "IMPORTANT USER DATA";  // a file of the user's, outside the game
 constexpr int kWrites = 3;
 constexpr int kLevel = 2;
