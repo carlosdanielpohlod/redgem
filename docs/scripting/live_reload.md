@@ -22,7 +22,8 @@ Its class body can contain instance methods, literal constants, `attr_reader`, `
 `attr_accessor`, and `private`/`protected`/`public` declarations. Literals include numbers,
 strings, symbols, booleans, nil, arrays (`%w[]`/`%i[]` too) and hashes with string or symbol keys.
 `private def`, string attribute names and a `::Behaviour` superclass are supported. Each source is
-limited to 256 KiB, with bounded declaration and literal nesting checks.
+limited to 256 KiB, with bounded declaration and literal nesting checks. Files already above
+that limit when Play starts run normally but are excluded from live reload until Play restarts.
 
 ```ruby
 class Mover < Behaviour
@@ -48,7 +49,9 @@ An error in a subsequently called method follows the usual rule: that behaviour 
 Stop and restart Play for executable file/class setup, computed constants, class methods,
 modules/mixins, changed inheritance, custom declaration hooks or a script that failed to load
 initially. A class whose declarations another file or a runtime callback changes is also
-refused; the diagnostic names the other file when known. Scene setup and unrelated helper files are not rerun. Existing timer blocks, event
-handlers and saved method objects retain their earlier code until replaced or cancelled.
+refused; the diagnostic names the other file when known. The engine prelude keeps its own
+source ownership. Nested lazy loads share the outermost source owner; restart Play to change
+those helper declarations. Scene setup and unrelated helper files are not rerun. Existing timer
+blocks, event handlers and saved method objects retain their earlier code until replaced or cancelled.
 Live reload watches files only in the editor; shipped games and dedicated servers do not poll
 or replace their scripts.

@@ -67,6 +67,7 @@ ScriptStamp script_stamp(const std::string& source) {
 }
 void ScriptHost::remember_source(const std::filesystem::path& path, const std::string& source) {
   if (!live_reload_) return;
+  if (source.size() > kReloadSourceBytes) return;
   const auto name = path.lexically_relative(scripts_dir_).generic_u8string();
   if (!safe_asset_name(name)) return;
   auto& state = reload_sources_[name];
@@ -83,7 +84,9 @@ void ScriptHost::refresh_reloaded(RClass* klass) {
 bool ScriptHost::reload_script(const std::string& script, bool retry) {
   auto* klass = class_named(class_name_for_script(script));
   if (!is_behaviour_class(klass)) return false;
-  auto& state = reload_sources_[script];
+  const auto found = reload_sources_.find(script);
+  if (found == reload_sources_.end()) return false;
+  auto& state = found->second;
   if (!needs_read(state, file_info(scripts_dir_, script), retry)) return false;
   const auto source = source_in(scripts_dir_, script);
   const auto stamp = stamp_of(source);
