@@ -5,6 +5,7 @@
 #include <mruby/class.h>
 #include <mruby/proc.h>
 #include <mruby/variable.h>
+#include <utility>
 
 #include "core/safe_path.hpp"
 #include "scene/props.hpp"
@@ -117,8 +118,9 @@ mrb_value ScriptHost::instantiate(ObjectId object, RClass* klass, const std::str
   if (!attached.ok) return not_created(class_name + "#__attach", attached.error);
   root_behaviour(object, instance.value);
   behaviours_by_object_[object].push_back(behaviours_.size());
-  behaviours_.push_back(
-      {context_.scene->handle(object), instance.value, class_name, false, true, overrides(klass, "fixed_update")});
+  BehaviourSlot slot{context_.scene->handle(object), instance.value, class_name};
+  slot.fixed_updates = overrides(klass, "fixed_update");
+  behaviours_.push_back(std::move(slot));
   return instance.value;
 }
 

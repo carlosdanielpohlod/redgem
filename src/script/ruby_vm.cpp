@@ -30,17 +30,38 @@ struct CallRequest {
   mrb_int argc = 0;
 };
 
+// Nested lazy loads are one declaration transaction owned by the outermost source.
+class ReloadEvaluation {
+ public:
+  ReloadEvaluation(ReloadOwnership* owner, const std::string& file) : owner_(owner) {
+    if (owner_) owner_->begin_eval(file);
+  }
+  ~ReloadEvaluation() {
+    if (owner_) owner_->end_eval(completed_);
+  }
+  ReloadEvaluation(const ReloadEvaluation&) = delete;
+  ReloadEvaluation& operator=(const ReloadEvaluation&) = delete;
+  void complete() {
+    if (owner_) owner_->complete_eval();
+    completed_ = true;
+  }
+
+ private:
+  ReloadOwnership* owner_;
+  bool completed_ = false;
+};
+
 mrb_value evaluate_source(mrb_state* mrb, void* userdata) {
   const auto* request = static_cast<const EvalRequest*>(userdata);
-  if (request->ownership) request->ownership->before_eval();
+  ReloadEvaluation evaluation(request->ownership, *request->file_name);
   RubyContext context(mrb);
   mrbc_filename(mrb, context.get(), request->file_name->c_str());
   context->no_exec = request->compile_only;
   context->capture_errors = request->compile_only;  // report instead of printing to stderr
   const mrb_value result =
       mrb_load_nstring_cxt(mrb, request->code->data(), static_cast<mrb_int>(request->code->size()), context.get());
-  if (request->ownership) request->ownership->observe(*request->file_name);
   if (mrb->exc != nullptr) mrb_exc_raise(mrb, mrb_obj_value(mrb->exc));
+  evaluation.complete();
   return result;
 }
 
@@ -171,6 +192,7 @@ void RubyVm::enable_reload_tracking() { reload_ownership_ = std::make_unique<Rel
 
 RubyVm::~RubyVm() {
   budget_.set_limit(std::chrono::milliseconds(0));  // the watchdog lets go of the interpreter first
+  reload_ownership_.reset();
   mrb_close(mrb_);
 }
 

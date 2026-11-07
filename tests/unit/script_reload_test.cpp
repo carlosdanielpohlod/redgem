@@ -409,3 +409,119 @@ TEST_CASE("script reload: a failed helper still owns the class changes made befo
   CHECK(result.error.find("broken_helper.rb") != std::string::npos);
   checked(vm, "raise unless Mover.new.value == 1 && Mover::State == []");
 }
+
+TEST_CASE("script reload: ownership tracking preserves super inherited constants and class variables") {
+  RubyVm vm;
+  checked(vm, R"(
+class Behaviour
+  INHERITED = 7
+  @@shared = 10
+  def initialize; @base = 3; end
+  def value; @base; end
+  def self.shared; @@shared; end
+end
+)");
+  vm.enable_reload_tracking();
+  REQUIRE(vm.eval(R"(
+class Mover < Behaviour
+  def initialize; super; end
+  def value; super + INHERITED + @@shared; end
+  def bump; @@shared += 1; end
+end
+)",
+                  "mover.rb")
+              .ok);
+  checked(vm, "$actor = Mover.new; raise unless $actor.value == 20; $actor.bump; raise unless Behaviour.shared == 11");
+  mrb_full_gc(vm.state());
+  auto* klass = mrb_class_get(vm.state(), "Mover");
+  const auto result = vm.reload_class(klass, R"(
+class Mover < Behaviour
+  def value; super + INHERITED + @@shared + 1; end
+end
+)",
+                                      "mover.rb");
+  REQUIRE_MESSAGE(result.ok, result.error);
+  checked(vm, "raise unless $actor.value == 22 && Behaviour.shared == 11");
+}
+TEST_CASE("script reload: the prelude keeps its own owner before any game file runs") {
+  RubyVm vm;
+  checked(vm, "class Behaviour; end; class NetworkSync < Behaviour; def engine_method; 42; end; end");
+  vm.enable_reload_tracking();
+  REQUIRE(vm.eval("class Mover < Behaviour; end", "mover.rb").ok);
+  const auto result =
+      vm.reload_class(mrb_class_get(vm.state(), "NetworkSync"), "class NetworkSync < Behaviour; end", "mover.rb");
+  CHECK_FALSE(result.ok);
+  CHECK(result.error.find("engine prelude") != std::string::npos);
+  checked(vm, "raise unless NetworkSync.new.engine_method == 42");
+}
+TEST_CASE("script reload: removing or replacing Behaviour does not invoke const_missing while observing") {
+  for (const auto* replacement : {"", "Behaviour = 42"}) {
+    RubyVm vm;
+    checked(vm, "class Behaviour; end");
+    vm.enable_reload_tracking();
+    const auto result = vm.eval(std::string("Object.send(:remove_const, :Behaviour); ") + replacement, "game.rb");
+    REQUIRE_MESSAGE(result.ok, result.error);
+    checked(vm, "def Object.const_missing(name); raise 'unexpected autoload'; end; class Unrelated; end");
+  }
+}
+TEST_CASE("script reload: unchanged initially oversized behaviours are excluded from watching") {
+  test::LogCapture quiet;
+  ReloadGame game;
+  game.write(std::string(kOriginal) + "\n#" + std::string(kReloadSourceBytes, 'x') + "\n");
+  auto session = game.open();
+  ScriptedInputSource input;
+  start(*session, input);
+  auto& host = session->runtime()->scripts();
+  const auto errors = host.error_count();
+  for (int i = 0; i < 20; ++i) CHECK(host.reload_scripts() == 0);
+  CHECK(host.reload_scripts(true) == 0);
+  game.write(kChanged);
+  CHECK(host.reload_scripts(true) == 0);
+  CHECK(host.error_count() == errors);
+  checked(host, "raise unless Mover::STEP == 1");
+}
+namespace {
+mrb_value load_nested_helper(mrb_state* mrb, mrb_value) {
+  auto& vm = *static_cast<RubyVm*>(mrb->ud);
+  const auto result = vm.eval("class Helper < Behaviour; def marker; 3; end; end", "helper.rb");
+  if (!result.ok) mrb_raise(mrb, E_RUNTIME_ERROR, result.error.c_str());
+  return mrb_obj_value(mrb_class_get(mrb, "Helper"));
+}
+}  // namespace
+TEST_CASE("script reload: nested lazy evaluations retain the outermost source owner") {
+  RubyVm vm;
+  checked(vm, "class Behaviour; end");
+  vm.enable_reload_tracking();
+  vm.state()->ud = &vm;
+  mrb_define_class_method(vm.state(), vm.state()->object_class, "const_missing", load_nested_helper, MRB_ARGS_REQ(1));
+  REQUIRE(vm.eval("class Mover < Behaviour; HELPER = Helper; def value; 1; end; end", "mover.rb").ok);
+  const auto helper = vm.reload_class(mrb_class_get(vm.state(), "Helper"),
+                                      "class Helper < Behaviour; def marker; 9; end; end", "helper.rb");
+  CHECK_FALSE(helper.ok);
+  CHECK(helper.error.find("mover.rb") != std::string::npos);
+  const auto mover = vm.reload_class(mrb_class_get(vm.state(), "Mover"),
+                                     "class Mover < Behaviour; def value; 2; end; end", "mover.rb");
+  REQUIRE_MESSAGE(mover.ok, mover.error);
+  checked(vm, "raise unless Mover.new.value == 2 && Helper.new.marker == 3");
+}
+TEST_CASE("script reload: classes left by failed evaluation never acquire the next successful file as owner") {
+  RubyVm vm;
+  checked(vm, "class Behaviour; end");
+  vm.enable_reload_tracking();
+  CHECK_FALSE(vm.eval("class Mover < Behaviour; def original; 1; end; end; raise 'broken'", "broken.rb").ok);
+  REQUIRE(vm.eval("class Mover; def added; 2; end; end", "mover.rb").ok);
+  const auto result = vm.reload_class(mrb_class_get(vm.state(), "Mover"),
+                                      "class Mover < Behaviour; def added; 3; end; end", "mover.rb");
+  CHECK_FALSE(result.ok);
+  CHECK(result.error.find("broken.rb") != std::string::npos);
+  checked(vm, "raise unless Mover.new.original == 1 && Mover.new.added == 2");
+}
+
+TEST_CASE("script reload: editor tracking leaves the prelude menu initializer callable") {
+  test::LogCapture quiet;
+  ReloadGame game;
+  auto session = game.open();
+  ScriptedInputSource input;
+  start(*session, input);
+  checked(session->runtime()->scripts(), "raise unless GameMenu.new.class == GameMenu");
+}
