@@ -44,9 +44,9 @@ bool InputState::held(const std::set<Key>& keys, const GamepadSample& pad, const
       std::any_of(binding.keys.begin(), binding.keys.end(), [&keys](Key key) { return keys.count(key) != 0; });
   const bool mouse_held = std::any_of(binding.mouse.begin(), binding.mouse.end(),
                                       [&mouse](MouseInput input) { return mouse_holds(mouse, input); });
-  return key_held || mouse_held || std::any_of(binding.buttons.begin(), binding.buttons.end(), [&pad](GamepadButton button) {
-           return pad.buttons[static_cast<std::size_t>(button)];
-         });
+  return key_held || mouse_held ||
+         std::any_of(binding.buttons.begin(), binding.buttons.end(),
+                     [&pad](GamepadButton button) { return pad.buttons[static_cast<std::size_t>(button)]; });
 }
 
 bool InputState::mouse_input_pressed(MouseInput input) const {

@@ -50,6 +50,8 @@ class GameMenu < Behaviour
               extra: -> { I18n.t("game.controls.mouse_extra") },
               wheel_up: -> { I18n.t("game.controls.mouse_wheel_up") },
               wheel_down: -> { I18n.t("game.controls.mouse_wheel_down") } }.freeze
+    # What names each kind of binding (a key, unless it says otherwise).
+    KINDS = { Input::PAD_PREFIX => :button, Input::MOUSE_PREFIX => :mouse }.freeze
     BUTTONS = { a: -> { I18n.t("game.controls.button_a") },
                 b: -> { I18n.t("game.controls.button_b") },
                 x: -> { I18n.t("game.controls.button_x") },
@@ -89,9 +91,6 @@ class GameMenu < Behaviour
       send(KINDS.fetch("#{kind}:", :key), name.to_sym)
     end
 
-    # What names each kind of binding (a key, unless it says otherwise).
-    KINDS = { Input::PAD_PREFIX => :button, Input::MOUSE_PREFIX => :mouse }.freeze
-
     def self.key(name) = KEYS[name]&.call || CHARACTERS[name] || keypad(name) || name.to_s.upcase
     def self.mouse(name) = MOUSE[name]&.call || readable(name)
 
@@ -102,6 +101,7 @@ class GameMenu < Behaviour
 
       I18n.t("game.controls.key_keypad", key: KEYPAD_CHARACTERS[name] || text.delete_prefix(KEYPAD_PREFIX))
     end
+
     def self.button(name) = BUTTONS[name]&.call || readable(name)
     def self.stick(axis) = STICKS[axis]&.call || readable(axis)
 

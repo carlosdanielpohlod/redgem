@@ -10,6 +10,18 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **The whole keyboard**: F1-F12, Insert, Delete, Home, End, Page Up and Page Down, the keypad
+  (`:kp_0` to `:kp_9`, `:kp_enter`, `:kp_add`...), Caps, Scroll and Num Lock, Print Screen, Pause,
+  Menu, Right Alt, the Super keys, and `;` `=` `[` `]` `\` and the grave key, for games and for
+  players rebinding, each with a label on the controls page.
+
+- **Mouse bindings**: `mouse:left`, `mouse:right`, `mouse:middle`, the side buttons (`mouse:side`,
+  `mouse:extra`) and the wheel (`mouse:wheel_up`, `mouse:wheel_down`, a press on each frame it
+  turns) trigger actions and axes from `game.json`, `Input.define_action(..., mouse: [...])` and
+  `Input.bind(..., mouse: ...)`. `Input.capture_next` and the controls page catch them too; the
+  click that starts a capture is never taken for the binding, and the click caught clicks nothing
+  else. `mouse: false` leaves the mouse out of a capture.
+
 - **Prefab creation**: save a selected hierarchy as a reusable GLB from the Project panel,
   preserving complete skeletons and nested references while validating dependencies before publication.
 

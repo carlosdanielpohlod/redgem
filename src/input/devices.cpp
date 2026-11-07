@@ -43,8 +43,8 @@ constexpr Named<MouseButton> kMouseButtonNames[] = {{"left", MouseButton::Left},
                                                     {"extra", MouseButton::Extra}};
 
 constexpr Named<MouseInput> kMouseInputNames[] = {
-    {"left", MouseInput::Left},         {"right", MouseInput::Right}, {"middle", MouseInput::Middle},
-    {"side", MouseInput::Side},         {"extra", MouseInput::Extra}, {"wheel_up", MouseInput::WheelUp},
+    {"left", MouseInput::Left},           {"right", MouseInput::Right}, {"middle", MouseInput::Middle},
+    {"side", MouseInput::Side},           {"extra", MouseInput::Extra}, {"wheel_up", MouseInput::WheelUp},
     {"wheel_down", MouseInput::WheelDown}};
 
 template <typename Value, std::size_t Count>

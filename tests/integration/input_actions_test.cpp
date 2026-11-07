@@ -174,8 +174,9 @@ TEST_CASE("a capture asked for by a click catches the next click, which clicks n
   input.set_mouse_button(MouseButton::Left, false);
   frame(*engine);
   // (A menu's cell is clicked when the left button is let go over it: it asks for the capture then.)
-  ruby(*engine, "$caught = []; Input.capture_next { |binding, pad| $caught << [binding, pad] } if "
-                "Input.mouse_released?(:left)");
+  ruby(*engine,
+       "$caught = []; Input.capture_next { |binding, pad| $caught << [binding, pad] } if "
+       "Input.mouse_released?(:left)");
   frame(*engine);
   CHECK(ruby(*engine, "$caught.inspect") == "[]");
   input.set_mouse_button(MouseButton::Left, true);
