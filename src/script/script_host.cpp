@@ -7,6 +7,7 @@
 #include <mruby/variable.h>
 
 #include <fstream>
+#include <exception>
 #include <sstream>
 
 #include "core/config.hpp"
@@ -51,8 +52,9 @@ bool holds_serial(mrb_value serial, mrb_int wanted) { return mrb_integer_p(seria
 
 ScriptHost& script_host(mrb_state* mrb) { return *static_cast<ScriptHost*>(mrb->ud); }
 
-ScriptHost::ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir)
-    : context_(context),
+ScriptHost::ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir, bool live_reload)
+    : live_reload_(live_reload),
+      context_(context),
       scripts_dir_(std::move(scripts_dir)),
       locales_(locales_around(scripts_dir_)),
       locale_(starting_locale(locales_)) {
@@ -61,6 +63,13 @@ ScriptHost::ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir
   start_roots();
   install_bindings(mrb);
   load_prelude();
+  if (live_reload_) prepare_reload_tracking();
+}
+
+void ScriptHost::prepare_reload_tracking() {
+  const auto result = vm_.enable_reload_tracking();
+  live_reload_ = result.ok;
+  if (!result.ok) report_error("preparing live reload", result.error);
 }
 
 void ScriptHost::load_prelude() {
@@ -78,7 +87,15 @@ void ScriptHost::report_error(const std::string& where, const std::string& error
 RubyResult ScriptHost::eval(const std::string& code, const std::string& file_name) { return vm_.eval(code, file_name); }
 
 RubyResult ScriptHost::load_file(const std::filesystem::path& path) {
-  std::ifstream in(path);
+  try {
+    return load_source(path);
+  } catch (const std::exception& error) {
+    return {false, mrb_nil_value(), "cannot load script: " + std::string(error.what())};
+  }
+}
+
+RubyResult ScriptHost::load_source(const std::filesystem::path& path) {
+  std::ifstream in(path, std::ios::binary);
   if (!in) {
     RubyResult result;
     result.ok = false;
@@ -87,7 +104,10 @@ RubyResult ScriptHost::load_file(const std::filesystem::path& path) {
   }
   std::stringstream buffer;
   buffer << in.rdbuf();
-  return vm_.eval(buffer.str(), path.string());
+  const auto code = buffer.str();
+  const auto result = vm_.eval(code, path.u8string());
+  if (result.ok) remember_source(path, code);
+  return result;
 }
 
 mrb_value ScriptHost::object_value(ObjectId object) {

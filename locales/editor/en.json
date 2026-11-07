@@ -253,6 +253,7 @@
   "editor.menu.open_scene": "Open Scene",
   "editor.menu.quit": "Quit",
   "editor.menu.redo": "Redo",
+  "editor.menu.reload_scripts": "Reload scripts",
   "editor.menu.save_scene": "Save Scene",
   "editor.menu.save_scene_as": "Save Scene As...",
   "editor.menu.show_all_panels": "Show all panels",

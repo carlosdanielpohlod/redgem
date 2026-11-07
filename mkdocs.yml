@@ -41,6 +41,7 @@ nav:
       - MCP tools: mcp.md
   - Scripting in Ruby:
       - Behaviours: scripting/behaviours.md
+      - Live script reload: scripting/live_reload.md
       - Gameplay recipes: scripting/gameplay.md
       - Multiplayer: scripting/multiplayer.md
       - Online services: scripting/online-services.md

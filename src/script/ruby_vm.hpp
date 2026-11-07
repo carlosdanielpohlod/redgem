@@ -7,11 +7,14 @@
 #include <functional>
 #include <initializer_list>
 #include <string>
+#include <memory>
 #include <vector>
 
 #include "script/script_budget.hpp"
+#include "script/ruby_reload.hpp"
 
 namespace redgem {
+class ReloadOwnership;
 
 struct RubyResult {
   bool ok = true;
@@ -32,7 +35,10 @@ class RubyVm {
 
   mrb_state* state() { return mrb_; }
 
+  RubyResult enable_reload_tracking();
   RubyResult eval(const std::string& code, const std::string& file_name);
+  // Replaces one plain behaviour class while retaining its identity and instance fields.
+  RubyResult reload_class(RClass* klass, const std::string& code, const std::string& file_name);
   // Compiles without running. On a syntax error, `error` says where ("line N: ...").
   RubyResult check_syntax(const std::string& code, const std::string& file_name);
   RubyResult call(mrb_value receiver, const char* method, std::initializer_list<mrb_value> args = {});
@@ -53,10 +59,14 @@ class RubyVm {
  private:
   RubyResult run_protected(mrb_protect_error_func* body, void* request);
   std::string describe_exception(mrb_value exception);
+  void finish_reload_failure();
+  RubyResult failed_result(mrb_value exception, bool evaluated_source);
 
   // (Before the interpreter, which keeps a pointer to it from its first instruction on.)
   ScriptBudget budget_;
   mrb_state* mrb_;
+  ReloadHooks reload_hooks_{};
+  std::unique_ptr<ReloadOwnership> reload_ownership_;
 };
 
 }  // namespace redgem

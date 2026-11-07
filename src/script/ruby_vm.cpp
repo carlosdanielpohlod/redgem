@@ -1,4 +1,6 @@
 #include "script/ruby_vm.hpp"
+#include "script/ruby_context.hpp"
+#include "script/reload_ownership.hpp"
 
 #include <mruby.h>
 #include <mruby/array.h>
@@ -16,6 +18,7 @@ struct EvalRequest {
   const std::string* code = nullptr;
   const std::string* file_name = nullptr;
   bool compile_only = false;
+  ReloadOwnership* ownership = nullptr;
 };
 
 // The arguments are borrowed from the caller for the length of the call: no copy is made, which
@@ -27,17 +30,65 @@ struct CallRequest {
   mrb_int argc = 0;
 };
 
-mrb_value run_eval(mrb_state* mrb, void* userdata) {
+// Nested lazy loads checkpoint their enclosing source before tracking their own declarations.
+class ReloadEvaluation {
+ public:
+  ReloadEvaluation(ReloadOwnership* owner, const std::string& file) : owner_(owner) {
+    if (owner_) owner_->begin_eval(file);
+  }
+  ~ReloadEvaluation() {
+    if (owner_) owner_->end_eval(completed_);
+  }
+  ReloadEvaluation(const ReloadEvaluation&) = delete;
+  ReloadEvaluation& operator=(const ReloadEvaluation&) = delete;
+  void complete() {
+    if (owner_) owner_->complete_eval();
+    completed_ = true;
+  }
+
+ private:
+  ReloadOwnership* owner_;
+  bool completed_ = false;
+};
+
+mrb_value evaluate_source(mrb_state* mrb, void* userdata) {
   const auto* request = static_cast<const EvalRequest*>(userdata);
-  mrbc_context* context = mrbc_context_new(mrb);
-  mrbc_filename(mrb, context, request->file_name->c_str());
+  ReloadEvaluation evaluation(request->ownership, *request->file_name);
+  RubyContext context(mrb);
+  mrbc_filename(mrb, context.get(), request->file_name->c_str());
   context->no_exec = request->compile_only;
   context->capture_errors = request->compile_only;  // report instead of printing to stderr
   const mrb_value result =
-      mrb_load_nstring_cxt(mrb, request->code->data(), static_cast<mrb_int>(request->code->size()), context);
-  mrbc_context_free(mrb, context);
+      mrb_load_nstring_cxt(mrb, request->code->data(), static_cast<mrb_int>(request->code->size()), context.get());
   if (mrb->exc != nullptr) mrb_exc_raise(mrb, mrb_obj_value(mrb->exc));
+  evaluation.complete();
   return result;
+}
+
+mrb_value run_eval(mrb_state* mrb, void* data) {
+  try {
+    return evaluate_source(mrb, data);
+  } catch (const std::exception& problem) {
+    mrb_raise(mrb, E_RUNTIME_ERROR, problem.what());
+  }
+  return mrb_nil_value();
+}
+
+struct ObservationRequest {
+  ReloadOwnership* ownership = nullptr;
+  bool initial = false;
+};
+mrb_value run_observation(mrb_state* mrb, void* data) {
+  auto& request = *static_cast<ObservationRequest*>(data);
+  try {
+    if (request.initial)
+      request.ownership->initialize();
+    else
+      request.ownership->observe_failure();
+  } catch (const std::exception& error) {
+    mrb_raise(mrb, E_RUNTIME_ERROR, error.what());
+  }
+  return mrb_nil_value();
 }
 
 mrb_value run_call(mrb_state* mrb, void* userdata) {
@@ -122,6 +173,7 @@ RClass* define_timeout_class(mrb_state* mrb) {
 RubyVm::RubyVm() : mrb_(mrb_open_allocf(mrb_default_allocf, &budget_)) {
   if (mrb_ == nullptr) throw std::runtime_error("cannot create the mruby interpreter");
   budget_.attach(mrb_, define_timeout_class(mrb_));
+  reload_hooks_ = class_reload_hooks(mrb_, mrb_->class_class);
 }
 
 void RubyVm::set_budget(std::chrono::milliseconds budget) { budget_.set_limit(budget); }
@@ -146,15 +198,34 @@ RubyResult RubyVm::run_protected(mrb_protect_error_func* body, void* request) {
     const BudgetedCall budgeted(budget_);
     result.value = mrb_protect_error(mrb_, body, request, &failed);
   }
-  if (!failed) return result;
-  result.ok = false;
-  result.error = describe_exception(result.value);
-  result.value = mrb_nil_value();
+  if (failed) return failed_result(result.value, body == run_eval);
   return result;
+}
+RubyResult RubyVm::failed_result(mrb_value exception, bool evaluated_source) {
+  // Quarantine failed declarations before even exception.inspect can run game callbacks.
+  if (evaluated_source) finish_reload_failure();
+  return {false, mrb_nil_value(), describe_exception(exception)};
+}
+
+RubyResult RubyVm::enable_reload_tracking() {
+  reload_ownership_ = std::make_unique<ReloadOwnership>(mrb_);
+  ObservationRequest request{reload_ownership_.get(), true};
+  auto result = run_protected(run_observation, &request);
+  if (!result.ok) reload_ownership_.reset();
+  return result;
+}
+void RubyVm::finish_reload_failure() {
+  if (!reload_ownership_) return;
+  ObservationRequest request{reload_ownership_.get(), false};
+  mrb_bool failed = false;
+  const BudgetedCall budgeted(budget_);
+  mrb_protect_error(mrb_, run_observation, &request, &failed);
+  if (failed) reload_ownership_->invalidate();
 }
 
 RubyVm::~RubyVm() {
   budget_.set_limit(std::chrono::milliseconds(0));  // the watchdog lets go of the interpreter first
+  reload_ownership_.reset();
   mrb_close(mrb_);
 }
 
@@ -168,7 +239,7 @@ RubyResult RubyVm::check_syntax(const std::string& code, const std::string& file
 }
 
 RubyResult RubyVm::eval(const std::string& code, const std::string& file_name) {
-  EvalRequest request{&code, &file_name};
+  EvalRequest request{&code, &file_name, false, reload_ownership_.get()};
   const int arena = mrb_gc_arena_save(mrb_);
   const RubyResult result = run_protected(run_eval, &request);
   mrb_gc_arena_restore(mrb_, arena);

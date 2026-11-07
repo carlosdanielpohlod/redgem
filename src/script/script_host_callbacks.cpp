@@ -11,6 +11,7 @@ namespace redgem {
 
 namespace {
 
+constexpr const char* kStartEntry = "start";            // initialization must finish before an instance can resume
 constexpr const char* kUpdateEntry = "__update";        // Behaviour#__update: its timers, then its update
 constexpr const char* kDestroyedEntry = "__destroyed";  // GameObject's, in the prelude
 
@@ -35,6 +36,7 @@ void ScriptHost::invoke(std::size_t index, const char* method, std::initializer_
 void ScriptHost::disable_failed(std::size_t index, const char* method, const std::string& error) {
   BehaviourSlot& slot = behaviours_[index];
   slot.enabled = false;
+  if (std::string(method) == kStartEntry) slot.start_failed = true;
   // (Timers and the behaviour's update run through one entry point: to the user it is "update".)
   const std::string shown = std::string(method) == kUpdateEntry ? "update" : method;
   const std::string& object_name = context_.scene->at(slot.object.id).name;
@@ -62,7 +64,7 @@ void ScriptHost::start_pending() {
     if (behaviours_[i].started) continue;
     if (!runnable(behaviours_[i])) continue;
     behaviours_[i].started = true;
-    invoke(i, "start", {});
+    invoke(i, kStartEntry, {});
   }
 }
 
