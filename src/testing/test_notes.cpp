@@ -48,10 +48,8 @@ void write_note(mrb_state* mrb, const std::filesystem::path& file, const char* t
   std::filesystem::create_directories(file.parent_path(), ignored);
   if (std::filesystem::is_symlink(file.parent_path(), ignored))
     mrb_raise(mrb, E_RUNTIME_ERROR, "the notes folder is a symbolic link: no note is written through it");
-  std::filesystem::path unfinished = file;
-  unfinished += kUnfinishedMark;
   std::string unwritten;  // (best effort, as before: a note that could not be left is not there)
-  durable::replace_file_quickly(file, unfinished, text, unwritten);
+  durable::replace_file_quickly(file, kUnfinishedMark, text, unwritten);
 }
 
 mrb_value leave_note(mrb_state* mrb, mrb_value) {

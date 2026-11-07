@@ -83,10 +83,8 @@ bool fits_a_file(const fs::path& file) {
 // Writes the text beside the file, then puts it in the file's place: a reader never sees half of it.
 // (What is written beside it is made new: a link planted under that name is never written through.)
 bool replace_file(const fs::path& file, const std::string& text, std::string& error) {
-  fs::path written = file;
-  written += config::kAgentWritingSuffix;
   std::string why;
-  if (durable::replace_file_quickly(file, written, text, why)) return true;
+  if (durable::replace_file_quickly(file, config::kAgentWritingSuffix, text, why)) return true;
   error = "cannot write " + file.u8string() + ": " + why;
   return false;
 }

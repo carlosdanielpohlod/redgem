@@ -27,22 +27,23 @@ bool write_flushed(const std::filesystem::path& file, const std::string& text, c
 // False when it could not.
 bool sync_folder(const std::filesystem::path& folder);
 
-// Replaces what `file` holds with `text`, whole: written beside it as <file>.part, flushed, moved
-// over it and the move pushed to the disk. False when `file` could not be replaced: it holds what
-// it held, and nothing is left beside it.
+// Replaces what `file` holds with `text`, whole: written beside it as <file>.<random>.part,
+// flushed, moved over it and the move pushed to the disk. False when `file` could not be replaced:
+// it holds what it held, and nothing this write made is left beside it.
 bool replace_file(const std::filesystem::path& file, std::string_view text, const Flush& flush = flush_to_disk);
 
-// replace_file, written first under the name `partial` (in the same folder as `file`). The partial
-// file is always made new and never opened through a link: whatever already has its name (a file a
-// crash left, or a symbolic link planted there to send the writing elsewhere) is removed first, and
-// the writing is refused when something takes the name again before the file is made.
-bool replace_file_via(const std::filesystem::path& file, const std::filesystem::path& partial, std::string_view text,
+// replace_file, its partial file named <file>.<random><partial_suffix>. That file is made new under
+// a name no other write has (two writes of one file never share one) and never opened through a
+// link; nothing already in the folder is removed or written. It is moved over `file` only while
+// its name still leads to the very file written: replaced by a link or another file meanwhile, the
+// write fails and leaves what is there alone.
+bool replace_file_via(const std::filesystem::path& file, const char* partial_suffix, std::string_view text,
                       const Flush& flush = flush_to_disk);
 
 // replace_file_via without the trips to the disk: the file is never left half written, but a power
 // cut right after may lose it (a scene save, an agent's edit: the editor's work, not a player's).
 // False, with why in `error`, when `file` could not be replaced.
-bool replace_file_quickly(const std::filesystem::path& file, const std::filesystem::path& partial,
-                          std::string_view text, std::string& error);
+bool replace_file_quickly(const std::filesystem::path& file, const char* partial_suffix, std::string_view text,
+                          std::string& error);
 
 }  // namespace redgem::durable

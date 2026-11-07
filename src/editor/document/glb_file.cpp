@@ -61,11 +61,9 @@ std::vector<std::uint8_t> glb_bytes(const std::string& json, const std::vector<s
 // Writes to a temporary file first, so a failed save never leaves half a scene behind. (That file
 // is made new: a link planted under its name is never written through.)
 bool write_atomically(const std::filesystem::path& path, const std::vector<std::uint8_t>& bytes, std::string& error) {
-  std::filesystem::path temp = path;
-  temp += config::kSceneWritingSuffix;
   const std::string_view text(reinterpret_cast<const char*>(bytes.data()), bytes.size());
   std::string why;
-  if (durable::replace_file_quickly(path, temp, text, why)) return true;
+  if (durable::replace_file_quickly(path, config::kSceneWritingSuffix, text, why)) return true;
   error = "cannot write " + path.string() + ": " + why;
   return false;
 }

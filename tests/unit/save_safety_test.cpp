@@ -3,10 +3,15 @@
 
 #include <doctest/doctest.h>
 
+#include <condition_variable>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <mutex>
+#include <set>
 #include <string>
+#include <thread>
+#include <vector>
 
 #include "core/platform.hpp"
 #include "storage/durable_file.hpp"
@@ -22,6 +27,8 @@ constexpr double kOlderScore = 900.0;
 constexpr const char* kDamaged = "{ not json";            // what a save cut short by a crash may hold
 constexpr const char* kAlsoDamaged = "[1, 2";             // another one, told apart from the first
 constexpr const char* kUserText = "IMPORTANT USER DATA";  // a file of the user's, outside the game
+constexpr const char* kFirstWriter = "first writer";      // what two writes of one file at once write
+constexpr const char* kSecondWriter = "second writer";
 constexpr int kWrites = 3;
 constexpr int kLevel = 2;
 constexpr int kFirstNumberedAside = 2;  // .damaged, then .damaged.2
@@ -43,6 +50,24 @@ struct TempSave {
 
 std::filesystem::path beside(const std::filesystem::path& file, const std::string& suffix) {
   return file.string() + suffix;
+}
+
+// The names of what a folder holds.
+std::set<std::string> names_in(const std::filesystem::path& folder) {
+  std::set<std::string> names;
+  for (const auto& entry : std::filesystem::directory_iterator(folder)) names.insert(entry.path().filename().string());
+  return names;
+}
+
+// The partial files being written for `file`: <file>.<random>.part, beside it.
+std::vector<std::filesystem::path> partials_of(const std::filesystem::path& file) {
+  const std::string start = file.filename().string() + ".";
+  std::vector<std::filesystem::path> partials;
+  for (const auto& entry : std::filesystem::directory_iterator(file.parent_path())) {
+    const std::string name = entry.path().filename().string();
+    if (name.rfind(start, 0) == 0 && entry.path().extension() == kPartial) partials.push_back(entry.path());
+  }
+  return partials;
 }
 
 std::string contents_of(const std::filesystem::path& file) {
@@ -252,7 +277,7 @@ TEST_CASE("a file replaced whole leaves nothing beside it, and its folder is flu
   write_text(file, kDamaged);
   REQUIRE(durable::replace_file(file, kAlsoDamaged));
   CHECK(contents_of(file) == kAlsoDamaged);
-  CHECK_FALSE(std::filesystem::exists(beside(file, kPartial)));
+  CHECK(names_in(temp.dir) == std::set<std::string>{"replaced.json"});
   CHECK_FALSE(durable::replace_file(temp.dir / "missing" / "replaced.json", kAlsoDamaged));
   CHECK(durable::sync_folder(temp.dir));
   // (Windows has no flush of a folder: there it always succeeds.)
@@ -260,7 +285,7 @@ TEST_CASE("a file replaced whole leaves nothing beside it, and its folder is flu
   CHECK(durable::sync_folder(temp.dir / "missing") != has_folder_flush);
 }
 
-TEST_CASE("a file replaced whole never writes through a link planted under its partial name") {
+TEST_CASE("a file replaced whole never writes through a link planted where it is written first") {
   const TempSave temp;
   const std::filesystem::path file = temp.dir / "game" / "settings.json";
   const std::filesystem::path victim = temp.dir / "elsewhere" / "victim.txt";
@@ -273,16 +298,16 @@ TEST_CASE("a file replaced whole never writes through a link planted under its p
   CHECK(contents_of(victim) == kUserText);
   CHECK(contents_of(file) == kAlsoDamaged);
   CHECK_FALSE(std::filesystem::is_symlink(file));
-  CHECK_FALSE(std::filesystem::exists(std::filesystem::symlink_status(beside(file, kPartial))));
+  CHECK(std::filesystem::is_symlink(beside(file, kPartial)));  // (not the write's own: left alone)
 }
 
-TEST_CASE("a partial file a crash left behind is replaced, not refused") {
+TEST_CASE("a partial file a crash left behind is neither written over nor in the way") {
   const TempSave temp;
   const std::filesystem::path file = temp.dir / "settings.json";
   write_text(beside(file, kPartial), kDamaged);
   REQUIRE(durable::replace_file(file, kAlsoDamaged));
   CHECK(contents_of(file) == kAlsoDamaged);
-  CHECK_FALSE(std::filesystem::exists(beside(file, kPartial)));
+  CHECK(contents_of(beside(file, kPartial)) == kDamaged);
 }
 
 TEST_CASE("a file replaced quickly is replaced whole, or says why it was not") {
@@ -290,10 +315,73 @@ TEST_CASE("a file replaced quickly is replaced whole, or says why it was not") {
   const std::filesystem::path file = temp.dir / "scene.glb";
   write_text(file, kDamaged);
   std::string why;
-  REQUIRE_MESSAGE(durable::replace_file_quickly(file, beside(file, kPartial), kAlsoDamaged, why), why);
+  REQUIRE_MESSAGE(durable::replace_file_quickly(file, kPartial, kAlsoDamaged, why), why);
   CHECK(contents_of(file) == kAlsoDamaged);
-  CHECK_FALSE(std::filesystem::exists(beside(file, kPartial)));
+  CHECK(names_in(temp.dir) == std::set<std::string>{"scene.glb"});
   const std::filesystem::path nowhere = temp.dir / "missing" / "scene.glb";
-  CHECK_FALSE(durable::replace_file_quickly(nowhere, beside(nowhere, kPartial), kAlsoDamaged, why));
+  CHECK_FALSE(durable::replace_file_quickly(nowhere, kPartial, kAlsoDamaged, why));
   CHECK_FALSE(why.empty());
+}
+
+TEST_CASE("a partial file swapped for a link while it is written is never moved into place") {
+  const TempSave temp;
+  const std::filesystem::path file = temp.dir / "game" / "settings.json";
+  const std::filesystem::path victim = temp.dir / "elsewhere" / "victim.txt";
+  write_text(file, kDamaged);
+  write_text(victim, kUserText);
+  bool swapped = false;
+  const durable::Flush swap_for_a_link = [&](std::FILE* out) {
+    const bool flushed = durable::flush_to_disk(out);
+    for (const std::filesystem::path& partial : partials_of(file)) {
+      std::filesystem::remove(partial);
+      std::error_code link_error;
+      std::filesystem::create_symlink(victim, partial, link_error);
+      swapped = !link_error;
+    }
+    return flushed;
+  };
+  const bool replaced = durable::replace_file(file, kAlsoDamaged, swap_for_a_link);
+  if (!swapped) return;  // (Windows without developer mode makes no links)
+  CHECK_FALSE(replaced);
+  CHECK_FALSE(std::filesystem::is_symlink(file));
+  CHECK(contents_of(file) == kDamaged);
+  CHECK(contents_of(victim) == kUserText);
+}
+
+TEST_CASE("two writes of one file at once each move their own whole file, never the other's") {
+  const TempSave temp;
+  const std::filesystem::path file = temp.dir / "settings.json";
+  write_text(file, kDamaged);
+  std::mutex lock;
+  std::condition_variable changed;
+  bool second_writing = false;
+  bool second_may_finish = false;
+  bool second_replaced = false;
+  std::thread second;
+  // The first write starts the second as it flushes, and lets it get as far as its own flush.
+  const durable::Flush start_the_second = [&](std::FILE* out) {
+    second = std::thread([&] {
+      second_replaced = durable::replace_file(file, kSecondWriter, [&](std::FILE* stream) {
+        std::unique_lock<std::mutex> hold(lock);
+        second_writing = true;
+        changed.notify_all();
+        changed.wait(hold, [&] { return second_may_finish; });
+        return durable::flush_to_disk(stream);
+      });
+    });
+    std::unique_lock<std::mutex> hold(lock);
+    changed.wait(hold, [&] { return second_writing; });
+    return durable::flush_to_disk(out);
+  };
+  CHECK(durable::replace_file(file, kFirstWriter, start_the_second));
+  CHECK(contents_of(file) == kFirstWriter);  // (whole, and its own)
+  {
+    const std::lock_guard<std::mutex> hold(lock);
+    second_may_finish = true;
+  }
+  changed.notify_all();
+  second.join();
+  CHECK(second_replaced);
+  CHECK(contents_of(file) == kSecondWriter);
+  CHECK(names_in(temp.dir) == std::set<std::string>{"settings.json"});
 }
