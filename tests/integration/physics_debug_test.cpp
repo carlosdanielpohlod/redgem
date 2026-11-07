@@ -4,6 +4,7 @@
 #include <set>
 
 #include "physics/physics_world.hpp"
+#include "scene/scene_config.hpp"
 #include "physics/jolt/jolt_debug_geometry.hpp"
 #include <Jolt/Physics/Collision/Shape/StaticCompoundShape.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
