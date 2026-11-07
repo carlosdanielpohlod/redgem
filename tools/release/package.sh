@@ -14,25 +14,23 @@ source "$(dirname "${BASH_SOURCE[0]}")/release_files.sh"
 LINUX_BUILD="${REPO_ROOT}/build/src"
 WINDOWS_BUILD="${REPO_ROOT}/build-windows/src"
 WINDOWS_STRIP="${REPO_ROOT}/.deps/llvm-mingw/bin/x86_64-w64-mingw32-strip"
-LINUX_PROGRAMS=(redgem redgem-player redgem-relay redgem-server redgem-test)
-WINDOWS_PROGRAMS=(redgem.exe redgem-player.exe redgem-relay.exe redgem-server.exe)
 MAC_SYSTEM="Darwin"   # what uname says on a Mac
 
 package_linux() {
   local root="$1/${PACKAGE_NAME}" program
   mkdir -p "${root}/bin/runtimes"
-  for program in "${LINUX_PROGRAMS[@]}"; do
+  for program in "${PROGRAMS[@]}"; do
     need "${LINUX_BUILD}/${program}"
     cp "${LINUX_BUILD}/${program}" "${root}/bin/"
     strip "${root}/bin/${program}"
   done
-  need "${LINUX_BUILD}/runtimes/windows/redgem-player.exe"
-  need "${LINUX_BUILD}/runtimes/android"
+  local runtime
+  for runtime in "${WINDOWS_RUNTIME}" "${ANDROID_RUNTIMES[@]}"; do need "${LINUX_BUILD}/${runtime}"; done
   cp -r "${LINUX_BUILD}/runtimes/windows" "${LINUX_BUILD}/runtimes/android" "${root}/bin/runtimes/"
-  "${WINDOWS_STRIP}" "${root}/bin/runtimes/windows/redgem-player.exe"
+  "${WINDOWS_STRIP}" "${root}/bin/${WINDOWS_RUNTIME}"
   copy_demos "${root}"
   copy_notices "${root}" README-linux.txt
-  tar -czf "${OUT_DIR}/${PACKAGE_NAME}-linux-x86_64.tar.gz" -C "$1" "${PACKAGE_NAME}"
+  tar -czf "${OUT_DIR}/${LINUX_DOWNLOAD}" -C "$1" "${PACKAGE_NAME}"
 }
 
 package_windows() {
@@ -45,7 +43,7 @@ package_windows() {
   done
   copy_demos "${root}"
   copy_notices "${root}" README-windows.txt
-  (cd "$1" && zip -qr "${OUT_DIR}/${PACKAGE_NAME}-windows-x86_64.zip" "${PACKAGE_NAME}")
+  (cd "$1" && zip -qr "${OUT_DIR}/${WINDOWS_DOWNLOAD}" "${PACKAGE_NAME}")
 }
 
 main() {

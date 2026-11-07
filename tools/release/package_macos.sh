@@ -13,19 +13,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/release_files.sh"
 
 BUILD="${REPO_ROOT}/build/src"
 APP_NAME="RedGem.app"
-# The editor first: it is what the app starts. The others stand beside it as they do in a build
-# (a game is built with the player found beside the editor).
-PROGRAMS=(redgem redgem-player redgem-relay redgem-server redgem-test)
 INFO_TEMPLATE="${REPO_ROOT}/tools/release/Info.plist"
 VERSION_MARK="@VERSION@"
 MINIMUM_MARK="@MINIMUM_SYSTEM@"
 DEFAULT_MINIMUM_SYSTEM="11.0"   # the oldest macOS the programs were built for, unless the build said
 AD_HOC_IDENTITY="-"              # codesign's name for "no identity"
-
-# The engine's version, as CMakeLists.txt says it.
-engine_version() {
-  sed -n 's/^project(redgem VERSION \([0-9.]*\).*/\1/p' "${REPO_ROOT}/CMakeLists.txt"
-}
 
 # The app's description, with the version and the oldest macOS it opens on written in.
 write_info() {

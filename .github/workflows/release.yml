@@ -1,0 +1,357 @@
+# The downloads of a release, built and packed here rather than by hand: the Linux one (with the
+# players for Windows and Android in bin/runtimes/) and the Windows one on Linux, with the pinned
+# llvm-mingw and Android NDK, and the two Mac ones on Macs of each kind. Each is checked before it
+# is kept (its list of files, and its programs run on its own system). Then all four are checked
+# together, and a release never gets fewer than four.
+#
+# What starts it, and what it does with the downloads (tools/release/plan_release.sh decides):
+# * a pushed tag v<version>: attached to that tag's draft release, which is made when missing;
+# * a pull request from a release-* branch: attached to the draft release of v<the version in
+#   CMakeLists.txt> (a fork's pull request only keeps them as the run's artifacts);
+# * a run started by hand: a dry run unless `dry_run` is unticked; a dry run only keeps them as
+#   the run's artifacts and touches no release.
+# A release is never published here: the owner publishes the draft. A published release is never
+# changed (tools/release/attach_to_draft.sh fails instead).
+name: Release
+
+on:
+  pull_request:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only keep the downloads as the run's artifacts (no release is made or changed)
+        type: boolean
+        default: true
+
+# A newer push to a pull request makes the run of the older one pointless; a tag's run is finished.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: What is released
+    # (Every other pull request skips the whole workflow.)
+    if: ${{ github.event_name != 'pull_request' || startsWith(github.head_ref, 'release-') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      commit: ${{ steps.plan.outputs.commit }}
+      attach: ${{ steps.plan.outputs.attach }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Decide the tag, and whether a release is touched
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          tools/release/plan_release.sh | tee -a "${GITHUB_OUTPUT}"
+
+  linux-windows:
+    name: Linux and Windows downloads
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 1G
+      FETCH_DIR: ${{ github.workspace }}/.deps/fetch
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # The engine's own list (docs/install.md), ccache, and zip for the Windows download.
+      - name: Install the build tools and libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build git ca-certificates xz-utils bison ccache zip unzip \
+            libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libxext-dev libxfixes-dev libxrender-dev libasound2-dev
+          echo "/usr/lib/ccache" >> "${GITHUB_PATH}"
+
+      # rake builds mruby, for each system.
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+
+      - name: Describe the toolchain
+        run: |
+          lsb_release -ds
+          cc --version | head -n 1
+          cmake --version | head -n 1
+          ruby --version
+
+      # The Linux workflow's caches, read only: a release run keeps nothing of its own.
+      - name: Restore the Linux compiler cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-linux-${{ github.run_id }}
+          restore-keys: ccache-linux-
+
+      - name: Restore the libraries' sources
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .deps/fetch/*-src
+            .deps/fetch/*-subbuild
+          key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
+
+      # Configured as the Linux workflow does, so that its compiler cache serves this build.
+      - name: Build the Linux programs
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DREDGEM_WARNINGS_AS_ERRORS=ON \
+            -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+          ccache --zero-stats
+          cmake --build build --target redgem redgem_player redgem_relay redgem_server redgem_test_tool
+          ccache --show-stats
+
+      # With the llvm-mingw release tools/windows/fetch_toolchain.sh pins: the player into
+      # build/src/runtimes/windows/, then the editor and the servers of the Windows download.
+      - name: Build the Windows programs
+        run: |
+          tools/windows/build_runtime.sh
+          cmake --build build-windows --target redgem redgem_relay redgem_server
+
+      # (The Android workflow's compiler cache goes where the Linux one was.)
+      - name: Set the Linux compiler cache aside
+        run: rm -rf .ccache
+
+      - name: Restore the NDK
+        uses: actions/cache/restore@v4
+        with:
+          path: .deps/android-ndk
+          key: android-ndk-${{ hashFiles('tools/android/fetch_toolchain.sh') }}
+
+      - name: Restore the Android compiler cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-android-${{ github.run_id }}
+          restore-keys: ccache-android-
+
+      - name: Restore the Android libraries' sources
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            build-android/*/_deps/*-src
+            build-android/*/_deps/*-subbuild
+          key: fetch-android-${{ hashFiles('cmake/Dependencies.cmake') }}
+
+      # With the NDK release tools/android/fetch_toolchain.sh pins (fetched when not restored).
+      - name: Build the Android players
+        env:
+          REDGEM_ANDROID_CMAKE_ARGS: >-
+            -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+            -DREDGEM_WARNINGS_AS_ERRORS=ON
+        run: tools/android/build_runtime.sh arm64-v8a x86_64
+
+      - name: Pack the downloads
+        run: tools/release/package.sh
+
+      - name: Check what the downloads hold
+        run: tools/release/check_downloads.sh dist/release redgem-linux-x86_64.tar.gz redgem-windows-x86_64.zip
+
+      - name: Run the Linux download's programs
+        run: tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.tar.gz
+
+      - name: Keep the Linux download
+        uses: actions/upload-artifact@v4
+        with:
+          name: redgem-linux-x86_64
+          path: dist/release/redgem-linux-x86_64.tar.gz
+          if-no-files-found: error
+
+      - name: Keep the Windows download
+        uses: actions/upload-artifact@v4
+        with:
+          name: redgem-windows-x86_64
+          path: dist/release/redgem-windows-x86_64.zip
+          if-no-files-found: error
+
+  # The Windows download is packed on Linux: its programs are run here, on Windows.
+  windows-check:
+    name: Windows download runs
+    needs: linux-windows
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: redgem-windows-x86_64
+          path: dist/release
+
+      - name: Run the Windows download's programs
+        run: tools/release/smoke_test.sh dist/release/redgem-windows-x86_64.zip
+
+  macos:
+    name: Mac download (${{ matrix.arch }})
+    needs: plan
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    env:
+      # The oldest macOS the programs run on (written into the app's Info.plist as well).
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install the build tools
+        run: brew install ninja
+
+      # rake builds mruby.
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Describe the toolchain
+        run: |
+          sw_vers
+          uname -m
+          xcodebuild -version
+          cmake --version | head -n 1
+          ruby --version
+
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DREDGEM_WARNINGS_AS_ERRORS=ON \
+            -DREDGEM_BUILD_TESTS=OFF
+          cmake --build build --target redgem redgem_player redgem_relay redgem_server redgem_test_tool
+
+      - name: Pack the download
+        run: tools/release/package.sh
+
+      - name: Check what the download holds
+        run: tools/release/check_downloads.sh dist/release redgem-macos-${{ matrix.arch }}.zip
+
+      - name: Run the download's programs
+        run: tools/release/smoke_test.sh dist/release/redgem-macos-${{ matrix.arch }}.zip
+
+      # As a double click does: through the system's launcher, with no game named (the project hub).
+      - name: Open the packed app and take a picture of the screen
+        run: |
+          unpacked="${RUNNER_TEMP}/unpacked"
+          mkdir -p "${unpacked}"
+          ditto -x -k "dist/release/redgem-macos-${{ matrix.arch }}.zip" "${unpacked}"
+          tools/macos/capture_window.sh "dist/screens/app-hub-${{ matrix.arch }}.png" 30 \
+            open -W -n "${unpacked}/redgem/RedGem.app"
+          pkill -x redgem || true
+
+      - name: Keep the download
+        uses: actions/upload-artifact@v4
+        with:
+          name: redgem-macos-${{ matrix.arch }}
+          path: dist/release/redgem-macos-${{ matrix.arch }}.zip
+          if-no-files-found: error
+
+      - name: Keep the picture of the app
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-hub-${{ matrix.arch }}
+          path: dist/screens
+          if-no-files-found: warn
+
+  # Runs even when a job above failed, to say which download is missing.
+  gather:
+    name: All four downloads
+    needs: [plan, linux-windows, windows-check, macos]
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: redgem-*
+          path: dist/release
+          merge-multiple: true
+
+      - name: Check that all four are there and hold what they must
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+        run: |
+          tools/release/check_downloads.sh dist/release
+          {
+            echo "### Downloads for ${TAG}"
+            echo '```'
+            (cd dist/release && sha256sum -- *)
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      # (A download can be there and still have failed a check: the Windows one runs apart.)
+      - name: Check that every build and check passed
+        if: ${{ !cancelled() }}
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"${RESULTS}"
+          jq -e 'all(.[]; .result == "success")' <<<"${RESULTS}" > /dev/null || {
+            echo "Not every job above passed: no release gets these downloads." >&2
+            exit 1
+          }
+
+  attach:
+    name: Attach to the draft release
+    needs: [plan, gather]
+    if: ${{ needs.plan.outputs.attach == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # The only job that may write: it makes or changes the draft release.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: redgem-*
+          path: dist/release
+          merge-multiple: true
+
+      - name: Attach the downloads to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          COMMIT: ${{ needs.plan.outputs.commit }}
+        run: tools/release/attach_to_draft.sh "${TAG}" "${COMMIT}" dist/release

@@ -223,7 +223,9 @@ not a promise of how it will be closed.
   `game.json` does not say, is guessed from its scripts' text (`Network.` or `HTTP.`): a script
   that reaches them some other way is not seen.
 - Saves live under RedGem's own folder, not under the game's or its studio's name.
-- Except the Mac's, the downloads are packed by hand, not by the continuous integration.
+- The downloads are built and packed by the continuous integration, on GitHub's runners, and
+  checked there only by listing them and running their programs' `--version` and `--help`: no
+  one opens the Windows and Linux editors from a download before a release is published.
 
 ### Engineering
 
