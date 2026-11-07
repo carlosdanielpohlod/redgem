@@ -11,6 +11,7 @@
 #include "scene/props.hpp"
 #include "script/script_host.hpp"
 #include "script/script_naming.hpp"
+#include "script/ruby_classes.hpp"
 
 namespace redgem {
 
@@ -65,12 +66,7 @@ bool ScriptHost::require_script(const std::string& script) {
   return true;
 }
 
-RClass* ScriptHost::class_named(const std::string& name) {
-  mrb_state* mrb = vm_.state();
-  if (!mrb_class_defined(mrb, name.c_str())) return nullptr;
-  const mrb_value constant = mrb_const_get(mrb, mrb_obj_value(mrb->object_class), mrb_intern_cstr(mrb, name.c_str()));
-  return mrb_class_p(constant) ? mrb_class_ptr(constant) : nullptr;
-}
+RClass* ScriptHost::class_named(const std::string& name) { return ruby_classes::root_class(vm_.state(), name.c_str()); }
 
 mrb_value ScriptHost::module_named(const char* name) {
   mrb_state* mrb = vm_.state();

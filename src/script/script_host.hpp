@@ -119,6 +119,8 @@ class ScriptHost {
   std::string reload_cursor_;
   bool loading_screen_failed_ = false;
   void load_prelude();
+  void prepare_reload_tracking();
+  RubyResult load_source(const std::filesystem::path& path);
   // A new Ruby GameObject for an object; stands_for says whether one still stands for it.
   mrb_value new_wrapper(const GameObject& object);
   bool stands_for(mrb_value wrapper, const GameObject& object);

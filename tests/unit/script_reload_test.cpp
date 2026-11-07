@@ -10,6 +10,7 @@
 #include "scene/props.hpp"
 #include "scene/scene_ids.hpp"
 #include "script/ruby_vm.hpp"
+#include "script/ruby_classes.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -488,7 +489,7 @@ mrb_value load_nested_helper(mrb_state* mrb, mrb_value) {
   return mrb_obj_value(mrb_class_get(mrb, "Helper"));
 }
 }  // namespace
-TEST_CASE("script reload: nested lazy evaluations retain the outermost source owner") {
+TEST_CASE("script reload: nested lazy evaluations retain each source owner") {
   RubyVm vm;
   checked(vm, "class Behaviour; end");
   vm.enable_reload_tracking();
@@ -497,12 +498,11 @@ TEST_CASE("script reload: nested lazy evaluations retain the outermost source ow
   REQUIRE(vm.eval("class Mover < Behaviour; HELPER = Helper; def value; 1; end; end", "mover.rb").ok);
   const auto helper = vm.reload_class(mrb_class_get(vm.state(), "Helper"),
                                       "class Helper < Behaviour; def marker; 9; end; end", "helper.rb");
-  CHECK_FALSE(helper.ok);
-  CHECK(helper.error.find("mover.rb") != std::string::npos);
+  REQUIRE_MESSAGE(helper.ok, helper.error);
   const auto mover = vm.reload_class(mrb_class_get(vm.state(), "Mover"),
                                      "class Mover < Behaviour; def value; 2; end; end", "mover.rb");
   REQUIRE_MESSAGE(mover.ok, mover.error);
-  checked(vm, "raise unless Mover.new.value == 2 && Helper.new.marker == 3");
+  checked(vm, "raise unless Mover.new.value == 2 && Helper.new.marker == 9");
 }
 TEST_CASE("script reload: classes left by failed evaluation never acquire the next successful file as owner") {
   RubyVm vm;
@@ -524,4 +524,110 @@ TEST_CASE("script reload: editor tracking leaves the prelude menu initializer ca
   ScriptedInputSource input;
   start(*session, input);
   checked(session->runtime()->scripts(), "raise unless GameMenu.new.class == GameMenu");
+}
+
+TEST_CASE("script reload: removing root aliases retains ownership while the real class remains bound") {
+  RubyVm vm;
+  checked(vm, "class Behaviour; end");
+  REQUIRE(vm.enable_reload_tracking().ok);
+  REQUIRE(vm.eval("class Mover < Behaviour; def value; 1; end; end; Boss = Mover; Other = Mover", "mover.rb").ok);
+  auto* klass = mrb_class_get(vm.state(), "Mover");
+  checked(vm, "Object.send(:remove_const, :Boss); Object.send(:remove_const, :Other)");
+  const auto preferred = mrb_intern_lit(vm.state(), "Boss");
+  CHECK(ruby_classes::root_binding(vm.state(), klass, preferred) == mrb_intern_lit(vm.state(), "Mover"));
+  const auto result = vm.reload_class(klass, "class Mover < Behaviour; def value; 2; end; end", "mover.rb");
+  REQUIRE_MESSAGE(result.ok, result.error);
+  checked(vm, "raise unless Mover.new.value == 2");
+}
+TEST_CASE("script reload: a callback after a failed evaluation is not blamed on the failed file") {
+  RubyVm vm;
+  checked(vm, "class Behaviour; end; class Mutator; def self.change; Mover.const_set(:EXTRA, 9); end; end");
+  REQUIRE(vm.enable_reload_tracking().ok);
+  REQUIRE(vm.eval("class Mover < Behaviour; def value; 1; end; end", "mover.rb").ok);
+  CHECK_FALSE(vm.eval("raise 'failed without changing classes'", "broken.rb").ok);
+  REQUIRE(vm.call(mrb_obj_value(mrb_class_get(vm.state(), "Mutator")), "change").ok);
+  const auto result = vm.reload_class(mrb_class_get(vm.state(), "Mover"),
+                                      "class Mover < Behaviour; def value; 2; end; end", "mover.rb");
+  CHECK_FALSE(result.ok);
+  CHECK(result.error.find("runtime callback") != std::string::npos);
+  CHECK(result.error.find("broken.rb") == std::string::npos);
+}
+TEST_CASE("script reload: changing a base does not resume a subclass disabled by its own callback") {
+  test::LogCapture quiet;
+  ReloadGame game;
+  std::string error;
+  REQUIRE(write_text_file(game.dir / "scripts/child.rb",
+                          "class Child < Mover; def update(_dt); raise 'child callback is broken'; end; end", error));
+  auto opened = SceneDocument::open(game.dir / config::kSceneFileName);
+  auto& doc = std::get<SceneDocument>(opened);
+  const int child = doc.add_empty("Child");
+  doc.set_prop(child, props::kScript, std::string("child.rb"));
+  REQUIRE(doc.save(error));
+  auto session = game.open();
+  ScriptedInputSource input;
+  start(*session, input);
+  auto& host = session->runtime()->scripts();
+  const auto errors = host.error_count();
+  REQUIRE(errors > 0);
+  game.write(kChanged);
+  REQUIRE(settled_reload(host) == 1);
+  session->tick(config::kFixedDeltaSeconds);
+  CHECK(host.error_count() == errors);
+}
+TEST_CASE("script reload: literal heredocs are accepted but interpolated setup is refused") {
+  RubyVm vm;
+  checked(vm, "class Behaviour; end; class Mover < Behaviour; end");
+  auto* klass = mrb_class_get(vm.state(), "Mover");
+  const auto result = vm.reload_class(klass, R"(
+class Mover < Behaviour
+  HELP = <<~TEXT
+    plain help
+  TEXT
+end
+)",
+                                      "mover.rb");
+  REQUIRE_MESSAGE(result.ok, result.error);
+  checked(vm, "raise unless Mover::HELP == \"plain help\n\"");
+  const auto interpolated = vm.reload_class(klass, R"(
+class Mover < Behaviour
+  HELP = <<~TEXT
+    #{($side_effect = true)}
+  TEXT
+end
+)",
+                                            "mover.rb");
+  CHECK_FALSE(interpolated.ok);
+  checked(vm, "raise if $side_effect; raise unless Mover::HELP == \"plain help\n\"");
+}
+
+namespace {
+thread_local mrb_allocf allocation_delegate = nullptr;
+void* reject_allocation(mrb_state* mrb, void* pointer, std::size_t bytes, void* userdata) {
+  return bytes == 0 ? allocation_delegate(mrb, pointer, bytes, userdata) : nullptr;
+}
+class AllocationFailure {
+ public:
+  explicit AllocationFailure(mrb_state* mrb) : mrb_(mrb), original_(mrb->allocf) {
+    allocation_delegate = original_;
+    mrb_->allocf = reject_allocation;
+  }
+  ~AllocationFailure() { mrb_->allocf = original_; }
+  AllocationFailure(const AllocationFailure&) = delete;
+  AllocationFailure& operator=(const AllocationFailure&) = delete;
+
+ private:
+  mrb_state* mrb_;
+  mrb_allocf original_;
+};
+}  // namespace
+TEST_CASE("script reload: allocation failure while initializing tracking is a protected error") {
+  RubyVm vm;
+  checked(vm, "class Behaviour; end; class Mover < Behaviour; def value; 1; end; end");
+  RubyResult result;
+  {
+    AllocationFailure failed(vm.state());
+    result = vm.enable_reload_tracking();
+  }
+  CHECK_FALSE(result.ok);
+  checked(vm, "raise unless Mover.new.value == 1");
 }

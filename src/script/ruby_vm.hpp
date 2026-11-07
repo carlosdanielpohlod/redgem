@@ -35,7 +35,7 @@ class RubyVm {
 
   mrb_state* state() { return mrb_; }
 
-  void enable_reload_tracking();
+  RubyResult enable_reload_tracking();
   RubyResult eval(const std::string& code, const std::string& file_name);
   // Replaces one plain behaviour class while retaining its identity and instance fields.
   RubyResult reload_class(RClass* klass, const std::string& code, const std::string& file_name);
@@ -59,6 +59,8 @@ class RubyVm {
  private:
   RubyResult run_protected(mrb_protect_error_func* body, void* request);
   std::string describe_exception(mrb_value exception);
+  void finish_reload_failure();
+  RubyResult failed_result(mrb_value exception, bool evaluated_source);
 
   // (Before the interpreter, which keeps a pointer to it from its first instruction on.)
   ScriptBudget budget_;

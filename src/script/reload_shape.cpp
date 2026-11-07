@@ -69,7 +69,9 @@ class Shape {
   bool named(const Node* value, const std::string& name) const { return mrb_sym_name(mrb_, symbol(value)) == name; }
   bool base(Node* node) const {
     const bool named_base = tagged(node, NODE_CONST) || tagged(node, NODE_COLON3);
-    return !node || (named_base && named(node->cdr, base_));
+    if (!node) return true;
+    const bool matching_base = named_base && named(node->cdr, base_);
+    return matching_base;
   }
   bool declaration(Node* node) {
     if (!tagged(node, NODE_CLASS)) return reject(node, "top-level executable setup");
@@ -106,12 +108,25 @@ class Shape {
     return true;
   }
   bool numeric(Node* node) const { return tagged(node, NODE_INT) || tagged(node, NODE_FLOAT); }
+  bool can_validate(Node* node, int depth) {
+    if (!node) return false;
+    if (depth == 0) return false;
+    return take();
+  }
+  bool heredoc(Node* node) {
+    const auto* info = reinterpret_cast<mrb_parser_heredoc_info*>(node->cdr);
+    const bool command = (info->type & STR_FUNC_XQUOTE) != 0;
+    if (command) return false;
+    return words(info->doc);  // interpolation is a non-string AST node, so words refuses it
+  }
+  bool word_array(Node* node) const { return tagged(node, NODE_WORDS) || tagged(node, NODE_SYMBOLS); }
   bool literal(Node* node, int depth = kLiteralDepth) {
-    if (!node || depth == 0 || !take()) return false;
+    if (!can_validate(node, depth)) return false;
     if (scalar(node)) return true;
+    if (tagged(node, NODE_HEREDOC)) return heredoc(node);
     if (tagged(node, NODE_NEGATE)) return numeric(node->cdr);
     if (tagged(node, NODE_ARRAY)) return sequence(node->cdr, depth - 1, false);
-    if (tagged(node, NODE_WORDS) || tagged(node, NODE_SYMBOLS)) return words(node->cdr);
+    if (word_array(node)) return words(node->cdr);
     return tagged(node, NODE_HASH) && sequence(node->cdr, depth - 1, true);
   }
   bool constant(Node* node) {
