@@ -62,10 +62,9 @@ std::variant<std::unique_ptr<EditorSession>, std::string> EditorSession::open(co
 }
 
 void EditorSession::begin_editing() {
+  follow_scene_file();
   scene_name_ = scene_name_of(game_dir_, document_.path());
   selection_.clear();
-  loaded_write_time_ = write_time(document_.path());
-  external_change_pending_ = false;
   refresh_preview();
 }
 
@@ -85,9 +84,18 @@ bool EditorSession::open_scene(const std::string& name, std::string& error) {
   return true;
 }
 
-void EditorSession::note_saved() {
+void EditorSession::follow_scene_file() {
+  recovery_.watch(document_.path());
   loaded_write_time_ = write_time(document_.path());
   external_change_pending_ = false;
+}
+void EditorSession::forget_recovery() {
+  std::string error;
+  if (!recovery_.discard(error)) log::warning(error);
+}
+void EditorSession::note_saved() {
+  forget_recovery();
+  follow_scene_file();
   log::info("saved " + document_.path().string());
 }
 
@@ -179,13 +187,16 @@ bool EditorSession::reload_from_disk() {
     log::error("cannot reload " + path.string() + ": " + *error);
     return false;
   }
-  const std::vector<std::string> selected = selected_names();
-  document_ = std::move(std::get<SceneDocument>(opened));
-  loaded_write_time_ = write_time(path);
-  external_change_pending_ = false;
-  refresh_and_reselect(selected);
-  log::info("reloaded " + path.string());
+  use_disk_document(std::move(std::get<SceneDocument>(opened)));
   return true;
+}
+void EditorSession::use_disk_document(SceneDocument document) {
+  const auto selected = selected_names();
+  forget_recovery();
+  document_ = std::move(document);
+  follow_scene_file();
+  refresh_and_reselect(selected);
+  log::info("reloaded " + document_.path().string());
 }
 
 }  // namespace redgem

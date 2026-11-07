@@ -350,5 +350,10 @@
   "editor.toolbar.stop": "Stop (Ctrl+P / Esc)",
   "editor.toolbar.world_axes": "World axes (click for local)",
   "editor.unsaved.question": "Save changes to {game} before closing?",
-  "editor.unsaved.title": "Unsaved changes"
+  "editor.unsaved.title": "Unsaved changes",
+  "editor.recovery.changed": "The original has changed since this copy, or the copy could not be verified. Recovery may replace newer work when you Save.",
+  "editor.recovery.discard": "Discard recovery copy",
+  "editor.recovery.title": "Recover scene",
+  "editor.recovery.question": "Recover unsaved changes from the scene recovery copy? The original changes only when you Save.",
+  "editor.recovery.recover": "Recover changes"
 }

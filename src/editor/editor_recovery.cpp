@@ -1,0 +1,51 @@
+#include "editor/editor_app.hpp"
+
+#include <imgui.h>
+
+#include "core/log.hpp"
+#include "core/translations.hpp"
+#include "editor/ui/labels.hpp"
+#include "editor/ui/style.hpp"
+
+namespace redgem {
+namespace {
+const char* recovery_popup() { return ui::window_title("editor.recovery.title", "###scene_recovery"); }
+}  // namespace
+bool EditorApp::can_autosave_scene() const {
+  return editing() && !pending_ && !waiting_for_build() && !interaction_active();
+}
+void EditorApp::autosave_scene() {
+  if (!can_autosave_scene()) return;
+  session_->autosave(frame_seconds());
+}
+void EditorApp::draw_recovery_dialog() {
+  if (!session_->recovery_pending() || pending_ || waiting_for_build()) return;
+  if (!ImGui::IsPopupOpen(recovery_popup())) ImGui::OpenPopup(recovery_popup());
+  if (!ImGui::BeginPopupModal(recovery_popup(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
+  ImGui::TextUnformatted(tr("editor.recovery.question"));
+  if (session_->recovery_source_changed()) ImGui::TextUnformatted(tr("editor.recovery.changed"));
+  draw_recovery_choices();
+  ImGui::EndPopup();
+}
+void EditorApp::draw_recovery_choices() {
+  if (ImGui::Button(tr("editor.recovery.recover"))) recover_scene();
+  ImGui::SameLine();
+  if (!ImGui::Button(tr("editor.recovery.discard"))) return;
+  std::string error;
+  if (session_->discard_recovery(error))
+    ImGui::CloseCurrentPopup();
+  else
+    log::error(error);
+}
+bool EditorApp::recover_scene() {
+  std::string error;
+  if (!session_->recover_scene(error)) {
+    log::error("cannot recover scene: " + error);
+    return false;
+  }
+  upload_preview_assets();
+  look_through_main_camera();
+  ImGui::CloseCurrentPopup();
+  return true;
+}
+}  // namespace redgem

@@ -144,7 +144,11 @@ not a promise of how it will be closed.
   backtraces do not jump to their lines.
 - The editor can show actual collider wireframes during Play/Pause; it does not yet draw
   contacts, joints or velocities, or preview colliders before Play.
-- No autosave or crash recovery of the scene being edited; no animation preview; no preferences beyond the graphics card (key bindings, camera speed, snap sizes); no HiDPI
+- Scene recovery writes a separate copy at safe editing boundaries about once a minute. It is
+  synchronous, limited to 64 MiB and embedded GLB buffers, and needs the original scene to remain
+  loadable when reopening. Linked images keep their existing paths; scripts and external assets
+  are not backed up. See [scene recovery](docs/editor.md#scene-recovery).
+- No animation preview; no preferences beyond the graphics card (key bindings, camera speed, snap sizes); no HiDPI
   scaling; dark theme only.
 
 ### What a shipped game offers its players

@@ -162,6 +162,26 @@ limit leaves edges out, the View menu warns that the limit was reached. Curves a
 The overlay is a runtime view: it does not appear before Play, and does not draw contact points,
 velocities or joints. Turning it off stops gathering the geometry.
 
+## Scene recovery
+
+While editing, the editor writes changed scene data roughly once a minute, outside active
+interactions, dialogs and Play. This is a separate hidden copy beside the scene
+(`.scene.glb.recovery`, or the corresponding name beside a scene in `scenes/`). The original
+file, dirty indicator and undo history stay unchanged. Copies and partial writes do not ship.
+Successful Save/Save As and explicit Discard remove the previous copy.
+
+After an interrupted session, opening that scene offers **Recover changes** or **Discard
+recovery copy**. Recovery restores unsaved work; **Save** replaces the original only when you
+choose it. A changed original is flagged, even if its timestamp and size match: check which
+version you want before saving. A damaged copy is refused and can be discarded.
+
+Recovery includes authored nodes, stable identities, materials and terrain edits, retaining
+raw prefab links. Images stored outside the GLB still resolve beside it; those images and
+prefab sources themselves are not backed up. Script files are separate. The current recovery
+write is synchronous, limited to 64 MiB, and requires embedded GLB buffers. The original scene
+must remain loadable to reopen the editor. Keep manual saves and version control for larger
+scenes or changes to external assets.
+
 ## Building
 
 **Build** (in the toolbar, or File > Build Game) asks which system to build for, saves the open

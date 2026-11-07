@@ -11,6 +11,7 @@
 #include "editor/document/glb_compact.hpp"
 #include "editor/document/gltf_json.hpp"
 #include "editor/document/material_textures.hpp"
+#include "editor/document/recovery_format.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "scene/scene_ids.hpp"
@@ -29,6 +30,20 @@ std::string uri_of(const nlohmann::json& entry) {
 // A glTF "uri" names a file next to the scene: one is given (none at all is the .glb's own binary
 // chunk), and it is no data written into the JSON itself.
 bool names_a_linked_file(const std::string& uri) { return !uri.empty() && gltf_checks::names_a_file(uri.c_str()); }
+
+bool recoverable_buffers(const GlbFile& glb, std::string& error) {
+  for (const auto& buffer : list_of(glb.json, kBuffers)) {
+    if (!uri_of(buffer).empty()) {
+      error = "recovery requires buffers embedded in the GLB";
+      return false;
+    }
+  }
+  if (glb.bin.size() > recovery_format::kMaxBytes) {
+    error = "scene exceeds the 64 MiB recovery limit";
+    return false;
+  }
+  return true;
+}
 
 }  // namespace
 
@@ -196,6 +211,21 @@ bool SceneDocument::save_file(const std::filesystem::path& path, std::string& er
   path_ = path;
   saved_version_ = version_;
   return true;
+}
+
+std::optional<GlbFile> SceneDocument::recovery_copy(std::string& error) {
+  if (!recoverable_buffers(glb_, error)) return std::nullopt;
+  if (!sync_for_writing(error)) return std::nullopt;
+  auto lean = without_unused(glb_);
+  if (!lean) lean = glb_;
+  material_textures::forget_unused_webp(lean->json);
+  return lean;
+}
+
+void SceneDocument::recovered_as(const std::filesystem::path& source) {
+  path_ = source;
+  saved_version_ = -1;
+  glb_.json.erase(recovery_format::kMetadata);
 }
 
 }  // namespace redgem

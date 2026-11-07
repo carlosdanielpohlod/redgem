@@ -68,6 +68,7 @@ void EditorApp::draw_dialogs() {
   draw_unsaved_dialog();
   draw_build_wait_dialog();
   draw_scene_name_dialog();
+  draw_recovery_dialog();
   draw_external_change_dialog();  // one question at a time: closing is asked first
   draw_shortcuts_dialog();
 }
@@ -110,6 +111,11 @@ void EditorApp::save_and_go_on() {
 }
 
 void EditorApp::go_on_without_saving() {
+  std::string error;
+  if (!session_->discard_recovery(error)) {
+    log::error(error);
+    return;
+  }
   const PendingAction action = take_pending();
   log::warning(action.kind == PendingAction::Kind::Leave ? "closing without saving"
                                                          : "opening " + action.scene + " without saving");
@@ -158,7 +164,7 @@ void EditorApp::draw_external_change_dialog() {
 // The outside change is asked about once the unsaved edits are not, and not while leaving waits
 // for a build (it is asked after): one question at a time.
 bool EditorApp::external_change_dialog_wanted() const {
-  return session_->external_change_pending() && !pending_ && !waiting_for_build() &&
+  return session_->external_change_pending() && !session_->recovery_pending() && !pending_ && !waiting_for_build() &&
          !ImGui::IsPopupOpen(external_change_popup());
 }
 

@@ -44,6 +44,11 @@ class SceneDocument {
   std::vector<std::string> linked_files() const;
   // True when the nodes or materials differ from what is on disk (undoing back to the saved
   // state clears it).
+  long long version() const { return version_; }
+  // A bounded authored copy for recovery; retains path, dirty state and undo/redo.
+  std::optional<GlbFile> recovery_copy(std::string& error);
+  // A validated recovery copy becomes unsaved work for the original file.
+  void recovered_as(const std::filesystem::path& source);
   bool dirty() const { return version_ != saved_version_; }
 
   // Records an undo step. Edits below call it themselves unless `record` is false, so a gizmo

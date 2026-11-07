@@ -42,3 +42,8 @@ screenshots/
 
 # What a dedicated server keeps beside the game it runs (redgem-server --data)
 games/*-data/
+
+# Editor recovery copies stay local.
+.*.glb.recovery
+.*.glb.recovery.part
+.redgem-recovery-*/
