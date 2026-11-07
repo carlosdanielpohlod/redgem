@@ -549,8 +549,10 @@ TEST_CASE("script reload: a callback after a failed evaluation is not blamed on 
   const auto result = vm.reload_class(mrb_class_get(vm.state(), "Mover"),
                                       "class Mover < Behaviour; def value; 2; end; end", "mover.rb");
   CHECK_FALSE(result.ok);
-  CHECK(result.error.find("runtime callback") != std::string::npos);
-  CHECK(result.error.find("broken.rb") == std::string::npos);
+  const auto diagnostic = result.error.substr(0, result.error.find('\n'));
+  CAPTURE(result.error);
+  CHECK(diagnostic.find("runtime callback") != std::string::npos);
+  CHECK(diagnostic.find("broken.rb") == std::string::npos);
 }
 TEST_CASE("script reload: changing a base retries a disabled subclass only once") {
   test::LogCapture quiet;
@@ -624,7 +626,8 @@ class AllocationFailure {
 }  // namespace
 TEST_CASE("script reload: allocation failure while initializing tracking is a protected error") {
   RubyVm vm;
-  checked(vm, "class Behaviour; end; class Mover < Behaviour; def value; 1; end; end");
+  // Enough rooted values to require backing storage instead of mruby's embedded small array.
+  checked(vm, "class Behaviour; end; class Mover < Behaviour; A=1; B=2; C=3; D=4; E=5; F=6; def value; 1; end; end");
   RubyResult result;
   {
     AllocationFailure failed(vm.state());
