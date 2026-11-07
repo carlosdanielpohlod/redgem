@@ -11,6 +11,10 @@ namespace redgem {
 namespace {
 constexpr std::size_t kPollFiles = 8;          // at most two MiB read per automatic editor poll
 constexpr std::size_t kContentCheckPolls = 8;  // periodically catch same-size, same-timestamp edits
+ReloadSource* tracked_source(std::map<std::string, ReloadSource>& sources, const std::string& name) {
+  const auto found = sources.find(name);
+  return found == sources.end() ? nullptr : &found->second;
+}
 std::optional<ReloadFileInfo> file_info(const std::filesystem::path& folder, const std::string& name) {
   const auto path = file_inside(folder.parent_path(), folder.filename() / std::filesystem::u8path(name));
   if (!path) return {};
@@ -84,13 +88,12 @@ void ScriptHost::refresh_reloaded(RClass* klass) {
 bool ScriptHost::reload_script(const std::string& script, bool retry) {
   auto* klass = class_named(class_name_for_script(script));
   if (!is_behaviour_class(klass)) return false;
-  const auto found = reload_sources_.find(script);
-  if (found == reload_sources_.end()) return false;
-  auto& state = found->second;
-  if (!needs_read(state, file_info(scripts_dir_, script), retry)) return false;
+  auto* state = tracked_source(reload_sources_, script);
+  if (!state) return false;
+  if (!needs_read(*state, file_info(scripts_dir_, script), retry)) return false;
   const auto source = source_in(scripts_dir_, script);
   const auto stamp = stamp_of(source);
-  if (!settled_change(state, stamp, retry)) return false;
+  if (!settled_change(*state, stamp, retry)) return false;
   if (!source) return reload_unreadable(script);
   return apply_reload(script, klass, *source);
 }
