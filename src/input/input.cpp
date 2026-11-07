@@ -93,6 +93,7 @@ void InputState::update(const InputSource& source) {
   previous_mouse_ = mouse_;
   mouse_ = source.mouse();
   touch_pointer_ = source.touch_pointer();
+  forget_let_go(mouse_);
   hide_swallowed_mouse();
   previous_gamepads_ = gamepads_;
   for (std::size_t pad = 0; pad < kMaxGamepads; ++pad) gamepads_[pad] = source.gamepad(pad);
@@ -133,13 +134,20 @@ void InputState::swallow_mouse() {
 
 // (A button swallowed reads as up from the frame it was pressed to the one it is let go in: it is
 // neither pressed nor released, so a menu under the pointer sees no click. The wheel swallowed
-// reads as still until a frame it does not turn: a scroll lasts several frames.)
+// reads as still until a frame it does not turn: a scroll lasts several frames.) Read from the
+// device's own sample, once a frame: the sample hidden says nothing of what was let go.
+void InputState::forget_let_go(const MouseSample& raw) {
+  for (std::size_t button = 0; button < kMouseButtonCount; ++button) {
+    if (!raw.buttons[button]) swallowed_buttons_[button] = false;
+  }
+  if (raw.wheel == 0.0f) swallowed_wheel_ = false;
+}
+
+// (Hiding what is hidden already changes nothing: it may run more than once a frame.)
 void InputState::hide_swallowed_mouse() {
   for (std::size_t button = 0; button < kMouseButtonCount; ++button) {
-    if (!mouse_.buttons[button]) swallowed_buttons_[button] = false;
     if (swallowed_buttons_[button]) mouse_.buttons[button] = false;
   }
-  if (mouse_.wheel == 0.0f) swallowed_wheel_ = false;
   if (swallowed_wheel_) mouse_.wheel = 0.0f;
 }
 

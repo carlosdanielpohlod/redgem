@@ -115,6 +115,37 @@ TEST_CASE("the click a capture caught is neither pressed nor released for anythi
   CHECK(input.mouse_pressed(MouseButton::Left));  // the next click is anybody's again
 }
 
+TEST_CASE("a mouse button or a scroll a capture caught stays hidden through the next capture") {
+  ScriptedInputSource source;
+  InputState input;
+  input.bindings().declare_action("aim", mouse_only(MouseInput::Right));
+  input.capture_next();
+  source.set_mouse_button(MouseButton::Right, true);
+  input.update(source);
+  CHECK(input.take_captured()->binding == InputBinding(MouseInput::Right));
+  input.capture_next();  // the next cell, while the right button is still held
+  source.set_key(Key::K, true);
+  input.update(source);
+  CHECK(input.take_captured()->binding == InputBinding(Key::K));
+  input.update(source);
+  CHECK_FALSE(input.mouse_down(MouseButton::Right));  // still the first capture's, never pressed again
+  CHECK(input.action_pressed("aim") == false);
+  source.set_mouse_button(MouseButton::Right, false);
+  input.update(source);
+  CHECK_FALSE(input.mouse_released(MouseButton::Right));
+
+  input.capture_next();
+  source.set_mouse_wheel(kWheelUp);
+  input.update(source);
+  CHECK(input.take_captured()->binding == InputBinding(MouseInput::WheelUp));
+  input.capture_next();
+  source.set_key(Key::J, true);
+  input.update(source);
+  CHECK(input.take_captured()->binding == InputBinding(Key::J));
+  input.update(source);  // the same scroll, still going
+  CHECK(input.mouse_wheel() == doctest::Approx(0.0f));
+}
+
 TEST_CASE("a capture catches the wheel's direction, and the turn is the capture's alone") {
   ScriptedInputSource source;
   InputState input;

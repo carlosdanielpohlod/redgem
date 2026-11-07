@@ -121,8 +121,10 @@ class InputState {
   // The mouse buttons pressed this frame read as up until they are let go; the wheel as still
   // until it stops.
   void swallow_mouse();
-  // Hides the mouse buttons swallowed that are still held, and the wheel still turning (and
-  // forgets what was let go).
+  // Forgets the swallowed mouse buttons the device's sample says were let go, and the wheel once
+  // it stopped.
+  void forget_let_go(const MouseSample& raw);
+  // Hides the mouse buttons swallowed, and the wheel while it is.
   void hide_swallowed_mouse();
   // Whether the capture waiting catches the mouse: asked to, and the mouse is no finger.
   bool catches_mouse() const { return capture_mouse_ == MouseCapture::Caught && !touch_pointer_; }
