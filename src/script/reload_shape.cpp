@@ -121,14 +121,18 @@ class Shape {
     return words(info->doc);  // interpolation is a non-string AST node, so words refuses it
   }
   bool word_array(Node* node) const { return tagged(node, NODE_WORDS) || tagged(node, NODE_SYMBOLS); }
+  bool container_literal(Node* node, int depth) {
+    if (tagged(node, NODE_ARRAY)) return sequence(node->cdr, depth - 1, false);
+    if (word_array(node)) return words(node->cdr);
+    const bool hash = tagged(node, NODE_HASH);
+    return hash && sequence(node->cdr, depth - 1, true);
+  }
   bool literal(Node* node, int depth = kLiteralDepth) {
     if (!can_validate(node, depth)) return false;
     if (scalar(node)) return true;
     if (tagged(node, NODE_HEREDOC)) return heredoc(node);
     if (tagged(node, NODE_NEGATE)) return numeric(node->cdr);
-    if (tagged(node, NODE_ARRAY)) return sequence(node->cdr, depth - 1, false);
-    if (word_array(node)) return words(node->cdr);
-    return tagged(node, NODE_HASH) && sequence(node->cdr, depth - 1, true);
+    return container_literal(node, depth);
   }
   bool constant(Node* node) {
     if (!tagged(node, NODE_ASGN)) return false;
