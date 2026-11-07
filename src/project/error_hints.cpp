@@ -42,7 +42,7 @@ constexpr std::size_t kSecond = 2;
 // matcher takes stack for every character a group matches, so a name of 100 000 characters (a
 // scene's script property can hold one) ran out of it and crashed the tool; no file, class or
 // method of a game is named with anywhere near this many.
-constexpr std::size_t kMostHintedBytes = 1024;
+constexpr std::size_t kMostHintedBytes = 512;
 // The most digits of a line number a hint reads: past them it is no line of any file (and would
 // not fit the number it is read into).
 constexpr std::size_t kMostLineDigits = 9;

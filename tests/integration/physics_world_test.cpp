@@ -217,16 +217,17 @@ TEST_CASE("past the bodies the world can hold, an object gets none, and that is 
   CHECK(log.count(log::Level::Error) == 1);
   CHECK(log.contains(std::to_string(config::kMaxBodies)));
   const auto above = [](std::uint32_t index) { return Vec3{kBoxSpacing * index, kRayLength / 2, kBoxSpacing}; };
-  CHECK(world->raycast(above(0), kDown, kRayLength, kNoObject));
-  CHECK_FALSE(world->raycast(above(boxes - 1), kDown, kRayLength, kNoObject));
+  // (The ground is ignored: under the first box, it would be hit whether the box has a body or not.)
+  CHECK(world->raycast(above(0), kDown, kRayLength, kGround));
+  CHECK_FALSE(world->raycast(above(boxes - 1), kDown, kRayLength, kGround));
 }
 
 TEST_CASE("a world of many thousand objects is taken apart in a moment, not in time for every pair of them") {
   // (A script that spawns until its budget stops it leaves tens of thousands: forgetting each one
   // used to look at every other, and closing the game took minutes.)
-  constexpr std::uint32_t kManyObjects = 50000;
+  constexpr std::uint32_t kManyObjects = 100000;  // (taking them apart pair by pair: about a minute)
   constexpr ObjectId kFirstObject = 100;
-  constexpr auto kInAMoment = std::chrono::seconds(10);
+  constexpr auto kInAMoment = std::chrono::seconds(5);
   auto world = world_with_ground();
   const redgem::test::LogCapture quiet;  // (past the bodies it holds, the world says so)
   REQUIRE_FALSE(world->add_object(body(kZone, {{"trigger", true}}, kAboveGround, kZoneHalfExtents)));

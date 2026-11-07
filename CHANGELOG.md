@@ -22,7 +22,7 @@ until 1.0, a release may change what games rely on (see
 ### Fixed
 
 - **A very long script name no longer crashes `redgem run`, `shot` and the MCP server**: the
-  error hints read at most the first 1024 bytes of a message, so the standard library's matcher
+  error hints read at most the first 512 bytes of a message, so the standard library's matcher
   no longer runs out of stack on a 100 000-character name. A line number too big for a file no
   longer throws.
 - **`Game.load_scene` with a name too long for the system** raises `no scene named ...` instead

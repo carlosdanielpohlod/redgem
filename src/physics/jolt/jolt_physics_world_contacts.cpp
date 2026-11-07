@@ -51,8 +51,8 @@ std::set<ObjectId> World::objects_inside(ObjectId id, const Record& trigger) con
 }
 
 void World::update_triggers() {
-  for (auto& [id, record] : records_) {
-    if (!record.trigger) continue;
+  for (const ObjectId id : triggers_) {
+    Record& record = *find(id);  // (triggers_ holds the records that are triggers, and only those)
     std::set<ObjectId> now = objects_inside(id, record);
     append_trigger_changes(id, record.overlaps, now, events_);
     record.overlaps = std::move(now);
