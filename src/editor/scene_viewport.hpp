@@ -6,9 +6,11 @@
 
 #include "app/frame_painter.hpp"
 #include "app/presenter.hpp"
+#include "render/debug_draw.hpp"
 #include "editor/gated_input_source.hpp"
 
 namespace redgem {
+class Engine;
 
 class Renderer;
 class Window;
@@ -57,6 +59,8 @@ class GameView final : public Presenter {
   // A game that locks the pointer gets it while it has the focus; Esc (Stop) gives it back.
   void capture_cursor(bool wanted) override;
   void present(const FrameView& view) override;
+  void set_physics_debug(Engine* engine) { physics_debug_engine_ = engine; }
+  bool physics_debug_truncated() const { return physics_debug_truncated_; }
   // The view is there for as long as the editor is: closing the window is the editor's business.
   bool open() const override { return true; }
   float frame_seconds() const override;
@@ -67,6 +71,11 @@ class GameView final : public Presenter {
   }
 
  private:
+  void paint_with_debug(const FrameView& view);
+  FrameView physics_view(const FrameView& view);
+  Engine* physics_debug_engine_ = nullptr;
+  DebugDrawBuffer physics_commands_;
+  bool physics_debug_truncated_ = false;
   bool pointer_granted(bool wanted) const { return input_.enabled && wanted; }
 
   Window& window_;

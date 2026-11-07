@@ -10,6 +10,7 @@
 
 #include "core/math.hpp"
 #include "physics/body_config.hpp"
+#include "physics/debug_geometry.hpp"
 #include "physics/collision_layers.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -122,6 +123,9 @@ class PhysicsWorld {
   virtual bool has_object(ObjectId object) const = 0;
   virtual BodyType body_type(ObjectId object) const = 0;
   virtual bool is_trigger(ObjectId object) const = 0;
+  // Read-only world-space tessellation of actual colliders, not render mesh bounds. Only requested
+  // by an enabled editor view; a hard ceiling and per-collider quotas bound its work and output.
+  virtual PhysicsDebugGeometry debug_geometry(std::size_t triangle_limit = kMaxPhysicsDebugTriangles) const = 0;
 
   // Kinematic bodies move there during the next step; trigger volumes are placed there.
   virtual void set_target_pose(ObjectId object, const Transform& world) = 0;

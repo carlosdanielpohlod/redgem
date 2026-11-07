@@ -156,6 +156,7 @@ add_executable(redgem_tests
   unit/markdown_blocks_test.cpp
   unit/session_history_test.cpp
   integration/physics_world_test.cpp
+  integration/physics_debug_test.cpp
   integration/physics_queries_test.cpp
   integration/physics_forces_test.cpp
   integration/physics_api_test.cpp
@@ -494,6 +495,7 @@ set_tests_properties(system.harness_reports_failures PROPERTIES LABELS system RU
 # The editor window itself, driven by a doctest program.
 add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp editor_system/editor_window_test.cpp
                editor_system/prefab_preview_test.cpp
+               editor_system/physics_debug_test.cpp
                editor_system/agent_panel_test.cpp
                editor_system/build_progress_test.cpp
                editor_system/window_picture.cpp

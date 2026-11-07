@@ -86,6 +86,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   bool has_object(ObjectId object) const override { return records_.count(object) != 0; }
   BodyType body_type(ObjectId object) const override;
   bool is_trigger(ObjectId object) const override;
+  PhysicsDebugGeometry debug_geometry(std::size_t triangle_limit) const override;
   void set_target_pose(ObjectId object, const Transform& world) override;
   void teleport(ObjectId object, const Transform& world) override;
   void set_body_rotation(ObjectId object, Quat rotation) override;

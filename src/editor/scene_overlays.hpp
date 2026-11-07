@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "scene/scene_config.hpp"
+#include "physics/debug_geometry.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
 
@@ -29,5 +30,10 @@ struct BrushMark {
 // Draws the overlays (inside a 3D mode) for the scene as it is, around each of `selected`.
 void draw_scene_overlays(const Scene& scene, const SceneDesc& desc, const std::vector<ObjectId>& selected,
                          const std::optional<BrushMark>& brush);
+
+class DebugDrawBuffer;
+// Adds unique collider edges to the renderer's world pass, before HUD/touch controls. False
+// when geometry or command limits omitted any edge.
+bool append_physics_colliders(DebugDrawBuffer& commands, const PhysicsDebugGeometry& geometry);
 
 }  // namespace redgem

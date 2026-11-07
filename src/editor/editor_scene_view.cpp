@@ -46,7 +46,7 @@ void EditorApp::render_viewport_texture() {
   if (runtime == nullptr) {
     draw_edited_scene();
   } else if (session_->play_state() == PlayState::Paused) {
-    runtime->present();  // a running game shows each of its frames itself (GameView); a paused one has none
+    runtime->present();
   }
 }
 
