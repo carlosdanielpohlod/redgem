@@ -18,6 +18,8 @@ VERSION_MARK="@VERSION@"
 MINIMUM_MARK="@MINIMUM_SYSTEM@"
 DEFAULT_MINIMUM_SYSTEM="11.0"   # the oldest macOS the programs were built for, unless the build said
 AD_HOC_IDENTITY="-"              # codesign's name for "no identity"
+ARM_PROCESSOR="arm64"            # what uname -m says on Apple Silicon
+INTEL_PROCESSOR="x86_64"         # and on an Intel Mac
 
 # The app's description, with the version and the oldest macOS it opens on written in.
 write_info() {
@@ -39,9 +41,18 @@ make_app() {
   codesign --force --sign "${AD_HOC_IDENTITY}" "$1/${APP_NAME}"
 }
 
+# The download's name for this Mac's kind of processor $1 (as uname -m says it).
+download_for() {
+  case "$1" in
+    "${ARM_PROCESSOR}") echo "${MAC_ARM_DOWNLOAD}" ;;
+    "${INTEL_PROCESSOR}") echo "${MAC_INTEL_DOWNLOAD}" ;;
+    *) echo "no download for a Mac with a $1 processor" >&2; exit 1 ;;
+  esac
+}
+
 main() {
-  local arch root
-  arch="$(uname -m)"
+  local download root
+  download="$(download_for "$(uname -m)")"
   WORK_DIR="$(mktemp -d)"
   trap 'rm -rf "${WORK_DIR}"' EXIT
   root="${WORK_DIR}/${PACKAGE_NAME}"
@@ -50,7 +61,7 @@ main() {
   make_app "${root}"
   copy_demos "${root}"
   copy_notices "${root}" README-macos.txt
-  (cd "${WORK_DIR}" && zip -qry "${OUT_DIR}/${PACKAGE_NAME}-macos-${arch}.zip" "${PACKAGE_NAME}")
+  (cd "${WORK_DIR}" && zip -qry "${OUT_DIR}/${download}" "${PACKAGE_NAME}")
   ls -l "${OUT_DIR}"
 }
 

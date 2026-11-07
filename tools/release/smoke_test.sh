@@ -27,8 +27,10 @@ expect_output() {
 main() {
   local archive="${1:?usage: smoke_test.sh <download>}" name bin suffix="" work
   name="$(basename "${archive}")"
-  work="$(mktemp -d)"
-  trap 'rm -rf "${work}"' EXIT
+  # (A global: the trap runs after main has returned.)
+  WORK_DIR="$(mktemp -d)"
+  trap 'rm -rf "${WORK_DIR}"' EXIT
+  work="${WORK_DIR}"
   case "${name}" in
     "${LINUX_DOWNLOAD}")
       tar -xzf "${archive}" -C "${work}"

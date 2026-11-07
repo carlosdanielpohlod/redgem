@@ -10,7 +10,8 @@
 #   CMakeLists.txt> (a fork's pull request only keeps them as the run's artifacts);
 # * a run started by hand: a dry run unless `dry_run` is unticked; a dry run only keeps them as
 #   the run's artifacts and touches no release.
-# A release is never published here: the owner publishes the draft. A published release is never
+# Everything is built from the commit the draft's tag points at: a pull request's head, not its
+# merge with main. A release is never published here: the owner publishes the draft. A published release is never
 # changed (tools/release/attach_to_draft.sh fails instead).
 name: Release
 
@@ -61,8 +62,9 @@ jobs:
           COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
           DRY_RUN: ${{ inputs.dry_run }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-        run: |
-          tools/release/plan_release.sh | tee -a "${GITHUB_OUTPUT}"
+        # (bash, not the default: with pipefail, a tag that is not the version fails here.)
+        shell: bash
+        run: tools/release/plan_release.sh | tee -a "${GITHUB_OUTPUT}"
 
   linux-windows:
     name: Linux and Windows downloads
@@ -76,6 +78,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.plan.outputs.commit }}
           persist-credentials: false
 
       # The engine's own list (docs/install.md), ccache, and zip for the Windows download.
@@ -192,7 +195,7 @@ jobs:
   # The Windows download is packed on Linux: its programs are run here, on Windows.
   windows-check:
     name: Windows download runs
-    needs: linux-windows
+    needs: [plan, linux-windows]
     runs-on: windows-latest
     timeout-minutes: 15
     defaults:
@@ -201,6 +204,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.plan.outputs.commit }}
           persist-credentials: false
 
       - uses: actions/download-artifact@v4
@@ -230,6 +234,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.plan.outputs.commit }}
           persist-credentials: false
 
       - name: Install the build tools
@@ -298,6 +303,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.plan.outputs.commit }}
           persist-credentials: false
 
       - uses: actions/download-artifact@v4
@@ -335,6 +341,11 @@ jobs:
     name: Attach to the draft release
     needs: [plan, gather]
     if: ${{ needs.plan.outputs.attach == 'true' }}
+    # One at a time per tag, across runs: a release-* pull request's and the tag's runs both
+    # write the same draft.
+    concurrency:
+      group: release-attach-${{ needs.plan.outputs.tag }}
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # The only job that may write: it makes or changes the draft release.
@@ -343,6 +354,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.plan.outputs.commit }}
           persist-credentials: false
 
       - uses: actions/download-artifact@v4

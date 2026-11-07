@@ -26,14 +26,10 @@ is_own_pull_request() { [[ "${HEAD_REPO:-}" == "${GITHUB_REPOSITORY:-}" ]]; }
 # Whether tag $1 names version $2: v0.6.0, or a pre-release of it such as v0.6.0-rc1.
 tag_names_version() { [[ "$1" == "${TAG_PREFIX}$2" || "$1" == "${TAG_PREFIX}$2-"* ]]; }
 
-should_attach() {
-  if is_tag_push; then return 0; fi
-  if is_dispatch; then
-    if is_dry_run; then return 1; fi
-    return 0
-  fi
-  is_pull_request && is_own_pull_request
-}
+is_real_dispatch() { is_dispatch && ! is_dry_run; }
+is_own_release_pull_request() { is_pull_request && is_own_pull_request; }
+
+should_attach() { is_tag_push || is_real_dispatch || is_own_release_pull_request; }
 
 main() {
   local version tag attach=false
