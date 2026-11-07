@@ -32,6 +32,9 @@ expect_plan "tag=v${VERSION}-rc1" EVENT=push REF_TYPE=tag REF_NAME="v${VERSION}-
 expect_plan "is not version ${VERSION}" EVENT=push REF_TYPE=tag REF_NAME="v${VERSION}9"
 expect_plan "is not version ${VERSION}" EVENT=push REF_TYPE=tag REF_NAME="v0.0.1"
 
+# A branch's push is never a release's.
+expect_plan $'tag=v'"${VERSION}"$'\ncommit='"${COMMIT}"$'\nattach=false' EVENT=push REF_TYPE=branch REF_NAME=main
+
 # A dispatch is a dry run unless told otherwise.
 expect_plan "attach=false" EVENT=workflow_dispatch
 expect_plan "attach=false" EVENT=workflow_dispatch DRY_RUN=true
