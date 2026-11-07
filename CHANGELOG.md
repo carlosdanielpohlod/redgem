@@ -19,6 +19,20 @@ until 1.0, a release may change what games rely on (see
 - **Prefab previews in the editor**: inherited geometry and components appear while editing,
   with reference selection, cached placement edits and preserved links on save.
 
+### Fixed
+
+- **A very long script name no longer crashes `redgem run`, `shot` and the MCP server**: the
+  error hints read at most the first 1024 bytes of a message, so the standard library's matcher
+  no longer runs out of stack on a 100 000-character name. A line number too big for a file no
+  longer throws.
+- **`Game.load_scene` with a name too long for the system** raises `no scene named ...` instead
+  of throwing a C++ exception through the interpreter and ending the game (or the editor's Play).
+- **Past 4096 physics bodies** an object gets no body, as before, but the engine now logs one
+  error naming the limit instead of saying nothing. The limit is listed in KNOWN_LIMITATIONS.md.
+- **A game that spawned tens of thousands of objects with bodies no longer hangs on close**: the
+  script budget did stop the spawning loop, but taking the physics world apart looked at every
+  object for each object destroyed. Destroying an object now only looks at the triggers.
+
 ## [0.5.0] - 2026-10-31
 
 ### Added

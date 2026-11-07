@@ -679,6 +679,20 @@ TEST_CASE("Game.load_scene switches scenes at the end of the frame and keeps Rub
   CHECK(engine->scene().find("Hero") != kNoObject);
 }
 
+TEST_CASE("a scene name too long for the system is a scene that is not there, not the end of the game") {
+  auto engine = sandbox();
+  frames(*engine, 1);
+  // (Past what a file's name may be: the system refuses to look, which used to throw out of the native.)
+  for (const char* name : {"'s' * 100000", "('a/' * 3000) + 'b'"}) {
+    CAPTURE(name);
+    const auto result = engine->scripts().eval(std::string("Game.load_scene(") + name + ")", "long_scene.rb");
+    CHECK_FALSE(result.ok);
+    CHECK(result.error.find("no scene named") != std::string::npos);
+  }
+  frames(*engine, 1);
+  CHECK(engine->scene_name() == "main");
+}
+
 TEST_CASE("sounds are looked up in the game's sounds folder") {
   constexpr float kHalfVolume = 0.5f;
   testing::RecordingAudio recording;  // made first: the engine plays through it until its end

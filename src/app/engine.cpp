@@ -226,7 +226,10 @@ void Engine::connect_context() {
     return spawn(source, world, physics);
   };
   context_.scene_exists = [this](const std::string& name) {
-    return safe_scene_name(name) && std::filesystem::exists(scene_file(options_.game_dir, name));
+    // (A script names it: a name the system refuses, too long for instance, is a scene that is not
+    // there, never an exception thrown through the interpreter.)
+    std::error_code unreadable;
+    return safe_scene_name(name) && std::filesystem::exists(scene_file(options_.game_dir, name), unreadable);
   };
 }
 

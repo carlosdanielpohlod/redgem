@@ -54,6 +54,7 @@ std::optional<std::string> World::add_object(const BodyDesc& desc) {
   record.shape = info.shape;
   record.pose = desc.world;
   if (!record.trigger) create_simulated(desc, info, record);
+  if (record.trigger) triggers_.insert(desc.object);
   records_.emplace(desc.object, std::move(record));
   return std::nullopt;
 }

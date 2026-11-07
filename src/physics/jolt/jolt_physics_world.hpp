@@ -227,6 +227,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   JPH::JobSystemSingleThreaded job_system_;
   JPH::PhysicsSystem system_;
   std::map<ObjectId, Record> records_;  // ordered: deterministic iteration
+  std::set<ObjectId> triggers_;         // of the records, those that are triggers
   std::map<JPH::uint32, ObjectId> body_owners_;
   std::map<const JPH::CharacterVirtual*, ObjectId> character_owners_;
   std::mutex contacts_mutex_;

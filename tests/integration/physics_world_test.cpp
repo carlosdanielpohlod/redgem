@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -218,4 +219,21 @@ TEST_CASE("past the bodies the world can hold, an object gets none, and that is 
   const auto above = [](std::uint32_t index) { return Vec3{kBoxSpacing * index, kRayLength / 2, kBoxSpacing}; };
   CHECK(world->raycast(above(0), kDown, kRayLength, kNoObject));
   CHECK_FALSE(world->raycast(above(boxes - 1), kDown, kRayLength, kNoObject));
+}
+
+TEST_CASE("a world of many thousand objects is taken apart in a moment, not in time for every pair of them") {
+  // (A script that spawns until its budget stops it leaves tens of thousands: forgetting each one
+  // used to look at every other, and closing the game took minutes.)
+  constexpr std::uint32_t kManyObjects = 50000;
+  constexpr ObjectId kFirstObject = 100;
+  constexpr auto kInAMoment = std::chrono::seconds(10);
+  auto world = world_with_ground();
+  const redgem::test::LogCapture quiet;  // (past the bodies it holds, the world says so)
+  REQUIRE_FALSE(world->add_object(body(kZone, {{"trigger", true}}, kAboveGround, kZoneHalfExtents)));
+  for (std::uint32_t i = 0; i < kManyObjects; ++i) {
+    REQUIRE_FALSE(world->add_object(body(kFirstObject + i, {{"collider", std::string("box")}}, {}, kCrateHalfExtents)));
+  }
+  const auto start = std::chrono::steady_clock::now();
+  world.reset();
+  CHECK(std::chrono::steady_clock::now() - start < kInAMoment);
 }
