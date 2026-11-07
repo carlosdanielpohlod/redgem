@@ -16,6 +16,10 @@ namespace redgem::tools {
 namespace {
 using namespace mcp;
 
+constexpr const char* kExternalChange =
+    "the scene changed on disk while the editor has unsaved edits; resolve it in the editor "
+    "(reload the file, or keep the edits) first";
+
 Json state(EditorSession& session) {
   Json selected = Json::array();
   for (const auto id : session.selected().ids())
@@ -49,11 +53,16 @@ std::string apply_words(SceneEdit& edit, int& index, const Json& args) {
   return {};
 }
 
+// The scene changed on disk while the editor had unsaved edits: the editor asks its user which to
+// keep, and that question (a dialog, which makes the editor busy too) is what holds every change.
+void require_no_external_change(const EditorSession& session) {
+  if (session.external_change_pending()) throw std::invalid_argument(kExternalChange);
+}
+
 void require_editable(const EditorSession& session, bool busy) {
+  require_no_external_change(session);
   if (!session.editing() || busy)
     throw std::invalid_argument("editor is busy; stop playing or finish the current gesture");
-  if (session.external_change_pending())
-    throw std::invalid_argument("resolve the editor's external file conflict first");
 }
 
 void validate_removal(const Json& args, const std::vector<std::string>& words) {
@@ -132,6 +141,7 @@ void validate_control(const std::string& action, const Json& args) {
 
 Json use_window(EditorSession& session, const std::string& action, const Json& args, bool busy, const Invoke& window) {
   if (!window) throw std::invalid_argument("this action requires an editor window");
+  if (action != "capture") require_no_external_change(session);
   if (action != "capture" && busy) throw std::invalid_argument("finish the current editor gesture or dialog first");
   if (action == "play") require_editable(session, false);
   if (args.contains("object")) {

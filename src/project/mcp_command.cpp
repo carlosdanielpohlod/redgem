@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 
@@ -111,6 +112,17 @@ mcp::Options options(const ToolLine& line) {
   return result;
 }
 
+// What the line asks mcp to serve. A line naming no game, or with options mcp does not take, is a
+// usage error, as for every command: it is said, with the usage, and nothing is served.
+std::optional<mcp::Options> options_of(const ToolLine& line) {
+  try {
+    return options(line);
+  } catch (const std::invalid_argument& error) {
+    std::cerr << "mcp: " << error.what() << '\n' << kUsage;
+    return std::nullopt;
+  }
+}
+
 int serve_game(const mcp::Options& options) {
   mcp::Session session(mcp::catalog(options), [&](const std::string& name, const mcp::Json& args) {
     return mcp::invoke(options, name, args);
@@ -126,7 +138,8 @@ int run_requested(const ToolLine& line) {
     return kExitSuccess;
   }
   try {
-    return serve_game(options(line));
+    const auto asked = options_of(line);
+    return asked ? serve_game(*asked) : kExitUsage;
   } catch (const std::exception& error) {
     std::cerr << "mcp: " << error.what() << '\n';
     return kExitFailure;

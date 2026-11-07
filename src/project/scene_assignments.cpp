@@ -2,16 +2,19 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <iterator>
 #include <optional>
 #include <sstream>
+#include <variant>
 
 #include "core/config.hpp"
 #include "core/translations.hpp"
 #include "project/closest_words.hpp"
 #include "project/scene_lookup.hpp"
 #include "project/scene_text.hpp"
+#include "editor/editor_config.hpp"
 #include "editor/node_tree.hpp"
 #include "project/tool_line.hpp"
 #include "scene/props.hpp"
@@ -30,6 +33,7 @@ constexpr const char* kPropPrefix = "prop.";
 constexpr const char* kTrue = "true";
 constexpr const char* kFalse = "false";
 constexpr std::size_t kVectorSides = 3;
+constexpr int kScaleDecimals = 3;  // enough to show the smallest scale (0.001)
 // Every key a word may set (the props are "prop.<key>").
 constexpr const char* kKeys =
     "position (pos), rotation (rot), scale, name, parent, script (scripts), prop.<key> (or <key> alone)";
@@ -70,57 +74,98 @@ std::vector<std::string> split(const std::string& text, char separator) {
   return parts;
 }
 
-std::optional<Vec3> vector_from(const std::string& text) {
+using Sides = std::array<double, kVectorSides>;
+
+std::optional<Sides> sides_from(const std::string& text) {
   const std::vector<std::string> parts = split(text, kComma);
   if (parts.size() != kVectorSides) return std::nullopt;
-  std::array<float, kVectorSides> sides{};
+  Sides sides{};
   for (std::size_t side = 0; side < kVectorSides; ++side) {
     const auto number = number_from(parts[side]);
     if (!number) return std::nullopt;
-    sides[side] = static_cast<float>(*number);
+    sides[side] = *number;
   }
-  return Vec3{sides[kXOffset], sides[kYOffset], sides[kZOffset]};
+  return sides;
 }
 
 // A scale may be one number, the same on every side.
-std::optional<Vec3> scale_from(const std::string& text) {
-  if (const auto number = number_from(text)) return Vec3::one() * static_cast<float>(*number);
-  return vector_from(text);
+std::optional<Sides> scale_sides_from(const std::string& text) {
+  if (const auto number = number_from(text)) return Sides{*number, *number, *number};
+  return sides_from(text);
+}
+
+Vec3 vector_of(const Sides& sides) {
+  return {static_cast<float>(sides[kXOffset]), static_cast<float>(sides[kYOffset]),
+          static_cast<float>(sides[kZOffset])};
+}
+
+// Whether every side is a number a placement takes (a float holds it, and it is no farther than
+// the tools reach): 1e40 would be saved as null, which is no glTF, and read back as 0.
+bool within_reach(const Sides& sides) {
+  return std::all_of(sides.begin(), sides.end(), [](double side) { return std::fabs(side) <= config::kLargestCoordinate; });
+}
+
+// Whether every side of a scale is at least the smallest the Inspector takes: zero flattens the
+// object to nothing (its transform has no inverse) and a negative one turns it inside out.
+bool keeps_shape(const Sides& sides) {
+  return std::all_of(sides.begin(), sides.end(), [](double side) { return static_cast<float>(side) >= editor_config::kMinScale; });
 }
 
 std::string needs_vector(const Assignment& assignment) {
   return tr("project.scene.needs_vector", {{"key", assignment.key}, {"value", assignment.value}});
 }
 
+std::string out_of_reach(const Assignment& assignment) {
+  return tr("project.scene.out_of_reach", {{"key", assignment.key},
+                                           {"value", assignment.value},
+                                           {"largest", number_text(config::kLargestCoordinate, 0)}});
+}
+
+// The vector a word gives, or what is wrong with it: three numbers, none out of reach.
+std::variant<Vec3, std::string> placement_vector(const Assignment& assignment, const std::optional<Sides>& sides) {
+  if (!sides) return needs_vector(assignment);
+  if (!within_reach(*sides)) return out_of_reach(assignment);
+  return vector_of(*sides);
+}
+
+std::string too_small(const Assignment& assignment) {
+  return tr("project.scene.scale_too_small",
+            {{"value", assignment.value}, {"least", number_text(editor_config::kMinScale, kScaleDecimals)}});
+}
+
+std::variant<Vec3, std::string> scale_vector(const Assignment& assignment) {
+  const std::optional<Sides> sides = scale_sides_from(assignment.value);
+  std::variant<Vec3, std::string> scale = placement_vector(assignment, sides);
+  if (std::holds_alternative<Vec3>(scale) && !keeps_shape(*sides)) return too_small(assignment);
+  return scale;
+}
+
 std::string only_equals(const Assignment& assignment) {
   return tr("project.scene.only_equals", {{"key", assignment.key}});
 }
 
-// Changes where the object is, keeping the rest of its placement.
+// Changes where the object is, keeping the rest of its placement; or says why the word cannot.
 template <typename Change>
-std::string place(SceneEdit& edit, int index, Change change) {
+std::string place(SceneEdit& edit, int index, const std::variant<Vec3, std::string>& vector, Change change) {
+  if (const auto* problem = std::get_if<std::string>(&vector)) return *problem;
   Transform local = edit.document.node(index).local;
-  change(local);
+  change(local, std::get<Vec3>(vector));
   edit.document.set_local(index, local);
   return {};
 }
 
 std::string set_position(SceneEdit& edit, int& index, const Assignment& assignment) {
-  const auto position = vector_from(assignment.value);
-  if (!position) return needs_vector(assignment);
-  return place(edit, index, [&position](Transform& local) { local.position = *position; });
+  const auto position = placement_vector(assignment, sides_from(assignment.value));
+  return place(edit, index, position, [](Transform& local, Vec3 value) { local.position = value; });
 }
 
 std::string set_rotation(SceneEdit& edit, int& index, const Assignment& assignment) {
-  const auto degrees = vector_from(assignment.value);
-  if (!degrees) return needs_vector(assignment);
-  return place(edit, index, [&degrees](Transform& local) { local.rotation = quat_from_euler_degrees(*degrees); });
+  const auto degrees = placement_vector(assignment, sides_from(assignment.value));
+  return place(edit, index, degrees, [](Transform& local, Vec3 value) { local.rotation = quat_from_euler_degrees(value); });
 }
 
 std::string set_scale(SceneEdit& edit, int& index, const Assignment& assignment) {
-  const auto scale = scale_from(assignment.value);
-  if (!scale) return needs_vector(assignment);
-  return place(edit, index, [&scale](Transform& local) { local.scale = *scale; });
+  return place(edit, index, scale_vector(assignment), [](Transform& local, Vec3 value) { local.scale = value; });
 }
 
 std::string set_name(SceneEdit& edit, int& index, const Assignment& assignment) {

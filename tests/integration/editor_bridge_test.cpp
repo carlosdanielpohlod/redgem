@@ -47,6 +47,7 @@ Json set(const std::vector<std::string>& words) {
   return {{"action", "set"}, {"object", "Coin1"}, {"assignments", words}};
 }
 bool ok(const Json& result) { return !result.at("isError").get<bool>(); }
+std::string text_of(const Json& result) { return result["content"][0]["text"]; }
 
 Json exchange(Game& game, EditorBridge& server, const std::string& name, const Json& args,
               const fs::path& connection = {}, const fs::path& client_game = {}) {
@@ -278,6 +279,25 @@ TEST_CASE("live commands do not overwrite an external change pending in the edit
   CHECK_FALSE(ok(invoke_editor(*game.session, "scene_edit", set({"position=7,8,9"}))));
   CHECK(fs::last_write_time(file) == changed);
   CHECK(game.session->document().dirty());
+}
+
+TEST_CASE("an external change pending is named as the reason, not a busy editor, even while its dialog is open") {
+  Game game;
+  REQUIRE(ok(invoke_editor(*game.session, "scene_edit", set({"position=1,2,3"}))));
+  const auto file = game.path / "scene.glb";
+  fs::last_write_time(file, fs::last_write_time(file) + std::chrono::seconds(1));
+  CHECK_FALSE(game.session->reload_if_changed_on_disk());
+  REQUIRE(game.session->external_change_pending());
+  constexpr bool kDialogOpen = true;  // (the editor's question makes it busy too)
+  const auto window = [](const std::string&, const Json&) { return Json(); };
+  for (const Json& args : {Json{{"action", "save"}}, Json{{"action", "undo"}}, Json{{"action", "play"}}}) {
+    CAPTURE(args.dump());
+    const Json refused = invoke_editor(*game.session, "editor", args, kDialogOpen, window);
+    CHECK_FALSE(ok(refused));
+    CHECK(text_of(refused).find("the scene changed on disk") != std::string::npos);
+  }
+  const Json edit = invoke_editor(*game.session, "scene_edit", set({"position=7,8,9"}), kDialogOpen);
+  CHECK(text_of(edit).find("resolve it in the editor") != std::string::npos);
 }
 
 TEST_CASE("live MCP rejects mutation actions in read-only mode before connecting") {

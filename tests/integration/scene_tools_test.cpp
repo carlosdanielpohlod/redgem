@@ -248,6 +248,33 @@ TEST_CASE("what set cannot do is refused, with what it can, and nothing is saved
   CHECK(fs::last_write_time(game.scene()) == before);
 }
 
+TEST_CASE("a placement no float holds, or past the tools' reach, is refused before anything is saved") {
+  GameCopy game("out_of_reach");
+  const auto before = fs::last_write_time(game.scene());
+  // (A float cannot hold 1e40: the file would have held null, no glTF, and the object moved to 0.)
+  for (const char* word : {"position=1e40,-1e40,1", "rotation=1e40,0,0", "scale=1e39", "position=2000000,0,0"}) {
+    CAPTURE(word);
+    const ToolResult refused = scene_tool({"set", game.dir(), "Player", word});
+    CHECK(refused.exit_code != kExitSuccess);
+    CHECK(has(refused.err, "takes numbers from -1000000 to 1000000"));
+  }
+  CHECK(fs::last_write_time(game.scene()) == before);
+  CHECK(scene_tool({"set", game.dir(), "Player", "position=1000000,-1000000,1"}).exit_code == kExitSuccess);
+}
+
+TEST_CASE("a scale of zero, below the smallest the Inspector takes, or negative is refused") {
+  GameCopy game("flat_scale");
+  const auto before = fs::last_write_time(game.scene());
+  for (const char* word : {"scale=0", "scale=-1", "scale=1,0,1", "scale=1,1,-2", "scale=0.0001"}) {
+    CAPTURE(word);
+    const ToolResult refused = scene_tool({"set", game.dir(), "Player", word});
+    CHECK(refused.exit_code != kExitSuccess);
+    CHECK(has(refused.err, "scale must be at least 0.001"));
+  }
+  CHECK(fs::last_write_time(game.scene()) == before);
+  CHECK(scene_tool({"set", game.dir(), "Player", "scale=0.001"}).exit_code == kExitSuccess);
+}
+
 TEST_CASE("add makes an empty object or a copy of another, where it is asked for") {
   GameCopy game("add");
   const ToolResult copy = scene_tool({"add", game.dir(), "Coin6", "--from", "Coin5", "position=3,3,-31"});

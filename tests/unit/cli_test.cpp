@@ -1,5 +1,9 @@
 #include <doctest/doctest.h>
 
+#include <filesystem>
+#include <string>
+#include <vector>
+
 #include "project/cli.hpp"
 #include "app/bundled_game.hpp"
 #include "app/game_settings.hpp"
@@ -53,6 +57,22 @@ TEST_CASE("errors") {
   CHECK_FALSE(parse_cli({"a", "b"}).ok);
   CHECK_FALSE(parse_cli({"a", "--bogus"}).ok);
   CHECK(parse_cli({"--help"}).options.mode == RunMode::Help);
+}
+
+TEST_CASE("a word that names no folder to open or play is refused, most likely a mistyped command") {
+  const std::filesystem::path missing = std::filesystem::temp_directory_path() / "redgem_cli_no_such_game";
+  std::filesystem::remove_all(missing);
+  for (const std::vector<std::string>& line : {std::vector<std::string>{missing.string()},
+                                               std::vector<std::string>{missing.string(), "--play"}}) {
+    const CliResult result = parse_cli(line);
+    REQUIRE(result.ok);  // (the line alone is understood: the folder is looked for apart)
+    CHECK(missing_game_folder(result.options).find("no game folder at") != std::string::npos);
+  }
+  CHECK(missing_game_folder(parse_cli({}).options).empty());  // the project hub
+  CHECK(missing_game_folder(parse_cli({std::filesystem::temp_directory_path().string()}).options).empty());
+  // (A new game makes its folder; a build says itself what is wrong with the game.)
+  CHECK(missing_game_folder(parse_cli({"new", missing.string()}).options).empty());
+  CHECK(missing_game_folder(parse_cli({"build", missing.string(), "out"}).options).empty());
 }
 
 TEST_CASE("new and build subcommands") {

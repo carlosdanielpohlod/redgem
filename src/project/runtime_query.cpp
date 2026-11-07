@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "core/config.hpp"
 #include "physics/body_config.hpp"
 #include "project/scene_lookup.hpp"
 #include "project/scene_text.hpp"
@@ -18,9 +19,7 @@ constexpr float kShownTolerance = 0.005f;
 // Shortest ray between two points: closer points are one point, with no direction to cast in.
 constexpr float kShortestRay = 1e-4f;
 constexpr char kComponentSeparator = ',';
-// Farthest a query point may be from the origin on any axis, in meters: well past any level, and
-// near enough that a ray between two such points stays finite in single precision.
-constexpr float kLargestCoordinate = 1.0e6f;
+using config::kLargestCoordinate;  // farthest a query point may be from the origin
 
 // "#7 Coin1" for an object of the loaded scene; "Coin1 (spawned)" for one made while playing.
 std::string object_label(Engine& engine, const SceneDesc& scene, ObjectId id) {
