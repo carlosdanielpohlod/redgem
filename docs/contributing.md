@@ -342,18 +342,13 @@ game's files may translate those too. The same test checks the games and templat
 repository: every key their scripts show has a text in their `locales/en.json` or the `game` part,
 and every text of theirs is shown.
 
-## Not there yet
+## Current limitations
 
-* Blend trees and animation events. Characters copied with Duplicate in the editor keep the pose
-  they were copied in.
-* Spot light cones, and camera clip planes from the scene (the engine uses fixed ones).
-* Reusing data when the same model is imported twice, and dropping the data of deleted imports
-  from `scene.glb` (each import appends its meshes and textures).
-* Mirrored objects (negative scale) are drawn inside out.
-* More vehicle options from Blender properties (drive layout, engine torque); hot reload of
-  scripts while playing.
+See [known limitations](https://github.com/carlosdanielpohlod/redgem/blob/main/KNOWN_LIMITATIONS.md)
+for current gaps and priorities. Check the relevant manual page and regression tests before
+starting a feature or reporting missing support.
 
-### Reading the process event history
+## Reading the process event history
 
 The native tooling API can read logs without replacing the console sink. Include
 `core/event_journal.hpp`, take `log::event_cursor()` before an operation, then read
