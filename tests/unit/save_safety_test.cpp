@@ -21,6 +21,7 @@ constexpr double kBestScore = 1250.0;
 constexpr double kOlderScore = 900.0;
 constexpr const char* kDamaged = "{ not json";  // what a save cut short by a crash may hold
 constexpr const char* kAlsoDamaged = "[1, 2";   // another one, told apart from the first
+constexpr const char* kUserText = "IMPORTANT USER DATA";  // a file of the user's, outside the game
 constexpr int kWrites = 3;
 constexpr int kLevel = 2;
 constexpr int kFirstNumberedAside = 2;  // .damaged, then .damaged.2
@@ -257,4 +258,29 @@ TEST_CASE("a file replaced whole leaves nothing beside it, and its folder is flu
   // (Windows has no flush of a folder: there it always succeeds.)
   const bool has_folder_flush = platform::this_desktop() != platform::Desktop::Windows;
   CHECK(durable::sync_folder(temp.dir / "missing") != has_folder_flush);
+}
+
+TEST_CASE("a file replaced whole never writes through a link planted under its partial name") {
+  const TempSave temp;
+  const std::filesystem::path file = temp.dir / "game" / "settings.json";
+  const std::filesystem::path victim = temp.dir / "elsewhere" / "victim.txt";
+  write_text(file, kDamaged);
+  write_text(victim, kUserText);
+  std::error_code link_error;
+  std::filesystem::create_symlink(victim, beside(file, kPartial), link_error);
+  if (link_error) return;  // (Windows without developer mode makes no links)
+  REQUIRE(durable::replace_file(file, kAlsoDamaged));
+  CHECK(contents_of(victim) == kUserText);
+  CHECK(contents_of(file) == kAlsoDamaged);
+  CHECK_FALSE(std::filesystem::is_symlink(file));
+  CHECK_FALSE(std::filesystem::exists(std::filesystem::symlink_status(beside(file, kPartial))));
+}
+
+TEST_CASE("a partial file a crash left behind is replaced, not refused") {
+  const TempSave temp;
+  const std::filesystem::path file = temp.dir / "settings.json";
+  write_text(beside(file, kPartial), kDamaged);
+  REQUIRE(durable::replace_file(file, kAlsoDamaged));
+  CHECK(contents_of(file) == kAlsoDamaged);
+  CHECK_FALSE(std::filesystem::exists(beside(file, kPartial)));
 }

@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <functional>
 #include <string>
+#include <string_view>
 
 // Writing a file so that what was written is on the disk, not only in the system's buffers, when
 // the writing returns: a power cut right after a save keeps it.
@@ -28,6 +29,13 @@ bool sync_folder(const std::filesystem::path& folder);
 // Replaces what `file` holds with `text`, whole: written beside it as <file>.part, flushed, moved
 // over it and the move pushed to the disk. False when `file` could not be replaced: it holds what
 // it held, and nothing is left beside it.
-bool replace_file(const std::filesystem::path& file, const std::string& text, const Flush& flush = flush_to_disk);
+bool replace_file(const std::filesystem::path& file, std::string_view text, const Flush& flush = flush_to_disk);
+
+// replace_file, written first under the name `partial` (in the same folder as `file`). The partial
+// file is always made new and never opened through a link: whatever already has its name (a file a
+// crash left, or a symbolic link planted there to send the writing elsewhere) is removed first, and
+// the writing is refused when something takes the name again before the file is made.
+bool replace_file_via(const std::filesystem::path& file, const std::filesystem::path& partial, std::string_view text,
+                      const Flush& flush = flush_to_disk);
 
 }  // namespace redgem::durable

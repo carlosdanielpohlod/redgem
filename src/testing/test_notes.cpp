@@ -11,6 +11,7 @@
 #include <sstream>
 #include <string>
 
+#include "storage/durable_file.hpp"
 #include "testing/test_input_bindings.hpp"
 
 namespace redgem::testing {
@@ -47,9 +48,10 @@ mrb_value leave_note(mrb_state* mrb, mrb_value) {
   std::error_code ignored;
   std::filesystem::create_directories(file.parent_path(), ignored);
   // Written whole under another name first: whoever reads a note never finds half of one.
-  const std::filesystem::path unfinished = file.string() + kUnfinishedMark;
-  std::ofstream(unfinished, std::ios::binary) << text;
-  std::filesystem::rename(unfinished, file, ignored);
+  // (Made new, among the temporary files every user shares: a link left there is never written through.)
+  std::filesystem::path unfinished = file;
+  unfinished += kUnfinishedMark;
+  durable::replace_file_via(file, unfinished, text);
   return mrb_nil_value();
 }
 

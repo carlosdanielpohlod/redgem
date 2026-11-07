@@ -42,6 +42,12 @@ until 1.0, a release may change what games rely on (see
 - **The editor bridge names a pending external change**: once the scene changed on disk while
   the editor had unsaved edits, every MCP action said "editor is busy". It now says the scene
   changed on disk and has to be resolved in the editor.
+- **Saves no longer write through a planted link**: a game folder carrying a symbolic link named
+  like a file being written (`scene.glb.tmp`, `*.redgem-writing`, `*.part`) made the editor's Save,
+  `redgem scene set|add|remove`, MCP `scene_edit` and the agent's file writes overwrite the file
+  the link pointed to, anywhere on the disk. Every write-then-rename now makes its temporary file
+  new (`O_CREAT|O_EXCL|O_NOFOLLOW`; `CREATE_NEW` on Windows) and removes a link in its way instead
+  of following it.
 
 ## [0.5.0] - 2026-10-31
 
