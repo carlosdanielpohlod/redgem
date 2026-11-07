@@ -164,6 +164,48 @@ TEST_CASE("a capture hands the next key or button pressed to its block, once") {
   CHECK(ruby(*engine, "$caught.size") == "2");
 }
 
+TEST_CASE("a capture asked for by a click catches the next click, which clicks nothing else") {
+  const TempFiles files;
+  const SceneDesc scene = one_camera();
+  auto engine = engine_for(scene, files);
+  ScriptedInputSource& input = engine->scripted_input();
+  input.set_mouse_button(MouseButton::Left, true);
+  frame(*engine);
+  input.set_mouse_button(MouseButton::Left, false);
+  frame(*engine);
+  // (A menu's cell is clicked when the left button is let go over it: it asks for the capture then.)
+  ruby(*engine, "$caught = []; Input.capture_next { |binding, pad| $caught << [binding, pad] } if "
+                "Input.mouse_released?(:left)");
+  frame(*engine);
+  CHECK(ruby(*engine, "$caught.inspect") == "[]");
+  input.set_mouse_button(MouseButton::Left, true);
+  frame(*engine);
+  CHECK(ruby(*engine, "$caught.inspect") == R"([["mouse:left", nil]])");
+  CHECK(ruby(*engine, "Input.mouse_pressed?(:left)") == "false");
+  input.set_mouse_button(MouseButton::Left, false);
+  frame(*engine);
+  CHECK(ruby(*engine, "Input.mouse_released?(:left)") == "false");
+  ruby(*engine, "Input.bind(:fire, $caught.first.first)");
+  input.set_mouse_button(MouseButton::Left, true);
+  frame(*engine);
+  CHECK(ruby(*engine, "[Input.action_pressed?(:fire), Input.bindings(:fire).last].inspect") ==
+        R"([true, "mouse:left"])");
+}
+
+TEST_CASE("a capture that leaves the mouse out catches a key while clicks work as usual") {
+  const TempFiles files;
+  const SceneDesc scene = one_camera();
+  auto engine = engine_for(scene, files);
+  ScriptedInputSource& input = engine->scripted_input();
+  ruby(*engine, "$caught = []; Input.capture_next(mouse: false) { |binding, _pad| $caught << binding }");
+  input.set_mouse_button(MouseButton::Left, true);
+  frame(*engine);
+  CHECK(ruby(*engine, "[$caught, Input.mouse_pressed?(:left), Input.capturing?].inspect") == "[[], true, true]");
+  input.set_key(Key::F5, true);
+  frame(*engine);
+  CHECK(ruby(*engine, "$caught.inspect") == R"(["key:f5"])");
+}
+
 TEST_CASE("the players' bindings are written once, at the frame's end, and only when they changed") {
   const TempFiles files;
   const SceneDesc scene = one_camera();

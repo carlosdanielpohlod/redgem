@@ -1,25 +1,55 @@
 # What the menu's controls page (see GameMenu::ControlsScreen) calls things, in the language in
-# use: a binding ("key:space" is "Space", "pad:a" "A button"), a stick (:left_x is "Left stick X")
+# use: a binding ("key:space" is "Space", "mouse:left" "Left mouse button", "pad:a" "A button"), a
+# stick (:left_x is "Left stick X")
 # and a row (the action :jump is "Jump", the negative side of :horizontal "Move left").
 class GameMenu < Behaviour
   module BindingNames
-    # Keys with a word for a name. Letters show as capitals, digits as they are.
+    # Keys with a word for a name. Letters and function keys show as capitals ("K", "F5"), digits
+    # as they are.
     KEYS = { space: -> { I18n.t("game.controls.key_space") },
              escape: -> { I18n.t("game.controls.key_escape") },
              enter: -> { I18n.t("game.controls.key_enter") },
              tab: -> { I18n.t("game.controls.key_tab") },
              backspace: -> { I18n.t("game.controls.key_backspace") },
+             insert: -> { I18n.t("game.controls.key_insert") },
+             delete: -> { I18n.t("game.controls.key_delete") },
+             home: -> { I18n.t("game.controls.key_home") },
+             end: -> { I18n.t("game.controls.key_end") },
+             page_up: -> { I18n.t("game.controls.key_page_up") },
+             page_down: -> { I18n.t("game.controls.key_page_down") },
              up: -> { I18n.t("game.controls.key_up") },
              down: -> { I18n.t("game.controls.key_down") },
              left: -> { I18n.t("game.controls.key_left") },
              right: -> { I18n.t("game.controls.key_right") },
+             caps_lock: -> { I18n.t("game.controls.key_caps_lock") },
+             scroll_lock: -> { I18n.t("game.controls.key_scroll_lock") },
+             num_lock: -> { I18n.t("game.controls.key_num_lock") },
+             print_screen: -> { I18n.t("game.controls.key_print_screen") },
+             pause: -> { I18n.t("game.controls.key_pause") },
+             menu: -> { I18n.t("game.controls.key_menu") },
              left_shift: -> { I18n.t("game.controls.key_left_shift") },
              right_shift: -> { I18n.t("game.controls.key_right_shift") },
              left_control: -> { I18n.t("game.controls.key_left_control") },
              right_control: -> { I18n.t("game.controls.key_right_control") },
-             left_alt: -> { I18n.t("game.controls.key_left_alt") } }.freeze
+             left_alt: -> { I18n.t("game.controls.key_left_alt") },
+             right_alt: -> { I18n.t("game.controls.key_right_alt") },
+             left_super: -> { I18n.t("game.controls.key_left_super") },
+             right_super: -> { I18n.t("game.controls.key_right_super") },
+             kp_enter: -> { I18n.t("game.controls.key_kp_enter") } }.freeze
     # Keys shown as the character they type.
-    CHARACTERS = { apostrophe: "'", comma: ",", minus: "-", period: ".", slash: "/" }.freeze
+    CHARACTERS = { apostrophe: "'", comma: ",", minus: "-", period: ".", slash: "/", semicolon: ";", equals: "=",
+                   left_bracket: "[", right_bracket: "]", backslash: "\\", grave: "`" }.freeze
+    # The keypad's keys, shown as "Numpad" and what they type (its digits by their names' ends).
+    KEYPAD_PREFIX = "kp_".freeze
+    KEYPAD_CHARACTERS = { kp_decimal: ".", kp_divide: "/", kp_multiply: "*", kp_subtract: "-", kp_add: "+",
+                          kp_equals: "=" }.freeze
+    MOUSE = { left: -> { I18n.t("game.controls.mouse_left") },
+              right: -> { I18n.t("game.controls.mouse_right") },
+              middle: -> { I18n.t("game.controls.mouse_middle") },
+              side: -> { I18n.t("game.controls.mouse_side") },
+              extra: -> { I18n.t("game.controls.mouse_extra") },
+              wheel_up: -> { I18n.t("game.controls.mouse_wheel_up") },
+              wheel_down: -> { I18n.t("game.controls.mouse_wheel_down") } }.freeze
     BUTTONS = { a: -> { I18n.t("game.controls.button_a") },
                 b: -> { I18n.t("game.controls.button_b") },
                 x: -> { I18n.t("game.controls.button_x") },
@@ -53,13 +83,25 @@ class GameMenu < Behaviour
     SIDE_MARKS = { negative: " -", positive: " +" }.freeze  # after a readable axis name
     WORD_JOINER = "_".freeze                   # between the words of a name
 
-    # A binding by name: "key:left_shift" is "Left Shift".
+    # A binding by name: "key:left_shift" is "Left Shift", "mouse:left" "Left mouse button".
     def self.of(binding)
       kind, name = binding.split(":", 2)
-      "#{kind}:" == Input::PAD_PREFIX ? button(name.to_sym) : key(name.to_sym)
+      send(KINDS.fetch("#{kind}:", :key), name.to_sym)
     end
 
-    def self.key(name) = KEYS[name]&.call || CHARACTERS[name] || name.to_s.upcase
+    # What names each kind of binding (a key, unless it says otherwise).
+    KINDS = { Input::PAD_PREFIX => :button, Input::MOUSE_PREFIX => :mouse }.freeze
+
+    def self.key(name) = KEYS[name]&.call || CHARACTERS[name] || keypad(name) || name.to_s.upcase
+    def self.mouse(name) = MOUSE[name]&.call || readable(name)
+
+    # A keypad key's name ("Numpad 1", "Numpad +"), or nil for another key.
+    def self.keypad(name)
+      text = name.to_s
+      return unless text.start_with?(KEYPAD_PREFIX)
+
+      I18n.t("game.controls.key_keypad", key: KEYPAD_CHARACTERS[name] || text.delete_prefix(KEYPAD_PREFIX))
+    end
     def self.button(name) = BUTTONS[name]&.call || readable(name)
     def self.stick(axis) = STICKS[axis]&.call || readable(axis)
 

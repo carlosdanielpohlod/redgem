@@ -16,6 +16,10 @@ constexpr int kRaylibButtons[] = {
     GAMEPAD_BUTTON_MIDDLE_LEFT,     GAMEPAD_BUTTON_MIDDLE_RIGHT,     GAMEPAD_BUTTON_LEFT_FACE_UP,
     GAMEPAD_BUTTON_LEFT_FACE_DOWN,  GAMEPAD_BUTTON_LEFT_FACE_LEFT,   GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
     GAMEPAD_BUTTON_LEFT_THUMB,      GAMEPAD_BUTTON_RIGHT_THUMB};
+// raylib's names for the mouse buttons, in MouseButton's order (the side buttons are its "side"
+// and "extra").
+constexpr int kRaylibMouseButtons[] = {MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_SIDE,
+                                       MOUSE_BUTTON_EXTRA};
 
 // A gamepad, which must be plugged in.
 GamepadSample read_gamepad(int pad) {
@@ -45,8 +49,7 @@ MouseSample RaylibInputSource::mouse() const {
   sample.x = position.x;
   sample.y = position.y;
   sample.wheel = GetMouseWheelMove();
-  sample.buttons = {IsMouseButtonDown(MOUSE_BUTTON_LEFT), IsMouseButtonDown(MOUSE_BUTTON_RIGHT),
-                    IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)};
+  for (std::size_t i = 0; i < kMouseButtonCount; ++i) sample.buttons[i] = IsMouseButtonDown(kRaylibMouseButtons[i]);
   return sample;
 }
 

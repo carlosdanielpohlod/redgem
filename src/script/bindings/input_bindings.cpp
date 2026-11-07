@@ -28,7 +28,7 @@ Key key_arg(mrb_state* mrb) {
 
 MouseButton mouse_button_arg(mrb_state* mrb) {
   const std::string name = name_arg(mrb);
-  return known(mrb, mouse_button_from_name(name), "unknown mouse button :%s (use :left, :right or :middle)", name);
+  return known(mrb, mouse_button_from_name(name), "unknown mouse button :%s (use :left, :right, :middle, :side or :extra)", name);
 }
 
 // --- Input ---------------------------------------------------------------------------------

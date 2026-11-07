@@ -36,8 +36,16 @@ constexpr Named<GamepadButton> kGamepadButtonNames[] = {
     {"right_stick", GamepadButton::RightStick},
 };
 
-constexpr Named<MouseButton> kMouseButtonNames[] = {
-    {"left", MouseButton::Left}, {"right", MouseButton::Right}, {"middle", MouseButton::Middle}};
+constexpr Named<MouseButton> kMouseButtonNames[] = {{"left", MouseButton::Left},
+                                                    {"right", MouseButton::Right},
+                                                    {"middle", MouseButton::Middle},
+                                                    {"side", MouseButton::Side},
+                                                    {"extra", MouseButton::Extra}};
+
+constexpr Named<MouseInput> kMouseInputNames[] = {
+    {"left", MouseInput::Left},         {"right", MouseInput::Right}, {"middle", MouseInput::Middle},
+    {"side", MouseInput::Side},         {"extra", MouseInput::Extra}, {"wheel_up", MouseInput::WheelUp},
+    {"wheel_down", MouseInput::WheelDown}};
 
 template <typename Value, std::size_t Count>
 std::optional<Value> find_named(const Named<Value> (&table)[Count], const std::string& name) {
@@ -72,5 +80,9 @@ std::optional<GamepadButton> gamepad_button_from_name(const std::string& name) {
 std::optional<MouseButton> mouse_button_from_name(const std::string& name) {
   return find_named(kMouseButtonNames, name);
 }
+
+std::optional<MouseInput> mouse_input_from_name(const std::string& name) { return find_named(kMouseInputNames, name); }
+
+std::string mouse_input_name(MouseInput input) { return name_of(kMouseInputNames, input); }
 
 }  // namespace redgem

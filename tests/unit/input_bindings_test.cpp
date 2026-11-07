@@ -33,13 +33,41 @@ TEST_CASE("bindings are written as key: and pad: followed by the name") {
   CHECK(binding_from_text("key:left_shift") == InputBinding(Key::LeftShift));
   CHECK(binding_from_text("pad:a") == InputBinding(GamepadButton::A));
   CHECK(binding_from_text("pad:dpad_left") == InputBinding(GamepadButton::DpadLeft));
-  for (const char* wrong : {"space", "key:", "key:hyper", "pad:turbo", "mouse:left", "pad:space", ""}) {
+  for (const char* wrong : {"space", "key:", "key:hyper", "pad:turbo", "mouse:", "mouse:thumb", "pad:space", ""}) {
     CHECK_FALSE(binding_from_text(wrong).has_value());
   }
   CHECK(binding_text(Key::Seven) == "key:7");
   CHECK(binding_text(GamepadButton::RightBumper) == "pad:right_bumper");
   CHECK(key_name(Key::Escape) == "escape");
   CHECK(gamepad_axis_name(GamepadAxis::LeftTrigger) == "left_trigger");
+}
+
+TEST_CASE("mouse bindings are written as mouse: followed by the button or the wheel's direction") {
+  CHECK(binding_from_text("mouse:left") == InputBinding(MouseInput::Left));
+  CHECK(binding_from_text("mouse:right") == InputBinding(MouseInput::Right));
+  CHECK(binding_from_text("mouse:middle") == InputBinding(MouseInput::Middle));
+  CHECK(binding_from_text("mouse:side") == InputBinding(MouseInput::Side));
+  CHECK(binding_from_text("mouse:extra") == InputBinding(MouseInput::Extra));
+  CHECK(binding_from_text("mouse:wheel_up") == InputBinding(MouseInput::WheelUp));
+  CHECK(binding_from_text("mouse:wheel_down") == InputBinding(MouseInput::WheelDown));
+  CHECK(binding_text(MouseInput::WheelDown) == "mouse:wheel_down");
+  CHECK(binding_text(Key::F5) == "key:f5");
+  CHECK(binding_text(Key::KeypadEnter) == "key:kp_enter");
+  CHECK(binding_from_text("key:page_up") == InputBinding(Key::PageUp));
+}
+
+TEST_CASE("an action lists keys, then the mouse, then gamepad buttons") {
+  ActionBinding binding;
+  binding.add(GamepadButton::X);
+  binding.add(MouseInput::Left);
+  binding.add(Key::K);
+  binding.add(MouseInput::Left);
+  CHECK(binding.all() == std::vector<InputBinding>{Key::K, MouseInput::Left, GamepadButton::X});
+  binding.remove(Key::K);
+  binding.remove(GamepadButton::X);
+  CHECK_FALSE(binding.empty());  // (the mouse is still there)
+  binding.remove(MouseInput::Left);
+  CHECK(binding.empty());
 }
 
 TEST_CASE("an action lists a binding once, keys before buttons") {
@@ -114,7 +142,8 @@ TEST_CASE("a change that changes nothing keeps the player on the game's bindings
 
 TEST_CASE("an input map written as JSON reads back the same") {
   InputMap map = InputMap::defaults();
-  map.bind_action("dash", {{Key::E}, {GamepadButton::B, GamepadButton::Y}});
+  map.bind_action("dash", {{Key::E}, {GamepadButton::B, GamepadButton::Y}, {MouseInput::Side}});
+  map.bind_action("zoom", {{}, {}, {MouseInput::WheelUp, MouseInput::Right}});
   map.bind_axis("climb", {{}, {{}, {GamepadButton::DpadUp}}, GamepadAxis::RightY, true});
   std::vector<std::string> problems;
   const InputMap back = input_map_from_json(input_map_json(map), problems);

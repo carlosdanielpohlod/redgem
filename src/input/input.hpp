@@ -15,8 +15,8 @@
 
 namespace redgem {
 
-// A key or gamepad button that went down while a capture waited for one (Input.capture_next), and
-// the gamepad it is on (none for a key).
+// A key, mouse button or gamepad button that went down (or the mouse wheel turned) while a capture
+// waited for one (Input.capture_next), and the gamepad it is on (none for a key or the mouse).
 // A capture's cancel key or button ends it with `cancelled` set: that binding was not chosen.
 struct CapturedBinding {
   InputBinding binding;
@@ -26,6 +26,10 @@ struct CapturedBinding {
 
 // What calls a capture off unless it is given others: Escape, and a gamepad's B or Back.
 std::vector<InputBinding> default_capture_cancels();
+
+// Whether a capture catches the mouse's buttons and wheel too, or leaves them to whatever else
+// reads them (the buttons and cells of a menu, which a click then works as usual).
+enum class MouseCapture { Caught, Ignored };
 
 // The first gamepad: the one read when no other is asked for, and the first player's.
 inline constexpr std::size_t kFirstGamepad = 0;
@@ -44,7 +48,7 @@ class InputState {
   // their gamepad's number.
   std::optional<float> axis(const std::string& name, std::size_t pad = kFirstGamepad) const;
   std::optional<bool> action_down(const std::string& name, std::size_t pad = kFirstGamepad) const;
-  // Whether any of the action's keys or buttons went down this frame.
+  // Whether any of the action's keys or buttons went down this frame (or its wheel turned).
   std::optional<bool> action_pressed(const std::string& name, std::size_t pad = kFirstGamepad) const;
   // Whether the action stopped being held this frame.
   std::optional<bool> action_released(const std::string& name, std::size_t pad = kFirstGamepad) const;
@@ -53,12 +57,15 @@ class InputState {
   PlayerBindings& bindings() { return bindings_; }
   const PlayerBindings& bindings() const { return bindings_; }
 
-  // Waits for the next key or gamepad button to go down (one held already does not count): the
-  // first update that sees one keeps it for take_captured, and stops waiting. One of `cancels`
-  // ends the capture as cancelled instead. Whatever went down that frame is the capture's alone:
-  // nothing else reads it as pressed (no action fires, no menu opens).
-  void capture_next(std::vector<InputBinding> cancels = default_capture_cancels()) {
-    capturing_ = true, captured_.reset(), capture_cancels_ = std::move(cancels);
+  // Waits for the next key, mouse button (or wheel turn) or gamepad button to go down (one held
+  // already does not count, such as the click that asked for the capture): the first update that
+  // sees one keeps it for take_captured, and stops waiting. One of `cancels` ends the capture as
+  // cancelled instead. Whatever went down that frame is the capture's alone: nothing else reads it
+  // as pressed (no action fires, no menu opens), and a mouse button caught is not seen again until
+  // it was let go (its release clicks nothing).
+  void capture_next(std::vector<InputBinding> cancels = default_capture_cancels(),
+                    MouseCapture mouse = MouseCapture::Caught) {
+    capturing_ = true, captured_.reset(), capture_cancels_ = std::move(cancels), capture_mouse_ = mouse;
   }
   void cancel_capture() { capturing_ = false; }
   bool capturing() const { return capturing_; }
@@ -99,8 +106,11 @@ class InputState {
  private:
   using Gamepads = std::array<GamepadSample, kMaxGamepads>;
 
-  // Whether an action is held with these keys down and this gamepad as it is.
-  static bool held(const std::set<Key>& keys, const GamepadSample& pad, const ActionBinding& binding);
+  // Whether an action is held with these keys down and this gamepad and mouse as they are.
+  static bool held(const std::set<Key>& keys, const GamepadSample& pad, const MouseSample& mouse,
+                   const ActionBinding& binding);
+  // Whether a mouse binding went down this frame: a button pressed, or the wheel turned its way.
+  bool mouse_input_pressed(MouseInput input) const;
   bool just_pressed(const ActionBinding& binding, std::size_t pad) const;
   float key_push(const AxisBinding& binding, std::size_t pad) const;
   float stick_push(const AxisBinding& binding, std::size_t pad) const;
@@ -108,8 +118,14 @@ class InputState {
   void catch_capture();
   // Makes everything held now read as held before too, so that none of it reads as pressed.
   void swallow_this_frame();
+  // The mouse buttons pressed this frame read as up until they are let go; the wheel as still.
+  void swallow_mouse();
+  // Hides the mouse buttons swallowed that are still held (and forgets those let go).
+  void hide_swallowed_buttons();
   bool cancels_capture(const InputBinding& binding) const;
   std::optional<CapturedBinding> first_pressed() const;
+  std::optional<CapturedBinding> first_pressed_key() const;
+  std::optional<CapturedBinding> first_pressed_mouse() const;
   std::optional<CapturedBinding> first_pressed_button(std::size_t pad) const;
 
   PlayerBindings bindings_;
@@ -123,6 +139,9 @@ class InputState {
   bool capturing_ = false;
   std::optional<CapturedBinding> captured_;
   std::vector<InputBinding> capture_cancels_;
+  MouseCapture capture_mouse_ = MouseCapture::Caught;
+  // The mouse buttons a capture caught, which read as up until they are let go.
+  std::array<bool, kMouseButtonCount> swallowed_buttons_{};
 };
 
 }  // namespace redgem

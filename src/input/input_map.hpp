@@ -9,27 +9,28 @@
 #include "input/devices.hpp"
 #include "input/keys.hpp"
 
-// What triggers a game's actions and moves its axes: the names a game gives them, and the keys
-// and gamepad buttons behind each name.
+// What triggers a game's actions and moves its axes: the names a game gives them, and the keys,
+// mouse buttons and gamepad buttons behind each name.
 namespace redgem {
 
-// One key or one gamepad button. As text (game.json, the player's saved bindings, Ruby):
-// "key:space", "pad:a".
-using InputBinding = std::variant<Key, GamepadButton>;
+// One key, one mouse button or wheel direction, or one gamepad button. As text (game.json, the
+// player's saved bindings, Ruby): "key:space", "mouse:left", "mouse:wheel_up", "pad:a".
+using InputBinding = std::variant<Key, GamepadButton, MouseInput>;
 
 std::optional<InputBinding> binding_from_text(const std::string& text);
 std::string binding_text(const InputBinding& binding);
 
-// What triggers an action: any of these keys or gamepad buttons.
+// What triggers an action: any of these keys, gamepad buttons or mouse buttons.
 struct ActionBinding {
   std::vector<Key> keys;
   std::vector<GamepadButton> buttons;
+  std::vector<MouseInput> mouse{};  // (last, and left out by those who bind none)
 
   // Adds what is not there yet (a binding is never listed twice).
   void add(const InputBinding& binding);
   void remove(const InputBinding& binding);
-  bool empty() const { return keys.empty() && buttons.empty(); }
-  // Keys first, then buttons, each in the order they were added.
+  bool empty() const { return keys.empty() && mouse.empty() && buttons.empty(); }
+  // Keys first, then the mouse, then gamepad buttons, each in the order they were added.
   std::vector<InputBinding> all() const;
 };
 
@@ -69,7 +70,7 @@ class InputMap {
   const std::map<std::string, ActionBinding>& actions() const { return actions_; }
 
   // The same names with the gamepad's buttons and sticks only: what a second player starts with,
-  // the keyboard being the first player's.
+  // the keyboard and the mouse being the first player's.
   InputMap without_keys() const;
 
  private:
