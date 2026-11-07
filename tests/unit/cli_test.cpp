@@ -62,8 +62,8 @@ TEST_CASE("errors") {
 TEST_CASE("a word that names no folder to open or play is refused, most likely a mistyped command") {
   const std::filesystem::path missing = std::filesystem::temp_directory_path() / "redgem_cli_no_such_game";
   std::filesystem::remove_all(missing);
-  for (const std::vector<std::string>& line : {std::vector<std::string>{missing.string()},
-                                               std::vector<std::string>{missing.string(), "--play"}}) {
+  for (const std::vector<std::string>& line :
+       {std::vector<std::string>{missing.string()}, std::vector<std::string>{missing.string(), "--play"}}) {
     const CliResult result = parse_cli(line);
     REQUIRE(result.ok);  // (the line alone is understood: the folder is looked for apart)
     CHECK(missing_game_folder(result.options).find("no game folder at") != std::string::npos);

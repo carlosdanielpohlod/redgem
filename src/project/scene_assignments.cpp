@@ -102,13 +102,15 @@ Vec3 vector_of(const Sides& sides) {
 // Whether every side is a number a placement takes (a float holds it, and it is no farther than
 // the tools reach): 1e40 would be saved as null, which is no glTF, and read back as 0.
 bool within_reach(const Sides& sides) {
-  return std::all_of(sides.begin(), sides.end(), [](double side) { return std::fabs(side) <= config::kLargestCoordinate; });
+  return std::all_of(sides.begin(), sides.end(),
+                     [](double side) { return std::fabs(side) <= config::kLargestCoordinate; });
 }
 
 // Whether every side of a scale is at least the smallest the Inspector takes: zero flattens the
 // object to nothing (its transform has no inverse) and a negative one turns it inside out.
 bool keeps_shape(const Sides& sides) {
-  return std::all_of(sides.begin(), sides.end(), [](double side) { return static_cast<float>(side) >= editor_config::kMinScale; });
+  return std::all_of(sides.begin(), sides.end(),
+                     [](double side) { return static_cast<float>(side) >= editor_config::kMinScale; });
 }
 
 std::string needs_vector(const Assignment& assignment) {
@@ -116,9 +118,9 @@ std::string needs_vector(const Assignment& assignment) {
 }
 
 std::string out_of_reach(const Assignment& assignment) {
-  return tr("project.scene.out_of_reach", {{"key", assignment.key},
-                                           {"value", assignment.value},
-                                           {"largest", number_text(config::kLargestCoordinate, 0)}});
+  return tr(
+      "project.scene.out_of_reach",
+      {{"key", assignment.key}, {"value", assignment.value}, {"largest", number_text(config::kLargestCoordinate, 0)}});
 }
 
 // The vector a word gives, or what is wrong with it: three numbers, none out of reach.
@@ -161,7 +163,8 @@ std::string set_position(SceneEdit& edit, int& index, const Assignment& assignme
 
 std::string set_rotation(SceneEdit& edit, int& index, const Assignment& assignment) {
   const auto degrees = placement_vector(assignment, sides_from(assignment.value));
-  return place(edit, index, degrees, [](Transform& local, Vec3 value) { local.rotation = quat_from_euler_degrees(value); });
+  return place(edit, index, degrees,
+               [](Transform& local, Vec3 value) { local.rotation = quat_from_euler_degrees(value); });
 }
 
 std::string set_scale(SceneEdit& edit, int& index, const Assignment& assignment) {
