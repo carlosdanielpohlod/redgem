@@ -32,6 +32,16 @@ until 1.0, a release may change what games rely on (see
 - **A game that spawned tens of thousands of objects with bodies no longer hangs on close**: the
   script budget did stop the spawning loop, but taking the physics world apart looked at every
   object for each object destroyed. Destroying an object now only looks at the triggers.
+- **`redgem scene set` and MCP `scene_edit` refuse placements a scene cannot hold**: a position,
+  rotation or scale past ±1 000 000 (the same reach as `game_query` points) is refused with the
+  range. Before, `1e40` was saved as `null`, which is not valid glTF, and the object moved to the
+  origin. A scale below 0.001 (the Inspector's smallest), zero or negative is refused too.
+- **Usage errors exit with 2 everywhere**: `redgem mcp` with no game, a folder that is not there
+  or an unknown `--allow` tool exited 1. `redgem <word>` naming no folder (a mistyped command)
+  now says so, with the usage, instead of failing to parse `<word>/scene.glb`.
+- **The editor bridge names a pending external change**: once the scene changed on disk while
+  the editor had unsaved edits, every MCP action said "editor is busy". It now says the scene
+  changed on disk and has to be resolved in the editor.
 
 ## [0.5.0] - 2026-10-31
 

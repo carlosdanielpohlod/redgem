@@ -31,5 +31,9 @@ inline constexpr const char* kRubyFileExtension = ".rb";
 // saves, and a file it writes for a coding agent. A file named so is never part of a game.
 inline constexpr const char* kSceneWritingSuffix = ".tmp";
 inline constexpr const char* kAgentWritingSuffix = ".redgem-writing";
+// Farthest a point the tools are given (a query's, an object's placement) may be from the origin
+// on any axis, in meters, and the largest number a placement takes: well past any level, and near
+// enough that sums and rays of such numbers stay finite in single precision.
+inline constexpr float kLargestCoordinate = 1.0e6f;
 
 }  // namespace redgem::config

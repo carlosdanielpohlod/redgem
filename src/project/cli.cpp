@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <system_error>
 
 #include "core/command_line.hpp"
 #include "core/config.hpp"
@@ -113,7 +114,26 @@ std::string problem_with(const Reading& reading) {
   return {};
 }
 
+// Whether the line opens a folder it names in the editor, or plays it.
+bool opens_named_folder(const CliOptions& options) {
+  const bool opens = options.mode == RunMode::Editor || options.mode == RunMode::Game;
+  return opens && !options.game_dir.empty();
+}
+
 }  // namespace
+
+// Whether the folder is surely not there. (One that cannot be looked at is left to the editor or
+// the game, which say why they cannot open it.)
+bool surely_missing(const std::filesystem::path& folder) {
+  std::error_code fs_error;
+  return !std::filesystem::exists(folder, fs_error) && !fs_error;
+}
+
+std::string missing_game_folder(const CliOptions& options) {
+  if (!opens_named_folder(options)) return {};
+  if (!surely_missing(options.game_dir)) return {};
+  return tr("project.cli.no_game_folder", {{"game_dir", options.game_dir.string()}});
+}
 
 std::string usage() {
   return tr("project.cli.usage", {{"templates", template_names(kTemplateSeparator)},
