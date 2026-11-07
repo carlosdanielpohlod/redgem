@@ -79,7 +79,8 @@ class Shape {
     auto* args = node->cdr;
     auto* path = args->car;
     const auto prefix = reinterpret_cast<std::uintptr_t>(path->car);
-    if (prefix > 1 || !named(path->cdr, name_)) return reject(node, "class name or namespace changed");
+    const bool matching_class = prefix <= 1 && named(path->cdr, name_);
+    if (!matching_class) return reject(node, "class name or namespace changed");
     if (!base(args->cdr->car)) return reject(node, "superclass expression changed");
     return statements(args->cdr->cdr->car->cdr, [this](Node* member) { return definition(member); });
   }
@@ -137,7 +138,9 @@ class Shape {
     for (; items; items = items->cdr) {
       if (!take()) return false;
       const bool literal_name = tagged(items->car, NODE_SYM) || tagged(items->car, NODE_STR);
-      if (!literal_name && !(visibility && tagged(items->car, NODE_DEF))) return false;
+      const bool visibility_method = visibility && tagged(items->car, NODE_DEF);
+      const bool allowed = literal_name || visibility_method;
+      if (!allowed) return false;
     }
     return true;
   }
@@ -151,7 +154,8 @@ class Shape {
     if (!declaration_helper(method)) return false;
     auto* call = args->cdr->cdr->car;
     if (!call) return true;
-    if (call->cdr->car || call->cdr->cdr) return false;
+    const bool extra_arguments = call->cdr->car || call->cdr->cdr;
+    if (extra_arguments) return false;
     const bool visibility = method == "private" || method == "protected" || method == "public";
     return attribute_names(call->car, visibility);
   }
@@ -163,7 +167,9 @@ class Shape {
     return "executable class setup";
   }
   bool definition(Node* node) {
-    if (tagged(node, NODE_DEF) || constant(node) || attributes(node) || tagged(node, NODE_NIL)) return true;
+    const bool declaration_only =
+        tagged(node, NODE_DEF) || constant(node) || attributes(node) || tagged(node, NODE_NIL);
+    if (declaration_only) return true;
     return reject(node, unsupported(node));
   }
   mrb_state* mrb_;

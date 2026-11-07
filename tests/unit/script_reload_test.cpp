@@ -552,7 +552,7 @@ TEST_CASE("script reload: a callback after a failed evaluation is not blamed on 
   CHECK(result.error.find("runtime callback") != std::string::npos);
   CHECK(result.error.find("broken.rb") == std::string::npos);
 }
-TEST_CASE("script reload: changing a base does not resume a subclass disabled by its own callback") {
+TEST_CASE("script reload: changing a base retries a disabled subclass only once") {
   test::LogCapture quiet;
   ReloadGame game;
   std::string error;
@@ -572,7 +572,9 @@ TEST_CASE("script reload: changing a base does not resume a subclass disabled by
   game.write(kChanged);
   REQUIRE(settled_reload(host) == 1);
   session->tick(config::kFixedDeltaSeconds);
-  CHECK(host.error_count() == errors);
+  CHECK(host.error_count() == errors + 1);
+  session->tick(config::kFixedDeltaSeconds);
+  CHECK(host.error_count() == errors + 1);
 }
 TEST_CASE("script reload: literal heredocs are accepted but interpolated setup is refused") {
   RubyVm vm;
@@ -630,4 +632,30 @@ TEST_CASE("script reload: allocation failure while initializing tracking is a pr
   }
   CHECK_FALSE(result.ok);
   checked(vm, "raise unless Mover.new.value == 1");
+}
+
+TEST_CASE("script reload: fixing an inherited update resumes instances of the subclass") {
+  test::LogCapture quiet;
+  ReloadGame game;
+  game.write(
+      "class Mover < Behaviour; attr_reader :steps; def start; $actor = self; @steps = 0; end; "
+      "def update(_dt); raise 'base callback broken'; end; end");
+  std::string error;
+  REQUIRE(write_text_file(game.dir / "scripts/child.rb", "class Child < Mover; end", error));
+  auto opened = SceneDocument::open(game.dir / config::kSceneFileName);
+  auto& doc = std::get<SceneDocument>(opened);
+  const int child = doc.add_empty("Child");
+  doc.set_prop(child, props::kScript, std::string("child.rb"));
+  REQUIRE(doc.save(error));
+  auto session = game.open();
+  ScriptedInputSource input;
+  start(*session, input);
+  auto& host = session->runtime()->scripts();
+  const auto errors = host.error_count();
+  REQUIRE(errors > 0);
+  game.write(kChanged);
+  REQUIRE(settled_reload(host) == 1);
+  session->tick(config::kFixedDeltaSeconds);
+  CHECK(host.error_count() == errors);
+  checked(host, "raise unless Scene.find('Child').get_component(Child).steps > 0");
 }
