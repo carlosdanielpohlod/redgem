@@ -19,6 +19,10 @@ until 1.0, a release may change what games rely on (see
 - **Prefab previews in the editor**: inherited geometry and components appear while editing,
   with reference selection, cached placement edits and preserved links on save.
 
+- **Release downloads from CI**: a `release-*` pull request, a pushed `v*` tag or a manual run
+  builds all four downloads on pinned toolchains, checks each one (contents, and its programs run
+  on its own system) and attaches them to a draft release; a release never gets fewer than four.
+
 ## [0.5.0] - 2026-10-31
 
 ### Added
