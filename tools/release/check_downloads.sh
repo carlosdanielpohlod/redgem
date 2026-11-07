@@ -10,7 +10,6 @@ set -euo pipefail
 # shellcheck source=tools/release/release_files.sh
 source "$(dirname "${BASH_SOURCE[0]}")/release_files.sh"
 
-DEMO_FILE="game.json"   # what each demo's folder holds at its top
 problems=0
 
 problem() {

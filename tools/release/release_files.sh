@@ -26,6 +26,7 @@ WINDOWS_RUNTIME="runtimes/windows/redgem-player.exe"
 ANDROID_RUNTIMES=(runtimes/android/arm64-v8a/libredgem.so runtimes/android/x86_64/libredgem.so)
 # (The showcase is built from downloaded assets that may not be passed on.)
 DEMOS=(platformer driving city)
+DEMO_FILE="scene.glb"   # what every demo's folder holds at its top (for check_downloads.sh)
 NOTICES=(LICENSE THIRD_PARTY_LICENSES.md)
 
 # The engine's version, as CMakeLists.txt says it.

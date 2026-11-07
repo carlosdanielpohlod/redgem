@@ -38,7 +38,7 @@ make_download() {
 # What every download holds besides its programs.
 common_files() {
   local demo notice
-  for demo in "${DEMOS[@]}"; do echo "games/${demo}/game.json"; done
+  for demo in "${DEMOS[@]}"; do echo "games/${demo}/${DEMO_FILE}"; done
   for notice in "${NOTICES[@]}" README.txt; do echo "${notice}"; done
 }
 
