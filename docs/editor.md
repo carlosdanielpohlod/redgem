@@ -154,7 +154,7 @@ triggers amber. Wires stay visible through opaque geometry, behind the game HUD 
 collision or compare a mesh with its collider. The view samples at most 8,192 triangles in a
 frame, first sharing it across colliders (up to 256 triangles each), then assigning unused
 budget to shapes with more detail. Shared wire edges are drawn once, and the world-pass
-command limit can also omit edges. If that
+command capacity bounds the requested triangle budget before collecting geometry. If that
 leaves geometry out, the View menu warns that the limit was reached. Curves are tessellated.
 
 The overlay is a runtime view: it does not appear before Play, and does not draw contact points,
