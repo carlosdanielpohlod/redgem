@@ -150,9 +150,11 @@ game. Boxes, spheres, capsules and triangle meshes follow their physics poses, i
 characters and trigger volumes; vehicle chassis shapes are included, wheels are not.
 
 Static shapes are gray, moving bodies green, kinematic bodies blue, characters cyan and
-triggers amber. Wires stay visible through opaque geometry. Pause the game to inspect a
+triggers amber. Wires stay visible through opaque geometry, behind the game HUD and touch controls. Pause the game to inspect a
 collision or compare a mesh with its collider. The view samples at most 8,192 triangles in a
-frame, sharing that budget across objects with a 256-triangle ceiling per collider. If that
+frame, first sharing it across colliders (up to 256 triangles each), then assigning unused
+budget to shapes with more detail. Shared wire edges are drawn once, and the world-pass
+command limit can also omit edges. If that
 leaves geometry out, the View menu warns that the limit was reached. Curves are tessellated.
 
 The overlay is a runtime view: it does not appear before Play, and does not draw contact points,

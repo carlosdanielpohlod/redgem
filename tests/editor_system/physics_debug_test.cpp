@@ -19,6 +19,28 @@ constexpr int kCaptureSide = 400;
 constexpr std::size_t kPictureBytes = 1024 * 1024;
 constexpr int kGreenMargin = 60;
 constexpr int kWirePixels = 40;
+constexpr Vec3 kActorPosition{0, 2, 0};
+constexpr Vec3 kCameraPosition{0, 2, 6};
+constexpr redgem::Color kActorColor{1, 0, 0, 1};
+constexpr redgem::Color kSunColor{1, 1, 1, 1};
+constexpr float kSunIntensity = 3;
+constexpr float kFovRadians = kPi / 3;
+void add_actor(SceneDocument& scene) {
+  const int actor = scene.add_primitive(PrimitiveShape::Sphere, "Actor", kActorColor);
+  scene.set_prop(actor, props::kBody, std::string(props::kBodyDynamic));
+  scene.set_prop(actor, props::kCollider, std::string("box"));
+  redgem::Transform pose;
+  pose.position = kActorPosition;
+  scene.set_local(actor, pose);
+}
+void add_camera(SceneDocument& scene) {
+  scene.add_light(LightType::Directional, "Sun", kSunColor, kSunIntensity);
+  const int camera = scene.add_camera("Camera", kFovRadians);
+  redgem::Transform pose;
+  pose.position = kCameraPosition;
+  scene.set_local(camera, pose);
+}
+bool is_green(::Color pixel) { return pixel.g > pixel.r + kGreenMargin && pixel.g > pixel.b + kGreenMargin; }
 void frames(EditorApp& app) {
   for (int frame = 0; frame < kFrames; ++frame) app.frame();
 }
@@ -27,19 +49,23 @@ std::filesystem::path game_files() {
   std::filesystem::remove_all(game);
   std::filesystem::create_directories(game / "scripts");
   auto scene = SceneDocument::create_empty(game / config::kSceneFileName);
-  const int actor = scene.add_primitive(PrimitiveShape::Sphere, "Actor", redgem::Color{1, 0, 0, 1});
-  scene.set_prop(actor, props::kBody, std::string(props::kBodyDynamic));
-  scene.set_prop(actor, props::kCollider, std::string("box"));
-  redgem::Transform pose;
-  pose.position = {0, 2, 0};
-  scene.set_local(actor, pose);
-  scene.add_light(LightType::Directional, "Sun", redgem::Color{1, 1, 1, 1}, 3);
-  const int camera = scene.add_camera("Camera", kPi / 3);
-  pose.position.z = 6;
-  scene.set_local(camera, pose);
+  add_actor(scene);
+  add_camera(scene);
   std::string error;
   REQUIRE_MESSAGE(scene.save(error), error);
   return game;
+}
+void cover_game(EditorApp& app) {
+  const auto result = app.session().runtime()->scripts().eval(
+      "class ViewportCover < Behaviour; SIDE = 4096; def update(_dt); "
+      "UI.rect(x: 0, y: 0, width: SIDE, height: SIDE, color: :blue); end; end; "
+      "Scene.find('Actor').add_component(ViewportCover)",
+      "physics_hud_test.rb");
+  REQUIRE_MESSAGE(result.ok, result.error);
+  app.session().pause(false);
+  frames(app);
+  app.session().pause(true);
+  frames(app);
 }
 int green_pixels(EditorApp& app) {
   std::string error;
@@ -51,7 +77,7 @@ int green_pixels(EditorApp& app) {
   for (int y = 0; y < image.height; ++y) {
     for (int x = 0; x < image.width; ++x) {
       const auto pixel = GetImageColor(image, x, y);
-      if (pixel.g > pixel.r + kGreenMargin && pixel.g > pixel.b + kGreenMargin) ++green;
+      if (is_green(pixel)) ++green;
     }
   }
   UnloadImage(image);
@@ -78,6 +104,8 @@ TEST_CASE("the editor can show actual collider wires while paused and remove the
   frames(app);
   CHECK(green_pixels(app) > baseline + kWirePixels);
   CHECK(test::save_window_picture(std::filesystem::path(REDGEM_SCREENSHOT_DIR) / "editor/physics_colliders.png"));
+  cover_game(app);
+  CHECK(green_pixels(app) <= baseline + kWirePixels);  // opaque HUD covers the world debug pass
   app.set_physics_debug(false);
   frames(app);
   CHECK(green_pixels(app) <= baseline + kWirePixels);

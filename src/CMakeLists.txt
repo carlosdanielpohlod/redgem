@@ -541,7 +541,7 @@ if(NOT ANDROID)
     editor/scene_viewport.cpp
     editor/scene_overlays.cpp
     editor/scene_overlays_physics.cpp
-    editor/editor_physics_debug.cpp
+    editor/scene_viewport_debug.cpp
     editor/editor_app.cpp
     editor/editor_frame.cpp
     editor/editor_commands.cpp
