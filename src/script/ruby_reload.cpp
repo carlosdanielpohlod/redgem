@@ -1,4 +1,6 @@
 #include "script/ruby_vm.hpp"
+#include "script/ruby_context.hpp"
+#include "script/reload_ownership.hpp"
 #include <mruby/class.h>
 #include <mruby/compile.h>
 #include <mruby/variable.h>
@@ -16,6 +18,7 @@ struct ReloadRequest {
   const std::string& code;
   const std::string& file;
   const ReloadHooks& hooks;
+  ReloadOwnership* ownership;
 };
 void changed(mrb_state* mrb, RClass* klass) {
   mrb_write_barrier(mrb, reinterpret_cast<RBasic*>(klass));
@@ -71,19 +74,11 @@ class ClassEdit {
   RClass* before_;
   bool committed_ = false;
 };
-struct Context {
-  mrb_state* mrb;
-  mrbc_context* value;
-  explicit Context(mrb_state* state) : mrb(state), value(mrbc_context_new(state)) {}
-  ~Context() { mrbc_context_free(mrb, value); }
-  Context(const Context&) = delete;
-  Context& operator=(const Context&) = delete;
-};
 mrb_value evaluate(mrb_state* mrb, const ReloadRequest& request) {
-  Context context(mrb);
-  context.value->capture_errors = true;
-  mrbc_filename(mrb, context.value, request.file.c_str());
-  const auto result = mrb_load_nstring_cxt(mrb, request.code.data(), request.code.size(), context.value);
+  RubyContext context(mrb);
+  context->capture_errors = true;
+  mrbc_filename(mrb, context.get(), request.file.c_str());
+  const auto result = mrb_load_nstring_cxt(mrb, request.code.data(), request.code.size(), context.get());
   if (mrb->exc) mrb_exc_raise(mrb, mrb_obj_value(mrb->exc));
   return result;
 }
@@ -110,9 +105,11 @@ void check_target(mrb_state* mrb, const ReloadRequest& request) {
 }
 mrb_value replace(mrb_state* mrb, const ReloadRequest& request) {
   check_target(mrb, request);
+  if (request.ownership) request.ownership->require_owner(request.klass, request.file);
   ClassEdit edit(mrb, request.klass);
   edit.clear_constants();
   const auto result = evaluate(mrb, request);
+  if (request.ownership) request.ownership->refresh(request.klass);
   edit.commit();
   return result;
 }
@@ -125,6 +122,12 @@ mrb_value run_reload(mrb_state* mrb, void* data) {
   return mrb_nil_value();
 }
 }  // namespace
+bool inherits_class(RClass* klass, RClass* base) {
+  if (!base) return false;
+  for (; klass; klass = klass->super)
+    if (klass == base) return true;
+  return false;
+}
 ReloadHooks class_reload_hooks(mrb_state* mrb, RClass* receiver) {
   ReloadHooks hooks{};
   for (std::size_t i = 0; i < hooks.size(); ++i) {
@@ -135,9 +138,7 @@ ReloadHooks class_reload_hooks(mrb_state* mrb, RClass* receiver) {
 }
 RubyResult RubyVm::reload_class(RClass* klass, const std::string& code, const std::string& file) {
   if (code.size() > kReloadSourceBytes) return {false, mrb_nil_value(), "live reload source exceeds 256 KiB"};
-  auto syntax = check_syntax(code, file);
-  if (!syntax.ok) return syntax;
-  ReloadRequest request{klass, code, file, reload_hooks_};
+  ReloadRequest request{klass, code, file, reload_hooks_, reload_ownership_.get()};
   const int arena = mrb_gc_arena_save(mrb_);
   auto result = run_protected(run_reload, &request);
   result.value = mrb_nil_value();

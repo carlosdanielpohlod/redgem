@@ -325,6 +325,7 @@ redgem_add_library(redgem_runtime
   script/ruby_vm.cpp
   script/reload_shape.cpp
   script/ruby_reload.cpp
+  script/reload_ownership.cpp
   script/script_budget.cpp
   script/script_host.cpp
   script/script_host_scripts.cpp

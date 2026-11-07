@@ -1,5 +1,6 @@
 #include "script/reload_shape.hpp"
 #include "script/ruby_reload.hpp"
+#include "script/ruby_context.hpp"
 #include <mruby/compile.h>
 #include <algorithm>
 #include <cstdint>
@@ -18,16 +19,11 @@ constexpr const char* kUnsupported =
 int kind(const Node* node) { return node ? static_cast<int>(reinterpret_cast<std::intptr_t>(node->car)) : -1; }
 mrb_sym symbol(const Node* node) { return static_cast<mrb_sym>(reinterpret_cast<std::uintptr_t>(node)); }
 bool tagged(const Node* node, int tag) { return kind(node) == tag; }
-struct ContextDeleter {
-  mrb_state* mrb;
-  void operator()(mrbc_context* context) const { mrbc_context_free(mrb, context); }
-};
 struct Parser {
-  std::unique_ptr<mrbc_context, ContextDeleter> context;
+  RubyContext context;
   std::unique_ptr<mrb_parser_state, decltype(&mrb_parser_free)> parser;
-  explicit Parser(mrb_state* state)
-      : context(mrbc_context_new(state), ContextDeleter{state}), parser(mrb_parser_new(state), mrb_parser_free) {
-    if (!context || !parser) throw std::runtime_error("cannot allocate a script parser");
+  explicit Parser(mrb_state* state) : context(state), parser(mrb_parser_new(state), mrb_parser_free) {
+    if (!parser) throw std::runtime_error("cannot allocate a script parser");
   }
   Parser(const Parser&) = delete;
   Parser& operator=(const Parser&) = delete;
@@ -36,16 +32,22 @@ struct Parser {
     parser->s = code.data();
     parser->send = code.data() + code.size();
     mrb_parser_parse(parser.get(), context.get());
-    if (parser->nerr != 0) throw std::runtime_error(kUnsupported);
+    if (parser->nerr != 0) {
+      const auto& problem = parser->error_buffer[0];
+      const char* message = problem.message ? problem.message : "syntax error";
+      throw std::runtime_error("line " + std::to_string(problem.lineno) + ": " + message);
+    }
     return parser->tree;
   }
 };
 class Shape {
  public:
   Shape(mrb_state* mrb, const std::string& name, const std::string& base) : mrb_(mrb), name_(name), base_(base) {}
+  const std::string& problem() const { return problem_; }
   bool file(Node* scope) {
-    if (!tagged(scope, NODE_SCOPE)) return false;
-    return statements(scope->cdr->cdr, [this](Node* node) { return declaration(node); }) && classes_ == 1;
+    if (!tagged(scope, NODE_SCOPE)) return reject(scope, "expected a file scope");
+    if (!statements(scope->cdr->cdr, [this](Node* node) { return declaration(node); })) return false;
+    return classes_ == 1 || reject(scope, "expected one behaviour class");
   }
 
  private:
@@ -58,16 +60,25 @@ class Shape {
       if (!statements(item->car, accepted)) return false;
     return true;
   }
+  bool reject(Node* node, const char* reason) {
+    const int line = node ? std::max(1, static_cast<int>(node->lineno)) : 1;
+    problem_ = "line " + std::to_string(line) + ": " + reason + "; restart Play";
+    return false;
+  }
   bool take() { return --remaining_ >= 0; }
   bool named(const Node* value, const std::string& name) const { return mrb_sym_name(mrb_, symbol(value)) == name; }
-  bool base(Node* node) const { return !node || (tagged(node, NODE_CONST) && named(node->cdr, base_)); }
+  bool base(Node* node) const {
+    const bool named_base = tagged(node, NODE_CONST) || tagged(node, NODE_COLON3);
+    return !node || (named_base && named(node->cdr, base_));
+  }
   bool declaration(Node* node) {
-    if (!tagged(node, NODE_CLASS) || ++classes_ != 1) return false;
+    if (!tagged(node, NODE_CLASS)) return reject(node, "top-level executable setup");
+    if (++classes_ != 1) return reject(node, "multiple class declarations");
     auto* args = node->cdr;
     auto* path = args->car;
     const auto prefix = reinterpret_cast<std::uintptr_t>(path->car);
-    if (prefix > 1 || !named(path->cdr, name_)) return false;
-    if (!base(args->cdr->car)) return false;
+    if (prefix > 1 || !named(path->cdr, name_)) return reject(node, "class name or namespace changed");
+    if (!base(args->cdr->car)) return reject(node, "superclass expression changed");
     return statements(args->cdr->cdr->car->cdr, [this](Node* member) { return definition(member); });
   }
   bool scalar(Node* node) const {
@@ -86,21 +97,33 @@ class Shape {
     }
     return true;
   }
+  bool words(Node* items) {
+    for (; items; items = items->cdr) {
+      if (!take()) return false;
+      const bool text = tagged(items->car, NODE_STR) || tagged(items->car, NODE_LITERAL_DELIM);
+      if (!text) return false;
+    }
+    return true;
+  }
   bool numeric(Node* node) const { return tagged(node, NODE_INT) || tagged(node, NODE_FLOAT); }
   bool literal(Node* node, int depth = kLiteralDepth) {
     if (!node || depth == 0 || !take()) return false;
     if (scalar(node)) return true;
     if (tagged(node, NODE_NEGATE)) return numeric(node->cdr);
     if (tagged(node, NODE_ARRAY)) return sequence(node->cdr, depth - 1, false);
+    if (tagged(node, NODE_WORDS) || tagged(node, NODE_SYMBOLS)) return words(node->cdr);
     return tagged(node, NODE_HASH) && sequence(node->cdr, depth - 1, true);
   }
   bool constant(Node* node) {
     if (!tagged(node, NODE_ASGN)) return false;
     return tagged(node->cdr->car, NODE_CONST) && literal(node->cdr->cdr);
   }
-  bool attribute_names(Node* items) {
-    for (; items; items = items->cdr)
-      if (!take() || !tagged(items->car, NODE_SYM)) return false;
+  bool attribute_names(Node* items, bool visibility) {
+    for (; items; items = items->cdr) {
+      if (!take()) return false;
+      const bool literal_name = tagged(items->car, NODE_SYM) || tagged(items->car, NODE_STR);
+      if (!literal_name && !(visibility && tagged(items->car, NODE_DEF))) return false;
+    }
     return true;
   }
   bool declaration_helper(const std::string& method) const {
@@ -114,14 +137,24 @@ class Shape {
     auto* call = args->cdr->cdr->car;
     if (!call) return true;
     if (call->cdr->car || call->cdr->cdr) return false;
-    return attribute_names(call->car);
+    const bool visibility = method == "private" || method == "protected" || method == "public";
+    return attribute_names(call->car, visibility);
+  }
+  const char* unsupported(Node* node) const {
+    if (tagged(node, NODE_CLASS)) return "nested class declaration";
+    if (tagged(node, NODE_SDEF)) return "class method declaration";
+    if (tagged(node, NODE_ASGN)) return "class assignment or computed constant initializer";
+    if (tagged(node, NODE_FCALL)) return "unsupported declaration call";
+    return "executable class setup";
   }
   bool definition(Node* node) {
-    return tagged(node, NODE_DEF) || constant(node) || attributes(node) || tagged(node, NODE_NIL);
+    if (tagged(node, NODE_DEF) || constant(node) || attributes(node) || tagged(node, NODE_NIL)) return true;
+    return reject(node, unsupported(node));
   }
   mrb_state* mrb_;
   const std::string& name_;
   const std::string& base_;
+  std::string problem_ = kUnsupported;
   int classes_ = 0;
   int remaining_ = kNodeBudget;
 };
@@ -129,6 +162,6 @@ class Shape {
 void require_reload_shape(mrb_state* mrb, const std::string& code, const std::string& name, const std::string& base) {
   Parser parser(mrb);
   Shape shape(mrb, name, base);
-  if (!shape.file(parser.parse(code))) throw std::runtime_error(kUnsupported);
+  if (!shape.file(parser.parse(code))) throw std::runtime_error(shape.problem());
 }
 }  // namespace redgem

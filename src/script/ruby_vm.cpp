@@ -1,4 +1,6 @@
 #include "script/ruby_vm.hpp"
+#include "script/ruby_context.hpp"
+#include "script/reload_ownership.hpp"
 
 #include <mruby.h>
 #include <mruby/array.h>
@@ -16,6 +18,7 @@ struct EvalRequest {
   const std::string* code = nullptr;
   const std::string* file_name = nullptr;
   bool compile_only = false;
+  ReloadOwnership* ownership = nullptr;
 };
 
 // The arguments are borrowed from the caller for the length of the call: no copy is made, which
@@ -27,17 +30,27 @@ struct CallRequest {
   mrb_int argc = 0;
 };
 
-mrb_value run_eval(mrb_state* mrb, void* userdata) {
+mrb_value evaluate_source(mrb_state* mrb, void* userdata) {
   const auto* request = static_cast<const EvalRequest*>(userdata);
-  mrbc_context* context = mrbc_context_new(mrb);
-  mrbc_filename(mrb, context, request->file_name->c_str());
+  if (request->ownership) request->ownership->before_eval();
+  RubyContext context(mrb);
+  mrbc_filename(mrb, context.get(), request->file_name->c_str());
   context->no_exec = request->compile_only;
   context->capture_errors = request->compile_only;  // report instead of printing to stderr
   const mrb_value result =
-      mrb_load_nstring_cxt(mrb, request->code->data(), static_cast<mrb_int>(request->code->size()), context);
-  mrbc_context_free(mrb, context);
+      mrb_load_nstring_cxt(mrb, request->code->data(), static_cast<mrb_int>(request->code->size()), context.get());
+  if (request->ownership) request->ownership->observe(*request->file_name);
   if (mrb->exc != nullptr) mrb_exc_raise(mrb, mrb_obj_value(mrb->exc));
   return result;
+}
+
+mrb_value run_eval(mrb_state* mrb, void* data) {
+  try {
+    return evaluate_source(mrb, data);
+  } catch (const std::exception& problem) {
+    mrb_raise(mrb, E_RUNTIME_ERROR, problem.what());
+  }
+  return mrb_nil_value();
 }
 
 mrb_value run_call(mrb_state* mrb, void* userdata) {
@@ -154,6 +167,8 @@ RubyResult RubyVm::run_protected(mrb_protect_error_func* body, void* request) {
   return result;
 }
 
+void RubyVm::enable_reload_tracking() { reload_ownership_ = std::make_unique<ReloadOwnership>(mrb_); }
+
 RubyVm::~RubyVm() {
   budget_.set_limit(std::chrono::milliseconds(0));  // the watchdog lets go of the interpreter first
   mrb_close(mrb_);
@@ -169,7 +184,7 @@ RubyResult RubyVm::check_syntax(const std::string& code, const std::string& file
 }
 
 RubyResult RubyVm::eval(const std::string& code, const std::string& file_name) {
-  EvalRequest request{&code, &file_name};
+  EvalRequest request{&code, &file_name, false, reload_ownership_.get()};
   const int arena = mrb_gc_arena_save(mrb_);
   const RubyResult result = run_protected(run_eval, &request);
   mrb_gc_arena_restore(mrb_, arena);

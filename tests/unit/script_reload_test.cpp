@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 #include <mruby.h>
 #include <mruby/class.h>
+#include <mruby/proc.h>
 #include <mruby/variable.h>
 #include <filesystem>
 #include "core/config.hpp"
@@ -18,6 +19,10 @@ void checked(RubyVm& vm, const std::string& source) {
   REQUIRE_MESSAGE(result.ok, result.error);
 }
 void checked(ScriptHost& host, const std::string& source) { checked(host.vm(), source); }
+std::size_t settled_reload(ScriptHost& host) {
+  host.reload_scripts();
+  return host.reload_scripts();
+}
 constexpr const char* kOriginal = R"(
 class Mover < Behaviour
   STEP = 1
@@ -112,8 +117,9 @@ TEST_CASE(
   for (const auto* code :
        {"$changed = true; class Mover < Behaviour; end", "class Mover < Behaviour; X = Scene.clear; end",
         "class Other < Behaviour; end", "class Mover < Behaviour; X = -[1]; end",
-        "class Mover < Behaviour; X = {[] => 1}; end", "class Mover < Behaviour; include Enumerable; end",
-        "class Mover < Behaviour; def self.value; 9; end; end", "class Mover < Behaviour; def update("}) {
+        "class Mover < Behaviour; X = {[] => 1}; end", "class Mover < Behaviour; X = %W[#{($changed = true)}]; end",
+        "class Mover < Behaviour; include Enumerable; end", "class Mover < Behaviour; def self.value; 9; end; end",
+        "class Mover < Behaviour; def update("}) {
     CAPTURE(code);
     CHECK_FALSE(vm.reload_class(klass, code, "mover.rb").ok);
     checked(vm, "raise unless $actor.value == 7; raise if $changed");
@@ -145,7 +151,7 @@ TEST_CASE(
   engine.physics().set_velocity(actor, velocity);
   const auto before = engine.scene().world_transform(actor);
   game.write(kChanged);
-  REQUIRE(host.reload_scripts() == 1);
+  REQUIRE(settled_reload(host) == 1);
   CHECK(approx_equal(engine.physics().velocity(actor), velocity, test::kTolerance));
   CHECK(approx_equal(engine.scene().world_transform(actor).position, before.position, test::kTolerance));
   checked(host,
@@ -153,7 +159,7 @@ TEST_CASE(
           "raise if $actor.respond_to?(:obsolete)");
   session->tick(config::kFixedDeltaSeconds);
   checked(host, "raise unless $actor.steps == $old_steps + 5 && $fixed > 0 && $starts == 1");
-  CHECK(host.reload_scripts() == 0);
+  CHECK(settled_reload(host) == 0);
   session->stop();
 }
 TEST_CASE("script reload: failed changed scripts retain last code and report once per version with manual retry") {
@@ -165,9 +171,9 @@ TEST_CASE("script reload: failed changed scripts retain last code and report onc
   auto& host = session->runtime()->scripts();
   game.write("class Mover < Behaviour; def update(");
   const auto errors = host.error_count();
-  CHECK(host.reload_scripts() == 0);
+  CHECK(settled_reload(host) == 0);
   CHECK(host.error_count() == errors + 1);
-  CHECK(host.reload_scripts() == 0);
+  CHECK(settled_reload(host) == 0);
   CHECK(host.error_count() == errors + 1);
   CHECK(host.reload_scripts(true) == 0);
   CHECK(host.error_count() == errors + 2);
@@ -175,17 +181,17 @@ TEST_CASE("script reload: failed changed scripts retain last code and report onc
   session->tick(config::kFixedDeltaSeconds);
   checked(host, "raise unless $actor.steps == $old_steps + 1");
   std::filesystem::remove(game.dir / "scripts/mover.rb");
-  CHECK(host.reload_scripts() == 0);
+  CHECK(settled_reload(host) == 0);
   CHECK(host.error_count() == errors + 3);
-  CHECK(host.reload_scripts() == 0);
+  CHECK(settled_reload(host) == 0);
   CHECK(host.error_count() == errors + 3);
   game.write(kChanged);
-  CHECK(host.reload_scripts() == 1);
+  CHECK(settled_reload(host) == 1);
   std::filesystem::rename(game.dir / "scripts", game.dir / "original_scripts");
   std::filesystem::create_directory_symlink(game.dir / "original_scripts", game.dir / "scripts");
-  CHECK(host.reload_scripts() == 0);
+  CHECK(settled_reload(host) == 0);
   CHECK(host.error_count() == errors + 4);
-  CHECK(host.reload_scripts() == 0);
+  CHECK(settled_reload(host) == 0);
   CHECK(host.error_count() == errors + 4);
   session->stop();
 }
@@ -239,14 +245,167 @@ TEST_CASE("script reload: a corrected callback resumes its disabled instance wit
   auto& host = session->runtime()->scripts();
   checked(host, "$before = $actor.steps");
   game.write("class Mover < Behaviour; def update(_dt); raise 'broken'; end; end");
-  REQUIRE(host.reload_scripts() == 1);
+  REQUIRE(settled_reload(host) == 1);
   const int errors = host.error_count();
   session->tick(config::kFixedDeltaSeconds);
   CHECK(host.error_count() == errors + 1);
   game.write(kChanged);
-  REQUIRE(host.reload_scripts() == 1);
+  REQUIRE(settled_reload(host) == 1);
   session->tick(config::kFixedDeltaSeconds);
   checked(host, "raise unless $actor.steps == $before + 5 && $starts == 1 && $fixed > 0");
   CHECK(host.error_count() == errors + 1);
   session->stop();
+}
+TEST_CASE("script reload: another file reopening a class keeps its methods and constants intact") {
+  test::LogCapture quiet;
+  ReloadGame game;
+  auto session = game.open();
+  ScriptedInputSource input;
+  start(*session, input);
+  auto& host = session->runtime()->scripts();
+  const auto helper = game.dir / "scripts/mover_ext.rb";
+  std::string error;
+  REQUIRE(write_text_file(helper, "class Mover; State = []; def boost; 77; end; end", error));
+  REQUIRE(host.load_file(helper).ok);
+  game.write(kChanged);
+  CHECK(settled_reload(host) == 0);
+  checked(host, "raise unless $actor.boost == 77 && Mover::State == []; raise unless Mover::STEP == 1");
+  const auto logs = host.vm().reload_class(mrb_class_get(host.vm().state(), "Mover"), kChanged,
+                                           (game.dir / "scripts/mover.rb").u8string());
+  CHECK_FALSE(logs.ok);
+  CHECK(logs.error.find("mover_ext.rb") != std::string::npos);
+  checked(host, "GC.start; raise unless $actor.boost == 77");
+}
+TEST_CASE("script reload: a helper that defines the class first is named in the refusal") {
+  RubyVm vm;
+  checked(vm, "class Behaviour; end");
+  vm.enable_reload_tracking();
+  REQUIRE(vm.eval("class Mover < Behaviour; State = []; end", "helper.rb").ok);
+  REQUIRE(vm.eval("class Mover; def value; 1; end; end", "mover.rb").ok);
+  auto* klass = mrb_class_get(vm.state(), "Mover");
+  const auto result = vm.reload_class(klass, "class Mover < Behaviour; def value; 9; end; end", "mover.rb");
+  CHECK_FALSE(result.ok);
+  CHECK(result.error.find("helper.rb") != std::string::npos);
+  checked(vm, "raise unless Mover.new.value == 1 && Mover::State == []");
+}
+TEST_CASE("script reload: failed starts stay disabled after replacing code") {
+  test::LogCapture quiet;
+  ReloadGame game;
+  game.write(
+      "class Mover < Behaviour; def start; raise 'no target'; end; def update(_dt); $bad_update = true; end; end");
+  auto session = game.open();
+  ScriptedInputSource input;
+  start(*session, input);
+  auto& host = session->runtime()->scripts();
+  const auto errors = host.error_count();
+  REQUIRE(errors > 0);
+  game.write("class Mover < Behaviour; def update(_dt); $bad_update = true; end; end");
+  REQUIRE(settled_reload(host) == 1);
+  session->tick(config::kFixedDeltaSeconds);
+  checked(host, "raise if $bad_update");
+  CHECK(host.error_count() == errors);
+}
+TEST_CASE("script reload: manual retry leaves successful unchanged constants and disabled callbacks alone") {
+  test::LogCapture quiet;
+  ReloadGame game;
+  game.write(
+      "class Mover < Behaviour; SPAWNED = []; def start; $actor = self; end; "
+      "def update(_dt); raise 'broken'; end; end");
+  auto session = game.open();
+  ScriptedInputSource input;
+  start(*session, input);
+  auto& host = session->runtime()->scripts();
+  checked(host, "Mover::SPAWNED << 1; $constant_id = Mover::SPAWNED.object_id");
+  const auto errors = host.error_count();
+  REQUIRE(host.reload_scripts(true) == 0);
+  session->tick(config::kFixedDeltaSeconds);
+  CHECK(host.error_count() == errors);
+  checked(host, "raise unless Mover::SPAWNED == [1] && Mover::SPAWNED.object_id == $constant_id");
+}
+TEST_CASE("script reload: CRLF loaded sources do not change at the first poll or manual retry") {
+  ReloadGame game;
+  std::string source;
+  for (const char letter : std::string(kOriginal)) source += letter == '\n' ? "\r\n" : std::string(1, letter);
+  game.write(source);
+  auto session = game.open();
+  ScriptedInputSource input;
+  start(*session, input);
+  auto& host = session->runtime()->scripts();
+  CHECK(settled_reload(host) == 0);
+  CHECK(host.reload_scripts(true) == 0);
+  CHECK(host.error_count() == 0);
+}
+TEST_CASE("script reload: incomplete writes settle before they can report an error") {
+  ReloadGame game;
+  auto session = game.open();
+  ScriptedInputSource input;
+  start(*session, input);
+  auto& host = session->runtime()->scripts();
+  const auto errors = host.error_count();
+  game.write("");
+  CHECK(host.reload_scripts() == 0);
+  CHECK(host.error_count() == errors);
+  game.write("class Mover < Behaviour; def update(");
+  CHECK(host.reload_scripts() == 0);
+  CHECK(host.error_count() == errors);
+  game.write(kChanged);
+  CHECK(host.reload_scripts() == 0);
+  CHECK(host.error_count() == errors);
+  CHECK(host.reload_scripts() == 1);
+  CHECK(host.error_count() == errors);
+}
+TEST_CASE("script reload: periodic content checks catch equal-size equal-timestamp changes") {
+  ReloadGame game;
+  auto session = game.open();
+  ScriptedInputSource input;
+  start(*session, input);
+  auto& host = session->runtime()->scripts();
+  const auto path = game.dir / "scripts/mover.rb";
+  const auto time = std::filesystem::last_write_time(path);
+  std::string code = kOriginal;
+  code.replace(code.find("STEP = 1"), std::string("STEP = 1").size(), "STEP = 9");
+  game.write(code);
+  std::filesystem::last_write_time(path, time);
+  std::size_t reloaded = 0;
+  for (int i = 0; i < 16; ++i) reloaded += host.reload_scripts();
+  CHECK(reloaded == 1);
+  checked(host, "raise unless Mover::STEP == 9");
+}
+TEST_CASE("script reload: plain Ruby declaration idioms and diagnostic locations are supported") {
+  RubyVm vm;
+  checked(vm, "class Behaviour; end; class Mover < Behaviour; end");
+  auto* klass = mrb_class_get(vm.state(), "Mover");
+  const auto result = vm.reload_class(klass, R"(
+class Mover < ::Behaviour
+  WORDS = %w[red blue]
+  SYMBOLS = %i[up down]
+  attr_reader "name"
+  private def hidden; 42; end
+end
+)",
+                                      "mover.rb");
+  REQUIRE_MESSAGE(result.ok, result.error);
+  checked(vm,
+          "raise 'words' unless Mover::WORDS == ['red', 'blue']; "
+          "raise 'symbols' unless Mover::SYMBOLS == [:up, :down]; "
+          "raise 'reader' unless Mover.new.respond_to?(:name); "
+          "raise 'body' unless Mover.new.send(:hidden) == 42");
+  const auto hidden = mrb_method_search(vm.state(), klass, mrb_intern_lit(vm.state(), "hidden"));
+  CHECK(MRB_METHOD_VISIBILITY(hidden) == MRB_METHOD_PRIVATE_FL);
+  const auto invalid = vm.reload_class(klass, "class Mover < Behaviour\n VALUE = Object.new\nend", "mover.rb");
+  CHECK_FALSE(invalid.ok);
+  CHECK(invalid.error.find("line 2") != std::string::npos);
+  CHECK(invalid.error.find("constant initializer") != std::string::npos);
+}
+TEST_CASE("script reload: a failed helper still owns the class changes made before it raised") {
+  RubyVm vm;
+  checked(vm, "class Behaviour; end");
+  vm.enable_reload_tracking();
+  REQUIRE(vm.eval("class Mover < Behaviour; def value; 1; end; end", "mover.rb").ok);
+  CHECK_FALSE(vm.eval("class Mover; State = []; end; raise 'helper failed'", "broken_helper.rb").ok);
+  auto* klass = mrb_class_get(vm.state(), "Mover");
+  const auto result = vm.reload_class(klass, "class Mover < Behaviour; def value; 9; end; end", "mover.rb");
+  CHECK_FALSE(result.ok);
+  CHECK(result.error.find("broken_helper.rb") != std::string::npos);
+  checked(vm, "raise unless Mover.new.value == 1 && Mover::State == []");
 }

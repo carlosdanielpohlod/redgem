@@ -99,6 +99,7 @@ class ScriptHost {
     std::string class_name;
     bool started = false;
     bool enabled = true;
+    bool start_failed = false;
     // Whether its class has a fixed_update of its own: Behaviour's does nothing, and calling it on
     // every behaviour every physics step would cost a protected Ruby call each for nothing.
     bool fixed_updates = true;
@@ -109,11 +110,12 @@ class ScriptHost {
 
   void remember_source(const std::filesystem::path& path, const std::string& code);
   bool reload_script(const std::string& script, bool retry);
+  bool apply_reload(const std::string& script, RClass* klass, const std::string& source);
   bool reload_unreadable(const std::string& script);
   bool reload_failed(const std::string& script, const std::string& error);
   void refresh_reloaded(RClass* klass);
   bool live_reload_ = false;
-  std::map<std::string, std::optional<ScriptStamp>> observed_sources_;
+  std::map<std::string, ReloadSource> reload_sources_;
   std::string reload_cursor_;
   bool loading_screen_failed_ = false;
   void load_prelude();

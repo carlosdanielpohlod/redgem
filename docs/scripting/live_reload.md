@@ -9,15 +9,19 @@ replacing its instances. Their fields, object identities, scene transforms and p
 remain in place. `start` and scene setup do not run again. A removed method falls back to the
 superclass, and a removed constant disappears from the class.
 
-The editor periodically checks up to eight loaded source files; a game with many scripts
-can take several polls. Reload waits while a gizmo, terrain stroke or popup is active. Typing in
+The editor checks metadata for up to eight loaded files at a time. Changed bytes must remain
+stable across two automatic polls; unchanged metadata gets a periodic content check too, so
+same-size edits with preserved timestamps still arrive. A game with many scripts can take
+several polls. Reload waits while a gizmo, terrain stroke or popup is active. Typing in
 a script tab does not block saved changes. **File > Reload scripts** saves open tabs and retries
-all loaded behaviour files immediately, including a previously rejected version.
+changed or previously rejected behaviour files immediately. Successfully loaded, unchanged
+files keep their constants and disabled callbacks as they are.
 
 A reloadable file defines one top-level behaviour class, keeping its class name and superclass.
 Its class body can contain instance methods, literal constants, `attr_reader`, `attr_writer`,
 `attr_accessor`, and `private`/`protected`/`public` declarations. Literals include numbers,
-strings, symbols, booleans, nil, arrays and hashes with string or symbol keys. Each source is
+strings, symbols, booleans, nil, arrays (`%w[]`/`%i[]` too) and hashes with string or symbol keys.
+`private def`, string attribute names and a `::Behaviour` superclass are supported. Each source is
 limited to 256 KiB, with bounded declaration and literal nesting checks.
 
 ```ruby
@@ -37,12 +41,14 @@ The declaration restrictions apply to code executed while the file itself is eva
 
 Syntax errors and unsupported declarations keep the previous code running and report the
 problem once per observed file version. Fix and save the file, or use **Reload scripts** to
-retry. A successfully reloaded class re-enables its behaviours if an earlier callback failed.
+retry. A successfully reloaded class re-enables behaviours disabled by later callbacks. A failed
+`start` leaves its instance disabled until Play is restarted, avoiding half-initialized updates.
 An error in a subsequently called method follows the usual rule: that behaviour is disabled.
 
 Stop and restart Play for executable file/class setup, computed constants, class methods,
 modules/mixins, changed inheritance, custom declaration hooks or a script that failed to load
-initially. Scene setup and unrelated helper files are not rerun. Existing timer blocks, event
+initially. A class whose declarations another file or a runtime callback changes is also
+refused; the diagnostic names the other file when known. Scene setup and unrelated helper files are not rerun. Existing timer blocks, event
 handlers and saved method objects retain their earlier code until replaced or cancelled.
 Live reload watches files only in the editor; shipped games and dedicated servers do not poll
 or replace their scripts.

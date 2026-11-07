@@ -62,6 +62,7 @@ ScriptHost::ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir
   start_roots();
   install_bindings(mrb);
   load_prelude();
+  if (live_reload_) vm_.enable_reload_tracking();
 }
 
 void ScriptHost::load_prelude() {
@@ -79,7 +80,7 @@ void ScriptHost::report_error(const std::string& where, const std::string& error
 RubyResult ScriptHost::eval(const std::string& code, const std::string& file_name) { return vm_.eval(code, file_name); }
 
 RubyResult ScriptHost::load_file(const std::filesystem::path& path) {
-  std::ifstream in(path);
+  std::ifstream in(path, std::ios::binary);
   if (!in) {
     RubyResult result;
     result.ok = false;
@@ -89,7 +90,7 @@ RubyResult ScriptHost::load_file(const std::filesystem::path& path) {
   std::stringstream buffer;
   buffer << in.rdbuf();
   const auto code = buffer.str();
-  const auto result = vm_.eval(code, path.string());
+  const auto result = vm_.eval(code, path.u8string());
   if (result.ok) remember_source(path, code);
   return result;
 }
