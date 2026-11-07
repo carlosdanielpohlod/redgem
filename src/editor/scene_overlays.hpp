@@ -31,7 +31,9 @@ struct BrushMark {
 void draw_scene_overlays(const Scene& scene, const SceneDesc& desc, const std::vector<ObjectId>& selected,
                          const std::optional<BrushMark>& brush);
 
-// Backend collider triangles drawn as colored wires; call inside a 3D mode.
-void draw_physics_colliders(const PhysicsDebugGeometry& geometry);
+class DebugDrawBuffer;
+// Adds unique collider edges to the renderer's world pass, before HUD/touch controls. False
+// when geometry or command limits omitted any edge.
+bool append_physics_colliders(DebugDrawBuffer& commands, const PhysicsDebugGeometry& geometry);
 
 }  // namespace redgem

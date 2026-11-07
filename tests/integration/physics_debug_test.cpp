@@ -4,6 +4,9 @@
 #include <set>
 
 #include "physics/physics_world.hpp"
+#include "physics/jolt/jolt_debug_geometry.hpp"
+#include <Jolt/Physics/Collision/Shape/StaticCompoundShape.h>
+#include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -19,6 +22,13 @@ BodyDesc body(ObjectId object, const std::string& type, const std::string& colli
   desc.config = body_config_from_props({{"body", type}, {"collider", collider}});
   desc.bounds = Bounds{{-0.5f, -1, -0.5f}, {0.5f, 1, 0.5f}, true};
   return desc;
+}
+bool is_character_triangle(const PhysicsDebugTriangle& triangle) {
+  const bool hero = triangle.object == kHero && triangle.type == BodyType::Character;
+  return hero && !triangle.trigger;
+}
+bool is_trigger_triangle(const PhysicsDebugTriangle& triangle) {
+  return triangle.object == kTrigger && triangle.trigger;
 }
 Bounds bounds_of(const PhysicsDebugGeometry& geometry, ObjectId object) {
   Bounds bounds;
@@ -52,7 +62,7 @@ TEST_CASE("physics debug: rotated scaled offset colliders follow actual bodies w
     CHECK_FALSE(triangle.trigger);
   }
   const auto before = bounds_of(geometry, kBox);
-  desc.world.position += Vec3{4, 1, -2};
+  desc.world.position = desc.world.position + Vec3{4, 1, -2};
   world->teleport(kBox, desc.world);
   const auto after = bounds_of(world->debug_geometry(), kBox);
   CHECK(approx_equal(after.center() - before.center(), Vec3{4, 1, -2}, kTolerance));
@@ -61,17 +71,19 @@ TEST_CASE("physics debug: characters and trigger shapes are included and their g
   auto world = create_jolt_physics_world(Vec3::zero());
   auto hero = body(kHero, "character", "capsule");
   hero.world.position = {0, 3, 0};
+  hero.bounds = Bounds{{-0.5f, 0, -0.5f}, {0.5f, 2, 0.5f}, true};
   REQUIRE_FALSE(world->add_object(hero));
   auto trigger = body(kTrigger, "static", "sphere");
   trigger.config.trigger = true;
   trigger.world.position = {4, 3, 0};
+  trigger.bounds = Bounds{{-0.5f, 0, -0.5f}, {0.5f, 2, 0.5f}, true};
   REQUIRE_FALSE(world->add_object(trigger));
   const auto geometry = world->debug_geometry();
   bool character_seen = false;
   bool trigger_seen = false;
   for (const auto& triangle : geometry.triangles) {
-    character_seen |= triangle.object == kHero && triangle.type == BodyType::Character && !triangle.trigger;
-    trigger_seen |= triangle.object == kTrigger && triangle.trigger;
+    character_seen |= is_character_triangle(triangle);
+    trigger_seen |= is_trigger_triangle(triangle);
   }
   CHECK(character_seen);
   CHECK(trigger_seen);
@@ -115,4 +127,70 @@ TEST_CASE("physics debug: quotas include later colliders and bound oversized req
   CHECK(world->debug_geometry(0).triangles.empty());
   const auto huge = world->debug_geometry(std::numeric_limits<std::size_t>::max());
   CHECK(huge.triangles.size() <= kMaxPhysicsDebugTriangles);
+}
+
+TEST_CASE("physics debug: vehicle chassis decorators expose their actual collision triangles") {
+  auto world = create_jolt_physics_world(Vec3::zero());
+  auto car = body(kBox, "vehicle", "box");
+  car.world.position = {0, 3, 0};
+  ObjectId wheel = 10;
+  constexpr float kAxle = 0.8f;
+  constexpr float kRadius = 0.3f;
+  constexpr float kWidth = 0.2f;
+  for (const float z : {-kAxle, kAxle}) {
+    for (const float x : {-kAxle, kAxle}) {
+      car.wheels.push_back({{wheel, static_cast<ObjectSerial>(wheel)}, {x, 0, z}, kRadius, kWidth});
+      ++wheel;
+    }
+  }
+  REQUIRE_FALSE(world->add_object(car));
+  const auto geometry = world->debug_geometry();
+  REQUIRE_FALSE(geometry.triangles.empty());
+  CHECK(approx_equal(bounds_of(geometry, kBox).center(), car.world.position, kTolerance));
+}
+TEST_CASE("physics debug: transformed compound shapes expose every leaf") {
+  auto world = create_jolt_physics_world(Vec3::zero());
+  JPH::StaticCompoundShapeSettings settings;
+  constexpr float kOffset = 2;
+  constexpr float kHalfSize = 0.5f;
+  for (const float x : {-kOffset, kOffset})
+    settings.AddShape(JPH::Vec3(x, 0, 0), JPH::Quat::sIdentity(), new JPH::BoxShape(JPH::Vec3::sReplicate(kHalfSize)));
+  const auto shape = settings.Create();
+  REQUIRE_FALSE(shape.HasError());
+  const JPH::TransformedShape transformed(JPH::RVec3::sZero(), JPH::Quat::sIdentity(), shape.Get().GetPtr(),
+                                          JPH::BodyID());
+  PhysicsDebugGeometry geometry;
+  const PhysicsDebugTriangle metadata{kBox, BodyType::Static, false, {}};
+  REQUIRE(jolt::append_debug_shape(transformed, metadata, 0, kMaxPhysicsDebugTriangles, geometry));
+  const auto bounds = bounds_of(geometry, kBox);
+  CHECK(bounds.min.x == doctest::Approx(-kOffset - kHalfSize));
+  CHECK(bounds.max.x == doctest::Approx(kOffset + kHalfSize));
+}
+
+TEST_CASE("physics debug: small colliders hand their unused quota to a detailed mesh") {
+  auto world = create_jolt_physics_world(Vec3::zero());
+  constexpr ObjectId kBoxes = 10;
+  constexpr ObjectId kTerrain = 20;
+  for (ObjectId id = 0; id < kBoxes; ++id) REQUIRE_FALSE(world->add_object(body(id, "static", "box")));
+  constexpr std::size_t kTriangles = 600;
+  constexpr float kSpacing = 2;
+  MeshDesc mesh;
+  PrimitiveDesc primitive;
+  for (std::size_t index = 0; index < kTriangles; ++index) {
+    const float x = static_cast<float>(index) * kSpacing;
+    const auto base = static_cast<std::uint32_t>(primitive.positions.size() / config::kFloatsPerPosition);
+    primitive.positions.insert(primitive.positions.end(), {x, 0, 0, x + 1, 0, 0, x, 0, 1});
+    primitive.normals.insert(primitive.normals.end(), {0, 1, 0, 0, 1, 0, 0, 1, 0});
+    primitive.indices.insert(primitive.indices.end(), {base, base + 2, base + 1});
+  }
+  mesh.primitives.push_back(primitive);
+  auto terrain = body(kTerrain, "static", "mesh");
+  terrain.mesh = &mesh;
+  REQUIRE_FALSE(world->add_object(terrain));
+  const auto geometry = world->debug_geometry();
+  std::size_t seen = 0;
+  for (const auto& triangle : geometry.triangles)
+    if (triangle.object == kTerrain) ++seen;
+  CHECK(seen == kTriangles);
+  CHECK_FALSE(geometry.truncated);
 }

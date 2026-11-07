@@ -239,7 +239,6 @@ class EditorApp {
   bool selection_editable() const;
   void draw_view_menu();
   void draw_physics_debug_menu();
-  void draw_physics_debug();
   void draw_game_object_menu();
   void draw_help_menu();
   void draw_graphics_card_menu();
@@ -394,7 +393,6 @@ class EditorApp {
   long long frame_count_ = 0;
   bool layout_built_ = false;
   bool physics_debug_ = false;
-  bool physics_debug_truncated_ = false;
   bool gizmo_dragging_ = false;
   group_transform::Drag group_drag_;                // the gizmo drag in progress, from where it began
   std::optional<box_select::ViewPoint> box_start_;  // where the left button went down in the view, while held

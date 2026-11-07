@@ -9,6 +9,7 @@
 #include "core/platform.hpp"
 #include "core/translations.hpp"
 #include "editor/editor_config.hpp"
+#include "editor/scene_viewport.hpp"
 #include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
 
@@ -170,9 +171,11 @@ void EditorApp::draw_view_menu() {
 void EditorApp::draw_physics_debug_menu() {
   ImGui::Separator();
   ImGui::MenuItem(tr("editor.menu.physics_colliders"), nullptr, &physics_debug_, session_->runtime() != nullptr);
-  if (!physics_debug_) return;
+  const bool showing = physics_debug_ && session_->runtime() != nullptr;
+  if (!showing) return;
   ImGui::TextDisabled("%s", tr("editor.scene.physics_legend"));
-  if (physics_debug_truncated_) ImGui::TextColored(ui::warning_color(), "%s", tr("editor.scene.physics_limit"));
+  const bool limited = game_view_ && game_view_->physics_debug_truncated();
+  if (limited) ImGui::TextColored(ui::warning_color(), "%s", tr("editor.scene.physics_limit"));
 }
 
 void EditorApp::draw_graphics_card_menu() {

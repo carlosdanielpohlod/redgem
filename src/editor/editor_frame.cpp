@@ -112,6 +112,7 @@ bool EditorApp::reloaded_from_disk() { return time_to(kReloadCheckFrames) && ses
 
 // The running game reads its keys and mouse through the Scene view, while the view has the focus.
 void EditorApp::feed_game() {
+  if (game_view_) game_view_->set_physics_debug(physics_debug_ ? session_->runtime() : nullptr);
   game_input_.enabled = game_has_input();
   game_input_.origin_x = viewport_->screen_x;
   game_input_.origin_y = viewport_->screen_y;
