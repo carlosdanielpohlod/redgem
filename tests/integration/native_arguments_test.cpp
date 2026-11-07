@@ -100,7 +100,8 @@ TEST_CASE("a name that stands for nothing is refused, by what it was meant to na
   CHECK(refuses(scripts, "Input.axis(:nope)", "unknown axis :nope"));
   CHECK(refuses(scripts, "Input.action?(:nope)", "unknown action :nope"));
   CHECK(refuses(scripts, "Input.action_pressed?(:nope)", "unknown action :nope"));
-  CHECK(refuses(scripts, "Input.mouse_down?(:nope)", "unknown mouse button :nope (use :left, :right or :middle)"));
+  CHECK(refuses(scripts, "Input.mouse_down?(:nope)",
+                "unknown mouse button :nope (use :left, :right, :middle, :side or :extra)"));
   CHECK(refuses(scripts, "Input.gamepad_axis(:nope)", "unknown gamepad axis :nope"));
   CHECK(refuses(scripts, "Input.gamepad_down?(:nope)", "unknown gamepad button :nope"));
   CHECK(refuses(scripts, "Input.down?(5)", "expected a Symbol or String"));
