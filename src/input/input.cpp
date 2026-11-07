@@ -101,6 +101,22 @@ void InputState::update(const InputSource& source) {
   catch_capture();
 }
 
+void InputState::capture_next(std::vector<InputBinding> cancels, MouseCapture mouse) {
+  capturing_ = true;
+  captured_.reset();
+  capture_cancels_ = std::move(cancels);
+  capture_mouse_ = mouse;
+  if (catches_mouse()) swallow_held_mouse();
+}
+
+void InputState::swallow_held_mouse() {
+  for (std::size_t button = 0; button < kMouseButtonCount; ++button) {
+    if (mouse_.buttons[button]) swallowed_buttons_[button] = true;
+  }
+  if (mouse_.wheel != 0.0f) swallowed_wheel_ = true;
+  hide_swallowed_mouse();
+}
+
 void InputState::catch_capture() {
   if (!capturing_) return;
   captured_ = first_pressed();

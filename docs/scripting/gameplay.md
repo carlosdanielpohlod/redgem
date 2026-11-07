@@ -152,7 +152,8 @@ thing checks `Input.bindings` of the other actions before binding it.
 A "press a key" screen asks for the next key, mouse button or gamepad button pressed, or the
 wheel turned. The block gets the binding as text, and the gamepad's number (`nil` for a key or the
 mouse); a key or button already held when it asks does not count, so the click on a "Rebind" button
-that asked is never taken for the binding. A mouse button caught is the capture's until it is let
+that asked is never taken for the binding (nor does its release click anything, and a scroll under
+way when it asks is not caught either). A mouse button caught is the capture's until it is let
 go: its release clicks nothing under the pointer. `mouse: false` leaves the mouse out of a capture,
 for a screen that waits for a gamepad button while its own buttons still take clicks. On a touch
 screen a tap is the mouse's left button, and a capture never catches it: taps keep working the

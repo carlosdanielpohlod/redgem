@@ -87,7 +87,8 @@ TEST_CASE("a capture catches a mouse button, not the click held when it was aske
   CHECK_FALSE(input.take_captured().has_value());
   source.set_mouse_button(MouseButton::Left, false);
   input.update(source);
-  CHECK_FALSE(input.take_captured().has_value());  // (nor its release)
+  CHECK_FALSE(input.take_captured().has_value());        // (nor its release)
+  CHECK_FALSE(input.mouse_released(MouseButton::Left));  // which clicks nothing either
   source.set_mouse_button(MouseButton::Right, true);
   input.update(source);
   const auto caught = input.take_captured();
@@ -144,6 +145,21 @@ TEST_CASE("a mouse button or a scroll a capture caught stays hidden through the 
   CHECK(input.take_captured()->binding == InputBinding(Key::J));
   input.update(source);  // the same scroll, still going
   CHECK(input.mouse_wheel() == doctest::Approx(0.0f));
+}
+
+TEST_CASE("a scroll under way when a capture starts is not caught; the next one is") {
+  ScriptedInputSource source;
+  InputState input;
+  source.set_mouse_wheel(kWheelUp);
+  input.update(source);
+  input.capture_next();
+  input.update(source);  // the same scroll, still going
+  CHECK_FALSE(input.take_captured().has_value());
+  source.set_mouse_wheel(0.0f);
+  input.update(source);
+  source.set_mouse_wheel(kWheelDown);
+  input.update(source);
+  CHECK(input.take_captured()->binding == InputBinding(MouseInput::WheelDown));
 }
 
 TEST_CASE("a capture catches the wheel's direction, and the turn is the capture's alone") {

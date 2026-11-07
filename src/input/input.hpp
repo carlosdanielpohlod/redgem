@@ -62,11 +62,11 @@ class InputState {
   // sees one keeps it for take_captured, and stops waiting. One of `cancels` ends the capture as
   // cancelled instead. Whatever went down that frame is the capture's alone: nothing else reads it
   // as pressed (no action fires, no menu opens), and a mouse button caught is not seen again until
-  // it was let go (its release clicks nothing).
+  // it was let go (its release clicks nothing). A capture that catches the mouse also hides the
+  // buttons held and the wheel turning as it starts, until they are let go (the release of the
+  // click that asked for it clicks nothing either, and a scroll under way is not caught).
   void capture_next(std::vector<InputBinding> cancels = default_capture_cancels(),
-                    MouseCapture mouse = MouseCapture::Caught) {
-    capturing_ = true, captured_.reset(), capture_cancels_ = std::move(cancels), capture_mouse_ = mouse;
-  }
+                    MouseCapture mouse = MouseCapture::Caught);
   void cancel_capture() { capturing_ = false; }
   bool capturing() const { return capturing_; }
   // What a capture caught, once: nothing again until the next one catches something.
@@ -121,6 +121,8 @@ class InputState {
   // The mouse buttons pressed this frame read as up until they are let go; the wheel as still
   // until it stops.
   void swallow_mouse();
+  // The mouse buttons held now read as up until they are let go; the wheel as still until it stops.
+  void swallow_held_mouse();
   // Forgets the swallowed mouse buttons the device's sample says were let go, and the wheel once
   // it stopped.
   void forget_let_go(const MouseSample& raw);
