@@ -10,6 +10,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Physics collider view**: inspect actual collision shapes during editor Play/Pause, with
+  colored wireframes, trigger and character shapes, and bounded geometry collection.
+
 - **Prefab creation**: save a selected hierarchy as a reusable GLB from the Project panel,
   preserving complete skeletons and nested references while validating dependencies before publication.
 

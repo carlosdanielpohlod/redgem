@@ -139,8 +139,9 @@ not a promise of how it will be closed.
   not replace the original selection with a reference or overwrite an existing source file.
 - Scripts reload when Play is pressed, not while the game runs. The script editor has no
   autocomplete, and a backtrace in the console does not jump to its line.
-- No autosave or crash recovery of the scene being edited; no animation preview or physics debug
-  view; no preferences beyond the graphics card (key bindings, camera speed, snap sizes); no HiDPI
+- The editor can show actual collider wireframes during Play/Pause; it does not yet draw
+  contacts, joints or velocities, or preview colliders before Play.
+- No autosave or crash recovery of the scene being edited; no animation preview; no preferences beyond the graphics card (key bindings, camera speed, snap sizes); no HiDPI
   scaling; dark theme only.
 
 ### What a shipped game offers its players

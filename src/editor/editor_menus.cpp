@@ -159,10 +159,19 @@ void EditorApp::draw_view_menu() {
                   &panels_.inspector);
   ImGui::MenuItem(ui::icon_label(ICON_FA_TERMINAL, "editor.menu.bottom_panels"), tr(kKeysBottomPanel), &panels_.bottom);
   ImGui::MenuItem(ui::icon_label(ICON_FA_ROBOT, "editor.menu.agent_panel"), nullptr, &panels_.agent);
+  draw_physics_debug_menu();
   ImGui::Separator();
   if (ImGui::MenuItem(ui::icon_label(ICON_FA_CODE, "editor.menu.focus_on_code")))
     panels_ = {false, false, false, false};
   if (ImGui::MenuItem(ui::icon_label(ICON_FA_TABLE_COLUMNS, "editor.menu.show_all_panels"))) panels_ = {};
+}
+
+void EditorApp::draw_physics_debug_menu() {
+  ImGui::Separator();
+  ImGui::MenuItem(tr("editor.menu.physics_colliders"), nullptr, &physics_debug_, session_->runtime() != nullptr);
+  if (!physics_debug_) return;
+  ImGui::TextDisabled("%s", tr("editor.scene.physics_legend"));
+  if (physics_debug_truncated_) ImGui::TextColored(ui::warning_color(), "%s", tr("editor.scene.physics_limit"));
 }
 
 void EditorApp::draw_graphics_card_menu() {

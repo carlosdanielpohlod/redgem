@@ -303,6 +303,7 @@ redgem_add_library(redgem_runtime
   physics/jolt/jolt_physics_world_joints.cpp
   physics/jolt/jolt_joints.cpp
   physics/jolt/jolt_physics_world_queries.cpp
+  physics/jolt/jolt_physics_world_debug.cpp
   audio/audio.cpp
   input/keys.cpp
   input/devices.cpp
@@ -539,6 +540,8 @@ if(NOT ANDROID)
     editor/gizmo.cpp
     editor/scene_viewport.cpp
     editor/scene_overlays.cpp
+    editor/scene_overlays_physics.cpp
+    editor/editor_physics_debug.cpp
     editor/editor_app.cpp
     editor/editor_frame.cpp
     editor/editor_commands.cpp
