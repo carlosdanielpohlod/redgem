@@ -170,6 +170,8 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
 
   // Rigid bodies.
   void create_body(const BodyDesc& desc, const ShapeInfo& info, Record& record);
+  // The world holds config::kMaxBodies bodies already: the object is left without one, said once.
+  void tell_bodies_full();
   void release_body(Record& record);
   void teleport_body(Record& record, const Transform& world);
 
@@ -234,6 +236,7 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   std::map<JointId, JointRecord> joints_;  // ordered: deterministic breaking
   std::set<JointId> broken_joints_;        // a few bytes a broken joint, for as long as the scene runs
   JointId next_joint_ = kNoJoint + 1;
+  bool told_bodies_full_ = false;  // the error that the world holds all the bodies it can was logged
 };
 
 }  // namespace redgem::jolt
