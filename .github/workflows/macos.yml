@@ -29,7 +29,7 @@ jobs:
   editor:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 100
+    timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:
@@ -92,7 +92,8 @@ jobs:
       # Software rendering varies by runner: a successful Intel run has taken 45 minutes.
       - name: Editor system test (opens the editor window)
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        timeout-minutes: 60
+        # The Macs draw it without a graphics card: on the Intel one it takes nearly an hour.
+        timeout-minutes: 90
         run: ctest --test-dir build -R '^system\.editor\.window$' --output-on-failure
 
       - name: Open the editor on a demo and take a picture of the screen
