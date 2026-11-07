@@ -1,9 +1,9 @@
 #include "storage/durable_file.hpp"
 
 #include <cerrno>
-#include <system_error>
 
 #include "core/log.hpp"
+#include "storage/staged_write.hpp"
 
 #ifdef _WIN32
 #include <io.h>
@@ -16,7 +16,6 @@ namespace redgem::durable {
 namespace {
 
 constexpr const char* kPartialSuffix = ".part";  // of a file still being written
-constexpr const char* kThisFolder = ".";         // where a file named with no folder is
 
 #ifdef _WIN32
 // Bytes as they are: a save written on Windows reads the same everywhere.
@@ -55,24 +54,9 @@ int sync_to_disk(std::FILE* file) {
 #endif
 }
 
-// Writes all of `text` and flushes it.
-bool write_and_flush(std::FILE* out, const std::string& text, const Flush& flush) {
-  if (std::fwrite(text.data(), 1, text.size(), out) != text.size()) return false;
-  return flush(out);
-}
-
-std::filesystem::path folder_of(const std::filesystem::path& file) {
-  return file.has_parent_path() ? file.parent_path() : std::filesystem::path(kThisFolder);
-}
-
-// Writes `partial` flushed, then moves it over `file`.
-bool write_and_move(const std::filesystem::path& partial, const std::filesystem::path& file, const std::string& text,
-                    const Flush& flush) {
-  if (!write_flushed(partial, text, flush)) return false;
-  std::error_code fs_error;
-  std::filesystem::rename(partial, file, fs_error);
-  return !fs_error;
-}
+// Pushes what was written out of the program's buffers to the system only: a write that may be lost
+// to a power cut, though never left half done.
+bool flush_to_system(std::FILE* file) { return std::fflush(file) == 0; }
 
 }  // namespace
 
@@ -84,10 +68,7 @@ bool flush_to_disk(std::FILE* file) {
 bool write_flushed(const std::filesystem::path& file, const std::string& text, const Flush& flush) {
   std::FILE* out = open_for_writing(file);
   if (out == nullptr) return false;
-  const bool flushed = write_and_flush(out, text, flush);
-  // A full disk can show only here: the file being replaced must not be lost to half a one.
-  if (std::fclose(out) != 0) return false;
-  return flushed;
+  return staging::write_and_close(out, text, flush);
 }
 
 bool sync_folder(const std::filesystem::path& folder) {
@@ -103,16 +84,23 @@ bool sync_folder(const std::filesystem::path& folder) {
 #endif
 }
 
-bool replace_file(const std::filesystem::path& file, const std::string& text, const Flush& flush) {
-  const std::filesystem::path partial = file.string() + kPartialSuffix;
-  if (!write_and_move(partial, file, text, flush)) {
-    std::error_code fs_error;
-    std::filesystem::remove(partial, fs_error);
-    return false;
-  }
+bool replace_file(const std::filesystem::path& file, std::string_view text, const Flush& flush) {
+  return replace_file_via(file, kPartialSuffix, text, flush);
+}
+
+bool replace_file_via(const std::filesystem::path& file, const char* partial_suffix, std::string_view text,
+                      const Flush& flush) {
+  if (!staging::write_staged(file, partial_suffix, text, flush).empty()) return false;
   // (The file is replaced either way: only a power cut in the next moments could undo it.)
-  if (!sync_folder(folder_of(file))) log::warning("the folder of " + file.string() + " could not be flushed to disk");
+  const std::filesystem::path folder = staging::folder_of(file);
+  if (!sync_folder(folder)) log::warning("the folder of " + file.string() + " could not be flushed to disk");
   return true;
+}
+
+bool replace_file_quickly(const std::filesystem::path& file, const char* partial_suffix, std::string_view text,
+                          std::string& error) {
+  error = staging::write_staged(file, partial_suffix, text, flush_to_system);
+  return error.empty();
 }
 
 }  // namespace redgem::durable

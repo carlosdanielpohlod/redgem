@@ -315,6 +315,9 @@ redgem_add_library(redgem_runtime
   input/touch_input_source.cpp
   storage/saved_values.cpp
   storage/durable_file.cpp
+  storage/staged_write.cpp
+  storage/staged_write_posix.cpp
+  storage/staged_write_windows.cpp
   storage/save_file.cpp
   storage/save_slots.cpp
   storage/save_file_slots.cpp
