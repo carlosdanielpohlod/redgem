@@ -82,7 +82,8 @@ void ScriptHost::refresh_reloaded(RClass* klass) {
   for (auto& slot : behaviours_) {
     auto* actual = mrb_obj_class(vm_.state(), slot.instance);
     slot.fixed_updates = overrides(actual, "fixed_update");
-    if (inherits_class(actual, klass) && !slot.start_failed) slot.enabled = true;
+    const bool resumes_here = actual == klass && !slot.start_failed;
+    if (resumes_here) slot.enabled = true;
   }
 }
 bool ScriptHost::reload_script(const std::string& script, bool retry) {

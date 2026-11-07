@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <utility>
 #include "script/ruby_reload.hpp"
+#include "script/ruby_classes.hpp"
 #include "script/script_reload.hpp"
 
 namespace redgem {
@@ -17,16 +18,7 @@ constexpr const char* kPreludeOwner = "engine prelude";
 std::string source_key(const std::string& file) {
   return std::filesystem::u8path(file).lexically_normal().generic_u8string();
 }
-RClass* bound_class(mrb_state* mrb, mrb_sym name) {
-  const auto root = mrb_obj_value(mrb->object_class);
-  if (!mrb_const_defined_at(mrb, root, name)) return nullptr;
-  const auto value = mrb_const_get(mrb, root, name);
-  return mrb_class_p(value) ? mrb_class_ptr(value) : nullptr;
-}
-bool constant_name(mrb_state* mrb, mrb_sym name) {
-  const char first = mrb_sym_name(mrb, name)[0];
-  return first >= 'A' && first <= 'Z';
-}
+using ruby_classes::constant_name;
 int keep_method(mrb_state*, mrb_sym name, mrb_method_t method, void* data) {
   static_cast<Methods*>(data)->emplace(name, method);
   return 0;
@@ -61,20 +53,20 @@ int compare_constant(mrb_state* mrb, mrb_sym name, mrb_value value, void* data) 
   comparison.same = found != comparison.expected.end() && mrb_obj_eq(mrb, value, found->second);
   return comparison.same ? 0 : 1;
 }
+bool has_method_proc(const mrb_method_t& method) { return !MRB_METHOD_FUNC_P(method) && method.as.proc; }
 mrb_value root_tables(mrb_state* mrb, RClass* klass, const Methods& methods, const Constants& constants) {
   const int arena = mrb_gc_arena_save(mrb);
   const auto roots = mrb_ary_new_capa(mrb, static_cast<mrb_int>(methods.size() + constants.size() + kClassRootSlots));
   mrb_ary_push(mrb, roots, mrb_obj_value(klass));
   for (const auto& [name, method] : methods)
-    if (!MRB_METHOD_FUNC_P(method) && method.as.proc)
-      mrb_ary_push(mrb, roots, mrb_obj_value(const_cast<RProc*>(method.as.proc)));
+    if (has_method_proc(method)) mrb_ary_push(mrb, roots, mrb_obj_value(const_cast<RProc*>(method.as.proc)));
   for (const auto& [name, value] : constants) mrb_ary_push(mrb, roots, value);
   mrb_gc_register(mrb, roots);
   mrb_gc_arena_restore(mrb, arena);
   return roots;
 }
 }  // namespace
-ReloadOwnership::ReloadOwnership(mrb_state* mrb) : mrb_(mrb) { observe(kPreludeOwner); }
+void ReloadOwnership::initialize() { observe(kPreludeOwner); }
 ReloadOwnership::~ReloadOwnership() {
   for (const auto& [klass, owner] : owners_) mrb_gc_unregister(mrb_, owner.roots);
 }
@@ -92,20 +84,31 @@ void ReloadOwnership::capture(RClass* klass, Owner& owner) {
 bool ReloadOwnership::same_tables(RClass* klass, const Owner& owner) const {
   Comparison<Methods> methods{owner.methods};
   mrb_mt_foreach(mrb_, klass, compare_method, &methods);
-  if (!methods.same || methods.seen != owner.methods.size()) return false;
+  const bool matching_methods = methods.same && methods.seen == owner.methods.size();
+  if (!matching_methods) return false;
   Comparison<Constants> constants{owner.constants};
   mrb_iv_foreach(mrb_, mrb_obj_value(klass), compare_constant, &constants);
   return constants.same && constants.seen == owner.constants.size();
 }
 void ReloadOwnership::forget_unbound() {
   for (auto next = owners_.begin(); next != owners_.end();) {
-    if (bound_class(mrb_, next->second.name) == next->first) {
+    auto& name = next->second.name;
+    name = ruby_classes::root_binding(mrb_, next->first, name);
+    if (name != 0) {
       ++next;
     } else {
       mrb_gc_unregister(mrb_, next->second.roots);
       next = owners_.erase(next);
     }
   }
+}
+void ReloadOwnership::observe_change(RClass* klass, Owner& owner, const std::string& file) {
+  if (!owner.changed_by.empty()) return;
+  if (same_tables(klass, owner)) return;
+  if (owner.file == file)
+    capture(klass, owner);
+  else
+    owner.changed_by = file;
 }
 void ReloadOwnership::consider(mrb_sym name, RClass* klass, const std::string& file) {
   auto [found, inserted] = owners_.try_emplace(klass);
@@ -114,8 +117,8 @@ void ReloadOwnership::consider(mrb_sym name, RClass* klass, const std::string& f
     owner.name = name;
     owner.file = file;
     capture(klass, owner);
-  } else if (owner.changed_by.empty() && !same_tables(klass, owner)) {
-    owner.changed_by = file;
+  } else {
+    observe_change(klass, owner, file);
   }
 }
 int ReloadOwnership::visit(mrb_state*, mrb_sym name, mrb_value value, void* data) {
@@ -123,42 +126,48 @@ int ReloadOwnership::visit(mrb_state*, mrb_sym name, mrb_value value, void* data
   if (!class_value) return 0;
   auto& observation = *static_cast<Observation*>(data);
   auto* klass = mrb_class_ptr(value);
-  if (klass != observation.base && inherits_class(klass, observation.base))
-    observation.ownership.consider(name, klass, observation.file);
+  const bool behaviour = klass != observation.base && inherits_class(klass, observation.base);
+  if (behaviour) observation.ownership.consider(name, klass, observation.file);
   return 0;
 }
-void ReloadOwnership::settle_failed_eval() {
+void ReloadOwnership::observe_failure() {
   if (failed_file_.empty()) return;
   observe("failed evaluation of " + std::exchange(failed_file_, {}));
 }
 void ReloadOwnership::before_eval() {
   forget_unbound();
-  settle_failed_eval();
   observe("runtime callbacks");
 }
 void ReloadOwnership::observe(const std::string& file) {
-  auto* base = bound_class(mrb_, mrb_intern_cstr(mrb_, kBehaviourClass));
+  if (!reliable_) return;
+  auto* base = ruby_classes::root_class(mrb_, kBehaviourClass);
   if (!base) return;
   Observation observation{*this, base, file};
   mrb_iv_foreach(mrb_, mrb_obj_value(mrb_->object_class), visit, &observation);
 }
 void ReloadOwnership::begin_eval(const std::string& file) {
-  if (depth_ == 0) {
-    before_eval();
-    active_file_ = source_key(file);
+  try {
+    begin_source(file);
+  } catch (...) {
+    reliable_ = false;
+    throw;
   }
-  ++depth_;
 }
-void ReloadOwnership::complete_eval() {
-  if (depth_ == 1) observe(active_file_);
+void ReloadOwnership::begin_source(const std::string& file) {
+  if (files_.empty())
+    before_eval();
+  else
+    observe(files_.back());  // attribute pending enclosing declarations before a lazy load
+  files_.push_back(source_key(file));
 }
+void ReloadOwnership::complete_eval() { observe(files_.back()); }
 void ReloadOwnership::end_eval(bool completed) {
-  --depth_;
-  if (depth_ == 0 && !completed) failed_file_ = std::move(active_file_);
+  if (!completed) failed_file_ = std::move(files_.back());
+  files_.pop_back();
 }
 void ReloadOwnership::require_owner(RClass* klass, const std::string& file) {
+  if (!reliable_) throw std::runtime_error("restart Play: source ownership tracking failed");
   forget_unbound();
-  settle_failed_eval();
   const auto found = owners_.find(klass);
   if (found == owners_.end()) throw std::runtime_error("restart Play: class has no recorded source owner");
   const auto& owner = found->second;

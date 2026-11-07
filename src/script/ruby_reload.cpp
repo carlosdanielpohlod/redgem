@@ -1,5 +1,6 @@
 #include "script/ruby_vm.hpp"
 #include "script/ruby_context.hpp"
+#include "script/ruby_classes.hpp"
 #include "script/reload_ownership.hpp"
 #include <mruby/class.h>
 #include <mruby/compile.h>
@@ -25,8 +26,7 @@ void changed(mrb_state* mrb, RClass* klass) {
   mrb_mc_clear_by_class(mrb, klass);
 }
 int remove_constant(mrb_state* mrb, mrb_sym name, mrb_value, void* target) {
-  const char first = mrb_sym_name(mrb, name)[0];
-  if (first >= 'A' && first <= 'Z') mrb_const_remove(mrb, mrb_obj_value(static_cast<RClass*>(target)), name);
+  if (ruby_classes::constant_name(mrb, name)) mrb_const_remove(mrb, mrb_obj_value(static_cast<RClass*>(target)), name);
   return 0;
 }
 int any_method(mrb_state*, mrb_sym, mrb_method_t, void* found) {
@@ -36,7 +36,8 @@ int any_method(mrb_state*, mrb_sym, mrb_method_t, void* found) {
 bool plain_meta(mrb_state* mrb, RClass* klass) {
   if (klass->c == mrb->class_class) return true;
   if (klass->c->tt != MRB_TT_SCLASS) return false;
-  if (klass->c->super && klass->c->super->tt == MRB_TT_ICLASS) return false;
+  const bool included_parent = klass->c->super && klass->c->super->tt == MRB_TT_ICLASS;
+  if (included_parent) return false;
   bool methods = false;
   mrb_mt_foreach(mrb, klass->c, any_method, &methods);
   return !methods;
@@ -83,11 +84,7 @@ mrb_value evaluate(mrb_state* mrb, const ReloadRequest& request) {
   return result;
 }
 bool names_class(mrb_state* mrb, RClass* klass, const std::string& name) {
-  const auto id = mrb_intern_cstr(mrb, name.c_str());
-  const auto root = mrb_obj_value(mrb->object_class);
-  if (!mrb_const_defined_at(mrb, root, id)) return false;
-  const auto value = mrb_const_get(mrb, root, id);
-  return mrb_class_p(value) && mrb_class_ptr(value) == klass;
+  return ruby_classes::root_class(mrb, name.c_str()) == klass;
 }
 bool class_names_bound(mrb_state* mrb, const ReloadRequest& request, const std::string& name, const std::string& base) {
   return names_class(mrb, request.klass, name) && names_class(mrb, request.klass->super, base);

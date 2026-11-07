@@ -30,7 +30,7 @@ struct CallRequest {
   mrb_int argc = 0;
 };
 
-// Nested lazy loads are one declaration transaction owned by the outermost source.
+// Nested lazy loads checkpoint their enclosing source before tracking their own declarations.
 class ReloadEvaluation {
  public:
   ReloadEvaluation(ReloadOwnership* owner, const std::string& file) : owner_(owner) {
@@ -70,6 +70,23 @@ mrb_value run_eval(mrb_state* mrb, void* data) {
     return evaluate_source(mrb, data);
   } catch (const std::exception& problem) {
     mrb_raise(mrb, E_RUNTIME_ERROR, problem.what());
+  }
+  return mrb_nil_value();
+}
+
+struct ObservationRequest {
+  ReloadOwnership* ownership = nullptr;
+  bool initial = false;
+};
+mrb_value run_observation(mrb_state* mrb, void* data) {
+  auto& request = *static_cast<ObservationRequest*>(data);
+  try {
+    if (request.initial)
+      request.ownership->initialize();
+    else
+      request.ownership->observe_failure();
+  } catch (const std::exception& error) {
+    mrb_raise(mrb, E_RUNTIME_ERROR, error.what());
   }
   return mrb_nil_value();
 }
@@ -181,14 +198,30 @@ RubyResult RubyVm::run_protected(mrb_protect_error_func* body, void* request) {
     const BudgetedCall budgeted(budget_);
     result.value = mrb_protect_error(mrb_, body, request, &failed);
   }
-  if (!failed) return result;
-  result.ok = false;
-  result.error = describe_exception(result.value);
-  result.value = mrb_nil_value();
+  if (failed) return failed_result(result.value, body == run_eval);
   return result;
 }
+RubyResult RubyVm::failed_result(mrb_value exception, bool evaluated_source) {
+  // Quarantine failed declarations before even exception.inspect can run game callbacks.
+  if (evaluated_source) finish_reload_failure();
+  return {false, mrb_nil_value(), describe_exception(exception)};
+}
 
-void RubyVm::enable_reload_tracking() { reload_ownership_ = std::make_unique<ReloadOwnership>(mrb_); }
+RubyResult RubyVm::enable_reload_tracking() {
+  reload_ownership_ = std::make_unique<ReloadOwnership>(mrb_);
+  ObservationRequest request{reload_ownership_.get(), true};
+  auto result = run_protected(run_observation, &request);
+  if (!result.ok) reload_ownership_.reset();
+  return result;
+}
+void RubyVm::finish_reload_failure() {
+  if (!reload_ownership_) return;
+  ObservationRequest request{reload_ownership_.get(), false};
+  mrb_bool failed = false;
+  const BudgetedCall budgeted(budget_);
+  mrb_protect_error(mrb_, run_observation, &request, &failed);
+  if (failed) reload_ownership_->invalidate();
+}
 
 RubyVm::~RubyVm() {
   budget_.set_limit(std::chrono::milliseconds(0));  // the watchdog lets go of the interpreter first
