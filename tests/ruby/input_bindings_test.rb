@@ -29,6 +29,23 @@ class InputBindingsTest < RedGemTest::Case
     assert_equal ["key:space", "pad:a"], Input.bindings(:jump)
   end
 
+  def test_the_mouse_is_bound_by_its_buttons_and_its_wheel_after_the_keys
+    Input.define_action(:shoot, :f, "pad:right_bumper", mouse: %i[left wheel_up])
+    assert_equal ["key:f", "mouse:left", "mouse:wheel_up", "pad:right_bumper"], Input.bindings(:shoot)
+    Input.bind(:jump, mouse: :side)
+    Input.bind(:jump, "mouse:right")
+    assert_equal ["key:space", "mouse:side", "mouse:right", "pad:a"], Input.bindings(:jump)
+    Input.unbind(:jump, mouse: %i[side right])
+    assert_equal ["key:space", "pad:a"], Input.bindings(:jump)
+    assert_raises(ArgumentError) { Input.bind(:jump, mouse: :thumb) }
+  end
+
+  def test_the_full_keyboard_binds_by_name
+    Input.define_action(:quick_save, :f5, :kp_enter, :page_up, :left_bracket, :right_alt, :caps_lock)
+    expected = %w[key:f5 key:kp_enter key:page_up key:left_bracket key:right_alt key:caps_lock]
+    assert_equal expected, Input.bindings(:quick_save)
+  end
+
   def test_an_axis_is_bound_side_by_side
     Input.unbind(:vertical, side: :positive)
     Input.bind(:vertical, key: :i, side: :positive)

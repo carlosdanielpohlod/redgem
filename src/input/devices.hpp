@@ -9,11 +9,20 @@
 // call them, and what each holds at one instant.
 namespace redgem {
 
-enum class MouseButton { Left, Right, Middle };
-inline constexpr std::size_t kMouseButtonCount = 3;
+// A mouse's buttons: the three everyone has, and the two side buttons many have (under the thumb).
+enum class MouseButton { Left, Right, Middle, Side, Extra };
+inline constexpr std::size_t kMouseButtonCount = 5;
 
 // "left" -> MouseButton::Left; nullopt for an unknown name.
 std::optional<MouseButton> mouse_button_from_name(const std::string& name);
+
+// What of a mouse an action may be bound to: its buttons (in MouseButton's order), and its wheel
+// turned up or down, which is a press on every frame it turns that way.
+enum class MouseInput { Left, Right, Middle, Side, Extra, WheelUp, WheelDown };
+
+// "wheel_up" -> MouseInput::WheelUp; nullopt for an unknown name. And back.
+std::optional<MouseInput> mouse_input_from_name(const std::string& name);
+std::string mouse_input_name(MouseInput input);
 
 // The mouse at one instant: where it is (pixels from the top-left of what the game is drawn in),
 // how far the wheel turned since the last frame, which buttons are held.

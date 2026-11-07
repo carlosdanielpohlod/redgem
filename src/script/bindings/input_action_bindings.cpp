@@ -20,7 +20,8 @@ namespace {
 using namespace binding;
 
 constexpr const char* kUnknownName = "unknown action or axis :%s";
-constexpr const char* kUnknownBinding = "unknown binding \"%s\" (bindings read like \"key:space\" or \"pad:a\")";
+constexpr const char* kUnknownBinding =
+    "unknown binding \"%s\" (bindings read like \"key:space\", \"mouse:left\" or \"pad:a\")";
 constexpr const char* kSideNeeded = "an axis is bound with side: :negative or :positive, and an action without one";
 constexpr const char* kNegativeSide = "negative";
 constexpr const char* kPositiveSide = "positive";
@@ -181,11 +182,13 @@ mrb_value input_reset_bindings(mrb_state* mrb, mrb_value) {
 
 // --- Capturing the next key or button ----------------------------------------------------------
 
-// Input.__capture(cancels): the bindings that call the capture off, as text.
+// Input.__capture(cancels, mouse): the bindings that call the capture off, as text, and whether
+// the mouse's buttons and wheel are caught too.
 mrb_value input_capture(mrb_state* mrb, mrb_value) {
   mrb_value cancels;
-  mrb_get_args(mrb, "A", &cancels);
-  input(mrb).capture_next(bindings_from(mrb, cancels).all());
+  mrb_bool mouse = true;
+  mrb_get_args(mrb, "Ab", &cancels, &mouse);
+  input(mrb).capture_next(bindings_from(mrb, cancels).all(), mouse ? MouseCapture::Caught : MouseCapture::Ignored);
   return mrb_nil_value();
 }
 
@@ -211,7 +214,7 @@ void install_rebinding(RClass* input_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, input_module, "__unbind", input_unbind, MRB_ARGS_REQ(4));
   mrb_define_module_function(mrb, input_module, "__bindings", input_bindings, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, input_module, "__reset_bindings", input_reset_bindings, MRB_ARGS_REQ(2));
-  mrb_define_module_function(mrb, input_module, "__capture", input_capture, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, input_module, "__capture", input_capture, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, input_module, "__cancel_capture", input_cancel_capture, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, input_module, "capturing?", input_capturing, MRB_ARGS_NONE());
 }
