@@ -5,11 +5,30 @@
 namespace redgem {
 namespace {
 
-// What starts the text of each kind of binding: "key:space", "pad:a".
+// What starts the text of each kind of binding: "key:space", "mouse:left", "pad:a".
 constexpr const char* kKeyPrefix = "key:";
+constexpr const char* kMousePrefix = "mouse:";
 constexpr const char* kPadPrefix = "pad:";
 
 bool starts_with(const std::string& text, const std::string& prefix) { return text.rfind(prefix, 0) == 0; }
+
+// The binding a text names, when it starts with `prefix` and the rest is a name `from_name` knows.
+template <typename FromName>
+std::optional<InputBinding> named_after(const std::string& text, const std::string& prefix, FromName from_name) {
+  if (!starts_with(text, prefix)) return std::nullopt;
+  const auto value = from_name(text.substr(prefix.size()));
+  if (!value) return std::nullopt;
+  return InputBinding(*value);
+}
+
+std::string text_of(Key key) { return kKeyPrefix + key_name(key); }
+std::string text_of(MouseInput input) { return kMousePrefix + mouse_input_name(input); }
+std::string text_of(GamepadButton button) { return kPadPrefix + gamepad_button_name(button); }
+
+// The list of an action's bindings that a binding of each kind goes in.
+std::vector<Key>& list_for(ActionBinding& binding, Key) { return binding.keys; }
+std::vector<MouseInput>& list_for(ActionBinding& binding, MouseInput) { return binding.mouse; }
+std::vector<GamepadButton>& list_for(ActionBinding& binding, GamepadButton) { return binding.buttons; }
 
 template <typename Value>
 void add_once(std::vector<Value>& values, Value value) {
@@ -21,39 +40,31 @@ void remove_all(std::vector<Value>& values, Value value) {
   values.erase(std::remove(values.begin(), values.end(), value), values.end());
 }
 
-ActionBinding buttons_only(const ActionBinding& binding) { return {{}, binding.buttons}; }
+ActionBinding buttons_only(const ActionBinding& binding) { return {{}, binding.buttons, {}}; }
 
 }  // namespace
 
 std::optional<InputBinding> binding_from_text(const std::string& text) {
-  const std::string key_prefix = kKeyPrefix;
-  const std::string pad_prefix = kPadPrefix;
-  if (starts_with(text, key_prefix)) {
-    if (const auto key = key_from_name(text.substr(key_prefix.size()))) return InputBinding(*key);
-  }
-  if (starts_with(text, pad_prefix)) {
-    if (const auto button = gamepad_button_from_name(text.substr(pad_prefix.size()))) return InputBinding(*button);
-  }
-  return std::nullopt;
+  if (auto key = named_after(text, kKeyPrefix, key_from_name)) return key;
+  if (auto mouse = named_after(text, kMousePrefix, mouse_input_from_name)) return mouse;
+  return named_after(text, kPadPrefix, gamepad_button_from_name);
 }
 
 std::string binding_text(const InputBinding& binding) {
-  if (const Key* key = std::get_if<Key>(&binding)) return kKeyPrefix + key_name(*key);
-  return kPadPrefix + gamepad_button_name(std::get<GamepadButton>(binding));
+  return std::visit([](auto one) { return text_of(one); }, binding);
 }
 
 void ActionBinding::add(const InputBinding& binding) {
-  if (const Key* key = std::get_if<Key>(&binding)) return add_once(keys, *key);
-  add_once(buttons, std::get<GamepadButton>(binding));
+  std::visit([this](auto one) { add_once(list_for(*this, one), one); }, binding);
 }
 
 void ActionBinding::remove(const InputBinding& binding) {
-  if (const Key* key = std::get_if<Key>(&binding)) return remove_all(keys, *key);
-  remove_all(buttons, std::get<GamepadButton>(binding));
+  std::visit([this](auto one) { remove_all(list_for(*this, one), one); }, binding);
 }
 
 std::vector<InputBinding> ActionBinding::all() const {
   std::vector<InputBinding> out(keys.begin(), keys.end());
+  out.insert(out.end(), mouse.begin(), mouse.end());
   out.insert(out.end(), buttons.begin(), buttons.end());
   return out;
 }

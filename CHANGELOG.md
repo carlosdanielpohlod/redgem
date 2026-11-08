@@ -10,6 +10,18 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **The whole keyboard**: F1-F12, Insert, Delete, Home, End, Page Up and Page Down, the keypad
+  (`:kp_0` to `:kp_9`, `:kp_enter`, `:kp_add`...), Caps, Scroll and Num Lock, Print Screen, Pause,
+  Menu, Right Alt, the Super keys, and `;` `=` `[` `]` `\` and the grave key, for games and for
+  players rebinding, each with a label on the controls page.
+
+- **Mouse bindings**: `mouse:left`, `mouse:right`, `mouse:middle`, the side buttons (`mouse:side`,
+  `mouse:extra`) and the wheel (`mouse:wheel_up`, `mouse:wheel_down`, a press on each frame it
+  turns) trigger actions and axes from `game.json`, `Input.define_action(..., mouse: [...])` and
+  `Input.bind(..., mouse: ...)`. `Input.capture_next` and the controls page catch them too; the
+  click that starts a capture is never taken for the binding, and the click caught clicks nothing
+  else. `mouse: false` leaves the mouse out of a capture.
+
 - **Prefab creation**: save a selected hierarchy as a reusable GLB from the Project panel,
   preserving complete skeletons and nested references while validating dependencies before publication.
 
@@ -22,6 +34,36 @@ until 1.0, a release may change what games rely on (see
 - **Release downloads from CI**: a `release-*` pull request, a pushed `v*` tag or a manual run
   builds all four downloads on pinned toolchains and checks each one (contents, and its programs
   run on its own system). A tag's run attaches them to the tag's draft release, all four or none.
+
+### Fixed
+
+- **A very long script name no longer crashes `redgem run`, `shot` and the MCP server**: the
+  error hints read at most the first 512 bytes of a message, so the standard library's matcher
+  no longer runs out of stack on a 100 000-character name. A line number too big for a file no
+  longer throws.
+- **`Game.load_scene` with a name too long for the system** raises `no scene named ...` instead
+  of throwing a C++ exception through the interpreter and ending the game (or the editor's Play).
+- **Past 4096 physics bodies** an object gets no body, as before, but the engine now logs one
+  error naming the limit instead of saying nothing. The limit is listed in KNOWN_LIMITATIONS.md.
+- **A game that spawned tens of thousands of objects with bodies no longer hangs on close**: the
+  script budget did stop the spawning loop, but taking the physics world apart looked at every
+  object for each object destroyed. Destroying an object now only looks at the triggers.
+- **`redgem scene set` and MCP `scene_edit` refuse placements a scene cannot hold**: a position,
+  rotation or scale past ±1 000 000 (the same reach as `game_query` points) is refused with the
+  range. Before, `1e40` was saved as `null`, which is not valid glTF, and the object moved to the
+  origin. A scale below 0.001 (the Inspector's smallest), zero or negative is refused too.
+- **Usage errors exit with 2 everywhere**: `redgem mcp` with no game, a folder that is not there
+  or an unknown `--allow` tool exited 1. `redgem <word>` naming no folder (a mistyped command)
+  now says so, with the usage, instead of failing to parse `<word>/scene.glb`.
+- **The editor bridge names a pending external change**: once the scene changed on disk while
+  the editor had unsaved edits, every MCP action said "editor is busy". It now says the scene
+  changed on disk and has to be resolved in the editor.
+- **Saves no longer write through a planted link**: a game folder carrying a symbolic link named
+  like a file being written (`scene.glb.tmp`, `*.redgem-writing`, `*.part`) made the editor's Save,
+  `redgem scene set|add|remove`, MCP `scene_edit` and the agent's file writes overwrite the file
+  the link pointed to, anywhere on the disk. Every write-then-rename now makes its temporary file
+  new (`O_CREAT|O_EXCL|O_NOFOLLOW`; `CREATE_NEW` on Windows) and removes a link in its way instead
+  of following it.
 
 ## [0.5.0] - 2026-10-31
 

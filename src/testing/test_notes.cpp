@@ -11,6 +11,7 @@
 #include <sstream>
 #include <string>
 
+#include "storage/durable_file.hpp"
 #include "testing/test_input_bindings.hpp"
 
 namespace redgem::testing {
@@ -39,17 +40,23 @@ std::filesystem::path note_file(mrb_state* mrb, const char* name) {
   return notes_folder() / note;
 }
 
+// Writes a note whole under another name first: whoever reads a note never finds half of one. That
+// file is made new and the folder must be no link (it is among the temporary files every user
+// shares): a link left there is never written through.
+void write_note(mrb_state* mrb, const std::filesystem::path& file, const char* text) {
+  std::error_code ignored;
+  std::filesystem::create_directories(file.parent_path(), ignored);
+  if (std::filesystem::is_symlink(file.parent_path(), ignored))
+    mrb_raise(mrb, E_RUNTIME_ERROR, "the notes folder is a symbolic link: no note is written through it");
+  std::string unwritten;  // (best effort, as before: a note that could not be left is not there)
+  durable::replace_file_quickly(file, kUnfinishedMark, text, unwritten);
+}
+
 mrb_value leave_note(mrb_state* mrb, mrb_value) {
   const char* name = nullptr;
   const char* text = nullptr;
   mrb_get_args(mrb, "zz", &name, &text);
-  const std::filesystem::path file = note_file(mrb, name);
-  std::error_code ignored;
-  std::filesystem::create_directories(file.parent_path(), ignored);
-  // Written whole under another name first: whoever reads a note never finds half of one.
-  const std::filesystem::path unfinished = file.string() + kUnfinishedMark;
-  std::ofstream(unfinished, std::ios::binary) << text;
-  std::filesystem::rename(unfinished, file, ignored);
+  write_note(mrb, note_file(mrb, name), text);
   return mrb_nil_value();
 }
 

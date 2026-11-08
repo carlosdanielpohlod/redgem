@@ -150,8 +150,9 @@ int run_command_line(const std::vector<std::string>& args) {
     return tools::run_mcp_command(std::vector<std::string>(args.begin() + 1, args.end()));
   if (const auto tool = tools::run_tool_command(args)) return said(*tool);
   const CliResult cli = parse_cli(args);
-  if (!cli.ok) {
-    std::cerr << cli.error << "\n\n" << usage();
+  const std::string problem = cli.ok ? missing_game_folder(cli.options) : cli.error;
+  if (!problem.empty()) {
+    std::cerr << problem << "\n\n" << usage();
     return kExitUsage;
   }
   return run_mode(cli.options);

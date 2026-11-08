@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "core/config.hpp"
+#include "core/short_text.hpp"
 #include "core/translations.hpp"
 #include "project/api_reference.hpp"
 #include "project/closest_words.hpp"
@@ -25,7 +26,8 @@ constexpr std::size_t kMostSuggestions = 3;
 // Of a call on an instance mruby names the class ("for Transform"); of one on a class or a module
 // itself, only that it is one ("for Module", "for Class"): the place's line of code says which.
 const char* const kUnknownMethod = R"(undefined method '([^']+)' for ([A-Z][A-Za-z0-9_:]*))";
-const char* const kPlace = R"(^([^ :]+\.rb):([0-9]+):)";
+const char* const kPlaceFile = R"(^([^ :]+\.rb):)";
+const char* const kPlaceLineEnd = ":";
 const char* const kClassName = R"(([A-Z][A-Za-z0-9_]*(?:::[A-Z][A-Za-z0-9_]*)*)\.)";
 const char* const kModuleReceiver = "Module";
 const char* const kClassReceiver = "Class";
@@ -36,6 +38,19 @@ const char* const kUnreadableScript = R"(loading scripts/([^ :]+\.rb): cannot re
 const char* const kPrintingMethods[] = {"puts", "print", "p", "pp", "printf"};
 constexpr std::size_t kFirst = 1;
 constexpr std::size_t kSecond = 2;
+// How much of a message, and of a line of code, the expressions below read. The standard library's
+// matcher takes stack for every character a group matches, so a name of 100 000 characters (a
+// scene's script property can hold one) ran out of it and crashed the tool; no file, class or
+// method of a game is named with anywhere near this many.
+constexpr std::size_t kMostHintedBytes = 512;
+// The most digits of a line number a hint reads: past them it is no line of any file (and would
+// not fit the number it is read into).
+constexpr std::size_t kMostLineDigits = 9;
+
+// Where a message says it comes from: "scripts/player.rb:12:".
+std::string place_pattern() {
+  return std::string(kPlaceFile) + "([0-9]{1," + std::to_string(kMostLineDigits) + "})" + kPlaceLineEnd;
+}
 
 using Groups = std::smatch;
 using Hinter = std::string (*)(const Groups&, const fs::path&);
@@ -73,13 +88,16 @@ std::string methods_hint(const ApiClass& owner, const std::string& method, bool 
   return tr("project.hint.method", {{"names", joined(near)}, {"class", owner.name}});
 }
 
-// Line `number` of a file; empty when there is none.
+// The start of a text the expressions may read whole (see kMostHintedBytes).
+std::string hinted_part(const std::string& text) { return std::string(utf8_prefix(text, kMostHintedBytes)); }
+
+// Line `number` of a file, as much of it as a hint reads; empty when there is none.
 std::string line_of(const fs::path& file, std::size_t number) {
   std::ifstream in(file);
   std::string line;
   std::size_t read = 0;
   while (read < number && std::getline(in, line)) ++read;
-  return read == number ? line : std::string();
+  return read == number ? hinted_part(line) : std::string();
 }
 
 // The text of a regular expression that finds `text` as it is.
@@ -95,7 +113,7 @@ std::string escaped(const std::string& text) {
 // The class a failed call was made on, read from the line of code the message points at
 // ("Input.presed?(:space)" -> "Input"); empty when the line does not say.
 std::string receiver_in_code(const std::string& message, const std::string& method, const fs::path& game_dir) {
-  static const std::regex place(kPlace);
+  static const std::regex place(place_pattern());
   Groups found;
   if (!std::regex_search(message, found, place)) return {};
   const std::string code = line_of(game_dir / found[kFirst].str(), std::stoul(found[kSecond].str()));
@@ -191,9 +209,10 @@ const std::vector<Pattern>& patterns() {
 }  // namespace
 
 std::string hint_for(const std::string& message, const fs::path& game_dir) {
+  const std::string hinted = hinted_part(message);  // (the groups below point into it)
   for (const Pattern& pattern : patterns()) {
     Groups groups;
-    if (std::regex_search(message, groups, pattern.expression)) return pattern.hint(groups, game_dir);
+    if (std::regex_search(hinted, groups, pattern.expression)) return pattern.hint(groups, game_dir);
   }
   return {};
 }

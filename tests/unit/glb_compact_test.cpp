@@ -2,8 +2,12 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <numeric>
+#include <string>
 
+#include "core/config.hpp"
 #include "editor/document/glb_compact.hpp"
 #include "editor/document/scene_document.hpp"
 #include "scene/gltf/gltf_loader.hpp"
@@ -17,6 +21,7 @@ namespace {
 constexpr std::size_t kBinBytes = 24;
 constexpr int kImports = 3;
 constexpr Color kGray{0.5f, 0.5f, 0.5f, 1.0f};
+constexpr const char* kUserText = "IMPORTANT USER DATA";  // a file of the user's, outside the game
 
 // Two meshes, each with a material, a texture, a picture and bytes of its own; one object, which
 // shows the second mesh. The binary chunk is the bytes 0, 1, 2...
@@ -59,6 +64,25 @@ SceneDocument saved_floor(const std::filesystem::path& file) {
 }
 
 }  // namespace
+
+TEST_CASE("saving a scene never writes through a link planted under its temporary name") {
+  const std::filesystem::path folder = std::filesystem::temp_directory_path() / "redgem_compact_planted";
+  std::filesystem::remove_all(folder);
+  std::filesystem::create_directories(folder / "game");
+  const std::filesystem::path victim = folder / "victim.txt";
+  std::ofstream(victim) << kUserText;
+  const std::filesystem::path file = folder / "game" / config::kSceneFileName;
+  std::error_code link_error;
+  std::filesystem::create_symlink(victim, file.string() + config::kSceneWritingSuffix, link_error);
+  if (!link_error) {  // (Windows without developer mode makes no links)
+    saved_floor(file);
+    std::ifstream in(victim);
+    CHECK(std::string(std::istreambuf_iterator<char>(in), {}) == kUserText);
+    CHECK_FALSE(std::filesystem::is_symlink(file));
+    CHECK(load_gltf_scene(file.string()).ok);
+  }
+  std::filesystem::remove_all(folder);
+}
 
 TEST_CASE("what no object uses is left out of a file, and what is left is numbered anew") {
   const std::optional<GlbFile> lean = without_unused(two_meshes_one_shown());

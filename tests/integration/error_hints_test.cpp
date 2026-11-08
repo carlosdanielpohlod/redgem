@@ -18,6 +18,7 @@ namespace fs = std::filesystem;
 namespace {
 
 const fs::path kPlatformer = REDGEM_PLATFORMER_DIR;
+constexpr std::size_t kVeryLongName = 100000;  // letters of a name, past what a stack's matcher took
 
 bool has(const std::string& text, const std::string& part) { return text.find(part) != std::string::npos; }
 
@@ -56,6 +57,18 @@ TEST_CASE("a scene or a script the game lacks is answered with those it has") {
   CHECK(has(hint_for("loading scripts/zzzzzzzz.rb: cannot read scripts/zzzzzzzz.rb", kPlatformer),
             "the scripts are: accounts.rb, camera_follow.rb"));
   CHECK(hint_for("something else went wrong", kPlatformer).empty());
+}
+
+TEST_CASE("a message of any length gets its hint, or none, and never ends the tool") {
+  // (A scene's script property can name a file of any length: 100 000 letters overflowed the
+  // stack of the matcher.)
+  const std::string long_name(kVeryLongName, 'x');
+  CHECK_NOTHROW(hint_for("loading scripts/" + long_name + ".rb: cannot read scripts/x.rb", kPlatformer));
+  CHECK_NOTHROW(hint_for("no scene named " + long_name + " (ArgumentError)", kPlatformer));
+  CHECK_NOTHROW(hint_for("uninitialized constant X" + long_name + " (NameError)", kPlatformer));
+  CHECK_NOTHROW(hint_for("undefined method '" + long_name + "' for Transform (NoMethodError)", kPlatformer));
+  // A line number no file has is no place to read the receiver from.
+  CHECK_NOTHROW(hint_for("player.rb:99999999999999999999999: undefined method 'zer' for Class", kPlatformer));
 }
 
 TEST_CASE("redgem run says the hint after the error") {

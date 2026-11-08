@@ -34,6 +34,10 @@ struct CliResult {
 };
 
 CliResult parse_cli(const std::vector<std::string>& args);
+// What is wrong with the folder a line opens in the editor or plays: it is not there, most likely a
+// mistyped command ("redgem bulid"). Empty when nothing is, or the line names no folder. (Apart from
+// parse_cli, which reads the line alone.)
+std::string missing_game_folder(const CliOptions& options);
 // The window a game is played in from the command line (--play): the developer's way to play,
 // so it comes with what a developer watches (the frames-per-second counter).
 GameWindowOptions developer_play_options(const CliOptions& options, GpuChoice gpu = GpuChoice::Auto);

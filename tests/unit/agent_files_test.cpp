@@ -4,9 +4,11 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <set>
 #include <string>
 
+#include "core/config.hpp"
 #include "editor/agent/agent_profiles.hpp"
 #include "editor/agent/child_process.hpp"
 #include "editor/agent/workspace_files.hpp"
@@ -24,6 +26,8 @@ namespace {
 #ifndef _WIN32
 constexpr mode_t kOwnerReadWrite = 0600;
 #endif
+constexpr const char* kUserText = "IMPORTANT USER DATA";  // a file of the user's, outside the game
+constexpr const char* kAgentText = "AGENT TEXT\n";        // what the agent asked to write
 
 fs::path fresh_folder(const std::string& name) {
   const fs::path folder = fs::temp_directory_path() / name;
@@ -77,6 +81,27 @@ TEST_CASE("a workspace refuses a symbolic link, even one to inside it") {
     CHECK_FALSE(workspace.write("linked/escape.txt", "x", error));
     CHECK(error.find("link") != std::string::npos);
     CHECK_FALSE(fs::exists(outside / "escape.txt"));
+  }
+  fs::remove_all(folder);
+  fs::remove_all(outside);
+}
+
+TEST_CASE("a workspace never writes through a link planted where it writes before replacing a file") {
+  const fs::path folder = fresh_folder("redgem_workspace_planted");
+  const fs::path outside = fresh_folder("redgem_workspace_planted_target");
+  fs::create_directories(folder / "scripts");
+  std::ofstream(outside / "victim.txt") << kUserText;
+  std::error_code link_error;
+  const fs::path planted = folder / "scripts" / (std::string("player.rb") + redgem::config::kAgentWritingSuffix);
+  fs::create_symlink(outside / "victim.txt", planted, link_error);
+  if (!link_error) {  // (Windows without developer mode makes no links)
+    const Workspace workspace(folder);
+    std::string error;
+    REQUIRE_MESSAGE(workspace.write("scripts/player.rb", kAgentText, error), error);
+    std::ifstream victim(outside / "victim.txt");
+    CHECK(std::string(std::istreambuf_iterator<char>(victim), {}) == kUserText);
+    CHECK_FALSE(fs::is_symlink(folder / "scripts" / "player.rb"));
+    CHECK(workspace.read("scripts/player.rb", {}, error) == std::optional<std::string>(kAgentText));
   }
   fs::remove_all(folder);
   fs::remove_all(outside);

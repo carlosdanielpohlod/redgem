@@ -9,8 +9,10 @@
 #include <string>
 
 #include "app/encoder_process.hpp"
+#include "core/exit_codes.hpp"
 #include "core/files.hpp"
 
+#include "project/mcp_command.hpp"
 #include "project/mcp_game_tools.hpp"
 #include "project/runtime_query.hpp"
 
@@ -121,6 +123,18 @@ TEST_CASE("query points are three finite numbers") {
     CHECK_THROWS_AS(point_argument({{"at", far}}, "at"), std::invalid_argument);
   }
   CHECK(point_argument({{"at", "1000000,0,-1000000"}}, "at").x == doctest::Approx(1.0e6));
+}
+
+TEST_CASE("redgem mcp with no game, no such folder or an unknown option is a usage error, as any command's") {
+  const std::string game = REDGEM_PLATFORMER_DIR;
+  const std::string missing = (std::filesystem::temp_directory_path() / "redgem_mcp_no_such_game").string();
+  std::filesystem::remove_all(missing);
+  CHECK(run_mcp_command({}) == kExitUsage);
+  CHECK(run_mcp_command({game, game}) == kExitUsage);
+  CHECK(run_mcp_command({missing}) == kExitUsage);
+  CHECK(run_mcp_command({game, "--allow", "bogus"}) == kExitUsage);
+  CHECK(run_mcp_command({game, "--allow", "scene_list,"}) == kExitUsage);
+  CHECK(run_mcp_command({game, "--bogus-option"}) == kExitUsage);
 }
 
 #ifndef _WIN32

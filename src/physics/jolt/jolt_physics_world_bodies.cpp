@@ -5,6 +5,9 @@
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Collision/Shape/OffsetCenterOfMassShape.h>
 
+#include <string>
+
+#include "core/log.hpp"
 #include "physics/jolt/jolt_vehicle.hpp"
 #include "physics/physics_config.hpp"
 
@@ -48,8 +51,17 @@ void World::create_body(const BodyDesc& desc, const ShapeInfo& info, Record& rec
       motion == JPH::EMotionType::Static ? JPH::EActivation::DontActivate : JPH::EActivation::Activate;
   const JPH::ObjectLayer layer = layers::object_layer(record.layer, motion != JPH::EMotionType::Static);
   record.body = system_.GetBodyInterface().CreateAndAddBody(body_settings(desc, shape, motion, layer), activation);
+  if (record.body.IsInvalid()) return tell_bodies_full();
   body_owners_[record.body.GetIndexAndSequenceNumber()] = desc.object;
   if (vehicle) attach_vehicle(desc, record);
+}
+
+void World::tell_bodies_full() {
+  if (told_bodies_full_) return;
+  told_bodies_full_ = true;
+  log::error("the physics world holds " + std::to_string(config::kMaxBodies) +
+             " bodies, all it can: objects added from now on get no body (no collisions, raycasts miss them) "
+             "until others are destroyed");
 }
 
 void World::release_body(Record& record) {

@@ -9,7 +9,7 @@
 
 // Actions and axes written down: the "input" section of a game's game.json, and the bindings a
 // player saved, which are written the same way:
-//   {"actions": {"jump": ["key:space", "pad:a"]},
+//   {"actions": {"jump": ["key:space", "pad:a"], "fire": ["mouse:left"]},
 //    "axes": {"steer": {"negative": ["key:a"], "positive": ["key:d"], "pad_axis": "left_x", "invert": false}}}
 namespace redgem {
 

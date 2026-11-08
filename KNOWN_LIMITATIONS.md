@@ -148,8 +148,9 @@ not a promise of how it will be closed.
 - The menu's controls page binds one key and one button to a row: rebinding a cell replaces all it
   had, so a second key for one action comes only from a game's script (`Input.bind`). It lists
   every action and axis the game declared. Gamepads cannot rumble (neither the
-  desktops' window library nor Android offers it), the mouse cannot be bound to an action, and a
-  capture catches keys and buttons, not sticks or triggers.
+  desktops' window library nor Android offers it), and a capture catches keys, mouse buttons, the
+  wheel and gamepad buttons, not sticks, triggers or mouse movement. Keys are named for their place
+  on a US keyboard, and the page shows them by those names whatever the layout types.
 - `UI` has no word wrap, anchors or scroll lists. Android has no on-screen keyboard.
 
 ### Audio
@@ -171,6 +172,10 @@ not a promise of how it will be closed.
   editor's Physics card has no collision layer picker (`layer` is set as a custom property).
 - Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - No navigation mesh or pathfinding.
+- A scene holds at most 4096 physics bodies at once (a fixed size, not set per game). An object
+  spawned past that gets no body: no collisions, and raycasts miss it. The engine logs one error
+  when that first happens. A game that keeps spawning (bullets, debris) has to destroy what it no
+  longer needs.
 - `Save` supports named slots and per-object pose/appearance checkpoints. Whole-world snapshots,
   automatic spawned-instance/behaviour persistence and game-data migration hooks remain future
   work. Slot selection and storage calls are synchronous.

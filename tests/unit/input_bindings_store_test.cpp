@@ -70,6 +70,8 @@ TEST_CASE("what players bound is written and read back, player by player") {
   PlayerBindings played;
   played.declare_action("dash", {{Key::E}, {}});
   played.bind(0, "jump", Key::K, std::nullopt);
+  played.bind(0, "fire", MouseInput::Left, std::nullopt);
+  played.bind(0, "run", MouseInput::WheelDown, std::nullopt);
   played.unbind(0, "dash", std::nullopt, std::nullopt);
   played.bind(kThirdPad, "horizontal", GamepadButton::DpadLeft, AxisSide::Negative);
   REQUIRE(write_player_bindings(file, played));
@@ -78,6 +80,9 @@ TEST_CASE("what players bound is written and read back, player by player") {
   read_player_bindings(file, next_run);
   next_run.declare_action("dash", {{Key::E}, {}});  // (the game declares it after the file is read)
   CHECK(listed(next_run.action(0, "jump")) == listed(played.action(0, "jump")));
+  CHECK(listed(next_run.action(0, "fire")) == listed(played.action(0, "fire")));
+  CHECK(listed(next_run.action(0, "run")) ==
+        std::vector<InputBinding>{Key::LeftShift, MouseInput::WheelDown, GamepadButton::B});
   CHECK(listed(next_run.action(0, "dash")).empty());
   CHECK(next_run.axis(kThirdPad, "horizontal")->negative.all() == std::vector<InputBinding>{GamepadButton::DpadLeft});
   CHECK(next_run.axis(kThirdPad, "horizontal")->stick == GamepadAxis::LeftX);

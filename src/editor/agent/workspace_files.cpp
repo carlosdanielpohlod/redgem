@@ -3,12 +3,12 @@
 #include <algorithm>
 #include <cctype>
 #include <iterator>
-#include <fstream>
 #include <sstream>
 #include <system_error>
 
 #include "core/config.hpp"
 #include "core/safe_path.hpp"
+#include "storage/durable_file.hpp"
 
 namespace redgem::agent {
 namespace {
@@ -81,19 +81,12 @@ bool fits_a_file(const fs::path& file) {
 }
 
 // Writes the text beside the file, then puts it in the file's place: a reader never sees half of it.
+// (What is written beside it is made new: a link planted under that name is never written through.)
 bool replace_file(const fs::path& file, const std::string& text, std::string& error) {
-  fs::path written = file;
-  written += config::kAgentWritingSuffix;
-  {
-    std::ofstream out(written, std::ios::binary | std::ios::trunc);
-    out << text;
-    if (!out) error = "cannot write " + file.u8string();
-  }
-  std::error_code fs_error;
-  if (error.empty()) fs::rename(written, file, fs_error);
-  if (fs_error) error = "cannot write " + file.u8string() + ": " + fs_error.message();
-  if (!error.empty()) fs::remove(written, fs_error);
-  return error.empty();
+  std::string why;
+  if (durable::replace_file_quickly(file, config::kAgentWritingSuffix, text, why)) return true;
+  error = "cannot write " + file.u8string() + ": " + why;
+  return false;
 }
 
 }  // namespace

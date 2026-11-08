@@ -56,7 +56,11 @@ void World::create_character(const BodyDesc& desc, const ShapeInfo& info, Record
                                                JPH::RVec3(to_jolt(desc.world.position)), JPH::Quat::sIdentity(),
                                                static_cast<JPH::uint64>(desc.object), &system_);
   record.character->SetListener(this);
-  body_owners_[record.character->GetInnerBodyID().GetIndexAndSequenceNumber()] = desc.object;
+  // (A world that holds all the bodies it can makes the character without the body that others
+  // collide with.)
+  const JPH::BodyID inner = record.character->GetInnerBodyID();
+  if (inner.IsInvalid()) tell_bodies_full();
+  if (!inner.IsInvalid()) body_owners_[inner.GetIndexAndSequenceNumber()] = desc.object;
   character_owners_[record.character.GetPtr()] = desc.object;
 }
 

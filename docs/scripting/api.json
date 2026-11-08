@@ -697,7 +697,7 @@
         {
           "name": "define_action",
           "static": true,
-          "args": "name, *bindings, keys: [], buttons: []",
+          "args": "name, *bindings, keys: [], buttons: [], mouse: []",
           "about": "adds an action of the game's own (besides game.json's input section)"
         },
         {
@@ -726,7 +726,7 @@
           "name": "bindings",
           "static": true,
           "args": "name, pad: 0",
-          "about": "what a player bound to an action: [\"key:space\", \"pad:a\"]"
+          "about": "what a player bound to an action: [\"key:space\", \"mouse:left\", \"pad:a\"]"
         },
         {
           "name": "bindings_changes",
@@ -736,13 +736,13 @@
         {
           "name": "bind",
           "static": true,
-          "args": "name, binding = nil, key: nil, button: nil, side: nil, pad: 0",
-          "about": "binds a key or a button to an action; kept between runs"
+          "args": "name, binding = nil, key: nil, button: nil, mouse: nil, side: nil, pad: 0",
+          "about": "binds a key, a mouse button (mouse: :left, :wheel_up) or a gamepad button to an action; kept between runs"
         },
         {
           "name": "unbind",
           "static": true,
-          "args": "name, binding = nil, key: nil, button: nil, side: nil, pad: 0",
+          "args": "name, binding = nil, key: nil, button: nil, mouse: nil, side: nil, pad: 0",
           "about": "takes a binding off an action"
         },
         {
@@ -754,8 +754,8 @@
         {
           "name": "capture_next",
           "static": true,
-          "args": "cancel: [\"key:escape\", \"pad:b\", \"pad:back\"], &block",
-          "about": "the next key or button pressed, to the block: |binding, pad| (nil: called off)"
+          "args": "cancel: [\"key:escape\", \"pad:b\", \"pad:back\"], mouse: true, &block",
+          "about": "the next key, mouse button, wheel turn or gamepad button pressed, to the block: |binding, pad| (nil: called off); mouse: false leaves the mouse out"
         },
         {
           "name": "capturing?",
@@ -802,7 +802,7 @@
           "name": "mouse_down?",
           "static": true,
           "args": "button",
-          "about": "whether a mouse button (:left, :right, :middle) is held"
+          "about": "whether a mouse button (:left, :right, :middle, :side, :extra) is held"
         },
         {
           "name": "mouse_pressed?",
