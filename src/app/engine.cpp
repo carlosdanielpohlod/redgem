@@ -54,9 +54,9 @@ Engine::Engine(const EngineOptions& options)
 Engine::~Engine() {
   scene_load_.reset();
   keep_bindings();
-  release_audio();
   // Scripts reference the scene and physics through the context: tear them down first.
   scripts_.reset();
+  release_audio();  // (after the scripts: a sound one plays as it goes stops too)
   physics_.reset();
 }
 

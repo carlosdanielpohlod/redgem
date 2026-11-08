@@ -150,7 +150,9 @@ mrb_value audio_listener(mrb_state* mrb, mrb_value) {
     mrb_raise(mrb, E_ARGUMENT_ERROR, "Audio.listener requires nonzero, nonparallel forward and up directions");
   return mrb_bool_value(audio(mrb).set_listener(listener));
 }
+// A sound's id; nil (what Audio.play returns for a sound that does not play) is no source.
 SoundSourceId spatial_source_id(mrb_state* mrb, mrb_value value) {
+  if (mrb_nil_p(value)) return kNoSoundSource;
   if (mrb_type(value) != MRB_TT_INTEGER) mrb_raise(mrb, E_ARGUMENT_ERROR, "expected a sound source integer id");
   const auto number = mrb_integer(value);
   if (number < 0) mrb_raise(mrb, E_ARGUMENT_ERROR, "sound source id must be nonnegative");

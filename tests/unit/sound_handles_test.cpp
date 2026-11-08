@@ -106,6 +106,17 @@ TEST_CASE("a sound's levels change while it plays, and levels it cannot have lea
   CHECK_FALSE(sounds.set_levels(id, levels));
   CHECK(driver.voices.at(id).mix.volume == doctest::Approx(kHalf));
   CHECK_FALSE(sounds.set_levels(id + 1, SoundLevels{}));
+  driver.voices.at(id).playing = false;  // it came to its end, and is not reaped yet
+  CHECK_FALSE(sounds.set_levels(id, SoundLevels{}));
+}
+
+TEST_CASE("a sound that ended gives its place back to the next one played") {
+  HandleTestDriver driver;
+  SoundPool sounds(driver);
+  for (std::size_t count = 0; count < kMaxSpatialSounds; ++count) REQUIRE(sounds.play("step", flat_at(kHalf)));
+  CHECK(sounds.play("step", flat_at(kHalf)) == kNoSoundSource);
+  driver.voices.begin()->second.playing = false;
+  CHECK(sounds.play("step", flat_at(kHalf)) != kNoSoundSource);
 }
 
 TEST_CASE("a group's volume is over every sound of that group, those playing and those to come") {

@@ -2,8 +2,9 @@
 # render scale, vsync, frame cap, quality) and heard (the master volume and each group's: music,
 # effects, voice), as the Settings module has them. Each change takes effect at once; leaving the
 # screen (its Back button or Esc) keeps them for the game's next runs and goes back to the screen
-# it was opened from. Its Controls button keeps them too, and opens the controls page (see GameMenu::ControlsScreen), which comes back to
-# it. A game's own options (add_option) come with its buttons.
+# it was opened from. Its Controls button keeps them too, and opens the controls page (see
+# GameMenu::ControlsScreen), which comes back to it. A game's own options (add_option) come with
+# its buttons.
 class GameMenu < Behaviour
   class SettingsScreen < Screen
     ROW_WIDTH = 560

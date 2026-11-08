@@ -15,6 +15,13 @@ class AudioTest < RedGemTest::Case
     refute Audio.playing?(1)
   end
 
+  def test_the_nil_of_a_sound_that_did_not_play_is_no_sound
+    hum = Audio.play(NOT_A_SOUND, loop: true)
+    refute Audio.set(hum, pitch: 1.5)
+    refute Audio.playing?(hum)
+    refute Audio.stop(hum)
+  end
+
   def test_an_unknown_group_is_refused
     error = assert_raises(ArgumentError) { Audio.play(NOT_A_SOUND, group: :ambience) }
     assert error.message.include?("unknown mix group :ambience"), error.message

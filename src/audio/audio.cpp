@@ -112,7 +112,7 @@ SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& sound
   const auto mix = mix_of(sound);
   if (!mix) return kNoSoundSource;
   if (next_ > kMaximumSoundHandle) return kNoSoundSource;
-  update();
+  reap();  // (a sound that ended gives its place back)
   if (sounds_.size() >= kMaxSpatialSounds) return kNoSoundSource;
   const auto id = static_cast<SoundSourceId>(next_);
   if (!driver_.start(id, name, sound, *mix)) return kNoSoundSource;
@@ -136,8 +136,8 @@ bool SoundPool::move(SoundSourceId id, Vec3 position) {
   return mix.has_value();
 }
 bool SoundPool::set_levels(SoundSourceId id, const SoundLevels& levels) {
+  if (!playing(id)) return false;  // (one that ended is not changed, even before it is reaped)
   const auto found = sounds_.find(id);
-  if (found == sounds_.end()) return false;
   SpatialSound changed = found->second;
   changed.volume = levels.volume.value_or(changed.volume);
   changed.pitch = levels.pitch.value_or(changed.pitch);
@@ -176,8 +176,12 @@ void SoundPool::refresh() {
   }
 }
 void SoundPool::update() {
+  for (const auto& [id, sound] : sounds_) driver_.update(id);
+  reap();
+  refresh();
+}
+void SoundPool::reap() {
   for (auto it = sounds_.begin(); it != sounds_.end();) {
-    driver_.update(it->first);
     if (driver_.playing(it->first)) {
       ++it;
       continue;
@@ -185,7 +189,6 @@ void SoundPool::update() {
     driver_.stop(it->first);
     it = sounds_.erase(it);
   }
-  refresh();
 }
 
 namespace {

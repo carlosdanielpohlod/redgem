@@ -8,8 +8,11 @@ namespace {
 
 constexpr float kSilentLevel = 0.0f;
 constexpr float kFullLevel = 1.0f;
+// Seconds: a fade shorter than this is no fade (a fade of a denormal second would make its rate
+// infinite).
+constexpr float kShortestFade = 0.001f;
 
-bool fades(float seconds) { return seconds > kNoFade; }
+bool fades(float seconds) { return seconds >= kShortestFade; }
 
 }  // namespace
 
@@ -86,8 +89,10 @@ void MusicPlayer::leave(float fade_seconds) {
 }
 
 void MusicPlayer::advance(Track& track, float seconds) {
-  track.level = std::clamp(track.level + track.rate * seconds, kSilentLevel, kFullLevel);
   driver_.update(track.id);
+  if (track.rate == 0.0f) return;  // (heard as it was)
+  track.level = std::clamp(track.level + track.rate * seconds, kSilentLevel, kFullLevel);
+  if (track.level >= kFullLevel) track.rate = 0.0f;  // faded in
   driver_.volume(track.id, heard_volume(track));
 }
 

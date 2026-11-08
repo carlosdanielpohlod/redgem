@@ -123,6 +123,16 @@ TEST_CASE("at most two streams play: a third track drops the one already fading 
   CHECK(driver.named("dusk")->volume == doctest::Approx(kQuarter));
 }
 
+TEST_CASE("a fade too short to be heard is no fade") {
+  constexpr float kDenormalSeconds = 1e-40f;
+  MusicTestDriver driver;
+  MusicPlayer music(driver);
+  REQUIRE(music.play("day", at_volume(kHalf, kDenormalSeconds)));
+  CHECK(driver.named("day")->volume == doctest::Approx(kHalf));
+  music.stop(kDenormalSeconds);
+  CHECK(driver.tracks.empty());
+}
+
 TEST_CASE("a track replaced before it was heard at all goes at the next update") {
   MusicTestDriver driver;
   MusicPlayer music(driver);

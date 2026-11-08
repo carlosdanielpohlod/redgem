@@ -102,6 +102,7 @@ class SoundPool {
  private:
   std::optional<SpatialMix> mix_of(const SpatialSound& sound) const;
   void refresh();
+  void reap();  // lets go of the sounds that ended
   SoundDriver& driver_;
   AudioListener listener_;
   GroupVolumes group_volumes_ = kFullGroupVolumes;
