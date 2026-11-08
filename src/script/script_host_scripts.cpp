@@ -5,17 +5,18 @@
 #include <mruby/class.h>
 #include <mruby/proc.h>
 #include <mruby/variable.h>
+#include <utility>
 
 #include "core/safe_path.hpp"
 #include "scene/props.hpp"
 #include "script/script_host.hpp"
 #include "script/script_naming.hpp"
+#include "script/ruby_classes.hpp"
 
 namespace redgem {
 
 namespace {
 
-constexpr const char* kBehaviourClass = "Behaviour";
 constexpr const char* kSceneScriptClass = "SceneScript";  // what a scene's setup script inherits from
 constexpr const char* kRunSceneScriptEntry = "__run";
 
@@ -65,12 +66,7 @@ bool ScriptHost::require_script(const std::string& script) {
   return true;
 }
 
-RClass* ScriptHost::class_named(const std::string& name) {
-  mrb_state* mrb = vm_.state();
-  if (!mrb_class_defined(mrb, name.c_str())) return nullptr;
-  const mrb_value constant = mrb_const_get(mrb, mrb_obj_value(mrb->object_class), mrb_intern_cstr(mrb, name.c_str()));
-  return mrb_class_p(constant) ? mrb_class_ptr(constant) : nullptr;
-}
+RClass* ScriptHost::class_named(const std::string& name) { return ruby_classes::root_class(vm_.state(), name.c_str()); }
 
 mrb_value ScriptHost::module_named(const char* name) {
   mrb_state* mrb = vm_.state();
@@ -93,13 +89,7 @@ void ScriptHost::attach(ObjectId object, const std::string& script) {
   instantiate(object, class_named(class_name), class_name);
 }
 
-bool ScriptHost::is_behaviour_class(RClass* klass) {
-  mrb_state* mrb = vm_.state();
-  if (!mrb_obj_is_kind_of(mrb, mrb_obj_value(klass), mrb->class_class)) return false;
-  RClass* behaviour = class_named(kBehaviourClass);
-  if (behaviour == nullptr) return false;
-  return mrb_test(vm_.call(mrb_obj_value(klass), "<=", {mrb_obj_value(behaviour)}).value);
-}
+bool ScriptHost::is_behaviour_class(RClass* klass) { return inherits_class(klass, class_named(kBehaviourClass)); }
 
 bool ScriptHost::overrides(RClass* klass, const char* method) {
   mrb_state* mrb = vm_.state();
@@ -124,8 +114,9 @@ mrb_value ScriptHost::instantiate(ObjectId object, RClass* klass, const std::str
   if (!attached.ok) return not_created(class_name + "#__attach", attached.error);
   root_behaviour(object, instance.value);
   behaviours_by_object_[object].push_back(behaviours_.size());
-  behaviours_.push_back(
-      {context_.scene->handle(object), instance.value, class_name, false, true, overrides(klass, "fixed_update")});
+  BehaviourSlot slot{context_.scene->handle(object), instance.value, class_name};
+  slot.fixed_updates = overrides(klass, "fixed_update");
+  behaviours_.push_back(std::move(slot));
   return instance.value;
 }
 

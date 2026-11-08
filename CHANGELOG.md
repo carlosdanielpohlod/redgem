@@ -22,6 +22,9 @@ until 1.0, a release may change what games rely on (see
   click that starts a capture is never taken for the binding, and the click caught clicks nothing
   else. `mouse: false` leaves the mouse out of a capture.
 
+- **Live script reload**: saved plain behaviour classes update during editor Play while retaining
+  instance fields and physics state; unsupported setup keeps its previous code until a restart.
+
 - **Prefab creation**: save a selected hierarchy as a reusable GLB from the Project panel,
   preserving complete skeletons and nested references while validating dependencies before publication.
 

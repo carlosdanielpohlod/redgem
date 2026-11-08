@@ -24,6 +24,7 @@ EngineOptions runtime_options(const std::filesystem::path& game_dir, const Scene
   EngineOptions options;
   options.game_dir = game_dir;
   options.scene = &scene;
+  options.live_script_reload = true;
   options.scene_name = scene_name;
   options.input = &devices.input;
   options.audio = devices.audio;

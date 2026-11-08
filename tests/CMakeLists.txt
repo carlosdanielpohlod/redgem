@@ -27,6 +27,7 @@ add_executable(redgem_tests
   unit/scene_identity_test.cpp
   unit/prefabs_test.cpp
   unit/prefab_export_test.cpp
+  unit/script_reload_test.cpp
   unit/scene_stable_ids_test.cpp
   unit/scene_diff_test.cpp
   unit/mcp_test.cpp
@@ -495,6 +496,7 @@ set_tests_properties(system.harness_reports_failures PROPERTIES LABELS system RU
 # The editor window itself, driven by a doctest program.
 add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp editor_system/editor_window_test.cpp
                editor_system/prefab_preview_test.cpp
+               editor_system/script_reload_test.cpp
                editor_system/agent_panel_test.cpp
                editor_system/build_progress_test.cpp
                editor_system/window_picture.cpp

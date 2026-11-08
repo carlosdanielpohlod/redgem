@@ -22,6 +22,8 @@ end
 
 Define only the ones you need. `other` is the other object (a `GameObject`).
 
+Saved behaviour code can also [reload during editor Play](live_reload.md) while keeping instance fields.
+
 ## Files and class names
 
 The file name decides the class name: `camera_follow.rb` must define `CameraFollow`. Scripts live

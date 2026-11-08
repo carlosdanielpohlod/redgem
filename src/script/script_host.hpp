@@ -4,6 +4,8 @@
 
 #include <filesystem>
 #include <set>
+#include <map>
+#include <optional>
 #include <unordered_map>
 #include <string>
 #include <vector>
@@ -13,6 +15,7 @@
 #include "physics/physics_world.hpp"
 #include "script/game_locales.hpp"
 #include "script/ruby_vm.hpp"
+#include "script/script_reload.hpp"
 #include "script/script_context.hpp"
 
 namespace redgem {
@@ -26,7 +29,7 @@ namespace redgem {
 //   script_host_http.cpp       handing the answers of web requests to Ruby
 class ScriptHost {
  public:
-  ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir);
+  ScriptHost(ScriptContext& context, std::filesystem::path scripts_dir, bool live_reload = false);
   ScriptHost(const ScriptHost&) = delete;
   ScriptHost& operator=(const ScriptHost&) = delete;
 
@@ -66,6 +69,8 @@ class ScriptHost {
   void detach(ObjectId object);
 
   RubyResult eval(const std::string& code, const std::string& file_name);
+  // Editor-only source polling; no watching or source hashing unless explicitly enabled.
+  std::size_t reload_scripts(bool retry = false);
   RubyResult load_file(const std::filesystem::path& path);
 
   // Cached Ruby GameObject wrapper for a scene object (stable identity).
@@ -94,6 +99,7 @@ class ScriptHost {
     std::string class_name;
     bool started = false;
     bool enabled = true;
+    bool start_failed = false;
     // Whether its class has a fixed_update of its own: Behaviour's does nothing, and calling it on
     // every behaviour every physics step would cost a protected Ruby call each for nothing.
     bool fixed_updates = true;
@@ -102,8 +108,21 @@ class ScriptHost {
     bool active() const { return started && enabled; }
   };
 
+  void remember_source(const std::filesystem::path& path, const std::string& code);
+  void record_source(const std::filesystem::path& path, const std::string& source, std::string& name);
+  void disable_reload_source(const std::string& name, const char* error);
+  bool reload_script(const std::string& script, bool retry);
+  bool apply_reload(const std::string& script, RClass* klass, const std::string& source);
+  bool reload_unreadable(const std::string& script);
+  bool reload_failed(const std::string& script, const std::string& error);
+  void refresh_reloaded(RClass* klass);
+  bool live_reload_ = false;
+  std::map<std::string, ReloadSource> reload_sources_;
+  std::string reload_cursor_;
   bool loading_screen_failed_ = false;
   void load_prelude();
+  void prepare_reload_tracking();
+  RubyResult load_source(const std::filesystem::path& path);
   // A new Ruby GameObject for an object; stands_for says whether one still stands for it.
   mrb_value new_wrapper(const GameObject& object);
   bool stands_for(mrb_value wrapper, const GameObject& object);
