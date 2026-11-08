@@ -4,17 +4,15 @@
 #include <array>
 #include <fstream>
 #include <stdexcept>
+#include <string_view>
 
 #include "storage/durable_file.hpp"
 #include "editor/document/recovery_format.hpp"
-#include "scene/scene_ids.hpp"
 
 namespace redgem {
 namespace {
 namespace fs = std::filesystem;
 constexpr const char* kSuffix = ".recovery";
-constexpr const char* kStagePrefix = ".redgem-recovery-";
-constexpr const char* kStageFile = "copy";
 using recovery_format::kMetadata;
 constexpr const char* kSource = "source";
 constexpr const char* kBaseline = "baseline";
@@ -89,28 +87,12 @@ std::optional<SceneDocument> read_recovered(const fs::path& source, std::string&
   document.recovered_as(source);
   return document;
 }
-struct Stage {
-  fs::path folder;
-  explicit Stage(const fs::path& parent) : folder(parent / (std::string(kStagePrefix) + make_scene_id())) {
-    require(fs::create_directory(folder), "cannot create recovery staging folder");
-  }
-  ~Stage() {
-    std::error_code ignored;
-    fs::remove_all(folder, ignored);
-  }
-  Stage(const Stage&) = delete;
-  Stage& operator=(const Stage&) = delete;
-};
 bool publish_copy(const GlbFile& glb, const fs::path& copy, const durable::Flush& flush, std::string& error) {
   const auto bytes = encode_glb(glb, error);
   if (!bytes) return false;
   require(bytes->size() <= recovery_format::kMaxBytes, "recovery copy exceeds the 64 MiB limit");
-  const Stage stage(copy.parent_path());
-  const auto staged = stage.folder / kStageFile;
-  require(durable::write_flushed(staged, std::string(bytes->begin(), bytes->end()), flush),
-          "cannot write and flush scene recovery");
-  fs::rename(staged, copy);
-  require(durable::sync_folder(copy.parent_path()), "recovery was written but its folder could not be flushed");
+  const std::string_view data(reinterpret_cast<const char*>(bytes->data()), bytes->size());
+  require(durable::replace_file(copy, data, flush), "cannot write and flush scene recovery");
   return true;
 }
 }  // namespace

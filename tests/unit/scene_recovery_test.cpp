@@ -121,8 +121,10 @@ TEST_CASE("scene recovery keeps a valid backup when flushing its replacement fai
   CHECK(game.bytes(copy) == good);
   CHECK(game.bytes(game.source) == original);
   CHECK(game.document.dirty());
-  for (const auto& entry : fs::directory_iterator(game.folder))
-    CHECK(entry.path().filename().string().find(".redgem-recovery-") != 0);
+  for (const auto& entry : fs::directory_iterator(game.folder)) {
+    const bool expected_file = entry.path() == game.source || entry.path() == copy;
+    CHECK(expected_file);
+  }
   fail_flush = false;
   game.autosave(recovery);
   CHECK(game.bytes(copy) != good);

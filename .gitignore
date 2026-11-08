@@ -46,4 +46,4 @@ games/*-data/
 # Editor recovery copies stay local.
 .*.glb.recovery
 .*.glb.recovery.part
-.redgem-recovery-*/
+.*.glb.recovery.*.part
