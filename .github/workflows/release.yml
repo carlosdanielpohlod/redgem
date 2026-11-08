@@ -19,9 +19,6 @@ on:
   pull_request:
   push:
     tags: ["v*"]
-    # TEMPORARY, removed before merging: a dry run of this branch (a workflow cannot be started
-    # by hand before it is on the default branch). A branch's push never attaches anything.
-    branches: [ci-release-downloads]
   workflow_dispatch:
 
 # A newer push to a pull request makes the run of the older one pointless. Other runs share no
