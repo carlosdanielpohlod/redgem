@@ -43,14 +43,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The test scripts are written for bash 4 or newer (the Mac's own is 3.2).
-      - name: Install the build tools
-        run: brew install ninja bash
-
-      # rake builds mruby.
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.3"
+      # ninja, bash 4 (the test scripts need it; the Mac's own is 3.2) and Ruby, as release.yml.
+      - uses: ./.github/actions/macos-build-tools
 
       # Informational only: which macOS, processor and graphics the runner has.
       - name: Describe the machine

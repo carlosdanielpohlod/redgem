@@ -108,8 +108,8 @@ Every pull request runs these workflows (`.github/workflows/`), side by side:
   each every night.
 
 * **Release** (`release.yml`): only on a `release-*` pull request, a pushed `v*` tag or a run
-  started by hand: the four downloads of a release, built, checked and attached to a draft
-  release (see [Releases](#releases)).
+  started by hand: the four downloads of a release, built and checked; a tag's run also attaches
+  them to its draft release (see [Releases](#releases)).
 
 Every workflow builds with `-DREDGEM_WARNINGS_AS_ERRORS=ON`: a compiler warning in `src/` or
 `tests/` fails it (the dependencies keep theirs). Build the same way before pushing to see them
@@ -157,17 +157,19 @@ The downloads of a release (`redgem-linux-x86_64.tar.gz`, `redgem-windows-x86_64
 by hand. A release goes:
 
 1. A pull request from a `release-<version>` branch bumps the version in `CMakeLists.txt` and
-   dates the changelog. Its run attaches the four downloads to a draft release for `v<version>`.
-2. After it is merged, pushing the tag `v<version>` builds them again from the tag and attaches
-   them to the same draft.
+   dates the changelog. Its run builds the four downloads and keeps them as its artifacts, to be
+   tried; it touches no release. It fails at once when the branch's version is not the one in
+   `CMakeLists.txt`, or when that version is released already.
+2. After it is merged, pushing the tag `v<version>` builds them from the tag and attaches them to
+   the tag's draft release, made when missing. Only a tag's run attaches anything.
 3. The owner writes the notes and publishes the draft on GitHub. The workflow never publishes a
    release, and never changes one that is published.
 
-Every download is checked before it is kept (what it holds, and its programs run on its own
-system), and the four are checked together: with one missing or any check failed, no release gets
-any. A run started by hand is a dry run by default: it only keeps the downloads as its artifacts.
-`tools/release/README.md` has the details, and how to pack them by hand to try a change to the
-scripts.
+Every download is checked before it is kept, and only by listing what it holds and running its
+programs' `--version` and `--help` on its own system. The four are checked together: with one
+missing or any check failed, the draft gets none of them. A run started by hand only keeps the
+downloads as its artifacts. `tools/release/README.md` has the details, and how to pack them by
+hand to try a change to the scripts.
 
 ## Layout
 

@@ -9,7 +9,6 @@ RELEASE_TOOLS="$1"
 source "${RELEASE_TOOLS}/release_files.sh"
 VERSION="$(engine_version)"
 COMMIT="0123abc"
-REPO="owner/redgem"
 failures=0
 
 fail() {
@@ -22,7 +21,7 @@ fail() {
 run_plan() {
   local outcome="$1" expected="$2" output status=0
   shift 2
-  output="$(env -i PATH="${PATH}" GITHUB_REPOSITORY="${REPO}" COMMIT="${COMMIT}" "$@" \
+  output="$(env -i PATH="${PATH}" COMMIT="${COMMIT}" "$@" \
     "${RELEASE_TOOLS}/plan_release.sh" 2>&1)" || status=$?
   [[ "${output}" == *"${expected}"* ]] || fail "$* expected \"${expected}\", got: ${output}"
   if [[ "${outcome}" == passes && "${status}" -ne 0 ]]; then fail "$* failed: ${output}"; fi
@@ -42,14 +41,15 @@ expect_refusal "is not version ${VERSION}" EVENT=push REF_TYPE=tag REF_NAME="v0.
 # A branch's push is never a release's.
 expect_plan $'tag=v'"${VERSION}"$'\ncommit='"${COMMIT}"$'\nattach=false' EVENT=push REF_TYPE=branch REF_NAME=main
 
-# A dispatch is a dry run unless told otherwise.
-expect_plan "attach=false" EVENT=workflow_dispatch
-expect_plan "attach=false" EVENT=workflow_dispatch DRY_RUN=true
-expect_plan $'tag=v'"${VERSION}"$'\ncommit='"${COMMIT}"$'\nattach=true' EVENT=workflow_dispatch DRY_RUN=false
+# Only a pushed tag attaches: a run started by hand only keeps the downloads as artifacts.
+expect_plan $'tag=v'"${VERSION}"$'\ncommit='"${COMMIT}"$'\nattach=false' EVENT=workflow_dispatch
 
-# A release-* pull request attaches from the repository's own branch, never from a fork's.
-expect_plan "attach=true" EVENT=pull_request HEAD_REPO="${REPO}"
-expect_plan "attach=false" EVENT=pull_request HEAD_REPO="someone/redgem"
+# A release pull request only keeps them too, and its branch must name the version.
+expect_plan $'tag=v'"${VERSION}"$'\ncommit='"${COMMIT}"$'\nattach=false' \
+  EVENT=pull_request HEAD_REF="release-${VERSION}"
+expect_plan "attach=false" EVENT=pull_request HEAD_REF="release-${VERSION}-rc1"
+expect_refusal "The branch release-0.0.1 is not version ${VERSION}" EVENT=pull_request HEAD_REF="release-0.0.1"
+expect_refusal "is not version ${VERSION}" EVENT=pull_request HEAD_REF="release-${VERSION}9"
 
 if [[ "${failures}" -gt 0 ]]; then
   echo "${failures} failure(s)" >&2

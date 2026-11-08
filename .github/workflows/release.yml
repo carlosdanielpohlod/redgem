@@ -5,30 +5,29 @@
 # together, and a release never gets fewer than four.
 #
 # What starts it, and what it does with the downloads (tools/release/plan_release.sh decides):
-# * a pushed tag v<version>: attached to that tag's draft release, which is made when missing;
-# * a pull request from a release-* branch: attached to the draft release of v<the version in
-#   CMakeLists.txt> (a fork's pull request only keeps them as the run's artifacts);
-# * a run started by hand: a dry run unless `dry_run` is unticked; a dry run only keeps them as
-#   the run's artifacts and touches no release.
-# Everything is built from the commit the draft's tag points at: a pull request's head, not its
-# merge with main. A release is never published here: the owner publishes the draft. A published release is never
-# changed (tools/release/attach_to_draft.sh fails instead).
+# * a pushed tag v<version>: attached to that tag's draft release, which is made when missing.
+#   Only a tag's run touches a release, so a draft only ever holds downloads built from its tag;
+# * a pull request from a release-<version> branch, or a run started by hand: kept as the run's
+#   artifacts only, to try them before tagging.
+# A pull request is built from its head, not its merge with main. The plan fails before anything
+# is built when the tag or the release branch does not name the version in CMakeLists.txt, or
+# when that version's release is published already. A release is never published here: the
+# owner publishes the draft. A published release is never changed (attach_to_draft.sh).
 name: Release
 
 on:
   pull_request:
   push:
     tags: ["v*"]
+    # TEMPORARY, removed before merging: a dry run of this branch (a workflow cannot be started
+    # by hand before it is on the default branch). A branch's push never attaches anything.
+    branches: [ci-release-downloads]
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: Only keep the downloads as the run's artifacts (no release is made or changed)
-        type: boolean
-        default: true
 
-# A newer push to a pull request makes the run of the older one pointless; a tag's run is finished.
+# A newer push to a pull request makes the run of the older one pointless. Other runs share no
+# group (their run's id): a tag's run is never cancelled, nor left pending behind another.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -46,8 +45,10 @@ jobs:
       commit: ${{ steps.plan.outputs.commit }}
       attach: ${{ steps.plan.outputs.attach }}
     steps:
+      # (A pull request's head: what the other jobs build, and its CMakeLists.txt.)
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Decide the tag, and whether a release is touched
@@ -57,17 +58,33 @@ jobs:
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
           COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
-          DRY_RUN: ${{ inputs.dry_run }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.head_ref }}
         # (bash, not the default: with pipefail, a tag that is not the version fails here.)
         shell: bash
         run: tools/release/plan_release.sh | tee -a "${GITHUB_OUTPUT}"
+
+      # Hours of builds for a release that can no longer take them are not started. (A run by
+      # hand only keeps artifacts: it may rebuild a published version.)
+      - name: Check that the release is not published already
+        if: ${{ github.ref_type == 'tag' || github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          state="$(tools/release/release_state.sh "${TAG}")"
+          echo "The release ${TAG} is ${state}."
+          if [[ "${state}" == "published" ]]; then
+            echo "::error::The release ${TAG} is published already: bump the version in CMakeLists.txt."
+            exit 1
+          fi
 
   linux-windows:
     name: Linux and Windows downloads
     needs: plan
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    # (About 12 minutes with the other workflows' caches; an hour without them.)
+    timeout-minutes: 90
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 1G
@@ -234,17 +251,12 @@ jobs:
           ref: ${{ needs.plan.outputs.commit }}
           persist-credentials: false
 
-      - name: Install the build tools
-        run: brew install ninja
-
-      # rake builds mruby.
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.3"
+      - uses: ./.github/actions/macos-build-tools
 
       - name: Describe the toolchain
         run: |
           sw_vers
+          bash --version | head -n 1
           uname -m
           xcodebuild -version
           cmake --version | head -n 1
@@ -265,8 +277,18 @@ jobs:
       - name: Run the download's programs
         run: tools/release/smoke_test.sh dist/release/redgem-macos-${{ matrix.arch }}.zip
 
+      - name: Keep the download
+        uses: actions/upload-artifact@v4
+        with:
+          name: redgem-macos-${{ matrix.arch }}
+          path: dist/release/redgem-macos-${{ matrix.arch }}.zip
+          if-no-files-found: error
+
       # As a double click does: through the system's launcher, with no game named (the project hub).
+      # A picture for a person to look at, not a check: a screen capture that fails on the
+      # runner does not hold back the download.
       - name: Open the packed app and take a picture of the screen
+        continue-on-error: true
         run: |
           unpacked="${RUNNER_TEMP}/unpacked"
           mkdir -p "${unpacked}"
@@ -274,13 +296,6 @@ jobs:
           tools/macos/capture_window.sh "dist/screens/app-hub-${{ matrix.arch }}.png" 30 \
             open -W -n "${unpacked}/redgem/RedGem.app"
           pkill -x redgem || true
-
-      - name: Keep the download
-        uses: actions/upload-artifact@v4
-        with:
-          name: redgem-macos-${{ matrix.arch }}
-          path: dist/release/redgem-macos-${{ matrix.arch }}.zip
-          if-no-files-found: error
 
       - name: Keep the picture of the app
         if: ${{ !cancelled() }}
@@ -337,12 +352,10 @@ jobs:
   attach:
     name: Attach to the draft release
     needs: [plan, gather]
+    # (Only a pushed tag's run: nothing else writes its draft. No concurrency group, which would
+    # cancel a pending attach: attach_to_draft.sh swaps the downloads in only once all four are
+    # up, and checks the result.)
     if: ${{ needs.plan.outputs.attach == 'true' }}
-    # One at a time per tag, across runs: a release-* pull request's and the tag's runs both
-    # write the same draft.
-    concurrency:
-      group: release-attach-${{ needs.plan.outputs.tag }}
-      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # The only job that may write: it makes or changes the draft release.

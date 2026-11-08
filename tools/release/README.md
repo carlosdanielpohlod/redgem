@@ -20,24 +20,34 @@ compilers are pinned: llvm-mingw by `tools/windows/fetch_toolchain.sh`, the Andr
 `tools/android/fetch_toolchain.sh`, the runners by their image names.
 
 1. Bump the version in `CMakeLists.txt` and move the `[Unreleased]` part of `CHANGELOG.md` under
-   it, on a branch named `release-<version>`, and open its pull request. Its run attaches the
-   downloads to a draft release for `v<version>` (made when there is none). Try them.
+   it, on a branch named `release-<version>`, and open its pull request. Its run builds the four
+   downloads from the branch's head and keeps them as the run's artifacts (`redgem-<system>`):
+   try them. It touches no release. It fails at once when the branch does not name the version
+   in `CMakeLists.txt`, or when that version's release is published already.
 2. Merge it, and push the tag: `git tag v<version> <merge commit> && git push origin v<version>`.
-   The tag's run builds the downloads again from the tag and attaches them to the same draft,
-   replacing what the pull request attached. A tag that does not name the version in
-   `CMakeLists.txt` (`v<version>`, or a pre-release such as `v<version>-rc1`) fails.
+   The tag's run builds the downloads from the tag and attaches them to the tag's draft release,
+   which it makes when there is none (a pre-release, for a tag such as `v<version>-rc1`). Only a
+   tag's run attaches anything, so the draft only holds downloads built from its tag. A tag that
+   does not name the version in `CMakeLists.txt`, or whose release is published, fails before
+   anything is built. Running it again (re-running the run) replaces the draft's downloads.
 3. On GitHub, write the release's notes and publish the draft. Nothing publishes it on its own.
 
-Each run checks every download before it keeps it: what it holds
-(`tools/release/check_downloads.sh`), and its programs run on its own system
-(`tools/release/smoke_test.sh`: the editor's `--version`, the relay's and the server's `--help`,
-and on a Mac the app's signature). Then the four are checked together: if one is missing, or any
-job failed, nothing is attached to a release. A published release is never changed
-(`tools/release/attach_to_draft.sh` fails instead).
+What a run checks, and what it does not:
+
+- Every download, before it is kept: what it holds (`tools/release/check_downloads.sh`), and its
+  programs run on its own system (`tools/release/smoke_test.sh`: the editor's `--version`, the
+  relay's and the server's `--help`, and on a Mac the app's signature). That is all: no editor
+  is opened from a download (the Mac's app is opened for a picture, which is not a check), and no
+  game is built with one.
+- Then the four together: if one is missing, or any job failed, nothing is attached.
+- Attaching (`tools/release/attach_to_draft.sh`): the new downloads go up under other names
+  (`incoming.<name>`), are checked to be all there at the sizes packed, and only then, the release
+  checked again to still be a draft, replace the old ones. A failed upload leaves the old ones. A
+  published release is never changed. (The checks and the swap are separate calls to GitHub: the
+  owner publishing the draft during the seconds of the swap is not guarded against.)
 
 To try the workflow without touching any release, start it by hand (Actions > Release > Run
-workflow) with `dry_run` ticked, as it is by default: the downloads are only kept as the run's
-artifacts, `redgem-<system>`.
+workflow): a run by hand only keeps the downloads as its artifacts.
 
 ## By hand
 
