@@ -1,22 +1,22 @@
 # The menu's settings screen (see GameMenu): how the game is shown (window mode, resolution,
-# render scale, vsync, frame cap, quality) and heard (master volume), as the Settings module has
-# them. Each change takes effect at once; leaving the screen (its Back button or Esc) keeps them
-# for the game's next runs and goes back to the screen it was opened from. Its Controls button
-# keeps them too, and opens the controls page (see GameMenu::ControlsScreen), which comes back to
+# render scale, vsync, frame cap, quality) and heard (the master volume and each group's: music,
+# effects, voice), as the Settings module has them. Each change takes effect at once; leaving the
+# screen (its Back button or Esc) keeps them for the game's next runs and goes back to the screen
+# it was opened from. Its Controls button keeps them too, and opens the controls page (see GameMenu::ControlsScreen), which comes back to
 # it. A game's own options (add_option) come with its buttons.
 class GameMenu < Behaviour
   class SettingsScreen < Screen
     ROW_WIDTH = 560
-    ROW_HEIGHT = 40
-    ROW_GAP = 8
-    CAPTION_SIZE = 22
-    CAPTION_HEIGHT = 30        # pixels a section's caption takes above its rows
+    ROW_HEIGHT = 32            # (ten rows and the heading fit above the buttons on a 720 pixel screen)
+    ROW_GAP = 5
+    CAPTION_SIZE = 20
+    CAPTION_HEIGHT = 28        # pixels a section's caption takes above its rows
     CAPTION_COLOR = :gold
     BUTTONS_SHARE = 0.8        # where its Back button sits, as a share of the screen's height
     PERCENT = 100
     VOLUME_STEP = 0.05
     VIDEO_ROWS = %i[window_mode resolution render_scale vsync fps_cap quality].freeze
-    AUDIO_ROWS = %i[volume].freeze
+    AUDIO_ROWS = %i[volume music_volume effects_volume voice_volume].freeze
     SECTIONS = [[-> { I18n.t("game.settings.video") }, VIDEO_ROWS],
                 [-> { I18n.t("game.settings.audio") }, AUDIO_ROWS]].freeze
     # What each window mode and quality is called, in the language in use.
@@ -28,6 +28,11 @@ class GameMenu < Behaviour
                       high: -> { I18n.t("game.settings.quality_high") },
                       ultra: -> { I18n.t("game.settings.quality_ultra") },
                       custom: -> { I18n.t("game.settings.quality_custom") } }.freeze
+    # What each volume's slider is called (the AUDIO_ROWS, each a setting of Settings).
+    VOLUME_NAMES = { volume: -> { I18n.t("game.settings.volume") },
+                     music_volume: -> { I18n.t("game.settings.music_volume") },
+                     effects_volume: -> { I18n.t("game.settings.effects_volume") },
+                     voice_volume: -> { I18n.t("game.settings.voice_volume") } }.freeze
 
     # The name of the screen it goes back to.
     attr_accessor :from
@@ -139,9 +144,16 @@ class GameMenu < Behaviour
       Settings.quality = quality if quality
     end
 
-    def volume(box)
-      volume = UI.slider(I18n.t("game.settings.volume"), Settings.volume, step: VOLUME_STEP, **box)
-      Settings.volume = volume unless volume == Settings.volume
+    def volume(box) = volume_slider(:volume, box)
+    def music_volume(box) = volume_slider(:music_volume, box)
+    def effects_volume(box) = volume_slider(:effects_volume, box)
+    def voice_volume(box) = volume_slider(:voice_volume, box)
+
+    # A slider for one of Settings' volumes.
+    def volume_slider(setting, box)
+      current = Settings.__send__(setting)
+      volume = UI.slider(VOLUME_NAMES.fetch(setting).call, current, step: VOLUME_STEP, **box)
+      Settings.__send__("#{setting}=", volume) unless volume == current
     end
   end
 end

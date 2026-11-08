@@ -627,6 +627,36 @@ Audio.music(:theme, loop: true)
 Audio.stop_music
 ```
 
+Every sound returns an id (or `nil` when its file is missing), so a sound that goes on can be
+stopped and changed while it plays:
+
+```ruby
+@hum = Audio.play(:engine_hum, loop: true, volume: 0.4)
+Audio.set(@hum, pitch: 0.8 + 0.7 * rush)   # volume: and pitch: change as it plays
+Audio.stop(@hum) if Audio.playing?(@hum)
+```
+
+A new track crossfades from the one playing with `fade:` (seconds), and `stop_music` fades out the
+same way:
+
+```ruby
+Audio.music(:night, fade: 2.0)
+Audio.stop_music(fade: 1.5)
+```
+
+Each sound plays in a mix group: `:effects` unless it says, `:music` or `:voice`. The player turns
+each group up or down on the settings screen (or a script, through `Settings.music_volume`,
+`Settings.effects_volume` and `Settings.voice_volume`), apart from the master volume, and the music
+follows the music group:
+
+```ruby
+Audio.play(:line_042, group: :voice)
+Audio.play_at(:radio, position, loop: true, group: :music)
+```
+
+At most 64 sounds with ids play at once, positional ones (`Audio.play_at`) included; a sound that
+does not loop lets its id go when it ends.
+
 ## A sense of speed
 
 ```ruby

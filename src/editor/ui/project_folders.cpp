@@ -28,7 +28,7 @@ void add_prefab(PanelContext& context, const std::string& name) {
 void play_sound(PanelContext& context, const std::string& name) {
   if (context.audio == nullptr) return;
   context.audio->set_sounds_dir(context.session.game_dir() / config::kSoundsDirName);
-  context.audio->play_sound(name, kFullVolume, kAsRecorded);  // sound previews play as recorded
+  context.audio->play_sound(name, FlatSound{});  // sound previews play as recorded, at full volume
 }
 
 void open_scene(PanelContext& context, const std::string& name) { context.scene_to_open = name; }

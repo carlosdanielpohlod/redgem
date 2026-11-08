@@ -5,34 +5,39 @@
 #include <optional>
 #include <string>
 
+#include "audio/mix_groups.hpp"
+#include "audio/music_player.hpp"
 #include "audio/spatial_audio.hpp"
 
 namespace redgem {
-
-// What the audio is at before a game changes it: every sound and music at its full volume, the
-// music at the pitch it was recorded at.
-inline constexpr float kFullVolume = 1.0f;
-inline constexpr float kAsRecorded = 1.0f;
 
 // Sound effects and music of a game, looked up by name in its sounds/ folder
 // ("jump" -> sounds/jump.wav | .ogg | .mp3 | .flac).
 class AudioSystem {
  public:
   virtual ~AudioSystem() = default;
-  virtual bool play_sound(const std::string& name, float volume, float pitch) = 0;
-  virtual bool play_music(const std::string& name, bool loop, float volume) = 0;
-  // Positional sources overlap independently, even when they use the same asset. Zero means no source.
+  // Every sound played gets a handle (flat or positional, one id space) that stops it, changes its
+  // levels and says whether it still plays. Zero means no source: the file is missing, the backend
+  // plays nothing (silent and test backends without a pool), or kMaxSpatialSounds already play.
+  virtual SoundSourceId play_sound(const std::string&, const FlatSound&) { return kNoSoundSource; }
+  // Positional sources overlap independently, even when they use the same asset.
   // The game supplies world positions and listener orientation; update them when objects/cameras move.
-  // Backends without positional playback (including silent/test backends) report no source.
   virtual SoundSourceId play_spatial_sound(const std::string&, const SpatialSound&) { return kNoSoundSource; }
   virtual bool set_listener(const AudioListener&) { return false; }
   virtual bool move_sound(SoundSourceId, Vec3) { return false; }
+  virtual bool set_sound_levels(SoundSourceId, const SoundLevels&) { return false; }
   virtual bool sound_playing(SoundSourceId) const { return false; }
   virtual bool stop_sound(SoundSourceId) { return false; }
-  // Releases positional sources only; music and flat sound effects keep playing.
-  virtual void stop_spatial_sounds() {}
+  // Releases every sound with a handle; the music keeps playing.
+  virtual void stop_sounds() {}
+  // The player's volume of a group (Settings.music_volume...): what each sound of it is heard at,
+  // times its own.
+  virtual void set_group_volume(MixGroup, float) {}
 
-  virtual void stop_music() = 0;
+  // A new track fades in over `request.fade_seconds` while the one playing fades out.
+  virtual bool play_music(const std::string& name, const MusicRequest& request) = 0;
+  virtual void fade_out_music(float seconds) = 0;
+  void stop_music() { fade_out_music(kNoFade); }
   // The playing music's pitch (1 = as recorded; it also plays faster or slower) and volume. They
   // can change every frame: an engine's drone following the car's speed.
   virtual void set_music_pitch(float pitch) = 0;
@@ -45,8 +50,8 @@ class AudioSystem {
     player_volume_ = volume;
     set_master_volume(game_volume_);
   }
-  // Called every frame (music streams need feeding).
-  virtual void update() = 0;
+  // Called every frame with the frame's seconds (music streams need feeding, fades move on).
+  virtual void update(float seconds) = 0;
   // Where sounds are looked up; changes with the game being played.
   virtual void set_sounds_dir(const std::filesystem::path& dir) = 0;
 
@@ -69,14 +74,43 @@ std::optional<std::filesystem::path> find_sound_file(const std::filesystem::path
 // No audio device (a game nobody listens to): nothing plays, and every sound is said to be missing.
 class NullAudio final : public AudioSystem {
  public:
-  bool play_sound(const std::string&, float, float) override { return false; }
-  bool play_music(const std::string&, bool, float) override { return false; }
-  void stop_music() override {}
+  bool play_music(const std::string&, const MusicRequest&) override { return false; }
+  void fade_out_music(float) override {}
   void set_music_pitch(float) override {}
   void set_music_volume(float) override {}
   void set_master_volume(float) override {}
-  void update() override {}
+  void update(float) override {}
   void set_sounds_dir(const std::filesystem::path&) override {}
+};
+
+// Sounds in a SoundPool and music in a MusicPlayer, over the drivers of a backend: what every
+// backend that plays something shares. A backend keeps its drivers in a base listed before this
+// one, so they outlive the pool and the player, which stop through them as they go.
+class MixedAudio : public AudioSystem {
+ public:
+  MixedAudio(SoundDriver& sounds, MusicDriver& music) : sounds_(sounds), music_(music) {}
+
+  SoundSourceId play_sound(const std::string& name, const FlatSound& sound) override;
+  SoundSourceId play_spatial_sound(const std::string& name, const SpatialSound& sound) override;
+  bool set_listener(const AudioListener& listener) override;
+  bool move_sound(SoundSourceId id, Vec3 position) override;
+  bool set_sound_levels(SoundSourceId id, const SoundLevels& levels) override;
+  bool sound_playing(SoundSourceId id) const override;
+  bool stop_sound(SoundSourceId id) override;
+  void stop_sounds() override;
+  void set_group_volume(MixGroup group, float volume) override;
+  bool play_music(const std::string& name, const MusicRequest& request) override;
+  void fade_out_music(float seconds) override;
+  void set_music_pitch(float pitch) override;
+  void set_music_volume(float volume) override;
+  void update(float seconds) override;
+
+ protected:
+  const MusicPlayer& music_player() const { return music_; }
+
+ private:
+  SoundPool sounds_;
+  MusicPlayer music_;
 };
 
 // Plays through raylib. Falls back to silence when no audio device is available.

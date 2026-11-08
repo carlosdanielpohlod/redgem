@@ -23,7 +23,7 @@ void Engine::frame(float frame_seconds) {
   follow_presenter();
   advance_or_loading(frame_seconds);
   present();
-  audio().update();
+  audio().update(frame_seconds);
   ++context_.time.frame;
   keep_bindings();
   switch_scene_if_asked();

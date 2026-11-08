@@ -1,15 +1,10 @@
 #include "audio/audio.hpp"
 
-#include <raylib.h>
-
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <map>
-#include <set>
-#include <variant>
+#include <utility>
 
-#include "core/log.hpp"
 #include "core/safe_path.hpp"
 
 namespace redgem {
@@ -85,6 +80,7 @@ bool valid_spatial_sound(const SpatialSound& sound) {
 }
 std::optional<SpatialMix> spatial_sound_mix(const AudioListener& listener, const SpatialSound& sound) {
   if (!valid_spatial_sound(sound)) return std::nullopt;
+  if (!sound.positional) return SpatialMix{sound.volume};  // (centered)
   if (!finite_audio_vector(listener.position)) return std::nullopt;
   const auto right = audio_right(listener);
   if (!right) return std::nullopt;
@@ -102,8 +98,18 @@ void spatial_mono_frames(float* samples, unsigned frames) {
     stereo[1] = mono;
   }
 }
-SoundSourceId SpatialSoundPool::play(const std::string& name, const SpatialSound& sound) {
-  const auto mix = spatial_sound_mix(listener_, sound);
+SpatialSound flat_sound(const FlatSound& sound) {
+  SpatialSound flat;
+  flat.volume = sound.volume;
+  flat.pitch = sound.pitch;
+  flat.loop = sound.loop;
+  flat.group = sound.group;
+  flat.positional = false;
+  return flat;
+}
+
+SoundSourceId SoundPool::play(const std::string& name, const SpatialSound& sound) {
+  const auto mix = mix_of(sound);
   if (!mix) return kNoSoundSource;
   if (next_ > kMaximumSoundHandle) return kNoSoundSource;
   update();
@@ -114,39 +120,62 @@ SoundSourceId SpatialSoundPool::play(const std::string& name, const SpatialSound
   ++next_;
   return id;
 }
-bool SpatialSoundPool::set_listener(const AudioListener& listener) {
+bool SoundPool::set_listener(const AudioListener& listener) {
   if (!valid_audio_listener(listener)) return false;
   listener_ = listener;
   refresh();
   return true;
 }
-bool SpatialSoundPool::move(SoundSourceId id, Vec3 position) {
+bool SoundPool::move(SoundSourceId id, Vec3 position) {
   if (!finite_audio_vector(position)) return false;
   const auto found = sounds_.find(id);
   if (found == sounds_.end()) return false;
   found->second.position = position;
-  const auto mix = spatial_sound_mix(listener_, found->second);
+  const auto mix = mix_of(found->second);
   if (mix) driver_.mix(id, *mix);
   return mix.has_value();
 }
-bool SpatialSoundPool::playing(SoundSourceId id) const { return sounds_.count(id) != 0 && driver_.playing(id); }
-bool SpatialSoundPool::stop(SoundSourceId id) {
+bool SoundPool::set_levels(SoundSourceId id, const SoundLevels& levels) {
+  const auto found = sounds_.find(id);
+  if (found == sounds_.end()) return false;
+  SpatialSound changed = found->second;
+  changed.volume = levels.volume.value_or(changed.volume);
+  changed.pitch = levels.pitch.value_or(changed.pitch);
+  const auto mix = mix_of(changed);
+  if (!mix) return false;
+  found->second = changed;
+  driver_.pitch(id, changed.pitch);
+  driver_.mix(id, *mix);
+  return true;
+}
+void SoundPool::set_group_volume(MixGroup group, float volume) {
+  group_volumes_[mix_group_index(group)] = volume;
+  refresh();
+}
+bool SoundPool::playing(SoundSourceId id) const { return sounds_.count(id) != 0 && driver_.playing(id); }
+bool SoundPool::stop(SoundSourceId id) {
   const auto found = sounds_.find(id);
   if (found == sounds_.end()) return false;
   driver_.stop(id);
   sounds_.erase(found);
   return true;
 }
-void SpatialSoundPool::clear() {
+void SoundPool::clear() {
   while (!sounds_.empty()) stop(sounds_.begin()->first);
 }
-void SpatialSoundPool::refresh() {
+// A sound's mix, its group's volume applied.
+std::optional<SpatialMix> SoundPool::mix_of(const SpatialSound& sound) const {
+  auto mix = spatial_sound_mix(listener_, sound);
+  if (mix) mix->volume *= group_volumes_[mix_group_index(sound.group)];
+  return mix;
+}
+void SoundPool::refresh() {
   for (const auto& [id, sound] : sounds_) {
-    const auto mix = spatial_sound_mix(listener_, sound);
+    const auto mix = mix_of(sound);
     if (mix) driver_.mix(id, *mix);
   }
 }
-void SpatialSoundPool::update() {
+void SoundPool::update() {
   for (auto it = sounds_.begin(); it != sounds_.end();) {
     driver_.update(it->first);
     if (driver_.playing(it->first)) {
@@ -163,188 +192,29 @@ namespace {
 
 constexpr const char* kSoundExtensions[] = {".wav", ".ogg", ".mp3", ".flac"};
 
-using SpatialVoice = std::variant<Sound, Music>;
-AudioStream spatial_stream(const SpatialVoice& voice) {
-  return std::visit([](const auto& source) { return source.stream; }, voice);
-}
-void unload_spatial_voice(Sound sound) { UnloadSound(sound); }
-void unload_spatial_voice(Music music) { UnloadMusicStream(music); }
-std::optional<SpatialVoice> load_spatial_loop(const std::filesystem::path& file) {
-  Music music = LoadMusicStream(file.string().c_str());
-  const bool valid = IsMusicValid(music) && IsAudioStreamValid(music.stream);
-  if (valid) return SpatialVoice{music};
-  UnloadMusicStream(music);
-  return std::nullopt;
-}
-std::optional<SpatialVoice> load_spatial_voice(const std::filesystem::path& file, bool loop) {
-  if (loop) return load_spatial_loop(file);
-  // Buffered effects play through their final frame; a short nonlooping music stream may end while refilling.
-  Sound sound = LoadSound(file.string().c_str());
-  if (IsSoundValid(sound)) return SpatialVoice{sound};
-  UnloadSound(sound);
-  return std::nullopt;
-}
-void spatial_mono_callback(void* buffer, unsigned frames) { spatial_mono_frames(static_cast<float*>(buffer), frames); }
-void apply_spatial_mix(AudioStream stream, SpatialMix mix) {
-  constexpr float kPanCenter = 0.5f;  // raylib uses 0 for right and 1 for left
-  SetAudioStreamVolume(stream, mix.volume);
-  SetAudioStreamPan(stream, kPanCenter * (1.0f - mix.pan));
-}
-void prepare_spatial_stream(AudioStream stream, const SpatialSound& sound, SpatialMix mix) {
-  AttachAudioStreamProcessor(stream, spatial_mono_callback);
-  SetAudioStreamPitch(stream, sound.pitch);
-  apply_spatial_mix(stream, mix);
-}
-class RaylibSpatialAudio final : public SpatialAudioDriver {
- public:
-  RaylibSpatialAudio(const std::filesystem::path& dir, const bool& ready) : dir_(dir), ready_(ready) {}
-  bool start(SoundSourceId id, const std::string& name, const SpatialSound& sound, SpatialMix mix) override {
-    if (!ready_) return false;
-    const auto file = find_sound_file(dir_, name);
-    if (!file) return false;
-    auto voice = load_spatial_voice(*file, sound.loop);
-    if (!voice) return false;
-    const auto stream = spatial_stream(*voice);
-    prepare_spatial_stream(stream, sound, mix);
-    streams_.emplace(id, *voice);
-    PlayAudioStream(stream);
-    return true;
-  }
-  void update(SoundSourceId id) override {
-    if (auto* music = std::get_if<Music>(&streams_.at(id))) UpdateMusicStream(*music);
-  }
-  bool playing(SoundSourceId id) const override { return IsAudioStreamPlaying(spatial_stream(streams_.at(id))); }
-  void mix(SoundSourceId id, SpatialMix mix) override { apply_spatial_mix(spatial_stream(streams_.at(id)), mix); }
-  void stop(SoundSourceId id) override {
-    const auto found = streams_.find(id);
-    if (found == streams_.end()) return;
-    const auto stream = spatial_stream(found->second);
-    StopAudioStream(stream);
-    DetachAudioStreamProcessor(stream, spatial_mono_callback);
-    std::visit([](const auto& voice) { unload_spatial_voice(voice); }, found->second);
-    streams_.erase(found);
-  }
-
- private:
-  const std::filesystem::path& dir_;
-  const bool& ready_;
-  std::map<SoundSourceId, SpatialVoice> streams_;
-};
-
-class RaylibAudio final : public AudioSystem {
- public:
-  RaylibAudio() {
-    InitAudioDevice();
-    ready_ = IsAudioDeviceReady();
-    if (!ready_) log::warning("no audio device: the game runs silently");
-  }
-
-  ~RaylibAudio() override {
-    spatial_.clear();
-    stop_music();
-    for (auto& [name, sound] : sounds_) UnloadSound(sound);
-    if (ready_) CloseAudioDevice();
-  }
-
-  bool play_sound(const std::string& name, float volume, float pitch) override {
-    if (!ready_) return false;
-    auto it = sounds_.find(name);
-    if (it == sounds_.end()) {
-      const auto file = resolve(name);
-      if (!file) return false;
-      Sound sound = LoadSound(file->string().c_str());
-      if (!IsSoundValid(sound)) return false;
-      it = sounds_.emplace(name, sound).first;
-    }
-    SetSoundVolume(it->second, volume);
-    SetSoundPitch(it->second, pitch);
-    PlaySound(it->second);
-    return true;
-  }
-
-  SoundSourceId play_spatial_sound(const std::string& name, const SpatialSound& sound) override {
-    return spatial_.play(name, sound);
-  }
-  bool set_listener(const AudioListener& listener) override { return spatial_.set_listener(listener); }
-  bool move_sound(SoundSourceId id, Vec3 position) override { return spatial_.move(id, position); }
-  bool sound_playing(SoundSourceId id) const override { return spatial_.playing(id); }
-  bool stop_sound(SoundSourceId id) override { return spatial_.stop(id); }
-  void stop_spatial_sounds() override { spatial_.clear(); }
-
-  bool play_music(const std::string& name, bool loop, float volume) override {
-    if (!ready_) return false;
-    stop_music();
-    const auto file = resolve(name);
-    if (!file) return false;
-    music_ = LoadMusicStream(file->string().c_str());
-    if (!IsMusicValid(music_)) return false;
-    music_.looping = loop;
-    SetMusicVolume(music_, volume);
-    PlayMusicStream(music_);
-    has_music_ = true;
-    return true;
-  }
-
-  void stop_music() override {
-    if (!has_music_) return;
-    StopMusicStream(music_);
-    UnloadMusicStream(music_);
-    has_music_ = false;
-  }
-
-  void set_music_pitch(float pitch) override {
-    if (has_music_) SetMusicPitch(music_, pitch);
-  }
-
-  void set_music_volume(float volume) override {
-    if (has_music_) SetMusicVolume(music_, volume);
-  }
-
-  void set_master_volume(float volume) override {
-    const float heard = heard_volume(volume);
-    if (ready_) SetMasterVolume(heard);
-  }
-
-  void update() override {
-    if (has_music_) UpdateMusicStream(music_);
-    spatial_.update();
-  }
-
-  void set_sounds_dir(const std::filesystem::path& dir) override {
-    if (dir == sounds_dir_) return;
-    spatial_.clear();
-    for (auto& [name, sound] : sounds_) UnloadSound(sound);
-    sounds_.clear();
-    missing_.clear();
-    sounds_dir_ = dir;
-  }
-
- private:
-  std::optional<std::filesystem::path> resolve(const std::string& name) {
-    auto file = find_sound_file(sounds_dir_, name);
-    if (file) return file;
-    // (Said once for each name: a game asks for the same sound every time it plays it.)
-    if (missing_.insert(name).second) log::warning("sound '" + name + "' not found in " + sounds_dir_.string());
-    return std::nullopt;
-  }
-
-  bool ready_ = false;
-  std::filesystem::path sounds_dir_;
-  std::map<std::string, Sound> sounds_;
-  std::set<std::string> missing_;
-  Music music_{};
-  bool has_music_ = false;
-  RaylibSpatialAudio spatial_driver_{sounds_dir_, ready_};
-  SpatialSoundPool spatial_{spatial_driver_};
-};
+using GroupName = std::pair<MixGroup, const char*>;
+constexpr GroupName kGroupNames[] = {
+    {MixGroup::Music, "music"}, {MixGroup::Effects, "effects"}, {MixGroup::Voice, "voice"}};
 
 }  // namespace
+
+const char* mix_group_name(MixGroup group) {
+  for (const auto& [known, name] : kGroupNames) {
+    if (known == group) return name;
+  }
+  return kGroupNames[0].second;  // (every group has its name)
+}
+
+std::optional<MixGroup> mix_group_from_name(const std::string& name) {
+  for (const auto& [group, known] : kGroupNames) {
+    if (name == known) return group;
+  }
+  return std::nullopt;
+}
 
 std::optional<std::filesystem::path> find_sound_file(const std::filesystem::path& sounds_dir, const std::string& name) {
   // (A name that reaches outside the sounds folder finds nothing.)
   return find_asset_file(sounds_dir, name, kSoundExtensions);
 }
-
-std::unique_ptr<AudioSystem> create_raylib_audio() { return std::make_unique<RaylibAudio>(); }
 
 }  // namespace redgem

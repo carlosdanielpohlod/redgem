@@ -80,6 +80,26 @@ TEST_CASE("the settings are kept as they are read back") {
   CHECK(read.volume == doctest::Approx(0.25f));
 }
 
+TEST_CASE("each group's volume is kept apart from the master volume, and held from silent to full") {
+  constexpr float kQuiet = 0.25f;
+  constexpr float kHalf = 0.5f;
+  constexpr float kLoud = 0.75f;
+  DisplaySettings display;
+  display.music_volume = kQuiet;
+  display.effects_volume = kHalf;
+  display.voice_volume = kLoud;
+  const DisplaySettings read = display_from_json(display_json(display), DisplaySettings{});
+  CHECK(read.volume == doctest::Approx(kPlayersFullVolume));
+  CHECK(read.music_volume == doctest::Approx(kQuiet));
+  CHECK(read.effects_volume == doctest::Approx(kHalf));
+  CHECK(read.voice_volume == doctest::Approx(kLoud));
+  const DisplaySettings held =
+      display_from_json({{"music_volume", 3.0}, {"effects_volume", -1.0}, {"voice_volume", "loud"}}, read);
+  CHECK(held.music_volume == doctest::Approx(kPlayersFullVolume));
+  CHECK(held.effects_volume == doctest::Approx(0.0f));
+  CHECK(held.voice_volume == doctest::Approx(kLoud));  // (not a number: as it was)
+}
+
 TEST_CASE("what is missing or not what it should be stays as it was, and what is out of range is held to it") {
   DisplaySettings base;
   base.resolution = {1280, 720};

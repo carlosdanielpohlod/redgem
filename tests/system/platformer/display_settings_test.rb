@@ -12,7 +12,7 @@ SMALL = [640, 360].freeze
 HALF = 0.5
 SETTINGS_OPTION = 3         # on the pause menu: Resume, Restart, Multiplayer, Settings, Quit
 QUALITY_ROW = 5             # on the settings screen: mode, resolution, scale, vsync, cap, quality
-CONTROLS_OPTION = 7         # after its seven rows: the Controls button, then Back
+CONTROLS_OPTION = 10        # after its ten rows (six of video, four volumes): the Controls button, then Back
 JUMP_ROW = 2                # on the controls page: the player's choice, then fire, jump, run...
 JUMP = GameMenu::ControlsPage::Row.new(:jump, nil)
 

@@ -10,6 +10,19 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Sound handles**: `Audio.play(name, loop:, volume:, pitch:, group:)` returns the sound's id (or
+  `nil`), in the same id space as `Audio.play_at`, so `Audio.stop(id)`, `Audio.playing?(id)` and the
+  new `Audio.set(id, volume:, pitch:)` work on flat sounds too: a looping hum, an alarm that stops.
+  Each play is a voice of its own, so plays of one sound overlap instead of restarting it.
+
+- **Music crossfade**: `Audio.music(name, fade: seconds)` fades the new track in while the one
+  playing fades out, and `Audio.stop_music(fade:)` fades it out.
+
+- **Mix groups**: every sound plays in `:music`, `:effects` (the default) or `:voice`
+  (`group:` on `Audio.play` and `Audio.play_at`). `Settings.music_volume`, `effects_volume` and
+  `voice_volume` are the player's volume of each, kept with the master volume, and the settings
+  screen has a slider for each.
+
 - **The whole keyboard**: F1-F12, Insert, Delete, Home, End, Page Up and Page Down, the keypad
   (`:kp_0` to `:kp_9`, `:kp_enter`, `:kp_add`...), Caps, Scroll and Num Lock, Print Screen, Pause,
   Menu, Right Alt, the Super keys, and `;` `=` `[` `]` `\` and the grave key, for games and for
@@ -37,6 +50,14 @@ until 1.0, a release may change what games rely on (see
 - **Release downloads from CI**: a `release-*` pull request, a pushed `v*` tag or a manual run
   builds all four downloads on pinned toolchains and checks each one (contents, and its programs
   run on its own system). A tag's run attaches them to the tag's draft release, all four or none.
+
+### Changed
+
+- **`Audio.play` returns an id or `nil`** instead of `true` or `false`; a call that ignores it, or
+  only tests it, works as before. Its pitch must be from 0.01 to 8, as `play_at`'s.
+- **`Audio.music` with a missing file** leaves the track playing as it was, instead of stopping it.
+- **`Audio.stop_sources`** stops every sound with an id, flat ones included. A game's sounds stop
+  when it ends (the editor's Stop included), and so do its player's group volumes.
 
 ### Fixed
 

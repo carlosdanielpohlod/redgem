@@ -10,6 +10,7 @@
 
 #include "audio/audio.hpp"
 #include "app/engine.hpp"
+#include "testing/recording_audio.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -26,7 +27,7 @@ struct RecordedSpatialVoice {
   SpatialMix mix;
   bool active = true;
 };
-class SpatialTestDriver final : public SpatialAudioDriver {
+class SpatialTestDriver final : public SoundDriver {
  public:
   std::map<SoundSourceId, RecordedSpatialVoice> voices;
   bool accept = true;
@@ -41,6 +42,7 @@ class SpatialTestDriver final : public SpatialAudioDriver {
   void update(SoundSourceId) override {}
   bool playing(SoundSourceId id) const override { return voices.at(id).active; }
   void mix(SoundSourceId id, SpatialMix mix) override { voices.at(id).mix = mix; }
+  void pitch(SoundSourceId id, float pitch) override { voices.at(id).sound.pitch = pitch; }
   void stop(SoundSourceId id) override {
     voices.erase(id);
     ++stopped;
@@ -141,7 +143,7 @@ TEST_CASE("positional stereo downmix removes source channel bias without crossin
 
 TEST_CASE("two spatial sources of one asset keep independent position and playback ownership") {
   SpatialTestDriver driver;
-  SpatialSoundPool sounds(driver);
+  SoundPool sounds(driver);
   const auto left = sounds.play("step", spatial_at({-1, 0, 0}));
   const auto right = sounds.play("step", spatial_at({1, 0, 0}));
   REQUIRE(left != kNoSoundSource);
@@ -158,7 +160,7 @@ TEST_CASE("two spatial sources of one asset keep independent position and playba
 
 TEST_CASE("listener changes refresh active voices while rejected input leaves their mix unchanged") {
   SpatialTestDriver driver;
-  SpatialSoundPool sounds(driver);
+  SoundPool sounds(driver);
   const auto id = sounds.play("bird", spatial_at({1, 0, 0}));
   REQUIRE(id != kNoSoundSource);
   AudioListener listener;
@@ -173,7 +175,7 @@ TEST_CASE("listener changes refresh active voices while rejected input leaves th
 
 TEST_CASE("spatial voice completion and clear release resources without reusing stale handles") {
   SpatialTestDriver driver;
-  SpatialSoundPool sounds(driver);
+  SoundPool sounds(driver);
   const auto finished = sounds.play("impact", {});
   driver.voices.at(finished).active = false;
   sounds.update();
@@ -188,7 +190,7 @@ TEST_CASE("spatial voice completion and clear release resources without reusing 
 
 TEST_CASE("spatial voice resources are bounded and failed starts do not leave handles behind") {
   SpatialTestDriver driver;
-  SpatialSoundPool sounds(driver);
+  SoundPool sounds(driver);
   driver.accept = false;
   CHECK(sounds.play("missing", {}) == kNoSoundSource);
   CHECK(driver.voices.empty());
@@ -203,7 +205,7 @@ TEST_CASE("spatial voice resources are bounded and failed starts do not leave ha
 TEST_CASE("spatial pool destruction releases every active loop and silent backends refuse playback") {
   SpatialTestDriver driver;
   {
-    SpatialSoundPool sounds(driver);
+    SoundPool sounds(driver);
     SpatialSound loop;
     loop.loop = true;
     REQUIRE(sounds.play("wind", loop) != kNoSoundSource);
@@ -218,28 +220,7 @@ TEST_CASE("spatial pool destruction releases every active loop and silent backen
 
 namespace {
 
-class SpatialTestAudio final : public AudioSystem {
- public:
-  SpatialTestDriver driver;
-  SpatialSoundPool pool{driver};
-  bool play_sound(const std::string&, float, float) override { return true; }
-  bool play_music(const std::string&, bool, float) override { return true; }
-  void stop_music() override {}
-  void set_music_pitch(float) override {}
-  void set_music_volume(float) override {}
-  void set_master_volume(float) override {}
-  void update() override { pool.update(); }
-  void set_sounds_dir(const std::filesystem::path&) override { pool.clear(); }
-  SoundSourceId play_spatial_sound(const std::string& name, const SpatialSound& sound) override {
-    return pool.play(name, sound);
-  }
-  bool set_listener(const AudioListener& listener) override { return pool.set_listener(listener); }
-  bool move_sound(SoundSourceId id, Vec3 position) override { return pool.move(id, position); }
-  bool sound_playing(SoundSourceId id) const override { return pool.playing(id); }
-  bool stop_sound(SoundSourceId id) override { return pool.stop(id); }
-  void stop_spatial_sounds() override { pool.clear(); }
-};
-std::unique_ptr<Engine> spatial_engine(SpatialTestAudio& audio) {
+std::unique_ptr<Engine> spatial_engine(testing::RecordingAudio& audio) {
   EngineOptions options;
   options.game_dir = test::fixture("games/sandbox");
   options.fixed_step = true;
@@ -257,24 +238,24 @@ std::string spatial_ruby(Engine& engine, const std::string& code) {
 }  // namespace
 
 TEST_CASE("Ruby positional audio exposes independent handles explicit listener orientation and movement") {
-  SpatialTestAudio audio;
+  testing::RecordingAudio audio;
   auto engine = spatial_engine(audio);
   CHECK(spatial_ruby(*engine, "$voice = Audio.play_at(:beep, [1, 0, 0], volume: 0.5, pitch: 1.5, loop: true)") == "1");
-  REQUIRE(audio.driver.voices.size() == 1);
-  CHECK(audio.driver.voices.at(1).sound.loop);
-  CHECK(audio.driver.voices.at(1).sound.pitch == doctest::Approx(1.5f));
-  CHECK(audio.driver.voices.at(1).mix.volume == kSpatialHalf);
+  REQUIRE(audio.voices().size() == 1);
+  CHECK(audio.voices().at(1).sound.loop);
+  CHECK(audio.voices().at(1).sound.pitch == doctest::Approx(1.5f));
+  CHECK(audio.voices().at(1).mix.volume == kSpatialHalf);
   CHECK(spatial_ruby(*engine, "Audio.listener([0, 0, 0], [1, 0, 0], [0, 1, 0])") == "true");
-  CHECK(audio.driver.voices.at(1).mix.pan == 0.0f);
+  CHECK(audio.voices().at(1).mix.pan == 0.0f);
   CHECK(spatial_ruby(*engine, "Audio.move($voice, Vector3.new(0, 0, 1))") == "true");
-  CHECK(audio.driver.voices.at(1).mix.pan == 1.0f);
+  CHECK(audio.voices().at(1).mix.pan == 1.0f);
   CHECK(spatial_ruby(*engine, "Audio.playing?($voice)") == "true");
   CHECK(spatial_ruby(*engine, "Audio.stop($voice)") == "true");
   CHECK(spatial_ruby(*engine, "Audio.playing?($voice)") == "false");
 }
 
 TEST_CASE("Ruby positional audio refuses invalid input before creating a voice") {
-  SpatialTestAudio audio;
+  testing::RecordingAudio audio;
   auto engine = spatial_engine(audio);
   auto* vm = engine->scripts().vm().state();
   mrb_gv_set(vm, mrb_intern_lit(vm, "$audio_nan"), mrb_float_value(vm, std::numeric_limits<mrb_float>::quiet_NaN()));
@@ -292,18 +273,16 @@ TEST_CASE("Ruby positional audio refuses invalid input before creating a voice")
     INFO(code);
     CHECK_FALSE(engine->scripts().eval(code, "invalid_spatial_audio.rb").ok);
   }
-  CHECK(audio.driver.voices.empty());
+  CHECK(audio.voices().empty());
 }
 
-TEST_CASE("Ruby spatial sources report playback failures and stop without interrupting flat audio") {
-  SpatialTestAudio audio;
+TEST_CASE("Ruby spatial sources report playback failures and stop with the flat sounds") {
+  testing::RecordingAudio audio;
   auto engine = spatial_engine(audio);
-  audio.driver.accept = false;
   CHECK(spatial_ruby(*engine, "Audio.play_at(:missing, [0, 0, 0]).nil?") == "true");
-  audio.driver.accept = true;
-  CHECK(spatial_ruby(*engine, "Audio.play_at(:beep, [0, 0, 0]); Audio.play(:beep)") == "true");
-  CHECK(audio.driver.voices.size() == 1);
+  CHECK(spatial_ruby(*engine, "Audio.play_at(:beep, [0, 0, 0]); Audio.play(:beep)") == "2");
+  CHECK(audio.voices().size() == 2);
   spatial_ruby(*engine, "Audio.stop_sources");
-  CHECK(audio.driver.voices.empty());
+  CHECK(audio.voices().empty());
   CHECK(spatial_ruby(*engine, "Audio.move(1, [0, 0, 0])") == "false");
 }

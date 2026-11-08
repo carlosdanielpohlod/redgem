@@ -131,6 +131,7 @@ class Engine {
   // Scene currently running ("main" is scene.glb).
   const std::string& scene_name() const { return context_.scene_name; }
   AudioSystem& audio();
+  bool audio_open() const;  // whether audio() has something to sound through
   // Who shows the game: the presenter of its options, or the nobody it made for itself.
   Presenter& presenter() { return *presenter_; }
   AnimationPlayer& animations() { return animations_; }
@@ -149,7 +150,10 @@ class Engine {
   // The player's display settings, as they were kept; and what changes and keeps them (Settings).
   void open_display(const DisplaySettings& game_defaults);
   void connect_display();
-  void follow_players_volume(float volume);
+  // Passes on what changed of the player's volumes: the master's and each group's.
+  void follow_players_volumes(const DisplaySettings& display);
+  void follow_group_volume(MixGroup group, float volume);
+  void release_audio();
   // What the player chose of the game: its display settings, and the keys of its actions.
   void open_player_choices(const GameSettings& settings);
   // The game's actions and axes (game.json), and what its players bound them to.
@@ -258,6 +262,7 @@ class Engine {
   // The player's volume their settings last set (a multiplier of the game's own master volume):
   // only a change of it is passed on.
   float players_volume_ = kPlayersFullVolume;
+  GroupVolumes players_group_volumes_ = kFullGroupVolumes;
 };
 
 }  // namespace redgem

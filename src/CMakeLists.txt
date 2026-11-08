@@ -304,6 +304,9 @@ redgem_add_library(redgem_runtime
   physics/jolt/jolt_joints.cpp
   physics/jolt/jolt_physics_world_queries.cpp
   audio/audio.cpp
+  audio/mixed_audio.cpp
+  audio/music_player.cpp
+  audio/raylib_audio.cpp
   input/keys.cpp
   input/devices.cpp
   input/input.cpp

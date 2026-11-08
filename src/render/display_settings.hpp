@@ -50,6 +50,11 @@ struct DisplaySettings {
   QualityPreset quality = QualityPreset::Ultra;
   QualityCaps custom_quality;         // what QualityPreset::Custom allows
   float volume = kPlayersFullVolume;  // the game's master volume, 0 (silent) to 1
+  // The volume of each group of sounds, 0 to 1: the music, the effects, the voices. Each is heard
+  // at it times the master volume.
+  float music_volume = kPlayersFullVolume;
+  float effects_volume = kPlayersFullVolume;
+  float voice_volume = kPlayersFullVolume;
 };
 
 const char* window_mode_name(WindowMode mode);  // "windowed", "fullscreen", "borderless"
@@ -74,7 +79,8 @@ int held_fps_cap(int cap);
 
 // The settings as the user's settings file keeps them, and as scripts see them (Settings):
 //   {"window_mode": "windowed", "width": 1280, "height": 720, "render_scale": 1.0, "vsync": true,
-//    "fps_cap": 60, "quality": "ultra", "volume": 1.0,
+//    "fps_cap": 60, "quality": "ultra", "volume": 1.0, "music_volume": 1.0, "effects_volume": 1.0,
+//    "voice_volume": 1.0,
 //    "custom_quality": {"msaa": 8, "antialias": true, "shadow_cascades": 4, "shadow_distance": 1.0,
 //                       "scatter_density": 1.0, "scatter_distance": 1.0, "sky_detail": 1.0,
 //                       "ambient_occlusion": 1.0, "bloom": 1.0}}
