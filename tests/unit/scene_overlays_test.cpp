@@ -75,7 +75,7 @@ TEST_CASE("collider wires discard whole nonfinite triangles before sorting") {
 TEST_CASE("collider lines fill free capacity while preserving script commands") {
   constexpr std::size_t kQuadEdges = 5;
   DebugDrawBuffer commands;
-  const DebugDrawItem script{DebugDrawItem::Kind::Box, Vec3::zero(), Vec3::one(), Color{1, 0, 0, 1}, true};
+  const DebugDrawItem script{DebugDrawItem::Kind::Box, Vec3::zero(), Vec3::one(), redgem::Color{1, 0, 0, 1}, true};
   const auto script_count = kMaxDebugDrawCommands - kQuadEdges;
   for (std::size_t index = 0; index < script_count; ++index) REQUIRE(commands.append(script));
   PhysicsDebugGeometry geometry;
