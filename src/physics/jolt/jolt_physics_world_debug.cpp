@@ -61,6 +61,7 @@ class LeafCollector final : public JPH::TransformedShapeCollector {
                 PhysicsDebugGeometry& geometry)
       : metadata_(metadata), skip_(skip), limit_(limit), geometry_(geometry) {}
   void AddHit(const JPH::TransformedShape& shape) override {
+    if (!complete_) return;
     complete_ = append_leaf(shape, metadata_, skip_, limit_, geometry_);
     if (!complete_) ForceEarlyOut();
   }

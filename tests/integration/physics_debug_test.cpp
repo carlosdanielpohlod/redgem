@@ -195,3 +195,41 @@ TEST_CASE("physics debug: small colliders hand their unused quota to a detailed 
   CHECK(seen == kTriangles);
   CHECK_FALSE(geometry.truncated);
 }
+
+TEST_CASE("physics debug: remaining quota skips previously sampled triangles across compound leaves") {
+  auto world = create_jolt_physics_world(Vec3::zero());
+  JPH::StaticCompoundShapeSettings settings;
+  constexpr float kHalfSize = 0.5f;
+  constexpr float kSpacing = 3;
+  constexpr int kLeaves = 4;
+  for (int index = 0; index < kLeaves; ++index)
+    settings.AddShape(JPH::Vec3(static_cast<float>(index) * kSpacing, 0, 0), JPH::Quat::sIdentity(),
+                      new JPH::BoxShape(JPH::Vec3::sReplicate(kHalfSize)));
+  const auto shape = settings.Create();
+  REQUIRE_FALSE(shape.HasError());
+  const JPH::TransformedShape transformed(JPH::RVec3::sZero(), JPH::Quat::sIdentity(), shape.Get().GetPtr(),
+                                          JPH::BodyID());
+  const PhysicsDebugTriangle metadata{kBox, BodyType::Static, false, {}};
+  PhysicsDebugGeometry expected;
+  REQUIRE(jolt::append_debug_shape(transformed, metadata, 0, kMaxPhysicsDebugTriangles, expected));
+  constexpr std::size_t kFirstQuota = 29;  // two box leaves and part of the third
+  REQUIRE(expected.triangles.size() > kFirstQuota);
+  PhysicsDebugGeometry sampled;
+  CHECK_FALSE(jolt::append_debug_shape(transformed, metadata, 0, kFirstQuota, sampled));
+  REQUIRE(sampled.triangles.size() == kFirstQuota);
+  REQUIRE(
+      jolt::append_debug_shape(transformed, metadata, sampled.triangles.size(), kMaxPhysicsDebugTriangles, sampled));
+  REQUIRE(sampled.triangles.size() == expected.triangles.size());
+  for (std::size_t index = 0; index < expected.triangles.size(); ++index)
+    for (std::size_t corner = 0; corner < kDebugTriangleCorners; ++corner)
+      CHECK(approx_equal(sampled.triangles[index].corners[corner], expected.triangles[index].corners[corner],
+                         kTolerance));
+}
+
+TEST_CASE("physics debug: an empty world needs no geometry even with only the capacity probe") {
+  auto world = create_jolt_physics_world(Vec3::zero());
+  constexpr std::size_t kProbeTriangles = 1;
+  const auto geometry = world->debug_geometry(kProbeTriangles);
+  CHECK(geometry.triangles.empty());
+  CHECK_FALSE(geometry.truncated);
+}

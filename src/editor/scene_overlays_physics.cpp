@@ -1,6 +1,7 @@
 #include "editor/scene_overlays.hpp"
 
 #include <array>
+#include <cmath>
 #include <algorithm>
 #include <vector>
 #include <tuple>
@@ -9,6 +10,8 @@
 
 namespace redgem {
 namespace {
+// Allow shared mesh edges to fill the buffer; append trims disconnected edges at capacity.
+constexpr std::size_t kTrianglesPerCommand = 2;
 constexpr Color kStatic{0.63f, 0.71f, 0.78f, 1};
 constexpr Color kDynamic{0.31f, 0.94f, 0.47f, 1};
 constexpr Color kKinematic{0.39f, 0.63f, 1, 1};
@@ -37,7 +40,14 @@ Edge edge_key(ObjectId object, Vec3 first, Vec3 second) {
   Point b{second.x, second.y, second.z};
   return a < b ? Edge{object, a, b} : Edge{object, b, a};
 }
+bool finite_corner(Vec3 corner) {
+  return std::isfinite(corner.x) && std::isfinite(corner.y) && std::isfinite(corner.z);
+}
+bool finite_triangle(const PhysicsDebugTriangle& triangle) {
+  return std::all_of(triangle.corners.begin(), triangle.corners.end(), finite_corner);
+}
 void collect_triangle(Edges& edges, const PhysicsDebugTriangle& triangle) {
+  if (!finite_triangle(triangle)) return;
   for (std::size_t corner = 0; corner < kDebugTriangleCorners; ++corner) {
     const auto first = triangle.corners[corner];
     const auto second = triangle.corners[(corner + 1) % kDebugTriangleCorners];
@@ -63,6 +73,10 @@ bool append_edge(DebugDrawBuffer& commands, const ColoredEdge& edge) {
   return commands.append({DebugDrawItem::Kind::Line, vector_of(first), vector_of(second), edge.second, false});
 }
 }  // namespace
+std::size_t physics_debug_triangle_budget(const DebugDrawBuffer& commands) {
+  const auto remaining = kMaxDebugDrawCommands - commands.items().size();
+  return std::min(kMaxPhysicsDebugTriangles, std::max(std::size_t{1}, remaining * kTrianglesPerCommand));
+}
 bool append_physics_colliders(DebugDrawBuffer& commands, const PhysicsDebugGeometry& geometry) {
   for (const auto& edge : unique_edges(geometry))
     if (!append_edge(commands, edge)) return false;

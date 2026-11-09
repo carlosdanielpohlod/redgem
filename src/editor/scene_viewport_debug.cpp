@@ -13,11 +13,10 @@ void copy_commands(DebugDrawBuffer& target, const DebugDrawBuffer* source) {
 }  // namespace
 FrameView GameView::physics_view(const FrameView& view) {
   copy_commands(physics_commands_, view.debug_draw);
-  const auto remaining = kMaxDebugDrawCommands - physics_commands_.items().size();
-  const auto triangle_limit = remaining / kDebugTriangleCorners;
+  const auto triangle_limit = physics_debug_triangle_budget(physics_commands_);
   const auto geometry = physics_debug_engine_->physics().debug_geometry(triangle_limit);
   const bool complete = append_physics_colliders(physics_commands_, geometry);
-  physics_debug_truncated_ = triangle_limit == 0 || !complete;
+  physics_debug_truncated_ = !complete;
   auto combined = view;
   combined.debug_draw = &physics_commands_;
   return combined;
