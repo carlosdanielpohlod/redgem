@@ -34,6 +34,10 @@ until 1.0, a release may change what games rely on (see
 - **Prefab previews in the editor**: inherited geometry and components appear while editing,
   with reference selection, cached placement edits and preserved links on save.
 
+- **Release downloads from CI**: a `release-*` pull request, a pushed `v*` tag or a manual run
+  builds all four downloads on pinned toolchains and checks each one (contents, and its programs
+  run on its own system). A tag's run attaches them to the tag's draft release, all four or none.
+
 ### Fixed
 
 - **A very long script name no longer crashes `redgem run`, `shot` and the MCP server**: the

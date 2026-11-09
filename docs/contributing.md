@@ -107,6 +107,10 @@ Every pull request runs these workflows (`.github/workflows/`), side by side:
 * **Fuzzing** (`fuzz.yml`): the fuzz targets below, a minute each on a pull request, ten minutes
   each every night.
 
+* **Release** (`release.yml`): only on a `release-*` pull request, a pushed `v*` tag or a run
+  started by hand: the four downloads of a release, built and checked; a tag's run also attaches
+  them to its draft release (see [Releases](#releases)).
+
 Every workflow builds with `-DREDGEM_WARNINGS_AS_ERRORS=ON`: a compiler warning in `src/` or
 `tests/` fails it (the dependencies keep theirs). Build the same way before pushing to see them
 first. A sanitized build is made and tested the same way as CI does:
@@ -145,6 +149,27 @@ Each target's seeds are in `tests/fuzz/corpus/<target>/`, and every build replay
 crashes it, fix the code and add the input to the target's corpus: its replay keeps it tested. A
 new parser of untrusted input gets a target of its own (`redgem_add_fuzz_target` in
 `tests/fuzz/CMakeLists.txt`).
+
+### Releases
+
+The downloads of a release (`redgem-linux-x86_64.tar.gz`, `redgem-windows-x86_64.zip`,
+`redgem-macos-arm64.zip`, `redgem-macos-x86_64.zip`) are built and packed by `release.yml`, never
+by hand. A release goes:
+
+1. A pull request from a `release-<version>` branch bumps the version in `CMakeLists.txt` and
+   dates the changelog. Its run builds the four downloads and keeps them as its artifacts, to be
+   tried; it touches no release. It fails at once when the branch's version is not the one in
+   `CMakeLists.txt`, or when that version is released already.
+2. After it is merged, pushing the tag `v<version>` builds them from the tag and attaches them to
+   the tag's draft release, made when missing. Only a tag's run attaches anything.
+3. The owner writes the notes and publishes the draft on GitHub. The workflow never publishes a
+   release, and never changes one that is published.
+
+Every download is checked before it is kept, and only by listing what it holds and running its
+programs' `--version` and `--help` on its own system. The four are checked together: with one
+missing or any check failed, the draft gets none of them. A run started by hand only keeps the
+downloads as its artifacts. `tools/release/README.md` has the details, and how to pack them by
+hand to try a change to the scripts.
 
 ## Layout
 

@@ -1,0 +1,15 @@
+# What a Mac runner needs to build the engine, for macos.yml and release.yml: ninja, bash 4 or
+# newer (the test and release scripts are written for it; the Mac's own is 3.2), and the Ruby
+# rake builds mruby with. Used after actions/checkout.
+name: Mac build tools
+description: ninja and bash from Homebrew, and Ruby for rake.
+runs:
+  using: composite
+  steps:
+    - name: Install ninja and bash
+      shell: bash
+      run: brew install ninja bash
+
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: "3.3"
