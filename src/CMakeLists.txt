@@ -545,6 +545,7 @@ if(NOT ANDROID)
   editor/editor_session.cpp
     editor/editor_session_create.cpp
     editor/editor_session_play.cpp
+    editor/recovery_lease.cpp
     editor/scene_recovery.cpp
     editor/editor_session_recovery.cpp
     editor/editor_recovery.cpp

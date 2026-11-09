@@ -145,6 +145,10 @@ void EditorApp::draw_status_bar() {
 
 // Left of the status bar: the console's newest line.
 void EditorApp::draw_last_message() {
+  if (!session_->recovery_problem().empty()) {
+    ImGui::TextColored(ui::warning_color(), "%s", session_->recovery_problem().c_str());
+    return;
+  }
   if (console_->entries().empty()) return;
   const ConsoleEntry& last = console_->entries().back();
   ImGui::TextColored(level_color(last.level), "%s", last.message.c_str());

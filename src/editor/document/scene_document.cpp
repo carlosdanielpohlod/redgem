@@ -39,7 +39,7 @@ bool recoverable_buffers(const GlbFile& glb, std::string& error) {
     }
   }
   if (glb.bin.size() > recovery_format::kMaxBytes) {
-    error = "scene exceeds the 64 MiB recovery limit";
+    error = recovery_format::limit_error();
     return false;
   }
   return true;
@@ -68,6 +68,22 @@ std::variant<SceneDocument, std::string> SceneDocument::open_file(const std::fil
   document.desc_ = std::move(loaded.scene);
   document.remember_ids();
   document.remember_node_references(0, 0);
+  return document;
+}
+
+std::variant<SceneDocument, std::string> SceneDocument::open_recovery(const std::filesystem::path& source,
+                                                                      GlbFile file) {
+  std::string error;
+  const auto bytes = encode_glb(file, error);
+  if (!bytes) return error;
+  auto loaded = load_gltf_snapshot(source.string(), *bytes, recovery_format::kMaxBytes);
+  if (!loaded.ok) return loaded.error;
+  SceneDocument document;
+  document.keep_file(std::move(file));
+  document.desc_ = std::move(loaded.scene);
+  document.remember_ids();
+  document.remember_node_references(0, 0);
+  document.recovered_as(source);
   return document;
 }
 

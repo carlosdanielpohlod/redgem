@@ -29,7 +29,8 @@ void EditorApp::autosave_scene() {
   session_->autosave(frame_seconds());
 }
 void EditorApp::draw_recovery_dialog() {
-  if (!session_->recovery_pending() || pending_ || waiting_for_build()) return;
+  const bool wanted = session_->recovery_pending() && !pending_ && !waiting_for_build();
+  if (!wanted) return;
   if (!ImGui::IsPopupOpen(recovery_popup())) ImGui::OpenPopup(recovery_popup());
   recovery_dialog_size();
   if (!ImGui::BeginPopupModal(recovery_popup(), nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;

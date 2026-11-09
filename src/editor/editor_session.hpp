@@ -141,9 +141,11 @@ class EditorSession {
   void redo();
   // Writes the scene being edited back to its file.
   bool save(std::string& error);
+  const std::string& recovery_problem() const { return recovery_.problem(); }
   bool recovery_pending() const { return recovery_.pending(); }
   bool recovery_source_changed() const { return recovery_.source_changed(); }
   bool recover_scene(std::string& error);
+  void ignore_recovery() { recovery_.ignore(); }
   bool discard_recovery(std::string& error) { return recovery_.discard(error); }
   void autosave(float seconds);
 

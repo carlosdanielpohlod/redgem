@@ -168,7 +168,11 @@ While editing, the editor writes changed scene data roughly once a minute, outsi
 interactions, dialogs and Play. This is a separate hidden copy beside the scene
 (`.scene.glb.recovery`, or the corresponding name beside a scene in `scenes/`). The original
 file, dirty indicator and undo history stay unchanged. Copies and partial writes do not ship.
-Successful Save/Save As and explicit Discard remove the previous copy.
+Successful Save/Save As and explicit Discard remove the previous copy. An OS-held per-scene
+lease prevents a second editor from offering or deleting a live editor's copy; its small hidden
+lock file stays in place, and the OS releases ownership after exit or a crash. If cleanup fails
+after Save, a fingerprinted dismissal marker suppresses that old copy across restarts when
+the folder permits writing the marker. Cleanup errors never prevent closing without saving.
 
 After an interrupted session, opening that scene offers **Recover changes** or **Discard
 recovery copy**. Recovery restores unsaved work; **Save** replaces the original only when you
@@ -179,7 +183,11 @@ Recovery includes authored nodes, stable identities, materials and terrain edits
 raw prefab links. Images stored outside the GLB still resolve beside it; those images and
 prefab sources themselves are not backed up. Script files are separate. The current recovery
 write is synchronous, limited to 64 MiB, and requires embedded GLB buffers. The original scene
-must remain loadable to reopen the editor. Keep manual saves and version control for larger
+must remain loadable to reopen the editor. The source fingerprint is computed lazily on the
+first recovery write, with file size and timestamp checked against the opened scene; once
+written, later conflicts are detected even if size and timestamp match. An autosave failure
+remains visible in the status bar and is retried only after another edit. Recovery refuses to
+replace edits made while its prompt was open. Keep manual saves and version control for larger
 scenes or changes to external assets.
 
 ## Building

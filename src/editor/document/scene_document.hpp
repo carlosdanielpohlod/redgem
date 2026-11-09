@@ -30,6 +30,7 @@ struct DescOffsets;
 class SceneDocument {
  public:
   static std::variant<SceneDocument, std::string> open(const std::filesystem::path& path);
+  static std::variant<SceneDocument, std::string> open_recovery(const std::filesystem::path& source, GlbFile file);
   // A document with no objects yet, saved to `path` on save() (new games start from it).
   static SceneDocument create_empty(const std::filesystem::path& path);
 

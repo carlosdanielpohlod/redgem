@@ -52,6 +52,7 @@ TEST_CASE("scene recovery writes a separate authored copy and preserves undo sta
   CHECK_FALSE(game.document.dirty());
   game.document.redo();
   CHECK(game.document.node(0).name == "Edited");
+  recovery.stop();
   SceneRecovery restarted;
   restarted.watch(game.source);
   REQUIRE(restarted.pending());
@@ -122,10 +123,13 @@ TEST_CASE("scene recovery keeps a valid backup when flushing its replacement fai
   CHECK(game.bytes(game.source) == original);
   CHECK(game.document.dirty());
   for (const auto& entry : fs::directory_iterator(game.folder)) {
-    const bool expected_file = entry.path() == game.source || entry.path() == copy;
+    auto lease_file = copy;
+    lease_file += ".lock";
+    const bool expected_file = entry.path() == game.source || entry.path() == copy || entry.path() == lease_file;
     CHECK(expected_file);
   }
   fail_flush = false;
+  game.document.set_name(0, "Third edit");
   game.autosave(recovery);
   CHECK(game.bytes(copy) != good);
 }
@@ -261,4 +265,109 @@ TEST_CASE("scene recovery refuses linked buffers before changing the document's 
   CHECK(game.bytes(game.source) == original);
   CHECK_FALSE(fs::exists(SceneRecovery::copy_path(game.source)));
   CHECK(game.document.dirty());
+}
+
+TEST_CASE("scene recovery never reads or deletes a live editor's copy") {
+  RecoveryGame game;
+  SceneRecovery owner;
+  owner.watch(game.source);
+  game.document.set_name(0, "Live unsaved edit");
+  game.autosave(owner);
+  const auto copy = SceneRecovery::copy_path(game.source);
+  const auto bytes = game.bytes(copy);
+  SceneRecovery other;
+  other.watch(game.source);
+  CHECK_FALSE(other.pending());
+  CHECK_FALSE(other.problem().empty());
+  REQUIRE(other.discard(game.error));
+  CHECK(game.bytes(copy) == bytes);
+  CHECK_FALSE(other.recover(game.document, game.error));
+  owner.stop();  // the same release the OS performs when the writer exits
+  other.watch(game.source);
+  REQUIRE(other.pending());
+  REQUIRE(other.recover(game.document, game.error));
+  CHECK(game.document.node(0).name == "Live unsaved edit");
+}
+TEST_CASE("scene recovery retains an external conflict after recovery and a second crash") {
+  RecoveryGame game;
+  SceneRecovery recovery;
+  recovery.watch(game.source);
+  game.document.set_name(0, "Recovered");
+  game.autosave(recovery);
+  auto opened = SceneDocument::open(game.source);
+  auto& external = std::get<SceneDocument>(opened);
+  external.set_name(0, "External");
+  REQUIRE(external.save(game.error));
+  recovery.watch(game.source);
+  REQUIRE(recovery.source_changed());
+  REQUIRE(recovery.recover(game.document, game.error));
+  game.document.set_name(0, "Recovered again");
+  game.autosave(recovery);
+  recovery.watch(game.source);
+  CHECK(recovery.source_changed());
+}
+TEST_CASE("scene recovery suppresses a permanent failure until the document changes") {
+  RecoveryGame game;
+  std::size_t attempts = 0;
+  SceneRecovery recovery([&](std::FILE*) {
+    ++attempts;
+    return false;
+  });
+  recovery.watch(game.source);
+  game.document.set_name(0, "Edit");
+  CHECK_FALSE(recovery.poll(game.document, SceneRecovery::kIntervalSeconds, game.error));
+  CHECK_FALSE(recovery.problem().empty());
+  REQUIRE(recovery.poll(game.document, SceneRecovery::kIntervalSeconds, game.error));
+  CHECK(attempts == 1);
+  game.document.set_name(0, "Another edit");
+  CHECK_FALSE(recovery.poll(game.document, SceneRecovery::kIntervalSeconds, game.error));
+  CHECK(attempts == 2);
+}
+TEST_CASE("editor recovery refuses to replace newer edits made while the prompt was open") {
+  RecoveryGame game;
+  auto opened = EditorSession::open(game.folder);
+  auto session = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
+  session->document().set_name(0, "Backup");
+  session->autosave(SceneRecovery::kIntervalSeconds);
+  session.reset();
+  opened = EditorSession::open(game.folder);
+  session = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
+  REQUIRE(session->recovery_pending());
+  session->document().set_name(0, "Newer bridge edit");
+  CHECK_FALSE(session->recover_scene(game.error));
+  CHECK(session->document().node(0).name == "Newer bridge edit");
+  CHECK(session->recovery_pending());
+}
+
+TEST_CASE("scene recovery uses the validated offer even if the pathname changes before recovery") {
+  RecoveryGame game;
+  SceneRecovery recovery;
+  recovery.watch(game.source);
+  game.document.set_name(0, "Validated backup");
+  game.autosave(recovery);
+  recovery.watch(game.source);
+  CHECK_FALSE(recovery.source_changed());  // cache the exact validated snapshot shown to the user
+  REQUIRE(write_text_file(SceneRecovery::copy_path(game.source), "replaced after prompt", game.error));
+  REQUIRE(recovery.recover(game.document, game.error));
+  CHECK(game.document.node(0).name == "Validated backup");
+}
+
+TEST_CASE("a dismissed old recovery copy is not reoffered after a later editor restart") {
+  RecoveryGame game;
+  SceneRecovery recovery;
+  recovery.watch(game.source);
+  game.document.set_name(0, "Older backup");
+  game.autosave(recovery);
+  game.document.set_name(0, "Newer manual save");
+  REQUIRE(game.document.save(game.error));
+  recovery.ignore();  // the fallback when deleting the older backup fails
+  recovery.stop();
+  SceneRecovery restarted;
+  restarted.watch(game.source);
+  CHECK_FALSE(restarted.pending());
+  CHECK(fs::exists(SceneRecovery::copy_path(game.source)));
+  game.document.set_name(0, "New unsaved edit");
+  game.autosave(restarted);
+  restarted.watch(game.source);
+  CHECK(restarted.pending());  // a fresh backup is not hidden by the old dismissal
 }

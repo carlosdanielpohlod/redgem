@@ -47,3 +47,7 @@ games/*-data/
 .*.glb.recovery
 .*.glb.recovery.part
 .*.glb.recovery.*.part
+
+.*.glb.recovery.lock
+.*.glb.recovery.dismissed
+.*.glb.recovery.dismissed.*.part

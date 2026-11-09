@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <memory>
+#include <utility>
 
 #include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_checks.hpp"
@@ -103,9 +104,8 @@ bool pictures_checked(const cgltf_data& data, const gltf_checks::NamedFiles& fil
 
 }  // namespace
 
-LoadResult load_gltf_scene(const std::string& path, std::uint64_t max_bytes) {
-  LoadResult result;
-  const CgltfPtr data = parsed_gltf(path, result.error, max_bytes);
+namespace {
+LoadResult read_scene(const CgltfPtr& data, const std::string& path, LoadResult result, std::uint64_t max_bytes) {
   if (data == nullptr) return result;
   // (Each file the scene names is found once, for every step below.)
   const gltf_checks::NamedFiles files = gltf_checks::named_files(*data, folder_of(path));
@@ -115,6 +115,24 @@ LoadResult load_gltf_scene(const std::string& path, std::uint64_t max_bytes) {
   result.ok = sound(reader.run(), path, result.error) && pictures_checked(*data, files, path, result, max_bytes);
   if (!result.ok) result.scene = SceneDesc{};
   return result;
+}
+}  // namespace
+LoadResult load_gltf_scene(const std::string& path, std::uint64_t max_bytes) {
+  LoadResult result;
+  const auto data = parsed_gltf(path, result.error, max_bytes);
+  return read_scene(data, path, std::move(result), max_bytes);
+}
+LoadResult load_gltf_snapshot(const std::string& path, const std::vector<std::uint8_t>& bytes,
+                              std::uint64_t max_bytes) {
+  LoadResult result;
+  if (!sound(bytes.size() > max_bytes ? "scene exceeds its loading byte budget" : "", path, result.error))
+    return result;
+  cgltf_options options{};
+  cgltf_data* raw = nullptr;
+  const auto parsed = cgltf_parse(&options, bytes.data(), bytes.size(), &raw);
+  const CgltfPtr data(raw);
+  if (!succeeded(parsed, "cannot parse", path, result.error)) return result;
+  return read_scene(data, path, std::move(result), max_bytes);
 }
 
 LoadResult load_gltf_scene(const std::string& path) { return load_gltf_scene(path, gltf_budget::kMaxSceneBytes); }

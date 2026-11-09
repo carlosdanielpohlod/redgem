@@ -20,6 +20,8 @@ struct LoadResult {
 // skeleton keeps its first config::kMaxSkinJoints joints, with a warning when it has more; a
 // vertex that names a joint its skeleton does not have follows the skeleton's first.
 LoadResult load_gltf_scene(const std::string& path);
+// Loads a validated snapshot without reopening its source; linked images resolve beside path.
+LoadResult load_gltf_snapshot(const std::string& path, const std::vector<std::uint8_t>& bytes, std::uint64_t max_bytes);
 // A tighter byte budget, checked before buffers are loaded and before images are decoded.
 LoadResult load_gltf_scene(const std::string& path, std::uint64_t max_bytes);
 

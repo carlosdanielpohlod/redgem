@@ -3,9 +3,11 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <set>
 #include <utility>
 
 #include "editor/document/scene_document.hpp"
+#include "editor/recovery_lease.hpp"
 #include "storage/durable_file.hpp"
 
 namespace redgem {
@@ -16,6 +18,12 @@ class SceneRecovery {
   static constexpr float kIntervalSeconds = 60.0f;
   static std::filesystem::path copy_path(const std::filesystem::path& source);
   void watch(const std::filesystem::path& source);
+  void ignore();
+  void stop() {
+    lease_.release();
+    pending_ = false;
+  }
+  const std::string& problem() const { return problem_; }
   bool pending() const { return pending_; }
   bool source_changed() const;
   bool recover(SceneDocument& document, std::string& error);
@@ -23,14 +31,25 @@ class SceneRecovery {
   bool poll(SceneDocument& document, float seconds, std::string& error);
 
  private:
+  const GlbFile* offered_copy(std::string& error) const;
+  bool own(const std::filesystem::path& source);
+  void reset_observation();
+  bool save_or_report(SceneDocument& document, std::string& error);
+  bool restore(SceneDocument& document, std::string& error);
   bool write(SceneDocument& document, std::string& error);
   durable::Flush flush_;
+  RecoveryLease lease_;
+  std::string problem_;
+  std::optional<long long> failed_version_;
+  std::set<std::filesystem::path> ignored_sources_;
   bool save_version(SceneDocument& document, std::string& error);
   std::filesystem::path source_;
   std::string baseline_;
+  std::string observed_stamp_;
   std::optional<long long> written_version_;
   float elapsed_ = 0;
   bool pending_ = false;
   mutable std::optional<bool> source_changed_;
+  mutable std::optional<GlbFile> offered_;
 };
 }  // namespace redgem

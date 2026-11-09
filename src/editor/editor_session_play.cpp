@@ -78,6 +78,7 @@ bool EditorSession::open_scene(const std::string& name, std::string& error) {
     error = *message;
     return false;
   }
+  if (!document_.dirty()) forget_recovery();
   document_ = std::move(std::get<SceneDocument>(opened));
   begin_editing();
   log::info("editing " + document_.path().string());
@@ -91,7 +92,10 @@ void EditorSession::follow_scene_file() {
 }
 void EditorSession::forget_recovery() {
   std::string error;
-  if (!recovery_.discard(error)) log::warning(error);
+  if (!recovery_.discard(error)) {
+    log::warning(error);
+    recovery_.ignore();
+  }
 }
 void EditorSession::note_saved() {
   forget_recovery();
