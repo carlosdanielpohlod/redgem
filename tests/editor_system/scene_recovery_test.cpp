@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <raylib.h>
 
 #include <filesystem>
 
@@ -12,6 +13,9 @@
 
 using namespace redgem;
 namespace {
+constexpr int kWindowWidth = 800;
+constexpr int kWindowHeight = 600;
+constexpr float kMaximumDialogWidth = 480;
 constexpr int kFrames = 5;  // settle docking and GPU presentation, without waiting out the autosave interval
 void settle(EditorApp& app) {
   for (int i = 0; i < kFrames; ++i) app.frame();
@@ -19,6 +23,7 @@ void settle(EditorApp& app) {
 std::unique_ptr<EditorApp> editor(const std::filesystem::path& game) {
   auto result = EditorApp::create(game, editor_options(GpuChoice::Auto));
   if (auto* error = std::get_if<std::string>(&result)) FAIL(*error);
+  SetWindowSize(kWindowWidth, kWindowHeight);
   return std::move(std::get<std::unique_ptr<EditorApp>>(result));
 }
 }  // namespace
@@ -43,6 +48,7 @@ TEST_CASE("the editor offers crash recovery and saves the recovered scene to its
   const auto* popup = ImGui::FindWindowByName("Recover scene###scene_recovery");
   REQUIRE(popup != nullptr);
   CHECK(popup->Active);
+  CHECK(popup->Size.x <= kMaximumDialogWidth);
   CHECK(test::save_window_picture(std::filesystem::path(REDGEM_SCREENSHOT_DIR) / "editor/recovery_offered.png"));
   REQUIRE(app->recover_scene());
   settle(*app);
