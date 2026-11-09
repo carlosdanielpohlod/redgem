@@ -11,9 +11,9 @@ namespace {
 
 constexpr float kFadeSeconds = 2.0f;
 constexpr float kHalfFade = kFadeSeconds / 2.0f;
-constexpr float kHalf = 0.5f;
-constexpr float kQuarter = 0.25f;
-constexpr float kRaisedPitch = 1.5f;
+constexpr float kHalfLevel = 0.5f;
+constexpr float kQuarterLevel = 0.25f;
+constexpr float kRaisedSoundPitch = 1.5f;
 
 struct TestTrack {
   std::string name;
@@ -58,8 +58,8 @@ MusicRequest at_volume(float volume, float fade_seconds = kNoFade) {
 TEST_CASE("a track with no fade is heard at its volume at once, and replaces the one playing at once") {
   MusicTestDriver driver;
   MusicPlayer music(driver);
-  REQUIRE(music.play("day", at_volume(kHalf)));
-  CHECK(driver.named("day")->volume == doctest::Approx(kHalf));
+  REQUIRE(music.play("day", at_volume(kHalfLevel)));
+  CHECK(driver.named("day")->volume == doctest::Approx(kHalfLevel));
   CHECK(driver.named("day")->loop);
   REQUIRE(music.play("night", at_volume(kFullVolume)));
   CHECK(driver.tracks.size() == 1);
@@ -70,28 +70,28 @@ TEST_CASE("a crossfade brings the new track in while the old one goes, then lets
   MusicTestDriver driver;
   MusicPlayer music(driver);
   REQUIRE(music.play("day", at_volume(kFullVolume)));
-  REQUIRE(music.play("night", at_volume(kHalf, kFadeSeconds)));
+  REQUIRE(music.play("night", at_volume(kHalfLevel, kFadeSeconds)));
   CHECK(driver.named("night")->volume == 0.0f);  // it starts silent
   CHECK(driver.tracks.size() == 2);
   music.update(kHalfFade);
-  CHECK(driver.named("night")->volume == doctest::Approx(kQuarter));
-  CHECK(driver.named("day")->volume == doctest::Approx(kHalf));
+  CHECK(driver.named("night")->volume == doctest::Approx(kQuarterLevel));
+  CHECK(driver.named("day")->volume == doctest::Approx(kHalfLevel));
   CHECK(driver.named("day")->updates == 1);  // both streams are fed while they play
   music.update(kHalfFade);
-  CHECK(driver.named("night")->volume == doctest::Approx(kHalf));
+  CHECK(driver.named("night")->volume == doctest::Approx(kHalfLevel));
   CHECK(driver.named("day") == nullptr);
   music.update(kFadeSeconds);
-  CHECK(driver.named("night")->volume == doctest::Approx(kHalf));  // never past its own volume
+  CHECK(driver.named("night")->volume == doctest::Approx(kHalfLevel));  // never past its own volume
 }
 
 TEST_CASE("a track that cannot play leaves the one playing as it was") {
   MusicTestDriver driver;
   MusicPlayer music(driver);
-  REQUIRE(music.play("day", at_volume(kHalf)));
+  REQUIRE(music.play("day", at_volume(kHalfLevel)));
   const auto day = music.current();
   CHECK_FALSE(music.play(driver.missing, at_volume(kFullVolume, kFadeSeconds)));
   CHECK(music.current() == day);
-  CHECK(driver.named("day")->volume == doctest::Approx(kHalf));
+  CHECK(driver.named("day")->volume == doctest::Approx(kHalfLevel));
 }
 
 TEST_CASE("stopping with a fade lets the track go over the fade, and without one at once") {
@@ -101,7 +101,7 @@ TEST_CASE("stopping with a fade lets the track go over the fade, and without one
   music.stop(kFadeSeconds);
   CHECK_FALSE(music.current().has_value());
   music.update(kHalfFade);
-  CHECK(driver.named("day")->volume == doctest::Approx(kHalf));
+  CHECK(driver.named("day")->volume == doctest::Approx(kHalfLevel));
   music.update(kHalfFade);
   CHECK(driver.tracks.empty());
   REQUIRE(music.play("night", at_volume(kFullVolume)));
@@ -120,15 +120,15 @@ TEST_CASE("at most two streams play: a third track drops the one already fading 
   CHECK(driver.named("day") == nullptr);
   // Dusk was halfway in: it goes from there to silence over the whole fade.
   music.update(kHalfFade);
-  CHECK(driver.named("dusk")->volume == doctest::Approx(kQuarter));
+  CHECK(driver.named("dusk")->volume == doctest::Approx(kQuarterLevel));
 }
 
 TEST_CASE("a fade too short to be heard is no fade") {
   constexpr float kDenormalSeconds = 1e-40f;
   MusicTestDriver driver;
   MusicPlayer music(driver);
-  REQUIRE(music.play("day", at_volume(kHalf, kDenormalSeconds)));
-  CHECK(driver.named("day")->volume == doctest::Approx(kHalf));
+  REQUIRE(music.play("day", at_volume(kHalfLevel, kDenormalSeconds)));
+  CHECK(driver.named("day")->volume == doctest::Approx(kHalfLevel));
   music.stop(kDenormalSeconds);
   CHECK(driver.tracks.empty());
 }
@@ -149,14 +149,14 @@ TEST_CASE("the music group's volume is over both tracks; the volume and pitch se
   REQUIRE(music.play("day", at_volume(kFullVolume)));
   REQUIRE(music.play("night", at_volume(kFullVolume, kFadeSeconds)));
   music.update(kHalfFade);
-  music.set_group_volume(kHalf);
-  CHECK(driver.named("day")->volume == doctest::Approx(kQuarter));
-  CHECK(driver.named("night")->volume == doctest::Approx(kQuarter));
-  music.set_volume(kHalf);
-  music.set_pitch(kRaisedPitch);
-  CHECK(driver.named("night")->volume == doctest::Approx(kHalf * kHalf * kHalf));
-  CHECK(driver.named("night")->pitch == doctest::Approx(kRaisedPitch));
-  CHECK(driver.named("day")->volume == doctest::Approx(kQuarter));
+  music.set_group_volume(kHalfLevel);
+  CHECK(driver.named("day")->volume == doctest::Approx(kQuarterLevel));
+  CHECK(driver.named("night")->volume == doctest::Approx(kQuarterLevel));
+  music.set_volume(kHalfLevel);
+  music.set_pitch(kRaisedSoundPitch);
+  CHECK(driver.named("night")->volume == doctest::Approx(kHalfLevel * kHalfLevel * kHalfLevel));
+  CHECK(driver.named("night")->pitch == doctest::Approx(kRaisedSoundPitch));
+  CHECK(driver.named("day")->volume == doctest::Approx(kQuarterLevel));
   CHECK(driver.named("day")->pitch == doctest::Approx(kAsRecorded));
 }
 
@@ -164,8 +164,8 @@ TEST_CASE("a player going away stops what it plays, and changes with nothing pla
   MusicTestDriver driver;
   {
     MusicPlayer music(driver);
-    music.set_volume(kHalf);
-    music.set_pitch(kRaisedPitch);
+    music.set_volume(kHalfLevel);
+    music.set_pitch(kRaisedSoundPitch);
     music.update(kHalfFade);
     REQUIRE(music.play("day", at_volume(kFullVolume)));
     REQUIRE(music.play("night", at_volume(kFullVolume, kFadeSeconds)));
