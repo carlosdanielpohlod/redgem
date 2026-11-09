@@ -13,6 +13,7 @@ namespace redgem {
 namespace {
 namespace fs = std::filesystem;
 constexpr const char* kSuffix = ".recovery";
+constexpr const char* kDismissalNotice = "Recovery dismissal applies only to this session: ";
 using recovery_format::kMetadata;
 constexpr const char* kSource = "source";
 constexpr const char* kBaseline = "baseline";
@@ -121,7 +122,8 @@ void SceneRecovery::reset_observation() {
   offered_.reset();
   written_version_.reset();
   failed_version_.reset();
-  problem_.clear();
+  const bool dismissal_failed = problem_.rfind(kDismissalNotice, 0) == 0;
+  if (!dismissal_failed) problem_.clear();
   elapsed_ = 0;
   pending_ = false;
 }
@@ -155,7 +157,7 @@ void SceneRecovery::ignore() {
     require(!digest.empty(), "cannot fingerprint the ignored recovery copy");
     require(durable::replace_file(dismissed_path(source_), digest, flush_), "cannot persist recovery dismissal");
   } catch (const std::exception& error) {
-    problem_ = "Recovery dismissal applies only to this session: " + std::string(error.what());
+    problem_ = std::string(kDismissalNotice) + error.what();
   }
 }
 const GlbFile* SceneRecovery::offered_copy(std::string& error) const {

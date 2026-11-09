@@ -371,3 +371,23 @@ TEST_CASE("a dismissed old recovery copy is not reoffered after a later editor r
   restarted.watch(game.source);
   CHECK(restarted.pending());  // a fresh backup is not hidden by the old dismissal
 }
+
+TEST_CASE("a failed backup cleanup after Save never offers the stale copy over the saved scene") {
+  RecoveryGame game;
+  auto opened = EditorSession::open(game.folder);
+  auto session = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
+  session->document().set_name(0, "Older backup");
+  session->autosave(SceneRecovery::kIntervalSeconds);
+  const auto copy = SceneRecovery::copy_path(game.source);
+  REQUIRE(fs::remove(copy));
+  REQUIRE(fs::create_directory(copy));
+  REQUIRE(write_text_file(copy / "cannot_remove_nonempty_directory", "occupied", game.error));
+  session->document().set_name(0, "Newer saved scene");
+  REQUIRE(session->save(game.error));
+  CHECK_FALSE(session->recovery_pending());
+  CHECK_FALSE(session->document().dirty());
+  CHECK_FALSE(session->recovery_problem().empty());
+  const auto saved = SceneDocument::open(game.source);
+  REQUIRE(std::holds_alternative<SceneDocument>(saved));
+  CHECK(std::get<SceneDocument>(saved).node(0).name == "Newer saved scene");
+}
