@@ -49,7 +49,7 @@ bool name_contains(const std::string& name, const std::string& wanted);
 float centered_start(float available, float size);
 // The dark pill behind the Scene view's hint: in the view's bottom-left corner, around a text of
 // `text_width` x `text_height`. The view starts at (view_x, view_y) and is `view_height` tall.
-Rect hint_pill(float view_x, float view_y, float view_height, float text_width, float text_height);
+Rect hint_pill(float view_x, float view_y, float view_height, float text_width, float text_height, float scale = 1);
 // What the Scene view's hint says: how to move around, how to shape the selected terrain, or who
 // has the keyboard while the game plays.
 enum class ViewportHint { Fly, TerrainSelected, Sculpting, GameHasKeyboard, ClickTheGame };

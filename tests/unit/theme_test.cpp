@@ -3,8 +3,11 @@
 #include <imgui.h>
 
 #include <initializer_list>
+#include <cmath>
+#include <limits>
 
 #include "editor/ui/style.hpp"
+#include "editor/ui/dpi.hpp"
 
 using namespace redgem;
 
@@ -45,4 +48,31 @@ TEST_CASE("errors, warnings and successes each have a color of their own") {
   CHECK_FALSE(same(ui::error_color(), ui::success_color()));
   CHECK_FALSE(same(ui::warning_color(), ui::success_color()));
   CHECK_FALSE(same(ui::muted_color(), ui::accent_color()));
+}
+
+TEST_CASE("monitor DPI is scaled once in pixel coordinates and kept logical on Retina") {
+  constexpr float kFractional = 1.5f;
+  constexpr float kDouble = 2;
+  for (const float scale : {1.0f, kFractional, kDouble}) {
+    CHECK(ui::interface_scale(scale, false) == scale);
+    CHECK(ui::interface_scale(scale, true) == 1);
+  }
+  CHECK(ui::interface_scale(std::numeric_limits<float>::quiet_NaN(), false) == 1);
+  CHECK(ui::interface_scale(std::numeric_limits<float>::infinity(), false) == 1);
+  CHECK(ui::interface_scale(0, false) == 1);
+  CHECK(ui::interface_scale(-1, false) == 1);
+}
+TEST_CASE("monitor changes rebuild spacing without accumulating scaling or changing the palette") {
+  const Interface interface;
+  ui::apply_interface_scale(1);
+  const auto baseline = ImGui::GetStyle();
+  for (const float scale : {1.5f, 2.0f, 1.5f, 1.0f}) {
+    ui::apply_interface_scale(scale);
+    const auto& style = ImGui::GetStyle();
+    CHECK(style.FontScaleDpi == scale);
+    CHECK(style.WindowPadding.x == doctest::Approx(baseline.WindowPadding.x * scale));
+    CHECK(style.FramePadding.y == doctest::Approx(std::floor(baseline.FramePadding.y * scale)));
+    CHECK(style.ScrollbarSize == doctest::Approx(baseline.ScrollbarSize * scale));
+    CHECK(same(style.Colors[ImGuiCol_Button], baseline.Colors[ImGuiCol_Button]));
+  }
 }

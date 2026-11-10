@@ -87,12 +87,12 @@ ViewportHint viewport_hint(const ViewportState& state) {
   return state.sculpting ? ViewportHint::Sculpting : ViewportHint::TerrainSelected;
 }
 
-Rect hint_pill(float view_x, float view_y, float view_height, float text_width, float text_height) {
+Rect hint_pill(float view_x, float view_y, float view_height, float text_width, float text_height, float scale) {
   Rect pill;
-  pill.min_x = view_x + kOverlayMargin;
-  pill.min_y = view_y + view_height - kOverlayMargin - text_height - kOverlayPadding * kBothSides;
-  pill.max_x = pill.min_x + text_width + kOverlayPadding * kBothSides;
-  pill.max_y = pill.min_y + text_height + kOverlayPadding * kBothSides;
+  pill.min_x = view_x + (kOverlayMargin * scale);
+  pill.min_y = view_y + view_height - (kOverlayMargin * scale) - text_height - (kOverlayPadding * scale) * kBothSides;
+  pill.max_x = pill.min_x + text_width + (kOverlayPadding * scale) * kBothSides;
+  pill.max_y = pill.min_y + text_height + (kOverlayPadding * scale) * kBothSides;
   return pill;
 }
 

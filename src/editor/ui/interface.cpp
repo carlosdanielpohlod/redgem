@@ -2,12 +2,15 @@
 
 #include <imgui.h>
 #include <rlImGui.h>
+#include <raylib.h>
+#include <utility>
 
 #include "editor/ui/style.hpp"
+#include "editor/ui/dpi.hpp"
 
 namespace redgem::ui {
 
-Interface::Interface(const Window&, Layout layout) {
+Interface::Interface(const Window&, Layout layout, ScaleReader read_scale) : read_scale_(std::move(read_scale)) {
   rlImGuiSetLoadFontsCallback(load_fonts);
   rlImGuiSetup(true);
   apply_theme();
@@ -18,7 +21,15 @@ Interface::Interface(const Window&, Layout layout) {
 
 Interface::~Interface() { rlImGuiShutdown(); }
 
-void Interface::begin_frame() { rlImGuiBegin(); }
+void Interface::begin_frame() {
+  const auto asked = read_scale_ ? read_scale_() : interface_scale(GetWindowScaleDPI().y, native_dpi_window());
+  const auto scale = interface_scale(asked, false);
+  if (scale != scale_) {
+    scale_ = scale;
+    apply_interface_scale(scale_);
+  }
+  rlImGuiBegin();
+}
 
 void Interface::end_frame() { rlImGuiEnd(); }
 

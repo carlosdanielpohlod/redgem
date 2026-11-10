@@ -10,6 +10,7 @@
 #include "core/platform.hpp"
 #include "core/translations.hpp"
 #include "editor/editor_config.hpp"
+#include "editor/ui/dpi.hpp"
 #include "editor/editor_logic.hpp"
 #include "project/game_templates.hpp"
 #include "project/recent_games.hpp"
@@ -28,6 +29,7 @@ WindowSettings hub_window(GpuChoice gpu) {
   settings.height = kHubHeight;
   settings.title = kHubTitle;
   settings.resizable = true;
+  settings.high_dpi = ui::native_dpi_window();
   settings.smooth_edges = true;
   settings.gpu = gpu;
   return settings;

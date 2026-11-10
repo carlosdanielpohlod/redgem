@@ -12,6 +12,7 @@
 #include "editor/editor_config.hpp"
 #include "editor/scene_viewport.hpp"
 #include "editor/ui/style.hpp"
+#include "editor/ui/dpi.hpp"
 #include "render/render_math.hpp"
 
 namespace redgem {
@@ -56,7 +57,7 @@ void Gizmo::draw_tools() {
     if (&tool != std::begin(kGizmoTools)) ImGui::SameLine();
     if (ui::icon_button(tool.icon, tr(tool.tooltip), mode_ == tool.mode)) mode_ = tool.mode;
   }
-  ImGui::SameLine(0.0f, kToolbarGroupGap);
+  ImGui::SameLine(0.0f, ui::scaled(kToolbarGroupGap));
   if (ui::icon_button(local_ ? ICON_FA_CUBE : ICON_FA_GLOBE,
                       tr(local_ ? "editor.toolbar.local_axes" : "editor.toolbar.world_axes"))) {
     local_ = !local_;

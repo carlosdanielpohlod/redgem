@@ -17,6 +17,7 @@ struct WindowSettings {
   // Smooths the edges of what is drawn straight into the window (an interface). A game needs
   // none: its picture is drawn off screen and smoothed there.
   bool smooth_edges = false;
+  bool high_dpi = false;                       // opt in before opening; game windows keep their existing coordinates
   int frames_per_second = config::kTargetFps;  // the pace frames are held to (kNoFrameCap: none)
   bool vsync = true;                           // frames wait for the monitor's refresh
   WindowMode mode = WindowMode::Windowed;

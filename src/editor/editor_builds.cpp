@@ -18,6 +18,7 @@
 #include "editor/scene_viewport.hpp"
 #include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
+#include "editor/ui/dpi.hpp"
 
 namespace redgem {
 namespace {
@@ -35,8 +36,8 @@ const char* build_wait_popup() { return ui::window_title("editor.build.wait_titl
 // In the Scene view's bottom-right corner (its hint takes the bottom-left one), as wide as a path
 // on two lines needs.
 void place_build_status(const SceneViewport& view) {
-  const ImVec2 corner(view.screen_x + view.width_pixels() - kOverlayMargin,
-                      view.screen_y + view.height_pixels() - kOverlayMargin);
+  const ImVec2 corner(view.screen_x + view.width_pixels() - ui::scaled(kOverlayMargin),
+                      view.screen_y + view.height_pixels() - ui::scaled(kOverlayMargin));
   ImGui::SetNextWindowPos(corner, ImGuiCond_Always, ImVec2(kBottomRight, kBottomRight));
   ImGui::SetNextWindowSizeConstraints(ImVec2(kBuildStatusWidth, 0.0f), ImVec2(kBuildStatusWidth, FLT_MAX));
 }
