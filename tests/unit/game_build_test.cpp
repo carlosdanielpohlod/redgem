@@ -99,10 +99,8 @@ TEST_CASE("a build warns of a game with no studio, no title or the studio every 
   CHECK(warns("{}"));
   CHECK(warns(R"({"title": "Coin Rush"})"));
   CHECK(warns(R"({"studio": "Pine Hill"})"));
-  CHECK(warns(std::string(R"({"title": "Coin Rush", "studio": ")") + kNewGameStudio + ""
-}
-"));
-    CHECK_FALSE(warns(R"({"title": "Coin Rush", "studio": "Pine Hill"})"));
+  CHECK(warns(std::string(R"({"title": "Coin Rush", "studio": ")") + kNewGameStudio + R"("})"));
+  CHECK_FALSE(warns(R"({"title": "Coin Rush", "studio": "Pine Hill"})"));
 }
 
 // A build writes the executable, the game folder and the licenses: over what an earlier build

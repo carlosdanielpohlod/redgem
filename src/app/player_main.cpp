@@ -48,7 +48,7 @@ int play_game_beside(const std::filesystem::path& program) {
   }
   const std::filesystem::path data = players_data_folder(*game);
   translations::use_language(language_for_run(game_data_files(data).settings));
-  crash::install_crash_handling({*game, data});
+  crash::install_crash_handling({*game, data, true});
   return play_in_window(players_window(*game, data));
 }
 

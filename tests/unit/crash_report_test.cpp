@@ -82,9 +82,9 @@ TEST_CASE("crash reports go in the crashes folder beside the game's save, named 
   std::filesystem::create_directories(game);
   std::ofstream(game / "game.json") << R"({"studio": "Pine Hill", "title": "Arena"})";
   const GameDataFiles files = game_data_files(players_data_folder(game));
-  CHECK(crash_folder_for({game}) == files.crashes);
-  CHECK(crash_folder_for({game}).parent_path() == files.save.parent_path());
-  CHECK(crash_folder_for({game, "elsewhere"}) == std::filesystem::path("elsewhere") / "crashes");
+  CHECK(crash_folder_for({game, {}, false}) == files.crashes);
+  CHECK(crash_folder_for({game, {}, false}).parent_path() == files.save.parent_path());
+  CHECK(crash_folder_for({game, "elsewhere", false}) == std::filesystem::path("elsewhere") / "crashes");
   CHECK(crash_file_name(kSomeAfternoon) == "crash-20261024-130509.log");
   std::filesystem::remove_all(game);
 }
