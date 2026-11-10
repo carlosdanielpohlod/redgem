@@ -33,6 +33,8 @@ class SceneRecovery {
  private:
   SceneRecoveryCopy* offered_copy(std::string& error) const;
   void discover_copy();
+  void begin_watch(const std::filesystem::path& source);
+  bool poll_ready(SceneDocument& document, float seconds, std::string& error);
   bool retry_lease();
   bool interval_due(float seconds);
   bool own(const std::filesystem::path& source);
@@ -49,7 +51,7 @@ class SceneRecovery {
   bool save_version(SceneDocument& document, std::string& error);
   std::filesystem::path source_;
   std::string baseline_;
-  std::string observed_stamp_;
+  bool takeover_pending_ = false;
   std::optional<long long> written_version_;
   float elapsed_ = 0;
   bool pending_ = false;

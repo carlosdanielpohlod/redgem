@@ -398,26 +398,38 @@ TEST_CASE("a failed backup cleanup after Save never offers the stale copy over t
   REQUIRE(session->save(game.error));
   CHECK_FALSE(session->recovery_pending());
   CHECK_FALSE(session->document().dirty());
-  CHECK_FALSE(session->recovery_problem().empty());
   const auto saved = SceneDocument::open(game.source);
   REQUIRE(std::holds_alternative<SceneDocument>(saved));
   CHECK(std::get<SceneDocument>(saved).node(0).name == "Newer saved scene");
 }
 
-TEST_CASE("scene recovery retries the lease after the live writer exits") {
+TEST_CASE("scene recovery takeover archives the previous writer without blocking current edits") {
   RecoveryGame game;
   auto owner = std::make_unique<SceneRecovery>();
   owner->watch(game.source);
   game.document.set_name(0, "Owner's edit");
   game.autosave(*owner);
+  const auto original = game.bytes(SceneRecovery::copy_path(game.source));
   SceneRecovery waiting;
   waiting.watch(game.source);
   CHECK_FALSE(waiting.problem().empty());
+  game.document.set_name(0, "Waiting editor's edit");
   owner.reset();
   REQUIRE(waiting.poll(game.document, SceneRecovery::kIntervalSeconds, game.error));
-  CHECK(waiting.pending());
+  CHECK_FALSE(waiting.pending());
   CHECK(waiting.problem().empty());
+  bool archived = false;
+  for (const auto& entry : fs::directory_iterator(game.folder)) {
+    if (entry.path().filename().string().find(".previous-") == std::string::npos) continue;
+    CHECK(game.bytes(entry.path()) == original);
+    archived = true;
+  }
+  REQUIRE(archived);
+  waiting.watch(game.source);
+  REQUIRE(waiting.recover(game.document, game.error));
+  CHECK(game.document.node(0).name == "Waiting editor's edit");
 }
+
 TEST_CASE("scene recovery catches a same-size same-time rewrite before the first autosave") {
   RecoveryGame game;
   SceneRecovery recovery;
@@ -455,7 +467,7 @@ TEST_CASE("a source larger than the copy limit can produce and recover a lean ba
   game.autosave(recovery);
   CHECK(fs::file_size(SceneRecovery::copy_path(game.source)) < kLargeBytes);
   recovery.watch(game.source);
-  CHECK_FALSE(recovery.source_changed());
+  CHECK(recovery.source_changed());  // bounded source verification is explicitly unknown above 1 MiB
   REQUIRE_MESSAGE(recovery.recover(game.document, game.error), game.error);
   CHECK(game.document.node(0).name == "Lean edit");
 }
@@ -488,4 +500,48 @@ TEST_CASE("copy size and decoded scene memory have independent recovery budgets"
   REQUIRE_MESSAGE(recovery.recover(game.document, game.error), game.error);
   CHECK(game.document.node(0).name == "Textured recovery");
   CHECK(game.document.desc().images.size() == 1);
+}
+
+TEST_CASE("recovery watch reports filesystem errors instead of escaping into the editor frame") {
+  RecoveryGame game;
+  const auto blocked = game.folder / "ordinary-file";
+  REQUIRE(write_text_file(blocked, "not a directory", game.error));
+  SceneRecovery recovery;
+  CHECK_NOTHROW(recovery.watch(blocked / "scene.glb"));
+  CHECK_FALSE(recovery.problem().empty());
+  CHECK_NOTHROW(recovery.poll(game.document, SceneRecovery::kIntervalSeconds, game.error));
+}
+
+TEST_CASE("failed dismissal persistence remains visible after following the saved scene") {
+  RecoveryGame game;
+  bool fail = false;
+  SceneRecovery recovery([&](std::FILE* file) { return !fail && durable::flush_to_disk(file); });
+  recovery.watch(game.source);
+  game.document.set_name(0, "Backup");
+  game.autosave(recovery);
+  fail = true;
+  recovery.ignore();
+  REQUIRE_FALSE(recovery.problem().empty());
+  recovery.watch(game.source);
+  CHECK_FALSE(recovery.pending());
+  CHECK_FALSE(recovery.problem().empty());
+}
+TEST_CASE("failure to clear a dismissal cannot fail a published copy or a completed discard") {
+  RecoveryGame game;
+  SceneRecovery recovery;
+  recovery.watch(game.source);
+  game.document.set_name(0, "Old backup");
+  game.autosave(recovery);
+  recovery.ignore();
+  const auto folder = platform::user_data_dir() / "scene-recovery";
+  const auto marker = fs::directory_iterator(folder)->path();
+  REQUIRE(fs::remove(marker));
+  REQUIRE(fs::create_directory(marker));
+  REQUIRE(write_text_file(marker / "occupied", "cannot remove nonempty directory", game.error));
+  game.document.set_name(0, "New backup");
+  game.autosave(recovery);
+  recovery.watch(game.source);
+  REQUIRE(recovery.pending());
+  REQUIRE(recovery.discard(game.error));
+  CHECK_FALSE(recovery.pending());
 }

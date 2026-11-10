@@ -184,11 +184,14 @@ Recovery includes authored nodes, stable identities, materials and terrain edits
 raw prefab links. Images stored outside the GLB still resolve beside it; those images and
 prefab sources themselves are not backed up. Script files are separate. The current recovery
 write is synchronous, limited to 64 MiB, and requires embedded GLB buffers. The original scene
-must remain loadable to reopen the editor. Small source files are fingerprinted when opened to detect rewrites even on file systems
-with coarse timestamps. Larger sources use a streamed fingerprint on the first recovery write,
-with file size and timestamp checked against the opened scene; once written, later conflicts
-are detected even if size and timestamp match. The copy-size limit does not restrict the
-original source size or the normal memory budget used to load its decoded images. An autosave failure
+must remain loadable to reopen the editor. Source verification reads at most 1 MiB on the editing thread. Larger sources are treated as
+unverifiable, so the recovery prompt warns even if size and timestamp are unchanged. The limit
+does not restrict the original source size or the normal memory budget used to load its decoded
+images. A second editor taking over after a live writer closes preserves that writer's backup
+as a hidden `.recovery.previous-<id>.glb` sibling, then backs up its own edits without opening
+a mid-session recovery prompt. To recover an archived copy, close the editor, preserve any
+current `.recovery` file, and copy the archived file to the scene's `.recovery` path before reopening.
+An autosave failure
 remains visible in the status bar and is retried only after another edit. Recovery refuses to
 replace edits made while its prompt was open. Keep manual saves and version control for larger
 scenes or changes to external assets.
