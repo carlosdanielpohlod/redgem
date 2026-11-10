@@ -299,11 +299,15 @@ bool SceneRecovery::save_or_report(SceneDocument& document, std::string& error) 
   problem_ = "Scene recovery unavailable: " + error;
   return false;
 }
+bool SceneRecovery::interval_due(float seconds) {
+  elapsed_ += seconds;
+  if (elapsed_ < kIntervalSeconds) return false;
+  elapsed_ = 0;
+  return true;
+}
 bool SceneRecovery::poll(SceneDocument& document, float seconds, std::string& error) {
   if (pending_) return true;
-  elapsed_ += seconds;
-  if (elapsed_ < kIntervalSeconds) return true;
-  elapsed_ = 0;
+  if (!interval_due(seconds)) return true;
   if (!retry_lease()) return true;
   const bool blocked = pending_ || failed_version_ == document.version();
   if (blocked) return true;

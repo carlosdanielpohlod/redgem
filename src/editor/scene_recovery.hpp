@@ -34,6 +34,7 @@ class SceneRecovery {
   SceneRecoveryCopy* offered_copy(std::string& error) const;
   void discover_copy();
   bool retry_lease();
+  bool interval_due(float seconds);
   bool own(const std::filesystem::path& source);
   void reset_observation();
   bool save_or_report(SceneDocument& document, std::string& error);

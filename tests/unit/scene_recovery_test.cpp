@@ -439,7 +439,10 @@ TEST_CASE("a source larger than the copy limit can produce and recover a lean ba
   auto file = read_glb(game.source, game.error);
   REQUIRE(file.has_value());
   constexpr std::size_t kLargeBytes = 65 * 1024 * 1024;
+  const auto unused_offset = file->bin.size();
   file->bin.resize(kLargeBytes);
+  file->json["bufferViews"].push_back(
+      {{"buffer", 0}, {"byteOffset", unused_offset}, {"byteLength", kLargeBytes - unused_offset}});
   file->json["buffers"][0]["byteLength"] = file->bin.size();
   REQUIRE(write_glb(game.source, *file, game.error));
   file.reset();
