@@ -49,14 +49,16 @@ otherwise): it is stuck in a loop, or does far too much in one go. See
 **A built game closed by itself.**
 A game that crashes writes a report and tells the player where it is (in a message box on
 Windows; on Linux and the Mac on its error stream, which a terminal shows). The report is a text
-file beside the game's save, in the player's home folder, in a folder named after the save:
+file in `crashes/`, beside the game's save, in the game's folder named after its studio and
+title:
 
 ```
-.config/redgem/saves/by-id/<id>-crashes/crash-<date>-<time>.log                 Linux, Windows
-Library/Application Support/RedGem/saves/by-id/<id>-crashes/crash-<date>-<time>.log   macOS
+~/.local/share/<studio>/<title>/crashes/crash-<date>-<time>.log                  Linux
+%APPDATA%\<studio>\<title>\crashes\crash-<date>-<time>.log                      Windows
+~/Library/Application Support/<studio>/<title>/crashes/crash-<date>-<time>.log   macOS
 ```
 
-(A game with no `id` uses `saves/<folder>-<digits>-crashes/`.) It says the game, the engine's
+(On Linux, `$XDG_DATA_HOME` stands for `~/.local/share` when it is set.) It says the game, the engine's
 version, the system, the time in UTC, what happened (the signal, such as `SIGSEGV`, or the
 exception and its message) and, where the system can say, the functions the program was in.
 Send it with a bug report. The save itself loses nothing: it is written to the disk on every

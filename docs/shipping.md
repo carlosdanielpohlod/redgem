@@ -228,20 +228,40 @@ redgem games/arena --record trailer.mp4 --record-fps 30 --record-size 3840x2160 
 - `game.json` says what the game is and how its window opens:
 
 ```json
-{ "id": "com.mystudio.mygame", "title": "My Game", "window_width": 1280, "window_height": 720 }
+{ "id": "com.mystudio.mygame", "studio": "My Studio", "title": "My Game", "window_width": 1280, "window_height": 720 }
 ```
 
-- `id` is what the game is known by: its save follows it when the folder is moved or renamed, and
-  its Android app is named after it. `redgem new` writes one (`my-game-3fa2c1b0`); change it to
-  your own before the first release and leave it alone after. It is small letters, digits, `.`,
-  `-` and `_`, starting and ending with a letter or a digit. Two games with the same `id` share
-  a save: a game started as a copy of another needs a new one. A game with no `id` keeps its
-  save by where its folder is, and starts a new save when it is given one.
+- `studio` and `title` name the folder the game's players keep their saves, settings, bindings
+  and crash reports in, where their system keeps what programs remember:
+
+  ```
+  Linux     $XDG_DATA_HOME/<studio>/<title>, else ~/.local/share/<studio>/<title>
+  Windows   %APPDATA%\<studio>\<title>
+  macOS     ~/Library/Application Support/<studio>/<title>
+  Android   the app's own files folder
+  ```
+
+  `redgem new` writes `"studio": "My Studio"`: put your own in before the first release, and
+  leave both alone after. A game whose studio or title changes looks for its saves in a new
+  folder, and finds none: nothing is moved. A game that names no studio is kept under
+  `RedGem Games`, and a build says so. Letters a folder's name cannot hold on some system
+  (`/ \ : * ? " < > |`, control characters) become `_`, a name Windows keeps for a device
+  (`CON`, `NUL`, `COM1`...) is given a `_` after it, and a long name is cut at 64 bytes. Two games
+  of the same studio and title share a folder: a game started as a copy of another needs a title
+  of its own.
+- The editor's Play and `redgem play` never use that folder: they keep the game's save and
+  bindings in `game-data/<studio>/<title>/` of your RedGem folder, and `redgem-test` in
+  `test-saves/`, so playing your game while you make it leaves your players' folder alone.
+- `id` is what the game is known by: its Android app is named after it. `redgem new` writes one
+  (`my-game-3fa2c1b0`); change it to your own before the first release and leave it alone after.
+  It is small letters, digits, `.`, `-` and `_`, starting and ending with a letter or a digit.
 - `game.json` may also say how the game is shown until its player chooses otherwise:
   `"fullscreen": true`, `"vsync": false`, `"fps_cap": 144` (`0` for no cap), `"render_scale": 0.75`
   (the world drawn at 75% of the window's size) and `"quality": "medium"` (`low`, `medium`, `high`,
   `ultra`). What the player chooses (see `Settings` in the [API reference](scripting/api.md)) is
-  kept in the user's settings file, by the game's `id`.
+  kept in `settings.json` in the game's folder (see `studio` above). A built game also reads the
+  graphics card (`"gpu"`) and the language (`"language"`) from that file, and never RedGem's own
+  settings.
 
 - Everything in the game folder is copied, including the scripts as plain `.rb` files.
 - Check the licenses of the models and sounds you include. A license that allows using an asset

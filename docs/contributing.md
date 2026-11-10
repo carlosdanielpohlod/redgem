@@ -325,8 +325,9 @@ Each part is the texts of one library, built into it (`redgem_embed_texts` in
 `src/CMakeLists.txt`), so that a program carries only what it shows: `core` (what a command
 line says of an option it cannot read), `game` (the runtime: what players read), `editor`, `project` (the hub and `redgem`'s command line), `server`, `relay` and
 `testing` (the command lines of the other programs). A program adds its parts and picks the
-language as it starts: the one in the user's settings (`"language"` in `settings.json`), else the
-system's; a key a translation lacks is shown in English.
+language as it starts: the one in the user's settings (`"language"` in `settings.json`; a built
+game's own `settings.json` for the player), else the system's; a key a translation lacks is shown
+in English.
 
 A key is the part's name, then where the text is, then what it is: `editor.menu.file`. The
 first word says which file it is in. A text with values in it names them, `Created {game}`, and

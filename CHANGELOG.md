@@ -68,6 +68,19 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **Each game keeps its data in a folder of its own, named after its studio and title**:
+  `game.json` gains `"studio"`, and a game's save, settings, bindings and crash reports are kept
+  together in `<studio>/<title>/` where the player's system keeps programs' data
+  (`$XDG_DATA_HOME` or `~/.local/share` on Linux, `%APPDATA%` on Windows,
+  `~/Library/Application Support` on macOS, the app's files folder on Android), as `save.json`,
+  `settings.json`, `bindings.json` and `crashes/`. The names are made safe folder names on every
+  system; a game with no studio goes under `RedGem Games`, and a build warns of it. `redgem new`
+  writes `"studio": "My Studio"`. The editor's Play and `redgem play` keep theirs in
+  `game-data/<studio>/<title>/` of the RedGem folder and `redgem-test` in `test-saves/`, never in
+  the players' folder; a built game no longer reads RedGem's own `settings.json`. **Saves,
+  bindings and display settings kept under `redgem/saves`, `redgem/bindings` and RedGem's
+  `settings.json` are not moved**: a game starts from nothing in its new folder, and the old
+  files stay where they were. The `id` no longer names the save.
 - **`Audio.play` returns an id or `nil`** instead of `true` or `false`; a call that ignores it, or
   only tests it, works as before. Its pitch must be from 0.01 to 8, as `play_at`'s.
 - **`Audio.music` with a missing file** leaves the track playing as it was, instead of stopping it.
