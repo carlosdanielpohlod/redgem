@@ -113,7 +113,7 @@ void draw_change(const agent::FileChange& change) {
 }
 
 void draw_tool_details(const ToolCall& call) {
-  ImGui::Indent(kDetailIndent);
+  ImGui::Indent(ui::scaled(kDetailIndent));
   if (!call.input.empty()) code_text(palette::kMuted, call.input);
   for (const agent::ToolContent& content : call.content) {
     if (content.change) {
@@ -122,7 +122,7 @@ void draw_tool_details(const ToolCall& call) {
       code_text(palette::kText, content.text);
     }
   }
-  ImGui::Unindent(kDetailIndent);
+  ImGui::Unindent(ui::scaled(kDetailIndent));
 }
 
 bool allows(PermissionKind kind) { return kind == PermissionKind::AllowOnce || kind == PermissionKind::AllowAlways; }
@@ -157,12 +157,12 @@ void draw_answer(const PermissionRequest& request) {
 // What the tool would be run with and the files it would touch, under the question: what is allowed
 // is seen, not only the title the agent gave it.
 void draw_what_it_runs(const agent::ToolCallPatch& tool) {
-  ImGui::Indent(kDetailIndent);
+  ImGui::Indent(ui::scaled(kDetailIndent));
   if (tool.input) code_text(palette::kMuted, *tool.input);
   for (const std::string& location : tool.locations.value_or(std::vector<std::string>{})) {
     ImGui::TextColored(palette::kMuted, "%s %s", ICON_FA_FILE_LINES, location.c_str());
   }
-  ImGui::Unindent(kDetailIndent);
+  ImGui::Unindent(ui::scaled(kDetailIndent));
 }
 
 // A button per option, on one row; the id of the one clicked.
@@ -180,7 +180,7 @@ std::optional<std::string> draw_options(const PermissionRequest& request) {
 
 void draw_user(const std::string& text) {
   ImGui::PushStyleColor(ImGuiCol_ChildBg, palette::kFrame);
-  ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, kBoxRounding);
+  ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, ui::scaled(kBoxRounding));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ui::scaled(kBoxPadding), ui::scaled(kBoxPadding)));
   ImGui::BeginChild("user", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding);
   ImGui::TextColored(palette::kAccentHover, "%s", ICON_FA_USER);

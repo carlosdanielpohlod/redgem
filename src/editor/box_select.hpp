@@ -35,7 +35,7 @@ std::optional<ViewPoint> to_view(const ViewCamera& camera, Vec3 point);
 editor_logic::Rect rect_between(ViewPoint a, ViewPoint b);
 bool contains(const editor_logic::Rect& rect, ViewPoint point);
 // Whether the mouse went far enough from where its button went down for a rectangle, not a click.
-bool dragged_far_enough(ViewPoint from, ViewPoint to);
+bool dragged_far_enough(ViewPoint from, ViewPoint to, float scale = 1.0f);
 
 // An object that can be selected with a rectangle, and where it shows on the view (nullopt when
 // it is behind the camera).

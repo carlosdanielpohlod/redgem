@@ -137,7 +137,8 @@ void draw_spans(const std::vector<Span>& spans, float indent) {
 // The mark ("•", "12.") before the item's text, set in by the item's level and wide enough for it.
 void draw_item(const Block& block, const std::string& mark) {
   const float mark_width = ImGui::CalcTextSize(mark.c_str()).x + ui::scaled(kMarkGap);
-  const float indent = kListIndent * static_cast<float>(block.level) + std::max(kListIndent, mark_width);
+  const float indent =
+      ui::scaled(kListIndent) * static_cast<float>(block.level) + std::max(ui::scaled(kListIndent), mark_width);
   const ImVec2 start = ImGui::GetCursorScreenPos();
   ImGui::GetWindowDrawList()->AddText(ImVec2(start.x + indent - mark_width, start.y),
                                       ImGui::GetColorU32(palette::kMuted), mark.c_str());
@@ -146,7 +147,7 @@ void draw_item(const Block& block, const std::string& mark) {
 
 void draw_quote(const Block& block) {
   const ImVec2 start = ImGui::GetCursorScreenPos();
-  draw_spans(block.spans, kQuoteIndent);
+  draw_spans(block.spans, ui::scaled(kQuoteIndent));
   const float bottom = ImGui::GetCursorScreenPos().y;
   ImGui::GetWindowDrawList()->AddRectFilled(start, ImVec2(start.x + ui::scaled(kQuoteBarWidth), bottom),
                                             ImGui::GetColorU32(palette::kBorder));

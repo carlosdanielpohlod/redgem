@@ -144,7 +144,7 @@ void draw_objects(PanelContext& context, HierarchyResult& result, Pending& pendi
 // The empty space below the tree: drop here to move objects to the top level, click to deselect.
 void draw_empty_space(PanelContext& context, HierarchyResult& result, Pending& pending) {
   const ImVec2 free = ImGui::GetContentRegionAvail();
-  const ImVec2 size(std::max(free.x, kRootDropMinWidth), std::max(free.y, ui::scaled(kRootDropMinHeight)));
+  const ImVec2 size(std::max(free.x, ui::scaled(kRootDropMinWidth)), std::max(free.y, ui::scaled(kRootDropMinHeight)));
   if (ImGui::InvisibleButton(kEmptySpaceId, size)) context.session.select(kNoObject);
   accept_drops(kNoIndex, pending);
   if (!ImGui::BeginPopupContextItem(kEmptySpaceMenu)) return;

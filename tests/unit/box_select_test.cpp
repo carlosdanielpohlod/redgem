@@ -56,6 +56,8 @@ TEST_CASE("a small move of the mouse is a click, a longer one a rectangle") {
   CHECK_FALSE(dragged_far_enough({100, 100}, {102, 101}));
   CHECK(dragged_far_enough({100, 100}, {110, 101}));
   CHECK(dragged_far_enough({100, 100}, {100, 90}));
+  CHECK_FALSE(dragged_far_enough({100, 100}, {105, 100}, 2.0f));
+  CHECK(dragged_far_enough({100, 100}, {108, 100}, 2.0f));
 }
 
 TEST_CASE("a rectangle selects the objects it holds, not the ones behind the camera") {
