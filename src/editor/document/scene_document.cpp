@@ -39,11 +39,21 @@ bool recoverable_buffers(const GlbFile& glb, std::string& error) {
       return false;
     }
   }
-  if (glb.bin.size() > recovery_format::kMaxBytes) {
-    error = recovery_format::limit_error();
-    return false;
-  }
   return true;
+}
+bool recovery_size(const GlbFile& glb, std::string& error) {
+  if (glb.bin.size() <= recovery_format::kMaxBytes) return true;
+  error = recovery_format::limit_error();
+  return false;
+}
+std::optional<GlbFile> lean_recovery(const GlbFile& glb, std::string& error) {
+  auto lean = without_unused(glb);
+  if (lean) {
+    if (!recovery_size(*lean, error)) return std::nullopt;
+    return lean;
+  }
+  if (!recovery_size(glb, error)) return std::nullopt;
+  return glb;
 }
 
 }  // namespace
@@ -230,8 +240,8 @@ bool SceneDocument::save_file(const std::filesystem::path& path, std::string& er
 std::optional<GlbFile> SceneDocument::recovery_copy(std::string& error) {
   if (!recoverable_buffers(glb_, error)) return std::nullopt;
   if (!sync_for_writing(error)) return std::nullopt;
-  auto lean = without_unused(glb_);
-  if (!lean) lean = glb_;
+  auto lean = lean_recovery(glb_, error);
+  if (!lean) return std::nullopt;
   material_textures::forget_unused_webp(lean->json);
   return lean;
 }
