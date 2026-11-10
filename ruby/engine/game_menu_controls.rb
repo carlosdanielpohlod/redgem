@@ -23,7 +23,7 @@ class GameMenu < Behaviour
     CONFLICT_MARK = " !".freeze
     WAITING_MARK = "...".freeze
     CUT_MARK = "...".freeze   # ends a cell's text cut short to fit it
-    VISIBLE_ROWS = 7          # rows shown at once; more scroll along with the focus
+    VISIBLE_ROWS = 7          # rows shown at once; more scroll (UI::ScrollList), along with the focus
     PLAYER_ROWS = 1           # the player's choice, before the rows in the focus
     BUTTONS_SHARE = 0.8       # where its first button sits, as a share of the screen's height
     # Which cell left and right go to.
@@ -44,7 +44,7 @@ class GameMenu < Behaviour
       @menu = menu
       @page = ControlsPage.new
       @column = ControlsPage::KEYS
-      @top = 0
+      @list = UI::ScrollList.new
       @cells = {}
     end
 
@@ -56,7 +56,7 @@ class GameMenu < Behaviour
     # Shown again: from its first row, on the keys' cells.
     def opened
       @column = ControlsPage::KEYS
-      @top = 0
+      @list.reset
     end
 
     def draw(first_button)
@@ -102,24 +102,23 @@ class GameMenu < Behaviour
       @page.player = picked unless picked == @page.player
     end
 
-    # The rows the focus is among, scrolled so the focused one shows; each frame's left or right
-    # first picks the focused row's cell. `shared`: the bindings on more than one row.
+    # The rows the focus is among, in a list that scrolls to the focused one (and with the wheel,
+    # but not while a capture waits for it); each frame's left or right first picks the focused
+    # row's cell. `shared`: the bindings on more than one row.
     def control_rows(y, shared)
       all = @page.rows
-      scroll_to(focus_index - PLAYER_ROWS, all.size)
       pick_column if focus_on_a_row?
       @cells = {}
-      all[@top, VISIBLE_ROWS].each_with_index do |row, at|
-        place = PLAYER_ROWS + @top + at
-        control_row(row, row_box(y + at * row_step, place), place, shared)
+      @list.draw(all.size, **list_box(y), focus: focus, first: PLAYER_ROWS, input: !@page.capturing?) do |index, box|
+        place = PLAYER_ROWS + index
+        control_row(all[index], box.merge(focused: focused?(place)), place, shared)
       end
     end
 
-    # Keeps the row at `index` among those shown (one before the first is the player's choice).
-    def scroll_to(index, count)
-      @top = index if index.between?(0, @top - 1)
-      @top = index - VISIBLE_ROWS + 1 if index >= @top + VISIBLE_ROWS
-      @top = @top.clamp(0, [count - VISIBLE_ROWS, 0].max)
+    # Where the rows' list is, under the player's choice: as tall as the rows it shows at once.
+    def list_box(y)
+      { x: row_x, y: y, width: @menu.scaled(ROW_WIDTH), height: (shown_rows - PLAYER_ROWS) * row_step,
+        row_height: row_step, gap: row_step - @menu.scaled(ROW_HEIGHT) }
     end
 
     # Whether the focus is on one of the rows (not on the player's choice, nor on a button).

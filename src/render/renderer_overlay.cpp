@@ -35,6 +35,18 @@ void draw_hud_rect(const HudItem& item) {
   }
 }
 
+bool is_clip(HudItem::Kind kind) { return kind == HudItem::Kind::Clip || kind == HudItem::Kind::Unclip; }
+
+// Cuts what follows to the item's box (Clip), or stops cutting it (Unclip); returns whether it is cut.
+bool clip_hud(const HudItem& item) {
+  if (item.kind == HudItem::Kind::Unclip) {
+    EndScissorMode();
+    return false;
+  }
+  BeginScissorMode(item.x, item.y, item.width, item.height);
+  return true;
+}
+
 unsigned char control_alpha(ControlCircle::Look look) {
   if (look == ControlCircle::Look::Base) return kTouchBaseAlpha;
   return look == ControlCircle::Look::Pressed ? kTouchPressedAlpha : kTouchRestingAlpha;
@@ -58,20 +70,31 @@ void Renderer::Impl::draw_hud_image(const HudItem& item) {
                  to_raylib(item.color));
 }
 
-void Renderer::draw_hud(const std::vector<HudItem>& hud) {
-  for (const HudItem& item : hud) {
-    switch (item.kind) {
-      case HudItem::Kind::Text:
-        impl_->draw_hud_text(item);
-        break;
-      case HudItem::Kind::Rect:
-        draw_hud_rect(item);
-        break;
-      case HudItem::Kind::Image:
-        impl_->draw_hud_image(item);
-        break;
-    }
+bool Renderer::Impl::draw_hud_item(const HudItem& item, bool clipped) {
+  if (is_clip(item.kind)) return clip_hud(item);
+  draw_hud_picture(item);
+  return clipped;
+}
+
+void Renderer::Impl::draw_hud_picture(const HudItem& item) {
+  switch (item.kind) {
+    case HudItem::Kind::Text:
+      draw_hud_text(item);
+      break;
+    case HudItem::Kind::Rect:
+      draw_hud_rect(item);
+      break;
+    default:  // an image (clips are not pictures)
+      draw_hud_image(item);
+      break;
   }
+}
+
+// A clip still on at the end (a script that never ended it) ends there: nothing after the HUD is cut.
+void Renderer::draw_hud(const std::vector<HudItem>& hud) {
+  bool clipped = false;
+  for (const HudItem& item : hud) clipped = impl_->draw_hud_item(item, clipped);
+  if (clipped) EndScissorMode();
 }
 
 int Renderer::text_width(const std::string& text, int size) const {

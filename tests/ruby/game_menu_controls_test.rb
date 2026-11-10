@@ -104,6 +104,18 @@ class GameMenuControlsTest < RedGemTest::Case
     assert controls.cells.key?([:horizontal, :negative, BUTTONS])
   end
 
+  def test_the_rows_scroll_to_the_focused_one_and_start_over_when_the_page_opens_again
+    opened, controls = opened_page
+    controls.focus.move_to(controls.rows - 1)
+    opened.update(0)
+    assert drawn?(controls, controls.page.rows.last), "the last row shows"
+    opened.show(:controls)
+    opened.update(0)
+    assert drawn?(controls, controls.page.rows.first), "back at the first row"
+  end
+
+  def drawn?(controls, row) = controls.cells.key?([row.name, row.side, KEYS])
+
   def test_leaving_the_page_calls_a_capture_off
     _opened, controls = opened_page
     controls.page.capture(JUMP, KEYS)

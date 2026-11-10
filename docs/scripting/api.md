@@ -30,6 +30,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Audio`](#audio) | Sounds and music from the game's sounds/ folder. |
 | [`UI`](#ui) | What a script draws over the game this frame: texts, rectangles, pictures, buttons. |
 | [`UI::Focus`](#uifocus) | Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping. |
+| [`UI::ScrollList`](#uiscrolllist) | Rows in a box that scrolls, drawn only inside it: the wheel, Page Up/Down, a gamepad's bumpers and right stick, and a focus. |
 | [`Debug`](#debug) | Developer diagnostics: console messages, frame timings and immediate world drawing. |
 | [`Game`](#game) | The game itself. |
 | [`Settings`](#settings) | How the player chose the game to be shown and heard; a change takes effect at once. |
@@ -438,21 +439,26 @@ Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `s
 
 What a script draws over the game this frame: texts, rectangles, pictures, buttons. See [gameplay.md](gameplay.md).
 
-- `UI.text(str, x:, y:, size:, color:, alpha:, align:)`: draws a text
-- `UI.rect(x:, y:, width:, height:, color:, alpha:, radius:)`: draws a rectangle
-- `UI.image(name, x:, y:, width:, height:)`: draws a picture of images/
-- `UI.button(label, x:, y:, width:, height:)`: draws a button; true the frame it is clicked
-- `UI.text_field(value, x:, y:, width:, height:, max_length:, secret:)`: a field to type in; returns the new value
+- `UI.text(str, x:, y:, size:, color:, alpha:, align:, width: nil, anchor: nil)`: draws a text; width: wraps it at word boundaries
+- `UI.rect(x:, y:, width:, height:, color:, alpha:, radius:, anchor: nil)`: draws a rectangle
+- `UI.image(name, x:, y:, width:, height:, anchor: nil)`: draws a picture of images/
+- `UI.button(label, x:, y:, width:, height:, anchor: nil)`: draws a button; true the frame it is clicked
+- `UI.text_field(value, x:, y:, width:, height:, max_length:, secret:, anchor: nil)`: a field to type in; returns the new value
 - `UI.width`: the width of the screen, in pixels
 - `UI.height`: the height of the screen, in pixels
 - `UI.text_width(str, size:)`: how wide a text is, in pixels (in the face selected)
-- `UI.toggle(label, on, x:, y:, width:, height:, focused: false)`: an on/off row of a settings screen; returns whether it is on
-- `UI.choice(label, choices, index, x:, y:, width:, height:, focused: false)`: a row that picks one of choices; returns the index chosen
-- `UI.slider(label, value, x:, y:, width:, height:, min: 0.0, max: 1.0, step: 0.05, focused: false)`: a row with a slider; returns the value
+- `UI.wrap(str, width:, size:)`: the lines a text wraps to at word boundaries, none wider than width
+- `UI.text_height(str, size:, width: nil)`: how tall a text is drawn, in pixels (wrapped to width, when given)
+- `UI.line_height(size)`: pixels from a line's top to the next one's at a text size
+- `UI.anchored(anchor, x:, y:, width: 0, height: 0)`: the top-left [x, y] of a box placed at an anchor, x and y from it
+- `UI.clip(x:, y:, width:, height:, anchor: nil, &block)`: draws what the block draws only inside a box
+- `UI.toggle(label, on, x:, y:, width:, height:, focused: false, anchor: nil)`: an on/off row of a settings screen; returns whether it is on
+- `UI.choice(label, choices, index, x:, y:, width:, height:, focused: false, anchor: nil)`: a row that picks one of choices; returns the index chosen
+- `UI.slider(label, value, x:, y:, width:, height:, min: 0.0, max: 1.0, step: 0.05, focused: false, anchor: nil)`: a row with a slider; returns the value
 - `UI.font`: the face texts are drawn with: a file name of fonts/, or nil for the built-in one
 - `UI.font = name`: draws the next texts with fonts/<name>.ttf or .otf (nil: the built-in face)
 
-A focused widget (`focused: true`) is worked by Enter or a gamepad's A, and left and right change it. The built-in face adds glyphs as they are asked for (Greek, Cyrillic, accented letters, `€`); for another face or script, put a `.ttf` or `.otf` in `fonts/` and set `UI.font`. A missing or unreadable face falls back to the built-in one, with a warning; glyphs a face lacks show as `?`; there is no bidirectional layout or complex-script shaping.
+A focused widget (`focused: true`) is worked by Enter or a gamepad's A, and left and right change it. An anchor (`:top_left`, `:top`, `:top_right`, `:left`, `:center`, `:right`, `:bottom_left`, `:bottom`, `:bottom_right`) makes x and y offsets from that point of the screen, and puts the matching corner of what is drawn there: `UI.text("Lives", anchor: :top_right, x: -20, y: 20)`. With an anchor, a text's box is as wide as `width:` or its widest line, and `align:` lays its lines out inside it; an image is placed by the width and height given. A text breaks at its own line breaks, and with `width:` also at spaces; a word longer than a line is cut between letters. Lines are `UI.line_height(size)` apart (1.25 times the size). Inside `UI.clip`, the pointer outside the box is over nothing drawn in it. The built-in face adds glyphs as they are asked for (Greek, Cyrillic, accented letters, `€`); for another face or script, put a `.ttf` or `.otf` in `fonts/` and set `UI.font`. A missing or unreadable face falls back to the built-in one, with a warning; glyphs a face lacks show as `?`; there is no bidirectional layout or complex-script shaping.
 
 ## UI::Focus
 
@@ -464,6 +470,20 @@ Which widget of a screen the keyboard and a gamepad work: up and down move it, w
 - `move_to(index)`: puts it on a widget (one clicked, or the one a screen comes back to)
 - `index`: the widget that has it
 - `reset`: back to the first widget
+
+## UI::ScrollList
+
+Rows in a box that scrolls, drawn only inside it: the wheel, Page Up/Down, a gamepad's bumpers and right stick, and a focus. See [gameplay.md](gameplay.md).
+
+- `UI::ScrollList.new`: a list scrolled to its first row
+- `draw(count, x:, y:, width:, height:, row_height:, gap: 0, focus: nil, first: 0, anchor: nil, input: true, &block)`: draws count rows in the box, calling the block with each shown row's index and box
+- `offset`: how far it is scrolled, in pixels from its first row's top
+- `offset = pixels`: scrolls it (kept within its rows when it is drawn)
+- `shown`: the indexes of the rows that show, as a range
+- `scrolls?`: whether its rows are taller than its box
+- `reset`: back to its first row
+
+Given a focus (`UI::Focus`), the list scrolls to the row the focus moves to, and Page Up and Page Down move the focus a page; row 0 is the focus' `first`, so rows may come after other widgets. Without one, up and down (arrows, D-pad) scroll a row. The wheel scrolls it while the pointer is over it, and scrolling away from the focused row stays until the focus moves. `input: false` leaves the keys and the wheel to something else that frame. A bar beside its right edge shows how far it is scrolled.
 
 ## Debug
 

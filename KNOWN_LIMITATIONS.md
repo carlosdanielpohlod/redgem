@@ -155,7 +155,11 @@ not a promise of how it will be closed.
   desktops' window library nor Android offers it), and a capture catches keys, mouse buttons, the
   wheel and gamepad buttons, not sticks, triggers or mouse movement. Keys are named for their place
   on a US keyboard, and the page shows them by those names whatever the layout types.
-- `UI` has no word wrap, anchors or scroll lists. Android has no on-screen keyboard.
+- `UI` lays texts out a line at a time: word wrap breaks only at spaces and between letters (no
+  hyphenation, no line-breaking rules of scripts written without spaces), and anchors place things
+  by fixed pixel sizes (sizes do not scale with the screen; `GameMenu` scales its own). There is
+  no layout engine (rows, columns, stacks) and no scroll region for anything other than rows of
+  one height. Android has no on-screen keyboard.
 
 ### Audio
 
