@@ -418,20 +418,21 @@ Named states and transitions for one character (animation.use(graph)). See [anim
 
 Sounds and music from the game's sounds/ folder.
 
-- `Audio.play(name, volume: 1.0, pitch: 1.0)`: plays a sound once
-- `Audio.music(name, loop: true, volume: 0.7)`: plays music
-- `Audio.stop_music`: stops the music
+- `Audio.play(name, volume: 1.0, pitch: 1.0, loop: false, group: :effects)`: plays a sound; returns its id (for stop, playing? and set), or nil
+- `Audio.music(name, loop: true, volume: 0.7, fade: 0.0)`: plays music, crossfading over fade seconds from the track playing
+- `Audio.stop_music(fade: 0.0)`: stops the music, fading it out over fade seconds
 - `Audio.music_pitch = pitch`: changes the music's pitch
 - `Audio.music_volume = volume`: changes the music's volume
 - `Audio.volume = volume`: the volume of everything
-- `Audio.play_at(name, position, loop: false, volume: 1.0, pitch: 1.0, reference_distance: 1.0, max_distance: 50.0)`: plays a sound at a place in the world; returns its id, or nil
+- `Audio.set(id, volume: nil, pitch: nil)`: changes the volume or pitch of a sound that plays; false once it stopped
+- `Audio.play_at(name, position, loop: false, volume: 1.0, pitch: 1.0, reference_distance: 1.0, max_distance: 50.0, group: :effects)`: plays a sound at a place in the world; returns its id, or nil
 - `Audio.listener(position, forward, up)`: where the ears are (move it with the camera)
 - `Audio.move(id, position)`: moves a sound played with play_at
 - `Audio.playing?(id)`: whether that sound still plays
 - `Audio.stop(id)`: stops that sound
-- `Audio.stop_sources`: stops every sound played with play_at
+- `Audio.stop_sources`: stops every sound played with play or play_at
 
-`play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 64 sources play at once; old ids are never reused.
+Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 64 sounds with ids play at once; old ids are never reused.
 
 ## UI
 
@@ -544,6 +545,12 @@ How the player chose the game to be shown and heard; a change takes effect at on
 - `Settings.quality_details = details`: changes some of them, and makes the quality :custom
 - `Settings.volume`: the player's volume, 0 to 1 (it multiplies Audio.volume)
 - `Settings.volume = volume`: changes it
+- `Settings.music_volume`: the player's volume of the music group, 0 to 1
+- `Settings.music_volume = volume`: changes it
+- `Settings.effects_volume`: the player's volume of the effects group, 0 to 1
+- `Settings.effects_volume = volume`: changes it
+- `Settings.voice_volume`: the player's volume of the voice group, 0 to 1
+- `Settings.voice_volume = volume`: changes it
 - `Settings.save`: keeps them for the next runs; false where they last for the run only
 
 Until the player chooses, everything is what `game.json` says. `Settings.save` keeps them only in a built game a player plays: in the editor's Play, `redgem run`, a server's rooms and tests they last for the run, and `save` returns false.

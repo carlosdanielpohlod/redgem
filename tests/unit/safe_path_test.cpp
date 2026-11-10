@@ -71,9 +71,9 @@ TEST_CASE("a sound outside the sounds folder is not played") {
   const Scratch scratch;
   testing::RecordingAudio audio;
   audio.set_sounds_dir(scratch.assets);
-  CHECK(audio.play_sound("jump", 1.0f, 1.0f));
-  CHECK_FALSE(audio.play_sound("../secret", 1.0f, 1.0f));
-  CHECK_FALSE(audio.play_music("../secret", false, 1.0f));
+  CHECK(audio.play_sound("jump", FlatSound{}) != kNoSoundSource);
+  CHECK(audio.play_sound("../secret", FlatSound{}) == kNoSoundSource);
+  CHECK_FALSE(audio.play_music("../secret", MusicRequest{}));
   CHECK(audio.played() == std::vector<std::string>{"jump"});
   CHECK_FALSE(find_sound_file(scratch.assets, "../secret").has_value());
 }

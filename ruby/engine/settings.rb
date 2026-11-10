@@ -1,5 +1,5 @@
 # How the player chose the game to be shown and heard: the window, how sharp its picture is, the
-# pace of its frames, how much the renderer does, the volume. A change takes effect at once;
+# pace of its frames, how much the renderer does, the volumes. A change takes effect at once;
 # Settings.save keeps what is in use for the game's next runs. Until the player chooses, everything
 # is what the game's game.json says (window_width, window_height, fullscreen, vsync, fps_cap,
 # render_scale, quality).
@@ -91,6 +91,25 @@ module Settings
 
   def self.volume=(volume)
     write("volume" => volume.to_f)
+  end
+
+  # The volume of each group of sounds (see Audio.play's group:), 0 to 1, under the master volume.
+  def self.music_volume = read("music_volume")
+
+  def self.music_volume=(volume)
+    write("music_volume" => volume.to_f)
+  end
+
+  def self.effects_volume = read("effects_volume")
+
+  def self.effects_volume=(volume)
+    write("effects_volume" => volume.to_f)
+  end
+
+  def self.voice_volume = read("voice_volume")
+
+  def self.voice_volume=(volume)
+    write("voice_volume" => volume.to_f)
   end
 
   def self.read(key) = __read[key]

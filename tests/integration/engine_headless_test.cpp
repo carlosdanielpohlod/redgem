@@ -697,8 +697,8 @@ TEST_CASE("sounds are looked up in the game's sounds folder") {
   constexpr float kHalfVolume = 0.5f;
   testing::RecordingAudio recording;  // made first: the engine plays through it until its end
   auto engine = sandbox(&recording);
-  CHECK(ruby(*engine, "Audio.play(:beep)") == "true");
-  CHECK(ruby(*engine, "Audio.play(:nope)") == "false");
+  CHECK(ruby(*engine, "Audio.play(:beep)") == "1");  // its handle
+  CHECK(ruby(*engine, "Audio.play(:nope).nil?") == "true");
   CHECK(ruby(*engine, "Audio.music('beep', loop: false)") == "true");
   CHECK(recording.played() == std::vector<std::string>{"beep"});
   CHECK(recording.music() == "beep");
@@ -715,7 +715,7 @@ TEST_CASE("sounds are looked up in the game's sounds folder") {
 TEST_CASE("an engine without an audio of its options is silent") {
   auto engine = sandbox();
   const int errors_before = engine->scripts().error_count();
-  CHECK(ruby(*engine, "Audio.play(:beep)") == "false");
+  CHECK(ruby(*engine, "Audio.play(:beep).nil?") == "true");
   CHECK(ruby(*engine, "Audio.music('beep', loop: false)") == "false");
   ruby(*engine, "Audio.music_pitch = 1.5; Audio.stop_music; Audio.volume = 0.5");  // asked of nobody: no harm
   CHECK(engine->scripts().error_count() == errors_before);

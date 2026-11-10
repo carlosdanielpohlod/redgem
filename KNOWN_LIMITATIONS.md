@@ -159,9 +159,13 @@ not a promise of how it will be closed.
 
 ### Audio
 
-- Positional sound provides stereo panning and distance falloff for at most 64 independent sources.
-  Games update source positions and the listener explicitly; there is no HRTF, occlusion or Doppler.
-  One music track at a time with no crossfade, no mixing groups.
+- At most 64 sounds with ids play at once, flat and positional together. Positional sound provides
+  stereo panning and distance falloff; games update source positions and the listener explicitly;
+  there is no HRTF, occlusion or Doppler.
+- One music track at a time, two while they crossfade. The mix groups are fixed (master, music,
+  effects, voice): a game cannot add its own, and there are no effects on a group (reverb,
+  ducking, filters). Fades are linear in volume, and only the music fades by itself; a sound's
+  levels change at once.
 
 ### Text
 

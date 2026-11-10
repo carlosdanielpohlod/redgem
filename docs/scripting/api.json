@@ -1523,21 +1523,22 @@
         {
           "name": "play",
           "static": true,
-          "args": "name, volume: 1.0, pitch: 1.0",
-          "about": "plays a sound once",
+          "args": "name, volume: 1.0, pitch: 1.0, loop: false, group: :effects",
+          "about": "plays a sound; returns its id (for stop, playing? and set), or nil",
           "top": 24,
           "example": "Audio.play(:jump)"
         },
         {
           "name": "music",
           "static": true,
-          "args": "name, loop: true, volume: 0.7",
-          "about": "plays music"
+          "args": "name, loop: true, volume: 0.7, fade: 0.0",
+          "about": "plays music, crossfading over fade seconds from the track playing"
         },
         {
           "name": "stop_music",
           "static": true,
-          "about": "stops the music"
+          "args": "fade: 0.0",
+          "about": "stops the music, fading it out over fade seconds"
         },
         {
           "name": "music_pitch=",
@@ -1558,9 +1559,15 @@
           "about": "the volume of everything"
         },
         {
+          "name": "set",
+          "static": true,
+          "args": "id, volume: nil, pitch: nil",
+          "about": "changes the volume or pitch of a sound that plays; false once it stopped"
+        },
+        {
           "name": "play_at",
           "static": true,
-          "args": "name, position, loop: false, volume: 1.0, pitch: 1.0, reference_distance: 1.0, max_distance: 50.0",
+          "args": "name, position, loop: false, volume: 1.0, pitch: 1.0, reference_distance: 1.0, max_distance: 50.0, group: :effects",
           "about": "plays a sound at a place in the world; returns its id, or nil"
         },
         {
@@ -1590,10 +1597,10 @@
         {
           "name": "stop_sources",
           "static": true,
-          "about": "stops every sound played with play_at"
+          "about": "stops every sound played with play or play_at"
         }
       ],
-      "notes": "`play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 64 sources play at once; old ids are never reused."
+      "notes": "Every sound played gets an id, flat (`play`) or positional (`play_at`) alike: `stop`, `playing?` and `set` take either. A sound that does not loop is decoded once and each play is a voice of its own; loops and music stream, so a crossfade plays two tracks for its length. A sound plays in a mix group, `:music`, `:effects` (the default) or `:voice`, and is heard at its volume times the player's volume of its group (`Settings.music_volume`, `effects_volume`, `voice_volume`) times the master volume. A track that cannot play leaves the one playing as it was. `play_at` sources use stereo panning and inverse-distance volume, fading to silence at `max_distance`. `volume` must be 0 or more and `pitch` from 0.01 to 8; `0 < reference_distance < max_distance`. Positions and directions may be arrays or `Vector3`. Update `Audio.listener(position, forward, up)` when the camera moves: nothing follows an object by itself. At most 64 sounds with ids play at once; old ids are never reused."
     },
     {
       "name": "UI",
@@ -1984,6 +1991,39 @@
         },
         {
           "name": "volume=",
+          "static": true,
+          "args": "volume",
+          "about": "changes it"
+        },
+        {
+          "name": "music_volume",
+          "static": true,
+          "about": "the player's volume of the music group, 0 to 1"
+        },
+        {
+          "name": "music_volume=",
+          "static": true,
+          "args": "volume",
+          "about": "changes it"
+        },
+        {
+          "name": "effects_volume",
+          "static": true,
+          "about": "the player's volume of the effects group, 0 to 1"
+        },
+        {
+          "name": "effects_volume=",
+          "static": true,
+          "args": "volume",
+          "about": "changes it"
+        },
+        {
+          "name": "voice_volume",
+          "static": true,
+          "about": "the player's volume of the voice group, 0 to 1"
+        },
+        {
+          "name": "voice_volume=",
           "static": true,
           "args": "volume",
           "about": "changes it"
