@@ -44,10 +44,11 @@ void EditorApp::draw_recovery_choices() {
   ImGui::SameLine();
   if (!ImGui::Button(tr("editor.recovery.discard"))) return;
   std::string error;
-  if (session_->discard_recovery(error))
-    ImGui::CloseCurrentPopup();
-  else
-    log::error(error);
+  if (!session_->discard_recovery(error)) {
+    log::warning(error);
+    session_->ignore_recovery();
+  }
+  ImGui::CloseCurrentPopup();
 }
 bool EditorApp::recover_scene() {
   std::string error;

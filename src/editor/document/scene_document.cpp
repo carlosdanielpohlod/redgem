@@ -14,6 +14,7 @@
 #include "editor/document/recovery_format.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_loader.hpp"
+#include "scene/gltf/gltf_budget.hpp"
 #include "scene/scene_ids.hpp"
 
 namespace redgem {
@@ -71,12 +72,9 @@ std::variant<SceneDocument, std::string> SceneDocument::open_file(const std::fil
   return document;
 }
 
-std::variant<SceneDocument, std::string> SceneDocument::open_recovery(const std::filesystem::path& source,
-                                                                      GlbFile file) {
-  std::string error;
-  const auto bytes = encode_glb(file, error);
-  if (!bytes) return error;
-  auto loaded = load_gltf_snapshot(source.string(), *bytes, recovery_format::kMaxBytes);
+std::variant<SceneDocument, std::string> SceneDocument::open_recovery(const std::filesystem::path& source, GlbFile file,
+                                                                      const std::vector<std::uint8_t>& bytes) {
+  auto loaded = load_gltf_snapshot(source.string(), bytes, gltf_budget::kMaxSceneBytes);
   if (!loaded.ok) return loaded.error;
   SceneDocument document;
   document.keep_file(std::move(file));

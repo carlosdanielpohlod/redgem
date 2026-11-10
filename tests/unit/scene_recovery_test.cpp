@@ -1,9 +1,11 @@
 #include <doctest/doctest.h>
 
 #include <filesystem>
+#include <memory>
 #include <string>
 
 #include "core/files.hpp"
+#include "core/platform.hpp"
 #include "editor/editor_session.hpp"
 #include "editor/scene_recovery.hpp"
 #include "scene/props.hpp"
@@ -14,15 +16,20 @@ namespace fs = std::filesystem;
 struct RecoveryGame {
   fs::path folder = fs::temp_directory_path() / "redgem_scene_recovery_test";
   fs::path source = folder / "scene.glb";
+  fs::path previous_data = platform::user_data_dir();
   std::string error;
   SceneDocument document = SceneDocument::create_empty(source);
   RecoveryGame() {
     fs::remove_all(folder);
     fs::create_directories(folder);
+    platform::set_user_data_dir(folder / "user-data");
     document.add_primitive(PrimitiveShape::Cube, "Original", {1, 0, 0, 1});
     REQUIRE_MESSAGE(document.save(error), error);
   }
-  ~RecoveryGame() { fs::remove_all(folder); }
+  ~RecoveryGame() {
+    platform::set_user_data_dir(previous_data);
+    fs::remove_all(folder);
+  }
   std::string bytes(const fs::path& path) {
     auto result = read_text_file(path, error);
     REQUIRE_MESSAGE(result.has_value(), error);
@@ -35,7 +42,8 @@ struct RecoveryGame {
 }  // namespace
 TEST_CASE("scene recovery writes a separate authored copy and preserves undo state") {
   RecoveryGame game;
-  SceneRecovery recovery;
+  auto writer = std::make_unique<SceneRecovery>();
+  auto& recovery = *writer;
   recovery.watch(game.source);
   const auto original = game.bytes(game.source);
   const auto id = game.document.node(0).stable_id;
@@ -52,7 +60,7 @@ TEST_CASE("scene recovery writes a separate authored copy and preserves undo sta
   CHECK_FALSE(game.document.dirty());
   game.document.redo();
   CHECK(game.document.node(0).name == "Edited");
-  recovery.stop();
+  writer.reset();
   SceneRecovery restarted;
   restarted.watch(game.source);
   REQUIRE(restarted.pending());
@@ -125,7 +133,8 @@ TEST_CASE("scene recovery keeps a valid backup when flushing its replacement fai
   for (const auto& entry : fs::directory_iterator(game.folder)) {
     auto lease_file = copy;
     lease_file += ".lock";
-    const bool expected_file = entry.path() == game.source || entry.path() == copy || entry.path() == lease_file;
+    const bool expected_file = entry.path() == game.source || entry.path() == copy || entry.path() == lease_file ||
+                               entry.path() == game.folder / "user-data";
     CHECK(expected_file);
   }
   fail_flush = false;
@@ -269,7 +278,8 @@ TEST_CASE("scene recovery refuses linked buffers before changing the document's 
 
 TEST_CASE("scene recovery never reads or deletes a live editor's copy") {
   RecoveryGame game;
-  SceneRecovery owner;
+  auto writer = std::make_unique<SceneRecovery>();
+  auto& owner = *writer;
   owner.watch(game.source);
   game.document.set_name(0, "Live unsaved edit");
   game.autosave(owner);
@@ -282,7 +292,7 @@ TEST_CASE("scene recovery never reads or deletes a live editor's copy") {
   REQUIRE(other.discard(game.error));
   CHECK(game.bytes(copy) == bytes);
   CHECK_FALSE(other.recover(game.document, game.error));
-  owner.stop();  // the same release the OS performs when the writer exits
+  writer.reset();  // the same release the OS performs when the writer exits
   other.watch(game.source);
   REQUIRE(other.pending());
   REQUIRE(other.recover(game.document, game.error));
@@ -354,20 +364,22 @@ TEST_CASE("scene recovery uses the validated offer even if the pathname changes 
 
 TEST_CASE("a dismissed old recovery copy is not reoffered after a later editor restart") {
   RecoveryGame game;
-  SceneRecovery recovery;
+  auto writer = std::make_unique<SceneRecovery>();
+  auto& recovery = *writer;
   recovery.watch(game.source);
   game.document.set_name(0, "Older backup");
   game.autosave(recovery);
   game.document.set_name(0, "Newer manual save");
   REQUIRE(game.document.save(game.error));
   recovery.ignore();  // the fallback when deleting the older backup fails
-  recovery.stop();
+  writer.reset();
   SceneRecovery restarted;
   restarted.watch(game.source);
   CHECK_FALSE(restarted.pending());
   CHECK(fs::exists(SceneRecovery::copy_path(game.source)));
   game.document.set_name(0, "New unsaved edit");
   game.autosave(restarted);
+  CHECK(fs::is_empty(platform::user_data_dir() / "scene-recovery"));
   restarted.watch(game.source);
   CHECK(restarted.pending());  // a fresh backup is not hidden by the old dismissal
 }
@@ -390,4 +402,87 @@ TEST_CASE("a failed backup cleanup after Save never offers the stale copy over t
   const auto saved = SceneDocument::open(game.source);
   REQUIRE(std::holds_alternative<SceneDocument>(saved));
   CHECK(std::get<SceneDocument>(saved).node(0).name == "Newer saved scene");
+}
+
+TEST_CASE("scene recovery retries the lease after the live writer exits") {
+  RecoveryGame game;
+  auto owner = std::make_unique<SceneRecovery>();
+  owner->watch(game.source);
+  game.document.set_name(0, "Owner's edit");
+  game.autosave(*owner);
+  SceneRecovery waiting;
+  waiting.watch(game.source);
+  CHECK_FALSE(waiting.problem().empty());
+  owner.reset();
+  REQUIRE(waiting.poll(game.document, SceneRecovery::kIntervalSeconds, game.error));
+  CHECK(waiting.pending());
+  CHECK(waiting.problem().empty());
+}
+TEST_CASE("scene recovery catches a same-size same-time rewrite before the first autosave") {
+  RecoveryGame game;
+  SceneRecovery recovery;
+  recovery.watch(game.source);
+  const auto time = fs::last_write_time(game.source);
+  const auto size = fs::file_size(game.source);
+  auto external = SceneDocument::open(game.source);
+  std::get<SceneDocument>(external).set_name(0, "External");
+  REQUIRE(std::get<SceneDocument>(external).save(game.error));
+  REQUIRE(fs::file_size(game.source) == size);
+  fs::last_write_time(game.source, time);
+  game.document.set_name(0, "Unsaved");
+  game.autosave(recovery);
+  recovery.watch(game.source);
+  CHECK(recovery.source_changed());
+}
+TEST_CASE("a source larger than the copy limit can produce and recover a lean backup") {
+  RecoveryGame game;
+  auto file = read_glb(game.source, game.error);
+  REQUIRE(file.has_value());
+  constexpr std::size_t kLargeBytes = 65 * 1024 * 1024;
+  file->bin.resize(kLargeBytes);
+  file->json["buffers"][0]["byteLength"] = file->bin.size();
+  REQUIRE(write_glb(game.source, *file, game.error));
+  file.reset();
+  auto opened = SceneDocument::open(game.source);
+  REQUIRE_MESSAGE(std::holds_alternative<SceneDocument>(opened), game.error);
+  game.document = std::move(std::get<SceneDocument>(opened));
+  SceneRecovery recovery;
+  recovery.watch(game.source);
+  game.document.set_name(0, "Lean edit");
+  game.autosave(recovery);
+  CHECK(fs::file_size(SceneRecovery::copy_path(game.source)) < kLargeBytes);
+  recovery.watch(game.source);
+  CHECK_FALSE(recovery.source_changed());
+  REQUIRE_MESSAGE(recovery.recover(game.document, game.error), game.error);
+  CHECK(game.document.node(0).name == "Lean edit");
+}
+TEST_CASE("copy size and decoded scene memory have independent recovery budgets") {
+  RecoveryGame game;
+  auto file = read_glb(game.source, game.error);
+  REQUIRE(file.has_value());
+  constexpr std::uint32_t kSide = 4096;  // decoded RGBA alone is 64 MiB
+  std::vector<std::uint8_t> header{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R'};
+  for (int dimension = 0; dimension < 2; ++dimension)
+    for (int shift = 24; shift >= 0; shift -= 8) header.push_back(static_cast<std::uint8_t>(kSide >> shift));
+  header.insert(header.end(), {8, 6, 0, 0, 0});
+  const auto offset = file->bin.size();
+  file->bin.insert(file->bin.end(), header.begin(), header.end());
+  const auto view = file->json["bufferViews"].size();
+  file->json["bufferViews"].push_back({{"buffer", 0}, {"byteOffset", offset}, {"byteLength", header.size()}});
+  file->json["buffers"][0]["byteLength"] = file->bin.size();
+  file->json["images"] = {{{"bufferView", view}, {"mimeType", "image/png"}}};
+  file->json["textures"] = {{{"source", 0}}};
+  file->json["materials"][0]["pbrMetallicRoughness"]["baseColorTexture"] = {{"index", 0}};
+  REQUIRE(write_glb(game.source, *file, game.error));
+  auto opened = SceneDocument::open(game.source);
+  REQUIRE(std::holds_alternative<SceneDocument>(opened));
+  game.document = std::move(std::get<SceneDocument>(opened));
+  SceneRecovery recovery;
+  recovery.watch(game.source);
+  game.document.set_name(0, "Textured recovery");
+  game.autosave(recovery);
+  recovery.watch(game.source);
+  REQUIRE_MESSAGE(recovery.recover(game.document, game.error), game.error);
+  CHECK(game.document.node(0).name == "Textured recovery");
+  CHECK(game.document.desc().images.size() == 1);
 }

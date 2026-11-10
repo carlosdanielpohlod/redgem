@@ -2,11 +2,14 @@
 
 #include <mbedtls/sha256.h>
 #include <array>
+#include <chrono>
 #include <fstream>
 #include <stdexcept>
 #include <string_view>
 
 #include "storage/durable_file.hpp"
+#include "core/platform.hpp"
+#include "scene/scene_ids.hpp"
 #include "editor/document/recovery_format.hpp"
 
 namespace redgem {
@@ -19,6 +22,7 @@ constexpr const char* kSource = "source";
 constexpr const char* kBaseline = "baseline";
 constexpr const char* kVersion = "version";
 constexpr int kFormatVersion = 1;
+constexpr std::uintmax_t kEagerFingerprintBytes = 1024 * 1024;
 constexpr std::size_t kChunkBytes = 64 * 1024;
 constexpr std::size_t kDigestBytes = 32;
 constexpr char kHex[] = "0123456789abcdef";
@@ -53,9 +57,6 @@ bool feed_digest(std::ifstream& in, Digest& digest) {
   return in.eof();
 }
 std::string fingerprint(const fs::path& file) {
-  std::error_code size_error;
-  const auto size = fs::file_size(file, size_error);
-  require(size_error || size <= recovery_format::kMaxBytes, recovery_format::limit_error().c_str());
   std::ifstream in(file, std::ios::binary);
   if (!in) return {};
   Digest digest;
@@ -71,12 +72,23 @@ std::string file_stamp(const fs::path& file) {
   if (error) return "missing";
   const auto time = fs::last_write_time(file, error);
   if (error) return "unknown";
-  return std::to_string(size) + ":" + std::to_string(time.time_since_epoch().count());
+  const auto ticks = std::chrono::duration_cast<std::chrono::nanoseconds>(time.time_since_epoch()).count();
+  return std::to_string(size) + ":" + std::to_string(ticks);
+}
+std::string path_digest(const fs::path& source) {
+  const auto name = fs::weakly_canonical(fs::absolute(source)).generic_u8string();
+  std::array<unsigned char, kDigestBytes> digest{};
+  require(mbedtls_sha256(reinterpret_cast<const unsigned char*>(name.data()), name.size(), digest.data(), 0) == 0,
+          "cannot identify scene recovery");
+  return hex(digest);
 }
 fs::path dismissed_path(const fs::path& source) {
-  auto result = SceneRecovery::copy_path(source);
-  result += ".dismissed";
-  return result;
+  return platform::user_data_dir() / "scene-recovery" / (path_digest(source) + ".dismissed");
+}
+void clear_dismissal(const fs::path& source) {
+  std::error_code error;
+  fs::remove(dismissed_path(source), error);
+  require(!error, "cannot clear scene recovery dismissal");
 }
 bool dismissed_copy(const fs::path& source) {
   std::ifstream marker(dismissed_path(source), std::ios::binary);
@@ -93,17 +105,33 @@ void safe_copy(const fs::path& source, const fs::path& copy) {
   require(!fs::is_symlink(fs::symlink_status(source)), "scene recovery source is a symbolic link");
   require(!fs::is_symlink(fs::symlink_status(copy)), "recovery copy is a symbolic link");
 }
-std::optional<GlbFile> checked_copy(const fs::path& source, std::string& error) {
+std::vector<std::uint8_t> copy_bytes(const fs::path& copy) {
+  const auto size = fs::file_size(copy);
+  require(size <= recovery_format::kMaxBytes, recovery_format::limit_error().c_str());
+  std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
+  std::ifstream in(copy, std::ios::binary);
+  require(static_cast<bool>(in.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(size))),
+          "cannot read scene recovery");
+  require(in.peek() == std::char_traits<char>::eof(), "scene recovery changed while reading");
+  return bytes;
+}
+std::optional<SceneRecoveryCopy> checked_copy(const fs::path& source, std::string& error) {
   const auto copy = SceneRecovery::copy_path(source);
   safe_copy(source, copy);
-  require(fs::file_size(copy) <= recovery_format::kMaxBytes, recovery_format::limit_error().c_str());
-  auto glb = read_glb(copy, error);
+  auto bytes = copy_bytes(copy);
+  auto glb = decode_glb(bytes, copy.string(), error);
   if (!glb) return std::nullopt;
   const auto& meta = glb->json.at(kMetadata);
   require(meta.at(kVersion) == kFormatVersion, "unknown recovery format");
   require(meta.at(kSource) == source.filename().generic_u8string(), "recovery belongs to another scene");
   require(meta.at(kBaseline).is_string(), "invalid recovery source fingerprint");
-  return glb;
+  return SceneRecoveryCopy{std::move(*glb), std::move(bytes)};
+}
+nlohmann::json recovery_metadata(const fs::path& source, const std::string& baseline) {
+  return {{kVersion, kFormatVersion},
+          {kSource, source.filename().generic_u8string()},
+          {kBaseline, baseline},
+          {"generation", make_scene_id()}};
 }
 bool publish_copy(const GlbFile& glb, const fs::path& copy, const durable::Flush& flush, std::string& error) {
   const auto bytes = encode_glb(glb, error);
@@ -134,18 +162,31 @@ bool SceneRecovery::own(const fs::path& source) {
   lock += ".lock";
   return already_owned || lease_.acquire(lock);
 }
+void SceneRecovery::discover_copy() {
+  std::error_code error;
+  const bool ignored = ignored_sources_.count(source_) != 0;
+  const bool exists = fs::exists(fs::symlink_status(copy_path(source_), error));
+  pending_ = !ignored && exists && !dismissed_copy(source_);
+}
 void SceneRecovery::watch(const fs::path& source) {
   reset_observation();
+  baseline_.clear();
+  observed_stamp_ = file_stamp(source);
+  std::error_code error;
+  const bool small = fs::file_size(source, error) <= kEagerFingerprintBytes && !error;
+  if (small) baseline_ = fingerprint(source);
   if (!own(source)) {
     problem_ = "Scene recovery unavailable: another editor owns it, or the folder is not writable";
     return;
   }
-  baseline_.clear();
-  observed_stamp_ = file_stamp(source);
-  std::error_code error;
-  const bool ignored = ignored_sources_.count(source) != 0;
-  const bool exists = fs::exists(fs::symlink_status(copy_path(source), error));
-  pending_ = !ignored && exists && !dismissed_copy(source);
+  discover_copy();
+}
+bool SceneRecovery::retry_lease() {
+  if (lease_.held()) return true;
+  if (!own(source_)) return false;
+  problem_.clear();
+  discover_copy();
+  return true;
 }
 void SceneRecovery::ignore() {
   ignored_sources_.insert(source_);
@@ -155,12 +196,13 @@ void SceneRecovery::ignore() {
   try {
     const auto digest = fingerprint(copy_path(source_));
     require(!digest.empty(), "cannot fingerprint the ignored recovery copy");
+    fs::create_directories(dismissed_path(source_).parent_path());
     require(durable::replace_file(dismissed_path(source_), digest, flush_), "cannot persist recovery dismissal");
   } catch (const std::exception& error) {
     problem_ = std::string(kDismissalNotice) + error.what();
   }
 }
-const GlbFile* SceneRecovery::offered_copy(std::string& error) const {
+SceneRecoveryCopy* SceneRecovery::offered_copy(std::string& error) const {
   if (!offered_) offered_ = checked_copy(source_, error);
   return offered_ ? &*offered_ : nullptr;
 }
@@ -169,7 +211,7 @@ bool SceneRecovery::source_changed() const {
   try {
     std::string error;
     const auto* copy = offered_copy(error);
-    const bool changed = !copy || copy->json.at(kMetadata).at(kBaseline) != fingerprint(source_);
+    const bool changed = !copy || copy->glb.json.at(kMetadata).at(kBaseline) != fingerprint(source_);
     source_changed_ = changed;
   } catch (const std::exception&) {
     source_changed_ = true;
@@ -178,10 +220,10 @@ bool SceneRecovery::source_changed() const {
 }
 bool SceneRecovery::restore(SceneDocument& document, std::string& error) {
   require(lease_.held(), "scene recovery is owned by another editor");
-  const auto* checked = offered_copy(error);
+  auto* checked = offered_copy(error);
   if (!checked) return false;
-  const auto recovered_baseline = checked->json.at(kMetadata).at(kBaseline).get<std::string>();
-  auto opened = SceneDocument::open_recovery(source_, std::move(*offered_));
+  const auto recovered_baseline = checked->glb.json.at(kMetadata).at(kBaseline).get<std::string>();
+  auto opened = SceneDocument::open_recovery(source_, std::move(checked->glb), checked->bytes);
   offered_.reset();
   if (auto* problem = std::get_if<std::string>(&opened)) {
     error = *problem;
@@ -200,7 +242,7 @@ bool SceneRecovery::recover(SceneDocument& document, std::string& error) {
     return false;
   }
 }
-bool SceneRecovery::discard(std::string& error) {
+bool SceneRecovery::remove_copy(std::string& error) {
   if (!lease_.held()) return true;
   std::error_code problem;
   fs::remove(copy_path(source_), problem);
@@ -208,10 +250,19 @@ bool SceneRecovery::discard(std::string& error) {
     error = "cannot remove scene recovery: " + problem.message();
     return false;
   }
+  clear_dismissal(source_);
   pending_ = false;
   offered_.reset();
   written_version_.reset();
   return true;
+}
+bool SceneRecovery::discard(std::string& error) {
+  try {
+    return remove_copy(error);
+  } catch (const std::exception& problem) {
+    error = problem.what();
+    return false;
+  }
 }
 bool SceneRecovery::write(SceneDocument& document, std::string& error) {
   const auto copy = copy_path(source_);
@@ -222,9 +273,10 @@ bool SceneRecovery::write(SceneDocument& document, std::string& error) {
   }
   auto glb = document.recovery_copy(error);
   if (!glb) return false;
-  glb->json[kMetadata] = {
-      {kVersion, kFormatVersion}, {kSource, source_.filename().generic_u8string()}, {kBaseline, baseline_}};
-  return publish_copy(*glb, copy, flush_, error);
+  glb->json[kMetadata] = recovery_metadata(source_, baseline_);
+  if (!publish_copy(*glb, copy, flush_, error)) return false;
+  clear_dismissal(source_);
+  return true;
 }
 bool SceneRecovery::save_version(SceneDocument& document, std::string& error) {
   try {
@@ -248,11 +300,13 @@ bool SceneRecovery::save_or_report(SceneDocument& document, std::string& error) 
   return false;
 }
 bool SceneRecovery::poll(SceneDocument& document, float seconds, std::string& error) {
-  const bool blocked = pending_ || !lease_.held() || failed_version_ == document.version();
-  if (blocked) return true;
+  if (pending_) return true;
   elapsed_ += seconds;
   if (elapsed_ < kIntervalSeconds) return true;
   elapsed_ = 0;
+  if (!retry_lease()) return true;
+  const bool blocked = pending_ || failed_version_ == document.version();
+  if (blocked) return true;
   if (!document.dirty()) return save_or_report(document, error);
   if (written_version_ == document.version()) return true;
   return save_or_report(document, error);

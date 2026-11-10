@@ -11,6 +11,10 @@
 #include "storage/durable_file.hpp"
 
 namespace redgem {
+struct SceneRecoveryCopy {
+  GlbFile glb;
+  std::vector<std::uint8_t> bytes;
+};
 // One hidden, durable recovery copy beside the original; it never counts as a manual Save.
 class SceneRecovery {
  public:
@@ -19,10 +23,6 @@ class SceneRecovery {
   static std::filesystem::path copy_path(const std::filesystem::path& source);
   void watch(const std::filesystem::path& source);
   void ignore();
-  void stop() {
-    lease_.release();
-    pending_ = false;
-  }
   const std::string& problem() const { return problem_; }
   bool pending() const { return pending_; }
   bool source_changed() const;
@@ -31,11 +31,14 @@ class SceneRecovery {
   bool poll(SceneDocument& document, float seconds, std::string& error);
 
  private:
-  const GlbFile* offered_copy(std::string& error) const;
+  SceneRecoveryCopy* offered_copy(std::string& error) const;
+  void discover_copy();
+  bool retry_lease();
   bool own(const std::filesystem::path& source);
   void reset_observation();
   bool save_or_report(SceneDocument& document, std::string& error);
   bool restore(SceneDocument& document, std::string& error);
+  bool remove_copy(std::string& error);
   bool write(SceneDocument& document, std::string& error);
   durable::Flush flush_;
   RecoveryLease lease_;
@@ -50,6 +53,6 @@ class SceneRecovery {
   float elapsed_ = 0;
   bool pending_ = false;
   mutable std::optional<bool> source_changed_;
-  mutable std::optional<GlbFile> offered_;
+  mutable std::optional<SceneRecoveryCopy> offered_;
 };
 }  // namespace redgem
