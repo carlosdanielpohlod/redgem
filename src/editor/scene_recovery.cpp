@@ -139,6 +139,13 @@ std::optional<SceneRecoveryCopy> checked_copy(const fs::path& source, std::strin
   require(meta.at(kBaseline).is_string(), "invalid recovery source fingerprint");
   return SceneRecoveryCopy{std::move(*glb), std::move(bytes)};
 }
+bool source_differs(const SceneRecoveryCopy* copy, const fs::path& source) {
+  if (!copy) return true;
+  const auto baseline = copy->glb.json.at(kMetadata).at(kBaseline).get<std::string>();
+  const auto current = fingerprint(source);
+  const bool unknown = baseline == kUnknownBaseline || current == kUnknownBaseline;
+  return unknown || baseline != current;
+}
 nlohmann::json recovery_metadata(const fs::path& source, const std::string& baseline) {
   return {{kVersion, kFormatVersion},
           {kSource, source.filename().generic_u8string()},
@@ -220,7 +227,7 @@ void SceneRecovery::ignore() {
   if (!lease_.held()) return;
   try {
     const auto digest = fingerprint(copy_path(source_), recovery_format::kMaxBytes);
-    require(!digest.empty(), "cannot fingerprint the ignored recovery copy");
+    require(digest.size() == kDigestBytes * kHexDigitsPerByte, "cannot fingerprint the ignored recovery copy");
     fs::create_directories(dismissed_path(source_).parent_path());
     require(durable::replace_file(dismissed_path(source_), digest, flush_), "cannot persist recovery dismissal");
   } catch (const std::exception& error) {
@@ -236,14 +243,7 @@ bool SceneRecovery::source_changed() const {
   try {
     std::string error;
     const auto* copy = offered_copy(error);
-    if (!copy) {
-      source_changed_ = true;
-      return true;
-    }
-    const auto baseline = copy->glb.json.at(kMetadata).at(kBaseline).get<std::string>();
-    const auto current = fingerprint(source_);
-    const bool unknown = baseline == kUnknownBaseline || current == kUnknownBaseline;
-    source_changed_ = unknown || baseline != current;
+    source_changed_ = source_differs(copy, source_);
   } catch (const std::exception&) {
     source_changed_ = true;
   }
