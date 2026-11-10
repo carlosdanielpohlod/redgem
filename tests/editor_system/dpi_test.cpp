@@ -38,10 +38,10 @@ void draw_panel(SceneViewport& view) {
   ImGui::SetNextWindowSize(ImVec2(ui::scaled(kPanelWidth), ui::scaled(kPanelHeight)));
   ImGui::Begin("Display scale");
   ImGui::TextUnformatted(ICON_FA_GEM " Interface text and icons");
-  CHECK(ImGui::GetFontSize() == doctest::Approx(editor_config::kInterfaceFontSize * ui::scaled(1)));
+  CHECK(ImGui::GetFontSize() == doctest::Approx(std::round(editor_config::kInterfaceFontSize * ui::scaled(1))));
   ImGui::PushFont(ui::code_font());
   ImGui::TextUnformatted("object.position = Vec3.new(1, 2, 3)");
-  CHECK(ImGui::GetFontSize() == doctest::Approx(editor_config::kCodeFontSize * ui::scaled(1)));
+  CHECK(ImGui::GetFontSize() == doctest::Approx(std::round(editor_config::kCodeFontSize * ui::scaled(1))));
   ImGui::PopFont();
   ImGui::Button("A scaled button");
   const auto origin = ImGui::GetCursorScreenPos();

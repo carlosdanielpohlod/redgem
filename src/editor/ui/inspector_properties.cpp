@@ -1,6 +1,7 @@
 // Inspector card of an object's custom properties, and the menu that adds one.
 
 #include <imgui.h>
+#include "editor/ui/dpi.hpp"
 #include <imgui_stdlib.h>
 
 #include <algorithm>
@@ -68,7 +69,7 @@ void draw_custom_row(PanelContext& context, int index, const std::string& key, c
   ImGui::SameLine();
   ImGui::AlignTextToFramePadding();
   ImGui::TextColored(muted_color(), "%s", key.c_str());
-  ImGui::SameLine(kLabelColumnWidth);
+  ImGui::SameLine(ui::scaled(kLabelColumnWidth));
   ImGui::SetNextItemWidth(kFillWidth);
   draw_custom_value(context, index, key, value);
 }
@@ -95,9 +96,9 @@ void draw_custom_props(PanelContext& context, int index) {
 void add_property_menu(PanelContext& context, int index) {
   InspectorState& state = context.state.inspector;
   std::string& key = state.new_property_key;
-  ImGui::SetNextItemWidth(kPopupFieldWidth);
+  ImGui::SetNextItemWidth(ui::scaled(kPopupFieldWidth));
   ImGui::InputTextWithHint(kNewPropertyId, tr("editor.inspector.property.name_hint"), &key);
-  ImGui::SetNextItemWidth(kPopupFieldWidth);
+  ImGui::SetNextItemWidth(ui::scaled(kPopupFieldWidth));
   choose(kKindId, state.new_property_type, kPropertyKinds);
   ImGui::BeginDisabled(!can_add_property(context.session.document().node(index).props, key));
   if (ImGui::Button(add_property_label())) {

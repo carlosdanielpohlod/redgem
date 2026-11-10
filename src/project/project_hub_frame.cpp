@@ -1,6 +1,7 @@
 // ProjectHub: one frame of its window. The title, and under it the two columns.
 
 #include "project/project_hub.hpp"
+#include "editor/ui/dpi.hpp"
 
 #include <imgui.h>
 #include <raylib.h>
@@ -24,7 +25,7 @@ void begin_hub_window() {
   const ImGuiViewport* viewport = ImGui::GetMainViewport();
   ImGui::SetNextWindowPos(viewport->WorkPos);
   ImGui::SetNextWindowSize(viewport->WorkSize);
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kHubPadding, kHubPadding));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ui::scaled(kHubPadding), ui::scaled(kHubPadding)));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
   ImGui::Begin(kHubWindowId, nullptr,
                ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
@@ -46,10 +47,10 @@ void ProjectHub::frame() {
 void ProjectHub::draw() {
   begin_hub_window();
   draw_title();
-  ImGui::BeginChild(kNewGameId, ImVec2(kHubSidebarWidth, 0.0f));
-  draw_new_game(kHubSidebarWidth);
+  ImGui::BeginChild(kNewGameId, ImVec2(ui::scaled(kHubSidebarWidth), 0.0f));
+  draw_new_game(ui::scaled(kHubSidebarWidth));
   ImGui::EndChild();
-  ImGui::SameLine(0.0f, kHubPadding);
+  ImGui::SameLine(0.0f, ui::scaled(kHubPadding));
   ImGui::BeginChild(kGamesId);
   draw_games();
   ImGui::EndChild();

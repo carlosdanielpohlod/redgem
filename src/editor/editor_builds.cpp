@@ -39,7 +39,8 @@ void place_build_status(const SceneViewport& view) {
   const ImVec2 corner(view.screen_x + view.width_pixels() - ui::scaled(kOverlayMargin),
                       view.screen_y + view.height_pixels() - ui::scaled(kOverlayMargin));
   ImGui::SetNextWindowPos(corner, ImGuiCond_Always, ImVec2(kBottomRight, kBottomRight));
-  ImGui::SetNextWindowSizeConstraints(ImVec2(kBuildStatusWidth, 0.0f), ImVec2(kBuildStatusWidth, FLT_MAX));
+  ImGui::SetNextWindowSizeConstraints(ImVec2(ui::scaled(kBuildStatusWidth), 0.0f),
+                                      ImVec2(ui::scaled(kBuildStatusWidth), FLT_MAX));
 }
 
 // What the build said it is doing, as a line of its own ("Copying the game's files").

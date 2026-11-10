@@ -1,6 +1,7 @@
 #include "editor/ui/dpi.hpp"
 
 #include <imgui.h>
+#include <ImGuizmo.h>
 #include <algorithm>
 #include <cmath>
 
@@ -10,6 +11,18 @@ namespace redgem::ui {
 namespace {
 constexpr float kMinimumScale = 0.5f;
 constexpr float kMaximumScale = 4.0f;
+void scale_gizmo(float scale) {
+  auto& gizmo = ImGuizmo::GetStyle();
+  gizmo = ImGuizmo::Style{};
+  gizmo.TranslationLineThickness *= scale;
+  gizmo.TranslationLineArrowSize *= scale;
+  gizmo.RotationLineThickness *= scale;
+  gizmo.RotationOuterLineThickness *= scale;
+  gizmo.ScaleLineThickness *= scale;
+  gizmo.ScaleLineCircleSize *= scale;
+  gizmo.HatchedAxisLineThickness *= scale;
+  gizmo.CenterCircleSize *= scale;
+}
 }  // namespace
 bool native_dpi_window() {
 #ifdef __APPLE__
@@ -30,6 +43,7 @@ void apply_interface_scale(float scale) {
   apply_theme();
   style.ScaleAllSizes(scale);
   style.FontScaleDpi = scale;
+  scale_gizmo(scale);
 }
 float scaled(float pixels) { return pixels * ImGui::GetStyle().FontScaleDpi; }
 }  // namespace redgem::ui

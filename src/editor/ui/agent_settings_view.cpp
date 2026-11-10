@@ -1,6 +1,7 @@
 // Part of the Agent panel: the list of agents, edited in a popup and kept in agents.json.
 
 #include <imgui.h>
+#include "editor/ui/dpi.hpp"
 #include <misc/cpp/imgui_stdlib.h>
 
 #include <algorithm>
@@ -48,7 +49,7 @@ void select(AgentSettings& settings, std::size_t index) {
 }
 
 void draw_list(AgentSettings& settings) {
-  ImGui::BeginChild("agents", ImVec2(kListWidth, field_height() * kListFields), ImGuiChildFlags_Borders);
+  ImGui::BeginChild("agents", ImVec2(ui::scaled(kListWidth), field_height() * kListFields), ImGuiChildFlags_Borders);
   for (std::size_t index = 0; index < settings.agents.size(); ++index) {
     ImGui::PushID(static_cast<int>(index));
     if (ImGui::Selectable(settings.agents[index].name.c_str(), index == settings.selected)) select(settings, index);
@@ -89,13 +90,13 @@ void draw_form(AgentSettings& settings) {
   if (settings.agents.empty()) return;
   agent::AgentProfile& agent = settings.agents[settings.selected];
   ImGui::BeginGroup();
-  ImGui::PushItemWidth(kFormWidth);
+  ImGui::PushItemWidth(ui::scaled(kFormWidth));
   ImGui::InputText(label_with_id("editor.agent.field_name", "name"), &agent.name);
   ImGui::InputText(label_with_id("editor.agent.field_command", "command"), &agent.command);
   ImGui::TextColored(palette::kMuted, "%s", tr("editor.agent.field_arguments"));
-  ImGui::InputTextMultiline("##arguments", &settings.arguments, ImVec2(kFormWidth, field_height()));
+  ImGui::InputTextMultiline("##arguments", &settings.arguments, ImVec2(ui::scaled(kFormWidth), field_height()));
   ImGui::TextColored(palette::kMuted, "%s", tr("editor.agent.field_environment"));
-  ImGui::InputTextMultiline("##environment", &settings.environment, ImVec2(kFormWidth, field_height()));
+  ImGui::InputTextMultiline("##environment", &settings.environment, ImVec2(ui::scaled(kFormWidth), field_height()));
   ImGui::PopItemWidth();
   ImGui::EndGroup();
 }

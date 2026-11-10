@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 
 #include <imgui.h>
+#include <ImGuizmo.h>
 
 #include <initializer_list>
 #include <cmath>
@@ -74,5 +75,17 @@ TEST_CASE("monitor changes rebuild spacing without accumulating scaling or chang
     CHECK(style.FramePadding.y == doctest::Approx(std::floor(baseline.FramePadding.y * scale)));
     CHECK(style.ScrollbarSize == doctest::Approx(baseline.ScrollbarSize * scale));
     CHECK(same(style.Colors[ImGuiCol_Button], baseline.Colors[ImGuiCol_Button]));
+  }
+}
+
+TEST_CASE("gizmo lines and handle radii scale from their baseline across monitor changes") {
+  const Interface interface;
+  const ImGuizmo::Style baseline;
+  for (const float scale : {1.0f, 1.5f, 2.0f, 1.0f}) {
+    ui::apply_interface_scale(scale);
+    const auto& style = ImGuizmo::GetStyle();
+    CHECK(style.TranslationLineThickness == doctest::Approx(baseline.TranslationLineThickness * scale));
+    CHECK(style.ScaleLineCircleSize == doctest::Approx(baseline.ScaleLineCircleSize * scale));
+    CHECK(style.CenterCircleSize == doctest::Approx(baseline.CenterCircleSize * scale));
   }
 }

@@ -2,6 +2,7 @@
 // markdown): what the user said, thoughts, tool call cards, the plan, questions, notices.
 
 #include <imgui.h>
+#include "editor/ui/dpi.hpp"
 
 #include <cmath>
 #include <string>
@@ -180,7 +181,7 @@ std::optional<std::string> draw_options(const PermissionRequest& request) {
 void draw_user(const std::string& text) {
   ImGui::PushStyleColor(ImGuiCol_ChildBg, palette::kFrame);
   ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, kBoxRounding);
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kBoxPadding, kBoxPadding));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ui::scaled(kBoxPadding), ui::scaled(kBoxPadding)));
   ImGui::BeginChild("user", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding);
   ImGui::TextColored(palette::kAccentHover, "%s", ICON_FA_USER);
   ImGui::SameLine();

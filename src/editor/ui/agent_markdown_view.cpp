@@ -2,6 +2,7 @@
 // laid out word by word, so that bold, italic and code sit inside wrapped lines.
 
 #include <imgui.h>
+#include "editor/ui/dpi.hpp"
 
 #include <algorithm>
 #include <cfloat>
@@ -79,12 +80,13 @@ void paint_word(const ImVec2& at, float width, const std::string& word, const Sp
   const float size = ImGui::GetFontSize();
   ImDrawList* draw = ImGui::GetWindowDrawList();
   if (span.code) {
-    draw->AddRectFilled(ImVec2(at.x - kCodePadding, at.y), ImVec2(at.x + width + kCodePadding, at.y + size),
+    draw->AddRectFilled(ImVec2(at.x - ui::scaled(kCodePadding), at.y),
+                        ImVec2(at.x + width + ui::scaled(kCodePadding), at.y + size),
                         ImGui::GetColorU32(palette::kFrame));
   }
   const ImU32 color = ImGui::GetColorU32(span_color(span));
   draw->AddText(font, size, at, color, word.c_str());
-  if (span.bold) draw->AddText(font, size, ImVec2(at.x + kBoldOffset, at.y), color, word.c_str());
+  if (span.bold) draw->AddText(font, size, ImVec2(at.x + ui::scaled(kBoldOffset), at.y), color, word.c_str());
 }
 
 float word_width(ImFont* font, const std::string& word) {
@@ -134,7 +136,7 @@ void draw_spans(const std::vector<Span>& spans, float indent) {
 
 // The mark ("•", "12.") before the item's text, set in by the item's level and wide enough for it.
 void draw_item(const Block& block, const std::string& mark) {
-  const float mark_width = ImGui::CalcTextSize(mark.c_str()).x + kMarkGap;
+  const float mark_width = ImGui::CalcTextSize(mark.c_str()).x + ui::scaled(kMarkGap);
   const float indent = kListIndent * static_cast<float>(block.level) + std::max(kListIndent, mark_width);
   const ImVec2 start = ImGui::GetCursorScreenPos();
   ImGui::GetWindowDrawList()->AddText(ImVec2(start.x + indent - mark_width, start.y),
@@ -146,12 +148,12 @@ void draw_quote(const Block& block) {
   const ImVec2 start = ImGui::GetCursorScreenPos();
   draw_spans(block.spans, kQuoteIndent);
   const float bottom = ImGui::GetCursorScreenPos().y;
-  ImGui::GetWindowDrawList()->AddRectFilled(start, ImVec2(start.x + kQuoteBarWidth, bottom),
+  ImGui::GetWindowDrawList()->AddRectFilled(start, ImVec2(start.x + ui::scaled(kQuoteBarWidth), bottom),
                                             ImGui::GetColorU32(palette::kBorder));
 }
 
 void draw_heading(const Block& block) {
-  ImGui::Dummy(ImVec2(0.0f, kHeadingGap));
+  ImGui::Dummy(ImVec2(0.0f, ui::scaled(kHeadingGap)));
   std::vector<Span> spans = block.spans;
   for (Span& span : spans) span.bold = true;
   draw_spans(spans, 0.0f);
@@ -169,7 +171,8 @@ void draw_code_header(const Block& block) {
 void draw_code(const Block& block, int index) {
   ImGui::PushID(index);
   ImGui::PushStyleColor(ImGuiCol_ChildBg, palette::kPanelDark);
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(kCodeBlockPadding, kCodeBlockPadding));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+                      ImVec2(ui::scaled(kCodeBlockPadding), ui::scaled(kCodeBlockPadding)));
   ImGui::BeginChild("code", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding,
                     ImGuiWindowFlags_HorizontalScrollbar);
   draw_code_header(block);

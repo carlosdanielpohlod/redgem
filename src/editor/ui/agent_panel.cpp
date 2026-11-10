@@ -1,4 +1,5 @@
 #include "editor/ui/agent_panel.hpp"
+#include "editor/ui/dpi.hpp"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -303,7 +304,7 @@ bool AgentPanel::is_current(const agent::PastSession& session) const {
 }
 
 void AgentPanel::draw_agent_picker() {
-  ImGui::SetNextItemWidth(kPickerWidth);
+  ImGui::SetNextItemWidth(ui::scaled(kPickerWidth));
   const char* shown = agents_.empty() ? "" : agents_[picked_].name.c_str();
   if (!ImGui::BeginCombo("##agent", shown)) return;
   for (std::size_t index = 0; index < agents_.size(); ++index) {
@@ -380,7 +381,7 @@ void AgentPanel::draw_or_pass(agent::AgentClient& client, std::size_t index) {
   }
   const float top = ImGui::GetCursorPosY();
   draw_entry(client, index);
-  ImGui::Dummy(ImVec2(0.0f, kEntryGap));
+  ImGui::Dummy(ImVec2(0.0f, ui::scaled(kEntryGap)));
   heights_[number] = ImGui::GetCursorPosY() - top;
 }
 
