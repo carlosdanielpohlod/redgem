@@ -62,7 +62,7 @@ std::variant<std::unique_ptr<EditorSession>, std::string> EditorSession::open(co
 }
 
 void EditorSession::begin_editing() {
-  follow_scene_file();
+  follow_scene_file(true);
   scene_name_ = scene_name_of(game_dir_, document_.path());
   selection_.clear();
   refresh_preview();
@@ -85,8 +85,8 @@ bool EditorSession::open_scene(const std::string& name, std::string& error) {
   return true;
 }
 
-void EditorSession::follow_scene_file() {
-  recovery_.watch(document_.path());
+void EditorSession::follow_scene_file(bool offer_archives) {
+  recovery_.watch(document_.path(), offer_archives);
   loaded_write_time_ = write_time(document_.path());
   external_change_pending_ = false;
 }

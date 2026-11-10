@@ -184,7 +184,7 @@ class EditorSession {
   void begin_editing();
   // Whatever is saved last is what the file on disk holds.
   void note_saved();
-  void follow_scene_file();
+  void follow_scene_file(bool offer_archives = false);
   void forget_recovery();
   void use_disk_document(SceneDocument document);
   // Whether the scene can be saved as `file` and still find the files it uses (see save_as).

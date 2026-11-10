@@ -11,7 +11,8 @@ class RecoveryLease {
   ~RecoveryLease();
   RecoveryLease(const RecoveryLease&) = delete;
   RecoveryLease& operator=(const RecoveryLease&) = delete;
-  bool acquire(const std::filesystem::path& file);
+  enum class Result { Acquired, Busy, Unavailable };
+  Result acquire(const std::filesystem::path& file);
   bool held() const { return handle_ != kInvalid; }
   void release();
 

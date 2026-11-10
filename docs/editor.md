@@ -188,9 +188,10 @@ must remain loadable to reopen the editor. Source verification reads at most 1 M
 unverifiable, so the recovery prompt warns even if size and timestamp are unchanged. The limit
 does not restrict the original source size or the normal memory budget used to load its decoded
 images. A second editor taking over after a live writer closes preserves that writer's backup
-as a hidden `.recovery.previous-<id>.glb` sibling, then backs up its own edits without opening
-a mid-session recovery prompt. To recover an archived copy, close the editor, preserve any
-current `.recovery` file, and copy the archived file to the scene's `.recovery` path before reopening.
+as a hidden `.recovery.previous-<id>` sibling and logs its path. On opening a scene, the editor
+offers a saved archive if there is no current recovery copy. Resolve the current copy and reopen
+the scene to see any remaining archives.
+
 An autosave failure
 remains visible in the status bar and is retried only after another edit. Recovery refuses to
 replace edits made while its prompt was open. Keep manual saves and version control for larger

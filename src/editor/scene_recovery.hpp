@@ -21,7 +21,7 @@ class SceneRecovery {
   explicit SceneRecovery(durable::Flush flush = durable::flush_to_disk) : flush_(std::move(flush)) {}
   static constexpr float kIntervalSeconds = 60.0f;
   static std::filesystem::path copy_path(const std::filesystem::path& source);
-  void watch(const std::filesystem::path& source);
+  void watch(const std::filesystem::path& source, bool offer_archives = false);
   void ignore();
   const std::string& problem() const { return problem_; }
   bool pending() const { return pending_; }
@@ -33,8 +33,8 @@ class SceneRecovery {
  private:
   SceneRecoveryCopy* offered_copy(std::string& error) const;
   void discover_copy();
-  void follow_owned_copy(bool takeover);
-  void begin_watch(const std::filesystem::path& source);
+  void prepare_copy(bool offer_archives);
+  void begin_watch(const std::filesystem::path& source, bool offer_archives);
   bool poll_ready(SceneDocument& document, float seconds, std::string& error);
   bool retry_lease();
   bool interval_due(float seconds);
@@ -53,6 +53,7 @@ class SceneRecovery {
   std::filesystem::path source_;
   std::string baseline_;
   bool takeover_pending_ = false;
+  bool inspection_pending_ = true;
   std::optional<long long> written_version_;
   float elapsed_ = 0;
   bool pending_ = false;

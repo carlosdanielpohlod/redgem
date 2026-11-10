@@ -293,9 +293,10 @@ TEST_CASE("scene recovery never reads or deletes a live editor's copy") {
   CHECK(game.bytes(copy) == bytes);
   CHECK_FALSE(other.recover(game.document, game.error));
   writer.reset();  // the same release the OS performs when the writer exits
-  other.watch(game.source);
-  REQUIRE(other.pending());
-  REQUIRE(other.recover(game.document, game.error));
+  SceneRecovery restarted;
+  restarted.watch(game.source);
+  REQUIRE(restarted.pending());
+  REQUIRE(restarted.recover(game.document, game.error));
   CHECK(game.document.node(0).name == "Live unsaved edit");
 }
 TEST_CASE("scene recovery retains an external conflict after recovery and a second crash") {
@@ -421,6 +422,7 @@ TEST_CASE("scene recovery takeover archives the previous writer without blocking
   bool archived = false;
   for (const auto& entry : fs::directory_iterator(game.folder)) {
     if (entry.path().filename().string().find(".previous-") == std::string::npos) continue;
+    CHECK(entry.path().extension() != ".glb");
     CHECK(game.bytes(entry.path()) == original);
     archived = true;
   }
@@ -428,6 +430,11 @@ TEST_CASE("scene recovery takeover archives the previous writer without blocking
   waiting.watch(game.source);
   REQUIRE(waiting.recover(game.document, game.error));
   CHECK(game.document.node(0).name == "Waiting editor's edit");
+  REQUIRE(waiting.discard(game.error));
+  waiting.watch(game.source, true);
+  REQUIRE(waiting.pending());
+  REQUIRE(waiting.recover(game.document, game.error));
+  CHECK(game.document.node(0).name == "Owner's edit");
 }
 
 TEST_CASE("scene recovery catches a same-size same-time rewrite before the first autosave") {
@@ -566,4 +573,25 @@ TEST_CASE("saving during a lease takeover preserves the other editor's backup wi
     archived = true;
   }
   CHECK(archived);
+}
+
+TEST_CASE("an unavailable lock file does not turn an existing recovery into a foreign copy") {
+  RecoveryGame game;
+  auto owner = std::make_unique<SceneRecovery>();
+  owner->watch(game.source);
+  game.document.set_name(0, "Recoverable edit");
+  game.autosave(*owner);
+  owner.reset();
+  auto lock = SceneRecovery::copy_path(game.source);
+  lock += ".lock";
+  REQUIRE(fs::remove(lock));
+  REQUIRE(fs::create_directory(lock));
+  SceneRecovery reader;
+  reader.watch(game.source);
+  CHECK_FALSE(reader.pending());
+  REQUIRE(fs::remove(lock));
+  REQUIRE(reader.poll(game.document, SceneRecovery::kIntervalSeconds, game.error));
+  REQUIRE(reader.pending());
+  REQUIRE(reader.recover(game.document, game.error));
+  CHECK(game.document.node(0).name == "Recoverable edit");
 }

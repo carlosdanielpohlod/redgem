@@ -101,8 +101,26 @@ void archive_copy(const fs::path& source) {
   const auto copy = SceneRecovery::copy_path(source);
   if (!fs::exists(copy)) return;
   auto archived = copy;
-  archived += ".previous-" + make_scene_id() + ".glb";
+  archived += ".previous-" + make_scene_id();
   fs::rename(copy, archived);
+  log::info("preserved another editor's recovery copy at " + archived.string());
+}
+fs::path next_archive(const fs::path& copy) {
+  const auto prefix = copy.filename().generic_u8string() + ".previous-";
+  const auto folder = copy.has_parent_path() ? copy.parent_path() : fs::path(".");
+  fs::path found;
+  for (const auto& entry : fs::directory_iterator(folder)) {
+    const auto name = entry.path().filename().generic_u8string();
+    const bool matching = name.rfind(prefix, 0) == 0 && entry.symlink_status().type() == fs::file_type::regular;
+    if (matching && (found.empty() || entry.path() < found)) found = entry.path();
+  }
+  return found;
+}
+void offer_archive(const fs::path& source) {
+  const auto copy = SceneRecovery::copy_path(source);
+  if (fs::exists(fs::symlink_status(copy))) return;
+  const auto archived = next_archive(copy);
+  if (!archived.empty()) fs::rename(archived, copy);
 }
 bool dismissed_copy(const fs::path& source) {
   std::ifstream marker(dismissed_path(source), std::ios::binary);
@@ -176,59 +194,58 @@ void SceneRecovery::reset_observation() {
   if (!dismissal_failed) problem_.clear();
   elapsed_ = 0;
   pending_ = false;
-  takeover_pending_ = false;
+  inspection_pending_ = true;
 }
 bool SceneRecovery::own(const fs::path& source) {
   const bool already_owned = source_ == source && lease_.held();
+  if (already_owned) return true;
+  if (source_ != source) takeover_pending_ = false;
   source_ = source;
   auto lock = copy_path(source);
   lock += ".lock";
-  return already_owned || lease_.acquire(lock);
+  const auto result = lease_.acquire(lock);
+  if (result == RecoveryLease::Result::Busy) takeover_pending_ = true;
+  return result == RecoveryLease::Result::Acquired;
 }
 void SceneRecovery::discover_copy() {
-  std::error_code error;
   const bool ignored = ignored_sources_.count(source_) != 0;
-  const bool exists = fs::exists(fs::symlink_status(copy_path(source_), error));
+  const bool exists = fs::exists(fs::symlink_status(copy_path(source_)));
   pending_ = !ignored && exists && !dismissed_copy(source_);
 }
-void SceneRecovery::follow_owned_copy(bool takeover) {
-  if (!takeover) {
+void SceneRecovery::prepare_copy(bool offer_archives) {
+  if (takeover_pending_) {
+    archive_copy(source_);
+    takeover_pending_ = false;
+  } else {
+    if (offer_archives) offer_archive(source_);
     discover_copy();
-    return;
   }
-  takeover_pending_ = true;
-  retry_lease();
+  inspection_pending_ = false;
 }
-void SceneRecovery::begin_watch(const fs::path& source) {
-  const bool takeover = source_ == source && takeover_pending_;
+void SceneRecovery::begin_watch(const fs::path& source, bool offer_archives) {
   reset_observation();
-  baseline_ = fingerprint(source);
-  if (baseline_.empty()) baseline_ = kUnknownBaseline;
+  baseline_ = kUnknownBaseline;
   if (!own(source)) {
-    takeover_pending_ = true;
     problem_ = "Scene recovery unavailable: another editor owns it, or the folder is not writable";
     return;
   }
-  follow_owned_copy(takeover);
+  const auto digest = fingerprint(source);
+  if (!digest.empty()) baseline_ = digest;
+  prepare_copy(offer_archives);
 }
-void SceneRecovery::watch(const fs::path& source) {
+void SceneRecovery::watch(const fs::path& source, bool offer_archives) {
   try {
-    begin_watch(source);
+    begin_watch(source, offer_archives);
   } catch (const std::exception& error) {
-    lease_.release();
-    source_ = source;
-    baseline_ = kUnknownBaseline;
-    takeover_pending_ = true;
-    pending_ = false;
+    if (takeover_pending_) lease_.release();
     problem_ = "Scene recovery unavailable: " + std::string(error.what());
   }
 }
 bool SceneRecovery::retry_lease() {
-  const bool ready = lease_.held() && !takeover_pending_;
+  const bool ready = lease_.held() && !inspection_pending_;
   if (ready) return true;
   if (!own(source_)) return false;
-  archive_copy(source_);
-  takeover_pending_ = false;
+  prepare_copy(false);
   problem_.clear();
   return true;
 }
@@ -350,9 +367,10 @@ bool SceneRecovery::poll_ready(SceneDocument& document, float seconds, std::stri
   const bool blocked = pending_ || failed_version_ == document.version();
   if (blocked) return true;
   if (!interval_due(seconds)) return true;
-  if (!retry_lease()) return true;
-  if (!document.dirty()) return save_or_report(document, error);
-  if (written_version_ == document.version()) return true;
+  const bool prepared = retry_lease() && !pending_;
+  if (!prepared) return true;
+  const bool already_written = document.dirty() && written_version_ == document.version();
+  if (already_written) return true;
   return save_or_report(document, error);
 }
 bool SceneRecovery::poll(SceneDocument& document, float seconds, std::string& error) {
@@ -361,7 +379,7 @@ bool SceneRecovery::poll(SceneDocument& document, float seconds, std::string& er
   } catch (const std::exception& problem) {
     error = problem.what();
     problem_ = "Scene recovery unavailable: " + error;
-    failed_version_ = document.version();
+    if (takeover_pending_) lease_.release();
     return false;
   }
 }
