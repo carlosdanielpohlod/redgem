@@ -1,5 +1,7 @@
 // UI natives: what scripts draw over the game.
 
+#include <algorithm>
+
 #include <mruby.h>
 #include <mruby/string.h>
 
@@ -72,6 +74,27 @@ mrb_value ui_text(mrb_state* mrb, mrb_value) {
   return mrb_nil_value();
 }
 
+// What follows is drawn only inside a box (one with no area hides it all).
+mrb_value ui_clip(mrb_state* mrb, mrb_value) {
+  Box box;
+  mrb_get_args(mrb, "iiii", &box.x, &box.y, &box.width, &box.height);
+  HudItem item;
+  item.kind = HudItem::Kind::Clip;
+  place(item, box);
+  item.width = std::max(item.width, 0);
+  item.height = std::max(item.height, 0);
+  context(mrb).hud.push_back(std::move(item));
+  return mrb_nil_value();
+}
+
+// What follows is drawn anywhere again.
+mrb_value ui_unclip(mrb_state* mrb, mrb_value) {
+  HudItem item;
+  item.kind = HudItem::Kind::Unclip;
+  context(mrb).hud.push_back(std::move(item));
+  return mrb_nil_value();
+}
+
 bool valid_font_name(const std::string& name) { return name.empty() || safe_asset_name(name); }
 
 mrb_value ui_font(mrb_state* mrb, mrb_value) {
@@ -109,6 +132,8 @@ void install_ui_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, ui_module, "__text", ui_text, MRB_ARGS_REQ(8));
   mrb_define_module_function(mrb, ui_module, "__rect", ui_rect, MRB_ARGS_REQ(9));
   mrb_define_module_function(mrb, ui_module, "__image", ui_image, MRB_ARGS_REQ(6));
+  mrb_define_module_function(mrb, ui_module, "__clip", ui_clip, MRB_ARGS_REQ(4));
+  mrb_define_module_function(mrb, ui_module, "__unclip", ui_unclip, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, ui_module, "__text_width", ui_text_width, MRB_ARGS_REQ(2));
   mrb_define_module_function(mrb, ui_module, "width", ui_width, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, ui_module, "height", ui_height, MRB_ARGS_NONE());

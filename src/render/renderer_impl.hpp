@@ -611,6 +611,7 @@ struct Renderer::Impl {
 
   void draw_hud_text(const HudItem& item);
   void draw_hud_image(const HudItem& item);
+  void draw_hud_item(const HudItem& item);  // a text, a rectangle or an image (a clip draws nothing)
 };
 
 }  // namespace redgem

@@ -505,6 +505,79 @@ To show it in the player's language, keep the text in the game's translation fil
 with `I18n.t("hud.coins", coins: @coins, total: @total)`: see
 [Texts in several languages](i18n.md).
 
+### At any screen size: anchors
+
+A game runs at whatever size the player picks (`Settings.resolutions`), so a HUD placed in
+pixels from the top-left corner drifts away from the other corners. Give it an anchor instead:
+x and y become offsets from that point of the screen, and the matching corner of what is drawn
+sits there.
+
+```ruby
+UI.text("Lives #{@lives}", anchor: :top_right, x: -20, y: 20, size: 28)   # top-right corner
+UI.image(:map_icon, anchor: :bottom_left, x: 20, y: -20, width: 64, height: 64)
+open_map if UI.button("Map", anchor: :bottom, x: 0, y: -24, width: 200, height: 56)
+```
+
+The anchors are `:top_left`, `:top`, `:top_right`, `:left`, `:center`, `:right`,
+`:bottom_left`, `:bottom` and `:bottom_right`. Texts, rectangles, images, buttons, text fields
+and the settings widgets all take one. `UI.anchored(:center, x: 0, y: 0, width: 300, height: 200)`
+gives the top-left `[x, y]` of a box placed that way, for laying out several things together. An
+image is placed by the width and height you give it.
+
+### Long texts: word wrap
+
+Give a text a `width:` and it wraps at spaces to lines no wider than that (a word longer than a
+line is cut between letters). Its own line breaks (`"\n"`) always start a new line, with or
+without a width. `UI.text_height` says how tall it will be, to size the box behind it:
+
+```ruby
+def dialog(line)
+  height = UI.text_height(line, width: 520, size: 24) + 40
+  UI.rect(anchor: :bottom, x: 0, y: -30, width: 560, height: height, color: :dark, alpha: 220, radius: 10)
+  UI.text(line, anchor: :bottom, x: 0, y: -50, width: 520, size: 24)
+end
+```
+
+`align:` lays each line out: `:left`, `:center` (x is the middle) or `:right` (x is the right
+edge); with an anchor, the lines are aligned inside the text's box. `UI.wrap(text, width:, size:)`
+gives the lines themselves, and `UI.line_height(size)` the distance between them.
+
+### Lists that scroll
+
+`UI::ScrollList` draws rows in a box, cuts off what falls outside it, and scrolls: with the mouse
+wheel over it, a gamepad's right stick, and Page Up and Page Down (a gamepad's bumpers). Keep one
+and draw it every frame; it calls your block for each row that shows, with its index and box:
+
+```ruby
+def update(_dt)
+  @list ||= UI::ScrollList.new
+  @focus ||= UI::Focus.new
+  @focus.update(@levels.size)                                    # up and down move the focus
+  @list.draw(@levels.size, anchor: :center, x: 0, y: 0, width: 480, height: 300,
+             row_height: 52, gap: 8, focus: @focus) do |index, box|
+    load_level(@levels[index]) if UI.button(@levels[index], **box, focused: @focus.at?(index))
+  end
+end
+```
+
+With a focus, the list scrolls to whichever row the focus moves to, and Page Up and Page Down
+move the focus a page. When other widgets come before the rows in the focus, say where the rows
+start with `first:`. Without a focus, up and down scroll a row at a time, which suits credits:
+
+```ruby
+@credits ||= UI::ScrollList.new
+lines = UI.wrap(CREDITS, width: 600, size: 24)
+@credits.draw(lines.size, anchor: :center, x: 0, y: 0, width: 600, height: 400,
+              row_height: UI.line_height(24)) do |index, box|
+  UI.text(lines[index], x: box[:x], y: box[:y], size: 24)
+end
+```
+
+`@credits.offset` is how far it has scrolled (set it to roll the credits on their own), and
+`reset` goes back to the top. To cut off anything else at a box's edges, draw it inside
+`UI.clip(x:, y:, width:, height:) { ... }`; the pointer outside the box is over nothing drawn in
+it. The menu's controls page is a scroll list.
+
 ## Menus, buttons and images
 
 Everything in `UI` is drawn the frame you call it, so a menu is just a behaviour that draws

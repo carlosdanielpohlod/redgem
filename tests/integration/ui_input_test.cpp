@@ -23,6 +23,7 @@ constexpr float kRayTolerance = 1e-3f;
 // A button drawn by the test's Ruby code, and a point inside and outside it.
 constexpr const char* kButton = "UI.button('Go', x: 100, y: 50, width: 200, height: 60)";
 constexpr float kOutsideX = 500.0f;
+constexpr int kMeasuredWidth = 40;  // how wide FontMeasurePresenter says every text in a game's face is
 
 // Nobody draws these games: they are told how big a screen they are on.
 NullPresenter screen({kScreenWidth, kScreenHeight});
@@ -216,7 +217,7 @@ class FontMeasurePresenter final : public Presenter {
                       const std::filesystem::path& folder) const override {
     selected = font;
     directory = folder;
-    return 40;
+    return kMeasuredWidth;
   }
   void capture_cursor(bool) override {}
   void present(const FrameView&) override {}
@@ -235,4 +236,54 @@ TEST_CASE("text alignment measures the selected font from the game's own fonts f
   ruby(*engine, "UI.text('Centered', x: 100, y: 10, align: :center)");
   REQUIRE(engine->script_context().hud.size() == 1);
   CHECK(engine->script_context().hud[0].x == 80);
+}
+
+TEST_CASE("a clip is queued around what its block draws, inside the one around it") {
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene);
+  frame(*engine);
+  ruby(*engine,
+       "UI.clip(x: 10, y: 20, width: 300, height: 200) do\n"
+       "  UI.clip(x: 200, y: 100, width: 300, height: 300) { UI.rect(x: 0, y: 0, width: 5, height: 5) }\n"
+       "end");
+  const std::vector<HudItem>& hud = engine->script_context().hud;
+  REQUIRE(hud.size() == 5);
+  CHECK(hud[0].kind == HudItem::Kind::Clip);
+  CHECK(hud[1].kind == HudItem::Kind::Clip);
+  CHECK((hud[1].x == 200 && hud[1].y == 100));
+  CHECK((hud[1].width == 110 && hud[1].height == 120));  // only where both clips are
+  CHECK(hud[2].kind == HudItem::Kind::Rect);
+  CHECK(hud[3].kind == HudItem::Kind::Clip);  // back to the outer one
+  CHECK(hud[3].width == 300);
+  CHECK(hud[4].kind == HudItem::Kind::Unclip);
+}
+
+TEST_CASE("an anchored text and rectangle keep to their corner of the screen") {
+  FontMeasurePresenter presenter;
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene, &presenter);
+  frame(*engine);
+  ruby(*engine, "UI.rect(anchor: :bottom_right, x: -10, y: -10, width: 100, height: 50)");
+  ruby(*engine, "UI.text('Wide', anchor: :top_right, x: -20, y: 20)");
+  const std::vector<HudItem>& hud = engine->script_context().hud;
+  REQUIRE(hud.size() == 2);
+  CHECK(hud[0].x == kScreenWidth - 110);
+  CHECK(hud[0].y == kScreenHeight - 60);
+  CHECK(hud[1].x == kScreenWidth - kMeasuredWidth - 20);  // its right edge 20 pixels from the screen's
+  CHECK(hud[1].y == 20);
+}
+
+TEST_CASE("a text wraps at word boundaries to its width, measured as it is drawn") {
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene);
+  frame(*engine);
+  // (Measured as wide as a text is taken to be without a font: "one two" is 77 pixels at size 20.)
+  CHECK(ruby(*engine, "UI.wrap('one two three', width: 80, size: 20)") == R"(["one two", "three"])");
+  CHECK(ruby(*engine, "UI.text_height('one two three', width: 80, size: 20)") == "45");
+  ruby(*engine, "UI.text('one two three', x: 0, y: 10, width: 80, size: 20)");
+  const std::vector<HudItem>& hud = engine->script_context().hud;
+  REQUIRE(hud.size() == 2);
+  CHECK(hud[0].text == "one two");
+  CHECK(hud[1].text == "three");
+  CHECK(hud[1].y == 10 + 25);  // a line height (1.25 times the size) under the first
 }

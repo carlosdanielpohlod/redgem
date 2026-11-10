@@ -11,7 +11,8 @@
 #   @volume = UI.slider("Volume", @volume, x: 40, y: 204, width: 480, height: 44, focused: @focus.at?(2))
 #
 # A focused widget is ringed. The confirm key (Enter) or a gamepad's A works it as a click does;
-# left and right (arrows, D-pad) change a toggle, a choice or a slider.
+# left and right (arrows, D-pad) change a toggle, a choice or a slider. Each takes an anchor too
+# (see ui_layout.rb).
 module UI
   # [keys, gamepad buttons] that do each thing.
   UP = [%i[up], %i[dpad_up]].freeze
@@ -94,8 +95,8 @@ module UI
 
   # A switch: returns whether it is on after this frame. A click flips it, and so do the confirm
   # key or button and left or right while it is focused.
-  def self.toggle(label, state, x:, y:, width:, height:, focused: false)
-    box = { x: x, y: y, width: width, height: height }
+  def self.toggle(label, state, x:, y:, width:, height:, focused: false, anchor: nil)
+    box = placed(anchor, x, y, width, height)
     state = !state if flipped?(box, focused)
     row(label, state ? I18n.t("game.settings.on") : I18n.t("game.settings.off"), box, focused)
     state
@@ -103,8 +104,8 @@ module UI
 
   # One of `choices` (texts): returns the index of the one chosen after this frame. Left and right
   # go through them while it is focused; a click (or the confirm key or button) goes to the next.
-  def self.choice(label, choices, index, x:, y:, width:, height:, focused: false)
-    box = { x: x, y: y, width: width, height: height }
+  def self.choice(label, choices, index, x:, y:, width:, height:, focused: false, anchor: nil)
+    box = placed(anchor, x, y, width, height)
     step = worked?(box, focused) ? 1 : 0
     step = sideways if focused && step.zero?
     index = (index + step) % choices.size
@@ -114,8 +115,9 @@ module UI
 
   # A number from `min` to `max`: returns it after this frame. The mouse held on its track sets
   # it; left and right move it a step while it is focused.
-  def self.slider(label, value, x:, y:, width:, height:, min: 0.0, max: 1.0, step: SLIDER_STEP, focused: false)
-    box = { x: x, y: y, width: width, height: height }
+  def self.slider(label, value, x:, y:, width:, height:, min: 0.0, max: 1.0, step: SLIDER_STEP, focused: false,
+                  anchor: nil)
+    box = placed(anchor, x, y, width, height)
     track = slider_track(box)
     value += sideways * step if focused
     value = slider_at(track, min, max) if held?(mouse_over?(**track))

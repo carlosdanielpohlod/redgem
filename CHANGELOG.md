@@ -10,6 +10,19 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **UI at any screen size**: `anchor:` on `UI.text`, `rect`, `image`, `button`, `text_field`,
+  `toggle`, `choice` and `slider` (`:top_left`, `:top`, `:top_right`, `:left`, `:center`,
+  `:right`, `:bottom_left`, `:bottom`, `:bottom_right`) makes x and y offsets from that point of
+  the screen, with the matching corner of what is drawn there, so a HUD keeps to its corner at
+  every resolution. `UI.anchored` gives the box's top-left corner for a layout of a game's own.
+- **Word wrap**: `UI.text(..., width:)` wraps at word boundaries (a word longer than a line is cut
+  between whole UTF-8 letters), and every text breaks at its own `"\n"`; `UI.text_height`,
+  `UI.wrap` and `UI.line_height` measure and lay out dialog boxes and credits.
+- **Scroll lists and clipping**: `UI::ScrollList` draws rows in a box that scrolls with the mouse
+  wheel, Page Up and Page Down, a gamepad's bumpers and right stick, and follows a `UI::Focus` to
+  keep the focused row in view. `UI.clip { }` cuts what its block draws to a box (and the pointer
+  outside it is over nothing in it). The menu's controls page scrolls with the wheel too.
+
 - **Sound handles**: `Audio.play(name, loop:, volume:, pitch:, group:)` returns the sound's id (or
   `nil`), in the same id space as `Audio.play_at`, so `Audio.stop(id)`, `Audio.playing?(id)` and the
   new `Audio.set(id, volume:, pitch:)` work on flat sounds too: a looping hum, an alarm that stops.

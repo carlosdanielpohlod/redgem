@@ -16,6 +16,8 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/debug.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui_widgets.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_layout.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_scroll.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_screen.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_settings.rb

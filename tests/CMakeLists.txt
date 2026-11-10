@@ -533,6 +533,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/material_pictures_render_test.cpp
                render_system/game_font_render_test.cpp
                render_system/missing_picture_render_test.cpp
+               render_system/hud_clip_render_test.cpp
                render_system/recording_render_test.cpp
                render_system/display_render_test.cpp
                render_system/camera_marker_render_test.cpp
