@@ -61,11 +61,7 @@ bool feed_digest(std::ifstream& in, Digest& digest, std::uintmax_t budget) {
   }
   return in.eof();
 }
-std::string fingerprint(const fs::path& file, std::uintmax_t budget = kEagerFingerprintBytes) {
-  std::error_code error;
-  const auto size = fs::file_size(file, error);
-  if (error) return {};
-  if (size > budget) return kUnknownBaseline;
+std::string digest_contents(const fs::path& file, std::uintmax_t budget) {
   std::ifstream in(file, std::ios::binary);
   if (!in) return {};
   Digest digest;
@@ -74,6 +70,13 @@ std::string fingerprint(const fs::path& file, std::uintmax_t budget = kEagerFing
   std::array<unsigned char, kDigestBytes> bytes{};
   require(mbedtls_sha256_finish(&digest.state, bytes.data()) == 0, "cannot finish scene fingerprint");
   return hex(bytes);
+}
+std::string fingerprint(const fs::path& file, std::uintmax_t budget = kEagerFingerprintBytes) {
+  std::error_code error;
+  const auto size = fs::file_size(file, error);
+  if (error) return {};
+  if (size > budget) return kUnknownBaseline;
+  return digest_contents(file, budget);
 }
 std::string path_digest(const fs::path& source) {
   const auto name = fs::weakly_canonical(fs::absolute(source)).generic_u8string();
