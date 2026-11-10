@@ -12,13 +12,13 @@ using redgem::test::RenderStage;
 
 namespace {
 
-constexpr int kSide = 256;                // the stage's picture, across and down
-constexpr int kHalf = kSide / 2;          // the clip: the picture's top-left quarter
-constexpr float kInside = 0.25f;          // a share of the picture inside that quarter, either way
-constexpr float kOutside = 0.75f;         // and one past it
-constexpr float kBelow = 0.6f;            // down past the quarter, above the strip below
-constexpr float kBottomStrip = 0.9f;      // down in the strip drawn after the clip ends
-constexpr int kStripTop = kSide * 3 / 4;  // where that strip starts
+constexpr int kPictureSide = 256;                // the stage's picture, across and down
+constexpr int kClipSide = kPictureSide / 2;      // the clip: the picture's top-left quarter
+constexpr float kInside = 0.25f;                 // a share of the picture inside that quarter, either way
+constexpr float kOutside = 0.75f;                // and one past it
+constexpr float kBelow = 0.6f;                   // down past the quarter, above the strip below
+constexpr float kBottomStrip = 0.9f;             // down in the strip drawn after the clip ends
+constexpr int kStripTop = kPictureSide * 3 / 4;  // where that strip starts
 constexpr unsigned char kBright = 150;
 constexpr unsigned char kDark = 70;
 
@@ -30,7 +30,7 @@ HudItem rect(int y, int height, redgem::Color color) {
   HudItem item;
   item.kind = HudItem::Kind::Rect;
   item.y = y;
-  item.width = kSide;
+  item.width = kPictureSide;
   item.height = height;
   item.color = color;
   return item;
@@ -57,8 +57,8 @@ const redgem::Color kBlue{0.0f, 0.0f, 1.0f, 1.0f};
 
 TEST_CASE("a HUD clip cuts what is drawn inside it to its box, and what follows its end is whole") {
   RenderStage stage;
-  const std::vector<HudItem> hud{clip(kHalf, kHalf), rect(0, kSide, kRed), unclip(),
-                                 rect(kStripTop, kSide - kStripTop, kBlue)};
+  const std::vector<HudItem> hud{clip(kClipSide, kClipSide), rect(0, kPictureSide, kRed), unclip(),
+                                 rect(kStripTop, kPictureSide - kStripTop, kBlue)};
   const Picture picture = stage.draw_hud(hud, "hud_clip");
   CHECK(red(picture.at(kInside, kInside)));
   CHECK(white(picture.at(kOutside, kInside)));      // cut off on the right
@@ -68,7 +68,7 @@ TEST_CASE("a HUD clip cuts what is drawn inside it to its box, and what follows 
 
 TEST_CASE("a HUD clip left on ends with the HUD") {
   RenderStage stage;
-  stage.draw_hud({clip(kHalf, kHalf)}, "hud_clip_left_on");
-  const Picture picture = stage.draw_hud({rect(0, kSide, kRed)}, "hud_clip_next_frame");
+  stage.draw_hud({clip(kClipSide, kClipSide)}, "hud_clip_left_on");
+  const Picture picture = stage.draw_hud({rect(0, kPictureSide, kRed)}, "hud_clip_next_frame");
   CHECK(red(picture.at(kOutside, kOutside)));
 }
