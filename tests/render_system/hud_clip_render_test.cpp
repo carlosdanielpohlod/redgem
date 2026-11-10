@@ -26,7 +26,7 @@ bool red(::Color c) { return c.r > kBright && c.g < kDark && c.b < kDark; }
 bool blue(::Color c) { return c.b > kBright && c.r < kDark && c.g < kDark; }
 bool white(::Color c) { return c.r > kBright && c.g > kBright && c.b > kBright; }
 
-HudItem rect(int y, int height, Color color) {
+HudItem rect(int y, int height, redgem::Color color) {
   HudItem item;
   item.kind = HudItem::Kind::Rect;
   item.y = y;
@@ -50,8 +50,8 @@ HudItem unclip() {
   return item;
 }
 
-const Color kRed{1.0f, 0.0f, 0.0f, 1.0f};
-const Color kBlue{0.0f, 0.0f, 1.0f, 1.0f};
+const redgem::Color kRed{1.0f, 0.0f, 0.0f, 1.0f};
+const redgem::Color kBlue{0.0f, 0.0f, 1.0f, 1.0f};
 
 }  // namespace
 
