@@ -15,6 +15,8 @@
 # (UI::Focus), the list scrolls to the row the focus moves to (row 0 is the focus' `first`, so the
 # rows may come after other widgets), and Page Up and Page Down move the focus. Without one, up
 # and down (arrows, D-pad) scroll a row. A bar beside its right edge shows how far it is scrolled.
+# Every list drawn hears these keys and the stick: draw it with `input: false` while the game uses
+# them for something else (walking with the arrows, turning the camera with the right stick).
 module UI
   PAGE_UP = [%i[page_up], %i[left_bumper]].freeze
   PAGE_DOWN = [%i[page_down], %i[right_bumper]].freeze
@@ -37,6 +39,7 @@ module UI
     def initialize
       @offset = 0
       @followed = nil
+      lay_out(0, 1, { x: 0, y: 0, width: 0, height: 0 }) # nothing to show before it is drawn
     end
 
     # Back to its first row.
@@ -55,7 +58,7 @@ module UI
       @first = first
       hear if input
       follow
-      UI.clip(**clip_box) { shown.each { |index| yield index, row_box(index, gap) } }
+      UI.clip(**clip_box(gap)) { shown.each { |index| yield index, row_box(index, gap) } }
       scrollbar if scrolls?
     end
 
@@ -103,7 +106,8 @@ module UI
     # The rows a page goes: as many as show whole (at least one).
     def page_rows = [@box[:height] / @row_height, 1].max.to_i
 
-    def wheel_pixels = UI.pointer_in?(@box) ? -Input.mouse_wheel * WHEEL_ROWS * @row_height : 0
+    # (Only with the pointer over it where it shows: inside any clip it is drawn in.)
+    def wheel_pixels = UI.mouse_over?(**@box) ? -Input.mouse_wheel * WHEEL_ROWS * @row_height : 0
 
     def stick_pixels
       push = Input.gamepad_axis(SCROLL_STICK)
@@ -119,11 +123,13 @@ module UI
     # Moves the focus a number of rows (staying on the list's).
     def focus_by(rows) = @focus.move_to(@first + (focused_row + rows).clamp(0, @count - 1))
 
-    # When the focus has moved to another row, scrolls so that it shows whole.
+    # When the focus has moved to another row, or the rows or the box changed size (another
+    # resolution), scrolls so that the focused row shows whole.
     def follow
       row = focused_row
-      show_row(row) if row && row != @followed
-      @followed = row
+      seen = [row, @row_height, @box[:height]]
+      show_row(row) if row && seen != @followed
+      @followed = seen
     end
 
     def show_row(row)
@@ -138,10 +144,13 @@ module UI
         height: @row_height - gap }
     end
 
-    # Where rows are drawn: the box, and room around it for a focused row's ring.
-    def clip_box
-      { x: @box[:x] - FOCUS_RING, y: @box[:y] - FOCUS_RING, width: @box[:width] + 2 * FOCUS_RING,
-        height: @box[:height] + 2 * FOCUS_RING }
+    # Where rows are drawn: the box, with room beside it for a focused row's ring, and above it as
+    # much as the gap a row leaves under it (the ring of the top row; the next row's top stays
+    # hidden below, where the gap of the last one shown already makes room).
+    def clip_box(gap)
+      above = [FOCUS_RING, gap].min
+      { x: @box[:x] - FOCUS_RING, y: @box[:y] - above, width: @box[:width] + 2 * FOCUS_RING,
+        height: @box[:height] + above }
     end
 
     # Beside its right edge: a track as tall as the box, and a handle as far down it as it is scrolled.
@@ -155,7 +164,11 @@ module UI
 
     def bar(box, alpha) = UI.rect(**box, color: SCROLLBAR_COLOR, alpha: alpha, radius: SCROLLBAR_WIDTH / 2)
 
-    # The handle's share of the track is the box's of the rows.
-    def handle_height = [@box[:height] * @box[:height] / (@count * @row_height), SCROLLBAR_MIN].max.to_i
+    # The handle's share of the track is the box's of the rows (never shorter than SCROLLBAR_MIN,
+    # nor than the track).
+    def handle_height
+      share = [@box[:height] * @box[:height] / (@count * @row_height), SCROLLBAR_MIN].max
+      [share, @box[:height]].min.to_i
+    end
   end
 end

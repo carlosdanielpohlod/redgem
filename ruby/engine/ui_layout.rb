@@ -29,15 +29,16 @@ module UI
   LINE_BREAK = "\n".freeze
   WORD_BREAK = " ".freeze            # also splits at runs of spaces and tabs (and drops them)
   KEEP_EMPTY_LINES = -1              # split's limit that keeps a text's empty last lines
-  WRAPS_KEPT = 64                    # texts the wrapping of which is remembered between frames
+  WRAPS_KEPT = 64                    # wrapped texts remembered between frames (the latest used)
 
   # The lines a text is drawn in at `size` when no line may be wider than `width` pixels (in the
   # face selected): broken at spaces, at the text's own line breaks, and between the letters of a
   # word too long for a line.
   def self.wrap(text, width:, size: DEFAULT_SIZE)
     key = [text.to_s, width.to_i, size.to_i, font]
-    wraps.clear if wraps_full?(key)
-    wraps[key] ||= paragraphs(key.first).flat_map { |line| Wrapping.new(key[1], key[2]).lines(line) }.freeze
+    lines = wraps.delete(key) || wrapped(*key)
+    wraps.shift if wraps.size >= WRAPS_KEPT
+    wraps[key] = lines
   end
 
   # How tall a text is drawn, in pixels, from its first line's top to its last line's bottom: with
@@ -75,9 +76,12 @@ module UI
 
   def self.align_share(align) = ALIGNS.fetch(align) { raise ArgumentError, "unknown align #{align.inspect}" }
 
-  # The wrapped texts remembered, by [text, width, size, face]; full when a new one has no room.
+  # The wrapped texts remembered, by [text, width, size, face]: the one used longest ago first.
   def self.wraps = @wraps ||= {}
-  def self.wraps_full?(key) = wraps.size >= WRAPS_KEPT && !wraps.key?(key)
+
+  def self.wrapped(text, width, size, _face)
+    paragraphs(text).flat_map { |line| Wrapping.new(width, size).lines(line) }.freeze
+  end
 
   # The boxes UI.clip draws in now, the innermost last.
   def self.clips = @clips ||= []

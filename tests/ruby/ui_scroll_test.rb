@@ -21,6 +21,7 @@ class UiScrollTest < RedGemTest::Case
   PAGE = 4                       # the rows that show at once
   LIST = { x: 0, y: 0, width: 200, height: PAGE * ROW, row_height: ROW }.freeze
   ON_THE_RIGHT = LIST.merge(x: 300).freeze # the same list, away from the pointer
+  TALLER_ROWS = LIST.merge(row_height: 30).freeze # the same list on a larger screen
   MOST = ROWS * ROW - PAGE * ROW # as far as it scrolls
   WHEEL_DOWN = -1.0
 
@@ -95,6 +96,20 @@ class UiScrollTest < RedGemTest::Case
     rows = drawn(focus: focus)
     assert_equal 7 * ROW - PAGE * ROW, @list.offset, "the focused row's bottom at the list's"
     assert_equal 6, rows.last.first
+  end
+
+  def test_it_follows_the_focus_again_when_its_rows_change_size
+    focus = UI::Focus.new
+    focus.move_to(6)
+    drawn(focus: focus)
+    @list.draw(ROWS, **TALLER_ROWS, focus: focus) { nil }
+    assert_equal 7 * 30 - PAGE * ROW, @list.offset
+  end
+
+  def test_a_list_not_drawn_yet_shows_nothing
+    list = UI::ScrollList.new
+    refute list.scrolls?
+    assert_equal [], list.shown.to_a
   end
 
   def test_the_wheel_takes_it_away_from_the_focus_until_the_focus_moves
