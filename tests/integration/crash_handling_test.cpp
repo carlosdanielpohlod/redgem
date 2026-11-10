@@ -1,4 +1,4 @@
-// A program that crashes writes a report beside its game's save and ends with a failure. Each
+// A program that crashes writes a report in its game's players' folder and ends with a failure. Each
 // crash happens in a program of its own (tests/tools/crash_helper.cpp), which these tests start.
 
 #include <doctest/doctest.h>
@@ -20,8 +20,8 @@ struct CrashFolders {
   std::filesystem::path root = std::filesystem::temp_directory_path() / "redgem-crash-test";
   std::filesystem::path data = root / "data";
   std::filesystem::path game = root / "game";
-  // Where the game's save is (saves/by-id/<id>.json), its reports go: beside it.
-  std::filesystem::path reports = data / "saves" / "by-id" / (std::string(kGameId) + "-crashes");
+  // The game's players' folder holds its save, and its reports in crashes/.
+  std::filesystem::path reports = data / "crashes";
 
   CrashFolders() {
     std::filesystem::remove_all(root);

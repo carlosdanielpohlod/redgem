@@ -30,6 +30,7 @@
   "project.build.for_macos": "For macOS",
   "project.build.for_windows": "For Windows (.exe)",
   "project.build.game_inside_its_build": "cannot build {game}: it is inside {folder}, which a build replaces",
+  "project.build.no_studio": "game.json names no studio, so the game's players keep their saves and settings under {folder}: say \"studio\" before the first release, since the studio and the title name that folder for good",
   "project.build.not_a_build": "cannot build: {path} is there and no build made it; move it away or build into another folder",
   "project.check.did_you_mean": "did you mean {names}?",
   "project.check.missing_script": "{where}: {script} is not there; {hint}",

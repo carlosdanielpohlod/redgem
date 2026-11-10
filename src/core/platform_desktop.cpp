@@ -17,6 +17,11 @@ constexpr const char* kUserDataFolder = "redgem";
 constexpr const char* kMacLibraryFolder = "Library";
 constexpr const char* kMacSupportFolder = "Application Support";
 constexpr const char* kMacUserDataFolder = "RedGem";
+// Where the desktops keep what programs remember, when their variables do not say.
+constexpr const char* kLinuxLocalFolder = ".local";
+constexpr const char* kLinuxSharedDataFolder = "share";
+constexpr const char* kWindowsAppDataFolder = "AppData";
+constexpr const char* kWindowsRoamingFolder = "Roaming";
 // What opens a file with the desktop's application, on the desktops that are not Windows.
 constexpr const char* kLinuxOpener = "xdg-open ";
 constexpr const char* kMacOpener = "open ";
@@ -24,10 +29,13 @@ constexpr const char* kQuietInBackground = " >/dev/null 2>&1 &";  // detached, a
 
 #if defined(_WIN32)
 constexpr Desktop kDesktop = Desktop::Windows;
+constexpr const char* kProgramsDataVariable = "APPDATA";
 #elif defined(__APPLE__)
 constexpr Desktop kDesktop = Desktop::Mac;
+constexpr const char* kProgramsDataVariable = nullptr;  // (the Mac's folder is always the same)
 #else
 constexpr Desktop kDesktop = Desktop::Linux;
+constexpr const char* kProgramsDataVariable = "XDG_DATA_HOME";
 #endif
 
 // The folder set_user_data_dir gave; empty until it gives one.
@@ -74,6 +82,20 @@ std::filesystem::path user_data_dir() {
 }
 
 void set_user_data_dir(const std::filesystem::path& folder) { given_user_data_dir() = folder; }
+
+std::filesystem::path programs_data_dir_on(Desktop desktop, const std::filesystem::path& home,
+                                           const std::filesystem::path& named) {
+  if (desktop == Desktop::Mac) return home / kMacLibraryFolder / kMacSupportFolder;
+  if (named.is_absolute()) return named;
+  if (desktop == Desktop::Windows) return home / kWindowsAppDataFolder / kWindowsRoamingFolder;
+  return home / kLinuxLocalFolder / kLinuxSharedDataFolder;
+}
+
+std::filesystem::path programs_data_dir() {
+  const std::filesystem::path named =
+      kProgramsDataVariable == nullptr ? std::filesystem::path() : environment_path(kProgramsDataVariable);
+  return programs_data_dir_on(kDesktop, home_dir(), named);
+}
 
 std::string posix_shell_word(const std::filesystem::path& text) { return quoted(text, '\'', "'\\''"); }
 

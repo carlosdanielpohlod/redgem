@@ -12,6 +12,7 @@
 #include "project/notices.hpp"
 #include "project/android/android_package.hpp"
 #include "project/game_build.hpp"
+#include "test_support.hpp"
 
 using namespace redgem;
 
@@ -79,6 +80,24 @@ TEST_CASE("a build for a computer never goes where its game folder would be the 
   CHECK(error == tr("project.build.game_inside_its_build",
                     {{"game", scratch.game.string()}, {"folder", (scratch.dir / kBundledGameFolder).string()}}));
   CHECK(std::filesystem::exists(scratch.game / config::kSceneFileName));
+}
+
+// The studio and the title name the folder a game's players keep their saves in, for good once
+// it ships: a build of a game that names no studio says so.
+TEST_CASE("a build of a game that names no studio warns that its players' saves go under the engine's name") {
+  const Scratch scratch;
+  const std::filesystem::path player = scratch.dir / "player";
+  std::ofstream(player) << "player";
+  std::string error;
+  {
+    const test::LogCapture log;
+    REQUIRE_MESSAGE(build_game(scratch.game, scratch.dir / "unnamed", player, BuildTarget::Linux, error), error);
+    CHECK(log.contains("game.json names no studio"));
+  }
+  std::ofstream(scratch.game / "game.json") << R"({"studio": "Pine Hill"})";
+  const test::LogCapture log;
+  REQUIRE_MESSAGE(build_game(scratch.game, scratch.dir / "named", player, BuildTarget::Linux, error), error);
+  CHECK_FALSE(log.contains("names no studio"));
 }
 
 // A build writes the executable, the game folder and the licenses: over what an earlier build

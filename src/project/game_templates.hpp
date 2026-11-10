@@ -18,6 +18,10 @@ struct GameTemplate {
 
 // What a new game starts from unless another template is asked for.
 inline constexpr const char* kDefaultTemplate = "empty";
+// The studio a new game says it is made by, unless its template says another: what its developer
+// puts their own name in place of before the first release (it names the folder its players'
+// saves are kept in, see app/game_data_location.hpp).
+inline constexpr const char* kNewGameStudio = "My Studio";
 
 // Every template, by name.
 const std::vector<GameTemplate>& game_templates();
@@ -30,7 +34,7 @@ bool valid_game_name(const std::string& name);
 std::string new_game_id(const std::string& name);
 
 // Creates a playable game folder: the template's files, the folders every game has (scripts/,
-// sounds/, scenes/, models/, images/, fonts/), a game.json with the game's title and id, and the
+// sounds/, scenes/, models/, images/, fonts/), a game.json with the game's title, studio and id, and the
 // guide to the game for whoever works on it (AGENTS.md and CLAUDE.md, see assistant_guide.hpp).
 // Fails if the folder exists and is not empty.
 bool create_game(const std::filesystem::path& game_dir, const std::string& template_name, std::string& error);

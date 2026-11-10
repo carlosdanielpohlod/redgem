@@ -1,6 +1,6 @@
 // Crashes on purpose, for tests/integration/crash_handling_test.cpp: it installs the crash
 // handling a shipped game has, for a game, then crashes the way it is asked to.
-//   redgem_crash_helper <user data folder> <game folder> segv|abort|terminate|terminate-memory|engine-thread|
+//   redgem_crash_helper <players' folder> <game folder> segv|abort|terminate|terminate-memory|engine-thread|
 //                       engine-thread-memory|exception|memory
 // (Built with the tests, never shipped.)
 
@@ -13,10 +13,10 @@
 #include <thread>
 
 #include "app/crash_report.hpp"
+#include "app/game_data_location.hpp"
 #include "app/game_texts.hpp"
 #include "core/engine_thread.hpp"
 #include "core/exit_codes.hpp"
-#include "core/platform.hpp"
 
 namespace {
 
@@ -52,7 +52,7 @@ int crash(const std::string& how) {
 
 int main(int argc, char** argv) {
   if (argc != kArguments) return redgem::kExitUsage;
-  redgem::platform::set_user_data_dir(argv[1]);
+  redgem::set_players_data_folder(argv[1]);
   redgem::add_game_texts();
   redgem::crash::install_crash_handling({argv[2], false});
   try {

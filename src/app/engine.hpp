@@ -67,10 +67,15 @@ struct EngineOptions {
   // Where Settings.save keeps them for the next runs. None: they last for this run only, and
   // nothing a player kept is read or written (see keeps_display).
   std::optional<DisplayKeeping> display_kept_in;
-  // Where Save keeps the game's data. Empty: the game's file in the user's RedGem folder.
+  // The folder the game keeps its save and its players' bindings in (see app/game_data_location.hpp):
+  // a player's own run gives the players' folder (players_data_folder). Empty: the developer's
+  // (developer_data_folder), so that the editor's Play and every other run of a developer's never
+  // touch what a player of the game kept.
+  std::filesystem::path data_folder;
+  // Where Save keeps the game's data. Empty: save.json in data_folder.
   std::filesystem::path save_file;
-  // Where the players' bindings of the game's actions are kept (Input.bind). Empty: the game's
-  // file in the user's RedGem folder, or nowhere for a game with no id or a server's room.
+  // Where the players' bindings of the game's actions are kept (Input.bind). Empty: bindings.json
+  // in data_folder, or nowhere for a server's room.
   std::filesystem::path bindings_file;
   // What Save keeps the game's data in, kept by whoever runs the engine, which it has to outlive
   // (a dedicated server's, shared by its rooms). save_file is not looked at then.

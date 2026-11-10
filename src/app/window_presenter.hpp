@@ -40,6 +40,9 @@ struct GameWindowOptions {
   // Where the player's choices are kept for the next runs (see EngineOptions::display_kept_in):
   // none for every run but a player's (see keeps_display).
   std::optional<DisplayKeeping> display_kept_in;
+  // The folder the game keeps its save and its players' bindings in (see EngineOptions::data_folder):
+  // the players' for a player's run, the developer's when empty.
+  std::filesystem::path data_folder;
   // Records the game to a video (see recording.hpp): drawn off screen at the size asked for, each
   // frame advancing the game by exactly 1/fps, the window showing what is recorded.
   std::optional<RecordOptions> record;

@@ -7,6 +7,7 @@
 #include <array>
 #include <utility>
 
+#include "app/game_data_location.hpp"
 #include "app/game_settings.hpp"
 #include "core/config.hpp"
 #include "core/files.hpp"
@@ -138,6 +139,7 @@ std::optional<BuildIdentity> build_identity(const std::filesystem::path& game_di
   const GameIdentityReading reading = read_game_identity(game_dir);
   error = reading.error;
   if (!error.empty()) return std::nullopt;
+  if (manifest.settings.studio.empty()) log::warning(tr("project.build.no_studio", {{"folder", kUnnamedStudioFolder}}));
   BuildIdentity identity{manifest.settings.title, manifest.settings.id, reading.identity, {}};
   if (!find_icon(game_dir, identity, error)) return std::nullopt;
   return identity;

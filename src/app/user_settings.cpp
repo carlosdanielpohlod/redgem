@@ -15,7 +15,7 @@ namespace {
 constexpr const char* kSettingsFileName = "settings.json";
 constexpr const char* kGpuKey = "gpu";
 constexpr const char* kLanguageKey = "language";
-constexpr const char* kGamesKey = "games";          // each game's display settings, by its key
+constexpr const char* kDisplayKey = "display";      // in a game's own settings file
 constexpr const char* kGpuVariable = "REDGEM_GPU";  // the user's choice of card for what is started from a shell
 constexpr int kJsonIndent = 2;
 
@@ -69,10 +69,8 @@ bool write_settings_json(const std::filesystem::path& file, const nlohmann::json
   return false;
 }
 
-bool holds_games(const nlohmann::json& json) { return json.contains(kGamesKey) && json[kGamesKey].is_object(); }
-
-bool holds_game(const nlohmann::json& json, const std::string& game_key) {
-  return holds_games(json) && json[kGamesKey].contains(game_key);
+bool holds_display(const nlohmann::json& json) {
+  return json.is_object() && json.contains(kDisplayKey) && json[kDisplayKey].is_object();
 }
 
 }  // namespace
@@ -87,21 +85,17 @@ bool write_user_settings(const std::filesystem::path& file, const UserSettings& 
   return write_settings_json(file, json, error);
 }
 
-DisplaySettings read_game_display(const std::filesystem::path& file, const std::string& game_key,
-                                  const DisplaySettings& defaults) {
+DisplaySettings read_game_display(const std::filesystem::path& file, const DisplaySettings& defaults) {
   const nlohmann::json json = read_json_file(file);
-  if (!holds_game(json, game_key)) return defaults;
-  return display_from_json(json[kGamesKey][game_key], defaults);
+  if (!holds_display(json)) return defaults;
+  return display_from_json(json[kDisplayKey], defaults);
 }
 
-bool write_game_display(const std::filesystem::path& file, const std::string& game_key, const DisplaySettings& display,
-                        std::string& error) {
+bool write_game_display(const std::filesystem::path& file, const DisplaySettings& display, std::string& error) {
   std::optional<nlohmann::json> kept = kept_settings(file, error);
   if (!kept) return false;
-  nlohmann::json& json = *kept;
-  if (!holds_games(json)) json[kGamesKey] = nlohmann::json::object();
-  json[kGamesKey][game_key] = display_json(display);
-  return write_settings_json(file, json, error);
+  (*kept)[kDisplayKey] = display_json(display);
+  return write_settings_json(file, *kept, error);
 }
 
 GpuChoice resolve_gpu_choice(const std::optional<std::string>& command_line,
@@ -114,13 +108,20 @@ GpuChoice resolve_gpu_choice(const std::optional<std::string>& command_line,
 }
 
 GpuChoice gpu_choice_for_run(const std::optional<std::string>& command_line) {
-  const std::string variable = platform::environment(kGpuVariable);
-  const std::optional<std::string> environment = variable.empty() ? std::nullopt : std::optional(variable);
-  return resolve_gpu_choice(command_line, environment, read_user_settings(user_settings_file()));
+  return gpu_choice_for_run(command_line, user_settings_file());
 }
 
-std::string language_for_run() {
-  const std::string chosen = read_user_settings(user_settings_file()).language;
+GpuChoice gpu_choice_for_run(const std::optional<std::string>& command_line,
+                             const std::filesystem::path& settings_file) {
+  const std::string variable = platform::environment(kGpuVariable);
+  const std::optional<std::string> environment = variable.empty() ? std::nullopt : std::optional(variable);
+  return resolve_gpu_choice(command_line, environment, read_user_settings(settings_file));
+}
+
+std::string language_for_run() { return language_for_run(user_settings_file()); }
+
+std::string language_for_run(const std::filesystem::path& settings_file) {
+  const std::string chosen = read_user_settings(settings_file).language;
   return chosen.empty() ? platform::system_language() : chosen;
 }
 

@@ -19,6 +19,7 @@ namespace {
 // What game.json says.
 constexpr const char* kIdKey = "id";
 constexpr const char* kTitleKey = "title";
+constexpr const char* kStudioKey = "studio";
 constexpr const char* kWindowWidthKey = "window_width";
 constexpr const char* kWindowHeightKey = "window_height";
 constexpr const char* kFullscreenKey = "fullscreen";
@@ -59,9 +60,10 @@ std::string read_id(const nlohmann::json& json, std::string& id) {
          ": id must look like com.mystudio.mygame or my-game (small letters, digits, '.', '-' and '_')";
 }
 
-// The title and the window's size: each is used only when it is what it should be.
+// The title, the studio and the window's size: each is used only when it is what it should be.
 void read_window(const nlohmann::json& json, GameSettings& settings) {
   if (holds_text(json, kTitleKey)) settings.title = printable(json[kTitleKey].get<std::string>());
+  if (holds_text(json, kStudioKey)) settings.studio = printable(json[kStudioKey].get<std::string>());
   settings.window_width = window_size(json, kWindowWidthKey, settings.window_width);
   settings.window_height = window_size(json, kWindowHeightKey, settings.window_height);
 }
@@ -148,6 +150,7 @@ bool write_game_settings(const std::filesystem::path& game_dir, const GameSettin
   nlohmann::json json = read_json_file(game_dir / kGameSettingsFile);
   if (!json.is_object()) json = nlohmann::json::object();
   if (!settings.id.empty()) json[kIdKey] = settings.id;
+  if (!settings.studio.empty()) json[kStudioKey] = settings.studio;
   json[kTitleKey] = settings.title;
   json[kWindowWidthKey] = settings.window_width;
   json[kWindowHeightKey] = settings.window_height;

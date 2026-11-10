@@ -10,6 +10,7 @@
 #include "app/scene_files.hpp"
 #include "app/touch_circles.hpp"
 #include "app/engine.hpp"
+#include "app/game_data_location.hpp"
 #include "core/config.hpp"
 #include "core/exit_codes.hpp"
 #include "app/user_settings.hpp"
@@ -617,7 +618,6 @@ TEST_CASE("a game whose id cannot be used still plays, and is told") {
   auto created = Engine::create(options);
   REQUIRE(std::holds_alternative<std::unique_ptr<Engine>>(created));
   CHECK(log.contains("game.json: id must look like"));
-  CHECK(log.contains("the game's save goes by where its folder is"));
   std::filesystem::remove_all(game);
 }
 
@@ -810,6 +810,57 @@ TEST_CASE("what the player sets is kept for the game's next run, and the player'
   CHECK(next_run.master_volume() == doctest::Approx(1.0f));
   CHECK(next_run.heard_master_volume() == doctest::Approx(0.5f));
   std::filesystem::remove(settings);
+}
+
+namespace {
+
+// A copy of the sandbox game, of a studio of the tests', removed with what it kept when the test ends.
+struct NamedSandbox {
+  std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_engine_data_folder_game";
+  NamedSandbox() {
+    std::filesystem::remove_all(dir);
+    std::filesystem::copy(fixture("games/sandbox"), dir, std::filesystem::copy_options::recursive);
+    std::ofstream(dir / kGameSettingsFile) << R"({"studio": "RedGem Tests", "title": "Data Folder Sandbox"})";
+    std::filesystem::remove_all(developer_data_folder(dir));
+  }
+  ~NamedSandbox() {
+    std::filesystem::remove_all(developer_data_folder(dir));
+    std::filesystem::remove_all(dir);
+  }
+  NamedSandbox(const NamedSandbox&) = delete;
+  NamedSandbox& operator=(const NamedSandbox&) = delete;
+};
+
+// The game shown by nobody, keeping its save and bindings in `data` (the developer's folder when empty).
+std::unique_ptr<Engine> keeping_data_in(const std::filesystem::path& game, const std::filesystem::path& data) {
+  EngineOptions options;
+  options.game_dir = game;
+  options.fixed_step = true;
+  options.data_folder = data;
+  auto created = Engine::create(options);
+  if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
+  return std::move(std::get<std::unique_ptr<Engine>>(created));
+}
+
+}  // namespace
+
+TEST_CASE(
+    "a player's run keeps its save in the folder it is given; any other run in the developer's, never the players'") {
+  const NamedSandbox game;
+  const std::filesystem::path players = std::filesystem::temp_directory_path() / "redgem_engine_players_folder";
+  std::filesystem::remove_all(players);
+  ruby(*keeping_data_in(game.dir, players), "Save[:best] = 3");
+  CHECK(std::filesystem::exists(game_data_files(players).save));
+  {
+    // (The editor's Play and `redgem play` give no folder.)
+    auto engine = keeping_data_in(game.dir, {});
+    CHECK(ruby(*engine, "Save.get(:best, 0)") == "0");  // what the player kept is not seen
+    ruby(*engine, "Save[:best] = 5");
+  }
+  CHECK(std::filesystem::exists(game_data_files(developer_data_folder(game.dir)).save));
+  CHECK(ruby(*keeping_data_in(game.dir, players), "Save[:best]") == "3");
+  CHECK_FALSE(std::filesystem::exists(players_data_folder(game.dir)));
+  std::filesystem::remove_all(players);
 }
 
 TEST_CASE("an engine not given where to keep its player's settings keeps nothing, and reads nothing kept") {

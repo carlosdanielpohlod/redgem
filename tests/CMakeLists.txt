@@ -12,6 +12,7 @@ add_executable(redgem_tests
   unit/files_test.cpp
   unit/command_line_test.cpp
   unit/names_test.cpp
+  unit/folder_names_test.cpp
   unit/texts_test.cpp
   unit/translation_keys_test.cpp
   unit/embed_test.cpp
@@ -111,6 +112,7 @@ add_executable(redgem_tests
   unit/animation_test.cpp
   unit/user_settings_test.cpp
   unit/save_file_test.cpp
+  unit/game_data_location_test.cpp
   unit/save_slots_test.cpp
   unit/save_safety_test.cpp
   unit/save_database_test.cpp
