@@ -35,6 +35,8 @@ void draw_hud_rect(const HudItem& item) {
   }
 }
 
+bool is_clip(HudItem::Kind kind) { return kind == HudItem::Kind::Clip || kind == HudItem::Kind::Unclip; }
+
 // Cuts what follows to the item's box (Clip), or stops cutting it (Unclip); returns whether it is cut.
 bool clip_hud(const HudItem& item) {
   if (item.kind == HudItem::Kind::Unclip) {
@@ -69,21 +71,23 @@ void Renderer::Impl::draw_hud_image(const HudItem& item) {
 }
 
 bool Renderer::Impl::draw_hud_item(const HudItem& item, bool clipped) {
+  if (is_clip(item.kind)) return clip_hud(item);
+  draw_hud_picture(item);
+  return clipped;
+}
+
+void Renderer::Impl::draw_hud_picture(const HudItem& item) {
   switch (item.kind) {
     case HudItem::Kind::Text:
       draw_hud_text(item);
-      return clipped;
+      break;
     case HudItem::Kind::Rect:
       draw_hud_rect(item);
-      return clipped;
-    case HudItem::Kind::Image:
+      break;
+    default:  // an image (clips are not pictures)
       draw_hud_image(item);
-      return clipped;
-    case HudItem::Kind::Clip:
-    case HudItem::Kind::Unclip:
-      return clip_hud(item);
+      break;
   }
-  return clipped;
 }
 
 // A clip still on at the end (a script that never ended it) ends there: nothing after the HUD is cut.
