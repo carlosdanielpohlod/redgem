@@ -6,14 +6,10 @@ description: "Known limits and what to do when something goes wrong."
 
 ## What RedGem does not do yet
 
-Knowing this up front saves time:
+The full list of what is missing or known to be wrong is
+[KNOWN_LIMITATIONS.md](https://github.com/carlosdanielpohlod/redgem/blob/main/KNOWN_LIMITATIONS.md).
+Knowing these up front saves time:
 
-- **Input** is keyboard, mouse and one gamepad. Keys and buttons cannot be rebound by the player.
-- **In-game interface** is texts, rectangles, images, buttons and text fields you draw each frame.
-  There are no sliders or layout containers.
-- **Particles** are let out in bursts, as dots or pictures. They do not collide and are not lit.
-- **Animation:** a character plays one clip with a second mixed over it. There are no blend trees,
-  no animation events and no inverse kinematics.
 - **Multiplayer** has no matchmaking and no lag compensation; playing over the internet needs a
   relay you run, or a forwarded port (see [Multiplayer](scripting/multiplayer.md)).
 - **Platforms:** the editor is developed on Linux; the Windows and macOS downloads are
@@ -24,7 +20,6 @@ Knowing this up front saves time:
   not signed by a registered Apple developer. Right-click `RedGem.app` and choose *Open* (on
   macOS 15 and later: *System Settings > Privacy & Security > Open Anyway*), or run
   `xattr -dr com.apple.quarantine RedGem.app` in the unpacked folder.
-- Scripts are loaded when you press Play; they are not reloaded while the game runs.
 - **Scene size:** a scene (or a model) that would need more than 4 GB of memory, counting its file,
   its vertices as the engine keeps them and its pictures as they are once decoded, is refused with
   a message saying how much it needs. The biggest demo scene comes to about 1.8 GB. This is an
