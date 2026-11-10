@@ -142,6 +142,26 @@ The window title and the status bar name the open scene, and the editor follows 
 for changes made outside. Built games carry every scene: Build copies the whole game folder,
 `scenes/` included.
 
+## Physics collider view
+
+During Play or Pause, **View > Physics colliders** draws the collision shapes the simulation
+actually uses over the game. It is off by default and does not change the scene or the shipped
+game. Boxes, spheres, capsules and triangle meshes follow their physics poses, including
+characters and trigger volumes; vehicle chassis shapes are included, wheels are not.
+
+Static shapes are gray, moving bodies green, kinematic bodies blue, characters cyan and
+triggers amber. Wires stay visible through opaque geometry, behind the game HUD and touch controls. Pause the game to inspect a
+collision or compare a mesh with its collider. The view samples at most 8,192 triangles in a
+frame, first sharing it across colliders (up to 256 triangles each), then assigning unused
+budget to shapes with more detail. Shared wire edges are drawn once, and the world-pass
+command buffer holds at most 4,096 commands, with script commands taking priority. Free
+line capacity determines a conservative triangle estimate; deduplicated edges fill the remaining
+space and stop at its actual capacity. Invalid coordinates are skipped. If a geometry or command
+limit leaves edges out, the View menu warns that the limit was reached. Curves are tessellated.
+
+The overlay is a runtime view: it does not appear before Play, and does not draw contact points,
+velocities or joints. Turning it off stops gathering the geometry.
+
 ## Building
 
 **Build** (in the toolbar, or File > Build Game) asks which system to build for, saves the open

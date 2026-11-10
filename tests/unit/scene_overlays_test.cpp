@@ -1,7 +1,10 @@
 #include <doctest/doctest.h>
 
+#include <limits>
+
 #include "editor/scene_overlays.hpp"
 #include "physics/body_config.hpp"
+#include "render/debug_draw.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -42,4 +45,48 @@ TEST_CASE("the viewport colors come out as raylib takes them") {
   CHECK(color.g == kOrange[1]);
   CHECK(color.b == kOrange[2]);
   CHECK(color.a == kOrange[3]);
+}
+
+TEST_CASE("collider wire commands keep one shared edge and draw in the world pass") {
+  PhysicsDebugGeometry geometry;
+  const PhysicsDebugTriangle first{1, BodyType::Dynamic, false, {Vec3{0, 0, 0}, Vec3{1, 0, 0}, Vec3{0, 1, 0}}};
+  const PhysicsDebugTriangle second{1, BodyType::Dynamic, false, {Vec3{1, 0, 0}, Vec3{1, 1, 0}, Vec3{0, 1, 0}}};
+  geometry.triangles = {first, second};
+  DebugDrawBuffer commands;
+  REQUIRE(append_physics_colliders(commands, geometry));
+  constexpr std::size_t kUniqueEdges = 5;
+  REQUIRE(commands.items().size() == kUniqueEdges);
+  for (const auto& command : commands.items()) CHECK(command.kind == DebugDrawItem::Kind::Line);
+}
+
+TEST_CASE("collider wires discard whole nonfinite triangles before sorting") {
+  const PhysicsDebugTriangle valid{1, BodyType::Dynamic, false, {Vec3{0, 0, 0}, Vec3{1, 0, 0}, Vec3{0, 1, 0}}};
+  auto nan = valid;
+  nan.corners[0].x = std::numeric_limits<float>::quiet_NaN();
+  auto infinity = valid;
+  infinity.corners[1].y = std::numeric_limits<float>::infinity();
+  PhysicsDebugGeometry geometry;
+  geometry.triangles = {nan, valid, infinity};
+  DebugDrawBuffer commands;
+  CHECK(append_physics_colliders(commands, geometry));
+  CHECK(commands.items().size() == kDebugTriangleCorners);
+}
+
+TEST_CASE("collider lines fill free capacity while preserving script commands") {
+  constexpr std::size_t kQuadEdges = 5;
+  DebugDrawBuffer commands;
+  const DebugDrawItem script{DebugDrawItem::Kind::Box, Vec3::zero(), Vec3::one(), redgem::Color{1, 0, 0, 1}, true};
+  const auto script_count = kMaxDebugDrawCommands - kQuadEdges;
+  for (std::size_t index = 0; index < script_count; ++index) REQUIRE(commands.append(script));
+  PhysicsDebugGeometry geometry;
+  geometry.triangles = {{1, BodyType::Dynamic, false, {Vec3{0, 0, 0}, Vec3{1, 0, 0}, Vec3{0, 1, 0}}},
+                        {1, BodyType::Dynamic, false, {Vec3{1, 0, 0}, Vec3{1, 1, 0}, Vec3{0, 1, 0}}}};
+  REQUIRE(physics_debug_triangle_budget(commands) >= geometry.triangles.size());
+  REQUIRE(append_physics_colliders(commands, geometry));
+  CHECK(commands.items().size() == kMaxDebugDrawCommands);
+  for (std::size_t index = 0; index < script_count; ++index)
+    CHECK(commands.items()[index].kind == DebugDrawItem::Kind::Box);
+  CHECK_FALSE(append_physics_colliders(commands, geometry));
+  CHECK(physics_debug_triangle_budget(commands) > 0);
+  CHECK(append_physics_colliders(commands, PhysicsDebugGeometry{}));
 }
