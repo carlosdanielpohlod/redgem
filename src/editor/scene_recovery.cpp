@@ -188,7 +188,16 @@ void SceneRecovery::discover_copy() {
   const bool exists = fs::exists(fs::symlink_status(copy_path(source_), error));
   pending_ = !ignored && exists && !dismissed_copy(source_);
 }
+void SceneRecovery::follow_owned_copy(bool takeover) {
+  if (!takeover) {
+    discover_copy();
+    return;
+  }
+  takeover_pending_ = true;
+  retry_lease();
+}
 void SceneRecovery::begin_watch(const fs::path& source) {
+  const bool takeover = source_ == source && takeover_pending_;
   reset_observation();
   baseline_ = fingerprint(source);
   if (baseline_.empty()) baseline_ = kUnknownBaseline;
@@ -197,7 +206,7 @@ void SceneRecovery::begin_watch(const fs::path& source) {
     problem_ = "Scene recovery unavailable: another editor owns it, or the folder is not writable";
     return;
   }
-  discover_copy();
+  follow_owned_copy(takeover);
 }
 void SceneRecovery::watch(const fs::path& source) {
   try {
@@ -224,7 +233,8 @@ void SceneRecovery::ignore() {
   ignored_sources_.insert(source_);
   pending_ = false;
   offered_.reset();
-  if (!lease_.held()) return;
+  const bool foreign_copy = !lease_.held() || takeover_pending_;
+  if (foreign_copy) return;
   try {
     const auto digest = fingerprint(copy_path(source_), recovery_format::kMaxBytes);
     require(digest.size() == kDigestBytes * kHexDigitsPerByte, "cannot fingerprint the ignored recovery copy");
@@ -274,7 +284,8 @@ bool SceneRecovery::recover(SceneDocument& document, std::string& error) {
   }
 }
 bool SceneRecovery::remove_copy(std::string& error) {
-  if (!lease_.held()) return true;
+  const bool foreign_copy = !lease_.held() || takeover_pending_;
+  if (foreign_copy) return true;
   std::error_code problem;
   fs::remove(copy_path(source_), problem);
   if (problem) {

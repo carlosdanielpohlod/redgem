@@ -33,6 +33,7 @@ class SceneRecovery {
  private:
   SceneRecoveryCopy* offered_copy(std::string& error) const;
   void discover_copy();
+  void follow_owned_copy(bool takeover);
   void begin_watch(const std::filesystem::path& source);
   bool poll_ready(SceneDocument& document, float seconds, std::string& error);
   bool retry_lease();

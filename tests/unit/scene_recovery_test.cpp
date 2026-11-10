@@ -545,3 +545,25 @@ TEST_CASE("failure to clear a dismissal cannot fail a published copy or a comple
   REQUIRE(recovery.discard(game.error));
   CHECK_FALSE(recovery.pending());
 }
+
+TEST_CASE("saving during a lease takeover preserves the other editor's backup without offering it") {
+  RecoveryGame game;
+  auto owner_result = EditorSession::open(game.folder);
+  auto owner = std::move(std::get<std::unique_ptr<EditorSession>>(owner_result));
+  owner->document().set_name(0, "First editor's unsaved work");
+  owner->autosave(SceneRecovery::kIntervalSeconds);
+  const auto first_copy = game.bytes(SceneRecovery::copy_path(game.source));
+  auto waiting_result = EditorSession::open(game.folder);
+  auto waiting = std::move(std::get<std::unique_ptr<EditorSession>>(waiting_result));
+  waiting->document().set_name(0, "Second editor's saved work");
+  owner.reset();
+  REQUIRE(waiting->save(game.error));
+  CHECK_FALSE(waiting->recovery_pending());
+  bool archived = false;
+  for (const auto& entry : fs::directory_iterator(game.folder)) {
+    if (entry.path().filename().string().find(".previous-") == std::string::npos) continue;
+    CHECK(game.bytes(entry.path()) == first_copy);
+    archived = true;
+  }
+  CHECK(archived);
+}
