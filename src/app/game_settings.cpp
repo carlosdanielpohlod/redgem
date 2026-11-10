@@ -127,6 +127,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   const nlohmann::json json = read_json_file(game_dir / kGameSettingsFile);
   if (!json.is_object()) return manifest;
   read_window(json, manifest.settings);
+  manifest.title_given = holds_text(json, kTitleKey);
   read_display(json, manifest.settings);
   manifest.id_error = read_id(json, manifest.settings.id);
   manifest.android_error = read_android_section(json, manifest.settings.android);

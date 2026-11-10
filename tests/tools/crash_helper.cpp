@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
   if (argc != kArguments) return redgem::kExitUsage;
   redgem::set_players_data_folder(argv[1]);
   redgem::add_game_texts();
-  redgem::crash::install_crash_handling({argv[2], false});
+  redgem::crash::install_crash_handling({argv[2], {}, false});
   try {
     return crash(argv[3]);
   } catch (const std::bad_alloc&) {

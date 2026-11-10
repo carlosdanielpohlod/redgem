@@ -74,7 +74,8 @@ until 1.0, a release may change what games rely on (see
   (`$XDG_DATA_HOME` or `~/.local/share` on Linux, `%APPDATA%` on Windows,
   `~/Library/Application Support` on macOS, the app's files folder on Android), as `save.json`,
   `settings.json`, `bindings.json` and `crashes/`. The names are made safe folder names on every
-  system; a game with no studio goes under `RedGem Games`, and a build warns of it. `redgem new`
+  system; a game with no studio goes under `RedGem Games`, and a build warns of a game with no
+  studio, no title or the `"My Studio"` every new game starts with. `redgem new`
   writes `"studio": "My Studio"`. The editor's Play and `redgem play` keep theirs in
   `game-data/<studio>/<title>/` of the RedGem folder and `redgem-test` in `test-saves/`, never in
   the players' folder; a built game no longer reads RedGem's own `settings.json`. **Saves,

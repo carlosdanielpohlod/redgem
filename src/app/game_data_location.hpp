@@ -41,7 +41,9 @@ GameDataFiles game_data_files(const std::filesystem::path& folder);
 // <studio>/<title>, each made a safe folder name (see core/folder_names.hpp): kUnnamedStudioFolder
 // for a game that names no studio, kUnnamedGameFolder for a title with nothing usable in it.
 std::filesystem::path game_data_subfolder(const GameSettings& settings);
-// The same for the game in `game_dir`, its game.json read.
+// The same for the game in `game_dir`, its game.json read. A game whose game.json gives no title
+// goes by the name of its folder, however the path to it is written: for a built game, the folder
+// around its "game" folder (where the player put it, so that a title is what keeps it in place).
 std::filesystem::path game_data_subfolder(const std::filesystem::path& game_dir);
 
 // The folder of the game's players, on this system (see above).

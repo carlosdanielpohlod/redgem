@@ -104,7 +104,7 @@ void prepare(const CrashSetup& setup) {
   facts.version = kVersion;
   facts.platform = platform_name();
   PreparedCrash& crash = prepared();
-  crash.folder = crash_folder_for(setup.game_dir);
+  crash.folder = crash_folder_for(setup);
   // (In UTF-8: on Windows a folder's name may hold letters the system's code page has none for.)
   crash.folder_text = crash.folder.u8string();
   crash.head = report_head(facts);
@@ -173,8 +173,9 @@ std::string format_crash_report(const CrashFacts& facts) {
   return report_head(facts) + report_moment(facts.time, facts.cause, facts.backtrace);
 }
 
-std::filesystem::path crash_folder_for(const std::filesystem::path& game_dir) {
-  return game_data_files(players_data_folder(game_dir)).crashes;
+std::filesystem::path crash_folder_for(const CrashSetup& setup) {
+  const bool given = !setup.data_folder.empty();
+  return game_data_files(given ? setup.data_folder : players_data_folder(setup.game_dir)).crashes;
 }
 
 std::string crash_file_name(long long seconds_since_epoch) {

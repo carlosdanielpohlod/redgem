@@ -501,7 +501,7 @@ TEST_CASE("an app goes online when its game says so, or when its scripts call th
     CHECK(log.contains("game.json says \"network\": false, yet the game's scripts use the network"));
   }
   {
-    std::ofstream(game / "game.json") << R"({"network": true, "studio": "Pine Hill"})";
+    std::ofstream(game / "game.json") << R"({"network": true, "studio": "Pine Hill", "title": "Sandbox"})";
     test::LogCapture log;
     CHECK(asks_for_network());
     CHECK(log.count(log::Level::Warning) == 0);

@@ -244,7 +244,9 @@ redgem games/arena --record trailer.mp4 --record-fps 30 --record-size 3840x2160 
   `redgem new` writes `"studio": "My Studio"`: put your own in before the first release, and
   leave both alone after. A game whose studio or title changes looks for its saves in a new
   folder, and finds none: nothing is moved. A game that names no studio is kept under
-  `RedGem Games`, and a build says so. Letters a folder's name cannot hold on some system
+  `RedGem Games`; one with no title goes by its folder's name, which for a built game is the
+  folder the player put it in, so moving it loses the saves. A build warns of a game with no
+  studio, no title, or the studio `redgem new` wrote. Letters a folder's name cannot hold on some system
   (`/ \ : * ? " < > |`, control characters) become `_`, a name Windows keeps for a device
   (`CON`, `NUL`, `COM1`...) is given a `_` after it, and a long name is cut at 64 bytes. Two games
   of the same studio and title share a folder: a game started as a copy of another needs a title

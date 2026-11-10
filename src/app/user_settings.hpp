@@ -20,7 +20,7 @@ struct UserSettings {
 std::filesystem::path user_settings_file();
 // Missing or unreadable files give the defaults.
 UserSettings read_user_settings(const std::filesystem::path& file);
-// (What else the file holds, each game's display settings, stays as it is.)
+// (What else the file holds stays as it is.)
 bool write_user_settings(const std::filesystem::path& file, const UserSettings& settings, std::string& error);
 
 // What the player chose for how a game is shown, kept in the game's own settings file under

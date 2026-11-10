@@ -29,8 +29,6 @@ std::string report_head(const CrashFacts& facts);
 // The report, whole.
 std::string format_crash_report(const CrashFacts& facts);
 
-// The folder a game's crash reports go in: crashes/ in its players' folder.
-std::filesystem::path crash_folder_for(const std::filesystem::path& game_dir);
 // The name of the report of a crash at a moment ("crash-20261024-130509.log").
 std::string crash_file_name(long long seconds_since_epoch);
 
@@ -40,9 +38,15 @@ const char* platform_name();
 
 struct CrashSetup {
   std::filesystem::path game_dir;
+  // The game's players' folder, where its save is (see app/game_data_location.hpp): empty for the
+  // one players_data_folder says.
+  std::filesystem::path data_folder;
   // Whether the player is shown a message box where the system has them (Windows): off for tests.
   bool show_dialog = true;
 };
+// The folder a game's crash reports go in: crashes/ in its players' folder, beside its save.
+std::filesystem::path crash_folder_for(const CrashSetup& setup);
+
 // Prepares everything a crash will need (where the report goes, what the player is told) and
 // installs the handlers. Once, before the game starts.
 void install_crash_handling(const CrashSetup& setup);

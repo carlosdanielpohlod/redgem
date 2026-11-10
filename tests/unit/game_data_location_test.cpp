@@ -128,3 +128,14 @@ TEST_CASE("platform folders of the desktops: XDG_DATA_HOME or .local/share, APPD
   CHECK(platform::programs_data_dir_on(platform::Desktop::Mac, home, named) ==
         home / "Library" / "Application Support");
 }
+
+TEST_CASE("a game with no title goes by its folder however its path is written, a built one by the folder around it") {
+  const TempGames games;
+  const std::string json = std::string(R"({"studio": ")") + kStudio + R"("})";
+  const std::filesystem::path city = games.game("city", json);
+  const std::filesystem::path sub = game_data_subfolder(city);
+  CHECK(sub == std::filesystem::path(kStudio) / "city");
+  CHECK(game_data_subfolder(city / "") == sub);
+  CHECK(game_data_subfolder(city / ".") == sub);
+  CHECK(game_data_subfolder(games.game(std::filesystem::path("dist") / "city" / "game", json)) == sub);
+}
