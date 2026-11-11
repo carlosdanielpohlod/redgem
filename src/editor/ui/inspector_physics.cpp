@@ -55,16 +55,16 @@ bool draw_trigger_row(EditorSession& session, int index, bool& trigger) {
   return false;
 }
 
-bool draw_body_row(EditorSession& session, int index, const PropertyMap& props) {
+bool draw_body_row(EditorSession& session, int index, const PropertyMap& props, bool active) {
   const int count = static_cast<int>(std::size(props::kBodyTypes));
   const std::string current = get_string(props, props::kBody).value_or(props::kBodyTypes[kDefaultBody]);
-  int type = editor_logic::index_of(props::kBodyTypes, count, current, kDefaultBody);
+  int type = active ? editor_logic::index_of(props::kBodyTypes, count, current, kDefaultBody) : kNoIndex;
   property_label(tr("editor.inspector.physics.body"));
   if (ImGui::Combo(kBodyId, &type, props::kBodyTypes, count)) {
     set_or_remove(session, index, props::kBody, PropertyValue(std::string(props::kBodyTypes[type])));
     return true;
   }
-  tooltip(tr(kBodyDescriptions[type]));
+  if (type != kNoIndex) tooltip(tr(kBodyDescriptions[type]));
   return false;
 }
 
@@ -121,26 +121,29 @@ void draw_mass_row(PanelContext& context, int index, float mass) {
 
 // The rows that say what the object is to the physics, until one of them changes it. (A trigger
 // has no body to choose.)
-bool draw_kind_rows(EditorSession& session, int index, const PropertyMap& props) {
+bool draw_kind_rows(EditorSession& session, int index, const PropertyMap& props, bool active) {
   bool trigger = get_bool(props, props::kTrigger).value_or(false);
   if (draw_trigger_row(session, index, trigger)) return true;
   if (trigger) return draw_collider_row(session, index, props);
-  return draw_body_row(session, index, props) || draw_collider_row(session, index, props);
+  return draw_body_row(session, index, props, active) || draw_collider_row(session, index, props);
+}
+
+void draw_physics_warnings(const BodyConfig& body) {
+  ImGui::PushStyleColor(ImGuiCol_Text, warning_color());
+  for (const std::string& warning : body.warnings) {
+    ImGui::TextWrapped(ICON_FA_TRIANGLE_EXCLAMATION "  %s", warning.c_str());
+  }
+  ImGui::PopStyleColor();
 }
 
 void draw_physics_rows(PanelContext& context, int index, const BodyConfig& body) {
   const bool active = body.wants_physics();
   if (!active) ImGui::TextWrapped("%s", tr("editor.inspector.physics.layer_no_body"));
   const auto& props = context.session.document().node(index).props;
-  const bool changed_kind = active && draw_kind_rows(context.session, index, props);
-  if (changed_kind) return;
+  if (draw_kind_rows(context.session, index, props, active)) return;
   if (draw_layer_row(context.session, index)) return;
   if (has_mass(body)) draw_mass_row(context, index, body.mass);
-  ImGui::PushStyleColor(ImGuiCol_Text, warning_color());
-  for (const std::string& warning : body.warnings) {
-    ImGui::TextWrapped(ICON_FA_TRIANGLE_EXCLAMATION "  %s", warning.c_str());
-  }
-  ImGui::PopStyleColor();
+  draw_physics_warnings(body);
 }
 
 }  // namespace
