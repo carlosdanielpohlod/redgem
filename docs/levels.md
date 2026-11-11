@@ -57,11 +57,15 @@ outer cone). Point and spot lights cast no shadow unless their object has the cu
 `cast_shadow = true` (in the editor: a toggle property of that name in the Inspector's
 properties). Then, of the lights that matter most to the camera, up to `local_shadows` (four
 unless the environment says fewer) cast shadows each frame: a spot one picture down its cone,
-a point light six (a cube around it), all 512 texels a side, filtered as the sun's. They cost a
+a point light six (a cube around it), all 512 texels a side in one atlas of sixteen, filtered as
+the sun's (so at most two point lights cast shadows at once, with up to two spots beside them). They cost a
 pass over the scene per picture, so give shadows to the few lights that need them (the torch in a
 corridor, the lamp over a table) rather than to every lamp. The player's quality caps them: ultra
 four, high two, medium one, low none; a graphics card that cannot hold them draws none. The
-objects whose `cast_shadow` is false stay out of these shadows too. A light's intensity and color can change while the game runs (see
+objects whose `cast_shadow` is false stay out of these shadows too. An object holding both a
+mesh and a light shares the one property, so put a lamp's shade on an object of its own (Blender
+always does). When more lights want shadows than are allowed, the ones nearest the camera get
+them, and a light that drops out of the budget loses its shadow at once. A light's intensity and color can change while the game runs (see
 [Gameplay recipes](scripting/gameplay.md#light-that-flickers-and-fades)).
 
 ### See-through materials and wind

@@ -74,8 +74,8 @@ until 1.0, a release may change what games rely on (see
 - **Shadows from point and spot lights**: a light whose object sets `cast_shadow = true` casts
   shadows (off unless said, so existing scenes draw as fast as before). Of those, the ones that
   matter most to the camera cast them each frame, up to the environment's `local_shadows` (0 to
-  4): a spot draws one perspective view, a point light the six faces of a cube, all into one depth
-  atlas, filtered like the sun's with a normal offset and a bias that follows the texel size. The
+  4, at most two of them point lights): a spot draws one perspective view, a point light the six
+  faces of a cube, all into one depth atlas, filtered like the sun's with a normal offset and a bias that follows the texel size. The
   quality presets cap them (ultra 4, high 2, medium 1, low 0; `local_shadows` in a custom quality
   and `Settings.quality_details`), and a graphics card that cannot make the atlas draws none.
 

@@ -146,7 +146,7 @@ const float LOCAL_TILES_ACROSS = 4.0;   // render_math::kLocalTilesAcross
 const float LOCAL_ATLAS_TEXELS = 2048.0; // render_math::kLocalShadowAtlasSize
 const float LOCAL_POLE = 0.99;          // render_math::kStraightUpOrDown: a view this straight up or down takes +Z as up
 const float LOCAL_NORMAL_OFFSET = 1.5;  // texels the lookup moves off the surface (prevents acne)
-const float LOCAL_SLOPE_BIAS = 1.0;     // texels of depth more the farther a texel spreads
+const float LOCAL_SLOPE_BIAS = 1.0;     // texels of depth, times one more per meter the surface drops across
 const float LOCAL_MIN_BIAS = 0.01;      // meters
 const int LOCAL_KERNEL = 1;             // (2k+1)^2 taps, as the sun's filter
 const int LOCAL_TAPS_ACROSS = LOCAL_KERNEL + 1 + LOCAL_KERNEL;
@@ -207,12 +207,13 @@ float localFiltered(vec2 uv, vec2 corner, float along, float near, float far) {
 float localVisibility(int slot, vec3 position, vec3 n, vec3 lightPosition, vec3 axis) {
   vec4 view = localShadows[slot];
   bool cube = view.y <= 0.0;
+  float spread = cube ? 1.0 : view.y;
+  float texelMeters = DEPTH_RANGE * max(length(position - lightPosition), view.z) * spread * LOCAL_TILES_ACROSS / LOCAL_ATLAS_TEXELS;
+  vec3 d = position + n * texelMeters * LOCAL_NORMAL_OFFSET - lightPosition;
+  // (A cube's face is chosen after the offset: the point looked up may have crossed to the next.)
   vec3 forward = cube ? vec3(0.0, 0.0, 1.0) : normalize(axis);
   float tile = view.x;
-  if (cube) tile += cubeFace(position - lightPosition, forward);
-  float spread = cube ? 1.0 : view.y;
-  float texelMeters = DEPTH_RANGE * max(dot(position - lightPosition, forward), view.z) * spread * LOCAL_TILES_ACROSS / LOCAL_ATLAS_TEXELS;
-  vec3 d = position + n * texelMeters * LOCAL_NORMAL_OFFSET - lightPosition;
+  if (cube) tile += cubeFace(d, forward);
   float along = dot(d, forward);
   if (along <= view.z) return 1.0;
   vec3 side = normalize(cross(forward, localUp(forward)));
@@ -220,7 +221,8 @@ float localVisibility(int slot, vec3 position, vec3 n, vec3 lightPosition, vec3 
   if (max(abs(seen.x), abs(seen.y)) > 1.0) return 1.0;
   vec2 corner = vec2(mod(tile, LOCAL_TILES_ACROSS), floor(tile / LOCAL_TILES_ACROSS)) / LOCAL_TILES_ACROSS;
   vec2 uv = corner + (seen * HALF + HALF) / LOCAL_TILES_ACROSS;
-  float bias = max(texelMeters * LOCAL_SLOPE_BIAS, LOCAL_MIN_BIAS);
+  // More on surfaces edge-on to the light, where a texel spans more depth (as the sun's).
+  float bias = max(texelMeters * LOCAL_SLOPE_BIAS * (1.0 + surfaceSlope(n, normalize(-d))), LOCAL_MIN_BIAS);
   return localFiltered(uv, corner, along - bias, view.z, view.w);
 }
 

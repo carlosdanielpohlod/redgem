@@ -86,7 +86,7 @@ void Renderer::Impl::draw_light_shadow(const LocalShadow& light_shadow, Vec3 vie
     draw_shadow_tile(view, light_shadow.first_tile, viewer);
     return;
   }
-  for (int face = 0; face < render_math::kCubeFaces; ++face) {
+  for (int face = 0; face < light_shadow.tiles; ++face) {
     const Camera3D view = face_camera(light.position, render_math::cube_face(face), kCubeSpread);
     draw_shadow_tile(view, light_shadow.first_tile + face, viewer);
   }

@@ -62,9 +62,11 @@ the same pull request.
   be Radiance `.hdr`). Animated WebP and KTX2/Basis textures are not read. WebP is decoded on the CPU and uploaded as
   ordinary pixels; it does not provide GPU texture compression.
 - Point and spot lights cast shadows only when their object sets `cast_shadow = true`, at most
-  four a frame (fewer under lower quality presets), each in 512-texel tiles of one atlas: a large
-  room lit by one point light gets coarse shadow edges, and the filter does not blend across a
-  point light's cube faces, so a faint seam can show where two faces meet. Lights beyond the
+  four a frame (fewer under lower quality presets) and at most two of them point lights, each in
+  512-texel tiles of one atlas: a large room lit by one point light gets coarse shadow edges, and
+  the filter does not blend across a point light's cube faces, so a faint seam can show where two
+  faces meet. A light that drops out of the budget as the camera moves loses its shadow at once
+  (no fade), and every shadowed light is drawn again each frame, moving or not. Lights beyond the
   budget, and every light on a card that cannot make the atlas, light through walls. Particles
   are lit by spots within their cones but receive no point or spot shadows.
 - An object mirrored with a negative scale in Blender is drawn inside out (the editor and the

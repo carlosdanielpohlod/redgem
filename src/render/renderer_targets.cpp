@@ -68,6 +68,13 @@ RenderTexture2D load_target(int width, int height, int format, bool with_depth) 
   return target;
 }
 
+void unload_depth_target(RenderTexture2D& target) {
+  if (!loaded(target)) return;
+  rlUnloadTexture(target.depth.id);
+  rlUnloadFramebuffer(target.id);
+  target = RenderTexture2D{};
+}
+
 // A framebuffer with only a depth texture, which shaders sample (the sun's shadow map, what soft
 // particles fade into).
 RenderTexture2D load_depth_target(int width, int height) {
@@ -79,15 +86,9 @@ RenderTexture2D load_depth_target(int width, int height) {
   target.depth = load_depth_texture(target.id, width, height);
   const bool complete = rlFramebufferComplete(target.id);
   rlDisableFramebuffer();
-  if (!complete) throw std::runtime_error("cannot create a depth target");
-  return target;
-}
-
-void unload_depth_target(RenderTexture2D& target) {
-  if (!loaded(target)) return;
-  rlUnloadTexture(target.depth.id);
-  rlUnloadFramebuffer(target.id);
-  target = RenderTexture2D{};
+  if (complete) return target;
+  unload_depth_target(target);  // (a card that refuses it keeps nothing of it)
+  throw std::runtime_error("cannot create a depth target");
 }
 
 // A target that draws on another's depth (which stays that other's when it is unloaded).
