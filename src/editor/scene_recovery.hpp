@@ -35,6 +35,7 @@ class SceneRecovery {
  private:
   SceneRecoveryCopy* offered_copy(std::string& error) const;
   void prepare_copy(bool offer_archives, bool allow_live_offer);
+  void prepare_live_copy(const std::filesystem::path& copy, bool allow_live_offer);
   void begin_watch(const std::filesystem::path& source, bool offer_archives);
   bool poll_ready(SceneDocument& document, float seconds, std::string& error);
   bool retry_lease(bool clean);
@@ -44,6 +45,7 @@ class SceneRecovery {
   void persist_dismissal();
   bool save_or_report(SceneDocument& document, std::string& error);
   bool restore(SceneDocument& document, std::string& error);
+  void adopt_offer(const std::string& baseline);
   bool remove_copy(std::string& error);
   bool write(SceneDocument& document, std::string& error);
   durable::Flush flush_;

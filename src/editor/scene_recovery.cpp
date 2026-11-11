@@ -211,16 +211,23 @@ bool SceneRecovery::own(const fs::path& source) {
   if (result == RecoveryLease::Result::Busy) takeover_pending_ = true;
   return result == RecoveryLease::Result::Acquired;
 }
+void SceneRecovery::prepare_live_copy(const fs::path& copy, bool allow_live_offer) {
+  if (!fs::exists(fs::symlink_status(copy))) return;
+  preserve_live_ = ignored_sources_.count(source_) != 0 || dismissed_copy(source_);
+  if (preserve_live_) return;
+  const bool archive_live = takeover_pending_ || !allow_live_offer;
+  if (archive_live) {
+    archive_copy(source_);
+  } else {
+    offered_path_ = copy;
+  }
+}
 void SceneRecovery::prepare_copy(bool offer_archives, bool allow_live_offer) {
   const auto copy = copy_path(source_);
-  const bool exists = fs::exists(fs::symlink_status(copy));
   if (takeover_pending_) ignored_sources_.erase(source_);
-  preserve_live_ = exists && (ignored_sources_.count(source_) != 0 || dismissed_copy(source_));
-  const bool has_live = exists && !preserve_live_;
-  const bool archive_live = takeover_pending_ || !allow_live_offer;
-  if (has_live && archive_live) archive_copy(source_);
-  if (has_live && !archive_live) offered_path_ = copy;
-  if (!pending() && offer_archives) offered_path_ = next_archive(copy);
+  prepare_live_copy(copy, allow_live_offer);
+  const bool find_archive = !pending() && offer_archives;
+  if (find_archive) offered_path_ = next_archive(copy);
   takeover_pending_ = false;
   inspection_pending_ = false;
 }
@@ -300,10 +307,13 @@ bool SceneRecovery::restore(SceneDocument& document, std::string& error) {
     return false;
   }
   document = std::move(std::get<SceneDocument>(opened));
-  baseline_ = recovered_baseline;
+  adopt_offer(recovered_baseline);
+  return true;
+}
+void SceneRecovery::adopt_offer(const std::string& baseline) {
+  baseline_ = baseline;
   if (offered_path_ != copy_path(source_)) adopted_archive_ = std::move(offered_path_);
   offered_path_.clear();
-  return true;
 }
 bool SceneRecovery::recover(SceneDocument& document, std::string& error) {
   try {
