@@ -116,14 +116,20 @@ void read_physics(const nlohmann::json& json, GameManifest& manifest) {
   manifest.physics_warnings = std::move(reading.warnings);
 }
 
-}  // namespace
-
-GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
+// What a game that says nothing is: named after its folder, with the engine's window.
+GameManifest default_manifest(const std::filesystem::path& game_dir) {
   GameManifest manifest;
   manifest.settings.title = game_dir.filename().string();
   manifest.settings.window_width = config::kWindowWidth;
   manifest.settings.window_height = config::kWindowHeight;
   manifest.settings.display.resolution = {config::kWindowWidth, config::kWindowHeight};
+  return manifest;
+}
+
+}  // namespace
+
+GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
+  GameManifest manifest = default_manifest(game_dir);
   const nlohmann::json json = read_json_file(game_dir / kGameSettingsFile);
   if (!json.is_object()) return manifest;
   read_window(json, manifest.settings);
