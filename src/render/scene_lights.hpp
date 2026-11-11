@@ -29,7 +29,7 @@ struct PointLight {
   float range = 0.0f;
   bool spot = false;
   Vec3 axis = Vec3::zero();  // spots: the way their light travels (unit length)
-  SpotCone cone;
+  SpotCone cone{};
   float outer_cone = 0.0f;   // spots: radians from the axis to where the light is gone
   bool cast_shadow = false;  // prop `cast_shadow` on the light's object (off unless said)
 };

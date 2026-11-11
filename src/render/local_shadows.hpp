@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "core/math.hpp"
+#include "render/capture_views.hpp"  // kCubeFaces: the tiles of a point light's shadow
 #include "render/scene_lights.hpp"
 
 namespace redgem::render_math {
@@ -18,7 +19,6 @@ inline constexpr int kMaxLocalShadows = 4;          // MAX_LOCAL_SHADOWS in the 
 inline constexpr int kLocalShadowAtlasSize = 2048;  // texels along each side of the atlas
 inline constexpr int kLocalTilesAcross = 4;         // LOCAL_TILES_ACROSS in the lit shader
 inline constexpr int kLocalShadowTiles = kLocalTilesAcross * kLocalTilesAcross;
-inline constexpr int kCubeFaces = 6;              // the tiles of a point light's shadow
 inline constexpr int kSpotTiles = 1;              // the tiles of a spot light's shadow
 inline constexpr float kLocalShadowNear = 0.05f;  // meters from the light depth starts
 // Radians off its axis a spot's shadow reaches at most: a perspective view cannot open to a right
