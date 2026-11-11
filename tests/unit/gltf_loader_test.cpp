@@ -1,8 +1,14 @@
 #include <doctest/doctest.h>
 
 #include <algorithm>
+#include <filesystem>
+#include <nlohmann/json.hpp>
+#include <string>
 
+#include "editor/document/glb_file.hpp"
 #include "scene/gltf/gltf_loader.hpp"
+#include "scene/props.hpp"
+#include "scene/scene_ids.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -57,6 +63,39 @@ TEST_CASE("loads meshes, materials, camera and light") {
   REQUIRE(sun.light.has_value());
   CHECK(sun.light->type == LightType::Directional);
   CHECK(sun.light->intensity == doctest::Approx(3.0f));
+}
+
+TEST_CASE("a spot light's cones are read from the file, and a light's cast_shadow from its extras") {
+  constexpr float kInner = 0.25f;  // radians, as the file below says
+  constexpr float kOuter = 0.5f;
+  const std::filesystem::path file =
+      std::filesystem::temp_directory_path() / ("redgem-spot-" + make_scene_id() + ".glb");
+  GlbFile glb;
+  glb.json = nlohmann::json::parse(R"({
+    "asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0, 1]}],
+    "extensionsUsed": ["KHR_lights_punctual"],
+    "extensions": {"KHR_lights_punctual": {"lights": [
+      {"type": "spot", "spot": {"innerConeAngle": 0.25, "outerConeAngle": 0.5}},
+      {"type": "spot"}]}},
+    "nodes": [
+      {"name": "Spot", "extensions": {"KHR_lights_punctual": {"light": 0}}, "extras": {"cast_shadow": true}},
+      {"name": "Plain", "extensions": {"KHR_lights_punctual": {"light": 1}}}]})");
+  std::string error;
+  REQUIRE_MESSAGE(write_glb(file, glb, error), error);
+  const LoadResult result = load_gltf_scene(file.string());
+  std::filesystem::remove(file);
+  REQUIRE_MESSAGE(result.ok, result.error);
+  const NodeDesc& spot = result.scene.nodes[result.scene.find_node("Spot")];
+  REQUIRE(spot.light.has_value());
+  CHECK(spot.light->type == LightType::Spot);
+  CHECK(spot.light->inner_cone == doctest::Approx(kInner));
+  CHECK(spot.light->outer_cone == doctest::Approx(kOuter));
+  CHECK(get_bool(spot.props, props::kCastShadow) == true);
+  // Without cones in the file, glTF's: full strength nowhere but the axis, gone a quarter turn off.
+  const NodeDesc& plain = result.scene.nodes[result.scene.find_node("Plain")];
+  REQUIRE(plain.light.has_value());
+  CHECK(plain.light->inner_cone == doctest::Approx(0.0f));
+  CHECK(plain.light->outer_cone == doctest::Approx(kDefaultSpotOuterCone));
 }
 
 TEST_CASE("missing files report an error") {

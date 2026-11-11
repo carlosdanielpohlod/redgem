@@ -357,7 +357,7 @@ vec3 waterIrradiance() {
   for (int i = 0; i < pointLightCount; ++i) {
     float distance = length(pointLightPositions[i] - fragPosition);
     float window = clamp(1.0 - distance / pointLightRanges[i], 0.0, 1.0);
-    light += pointLightColors[i] * window * window / (distance * distance + LIGHT_FALLOFF_BIAS);
+    light += pointLightColors[i] * window * window / (distance * distance + LIGHT_FALLOFF_BIAS) * localReach(i, fragPosition, up);
   }
   return light;
 }
@@ -366,7 +366,8 @@ vec3 waterPointReflection(vec3 n, vec3 v, vec3 f0, float rough, int index) {
   float distance = length(toLight);
   float window = clamp(1.0 - distance / pointLightRanges[index], 0.0, 1.0);
   float falloff = window * window / (distance * distance + LIGHT_FALLOFF_BIAS);
-  return shade(n, v, toLight / max(distance, EPSILON), pointLightColors[index] * falloff * PI,
+  float reach = localReach(index, fragPosition, vec3(0.0, 1.0, 0.0));
+  return shade(n, v, toLight / max(distance, EPSILON), pointLightColors[index] * falloff * reach * PI,
     vec3(0.0), f0, rough, 1.0);
 }
 vec3 waterReflection(vec3 n, vec3 v, float rough) {

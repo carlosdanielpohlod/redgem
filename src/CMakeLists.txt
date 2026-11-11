@@ -439,6 +439,8 @@ redgem_add_library(redgem_runtime
   render/shader_source.cpp
   render/environment.cpp
   render/scene_lights.cpp
+  render/local_shadows.cpp
+  render/renderer_local_shadows.cpp
   render/gpu_select.cpp
   render/window.cpp
   render/display_settings.cpp

@@ -85,6 +85,10 @@ constexpr LitUniform kLitUniforms[] = {
     {&LitUniforms::point_positions, shaders::kPointLightPositions},
     {&LitUniforms::point_colors, shaders::kPointLightColors},
     {&LitUniforms::point_ranges, shaders::kPointLightRanges},
+    {&LitUniforms::point_spots, shaders::kPointLightSpots},
+    {&LitUniforms::local_shadow_map, shaders::kLocalShadowMap},
+    {&LitUniforms::local_shadow_count, shaders::kLocalShadowCount},
+    {&LitUniforms::local_shadows, shaders::kLocalShadows},
     {&LitUniforms::fog_color, shaders::kFogColor},
     {&LitUniforms::fog_density, shaders::kFogDensity},
     {&LitUniforms::time, shaders::kTime},
@@ -118,6 +122,7 @@ constexpr ParticleUniform kParticleUniforms[] = {
     {&ParticleUniforms::point_positions, shaders::kPointLightPositions},
     {&ParticleUniforms::point_colors, shaders::kPointLightColors},
     {&ParticleUniforms::point_ranges, shaders::kPointLightRanges},
+    {&ParticleUniforms::point_spots, shaders::kPointLightSpots},
 };
 
 // The motion pass's uniforms, and where each one's location is kept.

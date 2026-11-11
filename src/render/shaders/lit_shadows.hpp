@@ -136,4 +136,104 @@ float sunVisibility(vec3 position, vec3 n, vec3 toSun) {
 }
 )GLSL";
 
+// The part that knows the shadows of point and spot lights (see local_shadows.hpp): each looked up
+// in its tiles of one depth atlas, a spot's one tile down its cone, a point's six cube faces. The
+// views are worked out here the same way the renderer drew them, with no matrices sent. Distances
+// are compared in meters along the view, so the bias grows with a texel's size where it falls.
+inline constexpr const char* kLitLocalShadows = R"GLSL(
+const int MAX_LOCAL_SHADOWS = 4;        // render_math::kMaxLocalShadows
+const float LOCAL_TILES_ACROSS = 4.0;   // render_math::kLocalTilesAcross
+const float LOCAL_ATLAS_TEXELS = 2048.0; // render_math::kLocalShadowAtlasSize
+const float LOCAL_POLE = 0.99;          // render_math::kStraightUpOrDown: a view this straight up or down takes +Z as up
+const float LOCAL_NORMAL_OFFSET = 1.5;  // texels the lookup moves off the surface (prevents acne)
+const float LOCAL_SLOPE_BIAS = 1.0;     // texels of depth, times one more per meter the surface drops across
+const float LOCAL_MIN_BIAS = 0.01;      // meters
+const int LOCAL_KERNEL = 1;             // (2k+1)^2 taps, as the sun's filter
+const int LOCAL_TAPS_ACROSS = LOCAL_KERNEL + 1 + LOCAL_KERNEL;
+const float DEPTH_RANGE = 2.0;          // a depth of 0..1 is -1..1 in the view's clip space
+
+uniform sampler2D localShadowMap;              // the atlas: depth as each light's tiles see it
+uniform int localShadowCount;                  // the first lights cast these shadows, in order
+uniform vec4 localShadows[MAX_LOCAL_SHADOWS];  // first tile, spread (tangent of half the view; 0: a point light's cube), near, far
+
+// How a spot dims off its axis (`spot`: the axis times its cone's scale, and its offset), squared
+// as glTF's lights do. A point light's (0, 0, 0, 1) is 1 every way.
+float spotCone(vec4 spot, vec3 fromLight) {
+  float cone = clamp(dot(fromLight, spot.xyz) + spot.w, 0.0, 1.0);
+  return cone * cone;
+}
+
+vec3 localUp(vec3 forward) { return abs(forward.y) > LOCAL_POLE ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0); }
+
+// The face of a cube around a light that a direction from it falls on (+X, -X, +Y, -Y, +Z, -Z, as
+// render_math::cube_face), and where that face looks.
+float cubeFace(vec3 d, out vec3 forward) {
+  vec3 a = abs(d);
+  if (a.x >= a.y && a.x >= a.z) {
+    forward = vec3(d.x > 0.0 ? 1.0 : -1.0, 0.0, 0.0);
+    return d.x > 0.0 ? 0.0 : 1.0;
+  }
+  if (a.y >= a.z) {
+    forward = vec3(0.0, d.y > 0.0 ? 1.0 : -1.0, 0.0);
+    return d.y > 0.0 ? 2.0 : 3.0;
+  }
+  forward = vec3(0.0, 0.0, d.z > 0.0 ? 1.0 : -1.0);
+  return d.z > 0.0 ? 4.0 : 5.0;
+}
+
+// Meters along a view from the depth its tile holds (`near`, `far`: its clip planes).
+float localDistance(float depth, float near, float far) {
+  float z = depth * DEPTH_RANGE - 1.0;
+  return DEPTH_RANGE * near * far / (far + near - z * (far - near));
+}
+
+// Percentage-closer filtering within one tile (`corner`: its corner in the atlas).
+float localFiltered(vec2 uv, vec2 corner, float along, float near, float far) {
+  float texel = 1.0 / LOCAL_ATLAS_TEXELS;
+  vec2 low = corner + texel;
+  vec2 high = corner + 1.0 / LOCAL_TILES_ACROSS - texel;
+  float lit = 0.0;
+  for (int x = -LOCAL_KERNEL; x <= LOCAL_KERNEL; ++x) {
+    for (int y = -LOCAL_KERNEL; y <= LOCAL_KERNEL; ++y) {
+      float depth = texture(localShadowMap, clamp(uv + vec2(x, y) * texel, low, high)).r;
+      lit += along > localDistance(depth, near, far) ? 0.0 : 1.0;
+    }
+  }
+  return lit / float(LOCAL_TAPS_ACROSS * LOCAL_TAPS_ACROSS);
+}
+
+// How much of the light of shadow `slot` reaches a point: 1 = all of it, 0 = in its shadow.
+// `axis`: a spot's axis (any length). Outside a spot's view, everything is lit.
+float localVisibility(int slot, vec3 position, vec3 n, vec3 lightPosition, vec3 axis) {
+  vec4 view = localShadows[slot];
+  bool cube = view.y <= 0.0;
+  float spread = cube ? 1.0 : view.y;
+  float texelMeters = DEPTH_RANGE * max(length(position - lightPosition), view.z) * spread * LOCAL_TILES_ACROSS / LOCAL_ATLAS_TEXELS;
+  vec3 d = position + n * texelMeters * LOCAL_NORMAL_OFFSET - lightPosition;
+  // (A cube's face is chosen after the offset: the point looked up may have crossed to the next.)
+  vec3 forward = cube ? vec3(0.0, 0.0, 1.0) : normalize(axis);
+  float tile = view.x;
+  if (cube) tile += cubeFace(d, forward);
+  float along = dot(d, forward);
+  if (along <= view.z) return 1.0;
+  vec3 side = normalize(cross(forward, localUp(forward)));
+  vec2 seen = vec2(dot(d, side), dot(d, cross(side, forward))) / (along * spread);
+  if (max(abs(seen.x), abs(seen.y)) > 1.0) return 1.0;
+  vec2 corner = vec2(mod(tile, LOCAL_TILES_ACROSS), floor(tile / LOCAL_TILES_ACROSS)) / LOCAL_TILES_ACROSS;
+  vec2 uv = corner + (seen * HALF + HALF) / LOCAL_TILES_ACROSS;
+  // More on surfaces edge-on to the light, where a texel spans more depth (as the sun's).
+  float bias = max(texelMeters * LOCAL_SLOPE_BIAS * (1.0 + surfaceSlope(n, normalize(-d))), LOCAL_MIN_BIAS);
+  return localFiltered(uv, corner, along - bias, view.z, view.w);
+}
+
+// How much of point or spot light `i` reaches a point facing `n`: its cone, then its shadow (the
+// first lights cast the shadows, in order).
+float localReach(int i, vec3 position, vec3 n) {
+  vec3 fromLight = position - pointLightPositions[i];
+  float cone = spotCone(pointLightSpots[i], fromLight / max(length(fromLight), EPSILON));
+  if (i >= localShadowCount || cone <= 0.0) return cone;
+  return cone * localVisibility(i, position, n, pointLightPositions[i], pointLightSpots[i].xyz);
+}
+)GLSL";
+
 }  // namespace redgem::shaders

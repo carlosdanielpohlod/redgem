@@ -17,8 +17,8 @@ module Settings
   FPS_CAPS = [0, 30, 60, 120, 144].freeze  # 0: no cap
   NO_CAP = 0
   # What a custom quality may say (see Settings.quality_details).
-  QUALITY_DETAILS = %i[msaa antialias shadow_cascades shadow_distance scatter_density scatter_distance sky_detail
-                       ambient_occlusion bloom].freeze
+  QUALITY_DETAILS = %i[msaa antialias shadow_cascades shadow_distance local_shadows scatter_density
+                       scatter_distance sky_detail ambient_occlusion bloom].freeze
 
   # :windowed, :fullscreen (the monitor switched to the window's size) or :borderless (a window as
   # big as the monitor).

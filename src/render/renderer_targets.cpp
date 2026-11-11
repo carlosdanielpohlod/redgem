@@ -68,6 +68,13 @@ RenderTexture2D load_target(int width, int height, int format, bool with_depth) 
   return target;
 }
 
+void unload_depth_target(RenderTexture2D& target) {
+  if (!loaded(target)) return;
+  rlUnloadTexture(target.depth.id);
+  rlUnloadFramebuffer(target.id);
+  target = RenderTexture2D{};
+}
+
 // A framebuffer with only a depth texture, which shaders sample (the sun's shadow map, what soft
 // particles fade into).
 RenderTexture2D load_depth_target(int width, int height) {
@@ -79,15 +86,9 @@ RenderTexture2D load_depth_target(int width, int height) {
   target.depth = load_depth_texture(target.id, width, height);
   const bool complete = rlFramebufferComplete(target.id);
   rlDisableFramebuffer();
-  if (!complete) throw std::runtime_error("cannot create a depth target");
-  return target;
-}
-
-void unload_depth_target(RenderTexture2D& target) {
-  if (!loaded(target)) return;
-  rlUnloadTexture(target.depth.id);
-  rlUnloadFramebuffer(target.id);
-  target = RenderTexture2D{};
+  if (complete) return target;
+  unload_depth_target(target);  // (a card that refuses it keeps nothing of it)
+  throw std::runtime_error("cannot create a depth target");
 }
 
 // A target that draws on another's depth (which stays that other's when it is unloaded).
@@ -191,6 +192,18 @@ void Renderer::Impl::ensure_glow_target() {
   if (!loaded(glow)) glow = load_target_on(hdr.depth, kHdrFormat);
 }
 
+bool Renderer::Impl::ensure_local_shadow_atlas() {
+  if (loaded(local_shadow)) return true;
+  if (!gpu.local_shadows) return false;
+  try {
+    local_shadow = load_depth_target(render_math::kLocalShadowAtlasSize, render_math::kLocalShadowAtlasSize);
+  } catch (const std::runtime_error&) {
+    gpu.local_shadows = false;
+    log::warning("the graphics card cannot hold the shadows of point and spot lights: they are left out");
+  }
+  return loaded(local_shadow);
+}
+
 void Renderer::Impl::ensure_scene_depth_target() {
   if (!loaded(scene_depth)) scene_depth = load_depth_target(hdr.texture.width, hdr.texture.height);
 }
@@ -221,6 +234,7 @@ void Renderer::Impl::release_targets() {
 
 void Renderer::Impl::release_fixed_targets() {
   unload_depth_target(shadow);
+  unload_depth_target(local_shadow);
   for (RenderTexture2D* target : {&reflection_face, &panorama, &debug_output}) unload(*target);
 }
 

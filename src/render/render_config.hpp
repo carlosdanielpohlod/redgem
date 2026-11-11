@@ -16,6 +16,8 @@ inline constexpr int kMaxWindowSide = 16384;
 // --- Quality an environment may ask for ------------------------------------------
 inline constexpr int kMostSamples = 8;   // samples a pixel: what every desktop card holds (phones: 4)
 inline constexpr int kMostCascades = 4;  // pictures of the sun's shadow map (render_math::kMaxShadowCascades)
+// Point and spot lights that cast shadows in one frame (render_math::kMaxLocalShadows).
+inline constexpr int kMostLocalShadows = 4;
 
 // --- Cameras and lights ----------------------------------------------------------
 inline constexpr float kDefaultCameraDistance = 10.0f;

@@ -30,7 +30,8 @@ inline constexpr const char* kTint = "tint";
 // range, make a detailed one up close and a light one far away.
 inline constexpr const char* kVisibleFrom = "visible_from";
 inline constexpr const char* kVisibleTo = "visible_to";
-// False keeps an object out of the sun's shadows (a sky dome, a glow): it is still drawn.
+// False keeps an object out of the shadows (a sky dome, a glow): it is still drawn. On a point
+// or spot light, true makes it cast shadows (off unless said).
 inline constexpr const char* kCastShadow = "cast_shadow";
 // Whether wind sways an object's foliage (its textured see-through materials). Not said, it does
 // unless a skeleton moves the object (a character's hair follows its head, not the wind).
@@ -98,6 +99,8 @@ inline constexpr const char* kMsaa = "msaa";  // samples per pixel of the scene'
 inline constexpr const char* kShadowCascades = "shadow_cascades";
 inline constexpr const char* kShadowDistance = "shadow_distance";  // meters
 inline constexpr const char* kShadowSoftness = "shadow_softness";  // degrees across the sun
+// How many point and spot lights may cast shadows at once (those whose `cast_shadow` is on).
+inline constexpr const char* kLocalShadows = "local_shadows";
 // How edges are smoothed: kTemporalAntialias, or after the picture is drawn (anything else).
 inline constexpr const char* kAntialias = "antialias";
 inline constexpr const char* kTemporalAntialias =

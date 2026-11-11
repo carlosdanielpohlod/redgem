@@ -99,6 +99,7 @@ void Renderer::Impl::draw_shadow_map(const Camera3D& camera, const Environment& 
   send_shadow_strength(shader, lit_uniforms.shadows, strength);
   send_shadow_strength(particle_shader, particle_uniforms.shadows, strength);
   bind_for_the_frame(shader, lit_uniforms.shadows.map, kShadowTextureSlot, shadow.depth.id);
+  draw_local_shadows(to_vec3(camera.position));
 }
 
 // The scene's depth as the sun sees it, and the matrices that lead the lit shader into that view.

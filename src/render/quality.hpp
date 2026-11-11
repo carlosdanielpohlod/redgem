@@ -15,15 +15,16 @@ enum class QualityPreset { Low, Medium, High, Ultra, Custom };
 // The most a quality preset lets a level's environment ask for. A level gets what it asked for
 // or less, never more: shares multiply what it asked for, the others hold it under them.
 struct QualityCaps {
-  int msaa = config::kMostSamples;              // samples per pixel
-  bool temporal_antialias = true;               // edges smoothed with the frames before
-  int shadow_cascades = config::kMostCascades;  // pictures of the sun's shadow map
-  float shadow_distance = 1.0f;                 // share of the meters the level's shadows reach
-  float scatter_density = 1.0f;                 // share of a scattered set's copies that are drawn
-  float scatter_distance = 1.0f;                // share of how far away scattered copies are drawn
-  float sky_detail = 1.0f;                      // share of the sky picture's width, and of its light's
-  float ambient_occlusion = 1.0f;               // share of how dark creases get
-  float bloom = 1.0f;                           // share of the glow around bright things
+  int msaa = config::kMostSamples;                // samples per pixel
+  bool temporal_antialias = true;                 // edges smoothed with the frames before
+  int shadow_cascades = config::kMostCascades;    // pictures of the sun's shadow map
+  float shadow_distance = 1.0f;                   // share of the meters the level's shadows reach
+  int local_shadows = config::kMostLocalShadows;  // point and spot lights casting shadows (0: none)
+  float scatter_density = 1.0f;                   // share of a scattered set's copies that are drawn
+  float scatter_distance = 1.0f;                  // share of how far away scattered copies are drawn
+  float sky_detail = 1.0f;                        // share of the sky picture's width, and of its light's
+  float ambient_occlusion = 1.0f;                 // share of how dark creases get
+  float bloom = 1.0f;                             // share of the glow around bright things
 };
 
 bool operator==(const QualityCaps& a, const QualityCaps& b);

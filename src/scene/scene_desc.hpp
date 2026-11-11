@@ -135,11 +135,19 @@ struct CameraDesc {
 
 enum class LightType { Directional, Point, Spot };
 
+// A spot light's widest cone unless its file says (glTF KHR_lights_punctual: a quarter of a half
+// turn), in radians from its axis.
+inline constexpr float kDefaultSpotOuterCone = 0.7853981634f;
+
 struct LightDesc {
   LightType type = LightType::Directional;
   Color color;
   float intensity = 0.0f;
   float range = 0.0f;  // meters; 0 = not given (the renderer then uses its default range)
+  // Spot lights only, radians from the axis: full strength inside `inner_cone`, dimming smoothly
+  // to nothing at `outer_cone` (glTF innerConeAngle and outerConeAngle).
+  float inner_cone = 0.0f;
+  float outer_cone = kDefaultSpotOuterCone;
 };
 
 // A skeleton: the nodes that deform a skinned mesh.
