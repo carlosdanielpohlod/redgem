@@ -113,3 +113,41 @@ TEST_CASE("the lights of prefabs do not shine until they are spawned") {
   desc.nodes = {lamp, prefab_lamp};
   CHECK(scene_lights(Scene::from_desc(desc)).points.size() == kOneLamp);
 }
+
+TEST_CASE("a spot shines the way its object faces, within its cone; a point light every way") {
+  constexpr float kInner = 0.2f;  // radians
+  constexpr float kOuter = 0.4f;
+  SceneDesc desc;
+  NodeDesc spot = light_node(LightType::Spot, kLampWatts);
+  spot.local.rotation = quat_from_euler_degrees({kQuarterTurnDown, 0.0f, 0.0f});
+  spot.light->inner_cone = kInner;
+  spot.light->outer_cone = kOuter;
+  desc.nodes = {spot, light_node(LightType::Point, kLampWatts)};
+  const SceneLights lights = scene_lights(Scene::from_desc(desc));
+  REQUIRE(lights.points.size() == desc.nodes.size());
+  const PointLight& shining = lights.points[0];
+  CHECK(shining.spot);
+  CHECK(approx_equal(shining.axis, -Vec3::up(), kTolerance));
+  CHECK(shining.outer_cone == doctest::Approx(kOuter));
+  const SpotCone expected = spot_cone(kInner, kOuter);
+  CHECK(shining.cone.scale == doctest::Approx(expected.scale));
+  CHECK(shining.cone.offset == doctest::Approx(expected.offset));
+  CHECK_FALSE(lights.points[1].spot);
+  CHECK(lights.points[1].cone.scale == 0.0f);
+  CHECK(lights.points[1].cone.offset == 1.0f);
+}
+
+TEST_CASE("point and spot lights cast shadows only when their object says cast_shadow") {
+  SceneDesc desc;
+  NodeDesc casting = light_node(LightType::Spot, kLampWatts);
+  casting.props[props::kCastShadow] = true;
+  NodeDesc unsaid = light_node(LightType::Point, kLampWatts);
+  NodeDesc refusing = light_node(LightType::Point, kLampWatts);
+  refusing.props[props::kCastShadow] = false;
+  desc.nodes = {casting, unsaid, refusing};
+  const SceneLights lights = scene_lights(Scene::from_desc(desc));
+  REQUIRE(lights.points.size() == desc.nodes.size());
+  CHECK(lights.points[0].cast_shadow);
+  CHECK_FALSE(lights.points[1].cast_shadow);  // off unless said: existing scenes stay as fast
+  CHECK_FALSE(lights.points[2].cast_shadow);
+}

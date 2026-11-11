@@ -82,7 +82,7 @@ int held_fps_cap(int cap);
 //    "fps_cap": 60, "quality": "ultra", "volume": 1.0, "music_volume": 1.0, "effects_volume": 1.0,
 //    "voice_volume": 1.0,
 //    "custom_quality": {"msaa": 8, "antialias": true, "shadow_cascades": 4, "shadow_distance": 1.0,
-//                       "scatter_density": 1.0, "scatter_distance": 1.0, "sky_detail": 1.0,
+//                       "local_shadows": 4, "scatter_density": 1.0, "scatter_distance": 1.0, "sky_detail": 1.0,
 //                       "ambient_occlusion": 1.0, "bloom": 1.0}}
 nlohmann::json display_json(const DisplaySettings& display);
 // `base` with what `json` says in place of its own: whatever is missing, or is not what it should

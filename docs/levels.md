@@ -43,12 +43,25 @@ Environment in the editor, or a Blender empty) sets the mood through its propert
 | `antialias` | `"temporal"` smooths edges with the frames before (see "Large outdoor scenes"); anything else, the default, smooths them after the picture is drawn |
 | `shadow_cascades`, `shadow_distance` | sun shadows over a large area: 1 to 4 maps, each farther from the camera, reaching `shadow_distance` meters (150 unless given) |
 | `shadow_softness` | how wide the sun is, in degrees: shadows grow softer the farther they fall from what casts them (the real sun is about 0.5; 0, the default, keeps every edge equally soft) |
+| `local_shadows` | how many point and spot lights may cast shadows at once, 0 to 4 (4 unless given; the player's quality may allow fewer): of the lights whose `cast_shadow` is on, those that matter most to the camera |
 | `glow_limit` | the brightest glowing particles together make a pixel, in linear light (2 to 4 suits fire): many flames or sparks over each other come near it and keep their color instead of washing out to white (0, the default, sets no limit) |
 
-Without one, scenes get a clear day. Other things worth knowing: the 16 point lights nearest to the
-camera are used each frame (so a street can have dozens of lamps); the sun casts soft shadows
-around the camera; and materials use their glTF normal, roughness/metallic, occlusion and emission
-textures. A light's intensity and color can change while the game runs (see
+Without one, scenes get a clear day. Other things worth knowing: the 16 point and spot lights
+nearest to the camera are used each frame (so a street can have dozens of lamps); the sun casts
+soft shadows around the camera; and materials use their glTF normal, roughness/metallic, occlusion
+and emission textures.
+
+**Point and spot lights.** A spot light shines within its cone: full strength inside Blender's
+spot size minus its blend (glTF's inner cone), fading smoothly to nothing at the spot size (the
+outer cone). Point and spot lights cast no shadow unless their object has the custom property
+`cast_shadow = true` (in the editor: a toggle property of that name in the Inspector's
+properties). Then, of the lights that matter most to the camera, up to `local_shadows` (four
+unless the environment says fewer) cast shadows each frame: a spot one picture down its cone,
+a point light six (a cube around it), all 512 texels a side, filtered as the sun's. They cost a
+pass over the scene per picture, so give shadows to the few lights that need them (the torch in a
+corridor, the lamp over a table) rather than to every lamp. The player's quality caps them: ultra
+four, high two, medium one, low none; a graphics card that cannot hold them draws none. The
+objects whose `cast_shadow` is false stay out of these shadows too. A light's intensity and color can change while the game runs (see
 [Gameplay recipes](scripting/gameplay.md#light-that-flickers-and-fades)).
 
 ### See-through materials and wind
@@ -126,8 +139,10 @@ loop until a script says otherwise (see [Control animations](scripting/gameplay.
 **Per-object color.** The property `tint = "#rrggbb"` multiplies the colors of an object's mesh, so
 copies sharing one mesh (cars, crates) can each have their own color.
 
-**No shadow.** `cast_shadow = false` keeps an object out of the sun's shadows (a sky dome, a glow,
-a light's shade): it is still drawn and still receives shadows.
+**No shadow.** `cast_shadow = false` keeps an object out of the shadows (a sky dome, a glow, a
+light's shade): it is still drawn and still receives shadows. On a point or spot light the same
+property works the other way round: `cast_shadow = true` makes the light cast shadows (see "Point
+and spot lights").
 
 **Graphics card.** On laptops with two cards the engine asks for the dedicated one and logs which
 card it got. To choose: Edit > Graphics Card in the editor (saved in
@@ -270,13 +285,13 @@ regenerates a whole level from code; `tools/blender/scene_kit.py` has helpers to
 | `prefab_file` | `prefabs/crate.glb` | An empty object loads a [reusable object file](prefabs.md) at its placement |
 | `visible_from`, `visible_to` | meters                          | The object is drawn only while that far from the camera: give a model a detailed version up close and a light one far away |
 | `tint`     | `"#rrggbb"`                                    | Multiplies the colors of this object's mesh (copies sharing a mesh can differ) |
-| `cast_shadow` | `false`                                     | Keeps the object out of the sun's shadows (a sky dome) |
+| `cast_shadow` | `false` / `true`                            | `false` keeps the object out of the shadows (a sky dome); `true` on a point or spot light makes it cast shadows (off unless said) |
 | `sway`     | `true` / `false`                               | Whether the wind sways its foliage: unless said, yes, except on objects a skeleton moves (see "See-through materials and wind") |
 | `environment` | `true`                                      | This object's properties set the sky, fog and effects (see "Look of a scene") |
 | anything   | number / string / bool                         | Available in Ruby as `props[:name]` / `prop(:name, default)` |
 
-Cameras and lights (sun, point) are taken from the Blender scene. Spot lights are loaded but lit
-like point lights (in every direction). Parenting is preserved.
+Cameras and lights (sun, point, spot) are taken from the Blender scene; a spot shines within its
+cone. Parenting is preserved.
 
 **Vehicles.** Give the chassis `body = "vehicle"` and parent the wheel meshes to it with `wheel = true`.
 Wheels in front of the center (Blender `+Y`) steer, the rear ones get the hand brake, and every axle

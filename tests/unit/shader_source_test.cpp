@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "render/gpu_profile.hpp"
+#include "render/local_shadows.hpp"
 #include "render/shader_source.hpp"
 #include "render/shaders/ambient_occlusion.hpp"
 #include "render/shaders/antialias.hpp"
@@ -209,4 +210,15 @@ TEST_CASE("water normal filtering is fragment only and keeps vertex and motion g
   CHECK_FALSE(contains(shaders::motion_vertex(), shaders::kWaterFilter));
   CHECK(contains(shaders::lit_vertex(), shaders::kWaterWaves));
   CHECK(contains(shaders::motion_vertex(), shaders::kWaterWaves));
+}
+
+TEST_CASE("the lit shader's shadows of point and spot lights use the renderer's own numbers") {
+  const std::string lit = shaders::lit_fragment();
+  CHECK(contains(lit, "MAX_LOCAL_SHADOWS = " + std::to_string(render_math::kMaxLocalShadows) + ";"));
+  CHECK(contains(lit, "LOCAL_TILES_ACROSS = " + std::to_string(render_math::kLocalTilesAcross) + ".0;"));
+  CHECK(contains(lit, "LOCAL_ATLAS_TEXELS = " + std::to_string(render_math::kLocalShadowAtlasSize) + ".0;"));
+  CHECK(contains(lit, "LOCAL_POLE = 0.99;"));
+  CHECK(render_math::kStraightUpOrDown == doctest::Approx(0.99f));
+  CHECK(contains(lit, std::string("uniform vec4 ") + shaders::kPointLightSpots));
+  CHECK(contains(shaders::kParticleVertex, std::string("uniform vec4 ") + shaders::kPointLightSpots));
 }

@@ -32,7 +32,8 @@ the same pull request.
   before another transition is evaluated; there are no hierarchical trees or irregular two-dimensional point clouds.
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
-  fading does not affect the cast shadow silhouette; point lights do not cast shadows.
+  fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot
+  lights.
 - Grass and other `Scatter` copies stop at the base template's `visible_to`. Distance meshes
   can be supplied with `lods`, but simplified models and impostor atlases are not generated
   automatically. Beyond the final range the ground is still its texture alone.
@@ -60,8 +61,12 @@ the same pull request.
 - Images support PNG, JPEG and static WebP, at most 8192 pixels a side (a sky picture may also
   be Radiance `.hdr`). Animated WebP and KTX2/Basis textures are not read. WebP is decoded on the CPU and uploaded as
   ordinary pixels; it does not provide GPU texture compression.
-- Only the sun casts shadows: point and spot lights light through walls, and spot lights are lit
-  like point lights, in every direction (their cone is read but not used).
+- Point and spot lights cast shadows only when their object sets `cast_shadow = true`, at most
+  four a frame (fewer under lower quality presets), each in 512-texel tiles of one atlas: a large
+  room lit by one point light gets coarse shadow edges, and the filter does not blend across a
+  point light's cube faces, so a faint seam can show where two faces meet. Lights beyond the
+  budget, and every light on a card that cannot make the atlas, light through walls. Particles
+  are lit by spots within their cones but receive no point or spot shadows.
 - An object mirrored with a negative scale in Blender is drawn inside out (the editor and the
   command-line tools refuse negative scales).
 - Morph targets (shape keys) are not read: their weights and names are dropped. Animation keys
