@@ -639,6 +639,37 @@ TEST_CASE("editor recovery keeps archives in place until explicitly discarded") 
   CHECK(fs::exists(older));
 }
 
+TEST_CASE("a stale session dismissal does not overwrite a later editor's recovery") {
+  RecoveryGame game;
+  SceneRecovery waiting;
+  waiting.watch(game.source);
+  game.document.set_name(0, "Dismissed edit");
+  game.autosave(waiting);
+  waiting.ignore();
+  waiting.watch(game.folder / "other.glb");
+
+  auto owner = std::make_unique<SceneRecovery>();
+  owner->watch(game.source);
+  REQUIRE_FALSE(owner->pending());
+  game.document.set_name(0, "New writer's edit");
+  game.autosave(*owner);
+  const auto live = SceneRecovery::copy_path(game.source);
+  const auto previous = game.bytes(live);
+  waiting.watch(game.source, true);
+  REQUIRE_FALSE(waiting.problem().empty());
+  owner.reset();
+
+  game.document.set_name(0, "Waiting editor's edit");
+  game.autosave(waiting);
+  REQUIRE_FALSE(waiting.pending());
+  CHECK(game.bytes(live) != previous);
+  waiting.watch(game.source);
+  REQUIRE(waiting.discard(game.error));
+  waiting.watch(game.source, true);
+  REQUIRE(waiting.recover(game.document, game.error));
+  CHECK(game.document.node(0).name == "New writer's edit");
+}
+
 TEST_CASE("a clean lease takeover keeps recovery for the next open") {
   RecoveryGame game;
   auto owner = std::make_unique<SceneRecovery>();

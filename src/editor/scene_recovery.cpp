@@ -214,7 +214,8 @@ bool SceneRecovery::own(const fs::path& source) {
 void SceneRecovery::prepare_copy(bool offer_archives, bool allow_live_offer) {
   const auto copy = copy_path(source_);
   const bool exists = fs::exists(fs::symlink_status(copy));
-  preserve_live_ = ignored_sources_.count(source_) != 0 || (exists && dismissed_copy(source_));
+  if (takeover_pending_) ignored_sources_.erase(source_);
+  preserve_live_ = exists && (ignored_sources_.count(source_) != 0 || dismissed_copy(source_));
   const bool has_live = exists && !preserve_live_;
   const bool archive_live = takeover_pending_ || !allow_live_offer;
   if (has_live && archive_live) archive_copy(source_);
