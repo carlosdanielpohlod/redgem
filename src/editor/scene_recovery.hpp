@@ -41,6 +41,7 @@ class SceneRecovery {
   bool interval_due(float seconds);
   bool own(const std::filesystem::path& source);
   void reset_observation();
+  void persist_dismissal();
   bool save_or_report(SceneDocument& document, std::string& error);
   bool restore(SceneDocument& document, std::string& error);
   bool remove_copy(std::string& error);

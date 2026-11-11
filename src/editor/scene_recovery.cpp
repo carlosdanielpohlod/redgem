@@ -262,7 +262,9 @@ void SceneRecovery::ignore() {
   if (archive) return;
   ignored_sources_.insert(source_);
   const bool foreign_copy = !lease_.held() || takeover_pending_;
-  if (foreign_copy) return;
+  if (!foreign_copy) persist_dismissal();
+}
+void SceneRecovery::persist_dismissal() {
   try {
     const auto digest = fingerprint(copy_path(source_), recovery_format::kMaxBytes);
     require(digest.size() == kDigestBytes * kHexDigitsPerByte, "cannot fingerprint the ignored recovery copy");
