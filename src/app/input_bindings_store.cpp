@@ -5,8 +5,6 @@
 
 #include "app/game_settings.hpp"
 #include "app/json_file.hpp"
-#include "app/save_location.hpp"
-#include "core/platform.hpp"
 #include "input/input_config.hpp"
 #include "storage/durable_file.hpp"
 
@@ -15,7 +13,6 @@ namespace {
 
 constexpr const char* kInputKey = "input";  // game.json's section
 constexpr const char* kPadsKey = "pads";    // the bindings file's list, one entry per player
-constexpr const char* kBindingsFolder = "bindings";
 constexpr int kJsonIndent = 2;
 
 using Json = nlohmann::json;
@@ -31,10 +28,6 @@ InputMap read_game_input(const std::filesystem::path& game_dir, std::vector<std:
   const bool declares_input = game.is_object() && game.contains(kInputKey);
   if (!declares_input) return {};
   return input_map_from_json(game[kInputKey], problems);
-}
-
-std::filesystem::path bindings_file_for(const std::filesystem::path& game_dir) {
-  return game_file_in(platform::user_data_dir() / kBindingsFolder, game_dir);
 }
 
 void read_player_bindings(const std::filesystem::path& file, PlayerBindings& bindings) {

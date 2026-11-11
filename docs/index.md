@@ -34,7 +34,7 @@ A game is a folder:
 | `sounds/` | `.wav`, `.ogg`, `.mp3` or `.flac` files |
 | `images/` | Pictures for menus and the HUD (`.png`, `.jpg`) |
 | `locales/` | The texts players read, one translation file per language: `en.json`, `pt.json`... (see [Texts in several languages](scripting/i18n.md)) |
-| `game.json` | The game's id, title and window size |
+| `game.json` | The game's id, studio, title and window size |
 
 The editor reads and writes these files directly. There is no project database and no import
 step: what you see in the folder is the game.

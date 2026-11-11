@@ -19,6 +19,7 @@ namespace {
 // What game.json says.
 constexpr const char* kIdKey = "id";
 constexpr const char* kTitleKey = "title";
+constexpr const char* kStudioKey = "studio";
 constexpr const char* kWindowWidthKey = "window_width";
 constexpr const char* kWindowHeightKey = "window_height";
 constexpr const char* kFullscreenKey = "fullscreen";
@@ -59,9 +60,10 @@ std::string read_id(const nlohmann::json& json, std::string& id) {
          ": id must look like com.mystudio.mygame or my-game (small letters, digits, '.', '-' and '_')";
 }
 
-// The title and the window's size: each is used only when it is what it should be.
+// The title, the studio and the window's size: each is used only when it is what it should be.
 void read_window(const nlohmann::json& json, GameSettings& settings) {
   if (holds_text(json, kTitleKey)) settings.title = printable(json[kTitleKey].get<std::string>());
+  if (holds_text(json, kStudioKey)) settings.studio = printable(json[kStudioKey].get<std::string>());
   settings.window_width = window_size(json, kWindowWidthKey, settings.window_width);
   settings.window_height = window_size(json, kWindowHeightKey, settings.window_height);
 }
@@ -114,17 +116,24 @@ void read_physics(const nlohmann::json& json, GameManifest& manifest) {
   manifest.physics_warnings = std::move(reading.warnings);
 }
 
-}  // namespace
-
-GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
+// What a game that says nothing is: named after its folder, with the engine's window.
+GameManifest default_manifest(const std::filesystem::path& game_dir) {
   GameManifest manifest;
   manifest.settings.title = game_dir.filename().string();
   manifest.settings.window_width = config::kWindowWidth;
   manifest.settings.window_height = config::kWindowHeight;
   manifest.settings.display.resolution = {config::kWindowWidth, config::kWindowHeight};
+  return manifest;
+}
+
+}  // namespace
+
+GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
+  GameManifest manifest = default_manifest(game_dir);
   const nlohmann::json json = read_json_file(game_dir / kGameSettingsFile);
   if (!json.is_object()) return manifest;
   read_window(json, manifest.settings);
+  manifest.title_given = holds_text(json, kTitleKey);
   read_display(json, manifest.settings);
   manifest.id_error = read_id(json, manifest.settings.id);
   manifest.android_error = read_android_section(json, manifest.settings.android);
@@ -148,6 +157,7 @@ bool write_game_settings(const std::filesystem::path& game_dir, const GameSettin
   nlohmann::json json = read_json_file(game_dir / kGameSettingsFile);
   if (!json.is_object()) json = nlohmann::json::object();
   if (!settings.id.empty()) json[kIdKey] = settings.id;
+  if (!settings.studio.empty()) json[kStudioKey] = settings.studio;
   json[kTitleKey] = settings.title;
   json[kWindowWidthKey] = settings.window_width;
   json[kWindowHeightKey] = settings.window_height;

@@ -7,6 +7,7 @@
 #include <array>
 #include <utility>
 
+#include "app/game_data_location.hpp"
 #include "app/game_settings.hpp"
 #include "core/config.hpp"
 #include "core/files.hpp"
@@ -15,6 +16,7 @@
 #include "core/safe_path.hpp"
 #include "core/translations.hpp"
 #include "project/build_steps.hpp"
+#include "project/game_templates.hpp"
 #include "project/icons/exe_icon.hpp"
 #include "project/icons/icon_set.hpp"
 
@@ -127,6 +129,17 @@ bool script_calls_network(const std::filesystem::path& file) {
   return text && calls_network(*text);
 }
 
+// Whether game.json names the folder the game's players keep their data in: a title, and a studio
+// that is not the one every new game starts with.
+bool names_its_data_folder(const GameManifest& manifest) {
+  const std::string& studio = manifest.settings.studio;
+  return manifest.title_given && !studio.empty() && studio != kNewGameStudio;
+}
+
+void warn_of_unnamed_data_folder(const std::filesystem::path& game_dir) {
+  log::warning(tr("project.build.unnamed_data_folder", {{"folder", game_data_subfolder(game_dir).generic_u8string()}}));
+}
+
 }  // namespace
 
 std::optional<BuildIdentity> build_identity(const std::filesystem::path& game_dir, std::string& error) {
@@ -138,6 +151,7 @@ std::optional<BuildIdentity> build_identity(const std::filesystem::path& game_di
   const GameIdentityReading reading = read_game_identity(game_dir);
   error = reading.error;
   if (!error.empty()) return std::nullopt;
+  if (!names_its_data_folder(manifest)) warn_of_unnamed_data_folder(game_dir);
   BuildIdentity identity{manifest.settings.title, manifest.settings.id, reading.identity, {}};
   if (!find_icon(game_dir, identity, error)) return std::nullopt;
   return identity;

@@ -7,9 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "app/game_data_location.hpp"
 #include "app/input_bindings_store.hpp"
-#include "app/save_location.hpp"
-#include "core/platform.hpp"
 
 using namespace redgem;
 
@@ -53,15 +52,13 @@ TEST_CASE("a game declares actions in game.json's input section") {
   CHECK(problems.empty());
 }
 
-TEST_CASE("a game's players keep their bindings named as its save is: by its id, else by its folder") {
+TEST_CASE("a game's players keep their bindings beside its save, in the game's own folder") {
   const TempFolder game;
-  const std::filesystem::path bindings = platform::user_data_dir() / "bindings";
-  CHECK(bindings_file_for(game.dir) == game_file_in(bindings, game.dir));
-  CHECK(bindings_file_for(game.dir).parent_path() == bindings);
-  CHECK(bindings_file_for(game.dir).filename().string().rfind(game.dir.filename().string(), 0) == 0);
-  CHECK(save_file_for(game.dir) == game_file_in(saves_folder(), game.dir));
-  game.write("game.json", R"({"id": "com.studio.racer"})");
-  CHECK(bindings_file_for(game.dir) == bindings / "by-id" / "com.studio.racer.json");
+  game.write("game.json", R"({"studio": "Pine Hill", "title": "Racer"})");
+  const GameDataFiles files = game_data_files(players_data_folder(game.dir));
+  CHECK(files.bindings.parent_path() == files.save.parent_path());
+  CHECK(files.bindings.parent_path() == players_data_folder(game.dir));
+  CHECK(files.bindings.filename() == "bindings.json");
 }
 
 TEST_CASE("what players bound is written and read back, player by player") {

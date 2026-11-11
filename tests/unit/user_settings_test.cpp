@@ -10,6 +10,26 @@
 
 using namespace redgem;
 
+namespace {
+
+constexpr int kWideWidth = 1280;
+constexpr int kWideHeight = 720;
+constexpr const char* kGpuVariable = "REDGEM_GPU";
+
+// No REDGEM_GPU for the life of the object (an empty one says nothing), what it held put back.
+class NoGpuVariable {
+ public:
+  NoGpuVariable() : before_(platform::environment(kGpuVariable)) { platform::set_environment(kGpuVariable, "", true); }
+  ~NoGpuVariable() { platform::set_environment(kGpuVariable, before_, true); }
+  NoGpuVariable(const NoGpuVariable&) = delete;
+  NoGpuVariable& operator=(const NoGpuVariable&) = delete;
+
+ private:
+  std::string before_;
+};
+
+}  // namespace
+
 TEST_CASE("the user's settings are a file of the user's RedGem folder") {
   CHECK(user_settings_file() == platform::user_data_dir() / "settings.json");
 }
@@ -50,32 +70,47 @@ TEST_CASE("settings are saved and read back; broken files give the defaults") {
   std::filesystem::remove_all(dir);
 }
 
-TEST_CASE("each game's display settings are kept by its key, apart from the others' and the user's own") {
+TEST_CASE("a game's display settings are kept in its own settings file, beside its player's card and language") {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_display_settings_test";
   std::filesystem::remove_all(dir);
   const std::filesystem::path file = dir / "settings.json";
   DisplaySettings defaults;
-  defaults.resolution = {1280, 720};
-  CHECK(read_game_display(file, "com.studio.one", defaults).resolution == defaults.resolution);  // no file yet
+  defaults.resolution = {kWideWidth, kWideHeight};
+  CHECK(read_game_display(file, defaults).resolution == defaults.resolution);  // no file yet
   DisplaySettings chosen = defaults;
   chosen.mode = WindowMode::Borderless;
   chosen.quality = QualityPreset::Low;
   std::string error;
-  REQUIRE_MESSAGE(write_game_display(file, "com.studio.one", chosen, error), error);
+  REQUIRE_MESSAGE(write_game_display(file, chosen, error), error);
   UserSettings user;
   user.gpu = GpuChoice::Integrated;
-  REQUIRE_MESSAGE(write_user_settings(file, user, error), error);  // (the games' settings stay)
-  REQUIRE_MESSAGE(write_game_display(file, "folder:two-1234", defaults, error), error);
-  const DisplaySettings one = read_game_display(file, "com.studio.one", defaults);
-  CHECK(one.mode == WindowMode::Borderless);
-  CHECK(one.quality == QualityPreset::Low);
-  CHECK(read_game_display(file, "folder:two-1234", defaults).mode == WindowMode::Windowed);
-  CHECK(read_game_display(file, "com.studio.three", defaults).quality == QualityPreset::Ultra);
+  REQUIRE_MESSAGE(write_user_settings(file, user, error), error);  // (the display stays)
+  const DisplaySettings kept = read_game_display(file, defaults);
+  CHECK(kept.mode == WindowMode::Borderless);
+  CHECK(kept.quality == QualityPreset::Low);
   CHECK(read_user_settings(file).gpu == GpuChoice::Integrated);
-  std::ofstream(file) << R"({"games": "broken"})";
-  CHECK(read_game_display(file, "com.studio.one", defaults).mode == WindowMode::Windowed);
-  REQUIRE_MESSAGE(write_game_display(file, "com.studio.one", chosen, error), error);
-  CHECK(read_game_display(file, "com.studio.one", defaults).mode == WindowMode::Borderless);
+  std::ofstream(file) << R"({"display": "broken"})";
+  CHECK(read_game_display(file, defaults).mode == WindowMode::Windowed);
+  REQUIRE_MESSAGE(write_game_display(file, chosen, error), error);
+  CHECK(read_game_display(file, defaults).mode == WindowMode::Borderless);
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("a built game's card and language come from its own settings file") {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "redgem_game_run_settings_test";
+  std::filesystem::remove_all(dir);
+  const std::filesystem::path file = dir / "settings.json";
+  UserSettings chosen;
+  chosen.gpu = GpuChoice::Integrated;
+  chosen.language = "pt";
+  std::string error;
+  REQUIRE_MESSAGE(write_user_settings(file, chosen, error), error);
+  CHECK(language_for_run(file) == "pt");
+  CHECK(gpu_choice_for_run(std::string("dedicated"), file) == GpuChoice::Dedicated);  // the command line first
+  {
+    const NoGpuVariable no_variable;
+    CHECK(gpu_choice_for_run(std::nullopt, file) == GpuChoice::Integrated);
+  }
   std::filesystem::remove_all(dir);
 }
 
@@ -98,11 +133,11 @@ TEST_CASE("a damaged settings file is moved aside, not written over, and the set
   DisplaySettings chosen;
   chosen.quality = QualityPreset::High;
   std::string error;
-  REQUIRE_MESSAGE(write_game_display(file, "com.studio.one", chosen, error), error);
+  REQUIRE_MESSAGE(write_game_display(file, chosen, error), error);
   const std::filesystem::path aside = dir / "settings.json.damaged";
   REQUIRE(std::filesystem::exists(aside));
   CHECK(text_of(aside) == R"({"gpu": "integrated", "games": {)");
-  CHECK(read_game_display(file, "com.studio.one", DisplaySettings{}).quality == QualityPreset::High);
+  CHECK(read_game_display(file, DisplaySettings{}).quality == QualityPreset::High);
   CHECK_FALSE(std::filesystem::exists(dir / "settings.json.part"));  // written whole, through a file beside it
   std::filesystem::remove_all(dir);
 }

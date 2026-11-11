@@ -8,17 +8,12 @@
 #include "input/player_bindings.hpp"
 
 // A game's actions and axes as its game.json declares them, and the bindings its players chose,
-// kept between runs in the user's RedGem folder.
+// kept between runs in the game's own folder (bindings.json, see app/game_data_location.hpp).
 namespace redgem {
 
 // What the "input" section of a game's game.json declares (nothing when it has none). What it
 // gets wrong is left out and said in `problems`.
 InputMap read_game_input(const std::filesystem::path& game_dir, std::vector<std::string>& problems);
-
-// Where the players of a game keep their bindings: in bindings/ of the user's RedGem folder,
-// named as the game's save is (by-id/<game id>.json, or after the game's folder for a game with
-// no id), so that they follow the game as its save does.
-std::filesystem::path bindings_file_for(const std::filesystem::path& game_dir);
 
 // Gives `bindings` the players' changes a file keeps. A missing or broken file keeps none: every
 // player starts with the game's bindings.

@@ -247,6 +247,7 @@ int play(WindowPresenter& window, InputSource& input, const GameWindowOptions& o
   game.audio = audio.get();
   game.display = window.shown();
   game.display_kept_in = options.display_kept_in;
+  game.data_folder = options.data_folder;
   const int status = Engine::create(game, std::move(scene))->run();
   return window.recording_failed() ? kExitFailure : status;
 }

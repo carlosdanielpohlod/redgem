@@ -128,6 +128,27 @@ TEST_CASE("saving the settings keeps the game's id, and writes one given to a ga
   std::filesystem::remove_all(plain.parent_path());
 }
 
+TEST_CASE("a game says its studio in game.json, as text that cannot drive a terminal; one that does not has none") {
+  CHECK(read_game_settings(game_saying("")).studio.empty());
+  CHECK(read_game_settings(game_saying(R"({"studio": "Pine Hill"})")).studio == "Pine Hill");
+  CHECK(read_game_settings(game_saying(R"({"studio": 7})")).studio.empty());
+  CHECK(read_game_settings(game_saying("{\"studio\": \"Pine\\u001b[2JHill\"}")).studio == "Pine?[2JHill");
+  std::filesystem::remove_all(game_saying("").parent_path());
+}
+
+TEST_CASE("saving the settings writes the studio, and leaves the file's alone when they carry none") {
+  const std::filesystem::path game = game_saying(R"({"title": "Coins!"})");
+  GameSettings settings = read_game_settings(game);
+  settings.studio = "Pine Hill";
+  std::string error;
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  CHECK(read_game_settings(game).studio == "Pine Hill");
+  settings.studio.clear();
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  CHECK(read_game_settings(game).studio == "Pine Hill");
+  std::filesystem::remove_all(game.parent_path());
+}
+
 TEST_CASE("game.json says how the game is shown until its player chooses otherwise") {
   const GameSettings plain = read_game_settings(game_saying(R"({"window_width": 800, "window_height": 450})"));
   CHECK(plain.display.resolution == SurfaceSize{kWidth, kHeight});

@@ -150,6 +150,7 @@ TEST_CASE("every template creates a game that loads and whose scripts compile") 
     }
     CHECK(scripts > 0);
     CHECK(read_game_settings(dir).title == dir.filename().string());
+    CHECK(read_game_settings(dir).studio == kNewGameStudio);
     test::LogCapture quiet;
     auto engine = play_headless(dir);
     engine->frame(config::kFixedDeltaSeconds);

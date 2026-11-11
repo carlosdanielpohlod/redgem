@@ -138,8 +138,8 @@ Input.reset_bindings(:jump)                   # back to the game's, for every pl
 Input.reset_bindings(pad: 1)                  # all of the second player's, back to the game's
 ```
 
-What players bind is kept between runs in the user's RedGem folder, under `bindings/`, named as
-the game's save is (`by-id/<game id>.json`, or after the game's folder for a game with no `id`).
+What players bind is kept between runs in `bindings.json`, beside the game's save (see
+[Save progress](#save-progress)).
 It is written at the end of the frame in which it changed, once however many calls changed it,
 and not at all when it ends up as the file already says. A player binds an axis' keys and
 buttons only: its stick, and whether the stick is inverted, are always the game's, so a game's
@@ -916,11 +916,28 @@ Save.clear                            # start from nothing
 Whole numbers come back as integers (a saved `12.0` is read as `12`): call `.to_f` on a value you
 divide.
 
-The file is written on every change, to `.config/redgem/saves/by-id/<id>.json` in the player's
-home folder, where `<id>` is the game's `id` from its `game.json`: the save stays with the game
-when its folder is moved or renamed. A game with no `id` saves to
-`.config/redgem/saves/<folder>-<digits>.json`, with digits made from where its folder is. Tests
-get a save file of their own, empty at the start of each test.
+The file is written on every change, to `save.json` in the game's own folder, named after the
+`studio` and `title` of its `game.json`, where the player's system keeps what programs remember:
+
+```
+Linux     ~/.local/share/<studio>/<title>/save.json   ($XDG_DATA_HOME/<studio>/<title> when set)
+Windows   %APPDATA%\<studio>\<title>\save.json
+macOS     ~/Library/Application Support/<studio>/<title>/save.json
+Android   the app's own files folder
+```
+
+The save stays with the game when its folder is moved or renamed, and is the same for every
+version of it for as long as the studio and the title are. Change either and the game starts
+with no save, in a new folder; nothing is moved. The game's folder also holds what its player
+chose in its settings (`settings.json`), the keys its players bound (`bindings.json`) and the
+reports of its crashes (`crashes/`). A game that names no studio is kept under `RedGem Games`;
+letters a folder's name cannot hold (`/ \ : * ? " < > |`) become `_`.
+
+Only the built game uses that folder. When you play the game in the editor or with
+`redgem play`, it saves to `game-data/<studio>/<title>/` in your RedGem folder (`~/.config/redgem`
+on Linux and Windows, `~/Library/Application Support/RedGem` on the Mac), so your test runs never
+touch your own progress as a player. Tests get a save file of their own, in `test-saves/`, empty
+at the start of each test.
 
 Each change is flushed to the disk before it replaces the file, and the save before it is kept
 beside it as `<name>.json.bak`, written the same way. A save found damaged (cut short by a crash

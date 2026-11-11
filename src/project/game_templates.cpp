@@ -71,10 +71,11 @@ bool write_template_files(const std::filesystem::path& game_dir, const std::map<
   return true;
 }
 
-// The game says what it is called and what it is known by, in its game.json.
+// The game says what it is called, who makes it and what it is known by, in its game.json.
 bool name_game(const std::filesystem::path& game_dir, std::string& error) {
   GameSettings settings = read_game_settings(game_dir);
   settings.title = normalized_folder(game_dir).filename().string();
+  if (settings.studio.empty()) settings.studio = kNewGameStudio;
   settings.id = new_game_id(settings.title);
   return write_game_settings(game_dir, settings, error);
 }

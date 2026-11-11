@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "app/android/android_bundle.hpp"
+#include "app/game_data_location.hpp"
 #include "app/user_settings.hpp"
 #include "app/window_presenter.hpp"
 #include "app/bundled_game.hpp"
@@ -34,8 +35,9 @@ namespace {
 
 using namespace redgem;
 
-// Where saves and settings are kept inside the app's own storage (where they have always been:
-// moving them would lose the saves of the games already installed).
+// Where what the engine keeps of its own (not of the game's) goes inside the app's storage. The
+// game's save, settings, bindings and crash reports are kept in the storage itself, the app being
+// the game (see app/game_data_location.hpp).
 constexpr const char* kUserDataFolder = ".config/redgem";
 constexpr std::size_t kCopyChunkBytes = 64 * 1024;
 constexpr std::size_t kLanguageLetters = 2;  // of the language and the country the phone is set to ("pt", "BR")
@@ -139,7 +141,8 @@ int play_unpacked_game(const android_app* app) {
   GameWindowOptions options;
   options.game_dir = kBundledGameFolder;
   options.screen_aspect = screen_aspect(app);
-  const PlayerDisplay display = player_display(options.game_dir, user_settings_file());
+  options.data_folder = players_data_folder(options.game_dir);
+  const PlayerDisplay display = player_display(options.game_dir, game_data_files(options.data_folder).settings);
   options.display = display.display;
   options.display_kept_in = display.kept_in;
   const RaylibInputSource devices;
@@ -152,8 +155,9 @@ int play_unpacked_game(const android_app* app) {
 int main(int, char**) {
   const android_app* app = GetAndroidApp();
   const std::filesystem::path home = app->activity->internalDataPath;
-  // Saves and settings live in the app's storage: the platform layer is told where.
+  // The game's data lives in the app's storage: the engine is told where.
   platform::set_user_data_dir(home / kUserDataFolder);
+  set_players_data_folder(home);
   // The game is played from a path relative to the app's storage ("game"), with that storage as
   // the working folder. It cannot be an absolute path: raylib opens every file it loads on Android
   // (pictures, sounds, music) through its own fopen, which first looks in the APK's assets and

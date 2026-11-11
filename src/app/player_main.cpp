@@ -9,6 +9,7 @@
 
 #include "app/bundled_game.hpp"
 #include "app/crash_report.hpp"
+#include "app/game_data_location.hpp"
 #include "app/game_texts.hpp"
 #include "app/user_settings.hpp"
 #include "app/window_presenter.hpp"
@@ -20,20 +21,23 @@
 
 namespace {
 
-// The window of the player's own run: the one that keeps what the player chooses.
-redgem::GameWindowOptions players_window(const std::filesystem::path& game) {
+// The window of the player's own run: the one that keeps what the player chooses, in the players'
+// folder of the game (see app/game_data_location.hpp), and reads nothing of RedGem's own.
+redgem::GameWindowOptions players_window(const std::filesystem::path& game, const std::filesystem::path& data) {
   using namespace redgem;
+  const GameDataFiles files = game_data_files(data);
   GameWindowOptions options;
   options.game_dir = game;
-  options.gpu = gpu_choice_for_run(std::nullopt);
-  const PlayerDisplay display = player_display(game, user_settings_file());
+  options.data_folder = data;
+  options.gpu = gpu_choice_for_run(std::nullopt, files.settings);
+  const PlayerDisplay display = player_display(game, files.settings);
   options.display = display.display;
   options.display_kept_in = display.kept_in;
   return options;
 }
 
 // Plays the game beside `program`; an error when there is none. From the moment the game is
-// found, a crash writes a report beside its save (see app/crash_report.hpp).
+// found, a crash writes a report in the game's folder (see app/crash_report.hpp).
 int play_game_beside(const std::filesystem::path& program) {
   using namespace redgem;
   const auto game = bundled_game(program);
@@ -42,8 +46,10 @@ int play_game_beside(const std::filesystem::path& program) {
     log::error("no game to play: " + expected.string() + " is missing");
     return kExitFailure;
   }
-  crash::install_crash_handling({*game});
-  return play_in_window(players_window(*game));
+  const std::filesystem::path data = players_data_folder(*game);
+  translations::use_language(language_for_run(game_data_files(data).settings));
+  crash::install_crash_handling({*game, data, true});
+  return play_in_window(players_window(*game, data));
 }
 
 }  // namespace
@@ -51,7 +57,6 @@ int play_game_beside(const std::filesystem::path& program) {
 int main(int, char**) {
   try {
     redgem::add_game_texts();
-    redgem::translations::use_language(redgem::language_for_run());
     return play_game_beside(redgem::platform::executable_path());
   } catch (const std::bad_alloc&) {
     return redgem::crash::end_out_of_memory();

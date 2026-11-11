@@ -10,7 +10,7 @@
 
 #include "app/game_identity.hpp"
 #include "app/input_bindings_store.hpp"
-#include "app/save_location.hpp"
+#include "app/game_data_location.hpp"
 #include "app/scene_bodies.hpp"
 #include "app/scene_water.hpp"
 #include "app/scene_files.hpp"
@@ -24,12 +24,9 @@
 namespace redgem {
 namespace {
 
-// What follows the word that a game's id cannot be used.
-constexpr const char* kSavedByFolderNote = ". Until it is put right, the game's save goes by where its folder is";
-
 // What game.json says that cannot be used, and what the game does instead.
 void warn_of_unusable(const GameManifest& manifest) {
-  if (!manifest.id_error.empty()) log::warning(manifest.id_error + kSavedByFolderNote);
+  if (!manifest.id_error.empty()) log::warning(manifest.id_error);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
   for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
 }
@@ -39,6 +36,12 @@ void warn_of_unusable(const GameManifest& manifest) {
 bool has_scene_file(const std::filesystem::path& game_dir, const std::string& name) {
   std::error_code fs_error;
   return safe_scene_name(name) && std::filesystem::exists(scene_file(game_dir, name), fs_error);
+}
+
+// The files a game keeps in the folder its engine was given: the developer's when it was given none.
+GameDataFiles kept_files(const EngineOptions& options) {
+  const bool given = !options.data_folder.empty();
+  return game_data_files(given ? options.data_folder : developer_data_folder(options.game_dir));
 }
 
 }  // namespace
@@ -172,8 +175,7 @@ void Engine::open_saves() {
     save_ = std::make_unique<SaveFile>();
     return;
   }
-  save_ =
-      std::make_unique<SaveFile>(options_.save_file.empty() ? save_file_for(options_.game_dir) : options_.save_file);
+  save_ = std::make_unique<SaveFile>(options_.save_file.empty() ? kept_files(options_).save : options_.save_file);
 }
 
 void Engine::open_player_choices(const GameSettings& settings) {
@@ -193,7 +195,7 @@ void Engine::open_bindings() {
 std::filesystem::path Engine::chosen_bindings_file() const {
   if (!options_.bindings_file.empty()) return options_.bindings_file;
   if (serves_a_room()) return {};  // (a room has no players of its own)
-  return bindings_file_for(options_.game_dir);
+  return kept_files(options_).bindings;
 }
 
 void Engine::keep_bindings() {

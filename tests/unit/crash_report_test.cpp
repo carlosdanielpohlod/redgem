@@ -3,10 +3,13 @@
 #include <csignal>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 #include "app/crash_report.hpp"
 #include "app/crash_text.hpp"
+#include "app/game_data_location.hpp"
 
 using namespace redgem;
 using namespace redgem::crash;
@@ -74,10 +77,16 @@ TEST_CASE("a report with no backtrace says why") {
   CHECK(format_crash_report(facts).find("Backtrace:\n  (none: the stack had already unwound)\n") != std::string::npos);
 }
 
-TEST_CASE("crash reports go beside the game's save, named after it and after the moment") {
-  const std::filesystem::path save = std::filesystem::path("data") / "saves" / "by-id" / "com.studio.arena.json";
-  CHECK(crash_folder_for(save) == std::filesystem::path("data") / "saves" / "by-id" / "com.studio.arena-crashes");
+TEST_CASE("crash reports go in the crashes folder beside the game's save, named after the moment") {
+  const std::filesystem::path game = std::filesystem::temp_directory_path() / "redgem-crash-folder-test";
+  std::filesystem::create_directories(game);
+  std::ofstream(game / "game.json") << R"({"studio": "Pine Hill", "title": "Arena"})";
+  const GameDataFiles files = game_data_files(players_data_folder(game));
+  CHECK(crash_folder_for({game, {}, false}) == files.crashes);
+  CHECK(crash_folder_for({game, {}, false}).parent_path() == files.save.parent_path());
+  CHECK(crash_folder_for({game, "elsewhere", false}) == std::filesystem::path("elsewhere") / "crashes");
   CHECK(crash_file_name(kSomeAfternoon) == "crash-20261024-130509.log");
+  std::filesystem::remove_all(game);
 }
 
 TEST_CASE("fatal signals are named in reports") {

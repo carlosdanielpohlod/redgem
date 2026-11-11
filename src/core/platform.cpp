@@ -69,9 +69,19 @@ std::string environment(const std::string& name) {
   return value != nullptr ? value : "";
 }
 
+#ifdef _WIN32
+std::filesystem::path environment_path(const std::string& name) {
+  const std::wstring wide_name(name.begin(), name.end());  // (the names of variables are ASCII)
+  const wchar_t* value = _wgetenv(wide_name.c_str());
+  return value != nullptr ? std::filesystem::path(value) : std::filesystem::path();
+}
+#else
+std::filesystem::path environment_path(const std::string& name) { return environment(name); }
+#endif
+
 std::filesystem::path home_dir() {
-  const std::string home = environment(kHomeVariable);
-  return home.empty() ? std::filesystem::temp_directory_path() : std::filesystem::path(home);
+  const std::filesystem::path home = environment_path(kHomeVariable);
+  return home.empty() ? std::filesystem::temp_directory_path() : home;
 }
 
 void set_environment(const std::string& name, const std::string& value, bool overwrite) {

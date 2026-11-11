@@ -8,11 +8,10 @@
 
 namespace redgem {
 
-// Where a player's display settings are kept between runs: a settings file, under the game's key
-// (see game_settings_key).
+// Where a player's display settings are kept between runs: the game's own settings file (see
+// app/game_data_location.hpp).
 struct DisplayKeeping {
   std::filesystem::path file;
-  std::string game_key;
 };
 
 // How a player shows a game, and where that is kept.

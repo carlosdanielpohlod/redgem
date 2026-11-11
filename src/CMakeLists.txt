@@ -159,6 +159,7 @@ redgem_add_library(redgem_core
   core/files.cpp
   core/command_line.cpp
   core/names.cpp
+  core/folder_names.cpp
   core/texts.cpp
   core/text_placeholders.cpp
   core/translations.cpp
@@ -452,7 +453,7 @@ redgem_add_library(redgem_runtime
   app/game_identity.cpp
   app/splash_screen.cpp
   app/bundled_game.cpp
-  app/save_location.cpp
+  app/game_data_location.cpp
   app/input_bindings_store.cpp
   app/user_settings.cpp
   app/game_display.cpp

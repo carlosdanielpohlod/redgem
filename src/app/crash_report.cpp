@@ -10,7 +10,7 @@
 #include "app/crash_handlers.hpp"
 #include "app/crash_text.hpp"
 #include "app/game_settings.hpp"
-#include "app/save_location.hpp"
+#include "app/game_data_location.hpp"
 #include "core/engine_thread.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
@@ -20,7 +20,6 @@ namespace redgem::crash {
 namespace {
 
 constexpr const char* kTitleLine = "RedGem crash report\n";
-constexpr const char* kFolderSuffix = "-crashes";
 // What the report says when the stack was gone by the time the crash was seen (an exception that
 // reached the program's top had already left every function it came through).
 constexpr const char* kNoBacktrace = "  (none: the stack had already unwound)\n";
@@ -105,7 +104,7 @@ void prepare(const CrashSetup& setup) {
   facts.version = kVersion;
   facts.platform = platform_name();
   PreparedCrash& crash = prepared();
-  crash.folder = crash_folder_for(save_file_for(setup.game_dir));
+  crash.folder = crash_folder_for(setup);
   // (In UTF-8: on Windows a folder's name may hold letters the system's code page has none for.)
   crash.folder_text = crash.folder.u8string();
   crash.head = report_head(facts);
@@ -174,10 +173,9 @@ std::string format_crash_report(const CrashFacts& facts) {
   return report_head(facts) + report_moment(facts.time, facts.cause, facts.backtrace);
 }
 
-std::filesystem::path crash_folder_for(const std::filesystem::path& save_file) {
-  std::filesystem::path name = save_file.stem();
-  name += kFolderSuffix;
-  return save_file.parent_path() / name;
+std::filesystem::path crash_folder_for(const CrashSetup& setup) {
+  const bool given = !setup.data_folder.empty();
+  return game_data_files(given ? setup.data_folder : players_data_folder(setup.game_dir)).crashes;
 }
 
 std::string crash_file_name(long long seconds_since_epoch) {

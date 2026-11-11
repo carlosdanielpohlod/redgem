@@ -16,7 +16,6 @@ namespace redgem::tools {
 namespace {
 
 constexpr const char* kScratchPrefix = "redgem-run-";
-constexpr const char* kSaveFile = "save.json";
 
 std::vector<std::string> camera_names(const SceneDesc& scene) {
   std::vector<std::string> names;
@@ -90,7 +89,7 @@ std::variant<std::unique_ptr<Engine>, std::string> engine_for(const PlayRequest&
   options.scene_name = request.scene;
   options.fixed_step = true;
   options.random_seed = request.seed;
-  options.save_file = scratch.path() / kSaveFile;
+  options.data_folder = scratch.path();
   return Engine::create(options, std::move(std::get<SceneDesc>(scene)));
 }
 

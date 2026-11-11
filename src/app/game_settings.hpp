@@ -17,10 +17,14 @@ inline constexpr const char* kGameSettingsFile = "game.json";
 
 struct GameSettings {
   std::string title;
+  // Who makes the game: with the title, it names the folder the game's players keep their saves
+  // and settings in (see app/game_data_location.hpp). Empty for a game that does not say.
+  //   "studio": "My Studio"
+  std::string studio;
   int window_width = 0;
   int window_height = 0;
-  // What the game is known by wherever it is kept and whatever it is called: its save follows it,
-  // and so does its Android app unless the app is given a package. Empty for a game that has none.
+  // What the game is known by wherever it is kept and whatever it is called: its Android app is
+  // named after it unless the app is given a package. Empty for a game that has none.
   //   "id": "com.mystudio.mygame"   or   "id": "my-game-3fa2c1b0"
   std::string id;
   AndroidSettings android;
@@ -41,6 +45,8 @@ struct GameManifest {
   // Always usable: the defaults (folder name as title, the engine's window size, an app with
   // nothing of its own) stand in for whatever is missing or is not what it should be.
   GameSettings settings;
+  // Whether game.json gives the title (the folder's name stands in for one it does not give).
+  bool title_given = false;
   // What is wrong with the "android" section, for whoever packs the app; empty when it can be
   // used. (A game plays all the same: the section only matters to a build for Android.)
   std::string android_error;
@@ -61,7 +67,7 @@ inline constexpr std::size_t kMaxGameIdLength = 100;
 bool valid_game_id(const std::string& id);
 // The settings alone, for whoever has no use for what is wrong with the file.
 GameSettings read_game_settings(const std::filesystem::path& game_dir);
-// Writes the title, the window's size and the id (when the settings have one). What else the file
+// Writes the title, the window's size, and the studio and the id (when the settings have them). What else the file
 // holds (its "android" section, an id the settings have none for...) stays as it is.
 bool write_game_settings(const std::filesystem::path& game_dir, const GameSettings& settings, std::string& error);
 

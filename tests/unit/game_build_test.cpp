@@ -12,6 +12,8 @@
 #include "project/notices.hpp"
 #include "project/android/android_package.hpp"
 #include "project/game_build.hpp"
+#include "project/game_templates.hpp"
+#include "test_support.hpp"
 
 using namespace redgem;
 
@@ -79,6 +81,26 @@ TEST_CASE("a build for a computer never goes where its game folder would be the 
   CHECK(error == tr("project.build.game_inside_its_build",
                     {{"game", scratch.game.string()}, {"folder", (scratch.dir / kBundledGameFolder).string()}}));
   CHECK(std::filesystem::exists(scratch.game / config::kSceneFileName));
+}
+
+// The studio and the title name the folder a game's players keep their saves in, for good once
+// it ships: a build of a game that has not named them says so.
+TEST_CASE("a build warns of a game with no studio, no title or the studio every new game starts with") {
+  const Scratch scratch;
+  const std::filesystem::path player = scratch.dir / "player";
+  std::ofstream(player) << "player";
+  std::string error;
+  const auto warns = [&](const std::string& json) {
+    std::ofstream(scratch.game / "game.json") << json;
+    const test::LogCapture log;
+    REQUIRE_MESSAGE(build_game(scratch.game, scratch.dir / "out", player, BuildTarget::Linux, error), error);
+    return log.contains("give the game a studio and a title of its own");
+  };
+  CHECK(warns("{}"));
+  CHECK(warns(R"({"title": "Coin Rush"})"));
+  CHECK(warns(R"({"studio": "Pine Hill"})"));
+  CHECK(warns(std::string(R"({"title": "Coin Rush", "studio": ")") + kNewGameStudio + R"("})"));
+  CHECK_FALSE(warns(R"({"title": "Coin Rush", "studio": "Pine Hill"})"));
 }
 
 // A build writes the executable, the game folder and the licenses: over what an earlier build

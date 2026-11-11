@@ -22,6 +22,17 @@ std::filesystem::path executable_path();
 // The user's home folder (a temporary folder when the system does not say).
 std::filesystem::path home_dir();
 
+// Where this desktop keeps what programs remember for a user, each program in folders of its own
+// (a game keeps its players' saves and settings there, see app/game_data_location.hpp): what
+// XDG_DATA_HOME names, else .local/share at home, on Linux; what APPDATA names, else
+// AppData/Roaming at home, on Windows; Library/Application Support at home on the Mac.
+std::filesystem::path programs_data_dir();
+// That folder on `desktop` for a user whose home folder is `home`, when the desktop's variable
+// (XDG_DATA_HOME, APPDATA; the Mac has none) names `named`. A path that is not absolute names
+// nothing: the desktop's usual folder is used.
+std::filesystem::path programs_data_dir_on(Desktop desktop, const std::filesystem::path& home,
+                                           const std::filesystem::path& named);
+
 // Where this user's RedGem data lives on this machine (settings, saves, the list of recent games):
 // the folder given with set_user_data_dir, else where this desktop keeps it (user_data_dir_on).
 std::filesystem::path user_data_dir();
@@ -36,6 +47,9 @@ void set_user_data_dir(const std::filesystem::path& folder);
 
 // What an environment variable of this process holds; nothing when it is not set, or set to nothing.
 std::string environment(const std::string& name);
+// The same, for a variable that names a folder: on Windows read as the system's own wide text, so
+// that a folder named in letters of any language comes out whole.
+std::filesystem::path environment_path(const std::string& name);
 // Sets an environment variable of this process. With `overwrite` false an existing value stays.
 void set_environment(const std::string& name, const std::string& value, bool overwrite);
 

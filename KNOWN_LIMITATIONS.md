@@ -273,7 +273,9 @@ not a promise of how it will be closed.
   with bundletool, never uploaded to Google Play. Whether an app asks for the network, when
   `game.json` does not say, is guessed from its scripts' text (`Network.` or `HTTP.`): a script
   that reaches them some other way is not seen.
-- Saves live under RedGem's own folder, not under the game's or its studio's name.
+- A game's folder is named after its studio and title: a game renamed in an update starts with no
+  save, in a new folder, and nothing moves the old one. Two games of the same studio and title
+  share it.
 - Saves, settings and bindings are plain JSON with no integrity check: a player can edit them.
 - The downloads are built and packed by the continuous integration, on GitHub's runners, and
   checked there only by listing them and running their programs' `--version` and `--help`: no
