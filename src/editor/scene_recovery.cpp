@@ -16,6 +16,8 @@ namespace redgem {
 namespace {
 namespace fs = std::filesystem;
 constexpr const char* kSuffix = ".recovery";
+constexpr const char* kArchiveSuffix = ".previous-";
+constexpr const char* kAppliedSuffix = ".applied-";
 constexpr const char* kDismissalNotice = "Recovery dismissal applies only to this session: ";
 using recovery_format::kMetadata;
 constexpr const char* kSource = "source";
@@ -100,7 +102,7 @@ void archive_copy(const fs::path& source) {
   const auto copy = SceneRecovery::copy_path(source);
   if (!fs::exists(copy)) return;
   auto archived = copy;
-  archived += ".previous-" + make_scene_id();
+  archived += kArchiveSuffix + make_scene_id();
   fs::rename(copy, archived);
   log::info("preserved another editor's recovery copy at " + archived.string());
 }
@@ -109,7 +111,7 @@ bool is_archive(const fs::directory_entry& entry, const std::string& prefix) {
   return name.rfind(prefix, 0) == 0 && entry.symlink_status().type() == fs::file_type::regular;
 }
 fs::path next_archive(const fs::path& copy) {
-  const auto prefix = copy.filename().generic_u8string() + ".previous-";
+  const auto prefix = copy.filename().generic_u8string() + kArchiveSuffix;
   const auto folder = copy.has_parent_path() ? copy.parent_path() : fs::path(".");
   fs::path found;
   fs::file_time_type newest{};
@@ -194,6 +196,8 @@ void SceneRecovery::reset_observation() {
   if (!dismissal_failed) problem_.clear();
   elapsed_ = 0;
   offered_path_.clear();
+  adopted_archive_.clear();
+  preserve_live_ = false;
   inspection_pending_ = true;
 }
 bool SceneRecovery::own(const fs::path& source) {
@@ -207,23 +211,16 @@ bool SceneRecovery::own(const fs::path& source) {
   if (result == RecoveryLease::Result::Busy) takeover_pending_ = true;
   return result == RecoveryLease::Result::Acquired;
 }
-void SceneRecovery::discover_copy(bool offer_archives) {
-  if (ignored_sources_.count(source_) != 0) return;
+void SceneRecovery::prepare_copy(bool offer_archives, bool allow_live_offer) {
   const auto copy = copy_path(source_);
   const bool exists = fs::exists(fs::symlink_status(copy));
-  const bool offer_live = exists && !dismissed_copy(source_);
-  if (offer_live) {
-    offered_path_ = copy;
-  } else if (offer_archives) {
-    offered_path_ = next_archive(copy);
-  }
-}
-void SceneRecovery::prepare_copy(bool offer_archives) {
-  if (takeover_pending_) {
-    archive_copy(source_);
-    takeover_pending_ = false;
-  }
-  discover_copy(offer_archives);
+  preserve_live_ = ignored_sources_.count(source_) != 0 || (exists && dismissed_copy(source_));
+  const bool has_live = exists && !preserve_live_;
+  const bool archive_live = takeover_pending_ || !allow_live_offer;
+  if (has_live && archive_live) archive_copy(source_);
+  if (has_live && !archive_live) offered_path_ = copy;
+  if (!pending() && offer_archives) offered_path_ = next_archive(copy);
+  takeover_pending_ = false;
   inspection_pending_ = false;
 }
 void SceneRecovery::begin_watch(const fs::path& source, bool offer_archives) {
@@ -235,7 +232,7 @@ void SceneRecovery::begin_watch(const fs::path& source, bool offer_archives) {
   }
   const auto digest = fingerprint(source);
   if (!digest.empty()) baseline_ = digest;
-  prepare_copy(offer_archives);
+  prepare_copy(offer_archives, true);
 }
 void SceneRecovery::watch(const fs::path& source, bool offer_archives) {
   try {
@@ -249,8 +246,7 @@ bool SceneRecovery::retry_lease(bool clean) {
   const bool ready = lease_.held() && !inspection_pending_;
   if (ready) return true;
   if (!own(source_)) return false;
-  const bool offer_archives = clean && takeover_pending_;
-  prepare_copy(offer_archives);
+  prepare_copy(false, clean);
   problem_.clear();
   return true;
 }
@@ -261,6 +257,7 @@ void SceneRecovery::ignore() {
   const bool archive = !ignored.empty() && ignored != copy_path(source_);
   if (archive) return;
   ignored_sources_.insert(source_);
+  preserve_live_ = true;
   const bool foreign_copy = !lease_.held() || takeover_pending_;
   if (!foreign_copy) persist_dismissal();
 }
@@ -303,6 +300,7 @@ bool SceneRecovery::restore(SceneDocument& document, std::string& error) {
   }
   document = std::move(std::get<SceneDocument>(opened));
   baseline_ = recovered_baseline;
+  if (offered_path_ != copy_path(source_)) adopted_archive_ = std::move(offered_path_);
   offered_path_.clear();
   return true;
 }
@@ -312,6 +310,17 @@ bool SceneRecovery::recover(SceneDocument& document, std::string& error) {
   } catch (const std::exception& problem) {
     error = problem.what();
     return false;
+  }
+}
+void SceneRecovery::retire_archive() {
+  if (adopted_archive_.empty()) return;
+  try {
+    auto applied = copy_path(source_);
+    applied += kAppliedSuffix + make_scene_id();
+    fs::rename(adopted_archive_, applied);
+    adopted_archive_.clear();
+  } catch (const std::exception& error) {
+    log::warning("cannot mark scene recovery as applied: " + std::string(error.what()));
   }
 }
 bool SceneRecovery::remove_copy(std::string& error) {
@@ -344,7 +353,7 @@ bool SceneRecovery::discard(std::string& error) {
     return false;
   }
 }
-bool SceneRecovery::discard_unsaved(std::string& error) { return pending() || discard(error); }
+bool SceneRecovery::discard_unsaved(std::string& error) { return pending() || preserve_live_ || discard(error); }
 bool SceneRecovery::write(SceneDocument& document, std::string& error) {
   const auto copy = copy_path(source_);
   safe_copy(source_, copy);
@@ -360,6 +369,8 @@ bool SceneRecovery::save_version(SceneDocument& document, std::string& error) {
     if (!write(document, error)) return false;
     written_version_ = document.version();
     ignored_sources_.erase(source_);
+    preserve_live_ = false;
+    retire_archive();
     return true;
   } catch (const std::exception& problem) {
     error = problem.what();

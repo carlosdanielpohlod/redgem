@@ -294,11 +294,10 @@ TEST_CASE("scene recovery never reads or deletes a live editor's copy") {
   CHECK(game.bytes(copy) == bytes);
   CHECK_FALSE(other.recover(game.document, game.error));
   writer.reset();  // the same release the OS performs when the writer exits
-  game.document.undo();
-  REQUIRE_FALSE(game.document.dirty());
-  game.autosave(other);
-  REQUIRE(other.pending());
-  REQUIRE(other.recover(game.document, game.error));
+  SceneRecovery restarted;
+  restarted.watch(game.source);
+  REQUIRE(restarted.pending());
+  REQUIRE(restarted.recover(game.document, game.error));
   CHECK(game.document.node(0).name == "Live unsaved edit");
 }
 TEST_CASE("scene recovery retains an external conflict after recovery and a second crash") {
@@ -596,6 +595,8 @@ TEST_CASE("an unavailable lock file does not turn an existing recovery into a fo
   reader.watch(game.source);
   CHECK_FALSE(reader.pending());
   REQUIRE(fs::remove(lock));
+  game.document.undo();
+  REQUIRE_FALSE(game.document.dirty());
   REQUIRE(reader.poll(game.document, SceneRecovery::kIntervalSeconds, game.error));
   REQUIRE(reader.pending());
   REQUIRE(reader.recover(game.document, game.error));
@@ -636,4 +637,87 @@ TEST_CASE("editor recovery keeps archives in place until explicitly discarded") 
   REQUIRE(session->discard_recovery(game.error));
   CHECK_FALSE(fs::exists(newer));
   CHECK(fs::exists(older));
+}
+
+TEST_CASE("a clean lease takeover keeps recovery for the next open") {
+  RecoveryGame game;
+  auto owner = std::make_unique<SceneRecovery>();
+  owner->watch(game.source);
+  game.document.set_name(0, "Other editor's edit");
+  game.autosave(*owner);
+  SceneRecovery waiting;
+  waiting.watch(game.source, true);
+  owner.reset();
+  game.document.undo();
+  REQUIRE_FALSE(game.document.dirty());
+  game.autosave(waiting);
+  CHECK_FALSE(waiting.pending());
+  CHECK_FALSE(fs::exists(SceneRecovery::copy_path(game.source)));
+
+  waiting.watch(game.source, true);
+  REQUIRE(waiting.pending());
+  REQUIRE(waiting.recover(game.document, game.error));
+  CHECK(game.document.node(0).name == "Other editor's edit");
+}
+
+TEST_CASE("a dismissed live copy survives a clean poll and does not hide an archive") {
+  RecoveryGame game;
+  SceneRecovery recovery;
+  recovery.watch(game.source);
+  game.document.set_name(0, "Dismissed");
+  game.autosave(recovery);
+  const auto live = SceneRecovery::copy_path(game.source);
+  auto archive = live;
+  archive += ".previous-test";
+  REQUIRE(fs::copy_file(live, archive));
+  const auto bytes = game.bytes(live);
+  recovery.ignore();
+  game.document.undo();
+  game.autosave(recovery);
+  CHECK(game.bytes(live) == bytes);
+
+  recovery.watch(game.source, true);
+  REQUIRE(recovery.pending());
+  REQUIRE(recovery.discard(game.error));
+  CHECK_FALSE(fs::exists(archive));
+  CHECK(game.bytes(live) == bytes);
+}
+
+TEST_CASE("a recovered archive is retired only after the recovered scene is written") {
+  RecoveryGame game;
+  auto owner = std::make_unique<SceneRecovery>();
+  owner->watch(game.source);
+  game.document.set_name(0, "Recovered archive");
+  game.autosave(*owner);
+  owner.reset();
+  const auto live = SceneRecovery::copy_path(game.source);
+  auto archive = live;
+  archive += ".previous-test";
+  fs::rename(live, archive);
+  const auto archived_bytes = game.bytes(archive);
+
+  auto opened = EditorSession::open(game.folder);
+  auto session = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
+  REQUIRE(session->recovery_pending());
+  REQUIRE(session->recover_scene(game.error));
+  REQUIRE(fs::exists(archive));
+
+  SUBCASE("successful manual save") { REQUIRE(session->save(game.error)); }
+  SUBCASE("successful autosave") {
+    session->autosave(SceneRecovery::kIntervalSeconds);
+    REQUIRE(fs::exists(live));
+  }
+
+  CHECK_FALSE(fs::exists(archive));
+  fs::path applied;
+  for (const auto& entry : fs::directory_iterator(game.folder)) {
+    if (entry.path().filename().string().find(".applied-") != std::string::npos) applied = entry.path();
+  }
+  REQUIRE_FALSE(applied.empty());
+  CHECK(game.bytes(applied) == archived_bytes);
+  session.reset();
+  if (fs::exists(live)) REQUIRE(fs::remove(live));
+  opened = EditorSession::open(game.folder);
+  session = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
+  CHECK_FALSE(session->recovery_pending());
 }

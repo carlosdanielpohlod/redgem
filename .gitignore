@@ -50,3 +50,4 @@ games/*-data/
 
 .*.glb.recovery.lock
 .*.glb.recovery.previous-*
+.*.glb.recovery.applied-*

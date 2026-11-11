@@ -1,4 +1,5 @@
 #include "editor/editor_app.hpp"
+#include "editor/ui/dpi.hpp"
 
 #include <imgui.h>
 
@@ -15,8 +16,8 @@ namespace {
 constexpr float kRecoveryWidth = 480;
 constexpr float kWindowMargin = 32;
 void recovery_dialog_size() {
-  const auto available = ImGui::GetMainViewport()->WorkSize.x - kWindowMargin;
-  const auto width = std::max(1.0f, std::min(kRecoveryWidth, available));
+  const auto available = ImGui::GetMainViewport()->WorkSize.x - ui::scaled(kWindowMargin);
+  const auto width = std::max(1.0f, std::min(ui::scaled(kRecoveryWidth), available));
   ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0), ImVec2(width, FLT_MAX));
 }
 const char* recovery_popup() { return ui::window_title("editor.recovery.title", "###scene_recovery"); }

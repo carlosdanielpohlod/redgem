@@ -201,10 +201,10 @@ does not restrict the original source size or the normal memory budget used to l
 images. A second editor taking over after a live writer closes preserves that writer's backup
 as a hidden `.recovery.previous-<id>` sibling and logs its path. On opening a scene, the editor
 offers the newest archive when there is no current recovery copy to show. A waiting editor
-with a clean scene can also offer it after taking over. A waiting editor with unsaved edits
-keeps backing up its own work and offers the archive the next time the scene is opened. Archived
-copies stay in place after recovery, saving or switching scenes. To remove one, reopen the scene
-and choose **Discard recovery copy**.
+preserves the former writer's copy and continues its own session. Reopen the scene to see that
+archive. The archive stays available until you discard it in the recovery dialog or the recovered
+scene is saved successfully. After a successful save or autosave of the recovered work, the
+archive is kept as a hidden `.recovery.applied-<id>` file and stops appearing in the dialog.
 
 An autosave failure
 remains visible in the status bar and is retried only after another edit. Recovery refuses to

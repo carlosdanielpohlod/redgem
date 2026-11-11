@@ -98,6 +98,7 @@ void EditorSession::forget_recovery() {
   }
 }
 void EditorSession::note_saved() {
+  recovery_.retire_archive();
   forget_recovery();
   follow_scene_file();
   log::info("saved " + document_.path().string());

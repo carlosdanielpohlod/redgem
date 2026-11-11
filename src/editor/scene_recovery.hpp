@@ -23,6 +23,7 @@ class SceneRecovery {
   static std::filesystem::path copy_path(const std::filesystem::path& source);
   void watch(const std::filesystem::path& source, bool offer_archives = false);
   void ignore();
+  void retire_archive();
   const std::string& problem() const { return problem_; }
   bool pending() const { return !offered_path_.empty(); }
   bool source_changed() const;
@@ -33,8 +34,7 @@ class SceneRecovery {
 
  private:
   SceneRecoveryCopy* offered_copy(std::string& error) const;
-  void discover_copy(bool offer_archives);
-  void prepare_copy(bool offer_archives);
+  void prepare_copy(bool offer_archives, bool allow_live_offer);
   void begin_watch(const std::filesystem::path& source, bool offer_archives);
   bool poll_ready(SceneDocument& document, float seconds, std::string& error);
   bool retry_lease(bool clean);
@@ -56,9 +56,11 @@ class SceneRecovery {
   std::string baseline_;
   bool takeover_pending_ = false;
   bool inspection_pending_ = true;
+  bool preserve_live_ = false;
   std::optional<long long> written_version_;
   float elapsed_ = 0;
   std::filesystem::path offered_path_;
+  std::filesystem::path adopted_archive_;
   mutable std::optional<bool> source_changed_;
   mutable std::optional<SceneRecoveryCopy> offered_;
 };

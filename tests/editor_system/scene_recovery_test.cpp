@@ -8,6 +8,7 @@
 #include "core/config.hpp"
 #include "editor/editor_app.hpp"
 #include "editor/scene_recovery.hpp"
+#include "editor/ui/dpi.hpp"
 #include "project/editor_setup.hpp"
 #include "window_picture.hpp"
 
@@ -48,7 +49,7 @@ TEST_CASE("the editor offers crash recovery and saves the recovered scene to its
   const auto* popup = ImGui::FindWindowByName("Recover scene###scene_recovery");
   REQUIRE(popup != nullptr);
   CHECK(popup->Active);
-  CHECK(popup->Size.x <= kMaximumDialogWidth);
+  CHECK(popup->Size.x <= ui::scaled(kMaximumDialogWidth));
   CHECK(test::save_window_picture(std::filesystem::path(REDGEM_SCREENSHOT_DIR) / "editor/recovery_offered.png"));
   REQUIRE(app->recover_scene());
   settle(*app);
