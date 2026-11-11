@@ -35,6 +35,8 @@ add_executable(redgem_tests
   unit/gltf_loader_test.cpp
   unit/gltf_loader_safety_test.cpp
   unit/spatial_audio_test.cpp
+  unit/music_player_test.cpp
+  unit/sound_handles_test.cpp
   unit/safe_path_test.cpp
   unit/image_header_test.cpp
   unit/webp_image_test.cpp
@@ -533,6 +535,7 @@ add_executable(redgem_render_system_tests render_system/render_test_main.cpp ren
                render_system/material_pictures_render_test.cpp
                render_system/game_font_render_test.cpp
                render_system/missing_picture_render_test.cpp
+               render_system/hud_clip_render_test.cpp
                render_system/recording_render_test.cpp
                render_system/display_render_test.cpp
                render_system/camera_marker_render_test.cpp

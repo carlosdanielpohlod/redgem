@@ -22,6 +22,9 @@ constexpr const char* kFpsCapKey = "fps_cap";
 constexpr const char* kQualityKey = "quality";
 constexpr const char* kCustomQualityKey = "custom_quality";
 constexpr const char* kVolumeKey = "volume";
+constexpr const char* kMusicVolumeKey = "music_volume";
+constexpr const char* kEffectsVolumeKey = "effects_volume";
+constexpr const char* kVoiceVolumeKey = "voice_volume";
 constexpr const char* kMsaaKey = "msaa";
 constexpr const char* kAntialiasKey = "antialias";
 constexpr const char* kCascadesKey = "shadow_cascades";
@@ -121,6 +124,16 @@ void read_window(const nlohmann::json& json, DisplaySettings& display) {
   read_whole(json, kFpsCapKey, kNoFrameCap, kMostFramesPerSecond, display.fps_cap);
 }
 
+// The master volume and each group's, all shares from 0 to 1.
+void read_volumes(const nlohmann::json& json, DisplaySettings& display) {
+  using Volume = std::pair<const char*, float*>;
+  const Volume volumes[] = {{kVolumeKey, &display.volume},
+                            {kMusicVolumeKey, &display.music_volume},
+                            {kEffectsVolumeKey, &display.effects_volume},
+                            {kVoiceVolumeKey, &display.voice_volume}};
+  for (const auto& [key, volume] : volumes) read_share(json, key, *volume);
+}
+
 }  // namespace
 
 const char* window_mode_name(WindowMode mode) {
@@ -178,7 +191,10 @@ nlohmann::json display_json(const DisplaySettings& display) {
           {kFpsCapKey, display.fps_cap},
           {kQualityKey, quality_name(display.quality)},
           {kCustomQualityKey, caps_json(display.custom_quality)},
-          {kVolumeKey, display.volume}};
+          {kVolumeKey, display.volume},
+          {kMusicVolumeKey, display.music_volume},
+          {kEffectsVolumeKey, display.effects_volume},
+          {kVoiceVolumeKey, display.voice_volume}};
 }
 
 DisplaySettings display_from_json(const nlohmann::json& json, DisplaySettings base) {
@@ -186,7 +202,7 @@ DisplaySettings display_from_json(const nlohmann::json& json, DisplaySettings ba
   read_window(json, base);
   read_name(json, kQualityKey, quality_from_name, base.quality);
   if (json.contains(kCustomQualityKey)) read_caps(json[kCustomQualityKey], base.custom_quality);
-  read_share(json, kVolumeKey, base.volume);
+  read_volumes(json, base);
   return base;
 }
 

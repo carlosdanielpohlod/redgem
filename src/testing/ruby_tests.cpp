@@ -33,7 +33,8 @@ constexpr const char* kRubyTestModule = "RedGemTest";
 constexpr const char* kRunAllMethod = "run_all";
 
 // What a file of Ruby unit tests runs against: a scene, physics (with the game's collision layers),
-// input, audio, a network and a web client with nothing in them.
+// input, audio (hearing the game's sounds, when the tests are a game's), a network and a web client
+// with nothing in them.
 struct BareWorld {
   Scene scene;
   std::unique_ptr<PhysicsWorld> physics;
@@ -117,6 +118,7 @@ int run_ruby_tests(const std::filesystem::path& test_file, const std::filesystem
   const std::optional<std::filesystem::path> scripts = scripts_for(test_file, game_dir);
   if (!scripts) return kExitFailure;
   BareWorld world(game_collision_layers(game_dir));
+  if (!game_dir.empty()) world.audio.set_sounds_dir(game_dir / config::kSoundsDirName);  // the game's sounds
   ScriptHost host(world.context, *scripts);
   if (const auto error = load_tests(host, world, test_file, !game_dir.empty())) {
     log::error(*error);

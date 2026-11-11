@@ -12,7 +12,7 @@ the same pull request.
   opened there: the editor and the games have been seen running on Windows under Wine only.
 - The macOS downloads have only run on GitHub's virtual Macs, which have no graphics card OpenGL
   can use: there the editor is drawn by Apple's software renderer (its system test takes about
-  half an hour instead of a minute), and the games' system tests are not run on the Mac. Never
+  an hour instead of a minute), and the games' system tests are not run on the Mac. Never
   tried on a real Mac. The app is not signed by a registered Apple developer nor notarized.
 - The editor on a Mac builds games for the Mac only: it carries no players for other systems.
   A built game's Mac app has been checked by unit tests on Linux and GitHub's Macs, never opened
@@ -60,6 +60,17 @@ the same pull request.
 - Images support PNG, JPEG and static WebP, at most 8192 pixels a side (a sky picture may also
   be Radiance `.hdr`). Animated WebP and KTX2/Basis textures are not read. WebP is decoded on the CPU and uploaded as
   ordinary pixels; it does not provide GPU texture compression.
+- Only the sun casts shadows: point and spot lights light through walls, and spot lights are lit
+  like point lights, in every direction (their cone is read but not used).
+- An object mirrored with a negative scale in Blender is drawn inside out (the editor and the
+  command-line tools refuse negative scales).
+- Morph targets (shape keys) are not read: their weights and names are dropped. Animation keys
+  with cubic-spline interpolation are skipped with a warning (export linear or step keys).
+- Of glTF's material extensions the engine reads clearcoat, emissive strength and WebP textures.
+  Transmission, sheen, specular, IOR, anisotropy, volume and texture transforms are ignored.
+- Indirect light comes from the sky and one live capture around the camera: no lightmaps, light
+  probes or baked lighting, so interiors and deep shade are lit by the sky. Exposure is a fixed
+  environment property; there is no eye adaptation.
 - A sky picture, shadow cascades, `msaa` and temporal anti-aliasing have been seen on desktop
   OpenGL only, not on a phone.
   On OpenGL ES 3 they rely on what the engine already needs there (half-float textures that can
@@ -98,6 +109,13 @@ the same pull request.
   files, sockets or `eval` (on purpose: a game cannot touch the player's machine).
 - `a&.b.c` does not stop at `a` being nil as it does in other Rubies: write `a&.b&.c`.
 - All text the engine and editor show is English. Games translate their own texts.
+- `Scene.spawn` cannot name or parent the copy, and an object's parent cannot be changed from a
+  script. The scene's first camera is the game's camera: a script cannot switch to another.
+- Custom properties that are lists or objects in the scene file are dropped with a warning: a
+  property is a number, a text or true/false.
+- Limits a game can reach: 64 hits per physics query, 4096 live particles and 256 emitters, 4096
+  `Debug` shapes a frame, 262,144 scattered copies, 16 collision layers, 64 named save slots
+  opened in one run, 1024 bones a skeleton, a 4 GB memory estimate per scene.
 
 ## Editor
 
@@ -109,6 +127,14 @@ the same pull request.
 - A pasted object carries its own copy of its meshes and pictures, even in the scene it was copied
   from (Duplicate shares them). A copy bigger than 64 MB pastes only in the editor window it was
   copied in.
+- Importing the same model twice appends its meshes and textures again, and deleting an import
+  leaves its data in the scene's file (only pictures no material shows are dropped on save).
+- A model whose glTF keeps its data in several buffers cannot be imported or pasted: export a
+  single `.glb` from Blender.
+- A character duplicated in the editor keeps the pose it was copied in.
+- Terrain is sculpted only: one 100 m square with one color and roughness, no texture painting,
+  no holes cut through it, and no joining of several terrains. A terrain re-exported from Blender
+  is an ordinary mesh.
 
 ## Tools
 
@@ -132,11 +158,12 @@ not a promise of how it will be closed.
 - A picture put on a material from the editor goes inside the scene's `.glb`: changing the file in
   `images/` afterwards does not change the scene (pick it again). The Inspector shows a slot's
   picture by name, without a preview, and sets neither a texture's sampler nor its UV set.
-- [Prefab file references](docs/prefabs.md) load at runtime and in editor Play, including nested
-  references, root property overrides, editing-viewport previews and placement from the Project
-  panel and exporting one selected hierarchy as a source file. Inherited children cannot be
-  overridden separately. Export needs complete skeletons and descendant-only animation; it does
-  not replace the original selection with a reference or overwrite an existing source file.
+- [Prefab file](docs/prefabs.md) instances cannot override inherited children separately, a
+  script cannot spawn a prefab file by its path (only a placement in the scene), and a running
+  scene does not see a changed prefab file until reloaded. Export needs complete skeletons and
+  descendant-only animation; it does not replace the original selection with a reference or
+  overwrite an existing source file. (Loading, nesting, root overrides, previews, placement from
+  the Project panel and export of a selected hierarchy are there.)
 - [Live script reload](docs/scripting/live_reload.md) updates plain behaviour methods and literal
   constants during editor Play, preserving instance fields. Executable setup, computed constants,
   class methods/mixins, changed inheritance and initially failed scripts still require a restart;
@@ -159,13 +186,23 @@ not a promise of how it will be closed.
   desktops' window library nor Android offers it), and a capture catches keys, mouse buttons, the
   wheel and gamepad buttons, not sticks, triggers or mouse movement. Keys are named for their place
   on a US keyboard, and the page shows them by those names whatever the layout types.
-- `UI` has no word wrap, anchors or scroll lists. Android has no on-screen keyboard.
+- Text fields take single key presses: there is no input-method composition, so languages typed
+  through a composition window cannot be entered even with a game font that draws them.
+- `UI` lays texts out a line at a time: word wrap breaks only at spaces and between letters (no
+  hyphenation, no line-breaking rules of scripts written without spaces), and anchors place things
+  by fixed pixel sizes (sizes do not scale with the screen; `GameMenu` scales its own). There is
+  no layout engine (rows, columns, stacks) and no scroll region for anything other than rows of
+  one height. Android has no on-screen keyboard.
 
 ### Audio
 
-- Positional sound provides stereo panning and distance falloff for at most 64 independent sources.
-  Games update source positions and the listener explicitly; there is no HRTF, occlusion or Doppler.
-  One music track at a time with no crossfade, no mixing groups.
+- At most 64 sounds with ids play at once, flat and positional together. Positional sound provides
+  stereo panning and distance falloff; games update source positions and the listener explicitly;
+  there is no HRTF, occlusion or Doppler.
+- One music track at a time, two while they crossfade. The mix groups are fixed (master, music,
+  effects, voice): a game cannot add its own, and there are no effects on a group (reverb,
+  ducking, filters). Fades are linear in volume, and only the music fades by itself; a sound's
+  levels change at once.
 
 ### Text
 
@@ -180,6 +217,8 @@ not a promise of how it will be closed.
   editor's Physics card has no collision layer picker (`layer` is set as a custom property).
 - Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - No navigation mesh or pathfinding.
+- A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
+  layout, torque and suspension cannot be set from properties.
 - A scene holds at most 4096 physics bodies at once (a fixed size, not set per game). An object
   spawned past that gets no body: no collisions, and raycasts miss it. The engine logs one error
   when that first happens. A game that keeps spawning (bullets, debris) has to destroy what it no
@@ -217,9 +256,10 @@ not a promise of how it will be closed.
   engine's calls that use that class with Ruby errors, instead of being stopped from doing so.
 - An Android build empties its staging folder (`.redgem-apk-stage` in the output folder) without
   checking that a build made it.
-- No unit tests for the room-code guessers, room codes, `ByteAllowance`, saved values, the socket
-  layer or the TLS stream on its own (only through requests); no test of a TLS name that does not
-  match its certificate, nor of a server sending interim (1xx) answers for ever.
+- No unit tests for the room codes and their guessers (`room_codes.cpp` is tested only through
+  the relay and server integration tests), the socket layer or the TLS stream on its own (only
+  through requests); no test of a TLS name that does not match its certificate, nor of a server
+  sending interim (1xx) answers for ever.
 
 ### Shipping
 
@@ -236,6 +276,7 @@ not a promise of how it will be closed.
   `game.json` does not say, is guessed from its scripts' text (`Network.` or `HTTP.`): a script
   that reaches them some other way is not seen.
 - Saves live under RedGem's own folder, not under the game's or its studio's name.
+- Saves, settings and bindings are plain JSON with no integrity check: a player can edit them.
 - The downloads are built and packed by the continuous integration, on GitHub's runners, and
   checked there only by listing them and running their programs' `--version` and `--help`: no
   one opens the Windows and Linux editors from a download before a release is published.
@@ -256,16 +297,18 @@ not a promise of how it will be closed.
   finds 161 bytes mruby allocated still held when the unit tests end; mruby is not built with the
   sanitizers, so whose they are is unknown, and every leak of mruby's memory is listed as known.
 - About forty unit and integration tests wait on the real clock, a source of rare timing failures.
-- Some constants are defined more than once (`kLargestPort` in four places, `kBitsPerByte` in
-  four, Ruby limits that repeat C++ ones), as are a few string helpers.
+- Some constants are defined more than once (`kLargestPort` in five places, though
+  `core/command_line.hpp` already exports one; `kBitsPerByte` in seven; Ruby limits that repeat
+  C++ ones), as are a few string helpers.
 - A connection's buffers never give memory back once grown, and copy what is left on every
   partial send (`frame_buffer.cpp`, `socket_io.cpp`).
 - `Save.update`'s block runs under one lock for the whole database, which every room of a
   dedicated server shares: a slow block holds up the saves of all rooms.
 - The threads of web requests are detached: one still running at exit may outlive the program's
   static objects.
-- Water is expensive in coastal views: refraction can fall back to a 32-step screen search with
-  refinement near shorelines and rocks, and the shore foam's distance is computed for every water
+- Water is expensive in coastal views: when refraction's 8-step estimate is rejected near
+  shorelines and rocks it falls back to a 16-step screen search refined by 9 halvings,
+  reflections march up to 32 steps, and the shore foam's distance is computed for every water
   pixel.
 
 ### Multiplayer
@@ -276,6 +319,8 @@ not a promise of how it will be closed.
   check movement, so a modified client can move anywhere.
 - Players who are not on the same network need a relay or a dedicated server: there is no direct
   connection through home routers (no STUN or hole punching).
+- A room holds at most 16 machines (a dedicated server's `--max-players` stops at 15), set by
+  the wire format, not by a game.
 - A dedicated server writes logs only: no status page or metrics (rooms, players, frame time,
   bandwidth).
 

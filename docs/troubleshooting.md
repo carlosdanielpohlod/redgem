@@ -4,13 +4,14 @@ description: "Known limits and what to do when something goes wrong."
 
 # Limits and troubleshooting
 
-## Current capabilities and limits
+## What RedGem does not do yet
 
-For supported features, see the [scripting API](scripting/api.md),
-[animation guide](scripting/animation.md) and [editor guide](editor.md).
-The [known limitations](https://github.com/carlosdanielpohlod/redgem/blob/main/KNOWN_LIMITATIONS.md)
-track remaining gaps and priorities as features are added.
+The full list of what is missing or known to be wrong is
+[KNOWN_LIMITATIONS.md](https://github.com/carlosdanielpohlod/redgem/blob/main/KNOWN_LIMITATIONS.md).
+Knowing these up front saves time:
 
+- **Multiplayer** has no matchmaking and no lag compensation; playing over the internet needs a
+  relay you run, or a forwarded port (see [Multiplayer](scripting/multiplayer.md)).
 - **Platforms:** the editor is developed on Linux; the Windows and macOS downloads are
   experimental (macOS has only run on GitHub's virtual Macs, drawn by Apple's software renderer).
   Games are built for Linux, Windows and Android, and for the Mac from the Mac's editor (no iOS,

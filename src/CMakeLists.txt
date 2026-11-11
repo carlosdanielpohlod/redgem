@@ -16,6 +16,8 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/debug.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/ui_widgets.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_layout.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/ui_scroll.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_screen.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/game_menu_settings.rb
@@ -305,6 +307,9 @@ redgem_add_library(redgem_runtime
   physics/jolt/jolt_physics_world_queries.cpp
   physics/jolt/jolt_physics_world_debug.cpp
   audio/audio.cpp
+  audio/mixed_audio.cpp
+  audio/music_player.cpp
+  audio/raylib_audio.cpp
   input/keys.cpp
   input/devices.cpp
   input/input.cpp

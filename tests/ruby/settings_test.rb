@@ -60,6 +60,22 @@ class SettingsTest < RedGemTest::Case
     assert_in_delta 1.0, Settings.volume
   end
 
+  def test_each_group_has_a_volume_of_its_own_apart_from_the_master_volume
+    Settings.volume = 1.0
+    Settings.music_volume = 0.25
+    Settings.effects_volume = 0.5
+    assert_in_delta 1.0, Settings.volume
+    assert_in_delta 0.25, Settings.music_volume
+    assert_in_delta 0.5, Settings.effects_volume
+  end
+
+  def test_a_groups_volume_is_held_from_silent_to_full
+    Settings.voice_volume = 3
+    assert_in_delta 1.0, Settings.voice_volume
+    Settings.voice_volume = -1
+    assert_in_delta 0.0, Settings.voice_volume
+  end
+
   def test_a_quality_is_one_of_the_presets
     Settings.quality = :medium
     assert_equal :medium, Settings.quality

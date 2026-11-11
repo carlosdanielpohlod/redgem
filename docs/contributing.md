@@ -342,13 +342,12 @@ game's files may translate those too. The same test checks the games and templat
 repository: every key their scripts show has a text in their `locales/en.json` or the `game` part,
 and every text of theirs is shown.
 
-## Current limitations
+## Not there yet
 
-See [known limitations](https://github.com/carlosdanielpohlod/redgem/blob/main/KNOWN_LIMITATIONS.md)
-for current gaps and priorities. Check the relevant manual page and regression tests before
-starting a feature or reporting missing support.
+What is missing or known to be wrong, with good places to start, is listed in
+[KNOWN_LIMITATIONS.md](https://github.com/carlosdanielpohlod/redgem/blob/main/KNOWN_LIMITATIONS.md).
 
-## Reading the process event history
+### Reading the process event history
 
 The native tooling API can read logs without replacing the console sink. Include
 `core/event_journal.hpp`, take `log::event_cursor()` before an operation, then read

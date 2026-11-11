@@ -56,6 +56,7 @@ Engine::~Engine() {
   keep_bindings();
   // Scripts reference the scene and physics through the context: tear them down first.
   scripts_.reset();
+  release_audio();  // (after the scripts: a sound one plays as it goes stops too)
   physics_.reset();
 }
 
@@ -123,19 +124,38 @@ void Engine::open_audio() {
 
 void Engine::open_display(const DisplaySettings& game_defaults) {
   context_.display = options_.display.value_or(game_defaults);
-  follow_players_volume(context_.display.volume);
+  follow_players_volumes(context_.display);
 }
 
-void Engine::follow_players_volume(float volume) {
-  if (volume == players_volume_) return;
-  players_volume_ = volume;
-  audio().set_player_volume(volume);
+void Engine::follow_players_volumes(const DisplaySettings& display) {
+  if (display.volume != players_volume_) {
+    players_volume_ = display.volume;
+    audio().set_player_volume(display.volume);
+  }
+  follow_group_volume(MixGroup::Music, display.music_volume);
+  follow_group_volume(MixGroup::Effects, display.effects_volume);
+  follow_group_volume(MixGroup::Voice, display.voice_volume);
+}
+
+void Engine::follow_group_volume(MixGroup group, float volume) {
+  float& followed = players_group_volumes_[mix_group_index(group)];
+  if (volume == followed) return;
+  followed = volume;
+  audio().set_group_volume(group, volume);
+}
+
+// The game's sounds end with it, and its player's group volumes with them (the audio may go on
+// sounding for someone else: the editor's previews).
+void Engine::release_audio() {
+  if (!audio_open()) return;  // (the engine failed to start before it had any)
+  audio().stop_sounds();
+  for (const MixGroup group : kMixGroups) follow_group_volume(group, kFullVolume);
 }
 
 void Engine::connect_display() {
   context_.apply_display = [this](const DisplaySettings& display) {
     presenter_->apply_display(display);
-    follow_players_volume(display.volume);
+    follow_players_volumes(display);
   };
   if (keeps_display(options_.display_kept_in)) {
     context_.save_display = [this](const DisplaySettings& display, std::string& error) {
@@ -251,6 +271,8 @@ void Engine::seed_scripts() {
   mrb_state* mrb = scripts_->vm().state();
   scripts_->vm().call(mrb_top_self(mrb), "srand", {mrb_int_value(mrb, *options_.random_seed)});
 }
+
+bool Engine::audio_open() const { return options_.audio != nullptr || owned_audio_ != nullptr; }
 
 AudioSystem& Engine::audio() { return options_.audio != nullptr ? *options_.audio : *owned_audio_; }
 
