@@ -77,6 +77,8 @@ PointLightUniforms pack_point_lights(const std::vector<PointLight>& lights) {
     packed.positions[i] = to_raylib(light.position);
     packed.colors[i] = to_raylib(light.color);
     packed.ranges[i] = light.range;
+    const Vec3 spot = light.axis * light.cone.scale;
+    packed.spots[i] = {spot.x, spot.y, spot.z, light.cone.offset};
   }
   return packed;
 }

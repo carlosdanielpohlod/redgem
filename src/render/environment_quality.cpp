@@ -35,6 +35,11 @@ int samples_of(float asked) {
   return samples;
 }
 
+// Point and spot lights casting shadows at once: a whole number from none to the most.
+int local_shadows_of(float asked) {
+  return static_cast<int>(std::lround(std::clamp(asked, 0.0f, static_cast<float>(config::kMostLocalShadows))));
+}
+
 int cascades_of(float asked) {
   return static_cast<int>(std::lround(std::clamp(asked, 1.0f, static_cast<float>(kMostCascades))));
 }
@@ -52,6 +57,13 @@ bool allowed_temporal(bool asked, const QualityCaps& caps, const GpuAbilities& g
   return asked && caps.temporal_antialias && gpu.temporal;
 }
 
+// Shadows of point and spot lights: as many as the level and the quality allow, none when the card
+// cannot hold their atlas.
+int allowed_local_shadows(int asked, const QualityCaps& caps, const GpuAbilities& gpu) {
+  if (!gpu.local_shadows) return 0;
+  return std::min(asked, std::max(caps.local_shadows, 0));
+}
+
 }  // namespace
 
 void read_sky_and_quality(const PropertyMap& props, Environment& env) {
@@ -64,6 +76,8 @@ void read_sky_and_quality(const PropertyMap& props, Environment& env) {
                                    kNearestShadows, kFarthestShadows);
   const float softness = std::clamp(number_or(props, props::environment::kShadowSoftness, 0.0f), 0.0f, kWidestSun);
   env.shadow_softness = degrees_to_radians(softness);
+  env.local_shadows = local_shadows_of(
+      number_or(props, props::environment::kLocalShadows, static_cast<float>(config::kMostLocalShadows)));
   env.temporal_antialias = get_string(props, props::environment::kAntialias) == props::environment::kTemporalAntialias;
 }
 
@@ -71,6 +85,7 @@ Environment within_quality(Environment env, const QualityCaps& caps, const GpuAb
   env.msaa = allowed_samples(env.msaa, caps.msaa, gpu);
   env.temporal_antialias = allowed_temporal(env.temporal_antialias, caps, gpu);
   env.shadow_cascades = std::clamp(caps.shadow_cascades, 1, env.shadow_cascades);
+  env.local_shadows = allowed_local_shadows(env.local_shadows, caps, gpu);
   // (Never nearer than the nearest shadows reach: a cascade needs room.)
   const float nearest = std::min(env.shadow_distance, kNearestShadows);
   env.shadow_distance = std::max(env.shadow_distance * allowed_share(caps.shadow_distance), nearest);

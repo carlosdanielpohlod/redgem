@@ -191,6 +191,18 @@ void Renderer::Impl::ensure_glow_target() {
   if (!loaded(glow)) glow = load_target_on(hdr.depth, kHdrFormat);
 }
 
+bool Renderer::Impl::ensure_local_shadow_atlas() {
+  if (loaded(local_shadow)) return true;
+  if (!gpu.local_shadows) return false;
+  try {
+    local_shadow = load_depth_target(render_math::kLocalShadowAtlasSize, render_math::kLocalShadowAtlasSize);
+  } catch (const std::runtime_error&) {
+    gpu.local_shadows = false;
+    log::warning("the graphics card cannot hold the shadows of point and spot lights: they are left out");
+  }
+  return loaded(local_shadow);
+}
+
 void Renderer::Impl::ensure_scene_depth_target() {
   if (!loaded(scene_depth)) scene_depth = load_depth_target(hdr.texture.width, hdr.texture.height);
 }
@@ -221,6 +233,7 @@ void Renderer::Impl::release_targets() {
 
 void Renderer::Impl::release_fixed_targets() {
   unload_depth_target(shadow);
+  unload_depth_target(local_shadow);
   for (RenderTexture2D* target : {&reflection_face, &panorama, &debug_output}) unload(*target);
 }
 

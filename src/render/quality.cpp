@@ -19,12 +19,14 @@ constexpr int kHighSamples = 4;
 constexpr int kHighCascades = 3;
 constexpr float kHighReach = 0.75f;  // of the shadows' and the scattered copies' distance
 constexpr float kHighDensity = 0.75f;
+constexpr int kHighLocalShadows = 2;  // point and spot lights casting shadows
 constexpr int kMediumSamples = 2;
 constexpr int kMediumCascades = 2;
 constexpr float kMediumReach = 0.5f;
 constexpr float kMediumDensity = 0.5f;
 constexpr float kMediumSky = 0.5f;
 constexpr float kMediumOcclusion = 0.5f;
+constexpr int kMediumLocalShadows = 1;
 constexpr float kLowReach = 0.35f;
 constexpr float kLowDensity = 0.25f;
 constexpr float kLowSky = 0.25f;
@@ -34,6 +36,7 @@ QualityCaps high_caps() {
   caps.msaa = kHighSamples;
   caps.shadow_cascades = kHighCascades;
   caps.shadow_distance = kHighReach;
+  caps.local_shadows = kHighLocalShadows;
   caps.scatter_density = kHighDensity;
   caps.scatter_distance = kHighReach;
   return caps;
@@ -44,6 +47,7 @@ QualityCaps medium_caps() {
   caps.msaa = kMediumSamples;
   caps.shadow_cascades = kMediumCascades;
   caps.shadow_distance = kMediumReach;
+  caps.local_shadows = kMediumLocalShadows;
   caps.scatter_density = kMediumDensity;
   caps.scatter_distance = kMediumReach;
   caps.sky_detail = kMediumSky;
@@ -57,6 +61,7 @@ QualityCaps low_caps() {
   caps.temporal_antialias = false;
   caps.shadow_cascades = 1;
   caps.shadow_distance = kLowReach;
+  caps.local_shadows = 0;
   caps.scatter_density = kLowDensity;
   caps.scatter_distance = kLowReach;
   caps.sky_detail = kLowSky;
@@ -70,8 +75,8 @@ QualityCaps low_caps() {
 bool operator==(const QualityCaps& a, const QualityCaps& b) {
   const auto fields = [](const QualityCaps& caps) {
     return std::make_tuple(caps.msaa, caps.temporal_antialias, caps.shadow_cascades, caps.shadow_distance,
-                           caps.scatter_density, caps.scatter_distance, caps.sky_detail, caps.ambient_occlusion,
-                           caps.bloom);
+                           caps.local_shadows, caps.scatter_density, caps.scatter_distance, caps.sky_detail,
+                           caps.ambient_occlusion, caps.bloom);
   };
   return fields(a) == fields(b);
 }

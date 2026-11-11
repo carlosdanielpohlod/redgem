@@ -2,8 +2,8 @@
 
 // The fragment shader every surface of a scene is lit by. It is one GLSL program, kept in parts
 // that share its uniforms and constants: this head (what it takes, how light meets a surface),
-// the sun's shadows (lit_shadows.hpp), the light from all around (lit_sky.hpp) and its main
-// (lit_main.hpp). lit_fragment() puts them together in that order, with copies fading by distance
+// the shadows of the sun and of point and spot lights (lit_shadows.hpp), the light from all around (lit_sky.hpp) and
+// its main (lit_main.hpp). lit_fragment() puts them together in that order, with copies fading by distance
 // (copy_fade.hpp) and which texels are drawn after the head.
 
 #include <string>
@@ -61,6 +61,7 @@ uniform int pointLightCount;
 uniform vec3 pointLightPositions[MAX_POINT_LIGHTS];
 uniform vec3 pointLightColors[MAX_POINT_LIGHTS];
 uniform float pointLightRanges[MAX_POINT_LIGHTS];
+uniform vec4 pointLightSpots[MAX_POINT_LIGHTS];  // a spot's axis times its cone's scale, and its offset (0, 0, 0, 1: a point light)
 uniform vec3 fogColor;
 uniform float fogDensity;
 
@@ -194,7 +195,8 @@ inline std::string lit_fragment(const LitFeatures& features = {}) {
   if (features.soft_shadows) switches += kSoftShadowsSwitch;
   if (features.clearcoat) switches += kClearcoatSwitch;
   if (features.water) switches += kWaterSwitch;
-  std::string source = std::string(kLitHead) + kCopyFade + kLitAlpha + kLitShadows + kLitSky + kLitClearcoat;
+  std::string source =
+      std::string(kLitHead) + kCopyFade + kLitAlpha + kLitShadows + kLitLocalShadows + kLitSky + kLitClearcoat;
   if (features.water) source += std::string(kWaterWaves) + kWaterFilter + kLitWater;
   source += kLitMain;
   const std::size_t version = source.find(kVersionLine);

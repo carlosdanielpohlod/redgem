@@ -18,6 +18,7 @@
 //   renderer_particle_glow.cpp glowing particles held to the environment's limit
 //   renderer_temporal.cpp     edges smoothed with the frames before (temporal anti-aliasing)
 //   renderer_shadows.cpp      the sun's shadow map
+//   renderer_local_shadows.cpp the shadows of point and spot lights
 //   renderer_reflections.cpp  the surroundings, for reflections
 //   renderer_post.cpp         from the lit picture to the one on screen
 //   renderer_overlay.cpp      what games draw over the picture
@@ -42,6 +43,7 @@
 #include "render/instance_batches.hpp"
 #include "render/water_ripple_packet.hpp"
 #include "render/instance_records.hpp"
+#include "render/local_shadows.hpp"
 #include "render/material_alpha.hpp"
 #include "render/mesh_pass.hpp"
 #include "render/particle_buffer.hpp"
@@ -66,6 +68,7 @@ inline constexpr ::Color kWhite{config::kMaxColorByte, config::kMaxColorByte, co
                                 config::kMaxColorByte};  // also the tint that leaves a drawn texture unchanged
 inline constexpr ::Color kBlack{0, 0, 0, config::kMaxColorByte};
 // Texture slots no material uses: bound once per frame.
+inline constexpr int kLocalShadowTextureSlot = 8;  // the atlas of point and spot lights' shadows
 inline constexpr int kReflectionTextureSlot = 9;
 inline constexpr int kShadowTextureSlot = 10;
 inline constexpr int kFrameTexelSlot = 11;
@@ -223,7 +226,10 @@ struct Renderer::Impl {
   render_detail::TemporalUniforms temporal_uniforms;
   Shader sharpen_shader{};
   // Targets whose size does not follow the window.
-  RenderTexture2D shadow{};           // depth of the scene seen from the sun (no color)
+  RenderTexture2D shadow{};  // depth of the scene seen from the sun (no color)
+  // Depth seen from the point and spot lights that cast shadows, in tiles (see local_shadows.hpp):
+  // made when a frame first draws one.
+  RenderTexture2D local_shadow{};
   RenderTexture2D reflection_face{};  // one 90-degree view of the surroundings
   RenderTexture2D panorama{};         // all of them, as longitude x latitude, with mips
   // Post-processing targets, sized like the output.
@@ -301,6 +307,10 @@ struct Renderer::Impl {
   bool glow_gathered = false;         // this frame's glowing particles wait in `glow`
   Vector3 sun_travel{};               // direction the sun's light travels
   std::array<Matrix, render_math::kMaxShadowCascades> light_matrices{};  // into each cascade's view
+  // The frame's point and spot lights as the lit shader takes them (those casting shadows first),
+  // and the shadows they cast.
+  std::vector<PointLight> frame_lights;
+  std::vector<render_math::LocalShadow> local_shadows;
   float view_tan_half_fov = 0.0f;  // of the camera, for rebuilding positions from depth
   float view_aspect = 0.0f;
   // The frame's particles: their pictures (by Particle::look.image), the distinct ones among those
@@ -359,6 +369,9 @@ struct Renderer::Impl {
   void draw_water_copies(const GpuPrimitive& primitive, const render_detail::InstanceRun& run, ObjectPass& pass);
   float mesh_wave_height(int mesh) const;
   void ensure_glow_target();
+  // The atlas of point and spot lights' shadows; false when the card cannot make it (it is not
+  // asked again: see GpuAbilities::local_shadows).
+  bool ensure_local_shadow_atlas();
   void ensure_scene_depth_target();
   void ensure_temporal_targets();
   void release_targets();
@@ -434,6 +447,7 @@ struct Renderer::Impl {
 
   // Sends the sun, the point lights nearest to the viewer and the environment to the shaders.
   void apply_lights(const Scene& scene, const Environment& env, Vec3 viewer);
+  void pick_frame_lights(std::vector<PointLight> points, const Environment& env, Vec3 viewer);
   void send_lights(Vector3 sun_direction, Vector3 sun_color, float ambient,
                    const render_math::PointLightUniforms& points);
   void send_atmosphere(const Environment& env);
@@ -581,6 +595,17 @@ struct Renderer::Impl {
   // leads into that view.
   Matrix draw_depth_from(const Camera3D& sun_view, Vec3 viewer);
   void send_cascades(const render_math::Cascades& cascades, float sun_size);
+
+  // --- Point and spot lights' shadows (renderer_local_shadows.cpp) ------------------------------
+
+  // Draws the depth seen from each light of `local_shadows` into its tiles of the atlas and hands
+  // them to the lit shader (none when the frame has none, or the card cannot hold the atlas).
+  // `viewer`: the game camera, which judges detail as in the sun's pass.
+  void draw_local_shadows(Vec3 viewer);
+  bool local_shadows_wanted();
+  void draw_light_shadow(const render_math::LocalShadow& shadow, Vec3 viewer);
+  void draw_shadow_tile(const Camera3D& view, int tile, Vec3 viewer);
+  void send_local_shadows();
 
   // --- Reflections (renderer_reflections.cpp) ---------------------------------------------------
 

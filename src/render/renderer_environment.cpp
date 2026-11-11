@@ -21,11 +21,10 @@ constexpr float kLightFadeDistance = 12.0f;  // meters over which the farthest u
 
 void Renderer::Impl::apply_lights(const Scene& scene, const Environment& env, Vec3 viewer) {
   SceneLights lights = scene_lights(scene);
-  const std::vector<PointLight> nearest =
-      nearest_lights(std::move(lights.points), viewer, shaders::kMaxPointLights, kLightFadeDistance);
+  pick_frame_lights(std::move(lights.points), env, viewer);
   const Vector3 sun_direction = to_raylib(lights.sun_direction);
   const Vector3 sun_color = to_raylib(lights.sun_color);
-  const render_math::PointLightUniforms points = render_math::pack_point_lights(nearest);
+  const render_math::PointLightUniforms points = render_math::pack_point_lights(frame_lights);
   send_lights(sun_direction, sun_color, env.ambient, points);
   send_particle_lights(sun_direction, sun_color, env, points);
   send_atmosphere(env);
@@ -34,6 +33,15 @@ void Renderer::Impl::apply_lights(const Scene& scene, const Environment& env, Ve
   wind = env.wind;
   glow_limit = env.glow_limit;
   sun_travel = sun_direction;
+}
+
+// The lights that matter most to the viewer, and of those the ones whose shadows the frame draws
+// (first: the lit shader finds a light's shadow by its place).
+void Renderer::Impl::pick_frame_lights(std::vector<PointLight> points, const Environment& env, Vec3 viewer) {
+  const std::vector<PointLight> nearest =
+      nearest_lights(std::move(points), viewer, shaders::kMaxPointLights, kLightFadeDistance);
+  local_shadows = render_math::pick_local_shadows(nearest, env.local_shadows);
+  frame_lights = render_math::shadowed_first(nearest, local_shadows);
 }
 
 void Renderer::Impl::send_lights(Vector3 sun_direction, Vector3 sun_color, float ambient,
@@ -46,6 +54,7 @@ void Renderer::Impl::send_lights(Vector3 sun_direction, Vector3 sun_color, float
   SetShaderValueV(shader, lit_uniforms.point_positions, points.positions, SHADER_UNIFORM_VEC3, points.count);
   SetShaderValueV(shader, lit_uniforms.point_colors, points.colors, SHADER_UNIFORM_VEC3, points.count);
   SetShaderValueV(shader, lit_uniforms.point_ranges, points.ranges, SHADER_UNIFORM_FLOAT, points.count);
+  SetShaderValueV(shader, lit_uniforms.point_spots, points.spots, SHADER_UNIFORM_VEC4, points.count);
 }
 
 void Renderer::Impl::send_particle_lights(Vector3 sun_direction, Vector3 sun_color, const Environment& env,
@@ -62,6 +71,7 @@ void Renderer::Impl::send_particle_lights(Vector3 sun_direction, Vector3 sun_col
   SetShaderValueV(particle_shader, at.point_positions, points.positions, SHADER_UNIFORM_VEC3, points.count);
   SetShaderValueV(particle_shader, at.point_colors, points.colors, SHADER_UNIFORM_VEC3, points.count);
   SetShaderValueV(particle_shader, at.point_ranges, points.ranges, SHADER_UNIFORM_FLOAT, points.count);
+  SetShaderValueV(particle_shader, at.point_spots, points.spots, SHADER_UNIFORM_VEC4, points.count);
 }
 
 // What surfaces are lit by from all around, what hides them far away, and the time foliage sways by.

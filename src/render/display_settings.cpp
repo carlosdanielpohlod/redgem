@@ -29,6 +29,7 @@ constexpr const char* kMsaaKey = "msaa";
 constexpr const char* kAntialiasKey = "antialias";
 constexpr const char* kCascadesKey = "shadow_cascades";
 constexpr const char* kShadowDistanceKey = "shadow_distance";
+constexpr const char* kLocalShadowsKey = "local_shadows";
 constexpr const char* kScatterDensityKey = "scatter_density";
 constexpr const char* kScatterDistanceKey = "scatter_distance";
 constexpr const char* kSkyDetailKey = "sky_detail";
@@ -95,6 +96,7 @@ nlohmann::json caps_json(const QualityCaps& caps) {
           {kAntialiasKey, caps.temporal_antialias},
           {kCascadesKey, caps.shadow_cascades},
           {kShadowDistanceKey, caps.shadow_distance},
+          {kLocalShadowsKey, caps.local_shadows},
           {kScatterDensityKey, caps.scatter_density},
           {kScatterDistanceKey, caps.scatter_distance},
           {kSkyDetailKey, caps.sky_detail},
@@ -107,6 +109,7 @@ void read_caps(const nlohmann::json& json, QualityCaps& caps) {
   read_whole(json, kMsaaKey, 0, config::kMostSamples, caps.msaa);
   read_bool(json, kAntialiasKey, caps.temporal_antialias);
   read_whole(json, kCascadesKey, 1, config::kMostCascades, caps.shadow_cascades);
+  read_whole(json, kLocalShadowsKey, 0, config::kMostLocalShadows, caps.local_shadows);
   using Share = std::pair<const char*, float*>;
   const Share shares[] = {{kShadowDistanceKey, &caps.shadow_distance},   {kScatterDensityKey, &caps.scatter_density},
                           {kScatterDistanceKey, &caps.scatter_distance}, {kSkyDetailKey, &caps.sky_detail},

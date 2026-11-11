@@ -42,6 +42,8 @@ LightDesc read_light(const cgltf_light& light) {
   out.color = {light.color[kRedChannel], light.color[kGreenChannel], light.color[kBlueChannel], kOpaqueAlpha};
   out.intensity = light.intensity;
   out.range = light.range;
+  out.inner_cone = light.spot_inner_cone_angle;
+  out.outer_cone = light.spot_outer_cone_angle;
   return out;
 }
 

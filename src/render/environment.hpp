@@ -40,6 +40,8 @@ struct Environment {
   int shadow_cascades = 1;       // pictures of the sun's shadow map, farther and farther from the camera
   float shadow_distance = 0.0f;  // meters from the camera the cascades reach
   float shadow_softness = 0.0f;  // radians across the sun: wider shadow edges farther from their casters (0: fixed)
+  // Point and spot lights that may cast shadows at once (of those whose `cast_shadow` is on).
+  int local_shadows = config::kMostLocalShadows;
   // Edges smoothed with the frames before (see temporal.hpp) instead of after the picture is drawn.
   bool temporal_antialias = false;
   // The brightest that glowing particles together make a pixel, in linear light: many of them over
@@ -57,6 +59,7 @@ Environment default_environment();
 //   sky_image (a name), sky_rotation (degrees), sky_intensity
 //   msaa (samples: 2, 4 or 8), shadow_cascades (1 to 4), shadow_distance (meters),
 //   shadow_softness (degrees across the sun: the real one is about half a degree),
+//   local_shadows (0 to 4 point and spot lights casting shadows at once),
 //   antialias ("temporal": with the frames before)
 Environment environment_from_props(const PropertyMap& props);
 
@@ -68,6 +71,7 @@ void read_sky_and_quality(const PropertyMap& props, Environment& env);
 struct GpuAbilities {
   bool multisampling = true;  // drawing several samples a pixel, and copying them into one
   bool temporal = true;       // copying the frame's depth and colors for the frames after it
+  bool local_shadows = true;  // a depth atlas for the shadows of point and spot lights
 };
 
 // What a level's environment gets of what it asks for under a quality and on a card: never more

@@ -60,6 +60,7 @@ struct PointLightUniforms {
   Vector3 positions[shaders::kMaxPointLights] = {};
   Vector3 colors[shaders::kMaxPointLights] = {};
   float ranges[shaders::kMaxPointLights] = {};
+  Vector4 spots[shaders::kMaxPointLights] = {};  // a spot's axis times its cone's scale, and its offset
   int count = 0;
 };
 // Lights beyond the shader's limit are left out.

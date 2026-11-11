@@ -13,6 +13,12 @@ inline constexpr const char* kPointLightCount = "pointLightCount";
 inline constexpr const char* kPointLightPositions = "pointLightPositions";
 inline constexpr const char* kPointLightColors = "pointLightColors";
 inline constexpr const char* kPointLightRanges = "pointLightRanges";
+// Per light: a spot's axis times its cone's scale, and the cone's offset (see SpotCone).
+inline constexpr const char* kPointLightSpots = "pointLightSpots";
+// Shadows of point and spot lights (see local_shadows.hpp).
+inline constexpr const char* kLocalShadowMap = "localShadowMap";
+inline constexpr const char* kLocalShadowCount = "localShadowCount";
+inline constexpr const char* kLocalShadows = "localShadows";
 inline constexpr const char* kFogColor = "fogColor";
 inline constexpr const char* kFogDensity = "fogDensity";
 inline constexpr const char* kViewPosition = "viewPos";

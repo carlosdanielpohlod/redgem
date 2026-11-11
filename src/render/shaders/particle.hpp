@@ -32,6 +32,7 @@ uniform int pointLightCount;
 uniform vec3 pointLightPositions[MAX_POINT_LIGHTS];
 uniform vec3 pointLightColors[MAX_POINT_LIGHTS];
 uniform float pointLightRanges[MAX_POINT_LIGHTS];
+uniform vec4 pointLightSpots[MAX_POINT_LIGHTS];  // a spot's axis times its cone's scale, and its offset
 out vec2 fragTexCoord;
 out vec4 fragColor;
 out vec3 fragLocalLight;
@@ -44,14 +45,18 @@ const float SKY_ABOVE = 0.5;           // of the sky around it: from above, arou
 const float SKY_AROUND = 0.3;
 const float SKY_BELOW = 0.2;
 const float LIGHT_FALLOFF_BIAS = 1.0;  // as the lit shader's: meters added so lights do not blow up up close
+const float NEAREST_LIGHT = 0.0001;    // meters: a puff right at a light still has a direction from it
 
 vec3 lightAround(vec3 position) {
   vec3 sky = skyTop * SKY_ABOVE + skyHorizon * SKY_AROUND + groundColor * SKY_BELOW;
   vec3 light = sky * ambientStrength;
   for (int i = 0; i < pointLightCount; ++i) {
-    float distance = length(pointLightPositions[i] - position);
+    vec3 away = position - pointLightPositions[i];
+    float distance = length(away);
     float window = clamp(1.0 - distance / pointLightRanges[i], 0.0, 1.0);
-    light += pointLightColors[i] * (window * window / (distance * distance + LIGHT_FALLOFF_BIAS)) * LIT_SHARE;
+    // A spot lights a puff within its cone only (a point light: everywhere).
+    float cone = clamp(dot(away / max(distance, NEAREST_LIGHT), pointLightSpots[i].xyz) + pointLightSpots[i].w, 0.0, 1.0);
+    light += pointLightColors[i] * (window * window / (distance * distance + LIGHT_FALLOFF_BIAS)) * cone * cone * LIT_SHARE;
   }
   return light;
 }

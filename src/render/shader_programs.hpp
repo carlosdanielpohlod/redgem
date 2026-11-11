@@ -80,6 +80,10 @@ struct LitUniforms {
   int point_positions = kNoLocation;
   int point_colors = kNoLocation;
   int point_ranges = kNoLocation;
+  int point_spots = kNoLocation;
+  int local_shadow_map = kNoLocation;
+  int local_shadow_count = kNoLocation;
+  int local_shadows = kNoLocation;
   int fog_color = kNoLocation;
   int fog_density = kNoLocation;
   int time = kNoLocation;
@@ -152,6 +156,7 @@ struct ParticleUniforms {
   int point_positions = kNoLocation;
   int point_colors = kNoLocation;
   int point_ranges = kNoLocation;
+  int point_spots = kNoLocation;
   int look = kNoLocation;  // the vertex attribute of how soft and how lit a particle is
 };
 
