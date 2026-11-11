@@ -3,6 +3,7 @@
 #include "editor/document/gltf_json.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <iterator>
 
 #include "scene/props.hpp"
@@ -14,6 +15,10 @@ namespace {
 constexpr float kUnitFactor = 1.0f;     // glTF color factors stop here
 constexpr float kInfiniteRange = 0.0f;  // glTF: a light without a range reaches as far as its strength allows
 constexpr float kInfiniteFar = 0.0f;    // a camera far plane of 0 means infinite
+constexpr float kConeAxis = 0.0f;
+constexpr float kMaxOuterCone = 1.5707963f;  // largest float below pi / 2
+constexpr const char* kInnerConeAngle = "innerConeAngle";
+constexpr const char* kOuterConeAngle = "outerConeAngle";
 
 bool is_scalar(const nlohmann::json& value) { return value.is_boolean() || value.is_number() || value.is_string(); }
 
@@ -96,6 +101,21 @@ bool needs_new_entry(bool known, const std::set<int>& claimed, int source) {
   return !known || claimed.count(source) != 0;
 }
 
+void write_spot_cones(nlohmann::json& entry, const LightDesc& light) {
+  if (light.type != LightType::Spot) {
+    entry.erase(kSpotLight);
+    return;
+  }
+  const bool outer_valid = std::isfinite(light.outer_cone) && light.outer_cone > kConeAxis;
+  const auto outer = outer_valid ? std::min(light.outer_cone, kMaxOuterCone) : kDefaultSpotOuterCone;
+  const auto max_inner = std::nextafter(outer, kConeAxis);
+  const auto inner = std::isfinite(light.inner_cone) ? std::clamp(light.inner_cone, kConeAxis, max_inner) : kConeAxis;
+  auto& spot = entry[kSpotLight];
+  if (!spot.is_object()) spot = nlohmann::json::object();
+  spot[kInnerConeAngle] = inner;
+  spot[kOuterConeAngle] = outer;
+}
+
 }  // namespace
 
 nlohmann::json property_json(const PropertyValue& value) {
@@ -157,6 +177,7 @@ void write_light(nlohmann::json& entry, const LightDesc& light) {
   entry[kType] = light_type_name(light.type);
   entry[kColor] = {light.color.r, light.color.g, light.color.b};
   entry[kIntensity] = light.intensity;
+  write_spot_cones(entry, light);
   if (light.range > kInfiniteRange) {
     entry[kRange] = light.range;
   } else {

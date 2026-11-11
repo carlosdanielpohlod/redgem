@@ -222,6 +222,22 @@ TEST_CASE("lights are saved by type, and with a range only when they have one") 
   CHECK_FALSE(entry.contains(kRange));
 }
 
+TEST_CASE("spot angles are valid on disk and belong only to spot lights") {
+  json entry = {{kSpotLight, {{kOtherExtension, true}}}};
+  LightDesc light{LightType::Spot, kOrange, kLampWatts};
+  light.inner_cone = kDefaultSpotOuterCone;
+  light.outer_cone = kDefaultSpotOuterCone;
+  write_light(entry, light);
+  const auto& spot = entry.at(kSpotLight);
+  CHECK(spot.at(kOtherExtension) == true);
+  CHECK(spot.at("innerConeAngle").get<float>() < spot.at("outerConeAngle").get<float>());
+  CHECK(spot.at("outerConeAngle") == kDefaultSpotOuterCone);
+
+  light.type = LightType::Point;
+  write_light(entry, light);
+  CHECK_FALSE(entry.contains(kSpotLight));
+}
+
 TEST_CASE("a camera without a far plane is saved as an infinite projection") {
   json entry = json::object();
   write_camera(entry, CameraDesc{kFovRadians, kNear, kFar});

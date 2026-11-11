@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 
 #include "core/translations.hpp"
 #include "editor/editor_config.hpp"
@@ -24,6 +25,12 @@ constexpr const char* kTypeId = "##type";
 constexpr const char* kColorId = "##color";
 constexpr const char* kIntensityId = "##intensity";
 constexpr const char* kRangeId = "##range";
+constexpr const char* kInnerConeId = "##inner_cone";
+constexpr const char* kOuterConeId = "##outer_cone";
+constexpr const char* kConeFormat = "%.1f deg";
+constexpr float kConeAxisDegrees = 0.0f;
+constexpr float kMaxConeDegrees = 90.0f;
+constexpr float kConeStepDegrees = 0.1f;
 constexpr const char* kFovId = "##fov";
 constexpr const char* kNearId = "##near";
 constexpr const char* kFarId = "##far";
@@ -34,6 +41,26 @@ bool draw_light_range(LightDesc& light) {
       ImGui::DragFloat(kRangeId, &light.range, kDragSpeedNumber, kNoLowerLimit, FLT_MAX, kMetersFormat);
   tooltip(tr("editor.inspector.light.range_tooltip"));
   return changed;
+}
+
+bool drag_cone(const char* id, const char* label, float& degrees, float min, float max) {
+  property_label(tr(label));
+  return ImGui::DragFloat(id, &degrees, kConeStepDegrees, min, max, kConeFormat, ImGuiSliderFlags_AlwaysClamp);
+}
+
+bool draw_spot_cones(LightDesc& light) {
+  const auto outer_angle = std::isfinite(light.outer_cone) ? light.outer_cone : kDefaultSpotOuterCone;
+  const auto inner_angle = std::isfinite(light.inner_cone) ? light.inner_cone : kConeAxisDegrees;
+  float outer = std::clamp(radians_to_degrees(outer_angle), kConeStepDegrees, kMaxConeDegrees);
+  float inner = std::clamp(radians_to_degrees(inner_angle), kConeAxisDegrees, outer - kConeStepDegrees);
+  bool changed = drag_cone(kOuterConeId, "editor.inspector.light.outer_cone", outer, kConeStepDegrees, kMaxConeDegrees);
+  inner = std::min(inner, outer - kConeStepDegrees);
+  changed |=
+      drag_cone(kInnerConeId, "editor.inspector.light.inner_cone", inner, kConeAxisDegrees, outer - kConeStepDegrees);
+  if (!changed) return false;
+  light.outer_cone = degrees_to_radians(outer);
+  light.inner_cone = degrees_to_radians(std::clamp(inner, kConeAxisDegrees, outer - kConeStepDegrees));
+  return true;
 }
 
 bool draw_light_fields(LightDesc& light) {
@@ -47,6 +74,7 @@ bool draw_light_fields(LightDesc& light) {
   changed |= ImGui::DragFloat(kIntensityId, &light.intensity, kDragSpeedIntensity, kNoLowerLimit, FLT_MAX);
   tooltip(tr(is_sun ? "editor.inspector.light.sun_strength" : "editor.inspector.light.watts"));
   if (!is_sun) changed |= draw_light_range(light);
+  if (light.type == LightType::Spot) changed |= draw_spot_cones(light);
   return changed;
 }
 
