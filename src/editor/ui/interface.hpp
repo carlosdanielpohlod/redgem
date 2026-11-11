@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "render/window.hpp"
 
 namespace redgem::ui {
@@ -12,7 +14,8 @@ class Interface {
   // they are put (a form).
   enum class Layout { Fixed, Dockable };
   // `window` is the open window it is drawn in: asked for so that there is one.
-  Interface(const Window& window, Layout layout);
+  using ScaleReader = std::function<float()>;
+  Interface(const Window& window, Layout layout, ScaleReader read_scale = {});
   ~Interface();
   Interface(const Interface&) = delete;
   Interface& operator=(const Interface&) = delete;
@@ -20,6 +23,10 @@ class Interface {
   // Everything of the interface drawn in a frame goes between these two, inside the window's frame.
   void begin_frame();
   void end_frame();
+
+ private:
+  ScaleReader read_scale_;
+  float scale_ = 0;
 };
 
 }  // namespace redgem::ui

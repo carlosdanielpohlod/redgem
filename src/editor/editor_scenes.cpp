@@ -2,6 +2,7 @@
 // about unsaved edits, see editor_dialogs), and saving the open one under a new name.
 
 #include "editor/editor_app.hpp"
+#include "editor/ui/dpi.hpp"
 
 #include <imgui.h>
 
@@ -118,7 +119,7 @@ void EditorApp::draw_scene_name_dialog() {
 
 void EditorApp::draw_scene_name_form() {
   ImGui::TextColored(ui::muted_color(), "%s", tr("editor.scenes.name_help"));
-  ImGui::SetNextItemWidth(kSceneNameFieldWidth);
+  ImGui::SetNextItemWidth(ui::scaled(kSceneNameFieldWidth));
   if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
   const char* button = scene_name_button(scene_name_dialog_);
   if (!ui::draw_new_scene_form(kSceneNameId, tr("editor.scenes.name_hint"), button, scene_name_field_)) return;

@@ -12,6 +12,7 @@
 #include "editor/scene_viewport.hpp"
 #include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
+#include "editor/ui/dpi.hpp"
 #include "render/render_math.hpp"
 #include "render/renderer.hpp"
 
@@ -111,7 +112,7 @@ void EditorApp::draw_play_border() {
   const ImVec2 origin(viewport_->screen_x, viewport_->screen_y);
   const ImVec2 end(origin.x + viewport_width(), origin.y + viewport_height());
   ImGui::GetWindowDrawList()->AddRect(origin, end, ImGui::GetColorU32(ui::accent_color()), 0.0f, 0,
-                                      kPlayBorderThickness);
+                                      ui::scaled(kPlayBorderThickness));
 }
 
 // A hint in the bottom-left corner, on a dark pill so it reads over any scene (and stays clear
@@ -124,11 +125,11 @@ void EditorApp::draw_viewport_hint(bool playing) {
   const char* hint = ui::icon_label(shown.icon, shown.text);
   const ImVec2 hint_size = ImGui::CalcTextSize(hint);
   const editor_logic::Rect pill =
-      editor_logic::hint_pill(view.screen_x, view.screen_y, viewport_height(), hint_size.x, hint_size.y);
+      editor_logic::hint_pill(view.screen_x, view.screen_y, viewport_height(), hint_size.x, hint_size.y, ui::scaled(1));
   ImDrawList* draw = ImGui::GetWindowDrawList();
   draw->AddRectFilled(ImVec2(pill.min_x, pill.min_y), ImVec2(pill.max_x, pill.max_y),
-                      ImGui::GetColorU32(ImGuiCol_WindowBg, kOverlayAlpha), kOverlayRounding);
-  draw->AddText(ImVec2(pill.min_x + kOverlayPadding, pill.min_y + kOverlayPadding),
+                      ImGui::GetColorU32(ImGuiCol_WindowBg, kOverlayAlpha), ui::scaled(kOverlayRounding));
+  draw->AddText(ImVec2(pill.min_x + ui::scaled(kOverlayPadding), pill.min_y + ui::scaled(kOverlayPadding)),
                 ImGui::GetColorU32(playing ? ui::accent_color() : ui::muted_color()), hint);
 }
 

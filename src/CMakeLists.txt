@@ -613,6 +613,7 @@ if(NOT ANDROID)
     editor/ui/theme.cpp
     editor/ui/fonts.cpp
     editor/ui/interface.cpp
+    editor/ui/dpi.cpp
     editor/ui/embedded_fonts.cpp
     editor/agent/program_search.cpp
     editor/agent/child_process_posix.cpp

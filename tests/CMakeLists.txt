@@ -503,6 +503,7 @@ add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp edi
                editor_system/script_reload_test.cpp
                editor_system/physics_debug_test.cpp
                editor_system/scene_recovery_test.cpp
+               editor_system/dpi_test.cpp
                editor_system/agent_panel_test.cpp
                editor_system/build_progress_test.cpp
                editor_system/window_picture.cpp

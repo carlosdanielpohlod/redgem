@@ -1,6 +1,7 @@
 // Inspector cards of the scripts attached to an object, and the menu that attaches one.
 
 #include <algorithm>
+#include "editor/ui/dpi.hpp"
 
 #include "core/log.hpp"
 #include "core/filled_texts.hpp"
@@ -96,7 +97,7 @@ void draw_scripts(PanelContext& context, int index) {
 void add_script_menu(PanelContext& context, int index) {
   const std::vector<std::string> attached = scripts_of(context.session, index);
   std::string& new_name = context.state.inspector.new_script_name;
-  ImGui::SetNextItemWidth(kPopupFieldWidth);
+  ImGui::SetNextItemWidth(ui::scaled(kPopupFieldWidth));
   if (draw_new_script_form(kNewScriptId, tr("editor.inspector.script.name_hint"), new_script_label(), new_name)) {
     create_and_attach_script(context, index, new_name);
   }
