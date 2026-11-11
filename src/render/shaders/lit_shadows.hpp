@@ -223,6 +223,15 @@ float localVisibility(int slot, vec3 position, vec3 n, vec3 lightPosition, vec3 
   float bias = max(texelMeters * LOCAL_SLOPE_BIAS, LOCAL_MIN_BIAS);
   return localFiltered(uv, corner, along - bias, view.z, view.w);
 }
+
+// How much of point or spot light `i` reaches a point facing `n`: its cone, then its shadow (the
+// first lights cast the shadows, in order).
+float localReach(int i, vec3 position, vec3 n) {
+  vec3 fromLight = position - pointLightPositions[i];
+  float cone = spotCone(pointLightSpots[i], fromLight / max(length(fromLight), EPSILON));
+  if (i >= localShadowCount || cone <= 0.0) return cone;
+  return cone * localVisibility(i, position, n, pointLightPositions[i], pointLightSpots[i].xyz);
+}
 )GLSL";
 
 }  // namespace redgem::shaders

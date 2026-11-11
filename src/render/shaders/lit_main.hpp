@@ -51,10 +51,8 @@ void main() {
     // Inverse-square falloff that reaches exactly zero at the light's range.
     float window = clamp(1.0 - distance / pointLightRanges[i], 0.0, 1.0);
     float falloff = window * window / (distance * distance + LIGHT_FALLOFF_BIAS);
-    float cone = spotCone(pointLightSpots[i], -toLight / distance);
-    // (The first lights cast the shadows, in order.)
-    float shadow = i < localShadowCount ? localVisibility(i, fragPosition, flatNormal, pointLightPositions[i], pointLightSpots[i].xyz) : 1.0;
-    color += shadeSurface(n, v, toLight / distance, pointLightColors[i] * falloff * cone * shadow * PI, albedo, f0, rough, metal);
+    float reach = localReach(i, fragPosition, flatNormal);
+    color += shadeSurface(n, v, toLight / distance, pointLightColors[i] * falloff * reach * PI, albedo, f0, rough, metal);
   }
 
   float occlusion = mix(1.0, max(texture(occlusionMap, fragTexCoord).r, MIN_OCCLUSION), occlusionStrength);
