@@ -344,14 +344,8 @@ and every text of theirs is shown.
 
 ## Not there yet
 
-* Blend trees and animation events. Characters copied with Duplicate in the editor keep the pose
-  they were copied in.
-* Spot light cones, and camera clip planes from the scene (the engine uses fixed ones).
-* Reusing data when the same model is imported twice, and dropping the data of deleted imports
-  from `scene.glb` (each import appends its meshes and textures).
-* Mirrored objects (negative scale) are drawn inside out.
-* More vehicle options from Blender properties (drive layout, engine torque); hot reload of
-  scripts while playing.
+What is missing or known to be wrong, with good places to start, is listed in
+[KNOWN_LIMITATIONS.md](https://github.com/carlosdanielpohlod/redgem/blob/main/KNOWN_LIMITATIONS.md).
 
 ### Reading the process event history
 
