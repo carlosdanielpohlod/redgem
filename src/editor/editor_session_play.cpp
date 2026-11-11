@@ -92,7 +92,7 @@ void EditorSession::follow_scene_file(bool offer_archives) {
 }
 void EditorSession::forget_recovery() {
   std::string error;
-  if (!recovery_.discard(error)) {
+  if (!recovery_.discard_unsaved(error)) {
     log::warning(error);
     recovery_.ignore();
   }

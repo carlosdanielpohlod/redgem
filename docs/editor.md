@@ -168,7 +168,8 @@ While editing, the editor writes changed scene data roughly once a minute, outsi
 interactions, dialogs and Play. This is a separate hidden copy beside the scene
 (`.scene.glb.recovery`, or the corresponding name beside a scene in `scenes/`). The original
 file, dirty indicator and undo history stay unchanged. Copies and partial writes do not ship.
-Successful Save/Save As and explicit Discard remove the previous copy. An OS-held per-scene
+Successful Save/Save As remove the current session's backup. The recovery dialog's
+**Discard recovery copy** removes the specific copy offered there. An OS-held per-scene
 lease prevents a second editor from offering or deleting a live editor's copy; its small hidden
 lock file stays in place, and the OS releases ownership after exit or a crash. If cleanup fails
 after Save, a fingerprinted dismissal marker in the user's RedGem data folder suppresses that old copy
@@ -189,8 +190,11 @@ unverifiable, so the recovery prompt warns even if size and timestamp are unchan
 does not restrict the original source size or the normal memory budget used to load its decoded
 images. A second editor taking over after a live writer closes preserves that writer's backup
 as a hidden `.recovery.previous-<id>` sibling and logs its path. On opening a scene, the editor
-offers a saved archive if there is no current recovery copy. Resolve the current copy and reopen
-the scene to see any remaining archives.
+offers the newest archive when there is no current recovery copy to show. A waiting editor
+with a clean scene can also offer it after taking over. A waiting editor with unsaved edits
+keeps backing up its own work and offers the archive the next time the scene is opened. Archived
+copies stay in place after recovery, saving or switching scenes. To remove one, reopen the scene
+and choose **Discard recovery copy**.
 
 An autosave failure
 remains visible in the status bar and is retried only after another edit. Recovery refuses to

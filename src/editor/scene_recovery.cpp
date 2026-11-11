@@ -2,7 +2,6 @@
 
 #include <mbedtls/sha256.h>
 #include <array>
-#include <chrono>
 #include <fstream>
 #include <stdexcept>
 #include <string_view>
@@ -105,22 +104,24 @@ void archive_copy(const fs::path& source) {
   fs::rename(copy, archived);
   log::info("preserved another editor's recovery copy at " + archived.string());
 }
+bool is_archive(const fs::directory_entry& entry, const std::string& prefix) {
+  const auto name = entry.path().filename().generic_u8string();
+  return name.rfind(prefix, 0) == 0 && entry.symlink_status().type() == fs::file_type::regular;
+}
 fs::path next_archive(const fs::path& copy) {
   const auto prefix = copy.filename().generic_u8string() + ".previous-";
   const auto folder = copy.has_parent_path() ? copy.parent_path() : fs::path(".");
   fs::path found;
+  fs::file_time_type newest{};
   for (const auto& entry : fs::directory_iterator(folder)) {
-    const auto name = entry.path().filename().generic_u8string();
-    const bool matching = name.rfind(prefix, 0) == 0 && entry.symlink_status().type() == fs::file_type::regular;
-    if (matching && (found.empty() || entry.path() < found)) found = entry.path();
+    if (!is_archive(entry, prefix)) continue;
+    const auto time = entry.last_write_time();
+    const bool preferred = found.empty() || time > newest || (time == newest && entry.path() < found);
+    if (!preferred) continue;
+    found = entry.path();
+    newest = time;
   }
   return found;
-}
-void offer_archive(const fs::path& source) {
-  const auto copy = SceneRecovery::copy_path(source);
-  if (fs::exists(fs::symlink_status(copy))) return;
-  const auto archived = next_archive(copy);
-  if (!archived.empty()) fs::rename(archived, copy);
 }
 bool dismissed_copy(const fs::path& source) {
   std::ifstream marker(dismissed_path(source), std::ios::binary);
@@ -148,8 +149,7 @@ std::vector<std::uint8_t> copy_bytes(const fs::path& copy) {
   require(in.peek() == std::char_traits<char>::eof(), "scene recovery changed while reading");
   return bytes;
 }
-std::optional<SceneRecoveryCopy> checked_copy(const fs::path& source, std::string& error) {
-  const auto copy = SceneRecovery::copy_path(source);
+std::optional<SceneRecoveryCopy> checked_copy(const fs::path& source, const fs::path& copy, std::string& error) {
   safe_copy(source, copy);
   auto bytes = copy_bytes(copy);
   auto glb = decode_glb(bytes, copy.string(), error);
@@ -193,7 +193,7 @@ void SceneRecovery::reset_observation() {
   const bool dismissal_failed = problem_.rfind(kDismissalNotice, 0) == 0;
   if (!dismissal_failed) problem_.clear();
   elapsed_ = 0;
-  pending_ = false;
+  offered_path_.clear();
   inspection_pending_ = true;
 }
 bool SceneRecovery::own(const fs::path& source) {
@@ -207,19 +207,23 @@ bool SceneRecovery::own(const fs::path& source) {
   if (result == RecoveryLease::Result::Busy) takeover_pending_ = true;
   return result == RecoveryLease::Result::Acquired;
 }
-void SceneRecovery::discover_copy() {
-  const bool ignored = ignored_sources_.count(source_) != 0;
-  const bool exists = fs::exists(fs::symlink_status(copy_path(source_)));
-  pending_ = !ignored && exists && !dismissed_copy(source_);
+void SceneRecovery::discover_copy(bool offer_archives) {
+  if (ignored_sources_.count(source_) != 0) return;
+  const auto copy = copy_path(source_);
+  const bool exists = fs::exists(fs::symlink_status(copy));
+  const bool offer_live = exists && !dismissed_copy(source_);
+  if (offer_live) {
+    offered_path_ = copy;
+  } else if (offer_archives) {
+    offered_path_ = next_archive(copy);
+  }
 }
 void SceneRecovery::prepare_copy(bool offer_archives) {
   if (takeover_pending_) {
     archive_copy(source_);
     takeover_pending_ = false;
-  } else {
-    if (offer_archives) offer_archive(source_);
-    discover_copy();
   }
+  discover_copy(offer_archives);
   inspection_pending_ = false;
 }
 void SceneRecovery::begin_watch(const fs::path& source, bool offer_archives) {
@@ -241,18 +245,22 @@ void SceneRecovery::watch(const fs::path& source, bool offer_archives) {
     problem_ = "Scene recovery unavailable: " + std::string(error.what());
   }
 }
-bool SceneRecovery::retry_lease() {
+bool SceneRecovery::retry_lease(bool clean) {
   const bool ready = lease_.held() && !inspection_pending_;
   if (ready) return true;
   if (!own(source_)) return false;
-  prepare_copy(false);
+  const bool offer_archives = clean && takeover_pending_;
+  prepare_copy(offer_archives);
   problem_.clear();
   return true;
 }
 void SceneRecovery::ignore() {
-  ignored_sources_.insert(source_);
-  pending_ = false;
+  const auto ignored = std::move(offered_path_);
+  offered_path_.clear();
   offered_.reset();
+  const bool archive = !ignored.empty() && ignored != copy_path(source_);
+  if (archive) return;
+  ignored_sources_.insert(source_);
   const bool foreign_copy = !lease_.held() || takeover_pending_;
   if (foreign_copy) return;
   try {
@@ -265,7 +273,8 @@ void SceneRecovery::ignore() {
   }
 }
 SceneRecoveryCopy* SceneRecovery::offered_copy(std::string& error) const {
-  if (!offered_) offered_ = checked_copy(source_, error);
+  if (!pending()) return nullptr;
+  if (!offered_) offered_ = checked_copy(source_, offered_path_, error);
   return offered_ ? &*offered_ : nullptr;
 }
 bool SceneRecovery::source_changed() const {
@@ -292,7 +301,7 @@ bool SceneRecovery::restore(SceneDocument& document, std::string& error) {
   }
   document = std::move(std::get<SceneDocument>(opened));
   baseline_ = recovered_baseline;
-  pending_ = false;
+  offered_path_.clear();
   return true;
 }
 bool SceneRecovery::recover(SceneDocument& document, std::string& error) {
@@ -304,8 +313,8 @@ bool SceneRecovery::recover(SceneDocument& document, std::string& error) {
   }
 }
 bool SceneRecovery::remove_copy(std::string& error) {
-  const bool foreign_copy = !lease_.held() || takeover_pending_;
-  if (foreign_copy) return true;
+  const bool unsafe = !lease_.held() || takeover_pending_ || inspection_pending_;
+  if (unsafe) return true;
   std::error_code problem;
   fs::remove(copy_path(source_), problem);
   if (problem) {
@@ -313,19 +322,27 @@ bool SceneRecovery::remove_copy(std::string& error) {
     return false;
   }
   clear_dismissal(source_);
-  pending_ = false;
+  offered_path_.clear();
   offered_.reset();
   written_version_.reset();
   return true;
 }
 bool SceneRecovery::discard(std::string& error) {
   try {
-    return remove_copy(error);
+    const bool archive = pending() && offered_path_ != copy_path(source_);
+    if (!archive) return remove_copy(error);
+    require(lease_.held(), "scene recovery is owned by another editor");
+    fs::remove(offered_path_);
+    offered_path_.clear();
+    offered_.reset();
+    source_changed_.reset();
+    return true;
   } catch (const std::exception& problem) {
     error = problem.what();
     return false;
   }
 }
+bool SceneRecovery::discard_unsaved(std::string& error) { return pending() || discard(error); }
 bool SceneRecovery::write(SceneDocument& document, std::string& error) {
   const auto copy = copy_path(source_);
   safe_copy(source_, copy);
@@ -348,7 +365,7 @@ bool SceneRecovery::save_version(SceneDocument& document, std::string& error) {
   }
 }
 bool SceneRecovery::save_or_report(SceneDocument& document, std::string& error) {
-  const bool saved = document.dirty() ? save_version(document, error) : discard(error);
+  const bool saved = document.dirty() ? save_version(document, error) : discard_unsaved(error);
   if (saved) {
     problem_.clear();
     return true;
@@ -364,10 +381,10 @@ bool SceneRecovery::interval_due(float seconds) {
   return true;
 }
 bool SceneRecovery::poll_ready(SceneDocument& document, float seconds, std::string& error) {
-  const bool blocked = pending_ || failed_version_ == document.version();
+  const bool blocked = pending() || failed_version_ == document.version();
   if (blocked) return true;
   if (!interval_due(seconds)) return true;
-  const bool prepared = retry_lease() && !pending_;
+  const bool prepared = retry_lease(!document.dirty()) && !pending();
   if (!prepared) return true;
   const bool already_written = document.dirty() && written_version_ == document.version();
   if (already_written) return true;

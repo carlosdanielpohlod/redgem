@@ -147,6 +147,7 @@ class EditorSession {
   bool recover_scene(std::string& error);
   void ignore_recovery() { recovery_.ignore(); }
   bool discard_recovery(std::string& error) { return recovery_.discard(error); }
+  bool discard_unsaved_recovery(std::string& error) { return recovery_.discard_unsaved(error); }
   void autosave(float seconds);
 
   // Writes it as a new scene of the game (scenes/<name>.glb), which is then the one edited.

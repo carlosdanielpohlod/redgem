@@ -112,7 +112,7 @@ void EditorApp::save_and_go_on() {
 
 void EditorApp::go_on_without_saving() {
   std::string error;
-  if (!session_->discard_recovery(error)) {
+  if (!session_->discard_unsaved_recovery(error)) {
     log::warning(error);
     session_->ignore_recovery();
   }

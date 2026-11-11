@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <chrono>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -293,10 +294,11 @@ TEST_CASE("scene recovery never reads or deletes a live editor's copy") {
   CHECK(game.bytes(copy) == bytes);
   CHECK_FALSE(other.recover(game.document, game.error));
   writer.reset();  // the same release the OS performs when the writer exits
-  SceneRecovery restarted;
-  restarted.watch(game.source);
-  REQUIRE(restarted.pending());
-  REQUIRE(restarted.recover(game.document, game.error));
+  game.document.undo();
+  REQUIRE_FALSE(game.document.dirty());
+  game.autosave(other);
+  REQUIRE(other.pending());
+  REQUIRE(other.recover(game.document, game.error));
   CHECK(game.document.node(0).name == "Live unsaved edit");
 }
 TEST_CASE("scene recovery retains an external conflict after recovery and a second crash") {
@@ -419,22 +421,26 @@ TEST_CASE("scene recovery takeover archives the previous writer without blocking
   REQUIRE(waiting.poll(game.document, SceneRecovery::kIntervalSeconds, game.error));
   CHECK_FALSE(waiting.pending());
   CHECK(waiting.problem().empty());
-  bool archived = false;
+  fs::path archived;
   for (const auto& entry : fs::directory_iterator(game.folder)) {
     if (entry.path().filename().string().find(".previous-") == std::string::npos) continue;
     CHECK(entry.path().extension() != ".glb");
     CHECK(game.bytes(entry.path()) == original);
-    archived = true;
+    archived = entry.path();
   }
-  REQUIRE(archived);
+  REQUIRE_FALSE(archived.empty());
   waiting.watch(game.source);
   REQUIRE(waiting.recover(game.document, game.error));
   CHECK(game.document.node(0).name == "Waiting editor's edit");
   REQUIRE(waiting.discard(game.error));
   waiting.watch(game.source, true);
   REQUIRE(waiting.pending());
+  CHECK_FALSE(fs::exists(SceneRecovery::copy_path(game.source)));
+  REQUIRE(waiting.discard_unsaved(game.error));
+  CHECK(waiting.pending());
   REQUIRE(waiting.recover(game.document, game.error));
   CHECK(game.document.node(0).name == "Owner's edit");
+  CHECK(game.bytes(archived) == original);
 }
 
 TEST_CASE("scene recovery catches a same-size same-time rewrite before the first autosave") {
@@ -594,4 +600,40 @@ TEST_CASE("an unavailable lock file does not turn an existing recovery into a fo
   REQUIRE(reader.pending());
   REQUIRE(reader.recover(game.document, game.error));
   CHECK(game.document.node(0).name == "Recoverable edit");
+}
+
+TEST_CASE("editor recovery keeps archives in place until explicitly discarded") {
+  RecoveryGame game;
+  SceneRecovery writer;
+  writer.watch(game.source);
+  game.document.set_name(0, "Archived");
+  game.autosave(writer);
+  const auto live = SceneRecovery::copy_path(game.source);
+  auto newer = live;
+  auto older = live;
+  newer += ".previous-z";
+  older += ".previous-a";
+  const auto time = fs::last_write_time(live);
+  fs::rename(live, newer);
+  fs::copy_file(newer, older);
+  fs::last_write_time(older, time - std::chrono::hours(1));
+  writer.watch(game.folder / "other.glb");
+
+  auto opened = EditorSession::open(game.folder);
+  auto session = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
+  REQUIRE(session->recovery_pending());
+  session->ignore_recovery();
+  session->autosave(SceneRecovery::kIntervalSeconds);
+  REQUIRE(session->save(game.error));
+  CHECK(fs::exists(newer));
+  CHECK(fs::exists(older));
+  CHECK_FALSE(fs::exists(live));
+
+  session.reset();
+  opened = EditorSession::open(game.folder);
+  session = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
+  REQUIRE(session->recovery_pending());
+  REQUIRE(session->discard_recovery(game.error));
+  CHECK_FALSE(fs::exists(newer));
+  CHECK(fs::exists(older));
 }

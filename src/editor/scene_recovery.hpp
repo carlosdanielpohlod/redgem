@@ -24,19 +24,20 @@ class SceneRecovery {
   void watch(const std::filesystem::path& source, bool offer_archives = false);
   void ignore();
   const std::string& problem() const { return problem_; }
-  bool pending() const { return pending_; }
+  bool pending() const { return !offered_path_.empty(); }
   bool source_changed() const;
   bool recover(SceneDocument& document, std::string& error);
   bool discard(std::string& error);
+  bool discard_unsaved(std::string& error);
   bool poll(SceneDocument& document, float seconds, std::string& error);
 
  private:
   SceneRecoveryCopy* offered_copy(std::string& error) const;
-  void discover_copy();
+  void discover_copy(bool offer_archives);
   void prepare_copy(bool offer_archives);
   void begin_watch(const std::filesystem::path& source, bool offer_archives);
   bool poll_ready(SceneDocument& document, float seconds, std::string& error);
-  bool retry_lease();
+  bool retry_lease(bool clean);
   bool interval_due(float seconds);
   bool own(const std::filesystem::path& source);
   void reset_observation();
@@ -56,7 +57,7 @@ class SceneRecovery {
   bool inspection_pending_ = true;
   std::optional<long long> written_version_;
   float elapsed_ = 0;
-  bool pending_ = false;
+  std::filesystem::path offered_path_;
   mutable std::optional<bool> source_changed_;
   mutable std::optional<SceneRecoveryCopy> offered_;
 };
