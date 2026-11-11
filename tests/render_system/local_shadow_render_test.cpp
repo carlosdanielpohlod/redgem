@@ -61,11 +61,12 @@ MeshDesc mesh_of(PrimitiveShape shape, int material) {
   return mesh;
 }
 
-// Nothing but the light under test: no sky light, no glow, no darkened creases.
+// Nothing but the light under test: no sky light, no fog, no glow, no darkened creases.
 NodeDesc dark_environment(double local_shadows) {
   NodeDesc node;
   node.name = "Environment";
   node.props = {{props::environment::kAmbient, 0.0},
+                {props::environment::kFogDensity, 0.0},
                 {props::environment::kAmbientOcclusion, 0.0},
                 {props::environment::kBloom, 0.0},
                 {props::environment::kLocalShadows, local_shadows}};
