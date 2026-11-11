@@ -82,7 +82,7 @@ TEST_CASE("a spot light's cones are read from the file, and a light's cast_shado
       {"name": "Plain", "extensions": {"KHR_lights_punctual": {"light": 1}}}]})");
   std::string error;
   REQUIRE_MESSAGE(write_glb(file, glb, error), error);
-  const LoadResult result = load_gltf_scene(file);
+  const LoadResult result = load_gltf_scene(file.string());
   std::filesystem::remove(file);
   REQUIRE_MESSAGE(result.ok, result.error);
   const NodeDesc& spot = result.scene.nodes[result.scene.find_node("Spot")];
