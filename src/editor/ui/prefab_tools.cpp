@@ -1,4 +1,5 @@
 #include "editor/ui/panels.hpp"
+#include "editor/ui/dpi.hpp"
 
 #include <imgui.h>
 #include "core/log.hpp"
@@ -22,7 +23,7 @@ void prefab_popup(PanelContext& context) {
   if (!ImGui::BeginPopup(kPopup)) return;
   auto& name = context.state.project.new_prefab_name;
   ImGui::TextUnformatted(tr("editor.prefab.save_selection"));
-  ImGui::SetNextItemWidth(kNameWidth);
+  ImGui::SetNextItemWidth(ui::scaled(kNameWidth));
   if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
   const NameRule rule{prefab_files::valid_name, "editor.prefab.name_rule"};
   if (draw_name_form(kName, tr("editor.prefab.name_hint"), tr("editor.prefab.save"), rule, name)) {

@@ -58,8 +58,9 @@ bool contains(const editor_logic::Rect& rect, ViewPoint point) {
   return across && point.y >= rect.min_y && point.y <= rect.max_y;
 }
 
-bool dragged_far_enough(ViewPoint from, ViewPoint to) {
-  return std::fabs(to.x - from.x) >= kMinBoxPixels || std::fabs(to.y - from.y) >= kMinBoxPixels;
+bool dragged_far_enough(ViewPoint from, ViewPoint to, float scale) {
+  const auto threshold = kMinBoxPixels * scale;
+  return std::fabs(to.x - from.x) >= threshold || std::fabs(to.y - from.y) >= threshold;
 }
 
 std::vector<int> inside(const std::vector<Candidate>& candidates, const editor_logic::Rect& rect) {

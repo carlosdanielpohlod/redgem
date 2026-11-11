@@ -1,6 +1,7 @@
 // The widgets the panels are made of.
 
 #include "editor/ui/style.hpp"
+#include "editor/ui/dpi.hpp"
 
 #include <imgui_internal.h>
 
@@ -34,7 +35,7 @@ bool inside(const ImGuiWindow* window, const ImGuiWindow* named) {
 void property_label(const char* text) {
   ImGui::AlignTextToFramePadding();
   ImGui::TextColored(kMuted, "%s", text);
-  ImGui::SameLine(kLabelColumnWidth);
+  ImGui::SameLine(ui::scaled(kLabelColumnWidth));
   ImGui::SetNextItemWidth(kFillWidth);
 }
 
@@ -82,7 +83,7 @@ void spinner() {
   const float start = static_cast<float>(ImGui::GetTime()) * kSpinnerSpeed;
   ImDrawList* draw = ImGui::GetWindowDrawList();
   draw->PathArcTo(center, size * kSpinnerRadius, start, start + kSpinnerArc, kSpinnerSegments);
-  draw->PathStroke(ImGui::GetColorU32(kAccent), ImDrawFlags_None, kSpinnerThickness);
+  draw->PathStroke(ImGui::GetColorU32(kAccent), ImDrawFlags_None, ui::scaled(kSpinnerThickness));
 }
 
 void toggle_button(const char* icon, const char* tip, bool& on) {

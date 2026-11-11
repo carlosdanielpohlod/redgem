@@ -171,8 +171,10 @@ not a promise of how it will be closed.
   backtraces do not jump to their lines.
 - The editor can show actual collider wireframes during Play/Pause; it does not yet draw
   contacts, joints or velocities, or preview colliders before Play.
-- No autosave or crash recovery of the scene being edited; no animation preview; no preferences beyond the graphics card (key bindings, camera speed, snap sizes); no HiDPI
-  scaling; dark theme only.
+- No autosave or crash recovery of the scene being edited; no animation preview; no preferences
+  beyond the graphics card (key bindings, camera speed, snap sizes); dark theme only.
+- Automatic monitor scaling applies to editor text and spacing. The scene preview renders at
+  logical viewport resolution, and there is no manual scale override.
 
 ### What a shipped game offers its players
 

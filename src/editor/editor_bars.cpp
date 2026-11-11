@@ -14,6 +14,7 @@
 #include "editor/editor_logic.hpp"
 #include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
+#include "editor/ui/dpi.hpp"
 
 namespace redgem {
 namespace {
@@ -39,14 +40,14 @@ bool begin_bar(const char* id, ImGuiDir side, float height) {
 // The strip under the menu bar. Like begin_bar, ImGui::End() closes it whatever this returns.
 bool begin_toolbar() {
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-  const bool open = begin_bar(kToolbarId, ImGuiDir_Up, kToolbarHeight);
+  const bool open = begin_bar(kToolbarId, ImGuiDir_Up, ui::scaled(kToolbarHeight));
   ImGui::PopStyleVar();
   return open;
 }
 
 bool begin_status_bar() {
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ImGui::GetStyle().WindowPadding.x, 0.0f));
-  const bool open = begin_bar(kStatusBarId, ImGuiDir_Down, kStatusBarHeight);
+  const bool open = begin_bar(kStatusBarId, ImGuiDir_Down, ui::scaled(kStatusBarHeight));
   ImGui::PopStyleVar();
   return open;
 }
@@ -69,7 +70,7 @@ const char* play_state_label(PlayState state) {
 void EditorApp::draw_toolbar() {
   if (begin_toolbar()) {
     ui::toggle_button(ICON_FA_TABLE_LIST, tr("editor.toolbar.hierarchy"), panels_.hierarchy);
-    ImGui::SameLine(0.0f, kToolbarGroupGap);
+    ImGui::SameLine(0.0f, ui::scaled(kToolbarGroupGap));
     ImGui::BeginDisabled(!editing());
     gizmo_.draw_tools();
     ImGui::EndDisabled();
@@ -108,7 +109,7 @@ void EditorApp::draw_game_tools() {
   draw_game_name();
   ImGui::SameLine();
   draw_build_button();
-  ImGui::SameLine(0.0f, kToolbarGroupGap);
+  ImGui::SameLine(0.0f, ui::scaled(kToolbarGroupGap));
   ui::toggle_button(ICON_FA_TABLE_LIST, tr("editor.toolbar.inspector"), panels_.inspector);
 }
 
@@ -120,7 +121,7 @@ void EditorApp::draw_game_name() {
       std::string(ICON_FA_GAMEPAD "  ") + game + (session_->document().dirty() ? "  " ICON_FA_CIRCLE : "");
   const float width = ImGui::CalcTextSize(label.c_str()).x;
   const float buttons = (icon_button_width() + ImGui::GetStyle().ItemSpacing.x) * kRightButtons;
-  ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - width - buttons - kToolbarGroupGap);
+  ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - width - buttons - ui::scaled(kToolbarGroupGap));
   ImGui::AlignTextToFramePadding();
   ImGui::TextColored(ui::muted_color(), "%s", label.c_str());
 }
@@ -136,7 +137,7 @@ void EditorApp::draw_build_button() {
 
 void EditorApp::draw_status_bar() {
   if (begin_status_bar()) {
-    ImGui::SetCursorPosY(editor_logic::centered_start(kStatusBarHeight, ImGui::GetTextLineHeight()));
+    ImGui::SetCursorPosY(editor_logic::centered_start(ui::scaled(kStatusBarHeight), ImGui::GetTextLineHeight()));
     draw_last_message();
     draw_scene_summary();
   }

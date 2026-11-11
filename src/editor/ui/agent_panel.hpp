@@ -140,8 +140,9 @@ class AgentPanel {
   std::vector<std::string> attached_;         // context for the next prompt
   std::map<std::size_t, ParsedText> parsed_;  // by entry number
   std::map<std::size_t, float> heights_;      // how tall each entry was last drawn, by number
-  float measured_width_ = 0.0f;               // the width those heights were measured at
-  std::vector<agent::PastSession> past_;      // the game's past conversations, newest first
+  float measured_scale_ = 0.0f;
+  float measured_width_ = 0.0f;           // the width those heights were measured at
+  std::vector<agent::PastSession> past_;  // the game's past conversations, newest first
   // The conversation's title (from its first message), and the session it belongs to.
   struct Title {
     std::string session;

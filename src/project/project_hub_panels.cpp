@@ -2,6 +2,7 @@
 // right are the games there are, and a field for the folder of any other.
 
 #include "project/project_hub.hpp"
+#include "editor/ui/dpi.hpp"
 
 #include <imgui.h>
 #include <imgui_stdlib.h>
@@ -59,7 +60,7 @@ void ProjectHub::draw_templates() {
   for (const GameTemplate& known : game_templates()) {
     const std::string title = editor_logic::capitalized(known.name);
     const hub::CardLabel label{known.name.c_str(), hub::template_icon(known.icon), title, known.description};
-    if (hub::card(label, template_ == known.name, kTemplateCardHeight)) template_ = known.name;
+    if (hub::card(label, template_ == known.name, ui::scaled(kTemplateCardHeight))) template_ = known.name;
   }
 }
 
@@ -85,7 +86,7 @@ void ProjectHub::draw_game_list() {
   for (std::size_t i = 0; i < games_.size(); ++i) {
     const std::string id = games_[i].string();
     const std::string path = shown_path(games_[i]);
-    const bool clicked = hub::card({id.c_str(), ICON_FA_GAMEPAD, titles_[i], path}, false, kHubCardHeight);
+    const bool clicked = hub::card({id.c_str(), ICON_FA_GAMEPAD, titles_[i], path}, false, ui::scaled(kHubCardHeight));
     const bool opened = clicked && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
     if (opened) open_game(games_[i]);
     ui::tooltip(tr("project.hub.open_hint"));
@@ -95,11 +96,11 @@ void ProjectHub::draw_game_list() {
 // A field for the path of a game that is not in the list.
 void ProjectHub::draw_open_folder() {
   ImGui::SeparatorText(ui::icon_label(ICON_FA_FOLDER_OPEN, "project.hub.open_folder"));
-  ImGui::SetNextItemWidth(-kOpenButtonWidth - ImGui::GetStyle().ItemSpacing.x);
+  ImGui::SetNextItemWidth(-ui::scaled(kOpenButtonWidth) - ImGui::GetStyle().ItemSpacing.x);
   const bool entered =
       ImGui::InputTextWithHint(kPathId, tr("project.hub.path_hint"), &open_path_, ImGuiInputTextFlags_EnterReturnsTrue);
   ImGui::SameLine();
-  const bool asked = ImGui::Button(tr("project.hub.open"), ImVec2(kOpenButtonWidth, 0.0f)) || entered;
+  const bool asked = ImGui::Button(tr("project.hub.open"), ImVec2(ui::scaled(kOpenButtonWidth), 0.0f)) || entered;
   if (asked) open_game(open_path_);
 }
 

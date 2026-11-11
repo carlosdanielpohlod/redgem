@@ -36,6 +36,9 @@ until 1.0, a release may change what games rely on (see
   `voice_volume` are the player's volume of each, kept with the master volume, and the settings
   screen has a slider for each.
 
+- **Editor display scaling**: monitor-aware text and interface spacing, native Retina windows,
+  and stable font handles while moving between monitors.
+
 - **The whole keyboard**: F1-F12, Insert, Delete, Home, End, Page Up and Page Down, the keypad
   (`:kp_0` to `:kp_9`, `:kp_enter`, `:kp_add`...), Caps, Scroll and Num Lock, Print Screen, Pause,
   Menu, Right Alt, the Super keys, and `;` `=` `[` `]` `\` and the grave key, for games and for

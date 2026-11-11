@@ -142,6 +142,16 @@ The window title and the status bar name the open scene, and the editor follows 
 for changes made outside. Built games carry every scene: Build copies the whole game folder,
 `scenes/` included.
 
+## Display scaling
+
+The editor and project hub follow the monitor's content scale. On Windows and X11, text,
+spacing and the toolbar grow with the scale; Retina windows retain logical coordinates and
+use a denser framebuffer. Moving between monitors rebuilds spacing from the original theme.
+The font atlas rasterizes interface text, code and icons at the current density without replacing
+their font handles. Pointer coordinates, scene picking and the game's preview keep their existing
+coordinate system. The scene preview still renders at its logical viewport resolution, so its
+image does not yet gain the extra pixel density of Retina text. There is no manual scale override.
+
 ## Physics collider view
 
 During Play or Pause, **View > Physics colliders** draws the collision shapes the simulation

@@ -8,6 +8,7 @@
 #include "core/config.hpp"
 #include "core/log.hpp"
 #include "editor/editor_config.hpp"
+#include "editor/ui/dpi.hpp"
 #include "editor/scene_viewport.hpp"
 #include "editor/ui/interface.hpp"
 #include "render/renderer.hpp"
@@ -27,6 +28,7 @@ WindowSettings window_settings(GpuChoice gpu) {
   settings.height = kWindowHeight;
   settings.title = kWindowTitle;
   settings.resizable = true;
+  settings.high_dpi = ui::native_dpi_window();
   settings.gpu = gpu;
   return settings;
 }

@@ -15,6 +15,7 @@
 #include "editor/picking.hpp"
 #include "editor/scene_viewport.hpp"
 #include "editor/ui/style.hpp"
+#include "editor/ui/dpi.hpp"
 #include "render/render_math.hpp"
 
 namespace redgem {
@@ -67,7 +68,7 @@ void EditorApp::use_selection_clicks() {
 void EditorApp::finish_selection_click(ViewPoint from, ViewPoint to) {
   const bool ctrl = keyboard::ctrl_down();
   const bool shift = keyboard::shift_down();
-  if (box_select::dragged_far_enough(from, to)) {
+  if (box_select::dragged_far_enough(from, to, ui::scaled(1.0f))) {
     select_in_box(box_select::rect_between(from, to), box_mode(ctrl, shift));
   } else {
     pick_at(to.x, to.y, view_click_mode(ctrl, shift));
@@ -75,7 +76,7 @@ void EditorApp::finish_selection_click(ViewPoint from, ViewPoint to) {
 }
 
 void EditorApp::draw_selection_rect(ViewPoint from, ViewPoint to) const {
-  if (!box_select::dragged_far_enough(from, to)) return;
+  if (!box_select::dragged_far_enough(from, to, ui::scaled(1.0f))) return;
   const editor_logic::Rect rect = box_select::rect_between(from, to);
   const ImVec2 min(viewport_->screen_x + rect.min_x, viewport_->screen_y + rect.min_y);
   const ImVec2 max(viewport_->screen_x + rect.max_x, viewport_->screen_y + rect.max_y);
@@ -83,7 +84,7 @@ void EditorApp::draw_selection_rect(ViewPoint from, ViewPoint to) const {
   ImVec4 fill = ui::accent_color();
   fill.w *= kSelectionRectFillAlpha;
   draw->AddRectFilled(min, max, ImGui::GetColorU32(fill));
-  draw->AddRect(min, max, ImGui::GetColorU32(ui::accent_color()), 0.0f, 0, kSelectionRectBorder);
+  draw->AddRect(min, max, ImGui::GetColorU32(ui::accent_color()), 0.0f, 0, ui::scaled(kSelectionRectBorder));
 }
 
 ObjectId EditorApp::object_at(float x, float y) const {

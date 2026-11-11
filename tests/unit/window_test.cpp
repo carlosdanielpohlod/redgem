@@ -16,6 +16,9 @@ TEST_CASE("a window is asked of the system with frames in step with the screen, 
   CHECK(window_flags(settings) == FLAG_VSYNC_HINT);
   settings.resizable = true;
   CHECK(window_flags(settings) == (FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE));
+  settings.high_dpi = true;
+  CHECK(window_flags(settings) == (FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_HIGHDPI));
+  settings.high_dpi = false;
   settings.smooth_edges = true;
   CHECK(window_flags(settings) == (FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT));
 }
