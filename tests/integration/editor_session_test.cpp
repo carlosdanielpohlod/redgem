@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <chrono>
 
+#include "app/game_settings.hpp"
 #include "app/scene_files.hpp"
 #include "editor/document/glb_file.hpp"
 #include "core/config.hpp"
@@ -67,6 +68,26 @@ TEST_CASE("a game opened by a relative path keeps its folder as an absolute one"
   const std::filesystem::path game_dir = std::get<std::unique_ptr<EditorSession>>(opened)->game_dir();
   CHECK(game_dir.is_absolute());
   CHECK(std::filesystem::equivalent(game_dir, dir));
+}
+
+TEST_CASE("the editor refreshes the game's collision layers without editing the scene") {
+  const auto dir = copy_sandbox("collision_layers");
+  const auto manifest = dir / kGameSettingsFile;
+  std::string error;
+  REQUIRE(write_text_file(manifest, R"({"physics":{"layers":["player","enemy"]}})", error));
+  auto session = open(dir);
+  REQUIRE(session->collision_layers().count() == 3);
+  CHECK(session->collision_layers().name(kDefaultLayer) == kDefaultLayerName);
+  CHECK(session->collision_layers().find("player").has_value());
+
+  REQUIRE(write_text_file(manifest, R"({"physics":{"layers":["terrain"]}})", error));
+  touch_later(manifest);
+  session->refresh_collision_layers();
+  CHECK_FALSE(session->collision_layers().find("player").has_value());
+  CHECK(session->collision_layers().find("terrain").has_value());
+  CHECK_FALSE(session->document().dirty());
+  session.reset();
+  std::filesystem::remove_all(dir);
 }
 
 TEST_CASE("refreshing one node gives the preview what rebuilding it all would, and keeps who it is") {

@@ -31,11 +31,12 @@ TEST_CASE("a new property starts as zero, an empty text or off") {
   CHECK(initial_value(PropertyKind::Toggle) == PropertyValue(false));
 }
 
-TEST_CASE("an object has a Physics card for a body, a trigger or a collider alone") {
+TEST_CASE("an object has a Physics card for a body, a trigger, a collider or a layer") {
   CHECK_FALSE(has_physics({}));
   CHECK_FALSE(has_physics({{kSpeed, kFast}}));
   CHECK(has_physics({{props::kBody, std::string(props::kBodyTypes[0])}}));
   CHECK(has_physics({{props::kTrigger, true}}));
+  CHECK(has_physics({{props::kLayer, std::string("player")}}));
   CHECK(has_physics({{props::kCollider, std::string(props::kColliders[0])}}));
 }
 
@@ -52,8 +53,9 @@ TEST_CASE("only the bodies gravity moves have a mass to set") {
 }
 
 TEST_CASE("properties with a widget of their own stay out of the list, and their names cannot be taken") {
-  for (const char* reserved : {props::kScript, props::kBody, props::kCollider, props::kTrigger, props::kMass,
-                               props::kTag, props::kWheel, props::kVisible, props::kPrefab, props::kTerrain}) {
+  for (const char* reserved :
+       {props::kScript, props::kBody, props::kCollider, props::kTrigger, props::kMass, props::kLayer, props::kTag,
+        props::kWheel, props::kVisible, props::kPrefab, props::kTerrain}) {
     CAPTURE(reserved);
     CHECK_FALSE(is_custom(reserved));
     CHECK_FALSE(can_add_property({}, reserved));

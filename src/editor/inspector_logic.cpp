@@ -14,9 +14,10 @@ constexpr int kAxisY = 1;
 
 // Properties edited by dedicated widgets instead of the generic list.
 const std::set<std::string>& reserved_props() {
-  static const std::set<std::string> keys = {
-      props::kScript, props::kBody,    props::kCollider, props::kTrigger, props::kMass,        props::kTag,
-      props::kWheel,  props::kVisible, props::kPrefab,   props::kTerrain, props::kTerrainSize, props::kTerrainCells};
+  static const std::set<std::string> keys = {props::kScript, props::kBody,    props::kCollider,    props::kTrigger,
+                                             props::kMass,   props::kTag,     props::kWheel,       props::kVisible,
+                                             props::kPrefab, props::kTerrain, props::kTerrainSize, props::kTerrainCells,
+                                             props::kLayer};
   return keys;
 }
 
@@ -59,7 +60,8 @@ PropertyValue initial_value(PropertyKind kind) {
 }
 
 bool has_physics(const PropertyMap& props) {
-  return body_config_from_props(props).wants_physics() || props.count(props::kCollider) != 0;
+  const bool has_settings = props.count(props::kCollider) != 0 || props.count(props::kLayer) != 0;
+  return has_settings || body_config_from_props(props).wants_physics();
 }
 
 bool has_mass(const BodyConfig& body) { return body.type == BodyType::Dynamic || body.type == BodyType::Vehicle; }

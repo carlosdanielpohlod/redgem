@@ -84,7 +84,10 @@ EditorApp::~EditorApp() {
 
 bool EditorApp::close_requested() const { return window_->close_requested(); }
 
-void EditorApp::rescan_files() { files_ = ProjectFiles::scan(session_->game_dir()); }
+void EditorApp::rescan_files() {
+  files_ = ProjectFiles::scan(session_->game_dir());
+  session_->refresh_collision_layers();
+}
 
 int EditorApp::run() {
   while (!finished()) {

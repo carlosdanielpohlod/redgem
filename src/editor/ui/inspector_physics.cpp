@@ -28,6 +28,7 @@ constexpr int kDefaultCollider = 0;  // the first of props::kColliders
 constexpr const char* kTriggerId = "##trigger";
 constexpr const char* kBodyId = "##body";
 constexpr const char* kColliderId = "##collider";
+constexpr const char* kLayerId = "##layer";
 constexpr const char* kMassId = "##mass";
 constexpr const char* kWheelId = "##wheel";
 
@@ -35,7 +36,7 @@ constexpr const char* kWheelId = "##wheel";
 void remove_physics(EditorSession& session, int index) {
   SceneDocument& doc = session.document();
   doc.checkpoint();
-  for (const char* key : {props::kBody, props::kCollider, props::kMass, props::kTrigger}) {
+  for (const char* key : {props::kBody, props::kCollider, props::kMass, props::kTrigger, props::kLayer}) {
     if (doc.node(index).props.count(key) != 0) doc.remove_prop(index, key, false);
   }
   doc.drop_checkpoint_if_unchanged();
@@ -77,6 +78,32 @@ bool draw_collider_row(EditorSession& session, int index, const PropertyMap& pro
   return true;
 }
 
+void select_layer(EditorSession& session, int index, const std::string& name, bool selected) {
+  if (!ImGui::Selectable(name.c_str(), selected)) return;
+  const auto& props = session.document().node(index).props;
+  const bool default_layer = name == kDefaultLayerName;
+  const bool unchanged = default_layer ? props.count(props::kLayer) == 0 : get_string(props, props::kLayer) == name;
+  if (unchanged) return;
+  const auto value = default_layer ? std::nullopt : std::optional<PropertyValue>(name);
+  set_or_remove(session, index, props::kLayer, value);
+}
+
+void draw_layer_row(EditorSession& session, int index, const std::string& current) {
+  const auto& layers = session.collision_layers();
+  property_label(tr("editor.inspector.physics.layer"));
+  const char* preview = current.empty() ? kDefaultLayerName : current.c_str();
+  if (!ImGui::BeginCombo(kLayerId, preview)) {
+    const bool unknown = !current.empty() && !layers.find(current);
+    if (unknown) tooltip(tr("editor.inspector.physics.layer_unknown"));
+    return;
+  }
+  for (std::size_t layer = 0; layer < layers.count(); ++layer) {
+    const auto& name = layers.name(layer);
+    select_layer(session, index, name, name == preview);
+  }
+  ImGui::EndCombo();
+}
+
 void draw_mass_row(PanelContext& context, int index, float mass) {
   property_label(tr("editor.inspector.physics.mass"));
   if (!ImGui::DragFloat(kMassId, &mass, kDragSpeedNumber, kMinMass, FLT_MAX, "%.2f kg")) return;
@@ -95,6 +122,7 @@ bool draw_kind_rows(EditorSession& session, int index, const PropertyMap& props)
 
 void draw_physics_rows(PanelContext& context, int index, const BodyConfig& body) {
   if (draw_kind_rows(context.session, index, context.session.document().node(index).props)) return;
+  draw_layer_row(context.session, index, body.layer);
   if (has_mass(body)) draw_mass_row(context, index, body.mass);
   for (const std::string& warning : body.warnings) {
     ImGui::TextColored(warning_color(), ICON_FA_TRIANGLE_EXCLAMATION "  %s", warning.c_str());

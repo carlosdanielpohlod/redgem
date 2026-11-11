@@ -10,6 +10,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Inspector collision layers**: assign a body or trigger to a layer defined in `game.json`
+  from the Physics card.
+
 - **UI at any screen size**: `anchor:` on `UI.text`, `rect`, `image`, `button`, `text_field`,
   `toggle`, `choice` and `slider` (`:top_left`, `:top`, `:top_right`, `:left`, `:center`,
   `:right`, `:bottom_left`, `:bottom`, `:bottom_right`) makes x and y offsets from that point of

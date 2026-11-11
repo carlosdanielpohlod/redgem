@@ -3,6 +3,7 @@
 
 #include "editor/editor_session.hpp"
 
+#include "app/game_settings.hpp"
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
 #include "core/files.hpp"
@@ -57,8 +58,16 @@ std::variant<std::unique_ptr<EditorSession>, std::string> EditorSession::open(co
   auto opened = SceneDocument::open(scene_path);
   if (auto* error = std::get_if<std::string>(&opened)) return *error;
   std::unique_ptr<EditorSession> session(new EditorSession(game_dir, std::move(std::get<SceneDocument>(opened))));
+  session->refresh_collision_layers();
   session->begin_editing();
   return session;
+}
+
+void EditorSession::refresh_collision_layers() {
+  const auto updated = write_time(game_dir_ / kGameSettingsFile);
+  if (updated == layer_settings_write_time_) return;
+  collision_layers_ = read_game_settings(game_dir_).collision_layers;
+  layer_settings_write_time_ = updated;
 }
 
 void EditorSession::begin_editing() {
