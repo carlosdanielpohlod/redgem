@@ -16,7 +16,7 @@ constexpr std::size_t kEnemy = 2;
 constexpr std::size_t kBullet = 3;
 constexpr std::size_t kPickup = 4;
 constexpr int kTooManyLayers = 20;      // past kMaxCollisionLayers
-constexpr std::size_t kOddEntries = 2;  // the number and the empty name; the repeated one is no harm
+constexpr std::size_t kOddEntries = 3;  // duplicate, number and empty name
 
 CollisionLayersReading read(const std::string& physics) {
   return collision_layers_from_json(nlohmann::json::parse(physics));
@@ -76,6 +76,7 @@ TEST_CASE("layers past sixteen, repeated names and names that are not text are l
   const CollisionLayersReading odd = read(R"({"layers": ["enemy", "enemy", 3, ""]})");
   CHECK(odd.layers.names_listed() == "default, enemy");
   CHECK(odd.warnings.size() == kOddEntries);
+  CHECK(mentions(odd, "duplicate layer 'enemy'"));
 }
 
 TEST_CASE("collides naming no layer is warned of, and the rest of it still counts") {

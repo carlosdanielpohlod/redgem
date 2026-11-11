@@ -78,30 +78,38 @@ bool draw_collider_row(EditorSession& session, int index, const PropertyMap& pro
   return true;
 }
 
-void select_layer(EditorSession& session, int index, const std::string& name, bool selected) {
-  if (!ImGui::Selectable(name.c_str(), selected)) return;
-  const auto& props = session.document().node(index).props;
-  const bool default_layer = name == kDefaultLayerName;
-  const bool unchanged = default_layer ? props.count(props::kLayer) == 0 : get_string(props, props::kLayer) == name;
-  if (unchanged) return;
-  const auto value = default_layer ? std::nullopt : std::optional<PropertyValue>(name);
-  set_or_remove(session, index, props::kLayer, value);
+std::string layer_preview(const PropertyMap& props) {
+  if (props.count(props::kLayer) == 0) return kDefaultLayerName;
+  const auto layer = get_string(props, props::kLayer).value_or("");
+  return layer.empty() ? tr("editor.inspector.physics.layer_invalid") : layer;
 }
 
-void draw_layer_row(EditorSession& session, int index, const std::string& current) {
-  const auto& layers = session.collision_layers();
-  property_label(tr("editor.inspector.physics.layer"));
-  const char* preview = current.empty() ? kDefaultLayerName : current.c_str();
-  if (!ImGui::BeginCombo(kLayerId, preview)) {
-    const bool unknown = !current.empty() && !layers.find(current);
-    if (unknown) tooltip(tr("editor.inspector.physics.layer_unknown"));
-    return;
+void warn_about_layer(BodyConfig& body, const PropertyMap& props, const CollisionLayers& layers) {
+  if (props.count(props::kLayer) == 0) return;
+  const auto layer = get_string(props, props::kLayer).value_or("");
+  if (layer.empty()) {
+    body.warnings.emplace_back(tr("editor.inspector.physics.layer_invalid_warning"));
+  } else if (!layers.find(layer)) {
+    body.warnings.emplace_back(tr("editor.inspector.physics.layer_unknown"));
   }
+}
+
+const std::string* pick_layer(const CollisionLayers& layers, const std::string& preview) {
+  property_label(tr("editor.inspector.physics.layer"));
+  if (!ImGui::BeginCombo(kLayerId, preview.c_str())) return nullptr;
+  const std::string* picked = nullptr;
   for (std::size_t layer = 0; layer < layers.count(); ++layer) {
     const auto& name = layers.name(layer);
-    select_layer(session, index, name, name == preview);
+    if (ImGui::Selectable(name.c_str(), name == preview)) picked = &name;
   }
   ImGui::EndCombo();
+  return picked;
+}
+
+bool draw_layer_row(EditorSession& session, int index) {
+  const auto& props = session.document().node(index).props;
+  const auto* picked = pick_layer(session.collision_layers(), layer_preview(props));
+  return picked && session.set_collision_layer({index}, *picked);
 }
 
 void draw_mass_row(PanelContext& context, int index, float mass) {
@@ -121,12 +129,18 @@ bool draw_kind_rows(EditorSession& session, int index, const PropertyMap& props)
 }
 
 void draw_physics_rows(PanelContext& context, int index, const BodyConfig& body) {
-  if (draw_kind_rows(context.session, index, context.session.document().node(index).props)) return;
-  draw_layer_row(context.session, index, body.layer);
+  const bool active = body.wants_physics();
+  if (!active) ImGui::TextWrapped("%s", tr("editor.inspector.physics.layer_no_body"));
+  const auto& props = context.session.document().node(index).props;
+  const bool changed_kind = active && draw_kind_rows(context.session, index, props);
+  if (changed_kind) return;
+  if (draw_layer_row(context.session, index)) return;
   if (has_mass(body)) draw_mass_row(context, index, body.mass);
+  ImGui::PushStyleColor(ImGuiCol_Text, warning_color());
   for (const std::string& warning : body.warnings) {
-    ImGui::TextColored(warning_color(), ICON_FA_TRIANGLE_EXCLAMATION "  %s", warning.c_str());
+    ImGui::TextWrapped(ICON_FA_TRIANGLE_EXCLAMATION "  %s", warning.c_str());
   }
+  ImGui::PopStyleColor();
 }
 
 }  // namespace
@@ -134,7 +148,8 @@ void draw_physics_rows(PanelContext& context, int index, const BodyConfig& body)
 void draw_physics(PanelContext& context, int index) {
   const PropertyMap& props = context.session.document().node(index).props;
   if (!has_physics(props)) return;
-  const BodyConfig body = body_config_from_props(props);
+  BodyConfig body = body_config_from_props(props);
+  warn_about_layer(body, props, context.session.collision_layers());
   bool removed = false;
   const bool open = component_header(ICON_FA_WEIGHT_HANGING, tr("editor.inspector.physics.title"), &removed);
   if (removed) {
@@ -142,6 +157,18 @@ void draw_physics(PanelContext& context, int index) {
   } else if (open) {
     draw_physics_rows(context, index, body);
   }
+}
+
+void draw_group_collision_layer(EditorSession& session) {
+  std::vector<std::string> names;
+  for (const auto id : session.selected().ids()) {
+    const auto& props = session.document().node(id).props;
+    if (has_physics(props)) names.push_back(layer_preview(props));
+  }
+  if (names.empty()) return;
+  const auto preview = shared_value(names).value_or(tr("editor.inspector.mixed"));
+  const auto* picked = pick_layer(session.collision_layers(), preview);
+  if (picked) session.set_collision_layer(session.selected().ids(), *picked);
 }
 
 void draw_wheel(EditorSession& session, int index) {

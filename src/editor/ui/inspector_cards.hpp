@@ -30,6 +30,7 @@ void draw_terrain(PanelContext& context, int index);
 // One card per attached script.
 void draw_scripts(PanelContext& context, int index);
 void draw_physics(PanelContext& context, int index);
+void draw_group_collision_layer(EditorSession& session);
 // Wheels are children of a vehicle: shown on the child itself.
 void draw_wheel(EditorSession& session, int index);
 // The properties without a card of their own.

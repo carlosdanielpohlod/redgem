@@ -40,6 +40,17 @@ TEST_CASE("an object has a Physics card for a body, a trigger, a collider or a l
   CHECK(has_physics({{props::kCollider, std::string(props::kColliders[0])}}));
 }
 
+TEST_CASE("choosing a collision layer stores names and clears the default assignment") {
+  const PropertyMap enemy{{props::kLayer, std::string("enemy")}};
+  CHECK(collision_layer_value("enemy") == std::optional<PropertyValue>(std::string("enemy")));
+  CHECK_FALSE(collision_layer_value(kDefaultLayerName).has_value());
+  CHECK_FALSE(collision_layer_changes(enemy, "enemy"));
+  CHECK_FALSE(collision_layer_changes({}, kDefaultLayerName));
+  CHECK(collision_layer_changes(enemy, kDefaultLayerName));
+  CHECK(collision_layer_changes({}, "enemy"));
+  CHECK(collision_layer_changes({{props::kLayer, true}}, kDefaultLayerName));
+}
+
 TEST_CASE("only the bodies gravity moves have a mass to set") {
   BodyConfig body;
   for (const BodyType type : {BodyType::Dynamic, BodyType::Vehicle}) {

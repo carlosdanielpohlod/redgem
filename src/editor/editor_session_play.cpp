@@ -64,10 +64,29 @@ std::variant<std::unique_ptr<EditorSession>, std::string> EditorSession::open(co
 }
 
 void EditorSession::refresh_collision_layers() {
-  const auto updated = write_time(game_dir_ / kGameSettingsFile);
-  if (updated == layer_settings_write_time_) return;
-  collision_layers_ = read_game_settings(game_dir_).collision_layers;
-  layer_settings_write_time_ = updated;
+  const auto file = game_dir_ / kGameSettingsFile;
+  std::error_code error;
+  const auto size = std::filesystem::file_size(file, error);
+  if (error == std::errc::no_such_file_or_directory) {
+    layer_settings_stamp_.reset();
+    collision_layers_ = CollisionLayers{};
+    return;
+  }
+  if (error) return;
+  const auto stamp = std::make_pair(write_time(file), size);
+  if (layer_settings_stamp_ == stamp) return;
+  layer_settings_stamp_ = stamp;
+  apply_layer_settings();
+}
+
+void EditorSession::apply_layer_settings() {
+  auto manifest = read_game_manifest(game_dir_);
+  if (!manifest.file_parsed) {
+    log::warning("game.json must be a valid JSON object; keeping the last collision layers");
+    return;
+  }
+  for (const auto& warning : manifest.physics_warnings) log::warning(warning);
+  collision_layers_ = std::move(manifest.settings.collision_layers);
 }
 
 void EditorSession::begin_editing() {

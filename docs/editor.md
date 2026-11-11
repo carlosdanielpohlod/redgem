@@ -156,8 +156,11 @@ image does not yet gain the extra pixel density of Retina text. There is no manu
 
 Choose **Layer** in the Inspector's **Physics** card to assign a body or trigger to one of the
 layers in `game.json` under `physics.layers`. Choose `default` to clear the object's assignment.
-The list refreshes when the editor detects a change to `game.json`. If an assigned name disappears
-from the list, the Inspector still shows it and the simulation uses the default layer.
+With several objects selected, one change applies to the selected objects with physics settings
+and can be undone together. The editor watches the modification time and size of `game.json`.
+If a write leaves invalid JSON, the editor logs a warning and keeps the last valid list. If an
+assigned name disappears from the list, the Inspector warns and the simulation uses the default
+layer.
 
 ## Physics collider view
 
