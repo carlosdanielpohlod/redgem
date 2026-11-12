@@ -27,19 +27,10 @@ std::string folder_seed() {
   return std::to_string(std::uniform_int_distribution<std::uint64_t>{}(random));
 }
 
-bool reserve_directory(const std::filesystem::path& path, std::error_code& error) {
-#ifdef _WIN32
-  return std::filesystem::create_directory(path, error);
-#else
-  constexpr mode_t kOwnerOnly = S_IRWXU;
-  if (::mkdir(path.c_str(), kOwnerOnly) == 0) return true;
-  error = std::error_code(errno, std::generic_category());
-  return false;
-#endif
-}
+bool already_exists(const std::error_code& error) { return !error || error == std::errc::file_exists; }
 
 bool occupied_path(const std::filesystem::path& path, const std::error_code& error) {
-  if (!error || error == std::errc::file_exists) return true;
+  if (already_exists(error)) return true;
 #ifdef _WIN32
   std::error_code ignored;
   return std::filesystem::exists(std::filesystem::symlink_status(path, ignored));
@@ -54,7 +45,7 @@ std::filesystem::path reserve_folder(const std::filesystem::path& parent, const 
     const auto suffix = attempt == 0 ? std::string{} : "-" + std::to_string(attempt);
     auto candidate = parent / (stem + suffix);
     std::error_code problem;
-    if (reserve_directory(candidate, problem)) return candidate;
+    if (make_private_directory(candidate, problem)) return candidate;
     if (occupied_path(candidate, problem)) continue;
     error = "cannot reserve " + candidate.string() + ": " + problem.message();
     return {};
@@ -64,6 +55,17 @@ std::filesystem::path reserve_folder(const std::filesystem::path& parent, const 
 }
 
 }  // namespace
+
+bool make_private_directory(const std::filesystem::path& path, std::error_code& error) {
+#ifdef _WIN32
+  return std::filesystem::create_directory(path, error);
+#else
+  error.clear();
+  if (::mkdir(path.c_str(), S_IRWXU) == 0) return true;
+  error = std::error_code(errno, std::generic_category());
+  return false;
+#endif
+}
 
 std::optional<std::string> read_text_file(const std::filesystem::path& path, std::string& error) {
   std::ifstream in(path, std::ios::binary);

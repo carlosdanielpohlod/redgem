@@ -664,6 +664,7 @@ if(NOT ANDROID)
     project/android/android_package_signing.cpp
     project/android/android_package_manifest.cpp
     project/android/android_package_stage.cpp
+    project/android/android_stage_cache.cpp
     project/android/android_stage_folder.cpp
     project/android/android_package_icons.cpp
     project/android/android_package_bundle.cpp
@@ -722,6 +723,9 @@ if(NOT ANDROID)
   # What `redgem --version` says: the version in project() at the top of the build.
   target_compile_definitions(redgem_project PRIVATE REDGEM_VERSION="${redgem_VERSION}")
   target_link_libraries(redgem_project PUBLIC redgem_editor)
+  if(WIN32)
+    target_link_libraries(redgem_project PRIVATE shell32 ole32 uuid)
+  endif()
 endif()
 
 # Where the programs are put by `cmake --install build --component redgem`: all in bin/, and the

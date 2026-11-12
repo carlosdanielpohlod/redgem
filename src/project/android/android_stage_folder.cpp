@@ -6,14 +6,11 @@
 #include <fstream>
 #include <string_view>
 #include <thread>
-
-#ifndef _WIN32
-#include <sys/stat.h>
-#include <unistd.h>
-#endif
+#include <utility>
+#include <vector>
 
 #include "core/log.hpp"
-#include "core/platform.hpp"
+#include "project/android/android_stage_cache.hpp"
 
 namespace redgem::android_stage {
 namespace {
@@ -51,11 +48,19 @@ bool generated_suffix(std::string_view suffix) {
   return digits(suffix.substr(0, dash)) && digits(suffix.substr(dash + 1));
 }
 
+bool reservation_file(const fs::directory_entry& entry, std::error_code& problem) {
+  const auto name = entry.path().filename();
+  const bool metadata = name == kLeaseFile || name == kPendingOwnerFile;
+  return metadata && fs::is_regular_file(entry.symlink_status(problem));
+}
+
 bool only_reservation_files(const fs::path& stage) {
-  for (const auto& entry : fs::directory_iterator(stage)) {
-    if (entry.path().filename() != kLeaseFile) return false;
+  std::error_code problem;
+  const fs::directory_iterator end;
+  for (fs::directory_iterator it(stage, problem); !problem && it != end; it.increment(problem)) {
+    if (!reservation_file(*it, problem)) return false;
   }
-  return true;
+  return !problem;
 }
 
 bool is_old_reservation(const fs::path& stage, std::string_view suffix) {
@@ -66,16 +71,24 @@ bool is_old_reservation(const fs::path& stage, std::string_view suffix) {
   return old && only_reservation_files(stage);
 }
 
-bool is_owned_stage(const fs::path& stage) {
-  const auto name = stage.filename().generic_u8string();
+bool stage_directory(const fs::path& stage, const std::string& name) {
+  if (name.rfind(kPrefix, 0) != 0) return false;
   std::error_code problem;
-  const bool directory = fs::is_directory(fs::symlink_status(stage, problem));
-  if (!directory || name.rfind(kPrefix, 0) != 0) return false;
+  return fs::is_directory(fs::symlink_status(stage, problem));
+}
+
+enum class StageKind { Other, Incomplete, Marked };
+
+StageKind stage_kind(const fs::path& stage) {
+  const auto name = stage.filename().generic_u8string();
+  if (!stage_directory(stage, name)) return StageKind::Other;
+  std::error_code problem;
   const auto marker = stage / kOwnerFile;
   const auto status = fs::symlink_status(marker, problem);
-  if (fs::is_regular_file(status)) return signature_matches(marker);
-  if (status.type() != fs::file_type::not_found) return false;
-  return is_old_reservation(stage, std::string_view(name).substr(std::string_view(kPrefix).size()));
+  if (fs::is_regular_file(status) && signature_matches(marker)) return StageKind::Marked;
+  if (status.type() != fs::file_type::not_found) return StageKind::Other;
+  const auto suffix = std::string_view(name).substr(std::string_view(kPrefix).size());
+  return is_old_reservation(stage, suffix) ? StageKind::Incomplete : StageKind::Other;
 }
 
 bool remove_payload(const fs::path& stage) {
@@ -86,74 +99,106 @@ bool remove_payload(const fs::path& stage) {
   return false;
 }
 
-// The stage lease stays held during the potentially slow payload deletion. Only the short
-// namespace operation needs the cache lock, which also prevents reuse before deletion finishes.
-void reclaim(const fs::path& stage, RecoveryLease& lease) {
-  if (!remove_payload(stage)) return;
-  RecoveryLease maintenance;
-  if (!hold_maintenance(maintenance, stage.parent_path())) {
-    log::warning("Android staging cleanup deferred for " + stage.string());
-    return;
-  }
-  lease.release();
+// The cache lock must be held while closing the stage lease and removing its directory.
+void finish_stage(const fs::path& stage) {
   std::error_code problem;
-  fs::remove_all(stage, problem);
+  for (const char* file : {kPendingOwnerFile, kLeaseFile, kOwnerFile}) {
+    fs::remove(stage / file, problem);
+    if (problem) break;
+  }
+  if (!problem) fs::remove(stage, problem);
   if (problem) log::warning("cannot remove Android staging folder " + stage.string() + ": " + problem.message());
 }
 
-bool hold_stale(RecoveryLease& lease, const fs::path& stage) {
-  RecoveryLease maintenance;
-  if (!hold_maintenance(maintenance, stage.parent_path())) return false;
-  if (!is_owned_stage(stage)) return false;
-  return lease.acquire(stage / kLeaseFile) == RecoveryLease::Result::Acquired;
+void finish_incomplete(const fs::path& stage) {
+  const auto lock = stage / kLeaseFile;
+  std::error_code problem;
+  if (fs::symlink_status(lock, problem).type() == fs::file_type::not_found) {
+    finish_stage(stage);
+    return;
+  }
+  RecoveryLease lease;
+  if (lease.acquire(lock) != RecoveryLease::Result::Acquired) return;
+  lease.release();
+  finish_stage(stage);
 }
 
-void sweep(const fs::path& cache) {
-  try {
-    for (const auto& entry : fs::directory_iterator(cache)) {
-      if (entry.path().filename().generic_u8string().rfind(kPrefix, 0) != 0) continue;
-      RecoveryLease lease;
-      if (hold_stale(lease, entry.path())) reclaim(entry.path(), lease);
-    }
-  } catch (const fs::filesystem_error& error) {
-    log::warning("cannot inspect Android build folders: " + std::string(error.what()));
+struct StaleStage {
+  fs::path path;
+  std::unique_ptr<RecoveryLease> lease;
+};
+
+void inspect_stage(std::vector<StaleStage>& stale, const fs::path& stage) {
+  switch (stage_kind(stage)) {
+    case StageKind::Other:
+      return;
+    case StageKind::Incomplete:
+      finish_incomplete(stage);
+      return;
+    case StageKind::Marked:
+      break;
+  }
+  auto lease = std::make_unique<RecoveryLease>();
+  if (lease->acquire(stage / kLeaseFile) == RecoveryLease::Result::Acquired) {
+    stale.push_back({stage, std::move(lease)});
   }
 }
 
-bool private_cache(const fs::path& cache) {
-#ifdef _WIN32
+std::vector<StaleStage> collect_stale(const fs::path& cache) {
+  RecoveryLease maintenance;
+  if (!hold_maintenance(maintenance, cache)) return {};
+  std::vector<StaleStage> stale;
   std::error_code problem;
-  fs::create_directory(cache, problem);
-  return fs::is_directory(fs::symlink_status(cache, problem));
-#else
-  constexpr mode_t kOwnerOnly = S_IRWXU;
-  if (::mkdir(cache.c_str(), kOwnerOnly) == 0) return true;
-  struct stat status{};
-  if (::lstat(cache.c_str(), &status) != 0) return false;
-  const bool owned = S_ISDIR(status.st_mode) && status.st_uid == ::geteuid();
-  return owned && (status.st_mode & (S_IRWXG | S_IRWXO)) == 0;
-#endif
+  const fs::directory_iterator end;
+  for (fs::directory_iterator it(cache, problem); !problem && it != end; it.increment(problem)) {
+    inspect_stage(stale, it->path());
+  }
+  if (problem) log::warning("cannot inspect Android build folders: " + problem.message());
+  return stale;
 }
 
-bool ensure_cache(const fs::path& cache, std::string& error) {
+// Only this batch's namespace changes run under the cache lock. Payload deletion holds
+// each stage's lease and happens outside that lock, regardless of the payload size.
+void finish_batch(const fs::path& cache, std::vector<StaleStage>& stale) {
+  if (stale.empty()) return;
+  RecoveryLease maintenance;
+  if (!hold_maintenance(maintenance, cache)) {
+    log::warning("Android staging cleanup deferred in " + cache.string());
+    return;
+  }
+  for (auto& stage : stale) {
+    stage.lease->release();
+    finish_stage(stage.path);
+  }
+}
+
+void sweep(const fs::path& cache) {
+  auto stale = collect_stale(cache);
+  const auto kept =
+      std::remove_if(stale.begin(), stale.end(), [](const StaleStage& stage) { return !remove_payload(stage.path); });
+  stale.erase(kept, stale.end());
+  finish_batch(cache, stale);
+}
+
+bool publish_marker(const fs::path& stage, std::string& error) {
+  const auto temp = stage / kPendingOwnerFile;
+  std::ofstream out(temp, std::ios::binary);
+  out << kOwnerSignature;
+  out.close();
+  if (!out) {
+    error = "cannot write Android staging marker " + temp.string();
+    return false;
+  }
   std::error_code problem;
-  fs::create_directories(cache.parent_path(), problem);
-  if (!problem && private_cache(cache)) return true;
-  error = "cannot use private Android build cache " + cache.string();
-  if (problem) error += ": " + problem.message();
+  fs::rename(temp, stage / kOwnerFile, problem);
+  if (!problem) return true;
+  error = "cannot publish Android staging marker " + temp.string() + ": " + problem.message();
   return false;
 }
 }  // namespace
 
-fs::path cache_root() {
-  const auto home = platform::home_dir();
-  if (platform::is_mac()) return home / "Library" / "Caches" / "RedGem" / "android-stage";
-  const auto named = platform::environment_path("XDG_CACHE_HOME");
-  const auto cache = named.is_absolute() ? named : home / ".cache";
-  return cache / "redgem" / "android-stage";
-}
-
-Folder::Folder(const fs::path& cache, std::string& error) {
+Folder::Folder(const fs::path& requested, std::string& error) {
+  const auto cache = normalized_folder(requested);
   if (!ensure_cache(cache, error)) return;
   sweep(cache);
   RecoveryLease maintenance;
@@ -171,7 +216,7 @@ bool Folder::mark_owned(std::string& error) {
     error = "cannot lock Android staging folder " + stage.string();
     return false;
   }
-  if (write_text_file(stage / kOwnerFile, kOwnerSignature, error)) return true;
+  if (publish_marker(stage, error)) return true;
   lease_.release();
   return false;
 }
@@ -180,7 +225,14 @@ Folder::~Folder() {
   if (!folder_) return;
   const auto stage = folder_->path();
   folder_->keep();
-  reclaim(stage, lease_);
+  if (!remove_payload(stage)) return;
+  RecoveryLease maintenance;
+  if (!hold_maintenance(maintenance, stage.parent_path())) {
+    log::warning("Android staging cleanup deferred for " + stage.string());
+    return;
+  }
+  lease_.release();
+  finish_stage(stage);
 }
 
 fs::path Folder::path() const { return folder_ ? folder_->path() : fs::path{}; }

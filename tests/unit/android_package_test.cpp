@@ -7,6 +7,10 @@
 #include <map>
 #include <sstream>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 #include "project/android/android_package.hpp"
 #include "project/android/android_stage_folder.hpp"
 #include <raylib.h>
@@ -281,13 +285,14 @@ TEST_CASE("an Android build reclaims marked stale stages and leaves live or unre
   REQUIRE(std::filesystem::create_directory(payload));
   REQUIRE(write_text_file(payload / "copy.bin", "discard", error));
 
-  const android_stage::Folder live(scratch.dir, error);
+  const auto cache = std::filesystem::canonical(scratch.dir);
+  const android_stage::Folder live(cache, error);
   REQUIRE_MESSAGE(!live.path().empty(), error);
   CHECK_FALSE(std::filesystem::exists(stale));
   CHECK(read(unrelated) == "keep");
   std::filesystem::path next;
   {
-    const android_stage::Folder failed(scratch.dir, error);
+    const android_stage::Folder failed(cache, error);
     next = failed.path();
     REQUIRE_MESSAGE(!next.empty(), error);
     const auto broken = next / android_stage::kPackageFolder;
@@ -303,12 +308,14 @@ TEST_CASE("an Android build reclaims marked stale stages and leaves live or unre
 
 TEST_CASE("Android cache sweeps an old incomplete reservation and skips paths it cannot prove safe") {
   const Scratch scratch;
+  std::string error;
 #ifndef _WIN32
   std::filesystem::permissions(scratch.dir, std::filesystem::perms::owner_all);
 #endif
   const std::string prefix = android_stage::kPrefix;
   const auto orphan = scratch.dir / (prefix + "12345");
   REQUIRE(std::filesystem::create_directory(orphan));
+  REQUIRE(write_text_file(orphan / android_stage::kPendingOwnerFile, "partial marker", error));
   const auto created = std::filesystem::last_write_time(orphan);
   constexpr std::chrono::minutes kOldAge{20};
   std::filesystem::last_write_time(orphan, created - kOldAge);
@@ -322,8 +329,7 @@ TEST_CASE("Android cache sweeps an old incomplete reservation and skips paths it
   std::filesystem::create_directory_symlink(unavailable.parent_path(), symlink);
 #endif
 
-  std::string error;
-  const android_stage::Folder next(scratch.dir, error);
+  const android_stage::Folder next(std::filesystem::canonical(scratch.dir), error);
   REQUIRE_MESSAGE(!next.path().empty(), error);
   CHECK_FALSE(std::filesystem::exists(orphan));
   CHECK(std::filesystem::exists(wrong));
@@ -332,6 +338,75 @@ TEST_CASE("Android cache sweeps an old incomplete reservation and skips paths it
   CHECK(std::filesystem::is_symlink(symlink));
 #endif
 }
+
+TEST_CASE("Android staging uses a configured user cache without a temporary-directory fallback") {
+  using android_stage::cache_root_on;
+  using platform::Desktop;
+  const Scratch scratch;
+  const auto home = scratch.dir / "home";
+  const auto named = scratch.dir / "named";
+  CHECK(cache_root_on(Desktop::Linux, {}, named).empty());
+  CHECK(cache_root_on(Desktop::Linux, "relative", {}).empty());
+  CHECK(cache_root_on(Desktop::Linux, home, named) == named / "redgem" / "android-stage");
+  CHECK(cache_root_on(Desktop::Linux, home, "relative") == home / ".cache" / "redgem" / "android-stage");
+  CHECK(cache_root_on(Desktop::Mac, home, named) == home / "Library" / "Caches" / "RedGem" / "android-stage");
+  CHECK(cache_root_on(Desktop::Windows, home, named) == named / "RedGem" / "android-stage");
+  CHECK(cache_root_on(Desktop::Windows, home, {}).empty());
+}
+
+#ifndef _WIN32
+TEST_CASE("Android staging creates a private cache beneath a trusted directory") {
+  namespace fs = std::filesystem;
+  const Scratch scratch;
+  const auto cache = fs::canonical(scratch.dir) / ".cache" / "redgem" / "android-stage";
+  std::string error;
+  const android_stage::Folder owned(cache, error);
+  REQUIRE_MESSAGE(!owned.path().empty(), error);
+  CHECK(fs::status(cache).permissions() == fs::perms::owner_all);
+  CHECK(read(owned.path() / android_stage::kOwnerFile) == android_stage::kOwnerSignature);
+  CHECK_FALSE(fs::exists(owned.path() / android_stage::kPendingOwnerFile));
+}
+
+TEST_CASE("Android staging rejects shared or linked cache paths") {
+  namespace fs = std::filesystem;
+  const Scratch scratch;
+  const auto home = fs::canonical(scratch.dir);
+  const auto parent = home / "cache";
+  REQUIRE(fs::create_directory(parent));
+  const auto cache = parent / "android-stage";
+  REQUIRE(fs::create_directory(cache));
+  fs::permissions(cache, fs::perms::owner_all);
+  std::string error;
+  for (const auto shared : {fs::perms::group_write, fs::perms::others_write}) {
+    fs::permissions(parent, fs::perms::owner_all | shared);
+    const android_stage::Folder unsafe(cache, error);
+    CHECK(unsafe.path().empty());
+    CHECK(fs::is_empty(cache));
+  }
+  fs::permissions(parent, fs::perms::owner_all);
+  fs::permissions(cache, fs::perms::owner_all | fs::perms::group_read);
+  const android_stage::Folder readable(cache, error);
+  CHECK(readable.path().empty());
+  const auto link = home / "linked";
+  fs::create_directory_symlink(parent, link);
+  const android_stage::Folder linked(link / "new-stage", error);
+  CHECK(linked.path().empty());
+  CHECK_FALSE(fs::exists(parent / "new-stage"));
+  const auto cache_link = parent / "cache-link";
+  fs::create_directory_symlink(cache, cache_link);
+  const android_stage::Folder redirected(cache_link, error);
+  CHECK(redirected.path().empty());
+  CHECK(fs::is_empty(cache));
+}
+
+TEST_CASE("Android staging refuses a cache directory owned by another user") {
+  if (::geteuid() == 0) return;
+  std::string error;
+  const android_stage::Folder foreign("/", error);
+  CHECK(foreign.path().empty());
+  CHECK(error.find("cannot use private Android build cache") != std::string::npos);
+}
+#endif
 
 TEST_CASE("a game says its own app id, version and signing key in game.json") {
   const Scratch scratch;

@@ -24,6 +24,9 @@ std::filesystem::path normalized_folder(const std::filesystem::path& folder);
 
 inline constexpr const char* kFolderOccupied = "folder already exists";
 
+// Creates one directory exclusively (0700 on POSIX). False means it was not created.
+bool make_private_directory(const std::filesystem::path& path, std::error_code& error);
+
 // A temporary sibling folder, reserved without replacing any existing path.
 class ReservedFolder {
  public:
