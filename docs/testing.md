@@ -127,7 +127,7 @@ your own next to them.
 ## Running the tests on every push
 
 Every new game comes with a GitHub Actions workflow, `.github/workflows/test.yml`, that runs its
-check and its tests on GitHub's machines on every push and pull request. It downloads the latest
+check and its tests on GitHub's machines on pushes to main and on pull requests. It downloads the latest
 RedGem for Linux (the `redgem-linux-x86_64.tar.gz` of the latest release) and runs
 `redgem check --run-tests` on the game; the run fails when a script does not compile, a scene
 names a file that is not there, or a test fails. Put the game's folder in a repository on GitHub,
@@ -136,8 +136,8 @@ repository, move the file to that repository's `.github/workflows/` and set `GAM
 game's folder. To copy it into a game made before it existed, this is the whole file:
 
 ```yaml
-# Tests the game on GitHub's machines, on every push and pull request: downloads the latest RedGem
-# for Linux, looks the game over and runs its tests (tests/*_test.rb), as
+# Tests the game on GitHub's machines, on pushes to main and on pull requests: downloads the
+# latest RedGem for Linux, looks the game over and runs its tests (tests/*_test.rb), as
 # `redgem check . --run-tests` does on your own machine. The run fails when a script does not
 # compile, a scene names a file that is not there, or a test fails.
 #
@@ -146,8 +146,11 @@ game's folder. To copy it into a game made before it existed, this is the whole 
 # repository, move this file up there and set GAME_DIR to that folder.
 name: Game tests
 
+# (A push to a pull request's branch runs it as the pull request: once, not twice. Name your
+# default branch here if it is not main.)
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

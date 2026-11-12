@@ -35,7 +35,7 @@ The templates (the project hub offers the same ones):
 
 The `third-person`, `top-down` and `menu-only` games come with tests of their own (`tests/`), which
 `redgem check --run-tests` runs. Every new game also comes with `.github/workflows/test.yml`, a
-GitHub Actions workflow that runs them on every push (see
+GitHub Actions workflow that runs them on pushes and pull requests (see
 [Testing your game](testing.md#running-the-tests-on-every-push)).
 
 ## `redgem scene`: read and change a scene

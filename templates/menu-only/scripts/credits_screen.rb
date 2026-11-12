@@ -1,6 +1,7 @@
 # The credits: who made the game, in a list that rolls up by itself (UI::ScrollList). The mouse
-# wheel, Page Up and Page Down or a gamepad's right stick scroll it too; Back or Esc goes back to
-# the title screen. Put your own names in CREDITS; what each role is called is in locales/en.json
+# wheel, Page Up and Page Down or a gamepad's right stick scroll it too, and up and down go through
+# its rows (they come before the Back button in the menu's focus, which starts on Back). Back or
+# Esc goes back to the title screen. Put your own names in CREDITS; what each role is called is in locales/en.json
 # (each a lookup, made as it is shown: in the language in use then).
 class CreditsScreen < GameMenu::Screen
   CREDITS = [
@@ -38,7 +39,13 @@ class CreditsScreen < GameMenu::Screen
     @list = UI::ScrollList.new
   end
 
-  def opened = @list.reset
+  # Shown again: from the first row, with the focus on Back.
+  def opened
+    @list.reset
+    focus&.move_to(rows)
+  end
+
+  def rows = CREDITS.size
   def first_button_share = BUTTON_SHARE
   def space_above = @menu.scaled(LIST_HEIGHT + LIST_ABOVE_BUTTON)
 
@@ -49,7 +56,7 @@ class CreditsScreen < GameMenu::Screen
     @list.offset = CreditsScreen.rolled(@list.offset, Time.unscaled_delta)
     @list.draw(CREDITS.size, x: (UI.width - width) / 2, y: first_button[1] - space_above, width: width,
                              height: @menu.scaled(LIST_HEIGHT), row_height: @menu.scaled(ROW_HEIGHT),
-                             gap: @menu.scaled(ROW_GAP)) { |index, box| credit(CREDITS[index], box) }
+                             gap: @menu.scaled(ROW_GAP), focus: focus) { |index, box| credit(CREDITS[index], box) }
   end
 
   private

@@ -26,7 +26,7 @@ until 1.0, a release may change what games rely on (see
   the game is made.
 - **A CI example for games**: every new game comes with `.github/workflows/test.yml`, a GitHub
   Actions workflow that downloads the latest RedGem for Linux and runs `redgem check --run-tests`
-  on every push and pull request (see docs/testing.md). The files every new game gets live in
+  on pushes to main and on pull requests (see docs/testing.md). The files every new game gets live in
   `templates/_shared/`.
 
 - **Typing on Android**: while a `UI.text_field` is drawn, the phone's on-screen keyboard is up;

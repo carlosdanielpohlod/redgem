@@ -1,7 +1,8 @@
 # A game just made from the menu-only template, in a window, worked with the mouse: its title
-# screen, its credits, and the engine's settings screen.
+# screen, its credits, and the engine's settings screen. (The keyboard, and what each screen
+# does, are the game's own tests: templates/menu-only/tests/.)
 SETTLE_FRAMES = 10
-ROLL_FRAMES = 60
+ROLL_FRAMES = 60             # the credits rolling, before their picture
 SETTINGS_BUTTON = 1          # on the title screen: Play, Settings, Credits, Quit
 CREDITS_BUTTON = 2
 BACK_BUTTON = 0              # the credits' only button
@@ -20,7 +21,6 @@ SystemTest.define do |t|
   click_button.call(CREDITS_BUTTON)
   t.assert("Credits opens the credits") { menu.screen == :credits }
   t.wait(ROLL_FRAMES)
-  t.assert("the credits roll") { menu.screens[:credits].list.offset.positive? }
   t.screenshot("credits")
   click_button.call(BACK_BUTTON)
   t.assert("Back goes to the title screen") { menu.screen == :title }

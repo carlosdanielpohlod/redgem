@@ -1,5 +1,5 @@
-# Tests the game on GitHub's machines, on every push and pull request: downloads the latest RedGem
-# for Linux, looks the game over and runs its tests (tests/*_test.rb), as
+# Tests the game on GitHub's machines, on pushes to main and on pull requests: downloads the
+# latest RedGem for Linux, looks the game over and runs its tests (tests/*_test.rb), as
 # `redgem check . --run-tests` does on your own machine. The run fails when a script does not
 # compile, a scene names a file that is not there, or a test fails.
 #
@@ -8,8 +8,11 @@
 # repository, move this file up there and set GAME_DIR to that folder.
 name: Game tests
 
+# (A push to a pull request's branch runs it as the pull request: once, not twice. Name your
+# default branch here if it is not main.)
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

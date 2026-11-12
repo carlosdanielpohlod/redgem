@@ -4,7 +4,8 @@ SETTLE_FRAMES = 30           # the hero lands on the ground first
 WALK_FRAMES = 60             # a second
 MIN_WALK = 3.0               # meters a second of walking takes it, at least
 TURN_FRAMES = 30
-MIN_TURN = 30.0              # degrees the stick turns the camera in that time, at least
+MIN_TURN = 60.0              # degrees the stick turns the camera in that time, at least
+EASE_FRAMES = 30             # the camera closes in on its new angle
 SIDEWAYS_SHARE = 0.5         # of a walk, how much is across once the camera turned
 FULL_TILT = 1.0              # the stick pushed all the way right
 
@@ -21,9 +22,10 @@ SystemTest.define do |t|
 
   t.tilt(:right_x, FULL_TILT, frames: TURN_FRAMES)
   t.assert("the right stick turns the camera around the hero") { orbit.yaw.abs > MIN_TURN }
+  t.wait(EASE_FRAMES)
 
   start = hero.transform.position
   t.hold(:w, frames: WALK_FRAMES)
-  walked = hero.transform.position - start
+  walked = (hero.transform.position - start).flat
   t.assert("W now walks the way the camera looks") { walked.x.abs > walked.length * SIDEWAYS_SHARE }
 end
