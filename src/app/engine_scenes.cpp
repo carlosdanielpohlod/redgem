@@ -24,7 +24,8 @@ void Engine::make_bodies() {
 }
 
 void Engine::bake_navigation() {
-  const NavBakeReport& report = navigation_.bake({scene_, scene_desc_, *physics_});
+  physics_->optimize_broad_phase();  // the bake's many rays and overlaps search it
+  const NavBakeReport& report = navigation_.bake(*physics_);
   log::info("navigation: baked " + std::to_string(report.cells) + " walkable cells of " +
             std::to_string(report.columns) + " columns in " + std::to_string(report.milliseconds) + " ms");
   if (!report.cells_enlarged) return;

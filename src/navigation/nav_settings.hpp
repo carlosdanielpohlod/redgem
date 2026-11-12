@@ -4,7 +4,8 @@
 // fine the grid they walk on is. Its "navigation" section (every key may be left out):
 //   "navigation": {
 //     "cell_size": 0.25,       meters a side of a grid cell
-//     "agent_radius": 0.4,     how close to a wall a character's center may come
+//     "agent_radius": 0.4,     how close to a wall a character's center may come (never less than
+//                              half a cell's diagonal: nothing between two cells goes unseen)
 //     "agent_height": 1.8,     the headroom a character needs
 //     "max_step": 0.4,         the highest step it climbs (and drops down) without jumping
 //     "max_slope": 45,         the steepest ground it walks on, in degrees

@@ -197,3 +197,27 @@ TEST_CASE("a point is on walkable ground over a walkable cell, up to a character
   CHECK_FALSE(on_nav_grid(grid, {1.5f, 0.0f, 1.5f}, kHeadroom));   // the hole
   CHECK_FALSE(on_nav_grid(grid, {-5.0f, 0.0f, 0.5f}, kHeadroom));  // off the grid
 }
+
+TEST_CASE("a straight walk never cuts the corner of a hole, as a search's diagonal step does not") {
+  const NavGrid grid = grid_from({"...", "#..", "..."});
+  CHECK_FALSE(walks_straight(grid, node_at(grid, 0, 0), node_at(grid, 2, 2)));  // past the corner of (0, 1)
+  CHECK_FALSE(walks_straight(grid, node_at(grid, 0, 0), node_at(grid, 1, 1)));
+  CHECK(walks_straight(grid, node_at(grid, 0, 0), node_at(grid, 2, 0)));
+  CHECK(walks_straight(grid, node_at(grid, 1, 0), node_at(grid, 2, 2)));
+  const NavGridPath path = find_nav_path(grid, node_at(grid, 0, 0), node_at(grid, 1, 1));
+  REQUIRE(path.status == NavPathStatus::Found);
+  CHECK(path.nodes.size() == 3);  // around the corner: no diagonal step past the hole
+}
+
+TEST_CASE("the nearest walkable point is looked for 8 m around, even on the smallest cells") {
+  NavGridShape shape;
+  shape.cell_size = nav::kMinCellSize;
+  shape.columns = 200;  // 10 m
+  shape.rows = 1;
+  shape.max_step = kMaxStep;
+  std::vector<std::vector<float>> heights(200);
+  heights.back() = {0.0f};
+  const NavGrid grid(shape, heights);
+  CHECK(nearest_nav_node(grid, {grid.position(0).x - 7.0f, 0.0f, 0.0f}).has_value());  // 7 m away
+  CHECK_FALSE(nearest_nav_node(grid, {grid.position(0).x - 9.0f, 0.0f, 0.0f}).has_value());
+}

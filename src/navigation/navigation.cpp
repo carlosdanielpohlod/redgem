@@ -23,11 +23,12 @@ std::vector<Vec3> positions(const NavGrid& grid, const std::vector<NavGrid::Node
 
 }  // namespace
 
-const NavBakeReport& Navigation::bake(const NavLevel& level) {
+const NavBakeReport& Navigation::bake(const PhysicsWorld& physics) {
   const double started = steady_seconds();
-  const Bounds area = static_level_bounds(level.scene, level.desc, level.physics);
+  const Bounds area = physics.static_bounds();
   const NavGridShape shape = nav_grid_shape(area, settings_);
-  const PhysicsNavProbe probe(level.physics, settings_, area.max.y + kRayHeadroom, area.min.y - kRayHeadroom);
+  const PhysicsNavProbe probe(physics, settings_, shape.cell_size, area.max.y + kRayHeadroom,
+                              area.min.y - kRayHeadroom);
   NavGrid baked = bake_nav_grid(shape, settings_, probe);
   report_.columns = shape.column_count();
   report_.cells = baked.node_count();

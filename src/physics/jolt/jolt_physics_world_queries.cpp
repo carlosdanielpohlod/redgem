@@ -213,4 +213,17 @@ bool World::overlaps_static(const QueryShape& shape, Vec3 center) const {
   return collector.HadHit();
 }
 
+Bounds World::static_bounds() const {
+  Bounds level;
+  for (const auto& [object, record] : records_) {
+    if (!level_body(object, record)) continue;
+    const JPH::BodyLockRead lock(system_.GetBodyLockInterface(), record.body);
+    if (!lock.Succeeded()) continue;
+    const JPH::AABox box = lock.GetBody().GetWorldSpaceBounds();
+    level.include(from_jolt(box.mMin));
+    level.include(from_jolt(box.mMax));
+  }
+  return level;
+}
+
 }  // namespace redgem::jolt

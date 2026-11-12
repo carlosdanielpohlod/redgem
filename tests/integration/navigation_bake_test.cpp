@@ -54,8 +54,9 @@ class Level {
   void add_floor() { add_box(kFloorCenter, kFloorHalf); }
 
   NavGrid bake(const Bounds& area = floor_area(), const NavSettings& settings = settings_for_tests()) const {
-    const PhysicsNavProbe probe(*world_, settings, kRayTop, kRayBottom);
-    return bake_nav_grid(nav_grid_shape(area, settings), settings, probe);
+    const NavGridShape shape = nav_grid_shape(area, settings);
+    const PhysicsNavProbe probe(*world_, settings, shape.cell_size, kRayTop, kRayBottom);
+    return bake_nav_grid(shape, settings, probe);
   }
 
   static NavSettings settings_for_tests() {

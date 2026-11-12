@@ -8,15 +8,15 @@
 #include "navigation/nav_bake.hpp"
 #include "navigation/nav_settings.hpp"
 #include "physics/physics_world.hpp"
-#include "scene/scene.hpp"
-#include "scene/scene_desc.hpp"
 
 namespace redgem {
 
 class PhysicsNavProbe final : public NavProbe {
  public:
-  // Rays look down from `top` to `bottom`; a character is the settings' agent.
-  PhysicsNavProbe(const PhysicsWorld& physics, const NavSettings& settings, float top, float bottom);
+  // Rays look down from `top` to `bottom`. A character is the settings' agent, but never thinner
+  // than half the diagonal of a cell of `cell_size`: then nothing between the middles of two cells
+  // side by side (diagonals too) goes unseen, as it is within that of one of them.
+  PhysicsNavProbe(const PhysicsWorld& physics, const NavSettings& settings, float cell_size, float top, float bottom);
   std::vector<NavSurface> surfaces(float x, float z) const override;
   bool blocked(Vec3 feet) const override;
 
@@ -27,8 +27,5 @@ class PhysicsNavProbe final : public NavProbe {
   float top_ = 0.0f;
   float depth_ = 0.0f;
 };
-
-// The box around every static body of the scene, in world space (not valid when there is none).
-Bounds static_level_bounds(const Scene& scene, const SceneDesc& desc, const PhysicsWorld& physics);
 
 }  // namespace redgem

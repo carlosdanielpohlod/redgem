@@ -127,6 +127,8 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   std::vector<RaycastHit> overlap(const QueryShape& shape, Vec3 center, const QueryFilter& filter) const override;
   std::vector<RaycastHit> static_surfaces(Vec3 origin, Vec3 direction, float max_distance) const override;
   bool overlaps_static(const QueryShape& shape, Vec3 center) const override;
+  Bounds static_bounds() const override;
+  void optimize_broad_phase() override { system_.OptimizeBroadPhase(); }
   std::variant<JointId, std::string> add_joint(const JointDesc& desc) override;
   void remove_joint(JointId joint) override;
   bool has_joint(JointId joint) const override { return joints_.count(joint) != 0; }
@@ -161,6 +163,10 @@ class World final : public PhysicsWorld, JPH::ContactListener, JPH::CharacterCon
   // Every hit of a ray, in no order (of static bodies only, with `statics_only`).
   std::vector<RaycastHit> every_ray_hit(Vec3 origin, Vec3 direction, float max_distance, const QueryFilter& filter,
                                         bool statics_only) const;
+  // Whether an object's body is part of the level: static, and no trigger.
+  bool level_body(ObjectId object, const Record& record) const {
+    return has_body(&record) && record.type == BodyType::Static && triggers_.count(object) == 0;
+  }
   // The layer of an object's body in Jolt's terms.
   JPH::ObjectLayer object_layer_of(const Record& record) const;
   // A rigid body neither moving nor about to: static, or asleep. Characters never are.

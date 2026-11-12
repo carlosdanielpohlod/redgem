@@ -464,7 +464,8 @@ and every key may be left out:
 
 A cell is walkable when its ground is no steeper than `max_slope` degrees and a character of
 `agent_radius` and `agent_height` standing on it is inside nothing: walls keep characters
-`agent_radius` away, and a ceiling lower than `agent_height` leaves no room under it. Two cells side
+`agent_radius` away (at least half a cell's diagonal, so that no wall hides between two cells),
+and a ceiling lower than `agent_height` leaves no room under it. Two cells side
 by side are joined when their heights are no more than `max_step` apart, so a character climbs
 stairs and curbs but not a ledge. Cells over each other (a bridge over a road) are told apart.
 

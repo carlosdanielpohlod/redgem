@@ -17,17 +17,8 @@
 #include "navigation/nav_grid.hpp"
 #include "navigation/nav_settings.hpp"
 #include "physics/physics_world.hpp"
-#include "scene/scene.hpp"
-#include "scene/scene_desc.hpp"
 
 namespace redgem {
-
-// What a level is baked from: its objects and the physics world their bodies are in.
-struct NavLevel {
-  const Scene& scene;
-  const SceneDesc& desc;
-  const PhysicsWorld& physics;
-};
 
 class Navigation {
  public:
@@ -36,8 +27,8 @@ class Navigation {
 
   // Forgets the grid (a new scene): the next question bakes one, unless one is baked first.
   void forget() { grid_.reset(); }
-  // Bakes the level's grid now, replacing any.
-  const NavBakeReport& bake(const NavLevel& level);
+  // Bakes the grid of the level in a physics world now (its static bodies), replacing any.
+  const NavBakeReport& bake(const PhysicsWorld& physics);
   bool baked() const { return grid_.has_value(); }
   const NavBakeReport& report() const { return report_; }
   // The baked grid (an empty one before a bake).

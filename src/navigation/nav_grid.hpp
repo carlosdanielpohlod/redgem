@@ -74,11 +74,14 @@ class NavGrid {
   std::pair<Node, Node> nodes_in(int column) const;
   // The node of a column a character on `from` steps onto (the one nearest its height), if any.
   std::optional<Node> step_to(Node from, int column) const;
-  // The nodes a character on `node` walks to in one step; returns how many there are.
+  // Whether a character on `from` steps onto `to`, a node of a column beside its own.
+  bool joins(Node from, Node to) const { return step_to(from, column_of(to)) == to; }
+  // The nodes a character on `node` walks to in one step; returns how many there are. A diagonal
+  // step is one only when both straight steps beside it are, and both of those lead to it too: no
+  // path cuts a corner.
   std::size_t neighbours(Node node, Links& links) const;
 
  private:
-  std::optional<Node> neighbour(Node node, NavCell cell, int dx, int dz) const;
   float step_cost(Node from, Node to) const;
 
   NavGridShape shape_;

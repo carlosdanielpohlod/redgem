@@ -46,13 +46,42 @@ bool over_grid(float cell_x, float cell_z, const NavGridShape& shape) {
   return inside_span(cell_x, shape.columns) && inside_span(cell_z, shape.rows);
 }
 
-// Whether both straight steps a diagonal goes between can be taken.
-bool corner_open(const std::array<bool, kStraightSteps>& open, const Diagonal& diagonal) {
-  return open[diagonal.along_x] && open[diagonal.along_z];
+using Node = NavGrid::Node;
+// The nodes the straight steps from a node lead to, in kStraight's order.
+using Sides = std::array<std::optional<Node>, kStraightSteps>;
+
+// The node a character on `node` steps onto in the column at `offset` from its cell, if any.
+std::optional<Node> step_by(const NavGrid& grid, Node node, NavCell cell, Offset offset) {
+  const std::optional<int> column = grid.column_of_cell({cell.x + offset.dx, cell.z + offset.dz});
+  if (!column) return std::nullopt;
+  return grid.step_to(node, *column);
 }
 
+// Whether a node is a step from both of two others.
+bool joined_from_both(const NavGrid& grid, Node one, Node other, Node node) {
+  return grid.joins(one, node) && grid.joins(other, node);
+}
+
+// The node across a corner, when both straight steps beside it (`sides`) can be taken and both
+// lead there too.
+std::optional<Node> across_corner(const NavGrid& grid, Node node, NavCell cell, const Diagonal& diagonal,
+                                  const Sides& sides) {
+  const std::optional<Node>& beside_x = sides[diagonal.along_x];
+  const std::optional<Node>& beside_z = sides[diagonal.along_z];
+  if (!beside_x) return std::nullopt;
+  if (!beside_z) return std::nullopt;
+  const std::optional<Node> next = step_by(grid, node, cell, diagonal.offset);
+  if (!next) return std::nullopt;
+  if (!joined_from_both(grid, *beside_x, *beside_z, *next)) return std::nullopt;
+  return next;
+}
+
+// A place along an axis, in cells, as the index of the nearest cell of the `count` there are (a
+// place far off the grid, or none at all, gives an edge's).
 int clamped_index(float index, int count) {
-  return std::clamp(static_cast<int>(std::floor(index)), 0, std::max(count - 1, 0));
+  const auto last = static_cast<float>(std::max(count - 1, 0));
+  // (fmax and fmin, unlike max and min, take a number over a NaN.)
+  return static_cast<int>(std::fmin(std::fmax(std::floor(index), 0.0f), last));
 }
 
 }  // namespace
@@ -109,26 +138,19 @@ std::optional<NavGrid::Node> NavGrid::step_to(Node from, int column) const {
   return best;
 }
 
-std::optional<NavGrid::Node> NavGrid::neighbour(Node node, NavCell cell, int dx, int dz) const {
-  const std::optional<int> column = column_of_cell({cell.x + dx, cell.z + dz});
-  if (!column) return std::nullopt;
-  return step_to(node, *column);
-}
-
 float NavGrid::step_cost(Node from, Node to) const { return length(position(to) - position(from)); }
 
 std::size_t NavGrid::neighbours(Node node, Links& links) const {
   const NavCell cell = cell_of_column(column_of(node));
   std::size_t count = 0;
-  std::array<bool, kStraightSteps> open{};
+  Sides sides;
   for (std::size_t step = 0; step < kStraightSteps; ++step) {
-    const std::optional<Node> next = neighbour(node, cell, kStraight[step].dx, kStraight[step].dz);
-    open[step] = next.has_value();
-    if (next) links[count++] = {*next, step_cost(node, *next)};
+    const std::optional<Node> side = step_by(*this, node, cell, kStraight[step]);
+    sides[step] = side;
+    if (side) links[count++] = {*side, step_cost(node, *side)};
   }
   for (const Diagonal& diagonal : kDiagonals) {
-    if (!corner_open(open, diagonal)) continue;
-    const std::optional<Node> next = neighbour(node, cell, diagonal.offset.dx, diagonal.offset.dz);
+    const std::optional<Node> next = across_corner(*this, node, cell, diagonal, sides);
     if (next) links[count++] = {*next, step_cost(node, *next)};
   }
   return count;

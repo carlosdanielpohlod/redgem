@@ -7,14 +7,15 @@
 
 #include "core/math.hpp"
 #include "navigation/nav_grid.hpp"
+#include "navigation/nav_settings.hpp"
 
 namespace redgem {
 
 namespace nav {
-// How far around a point its nearest walkable cell is looked for, in meters and at most in cells
-// (rings of columns around the point's own).
+// How far around a point its nearest walkable cell is looked for, in meters: enough rings of
+// columns around the point's own for the smallest cells to reach it.
 inline constexpr float kNearestReach = 8.0f;
-inline constexpr int kMaxNearestRings = 64;
+inline constexpr int kMaxNearestRings = static_cast<int>(kNearestReach / kMinCellSize) + 1;
 }  // namespace nav
 
 // The walkable cell nearest a point (straight-line distance), within nav::kNearestReach of it.
