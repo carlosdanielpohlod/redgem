@@ -17,6 +17,17 @@ until 1.0, a release may change what games rely on (see
   unless `--status-bind` names another address, holds counts only (no room codes or players),
   and never holds up the server: few connections, small requests, short deadlines.
   `--status-log <seconds>`, and `SIGUSR1` on Linux and macOS, write the same summary to the log.
+- **Three more templates** for `redgem new --template` and the project hub: `third-person` (a hero
+  that walks the way the camera looks and jumps, the camera orbiting behind it with the right
+  mouse button or the right stick), `top-down` (a hero under a tilted camera, walked by WASD or the
+  left stick, or sent to a spot by a left click) and `menu-only` (a title screen, the engine's
+  settings screen and controls page, and credits that roll in a scroll list; no 3D play). Each
+  comes with its own tests in `tests/`, which `redgem check --run-tests` runs and which pass as
+  the game is made.
+- **A CI example for games**: every new game comes with `.github/workflows/test.yml`, a GitHub
+  Actions workflow that downloads the latest RedGem for Linux and runs `redgem check --run-tests`
+  on every push and pull request (see docs/testing.md). The files every new game gets live in
+  `templates/_shared/`.
 
 - **Typing on Android**: while a `UI.text_field` is drawn, the phone's on-screen keyboard is up;
   it goes when no field is drawn (the field or its menu closed, the scene changed) or when the

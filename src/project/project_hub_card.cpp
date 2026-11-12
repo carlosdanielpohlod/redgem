@@ -23,7 +23,11 @@ struct NamedIcon {
   const char* name;
   const char* icon;
 };
-constexpr NamedIcon kTemplateIcons[] = {{"cube", ICON_FA_CUBE}, {"person-running", ICON_FA_PERSON_RUNNING}};
+constexpr NamedIcon kTemplateIcons[] = {{"cube", ICON_FA_CUBE},
+                                        {"person-running", ICON_FA_PERSON_RUNNING},
+                                        {"person-walking", ICON_FA_PERSON_WALKING},
+                                        {"map", ICON_FA_MAP},
+                                        {"list", ICON_FA_LIST}};
 
 // What a card shows, over a selectable that starts at `start`: the icon, and next to it the two
 // lines (with the gap between them) centered in the card's height.

@@ -19,18 +19,24 @@ constexpr const char* kTemplateInfoFile = "template.json";
 constexpr const char* kDescriptionKey = "description";
 constexpr const char* kIconKey = "icon";
 constexpr char kPathSeparator = '/';  // of the paths files are built in under
+// The folder of templates/ whose files every new game gets, whatever its template (it has no
+// template.json: it is no template of its own).
+constexpr const char* kSharedFolder = "_shared";
+
+using FilesByPath = std::map<std::string, std::string>;
 
 // A file built into the program, as a text of its bytes.
 std::string contents_of(const EmbeddedFile& file) {
   return {reinterpret_cast<const char*>(file.data), static_cast<std::size_t>(file.size)};
 }
 
-// The files of each template, by where they go in a game made from it.
-using TemplateFiles = std::map<std::string, std::map<std::string, std::string>>;
+// The files of each folder of templates/ (each template, and the shared files), by where they go
+// in a game made from it.
+using FolderFiles = std::map<std::string, FilesByPath>;
 
-const TemplateFiles& files_by_template() {
-  static const TemplateFiles files = [] {
-    TemplateFiles sorted;
+const FolderFiles& files_by_folder() {
+  static const FolderFiles files = [] {
+    FolderFiles sorted;
     for (const auto& entry : generated::template_files()) {
       const std::string_view path = entry.path;
       const std::size_t slash = path.find(kPathSeparator);
@@ -41,8 +47,25 @@ const TemplateFiles& files_by_template() {
   return files;
 }
 
+// Whether a folder of templates/ is a template: one that says what it is.
+bool is_template(const FilesByPath& files) { return files.count(kTemplateInfoFile) > 0; }
+
+// The files of the template of that name; nothing when there is no such template.
+const FilesByPath* files_of_template(const std::string& name) {
+  const auto found = files_by_folder().find(name);
+  if (found == files_by_folder().end()) return nullptr;
+  return is_template(found->second) ? &found->second : nullptr;
+}
+
+// What every new game gets, whatever its template.
+const FilesByPath& shared_files() {
+  static const FilesByPath none;
+  const auto found = files_by_folder().find(kSharedFolder);
+  return found == files_by_folder().end() ? none : found->second;
+}
+
 // What a template's own file says under `key`; nothing when it does not say it.
-std::string info(const std::map<std::string, std::string>& files, const char* key) {
+std::string info(const FilesByPath& files, const char* key) {
   const auto file = files.find(kTemplateInfoFile);
   if (file == files.end()) return {};
   const nlohmann::json json = nlohmann::json::parse(file->second, nullptr, false);
@@ -60,8 +83,7 @@ void create_game_folders(const std::filesystem::path& game_dir) {
   }
 }
 
-bool write_template_files(const std::filesystem::path& game_dir, const std::map<std::string, std::string>& files,
-                          std::string& error) {
+bool write_template_files(const std::filesystem::path& game_dir, const FilesByPath& files, std::string& error) {
   for (const auto& [path, contents] : files) {
     if (path == kTemplateInfoFile) continue;
     const std::filesystem::path file = game_dir / path;
@@ -85,8 +107,8 @@ bool name_game(const std::filesystem::path& game_dir, std::string& error) {
 const std::vector<GameTemplate>& game_templates() {
   static const std::vector<GameTemplate> templates = [] {
     std::vector<GameTemplate> found;
-    for (const auto& [name, files] : files_by_template()) {
-      found.push_back({name, info(files, kDescriptionKey), info(files, kIconKey)});
+    for (const auto& [name, files] : files_by_folder()) {
+      if (is_template(files)) found.push_back({name, info(files, kDescriptionKey), info(files, kIconKey)});
     }
     return found;
   }();
@@ -100,8 +122,8 @@ std::string template_names(const std::string& separator) {
 }
 
 bool create_game(const std::filesystem::path& game_dir, const std::string& template_name, std::string& error) {
-  const auto files = files_by_template().find(template_name);
-  if (files == files_by_template().end()) {
+  const FilesByPath* files = files_of_template(template_name);
+  if (files == nullptr) {
     error = "unknown template '" + template_name + "': the templates are " + template_names(", ");
     return false;
   }
@@ -110,8 +132,8 @@ bool create_game(const std::filesystem::path& game_dir, const std::string& templ
     return false;
   }
   create_game_folders(game_dir);
-  return write_template_files(game_dir, files->second, error) && name_game(game_dir, error) &&
-         tools::write_assistant_guide(game_dir, error);
+  return write_template_files(game_dir, shared_files(), error) && write_template_files(game_dir, *files, error) &&
+         name_game(game_dir, error) && tools::write_assistant_guide(game_dir, error);
 }
 
 }  // namespace redgem

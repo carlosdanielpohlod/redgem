@@ -16,6 +16,28 @@ is short, and every problem they report says where it is and what to do instead.
 Each one says more with `--help`. They end with exit code 0 when everything went well, 1 when
 something is wrong with the game, and 2 when the command line was not understood.
 
+## `redgem new`: make a game from a template
+
+```console
+$ redgem new games/my_game --template third-person
+created games/my_game (third-person). Open it with: redgem games/my_game
+```
+
+The templates (the project hub offers the same ones):
+
+| Template | What the game starts with |
+|----------|---------------------------|
+| `empty` (unless another is asked for) | Ground, sun, camera and a spinning cube |
+| `platformer` | A hero that runs, jumps and collects coins, its menus and online play |
+| `third-person` | A hero that walks and jumps, the camera behind it orbited by the mouse or the right stick |
+| `top-down` | A hero seen from above, walked by the keys or the stick or sent to a spot by a click |
+| `menu-only` | A title screen, the engine's settings and controls pages, and rolling credits: no 3D play |
+
+The `third-person`, `top-down` and `menu-only` games come with tests of their own (`tests/`), which
+`redgem check --run-tests` runs. Every new game also comes with `.github/workflows/test.yml`, a
+GitHub Actions workflow that runs them on every push (see
+[Testing your game](testing.md#running-the-tests-on-every-push)).
+
 ## `redgem scene`: read and change a scene
 
 A `scene.glb` is a binary file. `redgem scene` shows it as text, one line per object, and changes

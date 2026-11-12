@@ -1,0 +1,39 @@
+# Tests the game on GitHub's machines, on every push and pull request: downloads the latest RedGem
+# for Linux, looks the game over and runs its tests (tests/*_test.rb), as
+# `redgem check . --run-tests` does on your own machine. The run fails when a script does not
+# compile, a scene names a file that is not there, or a test fails.
+#
+# It came with the game (`redgem new`): see "Testing your game" in the RedGem manual. GitHub runs
+# it from .github/workflows/ at the top of the repository. If the game is in a folder of the
+# repository, move this file up there and set GAME_DIR to that folder.
+name: Game tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Check and test the game
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GAME_DIR: .
+      # The latest release. To stay on one version, name it: .../releases/download/v0.5.0/...
+      REDGEM_DOWNLOAD: https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.tar.gz
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download RedGem
+        run: |
+          curl -fsSL --retry 3 -o "${RUNNER_TEMP}/redgem.tar.gz" "${REDGEM_DOWNLOAD}"
+          tar -xzf "${RUNNER_TEMP}/redgem.tar.gz" -C "${RUNNER_TEMP}"
+
+      # (System tests run with no window: no display is needed.)
+      - name: Check the game and run its tests
+        run: |
+          "${RUNNER_TEMP}/redgem/bin/redgem" check "${GAME_DIR}" --run-tests

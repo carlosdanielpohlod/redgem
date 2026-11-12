@@ -163,6 +163,17 @@ the same pull request.
 - The showcase demo is built from downloaded assets that may not be passed on, so it is not in
   the downloads and its tests are skipped without it.
 - The scripts that record the site's video are not part of the repository.
+- The CI example every new game gets (`.github/workflows/test.yml`) is for GitHub Actions on
+  Linux only, and downloads the latest release: a game made from templates newer than that
+  release (the `third-person`, `top-down` and `menu-only` ones, until the next release) may use
+  scripting the release does not have yet. Its system tests run with no window: they take no
+  pictures, and a click lands on no screen (a template's own tests call `walk_to` instead of
+  clicking).
+- A game's `tests/` folder goes into its builds with the rest of the game (the tests are not run
+  there, and the player has no test code).
+- The template scenes are written by `tools/templates/build_template_scenes.py` from the editor's
+  primitives in the `empty` and `platformer` templates: a template is not yet made from the
+  editor's own primitive code.
 
 ## Before 1.0
 
