@@ -414,6 +414,71 @@ end
 `box_cast`, `capsule_cast`, `overlap_box` and `overlap_capsule` work the same way. Hits come
 nearest first, each object once, at most 64.
 
+## Chase the player: navigation
+
+`Navigation.path` finds the way around walls, along floors and up stairs and slopes, from one point
+to another: an Array of `Vector3` waypoints, or `nil` when there is no way there. An enemy walks to
+each waypoint in turn and asks again now and then, as the player moves:
+
+```ruby
+class Chaser < Behaviour
+  SPEED = 3.0
+  REPATH_SECONDS = 0.5
+  CLOSE_ENOUGH = 0.3
+
+  def start
+    @player = Scene.find('Player')
+    @waypoints = []
+    every(REPATH_SECONDS) { @waypoints = Navigation.path(transform.position, @player.transform.position) || [] }
+  end
+
+  def update(_delta)
+    @waypoints.shift while @waypoints.any? && transform.position.flat.distance_to(@waypoints.first.flat) < CLOSE_ENOUGH
+    target = @waypoints.first
+    return character.move(Vector3.zero) unless target
+
+    character.move((target - transform.position).flat.normalized * SPEED)
+  end
+end
+```
+
+`Navigation.nearest(point)` is the walkable point nearest a point (a spot to send someone to), and
+`Navigation.walkable?(point)` whether a point is on walkable ground. `Navigation.draw(transform.position)`
+shows the walkable cells around a point for one frame, a flat square each; call it every frame
+while you look, in the game or while playing in the editor.
+
+The walkable area is baked from the scene's static bodies: floors, walls, terrain and mesh colliders.
+A game whose `game.json` has a `navigation` section bakes it as each scene loads; any other bakes it
+when a script first asks (that frame takes longer). The section says how big the characters are,
+and every key may be left out:
+
+```json
+"navigation": {
+  "cell_size": 0.25,
+  "agent_radius": 0.4,
+  "agent_height": 1.8,
+  "max_step": 0.4,
+  "max_slope": 45
+}
+```
+
+A cell is walkable when its ground is no steeper than `max_slope` degrees and a character of
+`agent_radius` and `agent_height` standing on it is inside nothing: walls keep characters
+`agent_radius` away, and a ceiling lower than `agent_height` leaves no room under it. Two cells side
+by side are joined when their heights are no more than `max_step` apart, so a character climbs
+stairs and curbs but not a ledge. Cells over each other (a bridge over a road) are told apart.
+
+What it does not do yet:
+
+- Moving bodies, characters and triggers are not obstacles: a path goes through a closed door or a
+  crowd. Steer around them yourself (`Physics.sphere_cast` ahead of the character).
+- The bake sees the level as it is: one a script changes (walls spawned or destroyed) needs
+  `Navigation.bake`, which takes as long again. `Navigation.stats` says what the last one cost.
+- No jumps, ladders or teleporters between places the grid does not join.
+- A grid has at most 262,144 columns (512 by 512): a larger level is baked with larger cells,
+  with a warning. A search looks at no more than 16,384 cells, so that no frame stalls: a way
+  longer than that gives `nil` too. Ask for paths a few times a second, not every frame.
+
 ## Follow, orbit and shake the camera
 
 The camera follows, orbits and shakes on its own once told to: no script of its own has to move it

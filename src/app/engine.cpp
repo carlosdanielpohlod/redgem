@@ -31,6 +31,7 @@ void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
   for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
   for (const std::string& warning : manifest.servers_warnings) log::warning(warning);
+  for (const std::string& warning : manifest.navigation_warnings) log::warning(warning);
 }
 
 // What the game's scripts are told of what game.json says.
@@ -92,6 +93,7 @@ void Engine::initialize() {
   const GameIdentityReading identity = begin_loading();
   const GameManifest manifest = read_game_manifest(options_.game_dir);
   warn_of_unusable(manifest);
+  navigation_.configure(manifest.settings.navigation);
   build_world(manifest.settings.collision_layers);
   open_presenter(manifest.settings);
   open_audio();
@@ -235,6 +237,8 @@ void Engine::fill_context(const GameSettings& settings) {
   context_.scene = &scene_;
   context_.audio = &audio();
   context_.physics = physics_.get();
+  context_.navigation = &navigation_;
+  context_.bake_navigation = [this] { bake_navigation(); };
   context_.input = &input_;
   context_.time.fixed_delta = config::kFixedDeltaSeconds;
   context_.profiler = &profiler_;

@@ -28,6 +28,7 @@ class HttpClient;
 class AnimationPlayer;
 class ParticleSystem;
 class ParticleEmitters;
+class Navigation;
 
 // What a script changed on a transform; physics reacts differently to each.
 enum class TransformWrite { Position, Rotation };
@@ -101,6 +102,10 @@ struct ScriptContext {
   AnimationPlayer* animations = nullptr;
   ParticleSystem* particles = nullptr;
   ParticleEmitters* particle_emitters = nullptr;
+  // Where the characters a game moves can walk (Navigation), and what bakes the running scene's
+  // grid now. Null outside a running engine.
+  Navigation* navigation = nullptr;
+  std::function<void()> bake_navigation;
   bool renders_particles = false;  // emitters are local presentation, never simulated by a headless room
   // The multiplayer game this machine hosts or joined (Network).
   net::NetworkSession* network = nullptr;

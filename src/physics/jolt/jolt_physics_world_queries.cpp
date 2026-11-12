@@ -3,6 +3,7 @@
 
 #include "physics/jolt/jolt_physics_world.hpp"
 
+#include <Jolt/Physics/Body/Body.h>
 #include <Jolt/Physics/Body/BodyFilter.h>
 #include <Jolt/Physics/Body/BodyLock.h>
 #include <Jolt/Physics/Collision/CastResult.h>
@@ -27,16 +28,20 @@ namespace {
 // A ray with no direction or no length: it cannot hit anything.
 bool goes_nowhere(Vec3 direction, float max_distance) { return length(direction) <= kEpsilon || max_distance <= 0.0f; }
 
-// The bodies of the objects a query was told to ignore.
+// The bodies of the objects a query was told to ignore, and every moving one when it looks at
+// static bodies only.
 class IgnoredBodies final : public JPH::BodyFilter {
  public:
-  explicit IgnoredBodies(std::vector<JPH::BodyID> bodies) : bodies_(std::move(bodies)) {}
+  IgnoredBodies(std::vector<JPH::BodyID> bodies, bool statics_only)
+      : bodies_(std::move(bodies)), statics_only_(statics_only) {}
   bool ShouldCollide(const JPH::BodyID& body) const override {
     return std::find(bodies_.begin(), bodies_.end(), body) == bodies_.end();
   }
+  bool ShouldCollideLocked(const JPH::Body& body) const override { return !statics_only_ || body.IsStatic(); }
 
  private:
   std::vector<JPH::BodyID> bodies_;
+  bool statics_only_ = false;
 };
 
 // Nearest first; at the same distance by object, so the order never depends on Jolt's.
@@ -45,6 +50,13 @@ bool nearer(const RaycastHit& a, const RaycastHit& b) {
 }
 
 bool has_room(const std::vector<RaycastHit>& hits) { return hits.size() < config::kMaxQueryHits; }
+
+// Nearest first; at most kMaxQueryHits of them.
+std::vector<RaycastHit> nearest_first(std::vector<RaycastHit> hits) {
+  std::sort(hits.begin(), hits.end(), nearer);
+  if (hits.size() > config::kMaxQueryHits) hits.resize(config::kMaxQueryHits);
+  return hits;
+}
 
 // Each object once, at its nearest; nearest first; at most kMaxQueryHits of them.
 std::vector<RaycastHit> nearest_of_each(std::vector<RaycastHit> hits) {
@@ -130,23 +142,32 @@ std::optional<RaycastHit> World::raycast(Vec3 origin, Vec3 direction, float max_
   const JPH::RRayCast ray(JPH::RVec3(to_jolt(origin)), to_jolt(dir * max_distance));
   JPH::RayCastResult result;
   const LayersInMask layer_filter(filter.layers);
-  const IgnoredBodies body_filter(bodies_of(filter.ignore));
+  const IgnoredBodies body_filter(bodies_of(filter.ignore), false);
   if (!system_.GetNarrowPhaseQuery().CastRay(ray, result, {}, layer_filter, body_filter)) return std::nullopt;
   return ray_hit(ray, result, max_distance);
 }
 
-std::vector<RaycastHit> World::raycast_all(Vec3 origin, Vec3 direction, float max_distance,
-                                           const QueryFilter& filter) const {
+std::vector<RaycastHit> World::every_ray_hit(Vec3 origin, Vec3 direction, float max_distance, const QueryFilter& filter,
+                                             bool statics_only) const {
   const Vec3 dir = normalize(direction);
   if (goes_nowhere(dir, max_distance)) return {};
   const JPH::RRayCast ray(JPH::RVec3(to_jolt(origin)), to_jolt(dir * max_distance));
   JPH::AllHitCollisionCollector<JPH::CastRayCollector> collector;
   const LayersInMask layer_filter(filter.layers);
-  const IgnoredBodies body_filter(bodies_of(filter.ignore));
+  const IgnoredBodies body_filter(bodies_of(filter.ignore), statics_only);
   system_.GetNarrowPhaseQuery().CastRay(ray, JPH::RayCastSettings(), collector, {}, layer_filter, body_filter);
   std::vector<RaycastHit> hits;
   for (const JPH::RayCastResult& result : collector.mHits) hits.push_back(ray_hit(ray, result, max_distance));
-  return nearest_of_each(std::move(hits));
+  return hits;
+}
+
+std::vector<RaycastHit> World::raycast_all(Vec3 origin, Vec3 direction, float max_distance,
+                                           const QueryFilter& filter) const {
+  return nearest_of_each(every_ray_hit(origin, direction, max_distance, filter, false));
+}
+
+std::vector<RaycastHit> World::static_surfaces(Vec3 origin, Vec3 direction, float max_distance) const {
+  return nearest_first(every_ray_hit(origin, direction, max_distance, QueryFilter{}, true));
 }
 
 std::optional<RaycastHit> World::shape_cast(const QueryShape& shape, Vec3 from, Vec3 to,
@@ -156,7 +177,7 @@ std::optional<RaycastHit> World::shape_cast(const QueryShape& shape, Vec3 from, 
       swept.GetPtr(), JPH::Vec3::sReplicate(kUnitScale), matrix_of(from, shape.rotation), to_jolt(to - from));
   JPH::ClosestHitCollisionCollector<JPH::CastShapeCollector> collector;
   const LayersInMask layer_filter(filter.layers);
-  const IgnoredBodies body_filter(bodies_of(filter.ignore));
+  const IgnoredBodies body_filter(bodies_of(filter.ignore), false);
   system_.GetNarrowPhaseQuery().CastShape(cast, JPH::ShapeCastSettings(), JPH::RVec3::sZero(), collector, {},
                                           layer_filter, body_filter);
   if (!collector.HadHit()) return std::nullopt;
@@ -169,7 +190,7 @@ std::vector<RaycastHit> World::overlap(const QueryShape& shape, Vec3 center, con
   const JPH::RefConst<JPH::Shape> tested = shape_of(shape);
   JPH::AllHitCollisionCollector<JPH::CollideShapeCollector> collector;
   const LayersInMask layer_filter(filter.layers);
-  const IgnoredBodies body_filter(bodies_of(filter.ignore));
+  const IgnoredBodies body_filter(bodies_of(filter.ignore), false);
   system_.GetNarrowPhaseQuery().CollideShape(tested.GetPtr(), JPH::Vec3::sReplicate(kUnitScale),
                                              matrix_of(center, shape.rotation), JPH::CollideShapeSettings(),
                                              JPH::RVec3::sZero(), collector, {}, layer_filter, body_filter);
@@ -179,6 +200,17 @@ std::vector<RaycastHit> World::overlap(const QueryShape& shape, Vec3 center, con
     hits.push_back({owner_of(result.mBodyID2), point, contact_normal(result.mPenetrationAxis), length(point - center)});
   }
   return nearest_of_each(std::move(hits));
+}
+
+bool World::overlaps_static(const QueryShape& shape, Vec3 center) const {
+  const JPH::RefConst<JPH::Shape> tested = shape_of(shape);
+  JPH::AnyHitCollisionCollector<JPH::CollideShapeCollector> collector;
+  const LayersInMask layer_filter(kAllLayers);
+  const IgnoredBodies body_filter({}, true);
+  system_.GetNarrowPhaseQuery().CollideShape(tested.GetPtr(), JPH::Vec3::sReplicate(kUnitScale),
+                                             matrix_of(center, shape.rotation), JPH::CollideShapeSettings(),
+                                             JPH::RVec3::sZero(), collector, {}, layer_filter, body_filter);
+  return collector.HadHit();
 }
 
 }  // namespace redgem::jolt
