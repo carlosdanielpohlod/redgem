@@ -229,7 +229,10 @@ TEST_CASE("an encrypted connection carries messages once the other side proved i
   const double first_message_ms = milliseconds_since(started);
   REQUIRE(hello.has_value());
   CHECK((*hello)[wire::kAuth]["token"] == kSecret);
+  // (The side called says the protocol's version first, as a connection's always does.)
+  ends.taker.send(wire::hello());
   ends.taker.send(wire::game_message(kTalk, "back", kHostId, kFirstGuestId));
+  REQUIRE(ends.heard_by(ends.caller).has_value());
   const auto answer = ends.heard_by(ends.caller);
   REQUIRE(answer.has_value());
   CHECK((*answer)[wire::kName] == kTalk);
@@ -419,7 +422,7 @@ TEST_CASE("a player's hosted game shows a code its players join with, and a wron
   REQUIRE(ruby(host, "Network.host(port: 0, visible: false)") == "true");
   const std::string code = ruby(host, "Network.host_code");
   CHECK(code.size() == kHostCodeDigits + 1);
-  CHECK(ruby(host, "Network.fingerprint.delete(':').start_with?(Network.host_code.delete('-'))") == "true");
+  CHECK(ruby(host, "Network.fingerprint.gsub(':', '').start_with?(Network.host_code.gsub('-', ''))") == "true");
   const std::string port = std::to_string(host.network().port());
 
   Engine& friendly = game.add_machine();

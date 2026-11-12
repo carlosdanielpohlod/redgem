@@ -13,7 +13,7 @@ namespace redgem::net {
 // --fingerprint` print). A game that joins one of them checks that it is the one.
 //   "servers": [
 //     {"address": "play.example.com", "port": 7777, "fingerprint": "3F:A2:...:9C"},
-//     {"address": "relay.example.com", "fingerprint": "..."}
+//     {"address": "meet.example.com", "fingerprint": "..."}
 //   ]
 // Without "port", the fingerprint is the address's on every port.
 inline constexpr const char* kServersKey = "servers";
