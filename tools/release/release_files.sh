@@ -29,6 +29,22 @@ DEMOS=(platformer driving city)
 DEMO_FILE="scene.glb"   # what every demo's folder holds at its top (for check_downloads.sh)
 NOTICES=(LICENSE THIRD_PARTY_LICENSES.md)
 
+# The symbols of the players: each player as it was linked, before it was stripped for the
+# downloads, which `redgem symbolize` finds by the build id a crash report names. They are assets
+# of the release of their own, never in a download: redgem-symbols-<system>.zip, which holds
+# redgem-symbols/<system>/<the player> (for Android, one per processor).
+SYMBOLS_PACKAGE="${PACKAGE_NAME}-symbols"
+LINUX_SYMBOLS="${SYMBOLS_PACKAGE}-linux.zip"
+WINDOWS_SYMBOLS="${SYMBOLS_PACKAGE}-windows.zip"
+ANDROID_SYMBOLS="${SYMBOLS_PACKAGE}-android.zip"
+SYMBOL_DOWNLOADS=("${LINUX_SYMBOLS}" "${WINDOWS_SYMBOLS}" "${ANDROID_SYMBOLS}")
+LINUX_PLAYER_SYMBOLS="linux/redgem-player"
+WINDOWS_PLAYER_SYMBOLS="windows/redgem-player.exe"
+ANDROID_ABIS=(arm64-v8a x86_64)
+ANDROID_PLAYER="libredgem.so"
+# Everything a release carries: the downloads and the symbols.
+RELEASE_ASSETS=("${DOWNLOADS[@]}" "${SYMBOL_DOWNLOADS[@]}")
+
 # The engine's version, as CMakeLists.txt says it.
 engine_version() {
   sed -n 's/^project(redgem VERSION \([0-9.]*\).*/\1/p' "${REPO_ROOT}/CMakeLists.txt"
