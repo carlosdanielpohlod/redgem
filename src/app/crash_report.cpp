@@ -1,5 +1,6 @@
 #include "app/crash_report.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <ctime>
 #include <exception>
@@ -13,6 +14,7 @@
 #include "app/game_data_location.hpp"
 #include "core/engine_thread.hpp"
 #include "core/exit_codes.hpp"
+#include "core/files.hpp"
 #include "core/log.hpp"
 #include "core/translations.hpp"
 
@@ -98,11 +100,20 @@ std::string player_message(const char* key, const std::string& game, const std::
   return tr(key, {{"game", game}, {"folder", folder}});
 }
 
-void prepare(const CrashSetup& setup) {
+// What a report says before anything goes wrong.
+CrashFacts facts_known_before(const CrashSetup& setup, const ProgramIdentity& program) {
   CrashFacts facts;
   facts.game = read_game_settings(setup.game_dir).title;
   facts.version = kVersion;
   facts.platform = platform_name();
+  facts.build_id = program.build_id;
+  facts.program = program.name;
+  return facts;
+}
+
+void prepare(const CrashSetup& setup) {
+  const ProgramIdentity program = this_program();
+  const CrashFacts facts = facts_known_before(setup, program);
   PreparedCrash& crash = prepared();
   crash.folder = crash_folder_for(setup);
   // (In UTF-8: on Windows a folder's name may hold letters the system's code page has none for.)
@@ -110,7 +121,36 @@ void prepare(const CrashSetup& setup) {
   crash.head = report_head(facts);
   crash.closed_message = player_message("game.crash.closed", facts.game, crash.folder_text);
   crash.out_of_memory_message = player_message("game.crash.out_of_memory", facts.game, crash.folder_text);
+  crash.program = program.name;
+  crash.program_base = program.base;
   crash.show_dialog = setup.show_dialog;
+}
+
+bool is_report_name(const std::string& name) {
+  const std::string extension = kReportExtension;
+  const bool ends_as_report =
+      name.size() >= extension.size() && name.compare(name.size() - extension.size(), extension.size(), extension) == 0;
+  return name.rfind(kReportPrefix, 0) == 0 && ends_as_report;
+}
+
+// The name of the newest report in a folder (their names sort as their moments); empty for none.
+std::string newest_report_name(const std::filesystem::path& folder) {
+  std::error_code fs_error;
+  std::string newest;
+  for (const auto& entry : std::filesystem::directory_iterator(folder, fs_error)) {
+    const std::string name = entry.path().filename().u8string();
+    if (is_report_name(name)) newest = std::max(newest, name);
+  }
+  return newest;
+}
+
+// Whether no report is newer than the one already told of.
+bool nothing_new(const std::string& newest, const std::string& told) { return newest.empty() || newest <= told; }
+
+// Says that the game's last run crashed, when nobody was told yet (in the log: on a phone, adb logcat).
+void tell_of_an_untold_crash(const std::filesystem::path& folder) {
+  const auto report = untold_crash_report(folder);
+  if (report) log::warning(tr("game.crash.last_run", {{"report", report->u8string()}}));
 }
 
 // Whether an exception nobody caught is memory running out.
@@ -165,8 +205,9 @@ int report_and_tell(const std::string& cause, const std::string& message) {
 const PreparedCrash& prepared_crash() { return prepared(); }
 
 std::string report_head(const CrashFacts& facts) {
+  const std::string build_id = facts.build_id.empty() ? kUnknownBuild : facts.build_id;
   return std::string(kTitleLine) + "Game: " + facts.game + "\nEngine: " + facts.version +
-         "\nPlatform: " + facts.platform + "\n";
+         "\nPlatform: " + facts.platform + "\n" + kBuildLabel + build_id + " " + facts.program + "\n";
 }
 
 std::string format_crash_report(const CrashFacts& facts) {
@@ -182,6 +223,15 @@ std::string crash_file_name(long long seconds_since_epoch) {
   return std::string(kReportPrefix) + moment_stamp(utc_moment(seconds_since_epoch)).c_str() + kReportExtension;
 }
 
+std::optional<std::filesystem::path> untold_crash_report(const std::filesystem::path& folder) {
+  const std::string newest = newest_report_name(folder);
+  const std::filesystem::path told_file = folder / kToldFile;
+  std::string error;
+  if (nothing_new(newest, read_text_file(told_file, error).value_or(""))) return std::nullopt;
+  write_text_file(told_file, newest, error);
+  return folder / std::filesystem::u8path(newest);
+}
+
 const char* engine_version() { return kVersion; }
 
 const char* platform_name() {
@@ -193,6 +243,7 @@ void install_crash_handling(const CrashSetup& setup) {
   memory_reserve().reset(new char[kMemoryReserveBytes]);
   touch_pages(memory_reserve().get(), kMemoryReserveBytes);
   prepare(setup);
+  tell_of_an_untold_crash(prepared().folder);
   std::set_terminate(on_terminate);
   set_uncaught_handler(on_thread_exception);
   install_fatal_handlers();
@@ -206,8 +257,10 @@ std::filesystem::path write_report(const std::string& cause, const std::vector<s
   std::error_code fs_error;
   std::filesystem::create_directories(folder, fs_error);
   const std::filesystem::path file = folder / crash_file_name(static_cast<long long>(std::time(nullptr)));
+  const std::string text = prepared().head + report_moment(now_text(), cause, backtrace);
+  log_report_text(text);
   std::ofstream out(file, std::ios::binary | std::ios::trunc);
-  out << prepared().head << report_moment(now_text(), cause, backtrace);
+  out << text;
   return out.good() ? file : std::filesystem::path();
 }
 

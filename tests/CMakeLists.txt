@@ -157,6 +157,8 @@ add_executable(redgem_tests
   unit/clip_clock_test.cpp
   unit/camera_ray_test.cpp
   unit/crash_report_test.cpp
+  unit/build_id_test.cpp
+  unit/symbolize_test.cpp
   unit/agent_protocol_test.cpp
   unit/agent_client_test.cpp
   unit/agent_files_test.cpp

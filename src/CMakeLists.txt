@@ -148,6 +148,7 @@ redgem_add_library(redgem_core
   core/log.cpp
   core/event_journal.cpp
   core/short_text.cpp
+  core/build_id.cpp
   core/message_lines.cpp
   core/coarse_clock.cpp
   core/signal_stack.cpp
@@ -701,6 +702,8 @@ if(NOT ANDROID)
     project/check_command.cpp
     project/api_reference.cpp
     project/api_command.cpp
+    project/crash_symbols.cpp
+    project/symbolize_command.cpp
     project/assistant_guide.cpp
     project/error_hints.cpp
     project/project_texts.cpp)
