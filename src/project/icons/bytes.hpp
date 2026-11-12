@@ -12,8 +12,6 @@ namespace redgem::bytes {
 
 using Bytes = std::vector<std::uint8_t>;
 
-inline constexpr std::uint32_t kByteMask = 0xFF;
-
 // Adds `count` bytes of `value` at the end of `out`.
 inline void append_little(Bytes& out, std::uint32_t value, std::size_t count) {
   for (std::size_t i = 0; i < count; ++i)

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <string>
 
 #include "core/ports.hpp"
 #include "net/http/http_message.hpp"
@@ -62,7 +63,7 @@ bool read_authority(const std::string& authority, Url& url, std::string& error) 
   const auto port = colon == std::string::npos ? std::optional<std::uint16_t>(url.secure ? kHttpsPort : kHttpPort)
                                                : port_number(authority.substr(colon + 1));
   if (!is_host(url.host)) error = "the address names no machine";
-  if (!port) error = "the address's port is not a number from 1 to 65535";
+  if (!port) error = "the address's port is not a number from 1 to " + std::to_string(kLargestPort);
   url.port = port.value_or(0);
   return error.empty();
 }

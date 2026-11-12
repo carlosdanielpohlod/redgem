@@ -5,6 +5,8 @@
 #include <Jolt/Physics/Body/BodyLock.h>
 #include <Jolt/Physics/Vehicle/WheeledVehicleController.h>
 
+#include <utility>
+
 #include "physics/jolt/jolt_vehicle.hpp"
 
 namespace redgem::jolt {
@@ -34,11 +36,14 @@ JPH::Ref<JPH::VehicleConstraint> build_locked(const JPH::BodyLockInterface& lock
 }  // namespace
 
 void World::attach_vehicle(const BodyDesc& desc, Record& record) {
-  record.vehicle = build_locked(system_.GetBodyLockInterface(), record.body, desc.wheels, object_layer_of(record));
-  if (record.vehicle == nullptr) return;
+  // (Kept in the record only once the system has it: the record says it is a vehicle from then on.)
+  JPH::Ref<JPH::VehicleConstraint> vehicle =
+      build_locked(system_.GetBodyLockInterface(), record.body, desc.wheels, object_layer_of(record));
+  if (vehicle == nullptr) return;
+  system_.AddConstraint(vehicle.GetPtr());
+  system_.AddStepListener(vehicle.GetPtr());
   for (const WheelDesc& wheel : desc.wheels) record.wheel_objects.push_back(wheel.object);
-  system_.AddConstraint(record.vehicle.GetPtr());
-  system_.AddStepListener(record.vehicle.GetPtr());
+  record.vehicle = std::move(vehicle);
 }
 
 void World::release_vehicle(Record& record) {

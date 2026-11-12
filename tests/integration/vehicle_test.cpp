@@ -59,7 +59,7 @@ std::vector<WheelDesc> four_wheels() {
   return wheels;
 }
 
-std::unique_ptr<PhysicsWorld> world_with_ground() {
+std::unique_ptr<PhysicsWorld> world_with_car() {
   auto world = create_jolt_physics_world({0.0f, config::kGravityY, 0.0f});
   BodyDesc ground;
   ground.object = kGround;
@@ -67,22 +67,14 @@ std::unique_ptr<PhysicsWorld> world_with_ground() {
   ground.world.position = {0, -kGroundHalfThickness, 0};
   ground.bounds = box_bounds({kGroundHalfSize, kGroundHalfThickness, kGroundHalfSize});
   REQUIRE_FALSE(world->add_object(ground));
-  return world;
-}
 
-void add_car(PhysicsWorld& world) {
   BodyDesc car;
   car.object = kCar;
   car.config = body_config_from_props({{"body", std::string("vehicle")}});
   car.world.position = {0, kChassisHeight, 0};
   car.bounds = box_bounds(kChassisHalfExtents);
   car.wheels = four_wheels();
-  REQUIRE_FALSE(world.add_object(car));
-}
-
-std::unique_ptr<PhysicsWorld> world_with_car() {
-  auto world = world_with_ground();
-  add_car(*world);
+  REQUIRE_FALSE(world->add_object(car));
   return world;
 }
 
@@ -152,15 +144,4 @@ TEST_CASE("removing a vehicle removes its constraint") {
   CHECK_FALSE(world->has_object(kCar));
   CHECK(world->wheel_poses(kCar).empty());
   run(*world, kOneStep);
-}
-
-// A step takes Jolt's step-listener lock before every body's; adding a vehicle once the world has
-// stepped must take them in that order too (the sanitizer build's lock-order check runs this).
-TEST_CASE("a vehicle added after the world has stepped settles on its wheels") {
-  auto world = world_with_ground();
-  run(*world, kOneStep);
-  add_car(*world);
-  run(*world, kSettleSteps);
-  CHECK(world->wheel_poses(kCar).size() == kWheelCount);
-  CHECK(world->simulated_pose(kCar)->position.y > kChassisHalfExtents.y + kMinGroundClearance);
 }

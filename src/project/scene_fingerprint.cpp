@@ -19,7 +19,6 @@ namespace {
 constexpr std::size_t kDigestBytes = 32;
 constexpr std::size_t kHashBufferBytes = 4096;
 constexpr int kHexDigitsPerByte = 2;
-constexpr std::uint64_t kByteMask = 0xFF;
 
 void checked(int result) {
   if (result != 0) throw std::runtime_error("cannot calculate the scene content fingerprint");

@@ -20,7 +20,6 @@ namespace redgem::net {
 inline constexpr std::size_t kByte = 1;
 inline constexpr std::size_t kFloatBytes = 4;
 inline constexpr std::size_t kStepBytes = 2;
-inline constexpr std::uint32_t kByteMask = 0xFF;
 
 // Whether a byte of flags has `flag` set.
 inline bool has(std::uint32_t flags, std::uint32_t flag) { return (flags & flag) != 0; }

@@ -18,7 +18,6 @@ constexpr const char* kAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrs
 constexpr char kPadding = '=';
 constexpr int kBitsPerDigit = 6;  // what one base64 character holds
 constexpr std::uint32_t kDigitMask = 0x3F;
-constexpr std::uint32_t kByteMask = 0xFF;
 constexpr std::size_t kGroupBytes = 3;  // three bytes make four characters
 constexpr std::size_t kGroupDigits = 4;
 constexpr int kNotADigit = -1;
