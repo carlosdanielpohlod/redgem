@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 
+#include "core/ports.hpp"
 #include "net/secure/fingerprint.hpp"
 
 namespace redgem::net {
@@ -15,7 +16,6 @@ namespace {
 constexpr const char* kAddressKey = "address";
 constexpr const char* kPortKey = "port";
 constexpr const char* kFingerprintKey = "fingerprint";
-constexpr std::int64_t kLargestPort = 65535;
 constexpr std::int64_t kAnyPort = 0;
 constexpr std::int64_t kNotAPort = -1;
 constexpr char kRootDot = '.';
