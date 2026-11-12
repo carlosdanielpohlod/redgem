@@ -1,6 +1,5 @@
 #include <doctest/doctest.h>
 
-#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -286,6 +285,7 @@ TEST_CASE("an Android build reclaims marked stale stages and leaves live or unre
   const auto payload = stale / android_stage::kPackageFolder;
   REQUIRE(std::filesystem::create_directory(payload));
   REQUIRE(write_text_file(payload / "copy.bin", "discard", error));
+  REQUIRE(write_text_file(stale / ".DS_Store", "metadata", error));
 
   const auto cache = std::filesystem::canonical(scratch.dir);
   const android_stage::Folder live(cache, error);
@@ -308,7 +308,7 @@ TEST_CASE("an Android build reclaims marked stale stages and leaves live or unre
   CHECK(std::filesystem::is_directory(live.path()));
 }
 
-TEST_CASE("Android cache sweeps an old incomplete reservation and skips paths it cannot prove safe") {
+TEST_CASE("Android cache sweeps an incomplete reservation and skips paths it cannot prove safe") {
   const Scratch scratch;
   std::string error;
 #ifndef _WIN32
@@ -318,9 +318,6 @@ TEST_CASE("Android cache sweeps an old incomplete reservation and skips paths it
   const auto orphan = scratch.dir / (prefix + "12345");
   REQUIRE(std::filesystem::create_directory(orphan));
   REQUIRE(write_text_file(orphan / android_stage::kPendingOwnerFile, "partial marker", error));
-  const auto created = std::filesystem::last_write_time(orphan);
-  constexpr std::chrono::minutes kOldAge{20};
-  std::filesystem::last_write_time(orphan, created - kOldAge);
   const auto wrong = scratch.file(prefix + "wrong/" + android_stage::kOwnerFile,
                                   std::string(android_stage::kOwnerSignature) + "extra");
   const auto unavailable =
@@ -347,7 +344,7 @@ TEST_CASE("Android staging uses a configured user cache without a temporary-dire
   const Scratch scratch;
   const auto home = scratch.dir / "home";
   const auto named = scratch.dir / "named";
-  CHECK(cache_root_on(Desktop::Linux, {}, named).empty());
+  CHECK(cache_root_on(Desktop::Linux, {}, named) == named / "redgem" / "android-stage");
   CHECK(cache_root_on(Desktop::Linux, "relative", {}).empty());
   CHECK(cache_root_on(Desktop::Linux, home, named) == named / "redgem" / "android-stage");
   CHECK(cache_root_on(Desktop::Linux, home, "relative") == home / ".cache" / "redgem" / "android-stage");
@@ -360,6 +357,7 @@ TEST_CASE("Android staging uses a configured user cache without a temporary-dire
 TEST_CASE("Android staging creates a private cache beneath a trusted directory") {
   namespace fs = std::filesystem;
   const Scratch scratch;
+  fs::permissions(scratch.dir, fs::perms::owner_all);
   const auto cache = fs::canonical(scratch.dir) / ".cache" / "redgem" / "android-stage";
   std::string error;
   const android_stage::Folder owned(cache, error);
@@ -369,7 +367,7 @@ TEST_CASE("Android staging creates a private cache beneath a trusted directory")
   CHECK_FALSE(fs::exists(owned.path() / android_stage::kPendingOwnerFile));
 }
 
-TEST_CASE("Android staging rejects shared or linked cache paths") {
+TEST_CASE("Android staging resolves linked parents and rejects unsafe cache directories") {
   namespace fs = std::filesystem;
   const Scratch scratch;
   const auto home = fs::canonical(scratch.dir);
@@ -392,8 +390,8 @@ TEST_CASE("Android staging rejects shared or linked cache paths") {
   const auto link = home / "linked";
   fs::create_directory_symlink(parent, link);
   const android_stage::Folder linked(link / "new-stage", error);
-  CHECK(linked.path().empty());
-  CHECK_FALSE(fs::exists(parent / "new-stage"));
+  REQUIRE_MESSAGE(!linked.path().empty(), error);
+  CHECK(linked.path().parent_path() == parent / "new-stage");
   const auto cache_link = parent / "cache-link";
   fs::create_directory_symlink(cache, cache_link);
   const android_stage::Folder redirected(cache_link, error);
@@ -404,9 +402,9 @@ TEST_CASE("Android staging rejects shared or linked cache paths") {
 TEST_CASE("Android staging refuses a cache directory owned by another user") {
   if (::geteuid() == 0) return;
   std::string error;
-  const android_stage::Folder foreign("/", error);
+  const android_stage::Folder foreign("/usr", error);
   CHECK(foreign.path().empty());
-  CHECK(error.find("cannot use private Android build cache") != std::string::npos);
+  CHECK(error.find("cache must belong to the current user") != std::string::npos);
 }
 #endif
 

@@ -28,12 +28,14 @@ fs::path local_app_data() {
   return fs::path(owned.get());
 }
 
-bool private_cache(const fs::path& cache) {
+const char* private_cache_problem(const fs::path& cache, fs::path& failed) {
+  failed = cache.parent_path();
   std::error_code problem;
-  fs::create_directories(cache.parent_path(), problem);
-  if (problem) return false;
+  fs::create_directories(failed, problem);
+  if (problem) return "cannot create cache parent";
+  failed = cache;
   make_private_directory(cache, problem);
-  return fs::is_directory(fs::symlink_status(cache, problem));
+  return fs::is_directory(fs::symlink_status(cache, problem)) ? nullptr : "expected a real directory";
 }
 #else
 constexpr mode_t kOtherWrite = S_IWGRP | S_IWOTH;
@@ -53,43 +55,64 @@ bool existing_or_new(const fs::path& path, struct stat& info) {
   return ::lstat(path.c_str(), &info) == 0;
 }
 
-// The path has no symlinks, and no other user can replace any of its components.
-class CachePath {
- public:
-  bool safe_component(const fs::path& path, bool final) {
-    struct stat info{};
-    if (!existing_or_new(path, info) || !S_ISDIR(info.st_mode)) return false;
-    const bool owned = info.st_uid == user_;
-    if (final) return owned && (info.st_mode & kOtherAccess) == 0;
-    const bool trusted_system = !user_tree_ && info.st_uid == 0;
-    user_tree_ |= owned;
-    return (owned || trusted_system) && protected_ancestor(info);
-  }
+bool trusted_owner(uid_t owner) { return owner == 0 || owner == ::geteuid(); }
 
- private:
-  uid_t user_ = ::geteuid();
-  bool user_tree_ = false;
-};
+const char* leaf_problem(const struct stat& info) {
+  if (info.st_uid != ::geteuid()) return "cache must belong to the current user";
+  if ((info.st_mode & kOtherAccess) != 0) return "cache grants group or other access";
+  return nullptr;
+}
 
-bool private_cache(const fs::path& cache) {
-  CachePath permissions;
+const char* ancestor_problem(const struct stat& info) {
+  if (!trusted_owner(info.st_uid)) return "directory belongs to another user";
+  if (!protected_ancestor(info)) return "directory allows other users to write";
+  return nullptr;
+}
+
+const char* component_problem(const fs::path& path, bool final) {
+  struct stat info{};
+  if (!existing_or_new(path, info)) return "cannot inspect or create directory";
+  if (S_ISLNK(info.st_mode)) return "unexpected symbolic link";
+  if (!S_ISDIR(info.st_mode)) return "expected a directory";
+  return final ? leaf_problem(info) : ancestor_problem(info);
+}
+
+const char* private_cache_problem(const fs::path& cache, fs::path& failed) {
   fs::path current;
   for (const auto& component : cache) {
     current /= component;
-    if (!permissions.safe_component(current, current == cache)) return false;
+    if (const char* reason = component_problem(current, current == cache)) {
+      failed = current;
+      return reason;
+    }
   }
-  return true;
+  return nullptr;
 }
 #endif
+
+fs::path resolve_cache(const fs::path& requested, std::string& error) {
+  if (!requested.has_relative_path()) {
+    error = "cannot use private Android build cache " + requested.string() + ": expected a user directory";
+    return {};
+  }
+  std::error_code problem;
+  const auto parent = fs::weakly_canonical(requested.parent_path(), problem);
+  if (!problem) return parent / requested.filename();
+  error = "cannot resolve Android build cache parent " + requested.parent_path().string() + ": " + problem.message();
+  return {};
+}
 
 }  // namespace
 
 fs::path cache_root_on(platform::Desktop desktop, const fs::path& home, const fs::path& named) {
   if (desktop == platform::Desktop::Windows) return named.is_absolute() ? named / "RedGem" / kCacheFolder : fs::path{};
+  if (desktop == platform::Desktop::Mac) {
+    if (!home.is_absolute()) return {};
+    return home / "Library" / "Caches" / "RedGem" / kCacheFolder;
+  }
+  if (named.is_absolute()) return named / "redgem" / kCacheFolder;
   if (!home.is_absolute()) return {};
-  if (desktop == platform::Desktop::Mac) return home / "Library" / "Caches" / "RedGem" / kCacheFolder;
-  const auto base = named.is_absolute() ? named : home / ".cache";
-  return base / "redgem" / kCacheFolder;
+  return home / ".cache" / "redgem" / kCacheFolder;
 }
 
 fs::path cache_root() {
@@ -101,14 +124,18 @@ fs::path cache_root() {
 #endif
 }
 
-bool ensure_cache(const fs::path& cache, std::string& error) {
-  if (!cache.is_absolute()) {
+fs::path ensure_cache(const fs::path& requested, std::string& error) {
+  if (!requested.is_absolute()) {
     error = "cannot find a user cache for Android builds";
-    return false;
+    return {};
   }
-  if (private_cache(cache)) return true;
-  error = "cannot use private Android build cache " + cache.string();
-  return false;
+  const auto cache = resolve_cache(requested, error);
+  if (cache.empty()) return {};
+  fs::path failed;
+  const char* reason = private_cache_problem(cache, failed);
+  if (reason == nullptr) return cache;
+  error = "cannot use private Android build cache " + failed.string() + ": " + reason;
+  return {};
 }
 
 }  // namespace redgem::android_stage
