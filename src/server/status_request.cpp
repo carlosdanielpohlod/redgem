@@ -53,6 +53,7 @@ std::string without_body(const std::string& whole, const std::string& body) {
 
 StatusReply status_reply(const std::string& received, float waited, bool hung_up) {
   if (received.size() > kMostStatusRequestBytes) return StatusReply::Drop;
+  if (waited >= kStatusRequestSeconds) return StatusReply::Drop;  // (even a head that just got here)
   if (head_arrived(received)) return StatusReply::Http;
   if (asks_nothing(received, waited, hung_up)) return StatusReply::Plain;
   if (gave_up(waited, hung_up)) return StatusReply::Drop;

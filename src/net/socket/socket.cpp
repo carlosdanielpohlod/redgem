@@ -13,6 +13,9 @@ namespace {
 using namespace os;
 
 constexpr int kWaitingConnections = 16;  // connections the system holds until accept() takes them
+// Read at most as a connection closes (see close): a machine still sending at full speed is not
+// waited out.
+constexpr std::size_t kMostDiscardedBytes = 1024 * 1024;
 
 // A TCP connection sends small messages right away, notices in time a machine that vanished, and
 // survives sending to one that left.
@@ -95,9 +98,18 @@ Socket& Socket::operator=(Socket&& other) noexcept {
   return *this;
 }
 
-void Socket::close() {
+void Socket::close() { close_reading_at_most(kMostDiscardedBytes); }
+
+void Socket::close_reading_at_most(std::size_t most_unread) {
   if (handle_ == kNoHandle) return;
-  discard_unread(native(handle_));
+  discard_unread(native(handle_), most_unread);
+  close_native(native(handle_));
+  handle_ = kNoHandle;
+}
+
+void Socket::reset() {
+  if (handle_ == kNoHandle) return;
+  reset_on_close(native(handle_));
   close_native(native(handle_));
   handle_ = kNoHandle;
 }

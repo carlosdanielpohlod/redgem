@@ -134,12 +134,17 @@ TEST_CASE("the status port answers an HTTP request once its head arrived, and a 
   CHECK(status_reply(kGet, kNoTime, false) == StatusReply::Http);
   CHECK(status_reply("GET /\n\n", kNoTime, false) == StatusReply::Http);
   CHECK(status_reply("", kPlainAnswerAfterSeconds, false) == StatusReply::Plain);
+  CHECK(status_reply("", kStatusRequestSeconds - kPlainAnswerAfterSeconds, false) == StatusReply::Plain);
   CHECK(status_reply("", kPlainAnswerAfterSeconds, true) == StatusReply::Drop);  // (a check that the port is open)
 }
 
 TEST_CASE("the status port lets a request go unanswered when it is too long, too slow, or cut short") {
   CHECK(status_reply(std::string(kMostStatusRequestBytes + 1, 'x'), kNoTime, false) == StatusReply::Drop);
   CHECK(status_reply("GET / HTTP/1.1\r\n", kStatusRequestSeconds, false) == StatusReply::Drop);
+  // A head that comes whole only at the deadline is too late; just before it, it is answered.
+  const float just_before = kStatusRequestSeconds - kPlainAnswerAfterSeconds;
+  CHECK(status_reply(kGet, just_before, false) == StatusReply::Http);
+  CHECK(status_reply(kGet, kStatusRequestSeconds, false) == StatusReply::Drop);
   CHECK(status_reply("GET / HTTP/1.1\r\n", kNoTime, true) == StatusReply::Drop);
 }
 

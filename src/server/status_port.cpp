@@ -15,11 +15,6 @@ std::vector<std::uint8_t> bytes(const std::string& text) { return {text.begin(),
 
 bool too_old(float age) { return age > kMostStatusClientSeconds; }
 
-// Whether an answer needs no more turns: all of it went out, or the other side is gone.
-bool finished_sending(net::IoStatus status, const std::vector<std::uint8_t>& left) {
-  return status == net::IoStatus::Closed || left.empty();
-}
-
 }  // namespace
 
 bool StatusPort::open(const std::string& address, std::uint16_t port, std::string& error) {
@@ -28,6 +23,7 @@ bool StatusPort::open(const std::string& address, std::uint16_t port, std::strin
 }
 
 void StatusPort::close() {
+  for (Client& client : clients_) client.socket.reset();
   clients_.clear();
   listener_.close();
 }
@@ -53,7 +49,7 @@ void StatusPort::serve_client(Client& client, float seconds, const Document& doc
   client.age += seconds;
   if (client.stage == Stage::Listening) listen_to(client, document);
   if (client.stage == Stage::Answering) send_answer(client);
-  if (too_old(client.age)) client.stage = Stage::Done;
+  if (overstayed(client)) client.stage = Stage::Abandoned;
 }
 
 void StatusPort::listen_to(Client& client, const Document& document) {
@@ -70,19 +66,37 @@ void StatusPort::answer(Client& client, StatusReply reply, const Document& docum
   } else if (reply == StatusReply::Plain) {
     client.answer = bytes(plain_status_answer(document()));
   } else {
-    client.stage = Stage::Done;
+    client.stage = Stage::Abandoned;
   }
 }
 
 void StatusPort::send_answer(Client& client) {
-  // (Either way the connection closes then.)
-  if (finished_sending(client.socket.write(client.answer), client.answer)) client.stage = Stage::Done;
+  if (client.socket.write(client.answer) == net::IoStatus::Closed) {
+    client.stage = Stage::Abandoned;
+  } else if (client.answer.empty()) {
+    client.stage = Stage::Answered;
+  }
+}
+
+bool StatusPort::finished(const Client& client) {
+  return client.stage == Stage::Answered || client.stage == Stage::Abandoned;
+}
+
+bool StatusPort::overstayed(const Client& client) { return too_old(client.age) && client.stage != Stage::Answered; }
+
+void StatusPort::let_go(Client& client) {
+  if (client.stage == Stage::Answered) {
+    client.socket.close_reading_at_most(kMostStatusRequestBytes);
+  } else {
+    client.socket.reset();
+  }
 }
 
 void StatusPort::drop_done() {
-  clients_.erase(std::remove_if(clients_.begin(), clients_.end(),
-                                [](const Client& client) { return client.stage == Stage::Done; }),
-                 clients_.end());
+  for (Client& client : clients_) {
+    if (finished(client)) let_go(client);
+  }
+  clients_.erase(std::remove_if(clients_.begin(), clients_.end(), finished), clients_.end());
 }
 
 }  // namespace redgem::server

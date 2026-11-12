@@ -60,7 +60,14 @@ class Socket {
   std::uint16_t local_port() const;
   // The address, in numbers, of the machine at the other end; empty when there is none.
   std::string peer_address() const;
+  // Closes it, having read and dropped what arrived and was never read first (up to 1 MB), so
+  // that the other side gets a goodbye and not a reset.
   void close();
+  // The same, reading at most `most_unread` bytes first: for a program that must bound what one
+  // connection costs it.
+  void close_reading_at_most(std::size_t most_unread);
+  // Closes it at once with a reset: nothing more is read, nor sent.
+  void reset();
 
   // Sleeps until something happens on one of `sockets` (bytes arrive, someone connects, the other
   // side hangs up, or one that is `sending` can send again), for `seconds` at most. True when a

@@ -1,16 +1,19 @@
 #include "server/status_signal.hpp"
 
+#include <atomic>
 #include <csignal>
 
 namespace {
 
-// Set by the handler, taken by the server between turns (all a signal handler may safely do).
-volatile std::sig_atomic_t status_asked = 0;
+// Set by the handler, on whichever of the server's threads the system runs it (a lock-free atomic
+// is what a handler may touch from any thread), and taken by the lobby's between turns.
+std::atomic<bool> status_asked{false};
+static_assert(std::atomic<bool>::is_always_lock_free, "a signal handler may only touch a lock-free atomic");
 
 }  // namespace
 
 extern "C" {
-static void note_status_request(int) { status_asked = 1; }
+static void note_status_request(int) { status_asked.store(true); }
 }
 
 namespace redgem::server {
@@ -18,24 +21,20 @@ namespace redgem::server {
 #ifdef SIGUSR1
 bool StatusSignal::supported() { return true; }
 
-StatusSignal::StatusSignal() {
-  status_asked = 0;
-  std::signal(SIGUSR1, note_status_request);
+StatusSignal::StatusSignal() : previous_(nullptr) {
+  status_asked.store(false);
+  previous_ = std::signal(SIGUSR1, note_status_request);
 }
 
-StatusSignal::~StatusSignal() { std::signal(SIGUSR1, SIG_DFL); }
+StatusSignal::~StatusSignal() { std::signal(SIGUSR1, previous_ == SIG_ERR ? SIG_DFL : previous_); }
 #else
 bool StatusSignal::supported() { return false; }
 
-StatusSignal::StatusSignal() { static_cast<void>(note_status_request); }
+StatusSignal::StatusSignal() : previous_(nullptr) { static_cast<void>(note_status_request); }
 
 StatusSignal::~StatusSignal() = default;
 #endif
 
-bool StatusSignal::taken() {
-  const bool asked = status_asked != 0;
-  status_asked = 0;
-  return asked;
-}
+bool StatusSignal::taken() { return status_asked.exchange(false); }
 
 }  // namespace redgem::server

@@ -35,7 +35,12 @@ class StatusPort {
   void close();
 
  private:
-  enum class Stage { Listening, Answering, Done };
+  enum class Stage {
+    Listening,
+    Answering,
+    Answered,  // all of its answer went out: closed reading at most a request's worth of what is left
+    Abandoned  // unanswered, too slow, or gone: reset, nothing more read
+  };
 
   struct Client {
     net::Socket socket;
@@ -50,6 +55,12 @@ class StatusPort {
   static void listen_to(Client& client, const Document& document);
   static void answer(Client& client, StatusReply reply, const Document& document);
   static void send_answer(Client& client);
+  // Whether nothing more is done for it: answered or abandoned.
+  static bool finished(const Client& client);
+  // Whether it outlived its time, its answer not all sent.
+  static bool overstayed(const Client& client);
+  // Closes it as its stage says, so that no connection costs more than a bounded read.
+  static void let_go(Client& client);
   void drop_done();
 
   net::Socket listener_;

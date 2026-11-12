@@ -1,5 +1,6 @@
 #include "net/socket/socket_native.hpp"
 
+#include <algorithm>
 #include <cstring>
 
 #ifndef _WIN32
@@ -14,9 +15,6 @@ namespace {
 
 constexpr int kEnabled = 1;
 constexpr std::size_t kDiscardChunkBytes = 16 * 1024;
-// Read at most before a connection is closed anyway: a machine still sending at full speed is not
-// waited out.
-constexpr std::size_t kMostDiscardedBytes = 1024 * 1024;
 #ifdef _WIN32
 constexpr WORD kWinsockVersion = MAKEWORD(2, 2);
 #endif
@@ -96,13 +94,20 @@ void no_signal_on_closed(NativeSocket) {}  // (every send says so itself: kSendF
 
 IoStatus later_or_closed() { return would_block() ? IoStatus::WouldBlock : IoStatus::Closed; }
 
-void discard_unread(NativeSocket socket) {
+void discard_unread(NativeSocket socket, std::size_t most_bytes) {
   char chunk[kDiscardChunkBytes];
-  for (std::size_t discarded = 0; discarded < kMostDiscardedBytes;) {
-    const auto count = recv(socket, chunk, sizeof(chunk), 0);
+  for (std::size_t discarded = 0; discarded < most_bytes;) {
+    const std::size_t asked = std::min(sizeof(chunk), most_bytes - discarded);
+    const auto count = recv(socket, chunk, static_cast<int>(asked), 0);
     if (count <= 0) return;  // nothing more for now, or nothing more ever
     discarded += static_cast<std::size_t>(count);
   }
+}
+
+void reset_on_close(NativeSocket socket) {
+  linger at_once{};
+  at_once.l_onoff = 1;  // (and l_linger 0: the connection is reset, nothing waits to be sent)
+  setsockopt(socket, SOL_SOCKET, SO_LINGER, reinterpret_cast<const char*>(&at_once), sizeof(at_once));
 }
 
 void set_option(NativeSocket socket, int level, int option) {

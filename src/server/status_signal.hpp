@@ -6,6 +6,9 @@
 // never asked for.
 namespace redgem::server {
 
+// What handled a signal before (std::signal's kind of handler).
+using SignalHandler = void (*)(int);
+
 class StatusSignal {
  public:
   // Whether this system has the signal.
@@ -18,6 +21,9 @@ class StatusSignal {
 
   // Whether the status was asked for since the last time this was asked (it is then not any more).
   bool taken();
+
+ private:
+  SignalHandler previous_;  // put back when this goes
 };
 
 }  // namespace redgem::server
