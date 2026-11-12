@@ -111,6 +111,7 @@ The engine itself is **C++17**, built with CMake. Demo assets come from
 | System | Download | Then |
 |--------|----------|------|
 | Linux (x86_64) | [redgem-linux-x86_64.tar.gz](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.tar.gz) | unpack, run `bin/redgem` |
+| Linux (x86_64), AppImage | [redgem-linux-x86_64.AppImage](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.AppImage) | `chmod +x` it, run it |
 | Windows (x86_64) | [redgem-windows-x86_64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-windows-x86_64.zip) | unpack, run `redgem.exe` |
 | macOS (Apple Silicon) | [redgem-macos-arm64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-macos-arm64.zip) | unpack, open `RedGem.app` (unsigned: see the README inside) |
 | macOS (Intel) | [redgem-macos-x86_64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-macos-x86_64.zip) | unpack, open `RedGem.app` (unsigned: see the README inside) |

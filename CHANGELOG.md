@@ -96,6 +96,9 @@ until 1.0, a release may change what games rely on (see
   to the decompressed body (a decompression bomb is refused). A corrupt or cut body is an `error`,
   with the answer's status and headers kept.
 
+- **Linux AppImage**: `redgem-linux-x86_64.AppImage`, a fifth download beside the tarball, holds
+  the same editor, tools, players and demos in one file with the RedGem menu entry and icon. Run
+  it as `bin/redgem`; name another program first (`redgem-server --help`) to run that one.
 - **Crash reports on Android**: a built game for Android writes its crash report in `crashes/` of
   the app's files and in `adb logcat` (tag `redgem`), and hands the crash on to the system, which
   keeps its own tombstone too. The next run of any built game says in its log that the run
@@ -110,10 +113,13 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **The Linux download runs on glibc 2.35 or newer** (Ubuntu 22.04, Debian 12, Fedora 36 and
+  later) instead of 2.39: it is built on Ubuntu 22.04 with libstdc++ linked in, and so are the
+  players inside it, so games built for Linux run on those systems too. The release workflow
+  measures the floor and runs both Linux downloads on a bare Ubuntu 22.04.
 - **Crash report backtraces on Linux and Android are offsets into each program**
   (`Arena+0x1a2b`), as on Windows, so that `redgem symbolize` reads them; where the loader knows
   a frame's symbol, it follows in brackets.
-
 - **Each game keeps its data in a folder of its own, named after its studio and title**:
   `game.json` gains `"studio"`, and a game's save, settings, bindings and crash reports are kept
   together in `<studio>/<title>/` where the player's system keeps programs' data
