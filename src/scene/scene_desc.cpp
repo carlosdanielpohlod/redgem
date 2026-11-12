@@ -49,15 +49,18 @@ void sanitize_spot_cones(LightDesc& light) {
 }
 
 bool set_spot_cone_degrees(LightDesc& light, double inner, double outer) {
-  constexpr float kMaxConeDegrees = kDegreesPerHalfTurn * kHalf;
-  const bool ordered = inner >= 0.0 && inner < outer && outer <= kMaxConeDegrees;
+  // Check the requested gap before narrowing to radians stored in floats.
+  const auto minimum = std::nextafter(inner + kMinSpotConeGapDegrees, 0.0);
+  const bool ordered = inner >= 0.0 && outer >= minimum && outer <= kMaxSpotConeDegrees;
   if (light.type != LightType::Spot || !ordered) return false;
-  const float inner_cone = degrees_to_radians(static_cast<float>(inner));
-  const float outer_cone = std::min(degrees_to_radians(static_cast<float>(outer)), kMaxSpotOuterCone);
-  if (inner_cone > outer_cone - kMinSpotConeGap) return false;
-  light.inner_cone = inner_cone;
-  light.outer_cone = outer_cone;
+  light.inner_cone = degrees_to_radians(static_cast<float>(inner));
+  light.outer_cone = degrees_to_radians(static_cast<float>(outer));
+  sanitize_spot_cones(light);
   return true;
+}
+
+float spot_cone_degrees(float radians) {
+  return radians == kMaxSpotOuterCone ? kMaxSpotConeDegrees : radians_to_degrees(radians);
 }
 
 void Bounds::include(Vec3 point) {

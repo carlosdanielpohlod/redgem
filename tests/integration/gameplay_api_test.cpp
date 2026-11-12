@@ -541,7 +541,10 @@ TEST_CASE("scripts change both spotlight cone angles atomically in degrees") {
   auto engine = engine_for(scene, temp.file);
   frames(*engine, 1);
   ruby(*engine, "Scene.find('Spot').light.set_cone(inner: 15, outer: 90)");
-  CHECK(ruby(*engine, "Scene.find('Spot').light.cone_angles.map { |angle| angle.round }.inspect") == "[15, 90]");
+  CHECK(ruby(*engine, "Scene.find('Spot').light.cone_angles[1].inspect") == "90.0");
+  CHECK_FALSE(fails(*engine, "Scene.find('Spot').light.set_cone(inner: 30, outer: 30.1)"));
+  CHECK_FALSE(fails(*engine, "Scene.find('Spot').light.set_cone(inner: 0.4, outer: 0.5)"));
+  ruby(*engine, "Scene.find('Spot').light.set_cone(inner: 15, outer: 90)");
   CHECK(ruby(*engine, "Scene.find('Bulb').light.cone_angles.inspect") == "nil");
   CHECK(fails(*engine, "Scene.find('Bulb').light.set_cone(inner: 10, outer: 20)"));
   for (const char* args : {"inner: 30, outer: 30", "inner: -1, outer: 20", "inner: 0, outer: 0", "inner: 20, outer: 91",

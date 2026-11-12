@@ -48,9 +48,10 @@ class Rigidbody
   end
 end
 
-# The light an object shines with. Its brightness and color change from the next frame on:
+# The light an object shines with. Its brightness, color and spot cone can change while playing.
 #   every(0.05) { fire.light.intensity = 40 + rand * 20 }   # a flicker
 #   fire.light.color = :orange                               # a name, or [r, g, b] from 0 to 255
+#   lamp.light.set_cone(inner: 15, outer: 30)                # spot angles in degrees
 class Light
   def self.__new(id, serial)
     light = allocate
@@ -68,7 +69,11 @@ class Light
     __set_cone(inner, outer)
   end
 
-  def inspect = "#<Light intensity=#{intensity} color=#{color}>"
+  def inspect
+    angles = cone_angles
+    cone = angles ? " cone_angles=#{angles}" : ""
+    "#<Light intensity=#{intensity} color=#{color}#{cone}>"
+  end
 end
 
 # A car built in Blender: `body = "vehicle"` on the chassis, `wheel = true` on its wheel children.

@@ -139,8 +139,9 @@ enum class LightType { Directional, Point, Spot };
 // turn), in radians from its axis.
 inline constexpr float kDefaultSpotOuterCone = 0.7853981634f;
 inline constexpr float kSpotConeAxis = 0.0f;
-inline constexpr float kMinSpotConeGapDegrees = 0.1f;
-inline constexpr float kMinSpotConeGap = kMinSpotConeGapDegrees * kPi / kDegreesPerHalfTurn;
+inline constexpr double kMinSpotConeGapDegrees = 0.1;
+inline constexpr float kMaxSpotConeDegrees = kDegreesPerHalfTurn * kHalf;
+inline constexpr float kMinSpotConeGap = static_cast<float>(kMinSpotConeGapDegrees * kPi / kDegreesPerHalfTurn);
 inline constexpr float kMaxSpotOuterCone = 1.5707963f;  // largest float below pi / 2
 
 struct LightDesc {
@@ -158,6 +159,7 @@ float minimum_spot_outer_cone(float inner);
 void sanitize_spot_cones(LightDesc& light);
 // Changes both angles together. Invalid values or a different light type leave the light untouched.
 bool set_spot_cone_degrees(LightDesc& light, double inner, double outer);
+float spot_cone_degrees(float radians);
 
 // A skeleton: the nodes that deform a skinned mesh.
 struct SkinDesc {

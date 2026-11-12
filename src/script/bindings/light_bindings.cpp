@@ -1,5 +1,5 @@
-// Light natives: how bright a light shines and in what color, changed while the game runs (a fire
-// that flickers, a blast that fades). The renderer reads every light anew each frame.
+// Light natives: adjust brightness, color and spotlight cones while the game runs.
+// The renderer reads every light anew each frame.
 
 #include <mruby.h>
 #include <mruby/array.h>
@@ -55,8 +55,8 @@ mrb_value light_cone_angles(mrb_state* mrb, mrb_value self) {
   const auto& light = light_of(mrb, self);
   if (light.type != LightType::Spot) return mrb_nil_value();
   mrb_value angles = mrb_ary_new_capa(mrb, kConeAngleCount);
-  mrb_ary_push(mrb, angles, mrb_float_value(mrb, radians_to_degrees(light.inner_cone)));
-  mrb_ary_push(mrb, angles, mrb_float_value(mrb, radians_to_degrees(light.outer_cone)));
+  mrb_ary_push(mrb, angles, mrb_float_value(mrb, spot_cone_degrees(light.inner_cone)));
+  mrb_ary_push(mrb, angles, mrb_float_value(mrb, spot_cone_degrees(light.outer_cone)));
   return angles;
 }
 
@@ -64,9 +64,10 @@ mrb_value light_set_cone(mrb_state* mrb, mrb_value self) {
   mrb_float inner = 0, outer = 0;
   mrb_get_args(mrb, "ff", &inner, &outer);
   auto& light = light_of(mrb, self);
-  if (light.type != LightType::Spot) mrb_raise(mrb, E_ARGUMENT_ERROR, "set_cone requires a spot light");
+  if (light.type != LightType::Spot) mrb_raise(mrb, E_RUNTIME_ERROR, "set_cone requires a spot light");
   if (!set_spot_cone_degrees(light, inner, outer)) {
-    mrb_raise(mrb, E_ARGUMENT_ERROR, "spotlight cone angles must be between 0 and 90 degrees and at least 0.1 apart");
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "spotlight cone angles must be between 0 and %v degrees and at least %v apart",
+               mrb_float_value(mrb, kMaxSpotConeDegrees), mrb_float_value(mrb, kMinSpotConeGapDegrees));
   }
   return mrb_nil_value();
 }

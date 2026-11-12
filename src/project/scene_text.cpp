@@ -159,7 +159,7 @@ std::string light_detail(const LightDesc& light) {
                        " range=" + number_text(light.range, kDetailDecimals);
   if (light.type == LightType::Spot) {
     detail += " inner_cone=" + number_text(radians_to_degrees(light.inner_cone), kListAngleDecimals) + "deg";
-    detail += " outer_cone=" + number_text(radians_to_degrees(light.outer_cone), kListAngleDecimals) + "deg";
+    detail += " outer_cone=" + number_text(spot_cone_degrees(light.outer_cone), kListAngleDecimals) + "deg";
   }
   return detail;
 }
