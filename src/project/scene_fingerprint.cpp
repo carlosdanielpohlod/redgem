@@ -11,13 +11,14 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "core/bits.hpp"
+
 namespace redgem::tools::snapshot {
 namespace {
 
 constexpr std::size_t kDigestBytes = 32;
 constexpr std::size_t kHashBufferBytes = 4096;
 constexpr int kHexDigitsPerByte = 2;
-constexpr int kBitsPerByte = 8;
 constexpr std::uint64_t kByteMask = 0xFF;
 
 void checked(int result) {

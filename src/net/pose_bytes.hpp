@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "core/bits.hpp"
 #include "core/math.hpp"
 #include "net/pose_quantization.hpp"
 
@@ -19,7 +20,6 @@ namespace redgem::net {
 inline constexpr std::size_t kByte = 1;
 inline constexpr std::size_t kFloatBytes = 4;
 inline constexpr std::size_t kStepBytes = 2;
-inline constexpr int kBitsPerByte = 8;
 inline constexpr std::uint32_t kByteMask = 0xFF;
 
 // Whether a byte of flags has `flag` set.

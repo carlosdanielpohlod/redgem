@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 
+#include "core/bits.hpp"
 #include "core/webp_image.hpp"
 
 namespace redgem {
@@ -30,7 +31,6 @@ constexpr std::size_t kSegmentLengthAt = 2;     // from the segment's mark
 constexpr std::size_t kFrameHeightAt = 5;
 constexpr std::size_t kFrameWidthAt = 7;
 constexpr std::size_t kFrameSizeEnd = 9;
-constexpr int kBitsPerByte = 8;
 
 // A number stored most significant byte first, as both formats store theirs.
 std::uint32_t big_endian(const std::uint8_t* bytes, std::size_t count) {

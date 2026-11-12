@@ -3,12 +3,13 @@
 #include <algorithm>
 #include <cstddef>
 
+#include "core/bits.hpp"
+
 namespace redgem::net {
 
 namespace {
 
 constexpr std::size_t kLengthBytes = 4;
-constexpr int kBitsPerByte = 8;
 constexpr std::uint32_t kByteMask = 0xFF;
 
 // The length the bytes at `start` announce.

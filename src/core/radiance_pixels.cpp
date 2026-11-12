@@ -5,6 +5,7 @@
 #include <cmath>
 #include <vector>
 
+#include "core/bits.hpp"
 #include "core/radiance_image.hpp"
 
 namespace redgem {
@@ -22,7 +23,6 @@ constexpr std::size_t kGreen = 1;
 constexpr std::size_t kBlue = 2;
 constexpr std::uint8_t kRepeatAbove = 128;  // a count above this repeats one byte (count - 128) times
 constexpr int kExponentBias = 136;          // 128, and 8 more for the mantissa's bits
-constexpr int kBitsPerByte = 8;
 
 // Bytes read one after the other, never past the end.
 struct Cursor {

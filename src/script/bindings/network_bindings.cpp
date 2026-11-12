@@ -7,6 +7,7 @@
 #include <limits>
 
 #include "core/log.hpp"
+#include "core/ports.hpp"
 #include "net/discovery/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "script/bindings/binding_helpers.hpp"
@@ -18,7 +19,6 @@ namespace {
 
 using namespace binding;
 
-constexpr mrb_int kLargestPort = 65535;
 constexpr const char* kUnavailable = "Network is only available while a game runs";
 
 bool is_a_port(mrb_int port) { return port >= 0 && port <= kLargestPort; }

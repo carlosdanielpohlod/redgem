@@ -7,6 +7,7 @@
 #include "core/command_line.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
+#include "core/ports.hpp"
 #include "core/translations.hpp"
 
 namespace redgem::net {
@@ -17,7 +18,7 @@ using NumberOption = command_line::NumberOption<RelayCommand>;
 
 constexpr NumberOption kOptions[] = {
     // (Port 0 is no port to meet on: it stands for the usual one.)
-    {"--port", 0, command_line::kLargestPort,
+    {"--port", 0, kLargestPort,
      [](RelayCommand& command, int port) {
        if (port != 0) command.port = static_cast<std::uint16_t>(port);
      }},
