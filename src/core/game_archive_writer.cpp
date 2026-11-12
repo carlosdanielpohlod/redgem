@@ -19,7 +19,6 @@ using namespace archive_layout;
 namespace {
 
 constexpr int kDeflateMemoryLevel = 8;  // zlib's default
-constexpr const char* kPartialSuffix = ".partial";
 
 // A file's data as it goes into the archive.
 struct Packed {
@@ -169,7 +168,7 @@ class ArchiveWriter {
 // is one rename on one disk, and a write that fails leaves the archive that was there as it was.
 std::filesystem::path partial_of(const std::filesystem::path& file) {
   std::filesystem::path partial = file;
-  partial += kPartialSuffix;
+  partial += kArchivePartialSuffix;
   return partial;
 }
 

@@ -52,6 +52,8 @@ inline constexpr std::uint64_t kMaxArchiveEntryBytes = 1024ull * 1024ull * 1024u
 inline constexpr std::uint64_t kMaxDeflateRatio = 1032;
 // The file a built game's files are packed into, beside its executable (see app/bundled_game.hpp).
 inline constexpr const char* kArchiveFileName = "game.rgpak";
+// An archive is written as <file><kArchivePartialSuffix> beside it, then renamed over it.
+inline constexpr const char* kArchivePartialSuffix = ".partial";
 
 enum class ArchiveMethod : std::uint8_t { Stored = 0, Deflate = 1 };
 

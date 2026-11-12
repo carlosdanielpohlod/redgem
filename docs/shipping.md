@@ -41,7 +41,10 @@ into a build while you debug it:
 ```
 
 The player plays whichever of the two it finds (a packed build takes away the `game/` folder an
-earlier loose build left in the same place, and a loose build the archive). The editor's Play,
+earlier loose build left in the same place, and a loose build the archive). A build that fails
+leaves the earlier one as it was: the archive is written as `game.rgpak.partial` and renamed
+over the old one, and a loose build copies into `game.staged` before swapping it in for `game/`
+(the old folder set aside as `game.replaced` meanwhile). The editor's Play,
 `redgem <game> --play`, `redgem run` and the other tools always read the project folder itself:
 the archive is only made by a build.
 

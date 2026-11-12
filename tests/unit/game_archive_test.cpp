@@ -350,6 +350,14 @@ TEST_CASE("a mounted archive is the game's folder: its files are read from it, a
     REQUIRE(found.has_value());
     CHECK(game_files::read(*found, kMaxArchiveEntryBytes) == bytes_of(repeated_script()));
     CHECK(read_file_up_to(game / "scripts/player.rb", kMaxArchiveEntryBytes) == bytes_of(repeated_script()));
+    // A loose link in place of a packed folder is not followed either.
+    std::filesystem::create_directories(scratch.dir / "elsewhere");
+    std::ofstream(scratch.dir / "elsewhere" / "en.json") << R"({"hello": "Elsewhere"})";
+    std::filesystem::create_directory_symlink(scratch.dir / "elsewhere", game / "locales", link_error);
+    REQUIRE_FALSE(link_error);
+    const auto locale = file_inside(game / "locales", "en.json");
+    REQUIRE(locale.has_value());
+    CHECK(read_json_file(*locale)["hello"] == "Hello");
   }
   // Outside the game's folder, the disk.
   CHECK(game_files::is_file(scratch.dir / "beside.txt"));

@@ -13,6 +13,7 @@
 #include "project/notices.hpp"
 #include "project/android/android_package.hpp"
 #include "project/game_build.hpp"
+#include "project/game_shipping.hpp"
 #include "project/game_templates.hpp"
 #include "test_support.hpp"
 
@@ -154,6 +155,7 @@ TEST_CASE("a loose build whose earlier game folder cannot be taken away fails, a
 }
 #endif
 
+#ifndef _WIN32  // (a file that cannot be read, made by taking away the right to read it)
 TEST_CASE("a rebuild that fails leaves the earlier build's game as it was") {
   const Scratch scratch;
   const std::filesystem::path player = scratch.dir / "player";
@@ -161,23 +163,46 @@ TEST_CASE("a rebuild that fails leaves the earlier build's game as it was") {
   const std::filesystem::path out = scratch.dir / "out";
   std::string error;
   REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error), error);
-  // The archive cannot be written where it is written first (a folder holds that name).
-  std::filesystem::path partial = out / kArchiveFileName;
-  partial += ".partial";
-  std::filesystem::create_directories(partial);
-  std::ofstream(scratch.game / "added.txt") << "new";
+  const std::filesystem::path unreadable = scratch.game / "unreadable.txt";
+  std::ofstream(unreadable) << "new";
+  std::filesystem::permissions(unreadable, std::filesystem::perms::none);
+  // Packed: the earlier archive stays, whole, and nothing half written is left beside it.
   CHECK_FALSE(build_game(scratch.game, out, player, BuildTarget::Linux, error));
   CHECK(error.find("cannot pack the game") != std::string::npos);
   const auto archive = GameArchive::open(out / kArchiveFileName, error);
   REQUIRE_MESSAGE(archive.has_value(), error);
   CHECK(archive->find(config::kSceneFileName) != nullptr);
-  CHECK(archive->find("added.txt") == nullptr);
-  // A loose build after it puts the folder in place and takes the archive away.
+  CHECK_FALSE(std::filesystem::exists(out / (std::string(kArchiveFileName) + kArchivePartialSuffix)));
+  // Loose, over a loose build: the earlier folder stays, and no copy is left beside it.
+  std::filesystem::permissions(unreadable, std::filesystem::perms::owner_all);
   REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error, GameLayout::Loose), error);
-  CHECK(std::filesystem::is_regular_file(out / kBundledGameFolder / "added.txt"));
   CHECK_FALSE(std::filesystem::exists(out / kArchiveFileName));
-  CHECK_FALSE(std::filesystem::exists(out / "game.staged"));
-  CHECK_FALSE(std::filesystem::exists(out / "game.replaced"));
+  std::ofstream(scratch.game / "later.txt") << "later";
+  std::filesystem::permissions(unreadable, std::filesystem::perms::none);
+  CHECK_FALSE(build_game(scratch.game, out, player, BuildTarget::Linux, error, GameLayout::Loose));
+  CHECK(std::filesystem::is_regular_file(out / kBundledGameFolder / "unreadable.txt"));
+  CHECK_FALSE(std::filesystem::exists(out / kBundledGameFolder / "later.txt"));
+  CHECK_FALSE(std::filesystem::exists(out / kStagedGameFolder));
+  CHECK_FALSE(std::filesystem::exists(out / kReplacedGameFolder));
+  std::filesystem::permissions(unreadable, std::filesystem::perms::owner_all);
+}
+#endif
+
+TEST_CASE("a build never goes where its game is kept under one of the names it works with") {
+  const Scratch scratch;
+  const std::filesystem::path player = scratch.dir / "player";
+  std::ofstream(player) << "player";
+  std::string error;
+  for (const char* name : {kStagedGameFolder, kReplacedGameFolder}) {
+    CAPTURE(name);
+    const std::filesystem::path out = scratch.dir / "out" / name;  // (a folder of its own each time)
+    const std::filesystem::path game = out / name;
+    std::filesystem::create_directories(game);
+    std::ofstream(game / config::kSceneFileName) << "scene";
+    CHECK_FALSE(build_game(game, out, player, BuildTarget::Linux, error, GameLayout::Loose));
+    CHECK(error.find((out / name).string()) != std::string::npos);
+    CHECK(std::filesystem::is_regular_file(game / config::kSceneFileName));
+  }
 }
 
 TEST_CASE("a player no script of the engine makes is said to come from building the engine on its system") {

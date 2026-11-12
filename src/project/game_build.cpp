@@ -22,10 +22,6 @@ namespace {
 
 constexpr const char* kParentFolder = "..";          // how a path says "one folder up"
 constexpr const char* kFallbackExecutable = "play";  // for a game whose name gives no usable file name
-// Where a loose build's game folder is copied before it takes the earlier one's place, and where
-// the earlier one is put aside meanwhile.
-constexpr const char* kStagedSuffix = ".staged";
-constexpr const char* kReplacedSuffix = ".replaced";
 
 bool game_not_in_bundle(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                         std::string& error);
@@ -84,7 +80,10 @@ namespace {
 // The game folder a build replaces must not be the game itself, nor hold it.
 bool game_not_in_bundle(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                         std::string& error) {
-  return game_outside(game_dir, out_dir / kBundledGameFolder, error);
+  for (const std::string& name : game_file_outputs()) {
+    if (!game_outside(game_dir, out_dir / name, error)) return false;
+  }
+  return true;
 }
 
 }  // namespace
@@ -202,30 +201,49 @@ bool moved(const std::filesystem::path& from, const std::filesystem::path& to, s
   return false;
 }
 
-// The folder `staged` put where `target` is: the earlier one set aside first, and put back when
-// the new one cannot take its place; taken away once it has.
-bool put_in_place(const std::filesystem::path& staged, const std::filesystem::path& target, std::string& error) {
-  const std::filesystem::path earlier = beside(target, kReplacedSuffix);
-  if (!removed(earlier, error)) return false;
+// Whether `path` is there; false, with `error` saying why, when that cannot be told.
+bool told_whether_there(const std::filesystem::path& path, bool& there, std::string& error) {
   std::error_code fs_error;
-  const bool had_one = std::filesystem::exists(target, fs_error);
+  there = std::filesystem::exists(path, fs_error);  // (nothing there is no error)
+  if (!fs_error) return true;
+  error = "cannot look at " + path.string() + ": " + fs_error.message();
+  return false;
+}
+
+// The folder `staged` put where `target` is, the earlier one set aside as `earlier` first (and put
+// back when the new one cannot take its place).
+bool put_in_place(const std::filesystem::path& staged, const std::filesystem::path& target,
+                  const std::filesystem::path& earlier, std::string& error) {
+  bool had_one = false;
+  if (!told_whether_there(target, had_one, error)) return false;
   if (had_one && !moved(target, earlier, error)) return false;
-  if (moved(staged, target, error)) return removed(earlier, error);
+  if (moved(staged, target, error)) return true;
   std::string ignored;
   if (had_one) moved(earlier, target, ignored);
   return false;
 }
 
-// Loose: the files copied beside the earlier game folder, then put in its place; the archive an
-// earlier packed build left taken away last (a player plays an archive before a folder).
-bool ship_loose(const std::filesystem::path& game_dir, const std::filesystem::path& place, std::string& error) {
-  const std::filesystem::path staged = beside(place / kBundledGameFolder, kStagedSuffix);
-  if (copy_game(game_dir, staged, error) && put_in_place(staged, place / kBundledGameFolder, error)) {
-    return removed(place / kArchiveFileName, error);
+// What an earlier build that was stopped halfway left under a working name, taken away.
+bool no_leftovers(const std::filesystem::path& place, std::string& error) {
+  for (const char* name : {kStagedGameFolder, kReplacedGameFolder}) {
+    if (!removed(place / name, error)) return false;
   }
-  std::error_code fs_error;
-  std::filesystem::remove_all(staged, fs_error);
-  return false;
+  return removed(beside(place / kArchiveFileName, kArchivePartialSuffix), error);
+}
+
+// Loose: the files copied beside the earlier game folder, then put in its place; then the archive
+// an earlier packed build left (a player plays an archive before a folder) and the earlier folder
+// taken away, each failure said.
+bool ship_loose(const std::filesystem::path& game_dir, const std::filesystem::path& place, std::string& error) {
+  const std::filesystem::path staged = place / kStagedGameFolder;
+  const std::filesystem::path earlier = place / kReplacedGameFolder;
+  if (!copy_game(game_dir, staged, error) || !put_in_place(staged, place / kBundledGameFolder, earlier, error)) {
+    std::error_code fs_error;
+    std::filesystem::remove_all(staged, fs_error);
+    return false;
+  }
+  const bool no_archive = removed(place / kArchiveFileName, error);
+  return removed(earlier, error) && no_archive;
 }
 
 // Packed: the archive written whole before it replaces the earlier one (see write_game_archive);
@@ -236,8 +254,14 @@ bool ship_packed(const std::filesystem::path& game_dir, const std::filesystem::p
 
 }  // namespace
 
+std::vector<std::string> game_file_outputs() {
+  return {kBundledGameFolder, kArchiveFileName, kStagedGameFolder, kReplacedGameFolder,
+          std::string(kArchiveFileName) + kArchivePartialSuffix};
+}
+
 bool ship_game_files(const std::filesystem::path& game_dir, const std::filesystem::path& place, GameLayout layout,
                      std::string& error) {
+  if (!no_leftovers(place, error)) return false;
   return layout == GameLayout::Loose ? ship_loose(game_dir, place, error) : ship_packed(game_dir, place, error);
 }
 
@@ -250,8 +274,9 @@ bool build_folder(const std::filesystem::path& game_dir, const std::filesystem::
   std::error_code fs_error;
   std::filesystem::create_directories(out_dir, fs_error);
   // (Only what a build made is written over: anything else of the same name is left as it is.)
-  std::vector<std::string> outputs = {executable_file(game_dir, target), kBundledGameFolder, kArchiveFileName,
-                                      kNoticesFolder};
+  std::vector<std::string> outputs = {executable_file(game_dir, target), kNoticesFolder};
+  const std::vector<std::string> game_files = game_file_outputs();
+  outputs.insert(outputs.end(), game_files.begin(), game_files.end());
   const std::vector<std::string> shipping = shipping_outputs(game_dir, target);
   outputs.insert(outputs.end(), shipping.begin(), shipping.end());
   BuildRecord record = BuildRecord::of(out_dir);
