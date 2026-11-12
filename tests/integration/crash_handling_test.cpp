@@ -148,7 +148,7 @@ TEST_CASE("a report names the build that crashed by the id its program carries, 
 }
 
 TEST_CASE("a crash's report is symbolized with the program that crashed, by addr2line") {
-  const auto tool = redgem::tools::addr2line_on_path(redgem::platform::environment("PATH"));
+  const auto tool = redgem::tools::addr2line_here();
   if (!tool.has_value()) {
     // (The continuous integration's machines have one: there the test must run.)
     CHECK(redgem::platform::environment("CI").empty());

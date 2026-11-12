@@ -240,6 +240,8 @@ const char* platform_name() {
 }
 
 void install_crash_handling(const CrashSetup& setup) {
+  // (Once: an Android activity made again in the same process starts the game again.)
+  if (installed()) return;
   memory_reserve().reset(new char[kMemoryReserveBytes]);
   touch_pages(memory_reserve().get(), kMemoryReserveBytes);
   prepare(setup);

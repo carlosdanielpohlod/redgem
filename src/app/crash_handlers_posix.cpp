@@ -60,7 +60,6 @@ constexpr char kLineBreak = '\n';
 constexpr const char* kLineEnd = "\n";
 constexpr const char* kNoFrames = "  (none: the system gave no frames)\n";
 constexpr const char* kUnknownProgram = "?";
-constexpr const char* kSymbolOpen = " (";
 constexpr char kSymbolClose = ')';
 #if defined(__ANDROID__)
 constexpr const char* kLogTag = "redgem";  // as the engine's other messages (core/platform_log.cpp)
@@ -130,7 +129,7 @@ const char* program_name(const Dl_info& info) {
 template <std::size_t Size>
 void append_symbol(FixedText<Size>& text, const Dl_info& info) {
   if (info.dli_sname == nullptr) return;
-  text.append(kSymbolOpen);
+  text.append(kSymbolMark);
   text.append(info.dli_sname);
   text.append(kSymbolClose);
 }
@@ -190,10 +189,10 @@ int crashed_frames(void** frames, const void* context) {
   return 1 + this_threads_frames(frames + 1, kMaxFrames - 1);
 }
 
-// The report in the system's log as well, a line to an entry (an entry holds only so much).
-void log_report() {
+// A report in the system's log as well, a line to an entry (an entry holds only so much).
+void log_lines(const char* text) {
   FixedText<kLogLineBytes> line;
-  for (const char* at = report.c_str(); *at != '\0'; ++at) {
+  for (const char* at = text; *at != '\0'; ++at) {
     if (*at != kLineBreak) {
       line.append(*at);
       continue;
@@ -204,7 +203,7 @@ void log_report() {
 }
 #else
 int this_threads_frames(void** frames, int most) { return backtrace(frames, most); }
-void log_report() {}  // (the report is only a file: a terminal is told where it is)
+void log_lines(const char*) {}  // (the report is only a file: a terminal is told where it is)
 #endif
 
 #if defined(__APPLE__)
@@ -234,27 +233,36 @@ void append_backtrace(const void* context) {
   for (int i = 0; i < count; ++i) append_frame(report, frames[i]);
 }
 
-void compose_report(int signal, const void* context, const Moment& moment) {
+// What a report says before its backtrace: the game, the build, when and why.
+void compose_head(int signal, const Moment& moment) {
+  report.clear();
   report.append(prepared_crash().head.c_str());
   report.append(kTimeLabel);
   report.append(moment_text(moment).c_str());
   report.append(kCauseLabel);
   report.append(signal_description(signal));
   report.append(kBacktraceLabel);
-  append_backtrace(context);
 }
 
-void write_signal_report(int signal, const void* context) {
-  const Moment moment = utc_moment(static_cast<std::int64_t>(time(nullptr)));
-  compose_report(signal, context, moment);
-  log_report();
+int open_report_file(const Moment& moment) {
   ReportPath folder;
   folder.append(prepared_crash().folder_text.c_str());
   make_folders(folder);
-  const int fd = open(report_path(moment).c_str(), O_WRONLY | O_CREAT | O_TRUNC, kFileMode);
-  if (fd < 0) return;
-  write_text(fd, report.c_str());
-  close(fd);
+  return open(report_path(moment).c_str(), O_WRONLY | O_CREAT | O_TRUNC, kFileMode);
+}
+
+// The head is written before the stack is walked: a walk that crashes in a broken stack leaves it
+// on the disk.
+void write_signal_report(int signal, const void* context) {
+  const Moment moment = utc_moment(static_cast<std::int64_t>(time(nullptr)));
+  compose_head(signal, moment);
+  const int fd = open_report_file(moment);
+  if (fd >= 0) write_text(fd, report.c_str());
+  const std::size_t head_bytes = report.size();
+  append_backtrace(context);
+  if (fd >= 0) write_text(fd, report.c_str() + head_bytes);
+  if (fd >= 0) close(fd);
+  log_lines(report.c_str());
 }
 
 // What the player is told: on the error stream, which a terminal shows (and on Android in the
@@ -295,12 +303,14 @@ void on_fatal_signal(int signal, siginfo_t*, void* context) {
   raise(signal);
 }
 
+bool ends_a_line(const std::string& text) { return !text.empty() && text.back() == kLineBreak; }
+
 // A frame as current_backtrace gives it: without the report's indent and line end.
 std::string frame_text(const void* address) {
   FixedText<kMaxPathBytes> line;
   append_frame(line, address);
   std::string text = line.c_str() + std::strlen(kFrameIndent);
-  text.pop_back();
+  if (ends_a_line(text)) text.pop_back();  // (a frame cut short has no line end)
   return text;
 }
 
@@ -336,11 +346,7 @@ std::vector<std::string> current_backtrace() {
   return lines;
 }
 
-void log_report_text(const std::string& text) {
-  report.clear();
-  report.append(text.c_str());
-  log_report();
-}
+void log_report_text(const std::string& text) { log_lines(text.c_str()); }
 
 void show_player(const std::string& message) { tell_player(message.c_str()); }
 

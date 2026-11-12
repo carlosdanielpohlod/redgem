@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+#include "editor/agent/child_process.hpp"
 #include "project/crash_symbols.hpp"
 #include "project/tool_line.hpp"
 
@@ -29,7 +30,11 @@ ToolResult symbolize_report(const std::string& report, const std::filesystem::pa
 
 // Looks addresses up with a program of the addr2line kind.
 AddressResolver addr2line_resolver(const std::filesystem::path& tool);
-// The first llvm-addr2line on a PATH (the folders in `path_variable`), else the first addr2line.
-std::optional<std::filesystem::path> addr2line_on_path(const std::string& path_variable);
+// The first llvm-addr2line on a PATH (the folders in `path_variable`) that `runnable` takes, else
+// the first addr2line.
+std::optional<std::filesystem::path> addr2line_on_path(const std::string& path_variable,
+                                                       const agent::ProgramTest& runnable);
+// The same on this machine's PATH, of the programs it may run.
+std::optional<std::filesystem::path> addr2line_here();
 
 }  // namespace redgem::tools

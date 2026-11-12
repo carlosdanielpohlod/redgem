@@ -243,6 +243,7 @@
   "project.symbolize.no_symbols": "no symbols in {place} are of the build that crashed ({build_id}, {program}): use the symbols of the release the game was built with (redgem-symbols-<system>.zip), or the build folder of the player it was built with",
   "project.symbolize.no_tool": "no addr2line found to look addresses up with: put llvm-addr2line (LLVM) or addr2line (binutils) on the PATH, or name one with {option}",
   "project.symbolize.one_report": "name one crash report",
+  "project.symbolize.tool_failed": "the addr2line used could say nothing of {symbols}: it failed, or does not read that kind of program (llvm-addr2line reads them all)",
   "project.symbolize.unknown_build": "the program that crashed ({program}) carries no build id, so no symbols can be matched to it (the Mac's reports have none yet)",
   "project.symbolize.usage": [
     "usage: redgem symbolize <report> [--symbols <file or folder>] [--tool <addr2line>]",

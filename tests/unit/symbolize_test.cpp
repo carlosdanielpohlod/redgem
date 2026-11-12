@@ -143,8 +143,11 @@ TEST_CASE("a frame is an offset into a program, maybe with the loader's name of 
   CHECK_FALSE(report_frame("  Arena.exe+0x12zz").has_value());
 }
 
-TEST_CASE("what addr2line answers is read a pair of lines to an address") {
-  const auto answer = addr2line_answer("main\r\n/src/app/player_main.cpp:58\r\n??\n??:0\nstep()\n??:?\n");
+TEST_CASE("what addr2line answers is read three lines to an address, its own troubles passed over") {
+  const auto answer = addr2line_answer(
+      "0x140001a2b\r\nmain\r\n/src/app/player_main.cpp:58\r\n"
+      "llvm-addr2line: warning: no debug info\n"
+      "0x0000000140005000\n??\n??:0\n0x14000000f\nstep()\n??:?\n");
   REQUIRE(answer.size() == 3);
   CHECK(answer[0].function == "main");
   CHECK(answer[0].location == "/src/app/player_main.cpp:58");
@@ -161,7 +164,8 @@ TEST_CASE("the frames of the build's program are looked up in its symbols, at th
   const ToolResult result = symbolize_report(kReport, folder.path, fake.resolver());
   CHECK(result.exit_code == kExitSuccess);
   CHECK(fake.asked_file == folder.player);
-  const std::vector<std::uint64_t> expected = {kImageBase + kStepOffset, kImageBase + kMainOffset};
+  // (The first frame where it crashed; the next one inside the call it returns from, a byte before.)
+  const std::vector<std::uint64_t> expected = {kImageBase + kStepOffset, kImageBase + kMainOffset - 1};
   CHECK(fake.asked == expected);
   CHECK(says(result.out, "  Arena.exe+0x1a2b  in redgem::Engine::step() at src/app/engine.cpp:120\n"));
   CHECK(says(result.out, "\n  ntdll.dll+0x5000\n"));  // another program's frame, as it was
@@ -179,6 +183,27 @@ TEST_CASE("frames the resolver knows nothing of are left as they were") {
   CHECK(result.exit_code == kExitSuccess);
   CHECK(says(result.out, "\n  Arena.exe+0x1a2b\n"));
   CHECK(says(result.out, "\n  Arena.exe+0x10\n"));
+}
+
+TEST_CASE("a resolver that answers nothing (an addr2line that failed) fails the command") {
+  const SymbolsFolder folder;
+  FakeResolver fake;
+  const ToolResult result = symbolize_report(kReport, folder.path, fake.resolver());
+  CHECK(result.exit_code == kExitFailure);
+  CHECK(says(result.err, "redgem-player"));
+}
+
+TEST_CASE("of two files of the same build, the larger is the one with symbols") {
+  const BinaryIdentity identity{kBuildId, kImageBase};
+  constexpr std::uintmax_t kStrippedBytes = 100;
+  constexpr std::uintmax_t kFullBytes = 900;
+  const std::vector<SymbolFile> files = {{"stripped/Arena.exe", identity, kStrippedBytes},
+                                         {"symbols/Arena.exe", identity, kFullBytes},
+                                         {"other/Arena.exe", {kOtherBuildId, kImageBase}, kFullBytes * 2}};
+  const SymbolFile* chosen = symbols_of_build(files, kBuildId);
+  REQUIRE(chosen != nullptr);
+  CHECK(chosen->file == std::filesystem::path("symbols/Arena.exe"));
+  CHECK(symbols_of_build(files, "feed") == nullptr);
 }
 
 TEST_CASE("a report of another build is said to match no symbols, with the builds there are") {
@@ -225,8 +250,9 @@ TEST_CASE("the addr2line used is LLVM's when the PATH has it, else binutils'") {
   const std::string llvm_tool = platform::executable_file_name("llvm-addr2line", platform::is_windows());
   std::ofstream(gnu / gnu_tool) << "tool";
   std::ofstream(llvm / llvm_tool) << "tool";
-  CHECK(addr2line_on_path(gnu.string() + kPathListSeparator + llvm.string()) == llvm / llvm_tool);
-  CHECK(addr2line_on_path(kPathListSeparator + gnu.string()) == gnu / gnu_tool);
-  CHECK_FALSE(addr2line_on_path("").has_value());
+  const auto any_file = [](const std::filesystem::path& file) { return std::filesystem::is_regular_file(file); };
+  CHECK(addr2line_on_path(gnu.string() + kPathListSeparator + llvm.string(), any_file) == llvm / llvm_tool);
+  CHECK(addr2line_on_path(kPathListSeparator + gnu.string(), any_file) == gnu / gnu_tool);
+  CHECK_FALSE(addr2line_on_path("", any_file).has_value());
   std::filesystem::remove_all(root);
 }

@@ -1,7 +1,6 @@
 #include "project/symbolize_command.hpp"
 
 #include <array>
-#include <chrono>
 #include <sstream>
 
 #include "app/encoder_process.hpp"
@@ -9,6 +8,7 @@
 #include "core/files.hpp"
 #include "core/platform.hpp"
 #include "core/translations.hpp"
+#include "project/tool_play.hpp"
 
 namespace redgem::tools {
 namespace {
@@ -24,14 +24,20 @@ constexpr char kPathListSeparator = ':';
 // The tools that look addresses up, the first one found used: LLVM's (which reads the programs
 // of every system), then binutils'.
 constexpr std::array<const char*, 2> kAddr2LineTools = {"llvm-addr2line", "addr2line"};
-// How each is asked: the function of each address (-f), its name readable (-C), in a file (-e).
+// How each is asked: each address said before what is said of it (-a), its function (-f), the
+// function's name readable (-C), in a file (-e).
+constexpr const char* kAddressesFlag = "-a";
 constexpr const char* kFunctionsFlag = "-f";
 constexpr const char* kDemangleFlag = "-C";
 constexpr const char* kFileFlag = "-e";
 constexpr const char* kHexPrefix = "0x";
-constexpr const char* kScratchPrefix = "redgem-symbolize-";
-constexpr const char* kScratchExtension = ".txt";
+constexpr const char* kAnswerFile = "addr2line.txt";
 constexpr const char* kCurrentFolder = ".";
+constexpr auto kRunnable =
+    std::filesystem::perms::owner_exec | std::filesystem::perms::group_exec | std::filesystem::perms::others_exec;
+
+// What a program's file is called here, past its name: nothing, or Windows' .exe.
+std::vector<std::string> program_extensions() { return {platform::executable_file_name("", platform::is_windows())}; }
 
 ToolGrammar grammar() { return {{kSymbolsOption, kToolOption}, {command_line::kHelpOption}}; }
 
@@ -57,23 +63,17 @@ ToolResult no_symbols(const ReportBuild& build, const std::filesystem::path& pla
   return failed(message + "\n" + builds_found(files));
 }
 
-bool is_program_in(const std::string& folder, const std::filesystem::path& candidate) {
+// Whether a file may be run as a program here (on Windows, every file found by its .exe may).
+bool runnable_program(const std::filesystem::path& file) {
   std::error_code fs_error;
-  return !folder.empty() && std::filesystem::is_regular_file(candidate, fs_error);
-}
-
-std::optional<std::filesystem::path> file_on_path(const std::string& file, const std::string& path_variable) {
-  std::istringstream folders(path_variable);
-  for (std::string folder; std::getline(folders, folder, kPathListSeparator);) {
-    const std::filesystem::path candidate = std::filesystem::u8path(folder) / file;
-    if (is_program_in(folder, candidate)) return candidate;
-  }
-  return std::nullopt;
+  if (!std::filesystem::is_regular_file(file, fs_error)) return false;
+  if (platform::is_windows()) return true;
+  return (std::filesystem::status(file, fs_error).permissions() & kRunnable) != std::filesystem::perms::none;
 }
 
 std::optional<std::filesystem::path> chosen_tool(const ToolLine& line) {
   if (const auto named = line.value(kToolOption)) return std::filesystem::u8path(*named);
-  return addr2line_on_path(platform::environment(kPathVariable));
+  return addr2line_here();
 }
 
 std::filesystem::path symbols_place(const ToolLine& line) {
@@ -86,24 +86,18 @@ std::string hex_address(std::uint64_t address) {
   return text.str();
 }
 
-// A file of its own for what one run of the tool says.
-std::filesystem::path scratch_file() {
-  const auto moment = std::chrono::steady_clock::now().time_since_epoch().count();
-  return std::filesystem::temp_directory_path() / (kScratchPrefix + std::to_string(moment) + kScratchExtension);
-}
-
 bool ended_well(const ProcessEnd& end) { return end.started && end.exited && end.code == kExitSuccess; }
 
 std::vector<ResolvedAddress> look_up(const std::filesystem::path& tool, const std::filesystem::path& symbols,
                                      const std::vector<std::uint64_t>& addresses) {
-  std::vector<std::string> arguments = {tool.string(), kFunctionsFlag, kDemangleFlag, kFileFlag, symbols.string()};
+  std::vector<std::string> arguments = {tool.string(), kAddressesFlag, kFunctionsFlag,
+                                        kDemangleFlag, kFileFlag,      symbols.string()};
   for (const std::uint64_t address : addresses) arguments.push_back(hex_address(address));
-  const std::filesystem::path output = scratch_file();
+  const ScratchFolder scratch;  // (removed, with what the tool said in it, when this ends)
+  const std::filesystem::path output = scratch.path() / kAnswerFile;
   const ProcessEnd end = run_to_end(arguments, output);
   std::string error;
   const std::string said = read_text_file(output, error).value_or("");
-  std::error_code fs_error;
-  std::filesystem::remove(output, fs_error);
   return ended_well(end) ? addr2line_answer(said) : std::vector<ResolvedAddress>();
 }
 
@@ -130,7 +124,9 @@ ToolResult symbolize_report(const std::string& report, const std::filesystem::pa
   const std::vector<SymbolFile> files = symbol_files_in(symbols);
   const SymbolFile* matching = symbols_of_build(files, build->build_id);
   if (matching == nullptr) return no_symbols(*build, symbols, files);
-  return answer(symbolized_report(report, *build, *matching, resolve));
+  const auto symbolized = symbolized_report(report, *build, *matching, resolve);
+  if (!symbolized) return failed(tr("project.symbolize.tool_failed", {{"symbols", matching->file.u8string()}}));
+  return answer(*symbolized);
 }
 
 AddressResolver addr2line_resolver(const std::filesystem::path& tool) {
@@ -139,12 +135,18 @@ AddressResolver addr2line_resolver(const std::filesystem::path& tool) {
   };
 }
 
-std::optional<std::filesystem::path> addr2line_on_path(const std::string& path_variable) {
+std::optional<std::filesystem::path> addr2line_on_path(const std::string& path_variable,
+                                                       const agent::ProgramTest& runnable) {
   for (const char* tool : kAddr2LineTools) {
-    const auto found = file_on_path(platform::executable_file_name(tool, platform::is_windows()), path_variable);
-    if (found) return found;
+    const std::filesystem::path found =
+        agent::find_program_in(tool, path_variable, kPathListSeparator, program_extensions(), runnable);
+    if (!found.empty()) return found;
   }
   return std::nullopt;
+}
+
+std::optional<std::filesystem::path> addr2line_here() {
+  return addr2line_on_path(platform::environment(kPathVariable), runnable_program);
 }
 
 }  // namespace redgem::tools

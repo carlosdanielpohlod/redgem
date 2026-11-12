@@ -26,6 +26,7 @@ inline constexpr const char* kUnknownBuild = "unknown";
 // How a frame of a backtrace says where it is: <program>+0x<offset>, and then, where the system
 // can tell, " (<symbol>)".
 inline constexpr const char* kOffsetMark = "+0x";
+inline constexpr const char* kSymbolMark = " (";
 
 // What a report says.
 struct CrashFacts {

@@ -49,19 +49,25 @@ using AddressResolver = std::function<std::vector<ResolvedAddress>(const std::fi
 struct SymbolFile {
   std::filesystem::path file;
   BinaryIdentity identity;
+  std::uintmax_t bytes = 0;
 };
-// The programs that carry a build id: the file itself, or every one in a folder and the folders in it.
+// The programs that carry a build id: the file itself, or every one in a folder and the folders in
+// it (but hidden ones, such as .git).
 std::vector<SymbolFile> symbol_files_in(const std::filesystem::path& place);
-// The one of a build; null when none is.
+// The one of a build; null when none is. Of several (a copy stripped of its symbols keeps its build
+// id), the largest.
 const SymbolFile* symbols_of_build(const std::vector<SymbolFile>& files, const std::string& build_id);
 
 // The report, each frame of the build's program followed by what the symbols say of it:
 //   "  Arena.exe+0x1a2b  in redgem::Engine::step() at src/app/engine.cpp:120"
-std::string symbolized_report(const std::string& report, const ReportBuild& build, const SymbolFile& symbols,
-                              const AddressResolver& resolve);
+// The first frame is looked up where it is; every other one a byte before, inside the call it
+// returns from. Nothing when the resolver answered nothing (it could not read the symbols).
+std::optional<std::string> symbolized_report(const std::string& report, const ReportBuild& build,
+                                             const SymbolFile& symbols, const AddressResolver& resolve);
 
-// What addr2line answers when asked with -f: for each address a line with its function, then one
-// with its file:line ("??" and "??:0" where it does not know).
+// What addr2line answers when asked with -a -f: for each address the address, a line with its
+// function, then one with its file:line ("??" and "??:0" where it does not know). Lines that are
+// none of those (what it says of its own troubles) are passed over.
 std::vector<ResolvedAddress> addr2line_answer(const std::string& output);
 
 }  // namespace redgem::tools
