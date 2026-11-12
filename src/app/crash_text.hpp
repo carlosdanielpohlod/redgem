@@ -43,6 +43,10 @@ class FixedText {
   // (For a system call that takes a text it may change in place, as long as it puts it back.)
   char* data() { return bytes_; }
   std::size_t size() const { return length_; }
+  void clear() {
+    length_ = 0;
+    bytes_[0] = '\0';
+  }
 
  private:
   bool has_room() const { return length_ + 1 < Size; }  // (the last byte is the ending zero's)

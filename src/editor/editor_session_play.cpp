@@ -3,6 +3,7 @@
 
 #include "editor/editor_session.hpp"
 
+#include "app/game_settings.hpp"
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
 #include "core/files.hpp"
@@ -57,15 +58,41 @@ std::variant<std::unique_ptr<EditorSession>, std::string> EditorSession::open(co
   auto opened = SceneDocument::open(scene_path);
   if (auto* error = std::get_if<std::string>(&opened)) return *error;
   std::unique_ptr<EditorSession> session(new EditorSession(game_dir, std::move(std::get<SceneDocument>(opened))));
+  session->refresh_collision_layers();
   session->begin_editing();
   return session;
 }
 
+void EditorSession::refresh_collision_layers() {
+  const auto file = game_dir_ / kGameSettingsFile;
+  std::error_code error;
+  const auto size = std::filesystem::file_size(file, error);
+  if (error == std::errc::no_such_file_or_directory) {
+    layer_settings_stamp_.reset();
+    collision_layers_ = CollisionLayers{};
+    return;
+  }
+  if (error) return;
+  const auto stamp = std::make_pair(write_time(file), size);
+  if (layer_settings_stamp_ == stamp) return;
+  layer_settings_stamp_ = stamp;
+  apply_layer_settings();
+}
+
+void EditorSession::apply_layer_settings() {
+  auto manifest = read_game_manifest(game_dir_);
+  if (!manifest.file_parsed) {
+    log::warning("game.json must be a valid JSON object; keeping the last collision layers");
+    return;
+  }
+  for (const auto& warning : manifest.physics_warnings) log::warning(warning);
+  collision_layers_ = std::move(manifest.settings.collision_layers);
+}
+
 void EditorSession::begin_editing() {
+  follow_scene_file(true);
   scene_name_ = scene_name_of(game_dir_, document_.path());
   selection_.clear();
-  loaded_write_time_ = write_time(document_.path());
-  external_change_pending_ = false;
   refresh_preview();
 }
 
@@ -79,15 +106,29 @@ bool EditorSession::open_scene(const std::string& name, std::string& error) {
     error = *message;
     return false;
   }
+  if (!document_.dirty()) forget_recovery();
   document_ = std::move(std::get<SceneDocument>(opened));
   begin_editing();
   log::info("editing " + document_.path().string());
   return true;
 }
 
-void EditorSession::note_saved() {
+void EditorSession::follow_scene_file(bool offer_archives) {
+  recovery_.watch(document_.path(), offer_archives);
   loaded_write_time_ = write_time(document_.path());
   external_change_pending_ = false;
+}
+void EditorSession::forget_recovery() {
+  std::string error;
+  if (!recovery_.discard_unsaved(error)) {
+    log::warning(error);
+    recovery_.ignore();
+  }
+}
+void EditorSession::note_saved() {
+  recovery_.retire_archive();
+  forget_recovery();
+  follow_scene_file();
   log::info("saved " + document_.path().string());
 }
 
@@ -179,13 +220,16 @@ bool EditorSession::reload_from_disk() {
     log::error("cannot reload " + path.string() + ": " + *error);
     return false;
   }
-  const std::vector<std::string> selected = selected_names();
-  document_ = std::move(std::get<SceneDocument>(opened));
-  loaded_write_time_ = write_time(path);
-  external_change_pending_ = false;
-  refresh_and_reselect(selected);
-  log::info("reloaded " + path.string());
+  use_disk_document(std::move(std::get<SceneDocument>(opened)));
   return true;
+}
+void EditorSession::use_disk_document(SceneDocument document) {
+  const auto selected = selected_names();
+  forget_recovery();
+  document_ = std::move(document);
+  follow_scene_file();
+  refresh_and_reselect(selected);
+  log::info("reloaded " + document_.path().string());
 }
 
 }  // namespace redgem

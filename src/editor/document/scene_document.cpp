@@ -11,8 +11,10 @@
 #include "editor/document/glb_compact.hpp"
 #include "editor/document/gltf_json.hpp"
 #include "editor/document/material_textures.hpp"
+#include "editor/document/recovery_format.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_loader.hpp"
+#include "scene/gltf/gltf_budget.hpp"
 #include "scene/scene_ids.hpp"
 
 namespace redgem {
@@ -29,6 +31,30 @@ std::string uri_of(const nlohmann::json& entry) {
 // A glTF "uri" names a file next to the scene: one is given (none at all is the .glb's own binary
 // chunk), and it is no data written into the JSON itself.
 bool names_a_linked_file(const std::string& uri) { return !uri.empty() && gltf_checks::names_a_file(uri.c_str()); }
+
+bool recoverable_buffers(const GlbFile& glb, std::string& error) {
+  for (const auto& buffer : list_of(glb.json, kBuffers)) {
+    if (!uri_of(buffer).empty()) {
+      error = "recovery requires buffers embedded in the GLB";
+      return false;
+    }
+  }
+  return true;
+}
+bool recovery_size(const GlbFile& glb, std::string& error) {
+  if (glb.bin.size() <= recovery_format::kMaxBytes) return true;
+  error = recovery_format::limit_error();
+  return false;
+}
+std::optional<GlbFile> lean_recovery(const GlbFile& glb, std::string& error) {
+  auto lean = without_unused(glb);
+  if (lean) {
+    if (!recovery_size(*lean, error)) return std::nullopt;
+    return lean;
+  }
+  if (!recovery_size(glb, error)) return std::nullopt;
+  return glb;
+}
 
 }  // namespace
 
@@ -53,6 +79,19 @@ std::variant<SceneDocument, std::string> SceneDocument::open_file(const std::fil
   document.desc_ = std::move(loaded.scene);
   document.remember_ids();
   document.remember_node_references(0, 0);
+  return document;
+}
+
+std::variant<SceneDocument, std::string> SceneDocument::open_recovery(const std::filesystem::path& source, GlbFile file,
+                                                                      const std::vector<std::uint8_t>& bytes) {
+  auto loaded = load_gltf_snapshot(source.string(), bytes, gltf_budget::kMaxSceneBytes);
+  if (!loaded.ok) return loaded.error;
+  SceneDocument document;
+  document.keep_file(std::move(file));
+  document.desc_ = std::move(loaded.scene);
+  document.remember_ids();
+  document.remember_node_references(0, 0);
+  document.recovered_as(source);
   return document;
 }
 
@@ -196,6 +235,21 @@ bool SceneDocument::save_file(const std::filesystem::path& path, std::string& er
   path_ = path;
   saved_version_ = version_;
   return true;
+}
+
+std::optional<GlbFile> SceneDocument::recovery_copy(std::string& error) {
+  if (!recoverable_buffers(glb_, error)) return std::nullopt;
+  if (!sync_for_writing(error)) return std::nullopt;
+  auto lean = lean_recovery(glb_, error);
+  if (!lean) return std::nullopt;
+  material_textures::forget_unused_webp(lean->json);
+  return lean;
+}
+
+void SceneDocument::recovered_as(const std::filesystem::path& source) {
+  path_ = source;
+  saved_version_ = -1;
+  glb_.json.erase(recovery_format::kMetadata);
 }
 
 }  // namespace redgem

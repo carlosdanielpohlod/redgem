@@ -171,6 +171,11 @@
   "editor.inspector.physics.collider": "Collider",
   "editor.inspector.physics.dynamic_body": "Falls and gets pushed (crates, balls)",
   "editor.inspector.physics.kinematic_body": "Moved by scripts, pushes others",
+  "editor.inspector.physics.layer": "Layer",
+  "editor.inspector.physics.layer_invalid": "Invalid layer",
+  "editor.inspector.physics.layer_invalid_warning": "The layer must be a non-empty name. Physics uses the default layer.",
+  "editor.inspector.physics.layer_no_body": "This layer has no effect until the object has a body or trigger.",
+  "editor.inspector.physics.layer_unknown": "This layer is missing from game.json. Physics uses the default layer.",
   "editor.inspector.physics.mass": "Mass",
   "editor.inspector.physics.static_body": "Never moves (floors, walls)",
   "editor.inspector.physics.title": "Physics",
@@ -352,5 +357,10 @@
   "editor.toolbar.stop": "Stop (Ctrl+P / Esc)",
   "editor.toolbar.world_axes": "World axes (click for local)",
   "editor.unsaved.question": "Save changes to {game} before closing?",
-  "editor.unsaved.title": "Unsaved changes"
+  "editor.unsaved.title": "Unsaved changes",
+  "editor.recovery.changed": "The original has changed since this copy, or the original or copy could not be verified. Recovery may replace newer work when you Save.",
+  "editor.recovery.discard": "Discard recovery copy",
+  "editor.recovery.title": "Recover scene",
+  "editor.recovery.question": "Recover unsaved changes from the scene recovery copy? The original changes only when you Save.",
+  "editor.recovery.recover": "Recover changes"
 }

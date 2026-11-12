@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -13,8 +14,10 @@
 #include "editor/inspector_logic.hpp"
 #include "editor/selection.hpp"
 #include "editor/prefab_preview.hpp"
+#include "editor/scene_recovery.hpp"
 #include "scene/shapes/terrain.hpp"
 #include "input/input.hpp"
+#include "physics/collision_layers.hpp"
 #include "scene/scene.hpp"
 
 namespace redgem {
@@ -39,6 +42,9 @@ class EditorSession {
 
   SceneDocument& document() { return document_; }
   const std::filesystem::path& game_dir() const { return game_dir_; }
+  const CollisionLayers& collision_layers() const { return collision_layers_; }
+  void refresh_collision_layers();
+  bool set_collision_layer(const std::vector<ObjectId>& objects, const std::string& name);
   // The scene being edited, by the name scripts load it with ("main" is scene.glb, see
   // editor/game_scenes.hpp).
   const std::string& scene_name() const { return scene_name_; }
@@ -140,6 +146,15 @@ class EditorSession {
   void redo();
   // Writes the scene being edited back to its file.
   bool save(std::string& error);
+  const std::string& recovery_problem() const { return recovery_.problem(); }
+  bool recovery_pending() const { return recovery_.pending(); }
+  bool recovery_source_changed() const { return recovery_.source_changed(); }
+  bool recover_scene(std::string& error);
+  void ignore_recovery() { recovery_.ignore(); }
+  bool discard_recovery(std::string& error) { return recovery_.discard(error); }
+  bool discard_unsaved_recovery(std::string& error) { return recovery_.discard_unsaved(error); }
+  void autosave(float seconds);
+
   // Writes it as a new scene of the game (scenes/<name>.glb), which is then the one edited.
   // Refused when the scene uses files next to it (images, buffers) and would move to another
   // folder, where it would not find them.
@@ -173,8 +188,12 @@ class EditorSession {
   // The document just read from its file is edited from now on: nothing selected, and the file
   // followed for changes others make to it.
   void begin_editing();
+  void apply_layer_settings();
   // Whatever is saved last is what the file on disk holds.
   void note_saved();
+  void follow_scene_file(bool offer_archives = false);
+  void forget_recovery();
+  void use_disk_document(SceneDocument document);
   // Whether the scene can be saved as `file` and still find the files it uses (see save_as).
   bool files_found_from(const std::filesystem::path& file, std::string& error) const;
   // Whether an object can be edited now: the game is stopped, and there is one.
@@ -184,7 +203,7 @@ class EditorSession {
   bool playing() const { return play_state_ == PlayState::Playing && runtime_ != nullptr; }
   // The file on disk is another than the one loaded, and no game runs that reads the loaded one.
   bool reload_wanted(std::filesystem::file_time_type write_time) const {
-    return write_time != loaded_write_time_ && editing();
+    return write_time != loaded_write_time_ && editing() && !recovery_.pending();
   }
   // The first object carrying the environment's properties, or kNoObject.
   ObjectId find_environment() const;
@@ -214,6 +233,8 @@ class EditorSession {
                   const std::vector<Transform>& locals);
   void place_pasted(const std::vector<int>& objects, const std::string& parent, const Transform& parent_world);
   std::filesystem::path game_dir_;
+  CollisionLayers collision_layers_;
+  std::optional<std::pair<std::filesystem::file_time_type, std::uintmax_t>> layer_settings_stamp_;
   SceneDocument document_;
   std::string scene_name_;  // of the document's file, kept as it opens or is saved as another
   Scene preview_;
@@ -224,6 +245,7 @@ class EditorSession {
   AudioSystem* game_audio_ = nullptr;  // what the running game sounds through, when it has something
   std::filesystem::file_time_type loaded_write_time_{};
   bool external_change_pending_ = false;
+  SceneRecovery recovery_;
 };
 
 }  // namespace redgem

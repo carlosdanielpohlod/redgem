@@ -132,6 +132,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   GameManifest manifest = default_manifest(game_dir);
   const nlohmann::json json = read_json_file(game_dir / kGameSettingsFile);
   if (!json.is_object()) return manifest;
+  manifest.file_parsed = true;
   read_window(json, manifest.settings);
   manifest.title_given = holds_text(json, kTitleKey);
   read_display(json, manifest.settings);

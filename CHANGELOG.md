@@ -10,6 +10,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Inspector collision layers**: assign a body or trigger to a layer defined in `game.json`
+  from the Physics card.
+
 - **UI at any screen size**: `anchor:` on `UI.text`, `rect`, `image`, `button`, `text_field`,
   `toggle`, `choice` and `slider` (`:top_left`, `:top`, `:top_right`, `:left`, `:center`,
   `:right`, `:bottom_left`, `:bottom`, `:bottom_right`) makes x and y offsets from that point of
@@ -56,6 +59,9 @@ until 1.0, a release may change what games rely on (see
 - **Physics collider view**: inspect actual collision shapes during editor Play/Pause, with
   colored wireframes, trigger and character shapes, and bounded geometry collection.
 
+- **Scene recovery**: periodic durable copies of unsaved editor scenes, with a recovery prompt,
+  original-file conflict detection and cleanup on Save or Discard.
+
 - **Prefab creation**: save a selected hierarchy as a reusable GLB from the Project panel,
   preserving complete skeletons and nested references while validating dependencies before publication.
 
@@ -81,7 +87,23 @@ until 1.0, a release may change what games rely on (see
   quality presets cap them (ultra 4, high 2, medium 1, low 0; `local_shadows` in a custom quality
   and `Settings.quality_details`), and a graphics card that cannot make the atlas draws none.
 
+- **Crash reports on Android**: a built game for Android writes its crash report in `crashes/` of
+  the app's files and in `adb logcat` (tag `redgem`), and hands the crash on to the system, which
+  keeps its own tombstone too. The next run of any built game says in its log that the run
+  before crashed, naming the report.
+- **`redgem symbolize <report> [--symbols <dir>]`**: a crash report's frames with their functions
+  (and file:line where the symbols have them), looked up with `llvm-addr2line` or `addr2line`.
+  Every report now names the build of the player that crashed (`Build: <id> <program>`, the
+  linker's build id on Linux, Windows and Android), and the symbols of that very build are found
+  by it; a report of another build is said to be so, with the builds found. Each release carries
+  the players as they were linked, before stripping, as `redgem-symbols-linux.zip`,
+  `redgem-symbols-windows.zip` and `redgem-symbols-android.zip`, apart from the downloads.
+
 ### Changed
+
+- **Crash report backtraces on Linux and Android are offsets into each program**
+  (`Arena+0x1a2b`), as on Windows, so that `redgem symbolize` reads them; where the loader knows
+  a frame's symbol, it follows in brackets.
 
 - **Each game keeps its data in a folder of its own, named after its studio and title**:
   `game.json` gains `"studio"`, and a game's save, settings, bindings and crash reports are kept

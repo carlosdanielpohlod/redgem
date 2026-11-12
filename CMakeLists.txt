@@ -65,6 +65,14 @@ include(Dependencies)
 # (Set after the dependencies: only the targets made from here on, the engine's, take it.)
 set(CMAKE_COMPILE_WARNING_AS_ERROR ${REDGEM_WARNINGS_AS_ERRORS})
 
+# Every program the engine links carries the id of its build (an ELF note on Linux and Android,
+# the debug directory's CodeView record on Windows): a crash report names the build by it, and
+# `redgem symbolize` finds that build's symbols by it (see src/core/build_id.hpp). The Mac's
+# linker gives every program a UUID of its own, which the engine does not read yet.
+if(NOT APPLE)
+  add_link_options(-Wl,--build-id)
+endif()
+
 add_subdirectory(src)
 
 if(REDGEM_BUILD_TESTS)

@@ -30,6 +30,8 @@ struct DescOffsets;
 class SceneDocument {
  public:
   static std::variant<SceneDocument, std::string> open(const std::filesystem::path& path);
+  static std::variant<SceneDocument, std::string> open_recovery(const std::filesystem::path& source, GlbFile file,
+                                                                const std::vector<std::uint8_t>& bytes);
   // A document with no objects yet, saved to `path` on save() (new games start from it).
   static SceneDocument create_empty(const std::filesystem::path& path);
 
@@ -44,6 +46,11 @@ class SceneDocument {
   std::vector<std::string> linked_files() const;
   // True when the nodes or materials differ from what is on disk (undoing back to the saved
   // state clears it).
+  long long version() const { return version_; }
+  // A bounded authored copy for recovery; retains path, dirty state and undo/redo.
+  std::optional<GlbFile> recovery_copy(std::string& error);
+  // A validated recovery copy becomes unsaved work for the original file.
+  void recovered_as(const std::filesystem::path& source);
   bool dirty() const { return version_ != saved_version_; }
 
   // Records an undo step. Edits below call it themselves unless `record` is false, so a gizmo

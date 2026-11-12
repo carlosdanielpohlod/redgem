@@ -8,6 +8,7 @@
 #include "project/run_command.hpp"
 #include "project/scene_command.hpp"
 #include "project/shot_command.hpp"
+#include "project/symbolize_command.hpp"
 
 namespace redgem::tools {
 namespace {
@@ -20,7 +21,7 @@ struct NamedTool {
 };
 constexpr NamedTool kTools[] = {
     {kSceneCommand, run_scene_command}, {kRunCommand, run_run_command}, {kShotCommand, run_shot_command},
-    {kCheckCommand, run_check_command}, {kApiCommand, run_api_command},
+    {kCheckCommand, run_check_command}, {kApiCommand, run_api_command}, {kSymbolizeCommand, run_symbolize_command},
 };
 
 }  // namespace

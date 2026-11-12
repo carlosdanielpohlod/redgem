@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Checks that the downloads of a release are all there and hold what they must: the programs, the
-# players for other systems (in the Linux one), the demos and the licenses. It only reads the
+# players for other systems (in the Linux one), the demos and the licenses; and that the players'
+# symbols (redgem-symbols-<system>.zip) hold each player as it was linked. It only reads the
 # archives' lists of files, so it checks the downloads of every system on any machine.
-#   tools/release/check_downloads.sh dist/release                  # all four downloads
+#   tools/release/check_downloads.sh dist/release                  # all four downloads and the symbols
 #   tools/release/check_downloads.sh dist/release redgem-macos-arm64.zip   # only the ones named
 # Every problem is printed before it fails, so one missing download does not hide another.
 set -euo pipefail
@@ -47,9 +48,34 @@ required_files() {
   for notice in "${NOTICES[@]}" README.txt; do echo "${root}/${notice}"; done
 }
 
+# What symbols archive $1 must hold.
+required_symbols() {
+  local root="${SYMBOLS_PACKAGE}" abi
+  case "$1" in
+    "${LINUX_SYMBOLS}") echo "${root}/${LINUX_PLAYER_SYMBOLS}" ;;
+    "${WINDOWS_SYMBOLS}") echo "${root}/${WINDOWS_PLAYER_SYMBOLS}" ;;
+    "${ANDROID_SYMBOLS}")
+      for abi in "${ANDROID_ABIS[@]}"; do echo "${root}/android/${abi}/${ANDROID_PLAYER}"; done
+      ;;
+  esac
+}
+
+is_symbols() {
+  local symbols
+  for symbols in "${SYMBOL_DOWNLOADS[@]}"; do
+    [[ "$1" == "${symbols}" ]] && return 0
+  done
+  return 1
+}
+
+# What asset $1 of a release must hold.
+required() {
+  if is_symbols "$1"; then required_symbols "$1"; else required_files "$1"; fi
+}
+
 is_known_download() {
   local download
-  for download in "${DOWNLOADS[@]}"; do
+  for download in "${RELEASE_ASSETS[@]}"; do
     [[ "$1" == "${download}" ]] && return 0
   done
   return 1
@@ -58,7 +84,7 @@ is_known_download() {
 check_download() {
   local dir="$1" name="$2" listing file
   if ! is_known_download "${name}"; then
-    problem "${name}: not a download of a release (they are: ${DOWNLOADS[*]})"
+    problem "${name}: not a download of a release (they are: ${RELEASE_ASSETS[*]})"
     return
   fi
   if [[ ! -s "${dir}/${name}" ]]; then
@@ -71,14 +97,14 @@ check_download() {
   fi
   while IFS= read -r file; do
     grep -Fxq -- "${file}" <<<"${listing}" || problem "${name}: has no ${file}"
-  done < <(required_files "${name}")
+  done < <(required "${name}")
 }
 
 main() {
   local dir="${1:?usage: check_downloads.sh <folder> [download...]}" name
   shift
   local names=("$@")
-  [[ ${#names[@]} -gt 0 ]] || names=("${DOWNLOADS[@]}")
+  [[ ${#names[@]} -gt 0 ]] || names=("${RELEASE_ASSETS[@]}")
   for name in "${names[@]}"; do
     check_download "${dir}" "${name}"
   done
