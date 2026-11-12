@@ -32,35 +32,50 @@ void keep_joints_within(PrimitiveDesc& primitive, std::size_t joints) {
   }
 }
 
+float maximum_spot_inner_cone(float outer) {
+  // The degree pair was checked before conversion. Allow the last rounding step of a float.
+  return std::nextafter(outer - kMinSpotConeGap, outer);
+}
+
 float minimum_spot_outer_cone(float inner) {
-  const float sum = inner + kMinSpotConeGap;
-  // Keep the gap after rounding to the stored float.
-  return sum - kMinSpotConeGap < inner ? std::nextafter(sum, kMaxSpotOuterCone) : sum;
+  const float sum = std::min(inner + kMinSpotConeGap, kMaxSpotOuterCone);
+  return maximum_spot_inner_cone(sum) < inner ? std::nextafter(sum, kMaxSpotOuterCone) : sum;
 }
 
 void sanitize_spot_cones(LightDesc& light) {
-  if (light.type != LightType::Spot) return;
+  if (!is_spot_light(light)) return;
   const bool outer_valid = std::isfinite(light.outer_cone) && light.outer_cone > kSpotConeAxis;
   light.outer_cone =
       outer_valid ? std::clamp(light.outer_cone, kMinSpotConeGap, kMaxSpotOuterCone) : kDefaultSpotOuterCone;
-  const float max_inner = light.outer_cone - kMinSpotConeGap;
+  const float max_inner = maximum_spot_inner_cone(light.outer_cone);
   light.inner_cone =
       std::isfinite(light.inner_cone) ? std::clamp(light.inner_cone, kSpotConeAxis, max_inner) : kSpotConeAxis;
 }
 
-bool set_spot_cone_degrees(LightDesc& light, double inner, double outer) {
-  // Check the requested gap before narrowing to radians stored in floats.
+namespace {
+bool is_valid_cone_pair(double inner, double outer) {
   const auto minimum = std::nextafter(inner + kMinSpotConeGapDegrees, 0.0);
-  const bool ordered = inner >= 0.0 && outer >= minimum && outer <= kMaxSpotConeDegrees;
-  if (light.type != LightType::Spot || !ordered) return false;
-  light.inner_cone = degrees_to_radians(static_cast<float>(inner));
-  light.outer_cone = degrees_to_radians(static_cast<float>(outer));
+  return inner >= 0.0 && outer >= minimum && outer <= kMaxSpotConeDegrees;
+}
+
+constexpr double kConeStepsPerDegree = 10'000;
+constexpr double kConeGapSteps = kMinSpotConeGapDegrees * kConeStepsPerDegree;
+
+double cone_degree_steps(float radians) { return std::round(radians / kSpotRadiansPerDegree * kConeStepsPerDegree); }
+}  // namespace
+
+bool set_spot_cone_degrees(LightDesc& light, double inner, double outer) {
+  if (!is_spot_light(light) || !is_valid_cone_pair(inner, outer)) return false;
+  light.inner_cone = static_cast<float>(inner * kSpotRadiansPerDegree);
+  light.outer_cone = static_cast<float>(outer * kSpotRadiansPerDegree);
   sanitize_spot_cones(light);
   return true;
 }
 
-float spot_cone_degrees(float radians) {
-  return radians == kMaxSpotOuterCone ? kMaxSpotConeDegrees : radians_to_degrees(radians);
+SpotConeDegrees spot_cone_degrees(const LightDesc& light) {
+  const double outer = cone_degree_steps(light.outer_cone);
+  const double inner = std::min(cone_degree_steps(light.inner_cone), outer - kConeGapSteps);
+  return {inner / kConeStepsPerDegree, outer / kConeStepsPerDegree};
 }
 
 void Bounds::include(Vec3 point) {

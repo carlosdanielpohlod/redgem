@@ -124,9 +124,10 @@ Json light(const std::optional<LightDesc>& value) {
                    {"color", color(value->color)},
                    {"intensity", value->intensity},
                    {"range", value->range}};
-  if (value->type == LightType::Spot) {
-    snapshot["inner_cone"] = radians_to_degrees(value->inner_cone);
-    snapshot["outer_cone"] = spot_cone_degrees(value->outer_cone);
+  if (is_spot_light(*value)) {
+    const auto cones = spot_cone_degrees(*value);
+    snapshot["inner_cone"] = cones.inner;
+    snapshot["outer_cone"] = cones.outer;
   }
   return snapshot;
 }

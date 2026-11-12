@@ -14,6 +14,7 @@
 #include "core/exit_codes.hpp"
 #include "editor/document/scene_document.hpp"
 #include "project/closest_words.hpp"
+#include "project/mcp_tools.hpp"
 #include "project/scene_command.hpp"
 #include "project/scene_lookup.hpp"
 #include "project/scene_text.hpp"
@@ -102,10 +103,24 @@ TEST_CASE("scene set edits spotlight cones in degrees and refuses an invalid pai
   CHECK(rejected.exit_code == kExitFailure);
   CHECK(has(rejected.err, "spot_cone needs inner,outer"));
   CHECK(scene_tool({"set", game.dir(), "Sun", "spot_cone=15,30"}).exit_code == kExitFailure);
+  for (const char* bad :
+       {"spot_cone=30", "spot_cone=bad,30", "spot_cone=5,10,30", "spot_cone+=5,10", "inner_cone=15", "outer_cone=40"}) {
+    CAPTURE(bad);
+    CHECK(scene_tool({"set", game.dir(), "Spotlight", bad}).exit_code == kExitFailure);
+  }
+  const auto rollback = scene_tool({"set", game.dir(), "Spotlight", "prop.marker=true", "spot_cone=bad"});
+  CHECK(rollback.exit_code == kExitFailure);
+  CHECK(node_named(load(game.scene()), "Spotlight").props.count("marker") == 0);
 
   const auto described = scene_tool({"get", game.dir(), "Spotlight"});
   CHECK(described.exit_code == kExitSuccess);
   CHECK(has(described.out, "inner_cone=15deg outer_cone=30deg"));
+
+  const mcp::Options files{game.dir(), false, {}};
+  const mcp::Json edit{{"action", "set"}, {"object", "Spotlight"}, {"assignments", {"spot_cone=20,40"}}};
+  const auto reply = mcp::invoke(files, "scene_edit", edit);
+  REQUIRE_FALSE(reply.at("isError").get<bool>());
+  CHECK(has(scene_tool({"get", game.dir(), "Spotlight"}).out, "inner_cone=20deg outer_cone=40deg"));
 }
 
 TEST_CASE("a list can stop short, and says what it left out") {

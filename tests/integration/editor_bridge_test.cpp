@@ -103,6 +103,9 @@ TEST_CASE("a live spotlight edit changes its preview and can be undone") {
   REQUIRE(light.has_value());
   CHECK(radians_to_degrees(light->inner_cone) == doctest::Approx(15));
   CHECK(radians_to_degrees(light->outer_cone) == doctest::Approx(30));
+  const auto version = doc.version();
+  REQUIRE(ok(invoke_editor(session, "scene_edit", edit)));
+  CHECK(doc.version() == version);
   REQUIRE(ok(invoke_editor(session, "editor", {{"action", "undo"}})));
   CHECK(doc.node(index).light->outer_cone == doctest::Approx(kDefaultSpotOuterCone));
 }

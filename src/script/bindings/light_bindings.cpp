@@ -53,10 +53,11 @@ mrb_value light_set_intensity(mrb_state* mrb, mrb_value self) {
 
 mrb_value light_cone_angles(mrb_state* mrb, mrb_value self) {
   const auto& light = light_of(mrb, self);
-  if (light.type != LightType::Spot) return mrb_nil_value();
+  if (!is_spot_light(light)) return mrb_nil_value();
+  const auto cone = spot_cone_degrees(light);
   mrb_value angles = mrb_ary_new_capa(mrb, kConeAngleCount);
-  mrb_ary_push(mrb, angles, mrb_float_value(mrb, spot_cone_degrees(light.inner_cone)));
-  mrb_ary_push(mrb, angles, mrb_float_value(mrb, spot_cone_degrees(light.outer_cone)));
+  mrb_ary_push(mrb, angles, mrb_float_value(mrb, cone.inner));
+  mrb_ary_push(mrb, angles, mrb_float_value(mrb, cone.outer));
   return angles;
 }
 
@@ -64,9 +65,10 @@ mrb_value light_set_cone(mrb_state* mrb, mrb_value self) {
   mrb_float inner = 0, outer = 0;
   mrb_get_args(mrb, "ff", &inner, &outer);
   auto& light = light_of(mrb, self);
-  if (light.type != LightType::Spot) mrb_raise(mrb, E_RUNTIME_ERROR, "set_cone requires a spot light");
   if (!set_spot_cone_degrees(light, inner, outer)) {
-    mrb_raisef(mrb, E_ARGUMENT_ERROR, "spotlight cone angles must be between 0 and %v degrees and at least %v apart",
+    if (!is_spot_light(light)) mrb_raise(mrb, E_RUNTIME_ERROR, "set_cone requires a spot light");
+    mrb_raisef(mrb, E_ARGUMENT_ERROR,
+               "spotlight cone angles must be between 0 and %v degrees and at least %v degrees apart",
                mrb_float_value(mrb, kMaxSpotConeDegrees), mrb_float_value(mrb, kMinSpotConeGapDegrees));
   }
   return mrb_nil_value();

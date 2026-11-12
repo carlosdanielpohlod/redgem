@@ -43,6 +43,9 @@ constexpr const char* kScriptsKey = "scripts";
 constexpr const char* kMeshKey = "mesh";
 constexpr const char* kLightKey = "light";
 constexpr const char* kSpotConeKey = "spot_cone";
+constexpr const char* kInnerConeKey = "inner_cone";
+constexpr const char* kOuterConeKey = "outer_cone";
+constexpr int kGapDecimals = 1;
 constexpr char kPathSeparator = '/';
 // A key of up to this many letters is mistyped by one change at most; longer ones by two.
 constexpr std::size_t kShortKey = 5;
@@ -299,15 +302,24 @@ bool apply_cone(LightDesc& light, const std::string& value) {
   return set_spot_cone_degrees(light, *inner, *outer);
 }
 
+std::string cone_angle_error() {
+  return tr("project.scene.spot_cone_bad_angles",
+            {{"max", number_text(kMaxSpotConeDegrees, 0)}, {"gap", number_text(kMinSpotConeGapDegrees, kGapDecimals)}});
+}
+
 std::string set_spot_cone(SceneEdit& edit, int& index, const Assignment& assignment) {
-  auto light = edit.document.node(index).light;
-  auto* spot = light ? &*light : nullptr;
-  const bool is_spot = spot && spot->type == LightType::Spot;
-  if (!is_spot) return tr("project.scene.spot_cone_needs_light");
-  if (!apply_cone(*spot, assignment.value)) return tr("project.scene.spot_cone_bad_angles");
-  edit.document.set_light(index, *spot);
+  const auto& original = edit.document.node(index).light;
+  if (!original) return tr("project.scene.spot_cone_needs_light");
+  auto spot = *original;
+  if (!apply_cone(spot, assignment.value)) {
+    return is_spot_light(spot) ? cone_angle_error() : tr("project.scene.spot_cone_needs_light");
+  }
+  const bool unchanged = original->inner_cone == spot.inner_cone && original->outer_cone == spot.outer_cone;
+  if (!unchanged) edit.document.set_light(index, spot);
   return {};
 }
+
+std::string reject_cone_member(SceneEdit&, int&, const Assignment&) { return tr("project.scene.spot_cone_use_pair"); }
 
 using Setter = std::string (*)(SceneEdit&, int&, const Assignment&);
 struct Key {
@@ -316,10 +328,20 @@ struct Key {
   bool adds_and_takes;  // whether it takes += and -=
 };
 constexpr Key kSetters[] = {
-    {"position", set_position, false}, {"pos", set_position, false},        {"rotation", set_rotation, false},
-    {"rot", set_rotation, false},      {"scale", set_scale, false},         {"name", set_name, false},
-    {"parent", set_parent, false},     {props::kScript, set_scripts, true}, {kScriptsKey, set_scripts, true},
-    {kMeshKey, check_mesh, false},     {kLightKey, check_light, false},     {kSpotConeKey, set_spot_cone, false},
+    {"position", set_position, false},
+    {"pos", set_position, false},
+    {"rotation", set_rotation, false},
+    {"rot", set_rotation, false},
+    {"scale", set_scale, false},
+    {"name", set_name, false},
+    {"parent", set_parent, false},
+    {props::kScript, set_scripts, true},
+    {kScriptsKey, set_scripts, true},
+    {kMeshKey, check_mesh, false},
+    {kLightKey, check_light, false},
+    {kSpotConeKey, set_spot_cone, false},
+    {kInnerConeKey, reject_cone_member, false},
+    {kOuterConeKey, reject_cone_member, false},
 };
 
 const Key* key_named(const std::string& name) {

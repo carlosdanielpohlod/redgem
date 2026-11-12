@@ -151,3 +151,34 @@ TEST_CASE("point and spot lights cast shadows only when their object says cast_s
   CHECK_FALSE(lights.points[1].cast_shadow);  // off unless said: existing scenes stay as fast
   CHECK_FALSE(lights.points[2].cast_shadow);
 }
+
+TEST_CASE("every tenth-degree spotlight cone pair survives a degree round trip") {
+  constexpr int kTenthsPerDegree = 10;
+  constexpr int kSteps = static_cast<int>(kMaxSpotConeDegrees * kTenthsPerDegree);
+  LightDesc light;
+  light.type = LightType::Spot;
+  for (int step = 0; step < kSteps; ++step) {
+    const double inner = static_cast<double>(step) / kTenthsPerDegree;
+    const double outer = static_cast<double>(step + 1) / kTenthsPerDegree;
+    CAPTURE(inner);
+    CAPTURE(outer);
+    REQUIRE(set_spot_cone_degrees(light, inner, outer));
+    const auto stored = light;
+    const auto shown = spot_cone_degrees(light);
+    CHECK(shown.inner == inner);
+    CHECK(shown.outer == outer);
+    REQUIRE(set_spot_cone_degrees(light, shown.inner, shown.outer));
+    CHECK(light.inner_cone == stored.inner_cone);
+    CHECK(light.outer_cone == stored.outer_cone);
+  }
+}
+
+TEST_CASE("formatting a spotlight at a rounding boundary preserves an editable gap") {
+  LightDesc light;
+  light.type = LightType::Spot;
+  constexpr double kInner = 0.01005;
+  constexpr double kOuter = kInner + kMinSpotConeGapDegrees;
+  REQUIRE(set_spot_cone_degrees(light, kInner, kOuter));
+  const auto shown = spot_cone_degrees(light);
+  CHECK(set_spot_cone_degrees(light, shown.inner, shown.outer));
+}
