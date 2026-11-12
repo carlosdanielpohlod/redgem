@@ -1,8 +1,11 @@
 #include "audio/game_music.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <map>
 #include <mutex>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -37,10 +40,19 @@ void forget(const Music& music) {
   kept.by_stream.erase(music.ctxData);
 }
 
+// The kind of a music file as raylib names it from memory: its extension, in lower case (raylib
+// compares it as it is, where its own file loading ignores the case).
+std::string music_type(const std::filesystem::path& file) {
+  std::string type = file.extension().string();
+  std::transform(type.begin(), type.end(), type.begin(),
+                 [](unsigned char letter) { return static_cast<char>(std::tolower(letter)); });
+  return type;
+}
+
 Music music_from_archive(const std::filesystem::path& file) {
   auto bytes = game_files::read(file, kMaxMusicBytes);
   if (!bytes || bytes->empty()) return Music{};
-  const std::string type = file.extension().string();
+  const std::string type = music_type(file);
   const Music music = LoadMusicStreamFromMemory(type.c_str(), bytes->data(), static_cast<int>(bytes->size()));
   if (music.ctxData != nullptr) keep(music, std::move(*bytes));
   return music;

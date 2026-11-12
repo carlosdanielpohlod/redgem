@@ -151,15 +151,15 @@ bool sizes_bounded(const ArchiveEntry& entry) {
   return entry.size <= kMaxArchiveEntryBytes && entry.stored_size <= kMaxArchiveEntryBytes;
 }
 
-std::string quoted(const std::string& name) { return "'" + printable(name) + "'"; }
+std::string quoted_name(const std::string& name) { return "'" + printable(name) + "'"; }
 
 // What is wrong with an entry; empty when nothing is.
 std::string entry_problem(const ArchiveEntry& entry, std::uint64_t data_start, std::uint64_t archive_size) {
-  if (!safe_archive_name(entry.name)) return "the name " + quoted(entry.name) + " is not one a game may give";
-  if (!sizes_bounded(entry)) return quoted(entry.name) + " is too large";
+  if (!safe_archive_name(entry.name)) return "the name " + quoted_name(entry.name) + " is not one a game may give";
+  if (!sizes_bounded(entry)) return quoted_name(entry.name) + " is too large";
   if (!data_in_bounds(entry, data_start, archive_size))
-    return "the data of " + quoted(entry.name) + " is out of bounds";
-  if (!sizes_agree(entry)) return "the sizes of " + quoted(entry.name) + " do not agree";
+    return "the data of " + quoted_name(entry.name) + " is out of bounds";
+  if (!sizes_agree(entry)) return "the sizes of " + quoted_name(entry.name) + " do not agree";
   return {};
 }
 
@@ -251,7 +251,8 @@ bool GameArchive::index(const std::vector<std::uint8_t>& table, std::uint32_t co
 bool GameArchive::add(ArchiveEntry entry, std::uint64_t data_start, std::string& error) {
   error = entry_problem(entry, data_start, source_->size());
   if (!error.empty()) return false;
-  if (!by_name_.emplace(entry.name, entries_.size()).second) return fail(quoted(entry.name) + " is in it twice", error);
+  if (!by_name_.emplace(entry.name, entries_.size()).second)
+    return fail(quoted_name(entry.name) + " is in it twice", error);
   entries_.push_back(std::move(entry));
   return true;
 }
@@ -259,7 +260,7 @@ bool GameArchive::add(ArchiveEntry entry, std::uint64_t data_start, std::string&
 // (A file "a" beside a file "a/b" would make "a" both a file and a folder.)
 bool GameArchive::no_file_named_as_folder(std::string& error) const {
   for (const ArchiveEntry& entry : entries_) {
-    if (has_folder(entry.name)) return fail(quoted(entry.name) + " is both a file and a folder", error);
+    if (has_folder(entry.name)) return fail(quoted_name(entry.name) + " is both a file and a folder", error);
   }
   return true;
 }
@@ -288,19 +289,19 @@ std::vector<std::string> GameArchive::files_in(const std::string& name) const {
 std::optional<std::vector<std::uint8_t>> GameArchive::stored_data(const ArchiveEntry& entry, std::string& error) const {
   std::vector<std::uint8_t> stored(static_cast<std::size_t>(entry.stored_size));
   if (source_->read_at(entry.offset, stored.size(), stored.data())) return stored;
-  return refuse("cannot read " + quoted(entry.name) + " from the game archive", error);
+  return refuse("cannot read " + quoted_name(entry.name) + " from the game archive", error);
 }
 
 std::optional<std::vector<std::uint8_t>> GameArchive::read(const ArchiveEntry& entry, std::uint64_t max_bytes,
                                                            std::string& error) const {
   if (entry.size > max_bytes)
-    return refuse(quoted(entry.name) + " is larger than " + std::to_string(max_bytes) + " bytes", error);
+    return refuse(quoted_name(entry.name) + " is larger than " + std::to_string(max_bytes) + " bytes", error);
   auto bytes = stored_data(entry, error);
   if (!bytes) return std::nullopt;
   if (entry.method == ArchiveMethod::Deflate) bytes = inflated(*bytes, entry.size);
-  if (!bytes) return refuse("the data of " + quoted(entry.name) + " in the game archive does not inflate", error);
+  if (!bytes) return refuse("the data of " + quoted_name(entry.name) + " in the game archive does not inflate", error);
   if (archive_crc32(bytes->data(), bytes->size()) != entry.crc) {
-    return refuse(quoted(entry.name) + " in the game archive is damaged (its CRC32 does not match)", error);
+    return refuse(quoted_name(entry.name) + " in the game archive is damaged (its CRC32 does not match)", error);
   }
   return bytes;
 }

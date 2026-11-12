@@ -46,10 +46,14 @@ earlier loose build left in the same place, and a loose build the archive). The 
 the archive is only made by a build.
 
 The archive is read-only. Saves, settings, bindings and crash reports are kept in the players'
-own folder (see [Notes](#notes)), never in it. A player refuses an archive that is damaged or was
-tampered with (a wrong header, a file cut short, a file whose checksum does not match, a name
-that reaches outside the game, a name given twice) and says why, instead of playing what is
-left. It is not encryption: anyone with the file and the format below can list and extract it.
+own folder (see [Notes](#notes)), never in it. A player refuses an archive whose header or table
+is damaged or was tampered with (a wrong header, a table cut short, sizes out of bounds, a name
+that reaches outside the game, a name given twice) and says why. Each file's checksum is checked
+when the file is read: a file whose bytes do not match is never handed to the game, and the error
+(a script's error, or a warning in the log for a picture or a sound) says the archive is damaged.
+Names in the archive are matched exactly, case included, on every system: a script that asks
+for `Player.rb` when the file is `player.rb` works loose on Windows and macOS, but not packed.
+It is not encryption: anyone with the file and the format below can list and extract it.
 
 The format (`src/core/game_archive.hpp` has it in full; every number is little-endian):
 

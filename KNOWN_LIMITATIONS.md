@@ -312,7 +312,11 @@ not a promise of how it will be closed.
   it to a menu.
 - A built game's archive (`game.rgpak`) is checked (every size bounded, every file's CRC32) but
   neither encrypted nor signed: anyone can list and extract it, and anyone can make another valid
-  one. Its scripts are Ruby source, compressed, not compiled.
+  one. Its scripts are Ruby source, compressed, not compiled. A file's CRC32 is checked when the
+  file is read, not when the game starts: a game whose archive has one damaged picture starts, and
+  that picture fails to load. Names in it are matched case included, even on Windows and macOS,
+  whose own folders ignore case. A file read out of it is held twice for a moment (the archive's
+  copy and the one handed to raylib or cgltf), and each read opens the archive file anew.
 - Music in a built game's archive is read whole into memory (up to 256 MB a piece) before it
   plays: raylib streams music only from a file on the disk. On Android the archive is copied out
   of the APK into the app's storage on the first run (and after each update), so it takes its

@@ -41,7 +41,8 @@ until 1.0, a release may change what games rely on (see
   `game.json` and translations into one file, `game.rgpak`, beside the executable (inside the Mac
   app, and as one asset of the Android app), compressed where that makes a file smaller. The
   player reads every file of the game out of it (raylib's own loaders and music streams included)
-  and refuses a damaged or tampered archive with a reason. `--loose` keeps the files loose in a
+  and refuses a damaged or tampered archive with a reason (a file's checksum is checked when it
+  is read). `--loose` keeps the files loose in a
   `game/` folder, as before, to look into a build. The editor's Play and `redgem run` still read
   the project folder. The format is documented in `docs/shipping.md`, and the reader is fuzzed.
 

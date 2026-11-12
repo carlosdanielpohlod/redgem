@@ -57,9 +57,10 @@ std::filesystem::path reserve_folder(const std::filesystem::path& parent, const 
 
 // A file of the mounted game archive, as text (see game_files.hpp).
 std::optional<std::string> read_archived_text(const std::filesystem::path& path, std::string& error) {
-  const auto bytes = game_files::read(path, kMaxArchiveEntryBytes);
+  std::string why;
+  const auto bytes = game_files::read_archived(path, kMaxArchiveEntryBytes, why);
   if (bytes) return std::string(bytes->begin(), bytes->end());
-  error = "cannot read " + path.string();
+  error = "cannot read " + path.string() + ": " + why;
   return std::nullopt;
 }
 

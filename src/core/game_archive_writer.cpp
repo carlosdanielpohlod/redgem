@@ -71,6 +71,20 @@ std::uint64_t table_bytes(const std::vector<ArchiveInput>& inputs) {
 }
 
 // Whether every name may go into an archive, once, and the table stays within its bounds.
+// A name that some other name has as its folder ("a" beside "a/b"), which an archive may not hold;
+// nullptr when there is none. (Sorted, a folder's files come right after the first name past it.)
+bool has_files_in(const std::set<std::string>& names, const std::string& folder) {
+  const auto next = names.lower_bound(folder);
+  return next != names.end() && next->compare(0, folder.size(), folder) == 0;
+}
+
+const std::string* file_named_as_folder(const std::set<std::string>& names) {
+  for (const std::string& name : names) {
+    if (has_files_in(names, name + "/")) return &name;
+  }
+  return nullptr;
+}
+
 bool names_fit(const std::vector<ArchiveInput>& inputs, std::string& error) {
   if (inputs.size() > kMaxArchiveEntries) return fail("a game archive holds at most so many files", error);
   if (table_bytes(inputs) > kMaxArchiveTableBytes) return fail("the names of the game's files are too long", error);
@@ -80,6 +94,8 @@ bool names_fit(const std::vector<ArchiveInput>& inputs, std::string& error) {
       return fail("'" + printable(input.name) + "' cannot go into a game archive", error);
     if (!names.insert(input.name).second) return fail("'" + printable(input.name) + "' is given twice", error);
   }
+  const std::string* clash = file_named_as_folder(names);
+  if (clash != nullptr) return fail("'" + printable(*clash) + "' is both a file and a folder", error);
   return true;
 }
 

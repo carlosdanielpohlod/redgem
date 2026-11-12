@@ -194,6 +194,13 @@ TEST_CASE("only names a game may give go into an archive, each once") {
                                  {archive_input_from_bytes("a.rb", {}), archive_input_from_bytes("a.rb", {})},
                                  ArchiveCompression::Deflate, error));
   CHECK(error.find("given twice") != std::string::npos);
+  CHECK_FALSE(write_game_archive(scratch.dir / "clash.rgpak",
+                                 {archive_input_from_bytes("a.rb/b.rb", {}), archive_input_from_bytes("a.rb", {})},
+                                 ArchiveCompression::Deflate, error));
+  CHECK(error.find("both a file and a folder") != std::string::npos);
+  CHECK(write_game_archive(scratch.dir / "siblings.rgpak",
+                           {archive_input_from_bytes("a.rb", {}), archive_input_from_bytes("a.rb.bak/b.rb", {})},
+                           ArchiveCompression::Deflate, error));
   CHECK(safe_archive_name("scripts/ui/heart.rb"));
   // A file that cannot be read fails the archive, and leaves no half of one behind.
   CHECK_FALSE(write_game_archive(scratch.dir / "unread.rgpak",
@@ -270,9 +277,11 @@ TEST_CASE("an archive that names a file outside the game, or one file twice, is 
 
 TEST_CASE("an archive whose sizes lie is refused before anything is read") {
   const Scratch scratch;
-  // A file "a.rb" beside "a.rb/b.rb" would be a file and a folder at once.
-  const Bytes clash = archive_bytes(
-      scratch, {archive_input_from_bytes("a.rb", bytes_of("a")), archive_input_from_bytes("a.rb/b.rb", bytes_of("b"))});
+  // A file "a.rb" beside "a.rb/b.rb" would be a file and a folder at once (the writer never makes
+  // one: the second name is put in by hand).
+  Bytes clash = archive_bytes(
+      scratch, {archive_input_from_bytes("a.rb", bytes_of("a")), archive_input_from_bytes("abcd/b.rb", bytes_of("b"))});
+  put(clash, name_at({"a.rb"}), "a.rb/b.rb");
   CHECK(refusal_of(clash).find("both a file and a folder") != std::string::npos);
   const Bytes good = archive_bytes(scratch, {archive_input_from_bytes("a.rb", bytes_of(repeated_script())),
                                              archive_input_from_bytes("a/b.rb", bytes_of("b"))});

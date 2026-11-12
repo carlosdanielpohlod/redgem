@@ -35,6 +35,10 @@ std::optional<std::uintmax_t> file_size(const std::filesystem::path& path);
 // one (said in the log), for what is not a regular file (a device or a pipe never ends) and for
 // one that cannot be read.
 std::optional<std::vector<std::uint8_t>> read(const std::filesystem::path& path, std::uintmax_t max_bytes);
+// The same for a file of the mounted archive (see in_archive), with `error` saying why it cannot
+// be read (no such file, too large, damaged) instead of the log.
+std::optional<std::vector<std::uint8_t>> read_archived(const std::filesystem::path& path, std::uintmax_t max_bytes,
+                                                       std::string& error);
 // What is right inside a folder: in the archive its files, on the disk every entry (links and
 // subfolders too, for the caller to refuse by name).
 std::vector<std::filesystem::path> entries_in(const std::filesystem::path& folder);

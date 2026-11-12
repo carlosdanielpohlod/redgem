@@ -151,6 +151,15 @@ std::optional<std::vector<std::uint8_t>> read(const std::filesystem::path& path,
   return place.name ? read_from_archive(place, max_bytes) : read_from_disk(path, max_bytes);
 }
 
+std::optional<std::vector<std::uint8_t>> read_archived(const std::filesystem::path& path, std::uintmax_t max_bytes,
+                                                       std::string& error) {
+  const Place place = place_of(path);
+  const ArchiveEntry* entry = place.name ? entry_at(place) : nullptr;
+  if (entry != nullptr) return place.mount->archive.read(*entry, max_bytes, error);
+  error = "the game archive has no file " + path.generic_string();
+  return std::nullopt;
+}
+
 std::vector<std::filesystem::path> entries_in(const std::filesystem::path& folder) {
   const Place place = place_of(folder);
   if (!place.name) return disk_entries(folder);

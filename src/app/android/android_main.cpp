@@ -185,6 +185,13 @@ std::optional<std::filesystem::path> open_unpacked_game() {
   return game;
 }
 
+// The unpacked game opened, then played; kExitFailure when it cannot be opened.
+int open_and_play(android_app* app) {
+  const auto game = open_unpacked_game();
+  if (!game) return kExitFailure;
+  return play_reporting_crashes(app, *game);
+}
+
 }  // namespace
 
 int main(int, char**) {
@@ -205,10 +212,8 @@ int main(int, char**) {
     log::error("the game could not be unpacked into " + home.string());
     return kExitFailure;
   }
-  const auto game = open_unpacked_game();
-  if (!game) return kExitFailure;
   try {
-    return play_reporting_crashes(app, *game);
+    return open_and_play(app);
   } catch (const std::bad_alloc&) {
     return crash::end_out_of_memory();
   } catch (const std::exception& error) {
