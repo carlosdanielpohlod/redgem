@@ -27,6 +27,7 @@ using material_textures::Slot;
 constexpr const char* kPicturesPopup = "pictures";
 constexpr const char* kSlotButtonId = "##picture";
 constexpr int kNoPicture = kNoIndex;
+constexpr float kPreviewCenter = 0.5f;
 constexpr float kPreviewSize = 32.0f;  // logical pixels along the longest side
 
 // Each slot's row: the key of its label and of its tooltip, in material_textures::kSlots' order.
@@ -88,14 +89,25 @@ void accept_dropped_picture(PanelContext& context, int material, Slot slot) {
   ImGui::EndDragDropTarget();
 }
 
-void draw_preview(const Renderer* renderer, int image) {
-  if (renderer == nullptr) return;
-  const Texture2D texture = renderer->scene_texture(image);
+void draw_preview_image(Texture2D texture, ImVec2 origin, float side) {
   const int longest = std::max(texture.width, texture.height);
   if (longest <= 0) return;
-  const float scale = ui::scaled(kPreviewSize) / static_cast<float>(longest);
+  const float scale = side / static_cast<float>(longest);
   const ImVec2 size(static_cast<float>(texture.width) * scale, static_cast<float>(texture.height) * scale);
-  ImGui::Image(ImTextureRef(static_cast<ImTextureID>(texture.id)), size);
+  const ImVec2 top(origin.x + (side - size.x) * kPreviewCenter, origin.y + (side - size.y) * kPreviewCenter);
+  ImGui::GetWindowDrawList()->AddImage(ImTextureRef(static_cast<ImTextureID>(texture.id)), top,
+                                       ImVec2(top.x + size.x, top.y + size.y));
+}
+
+void draw_preview(const Renderer* renderer, int image) {
+  const float side = ui::scaled(kPreviewSize);
+  const ImVec2 origin = ImGui::GetCursorScreenPos();
+  ImGui::Dummy(ImVec2(side, side));
+  if (ImGui::IsItemVisible()) {
+    ImGui::GetWindowDrawList()->AddRectFilled(origin, ImVec2(origin.x + side, origin.y + side),
+                                              ImGui::GetColorU32(ImGuiCol_FrameBg));
+    if (renderer != nullptr) draw_preview_image(renderer->scene_texture(image), origin, side);
+  }
   ImGui::SameLine();
 }
 

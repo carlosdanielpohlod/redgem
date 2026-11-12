@@ -93,6 +93,16 @@ Texture2D Renderer::scene_texture(int image) const {
   return textures[static_cast<std::size_t>(image)];
 }
 
+std::uint64_t Renderer::scene_upload_count() const { return impl_->scene_uploads; }
+
+void Renderer::begin_scene_texture_use() { impl_->scene_textures_in_use = true; }
+
+void Renderer::end_scene_texture_use() {
+  impl_->scene_textures_in_use = false;
+  for (const Texture2D& texture : impl_->retired_scene_textures) UnloadTexture(texture);
+  impl_->retired_scene_textures.clear();
+}
+
 void Renderer::Impl::upload_new_textures(const SceneDesc& desc) {
   for (std::size_t i = textures.size(); i < desc.images.size(); ++i) {
     textures.push_back(load_scene_texture(desc.images[i]));
@@ -155,7 +165,11 @@ void Renderer::Impl::upload_new_meshes(const SceneDesc& desc) {
 void Renderer::Impl::release_assets() {
   release_meshes();
   skins.clear();
-  for (Texture2D& texture : textures) UnloadTexture(texture);
+  if (scene_textures_in_use) {
+    retired_scene_textures.insert(retired_scene_textures.end(), textures.begin(), textures.end());
+  } else {
+    for (const Texture2D& texture : textures) UnloadTexture(texture);
+  }
   textures.clear();
   // Materials share the shader and textures released above; only free their map arrays.
   for (Material& material : materials) MemFree(material.maps);

@@ -108,7 +108,8 @@ bool EditorApp::unsaved_work() const { return session_->document().dirty() || sc
 ui::PanelContext EditorApp::panel_context() {
   ui::PanelContext context{*session_, *scripts_, files_, panel_state_, spawn_point(), audio_.get()};
   context.terrain = &terrain_tool_;
-  if (!preview_upload_pending_) context.preview_renderer = renderer_.get();
+  const bool preview_loaded = renderer_->scene_upload_count() == preview_upload_;
+  if (session_->editing() && preview_loaded) context.preview_renderer = renderer_.get();
   return context;
 }
 

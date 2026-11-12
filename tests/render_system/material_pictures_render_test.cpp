@@ -85,7 +85,13 @@ TEST_CASE("a picture put on a material after it was uploaded is drawn, swapped a
   CHECK(cleared.find(pink).count == 0);
   CHECK(cleared.find(green).count == 0);
 
+  stage.begin_scene_texture_use();
   stage.upload(plain_cube());
+  const Image retained = LoadImageFromTexture(first);
+  CHECK(IsImageValid(retained));
+  CHECK(pink(GetImageColor(retained, 0, 0)) || green(GetImageColor(retained, 0, 0)));
+  UnloadImage(retained);
+  stage.end_scene_texture_use();
   CHECK(stage.scene_texture(0).id == 0);
   CHECK(stage.scene_texture(1).id == 0);
 }

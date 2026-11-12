@@ -2,6 +2,7 @@
 
 #include <raylib.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -38,6 +39,10 @@ class Renderer {
   void sync(const SceneDesc& desc);
   // Borrows an uploaded image for this frame, or returns an empty texture. Never unload it.
   Texture2D scene_texture(int image) const;
+  std::uint64_t scene_upload_count() const;
+  // Keep replaced scene textures alive until queued UI draws have finished.
+  void begin_scene_texture_use();
+  void end_scene_texture_use();
   // Uploads again the vertices of a mesh that was reshaped (a sculpted terrain).
   void refresh_mesh(const SceneDesc& desc, int mesh);
   // Camera of the scene's main camera object (or a default one).
