@@ -326,6 +326,8 @@ redgem_add_library(redgem_runtime
   input/raylib_input_source.cpp
   input/touch_controls.cpp
   input/touch_input_source.cpp
+  input/soft_keyboard.cpp
+  input/soft_keyboard_input_source.cpp
   storage/saved_values.cpp
   storage/durable_file.cpp
   storage/staged_write.cpp
@@ -738,9 +740,10 @@ set(REDGEM_INSTALL_COMPONENT redgem)
 
 if(ANDROID)
   # On Android the player is a library the system loads into a native activity; it plays the game
-  # packed in the same APK (see app/android/android_main.cpp). Its name is the one the packer writes into
+  # packed in the same APK (see app/android/android_main.cpp), and shows the system's keyboard for
+  # its text fields (app/android/android_soft_keyboard.cpp). Its name is the one the packer writes into
   # the app (app/android/android_bundle.hpp).
-  add_library(redgem SHARED app/android/android_main.cpp)
+  add_library(redgem SHARED app/android/android_main.cpp app/android/android_soft_keyboard.cpp)
   target_link_libraries(redgem PRIVATE redgem_runtime android log GLESv3)
   target_include_directories(redgem SYSTEM PRIVATE ${ANDROID_NDK}/sources/android/native_app_glue)
   target_link_options(redgem PRIVATE -u ANativeActivity_onCreate)

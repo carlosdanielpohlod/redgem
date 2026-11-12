@@ -210,7 +210,15 @@ not a promise of how it will be closed.
   hyphenation, no line-breaking rules of scripts written without spaces), and anchors place things
   by fixed pixel sizes (sizes do not scale with the screen; `GameMenu` scales its own). There is
   no layout engine (rows, columns, stacks) and no scroll region for anything other than rows of
-  one height. Android has no on-screen keyboard.
+  one height.
+- On Android the on-screen keyboard types the letters that have a key of their own on it (with
+  Shift, digits and signs). Letters a keyboard sends as a whole text (some accented letters, emoji,
+  words written by swiping or picked from suggestions on some keyboards) do not arrive.
+  `UI.keyboard_visible?` says whether the engine asked for the keyboard: when the system closes it
+  by its own means (the back key, the keyboard's own key to hide it), the game does not hear of it,
+  and it stays true until the field goes, is tapped, or the back key is pressed again. The
+  keyboard covers the bottom of the screen and nothing moves out of its way: a game keeps its
+  fields above it.
 
 ### Audio
 

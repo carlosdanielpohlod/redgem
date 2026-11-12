@@ -139,6 +139,8 @@ TEST_CASE("the manifest describes a full-screen native activity running the engi
   CHECK(manifest.find("android:name=\"android.app.lib_name\" android:value=\"redgem\"") != std::string::npos);
   CHECK(manifest.find("glEsVersion=\"0x00030000\"") != std::string::npos);
   CHECK(manifest.find("android:allowBackup=\"false\"") != std::string::npos);  // saves stay on the device
+  // The on-screen keyboard covers the game, which does not move or shrink under it.
+  CHECK(manifest.find("android:windowSoftInputMode=\"stateHidden|adjustNothing\"") != std::string::npos);
 }
 
 #ifndef _WIN32  // (Windows keeps who may read a file elsewhere than in these bits.)

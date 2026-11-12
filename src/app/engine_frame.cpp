@@ -43,7 +43,11 @@ void Engine::read_input() {
   input_source().show_touch_controls(context_.touch_controls);
   const SurfaceSize surface = presenter_->surface_size();
   input_source().fit_surface(static_cast<float>(surface.width), static_cast<float>(surface.height));
+  // (The text fields of the frame before: this one draws its own.)
+  input_source().request_text_input(context_.text_input);
+  context_.text_input = {};
   input_.update(input_source());
+  context_.keyboard_visible = input_source().soft_keyboard_shown();
 }
 
 void Engine::hand_on_capture() {

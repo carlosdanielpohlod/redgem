@@ -24,6 +24,8 @@ constexpr float kStickHalfway = 0.5f;
 constexpr int kFewestTweenCalls = 30;  // half a second of frames, give or take one, plus the start
 constexpr int kMostTweenCalls = 32;
 constexpr int kLongWait = kFramesPerSecond * 6;  // past the five-second timer
+constexpr float kFieldInsideX = 20.0f;           // a point inside the text fields the tests draw
+constexpr float kFieldInsideY = 20.0f;
 
 // A camera, an object to hang behaviours on, and a door whose "Open" clip slides it along x.
 SceneDesc small_scene() {
@@ -573,6 +575,39 @@ TEST_CASE("scripts read what is typed, and a text field keeps it") {
   input.type_text("tonia");  // more than fits
   frames(*engine, 1);
   CHECK(ruby(*engine, field) == "Antoni");
+}
+
+TEST_CASE("a text field asks a touch screen for its keyboard while it is drawn, and a tap says so") {
+  const TempSave temp;
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene, temp.file);
+  ScriptedInputSource& input = engine->scripted_input();
+  const std::string field = "UI.text_field('', x: 10, y: 10, width: 300, height: 40)";
+  ruby(*engine, field);
+  frames(*engine, 1);
+  CHECK(input.text_input_requested().field_shown);
+  CHECK_FALSE(input.text_input_requested().field_tapped);
+  frames(*engine, 1);  // that frame drew no field: the next is told none is there
+  CHECK_FALSE(input.text_input_requested().field_shown);
+  input.move_mouse(kFieldInsideX, kFieldInsideY);
+  input.set_mouse_button(MouseButton::Left, true);
+  frames(*engine, 1);
+  input.set_mouse_button(MouseButton::Left, false);
+  frames(*engine, 1);
+  ruby(*engine, field);  // the tap ends over it this frame
+  frames(*engine, 1);
+  CHECK(input.text_input_requested().field_tapped);
+}
+
+TEST_CASE("scripts see whether a touch screen's keyboard covers the screen") {
+  const TempSave temp;
+  const SceneDesc scene = small_scene();
+  auto engine = engine_for(scene, temp.file);
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "UI.keyboard_visible?") == "false");
+  engine->scripted_input().set_soft_keyboard_shown(true);
+  frames(*engine, 1);
+  CHECK(ruby(*engine, "UI.keyboard_visible?") == "true");
 }
 
 TEST_CASE("scripts start continuous emitters that follow an object and stop independently") {
