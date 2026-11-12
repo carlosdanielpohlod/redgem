@@ -79,8 +79,16 @@ until 1.0, a release may change what games rely on (see
   quality presets cap them (ultra 4, high 2, medium 1, low 0; `local_shadows` in a custom quality
   and `Settings.quality_details`), and a graphics card that cannot make the atlas draws none.
 
+- **Linux AppImage**: `redgem-linux-x86_64.AppImage`, a fifth download beside the tarball, holds
+  the same editor, tools, players and demos in one file with the RedGem menu entry and icon. Run
+  it as `bin/redgem`; name another program first (`redgem-server --help`) to run that one.
+
 ### Changed
 
+- **The Linux download runs on glibc 2.35 or newer** (Ubuntu 22.04, Debian 12, Fedora 36 and
+  later) instead of 2.39: it is built on Ubuntu 22.04 with libstdc++ linked in, and so are the
+  players inside it, so games built for Linux run on those systems too. The release workflow
+  measures the floor and runs both Linux downloads on AlmaLinux 9.
 - **Each game keeps its data in a folder of its own, named after its studio and title**:
   `game.json` gains `"studio"`, and a game's save, settings, bindings and crash reports are kept
   together in `<studio>/<title>/` where the player's system keeps programs' data

@@ -9,12 +9,24 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT_DIR="${REPO_ROOT}/dist/release"
 PACKAGE_NAME="redgem"
 # The downloads a release carries. The README's links (releases/latest/download/<name>) depend on
-# these names: a release gets all four or none (check_downloads.sh).
+# these names: a release gets all five or none (check_downloads.sh).
 LINUX_DOWNLOAD="${PACKAGE_NAME}-linux-x86_64.tar.gz"
+# The same programs, players and demos as the Linux tarball, in one file that runs as it is.
+APPIMAGE_DOWNLOAD="${PACKAGE_NAME}-linux-x86_64.AppImage"
 WINDOWS_DOWNLOAD="${PACKAGE_NAME}-windows-x86_64.zip"
 MAC_ARM_DOWNLOAD="${PACKAGE_NAME}-macos-arm64.zip"
 MAC_INTEL_DOWNLOAD="${PACKAGE_NAME}-macos-x86_64.zip"
-DOWNLOADS=("${LINUX_DOWNLOAD}" "${WINDOWS_DOWNLOAD}" "${MAC_ARM_DOWNLOAD}" "${MAC_INTEL_DOWNLOAD}")
+DOWNLOADS=("${LINUX_DOWNLOAD}" "${APPIMAGE_DOWNLOAD}" "${WINDOWS_DOWNLOAD}" "${MAC_ARM_DOWNLOAD}"
+  "${MAC_INTEL_DOWNLOAD}")
+# What the AppImage holds at its top besides the tarball's folder: what starts it, and the menu
+# entry and icon the system shows it by (from branding/).
+APPIMAGE_ENTRY="AppRun"
+APPIMAGE_DESKTOP="redgem.desktop"
+APPIMAGE_ICON="redgem.svg"
+# The oldest glibc the Linux programs run on, as the docs say it (README-linux.txt, docs/install.md,
+# KNOWN_LIMITATIONS.md): they are built on Ubuntu 22.04, with libstdc++ linked in. glibc_floor.sh
+# fails when a program needs a newer one, or when a doc says another.
+LINUX_GLIBC_FLOOR="2.35"
 # The programs of the Linux and Mac downloads. The editor first: it is what the Mac's app starts.
 # The others stand beside it as they do in a build (a game is built with the player found beside
 # the editor).

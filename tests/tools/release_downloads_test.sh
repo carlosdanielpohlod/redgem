@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tools/release/check_downloads.sh on downloads made up here: four complete ones pass, and a
+# tools/release/check_downloads.sh on downloads made up here: five complete ones pass, and a
 # release with a download missing, or a download missing a program, fails and names what is wrong.
 #   release_downloads_test.sh <tools/release folder>
 set -euo pipefail
@@ -32,7 +32,18 @@ make_download() {
   case "${name}" in
     *.tar.gz) tar -czf "${work}/downloads/${name}" -C "${tree}" "${PACKAGE_NAME}" ;;
     *.zip) (cd "${tree}" && zip -qr "${work}/downloads/${name}" "${PACKAGE_NAME}") ;;
+    *.AppImage) make_appimage "${work}/downloads/${name}" "${tree}/${PACKAGE_NAME}" ;;
   esac
+}
+
+# A stand-in for an AppImage at $1: a program that, as a real one does, unpacks its files (those
+# of folder $2) into squashfs-root when run with --appimage-extract.
+make_appimage() {
+  cat > "$1" <<EOF
+#!/usr/bin/env bash
+[[ "\$1" == --appimage-extract ]] || exit 1
+mkdir -p squashfs-root && cp -R "$2/." squashfs-root/
+EOF
 }
 
 # What every download holds besides its programs.
@@ -53,6 +64,8 @@ make_all() {
   for program in "${WINDOWS_PROGRAMS[@]}"; do windows+=("${program}"); done
   mac+=("RedGem.app/Contents/Info.plist")
   make_download "${LINUX_DOWNLOAD}" linux "${linux[@]}" "${common[@]}"
+  make_download "${APPIMAGE_DOWNLOAD}" appimage "${APPIMAGE_ENTRY}" "${APPIMAGE_DESKTOP}" "${APPIMAGE_ICON}" \
+    "${linux[@]}" "${common[@]}"
   make_download "${WINDOWS_DOWNLOAD}" windows "${windows[@]}" "${common[@]}"
   make_download "${MAC_ARM_DOWNLOAD}" mac-arm "${mac[@]}" "${common[@]}"
   make_download "${MAC_INTEL_DOWNLOAD}" mac-intel "${mac[@]}" "${common[@]}"
@@ -89,6 +102,12 @@ expect passes "complete" "${LINUX_DOWNLOAD}" "${WINDOWS_DOWNLOAD}"
 make_all
 make_download "${LINUX_DOWNLOAD}" linux "${LINUX_FILES[@]:0:6}"
 expect fails "has no ${PACKAGE_NAME}/bin/${ANDROID_RUNTIMES[0]}"
+
+# An AppImage without its menu entry is refused; its files are at its top, not in a folder.
+make_all
+make_download "${APPIMAGE_DOWNLOAD}" appimage "${APPIMAGE_ENTRY}" "${APPIMAGE_ICON}" "${LINUX_FILES[@]}"
+expect fails "${APPIMAGE_DOWNLOAD}: has no ${APPIMAGE_DESKTOP}"
+expect passes "complete" "${LINUX_DOWNLOAD}"
 
 # A name that is not a download's, or a file that is not an archive.
 make_all

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Attaches the four downloads in a folder to the draft release of a tag, making the draft when
+# Attaches the five downloads in a folder to the draft release of a tag, making the draft when
 # there is none yet. What the CI's release workflow runs on a pushed tag
 # (.github/workflows/release.yml), with gh signed in (GH_TOKEN, GH_REPO) to the repository.
 #   tools/release/attach_to_draft.sh <tag> <commit> <folder>
@@ -7,8 +7,8 @@
 # its own.)
 #
 # It never publishes, and never changes a published release. The draft never holds fewer than
-# four downloads because of it: the new ones go up under other names first (incoming.<name>),
-# are checked (all four, at the sizes packed), and only then, the release checked again to still
+# five downloads because of it: the new ones go up under other names first (incoming.<name>),
+# are checked (all five, at the sizes packed), and only then, the release checked again to still
 # be a draft, take the place of the old ones. A run that fails on the way leaves the old ones.
 set -euo pipefail
 

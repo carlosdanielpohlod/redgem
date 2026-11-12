@@ -5,8 +5,13 @@ Run the editor:
   bin/redgem                    the project hub: create a game or open one
   bin/redgem games/platformer   open a demo; press Play, move with WASD, jump with Space
 
-Needs a 64-bit Linux desktop with OpenGL 3.3, a processor with AVX2 and glibc 2.39 or newer
-(Ubuntu 24.04 and later). Nothing is installed: delete the folder to remove it.
+The AppImage holds these same files: run it where this says bin/redgem, and name the other
+programs first (./redgem-linux-x86_64.AppImage redgem-server --help). Its demos are inside it:
+--appimage-extract unpacks it all into squashfs-root/.
+
+Needs a 64-bit Linux desktop with OpenGL 3.3, a processor with AVX2 and glibc 2.35 or newer
+(Ubuntu 22.04, Debian 12, Fedora 36 and later). Nothing is installed: delete the folder (or the
+AppImage) to remove it. Games built for Linux run on the same systems.
 
 Also here:
 
