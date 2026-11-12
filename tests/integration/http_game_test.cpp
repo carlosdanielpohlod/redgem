@@ -74,6 +74,19 @@ TEST_CASE("a script's request is answered in its block, on a frame of the game, 
   remove_save(save_file());
 }
 
+TEST_CASE("a script's answer says where it came from once redirects were followed") {
+  test::LogCapture quiet;
+  HttpTestServer server(HttpTestServer::Kind::Plain, "");
+  server.answer_in_turn(
+      {http_answer("308 Permanent Redirect", "", "Location: /v2/news\r\n"), http_answer("200 OK", "{\"news\":1}")});
+  auto game = sandbox_game();
+  ruby(*game, "$got = nil; HTTP.get('" + server.url("/news") + "') { |r| $got = [r.ok?, r.url, r.json[:news]] }");
+  REQUIRE(eventually([&game] { return ruby(*game, "$got.nil?") == "false"; },
+                     [&game] { game->frame(config::kFixedDeltaSeconds); }));
+  CHECK(ruby(*game, "$got.inspect") == "[true, \"" + server.url("/v2/news") + "\", 1]");
+  remove_save(save_file());
+}
+
 TEST_CASE("a game that ends gives its requests up: no block of it is ever called") {
   test::LogCapture quiet;
   HttpTestServer server(HttpTestServer::Kind::Plain, "");

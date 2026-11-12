@@ -37,12 +37,18 @@ mrb_value headers_value(mrb_state* mrb, const net::HttpHeaders& headers) {
   return hash;
 }
 
-// An answer as what HTTP.__answer takes: id, status, headers, body, error (nil when it came).
+// A text, or nil when it is empty.
+mrb_value text_or_nil(mrb_state* mrb, const std::string& text) {
+  return text.empty() ? mrb_nil_value() : binding::text_value(mrb, text);
+}
+
+// An answer as what HTTP.__answer takes: id, status, headers, body, error (nil when it came) and
+// the address it came from after redirects (nil when the request never went).
 std::vector<mrb_value> answer_arguments(mrb_state* mrb, const net::HttpResult& result) {
   const net::HttpResponse& response = result.response;
-  const mrb_value error = response.error.empty() ? mrb_nil_value() : binding::text_value(mrb, response.error);
-  return {mrb_int_value(mrb, result.id), mrb_int_value(mrb, response.status), headers_value(mrb, response.headers),
-          binding::text_value(mrb, response.body), error};
+  return {mrb_int_value(mrb, result.id),        mrb_int_value(mrb, response.status),
+          headers_value(mrb, response.headers), binding::text_value(mrb, response.body),
+          text_or_nil(mrb, response.error),     text_or_nil(mrb, response.url)};
 }
 
 }  // namespace

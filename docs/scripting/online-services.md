@@ -34,7 +34,8 @@ end
   a hash or an array as JSON (with its `Content-Type`); `body:` sends a text as it is.
 - The block gets the `response` a moment later, on the game's own thread: the frame never waits.
   `ok?` (a 2xx status), `status` (0 when no answer came), `headers` (names in lower case), `body`,
-  `json` (nil when the body is not JSON) and `error` (why no answer came).
+  `json` (nil when the body is not JSON), `error` (why no answer came) and `url` (the address the
+  answer came from, once redirects were followed).
 - `response.json` gives hash keys as symbols when your scripts use that symbol, as strings
   otherwise (as messages do).
 - Addresses are `https://`, checked against the certificates the system trusts, or `http://` to
@@ -44,7 +45,23 @@ end
   whose end only the connection's end marks must end with the server's TLS goodbye
   (close_notify), or it is taken as cut short.
 - An answer is at most 8 MB; 16 requests may be on their way at once; each gives up after 15
-  seconds unless `timeout:` says otherwise (at most 120). Redirects are not followed.
+  seconds unless `timeout:` says otherwise (at most 120), its redirects included.
+- **Redirects** (301, 302, 303, 307, 308) are followed, up to 10 of them: the next one is an
+  error. A relative `Location` is read against the address that sent it. A 303, and a 301 or 302
+  to a POST, go on as a GET without the body (as browsers do); a 307 or 308 keeps the method and
+  the body. A redirect from `https://` to `http://` is not followed, and every address a redirect
+  leads to is checked as the first one was (`http://` only to this machine or network, never a
+  metadata address). When a redirect leaves the origin (another scheme, machine or port), the
+  request goes on without its `Authorization`, `Cookie` and `Proxy-Authorization` headers (other
+  headers go along). A `Location` with spaces or letters beyond ASCII is percent-encoded.
+  `redirects: false` gives the block the redirect itself (its `status` and its `location` header),
+  for a login flow that reads it.
+- **Compressed answers**: requests say `Accept-Encoding: gzip, deflate` (unless your headers name
+  one of their own), and a gzip or deflate answer reaches the block decompressed, without its
+  `content-encoding` and `content-length` headers. The 8 MB limit holds for the decompressed
+  body too, so a small answer that would inflate past it is refused; a corrupt or cut compressed
+  body is an `error` (the answer's `status` and `headers` stay, its `body` is empty). An answer of
+  several gzip members one after the other is read whole.
 - When a level is loaded, the blocks of requests still on their way are not called (the requests
   still go out). When the game ends (or Play is stopped in the editor) they are given up.
 

@@ -6,6 +6,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "net/socket/socket.hpp"
 
@@ -13,8 +14,8 @@ namespace redgem::test {
 
 // A web server on this machine for the tests of HTTP, on a thread of its own: plain, or TLS with a
 // certificate made for the test, which nothing trusts but the clients the test hands it to
-// (certificate_pem). It answers every request with the same bytes, or keeps quiet. Nothing it
-// does reaches beyond this machine.
+// (certificate_pem). It answers every request with the same bytes (or with answers in turn), or
+// keeps quiet. Nothing it does reaches beyond this machine.
 class HttpTestServer {
  public:
   enum class Kind { Plain, Secure };
@@ -24,6 +25,8 @@ class HttpTestServer {
   HttpTestServer(const HttpTestServer&) = delete;
   HttpTestServer& operator=(const HttpTestServer&) = delete;
 
+  // Set before any request: the answers to the requests in turn, the last one to all after it.
+  void answer_in_turn(std::vector<std::string> answers);
   // Set before any request: it reads requests and never answers them.
   void keep_quiet() { quiet_ = true; }
   // Set before any request: over TLS it ends each answer with close_notify, the goodbye that says
@@ -45,10 +48,12 @@ class HttpTestServer {
 
   void serve();
   void serve_one(net::Socket socket);
+  // What the request numbered `index` (from 0) is answered with.
+  std::string answer_to(int index) const;
   bool stopping() const { return stop_.load(); }
 
   Kind kind_;
-  std::string answer_;
+  std::vector<std::string> answers_;  // (under mutex_)
   std::string certificate_pem_;
   std::unique_ptr<Tls> tls_;
   net::Socket listener_;

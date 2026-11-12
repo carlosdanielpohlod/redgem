@@ -88,9 +88,7 @@ void HttpResponseParser::take_pending(std::size_t count) {
 bool HttpResponseParser::bodiless() const { return response_.status == kNoContent || response_.status == kNotModified; }
 
 std::string HttpResponseParser::header(const std::string& lower_name) const {
-  const auto found = std::find_if(response_.headers.begin(), response_.headers.end(),
-                                  [&lower_name](const auto& entry) { return entry.first == lower_name; });
-  return found != response_.headers.end() ? found->second : std::string();
+  return header_value(response_.headers, lower_name);
 }
 
 void HttpResponseParser::fail(const std::string& why) {

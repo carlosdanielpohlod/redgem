@@ -659,12 +659,12 @@ Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those
 
 Web requests; the answer comes to the block. See [online-services.md#http](online-services.md#http).
 
-- `HTTP.get(url, headers: {}, timeout: 15, &block)`: GET
-- `HTTP.post(url, json: nil, body: nil, headers: {}, timeout: 15, &block)`: POST
-- `HTTP.put(url, json: nil, body: nil, headers: {}, timeout: 15, &block)`: PUT
-- `HTTP.patch(url, json: nil, body: nil, headers: {}, timeout: 15, &block)`: PATCH
-- `HTTP.delete(url, headers: {}, timeout: 15, &block)`: DELETE
-- `HTTP.request(verb, url, json: nil, body: nil, headers: {}, timeout: 15, &block)`: any verb
+- `HTTP.get(url, headers: {}, timeout: 15, redirects: true, &block)`: GET
+- `HTTP.post(url, json: nil, body: nil, headers: {}, timeout: 15, redirects: true, &block)`: POST
+- `HTTP.put(url, json: nil, body: nil, headers: {}, timeout: 15, redirects: true, &block)`: PUT
+- `HTTP.patch(url, json: nil, body: nil, headers: {}, timeout: 15, redirects: true, &block)`: PATCH
+- `HTTP.delete(url, headers: {}, timeout: 15, redirects: true, &block)`: DELETE
+- `HTTP.request(verb, url, json: nil, body: nil, headers: {}, timeout: 15, redirects: true, &block)`: any verb
 
 ## HTTP::Response
 
@@ -673,9 +673,10 @@ What a web request's block is given. See [online-services.md#http](online-servic
 - `ok?`: whether it came back with a 2xx status
 - `status`: its status
 - `headers`: its headers
-- `body`: its body
+- `body`: its body (decompressed when it came with gzip or deflate)
 - `json`: its body read as JSON
 - `error`: why there was no answer, or nil
+- `url`: the address the answer came from, once redirects were followed
 
 ## I18n
 
