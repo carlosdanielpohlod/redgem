@@ -98,7 +98,7 @@ TEST_CASE("a redirect never goes from https to http, nor anywhere a request may 
         std::string::npos);
   CHECK(refusal("https://api.example.com/", "ftp://files.example.com/").find("https://") != std::string::npos);
   CHECK(refusal("https://api.example.com/", "https://user:pw@evil.example.com/").find("password") != std::string::npos);
-  @ @ @END CHECK(refusal("https://api.example.com/", "javascript:alert(1)").find("https://") != std::string::npos);
+  CHECK(refusal("https://api.example.com/", "javascript:alert(1)").find("https://") != std::string::npos);
   // From http, anything a request may go to: the machine checks still run when it is sent.
   CHECK(target("http://127.0.0.1/", "https://api.example.com/") == "https://api.example.com/");
 }
