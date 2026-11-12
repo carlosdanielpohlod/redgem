@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cerrno>
@@ -342,6 +343,7 @@ std::vector<std::string> current_backtrace() {
   void* frames[kMaxFrames];
   const int count = this_threads_frames(frames, kMaxFrames);
   std::vector<std::string> lines;
+  lines.reserve(static_cast<std::size_t>(std::max(count, 0)));
   for (int i = 0; i < count; ++i) lines.push_back(frame_text(frames[i]));
   return lines;
 }

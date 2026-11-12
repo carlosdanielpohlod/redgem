@@ -138,7 +138,7 @@ AddressResolver addr2line_resolver(const std::filesystem::path& tool) {
 std::optional<std::filesystem::path> addr2line_on_path(const std::string& path_variable,
                                                        const agent::ProgramTest& runnable) {
   for (const char* tool : kAddr2LineTools) {
-    const std::filesystem::path found =
+    std::filesystem::path found =
         agent::find_program_in(tool, path_variable, kPathListSeparator, program_extensions(), runnable);
     if (!found.empty()) return found;
   }

@@ -57,10 +57,6 @@ bool ends_a_frame(const std::string& place, std::size_t at, std::size_t end) {
   return has_digits && frame_ends_at(place, end);
 }
 
-bool is_frame_of(const std::optional<ReportFrame>& frame, const std::string& program) {
-  return frame && frame->program == program;
-}
-
 // The line of a report's first frame: where the program was when it crashed. Every frame after it
 // is where a call returns to, one byte past the call, which is what is looked up for it.
 std::size_t first_frame_line(const std::vector<std::string>& lines) {
@@ -89,7 +85,8 @@ FramesToLookUp frames_of_program(const std::vector<std::string>& lines, const st
   const std::size_t first = first_frame_line(lines);
   for (std::size_t i = first; i < lines.size(); ++i) {
     const auto frame = report_frame(lines[i]);
-    if (!is_frame_of(frame, program)) continue;
+    if (!frame) continue;
+    if (frame->program != program) continue;
     found.lines.push_back(i);
     found.addresses.push_back(base + looked_up_offset(*frame, i == first));
   }
@@ -116,14 +113,13 @@ bool is_address_line(const std::string& line) {
   return has_digits && line.find_first_not_of(kHexDigits, digits_at) == std::string::npos;
 }
 
-bool carries_a_build_id(const std::optional<BinaryIdentity>& identity) {
-  return identity && !identity->build_id.empty();
-}
-
+// Adds a file that is a program carrying a build id.
 void add_if_symbols(std::vector<SymbolFile>& files, const std::filesystem::path& file) {
   const auto identity = binary_identity_of_file(file);
+  if (!identity) return;
+  if (identity->build_id.empty()) return;
   std::error_code fs_error;
-  if (carries_a_build_id(identity)) files.push_back({file, *identity, std::filesystem::file_size(file, fs_error)});
+  files.push_back({file, *identity, std::filesystem::file_size(file, fs_error)});
 }
 
 // Whether a file is larger than another (than none at all): of two copies of a build, the one
