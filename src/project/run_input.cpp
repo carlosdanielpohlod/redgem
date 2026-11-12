@@ -237,7 +237,7 @@ std::string read_pads(const Json& value, RunInput& event) {
   if (!is_pad_list(value)) return tr("project.run.bad_pads", {{"most", std::to_string(kMaxGamepads)}});
   for (const auto& item : value) {
     RunPad pad;
-    const std::string problem = read_pad(item, pad);
+    std::string problem = read_pad(item, pad);
     if (!problem.empty()) return problem;
     if (has_pad(event.pads, pad.pad)) return tr("project.run.duplicate_pad", {{"pad", std::to_string(pad.pad)}});
     event.pads.push_back(std::move(pad));
@@ -348,13 +348,18 @@ bool hides_press(const RunInput& before, const RunInput& event) {
                      [&before](MouseButton button) { return holds_button(before, button); });
 }
 
+// Plugs in every pad the event lists (they stay plugged in for the rest of the run) and holds what it says.
+static void apply_pads(ScriptedInputSource& source, const RunInput& event, PluggedPads& plugged) {
+  for (const RunPad& pad : event.pads) plugged.at(pad.pad) = true;
+  plug_pads(source, plugged);
+  for (const RunPad& pad : event.pads) apply_pad(source, pad);
+}
+
 void apply_run_input(ScriptedInputSource& source, const RunInput& event, RunScreen screen, PluggedPads& plugged) {
   source.release_all();
   for (const Key key : event.keys) source.set_key(key, true);
   if (event.mouse) apply_mouse(source, *event.mouse, screen);
-  for (const RunPad& pad : event.pads) plugged.at(pad.pad) = true;
-  plug_pads(source, plugged);
-  for (const RunPad& pad : event.pads) apply_pad(source, pad);
+  apply_pads(source, event, plugged);
   source.set_touch_pointer(event.touch.has_value());
   if (event.touch) apply_touch(source, *event.touch, screen);
 }
