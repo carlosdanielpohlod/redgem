@@ -208,6 +208,19 @@ TEST_CASE("only names a game may give go into an archive, each once") {
                                  ArchiveCompression::Deflate, error));
   CHECK(error.find("gone.rb") != std::string::npos);
   CHECK_FALSE(std::filesystem::exists(scratch.dir / "unread.rgpak"));
+  // One that fails where an archive already is leaves that archive as it was.
+  const std::filesystem::path kept = scratch.dir / "kept.rgpak";
+  REQUIRE(write_game_archive(kept, sample_inputs(), ArchiveCompression::Deflate, error));
+  CHECK_FALSE(write_game_archive(kept, {archive_input_from_file("gone.rb", scratch.dir / "gone.rb")},
+                                 ArchiveCompression::Deflate, error));
+  const auto still = GameArchive::open(kept, error);
+  REQUIRE_MESSAGE(still.has_value(), error);
+  CHECK(still->entries().size() == sample_inputs().size());
+  CHECK_FALSE(std::filesystem::exists(scratch.dir / "kept.rgpak.partial"));
+  // And one that cannot be written at all (its folder is not there) says so.
+  CHECK_FALSE(
+      write_game_archive(scratch.dir / "nowhere" / "a.rgpak", sample_inputs(), ArchiveCompression::Deflate, error));
+  CHECK(error.find("cannot write") != std::string::npos);
 }
 
 TEST_CASE("an archive with a damaged header is refused with a reason") {
@@ -326,6 +339,18 @@ TEST_CASE("a mounted archive is the game's folder: its files are read from it, a
   std::ofstream(game / "intruder.rb") << "system('rm -rf /')";
   CHECK_FALSE(game_files::is_file(game / "intruder.rb"));
   CHECK_FALSE(game_files::read(game / "intruder.rb", kMaxArchiveEntryBytes).has_value());
+  // Nor a loose link put where a packed file is: the packed file is read, never what it leads to.
+  std::filesystem::create_directories(game / "scripts");
+  std::error_code link_error;
+  std::filesystem::create_symlink(scratch.dir / "beside.txt", game / "scripts/player.rb", link_error);
+  if (!link_error) {  // (Windows lets only some accounts make links.)
+    CHECK(game_files::in_archive(game / "scripts/player.rb"));
+    CHECK(read_text_file(game / "scripts/player.rb", error) == repeated_script());
+    const auto found = file_inside(game, "scripts/player.rb");
+    REQUIRE(found.has_value());
+    CHECK(game_files::read(*found, kMaxArchiveEntryBytes) == bytes_of(repeated_script()));
+    CHECK(read_file_up_to(game / "scripts/player.rb", kMaxArchiveEntryBytes) == bytes_of(repeated_script()));
+  }
   // Outside the game's folder, the disk.
   CHECK(game_files::is_file(scratch.dir / "beside.txt"));
   CHECK(read_text_file(scratch.dir / "beside.txt", error) == "on the disk");

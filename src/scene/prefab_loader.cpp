@@ -85,7 +85,7 @@ class Resolver {
     require(!through_link(folder_, fs::u8path(uri)), "prefab file uses a symbolic link");
     if (!found) throw std::runtime_error("prefab file is missing, linked or outside the game");
     require(found->extension() == kExtension, "prefab file must be a GLB");
-    return fs::weakly_canonical(*found);
+    return *found;  // (as file_inside gives it: inside a mounted archive, no link is followed)
   }
   std::string key(const fs::path& path) const {
     return path.lexically_relative(fs::weakly_canonical(folder_)).generic_u8string();

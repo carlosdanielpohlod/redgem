@@ -13,8 +13,11 @@ namespace {
 constexpr const char* kParentStep = "..";
 constexpr const char* kSameFolder = ".";
 
+// The game's folder as it was given (absolute, normalised) and as the system resolves it (links
+// above it followed): a path is in the archive when it names something below either one.
 struct Mount {
   std::filesystem::path root;
+  std::filesystem::path resolved_root;
   GameArchive archive;
 };
 
@@ -43,15 +46,31 @@ std::optional<std::filesystem::path> resolved(const std::filesystem::path& path)
   return full;
 }
 
+// A path made absolute, its "." and ".." steps taken by name: nothing on the disk is followed.
+std::optional<std::filesystem::path> plain(const std::filesystem::path& path) {
+  std::error_code fs_error;
+  const std::filesystem::path full = std::filesystem::absolute(path, fs_error);
+  if (fs_error) return std::nullopt;
+  return full.lexically_normal();
+}
+
 bool stays_inside(const std::filesystem::path& inside) { return !inside.empty() && *inside.begin() != kParentStep; }
 
-// The name of `path` inside the mounted folder ("" for the folder itself); nullopt outside it.
-std::optional<std::string> name_in(const Mount& mount, const std::filesystem::path& path) {
-  const auto full = resolved(path);
-  if (!full) return std::nullopt;
-  const std::filesystem::path inside = full->lexically_relative(mount.root);
+// The name of `full` below `root` ("" for the root itself); nullopt outside it.
+std::optional<std::string> name_below(const std::filesystem::path& root, const std::filesystem::path& full) {
+  const std::filesystem::path inside = full.lexically_relative(root);
   if (!stays_inside(inside)) return std::nullopt;
   return inside == kSameFolder ? std::string() : inside.generic_u8string();
+}
+
+// The name of `path` inside the mounted folder; nullopt outside it. Decided by the path's name
+// alone: whatever is on the disk below the folder (a loose file, a link out of it) is never
+// followed, so it can neither hide a file of the archive nor stand in for one.
+std::optional<std::string> name_in(const Mount& mount, const std::filesystem::path& path) {
+  const auto full = plain(path);
+  if (!full) return std::nullopt;
+  auto name = name_below(mount.root, *full);
+  return name ? name : name_below(mount.resolved_root, *full);
 }
 
 // Where a path is: in the mounted archive (its name there), or not (no name).
@@ -101,7 +120,8 @@ std::vector<std::filesystem::path> disk_entries(const std::filesystem::path& fol
 }  // namespace
 
 void mount(const std::filesystem::path& root, GameArchive archive) {
-  auto mount = std::make_shared<const Mount>(Mount{resolved(root).value_or(root), std::move(archive)});
+  const std::filesystem::path given = plain(root).value_or(root);
+  auto mount = std::make_shared<const Mount>(Mount{given, resolved(given).value_or(given), std::move(archive)});
   Mounted& state = mounted();
   const std::lock_guard<std::mutex> lock(state.guard);
   state.mount = std::move(mount);

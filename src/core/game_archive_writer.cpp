@@ -19,6 +19,7 @@ using namespace archive_layout;
 namespace {
 
 constexpr int kDeflateMemoryLevel = 8;  // zlib's default
+constexpr const char* kPartialSuffix = ".partial";
 
 // A file's data as it goes into the archive.
 struct Packed {
@@ -134,6 +135,7 @@ class ArchiveWriter {
   bool add(const ArchiveInput& input, ArchiveCompression compression, std::string& error) {
     auto bytes = input.bytes();
     if (!bytes) return fail("cannot read " + printable(input.name) + " (or it is too large)", error);
+    if (bytes->size() > kMaxArchiveEntryBytes) return fail("'" + printable(input.name) + "' is too large", error);
     ArchiveEntry entry{
         input.name, at_, bytes->size(), 0, ArchiveMethod::Stored, archive_crc32(bytes->data(), bytes->size())};
     const Packed packed = packed_for(std::move(*bytes), compression);
@@ -144,6 +146,8 @@ class ArchiveWriter {
     entries_.push_back(std::move(entry));
     return static_cast<bool>(out_) || fail("cannot write into the game archive", error);
   }
+
+  bool ready() const { return out_.is_open() && static_cast<bool>(out_); }
 
   bool finish() {
     std::vector<std::uint8_t> head = header_bytes(static_cast<std::uint32_t>(entries_.size()), table_size_);
@@ -161,9 +165,26 @@ class ArchiveWriter {
   std::vector<ArchiveEntry> entries_;
 };
 
+// Where an archive is written before it is whole: beside it, so that moving it over the archive
+// is one rename on one disk, and a write that fails leaves the archive that was there as it was.
+std::filesystem::path partial_of(const std::filesystem::path& file) {
+  std::filesystem::path partial = file;
+  partial += kPartialSuffix;
+  return partial;
+}
+
+// The written archive put in place of `file` (what was there replaced at once).
+bool moved_over(const std::filesystem::path& partial, const std::filesystem::path& file, std::string& error) {
+  std::error_code fs_error;
+  std::filesystem::rename(partial, file, fs_error);
+  if (!fs_error) return true;
+  return fail("cannot put the game archive in place as " + file.string() + ": " + fs_error.message(), error);
+}
+
 bool write_all(const std::filesystem::path& file, const std::vector<ArchiveInput>& inputs,
                ArchiveCompression compression, std::string& error) {
   ArchiveWriter writer(file, table_bytes(inputs));
+  if (!writer.ready()) return fail("cannot write the game archive " + file.string(), error);
   for (const ArchiveInput& input : inputs) {
     if (!writer.add(input, compression, error)) return false;
   }
@@ -183,9 +204,10 @@ ArchiveInput archive_input_from_bytes(const std::string& name, std::vector<std::
 bool write_game_archive(const std::filesystem::path& file, const std::vector<ArchiveInput>& inputs,
                         ArchiveCompression compression, std::string& error) {
   if (!names_fit(inputs, error)) return false;
-  if (write_all(file, inputs, compression, error)) return true;
+  const std::filesystem::path partial = partial_of(file);
+  if (write_all(partial, inputs, compression, error) && moved_over(partial, file, error)) return true;
   std::error_code fs_error;
-  std::filesystem::remove(file, fs_error);  // (half an archive is no archive)
+  std::filesystem::remove(partial, fs_error);  // (half an archive is no archive)
   return false;
 }
 

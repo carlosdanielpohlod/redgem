@@ -22,6 +22,10 @@ namespace {
 
 constexpr const char* kParentFolder = "..";          // how a path says "one folder up"
 constexpr const char* kFallbackExecutable = "play";  // for a game whose name gives no usable file name
+// Where a loose build's game folder is copied before it takes the earlier one's place, and where
+// the earlier one is put aside meanwhile.
+constexpr const char* kStagedSuffix = ".staged";
+constexpr const char* kReplacedSuffix = ".replaced";
 
 bool game_not_in_bundle(const std::filesystem::path& game_dir, const std::filesystem::path& out_dir,
                         std::string& error);
@@ -173,15 +177,68 @@ bool pack_game(const std::filesystem::path& game_dir, const std::filesystem::pat
   return false;
 }
 
+namespace {
+
+std::filesystem::path beside(const std::filesystem::path& path, const char* suffix) {
+  std::filesystem::path other = path;
+  other += suffix;
+  return other;
+}
+
+// `path` taken away, whatever it is; false, with `error` saying why, when it is still there.
+bool removed(const std::filesystem::path& path, std::string& error) {
+  std::error_code fs_error;
+  std::filesystem::remove_all(path, fs_error);
+  if (!fs_error) return true;
+  error = tr("project.build.cannot_empty", {{"folder", path.string()}, {"reason", fs_error.message()}});
+  return false;
+}
+
+bool moved(const std::filesystem::path& from, const std::filesystem::path& to, std::string& error) {
+  std::error_code fs_error;
+  std::filesystem::rename(from, to, fs_error);
+  if (!fs_error) return true;
+  error = "cannot move " + from.string() + " to " + to.string() + ": " + fs_error.message();
+  return false;
+}
+
+// The folder `staged` put where `target` is: the earlier one set aside first, and put back when
+// the new one cannot take its place; taken away once it has.
+bool put_in_place(const std::filesystem::path& staged, const std::filesystem::path& target, std::string& error) {
+  const std::filesystem::path earlier = beside(target, kReplacedSuffix);
+  if (!removed(earlier, error)) return false;
+  std::error_code fs_error;
+  const bool had_one = std::filesystem::exists(target, fs_error);
+  if (had_one && !moved(target, earlier, error)) return false;
+  if (moved(staged, target, error)) return removed(earlier, error);
+  std::string ignored;
+  if (had_one) moved(earlier, target, ignored);
+  return false;
+}
+
+// Loose: the files copied beside the earlier game folder, then put in its place; the archive an
+// earlier packed build left taken away last (a player plays an archive before a folder).
+bool ship_loose(const std::filesystem::path& game_dir, const std::filesystem::path& place, std::string& error) {
+  const std::filesystem::path staged = beside(place / kBundledGameFolder, kStagedSuffix);
+  if (copy_game(game_dir, staged, error) && put_in_place(staged, place / kBundledGameFolder, error)) {
+    return removed(place / kArchiveFileName, error);
+  }
+  std::error_code fs_error;
+  std::filesystem::remove_all(staged, fs_error);
+  return false;
+}
+
+// Packed: the archive written whole before it replaces the earlier one (see write_game_archive);
+// the game folder an earlier loose build left taken away after.
+bool ship_packed(const std::filesystem::path& game_dir, const std::filesystem::path& place, std::string& error) {
+  return pack_game(game_dir, place / kArchiveFileName, error) && removed(place / kBundledGameFolder, error);
+}
+
+}  // namespace
+
 bool ship_game_files(const std::filesystem::path& game_dir, const std::filesystem::path& place, GameLayout layout,
                      std::string& error) {
-  std::error_code fs_error;
-  if (layout == GameLayout::Loose) {
-    std::filesystem::remove(place / kArchiveFileName, fs_error);
-    return copy_game(game_dir, place / kBundledGameFolder, error);
-  }
-  std::filesystem::remove_all(place / kBundledGameFolder, fs_error);
-  return pack_game(game_dir, place / kArchiveFileName, error);
+  return layout == GameLayout::Loose ? ship_loose(game_dir, place, error) : ship_packed(game_dir, place, error);
 }
 
 namespace {

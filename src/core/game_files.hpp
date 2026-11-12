@@ -11,13 +11,16 @@
 // The one way the engine reads a game's own files (scripts, scenes, pictures, sounds, fonts,
 // texts, game.json). A built game's files are packed into an archive (see game_archive.hpp),
 // mounted as the folder the game would have been in: a path inside that folder is read from the
-// archive, and from the archive only (a loose file put beside it is never read instead). Any other
+// archive, and from the archive only (a loose file or link put there is never read instead, nor
+// followed: whether a path is inside is told from its name, see mount). Any other
 // path, and every path while nothing is mounted (a game played from its project folder, the
 // editor), is read from the disk. The archive is read-only: saves, settings and the players' data
 // folder are written on the disk, elsewhere.
 namespace redgem::game_files {
 
-// Mounts `archive` as the folder `root` (replacing what was mounted).
+// Mounts `archive` as the folder `root` (replacing what was mounted). A path is inside it when,
+// made absolute and its "." and ".." steps taken by name, it is below `root` as given or as the
+// system resolves it (links above the folder followed); nothing below `root` is ever followed.
 void mount(const std::filesystem::path& root, GameArchive archive);
 void unmount();
 // The folder the archive is mounted as; nullopt when none is.

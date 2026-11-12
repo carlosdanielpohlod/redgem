@@ -102,6 +102,14 @@ void warn_of_link(const std::filesystem::path& link) {
   log::warning(printable(link.string()) + " is a symbolic link: built games do not carry links, so it is left out");
 }
 
+// `relative` below `root`: in a mounted archive by name alone (what is on the disk there is never
+// followed, see core/game_files.hpp), else with the links on the disk followed.
+std::filesystem::path file_below(const std::filesystem::path& root, const std::filesystem::path& relative,
+                                 std::error_code& fs_error) {
+  if (game_files::in_archive(root)) return (root / relative).lexically_normal();
+  return std::filesystem::weakly_canonical(root / relative, fs_error);
+}
+
 }  // namespace
 
 bool safe_asset_name(std::string_view name) {
@@ -112,6 +120,8 @@ bool safe_asset_name(std::string_view name) {
 
 bool through_link(const std::filesystem::path& folder, const std::filesystem::path& relative) {
   // (A path given whole is looked at below the folder only: the folder's own may hold links.)
+  // (A mounted archive holds no links, whatever is on the disk where it is mounted.)
+  if (game_files::in_archive(folder)) return false;
   const std::filesystem::path below = relative.is_absolute() ? relative.lexically_relative(folder) : relative;
   std::filesystem::path step = folder;
   // (Every step as written: in "linked/../file" the ".." leaves the folder the link leads to.)
@@ -136,7 +146,7 @@ std::optional<std::filesystem::path> file_inside(const std::filesystem::path& fo
   const std::filesystem::path root =
       std::filesystem::weakly_canonical(folder.empty() ? std::filesystem::path(kHere) : folder, fs_error);
   if (fs_error) return std::nullopt;
-  std::filesystem::path file = std::filesystem::weakly_canonical(root / relative, fs_error);
+  const std::filesystem::path file = file_below(root, relative, fs_error);
   if (fs_error) return std::nullopt;
   if (!stays_below(file.lexically_relative(root))) return std::nullopt;
   if (!game_files::is_file(file)) return std::nullopt;

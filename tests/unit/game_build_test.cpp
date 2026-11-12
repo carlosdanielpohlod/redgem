@@ -131,7 +131,7 @@ TEST_CASE("a build replaces only what an earlier build made") {
 }
 
 #ifndef _WIN32  // (a folder that cannot be emptied, made by taking away the right to change it)
-TEST_CASE("a loose build whose earlier game folder cannot be emptied fails instead of shipping what is left") {
+TEST_CASE("a loose build whose earlier game folder cannot be taken away fails, and says why") {
   const Scratch scratch;
   const std::filesystem::path player = scratch.dir / "player";
   std::ofstream(player) << "player";
@@ -144,9 +144,41 @@ TEST_CASE("a loose build whose earlier game folder cannot be emptied fails inste
   std::filesystem::permissions(stuck, std::filesystem::perms::owner_read | std::filesystem::perms::owner_exec);
   CHECK_FALSE(build_game(scratch.game, out, player, BuildTarget::Linux, error, GameLayout::Loose));
   CHECK(error.find("cannot empty") != std::string::npos);
-  std::filesystem::permissions(stuck, std::filesystem::perms::owner_all);
+  // The new copy took the folder's place all the same: nothing of the earlier one is played.
+  CHECK(std::filesystem::is_regular_file(out / kBundledGameFolder / config::kSceneFileName));
+  CHECK_FALSE(std::filesystem::exists(out / kBundledGameFolder / "stuck"));
+  std::error_code fs_error;
+  for (const char* folder : {"game.replaced", "game"}) {
+    std::filesystem::permissions(out / folder / "stuck", std::filesystem::perms::owner_all, fs_error);
+  }
 }
 #endif
+
+TEST_CASE("a rebuild that fails leaves the earlier build's game as it was") {
+  const Scratch scratch;
+  const std::filesystem::path player = scratch.dir / "player";
+  std::ofstream(player) << "player";
+  const std::filesystem::path out = scratch.dir / "out";
+  std::string error;
+  REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error), error);
+  // The archive cannot be written where it is written first (a folder holds that name).
+  std::filesystem::path partial = out / kArchiveFileName;
+  partial += ".partial";
+  std::filesystem::create_directories(partial);
+  std::ofstream(scratch.game / "added.txt") << "new";
+  CHECK_FALSE(build_game(scratch.game, out, player, BuildTarget::Linux, error));
+  CHECK(error.find("cannot pack the game") != std::string::npos);
+  const auto archive = GameArchive::open(out / kArchiveFileName, error);
+  REQUIRE_MESSAGE(archive.has_value(), error);
+  CHECK(archive->find(config::kSceneFileName) != nullptr);
+  CHECK(archive->find("added.txt") == nullptr);
+  // A loose build after it puts the folder in place and takes the archive away.
+  REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error, GameLayout::Loose), error);
+  CHECK(std::filesystem::is_regular_file(out / kBundledGameFolder / "added.txt"));
+  CHECK_FALSE(std::filesystem::exists(out / kArchiveFileName));
+  CHECK_FALSE(std::filesystem::exists(out / "game.staged"));
+  CHECK_FALSE(std::filesystem::exists(out / "game.replaced"));
+}
 
 TEST_CASE("a player no script of the engine makes is said to come from building the engine on its system") {
   for (const BuildTarget target : {BuildTarget::Linux, BuildTarget::MacOS}) {
