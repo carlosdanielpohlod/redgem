@@ -90,6 +90,24 @@ TEST_CASE("live editor node edits are one undo step, update the preview and leav
   CHECK(session.document().node(index).props.count("bridge") == 1);
 }
 
+TEST_CASE("a live spotlight edit changes its preview and can be undone") {
+  Game game;
+  auto& session = *game.session;
+  auto& doc = session.document();
+  constexpr float kIntensity = 100.0f;
+  const auto index = doc.add_light(LightType::Spot, "Spotlight", redgem::Color{}, kIntensity);
+  session.refresh_preview();
+  const Json edit = {{"action", "set"}, {"object", "Spotlight"}, {"assignments", {"spot_cone=15,30"}}};
+  REQUIRE(ok(invoke_editor(session, "scene_edit", edit)));
+  const auto& light = session.scene().at(index).light;
+  REQUIRE(light.has_value());
+  CHECK(radians_to_degrees(light->inner_cone) == doctest::Approx(15));
+  CHECK(radians_to_degrees(light->outer_cone) == doctest::Approx(30));
+  REQUIRE(ok(invoke_editor(session, "scene_edit", edit)));
+  REQUIRE(ok(invoke_editor(session, "editor", {{"action", "undo"}})));
+  CHECK(doc.node(index).light->outer_cone == doctest::Approx(kDefaultSpotOuterCone));
+}
+
 TEST_CASE("a failed live edit rolls back earlier fields and preserves existing redo") {
   Game game;
   auto& doc = game.session->document();

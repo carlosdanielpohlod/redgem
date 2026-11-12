@@ -157,9 +157,10 @@ std::string light_detail(const LightDesc& light) {
                        " color=" + vector_text({light.color.r, light.color.g, light.color.b}, kDetailDecimals) +
                        " intensity=" + number_text(light.intensity, kDetailDecimals) +
                        " range=" + number_text(light.range, kDetailDecimals);
-  if (light.type == LightType::Spot) {
-    detail += " inner_cone=" + number_text(radians_to_degrees(light.inner_cone), kListAngleDecimals) + "deg";
-    detail += " outer_cone=" + number_text(radians_to_degrees(light.outer_cone), kListAngleDecimals) + "deg";
+  if (is_spot_light(light)) {
+    const auto cones = spot_cone_degrees(light);
+    detail += " inner_cone=" + number_text(cones.inner, kDetailDecimals) + "deg";
+    detail += " outer_cone=" + number_text(cones.outer, kDetailDecimals) + "deg";
   }
   return detail;
 }

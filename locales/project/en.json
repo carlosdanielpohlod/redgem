@@ -204,6 +204,9 @@
   "project.scene.scale_out_of_range": "scale takes numbers from {least} to {largest} on every side (zero flattens the object, a negative scale turns it inside out), not {value}",
   "project.scene.script_missing": "note: scripts/{script} does not exist yet; it must define class {class}",
   "project.scene.script_not_attached": "{script} is not attached; the object has: {scripts}",
+  "project.scene.spot_cone_needs_light": "spot_cone requires an existing spot light",
+  "project.scene.spot_cone_bad_angles": "spot_cone needs inner,outer in degrees, from 0 to {max} and at least {gap} degrees apart",
+  "project.scene.spot_cone_use_pair": "Use spot_cone=inner,outer to change both angles in degrees.",
   "project.scene.unknown_key": "unknown key {key} (prop.{key}= sets a property of that name); the keys are: {keys}",
   "project.scene.usage": [
     "usage:",

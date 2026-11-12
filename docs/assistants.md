@@ -42,6 +42,7 @@ Every one answers in a few lines and ends; each says more with `--help`. See
 | What is in a level | `redgem scene list .` (a line per object: `#5 Player pos=0,1.1,0 scripts=Player tag=player`) |
 | One object in full | `redgem scene get . Player` |
 | Move, tune, attach | `redgem scene set . Coin1 position=1,2,3 prop.speed=2 script+=Spinner` |
+| Tune a spotlight | `redgem scene set . Spotlight spot_cone=15,30` (inner and outer degrees) |
 | Add or remove | `redgem scene add . Coin6 --from Coin1 position=4,1,0`, `redgem scene remove . Coin6` |
 | Is the game in order | `redgem check .` (and `--run-tests` to run its tests) |
 | Does it play | `redgem run . --seconds 5`: each script error once, with its file and line |
