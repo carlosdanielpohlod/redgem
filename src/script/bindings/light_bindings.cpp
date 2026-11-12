@@ -19,7 +19,6 @@ using namespace binding;
 // show them (sRGB). Lights shine in linear light.
 constexpr mrb_int kChannels = 3;
 constexpr mrb_int kConeAngleCount = 2;
-constexpr float kMaxConeDegrees = kDegreesPerHalfTurn * kHalf;
 
 float linear_from_channel(mrb_state* mrb, mrb_int channel) {
   return linear_from_srgb(channel_from(mrb, static_cast<mrb_float>(channel), "a light's color channel"));
@@ -61,23 +60,14 @@ mrb_value light_cone_angles(mrb_state* mrb, mrb_value self) {
   return angles;
 }
 
-float cone_radians(mrb_state* mrb, mrb_float degrees) {
-  const auto angle = from_to(mrb, degrees, kSpotConeAxis, kMaxConeDegrees, "a spotlight cone angle in degrees");
-  return std::min(degrees_to_radians(static_cast<float>(angle)), kMaxSpotOuterCone);
-}
-
 mrb_value light_set_cone(mrb_state* mrb, mrb_value self) {
-  mrb_float inner_degrees = 0, outer_degrees = 0;
-  mrb_get_args(mrb, "ff", &inner_degrees, &outer_degrees);
+  mrb_float inner = 0, outer = 0;
+  mrb_get_args(mrb, "ff", &inner, &outer);
   auto& light = light_of(mrb, self);
   if (light.type != LightType::Spot) mrb_raise(mrb, E_ARGUMENT_ERROR, "set_cone requires a spot light");
-  const float inner = cone_radians(mrb, inner_degrees);
-  const float outer = cone_radians(mrb, outer_degrees);
-  if (inner > outer - kMinSpotConeGap) {
-    mrb_raise(mrb, E_ARGUMENT_ERROR, "spotlight cone angles must be at least 0.1 degrees apart");
+  if (!set_spot_cone_degrees(light, inner, outer)) {
+    mrb_raise(mrb, E_ARGUMENT_ERROR, "spotlight cone angles must be between 0 and 90 degrees and at least 0.1 apart");
   }
-  light.inner_cone = inner;
-  light.outer_cone = outer;
   return mrb_nil_value();
 }
 

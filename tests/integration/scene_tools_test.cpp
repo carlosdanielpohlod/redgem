@@ -86,6 +86,28 @@ TEST_CASE("a scene lists one short line per object, children under their parent"
   CHECK(has(listed.out, "#25 Sun pos=5,12,5 rot=-44.8,24.4,0 light=sun"));
 }
 
+TEST_CASE("scene set edits spotlight cones in degrees and refuses an invalid pair") {
+  const GameCopy game("spot_cone");
+  auto opened = SceneDocument::open(game.scene());
+  REQUIRE(std::holds_alternative<SceneDocument>(opened));
+  auto& doc = std::get<SceneDocument>(opened);
+  constexpr float kIntensity = 100.0f;
+  doc.add_light(LightType::Spot, "Spotlight", Color{}, kIntensity);
+  std::string error;
+  REQUIRE_MESSAGE(doc.save(error), error);
+
+  const auto changed = scene_tool({"set", game.dir(), "Spotlight", "spot_cone=15,30"});
+  REQUIRE_MESSAGE(changed.exit_code == kExitSuccess, changed.err);
+  const auto rejected = scene_tool({"set", game.dir(), "Spotlight", "spot_cone=35,30"});
+  CHECK(rejected.exit_code == kExitFailure);
+  CHECK(has(rejected.err, "spot_cone needs inner,outer"));
+  CHECK(scene_tool({"set", game.dir(), "Sun", "spot_cone=15,30"}).exit_code == kExitFailure);
+
+  const auto described = scene_tool({"get", game.dir(), "Spotlight"});
+  CHECK(described.exit_code == kExitSuccess);
+  CHECK(has(described.out, "inner_cone=15deg outer_cone=30deg"));
+}
+
 TEST_CASE("a list can stop short, and says what it left out") {
   const ToolResult top = scene_tool({"list", kPlatformer.string(), "--depth", "0"});
   CHECK_FALSE(has(top.out, "Visor"));

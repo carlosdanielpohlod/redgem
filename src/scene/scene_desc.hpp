@@ -156,6 +156,8 @@ struct LightDesc {
 
 float minimum_spot_outer_cone(float inner);
 void sanitize_spot_cones(LightDesc& light);
+// Changes both angles together. Invalid values or a different light type leave the light untouched.
+bool set_spot_cone_degrees(LightDesc& light, double inner, double outer);
 
 // A skeleton: the nodes that deform a skinned mesh.
 struct SkinDesc {

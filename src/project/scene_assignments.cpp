@@ -37,11 +37,12 @@ constexpr int kScaleDecimals = 3;    // enough to show the smallest scale (0.001
 constexpr double kNarrowable = 1.0;  // a number a float takes for sure, past any smallest scale
 // Every key a word may set (the props are "prop.<key>").
 constexpr const char* kKeys =
-    "position (pos), rotation (rot), scale, name, parent, script (scripts), prop.<key> (or <key> alone)";
+    "position (pos), rotation (rot), scale, name, parent, script (scripts), spot_cone, prop.<key> (or <key> alone)";
 // What a line calls the scripts, the mesh and the light (see scene_text.hpp).
 constexpr const char* kScriptsKey = "scripts";
 constexpr const char* kMeshKey = "mesh";
 constexpr const char* kLightKey = "light";
+constexpr const char* kSpotConeKey = "spot_cone";
 constexpr char kPathSeparator = '/';
 // A key of up to this many letters is mistyped by one change at most; longer ones by two.
 constexpr std::size_t kShortKey = 5;
@@ -289,6 +290,25 @@ std::string check_light(SceneEdit& edit, int& index, const Assignment& assignmen
   return shown_as(assignment.key, node.light ? light_name(node.light->type) : "", assignment);
 }
 
+bool apply_cone(LightDesc& light, const std::string& value) {
+  const auto comma = value.find(kComma);
+  if (comma == std::string::npos) return false;
+  const auto inner = number_from(value.substr(0, comma));
+  const auto outer = number_from(value.substr(comma + 1));
+  if (!inner || !outer) return false;
+  return set_spot_cone_degrees(light, *inner, *outer);
+}
+
+std::string set_spot_cone(SceneEdit& edit, int& index, const Assignment& assignment) {
+  auto light = edit.document.node(index).light;
+  auto* spot = light ? &*light : nullptr;
+  const bool is_spot = spot && spot->type == LightType::Spot;
+  if (!is_spot) return tr("project.scene.spot_cone_needs_light");
+  if (!apply_cone(*spot, assignment.value)) return tr("project.scene.spot_cone_bad_angles");
+  edit.document.set_light(index, *spot);
+  return {};
+}
+
 using Setter = std::string (*)(SceneEdit&, int&, const Assignment&);
 struct Key {
   const char* name;
@@ -299,7 +319,7 @@ constexpr Key kSetters[] = {
     {"position", set_position, false}, {"pos", set_position, false},        {"rotation", set_rotation, false},
     {"rot", set_rotation, false},      {"scale", set_scale, false},         {"name", set_name, false},
     {"parent", set_parent, false},     {props::kScript, set_scripts, true}, {kScriptsKey, set_scripts, true},
-    {kMeshKey, check_mesh, false},     {kLightKey, check_light, false},
+    {kMeshKey, check_mesh, false},     {kLightKey, check_light, false},     {kSpotConeKey, set_spot_cone, false},
 };
 
 const Key* key_named(const std::string& name) {
