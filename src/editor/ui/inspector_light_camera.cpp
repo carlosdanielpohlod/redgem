@@ -40,14 +40,14 @@ bool draw_light_range(LightDesc& light) {
 
 bool drag_cone(const char* id, const char* label, float& degrees, float min, float max) {
   property_label(tr(label));
-  return ImGui::DragFloat(id, &degrees, kMinSpotConeGapDegrees, min, max, kConeFormat);
+  return ImGui::DragFloat(id, &degrees, static_cast<float>(kMinSpotConeGapDegrees), min, max, kConeFormat);
 }
 
 bool draw_outer_cone(LightDesc& light) {
   const float narrowest = minimum_spot_outer_cone(light.inner_cone);
   const float min_angle = radians_to_degrees(narrowest);
-  const float max_angle = radians_to_degrees(kMaxSpotOuterCone);
-  float degrees = radians_to_degrees(light.outer_cone);
+  const float max_angle = kMaxSpotConeDegrees;
+  float degrees = static_cast<float>(spot_cone_degrees(light).outer);
   if (!drag_cone(kOuterConeId, "editor.inspector.light.outer_cone", degrees, min_angle, max_angle)) return false;
   const float angle = std::clamp(degrees_to_radians(degrees), narrowest, kMaxSpotOuterCone);
   if (angle == light.outer_cone) return false;
@@ -56,10 +56,10 @@ bool draw_outer_cone(LightDesc& light) {
 }
 
 bool draw_inner_cone(LightDesc& light) {
-  const float widest = light.outer_cone - kMinSpotConeGap;
+  const float widest = maximum_spot_inner_cone(light.outer_cone);
   const float min_angle = radians_to_degrees(kSpotConeAxis);
   const float max_angle = radians_to_degrees(widest);
-  float degrees = radians_to_degrees(light.inner_cone);
+  float degrees = static_cast<float>(spot_cone_degrees(light).inner);
   if (!drag_cone(kInnerConeId, "editor.inspector.light.inner_cone", degrees, min_angle, max_angle)) return false;
   const float angle = std::clamp(degrees_to_radians(degrees), kSpotConeAxis, widest);
   if (angle == light.inner_cone) return false;

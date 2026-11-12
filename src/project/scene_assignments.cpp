@@ -37,11 +37,15 @@ constexpr int kScaleDecimals = 3;    // enough to show the smallest scale (0.001
 constexpr double kNarrowable = 1.0;  // a number a float takes for sure, past any smallest scale
 // Every key a word may set (the props are "prop.<key>").
 constexpr const char* kKeys =
-    "position (pos), rotation (rot), scale, name, parent, script (scripts), prop.<key> (or <key> alone)";
+    "position (pos), rotation (rot), scale, name, parent, script (scripts), spot_cone, prop.<key> (or <key> alone)";
 // What a line calls the scripts, the mesh and the light (see scene_text.hpp).
 constexpr const char* kScriptsKey = "scripts";
 constexpr const char* kMeshKey = "mesh";
 constexpr const char* kLightKey = "light";
+constexpr const char* kSpotConeKey = "spot_cone";
+constexpr const char* kInnerConeKey = "inner_cone";
+constexpr const char* kOuterConeKey = "outer_cone";
+constexpr int kGapDecimals = 1;
 constexpr char kPathSeparator = '/';
 // A key of up to this many letters is mistyped by one change at most; longer ones by two.
 constexpr std::size_t kShortKey = 5;
@@ -289,6 +293,34 @@ std::string check_light(SceneEdit& edit, int& index, const Assignment& assignmen
   return shown_as(assignment.key, node.light ? light_name(node.light->type) : "", assignment);
 }
 
+bool apply_cone(LightDesc& light, const std::string& value) {
+  const auto comma = value.find(kComma);
+  if (comma == std::string::npos) return false;
+  const auto inner = number_from(value.substr(0, comma));
+  const auto outer = number_from(value.substr(comma + 1));
+  if (!inner || !outer) return false;
+  return set_spot_cone_degrees(light, *inner, *outer);
+}
+
+std::string cone_angle_error() {
+  return tr("project.scene.spot_cone_bad_angles",
+            {{"max", number_text(kMaxSpotConeDegrees, 0)}, {"gap", number_text(kMinSpotConeGapDegrees, kGapDecimals)}});
+}
+
+std::string set_spot_cone(SceneEdit& edit, int& index, const Assignment& assignment) {
+  const auto& original = edit.document.node(index).light;
+  if (!original) return tr("project.scene.spot_cone_needs_light");
+  auto spot = *original;
+  if (!apply_cone(spot, assignment.value)) {
+    return is_spot_light(spot) ? cone_angle_error() : tr("project.scene.spot_cone_needs_light");
+  }
+  const bool unchanged = original->inner_cone == spot.inner_cone && original->outer_cone == spot.outer_cone;
+  if (!unchanged) edit.document.set_light(index, spot);
+  return {};
+}
+
+std::string reject_cone_member(SceneEdit&, int&, const Assignment&) { return tr("project.scene.spot_cone_use_pair"); }
+
 using Setter = std::string (*)(SceneEdit&, int&, const Assignment&);
 struct Key {
   const char* name;
@@ -296,10 +328,20 @@ struct Key {
   bool adds_and_takes;  // whether it takes += and -=
 };
 constexpr Key kSetters[] = {
-    {"position", set_position, false}, {"pos", set_position, false},        {"rotation", set_rotation, false},
-    {"rot", set_rotation, false},      {"scale", set_scale, false},         {"name", set_name, false},
-    {"parent", set_parent, false},     {props::kScript, set_scripts, true}, {kScriptsKey, set_scripts, true},
-    {kMeshKey, check_mesh, false},     {kLightKey, check_light, false},
+    {"position", set_position, false},
+    {"pos", set_position, false},
+    {"rotation", set_rotation, false},
+    {"rot", set_rotation, false},
+    {"scale", set_scale, false},
+    {"name", set_name, false},
+    {"parent", set_parent, false},
+    {props::kScript, set_scripts, true},
+    {kScriptsKey, set_scripts, true},
+    {kMeshKey, check_mesh, false},
+    {kLightKey, check_light, false},
+    {kSpotConeKey, set_spot_cone, false},
+    {kInnerConeKey, reject_cone_member, false},
+    {kOuterConeKey, reject_cone_member, false},
 };
 
 const Key* key_named(const std::string& name) {
