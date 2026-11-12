@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "app/android/android_bundle.hpp"
+#include "app/android/android_soft_keyboard.hpp"
 #include "app/crash_report.hpp"
 #include "app/game_data_location.hpp"
 #include "app/user_settings.hpp"
@@ -28,6 +29,7 @@
 #include "core/platform.hpp"
 #include "core/translations.hpp"
 #include "input/raylib_input_source.hpp"
+#include "input/soft_keyboard_input_source.hpp"
 #include "input/touch_input_source.hpp"
 
 // The running activity, kept by raylib's Android layer.
@@ -137,9 +139,19 @@ std::string phone_language(const android_app* app) {
   return platform::language_of_locale(country.empty() ? language : language + "_" + country);
 }
 
-// Plays the game that was unpacked into the app's storage, on the whole screen, with on-screen
-// controls for whoever has no gamepad.
-int play_unpacked_game(const android_app* app) {
+// Plays a game with a phone's input: its fingers, on-screen controls for whoever has no gamepad,
+// and the system's keyboard for its text fields.
+int play_with_phone_input(const GameWindowOptions& options, android_app* app) {
+  const RaylibInputSource devices;
+  TouchInputSource touch_screen(devices);
+  AndroidSoftKeyboard keyboard(app);
+  SoftKeyboardInputSource input(touch_screen, keyboard);
+  keyboard.feed(input);
+  return play_in_window(options, input);
+}
+
+// Plays the game that was unpacked into the app's storage, on the whole screen.
+int play_unpacked_game(android_app* app) {
   GameWindowOptions options;
   options.game_dir = kBundledGameFolder;
   options.screen_aspect = screen_aspect(app);
@@ -147,15 +159,13 @@ int play_unpacked_game(const android_app* app) {
   const PlayerDisplay display = player_display(options.game_dir, game_data_files(options.data_folder).settings);
   options.display = display.display;
   options.display_kept_in = display.kept_in;
-  const RaylibInputSource devices;
-  TouchInputSource touch_screen(devices);
-  return play_in_window(options, touch_screen);
+  return play_with_phone_input(options, app);
 }
 
 // Plays the game with the crash handling a shipped game has: a crash writes its report in the
 // game's folder of the app's storage (crashes/, beside its save) and in the system's log, and the
 // next run says in the log that the one before crashed (see app/crash_report.hpp).
-int play_reporting_crashes(const android_app* app) {
+int play_reporting_crashes(android_app* app) {
   add_game_texts();
   translations::use_language(phone_language(app));
   crash::install_crash_handling({kBundledGameFolder, players_data_folder(kBundledGameFolder), false});
@@ -165,7 +175,7 @@ int play_reporting_crashes(const android_app* app) {
 }  // namespace
 
 int main(int, char**) {
-  const android_app* app = GetAndroidApp();
+  android_app* app = GetAndroidApp();
   const std::filesystem::path home = app->activity->internalDataPath;
   // The game's data lives in the app's storage: the engine is told where.
   platform::set_user_data_dir(home / kUserDataFolder);

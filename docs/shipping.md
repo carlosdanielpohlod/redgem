@@ -147,7 +147,9 @@ What changes on a phone:
   as it is; taps also work as mouse clicks, so `UI.button` menus work. A game with a touch
   interface of its own hides them with `Input.touch_controls = false`.
 - Characters may have as many bones on a phone as on a computer (up to 1024 per skeleton).
-- There is no on-screen keyboard yet, so text fields cannot be typed in.
+- The system's **on-screen keyboard** comes up while a `UI.text_field` is drawn, and the back key
+  puts it away. It covers the bottom of the screen: keep fields above it (`UI.keyboard_visible?`
+  says when it is up).
 - Phones are slower than computers: keep levels light (few lights, modest textures) and test on
   a real device. It needs Android 8 or later with OpenGL ES 3.
 - The APK is signed with a key the engine makes on your machine the first time

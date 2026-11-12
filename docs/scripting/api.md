@@ -444,6 +444,7 @@ What a script draws over the game this frame: texts, rectangles, pictures, butto
 - `UI.image(name, x:, y:, width:, height:, anchor: nil)`: draws a picture of images/
 - `UI.button(label, x:, y:, width:, height:, anchor: nil)`: draws a button; true the frame it is clicked
 - `UI.text_field(value, x:, y:, width:, height:, max_length:, secret:, anchor: nil)`: a field to type in; returns the new value
+- `UI.keyboard_visible?`: whether a phone's on-screen keyboard covers the bottom of the screen
 - `UI.width`: the width of the screen, in pixels
 - `UI.height`: the height of the screen, in pixels
 - `UI.text_width(str, size:)`: how wide a text is, in pixels (in the face selected)

@@ -83,15 +83,25 @@ module UI
   end
 
   # A box to type in. Returns the text after this frame's typing: keep it and pass it back. A
-  # secret one (a password) shows a star for each letter.
+  # secret one (a password) shows a star for each letter. On a phone, the system's keyboard is up
+  # while a text field is drawn (see UI.keyboard_visible?).
   #   @name = UI.text_field(@name, x: 40, y: 200, width: 320, height: 48)
   def self.text_field(value, x:, y:, width:, height:, max_length: FIELD_MAX_LENGTH, color: BUTTON_COLOR,
                       text_color: :white, secret: false, anchor: nil)
+    box = placed(anchor, x, y, width, height)
+    __text_field_drawn(clicked?(mouse_over?(**box)))
+    value = typed_into(value, max_length)
+    shown = secret ? SECRET_LETTER * letters(value) : value
+    draw_field(shown, box, color, text_color)
+    value
+  end
+
+  # A text field's text after this frame's typing: what was typed added, a letter taken off by
+  # Backspace, and cut to max_length letters.
+  def self.typed_into(value, max_length)
     value = value.to_s + Input.text
     value = chop(value) if Input.pressed?(:backspace)
     value = chop(value) while letters(value) > max_length
-    shown = secret ? SECRET_LETTER * letters(value) : value
-    draw_field(shown, placed(anchor, x, y, width, height), color, text_color)
     value
   end
 

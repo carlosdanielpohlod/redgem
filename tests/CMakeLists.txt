@@ -121,6 +121,7 @@ add_executable(redgem_tests
   unit/xml_writer_test.cpp
   unit/touch_controls_test.cpp
   unit/touch_input_source_test.cpp
+  unit/soft_keyboard_test.cpp
   unit/android_package_test.cpp
   unit/game_settings_test.cpp
   unit/json_file_test.cpp

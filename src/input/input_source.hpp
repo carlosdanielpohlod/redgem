@@ -11,6 +11,13 @@
 
 namespace redgem {
 
+// What the game's text fields asked of a touch screen's on-screen keyboard over a frame: whether
+// one was drawn, and whether one was tapped (which brings back a keyboard the player put away).
+struct TextInputRequest {
+  bool field_shown = false;
+  bool field_tapped = false;
+};
+
 // Where raw key, mouse and gamepad states come from: the real devices, or code that says what is
 // pressed.
 class InputSource {
@@ -32,6 +39,11 @@ class InputSource {
   // Says how large what the game is drawn on is, in pixels, every frame: what is laid out over
   // the game (a touch screen's controls) is laid out on that, wherever on a window it sits.
   virtual void fit_surface(float, float) {}
+  // Says, as a frame starts, what the text fields of the frame before asked for: a touch screen
+  // shows its on-screen keyboard while one is drawn. Nothing else has one to show.
+  virtual void request_text_input(const TextInputRequest&) {}
+  // Whether an on-screen keyboard was asked to cover the bottom of the screen.
+  virtual bool soft_keyboard_shown() const { return false; }
 };
 
 // Input fed by code: keys, a mouse and a gamepad that are wherever the program driving the game
@@ -47,6 +59,12 @@ class ScriptedInputSource final : public InputSource {
   std::string typed_text() const override { return typed_; }
   // What is "typed" every frame until told otherwise.
   void type_text(std::string text) { typed_ = std::move(text); }
+  void request_text_input(const TextInputRequest& request) override { text_input_ = request; }
+  bool soft_keyboard_shown() const override { return keyboard_shown_; }
+  // What the engine last said the text fields asked for.
+  const TextInputRequest& text_input_requested() const { return text_input_; }
+  // Plays a touch screen whose on-screen keyboard is up (or not).
+  void set_soft_keyboard_shown(bool shown) { keyboard_shown_ = shown; }
   // Either of these plugs the gamepad in.
   void set_gamepad_axis(GamepadAxis axis, float value, std::size_t pad = 0) {
     gamepads_.at(pad).connected = true;
@@ -77,6 +95,8 @@ class ScriptedInputSource final : public InputSource {
   bool touch_pointer_ = false;
   std::array<GamepadSample, kMaxGamepads> gamepads_{};
   std::string typed_;
+  TextInputRequest text_input_;
+  bool keyboard_shown_ = false;
 };
 
 }  // namespace redgem

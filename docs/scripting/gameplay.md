@@ -603,6 +603,18 @@ again (`Input.text` is what was typed this frame, for anything else):
 @name = UI.text_field(@name, x: 40, y: 200, width: 320, height: 48, max_length: 12)
 ```
 
+On a phone, the system's on-screen keyboard comes up while a text field is drawn, and goes once
+no field is drawn (the field or the menu holding it closed, the scene changed). The back key puts
+it away, and a tap on the field brings it back. Its letters reach `Input.text` and the field, and
+its Backspace and Enter work as a desktop keyboard's (`Input.pressed?(:enter)` to accept the
+text). The keyboard covers the bottom of the screen; `UI.keyboard_visible?` says whether it is up,
+so that a layout can move the field above it:
+
+```ruby
+field_y = UI.keyboard_visible? ? 80 : UI.height - 160
+@code = UI.text_field(@code, x: 40, y: field_y, width: 320, height: 48, max_length: 6)
+```
+
 ## Pause, and the flow between screens
 
 `Time.scale = 0` freezes the game: physics stops and behaviours get an `update` with a delta of

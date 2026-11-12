@@ -76,6 +76,11 @@ struct ScriptContext {
   bool mouse_locked = false;
   // Input.touch_controls: whether a touch screen shows its stick and buttons.
   bool touch_controls = true;
+  // What the text fields drawn this frame ask of a touch screen's on-screen keyboard (UI.text_field),
+  // said to the input as the next frame starts.
+  TextInputRequest text_input;
+  // UI.keyboard_visible?: whether an on-screen keyboard covers the bottom of the screen.
+  bool keyboard_visible = false;
   // Camera.motion_blur: how much the picture streaks away from its center, 0 to 1.
   float motion_blur = 0.0f;
   // How the player chose the game to be shown and heard (Settings): what is in use now.

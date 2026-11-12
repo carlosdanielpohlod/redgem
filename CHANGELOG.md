@@ -10,6 +10,13 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Typing on Android**: while a `UI.text_field` is drawn, the phone's on-screen keyboard is up;
+  it goes when no field is drawn (the field or its menu closed, the scene changed) or when the
+  back key puts it away, and a tap on the field brings it back. What it types reaches `Input.text`
+  and the text field like a desktop keyboard's letters, and its Backspace and Enter reach
+  `Input.pressed?`. `UI.keyboard_visible?` says whether it covers the bottom of the screen, for a
+  layout that moves the field above it.
+
 - **Inspector collision layers**: assign a body or trigger to a layer defined in `game.json`
   from the Physics card.
 
