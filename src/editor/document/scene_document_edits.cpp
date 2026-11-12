@@ -46,6 +46,7 @@ void SceneDocument::set_light(int index, const LightDesc& light, bool record) {
   if (!node.light) return;
   if (record) checkpoint();
   node.light = light;
+  sanitize_spot_cones(*node.light);
   touch();
 }
 

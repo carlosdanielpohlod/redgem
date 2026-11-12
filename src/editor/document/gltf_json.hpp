@@ -114,6 +114,11 @@ inline constexpr const char* kPointLight = "point";
 inline constexpr const char* kSpotLight = "spot";
 inline constexpr const char* kPerspectiveCamera = "perspective";
 
+// The cone parameters of a punctual spot light.
+inline constexpr const char* kSpotProperty = "spot";
+inline constexpr const char* kInnerConeAngle = "innerConeAngle";
+inline constexpr const char* kOuterConeAngle = "outerConeAngle";
+
 // Extensions the editor writes.
 inline constexpr const char* kLightsExtension = "KHR_lights_punctual";
 inline constexpr const char* kClearcoatExtension = "KHR_materials_clearcoat";

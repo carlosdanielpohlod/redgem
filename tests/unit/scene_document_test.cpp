@@ -477,6 +477,40 @@ TEST_CASE("light and camera edits are saved, and a duplicated light gets its own
   std::filesystem::remove(out);
 }
 
+TEST_CASE("editing only spot cone angles is undoable and survives reopening a scene") {
+  constexpr Color kWhite{1.0f, 1.0f, 1.0f, 1.0f};
+  constexpr float kIntensity = 500.0f;
+  constexpr float kInner = 0.3f;
+  constexpr float kOuter = 0.7f;
+  SceneDocument doc = open_fixture();
+  const int lamp = doc.add_light(LightType::Spot, "Spot", kWhite, kIntensity);
+  const auto out = temp_copy_path("spot_cones");
+  std::string error;
+  REQUIRE_MESSAGE(doc.save_as(out, error), error);
+
+  doc.checkpoint();
+  LightDesc light = *doc.node(lamp).light;
+  light.inner_cone = kInner;
+  light.outer_cone = kOuter;
+  doc.set_light(lamp, light, false);
+  doc.drop_checkpoint_if_unchanged();
+  CHECK(doc.dirty());
+  REQUIRE(doc.undo());
+  CHECK(doc.node(lamp).light->outer_cone == doctest::Approx(kDefaultSpotOuterCone));
+  REQUIRE(doc.redo());
+  REQUIRE_MESSAGE(doc.save(error), error);
+
+  const auto loaded = load_gltf_scene(out.string());
+  REQUIRE_MESSAGE(loaded.ok, loaded.error);
+  const auto saved = loaded.scene.find_node("Spot");
+  REQUIRE(saved != kNoIndex);
+  const auto& reopened = loaded.scene.nodes[saved].light;
+  REQUIRE(reopened.has_value());
+  CHECK(reopened->inner_cone == doctest::Approx(kInner));
+  CHECK(reopened->outer_cone == doctest::Approx(kOuter));
+  std::filesystem::remove(out);
+}
+
 TEST_CASE("saving twice after reparenting keeps every node's own data (lights stay on their node)") {
   constexpr Color kWhite{1.0f, 1.0f, 1.0f, 1.0f};
   constexpr float kIntensity = 3.0f;

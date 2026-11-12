@@ -125,6 +125,8 @@
   "editor.inspector.light.color": "Color",
   "editor.inspector.light.directional": "Directional",
   "editor.inspector.light.intensity": "Intensity",
+  "editor.inspector.light.inner_cone": "Inner cone",
+  "editor.inspector.light.outer_cone": "Outer cone",
   "editor.inspector.light.point": "Point",
   "editor.inspector.light.range": "Range",
   "editor.inspector.light.range_tooltip": "0 = not set (the engine then uses its default reach)",

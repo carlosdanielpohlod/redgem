@@ -5,6 +5,8 @@
 #include <string_view>
 #include <utility>
 
+#include "core/bits.hpp"
+
 namespace redgem::object_clipboard {
 namespace {
 
@@ -15,9 +17,7 @@ constexpr std::string_view kSpaces = " \t\r\n";  // what a clipboard may add to 
 constexpr const char* kAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 constexpr char kPadding = '=';
 constexpr int kBitsPerDigit = 6;  // what one base64 character holds
-constexpr int kBitsPerByte = 8;
 constexpr std::uint32_t kDigitMask = 0x3F;
-constexpr std::uint32_t kByteMask = 0xFF;
 constexpr std::size_t kGroupBytes = 3;  // three bytes make four characters
 constexpr std::size_t kGroupDigits = 4;
 constexpr int kNotADigit = -1;

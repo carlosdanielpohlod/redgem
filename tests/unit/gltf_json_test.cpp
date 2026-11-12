@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <limits>
 #include <set>
 #include <string>
 #include <vector>
@@ -220,6 +221,40 @@ TEST_CASE("lights are saved by type, and with a range only when they have one") 
   write_light(entry, LightDesc{LightType::Spot, kOrange, kLampWatts, kNoRange});
   CHECK(entry[kType] == kSpotLight);
   CHECK_FALSE(entry.contains(kRange));
+}
+
+TEST_CASE("spot angles are valid on disk and belong only to spot lights") {
+  json entry = {{kSpotProperty, {{kOtherExtension, true}}}};
+  LightDesc light{LightType::Spot, kOrange, kLampWatts};
+  light.inner_cone = kDefaultSpotOuterCone;
+  light.outer_cone = kDefaultSpotOuterCone;
+  write_light(entry, light);
+  const auto& spot = entry.at(kSpotProperty);
+  CHECK(spot.at(kOtherExtension) == true);
+  CHECK(spot.at(kInnerConeAngle).get<float>() < spot.at(kOuterConeAngle).get<float>());
+  CHECK(spot.at(kOuterConeAngle) == kDefaultSpotOuterCone);
+
+  light.type = LightType::Point;
+  write_light(entry, light);
+  CHECK_FALSE(entry.contains(kSpotProperty));
+}
+
+TEST_CASE("spotlights replace invalid cone angles before writing glTF") {
+  json entry = json::object();
+  LightDesc light{LightType::Spot, kOrange, kLampWatts};
+  light.inner_cone = std::numeric_limits<float>::quiet_NaN();
+  for (const auto invalid : {kSpotConeAxis, std::numeric_limits<float>::quiet_NaN()}) {
+    light.outer_cone = invalid;
+    write_light(entry, light);
+    CHECK(entry.at(kSpotProperty).at(kOuterConeAngle) == kDefaultSpotOuterCone);
+    CHECK(entry.at(kSpotProperty).at(kInnerConeAngle) == kSpotConeAxis);
+  }
+  light.outer_cone = std::numeric_limits<float>::min();
+  write_light(entry, light);
+  CHECK(entry.at(kSpotProperty).at(kOuterConeAngle) == kMinSpotConeGap);
+  light.outer_cone = kPi;
+  write_light(entry, light);
+  CHECK(entry.at(kSpotProperty).at(kOuterConeAngle) == kMaxSpotOuterCone);
 }
 
 TEST_CASE("a camera without a far plane is saved as an infinite projection") {

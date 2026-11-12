@@ -153,10 +153,15 @@ class ListWriter {
 std::string detail_line(const char* key, const std::string& value) { return std::string(key) + ": " + value + "\n"; }
 
 std::string light_detail(const LightDesc& light) {
-  return std::string(light_name(light.type)) +
-         " color=" + vector_text({light.color.r, light.color.g, light.color.b}, kDetailDecimals) +
-         " intensity=" + number_text(light.intensity, kDetailDecimals) +
-         " range=" + number_text(light.range, kDetailDecimals);
+  std::string detail = std::string(light_name(light.type)) +
+                       " color=" + vector_text({light.color.r, light.color.g, light.color.b}, kDetailDecimals) +
+                       " intensity=" + number_text(light.intensity, kDetailDecimals) +
+                       " range=" + number_text(light.range, kDetailDecimals);
+  if (light.type == LightType::Spot) {
+    detail += " inner_cone=" + number_text(radians_to_degrees(light.inner_cone), kListAngleDecimals) + "deg";
+    detail += " outer_cone=" + number_text(radians_to_degrees(light.outer_cone), kListAngleDecimals) + "deg";
+  }
+  return detail;
 }
 
 std::string camera_detail(const CameraDesc& camera) {

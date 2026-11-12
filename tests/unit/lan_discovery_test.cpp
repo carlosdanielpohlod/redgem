@@ -5,12 +5,14 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/ports.hpp"
 #include "net/discovery/lan_discovery.hpp"
 #include "net/private_address.hpp"
 #include "net/wire.hpp"
 
 using namespace redgem::net;
 using nlohmann::json;
+using redgem::kLargestPort;
 
 namespace {
 
@@ -21,7 +23,6 @@ constexpr std::uint16_t kOtherGamePort = 7780;
 constexpr int kPlayers = 3;
 constexpr int kMostPlayersShown = 99;
 constexpr int kTooManyPlayers = 5000;
-constexpr int kLargestPort = 65535;
 constexpr std::size_t kLongestName = 48;
 constexpr int kGamesOneAddressMayList = 4;
 constexpr int kGamesListed = 32;

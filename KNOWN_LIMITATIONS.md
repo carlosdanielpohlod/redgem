@@ -321,17 +321,13 @@ not a promise of how it will be closed.
 - The continuous integration has no real graphics card. The sanitizers (ASan, UBSan, TSan) run the tests
   that open no window, not the system tests; the coverage report is of those tests too, and no
   share of it is required. The load test and the benchmarks print numbers but fail on none.
-- ThreadSanitizer finds a lock-order inversion in the physics: adding a vehicle holds a body's
-  lock while it takes Jolt's step-listener lock, which a physics step takes the other way round.
-  Physics runs on one thread, so they never meet today; it is listed in
-  `tools/sanitizers/tsan.supp` until it is fixed. UBSan finds a read before a table in raylib's
-  bundled `stb_image_resize2` (scaling icons), listed in `tools/sanitizers/ubsan.supp`. LeakSanitizer
-  finds 161 bytes mruby allocated still held when the unit tests end; mruby is not built with the
-  sanitizers, so whose they are is unknown, and every leak of mruby's memory is listed as known.
+- UBSan finds a read before a table in raylib's bundled `stb_image_resize2` (scaling icons),
+  listed in `tools/sanitizers/ubsan.supp`. LeakSanitizer finds 161 bytes mruby allocated still
+  held when the unit tests end; mruby is not built with the sanitizers, so whose they are is
+  unknown, and every leak of mruby's memory is listed as known.
 - About forty unit and integration tests wait on the real clock, a source of rare timing failures.
-- Some constants are defined more than once (`kLargestPort` in five places, though
-  `core/command_line.hpp` already exports one; `kBitsPerByte` in seven; Ruby limits that repeat
-  C++ ones), as are a few string helpers.
+- Some constants are defined more than once (Ruby limits that repeat C++ ones), as are a few
+  string helpers.
 - A connection's buffers never give memory back once grown, and copy what is left on every
   partial send (`frame_buffer.cpp`, `socket_io.cpp`).
 - `Save.update`'s block runs under one lock for the whole database, which every room of a
