@@ -24,6 +24,13 @@
 #   Network.join("play.example.com", auth: { token: token })
 #   Network.authenticate { |peer, auth, decide| decide.accept(identity: ...) or decide.deny("why") }
 #
+# Every connection is encrypted (TLS). A join checks who answers by its fingerprint: a server's
+# (what redgem-server and redgem-relay print, or game.json's "servers"), or a hosted game's code:
+#
+#   Network.join("play.example.com", fingerprint: "3F:A2:...:9C")
+#   UI.text("Code: #{Network.host_code}", x: 20, y: 20)     # on the host ...
+#   Network.join("192.168.0.12", fingerprint: "3FA2C-1B09E")  # ... and the code a player typed
+#
 #   Network.on(:hit) { |data, from| @health -= data[:damage] }
 #   Network.emit(:hit, { damage: 3 })   # to everyone else; to: :host or to: a peer's id for one
 #
@@ -84,11 +91,15 @@ module Network
     # on_connect follows, and Network.room is then the code the others join with.
     # waiting_per_address: how many machines behind one address (players sharing a network that
     # reaches the internet through one address) may be joining at the same moment.
-    def host(port: DEFAULT_PORT, name: nil, visible: true, room: false, waiting_per_address: WAITING_PER_ADDRESS)
+    # Every connection is encrypted. A game hosted here proves itself with an identity made for
+    # it: Network.host_code is what to show the players who join, Network.fingerprint the whole of
+    # it. fingerprint: (with room: true) is the relay's, as with join.
+    def host(port: DEFAULT_PORT, name: nil, visible: true, room: false, waiting_per_address: WAITING_PER_ADDRESS,
+             fingerprint: nil)
       # (A number it does not take raises before the game this machine is in is left.)
       waiting = __waiting_per_address(waiting_per_address.to_i)
       leave
-      return __host_room(*relay_address) if room
+      return __host_room(*relay_address, fingerprint&.to_s) if room
 
       __host(port.to_i, name.to_s, visible, discovery_port, waiting)
     end
@@ -96,13 +107,17 @@ module Network
     # Starts joining a game (leaving the one this machine is in): at an address, or with
     # room: "K7QM3P" on the relay (or, with an address too, on the dedicated server there).
     # auth: (a hash) goes with it, for the game joined to decide on (Network.authenticate).
+    # fingerprint: is who must answer: a relay's or a dedicated server's whole fingerprint, or the
+    # code a player's hosted game shows (Network.host_code). Without it, game.json's "servers"
+    # say, and for an address they do not name the connection is encrypted but who answers is
+    # not checked. A machine that is not the one expected fails the join, saying so.
     # on_connect or on_fail tells how it went, a moment later.
-    def join(address = nil, port: DEFAULT_PORT, room: nil, auth: nil)
+    def join(address = nil, port: DEFAULT_PORT, room: nil, auth: nil, fingerprint: nil)
       leave
-      return join_room(address, port, room, auth) if room
+      return join_room(address, port, room, auth, fingerprint) if room
       raise ArgumentError, "join needs an address or a room" if address.nil?
 
-      __join(address.to_s, port.to_i, auth)
+      __join(address.to_s, port.to_i, auth, fingerprint&.to_s)
     end
 
     def leave
@@ -173,9 +188,9 @@ module Network
     end
 
     # A room by its code: on the dedicated server at `address` when there is one, on the relay otherwise.
-    def join_room(address, port, room, auth)
+    def join_room(address, port, room, auth, fingerprint)
       server = address.nil? ? relay_address : [address.to_s, port.to_i]
-      __join_room(*server, room.to_s.strip.upcase, auth)
+      __join_room(*server, room.to_s.strip.upcase, auth, fingerprint&.to_s)
     end
 
     # The relay as [address, port].

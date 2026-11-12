@@ -208,6 +208,7 @@ add_executable(redgem_tests
   integration/multiplayer_test.cpp
   integration/swordsman.cpp
   integration/relay_test.cpp
+  integration/encrypted_connection_test.cpp
   integration/relay_approval_test.cpp
   integration/lobby_test.cpp
   integration/dedicated_server_test.cpp
@@ -363,6 +364,11 @@ set_tests_properties(relay.help PROPERTIES PASS_REGULAR_EXPRESSION "usage:.*redg
 add_test(NAME relay.refuses_what_it_does_not_understand COMMAND redgem_relay --port many)
 set_tests_properties(relay.refuses_what_it_does_not_understand PROPERTIES
   PASS_REGULAR_EXPRESSION "--port needs a number from 0 to 65535")
+# What games pin a relay by: its certificate's SHA-256, made and kept in its data folder.
+set(REDGEM_FINGERPRINT_PATTERN "[0-9A-F][0-9A-F](:[0-9A-F][0-9A-F])+")
+add_test(NAME relay.prints_its_fingerprint
+         COMMAND redgem_relay --fingerprint --data ${CMAKE_CURRENT_BINARY_DIR}/relay-fingerprint-test)
+set_tests_properties(relay.prints_its_fingerprint PROPERTIES PASS_REGULAR_EXPRESSION "${REDGEM_FINGERPRINT_PATTERN}")
 
 # The game server's command line, as the program itself answers it.
 add_test(NAME server.help COMMAND redgem_server --help)
@@ -370,6 +376,10 @@ set_tests_properties(server.help PROPERTIES PASS_REGULAR_EXPRESSION "usage:.*red
 add_test(NAME server.refuses_what_it_does_not_understand COMMAND redgem_server ${CMAKE_SOURCE_DIR}/games/platformer --rooms many)
 set_tests_properties(server.refuses_what_it_does_not_understand PROPERTIES
   PASS_REGULAR_EXPRESSION "--rooms needs a number from 1 to 64")
+add_test(NAME server.prints_its_fingerprint
+         COMMAND redgem_server ${CMAKE_SOURCE_DIR}/games/platformer --fingerprint
+                 --data ${CMAKE_CURRENT_BINARY_DIR}/server-fingerprint-test)
+set_tests_properties(server.prints_its_fingerprint PROPERTIES PASS_REGULAR_EXPRESSION "${REDGEM_FINGERPRINT_PATTERN}")
 
 # Ruby unit tests run inside the engine's own mruby, by the test tool.
 file(GLOB REDGEM_RUBY_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ruby/*_test.rb)

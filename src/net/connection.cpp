@@ -3,9 +3,15 @@
 #include <utility>
 
 #include "core/log.hpp"
+#include "net/secure/tls_session.hpp"
 #include "net/traffic.hpp"
 
 namespace redgem::net {
+
+Connection::Connection() = default;
+Connection::~Connection() = default;
+Connection::Connection(Connection&& other) noexcept = default;
+Connection& Connection::operator=(Connection&& other) noexcept = default;
 
 Connection::Connection(Socket socket, std::size_t pending_limit, bool established)
     : socket_(std::move(socket)),
@@ -14,20 +20,34 @@ Connection::Connection(Socket socket, std::size_t pending_limit, bool establishe
       established_(established),
       answering_(established) {}
 
-Connection Connection::accepted(Socket socket, std::size_t pending_limit) {
-  return Connection(std::move(socket), pending_limit, true);
+Connection Connection::accepted(Socket socket, std::size_t pending_limit,
+                                const std::shared_ptr<const TlsIdentity>& identity) {
+  Connection connection(std::move(socket), pending_limit, true);
+  if (identity) connection.encrypt(TlsSession::answering(identity, connection.tls_error_));
+  return connection;
 }
 
-Connection Connection::calling(Socket socket) { return Connection(std::move(socket), kMaxPendingBytes, false); }
+Connection Connection::calling(Socket socket, const TlsTrust& trust) {
+  Connection connection(std::move(socket), kMaxPendingBytes, false);
+  if (trust.encrypted()) connection.encrypt(TlsSession::calling(trust, connection.tls_error_));
+  return connection;
+}
+
+void Connection::encrypt(std::unique_ptr<TlsSession> tls) {
+  tls_ = std::move(tls);
+  if (!tls_) close();  // TLS could not even start: nothing goes in the clear instead
+}
 
 std::size_t Connection::pump() {
   taken_this_poll_ = 0;
   if (hung_up()) return 0;
-  if (!established()) return 0;
+  if (!made()) return 0;
   const std::size_t arrived = take_in();
   flush();
   return arrived;
 }
+
+bool Connection::made() { return established() && secured(); }
 
 bool Connection::established() {
   if (established_) return true;
@@ -35,6 +55,33 @@ bool Connection::established() {
   if (status == IoStatus::Closed) hang_up();  // refused
   established_ = status == IoStatus::Ok;
   return established_;
+}
+
+bool Connection::secured() {
+  if (!handshaking()) return true;
+  const Handshake step = tls_->handshake(socket_);
+  if (step == Handshake::Failed) hang_up();
+  return step == Handshake::Done;
+}
+
+bool Connection::handshaking() const { return tls_ != nullptr && !tls_->done(); }
+
+bool Connection::work_waiting() const {
+  if (message_waiting()) return true;
+  return tls_ != nullptr && tls_->holds_unread();
+}
+
+std::string Connection::failure() const {
+  if (!tls_error_.empty()) return tls_error_;
+  return tls_ != nullptr ? tls_->failure() : std::string();
+}
+
+IoStatus Connection::read_some(std::vector<std::uint8_t>& into, std::size_t limit) {
+  return tls_ != nullptr ? tls_->read(socket_, into, limit) : socket_.read(into, limit);
+}
+
+IoStatus Connection::write_out() {
+  return tls_ != nullptr ? tls_->write(socket_, outgoing_) : socket_.write(outgoing_);
 }
 
 std::size_t Connection::take_in() {
@@ -45,7 +92,7 @@ std::size_t Connection::take_in() {
     return 0;
   }
   std::vector<std::uint8_t> arrived;
-  if (socket_.read(arrived, kMaxReadBytesPerPoll) == IoStatus::Closed) hang_up();
+  if (read_some(arrived, kMaxReadBytesPerPoll) == IoStatus::Closed) hang_up();
   if (!arrived.empty()) quiet_for_ = 0.0f;
   incoming_.append(arrived.data(), arrived.size());
   count_received(arrived.size());
@@ -104,8 +151,8 @@ void Connection::send_packed(const std::vector<std::uint8_t>& message) {
 void Connection::flush() {
   if (!can_write()) return;
   const std::size_t waiting = outgoing_.size();
-  const IoStatus status = socket_.write(outgoing_);
-  count_sent(waiting - outgoing_.size());
+  const IoStatus status = write_out();
+  count_sent(waiting - outgoing_.size());  // (the messages' bytes, before TLS adds its own)
   if (status == IoStatus::Closed) hang_up();
 }
 
@@ -121,7 +168,7 @@ void Connection::keep_in_touch(float seconds) {
 
 void Connection::keep_waiting(float seconds) {
   waiting_for_ += seconds;
-  if (waiting_for_ > kJoinTimeoutSeconds) close();  // connected and said nothing
+  if (waiting_for_ > patience()) close();  // connected and said nothing (or never finished its handshake)
 }
 
 void Connection::hang_up() {

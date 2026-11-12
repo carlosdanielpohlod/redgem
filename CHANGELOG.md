@@ -130,6 +130,19 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **Game connections are encrypted** (TLS 1.2 or 1.3, no renegotiation), to a player hosting, a
+  relay or a dedicated server alike, and a machine that talks in the clear is let go: games of
+  this version cannot play with earlier ones, nor use an earlier relay or server. A handshake not
+  over in 3 seconds is let go without holding up anyone else. The relay and the server make a TLS
+  identity the first time they start and keep it in their data folder (`redgem-relay --data`,
+  `./redgem-relay-data` by default; the server's `--data`), print its fingerprint when they start,
+  and show it with `--fingerprint`. A game pins it with `fingerprint:` on `Network.join` and
+  `Network.host(room: true)`, or for every join with `"servers"` in `game.json`, and refuses any
+  other machine. A player hosting proves itself with an identity made for the game, whose short
+  code `Network.host_code` (and whole `Network.fingerprint`) the others join with. Without a
+  fingerprint the connection is encrypted but whoever answers is believed. `docker compose up
+  relay` keeps the relay's identity in a volume.
+
 - **The Linux download runs on glibc 2.35 or newer** (Ubuntu 22.04, Debian 12, Fedora 36 and
   later) instead of 2.39: it is built on Ubuntu 22.04 with libstdc++ linked in, and so are the
   players inside it, so games built for Linux run on those systems too. The release workflow

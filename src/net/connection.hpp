@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -9,6 +10,8 @@
 #include <nlohmann/json.hpp>
 
 #include "net/frame_buffer.hpp"
+#include "net/secure/fingerprint.hpp"
+#include "net/secure/tls_identity.hpp"
 #include "net/socket/socket.hpp"
 #include "net/wire.hpp"
 #include "net/wire_codec.hpp"
@@ -23,20 +26,36 @@ namespace redgem::net {
 inline constexpr std::size_t kMaxPendingPerServed = 2 * kMaxFrameBytes;
 inline constexpr int kDefaultConnectionsPerAddress = 24;
 inline constexpr int kMostConnectionsPerAddress = 1024;
+// How long a machine that connected has to finish its TLS handshake, of the time it has to say
+// what it wants (kJoinTimeoutSeconds): one that keeps a handshake hanging holds a place, so it
+// is let go sooner. (Nothing waits for it meanwhile: every handshake goes on as bytes arrive.)
+inline constexpr float kHandshakeTimeoutSeconds = 3.0f;
+
+class TlsSession;
 
 // One machine's end of a TCP connection that carries messages (see wire.hpp): a host's to each
 // machine that joined, a joiner's to its host, a relay's to each machine it serves. What they all
 // need is here once: what arrives is cut into messages and checked, what waits is sent, a machine
 // that went silent is noticed, and no machine costs the others more than its share.
 // Nothing here waits: pump() it every poll.
+// It is encrypted (TLS, see net/secure/tls_session.hpp) when made so: no message moves before the
+// handshake is over, nor, on the side that calls, before the other proved to be the machine its
+// TlsTrust expects. Games and the server programs always encrypt; plaintext is for the engine's
+// own tests of the protocol, which write it byte by byte.
 class Connection {
  public:
-  Connection() = default;
+  Connection();
+  ~Connection();
+  Connection(Connection&& other) noexcept;
+  Connection& operator=(Connection&& other) noexcept;
   // Over the socket of a machine that connected to this one. `pending_limit` is how much may wait
-  // to be sent to it before it counts as no longer listening.
-  static Connection accepted(Socket socket, std::size_t pending_limit = kMaxPendingBytes);
-  // Over a socket that is still connecting out: what is sent meanwhile goes once it is through.
-  static Connection calling(Socket socket);
+  // to be sent to it before it counts as no longer listening. With an `identity` the connection
+  // is encrypted, this machine proving itself with it; without, it is plaintext.
+  static Connection accepted(Socket socket, std::size_t pending_limit = kMaxPendingBytes,
+                             const std::shared_ptr<const TlsIdentity>& identity = nullptr);
+  // Over a socket that is still connecting out: what is sent meanwhile goes once it is through
+  // (encrypted, and the other side checked, as `trust` says).
+  static Connection calling(Socket socket, const TlsTrust& trust = TlsTrust::plaintext());
 
   // A poll's first step: reads what arrived and sends what waits. How many bytes arrived.
   std::size_t pump();
@@ -58,7 +77,8 @@ class Connection {
   // Time passing for a machine that is in: says "I am here" when nothing was said to it lately,
   // and gives up on one not heard from for too long.
   void keep_in_touch(float seconds);
-  // Time passing for a newcomer that has not said what it wants yet: it is given up on in the end.
+  // Time passing for a newcomer that has not said what it wants yet: it is given up on in the end
+  // (sooner while its handshake is not over: kHandshakeTimeoutSeconds).
   void keep_waiting(float seconds);
 
   // Lets go of the other side now: nothing more of it is read, handled or sent.
@@ -71,6 +91,14 @@ class Connection {
   bool closed() const { return dropped_ || (gone_ && !incoming_.message_waiting()); }
   // Whether next_message has something to give without anything more arriving.
   bool message_waiting() const { return incoming_.message_waiting(); }
+  // Whether the next pump and next_message have something to do without anything more arriving:
+  // a message, or what arrived and waits in the TLS session.
+  bool work_waiting() const;
+  // Whether it is encrypted, and its handshake is not over yet.
+  bool handshaking() const;
+  // Why its TLS failed (a handshake that did not work out, another side than the one expected);
+  // empty when it did not, or it has none.
+  std::string failure() const;
   // The bytes held for it: what arrived and was not taken yet, and what waits to be sent.
   std::size_t held() const { return incoming_.buffered() + outgoing_.size(); }
   // What a wait watches its socket for.
@@ -82,11 +110,23 @@ class Connection {
   Connection(Socket socket, std::size_t pending_limit, bool established);
   // Whether the connection is made (a call out takes a moment; a refused one counts as hung up).
   bool established();
+  // Encrypts it with `tls`; with none (TLS could not start), it is closed.
+  void encrypt(std::unique_ptr<TlsSession> tls);
+  // Whether messages can move: the connection is made, and its handshake is over.
+  bool made();
+  // Whether its handshake is over (or it has none); one that failed hangs up.
+  bool secured();
+  // How long a newcomer may keep quiet before it is let go.
+  float patience() const { return handshaking() ? kHandshakeTimeoutSeconds : kJoinTimeoutSeconds; }
   std::size_t take_in();
+  // Moves bytes through the socket, or through the TLS session over it.
+  IoStatus read_some(std::vector<std::uint8_t>& into, std::size_t limit);
+  IoStatus write_out();
   // Whether nothing more goes to the other side: it hung up, or was let go.
   bool hung_up() const { return gone_ || dropped_; }
-  // Whether what waits can be written out now: to a side that is there, over a connection that is made.
-  bool can_write() const { return !hung_up() && established_; }
+  // Whether what waits can be written out now: to a side that is there, over a connection that is
+  // made (and encrypted, when it is to be).
+  bool can_write() const { return !hung_up() && established_ && !handshaking(); }
   // Whether one more message may be taken this poll (see kMaxMessagesPerPoll).
   bool takes_more() const { return !dropped_ && taken_this_poll_ < kMaxMessagesPerPoll; }
   // The other side is gone: nothing more is sent or read, but what it said is still to be taken.
@@ -102,9 +142,11 @@ class Connection {
   std::optional<nlohmann::json> not_ours();
 
   Socket socket_;
+  std::unique_ptr<TlsSession> tls_;  // null: plaintext
   FrameBuffer incoming_;
   std::vector<std::uint8_t> outgoing_;
   std::string address_;
+  std::string tls_error_;  // why TLS could not start
   std::size_t pending_limit_ = kMaxPendingBytes;
   int taken_this_poll_ = 0;   // messages (see kMaxMessagesPerPoll)
   float waiting_for_ = 0.0f;  // seconds a newcomer has kept quiet

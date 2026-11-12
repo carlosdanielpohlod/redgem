@@ -203,6 +203,11 @@ redgem_add_library(redgem_net
   net/animation_codec.cpp
   net/graph_animation_codec.cpp
   net/pose_baselines.cpp
+  net/secure/tls_basics.cpp
+  net/secure/fingerprint.cpp
+  net/secure/tls_identity.cpp
+  net/secure/tls_session.cpp
+  net/secure/server_pins.cpp
   net/connection.cpp
   net/traffic.cpp
   net/network_session.cpp
@@ -390,6 +395,7 @@ redgem_add_library(redgem_runtime
   script/bindings/network_bindings.cpp
   script/bindings/network_search_bindings.cpp
   script/bindings/network_state_bindings.cpp
+  script/bindings/network_security_bindings.cpp
   script/bindings/network_pose_bindings.cpp
   script/bindings/network_approval_bindings.cpp
   script/bindings/http_bindings.cpp
