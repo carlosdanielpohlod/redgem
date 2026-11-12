@@ -249,8 +249,15 @@ not a promise of how it will be closed.
   and a report): memory running out inside a library that does not throw (the graphics driver,
   the physics, the interpreter's own allocations, which a script sees as `NoMemoryError`) can
   still end the game with only a crash report, or none.
-- A built game for Android writes no crash report and shows no message (only `adb logcat`). On
-  Windows the report's backtrace is module offsets (`redgem-player.exe+0x1a2b`), not function names.
+- A crash report's backtrace is offsets into each program (`Arena.exe+0x1a2b`): function names
+  need `redgem symbolize` with the release's `redgem-symbols-<system>.zip` and an addr2line on the
+  developer's machine. The symbols name functions; file and line only where the player was built
+  with debugging information, which the release's are not. Mac reports name no build id, so
+  `redgem symbolize` cannot read them, and no Mac symbols are kept.
+- A built game for Android shows its player no message when it crashes: the report is written to
+  the app's files and to `adb logcat`, and the next run only says so in its log. The report's
+  backtrace on Android is what the unwinder could walk from the signal handler, after the address
+  the crash happened at.
 - The scripts' time budget stops Ruby code only: one call of the engine's own that takes long
   (a huge `Array#sort`, a request to the engine for millions of things) is not cut off, and the
   budget is wall time: a call paused in a debugger for longer than it is stopped when it resumes.

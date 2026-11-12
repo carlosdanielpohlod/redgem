@@ -13,6 +13,18 @@ A release carries four downloads, under these names (the README's
 Each one also has the demos (platformer, driving, city), `LICENSE`, `THIRD_PARTY_LICENSES.md` and
 its `README.txt` (`README-<system>.txt` here).
 
+Beside them, the players' symbols: each player as it was linked, before it was stripped for the
+downloads, which `redgem symbolize` reads a crash report of a game built with it with (it finds
+the one of the report's build by its build id). They are never in a download.
+
+| Asset | What it holds |
+| --- | --- |
+| `redgem-symbols-linux.zip` | `redgem-symbols/linux/redgem-player` |
+| `redgem-symbols-windows.zip` | `redgem-symbols/windows/redgem-player.exe` (linked with `--strip-debug`: functions, no lines) |
+| `redgem-symbols-android.zip` | `redgem-symbols/android/<arm64-v8a, x86_64>/libredgem.so` |
+
+The Mac's players carry no build id the engine reads yet: no Mac symbols are kept.
+
 ## How a release is made
 
 The continuous integration builds and packs the downloads (`.github/workflows/release.yml`). The
@@ -58,8 +70,9 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build
 tools/windows/build_runtime.sh
 cmake --build build-windows --target redgem redgem_relay redgem_server
 tools/android/build_runtime.sh
-tools/release/package.sh                 # dist/release: the Linux and Windows downloads
-tools/release/check_downloads.sh dist/release redgem-linux-x86_64.tar.gz redgem-windows-x86_64.zip
+tools/release/package.sh                 # dist/release: the Linux and Windows downloads, and the symbols
+tools/release/check_downloads.sh dist/release redgem-linux-x86_64.tar.gz redgem-windows-x86_64.zip \
+  redgem-symbols-linux.zip redgem-symbols-windows.zip redgem-symbols-android.zip
 tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.tar.gz
 ```
 
