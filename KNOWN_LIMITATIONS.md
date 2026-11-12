@@ -125,8 +125,15 @@ the same pull request.
   files, sockets or `eval` (on purpose: a game cannot touch the player's machine).
 - `a&.b.c` does not stop at `a` being nil as it does in other Rubies: write `a&.b&.c`.
 - All text the engine and editor show is English. Games translate their own texts.
-- `Scene.spawn` cannot name or parent the copy, and an object's parent cannot be changed from a
-  script. The scene's first camera is the game's camera: a script cannot switch to another.
+- `Camera.cut_to` fades through black only: there is no crossfade (the renderer draws one camera
+  a frame) and no wipe. The black is drawn by a behaviour of the camera cut to, so HUD drawn by a
+  behaviour that updates after it stays over it.
+- The choice of camera (`Camera.main =`) belongs to the scene: a scene loaded anew is seen
+  through its own first camera, and a cut in progress stops with the scene it played in.
+- The engine never moves the sound listener: a game that switches cameras moves
+  `Audio.listener` with `Camera.main` itself.
+- A dynamic body (and a character or a vehicle) is simulated in the world: a parent does not
+  carry it. Under a moving parent it keeps its own motion; make it kinematic to carry it.
 - Custom properties that are lists or objects in the scene file are dropped with a warning: a
   property is a number, a text or true/false.
 - Limits a game can reach: 64 hits per physics query, 4096 live particles and 256 emitters, 4096

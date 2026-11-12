@@ -199,6 +199,74 @@ TEST_CASE("what is under a prefab is a prefab too, and prefabs are not found by 
   CHECK(scene.find("Child") != kNoObject);  // by name, a template is found
 }
 
+TEST_CASE("a chosen camera is the main one while it is alive, and a new scene has none chosen") {
+  SceneDesc desc = family();
+  NodeDesc second;
+  second.name = "Second";
+  second.camera = CameraDesc{};
+  desc.nodes.push_back(second);
+  Scene scene = Scene::from_desc(desc);
+  const ObjectId first = scene.find("Camera");
+  const ObjectId chosen = scene.find("Second");
+  REQUIRE(scene.main_camera() == first);
+
+  scene.choose_main_camera(chosen);
+  CHECK(scene.main_camera() == chosen);
+  scene.choose_main_camera(kNoObject);  // back to the scene's first camera
+  CHECK(scene.main_camera() == first);
+
+  scene.choose_main_camera(chosen);
+  scene.at(chosen).camera.reset();  // no longer a camera: the first one shows the game
+  CHECK(scene.main_camera() == first);
+  scene.at(chosen).camera = CameraDesc{};
+  CHECK(scene.main_camera() == chosen);
+  scene.request_destroy(chosen);
+  scene.finalize_destroy(chosen);
+  CHECK(scene.main_camera() == first);
+  CHECK(Scene::from_desc(desc).main_camera() == first);
+}
+
+TEST_CASE("an object cannot go under itself or under what it carries") {
+  const Scene scene = Scene::from_desc(family());
+  const ObjectId parent = scene.find("Parent");
+  const ObjectId child = scene.find("Child");
+  CHECK(scene.would_cycle(parent, parent));
+  CHECK(scene.would_cycle(parent, child));
+  CHECK_FALSE(scene.would_cycle(child, parent));
+  CHECK_FALSE(scene.would_cycle(child, scene.find("Camera")));
+  CHECK_FALSE(scene.would_cycle(child, kNoObject));
+}
+
+TEST_CASE("a new parent keeps an object where it is in the world, or where it is relative to it") {
+  constexpr float kQuarterTurn = 90.0f;
+  const Vec3 parent_place{0, 5, 0};
+  const Vec3 child_place{1, 5, 0};
+  Scene scene = Scene::from_desc(family());
+  const ObjectId parent = scene.find("Parent");
+  const ObjectId child = scene.find("Child");
+  const ObjectId camera = scene.find("Camera");
+  scene.at(camera).local.position = {2, 0, 0};
+  scene.at(camera).local.rotation = quat_from_euler_degrees({0, kQuarterTurn, 0});
+  REQUIRE(approx_equal(scene.world_transform(child).position, child_place, kTolerance));
+
+  scene.set_parent(child, camera, true);
+  CHECK(scene.at(child).parent == camera);
+  CHECK(scene.at(camera).children == std::vector<ObjectId>{child});
+  CHECK(scene.at(parent).children.empty());
+  CHECK(approx_equal(scene.world_transform(child).position, child_place, kTolerance));
+
+  const Vec3 under_camera = scene.at(child).local.position;
+  scene.set_parent(child, parent, false);  // the same place relative to Parent as to the camera
+  CHECK(approx_equal(scene.at(child).local.position, under_camera, kTolerance));
+  CHECK(approx_equal(scene.world_transform(child).position, parent_place + under_camera, kTolerance));
+
+  const Vec3 moved = scene.world_transform(child).position;
+  scene.set_parent(child, kNoObject, true);
+  CHECK(scene.at(child).parent == kNoObject);
+  CHECK(scene.at(parent).children.empty());
+  CHECK(approx_equal(scene.at(child).local.position, moved, kTolerance));
+}
+
 TEST_CASE("wind sways an object's foliage unless it says not to, or a skeleton moves it") {
   SceneDesc desc;
   NodeDesc tree;

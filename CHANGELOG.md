@@ -18,6 +18,23 @@ until 1.0, a release may change what games rely on (see
   and never holds up the server: few connections, small requests, short deadlines.
   `--status-log <seconds>`, and `SIGUSR1` on Linux and macOS, write the same summary to the log.
 
+- **Camera switching**: `Camera.main = camera` sees the game through another camera object of the
+  scene (security cameras, a car's cameras, a cutscene's shots), and `Camera.main = nil` goes back
+  to the scene's first. `Camera.cut_to(camera, fade: seconds)` cuts through black: the picture
+  darkens over the first half, the cut happens at the darkest frame, and it comes back over the
+  second half, also while the game is paused; `Camera.cutting?` says whether one is playing. The
+  view natives (`screen_ray`, `world_to_screen`, `fov`) and the helpers (`follow`, `orbit`,
+  `shake`) act on the camera switched to. A scene loaded anew starts at its own first camera.
+  Temporal anti-aliasing and motion blur take any switch for a cut, however near the cameras are,
+  so nothing of the last shot smears into the next.
+- **Parents from scripts**: `Scene.spawn(..., name:, parent:)` names the copy (so `Scene.find`
+  finds it) and puts it under an object, keeping its place in the world. `GameObject#parent =`
+  moves an object under another one at runtime, keeping its place in the world, or at the root
+  with `nil`; `set_parent(object, keep_world: false)` keeps its local transform instead. An object
+  never goes under itself or what it carries, nor under a template. A kinematic body under a parent
+  goes where it takes it; a dynamic one keeps its own motion, and is taken to its new place
+  (stopped, as when a script sets its position) when `keep_world: false` moves it.
+
 - **Typing on Android**: while a `UI.text_field` is drawn, the phone's on-screen keyboard is up;
   it goes when no field is drawn (the field or its menu closed, the scene changed) or when the
   back key puts it away, and a tap on the field brings it back. What it types reaches `Input.text`

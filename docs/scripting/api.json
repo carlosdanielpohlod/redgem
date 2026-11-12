@@ -5,6 +5,7 @@
   "internal_classes": [
     "Behaviour::Timer",
     "Behaviour::Tween",
+    "Camera::Cut",
     "Camera::Follow",
     "Camera::Rig",
     "Camera::Shake",
@@ -234,6 +235,16 @@
         {
           "name": "parent",
           "about": "the object it is under, or nil"
+        },
+        {
+          "name": "parent=",
+          "args": "object",
+          "about": "puts it under another object (nil: at the root), where it stays in the world, then moves with it; never under itself or what it carries"
+        },
+        {
+          "name": "set_parent",
+          "args": "object, keep_world: true",
+          "about": "like parent=; keep_world: false keeps its local transform instead, so the new parent places it; returns the parent"
         },
         {
           "name": "children",
@@ -610,8 +621,8 @@
         {
           "name": "spawn",
           "static": true,
-          "args": "template, position: nil, rotation: nil, physics: true",
-          "about": "copies a prefab = true template, with its physics and scripts; returns the copy",
+          "args": "template, position: nil, rotation: nil, physics: true, name: nil, parent: nil",
+          "about": "copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy",
           "top": 20,
           "example": "Scene.spawn(\"Bullet\", position: transform.position, rotation: transform.rotation)"
         }
@@ -1226,7 +1237,25 @@
         {
           "name": "main",
           "static": true,
-          "about": "the object holding the camera"
+          "about": "the camera object the game is seen through: the one chosen with main= or cut_to, else the scene's first"
+        },
+        {
+          "name": "main=",
+          "static": true,
+          "args": "camera",
+          "about": "sees the game through another camera object at once (a cut in progress stops); nil goes back to the scene's first; a scene loaded anew starts at its first"
+        },
+        {
+          "name": "cut_to",
+          "static": true,
+          "args": "camera, fade: 0",
+          "about": "cuts to another camera; with a fade (seconds), through black: darker over its first half, cut at the darkest frame, back over the second half, also while paused; returns the camera",
+          "example": "Camera.cut_to(Scene.find(\"SecurityCam\"), fade: 0.6)"
+        },
+        {
+          "name": "cutting?",
+          "static": true,
+          "about": "whether a cut with a fade is still playing"
         },
         {
           "name": "screen_ray",

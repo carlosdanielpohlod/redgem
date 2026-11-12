@@ -3,6 +3,7 @@
 #include <raylib.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <vector>
 
@@ -33,6 +34,13 @@ void move_vertices(const Mesh& mesh, const PrimitiveDesc& primitive) {
 
 // A minimized window has no size: there is nothing to draw into.
 bool has_area(int width, int height) { return width > 0 && height > 0; }
+
+// The serial of the camera object the scene is seen through (kNoSerial without one): when it
+// changes, the frames before show another place.
+std::uint64_t viewer_of(const Scene& scene) {
+  const ObjectId camera = scene.main_camera();
+  return camera == kNoObject ? kNoSerial : scene.at(camera).serial;
+}
 
 }  // namespace
 
@@ -82,6 +90,7 @@ void Renderer::draw_plain(const Scene& scene, const Camera3D& camera, const Rend
   impl_->prepare_water_ripples(scene, water_ripples);
   const Environment env = within_quality(scene_environment(scene), impl_->quality, impl_->gpu);
   impl_->ensure_targets(width, height, env.msaa);
+  impl_->temporal.viewer = viewer_of(scene);
   impl_->prepare_frame(scene, camera, env, static_cast<float>(width) / static_cast<float>(height), particles);
   impl_->draw_lit_scene(camera, particles);
   impl_->post_process(env, output);

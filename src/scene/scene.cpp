@@ -91,11 +91,20 @@ std::vector<ObjectId> Scene::alive_ids() const {
 }
 
 ObjectId Scene::main_camera() const {
+  const ObjectId chosen = resolve(chosen_camera_);
+  return is_live_camera_id(chosen) ? chosen : first_camera();
+}
+
+void Scene::choose_main_camera(ObjectId id) { chosen_camera_ = handle(id); }
+
+ObjectId Scene::first_camera() const {
   for (const GameObject& object : objects_) {
     if (is_live_camera(object)) return object.id;
   }
   return kNoObject;
 }
+
+bool Scene::is_live_camera_id(ObjectId id) const { return valid(id) && is_live_camera(objects_[id]); }
 
 Transform Scene::world_transform(ObjectId id) const {
   const GameObject& object = at(id);
@@ -118,6 +127,22 @@ void Scene::set_world_rotation(ObjectId id, Quat rotation) {
   Transform world = world_transform(id);
   world.rotation = rotation;
   set_world_transform(id, world);
+}
+
+bool Scene::would_cycle(ObjectId id, ObjectId parent) const {
+  for (ObjectId above = parent; valid(above); above = objects_[above].parent) {
+    if (above == id) return true;
+  }
+  return false;
+}
+
+void Scene::set_parent(ObjectId id, ObjectId parent, bool keep_world) {
+  const Transform world = world_transform(id);
+  GameObject& object = at(id);
+  leave_parent(object);
+  object.parent = valid(parent) ? parent : kNoObject;
+  if (object.parent != kNoObject) objects_[object.parent].children.push_back(id);
+  if (keep_world) set_world_transform(id, world);
 }
 
 void Scene::request_destroy(ObjectId id) {

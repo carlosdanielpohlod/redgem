@@ -14,6 +14,8 @@ namespace {
 
 using namespace binding;
 
+constexpr const char* kSetParent = "GameObject#parent=";  // what errors of re-parenting start with
+
 mrb_value property_value(mrb_state* mrb, const PropertyValue& value) {
   if (const auto* flag = std::get_if<bool>(&value)) return mrb_bool_value(*flag);
   if (const auto* number = std::get_if<double>(&value)) return mrb_float_value(mrb, *number);
@@ -77,6 +79,29 @@ mrb_value game_object_parent(mrb_state* mrb, mrb_value self) {
   return object_or_nil(mrb, alive_object(mrb, self).parent);
 }
 
+// An object was moved in the world with what it carries: their bodies that physics moves go along
+// (see bodies::follow_write), as when a script sets a position.
+void tell_moved(mrb_state* mrb, ObjectId id) {
+  const ScriptContext& ctx = context(mrb);
+  if (!ctx.on_transform_written) return;
+  ctx.on_transform_written(id, TransformWrite::Position);
+  for (const ObjectId child : scene(mrb).at(id).children) tell_moved(mrb, child);
+}
+
+// GameObject#__set_parent(parent or nil, keep_world): see ruby/engine/game_object.rb.
+mrb_value game_object_set_parent(mrb_state* mrb, mrb_value self) {
+  mrb_value parent;
+  mrb_bool keep_world = true;
+  mrb_get_args(mrb, "ob", &parent, &keep_world);
+  const ObjectId id = placeable_id(mrb, self, kSetParent);
+  const ObjectId above = mrb_nil_p(parent) ? kNoObject : placeable_id(mrb, parent, kSetParent);
+  if (scene(mrb).would_cycle(id, above))
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "%s %v cannot go under itself or what it carries (%v)", kSetParent, self, parent);
+  scene(mrb).set_parent(id, above, keep_world);
+  if (!keep_world) tell_moved(mrb, id);
+  return parent;
+}
+
 mrb_value game_object_children(mrb_state* mrb, mrb_value self) {
   const GameObject& object = alive_object(mrb, self);
   mrb_value children = mrb_ary_new(mrb);
@@ -122,6 +147,7 @@ void install_identity_bindings(RClass* game_object, mrb_state* mrb) {
   mrb_define_method(mrb, game_object, "props", game_object_props, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "stable_id", game_object_stable_id, MRB_ARGS_NONE());
   mrb_define_method(mrb, game_object, "parent", game_object_parent, MRB_ARGS_NONE());
+  mrb_define_method(mrb, game_object, "__set_parent", game_object_set_parent, MRB_ARGS_REQ(2));
   mrb_define_method(mrb, game_object, "children", game_object_children, MRB_ARGS_NONE());
 }
 

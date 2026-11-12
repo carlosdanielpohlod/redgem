@@ -19,6 +19,31 @@ module Camera
   NEAREST_SEAT = 0.3
   HALF = 0.5
 
+  # Makes another camera of the scene the one the game is seen through, at once (a cut in progress
+  # stops); nil goes back to the scene's first camera. The helpers below act on it from then on.
+  def self.main=(camera)
+    @cut = nil
+    __choose(camera, "Camera.main=")
+  end
+
+  # Cuts to another camera. With a fade (seconds), the picture goes to black over its first half,
+  # is seen through the new camera from the darkest frame, and comes back over the second half; it
+  # plays on while the game is paused. Without one it cuts at once. Returns the camera.
+  def self.cut_to(camera, fade: 0.0)
+    seconds = __number(fade, "Camera.cut_to fade", 0.0)
+    return self.main = camera if seconds.zero?
+
+    __check(camera, "Camera.cut_to")
+    @cut = (camera.get_component(Cut) || camera.add_component(Cut)).begin_fade(seconds)
+    camera
+  end
+
+  # Whether a cut with a fade (Camera.cut_to) is still playing.
+  def self.cutting? = @cut&.playing? || false
+
+  # The cut playing now, if any (the newest: an older one stops when it sees it is not).
+  def self.__cut = @cut
+
   # Follows an object at an offset; see Camera::Follow for the options. Returns the Follow.
   def self.follow(target, **)
     __rig("Camera.follow").motion = Follow.new(__object(target, "Camera.follow"), **)
