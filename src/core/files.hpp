@@ -22,6 +22,8 @@ bool write_bytes_file(const std::filesystem::path& path, const std::vector<std::
 // ("games/foo/" -> "games/foo", whose filename is the game's name).
 std::filesystem::path normalized_folder(const std::filesystem::path& folder);
 
+inline constexpr const char* kFolderOccupied = "folder already exists";
+
 // A temporary sibling folder, reserved without replacing any existing path.
 class ReservedFolder {
  public:

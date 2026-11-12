@@ -21,7 +21,6 @@ bool ends_with_separator(const std::filesystem::path& normal) {
 }
 
 constexpr int kReserveAttempts = 8;
-constexpr const char* kFolderOccupied = "folder already exists";
 
 std::string folder_seed() {
   std::random_device random;
@@ -39,14 +38,24 @@ bool reserve_directory(const std::filesystem::path& path, std::error_code& error
 #endif
 }
 
+bool occupied_path(const std::filesystem::path& path, const std::error_code& error) {
+  if (!error || error == std::errc::file_exists) return true;
+#ifdef _WIN32
+  std::error_code ignored;
+  return std::filesystem::exists(std::filesystem::symlink_status(path, ignored));
+#else
+  static_cast<void>(path);
+  return false;
+#endif
+}
+
 std::filesystem::path reserve_folder(const std::filesystem::path& parent, const std::string& stem, std::string& error) {
   for (int attempt = 0; attempt < kReserveAttempts; ++attempt) {
     const auto suffix = attempt == 0 ? std::string{} : "-" + std::to_string(attempt);
-    const auto candidate = parent / (stem + suffix);
+    auto candidate = parent / (stem + suffix);
     std::error_code problem;
     if (reserve_directory(candidate, problem)) return candidate;
-    const bool occupied = !problem || problem == std::errc::file_exists;
-    if (occupied) continue;
+    if (occupied_path(candidate, problem)) continue;
     error = "cannot reserve " + candidate.string() + ": " + problem.message();
     return {};
   }

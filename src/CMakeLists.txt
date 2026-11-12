@@ -158,6 +158,7 @@ redgem_add_library(redgem_core
   core/platform_desktop.cpp
   core/platform_log.cpp
   core/files.cpp
+  core/recovery_lease.cpp
   core/command_line.cpp
   core/names.cpp
   core/folder_names.cpp
@@ -558,7 +559,6 @@ if(NOT ANDROID)
   editor/editor_session.cpp
     editor/editor_session_create.cpp
     editor/editor_session_play.cpp
-    editor/recovery_lease.cpp
     editor/scene_recovery.cpp
     editor/editor_session_recovery.cpp
     editor/editor_recovery.cpp

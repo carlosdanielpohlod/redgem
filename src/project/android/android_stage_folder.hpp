@@ -5,7 +5,7 @@
 #include <string>
 
 #include "core/files.hpp"
-#include "editor/recovery_lease.hpp"
+#include "core/recovery_lease.hpp"
 
 namespace redgem::android_stage {
 
@@ -15,10 +15,12 @@ inline constexpr char kOwnerSignature[] = "redgem-android-stage-v1\n";
 inline constexpr const char* kLeaseFile = ".redgem-stage-lease";
 inline constexpr const char* kPackageFolder = "package";
 
+std::filesystem::path cache_root();
+
 // Owns one build's staging folder until packing finishes.
 class Folder {
  public:
-  Folder(const std::filesystem::path& output, std::string& error);
+  Folder(const std::filesystem::path& cache, std::string& error);
   ~Folder();
   Folder(const Folder&) = delete;
   Folder& operator=(const Folder&) = delete;

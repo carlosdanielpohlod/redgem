@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -242,7 +243,7 @@ TEST_CASE("Android staging refuses to reuse a folder and leaves its contents int
       {"x86_64", scratch.file("built/libredgem.so", "engine")}};
   std::string error;
   CHECK_FALSE(stage_android_game(fixture("games/sandbox"), runtimes, "stamp", stage, error));
-  CHECK(error.find("already exists") != std::string::npos);
+  CHECK(error.find(kFolderOccupied) != std::string::npos);
   CHECK(read(file) == "belongs to the user");
   CHECK_FALSE(std::filesystem::exists(stage / "assets"));
 }
@@ -266,6 +267,9 @@ TEST_CASE("reserving a temporary folder retries a collision and cleans only the 
 
 TEST_CASE("an Android build reclaims marked stale stages and leaves live or unrelated folders alone") {
   const Scratch scratch;
+#ifndef _WIN32
+  std::filesystem::permissions(scratch.dir, std::filesystem::perms::owner_all);
+#endif
   std::string error;
   const auto unrelated = scratch.file(std::string(android_stage::kPrefix) + "other/keep.txt", "keep");
   const auto stale = scratch.dir / (std::string(android_stage::kPrefix) + "stale");
@@ -295,6 +299,38 @@ TEST_CASE("an Android build reclaims marked stale stages and leaves live or unre
   }
   CHECK_FALSE(std::filesystem::exists(next));
   CHECK(std::filesystem::is_directory(live.path()));
+}
+
+TEST_CASE("Android cache sweeps an old incomplete reservation and skips paths it cannot prove safe") {
+  const Scratch scratch;
+#ifndef _WIN32
+  std::filesystem::permissions(scratch.dir, std::filesystem::perms::owner_all);
+#endif
+  const std::string prefix = android_stage::kPrefix;
+  const auto orphan = scratch.dir / (prefix + "12345");
+  REQUIRE(std::filesystem::create_directory(orphan));
+  const auto created = std::filesystem::last_write_time(orphan);
+  constexpr std::chrono::minutes kOldAge{20};
+  std::filesystem::last_write_time(orphan, created - kOldAge);
+  const auto wrong = scratch.file(prefix + "wrong/" + android_stage::kOwnerFile,
+                                  std::string(android_stage::kOwnerSignature) + "extra");
+  const auto unavailable =
+      scratch.file(prefix + "unavailable/" + android_stage::kOwnerFile, android_stage::kOwnerSignature);
+  REQUIRE(std::filesystem::create_directory(unavailable.parent_path() / android_stage::kLeaseFile));
+#ifndef _WIN32
+  const auto symlink = scratch.dir / (prefix + "link");
+  std::filesystem::create_directory_symlink(unavailable.parent_path(), symlink);
+#endif
+
+  std::string error;
+  const android_stage::Folder next(scratch.dir, error);
+  REQUIRE_MESSAGE(!next.path().empty(), error);
+  CHECK_FALSE(std::filesystem::exists(orphan));
+  CHECK(std::filesystem::exists(wrong));
+  CHECK(std::filesystem::exists(unavailable));
+#ifndef _WIN32
+  CHECK(std::filesystem::is_symlink(symlink));
+#endif
 }
 
 TEST_CASE("a game says its own app id, version and signing key in game.json") {
