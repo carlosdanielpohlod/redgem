@@ -39,7 +39,7 @@ constexpr std::size_t kElementWriteArguments = 2;  // "[]=": the key and the val
 bool holds(const std::string& text, const std::string& word) { return lowered(text).find(word) != std::string::npos; }
 
 bool matches(const ApiClass& owner, const ApiMethod& method, const std::string& word) {
-  return holds(typed_signature(owner, method), word) || holds(method.about, word);
+  return holds(signature(owner, method), word) || holds(method.about, word);  // (not the types: Array has "ray")
 }
 
 // "  name(args)                      about".
@@ -119,10 +119,19 @@ bool reads_element(const ApiMethod& method) {
   return method.name == kElement || method.params.size() < kElementWriteArguments;
 }
 
+// The keys an element's writer takes: every parameter but the last, the value.
+std::string keys_in(const ApiMethod& method, const CallStyle& style) {
+  std::string text;
+  for (std::size_t at = 0; at + 1 < method.params.size(); ++at) {
+    text += (text.empty() ? "" : kSeparator) + style.argument(method.params[at]);
+  }
+  return text;
+}
+
 // "[key]" or "[key] = value", typed: "[String key] -> untyped", "[String key] = untyped value".
 std::string element_call(const ApiMethod& method, const CallStyle& style) {
   if (reads_element(method)) return "[" + arguments_in(method, style) + "]" + returned(method, style);
-  return "[" + style.argument(method.params.front()) + "] = " + style.argument(method.params.back());
+  return "[" + keys_in(method, style) + "] = " + style.argument(method.params.back());
 }
 
 // How a call is written after what it is called on: "rotate(degrees)", "position = vector",
@@ -243,8 +252,6 @@ std::string signature(const ApiClass& owner, const ApiMethod& method) {
 std::string typed_signature(const ApiClass& owner, const ApiMethod& method) {
   return called_on(owner.name, method.on_class ? kClassCall : kInstanceCall, method, kTypedCall);
 }
-
-std::string arguments_of(const ApiMethod& method) { return arguments_in(method, kPlainCall); }
 
 const ApiClass* find_api_class(const ApiReference& reference, const std::string& name) {
   const auto found = std::find_if(reference.classes.begin(), reference.classes.end(),

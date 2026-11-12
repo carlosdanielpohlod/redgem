@@ -113,6 +113,10 @@ std::string api_rbs(const ApiReference& reference) {
 bool write_type_signatures(const std::filesystem::path& game_dir, std::string& error) {
   std::error_code fs_error;
   std::filesystem::create_directories(game_dir / kSignaturesFolder, fs_error);
+  if (fs_error) {
+    error = "cannot make " + (game_dir / kSignaturesFolder).string() + ": " + fs_error.message();
+    return false;
+  }
   return write_text_file(game_dir / kSignaturesFile, api_rbs(api_reference()), error);
 }
 

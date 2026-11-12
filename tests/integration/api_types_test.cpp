@@ -164,7 +164,16 @@ TEST_CASE("the reference refuses what it may not hold, saying where") {
   CHECK(has(refusal(data), "Tools: its kind is class or module, not namespace"));
   data = reference_data();
   data["classes"][3]["superclass"] = "Mover";
-  CHECK(has(refusal(data), "Tools: it cannot come from Mover"));
+  CHECK(has(refusal(data), "Tools: a module comes from no class"));
+  data = reference_data();
+  data["classes"][0]["methods"][0]["params"].push_back({{"name", "name"}, {"type", "String"}});
+  CHECK(has(refusal(data), "Mover.new: name is out of place"));  // (needed after one left out)
+  data = reference_data();
+  move_params(data)[0]["name"] = "max distance";
+  CHECK(has(refusal(data), "Mover#move: a parameter cannot be called \"max distance\""));
+  data = reference_data();
+  data["classes"][0]["methods"][1]["about"] = "moves it\nreturns itself";
+  CHECK(has(refusal(data), "Mover#move: its about is one line"));
   data = reference_data();
   data["classes"][0]["methods"][2].erase("returns");
   CHECK_THROWS(read_api_reference(data.dump()));  // (every method says what it returns)
@@ -175,7 +184,6 @@ TEST_CASE("calls written with and without their types") {
   const ApiClass& mover = reference.classes[0];
   const ApiClass& tools = reference.classes[3];
   CHECK(signature(mover, mover.methods[1]) == "Mover#move(to, loop: false, &done)");
-  CHECK(arguments_of(mover.methods[1]) == "to, loop: false, &done");
   CHECK(typed_signature(mover, mover.methods[1]) ==
         "Mover#move(Vector3 | nil to, loop: bool = false) ?{ (Float) -> void } -> self");
   CHECK(typed_signature(mover, mover.methods[0]) == "Mover.new(Numeric speed = 1.0) -> Mover");

@@ -408,5 +408,8 @@ TEST_CASE("redgem api: an index, a class with its types, a search, the type sign
   CHECK(api({"Input", "--json"}).out.find("\"returns\":{\"type\":\"Float\"}") != std::string::npos);
   CHECK(api({"--search", "raycast", "--json"}).out.find("\"class\":\"Physics\"") != std::string::npos);
   CHECK(api({"--rbs"}).out == api_rbs(api_reference()));
+  CHECK(api({"Transform", "--rbs"}).exit_code == kExitUsage);  // (signatures are of the whole API)
+  CHECK(api({"--search", "ray", "--rbs"}).exit_code == kExitUsage);
+  CHECK(api({"--search", "ray"}).out.find("GameObject#children") == std::string::npos);  // (not Array's "ray")
   CHECK(api({"a", "b"}).exit_code == kExitUsage);
 }

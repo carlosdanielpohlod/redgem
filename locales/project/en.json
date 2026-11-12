@@ -11,6 +11,7 @@
   "project.api.no_class": "no class {class}.",
   "project.api.nothing_found": "no method has to do with {word}; redgem api lists the classes",
   "project.api.one_class": "name one class at a time",
+  "project.api.rbs_whole": "--rbs writes the signatures of the whole API: give it no class and no --search",
   "project.api.see_index": "redgem api lists the classes.",
   "project.api.usage": [
     "usage: redgem api [Class] [--search word] [--json] [--markdown] [--rbs]",

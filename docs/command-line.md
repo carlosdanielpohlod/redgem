@@ -224,7 +224,7 @@ Transform: Where an object is, how it is turned and how big it is.
 
 `redgem api` alone lists the classes, a line each; `redgem api <Class>` the methods of one, each
 with the types of its parameters and of what it returns; `redgem api --search <word>` the methods
-that have to do with a word (at most 20), the word also found in their types. `--json` says the
+that have to do with a word (at most 20). `--json` says the
 same as data, for tools. It is the [API reference](scripting/api.md), which `--markdown` writes,
 and which is made from `docs/scripting/api.json`.
 

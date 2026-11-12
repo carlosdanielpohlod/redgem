@@ -82,9 +82,6 @@ const std::string& api_reference_json();
 std::string signature(const ApiClass& owner, const ApiMethod& method);
 // ... with its types: "Input.axis(Symbol name, pad: Integer = 0) -> Float".
 std::string typed_signature(const ApiClass& owner, const ApiMethod& method);
-// The arguments a call is written with: "name, loop: true, &block".
-std::string arguments_of(const ApiMethod& method);
-
 // The class of that name (any case); nullptr when there is none.
 const ApiClass* find_api_class(const ApiReference& reference, const std::string& name);
 
@@ -92,7 +89,7 @@ const ApiClass* find_api_class(const ApiReference& reference, const std::string&
 std::string api_index(const ApiReference& reference);
 // One class: a line per method, with its types, then its notes.
 std::string api_class_text(const ApiClass& owner);
-// The methods whose call (with its types) or line holds `word` (any case), at most `most`, a line each.
+// The methods whose call or line holds `word` (any case), at most `most`, a line each with its types.
 std::string api_search(const ApiReference& reference, const std::string& word, std::size_t most);
 // docs/scripting/api.md.
 std::string api_markdown(const ApiReference& reference);
@@ -104,7 +101,7 @@ struct ApiCall {
 };
 // The calls games make most, in their rank's order.
 std::vector<ApiCall> most_used_calls(const ApiReference& reference);
-// The methods whose call (with its types) or line holds `word` (any case), in the reference's order.
+// The methods whose call (without its types) or line holds `word` (any case), in the reference's order.
 std::vector<ApiCall> methods_about(const ApiReference& reference, const std::string& word);
 
 // The same as data, for tools (compact JSON; the methods the engine keeps for itself left out):

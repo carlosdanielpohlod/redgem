@@ -1,6 +1,7 @@
 // Reading docs/scripting/api.json, and refusing what it may not hold (see api_reference.hpp).
 
 #include <algorithm>
+#include <cctype>
 #include <iterator>
 #include <stdexcept>
 
@@ -110,14 +111,35 @@ Slot slot_of(const ApiParam& param) {
 // Whether a call may have more than one parameter of a slot.
 bool is_repeatable(Slot slot) { return slot == Slot::Positional || slot == Slot::Keyword; }
 
-bool is_out_of_place(Slot before, Slot slot) { return slot < before || (slot == before && !is_repeatable(slot)); }
+bool is_positional(const ApiParam& param) { return slot_of(param) == Slot::Positional; }
+
+// Whether a positional parameter a call needs comes after one it may leave out (Ruby allows it;
+// RBS cannot say it).
+bool is_needed_after_optional(const ApiParam& before, const ApiParam& param) {
+  return is_positional(before) && is_positional(param) && before.optional && !param.optional;
+}
+
+bool is_out_of_place(const ApiParam& before, const ApiParam& param) {
+  const Slot first = slot_of(before);
+  const Slot slot = slot_of(param);
+  return slot < first || (slot == first && !is_repeatable(slot)) || is_needed_after_optional(before, param);
+}
 
 void check_order(const std::vector<ApiParam>& params, const std::string& where) {
   for (std::size_t at = 1; at < params.size(); ++at) {
-    if (is_out_of_place(slot_of(params[at - 1]), slot_of(params[at])))
-      refuse(where, params[at].name + " is out of place");
+    if (is_out_of_place(params[at - 1], params[at])) refuse(where, params[at].name + " is out of place");
   }
 }
+
+bool is_name_start(char letter) { return std::islower(static_cast<unsigned char>(letter)) != 0 || letter == '_'; }
+bool is_name_letter(char letter) { return std::isalnum(static_cast<unsigned char>(letter)) != 0 || letter == '_'; }
+
+// Whether a parameter's name is one Ruby (and RBS) can write: speed, max_distance, _unused.
+bool is_parameter_name(const std::string& name) {
+  return !name.empty() && is_name_start(name.front()) && std::all_of(name.begin(), name.end(), is_name_letter);
+}
+
+bool has_line_break(const std::string& text) { return text.find('\n') != std::string::npos; }
 
 bool mixes_kinds(const ApiParam& param) { return param.block && (param.keyword || param.rest); }
 bool is_optional_rest(const ApiParam& param) { return param.rest && param.optional; }
@@ -140,7 +162,7 @@ void check_type(const std::string& type, const std::vector<std::string>& classes
 }
 
 void check_param(const ApiParam& param, const std::vector<std::string>& classes, const std::string& where) {
-  if (param.name.empty()) refuse(where, "a parameter has no name");
+  if (!is_parameter_name(param.name)) refuse(where, "a parameter cannot be called \"" + param.name + "\"");
   const std::string place = where + " " + param.name;
   check_flags(param, place);
   check_type(param.type, classes, param.block ? TypePlace::Block : TypePlace::Parameter, place);
@@ -148,24 +170,19 @@ void check_param(const ApiParam& param, const std::vector<std::string>& classes,
 
 void check_method(const ApiClass& owner, const ApiMethod& method, const std::vector<std::string>& classes) {
   const std::string where = owner.name + (method.on_class ? kClassCall : kInstanceCall) + method.name;
+  if (has_line_break(method.about)) refuse(where, "its about is one line");
   for (const ApiParam& param : method.params) check_param(param, classes, where);
   check_order(method.params, where);
   check_type(method.returns, classes, TypePlace::Returned, where);
 }
 
-bool is_one_of(const std::string& name, const std::vector<std::string>& names) {
-  return std::find(names.begin(), names.end(), name) != names.end();
-}
-
-// Whether a class says it comes from something it cannot: a module comes from nothing, a class
-// from another class of the reference.
-bool has_wrong_superclass(const ApiClass& owner, const std::vector<std::string>& classes) {
-  if (owner.superclass.empty()) return false;
-  return owner.is_module || !is_one_of(owner.superclass, classes);
-}
+// Whether a module says it comes from a class (only a class does; which one, the tests check
+// against the engine).
+bool is_module_with_superclass(const ApiClass& owner) { return owner.is_module && !owner.superclass.empty(); }
 
 void check_class(const ApiClass& owner, const std::vector<std::string>& classes) {
-  if (has_wrong_superclass(owner, classes)) refuse(owner.name, "it cannot come from " + owner.superclass);
+  if (is_module_with_superclass(owner)) refuse(owner.name, "a module comes from no class");
+  if (has_line_break(owner.about)) refuse(owner.name, "its about is one line");
   for (const ApiMethod& method : owner.methods) check_method(owner, method, classes);
 }
 

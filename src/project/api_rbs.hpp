@@ -13,8 +13,9 @@
 
 namespace redgem::tools {
 
-// Where a game keeps them, in its own folder (the folder RBS tools look in). For whoever makes
-// the game: a build of it leaves them behind (see game_build.hpp).
+// Where a game keeps them, in its own folder (the folder RBS tools look in), beside any of its
+// own. For whoever makes the game: a build of it leaves the whole folder behind (see
+// game_build.hpp).
 inline constexpr const char* kSignaturesFolder = "sig";
 inline constexpr const char* kSignaturesFile = "sig/redgem.rbs";
 

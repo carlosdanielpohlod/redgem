@@ -53,6 +53,12 @@ ToolResult whole(const ToolLine& line) {
   return answer(api_index(api_reference()));
 }
 
+// Whether --rbs is asked of one class or a search: the signatures are of the whole API (RBS
+// files are read whole).
+bool asks_part_as_rbs(const ToolLine& line) {
+  return line.has(kRbsOption) && (!line.words.empty() || line.value(kSearchOption).has_value());
+}
+
 ToolResult usage_failure(const std::string& problem) {
   return failed(problem + "\n\n" + tr("project.api.usage"), kExitUsage);
 }
@@ -65,6 +71,7 @@ ToolResult run_api_command(const std::vector<std::string>& args) {
   if (!line) return usage_failure(error);
   if (line->has(command_line::kHelpOption)) return answer(tr("project.api.usage"));
   if (line->words.size() > 1) return usage_failure(tr("project.api.one_class"));
+  if (asks_part_as_rbs(*line)) return usage_failure(tr("project.api.rbs_whole"));
   if (const auto word = line->value(kSearchOption)) return search(*word, line->has(kJsonOption));
   if (!line->words.empty()) return one_class(line->words.front(), line->has(kJsonOption));
   return whole(*line);
