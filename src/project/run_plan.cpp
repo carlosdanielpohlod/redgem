@@ -17,9 +17,8 @@ namespace {
 constexpr std::uint32_t kLargestSeed = 2147483647;  // also fits an interpreter with 32-bit integers
 constexpr std::uintmax_t kMostInputBytes = 1024 * 1024;
 constexpr std::size_t kMostEvents = 10000;
-constexpr std::size_t kMostKeys = 128;
 constexpr std::size_t kMostExpressionBytes = 4096;
-constexpr int kMostInputDepth = 4;
+constexpr int kMostInputDepth = 5;  // events, an event, its pads, a pad, its axes
 
 std::optional<long long> whole_number(const std::string& text, long long least, long long most) {
   const auto number = number_from(text);
@@ -40,35 +39,11 @@ std::string read_numbers(const ToolLine& line, RunPlan& plan) {
   return {};
 }
 
-bool known_field(const std::string& field) { return field == "frame" || field == "keys"; }
-
-std::string read_keys(const nlohmann::json& keys, RunInput& event) {
-  if (!keys.is_array() || keys.size() > kMostKeys) return tr("project.run.bad_keys");
-  for (const auto& value : keys) {
-    if (!value.is_string()) return tr("project.run.bad_key");
-    const auto key = key_from_name(value.get<std::string>());
-    if (!key) return tr("project.run.unknown_key", {{"key", printable(value.get<std::string>())}});
-    event.keys.push_back(*key);
-  }
-  return {};
-}
-
-std::string read_event(const nlohmann::json& value, long long frames, RunInput& event) {
-  if (!value.is_object() || !value.contains("frame") || !value.contains("keys")) return tr("project.run.event_fields");
-  for (const auto& item : value.items()) {
-    if (!known_field(item.key())) return tr("project.run.unknown_input_field", {{"field", printable(item.key())}});
-  }
-  const auto frame = whole_number(value["frame"].dump(), 0, frames - 1);
-  if (!frame) return tr("project.run.bad_input_frame");
-  event.frame = *frame;
-  return read_keys(value["keys"], event);
-}
-
 std::string read_events(const nlohmann::json& json, long long frames, std::vector<RunInput>& events) {
   if (!json.is_array() || json.size() > kMostEvents) return tr("project.run.bad_events");
   for (const auto& value : json) {
     RunInput event;
-    const std::string problem = read_event(value, frames, event);
+    const std::string problem = read_run_input(value, frames, event);
     if (!problem.empty())
       return tr("project.run.input_event", {{"event", std::to_string(events.size())}, {"problem", problem}});
     events.push_back(std::move(event));

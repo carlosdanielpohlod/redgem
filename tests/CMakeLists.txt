@@ -48,6 +48,7 @@ add_executable(redgem_tests
   unit/input_bindings_test.cpp
   unit/input_bindings_store_test.cpp
   unit/mouse_bindings_test.cpp
+  unit/run_input_test.cpp
   unit/script_naming_test.cpp
   unit/cli_test.cpp
   unit/recording_test.cpp

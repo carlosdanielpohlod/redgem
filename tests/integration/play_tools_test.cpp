@@ -240,6 +240,41 @@ TEST_CASE("a run replays held keys and releases them at the given frame") {
   CHECK(has(ran.out, "frame 1: 1\nframe 2: 2\nframe 3: 2\nframe 4: 2\n"));
 }
 
+TEST_CASE("a run replays the mouse, gamepads and touch through the input the game reads") {
+  const GameCopy game("pointer_pad_touch_replay");
+  game.write("input.json", R"([
+    {"frame": 0, "mouse": {"x": 100, "y": 50, "buttons": ["left"]},
+                 "pads": [{"pad": 1, "buttons": ["a"], "axes": {"left_x": -1}}]},
+    {"frame": 1, "mouse": {"click": ["right"], "wheel": 2}},
+    {"frame": 2, "touch": {"x": 30, "y": 40}},
+    {"frame": 3, "tap": {"x": 10, "y": 20}}
+  ])");
+  game.write("scripts/main_scene.rb", R"(
+    class InputWitness < Behaviour
+      def update(_dt)
+        $seen = [pointer, pad]
+      end
+      def pointer
+        [Input.mouse_x.round, Input.mouse_y.round, Input.mouse_down?(:left), Input.action?(:fire),
+         Input.mouse_pressed?(:right), Input.mouse_wheel.round]
+      end
+      def pad = [Input.gamepad_down?(:a, pad: 1), Input.action?(:jump, pad: 1), Input.gamepad_axis(:left_x, pad: 1).round]
+    end
+    Input.define_action(:fire, mouse: [:left])
+    Input.define_action(:jump, buttons: [:a])
+    Scene.find('Player').add_component(InputWitness)
+    class MainScene < SceneScript; end
+  )");
+  const ToolResult ran = tool(
+      {"run", game.dir(), "--frames", "5", "--input", game.dir() + "/input.json", "--print", "$seen", "--every", "1"});
+  CHECK_MESSAGE(ran.exit_code == kExitSuccess, ran.out, ran.err);
+  CHECK(has(ran.out, "frame 1: [[100, 50, true, true, false, 0], [true, true, -1]]\n"));    // held, pad plugged in
+  CHECK(has(ran.out, "frame 2: [[100, 50, false, false, true, 2], [false, false, 0]]\n"));  // a click, the wheel
+  CHECK(has(ran.out, "frame 3: [[30, 40, true, true, false, 0], [false, false, 0]]\n"));    // a finger down
+  CHECK(has(ran.out, "frame 4: [[10, 20, true, true, false, 0], [false, false, 0]]\n"));    // a tap
+  CHECK(has(ran.out, "frame 5: [[10, 20, false, false, false, 0], [false, false, 0]]\n"));  // and its end
+}
+
 TEST_CASE("run assertions and stop conditions are evaluated after each frame") {
   const GameCopy game("run_conditions");
   const ToolResult stopped = tool({"run", game.dir(), "--frames", "20", "--until", "($n ||= 0; $n += 1) == 3",

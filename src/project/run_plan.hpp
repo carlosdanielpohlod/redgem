@@ -6,7 +6,7 @@
 #include <variant>
 #include <vector>
 
-#include "input/input_source.hpp"
+#include "project/run_input.hpp"
 #include "project/tool_line.hpp"
 
 namespace redgem::tools {
@@ -17,12 +17,6 @@ inline constexpr const char* kAssertOption = "--assert";
 inline constexpr const char* kUntilOption = "--until";
 inline constexpr const char* kPrintOption = "--print";
 inline constexpr const char* kEveryOption = "--every";
-
-// At a zero-based frame, replace the held keys. Between events the keys stay held.
-struct RunInput {
-  long long frame = 0;
-  std::vector<Key> keys;
-};
 
 inline constexpr long long kDefaultPrintEvery = 60;
 

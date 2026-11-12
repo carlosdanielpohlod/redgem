@@ -66,6 +66,23 @@ behaviour's state. Taking pictures is something only tests do: a game's own scri
 for it. What the game saves with `Save` goes to a file of the test's own, which starts
 empty: a test never sees or changes your real progress.
 
+## Replaying input without a test file
+
+`redgem run --input plan.json` plays the game with no window from a JSON list of input events:
+keys, the mouse (moves, held buttons, clicks, the wheel), gamepads 0 to 3 (buttons, sticks,
+triggers) and a finger on the screen (held, moved, lifted, or a tap), each from a zero-based
+frame. `--assert` and `--until` then check the game after every frame, and the command fails when
+they do not hold, so a plan file is a quick check of its own:
+
+```bash
+redgem run my_game --frames 120 --input plan.json --until "Scene.find('Door').nil?"
+```
+
+The events go through the same input a player's devices feed, so `Input.mouse_x`,
+`Input.mouse_down?`, `Input.gamepad_axis`, and actions bound to `mouse:left` or `pad:a` all see
+them. See [The command line](command-line.md) and
+[Repeating a headless session](assistants.md#repeating-a-headless-session) for every field.
+
 ## Testing Ruby code by itself
 
 Code that needs no running game (a formula, a helper class) can be tested without one. A file of

@@ -370,7 +370,8 @@ What is there today is the command line (`redgem scene`, `run`, `shot`, `check`,
 tools (`redgem mcp`), the editor's Agent panel, the `AGENTS.md` guide of new games and `llms.txt`;
 see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not there yet:
 
-- Headless input replay covers keyboard states only; mouse, gamepad and touch input are not yet replayed.
+- Headless input replay plays one finger, as the pointer a phone gives the game; multi-touch
+  gestures and the on-screen touch controls of a phone are not replayed.
 - Reading history from an unrelated running game: MCP's `events` tool reads its own process or
   its connected editor, using a process-local `since` cursor.
 - `redgem scene diff` compares loaded object content against an earlier scene file, but does

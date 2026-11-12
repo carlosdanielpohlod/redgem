@@ -112,8 +112,9 @@ Ruby and particle random stream, including random values read while scripts firs
 is a whole number from 0 to 2147483647. Scatter requests keep their own explicit seeds. Network
 traffic, web responses and scripts that read external clocks or files are outside this replay.
 
-Keyboard input comes from a JSON file. Each event replaces the whole set of held keys before
-its zero-based frame; keys remain held until the next event. An empty list releases them:
+Input comes from a JSON file. Each event replaces everything held (keys, mouse buttons, gamepads,
+a finger on the screen) before its zero-based frame; it stays held until the next event. An event
+with an empty `keys` list releases everything:
 
 ```json
 [
@@ -121,6 +122,34 @@ its zero-based frame; keys remain held until the next event. An empty list relea
   {"frame": 30, "keys": ["w", "space"]},
   {"frame": 31, "keys": ["w"]},
   {"frame": 120, "keys": []}
+]
+```
+
+Besides `keys`, an event may give any of these:
+
+| Field | Meaning |
+|-------|---------|
+| `"mouse": {"x": 320, "y": 180}` | Moves the pointer there; without `x` and `y` it stays where it was |
+| `"mouse": {"buttons": ["left"]}` | Holds mouse buttons (`left`, `right`, `middle`, `side`, `extra`) until the next event |
+| `"mouse": {"click": ["right"]}` | Presses buttons for this frame only: released on the next |
+| `"mouse": {"wheel": -1}` | Turns the wheel by notches this frame (up is positive) |
+| `"pads": [{"pad": 1, "buttons": ["a"], "axes": {"left_x": -1, "right_trigger": 1}}]` | Plugs in gamepad 0 to 3 (0 when `pad` is left out), holding buttons and pushing sticks (-1 to 1) and triggers (0 to 1) |
+| `"touch": {"x": 100, "y": 200}` | A finger held on the screen there: down, moved by the next `touch`, up when an event has none |
+| `"tap": {"x": 100, "y": 200}` | A finger down for this frame only |
+
+`x` and `y` are pixels from the top-left of the screen; with `"normalized": true` they are
+fractions (0 to 1) of its width and height. The game reads a finger the way it reads one on a
+phone: as the pointer (`Input.mouse_x`, `Input.mouse_y`), with the left button held. So `mouse`,
+`touch` and `tap` move the same pointer and an event takes only one of them; there is one finger.
+Everything goes through the input the game reads, so actions bound to `mouse:left` or `pad:a`
+fire as they would for a player. A gamepad an event does not list is unplugged:
+
+```json
+[
+  {"frame": 0, "mouse": {"x": 0.5, "y": 0.5, "normalized": true, "click": ["left"]}},
+  {"frame": 10, "pads": [{"buttons": ["a"], "axes": {"left_x": 1}}]},
+  {"frame": 40, "tap": {"x": 600, "y": 300}},
+  {"frame": 60, "keys": []}
 ]
 ```
 
@@ -142,7 +171,8 @@ Use them to read state: a mutation or a call to `rand` changes the session too. 
 input, game frame, assertion, periodic print, stop condition. On an early stop, a final print
 runs after the stop condition. A syntax error, exception or timeout in any expression fails the
 run with its frame and option. The command exits 0 on success, 1 for a failed run, and 2 for
-invalid options or an invalid input file. Input currently covers keyboard state only.
+invalid options or an invalid input file. On-screen touch controls (`Input.touch_controls`) are
+drawn only on a phone and are not replayed.
 
 ## Object identities
 
