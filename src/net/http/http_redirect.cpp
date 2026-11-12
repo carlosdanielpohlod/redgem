@@ -144,7 +144,7 @@ std::string resolved_target(const std::string& base, const std::string& referenc
 
 // A Location as an address of its own, read against the one its answer came from.
 std::string absolute_location(const Url& from, const std::string& location) {
-  const std::string reference = location.substr(0, location.find(kFragmentStart));
+  std::string reference = location.substr(0, location.find(kFragmentStart));
   if (has_scheme(reference)) return reference;
   if (starts_with(reference, kAuthorityStart)) return scheme_of(from) + reference;
   return scheme_of(from) + kAuthorityStart + from.authority() + resolved_target(from.target, reference);

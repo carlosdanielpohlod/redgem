@@ -38,9 +38,9 @@ net::HttpHeaders headers_from(mrb_state* mrb, mrb_value hash) {
   return headers;
 }
 
-// HTTP.__start(method, url, headers, body, timeout, redirects): the number its answer comes under.
-// An ArgumentError, saying why, for a request that cannot go as it is.
-mrb_value http_start(mrb_state* mrb, mrb_value) {
+// The request a script's HTTP.__start arguments describe.
+// An ArgumentError for a negative timeout.
+net::HttpRequest request_from_args(mrb_state* mrb) {
   const char* method = nullptr;
   const char* url = nullptr;
   mrb_value headers;
@@ -49,14 +49,19 @@ mrb_value http_start(mrb_state* mrb, mrb_value) {
   mrb_bool redirects = true;
   mrb_get_args(mrb, "zzHSfb", &method, &url, &headers, &body, &timeout, &redirects);
   timeout = at_least(mrb, timeout, 0.0, "a web request's timeout");
-  net::HttpRequest request{method,
-                           url,
-                           headers_from(mrb, headers),
-                           text_of(body),
-                           static_cast<float>(timeout),
-                           static_cast<bool>(redirects)};
+  return net::HttpRequest{method,
+                          url,
+                          headers_from(mrb, headers),
+                          text_of(body),
+                          static_cast<float>(timeout),
+                          static_cast<bool>(redirects)};
+}
+
+// HTTP.__start(method, url, headers, body, timeout, redirects): the number its answer comes under.
+// An ArgumentError, saying why, for a request that cannot go as it is.
+mrb_value http_start(mrb_state* mrb, mrb_value) {
   std::string error;
-  const int id = http(mrb).start(std::move(request), error);
+  const int id = http(mrb).start(request_from_args(mrb), error);
   if (id == 0) mrb_raisef(mrb, E_ARGUMENT_ERROR, "HTTP: %s", error.c_str());
   return mrb_int_value(mrb, id);
 }
