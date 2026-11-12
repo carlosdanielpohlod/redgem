@@ -3,6 +3,7 @@
 
 #include <imgui.h>
 
+#include <algorithm>
 #include <string>
 
 #include "core/config.hpp"
@@ -11,9 +12,11 @@
 #include "core/translations.hpp"
 #include "editor/document/material_textures.hpp"
 #include "editor/editor_config.hpp"
+#include "editor/ui/dpi.hpp"
 #include "editor/ui/inspector_cards.hpp"
 #include "editor/ui/labels.hpp"
 #include "editor/ui/style.hpp"
+#include "render/renderer.hpp"
 
 namespace redgem::ui::inspector {
 namespace {
@@ -24,6 +27,7 @@ using material_textures::Slot;
 constexpr const char* kPicturesPopup = "pictures";
 constexpr const char* kSlotButtonId = "##picture";
 constexpr int kNoPicture = kNoIndex;
+constexpr float kPreviewSize = 32.0f;  // logical pixels along the longest side
 
 // Each slot's row: the key of its label and of its tooltip, in material_textures::kSlots' order.
 struct SlotText {
@@ -84,18 +88,35 @@ void accept_dropped_picture(PanelContext& context, int material, Slot slot) {
   ImGui::EndDragDropTarget();
 }
 
-void draw_slot(PanelContext& context, int material, Slot slot) {
-  const SlotText& text = kSlotTexts[static_cast<std::size_t>(slot)];
+void draw_preview(const Renderer* renderer, int image) {
+  if (renderer == nullptr) return;
+  const Texture2D texture = renderer->scene_texture(image);
+  const int longest = std::max(texture.width, texture.height);
+  if (longest <= 0) return;
+  const float scale = ui::scaled(kPreviewSize) / static_cast<float>(longest);
+  const ImVec2 size(static_cast<float>(texture.width) * scale, static_cast<float>(texture.height) * scale);
+  ImGui::Image(ImTextureRef(static_cast<ImTextureID>(texture.id)), size);
+  ImGui::SameLine();
+}
+
+void draw_slot_button(PanelContext& context, int material, Slot slot) {
   const SceneDocument& doc = context.session.document();
-  ImGui::PushID(static_cast<int>(slot));
-  property_label(tr(text.label));
-  tooltip(tr(text.tooltip));
-  const char* shown = picture_label(doc, material_textures::image_in(doc.material(material), slot));
+  const int image = material_textures::image_in(doc.material(material), slot);
+  draw_preview(context.preview_renderer, image);
+  const char* shown = picture_label(doc, image);
   if (ImGui::Button((std::string(shown) + kSlotButtonId).c_str(), ImVec2(kFillWidth, 0.0f))) {
     ImGui::OpenPopup(kPicturesPopup);
   }
   accept_dropped_picture(context, material, slot);
   popup(kPicturesPopup, [&context, material, slot] { draw_picture_choices(context, material, slot); });
+}
+
+void draw_slot(PanelContext& context, int material, Slot slot) {
+  const SlotText& text = kSlotTexts[static_cast<std::size_t>(slot)];
+  ImGui::PushID(static_cast<int>(slot));
+  property_label(tr(text.label));
+  tooltip(tr(text.tooltip));
+  draw_slot_button(context, material, slot);
   ImGui::PopID();
 }
 

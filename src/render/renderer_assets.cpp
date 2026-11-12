@@ -87,6 +87,12 @@ Texture2D blank_map(int slot) {
 
 }  // namespace
 
+Texture2D Renderer::scene_texture(int image) const {
+  const auto& textures = impl_->textures;
+  if (!has_texture(textures, image)) return {};
+  return textures[static_cast<std::size_t>(image)];
+}
+
 void Renderer::Impl::upload_new_textures(const SceneDesc& desc) {
   for (std::size_t i = textures.size(); i < desc.images.size(); ++i) {
     textures.push_back(load_scene_texture(desc.images[i]));

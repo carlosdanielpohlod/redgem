@@ -14,6 +14,10 @@
 
 #include "scene/shapes/terrain.hpp"
 
+namespace redgem {
+class Renderer;
+}
+
 namespace redgem::ui {
 
 // The terrain brush: set up in the Inspector, used in the Scene view.
@@ -38,6 +42,7 @@ struct PanelContext {
   std::optional<std::string> scene_to_open{};
   bool new_scene_asked = false;
   TerrainTool* terrain = nullptr;
+  const Renderer* preview_renderer = nullptr;
 };
 
 // What an object's menu in the Hierarchy asks of the clipboard, which the editor holds.

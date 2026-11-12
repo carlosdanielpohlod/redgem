@@ -46,6 +46,7 @@ class RenderStage {
   // Brings the uploaded scene up to date with what changed in `desc` since, as the editor does
   // every frame (new pictures and materials, and their values).
   void sync(const SceneDesc& desc) { renderer_->sync(desc); }
+  Texture2D scene_texture(int image) const { return renderer_->scene_texture(image); }
   // Where the scene's pictures (a sky picture) and its particles' are looked for.
   void set_images_dir(const std::filesystem::path& dir) { renderer_->set_images_dir(dir); }
   // The scene as its camera sees it, with `particles` when given; also written to

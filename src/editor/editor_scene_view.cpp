@@ -79,6 +79,12 @@ void EditorApp::aim_viewport_camera() {
 }
 
 void EditorApp::upload_preview_assets() {
+  // Scene changes from a panel or dialog must keep the current thumbnails alive until drawing ends.
+  if (drawing_interface_) {
+    preview_upload_pending_ = true;
+    return;
+  }
+  preview_upload_pending_ = false;
   renderer_->upload(session_->preview_desc());
   preview_generation_ = session_->preview_generation();
 }

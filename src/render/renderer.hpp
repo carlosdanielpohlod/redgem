@@ -36,6 +36,8 @@ class Renderer {
   // Uploads assets added to `desc` since the last upload/sync and refreshes every material's values
   // (cheap enough to call every frame in the editor).
   void sync(const SceneDesc& desc);
+  // Borrows an uploaded image for this frame, or returns an empty texture. Never unload it.
+  Texture2D scene_texture(int image) const;
   // Uploads again the vertices of a mesh that was reshaped (a sculpted terrain).
   void refresh_mesh(const SceneDesc& desc, int mesh);
   // Camera of the scene's main camera object (or a default one).

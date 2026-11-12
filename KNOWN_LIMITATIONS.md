@@ -172,8 +172,8 @@ not a promise of how it will be closed.
 ### Editor
 
 - A picture put on a material from the editor goes inside the scene's `.glb`: changing the file in
-  `images/` afterwards does not change the scene (pick it again). The Inspector shows a slot's
-  picture by name, without a preview, and sets neither a texture's sampler nor its UV set.
+  `images/` afterwards does not change the scene (pick it again). The Inspector does not set a
+  texture's sampler or UV set.
 - [Prefab file](docs/prefabs.md) instances cannot override inherited children separately, a
   script cannot spawn a prefab file by its path (only a placement in the scene), and a running
   scene does not see a changed prefab file until reloaded. Export needs complete skeletons and
