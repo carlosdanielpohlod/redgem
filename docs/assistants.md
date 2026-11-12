@@ -19,7 +19,7 @@ seen, open a binary scene file or look at a window.
 
 ## What a new game comes with
 
-`redgem new` (and the project hub) writes two files into every new game:
+`redgem new` (and the project hub) writes three files into every new game:
 
 - **`AGENTS.md`**: the guide to the game, in the file most assistants look for: its layout, the
   commands below with examples, how to run its tests, its conventions (one behaviour per file,
@@ -28,6 +28,11 @@ seen, open a binary scene file or look at a window.
   same reference `redgem api` prints, so they are the engine's real ones.
 - **`CLAUDE.md`**: one line that points at `AGENTS.md`, for the assistant that reads that file
   instead.
+- **`sig/redgem.rbs`**: the scripting API as Ruby type signatures (RBS), which editors' Ruby
+  language servers read: completion, the line about each method, and type checks of the scripts
+  (see [`redgem api`](command-line.md#redgem-api-the-scripting-api)).
+
+None of them goes into a build of the game.
 
 Edit `AGENTS.md` as the game grows: what an assistant should know about *your* game (its rules,
 its scenes, what not to touch) belongs there.
@@ -102,8 +107,10 @@ them so:
 
 The manual's site has `llms.txt`, an index of its pages with a line about each, and
 `llms-full.txt`, every page in one file to search. The docs build writes both
-(`tools/docs/llms_txt.py`). The API reference is also data: `redgem api --json`, and
-`docs/scripting/api.json` in the repository, which tests keep in step with the engine.
+(`tools/docs/llms_txt.py`). The API reference is also data, with the type of every parameter and
+of what every method returns: `redgem api --json`, and `docs/scripting/api.json` in the
+repository, which tests keep in step with the engine (its classes, its methods, and the
+parameters of the methods written in Ruby).
 
 ## Repeating a headless session
 

@@ -71,6 +71,21 @@ until 1.0, a release may change what games rely on (see
   sized by game.json's `navigation` section (`cell_size`, `agent_radius`, `agent_height`,
   `max_step`, `max_slope`). Bakes and searches are bounded; moving bodies are not obstacles yet
   (see [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)).
+- **A typed scripting API, and type signatures for editors**: every method of
+  `docs/scripting/api.json` gives each parameter a type (with whether it is a keyword, optional,
+  its default, a rest or a block) and the type it returns, in a small closed language (`Integer`,
+  `Float`, `Numeric`, `String`, `Symbol`, `bool`, `nil`, `Color`, the API's classes, `Array[T]`,
+  `Hash[K, V]`, `Range[T]`, tuples, unions and blocks); the file is refused when it holds a type
+  not in it or a parameter out of place. `redgem api <Class>`, its search, the MCP `api` tool and
+  the [API reference](docs/scripting/api.md) show the types (`Input.axis(Symbol name, pad: Integer
+  = 0) -> Float`). `redgem api --rbs` writes them as Ruby type signatures (RBS), which new games
+  get as `sig/redgem.rbs` (kept out of builds), so editors with a Ruby language server (Steep,
+  Solargraph and the like) complete and type-check game scripts. The tests now also check that
+  each class is the class or module the engine has, and that the methods written in Ruby take the
+  parameters the reference says. `Behaviour::Timer`, what `after`, `every` and `tween` return, is
+  in the reference (`cancel`, `cancelled?`), and so are the keywords some methods took without
+  saying: `pad:` of `Input.axis`, `action?`, `action_pressed?` and the gamepad's, `alpha:` of
+  `UI.image`, the colors, `size:`, `focused:` and `confirm:` of `UI.button`, and more.
 
 - **Camera switching**: `Camera.main = camera` sees the game through another camera object of the
   scene (security cameras, a car's cameras, a cutscene's shots), and `Camera.main = nil` goes back

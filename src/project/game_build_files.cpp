@@ -7,6 +7,7 @@
 
 #include "app/game_settings.hpp"
 #include "core/config.hpp"
+#include "project/api_rbs.hpp"
 #include "project/assistant_guide.hpp"
 
 namespace redgem {
@@ -45,10 +46,12 @@ bool is_leftover(const std::string& name) {
 }
 
 // Whether a file is the guide of the game for whoever makes it: one of its files at the top of
-// the game's folder (one of that name deeper in is the game's own).
+// the game's folder, or the API's type signatures for their editor (one of that name elsewhere is
+// the game's own).
 bool is_makers_guide(const std::filesystem::path& file, const Shipping& shipping) {
   const std::filesystem::path inside = file.lexically_relative(shipping.game_dir);
-  return inside == tools::kGuideFileName || inside == tools::kPointerFileName;
+  return inside == tools::kGuideFileName || inside == tools::kPointerFileName ||
+         inside == std::filesystem::path(tools::kSignaturesFile);
 }
 
 // Whether the editor is still writing a file, under a name it takes off when it is done (a build

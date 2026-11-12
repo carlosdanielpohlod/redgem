@@ -1,15 +1,20 @@
 // The API reference (docs/scripting/api.json) says what the engine really has: every public
-// method the engine adds to Ruby is in it, everything in it is there, the manual's page is made
-// from it, and the guide new games get lists calls that exist and compile.
+// method the engine adds to Ruby is in it, everything in it is there, each class as the class or
+// module it is and each method of the engine's Ruby with the parameters it takes; the manual's
+// page and the type signatures are made from it, and the guide new games get lists calls that
+// exist and compile.
 
 #include <doctest/doctest.h>
 
 #include <mruby.h>
+#include <mruby/class.h>
+#include <mruby/proc.h>
 #include <mruby/string.h>
 
 #include <algorithm>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
@@ -19,9 +24,11 @@
 #include "app/engine.hpp"
 #include "core/exit_codes.hpp"
 #include "core/files.hpp"
+#include "project/api_rbs.hpp"
 #include "project/api_reference.hpp"
 #include "project/closest_words.hpp"
 #include "project/assistant_guide.hpp"
+#include "project/game_build.hpp"
 #include "project/game_templates.hpp"
 #include "project/tool_commands.hpp"
 #include "script/ruby_vm.hpp"
@@ -37,11 +44,16 @@ const fs::path kSource = REDGEM_SOURCE_DIR;
 constexpr std::size_t kMostGuideLines = 120;
 constexpr std::size_t kApiCalls = 25;
 constexpr const char* kInternalPrefix = "__";  // the engine's own plumbing, never a game's
+// Of the reference's methods, at least this many are written in Ruby, whose parameters Ruby can
+// tell (the others are C++'s): with fewer, the test of parameters would be checking next to nothing.
+constexpr std::size_t kLeastRubyMethods = 100;
+constexpr const char* kTestFile = "api_reference_test.rb";
 
 // What Ruby says of every class and module reachable from the top, nested ones included, each
 // under its path: "Class.method" for a method of its own called on it, "Class#method" for one of
 // its own called on its instances. And whether one of them has a method of its own or of a class
-// it comes from (Object and what is above it aside: those are Ruby's).
+// it comes from (Object and what is above it aside: those are Ruby's), what it is, and how a
+// method takes its arguments.
 constexpr const char* kReflection = R"ruby(
   def __api_walk(space, name, seen, out)
     return if seen[space.object_id]
@@ -63,16 +75,30 @@ constexpr const char* kReflection = R"ruby(
     end.flatten.join("\n")
   end
 
+  def __api_owner(path) = path.split("::").inject(Object) { |space, part| space.const_get(part) }
+
   def __api_has?(path, method, on_class)
-    owner = path.split("::").inject(Object) { |space, part| space.const_get(part) }
+    owner = __api_owner(path)
     chain = owner.is_a?(Class) ? owner.ancestors.take_while { |above| above != Object } : [owner]
     return chain.any? { |each| each.public_instance_methods(false).include?(method) } unless on_class
     (method == :new && owner.is_a?(Class)) || chain.any? { |each| each.singleton_methods(false).include?(method) }
   end
+
+  # "module", "class", or "class < Behaviour" for one that comes from another than Object.
+  def __api_kind(path)
+    owner = __api_owner(path)
+    return "module" unless owner.is_a?(Class)
+
+    owner.superclass == Object ? "class" : "class < #{owner.superclass}"
+  end
+
+  # A method's parameters as Proc#parameters says them, a word each: "req opt key key block". (The
+  # kinds only: mruby counts each kind exactly, and finds their names elsewhere.)
+  def __api_shape(parameters) = parameters.map { |kind, _name| kind.to_s }.join(" ")
 )ruby";
 
 std::string ruby_text(RubyVm& vm, const std::string& code) {
-  const RubyResult result = vm.eval(code, "api_reference_test.rb");
+  const RubyResult result = vm.eval(code, kTestFile);
   REQUIRE_MESSAGE(result.ok, code << ": " << result.error);
   return RSTRING_PTR(mrb_obj_as_string(vm.state(), result.value));
 }
@@ -112,6 +138,21 @@ std::string source_text(const char* file) {
   return without_returns(*text);
 }
 
+// Where two texts first part: "line 12: <one> | <other>"; nothing when they are the same. (A
+// failure says that instead of both whole pages.)
+std::string first_difference(const std::string& one, const std::string& other) {
+  std::stringstream ones(one);
+  std::stringstream others(other);
+  std::string a;
+  std::string b;
+  for (std::size_t line = 1;; ++line) {
+    const bool more_a = static_cast<bool>(std::getline(ones, a));
+    const bool more_b = static_cast<bool>(std::getline(others, b));
+    if (!more_a && !more_b) return one == other ? "" : "the end of the text";
+    if (a != b || more_a != more_b) return "line " + std::to_string(line) + ": " + a + " | " + b;
+  }
+}
+
 // "Class.method" or "Class#method" split at its separator.
 struct Named {
   std::string owner;
@@ -143,6 +184,86 @@ bool is_listed(const ApiReference& reference, const Named& named) {
 bool exists(RubyVm& vm, const std::string& owner, const std::string& method, bool on_class) {
   const std::string call = "__api_has?(\"" + owner + "\", :\"" + method + "\", " + (on_class ? "true" : "false") + ")";
   return ruby_text(vm, call + ".to_s") == "true";
+}
+
+// What the reference says a class is, as __api_kind says it.
+std::string documented_kind(const ApiClass& owner) {
+  if (owner.is_module) return "module";
+  return owner.superclass.empty() ? "class" : "class < " + owner.superclass;
+}
+
+// How a method takes its arguments: what the reference says, or what Ruby says.
+struct Shape {
+  std::size_t required = 0;
+  std::size_t optional = 0;
+  bool rest = false;
+  std::size_t keywords = 0;
+  bool keyword_rest = false;
+  bool block = false;
+};
+
+void add_to_shape(Shape& shape, const ApiParam& param) {
+  if (param.block) {
+    shape.block = true;
+  } else if (param.rest) {
+    (param.keyword ? shape.keyword_rest : shape.rest) = true;
+  } else if (param.keyword) {
+    ++shape.keywords;
+  } else {
+    ++(param.optional ? shape.optional : shape.required);
+  }
+}
+
+Shape documented_shape(const ApiMethod& method) {
+  Shape shape;
+  for (const ApiParam& param : method.params) add_to_shape(shape, param);
+  return shape;
+}
+
+// One of the words __api_shape says.
+void add_word_to_shape(Shape& shape, const std::string& word) {
+  if (word == "req") ++shape.required;
+  if (word == "opt") ++shape.optional;
+  if (word == "rest") shape.rest = true;
+  if (word == "key") ++shape.keywords;
+  if (word == "keyrest") shape.keyword_rest = true;
+  if (word == "block") shape.block = true;
+}
+
+// What Ruby says of a method's parameters; nothing for one written in C++, of which it cannot tell.
+std::optional<Shape> ruby_shape(RubyVm& vm, const ApiClass& owner, const ApiMethod& method) {
+  mrb_state* mrb = vm.state();
+  const RubyResult found = vm.eval(owner.name, kTestFile);
+  REQUIRE_MESSAGE(found.ok, found.error);
+  RClass* klass = mrb_class_ptr(method.on_class ? mrb_singleton_class(mrb, found.value) : found.value);
+  const mrb_method_t body = mrb_method_search_vm(mrb, &klass, mrb_intern_cstr(mrb, method.name.c_str()));
+  if (MRB_METHOD_UNDEF_P(body) || MRB_METHOD_CFUNC_P(body)) return std::nullopt;
+  const RubyResult parameters = vm.call(mrb_obj_value(MRB_METHOD_PROC(body)), "parameters");
+  REQUIRE_MESSAGE(parameters.ok, parameters.error);
+  const RubyResult words = vm.call(mrb_top_self(mrb), "__api_shape", {parameters.value});
+  REQUIRE_MESSAGE(words.ok, words.error);
+  Shape shape;
+  std::stringstream stream(RSTRING_PTR(mrb_obj_as_string(mrb, words.value)));
+  for (std::string word; stream >> word;) add_word_to_shape(shape, word);
+  return shape;
+}
+
+// Whether the keywords agree: as many, or, for a method that takes **, the reference may name more
+// (what the method passes on).
+bool keywords_agree(const Shape& ruby, const Shape& documented) {
+  return ruby.keyword_rest ? ruby.keywords <= documented.keywords : ruby.keywords == documented.keywords;
+}
+
+// What the reference says wrong about a method Ruby knows the parameters of; nothing when right.
+// (It may say a block that the method yields to without naming it.)
+std::string shape_mismatch(const Shape& ruby, const Shape& documented) {
+  if (ruby.required != documented.required) return "the positional parameters it needs";
+  if (ruby.optional != documented.optional) return "the positional parameters it may go without";
+  if (ruby.rest != documented.rest) return "*rest";
+  if (!keywords_agree(ruby, documented)) return "keywords";
+  if (documented.keyword_rest && !ruby.keyword_rest) return "**rest";
+  if (ruby.block && !documented.block) return "block";
+  return {};
 }
 
 }  // namespace
@@ -180,11 +301,62 @@ TEST_CASE("everything the API reference lists is in the engine") {
   CHECK_MESSAGE(gone.empty(), "in docs/scripting/api.json but not in the engine: " << joined(gone));
 }
 
-TEST_CASE("the manual's API page is made from the reference") {
+TEST_CASE("each class of the API reference is the class or module the engine has") {
+  const auto game = engine();
+  RubyVm& vm = game->scripts().vm();
+  ruby_text(vm, kReflection);
+  for (const ApiClass& owner : api_reference().classes) {
+    CHECK_MESSAGE(ruby_text(vm, "__api_kind(\"" + owner.name + "\")") == documented_kind(owner), owner.name);
+  }
+}
+
+TEST_CASE("the API reference gives the engine's Ruby methods the parameters they take") {
+  const auto game = engine();
+  RubyVm& vm = game->scripts().vm();
+  ruby_text(vm, kReflection);
+  std::vector<std::string> wrong;
+  std::size_t checked = 0;
+  for (const ApiClass& owner : api_reference().classes) {
+    for (const ApiMethod& method : owner.methods) {
+      const std::optional<Shape> ruby = ruby_shape(vm, owner, method);
+      if (!ruby) continue;
+      ++checked;
+      const std::string mismatch = shape_mismatch(*ruby, documented_shape(method));
+      if (!mismatch.empty()) wrong.push_back(signature(owner, method) + " (" + mismatch + ")");
+    }
+  }
+  CHECK(checked >= kLeastRubyMethods);
+  CHECK_MESSAGE(wrong.empty(), "docs/scripting/api.json says other parameters than the engine: " << joined(wrong));
+}
+
+TEST_CASE("a method's shape: what the reference says against what Ruby says") {
+  Shape ruby;
+  ruby.required = 1;
+  ruby.keywords = 1;
+  Shape documented = ruby;
+  CHECK(shape_mismatch(ruby, documented).empty());
+  documented.keywords = 2;
+  CHECK(shape_mismatch(ruby, documented) == "keywords");
+  ruby.keyword_rest = true;  // ... unless Ruby takes **: the reference may name what it passes on
+  CHECK(shape_mismatch(ruby, documented).empty());
+  documented.block = true;  // (a block it yields to, unnamed)
+  CHECK(shape_mismatch(ruby, documented).empty());
+  ruby.block = true;
+  documented.block = false;
+  CHECK(shape_mismatch(ruby, documented) == "block");
+  documented.optional = 1;
+  CHECK(shape_mismatch(ruby, documented) == "the positional parameters it may go without");
+}
+
+TEST_CASE("the manual's API page and the type signatures are made from the reference") {
   const std::string json = source_text("docs/scripting/api.json");
+  const ApiReference reference = read_api_reference(json);
+  // (Run `redgem api --markdown > docs/scripting/api.md` and `redgem api --rbs >
+  // docs/scripting/redgem.rbs` after changing the reference.)
   const std::string page = source_text("docs/scripting/api.md");
-  // (Run `redgem api --markdown > docs/scripting/api.md` after changing the reference.)
-  CHECK(page == api_markdown(read_api_reference(json)));
+  CHECK_MESSAGE(page == api_markdown(reference), first_difference(page, api_markdown(reference)));
+  const std::string signatures = source_text("docs/scripting/redgem.rbs");
+  CHECK_MESSAGE(signatures == api_rbs(reference), first_difference(signatures, api_rbs(reference)));
   CHECK(without_returns(api_reference_json()) == json);  // what the program has built in is the file
 }
 
@@ -203,7 +375,7 @@ TEST_CASE("the guide of new games lists 25 calls that exist, with examples that 
   CHECK(static_cast<std::size_t>(std::count(guide.begin(), guide.end(), '\n')) <= kMostGuideLines);
 }
 
-TEST_CASE("a new game comes with its guide") {
+TEST_CASE("a new game comes with its guide and the API's type signatures, which stay out of its builds") {
   const fs::path game = fs::temp_directory_path() / "redgem_api_guide_game";
   fs::remove_all(game);
   std::string error;
@@ -211,22 +383,30 @@ TEST_CASE("a new game comes with its guide") {
   std::string read_error;
   CHECK(read_text_file(game / "AGENTS.md", read_error) == assistant_guide());
   CHECK(read_text_file(game / "CLAUDE.md", read_error).value_or("").find("@AGENTS.md") != std::string::npos);
+  CHECK(read_text_file(game / kSignaturesFile, read_error) == api_rbs(api_reference()));
+  const std::vector<fs::path> shipped = shipped_files(game);
+  CHECK(std::find(shipped.begin(), shipped.end(), fs::path(kSignaturesFile)) == shipped.end());
   fs::remove_all(game);
 }
 
-TEST_CASE("redgem api: an index, a class, a search") {
+TEST_CASE("redgem api: an index, a class with its types, a search, the type signatures") {
   const auto api = [](const std::vector<std::string>& words) {
     std::vector<std::string> line{"api"};
     line.insert(line.end(), words.begin(), words.end());
     return *run_tool_command(line);
   };
   CHECK(api({}).out.find("Transform") != std::string::npos);
-  CHECK(api({"transform"}).out.find("rotate(degrees)") != std::string::npos);
-  CHECK(api({"Save"}).out.find("Save[key] = value") != std::string::npos);
-  CHECK(api({"--search", "RAYCAST"}).out.find("Physics.raycast(origin") != std::string::npos);
+  CHECK(api({"transform"}).out.find("rotate(Vector3 degrees) -> void") != std::string::npos);
+  CHECK(api({"Save"}).out.find("Save[String | Symbol key] = untyped value") != std::string::npos);
+  CHECK(api({"Input"}).out.find("Input.axis(Symbol name, pad: Integer = 0) -> Float") != std::string::npos);
+  CHECK(api({"Behaviour"}).out.find("tween(Numeric seconds, ease: Symbol = :smooth) { (Float) -> void }") !=
+        std::string::npos);
+  CHECK(api({"--search", "RAYCAST"}).out.find("Physics.raycast(Vector3 origin") != std::string::npos);
   CHECK(api({"--search", "zzzz"}).out.find("no method has to do with zzzz") != std::string::npos);
   CHECK(api({"Trasform"}).err == "no class Trasform. Did you mean Transform?");
   CHECK(api({"Input", "--json"}).out.find("\"name\":\"Input\"") != std::string::npos);
+  CHECK(api({"Input", "--json"}).out.find("\"returns\":{\"type\":\"Float\"}") != std::string::npos);
   CHECK(api({"--search", "raycast", "--json"}).out.find("\"class\":\"Physics\"") != std::string::npos);
+  CHECK(api({"--rbs"}).out == api_rbs(api_reference()));
   CHECK(api({"a", "b"}).exit_code == kExitUsage);
 }

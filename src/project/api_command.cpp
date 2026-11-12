@@ -2,6 +2,7 @@
 
 #include "core/command_line.hpp"
 #include "core/translations.hpp"
+#include "project/api_rbs.hpp"
 #include "project/api_reference.hpp"
 #include "project/closest_words.hpp"
 
@@ -11,10 +12,13 @@ namespace {
 constexpr const char* kSearchOption = "--search";
 constexpr const char* kJsonOption = "--json";
 constexpr const char* kMarkdownOption = "--markdown";
+constexpr const char* kRbsOption = "--rbs";
 constexpr std::size_t kMostFound = 20;
 constexpr std::size_t kMostSuggestions = 3;
 
-ToolGrammar grammar() { return {{kSearchOption}, {kJsonOption, kMarkdownOption, command_line::kHelpOption}}; }
+ToolGrammar grammar() {
+  return {{kSearchOption}, {kJsonOption, kMarkdownOption, kRbsOption, command_line::kHelpOption}};
+}
 
 ToolResult answer(std::string text) { return ToolResult{kExitSuccess, std::move(text), {}}; }
 
@@ -44,6 +48,7 @@ ToolResult search(const std::string& word, bool as_json) {
 
 ToolResult whole(const ToolLine& line) {
   if (line.has(kMarkdownOption)) return answer(api_markdown(api_reference()));
+  if (line.has(kRbsOption)) return answer(api_rbs(api_reference()));
   if (line.has(kJsonOption)) return answer(api_json(api_reference()) + "\n");
   return answer(api_index(api_reference()));
 }

@@ -751,7 +751,10 @@ if(NOT ANDROID)
     project/game_checks.cpp
     project/game_tests.cpp
     project/check_command.cpp
+    project/api_types.cpp
     project/api_reference.cpp
+    project/api_reference_read.cpp
+    project/api_rbs.cpp
     project/api_command.cpp
     project/crash_symbols.cpp
     project/symbolize_command.cpp

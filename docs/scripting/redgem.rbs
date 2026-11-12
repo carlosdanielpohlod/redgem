@@ -1,0 +1,1120 @@
+# The scripting API of RedGem games as Ruby type signatures (RBS), for the language servers of
+# editors and type checkers (Steep, Solargraph and the like). Made from docs/scripting/api.json
+# by `redgem api --rbs`: change that file, not this one.
+
+module RedGem
+  # A color: its name (:orange), or [r, g, b] from 0 to 255.
+  type color = Symbol | Array[Numeric]
+end
+
+# A Ruby class attached to an object: the engine calls its methods as the game runs.
+class Behaviour
+  # called once, before the first update
+  def start: () -> void
+  # called every frame; dt is the seconds since the last one
+  def update: (Float dt) -> void
+  # called 60 times a second, with the physics
+  def fixed_update: (Float dt) -> void
+  # something entered this object's trigger, or it entered one
+  def on_trigger_enter: (GameObject other) -> void
+  # something left this object's trigger
+  def on_trigger_exit: (GameObject other) -> void
+  # this object's body touched another
+  def on_collision_enter: (GameObject other) -> void
+  # this object's body stopped touching another
+  def on_collision_exit: (GameObject other) -> void
+  # the object is being destroyed
+  def on_destroy: () -> void
+  # the object this behaviour is attached to
+  def game_object: () -> GameObject
+  # the object's name
+  def name: () -> String
+  # the object's Transform
+  def transform: () -> Transform
+  # the object's CharacterController, or nil
+  def character: () -> (CharacterController | nil)
+  # the object's Rigidbody, or nil
+  def rigidbody: () -> (Rigidbody | nil)
+  # the object's Vehicle, or nil
+  def vehicle: () -> (Vehicle | nil)
+  # the object's own Animator
+  def animation: () -> Animator
+  # the object's custom properties, as a Hash
+  def props: () -> Hash[String, untyped]
+  # a setting: what add_component was given, else the object's property, else the default
+  def prop: (Symbol | String key, ?untyped default) -> untyped
+  # the object called name, or nil
+  def find: (String | Symbol name) -> (GameObject | nil)
+  # find that stops with a clear error when the object is missing
+  def find!: (String | Symbol name) -> GameObject
+  # every object with that tag
+  def find_all: (String | Symbol tag) -> Array[GameObject]
+  # removes an object (this one unless said) at the end of the step
+  def destroy: (?GameObject target) -> void
+  # another behaviour of this object, or nil
+  def get_component: (Class klass) -> (Behaviour | nil)
+  # runs the block once, that many seconds from now
+  def after: (Numeric seconds) { () -> void } -> Behaviour::Timer
+  # runs the block every that many seconds
+  def every: (Numeric seconds) { () -> void } -> Behaviour::Timer
+  # calls the block with t from 0 to 1 over that many seconds
+  def tween: (Numeric seconds, ?ease: Symbol) { (Float) -> void } -> Behaviour::Timer
+  # stops every after, every and tween of this behaviour
+  def cancel_timers: () -> void
+end
+
+# What after, every and tween return: something waiting to happen, which can be called off.
+class Behaviour::Timer
+  # calls it off (also from inside its own block)
+  def cancel: () -> void
+  # whether it was called off
+  def cancelled?: () -> bool
+end
+
+# An object of the scene, as scripts see it.
+class GameObject
+  # its name
+  def name: () -> String
+  # its number in the running game
+  def id: () -> Integer
+  # its persistent scene-file identity as a String; nil for runtime copies
+  def stable_id: () -> (String | nil)
+  # a versioned checkpoint of local pose, tint and visibility, suitable for Save
+  def capture_state: () -> Hash[Symbol, untyped]
+  # validates a checkpoint then restores pose and appearance; teleports physical descendants and returns self
+  def restore_state: (Hash[Symbol, untyped] state) -> self
+  # its tag property
+  def tag: () -> (String | nil)
+  # whether its tag is value
+  def tag?: (String | Symbol value) -> bool
+  # its custom properties
+  def props: () -> Hash[String, untyped]
+  # false once it was destroyed
+  def alive?: () -> bool
+  # removes it at the end of the step
+  def destroy: () -> void
+  # whether it is drawn
+  def visible: () -> bool
+  # shows or hides it
+  def visible=: (bool value) -> bool
+  # its behaviours
+  def behaviours: () -> Array[Behaviour]
+  # the object it is under, or nil
+  def parent: () -> (GameObject | nil)
+  # puts it under another object (nil: at the root), where it stays in the world, then moves with it; never under itself or what it carries
+  def parent=: (GameObject | nil object) -> (GameObject | nil)
+  # like parent=; keep_world: false keeps its local transform instead, so the new parent places it; returns the parent
+  def set_parent: (GameObject | nil object, ?keep_world: bool) -> (GameObject | nil)
+  # the objects under it
+  def children: () -> Array[GameObject]
+  # its Transform
+  def transform: () -> Transform
+  # its CharacterController, or nil
+  def character: () -> (CharacterController | nil)
+  # its Rigidbody, or nil
+  def rigidbody: () -> (Rigidbody | nil)
+  # its Vehicle, or nil
+  def vehicle: () -> (Vehicle | nil)
+  # the Light it shines with, or nil
+  def light: () -> (Light | nil)
+  # its Animator
+  def animation: () -> Animator
+  # seconds its animations run ahead of the original's (a spawned copy)
+  def animation_offset: () -> Float
+  # sets that offset
+  def animation_offset=: (Numeric seconds) -> Numeric
+  # one of its behaviours, or nil
+  def get_component: (Class klass) -> (Behaviour | nil)
+  # attaches a behaviour; settings are what its prop reads
+  def add_component: (Class klass, **untyped settings) -> (Behaviour | nil)
+  # the color its colors are multiplied by
+  def tint: () -> Vector3
+  # multiplies its colors: [1.0, 0.5, 0.5]
+  def tint=: (Vector3 | Array[Numeric] color) -> (Vector3 | Array[Numeric])
+  # the weight of a shape key (morph target) of its mesh and the meshes under it, or sets it: morph(:Smile, 0.7); nil when no part has the key, ArgumentError when setting one none has
+  def morph: (String | Symbol name, ?Numeric | nil weight) -> (Numeric | nil)
+  # the names of the shape keys of its mesh and the meshes under it, as symbols
+  def morph_names: () -> Array[Symbol]
+end
+
+# Where an object is, how it is turned and how big it is.
+class Transform
+  # its position in the world (Vector3)
+  def position: () -> Vector3
+  # moves it; a physics object is teleported
+  def position=: (Vector3 vector) -> Vector3
+  # its position relative to its parent
+  def local_position: () -> Vector3
+  # moves it relative to its parent
+  def local_position=: (Vector3 vector) -> Vector3
+  # its rotation, Euler degrees (Vector3)
+  def rotation: () -> Vector3
+  # turns it to those Euler degrees
+  def rotation=: (Vector3 degrees) -> Vector3
+  # turns it by those Euler degrees
+  def rotate: (Vector3 degrees) -> void
+  # turns it to face a point
+  def look_at: (Vector3 | GameObject target, ?Vector3 up) -> void
+  # moves it by an offset
+  def translate: (Vector3 offset) -> void
+  # its scale (Vector3)
+  def scale: () -> Vector3
+  # resizes it
+  def scale=: (Vector3 vector) -> Vector3
+  # the direction it faces (-Z)
+  def forward: () -> Vector3
+  # its right (+X)
+  def right: () -> Vector3
+  # its up (+Y)
+  def up: () -> Vector3
+end
+
+# A point or a direction in meters: x, y, z.
+class Vector3
+  # a vector
+  def initialize: (Numeric x, Numeric y, Numeric z) -> void
+  # the same as new
+  def self.[]: (Numeric x, Numeric y, Numeric z) -> Vector3
+  # (0, 0, 0)
+  def self.zero: () -> Vector3
+  # (1, 1, 1)
+  def self.one: () -> Vector3
+  # (0, 1, 0)
+  def self.up: () -> Vector3
+  # (0, -1, 0)
+  def self.down: () -> Vector3
+  # (-1, 0, 0)
+  def self.left: () -> Vector3
+  # (1, 0, 0)
+  def self.right: () -> Vector3
+  # (0, 0, -1)
+  def self.forward: () -> Vector3
+  # (0, 0, 1)
+  def self.back: () -> Vector3
+  # a vector given in Blender's axes (Z up)
+  def self.blender: (Numeric x, Numeric y, Numeric z) -> Vector3
+  # its x
+  def x: () -> Float
+  # its y
+  def y: () -> Float
+  # its z
+  def z: () -> Float
+  # sum
+  def +: (Vector3 other) -> Vector3
+  # difference
+  def -: (Vector3 other) -> Vector3
+  # the opposite vector
+  def -@: () -> Vector3
+  # scaled
+  def *: (Numeric number) -> Vector3
+  # divided
+  def /: (Numeric number) -> Vector3
+  # whether the numbers are exactly the same
+  def ==: (untyped other) -> bool
+  # dot product
+  def dot: (Vector3 other) -> Float
+  # cross product
+  def cross: (Vector3 other) -> Vector3
+  # its length
+  def length: () -> Float
+  # its length squared (faster)
+  def length_squared: () -> Float
+  # the same direction, length 1
+  def normalized: () -> Vector3
+  # the same direction, no longer than max_length
+  def clamped: (?Numeric max_length) -> Vector3
+  # the point t of the way to other
+  def lerp: (Vector3 other, Numeric t) -> Vector3
+  # the same with y = 0
+  def flat: () -> Vector3
+  # a copy with some parts changed: v.with(y: 0)
+  def with: (x: Numeric, y: Numeric, z: Numeric) -> Vector3
+  # the distance to another point
+  def distance_to: (Vector3 other) -> Float
+  # whether two vectors are about the same
+  def approx?: (Vector3 other, ?Numeric tolerance) -> bool
+  # [x, y, z]
+  def to_a: () -> [Float, Float, Float]
+  # changes it in place
+  def set: (Numeric x, Numeric y, Numeric z) -> self
+  # adds in place
+  def add!: (Vector3 other) -> self
+  # subtracts in place
+  def sub!: (Vector3 other) -> self
+  # scales in place
+  def scale!: (Numeric number) -> self
+  # normalizes in place
+  def normalize!: () -> self
+end
+
+# The objects of the running scene.
+module Scene
+  # the object called name, or nil
+  def self.find: (String | Symbol name) -> (GameObject | nil)
+  # the current scene object with that persistent String/Symbol identity, or nil
+  def self.find_by_id: (String | Symbol identity) -> (GameObject | nil)
+  # find that stops with a clear error when the object is missing
+  def self.find!: (String | Symbol name, ?wanted_by: Class | nil) -> GameObject
+  # every object with that tag
+  def self.find_all: (String | Symbol tag) -> Array[GameObject]
+  # every object
+  def self.objects: () -> Array[GameObject]
+  # copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy
+  def self.spawn: (String | GameObject template, ?position: Vector3 | nil, ?rotation: Vector3 | nil, ?physics: bool, ?name: String | nil, ?parent: GameObject | nil) -> (GameObject | nil)
+end
+
+# Sets a level up from Ruby when it loads: scripts/<scene>_scene.rb.
+class SceneScript
+  # runs when the level loads, before any behaviour starts
+  def setup: () -> void
+  # the object called name, or nil
+  def find: (String | Symbol name) -> (GameObject | nil)
+  # find that stops with a clear error when the object is missing
+  def find!: (String | Symbol name) -> GameObject
+  # every object with that tag
+  def find_all: (String | Symbol tag) -> Array[GameObject]
+end
+
+# Keyboard, mouse, gamepad and touch, read every frame.
+module Input
+  # :horizontal or :vertical, from -1 to 1 (keys, stick)
+  def self.axis: (Symbol name, ?pad: Integer) -> Float
+  # whether a key is held
+  def self.down?: (Symbol key) -> bool
+  # whether a key went down this frame
+  def self.pressed?: (Symbol key) -> bool
+  # whether a key went up this frame
+  def self.released?: (Symbol key) -> bool
+  # whether a named action (game settings) is held
+  def self.action?: (Symbol name, ?pad: Integer) -> bool
+  # whether a named action started this frame
+  def self.action_pressed?: (Symbol name, ?pad: Integer) -> bool
+  # whether a named action ended this frame
+  def self.action_released?: (Symbol name, ?pad: Integer) -> bool
+  # adds an action of the game's own (besides game.json's input section)
+  def self.define_action: (Symbol name, *String bindings, ?keys: Array[Symbol], ?buttons: Array[Symbol], ?mouse: Array[Symbol]) -> void
+  # adds an axis of the game's own: define_axis(:steer, negative: ["key:a"], positive: ["key:d"])
+  def self.define_axis: (Symbol name, ?negative: Array[String], ?positive: Array[String], ?pad_axis: Symbol | nil, ?invert: bool) -> void
+  # the names of the actions
+  def self.actions: () -> Array[Symbol]
+  # the names of the axes
+  def self.axes: () -> Array[Symbol]
+  # the stick that moves an axis (:left_x), the game's for every player; nil when none does
+  def self.axis_stick: (Symbol name) -> (Symbol | nil)
+  # what a player bound to an action: ["key:space", "mouse:left", "pad:a"]
+  def self.bindings: (Symbol name, ?pad: Integer) -> Array[String]
+  # a count that goes up whenever actions, axes or bindings may have changed
+  def self.bindings_changes: () -> Integer
+  # binds a key, a mouse button (mouse: :left, :wheel_up) or a gamepad button to an action; kept between runs
+  def self.bind: (Symbol name, ?String | nil binding, ?key: Symbol | nil, ?button: Symbol | nil, ?mouse: Symbol | nil, ?side: Symbol | nil, ?pad: Integer) -> void
+  # takes a binding off an action
+  def self.unbind: (Symbol name, ?String | nil binding, ?key: Symbol | nil, ?button: Symbol | nil, ?mouse: Symbol | nil, ?side: Symbol | nil, ?pad: Integer) -> void
+  # back to the game's own bindings (of one action, or all; of one pad, or all)
+  def self.reset_bindings: (?Symbol | nil name, ?pad: Integer | nil) -> void
+  # the next key, mouse button, wheel turn or gamepad button pressed, to the block: |binding, pad| (nil: called off); mouse: false leaves the mouse out
+  def self.capture_next: (?cancel: Array[String], ?mouse: bool) { (String | nil, Integer | nil) -> void } -> void
+  # whether a capture waits for a key
+  def self.capturing?: () -> bool
+  # whether a capture still waits to call that block (not once another took its place)
+  def self.capturing_for?: (Proc block) -> bool
+  # calls a capture off
+  def self.cancel_capture: () -> void
+  # the pointer's x, in pixels
+  def self.mouse_x: () -> Float
+  # the pointer's y, in pixels
+  def self.mouse_y: () -> Float
+  # how far the mouse moved this frame, across
+  def self.mouse_dx: () -> Float
+  # how far the mouse moved this frame, up and down
+  def self.mouse_dy: () -> Float
+  # how far the wheel turned this frame
+  def self.mouse_wheel: () -> Float
+  # whether a mouse button (:left, :right, :middle, :side, :extra) is held
+  def self.mouse_down?: (Symbol button) -> bool
+  # whether a mouse button went down this frame
+  def self.mouse_pressed?: (Symbol button) -> bool
+  # whether a mouse button went up this frame
+  def self.mouse_released?: (Symbol button) -> bool
+  # hides the pointer and keeps it in the window (first-person cameras)
+  def self.mouse_locked=: (bool locked) -> bool
+  # whether the pointer is locked
+  def self.mouse_locked?: () -> bool
+  # the numbers of the gamepads plugged in
+  def self.pads: () -> Array[Integer]
+  # whether a gamepad is connected
+  def self.gamepad?: (?pad: Integer) -> bool
+  # :left_x, :left_y, :right_x, :right_y, :left_trigger, :right_trigger
+  def self.gamepad_axis: (Symbol axis, ?pad: Integer) -> Float
+  # whether a gamepad button (:a, :b, :x, :y...) is held
+  def self.gamepad_down?: (Symbol button, ?pad: Integer) -> bool
+  # whether a gamepad button went down this frame
+  def self.gamepad_pressed?: (Symbol button, ?pad: Integer) -> bool
+  # whether a gamepad button went up this frame
+  def self.gamepad_released?: (Symbol button, ?pad: Integer) -> bool
+  # what was typed this frame
+  def self.text: () -> String
+  # shows the on-screen stick and buttons of a phone
+  def self.touch_controls=: (bool on) -> bool
+  # whether they are shown
+  def self.touch_controls?: () -> bool
+end
+
+# The game's clock (added to Ruby's Time).
+class Time
+  # seconds since the last frame
+  def self.delta: () -> Float
+  # seconds since the last frame, whatever Time.scale (also while paused)
+  def self.unscaled_delta: () -> Float
+  # seconds of a physics step (1/60)
+  def self.fixed_delta: () -> Float
+  # seconds since the game started
+  def self.elapsed: () -> Float
+  # how many frames have run
+  def self.frame: () -> Integer
+  # how fast game time runs (1 is normal)
+  def self.scale: () -> Float
+  # slows or speeds the game; 0 pauses it
+  def self.scale=: (Numeric value) -> Numeric
+end
+
+# Questions to the physics world: rays, moving shapes and shapes in place.
+module Physics
+  # the first thing a ray hits: {object:, point:, normal:, distance:}, or nil (skip: an object it sees through)
+  def self.raycast: (Vector3 origin, Vector3 direction, ?Numeric max_distance, ?GameObject | nil skip, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> (Hash[Symbol, untyped] | nil)
+  # everything a ray hits, nearest first
+  def self.raycast_all: (Vector3 origin, Vector3 direction, ?Numeric max_distance, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> Array[Hash[Symbol, untyped]]
+  # the first thing a ball moving from `from` to `to` touches, or nil
+  def self.sphere_cast: (Vector3 from, Vector3 to, Numeric radius, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> (Hash[Symbol, untyped] | nil)
+  # the same for a box (its whole size; rotation in degrees)
+  def self.box_cast: (Vector3 from, Vector3 to, Vector3 size, ?rotation: Vector3 | nil, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> (Hash[Symbol, untyped] | nil)
+  # the same for an upright capsule (height end to end)
+  def self.capsule_cast: (Vector3 from, Vector3 to, Numeric radius, Numeric height, ?rotation: Vector3 | nil, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> (Hash[Symbol, untyped] | nil)
+  # the hits of everything inside a ball, nearest first
+  def self.overlap_sphere: (Vector3 center, Numeric radius, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> Array[Hash[Symbol, untyped]]
+  # the same inside a box
+  def self.overlap_box: (Vector3 center, Vector3 size, ?rotation: Vector3 | nil, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> Array[Hash[Symbol, untyped]]
+  # the same inside a capsule
+  def self.overlap_capsule: (Vector3 center, Numeric radius, Numeric height, ?rotation: Vector3 | nil, ?layers: Array[Symbol] | Symbol | nil, ?ignore: Array[GameObject] | GameObject | nil) -> Array[Hash[Symbol, untyped]]
+  # the game's collision layers, as Symbols (game.json's physics layers)
+  def self.layers: () -> Array[Symbol]
+  # joins two objects, or one to the world (other nil): :fixed, :hinge, :slider, :point or :distance
+  def self.joint: (Symbol kind, GameObject object, ?GameObject | nil other, ?anchor: Vector3 | nil, ?other_anchor: Vector3 | nil, ?axis: Vector3 | nil, ?limits: Array[Numeric] | nil, ?motor_speed: Numeric | nil, ?motor_torque: Numeric | nil, ?min: Numeric | nil, ?max: Numeric | nil, ?spring: Numeric | nil, ?damping: Numeric | nil, ?break_force: Numeric | nil) -> Joint
+end
+
+# What holds two bodies together, or one to the world (made by Physics.joint).
+class Joint
+  # :fixed, :hinge, :slider, :point or :distance
+  def kind: () -> Symbol
+  # the object it holds
+  def object: () -> GameObject
+  # the other object it holds, or nil for the world
+  def other: () -> (GameObject | nil)
+  # whether it still holds them
+  def alive?: () -> bool
+  # whether it was pulled past its break force
+  def broken?: () -> bool
+  # lets go
+  def remove: () -> void
+  # whether it holds right now
+  def enabled?: () -> bool
+  # lets go for a while, or holds again
+  def enabled=: (bool flag) -> bool
+  # the pull (newtons) or twist (newton meters) it breaks at; 0 never breaks
+  def break_force: () -> Float
+  # sets the pull it breaks at
+  def break_force=: (Numeric newtons) -> Numeric
+  # a hinge turns at that speed (degrees per second) with at most that torque; 0 torque lets it go
+  def motor: (Numeric speed, Numeric torque) -> void
+  # how far a hinge turned from where it started, in degrees
+  def angle: () -> Float
+end
+
+# Where the characters a game moves can walk, and the way from one place to another.
+module Navigation
+  # the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there
+  def self.path: (Vector3 from, Vector3 to) -> (Array[Vector3] | nil)
+  # the walkable point nearest a point (within 8 m of it), or nil
+  def self.nearest: (Vector3 point) -> (Vector3 | nil)
+  # whether a point is on walkable ground, up to a character's height above it
+  def self.walkable?: (Vector3 point) -> bool
+  # shows the walkable cells within a radius for this frame, as Debug.box does; returns how many
+  def self.draw: (Vector3 around, ?Numeric radius, ?color: RedGem::color, ?alpha: Integer) -> Integer
+  # bakes the scene's grid again now (a level a script changed); returns what stats does
+  def self.bake: () -> Hash[Symbol, Numeric | bool]
+  # how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}
+  def self.stats: () -> Hash[Symbol, Numeric | bool]
+end
+
+# The body of an object with body = "character": walks, jumps, climbs steps.
+class CharacterController
+  # walks with that velocity (m/s) this frame
+  def move: (Vector3 velocity) -> void
+  # jumps up at that speed
+  def jump: (Numeric speed) -> void
+  # whether it stands on something
+  def grounded?: () -> bool
+  # its velocity
+  def velocity: () -> Vector3
+  # its collision layer, a Symbol
+  def layer: () -> Symbol
+  # moves it to another collision layer
+  def layer=: (Symbol name) -> Symbol
+end
+
+# The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis).
+class Rigidbody
+  # its velocity
+  def velocity: () -> Vector3
+  # sets its velocity
+  def velocity=: (Vector3 vector) -> Vector3
+  # pushes it
+  def add_impulse: (Vector3 vector) -> void
+  # pushes it during the next step (newtons); at a point (world space), it also turns it
+  def add_force: (Vector3 force, ?at: Vector3 | nil) -> void
+  # turns it during the next step (newton meters)
+  def add_torque: (Vector3 torque) -> void
+  # how fast it spins, degrees per second around each axis
+  def angular_velocity: () -> Vector3
+  # sets how fast it spins
+  def angular_velocity=: (Vector3 vector) -> Vector3
+  # its mass in kilograms
+  def mass: () -> Float
+  # changes its mass (more than 0)
+  def mass=: (Numeric kilograms) -> Numeric
+  # whether scripts move it (instead of forces)
+  def kinematic?: () -> bool
+  # turns a dynamic body kinematic, or back
+  def kinematic=: (bool flag) -> bool
+  # whether forces move it
+  def dynamic?: () -> bool
+  # turns a kinematic body dynamic, or back
+  def dynamic=: (bool flag) -> bool
+  # how much gravity pulls it (1 is normal)
+  def gravity_scale: () -> Float
+  # 0 floats, 2 falls twice as hard
+  def gravity_scale=: (Numeric scale) -> Numeric
+  # stops simulating it until something touches it
+  def sleep: () -> void
+  # simulates it again
+  def wake: () -> void
+  # whether it sleeps
+  def sleeping?: () -> bool
+  # its collision layer, a Symbol
+  def layer: () -> Symbol
+  # moves it to another collision layer
+  def layer=: (Symbol name) -> Symbol
+end
+
+# The body of an object with body = "vehicle" and wheels.
+class Vehicle
+  # drives it this frame (each from -1 or 0 to 1)
+  def drive: (?throttle: Numeric, ?steering: Numeric, ?brake: Numeric, ?handbrake: Numeric) -> void
+  # brakes fully
+  def stop: () -> void
+  # its speed in m/s, signed
+  def speed: () -> Float
+  # its velocity
+  def velocity: () -> Vector3
+end
+
+# The camera the game is seen through, and what it does on its own: follow, orbit, shake.
+module Camera
+  # the camera object the game is seen through: the one chosen with main= or cut_to, else the scene's first
+  def self.main: () -> (GameObject | nil)
+  # sees the game through another camera object at once (a cut in progress stops); nil goes back to the scene's first; a scene loaded anew starts at its first
+  def self.main=: (GameObject | nil camera) -> (GameObject | nil)
+  # cuts to another camera; with a fade (seconds), through black: darker over its first half, cut at the darkest frame, back over the second half, also while paused; returns the camera
+  def self.cut_to: (GameObject camera, ?fade: Numeric) -> GameObject
+  # whether a cut with a fade is still playing
+  def self.cutting?: () -> bool
+  # [origin, direction] through a pixel of the screen
+  def self.screen_ray: (Numeric x, Numeric y) -> ([Vector3, Vector3] | nil)
+  # [x, y]: where a Vector3 (or an object) is on the screen, in the pixels UI draws in; nil behind the camera
+  def self.world_to_screen: (Vector3 | GameObject point) -> ([Float, Float] | nil)
+  # its vertical field of view, in degrees
+  def self.fov: () -> (Float | nil)
+  # sets the field of view
+  def self.fov=: (Numeric degrees) -> Numeric
+  # how much the picture streaks with speed, 0 to 1
+  def self.motion_blur: () -> Float
+  # sets it
+  def self.motion_blur=: (Numeric amount) -> Numeric
+  # follows an object from now on: offset in meters (relative: in its own axes), smoothing in seconds to close half the way, in front of walls between; snap: false flies there
+  def self.follow: (GameObject target, ?offset: Vector3 | Array[Numeric], ?relative: bool, ?smoothing: Numeric, ?look_at: bool, ?look_height: Numeric, ?avoid_walls: bool, ?dead_zone: Numeric, ?snap: bool) -> void
+  # orbits an object or a point, looking at it, turned by dragging with the right mouse button or the right stick and zoomed by the wheel, also while paused; returns a Camera::Orbit
+  def self.orbit: (GameObject | Vector3 target, ?distance: Numeric, ?yaw: Numeric, ?pitch: Numeric, ?distances: Range[Numeric], ?pitches: Range[Numeric], ?smoothing: Numeric, ?input: bool, ?height: Numeric, ?avoid_walls: bool) -> Camera::Orbit
+  # stops following or orbiting; the camera stays where it is
+  def self.stop_following: () -> void
+  # whether it follows or orbits something (an object destroyed is let go)
+  def self.following?: () -> bool
+  # shakes what it shows (never the camera object): strength (0 to 1) adds to its trauma, held at 1, fading over duration seconds
+  def self.shake: (Numeric strength, ?duration: Numeric) -> Float
+  # how much it shakes now, 0 to 1
+  def self.trauma: () -> Float
+  # stops the shake at once
+  def self.stop_shaking: () -> void
+end
+
+# What Camera.orbit returns: the camera's angles and distance around what it orbits, for scripts to read and change.
+class Camera::Orbit
+  # degrees around it, -180 to 180: 0 behind it (its +Z side), 90 on its right
+  def yaw: () -> Float
+  # degrees above it
+  def pitch: () -> Float
+  # meters from it
+  def distance: () -> Float
+  # the object or point it orbits
+  def target: () -> (GameObject | Vector3)
+  # turns by degrees (the yaw wraps round, eased the short way), the pitch kept within its range
+  def turn: (Numeric yaw, Numeric pitch) -> void
+  # comes nearer (negative) or goes further, within its range
+  def zoom: (Numeric meters) -> void
+end
+
+# game_object.light: the light an object shines with.
+class Light
+  # watts for a point or spot light, lux for the sun
+  def intensity: () -> Float
+  # sets it; shows from the next frame
+  def intensity=: (Numeric value) -> Numeric
+  # its color [r, g, b], 0 to 255
+  def color: () -> [Integer, Integer, Integer]
+  # :orange or [r, g, b] from 0 to 255
+  def color=: (RedGem::color color) -> RedGem::color
+  # [inner, outer] in degrees for a spot light, or nil for other lights
+  def cone_angles: () -> ([Float, Float] | nil)
+  # sets both spot angles between 0 and 90 degrees, at least 0.1 degrees apart
+  def set_cone: (inner: Numeric, outer: Numeric) -> nil
+end
+
+# The scene's own animations (exported from Blender), by name.
+module Animation
+  # the names of the scene's animations
+  def self.names: () -> Array[String]
+  # plays one
+  def self.play: (String | Symbol name, ?loop: bool, ?speed: Numeric, ?restart: bool) -> void
+  # pauses one
+  def self.pause: (String | Symbol name) -> void
+  # stops one
+  def self.stop: (String | Symbol name) -> void
+  # whether it plays
+  def self.playing?: (String | Symbol name) -> bool
+  # where it is, in seconds
+  def self.time: (String | Symbol name) -> Float
+  # how long it is, in seconds
+  def self.duration: (String | Symbol name) -> Float
+  # jumps to a moment
+  def self.seek: (String | Symbol name, Numeric seconds) -> void
+end
+
+# game_object.animation (animation in a behaviour): an object's own clips.
+class Animator
+  # plays a clip, fading from the last one
+  def play: (String | Symbol name, ?loop: bool, ?speed: Numeric, ?fade: Numeric, ?restart: bool) -> void
+  # plays a clip over the one playing
+  def mix: (String | Symbol name, ?weight: Numeric, ?loop: bool, ?speed: Numeric) -> void
+  # stops the clip mixed over
+  def unmix: () -> void
+  # pauses its clips
+  def pause: () -> void
+  # goes back to the scene's animations
+  def follow_scene: (?fade: Numeric) -> void
+  # the clip playing
+  def clip: () -> (String | nil)
+  # whether a clip plays
+  def playing?: () -> bool
+  # where the clip is, in seconds
+  def time: () -> Float
+  # installs an Animation::Graph
+  def use: (Animation::Graph graph) -> void
+  # sets a parameter of the graph
+  def set: (Symbol parameter, untyped value) -> void
+  # the graph's state, or nil
+  def state: () -> (Symbol | nil)
+end
+
+# Named states and transitions for one character (animation.use(graph)).
+class Animation::Graph
+  # a graph starting at a state, with its parameters and their defaults
+  def initialize: (initial: Symbol, ?parameters: Hash[Symbol, untyped]) -> void
+  # a state that plays one clip
+  def clip: (Symbol name, String | Symbol clip, ?loop: bool, ?speed: Numeric) -> self
+  # a state that blends clips by a number: clips: [[0.0, :Idle], [5.0, :Run]]
+  def blend_1d: (Symbol name, parameter: Symbol, clips: Array[[Numeric, String | Symbol]], ?loop: bool, ?speed: Numeric) -> self
+  # a rectangular two-dimensional grid: parameters: [:x, :y], clips: [[[x, y], :Clip], ...]
+  def blend_2d: (Symbol name, parameters: [Symbol, Symbol], clips: Array[[[Numeric, Numeric], String | Symbol]], ?loop: bool, ?speed: Numeric) -> self
+  # goes from one state to another when a parameter says so
+  def transition: (Symbol from, Symbol to, parameter: Symbol, ?equals: untyped, ?above: Numeric | nil, ?below: Numeric | nil, ?fade: Numeric) -> self
+end
+
+# Sounds and music from the game's sounds/ folder.
+module Audio
+  # plays a sound; returns its id (for stop, playing? and set), or nil
+  def self.play: (String | Symbol name, ?volume: Numeric, ?pitch: Numeric, ?loop: bool, ?group: Symbol) -> (Integer | nil)
+  # plays music, crossfading over fade seconds from the track playing
+  def self.music: (String | Symbol name, ?loop: bool, ?volume: Numeric, ?fade: Numeric) -> void
+  # stops the music, fading it out over fade seconds
+  def self.stop_music: (?fade: Numeric) -> void
+  # changes the music's pitch
+  def self.music_pitch=: (Numeric pitch) -> Numeric
+  # changes the music's volume
+  def self.music_volume=: (Numeric volume) -> Numeric
+  # the volume of everything
+  def self.volume=: (Numeric volume) -> Numeric
+  # changes the volume or pitch of a sound that plays; false once it stopped
+  def self.set: (Integer id, ?volume: Numeric | nil, ?pitch: Numeric | nil) -> bool
+  # plays a sound at a place in the world; returns its id, or nil
+  def self.play_at: (String | Symbol name, Vector3 position, ?loop: bool, ?volume: Numeric, ?pitch: Numeric, ?reference_distance: Numeric, ?max_distance: Numeric, ?group: Symbol) -> (Integer | nil)
+  # where the ears are (move it with the camera)
+  def self.listener: (Vector3 position, Vector3 forward, Vector3 up) -> void
+  # moves a sound played with play_at
+  def self.move: (Integer id, Vector3 position) -> void
+  # whether that sound still plays
+  def self.playing?: (Integer id) -> bool
+  # stops that sound
+  def self.stop: (Integer id) -> void
+  # stops every sound played with play or play_at
+  def self.stop_sources: () -> void
+end
+
+# What a script draws over the game this frame: texts, rectangles, pictures, buttons.
+module UI
+  # draws a text; width: wraps it at word boundaries
+  def self.text: (String str, x: Numeric, y: Numeric, ?size: Numeric, ?color: RedGem::color, ?alpha: Integer, ?align: Symbol, ?width: Numeric | nil, ?anchor: Symbol | nil) -> void
+  # draws a rectangle
+  def self.rect: (x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?color: RedGem::color, ?alpha: Integer, ?radius: Numeric, ?anchor: Symbol | nil) -> void
+  # draws a picture of images/
+  def self.image: (String | Symbol name, x: Numeric, y: Numeric, ?width: Numeric, ?height: Numeric, ?alpha: Integer, ?anchor: Symbol | nil) -> void
+  # draws a button; true the frame it is clicked
+  def self.button: (String label, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?color: RedGem::color, ?hover_color: RedGem::color, ?text_color: RedGem::color, ?size: Numeric | nil, ?focused: bool, ?confirm: Array[Array[Symbol]], ?anchor: Symbol | nil) -> bool
+  # a field to type in; returns the new value
+  def self.text_field: (String value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?max_length: Integer, ?color: RedGem::color, ?text_color: RedGem::color, ?secret: bool, ?anchor: Symbol | nil) -> String
+  # whether a phone's on-screen keyboard covers the bottom of the screen
+  def self.keyboard_visible?: () -> bool
+  # the width of the screen, in pixels
+  def self.width: () -> Integer
+  # the height of the screen, in pixels
+  def self.height: () -> Integer
+  # how wide a text is, in pixels (in the face selected)
+  def self.text_width: (String str, ?size: Numeric) -> Integer
+  # the lines a text wraps to at word boundaries, none wider than width
+  def self.wrap: (String str, width: Numeric, ?size: Numeric) -> Array[String]
+  # how tall a text is drawn, in pixels (wrapped to width, when given)
+  def self.text_height: (String str, ?size: Numeric, ?width: Numeric | nil) -> Integer
+  # pixels from a line's top to the next one's at a text size
+  def self.line_height: (Numeric size) -> Integer
+  # the top-left [x, y] of a box placed at an anchor, x and y from it
+  def self.anchored: (Symbol anchor, x: Numeric, y: Numeric, ?width: Numeric, ?height: Numeric) -> [Integer, Integer]
+  # draws what the block draws only inside a box
+  def self.clip: (x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?anchor: Symbol | nil) { () -> void } -> void
+  # an on/off row of a settings screen; returns whether it is on
+  def self.toggle: (String label, bool on, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?focused: bool, ?anchor: Symbol | nil) -> bool
+  # a row that picks one of choices; returns the index chosen
+  def self.choice: (String label, Array[String] choices, Integer index, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?focused: bool, ?anchor: Symbol | nil) -> Integer
+  # a row with a slider; returns the value
+  def self.slider: (String label, Numeric value, x: Numeric, y: Numeric, width: Numeric, height: Numeric, ?min: Numeric, ?max: Numeric, ?step: Numeric, ?focused: bool, ?anchor: Symbol | nil) -> Float
+  # the face texts are drawn with: a file name of fonts/, or nil for the built-in one
+  def self.font: () -> (String | nil)
+  # draws the next texts with fonts/<name>.ttf or .otf (nil: the built-in face)
+  def self.font=: (String | nil name) -> (String | nil)
+end
+
+# Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping.
+class UI::Focus
+  # a focus on the first widget
+  def initialize: () -> void
+  # moves it among count widgets, as up or down was pressed this frame
+  def update: (Integer count) -> void
+  # whether the widget of that index has it: pass it as focused:
+  def at?: (Integer index) -> bool
+  # puts it on a widget (one clicked, or the one a screen comes back to)
+  def move_to: (Integer index) -> void
+  # the widget that has it
+  def index: () -> Integer
+  # back to the first widget
+  def reset: () -> void
+end
+
+# Rows in a box that scrolls, drawn only inside it: the wheel, Page Up/Down, a gamepad's bumpers and right stick, and a focus.
+class UI::ScrollList
+  # a list scrolled to its first row
+  def initialize: () -> void
+  # draws count rows in the box, calling the block with each shown row's index and box
+  def draw: (Integer count, x: Numeric, y: Numeric, width: Numeric, height: Numeric, row_height: Numeric, ?gap: Numeric, ?focus: UI::Focus | nil, ?first: Integer, ?anchor: Symbol | nil, ?input: bool) { (Integer, Hash[Symbol, Integer]) -> void } -> void
+  # how far it is scrolled, in pixels from its first row's top
+  def offset: () -> Numeric
+  # scrolls it (kept within its rows when it is drawn)
+  def offset=: (Numeric pixels) -> Numeric
+  # the indexes of the rows that show, as a range
+  def shown: () -> Range[Integer]
+  # whether its rows are taller than its box
+  def scrolls?: () -> bool
+  # back to its first row
+  def reset: () -> void
+end
+
+# Developer diagnostics: console messages, frame timings and immediate world drawing.
+module Debug
+  # says something
+  def self.log: (untyped message) -> void
+  # warns
+  def self.warn: (untyped message) -> void
+  # reports an error
+  def self.error: (untyped message) -> void
+  # whether foreground frame timings are being collected
+  def self.profiling?: () -> bool
+  # starts a fresh profile window when enabled; disabling retains the last summary
+  def self.profiling=: (bool enabled) -> bool
+  # whether the developer statistics overlay was requested
+  def self.stats_visible?: () -> bool
+  # shows frame timings and FPS; showing also enables profiling, hiding leaves collection running
+  def self.stats_visible=: (bool visible) -> bool
+  # a snapshot with samples, fps and latest/mean/peak timings in milliseconds
+  def self.frame_stats: () -> Hash[Symbol, untyped]
+  # clears statistics and discards any unfinished measurement
+  def self.reset_frame_stats: () -> void
+  # draws a world-space line for this frame; returns whether it was accepted
+  def self.line: (Vector3 from, Vector3 to, ?color: RedGem::color, ?alpha: Integer, ?depth_test: bool) -> bool
+  # draws an axis-aligned wire box with full nonnegative size for this frame; returns whether it was accepted
+  def self.box: (Vector3 center, Vector3 size, ?color: RedGem::color, ?alpha: Integer, ?depth_test: bool) -> bool
+end
+
+# The game itself.
+module Game
+  # switches to scenes/<name>.glb ("main" is scene.glb); Ruby globals survive
+  def self.load_scene: (String | Symbol name) -> void
+  # queues a background scene read; the old world survives failed reads and cancellation
+  def self.load_scene_async: (String | Symbol name) -> void
+  # a scene request is queued or being read
+  def self.loading?: () -> bool
+  # the requested scene name, or nil
+  def self.loading_scene: () -> (String | nil)
+  # the last asynchronous read error, or nil; cleared by the next load request
+  def self.loading_error: () -> (String | nil)
+  # cancels a pending asynchronous request; returns whether one was pending
+  def self.cancel_scene_load: () -> bool
+  # draws the loading screen each frame with unscaled delta; no block restores the default
+  def self.on_loading: () ?{ (Float) -> void } -> void
+  # the scene running
+  def self.scene_name: () -> String
+  # the game's title
+  def self.title: () -> String
+  # ends the game
+  def self.quit: () -> void
+  # ends a video recorded with --record; the game goes on
+  def self.stop_recording: () -> void
+  # the version in game.json ("1.2.0"), or nil
+  def self.version: () -> (String | nil)
+end
+
+# How the player chose the game to be shown and heard; a change takes effect at once.
+module Settings
+  # :windowed, :fullscreen or :borderless
+  def self.window_mode: () -> Symbol
+  # changes it
+  def self.window_mode=: (Symbol mode) -> Symbol
+  # whether the game fills the screen
+  def self.fullscreen?: () -> bool
+  # fullscreen, or back to a window
+  def self.fullscreen=: (bool on) -> bool
+  # [width, height] of the window, in pixels
+  def self.resolution: () -> [Integer, Integer]
+  # resizes the window: one of resolutions
+  def self.resolution=: ([Integer, Integer] size) -> [Integer, Integer]
+  # the sizes the monitor offers: [[w, h], ...]
+  def self.resolutions: () -> Array[[Integer, Integer]]
+  # the share of the window's size the world is drawn at (0.5 to 2)
+  def self.render_scale: () -> Float
+  # changes it
+  def self.render_scale=: (Numeric scale) -> Numeric
+  # whether frames wait for the screen
+  def self.vsync: () -> bool
+  # changes it
+  def self.vsync=: (bool on) -> bool
+  # frames a second at most; nil for none
+  def self.fps_cap: () -> (Integer | nil)
+  # changes it
+  def self.fps_cap=: (Integer | nil cap) -> (Integer | nil)
+  # :low, :medium, :high, :ultra or :custom
+  def self.quality: () -> Symbol
+  # the most a level's environment gets of what it asks for
+  def self.quality=: (Symbol quality) -> Symbol
+  # what the custom quality allows: {msaa:, antialias:, shadow_cascades:, ...}
+  def self.quality_details: () -> Hash[Symbol, untyped]
+  # changes some of them, and makes the quality :custom
+  def self.quality_details=: (Hash[Symbol, untyped] details) -> Hash[Symbol, untyped]
+  # the player's volume, 0 to 1 (it multiplies Audio.volume)
+  def self.volume: () -> Float
+  # changes it
+  def self.volume=: (Numeric volume) -> Numeric
+  # the player's volume of the music group, 0 to 1
+  def self.music_volume: () -> Float
+  # changes it
+  def self.music_volume=: (Numeric volume) -> Numeric
+  # the player's volume of the effects group, 0 to 1
+  def self.effects_volume: () -> Float
+  # changes it
+  def self.effects_volume=: (Numeric volume) -> Numeric
+  # the player's volume of the voice group, 0 to 1
+  def self.voice_volume: () -> Float
+  # changes it
+  def self.voice_volume=: (Numeric volume) -> Numeric
+  # keeps them for the next runs; false where they last for the run only
+  def self.save: () -> bool
+end
+
+# A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks.
+class GameMenu < Behaviour
+  # the menu of the scene, or nil
+  def self.instance: () -> (GameMenu | nil)
+  # opens a screen: :title, :pause, :over, :settings or one of the game's
+  def show: (Symbol screen) -> void
+  # opens the settings screen (window, resolution, quality, volume...; its Controls button opens the controls page)
+  def show_settings: () -> void
+  # closes the menu and goes on
+  def resume: () -> void
+  # starts the scene again
+  def restart: () -> void
+  # opens the end screen with a message
+  def finish: (String message) -> void
+  # whether the menu is open
+  def open?: () -> bool
+  # the screen open
+  def screen: () -> (Symbol | nil)
+  # the screens, by name (:title, :pause, :over, :settings, :controls and the game's own)
+  def screens: () -> Hash[Symbol, GameMenu::Screen]
+  # where the menu's button of that index is: [x, y, width, height]
+  def button_box: (Integer index) -> [Integer, Integer, Integer, Integer]
+end
+
+# A screen of the GameMenu.
+class GameMenu::Screen
+  # a screen with a heading and options: [[label, action], ...]
+  def initialize: (heading: String | Proc, options: Array[[String | Proc, Proc]], back: Symbol | nil) -> void
+  # adds an option
+  def add_option: (String | Proc label, ?index: Integer) { () -> void } -> void
+  # its heading
+  def heading: () -> String
+  # changes its heading
+  def heading=: (String | Proc text) -> (String | Proc)
+  # its options
+  def options: () -> Array[[String, Proc]]
+  # the screen Esc goes back to
+  def back: () -> (Symbol | nil)
+  # called when it is shown
+  def opened: () -> void
+  # called when it is left
+  def closed: () -> void
+  # draws what else it shows
+  def draw: ([Integer, Integer, Integer, Integer] first_button) -> void
+  # pixels kept between its heading and its buttons
+  def space_above: () -> Integer
+  # whether letters are typed into it
+  def typing?: () -> bool
+  # how many widgets it draws above its buttons that take the focus
+  def rows: () -> Integer
+  # where its first button sits, a share of the height (nil: the menu's)
+  def first_button_share: () -> (Float | nil)
+  # its UI::Focus, which the menu gives it
+  def focus: () -> (UI::Focus | nil)
+  # sets it
+  def focus=: (UI::Focus | nil focus) -> (UI::Focus | nil)
+end
+
+# Short-lived sparks, smoke and dust.
+module Particles
+  # adds particles; returns how many (size, color and alpha may be lists over their life)
+  def self.burst: (Vector3 position, ?count: Integer, ?color: RedGem::color | Array[RedGem::color], ?alpha: Integer | Array[Integer], ?speed: Numeric, ?spread: Numeric, ?direction: Vector3, ?life: Numeric, ?size: Numeric | Array[Numeric], ?gravity: Numeric, ?glow: bool, ?lit: bool, ?cast_shadow: bool, ?soft: Numeric, ?image: String | Symbol | nil, ?frames: [Integer, Integer], ?fps: Numeric, ?spin: Numeric) -> Integer
+  # starts a continuous local effect; returns a Particles::Emitter handle; uses burst settings except count
+  def self.emitter: (GameObject object, ?rate: Numeric, ?offset: Vector3, **untyped settings) -> Particles::Emitter
+  # how many are alive
+  def self.count: () -> Integer
+  # removes all particles and stops every emitter
+  def self.clear: () -> void
+end
+
+# A continuous particle effect attached to an object, returned by Particles.emitter.
+class Particles::Emitter
+  # whether this emitter is still emitting from a live object
+  def active?: () -> bool
+  # stops new births; existing particles finish their lives
+  def stop: () -> void
+end
+
+# Great numbers of copies of a mesh (grass, trees, rocks), drawn only.
+class Scatter
+  # places copies; returns a set (count, remove)
+  def self.place: (String | GameObject template, count: Integer, area: [Vector3, Vector3], ?ground: GameObject | nil, ?seed: Integer, ?scale: Numeric | Range[Numeric], ?align: bool, ?tints: Array[RedGem::color] | nil, ?tint_variation: Numeric, ?fade: Numeric, ?normals_up: Numeric, ?lods: Array[[String, Numeric]] | nil) -> Scatter
+  # removes every set
+  def self.clear: () -> void
+  # how many copies a set placed
+  def count: () -> Integer
+  # removes a set
+  def remove: () -> void
+end
+
+# What the game keeps between runs.
+module Save
+  # a value, or the default
+  def self.get: (String | Symbol key, ?untyped default) -> untyped
+  # keeps a value (nil removes it)
+  def self.set: (String | Symbol key, untyped value) -> untyped
+  # the same as get
+  def self.[]: (String | Symbol key) -> untyped
+  # the same as set
+  def self.[]=: (String | Symbol key, untyped value) -> untyped
+  # reads and writes a key with nothing in between
+  def self.update: (String | Symbol key, ?untyped default) { (untyped) -> untyped } -> untyped
+  # removes a key
+  def self.delete: (String | Symbol key) -> void
+  # removes everything
+  def self.clear: () -> void
+  # every key
+  def self.keys: () -> Array[Symbol]
+  # the selected save slot name; default keeps the existing save file
+  def self.slot: () -> String
+  # selects a named slot for this engine; default restores the original store
+  def self.slot=: (String | Symbol name) -> (String | Symbol)
+  # sorted names of persisted slots and slots opened in this run, including default
+  def self.slots: () -> Array[String]
+end
+
+# Web requests; the answer comes to the block.
+module HTTP
+  # GET
+  def self.get: (String url, ?headers: Hash[String | Symbol, untyped], ?timeout: Numeric, ?redirects: bool) ?{ (HTTP::Response) -> void } -> Integer
+  # POST
+  def self.post: (String url, ?json: untyped, ?body: String | nil, ?headers: Hash[String | Symbol, untyped], ?timeout: Numeric, ?redirects: bool) ?{ (HTTP::Response) -> void } -> Integer
+  # PUT
+  def self.put: (String url, ?json: untyped, ?body: String | nil, ?headers: Hash[String | Symbol, untyped], ?timeout: Numeric, ?redirects: bool) ?{ (HTTP::Response) -> void } -> Integer
+  # PATCH
+  def self.patch: (String url, ?json: untyped, ?body: String | nil, ?headers: Hash[String | Symbol, untyped], ?timeout: Numeric, ?redirects: bool) ?{ (HTTP::Response) -> void } -> Integer
+  # DELETE
+  def self.delete: (String url, ?headers: Hash[String | Symbol, untyped], ?timeout: Numeric, ?redirects: bool) ?{ (HTTP::Response) -> void } -> Integer
+  # any verb
+  def self.request: (String | Symbol verb, String url, ?json: untyped, ?body: String | nil, ?headers: Hash[String | Symbol, untyped], ?timeout: Numeric, ?redirects: bool) ?{ (HTTP::Response) -> void } -> Integer
+end
+
+# What a web request's block is given.
+class HTTP::Response
+  # whether it came back with a 2xx status
+  def ok?: () -> bool
+  # its status
+  def status: () -> Integer
+  # its headers
+  def headers: () -> Hash[String, String]
+  # its body (decompressed when it came with gzip or deflate)
+  def body: () -> String
+  # its body read as JSON
+  def json: () -> untyped
+  # why there was no answer, or nil
+  def error: () -> (String | nil)
+  # the address the answer came from, once redirects were followed
+  def url: () -> (String | nil)
+end
+
+# The game's texts in several languages (locales/*.json).
+module I18n
+  # the text of a key in the language in use, its {placeholders} filled
+  def self.t: (String | Symbol key, **untyped values) -> String
+  # the language in use (:en)
+  def self.locale: () -> Symbol
+  # changes the language
+  def self.locale=: (Symbol | String language) -> (Symbol | String)
+  # the languages of the game's locales/ files
+  def self.available_locales: () -> Array[Symbol]
+end
+
+# Games played together: on a local network, through a relay or on a dedicated server.
+module Network
+  # hosts a game, encrypted (fingerprint: is the relay's, with room: true)
+  def self.host: (?port: Integer, ?name: String | nil, ?visible: bool, ?room: bool, ?waiting_per_address: Integer, ?fingerprint: String | nil) -> bool
+  # joins a game (an address, or a room code), encrypted; fingerprint: is who must answer
+  def self.join: (?String | nil address, ?port: Integer, ?room: String | nil, ?auth: untyped, ?fingerprint: String | nil) -> bool
+  # the fingerprint of the game hosted here, or nil
+  def self.fingerprint: () -> (String | nil)
+  # the short code players who join the game hosted here check it with, or nil
+  def self.host_code: () -> (String | nil)
+  # leaves the game
+  def self.leave: () -> void
+  # whether this machine is in a game
+  def self.online?: () -> bool
+  # whether a join is on its way
+  def self.connecting?: () -> bool
+  # whether this machine hosts
+  def self.host?: () -> bool
+  # whether this machine is a dedicated server
+  def self.server?: () -> bool
+  # this machine's peer id
+  def self.id: () -> Integer
+  # the peers of the game
+  def self.peers: () -> Array[Integer]
+  # the peers without a dedicated server
+  def self.players: () -> Array[Integer]
+  # the port of the game
+  def self.port: () -> Integer
+  # the room code, on a relay
+  def self.room: () -> (String | nil)
+  # the relay's address
+  def self.relay: () -> (String | nil)
+  # sets the relay's address
+  def self.relay=: (String | nil address) -> (String | nil)
+  # looks for games on the local network
+  def self.search: () -> bool
+  # whether it is looking
+  def self.searching?: () -> bool
+  # stops looking
+  def self.stop_search: () -> void
+  # the games found
+  def self.games: () -> Array[Hash[Symbol, untyped]]
+  # the port games are looked for on
+  def self.discovery_port: () -> Integer
+  # changes it
+  def self.discovery_port=: (Integer port) -> Integer
+  # sends a message (:all, :host or a peer id)
+  def self.emit: (String | Symbol name, ?untyped data, ?to: Symbol | Integer) -> void
+  # receives a message: |data, from|
+  def self.on: (String | Symbol name) { (untyped, Integer) -> void } -> void
+  # this machine is in the game
+  def self.on_connect: () { () -> void } -> void
+  # the game is gone
+  def self.on_disconnect: () { () -> void } -> void
+  # someone arrived: |peer|
+  def self.on_join: () { (Integer) -> void } -> void
+  # someone left: |peer|
+  def self.on_leave: () { (Integer) -> void } -> void
+  # a join did not work out: |reason|
+  def self.on_fail: () { (String | nil) -> void } -> void
+  # decides who gets in: |peer, auth, decide|
+  def self.authenticate: () { (Integer, untyped, Network::Decision) -> void } -> void
+  # who a peer was accepted as
+  def self.identity: (Integer peer) -> untyped
+  # a peer's name
+  def self.player_name: (Integer peer) -> (String | nil)
+  # spawns a copy on every machine
+  def self.spawn: (String template, ?owner: Integer, ?position: Vector3 | nil, ?rotation: Vector3 | nil) -> (GameObject | nil)
+  # lets guests spawn those templates
+  def self.allow_spawn: (*String templates) -> void
+end
+
+# What an authenticate block decides with.
+class Network::Decision
+  # lets the peer in
+  def accept: (identity: untyped, ?name: String | nil) -> void
+  # keeps the peer out
+  def deny: (?String reason) -> void
+end
+
+# A behaviour: the same object in the same place on every machine.
+class NetworkSync < Behaviour
+  # whether this machine owns it
+  def mine?: () -> bool
+  # the peer that owns it
+  def owner: () -> Integer
+  # gives it to a peer
+  def owner=: (Integer peer) -> Integer
+  # the name it is known by on every machine
+  def key: () -> String
+  # sets its owner and key
+  def assign: (owner: Integer, ?key: String) -> void
+end

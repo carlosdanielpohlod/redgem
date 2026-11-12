@@ -3,7 +3,6 @@
   "about": "The scripting API of RedGem games: the classes and methods scripts use. Generated from docs/scripting/api.json, which tests keep in step with the engine.",
   "notes": "Script errors are logged with a backtrace and only disable the failing behaviour; the game keeps running. Every method takes finite numbers a float can hold: infinity, NaN or a number too large raises an `ArgumentError` instead of reaching the scene. A setting with a range raises outside it and says the range; nothing is quietly clamped, except `Vehicle#drive`'s inputs. Assigning `transform.position` to a physics object teleports it (moving bodies also stop); changing its rotation keeps its velocity. Images may be PNG, JPEG or static WebP (a name without an extension looks for `.webp` last), at most 8192 pixels a side; animated WebP and KTX2/Basis are not read. Missing or unreadable images (scene textures, `UI.image`, particle images) show an opaque magenta-and-black checkerboard, with a warning; a material that never named a texture keeps its plain color, and no path reads outside the game's folder.",
   "internal_classes": [
-    "Behaviour::Timer",
     "Behaviour::Tween",
     "Camera::Cut",
     "Camera::Follow",
@@ -24,293 +23,462 @@
   "classes": [
     {
       "name": "Behaviour",
+      "kind": "class",
       "about": "A Ruby class attached to an object: the engine calls its methods as the game runs.",
+      "guide": "behaviours.md",
       "methods": [
         {
           "name": "start",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "called once, before the first update",
           "top": 1,
           "example": "def start = @speed = prop(:speed, 3.0)"
         },
         {
           "name": "update",
-          "args": "dt",
+          "params": [
+            {"name": "dt", "type": "Float"}
+          ],
+          "returns": {"type": "void"},
           "about": "called every frame; dt is the seconds since the last one",
           "top": 2,
           "example": "def update(dt) = transform.rotate(Vector3.new(0, 90 * dt, 0))"
         },
         {
           "name": "fixed_update",
-          "args": "dt",
+          "params": [
+            {"name": "dt", "type": "Float"}
+          ],
+          "returns": {"type": "void"},
           "about": "called 60 times a second, with the physics"
         },
         {
           "name": "on_trigger_enter",
-          "args": "other",
+          "params": [
+            {"name": "other", "type": "GameObject"}
+          ],
+          "returns": {"type": "void"},
           "about": "something entered this object's trigger, or it entered one",
           "top": 14,
           "example": "def on_trigger_enter(other) = destroy if other.tag?(:player)"
         },
         {
           "name": "on_trigger_exit",
-          "args": "other",
+          "params": [
+            {"name": "other", "type": "GameObject"}
+          ],
+          "returns": {"type": "void"},
           "about": "something left this object's trigger"
         },
         {
           "name": "on_collision_enter",
-          "args": "other",
+          "params": [
+            {"name": "other", "type": "GameObject"}
+          ],
+          "returns": {"type": "void"},
           "about": "this object's body touched another"
         },
         {
           "name": "on_collision_exit",
-          "args": "other",
+          "params": [
+            {"name": "other", "type": "GameObject"}
+          ],
+          "returns": {"type": "void"},
           "about": "this object's body stopped touching another"
         },
         {
           "name": "on_destroy",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "the object is being destroyed"
         },
         {
           "name": "game_object",
+          "params": [],
+          "returns": {"type": "GameObject"},
           "about": "the object this behaviour is attached to"
         },
         {
           "name": "name",
+          "params": [],
+          "returns": {"type": "String"},
           "about": "the object's name"
         },
         {
           "name": "transform",
+          "params": [],
+          "returns": {"type": "Transform"},
           "about": "the object's Transform",
           "top": 3,
           "example": "transform.position += transform.forward * 2.0 * dt"
         },
         {
           "name": "character",
+          "params": [],
+          "returns": {"type": "CharacterController | nil"},
           "about": "the object's CharacterController, or nil",
           "top": 12,
           "example": "character.move(Vector3.new(x, 0, z) * 5.0)"
         },
         {
           "name": "rigidbody",
+          "params": [],
+          "returns": {"type": "Rigidbody | nil"},
           "about": "the object's Rigidbody, or nil"
         },
         {
           "name": "vehicle",
+          "params": [],
+          "returns": {"type": "Vehicle | nil"},
           "about": "the object's Vehicle, or nil"
         },
         {
           "name": "animation",
+          "params": [],
+          "returns": {"type": "Animator"},
           "about": "the object's own Animator"
         },
         {
           "name": "props",
+          "params": [],
+          "returns": {"type": "Hash[String, untyped]"},
           "about": "the object's custom properties, as a Hash"
         },
         {
           "name": "prop",
-          "args": "key, default = nil",
+          "params": [
+            {"name": "key", "type": "Symbol | String"},
+            {"name": "default", "type": "untyped", "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "untyped"},
           "about": "a setting: what add_component was given, else the object's property, else the default",
           "top": 4,
           "example": "@speed = prop(:speed, 3.0)"
         },
         {
           "name": "find",
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject | nil"},
           "about": "the object called name, or nil",
           "top": 5,
           "example": "@player = find(\"Player\")"
         },
         {
           "name": "find!",
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject"},
           "about": "find that stops with a clear error when the object is missing"
         },
         {
           "name": "find_all",
-          "args": "tag",
+          "params": [
+            {"name": "tag", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "Array[GameObject]"},
           "about": "every object with that tag",
           "top": 15,
           "example": "find_all(:coin).size"
         },
         {
           "name": "destroy",
-          "args": "target = game_object",
+          "params": [
+            {"name": "target", "type": "GameObject", "optional": true, "default": "game_object"}
+          ],
+          "returns": {"type": "void"},
           "about": "removes an object (this one unless said) at the end of the step",
           "top": 13,
           "example": "destroy(other)"
         },
         {
           "name": "get_component",
-          "args": "klass",
+          "params": [
+            {"name": "klass", "type": "Class"}
+          ],
+          "returns": {"type": "Behaviour | nil"},
           "about": "another behaviour of this object, or nil",
           "top": 16,
           "example": "get_component(Health)&.damage(1)"
         },
         {
           "name": "after",
-          "args": "seconds, &block",
+          "params": [
+            {"name": "seconds", "type": "Numeric"},
+            {"name": "block", "type": "^() -> void", "block": true}
+          ],
+          "returns": {"type": "Behaviour::Timer"},
           "about": "runs the block once, that many seconds from now",
           "top": 17,
           "example": "after(2.0) { destroy }"
         },
         {
           "name": "every",
-          "args": "seconds, &block",
+          "params": [
+            {"name": "seconds", "type": "Numeric"},
+            {"name": "block", "type": "^() -> void", "block": true}
+          ],
+          "returns": {"type": "Behaviour::Timer"},
           "about": "runs the block every that many seconds"
         },
         {
           "name": "tween",
-          "args": "seconds, ease: :smooth, &block",
+          "params": [
+            {"name": "seconds", "type": "Numeric"},
+            {"name": "ease", "type": "Symbol", "keyword": true, "optional": true, "default": ":smooth"},
+            {"name": "block", "type": "^(Float) -> void", "block": true}
+          ],
+          "returns": {"type": "Behaviour::Timer"},
           "about": "calls the block with t from 0 to 1 over that many seconds"
         },
         {
           "name": "cancel_timers",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "stops every after, every and tween of this behaviour"
         }
       ],
       "internal": [
         "inspect"
-      ],
-      "guide": "behaviours.md"
+      ]
+    },
+    {
+      "name": "Behaviour::Timer",
+      "kind": "class",
+      "about": "What after, every and tween return: something waiting to happen, which can be called off.",
+      "methods": [
+        {
+          "name": "cancel",
+          "params": [],
+          "returns": {"type": "void"},
+          "about": "calls it off (also from inside its own block)"
+        },
+        {
+          "name": "cancelled?",
+          "params": [],
+          "returns": {"type": "bool"},
+          "about": "whether it was called off"
+        }
+      ]
     },
     {
       "name": "GameObject",
+      "kind": "class",
       "about": "An object of the scene, as scripts see it.",
+      "guide": "behaviours.md",
       "methods": [
         {
           "name": "name",
+          "params": [],
+          "returns": {"type": "String"},
           "about": "its name"
         },
         {
           "name": "id",
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "its number in the running game"
         },
         {
           "name": "stable_id",
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "its persistent scene-file identity as a String; nil for runtime copies"
         },
         {
           "name": "capture_state",
+          "params": [],
+          "returns": {"type": "Hash[Symbol, untyped]"},
           "about": "a versioned checkpoint of local pose, tint and visibility, suitable for Save"
         },
         {
           "name": "restore_state",
-          "args": "state",
+          "params": [
+            {"name": "state", "type": "Hash[Symbol, untyped]"}
+          ],
+          "returns": {"type": "self"},
           "about": "validates a checkpoint then restores pose and appearance; teleports physical descendants and returns self"
         },
         {
           "name": "tag",
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "its tag property"
         },
         {
           "name": "tag?",
-          "args": "value",
+          "params": [
+            {"name": "value", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether its tag is value"
         },
         {
           "name": "props",
+          "params": [],
+          "returns": {"type": "Hash[String, untyped]"},
           "about": "its custom properties"
         },
         {
           "name": "alive?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "false once it was destroyed"
         },
         {
           "name": "destroy",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "removes it at the end of the step"
         },
         {
           "name": "visible",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether it is drawn"
         },
         {
           "name": "visible=",
-          "args": "value",
+          "params": [
+            {"name": "value", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
           "about": "shows or hides it"
         },
         {
           "name": "behaviours",
+          "params": [],
+          "returns": {"type": "Array[Behaviour]"},
           "about": "its behaviours"
         },
         {
           "name": "parent",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
           "about": "the object it is under, or nil"
         },
         {
           "name": "parent=",
-          "args": "object",
+          "params": [
+            {"name": "object", "type": "GameObject | nil"}
+          ],
+          "returns": {"type": "GameObject | nil"},
           "about": "puts it under another object (nil: at the root), where it stays in the world, then moves with it; never under itself or what it carries"
         },
         {
           "name": "set_parent",
-          "args": "object, keep_world: true",
+          "params": [
+            {"name": "object", "type": "GameObject | nil"},
+            {"name": "keep_world", "type": "bool", "keyword": true, "optional": true, "default": "true"}
+          ],
+          "returns": {"type": "GameObject | nil"},
           "about": "like parent=; keep_world: false keeps its local transform instead, so the new parent places it; returns the parent"
         },
         {
           "name": "children",
+          "params": [],
+          "returns": {"type": "Array[GameObject]"},
           "about": "the objects under it"
         },
         {
           "name": "transform",
+          "params": [],
+          "returns": {"type": "Transform"},
           "about": "its Transform"
         },
         {
           "name": "character",
+          "params": [],
+          "returns": {"type": "CharacterController | nil"},
           "about": "its CharacterController, or nil"
         },
         {
           "name": "rigidbody",
+          "params": [],
+          "returns": {"type": "Rigidbody | nil"},
           "about": "its Rigidbody, or nil"
         },
         {
           "name": "vehicle",
+          "params": [],
+          "returns": {"type": "Vehicle | nil"},
           "about": "its Vehicle, or nil"
         },
         {
           "name": "light",
+          "params": [],
+          "returns": {"type": "Light | nil"},
           "about": "the Light it shines with, or nil"
         },
         {
           "name": "animation",
+          "params": [],
+          "returns": {"type": "Animator"},
           "about": "its Animator"
         },
         {
           "name": "animation_offset",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "seconds its animations run ahead of the original's (a spawned copy)"
         },
         {
           "name": "animation_offset=",
-          "args": "seconds",
+          "params": [
+            {"name": "seconds", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "sets that offset"
         },
         {
           "name": "get_component",
-          "args": "klass",
+          "params": [
+            {"name": "klass", "type": "Class"}
+          ],
+          "returns": {"type": "Behaviour | nil"},
           "about": "one of its behaviours, or nil"
         },
         {
           "name": "add_component",
-          "args": "klass, **settings",
+          "params": [
+            {"name": "klass", "type": "Class"},
+            {"name": "settings", "type": "untyped", "keyword": true, "rest": true}
+          ],
+          "returns": {"type": "Behaviour | nil"},
           "about": "attaches a behaviour; settings are what its prop reads",
           "top": 18,
           "example": "find(\"Door\").add_component(Door, speed: 2.0)"
         },
         {
           "name": "tint",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "the color its colors are multiplied by"
         },
         {
           "name": "tint=",
-          "args": "color",
+          "params": [
+            {"name": "color", "type": "Vector3 | Array[Numeric]"}
+          ],
+          "returns": {"type": "Vector3 | Array[Numeric]"},
           "about": "multiplies its colors: [1.0, 0.5, 0.5]"
         },
         {
           "name": "morph",
-          "args": "name, weight = nil",
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "weight", "type": "Numeric | nil", "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Numeric | nil"},
           "about": "the weight of a shape key (morph target) of its mesh and the meshes under it, or sets it: morph(:Smile, 0.7); nil when no part has the key, ArgumentError when setting one none has"
         },
         {
           "name": "morph_names",
+          "params": [],
+          "returns": {"type": "Array[Symbol]"},
           "about": "the names of the shape keys of its mesh and the meshes under it, as symbols"
         }
       ],
@@ -318,80 +486,116 @@
         "==",
         "inspect",
         "to_s"
-      ],
-      "guide": "behaviours.md"
+      ]
     },
     {
       "name": "Transform",
+      "kind": "class",
       "about": "Where an object is, how it is turned and how big it is.",
       "methods": [
         {
           "name": "position",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "its position in the world (Vector3)"
         },
         {
           "name": "position=",
-          "args": "vector",
+          "params": [
+            {"name": "vector", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "moves it; a physics object is teleported",
           "top": 6,
           "example": "transform.position = Vector3.new(0, 1, 0)"
         },
         {
           "name": "local_position",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "its position relative to its parent"
         },
         {
           "name": "local_position=",
-          "args": "vector",
+          "params": [
+            {"name": "vector", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "moves it relative to its parent"
         },
         {
           "name": "rotation",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "its rotation, Euler degrees (Vector3)"
         },
         {
           "name": "rotation=",
-          "args": "degrees",
+          "params": [
+            {"name": "degrees", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "turns it to those Euler degrees"
         },
         {
           "name": "rotate",
-          "args": "degrees",
+          "params": [
+            {"name": "degrees", "type": "Vector3"}
+          ],
+          "returns": {"type": "void"},
           "about": "turns it by those Euler degrees",
           "top": 7,
           "example": "transform.rotate(Vector3.new(0, 90 * dt, 0))"
         },
         {
           "name": "look_at",
-          "args": "target, up = Vector3.up",
+          "params": [
+            {"name": "target", "type": "Vector3 | GameObject"},
+            {"name": "up", "type": "Vector3", "optional": true, "default": "Vector3.up"}
+          ],
+          "returns": {"type": "void"},
           "about": "turns it to face a point"
         },
         {
           "name": "translate",
-          "args": "offset",
+          "params": [
+            {"name": "offset", "type": "Vector3"}
+          ],
+          "returns": {"type": "void"},
           "about": "moves it by an offset"
         },
         {
           "name": "scale",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "its scale (Vector3)"
         },
         {
           "name": "scale=",
-          "args": "vector",
+          "params": [
+            {"name": "vector", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "resizes it"
         },
         {
           "name": "forward",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "the direction it faces (-Z)",
           "top": 8,
           "example": "transform.position += transform.forward * speed * dt"
         },
         {
           "name": "right",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "its right (+X)"
         },
         {
           "name": "up",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "its up (+Y)"
         }
       ],
@@ -401,12 +605,18 @@
     },
     {
       "name": "Vector3",
+      "kind": "class",
       "about": "A point or a direction in meters: x, y, z.",
       "methods": [
         {
           "name": "new",
           "static": true,
-          "args": "x, y, z",
+          "params": [
+            {"name": "x", "type": "Numeric"},
+            {"name": "y", "type": "Numeric"},
+            {"name": "z", "type": "Numeric"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "a vector",
           "top": 9,
           "example": "Vector3.new(0, 1, 0)"
@@ -414,266 +624,408 @@
         {
           "name": "[]",
           "static": true,
-          "args": "x, y, z",
+          "params": [
+            {"name": "x", "type": "Numeric"},
+            {"name": "y", "type": "Numeric"},
+            {"name": "z", "type": "Numeric"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "the same as new"
         },
         {
           "name": "zero",
           "static": true,
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "(0, 0, 0)"
         },
         {
           "name": "one",
           "static": true,
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "(1, 1, 1)"
         },
         {
           "name": "up",
           "static": true,
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "(0, 1, 0)"
         },
         {
           "name": "down",
           "static": true,
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "(0, -1, 0)"
         },
         {
           "name": "left",
           "static": true,
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "(-1, 0, 0)"
         },
         {
           "name": "right",
           "static": true,
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "(1, 0, 0)"
         },
         {
           "name": "forward",
           "static": true,
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "(0, 0, -1)"
         },
         {
           "name": "back",
           "static": true,
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "(0, 0, 1)"
         },
         {
           "name": "blender",
           "static": true,
-          "args": "x, y, z",
+          "params": [
+            {"name": "x", "type": "Numeric"},
+            {"name": "y", "type": "Numeric"},
+            {"name": "z", "type": "Numeric"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "a vector given in Blender's axes (Z up)"
         },
         {
           "name": "x",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "its x"
         },
         {
           "name": "y",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "its y"
         },
         {
           "name": "z",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "its z"
         },
         {
           "name": "+",
-          "args": "other",
+          "params": [
+            {"name": "other", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "sum"
         },
         {
           "name": "-",
-          "args": "other",
+          "params": [
+            {"name": "other", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "difference"
         },
         {
           "name": "-@",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "the opposite vector"
         },
         {
           "name": "*",
-          "args": "number",
+          "params": [
+            {"name": "number", "type": "Numeric"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "scaled"
         },
         {
           "name": "/",
-          "args": "number",
+          "params": [
+            {"name": "number", "type": "Numeric"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "divided"
         },
         {
           "name": "==",
-          "args": "other",
+          "params": [
+            {"name": "other", "type": "untyped"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether the numbers are exactly the same"
         },
         {
           "name": "dot",
-          "args": "other",
+          "params": [
+            {"name": "other", "type": "Vector3"}
+          ],
+          "returns": {"type": "Float"},
           "about": "dot product"
         },
         {
           "name": "cross",
-          "args": "other",
+          "params": [
+            {"name": "other", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "cross product"
         },
         {
           "name": "length",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "its length"
         },
         {
           "name": "length_squared",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "its length squared (faster)"
         },
         {
           "name": "normalized",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "the same direction, length 1"
         },
         {
           "name": "clamped",
-          "args": "max_length = 1.0",
+          "params": [
+            {"name": "max_length", "type": "Numeric", "optional": true, "default": "1.0"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "the same direction, no longer than max_length"
         },
         {
           "name": "lerp",
-          "args": "other, t",
+          "params": [
+            {"name": "other", "type": "Vector3"},
+            {"name": "t", "type": "Numeric"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "the point t of the way to other"
         },
         {
           "name": "flat",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "the same with y = 0"
         },
         {
           "name": "with",
-          "args": "x:, y:, z:",
+          "params": [
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "z", "type": "Numeric", "keyword": true}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "a copy with some parts changed: v.with(y: 0)"
         },
         {
           "name": "distance_to",
-          "args": "other",
+          "params": [
+            {"name": "other", "type": "Vector3"}
+          ],
+          "returns": {"type": "Float"},
           "about": "the distance to another point",
           "top": 19,
           "example": "near = transform.position.distance_to(@player.transform.position) < 2.0"
         },
         {
           "name": "approx?",
-          "args": "other, tolerance = 0.0001",
+          "params": [
+            {"name": "other", "type": "Vector3"},
+            {"name": "tolerance", "type": "Numeric", "optional": true, "default": "1e-6"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether two vectors are about the same"
         },
         {
           "name": "to_a",
+          "params": [],
+          "returns": {"type": "[Float, Float, Float]"},
           "about": "[x, y, z]"
         },
         {
           "name": "set",
-          "args": "x, y, z",
+          "params": [
+            {"name": "x", "type": "Numeric"},
+            {"name": "y", "type": "Numeric"},
+            {"name": "z", "type": "Numeric"}
+          ],
+          "returns": {"type": "self"},
           "about": "changes it in place"
         },
         {
           "name": "add!",
-          "args": "other",
+          "params": [
+            {"name": "other", "type": "Vector3"}
+          ],
+          "returns": {"type": "self"},
           "about": "adds in place"
         },
         {
           "name": "sub!",
-          "args": "other",
+          "params": [
+            {"name": "other", "type": "Vector3"}
+          ],
+          "returns": {"type": "self"},
           "about": "subtracts in place"
         },
         {
           "name": "scale!",
-          "args": "number",
+          "params": [
+            {"name": "number", "type": "Numeric"}
+          ],
+          "returns": {"type": "self"},
           "about": "scales in place"
         },
         {
           "name": "normalize!",
+          "params": [],
+          "returns": {"type": "self"},
           "about": "normalizes in place"
         }
       ],
+      "notes": "`==` compares the numbers exactly, and equal vectors are one key of a `Hash`. A vector used as a key must not be changed in place (`set`, `add!`...) while the `Hash` holds it: use a `dup` as the key. The scene keeps positions, rotations and scales in 32-bit floats, so a vector that goes through it comes back rounded: compare what comes back from the scene with `approx?(other, tolerance)`. The in-place methods change the vector and hand it back: `dup` one you got from someone else first. Arithmetic whose result would not fit a float, and dividing by zero, raise an `ArgumentError`; a vector changed in place is then left as it was.",
       "internal": [
         "eql?",
         "hash",
         "inspect",
         "to_s"
-      ],
-      "notes": "`==` compares the numbers exactly, and equal vectors are one key of a `Hash`. A vector used as a key must not be changed in place (`set`, `add!`...) while the `Hash` holds it: use a `dup` as the key. The scene keeps positions, rotations and scales in 32-bit floats, so a vector that goes through it comes back rounded: compare what comes back from the scene with `approx?(other, tolerance)`. The in-place methods change the vector and hand it back: `dup` one you got from someone else first. Arithmetic whose result would not fit a float, and dividing by zero, raise an `ArgumentError`; a vector changed in place is then left as it was."
+      ]
     },
     {
       "name": "Scene",
+      "kind": "module",
       "about": "The objects of the running scene.",
+      "guide": "gameplay.md",
       "methods": [
         {
           "name": "find",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject | nil"},
           "about": "the object called name, or nil"
         },
         {
           "name": "find_by_id",
           "static": true,
-          "args": "identity",
+          "params": [
+            {"name": "identity", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject | nil"},
           "about": "the current scene object with that persistent String/Symbol identity, or nil"
         },
         {
           "name": "find!",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "wanted_by", "type": "Class | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "GameObject"},
           "about": "find that stops with a clear error when the object is missing"
         },
         {
           "name": "find_all",
           "static": true,
-          "args": "tag",
+          "params": [
+            {"name": "tag", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "Array[GameObject]"},
           "about": "every object with that tag"
         },
         {
           "name": "objects",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[GameObject]"},
           "about": "every object"
         },
         {
           "name": "spawn",
           "static": true,
-          "args": "template, position: nil, rotation: nil, physics: true, name: nil, parent: nil",
+          "params": [
+            {"name": "template", "type": "String | GameObject"},
+            {"name": "position", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "rotation", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "physics", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "name", "type": "String | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "parent", "type": "GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "GameObject | nil"},
           "about": "copies a prefab = true template, with its physics and scripts, named name: (the template's by default) and under parent:, keeping its place in the world; returns the copy",
           "top": 20,
           "example": "Scene.spawn(\"Bullet\", position: transform.position, rotation: transform.rotation)"
         }
-      ],
-      "guide": "gameplay.md"
+      ]
     },
     {
       "name": "SceneScript",
+      "kind": "class",
       "about": "Sets a level up from Ruby when it loads: scripts/<scene>_scene.rb.",
+      "guide": "behaviours.md#setting-a-level-up-in-ruby",
       "methods": [
         {
           "name": "setup",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "runs when the level loads, before any behaviour starts",
           "top": 21,
           "example": "def setup = find!(\"Player\").add_component(Player, speed: 6.0)"
         },
         {
           "name": "find",
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject | nil"},
           "about": "the object called name, or nil"
         },
         {
           "name": "find!",
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "GameObject"},
           "about": "find that stops with a clear error when the object is missing"
         },
         {
           "name": "find_all",
-          "args": "tag",
+          "params": [
+            {"name": "tag", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "Array[GameObject]"},
           "about": "every object with that tag"
         }
-      ],
-      "guide": "behaviours.md#setting-a-level-up-in-ruby"
+      ]
     },
     {
       "name": "Input",
+      "kind": "module",
       "about": "Keyboard, mouse, gamepad and touch, read every frame.",
+      "guide": "gameplay.md",
       "methods": [
         {
           "name": "axis",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "Float"},
           "about": ":horizontal or :vertical, from -1 to 1 (keys, stick)",
           "top": 10,
           "example": "x = Input.axis(:horizontal)"
@@ -681,13 +1033,19 @@
         {
           "name": "down?",
           "static": true,
-          "args": "key",
+          "params": [
+            {"name": "key", "type": "Symbol"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a key is held"
         },
         {
           "name": "pressed?",
           "static": true,
-          "args": "key",
+          "params": [
+            {"name": "key", "type": "Symbol"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a key went down this frame",
           "top": 11,
           "example": "character.jump(8.0) if Input.pressed?(:space) && character.grounded?"
@@ -695,264 +1053,418 @@
         {
           "name": "released?",
           "static": true,
-          "args": "key",
+          "params": [
+            {"name": "key", "type": "Symbol"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a key went up this frame"
         },
         {
           "name": "action?",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a named action (game settings) is held"
         },
         {
           "name": "action_pressed?",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a named action started this frame"
         },
         {
           "name": "action_released?",
           "static": true,
-          "args": "name, pad: 0",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a named action ended this frame"
         },
         {
           "name": "define_action",
           "static": true,
-          "args": "name, *bindings, keys: [], buttons: [], mouse: []",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "bindings", "type": "String", "rest": true},
+            {"name": "keys", "type": "Array[Symbol]", "keyword": true, "optional": true, "default": "[]"},
+            {"name": "buttons", "type": "Array[Symbol]", "keyword": true, "optional": true, "default": "[]"},
+            {"name": "mouse", "type": "Array[Symbol]", "keyword": true, "optional": true, "default": "[]"}
+          ],
+          "returns": {"type": "void"},
           "about": "adds an action of the game's own (besides game.json's input section)"
         },
         {
           "name": "define_axis",
           "static": true,
-          "args": "name, negative: [], positive: [], pad_axis: nil, invert: false",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "negative", "type": "Array[String]", "keyword": true, "optional": true, "default": "[]"},
+            {"name": "positive", "type": "Array[String]", "keyword": true, "optional": true, "default": "[]"},
+            {"name": "pad_axis", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "invert", "type": "bool", "keyword": true, "optional": true, "default": "false"}
+          ],
+          "returns": {"type": "void"},
           "about": "adds an axis of the game's own: define_axis(:steer, negative: [\"key:a\"], positive: [\"key:d\"])"
         },
         {
           "name": "actions",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[Symbol]"},
           "about": "the names of the actions"
         },
         {
           "name": "axes",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[Symbol]"},
           "about": "the names of the axes"
         },
         {
           "name": "axis_stick",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "Symbol"}
+          ],
+          "returns": {"type": "Symbol | nil"},
           "about": "the stick that moves an axis (:left_x), the game's for every player; nil when none does"
         },
         {
           "name": "bindings",
           "static": true,
-          "args": "name, pad: 0",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "Array[String]"},
           "about": "what a player bound to an action: [\"key:space\", \"mouse:left\", \"pad:a\"]"
         },
         {
           "name": "bindings_changes",
           "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "a count that goes up whenever actions, axes or bindings may have changed"
         },
         {
           "name": "bind",
           "static": true,
-          "args": "name, binding = nil, key: nil, button: nil, mouse: nil, side: nil, pad: 0",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "binding", "type": "String | nil", "optional": true, "default": "nil"},
+            {"name": "key", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "button", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "mouse", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "side", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "void"},
           "about": "binds a key, a mouse button (mouse: :left, :wheel_up) or a gamepad button to an action; kept between runs"
         },
         {
           "name": "unbind",
           "static": true,
-          "args": "name, binding = nil, key: nil, button: nil, mouse: nil, side: nil, pad: 0",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "binding", "type": "String | nil", "optional": true, "default": "nil"},
+            {"name": "key", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "button", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "mouse", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "side", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "void"},
           "about": "takes a binding off an action"
         },
         {
           "name": "reset_bindings",
           "static": true,
-          "args": "name = nil, pad: nil",
+          "params": [
+            {"name": "name", "type": "Symbol | nil", "optional": true, "default": "nil"},
+            {"name": "pad", "type": "Integer | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "void"},
           "about": "back to the game's own bindings (of one action, or all; of one pad, or all)"
         },
         {
           "name": "capture_next",
           "static": true,
-          "args": "cancel: [\"key:escape\", \"pad:b\", \"pad:back\"], mouse: true, &block",
+          "params": [
+            {"name": "cancel", "type": "Array[String]", "keyword": true, "optional": true, "default": "[\"key:escape\", \"pad:b\", \"pad:back\"]"},
+            {"name": "mouse", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "block", "type": "^(String | nil, Integer | nil) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
           "about": "the next key, mouse button, wheel turn or gamepad button pressed, to the block: |binding, pad| (nil: called off); mouse: false leaves the mouse out"
         },
         {
           "name": "capturing?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether a capture waits for a key"
         },
         {
           "name": "capturing_for?",
           "static": true,
-          "args": "block",
+          "params": [
+            {"name": "block", "type": "Proc"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a capture still waits to call that block (not once another took its place)"
         },
         {
           "name": "cancel_capture",
           "static": true,
+          "params": [],
+          "returns": {"type": "void"},
           "about": "calls a capture off"
         },
         {
           "name": "mouse_x",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "the pointer's x, in pixels"
         },
         {
           "name": "mouse_y",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "the pointer's y, in pixels"
         },
         {
           "name": "mouse_dx",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "how far the mouse moved this frame, across"
         },
         {
           "name": "mouse_dy",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "how far the mouse moved this frame, up and down"
         },
         {
           "name": "mouse_wheel",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "how far the wheel turned this frame"
         },
         {
           "name": "mouse_down?",
           "static": true,
-          "args": "button",
+          "params": [
+            {"name": "button", "type": "Symbol"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a mouse button (:left, :right, :middle, :side, :extra) is held"
         },
         {
           "name": "mouse_pressed?",
           "static": true,
-          "args": "button",
+          "params": [
+            {"name": "button", "type": "Symbol"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a mouse button went down this frame"
         },
         {
           "name": "mouse_released?",
           "static": true,
-          "args": "button",
+          "params": [
+            {"name": "button", "type": "Symbol"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a mouse button went up this frame"
         },
         {
           "name": "mouse_locked=",
           "static": true,
-          "args": "locked",
+          "params": [
+            {"name": "locked", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
           "about": "hides the pointer and keeps it in the window (first-person cameras)"
         },
         {
           "name": "mouse_locked?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether the pointer is locked"
         },
         {
           "name": "pads",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[Integer]"},
           "about": "the numbers of the gamepads plugged in"
         },
         {
           "name": "gamepad?",
           "static": true,
+          "params": [
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a gamepad is connected"
         },
         {
           "name": "gamepad_axis",
           "static": true,
-          "args": "axis",
+          "params": [
+            {"name": "axis", "type": "Symbol"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "Float"},
           "about": ":left_x, :left_y, :right_x, :right_y, :left_trigger, :right_trigger"
         },
         {
           "name": "gamepad_down?",
           "static": true,
-          "args": "button",
+          "params": [
+            {"name": "button", "type": "Symbol"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a gamepad button (:a, :b, :x, :y...) is held"
         },
         {
           "name": "gamepad_pressed?",
           "static": true,
-          "args": "button",
+          "params": [
+            {"name": "button", "type": "Symbol"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a gamepad button went down this frame"
         },
         {
           "name": "gamepad_released?",
           "static": true,
-          "args": "button",
+          "params": [
+            {"name": "button", "type": "Symbol"},
+            {"name": "pad", "type": "Integer", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a gamepad button went up this frame"
         },
         {
           "name": "text",
           "static": true,
+          "params": [],
+          "returns": {"type": "String"},
           "about": "what was typed this frame"
         },
         {
           "name": "touch_controls=",
           "static": true,
-          "args": "on",
+          "params": [
+            {"name": "on", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
           "about": "shows the on-screen stick and buttons of a phone"
         },
         {
           "name": "touch_controls?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether they are shown"
         }
       ],
-      "guide": "gameplay.md",
       "notes": "Every action, axis, binding and gamepad call takes `pad:` (0 to 3: the player; 0 when left out). Actions and axes come from `game.json`'s `input` section and `define_action`/`define_axis`; a player's bindings are kept between runs, beside the game's save. See [Controls](gameplay.md#controls)."
     },
     {
       "name": "Time",
+      "kind": "class",
       "about": "The game's clock (added to Ruby's Time).",
       "methods": [
         {
           "name": "delta",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "seconds since the last frame"
         },
         {
           "name": "unscaled_delta",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "seconds since the last frame, whatever Time.scale (also while paused)"
         },
         {
           "name": "fixed_delta",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "seconds of a physics step (1/60)"
         },
         {
           "name": "elapsed",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "seconds since the game started"
         },
         {
           "name": "frame",
           "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "how many frames have run"
         },
         {
           "name": "scale",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "how fast game time runs (1 is normal)"
         },
         {
           "name": "scale=",
           "static": true,
-          "args": "value",
+          "params": [
+            {"name": "value", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "slows or speeds the game; 0 pauses it"
         }
       ]
     },
     {
       "name": "Physics",
+      "kind": "module",
       "about": "Questions to the physics world: rays, moving shapes and shapes in place.",
+      "guide": "gameplay.md",
       "methods": [
         {
           "name": "raycast",
           "static": true,
-          "args": "origin, direction, max_distance = 1000, skip = nil, layers: nil, ignore: nil",
+          "params": [
+            {"name": "origin", "type": "Vector3"},
+            {"name": "direction", "type": "Vector3"},
+            {"name": "max_distance", "type": "Numeric", "optional": true, "default": "1000.0"},
+            {"name": "skip", "type": "GameObject | nil", "optional": true, "default": "nil"},
+            {"name": "layers", "type": "Array[Symbol] | Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "ignore", "type": "Array[GameObject] | GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped] | nil"},
           "about": "the first thing a ray hits: {object:, point:, normal:, distance:}, or nil (skip: an object it sees through)",
           "top": 22,
           "example": "hit = Physics.raycast(transform.position, Vector3.down, 2.0, game_object)"
@@ -960,163 +1472,282 @@
         {
           "name": "raycast_all",
           "static": true,
-          "args": "origin, direction, max_distance = 1000, layers: nil, ignore: nil",
+          "params": [
+            {"name": "origin", "type": "Vector3"},
+            {"name": "direction", "type": "Vector3"},
+            {"name": "max_distance", "type": "Numeric", "optional": true, "default": "1000.0"},
+            {"name": "layers", "type": "Array[Symbol] | Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "ignore", "type": "Array[GameObject] | GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Array[Hash[Symbol, untyped]]"},
           "about": "everything a ray hits, nearest first",
           "example": "Physics.raycast_all(eye, forward, 50.0, layers: [:enemy]).each { |hit| hit[:object].destroy }"
         },
         {
           "name": "sphere_cast",
           "static": true,
-          "args": "from, to, radius, layers: nil, ignore: nil",
+          "params": [
+            {"name": "from", "type": "Vector3"},
+            {"name": "to", "type": "Vector3"},
+            {"name": "radius", "type": "Numeric"},
+            {"name": "layers", "type": "Array[Symbol] | Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "ignore", "type": "Array[GameObject] | GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped] | nil"},
           "about": "the first thing a ball moving from `from` to `to` touches, or nil"
         },
         {
           "name": "box_cast",
           "static": true,
-          "args": "from, to, size, rotation: nil, layers: nil, ignore: nil",
+          "params": [
+            {"name": "from", "type": "Vector3"},
+            {"name": "to", "type": "Vector3"},
+            {"name": "size", "type": "Vector3"},
+            {"name": "rotation", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "layers", "type": "Array[Symbol] | Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "ignore", "type": "Array[GameObject] | GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped] | nil"},
           "about": "the same for a box (its whole size; rotation in degrees)"
         },
         {
           "name": "capsule_cast",
           "static": true,
-          "args": "from, to, radius, height, rotation: nil, layers: nil, ignore: nil",
+          "params": [
+            {"name": "from", "type": "Vector3"},
+            {"name": "to", "type": "Vector3"},
+            {"name": "radius", "type": "Numeric"},
+            {"name": "height", "type": "Numeric"},
+            {"name": "rotation", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "layers", "type": "Array[Symbol] | Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "ignore", "type": "Array[GameObject] | GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped] | nil"},
           "about": "the same for an upright capsule (height end to end)"
         },
         {
           "name": "overlap_sphere",
           "static": true,
-          "args": "center, radius, layers: nil, ignore: nil",
+          "params": [
+            {"name": "center", "type": "Vector3"},
+            {"name": "radius", "type": "Numeric"},
+            {"name": "layers", "type": "Array[Symbol] | Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "ignore", "type": "Array[GameObject] | GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Array[Hash[Symbol, untyped]]"},
           "about": "the hits of everything inside a ball, nearest first",
           "example": "Physics.overlap_sphere(transform.position, 4.0, layers: :enemy).each { |hit| hit[:object].destroy }"
         },
         {
           "name": "overlap_box",
           "static": true,
-          "args": "center, size, rotation: nil, layers: nil, ignore: nil",
+          "params": [
+            {"name": "center", "type": "Vector3"},
+            {"name": "size", "type": "Vector3"},
+            {"name": "rotation", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "layers", "type": "Array[Symbol] | Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "ignore", "type": "Array[GameObject] | GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Array[Hash[Symbol, untyped]]"},
           "about": "the same inside a box"
         },
         {
           "name": "overlap_capsule",
           "static": true,
-          "args": "center, radius, height, rotation: nil, layers: nil, ignore: nil",
+          "params": [
+            {"name": "center", "type": "Vector3"},
+            {"name": "radius", "type": "Numeric"},
+            {"name": "height", "type": "Numeric"},
+            {"name": "rotation", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "layers", "type": "Array[Symbol] | Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "ignore", "type": "Array[GameObject] | GameObject | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Array[Hash[Symbol, untyped]]"},
           "about": "the same inside a capsule"
         },
         {
           "name": "layers",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[Symbol]"},
           "about": "the game's collision layers, as Symbols (game.json's physics layers)"
         },
         {
           "name": "joint",
           "static": true,
-          "args": "kind, object, other = nil, anchor: nil, other_anchor: nil, axis: nil, limits: nil, motor_speed: nil, motor_torque: nil, min: nil, max: nil, spring: nil, damping: nil, break_force: nil",
+          "params": [
+            {"name": "kind", "type": "Symbol"},
+            {"name": "object", "type": "GameObject"},
+            {"name": "other", "type": "GameObject | nil", "optional": true, "default": "nil"},
+            {"name": "anchor", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "other_anchor", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "axis", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "limits", "type": "Array[Numeric] | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "motor_speed", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "motor_torque", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "min", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "max", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "spring", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "damping", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "break_force", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Joint"},
           "about": "joins two objects, or one to the world (other nil): :fixed, :hinge, :slider, :point or :distance",
           "example": "Physics.joint(:hinge, door, nil, anchor: pin, axis: Vector3.up, limits: [0, 110])"
         }
       ],
-      "guide": "gameplay.md",
       "notes": "`layers:` is a layer's name or a list of them (every layer when nil); `ignore:` is an object or a list of objects to see through. Hits are `{object:, point:, normal:, distance:}`, each object once, nearest first, at most 64; triggers are never hit. A cast that starts inside something hits it at distance 0."
     },
     {
       "name": "Joint",
+      "kind": "class",
       "about": "What holds two bodies together, or one to the world (made by Physics.joint).",
+      "guide": "gameplay.md",
       "methods": [
         {
           "name": "kind",
+          "params": [],
+          "returns": {"type": "Symbol"},
           "about": ":fixed, :hinge, :slider, :point or :distance"
         },
         {
           "name": "object",
+          "params": [],
+          "returns": {"type": "GameObject"},
           "about": "the object it holds"
         },
         {
           "name": "other",
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
           "about": "the other object it holds, or nil for the world"
         },
         {
           "name": "alive?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether it still holds them"
         },
         {
           "name": "broken?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether it was pulled past its break force"
         },
         {
           "name": "remove",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "lets go"
         },
         {
           "name": "enabled?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether it holds right now"
         },
         {
           "name": "enabled=",
-          "args": "flag",
+          "params": [
+            {"name": "flag", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
           "about": "lets go for a while, or holds again"
         },
         {
           "name": "break_force",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "the pull (newtons) or twist (newton meters) it breaks at; 0 never breaks"
         },
         {
           "name": "break_force=",
-          "args": "newtons",
+          "params": [
+            {"name": "newtons", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "sets the pull it breaks at"
         },
         {
           "name": "motor",
-          "args": "speed, torque",
+          "params": [
+            {"name": "speed", "type": "Numeric"},
+            {"name": "torque", "type": "Numeric"}
+          ],
+          "returns": {"type": "void"},
           "about": "a hinge turns at that speed (degrees per second) with at most that torque; 0 torque lets it go"
         },
         {
           "name": "angle",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "how far a hinge turned from where it started, in degrees"
         }
       ],
+      "notes": "Points and axes are in world space; `anchor:` defaults to the object's position, `other_anchor:` (a distance joint's other end) to the other object's, `axis:` to up. A hinge's `limits:` are degrees [low, high] from where it starts (low -180 to 0, high 0 to 180), a slider's are meters along its axis; a hinge's `motor_speed:` needs a `motor_torque:`. A distance joint keeps between `min:` (0) and `max:` (how far apart the ends are) apart, springy with `spring:` (hertz) and `damping:`. Each kind refuses options it has no use for, and `motor` and `angle` raise for anything but a hinge. A joint needs a dynamic body at one end (one whose bodies were all made kinematic since holds nothing until one is dynamic again); it goes when either object is destroyed or the scene changes.",
       "internal": [
         "inspect",
         "to_s"
-      ],
-      "guide": "gameplay.md",
-      "notes": "Points and axes are in world space; `anchor:` defaults to the object's position, `other_anchor:` (a distance joint's other end) to the other object's, `axis:` to up. A hinge's `limits:` are degrees [low, high] from where it starts (low -180 to 0, high 0 to 180), a slider's are meters along its axis; a hinge's `motor_speed:` needs a `motor_torque:`. A distance joint keeps between `min:` (0) and `max:` (how far apart the ends are) apart, springy with `spring:` (hertz) and `damping:`. Each kind refuses options it has no use for, and `motor` and `angle` raise for anything but a hinge. A joint needs a dynamic body at one end (one whose bodies were all made kinematic since holds nothing until one is dynamic again); it goes when either object is destroyed or the scene changes."
+      ]
     },
     {
       "name": "Navigation",
+      "kind": "module",
       "about": "Where the characters a game moves can walk, and the way from one place to another.",
       "methods": [
         {
           "name": "path",
           "static": true,
-          "args": "from, to",
+          "params": [
+            {"name": "from", "type": "Vector3"},
+            {"name": "to", "type": "Vector3"}
+          ],
+          "returns": {"type": "Array[Vector3] | nil"},
           "about": "the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there",
           "example": "waypoints = Navigation.path(transform.position, Scene.find('Player').transform.position)"
         },
         {
           "name": "nearest",
           "static": true,
-          "args": "point",
+          "params": [
+            {"name": "point", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3 | nil"},
           "about": "the walkable point nearest a point (within 8 m of it), or nil"
         },
         {
           "name": "walkable?",
           "static": true,
-          "args": "point",
+          "params": [
+            {"name": "point", "type": "Vector3"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether a point is on walkable ground, up to a character's height above it"
         },
         {
           "name": "draw",
           "static": true,
-          "args": "around, radius = 10, color: :blue, alpha: 255",
+          "params": [
+            {"name": "around", "type": "Vector3"},
+            {"name": "radius", "type": "Numeric", "optional": true, "default": "10"},
+            {"name": "color", "type": "Color", "keyword": true, "optional": true, "default": ":blue"},
+            {"name": "alpha", "type": "Integer", "keyword": true, "optional": true, "default": "255"}
+          ],
+          "returns": {"type": "Integer"},
           "about": "shows the walkable cells within a radius for this frame, as Debug.box does; returns how many"
         },
         {
           "name": "bake",
           "static": true,
+          "params": [],
+          "returns": {"type": "Hash[Symbol, Numeric | bool]"},
           "about": "bakes the scene's grid again now (a level a script changed); returns what stats does"
         },
         {
           "name": "stats",
           "static": true,
+          "params": [],
+          "returns": {"type": "Hash[Symbol, Numeric | bool]"},
           "about": "how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}"
         }
       ],
@@ -1125,296 +1756,458 @@
     },
     {
       "name": "CharacterController",
+      "kind": "class",
       "about": "The body of an object with body = \"character\": walks, jumps, climbs steps.",
+      "guide": "gameplay.md",
       "methods": [
         {
           "name": "move",
-          "args": "velocity",
+          "params": [
+            {"name": "velocity", "type": "Vector3"}
+          ],
+          "returns": {"type": "void"},
           "about": "walks with that velocity (m/s) this frame"
         },
         {
           "name": "jump",
-          "args": "speed",
+          "params": [
+            {"name": "speed", "type": "Numeric"}
+          ],
+          "returns": {"type": "void"},
           "about": "jumps up at that speed"
         },
         {
           "name": "grounded?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether it stands on something"
         },
         {
           "name": "velocity",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "its velocity"
         },
         {
           "name": "layer",
+          "params": [],
+          "returns": {"type": "Symbol"},
           "about": "its collision layer, a Symbol"
         },
         {
           "name": "layer=",
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "Symbol"}
+          ],
+          "returns": {"type": "Symbol"},
           "about": "moves it to another collision layer"
         }
-      ],
-      "guide": "gameplay.md"
+      ]
     },
     {
       "name": "Rigidbody",
+      "kind": "class",
       "about": "The body of an object with body = \"dynamic\" or \"kinematic\" (or a vehicle's chassis).",
+      "guide": "gameplay.md",
       "methods": [
         {
           "name": "velocity",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "its velocity"
         },
         {
           "name": "velocity=",
-          "args": "vector",
+          "params": [
+            {"name": "vector", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "sets its velocity"
         },
         {
           "name": "add_impulse",
-          "args": "vector",
+          "params": [
+            {"name": "vector", "type": "Vector3"}
+          ],
+          "returns": {"type": "void"},
           "about": "pushes it"
         },
         {
           "name": "add_force",
-          "args": "force, at: nil",
+          "params": [
+            {"name": "force", "type": "Vector3"},
+            {"name": "at", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "void"},
           "about": "pushes it during the next step (newtons); at a point (world space), it also turns it",
           "example": "def fixed_update(_dt) = rigidbody.add_force(Vector3.up * 30.0)"
         },
         {
           "name": "add_torque",
-          "args": "torque",
+          "params": [
+            {"name": "torque", "type": "Vector3"}
+          ],
+          "returns": {"type": "void"},
           "about": "turns it during the next step (newton meters)"
         },
         {
           "name": "angular_velocity",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "how fast it spins, degrees per second around each axis"
         },
         {
           "name": "angular_velocity=",
-          "args": "vector",
+          "params": [
+            {"name": "vector", "type": "Vector3"}
+          ],
+          "returns": {"type": "Vector3"},
           "about": "sets how fast it spins"
         },
         {
           "name": "mass",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "its mass in kilograms"
         },
         {
           "name": "mass=",
-          "args": "kilograms",
+          "params": [
+            {"name": "kilograms", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "changes its mass (more than 0)"
         },
         {
           "name": "kinematic?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether scripts move it (instead of forces)"
         },
         {
           "name": "kinematic=",
-          "args": "flag",
+          "params": [
+            {"name": "flag", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
           "about": "turns a dynamic body kinematic, or back"
         },
         {
           "name": "dynamic?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether forces move it"
         },
         {
           "name": "dynamic=",
-          "args": "flag",
+          "params": [
+            {"name": "flag", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
           "about": "turns a kinematic body dynamic, or back"
         },
         {
           "name": "gravity_scale",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "how much gravity pulls it (1 is normal)"
         },
         {
           "name": "gravity_scale=",
-          "args": "scale",
+          "params": [
+            {"name": "scale", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "0 floats, 2 falls twice as hard"
         },
         {
           "name": "sleep",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "stops simulating it until something touches it"
         },
         {
           "name": "wake",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "simulates it again"
         },
         {
           "name": "sleeping?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether it sleeps"
         },
         {
           "name": "layer",
+          "params": [],
+          "returns": {"type": "Symbol"},
           "about": "its collision layer, a Symbol"
         },
         {
           "name": "layer=",
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "Symbol"}
+          ],
+          "returns": {"type": "Symbol"},
           "about": "moves it to another collision layer",
           "example": "rigidbody.layer = :bullet"
         }
       ],
-      "guide": "gameplay.md",
       "notes": "Forces and torques act during the next physics step only: add them every `fixed_update` to keep pushing. A body made dynamic again starts at rest. `kinematic=` and `dynamic=` raise for a vehicle."
     },
     {
       "name": "Vehicle",
+      "kind": "class",
       "about": "The body of an object with body = \"vehicle\" and wheels.",
+      "guide": "gameplay.md",
       "methods": [
         {
           "name": "drive",
-          "args": "throttle: 0.0, steering: 0.0, brake: 0.0, handbrake: 0.0",
+          "params": [
+            {"name": "throttle", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
+            {"name": "steering", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
+            {"name": "brake", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
+            {"name": "handbrake", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"}
+          ],
+          "returns": {"type": "void"},
           "about": "drives it this frame (each from -1 or 0 to 1)"
         },
         {
           "name": "stop",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "brakes fully"
         },
         {
           "name": "speed",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "its speed in m/s, signed"
         },
         {
           "name": "velocity",
+          "params": [],
+          "returns": {"type": "Vector3"},
           "about": "its velocity"
         }
       ],
-      "guide": "gameplay.md",
       "notes": "Wheel meshes must have their rotation applied (the axle along X). `drive`'s inputs are the one setting the engine clamps, since an analog stick may push a little past full."
     },
     {
       "name": "Camera",
+      "kind": "module",
       "about": "The camera the game is seen through, and what it does on its own: follow, orbit, shake.",
+      "guide": "gameplay.md#follow-orbit-and-shake-the-camera",
       "methods": [
         {
           "name": "main",
           "static": true,
+          "params": [],
+          "returns": {"type": "GameObject | nil"},
           "about": "the camera object the game is seen through: the one chosen with main= or cut_to, else the scene's first"
         },
         {
           "name": "main=",
           "static": true,
-          "args": "camera",
+          "params": [
+            {"name": "camera", "type": "GameObject | nil"}
+          ],
+          "returns": {"type": "GameObject | nil"},
           "about": "sees the game through another camera object at once (a cut in progress stops); nil goes back to the scene's first; a scene loaded anew starts at its first"
         },
         {
           "name": "cut_to",
           "static": true,
-          "args": "camera, fade: 0",
+          "params": [
+            {"name": "camera", "type": "GameObject"},
+            {"name": "fade", "type": "Numeric", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "GameObject"},
           "about": "cuts to another camera; with a fade (seconds), through black: darker over its first half, cut at the darkest frame, back over the second half, also while paused; returns the camera",
           "example": "Camera.cut_to(Scene.find(\"SecurityCam\"), fade: 0.6)"
         },
         {
           "name": "cutting?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether a cut with a fade is still playing"
         },
         {
           "name": "screen_ray",
           "static": true,
-          "args": "x, y",
+          "params": [
+            {"name": "x", "type": "Numeric"},
+            {"name": "y", "type": "Numeric"}
+          ],
+          "returns": {"type": "[Vector3, Vector3] | nil"},
           "about": "[origin, direction] through a pixel of the screen"
         },
         {
           "name": "world_to_screen",
           "static": true,
-          "args": "point",
+          "params": [
+            {"name": "point", "type": "Vector3 | GameObject"}
+          ],
+          "returns": {"type": "[Float, Float] | nil"},
           "about": "[x, y]: where a Vector3 (or an object) is on the screen, in the pixels UI draws in; nil behind the camera",
           "example": "x, y = Camera.world_to_screen(enemy.transform.position + Vector3.up * 2)"
         },
         {
           "name": "fov",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float | nil"},
           "about": "its vertical field of view, in degrees"
         },
         {
           "name": "fov=",
           "static": true,
-          "args": "degrees",
+          "params": [
+            {"name": "degrees", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "sets the field of view"
         },
         {
           "name": "motion_blur",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "how much the picture streaks with speed, 0 to 1"
         },
         {
           "name": "motion_blur=",
           "static": true,
-          "args": "amount",
+          "params": [
+            {"name": "amount", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "sets it"
         },
         {
           "name": "follow",
           "static": true,
-          "args": "target, offset: [0, 3, 6], relative: false, smoothing: 0.15, look_at: true, look_height: 1.0, avoid_walls: true, dead_zone: 0, snap: true",
+          "params": [
+            {"name": "target", "type": "GameObject"},
+            {"name": "offset", "type": "Vector3 | Array[Numeric]", "keyword": true, "optional": true, "default": "[0, 3, 6]"},
+            {"name": "relative", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "smoothing", "type": "Numeric", "keyword": true, "optional": true, "default": "0.15"},
+            {"name": "look_at", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "look_height", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "avoid_walls", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "dead_zone", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
+            {"name": "snap", "type": "bool", "keyword": true, "optional": true, "default": "true"}
+          ],
+          "returns": {"type": "void"},
           "about": "follows an object from now on: offset in meters (relative: in its own axes), smoothing in seconds to close half the way, in front of walls between; snap: false flies there",
           "example": "Camera.follow(Scene.find(\"Player\"), offset: Vector3.new(0, 3, 6), smoothing: 0.15)"
         },
         {
           "name": "orbit",
           "static": true,
-          "args": "target, distance: 6, yaw: 0, pitch: 20, distances: 1..30, pitches: -80..80, smoothing: 0.08, input: true, height: 1.0, avoid_walls: true",
+          "params": [
+            {"name": "target", "type": "GameObject | Vector3"},
+            {"name": "distance", "type": "Numeric", "keyword": true, "optional": true, "default": "6.0"},
+            {"name": "yaw", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
+            {"name": "pitch", "type": "Numeric", "keyword": true, "optional": true, "default": "20.0"},
+            {"name": "distances", "type": "Range[Numeric]", "keyword": true, "optional": true, "default": "1.0..30.0"},
+            {"name": "pitches", "type": "Range[Numeric]", "keyword": true, "optional": true, "default": "-80.0..80.0"},
+            {"name": "smoothing", "type": "Numeric", "keyword": true, "optional": true, "default": "0.08"},
+            {"name": "input", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "height", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "avoid_walls", "type": "bool", "keyword": true, "optional": true, "default": "true"}
+          ],
+          "returns": {"type": "Camera::Orbit"},
           "about": "orbits an object or a point, looking at it, turned by dragging with the right mouse button or the right stick and zoomed by the wheel, also while paused; returns a Camera::Orbit"
         },
         {
           "name": "stop_following",
           "static": true,
+          "params": [],
+          "returns": {"type": "void"},
           "about": "stops following or orbiting; the camera stays where it is"
         },
         {
           "name": "following?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether it follows or orbits something (an object destroyed is let go)"
         },
         {
           "name": "shake",
           "static": true,
-          "args": "strength, duration: 0.5",
+          "params": [
+            {"name": "strength", "type": "Numeric"},
+            {"name": "duration", "type": "Numeric", "keyword": true, "optional": true, "default": "0.5"}
+          ],
+          "returns": {"type": "Float"},
           "about": "shakes what it shows (never the camera object): strength (0 to 1) adds to its trauma, held at 1, fading over duration seconds",
           "example": "Camera.shake(0.5, duration: 0.4)"
         },
         {
           "name": "trauma",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "how much it shakes now, 0 to 1"
         },
         {
           "name": "stop_shaking",
           "static": true,
+          "params": [],
+          "returns": {"type": "void"},
           "about": "stops the shake at once"
         }
-      ],
-      "guide": "gameplay.md#follow-orbit-and-shake-the-camera"
+      ]
     },
     {
       "name": "Camera::Orbit",
+      "kind": "class",
       "about": "What Camera.orbit returns: the camera's angles and distance around what it orbits, for scripts to read and change.",
+      "guide": "gameplay.md#follow-orbit-and-shake-the-camera",
       "methods": [
         {
           "name": "yaw",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "degrees around it, -180 to 180: 0 behind it (its +Z side), 90 on its right"
         },
         {
           "name": "pitch",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "degrees above it"
         },
         {
           "name": "distance",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "meters from it"
         },
         {
           "name": "target",
+          "params": [],
+          "returns": {"type": "GameObject | Vector3"},
           "about": "the object or point it orbits"
         },
         {
           "name": "turn",
-          "args": "yaw, pitch",
+          "params": [
+            {"name": "yaw", "type": "Numeric"},
+            {"name": "pitch", "type": "Numeric"}
+          ],
+          "returns": {"type": "void"},
           "about": "turns by degrees (the yaw wraps round, eased the short way), the pitch kept within its range"
         },
         {
           "name": "zoom",
-          "args": "meters",
+          "params": [
+            {"name": "meters", "type": "Numeric"}
+          ],
+          "returns": {"type": "void"},
           "about": "comes nearer (negative) or goes further, within its range"
         }
       ],
@@ -1423,199 +2216,321 @@
         "lost?",
         "update",
         "wrap"
-      ],
-      "guide": "gameplay.md#follow-orbit-and-shake-the-camera"
+      ]
     },
     {
       "name": "Light",
+      "kind": "class",
       "about": "game_object.light: the light an object shines with.",
+      "guide": "gameplay.md#light-that-flickers-and-fades",
       "methods": [
         {
           "name": "intensity",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "watts for a point or spot light, lux for the sun"
         },
         {
           "name": "intensity=",
-          "args": "value",
+          "params": [
+            {"name": "value", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "sets it; shows from the next frame"
         },
         {
           "name": "color",
+          "params": [],
+          "returns": {"type": "[Integer, Integer, Integer]"},
           "about": "its color [r, g, b], 0 to 255"
         },
         {
           "name": "color=",
-          "args": "color",
+          "params": [
+            {"name": "color", "type": "Color"}
+          ],
+          "returns": {"type": "Color"},
           "about": ":orange or [r, g, b] from 0 to 255"
         },
         {
           "name": "cone_angles",
+          "params": [],
+          "returns": {"type": "[Float, Float] | nil"},
           "about": "[inner, outer] in degrees for a spot light, or nil for other lights"
         },
         {
           "name": "set_cone",
-          "args": "inner:, outer:",
+          "params": [
+            {"name": "inner", "type": "Numeric", "keyword": true},
+            {"name": "outer", "type": "Numeric", "keyword": true}
+          ],
+          "returns": {"type": "nil"},
           "about": "sets both spot angles between 0 and 90 degrees, at least 0.1 degrees apart"
         }
       ],
       "internal": [
         "inspect"
-      ],
-      "guide": "gameplay.md#light-that-flickers-and-fades"
+      ]
     },
     {
       "name": "Animation",
+      "kind": "module",
       "about": "The scene's own animations (exported from Blender), by name.",
+      "guide": "animation.md",
       "methods": [
         {
           "name": "names",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[String]"},
           "about": "the names of the scene's animations"
         },
         {
           "name": "play",
           "static": true,
-          "args": "name, loop: true, speed: 1.0, restart: false",
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "speed", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "restart", "type": "bool", "keyword": true, "optional": true, "default": "false"}
+          ],
+          "returns": {"type": "void"},
           "about": "plays one"
         },
         {
           "name": "pause",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "void"},
           "about": "pauses one"
         },
         {
           "name": "stop",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "void"},
           "about": "stops one"
         },
         {
           "name": "playing?",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether it plays"
         },
         {
           "name": "time",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "Float"},
           "about": "where it is, in seconds"
         },
         {
           "name": "duration",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "Float"},
           "about": "how long it is, in seconds"
         },
         {
           "name": "seek",
           "static": true,
-          "args": "name, seconds",
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "seconds", "type": "Numeric"}
+          ],
+          "returns": {"type": "void"},
           "about": "jumps to a moment"
         }
-      ],
-      "guide": "animation.md"
+      ]
     },
     {
       "name": "Animator",
+      "kind": "class",
       "about": "game_object.animation (animation in a behaviour): an object's own clips.",
+      "guide": "animation.md",
       "methods": [
         {
           "name": "play",
-          "args": "name, loop: true, speed: 1.0, fade: 0.0, restart: false",
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "speed", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "fade", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
+            {"name": "restart", "type": "bool", "keyword": true, "optional": true, "default": "false"}
+          ],
+          "returns": {"type": "void"},
           "about": "plays a clip, fading from the last one",
           "top": 23,
           "example": "animation.play(:Run, fade: 0.2)"
         },
         {
           "name": "mix",
-          "args": "name, weight: 1.0, loop: true, speed: 1.0",
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "weight", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "speed", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"}
+          ],
+          "returns": {"type": "void"},
           "about": "plays a clip over the one playing"
         },
         {
           "name": "unmix",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "stops the clip mixed over"
         },
         {
           "name": "pause",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "pauses its clips"
         },
         {
           "name": "follow_scene",
-          "args": "fade: 0.0",
+          "params": [
+            {"name": "fade", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"}
+          ],
+          "returns": {"type": "void"},
           "about": "goes back to the scene's animations"
         },
         {
           "name": "clip",
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "the clip playing"
         },
         {
           "name": "playing?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether a clip plays"
         },
         {
           "name": "time",
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "where the clip is, in seconds"
         },
         {
           "name": "use",
-          "args": "graph",
+          "params": [
+            {"name": "graph", "type": "Animation::Graph"}
+          ],
+          "returns": {"type": "void"},
           "about": "installs an Animation::Graph"
         },
         {
           "name": "set",
-          "args": "parameter, value",
+          "params": [
+            {"name": "parameter", "type": "Symbol"},
+            {"name": "value", "type": "untyped"}
+          ],
+          "returns": {"type": "void"},
           "about": "sets a parameter of the graph"
         },
         {
           "name": "state",
+          "params": [],
+          "returns": {"type": "Symbol | nil"},
           "about": "the graph's state, or nil"
         }
-      ],
-      "guide": "animation.md"
+      ]
     },
     {
       "name": "Animation::Graph",
+      "kind": "class",
       "about": "Named states and transitions for one character (animation.use(graph)).",
+      "guide": "animation.md",
       "methods": [
         {
           "name": "new",
           "static": true,
-          "args": "initial:, parameters: {}",
+          "params": [
+            {"name": "initial", "type": "Symbol", "keyword": true},
+            {"name": "parameters", "type": "Hash[Symbol, untyped]", "keyword": true, "optional": true, "default": "{}"}
+          ],
+          "returns": {"type": "Animation::Graph"},
           "about": "a graph starting at a state, with its parameters and their defaults"
         },
         {
           "name": "clip",
-          "args": "name, clip, loop: true, speed: 1.0",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "clip", "type": "String | Symbol"},
+            {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "speed", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"}
+          ],
+          "returns": {"type": "self"},
           "about": "a state that plays one clip"
         },
         {
           "name": "blend_1d",
-          "args": "name, parameter:, clips:, loop: true, speed: 1.0",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "parameter", "type": "Symbol", "keyword": true},
+            {"name": "clips", "type": "Array[[Numeric, String | Symbol]]", "keyword": true},
+            {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "speed", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"}
+          ],
+          "returns": {"type": "self"},
           "about": "a state that blends clips by a number: clips: [[0.0, :Idle], [5.0, :Run]]"
         },
         {
           "name": "blend_2d",
-          "args": "name, parameters:, clips:, loop: true, speed: 1.0",
+          "params": [
+            {"name": "name", "type": "Symbol"},
+            {"name": "parameters", "type": "[Symbol, Symbol]", "keyword": true},
+            {"name": "clips", "type": "Array[[[Numeric, Numeric], String | Symbol]]", "keyword": true},
+            {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "speed", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"}
+          ],
+          "returns": {"type": "self"},
           "about": "a rectangular two-dimensional grid: parameters: [:x, :y], clips: [[[x, y], :Clip], ...]"
         },
         {
           "name": "transition",
-          "args": "from, to, parameter:, equals: nil, above: nil, below: nil, fade: 0.0",
+          "params": [
+            {"name": "from", "type": "Symbol"},
+            {"name": "to", "type": "Symbol"},
+            {"name": "parameter", "type": "Symbol", "keyword": true},
+            {"name": "equals", "type": "untyped", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "above", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "below", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "fade", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"}
+          ],
+          "returns": {"type": "self"},
           "about": "goes from one state to another when a parameter says so"
         }
-      ],
-      "guide": "animation.md"
+      ]
     },
     {
       "name": "Audio",
+      "kind": "module",
       "about": "Sounds and music from the game's sounds/ folder.",
       "methods": [
         {
           "name": "play",
           "static": true,
-          "args": "name, volume: 1.0, pitch: 1.0, loop: false, group: :effects",
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "pitch", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"}
+          ],
+          "returns": {"type": "Integer | nil"},
           "about": "plays a sound; returns its id (for stop, playing? and set), or nil",
           "top": 24,
           "example": "Audio.play(:jump)"
@@ -1623,72 +2538,122 @@
         {
           "name": "music",
           "static": true,
-          "args": "name, loop: true, volume: 0.7, fade: 0.0",
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "0.7"},
+            {"name": "fade", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"}
+          ],
+          "returns": {"type": "void"},
           "about": "plays music, crossfading over fade seconds from the track playing"
         },
         {
           "name": "stop_music",
           "static": true,
-          "args": "fade: 0.0",
+          "params": [
+            {"name": "fade", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"}
+          ],
+          "returns": {"type": "void"},
           "about": "stops the music, fading it out over fade seconds"
         },
         {
           "name": "music_pitch=",
           "static": true,
-          "args": "pitch",
+          "params": [
+            {"name": "pitch", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "changes the music's pitch"
         },
         {
           "name": "music_volume=",
           "static": true,
-          "args": "volume",
+          "params": [
+            {"name": "volume", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "changes the music's volume"
         },
         {
           "name": "volume=",
           "static": true,
-          "args": "volume",
+          "params": [
+            {"name": "volume", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "the volume of everything"
         },
         {
           "name": "set",
           "static": true,
-          "args": "id, volume: nil, pitch: nil",
+          "params": [
+            {"name": "id", "type": "Integer"},
+            {"name": "volume", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "pitch", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "bool"},
           "about": "changes the volume or pitch of a sound that plays; false once it stopped"
         },
         {
           "name": "play_at",
           "static": true,
-          "args": "name, position, loop: false, volume: 1.0, pitch: 1.0, reference_distance: 1.0, max_distance: 50.0, group: :effects",
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "position", "type": "Vector3"},
+            {"name": "loop", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "volume", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "pitch", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "reference_distance", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "max_distance", "type": "Numeric", "keyword": true, "optional": true, "default": "50.0"},
+            {"name": "group", "type": "Symbol", "keyword": true, "optional": true, "default": ":effects"}
+          ],
+          "returns": {"type": "Integer | nil"},
           "about": "plays a sound at a place in the world; returns its id, or nil"
         },
         {
           "name": "listener",
           "static": true,
-          "args": "position, forward, up",
+          "params": [
+            {"name": "position", "type": "Vector3"},
+            {"name": "forward", "type": "Vector3"},
+            {"name": "up", "type": "Vector3"}
+          ],
+          "returns": {"type": "void"},
           "about": "where the ears are (move it with the camera)"
         },
         {
           "name": "move",
           "static": true,
-          "args": "id, position",
+          "params": [
+            {"name": "id", "type": "Integer"},
+            {"name": "position", "type": "Vector3"}
+          ],
+          "returns": {"type": "void"},
           "about": "moves a sound played with play_at"
         },
         {
           "name": "playing?",
           "static": true,
-          "args": "id",
+          "params": [
+            {"name": "id", "type": "Integer"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether that sound still plays"
         },
         {
           "name": "stop",
           "static": true,
-          "args": "id",
+          "params": [
+            {"name": "id", "type": "Integer"}
+          ],
+          "returns": {"type": "void"},
           "about": "stops that sound"
         },
         {
           "name": "stop_sources",
           "static": true,
+          "params": [],
+          "returns": {"type": "void"},
           "about": "stops every sound played with play or play_at"
         }
       ],
@@ -1696,12 +2661,25 @@
     },
     {
       "name": "UI",
+      "kind": "module",
       "about": "What a script draws over the game this frame: texts, rectangles, pictures, buttons.",
+      "guide": "gameplay.md",
       "methods": [
         {
           "name": "text",
           "static": true,
-          "args": "str, x:, y:, size:, color:, alpha:, align:, width: nil, anchor: nil",
+          "params": [
+            {"name": "str", "type": "String"},
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "size", "type": "Numeric", "keyword": true, "optional": true, "default": "24"},
+            {"name": "color", "type": "Color", "keyword": true, "optional": true, "default": ":white"},
+            {"name": "alpha", "type": "Integer", "keyword": true, "optional": true, "default": "255"},
+            {"name": "align", "type": "Symbol", "keyword": true, "optional": true, "default": ":left"},
+            {"name": "width", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "void"},
           "about": "draws a text; width: wraps it at word boundaries",
           "top": 25,
           "example": "UI.text(\"Coins: #{@coins}\", x: 20, y: 20, size: 32, color: :yellow)"
@@ -1709,108 +2687,231 @@
         {
           "name": "rect",
           "static": true,
-          "args": "x:, y:, width:, height:, color:, alpha:, radius:, anchor: nil",
+          "params": [
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "width", "type": "Numeric", "keyword": true},
+            {"name": "height", "type": "Numeric", "keyword": true},
+            {"name": "color", "type": "Color", "keyword": true, "optional": true, "default": ":black"},
+            {"name": "alpha", "type": "Integer", "keyword": true, "optional": true, "default": "255"},
+            {"name": "radius", "type": "Numeric", "keyword": true, "optional": true, "default": "0"},
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "void"},
           "about": "draws a rectangle"
         },
         {
           "name": "image",
           "static": true,
-          "args": "name, x:, y:, width:, height:, anchor: nil",
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "width", "type": "Numeric", "keyword": true, "optional": true, "default": "0"},
+            {"name": "height", "type": "Numeric", "keyword": true, "optional": true, "default": "0"},
+            {"name": "alpha", "type": "Integer", "keyword": true, "optional": true, "default": "255"},
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "void"},
           "about": "draws a picture of images/"
         },
         {
           "name": "button",
           "static": true,
-          "args": "label, x:, y:, width:, height:, anchor: nil",
+          "params": [
+            {"name": "label", "type": "String"},
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "width", "type": "Numeric", "keyword": true},
+            {"name": "height", "type": "Numeric", "keyword": true},
+            {"name": "color", "type": "Color", "keyword": true, "optional": true, "default": ":dark"},
+            {"name": "hover_color", "type": "Color", "keyword": true, "optional": true, "default": ":ruby"},
+            {"name": "text_color", "type": "Color", "keyword": true, "optional": true, "default": ":white"},
+            {"name": "size", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "focused", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "confirm", "type": "Array[Array[Symbol]]", "keyword": true, "optional": true, "default": "[[:enter], [:a]]"},
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "bool"},
           "about": "draws a button; true the frame it is clicked"
         },
         {
           "name": "text_field",
           "static": true,
-          "args": "value, x:, y:, width:, height:, max_length:, secret:, anchor: nil",
+          "params": [
+            {"name": "value", "type": "String"},
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "width", "type": "Numeric", "keyword": true},
+            {"name": "height", "type": "Numeric", "keyword": true},
+            {"name": "max_length", "type": "Integer", "keyword": true, "optional": true, "default": "64"},
+            {"name": "color", "type": "Color", "keyword": true, "optional": true, "default": ":dark"},
+            {"name": "text_color", "type": "Color", "keyword": true, "optional": true, "default": ":white"},
+            {"name": "secret", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "String"},
           "about": "a field to type in; returns the new value"
         },
         {
           "name": "keyboard_visible?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether a phone's on-screen keyboard covers the bottom of the screen"
         },
         {
           "name": "width",
           "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "the width of the screen, in pixels"
         },
         {
           "name": "height",
           "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "the height of the screen, in pixels"
         },
         {
           "name": "text_width",
           "static": true,
-          "args": "str, size:",
+          "params": [
+            {"name": "str", "type": "String"},
+            {"name": "size", "type": "Numeric", "keyword": true, "optional": true, "default": "24"}
+          ],
+          "returns": {"type": "Integer"},
           "about": "how wide a text is, in pixels (in the face selected)"
         },
         {
           "name": "wrap",
           "static": true,
-          "args": "str, width:, size:",
+          "params": [
+            {"name": "str", "type": "String"},
+            {"name": "width", "type": "Numeric", "keyword": true},
+            {"name": "size", "type": "Numeric", "keyword": true, "optional": true, "default": "24"}
+          ],
+          "returns": {"type": "Array[String]"},
           "about": "the lines a text wraps to at word boundaries, none wider than width"
         },
         {
           "name": "text_height",
           "static": true,
-          "args": "str, size:, width: nil",
+          "params": [
+            {"name": "str", "type": "String"},
+            {"name": "size", "type": "Numeric", "keyword": true, "optional": true, "default": "24"},
+            {"name": "width", "type": "Numeric | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Integer"},
           "about": "how tall a text is drawn, in pixels (wrapped to width, when given)"
         },
         {
           "name": "line_height",
           "static": true,
-          "args": "size",
+          "params": [
+            {"name": "size", "type": "Numeric"}
+          ],
+          "returns": {"type": "Integer"},
           "about": "pixels from a line's top to the next one's at a text size"
         },
         {
           "name": "anchored",
           "static": true,
-          "args": "anchor, x:, y:, width: 0, height: 0",
+          "params": [
+            {"name": "anchor", "type": "Symbol"},
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "width", "type": "Numeric", "keyword": true, "optional": true, "default": "0"},
+            {"name": "height", "type": "Numeric", "keyword": true, "optional": true, "default": "0"}
+          ],
+          "returns": {"type": "[Integer, Integer]"},
           "about": "the top-left [x, y] of a box placed at an anchor, x and y from it"
         },
         {
           "name": "clip",
           "static": true,
-          "args": "x:, y:, width:, height:, anchor: nil, &block",
+          "params": [
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "width", "type": "Numeric", "keyword": true},
+            {"name": "height", "type": "Numeric", "keyword": true},
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "block", "type": "^() -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
           "about": "draws what the block draws only inside a box"
         },
         {
           "name": "toggle",
           "static": true,
-          "args": "label, on, x:, y:, width:, height:, focused: false, anchor: nil",
+          "params": [
+            {"name": "label", "type": "String"},
+            {"name": "on", "type": "bool"},
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "width", "type": "Numeric", "keyword": true},
+            {"name": "height", "type": "Numeric", "keyword": true},
+            {"name": "focused", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "bool"},
           "about": "an on/off row of a settings screen; returns whether it is on"
         },
         {
           "name": "choice",
           "static": true,
-          "args": "label, choices, index, x:, y:, width:, height:, focused: false, anchor: nil",
+          "params": [
+            {"name": "label", "type": "String"},
+            {"name": "choices", "type": "Array[String]"},
+            {"name": "index", "type": "Integer"},
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "width", "type": "Numeric", "keyword": true},
+            {"name": "height", "type": "Numeric", "keyword": true},
+            {"name": "focused", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Integer"},
           "about": "a row that picks one of choices; returns the index chosen"
         },
         {
           "name": "slider",
           "static": true,
-          "args": "label, value, x:, y:, width:, height:, min: 0.0, max: 1.0, step: 0.05, focused: false, anchor: nil",
+          "params": [
+            {"name": "label", "type": "String"},
+            {"name": "value", "type": "Numeric"},
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "width", "type": "Numeric", "keyword": true},
+            {"name": "height", "type": "Numeric", "keyword": true},
+            {"name": "min", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
+            {"name": "max", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "step", "type": "Numeric", "keyword": true, "optional": true, "default": "0.05"},
+            {"name": "focused", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Float"},
           "about": "a row with a slider; returns the value"
         },
         {
           "name": "font",
           "static": true,
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "the face texts are drawn with: a file name of fonts/, or nil for the built-in one"
         },
         {
           "name": "font=",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | nil"}
+          ],
+          "returns": {"type": "String | nil"},
           "about": "draws the next texts with fonts/<name>.ttf or .otf (nil: the built-in face)"
         }
       ],
+      "notes": "A focused widget (`focused: true`) is worked by Enter or a gamepad's A, and left and right change it. An anchor (`:top_left`, `:top`, `:top_right`, `:left`, `:center`, `:right`, `:bottom_left`, `:bottom`, `:bottom_right`) makes x and y offsets from that point of the screen, and puts the matching corner of what is drawn there: `UI.text(\"Lives\", anchor: :top_right, x: -20, y: 20)`. With an anchor, a text's box is as wide as `width:` or its widest line, and `align:` lays its lines out inside it; an image is placed by the width and height given. A text breaks at its own line breaks, and with `width:` also at spaces; a word longer than a line is cut between letters. Lines are `UI.line_height(size)` apart (1.25 times the size). Inside `UI.clip`, the pointer outside the box is over nothing drawn in it. The built-in face adds glyphs as they are asked for (Greek, Cyrillic, accented letters, `€`); for another face or script, put a `.ttf` or `.otf` in `fonts/` and set `UI.font`. A missing or unreadable face falls back to the built-in one, with a warning; glyphs a face lacks show as `?`; there is no bidirectional layout or complex-script shaping.",
       "internal": [
         "align_share",
         "anchor_shares",
@@ -1859,148 +2960,228 @@
         "worked?",
         "wrapped",
         "wraps"
-      ],
-      "guide": "gameplay.md",
-      "notes": "A focused widget (`focused: true`) is worked by Enter or a gamepad's A, and left and right change it. An anchor (`:top_left`, `:top`, `:top_right`, `:left`, `:center`, `:right`, `:bottom_left`, `:bottom`, `:bottom_right`) makes x and y offsets from that point of the screen, and puts the matching corner of what is drawn there: `UI.text(\"Lives\", anchor: :top_right, x: -20, y: 20)`. With an anchor, a text's box is as wide as `width:` or its widest line, and `align:` lays its lines out inside it; an image is placed by the width and height given. A text breaks at its own line breaks, and with `width:` also at spaces; a word longer than a line is cut between letters. Lines are `UI.line_height(size)` apart (1.25 times the size). Inside `UI.clip`, the pointer outside the box is over nothing drawn in it. The built-in face adds glyphs as they are asked for (Greek, Cyrillic, accented letters, `€`); for another face or script, put a `.ttf` or `.otf` in `fonts/` and set `UI.font`. A missing or unreadable face falls back to the built-in one, with a warning; glyphs a face lacks show as `?`; there is no bidirectional layout or complex-script shaping."
+      ]
     },
     {
       "name": "UI::Focus",
+      "kind": "class",
       "about": "Which widget of a screen the keyboard and a gamepad work: up and down move it, wrapping.",
+      "guide": "gameplay.md",
       "methods": [
         {
           "name": "new",
           "static": true,
+          "params": [],
+          "returns": {"type": "UI::Focus"},
           "about": "a focus on the first widget"
         },
         {
           "name": "update",
-          "args": "count",
+          "params": [
+            {"name": "count", "type": "Integer"}
+          ],
+          "returns": {"type": "void"},
           "about": "moves it among count widgets, as up or down was pressed this frame"
         },
         {
           "name": "at?",
-          "args": "index",
+          "params": [
+            {"name": "index", "type": "Integer"}
+          ],
+          "returns": {"type": "bool"},
           "about": "whether the widget of that index has it: pass it as focused:"
         },
         {
           "name": "move_to",
-          "args": "index",
+          "params": [
+            {"name": "index", "type": "Integer"}
+          ],
+          "returns": {"type": "void"},
           "about": "puts it on a widget (one clicked, or the one a screen comes back to)"
         },
         {
           "name": "index",
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "the widget that has it"
         },
         {
           "name": "reset",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "back to the first widget"
         }
-      ],
-      "guide": "gameplay.md"
+      ]
     },
     {
       "name": "UI::ScrollList",
+      "kind": "class",
       "about": "Rows in a box that scrolls, drawn only inside it: the wheel, Page Up/Down, a gamepad's bumpers and right stick, and a focus.",
+      "guide": "gameplay.md",
       "methods": [
         {
           "name": "new",
           "static": true,
+          "params": [],
+          "returns": {"type": "UI::ScrollList"},
           "about": "a list scrolled to its first row"
         },
         {
           "name": "draw",
-          "args": "count, x:, y:, width:, height:, row_height:, gap: 0, focus: nil, first: 0, anchor: nil, input: true, &block",
+          "params": [
+            {"name": "count", "type": "Integer"},
+            {"name": "x", "type": "Numeric", "keyword": true},
+            {"name": "y", "type": "Numeric", "keyword": true},
+            {"name": "width", "type": "Numeric", "keyword": true},
+            {"name": "height", "type": "Numeric", "keyword": true},
+            {"name": "row_height", "type": "Numeric", "keyword": true},
+            {"name": "gap", "type": "Numeric", "keyword": true, "optional": true, "default": "0"},
+            {"name": "focus", "type": "UI::Focus | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "first", "type": "Integer", "keyword": true, "optional": true, "default": "0"},
+            {"name": "anchor", "type": "Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "input", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "block", "type": "^(Integer, Hash[Symbol, Integer]) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
           "about": "draws count rows in the box, calling the block with each shown row's index and box"
         },
         {
           "name": "offset",
+          "params": [],
+          "returns": {"type": "Numeric"},
           "about": "how far it is scrolled, in pixels from its first row's top"
         },
         {
           "name": "offset=",
-          "args": "pixels",
+          "params": [
+            {"name": "pixels", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "scrolls it (kept within its rows when it is drawn)"
         },
         {
           "name": "shown",
+          "params": [],
+          "returns": {"type": "Range[Integer]"},
           "about": "the indexes of the rows that show, as a range"
         },
         {
           "name": "scrolls?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether its rows are taller than its box"
         },
         {
           "name": "reset",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "back to its first row"
         }
       ],
-      "guide": "gameplay.md",
       "notes": "Given a focus (`UI::Focus`), the list scrolls to the row the focus moves to, and Page Up and Page Down move the focus a page; row 0 is the focus' `first`, so rows may come after other widgets. Without one, up and down (arrows, D-pad) scroll a row. The wheel scrolls it while the pointer is over it, and scrolling away from the focused row stays until the focus moves. `input: false` leaves the keys and the wheel to something else that frame. A bar beside its right edge shows how far it is scrolled."
     },
     {
       "name": "Debug",
+      "kind": "module",
       "about": "Developer diagnostics: console messages, frame timings and immediate world drawing.",
       "methods": [
         {
           "name": "log",
           "static": true,
-          "args": "message",
+          "params": [
+            {"name": "message", "type": "untyped"}
+          ],
+          "returns": {"type": "void"},
           "about": "says something"
         },
         {
           "name": "warn",
           "static": true,
-          "args": "message",
+          "params": [
+            {"name": "message", "type": "untyped"}
+          ],
+          "returns": {"type": "void"},
           "about": "warns"
         },
         {
           "name": "error",
           "static": true,
-          "args": "message",
+          "params": [
+            {"name": "message", "type": "untyped"}
+          ],
+          "returns": {"type": "void"},
           "about": "reports an error"
         },
         {
           "name": "profiling?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether foreground frame timings are being collected"
         },
         {
           "name": "profiling=",
           "static": true,
-          "args": "enabled",
+          "params": [
+            {"name": "enabled", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
           "about": "starts a fresh profile window when enabled; disabling retains the last summary"
         },
         {
           "name": "stats_visible?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether the developer statistics overlay was requested"
         },
         {
           "name": "stats_visible=",
           "static": true,
-          "args": "visible",
+          "params": [
+            {"name": "visible", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
           "about": "shows frame timings and FPS; showing also enables profiling, hiding leaves collection running"
         },
         {
           "name": "frame_stats",
           "static": true,
+          "params": [],
+          "returns": {"type": "Hash[Symbol, untyped]"},
           "about": "a snapshot with samples, fps and latest/mean/peak timings in milliseconds"
         },
         {
           "name": "reset_frame_stats",
           "static": true,
+          "params": [],
+          "returns": {"type": "void"},
           "about": "clears statistics and discards any unfinished measurement"
         },
         {
           "name": "line",
           "static": true,
-          "args": "from, to, color: :green, alpha: 255, depth_test: true",
+          "params": [
+            {"name": "from", "type": "Vector3"},
+            {"name": "to", "type": "Vector3"},
+            {"name": "color", "type": "Color", "keyword": true, "optional": true, "default": ":green"},
+            {"name": "alpha", "type": "Integer", "keyword": true, "optional": true, "default": "255"},
+            {"name": "depth_test", "type": "bool", "keyword": true, "optional": true, "default": "true"}
+          ],
+          "returns": {"type": "bool"},
           "about": "draws a world-space line for this frame; returns whether it was accepted"
         },
         {
           "name": "box",
           "static": true,
-          "args": "center, size, color: :green, alpha: 255, depth_test: true",
+          "params": [
+            {"name": "center", "type": "Vector3"},
+            {"name": "size", "type": "Vector3"},
+            {"name": "color", "type": "Color", "keyword": true, "optional": true, "default": ":green"},
+            {"name": "alpha", "type": "Integer", "keyword": true, "optional": true, "default": "255"},
+            {"name": "depth_test", "type": "bool", "keyword": true, "optional": true, "default": "true"}
+          ],
+          "returns": {"type": "bool"},
           "about": "draws an axis-aligned wire box with full nonnegative size for this frame; returns whether it was accepted"
         }
       ],
@@ -2008,276 +3189,395 @@
     },
     {
       "name": "Game",
+      "kind": "module",
       "about": "The game itself.",
+      "guide": "gameplay.md#a-loading-screen",
       "methods": [
         {
           "name": "load_scene",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "void"},
           "about": "switches to scenes/<name>.glb (\"main\" is scene.glb); Ruby globals survive"
         },
         {
           "name": "load_scene_async",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "void"},
           "about": "queues a background scene read; the old world survives failed reads and cancellation"
         },
         {
           "name": "loading?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "a scene request is queued or being read"
         },
         {
           "name": "loading_scene",
           "static": true,
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "the requested scene name, or nil"
         },
         {
           "name": "loading_error",
           "static": true,
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "the last asynchronous read error, or nil; cleared by the next load request"
         },
         {
           "name": "cancel_scene_load",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "cancels a pending asynchronous request; returns whether one was pending"
         },
         {
           "name": "on_loading",
           "static": true,
-          "args": "&block",
+          "params": [
+            {"name": "block", "type": "^(Float) -> void", "block": true, "optional": true}
+          ],
+          "returns": {"type": "void"},
           "about": "draws the loading screen each frame with unscaled delta; no block restores the default"
         },
         {
           "name": "scene_name",
           "static": true,
+          "params": [],
+          "returns": {"type": "String"},
           "about": "the scene running"
         },
         {
           "name": "title",
           "static": true,
+          "params": [],
+          "returns": {"type": "String"},
           "about": "the game's title"
         },
         {
           "name": "quit",
           "static": true,
+          "params": [],
+          "returns": {"type": "void"},
           "about": "ends the game"
         },
         {
           "name": "stop_recording",
           "static": true,
+          "params": [],
+          "returns": {"type": "void"},
           "about": "ends a video recorded with --record; the game goes on"
         },
         {
           "name": "version",
           "static": true,
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "the version in game.json (\"1.2.0\"), or nil"
         }
       ],
-      "notes": "While an asynchronous read is pending, physics, animations and normal behaviour callbacks pause.\nInput, networking, HTTP callbacks, audio and presentation continue. The loading callback can use\n`UI`, handle cancel buttons and animate using its unscaled delta; `Time.delta` is zero during\nloading. The pointer is released while the screen is shown. The default screen draws a translated\nloading label over the old world. A callback error is reported once and disables it for that load.\n\nUnsafe names are rejected immediately; missing or unreadable files are reported through\n`Game.loading_error` after the request runs. The old world stays intact if reading fails or is cancelled. The most recent request wins;\n`Game.load_scene` also supersedes an asynchronous request. Globals survive successful activation,\nbut the old scene's loading callback is removed before the next scene's setup runs. Errors are\nreported through `Game.loading_error` and the event log. At most eight background requests/results can be\noutstanding across the process, using one shared reader; a full queue fails without changing the\nworld. Cancelling an active read discards its result; it does not interrupt the file parser.\n\nOnly file reading and glTF parsing happen on the worker. Physics creation, script setup, texture\ndecoding and GPU upload still happen on the owning thread and may hitch during activation. The\nold and incoming scene coexist in memory during reading. Fixed-step offline runs (including\nrecordings and scripted replays) wait for the reader before advancing, then show exactly one\nloading frame before activation so completion does not depend on thread scheduling. Networked runs and dedicated-server rooms keep the\nbackground reader even in fixed-step mode; activation still runs on the server loop and can stall\nother rooms sharing that loop. Closing the process waits for an active parser to return.",
-      "guide": "gameplay.md#a-loading-screen"
+      "notes": "While an asynchronous read is pending, physics, animations and normal behaviour callbacks pause.\nInput, networking, HTTP callbacks, audio and presentation continue. The loading callback can use\n`UI`, handle cancel buttons and animate using its unscaled delta; `Time.delta` is zero during\nloading. The pointer is released while the screen is shown. The default screen draws a translated\nloading label over the old world. A callback error is reported once and disables it for that load.\n\nUnsafe names are rejected immediately; missing or unreadable files are reported through\n`Game.loading_error` after the request runs. The old world stays intact if reading fails or is cancelled. The most recent request wins;\n`Game.load_scene` also supersedes an asynchronous request. Globals survive successful activation,\nbut the old scene's loading callback is removed before the next scene's setup runs. Errors are\nreported through `Game.loading_error` and the event log. At most eight background requests/results can be\noutstanding across the process, using one shared reader; a full queue fails without changing the\nworld. Cancelling an active read discards its result; it does not interrupt the file parser.\n\nOnly file reading and glTF parsing happen on the worker. Physics creation, script setup, texture\ndecoding and GPU upload still happen on the owning thread and may hitch during activation. The\nold and incoming scene coexist in memory during reading. Fixed-step offline runs (including\nrecordings and scripted replays) wait for the reader before advancing, then show exactly one\nloading frame before activation so completion does not depend on thread scheduling. Networked runs and dedicated-server rooms keep the\nbackground reader even in fixed-step mode; activation still runs on the server loop and can stall\nother rooms sharing that loop. Closing the process waits for an active parser to return."
     },
     {
       "name": "Settings",
+      "kind": "module",
       "about": "How the player chose the game to be shown and heard; a change takes effect at once.",
+      "guide": "../shipping.md#notes",
       "methods": [
         {
           "name": "window_mode",
           "static": true,
+          "params": [],
+          "returns": {"type": "Symbol"},
           "about": ":windowed, :fullscreen or :borderless"
         },
         {
           "name": "window_mode=",
           "static": true,
-          "args": "mode",
+          "params": [
+            {"name": "mode", "type": "Symbol"}
+          ],
+          "returns": {"type": "Symbol"},
           "about": "changes it"
         },
         {
           "name": "fullscreen?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether the game fills the screen"
         },
         {
           "name": "fullscreen=",
           "static": true,
-          "args": "on",
+          "params": [
+            {"name": "on", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
           "about": "fullscreen, or back to a window"
         },
         {
           "name": "resolution",
           "static": true,
+          "params": [],
+          "returns": {"type": "[Integer, Integer]"},
           "about": "[width, height] of the window, in pixels"
         },
         {
           "name": "resolution=",
           "static": true,
-          "args": "size",
+          "params": [
+            {"name": "size", "type": "[Integer, Integer]"}
+          ],
+          "returns": {"type": "[Integer, Integer]"},
           "about": "resizes the window: one of resolutions"
         },
         {
           "name": "resolutions",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[[Integer, Integer]]"},
           "about": "the sizes the monitor offers: [[w, h], ...]"
         },
         {
           "name": "render_scale",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "the share of the window's size the world is drawn at (0.5 to 2)"
         },
         {
           "name": "render_scale=",
           "static": true,
-          "args": "scale",
+          "params": [
+            {"name": "scale", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "changes it"
         },
         {
           "name": "vsync",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether frames wait for the screen"
         },
         {
           "name": "vsync=",
           "static": true,
-          "args": "on",
+          "params": [
+            {"name": "on", "type": "bool"}
+          ],
+          "returns": {"type": "bool"},
           "about": "changes it"
         },
         {
           "name": "fps_cap",
           "static": true,
+          "params": [],
+          "returns": {"type": "Integer | nil"},
           "about": "frames a second at most; nil for none"
         },
         {
           "name": "fps_cap=",
           "static": true,
-          "args": "cap",
+          "params": [
+            {"name": "cap", "type": "Integer | nil"}
+          ],
+          "returns": {"type": "Integer | nil"},
           "about": "changes it"
         },
         {
           "name": "quality",
           "static": true,
+          "params": [],
+          "returns": {"type": "Symbol"},
           "about": ":low, :medium, :high, :ultra or :custom"
         },
         {
           "name": "quality=",
           "static": true,
-          "args": "quality",
+          "params": [
+            {"name": "quality", "type": "Symbol"}
+          ],
+          "returns": {"type": "Symbol"},
           "about": "the most a level's environment gets of what it asks for"
         },
         {
           "name": "quality_details",
           "static": true,
+          "params": [],
+          "returns": {"type": "Hash[Symbol, untyped]"},
           "about": "what the custom quality allows: {msaa:, antialias:, shadow_cascades:, ...}"
         },
         {
           "name": "quality_details=",
           "static": true,
-          "args": "details",
+          "params": [
+            {"name": "details", "type": "Hash[Symbol, untyped]"}
+          ],
+          "returns": {"type": "Hash[Symbol, untyped]"},
           "about": "changes some of them, and makes the quality :custom"
         },
         {
           "name": "volume",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "the player's volume, 0 to 1 (it multiplies Audio.volume)"
         },
         {
           "name": "volume=",
           "static": true,
-          "args": "volume",
+          "params": [
+            {"name": "volume", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "changes it"
         },
         {
           "name": "music_volume",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "the player's volume of the music group, 0 to 1"
         },
         {
           "name": "music_volume=",
           "static": true,
-          "args": "volume",
+          "params": [
+            {"name": "volume", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "changes it"
         },
         {
           "name": "effects_volume",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "the player's volume of the effects group, 0 to 1"
         },
         {
           "name": "effects_volume=",
           "static": true,
-          "args": "volume",
+          "params": [
+            {"name": "volume", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "changes it"
         },
         {
           "name": "voice_volume",
           "static": true,
+          "params": [],
+          "returns": {"type": "Float"},
           "about": "the player's volume of the voice group, 0 to 1"
         },
         {
           "name": "voice_volume=",
           "static": true,
-          "args": "volume",
+          "params": [
+            {"name": "volume", "type": "Numeric"}
+          ],
+          "returns": {"type": "Numeric"},
           "about": "changes it"
         },
         {
           "name": "save",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "keeps them for the next runs; false where they last for the run only"
         }
       ],
+      "notes": "Until the player chooses, everything is what `game.json` says. `Settings.save` keeps them only in a built game a player plays: in the editor's Play, `redgem run`, a server's rooms and tests they last for the run, and `save` returns false.",
       "internal": [
         "known",
         "read",
         "write"
-      ],
-      "guide": "../shipping.md#notes",
-      "notes": "Until the player chooses, everything is what `game.json` says. `Settings.save` keeps them only in a built game a player plays: in the editor's Play, `redgem run`, a server's rooms and tests they last for the run, and `save` returns false."
+      ]
     },
     {
       "name": "GameMenu",
+      "kind": "class",
+      "superclass": "Behaviour",
       "about": "A behaviour: title screen, pause menu, end screen and settings screen with its controls page; arrows or the D-pad move the focus, Enter or A picks.",
+      "guide": "gameplay.md#pause-and-the-flow-between-screens",
       "methods": [
         {
           "name": "instance",
           "static": true,
+          "params": [],
+          "returns": {"type": "GameMenu | nil"},
           "about": "the menu of the scene, or nil"
         },
         {
           "name": "show",
-          "args": "screen",
+          "params": [
+            {"name": "screen", "type": "Symbol"}
+          ],
+          "returns": {"type": "void"},
           "about": "opens a screen: :title, :pause, :over, :settings or one of the game's"
         },
         {
           "name": "show_settings",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "opens the settings screen (window, resolution, quality, volume...; its Controls button opens the controls page)"
         },
         {
           "name": "resume",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "closes the menu and goes on"
         },
         {
           "name": "restart",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "starts the scene again"
         },
         {
           "name": "finish",
-          "args": "message",
+          "params": [
+            {"name": "message", "type": "String"}
+          ],
+          "returns": {"type": "void"},
           "about": "opens the end screen with a message"
         },
         {
           "name": "open?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether the menu is open"
         },
         {
           "name": "screen",
+          "params": [],
+          "returns": {"type": "Symbol | nil"},
           "about": "the screen open"
         },
         {
           "name": "screens",
+          "params": [],
+          "returns": {"type": "Hash[Symbol, GameMenu::Screen]"},
           "about": "the screens, by name (:title, :pause, :over, :settings, :controls and the game's own)"
         },
         {
           "name": "button_box",
-          "args": "index",
+          "params": [
+            {"name": "index", "type": "Integer"}
+          ],
+          "returns": {"type": "[Integer, Integer, Integer, Integer]"},
           "about": "where the menu's button of that index is: [x, y, width, height]"
         }
       ],
@@ -2286,573 +3586,907 @@
         "scaled",
         "start",
         "update"
-      ],
-      "guide": "gameplay.md#pause-and-the-flow-between-screens"
+      ]
     },
     {
       "name": "GameMenu::Screen",
+      "kind": "class",
       "about": "A screen of the GameMenu.",
+      "guide": "gameplay.md#pause-and-the-flow-between-screens",
       "methods": [
         {
           "name": "new",
           "static": true,
-          "args": "heading:, options:, back:",
+          "params": [
+            {"name": "heading", "type": "String | Proc", "keyword": true},
+            {"name": "options", "type": "Array[[String | Proc, Proc]]", "keyword": true},
+            {"name": "back", "type": "Symbol | nil", "keyword": true}
+          ],
+          "returns": {"type": "GameMenu::Screen"},
           "about": "a screen with a heading and options: [[label, action], ...]"
         },
         {
           "name": "add_option",
-          "args": "label, index:, &action",
+          "params": [
+            {"name": "label", "type": "String | Proc"},
+            {"name": "index", "type": "Integer", "keyword": true, "optional": true, "default": "-1"},
+            {"name": "action", "type": "^() -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
           "about": "adds an option"
         },
         {
           "name": "heading",
+          "params": [],
+          "returns": {"type": "String"},
           "about": "its heading"
         },
         {
           "name": "heading=",
-          "args": "text",
+          "params": [
+            {"name": "text", "type": "String | Proc"}
+          ],
+          "returns": {"type": "String | Proc"},
           "about": "changes its heading"
         },
         {
           "name": "options",
+          "params": [],
+          "returns": {"type": "Array[[String, Proc]]"},
           "about": "its options"
         },
         {
           "name": "back",
+          "params": [],
+          "returns": {"type": "Symbol | nil"},
           "about": "the screen Esc goes back to"
         },
         {
           "name": "opened",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "called when it is shown"
         },
         {
           "name": "closed",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "called when it is left"
         },
         {
           "name": "draw",
-          "args": "first_button",
+          "params": [
+            {"name": "first_button", "type": "[Integer, Integer, Integer, Integer]"}
+          ],
+          "returns": {"type": "void"},
           "about": "draws what else it shows"
         },
         {
           "name": "space_above",
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "pixels kept between its heading and its buttons"
         },
         {
           "name": "typing?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether letters are typed into it"
         },
         {
           "name": "rows",
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "how many widgets it draws above its buttons that take the focus"
         },
         {
           "name": "first_button_share",
+          "params": [],
+          "returns": {"type": "Float | nil"},
           "about": "where its first button sits, a share of the height (nil: the menu's)"
         },
         {
           "name": "focus",
+          "params": [],
+          "returns": {"type": "UI::Focus | nil"},
           "about": "its UI::Focus, which the menu gives it"
         },
         {
           "name": "focus=",
-          "args": "focus",
+          "params": [
+            {"name": "focus", "type": "UI::Focus | nil"}
+          ],
+          "returns": {"type": "UI::Focus | nil"},
           "about": "sets it"
         }
-      ],
-      "guide": "gameplay.md#pause-and-the-flow-between-screens"
+      ]
     },
     {
       "name": "Particles",
+      "kind": "module",
       "about": "Short-lived sparks, smoke and dust.",
+      "guide": "gameplay.md#sparks-dust-and-smoke",
       "methods": [
         {
           "name": "burst",
           "static": true,
-          "args": "position, count:, color:, alpha:, glow:, lit:, cast_shadow:, soft:, direction:, spread:, speed:, life:, size:, gravity:, image:, frames:, fps:, spin:",
+          "params": [
+            {"name": "position", "type": "Vector3"},
+            {"name": "count", "type": "Integer", "keyword": true, "optional": true, "default": "12"},
+            {"name": "color", "type": "Color | Array[Color]", "keyword": true, "optional": true, "default": ":white"},
+            {"name": "alpha", "type": "Integer | Array[Integer]", "keyword": true, "optional": true, "default": "255"},
+            {"name": "speed", "type": "Numeric", "keyword": true, "optional": true, "default": "3.0"},
+            {"name": "spread", "type": "Numeric", "keyword": true, "optional": true, "default": "180.0"},
+            {"name": "direction", "type": "Vector3", "keyword": true, "optional": true, "default": "Vector3.up"},
+            {"name": "life", "type": "Numeric", "keyword": true, "optional": true, "default": "0.8"},
+            {"name": "size", "type": "Numeric | Array[Numeric]", "keyword": true, "optional": true, "default": "0.12"},
+            {"name": "gravity", "type": "Numeric", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "glow", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "lit", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "cast_shadow", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "soft", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
+            {"name": "image", "type": "String | Symbol | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "frames", "type": "[Integer, Integer]", "keyword": true, "optional": true, "default": "[1, 1]"},
+            {"name": "fps", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
+            {"name": "spin", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"}
+          ],
+          "returns": {"type": "Integer"},
           "about": "adds particles; returns how many (size, color and alpha may be lists over their life)"
         },
         {
           "name": "emitter",
           "static": true,
-          "args": "object, rate: 24, offset: Vector3.zero, **settings",
+          "params": [
+            {"name": "object", "type": "GameObject"},
+            {"name": "rate", "type": "Numeric", "keyword": true, "optional": true, "default": "24.0"},
+            {"name": "offset", "type": "Vector3", "keyword": true, "optional": true, "default": "Vector3.zero"},
+            {"name": "settings", "type": "untyped", "keyword": true, "rest": true}
+          ],
+          "returns": {"type": "Particles::Emitter"},
           "about": "starts a continuous local effect; returns a Particles::Emitter handle; uses burst settings except count"
         },
         {
           "name": "count",
           "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "how many are alive"
         },
         {
           "name": "clear",
           "static": true,
+          "params": [],
+          "returns": {"type": "void"},
           "about": "removes all particles and stops every emitter"
         }
       ],
+      "notes": "Emitters follow game time and stop on object destruction or scene changes. They are local visual effects, not replicated. Without a presenter, creation returns an inactive handle and no emitter is allocated or simulated. Births follow ordinary movement; movement over 10 meters per update starts them at the destination. Up to 256 emitters fairly share 4096 live particles; missed births are dropped.",
       "internal": [
         "colors",
         "list_of_colors?",
         "numbers",
         "parameters"
-      ],
-      "guide": "gameplay.md#sparks-dust-and-smoke",
-      "notes": "Emitters follow game time and stop on object destruction or scene changes. They are local visual effects, not replicated. Without a presenter, creation returns an inactive handle and no emitter is allocated or simulated. Births follow ordinary movement; movement over 10 meters per update starts them at the destination. Up to 256 emitters fairly share 4096 live particles; missed births are dropped."
+      ]
     },
     {
       "name": "Particles::Emitter",
+      "kind": "class",
       "about": "A continuous particle effect attached to an object, returned by Particles.emitter.",
+      "guide": "gameplay.md#sparks-dust-and-smoke",
       "methods": [
         {
           "name": "active?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether this emitter is still emitting from a live object"
         },
         {
           "name": "stop",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "stops new births; existing particles finish their lives"
         }
-      ],
-      "guide": "gameplay.md#sparks-dust-and-smoke"
+      ]
     },
     {
       "name": "Scatter",
+      "kind": "class",
       "about": "Great numbers of copies of a mesh (grass, trees, rocks), drawn only.",
+      "guide": "../levels.md#grass-forests-and-cities",
       "methods": [
         {
           "name": "place",
           "static": true,
-          "args": "template, count:, area:, ground: nil, seed: 0, scale: 1.0, align: false, tints:, tint_variation:, fade:, normals_up:, lods:",
+          "params": [
+            {"name": "template", "type": "String | GameObject"},
+            {"name": "count", "type": "Integer", "keyword": true},
+            {"name": "area", "type": "[Vector3, Vector3]", "keyword": true},
+            {"name": "ground", "type": "GameObject | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "seed", "type": "Integer", "keyword": true, "optional": true, "default": "0"},
+            {"name": "scale", "type": "Numeric | Range[Numeric]", "keyword": true, "optional": true, "default": "1.0"},
+            {"name": "align", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "tints", "type": "Array[Color] | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "tint_variation", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
+            {"name": "fade", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
+            {"name": "normals_up", "type": "Numeric", "keyword": true, "optional": true, "default": "0.0"},
+            {"name": "lods", "type": "Array[[String, Numeric]] | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "Scatter"},
           "about": "places copies; returns a set (count, remove)"
         },
         {
           "name": "clear",
           "static": true,
+          "params": [],
+          "returns": {"type": "void"},
           "about": "removes every set"
         },
         {
           "name": "count",
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "how many copies a set placed"
         },
         {
           "name": "remove",
+          "params": [],
+          "returns": {"type": "void"},
           "about": "removes a set"
         }
       ],
       "internal": [
         "look_options"
-      ],
-      "guide": "../levels.md#grass-forests-and-cities"
+      ]
     },
     {
       "name": "Save",
+      "kind": "module",
       "about": "What the game keeps between runs.",
+      "guide": "online-services.md#saving-on-a-server",
       "methods": [
         {
           "name": "get",
           "static": true,
-          "args": "key, default = nil",
+          "params": [
+            {"name": "key", "type": "String | Symbol"},
+            {"name": "default", "type": "untyped", "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "untyped"},
           "about": "a value, or the default"
         },
         {
           "name": "set",
           "static": true,
-          "args": "key, value",
+          "params": [
+            {"name": "key", "type": "String | Symbol"},
+            {"name": "value", "type": "untyped"}
+          ],
+          "returns": {"type": "untyped"},
           "about": "keeps a value (nil removes it)"
         },
         {
           "name": "[]",
           "static": true,
-          "args": "key",
+          "params": [
+            {"name": "key", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "untyped"},
           "about": "the same as get"
         },
         {
           "name": "[]=",
           "static": true,
-          "args": "key, value",
+          "params": [
+            {"name": "key", "type": "String | Symbol"},
+            {"name": "value", "type": "untyped"}
+          ],
+          "returns": {"type": "untyped"},
           "about": "the same as set"
         },
         {
           "name": "update",
           "static": true,
-          "args": "key, default = nil, &block",
+          "params": [
+            {"name": "key", "type": "String | Symbol"},
+            {"name": "default", "type": "untyped", "optional": true, "default": "nil"},
+            {"name": "block", "type": "^(untyped) -> untyped", "block": true}
+          ],
+          "returns": {"type": "untyped"},
           "about": "reads and writes a key with nothing in between"
         },
         {
           "name": "delete",
           "static": true,
-          "args": "key",
+          "params": [
+            {"name": "key", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "void"},
           "about": "removes a key"
         },
         {
           "name": "clear",
           "static": true,
+          "params": [],
+          "returns": {"type": "void"},
           "about": "removes everything"
         },
         {
           "name": "keys",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[Symbol]"},
           "about": "every key"
         },
         {
           "name": "slot",
           "static": true,
+          "params": [],
+          "returns": {"type": "String"},
           "about": "the selected save slot name; default keeps the existing save file"
         },
         {
           "name": "slot=",
           "static": true,
-          "args": "name",
+          "params": [
+            {"name": "name", "type": "String | Symbol"}
+          ],
+          "returns": {"type": "String | Symbol"},
           "about": "selects a named slot for this engine; default restores the original store"
         },
         {
           "name": "slots",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[String]"},
           "about": "sorted names of persisted slots and slots opened in this run, including default"
         }
       ],
-      "guide": "online-services.md#saving-on-a-server",
       "notes": "Values are numbers, texts, true/false, `Vector3`, and arrays and hashes of those; hashes come back with string keys. Named slots start on default for every engine and keep their selection across scenes. Selection is local to each engine, including shared-database server rooms. Names are 1–48 lowercase ASCII letters/digits, hyphens or underscores, starting with a letter/digit. At most 64 named stores may be opened per run/local backend and 4096 names listed; invalid names or unavailable backends leave selection unchanged and raise a Ruby error. The existing default file/table is preserved. Named files use their own atomic writes/backups; SQLite uses separate slot tables. Save.update writes to its entry store even if its block selects another slot. Slots keep values, not object-state snapshots or migration metadata."
     },
     {
       "name": "HTTP",
+      "kind": "module",
       "about": "Web requests; the answer comes to the block.",
+      "guide": "online-services.md#http",
       "methods": [
         {
           "name": "get",
           "static": true,
-          "args": "url, headers: {}, timeout: 15, redirects: true, &block",
+          "params": [
+            {"name": "url", "type": "String"},
+            {"name": "headers", "type": "Hash[String | Symbol, untyped]", "keyword": true, "optional": true, "default": "{}"},
+            {"name": "timeout", "type": "Numeric", "keyword": true, "optional": true, "default": "15.0"},
+            {"name": "redirects", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "block", "type": "^(HTTP::Response) -> void", "block": true, "optional": true}
+          ],
+          "returns": {"type": "Integer"},
           "about": "GET"
         },
         {
           "name": "post",
           "static": true,
-          "args": "url, json: nil, body: nil, headers: {}, timeout: 15, redirects: true, &block",
+          "params": [
+            {"name": "url", "type": "String"},
+            {"name": "json", "type": "untyped", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "body", "type": "String | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "headers", "type": "Hash[String | Symbol, untyped]", "keyword": true, "optional": true, "default": "{}"},
+            {"name": "timeout", "type": "Numeric", "keyword": true, "optional": true, "default": "15.0"},
+            {"name": "redirects", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "block", "type": "^(HTTP::Response) -> void", "block": true, "optional": true}
+          ],
+          "returns": {"type": "Integer"},
           "about": "POST"
         },
         {
           "name": "put",
           "static": true,
-          "args": "url, json: nil, body: nil, headers: {}, timeout: 15, redirects: true, &block",
+          "params": [
+            {"name": "url", "type": "String"},
+            {"name": "json", "type": "untyped", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "body", "type": "String | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "headers", "type": "Hash[String | Symbol, untyped]", "keyword": true, "optional": true, "default": "{}"},
+            {"name": "timeout", "type": "Numeric", "keyword": true, "optional": true, "default": "15.0"},
+            {"name": "redirects", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "block", "type": "^(HTTP::Response) -> void", "block": true, "optional": true}
+          ],
+          "returns": {"type": "Integer"},
           "about": "PUT"
         },
         {
           "name": "patch",
           "static": true,
-          "args": "url, json: nil, body: nil, headers: {}, timeout: 15, redirects: true, &block",
+          "params": [
+            {"name": "url", "type": "String"},
+            {"name": "json", "type": "untyped", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "body", "type": "String | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "headers", "type": "Hash[String | Symbol, untyped]", "keyword": true, "optional": true, "default": "{}"},
+            {"name": "timeout", "type": "Numeric", "keyword": true, "optional": true, "default": "15.0"},
+            {"name": "redirects", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "block", "type": "^(HTTP::Response) -> void", "block": true, "optional": true}
+          ],
+          "returns": {"type": "Integer"},
           "about": "PATCH"
         },
         {
           "name": "delete",
           "static": true,
-          "args": "url, headers: {}, timeout: 15, redirects: true, &block",
+          "params": [
+            {"name": "url", "type": "String"},
+            {"name": "headers", "type": "Hash[String | Symbol, untyped]", "keyword": true, "optional": true, "default": "{}"},
+            {"name": "timeout", "type": "Numeric", "keyword": true, "optional": true, "default": "15.0"},
+            {"name": "redirects", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "block", "type": "^(HTTP::Response) -> void", "block": true, "optional": true}
+          ],
+          "returns": {"type": "Integer"},
           "about": "DELETE"
         },
         {
           "name": "request",
           "static": true,
-          "args": "verb, url, json: nil, body: nil, headers: {}, timeout: 15, redirects: true, &block",
+          "params": [
+            {"name": "verb", "type": "String | Symbol"},
+            {"name": "url", "type": "String"},
+            {"name": "json", "type": "untyped", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "body", "type": "String | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "headers", "type": "Hash[String | Symbol, untyped]", "keyword": true, "optional": true, "default": "{}"},
+            {"name": "timeout", "type": "Numeric", "keyword": true, "optional": true, "default": "15.0"},
+            {"name": "redirects", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "block", "type": "^(HTTP::Response) -> void", "block": true, "optional": true}
+          ],
+          "returns": {"type": "Integer"},
           "about": "any verb"
         }
-      ],
-      "guide": "online-services.md#http"
+      ]
     },
     {
       "name": "HTTP::Response",
+      "kind": "class",
       "about": "What a web request's block is given.",
+      "guide": "online-services.md#http",
       "methods": [
         {
           "name": "ok?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether it came back with a 2xx status"
         },
         {
           "name": "status",
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "its status"
         },
         {
           "name": "headers",
+          "params": [],
+          "returns": {"type": "Hash[String, String]"},
           "about": "its headers"
         },
         {
           "name": "body",
+          "params": [],
+          "returns": {"type": "String"},
           "about": "its body (decompressed when it came with gzip or deflate)"
         },
         {
           "name": "json",
+          "params": [],
+          "returns": {"type": "untyped"},
           "about": "its body read as JSON"
         },
         {
           "name": "error",
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "why there was no answer, or nil"
         },
         {
           "name": "url",
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "the address the answer came from, once redirects were followed"
         }
-      ],
-      "guide": "online-services.md#http"
+      ]
     },
     {
       "name": "I18n",
+      "kind": "module",
       "about": "The game's texts in several languages (locales/*.json).",
+      "guide": "i18n.md",
       "methods": [
         {
           "name": "t",
           "static": true,
-          "args": "key, **values",
+          "params": [
+            {"name": "key", "type": "String | Symbol"},
+            {"name": "values", "type": "untyped", "keyword": true, "rest": true}
+          ],
+          "returns": {"type": "String"},
           "about": "the text of a key in the language in use, its {placeholders} filled"
         },
         {
           "name": "locale",
           "static": true,
+          "params": [],
+          "returns": {"type": "Symbol"},
           "about": "the language in use (:en)"
         },
         {
           "name": "locale=",
           "static": true,
-          "args": "language",
+          "params": [
+            {"name": "language", "type": "Symbol | String"}
+          ],
+          "returns": {"type": "Symbol | String"},
           "about": "changes the language"
         },
         {
           "name": "available_locales",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[Symbol]"},
           "about": "the languages of the game's locales/ files"
         }
-      ],
-      "guide": "i18n.md"
+      ]
     },
     {
       "name": "Network",
+      "kind": "module",
       "about": "Games played together: on a local network, through a relay or on a dedicated server.",
+      "guide": "multiplayer.md",
       "methods": [
         {
           "name": "host",
           "static": true,
-          "args": "port: 7777, name: nil, visible: true, room: false, waiting_per_address: 4, fingerprint: nil",
+          "params": [
+            {"name": "port", "type": "Integer", "keyword": true, "optional": true, "default": "7777"},
+            {"name": "name", "type": "String | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "visible", "type": "bool", "keyword": true, "optional": true, "default": "true"},
+            {"name": "room", "type": "bool", "keyword": true, "optional": true, "default": "false"},
+            {"name": "waiting_per_address", "type": "Integer", "keyword": true, "optional": true, "default": "Network::WAITING_PER_ADDRESS"},
+            {"name": "fingerprint", "type": "String | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "bool"},
           "about": "hosts a game, encrypted (fingerprint: is the relay's, with room: true)"
         },
         {
           "name": "join",
           "static": true,
-          "args": "address = nil, port: 7777, room: nil, auth: nil, fingerprint: nil",
+          "params": [
+            {"name": "address", "type": "String | nil", "optional": true, "default": "nil"},
+            {"name": "port", "type": "Integer", "keyword": true, "optional": true, "default": "7777"},
+            {"name": "room", "type": "String | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "auth", "type": "untyped", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "fingerprint", "type": "String | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "bool"},
           "about": "joins a game (an address, or a room code), encrypted; fingerprint: is who must answer"
         },
         {
           "name": "fingerprint",
           "static": true,
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "the fingerprint of the game hosted here, or nil"
         },
         {
           "name": "host_code",
           "static": true,
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "the short code players who join the game hosted here check it with, or nil"
         },
         {
           "name": "leave",
           "static": true,
+          "params": [],
+          "returns": {"type": "void"},
           "about": "leaves the game"
         },
         {
           "name": "online?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether this machine is in a game"
         },
         {
           "name": "connecting?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether a join is on its way"
         },
         {
           "name": "host?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether this machine hosts"
         },
         {
           "name": "server?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether this machine is a dedicated server"
         },
         {
           "name": "id",
           "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "this machine's peer id"
         },
         {
           "name": "peers",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[Integer]"},
           "about": "the peers of the game"
         },
         {
           "name": "players",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[Integer]"},
           "about": "the peers without a dedicated server"
         },
         {
           "name": "port",
           "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "the port of the game"
         },
         {
           "name": "room",
           "static": true,
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "the room code, on a relay"
         },
         {
           "name": "relay",
           "static": true,
+          "params": [],
+          "returns": {"type": "String | nil"},
           "about": "the relay's address"
         },
         {
           "name": "relay=",
           "static": true,
-          "args": "address",
+          "params": [
+            {"name": "address", "type": "String | nil"}
+          ],
+          "returns": {"type": "String | nil"},
           "about": "sets the relay's address"
         },
         {
           "name": "search",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "looks for games on the local network"
         },
         {
           "name": "searching?",
           "static": true,
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether it is looking"
         },
         {
           "name": "stop_search",
           "static": true,
+          "params": [],
+          "returns": {"type": "void"},
           "about": "stops looking"
         },
         {
           "name": "games",
           "static": true,
+          "params": [],
+          "returns": {"type": "Array[Hash[Symbol, untyped]]"},
           "about": "the games found"
         },
         {
           "name": "discovery_port",
           "static": true,
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "the port games are looked for on"
         },
         {
           "name": "discovery_port=",
           "static": true,
-          "args": "port",
+          "params": [
+            {"name": "port", "type": "Integer"}
+          ],
+          "returns": {"type": "Integer"},
           "about": "changes it"
         },
         {
           "name": "emit",
           "static": true,
-          "args": "name, data = nil, to: :all",
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "data", "type": "untyped", "optional": true, "default": "nil"},
+            {"name": "to", "type": "Symbol | Integer", "keyword": true, "optional": true, "default": ":all"}
+          ],
+          "returns": {"type": "void"},
           "about": "sends a message (:all, :host or a peer id)"
         },
         {
           "name": "on",
           "static": true,
-          "args": "name, &block",
+          "params": [
+            {"name": "name", "type": "String | Symbol"},
+            {"name": "block", "type": "^(untyped, Integer) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
           "about": "receives a message: |data, from|"
         },
         {
           "name": "on_connect",
           "static": true,
-          "args": "&block",
+          "params": [
+            {"name": "block", "type": "^() -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
           "about": "this machine is in the game"
         },
         {
           "name": "on_disconnect",
           "static": true,
-          "args": "&block",
+          "params": [
+            {"name": "block", "type": "^() -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
           "about": "the game is gone"
         },
         {
           "name": "on_join",
           "static": true,
-          "args": "&block",
+          "params": [
+            {"name": "block", "type": "^(Integer) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
           "about": "someone arrived: |peer|"
         },
         {
           "name": "on_leave",
           "static": true,
-          "args": "&block",
+          "params": [
+            {"name": "block", "type": "^(Integer) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
           "about": "someone left: |peer|"
         },
         {
           "name": "on_fail",
           "static": true,
-          "args": "&block",
+          "params": [
+            {"name": "block", "type": "^(String | nil) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
           "about": "a join did not work out: |reason|"
         },
         {
           "name": "authenticate",
           "static": true,
-          "args": "&block",
+          "params": [
+            {"name": "block", "type": "^(Integer, untyped, Network::Decision) -> void", "block": true}
+          ],
+          "returns": {"type": "void"},
           "about": "decides who gets in: |peer, auth, decide|"
         },
         {
           "name": "identity",
           "static": true,
-          "args": "peer",
+          "params": [
+            {"name": "peer", "type": "Integer"}
+          ],
+          "returns": {"type": "untyped"},
           "about": "who a peer was accepted as"
         },
         {
           "name": "player_name",
           "static": true,
-          "args": "peer",
+          "params": [
+            {"name": "peer", "type": "Integer"}
+          ],
+          "returns": {"type": "String | nil"},
           "about": "a peer's name"
         },
         {
           "name": "spawn",
           "static": true,
-          "args": "template, owner: Network.id, position:, rotation:",
+          "params": [
+            {"name": "template", "type": "String"},
+            {"name": "owner", "type": "Integer", "keyword": true, "optional": true, "default": "Network.id"},
+            {"name": "position", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"},
+            {"name": "rotation", "type": "Vector3 | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "GameObject | nil"},
           "about": "spawns a copy on every machine"
         },
         {
           "name": "allow_spawn",
           "static": true,
-          "args": "*templates",
+          "params": [
+            {"name": "templates", "type": "String", "rest": true}
+          ],
+          "returns": {"type": "void"},
           "about": "lets guests spawn those templates"
         }
-      ],
-      "guide": "multiplayer.md"
+      ]
     },
     {
       "name": "Network::Decision",
+      "kind": "class",
       "about": "What an authenticate block decides with.",
+      "guide": "online-services.md",
       "methods": [
         {
           "name": "accept",
-          "args": "identity:, name: nil",
+          "params": [
+            {"name": "identity", "type": "untyped", "keyword": true},
+            {"name": "name", "type": "String | nil", "keyword": true, "optional": true, "default": "nil"}
+          ],
+          "returns": {"type": "void"},
           "about": "lets the peer in"
         },
         {
           "name": "deny",
-          "args": "reason = \"not let in\"",
+          "params": [
+            {"name": "reason", "type": "String", "optional": true, "default": "\"not let in\""}
+          ],
+          "returns": {"type": "void"},
           "about": "keeps the peer out"
         }
-      ],
-      "guide": "online-services.md"
+      ]
     },
     {
       "name": "NetworkSync",
+      "kind": "class",
+      "superclass": "Behaviour",
       "about": "A behaviour: the same object in the same place on every machine.",
+      "guide": "multiplayer.md#objects-in-the-same-place-everywhere",
       "methods": [
         {
           "name": "mine?",
+          "params": [],
+          "returns": {"type": "bool"},
           "about": "whether this machine owns it"
         },
         {
           "name": "owner",
+          "params": [],
+          "returns": {"type": "Integer"},
           "about": "the peer that owns it"
         },
         {
           "name": "owner=",
-          "args": "peer",
+          "params": [
+            {"name": "peer", "type": "Integer"}
+          ],
+          "returns": {"type": "Integer"},
           "about": "gives it to a peer"
         },
         {
           "name": "key",
+          "params": [],
+          "returns": {"type": "String"},
           "about": "the name it is known by on every machine"
         },
         {
           "name": "assign",
-          "args": "owner:, key:",
+          "params": [
+            {"name": "owner", "type": "Integer", "keyword": true},
+            {"name": "key", "type": "String", "keyword": true, "optional": true, "default": "self.key"}
+          ],
+          "returns": {"type": "void"},
           "about": "sets its owner and key"
         }
       ],
@@ -2863,8 +4497,7 @@
         "toward",
         "update",
         "watch_afresh"
-      ],
-      "guide": "multiplayer.md#objects-in-the-same-place-everywhere"
+      ]
     }
   ]
 }

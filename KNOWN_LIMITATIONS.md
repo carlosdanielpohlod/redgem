@@ -423,9 +423,12 @@ not a promise of how it will be closed.
 
 - No migration notes between versions: CHANGELOG.md says what changed, not how to move a game
   across.
-- The API reference (`docs/scripting/api.json`, made into `docs/scripting/api.md` and `redgem api`)
-  is checked against the engine's classes and methods, but written by hand: arguments are written
-  as text, with no types, and there are no stubs for code editors.
+- The API reference (`docs/scripting/api.json`, made into `docs/scripting/api.md`, `redgem api`
+  and the type signatures `sig/redgem.rbs`) is checked against the engine's classes, methods and
+  the parameters of its Ruby methods, but its types are written by hand: what the C++ methods take
+  and what any method returns is not checked against the engine, nor are the names of keywords.
+  The signatures cover the engine's API only: a game's own classes need signatures of their own
+  for a type checker, and a game made before them gets them with `redgem api --rbs`.
 - Templates are `empty` and `platformer` only; there is no example of running game tests in a
   game's own continuous integration.
 

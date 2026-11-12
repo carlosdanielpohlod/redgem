@@ -234,6 +234,7 @@ add_executable(redgem_tests
   integration/scene_tools_test.cpp
   integration/play_tools_test.cpp
   integration/api_reference_test.cpp
+  integration/api_types_test.cpp
   integration/error_hints_test.cpp
   integration/agent_connection_test.cpp)
 # (zlib: the tests compress the answers their web servers send.)

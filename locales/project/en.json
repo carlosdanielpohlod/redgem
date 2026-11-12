@@ -13,13 +13,14 @@
   "project.api.one_class": "name one class at a time",
   "project.api.see_index": "redgem api lists the classes.",
   "project.api.usage": [
-    "usage: redgem api [Class] [--search word] [--json] [--markdown]",
+    "usage: redgem api [Class] [--search word] [--json] [--markdown] [--rbs]",
     "",
     "  redgem api                 a line per class of the scripting API",
-    "  redgem api Transform       the methods of one class, a line each",
+    "  redgem api Transform       the methods of one class, a line each, with their types",
     "  redgem api --search ray    the methods that have to do with a word",
     "  --json                     the same as data, for tools",
     "  --markdown                 the manual's page (docs/scripting/api.md)",
+    "  --rbs                      Ruby type signatures for editors (new games have them as sig/redgem.rbs)",
     ""
   ],
   "project.build.bundle_is_for_android": "--bundle makes an Android App Bundle: use it with --target android",
