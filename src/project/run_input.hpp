@@ -4,6 +4,7 @@
 // buttons, gamepads, a finger on the screen), and what lasts that frame only (a click, a tap, a
 // turn of the wheel). It is fed to the ScriptedInputSource the game reads, as a player's would be.
 
+#include <array>
 #include <cstddef>
 #include <optional>
 #include <string>
@@ -64,11 +65,18 @@ struct RunScreen {
   float height = 0.0f;
 };
 
+// Which gamepads an event of the run has listed so far.
+using PluggedPads = std::array<bool, kMaxGamepads>;
+
 // Reads one event of a run of `frames` frames into `event`; why it is not one otherwise.
 std::string read_run_input(const nlohmann::json& value, long long frames, RunInput& event);
 
-// Makes `event` what `source` holds, in place of whatever it held.
-void apply_run_input(ScriptedInputSource& source, const RunInput& event, RunScreen screen);
+// Whether `event` clicks or taps: presses let go of on the frame after it.
+bool lasts_one_frame(const RunInput& event);
+
+// Makes `event` what `source` holds, in place of whatever it held. A gamepad stays plugged in
+// once an event lists it (`plugged` keeps which have been), as a player's would.
+void apply_run_input(ScriptedInputSource& source, const RunInput& event, RunScreen screen, PluggedPads& plugged);
 // Lets go of what `event` held for its frame only (clicks, a tap, the wheel), the frame after it.
 void end_run_pulses(ScriptedInputSource& source, const RunInput& event);
 

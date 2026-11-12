@@ -39,13 +39,13 @@ const Fields kMouseFields = {kXField, kYField, kNormalizedField, kButtonsField, 
 const Fields kPadFields = {kPadField, kButtonsField, kAxesField};
 
 constexpr std::size_t kMostNames = 128;
-constexpr double kMostPixel = 65536.0;
+constexpr int kMostPixel = 65536;
 constexpr double kMostFraction = 1.0;
-constexpr double kMostWheelNotches = 100.0;
+constexpr int kMostWheelNotches = 100;
 constexpr double kStickLeast = -1.0;
 constexpr double kTriggerLeast = 0.0;
 constexpr double kAxisMost = 1.0;
-constexpr double kLastPad = static_cast<double>(kMaxGamepads - 1);
+constexpr std::size_t kLastPad = kMaxGamepads - 1;
 
 template <typename T>
 using NameReader = std::optional<T> (*)(const std::string&);
@@ -122,7 +122,7 @@ std::string not_an_object(const char* field) { return tr("project.run.bad_object
 
 template <typename T>
 std::string read_names(const Json& list, const char* field, NameReader<T> from_name, std::vector<T>& into) {
-  if (!is_name_list(list)) return tr("project.run.bad_names", {{"field", field}});
+  if (!is_name_list(list)) return tr("project.run.bad_names", {{"field", field}, {"most", std::to_string(kMostNames)}});
   for (const auto& value : list) {
     const auto found = value.is_string() ? from_name(value.get<std::string>()) : std::nullopt;
     if (!found) return tr("project.run.unknown_name", {{"field", field}, {"name", printable(value.dump())}});
@@ -138,18 +138,21 @@ std::optional<bool> flag_of(const Json& object, const char* field) {
 }
 
 std::optional<float> coordinate(const Json& object, const char* field, bool normalized) {
-  const auto number = number_within(field_or(object, field, Json()), 0.0, normalized ? kMostFraction : kMostPixel);
+  const auto number =
+      number_within(field_or(object, field, Json()), 0.0, normalized ? kMostFraction : static_cast<double>(kMostPixel));
   if (!number) return std::nullopt;
   return static_cast<float>(*number);
 }
+
+std::string bad_point() { return tr("project.run.bad_point", {{"most", std::to_string(kMostPixel)}}); }
 
 std::string read_point(const Json& object, RunPoint& point) {
   const auto normalized = flag_of(object, kNormalizedField);
   if (!normalized) return tr("project.run.bad_normalized");
   const auto x = coordinate(object, kXField, *normalized);
-  if (!x) return tr("project.run.bad_point");
+  if (!x) return bad_point();
   const auto y = coordinate(object, kYField, *normalized);
-  if (!y) return tr("project.run.bad_point");
+  if (!y) return bad_point();
   point = {*x, *y, *normalized};
   return {};
 }
@@ -170,8 +173,9 @@ std::string read_mouse_point(const Json& value, RunMouse& mouse) {
 }
 
 std::string read_wheel(const Json& value, RunMouse& mouse) {
-  const auto notches = number_within(value, -kMostWheelNotches, kMostWheelNotches);
-  if (!notches) return tr("project.run.bad_wheel");
+  const auto notches =
+      number_within(value, -static_cast<double>(kMostWheelNotches), static_cast<double>(kMostWheelNotches));
+  if (!notches) return tr("project.run.bad_wheel", {{"most", std::to_string(kMostWheelNotches)}});
   mouse.wheel = static_cast<float>(*notches);
   return {};
 }
@@ -209,8 +213,8 @@ std::string read_axes(const Json& value, RunPad& pad) {
 }
 
 std::string read_pad_number(const Json& value, RunPad& pad) {
-  const auto number = whole_within(field_or(value, kPadField, Json(0)), 0.0, kLastPad);
-  if (!number) return tr("project.run.bad_pad");
+  const auto number = whole_within(field_or(value, kPadField, Json(0)), 0.0, static_cast<double>(kLastPad));
+  if (!number) return tr("project.run.bad_pad", {{"last", std::to_string(kLastPad)}});
   pad.pad = static_cast<std::size_t>(*number);
   return {};
 }
@@ -230,7 +234,7 @@ bool has_pad(const std::vector<RunPad>& pads, std::size_t number) {
 }
 
 std::string read_pads(const Json& value, RunInput& event) {
-  if (!is_pad_list(value)) return tr("project.run.bad_pads");
+  if (!is_pad_list(value)) return tr("project.run.bad_pads", {{"most", std::to_string(kMaxGamepads)}});
   for (const auto& item : value) {
     RunPad pad;
     const std::string problem = read_pad(item, pad);
@@ -265,9 +269,12 @@ struct ScreenPoint {
   float y = 0.0f;
 };
 
+// A fraction of a screen's side, in pixels: 1 is its last pixel.
+float along(float fraction, float side) { return std::clamp(fraction * side, 0.0f, std::max(0.0f, side - 1.0f)); }
+
 ScreenPoint on_screen(const RunPoint& point, RunScreen screen) {
   if (!point.normalized) return {point.x, point.y};
-  return {point.x * screen.width, point.y * screen.height};
+  return {along(point.x, screen.width), along(point.y, screen.height)};
 }
 
 void move_to(ScriptedInputSource& source, const RunPoint& point, RunScreen screen) {
@@ -283,7 +290,6 @@ void apply_mouse(ScriptedInputSource& source, const RunMouse& mouse, RunScreen s
 }
 
 void apply_pad(ScriptedInputSource& source, const RunPad& pad) {
-  source.plug_gamepad(pad.pad);
   for (const GamepadButton button : pad.buttons) source.set_gamepad_button(button, true, pad.pad);
   for (const RunPadAxis& axis : pad.axes) source.set_gamepad_axis(axis.axis, axis.value, pad.pad);
 }
@@ -305,6 +311,14 @@ void end_clicks(ScriptedInputSource& source, const RunMouse& mouse) {
 
 bool is_tap(const RunInput& event) { return event.touch && event.touch->tap; }
 
+bool clicks(const RunInput& event) { return event.mouse && !event.mouse->clicks.empty(); }
+
+void plug_pads(ScriptedInputSource& source, const PluggedPads& plugged) {
+  for (std::size_t pad = 0; pad < plugged.size(); ++pad) {
+    if (plugged.at(pad)) source.plug_gamepad(pad);
+  }
+}
+
 }  // namespace
 
 std::string read_run_input(const nlohmann::json& value, long long frames, RunInput& event) {
@@ -314,10 +328,14 @@ std::string read_run_input(const nlohmann::json& value, long long frames, RunInp
       {check_fields(value, kEventFields), read_frame(value, frames, event), read_devices(value, event)});
 }
 
-void apply_run_input(ScriptedInputSource& source, const RunInput& event, RunScreen screen) {
+bool lasts_one_frame(const RunInput& event) { return is_tap(event) || clicks(event); }
+
+void apply_run_input(ScriptedInputSource& source, const RunInput& event, RunScreen screen, PluggedPads& plugged) {
   source.release_all();
   for (const Key key : event.keys) source.set_key(key, true);
   if (event.mouse) apply_mouse(source, *event.mouse, screen);
+  for (const RunPad& pad : event.pads) plugged.at(pad.pad) = true;
+  plug_pads(source, plugged);
   for (const RunPad& pad : event.pads) apply_pad(source, pad);
   source.set_touch_pointer(event.touch.has_value());
   if (event.touch) apply_touch(source, *event.touch, screen);

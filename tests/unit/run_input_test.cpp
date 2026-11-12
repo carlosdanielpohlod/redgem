@@ -138,11 +138,12 @@ TEST_CASE("a run event that is not one says why") {
 
 TEST_CASE("an event holds what it says on the input the game reads, in place of what was held") {
   ScriptedInputSource source;
+  PluggedPads plugged{};
   source.set_key(Key::A, true);
   const RunInput event = event_of(
       R"({"frame": 0, "keys": ["w"], "mouse": {"x": 0.5, "y": 0.25, "normalized": true, "buttons": ["left"]},
           "pads": [{"pad": 1, "buttons": ["b"], "axes": {"left_y": -1}}]})");
-  apply_run_input(source, event, kScreen);
+  apply_run_input(source, event, kScreen, plugged);
   CHECK_FALSE(source.is_key_down(Key::A));
   CHECK(source.is_key_down(Key::W));
   CHECK(source.mouse().x == doctest::Approx(320.0));
@@ -154,23 +155,44 @@ TEST_CASE("an event holds what it says on the input the game reads, in place of 
   CHECK(pad_axis(source, 1, GamepadAxis::LeftY) == doctest::Approx(-1.0));
   end_run_pulses(source, event);
   CHECK(held(source, MouseButton::Left));
-  apply_run_input(source, event_of(R"({"frame": 1, "keys": []})"), kScreen);
+  apply_run_input(source, event_of(R"({"frame": 1, "keys": []})"), kScreen, plugged);
   CHECK_FALSE(held(source, MouseButton::Left));
-  CHECK_FALSE(source.gamepad(1).connected);
+  CHECK_FALSE(pad_held(source, 1, GamepadButton::B));
+  CHECK(pad_axis(source, 1, GamepadAxis::LeftY) == doctest::Approx(0.0));
   CHECK(source.mouse().x == doctest::Approx(320.0));
 }
 
-TEST_CASE("a gamepad listed with nothing pressed is plugged in") {
+TEST_CASE("a gamepad listed once stays plugged in, with nothing pressed until an event says so") {
   ScriptedInputSource source;
-  apply_run_input(source, event_of(R"({"frame": 0, "pads": [{"pad": 3}]})"), kScreen);
+  PluggedPads plugged{};
+  apply_run_input(source, event_of(R"({"frame": 0, "pads": [{"pad": 3}]})"), kScreen, plugged);
   CHECK(source.gamepad(3).connected);
+  apply_run_input(source, event_of(R"({"frame": 5, "keys": ["w"]})"), kScreen, plugged);
+  CHECK(source.gamepad(3).connected);
+  CHECK_FALSE(source.gamepad(2).connected);
+}
+
+TEST_CASE("a normalized point of 1 is the screen's last pixel") {
+  ScriptedInputSource source;
+  PluggedPads plugged{};
+  apply_run_input(source, event_of(R"({"frame": 0, "tap": {"x": 1, "y": 1, "normalized": true}})"), kScreen, plugged);
+  CHECK(source.mouse().x == doctest::Approx(639.0));
+  CHECK(source.mouse().y == doctest::Approx(359.0));
+}
+
+TEST_CASE("only a click or a tap lasts one frame") {
+  CHECK(lasts_one_frame(event_of(R"({"frame": 0, "mouse": {"click": ["left"]}})")));
+  CHECK(lasts_one_frame(event_of(R"({"frame": 0, "tap": {"x": 1, "y": 1}})")));
+  CHECK_FALSE(lasts_one_frame(event_of(R"({"frame": 0, "mouse": {"buttons": ["left"], "wheel": 1}})")));
+  CHECK_FALSE(lasts_one_frame(event_of(R"({"frame": 0, "touch": {"x": 1, "y": 1}})")));
 }
 
 TEST_CASE("clicks, the wheel and taps last their frame; a held button and a held finger do not end") {
   ScriptedInputSource source;
+  PluggedPads plugged{};
   const RunInput click =
       event_of(R"({"frame": 0, "mouse": {"buttons": ["left"], "click": ["left", "right"], "wheel": 3}})");
-  apply_run_input(source, click, kScreen);
+  apply_run_input(source, click, kScreen, plugged);
   CHECK(held(source, MouseButton::Right));
   CHECK(source.mouse().wheel == doctest::Approx(3.0));
   end_run_pulses(source, click);
@@ -179,7 +201,7 @@ TEST_CASE("clicks, the wheel and taps last their frame; a held button and a held
   CHECK(source.mouse().wheel == doctest::Approx(0.0));
 
   const RunInput tap = event_of(R"({"frame": 1, "tap": {"x": 5, "y": 6}})");
-  apply_run_input(source, tap, kScreen);
+  apply_run_input(source, tap, kScreen, plugged);
   CHECK(source.touch_pointer());
   CHECK(held(source, MouseButton::Left));
   CHECK(source.mouse().x == doctest::Approx(5.0));
@@ -187,11 +209,11 @@ TEST_CASE("clicks, the wheel and taps last their frame; a held button and a held
   CHECK_FALSE(held(source, MouseButton::Left));
 
   const RunInput touch = event_of(R"({"frame": 2, "touch": {"x": 7, "y": 8}})");
-  apply_run_input(source, touch, kScreen);
+  apply_run_input(source, touch, kScreen, plugged);
   end_run_pulses(source, touch);
   CHECK(held(source, MouseButton::Left));
   CHECK(source.touch_pointer());
-  apply_run_input(source, event_of(R"({"frame": 3, "keys": []})"), kScreen);
+  apply_run_input(source, event_of(R"({"frame": 3, "keys": []})"), kScreen, plugged);
   CHECK_FALSE(source.touch_pointer());
   CHECK_FALSE(held(source, MouseButton::Left));
 }

@@ -133,7 +133,7 @@ Besides `keys`, an event may give any of these:
 | `"mouse": {"buttons": ["left"]}` | Holds mouse buttons (`left`, `right`, `middle`, `side`, `extra`) until the next event |
 | `"mouse": {"click": ["right"]}` | Presses buttons for this frame only: released on the next |
 | `"mouse": {"wheel": -1}` | Turns the wheel by notches this frame (up is positive) |
-| `"pads": [{"pad": 1, "buttons": ["a"], "axes": {"left_x": -1, "right_trigger": 1}}]` | Plugs in gamepad 0 to 3 (0 when `pad` is left out), holding buttons and pushing sticks (-1 to 1) and triggers (0 to 1) |
+| `"pads": [{"pad": 1, "buttons": ["a"], "axes": {"left_x": -1, "right_trigger": 1}}]` | Plugs in gamepad 0 to 3 (0 when `pad` is left out) for the rest of the run, holding buttons and pushing sticks (-1 to 1) and triggers (0 to 1) |
 | `"touch": {"x": 100, "y": 200}` | A finger held on the screen there: down, moved by the next `touch`, up when an event has none |
 | `"tap": {"x": 100, "y": 200}` | A finger down for this frame only |
 
@@ -142,7 +142,9 @@ fractions (0 to 1) of its width and height. The game reads a finger the way it r
 phone: as the pointer (`Input.mouse_x`, `Input.mouse_y`), with the left button held. So `mouse`,
 `touch` and `tap` move the same pointer and an event takes only one of them; there is one finger.
 Everything goes through the input the game reads, so actions bound to `mouse:left` or `pad:a`
-fire as they would for a player. A gamepad an event does not list is unplugged:
+fire as they would for a player. A gamepad stays plugged in once an event lists it, with nothing
+pressed when a later event leaves it out. A click or a tap is let go of on the next frame, so that
+frame must have no event of its own (two clicks need a frame between them):
 
 ```json
 [

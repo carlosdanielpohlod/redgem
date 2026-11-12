@@ -65,7 +65,7 @@ class RunSession {
     end_pulses();
     if (!input_due()) return;
     pulsing_ = &plan_.input[next_input_++];
-    apply_run_input(engine_.scripted_input(), *pulsing_, screen());
+    apply_run_input(engine_.scripted_input(), *pulsing_, screen(), plugged_);
   }
 
   RubyResult evaluate(const std::string& expression, const char* option) {
@@ -122,6 +122,7 @@ class RunSession {
   RunOutcome outcome_;
   std::size_t next_input_ = 0;
   const RunInput* pulsing_ = nullptr;  // the event applied on the frame before
+  PluggedPads plugged_{};
   bool reached_ = false;
   bool truncated_ = false;
 };

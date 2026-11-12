@@ -51,11 +51,24 @@ std::string read_events(const nlohmann::json& json, long long frames, std::vecto
   return {};
 }
 
+// A click or a tap is let go of on the frame after it: an event on that frame would hide the release
+// (two clicks in a row would read as one long press).
+bool crowds_pulse(const RunInput& before, const RunInput& event) {
+  return event.frame == before.frame + 1 && lasts_one_frame(before);
+}
+
+std::string spacing_problem(const RunInput& before, const RunInput& event) {
+  const std::string frame = std::to_string(event.frame);
+  if (event.frame == before.frame) return tr("project.run.duplicate_frame", {{"frame", frame}});
+  if (crowds_pulse(before, event)) return tr("project.run.crowded_pulse", {{"frame", frame}});
+  return {};
+}
+
 std::string order_events(std::vector<RunInput>& events) {
   std::sort(events.begin(), events.end(), [](const RunInput& a, const RunInput& b) { return a.frame < b.frame; });
   for (std::size_t i = 1; i < events.size(); ++i) {
-    if (events[i].frame == events[i - 1].frame)
-      return tr("project.run.duplicate_frame", {{"frame", std::to_string(events[i].frame)}});
+    const std::string problem = spacing_problem(events[i - 1], events[i]);
+    if (!problem.empty()) return problem;
   }
   return {};
 }
