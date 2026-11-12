@@ -33,6 +33,12 @@ struct Census {
   }
 };
 
+// Says where a server that started listens, and where it keeps its saves.
+void say_started(const GameServer& server, const ServerSettings& settings) {
+  log::info("game server listening on port " + std::to_string(server.port()) + " (Ctrl+C stops it)");
+  log::info("the game's saves are kept in " + (settings.data_dir / kSaveDatabaseName).string());
+}
+
 int run_server(const ServerSettings& settings) {
   // (Heard from the start: the system's own handling of SIGUSR1 ends the program.)
   StatusSignal status_signal;
@@ -43,8 +49,7 @@ int run_server(const ServerSettings& settings) {
     return kExitFailure;
   }
   const StopSignals signals;
-  log::info("game server listening on port " + std::to_string(server.port()) + " (Ctrl+C stops it)");
-  log::info("the game's saves are kept in " + (settings.data_dir / kSaveDatabaseName).string());
+  say_started(server, settings);
   serve_until(server, [&signals] { return signals.asked(); }, [&status_signal] { return status_signal.taken(); });
   server.stop();
   log::info("game server stopped");
