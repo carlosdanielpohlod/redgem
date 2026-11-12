@@ -55,6 +55,7 @@ add_executable(redgem_tests
   unit/build_job_test.cpp
   unit/mesh_builder_test.cpp
   unit/mesh_pieces_test.cpp
+  unit/scene_recovery_test.cpp
   unit/scene_document_test.cpp
   unit/scene_document_clipboard_test.cpp
   unit/scene_document_textures_test.cpp
@@ -157,6 +158,8 @@ add_executable(redgem_tests
   unit/clip_clock_test.cpp
   unit/camera_ray_test.cpp
   unit/crash_report_test.cpp
+  unit/build_id_test.cpp
+  unit/symbolize_test.cpp
   unit/agent_protocol_test.cpp
   unit/agent_client_test.cpp
   unit/agent_files_test.cpp
@@ -504,6 +507,7 @@ add_executable(redgem_editor_system_tests editor_system/editor_test_main.cpp edi
                editor_system/prefab_preview_test.cpp
                editor_system/script_reload_test.cpp
                editor_system/physics_debug_test.cpp
+               editor_system/scene_recovery_test.cpp
                editor_system/dpi_test.cpp
                editor_system/agent_panel_test.cpp
                editor_system/build_progress_test.cpp

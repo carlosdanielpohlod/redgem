@@ -56,6 +56,9 @@ until 1.0, a release may change what games rely on (see
 - **Physics collider view**: inspect actual collision shapes during editor Play/Pause, with
   colored wireframes, trigger and character shapes, and bounded geometry collection.
 
+- **Scene recovery**: periodic durable copies of unsaved editor scenes, with a recovery prompt,
+  original-file conflict detection and cleanup on Save or Discard.
+
 - **Prefab creation**: save a selected hierarchy as a reusable GLB from the Project panel,
   preserving complete skeletons and nested references while validating dependencies before publication.
 
@@ -82,6 +85,17 @@ until 1.0, a release may change what games rely on (see
 - **Linux AppImage**: `redgem-linux-x86_64.AppImage`, a fifth download beside the tarball, holds
   the same editor, tools, players and demos in one file with the RedGem menu entry and icon. Run
   it as `bin/redgem`; name another program first (`redgem-server --help`) to run that one.
+- **Crash reports on Android**: a built game for Android writes its crash report in `crashes/` of
+  the app's files and in `adb logcat` (tag `redgem`), and hands the crash on to the system, which
+  keeps its own tombstone too. The next run of any built game says in its log that the run
+  before crashed, naming the report.
+- **`redgem symbolize <report> [--symbols <dir>]`**: a crash report's frames with their functions
+  (and file:line where the symbols have them), looked up with `llvm-addr2line` or `addr2line`.
+  Every report now names the build of the player that crashed (`Build: <id> <program>`, the
+  linker's build id on Linux, Windows and Android), and the symbols of that very build are found
+  by it; a report of another build is said to be so, with the builds found. Each release carries
+  the players as they were linked, before stripping, as `redgem-symbols-linux.zip`,
+  `redgem-symbols-windows.zip` and `redgem-symbols-android.zip`, apart from the downloads.
 
 ### Changed
 
@@ -89,6 +103,9 @@ until 1.0, a release may change what games rely on (see
   later) instead of 2.39: it is built on Ubuntu 22.04 with libstdc++ linked in, and so are the
   players inside it, so games built for Linux run on those systems too. The release workflow
   measures the floor and runs both Linux downloads on a bare Ubuntu 22.04.
+- **Crash report backtraces on Linux and Android are offsets into each program**
+  (`Arena+0x1a2b`), as on Windows, so that `redgem symbolize` reads them; where the loader knows
+  a frame's symbol, it follows in brackets.
 - **Each game keeps its data in a folder of its own, named after its studio and title**:
   `game.json` gains `"studio"`, and a game's save, settings, bindings and crash reports are kept
   together in `<studio>/<title>/` where the player's system keeps programs' data

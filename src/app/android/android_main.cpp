@@ -11,11 +11,13 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <new>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "app/android/android_bundle.hpp"
+#include "app/crash_report.hpp"
 #include "app/game_data_location.hpp"
 #include "app/user_settings.hpp"
 #include "app/window_presenter.hpp"
@@ -150,6 +152,16 @@ int play_unpacked_game(const android_app* app) {
   return play_in_window(options, touch_screen);
 }
 
+// Plays the game with the crash handling a shipped game has: a crash writes its report in the
+// game's folder of the app's storage (crashes/, beside its save) and in the system's log, and the
+// next run says in the log that the one before crashed (see app/crash_report.hpp).
+int play_reporting_crashes(const android_app* app) {
+  add_game_texts();
+  translations::use_language(phone_language(app));
+  crash::install_crash_handling({kBundledGameFolder, players_data_folder(kBundledGameFolder), false});
+  return play_unpacked_game(app);
+}
+
 }  // namespace
 
 int main(int, char**) {
@@ -171,11 +183,10 @@ int main(int, char**) {
     return kExitFailure;
   }
   try {
-    add_game_texts();
-    translations::use_language(phone_language(app));
-    return play_unpacked_game(app);
+    return play_reporting_crashes(app);
+  } catch (const std::bad_alloc&) {
+    return crash::end_out_of_memory();
   } catch (const std::exception& error) {
-    log::error(error.what());
-    return kExitFailure;
+    return crash::end_with_exception(error.what());
   }
 }

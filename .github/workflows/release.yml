@@ -5,7 +5,9 @@
 # linked in, so that they run on glibc 2.35 and later systems (LINUX_GLIBC_FLOOR in
 # tools/release/release_files.sh), and are run again on a bare Ubuntu 22.04 (that glibc). Each download
 # is checked before it is kept (its list of files, and its programs run on its own system). Then
-# all five are checked together, and a release never gets fewer than five.
+# all five are checked together, and a release never gets fewer than five. The players' symbols
+# (each as it was linked, before it was stripped: the Linux one is the very player the container
+# built) go beside them as redgem-symbols-<system>.zip, for `redgem symbolize`.
 #
 # What starts it, and what it does with the downloads (tools/release/plan_release.sh decides):
 # * a pushed tag v<version>: attached to that tag's draft release, which is made when missing.
@@ -284,7 +286,8 @@ jobs:
             -DREDGEM_WARNINGS_AS_ERRORS=ON
         run: tools/android/build_runtime.sh arm64-v8a x86_64
 
-      # (With the AppImage: appimagetool and its runtime, pinned by tools/release/fetch_appimage_tools.sh.)
+      # (With the AppImage: appimagetool and its runtime, pinned by tools/release/fetch_appimage_tools.sh.
+      # With the players' symbols, as they were linked: release assets of their own.)
       - name: Pack the downloads
         run: tools/release/package.sh
 
@@ -306,7 +309,16 @@ jobs:
       - name: Check what the downloads hold
         run: |
           tools/release/check_downloads.sh dist/release \
-            redgem-linux-x86_64.tar.gz redgem-linux-x86_64.AppImage redgem-windows-x86_64.zip
+            redgem-linux-x86_64.tar.gz redgem-linux-x86_64.AppImage redgem-windows-x86_64.zip \
+            redgem-symbols-linux.zip redgem-symbols-windows.zip redgem-symbols-android.zip
+
+      # The symbols a crash report of each player is read with (`redgem symbolize`): never in a download.
+      - name: Keep the players' symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: redgem-symbols
+          path: dist/release/redgem-symbols-*.zip
+          if-no-files-found: error
 
       - name: Run the Linux downloads' programs
         run: |
@@ -498,7 +510,7 @@ jobs:
           path: dist/release
           merge-multiple: true
 
-      - name: Check that all five are there and hold what they must
+      - name: Check that all five and the symbols are there and hold what they must
         env:
           TAG: ${{ needs.plan.outputs.tag }}
         run: |

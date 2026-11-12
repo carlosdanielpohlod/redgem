@@ -48,21 +48,27 @@ otherwise): it is stuck in a loop, or does far too much in one go. See
 
 **A built game closed by itself.**
 A game that crashes writes a report and tells the player where it is (in a message box on
-Windows; on Linux and the Mac on its error stream, which a terminal shows). The report is a text
-file in `crashes/`, beside the game's save, in the game's folder named after its studio and
-title:
+Windows; on Linux and the Mac on its error stream, which a terminal shows; on Android in
+`adb logcat`). The report is a text file in `crashes/`, beside the game's save, in the game's
+folder named after its studio and title:
 
 ```
 ~/.local/share/<studio>/<title>/crashes/crash-<date>-<time>.log                  Linux
 %APPDATA%\<studio>\<title>\crashes\crash-<date>-<time>.log                      Windows
 ~/Library/Application Support/<studio>/<title>/crashes/crash-<date>-<time>.log   macOS
+<the app's files folder>/crashes/crash-<date>-<time>.log                         Android
 ```
 
 (On Linux, `$XDG_DATA_HOME` stands for `~/.local/share` when it is set.) It says the game, the engine's
-version, the system, the time in UTC, what happened (the signal, such as `SIGSEGV`, or the
-exception and its message) and, where the system can say, the functions the program was in.
-Send it with a bug report. The save itself loses nothing: it is written to the disk on every
-change. A built game for Android writes no report yet: look in `adb logcat`.
+version, the system, the build of the player (`Build: <id> <program>`), the time in UTC, what
+happened (the signal, such as `SIGSEGV`, or the exception and its message) and where the program
+was, as offsets into each program (`Arena.exe+0x1a2b`). `redgem symbolize <report>` turns those
+into functions and lines with the symbols of the release the game was built with (see
+[Shipping](shipping.md#crash-reports-and-symbols)). Send the report with a bug report. The save
+itself loses nothing: it is written to the disk on every change. The next time the game starts,
+its log says the run before crashed and names the report. On Android, `adb logcat` also has the
+whole report, under the tag `redgem`, and the system's own crash record (its tombstone) is kept
+as well.
 
 **`on_trigger_enter` never fires.**
 The object needs *Trigger* on, and the thing entering must be a character, a dynamic body or a

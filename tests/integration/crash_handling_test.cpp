@@ -9,7 +9,10 @@
 #include <sstream>
 #include <string>
 
+#include "core/build_id.hpp"
 #include "core/exit_codes.hpp"
+#include "core/platform.hpp"
+#include "project/symbolize_command.hpp"
 
 namespace {
 
@@ -112,3 +115,55 @@ TEST_CASE("an exception that leaves the work of an engine thread is reported wit
   check_reported("engine-thread", "uncaught exception: thrown on an engine thread");
   check_reported("engine-thread-memory", "out of memory");
 }
+
+#if !defined(__APPLE__)
+namespace {
+
+constexpr const char* kFunctionMark = "  in ";  // what a symbolized frame says its function after
+constexpr const char* kUnknownFunction = "??";
+
+std::string helper_name() { return std::filesystem::path(REDGEM_CRASH_HELPER_FILE).filename().u8string(); }
+
+// Whether a symbolized report names a function at one of its frames (not addr2line's "??").
+bool names_a_function(const std::string& text) {
+  const std::size_t mark = std::string(kFunctionMark).size();
+  for (std::size_t at = text.find(kFunctionMark); at != std::string::npos; at = text.find(kFunctionMark, at + 1)) {
+    if (text.compare(at + mark, std::string(kUnknownFunction).size(), kUnknownFunction) != 0) return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+TEST_CASE("a report names the build that crashed by the id its program carries, and frames as offsets into it") {
+  const CrashFolders folders;
+  REQUIRE(crashed(folders, "segv"));
+  const std::string report = the_report(folders);
+  CAPTURE(report);
+  const auto helper = redgem::binary_identity_of_file(REDGEM_CRASH_HELPER_FILE);
+  REQUIRE(helper.has_value());
+  CHECK_FALSE(helper->build_id.empty());
+  CHECK(says(report, "\nBuild: " + helper->build_id + " " + helper_name() + "\n"));
+  CHECK(says(report, "\n  " + helper_name() + "+0x"));
+}
+
+TEST_CASE("a crash's report is symbolized with the program that crashed, by addr2line") {
+  const auto tool = redgem::tools::addr2line_here();
+  if (!tool.has_value()) {
+    // (The continuous integration's machines have one: there the test must run.)
+    CHECK(redgem::platform::environment("CI").empty());
+    return;
+  }
+  const CrashFolders folders;
+  REQUIRE(crashed(folders, "segv"));
+  const std::filesystem::path symbols = folders.root / "symbols";
+  std::filesystem::create_directories(symbols);
+  std::filesystem::copy_file(REDGEM_CRASH_HELPER_FILE, symbols / helper_name());
+  const auto result =
+      redgem::tools::symbolize_report(the_report(folders), symbols, redgem::tools::addr2line_resolver(*tool));
+  CAPTURE(result.out);
+  CAPTURE(result.err);
+  CHECK(result.exit_code == redgem::kExitSuccess);
+  CHECK(names_a_function(result.out));
+}
+#endif

@@ -4,6 +4,7 @@
 #   tools/release/package.sh            # dist/release/redgem-linux-x86_64.tar.gz
 #                                       # dist/release/redgem-linux-x86_64.AppImage (the same files)
 #                                       # dist/release/redgem-windows-x86_64.zip
+#                                       # dist/release/redgem-symbols-{linux,windows,android}.zip
 # Build first: cmake --build build, tools/windows/build_runtime.sh, tools/android/build_runtime.sh
 # and, for the Windows download, cmake --build build-windows --target redgem redgem_relay redgem_server.
 # On a Mac it makes the Mac's download instead (package_macos.sh).
@@ -14,6 +15,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/release_files.sh"
 
 LINUX_BUILD="${REPO_ROOT}/build/src"
 WINDOWS_BUILD="${REPO_ROOT}/build-windows/src"
+ANDROID_BUILD="${REPO_ROOT}/build-android"   # tools/android/build_runtime.sh's, a folder per processor
 WINDOWS_STRIP="${REPO_ROOT}/.deps/llvm-mingw/bin/x86_64-w64-mingw32-strip"
 MAC_SYSTEM="Darwin"   # what uname says on a Mac
 APPIMAGE_ARCH="x86_64"
@@ -65,6 +67,27 @@ package_windows() {
   (cd "$1" && zip -qr "${OUT_DIR}/${WINDOWS_DOWNLOAD}" "${PACKAGE_NAME}")
 }
 
+# Copies built file $1 to $2 in the symbols' folder $3, making the folders on the way.
+keep_symbols() {
+  need "$1"
+  mkdir -p "$(dirname "$3/$2")"
+  cp "$1" "$3/$2"
+}
+
+# The players as they were linked, before they were stripped, each system's in an archive of its
+# own beside the downloads (never in one): what `redgem symbolize` reads a crash report with.
+package_symbols() {
+  local root="$1/${SYMBOLS_PACKAGE}" abi
+  keep_symbols "${LINUX_BUILD}/redgem-player" "${LINUX_PLAYER_SYMBOLS}" "${root}"
+  keep_symbols "${WINDOWS_BUILD}/redgem-player.exe" "${WINDOWS_PLAYER_SYMBOLS}" "${root}"
+  for abi in "${ANDROID_ABIS[@]}"; do
+    keep_symbols "${ANDROID_BUILD}/${abi}/src/${ANDROID_PLAYER}" "android/${abi}/${ANDROID_PLAYER}" "${root}"
+  done
+  (cd "$1" && zip -qr "${OUT_DIR}/${LINUX_SYMBOLS}" "${SYMBOLS_PACKAGE}/linux")
+  (cd "$1" && zip -qr "${OUT_DIR}/${WINDOWS_SYMBOLS}" "${SYMBOLS_PACKAGE}/windows")
+  (cd "$1" && zip -qr "${OUT_DIR}/${ANDROID_SYMBOLS}" "${SYMBOLS_PACKAGE}/android")
+}
+
 main() {
   if [[ "$(uname -s)" == "${MAC_SYSTEM}" ]]; then
     exec "${REPO_ROOT}/tools/release/package_macos.sh"
@@ -72,10 +95,11 @@ main() {
   WORK_DIR="$(mktemp -d)"
   trap 'rm -rf "${WORK_DIR}"' EXIT
   rm -rf "${OUT_DIR}"
-  mkdir -p "${OUT_DIR}" "${WORK_DIR}/linux" "${WORK_DIR}/appimage" "${WORK_DIR}/windows"
+  mkdir -p "${OUT_DIR}" "${WORK_DIR}/linux" "${WORK_DIR}/appimage" "${WORK_DIR}/windows" "${WORK_DIR}/symbols"
   package_linux "${WORK_DIR}/linux"
   package_appimage "${WORK_DIR}/linux" "${WORK_DIR}/appimage"
   package_windows "${WORK_DIR}/windows"
+  package_symbols "${WORK_DIR}/symbols"
   ls -l "${OUT_DIR}"
 }
 

@@ -14,6 +14,18 @@ A release carries five downloads, under these names (the README's
 Each one also has the demos (platformer, driving, city), `LICENSE`, `THIRD_PARTY_LICENSES.md` and
 its `README.txt` (`README-<system>.txt` here).
 
+Beside them, the players' symbols: each player as it was linked, before it was stripped for the
+downloads, which `redgem symbolize` reads a crash report of a game built with it with (it finds
+the one of the report's build by its build id). They are never in a download.
+
+| Asset | What it holds |
+| --- | --- |
+| `redgem-symbols-linux.zip` | `redgem-symbols/linux/redgem-player` (the very one the Linux downloads carry, built in the Ubuntu 22.04 container) |
+| `redgem-symbols-windows.zip` | `redgem-symbols/windows/redgem-player.exe` (linked with `--strip-debug`: functions, no lines) |
+| `redgem-symbols-android.zip` | `redgem-symbols/android/<arm64-v8a, x86_64>/libredgem.so` |
+
+The Mac's players carry no build id the engine reads yet: no Mac symbols are kept.
+
 The Linux programs are built in an Ubuntu 22.04 container, so that they take from glibc only
 what 2.35 has, and need no libstdc++ of the system's. `glibc_floor.sh` measures that (the newest
 `GLIBC_` version of their symbols, by `objdump -T`) and fails when it is newer than
@@ -51,7 +63,8 @@ What a run checks, and what it does not:
   programs and of the built game, on the runner and again in a bare Ubuntu 22.04 container). That is
   all: no editor window is opened from a download (the Mac's app is opened for a picture, which
   is not a check), and no game is played.
-- Then the five together: if one is missing, or any job failed, nothing is attached.
+- Then the five together, and the players' symbols: if one is missing, or any job failed, nothing
+  is attached.
 - Attaching (`tools/release/attach_to_draft.sh`): the new downloads go up under other names
   (`incoming.<name>`), are checked to be all there at the sizes packed, and only then, the release
   checked again to still be a draft, replace the old ones. A failed upload leaves the old ones. A
@@ -70,9 +83,10 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build
 tools/windows/build_runtime.sh
 cmake --build build-windows --target redgem redgem_relay redgem_server
 tools/android/build_runtime.sh
-tools/release/package.sh                 # dist/release: the Linux and Windows downloads
+tools/release/package.sh                 # dist/release: the Linux and Windows downloads, and the symbols
 tools/release/check_downloads.sh dist/release redgem-linux-x86_64.tar.gz \
-  redgem-linux-x86_64.AppImage redgem-windows-x86_64.zip
+  redgem-linux-x86_64.AppImage redgem-windows-x86_64.zip \
+  redgem-symbols-linux.zip redgem-symbols-windows.zip redgem-symbols-android.zip
 tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.tar.gz
 tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.AppImage
 ```

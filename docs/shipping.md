@@ -278,6 +278,39 @@ redgem games/arena --record trailer.mp4 --record-fps 30 --record-size 3840x2160 
 - Check the licenses of the models and sounds you include. A license that allows using an asset
   in a game does not always allow shipping its original file.
 
+## Crash reports and symbols
+
+A built game that crashes writes a report in `crashes/` of its players' folder (see `studio`
+above; on Android, the app's own files folder, and also in `adb logcat`). The next run of the
+game says in its log that the run before crashed, naming the report. See
+[Troubleshooting](troubleshooting.md) for what a report says.
+
+The player inside every game is stripped of its symbols, so a report's backtrace is offsets into
+the program (`Arena.exe+0x1a2b`). Its `Build:` line names the build of the player the game was
+built with. Each release keeps the players as they were linked, before they were stripped, beside
+its downloads: `redgem-symbols-linux.zip`, `redgem-symbols-windows.zip` and
+`redgem-symbols-android.zip` (one per phone processor). To read a report a player sent you:
+
+```bash
+unzip redgem-symbols-windows.zip            # from the release your game was built with
+redgem symbolize crash-20261024-130509.log --symbols redgem-symbols
+```
+
+It prints the report again with the function, and the file and line where the symbols have them,
+after each frame of the game's program:
+
+```
+  Arena.exe+0x1a2b  in redgem::Engine::step() at src/app/engine.cpp:120
+```
+
+`--symbols` takes a symbols file or a folder, searched with the folders in it (the current folder
+unless given); the file whose build id is the report's is used. A report of another build says so
+and lists the builds it found: get the symbols of the release the game was built with. A player
+you built yourself has its symbols in your build folder (`build/src/redgem-player`,
+`build-windows/src/redgem-player.exe`, `build-android/<processor>/src/libredgem.so`).
+Addresses are looked up with `llvm-addr2line` (LLVM) or `addr2line` (binutils), the first on the
+`PATH`, or the program `--tool` names. Reports of a Mac build name no build yet.
+
 ## Installing RedGem somewhere else
 
 `cmake --install build --component redgem --prefix <folder>` copies the programs out of the
