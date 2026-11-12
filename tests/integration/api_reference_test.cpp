@@ -230,6 +230,12 @@ void add_word_to_shape(Shape& shape, const std::string& word) {
   if (word == "block") shape.block = true;
 }
 
+// A Ruby method's proc as a value. mruby keeps it const, and mrb_obj_value takes a void*; the
+// proc is only read.
+mrb_value proc_value(const mrb_method_t& body) {
+  return mrb_obj_value(const_cast<RProc*>(MRB_METHOD_PROC(body)));  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+}
+
 // What Ruby says of a method's parameters; nothing for one written in C++, of which it cannot tell.
 std::optional<Shape> ruby_shape(RubyVm& vm, const ApiClass& owner, const ApiMethod& method) {
   mrb_state* mrb = vm.state();
@@ -238,7 +244,7 @@ std::optional<Shape> ruby_shape(RubyVm& vm, const ApiClass& owner, const ApiMeth
   RClass* klass = mrb_class_ptr(method.on_class ? mrb_singleton_class(mrb, found.value) : found.value);
   const mrb_method_t body = mrb_method_search_vm(mrb, &klass, mrb_intern_cstr(mrb, method.name.c_str()));
   if (MRB_METHOD_UNDEF_P(body) || MRB_METHOD_CFUNC_P(body)) return std::nullopt;
-  const RubyResult parameters = vm.call(mrb_obj_value(MRB_METHOD_PROC(body)), "parameters");
+  const RubyResult parameters = vm.call(proc_value(body), "parameters");
   REQUIRE_MESSAGE(parameters.ok, parameters.error);
   const RubyResult words = vm.call(mrb_top_self(mrb), "__api_shape", {parameters.value});
   REQUIRE_MESSAGE(words.ok, words.error);
