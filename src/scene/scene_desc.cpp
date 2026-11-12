@@ -1,6 +1,7 @@
 #include "scene/scene_desc.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 #include "scene/scene_config.hpp"
 
@@ -29,6 +30,15 @@ void keep_joints_within(PrimitiveDesc& primitive, std::size_t joints) {
   for (std::uint16_t& joint : primitive.joints) {
     if (joint >= joints) joint = 0;
   }
+}
+
+void sanitize_spot_cones(LightDesc& light) {
+  if (light.type != LightType::Spot) return;
+  const bool outer_valid = std::isfinite(light.outer_cone) && light.outer_cone > kSpotConeAxis;
+  light.outer_cone = outer_valid ? std::min(light.outer_cone, kMaxSpotOuterCone) : kDefaultSpotOuterCone;
+  const auto max_inner = std::nextafter(light.outer_cone, kSpotConeAxis);
+  light.inner_cone =
+      std::isfinite(light.inner_cone) ? std::clamp(light.inner_cone, kSpotConeAxis, max_inner) : kSpotConeAxis;
 }
 
 void Bounds::include(Vec3 point) {

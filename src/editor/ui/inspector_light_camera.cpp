@@ -18,7 +18,6 @@ using namespace editor_config;
 // The keys of the names of the kinds of light, in LightType's order.
 constexpr const char* kLightTypes[] = {"editor.inspector.light.directional", "editor.inspector.light.point",
                                        "editor.inspector.light.spot"};
-constexpr float kRadiansToDegrees = 57.29577951f;
 constexpr float kNoLowerLimit = 0.0f;            // intensities, ranges and clip distances are never negative
 constexpr const char* kMetersFormat = "%.1f m";  // how distances are shown in drags
 constexpr const char* kTypeId = "##type";
@@ -28,8 +27,6 @@ constexpr const char* kRangeId = "##range";
 constexpr const char* kInnerConeId = "##inner_cone";
 constexpr const char* kOuterConeId = "##outer_cone";
 constexpr const char* kConeFormat = "%.1f deg";
-constexpr float kConeAxisDegrees = 0.0f;
-constexpr float kMaxConeDegrees = 90.0f;
 constexpr float kConeStepDegrees = 0.1f;
 constexpr const char* kFovId = "##fov";
 constexpr const char* kNearId = "##near";
@@ -48,19 +45,35 @@ bool drag_cone(const char* id, const char* label, float& degrees, float min, flo
   return ImGui::DragFloat(id, &degrees, kConeStepDegrees, min, max, kConeFormat, ImGuiSliderFlags_AlwaysClamp);
 }
 
-bool draw_spot_cones(LightDesc& light) {
-  const auto outer_angle = std::isfinite(light.outer_cone) ? light.outer_cone : kDefaultSpotOuterCone;
-  const auto inner_angle = std::isfinite(light.inner_cone) ? light.inner_cone : kConeAxisDegrees;
-  float outer = std::clamp(radians_to_degrees(outer_angle), kConeStepDegrees, kMaxConeDegrees);
-  float inner = std::clamp(radians_to_degrees(inner_angle), kConeAxisDegrees, outer - kConeStepDegrees);
-  bool changed = drag_cone(kOuterConeId, "editor.inspector.light.outer_cone", outer, kConeStepDegrees, kMaxConeDegrees);
-  inner = std::min(inner, outer - kConeStepDegrees);
-  changed |=
-      drag_cone(kInnerConeId, "editor.inspector.light.inner_cone", inner, kConeAxisDegrees, outer - kConeStepDegrees);
-  if (!changed) return false;
-  light.outer_cone = degrees_to_radians(outer);
-  light.inner_cone = degrees_to_radians(std::clamp(inner, kConeAxisDegrees, outer - kConeStepDegrees));
+bool draw_outer_cone(LightDesc& light) {
+  const float narrowest = std::nextafter(light.inner_cone, kMaxSpotOuterCone);
+  const float min_angle = radians_to_degrees(narrowest);
+  const float max_angle = radians_to_degrees(kMaxSpotOuterCone);
+  float degrees = radians_to_degrees(light.outer_cone);
+  if (!drag_cone(kOuterConeId, "editor.inspector.light.outer_cone", degrees, min_angle, max_angle)) return false;
+  const float angle = std::clamp(degrees_to_radians(degrees), narrowest, kMaxSpotOuterCone);
+  if (angle == light.outer_cone) return false;
+  light.outer_cone = angle;
   return true;
+}
+
+bool draw_inner_cone(LightDesc& light) {
+  const float widest = std::nextafter(light.outer_cone, kSpotConeAxis);
+  const float min_angle = radians_to_degrees(kSpotConeAxis);
+  const float max_angle = radians_to_degrees(widest);
+  float degrees = radians_to_degrees(light.inner_cone);
+  if (!drag_cone(kInnerConeId, "editor.inspector.light.inner_cone", degrees, min_angle, max_angle)) return false;
+  const float angle = std::clamp(degrees_to_radians(degrees), kSpotConeAxis, widest);
+  if (angle == light.inner_cone) return false;
+  light.inner_cone = angle;
+  return true;
+}
+
+bool draw_spot_cones(LightDesc& light) {
+  sanitize_spot_cones(light);
+  const bool outer_changed = draw_outer_cone(light);
+  const bool inner_changed = draw_inner_cone(light);
+  return outer_changed || inner_changed;
 }
 
 bool draw_light_fields(LightDesc& light) {
@@ -115,12 +128,12 @@ void draw_camera(PanelContext& context, int index) {
   if (!node.camera) return;
   CameraDesc camera = *node.camera;
   if (!component_header(ICON_FA_VIDEO, tr("editor.inspector.camera.title"))) return;
-  float fov = camera.fov_y_radians * kRadiansToDegrees;
+  float fov = radians_to_degrees(camera.fov_y_radians);
   const bool changed = draw_camera_fields(camera, fov);
   draw_main_camera_note(context.session, index);
   if (!changed) return;
   streamed_edit(context);
-  camera.fov_y_radians = std::clamp(fov, kMinFovDegrees, kMaxFovDegrees) / kRadiansToDegrees;
+  camera.fov_y_radians = degrees_to_radians(std::clamp(fov, kMinFovDegrees, kMaxFovDegrees));
   camera.near_plane = std::max(camera.near_plane, kMinClipDistance);
   context.session.document().set_camera(index, camera, false);
   context.session.refresh_node(index);

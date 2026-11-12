@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <limits>
 #include <set>
 #include <string>
 #include <vector>
@@ -236,6 +237,21 @@ TEST_CASE("spot angles are valid on disk and belong only to spot lights") {
   light.type = LightType::Point;
   write_light(entry, light);
   CHECK_FALSE(entry.contains(kSpotLight));
+}
+
+TEST_CASE("spotlights replace invalid cone angles before writing glTF") {
+  json entry = json::object();
+  LightDesc light{LightType::Spot, kOrange, kLampWatts};
+  light.inner_cone = std::numeric_limits<float>::quiet_NaN();
+  for (const auto invalid : {kSpotConeAxis, std::numeric_limits<float>::quiet_NaN()}) {
+    light.outer_cone = invalid;
+    write_light(entry, light);
+    CHECK(entry.at(kSpotLight).at("outerConeAngle") == kDefaultSpotOuterCone);
+    CHECK(entry.at(kSpotLight).at("innerConeAngle") == kSpotConeAxis);
+  }
+  light.outer_cone = kPi;
+  write_light(entry, light);
+  CHECK(entry.at(kSpotLight).at("outerConeAngle") == kMaxSpotOuterCone);
 }
 
 TEST_CASE("a camera without a far plane is saved as an infinite projection") {

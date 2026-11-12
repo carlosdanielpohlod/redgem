@@ -3,7 +3,6 @@
 #include "editor/document/gltf_json.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <iterator>
 
 #include "scene/props.hpp"
@@ -15,8 +14,6 @@ namespace {
 constexpr float kUnitFactor = 1.0f;     // glTF color factors stop here
 constexpr float kInfiniteRange = 0.0f;  // glTF: a light without a range reaches as far as its strength allows
 constexpr float kInfiniteFar = 0.0f;    // a camera far plane of 0 means infinite
-constexpr float kConeAxis = 0.0f;
-constexpr float kMaxOuterCone = 1.5707963f;  // largest float below pi / 2
 constexpr const char* kInnerConeAngle = "innerConeAngle";
 constexpr const char* kOuterConeAngle = "outerConeAngle";
 
@@ -106,14 +103,12 @@ void write_spot_cones(nlohmann::json& entry, const LightDesc& light) {
     entry.erase(kSpotLight);
     return;
   }
-  const bool outer_valid = std::isfinite(light.outer_cone) && light.outer_cone > kConeAxis;
-  const auto outer = outer_valid ? std::min(light.outer_cone, kMaxOuterCone) : kDefaultSpotOuterCone;
-  const auto max_inner = std::nextafter(outer, kConeAxis);
-  const auto inner = std::isfinite(light.inner_cone) ? std::clamp(light.inner_cone, kConeAxis, max_inner) : kConeAxis;
+  auto cones = light;
+  sanitize_spot_cones(cones);
   auto& spot = entry[kSpotLight];
   if (!spot.is_object()) spot = nlohmann::json::object();
-  spot[kInnerConeAngle] = inner;
-  spot[kOuterConeAngle] = outer;
+  spot[kInnerConeAngle] = cones.inner_cone;
+  spot[kOuterConeAngle] = cones.outer_cone;
 }
 
 }  // namespace
