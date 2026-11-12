@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "scene/scene_config.hpp"
 
@@ -54,7 +55,9 @@ void sanitize_spot_cones(LightDesc& light) {
 
 namespace {
 bool is_valid_cone_pair(double inner, double outer) {
-  const auto minimum = std::nextafter(inner + kMinSpotConeGapDegrees, 0.0);
+  // Decimal input and Ruby's boxed floats can lose a few low bits.
+  constexpr double kRoundoff = 4.0 * std::numeric_limits<double>::epsilon() * kMaxSpotConeDegrees;
+  const double minimum = inner + kMinSpotConeGapDegrees - kRoundoff;
   return inner >= 0.0 && outer >= minimum && outer <= kMaxSpotConeDegrees;
 }
 
