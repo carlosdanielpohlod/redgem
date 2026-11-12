@@ -11,8 +11,6 @@ set -euo pipefail
 # shellcheck source=tools/release/release_files.sh
 source "$(dirname "${BASH_SOURCE[0]}")/release_files.sh"
 
-APPIMAGE_UNPACKED="squashfs-root"   # where an AppImage's --appimage-extract puts its files
-
 problems=0
 
 problem() {

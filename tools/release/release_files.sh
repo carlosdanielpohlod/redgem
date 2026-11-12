@@ -23,10 +23,14 @@ DOWNLOADS=("${LINUX_DOWNLOAD}" "${APPIMAGE_DOWNLOAD}" "${WINDOWS_DOWNLOAD}" "${M
 APPIMAGE_ENTRY="AppRun"
 APPIMAGE_DESKTOP="redgem.desktop"
 APPIMAGE_ICON="redgem.svg"
+APPIMAGE_UNPACKED="squashfs-root"   # where an AppImage's --appimage-extract puts its files
 # The oldest glibc the Linux programs run on, as the docs say it (README-linux.txt, docs/install.md,
 # KNOWN_LIMITATIONS.md): they are built on Ubuntu 22.04, with libstdc++ linked in. glibc_floor.sh
 # fails when a program needs a newer one, or when a doc says another.
 LINUX_GLIBC_FLOOR="2.35"
+# libgcc stays the system's (libgcc_s, which every glibc system has): the newest of its symbol
+# versions a program may take, that of GCC 7's libgcc_s, which every system of that floor has.
+LINUX_LIBGCC_FLOOR="7.0.0"
 # The programs of the Linux and Mac downloads. The editor first: it is what the Mac's app starts.
 # The others stand beside it as they do in a build (a game is built with the player found beside
 # the editor).

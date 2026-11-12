@@ -586,6 +586,10 @@ add_test(NAME tools.blender_runs_in_a_home_of_its_own
 # What refuses a release whose downloads are not all there, or miss what they must hold.
 add_test(NAME tools.release_downloads
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_downloads_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
+# What refuses Linux programs that need a newer glibc than the docs say, and how the AppImage
+# starts its programs.
+add_test(NAME tools.release_linux
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_linux_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
 # Which tag a run of the release workflow releases, and whether it touches a release at all.
 add_test(NAME tools.release_plan
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_plan_test.sh ${CMAKE_SOURCE_DIR}/tools/release)

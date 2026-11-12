@@ -58,7 +58,7 @@ unpack() {
       # (Unpacked too, for its demos and its programs' glibc; its programs are run through it.)
       install -m 755 "${archive}" "${work}/${name}"
       (cd "${work}" && "./${name}" --appimage-extract > /dev/null)
-      ROOT="${work}/squashfs-root"
+      ROOT="${work}/${APPIMAGE_UNPACKED}"
       export APPIMAGE_EXTRACT_AND_RUN=1
       EDITOR_RUN=("${work}/${name}")
       RELAY_RUN=("${work}/${name}" redgem-relay)

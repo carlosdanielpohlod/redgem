@@ -81,8 +81,8 @@ jobs:
 
   # The Linux programs, on an older system than the runners' so that the downloads run on older
   # systems too: what they take from glibc is what Ubuntu 22.04 has (2.35). Its GCC 12 is newer
-  # than its default compiler; libstdc++ is linked into the programs (-static-libstdc++), so they
-  # need no libstdc++ of the system's. (libgcc stays shared: every glibc system has libgcc_s, and
+  # than its default compiler; libstdc++ is linked into the programs (REDGEM_STATIC_LIBSTDCXX), so
+  # they need no libstdc++ of the system's. (libgcc stays shared: every glibc system has libgcc_s, and
   # linking it in would bring in GCC's unwinder, which needs glibc 2.35's _dl_find_object.)
   linux-build:
     name: Linux programs (Ubuntu 22.04)
@@ -126,8 +126,10 @@ jobs:
           echo "/opt/${archive}/bin" >> "${GITHUB_PATH}"
 
       # (In a container the workspace has the container's path, which github.workspace is not.)
-      - name: Place the compiler cache
-        run: echo "CCACHE_DIR=${GITHUB_WORKSPACE}/.ccache" >> "${GITHUB_ENV}"
+      - name: Place the caches
+        run: |
+          echo "CCACHE_DIR=${GITHUB_WORKSPACE}/.ccache" >> "${GITHUB_ENV}"
+          echo "FETCH_DIR=${GITHUB_WORKSPACE}/.deps/fetch" >> "${GITHUB_ENV}"
 
       - name: Describe the toolchain
         run: |
@@ -137,21 +139,32 @@ jobs:
           cmake --version | head -n 1
           ruby --version
 
-      # Its own: no other workflow builds with this compiler.
+      # Its own caches, under names no other workflow's restore-keys match: no other workflow
+      # builds with this compiler, nor fetches the libraries' sources at this path.
       - name: Restore the compiler cache
         uses: actions/cache/restore@v4
         with:
           path: .ccache
-          key: ccache-linux-ubuntu22-${{ github.run_id }}
-          restore-keys: ccache-linux-ubuntu22-
+          key: ccache-ubuntu22-linux-${{ github.run_id }}
+          restore-keys: ccache-ubuntu22-linux-
+
+      - name: Restore the libraries' sources
+        id: fetch-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .deps/fetch/*-src
+            .deps/fetch/*-subbuild
+          key: fetch-ubuntu22-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
 
       # (Warnings are the Linux workflow's to fail on, with the compiler the engine is written with.)
       - name: Build the Linux programs
         id: build
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DREDGEM_BUILD_TESTS=OFF \
+            -DREDGEM_STATIC_LIBSTDCXX=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_EXE_LINKER_FLAGS="-static-libstdc++"
+            -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
           ccache --zero-stats
           cmake --build build --target redgem redgem_player redgem_relay redgem_server redgem_test_tool
           ccache --show-stats
@@ -162,7 +175,16 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .ccache
-          key: ccache-linux-ubuntu22-${{ github.run_id }}
+          key: ccache-ubuntu22-linux-${{ github.run_id }}
+
+      - name: Keep the libraries' sources
+        if: ${{ steps.fetch-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .deps/fetch/*-src
+            .deps/fetch/*-subbuild
+          key: ${{ steps.fetch-cache.outputs.cache-primary-key }}
 
       # (In a tarball: an artifact keeps no file's permission to run.)
       - name: Pack the Linux programs
