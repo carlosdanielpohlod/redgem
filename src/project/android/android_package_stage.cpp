@@ -16,7 +16,8 @@ namespace redgem {
 
 namespace {
 
-constexpr const char* kAnyAbi = "<abi>";     // stands for a kind of processor in a path shown to people
+constexpr const char* kAnyAbi = "<abi>";  // stands for a kind of processor in a path shown to people
+constexpr const char* kFolderOccupied = "folder already exists";
 constexpr const char* kLineBreaks = "\n\r";  // what the list of an app's files is split at
 constexpr char kSkippedFolderPrefix = '_';   // the SDK's packer leaves such folders out
 
@@ -117,7 +118,7 @@ bool manifest_for(const std::filesystem::path& game_dir, const std::filesystem::
 bool create_stage_directory(const std::filesystem::path& folder, std::string& error) {
   std::error_code problem;
   if (std::filesystem::create_directory(folder, problem)) return true;
-  const std::string reason = problem ? problem.message() : "folder already exists";
+  const std::string reason = problem ? problem.message() : kFolderOccupied;
   error = "cannot create Android staging folder " + folder.string() + ": " + reason;
   return false;
 }

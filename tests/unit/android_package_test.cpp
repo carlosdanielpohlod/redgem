@@ -7,9 +7,11 @@
 #include <sstream>
 
 #include "project/android/android_package.hpp"
+#include "project/android/android_stage_folder.hpp"
 #include <raylib.h>
 
 #include "app/game_settings.hpp"
+#include "core/files.hpp"
 #include "core/image_header.hpp"
 #include "core/platform.hpp"
 #include "project/game_shipping.hpp"
@@ -243,6 +245,56 @@ TEST_CASE("Android staging refuses to reuse a folder and leaves its contents int
   CHECK(error.find("already exists") != std::string::npos);
   CHECK(read(file) == "belongs to the user");
   CHECK_FALSE(std::filesystem::exists(stage / "assets"));
+}
+
+TEST_CASE("reserving a temporary folder retries a collision and cleans only the new folder") {
+  const Scratch scratch;
+  const auto existing = scratch.file("stage-fixed/keep.txt", "keep");
+  std::string error;
+  std::filesystem::path reserved;
+  {
+    const ReservedFolder folder(scratch.dir, "stage-", error, "fixed");
+    REQUIRE_MESSAGE(!folder.path().empty(), error);
+    reserved = folder.path();
+    CHECK(reserved != existing.parent_path());
+    CHECK(std::filesystem::is_directory(reserved));
+    CHECK(read(existing) == "keep");
+  }
+  CHECK_FALSE(std::filesystem::exists(reserved));
+  CHECK(read(existing) == "keep");
+}
+
+TEST_CASE("an Android build reclaims marked stale stages and leaves live or unrelated folders alone") {
+  const Scratch scratch;
+  std::string error;
+  const auto unrelated = scratch.file(std::string(android_stage::kPrefix) + "other/keep.txt", "keep");
+  const auto stale = scratch.dir / (std::string(android_stage::kPrefix) + "stale");
+  REQUIRE(std::filesystem::create_directory(stale));
+  REQUIRE(write_text_file(stale / android_stage::kOwnerFile, android_stage::kOwnerSignature, error));
+  const std::map<std::string, std::filesystem::path> runtimes = {
+      {"x86_64", scratch.file("built/libredgem.so", "engine")}};
+  const auto payload = stale / android_stage::kPackageFolder;
+  REQUIRE(std::filesystem::create_directory(payload));
+  REQUIRE(write_text_file(payload / "copy.bin", "discard", error));
+
+  const android_stage::Folder live(scratch.dir, error);
+  REQUIRE_MESSAGE(!live.path().empty(), error);
+  CHECK_FALSE(std::filesystem::exists(stale));
+  CHECK(read(unrelated) == "keep");
+  std::filesystem::path next;
+  {
+    const android_stage::Folder failed(scratch.dir, error);
+    next = failed.path();
+    REQUIRE_MESSAGE(!next.empty(), error);
+    const auto broken = next / android_stage::kPackageFolder;
+    REQUIRE(std::filesystem::create_directory(broken));
+    REQUIRE(write_text_file(broken / "partial.bin", "partial build", error));
+    CHECK_FALSE(stage_android_game(fixture("games/sandbox"), runtimes, "stamp", broken, error));
+    CHECK(std::filesystem::is_directory(live.path()));
+    CHECK(read(unrelated) == "keep");
+  }
+  CHECK_FALSE(std::filesystem::exists(next));
+  CHECK(std::filesystem::is_directory(live.path()));
 }
 
 TEST_CASE("a game says its own app id, version and signing key in game.json") {

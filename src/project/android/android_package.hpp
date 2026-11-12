@@ -95,9 +95,9 @@ std::map<std::string, std::filesystem::path> android_runtimes(const std::filesys
 // the path shown to whoever has none.
 std::filesystem::path any_android_runtime_in(const std::filesystem::path& runtimes_dir);
 
-// Creates a new `stage_dir` and lays out what goes into the APK: assets/game/... (a copy of the game, without
-// hidden files and editors' backups),
-// assets/game.files, assets/game.stamp, lib/<abi>/libredgem.so and AndroidManifest.xml.
+// Creates a new `stage_dir` under an existing parent and lays out what goes into the APK: assets/game/... (a copy of
+// the game, without hidden files and editors' backups), assets/game.files, assets/game.stamp, lib/<abi>/libredgem.so
+// and AndroidManifest.xml.
 bool stage_android_game(const std::filesystem::path& game_dir,
                         const std::map<std::string, std::filesystem::path>& runtimes, const std::string& stamp,
                         const std::filesystem::path& stage_dir, std::string& error);

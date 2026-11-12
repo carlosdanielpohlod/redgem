@@ -659,6 +659,7 @@ if(NOT ANDROID)
     project/android/android_package_signing.cpp
     project/android/android_package_manifest.cpp
     project/android/android_package_stage.cpp
+    project/android/android_stage_folder.cpp
     project/android/android_package_icons.cpp
     project/android/android_package_bundle.cpp
     project/android/android_package_tools.cpp
