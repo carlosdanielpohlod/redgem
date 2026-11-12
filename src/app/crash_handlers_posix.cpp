@@ -220,6 +220,8 @@ void* crashed_frame(const void* context) {
 }
 
 int crashed_frames(void** frames, const void* context) {
+  // (macOS is the compiler's word in __builtin_available, which cppcheck takes for a macro.)
+  // cppcheck-suppress unknownMacro
   if (__builtin_available(macOS 12.0, *)) return backtrace_from_fp(crashed_frame(context), frames, kMaxFrames);
   return 0;
 }
