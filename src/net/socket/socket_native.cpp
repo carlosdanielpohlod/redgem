@@ -138,6 +138,19 @@ bool bind_local_port(NativeSocket socket, std::uint16_t port) {
   return bind(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0;
 }
 
+bool bind_to_address(NativeSocket socket, const std::string& address, std::uint16_t port, std::string& error) {
+  sockaddr_in where{};
+  where.sin_family = AF_INET;
+  where.sin_port = htons(port);
+  if (inet_pton(AF_INET, address.c_str(), &where.sin_addr) != 1) {
+    error = "not an address in numbers: " + address;
+    return false;
+  }
+  if (bind(socket, reinterpret_cast<const sockaddr*>(&where), sizeof(where)) == 0) return true;
+  error = last_error();
+  return false;
+}
+
 std::uint16_t bound_port(NativeSocket socket) {
   sockaddr_in address{};
   Length size = sizeof(address);

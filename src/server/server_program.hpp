@@ -12,8 +12,10 @@ namespace redgem::server {
 
 // Runs the server's turns on the real clock, one every fixed step of the engine, until `stop`
 // says so (it is asked between turns). Says in the log how many rooms and players there are
-// whenever that changes.
-void serve_until(GameServer& server, const std::function<bool()>& stop);
+// whenever that changes, and the whole status whenever `status_asked` says so (see StatusSignal).
+void serve_until(
+    GameServer& server, const std::function<bool()>& stop,
+    const std::function<bool()>& status_asked = [] { return false; });
 
 // The whole program: reads the command line and, unless it asks for help or makes no sense, runs
 // the server until the process is asked to stop (Ctrl+C, SIGTERM). Returns the exit code.

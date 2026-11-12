@@ -9,6 +9,7 @@
 #include "app/scene_files.hpp"
 #include "core/files.hpp"
 #include "core/log.hpp"
+#include "server/tick_pacer.hpp"
 
 namespace redgem::server {
 
@@ -24,7 +25,9 @@ bool GameServer::start(std::string& error) {
     return false;
   }
   scene_ = std::move(std::get<SceneDesc>(scene));
-  return open_saves(error) && lobby_.open(settings_.port, error, settings_.connections_per_address);
+  started_at_ = steady_seconds();
+  return open_saves(error) && lobby_.open(settings_.port, error, settings_.connections_per_address) &&
+         open_status(error);
 }
 
 bool GameServer::open_saves(std::string& error) {
@@ -40,6 +43,7 @@ void GameServer::tick(float seconds) {
   forget_closed_rooms();
   for (net::Arrival& arrival : lobby_.poll(seconds, in_rooms)) place(std::move(arrival));
   forget_closed_rooms();
+  report(seconds);
 }
 
 GameServer::~GameServer() { stop(); }
@@ -49,6 +53,7 @@ void GameServer::stop() {
   threads_.clear();
   rooms_.clear();
   lobby_.close();
+  status_port_.close();
 }
 
 std::size_t GameServer::player_count() const {

@@ -38,6 +38,16 @@ bool RoomSlot::closed() const {
   return closed_;
 }
 
+FrameTimes RoomSlot::frame_times() const {
+  const Hold hold(lock_);
+  return frames_.times();
+}
+
+void RoomSlot::note_frame(double seconds) {
+  const Hold hold(lock_);
+  frames_.note(seconds);
+}
+
 bool RoomSlot::visit(const std::function<void(Engine&)>& visitor) {
   const auto visit = std::make_shared<Visit>(Visit{visitor});
   Hold hold(lock_);

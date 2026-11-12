@@ -8,6 +8,7 @@
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "server/server_command.hpp"
+#include "server/status_signal.hpp"
 #include "server/stop_signals.hpp"
 #include "server/tick_pacer.hpp"
 
@@ -40,9 +41,10 @@ int run_server(const ServerSettings& settings) {
     return kExitFailure;
   }
   const StopSignals signals;
+  StatusSignal status_signal;
   log::info("game server listening on port " + std::to_string(server.port()) + " (Ctrl+C stops it)");
   log::info("the game's saves are kept in " + (settings.data_dir / kSaveDatabaseName).string());
-  serve_until(server, [&signals] { return signals.asked(); });
+  serve_until(server, [&signals] { return signals.asked(); }, [&status_signal] { return status_signal.taken(); });
   server.stop();
   log::info("game server stopped");
   return kExitSuccess;
@@ -50,13 +52,14 @@ int run_server(const ServerSettings& settings) {
 
 }  // namespace
 
-void serve_until(GameServer& server, const std::function<bool()>& stop) {
+void serve_until(GameServer& server, const std::function<bool()>& stop, const std::function<bool()>& status_asked) {
   TickPacer pacer(config::kFixedDeltaSeconds, steady_seconds());
   Census census;
   while (!stop()) {
     std::this_thread::sleep_for(std::chrono::duration<double>(pacer.until_next(steady_seconds())));
     server.tick(pacer.take_turn(steady_seconds()));
     census.report(server);
+    if (status_asked()) server.log_status();
   }
 }
 

@@ -1,6 +1,7 @@
 {
   "server.cli.data_needs_folder": "--data needs a folder",
   "server.cli.no_game": "which game? redgem-server <game_dir>",
+  "server.cli.status_bind_needs_address": "--status-bind needs an address in numbers, like 127.0.0.1",
   "server.cli.usage": [
     "usage:",
     "  redgem-server <game_dir> [options]    run a game on a server, for players to join over the internet",
@@ -14,6 +15,12 @@
     "  --rooms <number>          rooms open at once, each a match of its own (default: {default_rooms}, at most {most_rooms})",
     "  --threads <number>        threads the rooms run on, one room each while they last (default: this",
     "                            machine's {cores} cores, at most {most_threads})",
+    "  --status-port <number>    answer how busy the server is (rooms, players, frame time, traffic) as JSON",
+    "                            on this port, to an HTTP GET or a bare connection (default: none; 0 picks a free one)",
+    "  --status-bind <address>   the address the status port listens on (default: {status_address}, this",
+    "                            machine only)",
+    "  --status-log <seconds>    write the status in the log this often (at most {most_status_log}); SIGUSR1",
+    "                            writes it at any time",
     ""
   ]
 }

@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -16,6 +17,9 @@
 #include "server/room_slot.hpp"
 #include "server/room_thread.hpp"
 #include "server/save_database.hpp"
+#include "server/server_status.hpp"
+#include "server/status_port.hpp"
+#include "server/traffic_rate.hpp"
 
 namespace redgem::server {
 
@@ -43,6 +47,18 @@ std::filesystem::path data_dir_beside(const std::filesystem::path& game_dir);
 // many unless told otherwise.
 int processor_count();
 
+// Where a server's status is asked for unless told otherwise: this machine only.
+inline constexpr const char* kDefaultStatusAddress = net::kThisMachine;
+// The longest a server may be told to wait between two statuses in its log: a day.
+inline constexpr int kMostStatusLogSeconds = 24 * 60 * 60;
+
+// Whether, and where, a server says how busy it is (see server_status.hpp).
+struct StatusSettings {
+  std::optional<std::uint16_t> port;            // none: no status port (0 picks a free one)
+  std::string address = kDefaultStatusAddress;  // in numbers
+  int log_every_seconds = 0;                    // 0: in the log only when asked (SIGUSR1)
+};
+
 // What a dedicated server is asked to be.
 struct ServerSettings {
   std::filesystem::path game_dir;
@@ -51,6 +67,7 @@ struct ServerSettings {
   int connections_per_address = net::kDefaultConnectionsPerAddress;  // machines one address may connect
   std::filesystem::path data_dir;   // where Save is kept; empty: nothing is written (kept in memory for this run)
   int threads = processor_count();  // the threads the rooms run on, at most
+  StatusSettings status;
 };
 
 // A game played on a server with nobody at it (redgem-server): everyone joins, nobody hosts. One
@@ -70,7 +87,8 @@ class GameServer {
   GameServer(const GameServer&) = delete;
   GameServer& operator=(const GameServer&) = delete;
 
-  // Reads the game, opens its saves and the port; false with `error` when any cannot be done.
+  // Reads the game, opens its saves, the port and the status port (when it has one); false with
+  // `error` when any cannot be done.
   bool start(std::string& error);
   std::uint16_t port() const { return lobby_.port(); }
   // The lobby's turn: newcomers are heard and handed to their rooms, and the rooms whose match
@@ -83,6 +101,12 @@ class GameServer {
   std::size_t room_count() const { return rooms_.size(); }
   std::size_t player_count() const;
   std::size_t thread_count() const { return threads_.size(); }
+  // The port its status is asked for on; 0 when it has none.
+  std::uint16_t status_port() const { return status_port_.port(); }
+  // How busy it is now (from the lobby's thread, as tick).
+  ServerStatus status() const;
+  // Writes the status in the log.
+  void log_status() const;
   // Runs `visitor` with the game of the room with that code, on the room's thread between two of
   // its frames, and waits for it. False when no room has that code, or it closed first.
   bool visit(const std::string& code, const std::function<void(Engine&)>& visitor);
@@ -97,6 +121,11 @@ class GameServer {
   };
 
   bool open_saves(std::string& error);
+  bool open_status(std::string& error);
+  // The status's share of the lobby's turn: the traffic noted, the status port served, and the
+  // status logged when it is due.
+  void report(float seconds);
+  void log_when_due(float seconds);
   void place(net::Arrival arrival);
   // Whether `room` took the machine: false when there is no room, or it closed meanwhile.
   static bool handed_to(Room* room, net::Arrival& arrival);
@@ -121,6 +150,10 @@ class GameServer {
   net::Lobby lobby_;
   std::vector<Room> rooms_;  // in the order they opened
   std::vector<std::unique_ptr<RoomThread>> threads_;
+  double started_at_ = 0.0;  // steady_seconds when it started
+  StatusPort status_port_;
+  TrafficRate traffic_;
+  float since_status_logged_ = 0.0f;
 };
 
 }  // namespace redgem::server

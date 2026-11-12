@@ -34,6 +34,15 @@ bool listens_on(NativeSocket socket, std::uint16_t port) {
   return bind_to_port(socket, port) && listen(socket, kWaitingConnections) == 0;
 }
 
+// Takes a port on one address of this machine and starts holding whoever connects to it; false,
+// with `error` set, when it cannot.
+bool listens_at(NativeSocket socket, const std::string& address, std::uint16_t port, std::string& error) {
+  if (!bind_to_address(socket, address, port, error)) return false;
+  if (listen(socket, kWaitingConnections) == 0) return true;
+  error = last_error();
+  return false;
+}
+
 // Where a machine is, by its name or its address; nullptr when nothing is found. An address in
 // numbers needs no looking up; only a name asks the network, and waits for it.
 addrinfo* look_up(const std::string& address, std::uint16_t port) {
@@ -125,6 +134,17 @@ Socket Socket::listen_local(std::uint16_t port, std::string& error) {
   if (bind_local_port(socket, port) && listen(socket, kWaitingConnections) == 0) return listener;
   error = last_error();
   listener.close();
+  return listener;
+}
+
+Socket Socket::listen_at(const std::string& address, std::uint16_t port, std::string& error) {
+  Socket listener(open_stream(error));
+  if (!listener.valid()) return listener;
+#ifndef _WIN32
+  // (As listen_on: the port is free again right after the program stops.)
+  set_option(native(listener.handle_), SOL_SOCKET, SO_REUSEADDR);
+#endif
+  if (!listens_at(native(listener.handle_), address, port, error)) listener.close();
   return listener;
 }
 

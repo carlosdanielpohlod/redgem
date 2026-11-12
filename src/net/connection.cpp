@@ -3,6 +3,7 @@
 #include <utility>
 
 #include "core/log.hpp"
+#include "net/traffic.hpp"
 
 namespace redgem::net {
 
@@ -47,6 +48,7 @@ std::size_t Connection::take_in() {
   if (socket_.read(arrived, kMaxReadBytesPerPoll) == IoStatus::Closed) hang_up();
   if (!arrived.empty()) quiet_for_ = 0.0f;
   incoming_.append(arrived.data(), arrived.size());
+  count_received(arrived.size());
   return arrived.size();
 }
 
@@ -101,7 +103,10 @@ void Connection::send_packed(const std::vector<std::uint8_t>& message) {
 
 void Connection::flush() {
   if (!can_write()) return;
-  if (socket_.write(outgoing_) == IoStatus::Closed) hang_up();
+  const std::size_t waiting = outgoing_.size();
+  const IoStatus status = socket_.write(outgoing_);
+  count_sent(waiting - outgoing_.size());
+  if (status == IoStatus::Closed) hang_up();
 }
 
 void Connection::keep_in_touch(float seconds) {

@@ -39,6 +39,9 @@ class Socket {
   static Socket listen_on(std::uint16_t port, std::string& error);
   // A local tooling endpoint: binds only IPv4 loopback, never a network interface.
   static Socket listen_local(std::uint16_t port, std::string& error);
+  // Listens on one address of this machine only, given in numbers (127.0.0.1 for this machine
+  // alone, 0.0.0.0 for every address it has). Invalid, with `error` set, when it cannot.
+  static Socket listen_at(const std::string& address, std::uint16_t port, std::string& error);
   // Starts connecting to a machine by name or address; connect_status says how it is going.
   static Socket connect_to(const std::string& address, std::uint16_t port, std::string& error);
 

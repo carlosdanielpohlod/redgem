@@ -10,6 +10,7 @@
 
 #include "app/engine.hpp"
 #include "net/rooms/lobby.hpp"
+#include "server/frame_window.hpp"
 
 namespace redgem::server {
 
@@ -34,6 +35,8 @@ class RoomSlot {
   // How many machines connected from `address` it holds.
   int links_from(const std::string& address) const;
   bool closed() const;
+  // How long its recent frames took.
+  FrameTimes frame_times() const;
   // Runs `visitor` with the room's game on the room's thread, between two of its frames, and
   // waits for it. False when the room closed first.
   bool visit(const std::function<void(Engine&)>& visitor);
@@ -44,6 +47,8 @@ class RoomSlot {
   void run_visits(Engine& game);
   // Notes how full the game is now, for the lobby.
   void take_census(const net::NetworkSession& network);
+  // Notes how long one of its frames took (all of its turn: newcomers, visits and the game's frame).
+  void note_frame(double seconds);
   // Closes the room when its match is over: its game quit, or nobody is in it nor on the way.
   // True when it closed.
   bool close_when_over(bool game_quit);
@@ -76,6 +81,7 @@ class RoomSlot {
   std::size_t players_ = 0;             // as of the last census
   std::size_t deciding_ = 0;
   std::vector<std::string> addresses_;
+  FrameWindow frames_;
   bool closed_ = false;
 };
 

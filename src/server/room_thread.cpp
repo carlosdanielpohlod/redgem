@@ -64,7 +64,9 @@ void RoomThread::take_new_rooms() {
 
 void RoomThread::play_or_close(Room& room, float seconds) {
   try {
+    const double started = steady_seconds();
     play(room, seconds);
+    room.slot->note_frame(steady_seconds() - started);
   } catch (const std::exception& error) {
     end(room, std::string("its game failed: ") + error.what());  // the other rooms play on
   }

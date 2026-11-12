@@ -14,6 +14,8 @@
 #include "app/engine.hpp"
 #include "core/config.hpp"
 #include "integration/swordsman.hpp"
+#include "net/socket/socket.hpp"
+#include "net/traffic.hpp"
 #include "server/game_server.hpp"
 #include "server/server_program.hpp"
 #include "server/stop_signals.hpp"
@@ -64,6 +66,9 @@ constexpr double kLateness = 0.9;  // a turn may come a little early on a busy c
 constexpr float kRealTimeTolerance = 0.25f;
 constexpr std::chrono::milliseconds kHalfASecond{500};
 constexpr double kPastMatchOverSeconds = 20.0;  // far past the seconds the platformer's server waits after a win
+constexpr std::size_t kStatusReadBytes = 64 * 1024;
+constexpr const char* kHeadEnd = "\r\n\r\n";
+constexpr const char* kStatusGet = "GET /status HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
 
 std::string ruby(Engine& engine, const std::string& code) {
   const RubyResult result = engine.scripts().eval(code, "test.rb");
@@ -130,6 +135,7 @@ struct Online {
     settings.game_dir = played;
     settings.port = 0;
     settings.limits = limits;
+    settings.status.port = 0;  // (a free one: see status_port)
     return settings;
   }
 
@@ -192,7 +198,33 @@ struct Online {
 
   // What `code` gives in the game the server runs for the room `player` is in.
   std::string served(Engine& player, const std::string& code) { return in_room(server, player.network().room(), code); }
+
+  // What the server's status port answers to `request` (a bare connection when it is empty), the
+  // server's turns going on meanwhile, until it closes the connection.
+  std::string ask_status(const std::string& request) {
+    std::string error;
+    net::Socket socket = net::Socket::connect_to(net::kThisMachine, server.status_port(), error);
+    REQUIRE_MESSAGE(socket.valid(), error);
+    std::vector<std::uint8_t> outgoing(request.begin(), request.end());
+    std::vector<std::uint8_t> answer;
+    bool connected = false;
+    for (int i = 0; i < kMaxRounds; ++i) {
+      round();
+      if (!connected) connected = socket.connect_status() == net::IoStatus::Ok;
+      if (!connected) continue;
+      socket.write(outgoing);
+      if (socket.read(answer, kStatusReadBytes) == net::IoStatus::Closed) break;
+    }
+    return std::string(answer.begin(), answer.end());
+  }
 };
+
+// The JSON document of an HTTP answer.
+nlohmann::json body_of(const std::string& answer) {
+  const std::size_t head_end = answer.find(kHeadEnd);
+  REQUIRE(head_end != std::string::npos);
+  return nlohmann::json::parse(answer.substr(head_end + std::string(kHeadEnd).size()));
+}
 
 }  // namespace
 
@@ -449,4 +481,65 @@ TEST_CASE("a character's animation passes through a dedicated server's room to t
   online_game.round();
   ruby(first, "$hero.animation.play(:Attack)");
   CHECK(online_game.until([&] { return ruby(second, "$hero.animation.clip.inspect") == "\"Attack\""; }));
+}
+
+TEST_CASE("a dedicated server's status port answers an HTTP GET with how busy the server is") {
+  const net::TrafficTotals before = net::traffic_totals();
+  Online online_game(kRoomy);
+  REQUIRE(online_game.server.status_port() != 0);
+  online_game.join();
+  const std::string answer = online_game.ask_status(kStatusGet);
+  CHECK(answer.rfind("HTTP/1.1 200 OK\r\n", 0) == 0);
+  const nlohmann::json status = body_of(answer);
+  CHECK_FALSE(status["engine_version"].get<std::string>().empty());
+  CHECK(status["uptime_seconds"].get<double>() > 0.0);
+  CHECK(status["rooms"]["open"] == 1);
+  CHECK(status["rooms"]["limit"] == kRoomy.max_rooms);
+  CHECK(status["rooms"]["list"][0]["players"] == 1);
+  CHECK(status["players"]["total"] == 1);
+  CHECK(status["players"]["limit_per_room"] == kRoomy.max_players);
+  const nlohmann::json& frames = status["frame_ms"];
+  CHECK(frames["worst"].get<double>() >= frames["average"].get<double>());
+  CHECK(frames["budget"].get<double>() > 0.0);
+  CHECK(status["bytes_per_second"]["in"].get<double>() >= 0.0);
+  CHECK(status["threads"]["running"] == 1);
+  // (Nothing of who plays, nor of the room's code.)
+  CHECK(answer.find(online_game.players[0]->network().room()) == std::string::npos);
+  // The joining player's bytes were counted on their way in and out.
+  CHECK(net::traffic_totals().received > before.received);
+  CHECK(net::traffic_totals().sent > before.sent);
+}
+
+TEST_CASE("a bare connection to a dedicated server's status port gets the document alone") {
+  Online online_game(kRoomy);
+  const std::string answer = online_game.ask_status("");
+  REQUIRE_FALSE(answer.empty());
+  CHECK(answer.back() == '\n');
+  const nlohmann::json status = nlohmann::json::parse(answer);
+  CHECK(status["rooms"]["open"] == 0);
+  CHECK(status["players"]["total"] == 0);
+}
+
+TEST_CASE("a dedicated server's status port lets a request that says too much go unanswered") {
+  Online online_game(kRoomy);
+  CHECK(online_game.ask_status(std::string(server::kMostStatusRequestBytes * 2, 'x')).empty());
+  // (And it answers the next one.)
+  CHECK(online_game.ask_status(kStatusGet).rfind("HTTP/1.1 200 OK\r\n", 0) == 0);
+}
+
+TEST_CASE("a dedicated server opens a status port only when told, and only on an address in numbers") {
+  server::ServerSettings settings;
+  settings.game_dir = fixture("games/sandbox");
+  settings.port = 0;
+  std::string error;
+  {
+    server::GameServer quiet(settings);
+    REQUIRE_MESSAGE(quiet.start(error), error);
+    CHECK(quiet.status_port() == 0);
+  }
+  settings.status.port = 0;
+  settings.status.address = "localhost";
+  server::GameServer misplaced(settings);
+  CHECK_FALSE(misplaced.start(error));
+  CHECK(error.find("status port") != std::string::npos);
 }
