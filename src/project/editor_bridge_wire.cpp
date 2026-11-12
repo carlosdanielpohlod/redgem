@@ -12,6 +12,7 @@
 
 #include "core/files.hpp"
 #include "core/platform.hpp"
+#include "core/ports.hpp"
 #include "core/safe_path.hpp"
 
 namespace redgem::tools::bridge {
@@ -21,7 +22,6 @@ constexpr int kByteMaximum = 255;
 constexpr int kHexWidth = 2;
 constexpr int kMaxDepth = 16;
 constexpr std::uintmax_t kDescriptorBytes = 4096;
-constexpr int kLargestPort = 65535;
 // What the editor's proof is a keyed hash of, besides the client's nonce: no other use of the
 // token can produce the same bytes.
 constexpr const char* kProofContext = "redgem editor bridge proof v2\n";

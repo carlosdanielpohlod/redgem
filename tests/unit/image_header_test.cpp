@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "core/bits.hpp"
 #include "core/image_header.hpp"
 
 using namespace redgem;
@@ -12,7 +13,6 @@ namespace {
 constexpr std::uint32_t kWidth = 640;
 constexpr std::uint32_t kHeight = 480;
 constexpr std::uint32_t kTooWide = kMaxImageSide + 1;
-constexpr int kBitsPerByte = 8;
 
 void put_big_endian(std::vector<std::uint8_t>& out, std::uint32_t value, int bytes) {
   for (int shift = (bytes - 1) * kBitsPerByte; shift >= 0; shift -= kBitsPerByte) {

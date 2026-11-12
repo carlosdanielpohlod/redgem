@@ -2,14 +2,15 @@
 
 #include <string>
 
+#include "core/ports.hpp"
 #include "net/rooms/relay_program.hpp"
 
 using namespace redgem::net;
+using redgem::kLargestPort;
 
 namespace {
 
 constexpr std::uint16_t kChosenPort = 9000;
-constexpr std::uint16_t kLargestPort = 65535;
 constexpr std::uint16_t kWebPort = 80;
 
 }  // namespace

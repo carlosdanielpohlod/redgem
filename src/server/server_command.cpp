@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "core/command_line.hpp"
+#include "core/ports.hpp"
 #include "core/translations.hpp"
 
 namespace redgem::server {
@@ -14,7 +15,7 @@ constexpr const char* kDataOption = "--data";
 using NumberOption = command_line::NumberOption<ServerSettings>;
 
 constexpr NumberOption kOptions[] = {
-    {"--port", 0, command_line::kLargestPort,
+    {"--port", 0, kLargestPort,
      [](ServerSettings& settings, int port) { settings.port = static_cast<std::uint16_t>(port); }},
     {"--max-players", 1, kMostPlayersPerRoom,
      [](ServerSettings& settings, int players) { settings.limits.max_players = players; }},

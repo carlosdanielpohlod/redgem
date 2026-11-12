@@ -7,6 +7,7 @@
 #include <fstream>
 #include <vector>
 
+#include "core/bits.hpp"
 #include "core/image_header.hpp"
 #include "core/safe_path.hpp"
 #include "core/webp_image.hpp"
@@ -25,7 +26,6 @@ constexpr std::uint8_t kCanary = 0xda;
 constexpr std::size_t kLosslessDimensionsAt = 21;
 constexpr unsigned kHeightShift = 14;
 constexpr unsigned kAlphaShift = 28;
-constexpr unsigned kByteBits = 8;
 constexpr int kPastSceneBudget = 17;  // 17 RGBA8 images of 8192 squared exceed four GiB
 
 std::vector<std::uint8_t> webp_bytes(const std::string& name) {
@@ -37,7 +37,7 @@ std::vector<std::uint8_t> lossless_of_size(std::uint32_t width, std::uint32_t he
   auto encoded = webp_bytes("lossless");
   const auto dimensions = (width - 1) | ((height - 1) << kHeightShift) | (std::uint32_t{1} << kAlphaShift);
   for (std::size_t i = 0; i < sizeof(dimensions); ++i)
-    encoded[kLosslessDimensionsAt + i] = static_cast<std::uint8_t>(dimensions >> (kByteBits * i));
+    encoded[kLosslessDimensionsAt + i] = static_cast<std::uint8_t>(dimensions >> (kBitsPerByte * i));
   return encoded;
 }
 struct WebpScene {

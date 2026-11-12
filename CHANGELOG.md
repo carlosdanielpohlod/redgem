@@ -151,6 +151,11 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock
+  is released before the vehicle joins the simulation, so ThreadSanitizer no longer finds a
+  lock-order inversion there and its suppression is gone (the ground for physics on several
+  threads). The largest port, the bits in a byte and the byte mask are each defined once, and
+  the port errors of `Network` and of HTTP addresses say the range from that one definition.
 - **A very long script name no longer crashes `redgem run`, `shot` and the MCP server**: the
   error hints read at most the first 512 bytes of a message, so the standard library's matcher
   no longer runs out of stack on a 100 000-character name. A line number too big for a file no
