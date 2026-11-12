@@ -103,6 +103,8 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- Android builds use a new staging folder per build and preserve existing folders beside the output.
+
 - **A very long script name no longer crashes `redgem run`, `shot` and the MCP server**: the
   error hints read at most the first 512 bytes of a message, so the standard library's matcher
   no longer runs out of stack on a 100 000-character name. A line number too big for a file no

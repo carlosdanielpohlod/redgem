@@ -120,7 +120,7 @@ TEST_CASE("the app packed from a game with an id carries it, and a bad id stops 
   CHECK(read(scratch.dir / "stage" / "AndroidManifest.xml").find("package=\"com.mystudio.sandbox\"") !=
         std::string::npos);
   std::ofstream(game / "game.json") << R"({"id": "My Sandbox"})";
-  CHECK_FALSE(stage_android_game(game, runtimes, "stamp", scratch.dir / "stage", error));
+  CHECK_FALSE(stage_android_game(game, runtimes, "stamp", scratch.dir / "invalid-stage", error));
   CHECK(error.find("game.json: id must look like") == 0);
 }
 
@@ -211,17 +211,18 @@ TEST_CASE("a game is laid out as an APK's contents: its files, their list, a sta
   std::ofstream(game / "scripts" / "probe.rb~") << "x";
   std::ofstream(game / "release.keystore") << "the developer's signing key";  // never leaves their machine
   std::ofstream(game / "upload.jks") << "another";
-  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp-2", stage, error), error);
-  const std::string tidy = read(stage / "assets/game.files");
+  const auto second_stage = scratch.dir / "second-stage";
+  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp-2", second_stage, error), error);
+  const std::string tidy = read(second_stage / "assets/game.files");
   CHECK(tidy == listing);
-  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/.gitignore"));
-  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/.git"));
-  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/release.keystore"));
-  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/upload.jks"));
+  CHECK_FALSE(std::filesystem::exists(second_stage / "assets/game/.gitignore"));
+  CHECK_FALSE(std::filesystem::exists(second_stage / "assets/game/.git"));
+  CHECK_FALSE(std::filesystem::exists(second_stage / "assets/game/release.keystore"));
+  CHECK_FALSE(std::filesystem::exists(second_stage / "assets/game/upload.jks"));
   // A folder the SDK would silently leave out is refused, by name.
   std::filesystem::create_directories(game / "_shared");
   std::ofstream(game / "_shared" / "data.txt") << "x";
-  CHECK_FALSE(stage_android_game(game, runtimes, "s", stage, error));
+  CHECK_FALSE(stage_android_game(game, runtimes, "s", scratch.dir / "skipped-stage", error));
   CHECK(error.find("_shared/data.txt") != std::string::npos);
 
   // What cannot be packed is refused with a reason.
@@ -229,6 +230,19 @@ TEST_CASE("a game is laid out as an APK's contents: its files, their list, a sta
   CHECK(error.find("is not a game") != std::string::npos);
   CHECK_FALSE(stage_android_game(fixture("games/sandbox"), {}, "s", stage, error));
   CHECK(error.find("build_runtime.sh") != std::string::npos);
+}
+
+TEST_CASE("Android staging refuses to reuse a folder and leaves its contents intact") {
+  const Scratch scratch;
+  const auto file = scratch.file(".redgem-apk-stage/keep.txt", "belongs to the user");
+  const auto stage = file.parent_path();
+  const std::map<std::string, std::filesystem::path> runtimes = {
+      {"x86_64", scratch.file("built/libredgem.so", "engine")}};
+  std::string error;
+  CHECK_FALSE(stage_android_game(fixture("games/sandbox"), runtimes, "stamp", stage, error));
+  CHECK(error.find("already exists") != std::string::npos);
+  CHECK(read(file) == "belongs to the user");
+  CHECK_FALSE(std::filesystem::exists(stage / "assets"));
 }
 
 TEST_CASE("a game says its own app id, version and signing key in game.json") {
@@ -372,7 +386,7 @@ TEST_CASE("an app holds no file a link points at, and no file whose name would b
 
 #ifndef _WIN32  // (Windows has no file names with line breaks in them.)
   std::ofstream(game / "scripts" / "two\nlines.rb") << "x";
-  CHECK_FALSE(stage_android_game(game, runtimes, "stamp", stage, error));
+  CHECK_FALSE(stage_android_game(game, runtimes, "stamp", scratch.dir / "invalid-stage", error));
   CHECK(error.find("line break") != std::string::npos);
   CHECK(error.find("scripts") != std::string::npos);
 #endif
@@ -424,9 +438,10 @@ TEST_CASE("a game with an icon gets launcher icons at every density, and its man
   CHECK(manifest.find("android.permission.INTERNET") != std::string::npos);
   // A game without one has none, and no icon in its manifest.
   std::ofstream(game / "game.json") << R"({"version": "1.5.0"})";
-  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", stage, error), error);
-  CHECK_FALSE(std::filesystem::exists(stage / "res"));
-  CHECK(read(stage / "AndroidManifest.xml").find("android:icon") == std::string::npos);
+  const auto second_stage = scratch.dir / "stage-without-icon";
+  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", second_stage, error), error);
+  CHECK_FALSE(std::filesystem::exists(second_stage / "res"));
+  CHECK(read(second_stage / "AndroidManifest.xml").find("android:icon") == std::string::npos);
 }
 
 TEST_CASE("bundletool is found as a .jar named by the environment, or as a program on the PATH") {
@@ -477,8 +492,9 @@ TEST_CASE("an app goes online when its game says so, or when its scripts call th
       {"x86_64", scratch.file("built/libredgem.so", "engine")}};
   const std::filesystem::path game = scratch.dir / "game_src";
   std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
-  const std::filesystem::path stage = scratch.dir / "stage";
+  int attempt = 0;
   const auto asks_for_network = [&]() {
+    const auto stage = scratch.dir / ("network-stage-" + std::to_string(attempt++));
     std::string error;
     REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", stage, error), error);
     return read(stage / "AndroidManifest.xml").find("android.permission.INTERNET") != std::string::npos;

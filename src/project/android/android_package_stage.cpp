@@ -114,13 +114,12 @@ bool manifest_for(const std::filesystem::path& game_dir, const std::filesystem::
   return true;
 }
 
-// The folder the app's assets go in, inside a stage folder emptied of what an earlier build left.
-std::filesystem::path fresh_assets_folder(const std::filesystem::path& stage_dir) {
-  std::error_code fs_error;
-  std::filesystem::remove_all(stage_dir, fs_error);
-  std::filesystem::path assets = stage_dir / android_names::kAssetsFolder;
-  std::filesystem::create_directories(assets, fs_error);
-  return assets;
+bool create_stage_directory(const std::filesystem::path& folder, std::string& error) {
+  std::error_code problem;
+  if (std::filesystem::create_directory(folder, problem)) return true;
+  const std::string reason = problem ? problem.message() : "folder already exists";
+  error = "cannot create Android staging folder " + folder.string() + ": " + reason;
+  return false;
 }
 
 // What is checked before anything is staged.
@@ -163,7 +162,9 @@ bool stage_android_game(const std::filesystem::path& game_folder,
                         const std::filesystem::path& stage_dir, std::string& error) {
   const std::filesystem::path game_dir = normalized_folder(game_folder);
   if (!can_stage(game_dir, runtimes, error)) return false;
-  const std::filesystem::path assets = fresh_assets_folder(stage_dir);
+  const auto assets = stage_dir / android_names::kAssetsFolder;
+  const bool created = create_stage_directory(stage_dir, error) && create_stage_directory(assets, error);
+  if (!created) return false;
   std::vector<std::string> files;
   std::string manifest;
   // (The licenses of what the app contains go inside it, beside the game.)

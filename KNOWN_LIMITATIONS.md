@@ -259,8 +259,6 @@ not a promise of how it will be closed.
   only on Linux and macOS.
 - A script that sets an engine class's name to something else (`Vector3 = 5`) breaks the
   engine's calls that use that class with Ruby errors, instead of being stopped from doing so.
-- An Android build empties its staging folder (`.redgem-apk-stage` in the output folder) without
-  checking that a build made it.
 - No unit tests for the room codes and their guessers (`room_codes.cpp` is tested only through
   the relay and server integration tests), the socket layer or the TLS stream on its own (only
   through requests); no test of a TLS name that does not match its certificate, nor of a server

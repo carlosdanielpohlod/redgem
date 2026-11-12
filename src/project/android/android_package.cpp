@@ -1,12 +1,14 @@
 #include "project/android/android_package.hpp"
 
 #include <chrono>
+#include <utility>
 
 #include "core/files.hpp"
 #include "core/platform.hpp"
 #include "project/android/android_package_names.hpp"
 #include "project/build_steps.hpp"
 #include "project/game_build.hpp"
+#include "scene/scene_ids.hpp"
 
 namespace redgem {
 
@@ -15,7 +17,39 @@ namespace {
 constexpr const char* kApkExtension = ".apk";
 constexpr const char* kBundleExtension = ".aab";
 constexpr const char* kPathVariable = "PATH";
-constexpr const char* kStageFolder = ".redgem-apk-stage";  // inside the output folder, gone when the build ends
+constexpr const char* kStagePrefix = ".redgem-apk-stage-";
+constexpr const char* kPackageFolder = "package";
+
+// Owns only the folder this build created successfully.
+class StageFolder {
+ public:
+  StageFolder(const std::filesystem::path& output, std::string& error) {
+    std::error_code problem;
+    std::filesystem::create_directories(output, problem);
+    if (problem) {
+      error = "cannot create Android output folder: " + problem.message();
+      return;
+    }
+    auto candidate = output / (kStagePrefix + make_scene_id());
+    if (std::filesystem::create_directory(candidate, problem)) {
+      path_ = std::move(candidate);
+    } else {
+      error = "cannot reserve Android staging folder " + candidate.string();
+      if (problem) error += ": " + problem.message();
+    }
+  }
+  ~StageFolder() {
+    if (path_.empty()) return;
+    std::error_code ignored;
+    std::filesystem::remove_all(path_, ignored);
+  }
+  StageFolder(const StageFolder&) = delete;
+  StageFolder& operator=(const StageFolder&) = delete;
+  const std::filesystem::path& path() const { return path_; }
+
+ private:
+  std::filesystem::path path_;
+};
 
 // How the staged game is packed: with the SDK's tools, signed with the key, as an APK or (with
 // bundletool) as an App Bundle.
@@ -35,14 +69,13 @@ bool pack(const Packer& packer, const std::filesystem::path& stage, const std::f
 // Stages and packs the game in a folder of its own beside the app, gone when the build ends.
 bool build_app(const std::filesystem::path& game_dir, const std::map<std::string, std::filesystem::path>& runtimes,
                const Packer& packer, const std::filesystem::path& out, std::string& error) {
-  const std::filesystem::path stage = out.parent_path() / kStageFolder;
+  const StageFolder owned(out.parent_path(), error);
+  if (owned.path().empty()) return false;
+  const auto stage = owned.path() / kPackageFolder;
   build_steps::begin(build_steps::kCopyingFiles);
   // (The stamp only has to differ from the last build's.)
   const std::string stamp = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
-  const bool built = stage_android_game(game_dir, runtimes, stamp, stage, error) && pack(packer, stage, out, error);
-  std::error_code fs_error;
-  std::filesystem::remove_all(stage, fs_error);  // whether it worked or not
-  return built;
+  return stage_android_game(game_dir, runtimes, stamp, stage, error) && pack(packer, stage, out, error);
 }
 
 // How bundletool is run for `format` (nothing for an APK); nullopt, with `error` set, when a
