@@ -65,7 +65,7 @@ void draw_prefab_tools(PanelContext& context);
 // Saves the selection and requests a file rescan, reporting errors to the console.
 bool save_prefab(PanelContext& context, const std::string& name);
 
-void draw_console(ConsoleLog& console, ConsoleState& state);
+void draw_console(ConsoleLog& console, ConsoleState& state, ScriptWorkspace& scripts);
 
 // One code editor tab per open script (dockable: drag tabs to split, like a code editor). Ctrl+S
 // saves with a syntax check. New tabs dock into `new_tab_dock`.

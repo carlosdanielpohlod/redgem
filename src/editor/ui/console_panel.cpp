@@ -1,6 +1,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <utility>
 
 #include "editor/editor_config.hpp"
 #include "editor/ui/labels.hpp"
@@ -56,20 +57,62 @@ void draw_filters(ConsoleLog& console, ConsoleFilters& filters) {
   filter_button(ICON_FA_CIRCLE_XMARK, count_of(console, log::Level::Error), filters.errors, error_color());
 }
 
-void draw_entry(const ConsoleEntry& entry) {
+void draw_error_rows(std::string_view message, std::optional<ConsoleScriptLine>& selected) {
+  int index = 0;
+  while (!message.empty()) {
+    const auto end = message.find('\n');
+    const std::string row(message.substr(0, end));
+    if (auto location = console_script_line(row)) {
+      ImGui::PushID(index);
+      if (ImGui::TextLink(row.c_str())) selected = std::move(location);
+      ImGui::PopID();
+    } else {
+      ImGui::TextUnformatted(row.c_str());
+    }
+    if (end == std::string_view::npos) return;
+    message.remove_prefix(end + 1);
+    ++index;
+  }
+}
+
+void draw_entry(const ConsoleEntry& entry, std::optional<ConsoleScriptLine>& selected) {
   const LevelStyle style = style_of(entry.level);
   ImGui::TextColored(style.color, "%s", style.icon);
   ImGui::SameLine();
-  if (entry.level == log::Level::Info) {
+  if (entry.level == log::Level::Error) {
+    ImGui::PushStyleColor(ImGuiCol_Text, style.color);
+    draw_error_rows(entry.message, selected);
+    ImGui::PopStyleColor();
+  } else if (entry.level == log::Level::Info) {
     ImGui::TextUnformatted(entry.message.c_str());
   } else {
     ImGui::TextColored(style.color, "%s", entry.message.c_str());
   }
 }
 
+std::optional<ConsoleScriptLine> draw_entries(const ConsoleLog& console, const ConsoleFilters& filters) {
+  std::optional<ConsoleScriptLine> selected;
+  for (const ConsoleEntry& entry : console.entries()) {
+    if (!filters.shows(entry.level)) continue;
+    ImGui::PushID(&entry);
+    draw_entry(entry, selected);
+    ImGui::PopID();
+  }
+  return selected;
+}
+
+void open_source(ScriptWorkspace& scripts, const ConsoleScriptLine& selected) {
+  try {
+    std::string error;
+    if (!scripts.open_at(std::filesystem::u8path(selected.file), selected.line, error)) log::warning(error);
+  } catch (const std::filesystem::filesystem_error&) {
+    log::warning("cannot read the script path in the backtrace");
+  }
+}
+
 }  // namespace
 
-void draw_console(ConsoleLog& console, ConsoleState& state) {
+void draw_console(ConsoleLog& console, ConsoleState& state, ScriptWorkspace& scripts) {
   ImGui::Begin(window_title(editor_config::kConsoleTitle, editor_config::kConsoleWindow));
   draw_filters(console, state.filters);
   ImGui::Separator();
@@ -77,13 +120,12 @@ void draw_console(ConsoleLog& console, ConsoleState& state) {
   ImGui::BeginChild(kLogId, ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
   const bool at_bottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY();
   ImGui::PushFont(code_font(), 0.0f);
-  for (const ConsoleEntry& entry : console.entries()) {
-    if (state.filters.shows(entry.level)) draw_entry(entry);
-  }
+  const auto selected = draw_entries(console, state.filters);
   ImGui::PopFont();
   if (at_bottom) ImGui::SetScrollHereY(kScrollToBottom);
   ImGui::EndChild();
   ImGui::End();
+  if (selected) open_source(scripts, *selected);
 }
 
 }  // namespace redgem::ui

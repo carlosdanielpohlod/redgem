@@ -86,7 +86,9 @@ void draw_code(ScriptEditor& editor) {
                             ImGuiInputTextFlags_AllowTabInput);
   ImGui::PopStyleColor();
   const bool save_pressed = save_pressed_in_code();
-  draw_code_colors(id, editor.text(), editor.highlight());
+  const auto& highlight = editor.highlight();
+  scroll_code_to_line(id, editor.take_line_request(), highlight.line_starts.size());
+  draw_code_colors(id, editor.text(), highlight);
   ImGui::PopFont();
   if (save_pressed) save(editor);
 }

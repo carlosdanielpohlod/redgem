@@ -3,6 +3,7 @@
 #include <chrono>
 #include <filesystem>
 
+#include "editor/console_log.hpp"
 #include "editor/scripts/script_editor.hpp"
 #include "editor/scripts/script_workspace.hpp"
 #include "core/files.hpp"
@@ -148,5 +149,39 @@ TEST_CASE("a script changed by another program is reloaded, unless the tab has u
   REQUIRE(editor.save(error));
   CHECK_FALSE(editor.changed_on_disk());
   CHECK(*read_text_file(file, error) == "# mine\n");
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("Ruby backtrace rows identify a source file and a positive line") {
+  const auto location = console_script_line("    from C:/My Game/scripts/units/guard.rb:42:in update");
+  REQUIRE(location);
+  CHECK(location->file == "C:/My Game/scripts/units/guard.rb");
+  CHECK(location->line == 42);
+  CHECK_FALSE(console_script_line("    from guard.rb:0:in update"));
+  CHECK_FALSE(console_script_line("    from guard.rb:12oops"));
+  CHECK_FALSE(console_script_line("    from guard.rb:999999999999999999999999999"));
+  CHECK_FALSE(console_script_line("warning: guard.rb:42"));
+}
+
+TEST_CASE("opening a backtrace location focuses the tab and keeps edits") {
+  const auto dir = fresh_dir("backtrace");
+  const auto scripts = dir / "scripts";
+  std::filesystem::create_directory(scripts);
+  std::string error;
+  REQUIRE(create_script(scripts, "guard", error));
+  REQUIRE(create_script(dir, "outside", error));
+
+  ScriptWorkspace workspace(scripts);
+  ScriptEditor* tab = workspace.open("guard.rb", error);
+  REQUIRE(tab);
+  tab->text() += "# unsaved\n";
+  REQUIRE(workspace.open_at(scripts / "guard.rb", 4, error));
+  CHECK(workspace.take_focus_request() == "guard.rb");
+  CHECK(tab->take_line_request() == 4);
+  CHECK(tab->take_line_request() == 0);
+  CHECK(tab->modified());
+  CHECK_FALSE(workspace.open_at(dir / "outside.rb", 1, error));
+  CHECK_FALSE(workspace.open_at("../outside.rb", 1, error));
+  CHECK(workspace.tabs().size() == 1);
   std::filesystem::remove_all(dir);
 }

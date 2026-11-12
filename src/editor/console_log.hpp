@@ -2,11 +2,21 @@
 
 #include <cstddef>
 #include <deque>
+#include <optional>
+#include <string_view>
 #include <string>
 
 #include "core/log.hpp"
 
 namespace redgem {
+
+struct ConsoleScriptLine {
+  std::string file;
+  std::size_t line = 0;  // one-based
+};
+
+// The source location at the start of a Ruby backtrace row.
+std::optional<ConsoleScriptLine> console_script_line(std::string_view row);
 
 struct ConsoleEntry {
   log::Level level = log::Level::Info;

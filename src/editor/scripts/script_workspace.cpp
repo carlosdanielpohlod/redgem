@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "core/safe_path.hpp"
+
 namespace redgem {
 
 ScriptEditor* ScriptWorkspace::open(const std::string& file_name, std::string& error) {
@@ -14,6 +16,42 @@ ScriptEditor* ScriptWorkspace::open(const std::string& file_name, std::string& e
   }
   focus_request_ = file_name;
   return tab;
+}
+
+namespace {
+
+std::filesystem::path relative_source(const std::filesystem::path& root, const std::filesystem::path& source) {
+  std::error_code problem;
+  const auto absolute_root = std::filesystem::absolute(root, problem);
+  if (problem) return {};
+  const auto absolute_source = std::filesystem::absolute(source, problem);
+  if (problem) return {};
+  return absolute_source.lexically_relative(absolute_root.lexically_normal());
+}
+
+bool valid_source(const std::filesystem::path& root, const std::filesystem::path& relative) {
+  const std::string name = relative.generic_u8string();
+  return relative.extension() == ".rb" && safe_asset_name(name) && file_inside(root, relative).has_value();
+}
+
+std::filesystem::path script_source(const std::filesystem::path& root, const std::filesystem::path& source) {
+  if (source.is_relative() && valid_source(root, source)) return source;
+  const auto relative = relative_source(root, source);
+  return valid_source(root, relative) ? relative : std::filesystem::path{};
+}
+
+}  // namespace
+
+bool ScriptWorkspace::open_at(const std::filesystem::path& source, std::size_t line, std::string& error) {
+  const auto relative = script_source(scripts_dir_, source);
+  if (relative.empty()) {
+    error = "cannot open script source " + printable(source.generic_u8string());
+    return false;
+  }
+  ScriptEditor* tab = open(relative.generic_u8string(), error);
+  if (tab == nullptr) return false;
+  tab->show_line(line);
+  return true;
 }
 
 ScriptEditor* ScriptWorkspace::find(const std::string& file_name) {

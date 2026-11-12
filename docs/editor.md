@@ -44,7 +44,8 @@ icons):
   a picture to see it in your system's viewer.
   *New script* creates a `Behaviour` from a template, *New scene* a scene; *Open folder* shows the
   files.
-* **Console**: engine and Ruby output (filter by level), including script errors with backtraces.
+* **Console**: engine and Ruby output (filter by level). Click a Ruby backtrace row to open the
+  project's script and scroll to the reported line.
 * **Scripts**: each open Ruby file gets its own tab next to the Scene. Drag tabs to split the view
   anywhere (or press *Split right*), like a code editor's editor groups. The code is colored as
   you type: keywords, strings, symbols, comments, numbers, constants and `@variables` each have a
