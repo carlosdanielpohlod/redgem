@@ -84,6 +84,8 @@ until 1.0, a release may change what games rely on (see
 
 - **Spot cones**: spot lights shine within their glTF inner and outer cone angles, fading
   smoothly between them, on surfaces and on lit particles (they used to light every way).
+- **Spot light editing**: adjust the inner and outer beam angles in the Light card and save them
+  with the scene.
 - **Shadows from point and spot lights**: a light whose object sets `cast_shadow = true` casts
   shadows (off unless said, so existing scenes draw as fast as before). Of those, the ones that
   matter most to the camera cast them each frame, up to the environment's `local_shadows` (0 to

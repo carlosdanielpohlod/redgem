@@ -96,6 +96,19 @@ bool needs_new_entry(bool known, const std::set<int>& claimed, int source) {
   return !known || claimed.count(source) != 0;
 }
 
+void write_spot_cones(nlohmann::json& entry, const LightDesc& light) {
+  if (light.type != LightType::Spot) {
+    entry.erase(kSpotProperty);
+    return;
+  }
+  auto cones = light;
+  sanitize_spot_cones(cones);
+  auto& spot = entry[kSpotProperty];
+  if (!spot.is_object()) spot = nlohmann::json::object();
+  spot[kInnerConeAngle] = cones.inner_cone;
+  spot[kOuterConeAngle] = cones.outer_cone;
+}
+
 }  // namespace
 
 nlohmann::json property_json(const PropertyValue& value) {
@@ -157,6 +170,7 @@ void write_light(nlohmann::json& entry, const LightDesc& light) {
   entry[kType] = light_type_name(light.type);
   entry[kColor] = {light.color.r, light.color.g, light.color.b};
   entry[kIntensity] = light.intensity;
+  write_spot_cones(entry, light);
   if (light.range > kInfiniteRange) {
     entry[kRange] = light.range;
   } else {

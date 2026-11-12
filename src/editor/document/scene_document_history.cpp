@@ -43,7 +43,8 @@ bool same_materials(const std::vector<MaterialDesc>& a, const std::vector<Materi
 bool same_light(const std::optional<LightDesc>& a, const std::optional<LightDesc>& b) {
   if (a.has_value() != b.has_value()) return false;
   return !a || (a->type == b->type && a->color.r == b->color.r && a->color.g == b->color.g &&
-                a->color.b == b->color.b && a->intensity == b->intensity && a->range == b->range);
+                a->color.b == b->color.b && a->intensity == b->intensity && a->range == b->range &&
+                a->inner_cone == b->inner_cone && a->outer_cone == b->outer_cone);
 }
 
 bool same_camera(const std::optional<CameraDesc>& a, const std::optional<CameraDesc>& b) {
