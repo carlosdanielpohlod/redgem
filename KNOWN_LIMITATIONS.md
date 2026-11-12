@@ -126,14 +126,19 @@ the same pull request.
 - `a&.b.c` does not stop at `a` being nil as it does in other Rubies: write `a&.b&.c`.
 - All text the engine and editor show is English. Games translate their own texts.
 - `Camera.cut_to` fades through black only: there is no crossfade (the renderer draws one camera
-  a frame) and no wipe. The black is drawn by a behaviour of the camera cut to, so HUD drawn by a
-  behaviour that updates after it stays over it.
+  a frame) and no wipe. The black covers the world, never the UI.
 - The choice of camera (`Camera.main =`) belongs to the scene: a scene loaded anew is seen
   through its own first camera, and a cut in progress stops with the scene it played in.
 - The engine never moves the sound listener: a game that switches cameras moves
   `Audio.listener` with `Camera.main` itself.
-- A dynamic body (and a character or a vehicle) is simulated in the world: a parent does not
-  carry it. Under a moving parent it keeps its own motion; make it kinematic to carry it.
+- Only kinematic bodies and triggers ride with a moving parent. A dynamic body, a character and
+  a vehicle are simulated in the world and keep their own motion; a static collider stays where
+  it was made (a script setting its position moves it). A vehicle's wheels cannot change parent,
+  and an object put under a vehicle does not become a wheel.
+- An object that an animation clip poses keeps being posed by it under a new parent; a part taken
+  out of a spawned copy is no longer posed by that copy's clip.
+- An object checkpoint (`Save`) is tied to the parent its object had: after a change of parent it
+  no longer restores.
 - Custom properties that are lists or objects in the scene file are dropped with a warning: a
   property is a number, a text or true/false.
 - Limits a game can reach: 64 hits per physics query, 4096 live particles and 256 emitters, 4096

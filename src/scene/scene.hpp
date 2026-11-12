@@ -126,7 +126,8 @@ class Scene {
   bool would_cycle(ObjectId id, ObjectId parent) const;
   // Puts an object under another one (kNoObject: at the root of the scene), at the end of its
   // children. keep_world keeps where it is in the world; otherwise it keeps its local transform and
-  // moves with the new parent. The caller refuses a parent that would_cycle.
+  // moves with the new parent. A part of a copy becomes the root of a copy of its own. The caller
+  // refuses a parent that would_cycle.
   void set_parent(ObjectId id, ObjectId parent, bool keep_world);
 
   // True for objects marked `prefab = true` and their descendants.
@@ -169,6 +170,12 @@ class Scene {
   ObjectId first_camera() const;
   // Whether an id is an alive camera of the game (not a template's).
   bool is_live_camera_id(ObjectId id) const;
+  // Whether an object is inside a copy, not its root (see GameObject::copy_root).
+  static bool is_part_of_copy(const GameObject& object);
+  // A part taken out of a copy is the root of a copy of its own from then on, with what it carries:
+  // the clip of the copy it left no longer poses it, and nothing of it names that copy's root,
+  // whose slot may hold another object later. Changes `from` to `to` in `id`'s subtree.
+  void move_copy_root(ObjectId id, ObjectId from, ObjectId to);
   // A slot for a new copy: one a destroyed copy left, else a new one at the end.
   ObjectId free_slot();
   // The handles of the bones of a node's skin, which must all be in the scene by then.

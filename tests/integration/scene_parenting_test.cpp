@@ -132,6 +132,18 @@ TEST_CASE("a kinematic body under a parent goes where the parent takes it") {
   CHECK(says(*engine, lift_below));
 }
 
+TEST_CASE("a wheel stays on its vehicle") {
+  NodeDesc car = node("Car", {0, 1, 0}, {2, 0.5f, 4}, moving("vehicle"));
+  car.children = {3};
+  NodeDesc wheel = node("Wheel", {0.9f, -0.3f, 1.3f}, {0.3f, 0.8f, 0.8f}, {{"wheel", true}});
+  wheel.parent = 2;  // (after the camera and the ground)
+  TempGame game(kGame);
+  auto engine = engine_for(game, scene_with({car, wheel}));
+  REQUIRE(says(*engine, "Scene.find('Car').vehicle != nil"));
+  CHECK(refused_with(*engine, "Scene.find('Wheel').parent = nil", "wheel of its vehicle"));
+  CHECK(says(*engine, "Scene.find('Wheel').parent == Scene.find('Car')"));
+}
+
 TEST_CASE("a dynamic body keeps its own motion under a parent, and moves with keep_world: false") {
   TempGame game(kGame);
   auto engine = engine_for(game, parenting_scene());

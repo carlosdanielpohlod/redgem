@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "app/presenter.hpp"
 #include "physics_game.hpp"
@@ -47,6 +48,18 @@ std::unique_ptr<Engine> game_on(const TempGame& game, const SceneDesc& scene, Pr
   if (auto* error = std::get_if<std::string>(&created)) FAIL(*error);
   return std::move(std::get<std::unique_ptr<Engine>>(created));
 }
+
+// A screen that keeps what the UI drew over the last frame.
+class HudPresenter final : public Presenter {
+ public:
+  SurfaceSize surface_size() const override { return kScreen; }
+  int text_width(const std::string& text, int) const override { return static_cast<int>(text.size()); }
+  void capture_cursor(bool) override {}
+  void present(const FrameView& view) override { seen = view.hud; }
+  bool open() const override { return true; }
+  float frame_seconds() const override { return config::kFixedDeltaSeconds; }
+  std::vector<HudItem> seen;
+};
 
 bool says(Engine& engine, const std::string& code) { return ruby(engine, code) == "true"; }
 
@@ -151,13 +164,19 @@ TEST_CASE("the newest cut wins, and Camera.main = stops a cut at once") {
   auto engine = game_on(game, two_camera_scene(), screen);
   ruby(*engine, "$first = Camera.cut_to(Scene.find('Security'), fade: 1.0).get_component(Camera::Cut)");
   frames(*engine, kFewFrames);
-  ruby(*engine, "Camera.cut_to(Scene.find('Camera'), fade: 1.0)");  // the one already seen through
+  ruby(*engine, "$dark = $first.darkness; Camera.cut_to(Scene.find('Camera'), fade: 1.0)");  // already seen through
+  // The newer cut darkens on from where the older one had the picture: no flash of light.
+  CHECK(says(*engine, "$dark > 0 && Camera.__cut.darkness == $dark"));
+  frames(*engine, 1);
+  CHECK(says(*engine, "Camera.__cut.darkness > $dark"));
   frames(*engine, kPastTheEnd);
   CHECK(seen_through(*engine, "Camera"));  // the older cut never switched
   CHECK(says(*engine, "!$first.playing?"));
 
   ruby(*engine, "Camera.cut_to(Scene.find('Security'), fade: 1.0)");
   frames(*engine, kFewFrames);
+  error_of(*engine, "Camera.main = Scene.find('Hero')");  // refused: the cut plays on
+  CHECK(says(*engine, "Camera.cutting?"));
   ruby(*engine, "Camera.main = Scene.find('Camera')");
   CHECK(says(*engine, "!Camera.cutting?"));
   frames(*engine, kPastTheEnd);
@@ -183,7 +202,28 @@ TEST_CASE("a scene loaded anew is seen through its own first camera, and no cut 
   CHECK(says(engine, "!Camera.cutting?"));
 }
 
-TEST_CASE("the helpers move the camera the game is seen through, and let go of the one it left") {
+TEST_CASE("the black of a cut goes under all the UI of the frame") {
+  constexpr int kMarkSize = 5;
+  TempGame game(kGame);
+  HudPresenter screen;
+  auto engine = game_on(game, two_camera_scene(), screen);
+  // A HUD that updates before the cut, so it draws first.
+  ruby(*engine, "class Mark < Behaviour; def update(_dt) = UI.rect(x: 1, y: 1, width: 5, height: 5); end");
+  ruby(*engine, "Scene.find('Hero').add_component(Mark)");
+  frames(*engine, 1);
+  ruby(*engine, "Camera.cut_to(Scene.find('Security'), fade: 1.0)");
+  frames(*engine, kBeforeHalfway);
+  REQUIRE(screen.seen.size() >= 2);
+  const HudItem& cover = screen.seen.front();
+  CHECK(cover.kind == HudItem::Kind::Rect);
+  CHECK(cover.width == kScreen.width);
+  CHECK(cover.height == kScreen.height);
+  CHECK(cover.color.r == 0.0f);
+  CHECK(cover.color.a > 0.8f);
+  CHECK(screen.seen.back().width == kMarkSize);
+}
+
+TEST_CASE("the helpers move the camera the game is seen through, and wait on the one it left") {
   TempGame game(kGame);
   NullPresenter screen(kScreen);
   auto engine = game_on(game, two_camera_scene(), screen);
@@ -197,4 +237,11 @@ TEST_CASE("the helpers move the camera the game is seen through, and let go of t
   frames(*engine, kFewFrames);
   CHECK(says(*engine, "Scene.find('Security').transform.position.approx?(Vector3.new(2, 5, 5), 0.001)"));
   CHECK(says(*engine, "Scene.find('Camera').transform.position == $left"));
+
+  ruby(*engine, "Camera.main = Scene.find('Camera')");  // back: it takes up its follow again
+  frames(*engine, kFewFrames);
+  CHECK(says(*engine, "Camera.following?"));
+  CHECK(says(*engine, "Scene.find('Camera').transform.position.approx?(Vector3.new(2, 3, 6), 0.001)"));
+  CHECK(says(*engine, "Scene.find('Security').transform.position.approx?(Vector3.new(2, 5, 5), 0.001)"));
+  CHECK(engine->scripts().error_count() == 0);
 }

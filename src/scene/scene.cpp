@@ -142,7 +142,19 @@ void Scene::set_parent(ObjectId id, ObjectId parent, bool keep_world) {
   leave_parent(object);
   object.parent = valid(parent) ? parent : kNoObject;
   if (object.parent != kNoObject) objects_[object.parent].children.push_back(id);
+  if (is_part_of_copy(object)) move_copy_root(id, object.copy_root, id);
   if (keep_world) set_world_transform(id, world);
+}
+
+bool Scene::is_part_of_copy(const GameObject& object) {
+  return object.copy_root != kNoObject && object.copy_root != object.id;
+}
+
+void Scene::move_copy_root(ObjectId id, ObjectId from, ObjectId to) {
+  GameObject& object = objects_[id];
+  if (object.copy_root != from) return;
+  object.copy_root = to;
+  for (const ObjectId child : object.children) move_copy_root(child, from, to);
 }
 
 void Scene::request_destroy(ObjectId id) {

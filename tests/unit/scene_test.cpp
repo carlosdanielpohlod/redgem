@@ -267,6 +267,21 @@ TEST_CASE("a new parent keeps an object where it is in the world, or where it is
   CHECK(approx_equal(scene.at(child).local.position, moved, kTolerance));
 }
 
+TEST_CASE("a part taken out of a copy is the root of a copy of its own") {
+  Scene scene = Scene::from_desc(family());
+  const std::vector<ObjectId> copies = scene.clone(scene.find("Parent"));
+  REQUIRE(copies.size() == 2);
+  const ObjectId root = copies[0];
+  const ObjectId part = copies[1];
+  REQUIRE(scene.at(part).copy_root == root);
+  scene.set_parent(root, scene.find("Camera"), true);  // the root of a copy stays one
+  CHECK(scene.at(root).copy_root == root);
+  CHECK(scene.at(part).copy_root == root);
+  scene.set_parent(part, kNoObject, true);
+  CHECK(scene.at(part).copy_root == part);
+  CHECK(scene.at(root).copy_root == root);
+}
+
 TEST_CASE("wind sways an object's foliage unless it says not to, or a skeleton moves it") {
   SceneDesc desc;
   NodeDesc tree;

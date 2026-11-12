@@ -11,11 +11,12 @@ module Camera
     # How dark the picture is now: 0 (as it is) to 1 (black).
     attr_reader :darkness
 
-    # Starts the cut over, `seconds` long. Returns it.
-    def begin_fade(seconds)
+    # Starts the cut over, `seconds` long, from a picture already that dark (a cut it takes over
+    # from): it darkens on from there. Returns it.
+    def begin_fade(seconds, darkness = 0.0)
       @seconds = seconds
-      @elapsed = 0.0
-      @darkness = 0.0
+      @elapsed = seconds * darkness / SPAN
+      @darkness = darkness
       @switched = false
       @playing = true
       self
@@ -51,10 +52,11 @@ module Camera
 
     def darkness_at(share) = WHOLE - (SPAN * share - WHOLE).abs
 
-    # Draws the black over the picture, as dark as the cut is now.
+    # Draws the black over the picture, as dark as the cut is now, under all the UI of the frame (a
+    # menu opened during the cut stays readable).
     def cover
       alpha = (@darkness * UI::OPAQUE).round
-      UI.rect(x: 0, y: 0, width: UI.width, height: UI.height, color: :black, alpha: alpha) if alpha.positive?
+      Camera.__darken(alpha) if alpha.positive?
     end
   end
 end

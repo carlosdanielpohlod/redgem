@@ -5,6 +5,7 @@
 #include <mruby/hash.h>
 #include <mruby/string.h>
 
+#include "scene/props.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
 #include "script/script_host.hpp"
@@ -88,6 +89,28 @@ void tell_moved(mrb_state* mrb, ObjectId id) {
   for (const ObjectId child : scene(mrb).at(id).children) tell_moved(mrb, child);
 }
 
+// An object marked as a wheel (prop `wheel`) that is under another one.
+bool is_mounted_wheel(const GameObject& object) {
+  return object.parent != kNoObject && get_bool(object.props, props::kWheel).value_or(false);
+}
+
+// A wheel that physics turns and places with its vehicle (a `wheel` child of a vehicle body).
+bool is_vehicle_wheel(mrb_state* mrb, ObjectId id) {
+  const GameObject& object = scene(mrb).at(id);
+  if (!is_mounted_wheel(object)) return false;
+  PhysicsWorld* physics = context(mrb).physics;
+  return physics != nullptr && physics->body_type(object.parent) == BodyType::Vehicle;
+}
+
+// Refuses a move in the hierarchy that cannot be: under itself or what it carries, or a wheel off
+// its vehicle.
+void refuse_impossible_parent(mrb_state* mrb, mrb_value self, mrb_value parent, ObjectId id, ObjectId above) {
+  if (scene(mrb).would_cycle(id, above))
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "%s %v cannot go under itself or what it carries (%v)", kSetParent, self, parent);
+  if (is_vehicle_wheel(mrb, id))
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "%s %v is a wheel of its vehicle: it stays on it", kSetParent, self);
+}
+
 // GameObject#__set_parent(parent or nil, keep_world): see ruby/engine/game_object.rb.
 mrb_value game_object_set_parent(mrb_state* mrb, mrb_value self) {
   mrb_value parent;
@@ -95,8 +118,7 @@ mrb_value game_object_set_parent(mrb_state* mrb, mrb_value self) {
   mrb_get_args(mrb, "ob", &parent, &keep_world);
   const ObjectId id = placeable_id(mrb, self, kSetParent);
   const ObjectId above = mrb_nil_p(parent) ? kNoObject : placeable_id(mrb, parent, kSetParent);
-  if (scene(mrb).would_cycle(id, above))
-    mrb_raisef(mrb, E_ARGUMENT_ERROR, "%s %v cannot go under itself or what it carries (%v)", kSetParent, self, parent);
+  refuse_impossible_parent(mrb, self, parent, id, above);
   scene(mrb).set_parent(id, above, keep_world);
   if (!keep_world) tell_moved(mrb, id);
   return parent;

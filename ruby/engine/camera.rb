@@ -22,24 +22,29 @@ module Camera
   # Makes another camera of the scene the one the game is seen through, at once (a cut in progress
   # stops); nil goes back to the scene's first camera. The helpers below act on it from then on.
   def self.main=(camera)
-    @cut = nil
     __choose(camera, "Camera.main=")
+    @cut = nil
   end
 
   # Cuts to another camera. With a fade (seconds), the picture goes to black over its first half,
   # is seen through the new camera from the darkest frame, and comes back over the second half; it
-  # plays on while the game is paused. Without one it cuts at once. Returns the camera.
+  # plays on while the game is paused. Without one it cuts at once. A cut started while another
+  # plays darkens on from where that one is. Returns the camera.
   def self.cut_to(camera, fade: 0.0)
     seconds = __number(fade, "Camera.cut_to fade", 0.0)
     return self.main = camera if seconds.zero?
 
     __check(camera, "Camera.cut_to")
-    @cut = (camera.get_component(Cut) || camera.add_component(Cut)).begin_fade(seconds)
+    dark = __darkness
+    @cut = (camera.get_component(Cut) || camera.add_component(Cut)).begin_fade(seconds, dark)
     camera
   end
 
   # Whether a cut with a fade (Camera.cut_to) is still playing.
   def self.cutting? = @cut&.playing? || false
+
+  # How dark the cut playing has the picture, 0 to 1 (0 when none plays).
+  def self.__darkness = cutting? ? @cut.darkness : 0.0
 
   # The cut playing now, if any (the newest: an older one stops when it sees it is not).
   def self.__cut = @cut
