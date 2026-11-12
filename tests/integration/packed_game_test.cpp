@@ -87,8 +87,9 @@ TEST_CASE("the platformer built into an archive plays as it does from its folder
   const auto game = open_bundled_game(scratch.executable(), error);
   REQUIRE_MESSAGE(game.has_value(), error);
   CHECK(*game == scratch.out / kBundledGameFolder);
-  CHECK_FALSE(std::filesystem::exists(*game));  // nothing of it is on the disk
-  CHECK(read_game_settings(*game).title == read_game_settings(REDGEM_PLATFORMER_DIR).title);
+  CHECK_FALSE(std::filesystem::exists(*game));   // nothing of it is on the disk
+  CHECK(read_game_manifest(*game).file_parsed);  // game.json, read out of the archive
+  CHECK(read_game_settings(*game).studio == read_game_settings(REDGEM_PLATFORMER_DIR).studio);
   CHECK(read_game_locales(*game).languages == read_game_locales(REDGEM_PLATFORMER_DIR).languages);
   CHECK(played(*game) == loose_behaviours);  // every script found, loaded and run from the archive
 }

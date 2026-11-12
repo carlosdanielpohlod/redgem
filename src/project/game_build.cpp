@@ -261,6 +261,8 @@ std::vector<std::string> game_file_outputs() {
 
 bool ship_game_files(const std::filesystem::path& game_dir, const std::filesystem::path& place, GameLayout layout,
                      std::string& error) {
+  std::error_code fs_error;
+  std::filesystem::create_directories(place, fs_error);  // (a Mac app's Resources is made here)
   if (!no_leftovers(place, error)) return false;
   return layout == GameLayout::Loose ? ship_loose(game_dir, place, error) : ship_packed(game_dir, place, error);
 }
