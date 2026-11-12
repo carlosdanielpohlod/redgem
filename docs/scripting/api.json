@@ -2423,37 +2423,37 @@
         {
           "name": "get",
           "static": true,
-          "args": "url, headers: {}, timeout: 15, &block",
+          "args": "url, headers: {}, timeout: 15, redirects: true, &block",
           "about": "GET"
         },
         {
           "name": "post",
           "static": true,
-          "args": "url, json: nil, body: nil, headers: {}, timeout: 15, &block",
+          "args": "url, json: nil, body: nil, headers: {}, timeout: 15, redirects: true, &block",
           "about": "POST"
         },
         {
           "name": "put",
           "static": true,
-          "args": "url, json: nil, body: nil, headers: {}, timeout: 15, &block",
+          "args": "url, json: nil, body: nil, headers: {}, timeout: 15, redirects: true, &block",
           "about": "PUT"
         },
         {
           "name": "patch",
           "static": true,
-          "args": "url, json: nil, body: nil, headers: {}, timeout: 15, &block",
+          "args": "url, json: nil, body: nil, headers: {}, timeout: 15, redirects: true, &block",
           "about": "PATCH"
         },
         {
           "name": "delete",
           "static": true,
-          "args": "url, headers: {}, timeout: 15, &block",
+          "args": "url, headers: {}, timeout: 15, redirects: true, &block",
           "about": "DELETE"
         },
         {
           "name": "request",
           "static": true,
-          "args": "verb, url, json: nil, body: nil, headers: {}, timeout: 15, &block",
+          "args": "verb, url, json: nil, body: nil, headers: {}, timeout: 15, redirects: true, &block",
           "about": "any verb"
         }
       ],
@@ -2477,7 +2477,7 @@
         },
         {
           "name": "body",
-          "about": "its body"
+          "about": "its body (decompressed when it came with gzip or deflate)"
         },
         {
           "name": "json",
@@ -2486,6 +2486,10 @@
         {
           "name": "error",
           "about": "why there was no answer, or nil"
+        },
+        {
+          "name": "url",
+          "about": "the address the answer came from, once redirects were followed"
         }
       ],
       "guide": "online-services.md#http"

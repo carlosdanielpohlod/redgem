@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <chrono>
 
+#include "app/game_settings.hpp"
 #include "app/scene_files.hpp"
 #include "editor/document/glb_file.hpp"
 #include "core/config.hpp"
@@ -67,6 +68,56 @@ TEST_CASE("a game opened by a relative path keeps its folder as an absolute one"
   const std::filesystem::path game_dir = std::get<std::unique_ptr<EditorSession>>(opened)->game_dir();
   CHECK(game_dir.is_absolute());
   CHECK(std::filesystem::equivalent(game_dir, dir));
+}
+
+TEST_CASE("the editor refreshes the game's collision layers without editing the scene") {
+  const auto dir = copy_sandbox("collision_layers");
+  const auto manifest = dir / kGameSettingsFile;
+  std::string error;
+  REQUIRE(write_text_file(manifest, R"({"physics":{"layers":["player","enemy"]}})", error));
+  auto session = open(dir);
+  REQUIRE(session->collision_layers().count() == 3);
+  CHECK(session->collision_layers().name(kDefaultLayer) == kDefaultLayerName);
+  CHECK(session->collision_layers().find("player").has_value());
+
+  const auto time = std::filesystem::last_write_time(manifest);
+  REQUIRE(write_text_file(manifest, R"({"physics":)", error));
+  std::filesystem::last_write_time(manifest, time);
+  session->refresh_collision_layers();
+  CHECK(session->collision_layers().find("player").has_value());
+
+  REQUIRE(write_text_file(manifest, R"({"physics":{"layers":["terrain"]}})", error));
+  std::filesystem::last_write_time(manifest, time);
+  session->refresh_collision_layers();
+  CHECK_FALSE(session->collision_layers().find("player").has_value());
+  CHECK(session->collision_layers().find("terrain").has_value());
+  CHECK_FALSE(session->document().dirty());
+  session.reset();
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("one collision layer edit updates eligible objects and undoes them together") {
+  const auto dir = copy_sandbox("group_collision_layers");
+  std::string error;
+  REQUIRE(write_text_file(dir / kGameSettingsFile, R"({"physics":{"layers":["enemy"]}})", error));
+  auto session = open(dir);
+  auto& doc = session->document();
+  const auto body = doc.add_primitive(PrimitiveShape::Cube, "Layer body", redgem::Color{1, 1, 1, 1});
+  const auto trigger = doc.add_primitive(PrimitiveShape::Cube, "Layer trigger", redgem::Color{1, 1, 1, 1});
+  const auto visual = doc.add_empty("Visual");
+  doc.set_prop(body, props::kBody, std::string(props::kBodyDynamic));
+  doc.set_prop(trigger, props::kTrigger, true);
+  const std::vector<ObjectId> objects{body, trigger, visual};
+  REQUIRE(session->set_collision_layer(objects, "enemy"));
+  CHECK(get_string(doc.node(body).props, props::kLayer) == "enemy");
+  CHECK(get_string(doc.node(trigger).props, props::kLayer) == "enemy");
+  CHECK(doc.node(visual).props.count(props::kLayer) == 0);
+  CHECK_FALSE(session->set_collision_layer(objects, "enemy"));
+  session->undo();
+  CHECK(doc.node(body).props.count(props::kLayer) == 0);
+  CHECK(doc.node(trigger).props.count(props::kLayer) == 0);
+  session.reset();
+  std::filesystem::remove_all(dir);
 }
 
 TEST_CASE("refreshing one node gives the preview what rebuilding it all would, and keeps who it is") {

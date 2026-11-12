@@ -13,6 +13,7 @@ Pick one of the ways below.
 | System | Download |
 |--------|----------|
 | Linux (x86_64) | [redgem-linux-x86_64.tar.gz](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.tar.gz) |
+| Linux (x86_64), AppImage | [redgem-linux-x86_64.AppImage](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.AppImage) |
 | Windows (x86_64) | [redgem-windows-x86_64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-windows-x86_64.zip) |
 | macOS (Apple Silicon) | [redgem-macos-arm64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-macos-arm64.zip) |
 | macOS (Intel) | [redgem-macos-x86_64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-macos-x86_64.zip) |
@@ -20,8 +21,18 @@ Pick one of the ways below.
 Unpack it anywhere and run `bin/redgem` (Linux), `redgem.exe` (Windows) or open `RedGem.app`
 (macOS). Nothing is installed: delete the folder to remove it. The demos are in its `games/` folder.
 
-- **Linux** needs a desktop with OpenGL 3.3, a processor with AVX2 and glibc 2.39 or newer
-  (Ubuntu 24.04 and later). It builds games for Linux, Windows and Android.
+- **Linux** needs a desktop with OpenGL 3.3, a processor with AVX2 and glibc 2.35 or newer
+  (Ubuntu 22.04, Debian 12, Fedora 36 and later). It builds games for Linux, Windows and Android,
+  which run on the same systems (see [Building and sharing](shipping.md#for-linux)).
+- **The AppImage** is the same editor, tools, players and demos in one file that runs as it is:
+  `chmod +x redgem-linux-x86_64.AppImage`, then run it as you would `bin/redgem`
+  (`./redgem-linux-x86_64.AppImage` opens the project hub, `./redgem-linux-x86_64.AppImage my_game`
+  a game, `./redgem-linux-x86_64.AppImage check my_game` checks one).
+  Its other programs are named first: `./redgem-linux-x86_64.AppImage redgem-server --help`
+  (or `redgem-relay`, `redgem-player`, `redgem-test`). It needs FUSE, which desktops have; where
+  there is none (a container), add `--appimage-extract-and-run`. Its demos are inside it, read
+  only: `./redgem-linux-x86_64.AppImage --appimage-extract` unpacks everything into
+  `squashfs-root/`, demos included (or take them from the tarball).
 - **Windows** is compiled from Linux and has only been tried under Wine, not on a real Windows
   machine yet. It builds games for Windows.
 - **macOS** needs macOS 11 or newer. It is built and tested on GitHub's Mac machines (macOS 14 on

@@ -1,8 +1,13 @@
-# The downloads of a release, built and packed here rather than by hand: the Linux one (with the
-# players for Windows and Android in bin/runtimes/) and the Windows one on Linux, with the pinned
-# llvm-mingw and Android NDK, and the two Mac ones on Macs of each kind. Each is checked before it
-# is kept (its list of files, and its programs run on its own system). Then all four are checked
-# together, and a release never gets fewer than four.
+# The downloads of a release, built and packed here rather than by hand: the two Linux ones (a
+# tarball and an AppImage of the same files, with the players for Windows and Android in
+# bin/runtimes/) and the Windows one on Linux, with the pinned llvm-mingw and Android NDK, and the
+# two Mac ones on Macs of each kind. The Linux programs are built on Ubuntu 22.04 with libstdc++
+# linked in, so that they run on glibc 2.35 and later systems (LINUX_GLIBC_FLOOR in
+# tools/release/release_files.sh), and are run again on a bare Ubuntu 22.04 (that glibc). Each download
+# is checked before it is kept (its list of files, and its programs run on its own system). Then
+# all five are checked together, and a release never gets fewer than five. The players' symbols
+# (each as it was linked, before it was stripped: the Linux one is the very player the container
+# built) go beside them as redgem-symbols-<system>.zip, for `redgem symbolize`.
 #
 # What starts it, and what it does with the downloads (tools/release/plan_release.sh decides):
 # * a pushed tag v<version>: attached to that tag's draft release, which is made when missing.
@@ -76,16 +81,134 @@ jobs:
             exit 1
           fi
 
-  linux-windows:
-    name: Linux and Windows downloads
+  # The Linux programs, on an older system than the runners' so that the downloads run on older
+  # systems too: what they take from glibc is what Ubuntu 22.04 has (2.35). Its GCC 12 is newer
+  # than its default compiler; libstdc++ is linked into the programs (REDGEM_STATIC_LIBSTDCXX), so
+  # they need no libstdc++ of the system's. (libgcc stays shared: every glibc system has libgcc_s, and
+  # linking it in would bring in GCC's unwinder, which needs glibc 2.35's _dl_find_object.)
+  linux-build:
+    name: Linux programs (Ubuntu 22.04)
     needs: plan
     runs-on: ubuntu-24.04
-    # (About 12 minutes with the other workflows' caches; an hour without them.)
+    container:
+      image: ubuntu:22.04@sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11
+    # (About 15 minutes with its compiler cache; an hour without it.)
+    timeout-minutes: 90
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      CC: gcc-12
+      CXX: g++-12
+      CCACHE_MAXSIZE: 1G
+      # Ubuntu 22.04's CMake is older than the 3.24 the engine needs: Kitware's, pinned.
+      CMAKE_VERSION: "3.31.8"
+      CMAKE_SHA256: "630615d8e98ac33eba7fbe472626dff5c899c85af3c024585ae109166a6909d0"
+    steps:
+      # The engine's own list (docs/install.md), with GCC 12, Ruby and rake from Ubuntu, and curl
+      # for CMake. (git first: the checkout is a repository, which packing the demos reads.)
+      - name: Install the build tools and libraries
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            gcc-12 g++-12 libc6-dev make ninja-build git ca-certificates curl xz-utils bison ruby \
+            rake ccache zstd libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxi-dev libxext-dev libxfixes-dev libxrender-dev libasound2-dev
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.commit }}
+          persist-credentials: false
+
+      - name: Install CMake
+        run: |
+          archive="cmake-${CMAKE_VERSION}-linux-x86_64"
+          curl -fsSL --retry 3 -o "${RUNNER_TEMP}/${archive}.tar.gz" \
+            "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/${archive}.tar.gz"
+          echo "${CMAKE_SHA256}  ${RUNNER_TEMP}/${archive}.tar.gz" | sha256sum --check -
+          tar -xzf "${RUNNER_TEMP}/${archive}.tar.gz" -C /opt
+          echo "/opt/${archive}/bin" >> "${GITHUB_PATH}"
+
+      # (In a container the workspace has the container's path, which github.workspace is not.)
+      - name: Place the caches
+        run: |
+          echo "CCACHE_DIR=${GITHUB_WORKSPACE}/.ccache" >> "${GITHUB_ENV}"
+          echo "FETCH_DIR=${GITHUB_WORKSPACE}/.deps/fetch" >> "${GITHUB_ENV}"
+
+      - name: Describe the toolchain
+        run: |
+          grep PRETTY_NAME /etc/os-release
+          ldd --version | head -n 1
+          "${CXX}" --version | head -n 1
+          cmake --version | head -n 1
+          ruby --version
+
+      # Its own caches, under names no other workflow's restore-keys match: no other workflow
+      # builds with this compiler, nor fetches the libraries' sources at this path.
+      - name: Restore the compiler cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ccache
+          key: ccache-ubuntu22-linux-${{ github.run_id }}
+          restore-keys: ccache-ubuntu22-linux-
+
+      - name: Restore the libraries' sources
+        id: fetch-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .deps/fetch/*-src
+            .deps/fetch/*-subbuild
+          key: fetch-ubuntu22-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
+
+      # (Warnings are the Linux workflow's to fail on, with the compiler the engine is written with.)
+      - name: Build the Linux programs
+        id: build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DREDGEM_BUILD_TESTS=OFF \
+            -DREDGEM_STATIC_LIBSTDCXX=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
+          ccache --zero-stats
+          cmake --build build --target redgem redgem_player redgem_relay redgem_server redgem_test_tool
+          ccache --show-stats
+
+      # (Even when the build failed: what it compiled is still good.)
+      - name: Keep the compiler cache
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@v4
+        with:
+          path: .ccache
+          key: ccache-ubuntu22-linux-${{ github.run_id }}
+
+      - name: Keep the libraries' sources
+        if: ${{ steps.fetch-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .deps/fetch/*-src
+            .deps/fetch/*-subbuild
+          key: ${{ steps.fetch-cache.outputs.cache-primary-key }}
+
+      # (In a tarball: an artifact keeps no file's permission to run.)
+      - name: Pack the Linux programs
+        run: |
+          tar -czf linux-programs.tar.gz -C build/src redgem redgem-player redgem-relay redgem-server redgem-test
+
+      - name: Keep the Linux programs
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-programs
+          path: linux-programs.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  linux-windows:
+    name: Linux and Windows downloads
+    needs: [plan, linux-build]
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 1G
-      FETCH_DIR: ${{ github.workspace }}/.deps/fetch
     steps:
       - uses: actions/checkout@v4
         with:
@@ -114,30 +237,17 @@ jobs:
           cmake --version | head -n 1
           ruby --version
 
-      # The Linux workflow's caches, read only: a release run keeps nothing of its own.
-      - name: Restore the Linux compiler cache
-        uses: actions/cache/restore@v4
+      # Where the players for other systems go beside them (build/src/runtimes/).
+      - name: Take the Linux programs
+        uses: actions/download-artifact@v4
         with:
-          path: .ccache
-          key: ccache-linux-${{ github.run_id }}
-          restore-keys: ccache-linux-
+          name: linux-programs
+          path: ${{ runner.temp }}
 
-      - name: Restore the libraries' sources
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            .deps/fetch/*-src
-            .deps/fetch/*-subbuild
-          key: fetch-linux-${{ hashFiles('cmake/Dependencies.cmake', 'cmake/PatchGlfwForMac.cmake') }}
-
-      # Configured as the Linux workflow does, so that its compiler cache serves this build.
-      - name: Build the Linux programs
+      - name: Unpack the Linux programs
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DREDGEM_WARNINGS_AS_ERRORS=ON \
-            -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
-          ccache --zero-stats
-          cmake --build build --target redgem redgem_player redgem_relay redgem_server redgem_test_tool
-          ccache --show-stats
+          mkdir -p build/src
+          tar -xzf "${RUNNER_TEMP}/linux-programs.tar.gz" -C build/src
 
       # With the llvm-mingw release tools/windows/fetch_toolchain.sh pins: the player into
       # build/src/runtimes/windows/, then the editor and the servers of the Windows download.
@@ -145,10 +255,6 @@ jobs:
         run: |
           tools/windows/build_runtime.sh
           cmake --build build-windows --target redgem redgem_relay redgem_server
-
-      # (The Android workflow's compiler cache goes where the Linux one was.)
-      - name: Set the Linux compiler cache aside
-        run: rm -rf .ccache
 
       - name: Restore the NDK
         uses: actions/cache/restore@v4
@@ -180,14 +286,44 @@ jobs:
             -DREDGEM_WARNINGS_AS_ERRORS=ON
         run: tools/android/build_runtime.sh arm64-v8a x86_64
 
+      # (With the AppImage: appimagetool and its runtime, pinned by tools/release/fetch_appimage_tools.sh.
+      # With the players' symbols, as they were linked: release assets of their own.)
       - name: Pack the downloads
         run: tools/release/package.sh
 
-      - name: Check what the downloads hold
-        run: tools/release/check_downloads.sh dist/release redgem-linux-x86_64.tar.gz redgem-windows-x86_64.zip
+      # The newest glibc version the Linux programs take a symbol of, against what the docs say.
+      # (bash, not the default: with pipefail, a floor above the docs' fails here.)
+      - name: Measure the Linux programs' glibc floor
+        shell: bash
+        run: |
+          tools/release/glibc_floor.sh build/src/redgem build/src/redgem-player build/src/redgem-relay \
+            build/src/redgem-server build/src/redgem-test | tee "${RUNNER_TEMP}/glibc-floor.txt"
+          {
+            echo "### glibc floor of the Linux programs"
+            echo '```'
+            cat "${RUNNER_TEMP}/glibc-floor.txt"
+            echo '```'
+            echo "AppImage: $(stat -c %s dist/release/redgem-linux-x86_64.AppImage) bytes"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
-      - name: Run the Linux download's programs
-        run: tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.tar.gz
+      - name: Check what the downloads hold
+        run: |
+          tools/release/check_downloads.sh dist/release \
+            redgem-linux-x86_64.tar.gz redgem-linux-x86_64.AppImage redgem-windows-x86_64.zip \
+            redgem-symbols-linux.zip redgem-symbols-windows.zip redgem-symbols-android.zip
+
+      # The symbols a crash report of each player is read with (`redgem symbolize`): never in a download.
+      - name: Keep the players' symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: redgem-symbols
+          path: dist/release/redgem-symbols-*.zip
+          if-no-files-found: error
+
+      - name: Run the Linux downloads' programs
+        run: |
+          tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.tar.gz
+          tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.AppImage
 
       - name: Keep the Linux download
         uses: actions/upload-artifact@v4
@@ -196,12 +332,64 @@ jobs:
           path: dist/release/redgem-linux-x86_64.tar.gz
           if-no-files-found: error
 
+      # (Packed already: an AppImage is compressed inside.)
+      - name: Keep the AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: redgem-linux-x86_64-appimage
+          path: dist/release/redgem-linux-x86_64.AppImage
+          if-no-files-found: error
+          compression-level: 0
+
       - name: Keep the Windows download
         uses: actions/upload-artifact@v4
         with:
           name: redgem-windows-x86_64
           path: dist/release/redgem-windows-x86_64.zip
           if-no-files-found: error
+
+  # The Linux downloads on a bare system with the oldest glibc they are for (2.35): Ubuntu 22.04
+  # with none of the build's compilers and libraries. (Its glibc is the build's, and the floor:
+  # no older system can run them.) The programs run, a demo is checked and built, and what they
+  # and the built game take from glibc is measured again (tools/release/smoke_test.sh). It has no
+  # FUSE: the AppImage unpacks itself to run. (A window's libraries, OpenGL and X11, are opened
+  # when a window opens, which these checks do not.)
+  linux-old-system:
+    name: Linux downloads run on glibc 2.35
+    needs: [plan, linux-windows]
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:22.04@sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11
+    timeout-minutes: 20
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      # (objdump measures the floor; nothing else is added to the bare system.)
+      - name: Install objdump
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends binutils
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.commit }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: redgem-linux-x86_64*
+          path: dist/release
+          merge-multiple: true
+
+      - name: Describe the system
+        run: |
+          grep PRETTY_NAME /etc/os-release
+          ldd --version | head -n 1
+
+      - name: Run the Linux downloads' programs
+        run: |
+          tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.tar.gz
+          tools/release/smoke_test.sh dist/release/redgem-linux-x86_64.AppImage
 
   # The Windows download is packed on Linux: its programs are run here, on Windows.
   windows-check:
@@ -304,8 +492,8 @@ jobs:
 
   # Runs even when a job above failed, to say which download is missing.
   gather:
-    name: All four downloads
-    needs: [plan, linux-windows, windows-check, macos]
+    name: All five downloads
+    needs: [plan, linux-build, linux-windows, linux-old-system, windows-check, macos]
     if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -322,7 +510,7 @@ jobs:
           path: dist/release
           merge-multiple: true
 
-      - name: Check that all four are there and hold what they must
+      - name: Check that all five and the symbols are there and hold what they must
         env:
           TAG: ${{ needs.plan.outputs.tag }}
         run: |
@@ -350,7 +538,7 @@ jobs:
     name: Attach to the draft release
     needs: [plan, gather]
     # (Only a pushed tag's run: nothing else writes its draft. No concurrency group, which would
-    # cancel a pending attach: attach_to_draft.sh swaps the downloads in only once all four are
+    # cancel a pending attach: attach_to_draft.sh swaps the downloads in only once all five are
     # up, and checks the result.)
     if: ${{ needs.plan.outputs.attach == 'true' }}
     runs-on: ubuntu-24.04

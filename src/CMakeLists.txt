@@ -148,6 +148,7 @@ redgem_add_library(redgem_core
   core/log.cpp
   core/event_journal.cpp
   core/short_text.cpp
+  core/build_id.cpp
   core/message_lines.cpp
   core/coarse_clock.cpp
   core/signal_stack.cpp
@@ -230,9 +231,13 @@ redgem_add_library(redgem_net
   net/http/http_trust_system.cpp
   net/http/http_stream.cpp
   net/http/http_tls.cpp
+  net/http/http_redirect.cpp
+  net/http/http_encoding.cpp
   net/http/http_exchange.cpp
   net/http/http_client.cpp)
 target_link_libraries(redgem_net PUBLIC redgem_core nlohmann_json::nlohmann_json mbedtls)
+# (zlib: decompressing the answers to web requests.)
+target_link_libraries(redgem_net PRIVATE redgem_zlib)
 redgem_embed_texts(redgem_net relay)
 if(WIN32)
   # (crypt32: the Windows certificate store, which https:// answers are checked against.)
@@ -706,6 +711,8 @@ if(NOT ANDROID)
     project/check_command.cpp
     project/api_reference.cpp
     project/api_command.cpp
+    project/crash_symbols.cpp
+    project/symbolize_command.cpp
     project/assistant_guide.cpp
     project/error_hints.cpp
     project/project_texts.cpp)

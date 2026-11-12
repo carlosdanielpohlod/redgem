@@ -19,6 +19,7 @@
 #include "app/crash_handlers.hpp"
 #include "app/crash_report.hpp"
 #include "app/crash_text.hpp"
+#include "core/build_id.hpp"
 #include "core/exit_codes.hpp"
 #include "core/signal_stack.hpp"
 
@@ -117,24 +118,42 @@ void append_cause(Reporter& crash) {
 }
 
 constexpr std::size_t kFrameLineBytes = MAX_PATH * 4;
+constexpr std::size_t kModuleNameBytes = MAX_PATH * 3;  // (a letter of a wide path is up to 3 in UTF-8)
+constexpr const char* kUnknownModule = "?";
+// Something of this program's own, to ask the system which module that is.
+const char kProgramMark = 0;
 
-// Where an address is: the module it belongs to and how far into it ("redgem-player.exe+0x1a2b").
-template <std::size_t Size>
-void append_frame(FixedText<Size>& text, void* address) {
+// The module an address is in; null when it is in none.
+HMODULE module_of(const void* address) {
   HMODULE module = nullptr;
-  wchar_t wide_name[MAX_PATH] = L"?";
   const DWORD flags = GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT;
-  if (GetModuleHandleExW(flags, static_cast<LPCWSTR>(address), &module))
-    GetModuleFileNameW(module, wide_name, MAX_PATH);
-  char name[MAX_PATH * 3] = "?";
-  WideCharToMultiByte(CP_UTF8, 0, wide_name, -1, name, sizeof(name), nullptr, nullptr);
+  if (!GetModuleHandleExW(flags, static_cast<LPCWSTR>(address), &module)) return nullptr;
+  return module;
+}
+
+// A module's file name, without its folder, in UTF-8 ("redgem-player.exe"); kUnknownModule when the
+// system does not say.
+void module_file_name(HMODULE module, char (&name)[kModuleNameBytes]) {
+  wchar_t wide_name[MAX_PATH] = L"?";
+  if (module != nullptr) GetModuleFileNameW(module, wide_name, MAX_PATH);
+  if (WideCharToMultiByte(CP_UTF8, 0, wide_name, -1, name, sizeof(name), nullptr, nullptr) == 0)
+    std::strcpy(name, kUnknownModule);
   const char* base = name;
   for (const char* at = name; *at != '\0'; ++at) {
     if (std::strchr(kPathSeparators, *at) != nullptr) base = at + 1;
   }
+  std::memmove(name, base, std::strlen(base) + 1);
+}
+
+// Where an address is: the module it belongs to and how far into it ("redgem-player.exe+0x1a2b").
+template <std::size_t Size>
+void append_frame(FixedText<Size>& text, void* address) {
+  const HMODULE module = module_of(address);
+  char name[kModuleNameBytes] = {};
+  module_file_name(module, name);
   text.append(kFrameIndent);
-  text.append(base);
-  text.append("+0x");
+  text.append(name);
+  text.append(kOffsetMark);
   text.append_hex(reinterpret_cast<std::uintptr_t>(address) - reinterpret_cast<std::uintptr_t>(module));
   text.append('\n');
 }
@@ -255,6 +274,19 @@ void prepare_reporter() {
 
 }  // namespace
 
+ProgramIdentity this_program() {
+  ProgramIdentity program;
+  const HMODULE module = module_of(&kProgramMark);
+  char name[kModuleNameBytes] = {};
+  module_file_name(module, name);
+  program.name = name;
+  program.base = module;
+  if (module == nullptr) return program;
+  const auto identity = binary_identity_in_memory(module);
+  if (identity) program.build_id = identity->build_id;
+  return program;
+}
+
 void install_fatal_handlers() {
   give_this_thread_a_signal_stack();
   prepare_reporter();
@@ -284,6 +316,8 @@ void show_player(const std::string& message) {
   if (!prepared_crash().show_dialog || crash.message_box == nullptr) return;
   crash.message_box(nullptr, wide(message).c_str(), kDialogTitle, kDialogStyle);
 }
+
+void log_report_text(const std::string&) {}  // (Windows keeps no log apps write to: the file is the report)
 
 }  // namespace redgem::crash
 

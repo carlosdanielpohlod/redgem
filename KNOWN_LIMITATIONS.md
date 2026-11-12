@@ -19,7 +19,12 @@ the same pull request.
   on a real Mac.
 - A game's icon is put into a copy of the Windows player by the build; Windows' own loader of
   icons has been seen reading it under Wine only.
-- The Linux programs need a processor with AVX2 and glibc 2.39 or newer (Ubuntu 24.04 and later).
+- The Linux programs need a processor with AVX2 and glibc 2.35 or newer (Ubuntu 22.04, Debian 12,
+  Fedora 36 and later): they are built on Ubuntu 22.04, so no older system runs them (Debian 11,
+  RHEL 9 and its kind refuse them). The CI runs them on a bare Ubuntu 22.04 without opening a
+  window. The AppImage needs FUSE to start (`--appimage-extract-and-run` without it), and its
+  demos are read only inside it. Neither has been tried on a real desktop of another
+  distribution, nor on a Steam Deck.
 - Android games have been run on an emulator only, not on phones. The touch controls have one
   fixed layout (a stick and three buttons). The continuous integration builds the Android player
   but runs nothing on Android.
@@ -99,8 +104,12 @@ the same pull request.
 
 ## Web requests (HTTP)
 
-- Redirects are not followed; there are no cookies, no compression, no streaming, no uploads of
-  files: a request and its answer are each held whole in memory (at most 8 MB).
+- There are no cookies, no streaming, no uploads of files: a request and its answer are each
+  held whole in memory (at most 8 MB, decompressed). Answers compressed with anything but gzip
+  or deflate (br, zstd) are not decompressed (the engine does not ask for them).
+- Redirects stop after 10. When one leaves the origin, only `Authorization`, `Cookie` and
+  `Proxy-Authorization` are dropped: other headers a game sets (an `X-Api-Key`) go along. Pass
+  `redirects: false` to see the redirect and decide.
 - Looking a name up cannot be cut short: a request to a name the network takes long to answer
   for can outlast its timeout by that long (and a game that ends waits for nobody: the request's
   thread ends on its own).
@@ -222,8 +231,7 @@ not a promise of how it will be closed.
 
 ### Gameplay API
 
-- Joints are made from scripts only: a level cannot set one up in Blender or the editor. The
-  editor's Physics card has no collision layer picker (`layer` is set as a custom property).
+- Joints are made from scripts only: a level cannot set one up in Blender or the editor.
 - Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - No navigation mesh or pathfinding.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
@@ -249,8 +257,15 @@ not a promise of how it will be closed.
   and a report): memory running out inside a library that does not throw (the graphics driver,
   the physics, the interpreter's own allocations, which a script sees as `NoMemoryError`) can
   still end the game with only a crash report, or none.
-- A built game for Android writes no crash report and shows no message (only `adb logcat`). On
-  Windows the report's backtrace is module offsets (`redgem-player.exe+0x1a2b`), not function names.
+- A crash report's backtrace is offsets into each program (`Arena.exe+0x1a2b`): function names
+  need `redgem symbolize` with the release's `redgem-symbols-<system>.zip` and an addr2line on the
+  developer's machine. The symbols name functions; file and line only where the player was built
+  with debugging information, which the release's are not. Mac reports name no build id, so
+  `redgem symbolize` cannot read them, and no Mac symbols are kept.
+- A built game for Android shows its player no message when it crashes: the report is written to
+  the app's files and to `adb logcat`, and the next run only says so in its log. The report's
+  backtrace on Android is what the unwinder could walk from the signal handler, after the address
+  the crash happened at.
 - The scripts' time budget stops Ruby code only: one call of the engine's own that takes long
   (a huge `Array#sort`, a request to the engine for millions of things) is not cut off, and the
   budget is wall time: a call paused in a debugger for longer than it is stopped when it resumes.

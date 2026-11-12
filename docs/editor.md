@@ -28,7 +28,7 @@ icons):
   one card per component: Transform, Mesh with its materials (color, metallic, roughness, emission
   and their pictures, see [Material pictures](#material-pictures)),
   Light (type, color, intensity, range), Camera (field of view, clipping), one card per Ruby script,
-  Physics (body, trigger, collider, mass), vehicle wheels and custom properties. **Add Component**
+  Physics (body, trigger, collider, layer, mass), vehicle wheels and custom properties. **Add Component**
   adds scripts (existing or new), a physics body, a trigger or a property. With several objects
   selected it shows what they have in common: tag, visible, *Template* and the Transform, a dash
   where their values differ. An edit applies to all of them.
@@ -151,6 +151,16 @@ The font atlas rasterizes interface text, code and icons at the current density 
 their font handles. Pointer coordinates, scene picking and the game's preview keep their existing
 coordinate system. The scene preview still renders at its logical viewport resolution, so its
 image does not yet gain the extra pixel density of Retina text. There is no manual scale override.
+
+## Physics layers
+
+Choose **Layer** in the Inspector's **Physics** card to assign a body or trigger to one of the
+layers in `game.json` under `physics.layers`. Choose `default` to clear the object's assignment.
+With several objects selected, one change applies to the selected objects with physics settings
+and can be undone together. The editor watches the modification time and size of `game.json`.
+If a write leaves invalid JSON, the editor logs a warning and keeps the last valid list. If an
+assigned name disappears from the list, the Inspector warns and the simulation uses the default
+layer.
 
 ## Physics collider view
 

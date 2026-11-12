@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=RedGem
+GenericName=3D Game Editor
+Comment=Make 3D games scripted in Ruby
+Exec=redgem
+Icon=redgem
+Terminal=false
+Categories=Development;
+Keywords=game;3D;editor;Ruby;

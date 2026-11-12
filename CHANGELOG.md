@@ -10,6 +10,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Inspector collision layers**: assign a body or trigger to a layer defined in `game.json`
+  from the Physics card.
+
 - **UI at any screen size**: `anchor:` on `UI.text`, `rect`, `image`, `button`, `text_field`,
   `toggle`, `choice` and `slider` (`:top_left`, `:top`, `:top_right`, `:left`, `:center`,
   `:right`, `:bottom_left`, `:bottom`, `:bottom_right`) makes x and y offsets from that point of
@@ -81,9 +84,42 @@ until 1.0, a release may change what games rely on (see
   faces of a cube, all into one depth atlas, filtered like the sun's with a normal offset and a bias that follows the texel size. The
   quality presets cap them (ultra 4, high 2, medium 1, low 0; `local_shadows` in a custom quality
   and `Settings.quality_details`), and a graphics card that cannot make the atlas draws none.
+- **Web requests follow redirects**: `HTTP` follows 301, 302, 303, 307 and 308, up to 10 of them,
+  reading a relative `Location` against the address that sent it. A 303, and a 301 or 302 to a
+  POST, go on as a GET without the body; 307 and 308 keep both. A redirect from `https://` to
+  `http://` is refused, every hop is checked as the first address was (`http://` only nearby, no
+  metadata address), and a hop to another origin drops `Authorization`, `Cookie` and
+  `Proxy-Authorization`. A `Location` with spaces or UTF-8 is percent-encoded. `response.url` is
+  where the answer came from; `redirects: false` returns the redirect itself.
+- **Compressed web answers**: requests send `Accept-Encoding: gzip, deflate`, and gzip or deflate
+  answers (chunked or not) reach the block decompressed with zlib 1.3.2, the 8 MB limit applying
+  to the decompressed body (a decompression bomb is refused). A corrupt or cut body is an `error`,
+  with the answer's status and headers kept.
+
+- **Linux AppImage**: `redgem-linux-x86_64.AppImage`, a fifth download beside the tarball, holds
+  the same editor, tools, players and demos in one file with the RedGem menu entry and icon. Run
+  it as `bin/redgem`; name another program first (`redgem-server --help`) to run that one.
+- **Crash reports on Android**: a built game for Android writes its crash report in `crashes/` of
+  the app's files and in `adb logcat` (tag `redgem`), and hands the crash on to the system, which
+  keeps its own tombstone too. The next run of any built game says in its log that the run
+  before crashed, naming the report.
+- **`redgem symbolize <report> [--symbols <dir>]`**: a crash report's frames with their functions
+  (and file:line where the symbols have them), looked up with `llvm-addr2line` or `addr2line`.
+  Every report now names the build of the player that crashed (`Build: <id> <program>`, the
+  linker's build id on Linux, Windows and Android), and the symbols of that very build are found
+  by it; a report of another build is said to be so, with the builds found. Each release carries
+  the players as they were linked, before stripping, as `redgem-symbols-linux.zip`,
+  `redgem-symbols-windows.zip` and `redgem-symbols-android.zip`, apart from the downloads.
 
 ### Changed
 
+- **The Linux download runs on glibc 2.35 or newer** (Ubuntu 22.04, Debian 12, Fedora 36 and
+  later) instead of 2.39: it is built on Ubuntu 22.04 with libstdc++ linked in, and so are the
+  players inside it, so games built for Linux run on those systems too. The release workflow
+  measures the floor and runs both Linux downloads on a bare Ubuntu 22.04.
+- **Crash report backtraces on Linux and Android are offsets into each program**
+  (`Arena+0x1a2b`), as on Windows, so that `redgem symbolize` reads them; where the loader knows
+  a frame's symbol, it follows in brackets.
 - **Each game keeps its data in a folder of its own, named after its studio and title**:
   `game.json` gains `"studio"`, and a game's save, settings, bindings and crash reports are kept
   together in `<studio>/<title>/` where the player's system keeps programs' data

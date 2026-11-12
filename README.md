@@ -95,6 +95,7 @@ RedGem stands on open source. Thank you to the people behind these projects.
 | [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo) | Move, rotate and scale gizmos | MIT |
 | [nlohmann/json](https://github.com/nlohmann/json) 3.12.0 | Reading and writing glTF JSON and settings; multiplayer messages (MessagePack) | MIT |
 | [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/) 3.6.7 | HTTPS for the games' web requests | Apache 2.0 |
+| [zlib](https://zlib.net) 1.3.2 | Decompressing gzip and deflate answers to web requests | zlib |
 | [SQLite](https://www.sqlite.org) 3.50.4 | Where a dedicated server keeps its game's saves | Public domain |
 | [doctest](https://github.com/doctest/doctest) 2.4.11 | C++ tests | MIT |
 | [Inter](https://rsms.me/inter/), [JetBrains Mono](https://www.jetbrains.com/lp/mono/), [Font Awesome Free](https://fontawesome.com) | Editor fonts and icons | OFL |
@@ -110,6 +111,7 @@ The engine itself is **C++17**, built with CMake. Demo assets come from
 | System | Download | Then |
 |--------|----------|------|
 | Linux (x86_64) | [redgem-linux-x86_64.tar.gz](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.tar.gz) | unpack, run `bin/redgem` |
+| Linux (x86_64), AppImage | [redgem-linux-x86_64.AppImage](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-linux-x86_64.AppImage) | `chmod +x` it, run it |
 | Windows (x86_64) | [redgem-windows-x86_64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-windows-x86_64.zip) | unpack, run `redgem.exe` |
 | macOS (Apple Silicon) | [redgem-macos-arm64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-macos-arm64.zip) | unpack, open `RedGem.app` (unsigned: see the README inside) |
 | macOS (Intel) | [redgem-macos-x86_64.zip](https://github.com/carlosdanielpohlod/redgem/releases/latest/download/redgem-macos-x86_64.zip) | unpack, open `RedGem.app` (unsigned: see the README inside) |

@@ -9,12 +9,28 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT_DIR="${REPO_ROOT}/dist/release"
 PACKAGE_NAME="redgem"
 # The downloads a release carries. The README's links (releases/latest/download/<name>) depend on
-# these names: a release gets all four or none (check_downloads.sh).
+# these names: a release gets all five or none (check_downloads.sh).
 LINUX_DOWNLOAD="${PACKAGE_NAME}-linux-x86_64.tar.gz"
+# The same programs, players and demos as the Linux tarball, in one file that runs as it is.
+APPIMAGE_DOWNLOAD="${PACKAGE_NAME}-linux-x86_64.AppImage"
 WINDOWS_DOWNLOAD="${PACKAGE_NAME}-windows-x86_64.zip"
 MAC_ARM_DOWNLOAD="${PACKAGE_NAME}-macos-arm64.zip"
 MAC_INTEL_DOWNLOAD="${PACKAGE_NAME}-macos-x86_64.zip"
-DOWNLOADS=("${LINUX_DOWNLOAD}" "${WINDOWS_DOWNLOAD}" "${MAC_ARM_DOWNLOAD}" "${MAC_INTEL_DOWNLOAD}")
+DOWNLOADS=("${LINUX_DOWNLOAD}" "${APPIMAGE_DOWNLOAD}" "${WINDOWS_DOWNLOAD}" "${MAC_ARM_DOWNLOAD}"
+  "${MAC_INTEL_DOWNLOAD}")
+# What the AppImage holds at its top besides the tarball's folder: what starts it, and the menu
+# entry and icon the system shows it by (from branding/).
+APPIMAGE_ENTRY="AppRun"
+APPIMAGE_DESKTOP="redgem.desktop"
+APPIMAGE_ICON="redgem.svg"
+APPIMAGE_UNPACKED="squashfs-root"   # where an AppImage's --appimage-extract puts its files
+# The oldest glibc the Linux programs run on, as the docs say it (README-linux.txt, docs/install.md,
+# KNOWN_LIMITATIONS.md): they are built on Ubuntu 22.04, with libstdc++ linked in. glibc_floor.sh
+# fails when a program needs a newer one, or when a doc says another.
+LINUX_GLIBC_FLOOR="2.35"
+# libgcc stays the system's (libgcc_s, which every glibc system has): the newest of its symbol
+# versions a program may take, that of GCC 7's libgcc_s, which every system of that floor has.
+LINUX_LIBGCC_FLOOR="7.0.0"
 # The programs of the Linux and Mac downloads. The editor first: it is what the Mac's app starts.
 # The others stand beside it as they do in a build (a game is built with the player found beside
 # the editor).
@@ -28,6 +44,22 @@ ANDROID_RUNTIMES=(runtimes/android/arm64-v8a/libredgem.so runtimes/android/x86_6
 DEMOS=(platformer driving city)
 DEMO_FILE="scene.glb"   # what every demo's folder holds at its top (for check_downloads.sh)
 NOTICES=(LICENSE THIRD_PARTY_LICENSES.md)
+
+# The symbols of the players: each player as it was linked, before it was stripped for the
+# downloads, which `redgem symbolize` finds by the build id a crash report names. They are assets
+# of the release of their own, never in a download: redgem-symbols-<system>.zip, which holds
+# redgem-symbols/<system>/<the player> (for Android, one per processor).
+SYMBOLS_PACKAGE="${PACKAGE_NAME}-symbols"
+LINUX_SYMBOLS="${SYMBOLS_PACKAGE}-linux.zip"
+WINDOWS_SYMBOLS="${SYMBOLS_PACKAGE}-windows.zip"
+ANDROID_SYMBOLS="${SYMBOLS_PACKAGE}-android.zip"
+SYMBOL_DOWNLOADS=("${LINUX_SYMBOLS}" "${WINDOWS_SYMBOLS}" "${ANDROID_SYMBOLS}")
+LINUX_PLAYER_SYMBOLS="linux/redgem-player"
+WINDOWS_PLAYER_SYMBOLS="windows/redgem-player.exe"
+ANDROID_ABIS=(arm64-v8a x86_64)
+ANDROID_PLAYER="libredgem.so"
+# Everything a release carries: the downloads and the symbols.
+RELEASE_ASSETS=("${DOWNLOADS[@]}" "${SYMBOL_DOWNLOADS[@]}")
 
 # The engine's version, as CMakeLists.txt says it.
 engine_version() {

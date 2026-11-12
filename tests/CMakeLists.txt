@@ -137,6 +137,8 @@ add_executable(redgem_tests
   unit/http_url_test.cpp
   unit/http_message_test.cpp
   unit/http_response_parser_test.cpp
+  unit/http_redirect_test.cpp
+  unit/http_encoding_test.cpp
   unit/lan_discovery_test.cpp
   unit/nearby_games_test.cpp
   unit/network_event_test.cpp
@@ -158,6 +160,8 @@ add_executable(redgem_tests
   unit/clip_clock_test.cpp
   unit/camera_ray_test.cpp
   unit/crash_report_test.cpp
+  unit/build_id_test.cpp
+  unit/symbolize_test.cpp
   unit/agent_protocol_test.cpp
   unit/agent_client_test.cpp
   unit/agent_files_test.cpp
@@ -215,7 +219,8 @@ add_executable(redgem_tests
   integration/api_reference_test.cpp
   integration/error_hints_test.cpp
   integration/agent_connection_test.cpp)
-target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest)
+# (zlib: the tests compress the answers their web servers send.)
+target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest redgem_zlib)
 target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # A program that crashes on purpose, for the tests of crash reports (tests/tools/crash_helper.cpp).
 add_executable(redgem_crash_helper tools/crash_helper.cpp)
@@ -588,6 +593,10 @@ add_test(NAME tools.blender_runs_in_a_home_of_its_own
 # What refuses a release whose downloads are not all there, or miss what they must hold.
 add_test(NAME tools.release_downloads
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_downloads_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
+# What refuses Linux programs that need a newer glibc than the docs say, and how the AppImage
+# starts its programs.
+add_test(NAME tools.release_linux
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_linux_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
 # Which tag a run of the release workflow releases, and whether it touches a release at all.
 add_test(NAME tools.release_plan
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_plan_test.sh ${CMAKE_SOURCE_DIR}/tools/release)

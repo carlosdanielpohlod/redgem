@@ -174,6 +174,25 @@ Transform: Where an object is, how it is turned and how big it is.
 the same as data, for tools. It is the [API reference](scripting/api.md), which `--markdown`
 writes, and which is made from `docs/scripting/api.json`.
 
+## `redgem symbolize`: a crash report's functions
+
+```console
+$ redgem symbolize crash-20261024-130509.log --symbols redgem-symbols
+...
+Backtrace:
+  Arena.exe+0x1a2b  in redgem::Engine::step() at src/app/engine.cpp:120
+  ntdll.dll+0x5000
+```
+
+A built game's crash report says where the program was as offsets into it. `redgem symbolize`
+finds, in the file or folder `--symbols` names (the current folder unless given), the player
+whose build id is the one on the report's `Build:` line, and adds the function, and the file and
+line where the symbols have them, to each frame of it. The symbols of a release's players are
+its `redgem-symbols-<system>.zip` assets (see [Shipping](shipping.md#crash-reports-and-symbols)).
+It ends with 1, saying the builds it found, when none is the report's; with 2 when the line is
+not understood. Addresses are looked up with `llvm-addr2line` or `addr2line` from the `PATH`, or
+with the program `--tool <program>` names.
+
 Errors that `run` and `shot` report come with a hint when they are common ones: a mistyped method
 of one of the engine's classes gets the names near it, a class no script defines the file it is
 looked for in, a scene the game lacks the scenes it has.

@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -16,6 +17,7 @@
 #include "editor/scene_recovery.hpp"
 #include "scene/shapes/terrain.hpp"
 #include "input/input.hpp"
+#include "physics/collision_layers.hpp"
 #include "scene/scene.hpp"
 
 namespace redgem {
@@ -40,6 +42,9 @@ class EditorSession {
 
   SceneDocument& document() { return document_; }
   const std::filesystem::path& game_dir() const { return game_dir_; }
+  const CollisionLayers& collision_layers() const { return collision_layers_; }
+  void refresh_collision_layers();
+  bool set_collision_layer(const std::vector<ObjectId>& objects, const std::string& name);
   // The scene being edited, by the name scripts load it with ("main" is scene.glb, see
   // editor/game_scenes.hpp).
   const std::string& scene_name() const { return scene_name_; }
@@ -183,6 +188,7 @@ class EditorSession {
   // The document just read from its file is edited from now on: nothing selected, and the file
   // followed for changes others make to it.
   void begin_editing();
+  void apply_layer_settings();
   // Whatever is saved last is what the file on disk holds.
   void note_saved();
   void follow_scene_file(bool offer_archives = false);
@@ -227,6 +233,8 @@ class EditorSession {
                   const std::vector<Transform>& locals);
   void place_pasted(const std::vector<int>& objects, const std::string& parent, const Transform& parent_world);
   std::filesystem::path game_dir_;
+  CollisionLayers collision_layers_;
+  std::optional<std::pair<std::filesystem::file_time_type, std::uintmax_t>> layer_settings_stamp_;
   SceneDocument document_;
   std::string scene_name_;  // of the document's file, kept as it opens or is saved as another
   Scene preview_;

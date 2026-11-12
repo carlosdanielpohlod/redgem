@@ -17,6 +17,13 @@ option(REDGEM_BUILD_TESTS "Build the test suites" ON)
 # The continuous integration turns this on: a warning in the engine's own code (src, tests) fails
 # the build. The libraries it is built from keep theirs as warnings.
 option(REDGEM_WARNINGS_AS_ERRORS "Treat compiler warnings in the engine's own code as errors" OFF)
+# The release's Linux programs link libstdc++ in, so that they run on systems whose libstdc++ is
+# older than the compiler's (with the glibc of the system they are built on: see
+# tools/release/glibc_floor.sh). libgcc stays shared: every glibc system has libgcc_s.
+option(REDGEM_STATIC_LIBSTDCXX "Link libstdc++ into the Linux programs" OFF)
+if(REDGEM_STATIC_LIBSTDCXX AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT ANDROID)
+  add_link_options($<$<LINK_LANGUAGE:CXX>:-static-libstdc++>)
+endif()
 
 # The program is position independent (see cmake/Hardening.cmake), which every library linked
 # into it has to be as well. Most Linux toolchains build that way by themselves; where one does
@@ -64,6 +71,14 @@ include(Dependencies)
 
 # (Set after the dependencies: only the targets made from here on, the engine's, take it.)
 set(CMAKE_COMPILE_WARNING_AS_ERROR ${REDGEM_WARNINGS_AS_ERRORS})
+
+# Every program the engine links carries the id of its build (an ELF note on Linux and Android,
+# the debug directory's CodeView record on Windows): a crash report names the build by it, and
+# `redgem symbolize` finds that build's symbols by it (see src/core/build_id.hpp). The Mac's
+# linker gives every program a UUID of its own, which the engine does not read yet.
+if(NOT APPLE)
+  add_link_options(-Wl,--build-id)
+endif()
 
 add_subdirectory(src)
 

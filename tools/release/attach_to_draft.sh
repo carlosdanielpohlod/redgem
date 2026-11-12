@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Attaches the four downloads in a folder to the draft release of a tag, making the draft when
-# there is none yet. What the CI's release workflow runs on a pushed tag
+# Attaches the five downloads in a folder, and the players' symbols beside them
+# (redgem-symbols-<system>.zip), to the draft release of a tag, making the draft when there is
+# none yet. What the CI's release workflow runs on a pushed tag
 # (.github/workflows/release.yml), with gh signed in (GH_TOKEN, GH_REPO) to the repository.
 #   tools/release/attach_to_draft.sh <tag> <commit> <folder>
 # (The commit is what a new tag points at when the draft is published; a tag that exists keeps
 # its own.)
 #
 # It never publishes, and never changes a published release. The draft never holds fewer than
-# four downloads because of it: the new ones go up under other names first (incoming.<name>),
-# are checked (all four, at the sizes packed), and only then, the release checked again to still
+# five downloads because of it: the new ones go up under other names first (incoming.<name>),
+# are checked (all of them, at the sizes packed), and only then, the release checked again to still
 # be a draft, take the place of the old ones. A run that fails on the way leaves the old ones.
 set -euo pipefail
 
@@ -48,7 +49,7 @@ require_draft() {
 
 remove_staged() {
   local download id
-  for download in "${DOWNLOADS[@]}"; do
+  for download in "${RELEASE_ASSETS[@]}"; do
     id="$(asset_id "$1" "${STAGING_PREFIX}${download}" 2>/dev/null || true)"
     if [[ -n "${id}" ]]; then gh api -X DELETE "${ASSETS_ENDPOINT}/${id}" >/dev/null || true; fi
   done
@@ -76,7 +77,7 @@ ensure_draft() {
 verify_assets() {
   local tag="$1" dir="$2" prefix="$3" listing download size problems=0
   listing="$(list_assets "${tag}")"
-  for download in "${DOWNLOADS[@]}"; do
+  for download in "${RELEASE_ASSETS[@]}"; do
     size="$(wc -c < "${dir}/${download}" | tr -d ' ')"
     if ! has_asset "${listing}" "${prefix}${download}" "${size}"; then
       echo "  ${prefix}${download}: not on the release ${tag} at ${size} bytes" >&2
@@ -104,7 +105,7 @@ main() {
   # (A global: the trap runs after main has returned.)
   WORK_DIR="$(mktemp -d)"
   trap 'rm -rf "${WORK_DIR}"' EXIT
-  for download in "${DOWNLOADS[@]}"; do
+  for download in "${RELEASE_ASSETS[@]}"; do
     cp "${dir}/${download}" "${WORK_DIR}/${STAGING_PREFIX}${download}"
     staged+=("${WORK_DIR}/${STAGING_PREFIX}${download}")
   done
@@ -118,7 +119,7 @@ main() {
   fi
 
   require_draft "${tag}" "before the swap"
-  for download in "${DOWNLOADS[@]}"; do
+  for download in "${RELEASE_ASSETS[@]}"; do
     old="$(asset_id "${tag}" "${download}")"
     new="$(asset_id "${tag}" "${STAGING_PREFIX}${download}")"
     if [[ -n "${old}" ]]; then gh api -X DELETE "${ASSETS_ENDPOINT}/${old}" >/dev/null; fi

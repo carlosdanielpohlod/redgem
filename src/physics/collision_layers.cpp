@@ -1,6 +1,7 @@
 #include "physics/collision_layers.hpp"
 
 #include <algorithm>
+#include <set>
 
 #include <nlohmann/json.hpp>
 
@@ -15,17 +16,25 @@ constexpr const char* kNameSeparator = ", ";
 
 bool listed_text(const nlohmann::json& entry) { return entry.is_string() && !entry.get<std::string>().empty(); }
 
-void add_layer(CollisionLayers& layers, const nlohmann::json& entry, std::vector<std::string>& warnings) {
-  if (!listed_text(entry)) {
-    warnings.push_back(std::string(kSection) + "a layer must be a name, not " + entry.dump());
+void add_named_layer(CollisionLayersReading& reading, const std::string& name, std::set<std::string>& seen) {
+  const bool duplicate = !seen.insert(name).second;
+  if (duplicate) {
+    reading.warnings.push_back(std::string(kSection) + "duplicate layer '" + name + "'");
     return;
   }
-  const std::string name = entry.get<std::string>();
-  if (layers.find(name)) return;  // "default" said again, or a layer twice: it is there already
-  if (!layers.add(name)) {
-    warnings.push_back(std::string(kSection) + "at most " + std::to_string(kMaxCollisionLayers) + " layers; '" + name +
-                       "' is left out");
+  if (name == kDefaultLayerName) return;  // the default layer always exists
+  if (!reading.layers.add(name)) {
+    reading.warnings.push_back(std::string(kSection) + "at most " + std::to_string(kMaxCollisionLayers) + " layers; '" +
+                               name + "' is left out");
   }
+}
+
+void add_layer(CollisionLayersReading& reading, const nlohmann::json& entry, std::set<std::string>& seen) {
+  if (!listed_text(entry)) {
+    reading.warnings.push_back(std::string(kSection) + "a layer must be a name, not " + entry.dump());
+    return;
+  }
+  add_named_layer(reading, entry.get<std::string>(), seen);
 }
 
 void read_layers(const nlohmann::json& physics, CollisionLayersReading& reading) {
@@ -35,7 +44,8 @@ void read_layers(const nlohmann::json& physics, CollisionLayersReading& reading)
     reading.warnings.push_back(std::string(kSection) + "\"layers\" must be a list of names");
     return;
   }
-  for (const nlohmann::json& entry : listed) add_layer(reading.layers, entry, reading.warnings);
+  std::set<std::string> seen;
+  for (const nlohmann::json& entry : listed) add_layer(reading, entry, seen);
 }
 
 // The layer a name in "collides" stands for; a warning when it stands for none.
