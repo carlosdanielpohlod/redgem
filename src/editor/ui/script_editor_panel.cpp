@@ -1,6 +1,7 @@
 #include <imgui.h>
 #include <imgui_stdlib.h>
 
+#include <algorithm>
 #include <vector>
 
 #include "core/log.hpp"
@@ -76,18 +77,51 @@ bool save_pressed_in_code() {
   return ImGui::IsItemActive() && ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false);
 }
 
-// The code itself, filling the rest of the tab, in the colors of its Ruby (the text box's own text
-// is invisible: the colored copy shows instead). Ctrl+S in it saves.
+struct CodeJump {
+  ScriptEditor& editor;
+  bool moved = false;
+};
+
+bool has_jump(const ScriptEditor& editor) { return editor.line_request() != 0; }
+
+int move_to_line(ImGuiInputTextCallbackData* data) {
+  auto& jump = *static_cast<CodeJump*>(data->UserData);
+  if (!has_jump(jump.editor)) return 0;
+  if (data->EventFlag != ImGuiInputTextFlags_CallbackAlways) return 0;
+  const auto& starts = jump.editor.highlight().line_starts;
+  if (starts.empty()) return 0;
+  const auto target = starts[std::min(jump.editor.line_request(), starts.size()) - 1];
+  const int position = static_cast<int>(std::min(target, static_cast<std::size_t>(data->BufTextLen)));
+  data->CursorPos = position;
+  data->SelectionStart = position;
+  data->SelectionEnd = position;
+  jump.moved = true;
+  return 0;
+}
+
+void draw_code_input(ScriptEditor& editor, CodeJump& jump) {
+  if (has_jump(editor)) ImGui::SetKeyboardFocusHere();
+  ImGui::PushStyleColor(ImGuiCol_Text, palette::kTransparent);
+  const auto flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackAlways;
+  ImGui::InputTextMultiline(kCodeId, &editor.text(), ImVec2(editor_config::kFillWidth, editor_config::kFillWidth),
+                            flags, move_to_line, &jump);
+  ImGui::PopStyleColor();
+}
+
+void finish_jump(ScriptEditor& editor, ImGuiID id, const RubyHighlight& highlight, bool moved) {
+  if (!moved) return;
+  if (scroll_code_to_line(id, editor.line_request(), highlight.line_starts.size())) editor.finish_line_request();
+}
+
+// The input owns editing; the colored overlay shows the code in the same place.
 void draw_code(ScriptEditor& editor) {
   ImGui::PushFont(code_font(), 0.0f);
   const ImGuiID id = ImGui::GetID(kCodeId);
-  ImGui::PushStyleColor(ImGuiCol_Text, palette::kTransparent);
-  ImGui::InputTextMultiline(kCodeId, &editor.text(), ImVec2(editor_config::kFillWidth, editor_config::kFillWidth),
-                            ImGuiInputTextFlags_AllowTabInput);
-  ImGui::PopStyleColor();
+  CodeJump jump{editor};
+  draw_code_input(editor, jump);
   const bool save_pressed = save_pressed_in_code();
   const auto& highlight = editor.highlight();
-  scroll_code_to_line(id, editor.take_line_request(), highlight.line_starts.size());
+  finish_jump(editor, id, highlight, jump.moved);
   draw_code_colors(id, editor.text(), highlight);
   ImGui::PopFont();
   if (save_pressed) save(editor);

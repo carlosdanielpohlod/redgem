@@ -1,7 +1,6 @@
 #pragma once
 
 #include <filesystem>
-#include <utility>
 #include <string>
 
 #include "editor/scripts/ruby_tokens.hpp"
@@ -22,7 +21,8 @@ class ScriptEditor {
 
   std::string& text() { return text_; }
   void show_line(std::size_t line) { line_request_ = line; }
-  std::size_t take_line_request() { return std::exchange(line_request_, 0); }
+  std::size_t line_request() const { return line_request_; }
+  void finish_line_request() { line_request_ = 0; }
   bool modified() const { return text_ != saved_text_; }
   // The text's Ruby tokens, for coloring it (worked out again only after the text changed).
   const RubyHighlight& highlight() { return highlight_.of(text_); }

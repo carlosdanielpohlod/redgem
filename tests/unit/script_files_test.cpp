@@ -157,6 +157,7 @@ TEST_CASE("Ruby backtrace rows identify a source file and a positive line") {
   REQUIRE(location);
   CHECK(location->file == "C:/My Game/scripts/units/guard.rb");
   CHECK(location->line == 42);
+  REQUIRE(console_script_line("    from guard.rb:42 \r"));
   CHECK_FALSE(console_script_line("    from guard.rb:0:in update"));
   CHECK_FALSE(console_script_line("    from guard.rb:12oops"));
   CHECK_FALSE(console_script_line("    from guard.rb:999999999999999999999999999"));
@@ -177,9 +178,14 @@ TEST_CASE("opening a backtrace location focuses the tab and keeps edits") {
   tab->text() += "# unsaved\n";
   REQUIRE(workspace.open_at(scripts / "guard.rb", 4, error));
   CHECK(workspace.take_focus_request() == "guard.rb");
-  CHECK(tab->take_line_request() == 4);
-  CHECK(tab->take_line_request() == 0);
+  CHECK(tab->line_request() == 4);
+  tab->finish_line_request();
+  CHECK(tab->line_request() == 0);
   CHECK(tab->modified());
+  const auto spelled = scripts / "." / "guard.rb";
+  REQUIRE(workspace.open_at(spelled, 2, error));
+  CHECK(tab->line_request() == 2);
+  CHECK_FALSE(workspace.open_at("engine/guard.rb", 1, error));
   CHECK_FALSE(workspace.open_at(dir / "outside.rb", 1, error));
   CHECK_FALSE(workspace.open_at("../outside.rb", 1, error));
   CHECK(workspace.tabs().size() == 1);

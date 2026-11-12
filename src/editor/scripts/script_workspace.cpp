@@ -18,33 +18,27 @@ ScriptEditor* ScriptWorkspace::open(const std::string& file_name, std::string& e
   return tab;
 }
 
-namespace {
-
-std::filesystem::path relative_source(const std::filesystem::path& root, const std::filesystem::path& source) {
+std::filesystem::path ScriptWorkspace::relative_source(const std::filesystem::path& source) const {
   std::error_code problem;
-  const auto absolute_root = std::filesystem::absolute(root, problem);
+  const auto root = std::filesystem::weakly_canonical(scripts_dir_, problem);
   if (problem) return {};
-  const auto absolute_source = std::filesystem::absolute(source, problem);
+  const auto absolute = std::filesystem::absolute(source, problem);
   if (problem) return {};
-  return absolute_source.lexically_relative(absolute_root.lexically_normal());
+  const auto parent = std::filesystem::weakly_canonical(absolute.parent_path(), problem);
+  if (problem) return {};
+  return (parent / absolute.filename()).lexically_relative(root);
 }
 
+namespace {
 bool valid_source(const std::filesystem::path& root, const std::filesystem::path& relative) {
-  const std::string name = relative.generic_u8string();
-  return relative.extension() == ".rb" && safe_asset_name(name) && file_inside(root, relative).has_value();
+  return relative.extension() == ".rb" && safe_asset_name(relative.generic_u8string()) &&
+         file_inside(root, relative).has_value();
 }
-
-std::filesystem::path script_source(const std::filesystem::path& root, const std::filesystem::path& source) {
-  if (source.is_relative() && valid_source(root, source)) return source;
-  const auto relative = relative_source(root, source);
-  return valid_source(root, relative) ? relative : std::filesystem::path{};
-}
-
 }  // namespace
 
 bool ScriptWorkspace::open_at(const std::filesystem::path& source, std::size_t line, std::string& error) {
-  const auto relative = script_source(scripts_dir_, source);
-  if (relative.empty()) {
+  const auto relative = relative_source(source);
+  if (!valid_source(scripts_dir_, relative)) {
     error = "cannot open script source " + printable(source.generic_u8string());
     return false;
   }

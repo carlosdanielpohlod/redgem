@@ -19,6 +19,7 @@ class ScriptWorkspace {
   // Opens a script in a new tab, or brings its tab to the front if it is already open.
   // Returns the tab, or nullptr with `error` set.
   ScriptEditor* open(const std::string& file_name, std::string& error);
+  std::filesystem::path relative_source(const std::filesystem::path& source) const;
   bool open_at(const std::filesystem::path& source, std::size_t line, std::string& error);
   ScriptEditor* find(const std::string& file_name);
   const std::vector<std::unique_ptr<ScriptEditor>>& tabs() const { return tabs_; }

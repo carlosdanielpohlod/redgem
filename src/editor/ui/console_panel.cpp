@@ -1,7 +1,8 @@
 #include <imgui.h>
 
 #include <algorithm>
-#include <utility>
+
+#include "core/safe_path.hpp"
 
 #include "editor/editor_config.hpp"
 #include "editor/ui/labels.hpp"
@@ -57,48 +58,89 @@ void draw_filters(ConsoleLog& console, ConsoleFilters& filters) {
   filter_button(ICON_FA_CIRCLE_XMARK, count_of(console, log::Level::Error), filters.errors, error_color());
 }
 
-void draw_error_rows(std::string_view message, std::optional<ConsoleScriptLine>& selected) {
-  int index = 0;
-  while (!message.empty()) {
-    const auto end = message.find('\n');
-    const std::string row(message.substr(0, end));
-    if (auto location = console_script_line(row)) {
-      ImGui::PushID(index);
-      if (ImGui::TextLink(row.c_str())) selected = std::move(location);
-      ImGui::PopID();
-    } else {
-      ImGui::TextUnformatted(row.c_str());
-    }
-    if (end == std::string_view::npos) return;
-    message.remove_prefix(end + 1);
-    ++index;
-  }
-}
+struct VisibleRow {
+  const ConsoleEntry* entry;
+  const ConsoleRow* row;
+};
 
-void draw_entry(const ConsoleEntry& entry, std::optional<ConsoleScriptLine>& selected) {
-  const LevelStyle style = style_of(entry.level);
-  ImGui::TextColored(style.color, "%s", style.icon);
-  ImGui::SameLine();
-  if (entry.level == log::Level::Error) {
-    ImGui::PushStyleColor(ImGuiCol_Text, style.color);
-    draw_error_rows(entry.message, selected);
-    ImGui::PopStyleColor();
-  } else if (entry.level == log::Level::Info) {
-    ImGui::TextUnformatted(entry.message.c_str());
-  } else {
-    ImGui::TextColored(style.color, "%s", entry.message.c_str());
-  }
-}
-
-std::optional<ConsoleScriptLine> draw_entries(const ConsoleLog& console, const ConsoleFilters& filters) {
-  std::optional<ConsoleScriptLine> selected;
-  for (const ConsoleEntry& entry : console.entries()) {
+std::vector<VisibleRow> visible_rows(const ConsoleLog& console, const ConsoleFilters& filters) {
+  std::vector<VisibleRow> rows;
+  for (const auto& entry : console.entries()) {
     if (!filters.shows(entry.level)) continue;
-    ImGui::PushID(&entry);
-    draw_entry(entry, selected);
-    ImGui::PopID();
+    for (const auto& row : entry.rows) rows.push_back({&entry, &row});
   }
-  return selected;
+  return rows;
+}
+
+struct ConsoleInteraction {
+  const ConsoleScriptLine* selected = nullptr;
+  bool link_hovered = false;
+};
+
+bool links_to_project(const ConsoleScriptLine& source, const ScriptWorkspace& scripts) {
+  try {
+    const auto relative = scripts.relative_source(std::filesystem::u8path(source.file));
+    return safe_asset_name(relative.generic_u8string());
+  } catch (const std::filesystem::filesystem_error&) {
+    return false;
+  }
+}
+
+void draw_source_link(const ConsoleScriptLine& source, std::string_view text, ConsoleInteraction& interaction) {
+  const auto origin = ImGui::GetCursorScreenPos();
+  const char* end = text.data() + text.size();
+  const auto size = ImGui::CalcTextSize(text.data(), end);
+  if (ImGui::InvisibleButton("source", size, ImGuiButtonFlags_EnableNav)) interaction.selected = &source;
+  if (ImGui::IsItemHovered()) {
+    interaction.link_hovered = true;
+    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+  }
+  ImGui::GetWindowDrawList()->AddText(origin, ImGui::GetColorU32(ImGuiCol_TextLink), text.data(), end);
+}
+
+void draw_row_text(const VisibleRow& row, const ScriptWorkspace& scripts, ConsoleInteraction& interaction) {
+  const auto& source = row.row->source;
+  const auto text = std::string_view(row.entry->message).substr(row.row->offset, row.row->length);
+  if (source && links_to_project(*source, scripts)) {
+    draw_source_link(*source, text, interaction);
+  } else if (text.empty()) {
+    ImGui::Dummy(ImVec2(0, ImGui::GetTextLineHeight()));
+  } else {
+    ImGui::TextUnformatted(text.data(), text.data() + text.size());
+  }
+}
+
+void draw_row(const VisibleRow& row, const ScriptWorkspace& scripts, ConsoleInteraction& interaction) {
+  const auto style = style_of(row.entry->level);
+  if (row.row->offset == 0) {
+    ImGui::TextColored(style.color, "%s", style.icon);
+    ImGui::SameLine();
+  }
+  if (row.entry->level != log::Level::Info) ImGui::PushStyleColor(ImGuiCol_Text, style.color);
+  draw_row_text(row, scripts, interaction);
+  if (row.entry->level != log::Level::Info) ImGui::PopStyleColor();
+}
+
+void draw_visible_row(const VisibleRow& row, const ScriptWorkspace& scripts, ConsoleInteraction& interaction) {
+  ImGui::PushID(row.entry);
+  ImGui::PushID(row.row);
+  draw_row(row, scripts, interaction);
+  ImGui::PopID();
+  ImGui::PopID();
+}
+
+ConsoleInteraction draw_entries(const ConsoleLog& console, const ConsoleFilters& filters,
+                                const ScriptWorkspace& scripts) {
+  ConsoleInteraction interaction;
+  const auto rows = visible_rows(console, filters);
+  ImGuiListClipper clipper;
+  clipper.Begin(static_cast<int>(rows.size()), ImGui::GetTextLineHeightWithSpacing());
+  while (clipper.Step()) {
+    for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; ++index) {
+      draw_visible_row(rows[static_cast<std::size_t>(index)], scripts, interaction);
+    }
+  }
+  return interaction;
 }
 
 void open_source(ScriptWorkspace& scripts, const ConsoleScriptLine& selected) {
@@ -110,22 +152,26 @@ void open_source(ScriptWorkspace& scripts, const ConsoleScriptLine& selected) {
   }
 }
 
+ConsoleInteraction draw_log(const ConsoleLog& console, const ConsoleFilters& filters, const ScriptWorkspace& scripts) {
+  ImGui::BeginChild(kLogId, ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
+  const bool at_bottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY();
+  ImGui::PushFont(code_font(), 0.0f);
+  const auto interaction = draw_entries(console, filters, scripts);
+  ImGui::PopFont();
+  if (at_bottom && !interaction.link_hovered) ImGui::SetScrollHereY(kScrollToBottom);
+  ImGui::EndChild();
+  return interaction;
+}
+
 }  // namespace
 
 void draw_console(ConsoleLog& console, ConsoleState& state, ScriptWorkspace& scripts) {
   ImGui::Begin(window_title(editor_config::kConsoleTitle, editor_config::kConsoleWindow));
   draw_filters(console, state.filters);
   ImGui::Separator();
-
-  ImGui::BeginChild(kLogId, ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
-  const bool at_bottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY();
-  ImGui::PushFont(code_font(), 0.0f);
-  const auto selected = draw_entries(console, state.filters);
-  ImGui::PopFont();
-  if (at_bottom) ImGui::SetScrollHereY(kScrollToBottom);
-  ImGui::EndChild();
+  const auto interaction = draw_log(console, state.filters, scripts);
   ImGui::End();
-  if (selected) open_source(scripts, *selected);
+  if (interaction.selected != nullptr) open_source(scripts, *interaction.selected);
 }
 
 }  // namespace redgem::ui
