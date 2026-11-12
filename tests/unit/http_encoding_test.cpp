@@ -45,6 +45,13 @@ TEST_CASE("a gzip answer comes decompressed, without the headers that described 
   }
 }
 
+TEST_CASE("a gzip answer of several members one after the other is read whole") {
+  HttpResponse response =
+      answer("gzip", compressed("first half, ", kGzipWrapper) + compressed("second half", kGzipWrapper));
+  CHECK(decode_body(response).empty());
+  CHECK(response.body == "first half, second half");
+}
+
 TEST_CASE("a deflate answer comes decompressed, with zlib's wrapper or without") {
   for (const int window : {kZlibWrapper, kNoWrapper}) {
     HttpResponse response = answer("deflate", compressed(kText, window));

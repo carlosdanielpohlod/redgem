@@ -109,14 +109,19 @@ bool redirect_again(int redirects, HttpRequest& request, Url& url, const HttpRes
   return false;
 }
 
-// The answer as the game gets it: where it came from, and its body decompressed.
+// Whether the request goes on to where its answer sends it.
+bool goes_on(const HttpRequest& request, const HttpResponse& response) {
+  return request.follow_redirects && is_followed_redirect(response);
+}
+
+// The answer as the game gets it: where it came from, and its body decompressed. A body that
+// cannot be is the answer's error, its status and headers kept (and its body dropped).
 HttpResponse finished(HttpResponse response, const Url& url) {
   response.url = url_text(url);
-  std::string error = response.error.empty() ? decode_body(response) : std::string();
-  if (error.empty()) return response;
-  HttpResponse failed = HttpResponse::failure(std::move(error));
-  failed.url = std::move(response.url);
-  return failed;
+  if (!response.error.empty()) return response;
+  response.error = decode_body(response);
+  if (!response.error.empty()) response.body.clear();
+  return response;
 }
 
 }  // namespace
@@ -129,7 +134,7 @@ HttpResponse exchange(const HttpRequest& request, const Url& url, const std::sha
   Url at = url;
   for (int redirects = 0;; ++redirects) {
     HttpResponse response = exchange_once(next, at, trust, patience);
-    if (!is_followed_redirect(response)) return finished(std::move(response), at);
+    if (!goes_on(next, response)) return finished(std::move(response), at);
     std::string error;
     if (!redirect_again(redirects, next, at, response, error)) return finished(HttpResponse::failure(error), at);
   }

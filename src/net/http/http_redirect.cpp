@@ -31,6 +31,13 @@ constexpr char kSchemeEnd = ':';
 constexpr char kPathStart = '/';
 constexpr char kQueryStart = '?';
 constexpr char kFragmentStart = '#';
+// A Location's bytes that cannot travel as they are (spaces, letters beyond ASCII) go as %XX.
+constexpr char kFirstVisible = '!';
+constexpr char kLastVisible = '~';
+constexpr char kPercent = '%';
+constexpr const char* kHexDigits = "0123456789ABCDEF";
+constexpr unsigned kHighHalfShift = 4;
+constexpr unsigned kLowHalfMask = 0x0F;
 constexpr const char* kCurrentSegment = ".";
 constexpr const char* kParentSegment = "..";
 // What tells of a body: dropped with it when a redirect turns the request into a GET.
@@ -61,6 +68,26 @@ bool has_scheme(const std::string& reference) {
 }
 
 std::string scheme_of(const Url& url) { return url.secure ? kSecureScheme : kPlainScheme; }
+
+bool travels_as_is(char c) { return c >= kFirstVisible && c <= kLastVisible; }
+
+void append_encoded(std::string& text, unsigned char byte) {
+  text.append(1, kPercent).append(1, kHexDigits[byte >> kHighHalfShift]).append(1, kHexDigits[byte & kLowHalfMask]);
+}
+
+// A Location as it can go in a request line: what cannot travel as it is percent-encoded, as
+// browsers send it (servers often write UTF-8 paths in a Location as they are).
+std::string encoded(const std::string& location) {
+  std::string text;
+  for (const char c : location) {
+    if (travels_as_is(c)) {
+      text.push_back(c);
+    } else {
+      append_encoded(text, static_cast<unsigned char>(c));
+    }
+  }
+  return text;
+}
 
 // The segments of a path, without its first slash: "a/b/" is a, b and an empty last one.
 std::vector<std::string> segments(const std::string& path) {
@@ -153,7 +180,7 @@ bool is_followed_redirect(const HttpResponse& response) {
 std::string url_text(const Url& url) { return scheme_of(url) + kAuthorityStart + url.authority() + url.target; }
 
 std::optional<Url> redirect_target(const Url& from, const std::string& location, std::string& error) {
-  std::optional<Url> to = parse_url(absolute_location(from, trimmed(location)), error);
+  std::optional<Url> to = parse_url(absolute_location(from, encoded(trimmed(location))), error);
   if (to && is_downgrade(from, *to)) {
     error = "a redirect from https:// to http:// is not followed";
     return std::nullopt;

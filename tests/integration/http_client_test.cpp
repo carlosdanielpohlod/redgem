@@ -10,6 +10,7 @@
 #include "http_compression.hpp"
 #include "http_test_server.hpp"
 #include "net/http/http_client.hpp"
+#include "net/http/http_message.hpp"
 #include "net/http/http_redirect.hpp"
 
 using namespace redgem;
@@ -20,6 +21,7 @@ namespace {
 
 constexpr int kOk = 200;
 constexpr int kCreated = 201;
+constexpr int kFound = 302;
 constexpr std::chrono::milliseconds kPollPause{5};
 constexpr std::chrono::seconds kLongestWait{10};
 constexpr float kShortTimeout = 0.3f;
@@ -269,6 +271,20 @@ TEST_CASE("a request follows so many redirects, and the next one is an error") {
   CHECK(server.requests() == net::kMaxHttpRedirects + 1);
 }
 
+TEST_CASE("a request that does not follow redirects gets the redirect itself") {
+  HttpTestServer landing(HttpTestServer::Kind::Plain, http_answer("200 OK", "{}"));
+  HttpTestServer server(HttpTestServer::Kind::Plain, redirect_to("302 Found", "myapp://login?code=7"));
+  net::HttpClient client;
+  net::HttpRequest get = request("GET", server.url("/authorize"));
+  get.follow_redirects = false;
+  const net::HttpResponse response = answer(client, start(client, get));
+  CHECK_MESSAGE(response.error.empty(), response.error);
+  CHECK(response.status == kFound);
+  CHECK(net::header_value(response.headers, "location") == "myapp://login?code=7");
+  CHECK(response.url == server.url("/authorize"));
+  CHECK(server.requests() == 1);
+}
+
 TEST_CASE("a redirect from https to http is not followed: nothing goes out in plain text") {
   HttpTestServer plain(HttpTestServer::Kind::Plain, http_answer("200 OK", "{}"));
   HttpTestServer secure(HttpTestServer::Kind::Secure, redirect_to("302 Found", plain.url("/")));
@@ -350,12 +366,14 @@ TEST_CASE("a compressed answer that would outgrow the limit, or is corrupt, is r
   HttpTestServer bombing(HttpTestServer::Kind::Plain, http_answer("200 OK", bomb, "Content-Encoding: gzip\r\n"));
   net::HttpClient client;
   const net::HttpResponse refused = answer(client, start(client, request("GET", bombing.url("/"))));
-  CHECK(refused.status == 0);
+  CHECK(refused.status == kOk);  // (the answer came: its status and headers stay)
   CHECK(contains(refused.error, "once decompressed"));
+  CHECK(refused.body.empty());
 
   HttpTestServer corrupt(HttpTestServer::Kind::Plain,
                          http_answer("200 OK", "not gzip at all", "Content-Encoding: gzip\r\n"));
   const net::HttpResponse broken = answer(client, start(client, request("GET", corrupt.url("/"))));
-  CHECK(broken.status == 0);
+  CHECK(broken.status == kOk);
   CHECK(contains(broken.error, "gzip body is corrupt"));
+  CHECK(broken.body.empty());
 }

@@ -83,10 +83,12 @@ until 1.0, a release may change what games rely on (see
   POST, go on as a GET without the body; 307 and 308 keep both. A redirect from `https://` to
   `http://` is refused, every hop is checked as the first address was (`http://` only nearby, no
   metadata address), and a hop to another origin drops `Authorization`, `Cookie` and
-  `Proxy-Authorization`. `response.url` is where the answer came from.
+  `Proxy-Authorization`. A `Location` with spaces or UTF-8 is percent-encoded. `response.url` is
+  where the answer came from; `redirects: false` returns the redirect itself.
 - **Compressed web answers**: requests send `Accept-Encoding: gzip, deflate`, and gzip or deflate
   answers (chunked or not) reach the block decompressed with zlib 1.3.2, the 8 MB limit applying
-  to the decompressed body (a decompression bomb is refused). A corrupt or cut body is an `error`.
+  to the decompressed body (a decompression bomb is refused). A corrupt or cut body is an `error`,
+  with the answer's status and headers kept.
 
 ### Changed
 

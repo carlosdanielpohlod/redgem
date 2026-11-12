@@ -4,6 +4,8 @@
 
 #include <zlib.h>
 
+#include <vector>
+
 #include "net/http/http_message.hpp"
 
 namespace redgem::net {
@@ -20,7 +22,8 @@ constexpr int kGzipWrapperFlag = 16;
 constexpr int kGzipWindow = MAX_WBITS + kGzipWrapperFlag;
 constexpr int kZlibWindow = MAX_WBITS;
 constexpr int kRawWindow = -MAX_WBITS;
-// How much is decompressed at a time: the body grows by at most this past the limit before it is refused.
+// How much is decompressed at a time: the body grows at most this far past the limit before it is
+// refused.
 constexpr std::size_t kInflateStepBytes = 64 * 1024;
 // zlib's wrapper starts with two bytes: deflate as the method in the low bits of the first, and
 // the two of them read as one number a multiple of 31.
@@ -66,15 +69,29 @@ Inflated outcome(int result, std::size_t size) {
   return Inflated::Corrupt;
 }
 
-// Decompresses what fits in one more step's room at the end of `out`.
-Inflated inflate_step(z_stream& stream, std::string& out) {
-  const std::size_t before = out.size();
-  out.resize(before + kInflateStepBytes);
-  stream.next_out = reinterpret_cast<Bytef*>(&out[before]);
-  stream.avail_out = static_cast<uInt>(kInflateStepBytes);
+// Decompresses one step's worth into `scratch`, then onto the end of `out`.
+Inflated inflate_step(z_stream& stream, std::vector<unsigned char>& scratch, std::string& out) {
+  stream.next_out = scratch.data();
+  stream.avail_out = static_cast<uInt>(scratch.size());
   const int result = inflate(&stream, Z_NO_FLUSH);
-  out.resize(before + kInflateStepBytes - stream.avail_out);
+  out.append(reinterpret_cast<const char*>(scratch.data()), scratch.size() - stream.avail_out);
   return outcome(result, out.size());
+}
+
+// Whether a gzip body goes on with another member after the one that ended (gzip allows several,
+// one after the other, which make one text).
+bool another_member(Inflated state, const z_stream& stream, int window) {
+  const bool more_after_the_end = state == Inflated::Whole && stream.avail_in > 0;
+  return more_after_the_end && window == kGzipWindow;
+}
+
+// One stream (one gzip member); Going again when another member follows it.
+Inflated inflate_member(z_stream& stream, int window, std::vector<unsigned char>& scratch, std::string& out) {
+  Inflated state = Inflated::Going;
+  while (state == Inflated::Going) state = inflate_step(stream, scratch, out);
+  if (!another_member(state, stream, window)) return state;
+  inflateReset(&stream);
+  return Inflated::Going;
 }
 
 // Bytes after the compressed stream's end are no part of it: the body is not what it says.
@@ -89,8 +106,9 @@ Inflated inflate_all(const std::string& compressed, int window, std::string& out
   // (An answer's body is at most kMaxHttpBodyBytes: its size fits zlib's counts.)
   stream.next_in = reinterpret_cast<const Bytef*>(compressed.data());
   stream.avail_in = static_cast<uInt>(compressed.size());
+  std::vector<unsigned char> scratch(kInflateStepBytes);
   Inflated state = Inflated::Going;
-  while (state == Inflated::Going) state = inflate_step(stream, out);
+  while (state == Inflated::Going) state = inflate_member(stream, window, scratch, out);
   state = checked_end(state, stream);
   inflateEnd(&stream);
   return state;

@@ -10,10 +10,11 @@
 # Addresses are https:// (the server's certificate is checked against the system's), or http://
 # to this machine or the local network. An answer is at most 8 MB (once decompressed: gzip and
 # deflate answers come decompressed), 16 requests may be on their way at once, and each gives up
-# after 15 seconds unless timeout: says otherwise (at most 120). Up to 10 redirects are followed,
-# never from https:// to http://; response.url says where the answer came from. When a level is
-# loaded, the blocks of requests still on their way are not called (the requests still go out);
-# when the game ends, those requests are given up.
+# after 15 seconds unless timeout: says otherwise (at most 120). Up to 10 redirects are followed
+# (unless redirects: false), never from https:// to http://, and Authorization and Cookie headers
+# stay with the origin they were given to; response.url says where the answer came from. When a
+# level is loaded, the blocks of requests still on their way are not called (the requests still
+# go out); when the game ends, those requests are given up.
 module HTTP
   DEFAULT_TIMEOUT = 15.0   # seconds
   SUCCESS = (200..299)     # the statuses ok? stands for
@@ -44,34 +45,36 @@ module HTTP
   @waiting = {}
 
   class << self
-    def get(url, headers: {}, timeout: DEFAULT_TIMEOUT, &)
-      request(:get, url, headers: headers, timeout: timeout, &)
+    # redirects: false gives the block a redirect's own answer (its status and Location) instead
+    # of following it.
+    def get(url, headers: {}, timeout: DEFAULT_TIMEOUT, redirects: true, &)
+      request(:get, url, headers: headers, timeout: timeout, redirects: redirects, &)
     end
 
-    def delete(url, headers: {}, timeout: DEFAULT_TIMEOUT, &)
-      request(:delete, url, headers: headers, timeout: timeout, &)
+    def delete(url, headers: {}, timeout: DEFAULT_TIMEOUT, redirects: true, &)
+      request(:delete, url, headers: headers, timeout: timeout, redirects: redirects, &)
     end
 
     # json: sends a value as JSON (a hash, an array...); body: sends a text as it is.
-    def post(url, json: nil, body: nil, headers: {}, timeout: DEFAULT_TIMEOUT, &)
-      request(:post, url, json: json, body: body, headers: headers, timeout: timeout, &)
+    def post(url, json: nil, body: nil, headers: {}, timeout: DEFAULT_TIMEOUT, redirects: true, &)
+      request(:post, url, json: json, body: body, headers: headers, timeout: timeout, redirects: redirects, &)
     end
 
-    def put(url, json: nil, body: nil, headers: {}, timeout: DEFAULT_TIMEOUT, &)
-      request(:put, url, json: json, body: body, headers: headers, timeout: timeout, &)
+    def put(url, json: nil, body: nil, headers: {}, timeout: DEFAULT_TIMEOUT, redirects: true, &)
+      request(:put, url, json: json, body: body, headers: headers, timeout: timeout, redirects: redirects, &)
     end
 
-    def patch(url, json: nil, body: nil, headers: {}, timeout: DEFAULT_TIMEOUT, &)
-      request(:patch, url, json: json, body: body, headers: headers, timeout: timeout, &)
+    def patch(url, json: nil, body: nil, headers: {}, timeout: DEFAULT_TIMEOUT, redirects: true, &)
+      request(:patch, url, json: json, body: body, headers: headers, timeout: timeout, redirects: redirects, &)
     end
 
     # Any of them by its method's name. The request's number (what is waiting for it).
-    def request(verb, url, json: nil, body: nil, headers: {}, timeout: DEFAULT_TIMEOUT, &block)
+    def request(verb, url, json: nil, body: nil, headers: {}, timeout: DEFAULT_TIMEOUT, redirects: true, &block)
       raise ArgumentError, "HTTP: give json: or body:, not both" unless json.nil? || body.nil?
 
       headers = texts(headers)
       body = encode(json, headers) unless json.nil?
-      id = __start(verb.to_s.upcase, url.to_s, headers, body.to_s, timeout.to_f)
+      id = __start(verb.to_s.upcase, url.to_s, headers, body.to_s, timeout.to_f, redirects)
       @waiting[id] = block if block
       id
     end

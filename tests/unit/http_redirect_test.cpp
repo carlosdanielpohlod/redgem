@@ -89,6 +89,8 @@ TEST_CASE("a Location is read against the address its answer came from") {
   CHECK(target(from, "/a/b/../c/./d#part") == "https://api.example.com/a/c/d");
   CHECK(target("http://127.0.0.1:4567/x", "/y") == "http://127.0.0.1:4567/y");
   CHECK(target(from, "  /spaced  ") == "https://api.example.com/spaced");
+  CHECK(target(from, "/a b") == "https://api.example.com/a%20b");
+  CHECK(target(from, "/files/caf\xc3\xa9.png") == "https://api.example.com/files/caf%C3%A9.png");
 }
 
 TEST_CASE("a redirect never goes from https to http, nor anywhere a request may not go") {
@@ -96,8 +98,7 @@ TEST_CASE("a redirect never goes from https to http, nor anywhere a request may 
         std::string::npos);
   CHECK(refusal("https://api.example.com/", "ftp://files.example.com/").find("https://") != std::string::npos);
   CHECK(refusal("https://api.example.com/", "https://user:pw@evil.example.com/").find("password") != std::string::npos);
-  CHECK(refusal("https://api.example.com/", "/a b").find("spaces") != std::string::npos);
-  CHECK(refusal("https://api.example.com/", "javascript:alert(1)").find("https://") != std::string::npos);
+  @ @ @END CHECK(refusal("https://api.example.com/", "javascript:alert(1)").find("https://") != std::string::npos);
   // From http, anything a request may go to: the machine checks still run when it is sent.
   CHECK(target("http://127.0.0.1/", "https://api.example.com/") == "https://api.example.com/");
 }

@@ -52,12 +52,16 @@ end
   the body. A redirect from `https://` to `http://` is not followed, and every address a redirect
   leads to is checked as the first one was (`http://` only to this machine or network, never a
   metadata address). When a redirect leaves the origin (another scheme, machine or port), the
-  request goes on without its `Authorization`, `Cookie` and `Proxy-Authorization` headers.
+  request goes on without its `Authorization`, `Cookie` and `Proxy-Authorization` headers (other
+  headers go along). A `Location` with spaces or letters beyond ASCII is percent-encoded.
+  `redirects: false` gives the block the redirect itself (its `status` and its `location` header),
+  for a login flow that reads it.
 - **Compressed answers**: requests say `Accept-Encoding: gzip, deflate` (unless your headers name
   one of their own), and a gzip or deflate answer reaches the block decompressed, without its
   `content-encoding` and `content-length` headers. The 8 MB limit holds for the decompressed
   body too, so a small answer that would inflate past it is refused; a corrupt or cut compressed
-  body is an `error`.
+  body is an `error` (the answer's `status` and `headers` stay, its `body` is empty). An answer of
+  several gzip members one after the other is read whole.
 - When a level is loaded, the blocks of requests still on their way are not called (the requests
   still go out). When the game ends (or Play is stopped in the editor) they are given up.
 

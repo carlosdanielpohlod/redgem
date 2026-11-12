@@ -31,6 +31,8 @@ struct HttpRequest {
   HttpHeaders headers;
   std::string body;
   float timeout_seconds = kDefaultHttpTimeoutSeconds;
+  // Whether a redirect is followed (see http_redirect.hpp), or its answer is the request's.
+  bool follow_redirects = true;
 };
 
 struct HttpResponse {

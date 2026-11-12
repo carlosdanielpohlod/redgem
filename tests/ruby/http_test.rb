@@ -64,7 +64,8 @@ class HttpTest < RedGemTest::Case
   end
 
   def test_each_request_has_a_number_of_its_own
-    ids = [HTTP.put(NOBODY_THERE, body: "x"), HTTP.patch(NOBODY_THERE, json: [1])]
-    assert_equal 2, ids.uniq.size
+    ids = [HTTP.put(NOBODY_THERE, body: "x"), HTTP.patch(NOBODY_THERE, json: [1]),
+           HTTP.get(NOBODY_THERE, redirects: false)]
+    assert_equal 3, ids.uniq.size
   end
 end

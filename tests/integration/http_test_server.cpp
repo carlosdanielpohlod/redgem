@@ -215,6 +215,7 @@ void HttpTestServer::answer_in_turn(std::vector<std::string> answers) {
 
 std::string HttpTestServer::answer_to(int index) const {
   const std::lock_guard<std::mutex> lock(mutex_);
+  if (answers_.empty()) return {};
   return answers_.at(std::min(static_cast<std::size_t>(index), answers_.size() - 1));
 }
 

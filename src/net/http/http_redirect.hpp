@@ -21,7 +21,8 @@ bool is_followed_redirect(const HttpResponse& response);
 std::string url_text(const Url& url);
 
 // Where a redirect's Location sends a request made to `from`: an address of its own, one with no
-// scheme (//machine/path), or a path or a query read against `from`. nullopt, with `error`, when
+// scheme (//machine/path), or a path or a query read against `from`, with what cannot travel as
+// it is (spaces, letters beyond ASCII) percent-encoded. nullopt, with `error`, when
 // it is not an address a request may go to (as parse_url reads it), or it would take an https://
 // request to http://.
 std::optional<Url> redirect_target(const Url& from, const std::string& location, std::string& error);
