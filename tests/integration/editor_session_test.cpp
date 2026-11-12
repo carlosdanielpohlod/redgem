@@ -93,6 +93,7 @@ TEST_CASE("refreshing one node gives the preview what rebuilding it all would, a
   CHECK(one.mesh == all.mesh);
   CHECK(one.prefab == all.prefab);
   CHECK(one.light.has_value() == all.light.has_value());
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -127,6 +128,7 @@ TEST_CASE("a game's music, volume and music pitch end with the game, whether Sto
     CHECK(audio.music_volume() == kFullVolume);
     CHECK(audio.music_pitch() == kAsRecorded);
   }
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -156,6 +158,7 @@ TEST_CASE("play runs the edited scene and stop restores it") {
   CHECK(session->play_state() == PlayState::Editing);
   CHECK(session->runtime() == nullptr);
   CHECK(y_of(*session, "Crate") == doctest::Approx(kRaisedCrateY));
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -174,6 +177,7 @@ TEST_CASE("pause freezes the game") {
   session->pause(false);
   play_frames(*session, kSettleFrames);
   CHECK(y_of(*session, "Crate") < frozen);
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -191,6 +195,7 @@ TEST_CASE("selection follows duplicate, delete and undo") {
   CHECK(session->scene().find("Crate.001") != kNoObject);
   session->redo();
   CHECK(session->scene().find("Crate.001") == kNoObject);
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -206,6 +211,7 @@ TEST_CASE("undo keeps the same object selected even when indices shift") {
   session->redo();
   REQUIRE(session->selection() != kNoObject);
   CHECK(session->document().node(session->selection()).name == "Camera");
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -224,6 +230,7 @@ TEST_CASE("outside changes wait for a decision when there are unsaved edits") {
   CHECK_FALSE(session->external_change_pending());
   CHECK(session->scene().find("Crate") != kNoObject);
   CHECK_FALSE(session->document().dirty());
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -247,6 +254,8 @@ TEST_CASE("saved edits are used by the next run and reloaded from disk") {
   session->select_by_name("Box");
   CHECK(session->reload_if_changed_on_disk());
   CHECK(session->scene().find("Barrel") != kNoObject);
+  other.reset();
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -278,6 +287,7 @@ TEST_CASE("a script written in the editor runs when the game plays") {
   CHECK(session->runtime()->scripts().error_count() == kExpectedScriptErrors);  // only the sandbox's known ones
   session->stop();
   CHECK(y_of(*session, "Ground") == doctest::Approx(start_y));
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -313,6 +323,7 @@ TEST_CASE("objects created from the menus are placed, selected and undoable") {
   session->attach_script(moved, "kid.rb");
   session->attach_script(moved, "lift.rb");  // already there
   CHECK(get_string(session->document().node(moved).props, props::kScript) == "lift.rb, kid.rb");
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -331,6 +342,7 @@ TEST_CASE("a model from models/ is imported into the scene and plays") {
   REQUIRE(session->play({input}, error));
   CHECK(session->scene().find("Child") != kNoObject);
   session->stop();
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -349,6 +361,7 @@ TEST_CASE("a model dropped on an object becomes its child at the dropped world p
   session->undo();  // a single step removes it
   CHECK(session->scene().find("hierarchy") == kNoObject);
   CHECK((session->document().can_undo() ? 1 : 0) == steps_before);
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -367,6 +380,7 @@ TEST_CASE("the environment object carries the scene's sky and effects, and there
   CHECK(session->document().node_count() == count + 1);
   session->undo();  // one step
   CHECK(session->document().node_count() == count);
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -395,6 +409,7 @@ TEST_CASE("another scene of the game opens with its own undo history, and plays 
   session->stop();
   CHECK(session->scene_name() == kSecondScene);
   CHECK(session->scene().find("Level2Marker") != kNoObject);
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -415,6 +430,7 @@ TEST_CASE("save writes the open scene back to its own file, and save as makes an
   CHECK(read_scene(dir, "level3")->find_node("Camera.001") != kNoIndex);
   CHECK(read_scene(dir, "level2")->find_node("Camera.001") == kNoIndex);
   CHECK_FALSE(session->save_as("level2", error));  // a scene of the game already
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -428,6 +444,7 @@ TEST_CASE("the open scene's file is the one followed for outside changes") {
   touch_later(dir / config::kScenesDirName / "level2.glb");
   CHECK(session->reload_if_changed_on_disk());
   CHECK(session->scene_name() == "level2");
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -451,6 +468,7 @@ TEST_CASE("save as refuses to move a scene away from the files next to it that i
   CHECK(session->scene_name() == config::kMainSceneName);
   CHECK(session->document().dirty());
   CHECK(session->save(error));  // in its own folder it still finds it
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -500,6 +518,7 @@ TEST_CASE("several selected objects are duplicated, moved and deleted together, 
   session->undo();
   CHECK(session->scene().find("Crate") != kNoObject);
   CHECK(session->scene().find("Coin") != kNoObject);
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -531,6 +550,8 @@ TEST_CASE("objects cut from one scene are pasted into another, and saved there")
   REQUIRE(crate != kNoObject);
   CHECK(get_string(reopened->document().node(crate).props, props::kTag) == std::optional<std::string>("crate"));
   CHECK(reopened->document().node(crate).mesh != kNoIndex);
+  reopened.reset();
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -553,6 +574,7 @@ TEST_CASE("pasting under an object puts the copies there, and nothing is pasted 
   error.clear();
   CHECK_FALSE(session->paste(*clip, kNoObject, error));
   session->stop();
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -571,6 +593,7 @@ TEST_CASE("the Inspector of several objects moves a selected child once, with it
   CHECK(session->document().node(session->scene().find("Crate")).local.position.x == doctest::Approx(kNewX));
   CHECK(
       approx_equal(session->document().node(kid).local.position, kid_local, kPositionTolerance));  // moved with Family
+  session.reset();
   std::filesystem::remove_all(dir);
 }
 
@@ -586,5 +609,6 @@ TEST_CASE("the whole selection is dragged under another object in one undo step"
   session->undo();
   CHECK(session->document().node(session->scene().find("Crate")).parent == kNoIndex);
   CHECK(session->document().node(session->scene().find("Coin")).parent == kNoIndex);
+  session.reset();
   std::filesystem::remove_all(dir);
 }

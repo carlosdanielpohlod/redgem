@@ -13,6 +13,7 @@
 #include "editor/inspector_logic.hpp"
 #include "editor/selection.hpp"
 #include "editor/prefab_preview.hpp"
+#include "editor/scene_recovery.hpp"
 #include "scene/shapes/terrain.hpp"
 #include "input/input.hpp"
 #include "scene/scene.hpp"
@@ -140,6 +141,15 @@ class EditorSession {
   void redo();
   // Writes the scene being edited back to its file.
   bool save(std::string& error);
+  const std::string& recovery_problem() const { return recovery_.problem(); }
+  bool recovery_pending() const { return recovery_.pending(); }
+  bool recovery_source_changed() const { return recovery_.source_changed(); }
+  bool recover_scene(std::string& error);
+  void ignore_recovery() { recovery_.ignore(); }
+  bool discard_recovery(std::string& error) { return recovery_.discard(error); }
+  bool discard_unsaved_recovery(std::string& error) { return recovery_.discard_unsaved(error); }
+  void autosave(float seconds);
+
   // Writes it as a new scene of the game (scenes/<name>.glb), which is then the one edited.
   // Refused when the scene uses files next to it (images, buffers) and would move to another
   // folder, where it would not find them.
@@ -175,6 +185,9 @@ class EditorSession {
   void begin_editing();
   // Whatever is saved last is what the file on disk holds.
   void note_saved();
+  void follow_scene_file(bool offer_archives = false);
+  void forget_recovery();
+  void use_disk_document(SceneDocument document);
   // Whether the scene can be saved as `file` and still find the files it uses (see save_as).
   bool files_found_from(const std::filesystem::path& file, std::string& error) const;
   // Whether an object can be edited now: the game is stopped, and there is one.
@@ -184,7 +197,7 @@ class EditorSession {
   bool playing() const { return play_state_ == PlayState::Playing && runtime_ != nullptr; }
   // The file on disk is another than the one loaded, and no game runs that reads the loaded one.
   bool reload_wanted(std::filesystem::file_time_type write_time) const {
-    return write_time != loaded_write_time_ && editing();
+    return write_time != loaded_write_time_ && editing() && !recovery_.pending();
   }
   // The first object carrying the environment's properties, or kNoObject.
   ObjectId find_environment() const;
@@ -224,6 +237,7 @@ class EditorSession {
   AudioSystem* game_audio_ = nullptr;  // what the running game sounds through, when it has something
   std::filesystem::file_time_type loaded_write_time_{};
   bool external_change_pending_ = false;
+  SceneRecovery recovery_;
 };
 
 }  // namespace redgem

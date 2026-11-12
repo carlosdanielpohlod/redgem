@@ -172,6 +172,45 @@ limit leaves edges out, the View menu warns that the limit was reached. Curves a
 The overlay is a runtime view: it does not appear before Play, and does not draw contact points,
 velocities or joints. Turning it off stops gathering the geometry.
 
+## Scene recovery
+
+While editing, the editor writes changed scene data roughly once a minute, outside active
+interactions, dialogs and Play. This is a separate hidden copy beside the scene
+(`.scene.glb.recovery`, or the corresponding name beside a scene in `scenes/`). The original
+file, dirty indicator and undo history stay unchanged. Copies and partial writes do not ship.
+Successful Save/Save As remove the current session's backup. The recovery dialog's
+**Discard recovery copy** removes the specific copy offered there. An OS-held per-scene
+lease prevents a second editor from offering or deleting a live editor's copy; its small hidden
+lock file stays in place, and the OS releases ownership after exit or a crash. If cleanup fails
+after Save, a fingerprinted dismissal marker in the user's RedGem data folder suppresses that old copy
+across restarts, independently of the scene folder's permissions. New copies clear old
+dismissals and carry a fresh generation. Cleanup errors never prevent closing without saving.
+
+After an interrupted session, opening that scene offers **Recover changes** or **Discard
+recovery copy**. Recovery restores unsaved work; **Save** replaces the original only when you
+choose it. A changed original is flagged, even if its timestamp and size match: check which
+version you want before saving. A damaged copy is refused and can be discarded.
+
+Recovery includes authored nodes, stable identities, materials and terrain edits, retaining
+raw prefab links. Images stored outside the GLB still resolve beside it; those images and
+prefab sources themselves are not backed up. Script files are separate. The current recovery
+write is synchronous, limited to 64 MiB, and requires embedded GLB buffers. The original scene
+must remain loadable to reopen the editor. Source verification reads at most 1 MiB on the editing thread. Larger sources are treated as
+unverifiable, so the recovery prompt warns even if size and timestamp are unchanged. The limit
+does not restrict the original source size or the normal memory budget used to load its decoded
+images. A second editor taking over after a live writer closes preserves that writer's backup
+as a hidden `.recovery.previous-<id>` sibling and logs its path. On opening a scene, the editor
+offers the newest archive when there is no current recovery copy to show. A waiting editor
+preserves the former writer's copy and continues its own session. Reopen the scene to see that
+archive. The archive stays available until you discard it in the recovery dialog or the recovered
+scene is saved successfully. After a successful save or autosave of the recovered work, the
+archive is kept as a hidden `.recovery.applied-<id>` file and stops appearing in the dialog.
+
+An autosave failure
+remains visible in the status bar and is retried only after another edit. Recovery refuses to
+replace edits made while its prompt was open. Keep manual saves and version control for larger
+scenes or changes to external assets.
+
 ## Building
 
 **Build** (in the toolbar, or File > Build Game) asks which system to build for, saves the open

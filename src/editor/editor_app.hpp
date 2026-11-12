@@ -125,6 +125,8 @@ class EditorApp {
   void stop();
   void toggle_pause();
   void save();
+  // Restores the offered recovery copy as dirty work; the original stays untouched.
+  bool recover_scene();
   // The game's scenes, by the names scripts load them with ("main" is scene.glb). Opens another
   // one, after asking to save this one's edits when it has any.
   void open_scene(const std::string& name);
@@ -328,6 +330,10 @@ class EditorApp {
   void apply_gizmo_drag(const Transform& pivot);
   void update_title();
   void draw_dialogs();
+  bool can_autosave_scene() const;
+  void autosave_scene();
+  void draw_recovery_dialog();
+  void draw_recovery_choices();
   void draw_unsaved_dialog();
   bool unsaved_dialog_wanted() const;
   const char* unsaved_question() const;
