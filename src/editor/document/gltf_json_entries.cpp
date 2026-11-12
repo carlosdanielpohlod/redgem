@@ -14,8 +14,6 @@ namespace {
 constexpr float kUnitFactor = 1.0f;     // glTF color factors stop here
 constexpr float kInfiniteRange = 0.0f;  // glTF: a light without a range reaches as far as its strength allows
 constexpr float kInfiniteFar = 0.0f;    // a camera far plane of 0 means infinite
-constexpr const char* kInnerConeAngle = "innerConeAngle";
-constexpr const char* kOuterConeAngle = "outerConeAngle";
 
 bool is_scalar(const nlohmann::json& value) { return value.is_boolean() || value.is_number() || value.is_string(); }
 
@@ -100,12 +98,12 @@ bool needs_new_entry(bool known, const std::set<int>& claimed, int source) {
 
 void write_spot_cones(nlohmann::json& entry, const LightDesc& light) {
   if (light.type != LightType::Spot) {
-    entry.erase(kSpotLight);
+    entry.erase(kSpotProperty);
     return;
   }
   auto cones = light;
   sanitize_spot_cones(cones);
-  auto& spot = entry[kSpotLight];
+  auto& spot = entry[kSpotProperty];
   if (!spot.is_object()) spot = nlohmann::json::object();
   spot[kInnerConeAngle] = cones.inner_cone;
   spot[kOuterConeAngle] = cones.outer_cone;

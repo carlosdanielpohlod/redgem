@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cfloat>
-#include <cmath>
 
 #include "core/translations.hpp"
 #include "editor/editor_config.hpp"
@@ -27,7 +26,6 @@ constexpr const char* kRangeId = "##range";
 constexpr const char* kInnerConeId = "##inner_cone";
 constexpr const char* kOuterConeId = "##outer_cone";
 constexpr const char* kConeFormat = "%.1f deg";
-constexpr float kConeStepDegrees = 0.1f;
 constexpr const char* kFovId = "##fov";
 constexpr const char* kNearId = "##near";
 constexpr const char* kFarId = "##far";
@@ -42,11 +40,11 @@ bool draw_light_range(LightDesc& light) {
 
 bool drag_cone(const char* id, const char* label, float& degrees, float min, float max) {
   property_label(tr(label));
-  return ImGui::DragFloat(id, &degrees, kConeStepDegrees, min, max, kConeFormat, ImGuiSliderFlags_AlwaysClamp);
+  return ImGui::DragFloat(id, &degrees, kMinSpotConeGapDegrees, min, max, kConeFormat);
 }
 
 bool draw_outer_cone(LightDesc& light) {
-  const float narrowest = std::nextafter(light.inner_cone, kMaxSpotOuterCone);
+  const float narrowest = minimum_spot_outer_cone(light.inner_cone);
   const float min_angle = radians_to_degrees(narrowest);
   const float max_angle = radians_to_degrees(kMaxSpotOuterCone);
   float degrees = radians_to_degrees(light.outer_cone);
@@ -58,7 +56,7 @@ bool draw_outer_cone(LightDesc& light) {
 }
 
 bool draw_inner_cone(LightDesc& light) {
-  const float widest = std::nextafter(light.outer_cone, kSpotConeAxis);
+  const float widest = light.outer_cone - kMinSpotConeGap;
   const float min_angle = radians_to_degrees(kSpotConeAxis);
   const float max_angle = radians_to_degrees(widest);
   float degrees = radians_to_degrees(light.inner_cone);
@@ -70,7 +68,6 @@ bool draw_inner_cone(LightDesc& light) {
 }
 
 bool draw_spot_cones(LightDesc& light) {
-  sanitize_spot_cones(light);
   const bool outer_changed = draw_outer_cone(light);
   const bool inner_changed = draw_inner_cone(light);
   return outer_changed || inner_changed;

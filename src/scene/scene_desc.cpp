@@ -32,11 +32,18 @@ void keep_joints_within(PrimitiveDesc& primitive, std::size_t joints) {
   }
 }
 
+float minimum_spot_outer_cone(float inner) {
+  const float sum = inner + kMinSpotConeGap;
+  // Keep the gap after rounding to the stored float.
+  return sum - kMinSpotConeGap < inner ? std::nextafter(sum, kMaxSpotOuterCone) : sum;
+}
+
 void sanitize_spot_cones(LightDesc& light) {
   if (light.type != LightType::Spot) return;
   const bool outer_valid = std::isfinite(light.outer_cone) && light.outer_cone > kSpotConeAxis;
-  light.outer_cone = outer_valid ? std::min(light.outer_cone, kMaxSpotOuterCone) : kDefaultSpotOuterCone;
-  const auto max_inner = std::nextafter(light.outer_cone, kSpotConeAxis);
+  light.outer_cone =
+      outer_valid ? std::clamp(light.outer_cone, kMinSpotConeGap, kMaxSpotOuterCone) : kDefaultSpotOuterCone;
+  const float max_inner = light.outer_cone - kMinSpotConeGap;
   light.inner_cone =
       std::isfinite(light.inner_cone) ? std::clamp(light.inner_cone, kSpotConeAxis, max_inner) : kSpotConeAxis;
 }

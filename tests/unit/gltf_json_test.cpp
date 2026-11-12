@@ -224,19 +224,19 @@ TEST_CASE("lights are saved by type, and with a range only when they have one") 
 }
 
 TEST_CASE("spot angles are valid on disk and belong only to spot lights") {
-  json entry = {{kSpotLight, {{kOtherExtension, true}}}};
+  json entry = {{kSpotProperty, {{kOtherExtension, true}}}};
   LightDesc light{LightType::Spot, kOrange, kLampWatts};
   light.inner_cone = kDefaultSpotOuterCone;
   light.outer_cone = kDefaultSpotOuterCone;
   write_light(entry, light);
-  const auto& spot = entry.at(kSpotLight);
+  const auto& spot = entry.at(kSpotProperty);
   CHECK(spot.at(kOtherExtension) == true);
-  CHECK(spot.at("innerConeAngle").get<float>() < spot.at("outerConeAngle").get<float>());
-  CHECK(spot.at("outerConeAngle") == kDefaultSpotOuterCone);
+  CHECK(spot.at(kInnerConeAngle).get<float>() < spot.at(kOuterConeAngle).get<float>());
+  CHECK(spot.at(kOuterConeAngle) == kDefaultSpotOuterCone);
 
   light.type = LightType::Point;
   write_light(entry, light);
-  CHECK_FALSE(entry.contains(kSpotLight));
+  CHECK_FALSE(entry.contains(kSpotProperty));
 }
 
 TEST_CASE("spotlights replace invalid cone angles before writing glTF") {
@@ -246,12 +246,15 @@ TEST_CASE("spotlights replace invalid cone angles before writing glTF") {
   for (const auto invalid : {kSpotConeAxis, std::numeric_limits<float>::quiet_NaN()}) {
     light.outer_cone = invalid;
     write_light(entry, light);
-    CHECK(entry.at(kSpotLight).at("outerConeAngle") == kDefaultSpotOuterCone);
-    CHECK(entry.at(kSpotLight).at("innerConeAngle") == kSpotConeAxis);
+    CHECK(entry.at(kSpotProperty).at(kOuterConeAngle) == kDefaultSpotOuterCone);
+    CHECK(entry.at(kSpotProperty).at(kInnerConeAngle) == kSpotConeAxis);
   }
+  light.outer_cone = std::numeric_limits<float>::min();
+  write_light(entry, light);
+  CHECK(entry.at(kSpotProperty).at(kOuterConeAngle) == kMinSpotConeGap);
   light.outer_cone = kPi;
   write_light(entry, light);
-  CHECK(entry.at(kSpotLight).at("outerConeAngle") == kMaxSpotOuterCone);
+  CHECK(entry.at(kSpotProperty).at(kOuterConeAngle) == kMaxSpotOuterCone);
 }
 
 TEST_CASE("a camera without a far plane is saved as an infinite projection") {

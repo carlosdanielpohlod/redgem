@@ -156,7 +156,7 @@ image does not yet gain the extra pixel density of Retina text. There is no manu
 
 In the Inspector's **Light** card, choose **Spot**. **Outer cone** sets the angle from the light's
 axis where the beam ends. **Inner cone** sets where the light starts fading. The controls use
-degrees, and both angles are saved with the scene.
+degrees, keep the angles at least 0.1° apart, and save both with the scene.
 
 ## Physics collider view
 

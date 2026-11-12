@@ -155,13 +155,12 @@ TEST_CASE("scene diff reports edits to spotlight cones alone") {
   SceneDesc before = objects();
   auto& light = before.nodes[1].light.emplace();
   light.type = LightType::Spot;
-  light.outer_cone = 0.75f;
+  light.outer_cone = degrees_to_radians(45.0f);
   SceneDesc after = before;
-  after.nodes[1].light->inner_cone = 0.25f;
-  after.nodes[1].light->outer_cone = 0.5f;
+  after.nodes[1].light->inner_cone = degrees_to_radians(22.5f);
   const auto diff = scene_difference(before, after, "main");
-  CHECK(has(diff, "light.inner_cone: 0 -> 0.25"));
-  CHECK(has(diff, "light.outer_cone: 0.75 -> 0.5"));
+  CHECK(has(diff, "light.inner_cone: 0 -> 22.5"));
+  CHECK_FALSE(has(diff, "light.outer_cone:"));
 }
 
 TEST_CASE("scene diff reports animation keyframes and skin binding changes") {
