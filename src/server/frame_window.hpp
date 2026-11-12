@@ -3,8 +3,8 @@
 #include <array>
 #include <cstddef>
 
-// How long a dedicated server's rooms take for their frames, over the last few seconds: what its
-// status says (see server_status.hpp).
+// How long a dedicated server's rooms take for their frames (the turns of the threads they run on),
+// over the last few seconds: what its status says (see server_status.hpp).
 namespace redgem::server {
 
 // Frames the window holds: five seconds of the engine's fixed step.

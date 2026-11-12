@@ -124,6 +124,8 @@ TEST_CASE("the server program has no status port unless told, and keeps it to th
   CHECK(parse_server_command({"game", "--status-log", "0"}).error == "--status-log needs a number from 1 to 86400");
   CHECK(parse_server_command({"game", "--status-bind"}).error ==
         "--status-bind needs an address in numbers, like 127.0.0.1");
+  CHECK(parse_server_command({"game", "--status-bind", "0.0.0.0"}).error ==
+        "--status-bind is the address of the status port: give --status-port too");
   for (const char* option : {"--status-port <number>", "--status-bind <address>", "--status-log <seconds>"}) {
     CHECK(server_usage().find(option) != std::string::npos);
   }

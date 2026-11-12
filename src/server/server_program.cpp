@@ -34,6 +34,8 @@ struct Census {
 };
 
 int run_server(const ServerSettings& settings) {
+  // (Heard from the start: the system's own handling of SIGUSR1 ends the program.)
+  StatusSignal status_signal;
   GameServer server(settings);
   std::string error;
   if (!server.start(error)) {
@@ -41,7 +43,6 @@ int run_server(const ServerSettings& settings) {
     return kExitFailure;
   }
   const StopSignals signals;
-  StatusSignal status_signal;
   log::info("game server listening on port " + std::to_string(server.port()) + " (Ctrl+C stops it)");
   log::info("the game's saves are kept in " + (settings.data_dir / kSaveDatabaseName).string());
   serve_until(server, [&signals] { return signals.asked(); }, [&status_signal] { return status_signal.taken(); });

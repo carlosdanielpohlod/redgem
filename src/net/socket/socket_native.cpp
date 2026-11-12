@@ -122,31 +122,36 @@ std::intptr_t open_non_blocking(int type, int protocol, std::string& error) {
   return kInvalidSocket;
 }
 
-bool bind_to_port(NativeSocket socket, std::uint16_t port) {
+namespace {
+
+// Port `port` of the IPv4 address `host` (in the network's byte order).
+sockaddr_in ipv4(std::uint32_t host, std::uint16_t port) {
   sockaddr_in address{};
   address.sin_family = AF_INET;
-  address.sin_addr.s_addr = htonl(INADDR_ANY);
+  address.sin_addr.s_addr = host;
   address.sin_port = htons(port);
+  return address;
+}
+
+bool bind_ipv4(NativeSocket socket, const sockaddr_in& address) {
   return bind(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0;
 }
 
+}  // namespace
+
+bool bind_to_port(NativeSocket socket, std::uint16_t port) { return bind_ipv4(socket, ipv4(htonl(INADDR_ANY), port)); }
+
 bool bind_local_port(NativeSocket socket, std::uint16_t port) {
-  sockaddr_in address{};
-  address.sin_family = AF_INET;
-  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-  address.sin_port = htons(port);
-  return bind(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0;
+  return bind_ipv4(socket, ipv4(htonl(INADDR_LOOPBACK), port));
 }
 
 bool bind_to_address(NativeSocket socket, const std::string& address, std::uint16_t port, std::string& error) {
-  sockaddr_in where{};
-  where.sin_family = AF_INET;
-  where.sin_port = htons(port);
+  sockaddr_in where = ipv4(0, port);
   if (inet_pton(AF_INET, address.c_str(), &where.sin_addr) != 1) {
     error = "not an address in numbers: " + address;
     return false;
   }
-  if (bind(socket, reinterpret_cast<const sockaddr*>(&where), sizeof(where)) == 0) return true;
+  if (bind_ipv4(socket, where)) return true;
   error = last_error();
   return false;
 }

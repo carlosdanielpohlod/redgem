@@ -2,6 +2,7 @@
   "server.cli.data_needs_folder": "--data needs a folder",
   "server.cli.no_game": "which game? redgem-server <game_dir>",
   "server.cli.status_bind_needs_address": "--status-bind needs an address in numbers, like 127.0.0.1",
+  "server.cli.status_bind_needs_port": "--status-bind is the address of the status port: give --status-port too",
   "server.cli.usage": [
     "usage:",
     "  redgem-server <game_dir> [options]    run a game on a server, for players to join over the internet",

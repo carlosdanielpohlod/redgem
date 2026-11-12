@@ -76,8 +76,9 @@ Both answer one JSON document:
 
 - `rooms.open` near `rooms.limit` most of the time: players are being turned away, raise `--rooms`.
 - `frame_ms.worst` near `frame_ms.budget` (one frame of the engine's fixed step): rooms are
-  falling behind. Frame times cover each room's last 300 frames (about five seconds) and include
-  letting players in, as well as the game's frame.
+  falling behind: raise `--threads` (up to the machine's cores) or get a bigger machine. A room's
+  frame time is the turn of the thread it runs on, every room of that thread one after the
+  other, over its last 300 frames (about five seconds). Loading a new room's game is left out.
 - `bytes_per_second` is everything the server's game connections received and sent over the last
   ten seconds.
 
@@ -86,7 +87,9 @@ monitoring agent on it). `--status-bind 0.0.0.0` opens it to the network; keep i
 firewall then. The document holds counts and times only: no room codes, addresses or anything
 of the game or its players. It is served on the server's main loop without ever waiting: at most
 8 connections at a time, a request of at most 4 KB, arriving within 2 seconds; anything else is
-closed unanswered.
+closed unanswered, and so is a connection that closes without a word (a check that the port is
+open). `HEAD` gets the headers alone, other methods `405`. `--status-bind` without
+`--status-port` is refused.
 
 Without a port, `--status-log 60` writes the same summary to the log every minute, and on Linux
 and macOS `kill -USR1 <pid>` (or `systemctl kill -s USR1 <unit>`, `docker kill -s USR1

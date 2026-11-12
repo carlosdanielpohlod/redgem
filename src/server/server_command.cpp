@@ -86,13 +86,25 @@ std::string read_word(const std::vector<std::string>& args, std::size_t& next, S
   return {};
 }
 
+// Whether the line names an address for a status port it does not ask for.
+bool binds_no_status_port(const StatusSettings& status) {
+  return !status.port && status.address != kDefaultStatusAddress;
+}
+
+// What makes no sense in a line read whole, if anything does.
+std::string missing_from(const ServerSettings& settings) {
+  if (settings.game_dir.empty()) return tr("server.cli.no_game");
+  if (binds_no_status_port(settings.status)) return tr("server.cli.status_bind_needs_port");
+  return {};
+}
+
 // Reads the whole line into `settings`; what makes no sense in it, if anything does.
 std::string read_line(const std::vector<std::string>& args, ServerSettings& settings) {
   for (std::size_t next = 0; next < args.size();) {
     std::string error = read_word(args, next, settings);
     if (!error.empty()) return error;
   }
-  return settings.game_dir.empty() ? tr("server.cli.no_game") : "";
+  return missing_from(settings);
 }
 
 }  // namespace

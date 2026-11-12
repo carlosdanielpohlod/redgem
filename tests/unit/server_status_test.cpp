@@ -134,7 +134,7 @@ TEST_CASE("the status port answers an HTTP request once its head arrived, and a 
   CHECK(status_reply(kGet, kNoTime, false) == StatusReply::Http);
   CHECK(status_reply("GET /\n\n", kNoTime, false) == StatusReply::Http);
   CHECK(status_reply("", kPlainAnswerAfterSeconds, false) == StatusReply::Plain);
-  CHECK(status_reply("", kNoTime, true) == StatusReply::Plain);  // (hung up its side at once: nc -N)
+  CHECK(status_reply("", kPlainAnswerAfterSeconds, true) == StatusReply::Drop);  // (a check that the port is open)
 }
 
 TEST_CASE("the status port lets a request go unanswered when it is too long, too slow, or cut short") {
@@ -154,6 +154,11 @@ TEST_CASE("the status port's HTTP answer is the document to a GET, and a refusal
   CHECK(refused.rfind("HTTP/1.1 405 Method Not Allowed\r\n", 0) == 0);
   CHECK(refused.find(kDocument) == std::string::npos);
   CHECK(plain_status_answer(kDocument) == std::string(kDocument) + "\n");
+  const std::string head = http_status_answer("\r\nHEAD / HTTP/1.1\r\n\r\n", kDocument);
+  CHECK(head.rfind("HTTP/1.1 200 OK\r\n", 0) == 0);
+  CHECK(head.find("Content-Length: 7\r\n") != std::string::npos);
+  CHECK(head.find(kDocument) == std::string::npos);
+  CHECK(http_status_answer("\r\nGET / HTTP/1.1\r\n\r\n", kDocument).rfind("HTTP/1.1 200 OK\r\n", 0) == 0);
 }
 
 TEST_CASE("SIGUSR1 asks a server for its status in the log, once each time") {

@@ -34,8 +34,10 @@ void StatusPort::close() {
 
 void StatusPort::serve(float seconds, const Document& document) {
   if (!is_open()) return;
+  const std::size_t waiting = clients_.size();
   take_newcomers();
-  for (Client& client : clients_) serve_client(client, seconds, document);
+  // (One taken this turn connected at some moment of it: it has waited no time yet.)
+  for (std::size_t i = 0; i < clients_.size(); ++i) serve_client(clients_[i], i < waiting ? seconds : 0.0f, document);
   drop_done();
 }
 

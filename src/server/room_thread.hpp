@@ -48,9 +48,13 @@ class RoomThread {
   // Waits `seconds` for the next turn; false when the thread is to stop instead.
   bool wait_for_turn(double seconds);
   void take_new_rooms();
+  // A frame of every room, and how long that took noted in each.
+  void play_turn(float seconds);
   // One room's frame; a room whose game breaks is closed, the others go on.
   void play_or_close(Room& room, float seconds);
   void play(Room& room, float seconds);
+  // Makes the room's game, the time that takes kept apart (loading_seconds_).
+  void open(Room& room);
   std::unique_ptr<Engine> open_game(const std::string& code) const;
   // Closes the room and ends its match, saying why in the log.
   static void end(Room& room, const std::string& why);
@@ -61,8 +65,9 @@ class RoomThread {
   std::condition_variable wake_;
   bool stopping_ = false;
   std::vector<std::shared_ptr<RoomSlot>> new_rooms_;
-  std::vector<Room> rooms_;  // the thread's own
-  std::thread thread_;       // started last, once all of the above is in place
+  std::vector<Room> rooms_;       // the thread's own
+  double loading_seconds_ = 0.0;  // spent this turn making rooms' games
+  std::thread thread_;            // started last, once all of the above is in place
 };
 
 }  // namespace redgem::server
