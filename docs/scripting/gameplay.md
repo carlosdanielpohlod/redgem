@@ -859,6 +859,10 @@ glow.light.color = [255, 120, 40]                               # or a name: :or
 `intensity` is in the units Blender gives the light (watts for a point or spot light, lux for the
 sun) and is at least 0; `color` is three channels from 0 to 255, as a color picker shows them.
 
+For a spot light, set both beam angles in degrees with `lamp.light.set_cone(inner: 15, outer: 30)`.
+The light starts fading at the inner angle and reaches zero at the outer angle. Read the current
+pair with `lamp.light.cone_angles`.
+
 ## Control animations
 
 Every animation in a level plays in a loop from the start. `Animation` is for the ones that should

@@ -64,6 +64,10 @@ class Light
     __set_color(r.to_i, g.to_i, b.to_i)
   end
 
+  def set_cone(inner:, outer:)
+    __set_cone(inner, outer)
+  end
+
   def inspect = "#<Light intensity=#{intensity} color=#{color}>"
 end
 

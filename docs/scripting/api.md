@@ -375,6 +375,8 @@ game_object.light: the light an object shines with. See [gameplay.md#light-that-
 - `intensity = value`: sets it; shows from the next frame
 - `color`: its color [r, g, b], 0 to 255
 - `color = color`: :orange or [r, g, b] from 0 to 255
+- `cone_angles`: [inner, outer] in degrees for a spot light, or nil for other lights
+- `set_cone(inner:, outer:)`: sets both spot angles between 0 and 90 degrees, at least 0.1 degrees apart
 
 ## Animation
 

@@ -525,6 +525,36 @@ TEST_CASE("scripts change how bright a light shines and in what color, within wh
   CHECK(shining.intensity == doctest::Approx(5.0f));
 }
 
+TEST_CASE("scripts change both spotlight cone angles atomically in degrees") {
+  constexpr float kInner = 15.0f;
+  constexpr float kOuter = 90.0f;
+  const TempSave temp;
+  SceneDesc scene = small_scene();
+  NodeDesc spot;
+  spot.name = "Spot";
+  spot.light = LightDesc{LightType::Spot, Color{}};
+  scene.nodes.push_back(spot);
+  NodeDesc bulb;
+  bulb.name = "Bulb";
+  bulb.light = LightDesc{LightType::Point, Color{}};
+  scene.nodes.push_back(bulb);
+  auto engine = engine_for(scene, temp.file);
+  frames(*engine, 1);
+  ruby(*engine, "Scene.find('Spot').light.set_cone(inner: 15, outer: 90)");
+  CHECK(ruby(*engine, "Scene.find('Spot').light.cone_angles.map { |angle| angle.round }.inspect") == "[15, 90]");
+  CHECK(ruby(*engine, "Scene.find('Bulb').light.cone_angles.inspect") == "nil");
+  CHECK(fails(*engine, "Scene.find('Bulb').light.set_cone(inner: 10, outer: 20)"));
+  for (const char* args : {"inner: 30, outer: 30", "inner: -1, outer: 20", "inner: 0, outer: 0", "inner: 20, outer: 91",
+                           "inner: 0, outer: 0.01", "inner: 0, outer: 0.0 / 0.0"}) {
+    CAPTURE(args);
+    CHECK(fails(*engine, std::string("Scene.find('Spot').light.set_cone(") + args + ")"));
+  }
+  const auto& light = engine->scene().at(engine->scene().find("Spot")).light;
+  REQUIRE(light.has_value());
+  CHECK(radians_to_degrees(light->inner_cone) == doctest::Approx(kInner));
+  CHECK(radians_to_degrees(light->outer_cone) == doctest::Approx(kOuter));
+}
+
 TEST_CASE("a light brighter than white shows its color as a script can give it back") {
   constexpr Color kBrighterThanWhite{2.0f, 0.5f, -0.25f, 1.0f};  // linear light, past either end
   const TempSave temp;
