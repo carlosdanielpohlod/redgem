@@ -17,17 +17,25 @@ class SoftKeyboardPlatform {
 
 // When an on-screen keyboard is up: while the game draws a text field, unless the player put it
 // away with the back key and has not tapped a field since. It goes once a frame draws no field
-// (the field closed, the menu holding it closed, the scene changed).
+// (the field closed, the menu holding it closed, the scene changed), when the app leaves the screen
+// (and comes back with it), and when the game ends.
 class SoftKeyboard {
  public:
   // `platform` has to outlive this.
   explicit SoftKeyboard(SoftKeyboardPlatform& platform) : platform_(platform) {}
+  ~SoftKeyboard() { hide(); }
+  SoftKeyboard(const SoftKeyboard&) = delete;
+  SoftKeyboard& operator=(const SoftKeyboard&) = delete;
 
   // Shows or hides the keyboard for what the last frame's text fields asked.
   void follow(const TextInputRequest& request);
-  // A back key going down (`down`) or up: true when the press is the keyboard's (it was up, and it
-  // goes), so that the game does not see it. Its release, and the repeats of it held, are too.
-  bool take_back(bool down);
+  // The back key reached the game. The system's keyboard takes the back key while it is up (and
+  // goes), so if one was asked for it is down by now: it stays away until a field is tapped. The
+  // press itself is the game's.
+  void back_pressed();
+  // The app left the screen (another app, the home screen): the keyboard goes, and comes back with
+  // the app if a field is still drawn.
+  void leave_screen();
   bool shown() const { return shown_; }
 
  private:
@@ -38,15 +46,12 @@ class SoftKeyboard {
   static bool brings_back(const TextInputRequest& request) { return request.field_tapped || !request.field_shown; }
   // Whether a wanted keyboard is to be shown now: it is not up yet, or a field was tapped.
   bool asks_to_show(const TextInputRequest& request) const { return request.field_tapped || !shown_; }
-  // Whether a back key going `down` (or up) closes the keyboard: it goes down while it is up.
-  bool closed_by(bool down) const { return down && shown_; }
   void show();
   void hide();
 
   SoftKeyboardPlatform& platform_;
   bool shown_ = false;
-  bool put_away_ = false;   // the player closed it with the back key
-  bool back_held_ = false;  // the back key that closed it is still down
+  bool put_away_ = false;  // the player closed it with the back key
 };
 
 }  // namespace redgem

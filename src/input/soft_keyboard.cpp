@@ -9,20 +9,19 @@ void SoftKeyboard::follow(const TextInputRequest& request) {
     return;
   }
   // (A tap shows it again even when it should be up: the system may have put it away on its own,
-  // its own back key closing it before the game hears of it.)
+  // its back key closing it before the game hears of it.)
   if (asks_to_show(request)) show();
 }
 
-bool SoftKeyboard::take_back(bool down) {
-  if (back_held_) {
-    back_held_ = down;
-    return true;
-  }
-  if (!closed_by(down)) return false;
-  hide();
+void SoftKeyboard::back_pressed() {
+  if (!shown_) return;
+  hide();  // (to be sure: it is down already when the system's keyboard took the key first)
   put_away_ = true;
-  back_held_ = true;
-  return true;
+}
+
+void SoftKeyboard::leave_screen() {
+  hide();
+  put_away_ = false;
 }
 
 void SoftKeyboard::show() {

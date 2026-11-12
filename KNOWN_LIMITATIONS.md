@@ -215,7 +215,8 @@ not a promise of how it will be closed.
   Shift, digits and signs). Letters a keyboard sends as a whole text (some accented letters, emoji,
   words written by swiping or picked from suggestions on some keyboards) do not arrive.
   `UI.keyboard_visible?` says whether the engine asked for the keyboard: when the system closes it
-  by its own means (its own key to hide it), it stays true until the field goes or is tapped. The
+  by its own means (the back key, the keyboard's own key to hide it), the game does not hear of it,
+  and it stays true until the field goes, is tapped, or the back key is pressed again. The
   keyboard covers the bottom of the screen and nothing moves out of its way: a game keeps its
   fields above it.
 
