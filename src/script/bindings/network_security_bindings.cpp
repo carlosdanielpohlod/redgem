@@ -39,6 +39,16 @@ mrb_value network_host_code(mrb_state* mrb, mrb_value) {
   return digits.empty() ? mrb_nil_value() : text_value(mrb, net::host_code(digits));
 }
 
+// A fingerprint or a host's code as its digits alone (what the natives that connect take), checked
+// before the game this machine is in is left: ArgumentError when it is neither.
+mrb_value network_pin(mrb_state* mrb, mrb_value) {
+  const char* text = nullptr;
+  mrb_get_args(mrb, "z", &text);
+  const std::string digits = net::pin_digits(text).value_or(std::string());
+  if (digits.empty()) mrb_raise(mrb, E_ARGUMENT_ERROR, kNotAFingerprint);
+  return text_value(mrb, digits);
+}
+
 }  // namespace
 
 net::TlsTrust trust_arg(mrb_state* mrb, const char* fingerprint, const std::string& address, std::uint16_t port) {
@@ -51,6 +61,7 @@ net::TlsTrust trust_arg(mrb_state* mrb, const char* fingerprint, const std::stri
 void install_network_security_bindings(RClass* network_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, network_module, "fingerprint", network_fingerprint, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, network_module, "host_code", network_host_code, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, network_module, "__pin", network_pin, MRB_ARGS_REQ(1));
 }
 
 }  // namespace redgem

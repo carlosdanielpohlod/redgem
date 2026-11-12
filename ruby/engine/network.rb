@@ -96,10 +96,11 @@ module Network
     # it. fingerprint: (with room: true) is the relay's, as with join.
     def host(port: DEFAULT_PORT, name: nil, visible: true, room: false, waiting_per_address: WAITING_PER_ADDRESS,
              fingerprint: nil)
-      # (A number it does not take raises before the game this machine is in is left.)
+      # (A number or a fingerprint it does not take raises before the game this machine is in is left.)
       waiting = __waiting_per_address(waiting_per_address.to_i)
+      pin = fingerprint && __pin(fingerprint.to_s)
       leave
-      return __host_room(*relay_address, fingerprint&.to_s) if room
+      return __host_room(*relay_address, pin) if room
 
       __host(port.to_i, name.to_s, visible, discovery_port, waiting)
     end
@@ -113,11 +114,12 @@ module Network
     # not checked. A machine that is not the one expected fails the join, saying so.
     # on_connect or on_fail tells how it went, a moment later.
     def join(address = nil, port: DEFAULT_PORT, room: nil, auth: nil, fingerprint: nil)
+      pin = fingerprint && __pin(fingerprint.to_s) # (raises before this machine's game is left)
       leave
-      return join_room(address, port, room, auth, fingerprint) if room
+      return join_room(address, port, room, auth, pin) if room
       raise ArgumentError, "join needs an address or a room" if address.nil?
 
-      __join(address.to_s, port.to_i, auth, fingerprint&.to_s)
+      __join(address.to_s, port.to_i, auth, pin)
     end
 
     def leave
@@ -188,9 +190,9 @@ module Network
     end
 
     # A room by its code: on the dedicated server at `address` when there is one, on the relay otherwise.
-    def join_room(address, port, room, auth, fingerprint)
+    def join_room(address, port, room, auth, pin)
       server = address.nil? ? relay_address : [address.to_s, port.to_i]
-      __join_room(*server, room.to_s.strip.upcase, auth, fingerprint&.to_s)
+      __join_room(*server, room.to_s.strip.upcase, auth, pin)
     end
 
     # The relay as [address, port].

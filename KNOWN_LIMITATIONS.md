@@ -280,6 +280,8 @@ not a promise of how it will be closed.
 
 ### Security
 
+- The TLS private key of a relay, a server or a hosted game is in memory as PEM text while it
+  starts, and those copies are freed without being wiped first.
 - On a dedicated server, a game's plain `http://` reaches anything on the server's own private
   networks (only the clouds' known metadata addresses are refused).
 - On Windows a server's save database takes its folder's permissions: it is kept to its owner
@@ -352,7 +354,9 @@ not a promise of how it will be closed.
   remembers a fingerprint seen once (no trust on first use).
 - A player hosting is checked by a 10-digit code (40 bits of its fingerprint), not the whole
   fingerprint (64 digits, too long to read out loud): an attacker who can redirect the traffic
-  and spends about 2^40 certificate generations while that game is open could match it.
+  and spends about 2^40 certificate generations while that game is open could match it. A short
+  code is taken for any address, a relay's or a server's too, where an attacker has all the time
+  it wants: give those their whole fingerprint.
 - Through a relay, the connections are encrypted to the relay, not from player to player: the
   relay reads what the players of its rooms say.
 - No certificate rotation or revocation: a relay or server that loses its data folder (or its key)

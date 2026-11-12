@@ -55,15 +55,18 @@ std::string read_data_dir(const std::vector<std::string>& args, std::size_t& nex
   return {};
 }
 
-// Reads the word at `next` (and what it is given); an error when it makes no sense.
-std::string read_word(const std::vector<std::string>& args, std::size_t& next, RelayCommand& command) {
-  if (args[next] == kDataOption) return read_data_dir(args, next, command);
-  if (args[next] != command_line::kFingerprintOption) {
-    return command_line::read_number_option(kOptions, args, next, command);
-  }
+// Reads --fingerprint, which is given nothing.
+std::string read_fingerprint(std::size_t& next, RelayCommand& command) {
   command.show_fingerprint = true;
   ++next;
   return {};
+}
+
+// Reads the word at `next` (and what it is given); an error when it makes no sense.
+std::string read_word(const std::vector<std::string>& args, std::size_t& next, RelayCommand& command) {
+  if (args[next] == kDataOption) return read_data_dir(args, next, command);
+  if (args[next] == command_line::kFingerprintOption) return read_fingerprint(next, command);
+  return command_line::read_number_option(kOptions, args, next, command);
 }
 
 // Reads the whole line into `command`; what makes no sense in it, if anything does.

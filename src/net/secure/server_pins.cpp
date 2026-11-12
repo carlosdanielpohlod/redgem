@@ -1,6 +1,7 @@
 #include "net/secure/server_pins.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -17,6 +18,7 @@ constexpr const char* kFingerprintKey = "fingerprint";
 constexpr std::int64_t kLargestPort = 65535;
 constexpr std::int64_t kAnyPort = 0;
 constexpr std::int64_t kNotAPort = -1;
+constexpr char kRootDot = '.';
 constexpr const char* kNotAList =
     "game.json: \"servers\" is a list of {\"address\", \"port\", \"fingerprint\"}: it is left out";
 
@@ -57,9 +59,23 @@ std::string unusable(std::size_t index) {
          "\"port\" from 1 to 65535: it is left out";
 }
 
+// An address as names compare: in lower case, without the root's dot ("Play.Example.com." is
+// play.example.com).
+bool ends_in_root_dot(const std::string& name) { return !name.empty() && name.back() == kRootDot; }
+
+std::string plain_address(const std::string& address) {
+  std::string plain = address;
+  if (ends_in_root_dot(plain)) plain.pop_back();
+  std::transform(plain.begin(), plain.end(), plain.begin(),
+                 [](unsigned char letter) { return static_cast<char>(std::tolower(letter)); });
+  return plain;
+}
+
+bool on_port(const ServerPin& pin, std::uint16_t port) { return pin.port == kAnyPort || pin.port == port; }
+
 // Whether a pin is the one for that server (a pin without a port is the address's on every port).
 bool pins(const ServerPin& pin, const std::string& address, std::uint16_t port) {
-  return pin.address == address && (pin.port == 0 || pin.port == port);
+  return plain_address(pin.address) == plain_address(address) && on_port(pin, port);
 }
 
 }  // namespace

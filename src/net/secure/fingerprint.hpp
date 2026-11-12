@@ -10,8 +10,10 @@
 namespace redgem::net {
 
 // A fingerprint in hexadecimal digits (SHA-256: 32 bytes), and the part of it a player-hosted
-// game shows as its code (40 bits: forging a certificate that shares them takes far longer than
-// a join waits).
+// game shows as its code (40 bits: short enough to read out, at the cost of being forgeable by
+// someone who spends about 2^40 certificate generations while that game's code is in use; a new
+// one is made each time a player hosts. Servers and relays, whose identity stays, are pinned by
+// their whole fingerprint. See KNOWN_LIMITATIONS.md).
 inline constexpr std::size_t kFingerprintDigits = 64;
 inline constexpr std::size_t kHostCodeDigits = 10;
 

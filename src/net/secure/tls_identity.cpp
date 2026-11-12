@@ -81,7 +81,9 @@ int write_pem(CertificateWriter& writer, PrivateKey& key, TlsRandom& random, Pem
   if (result == 0) pair.certificate = reinterpret_cast<const char*>(buffer.data());
   if (result == 0) result = mbedtls_pk_write_key_pem(&key.pk, buffer.data(), buffer.size());
   if (result == 0) pair.key = reinterpret_cast<const char*>(buffer.data());
-  mbedtls_platform_zeroize(buffer.data(), buffer.size());  // (the private key: not left in freed memory)
+  // (Wiped as the other buffers of Mbed TLS are; the key's PEM text lives on in `pair`, as long as
+  // the program needs it, see KNOWN_LIMITATIONS.md.)
+  mbedtls_platform_zeroize(buffer.data(), buffer.size());
   return result;
 }
 
@@ -107,13 +109,21 @@ bool write_private_file(const std::filesystem::path& file, const std::string& te
   return write_text_file(file, text, error);
 }
 
+bool write_pem_files(const std::filesystem::path& folder, const PemPair& pair, std::string& error) {
+  return write_private_file(folder / kPrivateKeyFile, pair.key, error) &&
+         write_text_file(folder / kCertificateFile, pair.certificate, error);
+}
+
 bool keep_new_identity(const std::filesystem::path& folder, std::string& error) {
   PemPair pair;
   if (!new_pem_pair(pair, error)) return false;
   std::error_code ignored;  // (a folder that cannot be made shows as a file that cannot be written)
   std::filesystem::create_directories(folder, ignored);
-  return write_private_file(folder / kPrivateKeyFile, pair.key, error) &&
-         write_text_file(folder / kCertificateFile, pair.certificate, error);
+  if (write_pem_files(folder, pair, error)) return true;
+  // Half an identity would keep every later start from making a new one: none is left instead.
+  std::filesystem::remove(folder / kPrivateKeyFile, ignored);
+  std::filesystem::remove(folder / kCertificateFile, ignored);
+  return false;
 }
 
 // Whether neither file of an identity is in `folder`: a new one is made there.

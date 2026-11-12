@@ -42,6 +42,8 @@ class TlsSession {
   // Takes the handshake as far as what arrived lets it.
   Handshake handshake(Socket& socket);
   bool done() const { return done_; }
+  // Whether the handshake has bytes the socket did not take yet (it goes on once it can send).
+  bool handshake_sending() const { return handshake_sending_; }
   // Appends what arrived, decrypted, to `into`: about `limit` bytes at most (a record more).
   IoStatus read(Socket& socket, std::vector<std::uint8_t>& into, std::size_t limit);
   // Sends as much of `bytes` as goes out now, encrypted, and takes it off their front.
@@ -77,6 +79,7 @@ class TlsSession {
   Socket* socket_ = nullptr;  // the one the call at hand was given
   std::size_t unsent_ = 0;    // the length of a record Mbed TLS has not sent all of (it is asked again with it)
   bool done_ = false;
+  bool handshake_sending_ = false;
   std::string failure_;
 };
 

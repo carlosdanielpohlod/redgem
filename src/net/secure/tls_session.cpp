@@ -83,6 +83,7 @@ Handshake TlsSession::handshake(Socket& socket) {
   if (done_) return Handshake::Done;
   socket_ = &socket;
   const int result = mbedtls_ssl_handshake(&ssl_);
+  handshake_sending_ = result == MBEDTLS_ERR_SSL_WANT_WRITE;
   if (wants_more(result)) return Handshake::Going;
   if (result != 0) return failed_handshake(result);
   done_ = trusted();

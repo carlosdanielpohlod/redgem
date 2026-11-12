@@ -71,6 +71,11 @@ bool Connection::work_waiting() const {
   return tls_ != nullptr && tls_->holds_unread();
 }
 
+bool Connection::has_to_send() const {
+  if (!outgoing_.empty()) return true;
+  return tls_ != nullptr && tls_->handshake_sending();
+}
+
 std::string Connection::failure() const {
   if (!tls_error_.empty()) return tls_error_;
   return tls_ != nullptr ? tls_->failure() : std::string();

@@ -102,7 +102,9 @@ class Connection {
   // The bytes held for it: what arrived and was not taken yet, and what waits to be sent.
   std::size_t held() const { return incoming_.buffered() + outgoing_.size(); }
   // What a wait watches its socket for.
-  Watched watched() const { return {&socket_, !outgoing_.empty()}; }
+  Watched watched() const { return {&socket_, has_to_send()}; }
+  // Whether something waits for the socket to take it: messages, or the TLS handshake's bytes.
+  bool has_to_send() const;
   // Where the other side connected from, in numbers.
   const std::string& address() const { return address_; }
 
