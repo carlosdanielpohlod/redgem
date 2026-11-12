@@ -180,8 +180,9 @@ TEST_CASE("an archive is opened from its file, and knows its folders and what is
 
 TEST_CASE("only names a game may give go into an archive, each once") {
   const Scratch scratch;
-  for (const std::string& name : {"../escape.rb", "/etc/passwd", "a//b.rb", "./a.rb", "a\\b.rb", "c:/x.rb", "dir/",
-                                  std::string(kMaxArchiveNameBytes + 1, 'a'), std::string()}) {
+  for (const std::string& name :
+       std::vector<std::string>{"../escape.rb", "/etc/passwd", "a//b.rb", "./a.rb", "a\\b.rb", "c:/x.rb", "dir/",
+                                std::string(kMaxArchiveNameBytes + 1, 'a'), std::string()}) {
     CAPTURE(name);
     std::string error;
     CHECK_FALSE(write_game_archive(scratch.dir / "bad.rgpak", {archive_input_from_bytes(name, {})},
