@@ -11,6 +11,9 @@ namespace redgem::net {
 // What one game may ask of the web: an answer's size (its status line and headers apart), the
 // requests on their way at once, and how long one may take unless told otherwise (and at most).
 inline constexpr std::size_t kMaxHttpBodyBytes = 8 * 1024 * 1024;
+// How large a compressed (gzip or deflate) answer may grow once decompressed: the same as an
+// answer's size, so a small body that inflates to gigabytes (a decompression bomb) is refused.
+inline constexpr std::size_t kMaxHttpDecodedBodyBytes = kMaxHttpBodyBytes;
 inline constexpr std::size_t kMaxHttpHeadBytes = 64 * 1024;
 inline constexpr std::size_t kMaxHttpRequestsInFlight = 16;
 inline constexpr float kDefaultHttpTimeoutSeconds = 15.0f;
@@ -33,8 +36,11 @@ struct HttpRequest {
 struct HttpResponse {
   int status = 0;  // 0 when no answer came: `error` says why
   HttpHeaders headers;
-  std::string body;
+  std::string body;  // decompressed, when the server sent it with gzip or deflate
   std::string error;
+  // The address the answer came from once redirects were followed (when none came, the last one
+  // tried).
+  std::string url;
 
   static HttpResponse failure(std::string why) {
     HttpResponse response;

@@ -39,6 +39,8 @@ PROJECTS = [
      os.path.join(DEPS, "nlohmann_json-src", "LICENSE.MIT")),
     ("Mbed TLS", "HTTPS for the games' web requests (HTTP)", "https://www.trustedfirmware.org/projects/mbed-tls/",
      os.path.join(DEPS, "mbedtls-src", "LICENSE")),
+    ("zlib", "Decompressing gzip and deflate answers to the games' web requests", "https://zlib.net",
+     os.path.join(DEPS, "zlib-src", "LICENSE")),
     # (In the public domain: its "license" is the blessing its sources start with.)
     ("SQLite", "Where a dedicated server keeps its game's saves", "https://www.sqlite.org",
      os.path.join(DEPS, "sqlite-src", "sqlite3.h")),

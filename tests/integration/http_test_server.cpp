@@ -186,7 +186,7 @@ struct HttpTestServer::Tls {
   }
 };
 
-HttpTestServer::HttpTestServer(Kind kind, std::string answer) : kind_(kind), answer_(std::move(answer)) {
+HttpTestServer::HttpTestServer(Kind kind, std::string answer) : kind_(kind), answers_{std::move(answer)} {
   if (kind_ == Kind::Secure) {
     tls_ = std::make_unique<Tls>();
     certificate_pem_ = tls_->pem;
@@ -206,6 +206,16 @@ HttpTestServer::~HttpTestServer() {
 std::string HttpTestServer::url(const std::string& path) const {
   const std::string machine = kind_ == Kind::Secure ? "https://localhost:" : "http://127.0.0.1:";
   return machine + std::to_string(port_) + path;
+}
+
+void HttpTestServer::answer_in_turn(std::vector<std::string> answers) {
+  const std::lock_guard<std::mutex> lock(mutex_);
+  answers_ = std::move(answers);
+}
+
+std::string HttpTestServer::answer_to(int index) const {
+  const std::lock_guard<std::mutex> lock(mutex_);
+  return answers_.at(std::min(static_cast<std::size_t>(index), answers_.size() - 1));
 }
 
 std::string HttpTestServer::last_request() const {
@@ -233,7 +243,7 @@ void HttpTestServer::serve_one(net::Socket socket) {
     const std::lock_guard<std::mutex> lock(mutex_);
     last_request_ = request;
   }
-  ++requests_;
+  const int index = requests_++;
   while (quiet_.load() && !stopping()) {
     channel.wait();
     if (!channel.read(request)) {
@@ -241,7 +251,7 @@ void HttpTestServer::serve_one(net::Socket socket) {
       return;
     }
   }
-  channel.write_all(answer_, stop_);
+  channel.write_all(answer_to(index), stop_);
   if (goodbye_.load()) channel.say_goodbye();
 }
 

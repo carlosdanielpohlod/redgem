@@ -3,7 +3,9 @@
 #include <optional>
 #include <vector>
 
+#include "net/http/http_encoding.hpp"
 #include "net/http/http_message.hpp"
+#include "net/http/http_redirect.hpp"
 #include "net/http/http_response_parser.hpp"
 #include "net/http/http_stream.hpp"
 #include "net/private_address.hpp"
@@ -30,11 +32,15 @@ Socket connect(const Url& url, const Patience& patience, std::string& error) {
   return socket;
 }
 
+std::string metadata_refusal(const std::string& address) {
+  return "no request goes to a cloud's metadata address (" + address + ")";
+}
+
 std::unique_ptr<HttpStream> open_stream(Socket socket, const Url& url, const std::shared_ptr<const TrustStore>& trust,
                                         std::string& error) {
   // (Told apart by where the name led, as below: a name of the game's choosing can lead there too.)
   if (is_cloud_metadata_address(socket.peer_address())) {
-    error = "no request goes to a cloud's metadata address (" + socket.peer_address() + ")";
+    error = metadata_refusal(socket.peer_address());
     return nullptr;
   }
   if (url.secure) return secure_stream(std::move(socket), url.host, trust ? trust : TrustStore::system(), error);
@@ -82,17 +88,51 @@ HttpResponse converse(HttpStream& stream, const std::string& request, const Pati
   return parser.take();
 }
 
-}  // namespace
-
-HttpResponse exchange(const HttpRequest& request, const Url& url, const std::shared_ptr<const TrustStore>& trust,
-                      const std::atomic<bool>& cancelled) {
-  const Patience patience(request.timeout_seconds, cancelled);
+// One request to one address, a redirect in its answer not followed. Every address a request is
+// sent to goes through here, its checks and all: a redirect cannot lead around them.
+HttpResponse exchange_once(const HttpRequest& request, const Url& url, const std::shared_ptr<const TrustStore>& trust,
+                           const Patience& patience) {
+  // (An address written in numbers is refused before connecting; one a name leads to, once connected.)
+  if (is_cloud_metadata_address(url.host)) return HttpResponse::failure(metadata_refusal(url.host));
   std::string error;
   Socket socket = connect(url, patience, error);
   if (!socket.valid()) return HttpResponse::failure(error);
   std::unique_ptr<HttpStream> stream = open_stream(std::move(socket), url, trust, error);
   if (!stream) return HttpResponse::failure(error);
   return converse(*stream, request_text(request, url), patience);
+}
+
+// Follows one more redirect, unless as many as a request follows were already.
+bool redirect_again(int redirects, HttpRequest& request, Url& url, const HttpResponse& answer, std::string& error) {
+  if (redirects < kMaxHttpRedirects) return follow_redirect(request, url, answer, error);
+  error = "the answer redirected more than " + std::to_string(kMaxHttpRedirects) + " times";
+  return false;
+}
+
+// The answer as the game gets it: where it came from, and its body decompressed.
+HttpResponse finished(HttpResponse response, const Url& url) {
+  response.url = url_text(url);
+  std::string error = response.error.empty() ? decode_body(response) : std::string();
+  if (error.empty()) return response;
+  HttpResponse failed = HttpResponse::failure(std::move(error));
+  failed.url = std::move(response.url);
+  return failed;
+}
+
+}  // namespace
+
+HttpResponse exchange(const HttpRequest& request, const Url& url, const std::shared_ptr<const TrustStore>& trust,
+                      const std::atomic<bool>& cancelled) {
+  // (The timeout is the whole request's, its redirects and all.)
+  const Patience patience(request.timeout_seconds, cancelled);
+  HttpRequest next = request;
+  Url at = url;
+  for (int redirects = 0;; ++redirects) {
+    HttpResponse response = exchange_once(next, at, trust, patience);
+    if (!is_followed_redirect(response)) return finished(std::move(response), at);
+    std::string error;
+    if (!redirect_again(redirects, next, at, response, error)) return finished(HttpResponse::failure(error), at);
+  }
 }
 
 }  // namespace redgem::net

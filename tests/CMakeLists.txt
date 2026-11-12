@@ -136,6 +136,8 @@ add_executable(redgem_tests
   unit/http_url_test.cpp
   unit/http_message_test.cpp
   unit/http_response_parser_test.cpp
+  unit/http_redirect_test.cpp
+  unit/http_encoding_test.cpp
   unit/lan_discovery_test.cpp
   unit/nearby_games_test.cpp
   unit/network_event_test.cpp
@@ -214,7 +216,8 @@ add_executable(redgem_tests
   integration/api_reference_test.cpp
   integration/error_hints_test.cpp
   integration/agent_connection_test.cpp)
-target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest)
+# (zlib: the tests compress the answers their web servers send.)
+target_link_libraries(redgem_tests PRIVATE redgem_project redgem_game_server doctest::doctest redgem_zlib)
 target_include_directories(redgem_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # A program that crashes on purpose, for the tests of crash reports (tests/tools/crash_helper.cpp).
 add_executable(redgem_crash_helper tools/crash_helper.cpp)

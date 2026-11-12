@@ -130,8 +130,10 @@ No service is built into the engine and none is required.
 
 - **HTTP** lives in `src/net/http_*` (Mbed TLS 3.6, one thread per request), its Ruby side in
   `ruby/engine/http.rb`. `http://` is allowed when the address a name leads to is this machine's
-  or a private network's, checked once connected (nothing is sent otherwise). Redirects are not
-  followed. On Android the certificates are not bundled: the engine reads the system's own
+  or a private network's, checked once connected (nothing is sent otherwise). Redirects are
+  followed by `exchange` (`http_redirect.cpp`): each hop goes through the same connection and
+  address checks as the first, under the request's one timeout, and gzip/deflate bodies are
+  decompressed with zlib (`http_encoding.cpp`), held to the answer's size limit. On Android the certificates are not bundled: the engine reads the system's own
   (`/apex/com.android.conscrypt/cacerts`, then `/system/etc/security/cacerts`), which every app
   can read and which stays up to date. A level loaded while requests are on their way drops their
   blocks (the requests still go out); a game that ends gives them up.

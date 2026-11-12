@@ -19,6 +19,14 @@ class HttpTest < RedGemTest::Case
     assert_equal({ top: [1, 2] }, got.json)
   end
 
+  def test_an_answer_says_where_it_came_from_after_redirects
+    got = nil
+    id = HTTP.get(NOBODY_THERE) { |response| got = response }
+    HTTP.__answer(id, OK, {}, "{}", nil, "https://cdn.example.com/moved")
+    assert_equal "https://cdn.example.com/moved", got.url
+    assert_nil HTTP::Response.new(NO_ANSWER, {}, "", "too many requests").url
+  end
+
   def test_an_answer_is_not_ok_with_an_error_status_or_none_at_all
     refute HTTP::Response.new(NOT_FOUND, {}, "", nil).ok?
     refute HTTP::Response.new(NO_ANSWER, {}, "", "no answer within 15 seconds").ok?

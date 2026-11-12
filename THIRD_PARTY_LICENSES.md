@@ -18,6 +18,7 @@ their own licenses and are not covered here.
 - **cgltf**: Loading glTF scenes. https://github.com/jkuhlmann/cgltf
 - **nlohmann/json**: JSON, and MessagePack for multiplayer messages. https://github.com/nlohmann/json
 - **Mbed TLS**: HTTPS for the games' web requests (HTTP). https://www.trustedfirmware.org/projects/mbed-tls/
+- **zlib**: Decompressing gzip and deflate answers to the games' web requests. https://zlib.net
 - **SQLite**: Where a dedicated server keeps its game's saves. https://www.sqlite.org
 - **Dear ImGui**: The editor's interface. https://github.com/ocornut/imgui
 - **rlImGui**: Dear ImGui on raylib. https://github.com/raylib-extras/rlImGui
@@ -698,6 +699,33 @@ proprietary programs.  If your program is a subroutine library, you may
 consider it more useful to permit linking proprietary applications with the
 library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.
+```
+
+### zlib
+
+```
+Copyright notice:
+
+ (C) 1995-2026 Jean-loup Gailly and Mark Adler
+
+  This software is provided 'as-is', without any express or implied
+  warranty.  In no event will the authors be held liable for any damages
+  arising from the use of this software.
+
+  Permission is granted to anyone to use this software for any purpose,
+  including commercial applications, and to alter it and redistribute it
+  freely, subject to the following restrictions:
+
+  1. The origin of this software must not be misrepresented; you must not
+     claim that you wrote the original software. If you use this software
+     in a product, an acknowledgment in the product documentation would be
+     appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be
+     misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+
+  Jean-loup Gailly        Mark Adler
+  jloup@gzip.org          madler@alumni.caltech.edu
 ```
 
 ### SQLite

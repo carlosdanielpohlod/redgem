@@ -2477,7 +2477,7 @@
         },
         {
           "name": "body",
-          "about": "its body"
+          "about": "its body (decompressed when it came with gzip or deflate)"
         },
         {
           "name": "json",
@@ -2486,6 +2486,10 @@
         {
           "name": "error",
           "about": "why there was no answer, or nil"
+        },
+        {
+          "name": "url",
+          "about": "the address the answer came from, once redirects were followed"
         }
       ],
       "guide": "online-services.md#http"

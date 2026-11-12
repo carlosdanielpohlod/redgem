@@ -673,9 +673,10 @@ What a web request's block is given. See [online-services.md#http](online-servic
 - `ok?`: whether it came back with a 2xx status
 - `status`: its status
 - `headers`: its headers
-- `body`: its body
+- `body`: its body (decompressed when it came with gzip or deflate)
 - `json`: its body read as JSON
 - `error`: why there was no answer, or nil
+- `url`: the address the answer came from, once redirects were followed
 
 ## I18n
 

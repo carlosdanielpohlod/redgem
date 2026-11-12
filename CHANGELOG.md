@@ -78,6 +78,15 @@ until 1.0, a release may change what games rely on (see
   faces of a cube, all into one depth atlas, filtered like the sun's with a normal offset and a bias that follows the texel size. The
   quality presets cap them (ultra 4, high 2, medium 1, low 0; `local_shadows` in a custom quality
   and `Settings.quality_details`), and a graphics card that cannot make the atlas draws none.
+- **Web requests follow redirects**: `HTTP` follows 301, 302, 303, 307 and 308, up to 10 of them,
+  reading a relative `Location` against the address that sent it. A 303, and a 301 or 302 to a
+  POST, go on as a GET without the body; 307 and 308 keep both. A redirect from `https://` to
+  `http://` is refused, every hop is checked as the first address was (`http://` only nearby, no
+  metadata address), and a hop to another origin drops `Authorization`, `Cookie` and
+  `Proxy-Authorization`. `response.url` is where the answer came from.
+- **Compressed web answers**: requests send `Accept-Encoding: gzip, deflate`, and gzip or deflate
+  answers (chunked or not) reach the block decompressed with zlib 1.3.2, the 8 MB limit applying
+  to the decompressed body (a decompression bomb is refused). A corrupt or cut body is an `error`.
 
 ### Changed
 

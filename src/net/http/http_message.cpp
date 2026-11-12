@@ -17,6 +17,10 @@ constexpr const char* kMethodsWithBody[] = {"POST", "PUT", "PATCH"};
 // What the engine says itself about every request: a game cannot set these.
 constexpr const char* kReservedHeaders[] = {"host", "content-length", "connection", "transfer-encoding"};
 constexpr const char* kUserAgentHeader = "user-agent";
+// What answers may come compressed with (the engine decompresses them), unless a game says otherwise.
+constexpr const char* kAcceptEncodingHeader = "accept-encoding";
+constexpr const char* kAcceptEncodingName = "Accept-Encoding";
+constexpr const char* kAcceptedEncodings = "gzip, deflate";
 constexpr const char* kTokenSymbols = "!#$%&'*+-.^_`|~";  // what a header's name may hold besides letters and digits
 constexpr const char* kLineBreaks = "\r\n";
 constexpr const char* kLineEnd = "\r\n";
@@ -90,6 +94,18 @@ std::string trimmed(const std::string& text) {
   return text.substr(first, text.find_last_not_of(kBlanks) - first + 1);
 }
 
+std::string header_value(const HttpHeaders& headers, const std::string& lower_name) {
+  const auto found = std::find_if(headers.begin(), headers.end(),
+                                  [&lower_name](const auto& entry) { return entry.first == lower_name; });
+  return found != headers.end() ? found->second : std::string();
+}
+
+void remove_header(HttpHeaders& headers, const std::string& lower_name) {
+  headers.erase(std::remove_if(headers.begin(), headers.end(),
+                               [&lower_name](const auto& entry) { return lower_case(entry.first) == lower_name; }),
+                headers.end());
+}
+
 std::string request_problem(const HttpRequest& request) {
   if (!listed(kMethods, request.method)) return "HTTP sends GET, POST, PUT, PATCH and DELETE";
   if (request.headers.size() > kMaxHttpRequestHeaders) {
@@ -110,6 +126,7 @@ std::string request_text(const HttpRequest& request, const Url& url) {
   add_header(text, "Host", url.authority());
   add_header(text, "Connection", "close");
   if (!has_header(request.headers, kUserAgentHeader)) add_header(text, "User-Agent", kUserAgent);
+  if (!has_header(request.headers, kAcceptEncodingHeader)) add_header(text, kAcceptEncodingName, kAcceptedEncodings);
   if (says_body_length(request)) add_header(text, "Content-Length", std::to_string(request.body.size()));
   for (const auto& [name, value] : request.headers) add_header(text, name, value);
   return text.append(kLineEnd).append(request.body);

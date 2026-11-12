@@ -99,8 +99,12 @@ the same pull request.
 
 ## Web requests (HTTP)
 
-- Redirects are not followed; there are no cookies, no compression, no streaming, no uploads of
-  files: a request and its answer are each held whole in memory (at most 8 MB).
+- There are no cookies, no streaming, no uploads of files: a request and its answer are each
+  held whole in memory (at most 8 MB, decompressed). Answers compressed with anything but gzip
+  or deflate (br, zstd) are not decompressed (the engine does not ask for them).
+- Redirects stop after 10. A `Location` with spaces or letters other than ASCII is not followed
+  (it is not encoded for the server). A gzip answer of several members, one after the other, is
+  refused as corrupt.
 - Looking a name up cannot be cut short: a request to a name the network takes long to answer
   for can outlast its timeout by that long (and a game that ends waits for nobody: the request's
   thread ends on its own).

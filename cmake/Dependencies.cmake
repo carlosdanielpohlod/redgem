@@ -14,6 +14,8 @@ set(REDGEM_JSON_VERSION "v3.12.0")
 set(REDGEM_JSON_SHA256 "42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa")
 set(REDGEM_MBEDTLS_VERSION "3.6.7")
 set(REDGEM_MBEDTLS_SHA256 "a7e8bcbec0e6f761b4af24f25677626b35f762f68eef79c08677a363212d11f6")
+set(REDGEM_ZLIB_VERSION "1.3.2")
+set(REDGEM_ZLIB_SHA256 "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16")
 # SQLite 3.50.4: the year it came out, and its version written in digits.
 set(REDGEM_SQLITE_RELEASE "2025/sqlite-amalgamation-3500400")
 set(REDGEM_SQLITE_SHA256 "1d3049dd0f830a025a53105fc79fd2ab9431aea99e137809d064d8ee8356b032")
@@ -129,6 +131,12 @@ FetchContent_Declare(mbedtls
   URL https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${REDGEM_MBEDTLS_VERSION}/mbedtls-${REDGEM_MBEDTLS_VERSION}.tar.bz2
   URL_HASH SHA256=${REDGEM_MBEDTLS_SHA256})
 
+# --- zlib (gzip and deflate answers to the games' web requests; its release archive) ----------
+# Only its C files are built (below): its own CMake project would add a shared library and programs.
+FetchContent_Declare(zlib
+  URL https://github.com/madler/zlib/releases/download/v${REDGEM_ZLIB_VERSION}/zlib-${REDGEM_ZLIB_VERSION}.tar.gz
+  URL_HASH SHA256=${REDGEM_ZLIB_SHA256})
+
 # --- FreeType (game-supplied TrueType/OpenType fonts) -----------------------------
 # The release commit and archive checksum are pinned together.
 set(REDGEM_FREETYPE_COMMIT "0a0221a1347e2f1e07c395263540026e9a0aa7c7") # 2.14.3
@@ -202,7 +210,7 @@ if(WIN32)
   target_compile_options(Jolt PUBLIC "SHELL:-include type_traits")
 endif()
 # These ship no (usable) CMake project: only fetch their sources.
-foreach(dep imgui rlimgui imguizmo)
+foreach(dep imgui rlimgui imguizmo zlib)
   FetchContent_GetProperties(${dep})
   if(NOT ${dep}_POPULATED)
     FetchContent_Populate(${dep})
@@ -221,6 +229,21 @@ add_library(imgui_stack STATIC
 target_include_directories(imgui_stack SYSTEM PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/misc/cpp ${rlimgui_SOURCE_DIR} ${imguizmo_SOURCE_DIR}/src)
 target_compile_definitions(imgui_stack PUBLIC NO_FONT_AWESOME)
 target_link_libraries(imgui_stack PUBLIC raylib)
+
+# What decompresses (and, for the tests, compresses) the bodies of web answers. Its names carry a
+# z_ prefix (Z_PREFIX), so a system zlib another library brings into the process is never mixed up
+# with it; what it reads is const (ZLIB_CONST).
+add_library(redgem_zlib STATIC
+  ${zlib_SOURCE_DIR}/adler32.c
+  ${zlib_SOURCE_DIR}/crc32.c
+  ${zlib_SOURCE_DIR}/deflate.c
+  ${zlib_SOURCE_DIR}/inffast.c
+  ${zlib_SOURCE_DIR}/inflate.c
+  ${zlib_SOURCE_DIR}/inftrees.c
+  ${zlib_SOURCE_DIR}/trees.c
+  ${zlib_SOURCE_DIR}/zutil.c)
+target_include_directories(redgem_zlib SYSTEM PUBLIC ${zlib_SOURCE_DIR})
+target_compile_definitions(redgem_zlib PUBLIC Z_PREFIX ZLIB_CONST)
 
 add_library(cgltf_headers INTERFACE)
 target_include_directories(cgltf_headers SYSTEM INTERFACE "${cgltf_SOURCE_DIR}")
