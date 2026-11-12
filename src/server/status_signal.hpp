@@ -23,7 +23,7 @@ class StatusSignal {
   bool taken();
 
  private:
-  SignalHandler previous_;  // put back when this goes
+  [[maybe_unused]] SignalHandler previous_;  // put back when this goes (never set where there is no SIGUSR1)
 };
 
 }  // namespace redgem::server
