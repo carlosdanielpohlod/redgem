@@ -93,7 +93,7 @@ TEST_CASE("scene set edits spotlight cones in degrees and refuses an invalid pai
   REQUIRE(std::holds_alternative<SceneDocument>(opened));
   auto& doc = std::get<SceneDocument>(opened);
   constexpr float kIntensity = 100.0f;
-  doc.add_light(LightType::Spot, "Spotlight", Color{}, kIntensity);
+  doc.add_light(LightType::Spot, "Spotlight", redgem::Color{}, kIntensity);
   std::string error;
   REQUIRE_MESSAGE(doc.save(error), error);
 
