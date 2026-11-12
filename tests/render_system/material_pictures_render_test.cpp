@@ -25,6 +25,15 @@ constexpr float kGlow = 1.0f;
 bool pink(::Color c) { return c.r > kBright && c.b > kBright && c.g < kDark; }
 bool green(::Color c) { return c.g > kBright && c.r < kDark && c.b < kDark; }
 
+bool has_fixture_color(::Color color) { return pink(color) || green(color); }
+
+void check_retained_texture(Texture2D texture) {
+  const Image retained = LoadImageFromTexture(texture);
+  CHECK(IsImageValid(retained));
+  if (IsImageValid(retained)) CHECK(has_fixture_color(GetImageColor(retained, 0, 0)));
+  UnloadImage(retained);
+}
+
 ImageData picture(const char* file, const char* extension) {
   const auto bytes = read_file_up_to(test::fixture("images") + "/" + file, kMaxEncodedImageBytes);
   REQUIRE(bytes.has_value());
@@ -87,10 +96,7 @@ TEST_CASE("a picture put on a material after it was uploaded is drawn, swapped a
 
   stage.begin_scene_texture_use();
   stage.upload(plain_cube());
-  const Image retained = LoadImageFromTexture(first);
-  CHECK(IsImageValid(retained));
-  CHECK(pink(GetImageColor(retained, 0, 0)) || green(GetImageColor(retained, 0, 0)));
-  UnloadImage(retained);
+  check_retained_texture(first);
   stage.end_scene_texture_use();
   CHECK(stage.scene_texture(0).id == 0);
   CHECK(stage.scene_texture(1).id == 0);
