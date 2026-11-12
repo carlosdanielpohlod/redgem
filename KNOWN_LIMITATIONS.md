@@ -222,8 +222,7 @@ not a promise of how it will be closed.
 
 ### Gameplay API
 
-- Joints are made from scripts only: a level cannot set one up in Blender or the editor. The
-  editor's Physics card has no collision layer picker (`layer` is set as a custom property).
+- Joints are made from scripts only: a level cannot set one up in Blender or the editor.
 - Animation clips have no events (footsteps, hit frames), no root motion and no IK.
 - No navigation mesh or pathfinding.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive

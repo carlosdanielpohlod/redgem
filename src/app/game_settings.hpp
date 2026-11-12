@@ -45,6 +45,7 @@ struct GameManifest {
   // Always usable: the defaults (folder name as title, the engine's window size, an app with
   // nothing of its own) stand in for whatever is missing or is not what it should be.
   GameSettings settings;
+  bool file_parsed = false;
   // Whether game.json gives the title (the folder's name stands in for one it does not give).
   bool title_given = false;
   // What is wrong with the "android" section, for whoever packs the app; empty when it can be

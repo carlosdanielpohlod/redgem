@@ -23,8 +23,10 @@ std::optional<PropertyValue> text_or_nothing(const std::string& text);
 // What a new property of each kind starts as.
 PropertyValue initial_value(PropertyKind kind);
 
-// Whether the object has a Physics card: a body, a trigger or a collider.
+// Whether the object has a Physics card, including authored layer-only settings.
 bool has_physics(const PropertyMap& props);
+std::optional<PropertyValue> collision_layer_value(const std::string& name);
+bool collision_layer_changes(const PropertyMap& props, const std::string& name);
 // Whether a body has a mass to set (the ones gravity moves).
 bool has_mass(const BodyConfig& body);
 // Whether a property is shown in the generic list (the others have widgets of their own).

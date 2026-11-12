@@ -161,6 +161,7 @@ void draw_group(PanelContext& context) {
   ImGui::TextUnformatted(title.with(static_cast<long long>(selected(context).size())));
   draw_group_tag(context);
   draw_group_flags(context);
+  draw_group_collision_layer(context.session);
   if (!component_header(ICON_FA_UP_DOWN_LEFT_RIGHT, tr("editor.inspector.transform.title"))) return;
   for (const PartField& field : kPartFields) draw_part(context, field);
 }

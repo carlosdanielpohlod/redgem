@@ -12,10 +12,38 @@ namespace {
 
 constexpr float kTerrainRayReach = 2000.0f;  // meters a ray is followed looking for the ground
 
+std::vector<ObjectId> collision_layer_targets(const SceneDocument& document, const std::vector<ObjectId>& objects,
+                                              const std::string& name) {
+  std::vector<ObjectId> changed;
+  for (const auto id : objects) {
+    if (!document.has_node(id)) continue;
+    const auto& props = document.node(id).props;
+    const bool eligible = inspector_logic::has_physics(props);
+    if (eligible && inspector_logic::collision_layer_changes(props, name)) changed.push_back(id);
+  }
+  return changed;
+}
+
 }  // namespace
 
 EditorSession::EditorSession(std::filesystem::path game_dir, SceneDocument document)
     : game_dir_(std::move(game_dir)), document_(std::move(document)) {}
+
+bool EditorSession::set_collision_layer(const std::vector<ObjectId>& objects, const std::string& name) {
+  if (!editing() || !collision_layers_.find(name)) return false;
+  const auto changed = collision_layer_targets(document_, objects, name);
+  if (changed.empty()) return false;
+  const auto value = inspector_logic::collision_layer_value(name);
+  document_.checkpoint();
+  for (const auto id : changed) {
+    if (value)
+      document_.set_prop(id, props::kLayer, *value, false);
+    else
+      document_.remove_prop(id, props::kLayer, false);
+  }
+  refresh_preview();
+  return true;
+}
 
 const Scene& EditorSession::scene() const { return runtime_ ? runtime_->scene() : preview_; }
 
