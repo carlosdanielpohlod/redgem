@@ -129,7 +129,7 @@ fs::path ensure_cache(const fs::path& requested, std::string& error) {
     error = "cannot find a user cache for Android builds";
     return {};
   }
-  const auto cache = resolve_cache(requested, error);
+  auto cache = resolve_cache(requested, error);
   if (cache.empty()) return {};
   fs::path failed;
   const char* reason = private_cache_problem(cache, failed);

@@ -99,13 +99,17 @@ bool remove_payload(const fs::path& stage) {
 }
 
 // Collect first so removing entries does not affect directory iteration.
-std::error_code remove_stage_contents(const fs::path& stage) {
-  std::vector<fs::path> paths;
-  std::error_code problem;
+void list_stage_contents(const fs::path& stage, std::vector<fs::path>& paths, std::error_code& problem) {
   const fs::directory_iterator end;
   for (fs::directory_iterator it(stage, problem); !problem && it != end; it.increment(problem)) {
     if (it->path().filename() != kOwnerFile) paths.push_back(it->path());
   }
+}
+
+std::error_code remove_stage_contents(const fs::path& stage) {
+  std::vector<fs::path> paths;
+  std::error_code problem;
+  list_stage_contents(stage, paths, problem);
   if (problem) return problem;
   for (const auto& path : paths) {
     fs::remove(path, problem);
