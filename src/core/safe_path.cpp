@@ -1,9 +1,9 @@
 #include "core/safe_path.hpp"
 
-#include <fstream>
 #include <mutex>
 #include <set>
 
+#include "core/game_files.hpp"
 #include "core/log.hpp"
 
 namespace redgem {
@@ -139,22 +139,13 @@ std::optional<std::filesystem::path> file_inside(const std::filesystem::path& fo
   std::filesystem::path file = std::filesystem::weakly_canonical(root / relative, fs_error);
   if (fs_error) return std::nullopt;
   if (!stays_below(file.lexically_relative(root))) return std::nullopt;
-  if (!std::filesystem::is_regular_file(file, fs_error)) return std::nullopt;
+  if (!game_files::is_file(file)) return std::nullopt;
   if (through_link(folder, relative)) return std::nullopt;
   return file;
 }
 
 std::optional<std::vector<std::uint8_t>> read_file_up_to(const std::filesystem::path& file, std::uintmax_t max_bytes) {
-  std::error_code fs_error;
-  if (!std::filesystem::is_regular_file(file, fs_error)) return std::nullopt;
-  const std::uintmax_t size = std::filesystem::file_size(file, fs_error);
-  if (fs_error) return std::nullopt;
-  if (size > max_bytes) return std::nullopt;
-  std::ifstream in(file, std::ios::binary);
-  std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
-  // (Exactly the size it had when asked: a file that grows meanwhile is not followed.)
-  if (!in.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()))) return std::nullopt;
-  return bytes;
+  return game_files::read(file, max_bytes);
 }
 
 std::string printable(std::string_view text) { return without_controls(text, {}); }

@@ -310,8 +310,14 @@ not a promise of how it will be closed.
 - The splash picture shows once the window is open: reading the first level's file, before
   that, shows nothing. The Linux menu entry is for a package to install: the build does not add
   it to a menu.
-- A built game is the player program beside a folder of loose files, scripts as plain `.rb`
-  included: no packed or compressed archive.
+- A built game's archive (`game.rgpak`) is checked (every size bounded, every file's CRC32) but
+  neither encrypted nor signed: anyone can list and extract it, and anyone can make another valid
+  one. Its scripts are Ruby source, compressed, not compiled.
+- Music in a built game's archive is read whole into memory (up to 256 MB a piece) before it
+  plays: raylib streams music only from a file on the disk. On Android the archive is copied out
+  of the APK into the app's storage on the first run (and after each update), so it takes its
+  room twice on the phone. The packed Android app has not been run on an emulator or a phone yet:
+  the continuous integration only builds its player.
 - No installers: no Windows installer or code signing, no Linux AppImage or Flatpak. A game's Mac
   app (and the editor's) is signed ad hoc only, with no Developer ID nor notarization: a Mac that
   downloads it warns that its developer cannot be verified.

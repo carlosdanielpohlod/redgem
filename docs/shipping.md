@@ -10,17 +10,57 @@ description: "Building a standalone game for Linux, Windows, macOS and Android, 
 ./build/src/redgem build my_game dist/my_game
 ```
 
-This makes a folder with an executable named after your game (`dist/my_game/my_game`) and a
-`game/` folder with its files. Whoever receives the folder runs the executable: they do not need
-RedGem, Ruby or Blender installed.
+This makes a folder with an executable named after your game (`dist/my_game/my_game`) and
+`game.rgpak`, one file that holds all of the game's files (see [The game's files](#the-games-files)
+below). Whoever receives the folder runs the executable: they do not need RedGem, Ruby or Blender
+installed.
 
 That executable is the **player**: a copy of `redgem-player`, a small program that plays the game
-in the `game/` folder beside it and does nothing else. The editor, the project hub and the other
+packed in `game.rgpak` beside it and does nothing else. The editor, the project hub and the other
 tools you make the game with are not in it. A build looks for the player beside the `redgem`
 program that builds: `redgem-player` in the same folder for the system you are on, and
 `runtimes/<system>/` in that folder for the others (`runtimes/windows/redgem-player.exe`,
 `runtimes/android/<abi>/libredgem.so`). When one is missing the build says which file it looked
 for.
+
+## The game's files
+
+A build packs every file of the game that ships (its scenes, scripts, pictures, sounds, music,
+fonts, `game.json` and `locales/`) into one archive, `game.rgpak`, beside the executable. A file
+that compresses is compressed (the scripts, the JSON, most models); one that does not (a PNG, an
+OGG) is stored as it is. The player reads everything out of it: loose files are easy to change by
+mistake or on purpose, look unfinished, and stores prefer few files. What ships is the same as
+before: no hidden files and folders (`.git`, `.env`), no editors' backups, no files a link points
+at, no signing keys, no `AGENTS.md` / `CLAUDE.md` at the top of the game.
+
+`--loose` keeps the files as they are instead, in a `game/` folder beside the executable, to look
+into a build while you debug it:
+
+```bash
+./build/src/redgem build my_game dist/my_game --loose
+```
+
+The player plays whichever of the two it finds (a packed build takes away the `game/` folder an
+earlier loose build left in the same place, and a loose build the archive). The editor's Play,
+`redgem <game> --play`, `redgem run` and the other tools always read the project folder itself:
+the archive is only made by a build.
+
+The archive is read-only. Saves, settings, bindings and crash reports are kept in the players'
+own folder (see [Notes](#notes)), never in it. A player refuses an archive that is damaged or was
+tampered with (a wrong header, a file cut short, a file whose checksum does not match, a name
+that reaches outside the game, a name given twice) and says why, instead of playing what is
+left. It is not encryption: anyone with the file and the format below can list and extract it.
+
+The format (`src/core/game_archive.hpp` has it in full; every number is little-endian):
+
+```
+header  magic "RGPAK" 0x1A 0x0A 0x00 (8 bytes), version (u32, 1), file count (u32),
+        table offset (u64, 32: right after the header), table size (u64)
+table   one record per file: name length (u16), method (u8: 0 stored, 1 raw deflate),
+        reserved (u8, 0), CRC32 of the file (u32), data offset (u64), size (u64),
+        stored size (u64), then the name (UTF-8, '/' between folders: "scripts/player.rb")
+data    every file's data, one after another
+```
 
 ## Icon, version and splash picture
 
@@ -108,7 +148,7 @@ after the game's title. It holds everything, so it can be moved and opened like 
 ```
 My Game.app/Contents/Info.plist              its name, id, version and icon
 My Game.app/Contents/MacOS/my_game           the player
-My Game.app/Contents/Resources/game/         the game's files
+My Game.app/Contents/Resources/game.rgpak    the game's files (game/ with --loose)
 My Game.app/Contents/Resources/my_game.icns  the icon (16 to 1024 pixels)
 My Game.app/Contents/Resources/licenses/
 ```
@@ -126,7 +166,10 @@ tools/android/build_runtime.sh                                   # once: builds 
 ./build/src/redgem build my_game dist/my_game_android --target android
 ```
 
-The result is `dist/my_game_android/my_game.apk`, with the game's files inside it. Install it on
+The result is `dist/my_game_android/my_game.apk`, with the game's files inside it: its
+`game.rgpak` is one asset of the app, unpacked into the app's own storage on the first run (and
+after each update) and read from there. With `--loose` the app carries the files one by one
+instead, as before. Install it on
 a phone with `adb install`, or copy the file to the phone and open it.
 `tools/android/run_on_device.sh my_game` builds, installs, starts the game on the phone or
 emulator that `adb` sees, and shows its log.
@@ -235,7 +278,7 @@ redgem games/arena --record trailer.mp4 --record-fps 30 --record-size 3840x2160 
 
 ## Notes
 
-- The executable needs the `game/` folder next to it.
+- The executable needs `game.rgpak` (or, built with `--loose`, the `game/` folder) next to it.
 - `game.json` says what the game is and how its window opens:
 
 ```json
@@ -276,7 +319,8 @@ redgem games/arena --record trailer.mp4 --record-fps 30 --record-size 3840x2160 
   graphics card (`"gpu"`) and the language (`"language"`) from that file, and never RedGem's own
   settings.
 
-- Everything in the game folder is copied, including the scripts as plain `.rb` files.
+- Everything in the game folder that ships is packed, including the scripts, as their `.rb`
+  source (compressed, not compiled nor encrypted).
 - Check the licenses of the models and sounds you include. A license that allows using an asset
   in a game does not always allow shipping its original file.
 

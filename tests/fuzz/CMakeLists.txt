@@ -1,6 +1,6 @@
 # Fuzz targets: the parsers of what comes from outside (scene files, pictures, messages from other
-# machines, answers of web servers, the custom properties of a scene's objects), each fed made-up
-# inputs by libFuzzer (see fuzz_target.hpp and docs/contributing.md).
+# machines, answers of web servers, the custom properties of a scene's objects, built games'
+# archives), each fed made-up inputs by libFuzzer (see fuzz_target.hpp and docs/contributing.md).
 #   redgem_fuzz_<name>         the fuzzer, built with REDGEM_FUZZ=ON (clang only)
 #   redgem_fuzz_<name>_replay  the same target run on every file of its corpus, in every build: the
 #                              seeds (from the tests' fixtures) and every input that once crashed
@@ -35,3 +35,4 @@ redgem_add_fuzz_target(image_header redgem_core)
 redgem_add_fuzz_target(wire redgem_net)
 redgem_add_fuzz_target(http_response redgem_net)
 redgem_add_fuzz_target(json_scanner redgem_runtime)
+redgem_add_fuzz_target(game_archive redgem_core)

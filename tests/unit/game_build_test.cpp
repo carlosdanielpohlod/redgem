@@ -8,6 +8,7 @@
 #include "app/bundled_game.hpp"
 #include "app/scene_files.hpp"
 #include "core/config.hpp"
+#include "core/game_archive.hpp"
 #include "core/translations.hpp"
 #include "project/notices.hpp"
 #include "project/android/android_package.hpp"
@@ -116,7 +117,8 @@ TEST_CASE("a build replaces only what an earlier build made") {
   REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Windows, error), error);
 
   const std::string executable = executable_name(scratch.game);  // for Linux
-  for (const std::string& name : {std::string(kBundledGameFolder), executable, std::string(kNoticesFolder)}) {
+  for (const std::string& name :
+       {std::string(kBundledGameFolder), std::string(kArchiveFileName), executable, std::string(kNoticesFolder)}) {
     CAPTURE(name);
     const std::filesystem::path other_out = scratch.dir / ("other_out_" + std::to_string(name.size()));
     std::filesystem::remove_all(other_out);
@@ -129,18 +131,18 @@ TEST_CASE("a build replaces only what an earlier build made") {
 }
 
 #ifndef _WIN32  // (a folder that cannot be emptied, made by taking away the right to change it)
-TEST_CASE("a build whose earlier game folder cannot be emptied fails instead of shipping what is left") {
+TEST_CASE("a loose build whose earlier game folder cannot be emptied fails instead of shipping what is left") {
   const Scratch scratch;
   const std::filesystem::path player = scratch.dir / "player";
   std::ofstream(player) << "player";
   const std::filesystem::path out = scratch.dir / "out";
   std::string error;
-  REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error), error);
+  REQUIRE_MESSAGE(build_game(scratch.game, out, player, BuildTarget::Linux, error, GameLayout::Loose), error);
   const std::filesystem::path stuck = out / kBundledGameFolder / "stuck";
   std::filesystem::create_directories(stuck);
   std::ofstream(stuck / "stale.txt") << "from before";
   std::filesystem::permissions(stuck, std::filesystem::perms::owner_read | std::filesystem::perms::owner_exec);
-  CHECK_FALSE(build_game(scratch.game, out, player, BuildTarget::Linux, error));
+  CHECK_FALSE(build_game(scratch.game, out, player, BuildTarget::Linux, error, GameLayout::Loose));
   CHECK(error.find("cannot empty") != std::string::npos);
   std::filesystem::permissions(stuck, std::filesystem::perms::owner_all);
 }

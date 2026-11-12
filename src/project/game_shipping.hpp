@@ -17,7 +17,8 @@ struct BuildIdentity {
   std::string title;
   std::string id;  // the game's id; empty for none
   GameIdentity identity;
-  std::filesystem::path icon;  // the icon's file; empty for a game with none
+  std::filesystem::path icon;              // the icon's file; empty for a game with none
+  GameLayout layout = GameLayout::Packed;  // how the build was asked to ship the game's files
 };
 // What game.json says, checked: nullopt, with `error` saying why, for a version, a picture or a
 // network flag that cannot be used, or an icon that is not a file inside the game. (An id that
@@ -77,6 +78,13 @@ bool sign_mac_app(const std::filesystem::path& app, std::string& error);
 bool copy_player(const std::filesystem::path& player, const std::filesystem::path& binary, std::string& error);
 bool fresh_bundle(const std::filesystem::path& bundle, std::string& error);
 bool copy_game(const std::filesystem::path& game_dir, const std::filesystem::path& bundle, std::string& error);
+// The files of the game that ship, packed into one archive (`archive`, replaced), compressed.
+bool pack_game(const std::filesystem::path& game_dir, const std::filesystem::path& archive, std::string& error);
+// Puts the game's files in `place` as `layout` says: packed into <place>/game.rgpak, or loose in
+// <place>/game/. What an earlier build left there the other way is taken away, so a player beside
+// it never plays an older copy of the game.
+bool ship_game_files(const std::filesystem::path& game_dir, const std::filesystem::path& place, GameLayout layout,
+                     std::string& error);
 // Whether the game is outside a folder a build empties and replaces (it must not be emptied with it).
 bool game_outside(const std::filesystem::path& game_dir, const std::filesystem::path& replaced, std::string& error);
 

@@ -174,6 +174,9 @@ redgem_add_library(redgem_core
   core/core_texts.cpp
   core/platform_language.cpp
   core/safe_path.cpp
+  core/game_archive.cpp
+  core/game_archive_writer.cpp
+  core/game_files.cpp
   core/image_header.cpp
   core/webp_image.cpp
   core/float_image.cpp
@@ -185,6 +188,8 @@ redgem_add_library(redgem_core
   core/stopwatch.cpp)
 target_link_libraries(redgem_core PUBLIC nlohmann_json::nlohmann_json m)
 target_link_libraries(redgem_core PRIVATE webpdecoder)
+# (zlib: the game archive's compressed files and CRC32s, see core/game_archive.hpp.)
+target_link_libraries(redgem_core PRIVATE redgem_zlib)
 redgem_embed_texts(redgem_core core)
 if(ANDROID)
   # Where a phone shows a program's messages (see core/platform.cpp).
@@ -327,6 +332,7 @@ redgem_add_library(redgem_runtime
   audio/mixed_audio.cpp
   audio/music_player.cpp
   audio/raylib_audio.cpp
+  audio/game_music.cpp
   input/keys.cpp
   input/devices.cpp
   input/input.cpp
@@ -474,6 +480,7 @@ redgem_add_library(redgem_runtime
   app/game_identity.cpp
   app/splash_screen.cpp
   app/bundled_game.cpp
+  app/raylib_file_reading.cpp
   app/game_data_location.cpp
   app/input_bindings_store.cpp
   app/user_settings.cpp

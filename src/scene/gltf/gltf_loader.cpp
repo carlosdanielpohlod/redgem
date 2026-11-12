@@ -3,10 +3,13 @@
 #include <cgltf.h>
 
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <memory>
 #include <utility>
 
+#include "core/game_files.hpp"
 #include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_checks.hpp"
 #include "scene/gltf/gltf_reader.hpp"
@@ -61,9 +64,39 @@ bool sound(const std::string& problem, const std::string& path, std::string& err
 std::filesystem::path folder_of(const std::string& path) { return std::filesystem::path(path).parent_path(); }
 
 bool file_exceeds_budget(const std::string& path, std::uint64_t max_bytes) {
-  std::error_code error;
-  const auto bytes = std::filesystem::file_size(path, error);
-  return !error && bytes > max_bytes;
+  return game_files::file_size(path).value_or(0) > max_bytes;
+}
+
+// How many bytes of a file cgltf asks for: `size` when it says, else all of it.
+cgltf_size wanted_bytes(const cgltf_size* size, std::size_t whole) {
+  return (size != nullptr && *size != 0) ? *size : whole;
+}
+
+// cgltf reads the scene's file and the data files it names through the engine's own reading, so a
+// built game's scenes come out of its archive (see core/game_files.hpp).
+cgltf_result read_game_file(const cgltf_memory_options* /*memory*/, const cgltf_file_options* /*file*/,
+                            const char* path, cgltf_size* size, void** data) {
+  const auto bytes = game_files::read(path, kMaxArchiveEntryBytes);
+  if (!bytes) return cgltf_result_file_not_found;
+  const cgltf_size wanted = wanted_bytes(size, bytes->size());
+  if (wanted > bytes->size()) return cgltf_result_io_error;
+  void* copy = std::malloc(wanted == 0 ? 1 : wanted);
+  if (copy == nullptr) return cgltf_result_out_of_memory;
+  if (wanted > 0) std::memcpy(copy, bytes->data(), wanted);
+  if (size != nullptr) *size = wanted;
+  *data = copy;
+  return cgltf_result_success;
+}
+
+void release_game_file(const cgltf_memory_options* /*memory*/, const cgltf_file_options* /*file*/, void* data) {
+  std::free(data);
+}
+
+cgltf_options game_file_options() {
+  cgltf_options options{};
+  options.file.read = read_game_file;
+  options.file.release = release_game_file;
+  return options;
 }
 
 // The file parsed; null (and why, in `error`) when it cannot be, or is too big for memory alone.
@@ -71,7 +104,7 @@ CgltfPtr parsed_gltf(const std::string& path, std::string& error, std::uint64_t 
   if (!sound(gltf_budget::file_problem(path), path, error)) return nullptr;
   if (!sound(file_exceeds_budget(path, max_bytes) ? "scene exceeds its loading byte budget" : "", path, error))
     return nullptr;
-  cgltf_options options{};
+  cgltf_options options = game_file_options();
   cgltf_data* raw = nullptr;
   const cgltf_result parsed = cgltf_parse_file(&options, path.c_str(), &raw);
   CgltfPtr data(raw);
@@ -85,7 +118,7 @@ CgltfPtr parsed_gltf(const std::string& path, std::string& error, std::uint64_t 
 // read where the wrapped sum points.
 bool loaded_and_checked(cgltf_data& data, const gltf_checks::NamedFiles& files, const std::string& path,
                         std::string& error, std::uint64_t max_bytes) {
-  cgltf_options options{};
+  cgltf_options options = game_file_options();
   return sound(gltf_checks::buffer_file_problem(data, files), path, error) &&
          sound(gltf_budget::scene_problem(data, path, files), path, error) &&
          sound(gltf_budget::scene_bytes(data, path, files) > max_bytes ? "scene exceeds its loading byte budget" : "",
@@ -127,7 +160,7 @@ LoadResult load_gltf_snapshot(const std::string& path, const std::vector<std::ui
   LoadResult result;
   if (!sound(bytes.size() > max_bytes ? "scene exceeds its loading byte budget" : "", path, result.error))
     return result;
-  cgltf_options options{};
+  cgltf_options options = game_file_options();
   cgltf_data* raw = nullptr;
   const auto parsed = cgltf_parse(&options, bytes.data(), bytes.size(), &raw);
   const CgltfPtr data(raw);

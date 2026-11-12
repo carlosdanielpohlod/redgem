@@ -3,6 +3,7 @@
 #include <map>
 #include <set>
 #include <stdexcept>
+#include "core/game_files.hpp"
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
 #include "scene/gltf/gltf_loader.hpp"
@@ -84,10 +85,10 @@ class Resolver {
     require(!through_link(folder_, fs::u8path(uri)), "prefab file uses a symbolic link");
     if (!found) throw std::runtime_error("prefab file is missing, linked or outside the game");
     require(found->extension() == kExtension, "prefab file must be a GLB");
-    return fs::canonical(*found);
+    return fs::weakly_canonical(*found);
   }
   std::string key(const fs::path& path) const {
-    return path.lexically_relative(fs::canonical(folder_)).generic_u8string();
+    return path.lexically_relative(fs::weakly_canonical(folder_)).generic_u8string();
   }
   Source read_source(const fs::path& path) {
     auto loaded = load_gltf_scene(path.u8string(), limits_.expanded_bytes - expanded_bytes_);
@@ -105,7 +106,7 @@ class Resolver {
     const auto found = sources_.find(name);
     if (found != sources_.end()) return found->second;
     require(sources_.size() < limits_.files, "too many prefab files");
-    reserve_bytes(input_bytes_, fs::file_size(path), limits_.input_bytes);
+    reserve_bytes(input_bytes_, game_files::file_size(path).value_or(0), limits_.input_bytes);
     return sources_.emplace(name, read_source(path)).first->second;
   }
   void enter(const fs::path& path) {
@@ -178,7 +179,7 @@ bool has_references(const SceneDesc& scene) { return std::any_of(scene.nodes.beg
 SceneDesc resolve(SceneDesc scene, const std::filesystem::path& game_dir, const Limits& limits, Origins* origins) {
   Origins collected;
   if (has_references(scene))
-    scene = Resolver(std::move(scene), fs::canonical(game_dir), limits, origins ? &collected : nullptr).run();
+    scene = Resolver(std::move(scene), fs::weakly_canonical(game_dir), limits, origins ? &collected : nullptr).run();
   if (origins) *origins = std::move(collected);
   return scene;
 }

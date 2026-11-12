@@ -24,6 +24,7 @@ struct Packer {
   SigningKey key;
   AndroidFormat format = AndroidFormat::Apk;
   std::string bundletool;  // how bundletool is run; empty for an APK
+  GameLayout layout = GameLayout::Packed;
 };
 
 bool pack(const Packer& packer, const std::filesystem::path& stage, const std::filesystem::path& out,
@@ -38,10 +39,9 @@ bool build_app(const std::filesystem::path& game_dir, const std::map<std::string
   const android_stage::Folder owned(android_stage::cache_root(), error);
   if (owned.path().empty()) return false;
   const auto stage = owned.path() / android_stage::kPackageFolder;
-  build_steps::begin(build_steps::kCopyingFiles);
   // (The stamp only has to differ from the last build's.)
   const std::string stamp = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
-  return stage_android_game(game_dir, runtimes, stamp, stage, error) && pack(packer, stage, out, error);
+  return stage_android_game(game_dir, runtimes, stamp, stage, error, packer.layout) && pack(packer, stage, out, error);
 }
 
 // How bundletool is run for `format` (nothing for an APK); nullopt, with `error` set, when a
@@ -95,7 +95,7 @@ bool read_android_settings(const std::filesystem::path& game_dir, AndroidSetting
 std::optional<std::filesystem::path> build_android_game(const std::filesystem::path& game_dir,
                                                         const std::filesystem::path& out_dir,
                                                         const std::filesystem::path& runtimes_dir, std::string& error,
-                                                        AndroidFormat format) {
+                                                        AndroidFormat format, GameLayout layout) {
   if (!can_build(game_dir, out_dir, error)) return std::nullopt;
   const auto runtimes = runtimes_to_pack(runtimes_dir, error);
   if (runtimes.empty()) return std::nullopt;
@@ -104,7 +104,8 @@ std::optional<std::filesystem::path> build_android_game(const std::filesystem::p
   const auto key = bundletool ? signing_key_of(game_dir, error) : std::nullopt;
   if (!key) return std::nullopt;
   std::filesystem::path app = app_in(game_dir, out_dir, format);
-  if (!build_app(game_dir, runtimes, Packer{*tools, *key, format, *bundletool}, app, error)) return std::nullopt;
+  if (!build_app(game_dir, runtimes, Packer{*tools, *key, format, *bundletool, layout}, app, error))
+    return std::nullopt;
   return app;
 }
 
