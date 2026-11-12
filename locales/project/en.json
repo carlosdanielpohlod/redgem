@@ -160,6 +160,7 @@
   "project.run.event_fields": "each event needs frame and at least one of keys, mouse, pads, touch or tap",
   "project.run.every_needs_print": "--every needs --print",
   "project.run.frame_label": "frame {frame}: ",
+  "project.run.hidden_press": "the click or tap at frame {frame} presses a button the event before still holds: let it go first",
   "project.run.input_event": "input event {event}: {problem}",
   "project.run.needs_length": "--seconds and --frames need a number above 0, up to an hour of the game",
   "project.run.no_camera": "no camera called {camera}; the cameras are: {cameras}",

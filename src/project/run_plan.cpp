@@ -61,6 +61,7 @@ std::string spacing_problem(const RunInput& before, const RunInput& event) {
   const std::string frame = std::to_string(event.frame);
   if (event.frame == before.frame) return tr("project.run.duplicate_frame", {{"frame", frame}});
   if (crowds_pulse(before, event)) return tr("project.run.crowded_pulse", {{"frame", frame}});
+  if (hides_press(before, event)) return tr("project.run.hidden_press", {{"frame", frame}});
   return {};
 }
 

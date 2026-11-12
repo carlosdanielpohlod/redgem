@@ -217,3 +217,18 @@ TEST_CASE("clicks, the wheel and taps last their frame; a held button and a held
   CHECK_FALSE(source.touch_pointer());
   CHECK_FALSE(held(source, MouseButton::Left));
 }
+
+TEST_CASE("a click or a tap of a button the event before still holds would show no press") {
+  const RunInput holds_left = event_of(R"({"frame": 0, "mouse": {"buttons": ["left"]}})");
+  const RunInput finger = event_of(R"({"frame": 0, "touch": {"x": 1, "y": 1}})");
+  const RunInput tap = event_of(R"({"frame": 5, "tap": {"x": 1, "y": 1}})");
+  const RunInput left_click = event_of(R"({"frame": 5, "mouse": {"click": ["left"]}})");
+  const RunInput right_click = event_of(R"({"frame": 5, "mouse": {"click": ["right"]}})");
+  CHECK(hides_press(holds_left, tap));
+  CHECK(hides_press(holds_left, left_click));
+  CHECK(hides_press(finger, tap));
+  CHECK(hides_press(finger, left_click));
+  CHECK_FALSE(hides_press(holds_left, right_click));
+  CHECK_FALSE(hides_press(tap, left_click));
+  CHECK_FALSE(hides_press(event_of(R"({"frame": 0, "keys": []})"), tap));
+}

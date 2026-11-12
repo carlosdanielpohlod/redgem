@@ -73,6 +73,9 @@ std::string read_run_input(const nlohmann::json& value, long long frames, RunInp
 
 // Whether `event` clicks or taps: presses let go of on the frame after it.
 bool lasts_one_frame(const RunInput& event);
+// Whether `event` clicks or taps a button the event `before` it still holds: the game would see
+// no press, the button being down already.
+bool hides_press(const RunInput& before, const RunInput& event);
 
 // Makes `event` what `source` holds, in place of whatever it held. A gamepad stays plugged in
 // once an event lists it (`plugged` keeps which have been), as a player's would.

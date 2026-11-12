@@ -144,7 +144,9 @@ phone: as the pointer (`Input.mouse_x`, `Input.mouse_y`), with the left button h
 Everything goes through the input the game reads, so actions bound to `mouse:left` or `pad:a`
 fire as they would for a player. A gamepad stays plugged in once an event lists it, with nothing
 pressed when a later event leaves it out. A click or a tap is let go of on the next frame, so that
-frame must have no event of its own (two clicks need a frame between them):
+frame must have no event of its own (two clicks need a frame between them). A click or a tap of a
+button the event before still holds (a finger held is the left button) is refused too: the game
+would see no press. Each press and release is then a frame the game sees:
 
 ```json
 [

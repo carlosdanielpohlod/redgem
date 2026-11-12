@@ -313,6 +313,16 @@ bool is_tap(const RunInput& event) { return event.touch && event.touch->tap; }
 
 bool clicks(const RunInput& event) { return event.mouse && !event.mouse->clicks.empty(); }
 
+bool holds_finger(const RunInput& event) { return event.touch && !event.touch->tap; }
+
+bool mouse_holds(const RunInput& event, MouseButton button) { return event.mouse && holds(*event.mouse, button); }
+
+// Whether `event` keeps `button` down until the next event (a finger held is the left button).
+bool holds_button(const RunInput& event, MouseButton button) {
+  if (mouse_holds(event, button)) return true;
+  return button == MouseButton::Left && holds_finger(event);
+}
+
 void plug_pads(ScriptedInputSource& source, const PluggedPads& plugged) {
   for (std::size_t pad = 0; pad < plugged.size(); ++pad) {
     if (plugged.at(pad)) source.plug_gamepad(pad);
@@ -329,6 +339,14 @@ std::string read_run_input(const nlohmann::json& value, long long frames, RunInp
 }
 
 bool lasts_one_frame(const RunInput& event) { return is_tap(event) || clicks(event); }
+
+bool hides_press(const RunInput& before, const RunInput& event) {
+  if (is_tap(event) && holds_button(before, MouseButton::Left)) return true;
+  if (!event.mouse) return false;
+  const auto& pressed = event.mouse->clicks;
+  return std::any_of(pressed.begin(), pressed.end(),
+                     [&before](MouseButton button) { return holds_button(before, button); });
+}
 
 void apply_run_input(ScriptedInputSource& source, const RunInput& event, RunScreen screen, PluggedPads& plugged) {
   source.release_all();
