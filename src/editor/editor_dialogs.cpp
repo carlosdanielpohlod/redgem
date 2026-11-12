@@ -68,6 +68,7 @@ void EditorApp::draw_dialogs() {
   draw_unsaved_dialog();
   draw_build_wait_dialog();
   draw_scene_name_dialog();
+  draw_recovery_dialog();
   draw_external_change_dialog();  // one question at a time: closing is asked first
   draw_shortcuts_dialog();
 }
@@ -110,6 +111,11 @@ void EditorApp::save_and_go_on() {
 }
 
 void EditorApp::go_on_without_saving() {
+  std::string error;
+  if (!session_->discard_unsaved_recovery(error)) {
+    log::warning(error);
+    session_->ignore_recovery();
+  }
   const PendingAction action = take_pending();
   log::warning(action.kind == PendingAction::Kind::Leave ? "closing without saving"
                                                          : "opening " + action.scene + " without saving");

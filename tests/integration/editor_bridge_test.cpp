@@ -34,7 +34,10 @@ class Game {
     if (const auto* error = std::get_if<std::string>(&opened)) FAIL(*error);
     session = std::move(std::get<std::unique_ptr<EditorSession>>(opened));
   }
-  ~Game() { fs::remove_all(root); }
+  ~Game() {
+    session.reset();  // close the recovery lease before removing its directory on Windows
+    fs::remove_all(root);
+  }
   Game(const Game&) = delete;
   Game& operator=(const Game&) = delete;
   fs::path root = fs::temp_directory_path() / "redgem-editor-bridge-test";
