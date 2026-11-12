@@ -1641,6 +1641,11 @@
           "about": "a field to type in; returns the new value"
         },
         {
+          "name": "keyboard_visible?",
+          "static": true,
+          "about": "whether a phone's on-screen keyboard covers the bottom of the screen"
+        },
+        {
           "name": "width",
           "static": true,
           "about": "the width of the screen, in pixels"
@@ -1758,6 +1763,7 @@
         "text_box_width",
         "text_corner",
         "text_lines",
+        "typed_into",
         "widest",
         "within?",
         "worked?",

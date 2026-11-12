@@ -123,6 +123,18 @@ mrb_value ui_text_width(mrb_state* mrb, mrb_value) {
   return mrb_int_value(mrb, width);
 }
 
+// A text field drawn this frame, tapped (or clicked) or not: a touch screen shows its keyboard
+// for it.
+mrb_value ui_text_field_drawn(mrb_state* mrb, mrb_value) {
+  const bool tapped = bool_arg(mrb);
+  TextInputRequest& request = context(mrb).text_input;
+  request.field_shown = true;
+  request.field_tapped = request.field_tapped || tapped;
+  return mrb_nil_value();
+}
+
+mrb_value ui_keyboard_visible(mrb_state* mrb, mrb_value) { return mrb_bool_value(context(mrb).keyboard_visible); }
+
 }  // namespace
 
 void install_ui_bindings(mrb_state* mrb) {
@@ -135,6 +147,8 @@ void install_ui_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, ui_module, "__clip", ui_clip, MRB_ARGS_REQ(4));
   mrb_define_module_function(mrb, ui_module, "__unclip", ui_unclip, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, ui_module, "__text_width", ui_text_width, MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, ui_module, "__text_field_drawn", ui_text_field_drawn, MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, ui_module, "keyboard_visible?", ui_keyboard_visible, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, ui_module, "width", ui_width, MRB_ARGS_NONE());
   mrb_define_module_function(mrb, ui_module, "height", ui_height, MRB_ARGS_NONE());
 }

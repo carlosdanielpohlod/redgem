@@ -46,6 +46,7 @@ constexpr const char* kIcon = "android:icon";
 constexpr const char* kExported = "android:exported";
 constexpr const char* kOrientation = "android:screenOrientation";
 constexpr const char* kConfigChanges = "android:configChanges";
+constexpr const char* kSoftInputMode = "android:windowSoftInputMode";
 }  // namespace attr
 // The values that go in them.
 constexpr const char* kAndroidNamespace = "http://schemas.android.com/apk/res/android";
@@ -63,6 +64,9 @@ constexpr const char* kLauncherCategory = "android.intent.category.LAUNCHER";
 constexpr const char* kHandledChanges =
     "orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|keyboard|navigation|uiMode|density|"
     "fontScale|locale|layoutDirection|touchscreen";
+// The on-screen keyboard stays down until a text field asks for it, and covers the game without
+// moving or shrinking it: the game lays its fields out above it (UI.keyboard_visible?).
+constexpr const char* kKeyboardOverGame = "stateHidden|adjustNothing";
 constexpr const char* kOpenGlEs3 = "0x00030000";  // what the manifest calls OpenGL ES 3.0
 
 // What the app needs from the phone: a recent enough Android, OpenGL ES 3, and the network for a
@@ -82,7 +86,8 @@ void add_activity(XmlElement& application) {
   activity.attribute(attr::kName, kNativeActivity)
       .attribute(attr::kExported, kYes)
       .attribute(attr::kOrientation, kLandscape)
-      .attribute(attr::kConfigChanges, kHandledChanges);
+      .attribute(attr::kConfigChanges, kHandledChanges)
+      .attribute(attr::kSoftInputMode, kKeyboardOverGame);
   activity.child(tag::kMetaData).attribute(attr::kName, kLibraryNameKey).attribute(attr::kValue, kAndroidLibraryName);
   XmlElement& launcher = activity.child(tag::kIntentFilter);
   launcher.child(tag::kAction).attribute(attr::kName, kMainAction);
