@@ -94,10 +94,10 @@ manager or a terminal; the entry needs installing to show up in a menu.
 The executable is a copy of the `redgem-player` that came with the editor, so it runs where the
 editor's download runs: on x86_64 with AVX2 and glibc 2.35 or newer (Ubuntu 22.04, Debian 12,
 Fedora 36 and later), whatever system it was built on. It needs no libstdc++ of the player's
-system (that is inside it), only what every Linux desktop has: glibc, libgcc, OpenGL and X11.
-The release workflow checks this on every release: it builds a demo with each Linux download on
-an older system than the one the downloads are built on, and measures what the built game takes
-from glibc (`tools/release/glibc_floor.sh`). A player you build from source yourself needs the
+system (that is inside it): to start, it needs only glibc (`libc`, `libm`) and `libgcc_s`, which
+every Linux system has; OpenGL and X11 are opened when its window opens. The release workflow
+checks this on every release: it builds a demo with each Linux download on a bare Ubuntu 22.04
+(glibc 2.35), and measures what the built game takes from glibc (`tools/release/glibc_floor.sh`). A player you build from source yourself needs the
 glibc of the system it was built on.
 
 ## For macOS

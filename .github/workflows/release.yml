@@ -3,7 +3,7 @@
 # bin/runtimes/) and the Windows one on Linux, with the pinned llvm-mingw and Android NDK, and the
 # two Mac ones on Macs of each kind. The Linux programs are built on Ubuntu 22.04 with libstdc++
 # linked in, so that they run on glibc 2.35 and later systems (LINUX_GLIBC_FLOOR in
-# tools/release/release_files.sh), and are run again on an older system than that. Each download
+# tools/release/release_files.sh), and are run again on a bare Ubuntu 22.04 (that glibc). Each download
 # is checked before it is kept (its list of files, and its programs run on its own system). Then
 # all five are checked together, and a release never gets fewer than five.
 #
@@ -336,23 +336,27 @@ jobs:
           path: dist/release/redgem-windows-x86_64.zip
           if-no-files-found: error
 
-  # The Linux downloads on a system older than the one they are built on: AlmaLinux 9, whose glibc
-  # (2.34) every update of it keeps. The programs run, a demo is checked and built, and what they
-  # and the built game take from glibc is measured again (tools/release/smoke_test.sh). It has the
-  # libraries a desktop has (X11, OpenGL, ALSA), and no FUSE: the AppImage unpacks itself to run.
+  # The Linux downloads on a bare system with the oldest glibc they are for (2.35): Ubuntu 22.04
+  # with none of the build's compilers and libraries. (Its glibc is the build's, and the floor:
+  # no older system can run them.) The programs run, a demo is checked and built, and what they
+  # and the built game take from glibc is measured again (tools/release/smoke_test.sh). It has no
+  # FUSE: the AppImage unpacks itself to run. (A window's libraries, OpenGL and X11, are opened
+  # when a window opens, which these checks do not.)
   linux-old-system:
-    name: Linux downloads run on an older system
+    name: Linux downloads run on glibc 2.35
     needs: [plan, linux-windows]
     runs-on: ubuntu-24.04
     container:
-      image: almalinux:9@sha256:245f8aab832fe800aa42bdab5fad75ebbd8e0b4c9f24820a83c638b177857ae2
+      image: ubuntu:22.04@sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11
     timeout-minutes: 20
+    env:
+      DEBIAN_FRONTEND: noninteractive
     steps:
-      - name: Install what a desktop has, and objdump
+      # (objdump measures the floor; nothing else is added to the bare system.)
+      - name: Install objdump
         run: |
-          dnf install -y --setopt=install_weak_deps=False \
-            tar gzip findutils binutils libX11 libXrandr libXinerama libXcursor libXi libXext \
-            mesa-libGL alsa-lib
+          apt-get update
+          apt-get install -y --no-install-recommends binutils
 
       - uses: actions/checkout@v4
         with:

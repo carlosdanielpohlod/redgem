@@ -19,8 +19,9 @@ what 2.35 has, and need no libstdc++ of the system's. `glibc_floor.sh` measures 
 `GLIBC_` version of their symbols, by `objdump -T`) and fails when it is newer than
 `LINUX_GLIBC_FLOOR` in `release_files.sh`, or when a doc says another floor. The release workflow
 runs it on the programs as built, and `smoke_test.sh` again on both Linux downloads, with a demo
-built for Linux by each, in an AlmaLinux 9 container (glibc 2.34): a game built for Linux is a
-copy of `bin/redgem-player`, so it runs where the editor does.
+built for Linux by each, in a bare Ubuntu 22.04 container (glibc 2.35, none of the build's
+packages): a game built for Linux is a copy of `bin/redgem-player`, so it runs where the editor
+does. No older system can run them: the floor is the build system's own glibc.
 
 ## How a release is made
 
@@ -47,7 +48,7 @@ What a run checks, and what it does not:
   programs run on its own system (`tools/release/smoke_test.sh`: the editor's `--version`, the
   relay's and the server's `--help`, and on a Mac the app's signature; for the Linux downloads,
   also `redgem check` and `redgem build --target linux` on a demo and the glibc floor of the
-  programs and of the built game, on the runner and again in an AlmaLinux 9 container). That is
+  programs and of the built game, on the runner and again in a bare Ubuntu 22.04 container). That is
   all: no editor window is opened from a download (the Mac's app is opened for a picture, which
   is not a check), and no game is played.
 - Then the five together: if one is missing, or any job failed, nothing is attached.
