@@ -155,6 +155,12 @@ class NetworkSync < Behaviour
     @snapshots.add(@position, @rotation, animation)
   end
 
+  # The host did not believe a move of the object (Network.validate_movement): it is put back
+  # where the host believes it is. Only the owner's own object moves.
+  def __corrected(position)
+    transform.position = Vector3[*position] if mine?
+  end
+
   private
 
   def watch(dt)

@@ -32,6 +32,7 @@ void warn_of_unusable(const GameManifest& manifest) {
   for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
   for (const std::string& warning : manifest.servers_warnings) log::warning(warning);
   for (const std::string& warning : manifest.navigation_warnings) log::warning(warning);
+  for (const std::string& warning : manifest.movement_warnings) log::warning(warning);
 }
 
 // What the game's scripts are told of what game.json says.
@@ -101,6 +102,7 @@ void Engine::initialize() {
   fill_context(manifest.settings);
   connect_display();
   take_identity(identity);
+  network_.validate_movement(manifest.settings.movement);          // (a script may change it)
   if (serves_a_room()) network_.serve_room(options_.server_room);  // before any script asks
   start_scripts(std::chrono::milliseconds(manifest.settings.script_budget_ms));
   network_watch_.restart();  // the network's time starts with the game, not with its loading

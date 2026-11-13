@@ -41,8 +41,9 @@ constexpr float kMostOfTheWayToFive = 4.5f;   // from 3, where the ball starts
 constexpr float kShownBehind = 0.25f;         // seconds a watched swordsman is shown behind his owner
 constexpr float kFewFrames = 4.0f * config::kFixedDeltaSeconds;  // what a pose takes on its way, and more
 constexpr float kSomeMix = 0.05f;
-constexpr int kPastAWholePose = 180;  // frames: three seconds, past the two between whole poses  // meters of the
-                                      // sword's move that only a mixed clip makes
+constexpr float kTeleportDistance = 5.0f;  // meters the host believes a pose moves an object at most
+constexpr int kPastAWholePose = 180;       // frames: three seconds, past the two between whole poses  // meters of the
+                                           // sword's move that only a mixed clip makes
 
 // A camera, a platform the host moves, a ball to spawn copies of, and a swordsman (swordsman.hpp).
 SceneDesc small_scene() {
@@ -1003,4 +1004,26 @@ TEST_CASE("four corner animation grids reach another machine through NetworkSync
     CHECK(remote->to[i].weight == local->to[i].weight);
     CHECK(remote->to[i].clip.time == doctest::Approx(local->to[i].clip.time));
   }
+}
+
+TEST_CASE("a guest's object moved further than the host allows is put back, on every machine") {
+  Lan lan;
+  Engine* host = nullptr;
+  Engine* guest = nullptr;
+  std::tie(host, guest) = lan.host_and_guest();
+  ruby(*host, "Network.validate_movement(teleport_distance: " + std::to_string(kTeleportDistance) + ")");
+  for (Engine* machine : {host, guest}) {
+    ruby(*machine, "$platform = Scene.find('Platform'); $platform.add_component(NetworkSync, owner: 2)");
+  }
+  lan.rounds(kSettleRounds);
+  ruby(*guest, "$platform.transform.position = Vector3.new(" + std::to_string(kFarAlong) + ", 0, 0)");
+  lan.rounds(kSettleRounds);
+  // The host never believed it, and its owner put it back where the host has it.
+  CHECK(x_of(*host, "$platform") == doctest::Approx(0.0f).epsilon(kNear));
+  CHECK(x_of(*guest, "$platform") == doctest::Approx(0.0f).epsilon(kNear));
+  CHECK(ruby(*host, "Network.movement_violations(2)") == "1");
+  // A fair move from there is believed as before.
+  ruby(*guest, "$platform.transform.position = Vector3.new(1, 0, 0)");
+  lan.rounds(kSettleRounds);
+  CHECK(x_of(*host, "$platform") == doctest::Approx(1.0f).epsilon(kNear));
 }

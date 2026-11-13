@@ -128,6 +128,13 @@ void read_navigation(const nlohmann::json& json, GameManifest& manifest) {
   manifest.navigation_warnings = std::move(reading.warnings);
 }
 
+void read_movement(const nlohmann::json& json, GameManifest& manifest) {
+  if (!json.contains(net::kMovementSectionKey)) return;
+  net::MovementRulesReading reading = net::movement_rules_from_json(json[net::kMovementSectionKey]);
+  manifest.settings.movement = reading.rules;
+  manifest.movement_warnings = std::move(reading.warnings);
+}
+
 // What a game that says nothing is: named after its folder, with the engine's window.
 GameManifest default_manifest(const std::filesystem::path& game_dir) {
   GameManifest manifest;
@@ -154,6 +161,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   read_physics(json, manifest);
   read_servers(json, manifest);
   read_navigation(json, manifest);
+  read_movement(json, manifest);
   return manifest;
 }
 

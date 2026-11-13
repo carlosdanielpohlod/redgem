@@ -57,6 +57,7 @@ void NetworkSession::forgive_stall(float seconds) {
     link.allowance.forgive(seconds, kMostForgivenStallSeconds);
     link.messages.forgive(seconds, kMostForgivenStallSeconds);
   }
+  movement_.forgive(seconds, kMostForgivenStallSeconds);
 }
 
 }  // namespace redgem::net

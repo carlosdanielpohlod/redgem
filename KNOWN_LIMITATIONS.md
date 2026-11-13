@@ -405,8 +405,14 @@ not a promise of how it will be closed.
   can announce a game.
 - Plaintext is kept only inside the engine, for its own tests of the protocol: a game, the relay
   and the server have no way to turn encryption off.
-- Clients own the positions of their objects and decide their own collisions: a server cannot
-  check movement, so a modified client can move anywhere.
+- Clients own the positions of their objects and decide their own collisions. Movement
+  validation (`Network.validate_movement`, game.json's `"movement_validation"`, off by default)
+  lets the host or a dedicated server refuse moves faster or further than the game's limits, but
+  it checks positions only: not rotations, animations, collisions (walking through a wall within
+  the speed limit is believed), nor objects the host moves itself. One top speed and one
+  teleport distance hold for every object of the game, and a kicked machine is not told why. In a
+  room on a relay, nothing is checked (the relay passes poses on). A correction moves the owner's
+  transform; a physics body or character controller on it follows only if it follows the transform.
 - Players who are not on the same network need a relay or a dedicated server: there is no direct
   connection through home routers (no STUN or hole punching).
 - A room holds at most 16 machines (a dedicated server's `--max-players` stops at 15), set by

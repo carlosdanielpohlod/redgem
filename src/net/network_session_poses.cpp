@@ -3,6 +3,8 @@
 
 #include "net/network_session.hpp"
 
+#include <utility>
+
 namespace redgem::net {
 
 using namespace wire;
@@ -42,6 +44,17 @@ nlohmann::json placement(const PoseUpdate& update, const Pose& pose) {
   return heard;
 }
 
+// The pose an object is believed to be at, whole: what the others start from again once the host
+// no longer passes on what its machine says (see NetworkSession::relay_pose).
+PoseUpdate whole_pose(const PoseUpdate& update, const Pose& shown) {
+  PoseUpdate whole;
+  whole.key = update.key;
+  whole.position = shown.position;
+  whole.rotation = packed_rotation(shown.rotation);
+  whole.animation = update.animation;
+  return whole;
+}
+
 }  // namespace
 
 bool NetworkSession::send_pose(const std::string& key, Vec3 position, Quat rotation,
@@ -62,6 +75,54 @@ void NetworkSession::hear_pose(int from, const std::vector<std::uint8_t>& pose, 
   if (const auto whole = poses_.heard.take(from, *update)) {
     events.push_back(NetworkEvent::message(from, kPoseMessageName, placement(*update, *whole)));
   }
+}
+
+void NetworkSession::validate_movement(const MovementRules& rules) {
+  movement_.configure(rules);
+  diverged_.clear();
+}
+
+void NetworkSession::relay_checked_pose(Link& link, const nlohmann::json& passed, std::vector<NetworkEvent>& events) {
+  const auto update = decoded(passed[kData].get_binary());
+  if (!update) return;  // not a pose: nobody hears of it
+  const auto claimed = poses_.heard.take(link.peer, *update);
+  if (!claimed) {
+    queue_for_everyone_but(link.peer, passed);  // nothing to check it against: as without validation
+    return;
+  }
+  const MovementVerdict verdict = movement_.check(link.peer, update->key, claimed->position);
+  const Pose shown{verdict.position, claimed->rotation};
+  relay_pose(link.peer, *update, shown, passed, verdict.valid);
+  events.push_back(NetworkEvent::message(link.peer, kPoseMessageName, placement(*update, shown)));
+  if (!verdict.valid) correct(link, update->key, verdict.position, verdict.kick);
+}
+
+void NetworkSession::relay_pose(int from, const PoseUpdate& update, const Pose& shown, const nlohmann::json& passed,
+                                bool valid) {
+  const auto source = std::make_pair(from, update.key);
+  if (passes_as_sent(source, update, valid)) {
+    diverged_.erase(source);
+    queue_for_everyone_but(from, passed);
+    return;
+  }
+  if (diverged_.size() < kMaxDivergedObjects) diverged_.insert(source);
+  queue_for_everyone_but(from, pose_message(encoded(whole_pose(update, shown)), from));
+}
+
+bool NetworkSession::passes_as_sent(const std::pair<int, std::string>& source, const PoseUpdate& update,
+                                    bool valid) const {
+  return valid && (update.whole() || diverged_.count(source) == 0);
+}
+
+void NetworkSession::correct(Link& link, const std::string& key, Vec3 position, bool kick) {
+  link.connection.send(
+      game_message(kCorrectionMessageName, nlohmann::json::array({key, numbers_of(position)}), kHostId, link.peer));
+  if (kick) link.connection.close();  // past the game's kick_after: let go
+}
+
+void NetworkSession::forget_movement_of(int peer) {
+  movement_.forget(peer);
+  diverged_.erase(diverged_.lower_bound({peer, std::string()}), diverged_.lower_bound({peer + 1, std::string()}));
 }
 
 }  // namespace redgem::net
