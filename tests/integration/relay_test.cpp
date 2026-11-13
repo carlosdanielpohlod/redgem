@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <future>
 #include <limits>
 #include <set>
 #include <thread>
@@ -36,6 +37,8 @@ constexpr double kMillisecondsPerSecond = 1000.0;
 constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
 constexpr std::chrono::milliseconds kRoundPause{1};
 constexpr std::chrono::milliseconds kCallerDelay{20};
+// What a test waits for another thread at most before it gives up (a bound, never a measure).
+constexpr std::chrono::seconds kGuard{30};
 constexpr float kRoundSeconds = 0.001f;
 constexpr float kPastJoinTimeout = 6.0f;
 constexpr float kPastForgetting = 4.0f;  // seconds after which a silent game is forgotten
@@ -311,10 +314,17 @@ TEST_CASE("the relay program's turns sleep until there is work, then do it") {
   Meeting meeting;
   std::atomic<bool> stopped{false};
   std::atomic<int> woken_turns{0};
+  std::promise<bool> first_turn;
   // (Only this thread touches the relay while it runs.)
   std::thread program([&] {
+    first_turn.set_value(serve_relay_once(meeting.relay, kRoundSeconds));
     while (!stopped) woken_turns += serve_relay_once(meeting.relay, kRoundSeconds) ? 1 : 0;
   });
+  // With nobody there, only the wake time ends a turn. The program is then asleep in its next
+  // turn, before anyone calls: what wakes it is what arrives.
+  std::future<bool> first = first_turn.get_future();
+  REQUIRE(first.wait_for(kGuard) == std::future_status::ready);
+  CHECK_FALSE(first.get());
   NetworkSession opener;
   std::string error;
   REQUIRE_MESSAGE(opener.host_room(kLocalhost, meeting.relay.port(), error), error);
