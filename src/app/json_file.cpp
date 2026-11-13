@@ -40,20 +40,37 @@ std::optional<nlohmann::json> set_damaged_aside(const std::filesystem::path& fil
   return nlohmann::json::object();
 }
 
-// What the file holds, to be written again with something changed (nothing yet: an empty object).
+bool is_missing(const std::filesystem::file_status& status) {
+  return status.type() == std::filesystem::file_type::not_found;
+}
+
+std::optional<nlohmann::json> read_settings_object(const std::filesystem::path& file, std::string& error) {
+  std::ifstream in(file);
+  if (!in) {
+    error = "cannot read " + file.string();
+    return std::nullopt;
+  }
+  auto json = nlohmann::json::parse(in, nullptr, false);
+  if (in.bad()) {
+    error = "cannot finish reading " + file.string();
+    return std::nullopt;
+  }
+  if (json.is_object()) return json;
+  in.close();
+  return set_damaged_aside(file, error);
+}
+
 }  // namespace
 
 std::optional<nlohmann::json> read_json_for_update(const std::filesystem::path& file, std::string& error) {
-  nlohmann::json json = read_json_file(file);
-  if (json.is_object()) return json;
   std::error_code problem;
-  const bool exists = std::filesystem::exists(file, problem);
-  if (problem) {
-    error = "cannot inspect " + file.string() + ": " + problem.message();
+  const auto status = std::filesystem::symlink_status(file, problem);
+  if (is_missing(status)) return nlohmann::json::object();
+  if (!std::filesystem::is_regular_file(status)) {
+    error = "cannot update " + file.string() + ": expected a regular settings file";
     return std::nullopt;
   }
-  if (!exists) return nlohmann::json::object();
-  return set_damaged_aside(file, error);
+  return read_settings_object(file, error);
 }
 
 // Written whole: beside it first, then moved over it (see durable::replace_file).
