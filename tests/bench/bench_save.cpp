@@ -2,11 +2,10 @@
 // backup, as every Save.set does) and read back by a store that opens the file anew. The disk is
 // not flushed to: on a shared CI machine its time is the disk's, not the engine's.
 
-#include <unistd.h>
-
 #include <cstdio>
 #include <filesystem>
 #include <memory>
+#include <random>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -40,8 +39,9 @@ nlohmann::json progress(int revision) {
 
 // A folder of its own among the temporary files, removed with the last sampler that uses it.
 struct SaveFolder {
-  std::filesystem::path path = std::filesystem::temp_directory_path() /
-                               ("redgem-bench-" + std::to_string(::getpid()) + "-" + std::to_string(next++));
+  std::filesystem::path path =
+      std::filesystem::temp_directory_path() /
+      ("redgem-bench-" + std::to_string(std::random_device()()) + "-" + std::to_string(next++));
   SaveFolder() { std::filesystem::create_directories(path); }
   ~SaveFolder() {
     std::error_code ignored;

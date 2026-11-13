@@ -40,6 +40,7 @@ constexpr double kWarmUpSeconds = 2.0;  // everyone hears everyone before anythi
 // Status samples from the first seconds are left out: its frame times are over the last five
 // seconds (server/frame_window.hpp), which still held the rooms' games starting.
 constexpr double kSettleSeconds = 5.0;
+constexpr double kSettleMargin = 2.0;  // a few status samples after it, at least
 constexpr std::chrono::seconds kStatusEvery{1};
 constexpr double kMillisecondsPerSecond = 1000.0;
 constexpr const char* kSuite = "load";
@@ -82,6 +83,9 @@ Options read_options(int argc, char** argv) {
     if (!has_value || !read_option(argv[i], argv[i + 1], options))
       throw std::invalid_argument(std::string("unknown option or missing value: ") + argv[i]);
   }
+  // (The status's first seconds are left out: a shorter run would keep none of it.)
+  if (options.seconds <= kSettleSeconds + kSettleMargin)
+    throw std::invalid_argument("--seconds needs more than " + std::to_string(kSettleSeconds + kSettleMargin));
   return options;
 }
 
@@ -91,9 +95,13 @@ class StatusWatch {
   explicit StatusWatch(std::uint16_t port) : port_(port), started_(redgem::load::now_seconds()) {
     thread_ = std::thread([this] { watch(); });
   }
+  ~StatusWatch() { stop(); }
+  StatusWatch(const StatusWatch&) = delete;
+  StatusWatch& operator=(const StatusWatch&) = delete;
+  // Stops the watch (waiting for its last read); what it kept.
   StatusList stop() {
     stop_ = true;
-    thread_.join();
+    if (thread_.joinable()) thread_.join();
     return statuses_;
   }
 
@@ -140,20 +148,25 @@ struct Measured {
   int dropped = 0;
 };
 
-Measured play(const Options& options) {
-  BotList bots;
+void join_all(BotList& bots, const Options& options) {
   while (static_cast<int>(bots.size()) < options.clients && redgem::load::join_one(bots, options.port)) {
   }
+}
+
+Measured play(const Options& options) {
+  BotList bots;
+  join_all(bots, options);
   redgem::load::run_for(bots, kWarmUpSeconds);
   const double cpu_before = redgem::load::cpu_seconds(options.server_pid);
   const double start = redgem::load::now_seconds();
   StatusWatch watch(options.status_port);
   redgem::load::run_for(bots, options.seconds);
+  // (Read before the watch stops: its last read may take a second in which no bot plays.)
+  const double ticks = (redgem::load::now_seconds() - start) / redgem::config::kFixedDeltaSeconds;
+  const double cpu = redgem::load::cpu_seconds(options.server_pid) - cpu_before;
   Measured measured;
   measured.statuses = watch.stop();
-  const double ticks = (redgem::load::now_seconds() - start) / redgem::config::kFixedDeltaSeconds;
-  measured.cpu_ms_per_tick =
-      (redgem::load::cpu_seconds(options.server_pid) - cpu_before) * kMillisecondsPerSecond / ticks;
+  measured.cpu_ms_per_tick = cpu * kMillisecondsPerSecond / ticks;
   measured.dropped = options.clients - connected(bots);
   return measured;
 }
@@ -179,14 +192,6 @@ std::vector<Result> results(const Measured& measured, const Options& options) {
                 std::max(0, options.rooms - most_rooms_open(statuses)))};
 }
 
-int report(const std::vector<Result>& measured, const Options& options) {
-  std::fputs(redgem::bench::results_table(measured).c_str(), stdout);
-  std::string error;
-  if (options.out.empty() || redgem::bench::write_results(options.out, kSuite, measured, error)) return 0;
-  std::fprintf(stderr, "%s\n", error.c_str());
-  return 1;
-}
-
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -194,7 +199,7 @@ int main(int argc, char** argv) {
     const Options options = read_options(argc, argv);
     const Measured measured = play(options);
     if (measured.statuses.empty()) throw std::runtime_error("the status port never answered");
-    return report(results(measured, options), options);
+    return redgem::bench::report_results(kSuite, results(measured, options), options.out);
   } catch (const std::exception& error) {
     std::fprintf(stderr, "redgem_server_load: %s\n", error.what());
     return 1;

@@ -45,9 +45,18 @@ bool write_results(const std::filesystem::path& file, const std::string& suite, 
   if (file.has_parent_path()) std::filesystem::create_directories(file.parent_path(), ignored);
   std::ofstream out(file);
   out << results_json(suite, results).dump(kJsonIndent) << "\n";
+  out.close();  // (what fails to reach the disk is only known once it is flushed)
   if (out.good()) return true;
   error = "cannot write " + file.string();
   return false;
+}
+
+int report_results(const std::string& suite, const std::vector<Result>& results, const std::filesystem::path& file) {
+  std::fputs(results_table(results).c_str(), stdout);
+  std::string error;
+  if (file.empty() || write_results(file, suite, results, error)) return 0;
+  std::fprintf(stderr, "%s\n", error.c_str());
+  return 1;
 }
 
 }  // namespace redgem::bench

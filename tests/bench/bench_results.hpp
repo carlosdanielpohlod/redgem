@@ -29,4 +29,8 @@ std::string results_table(const std::vector<Result>& results);
 bool write_results(const std::filesystem::path& file, const std::string& suite, const std::vector<Result>& results,
                    std::string& error);
 
+// Prints results_table, and writes the results to `file` unless it is empty: the exit code of a
+// program that measured them (0, or 1 when they could not be written).
+int report_results(const std::string& suite, const std::vector<Result>& results, const std::filesystem::path& file);
+
 }  // namespace redgem::bench

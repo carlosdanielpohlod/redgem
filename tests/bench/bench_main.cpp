@@ -85,20 +85,12 @@ std::vector<Result> run_all(const Options& options) {
   return results;
 }
 
-int report(const std::vector<Result>& results, const Options& options) {
-  std::fputs(redgem::bench::results_table(results).c_str(), stdout);
-  std::string error;
-  if (options.out.empty() || redgem::bench::write_results(options.out, kSuite, results, error)) return 0;
-  std::fprintf(stderr, "%s\n", error.c_str());
-  return 1;
-}
-
 }  // namespace
 
 int main(int argc, char** argv) {
   try {
     const Options options = read_options(argc, argv);
-    return report(run_all(options), options);
+    return redgem::bench::report_results(kSuite, run_all(options), options.out);
   } catch (const std::exception& error) {
     std::fprintf(stderr, "redgem_bench: %s\n", error.what());
     return 1;

@@ -11,10 +11,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# A newer push to the same branch makes the run of the older one pointless.
+# A newer push to a pull request's branch makes the run of the older one pointless; every run on
+# main is kept, for the results it leaves.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -73,6 +74,7 @@ jobs:
           -DFETCHCONTENT_BASE_DIR="${FETCH_DIR}" -DFETCHCONTENT_UPDATES_DISCONNECTED=ON
 
       - name: Build
+        id: build
         run: |
           ccache --zero-stats
           cmake --build build --target redgem_bench redgem_server redgem_server_load
@@ -83,13 +85,13 @@ jobs:
 
       # Alone on the machine, after the benchmarks: nothing else takes the processor it measures.
       - name: Server load test
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: >
           tests/load/run_server_load.sh build/src/redgem-server build/tests/redgem_server_load games/platformer
           "${LOAD_ROOMS}" "${LOAD_PLAYERS_PER_ROOM}" "${LOAD_SECONDS}" --out "${RESULTS}/load.json"
 
       - name: Keep the results
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: bench-results
@@ -98,7 +100,7 @@ jobs:
           retention-days: 90
 
       - name: Check the thresholds
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: >
           python3 -I tools/bench/check_thresholds.py --thresholds tests/bench/thresholds.json
           --summary "${GITHUB_STEP_SUMMARY}" ${RESULTS}/*.json
