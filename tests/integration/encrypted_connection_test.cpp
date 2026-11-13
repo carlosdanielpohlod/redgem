@@ -438,6 +438,11 @@ TEST_CASE("a player's hosted game shows a code its players join with, and a wron
   // A fingerprint that is none raises, and leaves the game this machine is in alone.
   CHECK_FALSE(friendly.scripts().eval("Network.join('127.0.0.1', port: 1, fingerprint: 'not hex')", "t.rb").ok);
   CHECK_FALSE(friendly.scripts().eval("Network.host(room: true, fingerprint: '3FA2C')", "t.rb").ok);
+  // A relay's or a server's identity stays: a room takes its whole fingerprint, never a short code.
+  CHECK_FALSE(friendly.scripts().eval("Network.host(room: true, fingerprint: '" + code + "')", "t.rb").ok);
+  CHECK_FALSE(friendly.scripts().eval("Network.join(room: 'K7QM3P', fingerprint: '" + code + "')", "t.rb").ok);
+  // And a fingerprint is the relay's: a game hosted directly has none to check.
+  CHECK_FALSE(friendly.scripts().eval("Network.host(fingerprint: '" + code + "')", "t.rb").ok);
   CHECK(online(friendly));
   ruby(host, "Network.leave");
   CHECK(ruby(host, "[Network.fingerprint, Network.host_code].inspect") == "[nil, nil]");
@@ -472,6 +477,11 @@ TEST_CASE("game.json's servers are used when they make sense, and the rest are s
   CHECK(pinned_fingerprint(pins, "play.example.com", 7778).empty());
   CHECK(pinned_fingerprint(pins, "relay.example.com", 7778) == digits);
   CHECK(pinned_fingerprint(pins, "Play.Example.COM.", 7777) == digits);
+  // A pin naming the port wins over one for every port, listed before it or not.
+  const std::string other(kFingerprintDigits, 'C');
+  const std::vector<ServerPin> both = {{"play.example.com", 0, other}, {"play.example.com", 7777, digits}};
+  CHECK(pinned_fingerprint(both, "play.example.com", 7777) == digits);
+  CHECK(pinned_fingerprint(both, "play.example.com", 9000) == other);
   CHECK(pinned_fingerprint(pins, "elsewhere.example.com", 7777).empty());
   warnings.clear();
   CHECK(read_server_pins(nlohmann::json::object(), warnings).empty());

@@ -71,11 +71,16 @@ std::string plain_address(const std::string& address) {
   return plain;
 }
 
-bool on_port(const ServerPin& pin, std::uint16_t port) { return pin.port == kAnyPort || pin.port == port; }
+// Whether a pin names that address on exactly that port (kAnyPort: a pin that names no port).
+bool pins(const ServerPin& pin, const std::string& address, std::int64_t port) {
+  return plain_address(pin.address) == plain_address(address) && pin.port == port;
+}
 
-// Whether a pin is the one for that server (a pin without a port is the address's on every port).
-bool pins(const ServerPin& pin, const std::string& address, std::uint16_t port) {
-  return plain_address(pin.address) == plain_address(address) && on_port(pin, port);
+// The digits of the first pin naming that address on exactly that port; empty when none does.
+std::string digits_of(const std::vector<ServerPin>& pins_known, const std::string& address, std::int64_t port) {
+  const auto found = std::find_if(pins_known.begin(), pins_known.end(),
+                                  [&](const ServerPin& pin) { return pins(pin, address, port); });
+  return found != pins_known.end() ? found->digits : std::string();
 }
 
 }  // namespace
@@ -96,9 +101,9 @@ std::vector<ServerPin> read_server_pins(const nlohmann::json& servers, std::vect
 
 std::string pinned_fingerprint(const std::vector<ServerPin>& pins_known, const std::string& address,
                                std::uint16_t port) {
-  const auto found = std::find_if(pins_known.begin(), pins_known.end(),
-                                  [&](const ServerPin& pin) { return pins(pin, address, port); });
-  return found != pins_known.end() ? found->digits : std::string();
+  // (A pin naming the port wins over one for the address's every port, wherever each is listed.)
+  const std::string on_that_port = digits_of(pins_known, address, port);
+  return on_that_port.empty() ? digits_of(pins_known, address, kAnyPort) : on_that_port;
 }
 
 }  // namespace redgem::net

@@ -20,6 +20,12 @@ bool is_end(int result) {
   return result == 0 || result == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY || result == MBEDTLS_ERR_SSL_CONN_EOF;
 }
 
+// Whether a handshake's result is the other side hanging up (a host with no place for one more
+// from that address turns it away so), not something wrong with what it said.
+bool hung_up_on(int result) {
+  return result == MBEDTLS_ERR_SSL_CONN_EOF || result == MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY;
+}
+
 // Whether a result says nothing more can move now, with nothing wrong: try again later. (A TLS 1.3
 // server's ticket for resuming is of no use here: what follows it is read next time.)
 bool is_pause(int result) { return wants_more(result) || result == MBEDTLS_ERR_SSL_RECEIVED_NEW_SESSION_TICKET; }
@@ -85,6 +91,7 @@ Handshake TlsSession::handshake(Socket& socket) {
   const int result = mbedtls_ssl_handshake(&ssl_);
   handshake_sending_ = result == MBEDTLS_ERR_SSL_WANT_WRITE;
   if (wants_more(result)) return Handshake::Going;
+  if (hung_up_on(result)) return Handshake::Failed;  // (turned away: no TLS failure to tell of)
   if (result != 0) return failed_handshake(result);
   done_ = trusted();
   return done_ ? Handshake::Done : Handshake::Failed;

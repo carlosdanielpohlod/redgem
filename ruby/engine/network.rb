@@ -98,7 +98,7 @@ module Network
              fingerprint: nil)
       # (A number or a fingerprint it does not take raises before the game this machine is in is left.)
       waiting = __waiting_per_address(waiting_per_address.to_i)
-      pin = fingerprint && __pin(fingerprint.to_s)
+      pin = relay_pin(fingerprint, room)
       leave
       return __host_room(*relay_address, pin) if room
 
@@ -114,7 +114,8 @@ module Network
     # not checked. A machine that is not the one expected fails the join, saying so.
     # on_connect or on_fail tells how it went, a moment later.
     def join(address = nil, port: DEFAULT_PORT, room: nil, auth: nil, fingerprint: nil)
-      pin = fingerprint && __pin(fingerprint.to_s) # (raises before this machine's game is left)
+      # (Raises before this machine's game is left. A room's is a relay's or a server's: whole.)
+      pin = fingerprint && __pin(fingerprint.to_s, !room.nil?)
       leave
       return join_room(address, port, room, auth, pin) if room
       raise ArgumentError, "join needs an address or a room" if address.nil?
@@ -187,6 +188,15 @@ module Network
       return peer unless kind == :failed
 
       name.to_s.empty? ? nil : name
+    end
+
+    # The relay's whole fingerprint a host pins it by, as the natives take it; nil without one. (A
+    # game hosted at this machine's own address is checked by no one: it has nothing to pin.)
+    def relay_pin(fingerprint, room)
+      return nil if fingerprint.nil?
+      raise ArgumentError, "fingerprint: is the relay's: it goes with room: true" unless room
+
+      __pin(fingerprint.to_s, true)
     end
 
     # A room by its code: on the dedicated server at `address` when there is one, on the relay otherwise.

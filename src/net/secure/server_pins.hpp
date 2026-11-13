@@ -28,8 +28,9 @@ struct ServerPin {
 // (they are left out: a game that joins such a server checks nothing it does not know).
 std::vector<ServerPin> read_server_pins(const nlohmann::json& servers, std::vector<std::string>& warnings);
 // The fingerprint game.json gives for the server at `address` and `port` (digits); empty when it
-// gives none. Addresses are compared as names are: "Play.Example.com." is play.example.com. (A
-// name and its address in numbers are two addresses: a game pins the one it joins by.)
+// gives none. A pin naming the port wins over one for every port. Addresses are compared as
+// names are: "Play.Example.com." is play.example.com. (A name and its address in numbers are two
+// addresses: a game pins the one it joins by.)
 std::string pinned_fingerprint(const std::vector<ServerPin>& pins, const std::string& address, std::uint16_t port);
 
 }  // namespace redgem::net

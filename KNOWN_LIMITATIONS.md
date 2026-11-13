@@ -355,8 +355,8 @@ not a promise of how it will be closed.
 - A player hosting is checked by a 10-digit code (40 bits of its fingerprint), not the whole
   fingerprint (64 digits, too long to read out loud): an attacker who can redirect the traffic
   and spends about 2^40 certificate generations while that game is open could match it. A short
-  code is taken for any address, a relay's or a server's too, where an attacker has all the time
-  it wants: give those their whole fingerprint.
+  code is taken for any address joined directly, a dedicated server's too, where an attacker has
+  all the time it wants: give a server its whole fingerprint (a room takes nothing less).
 - Through a relay, the connections are encrypted to the relay, not from player to player: the
   relay reads what the players of its rooms say.
 - No certificate rotation or revocation: a relay or server that loses its data folder (or its key)

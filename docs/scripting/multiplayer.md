@@ -164,8 +164,9 @@ Network.relay = "relay.example.com"
 Network.host(room: true, fingerprint: "3F:A2:C1:...")               # the relay's
 ```
 
-Or, once for the whole game, in `game.json` (an entry without a `port` is the address's on every
-port; a fingerprint given to the call wins):
+With a room (`room:`), the fingerprint is the relay's or the server's, and only the whole of it is
+taken. Or, once for the whole game, in `game.json` (an entry without a `port` is the address's on
+every other port; a fingerprint given to the call wins):
 
 ```json
 {
@@ -176,9 +177,10 @@ port; a fingerprint given to the call wins):
 }
 ```
 
-A player hosting a game makes a new identity each time it hosts. `Network.host_code` is a short
-form of its fingerprint (`"3FA2C-1B09E"`, its first 10 digits) to show next to the room code or
-the address, for the others to join with:
+A player hosting a game at its own address makes a new identity each time it hosts.
+`Network.host_code` is a short form of its fingerprint (`"3FA2C-1B09E"`, its first 10 digits) to
+show next to the address, for the others to join with. (A room on a relay has none: its players
+reach the relay, and check the relay's fingerprint.)
 
 ```ruby
 UI.text("Code: #{Network.host_code}", x: 20, y: 20)              # on the host
