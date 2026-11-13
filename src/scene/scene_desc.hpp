@@ -138,6 +138,12 @@ enum class LightType { Directional, Point, Spot };
 // A spot light's widest cone unless its file says (glTF KHR_lights_punctual: a quarter of a half
 // turn), in radians from its axis.
 inline constexpr float kDefaultSpotOuterCone = 0.7853981634f;
+inline constexpr float kSpotConeAxis = 0.0f;
+inline constexpr double kMinSpotConeGapDegrees = 0.1;
+inline constexpr float kMaxSpotConeDegrees = kDegreesPerHalfTurn * kHalf;
+inline constexpr double kSpotRadiansPerDegree = static_cast<double>(kPi) / kDegreesPerHalfTurn;
+inline constexpr float kMinSpotConeGap = static_cast<float>(kMinSpotConeGapDegrees * kSpotRadiansPerDegree);
+inline constexpr float kMaxSpotOuterCone = 1.5707963f;  // largest float below pi / 2
 
 struct LightDesc {
   LightType type = LightType::Directional;
@@ -149,6 +155,19 @@ struct LightDesc {
   float inner_cone = 0.0f;
   float outer_cone = kDefaultSpotOuterCone;
 };
+
+inline bool is_spot_light(const LightDesc& light) { return light.type == LightType::Spot; }
+
+float maximum_spot_inner_cone(float outer);
+float minimum_spot_outer_cone(float inner);
+void sanitize_spot_cones(LightDesc& light);
+// Changes both angles together. Invalid values or a different light type leave the light untouched.
+bool set_spot_cone_degrees(LightDesc& light, double inner, double outer);
+struct SpotConeDegrees {
+  double inner;
+  double outer;
+};
+SpotConeDegrees spot_cone_degrees(const LightDesc& light);
 
 // A skeleton: the nodes that deform a skinned mesh.
 struct SkinDesc {

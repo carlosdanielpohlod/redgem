@@ -41,8 +41,7 @@ void RoomThread::run() {
   TickPacer pacer(config::kFixedDeltaSeconds, steady_seconds());
   while (wait_for_turn(pacer.until_next(steady_seconds()))) {
     take_new_rooms();
-    const float seconds = pacer.take_turn(steady_seconds());
-    for (Room& room : rooms_) play_or_close(room, seconds);
+    play_turn(pacer.take_turn(steady_seconds()));
     drop_closed_rooms();
   }
   take_new_rooms();  // (handed over as it stopped: their slots close too)
@@ -62,6 +61,16 @@ void RoomThread::take_new_rooms() {
   new_rooms_.clear();
 }
 
+void RoomThread::play_turn(float seconds) {
+  loading_seconds_ = 0.0;
+  const double started = steady_seconds();
+  for (Room& room : rooms_) play_or_close(room, seconds);
+  // What made the rooms of this thread late, or not: the turn of all of them, one after the other
+  // (loading a new room's game aside: that happens once, as its first player arrives).
+  const double turn = steady_seconds() - started - loading_seconds_;
+  for (Room& room : rooms_) room.slot->note_frame(turn);
+}
+
 void RoomThread::play_or_close(Room& room, float seconds) {
   try {
     play(room, seconds);
@@ -71,7 +80,7 @@ void RoomThread::play_or_close(Room& room, float seconds) {
 }
 
 void RoomThread::play(Room& room, float seconds) {
-  if (!room.game) room.game = open_game(room.slot->code());
+  if (!room.game) open(room);
   // Before anyone is let in: what a behaviour's start sets up (Network.authenticate) decides about
   // the room's very first player too, not only about those who come after its first frame.
   room.game->scripts().start_pending();
@@ -81,6 +90,12 @@ void RoomThread::play(Room& room, float seconds) {
   room.slot->take_census(room.game->network());
   const bool quit = room.game->finished();
   if (room.slot->close_when_over(quit)) end(room, quit ? "the match ended" : "everyone left");
+}
+
+void RoomThread::open(Room& room) {
+  const double started = steady_seconds();
+  room.game = open_game(room.slot->code());
+  loading_seconds_ += steady_seconds() - started;
 }
 
 std::unique_ptr<Engine> RoomThread::open_game(const std::string& code) const {

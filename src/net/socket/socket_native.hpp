@@ -61,8 +61,11 @@ std::string last_error();
 void close_native(NativeSocket socket);
 // Reads and drops what arrived on a connection and was never read. A connection closed with that
 // still in it ends with a reset instead of a goodbye, and on Windows a reset makes the other side
-// lose what it had not read yet of what this one said last.
-void discard_unread(NativeSocket socket);
+// lose what it had not read yet of what this one said last. At most `most_bytes`: a machine still
+// sending at full speed is not waited out.
+void discard_unread(NativeSocket socket, std::size_t most_bytes);
+// Makes closing the socket reset the connection at once: nothing unread is read, nothing unsent sent.
+void reset_on_close(NativeSocket socket);
 bool make_non_blocking(NativeSocket socket);
 // Whether a connection in the making has an answer yet: 1 yes, 0 not yet, negative on an error.
 int connection_answered(NativeSocket socket);
@@ -79,6 +82,9 @@ std::intptr_t open_non_blocking(int type, int protocol, std::string& error);
 // Takes a port of this machine, on every address it has.
 bool bind_to_port(NativeSocket socket, std::uint16_t port);
 bool bind_local_port(NativeSocket socket, std::uint16_t port);
+// Takes a port on one address of this machine, given in numbers; false when that is no address
+// in numbers (`error` says so) or the port cannot be had there.
+bool bind_to_address(NativeSocket socket, const std::string& address, std::uint16_t port, std::string& error);
 // The port a socket got; 0 when it has none.
 std::uint16_t bound_port(NativeSocket socket);
 std::string in_numbers(const sockaddr_in& address);

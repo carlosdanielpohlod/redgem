@@ -5,8 +5,10 @@
 #include <mruby.h>
 
 #include <limits>
+#include <string>
 
 #include "core/log.hpp"
+#include "core/ports.hpp"
 #include "net/discovery/lan_discovery.hpp"
 #include "net/network_session.hpp"
 #include "script/bindings/binding_helpers.hpp"
@@ -18,10 +20,15 @@ namespace {
 
 using namespace binding;
 
-constexpr mrb_int kLargestPort = 65535;
 constexpr const char* kUnavailable = "Network is only available while a game runs";
 
 bool is_a_port(mrb_int port) { return port >= 0 && port <= kLargestPort; }
+
+// (Made once and kept: mrb_raise leaves the function without running destructors.)
+const std::string& port_refusal() {
+  static const std::string refusal = "a port is a number from 0 to " + std::to_string(kLargestPort);
+  return refusal;
+}
 
 bool fits_an_int(mrb_int number) {
   return number >= std::numeric_limits<int>::min() && number <= std::numeric_limits<int>::max();
@@ -149,7 +156,7 @@ net::NetworkSession& network(mrb_state* mrb) { return binding::required(mrb, con
 net::LanDiscovery& discovery(mrb_state* mrb) { return binding::required(mrb, context(mrb).discovery, kUnavailable); }
 
 std::uint16_t port_arg(mrb_state* mrb, mrb_int port) {
-  if (!is_a_port(port)) mrb_raise(mrb, E_ARGUMENT_ERROR, "a port is a number from 0 to 65535");
+  if (!is_a_port(port)) mrb_raise(mrb, E_ARGUMENT_ERROR, port_refusal().c_str());
   return static_cast<std::uint16_t>(port);
 }
 

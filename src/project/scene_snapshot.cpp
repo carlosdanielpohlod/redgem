@@ -120,10 +120,16 @@ Json camera(const std::optional<CameraDesc>& value) {
 
 Json light(const std::optional<LightDesc>& value) {
   if (!value) return nullptr;
-  return {{"type", static_cast<int>(value->type)},
-          {"color", color(value->color)},
-          {"intensity", value->intensity},
-          {"range", value->range}};
+  Json snapshot = {{"type", static_cast<int>(value->type)},
+                   {"color", color(value->color)},
+                   {"intensity", value->intensity},
+                   {"range", value->range}};
+  if (is_spot_light(*value)) {
+    const auto cones = spot_cone_degrees(*value);
+    snapshot["inner_cone"] = cones.inner;
+    snapshot["outer_cone"] = cones.outer;
+  }
+  return snapshot;
 }
 
 bool same_value(const Json& a, const Json& b);

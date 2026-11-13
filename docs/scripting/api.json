@@ -1366,6 +1366,15 @@
           "name": "color=",
           "args": "color",
           "about": ":orange or [r, g, b] from 0 to 255"
+        },
+        {
+          "name": "cone_angles",
+          "about": "[inner, outer] in degrees for a spot light, or nil for other lights"
+        },
+        {
+          "name": "set_cone",
+          "args": "inner:, outer:",
+          "about": "sets both spot angles between 0 and 90 degrees, at least 0.1 degrees apart"
         }
       ],
       "internal": [

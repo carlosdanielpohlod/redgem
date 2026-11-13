@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <string>
 
+#include "core/ports.hpp"
 #include "net/http/http_message.hpp"
 
 namespace redgem::net {
@@ -14,7 +16,6 @@ constexpr const char* kHttpScheme = "http://";
 constexpr std::uint16_t kHttpsPort = 443;
 constexpr std::uint16_t kHttpPort = 80;
 constexpr std::size_t kMostPortDigits = 5;
-constexpr unsigned long kLargestPort = 65535;
 constexpr char kFirstVisible = '!';  // what a request line carries as it is: visible ASCII, no space
 constexpr char kLastVisible = '~';
 constexpr char kPathStart = '/';
@@ -36,7 +37,7 @@ bool travels_as_is(const std::string& text) {
 
 bool is_host_character(char c) { return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '.' || c == '-'; }
 
-bool is_port(unsigned long number) { return number > 0 && number <= kLargestPort; }
+bool is_port(unsigned long number) { return number > 0 && number <= static_cast<unsigned long>(kLargestPort); }
 
 std::optional<std::uint16_t> port_number(const std::string& digits) {
   if (!is_decimal(digits, kMostPortDigits)) return std::nullopt;
@@ -62,7 +63,7 @@ bool read_authority(const std::string& authority, Url& url, std::string& error) 
   const auto port = colon == std::string::npos ? std::optional<std::uint16_t>(url.secure ? kHttpsPort : kHttpPort)
                                                : port_number(authority.substr(colon + 1));
   if (!is_host(url.host)) error = "the address names no machine";
-  if (!port) error = "the address's port is not a number from 1 to 65535";
+  if (!port) error = "the address's port is not a number from 1 to " + std::to_string(kLargestPort);
   url.port = port.value_or(0);
   return error.empty();
 }

@@ -1,20 +1,35 @@
 #include "server/server_command.hpp"
 
 #include <algorithm>
+#include <iterator>
 
 #include "core/command_line.hpp"
+#include "core/ports.hpp"
 #include "core/translations.hpp"
 
 namespace redgem::server {
 
 namespace {
 
-constexpr const char* kDataOption = "--data";
-
 using NumberOption = command_line::NumberOption<ServerSettings>;
 
+// An option of the line given a word (a folder, an address), what it says when it is given none,
+// and what it sets.
+struct TextOption {
+  const char* name;
+  const char* missing;  // the text's key
+  void (*set)(ServerSettings&, const std::string&);
+};
+
+constexpr TextOption kTextOptions[] = {
+    {"--data", "server.cli.data_needs_folder",
+     [](ServerSettings& settings, const std::string& folder) { settings.data_dir = folder; }},
+    {"--status-bind", "server.cli.status_bind_needs_address",
+     [](ServerSettings& settings, const std::string& address) { settings.status.address = address; }},
+};
+
 constexpr NumberOption kOptions[] = {
-    {"--port", 0, command_line::kLargestPort,
+    {"--port", 0, kLargestPort,
      [](ServerSettings& settings, int port) { settings.port = static_cast<std::uint16_t>(port); }},
     {"--max-players", 1, kMostPlayersPerRoom,
      [](ServerSettings& settings, int players) { settings.limits.max_players = players; }},
@@ -22,6 +37,10 @@ constexpr NumberOption kOptions[] = {
     {"--per-address", 1, net::kMostConnectionsPerAddress,
      [](ServerSettings& settings, int machines) { settings.connections_per_address = machines; }},
     {"--threads", 1, kMostThreads, [](ServerSettings& settings, int threads) { settings.threads = threads; }},
+    {"--status-port", 0, command_line::kLargestPort,
+     [](ServerSettings& settings, int port) { settings.status.port = static_cast<std::uint16_t>(port); }},
+    {"--status-log", 1, kMostStatusLogSeconds,
+     [](ServerSettings& settings, int seconds) { settings.status.log_every_seconds = seconds; }},
 };
 
 std::string number(int value) { return std::to_string(value); }
@@ -37,24 +56,46 @@ TextValues usage_values() {
           {"default_rooms", number(kDefaultMaxRooms)},
           {"most_rooms", number(kMostRooms)},
           {"cores", number(processor_count())},
-          {"most_threads", number(kMostThreads)}};
+          {"most_threads", number(kMostThreads)},
+          {"status_address", kDefaultStatusAddress},
+          {"most_status_log", number(kMostStatusLogSeconds)}};
 }
 
-// Reads --data and the folder it is given.
-std::string read_data_dir(const std::vector<std::string>& args, std::size_t& next, ServerSettings& settings) {
+// The option of kTextOptions named `word`; nullptr when it is none of them.
+const TextOption* text_option(const std::string& word) {
+  const auto* option = std::find_if(std::begin(kTextOptions), std::end(kTextOptions),
+                                    [&word](const TextOption& known) { return word == known.name; });
+  return option == std::end(kTextOptions) ? nullptr : option;
+}
+
+// Reads `option` and the word it is given.
+std::string read_text_option(const TextOption& option, const std::vector<std::string>& args, std::size_t& next,
+                             ServerSettings& settings) {
   ++next;
-  const auto folder = command_line::option_value(args, next);
-  if (!folder) return tr("server.cli.data_needs_folder");
-  settings.data_dir = *folder;
+  const auto value = command_line::option_value(args, next);
+  if (!value) return tr(option.missing);
+  option.set(settings, *value);
   return {};
 }
 
 // Reads the word at `next` (and an option's number); an error when it makes no sense.
 std::string read_word(const std::vector<std::string>& args, std::size_t& next, ServerSettings& settings) {
-  if (args[next] == kDataOption) return read_data_dir(args, next, settings);
+  if (const TextOption* option = text_option(args[next])) return read_text_option(*option, args, next, settings);
   if (command_line::is_option(args[next])) return command_line::read_number_option(kOptions, args, next, settings);
   if (!settings.game_dir.empty()) return command_line::unexpected(args[next]);
   settings.game_dir = args[next++];
+  return {};
+}
+
+// Whether the line names an address for a status port it does not ask for.
+bool binds_no_status_port(const StatusSettings& status) {
+  return !status.port && status.address != kDefaultStatusAddress;
+}
+
+// What makes no sense in a line read whole, if anything does.
+std::string missing_from(const ServerSettings& settings) {
+  if (settings.game_dir.empty()) return tr("server.cli.no_game");
+  if (binds_no_status_port(settings.status)) return tr("server.cli.status_bind_needs_port");
   return {};
 }
 
@@ -64,7 +105,7 @@ std::string read_line(const std::vector<std::string>& args, ServerSettings& sett
     std::string error = read_word(args, next, settings);
     if (!error.empty()) return error;
   }
-  return settings.game_dir.empty() ? tr("server.cli.no_game") : "";
+  return missing_from(settings);
 }
 
 }  // namespace

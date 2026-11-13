@@ -204,6 +204,7 @@ redgem_add_library(redgem_net
   net/graph_animation_codec.cpp
   net/pose_baselines.cpp
   net/connection.cpp
+  net/traffic.cpp
   net/network_session.cpp
   net/network_session_host.cpp
   net/network_session_guest.cpp
@@ -508,6 +509,13 @@ if(NOT ANDROID)
     server/tick_pacer.cpp
     server/game_server.cpp
     server/game_server_rooms.cpp
+    server/game_server_status.cpp
+    server/frame_window.cpp
+    server/traffic_rate.cpp
+    server/server_status.cpp
+    server/status_request.cpp
+    server/status_port.cpp
+    server/status_signal.cpp
     server/server_command.cpp
     server/stop_signals.cpp
     server/server_program.cpp

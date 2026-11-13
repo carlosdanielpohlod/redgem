@@ -44,6 +44,7 @@ LightDesc read_light(const cgltf_light& light) {
   out.range = light.range;
   out.inner_cone = light.spot_inner_cone_angle;
   out.outer_cone = light.spot_outer_cone_angle;
+  sanitize_spot_cones(out);
   return out;
 }
 

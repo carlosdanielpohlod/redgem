@@ -1,5 +1,6 @@
 #include "net/socket/socket_native.hpp"
 
+#include <algorithm>
 #include <cstring>
 
 #ifndef _WIN32
@@ -14,9 +15,6 @@ namespace {
 
 constexpr int kEnabled = 1;
 constexpr std::size_t kDiscardChunkBytes = 16 * 1024;
-// Read at most before a connection is closed anyway: a machine still sending at full speed is not
-// waited out.
-constexpr std::size_t kMostDiscardedBytes = 1024 * 1024;
 #ifdef _WIN32
 constexpr WORD kWinsockVersion = MAKEWORD(2, 2);
 #endif
@@ -96,13 +94,20 @@ void no_signal_on_closed(NativeSocket) {}  // (every send says so itself: kSendF
 
 IoStatus later_or_closed() { return would_block() ? IoStatus::WouldBlock : IoStatus::Closed; }
 
-void discard_unread(NativeSocket socket) {
+void discard_unread(NativeSocket socket, std::size_t most_bytes) {
   char chunk[kDiscardChunkBytes];
-  for (std::size_t discarded = 0; discarded < kMostDiscardedBytes;) {
-    const auto count = recv(socket, chunk, sizeof(chunk), 0);
+  for (std::size_t discarded = 0; discarded < most_bytes;) {
+    const std::size_t asked = std::min(sizeof(chunk), most_bytes - discarded);
+    const auto count = recv(socket, chunk, static_cast<int>(asked), 0);
     if (count <= 0) return;  // nothing more for now, or nothing more ever
     discarded += static_cast<std::size_t>(count);
   }
+}
+
+void reset_on_close(NativeSocket socket) {
+  linger at_once{};
+  at_once.l_onoff = 1;  // (and l_linger 0: the connection is reset, nothing waits to be sent)
+  setsockopt(socket, SOL_SOCKET, SO_LINGER, reinterpret_cast<const char*>(&at_once), sizeof(at_once));
 }
 
 void set_option(NativeSocket socket, int level, int option) {
@@ -122,20 +127,38 @@ std::intptr_t open_non_blocking(int type, int protocol, std::string& error) {
   return kInvalidSocket;
 }
 
-bool bind_to_port(NativeSocket socket, std::uint16_t port) {
+namespace {
+
+// Port `port` of the IPv4 address `host` (in the network's byte order).
+sockaddr_in ipv4(std::uint32_t host, std::uint16_t port) {
   sockaddr_in address{};
   address.sin_family = AF_INET;
-  address.sin_addr.s_addr = htonl(INADDR_ANY);
+  address.sin_addr.s_addr = host;
   address.sin_port = htons(port);
+  return address;
+}
+
+bool bind_ipv4(NativeSocket socket, const sockaddr_in& address) {
   return bind(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0;
 }
 
+}  // namespace
+
+bool bind_to_port(NativeSocket socket, std::uint16_t port) { return bind_ipv4(socket, ipv4(htonl(INADDR_ANY), port)); }
+
 bool bind_local_port(NativeSocket socket, std::uint16_t port) {
-  sockaddr_in address{};
-  address.sin_family = AF_INET;
-  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-  address.sin_port = htons(port);
-  return bind(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0;
+  return bind_ipv4(socket, ipv4(htonl(INADDR_LOOPBACK), port));
+}
+
+bool bind_to_address(NativeSocket socket, const std::string& address, std::uint16_t port, std::string& error) {
+  sockaddr_in where = ipv4(0, port);
+  if (inet_pton(AF_INET, address.c_str(), &where.sin_addr) != 1) {
+    error = "not an address in numbers: " + address;
+    return false;
+  }
+  if (bind_ipv4(socket, where)) return true;
+  error = last_error();
+  return false;
 }
 
 std::uint16_t bound_port(NativeSocket socket) {

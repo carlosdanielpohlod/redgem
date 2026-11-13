@@ -10,6 +10,14 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
+  a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
+  in total, frame time (average and worst over the last five seconds, and the budget), bytes a
+  second in and out, the threads, uptime and the engine's version. It listens on `127.0.0.1`
+  unless `--status-bind` names another address, holds counts only (no room codes or players),
+  and never holds up the server: few connections, small requests, short deadlines.
+  `--status-log <seconds>`, and `SIGUSR1` on Linux and macOS, write the same summary to the log.
+
 - **Typing on Android**: while a `UI.text_field` is drawn, the phone's on-screen keyboard is up;
   it goes when no field is drawn (the field or its menu closed, the scene changed) or when the
   back key puts it away, and a tap on the field brings it back. What it types reaches `Input.text`
@@ -84,6 +92,8 @@ until 1.0, a release may change what games rely on (see
 
 - **Spot cones**: spot lights shine within their glTF inner and outer cone angles, fading
   smoothly between them, on surfaces and on lit particles (they used to light every way).
+- **Spot light editing**: adjust the inner and outer beam angles in the Light card and save them
+  with the scene.
 - **Shadows from point and spot lights**: a light whose object sets `cast_shadow = true` casts
   shadows (off unless said, so existing scenes draw as fast as before). Of those, the ones that
   matter most to the camera cast them each frame, up to the environment's `local_shadows` (0 to
@@ -149,6 +159,11 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock
+  is released before the vehicle joins the simulation, so ThreadSanitizer no longer finds a
+  lock-order inversion there and its suppression is gone (the ground for physics on several
+  threads). The largest port, the bits in a byte and the byte mask are each defined once, and
+  the port errors of `Network` and of HTTP addresses say the range from that one definition.
 - **A very long script name no longer crashes `redgem run`, `shot` and the MCP server**: the
   error hints read at most the first 512 bytes of a message, so the standard library's matcher
   no longer runs out of stack on a 100 000-character name. A line number too big for a file no

@@ -39,6 +39,9 @@ class Socket {
   static Socket listen_on(std::uint16_t port, std::string& error);
   // A local tooling endpoint: binds only IPv4 loopback, never a network interface.
   static Socket listen_local(std::uint16_t port, std::string& error);
+  // Listens on one address of this machine only, given in numbers (127.0.0.1 for this machine
+  // alone, 0.0.0.0 for every address it has). Invalid, with `error` set, when it cannot.
+  static Socket listen_at(const std::string& address, std::uint16_t port, std::string& error);
   // Starts connecting to a machine by name or address; connect_status says how it is going.
   static Socket connect_to(const std::string& address, std::uint16_t port, std::string& error);
 
@@ -57,7 +60,14 @@ class Socket {
   std::uint16_t local_port() const;
   // The address, in numbers, of the machine at the other end; empty when there is none.
   std::string peer_address() const;
+  // Closes it, having read and dropped what arrived and was never read first (up to 1 MB), so
+  // that the other side gets a goodbye and not a reset.
   void close();
+  // The same, reading at most `most_unread` bytes first: for a program that must bound what one
+  // connection costs it.
+  void close_reading_at_most(std::size_t most_unread);
+  // Closes it at once with a reset: nothing more is read, nor sent.
+  void reset();
 
   // Sleeps until something happens on one of `sockets` (bytes arrive, someone connects, the other
   // side hangs up, or one that is `sending` can send again), for `seconds` at most. True when a

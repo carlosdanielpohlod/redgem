@@ -6,6 +6,7 @@
 
 #include <vector>
 
+#include "core/bits.hpp"
 #include "net/http/http_message.hpp"
 
 namespace redgem::net {
@@ -30,7 +31,6 @@ constexpr std::size_t kInflateStepBytes = 64 * 1024;
 constexpr std::size_t kZlibHeaderBytes = 2;
 constexpr unsigned kZlibMethodMask = 0x0F;
 constexpr unsigned kZlibHeaderCheck = 31;
-constexpr unsigned kBitsPerByte = 8;
 
 enum class Coding { None, Gzip, Deflate };
 // How decompressing went, so far or in the end.

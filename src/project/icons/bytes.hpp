@@ -4,14 +4,13 @@
 #include <cstdint>
 #include <vector>
 
+#include "core/bits.hpp"
+
 // Numbers in the bytes of the files icons are kept in: Windows' are little-endian (the lowest byte
 // first), Apple's big-endian.
 namespace redgem::bytes {
 
 using Bytes = std::vector<std::uint8_t>;
-
-inline constexpr unsigned kBitsPerByte = 8;
-inline constexpr std::uint32_t kByteMask = 0xFF;
 
 // Adds `count` bytes of `value` at the end of `out`.
 inline void append_little(Bytes& out, std::uint32_t value, std::size_t count) {

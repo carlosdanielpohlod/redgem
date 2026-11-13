@@ -5,6 +5,8 @@
 #include <Jolt/Physics/Body/BodyLock.h>
 #include <Jolt/Physics/Vehicle/WheeledVehicleController.h>
 
+#include <utility>
+
 #include "physics/jolt/jolt_vehicle.hpp"
 
 namespace redgem::jolt {
@@ -21,15 +23,27 @@ WheelPose wheel_pose(const Record& record, std::size_t wheel) {
   return pose;
 }
 
+// The chassis's lock is held only while the constraint is built from it, and released before the
+// constraint is handed to the physics system: a step takes the step-listener lock, then every
+// body's, then the constraints', so taking either of those while holding a body's would invert it.
+JPH::Ref<JPH::VehicleConstraint> build_locked(const JPH::BodyLockInterface& locks, JPH::BodyID chassis,
+                                              const std::vector<WheelDesc>& wheels, JPH::ObjectLayer layer) {
+  const JPH::BodyLockWrite lock(locks, chassis);
+  if (!lock.Succeeded()) return nullptr;
+  return build_vehicle(lock.GetBody(), wheels, layer);
+}
+
 }  // namespace
 
 void World::attach_vehicle(const BodyDesc& desc, Record& record) {
-  JPH::BodyLockWrite lock(system_.GetBodyLockInterface(), record.body);
-  if (!lock.Succeeded()) return;
-  record.vehicle = build_vehicle(lock.GetBody(), desc.wheels, object_layer_of(record));
+  // (Kept in the record only once the system has it: the record says it is a vehicle from then on.)
+  JPH::Ref<JPH::VehicleConstraint> vehicle =
+      build_locked(system_.GetBodyLockInterface(), record.body, desc.wheels, object_layer_of(record));
+  if (vehicle == nullptr) return;
+  system_.AddConstraint(vehicle.GetPtr());
+  system_.AddStepListener(vehicle.GetPtr());
   for (const WheelDesc& wheel : desc.wheels) record.wheel_objects.push_back(wheel.object);
-  system_.AddConstraint(record.vehicle.GetPtr());
-  system_.AddStepListener(record.vehicle.GetPtr());
+  record.vehicle = std::move(vehicle);
 }
 
 void World::release_vehicle(Record& record) {

@@ -13,7 +13,6 @@ namespace redgem::command_line {
 
 inline constexpr const char* kHelpOption = "--help";
 inline constexpr const char* kShortHelpOption = "-h";
-inline constexpr int kLargestPort = 65535;
 
 // Whether a word asks for the program's usage.
 bool asks_for_help(const std::string& word);

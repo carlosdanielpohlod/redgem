@@ -5,6 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "core/ports.hpp"
 #include "core/safe_path.hpp"
 #include "net/private_address.hpp"
 #include "net/socket/socket.hpp"
@@ -24,7 +25,6 @@ constexpr std::size_t kMaxGames = 32;
 constexpr int kMaxGamesPerAddress = 4;  // one machine cannot fill the list by itself
 constexpr std::size_t kMaxGameNameBytes = 48;
 constexpr int kMaxPlayersShown = 99;
-constexpr int kLargestPort = 65535;
 
 bool has_text(const nlohmann::json& answer, const char* key) { return answer.contains(key) && answer[key].is_string(); }
 
