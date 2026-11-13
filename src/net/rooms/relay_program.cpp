@@ -16,6 +16,8 @@ namespace {
 
 using NumberOption = command_line::NumberOption<RelayCommand>;
 
+constexpr const char* kDataOption = "--data";
+
 constexpr NumberOption kOptions[] = {
     // (Port 0 is no port to meet on: it stands for the usual one.)
     {"--port", 0, kLargestPort,
@@ -40,13 +42,37 @@ TextValues usage_values() {
           {"default_per_address", number(kDefaultConnectionsPerAddress)},
           {"most_per_address", number(kMostConnectionsPerAddress)},
           {"default_rooms", number(kDefaultRoomsPerAddress)},
-          {"most_rooms", number(kMaxRelayRooms)}};
+          {"most_rooms", number(kMaxRelayRooms)},
+          {"default_data", kDefaultRelayDataDir}};
+}
+
+// Reads --data and the folder it is given.
+std::string read_data_dir(const std::vector<std::string>& args, std::size_t& next, RelayCommand& command) {
+  ++next;
+  const auto folder = command_line::option_value(args, next);
+  if (!folder) return tr("relay.cli.data_needs_folder");
+  command.data_dir = *folder;
+  return {};
+}
+
+// Reads --fingerprint, which is given nothing.
+std::string read_fingerprint(std::size_t& next, RelayCommand& command) {
+  command.show_fingerprint = true;
+  ++next;
+  return {};
+}
+
+// Reads the word at `next` (and what it is given); an error when it makes no sense.
+std::string read_word(const std::vector<std::string>& args, std::size_t& next, RelayCommand& command) {
+  if (args[next] == kDataOption) return read_data_dir(args, next, command);
+  if (args[next] == command_line::kFingerprintOption) return read_fingerprint(next, command);
+  return command_line::read_number_option(kOptions, args, next, command);
 }
 
 // Reads the whole line into `command`; what makes no sense in it, if anything does.
 std::string read_line(const std::vector<std::string>& args, RelayCommand& command) {
   for (std::size_t next = 0; next < args.size();) {
-    std::string error = command_line::read_number_option(kOptions, args, next, command);
+    std::string error = read_word(args, next, command);
     if (!error.empty()) return error;
   }
   return {};
@@ -69,15 +95,32 @@ void report_rooms(const RelayServer& relay, std::size_t& rooms) {
   }
 }
 
-int run_relay(const RelayCommand& command) {
-  RelayServer relay(command.limits);
+// Starts the relay, proving itself with the identity kept in its data folder; false, with the
+// reason logged, when it cannot.
+bool start_relay(RelayServer& relay, const RelayCommand& command) {
   std::string error;
-  if (!relay.start(command.port, error)) {
+  const auto identity = TlsIdentity::kept_in(command.data_dir, error);
+  if (identity == nullptr) {
+    log::error("cannot take the relay's TLS identity: " + error);
+    return false;
+  }
+  if (!relay.start(command.port, error, identity)) {
     log::error("cannot listen on port " + std::to_string(command.port) + ": " + error);
-    return kExitFailure;
+    return false;
   }
   log::info("relay listening on port " + std::to_string(relay.port()) + " (Ctrl+C stops it)");
+  log::info(fingerprint_notice(identity->fingerprint()));
+  return true;
+}
+
+int run_relay(const RelayCommand& command) {
+  RelayServer relay(command.limits);
+  if (!start_relay(relay, command)) return kExitFailure;
   serve_until_stopped(relay);
+}
+
+int show_fingerprint(const RelayCommand& command) {
+  return print_fingerprint(command.data_dir, std::cout) ? kExitSuccess : kExitFailure;
 }
 
 }  // namespace
@@ -107,6 +150,7 @@ int run_relay_program(const std::vector<std::string>& args) {
     std::cout << relay_usage();
     return kExitSuccess;
   }
+  if (command.show_fingerprint) return show_fingerprint(command);
   return run_relay(command);
 }
 

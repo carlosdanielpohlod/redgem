@@ -1,13 +1,19 @@
 {
+  "relay.cli.data_needs_folder": "--data needs a folder",
   "relay.cli.usage": [
     "usage:",
-    "  redgem-relay [--port <number>] [--per-address <number>] [--rooms-per-address <number>]",
+    "  redgem-relay [--port <number>] [--per-address <number>] [--rooms-per-address <number>] [--data <dir>]",
     "      run a meeting point for multiplayer games over the internet",
+    "  redgem-relay --fingerprint [--data <dir>]",
+    "      print the fingerprint games pin the relay by, and stop",
     "",
     "  --port <number>                the port to listen on (default: {default_port})",
     "  --per-address <number>         machines one address may connect (default: {default_per_address}, at most {most_per_address})",
     "  --rooms-per-address <number>   rooms one address may have open (default: {default_rooms}, at most {most_rooms})",
-    "Players behind one shared address (a campus, some mobile networks) may need more of both.",
+    "      (players behind one shared address, a campus, some mobile networks, may need more of both)",
+    "  --data <dir>                   where the relay keeps its TLS certificate and private key, made there",
+    "                                 the first time (default: {default_data})",
+    "Every connection is encrypted: games check the relay by its fingerprint.",
     ""
   ]
 }

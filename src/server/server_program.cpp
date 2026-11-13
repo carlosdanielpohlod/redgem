@@ -33,10 +33,13 @@ struct Census {
   }
 };
 
-// Says where a server that started listens, and where it keeps its saves.
+// Says where a server that started listens, where it keeps its saves and TLS identity, and the
+// fingerprint games pin it by.
 void say_started(const GameServer& server, const ServerSettings& settings) {
   log::info("game server listening on port " + std::to_string(server.port()) + " (Ctrl+C stops it)");
   log::info("the game's saves are kept in " + (settings.data_dir / kSaveDatabaseName).string());
+  log::info("its TLS identity is kept in " + settings.data_dir.string());
+  log::info(net::fingerprint_notice(server.fingerprint()));
 }
 
 int run_server(const ServerSettings& settings) {
@@ -78,6 +81,9 @@ int run_server_program(const std::vector<std::string>& args) {
   if (command.help) {
     std::cout << server_usage();
     return kExitSuccess;
+  }
+  if (command.show_fingerprint) {
+    return net::print_fingerprint(command.settings.data_dir, std::cout) ? kExitSuccess : kExitFailure;
   }
   return run_server(command.settings);
 }

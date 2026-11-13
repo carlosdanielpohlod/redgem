@@ -74,10 +74,10 @@ BuildTarget folder_target() {
 
 }  // namespace
 
-TEST_CASE("the templates are the folders of templates/, each with a word about itself") {
+TEST_CASE("the templates are the folders of templates/ with a template.json, each with a word about itself") {
   std::vector<std::string> folders;
   for (const auto& entry : std::filesystem::directory_iterator(REDGEM_TEMPLATES_DIR)) {
-    if (entry.is_directory()) folders.push_back(entry.path().filename().string());
+    if (std::filesystem::exists(entry.path() / "template.json")) folders.push_back(entry.path().filename().string());
   }
   std::sort(folders.begin(), folders.end());
   std::vector<std::string> names;
@@ -87,7 +87,7 @@ TEST_CASE("the templates are the folders of templates/, each with a word about i
     CHECK_FALSE(known.icon.empty());
   }
   CHECK(names == folders);
-  CHECK(template_names("|") == "empty|platformer");
+  CHECK(template_names("|") == "empty|menu-only|platformer|third-person|top-down");
   // What a new game starts from when nothing else is asked for is one of them.
   CHECK(std::find(names.begin(), names.end(), kDefaultTemplate) != names.end());
 }
@@ -121,6 +121,22 @@ TEST_CASE("a new game is its template's folder, file for file, and a game.json o
     CHECK_FALSE(std::filesystem::exists(dir / "template.json"));
     CHECK(std::filesystem::exists(dir / kGameSettingsFile));
     check_settings_kept(source, dir);
+    std::filesystem::remove_all(dir);
+  }
+}
+
+// The CI example (templates/_shared/.github/workflows/test.yml, see docs/testing.md): in every
+// new game, whatever its template, as it is.
+TEST_CASE("every new game comes with the workflow that runs its tests on GitHub") {
+  const std::filesystem::path workflow = std::filesystem::path(".github") / "workflows" / "test.yml";
+  const std::filesystem::path shared = std::filesystem::path(REDGEM_TEMPLATES_DIR) / "_shared";
+  REQUIRE(std::filesystem::is_regular_file(shared / workflow));
+  for (const GameTemplate& known : game_templates()) {
+    CAPTURE(known.name);
+    const auto dir = fresh("workflow_of_" + known.name);
+    std::string error;
+    REQUIRE_MESSAGE(create_game(dir, known.name, error), error);
+    CHECK(bytes_of(dir / workflow) == bytes_of(shared / workflow));
     std::filesystem::remove_all(dir);
   }
 }
@@ -222,7 +238,10 @@ TEST_CASE("games are not created over existing work or from unknown templates") 
   CHECK_FALSE(create_game(dir, "empty", error));
   CHECK(error.find("not empty") != std::string::npos);
   CHECK_FALSE(create_game(fresh("nope"), "racing", error));
-  CHECK(error == "unknown template 'racing': the templates are empty, platformer");
+  CHECK(error == "unknown template 'racing': the templates are empty, menu-only, platformer, third-person, top-down");
+  // The files every game gets are no template of their own.
+  CHECK_FALSE(create_game(fresh("shared"), "_shared", error));
+  CHECK(error.rfind("unknown template '_shared'", 0) == 0);
   std::filesystem::remove_all(dir);
 }
 

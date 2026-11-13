@@ -7,7 +7,7 @@
 #include <utility>
 
 #include "editor/document/scene_document.hpp"
-#include "editor/recovery_lease.hpp"
+#include "core/recovery_lease.hpp"
 #include "storage/durable_file.hpp"
 
 namespace redgem {

@@ -6,10 +6,10 @@
 #include <stdexcept>
 #include <utility>
 #include "core/config.hpp"
+#include "core/files.hpp"
 #include "core/safe_path.hpp"
 #include "editor/node_tree.hpp"
 #include "scene/prefab_import.hpp"
-#include "scene/scene_ids.hpp"
 #include "storage/durable_file.hpp"
 
 namespace redgem::prefab_files {
@@ -51,18 +51,6 @@ void require_exportable(const SceneDesc& scene, int root) {
     for (const auto& channel : clip.channels)
       require(channel.node != root, "animate descendants instead of the prefab root before exporting");
 }
-struct Stage {
-  fs::path dir;
-  explicit Stage(const fs::path& game) : dir(game / (std::string(kStagePrefix) + make_scene_id())) {
-    require(fs::create_directory(dir), "cannot create prefab staging folder");
-  }
-  ~Stage() {
-    std::error_code ignored;
-    fs::remove_all(dir, ignored);
-  }
-  Stage(const Stage&) = delete;
-  Stage& operator=(const Stage&) = delete;
-};
 void validate_source(const fs::path& game, const fs::path& staged) {
   SceneDesc probe;
   NodeDesc node;
@@ -85,8 +73,9 @@ bool save_source(SceneDocument& document, int root, Transform placement, const f
   const auto bytes = document.copy_nodes({root}, error, {prefabs::checked_placement(placement)});
   if (!bytes) return false;
   require(bytes->size() <= prefabs::Limits::kDefaultInputBytes, "prefab file exceeds its input byte budget");
-  const Stage stage(game);
-  const auto staged = stage.dir / kStageFile;
+  const ReservedFolder stage(game, kStagePrefix, error);
+  if (stage.path().empty()) return false;
+  const auto staged = stage.path() / kStageFile;
   const std::string contents(bytes->begin(), bytes->end());
   require(durable::write_flushed(staged, contents), "cannot write and flush the prefab source");
   validate_source(game, staged);

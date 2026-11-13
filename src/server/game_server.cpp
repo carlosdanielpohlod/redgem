@@ -26,9 +26,18 @@ bool GameServer::start(std::string& error) {
   }
   scene_ = std::move(std::get<SceneDesc>(scene));
   started_at_ = steady_seconds();
-  return open_saves(error) && lobby_.open(settings_.port, error, settings_.connections_per_address) &&
-         open_status(error);
+  return open_saves(error) && take_identity(error) &&
+         lobby_.open(settings_.port, error, settings_.connections_per_address, identity_) && open_status(error);
 }
+
+bool GameServer::take_identity(std::string& error) {
+  const std::filesystem::path& folder = settings_.data_dir;
+  identity_ = folder.empty() ? net::TlsIdentity::generate(error) : net::TlsIdentity::kept_in(folder, error);
+  if (identity_ == nullptr) error = "cannot take the server's TLS identity: " + error;
+  return identity_ != nullptr;
+}
+
+std::string GameServer::fingerprint() const { return identity_ != nullptr ? identity_->fingerprint() : std::string(); }
 
 bool GameServer::open_saves(std::string& error) {
   const std::filesystem::path& folder = settings_.data_dir;

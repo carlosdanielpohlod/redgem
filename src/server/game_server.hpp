@@ -87,10 +87,15 @@ class GameServer {
   GameServer(const GameServer&) = delete;
   GameServer& operator=(const GameServer&) = delete;
 
-  // Reads the game, opens its saves, the port and the status port (when it has one); false with
-  // `error` when any cannot be done.
+  // Reads the game, opens its saves, takes its TLS identity, opens the port and the status port
+  // (when it has one); false with `error` when any cannot be done. Every connection is encrypted:
+  // the identity is kept in the data folder (made there the first time), or made for this run
+  // when the server has none.
   bool start(std::string& error);
   std::uint16_t port() const { return lobby_.port(); }
+  // The fingerprint players pin the server by (hexadecimal digits, see net/secure/fingerprint.hpp);
+  // empty before start.
+  std::string fingerprint() const;
   // The lobby's turn: newcomers are heard and handed to their rooms, and the rooms whose match
   // ended are let go. (The rooms play on their own threads meanwhile, on the real clock.)
   void tick(float seconds);
@@ -121,6 +126,7 @@ class GameServer {
   };
 
   bool open_saves(std::string& error);
+  bool take_identity(std::string& error);
   bool open_status(std::string& error);
   // The status's share of the lobby's turn: the traffic noted, the status port served, and the
   // status logged when it is due.
@@ -147,6 +153,7 @@ class GameServer {
   ServerSettings settings_;
   SceneDesc scene_;                      // the game's first scene, read once: every room starts from it
   std::unique_ptr<SaveDatabase> saves_;  // shared by every room
+  std::shared_ptr<const net::TlsIdentity> identity_;
   net::Lobby lobby_;
   std::vector<Room> rooms_;  // in the order they opened
   std::vector<std::unique_ptr<RoomThread>> threads_;

@@ -65,6 +65,10 @@ foreach(info IN LISTS REDGEM_TEMPLATE_INFOS)
   file(GLOB_RECURSE template_files CONFIGURE_DEPENDS ${template_dir}/*)
   list(APPEND REDGEM_TEMPLATE_SOURCES ${template_files})
 endforeach()
+# What every new game gets, whatever its template (templates/_shared/: the CI example, see
+# docs/testing.md). (Hidden files too: the glob lists them as any other.)
+file(GLOB_RECURSE REDGEM_SHARED_TEMPLATE_FILES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/templates/_shared/*)
+list(APPEND REDGEM_TEMPLATE_SOURCES ${REDGEM_SHARED_TEMPLATE_FILES})
 # (In a folder of their own, which only the tools' library is given.)
 set(REDGEM_PROJECT_GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_project_include)
 set(REDGEM_TEMPLATES_HEADER ${REDGEM_PROJECT_GENERATED_DIR}/generated/templates.hpp)
@@ -158,6 +162,7 @@ redgem_add_library(redgem_core
   core/platform_desktop.cpp
   core/platform_log.cpp
   core/files.cpp
+  core/recovery_lease.cpp
   core/command_line.cpp
   core/names.cpp
   core/folder_names.cpp
@@ -203,6 +208,11 @@ redgem_add_library(redgem_net
   net/animation_codec.cpp
   net/graph_animation_codec.cpp
   net/pose_baselines.cpp
+  net/secure/tls_basics.cpp
+  net/secure/fingerprint.cpp
+  net/secure/tls_identity.cpp
+  net/secure/tls_session.cpp
+  net/secure/server_pins.cpp
   net/connection.cpp
   net/traffic.cpp
   net/network_session.cpp
@@ -390,6 +400,7 @@ redgem_add_library(redgem_runtime
   script/bindings/network_bindings.cpp
   script/bindings/network_search_bindings.cpp
   script/bindings/network_state_bindings.cpp
+  script/bindings/network_security_bindings.cpp
   script/bindings/network_pose_bindings.cpp
   script/bindings/network_approval_bindings.cpp
   script/bindings/http_bindings.cpp
@@ -570,7 +581,6 @@ if(NOT ANDROID)
   editor/editor_session.cpp
     editor/editor_session_create.cpp
     editor/editor_session_play.cpp
-    editor/recovery_lease.cpp
     editor/scene_recovery.cpp
     editor/editor_session_recovery.cpp
     editor/editor_recovery.cpp
@@ -676,6 +686,8 @@ if(NOT ANDROID)
     project/android/android_package_signing.cpp
     project/android/android_package_manifest.cpp
     project/android/android_package_stage.cpp
+    project/android/android_stage_cache.cpp
+    project/android/android_stage_folder.cpp
     project/android/android_package_icons.cpp
     project/android/android_package_bundle.cpp
     project/android/android_package_tools.cpp
@@ -712,6 +724,7 @@ if(NOT ANDROID)
     project/script_messages.cpp
     project/tool_play.cpp
     project/run_command.cpp
+    project/run_input.cpp
     project/run_plan.cpp
     project/run_session.cpp
     project/runtime_query.cpp
@@ -733,6 +746,9 @@ if(NOT ANDROID)
   # What `redgem --version` says: the version in project() at the top of the build.
   target_compile_definitions(redgem_project PRIVATE REDGEM_VERSION="${redgem_VERSION}")
   target_link_libraries(redgem_project PUBLIC redgem_editor)
+  if(WIN32)
+    target_link_libraries(redgem_project PRIVATE shell32 ole32 uuid)
+  endif()
 endif()
 
 # Where the programs are put by `cmake --install build --component redgem`: all in bin/, and the

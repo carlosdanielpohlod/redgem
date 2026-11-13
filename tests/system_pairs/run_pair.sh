@@ -55,7 +55,7 @@ start_relay() {
   local try port
   for (( try = 0; try < PORT_TRIES; try++ )); do
     port="$(candidate_port)"
-    "${RELAY}" --port "${port}" > "${RELAY_LOG}" 2>&1 &
+    "${RELAY}" --port "${port}" --data "${WORK}/relay-data" > "${RELAY_LOG}" 2>&1 &
     relay=$!
     if relay_listening; then
       leave_note relay_port "${port}"

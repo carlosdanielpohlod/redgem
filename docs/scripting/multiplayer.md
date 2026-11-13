@@ -91,8 +91,12 @@ small rented server is enough, it only passes messages on):
 
 ```bash
 ./build/src/redgem-relay               # listens on port 7778; --port <number> picks another
+./build/src/redgem-relay --fingerprint # shows its fingerprint (see "Encrypted connections")
 docker compose up relay                # or with Docker
 ```
+
+The relay keeps its TLS identity in `./redgem-relay-data` (`--data <folder>` picks another): it
+makes one the first time it starts, and prints its fingerprint every time.
 
 One address may hold 24 machines and 8 open rooms on a relay. When many players share one
 address (a campus, some mobile networks), raise them: `--per-address <number>` (up to 1024) and
@@ -140,6 +144,53 @@ end
 To let in only players who logged in, the join carries their token and the server's game decides
 (`Network.join(address, auth: { token: token })`, `Network.authenticate`): see
 [Online services](online-services.md).
+
+## Encrypted connections
+
+Every connection of a game is encrypted (TLS 1.2 or 1.3), whether it goes to a player hosting, a
+relay or a dedicated server: nobody on the way reads or changes what the players say, a login
+token in `auth:` included. A game has no way to turn it off, and a machine that talks in the clear
+is let go.
+
+Encryption alone does not say *who* answers. A relay or a server proves itself with a certificate
+of its own, made the first time it starts and kept in its data folder; its **fingerprint** (a
+SHA-256 of that certificate, 64 hexadecimal digits) is printed when it starts, and by
+`redgem-relay --fingerprint` or `redgem-server <game> --fingerprint`. A game that knows it pins
+it, and refuses any other machine (`on_fail` says so) before a word of the game is sent:
+
+```ruby
+Network.join("play.example.com", fingerprint: "3F:A2:C1:...")      # the whole fingerprint
+Network.relay = "relay.example.com"
+Network.host(room: true, fingerprint: "3F:A2:C1:...")               # the relay's
+```
+
+With a room (`room:`), the fingerprint is the relay's or the server's, and only the whole of it is
+taken. Or, once for the whole game, in `game.json` (an entry without a `port` is the address's on
+every other port; a fingerprint given to the call wins):
+
+```json
+{
+  "servers": [
+    { "address": "play.example.com", "port": 7777, "fingerprint": "3F:A2:C1:..." },
+    { "address": "relay.example.com", "fingerprint": "9B:04:7E:..." }
+  ]
+}
+```
+
+A player hosting a game at its own address makes a new identity each time it hosts.
+`Network.host_code` is a short form of its fingerprint (`"3FA2C-1B09E"`, its first 10 digits) to
+show next to the address, for the others to join with. (A room on a relay has none: its players
+reach the relay, and check the relay's fingerprint.)
+
+```ruby
+UI.text("Code: #{Network.host_code}", x: 20, y: 20)              # on the host
+Network.join("192.168.1.20", fingerprint: "3FA2C-1B09E")          # on the others
+```
+
+Without a fingerprint the connection is still encrypted, but whoever answers is believed (the log
+says so): fine on a local network, not enough against someone who can redirect the players'
+traffic. A machine whose handshake is not over in 3 seconds is let go, without holding up anyone
+else.
 
 ## Messages
 
@@ -268,7 +319,7 @@ code, or know the host's or the server's address. No relay or server is run for 
 runs its own. Every message passes through the host (or the relay), over TCP: a packet lost on
 the way holds up the ones after it. Nothing rewinds time to judge a shot where its shooter saw the
 target (lag compensation), so the shooter's machine should decide its own hits, as in "Deciding
-things once": fine for co-op and casual games, not for competitive shooters. Messages are not
-encrypted. Players are not authenticated
-unless the game hosting asks for it ([Online services](online-services.md)), in a room on a relay
-too.
+things once": fine for co-op and casual games, not for competitive shooters. Connections are
+encrypted, but who answers is checked only when the game gives its fingerprint (see "Encrypted
+connections"). Players are not authenticated unless the game hosting asks for it
+([Online services](online-services.md)), in a room on a relay too.

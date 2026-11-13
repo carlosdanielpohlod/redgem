@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -14,17 +15,23 @@ namespace redgem::net {
 // machines are let go, and quiet ones asked whether they are still there, about this late at most.
 inline constexpr float kRelayWakeSeconds = 1.0f;
 
+// Where a relay keeps its TLS identity (see TlsIdentity::kept_in) unless told otherwise: a folder
+// in the one it runs in.
+inline constexpr const char* kDefaultRelayDataDir = "redgem-relay-data";
+
 // What a relay's command line asks for.
 struct RelayCommand {
   bool ok = false;
   std::string error;  // why not, when it is not ok
   bool help = false;
+  bool show_fingerprint = false;  // only print the fingerprint games pin the relay by
   std::uint16_t port = kDefaultRelayPort;
   RelayLimits limits;
+  std::filesystem::path data_dir = kDefaultRelayDataDir;
 };
 
-// Reads `redgem-relay [--port <number>] [--per-address <number>] [--rooms-per-address <number>]`
-// (and --help, which wins over the rest of the line).
+// Reads `redgem-relay [--port <number>] [--per-address <number>] [--rooms-per-address <number>]
+// [--data <dir>] [--fingerprint]` (and --help, which wins over the rest of the line).
 RelayCommand parse_relay_command(const std::vector<std::string>& args);
 std::string relay_usage();
 

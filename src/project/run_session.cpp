@@ -46,14 +46,26 @@ class RunSession {
     outcome_.problem = frame_label(outcome_.frames) + problem;
   }
 
+  RunScreen screen() {
+    const ScriptContext& context = engine_.script_context();
+    return {static_cast<float>(context.screen_width), static_cast<float>(context.screen_height)};
+  }
+
+  // What the last event held for its frame only is let go of the frame after it.
+  void end_pulses() {
+    if (pulsing_ != nullptr) end_run_pulses(engine_.scripted_input(), *pulsing_);
+    pulsing_ = nullptr;
+  }
+
+  bool input_due() const {
+    return next_input_ < plan_.input.size() && plan_.input[next_input_].frame == outcome_.frames;
+  }
+
   void input() {
-    if (next_input_ == plan_.input.size()) return;
-    const RunInput& event = plan_.input[next_input_];
-    if (event.frame != outcome_.frames) return;
-    ScriptedInputSource& source = engine_.scripted_input();
-    source.release_all();
-    for (const Key key : event.keys) source.set_key(key, true);
-    ++next_input_;
+    end_pulses();
+    if (!input_due()) return;
+    pulsing_ = &plan_.input[next_input_++];
+    apply_run_input(engine_.scripted_input(), *pulsing_, screen(), plugged_);
   }
 
   RubyResult evaluate(const std::string& expression, const char* option) {
@@ -109,6 +121,8 @@ class RunSession {
   const RunPlan& plan_;
   RunOutcome outcome_;
   std::size_t next_input_ = 0;
+  const RunInput* pulsing_ = nullptr;  // the event applied on the frame before
+  PluggedPads plugged_{};
   bool reached_ = false;
   bool truncated_ = false;
 };

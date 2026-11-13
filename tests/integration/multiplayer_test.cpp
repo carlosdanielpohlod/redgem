@@ -840,7 +840,8 @@ TEST_CASE("machines that cannot reach each other meet in a room on a relay, by i
   Lan lan;
   lan.relay = std::make_unique<net::RelayServer>();
   std::string error;
-  REQUIRE_MESSAGE(lan.relay->start(0, error), error);
+  const auto identity = net::TlsIdentity::generate(error);  // (games always encrypt)
+  REQUIRE_MESSAGE(lan.relay->start(0, error, identity), error);
   Engine& opener = lan.add_machine();
   Engine& guest = lan.add_machine();
   CHECK_FALSE(opener.scripts().eval("Network.host(room: true)", "no_relay.rb").ok);  // where is the relay?
