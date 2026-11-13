@@ -36,8 +36,10 @@ TEST_CASE("fly camera moves along its own axes") {
   FlyInput input;
   input.forward = kFullInput;
   input.dt = kOneSecond;
+  constexpr float kPreferredSpeed = 12.0f;
+  camera.set_fly_speed(kPreferredSpeed);
   camera.update(input);
-  CHECK(camera.position().z < 0.0f);
+  CHECK(camera.position().z == doctest::Approx(-kPreferredSpeed));
   CHECK(std::fabs(camera.position().x) < kTolerance);
 
   FlyInput look;

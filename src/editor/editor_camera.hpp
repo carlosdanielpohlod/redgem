@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/math.hpp"
+#include "editor/editor_preferences.hpp"
 #include "scene/scene_desc.hpp"
 
 namespace redgem {
@@ -37,6 +38,7 @@ class EditorCamera {
   EditorCamera();
 
   void update(const FlyInput& input);
+  void set_fly_speed(float speed) { fly_speed_ = speed; }
   // Moves the camera so `bounds` (in world space, center + radius) fills the view.
   void frame(Vec3 center, float radius);
   void look_at(Vec3 position, Vec3 target);
@@ -49,6 +51,7 @@ class EditorCamera {
 
  private:
   Vec3 position_;
+  float fly_speed_ = kDefaultFlySpeed;
   float yaw_degrees_ = 0.0f;    // 0 looks down -Z
   float pitch_degrees_ = 0.0f;  // positive looks up
 };
