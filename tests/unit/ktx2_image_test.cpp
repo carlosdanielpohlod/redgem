@@ -45,11 +45,13 @@ constexpr std::size_t kFaceCountAt = 36;
 constexpr std::size_t kLevelCountAt = 40;
 constexpr std::size_t kSupercompressionAt = 44;
 constexpr std::size_t kLevelIndexAt = 80;
-constexpr std::size_t kKeyValuesLengthTopAt = 63;  // the high byte of the key/value data's length
+constexpr std::size_t kKeyValuesLengthTopAt = 63;     // the high byte of the key/value data's length
+constexpr std::size_t kFirstLevelUnpackedTopAt = 103;  // the high byte of the first level's uncompressed length
 constexpr std::uint8_t kAllBits = 0xFF;
 constexpr std::uint8_t kSomeVkFormat = 37;  // VK_FORMAT_R8G8B8A8_UNORM
 constexpr std::uint8_t kCubeFaces = 6;
-constexpr std::uint8_t kTwo = 2;
+constexpr std::uint8_t kTwoLayers = 2;
+constexpr std::uint32_t kHalving = 2;  // each mipmap level is half the one before it
 constexpr std::uint8_t kUnknownSupercompression = 3;
 constexpr std::uint8_t kTooManyLevels = kOpaqueLevels + 1;
 constexpr std::uint8_t kCanary = 0xda;
@@ -86,7 +88,7 @@ void check_levels(const TranscodedPicture& picture, ImageSize full, std::uint32_
     CHECK(level.size.width == size.width);
     CHECK(level.size.height == size.height);
     CHECK(level.bytes.size() == expected_bytes(picture.format, size));
-    size = ImageSize{std::max(size.width / kTwo, 1u), std::max(size.height / kTwo, 1u)};
+    size = ImageSize{std::max(size.width / kHalving, 1u), std::max(size.height / kHalving, 1u)};
   }
 }
 
@@ -152,13 +154,16 @@ TEST_CASE("KTX2 headers of what the engine does not draw, or that lie, are refus
   CHECK_FALSE(reads(with_byte(good, 0, 0)));
   CHECK_FALSE(reads(with_byte(good, kVkFormatAt, kSomeVkFormat)));
   CHECK_FALSE(reads(with_byte(good, kDepthAt, 1)));
-  CHECK_FALSE(reads(with_byte(good, kLayerCountAt, kTwo)));
+  CHECK_FALSE(reads(with_byte(good, kLayerCountAt, kTwoLayers)));
   CHECK_FALSE(reads(with_byte(good, kFaceCountAt, kCubeFaces)));
   CHECK_FALSE(reads(with_byte(good, kLevelCountAt, kTooManyLevels)));
   CHECK_FALSE(reads(with_byte(good, kSupercompressionAt, kUnknownSupercompression)));
   CHECK_FALSE(reads(std::vector<std::uint8_t>(good.begin(), good.begin() + kLevelIndexAt)));
   CHECK_FALSE(reads(std::vector<std::uint8_t>(good.begin(), good.end() - 1)));  // its last level cut short
   CHECK_FALSE(reads(with_byte(good, kKeyValuesLengthTopAt, kAllBits)));         // its offset plus length wraps
+  const auto zstandard = ktx2_bytes(kAlphaFixture);
+  REQUIRE(reads(zstandard));
+  CHECK_FALSE(reads(with_byte(zstandard, kFirstLevelUnpackedTopAt, kAllBits)));  // would unpack to exabytes
   CHECK_FALSE(read_ktx2_header(nullptr, 0).has_value());
   CHECK_FALSE(starts_as_ktx2(good.data(), kLevelIndexAt - 1));
 }

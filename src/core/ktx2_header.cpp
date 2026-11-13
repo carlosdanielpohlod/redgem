@@ -33,7 +33,13 @@ constexpr std::size_t kGlobalDataAt = 64;
 // The level index follows the header: per level, its offset, length and uncompressed length.
 constexpr std::size_t kLevelIndexAt = 80;
 constexpr std::size_t kLevelEntryBytes = 24;
-constexpr std::size_t kLevelLengthAt = 8;  // from the entry's start
+constexpr std::size_t kLevelLengthAt = 8;               // from the entry's start
+constexpr std::size_t kLevelUncompressedLengthAt = 16;  // from the entry's start
+// The largest level Basis data may unpack to: UASTC's 16 bytes per 4 x 4 block of pixels (ETC1S
+// unpacks to less). The transcoder sets aside the uncompressed length a level claims before it
+// unpacks it, so a made-up length could otherwise make it ask for gigabytes.
+constexpr std::uint32_t kBlockSide = 4;
+constexpr std::uint64_t kMostBlockBytes = 16;
 // Basis data has no Vulkan format of its own (VK_FORMAT_UNDEFINED).
 constexpr std::uint32_t kBasisVkFormat = 0;
 constexpr std::uint32_t kOneFace = 1;  // not a cube map
@@ -72,17 +78,29 @@ bool sections_inside(const std::uint8_t* data, std::size_t size) {
   return descriptor && key_values && global_data;
 }
 
-// Whether the level of this index entry lies inside the file, with some data.
-bool level_inside(const std::uint8_t* entry, std::size_t size) {
-  const std::uint64_t length = little_endian(entry + kLevelLengthAt, kU64Bytes);
-  return length > 0 && fits(little_endian(entry, kU64Bytes), length, size);
+std::uint64_t blocks_across(std::uint32_t side) { return (std::uint64_t{side} + kBlockSide - 1) / kBlockSide; }
+
+// The most bytes mipmap `level` of a picture this size can unpack to.
+std::uint64_t most_level_bytes(ImageSize size, std::uint32_t level) {
+  const std::uint32_t width = std::max(size.width >> level, std::uint32_t{1});
+  const std::uint32_t height = std::max(size.height >> level, std::uint32_t{1});
+  return blocks_across(width) * blocks_across(height) * kMostBlockBytes;
 }
 
-// Whether every level the index lists lies inside the file.
-bool levels_inside(const std::uint8_t* data, std::size_t size, std::uint32_t levels) {
-  if (!fits(kLevelIndexAt, std::uint64_t{levels} * kLevelEntryBytes, size)) return false;
-  for (std::uint32_t level = 0; level < levels; ++level) {
-    if (!level_inside(data + kLevelIndexAt + level * kLevelEntryBytes, size)) return false;
+// Whether the level of this index entry lies inside the file, with some data, and unpacks to no
+// more than `most_bytes`.
+bool level_inside(const std::uint8_t* entry, std::size_t size, std::uint64_t most_bytes) {
+  const std::uint64_t length = little_endian(entry + kLevelLengthAt, kU64Bytes);
+  const bool unpacks_small = little_endian(entry + kLevelUncompressedLengthAt, kU64Bytes) <= most_bytes;
+  return length > 0 && unpacks_small && fits(little_endian(entry, kU64Bytes), length, size);
+}
+
+// Whether every level the index lists lies inside the file, and unpacks to what its size takes.
+bool levels_inside(const std::uint8_t* data, std::size_t size, const Ktx2Header& header) {
+  if (!fits(kLevelIndexAt, std::uint64_t{header.levels} * kLevelEntryBytes, size)) return false;
+  for (std::uint32_t level = 0; level < header.levels; ++level) {
+    const std::uint8_t* entry = data + kLevelIndexAt + level * kLevelEntryBytes;
+    if (!level_inside(entry, size, most_level_bytes(header.size, level))) return false;
   }
   return true;
 }
@@ -126,7 +144,7 @@ std::optional<Ktx2Header> read_ktx2_header(const std::uint8_t* data, std::size_t
   const Ktx2Header header = claimed_header(data);
   if (!plausible(header)) return std::nullopt;
   if (!sections_inside(data, size)) return std::nullopt;
-  if (!levels_inside(data, size, header.levels)) return std::nullopt;
+  if (!levels_inside(data, size, header)) return std::nullopt;
   return header;
 }
 
