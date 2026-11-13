@@ -491,9 +491,9 @@ struct Renderer::Impl {
   // `first`: where the pass's record numbers start in `slots`.
   void draw_batch(const render_math::InstanceBatch& batch, std::size_t first, ObjectPass& pass);
   // Turns the pass's winding for mirrored copies (or back), only when it changes.
-  static void wind(bool mirrored, ObjectPass& pass);
+  static void face_by_winding(bool mirrored, ObjectPass& pass);
   // Every pass ends with front faces counter-clockwise, as the rest of the frame draws them.
-  static void unwind(ObjectPass& pass) { wind(false, pass); }
+  static void face_forward(ObjectPass& pass) { face_by_winding(false, pass); }
   void use_material(int material, ObjectPass& pass);
   void draw_primitive(const GpuPrimitive& primitive, const render_detail::InstanceRun& run, ObjectPass& pass);
 

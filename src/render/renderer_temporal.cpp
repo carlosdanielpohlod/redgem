@@ -91,7 +91,7 @@ void Renderer::Impl::draw_motion(std::size_t first, Vec3 viewer) {
                      render_math::AlphaPass::Motion, render_math::View{}};
   send_motion_frame(viewer);
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
-  unwind(objects);
+  face_forward(objects);
   end_mesh_pass();
   rlEnableColorBlend();
   rlEnableFramebuffer(drawing_framebuffer());
@@ -128,7 +128,7 @@ void Renderer::Impl::mark_see_through_cover(Vec3 viewer) {
   rlDisableDepthMask();
   send_motion_frame(viewer);
   for (const render_math::SeeThroughDraw& draw : see_through) draw_see_through_copies(draw, pass);
-  unwind(pass);
+  face_forward(pass);
   end_mesh_pass();
   rlEnableDepthMask();
   rlColorMask(true, true, true, true);

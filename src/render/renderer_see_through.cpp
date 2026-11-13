@@ -27,7 +27,7 @@ void Renderer::Impl::draw_see_through(std::size_t first, Vec3 viewer) {
   rlSetBlendMode(RL_BLEND_ALPHA);
   rlDisableDepthMask();
   for (const render_math::SeeThroughDraw& draw : see_through) draw_see_through_copies(draw, pass);
-  unwind(pass);
+  face_forward(pass);
   rlEnableDepthMask();
   end_mesh_pass();
 }
@@ -71,7 +71,7 @@ void Renderer::Impl::add_see_through(const render_math::InstanceBatch& batch, st
 
 void Renderer::Impl::draw_see_through_copies(const render_math::SeeThroughDraw& draw, ObjectPass& pass) {
   const InstanceRun run{slots.id, draw.first, draw.count};
-  wind(draw.mirrored, pass);
+  face_by_winding(draw.mirrored, pass);
   for (const GpuPrimitive& part : meshes[static_cast<std::size_t>(draw.mesh)]) {
     if (!render_math::drawn_see_through(factors_of(part.material))) continue;
     if (factors_of(part.material).water.enabled)
