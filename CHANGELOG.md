@@ -10,6 +10,14 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Benchmarks and a server load test with thresholds**: `redgem_bench` times the hot paths that
+  need no window (script updates, the physics step, loading a `.glb`, the network frame, JSON
+  saves, HTTP parsing) and reports each one's median and 95th percentile; `redgem_server_load` fills
+  a dedicated server's rooms with bots and reads its status port for its frame time, bytes a second
+  and dropped clients. A new `Benchmarks` CI workflow runs both on Linux, keeps the results as an
+  artifact, and fails only when a result clearly passes its ceiling in `tests/bench/thresholds.json`
+  (see the contributing guide).
+
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
   in total, frame time (average and worst over the last five seconds, and the budget), bytes a
