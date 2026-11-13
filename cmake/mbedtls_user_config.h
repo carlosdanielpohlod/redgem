@@ -8,3 +8,7 @@
 /* No self-tests: the engine never runs them, and their counters (of elliptic curve
    multiplications, say) are globals every TLS thread writes with no lock. */
 #undef MBEDTLS_SELF_TEST
+
+/* No renegotiation, on any connection: the games' web requests never need it, and a game's
+   server must not let a client make it redo the costliest part of a handshake at will. */
+#undef MBEDTLS_SSL_RENEGOTIATION

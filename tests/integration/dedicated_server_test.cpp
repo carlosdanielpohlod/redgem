@@ -327,7 +327,8 @@ TEST_CASE("a room that closed between two turns of the lobby holds no place: its
     std::this_thread::sleep_for(kRoundPause);
   }
   std::this_thread::sleep_for(kHalfASecond);
-  online_game.server.tick(config::kFixedDeltaSeconds);
+  // (Its TLS handshake takes the lobby a few turns, all of them after the old room closed.)
+  REQUIRE(online_game.until([&next] { return online(next); }));
   CHECK(online_game.server.room_count() == 1);
   online_game.server.stop();  // (its rooms' threads write to the log no more)
   CHECK(said.contains("opened (1 of 1)"));

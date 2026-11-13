@@ -29,7 +29,7 @@ Legacy clients send `initialize`, then `notifications/initialized`, before using
 | `scene_get` | Reads one `object` by persistent `#id`, unique name or hierarchy path. |
 | `scene_edit` | Takes `action` (`set`, `add`, `remove`), `object` and optional `assignments` (`key=value` strings), `from`, `parent`, `scene`. Removal requires `confirm: true`. Saves the scene file. |
 | `scene_diff` | Compares with an earlier scene file named by `against`, inside the game. |
-| `game_run` | Plays headlessly with `frames` (default 60, maximum 600), `seed`, `input`, `assert`, `until`, `print`, `every`, `scene`. |
+| `game_run` | Plays headlessly with `frames` (default 60, maximum 600), `seed`, `input`, `assert`, `until`, `print`, `every`, `scene`. `input` replays keys, the mouse, gamepads and touch (see [Repeating a headless session](assistants.md#repeating-a-headless-session)). |
 | `game_check` | Checks scripts, scenes and assets; does not run the game's test files. |
 | `game_shot` | Returns a PNG picture of the saved game at `at` seconds (default 1), `width` pixels wide (default 512, 16:9), optionally through another `camera`. |
 | `game_query` | Asks the playing game: `inspect` an `object`, `raycast` `from` one point `to` another, or `overlap` a sphere `at` a point with a `radius`. |

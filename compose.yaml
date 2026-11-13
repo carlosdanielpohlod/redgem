@@ -25,8 +25,9 @@ services:
     command: xvfb-run -a -s "-screen 0 1600x900x24" ctest --test-dir build --output-on-failure
 
   # Where games played over the internet meet (see the manual's Multiplayer page).
-  # It faces the internet, so it runs as nobody in particular, with none of root's powers, no way
-  # to gain any, and nothing it can write to: all a relay does is pass messages on.
+  # It faces the internet, so it runs as nobody in particular, with none of root's powers and no way
+  # to gain any. The one place it writes to is its data volume, where its TLS identity is kept (made
+  # the first time, so that games can pin its fingerprint: `redgem-relay --fingerprint` shows it).
   relay:
     build: .
     image: redgem
@@ -38,7 +39,9 @@ services:
     security_opt: ["no-new-privileges:true"]
     ports:
       - "7778:7778"
-    command: build/src/redgem-relay
+    volumes:
+      - relay-data:/relay-data
+    command: build/src/redgem-relay --data /relay-data
 
   # A game run on a dedicated server, for players to join (see the manual's Dedicated server page):
   # the platformer demo unless GAME names another game's folder. Like the relay, it runs with no
@@ -61,4 +64,5 @@ services:
       - server-data:/data
 
 volumes:
+  relay-data:
   server-data:

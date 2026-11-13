@@ -51,7 +51,8 @@ nlohmann::json numbers(Vec3 vector) {
 bool LoadBot::connect(std::uint16_t port, std::string& error) {
   net::Socket socket = net::Socket::connect_to(kLocalHost, port, error);
   if (!socket.valid()) return false;
-  connection_ = net::Connection::calling(std::move(socket));
+  // (Encrypted, as every game's: the server is this machine's own, so who answers is not checked.)
+  connection_ = net::Connection::calling(std::move(socket), net::TlsTrust::unverified());
   send(net::wire::hello());
   return true;
 }

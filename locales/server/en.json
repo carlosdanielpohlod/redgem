@@ -6,12 +6,13 @@
   "server.cli.usage": [
     "usage:",
     "  redgem-server <game_dir> [options]    run a game on a server, for players to join over the internet",
+    "  redgem-server <game_dir> --fingerprint [--data <dir>]    print the fingerprint players pin the server by, and stop",
     "",
     "  --port <number>           the port to listen on (default: {default_port}; 0 picks a free one)",
     "  --per-address <number>    machines one address may connect (default: {default_per_address}, at most {most_per_address}; players",
     "                            behind one shared address, a campus, may need more)",
-    "  --data <dir>              where the game's Save is kept, for every room (default: a folder beside",
-    "                            the game's, named after it with {data_suffix})",
+    "  --data <dir>              where the game's Save is kept, for every room, and the server's TLS certificate",
+    "                            and private key (default: a folder beside the game's, named after it with {data_suffix})",
     "  --max-players <number>    players in one room (default: {default_players}, at most {most_players})",
     "  --rooms <number>          rooms open at once, each a match of its own (default: {default_rooms}, at most {most_rooms})",
     "  --threads <number>        threads the rooms run on, one room each while they last (default: this",
@@ -22,6 +23,7 @@
     "                            machine only)",
     "  --status-log <seconds>    write the status in the log this often (at most {most_status_log}); SIGUSR1",
     "                            writes it at any time",
+    "Every connection is encrypted: games check the server by its fingerprint.",
     ""
   ]
 }

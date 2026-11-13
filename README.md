@@ -145,7 +145,7 @@ ctest --test-dir build                  # run the tests
 ## Making a game
 
 ```bash
-./build/src/redgem new games/my_game --template platformer   # or --template empty
+./build/src/redgem new games/my_game --template platformer   # or empty, third-person, top-down, menu-only
 ./build/src/redgem games/my_game                             # edit and play it
 ./build/src/redgem build games/my_game dist/my_game          # standalone game: dist/my_game/my_game
 ./build/src/redgem build games/my_game dist/win --target windows   # a Windows .exe (see docs/shipping.md)

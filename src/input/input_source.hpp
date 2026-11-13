@@ -65,6 +65,8 @@ class ScriptedInputSource final : public InputSource {
   const TextInputRequest& text_input_requested() const { return text_input_; }
   // Plays a touch screen whose on-screen keyboard is up (or not).
   void set_soft_keyboard_shown(bool shown) { keyboard_shown_ = shown; }
+  // A gamepad plugged in with nothing pressed (until release_all unplugs it).
+  void plug_gamepad(std::size_t pad) { gamepads_.at(pad).connected = true; }
   // Either of these plugs the gamepad in.
   void set_gamepad_axis(GamepadAxis axis, float value, std::size_t pad = 0) {
     gamepads_.at(pad).connected = true;
