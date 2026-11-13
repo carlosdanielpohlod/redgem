@@ -28,8 +28,7 @@ constexpr float kSquareScale = 0.05f;  // of the 10 m plane: half a meter across
 constexpr float kAside = 0.6f;         // meters to the right of the parent
 constexpr redgem::Color kGreen{0.1f, 1.0f, 0.1f, 1.0f};
 constexpr float kGlow = 2.0f;
-constexpr unsigned char kBright = 150;
-constexpr unsigned char kDim = 80;
+constexpr int kGreener = 30;        // a pixel of the square is this much greener than red or blue, at least
 constexpr std::size_t kSeen = 100;  // pixels of the square, at least
 constexpr float kSameSize = 0.1f;   // the mirrored square covers this share more or fewer pixels, at most
 constexpr float kSameSpot = 0.05f;  // of the picture across: how far from the mirrored place it may be
@@ -53,7 +52,8 @@ constexpr int kVisible = 60;       // the sum of a pixel's channels where the la
 constexpr float kShadowed = 0.5f;  // a shadowed middle is darker than this share of a lit one
 
 int luma(::Color c) { return c.r + c.g + c.b; }
-bool green(::Color c) { return c.g > kBright && c.r < kDim && c.b < kDim; }
+// The square's green, paled by the sky's light around it, and not the sky's own grey-blue.
+bool green(::Color c) { return c.g > c.r + kGreener && c.g > c.b + kGreener; }
 bool in_sun_shadow(::Color c) { return luma(c) < kInShadow; }
 int middle_of(const Picture& picture) { return luma(picture.at(kMiddle, kMiddle)); }
 
