@@ -64,11 +64,12 @@ end
 constexpr int kServedTurns = 30;
 constexpr int kOneThread = 1;
 // A room's sleeps on the fake clock wake this late: its turns cover more than a tick each.
-constexpr double kOversleep = config::kFixedDeltaSeconds;
+constexpr double kTick = config::kFixedDeltaSeconds;  // (in doubles: the clock counts in them)
+constexpr double kOversleep = kTick;
 // Game time comes in whole fixed steps: it trails the clock by less than one, give or take what
 // adding up its steps in floats rounds off.
 constexpr double kFloatRounding = 1e-3;
-constexpr double kStepTolerance = config::kFixedDeltaSeconds + kFloatRounding;
+constexpr double kStepTolerance = kTick + kFloatRounding;
 constexpr double kClockTolerance = 1e-9;
 constexpr std::chrono::milliseconds kHalfASecond{500};
 constexpr double kPastMatchOverSeconds = 20.0;  // far past the seconds the platformer's server waits after a win
@@ -385,7 +386,7 @@ TEST_CASE("a dedicated server's room plays the time its clock says passed, on it
   for (int turn = 0; turn < kServedTurns; ++turn) game_and_clock(online_game, player, clock);
   const GameAndClock last = game_and_clock(online_game, player, clock);
   const double clock_passed = last.clock - first.clock;
-  CHECK(clock_passed > kServedTurns * config::kFixedDeltaSeconds);
+  CHECK(clock_passed > kServedTurns * kTick);
   CHECK(std::abs(last.game - first.game - clock_passed) <= kStepTolerance);
 }
 
@@ -397,13 +398,13 @@ TEST_CASE("the server's turns keep to its clock until it is asked to stop") {
   bool on_time = true;
   server::serve_until(online_game.server, [&] {
     // Asked between turns: each came a tick after the one before, as the clock tells it.
-    const double due = started + turns * config::kFixedDeltaSeconds;
+    const double due = started + turns * kTick;
     on_time = on_time && std::abs(clock.now() - due) <= kClockTolerance;
     return turns++ == kServedTurns;
   });
   CHECK(on_time);
   CHECK(clock.sleeps() == kServedTurns);
-  CHECK(clock.slept() == doctest::Approx(kServedTurns * config::kFixedDeltaSeconds));
+  CHECK(clock.slept() == doctest::Approx(kServedTurns * kTick));
 }
 
 TEST_CASE("a player who floods a dedicated server's room is let go") {
