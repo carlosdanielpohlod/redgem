@@ -167,8 +167,9 @@ class GameMenu < Behaviour
       seen
     end
 
-    # A slot's bindings give way to the one caught, the column's others keeping their places. One
-    # the column already has changes nothing.
+    # A slot's bindings give way to the one caught, the column's others keeping their places (keys
+    # still list before mouse buttons, so a mouse button caught for a first cell shows after the
+    # keys). One the column already has changes nothing.
     def replace(row, column, slot, binding)
       now = bindings(row, column)
       return if now.include?(binding)

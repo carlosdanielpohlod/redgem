@@ -10,7 +10,7 @@
 # the game's next runs as they change.
 class GameMenu < Behaviour
   class ControlsScreen < Screen
-    ROW_WIDTH = 840
+    ROW_WIDTH = 720
     ROW_HEIGHT = 36
     ROW_GAP = 6
     LABEL_SHARE = 0.3         # how much of a row its name takes, on the left; the cells share the rest
