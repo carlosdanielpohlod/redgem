@@ -537,6 +537,7 @@ if(NOT ANDROID)
     server/server_command.cpp
     server/stop_signals.cpp
     server/server_program.cpp
+    server/key_locks.cpp
     server/save_database.cpp
     server/save_database_slots.cpp
     server/room_slot.cpp

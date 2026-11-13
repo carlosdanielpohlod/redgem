@@ -39,8 +39,8 @@ mrb_value save_set(mrb_state* mrb, mrb_value) {
 }
 
 // Save.update(key, default = nil) { |value| new_value }: the block makes the key's new value of its
-// value (default when it has none), with no other room of a dedicated server reading or writing
-// the save meanwhile. Returns the new value.
+// value (default when it has none), with no other room of a dedicated server writing that key
+// meanwhile (rooms writing other keys go on). Returns the new value.
 mrb_value save_update(mrb_state* mrb, mrb_value) {
   mrb_value key;
   mrb_value fallback = mrb_nil_value();

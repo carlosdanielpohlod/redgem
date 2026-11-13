@@ -119,7 +119,9 @@ The server's rooms run at the same time, each on a thread of its own, and share 
 a value and writing it back (`players = Save["players"]; ...; Save["players"] = players`) can lose
 what another room wrote in between: change a value that more than one room may change with
 `Save.update`, whose block gets the value as it is and returns the new one, with no other room
-reading or writing the save meanwhile (keep the block short: the other rooms' saves wait for it).
+writing that key meanwhile. Rooms writing other keys go on: only writes of the same key wait for
+the block, so keep it short. A block that writes a second key while another room is updating that
+one waits for it at most a quarter of a second, then the write is not made (and a warning says so).
 
 The server keeps its saves in a database, one row per key, each written as soon as it changes:
 a hash of every player is rewritten whole when one player changes, so with many players keep a

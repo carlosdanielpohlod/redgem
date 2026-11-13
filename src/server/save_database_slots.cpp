@@ -30,7 +30,8 @@ struct SlotStatements {
   }
 };
 }  // namespace
-// Each room owns this view; only the connection's recursive lock is shared. The server's root
+// Each room owns this view; only the connection's recursive lock and the key locks are shared
+// (a slot's keys are locked under its name). The server's root
 // store outlives every engine/slot view, just as required for EngineOptions::save.
 class DatabaseSlot final : public SaveStore {
  public:
@@ -49,10 +50,14 @@ class DatabaseSlot final : public SaveStore {
   bool set(const std::string& key, const nlohmann::json& value) override {
     if (value.is_null()) return remove(key);
     const auto text = saved::written(saved::kept(value).value_or(nlohmann::json()));
+    const KeyLocks::Hold writing = owner_.key_locks_.hold(name_, key);
+    if (!writing) return false;
     const std::lock_guard<std::recursive_mutex> hold(owner_.lock_);
     return statements_->write.use().bind(kSlot, name_).bind(kKey, key).bind(kValue, text).run();
   }
   bool remove(const std::string& key) override {
+    const KeyLocks::Hold writing = owner_.key_locks_.hold(name_, key);
+    if (!writing) return false;
     const std::lock_guard<std::recursive_mutex> hold(owner_.lock_);
     return statements_->remove.use().bind(kSlot, name_).bind(kKey, key).run();
   }
@@ -69,7 +74,8 @@ class DatabaseSlot final : public SaveStore {
     return keys;
   }
   bool update(const std::string& key, const Change& change) override {
-    const std::lock_guard<std::recursive_mutex> hold(owner_.lock_);
+    const KeyLocks::Hold updating = owner_.key_locks_.hold(name_, key);
+    if (!updating) return false;
     return set(key, change(get(key)));
   }
   std::string where() const override { return owner_.where() + " (slot " + name_ + ")"; }
