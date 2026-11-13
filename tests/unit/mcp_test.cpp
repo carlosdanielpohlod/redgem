@@ -216,6 +216,17 @@ TEST_CASE("MCP tool failures are results and long UTF-8 output is bounded") {
   CHECK(bounded.dump().size() < 8400);
 }
 
+TEST_CASE("game_run tells an agent the input it replays: keys, the mouse, gamepads and touch") {
+  for (const Json& tool : catalog(Options{})) {
+    if (tool["name"] != "game_run") continue;
+    const std::string description = tool["description"];
+    for (const char* word : {"keys", "mouse", "click", "wheel", "pads", "axes", "touch", "tap", "normalized"}) {
+      CAPTURE(word);
+      CHECK(description.find(word) != std::string::npos);
+    }
+  }
+}
+
 TEST_CASE("scene_edit tells an agent the words its assignments take, the color of one object among them") {
   for (const std::string connection : {"", "live"}) {
     Options options;

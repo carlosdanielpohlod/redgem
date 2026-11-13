@@ -699,8 +699,10 @@ The game's texts in several languages (locales/*.json). See [i18n.md](i18n.md).
 
 Games played together: on a local network, through a relay or on a dedicated server. See [multiplayer.md](multiplayer.md).
 
-- `Network.host(port: 7777, name: nil, visible: true, room: false)`: hosts a game
-- `Network.join(address = nil, port: 7777, room: nil, auth: nil)`: joins a game (an address, or a room code)
+- `Network.host(port: 7777, name: nil, visible: true, room: false, waiting_per_address: 4, fingerprint: nil)`: hosts a game, encrypted (fingerprint: is the relay's, with room: true)
+- `Network.join(address = nil, port: 7777, room: nil, auth: nil, fingerprint: nil)`: joins a game (an address, or a room code), encrypted; fingerprint: is who must answer
+- `Network.fingerprint`: the fingerprint of the game hosted here, or nil
+- `Network.host_code`: the short code players who join the game hosted here check it with, or nil
 - `Network.leave`: leaves the game
 - `Network.online?`: whether this machine is in a game
 - `Network.connecting?`: whether a join is on its way

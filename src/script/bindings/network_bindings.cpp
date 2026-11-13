@@ -48,6 +48,13 @@ void announce_hosted_game(mrb_state* mrb, const char* name, mrb_int discovery_po
   }
 }
 
+// Hosts a game on `port` that proves itself with an identity made for it (Network.fingerprint);
+// false, with `error`, when either cannot be.
+bool host_encrypted(mrb_state* mrb, std::uint16_t port, int waiting, std::string& error) {
+  const auto identity = net::TlsIdentity::generate(error);
+  return identity != nullptr && network(mrb).host(port, error, waiting, identity);
+}
+
 // How many machines from one address may wait to be let in at once, as a script asked: an
 // ArgumentError for a number Network.host does not take (asked before the game it is in is left).
 mrb_value network_waiting_per_address(mrb_state* mrb, mrb_value) {
@@ -67,7 +74,7 @@ mrb_value network_host(mrb_state* mrb, mrb_value) {
   mrb_get_args(mrb, "izbii", &port, &name, &visible, &discovery_port, &waiting);
   std::string error;
   discovery(mrb).stop_announcing();  // whatever game was hosted before is no longer there to find
-  if (!network(mrb).host(port_arg(mrb, port), error, static_cast<int>(waiting))) {
+  if (!host_encrypted(mrb, port_arg(mrb, port), static_cast<int>(waiting), error)) {
     return not_started("cannot host a game on port " + std::to_string(port), error);
   }
   if (visible) announce_hosted_game(mrb, name, discovery_port);
@@ -77,21 +84,27 @@ mrb_value network_host(mrb_state* mrb, mrb_value) {
 // Opens a room on a relay, or joins one by its code. True when it started (the outcome comes as an event).
 mrb_value network_host_room(mrb_state* mrb, mrb_value) {
   const char* address = nullptr;
+  const char* fingerprint = nullptr;
   mrb_int port = 0;
-  mrb_get_args(mrb, "zi", &address, &port);
+  mrb_get_args(mrb, "ziz!", &address, &port, &fingerprint);
+  const std::uint16_t relay_port = port_arg(mrb, port);
+  const net::TlsTrust trust = trust_arg(mrb, fingerprint, address, relay_port);
   std::string error;
-  if (network(mrb).host_room(address, port_arg(mrb, port), error)) return mrb_true_value();
+  if (network(mrb).host_room(address, relay_port, error, trust)) return mrb_true_value();
   return not_started(std::string("cannot reach the relay at ") + address, error);
 }
 
 mrb_value network_join_room(mrb_state* mrb, mrb_value) {
   const char* address = nullptr;
   const char* code = nullptr;
+  const char* fingerprint = nullptr;
   mrb_int port = 0;
   mrb_value auth;
-  mrb_get_args(mrb, "zizo", &address, &port, &code, &auth);
+  mrb_get_args(mrb, "zizoz!", &address, &port, &code, &auth, &fingerprint);
+  const std::uint16_t server_port = port_arg(mrb, port);
+  const net::TlsTrust trust = trust_arg(mrb, fingerprint, address, server_port);
   std::string error;
-  if (network(mrb).join_room(address, port_arg(mrb, port), code, error, auth_arg(mrb, auth))) return mrb_true_value();
+  if (network(mrb).join_room(address, server_port, code, error, auth_arg(mrb, auth), trust)) return mrb_true_value();
   return not_started(std::string("cannot join room ") + code + " at " + address, error);
 }
 
@@ -104,11 +117,14 @@ mrb_value network_room(mrb_state* mrb, mrb_value) {
 // True when the join started (its outcome comes as an event); false when the address means nothing.
 mrb_value network_join(mrb_state* mrb, mrb_value) {
   const char* address = nullptr;
+  const char* fingerprint = nullptr;
   mrb_int port = 0;
   mrb_value auth;
-  mrb_get_args(mrb, "zio", &address, &port, &auth);
+  mrb_get_args(mrb, "zioz!", &address, &port, &auth, &fingerprint);
+  const std::uint16_t host_port = port_arg(mrb, port);
+  const net::TlsTrust trust = trust_arg(mrb, fingerprint, address, host_port);
   std::string error;
-  if (network(mrb).join(address, port_arg(mrb, port), error, auth_arg(mrb, auth))) return mrb_true_value();
+  if (network(mrb).join(address, host_port, error, auth_arg(mrb, auth), trust)) return mrb_true_value();
   return not_started(std::string("cannot join ") + address, error);
 }
 
@@ -142,10 +158,10 @@ void install_connection_bindings(RClass* network_module, mrb_state* mrb) {
   mrb_define_module_function(mrb, network_module, "__waiting_per_address", network_waiting_per_address,
                              MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, network_module, "__host", network_host, MRB_ARGS_REQ(5));
-  mrb_define_module_function(mrb, network_module, "__host_room", network_host_room, MRB_ARGS_REQ(2));
-  mrb_define_module_function(mrb, network_module, "__join_room", network_join_room, MRB_ARGS_REQ(4));
+  mrb_define_module_function(mrb, network_module, "__host_room", network_host_room, MRB_ARGS_REQ(3));
+  mrb_define_module_function(mrb, network_module, "__join_room", network_join_room, MRB_ARGS_REQ(5));
   mrb_define_module_function(mrb, network_module, "room", network_room, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, network_module, "__join", network_join, MRB_ARGS_REQ(3));
+  mrb_define_module_function(mrb, network_module, "__join", network_join, MRB_ARGS_REQ(4));
   mrb_define_module_function(mrb, network_module, "__emit", network_emit, MRB_ARGS_REQ(3));
   mrb_define_module_function(mrb, network_module, "__leave", network_leave, MRB_ARGS_NONE());
 }
@@ -163,6 +179,7 @@ std::uint16_t port_arg(mrb_state* mrb, mrb_int port) {
 void install_network_bindings(mrb_state* mrb) {
   RClass* network_module = mrb_define_module(mrb, "Network");
   install_connection_bindings(network_module, mrb);
+  install_network_security_bindings(network_module, mrb);
   install_network_approval_bindings(network_module, mrb);
   install_network_search_bindings(network_module, mrb);
   install_network_state_bindings(network_module, mrb);

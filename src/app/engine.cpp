@@ -29,6 +29,13 @@ void warn_of_unusable(const GameManifest& manifest) {
   if (!manifest.id_error.empty()) log::warning(manifest.id_error);
   if (!manifest.script_budget_error.empty()) log::warning(manifest.script_budget_error);
   for (const std::string& warning : manifest.physics_warnings) log::warning(warning);
+  for (const std::string& warning : manifest.servers_warnings) log::warning(warning);
+}
+
+// What the game's scripts are told of what game.json says.
+void describe_game(ScriptContext& context, const GameSettings& settings) {
+  context.game_title = settings.title;
+  context.server_pins = settings.servers;
 }
 
 // Whether the game has a scene of that name. (A script names it: a name the system refuses, too long
@@ -90,7 +97,7 @@ void Engine::initialize() {
   open_audio();
   open_saves();
   open_player_choices(manifest.settings);
-  fill_context(manifest.settings.title);
+  fill_context(manifest.settings);
   connect_display();
   take_identity(identity);
   if (serves_a_room()) network_.serve_room(options_.server_room);  // before any script asks
@@ -218,13 +225,13 @@ void Engine::connect_effects() {
   context_.debug_draw = options_.presenter != nullptr ? &debug_draw_ : nullptr;
 }
 
-void Engine::fill_context(const std::string& game_title) {
+void Engine::fill_context(const GameSettings& settings) {
   connect_saves();
   connect_effects();
   context_.network = &network_;
   context_.discovery = &discovery_;
   context_.http = &http_;
-  context_.game_title = game_title;
+  describe_game(context_, settings);
   context_.scene = &scene_;
   context_.audio = &audio();
   context_.physics = physics_.get();

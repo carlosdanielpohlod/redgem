@@ -9,6 +9,7 @@
 
 #include "audio/audio.hpp"
 #include "input/input.hpp"
+#include "net/secure/server_pins.hpp"
 #include "physics/physics_world.hpp"
 #include "render/display_settings.hpp"
 #include "render/hud.hpp"
@@ -120,6 +121,8 @@ struct ScriptContext {
   net::HttpClient* http = nullptr;
   // What the game is called (game.json): how a hosted game shows up to others unless named.
   std::string game_title;
+  // The servers game.json knows by their fingerprints: a join that gives none checks these.
+  std::vector<net::ServerPin> server_pins;
   // Its version (game.json), for Game.version; empty when it gives none.
   std::string game_version;
   bool quit_requested = false;

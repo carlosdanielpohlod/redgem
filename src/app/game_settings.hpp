@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "app/android/android_settings.hpp"
+#include "net/secure/server_pins.hpp"
 #include "physics/collision_layers.hpp"
 #include "render/display_settings.hpp"
 #include "script/script_config.hpp"
@@ -38,6 +39,9 @@ struct GameSettings {
   int script_budget_ms = config::kDefaultScriptBudgetMs;
   // Which bodies collide with which: the "physics" section (see physics/collision_layers.hpp).
   CollisionLayers collision_layers;
+  // The relays and dedicated servers the game knows by their fingerprints: the "servers" section
+  // (see net/secure/server_pins.hpp). Joining one of them checks that it is the one.
+  std::vector<net::ServerPin> servers;
 };
 
 // Everything game.json says, read once.
@@ -59,6 +63,8 @@ struct GameManifest {
   std::string script_budget_error;
   // What is wrong with the "physics" section; each problem is left out, the rest is used.
   std::vector<std::string> physics_warnings;
+  // What is wrong with the "servers" section; each entry that cannot be used is left out.
+  std::vector<std::string> servers_warnings;
 };
 GameManifest read_game_manifest(const std::filesystem::path& game_dir);
 

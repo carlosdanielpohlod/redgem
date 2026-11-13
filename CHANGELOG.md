@@ -17,6 +17,25 @@ until 1.0, a release may change what games rely on (see
   unless `--status-bind` names another address, holds counts only (no room codes or players),
   and never holds up the server: few connections, small requests, short deadlines.
   `--status-log <seconds>`, and `SIGUSR1` on Linux and macOS, write the same summary to the log.
+- **Three more templates** for `redgem new --template` and the project hub: `third-person` (a hero
+  that walks the way the camera looks and jumps, the camera orbiting behind it with the right
+  mouse button or the right stick), `top-down` (a hero under a tilted camera, walked by WASD or the
+  left stick, or sent to a spot by a left click) and `menu-only` (a title screen, the engine's
+  settings screen and controls page, and credits that roll in a scroll list; no 3D play). Each
+  comes with its own tests in `tests/`, which `redgem check --run-tests` runs and which pass as
+  the game is made.
+- **A CI example for games**: every new game comes with `.github/workflows/test.yml`, a GitHub
+  Actions workflow that downloads the latest RedGem for Linux and runs `redgem check --run-tests`
+  on pushes to main and on pull requests (see docs/testing.md). The files every new game gets live in
+  `templates/_shared/`.
+
+- **Replaying the mouse, gamepads and touch**: an event of `redgem run --input` (and MCP
+  `game_run`'s `input`) may now move the mouse, hold, click and release its buttons and turn its
+  wheel (`mouse`), hold buttons and push sticks and triggers of gamepads 0 to 3 (`pads`), and put
+  a finger down, move it and lift it, or tap (`touch`, `tap`). Points are in screen pixels, or
+  fractions of the screen with `normalized`. It all goes through the input the game reads, so
+  `Input.mouse_*`, actions bound to `mouse:left` or `pad:a`, and gamepad reads see it as a
+  player's.
 
 - **Camera switching**: `Camera.main = camera` sees the game through another camera object of the
   scene (security cameras, a car's cameras, a cutscene's shots), and `Camera.main = nil` goes back
@@ -148,6 +167,19 @@ until 1.0, a release may change what games rely on (see
   `redgem-symbols-windows.zip` and `redgem-symbols-android.zip`, apart from the downloads.
 
 ### Changed
+
+- **Game connections are encrypted** (TLS 1.2 or 1.3, no renegotiation), to a player hosting, a
+  relay or a dedicated server alike, and a machine that talks in the clear is let go: games of
+  this version cannot play with earlier ones, nor use an earlier relay or server. A handshake not
+  over in 3 seconds is let go without holding up anyone else. The relay and the server make a TLS
+  identity the first time they start and keep it in their data folder (`redgem-relay --data`,
+  `./redgem-relay-data` by default; the server's `--data`), print its fingerprint when they start,
+  and show it with `--fingerprint`. A game pins it with `fingerprint:` on `Network.join` and
+  `Network.host(room: true)`, or for every join with `"servers"` in `game.json`, and refuses any
+  other machine. A player hosting proves itself with an identity made for the game, whose short
+  code `Network.host_code` (and whole `Network.fingerprint`) the others join with. Without a
+  fingerprint the connection is encrypted but whoever answers is believed. `docker compose up
+  relay` keeps the relay's identity in a volume.
 
 - **The Linux download runs on glibc 2.35 or newer** (Ubuntu 22.04, Debian 12, Fedora 36 and
   later) instead of 2.39: it is built on Ubuntu 22.04 with libstdc++ linked in, and so are the

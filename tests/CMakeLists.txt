@@ -48,6 +48,7 @@ add_executable(redgem_tests
   unit/input_bindings_test.cpp
   unit/input_bindings_store_test.cpp
   unit/mouse_bindings_test.cpp
+  unit/run_input_test.cpp
   unit/script_naming_test.cpp
   unit/cli_test.cpp
   unit/recording_test.cpp
@@ -210,6 +211,7 @@ add_executable(redgem_tests
   integration/multiplayer_test.cpp
   integration/swordsman.cpp
   integration/relay_test.cpp
+  integration/encrypted_connection_test.cpp
   integration/relay_approval_test.cpp
   integration/lobby_test.cpp
   integration/dedicated_server_test.cpp
@@ -290,9 +292,11 @@ set_tests_properties(layering.check_catches_upward_includes PROPERTIES
   PASS_REGULAR_EXPRESSION "forbidden include: src/core/upward.hpp includes render/picture.hpp")
 
 # Neither the program games ship as, nor the one that runs them on a server, nor the one they are
-# made with has test code in it.
+# made with has test code in it. (redgem carries the templates, and the tests their games come
+# with, as text: those are the games' own.)
 add_test(NAME app.ships_no_test_code
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_test_code.sh $<TARGET_FILE:redgem_player>
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ships_no_test_code.sh --templates ${CMAKE_SOURCE_DIR}/templates
+                 $<TARGET_FILE:redgem_player>
                  $<TARGET_FILE:redgem_server> $<TARGET_FILE:redgem>)
 # Guards the check itself: the test tool, which is made of test code, must fail it.
 add_test(NAME app.check_catches_test_code
@@ -365,6 +369,11 @@ set_tests_properties(relay.help PROPERTIES PASS_REGULAR_EXPRESSION "usage:.*redg
 add_test(NAME relay.refuses_what_it_does_not_understand COMMAND redgem_relay --port many)
 set_tests_properties(relay.refuses_what_it_does_not_understand PROPERTIES
   PASS_REGULAR_EXPRESSION "--port needs a number from 0 to 65535")
+# What games pin a relay by: its certificate's SHA-256, made and kept in its data folder.
+set(REDGEM_FINGERPRINT_PATTERN "[0-9A-F][0-9A-F](:[0-9A-F][0-9A-F])+")
+add_test(NAME relay.prints_its_fingerprint
+         COMMAND redgem_relay --fingerprint --data ${CMAKE_CURRENT_BINARY_DIR}/relay-fingerprint-test)
+set_tests_properties(relay.prints_its_fingerprint PROPERTIES PASS_REGULAR_EXPRESSION "${REDGEM_FINGERPRINT_PATTERN}")
 
 # The game server's command line, as the program itself answers it.
 add_test(NAME server.help COMMAND redgem_server --help)
@@ -372,6 +381,10 @@ set_tests_properties(server.help PROPERTIES PASS_REGULAR_EXPRESSION "usage:.*red
 add_test(NAME server.refuses_what_it_does_not_understand COMMAND redgem_server ${CMAKE_SOURCE_DIR}/games/platformer --rooms many)
 set_tests_properties(server.refuses_what_it_does_not_understand PROPERTIES
   PASS_REGULAR_EXPRESSION "--rooms needs a number from 1 to 64")
+add_test(NAME server.prints_its_fingerprint
+         COMMAND redgem_server ${CMAKE_SOURCE_DIR}/games/platformer --fingerprint
+                 --data ${CMAKE_CURRENT_BINARY_DIR}/server-fingerprint-test)
+set_tests_properties(server.prints_its_fingerprint PROPERTIES PASS_REGULAR_EXPRESSION "${REDGEM_FINGERPRINT_PATTERN}")
 
 # Ruby unit tests run inside the engine's own mruby, by the test tool.
 file(GLOB REDGEM_RUBY_TESTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ruby/*_test.rb)
@@ -439,11 +452,19 @@ foreach(test_file IN LISTS REDGEM_SYSTEM_TESTS)
   endif()
 endforeach()
 
-# The templates: a game is made from each as `redgem new` makes it, and played by the tests of
-# tests/system_templates/<template>/. A template with no test of its own stops the build.
-file(GLOB REDGEM_TEMPLATES CONFIGURE_DEPENDS LIST_DIRECTORIES true ${CMAKE_SOURCE_DIR}/templates/*)
-foreach(template_dir IN LISTS REDGEM_TEMPLATES)
+# The templates (the folders of templates/ with a template.json): a game is made from each as
+# `redgem new` makes it, and played by the tests of tests/system_templates/<template>/. A template
+# with no test of its own stops the build. A template that comes with tests of its own (its
+# tests/ folder) also has the new game's check run them, as its developer and the CI example do.
+file(GLOB REDGEM_TEMPLATE_INFOS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/templates/*/template.json)
+foreach(template_info IN LISTS REDGEM_TEMPLATE_INFOS)
+  get_filename_component(template_dir ${template_info} DIRECTORY)
   get_filename_component(template ${template_dir} NAME)
+  if(EXISTS ${template_dir}/tests)
+    add_test(NAME system.template.${template}.own_tests
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/system_templates/check_template.sh $<TARGET_FILE:redgem> ${template})
+    set_tests_properties(system.template.${template}.own_tests PROPERTIES LABELS system RUN_SERIAL TRUE)
+  endif()
   file(GLOB template_tests CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/system_templates/${template}/*_test.rb)
   if(NOT template_tests)
     message(FATAL_ERROR "the template '${template}' has no system test in tests/system_templates/${template}/")
@@ -604,6 +625,8 @@ add_test(NAME tools.release_linux
 # Which tag a run of the release workflow releases, and whether it touches a release at all.
 add_test(NAME tools.release_plan
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/release_plan_test.sh ${CMAKE_SOURCE_DIR}/tools/release)
+# The CI example every new game gets: it downloads what a release has, and the manual shows it.
+add_test(NAME tools.game_ci_example COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/game_ci_example_test.sh ${CMAKE_SOURCE_DIR})
 # The manual's index for coding assistants (llms.txt), which the docs build writes.
 add_test(NAME tools.llms_txt COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/llms_txt_test.py)
 # THIRD_PARTY_LICENSES.md is what the dependencies this build fetched make: a dependency updated

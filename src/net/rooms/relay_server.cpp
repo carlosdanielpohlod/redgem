@@ -16,7 +16,8 @@ bool is_for(int to, int peer) { return to == kEveryone || to == peer; }
 
 }  // namespace
 
-bool RelayServer::start(std::uint16_t port, std::string& error) {
+bool RelayServer::start(std::uint16_t port, std::string& error, std::shared_ptr<const TlsIdentity> identity) {
+  identity_ = std::move(identity);
   listener_ = Socket::listen_on(port, error);
   if (!listener_.valid()) return false;
   port_ = listener_.local_port();
@@ -40,8 +41,9 @@ bool RelayServer::wait(float seconds) const {
   std::vector<Watched> watched;
   if (!resting) watched.push_back({&listener_, false});
   for (const auto& member : members_) {
-    // Messages that arrived and still wait their turn (see kMaxMessagesPerPoll) are work for now.
-    if (member->connection.message_waiting()) return true;
+    // Messages that arrived and still wait their turn (see kMaxMessagesPerPoll) are work for now,
+    // as is what arrived and waits in a connection's TLS.
+    if (member->connection.work_waiting()) return true;
     watched.push_back(member->connection.watched());
   }
   return Socket::wait(watched, resting ? std::min(seconds, accept_rest_) : seconds);

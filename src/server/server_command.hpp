@@ -12,13 +12,14 @@ struct ServerCommand {
   bool ok = false;
   std::string error;  // why not, when it is not ok
   bool help = false;
+  bool show_fingerprint = false;  // only print the fingerprint players pin the server by
   ServerSettings settings;
 };
 
 // Reads `redgem-server <game_dir> [--port <number>] [--max-players <number>] [--rooms <number>]
 // [--per-address <number>] [--threads <number>] [--data <dir>] [--status-port <number>]
-// [--status-bind <address>] [--status-log <seconds>]` (and --help, which wins over the rest of
-// the line).
+// [--status-bind <address>] [--status-log <seconds>] [--fingerprint]` (and --help, which wins
+// over the rest of the line).
 ServerCommand parse_server_command(const std::vector<std::string>& args);
 std::string server_usage();
 

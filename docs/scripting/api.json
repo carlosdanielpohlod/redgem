@@ -2574,14 +2574,24 @@
         {
           "name": "host",
           "static": true,
-          "args": "port: 7777, name: nil, visible: true, room: false",
-          "about": "hosts a game"
+          "args": "port: 7777, name: nil, visible: true, room: false, waiting_per_address: 4, fingerprint: nil",
+          "about": "hosts a game, encrypted (fingerprint: is the relay's, with room: true)"
         },
         {
           "name": "join",
           "static": true,
-          "args": "address = nil, port: 7777, room: nil, auth: nil",
-          "about": "joins a game (an address, or a room code)"
+          "args": "address = nil, port: 7777, room: nil, auth: nil, fingerprint: nil",
+          "about": "joins a game (an address, or a room code), encrypted; fingerprint: is who must answer"
+        },
+        {
+          "name": "fingerprint",
+          "static": true,
+          "about": "the fingerprint of the game hosted here, or nil"
+        },
+        {
+          "name": "host_code",
+          "static": true,
+          "about": "the short code players who join the game hosted here check it with, or nil"
         },
         {
           "name": "leave",

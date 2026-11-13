@@ -173,7 +173,7 @@ class Engine {
   void connect_effects();
   void connect_saves();
   void select_save_slot(const std::string& name);
-  void fill_context(const std::string& game_title);
+  void fill_context(const GameSettings& settings);
   // What game.json says the game is (its version, for Game.version).
   // What game.json says the game is, read once; its splash picture shown while the rest loads.
   GameIdentityReading begin_loading();

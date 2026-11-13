@@ -16,6 +16,28 @@ is short, and every problem they report says where it is and what to do instead.
 Each one says more with `--help`. They end with exit code 0 when everything went well, 1 when
 something is wrong with the game, and 2 when the command line was not understood.
 
+## `redgem new`: make a game from a template
+
+```console
+$ redgem new games/my_game --template third-person
+created games/my_game (third-person). Open it with: redgem games/my_game
+```
+
+The templates (the project hub offers the same ones):
+
+| Template | What the game starts with |
+|----------|---------------------------|
+| `empty` (unless another is asked for) | Ground, sun, camera and a spinning cube |
+| `platformer` | A hero that runs, jumps and collects coins, its menus and online play |
+| `third-person` | A hero that walks and jumps, the camera behind it orbited by the mouse or the right stick |
+| `top-down` | A hero seen from above, walked by the keys or the stick or sent to a spot by a click |
+| `menu-only` | A title screen, the engine's settings and controls pages, and rolling credits: no 3D play |
+
+The `third-person`, `top-down` and `menu-only` games come with tests of their own (`tests/`), which
+`redgem check --run-tests` runs. Every new game also comes with `.github/workflows/test.yml`, a
+GitHub Actions workflow that runs them on pushes and pull requests (see
+[Testing your game](testing.md#running-the-tests-on-every-push)).
+
 ## `redgem scene`: read and change a scene
 
 A `scene.glb` is a binary file. `redgem scene` shows it as text, one line per object, and changes
@@ -118,6 +140,25 @@ run gives the same answer every time. It says each warning and error once (with 
 came), led by the place in the game's scripts it points at, then one line of summary, and ends
 with an error when a script failed. `--scene level2` starts on another scene. What the game saves
 goes to a folder of the run's own, deleted afterwards: a run never touches your progress.
+
+`--input plan.json` plays input from a JSON list of events, each at a zero-based frame. An event
+holds keys, mouse buttons, gamepads and a finger on the screen until the next one, and may click,
+tap or turn the wheel for its frame only:
+
+```json
+[
+  {"frame": 0, "keys": ["w"], "mouse": {"x": 320, "y": 180, "buttons": ["left"]}},
+  {"frame": 30, "mouse": {"click": ["right"], "wheel": 1}},
+  {"frame": 45, "pads": [{"pad": 0, "buttons": ["a"], "axes": {"left_x": -1}}]},
+  {"frame": 60, "touch": {"x": 0.5, "y": 0.5, "normalized": true}},
+  {"frame": 90, "tap": {"x": 100, "y": 200}},
+  {"frame": 120, "keys": []}
+]
+```
+
+Points are in screen pixels, or fractions of the screen with `"normalized": true`; a finger is
+the pointer, as on a phone. `--seed`, `--assert`, `--until` and `--print` make a run that checks
+itself; [Making games with an AI assistant](assistants.md#repeating-a-headless-session) has every field.
 
 ## `redgem shot`: a picture of a moment
 

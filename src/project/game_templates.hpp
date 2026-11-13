@@ -5,8 +5,9 @@
 #include <vector>
 
 // New games, made from the templates built into the program. A template is a game folder of the
-// repository (templates/<name>/): a new game is a copy of it, given its own name and id. Nothing
-// here knows what a template holds.
+// repository (templates/<name>/, with a template.json): a new game is a copy of it, given its own
+// name and id. Every new game also gets the files of templates/_shared/ (a CI workflow that runs
+// its tests, .github/workflows/test.yml). Nothing here knows what a template holds.
 namespace redgem {
 
 // A starting point for new games.
@@ -25,7 +26,7 @@ inline constexpr const char* kNewGameStudio = "My Studio";
 
 // Every template, by name.
 const std::vector<GameTemplate>& game_templates();
-// The names alone, as a command line lists them: "empty|platformer".
+// The names alone, as a command line lists them: "empty|menu-only|platformer|...".
 std::string template_names(const std::string& separator);
 // A name usable as a game folder: letters, digits, spaces, '-' and '_' (not starting with a space).
 bool valid_game_name(const std::string& name);
@@ -33,7 +34,7 @@ bool valid_game_name(const std::string& name);
 // its own, so that two games given the same name are still two games ("my-game-3fa2c1b0").
 std::string new_game_id(const std::string& name);
 
-// Creates a playable game folder: the template's files, the folders every game has (scripts/,
+// Creates a playable game folder: the template's files and the shared ones, the folders every game has (scripts/,
 // sounds/, scenes/, models/, images/, fonts/), a game.json with the game's title, studio and id, and the
 // guide to the game for whoever works on it (AGENTS.md and CLAUDE.md, see assistant_guide.hpp).
 // Fails if the folder exists and is not empty.

@@ -97,9 +97,14 @@ void NetworkSession::end_game_if_host_gone(std::vector<NetworkEvent>& events) {
   // The host is gone, and the game with it.
   const bool was_in = state_ == State::Online;
   NetworkEvent ended = NetworkEvent::of(was_in ? NetworkEvent::Kind::Disconnected : NetworkEvent::Kind::Failed);
-  ended.name = refusal_;
+  ended.name = why_host_gone();
   go_offline();
   events.push_back(ended);
+}
+
+std::string NetworkSession::why_host_gone() const {
+  // The host's own words, or what the connection's TLS found (another machine than the one expected).
+  return refusal_.empty() ? links_.front().connection.failure() : refusal_;
 }
 
 bool NetworkSession::send_through_host(const nlohmann::json& message, int to) {

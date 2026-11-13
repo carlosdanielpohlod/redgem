@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -82,15 +83,26 @@ class NetworkSession {
 
   // Starts a game others can join on `port` (0 picks a free one, see port()), with at most
   // `waiting_per_address` machines from one address waiting to be let in at once.
-  bool host(std::uint16_t port, std::string& error, int waiting_per_address = kDefaultWaitingPerAddress);
-  // Starts joining the game hosted at `address`. A Connected or Failed event tells how it went.
+  // Connections are encrypted (TLS) when the session is given an `identity` to prove itself with
+  // (Network.host makes a new one each time, see fingerprint()), and the others must call with TLS;
+  // without one they are plaintext, which only the engine's own tests of the protocol use.
+  bool host(std::uint16_t port, std::string& error, int waiting_per_address = kDefaultWaitingPerAddress,
+            std::shared_ptr<const TlsIdentity> identity = nullptr);
+  // Starts joining the game hosted at `address`. A Connected or Failed event tells how it went
+  // (a Failed one says why, when the other side is not the one `trust` expects).
   // `auth` (a hash, or null) goes with the hello, for the game joined to decide on.
-  bool join(const std::string& address, std::uint16_t port, std::string& error, const nlohmann::json& auth = nullptr);
+  bool join(const std::string& address, std::uint16_t port, std::string& error, const nlohmann::json& auth = nullptr,
+            const TlsTrust& trust = TlsTrust::plaintext());
   // Opens a room on the relay at `address`; the Connected event comes with its code in room().
-  bool host_room(const std::string& address, std::uint16_t port, std::string& error);
+  bool host_room(const std::string& address, std::uint16_t port, std::string& error,
+                 const TlsTrust& trust = TlsTrust::plaintext());
   // Joins the room with that code on the relay at `address`.
   bool join_room(const std::string& address, std::uint16_t port, const std::string& code, std::string& error,
-                 const nlohmann::json& auth = nullptr);
+                 const nlohmann::json& auth = nullptr, const TlsTrust& trust = TlsTrust::plaintext());
+  // The fingerprint of the identity a game hosted here proves itself with (hexadecimal digits, see
+  // net/secure/fingerprint.hpp): what joiners pin, whole or as its host code. Empty when not hosting
+  // directly, or hosting in plaintext.
+  std::string fingerprint() const;
   // Starts a game as a room of a dedicated server, under the room's code: this machine is the
   // host, with no player of its own.
   void serve_room(const std::string& code);
@@ -183,7 +195,8 @@ class NetworkSession {
     bool waiting() const { return !let_in() && !connection.closed(); }
   };
 
-  bool connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello, std::string& error);
+  bool connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello, const TlsTrust& trust,
+                   std::string& error);
   // Whether this machine passes the others' messages on itself (a host reached directly).
   bool relaying() const { return id_ == kHostId && !through_relay_; }
   // Whether `peer` is one of the others in the game.
@@ -277,6 +290,8 @@ class NetworkSession {
   void end_game_if_host_gone(std::vector<NetworkEvent>& events);
   // Whether the link to the host closed, and the game with it.
   bool host_gone() const;
+  // Why it closed, when anything says: the host's refusal, or the connection's TLS.
+  std::string why_host_gone() const;
   // Forgets the links that closed; whose they were, in the order they were held (0: never let in).
   std::vector<int> take_closed_links();
   // Whether a message may go out: from a machine in a game, to someone else, within what a message may be.
@@ -309,6 +324,7 @@ class NetworkSession {
   std::string refusal_;  // why the host turned this machine away, while joining
   std::string room_;
   Socket listener_;
+  std::shared_ptr<const TlsIdentity> identity_;  // what a game hosted here proves itself with (null: plaintext)
   std::vector<Link> links_;
   std::vector<int> peers_;
   std::vector<RoomAsking> room_asking_;

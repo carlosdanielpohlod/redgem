@@ -78,8 +78,17 @@ std::string read_text_option(const TextOption& option, const std::vector<std::st
   return {};
 }
 
+// Reads --fingerprint.
+std::string read_fingerprint(std::size_t& next, ServerCommand& command) {
+  command.show_fingerprint = true;
+  ++next;
+  return {};
+}
+
 // Reads the word at `next` (and an option's number); an error when it makes no sense.
-std::string read_word(const std::vector<std::string>& args, std::size_t& next, ServerSettings& settings) {
+std::string read_word(const std::vector<std::string>& args, std::size_t& next, ServerCommand& command) {
+  ServerSettings& settings = command.settings;
+  if (args[next] == command_line::kFingerprintOption) return read_fingerprint(next, command);
   if (const TextOption* option = text_option(args[next])) return read_text_option(*option, args, next, settings);
   if (command_line::is_option(args[next])) return command_line::read_number_option(kOptions, args, next, settings);
   if (!settings.game_dir.empty()) return command_line::unexpected(args[next]);
@@ -99,13 +108,13 @@ std::string missing_from(const ServerSettings& settings) {
   return {};
 }
 
-// Reads the whole line into `settings`; what makes no sense in it, if anything does.
-std::string read_line(const std::vector<std::string>& args, ServerSettings& settings) {
+// Reads the whole line into `command`; what makes no sense in it, if anything does.
+std::string read_line(const std::vector<std::string>& args, ServerCommand& command) {
   for (std::size_t next = 0; next < args.size();) {
-    std::string error = read_word(args, next, settings);
+    std::string error = read_word(args, next, command);
     if (!error.empty()) return error;
   }
-  return missing_from(settings);
+  return missing_from(command.settings);
 }
 
 }  // namespace
@@ -115,7 +124,7 @@ std::string server_usage() { return tr("server.cli.usage", usage_values()); }
 ServerCommand parse_server_command(const std::vector<std::string>& args) {
   ServerCommand command;
   command.help = std::any_of(args.begin(), args.end(), command_line::asks_for_help);
-  if (!command.help) command.error = read_line(args, command.settings);
+  if (!command.help) command.error = read_line(args, command);
   command.ok = command.error.empty();
   if (command.settings.data_dir.empty()) command.settings.data_dir = data_dir_beside(command.settings.game_dir);
   return command;
