@@ -351,8 +351,8 @@ not a promise of how it will be closed.
   connection through home routers (no STUN or hole punching).
 - A room holds at most 16 machines (a dedicated server's `--max-players` stops at 15), set by
   the wire format, not by a game.
-- A dedicated server writes logs only: no status page or metrics (rooms, players, frame time,
-  bandwidth).
+- A dedicated server's status (`--status-port`) is one JSON document of the moment: no history,
+  no Prometheus-style metrics, and no IPv6 address to bind it to.
 
 ### Documentation
 

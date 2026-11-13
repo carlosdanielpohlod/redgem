@@ -10,6 +10,14 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
+  a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
+  in total, frame time (average and worst over the last five seconds, and the budget), bytes a
+  second in and out, the threads, uptime and the engine's version. It listens on `127.0.0.1`
+  unless `--status-bind` names another address, holds counts only (no room codes or players),
+  and never holds up the server: few connections, small requests, short deadlines.
+  `--status-log <seconds>`, and `SIGUSR1` on Linux and macOS, write the same summary to the log.
+
 - **Typing on Android**: while a `UI.text_field` is drawn, the phone's on-screen keyboard is up;
   it goes when no field is drawn (the field or its menu closed, the scene changed) or when the
   back key puts it away, and a tap on the field brings it back. What it types reaches `Input.text`

@@ -32,6 +32,9 @@ below. The same goes for a [relay](scripting/multiplayer.md#over-the-internet-ro
 | `--threads` | The machine's cores | Threads the rooms run on, up to 64: each room has one of its own while there are no more rooms than threads |
 | `--per-address` | 24 | Machines one address may connect, up to 1024: raise it when many players share one address (a campus, some mobile networks) |
 | `--data` | `<game>-data` beside the game's folder | Where the game's `Save` is kept (`save.sqlite3`), for every room and every run |
+| `--status-port` | None | A port that answers how busy the server is, as JSON (see [Status](#status)); 0 picks a free one |
+| `--status-bind` | `127.0.0.1` | The address the status port listens on, in numbers |
+| `--status-log` | None | Writes the status to the log every so many seconds |
 
 It writes what happens to its output (rooms opened and closed, how many players) and stops
 cleanly on Ctrl+C or `SIGTERM`: every room is closed and its players are told.
@@ -43,6 +46,58 @@ player arrives, or when its game loads another) holds up no other room. Players 
 placed in rooms on the server's main thread meanwhile. With more rooms open than `--threads`, the
 rooms share the threads there are: a level loading in one then holds up the others on its thread
 for that moment.
+
+## Status
+
+To know when to raise `--rooms` (or rent a bigger machine), give the server a status port:
+
+```bash
+./build/src/redgem-server games/platformer --status-port 7778
+curl -s http://127.0.0.1:7778/            # an HTTP GET, any path
+nc 127.0.0.1 7778                         # or a bare connection: the same document, then it closes
+```
+
+Both answer one JSON document:
+
+```json
+{
+  "engine_version": "0.5.0",
+  "uptime_seconds": 3600.5,
+  "rooms": {"open": 2, "limit": 8, "list": [
+    {"players": 3, "frame_ms": {"average": 0.84, "worst": 2.1}},
+    {"players": 1, "frame_ms": {"average": 0.52, "worst": 1.3}}
+  ]},
+  "players": {"total": 4, "limit_per_room": 8},
+  "frame_ms": {"average": 0.76, "worst": 2.1, "budget": 16.667},
+  "bytes_per_second": {"in": 5210.0, "out": 18034.0},
+  "threads": {"running": 2, "limit": 4}
+}
+```
+
+- `rooms.open` near `rooms.limit` most of the time: players are being turned away, raise `--rooms`.
+- `frame_ms.worst` near `frame_ms.budget` (one frame of the engine's fixed step): rooms are
+  falling behind: raise `--threads` (up to the machine's cores) or get a bigger machine. A room's
+  frame time is the turn of the thread it runs on, every room of that thread one after the
+  other, over its last 300 frames (about five seconds). Loading a new room's game is left out.
+- `bytes_per_second` is everything the server's game connections received and sent over the last
+  ten seconds.
+
+The port listens on `127.0.0.1` only: it is for whoever is logged in to the machine (or a
+monitoring agent on it). `--status-bind 0.0.0.0` opens it to the network; keep it behind a
+firewall then. The document holds counts and times only: no room codes, addresses or anything
+of the game or its players. It is served on the server's main loop without ever waiting: at most
+8 connections at a time, a request of at most 4 KB, arriving within 2 seconds; anything else is
+closed unanswered, and so is a connection that closes without a word (a check that the port is
+open). `HEAD` gets the headers alone, other methods `405`. `--status-bind` without
+`--status-port` is refused.
+
+Without a port, `--status-log 60` writes the same summary to the log every minute, and on Linux
+and macOS `kill -USR1 <pid>` (or `systemctl kill -s USR1 <unit>`, `docker kill -s USR1
+<container>`) writes it once:
+
+```text
+status: 2/8 rooms, 4 players, frame 0.8 ms average, 2.1 ms worst (of 16.7), 5210.0 B/s in, 18034.0 B/s out, up 3600.5 s
+```
 
 ## Run it with Docker
 

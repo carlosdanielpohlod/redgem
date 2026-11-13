@@ -13,6 +13,9 @@ namespace {
 using namespace os;
 
 constexpr int kWaitingConnections = 16;  // connections the system holds until accept() takes them
+// Read at most as a connection closes (see close): a machine still sending at full speed is not
+// waited out.
+constexpr std::size_t kMostDiscardedBytes = 1024 * 1024;
 
 // A TCP connection sends small messages right away, notices in time a machine that vanished, and
 // survives sending to one that left.
@@ -32,6 +35,15 @@ std::intptr_t open_stream(std::string& error) {
 // Takes a port of this machine and starts holding for accept() whoever connects to it.
 bool listens_on(NativeSocket socket, std::uint16_t port) {
   return bind_to_port(socket, port) && listen(socket, kWaitingConnections) == 0;
+}
+
+// Takes a port on one address of this machine and starts holding whoever connects to it; false,
+// with `error` set, when it cannot.
+bool listens_at(NativeSocket socket, const std::string& address, std::uint16_t port, std::string& error) {
+  if (!bind_to_address(socket, address, port, error)) return false;
+  if (listen(socket, kWaitingConnections) == 0) return true;
+  error = last_error();
+  return false;
 }
 
 // Where a machine is, by its name or its address; nullptr when nothing is found. An address in
@@ -86,9 +98,18 @@ Socket& Socket::operator=(Socket&& other) noexcept {
   return *this;
 }
 
-void Socket::close() {
+void Socket::close() { close_reading_at_most(kMostDiscardedBytes); }
+
+void Socket::close_reading_at_most(std::size_t most_unread) {
   if (handle_ == kNoHandle) return;
-  discard_unread(native(handle_));
+  discard_unread(native(handle_), most_unread);
+  close_native(native(handle_));
+  handle_ = kNoHandle;
+}
+
+void Socket::reset() {
+  if (handle_ == kNoHandle) return;
+  reset_on_close(native(handle_));
   close_native(native(handle_));
   handle_ = kNoHandle;
 }
@@ -125,6 +146,17 @@ Socket Socket::listen_local(std::uint16_t port, std::string& error) {
   if (bind_local_port(socket, port) && listen(socket, kWaitingConnections) == 0) return listener;
   error = last_error();
   listener.close();
+  return listener;
+}
+
+Socket Socket::listen_at(const std::string& address, std::uint16_t port, std::string& error) {
+  Socket listener(open_stream(error));
+  if (!listener.valid()) return listener;
+#ifndef _WIN32
+  // (As listen_on: the port is free again right after the program stops.)
+  set_option(native(listener.handle_), SOL_SOCKET, SO_REUSEADDR);
+#endif
+  if (!listens_at(native(listener.handle_), address, port, error)) listener.close();
   return listener;
 }
 

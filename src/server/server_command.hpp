@@ -16,8 +16,9 @@ struct ServerCommand {
 };
 
 // Reads `redgem-server <game_dir> [--port <number>] [--max-players <number>] [--rooms <number>]
-// [--per-address <number>] [--threads <number>] [--data <dir>]` (and --help, which wins over the
-// rest of the line).
+// [--per-address <number>] [--threads <number>] [--data <dir>] [--status-port <number>]
+// [--status-bind <address>] [--status-log <seconds>]` (and --help, which wins over the rest of
+// the line).
 ServerCommand parse_server_command(const std::vector<std::string>& args);
 std::string server_usage();
 

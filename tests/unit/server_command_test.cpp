@@ -104,3 +104,29 @@ TEST_CASE("the server program fails, with the reason said, on a line it cannot r
   CHECK(run_server_program({"--help"}) == 0);
   CHECK(run_server_program({"/no/such/game", "--port", "0"}) == 1);
 }
+
+TEST_CASE("the server program has no status port unless told, and keeps it to this machine unless told") {
+  constexpr std::uint16_t kStatusPort = 9100;
+  constexpr int kLogSeconds = 60;
+  const ServerCommand plain = parse_server_command({"game"});
+  CHECK_FALSE(plain.settings.status.port.has_value());
+  CHECK(plain.settings.status.address == "127.0.0.1");
+  CHECK(plain.settings.status.log_every_seconds == 0);
+  const ServerCommand chosen =
+      parse_server_command({"game", "--status-port", "9100", "--status-bind", "0.0.0.0", "--status-log", "60"});
+  REQUIRE(chosen.ok);
+  CHECK(chosen.settings.status.port == kStatusPort);
+  CHECK(chosen.settings.status.address == "0.0.0.0");
+  CHECK(chosen.settings.status.log_every_seconds == kLogSeconds);
+  CHECK(parse_server_command({"game", "--status-port", "0"}).settings.status.port == 0);
+  CHECK(parse_server_command({"game", "--status-port", "65536"}).error ==
+        "--status-port needs a number from 0 to 65535");
+  CHECK(parse_server_command({"game", "--status-log", "0"}).error == "--status-log needs a number from 1 to 86400");
+  CHECK(parse_server_command({"game", "--status-bind"}).error ==
+        "--status-bind needs an address in numbers, like 127.0.0.1");
+  CHECK(parse_server_command({"game", "--status-bind", "0.0.0.0"}).error ==
+        "--status-bind is the address of the status port: give --status-port too");
+  for (const char* option : {"--status-port <number>", "--status-bind <address>", "--status-log <seconds>"}) {
+    CHECK(server_usage().find(option) != std::string::npos);
+  }
+}
