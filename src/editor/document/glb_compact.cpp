@@ -203,9 +203,22 @@ std::optional<GlbFile> without_unused(const nlohmann::json& json, const std::vec
   }
 }
 
-std::optional<GlbFile> compacted(const GlbFile& glb) {
-  const std::optional<nlohmann::json> merged = with_repeats_merged(glb.json, glb.bin);
-  return merged ? without_unused(*merged, glb.bin) : without_unused(glb);
+std::optional<GlbFile> compacted(const nlohmann::json& json, const std::vector<std::uint8_t>& bin) {
+  const std::optional<nlohmann::json> merged = with_repeats_merged(json, bin);
+  return without_unused(merged ? *merged : json, bin);
+}
+
+std::optional<GlbFile> compacted(const GlbFile& glb) { return compacted(glb.json, glb.bin); }
+
+bool compactable(const GlbFile& glb) {
+  try {
+    Json doc = glb.json;
+    usage_of(doc);
+    each(doc, kBufferViews, [&glb](Json& view) { bytes_of(view, glb.bin.size()); });
+    return true;
+  } catch (const std::exception&) {
+    return false;
+  }
 }
 
 }  // namespace redgem

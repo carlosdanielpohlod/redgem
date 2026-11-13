@@ -9,6 +9,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "editor/document/glb_file.hpp"
+
 namespace redgem {
 
 // The file's JSON with every reference to a repeated entry pointed at the first entry of its list
@@ -21,5 +23,12 @@ namespace redgem {
 // nullopt when nothing repeats, and when the file points at its data in a way that is not followed
 // here (see glb_usage).
 std::optional<nlohmann::json> with_repeats_merged(const nlohmann::json& json, const std::vector<std::uint8_t>& bin);
+
+// A copy of the accessor `accessor` and of its bytes, at the end of the file's lists, when it or
+// its buffer view is pointed at more than once (by a merged save, or by the file as exported):
+// what a mesh about to be written over (a terrain being sculpted) takes in its place, so that
+// nothing else changes with it. Returns the copy's number; nullopt when the accessor is not shared,
+// and when the file points at its data in a way not followed here.
+std::optional<int> unshared_copy(GlbFile& glb, std::size_t accessor);
 
 }  // namespace redgem

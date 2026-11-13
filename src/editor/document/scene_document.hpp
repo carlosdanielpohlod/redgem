@@ -238,6 +238,10 @@ class SceneDocument {
   void restore_shapes(const std::map<int, MeshShape>& shapes);
   // A mesh whose vertices changed: new bounds, and the renderer and the next save get to know.
   void mark_reshaped(int mesh);
+  // Gives a reshaped mesh positions and normals of its own where it shares them with other data
+  // (two copies of a model merged by a save, a file exported that way), so that writing its shape
+  // over them changes it alone.
+  void own_vertices(int mesh);
   // Writes a reshaped mesh's vertices over its old ones in the binary chunk (same count, so the
   // file does not grow).
   bool store_mesh_vertices(int mesh, std::string& error);
@@ -280,7 +284,8 @@ class SceneDocument {
   static std::variant<SceneDocument, std::string> open_file(const std::filesystem::path& path);
   int import_model_file(const std::filesystem::path& path, std::string& error, int parent);
   bool save_file(const std::filesystem::path& path, std::string& error);
-  // Remembers what a save wrote (see last_save) and logs a line when it left something out.
+  // Remembers what a save wrote (see last_save) and logs a line when it left out something the
+  // previous save did not.
   void report_save(const std::filesystem::path& path, std::size_t written_bytes);
   // Takes out of the file what an import that failed half way had already added to it.
   void forget_model(const model_import::JsonOffsets& offsets, std::size_t bin_size, std::size_t animations);

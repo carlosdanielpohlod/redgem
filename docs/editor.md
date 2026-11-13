@@ -118,7 +118,8 @@ months does not keep growing:
   vertex data, pictures, samplers and textures once: the second copy points at the first one's
   (found by comparing their bytes). Each import keeps its own materials and meshes, so the
   Inspector still edits one without the other. A terrain's vertices are never shared, since
-  sculpting writes over them.
+  sculpting writes over them (a terrain sculpted while it shares them gets a copy of its own
+  first). Copy uses the same rule, so a copy of two imports of one model carries its data once.
 * **Unused data is left out.** What no object uses any more (a deleted object's meshes, materials
   and pictures, an import that was undone, a picture no material shows) is not written. Template
   objects (`prefab`), prefab placements and pictures set in the Inspector count as used.
@@ -126,7 +127,7 @@ months does not keep growing:
   numbered as it was, so undo after a save brings a deleted object back with all its data, and the
   next save writes it again.
 
-When a save leaves something out, the Console logs a line with how many bytes. `redgem scene
+When a save leaves out more than the save before it, the Console logs a line with how many bytes. `redgem scene
 compact <game> [--scene name]` does the same from the command line: it rewrites a scene without its
 repeats and unused data and says how much it left out (see [the command line](command-line.md)).
 

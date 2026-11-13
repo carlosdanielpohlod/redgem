@@ -27,6 +27,10 @@ namespace {
 // What follows the number of bytes a save left out, in the line it logs.
 constexpr const char* kLeftOutReport = " bytes of unused or repeated data left out of the saved scene";
 
+// Whether a save left out data the one before it did not (each save after a deletion leaves the
+// same data out again: logged once).
+bool left_out_more(std::size_t left_out, std::size_t before) { return left_out > before; }
+
 // An image's or buffer's "uri" ("" without one).
 std::string uri_of(const nlohmann::json& entry) {
   return entry.is_object() ? entry.value(kUri, std::string()) : std::string();
@@ -225,6 +229,7 @@ bool SceneDocument::sync_for_writing(std::string& error) {
   for (const int mesh : unsaved_meshes_) {
     if (!store_mesh_vertices(mesh, error)) return false;
   }
+  sync_buffer();  // (a terrain given vertices of its own made the binary chunk longer)
   return true;
 }
 
@@ -246,8 +251,9 @@ bool SceneDocument::save_file(const std::filesystem::path& path, std::string& er
 
 void SceneDocument::report_save(const std::filesystem::path& path, std::size_t written_bytes) {
   const std::size_t held = glb_.bin.size();
+  const std::size_t left_out_before = last_save_.left_out_bytes;
   last_save_ = {written_bytes, held > written_bytes ? held - written_bytes : 0};
-  if (last_save_.left_out_bytes == 0) return;
+  if (!left_out_more(last_save_.left_out_bytes, left_out_before)) return;
   log::info(path.filename().string() + ": " + std::to_string(last_save_.left_out_bytes) + kLeftOutReport);
 }
 

@@ -12,6 +12,7 @@
 #include "core/command_line.hpp"
 #include "core/config.hpp"
 #include "core/translations.hpp"
+#include "editor/document/glb_compact.hpp"
 #include "editor/document/scene_document.hpp"
 #include "project/closest_words.hpp"
 #include "project/scene_assignments.hpp"
@@ -29,6 +30,8 @@ constexpr const char* kParentOption = "--parent";
 constexpr const char* kDepthOption = "--depth";
 constexpr const char* kLimitOption = "--limit";
 constexpr const char* kAgainstOption = "--against";
+constexpr const char* kDiffWord = "diff";
+constexpr const char* kCompactWord = "compact";
 // What the command takes after its name.
 ToolGrammar grammar() {
   return {{kSceneOption, kFromOption, kParentOption, kDepthOption, kLimitOption, kAgainstOption},
@@ -191,15 +194,24 @@ ToolResult diff(OpenScene& scene) {
   return compare_scene_file(scene.document.desc(), scene.name, *baseline, *limit);
 }
 
+// Whether the scene's file, as saved, is one compact can work on (see compactable).
+bool saved_compactable(const std::filesystem::path& file) {
+  std::string error;
+  const std::optional<GlbFile> saved = read_glb(file, error);
+  return saved && compactable(*saved);
+}
+
 // Saves the scene as it is: what it holds twice is written once, and what no object uses is left out.
 ToolResult compact(OpenScene& scene) {
   std::string error;
   if (!scene.document.save(error)) return failed(error);
   const SceneDocument::SaveReport& report = scene.document.last_save();
-  return answer(tr("project.scene.compacted", {{"scene", scene.name},
-                                               {"written", std::to_string(report.written_bytes)},
-                                               {"left_out", std::to_string(report.left_out_bytes)}}) +
-                "\n");
+  ToolResult result = answer(tr("project.scene.compacted", {{"scene", scene.name},
+                                                            {"written", std::to_string(report.written_bytes)},
+                                                            {"left_out", std::to_string(report.left_out_bytes)}}) +
+                             "\n");
+  if (!saved_compactable(scene.document.path())) result.err = tr("project.scene.compact_whole") + "\n";
+  return result;
 }
 
 // A line that takes as many words as it wants after those it needs (what to set).
@@ -212,20 +224,32 @@ struct Known {
   std::size_t most;   // how many it takes (a word too many is refused, never left unread)
 };
 constexpr Known kSubcommands[] = {
-    {"list", list, kObjectWord, kObjectWord},         {"diff", diff, kObjectWord, kObjectWord},
-    {"get", get, kFirstAssignment, kFirstAssignment}, {"set", set, kFirstAssignment, kAnyMore},
-    {"add", add, kFirstAssignment, kAnyMore},         {"remove", remove, kFirstAssignment, kFirstAssignment},
-    {"compact", compact, kObjectWord, kObjectWord},
+    {"list", list, kObjectWord, kObjectWord},          {kDiffWord, diff, kObjectWord, kObjectWord},
+    {"get", get, kFirstAssignment, kFirstAssignment},  {"set", set, kFirstAssignment, kAnyMore},
+    {"add", add, kFirstAssignment, kAnyMore},          {"remove", remove, kFirstAssignment, kFirstAssignment},
+    {kCompactWord, compact, kObjectWord, kObjectWord},
 };
 
-std::string unsupported_option(const Known& subcommand, const ToolLine& line) {
-  const bool diff_command = std::string(subcommand.word) == "diff";
-  if (!diff_command && line.value(kAgainstOption)) return tr("project.scene.diff_against_only");
-  if (!diff_command) return {};
-  for (const char* option : {kFromOption, kParentOption, kDepthOption}) {
-    if (line.value(option)) return tr("project.scene.diff_bad_option", {{"option", option}});
+// The options diff and compact have no use for.
+constexpr const char* kDiffRefuses[] = {kFromOption, kParentOption, kDepthOption};
+constexpr const char* kCompactRefuses[] = {kFromOption, kParentOption, kDepthOption, kLimitOption, kAgainstOption};
+
+// The refusal (`message`) of the first of `options` the line gives; "" when it gives none.
+template <std::size_t N>
+std::string first_refused(const ToolLine& line, const char* const (&options)[N], const char* message) {
+  for (const char* option : options) {
+    if (line.value(option)) return tr(message, {{"option", option}});
   }
   return {};
+}
+
+std::string unsupported_option(const Known& subcommand, const ToolLine& line) {
+  const std::string word = subcommand.word;
+  if (word == kCompactWord) return first_refused(line, kCompactRefuses, "project.scene.compact_bad_option");
+  const bool diff_command = word == kDiffWord;
+  if (!diff_command && line.value(kAgainstOption)) return tr("project.scene.diff_against_only");
+  if (!diff_command) return {};
+  return first_refused(line, kDiffRefuses, "project.scene.diff_bad_option");
 }
 
 bool has_its_words(const Known& subcommand, const ToolLine& line) {

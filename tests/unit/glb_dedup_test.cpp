@@ -3,6 +3,8 @@
 
 #include <doctest/doctest.h>
 
+#include <algorithm>
+#include <cstddef>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -14,6 +16,7 @@
 #include "scene/gltf/gltf_loader.hpp"
 #include "scene/property.hpp"
 #include "scene/props.hpp"
+#include "scene/shapes/terrain.hpp"
 #include "test_support.hpp"
 
 using namespace redgem;
@@ -200,7 +203,28 @@ TEST_CASE("a terrain's vertices are neither merged into another mesh's nor share
   CHECK(entries(*lean, "images") == 1);  // its pictures are merged like any other
   glb.json["nodes"][0]["extras"] = {{props::kTerrain, true}};
   glb.json["nodes"][1].erase("extras");
-  CHECK(entries(*compacted(glb), "accessors") == 2);  // whichever of the two comes first
+  CHECK(entries(*compacted(glb), "accessors") == 2);        // whichever of the two comes first
+  glb.json["nodes"][0]["extras"] = {{props::kTerrain, 1}};  // a flag as Blender exports it
+  CHECK(entries(*compacted(glb), "accessors") == 2);
+}
+
+TEST_CASE("an accessor pointed at twice gets a copy of its own, with its bytes; one pointed at once does not") {
+  const std::optional<GlbFile> lean = compacted(two_copies());  // both meshes point at accessor 0
+  REQUIRE(lean.has_value());
+  GlbFile glb = *lean;
+  const std::size_t bytes = glb.bin.size();
+  const std::optional<int> copy = unshared_copy(glb, 0);
+  REQUIRE(copy.has_value());
+  CHECK(*copy == 1);
+  const auto view = glb.json["accessors"][1]["bufferView"].get<std::size_t>();
+  CHECK(view == 2);
+  const auto offset = glb.json["bufferViews"][view]["byteOffset"].get<std::size_t>();
+  CHECK(offset >= bytes);
+  REQUIRE(glb.bin.size() == offset + kVertexBytes);
+  CHECK(std::equal(glb.bin.begin() + static_cast<std::ptrdiff_t>(offset), glb.bin.end(), lean->bin.begin()));
+  glb.json["meshes"][1]["primitives"][0]["attributes"]["POSITION"] = *copy;
+  CHECK_FALSE(unshared_copy(glb, 0).has_value());
+  CHECK_FALSE(unshared_copy(glb, 1).has_value());
 }
 
 TEST_CASE("a file pointing at its data in a way not followed is not merged") {
@@ -301,9 +325,16 @@ TEST_CASE("templates and prefab placements keep what they use; the save logs wha
   const int placement = doc.add_empty("Crate");
   doc.set_prop(placement, props::kPrefabFile, std::string(kPrefabFile));
   doc.remove(import_into(doc, model));
-  test::LogCapture log;
-  save_scene(doc);
-  CHECK(log.contains("left out"));
+  {
+    test::LogCapture log;
+    save_scene(doc);
+    CHECK(log.contains("left out"));
+  }
+  {
+    test::LogCapture log;
+    save_scene(doc);  // the same data left out again: no new line
+    CHECK_FALSE(log.contains("left out"));
+  }
   const SceneDesc saved = load(file);
   check_like_model(saved, kModelChild, load(model));
   const int crate = saved.find_node("Crate");
@@ -311,4 +342,35 @@ TEST_CASE("templates and prefab placements keep what they use; the save logs wha
   CHECK(get_string(saved.nodes[crate].props, props::kPrefabFile).value_or("") == kPrefabFile);
   std::filesystem::remove(file);
   std::filesystem::remove(model);
+}
+
+TEST_CASE("sculpting a terrain that shares its vertices with another mesh changes the terrain alone") {
+  constexpr TerrainGrid kGrid{40.0f, 20};
+  constexpr float kLift = 3.0f;
+  constexpr TerrainBrush kHill{0.0f, 0.0f, 6.0f, kLift, SculptMode::Raise};
+  const std::filesystem::path file = temp_scene("shared_terrain");
+  SceneDocument made = SceneDocument::create_empty(file);
+  made.add_terrain("Terrain", kGrid, kGray);
+  save_scene(made);
+  // A second object whose mesh points at the terrain's very vertices, as a file merged by a save
+  // before the terrain was marked one could.
+  GlbFile glb = read_scene(file);
+  nlohmann::json twin = glb.json["meshes"][0];
+  twin["name"] = "Twin";
+  glb.json["meshes"].push_back(twin);
+  glb.json["nodes"].push_back({{"name", "Twin"}, {"mesh", glb.json["meshes"].size() - 1}});
+  glb.json["scenes"][0]["nodes"].push_back(glb.json["nodes"].size() - 1);
+  std::string error;
+  REQUIRE_MESSAGE(write_glb(file, glb, error), error);
+  const std::vector<float> flat = part_of(load(file), "Twin").positions;
+  auto opened = SceneDocument::open(file);
+  REQUIRE(std::holds_alternative<SceneDocument>(opened));
+  SceneDocument& doc = std::get<SceneDocument>(opened);
+  doc.checkpoint();
+  REQUIRE(doc.sculpt_terrain(doc.desc().find_node("Terrain"), kHill));
+  save_scene(doc);
+  const SceneDesc saved = load(file);
+  CHECK(terrain_height(part_of(saved, "Terrain"), kGrid, 0.0f, 0.0f) == doctest::Approx(kLift));
+  CHECK(part_of(saved, "Twin").positions == flat);
+  std::filesystem::remove(file);
 }

@@ -348,6 +348,9 @@ TEST_CASE("compact rewrites a scene without its repeats and unused data, and say
   const ToolResult again = scene_tool({"compact", game.dir()});
   CHECK(has(again.out, "left out 0 bytes"));  // nothing is left to leave out
   CHECK(scene_tool({"compact", game.dir(), "Coin1"}).exit_code == kExitUsage);
+  const ToolResult with_option = scene_tool({"compact", game.dir(), "--from", "Coin1"});
+  CHECK(with_option.exit_code == kExitUsage);
+  CHECK(has(with_option.err, "scene compact does not accept --from"));
   CHECK(scene_tool({"compact", game.dir(), "--scene", "nowhere"}).exit_code != kExitSuccess);
 }
 
