@@ -1,4 +1,5 @@
 #include "app/json_file.hpp"
+#include <fstream>
 
 #include "core/game_files.hpp"
 
