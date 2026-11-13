@@ -133,13 +133,9 @@ bool create_game(const std::filesystem::path& game_dir, const std::string& templ
     return false;
   }
   create_game_folders(game_dir);
-<<<<<<< HEAD
   return write_template_files(game_dir, shared_files(), error) && write_template_files(game_dir, *files, error) &&
-         name_game(game_dir, error) && tools::write_assistant_guide(game_dir, error);
-=======
-  return write_template_files(game_dir, files->second, error) && name_game(game_dir, error) &&
-         tools::write_assistant_guide(game_dir, error) && tools::write_type_signatures(game_dir, error);
->>>>>>> 48fcd5aa (Type every parameter and return of the scripting API, and write RBS signatures)
+         name_game(game_dir, error) && tools::write_assistant_guide(game_dir, error) &&
+         tools::write_type_signatures(game_dir, error);
 }
 
 }  // namespace redgem
