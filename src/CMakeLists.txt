@@ -317,6 +317,9 @@ redgem_add_library(redgem_runtime
   physics/body_config.cpp
   physics/collision_layers.cpp
   physics/contact_events.cpp
+  physics/physics_threads.cpp
+  physics/step_worker.cpp
+  physics/overlapped_physics_world.cpp
   physics/jolt/jolt_runtime.cpp
   physics/jolt/jolt_shapes.cpp
   physics/jolt/jolt_vehicle.cpp

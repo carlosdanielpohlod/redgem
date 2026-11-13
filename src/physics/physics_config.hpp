@@ -2,6 +2,7 @@
 
 // The physics layer's numbers: the world, the bodies in it, characters and vehicles.
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 
@@ -20,6 +21,25 @@ inline constexpr std::uint32_t kMaxContactConstraints = 4096;
 inline constexpr std::size_t kPhysicsTempAllocatorBytes = 10u * 1024u * 1024u;
 inline constexpr std::uint32_t kMaxPhysicsJobs = 1024;
 inline constexpr int kPhysicsCollisionSteps = 1;
+
+// --- Threads --------------------------------------------------------------------
+// The threads that solve a step. One solves it on the thread that steps, as RedGem always did;
+// more run Jolt's thread pool (the stepping thread one of them), and a game's world then steps on
+// a thread of its own while the frame before it is drawn (see app/engine.hpp).
+inline constexpr int kDefaultPhysicsThreads = 1;
+inline constexpr int kMaxPhysicsThreads = 32;
+// The barriers Jolt's thread pool keeps (one for each step running at once: a world runs one).
+inline constexpr std::uint32_t kMaxPhysicsBarriers = 8;
+
+// What a setting asks for, within what a world can be given: 1 for anything below it.
+constexpr int bounded_physics_threads(int requested) {
+  return std::clamp(requested, kDefaultPhysicsThreads, kMaxPhysicsThreads);
+}
+
+// Whether a world given that many threads solves its steps on more than one.
+constexpr bool solves_in_parallel(int threads) { return threads > kDefaultPhysicsThreads; }
+
+// --- Colliders ------------------------------------------------------------------
 // Smallest half extent accepted for a collider (degenerate meshes such as planes).
 inline constexpr float kMinColliderHalfExtent = 0.01f;
 // Convex radius is clamped to this fraction of the smallest half extent.

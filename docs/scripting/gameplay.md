@@ -345,6 +345,23 @@ bullet.rigidbody.velocity = transform.forward * 40.0
 
 Triggers only notice bodies whose layer meets theirs, and queries look at the layers they are given.
 
+### Physics on more than one thread
+
+A game with many bodies can solve its physics on several threads with the `threads` key of the
+same section (1 to 32; 1, the default, is how every game ran before):
+
+```json
+"physics": {"threads": 4}
+```
+
+Each step is then shared by a pool of that many threads, with the same results as one thread, and
+the world takes each frame's last step on a thread of its own while that frame is drawn. Scripts
+never run while it does: `fixed_update`, `update` and every callback see the world between two
+steps. The frame drawn shows the objects where they were before that step, and the next frame
+starts by putting them where their bodies went and calling `on_collision_enter` and the others for
+it, so collisions reach scripts a frame later than with one thread, and `Time.elapsed` during
+`update` counts the steps finished, not that last one.
+
 ## Drive a car
 
 Give the chassis a **vehicle** body and mark its wheel children with `wheel = true`.

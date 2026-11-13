@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 
 #include "app/game_settings.hpp"
@@ -166,4 +167,56 @@ TEST_CASE("game.json says how the game is shown until its player chooses otherwi
   const GameSettings odd = read_game_settings(game_saying(R"({"fullscreen": "yes", "render_scale": 9})"));
   CHECK(odd.display.mode == WindowMode::Windowed);
   CHECK(odd.display.render_scale == kLargestRenderScale);
+}
+
+TEST_CASE("game.json says how many threads solve the game's physics, and one is what a game that does not say gets") {
+  constexpr int kFourThreads = 4;
+  CHECK(read_game_manifest(game_saying("")).settings.physics_threads == config::kDefaultPhysicsThreads);
+  CHECK(read_game_manifest(game_saying(R"({"physics": {"layers": ["default"]}})")).settings.physics_threads ==
+        config::kDefaultPhysicsThreads);
+  const GameManifest manifest = read_game_manifest(game_saying(R"({"physics": {"threads": 4}})"));
+  CHECK(manifest.settings.physics_threads == kFourThreads);
+  CHECK(manifest.physics_warnings.empty());
+}
+
+TEST_CASE("threads game.json cannot give the physics are said, and the physics is solved on one") {
+  for (const char* json : {R"({"physics": {"threads": 0}})", R"({"physics": {"threads": 33}})",
+                           R"({"physics": {"threads": "many"}})", R"({"physics": {"threads": 2.5}})"}) {
+    const GameManifest manifest = read_game_manifest(game_saying(json));
+    CHECK(manifest.settings.physics_threads == config::kDefaultPhysicsThreads);
+    REQUIRE(manifest.physics_warnings.size() == 1);
+    CHECK(manifest.physics_warnings.front().find("\"threads\" must be a whole number from 1 to 32") !=
+          std::string::npos);
+  }
+}
+
+TEST_CASE("the physics' threads go into game.json and come back, and the default takes them out") {
+  constexpr int kEightThreads = 8;
+  const std::filesystem::path game = game_saying(R"({"physics": {"layers": ["default", "player"], "threads": 2}})");
+  GameSettings settings = read_game_settings(game);
+  settings.physics_threads = kEightThreads;
+  std::string error;
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  const GameManifest saved = read_game_manifest(game);
+  CHECK(saved.settings.physics_threads == kEightThreads);
+  CHECK(saved.settings.collision_layers.count() == 2);  // (the rest of the section stays)
+
+  settings.physics_threads = config::kDefaultPhysicsThreads;
+  REQUIRE_MESSAGE(write_game_settings(game, settings, error), error);
+  std::ifstream file(game / kGameSettingsFile);
+  const std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  CHECK(text.find("threads") == std::string::npos);
+  CHECK(read_game_settings(game).physics_threads == config::kDefaultPhysicsThreads);
+  CHECK(read_game_settings(game).collision_layers.count() == 2);
+  std::filesystem::remove_all(game.parent_path());
+}
+
+TEST_CASE("a game that never said how many threads solve its physics is saved without saying it") {
+  const std::filesystem::path game = game_saying(R"({"title": "Plain"})");
+  std::string error;
+  REQUIRE_MESSAGE(write_game_settings(game, read_game_settings(game), error), error);
+  std::ifstream file(game / kGameSettingsFile);
+  const std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  CHECK(text.find("physics") == std::string::npos);
+  std::filesystem::remove_all(game.parent_path());
 }

@@ -1,5 +1,8 @@
 #include "physics/jolt/jolt_physics_world.hpp"
 
+#include <Jolt/Core/JobSystemSingleThreaded.h>
+#include <Jolt/Core/JobSystemThreadPool.h>
+
 #include <utility>
 
 #include "physics/jolt/jolt_vehicle.hpp"
@@ -22,13 +25,23 @@ bool can_take_layer(const Record* record, const CollisionLayers& layers, std::si
   return record != nullptr && layer < layers.count();
 }
 
+// What solves a step: the stepping thread alone, or it and a pool of the others it was given.
+std::unique_ptr<JPH::JobSystem> job_system_for(int threads) {
+  const int bounded = config::bounded_physics_threads(threads);
+  if (!config::solves_in_parallel(bounded)) {
+    return std::make_unique<JPH::JobSystemSingleThreaded>(config::kMaxPhysicsJobs);
+  }
+  const int workers = bounded - config::kDefaultPhysicsThreads;  // (the stepping thread works too)
+  return std::make_unique<JPH::JobSystemThreadPool>(config::kMaxPhysicsJobs, config::kMaxPhysicsBarriers, workers);
+}
+
 }  // namespace
 
-World::World(Vec3 gravity, const CollisionLayers& layers)
+World::World(Vec3 gravity, const CollisionLayers& layers, int threads)
     : gravity_(gravity),
       layers_(layers),
       temp_allocator_(config::kPhysicsTempAllocatorBytes),
-      job_system_(config::kMaxPhysicsJobs) {
+      job_system_(job_system_for(threads)) {
   system_.Init(config::kMaxBodies, config::kNumBodyMutexes, config::kMaxBodyPairs, config::kMaxContactConstraints,
                broad_phase_layers_, object_vs_broad_phase_, object_pairs_);
   system_.SetGravity(to_jolt(gravity));
@@ -123,7 +136,7 @@ void World::move_kinematic_bodies(float dt) {
 
 void World::step(float dt) {
   move_kinematic_bodies(dt);
-  system_.Update(dt, config::kPhysicsCollisionSteps, &temp_allocator_, &job_system_);
+  system_.Update(dt, config::kPhysicsCollisionSteps, &temp_allocator_, job_system_.get());
   break_overloaded_joints(dt);
   update_characters(dt);
   update_triggers();
@@ -163,8 +176,8 @@ std::optional<Transform> World::simulated_pose(ObjectId object) const {
 
 }  // namespace jolt
 
-std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers) {
-  return std::make_unique<jolt::World>(gravity, layers);
+std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers, int threads) {
+  return std::make_unique<jolt::World>(gravity, layers, threads);
 }
 
 }  // namespace redgem

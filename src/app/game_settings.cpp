@@ -12,6 +12,7 @@
 #include "core/files.hpp"
 #include "core/names.hpp"
 #include "core/safe_path.hpp"
+#include "physics/physics_threads.hpp"
 
 namespace redgem {
 namespace {
@@ -114,6 +115,16 @@ void read_physics(const nlohmann::json& json, GameManifest& manifest) {
   CollisionLayersReading reading = collision_layers_from_json(json[kPhysicsKey]);
   manifest.settings.collision_layers = std::move(reading.layers);
   manifest.physics_warnings = std::move(reading.warnings);
+  manifest.settings.physics_threads = physics_threads_from_json(json[kPhysicsKey], manifest.physics_warnings);
+}
+
+// The physics' threads, in the "physics" section (made when there is none, and the threads are not
+// the default). The rest of the section stays as it is.
+void write_physics_threads(nlohmann::json& json, int threads) {
+  const bool has_section = json.contains(kPhysicsKey) && json[kPhysicsKey].is_object();
+  if (!has_section && threads == config::kDefaultPhysicsThreads) return;
+  if (!has_section) json[kPhysicsKey] = nlohmann::json::object();
+  physics_threads_to_json(threads, json[kPhysicsKey]);
 }
 
 void read_servers(const nlohmann::json& json, GameManifest& manifest) {
@@ -176,6 +187,7 @@ bool write_game_settings(const std::filesystem::path& game_dir, const GameSettin
   json[kTitleKey] = settings.title;
   json[kWindowWidthKey] = settings.window_width;
   json[kWindowHeightKey] = settings.window_height;
+  write_physics_threads(json, settings.physics_threads);
   return write_text_file(game_dir / kGameSettingsFile, json.dump(kJsonIndent) + "\n", error);
 }
 

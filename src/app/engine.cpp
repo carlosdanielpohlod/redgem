@@ -108,6 +108,7 @@ void Engine::initialize() {
 
 void Engine::build_world(const GameSettings& settings) {
   collision_layers_ = settings.collision_layers;
+  physics_threads_ = config::bounded_physics_threads(options_.physics_threads.value_or(settings.physics_threads));
   navigation_.configure(settings.navigation);
   scene_ = Scene::from_desc(scene_desc_);
   animations_.reset(scene_desc_.animations, scene_);

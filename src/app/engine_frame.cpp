@@ -3,6 +3,7 @@
 #include "app/engine.hpp"
 
 #include <algorithm>
+#include <utility>
 
 #include "app/scene_bodies.hpp"
 #include "app/profile_overlay.hpp"
@@ -17,6 +18,7 @@ bool Engine::finished() const { return context_.quit_requested || !presenter_->o
 
 void Engine::frame(float frame_seconds) {
   profiler_.begin_frame();
+  settle_physics();
   prepare_frame();
   poll_network();
   answer_requests();
@@ -101,13 +103,35 @@ void Engine::advance_game(float frame_seconds) {
   // Time.scale slows or stops the simulation (0 pauses it); behaviours still get their update,
   // with a shorter delta, so menus work while the game is paused.
   const float scale = context_.time.scale;
-  const int steps = fixed_steps_due(frame_seconds, scale);
-  for (int i = 0; i < steps; ++i) fixed_step(config::kFixedDeltaSeconds);
+  run_fixed_steps(fixed_steps_due(frame_seconds, scale));
   // A long stall (a dragged window, a loading hitch) counts as one long frame, not as seconds of game.
   const float unscaled =
       options_.fixed_step ? config::kFixedDeltaSeconds : std::min(frame_seconds, config::kMaxFrameSeconds);
   context_.time.unscaled_delta = unscaled;
   update_frame(unscaled * scale);
+  begin_prepared_step();  // (drawn meanwhile: see frame())
+}
+
+void Engine::run_fixed_steps(int steps) {
+  const int in_place = overlaps_physics() ? std::max(steps - 1, 0) : steps;
+  for (int i = 0; i < in_place; ++i) fixed_step(config::kFixedDeltaSeconds);
+  if (in_place == steps) return;
+  prepare_fixed_step(config::kFixedDeltaSeconds);
+  prepared_step_ = config::kFixedDeltaSeconds;
+}
+
+void Engine::begin_prepared_step() {
+  if (!prepared_step_) return;
+  overlapped_->begin_step(*prepared_step_);
+  step_in_flight_ = std::exchange(prepared_step_, std::nullopt);
+}
+
+void Engine::settle_physics() {
+  if (!step_in_flight_) return;
+  const FrameProfileScope phase(profiler_, ProfilePhase::Physics);
+  const float dt = *std::exchange(step_in_flight_, std::nullopt);
+  overlapped_->finish_step();
+  finish_fixed_step(dt);
 }
 
 int Engine::fixed_steps_due(float frame_seconds, float scale) {
@@ -134,13 +158,22 @@ bool Engine::both_alive(const ContactEvent& event) const {
 }
 
 void Engine::fixed_step(float dt) {
+  prepare_fixed_step(dt);
+  const FrameProfileScope phase(profiler_, ProfilePhase::Physics);
+  physics_->step(dt);
+  finish_fixed_step(dt);
+}
+
+void Engine::prepare_fixed_step(float dt) {
   const FrameProfileScope phase(profiler_, ProfilePhase::Physics);
   context_.time.delta = dt;
   scripts_->fixed_update(dt);
   process_destroyed();
   update_scene_water(water_, scene_, scene_desc_, *physics_, 0.0f);  // prime newly spawned or teleported bodies
   bodies::push_poses(scene_, *physics_);
-  physics_->step(dt);
+}
+
+void Engine::finish_fixed_step(float dt) {
   bodies::pull_poses(scene_, *physics_);
   update_scene_water(water_, scene_, scene_desc_, *physics_, dt);
   for (const ContactEvent& event : physics_->drain_events()) {

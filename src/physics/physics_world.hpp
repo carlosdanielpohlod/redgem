@@ -11,6 +11,7 @@
 #include "core/math.hpp"
 #include "physics/body_config.hpp"
 #include "physics/debug_geometry.hpp"
+#include "physics/physics_config.hpp"
 #include "physics/collision_layers.hpp"
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -231,6 +232,9 @@ class PhysicsWorld {
   virtual float hinge_angle(JointId joint) const = 0;
 };
 
-std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers = {});
+// `threads` solve each step (see config::kDefaultPhysicsThreads): every count gives the same
+// world, step after step; more only finish a step of a large one sooner.
+std::unique_ptr<PhysicsWorld> create_jolt_physics_world(Vec3 gravity, const CollisionLayers& layers = {},
+                                                        int threads = config::kDefaultPhysicsThreads);
 
 }  // namespace redgem

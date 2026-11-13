@@ -155,6 +155,7 @@ add_executable(redgem_tests
   unit/server_status_test.cpp
   unit/particle_emitters_test.cpp
   unit/particles_test.cpp
+  unit/step_worker_test.cpp
   unit/particle_layout_test.cpp
   unit/animation_player_test.cpp
   unit/animation_blend_grid_test.cpp
@@ -174,6 +175,7 @@ add_executable(redgem_tests
   unit/markdown_blocks_test.cpp
   unit/session_history_test.cpp
   integration/physics_world_test.cpp
+  integration/threaded_physics_test.cpp
   integration/physics_debug_test.cpp
   integration/physics_queries_test.cpp
   integration/navigation_bake_test.cpp
