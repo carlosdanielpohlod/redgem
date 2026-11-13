@@ -100,7 +100,7 @@ TEST_CASE("a game's assets are the files of its asset folders, kind by folder an
   const SmallGame game("listing");
   const std::vector<AssetEntry> assets = game_assets(game.dir());
   CHECK(assets.size() == kListedAssets);
-  const AssetEntry& orc = asset_at(assets, "models/enemies/orc.glb");
+  const AssetEntry orc = asset_at(assets, "models/enemies/orc.glb");
   CHECK(orc.kind == AssetKind::Model);
   CHECK(orc.tags == std::vector<std::string>{"enemies"});
   CHECK(asset_at(assets, "images/ui/button.png").kind == AssetKind::Texture);
