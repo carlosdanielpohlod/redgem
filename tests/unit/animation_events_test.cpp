@@ -18,7 +18,7 @@ constexpr float kClipSeconds = 1.0f;
 constexpr float kFrame = 1.0f / 60.0f;
 constexpr int kFramesPerClip = 60;
 constexpr float kQuarter = 0.25f;
-constexpr float kHalf = 0.5f;
+constexpr float kHalfway = 0.5f;
 constexpr float kThreeQuarters = 0.75f;
 constexpr float kLight = 0.4f;  // a mix too light to fire events
 constexpr float kHeavy = 0.6f;  // and one heavy enough
@@ -44,7 +44,7 @@ struct Stage {
     desc.nodes[kBone].name = "Bone";
     desc.nodes[kBone].parent = kHero;
     desc.animations = {clip("Walk"), clip("Run"), clip("Wave", false), clip("Attack")};
-    desc.animations[0].markers = {{"footstep", kQuarter}, {"footstep", kThreeQuarters}, {"breath", kHalf}};
+    desc.animations[0].markers = {{"footstep", kQuarter}, {"footstep", kThreeQuarters}, {"breath", kHalfway}};
     scene = Scene::from_desc(desc);
     player.reset(desc.animations, scene);
   }
@@ -80,7 +80,7 @@ using Heard = std::vector<std::string>;
 TEST_CASE("an event fires when its clip passes its moment, once on every lap") {
   Stage stage;
   stage.play("Walk");
-  const std::uint32_t listener = stage.on("Walk", kHalf);
+  const std::uint32_t listener = stage.on("Walk", kHalfway);
   CHECK(stage.heard(0.4f).empty());
   stage.player.advance(0.2f, stage.scene);
   const std::vector<AnimationEvent> events = stage.player.take_events();
@@ -89,7 +89,7 @@ TEST_CASE("an event fires when its clip passes its moment, once on every lap") {
   CHECK(events[0].object == stage.scene.handle(kHero));
   CHECK(events[0].clip == "Walk");
   CHECK(events[0].name.empty());
-  CHECK(events[0].at == doctest::Approx(kHalf));
+  CHECK(events[0].at == doctest::Approx(kHalfway));
   CHECK(stage.count_over(kFramesPerClip * 3) == 3u);
 }
 
@@ -126,8 +126,8 @@ TEST_CASE("played backwards, moments fire from the end towards the start") {
   stage.play("Walk", -1.0f);
   stage.on("Walk", kQuarter);
   stage.on("Walk", kThreeQuarters);
-  CHECK(stage.heard(kHalf) == Heard{at("Walk", kThreeQuarters)});
-  CHECK(stage.heard(kHalf) == Heard{at("Walk", kQuarter)});
+  CHECK(stage.heard(kHalfway) == Heard{at("Walk", kThreeQuarters)});
+  CHECK(stage.heard(kHalfway) == Heard{at("Walk", kQuarter)});
 }
 
 TEST_CASE("markers authored with a clip fire by their name") {
@@ -145,14 +145,14 @@ TEST_CASE("markers authored with a clip fire by their name") {
 TEST_CASE("a listener taken off hears nothing more") {
   Stage stage;
   stage.play("Walk");
-  stage.player.unlisten(stage.on("Walk", kHalf));
+  stage.player.unlisten(stage.on("Walk", kHalfway));
   CHECK(stage.count_over(kFramesPerClip * 2) == 0u);
-  CHECK(stage.player.listen_at(stage.scene, kHero, "Dance", kHalf) == kNoAnimationListener);
+  CHECK(stage.player.listen_at(stage.scene, kHero, "Dance", kHalfway) == kNoAnimationListener);
 }
 
 TEST_CASE("a character that only follows the scene's clips fires no events") {
   Stage stage;
-  stage.on("Walk", kHalf);
+  stage.on("Walk", kHalfway);
   CHECK(stage.count_over(kFramesPerClip * 2) == 0u);
 }
 
@@ -183,7 +183,7 @@ TEST_CASE("a state transition fires the new state's moments from its start, and 
   graph.transitions = {{"Move", "Strike", "attack", AnimationComparison::Equal, true, kQuarter}};
   std::string error;
   REQUIRE(stage.player.use_graph(stage.scene, kHero, graph, error));
-  stage.on("Walk", kHalf);
+  stage.on("Walk", kHalfway);
   stage.on("Attack", 0.0f);
   stage.on("Attack", 0.1f);
   CHECK(stage.heard(0.3f).empty());

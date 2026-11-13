@@ -18,7 +18,7 @@ constexpr float kHipsHeight = 1.0f;
 constexpr float kWalkDistance = 2.0f;  // a lap of Walk moves the hips this far along x
 constexpr float kRunDistance = 4.0f;
 constexpr float kQuarter = 0.25f;
-constexpr float kHalf = 0.5f;
+constexpr float kHalfway = 0.5f;
 constexpr float kQuarterTurn = kPi / 2.0f;
 constexpr float kTolerance = 1e-4f;
 
@@ -101,7 +101,7 @@ TEST_CASE("root motion turns the character by its root's yaw") {
   Stage stage;
   stage.player.set_root_motion(stage.scene, kHero, true);
   stage.play("Turn");
-  CHECK(stage.moved(kHalf).yaw == doctest::Approx(kQuarterTurn * kHalf).epsilon(0.01));
+  CHECK(stage.moved(kHalfway).yaw == doctest::Approx(kQuarterTurn * kHalfway).epsilon(0.01));
   CHECK(approx_equal(stage.scene.at(kHips).local.rotation, Quat::identity(), kTolerance));
 }
 
@@ -110,11 +110,11 @@ TEST_CASE("blended clips move the character by their weights") {
   stage.player.set_root_motion(stage.scene, kHero, true);
   AnimationGraphDefinition graph;
   graph.initial = "Move";
-  graph.parameters = {{"speed", kHalf}};
+  graph.parameters = {{"speed", kHalfway}};
   graph.states = {{"Move", "speed", {{0.0f, "Walk"}, {1.0f, "Run"}}}};
   std::string error;
   REQUIRE(stage.player.use_graph(stage.scene, kHero, graph, error));
-  const float expected = (kWalkDistance + kRunDistance) * kHalf * kQuarter;
+  const float expected = (kWalkDistance + kRunDistance) * kHalfway * kQuarter;
   CHECK(stage.moved(kQuarter).translation.x == doctest::Approx(expected));
 }
 
