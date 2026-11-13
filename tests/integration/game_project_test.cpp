@@ -15,6 +15,7 @@
 
 #include "app/engine.hpp"
 #include "app/bundled_game.hpp"
+#include "core/game_archive.hpp"
 #include "app/game_settings.hpp"
 #include "project/game_build.hpp"
 #include "project/game_templates.hpp"
@@ -274,12 +275,13 @@ TEST_CASE("building a game makes a standalone folder") {
   const std::filesystem::path fake_engine = fresh("engine_binary");
   REQUIRE(write_text_file(fake_engine, "binary", error));
   REQUIRE_MESSAGE(build_game(game, out, fake_engine, BuildTarget::Linux, error), error);
-  // The executable is named after the game and plays the game that sits next to it.
+  // The executable is named after the game and plays the game packed next to it.
   const auto executable = out / executable_name(game);
   REQUIRE(std::filesystem::exists(executable));
   CHECK((std::filesystem::status(executable).permissions() & std::filesystem::perms::owner_exec) !=
         std::filesystem::perms::none);
-  CHECK(std::filesystem::exists(out / "game" / config::kSceneFileName));
+  CHECK(std::filesystem::is_regular_file(out / kArchiveFileName));
+  CHECK_FALSE(std::filesystem::exists(out / "game"));  // packed: no loose files
   CHECK(bundled_game(executable) == out / "game");
   CHECK_FALSE(bundled_game(fake_engine).has_value());  // an executable with no game beside it
   CHECK_FALSE(build_game(fresh("not_a_game"), out, fake_engine, BuildTarget::Linux, error));
@@ -288,7 +290,7 @@ TEST_CASE("building a game makes a standalone folder") {
   const auto windows_out = fresh("built_windows");
   REQUIRE_MESSAGE(build_game(game, windows_out, fake_engine, BuildTarget::Windows, error), error);
   CHECK(std::filesystem::exists(windows_out / (executable_name(game) + ".exe")));
-  CHECK(std::filesystem::exists(windows_out / "game" / config::kSceneFileName));
+  CHECK(std::filesystem::is_regular_file(windows_out / kArchiveFileName));
   CHECK(build_target_from_name("windows") == BuildTarget::Windows);
   CHECK_FALSE(build_target_from_name("amiga").has_value());
   std::filesystem::remove_all(windows_out);
@@ -368,9 +370,17 @@ TEST_CASE("the game built from the sandbox is the real player under the game's n
   CHECK(bytes_of(executable).find("Dear ImGui") == std::string::npos);
   CHECK(bytes_of(editor).find("Dear ImGui") != std::string::npos);
   CHECK(bundled_game(executable) == out / "game");
-  for (const std::filesystem::path& file : shipped_files(game)) {
+  const auto archive = GameArchive::open(out / kArchiveFileName, error);
+  REQUIRE_MESSAGE(archive.has_value(), error);
+  const std::vector<std::filesystem::path> shipped = shipped_files(game);
+  CHECK(archive->entries().size() == shipped.size());
+  for (const std::filesystem::path& file : shipped) {
     CAPTURE(file);
-    CHECK(bytes_of(out / "game" / file) == bytes_of(game / file));
+    const ArchiveEntry* entry = archive->find(file.generic_u8string());
+    REQUIRE(entry != nullptr);
+    const auto packed = archive->read(*entry, kMaxArchiveEntryBytes, error);
+    REQUIRE_MESSAGE(packed.has_value(), error);
+    CHECK(std::string(packed->begin(), packed->end()) == bytes_of(game / file));
   }
   std::filesystem::remove_all(out);
 }
@@ -427,7 +437,7 @@ TEST_CASE("a game is never built into itself") {
   CHECK_FALSE(build_game(game.string() + "/", game, engine, BuildTarget::Linux, error));
   CHECK_FALSE(std::filesystem::exists(game / "out"));
   REQUIRE_MESSAGE(build_game(game.string() + "/", root / "built", engine, BuildTarget::Linux, error), error);
-  CHECK(std::filesystem::exists(root / "built" / "game" / "scene.glb"));
+  CHECK(std::filesystem::is_regular_file(root / "built" / kArchiveFileName));
   std::filesystem::remove_all(root);
 }
 
@@ -471,7 +481,8 @@ TEST_CASE("a built game never carries a signing key left in its folder") {
   std::ofstream(dir / "game_src" / "release.keystore") << "secret";
   std::ofstream(dir / "engine") << "engine";
   std::string error;
-  REQUIRE_MESSAGE(build_game(dir / "game_src", dir / "out", dir / "engine", folder_target(), error), error);
+  REQUIRE_MESSAGE(build_game(dir / "game_src", dir / "out", dir / "engine", folder_target(), error, GameLayout::Loose),
+                  error);
   CHECK(std::filesystem::exists(dir / "out" / "game" / "scene.glb"));
   CHECK_FALSE(std::filesystem::exists(dir / "out" / "game" / "release.keystore"));
   CHECK(signing_key_file("keys/upload.jks"));
@@ -494,7 +505,7 @@ TEST_CASE("a built game carries no key in any case, nor the keystore its game.js
   std::ofstream(game / "game.json") << R"({"android": {"keystore": "secrets/../secrets/mine.bin"}})";
   std::ofstream(dir / "engine") << "engine";
   std::string error;
-  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", folder_target(), error), error);
+  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", folder_target(), error, GameLayout::Loose), error);
   for (const std::string& key : keys) {
     CAPTURE(key);
     CHECK_FALSE(std::filesystem::exists(dir / "out" / "game" / key));
@@ -518,12 +529,12 @@ TEST_CASE("a built game never carries the keystore its game.json names by an abs
   const nlohmann::json named = {{"android", {{"keystore", (game / "upload.bin").string()}}}};
   std::ofstream(game / "game.json") << named.dump();
   std::string error;
-  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", folder_target(), error), error);
+  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", folder_target(), error, GameLayout::Loose), error);
   CHECK_FALSE(std::filesystem::exists(dir / "out" / "game" / "upload.bin"));
 
   const bool case_ignored = std::filesystem::exists(game / "RELEASE.BIN");
   std::ofstream(game / "game.json") << R"({"android": {"keystore": "RELEASE.BIN"}})";
-  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", folder_target(), error), error);
+  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", folder_target(), error, GameLayout::Loose), error);
   CHECK(std::filesystem::exists(dir / "out" / "game" / "release.bin") == !case_ignored);
   std::filesystem::remove_all(dir);
 }
@@ -575,7 +586,7 @@ TEST_CASE("a built game holds the game's own files: nothing hidden, no backups, 
   std::filesystem::create_directory_symlink(dir / "outside", game / "linked_folder");
   std::ofstream(dir / "engine") << "engine";
   std::string error;
-  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", folder_target(), error), error);
+  REQUIRE_MESSAGE(build_game(game, dir / "out", dir / "engine", folder_target(), error, GameLayout::Loose), error);
   const std::filesystem::path built = dir / "out" / "game";
   CHECK(std::filesystem::exists(built / "scene.glb"));
   CHECK(std::filesystem::exists(built / "scenes" / "level2.glb"));

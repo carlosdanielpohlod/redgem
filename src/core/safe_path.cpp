@@ -1,9 +1,9 @@
 #include "core/safe_path.hpp"
 
-#include <fstream>
 #include <mutex>
 #include <set>
 
+#include "core/game_files.hpp"
 #include "core/log.hpp"
 
 namespace redgem {
@@ -102,6 +102,14 @@ void warn_of_link(const std::filesystem::path& link) {
   log::warning(printable(link.string()) + " is a symbolic link: built games do not carry links, so it is left out");
 }
 
+// A path as it is meant: inside a mounted archive by its name alone (what is on the disk there,
+// links included, is never followed: see core/game_files.hpp), else with the links on the disk
+// followed.
+std::filesystem::path resolved(const std::filesystem::path& path, std::error_code& fs_error) {
+  if (game_files::in_archive(path)) return std::filesystem::absolute(path, fs_error).lexically_normal();
+  return std::filesystem::weakly_canonical(path, fs_error);
+}
+
 }  // namespace
 
 bool safe_asset_name(std::string_view name) {
@@ -112,6 +120,8 @@ bool safe_asset_name(std::string_view name) {
 
 bool through_link(const std::filesystem::path& folder, const std::filesystem::path& relative) {
   // (A path given whole is looked at below the folder only: the folder's own may hold links.)
+  // (A mounted archive holds no links, whatever is on the disk where it is mounted.)
+  if (game_files::in_archive(folder)) return false;
   const std::filesystem::path below = relative.is_absolute() ? relative.lexically_relative(folder) : relative;
   std::filesystem::path step = folder;
   // (Every step as written: in "linked/../file" the ".." leaves the folder the link leads to.)
@@ -133,28 +143,18 @@ std::optional<std::filesystem::path> file_inside(const std::filesystem::path& fo
                                                  const std::filesystem::path& relative) {
   std::error_code fs_error;
   // (A file named without a folder is in the one the program runs in.)
-  const std::filesystem::path root =
-      std::filesystem::weakly_canonical(folder.empty() ? std::filesystem::path(kHere) : folder, fs_error);
+  const std::filesystem::path root = resolved(folder.empty() ? std::filesystem::path(kHere) : folder, fs_error);
   if (fs_error) return std::nullopt;
-  std::filesystem::path file = std::filesystem::weakly_canonical(root / relative, fs_error);
+  std::filesystem::path file = resolved(root / relative, fs_error);
   if (fs_error) return std::nullopt;
   if (!stays_below(file.lexically_relative(root))) return std::nullopt;
-  if (!std::filesystem::is_regular_file(file, fs_error)) return std::nullopt;
+  if (!game_files::is_file(file)) return std::nullopt;
   if (through_link(folder, relative)) return std::nullopt;
   return file;
 }
 
 std::optional<std::vector<std::uint8_t>> read_file_up_to(const std::filesystem::path& file, std::uintmax_t max_bytes) {
-  std::error_code fs_error;
-  if (!std::filesystem::is_regular_file(file, fs_error)) return std::nullopt;
-  const std::uintmax_t size = std::filesystem::file_size(file, fs_error);
-  if (fs_error) return std::nullopt;
-  if (size > max_bytes) return std::nullopt;
-  std::ifstream in(file, std::ios::binary);
-  std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
-  // (Exactly the size it had when asked: a file that grows meanwhile is not followed.)
-  if (!in.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()))) return std::nullopt;
-  return bytes;
+  return game_files::read(file, max_bytes);
 }
 
 std::string printable(std::string_view text) { return without_controls(text, {}); }

@@ -195,8 +195,8 @@ not a promise of how it will be closed.
 ### Editor
 
 - A picture put on a material from the editor goes inside the scene's `.glb`: changing the file in
-  `images/` afterwards does not change the scene (pick it again). The Inspector shows a slot's
-  picture by name, without a preview, and sets neither a texture's sampler nor its UV set.
+  `images/` afterwards does not change the scene (pick it again). The Inspector does not set a
+  texture's sampler or UV set.
 - [Prefab file](docs/prefabs.md) instances cannot override inherited children separately, a
   script cannot spawn a prefab file by its path (only a placement in the scene), and a running
   scene does not see a changed prefab file until reloaded. Export needs complete skeletons and
@@ -311,8 +311,6 @@ not a promise of how it will be closed.
   only on Linux and macOS.
 - A script that sets an engine class's name to something else (`Vector3 = 5`) breaks the
   engine's calls that use that class with Ruby errors, instead of being stopped from doing so.
-- An Android build empties its staging folder (`.redgem-apk-stage` in the output folder) without
-  checking that a build made it.
 - No unit tests for the room codes and their guessers (`room_codes.cpp` is tested only through
   the relay and server integration tests), the socket layer or the web requests' TLS stream on
   its own (only through requests; game connections' TLS is tested over loopback sockets only);
@@ -324,8 +322,18 @@ not a promise of how it will be closed.
 - The splash picture shows once the window is open: reading the first level's file, before
   that, shows nothing. The Linux menu entry is for a package to install: the build does not add
   it to a menu.
-- A built game is the player program beside a folder of loose files, scripts as plain `.rb`
-  included: no packed or compressed archive.
+- A built game's archive (`game.rgpak`) is checked (every size bounded, every file's CRC32) but
+  neither encrypted nor signed: anyone can list and extract it, and anyone can make another valid
+  one. Its scripts are Ruby source, compressed, not compiled. A file's CRC32 is checked when the
+  file is read, not when the game starts: a game whose archive has one damaged picture starts, and
+  that picture fails to load. Names in it are matched case included, even on Windows and macOS,
+  whose own folders ignore case. A file read out of it is held twice for a moment (the archive's
+  copy and the one handed to raylib or cgltf), and each read opens the archive file anew.
+- Music in a built game's archive is read whole into memory (up to 256 MB a piece) before it
+  plays: raylib streams music only from a file on the disk. On Android the archive is copied out
+  of the APK into the app's storage on the first run (and after each update), so it takes its
+  room twice on the phone. The packed Android app has not been run on an emulator or a phone yet:
+  the continuous integration only builds its player.
 - No installers: no Windows installer or code signing, no Linux AppImage or Flatpak. A game's Mac
   app (and the editor's) is signed ad hoc only, with no Developer ID nor notarization: a Mac that
   downloads it warns that its developer cannot be verified.

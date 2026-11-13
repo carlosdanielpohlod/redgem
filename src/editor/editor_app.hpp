@@ -366,6 +366,7 @@ class EditorApp {
   std::unique_ptr<Window> window_;
   std::unique_ptr<Renderer> renderer_;
   std::uint64_t preview_generation_ = 0;
+  std::uint64_t preview_upload_ = 0;
   std::unique_ptr<ui::Interface> interface_;
   std::unique_ptr<AudioSystem> audio_;
   std::unique_ptr<EditorSession> session_;

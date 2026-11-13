@@ -55,6 +55,14 @@ until 1.0, a release may change what games rely on (see
   it; a part taken out of a spawned copy leaves that copy's animation. A kinematic body under a parent
   goes where it takes it; a dynamic one keeps its own motion, and is taken to its new place
   (stopped, as when a script sets its position) when `keep_world: false` moves it.
+- **Packed games**: `redgem build` packs a game's scripts, scenes, pictures, sounds, music, fonts,
+  `game.json` and translations into one file, `game.rgpak`, beside the executable (inside the Mac
+  app, and as one asset of the Android app), compressed where that makes a file smaller. The
+  player reads every file of the game out of it (raylib's own loaders and music streams included)
+  and refuses a damaged or tampered archive with a reason (a file's checksum is checked when it
+  is read). `--loose` keeps the files loose in a
+  `game/` folder, as before, to look into a build. The editor's Play and `redgem run` still read
+  the project folder. The format is documented in `docs/shipping.md`, and the reader is fuzzed.
 
 - **Typing on Android**: while a `UI.text_field` is drawn, the phone's on-screen keyboard is up;
   it goes when no field is drawn (the field or its menu closed, the scene changed) or when the
@@ -210,6 +218,8 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Android build staging** uses a private per-user cache. Existing folders next to the APK or AAB
+  stay intact, and interrupted builds are cleaned up by later builds.
 - **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock
   is released before the vehicle joins the simulation, so ThreadSanitizer no longer finds a
   lock-order inversion there and its suppression is gone (the ground for physics on several

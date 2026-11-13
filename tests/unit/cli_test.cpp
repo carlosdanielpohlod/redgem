@@ -164,6 +164,17 @@ TEST_CASE("--bundle asks an Android build for an App Bundle, and a build for a c
   CHECK(error == tr("project.build.bundle_is_for_android"));
 }
 
+TEST_CASE("--loose keeps a build's files loose, and is for builds only") {
+  const CliResult loose = parse_cli({"build", "games/mine", "dist/mine", "--loose"});
+  REQUIRE(loose.ok);
+  CHECK(loose.options.loose);
+  CHECK_FALSE(parse_cli({"build", "games/mine", "dist/mine"}).options.loose);  // packed unless asked
+  CHECK(usage().find("--loose") != std::string::npos);
+  const CliResult played = parse_cli({"games/mine", "--play", "--loose"});
+  CHECK_FALSE(played.ok);
+  CHECK(played.error == tr("project.cli.loose_needs_build"));
+}
+
 TEST_CASE("-h asks for help too, and help forgets the rest of the line") {
   const CliResult help = parse_cli({"games/demo", "--gpu", "integrated", "-h"});
   REQUIRE(help.ok);

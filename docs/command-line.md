@@ -38,6 +38,17 @@ The `third-person`, `top-down` and `menu-only` games come with tests of their ow
 GitHub Actions workflow that runs them on pushes and pull requests (see
 [Testing your game](testing.md#running-the-tests-on-every-push)).
 
+## `redgem build`: make a standalone game
+
+```bash
+redgem build <game_dir> <out_dir> [--target linux|windows|macos|android] [--bundle] [--loose]
+```
+
+Makes the game for players in `<out_dir>`: the player named after the game, with the game's files
+packed into one archive, `game.rgpak` (for the Mac, an app; for Android, an `.apk`, or with
+`--bundle` an App Bundle). `--loose` keeps the files as they are, in a `game/` folder, to look
+into a build while debugging it. See [Building and sharing](shipping.md).
+
 ## `redgem scene`: read and change a scene
 
 A `scene.glb` is a binary file. `redgem scene` shows it as text, one line per object, and changes

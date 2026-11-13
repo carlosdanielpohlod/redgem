@@ -49,7 +49,10 @@ Renderer::Renderer(const Window&) : impl_(std::make_unique<Impl>()) {
   impl_->load_ui_font();
 }
 
-Renderer::~Renderer() { impl_->release(); }
+Renderer::~Renderer() {
+  end_scene_texture_use();
+  impl_->release();
+}
 
 void Renderer::upload(const SceneDesc& desc) {
   impl_->release_assets();

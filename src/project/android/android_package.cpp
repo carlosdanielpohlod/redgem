@@ -5,7 +5,7 @@
 #include "core/files.hpp"
 #include "core/platform.hpp"
 #include "project/android/android_package_names.hpp"
-#include "project/build_steps.hpp"
+#include "project/android/android_stage_folder.hpp"
 #include "project/game_build.hpp"
 
 namespace redgem {
@@ -15,7 +15,6 @@ namespace {
 constexpr const char* kApkExtension = ".apk";
 constexpr const char* kBundleExtension = ".aab";
 constexpr const char* kPathVariable = "PATH";
-constexpr const char* kStageFolder = ".redgem-apk-stage";  // inside the output folder, gone when the build ends
 
 // How the staged game is packed: with the SDK's tools, signed with the key, as an APK or (with
 // bundletool) as an App Bundle.
@@ -24,6 +23,7 @@ struct Packer {
   SigningKey key;
   AndroidFormat format = AndroidFormat::Apk;
   std::string bundletool;  // how bundletool is run; empty for an APK
+  GameLayout layout = GameLayout::Packed;
 };
 
 bool pack(const Packer& packer, const std::filesystem::path& stage, const std::filesystem::path& out,
@@ -32,17 +32,15 @@ bool pack(const Packer& packer, const std::filesystem::path& stage, const std::f
   return pack_android_bundle(packer.tools, packer.bundletool, stage, packer.key, out, error);
 }
 
-// Stages and packs the game in a folder of its own beside the app, gone when the build ends.
+// Stages and packs the game in a folder of its own in the cache, gone when the build ends.
 bool build_app(const std::filesystem::path& game_dir, const std::map<std::string, std::filesystem::path>& runtimes,
                const Packer& packer, const std::filesystem::path& out, std::string& error) {
-  const std::filesystem::path stage = out.parent_path() / kStageFolder;
-  build_steps::begin(build_steps::kCopyingFiles);
+  const android_stage::Folder owned(android_stage::cache_root(), error);
+  if (owned.path().empty()) return false;
+  const auto stage = owned.path() / android_stage::kPackageFolder;
   // (The stamp only has to differ from the last build's.)
   const std::string stamp = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
-  const bool built = stage_android_game(game_dir, runtimes, stamp, stage, error) && pack(packer, stage, out, error);
-  std::error_code fs_error;
-  std::filesystem::remove_all(stage, fs_error);  // whether it worked or not
-  return built;
+  return stage_android_game(game_dir, runtimes, stamp, stage, error, packer.layout) && pack(packer, stage, out, error);
 }
 
 // How bundletool is run for `format` (nothing for an APK); nullopt, with `error` set, when a
@@ -96,7 +94,7 @@ bool read_android_settings(const std::filesystem::path& game_dir, AndroidSetting
 std::optional<std::filesystem::path> build_android_game(const std::filesystem::path& game_dir,
                                                         const std::filesystem::path& out_dir,
                                                         const std::filesystem::path& runtimes_dir, std::string& error,
-                                                        AndroidFormat format) {
+                                                        AndroidFormat format, GameLayout layout) {
   if (!can_build(game_dir, out_dir, error)) return std::nullopt;
   const auto runtimes = runtimes_to_pack(runtimes_dir, error);
   if (runtimes.empty()) return std::nullopt;
@@ -105,7 +103,8 @@ std::optional<std::filesystem::path> build_android_game(const std::filesystem::p
   const auto key = bundletool ? signing_key_of(game_dir, error) : std::nullopt;
   if (!key) return std::nullopt;
   std::filesystem::path app = app_in(game_dir, out_dir, format);
-  if (!build_app(game_dir, runtimes, Packer{*tools, *key, format, *bundletool}, app, error)) return std::nullopt;
+  if (!build_app(game_dir, runtimes, Packer{*tools, *key, format, *bundletool, layout}, app, error))
+    return std::nullopt;
   return app;
 }
 

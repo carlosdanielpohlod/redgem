@@ -7,6 +7,7 @@
 #include <mruby/variable.h>
 #include <utility>
 
+#include "core/game_files.hpp"
 #include "core/safe_path.hpp"
 #include "scene/props.hpp"
 #include "script/script_host.hpp"
@@ -45,10 +46,7 @@ bool ScriptHost::in_scripts_folder(const std::string& script) {
   return !through_link(scripts_dir_, script);
 }
 
-bool ScriptHost::has_script(const std::string& script) const {
-  std::error_code fs_error;
-  return std::filesystem::exists(scripts_dir_ / script, fs_error);
-}
+bool ScriptHost::has_script(const std::string& script) const { return game_files::is_file(scripts_dir_ / script); }
 
 bool ScriptHost::require_script(const std::string& script) {
   if (loaded_scripts_.count(script) != 0) return true;

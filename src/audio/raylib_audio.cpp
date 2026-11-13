@@ -15,6 +15,7 @@
 #include <variant>
 
 #include "audio/audio.hpp"
+#include "audio/game_music.hpp"
 #include "core/log.hpp"
 
 namespace redgem {
@@ -65,10 +66,10 @@ class SoundLibrary {
 };
 
 std::optional<Music> load_music(const std::filesystem::path& file) {
-  Music music = LoadMusicStream(file.string().c_str());
+  Music music = load_game_music(file);
   const bool valid = IsMusicValid(music) && IsAudioStreamValid(music.stream);
   if (valid) return music;
-  UnloadMusicStream(music);
+  unload_game_music(music);
   return std::nullopt;
 }
 
@@ -78,7 +79,7 @@ AudioStream voice_stream(const Voice& voice) {
   return std::visit([](const auto& source) { return source.stream; }, voice);
 }
 void unload_voice(Sound alias) { UnloadSoundAlias(alias); }
-void unload_voice(Music music) { UnloadMusicStream(music); }
+void unload_voice(Music music) { unload_game_music(music); }
 
 std::optional<Voice> load_alias(SoundLibrary& library, const std::string& name) {
   const Sound* source = library.sound(name);
@@ -169,7 +170,7 @@ class RaylibMusicDriver final : public MusicDriver {
     const auto found = tracks_.find(id);
     if (found == tracks_.end()) return;
     StopMusicStream(found->second);
-    UnloadMusicStream(found->second);
+    unload_game_music(found->second);
     tracks_.erase(found);
   }
 
