@@ -130,7 +130,7 @@ struct Online {
   std::filesystem::path game;
 
   explicit Online(server::RoomLimits limits, std::filesystem::path played = fixture("games/sandbox"),
-                  int threads = server::processor_count(), Clock* clock = &steady_clock())
+                  int threads = server::processor_count(), Clock* clock = nullptr)
       : server(settings(limits, played, threads, clock)), game(std::move(played)) {
     std::filesystem::remove_all(dir);
     std::string error;
@@ -376,7 +376,8 @@ TEST_CASE("on a dedicated server the menu never opens, the game never freezes, a
 }
 
 TEST_CASE("a dedicated server's room plays the time its clock says passed, on its own thread") {
-  test::FakeClock clock(kOversleep);  // (only the room's thread sleeps on it)
+  // (Only the room's thread sleeps on it, really, so as not to spin: the clock still says how long.)
+  test::FakeClock clock(kOversleep, test::RealSleep::Yes);
   Online online_game(kRoomy, fixture("games/sandbox"), kOneThread, &clock);
   Engine& player = online_game.join();
   const GameAndClock first = game_and_clock(online_game, player, clock);

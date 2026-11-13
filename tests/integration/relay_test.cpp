@@ -35,6 +35,7 @@ constexpr float kSliver = 0.0001f;  // far less than a millisecond
 constexpr double kMillisecondsPerSecond = 1000.0;
 constexpr int kMaxRounds = 3000;  // of polling, a millisecond apart
 constexpr std::chrono::milliseconds kRoundPause{1};
+constexpr std::chrono::milliseconds kCallerDelay{20};
 constexpr float kRoundSeconds = 0.001f;
 constexpr float kPastJoinTimeout = 6.0f;
 constexpr float kPastForgetting = 4.0f;  // seconds after which a silent game is forgotten
@@ -228,6 +229,9 @@ TEST_CASE("a relay's wait ends as soon as someone connects") {
   Meeting meeting;
   Socket caller;
   std::thread late([&] {
+    // (Most likely while the relay sleeps; whether it calls before or during the wait, the
+    // outcome below is the same, and nothing here is timed.)
+    std::this_thread::sleep_for(kCallerDelay);
     std::string error;
     caller = Socket::connect_to(kLocalhost, meeting.relay.port(), error);
   });

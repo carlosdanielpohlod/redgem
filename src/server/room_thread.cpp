@@ -27,11 +27,13 @@ void RoomThread::add(std::shared_ptr<RoomSlot> slot) {
   new_rooms_.push_back(std::move(slot));
 }
 
+void RoomThread::ask_to_stop() {
+  const std::lock_guard<std::mutex> hold(lock_);
+  stopping_ = true;
+}
+
 void RoomThread::stop() {
-  {
-    const std::lock_guard<std::mutex> hold(lock_);
-    stopping_ = true;
-  }
+  ask_to_stop();
   if (thread_.joinable()) thread_.join();
 }
 

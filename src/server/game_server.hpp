@@ -69,9 +69,9 @@ struct ServerSettings {
   std::filesystem::path data_dir;   // where Save is kept; empty: nothing is written (kept in memory for this run)
   int threads = processor_count();  // the threads the rooms run on, at most
   StatusSettings status;
-  // What the server's turns and its rooms keep to (a test's own clock in tests); it outlives the
-  // server.
-  Clock* clock = &steady_clock();
+  // What the server's turns and its rooms keep to: a test's own clock in tests, which outlives the
+  // server; the steady clock when null.
+  Clock* clock = nullptr;
 };
 
 // A game played on a server with nobody at it (redgem-server): everyone joins, nobody hosts. One
@@ -104,7 +104,7 @@ class GameServer {
   // ended are let go. (The rooms play on their own threads meanwhile, on the server's clock.)
   void tick(float seconds);
   // The clock the server keeps to (see ServerSettings::clock).
-  Clock& clock() const { return *settings_.clock; }
+  Clock& clock() const { return settings_.clock != nullptr ? *settings_.clock : steady_clock(); }
   // Ends every match (their players are told the game is gone), waits for the rooms' threads to
   // end, and closes the port.
   void stop();

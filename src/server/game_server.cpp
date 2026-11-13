@@ -57,6 +57,8 @@ void GameServer::tick(float seconds) {
 GameServer::~GameServer() { stop(); }
 
 void GameServer::stop() {
+  // (All asked first: each ends after a turn's wait, and they wait out theirs together.)
+  for (auto& thread : threads_) thread->ask_to_stop();
   for (auto& thread : threads_) thread->stop();
   threads_.clear();
   rooms_.clear();

@@ -84,7 +84,8 @@ void report_rooms(const RelayServer& relay, std::size_t& rooms) {
   log::info(std::to_string(rooms) + " room(s) open, " + std::to_string(relay.connection_count()) + " machine(s)");
 }
 
-[[noreturn]] void serve_until_stopped(RelayServer& relay, const Clock& clock) {
+[[noreturn]] void serve_until_stopped(RelayServer& relay) {
+  const Clock& clock = steady_clock();
   std::size_t rooms = 0;
   double before = clock.now();
   for (;;) {
@@ -116,7 +117,7 @@ bool start_relay(RelayServer& relay, const RelayCommand& command) {
 int run_relay(const RelayCommand& command) {
   RelayServer relay(command.limits);
   if (!start_relay(relay, command)) return kExitFailure;
-  serve_until_stopped(relay, steady_clock());
+  serve_until_stopped(relay);
 }
 
 int show_fingerprint(const RelayCommand& command) {

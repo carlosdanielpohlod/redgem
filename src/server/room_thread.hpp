@@ -35,8 +35,11 @@ class RoomThread {
 
   // Gives the thread a room to run, from its next turn (from the lobby's thread).
   void add(std::shared_ptr<RoomSlot> slot);
+  // Asks the thread to end, without waiting for it: after its turn's wait, at most a tick, it
+  // ends the matches of its rooms. (A server asks all its threads before it waits for any.)
+  void ask_to_stop();
   // Ends the matches of its rooms (their players are told the game is gone) and waits for the
-  // thread to end (a turn's wait at most).
+  // thread to end.
   void stop();
 
  private:
