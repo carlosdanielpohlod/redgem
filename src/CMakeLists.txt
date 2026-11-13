@@ -721,6 +721,9 @@ if(NOT ANDROID)
     project/closest_words.cpp
     project/scene_text.cpp
     project/scene_diff.cpp
+    project/scene_revision.cpp
+    project/asset_search.cpp
+    project/search_command.cpp
     project/scene_snapshot.cpp
     project/scene_fingerprint.cpp
     project/scene_lookup.cpp

@@ -18,6 +18,7 @@
 #include "project/scene_lookup.hpp"
 #include "project/scene_text.hpp"
 #include "project/scene_diff.hpp"
+#include "project/scene_revision.hpp"
 #include "scene/props.hpp"
 
 namespace redgem::tools {
@@ -188,7 +189,8 @@ ToolResult diff(OpenScene& scene) {
   if (!baseline) return failed(tr("project.scene.diff_needs_against"), kExitUsage);
   const auto limit = count_option(scene.line, kLimitOption, kDefaultDiffLines);
   if (!limit) return failed(tr("project.scene.needs_count"), kExitUsage);
-  return compare_scene_file(scene.document.desc(), scene.name, *baseline, *limit);
+  if (names_scene_file(*baseline)) return compare_scene_file(scene.document.desc(), scene.name, *baseline, *limit);
+  return compare_scene_revision(scene.document.desc(), scene.name, scene.document.path(), *baseline, *limit);
 }
 
 // A line that takes as many words as it wants after those it needs (what to set).

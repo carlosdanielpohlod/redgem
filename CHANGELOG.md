@@ -10,6 +10,17 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Asset and template search** for assistants: `redgem assets <game> [words] [--kind
+  model|texture|sound|script|prefab] [--tag name] [--limit N]` lists the game's assets whose name
+  or folder has every word, best match first (a name that is the word, then one that starts with
+  it, holds it, a subfolder tag of that name, and the rest of the path); `redgem templates
+  [words]` does the same for the templates new games start from. MCP has both as the read-only
+  tools `asset_search` and `template_search`.
+- **Scene diff against Git**: `redgem scene diff <game> --against <revision>` (`HEAD`, `HEAD~1`,
+  `main`, a commit hash) compares the scene with the one that commit saved, read through
+  `git show`; MCP's `scene_diff` takes the same as `revision`, and a connected editor compares
+  its open, unsaved document with it. A missing revision, or a game in no Git repository, is an
+  error that says so.
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
   in total, frame time (average and worst over the last five seconds, and the budget), bytes a

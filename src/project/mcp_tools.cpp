@@ -11,6 +11,8 @@
 #include "core/safe_path.hpp"
 #include "core/short_text.hpp"
 #include "project/mcp_game_tools.hpp"
+#include "project/scene_revision.hpp"
+#include "project/search_command.hpp"
 #include "project/tool_commands.hpp"
 #include "project/editor_bridge.hpp"
 
@@ -73,6 +75,20 @@ Words api_words(const Json& args) {
   return words;
 }
 
+// A .glb file inside the game, as `against` names it.
+std::string earlier_save(const Options& options, const Json& args) {
+  if (!names_scene_file(args["against"].get<std::string>()))
+    throw std::invalid_argument("against must name a .glb file");
+  return inside(options, args, "against");
+}
+
+// What scene diff compares with: an earlier save, or the scene at a Git revision.
+std::string baseline(const Options& options, const Json& args) {
+  check_diff_baseline(args);
+  if (args.contains("against")) return earlier_save(options, args);
+  return args["revision"].get<std::string>();
+}
+
 const char* scene_action(const std::string& name) {
   if (name == "scene_list") return "list";
   if (name == "scene_get") return "get";
@@ -86,17 +102,38 @@ Words scene_command(const Options& options, const std::string& name, const Json&
   for (const char* key : {"depth", "limit"}) option(words, asked, key);
   if (name == "scene_diff") {
     words.push_back("--against");
-    words.push_back(inside(options, args, "against"));
+    words.push_back(baseline(options, args));
   }
   return words;
+}
+
+Words assets_words(const Options& options, const Json& args) {
+  Words words{kAssetsCommand, options.game.string()};
+  if (args.contains("query")) words.push_back(args["query"]);
+  for (const char* key : {"kind", "tag", "limit"}) option(words, args, key);
+  return words;
+}
+
+Words templates_words(const Json& args) {
+  Words words{kTemplatesCommand};
+  if (args.contains("query")) words.push_back(args["query"]);
+  option(words, args, "limit");
+  return words;
+}
+
+// The command lines of the tools that only read: the API, the searches and the scene's.
+Words reading_command(const Options& options, const std::string& name, const Json& args) {
+  if (name == "api") return api_words(args);
+  if (name == "asset_search") return assets_words(options, args);
+  if (name == "template_search") return templates_words(args);
+  return scene_command(options, name, args);
 }
 
 Words command(const Options& options, const std::string& name, const Json& args) {
   if (name == "scene_edit") return edit_words(options, args);
   if (name == "game_run") return run_words(options, args);
   if (name == "game_check") return {"check", options.game.string()};
-  if (name == "api") return api_words(args);
-  return scene_command(options, name, args);
+  return reading_command(options, name, args);
 }
 
 log::Level level(const std::string& name) {
@@ -214,6 +251,20 @@ Json discovered(const Options& options, const std::string& name, const Json& arg
   return from_files(native_result(options, name, args));
 }
 }  // namespace
+
+namespace {
+// Whether scene_diff's arguments name a revision Git could not take as one.
+bool names_bad_revision(const Json& args) {
+  return args.contains("revision") && !valid_revision(args["revision"].get<std::string>());
+}
+}  // namespace
+
+void check_diff_baseline(const Json& args) {
+  if (args.contains("against") == args.contains("revision"))
+    throw std::invalid_argument("give one of against (an earlier .glb) or revision (a Git revision)");
+  if (names_bad_revision(args))
+    throw std::invalid_argument("revision is not a Git revision: " + args["revision"].get<std::string>());
+}
 
 Json invoke(const Options& options, const std::string& name, const Json& args) {
   const Json tools = catalog(options);

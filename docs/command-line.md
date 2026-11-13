@@ -88,11 +88,16 @@ renames and reparenting. New objects get hexadecimal identities: take them from 
 | `redgem scene add <game> <name> [--from <object>] [--parent <object>] [key=value...]` | adds an empty object, or a copy of another (with its children), and saves |
 | `redgem scene remove <game> <object>` | removes the object and its children, and saves |
 | `redgem scene diff <game> --against <before.glb>` | compares the current scene with an earlier save, without changing either file |
+| `redgem scene diff <game> --against <revision>` | compares the current scene with the scene a Git revision saved (`HEAD`, `HEAD~1`, `main`, a commit hash) |
 
 Every command takes `--scene <name>` for another scene than `scene.glb`: `--scene level2` is
 `scenes/level2.glb`.
 
-For `diff`, save a copy of the scene before editing, then pass that file to `--against`. Objects
+For `diff`, save a copy of the scene before editing, then pass that file to `--against`; in a
+game kept in Git, pass a revision instead (`--against HEAD` shows what changed since the last
+commit). A value ending in `.glb` is a file, anything else a revision, read with `git show`
+(so `git` must be on the `PATH`). A revision that is not there, or a game in no repository, ends
+with an error that says so. Objects
 are matched by their persistent identities: a rename or a reordered node array does not create
 a new object. The summary counts added, removed and changed objects; details show the fields
 that changed, including placement, hierarchy, properties, materials, image bytes, geometry,
@@ -225,6 +230,32 @@ Transform: Where an object is, how it is turned and how big it is.
 `redgem api --search <word>` the methods that have to do with a word (at most 20). `--json` says
 the same as data, for tools. It is the [API reference](scripting/api.md), which `--markdown`
 writes, and which is made from `docs/scripting/api.json`.
+
+## `redgem assets` and `redgem templates`: find a file or a template
+
+```console
+$ redgem assets games/my_game orc
+texture images/orc.png
+model models/enemies/orc.glb
+model models/orc_boss.glb
+script scripts/orc_brain.rb
+$ redgem assets games/my_game --kind sound --tag ui
+sound sounds/ui/click.wav
+$ redgem templates jump
+platformer: Run, jump and collect coins
+third-person: Walk and jump, the camera behind you
+```
+
+`redgem assets <game> [words...]` lists the game's assets whose name or folder has every word,
+case aside, a line each: its kind and its path inside the game. An asset's kind is its folder:
+`model` (`models/`), `texture` (`images/`), `sound` (`sounds/`), `script` (`scripts/`) and
+`prefab` (`prefabs/`); its tags are the subfolders it is in (`models/enemies/orc.glb` is tagged
+`enemies`). The best matches come first: a name that is the word, then one that starts with it,
+one that holds it, a tag that is the word, and last the rest of the path; ties go by path.
+`--kind` and `--tag` keep one kind or one tag, and `--limit N` shows the best N (20 unless said,
+`0` for all). No words lists everything. `redgem templates [words...]` does the same for the
+templates `redgem new --template` takes, by their names and descriptions. Both are MCP tools too
+(`asset_search`, `template_search`, see [MCP tools](mcp.md)).
 
 ## `redgem symbolize`: a crash report's functions
 
