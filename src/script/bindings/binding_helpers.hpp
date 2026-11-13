@@ -54,6 +54,10 @@ ObjectHandle wrapped_handle(mrb_state* mrb, mrb_value self);
 GameObject& alive_object(mrb_state* mrb, mrb_value self);
 // The id of the object behind `self`, which must not have been destroyed.
 ObjectId alive_id(mrb_state* mrb, mrb_value self);
+// The id of an object a script may move in the hierarchy or put things under: a GameObject still
+// there, not about to be destroyed and not a template. A TypeError or an ArgumentError starting
+// with `what` otherwise.
+ObjectId placeable_id(mrb_state* mrb, mrb_value value, const char* what);
 
 // What a Ruby Vector3 holds, inside the object itself (see vector3_bindings.cpp). vector3_of
 // must be given a Vector3.
