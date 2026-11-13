@@ -32,6 +32,17 @@ class ParticleEmitters;
 // What a script changed on a transform; physics reacts differently to each.
 enum class TransformWrite { Position, Rotation };
 
+// What Scene.spawn asks for. More may come: each field has a default that changes nothing.
+struct SpawnRequest {
+  ObjectId source = kNoObject;     // the object copied
+  std::optional<Transform> world;  // where the copy goes in the world; nullopt: where its source is
+  // Whether the copy gets physics bodies (a copy that only shows where something is on another
+  // machine must not push things around here).
+  bool physics = true;
+  std::string name;             // what the copy is called; empty: its source's name
+  ObjectId parent = kNoObject;  // the object it goes under, keeping its place in the world
+};
+
 struct TimeInfo {
   float delta = 0.0f;
   float fixed_delta = 0.0f;
@@ -119,9 +130,7 @@ struct ScriptContext {
   // Called when a script writes a transform, so physics can follow.
   std::function<void(ObjectId, TransformWrite)> on_transform_written;
   // Creates a live copy of an object (Scene.spawn); null outside a running engine.
-  // The flag says whether the copy gets physics bodies (a copy that only shows where something is
-  // on another machine must not push things around here).
-  std::function<ObjectId(ObjectId, const std::optional<Transform>&, bool)> spawn;
+  std::function<ObjectId(const SpawnRequest&)> spawn;
   AudioSystem* audio = nullptr;
   // Scene requests are collected at frame end; asynchronous reads keep the old world until ready.
   std::string scene_name;
