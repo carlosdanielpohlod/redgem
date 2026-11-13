@@ -87,7 +87,8 @@ int build(const redgem::CliOptions& options) {
   std::string error;
   const BuildTarget target = target_of(options);
   const AndroidFormat format = options.android_bundle ? AndroidFormat::Bundle : AndroidFormat::Apk;
-  const auto executable = build_game_for(options.game_dir, options.build_dir, target, error, format);
+  const GameLayout layout = options.loose ? GameLayout::Loose : GameLayout::Packed;
+  const auto executable = build_game_for(options.game_dir, options.build_dir, target, error, format, layout);
   if (!executable) {
     log::error(error);
     return kExitFailure;

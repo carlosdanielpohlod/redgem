@@ -18,6 +18,12 @@ and create it. The same from a terminal:
 
 With Docker, write `tools/docker/editor.sh` wherever this manual says `./build/src/redgem`.
 
+The other templates start other kinds of game: `third-person` (a hero seen from behind),
+`top-down` (a hero seen from above, that walks where you click), `menu-only` (title, settings and
+credits screens, for a game of menus) and `empty`. They come with tests of their own, and every
+new game comes with a workflow that runs its tests on GitHub (see
+[Testing your game](testing.md)).
+
 The editor opens:
 
 - **Scene** (center): the level. Hold the right mouse button and use WASD to fly, scroll to move
@@ -77,7 +83,7 @@ the error, with its line, appears in the Console.
 ## 5. Share it
 
 **Build** in the toolbar (or `redgem build <game> <folder>`) makes a folder with your game's
-executable and its files, for Linux, Windows or (from a Mac) macOS. Zip it and send it. See [Building and sharing](shipping.md).
+executable and its files packed into one, `game.rgpak`, for Linux, Windows or (from a Mac) macOS. Zip it and send it. See [Building and sharing](shipping.md).
 
 ## Next
 

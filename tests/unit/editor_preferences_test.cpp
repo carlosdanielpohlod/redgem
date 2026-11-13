@@ -79,3 +79,18 @@ TEST_CASE("invalid editor preferences are refused before writing") {
     CHECK_FALSE(std::filesystem::exists(scratch.file));
   }
 }
+
+TEST_CASE("an editor preferences save preserves a damaged file and refuses a directory") {
+  const Scratch scratch;
+  const EditorPreferences defaults;
+  std::string error;
+  std::filesystem::create_directories(scratch.folder);
+  const std::string broken = "{";
+  REQUIRE(write_text_file(scratch.file, broken, error));
+  REQUIRE(write_editor_preferences(scratch.file, defaults, defaults, error));
+  CHECK(read_text_file(scratch.file.string() + ".damaged", error) == broken);
+  const auto directory = scratch.folder / "directory";
+  std::filesystem::create_directory(directory);
+  CHECK_FALSE(write_editor_preferences(directory, defaults, defaults, error));
+  CHECK(std::filesystem::is_directory(directory));
+}

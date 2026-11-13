@@ -1,6 +1,6 @@
 #include "app/json_file.hpp"
 
-#include <fstream>
+#include "core/game_files.hpp"
 
 #include "core/log.hpp"
 #include "storage/durable_file.hpp"
@@ -8,10 +8,17 @@
 
 namespace redgem {
 
+namespace {
+
+// The most a JSON file of a game or of its players is read into memory.
+constexpr std::uintmax_t kMaxJsonFileBytes = 64ull * 1024ull * 1024ull;
+
+}  // namespace
+
 nlohmann::json read_json_file(const std::filesystem::path& file) {
-  std::ifstream in(file);
-  if (!in) return nlohmann::json(nlohmann::json::value_t::discarded);
-  return nlohmann::json::parse(in, nullptr, false);
+  const auto bytes = game_files::read(file, kMaxJsonFileBytes);
+  if (!bytes) return nlohmann::json(nlohmann::json::value_t::discarded);
+  return nlohmann::json::parse(bytes->begin(), bytes->end(), nullptr, false);
 }
 
 bool holds_text(const nlohmann::json& json, const char* key) { return json.contains(key) && json[key].is_string(); }
@@ -40,20 +47,37 @@ std::optional<nlohmann::json> set_damaged_aside(const std::filesystem::path& fil
   return nlohmann::json::object();
 }
 
-// What the file holds, to be written again with something changed (nothing yet: an empty object).
+bool is_missing(const std::filesystem::file_status& status) {
+  return status.type() == std::filesystem::file_type::not_found;
+}
+
+std::optional<nlohmann::json> read_settings_object(const std::filesystem::path& file, std::string& error) {
+  std::ifstream in(file);
+  if (!in) {
+    error = "cannot read " + file.string();
+    return std::nullopt;
+  }
+  auto json = nlohmann::json::parse(in, nullptr, false);
+  if (in.bad()) {
+    error = "cannot finish reading " + file.string();
+    return std::nullopt;
+  }
+  if (json.is_object()) return json;
+  in.close();
+  return set_damaged_aside(file, error);
+}
+
 }  // namespace
 
 std::optional<nlohmann::json> read_json_for_update(const std::filesystem::path& file, std::string& error) {
-  nlohmann::json json = read_json_file(file);
-  if (json.is_object()) return json;
   std::error_code problem;
-  const bool exists = std::filesystem::exists(file, problem);
-  if (problem) {
-    error = "cannot inspect " + file.string() + ": " + problem.message();
+  const auto status = std::filesystem::symlink_status(file, problem);
+  if (is_missing(status)) return nlohmann::json::object();
+  if (!std::filesystem::is_regular_file(status)) {
+    error = "cannot update " + file.string() + ": expected a regular settings file";
     return std::nullopt;
   }
-  if (!exists) return nlohmann::json::object();
-  return set_damaged_aside(file, error);
+  return read_settings_object(file, error);
 }
 
 // Written whole: beside it first, then moved over it (see durable::replace_file).

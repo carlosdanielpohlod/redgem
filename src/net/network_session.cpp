@@ -43,14 +43,20 @@ NetworkEvent NetworkEvent::message(int from, const std::string& name, const nloh
   return event;
 }
 
-bool NetworkSession::host(std::uint16_t port, std::string& error, int waiting_per_address) {
+bool NetworkSession::host(std::uint16_t port, std::string& error, int waiting_per_address,
+                          std::shared_ptr<const TlsIdentity> identity) {
   leave();
   waiting_per_address_ = waiting_per_address;
   listener_ = Socket::listen_on(port, error);
   if (!listener_.valid()) return false;
   port_ = listener_.local_port();
+  identity_ = std::move(identity);
   start_hosting();
   return true;
+}
+
+std::string NetworkSession::fingerprint() const {
+  return identity_ != nullptr ? identity_->fingerprint() : std::string();
 }
 
 void NetworkSession::start_hosting() {
@@ -60,11 +66,11 @@ void NetworkSession::start_hosting() {
 }
 
 bool NetworkSession::connect_out(const std::string& address, std::uint16_t port, const nlohmann::json& hello,
-                                 std::string& error) {
+                                 const TlsTrust& trust, std::string& error) {
   leave();
   Socket socket = Socket::connect_to(address, port, error);
   if (!socket.valid()) return false;
-  links_.push_back({Connection::calling(std::move(socket)), kHostId});
+  links_.push_back({Connection::calling(std::move(socket), trust), kHostId});
   links_.front().connection.send(hello);  // goes out once the connection is made
   port_ = port;
   connecting_for_ = 0.0f;
@@ -73,29 +79,30 @@ bool NetworkSession::connect_out(const std::string& address, std::uint16_t port,
 }
 
 bool NetworkSession::join(const std::string& address, std::uint16_t port, std::string& error,
-                          const nlohmann::json& auth) {
-  return connect_out(address, port, hello_with(auth), error);
+                          const nlohmann::json& auth, const TlsTrust& trust) {
+  return connect_out(address, port, hello_with(auth), trust, error);
 }
 
-bool NetworkSession::host_room(const std::string& address, std::uint16_t port, std::string& error) {
+bool NetworkSession::host_room(const std::string& address, std::uint16_t port, std::string& error,
+                               const TlsTrust& trust) {
   nlohmann::json said = hello();
   said[kRoom] = kNewRoom;
   said[kGuards] = approving_;
-  if (!connect_out(address, port, said, error)) return false;
+  if (!connect_out(address, port, said, trust, error)) return false;
   through_relay_ = true;
   opening_room_ = true;
   return true;
 }
 
 bool NetworkSession::join_room(const std::string& address, std::uint16_t port, const std::string& code,
-                               std::string& error, const nlohmann::json& auth) {
+                               std::string& error, const nlohmann::json& auth, const TlsTrust& trust) {
   if (!names_a_room(code)) {
     error = "a room's code is needed to join it";
     return false;
   }
   nlohmann::json said = hello_with(auth);
   said[kRoom] = code;
-  if (!connect_out(address, port, said, error)) return false;
+  if (!connect_out(address, port, said, trust, error)) return false;
   through_relay_ = true;
   return true;
 }
@@ -104,6 +111,7 @@ void NetworkSession::leave() {
   // A last try to deliver what was already said.
   for (Link& link : links_) link.connection.flush();
   go_offline();
+  identity_.reset();  // (only a game hosted here has one, and only leaving ends it)
 }
 
 void NetworkSession::go_offline() {

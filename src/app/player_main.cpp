@@ -36,14 +36,15 @@ redgem::GameWindowOptions players_window(const std::filesystem::path& game, cons
   return options;
 }
 
-// Plays the game beside `program`; an error when there is none. From the moment the game is
-// found, a crash writes a report in the game's folder (see app/crash_report.hpp).
+// Plays the game beside `program` (packed in its archive, or loose); an error when there is none,
+// or its archive is damaged. From the moment the game is found, a crash writes a report in the
+// game's folder (see app/crash_report.hpp).
 int play_game_beside(const std::filesystem::path& program) {
   using namespace redgem;
-  const auto game = bundled_game(program);
+  std::string error;
+  const auto game = open_bundled_game(program, error);
   if (!game) {
-    const std::filesystem::path expected = program.parent_path() / kBundledGameFolder / config::kSceneFileName;
-    log::error("no game to play: " + expected.string() + " is missing");
+    log::error(error);
     return kExitFailure;
   }
   const std::filesystem::path data = players_data_folder(*game);

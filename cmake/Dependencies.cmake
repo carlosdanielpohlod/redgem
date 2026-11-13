@@ -131,7 +131,7 @@ FetchContent_Declare(mbedtls
   URL https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-${REDGEM_MBEDTLS_VERSION}/mbedtls-${REDGEM_MBEDTLS_VERSION}.tar.bz2
   URL_HASH SHA256=${REDGEM_MBEDTLS_SHA256})
 
-# --- zlib (gzip and deflate answers to the games' web requests; its release archive) ----------
+# --- zlib (gzip and deflate answers to web requests, built games' archives; its release archive) ---
 # Only its C files are built (below): its own CMake project would add a shared library and programs.
 FetchContent_Declare(zlib
   URL https://github.com/madler/zlib/releases/download/v${REDGEM_ZLIB_VERSION}/zlib-${REDGEM_ZLIB_VERSION}.tar.gz
@@ -230,7 +230,8 @@ target_include_directories(imgui_stack SYSTEM PUBLIC ${imgui_SOURCE_DIR} ${imgui
 target_compile_definitions(imgui_stack PUBLIC NO_FONT_AWESOME)
 target_link_libraries(imgui_stack PUBLIC raylib)
 
-# What decompresses (and, for the tests, compresses) the bodies of web answers. Its names carry a
+# What decompresses the bodies of web answers, and compresses and decompresses the files of built
+# games' archives (src/core/game_archive.hpp). Its names carry a
 # z_ prefix (Z_PREFIX), so a system zlib another library brings into the process is never mixed up
 # with it; what it reads is const (ZLIB_CONST).
 add_library(redgem_zlib STATIC

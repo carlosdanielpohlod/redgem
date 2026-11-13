@@ -36,8 +36,10 @@ void EditorApp::frame() {
   update_before_drawing();
   window_->begin_frame();
   ClearBackground(rgba(kViewportBackground));
+  renderer_->begin_scene_texture_use();
   draw_interface();
   window_->end_frame();
+  renderer_->end_scene_texture_use();
 }
 
 void EditorApp::update_before_drawing() {

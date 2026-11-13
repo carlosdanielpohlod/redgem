@@ -163,6 +163,17 @@ the same pull request.
 - The showcase demo is built from downloaded assets that may not be passed on, so it is not in
   the downloads and its tests are skipped without it.
 - The scripts that record the site's video are not part of the repository.
+- The CI example every new game gets (`.github/workflows/test.yml`) is for GitHub Actions on
+  Linux only, and downloads the latest release: a game made from templates newer than that
+  release (the `third-person`, `top-down` and `menu-only` ones, until the next release) may use
+  scripting the release does not have yet. Its system tests run with no window: they take no
+  pictures, and a click lands on no screen (a template's own tests call `walk_to` instead of
+  clicking).
+- A game's `tests/` folder goes into its builds with the rest of the game (the tests are not run
+  there, and the player has no test code).
+- The template scenes are written by `tools/templates/build_template_scenes.py` from the editor's
+  primitives in the `empty` and `platformer` templates: a template is not yet made from the
+  editor's own primitive code.
 
 ## Before 1.0
 
@@ -172,8 +183,8 @@ not a promise of how it will be closed.
 ### Editor
 
 - A picture put on a material from the editor goes inside the scene's `.glb`: changing the file in
-  `images/` afterwards does not change the scene (pick it again). The Inspector shows a slot's
-  picture by name, without a preview, and sets neither a texture's sampler nor its UV set.
+  `images/` afterwards does not change the scene (pick it again). The Inspector does not set a
+  texture's sampler or UV set.
 - [Prefab file](docs/prefabs.md) instances cannot override inherited children separately, a
   script cannot spawn a prefab file by its path (only a placement in the scene), and a running
   scene does not see a changed prefab file until reloaded. Export needs complete skeletons and
@@ -279,17 +290,18 @@ not a promise of how it will be closed.
 
 ### Security
 
+- The TLS private key of a relay, a server or a hosted game is in memory as PEM text while it
+  starts, and those copies are freed without being wiped first.
 - On a dedicated server, a game's plain `http://` reaches anything on the server's own private
   networks (only the clouds' known metadata addresses are refused).
 - On Windows a server's save database takes its folder's permissions: it is kept to its owner
   only on Linux and macOS.
 - A script that sets an engine class's name to something else (`Vector3 = 5`) breaks the
   engine's calls that use that class with Ruby errors, instead of being stopped from doing so.
-- An Android build empties its staging folder (`.redgem-apk-stage` in the output folder) without
-  checking that a build made it.
 - No unit tests for the room codes and their guessers (`room_codes.cpp` is tested only through
-  the relay and server integration tests), the socket layer or the TLS stream on its own (only
-  through requests); no test of a TLS name that does not match its certificate, nor of a server
+  the relay and server integration tests), the socket layer or the web requests' TLS stream on
+  its own (only through requests; game connections' TLS is tested over loopback sockets only);
+  no test of a TLS name that does not match its certificate, nor of a server
   sending interim (1xx) answers for ever.
 
 ### Shipping
@@ -297,8 +309,18 @@ not a promise of how it will be closed.
 - The splash picture shows once the window is open: reading the first level's file, before
   that, shows nothing. The Linux menu entry is for a package to install: the build does not add
   it to a menu.
-- A built game is the player program beside a folder of loose files, scripts as plain `.rb`
-  included: no packed or compressed archive.
+- A built game's archive (`game.rgpak`) is checked (every size bounded, every file's CRC32) but
+  neither encrypted nor signed: anyone can list and extract it, and anyone can make another valid
+  one. Its scripts are Ruby source, compressed, not compiled. A file's CRC32 is checked when the
+  file is read, not when the game starts: a game whose archive has one damaged picture starts, and
+  that picture fails to load. Names in it are matched case included, even on Windows and macOS,
+  whose own folders ignore case. A file read out of it is held twice for a moment (the archive's
+  copy and the one handed to raylib or cgltf), and each read opens the archive file anew.
+- Music in a built game's archive is read whole into memory (up to 256 MB a piece) before it
+  plays: raylib streams music only from a file on the disk. On Android the archive is copied out
+  of the APK into the app's storage on the first run (and after each update), so it takes its
+  room twice on the phone. The packed Android app has not been run on an emulator or a phone yet:
+  the continuous integration only builds its player.
 - No installers: no Windows installer or code signing, no Linux AppImage or Flatpak. A game's Mac
   app (and the editor's) is signed ad hoc only, with no Developer ID nor notarization: a Mac that
   downloads it warns that its developer cannot be verified.
@@ -342,8 +364,28 @@ not a promise of how it will be closed.
 
 ### Multiplayer
 
-- Game connections are not encrypted. A dropped player cannot reconnect, and when the host of a
-  hosted game leaves, the game ends for everyone (dedicated servers do not have this problem).
+- A dropped player cannot reconnect, and when the host of a hosted game leaves, the game ends for
+  everyone (dedicated servers do not have this problem).
+- Game connections are encrypted, but who answers is checked only when the game gives its
+  fingerprint (`fingerprint:`, or `"servers"` in `game.json`): without one, someone who can
+  redirect the players' traffic can stand in for the host, the relay or the server. Nothing
+  remembers a fingerprint seen once (no trust on first use).
+- A player hosting is checked by a 10-digit code (40 bits of its fingerprint), not the whole
+  fingerprint (64 digits, too long to read out loud): an attacker who can redirect the traffic
+  and spends about 2^40 certificate generations while that game is open could match it. A short
+  code is taken for any address joined directly, a dedicated server's too, where an attacker has
+  all the time it wants: give a server its whole fingerprint (a room takes nothing less).
+- Through a relay, the connections are encrypted to the relay, not from player to player: the
+  relay reads what the players of its rooms say.
+- No certificate rotation or revocation: a relay or server that loses its data folder (or its key)
+  gets a new fingerprint, and games that pinned the old one refuse it until they are updated.
+  Its certificate is self-signed, valid until 2099, and not checked against any authority.
+- A TLS handshake costs the relay and the server some CPU (an ECDHE key exchange and an ECDSA
+  signature): a flood of handshakes is limited only by the connections each address may hold.
+- Finding games on the local network (`Network.search`) is not authenticated: any machine there
+  can announce a game.
+- Plaintext is kept only inside the engine, for its own tests of the protocol: a game, the relay
+  and the server have no way to turn encryption off.
 - Clients own the positions of their objects and decide their own collisions: a server cannot
   check movement, so a modified client can move anywhere.
 - Players who are not on the same network need a relay or a dedicated server: there is no direct
@@ -369,7 +411,8 @@ What is there today is the command line (`redgem scene`, `run`, `shot`, `check`,
 tools (`redgem mcp`), the editor's Agent panel, the `AGENTS.md` guide of new games and `llms.txt`;
 see [docs/assistants.md](docs/assistants.md) and [docs/mcp.md](docs/mcp.md). Not there yet:
 
-- Headless input replay covers keyboard states only; mouse, gamepad and touch input are not yet replayed.
+- Headless input replay plays one finger, as the pointer a phone gives the game; multi-touch
+  gestures and the on-screen touch controls of a phone are not replayed.
 - Reading history from an unrelated running game: MCP's `events` tool reads its own process or
   its connected editor, using a process-local `since` cursor.
 - `redgem scene diff` compares loaded object content against an earlier scene file, but does

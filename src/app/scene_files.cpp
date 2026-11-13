@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "core/config.hpp"
+#include "core/game_files.hpp"
 #include "core/log.hpp"
 #include "core/safe_path.hpp"
 #include "scene/gltf/gltf_loader.hpp"
@@ -36,8 +37,7 @@ std::filesystem::path scene_in_game(const std::string& name) {
 }  // namespace
 
 bool is_game_folder(const std::filesystem::path& folder) {
-  std::error_code fs_error;
-  return std::filesystem::exists(folder / config::kSceneFileName, fs_error);
+  return game_files::is_file(folder / config::kSceneFileName);
 }
 
 std::variant<SceneDesc, std::string> read_game_scene(const std::filesystem::path& game_dir) {

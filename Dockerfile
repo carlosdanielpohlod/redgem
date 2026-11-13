@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /redgem
 COPY . .
 RUN cmake -S . -B build -G Ninja && cmake --build build
+# Where the relay keeps its TLS identity (compose.yaml mounts a volume there): its own, so that it
+# can write it the first time as the unprivileged user it runs as.
+RUN mkdir /relay-data && chown 65534:65534 /relay-data
 
 # Inside a container there is one graphics device: whatever the host hands over (or Mesa's software one).
 ENV REDGEM_GPU=integrated

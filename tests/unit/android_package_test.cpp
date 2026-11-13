@@ -6,10 +6,17 @@
 #include <map>
 #include <sstream>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 #include "project/android/android_package.hpp"
+#include "project/android/android_stage_folder.hpp"
 #include <raylib.h>
 
 #include "app/game_settings.hpp"
+#include "core/files.hpp"
+#include "core/game_archive.hpp"
 #include "core/image_header.hpp"
 #include "core/platform.hpp"
 #include "project/game_shipping.hpp"
@@ -120,7 +127,7 @@ TEST_CASE("the app packed from a game with an id carries it, and a bad id stops 
   CHECK(read(scratch.dir / "stage" / "AndroidManifest.xml").find("package=\"com.mystudio.sandbox\"") !=
         std::string::npos);
   std::ofstream(game / "game.json") << R"({"id": "My Sandbox"})";
-  CHECK_FALSE(stage_android_game(game, runtimes, "stamp", scratch.dir / "stage", error));
+  CHECK_FALSE(stage_android_game(game, runtimes, "stamp", scratch.dir / "invalid-stage", error));
   CHECK(error.find("game.json: id must look like") == 0);
 }
 
@@ -179,13 +186,43 @@ TEST_CASE("the engines built for Android are found by kind of processor") {
   CHECK(runtimes.at("arm64-v8a") == scratch.dir / "arm64-v8a/libredgem.so");
 }
 
-TEST_CASE("a game is laid out as an APK's contents: its files, their list, a stamp, the engine, the manifest") {
+TEST_CASE("a game is packed into an APK as one archive asset, listed as the one file the app unpacks") {
   const Scratch scratch;
   const std::map<std::string, std::filesystem::path> runtimes = {
       {"x86_64", scratch.file("built/libredgem.so", "engine")}};
   const std::filesystem::path stage = scratch.dir / "stage";
   std::string error;
   REQUIRE_MESSAGE(stage_android_game(fixture("games/sandbox"), runtimes, "stamp-1", stage, error), error);
+  CHECK(read(stage / "assets/game.files") == std::string(kArchiveFileName) + "\n");
+  CHECK_FALSE(std::filesystem::exists(stage / "assets/game"));
+  const auto archive = GameArchive::open(stage / "assets" / kArchiveFileName, error);
+  REQUIRE_MESSAGE(archive.has_value(), error);
+  CHECK(archive->entries().size() == shipped_files(fixture("games/sandbox")).size());
+  CHECK(archive->find("scene.glb") != nullptr);
+  CHECK(archive->find("scenes/level2.glb") != nullptr);
+  CHECK(read(stage / "assets/game.stamp") == "stamp-1");
+
+  // Packed, a name the APK's packer would leave out or its list could not hold is no matter.
+  const std::filesystem::path game = scratch.dir / "My Game";
+  std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
+  std::filesystem::create_directories(game / "_shared");
+  std::ofstream(game / "_shared" / "data.txt") << "x";
+  const std::filesystem::path shared_stage = scratch.dir / "shared-stage";
+  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp-2", shared_stage, error), error);
+  const auto with_shared = GameArchive::open(shared_stage / "assets" / kArchiveFileName, error);
+  REQUIRE_MESSAGE(with_shared.has_value(), error);
+  CHECK(with_shared->find("_shared/data.txt") != nullptr);
+}
+
+TEST_CASE(
+    "a game kept loose is laid out as an APK's contents: its files, their list, a stamp, the engine, the manifest") {
+  const Scratch scratch;
+  const std::map<std::string, std::filesystem::path> runtimes = {
+      {"x86_64", scratch.file("built/libredgem.so", "engine")}};
+  const std::filesystem::path stage = scratch.dir / "stage";
+  std::string error;
+  REQUIRE_MESSAGE(stage_android_game(fixture("games/sandbox"), runtimes, "stamp-1", stage, error, GameLayout::Loose),
+                  error);
 
   CHECK(std::filesystem::exists(stage / "assets/game/scene.glb"));
   CHECK(read(stage / "lib/x86_64/libredgem.so") == "engine");
@@ -213,17 +250,18 @@ TEST_CASE("a game is laid out as an APK's contents: its files, their list, a sta
   std::ofstream(game / "scripts" / "probe.rb~") << "x";
   std::ofstream(game / "release.keystore") << "the developer's signing key";  // never leaves their machine
   std::ofstream(game / "upload.jks") << "another";
-  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp-2", stage, error), error);
-  const std::string tidy = read(stage / "assets/game.files");
+  const auto second_stage = scratch.dir / "second-stage";
+  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp-2", second_stage, error, GameLayout::Loose), error);
+  const std::string tidy = read(second_stage / "assets/game.files");
   CHECK(tidy == listing);
-  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/.gitignore"));
-  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/.git"));
-  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/release.keystore"));
-  CHECK_FALSE(std::filesystem::exists(stage / "assets/game/upload.jks"));
+  CHECK_FALSE(std::filesystem::exists(second_stage / "assets/game/.gitignore"));
+  CHECK_FALSE(std::filesystem::exists(second_stage / "assets/game/.git"));
+  CHECK_FALSE(std::filesystem::exists(second_stage / "assets/game/release.keystore"));
+  CHECK_FALSE(std::filesystem::exists(second_stage / "assets/game/upload.jks"));
   // A folder the SDK would silently leave out is refused, by name.
   std::filesystem::create_directories(game / "_shared");
   std::ofstream(game / "_shared" / "data.txt") << "x";
-  CHECK_FALSE(stage_android_game(game, runtimes, "s", stage, error));
+  CHECK_FALSE(stage_android_game(game, runtimes, "s", scratch.dir / "skipped-stage", error, GameLayout::Loose));
   CHECK(error.find("_shared/data.txt") != std::string::npos);
 
   // What cannot be packed is refused with a reason.
@@ -232,6 +270,174 @@ TEST_CASE("a game is laid out as an APK's contents: its files, their list, a sta
   CHECK_FALSE(stage_android_game(fixture("games/sandbox"), {}, "s", stage, error));
   CHECK(error.find("build_runtime.sh") != std::string::npos);
 }
+
+TEST_CASE("Android staging refuses to reuse a folder and leaves its contents intact") {
+  const Scratch scratch;
+  const auto file = scratch.file(".redgem-apk-stage/keep.txt", "belongs to the user");
+  const auto stage = file.parent_path();
+  const std::map<std::string, std::filesystem::path> runtimes = {
+      {"x86_64", scratch.file("built/libredgem.so", "engine")}};
+  std::string error;
+  CHECK_FALSE(stage_android_game(fixture("games/sandbox"), runtimes, "stamp", stage, error));
+  CHECK(error.find(kFolderOccupied) != std::string::npos);
+  CHECK(read(file) == "belongs to the user");
+  CHECK_FALSE(std::filesystem::exists(stage / "assets"));
+}
+
+TEST_CASE("reserving a temporary folder retries a collision and cleans only the new folder") {
+  const Scratch scratch;
+  const auto existing = scratch.file("stage-fixed/keep.txt", "keep");
+  std::string error;
+  std::filesystem::path reserved;
+  {
+    const ReservedFolder folder(scratch.dir, "stage-", error, "fixed");
+    REQUIRE_MESSAGE(!folder.path().empty(), error);
+    reserved = folder.path();
+    CHECK(reserved != existing.parent_path());
+    CHECK(std::filesystem::is_directory(reserved));
+    CHECK(read(existing) == "keep");
+  }
+  CHECK_FALSE(std::filesystem::exists(reserved));
+  CHECK(read(existing) == "keep");
+}
+
+TEST_CASE("an Android build reclaims marked stale stages and leaves live or unrelated folders alone") {
+  const Scratch scratch;
+#ifndef _WIN32
+  std::filesystem::permissions(scratch.dir, std::filesystem::perms::owner_all);
+#endif
+  std::string error;
+  const auto unrelated = scratch.file(std::string(android_stage::kPrefix) + "other/keep.txt", "keep");
+  const auto stale = scratch.dir / (std::string(android_stage::kPrefix) + "stale");
+  REQUIRE(std::filesystem::create_directory(stale));
+  REQUIRE(write_text_file(stale / android_stage::kOwnerFile, android_stage::kOwnerSignature, error));
+  const std::map<std::string, std::filesystem::path> runtimes = {
+      {"x86_64", scratch.file("built/libredgem.so", "engine")}};
+  const auto payload = stale / android_stage::kPackageFolder;
+  REQUIRE(std::filesystem::create_directory(payload));
+  REQUIRE(write_text_file(payload / "copy.bin", "discard", error));
+  REQUIRE(write_text_file(stale / ".DS_Store", "metadata", error));
+
+  const auto cache = std::filesystem::canonical(scratch.dir);
+  const android_stage::Folder live(cache, error);
+  REQUIRE_MESSAGE(!live.path().empty(), error);
+  CHECK_FALSE(std::filesystem::exists(stale));
+  CHECK(read(unrelated) == "keep");
+  std::filesystem::path next;
+  {
+    const android_stage::Folder failed(cache, error);
+    next = failed.path();
+    REQUIRE_MESSAGE(!next.empty(), error);
+    const auto broken = next / android_stage::kPackageFolder;
+    REQUIRE(std::filesystem::create_directory(broken));
+    REQUIRE(write_text_file(broken / "partial.bin", "partial build", error));
+    CHECK_FALSE(stage_android_game(fixture("games/sandbox"), runtimes, "stamp", broken, error));
+    CHECK(std::filesystem::is_directory(live.path()));
+    CHECK(read(unrelated) == "keep");
+  }
+  CHECK_FALSE(std::filesystem::exists(next));
+  CHECK(std::filesystem::is_directory(live.path()));
+}
+
+TEST_CASE("Android cache sweeps an incomplete reservation and skips paths it cannot prove safe") {
+  const Scratch scratch;
+  std::string error;
+#ifndef _WIN32
+  std::filesystem::permissions(scratch.dir, std::filesystem::perms::owner_all);
+#endif
+  const std::string prefix = android_stage::kPrefix;
+  const auto orphan = scratch.dir / (prefix + "12345");
+  REQUIRE(std::filesystem::create_directory(orphan));
+  REQUIRE(write_text_file(orphan / android_stage::kPendingOwnerFile, "partial marker", error));
+  const auto wrong = scratch.file(prefix + "wrong/" + android_stage::kOwnerFile,
+                                  std::string(android_stage::kOwnerSignature) + "extra");
+  const auto unavailable =
+      scratch.file(prefix + "unavailable/" + android_stage::kOwnerFile, android_stage::kOwnerSignature);
+  REQUIRE(std::filesystem::create_directory(unavailable.parent_path() / android_stage::kLeaseFile));
+#ifndef _WIN32
+  const auto symlink = scratch.dir / (prefix + "link");
+  std::filesystem::create_directory_symlink(unavailable.parent_path(), symlink);
+#endif
+
+  const android_stage::Folder next(std::filesystem::canonical(scratch.dir), error);
+  REQUIRE_MESSAGE(!next.path().empty(), error);
+  CHECK_FALSE(std::filesystem::exists(orphan));
+  CHECK(std::filesystem::exists(wrong));
+  CHECK(std::filesystem::exists(unavailable));
+#ifndef _WIN32
+  CHECK(std::filesystem::is_symlink(symlink));
+#endif
+}
+
+TEST_CASE("Android staging uses a configured user cache without a temporary-directory fallback") {
+  using android_stage::cache_root_on;
+  using platform::Desktop;
+  const Scratch scratch;
+  const auto home = scratch.dir / "home";
+  const auto named = scratch.dir / "named";
+  CHECK(cache_root_on(Desktop::Linux, {}, named) == named / "redgem" / "android-stage");
+  CHECK(cache_root_on(Desktop::Linux, "relative", {}).empty());
+  CHECK(cache_root_on(Desktop::Linux, home, named) == named / "redgem" / "android-stage");
+  CHECK(cache_root_on(Desktop::Linux, home, "relative") == home / ".cache" / "redgem" / "android-stage");
+  CHECK(cache_root_on(Desktop::Mac, home, named) == home / "Library" / "Caches" / "RedGem" / "android-stage");
+  CHECK(cache_root_on(Desktop::Windows, home, named) == named / "RedGem" / "android-stage");
+  CHECK(cache_root_on(Desktop::Windows, home, {}).empty());
+}
+
+#ifndef _WIN32
+TEST_CASE("Android staging creates a private cache beneath a trusted directory") {
+  namespace fs = std::filesystem;
+  const Scratch scratch;
+  fs::permissions(scratch.dir, fs::perms::owner_all);
+  const auto cache = fs::canonical(scratch.dir) / ".cache" / "redgem" / "android-stage";
+  std::string error;
+  const android_stage::Folder owned(cache, error);
+  REQUIRE_MESSAGE(!owned.path().empty(), error);
+  CHECK(fs::status(cache).permissions() == fs::perms::owner_all);
+  CHECK(read(owned.path() / android_stage::kOwnerFile) == android_stage::kOwnerSignature);
+  CHECK_FALSE(fs::exists(owned.path() / android_stage::kPendingOwnerFile));
+}
+
+TEST_CASE("Android staging resolves linked parents and rejects unsafe cache directories") {
+  namespace fs = std::filesystem;
+  const Scratch scratch;
+  const auto home = fs::canonical(scratch.dir);
+  const auto parent = home / "cache";
+  REQUIRE(fs::create_directory(parent));
+  const auto cache = parent / "android-stage";
+  REQUIRE(fs::create_directory(cache));
+  fs::permissions(cache, fs::perms::owner_all);
+  std::string error;
+  for (const auto shared : {fs::perms::group_write, fs::perms::others_write}) {
+    fs::permissions(parent, fs::perms::owner_all | shared);
+    const android_stage::Folder unsafe(cache, error);
+    CHECK(unsafe.path().empty());
+    CHECK(fs::is_empty(cache));
+  }
+  fs::permissions(parent, fs::perms::owner_all);
+  fs::permissions(cache, fs::perms::owner_all | fs::perms::group_read);
+  const android_stage::Folder readable(cache, error);
+  CHECK(readable.path().empty());
+  const auto link = home / "linked";
+  fs::create_directory_symlink(parent, link);
+  const android_stage::Folder linked(link / "new-stage", error);
+  REQUIRE_MESSAGE(!linked.path().empty(), error);
+  CHECK(linked.path().parent_path() == parent / "new-stage");
+  const auto cache_link = parent / "cache-link";
+  fs::create_directory_symlink(cache, cache_link);
+  const android_stage::Folder redirected(cache_link, error);
+  CHECK(redirected.path().empty());
+  CHECK(fs::is_empty(cache));
+}
+
+TEST_CASE("Android staging refuses a cache directory owned by another user") {
+  if (::geteuid() == 0) return;
+  std::string error;
+  const android_stage::Folder foreign("/usr", error);
+  CHECK(foreign.path().empty());
+  CHECK(error.find("cache must belong to the current user") != std::string::npos);
+}
+#endif
 
 TEST_CASE("a game says its own app id, version and signing key in game.json") {
   const Scratch scratch;
@@ -366,7 +572,7 @@ TEST_CASE("an app holds no file a link points at, and no file whose name would b
   std::filesystem::create_symlink(scratch.dir / "outside" / "passwords.txt", game / "linked.txt");
   std::filesystem::create_directory_symlink(scratch.dir / "outside", game / "linked_folder");
   std::string error;
-  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", stage, error), error);
+  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", stage, error, GameLayout::Loose), error);
   CHECK(std::filesystem::exists(stage / "assets/game/scene.glb"));
   CHECK_FALSE(std::filesystem::exists(stage / "assets/game/linked.txt"));
   CHECK_FALSE(std::filesystem::exists(stage / "assets/game/linked_folder"));
@@ -374,7 +580,7 @@ TEST_CASE("an app holds no file a link points at, and no file whose name would b
 
 #ifndef _WIN32  // (Windows has no file names with line breaks in them.)
   std::ofstream(game / "scripts" / "two\nlines.rb") << "x";
-  CHECK_FALSE(stage_android_game(game, runtimes, "stamp", stage, error));
+  CHECK_FALSE(stage_android_game(game, runtimes, "stamp", scratch.dir / "invalid-stage", error, GameLayout::Loose));
   CHECK(error.find("line break") != std::string::npos);
   CHECK(error.find("scripts") != std::string::npos);
 #endif
@@ -426,9 +632,10 @@ TEST_CASE("a game with an icon gets launcher icons at every density, and its man
   CHECK(manifest.find("android.permission.INTERNET") != std::string::npos);
   // A game without one has none, and no icon in its manifest.
   std::ofstream(game / "game.json") << R"({"version": "1.5.0"})";
-  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", stage, error), error);
-  CHECK_FALSE(std::filesystem::exists(stage / "res"));
-  CHECK(read(stage / "AndroidManifest.xml").find("android:icon") == std::string::npos);
+  const auto second_stage = scratch.dir / "stage-without-icon";
+  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", second_stage, error), error);
+  CHECK_FALSE(std::filesystem::exists(second_stage / "res"));
+  CHECK(read(second_stage / "AndroidManifest.xml").find("android:icon") == std::string::npos);
 }
 
 TEST_CASE("bundletool is found as a .jar named by the environment, or as a program on the PATH") {
@@ -479,8 +686,9 @@ TEST_CASE("an app goes online when its game says so, or when its scripts call th
       {"x86_64", scratch.file("built/libredgem.so", "engine")}};
   const std::filesystem::path game = scratch.dir / "game_src";
   std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
-  const std::filesystem::path stage = scratch.dir / "stage";
+  int attempt = 0;
   const auto asks_for_network = [&]() {
+    const auto stage = scratch.dir / ("network-stage-" + std::to_string(attempt++));
     std::string error;
     REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", stage, error), error);
     return read(stage / "AndroidManifest.xml").find("android.permission.INTERNET") != std::string::npos;

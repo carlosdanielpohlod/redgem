@@ -22,8 +22,10 @@ bool asks_for_a_game(const nlohmann::json& message) {
 
 }  // namespace
 
-bool Lobby::open(std::uint16_t port, std::string& error, int connections_per_address) {
+bool Lobby::open(std::uint16_t port, std::string& error, int connections_per_address,
+                 std::shared_ptr<const TlsIdentity> identity) {
   connections_per_address_ = connections_per_address;
+  identity_ = std::move(identity);
   listener_ = Socket::listen_on(port, error);
   if (!listener_.valid()) return false;
   port_ = listener_.local_port();
@@ -41,7 +43,8 @@ std::vector<Arrival> Lobby::poll(float seconds, const AddressCount& in_rooms) {
 void Lobby::accept_newcomers(const AddressCount& in_rooms) {
   for (Socket guest; listener_.accept(guest) == IoStatus::Ok;) {
     if (!room_to_wait(guest.peer_address(), in_rooms)) continue;  // hung up on
-    newcomers_.push_back({Connection::accepted(std::move(guest), kMaxPendingPerServed), std::nullopt, nullptr});
+    newcomers_.push_back(
+        {Connection::accepted(std::move(guest), kMaxPendingPerServed, identity_), std::nullopt, nullptr});
   }
 }
 

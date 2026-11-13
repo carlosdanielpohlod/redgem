@@ -116,6 +116,11 @@ void read_physics(const nlohmann::json& json, GameManifest& manifest) {
   manifest.physics_warnings = std::move(reading.warnings);
 }
 
+void read_servers(const nlohmann::json& json, GameManifest& manifest) {
+  if (!json.contains(net::kServersKey)) return;
+  manifest.settings.servers = net::read_server_pins(json[net::kServersKey], manifest.servers_warnings);
+}
+
 // What a game that says nothing is: named after its folder, with the engine's window.
 GameManifest default_manifest(const std::filesystem::path& game_dir) {
   GameManifest manifest;
@@ -140,6 +145,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   manifest.android_error = read_android_section(json, manifest.settings.android);
   manifest.script_budget_error = read_script_budget(json, manifest.settings);
   read_physics(json, manifest);
+  read_servers(json, manifest);
   return manifest;
 }
 

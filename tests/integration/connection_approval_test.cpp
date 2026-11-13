@@ -153,7 +153,8 @@ struct Gathering {
   Engine& room_opener() {
     relay = std::make_unique<net::RelayServer>();
     std::string error;
-    REQUIRE_MESSAGE(relay->start(0, error), error);
+    const auto identity = net::TlsIdentity::generate(error);  // (games always encrypt)
+    REQUIRE_MESSAGE(relay->start(0, error, identity), error);
     Engine& opener = add_machine();
     REQUIRE(ruby(opener, relay_setting() + "; Network.host(room: true)") == "true");
     REQUIRE(until([&opener] { return online(opener); }));
@@ -331,7 +332,7 @@ TEST_CASE("what a join carries is a small hash: anything else is refused before 
   // A program that is not this one sends them anyway.
   for (const nlohmann::json& carried : {nlohmann::json("token"), nlohmann::json{{"t", std::string(5000, 'x')}}}) {
     std::string error;
-    REQUIRE(guest.network().join("127.0.0.1", port_of(host), error, carried));
+    REQUIRE(guest.network().join("127.0.0.1", port_of(host), error, carried, net::TlsTrust::unverified()));
     REQUIRE(game.until([&guest] { return offline(guest); }));
   }
   CHECK(ruby(guest, "$reasons.size") == "2");

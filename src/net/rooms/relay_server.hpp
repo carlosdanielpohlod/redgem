@@ -67,7 +67,10 @@ class RelayServer {
   // A relay that lets each address hold what `limits` say.
   explicit RelayServer(const RelayLimits& limits) : limits_(limits) {}
 
-  bool start(std::uint16_t port, std::string& error);
+  // Listens on `port`. With an `identity` every machine's connection is encrypted, the relay
+  // proving itself with it (redgem-relay always has one); without, they are plaintext, which only
+  // the engine's own tests of the protocol use.
+  bool start(std::uint16_t port, std::string& error, std::shared_ptr<const TlsIdentity> identity = nullptr);
   std::uint16_t port() const { return port_; }
   // Moves messages in and out; `seconds` since the last call.
   void poll(float seconds);
@@ -171,6 +174,7 @@ class RelayServer {
 
   Socket listener_;
   std::uint16_t port_ = 0;
+  std::shared_ptr<const TlsIdentity> identity_;  // null: plaintext
   std::vector<std::unique_ptr<Member>> members_;
   // The open rooms by code, each with whoever entered it: what a message passed on looks through,
   // instead of every machine on the relay. (Those who went are taken out as they are dropped.)

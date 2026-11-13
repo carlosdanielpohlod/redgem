@@ -64,12 +64,12 @@ TEST_CASE("a build on another thread is not heard by who listens on this one") {
   CHECK(heard.empty());
 }
 
-TEST_CASE("a build for a computer says it copies the player, then the game's files, then writes its icon") {
+TEST_CASE("a build for a computer says it copies the player, then packs the game's files, then writes its icon") {
   const Scratch scratch;
   std::vector<std::string> heard;
   const build_steps::Listen listen([&heard](const std::string& step) { heard.push_back(step); });
   std::string error;
   REQUIRE_MESSAGE(build_game(scratch.game, scratch.dir / "out", scratch.player, BuildTarget::Linux, error), error);
   CHECK(heard ==
-        std::vector<std::string>{build_steps::kCopyingPlayer, build_steps::kCopyingFiles, build_steps::kShippingFiles});
+        std::vector<std::string>{build_steps::kCopyingPlayer, build_steps::kPackingFiles, build_steps::kShippingFiles});
 }
