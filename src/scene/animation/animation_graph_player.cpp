@@ -130,7 +130,8 @@ const CompiledAnimationState& AnimationGraphPlayer::state_of(const StateClock& c
 }
 
 AnimationGraphPlayer::StateClock AnimationGraphPlayer::start(std::size_t state) const {
-  return {state, installed_graph().states[state].speed < 0.0f ? kFullPhase : 0.0};
+  const double phase = installed_graph().states[state].speed < 0.0f ? kFullPhase : 0.0;
+  return {state, phase, phase, 0.0};
 }
 
 std::vector<AnimationGraphSample> AnimationGraphPlayer::samples(const StateClock& clock) const {
@@ -143,7 +144,7 @@ std::vector<AnimationGraphSample> AnimationGraphPlayer::samples(const StateClock
 bool AnimationGraphPlayer::representable_speeds() const {
   // Check every state so a later transition cannot produce an unsendable snapshot.
   for (std::size_t state = 0; state < installed_graph().states.size(); ++state) {
-    const auto evaluated = samples({state, 0.0});
+    const auto evaluated = samples({state, 0.0, 0.0, 0.0});
     if (!std::all_of(evaluated.begin(), evaluated.end(), representable_speed)) return false;
   }
   return true;
