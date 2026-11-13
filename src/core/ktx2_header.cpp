@@ -25,6 +25,11 @@ constexpr std::size_t kLayerCountAt = 32;
 constexpr std::size_t kFaceCountAt = 36;
 constexpr std::size_t kLevelCountAt = 40;
 constexpr std::size_t kSupercompressionAt = 44;
+// Where its data format descriptor, key/value data (32-bit offset and length each) and
+// supercompression global data (64-bit each) are.
+constexpr std::size_t kDescriptorAt = 48;
+constexpr std::size_t kKeyValuesAt = 56;
+constexpr std::size_t kGlobalDataAt = 64;
 // The level index follows the header: per level, its offset, length and uncompressed length.
 constexpr std::size_t kLevelIndexAt = 80;
 constexpr std::size_t kLevelEntryBytes = 24;
@@ -49,6 +54,22 @@ std::uint32_t full_chain(ImageSize size) {
   std::uint32_t levels = 1;
   for (std::uint32_t side = std::max(size.width, size.height); side > 1; side >>= 1) ++levels;
   return levels;
+}
+
+// Whether a section of `length` bytes from `offset` lies inside the file (an empty one may say
+// any offset).
+bool section_inside(std::uint64_t offset, std::uint64_t length, std::size_t size) {
+  return length == 0 || fits(offset, length, size);
+}
+
+// Whether the header's sections lie inside the file. (The transcoder adds their 32-bit offsets
+// and lengths in 32 bits: a sum that wraps around would get past its own check.)
+bool sections_inside(const std::uint8_t* data, std::size_t size) {
+  const bool descriptor = section_inside(field(data, kDescriptorAt), field(data, kDescriptorAt + kU32Bytes), size);
+  const bool key_values = section_inside(field(data, kKeyValuesAt), field(data, kKeyValuesAt + kU32Bytes), size);
+  const bool global_data = section_inside(little_endian(data + kGlobalDataAt, kU64Bytes),
+                                          little_endian(data + kGlobalDataAt + kU64Bytes, kU64Bytes), size);
+  return descriptor && key_values && global_data;
 }
 
 // Whether the level of this index entry lies inside the file, with some data.
@@ -104,6 +125,7 @@ std::optional<Ktx2Header> read_ktx2_header(const std::uint8_t* data, std::size_t
   if (!drawable_kind(data)) return std::nullopt;
   const Ktx2Header header = claimed_header(data);
   if (!plausible(header)) return std::nullopt;
+  if (!sections_inside(data, size)) return std::nullopt;
   if (!levels_inside(data, size, header.levels)) return std::nullopt;
   return header;
 }

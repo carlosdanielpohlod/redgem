@@ -45,6 +45,8 @@ constexpr std::size_t kFaceCountAt = 36;
 constexpr std::size_t kLevelCountAt = 40;
 constexpr std::size_t kSupercompressionAt = 44;
 constexpr std::size_t kLevelIndexAt = 80;
+constexpr std::size_t kKeyValuesLengthTopAt = 63;  // the high byte of the key/value data's length
+constexpr std::uint8_t kAllBits = 0xFF;
 constexpr std::uint8_t kSomeVkFormat = 37;  // VK_FORMAT_R8G8B8A8_UNORM
 constexpr std::uint8_t kCubeFaces = 6;
 constexpr std::uint8_t kTwo = 2;
@@ -156,6 +158,7 @@ TEST_CASE("KTX2 headers of what the engine does not draw, or that lie, are refus
   CHECK_FALSE(reads(with_byte(good, kSupercompressionAt, kUnknownSupercompression)));
   CHECK_FALSE(reads(std::vector<std::uint8_t>(good.begin(), good.begin() + kLevelIndexAt)));
   CHECK_FALSE(reads(std::vector<std::uint8_t>(good.begin(), good.end() - 1)));  // its last level cut short
+  CHECK_FALSE(reads(with_byte(good, kKeyValuesLengthTopAt, kAllBits)));         // its offset plus length wraps
   CHECK_FALSE(read_ktx2_header(nullptr, 0).has_value());
   CHECK_FALSE(starts_as_ktx2(good.data(), kLevelIndexAt - 1));
 }

@@ -3,7 +3,7 @@
 // What a KTX2 file of Basis Universal data (KHR_texture_basisu) says it holds, read from its
 // header and level index without decoding anything. Only what the engine draws passes: one 2D
 // picture (no array, cube map or volume), of Basis data (no other Vulkan format), within the
-// picture limits of image_header.hpp, every mipmap level it lists inside the file.
+// picture limits of image_header.hpp, every section and mipmap level it lists inside the file.
 
 #include <cstddef>
 #include <cstdint>
