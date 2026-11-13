@@ -4,6 +4,7 @@
 #include <array>
 #include <exception>
 
+#include "editor/document/glb_dedup.hpp"
 #include "editor/document/glb_usage.hpp"
 #include "editor/document/gltf_json.hpp"
 #include "scene/scene_desc.hpp"
@@ -63,24 +64,6 @@ void drop_emptied_lights(Json& doc) {
   doc[kExtensions].erase(kLightsExtension);
   if (doc[kExtensions].empty()) doc.erase(kExtensions);
   remove_extension_used(doc, kLightsExtension);
-}
-
-// A buffer view kept the plain way: no extension, in the file's only buffer.
-bool plain_view(const Json& view) {
-  return !view.contains(kExtensions) && view.value(kBuffer, kOnlyBuffer) == kOnlyBuffer;
-}
-
-bool inside(std::size_t offset, std::size_t length, std::size_t whole) {
-  return offset <= whole && length <= whole - offset;
-}
-
-// Where a buffer view's bytes are in a binary chunk of `bin_size` bytes: first and one past last.
-std::pair<std::size_t, std::size_t> bytes_of(const Json& view, std::size_t bin_size) {
-  if (!plain_view(view)) throw NotFollowed();
-  const auto offset = view.value(kByteOffset, std::size_t{0});
-  const auto length = view.at(kByteLength).get<std::size_t>();
-  if (!inside(offset, length, bin_size)) throw NotFollowed();
-  return {offset, offset + length};
 }
 
 // The bytes the buffer views left in the file point at, one view after the other; each view is
@@ -218,6 +201,11 @@ std::optional<GlbFile> without_unused(const nlohmann::json& json, const std::vec
   } catch (const std::exception&) {
     return std::nullopt;
   }
+}
+
+std::optional<GlbFile> compacted(const GlbFile& glb) {
+  const std::optional<nlohmann::json> merged = with_repeats_merged(glb.json, glb.bin);
+  return merged ? without_unused(*merged, glb.bin) : without_unused(glb);
 }
 
 }  // namespace redgem

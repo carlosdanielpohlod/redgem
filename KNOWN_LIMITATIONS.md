@@ -140,11 +140,15 @@ the same pull request.
   animations, and a few hundred bytes of description per object still stay until the editor is
   closed.
 - In Docker the editor has no sound.
-- A pasted object carries its own copy of its meshes and pictures, even in the scene it was copied
-  from (Duplicate shares them). A copy bigger than 64 MB pastes only in the editor window it was
-  copied in.
-- Importing the same model twice appends its meshes and textures again, and deleting an import
-  leaves its data in the scene's file (only pictures no material shows are dropped on save).
+- A pasted object carries its own copy of its meshes and pictures in memory, even in the scene it
+  was copied from (Duplicate shares them); the saved file stores the repeated data once. A copy
+  bigger than 64 MB pastes only in the editor window it was copied in.
+- Repeated data is merged when the scene is saved, not when it is imported: a model imported
+  twice holds two copies in the editor's memory (and on the graphics card) until the scene is
+  opened again. Only identical bytes, accessors, pictures, samplers and textures are merged;
+  materials and meshes stay one per import, so the Inspector edits each import apart. A scene whose
+  glTF uses extensions that point at its data in ways of their own (compressed meshes, GPU
+  instancing) is saved whole: neither merged nor cleaned of unused data.
 - A model whose glTF keeps its data in several buffers cannot be imported or pasted: export a
   single `.glb` from Blender.
 - A character duplicated in the editor keeps the pose it was copied in.

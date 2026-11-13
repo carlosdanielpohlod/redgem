@@ -20,6 +20,11 @@ std::optional<GlbFile> without_unused(const GlbFile& glb);
 // file's, as long as the JSON points into it): only the bytes kept are copied.
 std::optional<GlbFile> without_unused(const nlohmann::json& json, const std::vector<std::uint8_t>& bin);
 
+// What a scene's file is written as: its repeated data merged (see with_repeats_merged in
+// glb_dedup.hpp), then without what nothing uses. nullopt when that leaves the file as it is, and
+// when it points at its data in a way not followed here: such a file is saved whole.
+std::optional<GlbFile> compacted(const GlbFile& glb);
+
 // What the editor keeps of a file's objects apart from its JSON (see SceneDocument): every node,
 // skeleton and animation as loaded or imported.
 struct GlbSources {

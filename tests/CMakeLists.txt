@@ -70,6 +70,7 @@ add_executable(redgem_tests
   unit/gltf_json_test.cpp
   unit/glb_geometry_test.cpp
   unit/glb_compact_test.cpp
+  unit/glb_dedup_test.cpp
   unit/glb_usage_test.cpp
   unit/undo_history_test.cpp
   unit/model_import_test.cpp

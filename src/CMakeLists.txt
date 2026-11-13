@@ -551,6 +551,7 @@ if(NOT ANDROID)
     editor/document/material_textures.cpp
     editor/document/glb_usage.cpp
     editor/document/glb_compact.cpp
+    editor/document/glb_dedup.cpp
     editor/document/gltf_json.cpp
     editor/document/gltf_json_entries.cpp
     editor/document/glb_geometry.cpp

@@ -155,6 +155,14 @@ class SceneDocument {
 
   bool save(std::string& error);
   bool save_as(const std::filesystem::path& path, std::string& error);
+  // What the last successful save wrote of the scene's data (its binary chunk: vertices, pictures,
+  // animation keys), and what it left out of what the document holds: data repeated elsewhere in
+  // the scene, and data no object uses any more. Both in bytes; zero before the first save.
+  struct SaveReport {
+    std::size_t written_bytes = 0;
+    std::size_t left_out_bytes = 0;
+  };
+  const SaveReport& last_save() const { return last_save_; }
 
   // A name not used by any node: "Crate" -> "Crate.001" (Blender style).
   std::string unique_name(const std::string& base) const;
@@ -272,6 +280,8 @@ class SceneDocument {
   static std::variant<SceneDocument, std::string> open_file(const std::filesystem::path& path);
   int import_model_file(const std::filesystem::path& path, std::string& error, int parent);
   bool save_file(const std::filesystem::path& path, std::string& error);
+  // Remembers what a save wrote (see last_save) and logs a line when it left something out.
+  void report_save(const std::filesystem::path& path, std::size_t written_bytes);
   // Takes out of the file what an import that failed half way had already added to it.
   void forget_model(const model_import::JsonOffsets& offsets, std::size_t bin_size, std::size_t animations);
   bool sync_glb(std::string& error);
@@ -370,7 +380,8 @@ class SceneDocument {
   std::set<int> changed_meshes_;   // reshaped since the renderer last asked
   std::set<int> unsaved_meshes_;   // reshaped since the last save
   std::set<int> released_meshes_;  // let go of: nothing can use them again
-  std::set<int> unshown_images_;   // added for a texture slot, no material shows them yet: held until one does
+  SaveReport last_save_;
+  std::set<int> unshown_images_;  // added for a texture slot, no material shows them yet: held until one does
 };
 
 }  // namespace redgem

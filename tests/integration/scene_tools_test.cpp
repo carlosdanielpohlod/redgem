@@ -337,6 +337,20 @@ TEST_CASE("remove takes an object out with its children") {
   CHECK(scene.find_node("Canopy1") == kNoIndex);
 }
 
+TEST_CASE("compact rewrites a scene without its repeats and unused data, and says how much it left out") {
+  GameCopy game("compact");
+  const ToolResult compacted = scene_tool({"compact", game.dir()});
+  REQUIRE(compacted.exit_code == kExitSuccess);
+  CHECK(has(compacted.out, "scene main: wrote "));
+  CHECK(has(compacted.out, " bytes of data, left out "));
+  const SceneDesc scene = load(game.scene());
+  CHECK(scene.nodes.size() == kPlatformerObjects);
+  const ToolResult again = scene_tool({"compact", game.dir()});
+  CHECK(has(again.out, "left out 0 bytes"));  // nothing is left to leave out
+  CHECK(scene_tool({"compact", game.dir(), "Coin1"}).exit_code == kExitUsage);
+  CHECK(scene_tool({"compact", game.dir(), "--scene", "nowhere"}).exit_code != kExitSuccess);
+}
+
 TEST_CASE("a scene that was changed from the command line still plays") {
   GameCopy game("plays");
   REQUIRE(scene_tool({"set", game.dir(), "Coin1", "position=0,1,-5", "prop.speed=3"}).exit_code == kExitSuccess);

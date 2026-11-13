@@ -191,6 +191,17 @@ ToolResult diff(OpenScene& scene) {
   return compare_scene_file(scene.document.desc(), scene.name, *baseline, *limit);
 }
 
+// Saves the scene as it is: what it holds twice is written once, and what no object uses is left out.
+ToolResult compact(OpenScene& scene) {
+  std::string error;
+  if (!scene.document.save(error)) return failed(error);
+  const SceneDocument::SaveReport& report = scene.document.last_save();
+  return answer(tr("project.scene.compacted", {{"scene", scene.name},
+                                               {"written", std::to_string(report.written_bytes)},
+                                               {"left_out", std::to_string(report.left_out_bytes)}}) +
+                "\n");
+}
+
 // A line that takes as many words as it wants after those it needs (what to set).
 constexpr std::size_t kAnyMore = std::numeric_limits<std::size_t>::max();
 
@@ -204,6 +215,7 @@ constexpr Known kSubcommands[] = {
     {"list", list, kObjectWord, kObjectWord},         {"diff", diff, kObjectWord, kObjectWord},
     {"get", get, kFirstAssignment, kFirstAssignment}, {"set", set, kFirstAssignment, kAnyMore},
     {"add", add, kFirstAssignment, kAnyMore},         {"remove", remove, kFirstAssignment, kFirstAssignment},
+    {"compact", compact, kObjectWord, kObjectWord},
 };
 
 std::string unsupported_option(const Known& subcommand, const ToolLine& line) {
