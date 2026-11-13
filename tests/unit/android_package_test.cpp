@@ -16,6 +16,7 @@
 
 #include "app/game_settings.hpp"
 #include "core/files.hpp"
+#include "core/game_archive.hpp"
 #include "core/image_header.hpp"
 #include "core/platform.hpp"
 #include "project/game_shipping.hpp"
@@ -185,13 +186,43 @@ TEST_CASE("the engines built for Android are found by kind of processor") {
   CHECK(runtimes.at("arm64-v8a") == scratch.dir / "arm64-v8a/libredgem.so");
 }
 
-TEST_CASE("a game is laid out as an APK's contents: its files, their list, a stamp, the engine, the manifest") {
+TEST_CASE("a game is packed into an APK as one archive asset, listed as the one file the app unpacks") {
   const Scratch scratch;
   const std::map<std::string, std::filesystem::path> runtimes = {
       {"x86_64", scratch.file("built/libredgem.so", "engine")}};
   const std::filesystem::path stage = scratch.dir / "stage";
   std::string error;
   REQUIRE_MESSAGE(stage_android_game(fixture("games/sandbox"), runtimes, "stamp-1", stage, error), error);
+  CHECK(read(stage / "assets/game.files") == std::string(kArchiveFileName) + "\n");
+  CHECK_FALSE(std::filesystem::exists(stage / "assets/game"));
+  const auto archive = GameArchive::open(stage / "assets" / kArchiveFileName, error);
+  REQUIRE_MESSAGE(archive.has_value(), error);
+  CHECK(archive->entries().size() == shipped_files(fixture("games/sandbox")).size());
+  CHECK(archive->find("scene.glb") != nullptr);
+  CHECK(archive->find("scenes/level2.glb") != nullptr);
+  CHECK(read(stage / "assets/game.stamp") == "stamp-1");
+
+  // Packed, a name the APK's packer would leave out or its list could not hold is no matter.
+  const std::filesystem::path game = scratch.dir / "My Game";
+  std::filesystem::copy(fixture("games/sandbox"), game, std::filesystem::copy_options::recursive);
+  std::filesystem::create_directories(game / "_shared");
+  std::ofstream(game / "_shared" / "data.txt") << "x";
+  const std::filesystem::path shared_stage = scratch.dir / "shared-stage";
+  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp-2", shared_stage, error), error);
+  const auto with_shared = GameArchive::open(shared_stage / "assets" / kArchiveFileName, error);
+  REQUIRE_MESSAGE(with_shared.has_value(), error);
+  CHECK(with_shared->find("_shared/data.txt") != nullptr);
+}
+
+TEST_CASE(
+    "a game kept loose is laid out as an APK's contents: its files, their list, a stamp, the engine, the manifest") {
+  const Scratch scratch;
+  const std::map<std::string, std::filesystem::path> runtimes = {
+      {"x86_64", scratch.file("built/libredgem.so", "engine")}};
+  const std::filesystem::path stage = scratch.dir / "stage";
+  std::string error;
+  REQUIRE_MESSAGE(stage_android_game(fixture("games/sandbox"), runtimes, "stamp-1", stage, error, GameLayout::Loose),
+                  error);
 
   CHECK(std::filesystem::exists(stage / "assets/game/scene.glb"));
   CHECK(read(stage / "lib/x86_64/libredgem.so") == "engine");
@@ -220,7 +251,7 @@ TEST_CASE("a game is laid out as an APK's contents: its files, their list, a sta
   std::ofstream(game / "release.keystore") << "the developer's signing key";  // never leaves their machine
   std::ofstream(game / "upload.jks") << "another";
   const auto second_stage = scratch.dir / "second-stage";
-  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp-2", second_stage, error), error);
+  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp-2", second_stage, error, GameLayout::Loose), error);
   const std::string tidy = read(second_stage / "assets/game.files");
   CHECK(tidy == listing);
   CHECK_FALSE(std::filesystem::exists(second_stage / "assets/game/.gitignore"));
@@ -230,7 +261,7 @@ TEST_CASE("a game is laid out as an APK's contents: its files, their list, a sta
   // A folder the SDK would silently leave out is refused, by name.
   std::filesystem::create_directories(game / "_shared");
   std::ofstream(game / "_shared" / "data.txt") << "x";
-  CHECK_FALSE(stage_android_game(game, runtimes, "s", scratch.dir / "skipped-stage", error));
+  CHECK_FALSE(stage_android_game(game, runtimes, "s", scratch.dir / "skipped-stage", error, GameLayout::Loose));
   CHECK(error.find("_shared/data.txt") != std::string::npos);
 
   // What cannot be packed is refused with a reason.
@@ -541,7 +572,7 @@ TEST_CASE("an app holds no file a link points at, and no file whose name would b
   std::filesystem::create_symlink(scratch.dir / "outside" / "passwords.txt", game / "linked.txt");
   std::filesystem::create_directory_symlink(scratch.dir / "outside", game / "linked_folder");
   std::string error;
-  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", stage, error), error);
+  REQUIRE_MESSAGE(stage_android_game(game, runtimes, "stamp", stage, error, GameLayout::Loose), error);
   CHECK(std::filesystem::exists(stage / "assets/game/scene.glb"));
   CHECK_FALSE(std::filesystem::exists(stage / "assets/game/linked.txt"));
   CHECK_FALSE(std::filesystem::exists(stage / "assets/game/linked_folder"));
@@ -549,7 +580,7 @@ TEST_CASE("an app holds no file a link points at, and no file whose name would b
 
 #ifndef _WIN32  // (Windows has no file names with line breaks in them.)
   std::ofstream(game / "scripts" / "two\nlines.rb") << "x";
-  CHECK_FALSE(stage_android_game(game, runtimes, "stamp", scratch.dir / "invalid-stage", error));
+  CHECK_FALSE(stage_android_game(game, runtimes, "stamp", scratch.dir / "invalid-stage", error, GameLayout::Loose));
   CHECK(error.find("line break") != std::string::npos);
   CHECK(error.find("scripts") != std::string::npos);
 #endif

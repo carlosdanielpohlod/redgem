@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #endif
 
+#include "core/game_files.hpp"
 #include "core/log.hpp"
 
 namespace redgem {
@@ -54,6 +55,15 @@ std::filesystem::path reserve_folder(const std::filesystem::path& parent, const 
   return {};
 }
 
+// A file of the mounted game archive, as text (see game_files.hpp).
+std::optional<std::string> read_archived_text(const std::filesystem::path& path, std::string& error) {
+  std::string why;
+  const auto bytes = game_files::read_archived(path, kMaxArchiveEntryBytes, why);
+  if (bytes) return std::string(bytes->begin(), bytes->end());
+  error = "cannot read " + path.string() + ": " + why;
+  return std::nullopt;
+}
+
 }  // namespace
 
 bool make_private_directory(const std::filesystem::path& path, std::error_code& error) {
@@ -68,6 +78,7 @@ bool make_private_directory(const std::filesystem::path& path, std::error_code& 
 }
 
 std::optional<std::string> read_text_file(const std::filesystem::path& path, std::string& error) {
+  if (game_files::in_archive(path)) return read_archived_text(path, error);
   std::ifstream in(path, std::ios::binary);
   if (!in) {
     error = "cannot read " + path.string();

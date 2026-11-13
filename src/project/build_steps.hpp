@@ -11,6 +11,7 @@ namespace redgem::build_steps {
 // The steps every build has, in the words its errors use.
 inline constexpr const char* kCopyingPlayer = "copying the player";
 inline constexpr const char* kCopyingFiles = "copying the game's files";
+inline constexpr const char* kPackingFiles = "packing the game's files";
 inline constexpr const char* kShippingFiles = "writing the game's icon";
 inline constexpr const char* kSigningApp = "signing the app";
 
