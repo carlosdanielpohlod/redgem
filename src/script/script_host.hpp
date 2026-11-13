@@ -179,7 +179,7 @@ class ScriptHost {
   bool running(const BehaviourSlot& slot) const;
   void disable_failed(std::size_t index, const char* method, const std::string& error);
   // The result of running a script's code, failed if the code set the engine's constants.
-  RubyResult guarded(RubyResult result);
+  RubyResult guarded(const RubyResult& result);
   // Puts back the engine's constants a method set while behaviours ran, reported as their error.
   void restore_engine_constants();
 

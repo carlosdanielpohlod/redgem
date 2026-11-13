@@ -89,7 +89,7 @@ RubyResult ScriptHost::eval(const std::string& code, const std::string& file_nam
   return guarded(vm_.eval(code, file_name));
 }
 
-RubyResult ScriptHost::guarded(RubyResult result) {
+RubyResult ScriptHost::guarded(const RubyResult& result) {
   const std::vector<std::string> restored = engine_constants_.restore(vm_.state());
   if (restored.empty()) return result;
   const std::string earlier = result.ok ? std::string() : "\n" + result.error;
