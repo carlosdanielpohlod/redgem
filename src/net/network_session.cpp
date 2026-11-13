@@ -128,6 +128,10 @@ void NetworkSession::go_offline() {
   through_relay_ = false;
   opening_room_ = false;
   server_hosted_ = false;
+  forget_game_state();
+}
+
+void NetworkSession::forget_game_state() {
   room_.clear();
   refusal_.clear();
   pending_events_.clear();

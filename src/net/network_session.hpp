@@ -403,6 +403,7 @@ class NetworkSession {
   void queue_for_everyone_but(int peer, const nlohmann::json& message);
   Link* link_to(int peer);
   void go_offline();
+  void forget_game_state();
 
   State state_ = State::Offline;
   int id_ = 0;
