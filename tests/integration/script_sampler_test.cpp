@@ -47,6 +47,20 @@ constexpr const char* kBusy = R"(
   Busy.run
 )";
 
+constexpr const char* kMixedIn = R"(
+  module Spinning
+    def whirl
+      i = 0
+      i += 1 while i < 20_000
+      i
+    end
+  end
+  class Top
+    include Spinning
+  end
+  Top.new.whirl
+)";
+
 bool has_method(const std::vector<ScriptMethodStat>& methods, const std::string& name) {
   for (const ScriptMethodStat& method : methods) {
     if (method.name == name) return true;
@@ -71,6 +85,19 @@ TEST_CASE("the sampler names the methods on the stack and charges the innermost 
   CHECK(top.front().name == "Busy#spin");
   CHECK(top.front().self * 2 > profile.samples());
   CHECK(has_method(top, "Busy.run"));
+}
+
+TEST_CASE("a method of an included module is named after the module") {
+  SteppingClock clock;
+  ScriptSampler sampler([&clock] { return clock(); });
+  RubyVm vm;
+  sampler.set_enabled(true);
+  vm.budget_keeper().set_sampler(&sampler);
+  REQUIRE(vm.eval(kMixedIn, "mixed_in.rb").ok);
+  vm.budget_keeper().set_sampler(nullptr);
+  const std::vector<ScriptMethodStat> top = sampler.profile().top(1);
+  REQUIRE(top.size() == 1);
+  CHECK(top.front().name == "Spinning#whirl");
 }
 
 TEST_CASE("a sampler that is off, or not given to the interpreter, samples nothing") {

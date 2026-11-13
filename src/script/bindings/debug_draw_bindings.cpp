@@ -40,10 +40,15 @@ struct LabelArgs {
   mrb_value at{};
   mrb_int r = 0, g = 0, b = 0, a = 0, size = 0;
 };
+// A size out of range is made one that is refused (cast as it is, it could wrap into the range).
+int label_size(mrb_int size) {
+  const bool in_range = size >= kMinDebugLabelSize && size <= kMaxDebugLabelSize;
+  return in_range ? static_cast<int>(size) : 0;
+}
 DebugLabel label_from(mrb_state* mrb, const LabelArgs& args) {
   const DrawArgs channels{mrb_nil_value(), mrb_nil_value(), args.r, args.g, args.b, args.a, true};
   return {std::string(args.text, static_cast<std::size_t>(args.length)), to_vec3(mrb, args.at), color(mrb, channels),
-          static_cast<int>(args.size)};
+          label_size(args.size)};
 }
 mrb_value label(mrb_state* mrb, mrb_value) {
   LabelArgs args;

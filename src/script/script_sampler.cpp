@@ -26,7 +26,13 @@ const char* attached_name(mrb_state* mrb, RClass* singleton) {
   return is_class_or_module(attached) ? mrb_class_name(mrb, mrb_class_ptr(attached)) : nullptr;
 }
 
-std::string label_of(mrb_state* mrb, RClass* owner, mrb_sym method) {
+// The module itself for one of its methods (mruby finds them in a stand-in class of the module).
+bool is_module_stand_in(const RClass* owner) { return owner != nullptr && owner->tt == MRB_TT_ICLASS; }
+
+RClass* named_owner(RClass* owner) { return is_module_stand_in(owner) ? owner->c : owner; }
+
+std::string label_of(mrb_state* mrb, RClass* found_in, mrb_sym method) {
+  RClass* owner = named_owner(found_in);
   const char* name = mrb_sym_name(mrb, method);
   const std::string called = name != nullptr ? name : kAnonymous;
   if (owner == nullptr) return std::string(kTopLevel) + kInstanceSeparator + called;
@@ -40,7 +46,8 @@ std::string label_of(mrb_state* mrb, RClass* owner, mrb_sym method) {
 ScriptSampler::ScriptSampler(Clock clock) : clock_(clock ? std::move(clock) : Clock(steady_now)) {}
 
 void ScriptSampler::set_enabled(bool enabled) {
-  if (enabled && !enabled_) clear();
+  const bool starting = enabled && !enabled_;
+  if (starting) clear();
   enabled_ = enabled;
 }
 
@@ -72,6 +79,7 @@ const std::string& ScriptSampler::name_of(mrb_state* mrb, const mrb_callinfo& fr
   const auto key = std::make_pair(static_cast<const RClass*>(owner), frame.mid);
   const auto found = names_.find(key);
   if (found != names_.end()) return found->second;
+  if (names_.size() >= kMaxCachedNames) names_.clear();  // (the stack being read holds copies)
   return names_.emplace(key, label_of(mrb, owner, frame.mid)).first->second;
 }
 

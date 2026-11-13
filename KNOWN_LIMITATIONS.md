@@ -268,13 +268,14 @@ not a promise of how it will be closed.
   Offline fixed-step runs intentionally wait for the reader for reproducible activation frames.
 - `Debug` supports an opt-in foreground phase profiler, FPS/frame-time overlay, immediate
   world-space lines/wire boxes and labels, GPU pass timings and a sampling profiler of the scripts.
-  GPU timings need desktop OpenGL 3.3 timer queries: OpenGL ES (Android) and the editor's Scene
-  view show none, and a renderer that draws several views a frame times the last one. GPU time is
+  GPU timings need desktop OpenGL 3.3 timer queries and the game's own window: OpenGL ES
+  (Android) and the editor's Play show none. GPU time is
   split into three coarse passes (prepare, scene, post), not per shadow cascade or effect. The
   script sampler only samples while Ruby runs instructions: time inside the engine's own
   functions counts for the Ruby method that called them, and Ruby blocks count for the method
   that made them. It samples the running fiber's stack only (its innermost 64 frames) and keeps
-  at most 1024 distinct methods. Labels are not drawn without a main camera, and are not
+  at most 1024 distinct methods. A class collected while profiling whose memory is reused by a
+  new class can lend it its name until profiling starts again. Labels are not drawn without a main camera, and are not
   hidden behind objects.
 
 ### Safety

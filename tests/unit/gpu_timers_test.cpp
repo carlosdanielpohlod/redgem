@@ -4,11 +4,14 @@
 
 using namespace redgem;
 
-TEST_CASE("each frame reads back the set of queries the frame before wrote, never its own") {
-  for (std::uint64_t frame = 1; frame < 6; ++frame) {
-    CHECK(gpu_read_set(frame) == gpu_write_set(frame - 1));
-    CHECK(gpu_read_set(frame) != gpu_write_set(frame));
+TEST_CASE("a frame looks back at the sets the frames before it wrote, never at its own") {
+  for (std::uint64_t frame = kGpuTimerFrames; frame < 3 * kGpuTimerFrames; ++frame) {
     CHECK(gpu_write_set(frame) < kGpuTimerFrames);
+    CHECK(gpu_set_before(frame, 0) == gpu_write_set(frame));
+    for (std::size_t age = 1; age < kGpuTimerFrames; ++age) {
+      CHECK(gpu_set_before(frame, age) == gpu_write_set(frame - age));
+      CHECK(gpu_set_before(frame, age) != gpu_write_set(frame));
+    }
   }
 }
 

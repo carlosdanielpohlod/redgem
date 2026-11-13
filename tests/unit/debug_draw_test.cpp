@@ -76,7 +76,9 @@ TEST_CASE("debug labels need a finite point, a size in range and a short text, a
   label = {};
   while (buffer.labels().size() < kMaxDebugLabels) REQUIRE(buffer.append(label));
   CHECK_FALSE(buffer.append(label));
-  CHECK(buffer.dropped() == 1);
+  CHECK(buffer.dropped_labels() == 1);
+  CHECK(buffer.dropped() == 0);
   buffer.clear();
   CHECK(buffer.labels().empty());
+  CHECK(buffer.dropped_labels() == 0);
 }

@@ -20,8 +20,8 @@ std::string_view gpu_pass_name(GpuPass pass) {
 
 std::size_t gpu_write_set(std::uint64_t frame) { return static_cast<std::size_t>(frame % kGpuTimerFrames); }
 
-std::size_t gpu_read_set(std::uint64_t frame) {
-  return static_cast<std::size_t>((frame + kGpuTimerFrames - 1) % kGpuTimerFrames);
+std::size_t gpu_set_before(std::uint64_t frame, std::size_t age) {
+  return static_cast<std::size_t>((frame + kGpuTimerFrames - age % kGpuTimerFrames) % kGpuTimerFrames);
 }
 
 double gpu_milliseconds(std::uint64_t nanoseconds) {
@@ -54,17 +54,22 @@ void GpuTimers::start_frame() {
   if (!active()) return;
   end();
   ++frame_;
-  collect(gpu_read_set(frame_));
+  // (Oldest first: what is left in the end is the newest answer.)
+  for (std::size_t age = kGpuTimerFrames - 1; age > 0; --age) collect(gpu_set_before(frame_, age));
 }
 
 void GpuTimers::collect(std::size_t set) {
   for (std::size_t pass = 0; pass < kGpuPassCount; ++pass) collect_pass(set, pass);
 }
 
-// An answer not there yet is left for the next frame's look (until the set is written again).
+// An answer not there yet is looked for again next frame, until its set is written again.
+bool GpuTimers::answered(std::size_t set, std::size_t pass) const {
+  return issued_[set][pass] && render_detail::timer_ready(queries_[set][pass]);
+}
+
 void GpuTimers::collect_pass(std::size_t set, std::size_t pass) {
+  if (!answered(set, pass)) return;
   const unsigned int query = queries_[set][pass];
-  if (!issued_[set][pass] || !render_detail::timer_ready(query)) return;
   timings_.pass_ms[pass] = gpu_milliseconds(render_detail::timer_nanoseconds(query));
   timings_.measured = true;
   issued_[set][pass] = false;

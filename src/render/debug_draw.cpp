@@ -48,7 +48,7 @@ bool DebugDrawBuffer::append(const DebugDrawItem& item) {
 bool DebugDrawBuffer::append(const DebugLabel& label) {
   if (!valid_debug_label(label)) return false;
   if (labels_.size() == kMaxDebugLabels) {
-    ++dropped_;
+    ++dropped_labels_;
     return false;
   }
   labels_.push_back(label);
@@ -58,5 +58,6 @@ void DebugDrawBuffer::clear() {
   items_.clear();
   labels_.clear();
   dropped_ = 0;
+  dropped_labels_ = 0;
 }
 }  // namespace redgem

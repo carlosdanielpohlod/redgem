@@ -111,6 +111,7 @@ TEST_CASE("Debug.label keeps its text, point, color and size for the frame, and 
   CHECK(labels[1].text == "42");
   CHECK(labels[1].size == 16);
   CHECK_FALSE(game.engine->scripts().eval("Debug.label('x', at: Vector3.zero, size: 0)", "invalid_label.rb").ok);
+  CHECK_FALSE(game.engine->scripts().eval("Debug.label('x', at: Vector3.zero, size: 2**32 + 16)", "wrap.rb").ok);
   game.frame();
   CHECK(game.engine->script_context().debug_draw->labels().empty());
 }

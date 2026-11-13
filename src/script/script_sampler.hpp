@@ -25,6 +25,8 @@ namespace redgem {
 inline constexpr std::chrono::microseconds kScriptSampleInterval{1000};
 inline constexpr std::uint32_t kInstructionsPerClockRead = 256;
 inline constexpr std::size_t kMaxSampledDepth = 64;  // the innermost frames of a deeper stack
+// Names worked out are forgotten past this many (classes made without end: Class.new, singletons).
+inline constexpr std::size_t kMaxCachedNames = 4096;
 
 class ScriptSampler {
  public:

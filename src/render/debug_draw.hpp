@@ -44,10 +44,12 @@ class DebugDrawBuffer {
   const std::vector<DebugDrawItem>& items() const { return items_; }
   const std::vector<DebugLabel>& labels() const { return labels_; }
   std::size_t dropped() const { return dropped_; }
+  std::size_t dropped_labels() const { return dropped_labels_; }
 
  private:
   std::vector<DebugDrawItem> items_;
   std::vector<DebugLabel> labels_;
   std::size_t dropped_ = 0;
+  std::size_t dropped_labels_ = 0;
 };
 }  // namespace redgem
