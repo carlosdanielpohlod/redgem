@@ -47,6 +47,14 @@ until 1.0, a release may change what games rely on (see
   fractions of the screen with `normalized`. It all goes through the input the game reads, so
   `Input.mouse_*`, actions bound to `mouse:left` or `pad:a`, and gamepad reads see it as a
   player's.
+- **Navigation**: `Navigation.path(from, to)` finds the way around walls, along floors and up
+  stairs and gentle slopes: Vector3 waypoints pulled straight, or nil when there is no way there.
+  `Navigation.nearest(point)`, `Navigation.walkable?(point)`, `Navigation.draw` (the walkable cells
+  around a point, for a frame), `Navigation.bake` and `Navigation.stats`. The walkable area is a
+  2.5D grid baked from the scene's static bodies as each scene loads (or when a script first asks),
+  sized by game.json's `navigation` section (`cell_size`, `agent_radius`, `agent_height`,
+  `max_step`, `max_slope`). Bakes and searches are bounded; moving bodies are not obstacles yet
+  (see [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md)).
 
 - **Camera switching**: `Camera.main = camera` sees the game through another camera object of the
   scene (security cameras, a car's cameras, a cutscene's shots), and `Camera.main = nil` goes back
