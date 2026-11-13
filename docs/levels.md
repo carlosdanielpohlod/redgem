@@ -175,6 +175,20 @@ Export the coat with the material in glTF. A zero coat weight preserves the orig
 The editor keeps its factors, texture references and normal scale through import and saving.
 The layering follows the [glTF clearcoat extension](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_clearcoat).
 
+### Compressed textures (KTX2)
+
+A texture may carry a KTX2 picture of Basis Universal data through `KHR_texture_basisu` (ETC1S
+or UASTC, the two kinds the extension allows; UASTC files may be Zstandard-compressed). The
+engine prefers it over the texture's plain picture (and over a WebP one), and transcodes it when
+the scene loads into what the graphics card takes: BC1 or BC3 (by whether the picture has alpha)
+on cards with S3TC, which desktop cards have; ASTC 4x4, or else ETC1/ETC2, on OpenGL ES (phones);
+plain RGBA8 on a card with none of them. A compressed texture takes a quarter to an eighth of the
+memory of an RGBA8 one, and is drawn from the mipmaps the file brought, so make them when you
+compress it (`basisu -ktx2 -mipmap picture.png`, or `toktx --t2 --encode uastc --genmipmap`). A
+KTX2 picture without mipmaps, or on a card that takes none of the formats, goes up as RGBA8 with
+mipmaps the card makes, as any PNG does. Its pixels are read as they are (no color conversion
+from the file's transfer function), and HDR Basis data is not read.
+
 ## Grass, forests and cities
 
 Tens of thousands of copies (a meadow's grass, a forest) are too many to be objects: a script

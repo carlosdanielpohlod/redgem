@@ -55,11 +55,19 @@ std::optional<int> source_of(const Json& holder) {
   return index_from(holder[kSource]);
 }
 
-// The WebP picture of a texture (EXT_texture_webp), when it has one.
-std::optional<int> webp_source(const Json& texture) {
+// The picture a texture shows through one of its extensions, when it has that one.
+std::optional<int> extension_source(const Json& texture, const char* extension) {
   if (!has_object(texture, kExtensions)) return std::nullopt;
-  const auto webp = texture[kExtensions].find(kWebpTextureExtension);
-  return webp == texture[kExtensions].end() ? std::nullopt : source_of(*webp);
+  const auto found = texture[kExtensions].find(extension);
+  return found == texture[kExtensions].end() ? std::nullopt : source_of(*found);
+}
+
+// The picture a texture shows, as the engine picks it: its KTX2 one (KHR_texture_basisu), its
+// WebP one (EXT_texture_webp), or its plain one.
+std::optional<int> shown_source(const Json& texture) {
+  if (const auto ktx2 = extension_source(texture, kBasisuTextureExtension)) return ktx2;
+  if (const auto webp = extension_source(texture, kWebpTextureExtension)) return webp;
+  return source_of(texture);
 }
 
 bool is_webp(const Json& doc, int image) {
@@ -145,7 +153,7 @@ std::vector<int> images_of(const MaterialDesc& material) {
 int image_of_texture(const Json& doc, int texture) {
   const Json* entry = entry_at(doc, kTextures, texture);
   if (entry == nullptr) return kNoIndex;
-  return webp_source(*entry).value_or(source_of(*entry).value_or(kNoIndex));
+  return shown_source(*entry).value_or(kNoIndex);
 }
 
 int slot_image(const Json& doc, const Json& material, Slot slot) {

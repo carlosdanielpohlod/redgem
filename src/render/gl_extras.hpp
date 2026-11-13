@@ -44,4 +44,7 @@ int largest_target_side();
 // Cube maps filtered across the seams between their faces (always so on OpenGL ES 3).
 void filter_cube_maps_across_seams();
 
+// Lets go of the errors earlier calls left, so that the next check is of a call's own.
+void forget_errors();
+
 }  // namespace redgem::render_detail

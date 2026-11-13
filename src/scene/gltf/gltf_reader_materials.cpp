@@ -12,20 +12,28 @@
 namespace redgem {
 namespace {
 
-constexpr const char* kJpegMimeType = "image/jpeg";
-constexpr const char* kJpegExtension = ".jpg";
+// The file kind each image's mime type names (the decoder's hint); PNG for any other.
+struct ImageKind {
+  const char* mime_type;
+  const char* extension;
+};
+constexpr ImageKind kImageKinds[] = {{"image/jpeg", ".jpg"}, {"image/webp", ".webp"}, {"image/ktx2", ".ktx2"}};
 constexpr const char* kPngExtension = ".png";
-constexpr const char* kWebpMimeType = "image/webp";
-constexpr const char* kWebpExtension = ".webp";
 const char* image_extension(const cgltf_image& image) {
   const std::string mime = text_or(image.mime_type, "");
-  if (mime == kJpegMimeType) return kJpegExtension;
-  return mime == kWebpMimeType ? kWebpExtension : kPngExtension;
+  for (const ImageKind& kind : kImageKinds) {
+    if (mime == kind.mime_type) return kind.extension;
+  }
+  return kPngExtension;
 }
+bool has_basisu_image(const cgltf_texture& texture) { return texture.has_basisu && texture.basisu_image != nullptr; }
 bool has_webp_image(const cgltf_texture& texture) { return texture.has_webp && texture.webp_image != nullptr; }
+// The picture a texture shows: its KTX2 one (KHR_texture_basisu) first, then its WebP one
+// (EXT_texture_webp), then its plain fallback.
 const cgltf_image* supported_image(const cgltf_texture& texture) {
+  if (has_basisu_image(texture)) return texture.basisu_image;
   if (has_webp_image(texture)) return texture.webp_image;
-  return texture.image;  // Basis/KTX2 still needs a decoder; retain its plain fallback.
+  return texture.image;
 }
 
 std::vector<std::uint8_t> embedded_bytes(const cgltf_buffer_view& view) {
