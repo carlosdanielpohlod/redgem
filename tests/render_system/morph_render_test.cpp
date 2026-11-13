@@ -20,8 +20,7 @@ namespace {
 constexpr Vec3 kCamera{0.0f, 0.0f, 3.0f};
 constexpr redgem::Color kGreen{0.1f, 1.0f, 0.1f, 1.0f};
 constexpr float kGlow = 2.0f;
-constexpr unsigned char kBright = 150;
-constexpr unsigned char kDim = 80;
+constexpr int kGreener = 30;        // a pixel of the square is this much greener than red or blue, at least
 constexpr std::size_t kSeen = 100;  // pixels of the square, at least
 constexpr float kGrown = 1.5f;      // either key whole makes the square this many times as big
 constexpr float kNearly = 0.1f;     // share either way a count may be off by
@@ -30,7 +29,8 @@ constexpr float kAside = 1.5f;      // meters between the two copies of the last
 constexpr std::size_t kFace = 1;    // the square's node, after the camera
 constexpr std::size_t kCopy = 2;
 
-bool green(::Color c) { return c.g > kBright && c.r < kDim && c.b < kDim; }
+// The square's green, paled by the sky's light around it, and not the sky's own grey-blue.
+bool green(::Color c) { return c.g > c.r + kGreener && c.g > c.b + kGreener; }
 
 bool about(float value, float expected) { return std::fabs(value - expected) <= expected * kNearly; }
 

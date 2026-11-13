@@ -449,6 +449,10 @@ struct Renderer::Impl {
   // One object's record and sight, and its bones and shape keys from texel `next_bone` on.
   // Returns where the next object's go.
   std::size_t sight_object(const Scene& scene, const GameObject& object, std::size_t next_bone);
+  // Where the object is seen to reach: its mesh's bounds placed by it (or by its skeleton's pose),
+  // with room for the waves and ripples that move its vertices.
+  render_math::Sight reach_of(const Scene& scene, const GameObject& object,
+                              const std::optional<render_detail::SkeletonPose>& pose) const;
   // Writes the shape keys an object shows at texel `first` (see morph_shapes.hpp), and says where
   // in `look`. Returns where the next object's texels go.
   std::size_t write_morphs(const GameObject& object, std::size_t first, render_math::InstanceLook& look);
