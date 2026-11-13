@@ -158,6 +158,12 @@ until 1.0, a release may change what games rely on (see
 
 ### Changed
 
+- **`Save.update` on a dedicated server locks only its key**: rooms updating different keys run
+  side by side instead of waiting for each other's blocks, and writes of the same key still wait,
+  so no change is lost. A block that writes a second key another room is updating waits at most
+  250 ms, then that write is refused (logged), so two rooms can never wait for each other forever.
+- **A connection's receive buffer gives memory back** after a large message, down to 64 KiB, once
+  what it holds uses less than a quarter of it.
 - **Game connections are encrypted** (TLS 1.2 or 1.3, no renegotiation), to a player hosting, a
   relay or a dedicated server alike, and a machine that talks in the clear is let go: games of
   this version cannot play with earlier ones, nor use an earlier relay or server. A handshake not
@@ -200,6 +206,9 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **A script can no longer break the engine by setting its constants**: `Vector3 = 5`, or
+  removing `Scene`, gives the script an `EngineConstantError` and the constant is put back (after
+  the file or console line runs, or at the end of the frame for a change made inside a method).
 - **Android build staging** uses a private per-user cache. Existing folders next to the APK or AAB
   stay intact, and interrupted builds are cleaned up by later builds.
 - **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock
