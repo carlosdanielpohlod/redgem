@@ -14,6 +14,8 @@ namespace {
 
 using namespace binding;
 
+constexpr mrb_int kSpawnArguments = 6;  // template, position, rotation, physics, name, parent
+
 mrb_value scene_find_by_id(mrb_state* mrb, mrb_value) {
   return object_or_nil(mrb, scene(mrb).find_by_stable_id(name_arg(mrb)));
 }
@@ -55,21 +57,37 @@ std::optional<Transform> spawn_placement(mrb_state* mrb, ObjectId id, mrb_value 
 }
 
 // Making the object, its bodies and its behaviours is the engine's time, not the script's.
-ObjectId spawned(mrb_state* mrb, ObjectId source, const std::optional<Transform>& placement, bool physics) {
+ObjectId spawned(mrb_state* mrb, const SpawnRequest& request) {
   const BudgetPause pause(script_host(mrb).vm().budget_keeper());
-  return context(mrb).spawn(source, placement, physics);
+  return context(mrb).spawn(request);
 }
 
+// What a copy is called: its template's name for nil, else a name that is not empty.
+std::string spawn_name(mrb_state* mrb, mrb_value name) {
+  if (mrb_nil_p(name)) return {};
+  std::string text = to_name(mrb, name);
+  if (text.empty()) mrb_raise(mrb, E_ARGUMENT_ERROR, "Scene.spawn name: must not be empty");
+  return text;
+}
+
+// What a copy goes under: nothing for nil, else an object things may be put under.
+ObjectId spawn_parent(mrb_state* mrb, mrb_value parent) {
+  return mrb_nil_p(parent) ? kNoObject : placeable_id(mrb, parent, "Scene.spawn parent:");
+}
+
+// Scene.__spawn(template, position, rotation, physics, name, parent): see ruby/engine/scene.rb.
 mrb_value scene_spawn(mrb_state* mrb, mrb_value) {
-  mrb_value source;
-  mrb_value position = mrb_nil_value();
-  mrb_value rotation = mrb_nil_value();
+  mrb_value source, position, rotation, name, parent;
   mrb_bool physics = true;
-  mrb_get_args(mrb, "o|oob", &source, &position, &rotation, &physics);
-  ScriptContext& ctx = context(mrb);
-  if (!ctx.spawn) mrb_raise(mrb, E_RUNTIME_ERROR, "Scene.spawn only works while the game runs");
-  const ObjectId id = spawn_source(mrb, source);
-  return object_or_nil(mrb, spawned(mrb, id, spawn_placement(mrb, id, position, rotation), physics));
+  mrb_get_args(mrb, "oooboo", &source, &position, &rotation, &physics, &name, &parent);
+  if (!context(mrb).spawn) mrb_raise(mrb, E_RUNTIME_ERROR, "Scene.spawn only works while the game runs");
+  SpawnRequest request;
+  request.source = spawn_source(mrb, source);
+  request.world = spawn_placement(mrb, request.source, position, rotation);
+  request.physics = physics;
+  request.name = spawn_name(mrb, name);
+  request.parent = spawn_parent(mrb, parent);
+  return object_or_nil(mrb, spawned(mrb, request));
 }
 
 }  // namespace
@@ -80,7 +98,7 @@ void install_scene_bindings(mrb_state* mrb) {
   mrb_define_module_function(mrb, scene_module, "find_by_id", scene_find_by_id, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, scene_module, "find_all", scene_find_all, MRB_ARGS_REQ(1));
   mrb_define_module_function(mrb, scene_module, "objects", scene_objects, MRB_ARGS_NONE());
-  mrb_define_module_function(mrb, scene_module, "__spawn", scene_spawn, MRB_ARGS_ARG(1, 3));
+  mrb_define_module_function(mrb, scene_module, "__spawn", scene_spawn, MRB_ARGS_REQ(kSpawnArguments));
 }
 
 }  // namespace redgem

@@ -260,9 +260,7 @@ void Engine::connect_context() {
     bodies::follow_write(scene_, *physics_, id, write);
     if (water_teleport_write(*physics_, id, write)) water_.forget(scene_.handle(id));
   };
-  context_.spawn = [this](ObjectId source, const std::optional<Transform>& world, bool physics) {
-    return spawn(source, world, physics);
-  };
+  context_.spawn = [this](const SpawnRequest& request) { return spawn(request); };
   context_.scene_exists = [this](const std::string& name) { return has_scene_file(options_.game_dir, name); };
 }
 
