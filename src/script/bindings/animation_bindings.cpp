@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "scene/animation/animation_markers.hpp"
 #include "scene/animation/animation_player.hpp"
 #include "script/bindings/binding_helpers.hpp"
 #include "script/bindings/bindings.hpp"
@@ -139,14 +140,11 @@ mrb_value game_object_animation_time(mrb_state* mrb, mrb_value self) {
 
 // --- Events and root motion of the object's own animation ----------------------------------------
 
-constexpr mrb_float kClipStart = 0.0;
-constexpr mrb_float kClipEnd = 1.0;
-
 mrb_value game_object_animation_listen_at(mrb_state* mrb, mrb_value self) {
   mrb_value name;
   mrb_float at = 0.0;
   mrb_get_args(mrb, "of", &name, &at);
-  at = from_to(mrb, at, kClipStart, kClipEnd, "an event's moment (at:)");
+  at = from_to(mrb, at, kClipStartAt, kClipEndAt, "an event's moment (at:)");
   const std::string clip = to_name(mrb, name);
   const std::uint32_t listener =
       animations(mrb).listen_at(scene(mrb), alive_id(mrb, self), clip, static_cast<float>(at));

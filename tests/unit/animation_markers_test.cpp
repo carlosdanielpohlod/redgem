@@ -46,6 +46,18 @@ TEST_CASE("a looping clip that wraps round meets the moments past its end and af
   CHECK(marks_passed(looping(1.4, kClip + 0.6), kMarks) == Order{1, 0});
 }
 
+TEST_CASE("a looping clip meets its end as each lap gets there, never as a lap begins") {
+  const std::vector<double> end{kClip};
+  CHECK(marks_passed(looping(0.0, 0.1), end).empty());  // the clip starting
+  CHECK(marks_passed(looping(1.9, kClip + 0.1), end) == Order{0});
+  CHECK(marks_passed(looping(1.9, kClip), end) == Order{0});  // a frame that ends right there
+  CHECK(marks_passed(looping(0.0, 0.1), end).empty());        // and the next one
+  // Backwards, the end its laps head for is the clip's start.
+  const std::vector<double> start{0.0};
+  CHECK(marks_passed(looping(kClip, 1.9), start).empty());
+  CHECK(marks_passed(looping(0.1, 0.0), start) == Order{0});
+}
+
 TEST_CASE("a long frame meets every moment it skipped, in order, lap after lap") {
   CHECK(marks_passed(looping(0.0, kClip * 2.0), kMarks) == Order{0, 1, 0, 1});
   CHECK(marks_passed(looping(0.0, kClip * 1000.0), kMarks).size() == kMarks.size() * kMaxMarkerLaps);

@@ -9,8 +9,6 @@
 namespace redgem {
 namespace {
 
-constexpr float kClipStart = 0.0f;
-constexpr float kClipEnd = 1.0f;
 constexpr const char* kSpaces = " \t\r\n";
 
 std::string trimmed(const std::string& text) {
@@ -19,7 +17,7 @@ std::string trimmed(const std::string& text) {
   return text.substr(first, text.find_last_not_of(kSpaces) - first + 1);
 }
 
-bool within_the_clip(float at) { return std::isfinite(at) && at >= kClipStart && at <= kClipEnd; }
+bool within_the_clip(float at) { return std::isfinite(at) && at >= kClipStartAt && at <= kClipEndAt; }
 
 // The whole of `text` read as a number, or nullopt.
 std::optional<float> number_in(const std::string& text) {
@@ -73,7 +71,13 @@ bool on_the_way(double start, double position, double end) {
   return start <= end ? start <= position && position < end : end < position && position <= start;
 }
 
-bool passes(const ClipSpan& span, double position) {
+// A looping clip's moment at the end its laps head for: the start of the next lap too.
+bool ends_a_lap(const ClipSpan& span, double mark) {
+  return span.loop && mark == (goes_forward(span) ? span.duration : 0.0);
+}
+
+bool passes(const ClipSpan& span, double mark, double position) {
+  if (ends_a_lap(span, mark)) return on_the_way(span.to, position, span.from);
   if (position == span.to) return reaches_its_end(span);
   return on_the_way(span.from, position, span.to);
 }
@@ -98,7 +102,7 @@ void collect(const ClipSpan& span, double mark, std::size_t index, std::vector<H
   const auto [first, last] = laps_around(span, mark);
   for (long lap = first; lap <= last; ++lap) {
     const double position = mark + static_cast<double>(lap) * span.duration;
-    if (passes(span, position)) hits.push_back({position, index});
+    if (passes(span, mark, position)) hits.push_back({position, index});
   }
 }
 

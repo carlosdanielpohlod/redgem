@@ -243,9 +243,10 @@ class AnimationPlayer {
   void find_roots(const Scene& scene);
   static bool moves_root(const RootMotionChoice& choice, std::size_t clip);
   void move_by_root(ObjectId character, const CharacterSteps& steps, Scene& scene);
-  void add_side(const RootMotionChoice& choice, const std::vector<ClipStep>& side, float weight, Scene& scene,
+  // Whether any clip of `side` had root motion to add.
+  bool add_side(const RootMotionChoice& choice, const std::vector<ClipStep>& side, float weight, Scene& scene,
                 RootMotion& motion);
-  void add_step(const ClipStep& step, float weight, Scene& scene, RootMotion& motion);
+  bool add_step(const ClipStep& step, float weight, Scene& scene, RootMotion& motion);
   // Keeps a root at its rest place and heading, horizontally: its motion went to the character.
   void pin(Scene& scene, ObjectId root, const Transform& parent) const;
   // The object a character shows the node `node` of a clip as; kNoObject when it has none.

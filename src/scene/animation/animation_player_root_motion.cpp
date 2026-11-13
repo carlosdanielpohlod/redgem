@@ -15,8 +15,8 @@ namespace {
 
 constexpr float kFullTurn = kTwo * kPi;
 
-bool moves_a_root(const AnimationChannel& channel, const Scene& scene) {
-  return channel.path != AnimationPath::Scale && scene.is_alive(channel.node);
+bool animates(const AnimationChannel& channel, AnimationPath path, const Scene& scene) {
+  return channel.path == path && scene.is_alive(channel.node);
 }
 
 int depth_of(const Scene& scene, ObjectId object) {
@@ -25,17 +25,24 @@ int depth_of(const Scene& scene, ObjectId object) {
   return depth;
 }
 
-// The highest node a clip moves or turns.
-int highest_node(const AnimationDesc& clip, const Scene& scene) {
+// The highest node of the scene a clip animates on `path`.
+int highest_node(const AnimationDesc& clip, AnimationPath path, const Scene& scene) {
   int node = kNoIndex;
   int highest = INT_MAX;
   for (const AnimationChannel& channel : clip.channels) {
-    if (!moves_a_root(channel, scene)) continue;
+    if (!animates(channel, path, scene)) continue;
     const int depth = depth_of(scene, channel.node);
     if (depth < highest) node = channel.node;
     highest = std::min(highest, depth);
   }
   return node;
+}
+
+// A clip's root: the highest node it moves, or (for a clip that only turns things) turns. A node
+// above that is only turned, such as an armature keyed for Blender's axes, is not it.
+int root_node(const AnimationDesc& clip, const Scene& scene) {
+  const int moving = highest_node(clip, AnimationPath::Translation, scene);
+  return moving != kNoIndex ? moving : highest_node(clip, AnimationPath::Rotation, scene);
 }
 
 bool descends_from(const Scene& scene, ObjectId object, ObjectId ancestor) {
@@ -125,7 +132,7 @@ std::pair<const AnimationChannel*, const AnimationChannel*> channels_of(const An
 void AnimationPlayer::find_roots(const Scene& scene) {
   roots_.clear();
   for (const AnimationDesc& clip : *clips_) {
-    const int node = highest_node(clip, scene);
+    const int node = root_node(clip, scene);
     const auto [moving, turning] = channels_of(clip, node);
     roots_.push_back(ClipRoot{node, moving, turning});
   }
@@ -177,22 +184,25 @@ void AnimationPlayer::move_by_root(ObjectId character, const CharacterSteps& ste
   const auto choice = root_motion_.find(scene.handle(character));
   if (choice == root_motion_.end()) return;
   RootMotion motion{scene.handle(character), Vec3{}, 0.0f};
-  add_side(choice->second, steps.from, kWhole - steps.blend, scene, motion);
-  add_side(choice->second, steps.to, steps.blend, scene, motion);
-  motions_.push_back(motion);
+  const bool from_moved = add_side(choice->second, steps.from, kWhole - steps.blend, scene, motion);
+  const bool to_moved = add_side(choice->second, steps.to, steps.blend, scene, motion);
+  // (Nothing with root motion shown: the character is left alone.)
+  if (from_moved || to_moved) motions_.push_back(motion);
 }
 
-void AnimationPlayer::add_side(const RootMotionChoice& choice, const std::vector<ClipStep>& side, float weight,
+bool AnimationPlayer::add_side(const RootMotionChoice& choice, const std::vector<ClipStep>& side, float weight,
                                Scene& scene, RootMotion& motion) {
+  bool moved = false;
   for (const ClipStep& step : side) {
-    if (moves_root(choice, step.clip)) add_step(step, weight * step.weight, scene, motion);
+    if (moves_root(choice, step.clip)) moved = add_step(step, weight * step.weight, scene, motion) || moved;
   }
+  return moved;
 }
 
-void AnimationPlayer::add_step(const ClipStep& step, float weight, Scene& scene, RootMotion& motion) {
+bool AnimationPlayer::add_step(const ClipStep& step, float weight, Scene& scene, RootMotion& motion) {
   const ClipRoot& root = roots_[step.clip];
   const ObjectId object = root_object(scene, scene.resolve(motion.character), root.node);
-  if (object == kNoObject) return;
+  if (object == kNoObject) return false;
   const Transform parent = parent_world(scene, object);
   const float duration = duration_of(step.clip);
   if (root.translation != nullptr) {
@@ -202,6 +212,7 @@ void AnimationPlayer::add_step(const ClipStep& step, float weight, Scene& scene,
   const Heading heading{up_in(parent), rest_of(scene, object).rotation};
   if (root.rotation != nullptr) motion.yaw += turned(*root.rotation, step.span, duration, heading) * weight;
   pin(scene, object, parent);
+  return true;
 }
 
 void AnimationPlayer::pin(Scene& scene, ObjectId root, const Transform& parent) const {

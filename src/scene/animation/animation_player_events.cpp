@@ -127,10 +127,12 @@ bool lighter(const Step& a, const Step& b) {
   return a.weight < b.weight;
 }
 
-// A clip mixed over a character fires its events while it shows enough of it.
+// A clip mixed over a character fires its events while it shows enough of it, unless it is the
+// clip that leads already (whose events fire once).
 template <typename Step>
-bool loud_enough(const std::optional<Step>& layer, float least) {
-  return layer.has_value() && layer->weight >= least;
+bool layer_fires(const std::optional<Step>& layer, const Step* main, float least) {
+  if (!layer.has_value() || layer->weight < least) return false;
+  return main == nullptr || main->clip != layer->clip;
 }
 
 }  // namespace
@@ -138,9 +140,10 @@ bool loud_enough(const std::optional<Step>& layer, float least) {
 void AnimationPlayer::queue_events(const Scene& scene, ObjectId character, const CharacterSteps& steps) {
   const auto found = listeners_.find(scene.handle(character));
   if (found == listeners_.end()) return;
-  const auto main = std::max_element(steps.to.begin(), steps.to.end(), lighter<ClipStep>);  // the first of equals
-  if (main != steps.to.end()) queue_step_events(found->second, *main);
-  if (loud_enough(steps.layer, kLayerEventWeight)) queue_step_events(found->second, *steps.layer);
+  const auto lead = std::max_element(steps.to.begin(), steps.to.end(), lighter<ClipStep>);  // the first of equals
+  const ClipStep* main = lead != steps.to.end() ? &*lead : nullptr;
+  if (main != nullptr) queue_step_events(found->second, *main);
+  if (layer_fires(steps.layer, main, kLayerEventWeight)) queue_step_events(found->second, *steps.layer);
 }
 
 void AnimationPlayer::queue_step_events(const std::vector<Listener>& listeners, const ClipStep& step) {

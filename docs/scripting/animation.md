@@ -102,6 +102,7 @@ Each moment fires exactly once every time the clip's time passes it:
 - a long frame fires every moment it went past, in the order the clip plays them, lap after lap
   (at most eight laps per frame);
 - a clip played backwards fires its moments from the end towards the start;
+- a looping clip's moment at `at: 1.0` fires as each lap ends, not as the clip starts;
 - a clip played once fires a moment at `at: 1.0` when it reaches the end, and nothing while it
   holds its last pose; one that starts over (`restart: true`, `seek`) passes its moments again.
 
@@ -114,7 +115,8 @@ Which clips fire:
   leads;
 - on a state transition the destination state fires from its start; the source state is silent
   during the fade;
-- a clip mixed over the character (`mix`) fires while its weight is at least 0.5.
+- a clip mixed over the character (`mix`) fires while its weight is at least 0.5 (and is not the
+  clip that leads already).
 
 The scene's own clips (`Animation`) do not fire events, nor do graphs received from another
 machine (`NetworkSync`): their owner's machine hears them.
@@ -154,7 +156,10 @@ place. A loop that wraps round adds a whole lap's travel each time.
 
 A character with a `CharacterController` (`body = character`) moves through the physics: the
 travel is added to its next step on top of `character.move`, and it slides along walls and
-climbs steps as it would anyway (a frame late). Any other object is moved there directly.
+climbs steps as it would anyway (a frame late). Dynamic rigid bodies and vehicles are left to
+the physics; any other object is moved there directly. Root motion is set on each machine and is
+not sent over the network: turn it on where the character's animation is played (its owner),
+and let `NetworkSync` send where it went.
 
 When clips blend (a fade, a blend tree, a transition) the motion is their travel weighted as they
 are shown. A clip mixed over the character (`mix`) adds none. Root motion only comes from the

@@ -139,7 +139,15 @@ void Engine::apply_root_motion() {
   }
 }
 
+namespace {
+
+// Bodies the physics drives on its own, which root motion leaves to it.
+bool simulated_on_its_own(BodyType type) { return type == BodyType::Dynamic || type == BodyType::Vehicle; }
+
+}  // namespace
+
 void Engine::move_by(ObjectId object, const RootMotion& motion) {
+  if (simulated_on_its_own(physics_->body_type(object))) return;
   const Transform world = scene_.world_transform(object);
   scene_.set_world_rotation(object, normalize(quat_from_axis_angle(Vec3::up(), motion.yaw) * world.rotation));
   if (physics_->body_type(object) == BodyType::Character) {

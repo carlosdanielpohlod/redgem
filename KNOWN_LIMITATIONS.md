@@ -44,8 +44,10 @@ the same pull request.
 - Root motion takes the horizontal travel and the yaw of each clip's highest moving node; its
   vertical motion stays in the pose (a jump lifts the mesh, not the character). A clip mixed
   over a character (`mix`) adds none, a clip that moves the character's own object has none, and
-  a character controller follows it one frame late. Rigid bodies are moved by the physics, not by
-  root motion.
+  a character controller follows it one frame late. Dynamic rigid bodies and vehicles are moved by
+  the physics only: root motion leaves them alone. Root motion is not sent over the network:
+  `NetworkSync` sends where the owner's character went, and on the other machines a character
+  following a graph received from the owner is not pinned (its root moves in the pose).
 - Particle shadow casting is opt-in sun-facing alpha-cutout sprites (`cast_shadow: true`), not
   volumetric density shadows. Lit particles receive filtered scene sun shadows. Camera-depth soft
   fading does not affect the cast shadow silhouette; particles cast no shadows from point or spot

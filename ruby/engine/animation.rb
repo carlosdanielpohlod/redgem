@@ -105,10 +105,16 @@ class Animator
 
   def moment(clip, at, seconds)
     raise ArgumentError, "an animation event takes either at: or seconds:" unless at.nil? ^ seconds.nil?
-    return at.to_f if seconds.nil?
 
+    seconds.nil? ? at.to_f : share_of(clip, seconds.to_f)
+  end
+
+  def share_of(clip, seconds)
     length = Animation.duration(clip)
-    length.positive? ? seconds.to_f / length : 0.0
+    raise ArgumentError, "seconds: must be from 0 to #{length} (the clip's length), not #{seconds}" unless
+      seconds.between?(0.0, length)
+
+    length.positive? ? seconds / length : 0.0
   end
 end
 

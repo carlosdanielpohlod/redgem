@@ -16,6 +16,9 @@ namespace redgem {
 inline constexpr const char* kAnimationEventsProperty = "redgem_events";
 inline constexpr char kMarkerSeparator = ',';
 inline constexpr char kMarkerTimeSign = '@';
+// A moment of a clip, normalized: from its start to its end.
+inline constexpr float kClipStartAt = 0.0f;
+inline constexpr float kClipEndAt = 1.0f;
 
 struct ParsedMarkers {
   std::vector<AnimationMarker> markers;
@@ -37,7 +40,9 @@ struct ClipSpan {
 // The indices of the moments (`marks`, in seconds within the clip) that `span` went past, in the
 // order it met them, each once for every time it did. A span takes in where it starts and not
 // where it ends, so that frame after frame each moment is met exactly once; a clip played once
-// takes in its last moment too when it reaches it. At most kMaxMarkerLaps laps are counted.
+// takes in its last moment too when it reaches it. In a loop, the end a lap heads for is met as
+// the lap gets there (the other way round: taken in where the span ends, not where it starts),
+// never as a lap begins. At most kMaxMarkerLaps laps are counted.
 std::vector<std::size_t> marks_passed(const ClipSpan& span, const std::vector<double>& marks);
 
 inline constexpr int kMaxMarkerLaps = 8;

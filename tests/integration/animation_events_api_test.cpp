@@ -87,6 +87,7 @@ TEST_CASE("animation events refuse what they cannot listen for") {
   CHECK(error_of(*engine, "$hero.animation.on(:Walk, at: 0.5, seconds: 1) {}").find("either") != std::string::npos);
   CHECK(error_of(*engine, "$hero.animation.on(:Walk) {}").find("either") != std::string::npos);
   CHECK(error_of(*engine, "$hero.animation.on(:Walk, at: 1.5) {}").find("from 0 to 1") != std::string::npos);
+  CHECK(error_of(*engine, "$hero.animation.on(:Walk, seconds: 2) {}").find("seconds:") != std::string::npos);
   CHECK(error_of(*engine, "$hero.animation.on(:Dance, at: 0.5) {}").find("Dance") != std::string::npos);
   CHECK(error_of(*engine, "$hero.animation.play(:Dance, root_motion: true)").find("Dance") != std::string::npos);
 }
