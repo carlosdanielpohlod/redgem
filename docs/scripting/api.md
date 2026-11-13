@@ -18,6 +18,7 @@ The scripting API of RedGem games: the classes and methods scripts use. Generate
 | [`Time`](#time) | The game's clock (added to Ruby's Time). |
 | [`Physics`](#physics) | Questions to the physics world: rays, moving shapes and shapes in place. |
 | [`Joint`](#joint) | What holds two bodies together, or one to the world (made by Physics.joint). |
+| [`Navigation`](#navigation) | Where the characters a game moves can walk, and the way from one place to another. |
 | [`CharacterController`](#charactercontroller) | The body of an object with body = "character": walks, jumps, climbs steps. |
 | [`Rigidbody`](#rigidbody) | The body of an object with body = "dynamic" or "kinematic" (or a vehicle's chassis). |
 | [`Vehicle`](#vehicle) | The body of an object with body = "vehicle" and wheels. |
@@ -289,6 +290,19 @@ What holds two bodies together, or one to the world (made by Physics.joint). See
 - `angle`: how far a hinge turned from where it started, in degrees
 
 Points and axes are in world space; `anchor:` defaults to the object's position, `other_anchor:` (a distance joint's other end) to the other object's, `axis:` to up. A hinge's `limits:` are degrees [low, high] from where it starts (low -180 to 0, high 0 to 180), a slider's are meters along its axis; a hinge's `motor_speed:` needs a `motor_torque:`. A distance joint keeps between `min:` (0) and `max:` (how far apart the ends are) apart, springy with `spring:` (hertz) and `damping:`. Each kind refuses options it has no use for, and `motor` and `angle` raise for anything but a hinge. A joint needs a dynamic body at one end (one whose bodies were all made kinematic since holds nothing until one is dynamic again); it goes when either object is destroyed or the scene changes.
+
+## Navigation
+
+Where the characters a game moves can walk, and the way from one place to another. See [gameplay.md#chase-the-player-navigation](gameplay.md#chase-the-player-navigation).
+
+- `Navigation.path(from, to)`: the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there
+- `Navigation.nearest(point)`: the walkable point nearest a point (within 8 m of it), or nil
+- `Navigation.walkable?(point)`: whether a point is on walkable ground, up to a character's height above it
+- `Navigation.draw(around, radius = 10, color: :blue, alpha: 255)`: shows the walkable cells within a radius for this frame, as Debug.box does; returns how many
+- `Navigation.bake`: bakes the scene's grid again now (a level a script changed); returns what stats does
+- `Navigation.stats`: how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}
+
+The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning.
 
 ## CharacterController
 
