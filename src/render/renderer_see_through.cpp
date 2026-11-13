@@ -23,7 +23,11 @@ void Renderer::Impl::draw_see_through(std::size_t first, Vec3 viewer) {
   gather_see_through(first, viewer);
   if (see_through.empty()) return;
   render_math::sort_back_to_front(see_through);
-  ObjectPass pass{begin_mesh_pass(shader, lit_instance_slot), lit_uniforms.skinned, AlphaPass::SeeThrough, {}};
+  ObjectPass pass{begin_mesh_pass(shader, lit_instance_slot),
+                  lit_uniforms.skinned,
+                  MorphLocations{lit_uniforms.morph_first, lit_uniforms.morph_vertices},
+                  AlphaPass::SeeThrough,
+                  {}};
   rlSetBlendMode(RL_BLEND_ALPHA);
   rlDisableDepthMask();
   for (const render_math::SeeThroughDraw& draw : see_through) draw_see_through_copies(draw, pass);

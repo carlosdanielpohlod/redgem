@@ -144,6 +144,8 @@ std::size_t Renderer::Impl::draw_objects(bool depth_pass, Vec3 viewer, float det
   ObjectPass objects{
       begin_mesh_pass(depth_pass ? depth_shader : shader, depth_pass ? depth_instance_slot : lit_instance_slot),
       depth_pass ? depth_uniforms.skinned : lit_uniforms.skinned,
+      depth_pass ? MorphLocations{depth_uniforms.morph_first, depth_uniforms.morph_vertices}
+                 : MorphLocations{lit_uniforms.morph_first, lit_uniforms.morph_vertices},
       depth_pass ? render_math::AlphaPass::Shadow : render_math::AlphaPass::Opaque, view};
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
   if (covering) cover_edges(false);
@@ -170,12 +172,20 @@ void Renderer::Impl::draw_primitive(const GpuPrimitive& primitive, const Instanc
   use_material(primitive.material, pass);
   const bool two_sided = pass.last_two_sided;
   if (two_sided) rlDisableBackfaceCulling();
+  send_part(primitive, pass);
+  draw_instances(pass.meshes, primitive.mesh, run);
+  if (two_sided) rlEnableBackfaceCulling();
+}
+
+void Renderer::Impl::send_part(const GpuPrimitive& primitive, const ObjectPass& pass) {
   // Per part: a skinned object may still have parts without bone weights, which stay rigid. (So
   // does a copy whose skeleton could not be posed: it has no first bone.)
   const float skinning = primitive.skinned ? kOn : kOff;
   rlSetUniform(pass.skinned_location, &skinning, SHADER_UNIFORM_FLOAT, 1);
-  draw_instances(pass.meshes, primitive.mesh, run);
-  if (two_sided) rlEnableBackfaceCulling();
+  // A part's shape keys: where their deltas start, and how many vertices each key moves.
+  const auto vertices = static_cast<float>(primitive.mesh.vertexCount);
+  rlSetUniform(pass.morph.first, &primitive.morph_first, SHADER_UNIFORM_FLOAT, 1);
+  rlSetUniform(pass.morph.vertices, &vertices, SHADER_UNIFORM_FLOAT, 1);
 }
 
 }  // namespace redgem

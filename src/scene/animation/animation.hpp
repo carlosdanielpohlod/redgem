@@ -2,6 +2,7 @@
 
 #include <array>
 #include <functional>
+#include <vector>
 
 #include "scene/scene.hpp"
 #include "scene/scene_desc.hpp"
@@ -17,6 +18,13 @@ using ChannelValue = std::array<float, kMaxChannelFloats>;
 // translation and scale, a normalized quaternion (x y z w) for rotation. Keys are interpolated
 // linearly (rotations along the shortest arc).
 ChannelValue sample_channel(const AnimationChannel& channel, float time);
+
+// The shape-key weights of a weights channel at `time` seconds (clamped to its first and last
+// keys), one per shape key, interpolated linearly. Empty for a channel without keys.
+std::vector<float> sample_weights(const AnimationChannel& channel, float time);
+
+// `weights` moved `share` of the way to `to` (all the way at 1 or more), as far as both go.
+void lay_weights_over(std::vector<float>& weights, const std::vector<float>& to, float share);
 
 // Poses the nodes a clip animates as they are `time` seconds into it, looping. Nodes that no
 // longer exist are skipped. Copies of those nodes (Scene::clone) are posed too, each as far

@@ -28,8 +28,8 @@ bool same(const Transform& a, const Transform& b) {
 
 // Whether a record would be written from the very same as last time.
 bool same(const RecordSource& a, const RecordSource& b) {
-  return same(a.world, b.world) && same(a.tint, b.tint) && a.first_bone == b.first_bone && a.sway == b.sway &&
-         a.record == b.record;
+  return same(a.world, b.world) && same(a.tint, b.tint) && a.first_bone == b.first_bone &&
+         a.first_morph == b.first_morph && a.sway == b.sway && a.record == b.record;
 }
 
 }  // namespace
@@ -57,18 +57,28 @@ std::size_t Renderer::Impl::sight_object(const Scene& scene, const GameObject& o
   const std::optional<SkeletonPose> pose = pose_skeleton(scene, object, next_bone);
   render_math::InstanceLook look{object.tint, pose ? static_cast<float>(next_bone) : render_math::kNoBones};
   look.sway = object.sways ? render_math::kSways : render_math::kStill;
-  if (temporal.on) note_fresh_record(scene, object, look.first_bone, pose ? pose->bones : 0);
+  const std::size_t next = write_morphs(object, pose ? next_bone + pose->bones * kTexelsPerMatrix : next_bone, look);
+  if (temporal.on) note_fresh_record(scene, object, look, pose ? pose->bones : 0);
   render_math::Sight seen = pose ? render_math::skinned_sight_of(bounds, worlds[slot], pose->first)
                                  : render_math::sight_of(bounds, worlds[slot]);
   seen.sphere.radius += mesh_wave_height(object.mesh) + water_ripple_bound(water_ripples, scene.handle(object.id));
   sights[slot] = ObjectSight{write_record(slot, look), seen, object.mesh, object.visible_from, object.visible_to,
                              object.cast_shadow};
-  return pose ? next_bone + pose->bones * kTexelsPerMatrix : next_bone;
+  return next;
+}
+
+std::size_t Renderer::Impl::write_morphs(const GameObject& object, std::size_t first, render_math::InstanceLook& look) {
+  if (!render_math::shows_morphs(object.morph_weights)) return first;
+  const render_math::MorphTexels pairs = render_math::morph_texels(render_math::active_morphs(object.morph_weights));
+  if (!texels.write(first, pairs.data(), render_math::kMorphTexels)) return first;
+  look.first_morph = static_cast<float>(first);
+  return first + render_math::kMorphTexels;
 }
 
 bool Renderer::Impl::write_record(std::size_t slot, const render_math::InstanceLook& look) {
   const std::size_t record = scattered_records + slot;
-  const RecordSource source{worlds[slot], look.tint, look.first_bone, look.sway, static_cast<float>(record)};
+  const RecordSource source{worlds[slot],     look.tint, look.first_bone,
+                            look.first_morph, look.sway, static_cast<float>(record)};
   RecordSource& last = record_sources[slot];
   if (same(source, last)) return true;
   if (!render_math::write_instance(texels, record, model_matrix(worlds[slot]), look)) return false;
@@ -124,6 +134,15 @@ void Renderer::Impl::send_frame_texels() {
   if (temporal.on) carry_fresh_texels();
   bind_for_the_frame(shader, lit_uniforms.frame_texels, kFrameTexelSlot, texel_texture);
   bind_for_the_frame(depth_shader, depth_uniforms.frame_texels, kFrameTexelSlot, texel_texture);
+  send_morph_texels();
+}
+
+// (Bound to its own slot even when no part has shape keys, which no shader reads then: a sampler
+// left on slot 0 would share it with the material's picture.)
+void Renderer::Impl::send_morph_texels() {
+  bind_for_the_frame(shader, lit_uniforms.morph_texels, kMorphTexelSlot, morph_texture);
+  bind_for_the_frame(depth_shader, depth_uniforms.morph_texels, kMorphTexelSlot, morph_texture);
+  bind_for_the_frame(motion_shader, motion_uniforms.morph_texels, kMorphTexelSlot, morph_texture);
 }
 
 void Renderer::Impl::remake_texel_texture() {

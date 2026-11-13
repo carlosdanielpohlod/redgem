@@ -37,6 +37,14 @@ void blend_cover() {
 // the editor's) and the graphics card can.
 // (The environment is held to what the card can do; the card may have turned out not to during
 // this very frame.)
+// Whether an object's bones or shape keys went elsewhere in the frame's texels since its record
+// was last written.
+bool moved_in_texels(const RecordSource& last, const render_math::InstanceLook& look) {
+  return last.first_bone != look.first_bone || last.first_morph != look.first_morph;
+}
+
+bool shows_morphs(const render_math::InstanceLook& look) { return look.first_morph >= 0.0f; }
+
 bool temporal_wanted(const Environment& env, bool allowed, bool supported) {
   return env.temporal_antialias && allowed && supported;
 }
@@ -88,7 +96,7 @@ void Renderer::Impl::draw_motion(std::size_t first, Vec3 viewer) {
   ClearBackground(kNoMotion);
   rlDisableColorBlend();  // motion is written as it is
   ObjectPass objects{begin_mesh_pass(motion_shader, motion_instance_slot), motion_uniforms.skinned,
-                     render_math::AlphaPass::Motion, render_math::View{}};
+                     motion_morph_locations(), render_math::AlphaPass::Motion, render_math::View{}};
   send_motion_frame(viewer);
   for (const render_math::InstanceBatch& batch : batches.batches()) draw_batch(batch, first, objects);
   end_mesh_pass();
@@ -122,7 +130,7 @@ void Renderer::Impl::mark_particle_cover() {
 void Renderer::Impl::mark_see_through_cover(Vec3 viewer) {
   rlEnableFramebuffer(motion.id);
   ObjectPass pass{begin_mesh_pass(motion_shader, motion_instance_slot), motion_uniforms.skinned,
-                  render_math::AlphaPass::Cover, render_math::View{}};
+                  motion_morph_locations(), render_math::AlphaPass::Cover, render_math::View{}};
   blend_cover();
   rlDisableDepthMask();
   send_motion_frame(viewer);
@@ -170,15 +178,18 @@ void Renderer::Impl::give_up_temporal() {
   release_previous_texels();
 }
 
-void Renderer::Impl::note_fresh_record(const Scene& scene, const GameObject& object, float first_bone,
-                                       std::size_t bones) {
+void Renderer::Impl::note_fresh_record(const Scene& scene, const GameObject& object,
+                                       const render_math::InstanceLook& look, std::size_t bones) {
   const auto slot = static_cast<std::size_t>(object.id);
   const ObjectHandle owner = scene.handle(object.id);
-  const bool fresh = record_owners[slot] != owner || record_sources[slot].first_bone != first_bone;
+  const bool fresh = record_owners[slot] != owner || moved_in_texels(record_sources[slot], look);
   record_owners[slot] = owner;
   if (!fresh) return;
   fresh_texels.emplace_back(render_math::record_texel(scattered_records + slot), render_math::kTexelsPerInstance);
-  if (bones > 0) fresh_texels.emplace_back(static_cast<std::size_t>(first_bone), bones * render_math::kTexelsPerMatrix);
+  if (bones > 0)
+    fresh_texels.emplace_back(static_cast<std::size_t>(look.first_bone), bones * render_math::kTexelsPerMatrix);
+  if (shows_morphs(look))
+    fresh_texels.emplace_back(static_cast<std::size_t>(look.first_morph), render_math::kMorphTexels);
 }
 
 // Fresh records and bones go into the last frame's copy as they are now.

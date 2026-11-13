@@ -917,6 +917,23 @@ animation.unmix
 `animation.follow_scene(fade: 0.3)` hands the character back to what the level plays, and
 `animation.clip` is the name of its own clip (nil while it follows the level).
 
+### Shape keys
+
+A mesh's shape keys (Blender's, exported as glTF morph targets) come with the model: faces,
+blinks, a door that bends. Keys keyed in an action (Blender exports them as a `weights`
+channel) play with the clip like any other channel. A script sets them by name on an object and
+on the meshes under it:
+
+```ruby
+face = find("Head")
+face.morph_names           # => [:Smile, :Blink_L, :Blink_R]
+face.morph(:Smile, 0.7)    # 0 leaves the mesh as modeled, 1 is the whole key
+face.morph(:Smile)         # => 0.7 (nil when no part has that key)
+```
+
+Each copy of a mesh shows its own weights, the eight heaviest at most at once. A clip that moves a
+key sets it again every frame it plays, as it does a bone.
+
 ## Save progress
 
 `Save` keeps numbers, texts and true/false values between runs, in one file per game:

@@ -76,8 +76,11 @@ the same pull request.
   are lit by spots within their cones but receive no point or spot shadows.
 - An object mirrored with a negative scale in Blender is drawn inside out (the editor and the
   command-line tools refuse negative scales).
-- Morph targets (shape keys) are not read: their weights and names are dropped. Animation keys
-  with cubic-spline interpolation are skipped with a warning (export linear or step keys).
+- Shape keys (glTF morph targets) move positions and normals; their tangents are not morphed. A
+  copy of a mesh shows its eight heaviest keys at once. Their weights are not sent to the other
+  machines of a network game, are left out of the blends of animation graphs (the clips that
+  move them play as they are), and a node's own `weights` are ignored for the mesh's. Animation
+  keys with cubic-spline interpolation are skipped with a warning (export linear or step keys).
 - Of glTF's material extensions the engine reads clearcoat, emissive strength and WebP textures.
   Transmission, sheen, specular, IOR, anisotropy, volume and texture transforms are ignored.
 - Indirect light comes from the sky and one live capture around the camera: no lightmaps, light

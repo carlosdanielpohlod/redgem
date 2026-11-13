@@ -10,6 +10,14 @@ until 1.0, a release may change what games rely on (see
 
 ### Added
 
+- **Shape keys (morph targets)**: a mesh's shape keys are read from glTF with their names, starting
+  weights, position and normal deltas, and clips' `weights` channels play them. The vertex shader
+  applies them as it does bones: every part's deltas in one float texture and, per drawn copy,
+  its eight heaviest keys in the frame's texels, so copies drawn in one call each show their own
+  weights (lit, shadow, motion and see-through passes alike, desktop and OpenGL ES). Scripts set
+  them by name: `face.morph(:Smile, 0.7)`, `face.morph(:Smile)`, `face.morph_names`. Imported
+  models keep their shape keys in the editor.
+
 - **Dedicated server status**: `redgem-server --status-port <port>` answers a local HTTP GET, or
   a bare TCP connection, with one JSON document: rooms open and the limit, players per room and
   in total, frame time (average and worst over the last five seconds, and the budget), bytes a

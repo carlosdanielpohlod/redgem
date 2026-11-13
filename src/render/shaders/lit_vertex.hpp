@@ -5,6 +5,8 @@
 
 #include <string>
 
+#include "render/instance_records.hpp"
+
 #include "render/shaders/water_waves.hpp"
 
 namespace redgem::shaders {
@@ -17,7 +19,9 @@ namespace redgem::shaders {
 // copy's own origin move more, each copy with its own phase, from where it stands. Skinned meshes
 // (skinned > 0.5) are placed by their skeleton: each vertex follows up to four bones, whose
 // matrices already lead to world space. A scattered copy may fade out (and in) at the ends of the
-// distances it is drawn at, and be lit as if it faced up (grass), as its record says.
+// distances it is drawn at, and be lit as if it faced up (grass), as its record says. A part with
+// shape keys (morphFirst >= 0) moves each vertex, and turns its normal, by the keys its copy's
+// record points at, before its skeleton poses it (see morph_shapes.hpp).
 //
 // lit_vertex() puts its parts together: what it takes, where a copy's vertex is, and its main.
 inline constexpr const char* kVertexHead = R"GLSL(
@@ -34,6 +38,9 @@ in vec4 vertexBoneWeights;
 layout(location = 9) in float instanceSlot;
 uniform sampler2D frameTexels;
 uniform float skinned;
+uniform sampler2D morphTexels;  // every part's shape-key deltas
+uniform float morphFirst;       // where this part's start in them (below 0: it has none)
+uniform float morphVertices;    // how many vertices it has: each key has a delta for every one
 
 uniform vec3 viewPos;               // the game camera's, in every pass: copies fade by their distance to it
 uniform mat4 matView;
@@ -43,7 +50,8 @@ uniform float time;
 )GLSL";
 
 // Where a copy's vertex is, read from a texture of records and bones (this frame's, or in
-// motion.hpp the last frame's as well) at a time (the wind's).
+// motion.hpp the last frame's as well) at a time (the wind's). (The shape-key numbers it uses come
+// before it: see shape_key_limits.)
 inline constexpr const char* kVertexPlacement = R"GLSL(
 const float WIND_SPEED = 1.3;
 const float WIND_FREQUENCY = 0.35;      // phase change per meter, so neighbours are out of step
@@ -79,6 +87,29 @@ mat4 skeletonPose(sampler2D texels, int firstBone) {
          bone(texels, firstBone, vertexBoneIds.w) * vertexBoneWeights.w;
 }
 
+// The texel where the (key, weight) pairs of the shape keys a copy shows start, in `texels`; below
+// 0 when it shows none or the part has none.
+float shapeKeysOf(sampler2D texels, int record) {
+  return morphFirst < 0.0 ? NO_SHAPE_KEYS : texelOf(texels, record + MORPH_TEXEL).w;
+}
+
+// Where shape key `key`'s delta of this vertex's position is (its normal's is the next texel).
+int deltaOf(float key) {
+  return int(morphFirst) + (int(key) * int(morphVertices) + gl_VertexID) * TEXELS_PER_MORPH_VERTEX;
+}
+
+// `base` moved by the shape keys whose pairs start at texel `first` of `texels`: their position
+// deltas (`part` 0) or their normal deltas (`part` 1), each times its weight.
+vec3 shaped(vec3 base, sampler2D texels, float first, int part) {
+  if (first < 0.0) return base;
+  for (int i = 0; i < MORPH_TEXELS; ++i) {
+    vec4 pairs = texelOf(texels, int(first) + i);
+    base += pairs.y * texelOf(morphTexels, deltaOf(pairs.x) + part).xyz;
+    base += pairs.w * texelOf(morphTexels, deltaOf(pairs.z) + part).xyz;
+  }
+  return base;
+}
+
 // Whether a copy whose record says `look` is placed by its skeleton. (A copy whose skeleton could
 // not be posed has no first bone: it stays as modeled.)
 bool posed(vec4 look) { return skinned > SWITCH_ON && look.a >= 0.0; }
@@ -94,10 +125,10 @@ vec4 swayed(vec4 world, float ground, float wind, float clock) {
   return world;
 }
 
-// The vertex placed by `toWorld` (its record's matrix, or its skeleton's pose), swayed as the
-// record says.
-vec4 placedBy(mat4 toWorld, float ground, sampler2D texels, int record, float clock, bool previous) {
-  vec4 world = toWorld * vec4(vertexPosition, 1.0);
+// The vertex (at `position`, shaped by its shape keys) placed by `toWorld` (its record's matrix,
+// or its skeleton's pose), swayed as the record says.
+vec4 placedBy(mat4 toWorld, vec3 position, float ground, sampler2D texels, int record, float clock, bool previous) {
+  vec4 world = toWorld * vec4(position, 1.0);
   float wind = windAmount * texelOf(texels, record + NORMAL_TEXEL).w;  // (the record's own, not its skeleton's)
   if (wind > 0.0) world = swayed(world, ground, wind, clock);
   if (waterEnabled > SWITCH_ON) world.y += waterDeformation(world.xz, clock, previous).x;
@@ -110,7 +141,8 @@ vec4 placed(sampler2D texels, int record, float clock, bool previous) {
   mat4 toWorld = matrixOf(texels, record);
   float ground = toWorld[3].y;
   if (posed(look)) toWorld = skeletonPose(texels, int(look.a));
-  return placedBy(toWorld, ground, texels, record, clock, previous);
+  vec3 position = shaped(vertexPosition, texels, shapeKeysOf(texels, record), POSITION_DELTA);
+  return placedBy(toWorld, position, ground, texels, record, clock, previous);
 }
 
 // How much of a copy `distance` meters away is kept as it fades out at the far end of its
@@ -145,17 +177,35 @@ void main() {
     toWorld = skeletonPose(frameTexels, int(look.a));  // (worked out once, for the position and the normals)
     normalToWorld = mat3(toWorld);  // good enough for normals: they are normalized, and rigs are not sheared
   }
-  vec4 world = placedBy(toWorld, ground, frameTexels, record, time, false);
+  float shapes = shapeKeysOf(frameTexels, record);
+  vec3 position = shaped(vertexPosition, frameTexels, shapes, POSITION_DELTA);
+  vec4 world = placedBy(toWorld, position, ground, frameTexels, record, time, false);
   fragPosition = world.xyz;
   fragTexCoord = vertexTexCoord;
   fragColor = vertexColor;
-  fragNormal = normalize(normalToWorld * vertexNormal);
+  fragNormal = normalize(normalToWorld * shaped(vertexNormal, frameTexels, shapes, NORMAL_DELTA));
   fragTint = look.rgb;
   gl_Position = matProjection * matView * world;
 }
 )GLSL";
 
+// The shape-key numbers the vertex shaders and the engine agree on (morph_shapes.hpp and
+// instance_records.hpp), as GLSL constants.
+inline std::string shape_key_limits() {
+  const auto constant = [](const char* type, const char* name, const std::string& value) {
+    return std::string("const ") + type + " " + name + " = " + value + ";\n";
+  };
+  return constant("int", "MORPH_TEXEL", std::to_string(render_math::kMorphTexel)) +
+         constant("int", "MORPH_TEXELS", std::to_string(render_math::kMorphTexels)) +
+         constant("int", "TEXELS_PER_MORPH_VERTEX", std::to_string(render_math::kTexelsPerMorphVertex)) +
+         constant("int", "POSITION_DELTA", std::to_string(render_math::kPositionDeltaTexel)) +
+         constant("int", "NORMAL_DELTA", std::to_string(render_math::kNormalDeltaTexel)) +
+         constant("float", "NO_SHAPE_KEYS", std::to_string(render_math::kNoMorphs));
+}
+
 // The lit (and depth) pass's vertex shader, whole.
-inline std::string lit_vertex() { return std::string(kVertexHead) + kWaterWaves + kVertexPlacement + kLitVertexMain; }
+inline std::string lit_vertex() {
+  return std::string(kVertexHead) + kWaterWaves + shape_key_limits() + kVertexPlacement + kLitVertexMain;
+}
 
 }  // namespace redgem::shaders

@@ -89,6 +89,13 @@ struct MaterialDesc {
   WaterDesc water;
 };
 
+// A shape key (glTF morph target) of a primitive: how far each of its vertices moves, and how its
+// normal turns, when the key is applied whole (weight 1).
+struct MorphTarget {
+  std::vector<float> positions;  // xyz per vertex, as many as the primitive's positions
+  std::vector<float> normals;    // xyz per vertex; empty when the key leaves the normals as they are
+};
+
 struct PrimitiveDesc {
   std::vector<float> positions;        // xyz
   std::vector<float> normals;          // xyz, same count as positions
@@ -99,8 +106,13 @@ struct PrimitiveDesc {
   // how much each one moves it.
   std::vector<std::uint16_t> joints;  // 4 per vertex, indices into SkinDesc::joints
   std::vector<float> weights;         // 4 per vertex
+  // Shape keys, as many as the mesh has (MeshDesc::target_names), in its order.
+  std::vector<MorphTarget> targets;
   int material = kNoIndex;
 };
+
+// Whether a shape key moves each of a primitive's vertices (and turns each normal, or none).
+bool fits_primitive(const MorphTarget& target, const PrimitiveDesc& primitive);
 
 // Makes every joint of a primitive's vertices one of a skeleton of `joints` joints: one past its
 // last becomes its first, whose bone is there (a file may name joints its skeleton does not have).
@@ -124,7 +136,11 @@ struct Bounds {
 struct MeshDesc {
   std::string name;
   std::vector<PrimitiveDesc> primitives;
-  Bounds bounds;  // in the mesh's local space
+  Bounds bounds;  // in the mesh's local space (with every shape key applied whole too)
+  // Its shape keys (every primitive has them all, in this order): their names ("Key 3" for one
+  // the file does not name) and how much of each an object of the mesh starts with.
+  std::vector<std::string> target_names;
+  std::vector<float> target_weights;
 };
 
 struct CameraDesc {
@@ -177,14 +193,17 @@ struct SkinDesc {
   std::vector<std::array<float, kFloatsPerMatrix>> inverse_bind;
 };
 
-enum class AnimationPath { Translation, Rotation, Scale };
+// What a channel animates: where a node is, how it is turned, its scale, or the weights of the
+// shape keys of its mesh.
+enum class AnimationPath { Translation, Rotation, Scale, Weights };
 
 // The keyframes of one property of one node.
 struct AnimationChannel {
   int node = kNoIndex;
   AnimationPath path = AnimationPath::Translation;
-  std::vector<float> times;   // seconds, increasing
-  std::vector<float> values;  // 3 floats per key (4 for rotations: x y z w)
+  std::vector<float> times;  // seconds, increasing
+  // 3 floats per key (4 for rotations: x y z w; for weights, one per shape key of the node's mesh).
+  std::vector<float> values;
 };
 
 struct AnimationDesc {

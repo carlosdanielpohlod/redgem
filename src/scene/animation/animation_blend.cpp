@@ -83,6 +83,12 @@ AnimationChannel merged_channel(ChannelKey key, const ChannelValue& value) {
   return channel;
 }
 
+// Whether a channel takes part in a blend of clips: one of a node there is that places it. (Weights
+// of shape keys are left to the clips as they play.)
+bool blends(const AnimationChannel& channel, std::size_t nodes) {
+  return is_index_of(channel.node, nodes) && channel.path != AnimationPath::Weights;
+}
+
 void add_layout_channel(AnimationBlendLayout& layout, const AnimationChannel& channel, std::size_t index,
                         std::size_t clips) {
   auto& channels = layout[{channel.node, channel.path}];
@@ -96,7 +102,7 @@ AnimationBlendLayout animation_blend_layout(const std::vector<AnimationDesc>& cl
   AnimationBlendLayout layout;
   for (std::size_t index = 0; index < clips.size(); ++index) {
     for (const auto& channel : clips[index].channels) {
-      if (!is_index_of(channel.node, nodes)) continue;
+      if (!blends(channel, nodes)) continue;
       add_layout_channel(layout, channel, index, clips.size());
     }
   }
