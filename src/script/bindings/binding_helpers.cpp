@@ -58,6 +58,11 @@ Vec3 vec3_from_vector(mrb_state* mrb, mrb_value vector) {
 // An Array of three: [x, y, z].
 bool is_triple(mrb_value value) { return mrb_array_p(value) && RARRAY_LEN(value) == kVectorComponents; }
 
+// An object that is staying (not about to be destroyed) and is not a template (a prefab).
+bool is_placeable(const Scene& objects, ObjectId id) {
+  return !objects.at(id).pending_destroy && !objects.is_prefab(id);
+}
+
 }  // namespace
 
 ScriptContext& context(mrb_state* mrb) { return script_host(mrb).context(); }
@@ -82,6 +87,14 @@ GameObject& alive_object(mrb_state* mrb, mrb_value self) {
 }
 
 ObjectId alive_id(mrb_state* mrb, mrb_value self) { return alive_object(mrb, self).id; }
+
+ObjectId placeable_id(mrb_state* mrb, mrb_value value, const char* what) {
+  if (!is_game_object(mrb, value)) mrb_raisef(mrb, E_TYPE_ERROR, "%s expects a GameObject, not %v", what, value);
+  const ObjectId id = alive_id(mrb, value);
+  if (!is_placeable(scene(mrb), id))
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "%s %v is a template or is being destroyed", what, value);
+  return id;
+}
 
 bool is_vector3(mrb_state* mrb, mrb_value value) {
   return mrb_obj_is_kind_of(mrb, value, mrb_class_get(mrb, kVector3Class));

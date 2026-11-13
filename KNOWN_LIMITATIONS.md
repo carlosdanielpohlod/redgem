@@ -125,8 +125,20 @@ the same pull request.
   files, sockets or `eval` (on purpose: a game cannot touch the player's machine).
 - `a&.b.c` does not stop at `a` being nil as it does in other Rubies: write `a&.b&.c`.
 - All text the engine and editor show is English. Games translate their own texts.
-- `Scene.spawn` cannot name or parent the copy, and an object's parent cannot be changed from a
-  script. The scene's first camera is the game's camera: a script cannot switch to another.
+- `Camera.cut_to` fades through black only: there is no crossfade (the renderer draws one camera
+  a frame) and no wipe. The black covers the world, never the UI.
+- The choice of camera (`Camera.main =`) belongs to the scene: a scene loaded anew is seen
+  through its own first camera, and a cut in progress stops with the scene it played in.
+- The engine never moves the sound listener: a game that switches cameras moves
+  `Audio.listener` with `Camera.main` itself.
+- Only kinematic bodies and triggers ride with a moving parent. A dynamic body, a character and
+  a vehicle are simulated in the world and keep their own motion; a static collider stays where
+  it was made (a script setting its position moves it). A vehicle's wheels cannot change parent,
+  and an object put under a vehicle does not become a wheel.
+- An object that an animation clip poses keeps being posed by it under a new parent; a part taken
+  out of a spawned copy is no longer posed by that copy's clip.
+- An object checkpoint (`Save`) is tied to the parent its object had: after a change of parent it
+  no longer restores.
 - Custom properties that are lists or objects in the scene file are dropped with a warning: a
   property is a number, a text or true/false.
 - Limits a game can reach: 64 hits per physics query, 4096 live particles and 256 emitters, 4096
@@ -251,7 +263,13 @@ not a promise of how it will be closed.
 
 - Joints are made from scripts only: a level cannot set one up in Blender or the editor.
 - Animation clips have no events (footsteps, hit frames), no root motion and no IK.
-- No navigation mesh or pathfinding.
+- Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
+  262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
+  cells (a longer way gives `nil`). Moving bodies, characters and triggers are not obstacles; a
+  level a script changes needs `Navigation.bake`; there are no off-grid links (jumps, ladders,
+  teleporters), no navigation areas with costs, no crowd steering and no bake preview in the editor
+  while editing (`Navigation.draw` shows the grid while playing). A bake runs on the main thread as
+  the scene loads.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
   layout, torque and suspension cannot be set from properties.
 - A scene holds at most 4096 physics bodies at once (a fixed size, not set per game). An object

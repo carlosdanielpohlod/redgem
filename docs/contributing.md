@@ -184,6 +184,7 @@ src/scene     scene graph (objects, transforms, copies), particles, the custom p
               animations, Blender extras), animation/ (clips and their playback), shapes/
               (primitives and terrain)
 src/physics   PhysicsWorld interface + Jolt implementation
+src/navigation the walkable grid baked from the static bodies, paths on it (A*, pulled straight)
 src/input     keys, axes/actions, keyboard, mouse, gamepad and scripted input sources; a touch
               screen's on-screen controls (touch_input_source.hpp), which only the program for
               a touch screen puts in front of the others
@@ -232,8 +233,8 @@ cmake         dependencies (pinned versions) and file embedding
 ```
 
 The folders of `src` are layers, in the order above: each includes only itself and what is below
-it (`core`; then `scene`, `net`, `input`, `audio`, `physics`, `storage`; then `render` and
-`script`; then `app`; then `server`, `editor`, `project`; `testing` sees everything and nothing
+it (`core`; then `scene`, `net`, `input`, `audio`, `physics`, `storage`; then `navigation`
+(above `physics`) and `render`; then `script`; then `app`; then `server`, `editor`, `project`; `testing` sees everything and nothing
 sees it).
 Each layer keeps its own numbers in a `<layer>_config.hpp` next to its code.
 

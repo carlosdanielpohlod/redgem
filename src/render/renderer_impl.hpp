@@ -162,6 +162,7 @@ struct TemporalState {
   std::uint64_t frame = 0;     // frames mixed so far: the jitter's phase
   std::size_t latest = 0;      // which of the histories holds the newest mix
   render_math::TemporalView view;
+  std::uint64_t viewer = 0;    // the serial of the camera object this frame is seen through
   Vector2 depth_projection{};  // unjittered projection z coefficients
   Vector2 current_jitter{};    // projection shift in texture coordinates
   Vector2 previous_jitter{};
