@@ -121,6 +121,13 @@ void read_servers(const nlohmann::json& json, GameManifest& manifest) {
   manifest.settings.servers = net::read_server_pins(json[net::kServersKey], manifest.servers_warnings);
 }
 
+void read_navigation(const nlohmann::json& json, GameManifest& manifest) {
+  if (!json.contains(nav::kSectionKey)) return;
+  NavSettingsReading reading = nav_settings_from_json(json[nav::kSectionKey]);
+  manifest.settings.navigation = reading.settings;
+  manifest.navigation_warnings = std::move(reading.warnings);
+}
+
 // What a game that says nothing is: named after its folder, with the engine's window.
 GameManifest default_manifest(const std::filesystem::path& game_dir) {
   GameManifest manifest;
@@ -146,6 +153,7 @@ GameManifest read_game_manifest(const std::filesystem::path& game_dir) {
   manifest.script_budget_error = read_script_budget(json, manifest.settings);
   read_physics(json, manifest);
   read_servers(json, manifest);
+  read_navigation(json, manifest);
   return manifest;
 }
 

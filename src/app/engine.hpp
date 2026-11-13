@@ -19,6 +19,7 @@
 #include "net/http/http_client.hpp"
 #include "net/discovery/lan_discovery.hpp"
 #include "net/network_session.hpp"
+#include "navigation/navigation.hpp"
 #include "physics/physics_world.hpp"
 #include "render/hud.hpp"
 #include "scene/animation/animation_player.hpp"
@@ -147,8 +148,11 @@ class Engine {
 
   // Starting up, in this order (the first scene is in place by then).
   void initialize();
-  // The scene, its animations and its bodies, which collide as game.json's layers say.
-  void build_world(const CollisionLayers& layers);
+  // The scene, its animations and its bodies, which collide as game.json's layers say; and how
+  // its navigation grid is baked.
+  void build_world(const GameSettings& settings);
+  // Bakes the running scene's navigation grid now, and logs what it cost.
+  void bake_navigation();
   void open_presenter(const GameSettings& settings);
   void open_audio();
   void open_saves();
@@ -171,6 +175,8 @@ class Engine {
   // Whether the game is a room of a dedicated server (see EngineOptions::server_room).
   bool serves_a_room() const { return !options_.server_room.empty(); }
   void connect_effects();
+  // The scene, its bodies and its navigation, for the scripts.
+  void connect_world();
   void connect_saves();
   void select_save_slot(const std::string& name);
   void fill_context(const GameSettings& settings);
@@ -249,6 +255,7 @@ class Engine {
   Scene scene_;
   std::unique_ptr<PhysicsWorld> physics_;
   CollisionLayers collision_layers_;  // game.json's: every scene's physics world has them
+  Navigation navigation_;             // where characters walk in the running scene
   InputState input_;
   ScriptedInputSource scripted_input_;
   std::filesystem::path bindings_file_;  // empty: the players' bindings are kept nowhere

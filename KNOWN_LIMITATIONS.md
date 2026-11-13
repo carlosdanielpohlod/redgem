@@ -277,7 +277,13 @@ not a promise of how it will be closed.
 
 - Joints are made from scripts only: a level cannot set one up in Blender or the editor.
 - Animation clips have no IK.
-- No navigation mesh or pathfinding.
+- Navigation (`Navigation.path`) walks a 2.5D grid baked from the scene's static bodies, at most
+  262,144 columns (a larger level gets larger cells), and a search looks at no more than 16,384
+  cells (a longer way gives `nil`). Moving bodies, characters and triggers are not obstacles; a
+  level a script changes needs `Navigation.bake`; there are no off-grid links (jumps, ladders,
+  teleporters), no navigation areas with costs, no crowd steering and no bake preview in the editor
+  while editing (`Navigation.draw` shows the grid while playing). A bake runs on the main thread as
+  the scene loads.
 - A game's vehicle drives every axle, steers the front wheels and brakes the rear ones: drive
   layout, torque and suspension cannot be set from properties.
 - A scene holds at most 4096 physics bodies at once (a fixed size, not set per game). An object
