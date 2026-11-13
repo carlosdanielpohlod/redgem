@@ -13,32 +13,45 @@ constexpr const char* kBusyEnd =
 // How many key locks the calling thread holds, of every save.
 thread_local int keys_held = 0;
 
-// Takes `lock`: waiting for as long as it takes when the thread holds no other key, else at most
-// kNestedKeyWait (see KeyLocks).
-bool acquired(std::recursive_timed_mutex& lock) {
+}  // namespace
+
+KeyLocks::Hold::~Hold() {
+  if (owner_ != nullptr) owner_->release(entry_);
+}
+
+KeyLocks::Hold KeyLocks::hold(const std::string& slot, const std::string& key) {
+  std::unique_lock<std::mutex> table(table_lock_);
+  const Entries::iterator entry = entries_.try_emplace({slot, key}).first;
+  ++entry->second.users;
+  if (acquired(table, entry->second)) return Hold(this, entry);
+  table.unlock();
+  leave(entry);
+  throw SaveKeyBusy(kBusyStart + key + kBusyEnd);
+}
+
+// Waiting for as long as it takes when the thread holds no other key, else at most kNestedKeyWait.
+bool KeyLocks::acquired(std::unique_lock<std::mutex>& table, Entry& entry) {
+  const std::thread::id me = std::this_thread::get_id();
+  const auto free = [&entry, me] { return entry.depth == 0 || entry.owner == me; };
   if (keys_held == 0) {
-    lock.lock();
-  } else if (!lock.try_lock_for(kNestedKeyWait)) {
+    released_.wait(table, free);
+  } else if (!released_.wait_for(table, kNestedKeyWait, free)) {
     return false;
   }
+  entry.owner = me;
+  ++entry.depth;
   ++keys_held;
   return true;
 }
 
-}  // namespace
-
-KeyLocks::Hold::~Hold() {
-  if (owner_ == nullptr) return;
-  entry_->second.lock.unlock();
-  --keys_held;
-  owner_->leave(entry_);
-}
-
-KeyLocks::Hold KeyLocks::hold(const std::string& slot, const std::string& key) {
-  const Entries::iterator entry = enter({slot, key});
-  if (acquired(entry->second.lock)) return Hold(this, entry);
+void KeyLocks::release(Entries::iterator entry) {
+  {
+    const std::lock_guard<std::mutex> table(table_lock_);
+    --entry->second.depth;
+    --keys_held;
+  }
+  released_.notify_all();
   leave(entry);
-  throw SaveKeyBusy(kBusyStart + key + kBusyEnd);
 }
 
 std::size_t KeyLocks::size() {
@@ -47,13 +60,6 @@ std::size_t KeyLocks::size() {
 }
 
 // (Map entries stay where they are while others come and go: the iterator stays good.)
-KeyLocks::Entries::iterator KeyLocks::enter(const Name& name) {
-  const std::lock_guard<std::mutex> hold(table_lock_);
-  const Entries::iterator entry = entries_.try_emplace(name).first;
-  ++entry->second.users;
-  return entry;
-}
-
 void KeyLocks::leave(Entries::iterator entry) {
   const std::lock_guard<std::mutex> hold(table_lock_);
   if (--entry->second.users == 0) entries_.erase(entry);
