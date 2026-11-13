@@ -25,6 +25,15 @@ constexpr float kGlow = 1.0f;
 bool pink(::Color c) { return c.r > kBright && c.b > kBright && c.g < kDark; }
 bool green(::Color c) { return c.g > kBright && c.r < kDark && c.b < kDark; }
 
+bool has_fixture_color(::Color color) { return pink(color) || green(color); }
+
+void check_retained_texture(Texture2D texture) {
+  const Image retained = LoadImageFromTexture(texture);
+  CHECK(IsImageValid(retained));
+  if (IsImageValid(retained)) CHECK(has_fixture_color(GetImageColor(retained, 0, 0)));
+  UnloadImage(retained);
+}
+
 ImageData picture(const char* file, const char* extension) {
   const auto bytes = read_file_up_to(test::fixture("images") + "/" + file, kMaxEncodedImageBytes);
   REQUIRE(bytes.has_value());
@@ -54,12 +63,18 @@ TEST_CASE("a picture put on a material after it was uploaded is drawn, swapped a
   RenderStage stage;
   SceneDesc desc = plain_cube();
   stage.upload(desc);
+  CHECK(stage.scene_texture(kNoIndex).id == 0);
+  CHECK(stage.scene_texture(0).id == 0);
   const Picture before = stage.draw(Scene::from_desc(desc), "material_picture_none");
   CHECK(before.find(pink).count == 0);
 
   desc.images.push_back(picture("lossless.webp", ".webp"));
   show_picture(desc, 0);
   stage.sync(desc);
+  const Texture2D first = stage.scene_texture(0);
+  CHECK(first.id != 0);
+  CHECK(first.width > 0);
+  CHECK(first.height > 0);
   const Picture given = stage.draw(Scene::from_desc(desc), "material_picture_given");
   CHECK(given.find(pink).count > kVisiblePixels);
   CHECK(given.find(green).count > kVisiblePixels);
@@ -67,6 +82,8 @@ TEST_CASE("a picture put on a material after it was uploaded is drawn, swapped a
   desc.images.push_back(picture("sniff.png", ".png"));  // all green
   show_picture(desc, 1);
   stage.sync(desc);
+  CHECK(stage.scene_texture(0).id == first.id);
+  CHECK(stage.scene_texture(1).id != 0);
   const Picture swapped = stage.draw(Scene::from_desc(desc), "material_picture_swapped");
   CHECK(swapped.find(pink).count == 0);
   CHECK(swapped.find(green).count > kVisiblePixels);
@@ -76,4 +93,11 @@ TEST_CASE("a picture put on a material after it was uploaded is drawn, swapped a
   const Picture cleared = stage.draw(Scene::from_desc(desc), "material_picture_cleared");
   CHECK(cleared.find(pink).count == 0);
   CHECK(cleared.find(green).count == 0);
+
+  stage.begin_scene_texture_use();
+  stage.upload(plain_cube());
+  check_retained_texture(first);
+  stage.end_scene_texture_use();
+  CHECK(stage.scene_texture(0).id == 0);
+  CHECK(stage.scene_texture(1).id == 0);
 }

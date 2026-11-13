@@ -16,6 +16,7 @@
 #include "app/scene_files.hpp"
 #include "app/splash_screen.hpp"
 #include "core/config.hpp"
+#include "core/game_files.hpp"
 #include "core/log.hpp"
 #include "core/translations.hpp"
 #include "storage/save_file.hpp"
@@ -41,8 +42,7 @@ void describe_game(ScriptContext& context, const GameSettings& settings) {
 // Whether the game has a scene of that name. (A script names it: a name the system refuses, too long
 // for instance, is a scene that is not there, never an exception thrown through the interpreter.)
 bool has_scene_file(const std::filesystem::path& game_dir, const std::string& name) {
-  std::error_code fs_error;
-  return safe_scene_name(name) && std::filesystem::exists(scene_file(game_dir, name), fs_error);
+  return safe_scene_name(name) && game_files::is_file(scene_file(game_dir, name));
 }
 
 // The files a game keeps in the folder its engine was given: the developer's when it was given none.

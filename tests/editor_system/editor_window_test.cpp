@@ -14,6 +14,7 @@
 #include <imgui_internal.h>
 
 #include "app/bundled_game.hpp"
+#include "core/game_files.hpp"
 #include "app/game_settings.hpp"
 #include "core/files.hpp"
 #include "core/platform.hpp"
@@ -351,9 +352,12 @@ TEST_CASE("a game is built up in the editor: new objects, an imported model, mat
     CHECK(std::filesystem::file_size(built_program) == std::filesystem::file_size(REDGEM_PLAYER_FILE));
   }
   CHECK(std::filesystem::file_size(built_program) != std::filesystem::file_size(platform::executable_path()));
-  const auto built_game = bundled_game(built_program);
-  REQUIRE(built_game.has_value());
+  // (The build packs the game's files: its scene is read out of the archive, mounted as the player would.)
+  std::string open_error;
+  const auto built_game = open_bundled_game(built_program, open_error);
+  REQUIRE_MESSAGE(built_game.has_value(), open_error);
   const LoadResult built = load_gltf_scene((*built_game / "scene.glb").string());
+  game_files::unmount();
   REQUIRE(built.ok);
   CHECK(built.scene.find_node("Sphere") != kNoIndex);
   CHECK(built.scene.find_node("tower") != kNoIndex);

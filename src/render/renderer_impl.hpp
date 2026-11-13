@@ -256,6 +256,8 @@ struct Renderer::Impl {
   std::array<RenderTexture2D, render_detail::kHistories> histories{};
   // The scene's assets.
   std::vector<Texture2D> textures;
+  std::vector<Texture2D> retired_scene_textures;
+  bool scene_textures_in_use = false;
   std::vector<Material> materials;
   std::vector<MaterialDesc> material_factors;  // per material, read at draw time
   const MaterialDesc fallback_factors;         // of parts without a material: white dielectric

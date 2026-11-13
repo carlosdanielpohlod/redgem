@@ -1,6 +1,7 @@
 // The player's entry point on Android (the library a game's app loads, made of the runtime alone). The game's files
-// travel inside the APK; on the first run (and after every update) they are copied to the app's own storage, and the
-// game plays from there.
+// travel inside the APK, packed into one asset (game.rgpak, see core/game_archive.hpp), or loose when the build kept
+// them so; on the first run (and after every update) they are copied to the app's own storage, and the game plays
+// from there.
 
 #include <android/asset_manager.h>
 #include <android/configuration.h>
@@ -12,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <new>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -24,6 +26,7 @@
 #include "app/window_presenter.hpp"
 #include "app/bundled_game.hpp"
 #include "app/game_texts.hpp"
+#include "core/game_archive.hpp"
 #include "core/exit_codes.hpp"
 #include "core/log.hpp"
 #include "core/platform.hpp"
@@ -107,6 +110,7 @@ bool unpack_game(AAssetManager* assets, const std::filesystem::path& home) {
   if (already_unpacked(stamp, stamp_file)) return true;
   std::error_code ignored;
   std::filesystem::remove_all(home / kBundledGameFolder, ignored);
+  std::filesystem::remove(home / kArchiveFileName, ignored);
   const int copied = copy_game_files(assets, home);
   if (copied == 0) return false;
   // (If the stamp cannot be written the game still runs: it is only unpacked again next time.)
@@ -151,9 +155,9 @@ int play_with_phone_input(const GameWindowOptions& options, android_app* app) {
 }
 
 // Plays the game that was unpacked into the app's storage, on the whole screen.
-int play_unpacked_game(android_app* app) {
+int play_unpacked_game(android_app* app, const std::filesystem::path& game) {
   GameWindowOptions options;
-  options.game_dir = kBundledGameFolder;
+  options.game_dir = game;
   options.screen_aspect = screen_aspect(app);
   options.data_folder = players_data_folder(options.game_dir);
   const PlayerDisplay display = player_display(options.game_dir, game_data_files(options.data_folder).settings);
@@ -165,11 +169,27 @@ int play_unpacked_game(android_app* app) {
 // Plays the game with the crash handling a shipped game has: a crash writes its report in the
 // game's folder of the app's storage (crashes/, beside its save) and in the system's log, and the
 // next run says in the log that the one before crashed (see app/crash_report.hpp).
-int play_reporting_crashes(android_app* app) {
+int play_reporting_crashes(android_app* app, const std::filesystem::path& game) {
   add_game_texts();
   translations::use_language(phone_language(app));
-  crash::install_crash_handling({kBundledGameFolder, players_data_folder(kBundledGameFolder), false});
-  return play_unpacked_game(app);
+  crash::install_crash_handling({game, players_data_folder(game), false});
+  return play_unpacked_game(app, game);
+}
+
+// The unpacked game, opened (its archive checked and mounted, see app/bundled_game.hpp): the
+// relative folder "game", in the working folder. Nothing, with the reason logged, when it cannot be.
+std::optional<std::filesystem::path> open_unpacked_game() {
+  std::string error;
+  auto game = open_game_in(std::filesystem::path(), error);
+  if (!game) log::error(error);
+  return game;
+}
+
+// The unpacked game opened, then played; kExitFailure when it cannot be opened.
+int open_and_play(android_app* app) {
+  const auto game = open_unpacked_game();
+  if (!game) return kExitFailure;
+  return play_reporting_crashes(app, *game);
 }
 
 }  // namespace
@@ -193,7 +213,7 @@ int main(int, char**) {
     return kExitFailure;
   }
   try {
-    return play_reporting_crashes(app);
+    return open_and_play(app);
   } catch (const std::bad_alloc&) {
     return crash::end_out_of_memory();
   } catch (const std::exception& error) {

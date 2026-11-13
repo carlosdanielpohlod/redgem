@@ -6,11 +6,10 @@
 #include <mruby/hash.h>
 #include <mruby/variable.h>
 
-#include <fstream>
 #include <exception>
-#include <sstream>
 
 #include "core/config.hpp"
+#include "core/files.hpp"
 #include "core/log.hpp"
 #include "core/language_names.hpp"
 #include "core/translations.hpp"
@@ -101,17 +100,17 @@ RubyResult ScriptHost::load_file(const std::filesystem::path& path) {
   }
 }
 
+// (A built game's scripts are read from its archive: see core/game_files.hpp.)
 RubyResult ScriptHost::load_source(const std::filesystem::path& path) {
-  std::ifstream in(path, std::ios::binary);
-  if (!in) {
+  std::string error;
+  const std::optional<std::string> source = read_text_file(path, error);
+  if (!source) {
     RubyResult result;
     result.ok = false;
-    result.error = "cannot read " + path.string();
+    result.error = error;
     return result;
   }
-  std::stringstream buffer;
-  buffer << in.rdbuf();
-  const auto code = buffer.str();
+  const std::string& code = *source;
   const auto result = vm_.eval(code, path.u8string());
   if (result.ok) remember_source(path, code);
   return result;

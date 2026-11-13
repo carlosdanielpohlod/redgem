@@ -95,12 +95,14 @@ std::map<std::string, std::filesystem::path> android_runtimes(const std::filesys
 // the path shown to whoever has none.
 std::filesystem::path any_android_runtime_in(const std::filesystem::path& runtimes_dir);
 
-// Creates a new `stage_dir` under an existing parent and lays out what goes into the APK: assets/game/... (a copy of
-// the game, without hidden files and editors' backups), assets/game.files, assets/game.stamp, lib/<abi>/libredgem.so
-// and AndroidManifest.xml.
+// Creates a new `stage_dir` under an existing parent and lays out what goes into the APK: the
+// game's files (the ones every build ships, see shipped_files) as one asset, assets/game.rgpak, or
+// with GameLayout::Loose as a copy of the game in assets/game/...; assets/game.files (what the app
+// unpacks), assets/game.stamp, lib/<abi>/libredgem.so and AndroidManifest.xml.
 bool stage_android_game(const std::filesystem::path& game_dir,
                         const std::map<std::string, std::filesystem::path>& runtimes, const std::string& stamp,
-                        const std::filesystem::path& stage_dir, std::string& error);
+                        const std::filesystem::path& stage_dir, std::string& error,
+                        GameLayout layout = GameLayout::Packed);
 
 // Lets only its owner read and write a file: a signing key is nobody else's on a shared machine.
 void keep_to_owner(const std::filesystem::path& file);
@@ -137,6 +139,7 @@ bool pack_android_bundle(const AndroidTools& tools, const std::string& bundletoo
 std::optional<std::filesystem::path> build_android_game(const std::filesystem::path& game_dir,
                                                         const std::filesystem::path& out_dir,
                                                         const std::filesystem::path& runtimes_dir, std::string& error,
-                                                        AndroidFormat format = AndroidFormat::Apk);
+                                                        AndroidFormat format = AndroidFormat::Apk,
+                                                        GameLayout layout = GameLayout::Packed);
 
 }  // namespace redgem

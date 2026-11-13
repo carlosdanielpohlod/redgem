@@ -80,6 +80,7 @@ void EditorApp::aim_viewport_camera() {
 
 void EditorApp::upload_preview_assets() {
   renderer_->upload(session_->preview_desc());
+  preview_upload_ = renderer_->scene_upload_count();
   preview_generation_ = session_->preview_generation();
 }
 
