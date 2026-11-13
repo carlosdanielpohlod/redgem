@@ -198,7 +198,7 @@ class NetworkSession {
     int asking_as = 0;      // the id a newcomer would have, while the game decides on it
     int ticket = 0;         // ... and what the decision names
     float asking_for = 0.0f;
-    std::string token;  // what gets its place back should it drop (empty: none is held for it)
+    std::string token{};  // what gets its place back should it drop (empty: none is held for it)
 
     bool let_in() const { return peer != 0; }
     bool asking() const { return asking_as != 0; }
@@ -215,9 +215,9 @@ class NetworkSession {
   // A place the host holds for a machine whose connection dropped (allow_reconnect).
   struct Held {
     int peer = 0;
-    std::string token;
+    std::string token{};
     float held_for = 0.0f;
-    std::vector<int> departed;  // who left meanwhile (an id may be someone else's by its return)
+    std::vector<int> departed{};  // who left meanwhile (an id may be someone else's by its return)
   };
 
   // How a guest calls its host again, with what, and for how long (allow_reconnect).
