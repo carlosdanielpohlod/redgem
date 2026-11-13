@@ -221,6 +221,7 @@ bool SceneDocument::sync_for_writing(std::string& error) {
   for (const int mesh : unsaved_meshes_) {
     if (!store_mesh_vertices(mesh, error)) return false;
   }
+  sync_buffer();
   return true;
 }
 

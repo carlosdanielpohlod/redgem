@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 #include "scene/shapes/terrain.hpp"
+#include "scene/scene_config.hpp"
 
 namespace redgem {
 namespace {
@@ -90,7 +92,65 @@ bool sculpt_reached(PrimitiveDesc& mesh, const TerrainGrid& grid, const Stroke& 
   return touched;
 }
 
+std::uint8_t blended_color(std::uint8_t previous, float target, float share) {
+  const float value = std::clamp(target, 0.0f, 1.0f) * config::kMaxColorByte;
+  return static_cast<std::uint8_t>(std::lround(previous + (value - previous) * share));
+}
+
+bool tint_vertex(std::vector<std::uint8_t>& colors, std::size_t at, Color tint, float share) {
+  const float channels[] = {tint.r, tint.g, tint.b};
+  bool changed = false;
+  for (std::size_t i = 0; i < std::size(channels); ++i) {
+    const auto painted = blended_color(colors[at + i], channels[i], share);
+    changed |= colors[at + i] != painted;
+    colors[at + i] = painted;
+  }
+  return changed;
+}
+
+bool paint_vertex(PrimitiveDesc& mesh, const TerrainGrid& grid, const TerrainBrush& brush, Color tint, int column,
+                  int row) {
+  const float distance = std::hypot(grid.coordinate(column) - brush.x, grid.coordinate(row) - brush.z);
+  const float share = std::clamp(brush.amount * falloff(distance, brush.radius), 0.0f, kFullWeight);
+  if (share <= 0.0f) return false;
+  const auto vertex = grid.vertex_offset(column, row) / config::kFloatsPerPosition;
+  return tint_vertex(mesh.colors, vertex * config::kChannelsPerColor, tint, share);
+}
+
+bool paint_reached(PrimitiveDesc& mesh, const TerrainGrid& grid, const TerrainBrush& brush, Color tint) {
+  const auto columns = span_under(grid, brush.x, brush.radius);
+  const auto rows = span_under(grid, brush.z, brush.radius);
+  bool changed = false;
+  for (int row = rows.first; row <= rows.last; ++row) {
+    for (int column = columns.first; column <= columns.last; ++column) {
+      changed |= paint_vertex(mesh, grid, brush, tint, column, row);
+    }
+  }
+  return changed;
+}
+
+bool valid_paint(const TerrainBrush& brush, Color tint) {
+  const bool finite_position = std::isfinite(brush.x) && std::isfinite(brush.z);
+  const bool finite_strength = std::isfinite(brush.radius) && std::isfinite(brush.amount);
+  const bool finite_tint = std::isfinite(tint.r) && std::isfinite(tint.g) && std::isfinite(tint.b);
+  return finite_position && finite_strength && finite_tint && brush.radius > 0.0f && brush.amount > 0.0f;
+}
+
 }  // namespace
+
+bool paint_terrain(PrimitiveDesc& mesh, const TerrainGrid& grid, const TerrainBrush& brush, Color tint) {
+  const bool can_paint = grid.fits(mesh) && grid.covers(brush.x, brush.z) && valid_paint(brush, tint);
+  if (!can_paint) return false;
+  const auto size = mesh.positions.size() / config::kFloatsPerPosition * config::kChannelsPerColor;
+  const bool blank = mesh.colors.empty();
+  if (blank) mesh.colors.resize(size, config::kMaxColorByte);
+  if (mesh.colors.size() != size) return false;
+  auto bounded = brush;
+  bounded.radius = std::min(brush.radius, grid.size);
+  const bool changed = paint_reached(mesh, grid, bounded, tint);
+  if (blank && !changed) mesh.colors.clear();
+  return changed;
+}
 
 bool sculpt_terrain(PrimitiveDesc& mesh, const TerrainGrid& grid, const TerrainBrush& brush) {
   const bool nothing_to_sculpt = !grid.fits(mesh) || brush.radius <= 0.0f;

@@ -148,7 +148,7 @@ the same pull request.
 - A model whose glTF keeps its data in several buffers cannot be imported or pasted: export a
   single `.glb` from Blender.
 - A character duplicated in the editor keeps the pose it was copied in.
-- Terrain is sculpted only: one 100 m square with one color and roughness, no texture painting,
+- Terrain is one 100 m square with vertex tint painting and one material, no texture-layer painting,
   no holes cut through it, and no joining of several terrains. A terrain re-exported from Blender
   is an ordinary mesh.
 

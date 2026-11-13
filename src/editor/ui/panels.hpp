@@ -24,6 +24,8 @@ namespace redgem::ui {
 struct TerrainTool {
   bool sculpting = false;  // while on, dragging the left button over the selected terrain reshapes it
   SculptMode mode = SculptMode::Raise;
+  bool painting = false;
+  Color tint{};
   float radius = editor_config::kDefaultBrushRadius;  // meters
   // Meters per second for Raise and Lower; how fast Smooth and Flatten act.
   float strength = editor_config::kDefaultBrushStrength;

@@ -48,6 +48,18 @@ bool SceneDocument::sculpt_terrain(int node, const TerrainBrush& brush) {
   return true;
 }
 
+bool SceneDocument::paint_terrain(int node, const TerrainBrush& brush, Color tint) {
+  const auto grid = terrain_grid(node);
+  if (!grid) return false;
+  const int mesh = desc_.nodes[static_cast<std::size_t>(node)].mesh;
+  auto& ground = desc_.meshes[static_cast<std::size_t>(mesh)].primitives.front();
+  if (!redgem::paint_terrain(ground, *grid, brush, tint)) return false;
+  changed_meshes_.insert(mesh);
+  unsaved_meshes_.insert(mesh);
+  touch();
+  return true;
+}
+
 void SceneDocument::mark_reshaped(int mesh) {
   MeshDesc& target = desc_.meshes.at(static_cast<std::size_t>(mesh));
   target.bounds = mesh_bounds_of(target.primitives.front());
@@ -59,9 +71,11 @@ void SceneDocument::restore_shapes(const std::map<int, MeshShape>& shapes) {
   for (const auto& [mesh, shape] : shapes) {
     MeshDesc& target = desc_.meshes.at(static_cast<std::size_t>(mesh));
     PrimitiveDesc& ground = target.primitives.front();
-    if (ground.positions == shape.positions) continue;
+    const bool unchanged = ground.positions == shape.positions && ground.colors == shape.colors;
+    if (unchanged) continue;
     ground.positions = shape.positions;
     ground.normals = shape.normals;
+    ground.colors = shape.colors;
     mark_reshaped(mesh);
   }
 }
@@ -74,7 +88,7 @@ std::vector<int> SceneDocument::take_changed_meshes() {
 
 bool SceneDocument::store_mesh_vertices(int mesh, std::string& error) {
   const MeshDesc& source = desc_.meshes.at(static_cast<std::size_t>(mesh));
-  const nlohmann::json& attributes =
+  nlohmann::json& attributes =
       glb_.json[kMeshes][static_cast<std::size_t>(mesh)][kPrimitives][kOnlyPrimitive][kAttributes];
   const auto positions = attributes.at(kPositionAttribute).get<std::size_t>();
   const auto normals = attributes.at(kNormalAttribute).get<std::size_t>();
@@ -84,6 +98,7 @@ bool SceneDocument::store_mesh_vertices(int mesh, std::string& error) {
     return false;
   }
   glb_geometry::write_bounds(glb_.json[kAccessors][positions], source.bounds);
+  glb_geometry::store_vertex_colors(glb_, attributes, source.primitives.front().colors);
   return true;
 }
 

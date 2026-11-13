@@ -28,6 +28,9 @@ void write_bounds(nlohmann::json& accessor, const Bounds& bounds);
 // Appends raw bytes to the binary chunk, aligned; returns where they start.
 std::size_t append_binary(GlbFile& glb, const std::uint8_t* data, std::size_t bytes);
 
+// Stores a changed color stream without overwriting a potentially shared accessor.
+void store_vertex_colors(GlbFile& glb, nlohmann::json& attributes, const std::vector<std::uint8_t>& colors);
+
 // A mesh of one part: its vertex streams and indices go into the file as new buffer views and
 // accessors (the positions with `bounds`), and the mesh after the file's others. Returns the
 // mesh's index.

@@ -14,6 +14,7 @@
 #include "editor/document/glb_file.hpp"
 #include "editor/document/scene_document.hpp"
 #include "scene/shapes/primitives.hpp"
+#include "scene/scene_config.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
 
@@ -895,6 +896,41 @@ std::filesystem::path raw_glb(const std::string& name, std::string text) {
 }
 
 }  // namespace
+
+TEST_CASE("terrain paint can be undone, redone and saved as vertex colors") {
+  constexpr TerrainGrid kGrid{40.0f, 20};
+  constexpr TerrainBrush kBrush{0.0f, 0.0f, 6.0f, 1.0f, SculptMode::Smooth};
+  constexpr Color kTint{0.0f, 0.0f, 0.0f, 1.0f};
+  const auto path = temp_copy_path("painted-terrain");
+  SceneDocument doc = SceneDocument::create_empty(path);
+  const int terrain = doc.add_terrain("Terrain", kGrid, {});
+  const int mesh = doc.node(terrain).mesh;
+  const auto ground = [&] { return doc.desc().meshes[static_cast<std::size_t>(mesh)].primitives.front(); };
+  const auto before = ground();
+  doc.checkpoint();
+  REQUIRE(doc.paint_terrain(terrain, kBrush, kTint));
+  const auto painted = ground();
+  CHECK(painted.positions == before.positions);
+  CHECK(painted.normals == before.normals);
+  REQUIRE_FALSE(painted.colors.empty());
+  CHECK(painted.colors.front() == config::kMaxColorByte);
+  CHECK(*std::min_element(painted.colors.begin(), painted.colors.end()) == 0);
+  REQUIRE(doc.undo());
+  CHECK(ground().colors.empty());
+  REQUIRE(doc.redo());
+  CHECK(ground().colors == painted.colors);
+
+  std::string error;
+  REQUIRE_MESSAGE(doc.save(error), error);
+  const LoadResult loaded = load_gltf_scene(path.string());
+  REQUIRE_MESSAGE(loaded.ok, loaded.error);
+  const int node = loaded.scene.find_node("Terrain");
+  REQUIRE(node != kNoIndex);
+  const auto loaded_mesh = loaded.scene.nodes[static_cast<std::size_t>(node)].mesh;
+  REQUIRE(loaded_mesh != kNoIndex);
+  CHECK(loaded.scene.meshes[static_cast<std::size_t>(loaded_mesh)].primitives.front().colors == painted.colors);
+  std::filesystem::remove(path);
+}
 
 TEST_CASE("a terrain whose file says its vertices start before the data is not saved over other memory") {
   constexpr TerrainGrid kGrid{40.0f, 20};
