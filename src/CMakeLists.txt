@@ -7,6 +7,7 @@ set(REDGEM_PRELUDE_SOURCES
   ${CMAKE_SOURCE_DIR}/ruby/engine/components.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/physics.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/joint.rb
+  ${CMAKE_SOURCE_DIR}/ruby/engine/navigation.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/scene.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour.rb
   ${CMAKE_SOURCE_DIR}/ruby/engine/behaviour_timers.rb
@@ -329,6 +330,13 @@ redgem_add_library(redgem_runtime
   physics/jolt/jolt_joints.cpp
   physics/jolt/jolt_physics_world_queries.cpp
   physics/jolt/jolt_physics_world_debug.cpp
+  navigation/nav_settings.cpp
+  navigation/nav_grid.cpp
+  navigation/nav_bake.cpp
+  navigation/nav_physics_probe.cpp
+  navigation/nav_path.cpp
+  navigation/nav_queries.cpp
+  navigation/navigation.cpp
   audio/audio.cpp
   audio/mixed_audio.cpp
   audio/music_player.cpp
@@ -385,6 +393,7 @@ redgem_add_library(redgem_runtime
   script/bindings/joint_args.cpp
   script/bindings/joint_bindings.cpp
   script/bindings/light_bindings.cpp
+  script/bindings/navigation_bindings.cpp
   script/bindings/profile_bindings.cpp
   script/bindings/debug_draw_bindings.cpp
   script/bindings/runtime_bindings.cpp

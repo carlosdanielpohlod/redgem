@@ -1081,6 +1081,49 @@
       "notes": "Points and axes are in world space; `anchor:` defaults to the object's position, `other_anchor:` (a distance joint's other end) to the other object's, `axis:` to up. A hinge's `limits:` are degrees [low, high] from where it starts (low -180 to 0, high 0 to 180), a slider's are meters along its axis; a hinge's `motor_speed:` needs a `motor_torque:`. A distance joint keeps between `min:` (0) and `max:` (how far apart the ends are) apart, springy with `spring:` (hertz) and `damping:`. Each kind refuses options it has no use for, and `motor` and `angle` raise for anything but a hinge. A joint needs a dynamic body at one end (one whose bodies were all made kinematic since holds nothing until one is dynamic again); it goes when either object is destroyed or the scene changes."
     },
     {
+      "name": "Navigation",
+      "about": "Where the characters a game moves can walk, and the way from one place to another.",
+      "methods": [
+        {
+          "name": "path",
+          "static": true,
+          "args": "from, to",
+          "about": "the points to walk through from near `from` to near `to` (Vector3s, both ends included), or nil when there is no way there",
+          "example": "waypoints = Navigation.path(transform.position, Scene.find('Player').transform.position)"
+        },
+        {
+          "name": "nearest",
+          "static": true,
+          "args": "point",
+          "about": "the walkable point nearest a point (within 8 m of it), or nil"
+        },
+        {
+          "name": "walkable?",
+          "static": true,
+          "args": "point",
+          "about": "whether a point is on walkable ground, up to a character's height above it"
+        },
+        {
+          "name": "draw",
+          "static": true,
+          "args": "around, radius = 10, color: :blue, alpha: 255",
+          "about": "shows the walkable cells within a radius for this frame, as Debug.box does; returns how many"
+        },
+        {
+          "name": "bake",
+          "static": true,
+          "about": "bakes the scene's grid again now (a level a script changed); returns what stats does"
+        },
+        {
+          "name": "stats",
+          "static": true,
+          "about": "how the grid was baked: {columns:, cells:, cell_size:, cells_enlarged:, milliseconds:}"
+        }
+      ],
+      "guide": "gameplay.md#chase-the-player-navigation",
+      "notes": "The grid is baked from the scene's static bodies as it loads when game.json has a `navigation` section (`cell_size` 0.25, `agent_radius` 0.4, `agent_height` 1.8, `max_step` 0.4, `max_slope` 45 degrees, `bake_on_load` true), and otherwise when a script first asks. Moving bodies, characters and triggers are not obstacles, and a level changed after the bake is not seen until `Navigation.bake`. A path goes through cells side by side no more than `max_step` apart, never cutting a corner, and is pulled straight. A search looks at no more than 16384 cells: a way longer than that gives nil, as one to a place nobody can reach does. A grid has at most 262144 columns: a larger level is baked with larger cells, with a warning."
+    },
+    {
       "name": "CharacterController",
       "about": "The body of an object with body = \"character\": walks, jumps, climbs steps.",
       "methods": [
