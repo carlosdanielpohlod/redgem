@@ -70,8 +70,8 @@ void Renderer::Impl::begin_temporal(const Environment& env, const Camera3D& came
 
 render_math::TemporalView Renderer::Impl::temporal_view(const Camera3D& camera) const {
   const Vec3 position = to_vec3(camera.position);
-  return {hdr.texture.width, hdr.texture.height, position, normalize(to_vec3(camera.target) - position),
-          camera.fovy,       scene_uploads};
+  return {hdr.texture.width, hdr.texture.height, position,       normalize(to_vec3(camera.target) - position),
+          camera.fovy,       scene_uploads,      temporal.viewer};
 }
 
 void Renderer::Impl::jitter_view() {

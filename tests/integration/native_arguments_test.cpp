@@ -89,7 +89,7 @@ TEST_CASE("what needs a running game says so to a script run without one") {
   CHECK(refuses(scripts, "Save.keys", "Save is only available while a game runs"));
   CHECK(refuses(scripts, "Network.online?", "Network is only available while a game runs"));
   CHECK(refuses(scripts, "Network.searching?", "Network is only available while a game runs"));
-  CHECK(refuses(scripts, "Scene.__spawn('Host')", "Scene.spawn only works while the game runs"));
+  CHECK(refuses(scripts, "Scene.spawn('Host')", "Scene.spawn only works while the game runs"));
 }
 
 TEST_CASE("a name that stands for nothing is refused, by what it was meant to name") {
