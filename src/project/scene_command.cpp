@@ -210,7 +210,7 @@ ToolResult compact(OpenScene& scene) {
                                                             {"written", std::to_string(report.written_bytes)},
                                                             {"left_out", std::to_string(report.left_out_bytes)}}) +
                              "\n");
-  if (!saved_compactable(scene.document.path())) result.err = tr("project.scene.compact_whole") + "\n";
+  if (!saved_compactable(scene.document.path())) result.err = std::string(tr("project.scene.compact_whole")) + "\n";
   return result;
 }
 
