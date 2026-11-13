@@ -258,19 +258,24 @@ mrb_method_t method_body(mrb_state* mrb, mrb_value found, const ApiMethod& metho
 }
 
 // What Ruby says of a method's parameters; nothing for one written in C++, of which it cannot tell.
-std::optional<Shape> ruby_shape(RubyVm& vm, const ApiClass& owner, const ApiMethod& method) {
-  mrb_state* mrb = vm.state();
-  const RubyResult found = vm.eval(owner.name, kTestFile);
-  REQUIRE_MESSAGE(found.ok, found.error);
-  const RProc* proc = ruby_proc(method_body(mrb, found.value, method));
-  if (proc == nullptr) return std::nullopt;
+// The kinds of a proc's parameters, as words: "req opt key block".
+std::string parameter_words(RubyVm& vm, const RProc* proc, const std::string& place) {
   // (mrb_obj_value takes a void*; the proc is only read)
   const RubyResult parameters = vm.call(mrb_obj_value(const_cast<RProc*>(proc)), "parameters");  // NOLINT
-  REQUIRE_MESSAGE(parameters.ok, owner.name + " " + method.name + ": " + parameters.error);
-  const RubyResult words = vm.call(mrb_top_self(mrb), "__api_shape", {parameters.value});
+  const std::string asked = place + ": " + parameters.error;
+  REQUIRE_MESSAGE(parameters.ok, asked);
+  const RubyResult words = vm.call(mrb_top_self(vm.state()), "__api_shape", {parameters.value});
   REQUIRE_MESSAGE(words.ok, words.error);
+  return RSTRING_PTR(mrb_obj_as_string(vm.state(), words.value));
+}
+
+std::optional<Shape> ruby_shape(RubyVm& vm, const ApiClass& owner, const ApiMethod& method) {
+  const RubyResult found = vm.eval(owner.name, kTestFile);
+  REQUIRE_MESSAGE(found.ok, found.error);
+  const RProc* proc = ruby_proc(method_body(vm.state(), found.value, method));
+  if (proc == nullptr) return std::nullopt;
   Shape shape;
-  std::stringstream stream(RSTRING_PTR(mrb_obj_as_string(mrb, words.value)));
+  std::stringstream stream(parameter_words(vm, proc, owner.name + " " + method.name));
   for (std::string word; stream >> word;) add_word_to_shape(shape, word);
   return shape;
 }
