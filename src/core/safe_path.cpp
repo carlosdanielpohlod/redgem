@@ -145,7 +145,7 @@ std::optional<std::filesystem::path> file_inside(const std::filesystem::path& fo
   // (A file named without a folder is in the one the program runs in.)
   const std::filesystem::path root = resolved(folder.empty() ? std::filesystem::path(kHere) : folder, fs_error);
   if (fs_error) return std::nullopt;
-  const std::filesystem::path file = resolved(root / relative, fs_error);
+  std::filesystem::path file = resolved(root / relative, fs_error);
   if (fs_error) return std::nullopt;
   if (!stays_below(file.lexically_relative(root))) return std::nullopt;
   if (!game_files::is_file(file)) return std::nullopt;

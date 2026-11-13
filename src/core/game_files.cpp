@@ -28,8 +28,10 @@ struct Mounted {
 };
 
 Mounted& mounted() {
-  static Mounted state;
-  return state;
+  // Process lifetime: a background reader can still look up a file while normal statics are being
+  // destroyed (see link_warnings in safe_path.cpp). The pointer stays reachable for leak checking.
+  static auto* const state = new Mounted;
+  return *state;
 }
 
 std::shared_ptr<const Mount> current_mount() {

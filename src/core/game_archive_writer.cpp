@@ -31,13 +31,16 @@ bool fail(const std::string& why, std::string& error) {
   return false;
 }
 
+// A raw deflate stream begun (no zlib header: the table says what the data is); false when not.
+bool began_deflate(z_stream& stream) {
+  return deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -MAX_WBITS, kDeflateMemoryLevel,
+                      Z_DEFAULT_STRATEGY) == Z_OK;
+}
+
 // `bytes` as raw deflate; nullopt when zlib cannot.
 std::optional<std::vector<std::uint8_t>> deflated(const std::vector<std::uint8_t>& bytes) {
   z_stream stream{};
-  const int level = Z_DEFAULT_COMPRESSION;
-  if (deflateInit2(&stream, level, Z_DEFLATED, -MAX_WBITS, kDeflateMemoryLevel, Z_DEFAULT_STRATEGY) != Z_OK) {
-    return std::nullopt;
-  }
+  if (!began_deflate(stream)) return std::nullopt;
   std::vector<std::uint8_t> packed(deflateBound(&stream, static_cast<uLong>(bytes.size())));
   stream.next_in = bytes.data();
   stream.avail_in = static_cast<uInt>(bytes.size());
@@ -70,14 +73,15 @@ std::uint64_t table_bytes(const std::vector<ArchiveInput>& inputs) {
   return bytes;
 }
 
-// Whether every name may go into an archive, once, and the table stays within its bounds.
-// A name that some other name has as its folder ("a" beside "a/b"), which an archive may not hold;
-// nullptr when there is none. (Sorted, a folder's files come right after the first name past it.)
+// Whether some name is inside `folder` ("a/"). (Sorted, a folder's files come right after the first
+// name past it.)
 bool has_files_in(const std::set<std::string>& names, const std::string& folder) {
   const auto next = names.lower_bound(folder);
   return next != names.end() && next->compare(0, folder.size(), folder) == 0;
 }
 
+// A name that some other name has as its folder ("a" beside "a/b"), which an archive may not hold;
+// nullptr when there is none.
 const std::string* file_named_as_folder(const std::set<std::string>& names) {
   for (const std::string& name : names) {
     if (has_files_in(names, name + "/")) return &name;
@@ -85,15 +89,22 @@ const std::string* file_named_as_folder(const std::set<std::string>& names) {
   return nullptr;
 }
 
-bool names_fit(const std::vector<ArchiveInput>& inputs, std::string& error) {
-  if (inputs.size() > kMaxArchiveEntries) return fail("a game archive holds at most so many files", error);
-  if (table_bytes(inputs) > kMaxArchiveTableBytes) return fail("the names of the game's files are too long", error);
-  std::set<std::string> names;
+// Whether every name may go into an archive, once, collected into `names`.
+bool each_name_once(const std::vector<ArchiveInput>& inputs, std::set<std::string>& names, std::string& error) {
   for (const ArchiveInput& input : inputs) {
     if (!safe_archive_name(input.name))
       return fail("'" + printable(input.name) + "' cannot go into a game archive", error);
     if (!names.insert(input.name).second) return fail("'" + printable(input.name) + "' is given twice", error);
   }
+  return true;
+}
+
+// Whether every name may go into an archive, once, and the table stays within its bounds.
+bool names_fit(const std::vector<ArchiveInput>& inputs, std::string& error) {
+  if (inputs.size() > kMaxArchiveEntries) return fail("a game archive holds at most so many files", error);
+  if (table_bytes(inputs) > kMaxArchiveTableBytes) return fail("the names of the game's files are too long", error);
+  std::set<std::string> names;
+  if (!each_name_once(inputs, names, error)) return false;
   const std::string* clash = file_named_as_folder(names);
   if (clash != nullptr) return fail("'" + printable(*clash) + "' is both a file and a folder", error);
   return true;

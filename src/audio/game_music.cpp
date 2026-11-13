@@ -24,8 +24,9 @@ struct StreamedBytes {
 };
 
 StreamedBytes& streamed() {
-  static StreamedBytes bytes;
-  return bytes;
+  // Process lifetime: music may be unloaded while normal statics are being destroyed.
+  static auto* const bytes = new StreamedBytes;
+  return *bytes;
 }
 
 void keep(const Music& music, std::vector<std::uint8_t> bytes) {
