@@ -84,7 +84,7 @@ AnimationChannel merged_channel(ChannelKey key, const ChannelValue& value) {
 }
 
 // Whether a channel takes part in a blend of clips: one of a node there is that places it. (Weights
-// of shape keys are left to the clips as they play.)
+// of shape keys are laid from each clip by its share: AnimationPlayer::weigh_graph_samples.)
 bool blends(const AnimationChannel& channel, std::size_t nodes) {
   return is_index_of(channel.node, nodes) && channel.path != AnimationPath::Weights;
 }

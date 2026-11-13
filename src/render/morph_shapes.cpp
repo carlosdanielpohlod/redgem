@@ -40,6 +40,25 @@ void append_target(std::vector<float>& texels, const MorphTarget& target, std::s
   }
 }
 
+// The larger along each axis of `reach` and how far `delta` goes either way.
+Vec3 farther(Vec3 reach, Vec3 delta) {
+  return {std::max(reach.x, std::fabs(delta.x)), std::max(reach.y, std::fabs(delta.y)),
+          std::max(reach.z, std::fabs(delta.z))};
+}
+
+Vec3 largest_delta(const std::vector<float>& deltas) {
+  Vec3 largest = Vec3::zero();
+  for (std::size_t at = 0; at + kAxes <= deltas.size(); at += kAxes) largest = farther(largest, vec3_from(&deltas[at]));
+  return largest;
+}
+
+// How far a part's shape keys, all applied whole, can take any of its vertices along each axis.
+Vec3 shape_key_reach(const PrimitiveDesc& part) {
+  Vec3 reach = Vec3::zero();
+  for (const MorphTarget& target : part.targets) reach = reach + largest_delta(target.positions);
+  return reach;
+}
+
 }  // namespace
 
 std::vector<ActiveMorph> active_morphs(const std::vector<float>& weights) {
@@ -71,6 +90,16 @@ float append_morph_deltas(std::vector<float>& texels, const PrimitiveDesc& part,
   if (!room_for(first, needed, max_texels)) return kNoMorphs;
   for (const MorphTarget& target : part.targets) append_target(texels, target, vertices);
   return static_cast<float>(first);
+}
+
+Bounds drawn_bounds(const MeshDesc& mesh) {
+  Bounds bounds = mesh.bounds;
+  if (!bounds.valid) return bounds;
+  Vec3 reach = Vec3::zero();
+  for (const PrimitiveDesc& part : mesh.primitives) reach = farther(reach, shape_key_reach(part));
+  bounds.min = bounds.min - reach;
+  bounds.max = bounds.max + reach;
+  return bounds;
 }
 
 Vec3 morphed_position(const PrimitiveDesc& part, std::size_t vertex, const std::vector<ActiveMorph>& active) {

@@ -52,6 +52,11 @@ MorphTexels morph_texels(const std::vector<ActiveMorph>& active);
 // `max_texels`.
 float append_morph_deltas(std::vector<float>& texels, const PrimitiveDesc& part, std::size_t max_texels);
 
+// The bounds a mesh is culled by: its own, grown along each axis by how far its shape keys can
+// take a vertex that way with weights between -1 and 1 at once. (Its own bounds, which physics
+// uses, are the mesh as it was modeled.)
+Bounds drawn_bounds(const MeshDesc& mesh);
+
 // Where vertex `vertex` of a part is with the shape keys `active` applied, as the shader puts it.
 Vec3 morphed_position(const PrimitiveDesc& part, std::size_t vertex, const std::vector<ActiveMorph>& active);
 

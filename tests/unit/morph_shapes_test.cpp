@@ -8,6 +8,7 @@
 #include "render/mesh_pieces.hpp"
 #include "render/morph_shapes.hpp"
 #include "scene/animation/animation.hpp"
+#include "scene/animation/animation_player.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "scene/scene.hpp"
 #include "test_support.hpp"
@@ -29,6 +30,9 @@ constexpr float kStretch = 0.5f;
 constexpr float kNormalTurn = 0.25f;
 constexpr float kSmileAtStart = 0.25f;
 constexpr std::size_t kY = 1;
+constexpr float kLayerWeight = 0.3f;
+constexpr float kFrame = 1.0f / 60.0f;
+constexpr int kFramesPastTheEnd = 120;  // two seconds of a one-second clip
 
 SceneDesc morph_fixture() {
   const LoadResult loaded = load_gltf_scene(fixture("morph.glb"));
@@ -66,9 +70,39 @@ TEST_CASE("a mesh's shape keys are read with their names, starting weights and d
   CHECK(y_of(part.targets[kSmile].positions, kTopRight) == doctest::Approx(kLift));
   CHECK(y_of(part.targets[kSmile].normals, kTopRight) == doctest::Approx(kNormalTurn));
   CHECK(part.targets[kWide].normals.empty());  // Wide leaves the normals as they are
-  // The bounds hold the square with each key applied whole.
-  CHECK(mesh.bounds.max.y == doctest::Approx(0.5f + kLift));
-  CHECK(mesh.bounds.max.x == doctest::Approx(0.5f + kStretch));
+  // The mesh's bounds (physics uses them) are the square as modeled.
+  CHECK(mesh.bounds.max.y == doctest::Approx(0.5f));
+  CHECK(mesh.bounds.max.x == doctest::Approx(0.5f));
+}
+
+TEST_CASE("a mesh is culled by where its shape keys can take it, either way") {
+  const MeshDesc mesh = morph_fixture().meshes.front();
+  const Bounds drawn = drawn_bounds(mesh);
+  CHECK(drawn.max.y == doctest::Approx(0.5f + kLift));
+  CHECK(drawn.min.y == doctest::Approx(-0.5f - kLift));  // a weight of -1 takes it down
+  CHECK(drawn.max.x == doctest::Approx(0.5f + kStretch));
+  CHECK(drawn.max.z == doctest::Approx(0.0f));
+
+  PrimitiveDesc both = lifted_row(kCorners);
+  both.targets.push_back(both.targets.front());  // two keys moving the same vertices: they add up
+  MeshDesc lifted;
+  for (std::size_t v = 0; v < kCorners; ++v) lifted.bounds.include(vec3_from(&both.positions[v * 3]));
+  lifted.primitives = {both};
+  CHECK(drawn_bounds(lifted).max.y == doctest::Approx(2.0f * static_cast<float>(kCorners - 1)));
+}
+
+TEST_CASE("a clip laid over by less than whole moves shape keys from the mesh's own weights, steadily") {
+  const SceneDesc desc = morph_fixture();
+  Scene scene = Scene::from_desc(desc);
+  AnimationPlayer player;
+  player.reset(desc.animations, scene);
+  player.stop("Talk");  // the scene's own playing of it, which would set them whole
+  REQUIRE(player.mix_on(scene, 0, "Talk", kLayerWeight, false, 1.0f));
+  for (int frame = 0; frame < kFramesPastTheEnd; ++frame) player.advance(kFrame, scene);
+  // Held at the clip's end, (1, 0.5), a share of the way from (0.25, 0): not crept up to it.
+  const GameObject& face = scene.at(0);
+  CHECK(face.morph_weights[kSmile] == doctest::Approx(kSmileAtStart + (1.0f - kSmileAtStart) * kLayerWeight));
+  CHECK(face.morph_weights[kWide] == doctest::Approx(0.5f * kLayerWeight));
 }
 
 TEST_CASE("an object starts with its mesh's shape keys, and a weights channel moves them") {

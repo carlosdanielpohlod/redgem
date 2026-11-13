@@ -45,6 +45,10 @@ struct PoseOptions {
   // Called before each channel is laid on an object, with what it is about to change (the
   // player uses it to give blends a steady pose to start from).
   std::function<void(ObjectId, AnimationPath, Transform&)> before;
+  // The same for a weights channel, with the object whose shape keys it is about to move.
+  std::function<void(GameObject&)> before_weighing;
+  // Only the clip's weights channels: its placements are laid some other way (animation graphs).
+  bool only_shape_keys = false;
 };
 void apply_animation(const AnimationDesc& clip, float time, Scene& scene, const PoseOptions& options);
 

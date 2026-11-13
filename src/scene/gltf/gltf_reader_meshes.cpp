@@ -56,19 +56,26 @@ bool reads_as_deltas(const std::vector<float>* deltas, const cgltf_attribute& at
   return deltas != nullptr && attribute.data->type == cgltf_type_vec3;
 }
 
-MorphTarget read_target(const cgltf_morph_target& source) {
+constexpr float kUnmoved = 0.0f;  // the position delta of a shape key that only turns normals
+
+// A shape key of a part of `position_floats` floats of positions; one that only turns normals
+// (glTF allows a key without POSITION) moves every vertex by nothing.
+MorphTarget read_target(const cgltf_morph_target& source, std::size_t position_floats) {
   MorphTarget target;
   for (cgltf_size a = 0; a < source.attributes_count; ++a) {
     const cgltf_attribute& attribute = source.attributes[a];
     std::vector<float>* deltas = deltas_of(attribute.type, target);
     if (reads_as_deltas(deltas, attribute)) *deltas = gltf_accessors::unpack_floats(attribute.data);
   }
+  if (target.positions.empty()) target.positions.assign(position_floats, kUnmoved);
   return target;
 }
 
-std::vector<MorphTarget> read_targets(const cgltf_primitive& primitive) {
+std::vector<MorphTarget> read_targets(const cgltf_primitive& primitive, std::size_t position_floats) {
   std::vector<MorphTarget> targets;
-  for (cgltf_size t = 0; t < primitive.targets_count; ++t) targets.push_back(read_target(primitive.targets[t]));
+  for (cgltf_size t = 0; t < primitive.targets_count; ++t) {
+    targets.push_back(read_target(primitive.targets[t], position_floats));
+  }
   return targets;
 }
 
@@ -95,16 +102,6 @@ std::string target_name(const cgltf_mesh& source, std::size_t index) {
 
 float target_weight(const cgltf_mesh& source, std::size_t index) {
   return index < source.weights_count ? source.weights[index] : 0.0f;
-}
-
-// Where a part's vertices reach with each of its shape keys applied whole.
-void include_targets(Bounds& bounds, const PrimitiveDesc& primitive) {
-  for (const MorphTarget& target : primitive.targets) {
-    for (std::size_t f = 0; f + config::kFloatsPerPosition <= target.positions.size();
-         f += config::kFloatsPerPosition) {
-      bounds.include(vec3_from(&primitive.positions[f]) + vec3_from(&target.positions[f]));
-    }
-  }
 }
 
 // Only the first set of each attribute is kept (TEXCOORD_0, COLOR_0...).
@@ -137,7 +134,6 @@ void keep_primitive(MeshDesc& mesh, PrimitiveDesc& primitive) {
   for (std::size_t v = 0; v < vertex_count_of(primitive); ++v) {
     mesh.bounds.include(vec3_from(&primitive.positions[v * config::kFloatsPerPosition]));
   }
-  include_targets(mesh.bounds, primitive);
   mesh.primitives.push_back(std::move(primitive));
 }
 
@@ -187,7 +183,7 @@ std::optional<PrimitiveDesc> GltfReader::load_primitive(const cgltf_primitive& p
   if (!read_attributes(primitive, out)) return dropped(mesh_name, "an attribute is not of the kind glTF gives it");
   if (out.positions.empty()) return dropped(mesh_name, "its positions cannot be read");
   ensure_normals(out, mesh_name);
-  out.targets = read_targets(primitive);
+  out.targets = read_targets(primitive, out.positions.size());
   out.indices = gltf_accessors::triangle_corners(primitive.indices, vertex_count_of(out));
   if (out.indices.empty()) return dropped(mesh_name, "its triangles cannot be read");
   const std::string problem = primitive_shape_problem(out);

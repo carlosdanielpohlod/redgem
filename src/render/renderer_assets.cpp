@@ -169,7 +169,7 @@ void Renderer::Impl::refresh_material_values(const SceneDesc& desc) {
 void Renderer::Impl::upload_new_meshes(const SceneDesc& desc) {
   for (std::size_t m = meshes.size(); m < desc.meshes.size(); ++m) {
     meshes.push_back(upload_mesh(desc.meshes[m], morph_deltas));
-    mesh_bounds.push_back(desc.meshes[m].bounds);
+    mesh_bounds.push_back(render_math::drawn_bounds(desc.meshes[m]));
   }
   if (morph_deltas.size() != morph_texture_floats) remake_morph_texture();
 }

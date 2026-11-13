@@ -48,6 +48,7 @@ void give_shape_keys(const SceneDesc& desc, GameObject& object) {
   const MeshDesc& mesh = desc.meshes[static_cast<std::size_t>(object.mesh)];
   object.morph_names = mesh.target_names;
   object.morph_weights = mesh.target_weights;
+  object.morph_rest = mesh.target_weights;
 }
 
 GameObject object_of(const NodeDesc& node, ObjectId id, const SceneDesc& desc) {

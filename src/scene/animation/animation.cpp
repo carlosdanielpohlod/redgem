@@ -144,6 +144,7 @@ void pose(const AnimationChannel& channel, const Playback& playback, float time,
 // A weights channel moves the object's shape keys, not its placement.
 void weigh_shape_keys(const AnimationChannel& channel, const Playback& playback, float time, GameObject& object) {
   const float at = clip_time(playback.clip, time, playback.options.loop);
+  if (playback.options.before_weighing) playback.options.before_weighing(object);
   lay_weights_over(object.morph_weights, sample_weights(channel, at), playback.options.weight);
 }
 
@@ -151,6 +152,11 @@ void pose_object(const AnimationChannel& channel, const Playback& playback, floa
   if (channel.path == AnimationPath::Weights) return weigh_shape_keys(channel, playback, time, object);
   if (playback.options.before) playback.options.before(object.id, channel.path, object.local);
   pose(channel, playback, time, object.local);
+}
+
+// Whether a channel is left alone: a placement, when only shape keys are wanted.
+bool left_alone(const AnimationChannel& channel, const PoseOptions& options) {
+  return options.only_shape_keys && channel.path != AnimationPath::Weights;
 }
 
 void pose_original(const AnimationChannel& channel, const Playback& playback, Scene& scene) {
@@ -185,6 +191,7 @@ void apply_animation(const AnimationDesc& clip, float time, Scene& scene, const 
   if (options.weight <= 0.0f) return;
   const Playback playback{clip, time, options};
   for (const AnimationChannel& channel : clip.channels) {
+    if (left_alone(channel, options)) continue;
     pose_original(channel, playback, scene);
     pose_copies(channel, playback, scene);
   }

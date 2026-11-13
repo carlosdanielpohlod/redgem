@@ -99,12 +99,15 @@ int deltaOf(float key) {
 }
 
 // `base` moved by the shape keys whose pairs start at texel `first` of `texels`: their position
-// deltas (`part` 0) or their normal deltas (`part` 1), each times its weight.
+// deltas (`part` 0) or their normal deltas (`part` 1), each times its weight. The pairs come
+// heaviest first and the unused ones weigh nothing, so the first of those ends them.
 vec3 shaped(vec3 base, sampler2D texels, float first, int part) {
   if (first < 0.0) return base;
   for (int i = 0; i < MORPH_TEXELS; ++i) {
     vec4 pairs = texelOf(texels, int(first) + i);
+    if (pairs.y == 0.0) break;
     base += pairs.y * texelOf(morphTexels, deltaOf(pairs.x) + part).xyz;
+    if (pairs.w == 0.0) break;
     base += pairs.w * texelOf(morphTexels, deltaOf(pairs.z) + part).xyz;
   }
   return base;
