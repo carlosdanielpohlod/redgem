@@ -17,6 +17,10 @@ struct Arrival {
   Connection connection;
   std::string room;     // the code of the room it asks for; empty for any room with a free place
   nlohmann::json auth;  // what it carries for the room's game to decide on (null: nothing)
+  std::string resume;   // the token of the place held for it in `room`, when it reconnects (see allow_reconnect)
+
+  // Whether it asks for its place back, in a room it names.
+  bool resumes() const { return !resume.empty() && !room.empty(); }
 };
 
 // How many machines from an address are in the server's rooms already.
@@ -49,6 +53,7 @@ class Lobby {
     Connection connection;
     std::optional<std::string> wants;  // the room it asked for, once it said ("" for any)
     nlohmann::json auth;
+    std::string resume;
 
     // Said which room it wants, and is still there to be placed.
     bool ready() const { return wants.has_value() && !connection.closed(); }

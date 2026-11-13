@@ -720,6 +720,9 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.leave`: leaves the game
 - `Network.online?`: whether this machine is in a game
 - `Network.connecting?`: whether a join is on its way
+- `Network.reconnecting?`: whether this machine's connection dropped and it is getting back in
+- `Network.reconnect_window`: seconds the game hosted here holds a dropped player's place (0: none)
+- `Network.reconnect_window = seconds`: holds a dropped player's place and id that long, up to 300 (0 turns it off)
 - `Network.host?`: whether this machine hosts
 - `Network.server?`: whether this machine is a dedicated server
 - `Network.id`: this machine's peer id
@@ -742,6 +745,9 @@ Games played together: on a local network, through a relay or on a dedicated ser
 - `Network.on_join(&block)`: someone arrived: |peer|
 - `Network.on_leave(&block)`: someone left: |peer|
 - `Network.on_fail(&block)`: a join did not work out: |reason|
+- `Network.on_reconnecting(&block)`: a connection dropped and its place is held: |peer|
+- `Network.on_reconnected(&block)`: a dropped machine is back in its place: |peer|
+- `Network.on_lost(&block)`: this machine could not get back in time: |reason|
 - `Network.authenticate(&block)`: decides who gets in: |peer, auth, decide|
 - `Network.identity(peer)`: who a peer was accepted as
 - `Network.player_name(peer)`: a peer's name

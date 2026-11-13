@@ -166,6 +166,7 @@ void Connection::keep_in_touch(float seconds) {
   since_said_ += seconds;
   if (quiet_for_ > kSilenceTimeoutSeconds) {
     close();  // gone without a goodbye
+    lost_ = true;
   } else if (since_said_ >= kPingEverySeconds) {
     send({{wire::kKind, wire::kPing}});
   }

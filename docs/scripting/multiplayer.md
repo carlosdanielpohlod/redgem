@@ -211,6 +211,36 @@ An array or a hash holds at most 4096 things (in a message: `Save` keeps any num
 until the next level is loaded, so register them in a behaviour's `start` or a scene script's
 `setup`. Names starting with `$` are the engine's own.
 
+## Reconnecting after a drop
+
+A phone switching from Wi-Fi to mobile data, or a router restarting, drops a player's connection
+for a moment. The game hosting (directly, or on a dedicated server) can hold that player's place
+and id for a while, so that it gets back in as if nothing happened:
+
+```ruby
+# on the host (on a dedicated server: in a manager's start)
+Network.reconnect_window = 20   # seconds; 0 (the default) turns it off, 300 at most
+
+Network.on_reconnecting { |peer| show_banner("#{peer} lost the connection...") }  # on the host and on that machine
+Network.on_reconnected { |peer| hide_banner }   # back, with the same id
+Network.on_lost { |reason| go_to_menu(reason) } # on that machine: it could not get back in time
+```
+
+The machine whose connection dropped stays in the game (`Network.reconnecting?` is true,
+`Network.id` and `Network.peers` stay the same; nothing can be sent meanwhile) and calls the
+host again every second. Its welcome gave it a secret token, which is what gets the place back:
+a machine that does not have it is turned away, a token gets a place back once (each return
+gives a new one), and once the window is over the place is gone. The others hear the player left
+(`on_leave`) only when the window is over; if it gets back first they hear nothing. A player
+who leaves (`Network.leave`) says so and holds no place; a host that leaves ends the game at once
+for everyone, as before.
+
+What was said while it was away is not replayed. When it is back, the host tells it the spawned
+objects as they are now (`Network.spawn`), it starts what it knows of the others' objects over,
+and the peers that came and went meanwhile arrive and leave (`on_join`, `on_leave`) on its
+machine. Messages of the game (`Network.emit`) sent meanwhile to it are lost, so keep what
+matters in state the host can send again (in an `on_reconnected` handler on the host).
+
 ## Objects in the same place everywhere
 
 A `NetworkSync` keeps an object where its **owner** has it: the owner's machine moves it as usual
@@ -322,4 +352,6 @@ target (lag compensation), so the shooter's machine should decide its own hits, 
 things once": fine for co-op and casual games, not for competitive shooters. Connections are
 encrypted, but who answers is checked only when the game gives its fingerprint (see "Encrypted
 connections"). Players are not authenticated unless the game hosting asks for it
-([Online services](online-services.md)), in a room on a relay too.
+([Online services](online-services.md)), in a room on a relay too. A room on a relay holds no
+place for a player whose connection dropped (see "Reconnecting after a drop"), and when the
+player hosting a game drops, the game ends: nobody else takes over as host.

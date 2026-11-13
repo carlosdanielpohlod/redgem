@@ -10,6 +10,7 @@
 namespace redgem::server {
 
 void GameServer::place(net::Arrival arrival) {
+  if (arrival.resumes()) return place_back(arrival);
   const Placement placement = choose_room(seats(), arrival.room, settings_.limits);
   if (placement.kind == Placement::Kind::UnknownRoom) {
     lobby_.turn_away_guess(arrival);
@@ -23,6 +24,12 @@ void GameServer::place(net::Arrival arrival) {
   }
   // A new room runs once it holds its first machine: empty, it would close at its first turn.
   if (new_room) run(*room);
+}
+
+void GameServer::place_back(net::Arrival& arrival) {
+  Room* room = find_room(arrival.room);
+  if (room == nullptr) return lobby_.turn_away_guess(arrival);
+  if (!handed_to(room, arrival)) arrival.connection.close();
 }
 
 bool GameServer::handed_to(Room* room, net::Arrival& arrival) {

@@ -101,6 +101,17 @@ the same pull request.
   game hosted directly lets 4 of them be joining at once. Whoever runs the relay, the server or
   the game has to raise these (`--per-address`, `--rooms-per-address`,
   `Network.host(waiting_per_address:)`).
+- Reconnecting (`Network.reconnect_window`) works in games hosted directly and on a dedicated
+  server, not in rooms on a relay (the relay holds no place: a player whose connection drops
+  there leaves the game). Messages sent to a player while it was away are lost, not replayed,
+  and objects spawned and removed meanwhile are set right only for `Network.spawn`'s own: other
+  state the game keeps has to be sent again by the game. A drop that neither side hears (no
+  reset arrives, the other side just goes silent) is noticed only after 45 seconds of silence,
+  so a shorter window covers only the drops that are heard (a network that changes, a router
+  that restarts). There is no transport resumption below TCP: each return is a new connection
+  and a new TLS handshake.
+- There is no host migration: when the player hosting a game leaves or drops, the game ends for
+  everyone. Hosting on a dedicated server avoids it.
 
 ## Web requests (HTTP)
 

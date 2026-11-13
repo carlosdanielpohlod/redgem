@@ -105,6 +105,19 @@ module Network
       end
     end
 
+    # Someone got its place back after its connection dropped. The host shows it the objects as
+    # they are now; the machine that was away starts over from that, keeping its own (it missed
+    # what was spawned and removed meanwhile).
+    def welcome_back(peer)
+      return send_spawned_to(peer) if host?
+
+      forget_others_objects if peer == id
+    end
+
+    def forget_others_objects
+      @spawned.to_a.each { |key, entry| remove(key) unless entry[:owner] == id }
+    end
+
     def announce_scene_reset
       mine = keys_spawned_by(id)
       __deliver(DESPAWN, mine, :all) unless mine.empty?

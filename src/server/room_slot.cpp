@@ -60,7 +60,8 @@ bool RoomSlot::visit(const std::function<void(Engine&)>& visitor) {
 void RoomSlot::admit_arrivals(net::NetworkSession& network) {
   // (All under the lock: the lobby never sees a newcomer in neither place.)
   const Hold hold(lock_);
-  for (net::Arrival& arrival : arrivals_) network.admit_arrival(std::move(arrival.connection), arrival.auth);
+  for (net::Arrival& arrival : arrivals_)
+    network.admit_arrival(std::move(arrival.connection), arrival.auth, arrival.resume);
   arrivals_.clear();
   census_locked(network);
 }

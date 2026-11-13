@@ -133,6 +133,9 @@ class GameServer {
   void report(float seconds);
   void log_when_due(float seconds);
   void place(net::Arrival arrival);
+  // A machine that reconnects goes back to the room it names, full or not (the place is its own):
+  // the room's game checks its token. A room nobody has counts as a guess.
+  void place_back(net::Arrival& arrival);
   // Whether `room` took the machine: false when there is no room, or it closed meanwhile.
   static bool handed_to(Room* room, net::Arrival& arrival);
   // A room for a newcomer, not running yet (see run); nullptr when no code was found for it.

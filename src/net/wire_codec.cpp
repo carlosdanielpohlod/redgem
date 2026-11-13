@@ -1,6 +1,7 @@
 #include "net/wire_codec.hpp"
 
 #include <algorithm>
+#include <iterator>
 
 #include "core/log.hpp"
 #include "core/platform.hpp"
@@ -75,7 +76,15 @@ bool texts_valid(const json& value) {
 
 std::string as_text(const json& message) { return message.dump(kCompact, ' ', false, json::error_handler_t::replace); }
 
-bool carries_credentials(const json& message) { return message.is_object() && message.contains(kAuth); }
+// What a log must not show of a message: a join's credentials, and the token that gets a place
+// back after a drop (a hello's, or the next one in a welcome).
+constexpr const char* kSecretKeys[] = {kAuth, kResume};
+
+bool carries_credentials(const json& message) {
+  if (!message.is_object()) return false;
+  return std::any_of(std::begin(kSecretKeys), std::end(kSecretKeys),
+                     [&message](const char* key) { return message.contains(key); });
+}
 
 bool logging_messages() {
   static const bool logging = platform::environment(kLogVariable) == kLogOn;
@@ -94,7 +103,9 @@ std::vector<std::uint8_t> msgpack(const json& message) {
 std::string log_text(const json& message) {
   if (!carries_credentials(message)) return as_text(message);
   json shown = message;
-  shown[kAuth] = kHidden;
+  for (const char* key : kSecretKeys) {
+    if (shown.contains(key)) shown[key] = kHidden;
+  }
   return as_text(shown);
 }
 

@@ -1,5 +1,6 @@
 #include <doctest/doctest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <csignal>
@@ -13,6 +14,7 @@
 
 #include "app/engine.hpp"
 #include "core/config.hpp"
+#include "integration/middleman.hpp"
 #include "integration/swordsman.hpp"
 #include "net/socket/socket.hpp"
 #include "net/traffic.hpp"
@@ -367,6 +369,42 @@ TEST_CASE("the server's turns keep to the real clock until it is asked to stop")
   CHECK(real >= kServedTurns * config::kFixedDeltaSeconds * kLateness);
   const float game = std::stof(online_game.served(player, "Time.elapsed")) - game_before;
   CHECK(std::abs(game - static_cast<float>(real)) <= kRealTimeTolerance);
+}
+
+TEST_CASE("a player whose connection to a full room drops gets its place back, with its id") {
+  Online online_game(kOneRoomOfTwo);
+  Engine& first = online_game.join();
+  const std::string room = first.network().room();
+  REQUIRE(in_room(online_game.server, room, "Network.reconnect_window = 20; Network.reconnect_window") == "20.0");
+  test::Middleman network(online_game.server.port());
+  REQUIRE(network.valid());
+  net::NetworkSession dropping;
+  std::vector<net::NetworkEvent> events;
+  const auto until = [&](const std::function<bool()>& done) {
+    return online_game.until([&] {
+      network.pump();
+      for (net::NetworkEvent& event : dropping.poll(config::kFixedDeltaSeconds)) events.push_back(std::move(event));
+      return done();
+    });
+  };
+  std::string error;
+  REQUIRE(dropping.join_room(net::kThisMachine, network.port(), room, error, nullptr, net::TlsTrust::unverified()));
+  REQUIRE(until([&] { return dropping.state() == net::NetworkSession::State::Online; }));
+  const int id = dropping.id();
+  network.block(true);
+  network.cut();
+  REQUIRE(until([&] { return dropping.state() == net::NetworkSession::State::Reconnecting; }));
+  // The room holds its place: it is still full, and the player is still in it.
+  CHECK(online_game.served(first, "Network.players.size") == "2");
+  network.block(false);
+  REQUIRE(until([&] { return dropping.state() == net::NetworkSession::State::Online; }));
+  CHECK(dropping.id() == id);
+  CHECK(dropping.room() == room);
+  CHECK(std::count_if(events.begin(), events.end(), [](const net::NetworkEvent& event) {
+          return event.kind == net::NetworkEvent::Kind::Reconnected;
+        }) == 1);
+  CHECK(online_game.served(first, "Network.players.size") == "2");
+  CHECK(ruby(first, "$log.inspect") == "[]");  // the other player never heard anything end
 }
 
 TEST_CASE("a player who floods a dedicated server's room is let go") {

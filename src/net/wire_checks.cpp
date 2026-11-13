@@ -97,6 +97,18 @@ bool is_list_of_peers(const nlohmann::json& message, const char* key) {
   return std::adjacent_find(ids.begin(), ids.end()) == ids.end();
 }
 
+// How long a welcome says its game holds a place that dropped: a number of seconds there can be.
+bool is_window(const nlohmann::json& message) {
+  if (!message.contains(wire::kWindow)) return true;
+  const nlohmann::json& seconds = message[wire::kWindow];
+  return seconds.is_number() && seconds >= 0 && seconds <= kMostReconnectWindowSeconds;
+}
+
+// What reconnecting adds to a hello or a welcome: a token as long as one is, and a window.
+bool resumes_well(const nlohmann::json& message) {
+  return is_text_up_to(message, wire::kResume, kResumeTokenDigits) && is_window(message);
+}
+
 bool is_pose(const nlohmann::json& data) { return data.is_binary() && data.get_binary().size() <= kMaxPoseBytes; }
 
 // What a message carries: a pose's bytes, or a game's data.
@@ -116,7 +128,7 @@ bool well_formed(const nlohmann::json& message) {
   return has_kind(message) && is_id(message, kFrom) && is_id(message, kTo) && is_short_text(message, kName) &&
          is_list_of_peers(message, kPeers) && is_short_text(message, kRoom) && is_flag(message, kServer) &&
          is_flag(message, kGuards) && is_text_up_to(message, kReason, kMaxReasonBytes) && is_version(message) &&
-         carries_what_it_may(message);
+         resumes_well(message) && carries_what_it_may(message);
 }
 
 bool acceptable_auth(const nlohmann::json& auth) {
