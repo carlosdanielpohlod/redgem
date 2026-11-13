@@ -16,7 +16,7 @@
 namespace redgem::render_detail {
 namespace {
 
-constexpr const char* kSkyExtensions[] = {"", ".hdr", ".png", ".jpg", ".jpeg", ".webp"};
+constexpr const char* kSkyExtensions[] = {"", ".hdr", ".png", ".jpg", ".jpeg", ".webp", ".ktx2"};
 constexpr float kGamma = 2.2f;  // the curve sRGB pictures are stored with, as the shaders take it
 
 float linear(unsigned char channel) {
@@ -73,8 +73,8 @@ std::optional<FloatImage> load_sky_picture(const std::filesystem::path& folder, 
   std::optional<FloatImage> picture = file ? decode_sky(*file, widest) : std::nullopt;
   if (!picture) {
     log::warning("no sky picture '" + printable(name) + "' that can be read in " + folder.string() +
-                 ": a Radiance (.hdr), PNG, JPEG or static WebP picture of at most " + std::to_string(kMaxImageSide) +
-                 " pixels a side");
+                 ": a Radiance (.hdr), PNG, JPEG, static WebP or KTX2 picture of at most " +
+                 std::to_string(kMaxImageSide) + " pixels a side");
   }
   return picture;
 }

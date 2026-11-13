@@ -1,6 +1,5 @@
 #include "render/texture_loading.hpp"
 
-#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
@@ -18,7 +17,7 @@ namespace redgem::render_detail {
 namespace {
 
 // How a picture's file may be named: as asked for, or with one of the kinds of picture read.
-constexpr const char* kPictureExtensions[] = {"", ".png", ".jpg", ".jpeg", ".webp"};
+constexpr const char* kPictureExtensions[] = {"", ".png", ".jpg", ".jpeg", ".webp", ".ktx2"};
 constexpr int kMissingPictureSide = 64;  // a small, opaque diagnostic pattern
 constexpr int kMissingPictureCell = 8;
 constexpr ::Color kMissingPink{255, 0, 255, 255};
@@ -50,15 +49,20 @@ Image decode_webp_picture(const EncodedImage& encoded) {
   return {};
 }
 
-// A KTX2 picture's full-size level as RGBA8, in memory raylib owns (MemFree, as UnloadImage does).
+// A KTX2 picture's full-size level as RGBA8, transcoded straight into memory raylib owns (MemFree,
+// as UnloadImage does).
 Image decode_ktx2_picture(const std::vector<std::uint8_t>& encoded) {
-  const std::optional<TranscodedLevel> level = decode_ktx2_rgba(encoded.data(), encoded.size());
-  if (!level) return {};
-  auto* data = static_cast<std::uint8_t*>(RL_MALLOC(level->bytes.size()));
+  const std::optional<Ktx2Header> header = read_ktx2_header(encoded.data(), encoded.size());
+  if (!header) return {};
+  const int width = static_cast<int>(header->size.width);
+  const int height = static_cast<int>(header->size.height);
+  const auto capacity = static_cast<std::size_t>(width) * height * kRgbaChannels;
+  auto* data = static_cast<std::uint8_t*>(RL_MALLOC(capacity));
   if (data == nullptr) return {};
-  std::copy(level->bytes.begin(), level->bytes.end(), data);
-  return {data, static_cast<int>(level->size.width), static_cast<int>(level->size.height), 1,
-          PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
+  if (decode_ktx2_rgba_into(encoded.data(), encoded.size(), data, capacity))
+    return {data, width, height, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
+  MemFree(data);
+  return {};
 }
 
 // A KTX2 picture that brought its own mipmaps, on a card that takes a compressed format: it stays

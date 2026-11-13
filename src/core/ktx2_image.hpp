@@ -32,7 +32,11 @@ struct TranscodedPicture {
 std::optional<TranscodedPicture> transcode_ktx2(const std::uint8_t* data, std::size_t size,
                                                 const GpuTextureSupport& support);
 
-// The full-size picture alone, as RGBA8 (four bytes a pixel, rows from the top).
+// The full-size picture alone, as RGBA8 (four bytes a pixel, rows from the top), into the
+// caller's buffer of `capacity` bytes (at least the header's width x height x 4); false when the
+// file is refused, its data is corrupt or the buffer is too small (one too small is not written).
+bool decode_ktx2_rgba_into(const std::uint8_t* data, std::size_t size, std::uint8_t* output, std::size_t capacity);
+// The same, into a buffer of its own.
 std::optional<TranscodedLevel> decode_ktx2_rgba(const std::uint8_t* data, std::size_t size);
 
 }  // namespace redgem

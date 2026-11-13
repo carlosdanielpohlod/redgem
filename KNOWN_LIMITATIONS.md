@@ -72,7 +72,8 @@ the same pull request.
   arrays and cube maps, or KTX2 files that hold other formats than Basis data. KTX2 is
   transcoded on the main thread as the scene's textures are uploaded. The editor shows KTX2
   textures but cannot add one in the Inspector. Elsewhere (`UI.image`, particle and sky
-  pictures) a `.ktx2` file is only found when named with its extension, and is decoded to RGBA8.
+  pictures) a `.ktx2` file is decoded to RGBA8. A scene loads every image it lists, so the
+  plain fallback of a texture that shows its KTX2 picture is uploaded (and counted) too.
 - Point and spot lights cast shadows only when their object sets `cast_shadow = true`, at most
   four a frame (fewer under lower quality presets) and at most two of them point lights, each in
   512-texel tiles of one atlas: a large room lit by one point light gets coarse shadow edges, and

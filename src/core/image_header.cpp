@@ -102,11 +102,11 @@ std::optional<ImageHeader> read_header(const std::uint8_t* data, std::size_t siz
   if (const auto webp = webp_image_size(data, size)) return ImageHeader{*webp, EncodedImageFormat::Webp};
   return std::nullopt;
 }
+}  // namespace
+
 bool within_image_limits(ImageSize size) {
   return std::min(size.width, size.height) > 0 && std::max(size.width, size.height) <= kMaxImageSide;
 }
-
-}  // namespace
 
 std::optional<ImageSize> encoded_image_size(const std::uint8_t* data, std::size_t size) {
   const auto header = read_header(data, size);

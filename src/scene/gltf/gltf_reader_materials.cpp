@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/ktx2_header.hpp"
 #include "core/safe_path.hpp"
 #include "scene/gltf/extras_parser.hpp"
 #include "scene/props.hpp"
@@ -28,12 +29,23 @@ const char* image_extension(const cgltf_image& image) {
 }
 bool has_basisu_image(const cgltf_texture& texture) { return texture.has_basisu && texture.basisu_image != nullptr; }
 bool has_webp_image(const cgltf_texture& texture) { return texture.has_webp && texture.webp_image != nullptr; }
-// The picture a texture shows: its KTX2 one (KHR_texture_basisu) first, then its WebP one
-// (EXT_texture_webp), then its plain fallback.
-const cgltf_image* supported_image(const cgltf_texture& texture) {
-  if (has_basisu_image(texture)) return texture.basisu_image;
+// What a texture shows besides its KTX2 picture: its WebP one (EXT_texture_webp), or its plain one.
+const cgltf_image* fallback_image(const cgltf_texture& texture) {
   if (has_webp_image(texture)) return texture.webp_image;
   return texture.image;
+}
+
+// Whether the scene's image `image` (a number, perhaps kNoIndex) holds a KTX2 picture the engine reads.
+bool readable_ktx2(const std::vector<ImageData>& images, int image) {
+  if (!is_index_of(image, images.size())) return false;
+  const std::vector<std::uint8_t>& encoded = images[static_cast<std::size_t>(image)].encoded;
+  return read_ktx2_header(encoded.data(), encoded.size()).has_value();
+}
+
+// A texture shows its KTX2 picture (KHR_texture_basisu) when the engine reads it, or when it has
+// nothing else to show; otherwise its fallback, as the extension asks of a reader that cannot.
+bool shows_ktx2(const std::vector<ImageData>& images, int ktx2, const cgltf_texture& texture) {
+  return readable_ktx2(images, ktx2) || fallback_image(texture) == nullptr;
 }
 
 std::vector<std::uint8_t> embedded_bytes(const cgltf_buffer_view& view) {
@@ -121,7 +133,10 @@ void GltfReader::load_images() {
 
 int GltfReader::image_of(const cgltf_texture_view& view) const {
   if (view.texture == nullptr) return kNoIndex;
-  return index_of(supported_image(*view.texture), data_.images);
+  const cgltf_texture& texture = *view.texture;
+  const int ktx2 = index_of(has_basisu_image(texture) ? texture.basisu_image : nullptr, data_.images);
+  if (shows_ktx2(result_.scene.images, ktx2, texture)) return ktx2;
+  return index_of(fallback_image(texture), data_.images);
 }
 
 void GltfReader::read_pbr(const cgltf_material& material, MaterialDesc& out) const {

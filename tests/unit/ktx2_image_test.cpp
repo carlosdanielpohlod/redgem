@@ -1,6 +1,7 @@
 #include <doctest/doctest.h>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -11,6 +12,7 @@
 #include "core/ktx2_header.hpp"
 #include "core/ktx2_image.hpp"
 #include "core/safe_path.hpp"
+#include "editor/document/glb_images.hpp"
 #include "scene/gltf/gltf_budget.hpp"
 #include "scene/gltf/gltf_loader.hpp"
 #include "test_support.hpp"
@@ -48,6 +50,9 @@ constexpr std::uint8_t kCubeFaces = 6;
 constexpr std::uint8_t kTwo = 2;
 constexpr std::uint8_t kUnknownSupercompression = 3;
 constexpr std::uint8_t kTooManyLevels = kOpaqueLevels + 1;
+constexpr std::uint8_t kCanary = 0xda;
+constexpr int kFallbackImage = 0;
+constexpr int kKtx2Image = 1;
 
 std::vector<std::uint8_t> ktx2_bytes(const std::string& name) {
   const auto bytes = read_file_up_to(test::fixture("images/" + name + ".ktx2"), kMaxEncodedImageBytes);
@@ -220,6 +225,23 @@ TEST_CASE("files that are not KTX2 pictures the engine reads are not transcoded"
   CHECK_FALSE(decode_ktx2_rgba(png->data(), png->size()).has_value());
 }
 
+TEST_CASE("a KTX2 picture decodes into the caller's buffer only when it holds the whole picture") {
+  const auto opaque = ktx2_bytes(kOpaqueFixture);
+  const std::size_t bytes = std::size_t{kOpaqueWidth} * kOpaqueHeight * kRgbaBytes;
+  std::vector<std::uint8_t> output(bytes + 1, kCanary);
+  CHECK_FALSE(decode_ktx2_rgba_into(opaque.data(), opaque.size(), output.data(), bytes - 1));
+  CHECK(std::all_of(output.begin(), output.end(), [](std::uint8_t byte) { return byte == kCanary; }));
+  CHECK_FALSE(decode_ktx2_rgba_into(opaque.data(), opaque.size(), nullptr, bytes));
+  REQUIRE(decode_ktx2_rgba_into(opaque.data(), opaque.size(), output.data(), bytes));
+  CHECK(output.back() == kCanary);
+  CHECK(output.front() > kBright);  // the red top-left pixel
+}
+
+TEST_CASE("the editor carries KTX2 pictures in under their own mime type") {
+  CHECK(glb_images::mime_type_of(ktx2_bytes(kAlphaFixture)) == "image/ktx2");
+  CHECK(glb_images::mime_type_of(std::vector<std::uint8_t>(kLevelIndexAt, 0)).empty());
+}
+
 TEST_CASE("a KTX2 picture counts toward a scene's decoded memory as an RGBA8 one") {
   const auto opaque = ktx2_bytes(kOpaqueFixture);
   CHECK(gltf_budget::decoded_bytes({ImageData{opaque, ".ktx2"}}) ==
@@ -234,8 +256,28 @@ TEST_CASE("glTF KHR_texture_basisu shows its KTX2 picture over the plain fallbac
   const auto loaded = scene.load(doc);
   REQUIRE_MESSAGE(loaded.ok, loaded.error);
   REQUIRE(loaded.scene.materials.size() == 1);
-  CHECK(loaded.scene.materials[0].base_color_image == 1);
+  CHECK(loaded.scene.materials[0].base_color_image == kKtx2Image);
   REQUIRE(loaded.scene.images.size() == 2);
   CHECK(loaded.scene.images[1].file_extension == ".ktx2");
   CHECK(starts_as_ktx2(loaded.scene.images[1].encoded.data(), loaded.scene.images[1].encoded.size()));
+}
+
+TEST_CASE("a KTX2 picture the engine cannot read leaves the texture its fallback, when it has one") {
+  Ktx2Scene scene;
+  auto broken = ktx2_bytes(kAlphaFixture);
+  broken[kFaceCountAt] = kCubeFaces;
+  std::ofstream file(scene.folder / "picture.ktx2", std::ios::binary | std::ios::trunc);
+  file.write(reinterpret_cast<const char*>(broken.data()), static_cast<std::streamsize>(broken.size()));
+  file.close();
+  auto doc = basisu_scene();
+  int shown = kFallbackImage;
+  SUBCASE("with a plain fallback") {}
+  SUBCASE("with nothing else to show") {
+    doc["textures"][0].erase("source");
+    shown = kKtx2Image;
+  }
+  const auto loaded = scene.load(doc);
+  REQUIRE_MESSAGE(loaded.ok, loaded.error);
+  REQUIRE(loaded.scene.materials.size() == 1);
+  CHECK(loaded.scene.materials[0].base_color_image == shown);
 }

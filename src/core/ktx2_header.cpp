@@ -51,10 +51,6 @@ std::uint32_t full_chain(ImageSize size) {
   return levels;
 }
 
-bool within_limits(ImageSize size) {
-  return std::min(size.width, size.height) > 0 && std::max(size.width, size.height) <= kMaxImageSide;
-}
-
 // Whether the level of this index entry lies inside the file, with some data.
 bool level_inside(const std::uint8_t* entry, std::size_t size) {
   const std::uint64_t length = little_endian(entry + kLevelLengthAt, kU64Bytes);
@@ -91,7 +87,7 @@ bool drawable_kind(const std::uint8_t* data) { return one_basis_picture(data) &&
 bool within_file_limit(std::size_t size) { return size <= kMaxEncodedImageBytes; }
 
 bool plausible(const Ktx2Header& header) {
-  return within_limits(header.size) && header.levels <= full_chain(header.size);
+  return within_image_limits(header.size) && header.levels <= full_chain(header.size);
 }
 
 }  // namespace

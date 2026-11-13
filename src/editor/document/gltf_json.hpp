@@ -135,6 +135,7 @@ inline constexpr const char* kMimeType = "mimeType";
 inline constexpr const char* kPngMime = "image/png";
 inline constexpr const char* kJpegMime = "image/jpeg";
 inline constexpr const char* kWebpMime = "image/webp";
+inline constexpr const char* kKtx2Mime = "image/ktx2";  // (carried in when linked, never added)
 
 // What a document made here says about itself.
 inline constexpr const char* kGltfVersion = "2.0";
