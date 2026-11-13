@@ -202,6 +202,7 @@ struct Renderer::Impl {
   using GpuPrimitive = render_detail::GpuPrimitive;
   using ObjectPass = render_detail::ObjectPass;
   using ObjectSight = render_detail::ObjectSight;
+  using MorphLocations = render_detail::MorphLocations;
 
   // Shaders, and where the ones drawn with all frame long take their values.
   Shader shader{};
