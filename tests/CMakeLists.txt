@@ -81,6 +81,7 @@ add_executable(redgem_tests
   unit/inspector_typing_test.cpp
   unit/ui_widgets_test.cpp
   unit/editor_camera_test.cpp
+  unit/editor_preferences_test.cpp
   unit/gated_input_source_test.cpp
   unit/gizmo_test.cpp
   unit/scene_overlays_test.cpp

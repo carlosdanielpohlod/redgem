@@ -385,6 +385,7 @@ class EditorApp {
   unsigned int script_dock_ = 0;              // dock of the last focused script tab
   EditorPreferences preferences_;
   EditorPreferences edited_preferences_;
+  std::string preferences_error_;
   bool preferences_requested_ = false;
   EditorCamera camera_;
   GatedInputSource game_input_;

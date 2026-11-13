@@ -6,7 +6,7 @@
 
 #include "app/json_file.hpp"
 #include "core/platform.hpp"
-#include "storage/durable_file.hpp"
+#include "editor/recovery_lease.hpp"
 
 namespace redgem {
 namespace {
@@ -16,14 +16,11 @@ constexpr const char* kFly = "fly_speed";
 constexpr const char* kTranslate = "translate_snap";
 constexpr const char* kRotate = "rotate_snap";
 constexpr const char* kScale = "scale_snap";
-constexpr int kJsonIndent = 2;
 
 bool in_range(double value, float min, float max) { return std::isfinite(value) && value >= min && value <= max; }
 
-bool has_number(const nlohmann::json& json, const char* key) { return json.contains(key) && json.at(key).is_number(); }
-
 float number(const nlohmann::json& json, const char* key, float fallback, float min, float max) {
-  if (!has_number(json, key)) return fallback;
+  if (!holds_number(json, key)) return fallback;
   const auto value = json.at(key).get<double>();
   return in_range(value, min, max) ? static_cast<float>(value) : fallback;
 }
@@ -42,20 +39,54 @@ EditorPreferences read_editor_preferences(const std::filesystem::path& file) {
   return values;
 }
 
-static bool save_json(const std::filesystem::path& file, const nlohmann::json& json) {
-  std::error_code problem;
-  if (file.has_parent_path()) std::filesystem::create_directories(file.parent_path(), problem);
-  return !problem && durable::replace_file(file, json.dump(kJsonIndent) + "\n");
+namespace {
+
+bool valid_preferences(const EditorPreferences& values) {
+  return in_range(values.fly_speed, kMinFlySpeed, kMaxFlySpeed) &&
+         in_range(values.translate_snap, kMinSnapStep, kMaxSnapStep) &&
+         in_range(values.rotate_snap, kMinSnapStep, kMaxRotateSnap) &&
+         in_range(values.scale_snap, kMinSnapStep, kMaxSnapStep);
 }
 
-bool write_editor_preferences(const std::filesystem::path& file, const EditorPreferences& values, std::string& error) {
-  const nlohmann::json json{{kFly, values.fly_speed},
-                            {kTranslate, values.translate_snap},
-                            {kRotate, values.rotate_snap},
-                            {kScale, values.scale_snap}};
-  if (save_json(file, json)) return true;
-  error = "cannot write " + file.string();
+void merge_changes(nlohmann::json& json, const EditorPreferences& previous, const EditorPreferences& values) {
+  if (previous.fly_speed != values.fly_speed) json[kFly] = values.fly_speed;
+  if (previous.translate_snap != values.translate_snap) json[kTranslate] = values.translate_snap;
+  if (previous.rotate_snap != values.rotate_snap) json[kRotate] = values.rotate_snap;
+  if (previous.scale_snap != values.scale_snap) json[kScale] = values.scale_snap;
+}
+
+}  // namespace
+
+namespace {
+
+bool lock_preferences(const std::filesystem::path& file, RecoveryLease& lease, std::string& error) {
+  std::error_code problem;
+  if (file.has_parent_path()) std::filesystem::create_directories(file.parent_path(), problem);
+  if (problem) {
+    error = "cannot create " + file.parent_path().string() + ": " + problem.message();
+    return false;
+  }
+  auto lock = file;
+  lock += ".lock";
+  if (lease.acquire(lock) == RecoveryLease::Result::Acquired) return true;
+  error = "cannot lock " + file.string() + "; try saving again";
   return false;
+}
+
+}  // namespace
+
+bool write_editor_preferences(const std::filesystem::path& file, const EditorPreferences& previous,
+                              const EditorPreferences& values, std::string& error) {
+  if (!valid_preferences(values)) {
+    error = "Camera speed and snap steps must be finite and within their displayed ranges.";
+    return false;
+  }
+  RecoveryLease lease;
+  if (!lock_preferences(file, lease, error)) return false;
+  auto json = read_json_for_update(file, error);
+  if (!json) return false;
+  merge_changes(*json, previous, values);
+  return write_json_file(file, *json, error);
 }
 
 }  // namespace redgem

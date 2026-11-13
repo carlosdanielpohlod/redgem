@@ -2,7 +2,6 @@
 
 #include <imgui.h>
 
-#include "core/log.hpp"
 #include "core/translations.hpp"
 #include "editor/ui/dpi.hpp"
 #include "editor/ui/labels.hpp"
@@ -15,7 +14,8 @@ constexpr const char* kValueFormat = "%.2f";
 
 void preference_field(const char* key, float& value, float min, float max) {
   ImGui::SetNextItemWidth(ui::scaled(kFieldWidth));
-  ImGui::SliderFloat(tr(key), &value, min, max, kValueFormat, ImGuiSliderFlags_AlwaysClamp);
+  ImGui::SliderFloat(tr(key), &value, min, max, kValueFormat,
+                     ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic);
 }
 
 void draw_fields(EditorPreferences& values) {
@@ -34,12 +34,10 @@ void EditorApp::apply_preferences(const EditorPreferences& values) {
 }
 
 void EditorApp::save_preferences() {
-  std::string error;
-  if (!write_editor_preferences(editor_preferences_file(), edited_preferences_, error)) {
-    log::error(error);
-    return;
-  }
-  apply_preferences(edited_preferences_);
+  const auto file = editor_preferences_file();
+  preferences_error_.clear();
+  if (!write_editor_preferences(file, preferences_, edited_preferences_, preferences_error_)) return;
+  apply_preferences(read_editor_preferences(file));
   ImGui::CloseCurrentPopup();
 }
 
@@ -48,6 +46,7 @@ void EditorApp::draw_preferences_dialog() {
   if (preferences_requested_) {
     preferences_requested_ = false;
     edited_preferences_ = preferences_;
+    preferences_error_.clear();
     ImGui::OpenPopup(popup);
   }
   if (!ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
@@ -62,6 +61,7 @@ void EditorApp::draw_preferences_actions() {
   if (ImGui::Button(ui::save_label())) save_preferences();
   ImGui::SameLine();
   if (ImGui::Button(ui::cancel_label())) ImGui::CloseCurrentPopup();
+  if (!preferences_error_.empty()) ImGui::TextWrapped("%s", preferences_error_.c_str());
 }
 
 }  // namespace redgem

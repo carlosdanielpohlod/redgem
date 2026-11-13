@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core/math.hpp"
-#include "editor/editor_preferences.hpp"
+#include "editor/editor_config.hpp"
 #include "scene/scene_desc.hpp"
 
 namespace redgem {
@@ -51,7 +51,7 @@ class EditorCamera {
 
  private:
   Vec3 position_;
-  float fly_speed_ = kDefaultFlySpeed;
+  float fly_speed_ = editor_config::kDefaultFlySpeed;
   float yaw_degrees_ = 0.0f;    // 0 looks down -Z
   float pitch_degrees_ = 0.0f;  // positive looks up
 };
