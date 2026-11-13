@@ -191,6 +191,8 @@ until 1.0, a release may change what games rely on (see
 
 ### Fixed
 
+- **Android build staging** uses a private per-user cache. Existing folders next to the APK or AAB
+  stay intact, and interrupted builds are cleaned up by later builds.
 - **Adding a vehicle takes the physics locks in the order a step takes them**: the chassis's lock
   is released before the vehicle joins the simulation, so ThreadSanitizer no longer finds a
   lock-order inversion there and its suppression is gone (the ground for physics on several
