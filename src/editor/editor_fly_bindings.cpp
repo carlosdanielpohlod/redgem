@@ -43,18 +43,9 @@ void rebind_fly_key(FlyBindings& bindings, FlyDirection direction, Key key) {
 }
 
 std::string fly_key_label(Key key) {
-  switch (key) {
-    case Key::Right:
-      return tr("editor.preferences.key_right");
-    case Key::Left:
-      return tr("editor.preferences.key_left");
-    case Key::Down:
-      return tr("editor.preferences.key_down");
-    case Key::Up:
-      return tr("editor.preferences.key_up");
-    default:
-      break;
-  }
+  constexpr const char* kArrows[] = {"editor.preferences.key_right", "editor.preferences.key_left",
+                                     "editor.preferences.key_down", "editor.preferences.key_up"};
+  if (is_arrow(key)) return tr(kArrows[static_cast<int>(key) - static_cast<int>(Key::Right)]);
   auto name = key_name(key);
   if (!name.empty()) name.front() = static_cast<char>(std::toupper(static_cast<unsigned char>(name.front())));
   return name;

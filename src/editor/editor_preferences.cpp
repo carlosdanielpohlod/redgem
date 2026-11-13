@@ -6,6 +6,7 @@
 
 #include "app/json_file.hpp"
 #include "core/platform.hpp"
+#include "core/translations.hpp"
 #include "core/recovery_lease.hpp"
 
 namespace redgem {
@@ -99,18 +100,21 @@ bool lock_preferences(const std::filesystem::path& file, RecoveryLease& lease, s
   return false;
 }
 
+bool validate_preferences(const EditorPreferences& values, std::string& error) {
+  if (!valid_preferences(values)) {
+    error = tr("editor.preferences.invalid_motion");
+    return false;
+  }
+  if (valid_fly_bindings(values.fly_bindings)) return true;
+  error = tr("editor.preferences.invalid_keys");
+  return false;
+}
+
 }  // namespace
 
 bool write_editor_preferences(const std::filesystem::path& file, const EditorPreferences& previous,
                               const EditorPreferences& values, std::string& error) {
-  if (!valid_preferences(values)) {
-    error = "Camera speed and snap steps must be finite and within their displayed ranges.";
-    return false;
-  }
-  if (!valid_fly_bindings(values.fly_bindings)) {
-    error = "Camera movement needs six distinct letter or arrow keys.";
-    return false;
-  }
+  if (!validate_preferences(values, error)) return false;
   RecoveryLease lease;
   if (!lock_preferences(file, lease, error)) return false;
   auto json = read_json_for_update(file, error);
